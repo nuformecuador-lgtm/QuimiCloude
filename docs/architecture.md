@@ -84,15 +84,29 @@ del dominio.
    un **factor decimal exacto de cuatro decimales, mayor que cero** —1 litro = 1000 mililitros—,
    con derivacion de **un solo nivel**, y el modulo `unidades` publica la funcion que convierte.
    Efecto util: la derivacion **deduce la familia de la magnitud**, asi que convertir entre dos
-   unidades que no comparten base es un error, no un resultado. **Ningun consumidor la usa** aun:
-   inventario, recetas y pedidos siguen tratando la unidad como anotativa, y quien la estrene ira
-   en su propia ficha. QC-76 anade tambien el **ambito por empresa** (`company_id` opcional; sin
-   el, la unidad es de sistema y vale para todas), lo que **absorbio y cancelo QC-51**. Detalle y
-   las 30 decisiones cerradas en
+   unidades que no comparten base es un error, no un resultado.
+   **El PRIMER CONSUMIDOR es QC-63** (`ejecutar-receta-operador`), decidido el 2026-09-08 al
+   acotarla: la pantalla con la que el Operador ejecuta la receta de un pedido asignado deja
+   **cambiar la unidad en que se ven las cantidades** —la misma linea en litros o en mililitros—,
+   para no obligar a nadie a convertir de cabeza en planta. Cambia **solo como se ve**: no altera la receta ni el pedido y
+   no persiste nada, y solo se ofrecen unidades que **comparten base efectiva**. Inventario, recetas y
+   pedidos **siguen** tratando la unidad como anotativa. QC-76 anade tambien el **ambito por empresa**
+   (`company_id` opcional; sin el, la unidad es de sistema y vale para todas), lo que **absorbio y
+   cancelo QC-51**. Detalle y las 30 decisiones cerradas en
    `specs/QC-76-equivalencia-y-ambito-de-unidades/requirements.md`.
 2. **Trazabilidad por lote.** ¿Se rastrea lote/batch y fecha de vencimiento? En quimicos
    suele ser obligatorio por normativa, y retrofitear lotes sobre un inventario que solo
    guarda totales es de las migraciones mas dolorosas que existen.
+   **RESPONDIDA A MEDIAS, NO CERRADA (2026-09-10, al acotar QC-90).** La tabla
+   `product_batches` existe desde el 2026-09-09 -presentacion, existencia, costo unitario,
+   `lot` y `expiry_date`, los dos ultimos opcionales- y **QC-90** es quien empieza a
+   escribirla: el alta de producto crea su primer lote. Ademas se decidio que **manda el
+   lote**: `products.stock` se quita y la existencia pasa a ser la suma de los lotes, que es
+   **QC-91**, con **QC-92** para corregirla por ajuste. Lo que sigue ABIERTO es el resto de la
+   pregunta: **nada consume todavia** el lote ni el vencimiento -no hay pantalla que los liste,
+   ni consumo que elija de que lote sale lo que se despacha, ni aviso por vencer-, y esta sin
+   decidir que cuenta como lote vivo. Detalle en
+   `specs/QC-90-alta-del-primer-lote/requirements.md`.
 3. **Fichas de seguridad y clasificacion de peligro.** ¿El sistema debe almacenar FDS/SDS,
    clasificacion GHS, o restricciones de almacenamiento/transporte por incompatibilidad?
    Eso decide si hay gestion de archivos (Supabase Storage) y reglas de validacion.

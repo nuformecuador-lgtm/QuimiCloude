@@ -2575,3 +2575,560 @@ disco por las rutas largas de `pnpm` (`fatal: ... is not a working tree`). Remat
   en disco por las rutas largas de `pnpm`, y `rm -rf`/`Remove-Item` tampoco pudieron con él.
   Rematado con un **espejo `robocopy /MIR` desde un directorio vacío** y luego borrado, que sí
   vacía rutas de más de 260 caracteres. Sigue sin ficha, y ahora hay remedio conocido.
+
+## QC-70 — errores-centralizados (cerrada el 2026-09-10, PR #52, merge `192842a`)
+
+- Catálogo único y **cerrado** de 25 códigos de error con un mensaje cada uno, una sola
+  implementación del traductor, y los cinco módulos (inventario, pedidos, proveedores,
+  recetas, unidades) migrados a tomar de ahí código y mensaje. Los códigos se abrieron
+  **por caso concreto** —`not_found` significaba cinco cosas distintas—, y por eso la zona
+  fue `fullstack`: las siete pantallas que comparaban contra el código genérico se
+  actualizaron a la vez. Guardia ejecutable que da rojo si un módulo declara errores fuera
+  del catálogo.
+- Requisitos cubiertos: R1–R33, todos con test. 16 tasks. `reviewer` **APROBADO** en una
+  ronda (0 mayores, 6 menores). `./init.sh` completo en `== init OK ==`: 296 archivos de
+  test, 3777 casos, 18 skips, **0 rojos**.
+
+### El riesgo declarado se cumplió, y exactamente donde la ficha dijo
+
+La ficha traía anotado por adelantado el choque con **QC-39**: renombra `duplicate_name` y
+`not_found` de unidades, y como los archivos no existían en `dev`, «el merge sale limpio y
+falla EN PANTALLA, no en el gate». Ocurrió tal cual. `unit-form.tsx` repartía los errores
+por campo con `Record<string, …>` indexado por `duplicate_name`, renombrado aquí a
+`unit_duplicate_name`: el typecheck seguía verde y el mensaje «ya existe una unidad con ese
+nombre» se caía de junto al campo a la región genérica. **Un tipo abierto convirtió un
+renombrado en un fallo silencioso de UI.** Corregido al patrón `Partial<Record<ErrorCode,
+…>>` que la pantalla hermana ya usaba, con lo que ahora rompe la compilación.
+
+La lección general, que vale más que el arreglo: **la defensa contra un renombrado no es la
+disciplina, es el tipo cerrado**. En la segunda ronda de sincronización el barrido completo
+de `app/` y `components/` no encontró ningún caso más —los 17 `Record<string, …>` que
+existen no indexan códigos, y los 18 literales están todos con `: ErrorCode` o `satisfies
+ErrorCode`—, y la razón es estructural: al tipar el `code` de los siete adaptadores driving,
+el compilador cubre esos caminos. Se vio el efecto **invertido**: un caso entrado en `dev`
+(`order-form.test.tsx:664`) devolvía el genérico `not_found`, que ya no existe; en `dev`
+compilaba porque allí `code` era `string`, aquí fue error de tipos. Es para lo que se hizo.
+
+### Hicieron falta dos rondas de F2.3, y eso es dato
+
+`dev` se movió por debajo entre la primera sincronización y el push: la primera reconcilió
+unidades (choque con QC-39, PR #51), la segunda inventario y pedidos (5 conflictos nuevos
+de `419f01e`, `df259e7`, `5544a81`, `78a96f3`). Con `dev` recibiendo merges a este ritmo, una
+rama larga paga la sincronización más de una vez; el PR #52 estuvo en `CONFLICTING` con el
+gate ya verde.
+
+### Deuda que deja, con nombre y dueño
+
+- **El PR absorbió dos arreglos de typecheck que no son de esta ficha.** `419f01e` añadió
+  `stock` a `ProductRef` y `productStock` a `RecipeLineView` sin actualizar dos dobles de
+  `recetas`; no dieron conflicto —ninguna rama tocaba esos archivos— y reventaron el
+  typecheck. Se arreglaron porque bloqueaban, pero **viajan dentro de QC-70 sin ser de
+  QC-70**, y había cambios sin commitear sobre esos mismos archivos en el árbol principal.
+- **Se retiró un caso de test de R32.** `dev` quitó el selector de presentación del
+  formulario de producto, así que el caso no se podía conservar. Se verificó antes de
+  borrarlo que `presentation-select.tsx` sigue vivo en proveedores y que su caso
+  equivalente existe en `catalog-line-sheet.test.tsx`: no se pierde cobertura. **Es el
+  único punto de juicio real de la tanda.**
+- **Cinco entradas de `baseline-rojos.json` ya pasan**, cuatro gracias a esta rama. Nadie
+  tocó el archivo. Limpiarlo es decisión aparte.
+- **El flake de saturación de QC-58 volvió a aparecer**: 4 rojos de UI en una corrida
+  intermedia, 0 en la siguiente, 57/57 aislados en 46 s. No se baselineó porque esa clase
+  de decisión la tomó el humano la vez anterior.
+- **Séptima y octava guardia de alcance con el mismo defecto de diseño.** Dos guardias de
+  QC-39, con QC-39 ya en `dev`, acusaban a QC-70 de hacer justo lo que su spec le manda.
+  Se les aplicó el precedente ya sentado para QC-75/QC-65/QC-38 (centinela de rama de dos
+  señales y skip ruidoso fuera de ella). Van **siete** parcheadas una por una: el patrón
+  —una guardia que muerde a cualquier rama que toque su zona, no solo a la suya— es
+  material de `/afinar-regla`, no de una ficha más.
+- **Octava vez que `wt.sh done` falla en Windows**: desregistró el worktree pero dejó el
+  árbol en disco por las rutas largas de `pnpm`. Rematado con `rm -rf` + `git worktree
+  prune`, tras verificar que la punta de la rama era ancestro de `origin/dev`. Sigue sin
+  ficha.
+- **La base del worktree tenía sin aplicar la migración `product_batches`**: 12 suites de
+  integración caían con `Null constraint violation on (presentation_id)` hasta un
+  `prisma migrate deploy`. Es la quinta vez que el drift de base entre worktrees bloquea
+  una feature.
+
+**Desbloquea QC-71** (`identificador-de-request`), que dependía de esta: QC-70 dejó el hueco
+en la forma del error genérico y QC-71 lo rellena.
+
+## QC-78 — estado-de-cuenta-en-el-acceso (cerrada el 2026-09-10, PR #53, merge `752dc58`)
+
+- El estado que QC-65 persiste **manda de verdad**: solo `active` entra al login, y quien ya está
+  dentro sale en la siguiente pantalla que abra. **Sin columnas, sin enum, sin migración y sin
+  dependencias** (R26, R27): cambia *quién escribe y quién lee* `account_status`,
+  `failed_login_attempts`, `lock_level` y `locked_until`, que ya existían.
+- Requisitos cubiertos: **R1–R30**, todos con test. `reviewer` **APROBADO** (0 mayores, 7 menores)
+  con **9 mutaciones** aplicadas y revertidas.
+
+**Nació con 28 requisitos y cerró con 30, y esa es su historia.** El E2E de R28 (b) —el test
+titular, el que comprueba que quien pierde la cuenta sale— destapó un **bucle de redirecciones**:
+`Load cannot follow more than 20 redirections`. La cookie sigue viva y firmada, el borde no puede
+consultar la base (QC-9 R4, QC-75 R18) y devolvía a la zona privada, mientras el layout —que sí
+consulta— devolvía al login. **Quien se quedaba sin cuenta no acababa en el login: acababa en un
+error del navegador.**
+
+**El defecto era MÁS VIEJO que la ficha, y eso es lo más valioso que deja.** En `resolve-session.ts`
+el corte de QC-78 es el **sexto** de una lista donde ya estaban el de baja lógica (**QC-8 R11**) y
+el de empresa no viva (**QC-48 R15**). Los tres hacen `return null` y salen por el mismo `redirect`,
+así que **los tres lo producían desde que existen**. Nadie lo había visto porque **ningún E2E abría
+sesión y mataba la ficha después**. QC-78 no lo introdujo: lo hizo alcanzable por el único camino
+que existía para cubrirlo, y lo arregla para los tres.
+
+R29 y R30 se añadieron a mitad de F2.1 con aprobación humana. La salida elegida —**marca opaca** en
+la redirección, y la regla 3 del borde no dispara con ella— es la única que **no reabre ninguna
+decisión cerrada**: no borra la cookie, no consulta la base en el borde, no añade consultas (R21) y
+no depende de QC-23 (R22). Se descartaron las otras tres por escrito, cada una con el requisito
+contra el que chocaba. Un hallazgo del `spec_author` salvó la ampliación: `require-page-permission.ts`
+**también** hace `redirect(LOGIN_ROUTE)`, así que arreglar solo el layout habría dejado el bucle
+vivo por esa puerta con el E2E en verde.
+
+**Las decisiones de seguridad, heredadas y no reinventadas:** el estado se evalúa **después** del
+hash (R2), porque cortar antes sería un oráculo de tiempo (QC-7 R29); los tres estados no-`active`
+devuelven **la misma instancia** del rechazo genérico (R3); `pending` e `inactive` **no escriben
+nada** (R5, R6), a diferencia **deliberada** del corte por empresa de QC-48; y ninguna escritura
+puede dejar `blocked` con `locked_until` vacío (R15), que significaría «bloqueada por una persona» y
+no caducaría jamás.
+
+**Verificación:** `./init.sh` completo en `== init OK ==` con **299/299 archivos, 3885 tests y CERO
+rojos**; `e2e/session.spec.ts` **6 passed en Chromium y WebKit**, corrido **después** del merge con
+`dev` a propósito —la medición anterior era sobre código que el merge no tocó, pero «no lo tocó» es
+un argumento y no una corrida—.
+
+**El hallazgo de arnés que deja, y que ya no es teórico:**
+
+- **El primer `./init.sh` completo dio `== init OK ==` y era FALSO VERDE.** El único rojo estaba en
+  el baseline, pero **el caso que caía no era el que esa entrada documenta**: era `QC-64 R12`, la
+  guardia que impide que `lib/shared/routes.ts` gane constantes, **rota por T20 de esta misma
+  ficha**. Listar un archivo en `baseline-rojos.json` **lo apaga entero**, así que una regresión
+  introducida ese mismo día se declaró verde. La nota del baseline ya anunciaba el coste y el cierre
+  de QC-83 lo dejó como ficha pendiente; **ahora hay un caso medido**. Arreglada sin relajar la
+  aserción —sigue siendo igualdad exacta— y con la mordida demostrada por el leader (constante
+  ficticia → rojo → revertida → 25/25). Ese archivo llevaba apagado desde el 2026-09-04.
+  **Ficha de arnés: el comparador debería poder ignorar CASOS, no archivos.**
+- **Es también la prueba de por qué el gate completo lo corre el leader**: un subagente habría leído
+  «sin rojos nuevos, todos en el baseline» y habría abierto el PR.
+
+**Dos cosas más que quedan dichas:**
+
+- **R30 (b) prometía más de lo que el código cumple** y se acotó el texto por decisión humana. La
+  marca **puede** acabar en el destino de vuelta si el propio usuario se escribe la URL; es inerte
+  **solo porque nadie la lee fuera de la regla del login**. Quedó escrito como **condición de
+  seguridad**: quien conecte alguna vez la marca a un aviso visible abre un vector de terceros por
+  enlace y tiene que volver al requisito primero.
+- **T16 no se marcó.** Pedía `--rapido` por tanda y el leader corrió el gate **completo** dos veces:
+  cubre más, pero no es lo que la task decía.
+
+**El implementer murió por límite de sesión** tras commitear la guardia y antes de documentarla; el
+árbol quedó limpio y el leader escribió esa entrada y demostró la mordida. **Novena vez que `wt.sh
+done` falla en Windows** —desregistra el worktree y deja el árbol por las rutas largas de `pnpm`—,
+rematado con `rm -rf` + `git worktree prune`. Van nueve y **sigue sin ficha**.
+
+## QC-66 — crud-de-usuarios (cerrada el 2026-09-11, PR #56, merge `35acbdd`)
+
+**Zona `backend`, `complexity: medium`, 49 requisitos EARS, todos con test.** Crear, consultar,
+editar, listar, borrar lógicamente y mover el estado de una cuenta entre sus cuatro valores. La
+pantalla va aparte (QC-67).
+
+**La ficha que no da acceso a nadie, a propósito.** La contraseña la genera el sistema al azar, se
+guarda transformada y **no se muestra ni se devuelve en ninguna respuesta**: quien entra es quien la
+establece por el enlace de QC-79. El usuario nace `pending` y con la marca de cambiarla al primer
+acceso. Es una consecuencia aceptada por escrito al acotar, no un olvido de diseño.
+
+**Lo que trajo además del CRUD:** dos permisos nuevos —`usuarios.consultar` y `usuarios.modificar`—
+que llevan el catálogo cerrado de once a trece, con su migración y su seed al rol Administrador; el
+borrado lógico con `deleted_at`, que libera correo, usuario y documento para otra persona de la misma
+empresa; y el listado **abierto de nacimiento** —paginado 10/25, búsqueda, filtro por estado y orden—
+para que la pantalla no tenga que reabrir la firma después.
+
+**Dos guardas que son de negocio y no de validación:** el administrador no puede cambiar su propio
+estado ni su propio rol ni borrarse, y ninguna operación puede dejar a la empresa sin al menos un
+administrador en `active`. Y el actor **no se ve a sí mismo**: ni en el listado ni pidiendo su ficha
+por identificador.
+
+**El `reviewer` rechazó en primera ronda y aprobó en segunda.** MAYOR-1 se cerró **verificado con
+sondas, no por lectura**: rango sin resolver → 6 rojos; rama ajena o diff vacío → 5 `skipped` con el
+motivo impreso; rama propia → 16 en verde. Once de los dieciséis casos muerden para siempre. R46 se
+queda sin guardia de contenido en `dev` **a conciencia**: una ahí bloquearía a QC-67.
+
+**La deuda que deja, y es una decisión humana, no un pendiente técnico.** Cuando un administrador
+mueve una cuenta de `blocked` a `active`, **no se limpia `locked_until`**, así que el desbloqueo
+manual no surte efecto: la cuenta se vuelve a bloquear sola. Lo vieron por separado el `implementer`
+y el `reviewer` (**MAYOR-2**). No lo introduce este código y **QC-66 no puede repararlo sin violar su
+propia R45**, que es spec aprobado; QC-78 ya publicó el mecanismo (`clearedLockState()`) que nadie
+llama. Queda anotado en `progress/current.md > Deudas` con las tres salidas posibles, y **QC-67 no
+debería ofrecer «desbloquear» hasta que se decida**.
+
+**Verificación:** `./init.sh` completo en `== init OK ==` — **310 archivos, 4135 tests, cero rojos**.
+Sincronizada dos veces con `dev` (QC-70 y QC-78 dentro): 55 archivos, +13650/−549. `identity` entró
+al catálogo único de errores de QC-70 y `NotFoundError` pasó a `UserNotFoundError` en el camino.
+
+**Menor que se recoge quien toque ese archivo:** `birth-date.ts` estaba contado pero no vigilado por
+las listas de contenido; se arregló en `5137f62`.
+
+## QC-90 — alta-del-primer-lote (cerrada el 2026-09-11, PR #54, merge `13fc41c`)
+
+**Zona `fullstack`, `complexity: medium`, 32 requisitos EARS, 15 tasks, todos los requisitos con
+test.** El alta de un producto crea además su primer lote en `product_batches` con lo que se escribe
+en el mismo panel: presentación (obligatoria), costo, lote y fecha de expiración. Si el nombre
+corresponde a un producto que ya existe, **no se crea otro producto: se le agrega el lote**.
+
+**No se partió en backend + frontend pese a ser `fullstack`** (F1.0 lo pide). El front ya estaba
+construido y verificado —sin commitear— y lo que le quedaba era que los cinco campos viajaran y
+alinear el costo a `> 0`; partirlo habría dejado una ficha de front de dos líneas esperando a la
+otra. Mismo criterio que QC-70.
+
+**Las decisiones que cambian el comportamiento, todas cerradas al acotar:** basta con uno de los dos
+costos —si solo viene el total, el unitario se deriva como `total / existencia` a 4 decimales, con
+`BigInt` y sin dependencia nueva—; con existencia 0 o vacía y solo costo total **el alta se rechaza**
+pidiendo existencia ≥ 1, porque no hay unitario posible y la columna es `NOT NULL` con `CHECK > 0`;
+el alta **siempre** crea lote, aunque lote y vencimiento sean opcionales; y la existencia se escribe
+en el lote **y sigue escribiéndose en el producto**, transitoriamente, hasta QC-91.
+
+**La consecuencia aceptada a conciencia:** mientras QC-91 no exista, agregar un lote a un producto
+que ya existe **no cambia la existencia de ese producto**.
+
+**El `reviewer` rechazó en primera ronda por un objetivo táctil de 24×24 px** en
+`presentation-select.tsx`, y la decisión humana fue **cumplir la regla en vez de declarar la
+excepción** — la salida más cara de las dos: se arregló también `ProductField`, que estaba **exento
+por alcance**, y en los dos casos crece el `<button>` de verdad (`min-h-11 min-w-11` con `shrink-0`),
+no un pseudo-elemento ni un margen negativo. Con tests que muerden.
+
+**Verificación:** `./init.sh` completo en verde tras sincronizar con `dev` —que traía QC-78 entera,
+47 archivos—: **306 archivos, 3973 tests, 0 rojos**. E2E (R32) en **Chromium y WebKit**, y comprueba
+el costo derivado **contra la base, no contra la pantalla**. Sin dependencias nuevas, sin columnas,
+sin migración.
+
+**Lo que queda abierto y esta ficha no cierra:** las tres preguntas del `requirements.md` —moneda del
+costo, trazabilidad por lote a medias (se *guardan* lote y vencimiento, pero **nada los consume**) y
+qué pasa con el lote de un producto borrado—; la carrera del alta de un nombre nuevo, que es el
+comportamiento de hoy y pide índice único, o sea migración, o sea **QC-81**; y el aislamiento por
+empresa, que es **QC-49**.
+
+**Ficha nacida de la revisión: QC-93** — tres casos E2E de permisos cuya premisa derogó QC-75; uno
+rojo confirmado, dos por comprobar. No enrojecen `./init.sh`, que no corre Playwright.
+
+**Dos cosas del cierre que valen como hallazgo de arnés:**
+
+- **La guarda 3 de `wt.sh done` salvó trabajo real.** Al desmontar, el worktree estaba sucio: la
+  **segunda ronda completa del `reviewer`** (+124 líneas de
+  `progress/review_QC-90-alta-del-primer-lote.md`) vivía solo ahí y **nunca entró al PR**. Se rescató
+  al árbol principal antes de borrar nada. Es exactamente el caso de los 133 archivos que documenta
+  `docs/worktrees.md`, esta vez con la guarda puesta.
+- **Décima vez que `wt.sh done` falla en Windows** —desregistra el worktree y deja el árbol en disco
+  por las rutas largas de `pnpm`—, en las dos fichas de este cierre. Rematado con `rm -rf`. Van diez
+  y **sigue sin ficha**.
+
+## QC-71 — identificador-de-request (cerrada el 2026-09-11, PR #55, merge `398dfd6`)
+
+Cada petición lleva un identificador propio, generado en el middleware, que viaja hasta la capa
+que atrapa los errores y se escribe **solo cuando hay error**. El error inesperado —el genérico de
+QC-70— lo lleva de vuelta al navegador, para que quien reporta un fallo pueda decir cuál buscar.
+El mensaje sigue siendo neutro y el detalle interno sigue sin salir.
+
+21 requisitos EARS, 11 tasks, 91 archivos (+6615 / -774). Sin dependencia nueva:
+`crypto.randomUUID()` es global en los dos runtimes.
+
+Gate `./init.sh` completo en verde antes del merge: 323/323 archivos, 4336 tests, cero rojos.
+
+### El PR estuvo en conflicto sin que hubiera nada que resolver
+
+El PR #55 figuró `CONFLICTING` en `product-form.tsx` y `lib/composition/index.ts`. No era trabajo
+pendiente: la **rama publicada** iba 29 commits detrás de `dev`, mientras que la local ya traía el
+merge con `origin/dev` (`6226490`) y daba 0 atrás. Los conflictos vivían solo en GitHub, contra un
+estado de la rama que en disco ya no existía. Se arreglaron **empujando**, sin editar una línea.
+
+**Lo aprovechable:** al ver `CONFLICTING` en un PR, comparar primero la rama PUBLICADA con la base
+(`git rev-list --left-right --count origin/<rama>...origin/dev`) antes de abrir ningún archivo. Si
+la local está 0 atrás, no hay conflicto que resolver — hay un push que falta.
+
+### La base compartida estaba atrasada respecto de `dev`, y el gate fue quien lo dijo
+
+El gate cayó con dos rojos de integración de identity. No eran de esta ficha: a la base
+`QuimiCloude` le faltaba `20260910120000_user_permissions_catalog`, la migración del catálogo de
+permisos de QC-66, ya mergeada en `dev` por el PR #56. El propio test lo decía con todas las
+letras. Aplicada con `migrate deploy` —de datos, idempotente, con `down.sql`—; los dos a verde.
+
+**No era un parche para este PR:** cualquiera que corriera integración contra `dev` se comía el
+mismo rojo. **Y la causa de fondo sigue abierta:** el worktree de QC-71 apuntaba a la base
+**compartida** `QuimiCloude`, no a una propia como hizo QC-90 con `QuimiCloude_QC90`. Ninguno de
+los otros worktrees tiene `.env` siquiera. `docs/worktrees.md` **no dice nada** sobre la base por
+feature: la convención existe en la práctica y no está escrita. Material de `/afinar-regla`.
+
+### Un flake, descartado con evidencia en vez de con baseline
+
+`tests/unit/inventario/product-page.test.tsx` cayó en una corrida completa. **No se dio por bueno a
+la ligera, porque esta ficha SÍ toca ese archivo**: se comprobó que el caso que cae es de un error
+**catalogado** (`unauthorized`) —la mitad que QC-71 deja intacta, ya que el identificador solo viaja
+en el inesperado—, que la ficha solo **suma** casos ahí (128 líneas, cero borrados), que el fallo
+fue **expiración de `waitFor`** y no aserción fallida, y que pasa aislado 42/42. La tercera corrida
+salió limpia. Es el flake de saturación de QC-58.
+
+**No se añadió al baseline**, y la decisión es deliberada: una caída única no es deuda persistente,
+y listarlo apagaría el archivo entero —sus 42 casos— para el comparador.
+
+### Deuda que deja, con nombre y dueño
+
+- **El gate avisa que 5 archivos del baseline ya pasan** y toca limpiarlos:
+  `tests/integration/inventario/product-crud.int.test.ts`, los dos de recetas
+  (`recipe-route-contract`, `module-contract`) y los dos de unidades (`modulo-intacto`,
+  `unidades-convenciones`). Sin ficha todavía.
+- **Undécima vez que `wt.sh done` falla en Windows**: desregistró el worktree y dejó el árbol en
+  disco. Rematado con `rm -rf` tras verificar que la rama estaba íntegra en `origin/dev` y sin
+  commits sin publicar. Van once y **sigue sin ficha**.
+- **`docs/jira.md` miente sobre el nombre de la columna**: dice *Hecho* para `done`, y el board real
+  usa **Finalizado** (transición `41`). Corregir el documento o la columna, pero que coincidan.
+
+## QC-94 — consulta-de-roles: CERRADA el 2026-09-11 (PR #57, merge `5e84433`)
+
+**Nació el mismo día en que se cerró**, al acotar QC-67 con `/afinar-feature`: el formulario de usuarios
+exige un `roleId` UUID desde QC-66 y **no había ninguna forma de saber qué roles existen** ni qué
+identificador tiene cada uno — el módulo solo exportaba los nombres del seed. La pantalla habría
+llegado al `spec_author` con un selector imposible de pintar.
+
+**R1–R21, todos con test.** Consulta de solo lectura que devuelve `id` y `name` ordenados por nombre
+**en la base**, autorizada en el service como primera línea con `usuarios.consultar` **o**
+`usuarios.modificar` —QC-74 decidió que uno no implica al otro, y las dos mitades de la pantalla
+necesitan el selector—. Sin migración, sin dependencia y sin permiso nuevo: el catálogo sigue en trece.
+`reviewer` **APROBADO en primera ronda**, 0 mayores y 4 menores. `./init.sh` completo sobre el árbol ya
+sincronizado: **329 archivos, 4423 verdes, 0 rojos nuevos**.
+
+**El catálogo de roles es GLOBAL, y la acotación lo descubrió a tiempo.** La primera redacción de la
+ficha —escrita el mismo día— decía «los roles de la empresa de la sesión», y `db/schema.prisma` lo
+desmiente: `Role` no tiene columna de empresa y su `name` es único en toda la tabla. El board se
+corrigió **antes** de sembrar el spec, que es el orden que `docs/jira.md` exige.
+
+**Tres cosas que dejó dichas y que valen para la próxima ficha:**
+
+1. **Cero conflictos de merge no es cero trabajo.** El merge de `dev` entró limpio, pero QC-71 había
+   cambiado la firma de `createErrorStateTranslator` y migrado los **ocho** adaptadores driving que
+   existían entonces; `role-actions.ts` nació después y en paralelo, así que era el **noveno** y no
+   estaba en esa lista. Lo cazó el `typecheck` en F2.3, no el merge. Ningún merge ve un desajuste
+   semántico, y por eso F2.3 es un paso propio y no un trámite.
+2. **Una sola base local para todos los worktrees es un punto de fricción entre sesiones.** 61 tests de
+   integración de `proveedores`, `unidades`, `recetas` e `inventario` salieron rojos por
+   `20260911120000_presentation_unit`, migración de la rama **QC-80** de otra sesión **que no está en
+   `dev`** y que quita `products.unit_id`. No era la base atrasada —el primer diagnóstico, falso— sino
+   **adelantada con trabajo ajeno**. Se resolvió dándole a esta feature su propia base
+   `QuimiCloude_QC94`; revertir la compartida habría roto a la sesión de QC-80. Es exactamente lo que
+   **QC-77** existe para arreglar de raíz, y sigue en `pending`.
+3. **Un worktree nuevo no está listo para el gate.** Le faltan `node_modules`, el cliente de Prisma y
+   los tipos de ruta de Next, y `init.sh` solo instala si no hay `node_modules`. Además, un
+   `./init.sh --rapido | tail` devuelve el código de salida del `tail`: el primer «verde» de esta
+   sesión fue falso por eso.
+
+## QC-80 — unidad-desde-la-presentacion (2026-09-11)
+
+`fullstack`, `medium`. PR **#58** mergeado en `dev` (merge `f783e06`). 28 requisitos EARS, 15 tasks,
+`./init.sh` completo en verde antes del PR: **4498 tests, 0 rojos**. Worktree desmontado y base local
+propia `QuimiCloude_QC80` eliminada.
+
+`presentations` gana `unit_id` **NOT NULL** con FK a `units` y `products` pierde la suya. El selector de
+unidad de la línea de receta deja de leer la del producto: se acota por la presentación del **lote más
+reciente**. El backfill deja las presentaciones existentes en **kilogramo** y no borra ninguna fila.
+
+**Cinco cosas que dejó dichas y que valen para la próxima ficha:**
+
+1. **Una `description` de hace tres días puede estar mintiendo.** La ficha decía que el producto hereda
+   la presentación «de la suya», y **QC-90 la había mudado a `product_batches`** dos días antes. La
+   acotación lo detectó y el board se corrigió **antes** de sembrar el spec. Una ficha escrita antes que
+   otra que ya se mergeó no es una ficha vigente: es una hipótesis.
+2. **Una pregunta abierta se cierra con datos, no con criterio.** «¿Con qué unidad se rellenan las 114
+   presentaciones?» sonaba a decisión de negocio cara. Consultada la base: **113 eran residuo de tests**
+   sin ningún lote que las referenciara y la única real era «Bolsa 5 KG». La decisión se volvió trivial.
+3. **Pasar aislado NO es prueba de inocencia.** `product-page.test.tsx` pasaba 44/44 solo y fallaba 8
+   casos en lote, dos corridas seguidas. Se dio por flake de saturación —mal— hasta que se corrió el
+   proyecto `ui` **en `dev` sin la rama**: 73/73 en verde. Ahí quedó demostrado que el rojo era propio.
+   La comparación contra `dev` es la que decide, no la repetición.
+4. **QC-58 arregló medio problema y nadie lo vio durante nueve días.** Subió `testTimeout` de 5 s a 15 s,
+   pero **`findBy*` y `waitFor` no miran `testTimeout`**: miran `asyncUtilTimeout`, que seguía en su
+   defecto de **1000 ms**. La firma engañaba —`Unable to find an element` con los 15 s del test
+   intactos—: quien se rendía era la consulta, no el test. Fijado en 5 s, por debajo de los 15 s del
+   test a propósito, para que el fallo lo reporte la consulta diciendo qué buscaba. El agujero sigue en
+   `dev`, latente: allí no se ve porque el proyecto `ui` corre más rápido y no llega al límite.
+5. **El ruido de fin de línea puede ser el 86 % de un PR.** 53 archivos se guardaron en CRLF sobre un
+   repo en LF: el diff eran 22.759/20.563 líneas y el cambio real 3.264/1.068. Además enmascaró un
+   conflicto: `presentation-form.tsx` salía como conflicto de archivo entero, y solo al normalizarlo
+   aparecieron los dos reales que escondía.
+
+**Un camino de alta que ningún test veía.** `components/shared/presentation-select.tsx` —el alta
+embebida que usan proveedores y producto— llamaba al esquema sin unidad y no llegaba nunca a la Server
+Action. Era un incumplimiento real de R11 que el `tasks.md` no preveía, y lo destapó la implementación,
+no la revisión.
+
+## QC-86 — modelo-de-asignacion-de-pedidos: CERRADA el 2026-09-11 (PR #59, merge `30c06c7`)
+
+Acotada, especificada, implementada, revisada y mergeada **en el mismo día**. Entra el módulo nuevo
+`asignaciones` con la tabla `OrderAssignment` —FK compuestas por empresa, `CHECK` y RLS—, su
+migración con `down.sql` **verificada aplicando, revirtiendo y reaplicando tres veces con diff
+vacío**, y los dos permisos en el catálogo y en el seed: `asignaciones.consultar` (con el que nace
+el Operador) y `asignaciones.modificar`. El catálogo pasa de **13 a 15** permisos y el seed de **14
+a 17** asignaciones. 37 requisitos EARS, los 37 con test. `reviewer` **APROBADO a la primera**: 0
+mayores, 5 menores, 22 mutaciones probadas.
+
+**Lo que NO entra, a propósito**: ningún caso de uso, service, Server Action ni pantalla. El corte
+de autorización es de **QC-87** y **QC-88**, y un test lo vigila **en negativo** para que nadie lo
+adelante por accidente. Mismo límite con el que se cerraron QC-47 y QC-83.
+
+**Desbloquea QC-88** del todo y **QC-87** a medias (le falta además QC-84). Con QC-88 se destraba
+**QC-63**, que es la ficha que originó las seis.
+
+### Las tres lecciones, que valen más que la feature
+
+**1. El universo de la familia «tests que miden la rama contra git» no es «listas blancas»: son los
+18 tests que consultan git, y hay que barrerlos todos.** Se tocaron **diez** tests ajenos en tres
+familias. Dos no estaban en el `tasks.md`: `guard-nav-permisos-declarados` (afirma el **tamaño** del
+catálogo, y el spec listó cinco archivos de esa clase cuando eran seis) e `inventario-schema` (afirma
+el **vacío** sobre `db/migrations/`, y por eso el grep de `origin/dev...` no lo trajo — usa
+`merge-base`). **En los diez el criterio fue subir el número o nombrar la excepción, nunca relajar la
+aserción**; donde hizo falta una excepción, se añadió además una aserción con una carpeta intrusa
+sintética que demuestra que el filtro no se la traga.
+
+**2. La base propia evita el drift entrante, pero HAY QUE MIGRARLA DESPUÉS DE CADA MERGE.** La base
+`QuimiCloude_QC86` nos salvó del drift que sí bloqueó a QC-94 —cuyos rojos de integración no eran
+«la base atrasada» sino una migración de **QC-80**, rama ajena sin mergear, aplicada sobre la base
+compartida—. Pero tras el segundo merge el gate cayó con **13 archivos de integración** y `The column
+'existe' does not exist`: faltaba aplicar `20260911120000_presentation_unit`. **`AGENTS.md > F2.3` no
+tiene ese paso**: habla de resolver conflictos y pushear, no de poner la base al día. Es ficha de
+arnés.
+
+**3. El flake de `product-page.test.tsx` NO era saturación, y el baseline se usó mal.** El leader lo
+metió al baseline el 2026-09-11 por decisión humana, con la evidencia de que caía en `dev` limpio y
+con un número distinto de casos en cada corrida. **QC-80 encontró la causa real y la entrada se
+retiró en el mismo día**: `QC-58` subió `testTimeout` a 15 s, pero `findBy*` y `waitFor` no lo miran
+—miran `asyncUtilTimeout`, que seguía en **1000 ms**—. El elemento sí se renderizaba; quien se rendía
+era la consulta. Con el plazo arreglado el archivo pasa **44/44** y la corrida del proyecto `ui` es
+**casi el doble de rápida**. La lección no es «el baseline está mal», es que **una firma de
+expiración bajo carga puede ser un hueco del arnés, y conviene buscar la causa antes de declarar
+deuda ajena**.
+
+### Dos decisiones del humano que quedaron escritas con su precio
+
+- **Doble origen: gana el primero.** Si la misma persona llega suelta y dentro de un grupo, el pedido
+  guarda **un solo origen**. El precio está en la tabla: el pedido no sabrá que también venía de otro
+  grupo, y quitar ese grupo se la lleva. Se eligió a sabiendas frente a guardar todos los orígenes.
+- **La coherencia de empresa no alcanza al pedido.** `orders` **no tiene `company_id`** —el
+  multi-empresa es la épica **QC-46**—, así que la guarda que QC-83 puso en la BASE aquí solo cierra
+  **persona ↔ grupo ↔ fila**. Escrito como límite, no descubierto implementando.
+
+### Deuda que deja, con nombre y dueño
+
+- **Dos preguntas abiertas, las dos de QC-87**: si volver a aplicar un grupo refresca la lista de
+  responsables, y qué estados de pedido admiten asignación.
+- **Un comentario del `migration.sql` dice «los CUATRO INSERT» y hay tres sentencias.** No se corrige
+  porque editar el SQL de una migración aplicada invalida su checksum; lo arregla la ficha que vuelva
+  a tocar ese archivo, si la hay.
+- **Dos migraciones comparten el sello `20260911120000`** (`order_assignments` y `presentation_unit`).
+  **Medido, no razonado**: Prisma ordena por el nombre completo de la carpeta, así que desempata el
+  sufijo; se aplicaron desde cero sobre una base vacía y las dos entran, en ese orden, y son
+  disjuntas. Feo, inocuo.
+- **Décima vez que `wt.sh done` falla en Windows**: desregistró el worktree pero dejó el árbol en
+  disco. Rematado con el remedio que sí funciona —espejar un directorio vacío con `robocopy /MIR` y
+  borrar—. Sigue sin ficha de arnés.
+- **`progress/current.md` se lo llevó por delante otra sesión** mientras corría el gate: la fila de
+  QC-86 y su entrada en *Evaluaciones* desaparecieron y hubo que reescribirlas. Con tres o cuatro
+  sesiones de leader concurrentes, **quien reescriba el archivo entero pisa a las demás**. Ficha de
+  arnés; `feature_list.json` no lo sufre porque ahí se edita quirúrgicamente.
+
+## QC-67 — pantalla-de-usuarios: CERRADA el 2026-09-11 (PR #60, merge `46fc293`)
+
+La pantalla de administración de usuarios en `configuracion/usuarios`, sobre la tabla compartida:
+listado con búsqueda, filtro por estado y orden; alta y edición en panel lateral; borrado con
+confirmación; y el cambio de estado de cuenta entre sus cuatro valores. **Sin backend propio**:
+consume las seis Server Actions de QC-66 y la consulta de roles de QC-94.
+
+**R1–R42 con test, 45 tasks, `reviewer` APROBADO sin bloqueantes**, gate completo certificado por el
+leader (353 archivos, ~4880 tests, 0 rojos). Sin dependencia, sin migración y sin permiso nuevo. Los
+**dos cortes de permiso** quedan operativos y no se sustituyen: `usuarios.consultar` para entrar,
+`usuarios.modificar` para que aparezcan las acciones de escritura; la UI **oculta, no autoriza**. La
+**E2E que QC-66 difirió aquí con motivo** queda cerrada.
+
+De los 6 menores del `reviewer`: uno se arregló aquí —un aserto condicionado que un renombrado habría
+apagado en silencio, y se demostró que muerde con una sonda revertida—, cuatro salieron a **QC-97** y
+el quinto sigue como deuda anotada.
+
+**La ficha nació el mismo día que se cerró**, y su acotación destapó dos fichas antes de escribir una
+línea de código: **QC-94** (la consulta de roles que faltaba, hecha y mergeada el mismo día) y **QC-95**
+(el desbloqueo que limpia el contador). Acotar antes de especificar se pagó solo.
+
+**Cuatro cosas que costaron tiempo y no se repiten gratis:**
+
+1. **Dos sincronizaciones con `dev`, ninguna con conflictos de texto, las dos con trabajo real.** La
+   primera destapó que los centinelas de la ficha comparaban contra un **SHA congelado** y acusaban a
+   QC-67 de abrir `db/` con lo que traía el merge; se arregló **contra qué se compara** (`merge-base`)
+   sin tocar **qué se exige**. La segunda verificó el significado de tres listas cerradas y descubrió
+   que un ancla que yo daba por subida **no debía subir**: QC-86 no añadió enlace de menú, su octavo
+   `testId` era un grupo. Verificar contra la fuente, incluso cuando la suposición viene del leader.
+2. **El leader se equivocó y el implementer lo corrigió midiendo.** Un gate con `transform` de 473 s
+   frente a los 51 s de `dev` me hizo sospechar del grafo de imports de la ficha. Era **carga de
+   máquina**: seis gates suyos entre 44 s y 132 s, su página transformando en 647 ms frente a los
+   710 ms del precedente, y la imposibilidad estructural de que 74 líneas en tres archivos hoja afecten
+   a `lib/composition`, que no importa nada de `app/`. **No tocó nada** mientras la causa no estuvo
+   clara: ni el timeout ajeno, ni el baseline. Meter en el baseline algo que **no falla en `dev`**
+   habría sido registrar una mentira.
+3. **Un `git init` accidental en `C:UsersCristian`** (hoy 12:41, cero commits) puso en rojo
+   `guard-validador-ve-worktrees-hermanos`: el validador resuelve la raíz desde el directorio actual y
+   creía que el proyecto era el directorio personal. Borrado con permiso; la guardia volvió a verde
+   **sola**. Riesgo mayor que la guardia: un `git add -A` desde ahí habría indexado el perfil entero.
+4. **La base compartida, otra vez.** La feature nació con base propia `QuimiCloude_QC67` desde el
+   arranque, y por eso fue la única del día que no perdió un gate por trabajo ajeno.
+
+## QC-84 — crud-de-grupos-de-trabajo: CERRADA el 2026-09-12 (PR #62, merge `ebf97df`)
+
+Los **siete casos de uso** de un grupo de trabajo en `identity` —crear, listar, ver miembros,
+renombrar, meter, sacar y dar de baja—, con la autorización en el service y el listado de miembros
+paginado. **54 requisitos, los 54 con test.** `reviewer` **APROBADO a la primera**: 0 bloqueantes,
+0 mayores, 5 menores, 6 mutaciones probadas. `./init.sh` completo en `== init OK ==` **a la
+primera**, que no había pasado en las dos fichas anteriores.
+
+**Lo que NO entra, y es un límite medido, no un olvido**: ninguna migración, ningún cambio de
+`db/schema.prisma` y **ningún permiso nuevo**. El modelo es de QC-83 y el catálogo se queda en
+**quince** entradas.
+
+### Las dos decisiones del humano que fueron contra la recomendación, y su precio
+
+Las dos se tomaron sabiendo el coste, escrito en la tabla **antes** de implementar:
+
+- **Se reusan `usuarios.*` en vez de crear `grupos.*`.** Ahorra dos permisos y no hay tests del
+  número exacto que retensar. **Precio**: nadie puede gestionar turnos sin poder dar de alta y de
+  baja usuarios.
+- **El listado de miembros muestra solo cuentas `active`.** **Precio, y es el reporte de «esto está
+  roto» más probable de la ficha**: un usuario recién creado nace `pending` (QC-66 dec. 7) y **no
+  aparece en sus grupos** hasta que entra por primera vez y cambia la contraseña; una cuenta
+  bloqueada media hora desaparece del grupo y vuelve sola. Ambos con test que **cae al mutar**.
+
+La paginación de miembros la cerró el humano **al aprobar el spec** (F1.4): entró como decisión 18
+y como **R51–R54**, al final y **sin renumerar nada** (precedente de QC-33). Se pagina **en el caso
+de uso, después del filtro**, para que el total no mienta y la regla del estado efectivo viva en un
+solo sitio.
+
+### La lección: un centinela que mide el rango bien puede seguir midiendo a quién no debe
+
+Dos centinelas de **QC-67**, recién mergeada, se pusieron rojos en esta rama. Uno **acusaba a QC-84
+de abrir `identity`** listando sus quince archivos. Su commit `1a9e2c4` había arreglado el **rango**
+—`merge-base` en vez de un SHA congelado— y **quedó pendiente el sujeto**: no comprobaba de quién es
+la rama. Su centinela hermano, `account-status-scope`, lleva la regla escrita en la cabecera:
+*«aplicarlas a otra rama no mide nada, solo pone en rojo trabajo legítimo ajeno»*.
+
+Se arreglaron **desde esta rama, en commit propio (`c631118`)**, por decisión humana: señal de rama
+**conjuntiva** copiando la forma del hermano —`page.tsx` **más** la carpeta `specs/QC-67-*`, que es
+lo que discrimina de verdad porque cada ficha trae la suya—, `skipped` **con motivo** cuando no es
+su rama. **141 inserciones y 2 supresiones, las dos de la línea del `import`**: ni una lista
+cerrada, ni una igualdad, ni un `expect` tocados. Probado **en las dos mitades**: en esta rama los 6
+casos quedan `skipped` y los otros 22 siguen vigilando; **simulando ser la rama de QC-67** vuelven a
+morder ante una violación real. De los dos síntomas, **solo uno lo destapó QC-84**: las anclas de
+no-vacuidad fallaban igual en `dev`.
+
+### Deuda que deja, con nombre y dueño
+
+- **Decisión de producto pendiente, no defecto**: un nombre de solo signos (`"!!!"`) normaliza a
+  **cadena vacía**, así que «!!!» y «¿¿¿» colisionan y el operador leerá «ya existe» sobre dos
+  nombres que en pantalla se ven distintos. **El código cumple R12**, que define «mismo nombre» como
+  «coincide una vez normalizado». Las salidas: exigir al menos una letra o dígito (regla nueva), o
+  que **QC-85** lo explique en el mensaje.
+- **El baseline tiene cinco archivos que YA PASAN**, y el gate lo avisa en cada corrida. Entre ellos
+  `product-crud.int.test.ts`, cuya propia entrada manda retirarla «en cuanto la suite completa pase
+  tres veces seguidas con el archivo dentro» — y ya van varias entre QC-86 y QC-84. Cada archivo
+  listado está **apagado entero** para el comparador. **Ficha de arnés que se paga en intereses.**
+- **Undécima vez que `wt.sh done` falla en Windows**: desregistró el worktree y dejó el árbol en
+  disco. Rematado otra vez con `robocopy /MIR`. Sigue sin ficha.

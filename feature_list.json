@@ -637,8 +637,8 @@
       "epic": "QC-46",
       "epic_name": "Multiempresa",
       "name": "aislamiento-por-empresa-en-inventario",
-      "description": "Los productos y las presentaciones pasan a pertenecer cada uno a una empresa, y nadie puede ver ni tocar los de otra. Toda consulta y toda escritura del inventario se limitan a la empresa de quien pide, y el intento de leer o modificar un producto de otra empresa se rechaza aunque se conozca su identificador. La base se siembra limpia. Recetas y unidades se separan en sus propias fichas.",
-      "status": "pending",
+      "description": "Los productos, las presentaciones y los lotes pasan a pertenecer cada uno a una empresa, y nadie puede ver ni tocar los de otra. Toda consulta y toda escritura del inventario se limitan a la empresa de quien pide, y el intento de leer o modificar algo de otra empresa se rechaza aunque se conozca su identificador. Recetas, unidades, proveedores y pedidos se separan en sus propias fichas.\n\nDECISIONES CERRADAS CON EL HUMANO EL 2026-09-11:\n\n* SON TRES TABLAS, NO DOS. La tarjeta original nombraba productos y presentaciones porque se escribio antes de que existieran los lotes: product_batches nacio el 2026-09-09 con QC-90. Las tres ganan company_id obligatorio.\n* EL LOTE LLEVA COLUMNA PROPIA y no hereda la empresa por su producto: QC-81 necesita la unicidad (empresa, lote) que el humano pidio, y sin columna no se puede construir. Esta ficha la desbloquea.\n* LAS PRESENTACIONES SON DE LA EMPRESA, sin catalogo compartido. Se aparta a conciencia del patron de QC-76, que hizo la empresa OPCIONAL en las unidades para que existieran las de sistema: aqui cada empresa tiene las suyas y no ve las de nadie mas.\n* LAS FILAS VIVAS SE ASIGNAN A \"QuimiCloud\". Comprobado contra la base: hay 23 productos vivos, 114 presentaciones, 1 lote y 37 empresas, de las que solo QuimiCloud es real y las otras 36 son residuo de tests. NO se borra ninguna fila: la limpieza del residuo es QC-77. La frase original \"la base se siembra limpia\" NO significa vaciar el inventario.\n* LA FRONTERA SE VALIDA EN EL SERVICE, no con RLS ni con el corte de ruta (docs/architecture.md). El filtro por empresa vive en UN UNICO PUNTO de consulta del modulo y no repetido caso a caso, heredado de QC-76.\n* LAS FILAS DE UNA EMPRESA DADA DE BAJA NO SE TOCAN, heredado de QC-76.\n* NO NACEN PERMISOS NUEVOS: siguen siendo inventario.consultar e inventario.modificar.\n* LLEVA E2E: que alguien de la empresa A no vea ni toque el inventario de la B es de la misma familia que los permisos, y un fallo aqui es una fuga de datos entre clientes.\n\nNO ENTRA: recetas (QC-50), proveedores (QC-59), pedidos (QC-60), la guardia de esquema que exige empresa en toda tabla de negocio (QC-61), la limpieza del residuo de tests (QC-77) y el correlativo de lote por empresa (QC-81). Las unidades ya las aislo QC-76.\n\nNo quedan preguntas abiertas.",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
@@ -935,7 +935,7 @@
       "epic_name": "Identidad y acceso",
       "name": "pantalla-de-usuarios",
       "description": "Listado y formulario de usuarios sobre la tabla de datos compartida, con la accion de CAMBIAR EL ESTADO DE LA CUENTA entre sus cuatro valores -active, pending, inactive, blocked-, que crea QC-65. No construye backend propio: consume el CRUD de usuarios.\n\nActualizado el 2026-09-08, al acotar QC-65: esta descripcion decia \"habilitar y deshabilitar una cuenta\", que era el modelo de dos valores que la acotacion sustituyo.",
-      "status": "pending",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "frontend",
@@ -1002,7 +1002,7 @@
       "epic_name": "Plataforma",
       "name": "identificador-de-request",
       "description": "Cuando algo falla no hay forma de encontrar rapido en los logs la peticion concreta que fallo. Esta ficha le da a cada peticion un identificador propio, generado en el middleware, que llega hasta la capa que ya atrapa los errores y aparece en la linea de log del fallo.\n\nEL ERROR INESPERADO LLEVA EL IDENTIFICADOR DE VUELTA AL NAVEGADOR. Es el error generico de QC-70, el que sale cuando revienta algo que no esta en el catalogo. Quien reporta el fallo puede decir cual buscar, que es el motivo por el que existe la ficha. Lo que NO cambia: el mensaje sigue siendo neutro y el detalle interno -traza, nombres de tablas, SQL- sigue sin salir. Mostrarlo obliga a tocar los componentes de error de las pantallas: por eso la zona es fullstack y no backend.\n\nSOLO EN EL ERROR. El identificador no viaja de vuelta en las respuestas que van bien: devolverlo siempre expone un dato interno en cada peticion, incluidas las publicas.\n\nSOLO SE ESCRIBE LOG CUANDO FALLA. El identificador se genera en todas las peticiones, pero la linea se escribe cuando hay error. Es el criterio que QC-57 ya dejo escrito en el log de listados: un aviso por cada consulta limpia es ruido, y el ruido acaba en un filtro de logs que tambien se traga el aviso que importa.\n\nEL IDENTIFICADOR NO ENTRA EN EL DOMINIO de los modulos: se queda en la capa que atrapa los errores, o sea el traductor unico que deja QC-70, y NO se declara ningun puerto nuevo. El precedente pesa: el puerto ListQueryLog de QC-57 acabo declarado CINCO veces para una sola implementacion.\n\nSIN DEPENDENCIA NUEVA: crypto.randomUUID() es global en el runtime del borde y en Node. Ademas es condicion para pasar guard-middleware-edge, que recorre el cierre de imports completo desde middleware.ts y prohibe node:crypto, crypto, @prisma/client y next/headers.\n\nNO ENTRA el catalogo de codigos ni el tipo de error unico: eso es QC-70, de la que esta depende.\n\nNO ENTRA una linea de log por peticion con ruta y duracion. Se descarto: es volumen, y las rutas del ERP llevan identificadores de pedido y de proveedor y a veces el texto buscado, que docs/architecture.md > Anti-patrones prohibe registrar.\n\nNO ENTRA ningun cambio en db/: el identificador no se guarda en ninguna tabla.\n\nNO ENTRA la politica de retencion ni el destino de los logs. Hoy son console.*; esta ficha no cambia adonde van.\n\nDOS COSAS QUEDAN ABIERTAS Y NO SE RELLENAN CON UN SUPUESTO, las decide el design.md: donde se engancha la generacion del id -Next admite UN SOLO middleware y hoy lo ocupa el portero de rutas de identity (QC-9)-, y como cruza el id del middleware a la Server Action, que son dos ejecuciones distintas en runtimes distintos cuyo unico canal es una cabecera.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "fullstack",
@@ -1135,9 +1135,9 @@
       "epic_name": "Identidad y acceso",
       "name": "alta-sin-contrasena-y-enlace",
       "description": "Decidida el 2026-09-08 al acotar QC-65, que cerro que la cuenta nace pending.\n\nLA CONTRASENA PASA A SER OPCIONAL AL CREAR UN USUARIO. Si el administrador la escribe, todo sigue como en QC-66. Si no la escribe, no se inventa ninguna: a la persona se le envia un enlace con el que establece su propia contrasena, y al establecerla la cuenta pasa de pending a active. Es el unico camino por el que una cuenta se activa sola; el otro sigue siendo el administrador moviendo el estado a mano desde QC-66.\n\nARRASTRA ENVIO DE CORREO, que hoy no existe en ninguna parte del ERP. Eso es una DEPENDENCIA NUEVA y no entra sin aprobacion humana: los cuatro checks de salud y su fila en docs/dependencias.md son condicion (regla 7 de CLAUDE.md). Elegir el proveedor es parte de esta ficha y se decide al acotarla, no al implementarla.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO: cuanto vive el enlace, si se puede reenviar, y si sirve tambien para recuperar una contrasena olvidada -que hoy no tiene ficha- o solo para el alta.\n\nLA CONTRASENA QUE SE ESTABLECE PASA POR LA POLITICA DE QC-19, sin excepciones, y por el hashing de QC-5. El enlace no es una puerta lateral a la politica de contrasenas.\n\nVA DESPUES DE QC-66, que es quien crea usuarios.",
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
-      "complexity": null,
+      "complexity": "high",
       "zone": "fullstack",
       "branch": "feature/QC-79-alta-sin-contrasena-y-enlace",
       "depends_on": [
@@ -1146,13 +1146,30 @@
       "spec_path": "specs/QC-79-alta-sin-contrasena-y-enlace"
     },
     {
+      "key": "QC-96",
+      "id": 96,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "recuperar-contrasena-olvidada",
+      "description": "Nacida el 2026-09-11 al acotar QC-79 con /afinar-feature.\n\nQUIEN NO PUEDE ENTRAR PORQUE OLVIDO SU CONTRASENA TIENE QUE PODER RECUPERARLA POR SI MISMO, sin llamar al administrador. Hoy no hay ninguna via: QC-79 resuelve el ALTA y QC-89 resuelve que el ADMINISTRADOR restablezca la de otro, pero nadie cubre a la persona que ya tenia cuenta activa y no recuerda su contrasena.\n\nPOR QUE NO ENTRO EN QC-79: es OTRO FLUJO Y OTRA SUPERFICIE DE ATAQUE. El enlace de QC-79 lo dispara un administrador con sesion abierta; este lo dispara CUALQUIERA desde la pantalla de acceso, sin sesion. La respuesta no puede revelar si ese correo existe, o la pantalla se vuelve un sondeo de usuarios validos.\n\nLO QUE SI HEREDA DE QC-79: el envio de correo con resend y el mecanismo de token de un solo enlace vivo por persona. NO los reconstruye.\n\nQUEDA ABIERTO: cuanto vive este enlace; que se responde a un correo que no existe; si hay limite de intentos -y si espera a QC-73-; si al recuperar se cierran las sesiones abiertas; y si una cuenta pending, inactive o blocked puede recuperar.\n\nACOTAR CON /afinar-feature ANTES DE SEMBRAR EL SPEC.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-96-recuperar-contrasena-olvidada",
+      "depends_on": [
+        "QC-79"
+      ],
+      "spec_path": "specs/QC-96-recuperar-contrasena-olvidada"
+    },
+    {
       "key": "QC-80",
       "id": 80,
       "epic": "QC-18",
       "epic_name": "Inventario",
       "name": "unidad-desde-la-presentacion",
       "description": "La unidad deja de declararse producto a producto y pasa a ser una propiedad de la presentacion: toda presentacion tiene una unidad, obligatoria. El producto ya no guarda unidad propia.\n\nQuien da de alta o edita una presentacion elige su unidad y no puede dejarla vacia. Las presentaciones que ya existen quedan todas con una unidad asignada, sin que nadie tenga que repasarlas a mano.\n\nCon esto, el selector de unidad de una linea de receta empieza a acotarse de verdad al grupo del ingrediente: hoy ningun producto declara unidad, asi que ofrece siempre el catalogo entero.\n\nDECISIONES YA CERRADAS CON EL HUMANO (2026-09-08, ampliadas el 2026-09-11):\n\n* La columna de unidad del producto se elimina. Esta vacia en las 7 filas vivas (comprobado contra la base), asi que no se pierde ningun dato ni hace falta rescatarlo.\n* La unidad de la presentacion es obligatoria.\n* LA PRESENTACION YA NO CUELGA DEL PRODUCTO: QC-90 la mudo a product_batches el 2026-09-09, asi que la premisa original de esta ficha (\"cada producto hereda la de la suya\") quedo obsoleta. La unidad de un producto es la de la presentacion de SU LOTE MAS RECIENTE. Si el producto todavia no tiene lotes, la linea de receta ofrece el catalogo entero, como hoy.\n* Backfill decidido: las 114 presentaciones existentes quedan en KILOGRAMO. 113 son residuo de tests sin referenciar por ningun lote (su limpieza es QC-77) y la unica real, \"Bolsa 5 KG\", es kilogramo. Esta ficha no borra filas.\n* El selector de unidad de la presentacion ofrece TODAS las unidades del catalogo, sin filtrar por empresa: las presentaciones todavia no tienen empresa y filtrarlas se adelantaria a QC-49.\n* La linea de catalogo de proveedor (QC-52) NO entra: conserva su unidad propia y opcional, porque son terminos comerciales, no propiedades de la cosa.\n* Sin E2E, y por este motivo: no hay movimiento de inventario ni importe; se anade un campo obligatorio y se acota un selector, y eso lo cubren los tests unitarios y de integracion.\n\nNo quedan preguntas abiertas.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "fullstack",
@@ -1216,9 +1233,9 @@
       "epic_name": "Identidad y acceso",
       "name": "crud-de-grupos-de-trabajo",
       "description": "Los casos de uso de un grupo de trabajo: crear uno con su nombre, listar los de la empresa, ver quienes lo componen, cambiar su nombre, meter y sacar personas, y borrarlo. Todo limitado a la empresa de quien pide. El nombre es unico dentro de la empresa y se rechaza el duplicado diciendolo. Sacar a una persona de un grupo NO la borra ni la desactiva. Borrar un grupo que ya fue usado para asignar un pedido no puede dejar ese pedido sin responsables: el modulo de asignacion guarda a las personas, no al grupo vivo, asi que el borrado no arrastra trabajo ya asignado, y esta ficha lo tiene que demostrar con un test. Que permiso corta cada operacion sigue el patron de QC-74: consultar para leer, modificar para escribir, sin implicacion entre ellos. Lo que NO entra: el modelo y la migracion (QC-83); la pantalla (QC-85). Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
-      "status": "pending",
+      "status": "done",
       "sdd": true,
-      "complexity": null,
+      "complexity": "medium",
       "zone": "backend",
       "branch": "feature/QC-84-crud-de-grupos-de-trabajo",
       "depends_on": [
@@ -1233,13 +1250,14 @@
       "epic_name": "Identidad y acceso",
       "name": "pantalla-de-grupos-de-trabajo",
       "description": "La pantalla donde el Administrador ve los grupos de trabajo de su empresa, crea uno, le cambia el nombre, mete y saca personas, y lo borra con confirmacion. Cada grupo muestra cuantas personas tiene y quienes son. Se decide al acotar si es una pantalla propia o una seccion dentro de la pantalla de usuarios (QC-67), que todavia no esta especificada. Las dos opciones son razonables y la decision cambia la ficha, asi que no se da por supuesta aqui. Reutiliza lo que ya existe y no lo vuelve a montar: la tabla de datos compartida (QC-55), busqueda y orden (QC-57), el panel lateral y el dialogo de borrado del patron de QC-45, y el corte por permiso de pantalla de QC-75. Lo que NO entra: el modelo (QC-83) ni los casos de uso (QC-84). Asignar trabajo a un grupo se hace desde la pantalla de pedidos, en QC-87. Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
-      "complexity": null,
+      "complexity": "medium",
       "zone": "frontend",
       "branch": "feature/QC-85-pantalla-de-grupos-de-trabajo",
       "depends_on": [
-        "QC-84"
+        "QC-84",
+        "QC-67"
       ],
       "spec_path": "specs/QC-85-pantalla-de-grupos-de-trabajo"
     },
@@ -1250,7 +1268,7 @@
       "epic_name": "Pedidos",
       "name": "modelo-de-asignacion-de-pedidos",
       "description": "Un pedido pasa a tener responsables: las personas encargadas de prepararlo. Esta ficha es el modulo nuevo de asignacion y su modelo: la tabla N:M que une pedido con persona, y la migracion. LA ASIGNACION SE CONGELA. Se puede asignar marcando personas sueltas, eligiendo uno o varios grupos de trabajo, o mezclando las dos cosas -dos equipos, o un equipo mas dos personas sueltas-. Cuando se elige un grupo, el pedido guarda LAS PERSONAS QUE ESE GRUPO TENIA EN ESE MOMENTO, mas la marca de que vinieron de ese grupo y su nombre, para poder mostrarlo. Sacar a alguien de un grupo manana NO le quita un pedido que ya estaba ejecutando, y meter a alguien no le hace aparecer pedidos viejos. EL MODULO TRAE DOS PERMISOS, como todos los demas (QC-74): consultar -ver los pedidos que tengo asignados- y modificar -asignar y desasignar-. El Operador nace con consultar. No se le da acceso a recetas: hoy el permiso de consultar recetas abre tambien el listado y el formulario de edicion. Lo que NO entra: la pantalla de asignar (QC-87), el listado del Operador (QC-88) y ejecutar la receta (QC-63). Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
-      "status": "pending",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
@@ -1381,7 +1399,7 @@
       "epic_name": "Identidad y acceso",
       "name": "consulta-de-roles",
       "description": "Hace falta poder consultar los roles que existen, con su identificador y su nombre, para que un formulario pueda ofrecerlos a elegir.\n\nPOR QUE NACE. QC-66 dejo el alta y la edicion de usuarios exigiendo un roleId (un identificador), pero no hay ninguna forma de saber que roles hay ni que identificador tiene cada uno: el modulo solo expone los NOMBRES del seed. Sin esta ficha, la pantalla de usuarios (QC-67) no puede pintar el selector de rol, y por eso la bloquea.\n\nQUE ENTRA. Una consulta que devuelve los roles con su identificador y su nombre, ordenados por nombre.\n\nEL CATALOGO DE ROLES ES GLOBAL, NO POR EMPRESA. La tabla roles no tiene columna de empresa: el nombre es unico en todo el sistema y todas las empresas comparten los mismos roles. Corregido el 2026-09-11 al acotar la ficha; la primera redaccion decia \"los roles de la empresa de la sesion\" y era falsa.\n\nLA AUTORIZA CUALQUIERA DE LOS DOS PERMISOS DE USUARIOS, usuarios.consultar o usuarios.modificar, validados en el service como primera linea. QC-74 decidio que modificar NO implica consultar, y las dos mitades necesitan el selector: quien entra a la pantalla tiene consultar, quien abre el formulario de alta tiene modificar.\n\nLO QUE NO ENTRA. Crear, editar o borrar roles: el catalogo de roles es cerrado y corto y no tiene pantalla de administracion (decidido en QC-4). Tampoco los permisos de cada rol, ni la descripcion del rol: existe en la tabla pero hoy no la pinta nadie.\n\nE2E DIFERIDA A QC-67, CON MOTIVO: esta ficha no tiene pantalla, y el flujo de extremo a extremo se prueba cuando exista el selector que la ejerce. Precedente QC-43 -> QC-44 y QC-66 -> QC-67.\n\nDetectada el 2026-09-11 al acotar QC-67 con /afinar-feature.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "low",
       "zone": "backend",
@@ -1403,6 +1421,70 @@
       "branch": "feature/QC-95-desbloqueo-manual-limpia-el-conteo",
       "depends_on": null,
       "spec_path": "specs/QC-95-desbloqueo-manual-limpia-el-conteo"
+    },
+    {
+      "key": "QC-97",
+      "id": 97,
+      "epic": "QC-16",
+      "epic_name": "Plataforma",
+      "name": "pulido-transversal-de-pantallas-privadas",
+      "description": "Cuatro deudas que el reviewer de QC-67 levanto como menores y que NO son de esa pantalla: las cuatro son transversales, ya existian antes y se arreglan en mas de un sitio a la vez. Se agrupan aqui a peticion del humano el 2026-09-11 para no abrir cuatro tarjetas diminutas. Ninguna es bloqueante y ninguna impide usar la aplicacion.\n\n1. LA PROMESA QUE DEJA EL PANEL COLGADO. En el panel lateral de usuarios, la consulta de la ficha se lanza sin manejar el RECHAZO de la promesa: cubre el error que la consulta DEVUELVE, pero no el fallo al resolver la sesion, que ocurre fuera de su try. Si eso falla, el panel se queda en \"cargando\" para siempre. El mismo patron esta en el formulario de pedidos (order-form.tsx): SE ARREGLA EN LOS DOS SITIOS O EN NINGUNO.\n\n2. LA SESION SE RESUELVE DOS VECES POR RENDER. Cada pantalla privada que exige permiso y ademas pregunta si el actor puede modificar paga DOS consultas a la tabla de usuarios en la misma peticion. No es peor que el precedente, pero la ruta privada es la mas transitada. La solucion es cachear la resolucion de sesion POR PETICION, y por eso es transversal.\n\n3. QUE EL MODULO PUBLIQUE COMO PREGUNTAR POR UN PERMISO SIN LANZAR. Hoy identity solo ofrece exigir y lanzar. Una pantalla que quiere PREGUNTAR para ocultar un boton tiene que rodearlo atrapando el error, y ese rodeo es copiable. El modulo debe publicar el predicado.\n\n4. LA BUSQUEDA NO VUELVE A LA PRIMERA PAGINA. En los listados sobre la tabla compartida, buscar desde la pagina 3 deja la pagina 3 y puede mostrar un vacio que confunde. Cambiarlo es DECISION NUEVA y afecta a las siete listas.\n\nLO QUE NO ENTRA: la tercera copia del resolutor de Server Components en los tests, ya anotada como deuda con nombre.\n\nOrigen: progress/review_QC-67-pantalla-de-usuarios.md, hallazgos 1, 2, 3 y 5.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-97-pulido-transversal-de-pantallas-privadas",
+      "depends_on": null,
+      "spec_path": "specs/QC-97-pulido-transversal-de-pantallas-privadas"
+    },
+    {
+      "key": "QC-98",
+      "id": 98,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "aviso-y-reenvio-del-enlace-en-la-pantalla",
+      "zone": "frontend",
+      "branch": "feature/QC-98-aviso-y-reenvio-del-enlace-en-la-pantalla",
+      "spec_path": "specs/QC-98-aviso-y-reenvio-del-enlace-en-la-pantalla",
+      "depends_on": [
+        "QC-79"
+      ],
+      "description": "Nacida el 2026-09-11 al cerrar QC-79.\n\nQC-79 DEJA EL DATO Y NADIE LO CONSUME. Su R30 obliga a que el alta distinga «creado y correo enviado» de «creado y correo NO enviado», y su R14 expone el REENVIO del enlace bajo usuarios.modificar. Las dos cosas existen, estan probadas y no las usa ninguna pantalla.\n\nCONSECUENCIA REAL: si el envio falla, el usuario queda creado en pending con su enlace emitido, la pantalla dice «usuario creado» y NADIE SE ENTERA. La persona nunca recibe el enlace y el reenvio no esta en la interfaz.\n\nPOR QUE QUEDO ASI: R40 de QC-79 le prohibe tocar pantallas de administracion de usuarios, que son de QC-67; y QC-67 se mergeo ANTES (PR #60 frente a #61), cuando ese dato aun no existia. El hueco lo abrio el orden de merge, no un olvido.\n\nQUEDA ABIERTO: como se avisa; si el reenvio se ofrece siempre o solo tras un fallo; que se dice si el reenvio tambien falla; si el listado distingue enlace vivo de caducado -lo que obliga a leerlo-; y si hace falta E2E propia.\n\nACOTAR CON /afinar-feature ANTES DE SEMBRAR EL SPEC.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null
+    },
+    {
+      "key": "QC-99",
+      "id": 99,
+      "epic": "QC-16",
+      "epic_name": "Plataforma",
+      "name": "guardias-censo-rompen-features-posteriores",
+      "zone": "backend",
+      "branch": "feature/QC-99-guardias-censo-rompen-features-posteriores",
+      "spec_path": "specs/QC-99-guardias-censo-rompen-features-posteriores",
+      "depends_on": [],
+      "description": "Nacida el 2026-09-11 al cerrar QC-79, que rompio TRES guardias ajenas sin hacer nada mal.\n\nEL PATRON: varias fichas escribieron una guardia para afirmar «MI ficha no anade X», pero la implementaron como CENSO -total absoluto, lista cerrada por igualdad, o recorrido del diff contra origin/dev-. Ninguna esta acotada a su ficha, asi que CUALQUIER feature posterior que anada algo legitimo las pone en rojo.\n\nSolo QC-79 rompio tres, y el baseline ya traia CINCO entradas de la misma especie con el mismo diagnostico escrito.\n\nPOR QUE EL BASELINE NO ES LA SOLUCION: apaga el archivo ENTERO para el comparador, incluidos sus casos validos. La guardia deja de proteger lo que vino a proteger y nadie lo nota.\n\nDOS HALLAZGOS ADYACENTES DEL MISMO DIA: ./init.sh --rapido NO consulta el baseline -solo el modo completo-, asi que saldra rojo por deuda ajena a todo el mundo; y dos entradas del baseline tenian el motivo FALSO y nadie lo reviso al cambiar la causa.\n\nQUEDA ABIERTO: acotar cada guardia contra el merge-base; apoyar el censo de dependencias en docs/dependencias.md; si --rapido debe consultar el baseline; si las entradas necesitan caducidad; y que se hace con las nueve entradas acumuladas.\n\nACOTAR CON /afinar-regla, NO con /afinar-feature: es arnes, no producto.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null
+    },
+    {
+      "key": "QC-100",
+      "id": 100,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "conteo-de-miembros-de-un-grupo",
+      "description": "El listado de grupos de trabajo devuelve, para cada grupo, cuantas personas tiene: las VISIBLES -las cuentas activas, que son las que la lista muestra- y el TOTAL de pertenencias. La pantalla los muestra juntos, \"3 de 5\", con una ayuda que explique la diferencia. Hoy el listado devuelve solo identificador y nombre, y hay un test que congela esas claves exactas: esta ficha lo amplia y lo actualiza. Decidido el 2026-09-12 al acotar QC-85, que se quedo sin el conteo por eso.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-100-conteo-de-miembros-de-un-grupo",
+      "depends_on": [
+        "QC-84"
+      ],
+      "spec_path": "specs/QC-100-conteo-de-miembros-de-un-grupo"
     }
   ]
 }
