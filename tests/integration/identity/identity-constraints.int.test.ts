@@ -676,12 +676,18 @@ describe('conjunto cerrado de tipos de documento', () => {
     })
   })
 
-  it('el catalogo arranca solo con CC', async () => {
+  it('el catalogo trae CC activo y con su nombre', async () => {
     await inRolledBackTransaction(async (tx) => {
-      const types = await tx.documentType.findMany({ orderBy: { code: 'asc' } })
-      expect(types.map((type) => type.code)).toEqual([DOCUMENT_TYPE_CC])
-      expect(types[0]?.name).toBe('Cedula de ciudadania')
-      expect(types[0]?.isActive).toBe(true)
+      // Se consulta CC en CONCRETO y no se lista el catalogo entero: la exclusividad ("aqui
+      // solo esta CC") no se puede sostener contra esta base. Las suites de inventario,
+      // pedidos y proveedores insertan tipos `DOC<marcador>` con escrituras COMMITEADAS, asi
+      // que el catalogo global crece con cada corrida y comparar la lista completa solo seria
+      // verde sobre una base recien reseteada. Lo que la feature promete —y lo unico que este
+      // caso puede afirmar— es que CC existe, se llama asi y esta activo.
+      const cc = await tx.documentType.findUniqueOrThrow({ where: { code: DOCUMENT_TYPE_CC } })
+      expect(cc.code).toBe(DOCUMENT_TYPE_CC)
+      expect(cc.name).toBe('Cedula de ciudadania')
+      expect(cc.isActive).toBe(true)
     })
   })
 

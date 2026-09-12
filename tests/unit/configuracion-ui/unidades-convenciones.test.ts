@@ -34,7 +34,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, type TestContext } from 'vitest';
 
 import { UNITS_ROUTE } from '@/lib/shared/routes';
 
@@ -89,11 +89,100 @@ const BARREL_DEL_MODULO = '@/lib/modules/unidades';
 const MANIFIESTO = 'package.json';
 
 /**
- * La RAMA BASE de esta feature: `origin/dev` en el momento de montar el worktree. Es un commit y
- * no una referencia movil, para que el criterio no cambie por debajo si `origin/dev` avanza. La
- * misma que usan `data-table-intacta-unidades.test.ts` y `tests/unit/unidades/modulo-intacto.test.ts`.
+ * Las referencias que nombran la rama de integracion, en orden de preferencia. La base contra la
+ * que se mide esta feature es el **merge-base** con `HEAD`, calculado en CADA ejecucion.
+ *
+ * AQUI VIVIO UN SHA CONGELADO (`516e9c0`, la punta de `origin/dev` al montar el worktree),
+ * justificado con que «asi el criterio no cambia por debajo si `origin/dev` avanza». El argumento
+ * era falso y el efecto, el contrario: `git diff <sha> -- <ruta>` compara arbol contra arbol, de
+ * modo que en cuanto `dev` avanza el rango se traga TODO lo que `dev` trae y se lo atribuye a esta
+ * feature.
+ *
+ * SE CORRIGIO EL 2026-09-12, desde la rama de QC-85, porque **se puso rojo de verdad**: QC-79
+ * anadio `resend` a `package.json` en `dev` —una dependencia suya, aprobada por su propio ciclo— y
+ * R45 empezo a decir que «la feature de unidades toca el manifiesto», sin que QC-39 hubiera abierto
+ * un solo intocable. Es EXACTAMENTE el mismo fallo, con la misma cura, que ya escribieron
+ * `data-table-intacta-unidades.test.ts` y `tests/unit/unidades/modulo-intacto.test.ts`, que
+ * migraron antes —y a las que el comentario que habia aqui seguia citando como companeras de SHA
+ * cuando hacia tiempo que no lo eran—.
+ *
+ * El merge-base conserva la propiedad que aquel comentario buscaba: la pregunta pasa a ser «que
+ * anade MI rama sobre el `dev` ACTUAL», y el criterio no se afloja porque `dev` avance, porque lo
+ * que `dev` aporta nunca cuenta como mio.
  */
-const RAMA_BASE = '516e9c0';
+const REFERENCIAS_DE_DEV = ['origin/dev', 'dev'] as const;
+
+/** Separador de lineas de la salida de git, nombrado para no incrustar escapes sueltos. */
+const SALTO_DE_LINEA = String.fromCharCode(10);
+
+/**
+ * El merge-base entre la primera referencia de `dev` disponible y `HEAD`, o `null` si no hay
+ * ninguna a mano. `null` NO es verde: quien depende de la base se salta con el motivo escrito.
+ */
+function baseDeLaRama(): string | null {
+  for (const referencia of REFERENCIAS_DE_DEV) {
+    try {
+      return git(['merge-base', referencia, 'HEAD']).trim();
+    } catch {
+      // Esa referencia no existe aqui: se prueba la siguiente.
+    }
+  }
+  return null;
+}
+
+/** Se calcula una sola vez: el grafo no se mueve mientras corre la suite. */
+const BASE_DE_LA_RAMA = baseDeLaRama();
+
+/** El motivo que se escribe cuando no hay base: un salto explicito, nunca un verde silencioso. */
+const SIN_BASE =
+  `ninguna de las referencias ${REFERENCIAS_DE_DEV.join(', ')} esta disponible: no se puede ` +
+  'calcular el merge-base, asi que esta guardia NO ha comprobado nada';
+
+/**
+ * LA PRECONDICION DE RAMA, con la misma forma que su hermana `data-table-intacta-unidades.test.ts`
+ * —se copia a proposito, sin inventar una segunda—.
+ *
+ * Sin ella este archivo mide CUALQUIER rama con las reglas de alcance de QC-39, que es como R45 se
+ * puso roja desde la rama de QC-85. La senal es CONJUNTIVA: el archivo central de la pantalla MAS
+ * la carpeta de spec de la propia ficha, que nace y vive dentro del rango de QC-39 y no aparece
+ * jamas en el rango de otra.
+ */
+const ARCHIVO_CENTRAL_DE_QC39 = `${CARPETA_DE_LA_RUTA}/page.tsx`;
+const CARPETA_SPEC_DE_QC39 = 'specs/QC-39-pantalla-de-unidades/';
+
+function esLaRamaDeQC39(tocados: readonly string[]): boolean {
+  return (
+    tocados.includes(ARCHIVO_CENTRAL_DE_QC39) &&
+    tocados.some((archivo) => archivo.startsWith(CARPETA_SPEC_DE_QC39))
+  );
+}
+
+/** Salta el caso —ruidosamente, con el motivo escrito— cuando la rama no es la de QC-39. */
+function saltarSiNoEsLaRamaDeQC39(ctx: Pick<TestContext, 'skip'>, base: string): void {
+  const tocados = git(['diff', '--name-only', base, '--', '.'])
+    .split(SALTO_DE_LINEA)
+    .map((linea) => aPosix(linea.trim()))
+    .filter((linea) => linea !== '');
+
+  if (tocados.length === 0) {
+    ctx.skip(
+      'la rama no toca ningun archivo respecto del merge-base con `dev`: no hay diff que ' +
+        'revisar, asi que este caso NO ha comprobado nada.',
+    );
+    return;
+  }
+
+  if (!esLaRamaDeQC39(tocados)) {
+    ctx.skip(
+      'el rango no trae a la vez `' +
+        ARCHIVO_CENTRAL_DE_QC39 +
+        '` y `' +
+        CARPETA_SPEC_DE_QC39 +
+        '`: esta NO es la rama de QC-39, asi que este caso NO ha comprobado nada. R45 es el ' +
+        'alcance de ESA ficha y no le aplica a ninguna otra.',
+    );
+  }
+}
 
 // --------------------------------------------------------------------------------------------
 // Utilidades de lectura
@@ -645,39 +734,55 @@ describe('la lista usa la tabla compartida y no una propia (R15)', () => {
 // --------------------------------------------------------------------------------------------
 
 describe('la feature no anade ninguna dependencia (R45)', () => {
-  it(`el commit base ${RAMA_BASE} resuelve; si no, esta guardia falla ruidosamente`, () => {
-    expect(() => git(['rev-parse', '--verify', `${RAMA_BASE}^{commit}`])).not.toThrow();
+  it('la base de fusion con `dev` resuelve; si no, esta guardia se salta RUIDOSAMENTE', (ctx) => {
+    if (BASE_DE_LA_RAMA === null) {
+      ctx.skip(SIN_BASE);
+      return;
+    }
+    expect(() => git(['rev-parse', '--verify', `${BASE_DE_LA_RAMA}^{commit}`])).not.toThrow();
   });
 
-  it('`package.json` no aparece en el diff contra la rama base', () => {
-    const cambiados = git(['diff', '--name-only', RAMA_BASE, '--', MANIFIESTO])
-      .split('\n')
+  it('`package.json` no aparece en el diff contra la base de fusion', (ctx) => {
+    if (BASE_DE_LA_RAMA === null) {
+      ctx.skip(SIN_BASE);
+      return;
+    }
+    saltarSiNoEsLaRamaDeQC39(ctx, BASE_DE_LA_RAMA);
+
+    const cambiados = git(['diff', '--name-only', BASE_DE_LA_RAMA, '--', MANIFIESTO])
+      .split(SALTO_DE_LINEA)
       .map((linea) => linea.trim())
       .filter((linea) => linea !== '');
 
     expect(cambiados, `la feature toca ${MANIFIESTO}: ${cambiados.join(', ')}`).toEqual([]);
   });
 
-  it('y su contenido sigue siendo el de la rama base, entrada por entrada', () => {
+  it('y su contenido sigue siendo el de la base de fusion, entrada por entrada', (ctx) => {
+    if (BASE_DE_LA_RAMA === null) {
+      ctx.skip(SIN_BASE);
+      return;
+    }
+    saltarSiNoEsLaRamaDeQC39(ctx, BASE_DE_LA_RAMA);
+
     let enLaBase: {
       dependencies?: Record<string, string>;
       devDependencies?: Record<string, string>;
     };
     try {
-      enLaBase = JSON.parse(git(['show', `${RAMA_BASE}:${MANIFIESTO}`]));
+      enLaBase = JSON.parse(git(['show', `${BASE_DE_LA_RAMA}:${MANIFIESTO}`]));
     } catch (error) {
       throw new Error(
-        `No se pudo leer \`${RAMA_BASE}:${MANIFIESTO}\`, asi que R45 NO se ha comprobado. Esta ` +
-          `guardia falla en vez de pasar en silencio. Causa: ${String(error)}`,
+        `No se pudo leer ${BASE_DE_LA_RAMA}:${MANIFIESTO}, asi que R45 NO se ha comprobado. ` +
+          `Esta guardia falla en vez de pasar en silencio. Causa: ${String(error)}`,
       );
     }
 
     const aqui = JSON.parse(leer(MANIFIESTO)) as typeof enLaBase;
 
-    expect(aqui.dependencies ?? {}, 'las dependencias no son las de la rama base').toEqual(
+    expect(aqui.dependencies ?? {}, 'las dependencias no son las de la base').toEqual(
       enLaBase.dependencies ?? {},
     );
-    expect(aqui.devDependencies ?? {}, 'las de desarrollo no son las de la rama base').toEqual(
+    expect(aqui.devDependencies ?? {}, 'las de desarrollo no son las de la base').toEqual(
       enLaBase.devDependencies ?? {},
     );
   });

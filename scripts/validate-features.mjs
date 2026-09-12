@@ -98,13 +98,43 @@ if (!existsSync(FEATURE_LIST)) {
 }
 
 let features;
+let jira;
 try {
   const raw = JSON.parse(readFileSync(FEATURE_LIST, 'utf8'));
   features = raw.features;
+  jira = raw.jira;
   if (!Array.isArray(features)) throw new Error('la clave "features" no es un array');
 } catch (err) {
   console.error(`[features] ${FEATURE_LIST} no se pudo leer: ${err.message}`);
   process.exit(1);
+}
+
+// --- 0. El board al que pertenece este archivo ----------------------------------------
+// `jira.project` es la identidad del board en disco, y NO se deriva de los `key` a
+// proposito. F0 regenera `features` ENTERO desde el board (`docs/jira.md > Si Jira y el
+// disco divergen`): un F0 disparado contra el proyecto equivocado dejaria todos los key con
+// el prefijo nuevo, consistentes entre si, y una comprobacion derivada los daria por
+// buenos. Derivar validaria el resultado del error contra el error. Por eso se declara
+// aparte, y por eso F0 tiene prohibido tocar este bloque.
+const conKey = features.filter((f) => f.key != null);
+if (conKey.length > 0) {
+  if (!jira?.project) {
+    errores.push(
+      `${FEATURE_LIST} no declara "jira.project": no hay contra que validar que las fichas ` +
+      `vengan del board correcto (docs/jira.md > El board al que pertenece el disco).`,
+    );
+  } else {
+    const ajenas = conKey.filter((f) => f.key.split('-')[0] !== jira.project);
+    if (ajenas.length > 0) {
+      errores.push(
+        `fichas de otro board en ${FEATURE_LIST} (se esperaba "${jira.project}"): ` +
+        `${ajenas.map((f) => f.key).join(', ')}. Si el proyecto cambio a proposito, ` +
+        `actualiza "jira.project"; si no, la ultima importacion apunto al board equivocado.`,
+      );
+    } else {
+      notas.push(`las ${conKey.length} fichas vienen del proyecto ${jira.project}`);
+    }
+  }
 }
 
 // --- 1. Integridad basica -------------------------------------------------------------

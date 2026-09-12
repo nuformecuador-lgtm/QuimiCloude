@@ -13,8 +13,10 @@
 // `user-list-params.ts` —es la clave de `DataTableParams.filters`— y se publica solo desde ahi,
 // aunque `user-columns.tsx` tambien lo use.
 //
-// **Barrel COMPLETO desde T13**: republica los TRECE componentes de la ruta —las piezas de T4 a
-// T8 y las tres escrituras de T9 a T11— y ningun nombre publico se queda fuera.
+// **Barrel COMPLETO desde T13**: republica los VEINTISIETE componentes de la ruta —los trece de la
+// pantalla de personas (QC-67), las tres piezas del conmutador de pestanas (QC-85 T2), las siete
+// de la lista de grupos (QC-85 T3–T7) y las cuatro de las escrituras de grupos (QC-85 T8–T11)— y
+// ningun nombre publico se queda fuera.
 // `usuarios-convenciones.test.ts` lo ata por los dos lados: que cada archivo aparezca aqui y que
 // cada nombre exportado por ellos este republicado.
 export {
@@ -158,3 +160,142 @@ export {
   UserStatusDialog,
   type UserStatusDialogProps,
 } from './user-status-dialog';
+export {
+  USUARIOS_TABS_TESTID,
+  USUARIOS_TAB_TESTIDS,
+  UsuariosTabsSwitch,
+  type UsuariosTabsSwitchProps,
+} from './usuarios-tabs-switch';
+export {
+  GROUPS_TAB,
+  TAB_PARAM,
+  USERS_TAB,
+  USUARIOS_TABS,
+  isUsuariosTab,
+  parseUsuariosTab,
+  usuariosTabHref,
+  type UsuariosTab,
+} from './usuarios-tabs';
+export {
+  USUARIOS_TABS_LABEL,
+  USUARIOS_TAB_LABELS,
+  WORK_GROUP_ACTIONS_COLUMN_LABEL,
+  WORK_GROUP_NAME_COLUMN_LABEL,
+  WORK_GROUP_SECTION_TESTID,
+  deleteWorkGroupLabel,
+  editWorkGroupLabel,
+} from './work-group-labels';
+export {
+  WORK_GROUP_ACTIONS_COLUMN_ID,
+  WORK_GROUP_ACTION_DELETE_TESTID,
+  WORK_GROUP_ACTION_EDIT_TESTID,
+  WORK_GROUP_COLUMNS,
+  WORK_GROUP_COLUMN_COUNT,
+  WORK_GROUP_NAME_COLUMN_ID,
+  WORK_GROUP_ROW_ACTIONS_TESTID,
+  WorkGroupRowActions,
+  createWorkGroupColumns,
+  type WorkGroupColumnsDeps,
+  type WorkGroupRowActionHandler,
+  type WorkGroupRowActionsProps,
+} from './work-group-columns';
+export {
+  WORK_GROUP_LIST_CLEAR_SEARCH_TESTID,
+  WORK_GROUP_LIST_EMPTY_MESSAGE_TESTID,
+  WORK_GROUP_LIST_EMPTY_TESTID,
+  WORK_GROUP_LIST_FIRST_PAGE_TESTID,
+  WorkGroupListEmpty,
+  type WorkGroupListEmptyProps,
+} from './work-group-list-empty';
+export {
+  WORK_GROUP_LIST_ERROR_CODE_TESTID,
+  WORK_GROUP_LIST_ERROR_MESSAGE_TESTID,
+  WORK_GROUP_LIST_ERROR_TESTID,
+  WORK_GROUP_LIST_RETRY_TESTID,
+  WorkGroupListError,
+  type WorkGroupListErrorProps,
+} from './work-group-list-error';
+export {
+  buildWorkGroupListQuery,
+  parseWorkGroupListParams,
+  workGroupListHref,
+  type WorkGroupListSearchParams,
+} from './work-group-list-params';
+export {
+  WORK_GROUP_LIST_TESTID,
+  WorkGroupListSection,
+  type WorkGroupListSectionProps,
+} from './work-group-list-section';
+export {
+  WORK_GROUP_LIST_SKELETON_TESTID,
+  WORK_GROUP_ROW_SKELETON_TESTID,
+  WORK_GROUP_SKELETON_COLUMN_COUNT,
+  WorkGroupListSkeleton,
+} from './work-group-list-skeleton';
+export {
+  DELETE_WORK_GROUP_CONFIRM_TESTID,
+  DELETE_WORK_GROUP_DIALOG_TESTID,
+  DELETE_WORK_GROUP_DISMISS_TESTID,
+  DELETE_WORK_GROUP_ERROR_MESSAGE_TESTID,
+  DELETE_WORK_GROUP_ERROR_TESTID,
+  DELETE_WORK_GROUP_FORM_TESTID,
+  DELETE_WORK_GROUP_ID_TESTID,
+  DELETE_WORK_GROUP_MESSAGE_TESTID,
+  DeleteWorkGroupDialog,
+  type DeleteWorkGroupDialogProps,
+} from './delete-work-group-dialog';
+export {
+  WORK_GROUP_FORM_CANCEL_TESTID,
+  WORK_GROUP_FORM_ERROR_CODE_TESTID,
+  WORK_GROUP_FORM_ERROR_TESTID,
+  WORK_GROUP_FORM_ID_TESTID,
+  WORK_GROUP_FORM_SUBMIT_TESTID,
+  WORK_GROUP_FORM_TESTID,
+  WORK_GROUP_ID_FIELD,
+  WORK_GROUP_NAME_ERROR_TESTID,
+  WORK_GROUP_NAME_FIELD,
+  WORK_GROUP_NAME_FIELD_TESTID,
+  WORK_GROUP_NAME_ISSUE_MESSAGES,
+  WorkGroupForm,
+  workGroupNameIssue,
+  type WorkGroupFormProps,
+  type WorkGroupNameIssue,
+} from './work-group-form';
+export {
+  WORK_GROUP_ADD_ERROR_TESTID,
+  WORK_GROUP_CANDIDATES_EMPTY_TESTID,
+  WORK_GROUP_CANDIDATES_ERROR_TESTID,
+  WORK_GROUP_CANDIDATES_LOADING_TESTID,
+  WORK_GROUP_CANDIDATE_TESTID,
+  WORK_GROUP_MEMBERS_EMPTY_TESTID,
+  WORK_GROUP_MEMBERS_ERROR_TESTID,
+  WORK_GROUP_MEMBERS_LOADING_TESTID,
+  WORK_GROUP_MEMBERS_NEXT_TESTID,
+  WORK_GROUP_MEMBERS_POSITION_TESTID,
+  WORK_GROUP_MEMBERS_PREVIOUS_TESTID,
+  WORK_GROUP_MEMBERS_TESTID,
+  WORK_GROUP_MEMBER_ID_FIELD,
+  WORK_GROUP_MEMBER_NAME_TESTID,
+  WORK_GROUP_MEMBER_REMOVE_TESTID,
+  WORK_GROUP_MEMBER_ROW_TESTID,
+  WORK_GROUP_MEMBER_SEARCH_TESTID,
+  WORK_GROUP_REMOVE_ERROR_TESTID,
+  WorkGroupMembers,
+  workGroupMembersPositionLabel,
+  type WorkGroupMembersProps,
+} from './work-group-members';
+export {
+  WORK_GROUP_SHEET_TESTID,
+  WorkGroupSheet,
+  type WorkGroupSheetProps,
+} from './work-group-sheet';
+export {
+  WORK_GROUP_CREATE_OPEN_TESTID,
+  WORK_GROUP_TABLE_ID,
+  WORK_GROUP_TABLE_TESTID,
+  WORK_GROUP_TABLE_TEXTS,
+  WorkGroupTable,
+  type WorkGroupPanel,
+  type WorkGroupPanelMode,
+  type WorkGroupTableProps,
+} from './work-group-table';

@@ -140,8 +140,9 @@ ninguna aplica, salta al paso 6.
 Para cualquiera de las tres: redacta el valor nuevo, muéstralo, y **con un sí explícito
 escríbelo en el issue** con las herramientas MCP de `atlassian`. Recién entonces siembras.
 
-- **Una ficha nueva se crea completa o no se crea:** tipo `Tarea`, `parent` puesto a la épica
-  del módulo, el link **«is blocked by»** hacia lo que la bloquea, y los labels del contrato
+- **Una ficha nueva se crea completa o no se crea:** en el proyecto que declara
+  `jira.project` en `feature_list.json` —no en uno elegido por contexto—, tipo `Tarea`,
+  `parent` puesto a la épica del módulo, el link **«is blocked by»** hacia lo que la bloquea, y los labels del contrato
   (`sdd`, `slug:<kebab-case>`, `zone:<...>`, más `complexity:<...>` **solo si la acotación ya
   lo sabe**; si no, se deja fuera y lo asigna el leader en F1.0). Una ficha a medias es peor
   que ninguna: F0 la importa igual y aterriza en el backlog sin slug ni zona.

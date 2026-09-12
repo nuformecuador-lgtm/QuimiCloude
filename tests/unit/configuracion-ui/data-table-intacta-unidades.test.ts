@@ -4,9 +4,9 @@
 // arbol. R31 prohibe anadir a `components/shared/data-table/` ninguna propiedad ni mecanismo nuevo
 // para pintar acciones de fila —la columna de acciones es una columna normal cuyo `cell` devuelve
 // `ReactNode`— y R45 prohibe escribir o editar a mano nada de `components/ui/`. Las dos cosas se
-// comprueban sobre el diff contra la RAMA BASE de la feature, igual que
-// `tests/unit/unidades/modulo-intacto.test.ts`, que es el hermano de esta guardia en la capa del
-// modulo.
+// comprueban sobre el diff contra la base de la rama —el **merge-base** con `dev`, ver
+// `REFERENCIAS_DE_DEV`—, y solo cuando la rama medida es la de QC-39: ver la PRECONDICION DE RAMA.
+// `tests/unit/unidades/modulo-intacto.test.ts` es el hermano de esta guardia en la capa del modulo.
 //
 // El diff se hace contra el ARBOL DE TRABAJO —no contra `HEAD`—, asi que una modificacion sin
 // commitear tambien cae. Si el commit base no esta disponible donde corre la suite, el caso se
@@ -20,7 +20,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, type TestContext } from 'vitest';
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). Aqui la «raiz»
  *  puede ser un WORKTREE, donde `.git` es un archivo y no una carpeta; los comandos de git
@@ -42,31 +42,65 @@ function findRepoRoot(startDir: string): string {
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
 
 /**
- * La RAMA BASE de esta feature: `origin/dev` en el momento de montar el worktree. Es un commit y no
- * una referencia movil, para que el criterio no cambie por debajo si `origin/dev` avanza mientras
- * la rama esta viva. La misma que usa `tests/unit/unidades/modulo-intacto.test.ts`.
+ * Las referencias que nombran la rama de integracion, en orden de preferencia. La base contra la
+ * que se mide esta feature es el **merge-base** entre `dev` y `HEAD`, calculado en CADA ejecucion.
+ *
+ * Aqui vivio un SHA congelado (`516e9c0`, el `origin/dev` del que nacio el worktree) justificado
+ * con que «asi el criterio no cambia por debajo si `origin/dev` avanza». El argumento es falso y el
+ * efecto, el contrario —la misma leccion que `data-table-intacta-usuarios.test.ts` ya escribio para
+ * su gemela—: `git diff <sha> -- <rutas>` (DOS puntos) compara arbol contra arbol, de modo que el
+ * rango se traga todo lo que `dev` ha traido desde entonces y se lo atribuye a esta feature. El
+ * 2026-09-12, desde la rama de QC-85, ese rango eran **565 archivos ajenos**, y entre ellos
+ * aparecian `app/(private)/configuracion/unidades/page.tsx` y `specs/QC-39-pantalla-de-unidades/`:
+ * con el SHA congelado, la precondicion de rama de abajo habria dado positivo en CUALQUIER rama y
+ * no habria discriminado nada.
+ *
+ * El merge-base conserva —y refuerza— la propiedad que aquel comentario buscaba: la pregunta pasa a
+ * ser «que anade MI rama sobre el `dev` ACTUAL», que es justo lo que R45 quiere saber, y el
+ * criterio no se afloja porque `dev` avance, porque lo que `dev` aporta nunca cuenta como mio.
  */
-const RAMA_BASE = '516e9c0';
+const REFERENCIAS_DE_DEV = ['origin/dev', 'dev'] as const;
 
 /** Las dos carpetas que esta feature NO puede tocar (R31, R45, R47). */
 const INTOCABLES = ['components/shared/data-table', 'components/ui'] as const;
+
+/** La carpeta de la pantalla de QC-39: el ancla de no-vacuidad de esta guardia. */
+const CARPETA_DE_LA_PANTALLA = 'app/(private)/configuracion/unidades';
 
 function git(args: readonly string[]): string {
   return execFileSync('git', [...args], { cwd: repoRoot, encoding: 'utf8' });
 }
 
-/** `true` si el commit base esta disponible aqui; si no, los casos que dependen de el se saltan. */
-function baseDisponible(): boolean {
-  try {
-    git(['rev-parse', '--verify', `${RAMA_BASE}^{commit}`]);
-    return true;
-  } catch {
-    return false;
+/**
+ * El merge-base entre la primera referencia de `dev` disponible y `HEAD`, o `null` si no hay
+ * ninguna a mano. `null` NO es verde: quien depende de la base se salta con el motivo escrito.
+ */
+function baseDeLaRama(): string | null {
+  for (const referencia of REFERENCIAS_DE_DEV) {
+    try {
+      return git(['merge-base', referencia, 'HEAD']).trim();
+    } catch {
+      // Esa referencia no existe aqui: se prueba la siguiente.
+    }
   }
+  return null;
 }
 
-function archivosCambiados(rutas: readonly string[]): readonly string[] {
-  return git(['diff', '--name-only', RAMA_BASE, '--', ...rutas])
+/** Se calcula una sola vez: el grafo no se mueve mientras corre la suite. */
+const BASE_DE_LA_RAMA = baseDeLaRama();
+
+/** El motivo que se escribe cuando no hay base: un salto explicito, nunca un verde silencioso. */
+const SIN_BASE =
+  `ninguna de las referencias ${REFERENCIAS_DE_DEV.join(', ')} esta disponible: no se puede ` +
+  'calcular el merge-base, asi que esta guardia NO ha comprobado nada';
+
+/**
+ * Los archivos cambiados bajo `rutas` respecto del merge-base. El base va como commit suelto y no
+ * como `origin/dev...HEAD` a proposito: la forma de tres puntos solo mira commits, y aqui hace
+ * falta que el ARBOL DE TRABAJO cuente.
+ */
+function archivosCambiados(base: string, rutas: readonly string[]): readonly string[] {
+  return git(['diff', '--name-only', base, '--', ...rutas])
     .split('\n')
     .map((linea) => linea.trim())
     .filter((linea) => linea !== '');
@@ -91,28 +125,101 @@ function fuenteSinComentarios(ruta: string): string {
     .replace(/\/\*[\s\S]*?\*\//g, ' ');
 }
 
+/**
+ * LA PRECONDICION DE RAMA (anadida el 2026-09-12 desde la rama de QC-85).
+ *
+ * Esta guardia sabia contra que comparar pero no comprobaba QUE RAMA estaba midiendo. Mientras
+ * QC-39 vivia en su worktree eso no se notaba; **en cuanto QC-39 se mergeo en `dev`, este archivo
+ * empezo a medir CUALQUIER rama con las reglas de alcance de QC-39**. Lo destapo QC-85 (pantalla de
+ * grupos de trabajo) el 2026-09-12: su R37 autoriza anadir una primitiva por la CLI de shadcn —el
+ * unico camino permitido— y el archivo resultante, **`components/ui/tabs.tsx`**, puso en rojo el
+ * caso «QC-39 modifico archivos intocables» con `expected [ 'components/ui/tabs.tsx' ] to deeply
+ * equal []`. R31, R45 y R47 son el alcance de QC-39 y no le aplican a ninguna otra ficha.
+ *
+ * El agujero no era solo el rojo falso: era tambien el **verde falso**. Una rama ajena que no
+ * tocara `components/ui/` salia verde aqui, y ese verde decia «he revisado el diff de QC-39 y no
+ * abre la tabla compartida» sin haber mirado el diff de QC-39 en absoluto.
+ *
+ * Es la misma leccion, y la misma cura, que `tests/unit/identity/account-status-scope.test.ts` y
+ * `tests/unit/configuracion-ui/data-table-intacta-usuarios.test.ts`. **Se copia su forma a
+ * proposito, sin inventar una tercera**: que el repo tenga varias maneras de decir lo mismo es la
+ * mitad del problema que se esta arreglando.
+ *
+ * LA SENAL es CONJUNTIVA: el archivo central de la pantalla **mas** la carpeta de spec de la propia
+ * ficha. La carpeta de spec discrimina de verdad porque nace y vive dentro del rango de QC-39 y no
+ * aparece jamas en el rango de otra ficha, que trae la SUYA. No se usa este archivo de test como
+ * senal, justamente porque otras fichas lo enmiendan al chocar con el.
+ *
+ * **Esto ENDURECE la precondicion, no relaja la comprobacion**: en la rama real de QC-39 las dos
+ * senales estan presentes y los dos casos de abajo corren exactamente igual, con la misma lista
+ * cerrada de `INTOCABLES` —que no se toca, y a la que no se le anade ninguna excepcion— y las
+ * mismas igualdades. Fuera de su rama quedan `skipped`, nunca verdes.
+ */
+const ARCHIVO_CENTRAL_DE_QC39 = `${CARPETA_DE_LA_PANTALLA}/page.tsx`;
+const CARPETA_SPEC_DE_QC39 = 'specs/QC-39-pantalla-de-unidades/';
+
+export function esLaRamaDeQC39(tocados: readonly string[]): boolean {
+  return (
+    tocados.includes(ARCHIVO_CENTRAL_DE_QC39) &&
+    tocados.some((archivo) => archivo.startsWith(CARPETA_SPEC_DE_QC39))
+  );
+}
+
+/**
+ * Salta el caso —ruidosamente, con el motivo escrito— cuando la rama no es la de QC-39. El diff se
+ * pide sobre TODO el arbol (`.`) y no solo sobre las rutas vigiladas: la senal vive fuera de ellas.
+ */
+function saltarSiNoEsLaRamaDeQC39(ctx: Pick<TestContext, 'skip'>, base: string): void {
+  const tocados = archivosCambiados(base, ['.']);
+
+  if (tocados.length === 0) {
+    ctx.skip(
+      'la rama no toca ningun archivo respecto del merge-base con `dev`: no hay diff que ' +
+        'revisar, asi que este caso NO ha comprobado nada. Ocurre al correr el gate sobre `dev` ' +
+        'con el arbol limpio.',
+    );
+    return;
+  }
+
+  if (!esLaRamaDeQC39(tocados)) {
+    ctx.skip(
+      'el rango no trae a la vez `' +
+        ARCHIVO_CENTRAL_DE_QC39 +
+        '` y `' +
+        CARPETA_SPEC_DE_QC39 +
+        '`: esta NO es la rama de QC-39, asi que este caso NO ha comprobado nada. R31, R45 y R47 ' +
+        'son el alcance de ESA ficha y no le aplican a ninguna otra.',
+    );
+  }
+}
+
 describe('esta feature no abre la tabla compartida ni las primitivas (R31, R45)', () => {
   it('ningun archivo de `components/shared/data-table/` ni de `components/ui/` cambia', (ctx) => {
-    if (!baseDisponible()) {
-      ctx.skip(`el commit base ${RAMA_BASE} no esta disponible: no se puede comparar el diff`);
+    if (BASE_DE_LA_RAMA === null) {
+      ctx.skip(SIN_BASE);
       return;
     }
+    saltarSiNoEsLaRamaDeQC39(ctx, BASE_DE_LA_RAMA);
 
-    const tocados = [...archivosCambiados(INTOCABLES), ...archivosSinSeguimiento(INTOCABLES)];
+    const tocados = [
+      ...archivosCambiados(BASE_DE_LA_RAMA, INTOCABLES),
+      ...archivosSinSeguimiento(INTOCABLES),
+    ];
 
     expect(tocados, `QC-39 modifico archivos intocables: ${tocados.join(', ')}`).toEqual([]);
   });
 
   it('el detector muerde: comparando la carpeta de la pantalla, el diff NO sale vacio', (ctx) => {
-    if (!baseDisponible()) {
-      ctx.skip(`el commit base ${RAMA_BASE} no esta disponible: no se puede comparar el diff`);
+    if (BASE_DE_LA_RAMA === null) {
+      ctx.skip(SIN_BASE);
       return;
     }
+    saltarSiNoEsLaRamaDeQC39(ctx, BASE_DE_LA_RAMA);
 
     // El caso simetrico, para que «lista vacia» no pueda serlo por vacuidad —por ejemplo porque el
-    // `--` estuviera mal puesto y git no mirara nada—. La carpeta de la pantalla SI cambio respecto
-    // a la rama base: las piezas puras de T5 y T6 ya estan ahi.
-    const cambiados = archivosCambiados(['app/(private)/configuracion/unidades']);
+    // `--` estuviera mal puesto y git no mirara nada—. La carpeta de la pantalla SI cambia respecto
+    // de la base en la rama de QC-39: ahi estan las piezas de la feature.
+    const cambiados = archivosCambiados(BASE_DE_LA_RAMA, [CARPETA_DE_LA_PANTALLA]);
 
     expect(cambiados.length).toBeGreaterThan(0);
   });

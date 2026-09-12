@@ -32,6 +32,11 @@
  * orden que respeta `users_company_id_fkey`— para que la primera corrida tenga que CREAR la
  * empresa en vez de reutilizar la que dejo la instalacion. Sigue todo dentro del `tx` que
  * termina en ROLLBACK.
+ *
+ * QC-49 — esa ficha colgo el inventario (`units`, `products`, `presentations`,
+ * `product_batches`) de `companies`, no de `users`, y el barrido previo solo recorria el
+ * cierre de `users`: esas tablas sobrevivian al reset y el borrado de `companies` moria con
+ * `Foreign key constraint violated`. Desde ahora el cierre se calcula desde AMBOS origenes.
  */
 import { randomUUID } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -137,16 +142,42 @@ type ForeignKeyEdge = { readonly child: string; readonly parent: string };
 const SAFE_TABLE_NAME = /^[a-z_][a-z0-9_]*$/;
 
 /**
- * Devuelve las tablas que dependen de `users` (directa o transitivamente), ordenadas para
- * poder borrarlas de arriba a abajo sin violar ninguna FK: primero las hojas, al final las
- * que estan pegadas a `users`. `users` NO va en la lista; lo borra su llamador.
+ * Las tablas que el llamador borra por su cuenta y que, por tanto, nunca deben aparecer en
+ * la lista que devuelve `tablesDependingOn`: son los ORIGENES del recorrido.
+ *
+ * QC-49 — antes el unico origen era `users`. Esa ficha colgo el inventario (`units`,
+ * `products`, `presentations`, `product_batches`) directamente de `companies`, no de
+ * `users`, asi que el cierre transitivo desde `users` no las visitaba nunca: sobrevivian al
+ * reset y hacian reventar el `tx.company.deleteMany({})` del final con
+ * `Foreign key constraint violated`. Con `companies` tambien como origen, esas tablas entran
+ * en el recorrido y se van antes que la empresa que las sostiene.
+ */
+const RESET_ROOT_TABLES = ['users', 'companies'] as const;
+
+/**
+ * Devuelve las tablas que dependen de cualquiera de los `roots` (directa o transitivamente),
+ * ordenadas para poder borrarlas de arriba a abajo sin violar ninguna FK: primero las hojas,
+ * al final las que estan pegadas a un origen. Los propios `roots` NO van en la lista; los
+ * borra su llamador (`tx.user.deleteMany` y `tx.company.deleteMany`).
+ *
+ * El ORDEN sale del mismo recorrido de siempre y sirve tal cual para varios origenes: el
+ * cierre se calcula hacia ABAJO (de padre a hijo) sobre un unico conjunto `pending`, y luego
+ * se emite por capas sacando en cada vuelta las tablas a las que ya no apunta ninguna otra
+ * tabla pendiente. O sea que los hijos salen SIEMPRE antes que sus padres, incluso cuando
+ * padre e hijo vienen de ramas distintas (`presentations` y `product_batches` cuelgan de
+ * `products`, y `products` cuelga a la vez de `users` y de `companies`): al mezclarlo todo en
+ * un solo conjunto, la dependencia se respeta sin tener que invertir nada.
  *
  * Se lee del CATALOGO de Postgres, no de una lista escrita a mano, a proposito: cuando un
  * modulo nuevo añada una columna de auditoria hacia `users` (ya pasó con `recipes`,
- * `products`, `suppliers`, `orders` y `supplier_catalog_lines`), este helper lo recoge solo
- * y el archivo no vuelve a ponerse rojo por una tabla que nadie recordo listar aqui.
+ * `products`, `suppliers`, `orders` y `supplier_catalog_lines`) o cuelgue una tabla de
+ * `companies` (ya pasó con QC-49), este helper lo recoge solo y el archivo no vuelve a
+ * ponerse rojo por una tabla que nadie recordo listar aqui.
  */
-async function tablesDependingOnUsers(tx: Prisma.TransactionClient): Promise<readonly string[]> {
+async function tablesDependingOn(
+  tx: Prisma.TransactionClient,
+  roots: readonly string[],
+): Promise<readonly string[]> {
   const edges = await tx.$queryRaw<ForeignKeyEdge[]>`
     SELECT hijo.relname::text AS child, padre.relname::text AS parent
     FROM pg_constraint con
@@ -156,13 +187,14 @@ async function tablesDependingOnUsers(tx: Prisma.TransactionClient): Promise<rea
     WHERE con.contype = 'f' AND ns.nspname = 'public' AND hijo.relname <> padre.relname
   `;
 
-  // Cierre transitivo hacia abajo desde `users`, sin incluir a `users`.
+  // Cierre transitivo hacia abajo desde cada origen, sin incluir a los propios origenes.
+  const rootSet = new Set(roots);
   const pending = new Set<string>();
-  const queue: string[] = ['users'];
+  const queue: string[] = [...roots];
   while (queue.length > 0) {
     const parent = queue.shift() as string;
     for (const edge of edges) {
-      if (edge.parent !== parent || pending.has(edge.child) || edge.child === 'users') continue;
+      if (edge.parent !== parent || pending.has(edge.child) || rootSet.has(edge.child)) continue;
       pending.add(edge.child);
       queue.push(edge.child);
     }
@@ -178,7 +210,7 @@ async function tablesDependingOnUsers(tx: Prisma.TransactionClient): Promise<rea
     );
     if (leaves.length === 0) {
       throw new Error(
-        `ciclo de claves foraneas entre las tablas dependientes de users: ${[...pending].join(', ')}`,
+        `ciclo de claves foraneas entre las tablas dependientes de ${roots.join('/')}: ${[...pending].join(', ')}`,
       );
     }
     for (const leaf of leaves.sort()) {
@@ -203,10 +235,15 @@ async function tablesDependingOnUsers(tx: Prisma.TransactionClient): Promise<rea
  * alguien sembro datos, los 8 casos se pusieron rojos. Ahora el escenario se construye
  * entero y el test no depende de con que datos arranque la base local.
  *
+ * QC-49 — y lo mismo vale para `companies`: el inventario cuelga de la empresa, no del
+ * usuario, asi que el barrido se hace desde los DOS origenes (`RESET_ROOT_TABLES`) en una
+ * sola pasada ordenada. Si se hiciera en dos pasadas independientes, `products` —hijo de
+ * ambos— podria intentar borrarse antes que `presentations`.
+ *
  * TODO ESTO SIGUE DENTRO DEL `tx` QUE TERMINA EN ROLLBACK: no se pierde ni una fila real.
  */
 async function resetIdentityToEmptyState(tx: Prisma.TransactionClient): Promise<void> {
-  for (const table of await tablesDependingOnUsers(tx)) {
+  for (const table of await tablesDependingOn(tx, RESET_ROOT_TABLES)) {
     if (!SAFE_TABLE_NAME.test(table)) {
       throw new Error(`nombre de tabla inesperado en el catalogo: ${table}`);
     }

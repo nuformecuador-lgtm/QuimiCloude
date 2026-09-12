@@ -69,6 +69,7 @@ Cuando abres Claude Code en la raíz de este repo, actúas como **leader**. El l
 - Qué dependencias están aprobadas y cómo se aprueba una → `docs/dependencias.md`
 - Un worktree por feature: montar y desmontar → `docs/worktrees.md`
 - El board manda, el disco trabaja: contrato con Jira → `docs/jira.md`
+- Conectar tu cuenta de Jira y ver a qué proyectos accedes → `/jira-connect`
 - Criterios de estado final correcto → `CHECKPOINTS.md`
 - Afinar una mejora al arnés antes de aplicarla → `/afinar-regla`
 - Afinar una feature del board antes de especificarla → `/afinar-feature`

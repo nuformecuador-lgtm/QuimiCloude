@@ -77,6 +77,35 @@ pnpm exec vitest related --run $(git diff --name-only origin/dev...HEAD)   # tre
 > despreciable. El motivo para correr `./init.sh` completo antes del PR no es el tiempo, es la
 > cobertura.
 
+### El gate regenera los artefactos antes de mirar nada (2026-09-12)
+
+`init.sh` corre **siempre** `prisma generate` y `next typegen`, y reinstala si `pnpm-lock.yaml`
+es más nuevo que `node_modules`. No es comodidad: es que **estos errores mienten sobre su causa**,
+y el 2026-09-11 costaron cuatro paradas y una suite E2E entera caída sin que nadie lo supiera.
+
+| Lo que sale por pantalla | Lo que parece | Lo que era |
+|---|---|---|
+| `Module '@prisma/client' has no exported member 'Prisma'` | versiones de Prisma peleadas | un `generate` que faltaba tras montar el worktree |
+| `Cannot find name 'LayoutProps'` | un problema de Next | los tipos de ruta sin generar |
+| `Cannot find module 'resend'` | **una dependencia metida sin aprobar** (regla 7) | estaba aprobada, documentada y en `package.json`; el `node_modules` del árbol principal se quedó corto tras el merge |
+
+El tercero es el que justifica la regla por sí solo: un síntoma de entorno **acusando a otra
+sesión de saltarse una regla del arnés**. De ahí a «arreglar» algo que no está roto hay un paso.
+
+**Coste medido el 2026-09-12**, no estimado: 12 s de `prisma generate` más 5 s de `next typegen`
+en régimen estable; **128 s la primera vez** tras cambiar el esquema. Sobre el gate completo
+(160–480 s) es un 4–10 %; sobre el rápido (~60 s), un 28 %. Se paga igual: **una sola corrida
+repetida por entorno desfasado cuesta más que tres con estos pasos dentro**.
+
+Los dos pasos **avisan y siguen** si fallan, nunca abortan. El gate de verdad es el `typecheck`
+que viene después; si el artefacto no se pudo generar, el aviso explica de antemano el error
+fantasma que va a salir. Un `fail` aquí dejaría sin gate a quien tenga el entorno a medias.
+
+**Lo que esto NO cubre, y sigue siendo manual:** aplicar a la base las **migraciones** que traiga
+un merge con `dev`. El gate regenera el *cliente* de Prisma, no ejecuta `migrate deploy`. Si tu
+rama sincroniza y `dev` traía una migración, los tests de integración darán rojos que no son
+tuyos hasta que la apliques. Está escrito en `AGENTS.md > F2.3`.
+
 ## Qué cuenta como evidencia
 - Salida real de los tests pasando, pegada en `progress/impl_<feature>.md`.
 - El mapa `R<n> → test`: para cada requisito, el test que lo cubre.

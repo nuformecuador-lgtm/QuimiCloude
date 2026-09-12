@@ -108,6 +108,13 @@ Luego, según la razón:
 
 ## El gate
 
+
+Y desde el 2026-09-12, `./init.sh` **deja el entorno al día antes de mirar nada**: regenera el
+cliente de Prisma y los tipos de ruta de Next, y reinstala si cambió el lock. Un worktree recién
+montado no trae ninguna de las tres cosas, y sus errores no nombran su causa. El porqué, la tabla
+de síntomas engañosos y el coste medido: `docs/verification.md > El gate regenera los artefactos`.
+Lo que sigue siendo tuyo: aplicar a **tu** base las migraciones que traiga un merge con `dev`.
+
 `./init.sh` cuenta los worktrees registrados y avisa si hay más de 5 además del
 principal, o si alguno quedó con el directorio borrado. Es `warn`, **no `fail`**: un gate
 rojo por tareas domésticas bloquearía trabajo real y la respuesta previsible sería

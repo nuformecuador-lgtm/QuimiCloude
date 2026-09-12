@@ -4,7 +4,14 @@
 > (HEAD `fedcbf6`, **sin sincronizar con `origin/dev`**, que va 15 commits por delante) ·
 > **Worktree** `.worktrees/QC-77-aislamiento-de-la-base-en-tests-de-integracion`.
 >
-> **Veredicto: RECHAZADO.** 4 hallazgos mayores (todos de **trazabilidad**: requisitos sin
+> **VEREDICTO VIGENTE (segunda pasada, F2.3): OK.** Cero mayores vivos, 3 menores sin accion
+> obligada, **31 de 31 requisitos cubiertos**. El detalle de esta segunda pasada esta en la
+> **seccion 8**, al final; lo de abajo es la primera pasada, que se deja entera para que se vea
+> que cambio.
+>
+> ---
+>
+> **Primera pasada (F2.2) — Veredicto: RECHAZADO.** 4 hallazgos mayores (todos de **trazabilidad**: requisitos sin
 > ningun test que vuelva a correr) y 8 menores. Ningun defecto funcional: lo que la ficha
 > construyo **funciona, y lo he vuelto a medir yo**. Lo que falta es que siga funcionando
 > manana sin que nadie se acuerde de medirlo a mano.
@@ -274,3 +281,142 @@ los 13 rojos de la linea base desaparecidos, base de desarrollo intacta, esquema
 una base al dia, borrado al terminar, guardian y guardia mordiendo. Lo que falta es que el arnes
 se entere solo el dia que deje de funcionar, que es literalmente lo que esta ficha vino a
 enseñarle al repo.
+
+---
+
+# 8. SEGUNDA PASADA (F2.3, 2026-09-12) — veredicto **OK**
+
+La rama ya no esta sin commitear: **7 commits** sobre `fedcbf6` (`1d9c389`, `559041e`, `ae6e881`,
+`ea47b9f`, `a9ad3fb`, `e7b69b7`, `ca3259f`), arbol limpio, **39 archivos** en el diff contra
+`origin/dev`. Sigue sin haber una sola ruta bajo `app/`, `lib/`, `components/`, `db/` ni `e2e/`, y
+`package.json` sigue ganando **solo** el script `db:test` (diff releido entero).
+
+## 8.1 Que corri yo en esta segunda pasada
+
+| Comando | Resultado |
+| --- | --- |
+| `vitest run tests/unit/test-database tests/guards/guard-aislamiento-integracion.test.ts` | **5 archivos, 57 casos verdes** (18 nombres + 8 guardian + 16 barrido + 9 aviso + 6 guardia del censo) |
+| `vitest run tests/integration/infra/ciclo-de-vida-de-la-base.int.test.ts` | **5/5 verde** sobre su base efimera, borrada al terminar |
+| `vitest run --project integration` | **42/42 archivos, 635/635 casos, VERDE** (65 s), base `qct_qc77_7a512e99_mtyppdxx_qtw`, borrada al terminar. El archivo nuevo **no rompio a ninguno de los 41** |
+| `./init.sh --rapido` | **rc=0**; ahora el grafo **si** selecciona la ficha: **6 archivos / 62 casos** relacionados (antes cero) mas **33 guardias**; bloque `6.c` en verde; base efimera creada y borrada |
+| `pnpm run db:test list` y conteo de las 20 tablas de `QuimiCloude` | 39 bases, **las 21 heredadas intactas**, unica `qct_` viva la plantilla; **la base de desarrollo identica** a la de la primera pasada despues de cuatro corridas de integracion |
+| Censo contra arbol | `aislamiento.json` 18 mas 24 = **42**; el arbol tiene **42** archivos `.int.test.ts` |
+| `git log fedcbf6..HEAD` sobre `requirements.md` | **vacio**: el bloque de Alcance, las dos preguntas abiertas y las 11 decisiones del humano **no se tocaron** |
+
+## 8.2 Las mutaciones que repeti yo (no me creo las diez de la bitacora)
+
+Todas con copia previa (`cp`), restauracion desde esa copia y **md5 comprobado** al volver
+(`2b698ebb1b6ce9b78f77b1f6d7fb0ae7`), con `git status` limpio despues de cada una.
+
+| # | Mutacion | Resultado |
+| --- | --- | --- |
+| 1 | **Guarda 1 borrada** de `verdictFor` — lo unico que protege `QuimiCloude` si algun dia se llamara con forma `qct_` | **ROJO, 3 casos**: «retiene la base de desarrollo aunque su nombre sea un qct_ valido», «retiene tambien la segunda URL», «gana sobre las demas» |
+| 2 | **Guarda 1 reordenada** al final de la rama `run`, o sea dejando sin proteger la forma heredada | **ROJO, 1 caso**: «retiene tambien la segunda URL de desarrollo» |
+| 3 | **Guarda 1 movida detras de las guardas 2 y 3**, sin dejar de proteger nada | **VERDE**, y es lo correcto: mutacion **equivalente**, la base de desarrollo sigue retenida. Ver la nota de 8.5 |
+| 4 | `reclaimAbandonedDatabases` **sin el filtro de `worktreePath`**, o sea borrando rastros de OTRO worktree | **ROJO, 1 caso**: «control negativo: no toca la base de otro worktree ni la de un pid vivo (R9)» |
+| 5 | Un export nuevo con nombre en castellano en `test-database.ts` | **ROJO**: «exporta solo identificadores escritos en ingles» — R31 sigue mordiendo con la superficie ampliada |
+
+Las dos que el leader pidio expresamente —la guarda 1 y el filtro de worktree— **muerden las dos**.
+Ninguna se quedo verde debiendo estar roja.
+
+## 8.3 Los cuatro mayores, uno a uno
+
+- **M1 (R12) — CERRADO.** El juicio salio a `tests/helpers/run-database-guard.ts`, funcion **pura**
+  que recibe el entorno y devuelve el mensaje; en `_setup.ts` queda solo el `throw`. Lei los dos
+  archivos: el comportamiento es **identico** al que ejercite en la primera pasada, orden de
+  desenlaces incluido. `guardian-r12.test.ts` cubre los cinco abortos mas dos verdes, y los seis
+  rojos afirman ademas que **el mensaje nombra la base encontrada**, que es lo que R12 exige
+  literalmente. El caso verde impide el fallo clasico de un guardian que aborte siempre.
+- **M2 (R26, R27, R29, guarda 1 de R30) — CERRADO.** `verdictFor` y `VerdictContext` exportados.
+  **Verifique linea a linea que el orden de las guardas NO cambio** respecto de lo que lei en la
+  primera pasada: 1 desarrollo, 2 desconocido, 3 conexiones, plantillas, 5 git ilegible, 4 dueno
+  vivo, con los mismos textos de razon. Los 16 casos cubren las cinco guardas, las dos reglas de
+  plantilla, dos SAFE positivos y `dropSweptDatabase` rechazando un nombre desconocido **antes de
+  abrir conexion** (lo mide apuntando a un puerto muerto: si la validacion se moviera detras, el
+  error seria de red y el caso se pondria rojo). Las mutaciones 1, 2 y 4 lo confirman.
+- **M3 (R7, R8, R9) — CERRADO.** `ciclo-de-vida-de-la-base.int.test.ts` no se cree a la libreria:
+  pregunta a **`pg_database`** despues de cada borrado, y afirma tambien que la base **existia
+  antes**, sin lo cual un `createRunDatabase` que no creara nada dejaria el caso verde por
+  vacuidad. El caso de R8 mide lo que importa —que `dropRunDatabaseSync` **no devuelve promesa** y
+  que la base ya no esta **sin ningun `await` intermedio**—, que es la propiedad que el handler de
+  Vitest vuelve critica. R9 trae **control negativo doble** (otro worktree, pid vivo) y usa
+  directorios temporales para no poder tocar la base de la corrida viva; el `afterAll` comprueba
+  contra el catalogo que no dejo nada. Corri el archivo y `db:test list` justo despues: cero bases
+  sueltas.
+- **M4 (R14, R15, R16) — CERRADO.** El formateo salio a `describePendingMigrations` (puro) y
+  `commandStatus` solo imprime. Los nueve casos cubren los tres desenlaces, que la «mas antigua»
+  se elige **ordenando** y no cogiendo `pending[0]`, y **tres que leen `init.sh` como texto**: que
+  el bloque `6.c` conserva su `|| true`, que su **unico** `fail` es el del script ausente, y que el
+  `else` imprime con `warn`. Es justo lo que faltaba: R15 deja de depender de que nadie toque siete
+  caracteres sin que nada se entere.
+
+## 8.4 Las dos cosas que el implementer declaro solo, juzgadas
+
+1. **El subagente que edito `tests/helpers/test-database.ts` fuera de su carril**
+   (`progress/qc77-mediciones/M3.md > 8`): declarado sin maquillar, incluido el riesgo que el
+   propio agente no podia descartar. **Comprobado en disco por mi, y no se perdio nada.** Siguen en
+   pie los tres cambios de F2.3 —`verdictFor` y `VerdictContext` exportados (`:896`, `:910`) y
+   `describePendingMigrations` con su `sort()` (`:776-800`)— y **todos** los marcadores de F2.1:
+   `dropRunDatabaseSync` con `spawnSync` (`:370-395`), el rename de la plantilla provisional
+   (`:552`), el reintento ante `55006` (`:613`), `WITH (FORCE)`, `pg_advisory_lock` (`:534`), el
+   filtro `rolled_back_at IS NULL AND finished_at IS NOT NULL` (`:737`) y el filtro de
+   `worktreePath` (`:693`). El archivo paso de 971 a 1026 lineas: **solo crecio**. Y lo que hace
+   que esto deje de ser un riesgo abierto es que ahora hay tests encima: si el `sort()` se hubiera
+   perdido en una de esas ventanas, «elige la mas antigua de verdad» estaria rojo, y esta verde.
+   **Proceso mejorable, resultado intacto: menor, sin accion.**
+2. **Los seis requisitos que se cubren «por el criterio» (R2, R3, R11, R13, R25 y R10): los
+   acepto**, y no es una concesion nueva — son los mismos que ya acepte en la primera pasada
+   (seccion 2, «Cubiertos»). Si la plantilla no se construye o se copia mal, se caen los 635 casos;
+   si la URL no llega al worker, el guardian aborta antes del primer caso, **y ahora ese guardian
+   tiene sus propios tests**, que es lo que le faltaba al razonamiento para sostenerse. R10 sigue
+   siendo cobertura por partes y deuda nombrada: se cierra sola cuando dos worktrees tengan la
+   ficha.
+
+## 8.5 Estado de los hallazgos de la primera pasada
+
+| Hallazgo | Estado |
+| --- | --- |
+| **M1, M2, M3, M4** (mayores) | **CERRADOS**, verificados corriendo y mutando |
+| menor 1 — referencias colgadas | **CERRADO**: un `grep` de `_qc77_` en `tests/` y `scripts/` no devuelve nada; la que viajaba dentro del mensaje de error de R12 apunta ahora a `progress/qc77-mediciones/T4.md` |
+| menor 2 — sin commitear | **CERRADO**: 7 commits, arbol limpio, y `--rapido` pasa de 0 a 62 casos relacionados |
+| menor 3 — `design.md > 2` | **CERRADO**: el parrafo describe el comportamiento real y anota la correccion |
+| menor 4 — divergencias solo en la bitacora | **CERRADO**: `design.md > 14` con las cinco, mas la nota sobre la guarda 4 |
+| menor 6 — `tasks.md` | **CERRADO**: los seis archivos anotados con su fase y su porque |
+| menor 5 — R10 por partes | **Vivo, sin accion**: aceptado y nombrado como deuda |
+| menor 7 — `QC77_RUN_DATABASE` | **Vivo, sin accion**: justificado, y ya figura en `design.md > 14` |
+| menor 8 — 28 filas de `_prisma_migrations` | **Vivo, sin accion**: correcto, y ya figura en `design.md > 14` |
+
+**Menores nuevos de esta pasada: ninguno.** Solo una nota, por precision: el caso «gana sobre las
+demas» dice fijar el **orden** de las guardas, y mi mutacion 3 enseña que lo que fija de verdad es
+algo distinto y mas util — que la guarda 1 **dispare antes de cualquier `safe(...)`**. Las
+reordenaciones que si hacen daño (mutaciones 1 y 2) se ponen rojas. El comentario promete una cosa
+y el test protege otra ligeramente distinta; no hay hueco.
+
+## 8.6 Checklist de `CHECKPOINTS.md`, revisado
+
+Todo lo de la seccion 1 sigue igual salvo lo que se movio:
+
+- [x] **Trazabilidad — cada `R<n>` mapea a un test concreto. 31 de 31.** Los diez huecos (R7, R8,
+      R9, R12, R14, R15, R16, R26, R27, R29) y la guarda 1 de R30 tienen ahora test que vuelve a
+      correr en cada gate, y lo he mutado para comprobar que muerde.
+- [x] `typecheck` y `lint` en verde (dentro de `./init.sh --rapido`, rc=0).
+- [ ] `tasks.md` con todas `[x]` — **17 de 18**; T18 sigue siendo del leader.
+- [ ] `./init.sh` completo en verde — **T18, y despues del merge con `dev`**.
+- [x] `progress/review_<feature>.md` con veredicto **OK**.
+- [ ] `progress/history.md` y desmontaje del worktree: fases posteriores.
+
+## 8.7 Veredicto de la segunda pasada
+
+**OK.** Cero mayores vivos; tres menores vivos que **no piden accion** (R10 por partes,
+`QC77_RUN_DATABASE` y las 28 filas de `_prisma_migrations`, los tres aceptados y ya escritos en el
+`design.md`). **31 de 31 requisitos cubiertos** por algo que vuelve a correr.
+
+Lo que cambio entre las dos pasadas no fue la funcionalidad —esa ya estaba— sino que el arnes se
+entere solo el dia que deje de funcionar. Cinco mutaciones mias lo confirman: se rompe lo que la
+ficha protege y el gate se pone rojo nombrando que se rompio.
+
+**Sigue faltando T18** (`./init.sh` completo, sin banderas, **despues** del merge con `dev`), que
+no es mio: esta ficha toca `init.sh` y `scripts/`, justo lo que el modo rapido se niega a cubrir. Y
+sigue en pie el aviso de la seccion 6: si los 15 commits de `dev` traen archivos nuevos bajo
+`tests/integration/`, la guardia del censo los pondra en rojo hasta que se declaren — eso es la
+guardia trabajando, no una regresion.

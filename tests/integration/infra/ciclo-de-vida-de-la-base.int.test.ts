@@ -69,12 +69,25 @@ const PID_MUERTO = 999_999
 /**
  * Plazo de los hooks. El `testTimeout` de los tres proyectos es 15 s
  * (`vitest.config.mts`, vigilado por `guard-teclear-y-plazo`), pero el de los HOOKS sigue
- * siendo el de por defecto (10 s) y aqui un hook crea hasta tres bases. Se iguala a mano,
+ * siendo el de por defecto (10 s) y aqui un hook crea hasta tres bases. Se pone a mano,
  * por la misma razon que QC-58 subio el otro: bajo carga, copiar una base tarda mas de lo
  * que tarda en reposo, y un gate que cambia de color segun lo ocupada que este la maquina no
  * informa de nada. No se toca la config: es un plazo local de este archivo.
+ *
+ * **Por que 60 s y no 15, que es lo que decia aqui hasta el merge con `dev` de F2.3.** Con 15 s
+ * este archivo pasaba **corriendo solo** (el caso mas lento, 4,7 s) y el hook de R9 **expiraba**
+ * en cuanto corria acompanado —medido: `Hook timed out in 15000ms` junto a `identity-seed` e
+ * `identity-constraints`—. No es un flake: es aritmetica. Ese hook hace **tres**
+ * `CREATE DATABASE ... TEMPLATE` en serie y **cada uno reintenta ante `55006`** (plantilla
+ * ocupada) con espera creciente de hasta ~4 s antes de rendirse; tres veces eso ya se come el
+ * plazo entero, y encima queda el barrido. 15 s no era un margen, era el borde exacto.
+ *
+ * El coste de este numero es el de siempre: un hook colgado **de verdad** tarda 60 s en
+ * reportarse en vez de 15. Se acepta, igual que lo acepto QC-58, porque la alternativa —dejarlo
+ * al borde— es un rojo que aparece y desaparece segun con quien te toque correr, que es
+ * justamente lo que esta ficha vino a quitar del gate.
  */
-const PLAZO_DE_HOOK_MS = 15_000
+const PLAZO_DE_HOOK_MS = 60_000
 
 /** La coordenada de conexion. `_setup.ts` ya garantizo que apunta a la base de esta corrida. */
 let urlDeConexion: string
