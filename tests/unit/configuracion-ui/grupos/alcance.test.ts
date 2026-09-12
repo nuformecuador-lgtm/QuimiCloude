@@ -163,6 +163,34 @@ export function esLaRamaDeQC85(tocados: readonly string[]): boolean {
 }
 
 /**
+ * LA SENAL, EN DISYUNTIVA: «aqui hay algo de QC-85 que medir».
+ *
+ * No sustituye a `esLaRamaDeQC85` ni la afloja —esa sigue siendo CONJUNTIVA y es la que decide si
+ * un caso mide o se salta—. Esta responde una pregunta distinta y estrictamente mas debil: si el
+ * rango trae AL MENOS UNA de las dos senales. Sirve solo para el ancla de no-vacuidad de mas abajo,
+ * que necesita distinguir «no hay nada de esta ficha que medir» (correr el gate sobre `dev`, donde
+ * QC-85 ya esta mergeada y por tanto no la aporta la rama: se salta con el motivo escrito) de «hay
+ * trabajo de QC-85 delante y la precondicion NO lo reconoce» (el fallo que el ancla persigue: sigue
+ * rojo). Con la conjuntiva, el ancla se volveria un test que pasa siempre.
+ */
+function traeAlgunaSenalDeQC85(tocados: readonly string[]): boolean {
+  return (
+    tocados.includes(ARCHIVO_CENTRAL_DE_QC85) ||
+    tocados.some((archivo) => archivo.startsWith(CARPETA_SPEC_DE_QC85))
+  );
+}
+
+/**
+ * El motivo que se escribe cuando la rama no aporta NADA. Vive suelto porque lo comparten el
+ * preambulo de los casos que miden el diff y el ancla de no-vacuidad: que el repo tenga dos
+ * maneras de decir lo mismo es la mitad del problema que esta cabecera arreglo.
+ */
+const RAMA_SIN_APORTES =
+  'la rama no toca ningun archivo respecto del merge-base con `dev`: no hay diff que revisar, ' +
+  'asi que este caso NO ha comprobado nada. Ocurre al correr el gate sobre `dev` con el arbol ' +
+  'limpio.';
+
+/**
  * Salta el caso —ruidosamente, con el motivo escrito— cuando la rama no es la de QC-85. Se pide
  * TODO el arbol (`.`) y no solo las rutas vigiladas: la senal vive fuera de ellas. Y se mira
  * tambien lo SIN SEGUIMIENTO, porque el archivo central de esta ficha es un alta.
@@ -171,11 +199,7 @@ function saltarSiNoEsLaRamaDeQC85(ctx: Pick<TestContext, 'skip'>, base: string):
   const tocados = aportadosPorLaRama(base, ['.']);
 
   if (tocados.length === 0) {
-    ctx.skip(
-      'la rama no toca ningun archivo respecto del merge-base con `dev`: no hay diff que ' +
-        'revisar, asi que este caso NO ha comprobado nada. Ocurre al correr el gate sobre `dev` ' +
-        'con el arbol limpio.',
-    );
+    ctx.skip(RAMA_SIN_APORTES);
     return;
   }
 
@@ -261,16 +285,64 @@ describe('la senal CONJUNTIVA discrimina de verdad la rama de QC-85', () => {
     ).toBe(false);
   });
 
+  it('la senal disyuntiva es MAS DEBIL que la precondicion: el ancla de abajo sigue mordiendo', () => {
+    // El caso que justifica que el ancla se pueda saltar sin volverse decorativa. Una rama que
+    // trae SOLO una de las dos senales —aqui, la carpeta de spec de QC-85— si tiene «algo de
+    // QC-85 que medir», asi que el ancla NO se salta y, como la precondicion conjuntiva da falso,
+    // se pone roja. Que es exactamente el fallo que persigue.
+    const soloUnaSenal = [`${CARPETA_SPEC_DE_QC85}requirements.md`, 'progress/current.md'];
+
+    expect(traeAlgunaSenalDeQC85(soloUnaSenal)).toBe(true);
+    expect(esLaRamaDeQC85(soloUnaSenal)).toBe(false);
+
+    // Y sobre una rama sin nada de esta ficha —el gate corriendo en `dev`— no hay nada que medir.
+    expect(
+      traeAlgunaSenalDeQC85([
+        'app/(private)/configuracion/usuarios/page.tsx',
+        'specs/QC-67-pantalla-de-usuarios/requirements.md',
+      ]),
+    ).toBe(false);
+  });
+
   it('esta ejecucion SI es la rama de QC-85: ningun caso de abajo se ha saltado en silencio', (ctx) => {
-    // Ancla de no-vacuidad de la propia precondicion. Si esto fuera falso, todos los casos que
-    // miden el diff estarian `skipped` y el archivo entero seria decorativo. Sin base no se pasa
-    // de largo: se salta con el motivo escrito, como todos sus hermanos.
+    // Ancla de no-vacuidad de la propia precondicion. Si esto fuera falso ESTANDO delante el
+    // trabajo de QC-85, todos los casos que miden el diff estarian `skipped` y el archivo entero
+    // seria decorativo. Sin base no se pasa de largo: se salta con el motivo escrito, como todos
+    // sus hermanos.
     if (BASE_DE_LA_RAMA === null) {
       ctx.skip(SIN_BASE);
       return;
     }
 
-    expect(esLaRamaDeQC85(aportadosPorLaRama(BASE_DE_LA_RAMA, ['.']))).toBe(true);
+    const tocados = aportadosPorLaRama(BASE_DE_LA_RAMA, ['.']);
+
+    // «No hay nada que medir» NO es el fallo que este caso persigue, y desde el merge de QC-85 en
+    // `dev` (PR #64) es el estado NORMAL: sus archivos ya no los aporta ninguna rama, asi que la
+    // precondicion no puede reconocerla jamas corriendo sobre `dev`. Se salta ruidosamente, con el
+    // motivo escrito, igual que hacen sus hermanos por la via de `saltarSiNoEsLaRamaDeQC85`.
+    //
+    // Lo que NO se salta es «hay trabajo de QC-85 delante y la precondicion no lo reconoce»: ahi
+    // la senal disyuntiva da positivo, el caso corre y se pone rojo. Esa es la linea, y es la misma
+    // que traza `saltarSiNoEsLaRamaDeQC85`: no hay diff que revisar vs. hay diff y no cuadra.
+    if (tocados.length === 0) {
+      ctx.skip(RAMA_SIN_APORTES);
+      return;
+    }
+
+    if (!traeAlgunaSenalDeQC85(tocados)) {
+      ctx.skip(
+        'la rama no aporta ni `' +
+          ARCHIVO_CENTRAL_DE_QC85 +
+          '` ni nada bajo `' +
+          CARPETA_SPEC_DE_QC85 +
+          '`: no hay trabajo de QC-85 que medir, asi que este ancla NO ha comprobado nada. Ocurre ' +
+          'al correr el gate sobre `dev`, donde QC-85 ya esta mergeada y por tanto no la aporta ' +
+          'ninguna rama.',
+      );
+      return;
+    }
+
+    expect(esLaRamaDeQC85(tocados)).toBe(true);
   });
 });
 
@@ -498,7 +570,13 @@ describe('toda escritura y toda lectura pasan por operaciones YA publicadas (R36
     ).toEqual([]);
   });
 
-  it('y las ocho operaciones consumidas SE importan de verdad: el detector no mira al vacio', () => {
+  it('y las ocho operaciones consumidas SE importan de verdad: el detector no mira al vacio', (ctx) => {
+    // Este caso mide el DIFF, aunque no lo parezca: `archivosDeLaPantalla()` deriva su lista de lo
+    // que la rama APORTA bajo la carpeta de la pantalla. Fuera de la rama de QC-85 esa lista esta
+    // vacia —sobre `dev` sus archivos ya no los aporta nadie— y el caso no tiene nada que escanear.
+    // Le falta el mismo preambulo que a sus hermanos: se salta ruidosamente, no pasa en verde.
+    baseDeEstaRama(ctx);
+
     const importadas = new Set(
       importacionesDeLaPantalla()
         .filter((leida) => esAdaptadorDriving(leida.origen))
