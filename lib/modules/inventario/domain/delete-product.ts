@@ -12,7 +12,13 @@ export type DeleteProductDeps = {
 /**
  * Borrado de producto (R14, R15, R16). Logico y sin restaurar (D5): usa
  * `softDeleteAlive`, nunca un borrado fisico. La autoria ya no se registra aqui: se mudo al
- * lote (`ProductBatch`) el 2026-09-09, asi que el actor solo sirve para el permiso.
+ * lote (`ProductBatch`) el 2026-09-09, asi que el actor solo sirve para el permiso y para la
+ * EMPRESA en cuyo nombre se borra.
+ *
+ * QC-49 (R16): el ambito viaja al puerto y entra en el `where`. Un `id` de otra empresa
+ * devuelve `false` -igual que «no existe» y que «ya borrado»- y se traduce a
+ * `ProductNotFoundError`, nunca a un error de autorizacion; y no se marca como borrada ninguna
+ * fila, ni propia ni ajena.
  */
 export function createDeleteProduct(
   deps: DeleteProductDeps,
@@ -31,7 +37,9 @@ export function createDeleteProduct(
     // `actor.id`) y el error es el de QC-70 (R17): `ProductNotFoundError`, con el codigo
     // `product_not_found` del catalogo unico, en vez del `NotFoundError` generico que compartian
     // cinco modulos con mensajes distintos.
-    const deleted = await deps.products.softDeleteAlive(id, now());
+    const deleted = await deps.products.softDeleteAlive(id, now(), {
+      companyId: actor.companyId,
+    });
     if (!deleted) throw new ProductNotFoundError();
   };
 }

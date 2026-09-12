@@ -78,6 +78,13 @@ export function hallazgosDeVersionDeNext(
 // lista se lee del disco una vez y se escribe aqui; si alguien anade un `.spec.ts`, esto se pone
 // rojo y hay que reabrir la decision cerrada, que es justo lo que se quiere.
 export const E2E_ESPERADOS = [
+  // Es de QC-49 (aislamiento por empresa en inventario, T15 / R27), no de QC-71, y entra por la
+  // puerta que el propio mensaje de `hallazgosDeE2e` senala: «otra ficha y otra decision» -esta,
+  // aprobada en `specs/QC-49-.../design.md > 8`-. NO ejercita el cruce borde -> Server Action del
+  // identificador de peticion, asi que el diferimiento de R21 sigue INTACTO: lo que prueba es que
+  // una sesion de la empresa A no ve ni puede borrar inventario de la B. La lista sigue CERRADA:
+  // el siguiente `.spec.ts` que aparezca sin ficha vuelve a poner esto en rojo.
+  'aislamiento-inventario.spec.ts',
   'errores.spec.ts',
   'inventario.spec.ts',
   'login-skin.spec.ts',
@@ -180,6 +187,12 @@ export const MIGRACIONES_ESPERADAS = [
   // actualiza esta lista. Sigue sin persistir ningun identificador de peticion: su SQL no nombra
   // ninguno de `TERMINOS_DEL_IDENTIFICADOR`, que es lo que R19 protege de verdad.
   '20260911120000_presentation_unit',
+  // Es de QC-49 (aislamiento por empresa en inventario: las tres tablas ganan `company_id`), no
+  // de QC-71. Se anade aqui por lo mismo que la de arriba: es justo lo que pide el mensaje de
+  // `hallazgosDeMigraciones` -- la ficha que trae la migracion actualiza esta lista. Sigue sin
+  // persistir ningun identificador de peticion: su SQL no nombra ninguno de
+  // `TERMINOS_DEL_IDENTIFICADOR`, que es lo que R19 protege de verdad.
+  '20260911130000_inventory_company_scope',
 ] as const
 
 export function hallazgosDeMigraciones(

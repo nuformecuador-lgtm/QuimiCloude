@@ -190,10 +190,32 @@ function normalizeProductNameForTest(name: string): string {
     .replace(/[^a-z0-9]/gu, '')
 }
 
+/**
+ * Empresa del ANDAMIAJE de inventario (QC-49 R1).
+ *
+ * `products.company_id` --y `presentations.company_id` y `product_batches.company_id`-- son NOT
+ * NULL desde `<ts>_inventory_company_scope`, asi que sembrar un producto exige una empresa. Se
+ * REUTILIZA una que ya existe en la base (`db:seed` deja la de instalacion) en vez de crear una
+ * nueva: este archivo limpia a mano lo que siembra, y una empresa creada aqui quedaria de
+ * residuo --justo lo que QC-77 tiene que ir a limpiar despues--.
+ *
+ * Aqui la empresa es ANDAMIAJE y nada mas: este archivo no prueba el aislamiento por empresa
+ * --eso es `tests/integration/inventario/company-scope.int.test.ts`-- y ningun aserto suyo
+ * depende de cual sea.
+ */
+async function andamiajeCompanyId(db: Db): Promise<string> {
+  const company = await db.company.findFirstOrThrow({ select: { id: true } });
+  return company.id;
+}
+
 /** Producto vivo, para usar como linea de receta. Sin presentacion desde el 2026-09-09. */
 async function createTestProduct(db: Db, name = `Producto ${token()}`): Promise<string> {
   const product = await db.product.create({
-    data: { name, nameNormalized: normalizeProductNameForTest(name) },
+    data: {
+      name,
+      nameNormalized: normalizeProductNameForTest(name),
+      companyId: await andamiajeCompanyId(db),
+    },
     select: { id: true },
   });
   return product.id;

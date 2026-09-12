@@ -126,6 +126,25 @@ async function unidadDeSistema(db: typeof prisma): Promise<string> {
   return unit.id;
 }
 
+/**
+ * Empresa del ANDAMIAJE de inventario (QC-49 R1).
+ *
+ * `products.company_id` y `presentations.company_id` son NOT NULL desde
+ * `<ts>_inventory_company_scope`, asi que sembrar cualquiera de las dos exige una empresa. Se
+ * REUTILIZA una que ya existe en la base (`db:seed` deja la de instalacion) en vez de crear una
+ * nueva: parte de lo que siembra este archivo se limpia a mano, y una empresa creada aqui
+ * quedaria de residuo.
+ *
+ * Aqui la empresa es ANDAMIAJE y nada mas: este archivo no prueba el aislamiento por empresa
+ * --eso es `tests/integration/inventario/company-scope.int.test.ts`-- y ningun aserto suyo
+ * depende de cual sea. La unidad de estas presentaciones es DE SISTEMA, que vale para cualquier
+ * empresa (QC-76 R11), asi que `presentations_check_unit_scope` la acepta (QC-49 R23).
+ */
+async function andamiajeCompanyId(db: typeof prisma): Promise<string> {
+  const company = await db.company.findFirstOrThrow({ select: { id: true } });
+  return company.id;
+}
+
 beforeAll(async () => {
   supplierId = await crearProveedor();
   otroSupplierId = await crearProveedor();
@@ -137,6 +156,7 @@ beforeAll(async () => {
         name: presentationName,
         nameNormalized: normalizeForTest(presentationName),
         unitId: await unidadDeSistema(prisma),
+        companyId: await andamiajeCompanyId(prisma),
       },
       select: { id: true },
     })
@@ -149,6 +169,7 @@ beforeAll(async () => {
         name: otraName,
         nameNormalized: normalizeForTest(otraName),
         unitId: await unidadDeSistema(prisma),
+        companyId: await andamiajeCompanyId(prisma),
       },
       select: { id: true },
     })

@@ -262,12 +262,20 @@ test.beforeAll(async () => {
   // y crearlo aqui deja el recorrido del Administrador centrado en la pantalla de recetas, no en
   // la de inventario -que ya tiene su propio E2E (QC-22). Sin presentacion desde el 2026-09-09:
   // la presentacion se mudo a `product_batches`.
+  // La empresa del worker, ya creada arriba. Se copia a una constante para que el tipo sea
+  // `string` y no `string | null`: `products.company_id` no admite nulo (QC-49 R1).
+  const empresaDelWorker = companyId;
+  if (empresaDelWorker === null) throw new Error('el fixture no creo la empresa del worker');
+
   await prisma.product.create({
-    // `name_normalized` (QC-57) es NOT NULL: el fixture la escribe con la MISMA funcion del
-    // dominio que usa la app.
+    // QC-49 (R1): `products.company_id` es NOT NULL con FK a `companies`. El producto de
+    // fixture es de la MISMA empresa del worker -la que se acaba de crear arriba-, que es la
+    // empresa en cuyo nombre se abre la sesion. `afterAll` ya borra el producto ANTES que la
+    // empresa, que es el orden que exige `products_company_id_fkey` (ON DELETE RESTRICT).
     data: {
       name: productName,
       nameNormalized: normalizeProductName(productName),
+      companyId: empresaDelWorker,
     },
   });
 });

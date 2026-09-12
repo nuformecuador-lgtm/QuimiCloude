@@ -257,13 +257,15 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     // deliberado (design.md > 9, pregunta 2): con la columna, borrar seria un UPDATE y la
     // FK no podria bloquearlo, con lo que R14 se quedaria sin ninguna garantia real.
     //
-    // 2026-09-11, QC-80 R1: entra `unitId`, y es la SEXTA y ultima. La igualdad exacta se
-    // conserva a proposito: una septima columna seria una migracion que nadie declaro.
+    // 2026-09-11, QC-80 R1: entra `unitId`, y es la SEXTA.
+    // 2026-09-11, QC-49 R1: entra `companyId`, y es la SEPTIMA y ultima. La igualdad exacta se
+    // conserva a proposito: una octava columna seria una migracion que nadie declaro.
     const scalarNames = presentation.fields
       .filter((candidate) => !candidate.isList && candidate.type !== 'Product')
       .map((candidate) => candidate.name)
       .sort()
     expect(scalarNames).toEqual([
+      'companyId',
       'createdAt',
       'id',
       'name',
@@ -273,6 +275,33 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     ])
     expect(has(presentation, 'deletedAt')).toBe(false)
     expect(presentation.body).not.toMatch(/deleted_at/)
+
+    // QC-49 R1: la empresa es OBLIGATORIA y uuid, y es escalar SIN `@relation` a proposito
+    // (`Company` es de `identity`): con relacion, el cliente ofreceria `include: { company: true }`
+    // desde `inventario` y ninguna guardia lo veria.
+    const presentationCompanyId = field(presentation, 'companyId')
+    expect(presentationCompanyId.type).toBe('String')
+    expect(presentationCompanyId.isOptional, 'presentations.company_id es NOT NULL (R1)').toBe(
+      false,
+    )
+    expect(presentationCompanyId.attributes).toContain('@map("company_id")')
+    expect(presentationCompanyId.attributes).toContain('@db.Uuid')
+    expect(presentation.body, 'companyId es escalar, sin @relation (R1)').not.toMatch(
+      /companyId\s+String[^\n]*@relation/,
+    )
+
+    // QC-49 R20: la unicidad de nombre normalizado deja de ser GLOBAL y pasa a ser POR EMPRESA,
+    // con la empresa de cabeza. Se afirma la forma exacta Y se veta la vieja: un
+    // `@@unique([nameNormalized])` suelto volveria a impedir que dos empresas usen el mismo
+    // nombre, que es justo lo que esta ficha abrio.
+    expect(presentation.body).toMatch(
+      /@@unique\(\[companyId,\s*nameNormalized\],\s*map:\s*"presentations_company_name_unique"\)/,
+    )
+    expect(
+      presentation.body,
+      'la unicidad global de nombre normalizado no puede volver (R20)',
+    ).not.toMatch(/@@unique\(\[\s*nameNormalized\s*\]/)
+    expect(field(presentation, 'nameNormalized').attributes).not.toMatch(/@unique/)
   })
 
   it('el esquema declara exactamente dos modelos nuevos: Presentation y Product', () => {
@@ -340,17 +369,39 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     // es un dato de negocio de R3 sino la forma canonica de `name`, derivada y escrita por el
     // adaptador en toda escritura. Se declara aparte y en positivo para que el censo siga
     // siendo una igualdad exacta —una columna de mas seguiria poniendo esto rojo—.
+    //
+    // `companyId` (QC-49 R1) tampoco entra en `PRODUCT_BUSINESS_FIELDS`: no es un dato de
+    // negocio del producto sino a QUIEN pertenece la fila, y el adaptador la escribe desde el
+    // unico punto que define el ambito. Se declara aparte, en positivo, por el mismo motivo.
     expect(scalarNames).toEqual(
       [
         'id',
         ...PRODUCT_BUSINESS_FIELDS.map(([name]) => name),
         'nameNormalized',
+        'companyId',
         'createdAt',
         'updatedAt',
         'deletedAt',
       ].sort(),
     )
     expect(product.body).toContain('@@map("products")')
+
+    // QC-49 R1: obligatoria, uuid y ESCALAR sin `@relation` (`Company` es de `identity`).
+    const productCompanyId = field(product, 'companyId')
+    expect(productCompanyId.type).toBe('String')
+    expect(productCompanyId.isOptional, 'products.company_id es NOT NULL (R1)').toBe(false)
+    expect(productCompanyId.attributes).toContain('@map("company_id")')
+    expect(productCompanyId.attributes).toContain('@db.Uuid')
+    expect(product.body, 'companyId es escalar, sin @relation (R1)').not.toMatch(
+      /companyId\s+String[^\n]*@relation/,
+    )
+    // QC-49 R10: la columna queda indexada, y el indice NO es parcial —por el pasa la
+    // verificacion del `RESTRICT` de la FK, que ve tambien los productos con borrado logico—.
+    expect(product.body).toMatch(/@@index\(\[companyId\],\s*map:\s*"products_company_id_idx"\)/)
+    // QC-49 R21: sigue SIN unicidad de nombre, ni global ni por empresa.
+    expect(product.body, 'products no gana unicidad de nombre (R21)').not.toMatch(
+      /@@unique\([^)]*nameNormalized/,
+    )
   })
 
   it('ProductBatch declara la presentacion, el stock, el coste y la autoria mudados desde products', () => {
@@ -700,8 +751,13 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     // 2026-09-09: la presentacion se mudo a `product_batches`, asi que `products` conservaba
     // SOLO el indice de la FK de unidad (`products_unit_id_idx`, QC-32 R20).
     // 2026-09-11, QC-80 R7: ese indice TAMBIEN se va, con la columna y la FK. `products` no
-    // declara ya ningun `@@index`: el unico que le quedaba era el de la unidad.
-    expect(indexMaps).toEqual([])
+    // declaraba ya ningun `@@index`: el unico que le quedaba era el de la unidad.
+    // 2026-09-11, QC-49 R10: NACE `products_company_id_idx`, y vuelve a ser el unico. La
+    // igualdad exacta se conserva: un indice de mas es una migracion que nadie declaro.
+    expect(indexMaps).toEqual(['products_company_id_idx'])
+    for (const name of indexMaps) {
+      expect(name ?? '', `el indice ${name ?? ''} debe ir en snake_case ingles`).toMatch(SNAKE_CASE)
+    }
     expect(product.body, 'products_unit_id_idx se fue con la columna (R7)').not.toMatch(
       /products_unit_id_idx/,
     )
@@ -999,6 +1055,9 @@ const PRODUCT_BATCH_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['unitCost', 'unit_cost'],
   ['lot', 'lot'],
   ['expiryDate', 'expiry_date'],
+  // QC-49 R2: el lote declara su empresa en COLUMNA PROPIA y no la deduce de su producto —sin
+  // columna, QC-81 no podria construir la unicidad `(empresa, lote)`—.
+  ['companyId', 'company_id'],
   ['createdBy', 'created_by'],
   ['updatedBy', 'updated_by'],
 ]
@@ -1034,6 +1093,24 @@ describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batch
       'ProductBatch gano o perdio columnas: la presentacion vive solo aqui y no se mueve (R25)',
     ).toEqual(
       ['id', ...PRODUCT_BATCH_COLUMNS.map(([nombre]) => nombre), 'createdAt', 'updatedAt'].sort(),
+    )
+
+    // QC-49 R2 y R10: la empresa del lote es obligatoria, uuid, escalar sin `@relation`, y
+    // esta indexada. Si fuera anulable, un lote podria quedarse sin dueno y el disparador de
+    // coherencia con su producto no tendria nada que comparar.
+    const batchCompanyId = field(productBatch, 'companyId')
+    expect(batchCompanyId.type).toBe('String')
+    expect(batchCompanyId.isOptional, 'product_batches.company_id es NOT NULL (R2)').toBe(false)
+    expect(batchCompanyId.attributes).toContain('@db.Uuid')
+    expect(productBatch.body, 'companyId es escalar, sin @relation (R2)').not.toMatch(
+      /companyId\s+String[^\n]*@relation/,
+    )
+    expect(productBatch.body).toMatch(
+      /@@index\(\[companyId\],\s*map:\s*"product_batches_company_id_idx"\)/,
+    )
+    // QC-49 R30: el correlativo de lote por empresa es QC-81 y NO entra aqui.
+    expect(productBatch.body, 'la unicidad (empresa, lote) es QC-81, no esta ficha').not.toMatch(
+      /@@unique\([^)]*lot/,
     )
   })
 

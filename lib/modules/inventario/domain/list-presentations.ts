@@ -27,6 +27,11 @@ const listQuerySchema = createListQuerySchema();
  *
  * `presentations` NO tiene borrado logico (D6 de QC-20): por eso su puerto se llama `list` y no
  * `listAlive`, y por eso el adaptador no anade ninguna condicion de vida que no existe.
+ *
+ * QC-49 (R14): el ambito -la empresa del actor- se pasa al puerto junto con la consulta ya
+ * saneada. El orden por defecto, la busqueda, los filtros, la paginacion y la forma del
+ * resultado NO cambian (R31); el `total` cuenta solo lo visible para esa empresa. Componer el
+ * ambito con lo demas es del adaptador: aqui no se escribe ninguna condicion.
  */
 export function createListPresentations(
   deps: ListPresentationsDeps,
@@ -43,6 +48,6 @@ export function createListPresentations(
     const { query, ignored } = sanitizeListQuery(parsed.data, PRESENTATION_QUERYABLE);
     deps.log.ignoredFields(LIST_NAME, ignored);
 
-    return deps.presentations.list(query);
+    return deps.presentations.list(query, { companyId: actor.companyId });
   };
 }

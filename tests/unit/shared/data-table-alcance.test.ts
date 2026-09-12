@@ -346,21 +346,42 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // CERRADA, el E2E de recetas sigue fuera y un SEXTO spec que referencie `data-table` vuelve a
   // ponerla en rojo.
   //
+  // AMPLIADA POR CUARTA VEZ el 2026-09-11 (QC-49, aislamiento-por-empresa-en-inventario): entra la
+  // SEXTA entrada, `e2e/aislamiento-inventario.spec.ts`, y NO estrena ninguna pantalla. La trae el
+  // E2E que exige QC-49 R27 (`specs/QC-49-aislamiento-por-empresa-en-inventario/requirements.md >
+  // Decisiones cerradas`, «¿Hace falta E2E? Si»), cuyo recorrido atraviesa LAS DOS pantallas que ya
+  // consumen la tabla compartida -inventario (entrada 1) y presentaciones (entrada 3)- y afirma
+  // sobre LAS FILAS QUE EL SERVIDOR SIRVE: que con sesion en la empresa A no aparece ninguna fila
+  // de la B en ninguna de las dos listas, y que borrar una fila de la B conociendo su identificador
+  // se rechaza y la deja intacta. Por eso localiza `data-table-cell-name`: la celda de nombre de la
+  // tabla compartida es donde se leen esas filas, exactamente como la localizan QC-45 y QC-39.
+  // Se anade la fila y se TENSA el centinela, nunca se afloja.
+  //
+  // OJO -- QC-49 y QC-67 ampliaron esta lista EL MISMO DIA, cada una creyendo que la suya era la
+  // SEXTA entrada, y el merge las junto: son la SEXTA y la SEPTIMA. El ancla pasa de cinco a
+  // SIETE de una vez. La lista sigue CERRADA, el E2E de recetas sigue fuera y un OCTAVO spec que
+  // referencie `data-table` vuelve a ponerla en rojo.
+  //
   // AMPLIADA POR CUARTA VEZ el 2026-09-11 (QC-67, pantalla-de-usuarios): entra la SEXTA entrada,
   // `e2e/usuarios.spec.ts`, por la misma via que la quinta. Su E2E -exigido por QC-67 R42- localiza
   // `data-table-cell-<columna>` y `data-table-row-<id>` porque la lista de usuarios ES la tabla
   // compartida (QC-67 R9), que esta feature consume por su barrel publico sin abrir ni uno de sus
   // archivos (`tests/unit/configuracion-ui/data-table-intacta-usuarios.test.ts`). Se anade la fila
-  // y se TENSA el centinela -el ancla pasa de cinco entradas a seis-, nunca se afloja: la lista
-  // sigue CERRADA, el E2E de recetas sigue fuera y un SEPTIMO spec vuelve a ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos seis', () => {
+  // y se TENSA el centinela, nunca se afloja (ver la nota de arriba sobre las dos ampliaciones).
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos siete', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
       .filter((file) => /data-table/.test(readSource(file)))
       .map((file) => relative(repoRoot, file).split(sep).join('/'))
       .sort()
-    expect(referencian, 'solo estos seis E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos siete E2E pueden referenciar la tabla compartida (R36)').toEqual([
+      // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
+      // ya consumen la tabla compartida -inventario y presentaciones- y localiza
+      // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
+      // B con sesion en la A, ni siquiera al borrar conociendo el identificador. No estrena
+      // pantalla: mide las que ya estaban.
+      'e2e/aislamiento-inventario.spec.ts',
       'e2e/inventario.spec.ts',
       'e2e/pedidos.spec.ts',
       // La CUARTA entrada la trae QC-45 el 2026-09-07: su E2E localiza la tabla compartida porque
@@ -371,7 +392,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // La QUINTA la trae QC-39 el 2026-09-08 (R50): el E2E de la pantalla de unidades localiza
       // las celdas y la fila de la tabla compartida, que es la que su lista monta (QC-39 R15).
       'e2e/unidades.spec.ts',
-      // La SEXTA la trae QC-67 el 2026-09-11 (R42): el E2E de la pantalla de usuarios localiza las
+      // La SEPTIMA la trae QC-67 el 2026-09-11 (R42): el E2E de la pantalla de usuarios localiza las
       // celdas y la fila de la tabla compartida, que es la que su lista monta (QC-67 R9).
       'e2e/usuarios.spec.ts',
     ])

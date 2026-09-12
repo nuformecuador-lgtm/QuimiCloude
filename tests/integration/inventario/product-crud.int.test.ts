@@ -18,7 +18,7 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   createProduct,
@@ -28,6 +28,7 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 import type { ListQuery } from '@/lib/modules/inventario/domain/list-query';
 import type { NewProduct } from '@/lib/modules/inventario/domain/product-view';
 
@@ -43,6 +44,33 @@ function token(): string {
  * solo para rellenar `products.unit_id`, columna que la migracion de esta ficha elimino. El
  * producto ya no declara unidad -la declara la presentacion (R1)-, asi que el alta de un
  * producto no necesita ninguna unidad de apoyo. */
+
+/**
+ * Empresa propia del archivo y AMBITO de todas sus llamadas al adaptador (QC-49 R1, R13).
+ *
+ * `products.company_id` es NOT NULL desde `<ts>_inventory_company_scope`, y las siete funciones
+ * de `product-prisma.ts` exigen el ambito en su firma: sin el no compilan (R13). La empresa es
+ * EFIMERA y propia del archivo, asi que `collectAllPages` -que recorre el listado con
+ * `search: ''`- ve EXACTAMENTE lo que este archivo sembro y nada mas, que es mas acotado que lo
+ * que veia antes.
+ *
+ * ESTE ARCHIVO NO PRUEBA EL AISLAMIENTO: sigue probando borrado logico, exclusion de borrados,
+ * paginacion estable y orden. El aislamiento es `company-scope-queries.int.test.ts`.
+ */
+let empresaDelArchivo: string;
+
+function ambito(): InventoryScope {
+  return { companyId: empresaDelArchivo };
+}
+
+beforeAll(async () => {
+  const nombre = `Empresa crud productos ${token()}`;
+  const { id } = await prisma.company.create({
+    data: { name: nombre, nameNormalized: nombre.toLowerCase().replace(/[^a-z0-9]/gu, '') },
+    select: { id: true },
+  });
+  empresaDelArchivo = id;
+});
 
 function baseProductInput(overrides: Partial<NewProduct> = {}): NewProduct {
   return {
@@ -63,16 +91,19 @@ async function collectAllPages(
     filters: {},
     search: '',
   });
-  const first = await listAliveProducts(listQuery(1));
+  const first = await listAliveProducts(listQuery(1), ambito());
   const items = [...first.items];
   for (let page = 2; page <= first.totalPages; page += 1) {
-    const next = await listAliveProducts(listQuery(page));
+    const next = await listAliveProducts(listQuery(page), ambito());
     items.push(...next.items);
   }
   return items.map((item) => ({ id: item.id, name: item.name }));
 }
 
 afterAll(async () => {
+  // La empresa del archivo, cuando ya no queda ningun producto que la referencie:
+  // `products_company_id_fkey` es ON DELETE RESTRICT.
+  await prisma.company.deleteMany({ where: { id: empresaDelArchivo } });
   await prisma.$disconnect();
 });
 
@@ -84,13 +115,13 @@ describe('R15: el borrado logico conserva la fila', () => {
 
     try {
       const input: NewProduct = { ...baseProductInput({ stock: 9 }) };
-      const created = await createProduct(input, new Date());
+      const created = await createProduct(input, new Date(), ambito());
       productId = created.id;
 
       const before = await prisma.product.findUniqueOrThrow({ where: { id: created.id } });
       expect(before.deletedAt).toBeNull();
 
-      const ok = await softDeleteAliveProduct(created.id, new Date());
+      const ok = await softDeleteAliveProduct(created.id, new Date(), ambito());
       expect(ok).toBe(true);
 
       // Se relee con Prisma DIRECTO (sin el filtro de "vivo") para comprobar que la fila
@@ -121,19 +152,19 @@ describe('R16: los productos borrados no aparecen en ninguna consulta', () => {
 
     try {
       const input: NewProduct = { ...baseProductInput() };
-      const created = await createProduct(input, new Date());
+      const created = await createProduct(input, new Date(), ambito());
       productId = created.id;
 
       // Vivo: aparece en la ficha y en el listado.
-      expect(await findAliveProductById(created.id)).not.toBeNull();
+      expect(await findAliveProductById(created.id, ambito())).not.toBeNull();
       const aliveList = await collectAllPages(25);
       expect(aliveList.some((item) => item.id === created.id)).toBe(true);
 
-      const ok = await softDeleteAliveProduct(created.id, new Date());
+      const ok = await softDeleteAliveProduct(created.id, new Date(), ambito());
       expect(ok).toBe(true);
 
       // Borrado: desaparece de las DOS consultas, aunque la fila siga existiendo.
-      expect(await findAliveProductById(created.id)).toBeNull();
+      expect(await findAliveProductById(created.id, ambito())).toBeNull();
       const deletedList = await collectAllPages(25);
       expect(deletedList.some((item) => item.id === created.id)).toBe(false);
 
@@ -157,7 +188,7 @@ describe('R26: la paginacion es estable con homonimos', () => {
       // desempate por id, dos de ellos podrian intercambiarse entre paginas.
       for (let i = 0; i < 5; i += 1) {
         const input: NewProduct = { ...baseProductInput({ name: homonymName }) };
-        const created = await createProduct(input, new Date());
+        const created = await createProduct(input, new Date(), ambito());
         createdIds.push(created.id);
       }
 
@@ -187,7 +218,7 @@ describe('R35: orden name ASC, id ASC', () => {
     try {
       for (let i = 0; i < 4; i += 1) {
         const input: NewProduct = { ...baseProductInput({ name: homonymName }) };
-        const created = await createProduct(input, new Date());
+        const created = await createProduct(input, new Date(), ambito());
         createdIds.push(created.id);
       }
 

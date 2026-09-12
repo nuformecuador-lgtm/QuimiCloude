@@ -56,11 +56,24 @@ function readFormString(formData: FormData, name: string): string {
 /** El traductor UNICO (R10), parametrizado por la base de este modulo. Ver `product-actions.ts`. */
 const toErrorState = createErrorStateTranslator(InventarioError, observabilidad.readRequestIdHeader);
 
-/** El actor que exige R1/D17: se resuelve UNA vez por invocacion (ver `product-actions.ts`). */
+/**
+ * El actor que exige R1/D17: se resuelve UNA vez por invocacion y, desde QC-49 (R12), con LAS
+ * DOS CARAS de la sesion del servidor —`getSessionUser()` para id y permisos,
+ * `getSessionContext()` para la EMPRESA—, pedidas en paralelo. Falla cerrado: sin cualquiera de
+ * las dos el actor es `null` y el caso de uso rechaza antes de tocar el repositorio. La empresa
+ * nunca sale del `FormData`. El razonamiento completo esta en `product-actions.ts`.
+ */
 async function currentActor(): Promise<Actor | null> {
-  const sessionUser = await identity.getSessionUser();
-  if (sessionUser === null) return null;
-  return { id: sessionUser.id, permissions: sessionUser.permissions };
+  const [sessionUser, sessionContext] = await Promise.all([
+    identity.getSessionUser(),
+    identity.getSessionContext(),
+  ]);
+  if (sessionUser === null || sessionContext === null) return null;
+  return {
+    id: sessionUser.id,
+    companyId: sessionContext.companyId,
+    permissions: sessionUser.permissions,
+  };
 }
 
 /** Alta de presentacion (R9, R11, R17-R20, R37). */

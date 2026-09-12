@@ -31,7 +31,7 @@ consecuencias de arquitectura que no son opinables:
      son las del sistema, y son una lista corta y cerrada: `users`, `roles`,
      `document_types`. Anadir una tabla de operacion sin empresa es BLOQUEANTE.
    - **Lo ya construido todavia no lo esta**, y esa es la deuda que salda la epica QC-46:
-     inventario (QC-49), recetas (QC-50), unidades (QC-51), proveedores (QC-59) y pedidos
+     recetas (QC-50), unidades (QC-51), proveedores (QC-59) y pedidos
      (QC-60). La guardia que lo hace cumplir es QC-61. Mientras una tabla siga en esa
      lista es deuda registrada, no
      incumplimiento; cuando la lista quede vacia, esta vineta se borra.

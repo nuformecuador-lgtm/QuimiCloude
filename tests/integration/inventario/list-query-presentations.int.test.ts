@@ -28,6 +28,7 @@ import { normalizePresentationName } from '@/lib/modules/inventario';
 import { prisma } from '@/lib/shared/db/prisma';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
+import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 import type { ListQuery } from '@/lib/modules/inventario/domain/list-query';
 
 function token(): string {
@@ -52,6 +53,34 @@ async function unidadDeSistema(db: typeof prisma): Promise<string> {
 
 const creadas: string[] = [];
 
+/**
+ * Empresa propia del archivo y AMBITO de todas sus consultas (QC-49 R1, R13, R14).
+ *
+ * `presentations.company_id` es NOT NULL desde `<ts>_inventory_company_scope`, y
+ * `listPresentations` exige el ambito en su firma: sin el no compila. Se siembra una empresa
+ * EFIMERA en vez de reutilizar la de instalacion por la misma razon por la que cada caso acota
+ * por su marcador -aqui ademas el ambito ya acota el conjunto entero, asi que ninguna fila de
+ * otro archivo ni de otra sesion puede entrar en un recuento-. Se borra en el `afterAll`, la
+ * ultima, cuando ya no queda ninguna presentacion que la referencie.
+ *
+ * ESTE ARCHIVO NO PRUEBA EL AISLAMIENTO: sigue probando orden, filtro, busqueda y paginacion,
+ * exactamente los mismos casos de QC-57. El aislamiento es `company-scope-queries.int.test.ts`.
+ */
+let empresaDelArchivo: string;
+
+function ambito(): InventoryScope {
+  return { companyId: empresaDelArchivo };
+}
+
+beforeAll(async () => {
+  const nombre = `Empresa listado presentaciones ${token()}`;
+  const company = await prisma.company.create({
+    data: { name: nombre, nameNormalized: nombre.toLowerCase().replace(/[^a-z0-9]/gu, '') },
+    select: { id: true },
+  });
+  empresaDelArchivo = company.id;
+});
+
 async function sembrar(nombres: readonly string[], createdAt?: Date): Promise<void> {
   for (const name of nombres) {
     const fila = await prisma.presentation.create({
@@ -59,6 +88,7 @@ async function sembrar(nombres: readonly string[], createdAt?: Date): Promise<vo
         name,
         nameNormalized: normalizePresentationName(name),
         unitId: await unidadDeSistema(prisma),
+        companyId: empresaDelArchivo,
         ...(createdAt === undefined ? {} : { createdAt }),
       },
       select: { id: true },
@@ -73,6 +103,8 @@ function consulta(partial: Partial<ListQuery> = {}): ListQuery {
 
 afterAll(async () => {
   await prisma.presentation.deleteMany({ where: { id: { in: creadas } } });
+  // La empresa del archivo va DESPUES: `presentations_company_id_fkey` es ON DELETE RESTRICT.
+  await prisma.company.deleteMany({ where: { id: empresaDelArchivo } });
   await prisma.$disconnect();
 });
 
@@ -90,7 +122,7 @@ describe('orden, filtro y busqueda sobre el conjunto completo (R13, R14, R29)', 
   it('la fila que en el orden de hoy esta en la pagina 3 aparece en la 1 al ordenar al reves (R13)', async () => {
     const ultima = NOMBRES[NOMBRES.length - 1];
 
-    const pagina3 = await listPresentations(consulta({ page: 3, pageSize: 5, search: MARCA }));
+    const pagina3 = await listPresentations(consulta({ page: 3, pageSize: 5, search: MARCA }), ambito());
     expect(pagina3.items.map((p) => p.name)).toContain(ultima);
 
     const descPagina1 = await listPresentations(
@@ -100,6 +132,7 @@ describe('orden, filtro y busqueda sobre el conjunto completo (R13, R14, R29)', 
         search: MARCA,
         sort: { columnId: 'name', direction: 'desc' },
       }),
+      ambito(),
     );
     expect(descPagina1.items[0]?.name).toBe(ultima);
   });
@@ -107,7 +140,7 @@ describe('orden, filtro y busqueda sobre el conjunto completo (R13, R14, R29)', 
   it('el total y el numero de paginas describen el conjunto YA filtrado (R14)', async () => {
     // R14 — el `count` usa el MISMO `where` que el `findMany`: con la busqueda puesta, el total
     // es el de las doce sembradas, no el del catalogo entero.
-    const pagina = await listPresentations(consulta({ page: 1, pageSize: 5, search: MARCA }));
+    const pagina = await listPresentations(consulta({ page: 1, pageSize: 5, search: MARCA }), ambito());
 
     expect(pagina.total).toBe(NOMBRES.length);
     expect(pagina.totalPages).toBe(3);
@@ -115,14 +148,14 @@ describe('orden, filtro y busqueda sobre el conjunto completo (R13, R14, R29)', 
   });
 
   it('pedir 100 por pagina se ACOTA a 25, no se rechaza (R29)', async () => {
-    const pagina = await listPresentations(consulta({ pageSize: 100, search: MARCA }));
+    const pagina = await listPresentations(consulta({ pageSize: 100, search: MARCA }), ambito());
 
     expect(pagina.pageSize).toBe(MAX_PAGE_SIZE);
     expect(pagina.items).toHaveLength(NOMBRES.length);
   });
 
   it('sin orden, el orden es el de hoy: nombre ascendente (R11)', async () => {
-    const pagina = await listPresentations(consulta({ pageSize: 25, search: MARCA }));
+    const pagina = await listPresentations(consulta({ pageSize: 25, search: MARCA }), ambito());
 
     const nombres = pagina.items.map((p) => p.name);
     expect(nombres).toEqual([...nombres].sort());
@@ -136,7 +169,7 @@ describe('la busqueda ignora acentos y mayusculas (R16, R18, R19)', () => {
     const marca = token();
     await sembrar([`Solución ${marca}`, `Frasco ${marca}`]);
 
-    const pagina = await listPresentations(consulta({ pageSize: 25, search: `solucion ${marca}` }));
+    const pagina = await listPresentations(consulta({ pageSize: 25, search: `solucion ${marca}` }), ambito());
 
     expect(pagina.items.map((p) => p.name)).toEqual([`Solución ${marca}`]);
     expect(pagina.total).toBe(1);
@@ -158,6 +191,7 @@ describe('el rango de fechas se compara en UTC, con los dos extremos inclusivos'
         search: marca,
         filters: { createdAt: { kind: 'dateRange', from: DIA, to: DIA } },
       }),
+      ambito(),
     );
 
     expect(pagina.items.map((p) => p.name).sort()).toEqual(
@@ -185,6 +219,7 @@ describe('desempate estable por identificador (R10)', () => {
           search: `empate ${marca}`,
           sort: { columnId: 'createdAt', direction: 'asc' },
         }),
+        ambito(),
       );
       vistos.push(...pagina.items.map((p) => p.id));
     }

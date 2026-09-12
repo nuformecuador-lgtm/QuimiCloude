@@ -214,11 +214,35 @@ async function unidadDeSistema(db: Db): Promise<string> {
   return unit.id;
 }
 
+/**
+ * Empresa del ANDAMIAJE de inventario (QC-49 R1).
+ *
+ * `products.company_id` y `presentations.company_id` son NOT NULL desde
+ * `<ts>_inventory_company_scope`, asi que sembrar cualquiera de las dos exige una empresa. Se
+ * REUTILIZA una que ya existe en la base (`db:seed` deja la de instalacion) en vez de crear una
+ * nueva: parte de lo que siembra este archivo se limpia a mano, y una empresa creada aqui
+ * quedaria de residuo.
+ *
+ * Aqui la empresa es ANDAMIAJE y nada mas: este archivo no prueba el aislamiento por empresa
+ * --eso es `tests/integration/inventario/company-scope.int.test.ts`-- y ningun aserto suyo
+ * depende de cual sea. La unidad de estas presentaciones es DE SISTEMA, que vale para cualquier
+ * empresa (QC-76 R11), asi que `presentations_check_unit_scope` la acepta (QC-49 R23).
+ */
+async function andamiajeCompanyId(db: Db): Promise<string> {
+  const company = await db.company.findFirstOrThrow({ select: { id: true } });
+  return company.id;
+}
+
 /** Presentacion REAL de apoyo: `presentation_id` es FK a `presentations` (R30). */
 async function createTestPresentation(db: Db): Promise<string> {
   const name = `Bidon ${token()}`;
   const presentation = await db.presentation.create({
-    data: { name, nameNormalized: normalizeForTest(name), unitId: await unidadDeSistema(db) },
+    data: {
+      name,
+      nameNormalized: normalizeForTest(name),
+      unitId: await unidadDeSistema(db),
+      companyId: await andamiajeCompanyId(db),
+    },
     select: { id: true },
   });
   return presentation.id;
@@ -248,7 +272,11 @@ async function createTestUnit(db: Db): Promise<string> {
 async function createTestProduct(db: Db): Promise<{ id: string }> {
   const productName = `Articulo ${token()}`;
   const product = await db.product.create({
-    data: { name: productName, nameNormalized: normalizeForTest(productName) },
+    data: {
+      name: productName,
+      nameNormalized: normalizeForTest(productName),
+      companyId: await andamiajeCompanyId(db),
+    },
     select: { id: true },
   });
   return { id: product.id };
