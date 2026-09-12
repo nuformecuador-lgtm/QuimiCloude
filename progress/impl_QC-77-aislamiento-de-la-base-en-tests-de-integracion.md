@@ -576,3 +576,47 @@ Lo que si se sostiene, y es lo que se lleva el leader:
 | `db:test list` + `.qc-test-db/` | Unica `qct_` viva: la plantilla. Cero rastros. `QuimiCloude` y las heredadas intactas |
 
 **Sigue faltando T18**, el gate completo, que lo corre el leader.
+
+---
+
+## 11. Dos deudas que el humano decidio dejar para despues (2026-09-12)
+
+Ninguna de las dos es de QC-77 y **ninguna se ha tocado**. Van escritas aqui porque, si no, se
+pierden.
+
+### 1. El invariante fuerte de `identity-constraints`, que QC-77 vuelve a hacer cierto
+
+`d2fcb9d` —de otra sesion, en paralelo— relajo el caso «el catalogo arranca solo con CC» a «CC
+existe, se llama asi y esta activo». **El argumento era correcto entonces**: sobre una base
+compartida y sucia ese invariante global es imposible, porque inventario, pedidos y proveedores
+insertan tipos `DOC<marcador>` commiteados.
+
+**Con la base efimera de QC-77 el invariante vuelve a ser cierto y comprobable**, asi que la
+relajacion ya no hace falta y cuesta un poco de cobertura: hoy el caso no notaria que el catalogo
+arranca con basura al lado de CC.
+
+**Decision del humano (2026-09-12): para despues, no ahora.** Es codigo de otra sesion, recien
+commiteado, y QC-77 ya esta verde; meterle mano en caliente es como se rompen dos cosas en vez de
+arreglar una. Alguien la recoge en frio.
+
+*(Y una precision honesta sobre el razonamiento con el que llegue a proponerlo: mi hipotesis era que
+QC-77 y `d2fcb9d` se complementaban, la medi y era **falsa** — ver la seccion 10. Esta propuesta
+sigue en pie igualmente, pero por lo que dice este parrafo, no por aquella.)*
+
+### 2. `tests/unit/configuracion-ui/grupos/alcance.test.ts`, arreglado — y lo que deja abierto
+
+Arreglado en `b4a3983`, en commit propio y separado, porque el gate completo (T18) lo encontro
+rojo: **entro a `dev` ya roto en `97c96c2`** y falla igual en `dev` con el arbol limpio.
+
+Lo que **queda abierto y no se toco**, porque el encargo era acotado a los dos casos que caian: ese
+archivo tiene varios `toEqual([])` que, **fuera** de la rama de QC-85, pasan **en verde por
+vacuidad** en vez de saltarse. No estan rotos y no ponen nada en rojo, asi que no urge; pero la
+cabecera del propio archivo dice que «un `toEqual([])` sin mordiente es un falso verde», y hoy su
+unica red contra eso son las dos anclas — que ahora, correctamente, quedan `skipped` fuera de la
+rama. O sea: **fuera de la rama de QC-85 ese archivo no vigila nada, y lo dice por los skips.** Es
+el diseno correcto; solo conviene que quien lo lea no confunda sus verdes con cobertura.
+
+**Es la tercera aparicion de esta especie en el repo** (`data-table-intacta-usuarios`,
+`data-table-intacta-unidades`, los dos de QC-84 en `c631118`, y ahora este). El patron ya tiene
+nombre y forma canonica; lo que no tiene es un sitio donde este escrito **una sola vez** para que el
+proximo centinela nazca bien en vez de nacer roto y arreglarse despues. Candidato a ficha del arnes.
