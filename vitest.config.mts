@@ -75,6 +75,13 @@ export default defineConfig({
           testTimeout: 15_000,
           include: ['tests/integration/**/*.test.ts'],
           exclude,
+          // QC-77: la base de esta corrida. `_global-setup.ts` corre una vez en el proceso
+          // principal (crea la base efimera desde la plantilla, publica su URL y la borra al
+          // terminar); `_setup.ts` corre en cada worker y aborta si la conexion no apunta a
+          // esa base (R12). Ninguno de los dos lleva `.test.` en el nombre, asi que el
+          // `include` de arriba no los recoge como suite.
+          globalSetup: ['./tests/integration/_global-setup.ts'],
+          setupFiles: ['./tests/integration/_setup.ts'],
           // Los de integracion no se aislan entre si: pegan contra UNA base real y
           // compartida, y alguno afirma sobre el estado global de una tabla (p. ej.
           // "no hay ningun usuario"). Si corren a la vez, cada archivo ve las filas
