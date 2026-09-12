@@ -16,9 +16,31 @@ pasa; no se pipea el gate a `head`/`tail` para leer su codigo de salida; y se re
 
 ---
 
+## Archivos que NO estaban listados en ninguna task, y se anotan aqui (2026-09-12)
+
+La cabecera de arriba lo exige: «si una task acaba tocando un archivo que no esta listado, **se
+anota antes de seguir**». Estos seis nacieron despues del `tasks.md` aprobado y no pertenecen a
+ninguna task original. **Ninguno toca `app/`, `lib/`, `components/`, `db/`, `e2e/` ni los 23
+archivos intocables**, asi que el alcance de la ficha no cambia; lo que cambia es su verificacion.
+
+| Archivo | Fase | Por que existe |
+| --- | --- | --- |
+| `tests/unit/test-database/nombres-y-huella.test.ts` | F2.1 (implementer) | R4/R5/R6/R28/R30/R31 iban a quedarse solo con medicion manual, que no vuelve a correr. 18 casos puros, sin base. **Aceptado por el reviewer** (menor 6 de `progress/review_QC-77-*.md`) |
+| `tests/helpers/run-database-guard.ts` | F2.3 (M1) | El juicio de R12 vivia en el cuerpo de `_setup.ts`, asi que no se podia importar desde un test sin disparar el aborto. Modulo puro, sin dependencias |
+| `tests/unit/test-database/guardian-r12.test.ts` | F2.3 (M1) | R12 — el guardian que sostiene la ficha, sin test |
+| `tests/unit/test-database/barrido-veredictos.test.ts` | F2.3 (M2) | R26/R27/R29 y la **guarda 1** de R30 — el codigo que ejecuta `DROP DATABASE`, sin test |
+| `tests/unit/test-database/aviso-base-atrasada.test.ts` | F2.3 (M4) | R14/R15/R16 — el aviso del gate, sin test |
+| `tests/integration/infra/ciclo-de-vida-de-la-base.int.test.ts` | F2.3 (M3) | R7/R8/R9 — el ciclo de borrado, sin test. Declarado en el censo, y de paso ejercita la guardia con un archivo nuevo de verdad |
+
+Ademas, en F2.3 se **exportaron** `verdictFor` / `VerdictContext` y se extrajo un formateador puro
+de `pendingMigrations` en `tests/helpers/test-database.ts` (ya listado en T5/T6/T10): sin eso, las
+cinco guardas del barrido y los tres desenlaces del aviso **no eran testeables sin servidor**.
+
+---
+
 ## Bloque A — Medir antes de construir
 
-### [ ] T1. Reproducir el estado del que venimos y anotar la linea base
+### [x] T1. Reproducir el estado del que venimos y anotar la linea base
 - Dep: ninguna.
 - Archivos: ninguno (medicion).
 - Correr **solos** `tests/integration/identity/identity-constraints.int.test.ts` y
@@ -29,7 +51,7 @@ pasa; no se pipea el gate a `head`/`tail` para leer su codigo de salida; y se re
   nombre de la base contra la que corrieron.
 - Cubre: — (medicion; sin ella T12 no significa nada).
 
-### [ ] T2. [P] Escribir la receta de la plantilla a mano, paso a paso
+### [x] T2. [P] Escribir la receta de la plantilla a mano, paso a paso
 - Dep: ninguna.
 - Archivos: ninguno (medicion).
 - Sobre una base vacia creada a mano, ejecutar los cuatro pasos de `design.md > 3` y anotar la
@@ -42,7 +64,7 @@ pasa; no se pipea el gate a `head`/`tail` para leer su codigo de salida; y se re
   ya no existe.
 - Cubre: R3 (parcial; el test llega en T5).
 
-### [ ] T3. [P] Inventariar las bases y los rastros que ya existen
+### [x] T3. [P] Inventariar las bases y los rastros que ya existen
 - Dep: ninguna.
 - Archivos: ninguno (medicion).
 - Listar las bases del Postgres local y anotar cuales encajan en `QuimiCloude_QC<n>` (se esperan
@@ -51,7 +73,7 @@ pasa; no se pipea el gate a `head`/`tail` para leer su codigo de salida; y se re
 - **Hecho cuando:** la lista esta en la bitacora, con la base de desarrollo marcada explicitamente.
 - Cubre: R28, R30 (parcial).
 
-### [ ] T4. Medir como llega el entorno del `globalSetup` al worker, y si el `globalSetup` corre con cero archivos seleccionados
+### [x] T4. Medir como llega el entorno del `globalSetup` al worker, y si el `globalSetup` corre con cero archivos seleccionados
 - Dep: ninguna. **Bloqueante de todo el bloque B**: `design.md > 4` declara esto como el unico
   desconocido tecnico y prohibe expresamente suponerlo.
 - Archivos: dos archivos **temporales** que se borran al terminar
@@ -72,7 +94,7 @@ pasa; no se pipea el gate a `head`/`tail` para leer su codigo de salida; y se re
 
 Dep de todo el bloque: **T4**.
 
-### [ ] T5. La libreria: nombres, huella de migraciones y plantilla
+### [x] T5. La libreria: nombres, huella de migraciones y plantilla
 - Dep: T2, T4.
 - Archivos: `tests/helpers/test-database.ts` (nuevo).
 - `runDatabaseName`, `templateDatabaseName`, `migrationsFingerprint`, `withDatabaseName`,
@@ -87,7 +109,7 @@ Dep de todo el bloque: **T4**.
   desde cero con `prisma migrate status` al dia.
 - Cubre: R2, R3, R4, R5, R6, R31.
 
-### [ ] T6. La libreria: crear, borrar, rastro y auto-curacion
+### [x] T6. La libreria: crear, borrar, rastro y auto-curacion
 - Dep: T5.
 - Archivos: `tests/helpers/test-database.ts`.
 - `createRunDatabase` (`CREATE DATABASE ... TEMPLATE`, con reintento ante `55006`),
@@ -99,7 +121,7 @@ Dep de todo el bloque: **T4**.
   dice. Salidas en la bitacora.
 - Cubre: R1, R7, R9.
 
-### [ ] T7. Enganchar el ciclo de vida en Vitest y el guardian
+### [x] T7. Enganchar el ciclo de vida en Vitest y el guardian
 - Dep: T6.
 - Archivos: `tests/integration/_global-setup.ts` (nuevo), `tests/integration/_setup.ts` (nuevo),
   `vitest.config.mts`, `.gitignore`.
@@ -114,7 +136,7 @@ Dep de todo el bloque: **T4**.
   pasa, la salida dice contra que base corrio, y al terminar esa base ya no existe.
 - Cubre: R1, R7, R8, R12.
 
-### [ ] T8. Probar que el ciclo de vida aguanta las interrupciones
+### [x] T8. Probar que el ciclo de vida aguanta las interrupciones
 - Dep: T7. **Bloqueante: sin esta task, T7 no cuenta como hecha.**
 - Archivos: ninguno de forma permanente.
 - Tres desenlaces, uno a uno, comprobando en cada caso que **no queda ninguna base `qct_`**:
@@ -125,7 +147,7 @@ Dep de todo el bloque: **T4**.
 - **Hecho cuando:** los tres desenlaces estan en la bitacora con la lista de bases antes y despues.
 - Cubre: R7, R8, R9.
 
-### [ ] T9. Dos worktrees a la vez
+### [x] T9. Dos worktrees a la vez
 - Dep: T7.
 - Archivos: ninguno (verificacion).
 - Lanzar la integracion desde **dos** worktrees simultaneamente y comprobar: dos nombres de base
@@ -139,7 +161,7 @@ Dep de todo el bloque: **T4**.
 
 ## Bloque C — La CLI, el aviso y la guardia
 
-### [ ] T10. La CLI `scripts/test-db.ts` con sus cuatro subcomandos
+### [x] T10. La CLI `scripts/test-db.ts` con sus cuatro subcomandos
 - Dep: T6, T3.
 - Archivos: `scripts/test-db.ts` (nuevo), `tests/helpers/test-database.ts`, `package.json`.
 - `status`, `template`, `list`, `clean [--force]` (`design.md > 6`), con las **cinco guardas** y la
@@ -151,7 +173,7 @@ Dep de todo el bloque: **T4**.
   desarrollo como HOLD con la razon; `pnpm run db:test clean` no borra nada y lo dice.
 - Cubre: R26, R28, R29, R30.
 
-### [ ] T11. Probar que el barrido NO borra lo que no debe
+### [x] T11. Probar que el barrido NO borra lo que no debe
 - Dep: T10. **Bloqueante: sin esta task, T10 no cuenta como hecha.**
 - Archivos: ninguno de forma permanente (bases de fixture que se crean y se borran).
 - Un fixture por guarda, cada uno confirmando `HOLD` **con su razon**:
@@ -166,7 +188,7 @@ Dep de todo el bloque: **T4**.
   estaba, salvo las 21 heredadas si el humano autoriza barrerlas en esta misma task.
 - Cubre: R27, R29, R30.
 
-### [ ] T12. El aviso amarillo en `init.sh`
+### [x] T12. El aviso amarillo en `init.sh`
 - Dep: T10.
 - Archivos: `init.sh`.
 - Bloque `6.c`, **despues** del `6.b` y **antes** de los tests, en los dos modos. `warn` si la base
@@ -181,7 +203,7 @@ Dep de todo el bloque: **T4**.
   queda restaurado desde copia.
 - Cubre: R14, R15, R16.
 
-### [ ] T13. El censo y la guardia
+### [x] T13. El censo y la guardia
 - Dep: T7 (para poder correr los 41 y clasificarlos con certeza).
 - Archivos: `tests/integration/aislamiento.json` (nuevo),
   `tests/guards/guard-aislamiento-integracion.test.ts` (nuevo).
@@ -194,7 +216,7 @@ Dep de todo el bloque: **T4**.
 - **Hecho cuando:** la guardia pasa en verde y `pnpm run test:guardias` la selecciona sola.
 - Cubre: R17, R18, R22.
 
-### [ ] T14. Probar que la guardia MUERDE
+### [x] T14. Probar que la guardia MUERDE
 - Dep: T13. **Bloqueante: sin esta task, T13 no cuenta como hecha.**
 - Archivos: ninguno de forma permanente (se muta y se restaura **desde copia**).
 - Cuatro mutaciones: (a) archivo nuevo bajo `tests/integration/` sin entrada en el censo;
@@ -208,7 +230,7 @@ Dep de todo el bloque: **T4**.
 
 ## Bloque D — La prueba de que la ficha sirvio para algo
 
-### [ ] T15. Los 41 archivos de integracion, sobre base efimera
+### [x] T15. Los 41 archivos de integracion, sobre base efimera
 - Dep: T7, T13.
 - Archivos: ninguno (verificacion).
 - `pnpm exec vitest run --project integration` **tres veces seguidas**, desde un shell limpio.
@@ -224,7 +246,7 @@ Dep de todo el bloque: **T4**.
   y los conteos de antes y despues.
 - Cubre: R11 (parcial), R13, R17, R25.
 
-### [ ] T16. [P] `./init.sh --rapido` en verde, y sin base sucia
+### [x] T16. [P] `./init.sh --rapido` en verde, y sin base sucia
 - Dep: T12, T14, T15.
 - Archivos: ninguno (verificacion).
 - Dos corridas: una con el diff tocando un archivo **con** tests de integracion relacionados y otra
@@ -235,7 +257,7 @@ Dep de todo el bloque: **T4**.
 - **Hecho cuando:** las dos salidas y los dos codigos de salida estan en la bitacora.
 - Cubre: R11.
 
-### [ ] T17. [P] Documentacion y bitacora
+### [x] T17. [P] Documentacion y bitacora
 - Dep: T15.
 - Archivos: `docs/verification.md`, `progress/impl_QC-77-aislamiento-de-la-base-en-tests-de-integracion.md`,
   `progress/current.md`.

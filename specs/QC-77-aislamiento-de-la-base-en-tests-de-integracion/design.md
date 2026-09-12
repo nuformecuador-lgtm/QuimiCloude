@@ -85,8 +85,13 @@ heredada       QuimiCloude_QC<n>          (las 21 de la decision 10; solo se lee
   se reutiliza. **No hay bandera `--rebuild-si-cambio`**: una bandera es algo que alguien tiene
   que acordarse de poner.
 - **`<key>`** — la clave de la ficha sacada del nombre del directorio del worktree
-  (`QC-77-...` → `qc77`); `main` si se corre desde el worktree principal. Es para que un humano
-  mirando `\l` en psql sepa de quien es la base.
+  (`QC-77-...` → `qc77`). Si el directorio no empieza por una clave de ficha se usa su nombre
+  saneado y truncado a 12 (desde el worktree principal `labs/` sale `labs`), y `main` queda como
+  **ultimo recurso**, solo cuando el saneado no deja ni una letra ni un digito. Es para que un
+  humano mirando `\l` en psql sepa de quien es la base — **no es la identidad**, que es el `<wt8>`.
+  *(Corregido el 2026-09-12 en F2.3: este parrafo decia «`main` si se corre desde el worktree
+  principal», y el codigo nunca hizo eso. El comportamiento correcto es el de arriba, fijado por
+  `tests/unit/test-database/nombres-y-huella.test.ts`.)*
 - **`<wt8>`** — 8 hex del SHA-256 de la **ruta absoluta del worktree**, normalizada. Es la
   identidad real (el `<key>` puede repetirse o truncarse); es lo que el barrido cruza contra
   `git worktree list` para saber si el dueno sigue vivo (R29).
@@ -472,3 +477,44 @@ heredada) para el DDL y las consultas a `pg_stat_activity`/`_prisma_migrations`,
 - **Bases acumuladas.** El barrido del `## 6` es manual a proposito. Si algun dia estorban,
   `init.sh` ya tiene el precedente exacto de como avisar sin bloquear: el bloque 5 de worktrees
   acumulados. **No entra hoy**: un aviso mas en el gate por algo que aun no ha dolido es ruido.
+
+---
+
+## 14. Addendum: lo que la implementacion cambio de este diseno (F2.1–F2.3, 2026-09-12)
+
+Este documento es lo que sobrevive a la ficha, asi que las divergencias reales viven **aqui** y no
+solo en la bitacora. Las cinco estan medidas; el detalle y las salidas, en
+`progress/impl_QC-77-aislamiento-de-la-base-en-tests-de-integracion.md > 6` y en
+`progress/qc77-mediciones/`.
+
+1. **El borrado del camino de senal es SINCRONO, y no puede dejar de serlo** (afecta a `## 5`,
+   capa 2). La capa 2 tal como estaba escrita —handler que hace `await` del `DROP`— **no
+   funciona**: Vitest registra su propio handler de `SIGINT`/`SIGTERM` que termina en
+   `setTimeout(() => process.exit(), 1)` (`node_modules/vitest/dist/chunks/cli-api.*.js`,
+   `addCleanupListeners`). **Un milisegundo**: la promesa del `DROP` no se resuelve y el proceso se
+   va con la base viva — medido, el primer Ctrl-C la dejo en pie. El camino de senal usa
+   `dropRunDatabaseSync` (`spawnSync` de un `node -e` con `pg`, sin dependencias nuevas), que
+   bloquea el hilo hasta que el `DROP` termina. **Convertirla en `async` reabre el agujero**, y por
+   eso hay un test que afirma que no devuelve una promesa.
+2. **Existe un canal mas que el `## 4` no nombraba: `QC77_RUN_DATABASE`.** R12 no pide «apunta a
+   una base `qct_`» sino «apunta a **la de esta corrida**». `_global-setup.ts` publica el nombre y
+   `_setup.ts` lo compara; sin el, la base efimera de **otra** corrida pasaria el filtro. No es una
+   variable de escape y no cambia ningun comportamiento: es el dato que R12 manda comparar.
+3. **La plantilla se construye con nombre provisional y se renombra al final**
+   (`qct_tplbuild_<huella>_<pid>` -> `qct_tpl_<huella>`), lo que el `## 3` no decia. Sin eso, un
+   kill a mitad de los ~40 s de la receta dejaria una plantilla **incompleta con el nombre bueno**,
+   que R6 reutilizaria para siempre — el peor fallo posible de esta ficha, porque seria silencioso.
+4. **`<key>` no es `main` desde el worktree principal.** Corregido en el `## 2`, donde estaba mal.
+5. **`_prisma_migrations` de la plantilla tiene 28 filas, no 27** (afecta a `## 3` y a la
+   comparacion de esquemas de R25). La de mas es el intento fallido de
+   `20260911130000_inventory_company_scope`, con `rolled_back_at` puesto, y **la plantilla la
+   arrastra a todas sus copias**. Toda comparacion de migraciones aplicadas **debe** filtrar
+   `rolled_back_at IS NULL AND finished_at IS NOT NULL` — hoy eso solo lo sabe `pendingMigrations`.
+   Verificado por el reviewer: 28 totales, **27** con el filtro, y el esquema **identico** al de la
+   base de desarrollo. La fila de mas **no** esconde una plantilla a medias.
+
+**Ademas, sobre el `## 6` (el barrido):** la guarda 4 dice «existe un worktree o una rama
+`feature/QC-<n>-*`» sin precisar local o remota. Se implemento contando **ambas**, por la regla de
+oro. Consecuencia: como las ramas remotas de feature no se borran tras el merge, retienen mucho, y
+el reparto SAFE/HOLD **cambia solo** segun se desmontan worktrees y se borran ramas. Se barre
+mirando la salida del momento, nunca una lista copiada.

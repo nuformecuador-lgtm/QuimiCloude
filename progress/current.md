@@ -19,6 +19,51 @@
 
 ## Evaluaciones
 
+### QC-77 - F2.1 implementada, 17/18 tasks (2026-09-12)
+
+**Falta solo T18: `./init.sh` completo, que por enunciado lo corre el LEADER.** Despues, `reviewer`.
+
+Bitacora: `progress/impl_QC-77-aislamiento-de-la-base-en-tests-de-integracion.md`. Evidencia cruda
+por task en `progress/qc77-mediciones/` (14 archivos). **Los 31 requisitos mapeados**: 12 con test
+automatico, 19 con medicion pegada, 7 con las dos cosas.
+
+Lo que hay que saber sin abrir la bitacora:
+
+- **Funciona**: los 41 archivos de integracion, **630/630 casos, tres corridas seguidas en verde**,
+  cada una sobre su base efimera. Los **13 rojos** de la linea base desaparecieron y el `23505` del
+  correlativo **no aparecio**. La base de desarrollo quedo identica (conteo por tabla, tres veces).
+- **La puerta de diseno (T4) se midio y no contradijo nada**: `process.env` del `globalSetup` **si**
+  llega al worker (pool `forks`), y el `globalSetup` **no** corre con cero archivos seleccionados,
+  asi que **no se escribio el corto-circuito** ni se toco `scripts/test-rapido.mjs`.
+- **Una cosa del design no funcionaba y se cambio**: el borrado ante Ctrl-C tiene que ser
+  **sincrono**, porque Vitest hace `setTimeout(() => process.exit(), 1)` en su propio handler y un
+  `DROP` con `await` no llega. Convertirlo en `async` reabre el agujero.
+- **Alcance respetado**: nada bajo `app/`, `lib/`, `components/`, `db/` ni `e2e/`; ninguno de los 41
+  archivos de `tests/integration/**` modificado (R22); `package.json` solo gana el script `db:test`
+  y **ninguna dependencia** (R23).
+- **Anadido que NO estaba en `tasks.md`** y que el reviewer debe poder rechazar:
+  `tests/unit/test-database/nombres-y-huella.test.ts`, 18 casos sobre las funciones puras, porque
+  R4/R5/R6/R28/R30/R31 se apoyaban solo en mediciones que no vuelven a correr.
+- **`dev` se movio 15 commits** mientras corria la ficha (ultimo: merge de QC-85, PR #64). **Hay que
+  mergear `dev` antes del gate y del PR**, y el gate que vale es el de despues del merge.
+
+### Deudas que deja abiertas, todas **fuera** del alcance de QC-77
+
+1. **`scripts/test-rapido.mjs` corre las guardias solo `if (status === 0)`**: si la primera mitad
+   sale roja, **las guardias no corren**. «El rapido corre siempre todas las guardias» es cierto
+   solo hasta el primer rojo. Medido en T16. Candidato a ficha.
+2. **Un worktree recien montado no pasa `pnpm run typecheck`** hasta correr `pnpm exec next typegen`
+   (`app/layout.tsx` usa `LayoutProps`, que Next genera en `.next/types`, y `.next` no viaja con el
+   worktree). Tres subagentes tropezaron con el mismo `TS2304`. Candidato a ficha o a una linea en
+   `docs/worktrees.md`.
+3. **`db:test clean --force` no tiene filtro**: todo o nada sobre los SAFE. Candidato a `--solo`.
+4. **R10 no se probo de punta a punta** (dos worktrees distintos a la vez): los worktrees vivos no
+   tienen la libreria y correr alli habria ensuciado la base de desarrollo — el bug que la ficha
+   cierra. Se cierra solo cuando QC-77 este en `dev`.
+5. **Las bases heredadas siguen todas en pie.** `db:test list` marca hoy 9 SAFE, pero **barrerlas es
+   decision del humano** y no se pidio. El reparto SAFE/HOLD **cambia solo** segun se desmontan
+   worktrees: se barre mirando la salida del momento, no una lista copiada.
+
 ### QC-77 - acotada con `/afinar-feature` (2026-09-12)
 
 Alcance, **11 decisiones cerradas** y **dos preguntas abiertas con respuesta por defecto** en
