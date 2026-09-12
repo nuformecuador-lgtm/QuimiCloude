@@ -483,3 +483,96 @@ plantilla y `.qc-test-db/` esta vacio.
 **Sigue sin ser el veredicto**: esta ficha toca `init.sh` y `scripts/`, justo lo que
 `docs/verification.md` dice que el modo rapido se niega a cubrir. El que vale es **T18**, despues
 del merge con `dev`.
+
+---
+
+## 10. F2.3 — sincronizacion con `dev` (2026-09-12)
+
+Merge `57f8e2b`, **22 commits** de `origin/dev`. La rama queda **0 behind**.
+
+### El unico conflicto textual
+
+`progress/current.md` — resuelto **con la version de `dev`**, por indicacion del leader: ese
+archivo lo mantiene el y hay otra sesion escribiendolo. No se metio nada de QC-77.
+
+### Los dos que automergearon, que era donde estaba el riesgo
+
+`init.sh` y `docs/verification.md` los toca `dev` y los toca esta ficha. Git no se quejo, asi que
+se revisaron **a mano**, que es lo que el automerge no hace:
+
+- **`init.sh`**: `dev` (`659b600`) mete un bloque 2 que corre `prisma generate` y `next typegen`
+  **antes de mirar nada**; el `6.c` de esta ficha sigue entre el `6.b` y los tests. Conviven, y el
+  orden es el correcto. **De regalo, ese bloque cierra el hallazgo 9 de la seccion 6**: un worktree
+  recien montado ya no falla el typecheck por `LayoutProps`. La deuda que reporte ya no existe.
+- **`docs/verification.md`**: la seccion de `dev` («El gate regenera los artefactos...») y la de
+  QC-77 («Los tests de integracion corren sobre una base propia y efimera») son distintas y no se
+  solapan. Ninguna seccion duplicada, ningun marcador suelto en todo el arbol.
+
+### Ni un caso de test perdido
+
+Los dos archivos que toca `d2fcb9d` suman **61 casos antes y 61 despues** (`identity-constraints`
+47 + `identity-seed` 14). El commit **renombra** un `it()` y estrecha su afirmacion; no borra
+ninguno.
+
+### El censo no necesito altas
+
+Los 22 commits **no traen ningun archivo nuevo** bajo `tests/integration/**`: 42 en el arbol, 42
+declarados. Y los dos que cambian **siguen aislandose por transaccion**, que es como estaban
+declarados — comprobado leyendo los archivos, no deduciendolo.
+
+### Lo que el merge rompio SIN ser conflicto textual
+
+El hook de R9 de `tests/integration/infra/ciclo-de-vida-de-la-base.int.test.ts` **expiraba a los
+15 s** al correr acompanado: `Hook timed out in 15000ms`. Pasaba **corriendo solo** —asi lo
+verifico M3 y asi lo aprobo el reviewer— y solo se cae en compania.
+
+**No es un flake, es aritmetica**: ese hook hace **tres** `CREATE DATABASE ... TEMPLATE` en serie y
+**cada uno reintenta ante `55006`** (plantilla ocupada) con espera creciente de hasta ~4 s. Tres
+veces eso se come el plazo entero antes de llegar al barrido. **15 s no era un margen, era el borde
+exacto.** Plazo local del archivo a **60 s**, con el porque escrito dentro; `vitest.config.mts`
+**no se toca** (lo vigila `guard-teclear-y-plazo` desde QC-58).
+
+Es un fallo **mio**, de F2.3 anterior, que el merge solo saco a la luz: habria reventado en T18, que
+corre los 42 archivos juntos.
+
+### La duplicidad semantica de `d2fcb9d`: mi lectura, y lo que NO pude sostener
+
+`d2fcb9d fix(tests): el reset de identidad contempla el inventario de QC-49` ataca **los dos mismos
+archivos y los dos mismos sintomas** que la linea base de T1 (`identity-seed`, 12 rojos por
+`Foreign key constraint violated` en `company.deleteMany({})`; `identity-constraints`, 1 rojo por
+las 38 filas `DOC*` residuales). Dos arreglos distintos para el mismo dolor.
+
+**Mi primera hipotesis era que se complementaban** —QC-77 quita el residuo *entre* corridas,
+`d2fcb9d` quitaria el acoplamiento *dentro* de una corrida— y **la medi antes de reportarla. Es
+FALSA.** Revirtiendo los dos archivos a la version pre-`d2fcb9d` (desde copia, restaurados) y
+corriendo `inventario/product-crud` + `presentation-uniqueness` **antes** de los dos de identidad en
+la misma corrida: **70/70 verde**. O sea: **QC-77 sola ya aguanta ese orden adverso**, y no
+consegui construir el caso en que `d2fcb9d` salve algo que QC-77 no salve.
+
+Lo que si se sostiene, y es lo que se lleva el leader:
+
+- **No se contradicen y no hay que borrar nada.** Los dos pasan juntos: 42/42 archivos, 635/635
+  casos.
+- **La mitad de `identity-seed` es una correccion real e independiente del aislamiento**: el cierre
+  transitivo de FKs de `resetIdentityToEmptyState` partia solo de `users` y no visitaba la rama que
+  QC-49 colgo de `companies`. Ese helper estaba **mal** con respecto al esquema, lo aisles como lo
+  aisles. Se queda.
+- **La mitad de `identity-constraints` si merece una mirada del humano.** Relajo «el catalogo
+  arranca solo con CC» a «CC existe, se llama asi y esta activo», con el argumento —correcto
+  entonces— de que el invariante global era imposible sobre una base compartida y sucia. **Con
+  QC-77 ese invariante vuelve a ser cierto y comprobable**, asi que la relajacion ya no hace falta y
+  cuesta un poco de cobertura. **No lo he tocado** (no es mio y no me lo han pedido): queda
+  **propuesto** para que lo decida quien corresponda.
+
+### Verificacion post-merge
+
+| Que | Resultado |
+| --- | --- |
+| `pnpm run typecheck` | **rc=0** |
+| `pnpm run lint` | **rc=0** |
+| `vitest run guard tests/unit/test-database` | **37 archivos, 398 casos verdes** (4 skipped) |
+| La combinacion que fallo, **dos veces** tras el arreglo del plazo | **3/3 archivos, 66/66 casos** |
+| `vitest run --project integration` **entero** | **42/42 archivos, 635/635 casos**, 59,5 s, sobre `qct_qc77_7a512e99_mtyq324r_f24`, **borrada al terminar** |
+| `db:test list` + `.qc-test-db/` | Unica `qct_` viva: la plantilla. Cero rastros. `QuimiCloude` y las heredadas intactas |
+
+**Sigue faltando T18**, el gate completo, que lo corre el leader.
