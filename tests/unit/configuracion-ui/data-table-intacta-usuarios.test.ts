@@ -19,7 +19,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, type TestContext } from 'vitest';
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). Aqui la «raiz»
  *  puede ser un WORKTREE, donde `.git` es un archivo y no una carpeta; los comandos de git
@@ -119,12 +119,77 @@ function fuenteSinComentarios(ruta: string): string {
     .replace(/\/\*[\s\S]*?\*\//g, ' ');
 }
 
+/**
+ * LA PRECONDICION DE RAMA (anadida el 2026-09-11 desde la rama de QC-84).
+ *
+ * `1a9e2c4` arreglo el RANGO de este centinela —merge-base en vez de un SHA congelado— y dejo
+ * pendiente el SUJETO: seguia sin comprobar QUE RAMA estaba midiendo. Mientras QC-67 vivia en su
+ * worktree eso no se notaba; **en cuanto QC-67 se mergeo en `dev`, este archivo empezo a medir
+ * CUALQUIER rama con las reglas de alcance de QC-67**. Lo destapo QC-84 al sincronizar: su ancla de
+ * no-vacuidad fallaba con `expected 0 to be greater than 0` porque una rama de backend no toca la
+ * carpeta de la pantalla de usuarios —y fallaba igual corriendo el gate sobre `dev` con el arbol
+ * limpio, donde el diff contra el propio merge-base es de CERO archivos—.
+ *
+ * Es la misma leccion, y la misma cura, que `tests/unit/identity/account-status-scope.test.ts`
+ * escribio en su cabecera: «aplicarlas a otra rama no mide nada, solo pone en rojo trabajo legitimo
+ * ajeno». **Se copia su forma a proposito, sin inventar una segunda**: que el repo tenga dos
+ * maneras de decir lo mismo es la mitad del problema que se esta arreglando.
+ *
+ * LA SENAL es CONJUNTIVA: el archivo central de la pantalla **mas** la carpeta de spec de la propia
+ * ficha. La carpeta de spec discrimina de verdad porque nace y vive dentro del rango de QC-67 y no
+ * aparece jamas en el rango de otra ficha, que trae la SUYA. No se usa este archivo de test como
+ * senal, justamente porque otras fichas lo enmiendan al chocar con el.
+ *
+ * **Esto ENDURECE la precondicion, no relaja la comprobacion**: en la rama real de QC-67 las dos
+ * senales estan presentes y los dos casos de abajo corren exactamente igual, con las mismas listas
+ * cerradas y las mismas igualdades. Fuera de su rama quedan `skipped` —nunca verdes—: un verde
+ * diria «he revisado el diff de QC-67 y no abre la tabla compartida» sin haber mirado nada.
+ */
+const ARCHIVO_CENTRAL_DE_QC67 = 'app/(private)/configuracion/usuarios/page.tsx';
+const CARPETA_SPEC_DE_QC67 = 'specs/QC-67-pantalla-de-usuarios/';
+
+export function esLaRamaDeQC67(tocados: readonly string[]): boolean {
+  return (
+    tocados.includes(ARCHIVO_CENTRAL_DE_QC67) &&
+    tocados.some((archivo) => archivo.startsWith(CARPETA_SPEC_DE_QC67))
+  );
+}
+
+/**
+ * Salta el caso —ruidosamente, con el motivo escrito— cuando la rama no es la de QC-67. El diff se
+ * pide sobre TODO el arbol (`.`) y no solo sobre las rutas vigiladas: la senal vive fuera de ellas.
+ */
+function saltarSiNoEsLaRamaDeQC67(ctx: Pick<TestContext, 'skip'>, base: string): void {
+  const tocados = archivosCambiados(base, ['.']);
+
+  if (tocados.length === 0) {
+    ctx.skip(
+      'la rama no toca ningun archivo respecto del merge-base con `dev`: no hay diff que ' +
+        'revisar, asi que este caso NO ha comprobado nada. Ocurre al correr el gate sobre `dev` ' +
+        'con el arbol limpio.',
+    );
+    return;
+  }
+
+  if (!esLaRamaDeQC67(tocados)) {
+    ctx.skip(
+      'el rango no trae a la vez `' +
+        ARCHIVO_CENTRAL_DE_QC67 +
+        '` y `' +
+        CARPETA_SPEC_DE_QC67 +
+        '`: esta NO es la rama de QC-67, asi que este caso NO ha comprobado nada. R9 y R37 son ' +
+        'el alcance de ESA ficha y no le aplican a ninguna otra.',
+    );
+  }
+}
+
 describe('esta feature no abre la tabla compartida ni las primitivas (R9, R37)', () => {
   it('ningun archivo de `components/shared/data-table/` ni de `components/ui/` cambia', (ctx) => {
     if (BASE_DE_LA_RAMA === null) {
       ctx.skip(SIN_BASE);
       return;
     }
+    saltarSiNoEsLaRamaDeQC67(ctx, BASE_DE_LA_RAMA);
 
     const tocados = [
       ...archivosCambiados(BASE_DE_LA_RAMA, INTOCABLES),
@@ -139,6 +204,7 @@ describe('esta feature no abre la tabla compartida ni las primitivas (R9, R37)',
       ctx.skip(SIN_BASE);
       return;
     }
+    saltarSiNoEsLaRamaDeQC67(ctx, BASE_DE_LA_RAMA);
 
     // El caso simetrico, para que «lista vacia» no pueda serlo por vacuidad —por ejemplo porque el
     // `--` estuviera mal puesto, o porque el rango se calculara mal, y git no mirara nada—. La

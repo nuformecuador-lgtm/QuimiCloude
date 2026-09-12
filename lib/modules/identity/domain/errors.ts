@@ -199,3 +199,116 @@ export class ValidationError extends IdentityError {
     super('invalid_input', diagnostic);
   }
 }
+
+// ---------------------------------------------------------------------------
+// QC-84 — Los grupos de trabajo (`design.md > 7.1`). Siete clases NUEVAS al final del archivo:
+// ninguna de las diez de arriba se toca, ni su `code` ni su texto.
+//
+// **Por que son TRES codigos de «ya pertenece pero no se ve» y no uno** (`design.md > 7.2`): la
+// decision 5 pide que el error diga que la persona YA PERTENECE **y POR QUE no aparece** en la
+// lista. El motivo no puede viajar como dato: el `diagnostic` de QC-70 (R28, R29) va al registro
+// del servidor y SOLO ahi, asi que un unico `work_group_member_exists` con el motivo dentro le
+// dejaria al operador un «ya pertenece» sobre una lista donde esa persona no esta —exactamente el
+// caso que la decision 5 viene a cerrar—. Y el motivo tampoco puede ir en el TEXTO de un codigo
+// compartido, porque QC-70 R4 prohibe que dos codigos compartan frase y el catalogo no interpola
+// (R7): el mensaje sale del codigo y de nada mas. Luego un motivo = un codigo. Son tres —cuenta
+// `pending`, cuenta `inactive` y cuenta bloqueada— porque son las tres formas de que
+// `effectiveAccountStatus` no diga `'active'`, y son tres acciones distintas para quien las lee:
+// activar la cuenta, reactivarla o esperar a que venza el bloqueo. El cuarto caso —la persona SI
+// se ve— es `WorkGroupMemberExistsError`, y no comparte codigo con ninguno de los tres (R31).
+//
+// El NOMBRE del grupo no entra en ninguno de los cuatro mensajes, y esta dicho por escrito en
+// `design.md > 7.2`: con QC-70 tal y como esta mergeado no es implementable, y meterlo en el
+// `diagnostic` no lo pondria delante del operador. Lo pone la pantalla (QC-85), que sabe que grupo
+// acaba de abrir. Interpolar en el catalogo seria una enmienda a QC-70 y es otra ficha.
+// ---------------------------------------------------------------------------
+
+/**
+ * R8, R9: el grupo no existe, esta dado de baja o es de **otra empresa**.
+ *
+ * Los tres casos comparten `code` por el mismo motivo que `UserNotFoundError`: distinguirlos
+ * convertiria la consulta en un **oraculo de existencia** sobre datos ajenos. De ahi que el grupo
+ * de otra empresa responda no-encontrado y **no** `unauthorized` (criterio de QC-38, QC-43 y
+ * QC-66). Un grupo dado de baja es inexistente para las siete operaciones (R40): no hay forma de
+ * restaurarlo ni de listarlo.
+ */
+export class WorkGroupNotFoundError extends IdentityError {
+  readonly code = 'work_group_not_found';
+
+  constructor(diagnostic?: string) {
+    super('work_group_not_found', diagnostic);
+  }
+}
+
+/**
+ * R12, R17: crear o renombrar choca contra `work_groups_name_unique` —el indice funcional,
+ * compuesto con `company_id` y **parcial** (`WHERE deleted_at IS NULL`) que QC-83 ya creo—.
+ *
+ * Se lanza al traducir el resultado discriminado del puerto, que nace del `P2002`: la garantia es
+ * el **indice**, nunca una consulta previa de existencia —entre el `SELECT` y el `INSERT` cabe otra
+ * transaccion—. Por eso el puerto no expone ninguna busqueda por nombre.
+ */
+export class WorkGroupDuplicateNameError extends IdentityError {
+  readonly code = 'work_group_duplicate_name';
+
+  constructor(diagnostic?: string) {
+    super('work_group_duplicate_name', diagnostic);
+  }
+}
+
+/** R30: la persona ya pertenece al grupo **y aparece** en la lista de miembros de R19. */
+export class WorkGroupMemberExistsError extends IdentityError {
+  readonly code = 'work_group_member_exists';
+
+  constructor(diagnostic?: string) {
+    super('work_group_member_exists', diagnostic);
+  }
+}
+
+/**
+ * R31: ya pertenece, pero el filtro de R19 la oculta porque su cuenta esta **pendiente**. El motivo
+ * lo decide `effectiveAccountStatus`, la misma funcion que decide quien sale en la lista: el «por
+ * que no se ve» y el «quien se ve» no pueden divergir.
+ */
+export class WorkGroupMemberExistsPendingError extends IdentityError {
+  readonly code = 'work_group_member_exists_pending';
+
+  constructor(diagnostic?: string) {
+    super('work_group_member_exists_pending', diagnostic);
+  }
+}
+
+/** R31: ya pertenece; no se ve porque su cuenta esta **inactiva**. */
+export class WorkGroupMemberExistsInactiveError extends IdentityError {
+  readonly code = 'work_group_member_exists_inactive';
+
+  constructor(diagnostic?: string) {
+    super('work_group_member_exists_inactive', diagnostic);
+  }
+}
+
+/**
+ * R31: ya pertenece; no se ve porque su cuenta esta **bloqueada**. Incluye el bloqueo por intentos
+ * fallidos con el plazo VIGENTE, que puede tener la columna en `active` (QC-78 R11) y que por eso
+ * solo `effectiveAccountStatus` sabe reconocer.
+ */
+export class WorkGroupMemberExistsBlockedError extends IdentityError {
+  readonly code = 'work_group_member_exists_blocked';
+
+  constructor(diagnostic?: string) {
+    super('work_group_member_exists_blocked', diagnostic);
+  }
+}
+
+/**
+ * R36: se saca del grupo a quien **no pertenece**. Es distinto de `UserNotFoundError` —la persona
+ * puede existir perfectamente— y distinto de `WorkGroupNotFoundError`: aqui lo que falta es la
+ * fila de PERTENENCIA, no ninguno de sus dos extremos.
+ */
+export class WorkGroupMemberNotFoundError extends IdentityError {
+  readonly code = 'work_group_member_not_found';
+
+  constructor(diagnostic?: string) {
+    super('work_group_member_not_found', diagnostic);
+  }
+}

@@ -29,6 +29,13 @@
  * (Este archivo sigue sin IMPORTAR nada del modulo de los usuarios, y por eso la cita de arriba es
  * por ficha y no por ruta: el catalogo no depende de ningun modulo, son los modulos los que
  * dependen de el.)
+ *
+ * **Cuarta enmienda, el 2026-09-11 (QC-84)**: la misma familia `identity` gana SIETE codigos mas,
+ * los de los GRUPOS DE TRABAJO. El motivo es el mismo que el de QC-66 y se aplica a un caso nuevo:
+ * administrar los grupos de una empresa tiene fallos distinguibles —el grupo que no existe, el
+ * nombre repetido, la pertenencia duplicada con sus tres motivos de ocultacion y la persona que no
+ * pertenece— y cada uno necesita UN mensaje propio. No abre una familia nueva ni un modulo nuevo:
+ * las dos tablas son de `identity` desde QC-83. Aprobada por el humano el 2026-09-11.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -64,6 +71,20 @@ export const ERROR_CODES = [
   'role_not_found',
   'self_operation',
   'last_administrator',
+  // `identity` (QC-84): los grupos de trabajo. Misma familia y mismo modulo que los siete de
+  // arriba —un grupo es un conjunto de personas y las personas viven en `identity` (QC-84
+  // `design.md > 9.4`)—, asi que NO abren una septima familia: amplian la sexta.
+  //
+  // Son TRES codigos de «ya pertenece pero no se ve» y no uno porque R4 prohibe que dos codigos
+  // compartan texto, y «pendiente», «inactiva» y «bloqueada» son tres frases distintas y tres
+  // acciones distintas para quien las lee (QC-84 `design.md > 7.2`).
+  'work_group_not_found',
+  'work_group_duplicate_name',
+  'work_group_member_exists',
+  'work_group_member_exists_pending',
+  'work_group_member_exists_inactive',
+  'work_group_member_exists_blocked',
+  'work_group_member_not_found',
 ] as const;
 
 /** La union cerrada de los codigos declarados arriba (R2). */
