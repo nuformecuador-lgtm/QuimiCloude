@@ -574,3 +574,49 @@ que ayer con `inventario-schema`. El baseline queda en **8**.
 `product-crud.int.test.ts` se acerca a su criterio de retirada —su nota exige **tres corridas
 completas verdes seguidas**— pero retirarla es de quien la escribio, y hoy la suite ha tenido una
 corrida roja por saturacion de por medio. Queda **anotado como deuda visible**.
+
+## El flake de `identity-facade`, cerrado reestructurando (decision del humano)
+
+**No se baselineo y no se subio `testTimeout`.** Las dos vias se descartaron por escrito:
+
+- **Subir `testTimeout`**: **QC-58 ya lo subio de 5 s a 15 s por este mismo motivo**, y su propia nota
+  dice que si vuelve a caer «el techo esta en la maquina». Seria la segunda venda sobre la misma
+  herida, y la **proxima ficha que cablee algo en `lib/composition` la rompe igual**.
+- **Baselinearlo**: apagaria el archivo **entero** para el comparador —los casos de QC-48, QC-78,
+  QC-66, QC-94 y los de esta ficha—, y ademas es un archivo que **QC-79 modifico**: seria tapar algo
+  propio, que es justo lo que el baseline no es.
+
+**La causa, medida.** El archivo tenia **15 `await import('@/lib/composition')`**, uno por caso, y
+**sin `vi.resetModules()`**: el modulo se cachea, asi que el coste real —transformar el grafo entero
+de composicion— lo pagaba **el primer caso**, que resulta ser `getSessionContext`, **de QC-48**. De
+ahi que el sintoma culpara siempre a un caso inocente y solo apareciera **bajo carga**.
+
+**Un dato que casi invalida la salida elegida, y que hay que dejar escrito**: `hookTimeout` **no esta
+configurado** en `vitest.config.mts`, asi que vale el **defecto de Vitest, 10 s** — **menor** que los
+15 s de `testTimeout`. Mover el import a un `beforeAll` **sin mas habria expirado ANTES** que el
+codigo anterior. Por eso el hook lleva **presupuesto explicito** (`beforeAll(fn, 60_000)`), ~8x el
+coste medido del grafo. **Esto no es subir `testTimeout`**: es un presupuesto **local, de un hook, de
+un archivo**, para un coste conocido que se paga **una vez**, frente a dar mas margen a **todos** los
+tests del repo. `vitest.config.mts` **no se toco**.
+
+**Ninguna asercion cambio: 15 casos antes, 15 despues.** Los `vi.mock` siguen aplicandose —el import
+sigue siendo **dinamico** dentro del hook, no estatico en cabecera— y lo demuestran los casos que
+solo pasan con dobles. Aislado, el archivo baja de **~6,4 s a ~3,6 s**.
+
+### Las TRES corridas completas seguidas que exige el listón del baseline
+
+```
+CORRIDA 1   identity-facade ✓ 15 tests 5984ms   Duration 215.41s   == init OK ==
+CORRIDA 2   identity-facade ✓ 15 tests 5782ms   Duration 182.20s   == init OK ==
+CORRIDA 3   identity-facade ✓ 15 tests 5822ms   Duration 181.16s   == init OK ==
+
+Tests  7 failed | 5428 passed | 42 skipped (5477)
+sin rojos nuevos (5 rojos, todos en el baseline de 8); 3 por limpiar
+```
+
+Las tres en verde, y el archivo **consistente** (5,8-6,0 s, muy por debajo del limite). De paso la
+suite entera baja de **277-595 s a 181-215 s**: el archivo ya no bloquea. Antes de la
+reestructuracion habia caido **2 de 3**.
+
+**El baseline queda en 8** tras retirar `usuarios-convenciones`. Las **3** que el comparador senala
+como limpiables siguen sin tocarse: son de fichas ajenas y retirarlas es de quien las escribio.
