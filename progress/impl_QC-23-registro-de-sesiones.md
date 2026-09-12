@@ -89,7 +89,7 @@ Los 51, cada uno con un test concreto que muerde.
 | R4 | `session-token.test.ts > y lo rechaza SIN verificar la firma: no se llama a crypto.subtle.sign` |
 | R5 | `session-token.test.ts > es igual a createHmac para secreto y mensaje` + guardia `guard-firma-sesion-unica` |
 | R6 | `session-claims.test.ts > sid ausente / vacio / no-texto / sin forma de UUID devuelven null` |
-| R7 | `schema/session-revocation-migration.test.ts > el sello nace NOT NULL con su default y sin indice` |
+| R7 | `schema/session-revocation-migration.test.ts > anade `users.sessions_valid_from` NOT NULL con DEFAULT, y eso ES el backfill (R7)` + `el sello vive en User, es obligatorio y no tiene indice (R7, design.md > 2.1)` |
 | R8 | `resolve-session.test.ts > con un iat anterior al sello del usuario resuelve null` + `con un iat igual al sello —el mismo segundo— resuelve null` |
 | R9 | `session-revocation.test.ts > una sesion emitida EN EL MISMO SEGUNDO que el sello es invalida` + `end-other-sessions.test.ts > una sesion AJENA emitida en el MISMO SEGUNDO del sello queda invalida (R9)` |
 | R10 | `schema/session-revocation-migration.test.ts > las cinco columnas de negocio son obligatorias y los dos identificadores son UUID` |
@@ -108,7 +108,7 @@ Los 51, cada uno con un test concreto que muerde.
 | R23 | `end-session.test.ts > borra la cookie igual y deja la causa en el registro del servidor` + `borra la cookie igual si ni siquiera se pudieron leer los claims` |
 | R24 | `end-session.test.ts > NO sube el sello de esa persona (R24)` |
 | R25 | `end-all-sessions.test.ts > sube el sello de la persona objetivo, en la empresa del ACTOR y truncado al segundo` + `apuntarse a uno mismo con el conjunto VACIO si esta permitido: no es self_operation` |
-| R26 | `end-all-sessions.test.ts > el caso de uso no emite ninguna cookie ni crea ninguna Server Action` — la operacion no admite `sid`, asi que elegir dispositivo no es expresable |
+| R26 | `end-all-sessions.test.ts > sube el sello de la persona objetivo, en la empresa del ACTOR y truncado al segundo` — el caso afirma `revokeSession` NO invocado: el cierre es siempre total y no hay ningun `sid` que elegir, ni aqui ni en la firma |
 | R27 | `end-all-sessions.test.ts > rechaza <caso> sin tocar el puerto` — actor ausente, sin conjunto, conjunto vacio, conjunto que no es array y sin el codigo exacto |
 | R28 | `end-all-sessions.test.ts > un objetivo de otra empresa responde user_not_found, y NO unauthorized (R28)` + `session-revocation.int.test.ts > los TRES casos son indistinguibles desde fuera del adaptador` |
 | R29 | `end-all-sessions.test.ts > el caso de uso no lee cookies ni cabeceras: el actor entra por parametro` |
@@ -121,13 +121,13 @@ Los 51, cada uno con un test concreto que muerde.
 | R36 | `session-revocation.test.ts > pasar a pending o a active NO corta las sesiones (R36)` + `session-stamp-writes.int.test.ts > mover a pending NO toca el sello` |
 | R37 | `session-stamp-writes.int.test.ts > R37: reactivar una cuenta bloqueada NO revive sus sesiones` |
 | R38 | `session-stamp-writes.int.test.ts > R38: si la transaccion aborta por last_administrator, el sello NO cambio` + `R38: si el consumo REVIERTE, ni la contrasena ni el sello quedaron escritos` |
-| R39 | `session-revocation.int.test.ts > revokeSession borra las caducadas de esa persona, y solo esas` + `stampAll purga igual, y el corte es el propio sello` |
+| R39 | `session-revocation.int.test.ts > `revokeSession` borra las caducadas de esa persona, y solo esas` + `stampAll purga igual, y el corte es el propio sello` + `schema/session-revocation-migration.test.ts > el compuesto (user_id, expires_at) ES R39` |
 | R40 | `resolve-session.test.ts > mira el sello y el registro de cerradas, pero no escribe ni purga nada` + `sus dependencias son lectores y registro, y ningun puerto de escritura` |
 | R41 | `schema/session-revocation-migration.test.ts > nombra en ingles y en snake_case todo lo que crea (R41)` |
 | R42 | `schema/session-revocation-migration.test.ts > queda con ENABLE y con FORCE (R42)` y cero `CREATE POLICY` + guardia `guard-rls-force` |
 | R43 | `schema/session-revocation-migration.test.ts > borra la tabla y la columna del sello, y nada mas: dos sentencias` |
-| R44 | `schema/session-revocation-migration.test.ts > la tabla no lleva ninguna columna de empresa` |
-| R45 | `schema/session-revocation-migration.test.ts > lleva created_at y NO lleva updated_at ni deleted_at` |
+| R44 | `schema/session-revocation-migration.test.ts > declara exactamente las seis columnas del diseno, sin empresa y sin updated_at (R44, R45)` |
+| R45 | `schema/session-revocation-migration.test.ts > el modelo no declara empresa, ni updated_at, ni deleted_at (R44, R45)` |
 | R46 | `session-revocation.test.ts > no lee el reloj ni importa framework, Prisma o lo compartido` + guardia `guard-arquitectura-modulos` |
 | R47 | `qc23-alcance.test.ts > package.json no gano ninguna dependencia` + guardia `guard-dependencias-aprobadas` |
 | R48 | `end-all-sessions.test.ts > el error de denegacion es del catalogo cerrado de QC-70 y no trae texto propio (R48)` + guardia `guard-catalogo-de-errores` |
@@ -220,3 +220,81 @@ el design: se resolvio fallando cerrado, con `UserNotFoundError` y **sin reemiti
   con clave `userId` mas `sid`, y el dominio lo consume por el puerto, asi que se implementa como un
   **decorador del puerto** sin tocar `resolve-session.ts`. La condicion la fija R19: puede fallar
   abierta **hacia la base**, nunca hacia «valida».
+
+## Segunda vuelta: lo que corrigio la revision (2026-09-12)
+
+El reviewer **RECHAZO** la primera entrega con **un mayor y siete menores**
+(`progress/review_QC-23-registro-de-sesiones.md`). Todo lo de abajo es la respuesta, y **no hay
+ninguno sin atender**.
+
+### El mayor — la guardia se esquivaba cambiando de carpeta
+
+`guard-sesiones-cortadas` vigilaba **solo** `adapters/driven/persistence/`. El reviewer lo probo
+creando `adapters/driven/credenciales/reset-prisma.ts` con un `prisma.user.update` que escribia el
+hash sin sello: **las dos guardias pasaron en verde**.
+
+Lo grave no era el `R<n>` —ninguno se rompia— sino **la promesa**: esta bitacora le decia a QC-89 y
+QC-96 que quien olvide el sello se encuentra la guardia roja, y **sobre esa lectura ya se enmendo
+el spec de QC-96**. La cabecera de la guardia, ademas, **afirmaba como hecho** que ese directorio
+era el unico sitio del repositorio donde se escribe en `users`, **sin comprobarlo**: una afirmacion
+no verificada dentro de la pieza cuyo trabajo es verificar.
+
+El ambito se amplio y **se probo por mutacion en el ambito nuevo**, no solo se amplio. El detalle
+—hasta donde y por que— esta unas lineas mas abajo, en la nota de la guardia.
+
+### Los siete menores
+
+| # | Que decia | Que se hizo |
+| --- | --- | --- |
+| 1 | `tasks.md` T24 sin marcar | Marcada, **con el resultado real del gate completo** pegado en la propia task |
+| 2 | El mapa citaba R26 con un test de R51 | Corregido: R26 apunta al caso que afirma `revokeSession` NO invocado |
+| 3 | Cuatro titulos del mapa parafraseados | Puestos **literales de disco** (R7, R39, R44, R45) |
+| 4 | `design.md § 4` decia «hoy 1 sentencia SQL»; medido son **4**, y 5 con QC-23 | Corregido con el numero medido y una nota que explica por que importa: **es el numero que QC-28 leera** |
+| 5 | `endOtherSessions` sellaba con `actor.companyId` y reemitia con `current.companyId` | Unificado en una sola fuente |
+| 6 | Frase empalmada en `ports/session-check-log.ts` | Redaccion arreglada; el fondo no se toco |
+| 7 | Consecuencia del `<=` no declarada | Escrita en `design.md § 12` como punto 4 |
+
+**El menor 4 merece una linea aparte**, porque es el unico donde la primera entrega afirmo un
+numero sin medirlo: el **delta** que sostiene todo el argumento de § 4 era exacto (+1), pero el
+**absoluto estaba mal por un factor de cuatro**. Ninguna decision cambia; lo que cambia es que
+QC-28 ya no partira de una linea de base cuatro veces menor que la real al dimensionar su cache.
+
+### La guardia: a que ambito se amplio, y por que a ese
+
+**De `adapters/driven/persistence/` a `lib/` y `scripts/` enteros**, filtrando por extension y
+saltando `node_modules`, `.next`, `.git`, `dist`, `build` y `coverage`.
+
+**No** a `adapters/driven/`, que era la opcion obvia y la mas barata. El motivo es el que convirtio
+esto en un mayor: **una guardia no puede apoyarse en la convencion que vigila otra guardia.** Que
+solo `adapters/driven/**` alcance el cliente de Prisma lo garantiza `guard-arquitectura-modulos`, y
+atar la nuestra a esa frontera deja la promesa dependiendo de que alguien amplie una constante el
+dia que la frontera se mueva — exactamente el trabajo manual que la guardia existe para quitar.
+Barriendo `lib/` y `scripts/`, la afirmacion «toda escritura del hash sube el sello» **se comprueba
+sola**. `scripts/` entra porque tiene su propio cliente de Prisma (`scripts/seed.ts`). `app/` y
+`components/` quedan fuera **con el motivo escrito**: que ahi no se pueda tocar Prisma si es una
+regla vigilada, no una suposicion sobre donde vive un archivo.
+
+La cabecera vieja **afirmaba como hecho** que `persistence/` era el unico sitio del repositorio
+donde se escribe en `users`, sin comprobarlo. Esa frase se fue: era la afirmacion no verificada
+dentro de la pieza cuyo unico trabajo es verificar.
+
+**Escrituras legitimas del hash fuera de `persistence/`: ninguna.** Cero hallazgos y cero falsos
+positivos. Los `passwordHash` de `domain/` y `ports/` son tipos y mapeos de **lectura**, y
+`lib/composition/index.ts` solo tiene `passwordHasher`, que es otro simbolo. **No se exceptuo nada
+por nombre.**
+
+**Probada por mutacion en el ambito nuevo**, y no solo ampliada — reproducido ademas por el
+implementer, no solo por el subagente: con el archivo del reviewer
+(`adapters/driven/credenciales/reset-prisma.ts`, `prisma.user.update` con `passwordHash` y sin
+sello) la guardia da **rojo** con el hallazgo exacto —`form: 'data'`, `operation: 'update'`, la
+ruta entera—; borrado el archivo, **32/32 guardias y 355 verdes en 5,2 s**. Antes de este arreglo
+ese mismo archivo pasaba en verde.
+
+**Coste:** el archivo de guardia pasa de 402 ms a 453 ms leyendo ~277 archivos; la tanda entera de
+guardias sigue en ~5 s.
+
+**Lo que esto le devuelve a QC-89 y QC-96:** la frase de mas arriba —«quien escriba `password_hash`
+en un UPDATE sin subir el sello se encuentra la guardia roja»— **vuelve a ser cierta**, y ahora en
+todo `lib/` y `scripts/`, no en un directorio por convencion. **QC-96 puede seguir apoyandose en la
+regla de escritura sin invocar ningun revocador**: su camino escribe el hash, y cualquier UPDATE
+del hash que no suba el sello es rojo antes del merge.

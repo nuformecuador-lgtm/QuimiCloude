@@ -20,10 +20,19 @@ import type { SessionWriter } from '../ports/session-writer';
 /**
  * La sesion EN CURSO de quien invoca, en la forma minima que hace falta para volver a emitirla.
  *
- * `roleName` y `companyId` son la foto firmada del instante del login, y se reemiten tal cual:
- * esta operacion cierra sesiones, no revisa el rol ni mueve a nadie de empresa.
+ * `roleName` es la foto firmada del instante del login, y se reemite tal cual: esta operacion
+ * cierra sesiones, no revisa el rol.
  *
- * `sessionId` es el `sid` de la sesion que se esta reemplazando, y **no se lee**: el `sid` nuevo
+ * `companyId` **no se lee**, y esto es deliberado. La empresa con la que se SELLA y la empresa con
+ * la que se REEMITE tienen que ser el mismo dato o el corte se puede escapar por la rendija; asi
+ * que las dos salen de `actor.companyId`, que es quien trae el ambito de autorizacion de esta
+ * llamada. Hoy los dos valores coinciden por construccion —la sesion resuelta alimenta a los
+ * dos—, y si algun dia divergieran, tomar el del actor es lo correcto: sellar una empresa y
+ * reemitir otra entrega una cookie fuera del ambito que se acaba de autorizar. Viaja en el tipo
+ * porque `design.md > 5.3` fija asi la forma de `CurrentSession`, y porque obliga a que quien
+ * invoque tenga una sesion RESUELTA delante.
+ *
+ * `sessionId` es el `sid` de la sesion que se esta reemplazando, y **tampoco se lee**: el `sid` nuevo
  * lo produce `SessionIdFactory` (R2) y el viejo NO se registra en el registro de sesiones
  * cerradas, porque el sello ya lo deja invalido —una fila mas seria una segunda escritura que no
  * cambia ninguna respuesta—. Viaja en el tipo porque es lo que obliga a que quien invoque tenga
@@ -103,11 +112,14 @@ export function createEndOtherSessions(
     // Paso 3. R31 — la sesion actual sobrevive, pero como una sesion NUEVA: `sid` nuevo (R2) e
     // `issuedAt` estrictamente posterior al sello. `createSessionTicket` calcula su `expiresAt`
     // como siempre, `issuedAt + 8 h` (R49).
+    //
+    // La empresa sale de `actor.companyId`, LA MISMA con la que se acaba de sellar arriba, y no de
+    // `current.companyId`: un solo dato para las dos cosas. Ver el comentario de `CurrentSession`.
     await deps.sessions.startSession(
       createSessionTicket(
         actor.id,
         current.roleName,
-        current.companyId,
+        actor.companyId,
         deps.ids.newSessionId(),
         firstIssuedAtAfterStamp(sello),
       ),

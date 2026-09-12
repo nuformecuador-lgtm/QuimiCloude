@@ -200,11 +200,16 @@
   **Hecho:** las dos anotaciones existen y nombran QC-53.
   _Deps: —_
 
-- [ ] **T24. Cierre: gate completo y mapa de trazabilidad.**
+- [x] **T24. Cierre: gate completo y mapa de trazabilidad.**
   `./init.sh` en verde y `progress/impl_QC-23-registro-de-sesiones.md` con el mapa `R<n> → test`
   **completo**, sin ningún requisito huérfano.
   **Hecho:** los 51 requisitos aparecen en el mapa con un test concreto; el reviewer puede
   comprobarlo sin abrir el código.
+  **Resultado (2026-09-12), corrido por el leader y repetido por el reviewer:** `./init.sh`
+  completo `== init OK ==`, exit 0 — 396 archivos, 5773 tests, **5729 verdes**, 42 skipped y un
+  único archivo rojo, que **está en el baseline** y es ajeno a esta ficha
+  (`tests/unit/configuracion-ui/unidades-convenciones.test.ts`, 2 casos, por `resend` de QC-79;
+  QC-23 no toca `package.json`).
   _Deps: todas_
 
 ## Mapa `R<n> → task`

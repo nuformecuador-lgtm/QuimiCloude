@@ -5,9 +5,12 @@
 // es una funcion que haya que acordarse de llamar**: es una regla sobre la escritura. QC-89 (el
 // administrador restablece la contrasena de otro) y QC-96 (la recuperacion) todavia no existen, y
 // cuando se escriban -dentro de seis semanas, por otra persona o por otro agente- van a anadir un
-// `UPDATE` del hash a este mismo directorio. Un test de comportamiento no puede fallar por codigo
-// que aun no se ha escrito; esta guardia si. Ese es todo su trabajo: ponerse roja en el commit que
-// introduce el olvido, no en la auditoria de seguridad de seis meses despues.
+// `UPDATE` del hash en ALGUN sitio del repositorio, y nadie puede saber hoy en cual. Un test de
+// comportamiento no puede fallar por codigo que aun no se ha escrito; esta guardia si. Ese es todo
+// su trabajo: ponerse roja en el commit que introduce el olvido, no en la auditoria de seguridad de
+// seis meses despues. Por eso el ambito que barre es `lib/` y `scripts/` enteros y no un
+// directorio concreto: el porque esta escrito en la cabecera de `WATCHED_ROOTS`, y es la leccion
+// que costo que esta guardia se pudiera esquivar cambiando de carpeta.
 //
 // LAS DOS FORMAS, y esto es lo unico que el diseno no dijo con precision. `design.md > 5.4`
 // describe la guardia como «busca escrituras de Prisma con `passwordHash:` en su `data`». Eso, a
@@ -31,7 +34,8 @@
 // Cada regla se autocomprueba sobre fuentes SINTETICOS que la violan y sobre fuentes que la
 // cumplen: un `toEqual([])` sobre un directorio que ya cumple no demuestra que la guardia funcione.
 
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -55,12 +59,43 @@ function findRepoRoot(startDir: string): string {
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)))
 
 /**
- * El directorio que se vigila. **Es el unico sitio del repositorio donde se puede escribir en
- * `users`**: el dominio no habla con Prisma y los adaptadores driving llaman a los casos de uso.
- * Si algun dia nace un segundo directorio de persistencia en `identity`, esta constante es la que
- * hay que ampliar.
+ * LO QUE SE BARRE: `lib/` y `scripts/` ENTEROS. No `adapters/driven/`, y menos aun un unico
+ * directorio de persistencia.
+ *
+ * EL MOTIVO, ESCRITO AQUI PORQUE ES LA LECCION QUE PAGO ESTA GUARDIA. La version anterior vigilaba
+ * solo `lib/modules/identity/adapters/driven/persistence/` y justificaba ese recorte **afirmando**
+ * que ese era el unico sitio del repositorio donde se podia escribir en `users`. Esa afirmacion no
+ * la comprobaba nadie: un archivo con `prisma.user.update({ data: { passwordHash } })` colocado en
+ * `adapters/driven/credenciales/` dejaba las dos guardias en verde —verificado, no supuesto—,
+ * porque `guard-arquitectura-modulos` permite alcanzar el cliente de Prisma desde **todo**
+ * `adapters/driven/**`, no solo desde `persistence/`. Una carpeta nueva y la promesa se caia.
+ *
+ * De ahi la regla que fija este ambito: **una guardia no puede apoyarse en la convencion que
+ * vigila otra guardia**. Si el ambito fuera `adapters/driven/`, seguir cumpliendo la promesa
+ * dependeria de que alguien se acuerde de ampliar esta constante el dia que la convencion cambie
+ * —y «acordarse» es justo el trabajo que una guardia existe para quitar—. Barriendo `lib/` y
+ * `scripts/` la afirmacion «toda escritura del hash sube el sello» **se comprueba sola**: donde
+ * sea que nazca el archivo, cae dentro.
+ *
+ * `scripts/` entra porque tiene su **propio** cliente de Prisma (`scripts/seed.ts`) y no pasa por
+ * los adaptadores del modulo. `app/` y `components/` quedan fuera a proposito: no pueden tocar
+ * Prisma —eso si lo vigila `guard-arquitectura-modulos`, y ahi es una regla, no una suposicion
+ * sobre donde se guardan los archivos—.
+ *
+ * El coste: son ~280 archivos de texto, se leen una vez y la guardia sigue por debajo del medio
+ * segundo. `node_modules`, `.next` y compania se saltan explicitamente por si algun dia aparecen
+ * dentro (ver `IGNORED_DIRS`).
  */
-const PERSISTENCE_DIR = join(
+const WATCHED_ROOTS = [join(repoRoot, 'lib'), join(repoRoot, 'scripts')]
+
+/** Directorios que nunca se recorren: son codigo ajeno o generado, y solo cuestan tiempo. */
+const IGNORED_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'build', 'coverage'])
+
+/** Extensiones que se leen. Todo lo demas (`.sh`, `.gitkeep`, binarios) no puede escribir con Prisma. */
+const WATCHED_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs']
+
+/** El UPDATE del enlace de credencial de QC-79: el unico UPDATE del hash que existe hoy. */
+const CREDENTIAL_LINK_FILE = join(
   repoRoot,
   'lib',
   'modules',
@@ -68,6 +103,7 @@ const PERSISTENCE_DIR = join(
   'adapters',
   'driven',
   'persistence',
+  'credential-setup-link-prisma.ts',
 )
 
 /** El mensaje que ve quien encuentre esta guardia en rojo. Nombra la ficha y la decision. */
@@ -85,9 +121,10 @@ export const REMEDY =
  * Los comentarios explican; no ejecutan. Se quitan antes de juzgar el codigo — si no, el propio
  * texto de esta cabecera, copiado en un archivo vigilado, contaria como una escritura.
  *
- * Limite conocido y aceptado: un `//` dentro de una cadena de texto se comeria el resto de la
- * linea. En este directorio no hay ninguno (son SQL y objetos de Prisma), y el efecto de un falso
- * positivo aqui es que la guardia se ponga roja de mas, que es el lado correcto por el que fallar.
+ * Limite conocido y aceptado: un `//` dentro de una cadena de texto se comeria el resto de esa
+ * linea. Para que eso escondiera una infraccion, la escritura del hash tendria que ir DESPUES de
+ * un `://` en la misma linea; y en el sentido contrario el efecto es que la guardia se ponga roja
+ * de mas, que es el lado correcto por el que fallar.
  */
 export function stripComments(source: string): string {
   return source
@@ -232,33 +269,65 @@ export function findPasswordWritesWithoutStamp(source: string): readonly Finding
   return [...findDataWritesWithoutStamp(source), ...findRawSqlWritesWithoutStamp(source)]
 }
 
-/** Todos los `.ts` bajo el directorio vigilado, recursivamente. */
+/**
+ * Todos los fuentes bajo un directorio, recursivamente, saltando `IGNORED_DIRS` y quedandose con
+ * `WATCHED_EXTENSIONS`. El filtro es lo que mantiene barata la ampliacion de ambito: se abren ~280
+ * archivos de texto y ninguno de otra cosa.
+ */
 function listSourceFiles(dir: string): readonly string[] {
   const out: string[] = []
   for (const entry of readdirSync(dir)) {
+    if (IGNORED_DIRS.has(entry)) continue
     const full = join(dir, entry)
     if (statSync(full).isDirectory()) out.push(...listSourceFiles(full))
-    else if (full.endsWith('.ts')) out.push(full)
+    else if (WATCHED_EXTENSIONS.some((ext) => full.endsWith(ext))) out.push(full)
   }
   return out
 }
 
-describe('guardia — el cambio de contrasena corta las sesiones vivas (QC-23)', () => {
-  const files = listSourceFiles(PERSISTENCE_DIR)
+/**
+ * ¿Caeria este archivo dentro de la barredora? Se escribe aparte del recorrido porque es la
+ * pregunta que la version anterior de esta guardia respondia mal: la deteccion estaba bien, el
+ * **ambito** no. Con esto, «un archivo en tal sitio queda vigilado» es una asercion y no una
+ * suposicion.
+ */
+export function isWatched(absolutePath: string): boolean {
+  const normalized = absolutePath.replaceAll('\\', '/')
+  if (!WATCHED_EXTENSIONS.some((ext) => normalized.endsWith(ext))) return false
+  if (normalized.split('/').some((segment) => IGNORED_DIRS.has(segment))) return false
+  return WATCHED_ROOTS.some((root) => normalized.startsWith(`${root.replaceAll('\\', '/')}/`))
+}
 
-  it('el directorio vigilado existe y tiene archivos que leer', () => {
+/** Lo mismo, sobre las varias raices vigiladas. */
+function listWatchedFiles(roots: readonly string[] = WATCHED_ROOTS): readonly string[] {
+  return roots.flatMap((root) => listSourceFiles(root))
+}
+
+/** Las infracciones de un conjunto de archivos, con la ruta relativa al repo. */
+function offendersIn(files: readonly string[]) {
+  return files.flatMap((file) =>
+    findPasswordWritesWithoutStamp(readFileSync(file, 'utf8')).map((finding) => ({
+      file: relative(repoRoot, file).replaceAll('\\', '/'),
+      ...finding,
+    })),
+  )
+}
+
+describe('guardia — el cambio de contrasena corta las sesiones vivas (QC-23)', () => {
+  const files = listWatchedFiles()
+
+  it('las raices vigiladas existen y tienen archivos que leer', () => {
     // Sin esto, un cambio de ruta dejaria la guardia verde sin haber mirado nada.
     expect(files.length).toBeGreaterThan(0)
     expect(files.some((file) => file.endsWith('credential-setup-link-prisma.ts'))).toBe(true)
+    // Y que las DOS raices aportan algo: `scripts/` tiene su propio cliente de Prisma.
+    for (const root of WATCHED_ROOTS) {
+      expect(listSourceFiles(root).length, `raiz vacia: ${root}`).toBeGreaterThan(0)
+    }
   })
 
   it('ninguna escritura del hash de contrasena olvida el sello', () => {
-    const offenders = files.flatMap((file) =>
-      findPasswordWritesWithoutStamp(readFileSync(file, 'utf8')).map((finding) => ({
-        file: relative(repoRoot, file).replaceAll('\\', '/'),
-        ...finding,
-      })),
-    )
+    const offenders = offendersIn(files)
 
     expect(offenders, `${REMEDY}\n\nEscrituras sin sello:\n${JSON.stringify(offenders, null, 2)}`)
       .toEqual([])
@@ -268,7 +337,7 @@ describe('guardia — el cambio de contrasena corta las sesiones vivas (QC-23)',
     // El caso concreto de T15: si alguien quita esa linea, el archivo de arriba se pone rojo. Esto
     // lo ancla por nombre para que el «ninguna escritura olvida el sello» no pueda quedarse verde
     // porque el archivo dejo de estar en la lista.
-    const source = readFileSync(join(PERSISTENCE_DIR, 'credential-setup-link-prisma.ts'), 'utf8')
+    const source = readFileSync(CREDENTIAL_LINK_FILE, 'utf8')
     expect(findPasswordWritesWithoutStamp(source)).toEqual([])
     expect(stripComments(source)).toMatch(/"sessions_valid_from"\s*=/)
   })
@@ -372,5 +441,82 @@ describe('guardia — el cambio de contrasena corta las sesiones vivas (QC-23)',
       'Prisma.sql`UPDATE "users" SET "sessions_valid_from" = ${s} WHERE "id" = ${a}::uuid`\n' +
       'Prisma.sql`UPDATE "users" SET "password_hash" = ${h} WHERE "id" = ${b}::uuid`'
     expect(findRawSqlWritesWithoutStamp(source)).toHaveLength(1)
+  })
+
+  // -------------------------------------------------------------------------------------------
+  // EL RECORRIDO: DONDE mira la guardia
+  //
+  // Esta es la parte que fallaba, y no fallaba la deteccion: con el ambito viejo, el mismo
+  // `prisma.user.update` que ponia la guardia roja dentro de `persistence/` la dejaba verde una
+  // carpeta mas alla. Los tres casos de abajo vigilan el recorrido, no la regla.
+  // -------------------------------------------------------------------------------------------
+
+  it('el recorrido entra en un subdirectorio hermano RECIEN NACIDO, y salta lo que debe saltar', () => {
+    // POR QUE EL ARBOL SINTETICO NO SE ESCRIBE DENTRO DE `lib/`, aunque sea ahi donde muerde de
+    // verdad: `test:guardias` corre los 32 archivos EN PARALELO y hay 17 guardias mas que leen
+    // `lib/` del disco. Comprobado: un `reset-prisma.ts` real bajo `adapters/driven/credenciales/`
+    // pone roja tambien a `guard-password-never-plaintext`. Un archivo de usar y tirar dentro del
+    // arbol vigilado seria una guardia roja aleatoria segun quien lea primero. Asi que el arbol va
+    // en un temporal del sistema —que es lo que prueba el RECORRIDO: recursion, subdirectorio
+    // nuevo, filtro de extension y salto de `node_modules`— y la cobertura del ambito REAL la
+    // prueban los dos casos siguientes, sobre rutas de verdad.
+    const root = mkdtempSync(join(tmpdir(), 'qc23-guardia-'))
+    try {
+      const nuevo = join(root, 'adapters', 'driven', 'credenciales')
+      mkdirSync(nuevo, { recursive: true })
+      writeFileSync(
+        join(nuevo, 'reset-prisma.ts'),
+        'await prisma.user.update({ where: { id }, data: { passwordHash: hash } })\n',
+        'utf8',
+      )
+      // Ruido que NO debe contarse: un `.sh` con la misma escritura y una copia bajo node_modules.
+      writeFileSync(join(nuevo, 'reset.sh'), 'data: { passwordHash: hash }\n', 'utf8')
+      const ajeno = join(root, 'node_modules', 'paquete')
+      mkdirSync(ajeno, { recursive: true })
+      writeFileSync(join(ajeno, 'index.ts'), 'data: { passwordHash: hash }\n', 'utf8')
+
+      const encontrados = listSourceFiles(root)
+      expect(encontrados).toHaveLength(1)
+      expect(encontrados[0]?.endsWith('reset-prisma.ts')).toBe(true)
+
+      const offenders = offendersIn(encontrados)
+      expect(offenders).toHaveLength(1)
+      expect(offenders[0]?.operation).toBe('update')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('la ruta EXACTA con la que se esquivo la guardia cae dentro del ambito', () => {
+    // El experimento del reviewer, anclado por ruta: si alguien vuelve a encoger `WATCHED_ROOTS`,
+    // esto se pone rojo antes de que exista el archivo.
+    const evasion = join(
+      repoRoot, 'lib', 'modules', 'identity', 'adapters', 'driven', 'credenciales',
+      'reset-prisma.ts',
+    )
+    expect(isWatched(evasion)).toBe(true)
+    // Y cualquier otro sitio de `lib/`, que es el punto de barrer la carpeta entera.
+    expect(isWatched(join(repoRoot, 'lib', 'shared', 'db', 'reset.ts'))).toBe(true)
+    expect(isWatched(join(repoRoot, 'lib', 'modules', 'otro', 'domain', 'x.ts'))).toBe(true)
+    // `scripts/` entra: tiene su propio cliente de Prisma.
+    expect(isWatched(join(repoRoot, 'scripts', 'seed.ts'))).toBe(true)
+    // Lo que queda fuera, y a proposito: lo que no es fuente, y el codigo ajeno.
+    expect(isWatched(join(repoRoot, 'scripts', 'algo.sh'))).toBe(false)
+    expect(isWatched(join(repoRoot, 'lib', 'node_modules', 'p', 'index.ts'))).toBe(false)
+  })
+
+  it('sobre el arbol REAL, la lista leida desborda `persistence/` por los cuatro costados', () => {
+    const rutas = files.map((file) => relative(repoRoot, file).replaceAll('\\', '/'))
+    const dentroDePersistence = 'lib/modules/identity/adapters/driven/persistence/'
+    expect(rutas.some((ruta) => ruta.startsWith(dentroDePersistence))).toBe(true)
+    // Un directorio HERMANO de `persistence/`, que es exactamente el caso de la evasion.
+    expect(rutas.some((ruta) =>
+      ruta.startsWith('lib/modules/identity/adapters/driven/observability/'))).toBe(true)
+    // Y las dos raices, mas alla del modulo.
+    expect(rutas.some((ruta) => ruta.startsWith('lib/composition/'))).toBe(true)
+    expect(rutas.some((ruta) => ruta.startsWith('scripts/'))).toBe(true)
+    // La mayoria de lo leido NO esta en `persistence/`: si esto cae, el ambito se encogio.
+    expect(rutas.filter((ruta) => !ruta.startsWith(dentroDePersistence)).length)
+      .toBeGreaterThan(100)
   })
 })

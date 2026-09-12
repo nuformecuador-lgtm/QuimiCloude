@@ -216,10 +216,29 @@ describe('endOtherSessions — el sello sube y la sesion actual se reemite (R30,
     expect(ticket.issuedAt.getTime()).toBe(SELLO.getTime() + 1000);
     // La ventana NO cambia: 8 h absolutas desde la emision, sin renovacion deslizante.
     expect(ticket.expiresAt.getTime() - ticket.issuedAt.getTime()).toBe(SESSION_DURATION_MS);
-    // El rol y la empresa se reemiten TAL CUAL: esta operacion cierra sesiones, no revisa roles.
+    // El rol se reemite TAL CUAL: esta operacion cierra sesiones, no revisa roles.
     expect(ticket.userId).toBe(ACTOR_ID);
     expect(ticket.roleName).toBe(ACTUAL.roleName);
     expect(ticket.companyId).toBe(COMPANY_ID);
+  });
+
+  it('la empresa con la que se SELLA y con la que se REEMITE es UNA, y es la del actor', async () => {
+    // Un solo dato para las dos cosas. Hoy `actor.companyId` y `current.companyId` coinciden por
+    // construccion —los alimenta la misma sesion resuelta—, asi que la unica forma de anclar la
+    // eleccion es hacerlos DIVERGIR a proposito y ver cual gana. Gana el del actor, porque es
+    // quien trae el ambito de autorizacion: sellar una empresa y reemitir otra entregaria una
+    // cookie fuera de lo que se acaba de autorizar.
+    const OTRA_EMPRESA = '77777777-7777-4777-8777-777777777777';
+    const mundo = crearMundo();
+
+    await crearCaso(mundo)(ACTOR, { ...ACTUAL, companyId: OTRA_EMPRESA });
+
+    expect(mundo.stampAll).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: ACTOR_ID, companyId: COMPANY_ID }),
+    );
+    const [ticket] = mundo.emitidos as [SessionTicket];
+    expect(ticket.companyId).toBe(COMPANY_ID);
+    expect(ticket.companyId).not.toBe(OTRA_EMPRESA);
   });
 
   it('ninguna peticion ordinaria reemite ni prolonga nada (R49)', async () => {

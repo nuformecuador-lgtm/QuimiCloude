@@ -10,12 +10,13 @@
  *
  * ENMIENDA A `design.md > 4.2`, ANOTADA AQUI PORQUE ES UNA DESVIACION DEL SPEC APROBADO. El
  * diseno escribio esta firma con DOS parametros —la causa y el identificador de peticion de
- * QC-71—, entrando el segundo por parametro desde el dominio. Ni ese nombre se puede escribir
- * aqui: la guardia barre el TEXTO de estos archivos, asi que este comentario tampoco lo nombra. **No se puede**: QC-71 R9 es una decision
- * cerrada con guardia propia —`tests/guards/guard-identificador-de-request.test.ts`, caso
+ * QC-71—, entrando el segundo por parametro desde el dominio. **No se puede**: QC-71 R9 es una
+ * decision cerrada con guardia propia —`tests/guards/guard-identificador-de-request.test.ts`, caso
  * «ningun domain/ ni ports/ de los modulos de negocio menciona el identificador»— y dice que el
  * identificador NO atraviesa el contrato de un modulo de negocio hacia adentro: se queda en el
- * borde y en la capa que traduce los errores. El spec de QC-23 se escribio sin verlo.
+ * borde y en la capa que traduce los errores. El spec de QC-23 se escribio sin verlo. Y ese nombre
+ * no se puede ni escribir aqui: esa guardia barre el TEXTO de estos archivos, asi que este
+ * comentario tampoco lo nombra.
  *
  * Lo que R17 pide —«la causa en el registro del servidor JUNTO al identificador de peticion»— se
  * cumple entero, y en el unico sitio donde puede cumplirse: el **adaptador** de este puerto
