@@ -559,18 +559,26 @@ describe('ninguna dependencia de terceros nueva (R37)', () => {
     expect(tocados, `R37: el manifiesto cambio: ${tocados.join(', ')}`).toEqual([]);
   });
 
-  it('ninguna primitiva EXISTENTE de `components/ui/` se modifica', (ctx) => {
+  it('de `components/ui/` esta rama aporta EXACTAMENTE la primitiva de pestanas', (ctx) => {
     const base = baseDeEstaRama(ctx);
 
-    const modificadas = archivosCambiados(base, ['components/ui']);
+    // Se mide lo que la rama APORTA —diff MAS archivos sin seguimiento—, no una de las dos
+    // mitades. Aqui vivieron dos casos, uno por mitad: uno exigia `archivosCambiados === []` y el
+    // otro `archivosSinSeguimiento === [tabs.tsx]`. Los dos se pusieron rojos EL MISMO DIA en que
+    // el trabajo se commiteo, sin que cambiara ni un byte de `components/ui/`: lo unico que paso
+    // es que `tabs.tsx` dejo de estar sin seguimiento y paso a estar en el diff.
+    //
+    // Eso era fragilidad del METODO, no rigor: R37 habla de QUE archivos toca la ficha, y eso no
+    // puede depender de si ya se commitearon. La union no afloja nada —la igualdad sigue siendo
+    // contra la MISMA lista cerrada de un solo elemento— y ademas cierra el agujero simetrico:
+    // antes, modificar una primitiva existente Y dejarla sin commitear se colaba por la rendija
+    // entre los dos casos.
+    const aportadas = aportadosPorLaRama(base, ['components/ui']);
 
-    expect(modificadas, `R37: primitivas modificadas: ${modificadas.join(', ')}`).toEqual([]);
-  });
-
-  it('y el alta es EXACTAMENTE `components/ui/tabs.tsx`, traida por la CLI', (ctx) => {
-    baseDeEstaRama(ctx);
-
-    expect(archivosSinSeguimiento(['components/ui'])).toEqual([...ALTAS_AUTORIZADAS_EN_PRIMITIVAS]);
+    expect(
+      aportadas,
+      `R37: de components/ui/ solo puede salir la primitiva traida por la CLI; salieron: ${aportadas.join(', ')}`,
+    ).toEqual([...ALTAS_AUTORIZADAS_EN_PRIMITIVAS]);
   });
 });
 
@@ -629,15 +637,22 @@ describe('la tabla compartida y las guardias heredadas quedan intactas (R12, R39
     expect(tocados, `R12: la tabla compartida se toco: ${tocados.join(', ')}`).toEqual([]);
   });
 
-  it('la unica guardia heredada que se modifica es la que esta ficha TENSA, nombrada', (ctx) => {
+  it('de `tests/guards/` esta rama aporta exactamente el alta nueva y la guardia que TENSA', (ctx) => {
     const base = baseDeEstaRama(ctx);
 
-    const modificadas = archivosCambiados(base, ['tests/guards']);
+    // Misma leccion que en `components/ui/`: se mide lo APORTADO —diff mas sin seguimiento—, y no
+    // una de las dos mitades, porque cual de las dos aplica depende de si ya se commiteo.
+    const aportadas = aportadosPorLaRama(base, ['tests/guards']);
+
+    const esperadas = [
+      ...ALTAS_AUTORIZADAS_EN_GUARDIAS,
+      ...GUARDIAS_HEREDADAS_QUE_ESTA_FICHA_TENSA,
+    ].sort();
 
     expect(
-      modificadas,
-      `R39: guardias modificadas fuera de lo declarado: ${modificadas.join(', ')}`,
-    ).toEqual([...GUARDIAS_HEREDADAS_QUE_ESTA_FICHA_TENSA]);
+      aportadas,
+      `R39: de tests/guards/ solo pueden salir el alta nueva y la guardia tensada; salieron: ${aportadas.join(', ')}`,
+    ).toEqual(esperadas);
   });
 
   it('y lo que esa guardia gana es un ALTA, no una asercion relajada: cero lineas borradas', (ctx) => {
@@ -674,10 +689,21 @@ describe('la tabla compartida y las guardias heredadas quedan intactas (R12, R39
     ).toBe(true);
   });
 
-  it('y el unico alta en `tests/guards/` es la guardia nueva de esta ficha', (ctx) => {
-    baseDeEstaRama(ctx);
+  it('y la guardia NUEVA es un archivo que antes no existia, no una heredada disfrazada', (ctx) => {
+    const base = baseDeEstaRama(ctx);
 
-    expect(archivosSinSeguimiento(['tests/guards'])).toEqual([...ALTAS_AUTORIZADAS_EN_GUARDIAS]);
+    // `--diff-filter=A`: solo altas. Que un archivo este en la lista de «nuevos» tiene que ser un
+    // hecho de git, no una afirmacion de este test.
+    const altas = git(['diff', '--name-only', '--diff-filter=A', base, '--', 'tests/guards'])
+      .split(SALTO_DE_LINEA)
+      .map((linea) => linea.trim())
+      .filter((linea) => linea !== '')
+      .concat(archivosSinSeguimiento(['tests/guards']))
+      .sort();
+
+    expect(altas, `R39: altas en tests/guards/: ${altas.join(', ')}`).toEqual([
+      ...ALTAS_AUTORIZADAS_EN_GUARDIAS,
+    ]);
   });
 });
 

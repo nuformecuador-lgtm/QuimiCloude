@@ -582,3 +582,89 @@ Ruta corta: `grupos/` = `tests/unit/configuracion-ui/grupos/`. Lo que no lleva p
 | R42 | `e2e/grupos-de-trabajo.spec.ts` - el recorrido completo, verde en chromium y webkit |
 | R43 | `e2e/usuarios.spec.ts` y `e2e/permisos.spec.ts` sin cambios de guion; `git status e2e/` muestra **solo** el archivo nuevo; `grupos/alcance.test.ts` cubre el alta nombrada en E2E_ESPERADOS |
 
+
+
+## 15. F2.3 — commits, merge con `origin/dev` y lo que destapo
+
+El `reviewer` encontro lo que se nos paso a los dos: **nada estaba commiteado y la rama iba 31
+commits por detras**. `HEAD` **era** la merge-base, asi que `git diff origin/dev...HEAD` salia vacio
+y el `./init.sh --rapido` del leader imprimio «nada que relacionar»: **no corrio ni un solo test de
+esta ficha**, solo las guardias. Aquel verde era vacio.
+
+### Siete commits
+
+| Commit | Que lleva |
+| --- | --- |
+| `docs(QC-85)` | el spec aprobado |
+| `feat(QC-85)` | la primitiva de pestanas y la guardia del `cn`, con la edicion a mano razonada |
+| `feat(QC-85)` | la pestana entera: 14 piezas, `page.tsx` y el barrel |
+| `test(QC-85)` | los 16 unitarios, el centinela de alcance y el E2E |
+| `test(QC-85)` | las listas cerradas tensadas y los tres tests heredados de QC-67 |
+| `test(QC-39,QC-45)` | los tres centinelas ajenos curados |
+| `docs(QC-85)` | bitacora y revision |
+
+### El merge: 31 commits, un solo conflicto y no era ambiguo
+
+Trae **QC-79** (alta sin contrasena y enlace: dos migraciones, `user-form.tsx` reescrito,
+`lib/shared/routes.ts`, `resend` en `package.json`, `e2e/establecer-contrasena.spec.ts`,
+`guard-envio-de-correo`) y **QC-49** (aislamiento por empresa en inventario: migracion,
+`guard-ambito-empresa-inventario`, `e2e/aislamiento-inventario.spec.ts`).
+
+**El unico conflicto**: `specs/QC-85-.../requirements.md`, add/add. `dev` traia el **esbozo** que
+`/afinar-feature` sembro —45 lineas, «Pendiente: los escribe spec_author (F1.2)»—; esta rama trae el
+spec **aprobado**, 345 lineas. Antes de resolver se comprobo que **las 13 decisiones cerradas del
+humano coinciden palabra por palabra** en las dos versiones, asi que quedarse con la de esta rama no
+pierde ninguna decision suya. No hizo falta preguntar.
+
+`guard-identificador-de-request.test.ts` **automergeo limpio** y `E2E_ESPERADOS` conserva las **tres**
+altas: `grupos-de-trabajo` (esta ficha), `establecer-contrasena` (QC-79) y `aislamiento-inventario`
+(QC-49).
+
+**Inmediatamente despues del merge**: `pnpm install --frozen-lockfile`, `prisma migrate deploy` —las
+dos migraciones nuevas aplicadas— y `prisma generate`. Mas `next typegen`, que un worktree necesita
+para que `tsc` vea `LayoutProps`.
+
+### Cuatro rojos que solo podian aparecer con el trabajo commiteado
+
+Ninguno era un fallo del producto; los cuatro eran centinelas midiendo mal. **Los cuatro se
+TENSARON.**
+
+**1 y 2 — `grupos/alcance.test.ts`, mio, y era FRAGIL.** Dos casos de R37 y dos de R39 partian la
+pregunta en dos mitades: uno exigia `archivosCambiados === []` y el otro
+`archivosSinSeguimiento === [el alta]`. **Se pusieron rojos el mismo dia en que el trabajo se
+commiteo, sin que cambiara un byte**: `tabs.tsx` simplemente dejo de estar sin seguimiento y paso al
+diff. Eso era fragilidad del METODO: R37 habla de QUE archivos toca la ficha, y eso no puede
+depender de si ya se commitearon. Pasan a medir **lo APORTADO** —diff MAS sin seguimiento—, contra
+la **misma lista cerrada**. No afloja y ademas **cierra el agujero simetrico**: antes, modificar una
+primitiva existente y dejarla sin commitear se colaba por la rendija entre los dos casos. El caso de
+las altas en `tests/guards/` pasa ademas a usar `--diff-filter=A`, para que «esto es un archivo
+nuevo» sea un hecho de git y no una afirmacion del test.
+
+**3 — `tests/unit/shared/data-table-alcance.test.ts` (QC-55).** Lista CERRADA de los E2E que pueden
+referenciar la tabla compartida; el spec nuevo la hacia **ocho**. Se da de alta nombrandolo, con el
+motivo —la lista de grupos ES la tabla compartida, consumida por su barrel sin abrir ni uno de sus
+archivos—, siguiendo la forma de las cuatro ampliaciones anteriores. Un NOVENO spec vuelve a ponerla
+roja.
+
+**4 — `tests/unit/configuracion-ui/unidades-convenciones.test.ts` (QC-39): el SHA congelado, que
+DEJO DE SER TEORICO.** En la seccion 4 se anoto como riesgo y se decidio no tocarlo porque estaba
+verde. **El merge lo puso rojo**: QC-79 anadio `resend` a `package.json` en `dev`, y R45 empezo a
+decir que «la feature de unidades toca el manifiesto» sin que QC-39 hubiera abierto un solo
+intocable. Se cura igual que sus dos hermanas: **merge-base** en cada ejecucion y **precondicion de
+rama conjuntiva** (`page.tsx` de unidades + `specs/QC-39-pantalla-de-unidades/`), copiando el idioma
+de `data-table-intacta-unidades.test.ts` sin inventar una segunda forma. Fuera de la rama de QC-39
+queda `skipped` con motivo, nunca verde.
+
+Ya no queda **ningun** SHA congelado en uso en el repo.
+
+### Verificacion tras el merge
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm typecheck` | **limpio** |
+| `pnpm lint` | **limpio** |
+| `pnpm exec vitest run tests/unit/configuracion-ui tests/unit/navegacion tests/guards tests/unit/shared` | **105 archivos · 1412 pasan · 17 saltados · 0 rojos** |
+| `pnpm exec playwright test e2e/grupos-de-trabajo.spec.ts` | **2 passed** (chromium + webkit), 55.8s |
+
+Y ahora el rango **existe**: `git diff origin/dev...HEAD` ya no esta vacio, asi que el
+`./init.sh --rapido` del leader tiene de verdad que relacionar.

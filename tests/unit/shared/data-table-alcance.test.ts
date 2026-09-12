@@ -368,20 +368,30 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // compartida (QC-67 R9), que esta feature consume por su barrel publico sin abrir ni uno de sus
   // archivos (`tests/unit/configuracion-ui/data-table-intacta-usuarios.test.ts`). Se anade la fila
   // y se TENSA el centinela, nunca se afloja (ver la nota de arriba sobre las dos ampliaciones).
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos siete', () => {
+  // AMPLIADA POR QUINTA VEZ el 2026-09-12 (QC-85, pantalla-de-grupos-de-trabajo): entra la OCTAVA
+  // entrada, `e2e/grupos-de-trabajo.spec.ts`, por la MISMA via que la sexta y la septima. Su E2E
+  // -exigido por QC-85 R42- localiza `data-table-row-<id>` y las celdas porque la lista de GRUPOS
+  // es la tabla compartida (QC-85 R12), que esa feature consume por su barrel publico sin abrir ni
+  // uno de sus archivos -su `grupos/alcance.test.ts` lo mide con el diff vacio en
+  // `components/shared/data-table/`-. No estrena pantalla: la pestana vive dentro de la de usuarios,
+  // que ya estaba en esta lista. Se anade la fila y se TENSA el centinela, nunca se afloja: un
+  // NOVENO spec que referencie `data-table` vuelve a ponerlo en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos ocho', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
       .filter((file) => /data-table/.test(readSource(file)))
       .map((file) => relative(repoRoot, file).split(sep).join('/'))
       .sort()
-    expect(referencian, 'solo estos siete E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos ocho E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
       // ya consumen la tabla compartida -inventario y presentaciones- y localiza
       // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
       // B con sesion en la A, ni siquiera al borrar conociendo el identificador. No estrena
       // pantalla: mide las que ya estaban.
       'e2e/aislamiento-inventario.spec.ts',
+      // La OCTAVA la trae QC-85 el 2026-09-12 (R42): ver la nota de arriba.
+      'e2e/grupos-de-trabajo.spec.ts',
       'e2e/inventario.spec.ts',
       'e2e/pedidos.spec.ts',
       // La CUARTA entrada la trae QC-45 el 2026-09-07: su E2E localiza la tabla compartida porque
