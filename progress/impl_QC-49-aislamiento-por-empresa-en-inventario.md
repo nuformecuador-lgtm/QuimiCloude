@@ -315,3 +315,92 @@ WebKit en la primera, y su archivo no se ha tocado desde entonces salvo por la l
 es suya.
 
 **T17 sigue sin marcar**, y es lo correcto: el implementer no se autoaprueba el gate.
+
+---
+
+# Tercera vuelta — la guardia que solo despertó al haber commits (2026-09-12)
+
+## Qué pasó, y por qué no lo vio nadie antes
+
+`tests/unit/recetas-ui/recipe-route-contract.test.ts:834` se puso rojo reclamando los dos archivos
+de la migración de QC-49. **No es una regresión**: es esa guardia **ejercitándose por primera vez en
+esta rama**.
+
+El caso compara `git diff --name-only origin/dev...HEAD`. Mientras la rama **no tuvo commits** ese
+rango estaba **vacío**, y el caso moría antes, en su propia aserción de «el rango no estaba
+disponible: este caso no ha comprobado nada» — que es justo el motivo por el que el archivo figura en
+`tests/baseline-rojos.json`. Al haber commits y el merge con `dev`, el rango pasó a traer los 69
+archivos reales y la lista volvió a medir. Y midió bien: encontró una migración que nadie había
+nombrado.
+
+Esto es el coste aceptado que el propio `baseline-rojos.json` tiene escrito en su `motivo`, visto en
+vivo: **listar un archivo entero apaga también sus casos buenos**, y los apaga precisamente en las
+ramas de feature, que es donde morderían.
+
+## El arreglo
+
+`MIGRACION_QC49` añadida a `DB_PERMITIDAS`, con su párrafo de motivo al nivel de las entradas de
+QC-80 y QC-86: por qué una migración de `inventario` aparece en el diff de una guardia de `recetas`
+(las tres tablas son de `inventario`, y añadir una columna obligatoria a tres tablas es una migración
+de esquema por definición), y **por qué eso no es tocar `recetas`** — que es lo que el caso vigila de
+verdad. Se deja escrito que `recetas` no cambia ni un archivo, que `tocaRecetas` sigue sin ninguna
+excepción nueva, y que `ProductCatalog.findRefs` se queda **deliberadamente** sin ámbito (R29) para
+no tocar `recetas`, con destino QC-50 — que será la ficha que traiga aquí su propia entrada.
+
+`db/schema.prisma` no se repite: ya está nombrado en `MIGRACION_QC34`, como dicen las demás entradas.
+
+**La guardia no se aflojó**, y está medido: quitando `...MIGRACION_QC49` de `DB_PERMITIDAS` el caso
+vuelve a **rojo** nombrando los dos archivos (`1 failed | 24 passed`), y restaurándolo vuelve a
+**25 passed**. O sea que lo que lo pone verde es la **lista nombrada**, no un permiso general. El
+diff del archivo es **+36/−0**: puramente aditivo, sin churn de finales de línea.
+
+**No rediseñé la lista.** Se puede argumentar que debería derivarse en vez de escribirse a mano —cada
+ficha con migración tiene que venir a editar un test de `recetas`, que es acoplamiento raro—, pero eso
+es cambiarle la forma a un centinela ajeno y hoy no toca. Queda dicho, no hecho.
+
+## Las demás guardias de rango, que era la pregunta de fondo
+
+Cualquier centinela que compare contra `origin/dev...HEAD` estuvo neutralizado mientras la rama no
+tuvo commits. **Busqué todas y las corrí**: son **14 archivos** (`origin/dev...HEAD` o
+`merge-base origin/dev`):
+
+`recetas-ui/recipe-route-contract`, `recetas/module-contract`, `navegacion/qc75-convenciones`,
+`identity/roles/scope`, `identity/grupos/scope`, `identity/usuarios/scope`,
+`identity/account-status-scope`, `identity/qc78-alcance`, `configuracion-ui/usuarios-convenciones`,
+`configuracion-ui/data-table-intacta-usuarios`, `guards/guard-identificador-de-request`,
+`unidades/unidades-convenciones`, `unidades/modulo-intacto`, `unidades/consumidores-catalogo`.
+
+Resultado, corriéndolos juntos: **14 archivos, 179 pasados, 35 saltados. Ninguno rojo.** El único que
+mordía era el de `recetas`.
+
+**Observación que dejo al leader, sin tocar nada:** con la rama ya con commits, las dos entradas de
+`recetas` de `tests/baseline-rojos.json` (`recipe-route-contract` y `recetas/module-contract`) **pasan
+en esta rama**. Siguen siendo correctas como baseline —en `dev` el rango sí está vacío y allí fallan—,
+así que **no las toco**: retirarlas es una decisión sobre `dev`, no sobre QC-49.
+
+## Verificación de esta vuelta — con el alcance declarado
+
+```
+pnpm run typecheck  ->  exit 0, sin salida.
+pnpm run lint       ->  exit 0, sin salida.
+
+npx vitest run <los 14 archivos que comparan contra origin/dev...HEAD>
+  Test Files  14 passed (14)
+       Tests  179 passed | 35 skipped (214)
+
+npx vitest run guard   <- las 30 guardias, no un subconjunto
+  Test Files  30 passed (30)
+       Tests  333 passed | 4 skipped (337)
+
+Mutacion del arreglo (quitar MIGRACION_QC49): 1 failed | 24 passed. Restaurado: 25 passed.
+```
+
+**Alcance de lo que NO corrí en esta vuelta**: la suite completa y Playwright. El cambio es una
+entrada en una lista de un único archivo de test, ya cubierto arriba. El gate entero lo corre el
+leader.
+
+**Los otros cuatro rojos de esa corrida no son míos y no los toqué**: `guard-teclear-y-plazo`,
+`identity-facade`, `order-sheet` y el cuarto cayeron los cuatro con `Test timed out in 15000ms`, sin
+una sola aserción fallida, en una corrida de **751 s** frente a los 176–235 s habituales. Es la firma
+exacta del flake de saturación que documenta `docs/verification.md`, con la máquina cargada por gates
+de otras sesiones. Los vuelve a medir el leader.

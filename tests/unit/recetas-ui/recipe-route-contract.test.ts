@@ -508,6 +508,41 @@ const MIGRACION_QC86 = [
   'db/migrations/20260911120000_order_assignments/down.sql',
 ];
 
+// RETENSADO 2026-09-12 (QC-49), con el MISMO criterio que los siete retensados de arriba: el
+// rango `origin/dev...HEAD` mide la rama que corre el gate, asi que cada archivo legitimo de
+// `db/` posterior se NOMBRA uno a uno o el caso deja de vigilar nada.
+//
+// POR QUE ESTE CASO NO LO HABIA CAZADO NADIE ANTES, que es lo que importa aqui: mientras la rama
+// de QC-49 no tuvo commits, `origin/dev...HEAD` estaba VACIO y el caso moria antes, en la
+// asercion de «el rango no estaba disponible» -por eso el archivo figura en
+// `tests/baseline-rojos.json`-. En cuanto la rama tuvo commits y su merge con `dev`, el rango
+// paso a traer los 69 archivos de verdad y esta lista volvio a medir. O sea que el rojo no es
+// una regresion de QC-49: es esta guardia ejercitandose por primera vez en esta rama.
+//
+// POR QUE `db/` cambia aqui: QC-49 aisla el inventario por empresa. Las TRES tablas del modulo
+// -`products`, `presentations` y `product_batches`- ganan `company_id` NOT NULL con FK a
+// `companies`, mas el intercambio del indice unico de nombre de presentacion por el compuesto
+// `(company_id, name_normalized)` y dos disparadores de coherencia. Anadir una columna
+// obligatoria a tres tablas es una migracion de esquema por definicion: no hay forma de hacerlo
+// sin tocar `db/`. Son EXACTAMENTE los dos archivos de UNA carpeta de migracion, con su
+// `down.sql` como manda el arnes. `db/schema.prisma` no se repite aqui: ya esta nombrado en
+// `MIGRACION_QC34`.
+//
+// Y POR QUE ESTO NO ES TOCAR `lib/modules/recetas`, que es lo que este caso vigila de verdad:
+// las tres tablas son del modulo `inventario` (`/// @module inventario` en el esquema) y toda la
+// logica de esta ficha vive en `lib/modules/inventario`. `recetas` no cambia ni un archivo -el
+// filtro de `tocaRecetas` lo sigue exigiendo sin ninguna excepcion nueva-, y sigue resolviendo
+// sus referencias de producto por donde siempre: `ProductCatalog.findRefs`, que esta ficha deja
+// DELIBERADAMENTE sin ambito de empresa (R29) para no tocar `recetas`, con destino escrito en
+// QC-50. Esa es precisamente la ficha que aislara `recetas`, y es la que traera aqui su propia
+// entrada.
+//
+// Cualquier OTRO archivo de `db/` sigue poniendo este caso rojo.
+const MIGRACION_QC49 = [
+  'db/migrations/20260911130000_inventory_company_scope/migration.sql',
+  'db/migrations/20260911130000_inventory_company_scope/down.sql',
+];
+
 /** Toda ruta de `lib/modules/recetas/` cuyo cambio esta aprobado y nombrado por una ficha. */
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
@@ -524,6 +559,7 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC66,
   ...MIGRACION_QC80,
   ...MIGRACION_QC86,
+  ...MIGRACION_QC49,
 ];
 
 /**
