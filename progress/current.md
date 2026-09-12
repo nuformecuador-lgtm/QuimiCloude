@@ -19,6 +19,15 @@
 
 ## Evaluaciones
 
+### QC-77 - acotada con `/afinar-feature` (2026-09-12)
+
+Alcance, **11 decisiones cerradas** y **dos preguntas abiertas con respuesta por defecto** en
+`specs/QC-77-aislamiento-de-la-base-en-tests-de-integracion/requirements.md`. No se copian aqui.
+El board se actualizo ANTES de sembrar: la ficha nacio sin `complexity` a proposito -era una de las
+cosas por decidir- y gana ahora el label `complexity:medium` mas el parrafo de alcance cerrado en su
+`description`. Ninguna ficha nueva y ninguna cancelada. Sigue `pending` en Backlog: la mueve el
+leader en F1.3.
+
 ### QC-85 - acotada con `/afinar-feature` (2026-09-12)
 
 Alcance, **13 decisiones cerradas** y **cero preguntas abiertas** en
