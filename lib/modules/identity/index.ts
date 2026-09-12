@@ -299,3 +299,24 @@ export {
   type ListWorkGroupMembersDeps,
   type PaginationPolicy,
 } from './domain/list-work-group-members';
+// ---------------------------------------------------------------------------------------
+// QC-23 T17 (`design.md > 8`) — los TRES casos de uso del cierre de sesion (R20-R32). Bloque
+// NUEVO al final: no reordena ni reformatea ninguna de las lineas de arriba.
+//
+// Solo simbolos de `./domain`, igual que los bloques anteriores. En particular NO sale por aqui
+// nada de `ports/` ni de `adapters/driven/**` -los ve solo `lib/composition`, que es el unico
+// que ata puerto -> adaptador- y esta ficha no crea ningun `adapters/driving/**` que reexportar:
+// no hay pagina, ruta, componente ni Server Action que la invoque (R51), y eso es de QC-101 y
+// QC-53.
+//
+// Los tipos `*Deps` viajan con las factories: quien las cablea es `lib/composition`, y sin el
+// tipo no podria declarar la dependencia.
+// ---------------------------------------------------------------------------------------
+
+export { createEndSession, type EndSessionDeps } from './domain/end-session';
+export { createEndAllSessions, type EndAllSessionsDeps } from './domain/end-all-sessions';
+export {
+  createEndOtherSessions,
+  type CurrentSession,
+  type EndOtherSessionsDeps,
+} from './domain/end-other-sessions';

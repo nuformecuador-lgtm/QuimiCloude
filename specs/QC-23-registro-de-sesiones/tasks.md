@@ -99,7 +99,7 @@
 
 ## Fase 4 — Los casos de uso
 
-- [ ] **T11. `end-session.ts` y el cierre de un dispositivo.**
+- [x] **T11. `end-session.ts` y el cierre de un dispositivo.**
   Caso de uso `createEndSession`: leer claims → registrar el cierre + purgar → borrar la cookie
   **siempre**, también si el registro falló, dejando la causa en el log con el identificador de
   petición. La clave de la fachada sigue llamándose `endSession`.
@@ -108,7 +108,7 @@
   sesiones de esa persona siguen resolviendo; otro, que el sello **no** sube.
   _Deps: T7_
 
-- [ ] **T12. `end-all-sessions.ts` — el cierre total.**
+- [x] **T12. `end-all-sessions.ts` — el cierre total.**
   Autorización en la **primera línea**: sobre uno mismo no exige código; sobre otra persona exige
   `usuarios.modificar`. Ámbito por empresa y vivo en el puerto; `'not_found'` → `UserNotFoundError`.
   **Hecho:** tests de denegación con actor ausente, sin permisos, con el conjunto vacío, con un
@@ -117,7 +117,7 @@
   `user_not_found` y **no** `unauthorized`; ningún código de error nuevo en el catálogo de QC-70.
   _Deps: T7_
 
-- [ ] **T13. `end-other-sessions.ts` — todas menos la actual.**
+- [x] **T13. `end-other-sessions.ts` — todas menos la actual.**
   Sube el sello y reemite la sesión actual con `sid` nuevo e `issuedAt = sello + 1 s`.
   **Hecho:** un test afirma que la cookie vieja del **mismo** dispositivo queda inválida y la nueva
   vale; otro, que una sesión ajena emitida **en el mismo segundo** del sello queda inválida; otro,
@@ -127,7 +127,7 @@
 
 ## Fase 5 — Los cortes en las escrituras que ya existen
 
-- [ ] **T14. El sello sube dentro de las transacciones de QC-66.**
+- [x] **T14. El sello sube dentro de las transacciones de QC-66.**
   `applyGuardedChange` (`account_status`, `delete`) y `updateAliveInCompany` (cambio de rol)
   escriben `sessions_valid_from` en el **mismo** `UPDATE`, decidido por `changeRevokesSessions`.
   **Hecho:** integración que prueba las cuatro transiciones —`blocked`, `inactive`, borrado, cambio
@@ -136,14 +136,14 @@
   sesiones.
   _Deps: T6_
 
-- [ ] **T15. El sello sube al establecer la contraseña con el enlace (QC-79).**
+- [x] **T15. El sello sube al establecer la contraseña con el enlace (QC-79).**
   `applyCredentialAndActivate` añade `sessionsValidFrom` a su `UPDATE`, dentro de la transacción
   atómica que ya tiene.
   **Hecho:** la suite de QC-79 sigue verde; un test de integración afirma que tras consumir el
   enlace el sello de esa persona quedó en el instante del consumo.
   _Deps: T6_
 
-- [ ] **T16. Guardia `guard-sesiones-cortadas.test.ts`.**
+- [x] **T16. Guardia `guard-sesiones-cortadas.test.ts`.**
   Recorre `lib/modules/identity/adapters/driven/persistence/**` y se pone roja si un `data` de
   escritura Prisma lleva `passwordHash:` sin `sessionsValidFrom:` en el mismo objeto.
   **Hecho:** verde con el código de T15; roja si se quita esa línea; el mensaje de fallo nombra
@@ -152,7 +152,7 @@
 
 ## Fase 6 — Cableado, pruebas y cierre
 
-- [ ] **T17. Cableado en `lib/composition/index.ts`.**
+- [x] **T17. Cableado en `lib/composition/index.ts`.**
   `sessionIds`, `sessionEraser`, `sessionRevocations`, `sessionCheckLog`, y las tres claves
   `endSession` / `endAllSessions` / `endOtherSessions`. Bloque **al final**, sin reordenar ni
   reformatear nada; `resolveSession` se sigue construyendo **una sola vez**.
@@ -174,27 +174,27 @@
   **Hecho:** los seis cortes previos conservan sus tests sin modificar.
   _Deps: T10_
 
-- [ ] **T20. [P] Tests unit de los tres casos de uso.**
+- [x] **T20. [P] Tests unit de los tres casos de uso.**
   Cierre individual, cierre total, cierre de todas menos la actual, autorización y ámbito.
   **Hecho:** cada caso de uso tiene su test de permiso denegado **antes** de tocar el puerto (el
   doble del repositorio afirma cero invocaciones).
   _Deps: T11, T12, T13_
 
-- [ ] **T21. [P] Tests de integración contra la base.**
+- [x] **T21. [P] Tests de integración contra la base.**
   Unicidad de `session_id`; el segundo cierre del mismo `sid` no falla ni duplica; la purga borra
   solo las caducadas **de esa persona**; el sello escrito queda truncado al segundo; `stampAll`
   sobre otra empresa o sobre una fila borrada devuelve `'not_found'`.
   **Hecho:** corren contra la base de la feature y son idempotentes entre corridas.
   _Deps: T8, T14, T15_
 
-- [ ] **T22. [P] Test de alcance de la ficha.**
+- [x] **T22. [P] Test de alcance de la ficha.**
   Afirma que `package.json` no ganó dependencias; que el puerto no expone ningún listado de
   sesiones; y que la feature no añadió ninguna página, ruta ni Server Action.
   **Hecho:** `guard-dependencias-aprobadas` verde; el test es rojo si alguien añade un
   `listSessions` al puerto o un `page.tsx` a la feature.
   _Deps: T7, T17_
 
-- [ ] **T23. Anotar la deuda de E2E.**
+- [x] **T23. Anotar la deuda de E2E.**
   El diferimiento a QC-53 queda escrito en `progress/impl_QC-23-registro-de-sesiones.md` y en
   `progress/current.md > Deudas y cosas abiertas`, con su motivo y su destinatario.
   **Hecho:** las dos anotaciones existen y nombran QC-53.

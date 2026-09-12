@@ -67,3 +67,28 @@ export function requireAnyPermission(
 ): asserts actor is Actor {
   assertAnyPermission(actor, permissions, () => new UnauthorizedError());
 }
+
+/**
+ * QC-23 (T12, R27, R29) — hermana de `requirePermission` para las operaciones que **no exigen
+ * ningun codigo**, solo un actor de verdad: cerrar las **propias** sesiones (R25).
+ *
+ * Falla cerrado igual que sus hermanas —actor ausente se rechaza con el mismo
+ * `UnauthorizedError` de ESTE modulo, asi que el adaptador driving lo sigue serializando con su
+ * `error instanceof IdentityError`— y en la MISMA primera linea, antes de validar la entrada y
+ * antes de tocar el repositorio (R27). Sin actor no hay sesion propia que cerrar: no es que la
+ * operacion no tenga sentido, es que no hay a quien aplicarla.
+ *
+ * **No mira el conjunto de permisos, y eso no es un descuido:** R27 dice que cerrar las propias
+ * sesiones no exige ningun codigo, asi que un actor con el conjunto vacio SI puede cerrar las
+ * suyas. Exigirle un codigo aqui seria inventarse un permiso que la decision cerrada 17 no da.
+ * Quien apunta a OTRA persona no pasa por aqui: pasa por `requirePermission(actor,
+ * 'usuarios.modificar')`, que si comprueba pertenencia exacta y rechaza el conjunto vacio, el
+ * conjunto que no es un array y el codigo que no esta.
+ *
+ * Misma firma de ASERCION que sus hermanas (`asserts actor is Actor`): el estrechamiento vive
+ * aqui, no en una funcion compartida, por el mismo motivo escrito en `require-permission.ts`
+ * —TypeScript no verifica el cuerpo de una funcion de asercion—.
+ */
+export function requireActor(actor: Actor | null | undefined): asserts actor is Actor {
+  if (!actor) throw new UnauthorizedError();
+}

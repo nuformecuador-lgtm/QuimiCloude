@@ -82,6 +82,17 @@ porque es validacion de entrada y no una regla nueva de dominio.
 
 ## Deudas y cosas abiertas
 
+### La E2E de QC-23 queda diferida a QC-53, con destinatario (2026-09-12)
+
+QC-23 (`registro-de-sesiones`) **no anade ninguna pantalla, ninguna ruta y ningun boton**: es
+esquema, migracion y dominio, y su spec lo cierra por escrito (R50, R51). No hay recorrido
+navegable que visitar, asi que la prueba de extremo a extremo en navegador se difiere a **QC-53**,
+que es quien trae el boton de «cerrar todas mis sesiones» y con el el recorrido. El boton del
+administrador que invoca la misma operacion es **QC-101**.
+
+Es una **deuda con destinatario, no una exencion** de `CHECKPOINTS.md > Calidad de codigo`: la
+operacion queda implementada y probada en el service, y quien construya QC-53 hereda la E2E.
+
 ### El gate de `dev` queda en rojo por la BASE COMPARTIDA, no por `dev` (2026-09-12)
 
 Al cerrar QC-49 y QC-79 el leader corrió `./init.sh` completo sobre `dev` y salió **rojo con 22
