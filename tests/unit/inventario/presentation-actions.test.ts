@@ -29,12 +29,16 @@ const {
   deletePresentationMock,
   listPresentationsMock,
   getSessionUserMock,
+  getSessionContextMock,
 } = vi.hoisted(() => ({
   createPresentationMock: vi.fn(),
   updatePresentationMock: vi.fn(),
   deletePresentationMock: vi.fn(),
   listPresentationsMock: vi.fn(),
   getSessionUserMock: vi.fn(),
+  // QC-49 (R12): la SEGUNDA cara de la sesion. La action pide las dos en paralelo y la
+  // empresa sale de esta, nunca del `FormData`.
+  getSessionContextMock: vi.fn(),
 }));
 
 // QC-71 (T7, R7, R13): el adaptador driving pide a la composicion la LECTURA de la cabecera
@@ -47,7 +51,7 @@ const { REQUEST_ID_DE_PRUEBA, readRequestIdHeaderMock } = vi.hoisted(() => {
 
 vi.mock('@/lib/composition', () => ({
   observabilidad: { readRequestIdHeader: readRequestIdHeaderMock },
-  identity: { getSessionUser: getSessionUserMock },
+  identity: { getSessionUser: getSessionUserMock, getSessionContext: getSessionContextMock },
   inventario: {
     createPresentation: createPresentationMock,
     updatePresentation: updatePresentationMock,
@@ -66,9 +70,21 @@ const ADMIN_SESSION_USER = {
   permissions: ['inventario.consultar', 'inventario.modificar'],
 };
 
+/**
+ * QC-49 (R12, `design.md > 4.1`): el contexto de sesion del SERVIDOR, de donde -y solo de
+ * donde- sale la empresa en cuyo nombre opera la action.
+ */
+const ADMIN_SESSION_CONTEXT = {
+  userId: 'user-admin-1',
+  companyId: 'company-a',
+  roleName: 'Administrador',
+};
+
 /** El actor que la action debe construir a partir de esa sesion (QC-74, design.md > 4). */
 const ADMIN_ACTOR = {
   id: 'user-admin-1',
+  // QC-49 (R11): la empresa viaja DENTRO del actor, tomada del contexto de sesion.
+  companyId: 'company-a',
   permissions: ['inventario.consultar', 'inventario.modificar'],
 };
 
@@ -89,6 +105,7 @@ const MUTATION_INITIAL: PresentationMutationFormState = { status: 'idle' };
 beforeEach(() => {
   vi.clearAllMocks();
   getSessionUserMock.mockResolvedValue(ADMIN_SESSION_USER);
+  getSessionContextMock.mockResolvedValue(ADMIN_SESSION_CONTEXT);
 });
 
 describe('createPresentationAction', () => {
@@ -407,5 +424,154 @@ describe('listPresentationsAction', () => {
       code: 'invalid_input',
       message: expect.any(String),
     });
+  });
+});
+
+// AMPLIACION 2026-09-11 (QC-49, T14) — LA EMPRESA SALE DE LA SESION Y NO VUELVE AL NAVEGADOR.
+//
+// Mismo contrato que `product-actions.test.ts` -ahi esta el razonamiento largo-, sobre las
+// CUATRO actions de presentacion. Cubre R12, R19 y R31.
+describe('QC-49 R12 — la empresa sale de getSessionContext y nunca del FormData', () => {
+  const INVOCACIONES: ReadonlyArray<{
+    readonly nombre: string;
+    readonly mock: ReturnType<typeof vi.fn>;
+    readonly invocar: (formData: FormData) => Promise<unknown>;
+  }> = [
+    {
+      nombre: 'createPresentationAction',
+      mock: createPresentationMock,
+      invocar: (formData) => createPresentationAction(CREATE_INITIAL, formData),
+    },
+    {
+      nombre: 'updatePresentationAction',
+      mock: updatePresentationMock,
+      invocar: (formData) => updatePresentationAction('presentation-1', MUTATION_INITIAL, formData),
+    },
+    {
+      nombre: 'deletePresentationAction',
+      mock: deletePresentationMock,
+      invocar: () => deletePresentationAction(MUTATION_INITIAL, formDataOf({ id: 'presentation-1' })),
+    },
+    {
+      nombre: 'listPresentationsAction',
+      mock: listPresentationsMock,
+      invocar: () => listPresentationsAction({ page: 1, pageSize: 10 }),
+    },
+  ];
+
+  const FORM_VALIDO = { name: 'Bidon 20 L', unitId: UNIDAD };
+
+  function actorRecibido(mock: ReturnType<typeof vi.fn>): unknown {
+    const llamada = mock.mock.calls.at(-1);
+    if (llamada === undefined) throw new Error('el caso de uso no fue llamado');
+    return llamada.at(-1);
+  }
+
+  it('las cuatro actions piden LAS DOS caras de la sesion y componen el actor con la empresa', async () => {
+    for (const { nombre, mock, invocar } of INVOCACIONES) {
+      vi.clearAllMocks();
+      getSessionUserMock.mockResolvedValue(ADMIN_SESSION_USER);
+      getSessionContextMock.mockResolvedValue(ADMIN_SESSION_CONTEXT);
+      mock.mockResolvedValue({ id: 'x', items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 });
+
+      await invocar(formDataOf(FORM_VALIDO));
+
+      expect(getSessionUserMock, nombre).toHaveBeenCalledTimes(1);
+      expect(getSessionContextMock, nombre).toHaveBeenCalledTimes(1);
+      expect(actorRecibido(mock), nombre).toEqual(ADMIN_ACTOR);
+    }
+  });
+
+  it('sin contexto de sesion el actor es null ENTERO, no un actor a medias sin empresa', async () => {
+    // Falla cerrado (R12): sin cualquiera de las dos caras no hay actor, y sin actor el caso de
+    // uso rechaza en su primera linea, antes del repositorio. Lo que se impide aqui es el actor
+    // a medias -con `companyId: undefined`-, que dejaria bajar un ambito de nadie.
+    const AUSENCIAS = [
+      { etiqueta: 'sin contexto de sesion', user: ADMIN_SESSION_USER, context: null },
+      { etiqueta: 'sin usuario de sesion', user: null, context: ADMIN_SESSION_CONTEXT },
+      { etiqueta: 'sin ninguna de las dos', user: null, context: null },
+    ];
+
+    for (const { etiqueta, user, context } of AUSENCIAS) {
+      for (const { nombre, mock, invocar } of INVOCACIONES) {
+        vi.clearAllMocks();
+        getSessionUserMock.mockResolvedValue(user);
+        getSessionContextMock.mockResolvedValue(context);
+        mock.mockRejectedValue(new UnauthorizedError());
+
+        const resultado = await invocar(formDataOf(FORM_VALIDO));
+
+        expect(actorRecibido(mock), `${nombre} ${etiqueta}`).toBeNull();
+        expect(resultado, `${nombre} ${etiqueta}`).toEqual({
+          status: 'error',
+          code: 'unauthorized',
+          message: expect.any(String),
+        });
+      }
+    }
+  });
+
+  it('una companyId en el FormData no cambia la empresa ni llega al caso de uso', async () => {
+    createPresentationMock.mockResolvedValue({ id: 'presentation-1' });
+    updatePresentationMock.mockResolvedValue(undefined);
+
+    const conEmpresaColada = formDataOf({
+      ...FORM_VALIDO,
+      companyId: 'company-b',
+      company_id: 'company-b',
+    });
+
+    await createPresentationAction(CREATE_INITIAL, conEmpresaColada);
+    await updatePresentationAction('presentation-1', MUTATION_INITIAL, conEmpresaColada);
+
+    for (const mock of [createPresentationMock, updatePresentationMock]) {
+      const llamada = mock.mock.calls.at(-1);
+      if (llamada === undefined) throw new Error('el caso de uso no fue llamado');
+
+      expect(llamada.at(-1)).toEqual(ADMIN_ACTOR);
+      const serializado = JSON.stringify(llamada.slice(0, -1));
+      expect(serializado).not.toContain('companyId');
+      expect(serializado).not.toContain('company_id');
+      expect(serializado).not.toContain('company-b');
+    }
+  });
+});
+
+describe('QC-49 R19/R31 — ni la empresa sale al navegador ni cambian las firmas publicas', () => {
+  it('ningun estado devuelto por las cuatro actions contiene la empresa (R19)', async () => {
+    createPresentationMock.mockResolvedValue({ id: 'presentation-1' });
+    updatePresentationMock.mockResolvedValue(undefined);
+    deletePresentationMock.mockResolvedValue(undefined);
+    listPresentationsMock.mockResolvedValue({
+      items: [{ id: 'presentation-1', name: 'Bidon 20 L', unitId: UNIDAD }],
+      total: 1,
+      page: 1,
+      pageSize: 10,
+      totalPages: 1,
+    });
+
+    const FORM_VALIDO = { name: 'Bidon 20 L', unitId: UNIDAD };
+    const estados: readonly unknown[] = [
+      await createPresentationAction(CREATE_INITIAL, formDataOf(FORM_VALIDO)),
+      await updatePresentationAction('presentation-1', MUTATION_INITIAL, formDataOf(FORM_VALIDO)),
+      await deletePresentationAction(MUTATION_INITIAL, formDataOf({ id: 'presentation-1' })),
+      await listPresentationsAction({ page: 1, pageSize: 10 }),
+    ];
+
+    // Ancla: los cuatro son de EXITO. Si fueran de error, el barrido pasaria en verde sin haber
+    // mirado una sola salida con datos dentro.
+    for (const estado of estados) {
+      expect(estado).toMatchObject({ status: 'success' });
+      const serializado = JSON.stringify(estado);
+      expect(serializado).not.toContain('companyId');
+      expect(serializado).not.toContain(ADMIN_SESSION_CONTEXT.companyId);
+    }
+  });
+
+  it('las cuatro Server Actions conservan su firma publica (R31)', () => {
+    expect(createPresentationAction).toHaveLength(2);
+    expect(updatePresentationAction).toHaveLength(3);
+    expect(deletePresentationAction).toHaveLength(2);
+    expect(listPresentationsAction).toHaveLength(1);
   });
 });

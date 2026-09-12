@@ -162,6 +162,69 @@ export { requireAnyPermission } from './domain/actor';
 export type { RoleOption } from './domain/role-view';
 export { createListRoles, type ListRolesDeps } from './domain/list-roles';
 
+// QC-79 T17 (R32) — el enlace con el que una persona ESTABLECE su contrasena la primera vez.
+// Bloque NUEVO al final: no reordena ni reformatea ninguna linea de arriba.
+//
+// Solo simbolos de `./domain`, igual que el bloque de QC-66. En particular **NO se reexporta
+// `adapters/driving/credential-setup-actions`** (T18): meteria `'use server'` en el cierre
+// transitivo del contrato y lo haria inimportable desde un componente de cliente
+// (`guard-arquitectura-modulos.test.ts`, bloque del contrato). La pagina publica de T19 las
+// importa por su RUTA EXACTA. Tampoco se reexporta nada de `ports/` ni de `adapters/driven/**`:
+// los tres puertos nuevos los cablea `lib/composition`, que es el unico que necesita verlos.
+// ---------------------------------------------------------------------------------------
+
+// La vida del enlace (R8) y el centinela con el que nace una fila sin credencial utilizable (R4).
+// Dominio puro: no arrastra ni Prisma ni servidor.
+export {
+  CREDENTIAL_SETUP_LINK_TTL_DAYS,
+  CREDENTIAL_SETUP_LINK_TTL_MS,
+  NO_CREDENTIAL_SENTINEL,
+  credentialSetupLinkExpiresAt,
+  evaluateLink,
+  isCredentialSetupLinkLive,
+  type CredentialSetupLink,
+  type CredentialSetupLinkState,
+} from './domain/credential-setup-link';
+
+// Las dos clases nuevas con `code` estable del catalogo cerrado de QC-70 (R34): la respuesta
+// UNICA e indistinguible de los seis rechazos del enlace (R22) y el rechazo distinguible del
+// reenvio a alguien que ya no esta en `pending` (R15).
+export { CredentialLinkInvalidError, UserNotPendingError } from './domain/errors';
+
+// Los dos rechazos de FORMULARIO, que quedan FUERA del catalogo por **QC-70 R29** —el campo de
+// diagnostico no se serializa al navegador, y su guardia es R30—: las reglas incumplidas son
+// datos que la persona necesita para corregir, y por eso viajan en una variante propia del
+// estado y no en un `ErrorState`. Es una **excepcion declarada** a la letra de QC-79 R34, no un
+// cumplimiento suyo: ver `design.md > 11.3` y la cabecera de `domain/credential-rejected.ts`.
+export {
+  CredentialConfirmationMismatchError,
+  CredentialPolicyRejectedError,
+} from './domain/credential-rejected';
+
+// Los esquemas de entrada de las dos mutaciones nuevas (R33) y sus tipos inferidos.
+export {
+  resendCredentialSetupLinkSchema,
+  setCredentialWithLinkSchema,
+  type ResendCredentialSetupLinkInput,
+  type SetCredentialWithLinkInput,
+} from './domain/credential-setup-input';
+
+// Como acabo el correo del alta (R30): `sent`, `failed` —creado igual, con enlace vivo, y QC-67
+// ofrece el reenvio— o `not_needed` cuando el administrador escribio la contrasena (R3).
+export type { CreateUserMailOutcome, CreateUserResult } from './domain/create-user';
+
+// Las DOS factories de caso de uso nuevas. Los tipos `*Deps` viajan con ellas: quien las cablea
+// es `lib/composition`, y sin el tipo no podria declarar la dependencia.
+export {
+  createSetCredentialWithLink,
+  type SetCredentialWithLinkDeps,
+} from './domain/set-credential-with-link';
+export {
+  createIssueCredentialSetupLink,
+  type IssueCredentialSetupLinkDeps,
+  type IssueCredentialSetupLinkResult,
+} from './domain/issue-credential-setup-link';
+
 // ---------------------------------------------------------------------------------------
 // QC-84 T10 — Los grupos de trabajo (R44). Bloque NUEVO al final: no reordena ni reformatea
 // ninguna de las lineas de arriba.

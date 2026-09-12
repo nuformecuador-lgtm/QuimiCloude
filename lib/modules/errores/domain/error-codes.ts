@@ -63,7 +63,10 @@ export const ERROR_CODES = [
   'invalid_derivation',
   'unit_in_use',
   'incompatible_units',
-  // `identity` (QC-66): la administracion de usuarios. Ver la enmienda a R25 en la cabecera.
+  // `identity` (QC-66, ampliado por QC-79): la administracion de usuarios. Ver la enmienda a R25
+  // en la cabecera. QC-79 NO redacta ninguna enmienda nueva: se apoya en esa misma —`identity` ya
+  // es el sexto modulo del catalogo— y solo anade dos entradas mas bajo este encabezado, el enlace
+  // invalido para establecer la contrasena y la cuenta que ya no esta en `pending`.
   'user_not_found',
   'duplicate_email',
   'duplicate_username',
@@ -71,6 +74,8 @@ export const ERROR_CODES = [
   'role_not_found',
   'self_operation',
   'last_administrator',
+  'credential_link_invalid',
+  'user_not_pending',
   // `identity` (QC-84): los grupos de trabajo. Misma familia y mismo modulo que los siete de
   // arriba —un grupo es un conjunto de personas y las personas viven en `identity` (QC-84
   // `design.md > 9.4`)—, asi que NO abren una septima familia: amplian la sexta.

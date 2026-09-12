@@ -98,11 +98,18 @@ async function seedUnit(
 
 /** Producto. Sin presentacion desde el 2026-09-09 y SIN UNIDAD desde QC-80 (R7, R21): la
  *  declara la presentacion, y la del producto se deriva de la del lote mas reciente (R22). */
-async function createProduct(marker: string): Promise<{ readonly productId: string }> {
+async function createProduct(
+  marker: string,
+  companyId: string,
+): Promise<{ readonly productId: string }> {
   const product = await prisma.product.create({
     data: {
       name: `Producto ${marker}`,
       nameNormalized: `producto${marker}`,
+      // QC-49 R1: `products.company_id` es NOT NULL. Va la MISMA empresa del actor del caso,
+      // no una cualquiera: la unidad que este producto acaba usando la creo ese actor, y el
+      // disparador `presentations_check_unit_scope` rechaza cruzar empresas (R23).
+      companyId,
     },
     select: { id: true },
   })
@@ -111,9 +118,21 @@ async function createProduct(marker: string): Promise<{ readonly productId: stri
 
 /** Presentacion CON su unidad (QC-80 R1: `presentations.unit_id` es NOT NULL con FK a
  *  `units`, ON DELETE RESTRICT). Es la referencia al catalogo que antes traia el producto. */
-async function createPresentation(marker: string, unitId: string): Promise<string> {
+async function createPresentation(
+  marker: string,
+  unitId: string,
+  companyId: string,
+): Promise<string> {
   const presentation = await prisma.presentation.create({
-    data: { name: `Presentacion ${marker}`, nameNormalized: `presentacion${marker}`, unitId },
+    // QC-49: `company_id` es NOT NULL (R1) y tiene que ser LA MISMA que la de `unitId`, porque
+    // el disparador `presentations_check_unit_scope` rechaza una unidad de otra empresa (R23).
+    // Las unidades de estos casos las crea `unidades.createUnit` con el actor de `companyId`.
+    data: {
+      name: `Presentacion ${marker}`,
+      nameNormalized: `presentacion${marker}`,
+      unitId,
+      companyId,
+    },
     select: { id: true },
   })
   return presentation.id
@@ -578,12 +597,12 @@ describe('updateUnit — R20: cambiar base y factor de una unidad ya en uso no t
       seeded.units = [...(seeded.units ?? []), unitId]
 
       // TRASLADADO EL 2026-09-11 POR QC-80 (R1): quien apunta a la unidad es la PRESENTACION.
-      const presentationId = await createPresentation(`pres${marker}`, unitId)
+      const presentationId = await createPresentation(`pres${marker}`, unitId, companyId)
       seeded.presentations = [presentationId]
 
       const recipeId = await createRecipe(`rec${marker}`)
       seeded.recipes = [recipeId]
-      const { productId: productoDeLaLinea } = await createProduct(`linea${marker}`)
+      const { productId: productoDeLaLinea } = await createProduct(`linea${marker}`, companyId)
       seeded.products = [...(seeded.products ?? []), productoDeLaLinea]
       const lineId = await createLine(recipeId, productoDeLaLinea, unitId, '3.5000')
       seeded.recipeLines = [lineId]
@@ -663,7 +682,7 @@ describe('deleteUnit — R24: bloqueado por uso, con UnitInUseError y las filas 
       const { id: unitId } = await unidades.createUnit({ name: `Usada por presentacion ${marker}` }, actor)
       seeded.units = [unitId]
 
-      const presentationId = await createPresentation(`pres${marker}`, unitId)
+      const presentationId = await createPresentation(`pres${marker}`, unitId, companyId)
       seeded.presentations = [presentationId]
 
       await expect(unidades.deleteUnit(unitId, actor)).rejects.toBeInstanceOf(UnitInUseError)
@@ -697,7 +716,7 @@ describe('deleteUnit — R24: bloqueado por uso, con UnitInUseError y las filas 
       const { id: unitId } = await unidades.createUnit({ name: `Usada por linea ${marker}` }, actor)
       seeded.units = [unitId]
 
-      const { productId } = await createProduct(`prod${marker}`)
+      const { productId } = await createProduct(`prod${marker}`, companyId)
       seeded.products = [productId]
       const recipeId = await createRecipe(`rec${marker}`)
       seeded.recipes = [recipeId]

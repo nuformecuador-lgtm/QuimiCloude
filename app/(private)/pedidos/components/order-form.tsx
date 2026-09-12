@@ -535,6 +535,10 @@ export function OrderForm({ order, recipes, units, onSaved }: OrderFormProps) {
               Cantidad: control NUMERICO del navegador (enmienda humana del 2026-09-08 a R39). Con
               `step="any"` para que el decimal no choque contra el paso entero por defecto. El valor
               sigue viajando como cadena en el `FormData` y sigue validandolo el esquema del contrato.
+
+              Al SOLTAR EL FOCO el valor se coloca a DOS decimales y sin ceros finales (decision
+              humana del 2026-09-09): «25.00» y «25.0» quedan como «25», «25.3» y «25.08» conservan
+              sus decimales. El `FormData` viaja con el valor ya colocado.
             */}
             <OrderField
               name="quantity"
@@ -543,6 +547,7 @@ export function OrderForm({ order, recipes, units, onSaved }: OrderFormProps) {
               type="number"
               step="any"
               inputMode="decimal"
+              roundDecimals={2}
               defaultValue={initialValue('quantity', order?.quantity ?? '')}
               onValueChange={setQuantity}
               error={fieldErrors.quantity}

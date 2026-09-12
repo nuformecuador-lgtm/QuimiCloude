@@ -257,6 +257,14 @@ interface Fixtures {
  */
 async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
   const marca = token()
+  // QC-49 R1: `products.company_id` es NOT NULL con FK a `companies`, asi que el andamiaje
+  // necesita su propia empresa efimera. NUNCA la de instalacion: `companies_name_unique` es
+  // global y el nombre chocaria con el que siembra `db:seed`.
+  const companyName = `Empresa producto ${marca}`
+  const company = await tx.company.create({
+    data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
+    select: { id: true },
+  })
   const product = await tx.product.create({
     // `name_normalized` (QC-57) es NOT NULL y se pasa LITERAL, sin llamar a
     // `normalizeProductName`: mismo criterio que el resto de nombres normalizados de este
@@ -264,6 +272,7 @@ async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
     data: {
       name: 'Acido citrico monohidratado',
       nameNormalized: 'acidocitricomonohidratado',
+      companyId: company.id,
     },
     select: { id: true },
   })

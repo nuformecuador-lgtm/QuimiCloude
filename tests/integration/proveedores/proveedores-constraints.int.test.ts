@@ -214,6 +214,25 @@ async function createUser(tx: Prisma.TransactionClient): Promise<string> {
  * Desde QC-52 es la FK que la linea necesita para existir (R10): `presentation_id` es
  * OBLIGATORIA porque forma parte de su identidad.
  */
+/**
+ * Empresa del ANDAMIAJE de inventario (QC-49 R1).
+ *
+ * `products.company_id` y `presentations.company_id` son NOT NULL desde
+ * `<ts>_inventory_company_scope`, asi que sembrar cualquiera de las dos exige una empresa. Se
+ * REUTILIZA una que ya existe en la base (`db:seed` deja la de instalacion) en vez de crear una
+ * nueva: parte de lo que siembra este archivo se limpia a mano, y una empresa creada aqui
+ * quedaria de residuo.
+ *
+ * Aqui la empresa es ANDAMIAJE y nada mas: este archivo no prueba el aislamiento por empresa
+ * --eso es `tests/integration/inventario/company-scope.int.test.ts`-- y ningun aserto suyo
+ * depende de cual sea. La unidad de estas presentaciones es DE SISTEMA, que vale para cualquier
+ * empresa (QC-76 R11), asi que `presentations_check_unit_scope` la acepta (QC-49 R23).
+ */
+async function andamiajeCompanyId(tx: Prisma.TransactionClient): Promise<string> {
+  const company = await tx.company.findFirstOrThrow({ select: { id: true } })
+  return company.id
+}
+
 async function createPresentation(tx: Prisma.TransactionClient): Promise<string> {
   const marca = token()
   const presentation = await tx.presentation.create({
@@ -221,6 +240,7 @@ async function createPresentation(tx: Prisma.TransactionClient): Promise<string>
       name: `Bidon 20 L ${marca}`,
       nameNormalized: `bidon20l${marca}`,
       unitId: await unidadDeSistema(tx),
+      companyId: await andamiajeCompanyId(tx),
     },
     select: { id: true },
   })

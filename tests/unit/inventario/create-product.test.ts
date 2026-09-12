@@ -21,17 +21,26 @@ import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-ba
 import type { NewProduct } from '@/lib/modules/inventario/domain/product-view';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 
+/** QC-49 (R11): la empresa EN CUYO NOMBRE opera el actor. Los casos de uso la convierten en
+ *  `InventoryScope` y se la pasan al puerto; no autoriza nada por si sola. */
+const EMPRESA = 'company-a';
+
 const ADMIN: Actor = {
   id: 'admin-1',
+  companyId: EMPRESA,
   permissions: ['inventario.consultar', 'inventario.modificar'],
 };
 
 /** QC-74 (R13, R14): conjunto de permisos VACIO. El Operador de hoy si tiene
  *  `inventario.consultar`, asi que no sirve como caso de rechazo. */
-const SIN_PERMISO: Actor = { id: 'sin-permiso-1', permissions: [] };
+const SIN_PERMISO: Actor = { id: 'sin-permiso-1', companyId: EMPRESA, permissions: [] };
 
 /** Actor con OTRO permiso del modulo: consultar no concede modificar (QC-74 R13). */
-const SOLO_CONSULTA: Actor = { id: 'consulta-1', permissions: ['inventario.consultar'] };
+const SOLO_CONSULTA: Actor = {
+  id: 'consulta-1',
+  companyId: EMPRESA,
+  permissions: ['inventario.consultar'],
+};
 
 /** Instante fijo, inyectado como dependencia (`now`): ver el comentario en `create-product.ts`. */
 const AHORA = new Date('2026-09-10T10:00:00.000Z');
@@ -196,7 +205,8 @@ describe('R15, R16, R21 — producto nuevo', () => {
 
     const resultado = await createProduct(ALTA_VALIDA, ADMIN);
 
-    expect(products.findAliveIdByName).toHaveBeenCalledWith('Acido sulfurico');
+    // QC-49 (R13, R18): el nombre va TAL CUAL y el ambito de la empresa del actor detras.
+    expect(products.findAliveIdByName).toHaveBeenCalledWith('Acido sulfurico', { companyId: EMPRESA });
     expect(products.createWithFirstBatch).toHaveBeenCalledTimes(1);
     expect(products.addBatchToAlive).not.toHaveBeenCalled();
     expect(resultado).toEqual({ id: 'producto-nuevo-1' });
@@ -326,7 +336,7 @@ describe('R22 — autoria del lote', () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
-    await createProduct(ALTA_VALIDA, { id: 'usuario-42', permissions: ['inventario.modificar'] });
+    await createProduct(ALTA_VALIDA, { id: 'usuario-42', companyId: EMPRESA, permissions: ['inventario.modificar'] });
 
     expect(loteCreado(products).createdBy).toBe('usuario-42');
   });
@@ -337,7 +347,7 @@ describe('R22 — autoria del lote', () => {
     });
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
-    await createProduct(ALTA_VALIDA, { id: 'usuario-42', permissions: ['inventario.modificar'] });
+    await createProduct(ALTA_VALIDA, { id: 'usuario-42', companyId: EMPRESA, permissions: ['inventario.modificar'] });
 
     expect(products.addBatchToAlive.mock.calls[0][1].createdBy).toBe('usuario-42');
   });
@@ -373,9 +383,13 @@ describe('R17, R18 — el nombre corresponde a un producto que ya existe', () =>
     await createProduct({ ...ALTA_VALIDA, stock: 999, qtyAlert: 888, name: 'Otro nombre' }, ADMIN);
 
     const llamada = products.addBatchToAlive.mock.calls[0];
-    expect(llamada).toHaveLength(3);
+    // QC-49 (R13): el cuarto argumento es el AMBITO, no un campo del producto. Lo que R18
+    // vigila -que el candidato del producto no viaje- sigue intacto: se comprueba abajo, sobre
+    // las claves de `llamada[1]`.
+    expect(llamada).toHaveLength(4);
     expect(llamada[0]).toBe('producto-9');
     expect(llamada[2]).toBe(AHORA);
+    expect(llamada[3]).toEqual({ companyId: EMPRESA });
     // El lote lleva SU existencia -la escrita, que es la del lote que se agrega-, pero no
     // lleva ningun campo del producto: nada que permita tocar `name`, `qty_alert` ni `unit_id`.
     expect(Object.keys(llamada[1]).sort()).toEqual([

@@ -14,6 +14,7 @@ import { UnauthorizedError, ValidationError } from '@/lib/modules/inventario/dom
 import { createListPresentations } from '@/lib/modules/inventario/domain/list-presentations';
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
 
+import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 import type { ListQuery } from '@/lib/modules/inventario/domain/list-query';
 import type { Page } from '@/lib/modules/inventario/domain/page';
 import type { PresentationView } from '@/lib/modules/inventario/domain/presentation-view';
@@ -24,14 +25,19 @@ import type { ProductRepository } from '@/lib/modules/inventario/ports/product-r
 
 /** QC-74 (R18): el actor ya no trae nombre de rol, trae su conjunto de permisos. Este
  *  lleva los dos codigos de `inventario`, que es lo que el seed da al Administrador. */
+/** QC-49 (R11): la empresa EN CUYO NOMBRE opera el actor. El caso de uso la convierte en
+ *  `InventoryScope` y se la pasa al puerto; no autoriza nada por si sola. */
+const EMPRESA = 'company-a';
+
 const ADMIN: Actor = {
   id: 'admin-1',
+  companyId: EMPRESA,
   permissions: ['inventario.consultar', 'inventario.modificar'],
 };
 
 /** QC-74 (R13, R14): actor con el conjunto VACIO. Sustituye al viejo "rol Operador": desde
  *  QC-74 el Operador SI tiene `inventario.consultar`, asi que ya no sirve como caso de rechazo. */
-const SIN_PERMISO: Actor = { id: 'sin-permiso-1', permissions: [] };
+const SIN_PERMISO: Actor = { id: 'sin-permiso-1', companyId: EMPRESA, permissions: [] };
 
 function paginaVacia<T>(): Page<T> {
   return { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 };
@@ -71,11 +77,27 @@ function montarPresentaciones() {
   };
 }
 
-/** La consulta que llego al puerto en la ultima llamada. */
-function consultaRecibida(recibidas: readonly (readonly [ListQuery])[]): ListQuery {
+/**
+ * La consulta que llego al puerto en la ultima llamada.
+ *
+ * QC-49 (R13, R31): el puerto pasa a recibir DOS argumentos -la consulta y el AMBITO-, asi
+ * que el tipo de `mock.calls` cambio. Lo que este ayudante devuelve NO cambia: sigue siendo
+ * la consulta, el primer argumento, que es lo que afirma todo el archivo. El ambito se lee
+ * con `ambitoRecibido`, abajo, y tiene sus propios casos.
+ */
+function consultaRecibida(recibidas: readonly (readonly [ListQuery, InventoryScope])[]): ListQuery {
   const ultima = recibidas.at(-1);
   if (ultima === undefined) throw new Error('el puerto no fue llamado');
   return ultima[0];
+}
+
+/** El ambito que llego al puerto en la ultima llamada (QC-49 R13). */
+function ambitoRecibido(
+  recibidas: readonly (readonly [ListQuery, InventoryScope])[],
+): InventoryScope {
+  const ultima = recibidas.at(-1);
+  if (ultima === undefined) throw new Error('el puerto no fue llamado');
+  return ultima[1];
 }
 
 describe('list-products: autorizacion antes que todo (R33, R34)', () => {
@@ -281,5 +303,79 @@ describe('list-presentations: mismo contrato, misma disciplina', () => {
     await listPresentations({ search: 'bidon' }, ADMIN);
 
     expect(consultaRecibida(presentations.list.mock.calls).search).toBe('bidon');
+  });
+});
+
+// AMPLIACION 2026-09-11 (QC-49, R31) — LO QUE NO PUEDE CAMBIAR.
+//
+// QC-49 acota los dos listados a la empresa de la sesion y NADA MAS: el orden por defecto, la
+// busqueda, el filtrado, la paginacion y la FORMA del resultado se quedan como estaban, y las
+// firmas de los dos casos de uso tampoco cambian. Todo lo de arriba en este archivo sigue
+// midiendo exactamente eso -y sigue verde-, asi que este bloque no lo repite: ancla lo que la
+// ficha AÑADE sin romperlo, que es donde esta el riesgo.
+describe('QC-49 R31 — el ambito se anade al puerto y no cambia ni la firma ni la salida', () => {
+  it('los dos casos de uso siguen recibiendo (entrada, actor) y devolviendo la misma Page', async () => {
+    const { listProducts } = montarProductos();
+    const { listPresentations } = montarPresentaciones();
+
+    // La firma: DOS parametros, ni uno mas. Si alguien hubiera colado la empresa como tercer
+    // argumento -en vez de dentro del actor-, `length` seria 3 y esto cae.
+    expect(listProducts).toHaveLength(2);
+    expect(listPresentations).toHaveLength(2);
+
+    // La forma de la salida: las cinco claves de `Page`, sin ninguna de empresa (R19).
+    const paginaProductos = await listProducts({ page: 1 }, ADMIN);
+    const paginaPresentaciones = await listPresentations({ page: 1 }, ADMIN);
+
+    for (const pagina of [paginaProductos, paginaPresentaciones]) {
+      expect(Object.keys(pagina).sort()).toEqual(['items', 'page', 'pageSize', 'total', 'totalPages']);
+    }
+    expect(paginaProductos).toEqual(paginaVacia());
+    expect(paginaPresentaciones).toEqual(paginaVacia());
+  });
+
+  it('la empresa viaja en el SEGUNDO argumento del puerto y no se cuela dentro de la consulta', async () => {
+    // R13/R31 a la vez: el ambito llega, y llega APARTE. Si alguien lo fundiera en la consulta
+    // -un `companyId` dentro de `filters`, o una clave suelta en el objeto de `ListQuery`-, la
+    // segunda afirmacion cae: el contrato generico de QC-57 tiene cinco claves y solo cinco.
+    const { products, listProducts } = montarProductos();
+    const { presentations, listPresentations } = montarPresentaciones();
+
+    await listProducts({ page: 2, pageSize: 25, search: 'bidon' }, ADMIN);
+    await listPresentations({ page: 2, pageSize: 25, search: 'bidon' }, ADMIN);
+
+    expect(ambitoRecibido(products.listAlive.mock.calls)).toEqual({ companyId: EMPRESA });
+    expect(ambitoRecibido(presentations.list.mock.calls)).toEqual({ companyId: EMPRESA });
+
+    for (const consulta of [
+      consultaRecibida(products.listAlive.mock.calls),
+      consultaRecibida(presentations.list.mock.calls),
+    ]) {
+      expect(Object.keys(consulta).sort()).toEqual([
+        'filters',
+        'page',
+        'pageSize',
+        'search',
+        'sort',
+      ]);
+      expect(JSON.stringify(consulta)).not.toContain('companyId');
+      expect(JSON.stringify(consulta)).not.toContain(EMPRESA);
+    }
+  });
+
+  it('la empresa sale del ACTOR, no de la entrada: cambiar de actor cambia el ambito', async () => {
+    // Falsable de verdad: si el caso de uso leyera la empresa de la entrada -o la tuviera
+    // cableada-, el ambito de la segunda llamada seguiria siendo el de la primera.
+    const { products, listProducts } = montarProductos();
+    const OTRA_EMPRESA = 'company-b';
+
+    await listProducts({ page: 1 }, ADMIN);
+    expect(ambitoRecibido(products.listAlive.mock.calls)).toEqual({ companyId: EMPRESA });
+
+    await listProducts(
+      { page: 1, filters: {}, search: '' },
+      { ...ADMIN, companyId: OTRA_EMPRESA },
+    );
+    expect(ambitoRecibido(products.listAlive.mock.calls)).toEqual({ companyId: OTRA_EMPRESA });
   });
 });

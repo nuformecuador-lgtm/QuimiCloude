@@ -36,6 +36,7 @@ import { normalizeProductName } from '@/lib/modules/inventario';
 import { prisma } from '@/lib/shared/db/prisma';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
+import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 import type { ListFilterValue, ListQuery } from '@/lib/modules/inventario/domain/list-query';
 
 /**
@@ -58,6 +59,33 @@ function normalizeForTest(name: string): string {
     .replace(/\p{Diacritic}/gu, '')
     .replace(/[^a-z0-9]/gu, '');
 }
+
+/**
+ * Empresa propia del archivo y AMBITO de todas sus consultas (QC-49 R1, R13, R14).
+ *
+ * `products.company_id` es NOT NULL desde `<ts>_inventory_company_scope`, y `listAliveProducts`
+ * exige el ambito en su firma: sin el no compila. Se siembra una empresa EFIMERA en vez de
+ * reutilizar la de instalacion porque asi el ambito acota el conjunto entero y ninguna fila de
+ * otro archivo ni de otra sesion puede entrar en un recuento. Se borra en el `afterAll`, la
+ * ultima, cuando ya no queda inventario que la referencie.
+ *
+ * ESTE ARCHIVO NO PRUEBA EL AISLAMIENTO: sigue probando orden, filtro, busqueda y paginacion,
+ * exactamente los mismos casos de QC-57. El aislamiento es `company-scope-queries.int.test.ts`.
+ */
+let empresaDelArchivo: string;
+
+function ambito(): InventoryScope {
+  return { companyId: empresaDelArchivo };
+}
+
+beforeAll(async () => {
+  const nombre = `Empresa listado productos ${token()}`;
+  const company = await prisma.company.create({
+    data: { name: nombre, nameNormalized: nombre.toLowerCase().replace(/[^a-z0-9]/gu, '') },
+    select: { id: true },
+  });
+  empresaDelArchivo = company.id;
+});
 
 /** Identificadores de todo lo sembrado, para borrarlo por `id` EXACTO en el `afterAll`. */
 const productosSembrados: string[] = [];
@@ -95,6 +123,7 @@ async function sembrar(semillas: readonly Semilla[]): Promise<readonly string[]>
         stock: semilla.stock ?? null,
         qtyAlert: semilla.qtyAlert ?? null,
         deletedAt: semilla.deletedAt ?? null,
+        companyId: empresaDelArchivo,
         ...(semilla.createdAt === undefined ? {} : { createdAt: semilla.createdAt }),
       },
       select: { id: true },
@@ -121,7 +150,7 @@ async function sembrarUnidad(): Promise<string> {
 async function sembrarPresentacion(unitId: string): Promise<string> {
   const name = `presentacion ${token()}`;
   const { id } = await prisma.presentation.create({
-    data: { name, nameNormalized: normalizeForTest(name), unitId },
+    data: { name, nameNormalized: normalizeForTest(name), unitId, companyId: empresaDelArchivo },
     select: { id: true },
   });
   presentacionesSembradas.push(id);
@@ -137,7 +166,16 @@ async function sembrarLote(
   createdAt: Date,
 ): Promise<string> {
   const { id } = await prisma.productBatch.create({
-    data: { productId, presentationId, stock: 1, unitCost: '1.0000', createdAt },
+    data: {
+      productId,
+      presentationId,
+      stock: 1,
+      unitCost: '1.0000',
+      createdAt,
+      // QC-49 R2/R22: el lote declara SU empresa, y `product_batches_check_company` exige que
+      // coincida con la de su producto Y con la de su presentacion. Las tres son la del archivo.
+      companyId: empresaDelArchivo,
+    },
     select: { id: true },
   });
   lotesSembrados.push(id);
@@ -151,6 +189,8 @@ afterAll(async () => {
   await prisma.product.deleteMany({ where: { id: { in: productosSembrados } } });
   await prisma.presentation.deleteMany({ where: { id: { in: presentacionesSembradas } } });
   await prisma.unit.deleteMany({ where: { id: { in: unidadesSembradas } } });
+  // La empresa del archivo va la ULTIMA: las tres FK a `companies` son ON DELETE RESTRICT.
+  await prisma.company.deleteMany({ where: { id: empresaDelArchivo } });
   await prisma.$disconnect();
 });
 
@@ -170,15 +210,16 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
     const nombreDeLaUltima = NOMBRES[NOMBRES.length - 1];
 
     // En el orden de HOY (`name ASC`), con paginas de 5, la fila 12 cae en la pagina 3.
-    const porDefectoPagina3 = await listAliveProducts(consulta({ page: 3, pageSize: 5 }));
+    const porDefectoPagina3 = await listAliveProducts(consulta({ page: 3, pageSize: 5 }), ambito());
     expect(porDefectoPagina3.items.map((p) => p.name)).toContain(nombreDeLaUltima);
-    const porDefectoPagina1 = await listAliveProducts(consulta({ page: 1, pageSize: 5 }));
+    const porDefectoPagina1 = await listAliveProducts(consulta({ page: 1, pageSize: 5 }), ambito());
     expect(porDefectoPagina1.items.map((p) => p.name)).not.toContain(nombreDeLaUltima);
 
     // Pidiendo el orden inverso, la MISMA fila tiene que salir en la pagina 1: si el orden se
     // aplicara sobre la pagina ya traida, seguiria estando en la 3.
     const desc = await listAliveProducts(
       consulta({ page: 1, pageSize: 5, sort: { columnId: 'name', direction: 'desc' } }),
+      ambito(),
     );
     expect(desc.items[0]?.name).toBe(nombreDeLaUltima);
   });
@@ -191,6 +232,7 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
         pageSize: 5,
         filters: { stock: { kind: 'numberRange', min: 12, max: 12 } },
       }),
+      ambito(),
     );
 
     expect(pagina.items.map((p) => p.name)).toEqual([NOMBRES[NOMBRES.length - 1]]);
@@ -209,6 +251,7 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
           qtyAlert: { kind: 'numberRange', min: 5, max: 12 },
         },
       }),
+      ambito(),
     );
 
     expect(pagina.total).toBe(4);
@@ -218,7 +261,7 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
 
   it('pedir 100 por pagina se ACOTA a 25, no se rechaza (R29)', async () => {
     // R29 — acotar, no rechazar. El `pageSize` que sale es el efectivo, nunca el pedido.
-    const pagina = await listAliveProducts(consulta({ page: 1, pageSize: 100 }));
+    const pagina = await listAliveProducts(consulta({ page: 1, pageSize: 100 }), ambito());
 
     expect(pagina.pageSize).toBe(MAX_PAGE_SIZE);
     expect(pagina.items.length).toBeLessThanOrEqual(MAX_PAGE_SIZE);
@@ -241,6 +284,7 @@ describe('desempate estable por identificador (R10)', () => {
           sort: { columnId: 'stock', direction: 'asc' },
           filters: { stock: { kind: 'numberRange', min: 7, max: 7 } },
         }),
+        ambito(),
       );
       vistos.push(...pagina.items.map((p) => p.id));
     }
@@ -280,6 +324,7 @@ describe('los nulos van SIEMPRE al final, en las DOS direcciones (decision cerra
           filters: soloEstas(),
           search: normalizeProductName(CON_VALOR),
         }),
+        ambito(),
       );
 
       const stocks = pagina.items.map((p) => p.stock);
@@ -306,6 +351,7 @@ describe('la busqueda ignora acentos y mayusculas (R16, R18, R19)', () => {
 
     const pagina = await listAliveProducts(
       consulta({ pageSize: 25, search: `${marca} solucion buffer` }),
+      ambito(),
     );
 
     expect(pagina.items.map((p) => p.name)).toEqual([`${marca} Solución Buffer pH 7`]);
@@ -320,7 +366,7 @@ describe('la busqueda ignora acentos y mayusculas (R16, R18, R19)', () => {
     const marca = token();
     await sembrar([{ name: `${marca} Hipoclorito de sodio 5%`, stock: 1 }]);
 
-    const pagina = await listAliveProducts(consulta({ pageSize: 25, search: 'de sodio 5' }));
+    const pagina = await listAliveProducts(consulta({ pageSize: 25, search: 'de sodio 5' }), ambito());
 
     expect(pagina.items.map((p) => p.name)).toContain(`${marca} Hipoclorito de sodio 5%`);
   });
@@ -340,6 +386,7 @@ describe('el borrado logico no sale del listado, filtre lo que filtre (R7)', () 
         pageSize: 25,
         filters: { stock: { kind: 'numberRange', min: 42, max: 42 } },
       }),
+      ambito(),
     );
 
     expect(pagina.items.map((p) => p.name)).toEqual([`${marca} viva`]);
@@ -367,6 +414,7 @@ describe('el rango de fechas se compara en UTC, con los dos extremos inclusivos'
         pageSize: 25,
         filters: { createdAt: { kind: 'dateRange', from: DIA, to: DIA } },
       }),
+      ambito(),
     );
 
     expect(pagina.items.map((p) => p.name).sort()).toEqual(
@@ -397,7 +445,7 @@ describe('QC-80 — el listado devuelve la unidad derivada del lote mas reciente
     await sembrarLote(productId, presentacionReciente, new Date('2031-05-02T00:00:00.000Z'));
     await sembrarLote(productId, presentacionVieja, new Date('2031-05-01T00:00:00.000Z'));
 
-    const pagina = await listAliveProducts(consulta({ pageSize: 25, search: marca }));
+    const pagina = await listAliveProducts(consulta({ pageSize: 25, search: marca }), ambito());
 
     expect(pagina.items).toHaveLength(1);
     expect(pagina.items[0]?.latestBatchUnitId).toBe(unidadReciente);
@@ -412,7 +460,7 @@ describe('QC-80 — el listado devuelve la unidad derivada del lote mas reciente
     const marca = `Sin lotes ${token()}`;
     await sembrar([{ name: `${marca} recien dado de alta`, stock: null }]);
 
-    const pagina = await listAliveProducts(consulta({ pageSize: 25, search: marca }));
+    const pagina = await listAliveProducts(consulta({ pageSize: 25, search: marca }), ambito());
 
     expect(pagina.items).toHaveLength(1);
     expect(pagina.items[0]?.latestBatchUnitId).toBeNull();

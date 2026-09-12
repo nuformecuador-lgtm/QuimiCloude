@@ -30,14 +30,19 @@ import type { PresentationRepository } from '@/lib/modules/inventario/ports/pres
 
 /** QC-74 (R18): el actor ya no trae nombre de rol, trae su conjunto de permisos. Este
  *  lleva los dos codigos de `inventario`, que es lo que el seed da al Administrador. */
+/** QC-49 (R11): la empresa EN CUYO NOMBRE opera el actor. El caso de uso la convierte en
+ *  `InventoryScope` y se la pasa al puerto; no autoriza nada por si sola. */
+const EMPRESA = 'company-a';
+
 const ADMIN: Actor = {
   id: 'actor-admin',
+  companyId: EMPRESA,
   permissions: ['inventario.consultar', 'inventario.modificar'],
 };
 
 /** QC-74 (R13, R14): actor con el conjunto VACIO. Sustituye al viejo "rol Operador": desde
  *  QC-74 el Operador SI tiene `inventario.consultar`, asi que ya no sirve como caso de rechazo. */
-const SIN_PERMISO: Actor = { id: 'actor-sin-permiso', permissions: [] };
+const SIN_PERMISO: Actor = { id: 'actor-sin-permiso', companyId: EMPRESA, permissions: [] };
 
 /** QC-80: la unidad de la presentacion, uuid de una fila de `units`. Aqui es un doble; que
  *  exista de verdad lo cierra la FK, no este archivo. */
@@ -96,16 +101,18 @@ describe('create-presentation', () => {
     // QC-80 (R11): los tres campos viajan JUNTOS en una unica llamada al puerto. No existe
     // ninguna segunda escritura que anada la unidad despues.
     expect(create).toHaveBeenCalledTimes(1);
-    expect(create).toHaveBeenCalledWith({
-      name: 'Bidon 20 L',
-      nameNormalized: normalizePresentationName('Bidon 20 L'),
-      unitId: UNIDAD,
-    });
-    expect(create).toHaveBeenCalledWith({
-      name: 'Bidon 20 L',
-      nameNormalized: 'bidon20l',
-      unitId: UNIDAD,
-    });
+    expect(create).toHaveBeenCalledWith(
+      {
+        name: 'Bidon 20 L',
+        nameNormalized: normalizePresentationName('Bidon 20 L'),
+        unitId: UNIDAD,
+      },
+      { companyId: EMPRESA },
+    );
+    expect(create).toHaveBeenCalledWith(
+      { name: 'Bidon 20 L', nameNormalized: 'bidon20l', unitId: UNIDAD },
+      { companyId: EMPRESA },
+    );
 
     const updatePresentation = createUpdatePresentation({ presentations });
     await updatePresentation(
@@ -114,11 +121,15 @@ describe('create-presentation', () => {
       ADMIN,
     );
 
-    expect(replace).toHaveBeenCalledWith(PRESENTACION.id, {
-      name: 'Bidon 20 Litros',
-      nameNormalized: normalizePresentationName('Bidon 20 Litros'),
-      unitId: UNIDAD,
-    });
+    expect(replace).toHaveBeenCalledWith(
+      PRESENTACION.id,
+      {
+        name: 'Bidon 20 Litros',
+        nameNormalized: normalizePresentationName('Bidon 20 Litros'),
+        unitId: UNIDAD,
+      },
+      { companyId: EMPRESA },
+    );
   });
 
   it('rechaza el alta SIN unidad antes de llamar al puerto (R10)', async () => {
@@ -232,11 +243,15 @@ describe('update-presentation', () => {
       ADMIN,
     );
 
-    expect(replace).toHaveBeenCalledWith(PRESENTACION.id, {
-      name: PRESENTACION.name,
-      nameNormalized: PRESENTACION.nameNormalized,
-      unitId: OTRA_UNIDAD,
-    });
+    expect(replace).toHaveBeenCalledWith(
+      PRESENTACION.id,
+      {
+        name: PRESENTACION.name,
+        nameNormalized: PRESENTACION.nameNormalized,
+        unitId: OTRA_UNIDAD,
+      },
+      { companyId: EMPRESA },
+    );
     expect(replace.mock.calls[0]?.[1].unitId).not.toBe(PRESENTACION.unitId);
   });
 
@@ -314,7 +329,10 @@ describe('list-presentations', () => {
     expect(resultado).toBe(PAGINA_VACIA);
     // QC-57: lo que llega al puerto es la consulta del contrato generico ya saneada, con sus
     // defectos aplicados -no el `{ page: 1 }` crudo del llamante-.
-    expect(list).toHaveBeenCalledWith({ page: 1, sort: null, filters: {}, search: '' });
+    expect(list).toHaveBeenCalledWith(
+      { page: 1, sort: null, filters: {}, search: '' },
+      { companyId: EMPRESA },
+    );
   });
 
   it('rechaza una consulta con pagina invalida antes de llamar al puerto', async () => {

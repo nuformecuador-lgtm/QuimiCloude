@@ -260,3 +260,127 @@ Una sola cosa:
 
 Y antes del PR, con independencia de M1: **commitear los 24 archivos sueltos** (m1) y volver a
 correr `./init.sh` completo sobre el arbol ya commiteado.
+
+---
+
+# Segunda ronda — 2026-09-10
+
+> El implementer atendio el hallazgo mayor y los cuatro menores. Se revisa **solo el delta**:
+> `git diff ac5106f..HEAD`, mas una relectura de lo que ya estaba aprobado por si el agrandado de
+> `ProductField` —que usan **todos** los campos del panel— hubiera roto algo.
+> Arbol de trabajo **limpio**: `git status --porcelain` sin salida.
+
+## Veredicto de la segunda ronda
+
+**APROBADO.**
+
+El hallazgo mayor esta cerrado de verdad —area tactil real, no un `aria` ni un margen negativo—,
+los cuatro menores tambien, y nada de lo que ya estaba dado por bueno se movio. Gate completo
+corrido por el reviewer: **303 archivos / 3869 tests / 18 skipped / 0 rojos**, exit 0.
+
+## M1 — cerrado, y bien cerrado
+
+Decision humana: **cumplir la regla, no declarar la excepcion**. Es la salida (a) de mi informe, y
+ademas la mas cara de las dos: se arregla tambien `ProductField`, que estaba **exento por alcance**.
+
+| Comprobacion | Resultado |
+|---|---|
+| `presentation-select.tsx:330` | `className={`flex ${TOUCH_TARGET} shrink-0 …`}`, y `TOUCH_TARGET` es `'min-h-11 min-w-11'` (linea 32 del mismo archivo) |
+| `product-field.tsx:82` | lo mismo, con la constante de su propio archivo (linea 10) |
+| Area pulsable REAL | Si. Crece el `<button>`, no un pseudo-elemento: `min-h-11 min-w-11` mas `flex items-center justify-center`. **Ni un margen negativo** en ninguno de los dos, y el icono dibujado sigue en `size-4` centrado |
+| El flex del padre no lo recorta | `shrink-0` en los dos, dentro del `flex items-center gap-1.5` de la etiqueta. Es el detalle que se habria comido los 44 px de ancho en pantalla estrecha |
+| Los tests muerden | Si, y se ve por inspeccion sin necesidad de repetir la mutacion: afirman `toHaveClass('min-h-11')`, `toHaveClass('min-w-11')` **y** `not.toHaveClass('size-6')`. Volver a `size-6` rompe las tres a la vez, en los dos archivos |
+
+Tests nuevos: `tests/unit/inventario/product-field.test.tsx` (archivo nuevo, 2 casos) y el caso «el
+disparador cumple el objetivo tactil minimo» en
+`tests/unit/shared/presentation-select-helper.test.tsx`. Los dos siguen el patron de los otros
+disparadores compartidos del repo, que es lo que pedia el hallazgo. El segundo caso de
+`product-field.test.tsx` —«sin `helper` no hay disparador que medir»— evita el verde vacuo si
+alguien deja de pintar el boton.
+
+**Nada se rompio al agrandar.** Era el riesgo real de esta ronda, porque `ProductField` lo usan los
+seis campos del panel: `product-page.test.tsx` (36 casos que montan la pantalla entera) sigue en
+verde, y la suite completa tambien.
+
+## m2, m3, m4 — cerrados
+
+**m2.** `design.md > 8` reescrito. No se limita a corregir la frase: deja por escrito **por que**
+era falsa —T0 entro fuera del plan y nadie releyo el parrafo— y la leccion operativa («cuando entra
+una task fuera del plan, este parrafo hay que releerlo»). Eso vale mas que la correccion.
+
+**m3 — verifique el razonamiento, que es lo que se me pidio, y es CORRECTO.** El implementer eligio
+mi salida (b) y argumenta que (a) no es honestamente posible. Comprobado en el codigo, no aceptado
+de palabra:
+
+- el puerto es `findAliveIdByName(name): Promise<string | null>`
+  (`lib/modules/inventario/ports/product-repository.ts`);
+- el `deleted_at IS NULL` vive **entero** en el `where` del adaptador
+  (`product-prisma.ts:findAliveIdByName`);
+- luego, desde el caso de uso, «el unico homonimo esta borrado» y «no hay ningun homonimo» son
+  **literalmente el mismo valor**, `null`. Un doble que los distinguiera estaria reimplementando la
+  semantica del adaptador dentro de un test de dominio: afirmaria la premisa, no el comportamiento.
+
+O sea que mi m3 pedia algo que el diseno hace imposible por construccion, y eso **es la respuesta
+correcta al hallazgo**, no una evasion. El `describe` pasa a «R19 — sin id del puerto, el alta crea
+producto nuevo», que es lo que de verdad mide, y el comentario remite por ruta y por nombre de caso
+al test que si prueba R19 contra Postgres. La trazabilidad de R19 no se debilita: sigue cubierta en
+`tests/integration/inventario/product-batch-write.int.test.ts` con homonimos borrados sembrados a
+proposito.
+
+**m4.** Punto y coma alineado en `tests/unit/inventario/module-contract.test.ts`.
+
+**m1.** Todo commiteado: seis commits del implementer (`3470635`, `901f0b6`, `fc4293d`, `2b9f062`,
+`92c2dd5`, `0e04f1a`) y uno del leader (`36a1ba1`) con la ficha del board. Separar ese ultimo es
+correcto: `feature_list.json` es del leader, no del implementer.
+
+## Relectura de lo ya aprobado, sobre HEAD
+
+Se volvio a medir sobre el arbol commiteado, no sobre el que revise la primera vez:
+
+- Coma flotante: siguen siendo **dos** `Number(` en todo el camino, los dos sobre enteros
+  (`product-actions.ts:122`, `product-form.tsx:161`). Ningun `parseFloat`, `toFixed` ni `parseInt`.
+- `requirePermission(actor, 'inventario.modificar')` sigue siendo la primera linea del caso de uso,
+  antes de zod (`create-product.ts:77`).
+- Los dos `catch (error)` del adaptador siguen **fuera** de su `$transaction`
+  (`product-prisma.ts:490/511` y `542/556`).
+- `package.json`, `pnpm-lock.yaml` y `db/` siguen **intactos** contra el merge-base original
+  (`192842a`): cero dependencias, cero migraciones (R29).
+- `feature_list.json` con QC-90/91/92 no rompe la regla del arnes: el gate imprime
+  «regla max-2-por-zona respetada (in_progress=2)».
+
+## Gate de la segunda ronda (corrido por el reviewer)
+
+```
+regla max-2-por-zona respetada (in_progress=2)
+specs presentes para features sdd en vuelo
+ninguna ficha sembrada esperando al board
+cada spec sembrado tiene su ficha, con el mismo slug
+typecheck paso
+lint paso
+
+ Test Files  303 passed (303)
+      Tests  3869 passed | 18 skipped (3887)
+   Duration  278.59s
+
+aviso: 5 archivo(s) del baseline ya pasan; toca limpiarlos: [los cinco de siempre]
+tests: sin rojos nuevos (0 rojos, todos en el baseline de 5); 5 por limpiar
+todas las migraciones tienen down.sql
+== init OK ==
+```
+
+`exit 0`. Coincide con lo que reporta el implementer: 303 archivos y 3869 tests, tres mas que en la
+primera ronda — los tres casos de tamano tactil que M1 hizo escribir.
+
+## Lo que sigue abierto, y no lo cierra esta ficha
+
+No son hallazgos: quedan anotados para el leader, tal como se acordo en la primera ronda.
+
+1. **El E2E de QC-22** cuya premisa derogo QC-75: necesita **ficha propia** que decida que afirma
+   ahora. No enrojece `./init.sh`, que no corre Playwright.
+2. **Los 5 archivos del baseline** que ya pasan en esta rama: limpiarlos es decision del arnes, no
+   de la ficha, y hacerlo desde aqui pondria el gate de `dev` en rojo.
+3. **Las tres preguntas abiertas** del `requirements.md` —moneda del importe, trazabilidad por lote
+   a medias y que pasa con el lote de un producto borrado—, mas el aislamiento por empresa (QC-49)
+   y la carrera del alta de un nombre nuevo (QC-81).
+4. Del checklist de `CHECKPOINTS.md` quedan los dos pasos que **son del leader**: la entrada en
+   `progress/history.md` y desmontar el worktree.

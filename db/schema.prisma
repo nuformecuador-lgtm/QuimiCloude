@@ -209,9 +209,13 @@ model User {
   /// los tres indices unicos funcionales de QC-4.
   accountStatusChangedBy String? @map("account_status_changed_by") @db.Uuid
 
-  documentType DocumentType @relation(fields: [documentTypeCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
-  role         Role         @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  company      Company      @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  documentType          DocumentType           @relation(fields: [documentTypeCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
+  role                  Role                   @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  company               Company                @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  /// QC-79. Lado inverso de `credential_setup_tokens.user_id`. Prisma EXIGE este campo para
+  /// el `@relation` de `CredentialSetupToken`; es virtual y NO anade ninguna columna ni ningun
+  /// indice a `users` (R37).
+  credentialSetupTokens CredentialSetupToken[]
 
   @@unique([id, companyId], map: "users_id_company_id_key")
   @@index([roleId], map: "users_role_id_idx")
@@ -376,6 +380,38 @@ model WorkGroupMember {
   @@map("work_group_members")
 }
 
+/// @module identity
+/// QC-79. Enlace de un solo uso con el que una persona ESTABLECE su contrasena la primera vez.
+/// NO guarda el secreto: guarda su HUELLA (`token_digest`, SHA-256 en hexadecimal). Ver design.md > 4.
+///
+/// OJO — «como maximo UN enlace vivo por persona» (R11) NO esta aqui: es el indice unico
+/// PARCIAL `credential_setup_tokens_one_live_per_user`
+/// (`ON ("user_id") WHERE "consumed_at" IS NULL AND "superseded_at" IS NULL`), y Prisma no
+/// modela indices parciales. Vive escrito A MANO en
+/// `db/migrations/<ts>_credential_setup_tokens/migration.sql` y ese es el unico sitio donde
+/// existe — drift declarado, igual que los tres indices unicos funcionales de QC-4/QC-47.
+/// Quien anada aqui un `@@unique([userId])` lo convierte en TOTAL y mata R11 en silencio.
+///
+/// SIN columna de empresa (R37): no es una tabla de operacion, cuelga 1-a-N de `users` y su
+/// empresa es, por definicion, la del usuario al que apunta. SIN `updated_at`: una fila tiene
+/// exactamente tres transiciones —nace, se consume, se sustituye— y cada una tiene su propia
+/// columna con su instante. Nada se borra fisicamente (R12): consumir y sustituir son UPDATE.
+model CredentialSetupToken {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  tokenDigest  String    @map("token_digest")
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
+  consumedAt   DateTime? @map("consumed_at") @db.Timestamptz(6)
+  supersededAt DateTime? @map("superseded_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([tokenDigest], map: "credential_setup_tokens_token_digest_key")
+  @@index([userId], map: "credential_setup_tokens_user_id_idx")
+  @@map("credential_setup_tokens")
+}
+
 /// Presentacion comercial que clasifica los productos (design.md > 2.1). Catalogo
 /// compartido: una misma presentacion la usan muchos productos, y no se puede borrar
 /// mientras tenga alguno asignado (R14, via ON DELETE RESTRICT).
@@ -416,18 +452,42 @@ model WorkGroupMember {
 /// borra, el esquema sigue validando y el cliente sigue compilando, y no se entera nadie.
 /// El `@@index` de abajo SI lo declara Prisma (R3); no es unico, muchas presentaciones
 /// comparten unidad.
+///
+/// OJO 2 — `companyId` la anade QC-49 (R1): la presentacion es DE LA EMPRESA, sin catalogo
+/// compartido (decision cerrada 3). Es NOT NULL y se aparta a conciencia de `units.companyId`
+/// (QC-76), que es OPCIONAL justo para que existan las unidades DE SISTEMA: aqui no hay
+/// presentaciones de sistema, y una columna opcional significaria «fila que ve todo el mundo».
+/// Es un campo ESCALAR uuid SIN `@relation`, y es DELIBERADO: `Company` es del modulo
+/// `identity` y `Presentation` de `inventario`, asi que con `@relation` el cliente Prisma
+/// ofreceria `include: { company: true }` --una lectura de otro modulo que NINGUNA guardia
+/// detecta, porque no es un import ni un `prisma.company`--. Mismo patron que `unitId`.
+/// CONSECUENCIA QUE HAY QUE SABER: la FK real `presentations_company_id_fkey`
+/// (ON DELETE RESTRICT ON UPDATE CASCADE) vive escrita A MANO en
+/// `db/migrations/20260911130000_inventory_company_scope/migration.sql` y es por tanto DRIFT
+/// para Prisma, igual que `presentations_unit_id_fkey`. Ahi vive tambien el disparador
+/// `presentations_check_unit_scope`, que exige que la unidad sea de la misma empresa o de
+/// sistema (R23) y que Prisma tampoco modela.
+///
+/// OJO 3 — la unicidad del nombre normalizado es POR EMPRESA desde QC-49 (R20): el indice
+/// GLOBAL `presentations_name_normalized_key` de QC-20 CAYO, y dos empresas pueden tener cada
+/// una su «Garrafa 20 L». A diferencia de los cuatro indices parciales de QC-76, este es
+/// compuesto y NO parcial --`companyId` es NOT NULL--, asi que Prisma SI sabe modelarlo y se
+/// declara aqui abajo: no hay drift en este punto y el `P2002` se sigue traduciendo a
+/// `'duplicate'`. Volver a ponerlo sobre `nameNormalized` a secas le quitaria «Garrafa 20 L» a
+/// todas las empresas menos a la primera que la cree, y en silencio.
 /// @module inventario
 model Presentation {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name           String
   nameNormalized String   @map("name_normalized")
   unitId         String   @map("unit_id") @db.Uuid
+  companyId      String   @map("company_id") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   batches ProductBatch[]
 
-  @@unique([nameNormalized], map: "presentations_name_normalized_key")
+  @@unique([companyId, nameNormalized], map: "presentations_company_name_unique")
   @@index([unitId], map: "presentations_unit_id_idx")
   @@map("presentations")
 }
@@ -497,6 +557,24 @@ model Presentation {
 /// `db/migrations/20260904160000_list_query_indexes/migration.sql`:
 /// `products_name_normalized_trgm_idx`, `products_name_idx`, `products_stock_idx`,
 /// `products_qty_alert_idx`, `products_created_at_idx` y `products_updated_at_idx`.
+///
+/// OJO 5 — `companyId` la anade QC-49 (R1): todo producto es DE UNA EMPRESA, NOT NULL. Es un
+/// campo ESCALAR uuid SIN `@relation`, y es DELIBERADO: `Company` es del modulo `identity` y
+/// `Product` de `inventario`, asi que con `@relation` el cliente Prisma ofreceria
+/// `include: { company: true }` --una lectura de otro modulo que NINGUNA guardia detecta,
+/// porque no es un import ni un `prisma.company`--. Mismo patron que `units.company_id`
+/// (QC-76) y que `presentations.unit_id` (QC-80).
+/// CONSECUENCIA QUE HAY QUE SABER: la FK real `products_company_id_fkey`
+/// (ON DELETE RESTRICT ON UPDATE CASCADE) vive escrita A MANO en
+/// `db/migrations/20260911130000_inventory_company_scope/migration.sql` y es por tanto DRIFT
+/// para Prisma. TODA MIGRACION FUTURA DE `products` HAY QUE REVISARLA A MANO: si el drift la
+/// borra, el esquema sigue validando y el cliente sigue compilando, y no se entera nadie.
+/// El `@@index` de abajo SI lo declara Prisma (R10) y NO es parcial a proposito: por el pasa la
+/// verificacion del `RESTRICT`, que tiene que ver tambien los productos con borrado logico.
+/// `products` SIGUE SIN unicidad de nombre (R21): dos productos pueden llamarse igual DENTRO de
+/// la misma empresa, como desde QC-20. Lo que si acota QC-49 es la RESOLUCION por nombre del
+/// alta, que mira solo los vivos de la empresa del actor: eso es filtro del repositorio, no
+/// restriccion del esquema.
 /// @module inventario
 model Product {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -505,12 +583,14 @@ model Product {
   stock          Int?
   qtyAlert       Int?      @map("qty_alert")
   imagePath      String?   @map("image_path")
+  companyId      String    @map("company_id") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   batches ProductBatch[]
 
+  @@index([companyId], map: "products_company_id_idx")
   @@map("products")
 }
 
@@ -555,6 +635,20 @@ model Product {
 ///
 /// `lot` y `expiryDate` son OPCIONALES: no todo lote lleva numero ni fecha de vencimiento.
 /// `expiryDate` es `@db.Date` (fecha sin hora), como `users.birth_date`.
+///
+/// OJO — `companyId` la anade QC-49 (R2) y es COLUMNA PROPIA DEL LOTE, no se deriva por `join`
+/// con su producto (decision cerrada 2): QC-81 necesita la unicidad `(company_id, lot)` y un
+/// indice no puede indexar la columna de otra tabla. NOT NULL. Es un campo ESCALAR uuid SIN
+/// `@relation`, por el mismo motivo que `createdBy`/`updatedBy`: `Company` es de `identity` y
+/// `ProductBatch` de `inventario`, y con `@relation` el cliente ofreceria
+/// `include: { company: true }`, un cruce de modulos que ninguna guardia detecta.
+/// CONSECUENCIA QUE HAY QUE SABER: la FK real `product_batches_company_id_fkey`
+/// (ON DELETE RESTRICT ON UPDATE CASCADE) vive escrita A MANO en
+/// `db/migrations/20260911130000_inventory_company_scope/migration.sql`, junto con las dos de
+/// auditoria, y es DRIFT para Prisma. Ahi vive tambien el disparador
+/// `product_batches_check_company`, que exige que la empresa del lote coincida con la de su
+/// producto Y con la de su presentacion (R22) --lo que ni un CHECK ni una FK pueden decir, y
+/// que Prisma tampoco modela--. El `@@index` de abajo SI lo declara Prisma (R10).
 /// @module inventario
 model ProductBatch {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -564,6 +658,7 @@ model ProductBatch {
   unitCost       Decimal   @map("unit_cost") @db.Decimal(14, 4)
   lot            String?   @map("lot")
   expiryDate     DateTime? @map("expiry_date") @db.Date
+  companyId      String    @map("company_id") @db.Uuid
   createdBy      String?   @map("created_by") @db.Uuid
   updatedBy      String?   @map("updated_by") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -572,6 +667,7 @@ model ProductBatch {
   product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   presentation Presentation @relation(fields: [presentationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
+  @@index([companyId], map: "product_batches_company_id_idx")
   @@index([productId], map: "product_batches_product_id_idx")
   @@index([presentationId], map: "product_batches_presentation_id_idx")
   @@index([createdBy], map: "product_batches_created_by_idx")

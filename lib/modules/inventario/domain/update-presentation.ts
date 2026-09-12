@@ -28,6 +28,11 @@ export type UpdatePresentationDeps = {
  * QC-80 (R12, R13): la edicion sigue siendo REEMPLAZO COMPLETO y ahora reemplaza tambien la
  * unidad -si se envio otra, la anterior no se conserva-. `'invalid_unit'` se traduce a
  * `ValidationError` (`invalid_input`), distinguible del duplicado y del «en uso» del borrado.
+ *
+ * QC-49 (R16): el ambito viaja al puerto y entra en el `where` del `UPDATE`. Una presentacion
+ * de OTRA empresa vuelve como `'not_found'` -el mismo camino que «no existe»- y se traduce a
+ * `PresentationNotFoundError`, nunca a un error de autorizacion; no se modifica ninguna fila.
+ * La empresa nunca se reescribe: no viaja en `PresentationData` (R17).
  */
 export function createUpdatePresentation(
   deps: UpdatePresentationDeps,
@@ -43,11 +48,15 @@ export function createUpdatePresentation(
     if (!parsed.success) throw new ValidationError();
 
     const nameNormalized = normalizePresentationName(parsed.data.name);
-    const result = await deps.presentations.replace(id, {
-      name: parsed.data.name,
-      nameNormalized,
-      unitId: parsed.data.unitId,
-    });
+    const result = await deps.presentations.replace(
+      id,
+      {
+        name: parsed.data.name,
+        nameNormalized,
+        unitId: parsed.data.unitId,
+      },
+      { companyId: actor.companyId },
+    );
 
     if (result === 'not_found') throw new PresentationNotFoundError();
     if (result === 'duplicate') throw new PresentationDuplicateNameError();

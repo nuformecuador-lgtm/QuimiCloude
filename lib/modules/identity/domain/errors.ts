@@ -200,6 +200,28 @@ export class ValidationError extends IdentityError {
   }
 }
 
+/**
+ * QC-79 (R22): el secreto recibido no sirve. **Los seis casos comparten esta clase y este `code` a
+ * proposito** (`design.md > 4.8`): el enlace no corresponde a ninguna fila, ha CADUCADO, ya fue
+ * CONSUMIDO, lo SUSTITUYO un reenvio, la cuenta a la que apunta esta BORRADA, o la cuenta ya no
+ * esta en `pending`. Distinguirlos convertiria el enlace en un ORACULO: probando secretos se
+ * sabria si existen y, sabiendo uno viejo, si la cuenta ya se activo.
+ *
+ * Mismo criterio con el que `UserNotFoundError` cubre sus cuatro casos, y la razon de que ese
+ * codigo NO se reutilice aqui: este caso no habla de un usuario, habla de un ENLACE, y QC-70 R4
+ * prohibe dos codigos con el mismo texto tanto como un codigo con dos significados.
+ *
+ * El `diagnostic` —que va al registro del servidor y NO al navegador (QC-70 R28, R29)— nunca debe
+ * llevar el secreto ni su huella (R13).
+ */
+export class CredentialLinkInvalidError extends IdentityError {
+  readonly code = 'credential_link_invalid';
+
+  constructor(diagnostic?: string) {
+    super('credential_link_invalid', diagnostic);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // QC-84 — Los grupos de trabajo (`design.md > 7.1`). Siete clases NUEVAS al final del archivo:
 // ninguna de las diez de arriba se toca, ni su `code` ni su texto.
@@ -237,6 +259,27 @@ export class WorkGroupNotFoundError extends IdentityError {
 
   constructor(diagnostic?: string) {
     super('work_group_not_found', diagnostic);
+  }
+}
+
+/**
+ * QC-79 (R15): el reenvio del enlace apunta a un usuario que existe, esta vivo y es de la empresa
+ * del actor, pero **ya no esta en `pending`** —activo, inactivo o bloqueado—.
+ *
+ * SI se distingue de `UserNotFoundError`, y a proposito (`design.md > 5.4`): quien reenvia trae
+ * `usuarios.modificar` y ya ve el estado de cuenta de esa persona en el listado de QC-66, asi que
+ * el codigo no le revela nada nuevo; a cambio permite a QC-67 decir «esta cuenta ya esta activa»
+ * en vez de mentir. Mismo razonamiento con el que QC-66 separo `self_operation`.
+ *
+ * Ojo: esto NO contradice la respuesta unica de R22. Alli no hay actor ni permiso —cualquiera con
+ * el enlace puede llamar—, y por eso «ya no esta en pending» se responde con
+ * `CredentialLinkInvalidError`. Aqui el llamante ya esta autorizado a ver ese estado.
+ */
+export class UserNotPendingError extends IdentityError {
+  readonly code = 'user_not_pending';
+
+  constructor(diagnostic?: string) {
+    super('user_not_pending', diagnostic);
   }
 }
 

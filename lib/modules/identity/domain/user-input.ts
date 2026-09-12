@@ -83,6 +83,30 @@ export const createUserSchema = z.strictObject({
   username: trimmed(USER_USERNAME_MAX_LENGTH),
   /** R18: si el rol no existe, quien lo rechaza es el puerto con `role_not_found`. */
   roleId: z.string().uuid(),
+  /**
+   * **QC-79 R1 — el UNICO campo nuevo del alta, y es OPCIONAL.** Esto ENMIENDA la linea de arriba
+   * que decia «**cualquier** campo de contrasena» por QC-66 R15: la contrasena ya no la genera el
+   * sistema al azar. Si el administrador la escribe, se evalua contra la politica de QC-19 y se
+   * guarda como hash de QC-5 (R2, R3); si no la escribe, **no se genera ninguna** (R4) y el acceso
+   * lo da el enlace por correo (R7).
+   *
+   * Lo que NO cambia: `password`, `passwordHash`, `newPassword` y cualquier otro nombre siguen
+   * siendo claves desconocidas y `strictObject` los sigue RECHAZANDO, igual que `companyId`,
+   * `accountStatus`, `mustChangeCredential` y los tres contadores. El campo nuevo es este y ninguno
+   * mas.
+   *
+   * **Sin `trim()` y sin `max()`, a proposito** (`design.md > 5.2`): QC-19 R10 prohibe recortar o
+   * normalizar la candidata -un espacio al final es parte de la contrasena- y el maximo lo pone la
+   * propia politica (`max_length`, QC-19 R11), no un segundo numero escrito aqui que podria
+   * divergir de ella. El nombre dice `credential` y no `password` por
+   * `guard-password-never-plaintext`: se adapta el nombre, no la guardia.
+   *
+   * **La cadena vacia NO se contempla aqui, y tampoco es un olvido**: `min(1)` la rechaza, y quien
+   * la convierte en «ausente» -que es lo que R1 exige: ausencia y cadena vacia son lo MISMO- es
+   * `create-user.ts`, en UN solo sitio y antes de este esquema. Meter aqui un `transform` seria el
+   * segundo sitio.
+   */
+  credential: z.string().min(1).optional(),
 });
 
 /**
@@ -93,8 +117,16 @@ export const createUserSchema = z.strictObject({
  *
  * Y **no admite** empresa, contrasena, estado de cuenta, marca de cambio de credencial ni ningun
  * contador de acceso (R20): no porque se ignoren, sino porque `strictObject` los RECHAZA.
+ *
+ * **QC-79: el `omit` del campo nuevo es el requisito, no una simplificacion.** `design.md > 5.2`
+ * dice que `credential` entra «dentro del `strictObject` existente», y ahi ese diseno no se
+ * sostiene literalmente: hasta hoy este esquema ERA el del alta, asi que meter el campo dentro sin
+ * mas haria que **la EDICION admitiera una contrasena**, y **QC-66 R20 lo prohibe expresamente**.
+ * El campo nuevo es **solo del alta** (QC-79 R1), asi que la edicion lo quita explicitamente. Lo
+ * demas se conserva entero: sigue siendo el MISMO objeto que el alta -reemplazo completo de los
+ * nueve campos, no un `partial()`- y el test que recorre los dos esquemas a la vez sigue en pie.
  */
-export const updateUserSchema = createUserSchema;
+export const updateUserSchema = createUserSchema.omit({ credential: true });
 
 /**
  * Mover el estado de cuenta (`design.md > 6.2`). El conjunto cerrado se **importa** de QC-65:

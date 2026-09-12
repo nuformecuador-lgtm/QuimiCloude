@@ -154,6 +154,23 @@ async function unidadDeSistema(db: Prisma.TransactionClient): Promise<string> {
 }
 
 /**
+ * Empresa del ANDAMIAJE (QC-49 R1).
+ *
+ * Las tres tablas de inventario ganaron `company_id` NOT NULL en
+ * `<ts>_inventory_company_scope`, asi que sembrar un producto o una presentacion exige una
+ * empresa. Se REUTILIZA una que ya existe en la base -`db:seed` deja la de instalacion- por el
+ * mismo motivo por el que `unidadDeSistema` resuelve `kilogramo` por su nombre normalizado: no
+ * se escribe ningun uuid a mano y no se deja residuo.
+ *
+ * Aqui la empresa es ANDAMIAJE y nada mas: ningun caso de este archivo afirma nada sobre ella.
+ * El aislamiento por empresa lo prueba `company-scope.int.test.ts` (QC-49 T11).
+ */
+async function empresaDeAndamiaje(db: Prisma.TransactionClient): Promise<string> {
+  const company = await db.company.findFirstOrThrow({ select: { id: true } })
+  return company.id
+}
+
+/**
  * Crea una unidad REAL dentro de la transaccion del test y devuelve su identificador.
  *
  * 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Donde estos tests
@@ -198,13 +215,20 @@ type ProductColumn = 'name' | 'stock' | 'qty_alert'
  * NOT NULL sin DEFAULT (lo rellena el cliente Prisma via `@updatedAt`, no la base).
  * `name_normalized` se da siempre por lo mismo (QC-57): es NOT NULL y sin DEFAULT.
  */
-function rawInsertProduct(
+async function rawInsertProduct(
   tx: Prisma.TransactionClient,
   columns: Partial<Record<ProductColumn, Prisma.Sql>>,
 ): Promise<number> {
   const entries = Object.entries(columns) as [ProductColumn, Prisma.Sql][]
   const names = entries.map(([name]) => Prisma.raw(`"${name}"`))
   const values = entries.map(([, value]) => value)
+
+  // QC-49 (R1): `company_id` es NOT NULL sin DEFAULT, asi que va SIEMPRE, por el mismo motivo
+  // que `name_normalized`: sin ella cualquier rechazo que un caso busque -el CHECK del stock
+  // negativo, el 23502 del nombre- llegaria antes como 23502 sobre ESTA columna y el caso
+  // dejaria de probar lo que dice probar.
+  names.push(Prisma.raw('"company_id"'))
+  values.push(Prisma.sql`CAST(${await empresaDeAndamiaje(tx)} AS uuid)`)
 
   // `name_normalized` (QC-57) es NOT NULL sin DEFAULT: va SIEMPRE, como `updated_at`, o
   // cualquier rechazo que este helper busque llegaria antes como 23502 sobre ESTA columna y
@@ -274,6 +298,7 @@ describe('estructura de la presentacion', () => {
           name: 'Bidon 20 L',
           nameNormalized: normalizeForTest('Bidon 20 L'),
           unitId: await unidadDeSistema(tx),
+          companyId: await empresaDeAndamiaje(tx),
         },
       })
       // R1: identificador propio, estable y no derivado de los datos de negocio.
@@ -328,6 +353,7 @@ describe('estructura del producto', () => {
           nameNormalized: normalizeForTest('Acido citrico monohidratado'),
           stock: 120,
           qtyAlert: 20,
+          companyId: await empresaDeAndamiaje(tx),
         },
         select: { id: true },
       })
@@ -373,7 +399,11 @@ describe('estructura del producto', () => {
   it('acepta un producto sin existencia ni cantidad de alerta, y los devuelve como ausencia de valor, y ya no tiene donde declarar unidad (R21)', async () => {
     await inRolledBackTransaction(async (tx) => {
       const { id } = await tx.product.create({
-        data: { name: 'Ficha recien abierta', nameNormalized: normalizeForTest('Ficha recien abierta') },
+        data: {
+          name: 'Ficha recien abierta',
+          nameNormalized: normalizeForTest('Ficha recien abierta'),
+          companyId: await empresaDeAndamiaje(tx),
+        },
         select: { id: true },
       })
 
@@ -469,7 +499,13 @@ describe('estructura del producto', () => {
       // El CHECK rechaza el negativo, no el cero ni el valor ausente: R5 y R6 conviven
       // con R9 porque en SQL un CHECK que evalua a NULL se cumple.
       const { id } = await tx.product.create({
-        data: { name: 'Ceros y nulos', nameNormalized: normalizeForTest('Ceros y nulos'), stock: 0, qtyAlert: 0 },
+        data: {
+          name: 'Ceros y nulos',
+          nameNormalized: normalizeForTest('Ceros y nulos'),
+          stock: 0,
+          qtyAlert: 0,
+          companyId: await empresaDeAndamiaje(tx),
+        },
         select: { id: true },
       })
       const zeroed = await tx.product.findUniqueOrThrow({ where: { id } })
@@ -522,7 +558,12 @@ describe('estructura del producto', () => {
         // presentacion del bucle chocaria con 23505 y el caso moriria por donde no mira.
         const name = `Presentacion ${String(indice)} en ${symbol ?? 'unidad sin simbolo'}`
         const { id } = await tx.presentation.create({
-          data: { name, nameNormalized: normalizeForTest(name), unitId },
+          data: {
+            name,
+            nameNormalized: normalizeForTest(name),
+            unitId,
+            companyId: await empresaDeAndamiaje(tx),
+          },
           select: { id: true },
         })
         ids.push(id)
@@ -566,7 +607,12 @@ describe('estructura del producto', () => {
       const libre = await createUnit(tx)
       const nombre = `Bolsa marcada ${marcador}`
       const { id: presentationId } = await tx.presentation.create({
-        data: { name: nombre, nameNormalized: normalizeForTest(nombre), unitId: enUso },
+        data: {
+          name: nombre,
+          nameNormalized: normalizeForTest(nombre),
+          unitId: enUso,
+          companyId: await empresaDeAndamiaje(tx),
+        },
         select: { id: true },
       })
 
@@ -603,6 +649,7 @@ describe('estructura del producto', () => {
           nameNormalized: normalizeForTest('Producto vigilado'),
           stock: 3,
           qtyAlert: 50,
+          companyId: await empresaDeAndamiaje(tx),
         },
         select: { id: true },
       })
@@ -633,17 +680,29 @@ describe('nombre del producto', () => {
       // Exactamente el mismo texto: sin indice unico, ni total ni parcial (R16). Se
       // aparta a proposito del precedente de `users`, donde esto seria 23505.
       const { id: first } = await tx.product.create({
-        data: { name: 'Sosa caustica', nameNormalized: normalizeForTest('Sosa caustica') },
+        data: {
+          name: 'Sosa caustica',
+          nameNormalized: normalizeForTest('Sosa caustica'),
+          companyId: await empresaDeAndamiaje(tx),
+        },
         select: { id: true },
       })
       const { id: second } = await tx.product.create({
-        data: { name: 'Sosa caustica', nameNormalized: normalizeForTest('Sosa caustica') },
+        data: {
+          name: 'Sosa caustica',
+          nameNormalized: normalizeForTest('Sosa caustica'),
+          companyId: await empresaDeAndamiaje(tx),
+        },
         select: { id: true },
       })
       // Y solo cambiando las mayusculas: tampoco hay indice unico funcional sobre
       // `lower(name)`, al reves que en `users`.
       const { id: third } = await tx.product.create({
-        data: { name: 'SOSA CAUSTICA', nameNormalized: normalizeForTest('SOSA CAUSTICA') },
+        data: {
+          name: 'SOSA CAUSTICA',
+          nameNormalized: normalizeForTest('SOSA CAUSTICA'),
+          companyId: await empresaDeAndamiaje(tx),
+        },
         select: { id: true },
       })
 
@@ -672,6 +731,7 @@ describe('borrado logico y marcas de tiempo', () => {
           nameNormalized: normalizeForTest('Producto que se retira'),
           stock: 9,
           qtyAlert: 1,
+          companyId: await empresaDeAndamiaje(tx),
         },
         select: { id: true },
       })
@@ -699,13 +759,18 @@ describe('borrado logico y marcas de tiempo', () => {
           name: 'Caneca 5 L',
           nameNormalized: normalizeForTest('Caneca 5 L'),
           unitId: await unidadDeSistema(tx),
+          companyId: await empresaDeAndamiaje(tx),
         },
       })
       expect(presentation.createdAt).toBeInstanceOf(Date)
       expect(presentation.updatedAt).toBeInstanceOf(Date)
 
       const created = await tx.product.create({
-        data: { name: 'Producto con marcas', nameNormalized: normalizeForTest('Producto con marcas') },
+        data: {
+          name: 'Producto con marcas',
+          nameNormalized: normalizeForTest('Producto con marcas'),
+          companyId: await empresaDeAndamiaje(tx),
+        },
       })
       expect(created.createdAt).toBeInstanceOf(Date)
       expect(created.updatedAt).toBeInstanceOf(Date)
@@ -745,6 +810,9 @@ describe('QC-52 — censo de products tras la migracion', () => {
   /** Columnas exactas que `products` debe tener tras las migraciones (R1, R2, R4 y la
    * mudanza a `product_batches` del 2026-09-09). */
   const COLUMNAS_ESPERADAS = [
+    // QC-49 (R1): `company_id`, NOT NULL con FK a `companies`. Todo producto es de UNA empresa.
+    // La lista es una igualdad exacta, asi que es ella quien vigila que no desaparezca.
+    'company_id',
     'created_at',
     'deleted_at',
     'id',
@@ -796,19 +864,21 @@ describe('QC-52 — censo de products tras la migracion', () => {
     expect(row?.column_default).toBeNull()
   })
 
-  it('ya no le queda ninguna clave foranea: la ultima, la de la unidad, se fue con QC-80 (R7)', async () => {
-    // ACTUALIZADO EL 2026-09-11 POR QC-80 (R7). ANTES este caso afirmaba que `products`
-    // conservaba EXACTAMENTE una FK, `products_unit_id_fkey` -> `units`. La migracion de esta
-    // ficha la elimina junto con la columna, asi que la afirmacion no se borra: se INVIERTE y
-    // sigue siendo una igualdad exacta. La presentacion y la autoria ya se habian mudado a
-    // `product_batches` el 2026-09-09. Si una FK volviera a `products` por cualquier via --un
-    // drift del modelo, una migracion futura--, esto lo dice.
+  it('su unica clave foranea es la de la empresa, y ninguna mas', async () => {
+    // ACTUALIZADO EL 2026-09-11 POR QC-49 (R1). ANTES este caso afirmaba que `products` no
+    // conservaba NINGUNA FK -QC-80 se llevo la ultima, la de la unidad, con su columna-. La
+    // migracion de esta ficha le da una nueva, `products_company_id_fkey` -> `companies`, asi
+    // que la afirmacion no se borra ni se afloja: sigue siendo una IGUALDAD EXACTA y ahora
+    // nombra la que tiene que haber. Si apareciera una segunda por cualquier via --un drift del
+    // modelo, una migracion futura--, esto lo dice igual.
     const rows = await prisma.$queryRaw<{ conname: string; confrelid: string }[]>`
       SELECT c.conname, c.confrelid::regclass::text AS confrelid
       FROM pg_constraint c
       WHERE c.conrelid = 'public.products'::regclass AND c.contype = 'f'
       ORDER BY c.conname`
-    expect(rows.map((row) => [row.conname, row.confrelid])).toEqual([])
+    expect(rows.map((row) => [row.conname, row.confrelid])).toEqual([
+      ['products_company_id_fkey', 'companies'],
+    ])
 
     // Ancla: la consulta SI ve las FK de esta base. Sin esto, un error de escritura en el
     // `regclass` devolveria vacio y el caso seria un placebo.

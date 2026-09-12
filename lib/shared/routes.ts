@@ -147,6 +147,35 @@ export const UNITS_ROUTE = '/configuracion/unidades';
  */
 export const USERS_ROUTE = '/configuracion/usuarios';
 
+/**
+ * Pagina PUBLICA donde una persona establece su contrasena la primera vez, a la que se llega
+ * desde el enlace del correo (QC-79, R17).
+ *
+ * **No entra en `PRIVATE_ROUTE_PREFIXES`, y es a proposito** (`design.md > 5.1`): se sirve **sin
+ * sesion**, y la regla 1 de `route-access.ts` deja pasar sin redirigir todo lo que no es privado
+ * ni el login, asi que el middleware **no se toca**. Meterla en la lista de prefijos privados
+ * mandaria al login a la unica persona que todavia no puede entrar.
+ *
+ * Vive aqui, como `LOGIN_ROUTE`, porque la escriben tres sitios que no se conocen entre si —la
+ * pagina, y los **dos** transportes de correo que arman la URL del enlace— y ninguno de ellos
+ * debe incrustar la URL como literal. Antes de T19 era una constante local duplicada en los tres.
+ */
+export const CREDENTIAL_SETUP_ROUTE = '/establecer-contrasena';
+
+/**
+ * Camino de la pagina de arriba **con el secreto del enlace en el CAMINO**, nunca en la cadena de
+ * consulta (QC-79, `design.md > 4.4`): en el camino no acaba como un parametro mas en los
+ * registros de acceso de los intermediarios, y el secreto va en base64url, que no necesita
+ * escapado.
+ *
+ * Mismo patron que `recipeEditRoute` y `supplierDetailRoute`: ningun archivo de producto compone
+ * esta URL a mano. Devuelve un camino **relativo**; quien necesite la URL absoluta —el correo— le
+ * antepone la base que le da su configuracion (R28).
+ */
+export function credentialSetupRoute(secret: string): string {
+  return `${CREDENTIAL_SETUP_ROUTE}/${secret}`;
+}
+
 /** Ruta aun inexistente (S6): hoy devuelve 404 y el slug definitivo esta sin confirmar. */
 export const FORGOT_PASSWORD_ROUTE = '/recuperar-contrasena';
 
