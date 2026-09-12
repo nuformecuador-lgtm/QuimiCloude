@@ -31,6 +31,38 @@
 // reescribir a mano un valor que la base ya pone bien. Lo que NO esta exento, y es el caso que esta
 // guardia vino a vigilar, es el `UPDATE`.
 //
+// LO QUE VE Y LO QUE NO, dicho aqui antes de que nadie se apoye en ello. Esta guardia juzga el
+// TEXTO del archivo, no su semantica, y despues de esta ficha su cabecera es el documento donde
+// QC-89 y QC-96 van a leer hasta donde estan cubiertas. Asi que el limite se escribe, no se supone.
+//
+// SE DETECTA: el `data: { passwordHash: ... }` en linea, que es la forma que toma el descuido real;
+// el `const data = { ... }` extraido a una variable antes de pasarlo, que cae por el camino de
+// fallo cerrado (un verbo de escritura que no se reconoce cuenta como violacion); y el
+// `UPDATE "users"` en SQL crudo que toca `password_hash` sin tocar `sessions_valid_from`.
+//
+// NO SE DETECTA: un objeto construido por un helper y devuelto con `return`. Esto queda verde:
+//
+//     function construir(hash: string) { return { passwordHash: hash, updatedAt: new Date() } }
+//     await tx.user.update({ where: { id }, data: construir(hash) })
+//
+// `payloadKeyOf` mira de que clave cuelga el objeto literal: ahi cuelga de un `return` y no de
+// `data:`, y se salta. NO ESTA CERRADO, Y ES UNA ELECCION, no un olvido:
+// `user-credentials-prisma.ts` tiene un `return { passwordHash: fila.password_hash }` que MAPEA una
+// fila LEIDA, y marcar todo `return { passwordHash ... }` convertiria esa lectura legitima en un
+// rojo permanente. Se eligio el lado de no molestar sabiendo lo que quedaba fuera: esquivarla exige
+// una construccion de dos saltos que nadie escribe por descuido, y hoy no existe en el repositorio.
+//
+// LA SALIDA, para quien quiera cerrarlo: marcar `return { passwordHash ... }` SOLO en archivos que
+// ademas contengan un verbo de escritura de Prisma. El mapeo de lectura no tiene ninguno, asi que
+// queda fuera solo, sin una excepcion por nombre de archivo.
+//
+// LA TERCERA FRONTERA, medida y deliberadamente NO implementada. `app/` y `components/` quedan
+// fuera de `WATCHED_ROOTS` apoyandose en que `guard-arquitectura-modulos` les prohibe tocar Prisma:
+// es una prohibicion vigilada y no un habito de nombres, pero sigue siendo una dependencia de otra
+// guardia. Anadirlas son 206 archivos mas, CERO menciones de `passwordHash` o `password_hash` en
+// los dos arboles a dia de hoy -o sea cero falsos positivos garantizados- y unos +45 ms. Es la
+// mejora obvia para quien toque esta guardia despues, por ejemplo QC-89.
+//
 // Cada regla se autocomprueba sobre fuentes SINTETICOS que la violan y sobre fuentes que la
 // cumplen: un `toEqual([])` sobre un directorio que ya cumple no demuestra que la guardia funcione.
 

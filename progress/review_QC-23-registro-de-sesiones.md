@@ -239,3 +239,204 @@ lado cerrado: se lanza `UserNotFoundError` y **no se reemite** ninguna cookie.
   con clave `userId` mas `sid`, el dominio lo consume por el puerto y el decorador no obliga a tocar
   `resolve-session.ts`. La condicion de R19 —poder fallar abierta **hacia la base**, nunca hacia
   valida— esta escrita y tiene test.
+
+---
+
+# Segunda ronda — 2026-09-12 · commit `90f88f1`
+
+> Delta revisado: `git diff b450212..HEAD`, un solo commit, arbol limpio. Mas relectura de lo ya
+> aprobado por si el ensanchado de la guardia rompio algo. La primera ronda queda arriba intacta.
+
+## Veredicto de la segunda ronda
+
+**APROBADO.**
+
+**El mayor 1 esta cerrado, y cerrado mejor de lo que yo propuse.** Los siete menores estan
+atendidos, los siete de verdad y no de palabra: los verifique uno a uno en disco. Aparece **un menor
+nuevo** (menor 8), que no bloquea: es una limitacion de DETECCION preexistente —no de ambito, no la
+introdujo este commit— que hoy no esta declarada en la cabecera de la guardia.
+
+## El mayor 1: cerrado, y verificado por mutacion en cuatro sitios
+
+El ambito paso de `adapters/driven/persistence/` a **`lib/` y `scripts/` enteros**
+(`WATCHED_ROOTS`), con filtro de extension y `IGNORED_DIRS`. **Avalo la decision de NO ampliarlo a**
+**`adapters/driven/`**, que era lo que yo propuse: el argumento del implementer es mejor que mi
+propuesta. Una guardia que se ata a `adapters/driven/` esta apoyandose en una **convencion de nombres**
+que nadie vigila, y la promesa vuelve a depender de que alguien amplie una constante. Con `lib/` +
+`scripts/` la afirmacion se comprueba sola. Corregi mi propio hallazgo en ese punto.
+
+Y **la cabecera que afirmaba sin comprobar se elimino**, que era la mitad del problema.
+
+Lo probe yo, en disco, cuatro veces:
+
+| Mutacion | Donde | Resultado |
+| --- | --- | --- |
+| `prisma.user.update({ data: { passwordHash } })` | `lib/modules/identity/adapters/driven/credenciales/reset-prisma.ts` — **la ruta exacta de la evasion de la primera ronda** | **ROJO**, con la ruta completa, `form: data` y `operation: update`. 16 pasan, 1 cae |
+| `tx.user.updateMany({ data: { passwordHash } })` en un `.mts` | `lib/utilidades/muy/profundo/zz.mts` — **subdirectorio nuevo, profundo y fuera de `identity`** | **ROJO** |
+| `$executeRaw` con `UPDATE "users" SET "password_hash"` en un `.mjs` | `scripts/zz-reset.mjs` | **ROJO**. La segunda raiz no es decorativa |
+| Arbol limpio | — | **17/17 verdes** |
+
+Las tres mutaciones salieron rojas **en la misma corrida**, o sea que la guardia no se para en el
+primer hallazgo. Con el ambito viejo, las tres pasaban en verde.
+
+### Los `IGNORED_DIRS` no abren ningun agujero
+
+La pregunta correcta no es si la lista es razonable, sino si **hoy** salta algo real. Censo del arbol:
+
+```
+find lib scripts -type d \( -name node_modules -o -name dist -o -name build -o -name coverage \) -> VACIO
+```
+
+Ninguna de las seis carpetas ignoradas existe bajo `lib/` ni bajo `scripts/`, asi que **no se esta
+saltando ni un archivo real**. 66 directorios recorridos; 277 `.ts` + 3 `.mjs` leidos, y lo unico que
+queda fuera por extension son 7 `.gitkeep` y 1 `.sh` —ninguno puede hablar con Prisma—. La cifra
+coincide con el «~280 archivos» que declara la cabecera.
+
+El riesgo residual es teorico: alguien que llame `build/` a un directorio de fuentes dentro de `lib/`.
+Seria ademas una violacion de convencion por si misma, y no lo cuento como hallazgo.
+
+### Falsos positivos: cero, y por el motivo correcto
+
+El arbol real da **17/17 verdes**, luego cero falsos positivos. Comprobe **por que** no se marcan las
+menciones legitimas del hash que el ambito nuevo ahora si alcanza, en vez de darlo por bueno:
+
+- `domain/seed-initial-access.ts:166` — el objeto cuelga de `repository.createInitialAdmin({...})`,
+  una llamada a PUERTO. `payloadKeyOf` devuelve vacio, no es `data`/`update`/`create`, y no se marca.
+  Correcto: no es una escritura de Prisma. La escritura real esta en
+  `initial-access-repository-prisma.ts:142`, es un `create` y esta exenta a proposito.
+- `ports/initial-access-repository.ts` y `ports/user-credentials-reader.ts` — son **tipos**.
+- `user-credentials-prisma.ts:95` — `return { passwordHash: fila.password_hash }`, mapeo de LECTURA.
+
+Y los casos «NO marca» siguen protegiendo lo suyo: verifique que siguen en el archivo y verdes los de
+creacion (`create`, `createMany`, la rama `create:` de un `upsert`), el de mapeo de lectura, el de
+comentarios y el de `INSERT INTO "users"`. Ninguno se relajo para hacer sitio al ambito nuevo.
+
+### El coste: menor de lo declarado, y da igual
+
+Medi tres corridas de la version nueva y dos de la vieja (`git show b450212:` en un archivo aparte).
+El numero «402 ms -> 453 ms» de la bitacora es **ruido de arranque**: el `Duration` total oscila entre
+422 y 664 ms en la version NUEVA y entre 502 y 611 ms en la VIEJA, o sea que se solapan.
+
+El numero que si mide algo es el componente `tests`, que aisla la ejecucion del arranque de vitest:
+**16-17 ms antes, 73-92 ms ahora**. O sea **unos +65 ms reales** por leer 280 archivos en vez de 8.
+La tanda entera de guardias: **27 archivos, 299 casos, 4,1 s**. Aceptable sin discusion para una
+guardia que corre en cada gate — y barato para lo que compra. La cifra de la bitacora esta mal, pero
+mal **en contra** de la ficha: el coste real es menor que el declarado. No lo cuento como hallazgo.
+
+### La desviacion del arbol sintetico en un temporal: **cierta y bien resuelta**
+
+El caso `el recorrido entra en un subdirectorio hermano RECIEN NACIDO` construye su arbol con
+`mkdtempSync` en el temporal del sistema, no dentro de `lib/`. El motivo declarado es real y lo
+confirme: `test:guardias` corre en paralelo y **17 guardias mas leen `lib/` del disco**, asi que un
+archivo de usar y tirar ahi produce rojos ajenos y aleatorios. Lo vi de primera mano en la primera
+ronda, cuando mi propio archivo de prueba en `tests/integration/` hizo caer el `lint` del gate.
+
+La pregunta que importa es la que pide el coordinador: **¿el caso sintetico prueba solo su propio
+temporal?** No. La cobertura del ambito REAL la anclan los otros dos casos, y los dos muerden sobre
+rutas de verdad:
+
+- `la ruta EXACTA con la que se esquivo la guardia cae dentro del ambito` usa `isWatched()` sobre
+  rutas construidas desde `repoRoot`, incluida la ruta literal de mi evasion. Si alguien encoge
+  `WATCHED_ROOTS`, este caso cae **antes de que el archivo exista**.
+- `sobre el arbol REAL, la lista leida desborda persistence por los cuatro costados` opera sobre
+  `files`, que **es el recorrido de verdad** (`listWatchedFiles()`), y exige que aparezcan
+  `observability/` —el directorio HERMANO, que es el caso de la evasion—, `lib/composition/` y
+  `scripts/`, mas de 100 archivos fuera de `persistence/`.
+
+O sea: el reparto es correcto. El sintetico prueba el **mecanismo** del recorrido —recursion,
+directorio recien nacido, filtro de extension, salto de `node_modules`—, que es justo lo que no se
+puede probar sin ensuciar el arbol; y el ambito real lo prueban los otros dos sobre rutas reales.
+Mi propia mutacion en `lib/utilidades/muy/profundo/zz.mts` cierra el circulo de extremo a extremo.
+
+**Un apunte, no un hallazgo:** `isWatched()` y `listSourceFiles()` son dos implementaciones del
+mismo predicado. Comparten las tres constantes, asi que hoy no pueden divergir en lo que importa, y
+el tercer caso ancla el recorrido real. Vale la pena saber que estan las dos.
+
+## Los siete menores, uno a uno
+
+| # | Estado | Comprobado en disco |
+| --- | --- | --- |
+| 1 | **Atendido** | `tasks.md:203` ahora es `[x]`, y ademas pega el resultado real del gate dentro de la task. 24/24 |
+| 2 | **Atendido** | El mapa manda R26 al caso que afirma `revokeSession` NO invocado, que es el que de verdad prueba que el cierre es total. Ya no apunta al test de R51 |
+| 3 | **Atendido** | R7, R39, R44 y R45 citan ahora titulos literales de disco. Los busque uno a uno: los cuatro encajan. R7 y R39 ganan ademas un segundo test cada uno |
+| 4 | **Atendido, y bien** | La tabla de `design.md § 4` dice **4 hoy, 5 con QC-23**, que es exactamente lo que yo medi. La nota explica que el delta (+1) no cambia y por que se corrige el absoluto: es el numero que QC-28 leera. Confirmo el numero |
+| 5 | **Atendido, con test que muerde** | `end-other-sessions.ts:122` usa `actor.companyId` en las dos. Lo mute de vuelta a `current.companyId` y el caso nuevo `la empresa con la que se SELLA y con la que se REEMITE es UNA` **se pone rojo**. Hace divergir los valores a proposito, que es la unica forma de anclar la eleccion |
+| 6 | **Atendido** | `ports/session-check-log.ts:10-19` lee corrido; la aclaracion sobre la guardia paso al final del parrafo. El fondo no se toco |
+| 7 | **Atendido, y mejor de lo pedido** | `design.md § 12` gana el punto 4 con la consecuencia, por que el precio es el correcto, que hoy nadie la pisa —con la razon: `applyCredentialAndActivate` no invoca `startSession`— y **a quien la hereda**: QC-89 y QC-96, con la salida nombrada (`firstIssuedAtAfterStamp`) |
+
+**Ninguno quedo mal atendido.** El 4, el 5 y el 7 quedaron por encima de lo que pedi.
+
+## Hallazgo nuevo
+
+### menor 8 — la guardia se esquiva tambien por DETECCION, si el `data` lo devuelve un helper
+
+No es de ambito y **no lo introdujo este commit** —existia en la primera ronda y no lo vi—. Lo pruebo
+aqui porque el ambito nuevo invita a creer que la cobertura ya es total.
+
+Verificado, no deducido. Con este archivo **dentro** del directorio mas vigilado del repo:
+
+```ts
+function construir(hash: string) {
+  return { passwordHash: hash, updatedAt: new Date() };
+}
+await tx.user.update({ where: { id }, data: construir(hash) });
+```
+
+la guardia da **17/17 verdes**. `payloadKeyOf` mira la clave de la que cuelga el objeto literal: aqui
+cuelga de un `return`, no de `data:`, y se salta.
+
+Y **el salto es deliberado y tiene su motivo**: `user-credentials-prisma.ts:95` es exactamente
+`return { passwordHash: fila.password_hash }` y es un mapeo de LECTURA que no debe marcarse nunca.
+Marcar todo `return { passwordHash }` convertiria esa lectura legitima en un rojo permanente. O sea
+que la guardia eligio el lado de no molestar, y la eleccion es defendible.
+
+Por que es menor y no mayor: hace falta una construccion de dos saltos que nadie escribe por
+descuido —el caso por descuido es `data: { passwordHash }` a secas, y ese SI cae, igual que cae
+`const data = { … }` por el camino de fallo cerrado—. No hay ningun sitio en el repo que lo haga hoy.
+
+**Lo que falta, y es barato:** que la cabecera **declare este limite**, como ya declara el del `//`
+dentro de una cadena. Hoy la cabecera solo enumera ese, y despues de esta ficha la cabecera de esta
+guardia concreta es un documento en el que otras dos fichas se van a apoyar. Si ademas se quiere
+cerrar: marcar `return { passwordHash … }` **solo** en archivos que tambien contengan un verbo de
+escritura de Prisma deja fuera al mapeo de lectura de `user-credentials-prisma.ts`, que no lo tiene.
+
+## ¿Es `lib/` + `scripts/` la frontera correcta?
+
+**Si, y es mejor que la que yo propuse.** La regla que la justifica —una guardia no puede apoyarse en
+la convencion que vigila otra guardia— es correcta y generaliza bien.
+
+Hay un asterisco honesto, y lo dejo escrito porque el propio argumento del implementer lo invita:
+dejar fuera `app/` y `components/` **tambien** se apoya en otra guardia (`guard-arquitectura-modulos`
+les prohibe tocar Prisma). La distincion se sostiene —ahi hay una **prohibicion vigilada**, mientras
+que «los driven viven en `persistence/`» no era una regla sino un habito de nombres que nadie
+comprobaba—, pero es una dependencia al fin y al cabo: si algun dia esa prohibicion se relaja, esta
+promesa se encoge en silencio.
+
+**Tercera frontera, si se quiere cerrar del todo:** anadir `app/` y `components/` a `WATCHED_ROOTS`.
+Lo medi: son 206 archivos mas y **cero menciones** de `passwordHash` o `password_hash` en los dos
+arboles, o sea **cero falsos positivos garantizados hoy** y un coste de unos +45 ms. Con eso la
+guardia deja de depender de ninguna otra y pasa a afirmar sobre todo el codigo de aplicacion.
+
+**No lo pido como condicion**: lo de ahora ya cierra el agujero que encontre, esta declarado con su
+porque, y la diferencia entre las dos opciones es un riesgo de segundo orden. Lo dejo como la mejora
+obvia para quien toque esta guardia despues — por ejemplo, QC-89.
+
+## Relectura de lo ya aprobado
+
+Comprobado que el ensanchado no rompio nada:
+
+- **`tests/guards/` entero: 27 archivos, 299 casos, verdes, 4,1 s.** Ninguna de las otras 26 guardias
+  se resiente del ambito nuevo ni entra en conflicto con el.
+- **`./init.sh` completo, corrido por mi por segunda vez: `== init OK ==`, exit 0.** 396 archivos,
+  **5777 tests** (4 mas que en la primera ronda: los 3 casos nuevos de la guardia y el de
+  `end-other-sessions`), **5733 verdes**, 42 skipped, y **el mismo unico rojo del baseline**
+  (`configuracion-ui/unidades-convenciones.test.ts`, 2 casos, por `resend` de QC-79). Sin rojos nuevos.
+- El delta **no toca** produccion mas alla de `end-other-sessions.ts` (menor 5) y un comentario en
+  `ports/session-check-log.ts` (menor 6). El resto son tests, specs y bitacora. Nada de lo que aprobe
+  en la primera ronda —migracion, esquema, los dos cortes, los tres casos de uso, el adaptador, el
+  cableado, los siete archivos ajenos— cambio ni una linea.
+
+## Veredicto final
+
+**APROBADO.** Sin mayores. El menor 8 es una linea de documentacion en la cabecera de la guardia y no
+justifica una tercera ronda; se puede cerrar al paso, aqui o en QC-89.

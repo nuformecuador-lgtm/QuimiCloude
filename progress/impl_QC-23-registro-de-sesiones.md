@@ -290,11 +290,47 @@ sello) la guardia da **rojo** con el hallazgo exacto —`form: 'data'`, `operati
 ruta entera—; borrado el archivo, **32/32 guardias y 355 verdes en 5,2 s**. Antes de este arreglo
 ese mismo archivo pasaba en verde.
 
-**Coste:** el archivo de guardia pasa de 402 ms a 453 ms leyendo ~277 archivos; la tanda entera de
-guardias sigue en ~5 s.
+**Coste:** **~+65 ms**, medido por el reviewer y **corregido en contra de la primera cifra de esta
+bitacora**. El «402 ms -> 453 ms» que se escribio aqui era **ruido de arranque de vitest**: el
+`Duration` total de las dos versiones se solapa (422-664 ms la nueva, 502-611 ms la vieja), asi que
+no medía nada. El numero que si aisla la ejecucion es el componente `tests`: **16-17 ms antes,
+73-92 ms ahora**, por leer ~280 archivos en vez de 8. La tanda entera de guardias: 4,1 s. Se deja
+escrito el metodo y no solo el numero, porque el error no fue de calculo sino de **medir lo que no
+era**.
 
 **Lo que esto le devuelve a QC-89 y QC-96:** la frase de mas arriba —«quien escriba `password_hash`
 en un UPDATE sin subir el sello se encuentra la guardia roja»— **vuelve a ser cierta**, y ahora en
 todo `lib/` y `scripts/`, no en un directorio por convencion. **QC-96 puede seguir apoyandose en la
 regla de escritura sin invocar ningun revocador**: su camino escribe el hash, y cualquier UPDATE
 del hash que no suba el sello es rojo antes del merge.
+
+### El menor 8: declarado y NO cerrado (decision del humano)
+
+La segunda ronda **aprobo** la ficha y encontro un octavo menor: la guardia **tambien se esquiva por
+DETECCION**, no solo por ambito. Si el objeto que lleva el hash cuelga de un `return` en vez de ir
+en linea tras `data:`, no lo ve — verificado dentro del directorio mas vigilado del repo, 17/17
+verdes:
+
+```ts
+function construir(hash: string) { return { passwordHash: hash, updatedAt: new Date() }; }
+await tx.user.update({ where: { id }, data: construir(hash) });
+```
+
+**El humano decidio no cerrarlo, sino declararlo**, y la decision es la correcta: el salto es
+deliberado. `user-credentials-prisma.ts:95` es literalmente `return { passwordHash:
+fila.password_hash }`, un **mapeo de LECTURA** que no debe marcarse nunca; marcar todo `return {
+passwordHash }` lo convertiria en un rojo permanente. Y el descuido **real** —`data: { passwordHash
+}` a secas, o un `const data = {...}` extraido a variable, que cae por fallo cerrado— **si se
+detecta**. Esquivarla exige una construccion de dos saltos que nadie escribe por descuido.
+
+Lo que si cambia es que **esta escrito en la cabecera de la guardia**: que SI se detecta, que NO,
+por que no se cerro y **la salida para quien quiera cerrarlo** —marcar `return { passwordHash ... }`
+solo en archivos que ademas contengan un verbo de escritura de Prisma, con lo que el mapeo de
+lectura queda fuera solo, sin excepciones por nombre—. Esa cabecera es **el documento donde QC-89 y
+QC-96 leeran hasta donde estan cubiertas**, asi que no puede prometer mas de lo que cumple.
+
+Queda ademas anotada la **tercera frontera** que el reviewer midio y no pidio: anadir `app/` y
+`components/` a `WATCHED_ROOTS` son 206 archivos mas, **cero menciones** de `passwordHash` hoy —o
+sea cero falsos positivos garantizados— y ~+45 ms, y con eso la guardia dejaria de depender de que
+`guard-arquitectura-modulos` prohiba tocar Prisma desde ahi. **No se implemento**: es la mejora
+obvia para quien la toque despues, por ejemplo QC-89.
