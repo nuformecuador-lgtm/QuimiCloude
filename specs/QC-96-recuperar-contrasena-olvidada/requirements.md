@@ -51,7 +51,7 @@
 > | **R8** | «el enlace DEBE caducar **7 días** después de su emisión» | **Se conserva para `setup`.** **R11** fija **1 hora** para `recovery`: dos plazos, uno por propósito, en la misma tabla (decisión cerrada 1). |
 > | **R40** | esta feature no toca el bloqueo por intentos fallidos | **Se hereda literal** en **R26**: QC-96 tampoco lo toca. |
 >
-> **Requisito de QC-23 que esta ficha ENMIENDA antes de que QC-23 exista**, y se dice de frente
+> **Requisito de QC-23 que esta ficha ENMIENDA**, y se dice de frente
 > porque el reviewer lo va a buscar: la **decisión cerrada 2 de QC-23** («¿Cambiar la contraseña
 > cierra sesiones? **Sí: todas menos la actual**») enumera **tres** caminos —QC-36, QC-89 y el
 > enlace de QC-79— y **omite éste**. **R29** lo cierra: en la recuperación se cierran **TODAS**, sin
@@ -59,6 +59,13 @@
 > la recuperación existe es justamente que otro entró a la cuenta. Esto **no reabre** una decisión
 > de QC-23: añade el cuarto camino que su enumeración no contempló, y así lo fijó el humano el
 > 2026-09-12 en la decisión cerrada 5 de **esta** ficha.
+>
+> **Y encaja sin fricción con lo que QC-23 construyó.** El «menos la actual» de QC-23 no es una
+> excepción dentro de la escritura: la escritura sube el sello y cae **todo**, y quien conserva su
+> sesión la conserva porque QC-23 **la reemite** después (su R31, `firstIssuedAtAfterStamp`). En la
+> recuperación **no hay nada que reemitir** —no hay sesión abierta que sea la de quien actúa—, así
+> que no reemitir es exactamente «todas», sin código propio y sin ninguna variante del mecanismo.
+> **R29** lo exige explícitamente.
 >
 > **Requisitos de ALCANCE (R36) y de ausencia deliberada de autorización (R2)**: son requisitos de
 > pleno derecho y no comentarios. Aquí son críticos: esta es la **única** superficie de escritura
@@ -231,30 +238,59 @@ criterio conservador que QC-79 R21 y R40.)*
 
 ### Las sesiones abiertas
 
+> **Enmienda del 2026-09-12, con QC-23 ya implementada en disco.** La versión anterior de R27–R29
+> exigía **invocar** un revocador por un puerto, con la firma asumida `revokeAllSessionsOf(userId,
+> now)`. **Esa firma no existe y no podía existir.** Lo que QC-23 expone es
+> `endAllSessions(actor: Actor | null | undefined, targetUserId: string)`
+> (`lib/modules/identity/domain/end-all-sessions.ts`), que **exige un actor en su primera línea**
+> —`requirePermission(actor, 'usuarios.modificar')` o `requireActor(actor)`, su R27— y que saca el
+> ámbito de `actor.companyId`. **QC-96 no tiene actor** (R2, R21: nadie está dentro), así que
+> invocarlo no es «adaptar un nombre»: sería imposible, o exigiría fabricar un actor falso.
+>
+> Y no hace falta. QC-23 no implementó el corte por contraseña como una función que haya que
+> acordarse de llamar, sino como **una regla sobre la escritura**: toda transacción que escriba
+> `users.password_hash` sube `users.sessions_valid_from` **en la misma sentencia**
+> (`domain/session-revocation.ts`, su decisión cerrada 2), y lo vigila
+> `tests/guards/guard-sesiones-cortadas.test.ts`, que **cubre explícitamente el `UPDATE` crudo de
+> `credential-setup-link-prisma.ts`** — justo el archivo y el camino que esta ficha extiende.
+>
+> **La decisión cerrada 5 no se reabre**: recuperar sigue cerrando **TODAS** las sesiones. Lo que
+> cambia es **cómo**: por la regla de escritura, no por una invocación. Ver **P3**, cerrada.
+
 **R27.** CUANDO la contraseña se establece con un enlace de **recuperación** válido, el sistema DEBE
-cerrar **TODAS** las sesiones abiertas de esa persona, sin preservar ninguna, **invocando** el
-mecanismo de revocación de **QC-23** a través de un **puerto** del módulo. El sistema NO DEBE
-implementar ningún mecanismo propio de revocación: NO DEBE añadir ninguna columna, ninguna tabla ni
-ningún cambio de formato del token de sesión, y ningún archivo de esta feature DEBE escribir el sello
-de sesiones ni el registro de sesiones cerradas.
+dejar inválidas **TODAS** las sesiones abiertas de esa persona, sin preservar ninguna, **subiendo el
+sello `users.sessions_valid_from` de esa persona en la MISMA sentencia `UPDATE` que escribe
+`users.password_hash`**, al instante de la operación y truncado al segundo con la única función del
+repositorio que lo trunca. El sistema NO DEBE hacerlo con una segunda escritura, ni con una segunda
+transacción, ni invocando ningún caso de uso de revocación: `endAllSessions` de QC-23 exige un actor
+autorizado y aquí **no hay ninguno** (R2, R21), y dos escrituras sobre la misma fila abrirían una
+ventana en la que la contraseña ya cambió y las cookies viejas todavía valen.
 
-**R28.** SI la revocación de R27 no se puede completar, ENTONCES la operación NO DEBE terminar con la
-contraseña cambiada y sesiones vivas: el orden de las escrituras DEBE ser tal que **ningún camino de
-fallo** —error del puerto, caída entre pasos— deje una contraseña nueva conviviendo con una sesión
-antigua todavía válida. Es admisible el resultado contrario —sesiones cerradas y contraseña sin
-cambiar—, y en ese caso el sistema DEBE responder un fallo y la persona DEBE poder volver a pedir el
-enlace.
+**R28.** La escritura de R27 —hash y sello— DEBE ser **una sola sentencia dentro de la misma
+transacción** que consume el enlace, de modo que **ningún camino de fallo** pueda dejar una
+contraseña nueva conviviendo con una sesión antigua todavía válida: si la sentencia no se confirma,
+no se confirma ninguna de las dos columnas y el enlace **no** queda consumido. SI la transacción
+falla, ENTONCES el sistema DEBE responder un fallo, NO DEBE modificar ninguna fila y la persona DEBE
+poder volver a usar el enlace o pedir otro.
 
-**R29.** La revocación de R27 DEBE alcanzar **toda** sesión abierta, incluida cualquiera del
-dispositivo desde el que se establece la contraseña. Esta feature NO DEBE ofrecer ninguna opción de
-preservar una sesión, y NO DEBE iniciar sesión automáticamente al terminar.
+**R29.** El corte de R27 DEBE alcanzar **toda** sesión abierta de esa persona, incluida cualquiera
+del dispositivo desde el que se establece la contraseña, y NO DEBE quedar acotado por empresa ni por
+ningún otro filtro además del identificador del usuario dueño del enlace. Esta feature NO DEBE
+ofrecer ninguna opción de preservar una sesión y NO DEBE iniciar sesión automáticamente al terminar.
+Además, esta feature NO DEBE implementar ningún mecanismo propio de revocación: NO DEBE añadir
+ninguna columna, ninguna tabla, ningún índice ni ningún cambio de formato del token de sesión, NO
+DEBE tocar `revoked_sessions` ni `resolve-session.ts`, y NO DEBE modificar ni debilitar
+`tests/guards/guard-sesiones-cortadas.test.ts`, que DEBE seguir verde **sin haber sido tocada**. Todo
+lo que esta ficha aporta al corte es **cumplir** la regla que esa guardia ya vigila.
 
 ### Frontera, datos, errores y dependencias
 
 **R30.** Los dos casos de uso nuevos DEBEN vivir en `lib/modules/identity/domain/`, con la
-persistencia, la fábrica del secreto, el reloj, el envío de correo y la revocación de sesiones de
-QC-23 detrás de **puertos** implementados en `adapters/driven/` y cableados **solo** en
-`lib/composition/`; el `domain/` y los `ports/` NO DEBEN importar Prisma, `resend`, framework ni
+persistencia, la fábrica del secreto, el reloj y el envío de correo detrás de **puertos**
+implementados en `adapters/driven/` y cableados **solo** en `lib/composition/`. El sello de R27 lo
+escribe el **adaptador de persistencia** —es una columna más del `UPDATE` que ya hace, no una
+dependencia nueva del dominio—, y esta feature NO DEBE añadir ningún puerto de revocación de
+sesiones; el `domain/` y los `ports/` NO DEBEN importar Prisma, `resend`, framework ni
 `lib/shared/**`, y el contrato `lib/modules/identity/index.ts` NO DEBE reexportar ningún adaptador
 `driving`.
 
@@ -289,7 +325,8 @@ acción alcanzable solo con `:hover`.
 **R36.** Esta feature NO DEBE incluir: el límite **por origen** (R20, es **QC-73**); el
 restablecimiento de la contraseña **de otra persona** por un administrador (**QC-89**); ninguna
 pantalla ni ruta de **administración de usuarios** (**QC-67**); el **mecanismo** de revocación de
-sesiones (**QC-23**, R27); ni ningún botón de «cerrar mis sesiones» (**QC-53**) o de cerrar las de
+sesiones —sello, registro de sesiones cerradas y su guardia— que es de **QC-23** y aquí solo se
+**cumple** (R27, R29); ni ningún botón de «cerrar mis sesiones» (**QC-53**) o de cerrar las de
 otro (**QC-101**). La única superficie de interfaz que aporta es la pantalla de R1.
 
 ### Prueba de extremo a extremo
@@ -311,7 +348,7 @@ requisitos que la hacen testeable. **Ninguna de las 7 queda sin `R<n>`.**
 | 2 | Un correo que no existe ve **el mismo mensaje** y con el **mismo tiempo de respuesta** | **R4**, **R5**, **R6**, R7, R37 |
 | 3 | **Solo `active`** recupera; `pending`, `inactive` y `blocked`, **en silencio** | **R9**, R5 (b, c, d), R23, R25 |
 | 4 | **Límite por correo** dentro de esta ficha, sin librería ni almacén nuevo; el de origen es QC-73 | **R17**, **R18**, **R19**, R20, R34 |
-| 5 | Recuperar cierra **TODAS** las sesiones; lo construye QC-23, aquí se **invoca** | **R27**, **R28**, **R29**, R36 |
+| 5 | Recuperar cierra **TODAS** las sesiones; lo construye QC-23, aquí se **invoca** | **R27**, **R28**, **R29**, R36 — *el **qué** sigue en pie; el **cómo** es la regla de escritura de QC-23 y no una invocación (ver la enmienda sobre R27 y **P3**)* |
 | 6 | **Misma tabla** que QC-79, con un campo que distingue el propósito | **R12**, R11, R14, R23, R33 |
 | 7 | Precedentes heredados de QC-79: solo la huella, uno vivo por índice, un solo uso, política QC-19 + hashing QC-5, errores del catálogo de QC-70 con el identificador de QC-71, remitente por configuración | **R13**, R14, R24, R15, R32, R30 |
 
@@ -332,6 +369,9 @@ de abajo no se reabren.
 **Tres NUEVAS, abiertas por `spec_author` en F1.2.** Ninguna bloquea la implementación: las tres van
 con su **respuesta propuesta ya escrita como requisito**, y mientras no se confirmen manda el
 requisito.
+
+**Estado al 2026-09-12, tras la enmienda de QC-23: solo P1 sigue abierta.** P2 la cerró el humano;
+**P3 la cierra el código de QC-23 leído en disco**, y su respuesta cambió R27–R29.
 
 1. **P1 — Un correo que existe en DOS empresas.** La unicidad del correo es **por empresa**
    (`users_email_unique` sobre `("company_id", lower("email"))`, QC-47), así que una misma dirección
@@ -354,17 +394,36 @@ requisito.
    toca luego: **no son variables de entorno a propósito** —no cambian entre entornos—, y moverlos
    cuesta dos constantes y los casos que las citan, sin migración. Ver la decisión 8 de la tabla.
 
-3. **P3 — La firma exacta con la que se invoca QC-23.** `specs/QC-23-registro-de-sesiones/` contiene
-   **solo** `requirements.md`, con su sección `## Requisitos (EARS)` todavía en
-   «_Pendiente: los escribe spec_author_», sin `design.md` y sin `tasks.md`; y en `feature_list.json`
-   QC-23 está en **`pending`**, no en `spec_ready`. O sea: **no existe ningún contrato escrito** del
-   que copiar la firma, solo su **tabla de decisiones cerradas** (sello por usuario + identificador
-   de sesión).
-   - **Respuesta propuesta, escrita como requisito: R27 y R28**, que exigen invocar **por un puerto**
-     y prohíben implementar el mecanismo. El puerto y su firma asumida están en `design.md > 7`, con
-     lo que pasa si QC-23 aterriza con otro nombre.
-   - **Esto no lo decide `spec_author`**: QC-96 **no puede mergearse antes que QC-23** (ya está en su
-     `depends_on`), y las tasks bloqueadas están marcadas en `tasks.md`.
+3. **P3 — CERRADA el 2026-09-12 leyendo QC-23 en disco, no su spec.** La pregunta era «con qué firma
+   se invoca el revocador de QC-23». **La respuesta es que no se invoca.** Lo que se comprobó, con
+   ruta y línea, en el worktree `QC-23-registro-de-sesiones`:
+   - **La firma asumida no existe.** No hay ningún `revokeAllSessionsOf(userId, now)`. Lo que hay es
+     `createEndAllSessions(deps)` devolviendo
+     `endAllSessions(actor: Actor | null | undefined, targetUserId: string): Promise<void>`
+     (`lib/modules/identity/domain/end-all-sessions.ts`). **Y no podía ser la otra**: su primera
+     línea es `requirePermission(actor, 'usuarios.modificar')` o `requireActor(actor)` —la
+     autorización antes que nada, R27 de QC-23— y el ámbito sale de `actor.companyId` —el actor por
+     parámetro, su R29—. **QC-96 no tiene actor** (R2, R21), así que no hay nada que pasarle; el
+     puerto `SessionRevocationRepository.stampAll` exige además `companyId`, que esta ficha tampoco
+     tiene sin resolverlo a mano.
+   - **Y no hace falta invocar nada.** QC-23 implementó el corte por contraseña como **una regla
+     sobre la escritura**, no como una llamada: `domain/session-revocation.ts` lo dice literalmente
+     («el cambio de contraseña no es una decisión, es una regla sobre la escritura») y
+     `tests/guards/guard-sesiones-cortadas.test.ts` la vigila sobre todo
+     `adapters/driven/persistence/`, con un caso que ancla **por nombre** el `UPDATE` crudo de
+     `credential-setup-link-prisma.ts` — el archivo que esta ficha extiende. Ese `UPDATE` ya escribe
+     hoy `"sessions_valid_from" = ${floorToSecond(now)}` junto a `"password_hash"`, y su comentario
+     dice, textualmente, que se escribe «para que quede cerrada la puerta si QC-89 o QC-96 reutilizan
+     este camino».
+   - **Consecuencia, escrita como requisito: R27, R28 y R29 reescritos.** El corte llega porque el
+     `UPDATE` de `applyRecoveryCredential` sube el sello en el mismo `SET`. Si alguien lo olvidara,
+     la guardia de QC-23 se pone roja en ese commit: la trazabilidad no depende de que el implementer
+     se acuerde.
+   - **Se gana atomicidad**: desaparece el paso intermedio de revocación que `design.md > 7.2` metía
+     entre el consumo y la escritura, así que QC-96 recupera **una sola transacción**, como QC-79.
+   - **QC-96 sigue con `QC-23` en su `depends_on`**, porque la columna `users.sessions_valid_from` y
+     `floorToSecond` son suyas y tienen que estar en el árbol; pero ya **no hay ninguna task
+     bloqueada a la espera de un contrato** (ver `tasks.md`).
 
 ## Decisiones cerradas (no reabrir)
 

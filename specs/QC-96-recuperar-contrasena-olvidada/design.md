@@ -7,7 +7,7 @@
 > tabla de **7 decisiones**. Aquí va el **cómo**: la columna de propósito y su migración con
 > `down.sql`, **cómo se consigue una respuesta indistinguible** —mismo contenido, mismo tiempo—, **por
 > qué el límite por correo no es un oráculo y dónde vive su conteo sin almacén nuevo**, cómo se
-> **invoca QC-23 sin haberla construido** y qué pasa si cambia, la reutilización de la pantalla de
+> **cumple la regla de escritura de QC-23** sin invocar a nadie (§ 7), la reutilización de la pantalla de
 > QC-79, y cómo se verifica todo incluyendo el E2E.
 >
 > **Precedente literal, que es el 80 % del trabajo**: `specs/QC-79-alta-sin-contrasena-y-enlace/` y
@@ -32,13 +32,13 @@
 | `lib/modules/identity/domain/credential-recovery-input.ts` | **NUEVO.** Esquema `zod` de la solicitud (§ 5.2). |
 | `lib/modules/identity/domain/request-credential-recovery.ts` | **NUEVO.** El caso de uso **público sin actor** (R2–R19). |
 | `lib/modules/identity/domain/constant-response-time.ts` | **NUEVO.** El presupuesto fijo de tiempo de R6 (§ 6.2), dominio puro. |
-| `lib/modules/identity/domain/set-credential-with-link.ts` | **MODIFICADO.** El camino de consumo se vuelve consciente del propósito y añade la revocación (§ 7.2). |
+| `lib/modules/identity/domain/set-credential-with-link.ts` | **MODIFICADO.** El camino de consumo se vuelve consciente del propósito (§ 7.2). |
 | `lib/modules/identity/ports/credential-setup-link-repository.ts` | **MODIFICADO.** `issueRecoveryLink`, `consumeLink` y `applyRecoveryCredential` (§ 5.1). |
-| `lib/modules/identity/ports/session-revoker.ts` | **NUEVO.** El puerto de R27. **La firma asumida de QC-23** (§ 7.1). |
+| ~~`lib/modules/identity/ports/session-revoker.ts`~~ | **NO SE CREA.** La enmienda del 2026-09-12 lo eliminó: el corte de sesiones es una columna del `UPDATE`, no un puerto (§ 7). |
 | `lib/modules/identity/adapters/driven/persistence/credential-setup-link-prisma.ts` | **MODIFICADO.** Las transacciones de § 4.3, § 4.4 y § 6.3. |
 | `lib/modules/identity/adapters/driving/credential-setup-actions.ts` | **MODIFICADO.** Una Server Action nueva, `requestCredentialRecoveryAction` (§ 5.3). |
 | `lib/modules/identity/index.ts` | Gana los tipos y la factory nueva — solo de `./domain`. |
-| `lib/composition/index.ts` | Cablea el caso de uso nuevo y el puerto de sesiones (**T12, bloqueada por QC-23**). |
+| `lib/composition/index.ts` | Cablea **solo** el caso de uso nuevo. Ningún puerto de sesiones que cablear (§ 7.3). |
 | `lib/shared/routes.ts` | **MODIFICADO.** `FORGOT_PASSWORD_ROUTE` deja de ser «ruta aún inexistente». |
 | `app/(public)/recuperar-contrasena/page.tsx` + `components/` | **NUEVOS.** La pantalla de R1. |
 | `e2e/recuperar-contrasena.spec.ts` | **NUEVO.** R37 (§ 9.3). |
@@ -54,8 +54,8 @@ nueva + ninguna modificación de `login/` ni de `establecer-contrasena/`, ver §
 **Choque de archivos a vigilar**: cualquier otra feature en vuelo que toque
 `lib/modules/identity/domain/set-credential-with-link.ts`,
 `credential-setup-link-repository.ts` o `credential-setup-actions.ts` —hoy, en `origin/dev`,
-ninguna—. **QC-23 sí tocará `users` y `lib/composition/index.ts`**, y por eso § 7.3 fija el orden de
-merge.
+ninguna—. **QC-23 ya tocó `users` y `credential-setup-link-prisma.ts`** (el sello junto al hash), así
+que QC-96 se escribe **sobre** su árbol y no al lado: § 7.3 dice qué hereda y qué ya no le debe.
 
 ---
 
@@ -71,7 +71,7 @@ QC-79 encontró ocho archivos ajenos donde el diseño había escrito seis.
 | 2 | `tests/unit/identity/credencial/set-credential-with-link.test.ts` | los seis rechazos indistinguibles y la activación | **Gana** el camino `recovery` y el caso de propósito cruzado; **ninguna expectativa se borra ni se debilita**. |
 | 3 | `tests/unit/identity/credencial/credential-setup-actions.test.ts` | dos actions | Tres. Las dos de QC-79 conservan sus casos. |
 | 4 | `tests/unit/identity/schema/credential-setup-migration.test.ts` | el UP de QC-79 y su `down.sql` | **No se toca**: la migración nueva tiene **su propio** test estático (§ 9.1). Se corre para comprobar que sigue verde. |
-| 5 | `tests/unit/composition/identity-facade.test.ts` | las claves de la fachada | **Gana** la clave nueva. La del puerto de sesiones, **en T12** (bloqueada). |
+| 5 | `tests/unit/composition/identity-facade.test.ts` | las claves de la fachada | **Gana** la clave nueva del caso de uso público, y **solo esa**: no hay ningún puerto de sesiones que cablear (§ 7.3). |
 | 6 | `e2e/establecer-contrasena.spec.ts` | el camino de QC-79 | **No se toca**. Se corre: si el propósito por defecto no fuera `setup`, se pondría rojo, y eso es exactamente lo que se quiere que vigile. |
 | 7 | `tests/guards/guard-envio-de-correo.test.ts`, `guard-dependencias-aprobadas`, `guard-arquitectura-modulos`, `guard-rls-force`, `guard-password-never-plaintext`, `guard-catalogo-de-errores` | invariantes del repo | Verdes **sin tocarlas** (R30, R32, R33, R34). |
 
@@ -242,7 +242,10 @@ Abre una carrera entre los dos viajes y duplica el coste de la ruta pública.
 | " | `consumeLink(digest, now) → { userId, purpose } \| 'invalid'` | § 7.2 paso 1 |
 | " | `applyRecoveryCredential({ userId, credentialHash, now }) → 'ok' \| 'invalid'` | § 7.2 paso 3 |
 | " | `applyCredentialAndActivate` (QC-79) | **se conserva intacto**, es el camino `setup` |
-| `SessionRevoker` (nuevo) | `revokeAllSessionsOf(userId, now)` | § 7.1 |
+
+**No hay ningún puerto de sesiones, y la enmienda del 2026-09-12 lo quitó a propósito** (§ 7).
+`applyRecoveryCredential` sube el sello de QC-23 como una columna más de su `UPDATE`: el corte de
+sesiones no es una dependencia del dominio, es parte de la escritura.
 
 **Sigue sin haber ningún método de lectura de enlaces** (`findByDigest`), y es deliberado, igual que
 en QC-79 § 6.2: `consumeLink` es un *compare-and-set* que **escribe y devuelve**, no un `SELECT`
@@ -289,7 +292,7 @@ export type RequestRecoveryFormState =
 | Correo malformado o clave desconocida | `invalid_input` (ya existe) |
 | Cualquier resultado de la resolución, del límite o del correo | **`{ status: 'submitted' }`** (R4) |
 | Enlace inválido al establecer, **por cualquiera de los siete casos** | `credential_link_invalid` (ya existe, QC-79) |
-| Fallo del puerto de sesiones (R28) | `unexpected` con su `reference` de QC-71 |
+| Fallo de la transacción que escribe credencial + sello (R28) | `unexpected` con su `reference` de QC-71 |
 
 **Cero códigos nuevos** (R32), y eso no es suerte: cada código nuevo habría sido una forma de
 distinguir ramas que R5 exige indistinguibles.
@@ -384,96 +387,128 @@ responde. Un test de alcance recorre los archivos de la feature y falla ante cua
 
 ---
 
-## 7. QC-23: cómo se invoca lo que todavía no existe
+## 7. QC-23: el corte de sesiones **no se invoca, se cumple**
 
-**El problema, dicho entero y sin rodeos.** La decisión cerrada 5 dice que recuperar cierra **todas**
-las sesiones y que el mecanismo lo construye QC-23. Pero:
+> **ENMENDADO el 2026-09-12, con QC-23 ya implementada en disco y leída línea a línea.** La versión
+> anterior de esta sección definía un puerto `SessionRevoker` con la firma **asumida**
+> `revokeAllSessionsOf(userId, now)`, derivada de la tabla de decisiones de QC-23 porque entonces no
+> había ni `design.md` ni código. **Esa firma no existe, y además QC-96 no necesita invocar nada.**
+> Lo de abajo ya no asume: cita archivo y línea.
 
-- **QC-23 no está mergeada.** En `origin/dev` no existen `users.sessions_valid_from`, ni el `sid`
-  dentro del token, ni `revoked_sessions`. Nada de eso compila hoy.
-- **Y hay algo peor, verificado en este worktree el 2026-09-12**: `specs/QC-23-registro-de-sesiones/`
-  contiene **un solo archivo**, `requirements.md`, cuya sección `## Requisitos (EARS)` sigue diciendo
-  «_Pendiente: los escribe spec_author (F1.2)_»; **no hay `design.md` ni `tasks.md`**, y en
-  `feature_list.json` QC-23 figura como **`pending`**, no como `spec_ready`. **Así que no existe
-  ningún contrato escrito del que copiar una firma.** Lo único que existe es su **tabla de decisiones
-  cerradas**, y de ahí —y solo de ahí— sale lo de abajo. Está anotado como **P3** en
-  `requirements.md`.
+### 7.1 Lo que QC-23 construyó de verdad, y por qué no encaja como invocación
 
-### 7.1 La firma asumida, y de dónde sale exactamente
+**Existe `endAllSessions`, pero pide un actor autorizado.**
+`lib/modules/identity/domain/end-all-sessions.ts`:
 
 ```ts
-// lib/modules/identity/ports/session-revoker.ts   (QC-96)
-/**
- * Cierra TODAS las sesiones abiertas de una persona (R27).
- *
- * FIRMA ASUMIDA. El mecanismo lo construye QC-23 y esta ficha NO lo implementa. La forma se deriva
- * de `specs/QC-23-registro-de-sesiones/requirements.md > Decisiones cerradas`, filas del 2026-09-03:
- *   - «¿Como se invalida un codigo ya emitido? Con dos mecanismos: **sello por usuario** (mata todo
- *     lo anterior a una fecha) e identificador de sesion (mata una sola)»  -> el sello basta para
- *     «todas», y por eso este puerto pide el usuario y el instante y NADA mas.
- *   - «¿El sello cambia el formato del token? **No**: el token ya lleva `iat` firmado»  -> invocarlo
- *     no obliga a esta ficha a saber nada del token.
- *   - «Modulo y capas: **identity**, la logica en domain/, el almacen como adaptador driven detras
- *     de un puerto, cableado solo en lib/composition/»  -> el adaptador es de QC-23 y el cableado
- *     vive donde siempre.
- */
-export interface SessionRevoker {
-  revokeAllSessionsOf(userId: string, now: Date): Promise<void>;
-}
+export function createEndAllSessions(
+  deps: EndAllSessionsDeps,
+): (actor: Actor | null | undefined, targetUserId: string) => Promise<void>
 ```
 
-**Qué implica «asumida»**, sin disimulo: las dos decisiones del 2026-09-03 fijan la **semántica**
-—sello por usuario, sin tocar el formato del token— pero **no** el nombre del método, ni el de la
-columna, ni si QC-23 expondrá la capacidad como puerto o como método de un repositorio suyo. Ese es
-el hueco de P3.
+y su cuerpo empieza, literalmente en la primera línea ejecutable:
 
-### 7.2 Cómo se usa, y por qué el orden de los pasos es un requisito
+```ts
+if (targetUserId !== actor?.id) requirePermission(actor, 'usuarios.modificar');
+else requireActor(actor);
+```
 
-`set-credential-with-link.ts` pasa a hacer, para el propósito `recovery`:
+Después saca el ámbito de `actor.companyId` para pasárselo a
+`SessionRevocationRepository.stampAll({ userId, companyId, validFrom })`
+(`lib/modules/identity/ports/session-revocation-repository.ts`).
+
+**Por qué eso cierra la puerta, y no es un detalle de nombres.** QC-96 **no tiene actor**: R2 y R21
+dicen que ni la solicitud ni el establecimiento leen sesión, cookie ni cabecera de identidad.
+`endAllSessions` no acepta «sin actor» —falla cerrado, que es su R27— y tampoco tiene de dónde sacar
+`companyId`. Invocarlo exigiría **fabricar un actor falso con permiso de administrador** dentro del
+camino público y sin sesión del ERP: exactamente el agujero que la autorización-en-primera-línea de
+QC-23 existe para impedir. No es adaptar una firma; es romperla.
+
+**Y no hace ninguna falta, porque QC-23 no hizo del corte por contraseña una llamada.**
+`domain/session-revocation.ts`, al final de `changeRevokesSessions`, lo dice con todas sus letras:
+
+> «Lo que NO decide esta funcion: el cambio de contrasena. Ese no es una variante mas porque no es
+> una decision —siempre corta, por los tres caminos (R30)— sino **una regla sobre la escritura**:
+> toda transaccion que escriba `users.password_hash` sube `sessions_valid_from` en la MISMA
+> sentencia, y lo hace cumplir `tests/guards/guard-sesiones-cortadas.test.ts`.»
+
+Esa guardia vigila **todo** `lib/modules/identity/adapters/driven/persistence/`, en sus **dos**
+formas —el objeto `data` de Prisma y el **SQL crudo**—, exime solo la **creación** de filas, y tiene
+un caso que ancla **por nombre** el archivo que esta ficha extiende:
+
+> `it('el UPDATE del enlace de credencial esta cubierto de verdad, no por casualidad')`
+
+Hoy, `credential-setup-link-prisma.ts > applyCredentialAndActivate` ya escribe:
+
+```sql
+UPDATE "users"
+   SET "password_hash" = ${input.credentialHash},
+       "sessions_valid_from" = ${floorToSecond(input.now)},
+       ...
+```
+
+con un comentario de QC-23 T15 que dice que allí el sello **no tiene efecto medible** —la cuenta
+venía de `pending` y nunca tuvo sesión— y que se escribe igual porque «**es la puerta que queda
+cerrada si QC-89 o QC-96 reutilizan este camino**». QC-96 es exactamente ese caso, y es el primero
+en el que el sello **sí** tiene efecto: la cuenta está `active` y puede tener sesiones vivas.
+
+**Conclusión de diseño: QC-96 no invoca ningún revocador y no añade ningún puerto.** Cumple la regla
+de escritura, y quien la haga cumplir si alguien la olvida es la guardia de QC-23, no la memoria del
+implementer.
+
+### 7.2 Cómo queda el camino: **una transacción**, como en QC-79
+
+`set-credential-with-link.ts`, para el propósito `recovery`:
 
 ```
 1. consumeLink(digest, now)               -> { userId, purpose } | 'invalid'   (CAS atomico)
-2. si purpose = 'setup'  -> el camino de QC-79, INTACTO (activar la cuenta pendiente)
-3. si purpose = 'recovery':
-     3a. sessions.revokeAllSessionsOf(userId, now)     // R27 — ANTES de escribir la credencial
-     3b. applyRecoveryCredential({ userId, credentialHash, now })
-         -- WHERE id = $u AND deleted_at IS NULL AND account_status = 'active'
-         -- 0 filas => 'invalid' (R23, R25)
+2. si purpose = 'setup'    -> el camino de QC-79, INTACTO (activar la cuenta pendiente)
+3. si purpose = 'recovery' -> applyRecoveryCredential({ userId, credentialHash, now })
 ```
 
-**El orden es R28.** Si la revocación fuera después de escribir la credencial, un fallo en ella
-dejaría exactamente el estado que la ficha existe para impedir: contraseña nueva y la sesión del
-intruso todavía viva. Poniéndola antes, **todo camino de fallo falla del lado seguro**: sesiones
-cerradas y contraseña sin cambiar, y la persona vuelve a pedir el enlace —que cuesta un minuto y es
-literalmente el argumento de la decisión 1—.
+y el `UPDATE` del paso 3, dentro de **la misma transacción** que el consumo del paso 1
+(`applyCredentialAndActivate` de QC-79 es el molde y **no se toca**):
 
-**Lo que se pierde respecto de QC-79, y se dice**: allí consumo + credencial + activación eran **una**
-transacción (su R20). Aquí el consumo y la escritura de la credencial quedan en **dos** escrituras con
-la revocación en medio, porque el puerto de sesiones no es de esta ficha y no puede vivir dentro del
-callback de una transacción de Prisma sin arrastrar a QC-23 dentro del adaptador de QC-96 —que es
-justo lo que «invocas, no construyes» prohíbe—. La ventana que abre es: enlace consumido, sesiones
-cerradas, contraseña sin cambiar. **Nadie queda bloqueado** (se pide otro enlace) y **nadie queda
-expuesto** (las sesiones ya están cerradas). Cuando QC-23 aterrice, si expone la revocación como una
-escritura sobre `users` que se puede hacer en la **misma transacción**, colapsar los tres pasos en uno
-es una tarea pequeña y está anotada en `tasks.md` como seguimiento (T13).
+```sql
+UPDATE "users"
+   SET "password_hash"       = ${credentialHash},
+       "sessions_valid_from" = ${floorToSecond(now)}   -- R27: MISMA sentencia, no una segunda
+ WHERE "id" = ${userId}::uuid
+   AND "deleted_at" IS NULL
+   AND "account_status" = 'active'::"UserAccountStatus"   -- R23, R25: 0 filas => rollback => 'invalid'
+```
+
+**Sin `account_status` en el `SET`** (R22: la cuenta ya estaba `active`), **sin
+`account_status_changed_*`**, **sin `must_change_credential`** y **sin tocar el bloqueo** (R26).
+`floorToSecond` es la función de QC-23 (`domain/session-revocation.ts`) que el adaptador **ya
+importa**: no se escribe una segunda forma de truncar, porque dos granularidades convertirían el
+borde de la comparación `<=` en un volado — el motivo está escrito en su propio docstring.
+
+**R28 sale gratis, y eso es la ganancia de la enmienda.** El diseño anterior tenía tres pasos
+—consumo, revocación, credencial— con la revocación en medio y un párrafo entero justificando la
+ventana «enlace consumido, sesiones cerradas, contraseña sin cambiar» que abría. **Esa ventana
+desaparece**: hash y sello son dos columnas del mismo `SET`, dentro de la transacción que consume el
+enlace. Si no se confirma, no se confirma nada —ni el consumo—, y la persona puede reusar su enlace.
+Es **imposible por construcción** terminar con contraseña nueva y sesión antigua viva.
 
 El consumo sigue siendo **un compare-and-set** y **no** se añade ningún `findByDigest` (R25): los
 siete casos de rechazo siguen saliendo por la misma puerta y con el mismo error.
 
-### 7.3 Qué pasa si QC-23 cambia antes de mergear
+### 7.3 Qué depende todavía de QC-23, y qué ya no
 
-| Escenario | Coste | Quién lo paga |
-| --- | --- | --- |
-| QC-23 expone otro **nombre** de método o de puerto | Una línea de `lib/composition/index.ts` y el archivo del puerto. El dominio y sus tests no se enteran: hablan con `SessionRevoker`. | T12 |
-| QC-23 decide que la revocación necesita **más datos** (p. ej. el `sid` actual, para preservar una sesión) | **No aplica**: R29 dice **todas**, sin preservar ninguna, y esa es una decisión cerrada de **esta** ficha del 2026-09-12, posterior a la de QC-23. Si QC-23 solo ofreciera «todas menos la actual», QC-96 necesita además la variante total — y se pide como cambio a QC-23, **no** se implementa aquí. | Leader |
-| QC-23 **no** se mergea | QC-96 **no se mergea**: ya está en su `depends_on`. Las tasks bloqueadas (T12, T13, T18, y la aserción de sesiones del E2E) no se cierran, y R27–R29 no tienen test real. | Leader |
-| QC-23 se mergea **después** de que QC-96 esté escrita | Rebase + una línea de cableado + correr T12 y T18. El resto de la feature ya está verde con dobles. | Implementer |
+| Qué | Estado |
+| --- | --- |
+| La columna `users.sessions_valid_from` y `floorToSecond` | **De QC-23.** Tienen que estar en el árbol: por eso QC-96 conserva `QC-23` en su `depends_on` |
+| `tests/guards/guard-sesiones-cortadas.test.ts` | **De QC-23.** QC-96 **no la toca**; simplemente su `UPDATE` nuevo tiene que pasarla (R29) |
+| Un puerto `SessionRevoker` de QC-96 | **Eliminado.** No se crea |
+| El cableado de un revocador en `lib/composition/index.ts` | **Eliminado.** No hay nada que cablear |
+| `endAllSessions` / `SessionRevocationRepository` | **No se usan.** QC-96 no tiene actor (§ 7.1) |
+| Tasks a la espera de un contrato de QC-23 | **Ninguna.** Ver `tasks.md` |
 
-**Lo que esta ficha NO hace bajo ningún escenario**: escribir `users.sessions_valid_from`, añadir el
-`sid` al token, crear `revoked_sessions`, o poner un adaptador «provisional» que no revoque nada. Un
-adaptador que devuelva `Promise.resolve()` haría pasar los tests **y dejaría las sesiones abiertas**:
-eso es peor que no tenerlo, porque miente. Por eso el cableado es una task **bloqueada** y no un
-apaño.
+**Lo que esta ficha sigue sin hacer**: crear ninguna columna ni tabla de sesiones, añadir el `sid` al
+token, tocar `revoked_sessions` o `resolve-session.ts`, y —lo más importante— **debilitar la guardia
+de QC-23 para que el `UPDATE` nuevo pase**. Si la guardia se pusiera roja, la respuesta es añadir el
+sello, nunca aflojar la regla.
 
 ---
 
@@ -533,7 +568,7 @@ acaba de descartar.
 | Unit (dominio puro) | `tests/unit/identity/recuperacion/response-budget.test.ts` | R6: las nueve ramas resuelven en el **mismo** presupuesto con reloj y `sleep` dobles; el envío lento no lo alarga; caso de sensibilidad sin `hold` → rojo |
 | Unit (dominio puro) | `tests/unit/identity/credencial/link-lifetime.test.ts` (ampliado) | R11: **1 hora** para `recovery` y **7 días** para `setup`, con el borde exacto de cada uno |
 | Unit (dominio) | `tests/unit/identity/credencial/set-credential-with-link.test.ts` (ampliado) | R21–R26: el camino `recovery` no cambia el estado; el propósito cruzado se rechaza con el **mismo** error; la política deja el enlace vivo; `must_change_credential` y el bloqueo intactos |
-| Unit (dominio) | `tests/unit/identity/recuperacion/session-revocation.test.ts` | R27–R29: se invoca el puerto **antes** de escribir la credencial; si el puerto lanza, **la contraseña no se escribe**; no se preserva ninguna sesión |
+| Unit (estático) | `tests/unit/identity/recuperacion/sello-en-la-misma-sentencia.test.ts` | R27, R29: el SQL de `applyRecoveryCredential` escribe `"sessions_valid_from"` **en el mismo `SET`** que `"password_hash"`, con `floorToSecond` y **sin** filtro de empresa; caso de sensibilidad: quitar el sello lo pone rojo (y también pone roja la guardia de QC-23) |
 | Unit (driving) | `tests/unit/identity/credencial/credential-setup-actions.test.ts` (ampliado) | R31, R32, R4: `FormData`, **sin** resolución de actor, estado sin campos, traducción por el traductor único |
 | Unit (UI) | `tests/unit/identity-ui/request-recovery-form.test.tsx` | R1, R4, R35: el DOM es **el mismo** con correo existente y con inexistente; 16 px, 44 px, `dvh`, sin `:hover` |
 | Unit (estático) | `tests/unit/identity/schema/credential-purpose-migration.test.ts` | R33: el UP crea el tipo y la columna con su `DEFAULT`, **no** toca `users`, **no** toca los tres índices de QC-47 ni el parcial de «uno vivo»; el `down.sql` es su inverso |
@@ -541,14 +576,21 @@ acaba de descartar.
 | Integración | `tests/integration/identity/credential-recovery.int.test.ts` | R9, R10, R12–R14, R17, R18, R22, R23, R25 contra Postgres real: la huella y no el secreto; **dos** cuentas con el mismo correo en dos empresas reciben **dos** enlaces; el tope corta la cuarta; la recuperación **sustituye** un enlace de alta vivo; el consumo cruzado de propósitos falla; el `active` requerido; RLS forzado sigue en pie |
 | Ciclo real | task T6 | R33: `db:migrate` → `db:rollback` → `db:migrate`, con la salida en la bitácora |
 | **E2E** | `e2e/recuperar-contrasena.spec.ts` | **R37**, § 9.3 |
-| Guardias (ya existen) | `guard-arquitectura-modulos`, `guard-rls-force`, `guard-password-never-plaintext`, `guard-dependencias-aprobadas`, `guard-catalogo-de-errores`, `guard-envio-de-correo` | R30, R32, R33, R34 — verdes **sin tocarlas** |
+| Guardias (ya existen) | `guard-arquitectura-modulos`, `guard-rls-force`, `guard-password-never-plaintext`, `guard-dependencias-aprobadas`, `guard-catalogo-de-errores`, `guard-envio-de-correo`, **`guard-sesiones-cortadas` (QC-23)** | R30, R32, R33, R34 y **R27/R29** — verdes **sin tocarlas** |
 
-### 9.2 Lo que NO se puede probar hasta que entre QC-23
+### 9.2 Las sesiones, probadas de verdad y sin dobles
 
-R27–R29 quedan cubiertas **con dobles** (fila 5 de la tabla): eso demuestra que el caso de uso invoca,
-en el orden correcto, y que falla del lado seguro. Lo que **no** se puede demostrar sin QC-23 es que
-la invocación **cierra sesiones de verdad**: eso es un test de integración contra el mecanismo de
-QC-23 y es **suyo**. Queda anotado en `tasks.md` (T18) y en la bitácora, no escondido.
+**La enmienda del 2026-09-12 quitó el único punto ciego que tenía esta ficha.** Antes, R27–R29 solo
+se podían cubrir con dobles del puerto asumido —«se llamó al revocador, en este orden»—, y demostrar
+que las sesiones **caen de verdad** quedaba bloqueado hasta que QC-23 entrara. Ahora el corte es una
+columna del `UPDATE`, así que se prueba en tres niveles y ninguno es un doble de sí mismo:
+
+1. **Estático** (fila nueva de § 9.1): el sello está en el mismo `SET`, con su caso de sensibilidad.
+2. **La guardia de QC-23**, que ya vigila ese directorio y ese archivo por nombre: si alguien quita
+   el sello, se pone roja **en ese commit**, sin que QC-96 tenga que acordarse de nada.
+3. **Integración contra Postgres real** (T16): tras recuperar, `users.sessions_valid_from` de esa
+   persona es el instante de la operación **truncado al segundo**, y una sesión emitida antes queda
+   invalidada por `isStampedOut` de QC-23.
 
 ### 9.3 El E2E: **sí lleva, y por qué**
 
@@ -564,9 +606,11 @@ temporal por worker, `APP_BASE_URL` al `baseURL` de Playwright, `playwright.conf
 más, que es el que justifica que este E2E exista y no sea decorativo: **pedirlo con un correo que no
 existe pinta exactamente la misma pantalla** (R37).
 
-**Lo que el E2E NO hace**: las nueve ramas de R5 una a una (son unitarias), la medición de tiempos (es
-unitaria y determinista; medir tiempos en un navegador es un *flake* garantizado), y la comprobación
-de que las sesiones se cerraron —**bloqueada por QC-23**, § 9.2—.
+**Lo que el E2E NO hace**: las nueve ramas de R5 una a una (son unitarias), y la medición de tiempos
+(es unitaria y determinista; medir tiempos en un navegador es un *flake* garantizado). La
+comprobación de que las sesiones se cerraron **ya no está bloqueada** (§ 9.2) y **sí entra** en el
+E2E, que es donde se puede hacer bien: se deja una sesión abierta en un segundo contexto de
+navegador, se recupera la contraseña y se comprueba que ese contexto acaba en el login.
 
 ---
 
@@ -596,8 +640,10 @@ aquí lo es: **esta feature no propone ninguna librería nueva y no toca `packag
 2. **Un correo puede perderse** si el proveedor tarda más que el presupuesto y la función se congela
    (§ 6.2). Remedio: volver a pedirlo.
 3. **El tope se puede exceder en uno** bajo concurrencia exacta (§ 6.3).
-4. **Consumo y escritura de la credencial dejan de ser una sola transacción** en el camino de
-   recuperación (§ 7.2), con una ventana que falla del lado seguro. Se colapsa cuando entre QC-23.
+4. ~~**Consumo y escritura de la credencial dejan de ser una sola transacción** en el camino de
+   recuperación, con una ventana que falla del lado seguro.~~ **Ya no aplica** tras la enmienda del
+   2026-09-12: el corte de sesiones es una columna del mismo `UPDATE`, así que el camino de
+   recuperación es **una sola transacción**, igual que el de alta de QC-79 (§ 7.2).
 5. **Una cuenta bloqueada temporalmente por intentos fallidos no puede recuperar** hasta que el plazo
    venza, porque R9 usa el **estado efectivo** de QC-78. Es incómodo justo para quien más lo
    necesita —quien olvidó la contraseña suele ser quien falló cinco veces—, y aun así se elige así
@@ -660,10 +706,24 @@ Mismo argumento que QC-79 § 11.4, y aquí **más fuerte**: convertiría la pág
 de secretos sin coste y crearía un segundo camino de comprobación que puede divergir del `UPDATE`
 condicional. La comprobación ocurre **una sola vez**, donde se escribe.
 
-### 12.8 Un adaptador provisional del puerto de sesiones que no revoque nada — descartada
+### 12.8 Invocar `endAllSessions` de QC-23 con un actor fabricado — descartada (enmienda 2026-09-12)
 
-Desbloquearía T12 y pondría el E2E en verde hoy. Y dejaría **las sesiones abiertas** mientras todos
-los tests dicen que se cerraron: un test que miente es peor que un test que falta. § 7.3.
+Sustituye a la alternativa que había aquí antes («un adaptador provisional del puerto de sesiones que
+no revoque nada»), que dejó de existir junto con el puerto.
+
+Al ver que `endAllSessions(actor, targetUserId)` exige actor, la salida rápida sería fabricar uno
+—«el sistema», con `usuarios.modificar` y la empresa del usuario objetivo— y llamarlo. Se descarta por
+tres motivos, cualquiera de ellos suficiente:
+
+1. **Pondría un actor con permiso de administrador en el único camino público y sin sesión del ERP.**
+   La autorización-en-primera-línea de QC-23 (su R27) existe precisamente para que eso no se pueda
+   hacer, y un actor sintético la convierte en decorado.
+2. **Serían dos transacciones sobre la misma fila**: la del hash y la del sello, con la ventana que
+   la decisión cerrada 2 de QC-23 prohíbe por escrito en el mensaje de remedio de su guardia.
+3. **No hace falta.** El sello en el mismo `SET` consigue lo mismo, es atómico y ya está vigilado.
+
+Y la variante «ampliar QC-23 con un `endAllSessionsWithoutActor`» tampoco: sería pedir una puerta sin
+autorización a la ficha cuyo requisito es que no la haya, para un efecto que la escritura ya produce.
 
 ### 12.9 Pedir también el nombre de usuario o la empresa en el formulario — descartada
 
@@ -675,8 +735,13 @@ oráculo, esta vez de empresas. La ambigüedad se resuelve enviando a todas (R10
 
 ## 13. Preguntas abiertas que deja este diseño
 
-Las **tres** de `requirements.md` (P1 correo en dos empresas, P2 el tope y la ventana, P3 la firma de
-QC-23). **Ninguna bloquea escribir el código**: las tres tienen su respuesta propuesta ya redactada
-como requisito, y las tres se cambian con un diff pequeño y sin migración. La única que bloquea
-**cerrar** la feature es **P3**, y no por la pregunta en sí sino por el hecho del que nace: **QC-23 no
-está mergeada y ni siquiera tiene spec escrito** (§ 7).
+**Queda una: P1** (un correo que existe en dos empresas). No bloquea escribir el código —su respuesta
+propuesta es **R10**, ya redactada como requisito— y cambiarla cuesta R10, su test y una línea del
+`WHERE`, sin migración.
+
+- **P2** (el tope y la ventana) la cerró el humano el 2026-09-12: **3 por hora**, que es lo que R17
+  ya decía.
+- **P3** (la firma con la que se invoca QC-23) la cierra la **enmienda del 2026-09-12**, leyendo
+  QC-23 en disco: **no se invoca nada**, el corte llega por la regla de escritura (§ 7). Con ella
+  desaparece lo que sí bloqueaba cerrar la feature; ya no hay ninguna task a la espera de un
+  contrato ajeno.

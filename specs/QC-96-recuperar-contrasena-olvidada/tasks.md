@@ -11,12 +11,24 @@
 > **`./init.sh --rapido`**; cerrar la feature y cualquier PR es **`./init.sh`** completo, sin
 > excepción (regla 5 de `CLAUDE.md`).
 >
-> **CUATRO TASKS ESTÁN BLOQUEADAS POR QC-23** y se marcan `[BLOQUEADA: QC-23]`: **T12**, **T13b**,
-> **T18** y la aserción de sesiones de **T17**. QC-23 **no está mergeada**, y además —verificado el
-> 2026-09-12 en este worktree— **ni siquiera tiene spec escrito**: `specs/QC-23-registro-de-sesiones/`
-> solo tiene `requirements.md` con su sección EARS en «_Pendiente_», y `feature_list.json` la da como
-> `pending`. Ver `design.md > 7`. **No se desbloquean con un adaptador provisional** (`design.md >
-> 12.8`): un doble que no revoque nada pondría los tests en verde y dejaría las sesiones abiertas.
+> **YA NO HAY NINGUNA TASK BLOQUEADA POR QC-23** (enmienda del 2026-09-12). Antes lo estaban **T12**,
+> **T13b**, **T18** y la aserción de sesiones de **T17**, porque el diseño asumía invocar un revocador
+> con una firma que no existía. Leída QC-23 **en disco**, el corte de sesiones **no se invoca**: es una
+> regla sobre la escritura —`users.sessions_valid_from` sube en la MISMA sentencia que
+> `users.password_hash`— vigilada por `tests/guards/guard-sesiones-cortadas.test.ts`, que cubre por
+> nombre el `UPDATE` de `credential-setup-link-prisma.ts` que esta ficha extiende. Ver
+> `design.md > 7` y **P3** de `requirements.md`. Consecuencia en esta lista:
+>
+> | Task | Qué pasa |
+> | --- | --- |
+> | **T12** (cablear `SessionRevoker`) | **ELIMINADA.** No hay puerto que cablear |
+> | **T13b** (colapsar los tres pasos en una transacción) | **ELIMINADA.** Ya nace en una sola transacción; nada que colapsar |
+> | **T18** (la revocación de verdad) | **REDUCIDA y DESBLOQUEADA** → **T18'**, un test estático + una aserción de integración en T16 |
+> | **T17** (E2E) | **DESBLOQUEADA.** La aserción de sesiones **sí entra** |
+> | **T8** | Pierde el puerto `SessionRevoker`; conserva los tres métodos del repositorio |
+>
+> QC-96 **sigue con `QC-23` en su `depends_on`**: necesita la columna y `floorToSecond` en el árbol.
+> Lo que ya no necesita es un contrato que nadie había escrito.
 >
 > **NINGUNA dependencia nueva** (R34): esta feature no toca `package.json`. No hay puerta humana de
 > dependencia, a diferencia de QC-79 T2.
@@ -98,13 +110,13 @@
 
 ## Fase 3 — Puertos y persistencia
 
-- [ ] **T8 — Los puertos: los tres métodos nuevos y `SessionRevoker`.** — **R12, R14, R27, R30**
+- [ ] **T8 — Los puertos: los tres métodos nuevos.** — **R12, R14, R30**
       `ports/credential-setup-link-repository.ts` gana `issueRecoveryLinks`, `consumeLink` y
-      `applyRecoveryCredential` (`design.md > 5.1`), **sin** añadir ningún lector de enlaces;
-      `ports/session-revoker.ts` **nuevo**, con la **firma asumida** y el comentario que cita las tres
-      filas de la tabla de decisiones de QC-23 de las que sale (`design.md > 7.1`).
-      **Hecho cuando:** `guard-arquitectura-modulos` pasa, los dos archivos no importan framework,
-      Prisma ni `lib/shared/**`, y el puerto nuevo **no** tiene implementación en esta rama.
+      `applyRecoveryCredential` (`design.md > 5.1`), **sin** añadir ningún lector de enlaces.
+      **NO se crea `ports/session-revoker.ts`** y no se añade ningún puerto de sesiones: el corte lo
+      hace el `UPDATE` de T10 (`design.md > 7`).
+      **Hecho cuando:** `guard-arquitectura-modulos` pasa, el archivo no importa framework, Prisma ni
+      `lib/shared/**`, y `ls lib/modules/identity/ports/` **no** muestra ningún revocador nuevo.
       *(Depende de T1.)*
 
 - [ ] **T9 — Emitir: resolución por correo, límite y transacción.** — **R8, R9, R10, R14, R17, R18, R19**
@@ -116,12 +128,19 @@
       se emitió (`design.md > 4.4`).
       *(Depende de T2, T8.)*
 
-- [ ] **T10 — [P] Consumir: el propósito decide el estado exigido.** — **R22, R23, R25**
+- [ ] **T10 — [P] Consumir: el propósito decide el estado exigido, y el sello va en el mismo `SET`.**
+      — **R22, R23, R25, R27, R28, R29**
       `consumeLink` (compare-and-set que devuelve `{ userId, purpose }`) y `applyRecoveryCredential`
-      (`UPDATE users … WHERE deleted_at IS NULL AND account_status = 'active'`, 0 filas → `'invalid'`).
-      `applyCredentialAndActivate` de QC-79 **no se toca**.
-      **Hecho cuando:** los tests cubren los dos propósitos, el cruzado en las dos direcciones, y
-      afirman que el SQL de recuperación **no** contiene `account_status =` en su `SET`.
+      (`UPDATE users SET password_hash = …, sessions_valid_from = ${floorToSecond(now)}
+      WHERE deleted_at IS NULL AND account_status = 'active'`, 0 filas → rollback → `'invalid'`), **los
+      dos dentro de la misma transacción** (`design.md > 7.2`). `applyCredentialAndActivate` de QC-79
+      **no se toca**, y `floorToSecond` se **importa** de `domain/session-revocation.ts` (QC-23), no se
+      reescribe.
+      **Hecho cuando:** los tests cubren los dos propósitos y el cruzado en las dos direcciones;
+      afirman que el SQL de recuperación **no** contiene `account_status =` en su `SET` pero **sí**
+      `"sessions_valid_from" =`; y `guard-sesiones-cortadas` (QC-23) sigue verde **sin haberla tocado**
+      —y se comprueba a mano que se pone **roja** si se borra el sello, para saber que vigila de verdad
+      este `UPDATE` nuevo—.
       *(Depende de T2, T8.)*
 
 ## Fase 4 — Casos de uso
@@ -135,31 +154,27 @@
       si lo llaman); y que un envío que tarda más que el presupuesto **no** alarga la respuesta.
       *(Depende de T5, T6, T7, T9.)*
 
-- [ ] **T12 — [BLOQUEADA: QC-23] Cablear `SessionRevoker` en la composición.** — **R27, R30**
-      Una línea en `lib/composition/index.ts` atando el puerto al adaptador que trae QC-23.
-      **Hecho cuando:** `identity-facade.test.ts` incluye la clave nueva y el typecheck pasa **con el
-      adaptador real**, no con un doble.
-      *(Depende de que **QC-23 esté mergeada**. `design.md > 7.3` dice qué cuesta si su firma cambia:
-      esta línea y el archivo del puerto.)*
+- [x] ~~**T12 — Cablear `SessionRevoker` en la composición.**~~ **ELIMINADA el 2026-09-12.** No existe
+      ningún puerto de sesiones que cablear (`design.md > 7.3`). `lib/composition/index.ts` solo gana
+      la clave del caso de uso público de T11, y eso ya lo cubre T11.
 
-- [ ] **T13a — Establecer la contraseña: el propósito y la revocación, en el dominio.** —
-      **R21, R22, R23, R24, R25, R26, R28, R29**
-      `set-credential-with-link.ts` pasa a los tres pasos de `design.md > 7.2`, con la revocación
-      **antes** de escribir la credencial. El camino `setup` queda **idéntico**. No se añade ningún
+- [ ] **T13 — Establecer la contraseña: el propósito, en el dominio.** —
+      **R21, R22, R23, R24, R25, R26**
+      *(Era T13a. Se renombra porque T13b desapareció.)*
+      `set-credential-with-link.ts` pasa a los pasos de `design.md > 7.2`: consumir, y según el
+      propósito ir al camino `setup` de QC-79 —**idéntico**— o a `applyRecoveryCredential`. **Sin
+      ningún paso de revocación intermedio**: el corte vive en el `UPDATE` de T10. No se añade ningún
       `findByDigest`.
-      **Hecho cuando:** `session-revocation.test.ts` afirma el **orden** (el doble del repositorio
-      falla si se le llama antes que al revocador) y que, **si el revocador lanza, la credencial no se
-      escribe**; y `set-credential-with-link.test.ts` conserva sus casos de QC-79 y gana los de
-      recuperación y los de propósito cruzado con el **mismo** error.
+      **Hecho cuando:** `set-credential-with-link.test.ts` conserva sus casos de QC-79 y gana los de
+      recuperación y los de propósito cruzado con el **mismo** error; y afirma que el caso de uso **no
+      recibe ningún puerto de sesiones entre sus `deps`** —el corte no es responsabilidad suya, y si un
+      día alguien le añade uno el test lo dice—.
       *(Depende de T8, T10.)*
 
-- [ ] **T13b — [BLOQUEADA: QC-23] Ajustar la firma real y, si QC-23 lo permite, colapsar los tres
-      pasos en una transacción.** — **R27, R28**
-      Seguimiento escrito de `design.md > 7.2`: si QC-23 expone la revocación como escritura sobre
-      `users`, mover 3a dentro de la transacción de 3b y recuperar la atomicidad que QC-79 tenía.
-      **Hecho cuando:** o se hace y el test de orden se sustituye por uno de atomicidad, o queda
-      anotado en la bitácora por qué no se puede con la forma que QC-23 trajo.
-      *(Depende de T12.)*
+- [x] ~~**T13b — Ajustar la firma real y colapsar los tres pasos en una transacción.**~~ **ELIMINADA
+      el 2026-09-12.** Era el seguimiento de una atomicidad perdida que ya no se pierde: con el sello
+      dentro del mismo `SET`, el camino de recuperación nace en **una sola transacción** (T10). Lo que
+      T13b iba a arreglar no llega a romperse.
 
 ## Fase 5 — Superficie
 
@@ -183,11 +198,16 @@
 
 ## Fase 6 — Verificación
 
-- [ ] **T16 — Integración contra Postgres real.** — **R9, R10, R13, R14, R17, R18, R23, R25**
+- [ ] **T16 — Integración contra Postgres real.** — **R9, R10, R13, R14, R17, R18, R23, R25, R27, R29**
       `tests/integration/identity/credential-recovery.int.test.ts` con los casos de
       `design.md > 9.1`: la huella y no el secreto en la columna; **dos** empresas con el mismo correo
       → **dos** enlaces; el tope corta; la recuperación **sustituye** un enlace de alta vivo; el
       consumo cruzado falla; RLS sigue forzado.
+      **Y el caso de sesiones, que ya no está bloqueado** (R27, R29): tras recuperar,
+      `users.sessions_valid_from` de esa persona vale el instante de la operación **truncado al
+      segundo**, e `isStampedOut` de QC-23 declara inválida una sesión emitida antes. Y el caso
+      negativo que lo hace valer: una transacción que **falla** (contraseña sobre una cuenta que dejó
+      de estar `active`) no cambia **ninguna** de las dos columnas (R28).
       **Hecho cuando:** el archivo pasa contra la base de esta rama, con su limpieza en el orden que
       exige el `ON DELETE RESTRICT` (enlaces → usuarios → empresa).
       *(Depende de T9, T10.)*
@@ -197,34 +217,42 @@
       (variables en el proceso del spec, directorio temporal por worker, `playwright.config.ts` sin
       tocar): login → «¿Olvidaste tu contraseña?» → correo de una cuenta activa → buzón → establecer →
       **entrar** → el enlace ya no sirve → y un correo **inexistente** pinta lo mismo.
+      **Y la aserción de sesiones, que ya NO está bloqueada** (R27, R29): un segundo contexto de
+      navegador con la sesión de esa persona abierta **acaba en el login** tras la recuperación.
       **Hecho cuando:** pasa en chromium y webkit y no espera por tiempo en ningún punto.
-      **La aserción de que las sesiones se cerraron queda [BLOQUEADA: QC-23]** y anotada en el propio
-      archivo.
       *(Depende de T15, T16.)*
 
-- [ ] **T18 — [BLOQUEADA: QC-23] La revocación, de verdad.** — **R27, R29**
-      Test de integración que abre dos sesiones, recupera la contraseña y afirma que **las dos** dejan
-      de valer.
-      **Hecho cuando:** pasa contra el mecanismo real de QC-23. Hasta entonces R27 y R29 están
-      cubiertas **solo con dobles** (T13a), y eso queda escrito en la bitácora, no escondido
-      (`design.md > 9.2`).
-      *(Depende de T12.)*
+- [ ] **T18' — [P] El sello, en la misma sentencia: test estático.** — **R27, R29**
+      *(Sustituye a la antigua T18 «la revocación, de verdad», que estaba bloqueada y probaba una
+      invocación que ya no existe.)*
+      `tests/unit/identity/recuperacion/sello-en-la-misma-sentencia.test.ts`: el SQL de
+      `applyRecoveryCredential` escribe `"sessions_valid_from"` **en el mismo `SET`** que
+      `"password_hash"`, con `floorToSecond`, y **sin** filtro de empresa (R29: no se acota por
+      `company_id`). Y que la feature **no crea ningún puerto de sesiones** ni importa
+      `end-all-sessions`, `SessionRevocationRepository` o `revoked_sessions`.
+      **Hecho cuando:** pasa; su caso de sensibilidad —borrar el sello del `SET`— lo pone rojo, y pone
+      roja también `guard-sesiones-cortadas` de QC-23, que **no se toca**.
+      *(Depende de T10.)*
 
-- [ ] **T19 — [P] Test de alcance y las guardias.** — **R7, R20, R30, R34, R36**
+- [ ] **T19 — [P] Test de alcance y las guardias.** — **R7, R20, R29, R30, R34, R36**
       `scope.test.ts`: ningún `console.*` en los archivos de la feature; ninguna lectura de origen
       (`x-forwarded-for`, `request.ip`, `headers()` para la IP); ningún route handler ni cron nuevo;
       `package.json` sin ninguna entrada respecto de `origin/dev`; ningún archivo bajo
-      `app/(private)/` ni `components/`.
-      **Hecho cuando:** pasa, y las seis guardias que ya existen siguen verdes **sin haberlas tocado**.
+      `app/(private)/` ni `components/`. **Y el alcance sobre QC-23** (R29): el diff de la feature no
+      crea ninguna columna ni tabla de sesiones, no toca `resolve-session.ts`, `revoked_sessions` ni
+      el formato del token, y **no modifica `tests/guards/guard-sesiones-cortadas.test.ts`**.
+      **Hecho cuando:** pasa, y las guardias que ya existen —las seis de QC-79 más
+      `guard-sesiones-cortadas` de QC-23— siguen verdes **sin haberlas tocado**.
       *(Depende de T15.)*
 
 - [ ] **T20 — Cierre.**
       `./init.sh` completo; el mapa `R<n> -> test` en
-      `progress/impl_QC-96-recuperar-contrasena-olvidada.md`; las tasks bloqueadas por QC-23 listadas
-      con su motivo en `progress/current.md > Deudas y cosas abiertas`.
-      **Hecho cuando:** el gate completo termina en verde, el mapa cubre **R1–R37** sin huecos, y las
-      cuatro marcas `[BLOQUEADA: QC-23]` están explicadas por escrito.
-      *(Depende de todas las anteriores no bloqueadas.)*
+      `progress/impl_QC-96-recuperar-contrasena-olvidada.md`; **P1** anotada como lo único abierto en
+      `progress/current.md > Deudas y cosas abiertas`.
+      **Hecho cuando:** el gate completo termina en verde, el mapa cubre **R1–R37** sin huecos, **no
+      queda ninguna marca `[BLOQUEADA: QC-23]`** en esta lista, y las seis guardias más
+      `guard-sesiones-cortadas` están verdes sin haber sido tocadas.
+      *(Depende de todas las anteriores.)*
 
 ---
 
@@ -235,16 +263,16 @@
 | R | Task(s) | | R | Task(s) |
 | --- | --- | --- | --- | --- |
 | R1 | T15 | | R20 | T19 |
-| R2 | T11, T14 | | R21 | T13a |
-| R3 | T7, T11 | | R22 | T10, T13a |
-| R4 | T11, T14, T15 | | R23 | T10, T13a, T16 |
-| R5 | T11, T16 | | R24 | T13a |
-| R6 | T6, T11 | | R25 | T10, T13a |
-| R7 | T11, T19 | | R26 | T13a |
-| R8 | T9, T11 | | R27 | T8, **T12**, T13a, **T18** |
-| R9 | T9, T11, T16 | | R28 | T13a, **T13b** |
-| R10 | T9, T16 | | R29 | T13a, **T18** |
-| R11 | T2, T5 | | R30 | T8, T12, T19 |
+| R2 | T11, T14 | | R21 | T13 |
+| R3 | T7, T11 | | R22 | T10, T13 |
+| R4 | T11, T14, T15 | | R23 | T10, T13, T16 |
+| R5 | T11, T16 | | R24 | T13 |
+| R6 | T6, T11 | | R25 | T10, T13 |
+| R7 | T11, T19 | | R26 | T13 |
+| R8 | T9, T11 | | R27 | T10, T16, T17, **T18'** |
+| R9 | T9, T11, T16 | | R28 | T10, T16 |
+| R10 | T9, T16 | | R29 | T10, T16, T17, **T18'**, T19 |
+| R11 | T2, T5 | | R30 | T8, T19 |
 | R12 | T2, T8 | | R31 | T14 |
 | R13 | T9, T16 | | R32 | T14 |
 | R14 | T9, T16 | | R33 | T2, T3, T4 |
@@ -254,17 +282,18 @@
 | R18 | T9, T16 | | R37 | T17 |
 | R19 | T9, T11, T16 | | | |
 
-**Requisitos que dependen de una task bloqueada por QC-23**: **R27**, **R28** y **R29**. Los tres
-tienen cobertura con dobles en **T13a** desde el primer día; lo que falta hasta que QC-23 entre es el
-cableado real (T12), la prueba contra el mecanismo (T18) y el posible colapso en una sola transacción
-(T13b). **Ningún otro requisito está bloqueado.**
+**Ningún requisito depende ya de una task bloqueada.** Tras la enmienda del 2026-09-12, **R27**,
+**R28** y **R29** se prueban sin dobles y sin esperar a nadie: el sello va en el `UPDATE` (T10), un
+test estático lo ancla (T18'), la integración lo mide contra Postgres real (T16), el E2E lo ve en un
+navegador (T17), y `guard-sesiones-cortadas` de QC-23 lo vigila para siempre **sin que QC-96 la
+toque**. **T12 y T13b ya no existen**, y **T13a pasa a llamarse T13**.
 
 ## Orden sugerido de tandas
 
 1. **Tanda A** — T1, T2, T3, T4. *(La base y su reversibilidad.)*
 2. **Tanda B** — T5, T6, T7, T8. *(Dominio puro y puertos; T6 y T7 en paralelo.)*
-3. **Tanda C** — T9, T10. *(Persistencia; T10 en paralelo con T9.)*
-4. **Tanda D** — T11, T13a. *(Los dos casos de uso.)*
+3. **Tanda C** — T9, T10, T18'. *(Persistencia y el test del sello; T10 en paralelo con T9.)*
+4. **Tanda D** — T11, T13. *(Los dos casos de uso.)*
 5. **Tanda E** — T14, T15, T19. *(La superficie y el alcance.)*
-6. **Tanda F** — T16, T17. *(Integración y E2E.)*
-7. **Tanda G** — T12, T13b, T18 **cuando QC-23 esté mergeada**, y T20.
+6. **Tanda F** — T16, T17. *(Integración y E2E, ya con las sesiones dentro.)*
+7. **Tanda G** — T20. *(Cierre: `./init.sh` completo.)*
