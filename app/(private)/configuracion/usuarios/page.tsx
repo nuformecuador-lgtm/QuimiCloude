@@ -7,11 +7,19 @@ import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/r
 import { BRAND_LABEL, USERS_LABEL } from '@/lib/shared/navigation/private-nav';
 
 import {
+  GROUPS_TAB,
   USERS_TITLE_TESTID,
   UserListSection,
   UserListSkeleton,
+  UsuariosTabsSwitch,
+  WORK_GROUP_SECTION_TESTID,
+  WorkGroupListSection,
+  WorkGroupListSkeleton,
   buildUserListQuery,
+  buildWorkGroupListQuery,
   parseUserListParams,
+  parseUsuariosTab,
+  parseWorkGroupListParams,
   type UserListSearchParams,
 } from './components';
 
@@ -88,6 +96,21 @@ async function canModifyUsers(): Promise<boolean> {
  * tamano, orden, filtro o busqueda (R19). Sin ella, Next reutiliza el limite y el usuario se queda
  * mirando el resultado anterior sin ninguna senal de que algo esta en vuelo.
  *
+ * **La pestana vigente sale de la DIRECCION y la decide el SERVIDOR** (QC-85 R1, R2, R3, R6;
+ * `design.md > 3`). Se resuelve **despues** del corte, sobre los mismos `searchParams` ya
+ * resueltos, y de ella depende **cual de las dos secciones se monta**: nunca las dos. El
+ * conmutador es un componente de cliente que solo navega —no pinta contenido—, asi que la lista de
+ * grupos no se consulta para quien nunca abre esa pestana, y un `?tab=grupos` compartido por enlace
+ * llega pintado en el HTML servido. Sin `tab`, o con un valor desconocido, se sirve la de personas
+ * **con los mismos parametros de lista de siempre** (R2, R6): esta pagina no exige que la URL
+ * nombre la pestana por defecto.
+ *
+ * **Cada pestana tiene su propio `<Suspense>`, su propia `key` y su propio esqueleto** (QC-85 R19):
+ * la de grupos se envuelve con `buildWorkGroupListQuery(...)`, que **conserva `tab=grupos`**, de
+ * modo que paginar, ordenar o buscar dentro de los grupos sigue mostrando grupos (R3, R7). **Los
+ * parametros de lista de las dos pestanas son independientes** (R7): cada parser lee los suyos de
+ * la misma URL y el conmutador emite un `href` que lleva **solo** `tab`.
+ *
  * **La marca y la etiqueta llegan IMPORTADAS**, nunca escritas a mano: el nombre de la pantalla es
  * el mismo dato que pinta su item del menu.
  */
@@ -98,8 +121,11 @@ export default async function UsuariosPage({
 }) {
   await requirePagePermission('usuarios.consultar');
 
+  const resolved = await searchParams;
+  const tab = parseUsuariosTab(resolved);
   const canModify = await canModifyUsers();
-  const params = parseUserListParams(await searchParams);
+  const params = parseUserListParams(resolved);
+  const workGroupParams = parseWorkGroupListParams(resolved);
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -108,12 +134,24 @@ export default async function UsuariosPage({
           {USERS_LABEL}
         </h1>
       </div>
-      <Suspense
-        key={buildUserListQuery(params)}
-        fallback={<UserListSkeleton rows={params.pageSize} />}
-      >
-        <UserListSection params={params} canModify={canModify} />
-      </Suspense>
+      <UsuariosTabsSwitch tab={tab} />
+      {tab === GROUPS_TAB ? (
+        <div data-testid={WORK_GROUP_SECTION_TESTID}>
+          <Suspense
+            key={buildWorkGroupListQuery(workGroupParams)}
+            fallback={<WorkGroupListSkeleton rows={workGroupParams.pageSize} />}
+          >
+            <WorkGroupListSection params={workGroupParams} canModify={canModify} />
+          </Suspense>
+        </div>
+      ) : (
+        <Suspense
+          key={buildUserListQuery(params)}
+          fallback={<UserListSkeleton rows={params.pageSize} />}
+        >
+          <UserListSection params={params} canModify={canModify} />
+        </Suspense>
+      )}
     </div>
   );
 }
