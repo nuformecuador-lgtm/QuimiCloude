@@ -259,6 +259,10 @@ Feature con `depends_on` no arranca hasta que su dependencia este `done`.
    - Resuelve conflictos triviales automaticamente.
    - Si un conflicto es ambiguo (no sabe que version conservar), **pregunta al humano**
      y registra el conflicto en `progress/current.md > Conflictos pendientes`.
+   - **Si el merge trae migraciones, las aplica a la base de SU feature** (`prisma migrate deploy`)
+     antes de verificar nada. El gate regenera el *cliente* de Prisma solo, pero no ejecuta las
+     migraciones: sin este paso, los tests de integracion dan rojos que no son de la rama. Paso a
+     paso y el porque: `docs/verification.md > El gate regenera los artefactos`.
    - Hace `git push` de los cambios resueltos.
 10. (F2.4) **PR hacia `dev`.** El implementer:
     - Corre `./init.sh` **completo** (sin flags) antes de abrir el PR, sin excepcion.
