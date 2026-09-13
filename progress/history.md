@@ -3332,3 +3332,78 @@ Ninguno era un fallo del producto: **los cuatro medían mal**.
   pero con el directorio retenido** por un proceso, así que `wt.sh` falló por `.git` inexistente y
   hubo que desregistrar a mano. El directorio vacío sigue en `.worktrees/`. La rama se borró en local
   y en `origin`.
+
+## QC-77 — aislamiento-de-la-base-en-tests-de-integracion: CERRADA el 2026-09-13 (PR #65, merge `12d254f`)
+
+Cada corrida de `tests/integration/**` arranca ahora sobre **su propia base desechable**, creada
+desde una plantilla ya migrada y sembrada y **borrada al terminar pase lo que pase** —incluido
+Ctrl-C, donde el borrado por señal es **síncrono a propósito**: Vitest hace
+`setTimeout(() => process.exit(), 1)` en su handler y un `await` no llega a ejecutarse—. Entra
+además el guardián que aborta si la corrida no apunta a su base efímera, la CLI `db:test`
+(`status`, `list` y un barrido con cinco guardas), el aviso amarillo cuando la base de desarrollo
+tiene migraciones pendientes, y el censo de aislamiento con su guardia para los tests nuevos.
+**31 requisitos, los 31 con test que vuelve a correr. Ninguna dependencia nueva.**
+
+### El daño que arregla, medido antes de empezar
+
+El gate completo sobre `dev` daba **22 archivos de integración en rojo** fuera del baseline. La
+causa de los 22 era **una sola**: la base compartida, cuatro migraciones atrasada. Migrada, queda-
+ban **2**, y los dos eran estado de datos —38 tipos de documento `DOCxxxxxxxx` de corridas viejas,
+y el reset de `identity-seed` que ya no podía borrar empresas porque QC-49 colgó el inventario de
+`companies` con `ON DELETE RESTRICT`—. Sobre base limpia, esos dos daban **61/61 verde**. Ese
+experimento —hacer la base limpia a mano y medir— es lo que convirtió la ficha de sospecha en
+encargo, y la receta que salió de él está ahora escrita en `design.md`.
+
+### Rechazada en primera revisión, y por el motivo correcto
+
+El `implementer` entregó **12 requisitos con test automático y 19 con «medición pegada»**, y fue
+él quien marcó la distinción en su mapa. El `reviewer` la convirtió en el criterio del rechazo:
+**una medición cuenta solo si romper el requisito pone el gate en rojo por sí solo.** Cuatro
+bloqueantes, todos de trazabilidad y ninguno funcional — entre ellos el guardián que protege la
+base de desarrollo y el barrido que ejecuta `DROP DATABASE`, los dos sin test. Segunda vuelta: **38
+casos nuevos**, y aprobado con 31 de 31.
+
+Destapó de paso que **nada estaba commiteado**: con el diff vacío, `--rapido` seleccionaba **cero**
+tests relacionados. No era cosmético.
+
+### Tres cosas que valen más que la feature
+
+- **El `spec_author` no se creyó el brief del leader y acertó.** Se le dijo «18 de 41 archivos usan
+  el patrón de rollback». Fue a comprobarlo: el `grep` obvio devuelve **19**, porque
+  `work-group-crud` usa el patrón para un sondeo suelto y committea el resto. El recuento era
+  correcto; **lo falso era el método**. Por eso la guardia es un censo explícito y no un grep.
+- **El `reviewer` repitió las mutaciones él mismo**, y una salió **verde**: mover la guarda que
+  protege la base de desarrollo detrás de otras dos es **equivalente**, la base sigue retenida. Leer
+  ese verde como correcto —y no como un test que no muerde— es la parte difícil de hacer bien.
+- **Un subagente editó un archivo fuera de su carril** para poder mutar y probar que su test mordía,
+  y **lo declaró** avisando que no podía descartar haber revertido un cambio ajeno. Se verificó en
+  disco: no se perdió nada. El riesgo fue real y lo causó el reparto de archivos del `implementer`.
+
+### Dos sesiones arreglando el mismo centinela el mismo día
+
+El gate salió rojo por **un archivo que no era de esta ficha**: el centinela de alcance de QC-85,
+**rojo ya en `dev`** desde `97c96c2` —verificado corriéndolo allí— porque sus anclas de no-vacuidad
+no tienen nada que medir fuera de su rama. Es la **tercera aparición** de esta especie en el repo.
+Se arregló desde esta rama por decisión humana (`b4a3983`)… y resultó que **la otra sesión lo había
+arreglado a la vez en `dev`** (`5f687c2`, 88 inserciones contra 30). El conflicto se resolvió
+tomando **entera la versión de `dev`**, tras verificar que pasa y que cubre más: el archivo queda
+idéntico al suyo, sin una tercera variante conviviendo. La misma colisión que ya tuvieron QC-49 y
+QC-67, ahora entre dos sesiones en vez de entre dos fichas.
+
+### Deuda que deja, con nombre y dueño
+
+- **8 entradas del baseline ya pasan** y el gate lo avisa en cada corrida; varias caen justamente
+  porque esta ficha quita el residuo. Entre ellas `product-crud.int.test.ts`, cuya propia entrada
+  mandaba retirarla «en cuanto la suite pase tres veces seguidas con el archivo dentro». **Retirarlas
+  es trabajo aparte y sigue sin ficha.**
+- **R10** (dos worktrees corriendo a la vez) queda cubierto **por partes**: probarlo de punta a punta
+  exigía ensuciar la base de desarrollo, o sea provocar el bug para demostrar el arreglo.
+- **La relajación de «el catálogo arranca solo con CC»** que entró por `dev` ya no hace falta: con
+  base efímera el invariante vuelve a ser comprobable. **La retira QC-87**, por decisión humana, para
+  que dos sesiones no se pisen en el mismo archivo.
+- **La suite E2E completa no sobrevive a una base limpia**: 23 fallos, porque el rol Operador no
+  tiene `dashboard.consultar` y aterriza en `/inventario`, reventando el `waitForURL` de todo spec
+  que espere el dashboard con un fixture no-Administrador. Medido por la sesión de QC-85. **No es de
+  QC-77 ni de QC-87, y no tiene ficha.**
+- **`wt.sh done` volvió a fallar en Windows**, y el patrón del centinela que mide a quién no debe
+  sigue **sin un sitio donde esté escrito una sola vez**. Los dos son candidatos a ficha del arnés.
