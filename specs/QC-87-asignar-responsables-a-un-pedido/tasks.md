@@ -148,7 +148,7 @@ E2E** en esta mitad (hallazgo 1 del design).
 mutar** lo que vigila.
 **Depende de:** T7, T8, T9.
 
-### T15 — El mapa `R<n> -> test` y el cierre
+### [x] T15 — El mapa `R<n> -> test` y el cierre
 Escribir `progress/impl_QC-87-asignar-responsables-a-un-pedido.md` con el mapa completo
 (`CHECKPOINTS.md > Trazabilidad`), verificar que el diff de `db/**`, `package.json`,
 `pnpm-lock.yaml`, `app/**` y `components/**` es **vacío** (R48, R50, R51) y que el catálogo sigue con
