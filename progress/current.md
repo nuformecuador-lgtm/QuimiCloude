@@ -20,6 +20,17 @@
 
 ## Evaluaciones
 
+### QC-93 - acotada con `/afinar-feature` (2026-09-13)
+
+Alcance, **10 decisiones cerradas** y **cero preguntas abiertas** en
+`specs/QC-93-aterrizaje-sin-permiso-de-modulo/requirements.md`. No se copian aqui.
+**El board se actualizo ANTES de sembrar, y por dos motivos**: la ficha nacio sin `complexity`
+-gana `complexity:medium`- y su `description` **mentia en dos datos**, que se corrigieron: son
+**cuatro** los casos de «acaba fuera» y no tres -faltaba `e2e/recetas.spec.ts:376` (R6)-, y el dano
+real son **23 fallos** en trece suites sobre base limpia. Ninguna ficha nueva y ninguna cancelada:
+QC-93 **absorbe** el hallazgo de los 23 que reporto la sesion de QC-85 y que no tenia ficha. Sigue
+`pending` en Backlog.
+
 ### QC-87 - acotada con `/afinar-feature` (2026-09-12)
 
 Alcance, **12 decisiones cerradas** y **cero preguntas abiertas** en
