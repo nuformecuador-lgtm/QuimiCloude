@@ -110,7 +110,7 @@ cambiarlos, está mal escrita.
       pantalla de QC-35 intactos), y H4 (el tope del dominio coincide con `MAX_PAGE_SIZE`).
       **Hecho**: las guardias mueren al mutar el archivo real, no solo pasan en verde.
 
-- [ ] **T18. Cierre.** (depende de todas)
+- [x] **T18. Cierre.** (depende de todas)
       `./init.sh` completo, mapa `R<n> -> test` en `progress/impl_QC-102-...md`, revisión.
       **Hecho**: gate verde contra `tests/baseline-rojos.json` y los 41 requisitos mapeados.
 
