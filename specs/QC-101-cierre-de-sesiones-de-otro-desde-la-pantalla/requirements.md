@@ -30,7 +30,113 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+> Identificadores en ingles. Cada `R<n>` termina mapeado a un test concreto en
+> `progress/impl_QC-101-*.md` (`CHECKPOINTS.md > Trazabilidad`). Los requisitos **negativos**
+> (R16-R20) son los limites de alcance de la tabla de decisiones, escritos como requisitos para que
+> tengan test propio y no se queden en nota de diseno.
+
+### La Server Action (la puerta que hoy falta)
+
+**R1.** El sistema DEBE exponer **una** Server Action, `endAllSessionsAction`, que cierre todas las
+sesiones de la persona objetivo **delegando en el caso de uso ya cableado**
+`identity.endAllSessions` (`lib/composition/index.ts:568`), sin reimplementar, repetir ni compensar
+ninguna de sus reglas: ni la comprobacion de permiso, ni el filtro de empresa, ni el truncado del
+sello, ni la traduccion de los tres casos de no-encontrado.
+
+**R2.** CUANDO se invoca `endAllSessionsAction`, el sistema DEBE construir el actor con **las dos
+caras** de la sesion del servidor —identificador y permisos de `getSessionUser()`, empresa de
+`getSessionContext()`— y pasarlo **por parametro** al caso de uso. SI falta cualquiera de las dos,
+ENTONCES el actor DEBE ser `null` y la accion DEBE seguir adelante hasta que el caso de uso la
+rechace (falla cerrado, sin error propio escrito en el borde).
+
+**R3.** SI quien invoca la accion sobre **otra** persona no trae `usuarios.modificar`, ENTONCES el
+sistema DEBE rechazar la operacion **en el service** con el codigo estable `unauthorized` y **no
+DEBE tocar el puerto de revocacion**: ninguna sesion de nadie queda invalidada. Ocultar el control
+en la interfaz **no cuenta** como cumplimiento de este requisito
+(`docs/architecture.md > Acceso a datos y autorizacion`).
+
+**R4.** SI el objetivo no existe, esta borrado logicamente o pertenece a otra empresa, ENTONCES el
+sistema DEBE responder el **mismo** codigo `user_not_found` en los tres casos, sin distinguirlos y
+sin revelar cual fue.
+
+**R5.** CUANDO la operacion termina bien, la accion DEBE devolver un estado serializable de exito
+**sin ningun dato**: sin numero de sesiones cerradas, sin identificadores de sesion, sin credencial
+y sin lista de dispositivos.
+
+**R6.** El sistema DEBE traducir todo fallo de la accion **por el `code` estable** de la clase de
+error y nunca por el texto del mensaje, con el traductor unico del modulo `errores`, y DEBE devolver
+`unexpected` —con su mensaje neutro y el detalle solo en el registro del servidor— ante cualquier
+error que no sea de dominio. Ningun `catch` DEBE descartar un error, y **no se declara ningun codigo
+de error nuevo**.
+
+### El control y su confirmacion, en el panel de detalle
+
+**R7.** MIENTRAS el panel de detalle del usuario este abierto sobre **otra** persona **con la cuenta
+`active`**, el sistema DEBE ofrecer un control «Cerrar todas las sesiones» cuyo nombre accesible
+incluya **el nombre de esa persona**.
+
+**R8.** El sistema **NO DEBE** anadir ninguna accion nueva a la fila del listado: la celda de
+acciones DEBE seguir emitiendo exactamente los tres controles de hoy —editar, cambiar estado y
+eliminar—, ni uno mas, y no se introduce ningun menu desplegable de fila.
+
+**R9.** CUANDO se activa ese control, el sistema DEBE pedir confirmacion en un dialogo que **nombre
+a la persona** y advierta que tendra que volver a entrar. MIENTRAS no se confirme, el sistema **NO
+DEBE** invocar la Server Action: abrir el dialogo no cierra ninguna sesion.
+
+**R10.** CUANDO se confirma el dialogo, el sistema DEBE invocar la Server Action **exactamente una
+vez** y con el identificador de la persona del panel.
+
+**R11.** SI la cuenta de la persona del panel **no** esta `active`, ENTONCES el control **NO DEBE
+existir en el DOM**: ni visible, ni deshabilitado, ni acompanado de explicacion.
+
+**R12.** SI la persona del panel es **el propio actor de la sesion**, ENTONCES el control **NO DEBE
+existir en el DOM**, con el mismo criterio de R11.
+
+**R13.** CUANDO la accion responde exito, el sistema DEBE, en este orden: cerrar el dialogo, avisar
+por el `<Toaster />` que ya monta el layout privado con un texto que **confirma la accion sin
+prometer ningun numero**, y poner la pantalla al dia **con la misma URL** (sin perder pagina,
+tamano, orden, filtro ni busqueda).
+
+**R14.** SI la accion responde error, ENTONCES el sistema DEBE pintarlo **dentro del dialogo** y
+**por su `code`**, DEBE mantener el dialogo abierto y **NO DEBE** emitir el aviso de exito ni alterar
+nada de lo pintado en la pantalla.
+
+**R15.** El control y su dialogo DEBEN cumplir
+`docs/architecture.md > Componentes > Regla: multiplataforma`: objetivo tactil de al menos 44x44 px
+y ninguna via de activacion que dependa de `:hover`.
+
+**R16.** La decision de si el control se emite DEBE bajar **por props** desde el servidor: ningun
+componente de cliente de esta pantalla lee la sesion, importa `lib/composition` ni consulta la base
+por su cuenta.
+
+### El recorrido completo (la razon de ser de la ficha)
+
+**R17.** CUANDO un Administrador con `usuarios.modificar` cierra las sesiones de otra persona que
+**tenia una sesion viva en otro navegador**, ENTONCES la siguiente navegacion privada de esa persona
+DEBE acabar **en el login**, sin llegar a ver ninguna pantalla privada y **en una sola redireccion
+de documento**. Se verifica de punta a punta, en un navegador real, con **dos contextos vivos a la
+vez** (`e2e/`).
+
+### Limites de alcance (requisitos negativos, cada uno con su test)
+
+**R18.** El sistema **NO DEBE** crear el permiso `sesiones.modificar` ni modificar el catalogo de
+permisos: el conjunto de codigos declarado DEBE ser identico al de la base de fusion, y la
+autorizacion DEBE seguir siendo `usuarios.modificar` heredado de QC-23.
+
+**R19.** El sistema **NO DEBE** anadir al dominio ningun conteo de sesiones: ninguna firma nueva o
+modificada DEBE devolver un numero de sesiones, y ningun texto de la interfaz DEBE afirmar cuantas
+se cerraron.
+
+**R20.** El sistema **NO DEBE** exponer ninguna lista de sesiones vivas: el puerto de revocacion
+DEBE seguir declarando exactamente `revokeSession` y `stampAll`, sin ningun metodo de listado,
+busqueda o lectura.
+
+**R21.** El sistema **NO DEBE** incluir el control del **propio** usuario sobre sus sesiones —eso es
+QC-53—: ninguna pantalla nueva ni existente DEBE ofrecer «cerrar mis sesiones», y `endOtherSessions`
+DEBE seguir sin ser invocado desde ninguna interfaz.
+
+**R22.** El sistema **NO DEBE** anadir ninguna dependencia: el conjunto de nombres de
+`dependencies` + `devDependencies` DEBE ser identico al de la base de fusion con `origin/dev`.
 
 ## Preguntas abiertas
 
