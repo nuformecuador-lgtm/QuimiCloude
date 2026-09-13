@@ -115,19 +115,19 @@ nombre **de la fila**, personas de baja incluidas y orden estable.
 **sin** ninguno de `asignaciones.*` y espera éxito.
 **Depende de:** T2, T3, T4, T5, T6.
 
-### T10 — El barril de `asignaciones`
+### [x] T10 — El barril de `asignaciones`
 Publica las **cuatro** factories con sus `*Deps`, los errores, los esquemas y `OrderResponsible`.
 **No** publica el puerto, el adaptador driven ni las Server Actions (R46).
 **Hecho:** el barril se puede importar desde un componente de cliente (no arrastra `next/*`,
 `@prisma/client` ni `'use server'`); `guard-arquitectura-modulos` verde.
 **Depende de:** T7, T8, T9.
 
-### T11 — Cableado en `lib/composition`
+### [x] T11 — Cableado en `lib/composition`
 `design.md > 2.3`. Los tres adaptadores nuevos y las cuatro funciones ya cableadas.
 **Hecho:** ningún otro archivo de producción importa un adaptador driven (R47).
 **Depende de:** T10.
 
-### T12 — Las tres Server Actions y la consulta tipada
+### [x] T12 — Las tres Server Actions y la consulta tipada
 `design.md > 7`. `FormData` crudo al esquema, actor de las dos caras de la sesión, traducción por
 `code`, **sin `revalidatePath`** y **sin** comprobar permisos en esta capa.
 **Hecho:** R41, R43, R44 con sus tests; un test comprueba que un `FormData` sin `orderId` acaba en

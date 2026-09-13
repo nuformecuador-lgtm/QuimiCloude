@@ -113,7 +113,7 @@ export function createOrderAssignmentRepository(db: PrismaLike = prisma): OrderA
       userId: string,
     ): Promise<'ok' | 'not_found'> {
       const { count } = await db.orderAssignment.deleteMany({
-        where: { orderId, userId, companyId },
+        where: { orderId, companyId },
       });
       return count === 1 ? 'ok' : 'not_found';
     },
