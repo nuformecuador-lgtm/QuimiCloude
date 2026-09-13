@@ -676,16 +676,22 @@ describe('conjunto cerrado de tipos de documento', () => {
     })
   })
 
-  it('el catalogo trae CC activo y con su nombre', async () => {
+  it('el catalogo arranca SOLO con CC, activo y con su nombre', async () => {
     await inRolledBackTransaction(async (tx) => {
-      // Se consulta CC en CONCRETO y no se lista el catalogo entero: la exclusividad ("aqui
-      // solo esta CC") no se puede sostener contra esta base. Las suites de inventario,
-      // pedidos y proveedores insertan tipos `DOC<marcador>` con escrituras COMMITEADAS, asi
-      // que el catalogo global crece con cada corrida y comparar la lista completa solo seria
-      // verde sobre una base recien reseteada. Lo que la feature promete —y lo unico que este
-      // caso puede afirmar— es que CC existe, se llama asi y esta activo.
-      const cc = await tx.documentType.findUniqueOrThrow({ where: { code: DOCUMENT_TYPE_CC } })
-      expect(cc.code).toBe(DOCUMENT_TYPE_CC)
+      // Se lista el catalogo ENTERO y se compara por IGUALDAD, no por "contiene" ni "al menos":
+      // lo que la feature promete es exclusividad —aqui solo esta CC—, y una asercion que solo
+      // comprobara la existencia de CC no vigilaria eso.
+      //
+      // Esta asercion estuvo RELAJADA (se consultaba CC en concreto) mientras los tests de
+      // integracion compartian la base de desarrollo: las suites de inventario, pedidos y
+      // proveedores insertan tipos `DOC<marcador>` con escrituras COMMITEADAS, el catalogo global
+      // crecia con cada corrida y la comparacion completa solo era verde sobre una base recien
+      // reseteada. **QC-77 elimino esa causa de raiz**: cada corrida de integracion va contra su
+      // propia base efimera, copia de una plantilla recien migrada y sembrada, asi que el
+      // invariante vuelve a ser cierto y comprobable. La relajacion se retira aqui.
+      const catalogo = await tx.documentType.findMany({ orderBy: { code: 'asc' } })
+      expect(catalogo.map((tipo) => tipo.code)).toEqual([DOCUMENT_TYPE_CC])
+      const [cc] = catalogo
       expect(cc.name).toBe('Cedula de ciudadania')
       expect(cc.isActive).toBe(true)
     })

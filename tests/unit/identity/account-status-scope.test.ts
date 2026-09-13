@@ -319,6 +319,29 @@ const SITIOS_PERMITIDOS = [
   'lib/modules/identity/domain/list-work-group-members.ts',
   'lib/modules/identity/domain/work-group-queryable.ts',
   'lib/modules/identity/ports/work-group-repository.ts',
+
+  // ---------------------------------------------------------------------------------------
+  // QC-87 T3 — LOS DOS CONTRATOS CON LOS QUE OTRO MODULO PREGUNTA POR PERSONAS Y POR GRUPOS.
+  //
+  // Tres archivos mas, y por el mismo motivo que el bloque de QC-84: la lista se RETENSA
+  // NOMBRANDO LA EXCEPCION, no relajando la asercion.
+  //
+  // QUIEN LOS AUTORIZA: **QC-87 R21**, que manda decidir quien se asigna al aplicar un grupo
+  // con la MISMA definicion que decide quien aparece en la lista de miembros, y prohibe por
+  // escrito un `WHERE account_status = 'active'` a secas. Ninguno de los tres declara una
+  // segunda definicion del estado: el adaptador PASA POR `effectiveAccountStatus` -la unica de
+  // QC-78 R7- y los dos de `domain/` solo la nombran al explicar que significa `isActive`.
+  //
+  //   - `assignment-directory-prisma.ts` TRAE la columna y el plazo en su `select` y los
+  //     traduce con `effectiveAccountStatus(view, now)`, con el `now` que le pasan: no hay ni
+  //     un `if` sobre el valor de la columna, y no escribe el estado jamas.
+  //   - `people-directory.ts` y `work-group-directory.ts` lo nombran en la DOCUMENTACION de
+  //     `isActive` y de `activeMemberIds` -«estado EFECTIVO, no la columna»-, que es justo lo
+  //     que hay que decir para que nadie lo reimplemente. `MENCION_DEL_ESTADO` mira el archivo
+  //     entero y una excepcion nombrada es mas honesta que ensanchar el patron.
+  'lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma.ts',
+  'lib/modules/identity/domain/people-directory.ts',
+  'lib/modules/identity/domain/work-group-directory.ts',
 ] as const;
 
 /**
