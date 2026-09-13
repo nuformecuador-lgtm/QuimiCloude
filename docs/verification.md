@@ -135,6 +135,94 @@ tuyos hasta que la apliques. Está escrito en `AGENTS.md > F2.3`.
   limpio y **1 archivo y 2 tests** con el `.env` cargado, y el rojo no decía «falta una
   variable» sino «Validation Error» de Prisma, que se lee como un fallo de código.
 
+## Los tests de integración corren sobre una base propia y efímera (QC-77, 2026-09-12)
+
+Complementa la nota del `.env` de arriba: el gate carga `DATABASE_URL` para saber **dónde está el
+Postgres**, no para escribir en ella. Los tests de integración **no tocan la base de desarrollo**.
+
+**Cada corrida del proyecto `integration` crea su propia base, copia de una plantilla ya migrada y
+sembrada, y la borra al terminar pase lo que pase.** La regla es **la misma en `./init.sh` completo
+y en `--rapido`**: no hay dos verdades, el enganche vive en el `globalSetup` del proyecto, no en el
+modo del gate. La corrida dice por consola contra qué base va — una corrida de integración que no
+lo dice no es auditable.
+
+Lo que esto compró, medido en tres corridas seguidas de los 41 archivos / 630 casos: las tres en
+verde, con base distinta cada una, y los **13 rojos** que la base compartida y sucia arrastraba
+(`identity-constraints` e `identity-seed`) desaparecidos. La base de desarrollo quedó idéntica en
+sus 20 tablas antes y después.
+
+### La plantilla, y por qué la receta tiene cuatro pasos
+
+`prisma migrate deploy` **no termina sobre una base vacía**, y eso es a propósito:
+`20260911130000_inventory_company_scope` exige que exista la empresa inicial y falla cerrado
+(QC-49 R3). Así que la plantilla se construye **migrar → sembrar → `migrate resolve
+--rolled-back` → migrar**. La receta entera, con los detalles que no son obvios, está en
+`specs/QC-77-aislamiento-de-la-base-en-tests-de-integracion/design.md > 3`; no se copia aquí para
+que no haya dos versiones que se desincronicen.
+
+Cuesta ~38 s, y **se pagan una vez por conjunto de migraciones, no por corrida**: el nombre de la
+plantilla lleva una huella de las migraciones **y** del sembrado, así que mientras ninguno de los
+dos cambie se reutiliza tal cual y la copia es un `CREATE DATABASE ... TEMPLATE`. Si cambian, el
+nombre cambia, no existe esa plantilla y se construye sola. El nombre **es** la invalidación de
+caché: no hay que acordarse de borrar nada.
+
+### La base de desarrollo atrasada: avisa en amarillo, no falla
+
+El bloque `6.c` de `init.sh` consulta el estado de la base de desarrollo antes de los tests y
+**avisa; no cambia el código de salida del gate**. El porqué es una tarde perdida: el 2026-09-12 la
+base iba cuatro migraciones atrás y eso dejó **22 archivos en rojo sin que nada dijera la causa**.
+El aviso existe para explicar ese rojo **antes** de verlo. Bloquear un PR por el estado de una base
+local sería un gate que se ignora, y el aviso distingue «va N atrás, la más antigua que falta es
+X» de «no se pudo consultar: <razón>», que no son lo mismo.
+
+**Lo que sí es `fail` es que falte `scripts/test-db.ts`.** Colgar el bloque de un `[ -f ... ]` con
+un `warn` en el `else` sería exactamente el anti-patrón que este mismo archivo documenta más abajo:
+en la máquina que no tenga el script, el check se salta entero y el gate sigue verde. Que el script
+no exista es una rotura del arnés; que la base esté atrasada es la circunstancia que el bloque vino
+a contar.
+
+### `pnpm run db:test clean` — la regla de oro: ante la duda, NO borra
+
+Las bases huérfanas de corridas muertas y las heredadas por worktree se barren con
+`pnpm run db:test clean`. **Dry-run por defecto**: imprime la tabla con veredicto y razón por fila
+y termina diciendo que no borró nada; hace falta `--force` para que muerda. Cinco guardas retienen
+una base, y basta una: es la de desarrollo, el nombre no encaja en ninguna forma conocida, tiene
+conexiones abiertas, su worktree o su rama `feature/QC-<n>-*` siguen vivos, o **no se pudo leer su
+estado** (si git no responde, no se juzga: se retiene). Cada una se probó con su fixture y mordió
+por su razón; con git inaccesible salen **cero** borrables.
+
+Las **plantillas se listan aparte y no caen** en un barrido normal: son caché de esquema, no
+basura, y se reconstruyen solas. Los otros subcomandos: `status` (estado de la base de desarrollo,
+el que consume `init.sh`), `template` (construye o reutiliza la plantilla) y `list` (el inventario
+sin borrar nada).
+
+### El censo de aislamiento, y lo que su guardia NO comprueba
+
+Todo archivo nuevo bajo `tests/integration/**` tiene que declarar en
+`tests/integration/aislamiento.json` **cómo se aísla**: `transaccion` (transacción interactiva que
+termina en `ROLLBACK`) o `commit` (escribe de verdad, o no escribe nada) y, si es `commit`, con
+`motivo` y `desde` propios. Si falta, `tests/guards/guard-aislamiento-integracion.test.ts` pone el
+gate en rojo. Vive en las guardias porque el censo es un JSON que no importa nadie: ningún grafo de
+imports lo relacionaría con un cambio.
+
+**Lo que la guardia no comprueba es que el modo declarado sea cierto.** Un archivo puede declararse
+`transaccion` y committear, y saldría verde. Comprobarlo exigiría leer el código del test, y eso
+está medido y no es fiable: un `grep` de `inRolledBackTransaction` devuelve **19** archivos cuando
+la verdad son **18** — `identity/work-group-crud.int.test.ts` usa el patrón para un sondeo suelto y
+el resto de sus casos committea. Una guardia que cuenta mal desde el primer día entrena a todos a
+ignorarla. Lo que compra es más modesto y vale la pena: que nadie añada un archivo de integración
+sin haber pensado cómo se aísla.
+
+### Dos cosas medidas que conviene no volver a descubrir
+
+- **El borrado del camino de señal (Ctrl-C) es síncrono a propósito.** Vitest, en su propio
+  handler, hace `setTimeout(() => process.exit(), 1)`: un `DROP DATABASE` con `await` no llega a
+  terminar. **Convertir `dropRunDatabaseSync` en `async` devuelve la base viva tras Ctrl-C.** Está
+  comprobado con un Ctrl-C real a mitad de corrida, no razonado.
+- **Un `SIGKILL` o cerrar la terminal no ejecuta nada**, y no hay handler que lo arregle. Esa base
+  la recoge **la corrida siguiente**, que antes de crear nada barre los rastros de `.qc-test-db/`
+  de este worktree cuyo pid ya está muerto, y dice por consola cuál borró y por qué.
+
 ## Rojos heredados: la pregunta es «¿rompí algo YO?»
 
 Cuando `dev` arrastra tests rojos que no son tuyos, la suite completa termina siempre en rojo y
