@@ -34,10 +34,10 @@
  */
 import { requirePermission, type Actor } from './actor';
 import { OrderNotFoundError } from './errors';
+import { compareResponsibles, toOrigin } from './responsible-order';
 
 import type { OrderResponsible } from './assignment-view';
-import type { AssignmentOrigin } from './order-assignment';
-import type { AssignmentRow, OrderAssignmentRepository } from '../ports/order-assignment-repository';
+import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
 
 // De otro modulo se consume SOLO su contrato publico, nunca una ruta profunda
 // (`docs/architecture.md > La regla de dependencias`). Son interfaces puras: no arrastran servidor.
@@ -65,49 +65,12 @@ export type ListOrderResponsiblesDeps = {
 };
 
 /**
- * El orden de R38: por **nombre mostrable**, con desempate por **identificador de la persona**.
- *
- * Es la unica excepcion del repo al reparto habitual «ordena la base» (`design.md > 3`), y tiene
- * motivo: se ordena por un nombre que vive en `users`, tabla que este modulo NO puede consultar
- * (`design.md > 11.3`). El adaptador devuelve las filas ordenadas por `user_id` -barato, cubierto
- * por la PK- para que la LECTURA ya sea determinista antes de resolver nombres, y aqui se reordena
- * con los nombres ya resueltos.
- *
- * **El desempate por `userId` no es cosmetico: es lo que hace el orden TOTAL** (R38). Sin el, dos
- * homonimas -y dos personas pueden llamarse igual, a diferencia de los roles de QC-94- quedarian
- * en un orden que depende de como estuvieran colocadas antes del `sort`, y «dos lecturas seguidas
- * devuelven la misma secuencia» dejaria de estar garantizado.
- *
- * El nombre se compara con un `Intl.Collator` de locale FIJO: el orden no puede depender de la
- * configuracion regional de la maquina que ejecute el proceso. El desempate compara el
- * identificador por puntos de codigo -son uuid, sin acentos ni mayusculas que discutir-, para que
- * sea total aunque el colador considere iguales dos nombres.
+ * **QC-102 T3 — el comparador y `toOrigin` ya NO viven aqui**: se movieron a
+ * `./responsible-order`, sin cambiar ni una linea de su cuerpo, para que la consulta EN LOTE de
+ * QC-102 (`list-responsibles-for-orders.ts`) ordene con la MISMA definicion y no con una copia
+ * (QC-102 R6). El comportamiento de este caso de uso no cambia: sus tests pasan sin tocar su
+ * guion. Los motivos del orden y del origen viajaron con el codigo y se leen en ese archivo.
  */
-const NAME_COLLATOR = new Intl.Collator('es', { sensitivity: 'base', numeric: false });
-
-function compareResponsibles(one: OrderResponsible, other: OrderResponsible): number {
-  const byName = NAME_COLLATOR.compare(one.displayName, other.displayName);
-  if (byName !== 0) return byName;
-  // El DESEMPATE, que es la mitad de R38. Se compara por puntos de codigo -no con el colador- para
-  // que el orden sea TOTAL: dos identificadores distintos nunca empatan aqui, y por tanto dos
-  // lecturas seguidas del mismo pedido no pueden devolver secuencias distintas.
-  if (one.userId === other.userId) return 0;
-  return one.userId < other.userId ? -1 : 1;
-}
-
-/**
- * El origen de LA FILA (R35, R36). `workGroupId` y `workGroupName` van juntos o ninguno -el CHECK
- * `order_assignments_work_group_name_matches_group` de QC-86 R7 lo garantiza en Postgres y la union
- * discriminada lo garantiza en TypeScript-, asi que cualquier fila a medias que llegara aqui se lee
- * como lo unico que se puede afirmar de ella: un responsable suelto. No se inventa un nombre de
- * grupo ni se va a buscar el de hoy.
- */
-function toOrigin(row: AssignmentRow): AssignmentOrigin {
-  if (row.workGroupId !== null && row.workGroupName !== null) {
-    return { kind: 'workGroup', workGroupId: row.workGroupId, workGroupName: row.workGroupName };
-  }
-  return { kind: 'direct' };
-}
 
 export function createListOrderResponsibles(
   deps: ListOrderResponsiblesDeps,

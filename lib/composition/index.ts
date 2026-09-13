@@ -260,6 +260,7 @@ import type { WorkGroupRepository } from '@/lib/modules/identity/ports/work-grou
 import {
   createAssignResponsibles,
   createListOrderResponsibles,
+  createListResponsiblesForOrders,
   createRemoveWorkGroupFromOrder,
   createUnassignResponsible,
 } from '@/lib/modules/asignaciones';
@@ -979,6 +980,19 @@ export const asignaciones = {
   // tests que no lo inyectan.
   listOrderResponsibles: createListOrderResponsibles({
     orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    people: peopleDirectory,
+    now: () => new Date(),
+  }),
+  // QC-102 T5 - la QUINTA operacion: los responsables de VARIOS pedidos a la vez, que es lo que
+  // el listado pide una vez por pagina (`QC-102 design.md > 2.5`). MISMO `orderAssignmentRepository`
+  // y MISMO `peopleDirectory` que los otros cuatro casos de uso: ningun adaptador nuevo.
+  //
+  // **SIN `OrderCatalog`**, y no es un olvido: el hallazgo H3 de QC-102 lo deja escrito. Comprobar
+  // que cada pedido de la pagina existe costaria una consulta POR PEDIDO -lo que su R4 prohibe-,
+  // asi que un identificador desconocido devuelve su entrada VACIA (R7). La empresa la sigue
+  // aplicando el puerto con la del actor (R3).
+  listResponsiblesForOrders: createListResponsiblesForOrders({
     assignments: orderAssignmentRepository,
     people: peopleDirectory,
     now: () => new Date(),

@@ -54,6 +54,9 @@ function montar(order: OrderAssignmentTarget | null): {
   const assignments = {
     insertMissing: vi.fn(async (rows: readonly unknown[]) => rows.length),
     listByOrderInCompany: vi.fn(async () => []),
+    // QC-102 T1: el puerto gano un quinto metodo (la consulta EN LOTE). El doble lo declara
+    // para seguir satisfaciendo la interfaz; ningun caso de uso de QC-87 lo invoca.
+    listByOrdersInCompany: vi.fn(async () => []),
     deleteOne: vi.fn(async () => 'ok' as const),
     deleteByWorkGroup: vi.fn(async () => 0),
   };
