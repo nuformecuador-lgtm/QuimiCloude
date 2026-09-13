@@ -7,10 +7,20 @@
 //
 //   (a) **Las Server Actions de QC-87 se importan por su RUTA EXACTA**
 //       (`@/lib/modules/asignaciones/adapters/driving/order-assignment-actions`), nunca desde el
-//       barrel `@/lib/modules/asignaciones`. No es cosmetica: el contrato del modulo solo reexporta
-//       `./domain` y NO puede arrastrar servidor (`guard-arquitectura-modulos`, R10), asi que
-//       sacar las acciones por el barrel romperia el contrato del modulo entero, no solo el estilo
-//       de este import. El barrel SI vale para los tipos (`OrderResponsible`), que es como se usa.
+//       barrel `@/lib/modules/asignaciones` ni desde ningun otro sitio. No es cosmetica: el
+//       contrato del modulo solo reexporta `./domain` y NO puede arrastrar servidor
+//       (`guard-arquitectura-modulos`, R10), asi que sacar las acciones por el barrel romperia el
+//       contrato del modulo entero, no solo el estilo de este import.
+//
+//       Lo que R40 prohibe son **las acciones**, y nada mas. El barrel es la puerta legitima del
+//       modulo -`docs/architecture.md` deja que `app/**` importe el contrato- y por el entran los
+//       tipos (`OrderResponsible`) y los simbolos de DOMINIO PURO que el contrato publica a
+//       proposito: el predicado `canModifyAssignments` (R29/R50, para que el codigo del permiso no
+//       salga del modulo), los errores, los esquemas `zod` y la proyeccion de salida. Por eso el
+//       detector NO mide «valor contra tipo» -seria mas estricto que su requisito y mordria codigo
+//       legitimo-: mide una lista NOMBRADA de acciones, y otro caso de este mismo archivo
+//       comprueba que esa lista es exactamente la que exporta el fuente real de acciones, para que
+//       una accion nueva no se cuele por olvidar anadirla.
 //
 //   (b) **La pantalla no vuelve a escribir ninguna regla de QC-87.** Las cuatro que la decision
 //       cerrada 12 enumera —que estados admiten asignacion, «solo cuentas `active`», «reaplicar
@@ -53,7 +63,24 @@ const DOMINIO = join(repoRoot, 'lib', 'modules', 'asignaciones', 'domain')
 const RUTA_EXACTA = '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions'
 const BARREL = '@/lib/modules/asignaciones'
 
-/** Las cinco Server Actions del modulo: las cuatro de QC-87 mas la del lote que anade QC-102. */
+/** El fuente REAL de las acciones, para comprobar que la lista de abajo no se queda corta. */
+const FUENTE_DE_ACCIONES = join(
+  repoRoot,
+  'lib',
+  'modules',
+  'asignaciones',
+  'adapters',
+  'driving',
+  'order-assignment-actions.ts',
+)
+
+/**
+ * Las cinco Server Actions del modulo, NOMBRADAS una a una: las cuatro de QC-87 mas la del lote
+ * que anade QC-102. Escritas a mano y no deducidas de un sufijo («si acaba en `Action`»), porque un
+ * criterio asi se afloja sin que nadie lo note. El riesgo contrario -que la lista se quede vieja y
+ * una accion nueva entre por el barrel en silencio- lo cubre el caso «la lista coincide con lo que
+ * el fuente real exporta».
+ */
 const ACCIONES = [
   'assignResponsiblesAction',
   'unassignResponsibleAction',
@@ -90,31 +117,37 @@ export function importBlocks(source: string): ReadonlyArray<{ clause: string; sp
 // ---------------------------------------------------------------------------
 
 /**
- * Hallazgos de (a). Dos infracciones distintas:
- *   - sacar UNA accion del barrel del modulo;
- *   - importar el barrel con valores (no `import type`), que es lo que permitiria lo anterior.
+ * Hallazgos de (a): UNA sola infraccion, la que R40 nombra —una Server Action de QC-87 tomada de
+ * cualquier sitio que no sea su ruta exacta, y senaladamente del barrel del modulo—.
+ *
+ * Se decide por la LISTA nombrada `ACCIONES`, no por «valor contra tipo»: importar VALORES del
+ * contrato es legitimo y es justo lo que la pantalla hace con `canModifyAssignments` (R29/R50).
  */
 export function findActionImportFindings(files: readonly Fuente[]): readonly string[] {
   const findings: string[] = []
   for (const file of files) {
     for (const { clause, specifier } of importBlocks(file.content)) {
-      if (specifier !== BARREL) continue
-      const nombradas = ACCIONES.filter((accion) => new RegExp(`\\b${accion}\\b`).test(clause))
-      for (const accion of nombradas) {
+      if (specifier === RUTA_EXACTA) continue
+      for (const accion of ACCIONES) {
+        if (!new RegExp(`\\b${accion}\\b`).test(clause)) continue
+        const origen = specifier === BARREL ? `el barrel '${BARREL}'` : `'${specifier}'`
         findings.push(
-          `${file.relPath}: importa '${accion}' desde el barrel '${BARREL}'; las Server Actions se ` +
-            `consumen por su ruta exacta '${RUTA_EXACTA}' (R40)`,
-        )
-      }
-      if (nombradas.length === 0 && !/^\s*type\b/.test(clause)) {
-        findings.push(
-          `${file.relPath}: importa VALORES desde el barrel '${BARREL}'; del contrato del modulo ` +
-            'solo se toman tipos (`import type`), y las acciones van por su ruta exacta (R40)',
+          `${file.relPath}: importa la Server Action '${accion}' desde ${origen}; las Server ` +
+            `Actions de QC-87 se consumen por su ruta exacta '${RUTA_EXACTA}' (R40)`,
         )
       }
     }
   }
   return findings
+}
+
+/** Los nombres de las Server Actions que exporta el fuente REAL, para contrastarlos con `ACCIONES`. */
+export function exportedActionNames(source: string): readonly string[] {
+  const limpio = stripComments(source)
+  const nombres = [...limpio.matchAll(/export\s+async\s+function\s+(\w+)/g)].map(
+    (match) => match[1] as string,
+  )
+  return [...new Set(nombres)].sort()
 }
 
 // ---------------------------------------------------------------------------
@@ -288,21 +321,68 @@ describe('(a) las Server Actions de QC-87 se importan por su ruta exacta (R40)',
 
     const findings = findActionImportFindings([mutado])
     expect(findings).toHaveLength(3)
-    expect(findings.join(' | ')).toContain("importa 'assignResponsiblesAction' desde el barrel")
+    expect(findings.join(' | ')).toContain(
+      "importa la Server Action 'assignResponsiblesAction' desde el barrel",
+    )
   })
 
-  it('`import type` desde el barrel es legitimo, y un valor suelto no lo es', () => {
+  it('MUERE tambien con la de desasignar y con la de quitar grupo, sacadas del barrel', () => {
+    const real = fuentesDeLaPantalla.find((file) =>
+      file.relPath.endsWith('components/order-responsibles.tsx'),
+    ) as Fuente
+
+    for (const accion of ['unassignResponsibleAction', 'removeWorkGroupFromOrderAction'] as const) {
+      // Se desvia UNA sola accion y el resto se queda por su ruta exacta: el hallazgo tiene que ser
+      // exactamente uno, y nombrar la que se ha desviado.
+      const mutado: Fuente = {
+        relPath: real.relPath,
+        content:
+          `import { ${accion} } from '${BARREL}';\n` +
+          real.content.replace(`  ${accion},\n`, ''),
+      }
+      expect(mutado.content).not.toBe(real.content)
+
+      expect(findActionImportFindings([mutado])).toEqual([
+        `${real.relPath}: importa la Server Action '${accion}' desde el barrel '${BARREL}'; ` +
+          `las Server Actions de QC-87 se consumen por su ruta exacta '${RUTA_EXACTA}' (R40)`,
+      ])
+    }
+  })
+
+  it('del barrel entran los tipos Y el dominio puro; lo unico prohibido es la accion', () => {
     const tipos: Fuente = {
       relPath: 'sintetico.tsx',
       content: `import type { OrderResponsible } from '${BARREL}';`,
     }
     expect(findActionImportFindings([tipos])).toEqual([])
 
-    const valor: Fuente = {
+    // El predicado de permiso y la constante del lote son DOMINIO PURO que el contrato publica a
+    // proposito (R29/R50): sacarlos del barrel es el uso previsto, no una infraccion.
+    const dominio: Fuente = {
       relPath: 'sintetico.tsx',
-      content: `import { MAX_ORDERS_PER_BATCH } from '${BARREL}';`,
+      content:
+        `import { canModifyAssignments } from '${BARREL}';\n` +
+        `import { MAX_ORDERS_PER_BATCH } from '${BARREL}';\n`,
     }
-    expect(findActionImportFindings([valor])).toHaveLength(1)
+    expect(findActionImportFindings([dominio])).toEqual([])
+
+    // Una accion, en cambio, no entra por el barrel ni acompanada de dominio legitimo.
+    const accion: Fuente = {
+      relPath: 'sintetico.tsx',
+      content: `import { canModifyAssignments, assignResponsiblesAction } from '${BARREL}';`,
+    }
+    expect(findActionImportFindings([accion])).toHaveLength(1)
+
+    // Ni por un tercer camino que no sea su ruta exacta (un re-export local, por ejemplo).
+    const rodeo: Fuente = {
+      relPath: 'sintetico.tsx',
+      content: "import { assignResponsiblesAction } from './order-responsibles';",
+    }
+    expect(findActionImportFindings([rodeo])).toEqual([
+      "sintetico.tsx: importa la Server Action 'assignResponsiblesAction' desde " +
+        "'./order-responsibles'; las Server Actions de QC-87 se consumen por su ruta exacta " +
+        `'${RUTA_EXACTA}' (R40)`,
+    ])
 
     // Y un comentario que nombre la accion y el barrel no es una infraccion.
     const comentario: Fuente = {
@@ -310,6 +390,15 @@ describe('(a) las Server Actions de QC-87 se importan por su ruta exacta (R40)',
       content: `// ojo: assignResponsiblesAction NO se importa de '${BARREL}'\nexport const x = 1;`,
     }
     expect(findActionImportFindings([comentario])).toEqual([])
+  })
+
+  it('la lista de acciones vigiladas es EXACTAMENTE la que exporta el fuente real', () => {
+    // Sin esto, anadir una Server Action al modulo y olvidarse de `ACCIONES` abriria un agujero en
+    // silencio: la accion nueva podria salir del barrel y la guardia seguiria en verde. El fuente
+    // de acciones no exporta ninguna funcion `async` que no sea una accion, asi que la comparacion
+    // es de conjunto a conjunto y no de «las que acaban en Action».
+    const fuente = readFileSync(FUENTE_DE_ACCIONES, 'utf8')
+    expect(exportedActionNames(fuente)).toEqual([...ACCIONES].sort())
   })
 })
 
