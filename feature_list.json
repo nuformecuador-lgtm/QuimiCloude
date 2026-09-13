@@ -301,11 +301,11 @@
       "epic": "QC-17",
       "epic_name": "Identidad y acceso",
       "name": "cierre-de-sesiones-de-otro-desde-la-pantalla",
-      "description": "Nacida el 2026-09-12 al re-acotar QC-23.\n\nQC-23 IMPLEMENTA LA CAPACIDAD Y NADIE PUEDE INVOCARLA: el Administrador puede cerrar todas las sesiones de otro usuario, la operacion queda escrita y probada en el servicio, y falta el boton.\n\nPOR QUE AHORA SI: cuando QC-23 se acoto el 2026-09-03 no habia pantalla de administracion de usuarios, asi que su spec dejo la capacidad «implementada y sin forma de invocarse desde la interfaz». Hoy existen QC-66 y QC-67, las dos mergeadas.\n\nPOR QUE FICHA APARTE: QC-23 es backend y deja los botones fuera desde el principio -el del usuario es QC-53-.\n\nQUEDA ABIERTO: si vive en el menu de la fila, en la ficha del usuario o en las dos; si pide confirmacion y con que texto -expulsa a alguien que puede estar trabajando-; que se dice si no habia ninguna sesion abierta; si el listado muestra cuantas sesiones vivas hay -lo que obliga a leerlas-; y que pasa si el administrador se lo aplica a si mismo.\n\nACOTAR CON /afinar-feature ANTES DE SEMBRAR EL SPEC.",
+      "description": "El Administrador puede cerrar TODAS las sesiones de otra persona desde la pantalla de administracion de usuarios.\n\nNacida el 2026-09-12 al re-acotar QC-23, que IMPLEMENTA LA CAPACIDAD Y NADIE PUEDE INVOCARLA: la operacion queda escrita y probada en el servicio, y falta el boton. Cuando QC-23 se acoto el 2026-09-03 no habia pantalla de administracion de usuarios; hoy existen QC-66 y QC-67, y QC-23 cerro con el merge del PR #66.\n\nLA ZONA CAMBIO DE frontend A fullstack EL 2026-09-13, AL ACOTAR, y ese es el hallazgo principal: la ficha nacio creyendo que solo faltaba un boton, y falta tambien LA PUERTA POR LA QUE ESE BOTON LLAMA. El caso de uso end-all-sessions existe en el dominio y esta probado, pero NADA LO EXPONE: no hay Server Action.\n\nALCANCE CERRADO (2026-09-13, /afinar-feature): el boton vive EN EL PANEL DE DETALLE del usuario y no en la fila; entra la SERVER ACTION que falta; pide CONFIRMACION con el nombre de la persona dentro; NUNCA SOBRE UNO MISMO -eso es QC-53-; SOLO SOBRE CUENTAS ACTIVAS, porque en las dadas de baja las sesiones ya se cortaron al cambiar el estado; el mensaje al terminar CONFIRMA SIN PROMETER NUMERO; y entra el E2E DEL RECORRIDO COMPLETO, que es el unico sitio donde se demuestra que la revocacion de QC-23 sirve de punta a punta.\n\nTRES DE LAS CINCO PREGUNTAS ABIERTAS LAS CONTESTO EL DISCO: no hay menu de fila -son tres botones de icono en user-row-actions.tsx:98,110,122-; no se puede saber si no habia ninguna sesion abierta -end-all-sessions.ts:64 devuelve void-; y no existe ninguna lista de sesiones vivas, porque la revocacion es un SELLO DE TIEMPO y QC-23 descarto esa lectura a proposito.\n\nLO QUE NO ENTRA: el boton del propio usuario (QC-53, donde vive tambien la autoaplicacion); decir cuantas sesiones se cerraron; listar sesiones vivas; y un permiso nuevo sesiones.modificar -se usa usuarios.modificar, y el porque esta escrito en end-all-sessions.ts:33-35-.\n\nLas decisiones completas -10 filas, cero preguntas abiertas- viven en specs/QC-101-cierre-de-sesiones-de-otro-desde-la-pantalla/requirements.md.",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
-      "zone": "frontend",
+      "complexity": "medium",
+      "zone": "fullstack",
       "branch": "feature/QC-101-cierre-de-sesiones-de-otro-desde-la-pantalla",
       "depends_on": [
         "QC-23"
@@ -371,7 +371,7 @@
       "epic": "QC-16",
       "epic_name": "Plataforma",
       "name": "cache-de-sesion-en-redis",
-      "description": "Hoy, cada vez que se abre una pantalla privada, el sistema consulta la base de datos para saber quien es el usuario de la sesion, como se llama y cual es su rol. Es la ruta mas transitada de la aplicacion. VERIFICADO EN DISCO EL 2026-09-13 AL ACOTAR: la premisa sigue viva, resolveSession lee los claims de la cookie y consulta la base en cada peticion. Hace falta guardar ese dato en una memoria rapida (Redis, por Upstash). Caduca al minuto. SE GUARDA LA RESOLUCION ENTERA DE LA SESION, de la que ya salen las DOS proyecciones -quien eres y de que empresa-: cachear solo una dejaria la otra yendo a la base, porque nacen de la MISMA consulta. ESTO NO PUEDE DEBILITAR UNA GARANTIA YA DECIDIDA. La cache se borra EN EL ACTO ante cualquier cambio de quien eres o que puedes: dar de baja, cambiar el rol, cambiar el estado de la cuenta, cambiar la contrasena, REVOCAR UNA SESION y CERRAR TODAS. Las dos ultimas se anadieron al acotar: la ficha se escribio ANTES de QC-23, que trajo la revocacion. El TTL de un minuto es la red de seguridad, no el mecanismo. Si Redis no responde se consulta la base: mas lento pero correcto, y nunca se deja a nadie fuera ni se deja entrar a nadie por un fallo de la cache. SE APAGA CON UNA VARIABLE DE ENTORNO, que devuelve al mismo camino de respaldo. LA CACHE ENTRA POR UN PUERTO, con adaptador en memoria en tests y local; el de Upstash solo donde hay credenciales. El gate corre SIN RED. DEPENDENCIA APROBADA POR EL HUMANO EL 2026-09-13: @upstash/redis, cuatro checks verificados contra npm -sin deprecated, 1.38.4 del 2026-09-04, 3.811.925 descargas semanales, MIT-. Cliente REST, sin conexiones TCP abiertas. Aislada en un solo adaptador; su fila en docs/dependencias.md la escribe el leader en F1.4. ENTRA UN E2E, y uno solo: dar de baja con la sesion abierta y comprobar que en el SIGUIENTE clic ya esta fuera, con la cache activa. Lo demas por integracion. No se guarda ninguna contrasena ni dato de credencial. Lo que NO entra: cachear datos de negocio. Decisiones cerradas en specs/QC-28-cache-de-sesion-en-redis/requirements.md.",
+      "description": "CONDICIONADA A UNA MEDICION, POR DECISION HUMANA DEL 2026-09-13. No arranca hasta que cierre QC-104 y haya un numero que diga que la ruta caliente sigue doliendo. La ficha daba por hecha la conclusion -Redis- sin un dato que la sostenga, y el cliente REST de Upstash ES TAMBIEN UNA LLAMADA DE RED: no se cambia red por memoria, se cambia Postgres-por-red por Redis-por-HTTP. Ni las regiones ni el cuello de botella estan medidos, y la app no tiene carga real. EL DIAGNOSTICO SE QUEDABA CORTO, y eso SI esta medido en disco: la sesion se resuelve DOS O TRES VECES POR PAGINA -layout privado, requirePagePermission de cada page.tsx, y una tercera en /configuracion/usuarios- sin ninguna memoizacion, y cada resolucion trae users mas role mas sus permisos mas company mas revoked_sessions. Colapsarlas es QC-104, y es gratis. SI LA MEDICION LO PIDE, lo acotado el 2026-09-13 entra tal cual: se guarda la resolucion entera, caduca al minuto, y se borra EN EL ACTO ante dar de baja, cambiar rol, cambiar estado de cuenta, cambiar contrasena, REVOCAR UNA SESION y CERRAR TODAS -las dos ultimas anadidas al acotar, porque la ficha es anterior a QC-23-. Si Redis no responde se consulta la base. Se apaga con una variable de entorno. Entra por un puerto, con adaptador en memoria en tests y local. DEPENDENCIA @upstash/redis: aprobada por el humano el 2026-09-13 con los cuatro checks verificados, pero LA APROBACION QUEDA EN SUSPENSO mientras la ficha lo este, y los checks se vuelven a verificar en F1.4. Entra UN E2E: dar de baja con la sesion abierta y comprobar que en el siguiente clic ya esta fuera. Lo que NO entra: cachear datos de negocio, y la memoizacion por peticion, que es QC-104. Decisiones cerradas en specs/QC-28-cache-de-sesion-en-redis/requirements.md.",
       "status": "pending",
       "sdd": true,
       "complexity": "high",
@@ -379,7 +379,8 @@
       "branch": "feature/QC-28-cache-de-sesion-en-redis",
       "depends_on": [
         "QC-8",
-        "QC-23"
+        "QC-23",
+        "QC-104"
       ],
       "spec_path": "specs/QC-28-cache-de-sesion-en-redis"
     },
@@ -1542,6 +1543,21 @@
         "QC-81"
       ],
       "spec_path": "specs/QC-103-lote-y-fecha-de-compra-en-el-alta"
+    },
+    {
+      "key": "QC-104",
+      "id": 104,
+      "epic": "QC-16",
+      "epic_name": "Plataforma",
+      "name": "sesion-una-sola-vez-por-peticion",
+      "description": "Hoy la sesion se resuelve VARIAS VECES para pintar una sola pagina privada, y cada vez es la misma consulta completa. MEDIDO EN DISCO EL 2026-09-13: el layout privado la resuelve para pintar el pie con el nombre y el rol (app/(private)/layout.tsx:59), el requirePagePermission de cada page.tsx la resuelve OTRA VEZ, y en /configuracion/usuarios hay una TERCERA. No existe ninguna memoizacion: se busco cache() y no hay. Y no es una lectura barata por clave: cada resolucion trae users mas role mas SU LISTA DE PERMISOS mas company mas la comprobacion en revoked_sessions (session-user-prisma.ts). Lo que hay que hacer: que dentro de UNA MISMA peticion esa resolucion ocurra UNA SOLA VEZ. POR QUE VA ANTES QUE QC-28: no necesita servicio externo, ni dependencia nueva, no anade un modo de fallo dentro de la autenticacion y NO PUEDE QUEDARSE OBSOLETO POR CONSTRUCCION, porque el resultado vive solo mientras dura esa peticion: la garantia de que dar de baja surte efecto en el siguiente clic no se toca. ADEMAS DEJA LA MEDICION QUE QC-28 NO TIENE. Lo que NO entra: la cache en Redis (QC-28), bloqueada por esta.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-104-sesion-una-sola-vez-por-peticion",
+      "depends_on": [],
+      "spec_path": "specs/QC-104-sesion-una-sola-vez-por-peticion"
     }
   ]
 }

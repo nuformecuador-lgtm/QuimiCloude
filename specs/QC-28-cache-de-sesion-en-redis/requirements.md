@@ -1,9 +1,16 @@
 # QC-28 — cache-de-sesion-en-redis · requirements.md
 
-> **Zona** `backend` · **Complejidad** `high` · **depends_on** QC-8 (hecha), QC-23 (hecha) ·
-> **Rama** `feature/QC-28-cache-de-sesion-en-redis`
+> **Zona** `backend` · **Complejidad** `high` · **depends_on** QC-8 (hecha), QC-23 (hecha),
+> **QC-104 (pendiente)** · **Rama** `feature/QC-28-cache-de-sesion-en-redis`
 >
-> **Alcance.** Guardar en memoria rápida (Redis, servido por **Upstash**) el resultado de
+> ## ⚠ CONDICIONADA A UNA MEDICION — NO ARRANCA TODAVIA
+>
+> **Decision humana del 2026-09-13, tomada DESPUES de cerrar la tabla de abajo.** Esta ficha no
+> pasa a `spec_author` hasta que **QC-104** cierre y **haya un numero** que diga que la ruta
+> caliente sigue doliendo. Lo de abajo sigue siendo valido y **no se reabre**: es lo que entra
+> **si** la medicion lo pide. El porque, en las decisiones 10 a 12.
+>
+> **Alcance (condicionado).** Guardar en memoria rápida (Redis, servido por **Upstash**) el resultado de
 > **resolver la sesión**, que hoy consulta la base en **cada** petición privada. El dato caduca al
 > **minuto** y se borra **en el acto** ante cualquier cambio de quién eres o qué puedes. Si Redis no
 > responde, se consulta la base: más lento, correcto, y **nunca** deja a nadie fuera ni deja entrar
@@ -41,3 +48,6 @@ de un usuario exige además un índice por **usuario**. Lo resuelve el diseño, 
 | 2026-09-13 | ¿La premisa sigue viva? | **Sí, verificado en disco**: `resolveSession()` lee los claims de la cookie **y consulta la base** (`findActiveSessionUserById`, vía `lib/composition/index.ts:296`) en **cada** petición. **A diferencia de QC-23, QC-81 y QC-102, esta ficha NO estaba derogada**, y por eso se especifica en vez de reescribirse |
 | 2026-09-13 | ¿Por qué sigue siendo `backend` si trae un E2E? | Porque **el E2E es un test, no una pantalla**: esta ficha no toca `app/` ni `components/`. `zone` se queda en **`backend`** y `complexity` en **`high`** —se mete en la autenticación, estrena servicio externo y su invalidación cruza seis caminos de cambio distintos— |
 | 2026-09-13 | Lo que se hereda y no se decide otra vez | **Puerto + adaptador driven** cableado en `lib/composition`, el patrón de todo lo externo del repo; identificadores en **inglés**; y de la propia ficha, ya fijado por el humano el 2026-09-02: **TTL de un minuto**, **respaldo a la base** si Redis no responde, **nunca** dejar fuera ni dejar entrar por un fallo de la caché, y **ninguna credencial** guardada |
+| 2026-09-13 | **¿Esta justificado Redis?** (preguntado por el humano DESPUES de cerrar las nueve de arriba) | **Sin medicion, no.** La ficha **daba por hecha la conclusion** sin un solo dato: no hay ni un numero en la tarjeta ni en el repo, y la app **no tiene carga real**. Ademas el cliente REST de Upstash **es tambien una llamada de red** desde la funcion: no se cambia red por memoria, se cambia **Postgres-por-red por Redis-por-HTTP**, y que eso gane depende de las regiones y de que Postgres sea de verdad el cuello de botella. **Ninguna de las dos cosas esta medida.** Lo que Redis **si** trae seguro: servicio externo, dependencia, **un modo de fallo nuevo dentro de la autenticacion**, seis caminos de invalidacion y un E2E |
+| 2026-09-13 | El diagnostico de la ficha, **medido en disco** | **Se quedaba corto, y el hallazgo justifica otra ficha.** La sesion no se resuelve una vez por peticion: se resuelve **DOS O TRES VECES POR PAGINA** —`app/(private)/layout.tsx:59` para pintar el pie, el `requirePagePermission` de cada `page.tsx` **otra vez**, y una **tercera** en `/configuracion/usuarios`— y **no existe ninguna memoizacion** (se busco `cache()` y no hay). Cada resolucion trae `users` + `role` + **su lista de permisos** + `company` + `revoked_sessions` |
+| 2026-09-13 | Entonces, ¿que va primero? | **QC-104** (`sesion-una-sola-vez-por-peticion`), creada ese dia y enlazada «blocks» hacia esta: colapsar esas repeticiones **dentro de la misma peticion**. No necesita servicio, ni dependencia, ni anade riesgo en la autenticacion, y **no puede quedarse obsoleto por construccion** —vive solo mientras dura la peticion—, asi que la garantia de «dar de baja surte efecto en el siguiente clic» **ni se toca**. Y **deja la medicion que esta ficha no tiene**. La aprobacion de `@upstash/redis` **queda EN SUSPENSO** mientras tanto: **no se instala nada**, y sus cuatro checks **se vuelven a verificar en F1.4**, porque para entonces estaran caducados |
