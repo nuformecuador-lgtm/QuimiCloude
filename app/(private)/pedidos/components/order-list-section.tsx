@@ -1,8 +1,8 @@
 import type { DataTableParams } from '@/components/shared/data-table';
 import { identity } from '@/lib/composition';
+import { canModifyAssignments } from '@/lib/modules/asignaciones';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import { listResponsiblesForOrdersAction } from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
-import { assertPermission } from '@/lib/modules/identity';
 import { listUsersAction } from '@/lib/modules/identity/adapters/driving/user-actions';
 import { listWorkGroupsAction } from '@/lib/modules/identity/adapters/driving/work-group-actions';
 import { listOrdersAction } from '@/lib/modules/pedidos/adapters/driving/order-actions';
@@ -103,37 +103,23 @@ async function loadFormCatalogs(): Promise<{
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Marca del `onDenied` de `assertPermission` cuando lo que se quiere es una RESPUESTA y no un
- * corte. Mismo patron, letra por letra, que `canModifyUsers` en la pantalla de usuarios (QC-67):
- * `assertPermission` siempre lanza lo que devuelve su tercer argumento, asi que se le pasa ESTA
- * instancia y se la reconoce por identidad; cualquier otro error se vuelve a lanzar intacto.
- */
-const PERMISO_DENEGADO = new Error('permiso denegado');
-
-/**
  * `true` si la sesion trae `asignaciones.modificar` (QC-102 R28, `design.md > 3.4`).
  *
  * **No es autorizacion, es PRESENTACION**: decide que controles se EMITEN en el HTML, no que se
- * puede hacer. Quien autoriza es `requirePermission` en la primera linea de los cuatro casos de
- * uso de QC-87, que rechaza igual aunque esta pantalla se saltara —y hay test suyo que lo afirma,
- * `tests/unit/asignaciones/authorization.test.ts`—.
+ * puede hacer. Quien autoriza de verdad es `requirePermission` en la primera linea de los cuatro
+ * casos de uso de QC-87, que rechaza igual aunque esta pantalla se saltara —y hay test suyo que lo
+ * afirma, `tests/unit/asignaciones/authorization.test.ts`—: anticipar aqui no es autorizar alli.
  *
- * **La pertenencia la resuelve `assertPermission` y nada mas**: un `permissions.includes(...)`
- * aqui seria una segunda definicion de «el actor tiene este permiso», libre de divergir de la
- * unica que QC-74 R12 dejo en pie. Con la sesion caida devuelve `false`, la direccion segura.
+ * **La pertenencia la resuelve `canModifyAssignments`, del propio modulo `asignaciones`, y nada
+ * mas**: el predicado acepta directamente el `SessionUser` de `identity.getSessionUser()`, delega
+ * en `assertPermission` por dentro y nunca lanza, asi que el literal `'asignaciones.modificar'`
+ * vive dentro de `asignaciones` y no se repite aqui (R29, R50). Con la sesion caida devuelve
+ * `false`, la direccion segura.
  *
  * **El componente de cliente NO lee cookies ni permisos** (R28): este booleano baja por props.
  */
 async function canModifyResponsibles(): Promise<boolean> {
-  const user = await identity.getSessionUser();
-
-  try {
-    assertPermission(user, 'asignaciones.modificar', () => PERMISO_DENEGADO);
-    return true;
-  } catch (error) {
-    if (error !== PERMISO_DENEGADO) throw error;
-    return false;
-  }
+  return canModifyAssignments(await identity.getSessionUser());
 }
 
 /**
