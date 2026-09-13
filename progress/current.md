@@ -12,12 +12,44 @@
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
 | QC-93 | aterrizaje-sin-permiso-de-modulo | Identidad y acceso | fullstack | spec_ready | feature/QC-93-aterrizaje-sin-permiso-de-modulo | **F1.0-F1.3 hechos el 2026-09-13; PARADA EN F1.4 esperando aprobacion humana**. Acotada el 2026-09-13: 10 decisiones cerradas, cero abiertas. **NO se parte en backend + frontend**, y no es un olvido: la decision cerrada dice que los 23 fallos son una unica causa raiz y que partirla dejaria media suite rota con dos fichas tocando los mismos archivos. Cupo comprobado: `fullstack` tenia **0 `in_progress`**. Worktree desde `origin/dev`, con el merge de QC-87 (PR #67) dentro. `spec_author` entrego **R1-R24** y **13 tasks** (commit `679f340`), con la **semilla verificada intacta por diff** contra `f5d310a`. **Tres hallazgos medidos en `design.md > 0`, ninguno tocado**: (1) **no hay indicio de agujero real de permisos** -el corte va en cada `page.tsx` con `requirePagePermission` y los items ocultos no viajan en el HTML-; (2) **tres de las cuatro lineas de la ficha estan desplazadas** -inventario `:571` y no `:306`, pedidos `:447`, proveedores `:467`; recetas `:376` es exacta-; (3) **los 23 fallos NO se reconstruyen en disco**: la causa raiz alcanza a 4 tests = 8 ejecuciones rojas en dos motores, y `errores.spec.ts` solo crea Administrador, asi que su rojo es de otra cosa. **La cifra no se forzo**: T1 mide antes, T12 despues y R24 exige causa nombrada por cada rojo superviviente. Tarjeta en *En revision* con la ruta comentada. **Una decision para el humano al aprobar**: el spec anade una **guardia en `tests/guards/`** (R9) y un unit test del helper -lo unico de esta feature que el gate puede ejecutar-. Sin dependencias nuevas |
-| QC-102 | responsables-en-la-pantalla-de-pedidos | Pedidos | frontend | pending | feature/QC-102-responsables-en-la-pantalla-de-pedidos | **Nacida el 2026-09-12 al partir QC-87** en F1.0. El panel lateral de responsables, los avatares con el nombre del grupo y **el E2E del recorrido completo**. `depends_on: QC-87`: **DESBLOQUEADA el 2026-09-13**, la mitad backend se mergeo en `dev` (PR #67) y esta `done`. Lista para F1.0. Sin `complexity` todavia; las decisiones cerradas de las dos mitades viven en la semilla de QC-87. La primitiva `avatar` **ya existe**, verificado en disco, asi que no hay que invocar la CLI de shadcn |
+| QC-102 | responsables-en-la-pantalla-de-pedidos | Pedidos | frontend | pending | feature/QC-102-responsables-en-la-pantalla-de-pedidos | **ACOTADA con `/afinar-feature` el 2026-09-13**: alcance, **13 decisiones cerradas** y **cero preguntas abiertas** en `specs/QC-102-responsables-en-la-pantalla-de-pedidos/requirements.md`. No se copian aqui. **Nacida el 2026-09-12 al partir QC-87** en F1.0. El panel lateral de responsables, los avatares con el nombre del grupo y **el E2E del recorrido completo**. `depends_on: QC-87`: **DESBLOQUEADA el 2026-09-13**, la mitad backend se mergeo en `dev` (PR #67) y esta `done`. Lista para F1.0. Sin `complexity` todavia; las decisiones cerradas de las dos mitades viven en la semilla de QC-87. La primitiva `avatar` **ya existe**, verificado en disco, asi que no hay que invocar la CLI de shadcn |
 | QC-63 | ejecutar-receta-operador | Recetas | fullstack | pending | feature/QC-63-ejecutar-receta-operador | **Acotada con `/afinar-feature` el 2026-09-08 y BLOQUEADA**: la acotación destapó que el Operador entra por **pedidos asignados**, no por recetas, y creó seis fichas (QC-83…QC-88). `depends_on: QC-62, QC-64, QC-88`. No arranca; worktree desmontado |
 | QC-81 | lote-y-fecha-de-compra | Inventario | backend | pending | feature/QC-81-lote-y-fecha-de-compra | **F1.0 y F1.1 hechos el 2026-09-13; PARADA EN F1.2 esperando decision humana**. Cupo libre: tras el merge de los PR #66 y #67 **no queda ninguna feature `in_progress` en ninguna zona**. Worktree montado desde `origin/dev` (`5f021c7`, con QC-23 y QC-87 dentro). **NO se lanza `spec_author` todavia, y por una razon medida en disco, no por prudencia generica: la ficha esta DEROGADA en su premisa central.** Se escribio el 2026-09-08 diciendo que «cada producto registra el lote» y que `products` necesita la columna; desde entonces **QC-90 cerro** y el lote **ya existe**, pero **en `product_batches.lot`** -anulable, sin unicidad y sin correlativo (`db/schema.prisma`, migracion `20260909120000_product_batches`), leido en `product-prisma.ts:545` y `create-product.ts:106`-. Y la **fecha de compra NO EXISTE en ninguna parte**: lo que hay es `expiryDate`, que es otra cosa. Jira ya enlaza QC-81 «relates to» **QC-90 (Finalizado)**. Encima la ficha arrastra su propio **QUEDA ABIERTO**: la forma del correlativo y el valor del backfill. **Es la misma trampa que costo una ronda entera en QC-23**: un spec escrito contra un `dev` que ya no existe. Toca `/afinar-feature` antes del `spec_author` |
 | QC-82 | registro-de-ejecucion-de-receta | Recetas | backend | pending | feature/QC-82-registro-de-ejecucion-de-receta | **Nacida del chat el 2026-09-08** y creada en el board (QC-27), enlazada «relates to QC-63». `complexity: medium`, sin dependencias. **Pendiente F1.0 y F1.2**: ampliada el 2026-09-08 con `canceled` en el enum y un `reason` anulable; cerrado que cancelar sin motivo no se puede; quedan SEIS preguntas abiertas -entre ellas si el motivo vale fuera de la cancelacion, que se guarda en el paso y que significa «el tiempo»-, asi que toca `/afinar-feature` antes del `spec_author` |
 
 ## Evaluaciones
+
+### QC-102 - acotada con `/afinar-feature` (2026-09-13)
+
+Alcance, **13 decisiones cerradas** y **cero preguntas abiertas** en
+`specs/QC-102-responsables-en-la-pantalla-de-pedidos/requirements.md`. No se copian aqui.
+
+**El board se corrigio ANTES de sembrar, y la acotacion CAMBIO EL TAMANO DE LA FICHA.** Nacio como
+`frontend`/`medium` y sale como **`fullstack`/`high`**, porque se verifico en disco que **el listado
+no tiene de donde sacar los responsables**: `OrderView` tiene catorce campos y ninguno de
+asignacion, el modulo `pedidos` no tiene **ni una** referencia a `orderAssignment`, y lo unico que
+QC-87 publico recibe **un** `orderId`. La `description` prometia el listado, asi que mentia. Los tres
+labels y la `description` entera se reescribieron en el issue antes de escribir el archivo.
+
+**Es el mismo golpe que se llevo QC-85** con el conteo de personas por grupo, y se resolvio al
+reves: alli el dato salio del alcance y nacio QC-100; aqui **la ficha crece y se lo queda**, por
+decision humana. El camino es **una consulta EN LOTE por pagina**, compuesta como ya se compone
+`recipeName` en `list-orders.ts` — **ni un JOIN** (R53 y QC-33 R31/R32 lo prohiben, y QC-33 dejo las
+FK como escalares sin `@relation` justamente para eso) **ni una consulta por fila**.
+
+**Dos cosas que la acotacion evito construir de mas**: el nombre del grupo **no necesita ningun
+join** porque QC-86 lo congelo dentro de la fila, y **abrir el panel no cuesta consulta** porque la
+fila ya trae sus responsables.
+
+**Una decision humana contra el precedente, escrita con su consecuencia**: en un pedido `ENTREGADO`
+o `CANCELADO` los controles de asignar **no aparecen y sin frase**, aunque la misma fila **si**
+explica por que no se puede editar (`FINAL_ORDER_REASON`). Queda anotado que la pantalla explicara
+una cosa y callara la otra.
+
+**Nota heredada al `design.md`**: `asignaciones` **ya depende de `pedidos`**, asi que la consulta en
+lote **no puede crear un ciclo** `pedidos -> asignaciones`. Donde se compone lo decide el diseno.
+
+Ninguna ficha nueva y ninguna cancelada. Sigue `pending` en Backlog: la mueve el leader en F1.3.
 
 ### QC-93 - acotada con `/afinar-feature` (2026-09-13)
 
