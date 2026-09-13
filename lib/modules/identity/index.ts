@@ -299,6 +299,20 @@ export {
   type ListWorkGroupMembersDeps,
   type PaginationPolicy,
 } from './domain/list-work-group-members';
+
+// ---------------------------------------------------------------------------------------
+// QC-87 T3 — Los DOS contratos con los que otro modulo pregunta por personas y por grupos de
+// trabajo sin tocar `users`, `work_groups` ni `work_group_members` (`design.md > 2.2`).
+// Bloque NUEVO al final: no reordena ni reformatea ninguna linea de arriba.
+//
+// Solo simbolos de `./domain`: son tipos e interfaces puros, asi que el contrato sigue
+// importable desde un componente de cliente. El adaptador que los implementa
+// (`adapters/driven/persistence/assignment-directory-prisma.ts`) NO sale por aqui: lo ve solo
+// `lib/composition`, el unico sitio que ata puerto -> implementacion (R47).
+// ---------------------------------------------------------------------------------------
+export type { PersonRef, PeopleDirectory } from './domain/people-directory';
+export type { WorkGroupSnapshot, WorkGroupDirectory } from './domain/work-group-directory';
+
 // ---------------------------------------------------------------------------------------
 // QC-23 T17 (`design.md > 8`) — los TRES casos de uso del cierre de sesion (R20-R32). Bloque
 // NUEVO al final: no reordena ni reformatea ninguna de las lineas de arriba.

@@ -252,6 +252,23 @@ import {
 } from '@/lib/modules/identity/adapters/driven/persistence/work-group-prisma';
 import type { PaginationPolicy } from '@/lib/modules/identity';
 import type { WorkGroupRepository } from '@/lib/modules/identity/ports/work-group-repository';
+// QC-87 T11 (`design.md > 2.3`) — asignar responsables a un pedido. Las CUATRO factories salen del
+// CONTRATO del modulo (`@/lib/modules/asignaciones`, solo dominio); los TRES adaptadores driven
+// nuevos, por su ruta exacta —el de `pedidos`, el de `identity` y el propio de `asignaciones`—, y
+// los tipos de los cuatro puertos, de los barriles de sus modulos y de `ports/`. Las Server
+// Actions de T12 NO se importan aqui (la flecha va driving -> composicion).
+import {
+  createAssignResponsibles,
+  createListOrderResponsibles,
+  createRemoveWorkGroupFromOrder,
+  createUnassignResponsible,
+} from '@/lib/modules/asignaciones';
+import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
+import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
+import { findAliveOrderTargetById } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
+import type { OrderCatalog } from '@/lib/modules/pedidos';
+import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
+import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
 // QC-19: una sola instancia de la politica, la misma que se expone en la fachada y la que
@@ -878,4 +895,92 @@ export const pedidos = {
  *  que se la pasan al traductor unico de errores (`createErrorStateTranslator`). */
 export const observabilidad = {
   readRequestIdHeader: readRequestIdHeader satisfies RequestIdHeaderReader,
+} as const;
+
+// ---------------------------------------------------------------------------------------
+// `asignaciones` (QC-87, T11, `design.md > 2.3`). Bloque NUEVO al final, mismo criterio que los
+// de `recetas`, `proveedores`, `unidades` y `pedidos`: no reordena ni reformatea NADA de lo de
+// arriba. Sus imports viven al final del bloque de imports.
+//
+// Es el UNICO archivo que ata puerto -> implementacion para este modulo (R47): ningun otro
+// archivo de produccion puede importar sus adaptadores driven, y lo vigila
+// `tests/guards/guard-arquitectura-modulos.test.ts`.
+//
+// CUATRO puertos y TRES adaptadores nuevos, ninguno de ellos de `asignaciones` salvo el ultimo:
+// el pedido lo responde `pedidos`, la persona y el grupo los responde `identity`, y cada modulo
+// lo hace con un adaptador SUYO. `asignaciones` no toca `prisma.order`, `prisma.user` ni
+// `prisma.workGroup` por ninguna via.
+// ---------------------------------------------------------------------------------------
+
+/** `OrderCatalog` cableado con el adaptador driven DE PEDIDOS (`design.md > 2.1`): mismo patron
+ *  que `RecipeCatalog` arriba. `asignaciones` solo conoce el TIPO, y por el solo puede saber si
+ *  el pedido esta VIVO y en que ESTADO —ni el numero, ni la receta, ni las cantidades—. */
+const orderCatalog: OrderCatalog = { findAliveById: findAliveOrderTargetById };
+
+/**
+ * `PeopleDirectory` y `WorkGroupDirectory` cableados con el MISMO adaptador driven DE IDENTITY
+ * (`design.md > 2.2`): un solo objeto que cumple las dos interfaces, y por eso dos constantes que
+ * apuntan a la misma implementacion en vez de dos construcciones que puedan divergir.
+ *
+ * El `now` NO se resuelve aqui: los dos contratos lo reciben POR PARAMETRO en cada llamada,
+ * porque el estado efectivo de una cuenta depende del reloj (QC-78 R7, R8) y una cuenta bloqueada
+ * por plazo vencido vuelve sola a `active` sin ninguna escritura.
+ */
+const peopleDirectory: PeopleDirectory = assignmentDirectoryPrisma;
+const workGroupDirectory: WorkGroupDirectory = assignmentDirectoryPrisma;
+
+/**
+ * `OrderAssignmentRepository` cableado con el adaptador driven de `asignaciones`
+ * (`design.md > 3`). Se INVOCA la fabrica SIN argumento, que es la forma que su propia
+ * documentacion reserva para este archivo: sin cliente explicito habla por el `PrismaClient`
+ * global.
+ *
+ * Que sea una FABRICA y no un objeto ya construido es R27 y no un gusto: el dia que la operacion
+ * gane una segunda escritura, quien abre la transaccion le pasa el cliente transaccional a esta
+ * misma fabrica y el dominio sigue sin conocer Prisma. Hoy la atomicidad la da la UNICA sentencia
+ * de `insertMissing` (`INSERT ... ON CONFLICT DO NOTHING`), que Postgres ejecuta entera o nada.
+ * Por eso aqui se cablea el cliente global: no hay ninguna transaccion abierta que cerrar desde
+ * este archivo, y abrirla aqui seria meter una decision de ejecucion en el punto de composicion.
+ */
+const orderAssignmentRepository: OrderAssignmentRepository = createOrderAssignmentRepository();
+
+/**
+ * Fachada del modulo `asignaciones` ya cableada (T11, `design.md > 2.3`). Es lo que consumen las
+ * tres Server Actions y la consulta de T12.
+ *
+ * El ACTOR NO se resuelve aqui, mismo criterio que los otros seis modulos (R1, R4): cada caso de
+ * uso lo recibe por parametro, y quien lo construye con las dos caras de la sesion
+ * —`getSessionUser` y `getSessionContext`, arriba en el objeto `identity`— es el adaptador driving
+ * de T12. Y la EMPRESA tampoco se pasa: la lleva el actor (R5) y la aplican los puertos (R7).
+ *
+ * El `now` de las TRES escrituras entra por PARAMETRO en cada llamada —`assignResponsibles(actor,
+ * input, now)`—: el dominio no tiene reloj propio.
+ */
+export const asignaciones = {
+  assignResponsibles: createAssignResponsibles({
+    assignments: orderAssignmentRepository,
+    orders: orderCatalog,
+    people: peopleDirectory,
+    groups: workGroupDirectory,
+  }),
+  removeWorkGroupFromOrder: createRemoveWorkGroupFromOrder({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+  }),
+  unassignResponsible: createUnassignResponsible({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+  }),
+  // El `now` de la CONSULTA es el unico del modulo que viaja por `deps`, y se cablea EXPLICITO a
+  // proposito: `ListOrderResponsiblesDeps` lo declara opcional con `?? new Date()`, y dejarlo sin
+  // cablear haria que el unico lector del reloj de todo el modulo fuera un defecto silencioso
+  // dentro del dominio. Con esta linea, el reloj real entra SIEMPRE desde el punto de composicion
+  // —igual que el resto del modulo lo pasa por parametro (QC-78)— y el defecto queda solo para los
+  // tests que no lo inyectan.
+  listOrderResponsibles: createListOrderResponsibles({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    people: peopleDirectory,
+    now: () => new Date(),
+  }),
 } as const;

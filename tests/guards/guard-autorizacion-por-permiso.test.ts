@@ -50,7 +50,7 @@ function findRepoRoot(startDir: string): string {
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
 
 /**
- * Los cinco modulos de negocio: el alcance EXACTO de R18 y R20. Se barren en profundidad.
+ * Los seis modulos de negocio: el alcance EXACTO de R18 y R20. Se barren en profundidad.
  *
  * El barrido es a proposito mas estrecho que el de `guard-rol-administrador-unico.test.ts` (que
  * recorre `lib`, `app`, `components`, `hooks` y la raiz). Las exenciones de `design.md > 6.2` no se
@@ -74,13 +74,19 @@ const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
  *
  * La exencion de `identity` tiene ancla mas abajo («la exencion de identity es la declarada...»):
  * si dejara de contener lo que se le perdona, la exencion sobra y hay que revisarla.
+ *
+ * **AMPLIADO 2026-09-13 por QC-87 (T13): `asignaciones` es el SEXTO.** Eran cinco desde QC-74.
+ * QC-86 creo el modulo con solo dos tipos y sin ninguna operacion, asi que no habia nada que
+ * autorizar; QC-87 estrena sus cuatro casos de uso y con ellos `asignaciones.modificar` (su R1).
+ * Sin esta linea el modulo nuevo quedaria FUERA del barrido y la guardia pasaria en verde sin
+ * mirarlo, que es justo el agujero que el caso «el barrido encuentra los seis modulos» vigila.
  */
-const BUSINESS_MODULES = ['inventario', 'recetas', 'unidades', 'proveedores', 'pedidos'];
+const BUSINESS_MODULES = ['inventario', 'recetas', 'unidades', 'proveedores', 'pedidos', 'asignaciones'];
 
 const IGNORED_DIRS = new Set(['node_modules', '.next', '.git', '.prisma', 'dist', '.worktrees']);
 
 /**
- * `design.md > 6.2` dice «los archivos `.ts`», y hoy no hay ni un `.tsx` bajo estos cinco modulos
+ * `design.md > 6.2` dice «los archivos `.ts`», y hoy no hay ni un `.tsx` bajo estos seis modulos
  * (son dominio, puertos y adaptadores: no tienen JSX). Se incluye `.tsx` igualmente porque un
  * componente que apareciera ahi caeria bajo exactamente la misma regla, y ampliar el barrido no
  * puede debilitarlo.
@@ -165,7 +171,7 @@ export type ForbiddenPattern = {
  * 2. Los identificadores `ROLE_ADMINISTRADOR`, `ROLE_OPERADOR`, `assertAdminRole` y `requireAdmin` —
  *    autorizar por rol importando la constante o la comprobacion «es Administrador» heredada de
  *    QC-54. Compila y es exactamente lo que esta ficha borro.
- * 3. El identificador `roleName` — el campo que R18 saca del `Actor` de estos cinco modulos. Que hoy
+ * 3. El identificador `roleName` — el campo que R18 saca del `Actor` de estos seis modulos. Que hoy
  *    no compile es una casualidad del tipo actual, no una regla: quien lo reintroduzca en su `Actor`
  *    lo hara compilar de nuevo.
  */
@@ -197,7 +203,7 @@ export function findForbiddenPatternsInSource(source: string): readonly string[]
   );
 }
 
-/** Todos los `.ts`/`.tsx` de los cinco modulos de negocio (rutas absolutas). */
+/** Todos los `.ts`/`.tsx` de los seis modulos de negocio (rutas absolutas). */
 export function listBusinessModuleFiles(root: string): readonly string[] {
   return BUSINESS_MODULES.flatMap((moduleName) =>
     listSourceFiles(join(root, 'lib', 'modules', moduleName)),
@@ -211,7 +217,7 @@ export type Offense = {
   readonly patterns: readonly string[];
 };
 
-/** Los archivos de los cinco modulos de negocio que autorizan (o pueden autorizar) por rol (R20). */
+/** Los archivos de los seis modulos de negocio que autorizan (o pueden autorizar) por rol (R20). */
 export function findRoleAuthorizationOffenses(root: string): readonly Offense[] {
   return listBusinessModuleFiles(root)
     .map((absPath) => ({
@@ -227,7 +233,7 @@ function describeOffense(offense: Offense): string {
 }
 
 describe('guardia — ningun servicio de negocio autoriza por nombre de rol (R20, R21)', () => {
-  it('ningun archivo de los cinco modulos de negocio usa el rol para autorizar', () => {
+  it('ningun archivo de los seis modulos de negocio usa el rol para autorizar', () => {
     const culpables = findRoleAuthorizationOffenses(repoRoot);
 
     expect(
@@ -236,7 +242,7 @@ describe('guardia — ningun servicio de negocio autoriza por nombre de rol (R20
         ? undefined
         : 'Estos archivos de los modulos de negocio autorizan por nombre de rol: ' +
             `${culpables.map(describeOffense).join('; ')}. ` +
-            'Los cinco modulos autorizan por PERMISO (R12, R18): usa ' +
+            'Los seis modulos autorizan por PERMISO (R12, R18): usa ' +
             '`requirePermission(actor, <codigo>)` del `actor.ts` del propio modulo y deja el ' +
             '`Actor` como `{ id, permissions }`. El nombre del rol es de `identity`; un modulo de ' +
             'negocio que lo lea vuelve a atar la autorizacion a un rol concreto y deja el modelo ' +
@@ -247,7 +253,7 @@ describe('guardia — ningun servicio de negocio autoriza por nombre de rol (R20
   // Ancla anti-vacuidad: sin esto, un barrido que no encontrara NINGUN archivo —una carpeta
   // renombrada, un `BUSINESS_MODULES` mal escrito— dejaria el caso de arriba en verde sin haber
   // leido nada.
-  it('el barrido encuentra los cinco modulos y una cantidad razonable de archivos', () => {
+  it('el barrido encuentra los seis modulos y una cantidad razonable de archivos', () => {
     const relativos = listBusinessModuleFiles(repoRoot).map((absPath) =>
       toPosix(absPath.slice(repoRoot.length + 1)),
     );
@@ -266,7 +272,7 @@ describe('guardia — ningun servicio de negocio autoriza por nombre de rol (R20
 
     expect(
       relativos.length,
-      `El barrido solo encontro ${relativos.length} archivos en los cinco modulos de negocio. ` +
+      `El barrido solo encontro ${relativos.length} archivos en los seis modulos de negocio. ` +
         'Eran mas de cien cuando se escribio esta guardia; un numero asi de bajo significa que el ' +
         'recorrido se rompio, no que el codigo adelgazo.',
     ).toBeGreaterThan(80);
