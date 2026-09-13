@@ -141,7 +141,7 @@ Es una línea, y sin ella el módulo nuevo queda **fuera** del barrido que impid
 temporalmente un `'Administrador'` en un archivo del módulo.
 **Depende de:** T6. `[P]` con T7–T12.
 
-### T14 — Los tests de integración contra Postgres real
+### [x] T14 — Los tests de integración contra Postgres real
 `design.md > 8`. Cada caso en una transacción con `ROLLBACK`. Son la evidencia que **sustituye al
 E2E** en esta mitad (hallazgo 1 del design).
 **Hecho:** R5–R7, R15, R19–R23, R26–R29, R32 demostrados contra la base, y cada aserción **cae al
