@@ -467,3 +467,40 @@ Van **cuatro** en esta ficha, y los dos nuevos son de la misma familia que los d
 que **pasan en `dev`** —donde nada las activa— y **rompen a la siguiente feature**. El censo de
 aislamiento de QC-77 pide ademas que **cada** archivo de integracion nuevo se declare, asi que los dos
 de esta ficha entran en `tests/integration/aislamiento.json`. **No se abre ficha: QC-99 ya existe.**
+
+## F2.4 — cierre: commit, gate completo y PR
+
+La tanda pendiente (el arreglo del arranque caido de integracion, las dos garantias del gate y las
+dos entradas del censo de aislamiento) se committeo en **`5c104c1`**, sin ampliar el cambio.
+
+**`./init.sh` COMPLETO, sin flags, desde el worktree** (base propia `QuimiCloude_QC23`, 28
+migraciones aplicadas). Salida real:
+
+```
+✓ typecheck paso
+✓ lint paso
+✓ los tres proyectos corrieron (ui, node, integration)
+✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 8); 8 por limpiar
+✓ todas las migraciones tienen down.sql
+== init OK ==
+```
+
+```
+ Test Files  419 passed (419)
+      Tests  6028 passed | 66 skipped (6094)
+   Duration  273.91s
+```
+
+**Exit 0.** **419 archivos, 6028 verdes, 66 saltados, CERO rojos** —ni siquiera los 8 heredados del
+baseline, que hoy pasan y el gate reporta como «8 por limpiar», aviso ajeno a esta ficha—. Entre
+ellos `tests/unit/configuracion-ui/unidades-convenciones.test.ts`, el de `resend` de QC-79.
+
+Las cifras suben respecto de la corrida anterior de esta bitacora (413 archivos / 5965 verdes)
+porque aquella corrio ANTES de que `dev` trajera QC-77 entero: son archivos de `dev`, no de aqui.
+
+**Las dos garantias nuevas del gate se vieron funcionar en verde**: la linea «los tres proyectos
+corrieron (ui, node, integration)» es nueva y es exactamente la que el 2026-09-13 no existia, cuando
+el gate canto OK con la integracion abortada. Las dos suites nuevas de la ficha corrieron:
+`session-revocation.int.test.ts` (12) y `session-stamp-writes.int.test.ts` (13).
+
+No se toco `feature_list.json` ni Jira: eso es F2.5, y lo hace el leader cuando el humano mergee.
