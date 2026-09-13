@@ -98,12 +98,12 @@ cambiarlos, está mal escrita.
       escritura, **y** la Server Action rechaza igual (el test de autorización de QC-87 se invoca,
       no se reescribe).
 
-- [ ] **T16. E2E del recorrido completo.** (depende de T15)
+- [x] **T16. E2E del recorrido completo.** (depende de T15)
       `e2e/pedidos-responsables.spec.ts`: abrir un pedido, marcar una persona, aplicar un grupo,
       sacar a alguien, cerrar y comprobar **en el listado** los avatares y el nombre del grupo.
       **Hecho**: R37 verde y `e2e/pedidos.spec.ts` pasando **sin cambios en su guion** (R38).
 
-- [ ] **T17. Guardias de los límites.** (`[P]` con T16)
+- [x] **T17. Guardias de los límites.** (`[P]` con T16)
       Tests de R5 (ninguna `@relation` nueva ni `include` entre pedidos y asignaciones), R14 (nadie
       de `pedidos` importa `asignaciones`), R15 (`git diff db/**` vacío y el catálogo con quince
       permisos), R39 (`package.json` sin dependencias nuevas), R40/R41 (los cuatro casos de uso y la
