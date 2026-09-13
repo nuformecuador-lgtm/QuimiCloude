@@ -3457,3 +3457,80 @@ en un repo con CRLF no borraba ningún comentario de línea.
   del arnés; ahora tiene dos ocurrencias medidas.
 
 **QC-102** (la mitad de pantalla) queda **desbloqueada**.
+
+## QC-23 — registro-de-sesiones · CERRADA el 2026-09-13 (PR #66, merge `5f021c7`)
+
+Las sesiones se revocan de verdad, no solo se retira la cookie. `complexity: high`, zona `backend`,
+51 requisitos EARS y 24 tasks. Review en `progress/review_QC-23-registro-de-sesiones.md`; bitácora
+en `progress/impl_QC-23-registro-de-sesiones.md`.
+
+### Lo que entrega, y por qué son DOS mecanismos y no uno
+
+- **Un sello por usuario**, `users.sessions_valid_from`: toda sesión emitida antes o en ese instante
+  deja de valer. Cubre los cortes masivos —baja, bloqueo, cambio de rol, cambio de contraseña,
+  cierre total— y **cuesta cero consultas**: sale del `findFirst` de `users` que ya se hacía.
+- **Una tabla de sesiones CERRADAS**, `revoked_sessions`, para el cierre individual, que el sello no
+  sabe distinguir. Es una **lista negra, no un censo**: no se guardan las sesiones abiertas y el
+  login no escribe ninguna fila. Ausencia significa «válida».
+
+El token sube a `v4` y estrena `sid`, que es lo que permite señalar una sesión concreta.
+
+### Tres decisiones que conviene no volver a discutir
+
+1. **No se guardan las sesiones abiertas** (alternativa 3 del `design.md`): obligaría a escribir en
+   cada login y a leer N filas por petición, justo lo que QC-28 viene a quitar, y regalaría la lista
+   de dispositivos, que está fuera de alcance por la decisión 12.
+2. **La comprobación NO va en el middleware** (alternativa 7): el borde no es la frontera de
+   seguridad ni consulta la base, y `guard-middleware-edge.test.ts` se pondría roja en cuanto el
+   cierre de imports tocara un repositorio. Los dos cortes son pasos 7 y 8 de `resolve-session.ts`.
+3. **El sello se trunca al segundo y la comparación es `<=`, no `<`.** Como `iat` viaja en segundos,
+   el `<` estricto dejaría sobrevivir una sesión ajena emitida en el mismo segundo del corte. El
+   precio es que la sesión reemitida dura un segundo más de ocho horas. Se paga.
+
+### El hallazgo que vale más que la feature: el gate daba VERDE con la integración caída
+
+`./init.sh` cantó `== init OK ==` con el proyecto de integración **abortado en el arranque y cero
+tests corridos**. El veredicto salía solo del JSON de rojos, y un proyecto que no arranca no escribe
+rojos: era invisible. La causa era la receta de plantilla de QC-77, que sembraba con el esquema a
+medias —QC-23 es la **primera ficha que añade una COLUMNA** después del corte de la migración de
+QC-49, y `@default(now())` lo rellena Prisma del lado del cliente—.
+
+Arreglado desde aquí por decisión humana, y el gate gana **dos garantías** para que no pueda volver
+a mentir así: (1) los tres proyectos —`ui`, `node`, `integration`— tienen que aparecer en el informe
+o es rojo, diciendo cuál falta; (2) si el proceso sale distinto de cero y el informe no trae ningún
+archivo rojo que lo explique, algo falló **fuera** de los tests y el gate falla. Probado por
+mutación: devolviendo el seed al punto intermedio, vuelve a romperse con el mismo error.
+
+### Rechazada en primera revisión, y por el motivo correcto
+
+El `reviewer` la rechazó con 1 hallazgo mayor que **no rompía ningún `R<n>` de esta ficha**: rompía
+la promesa que le hace a **QC-89 y QC-96**. El arreglo fue una constante y un caso de test, sin
+tocar producción. Aprobada en segunda ronda, sin mayores.
+
+### Dos conflictos con QC-87, y los dos eran aditivos
+
+QC-87 se mergeó en `dev` (PR #67) entre la apertura del #66 y su merge, y dejó el PR en
+`CONFLICTING`. Conflictaron `lib/modules/identity/index.ts` y
+`tests/unit/identity/account-status-scope.test.ts`: **las dos ramas añadían un bloque al final del
+mismo ancla**. Se resolvió conservando ambos lados íntegros, comentarios incluidos. `dev` no traía
+migraciones, verificado en `db/migrations/` —28 contra 29, la extra es la suya—.
+
+Gate final tras el merge: `== init OK ==`, exit 0 — **439 archivos, 6266 verdes, 66 saltados, cero
+rojos**. Integración: 54 archivos, 709 verdes.
+
+### Deuda que deja, con nombre y dueño
+
+- **La E2E queda diferida a QC-53** (R50), declarada como requisito: esta ficha no añade pantalla,
+  ruta ni botón. Deuda con destinatario, no exención.
+- **El botón del administrador no existe hasta QC-101** (R51): la operación queda implementada y
+  probada, sin ninguna vía de invocación desde la interfaz.
+- **La purga es perezosa y por persona**, así que quien cierra una sesión y no vuelve a cerrar
+  ninguna deja su fila caducada indefinidamente. No crece, no afecta a la corrección y no degrada la
+  consulta —va por índice único—, pero **no está entre las siete consecuencias declaradas del
+  `design.md`**. Destinatario natural: QC-28, que vuelve a tocar esta ruta.
+- **`pending` no corta (R36)**: mover una cuenta `active` → `pending` → `active` dentro de las 8 h
+  **revive** sus cookies. Consecuencia directa de la decisión 1, escrita para que nadie la descubra
+  de sorpresa.
+- **Una caída de la base se ve como un cierre de sesión** (§ 4.2): precio de que la revocación no se
+  pueda saltar provocando un fallo.
+- **Los 8 rojos del baseline pasan todos** y nadie los ha limpiado. Material de QC-99.
