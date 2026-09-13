@@ -746,6 +746,91 @@ export function findCompositionForbiddenImportFinding(relPath: string, specifier
 }
 
 // ---------------------------------------------------------------------------
+// BLOQUE 15 — El grafo entre modulos es ACICLICO (QC-102 R14)
+// ---------------------------------------------------------------------------
+//
+// El bloque 5 ya prohibe la ruta PROFUNDA a otro modulo, pero no dice nada de la DIRECCION: hoy
+// `asignaciones -> pedidos` es legal y esta en disco (`list-order-responsibles.ts` consume
+// `OrderCatalog`). Lo que QC-102 R14 anade es que la flecha de vuelta NO puede existir: si
+// `pedidos` importara `asignaciones` -aunque fuera por el contrato publico, que el bloque 5
+// permite- se cerraria el ciclo `pedidos -> asignaciones -> pedidos`, con dos barriles
+// inicializandose el uno al otro y constantes en `undefined` en tiempo de arranque. Por eso la
+// composicion del lote vive en `app/**` y no dentro de `listOrders` (`design.md > 1`).
+//
+// Se vigila el grafo ENTERO, no el par concreto: una regla escrita como «pedidos no importa
+// asignaciones» solo protege de la unica forma que ya sabemos nombrar, y el dia que
+// `recetas -> inventario -> recetas` aparezca nadie lo vera.
+
+export type ModuleEdge = {
+  readonly from: string
+  readonly to: string
+  readonly relPath: string
+  readonly specifier: string
+}
+
+/** Aristas `<modulo> -> <modulo>` del repo. Cuenta TODO import, incluido `import type`: R14 dice
+ *  «ni por su contrato publico ni por ruta profunda», sin excepcion para los tipos. */
+export function collectModuleEdges(
+  files: ReadonlyArray<{
+    relPath: string
+    resolvedTargets: ReadonlyArray<{ specifier: string; target: ImportTarget }>
+  }>,
+): readonly ModuleEdge[] {
+  const edges: ModuleEdge[] = []
+  for (const file of files) {
+    const from = moduleOfPath(file.relPath)
+    if (from === null) continue
+    for (const { specifier, target } of file.resolvedTargets) {
+      if (target.kind === 'external') continue
+      const to = moduleOfPath(target.relPath)
+      if (to === null || to === from) continue
+      edges.push({ from, to, relPath: file.relPath, specifier })
+    }
+  }
+  return edges
+}
+
+/** Hallazgos: toda arista que cierre un ciclo, un hallazgo por PAR de modulos implicados. */
+export function findModuleCycleFindings(edges: readonly ModuleEdge[]): readonly string[] {
+  const adyacentes = new Map<string, Set<string>>()
+  for (const edge of edges) {
+    const destinos = adyacentes.get(edge.from) ?? new Set<string>()
+    destinos.add(edge.to)
+    adyacentes.set(edge.from, destinos)
+  }
+
+  const alcanzablesDesde = (origen: string): ReadonlySet<string> => {
+    const vistos = new Set<string>()
+    const pendientes = [...(adyacentes.get(origen) ?? [])]
+    while (pendientes.length > 0) {
+      const actual = pendientes.pop() as string
+      if (vistos.has(actual)) continue
+      vistos.add(actual)
+      pendientes.push(...(adyacentes.get(actual) ?? []))
+    }
+    return vistos
+  }
+
+  const ordenadas = [...edges].sort((a, b) =>
+    `${a.from}|${a.to}|${a.relPath}|${a.specifier}`.localeCompare(
+      `${b.from}|${b.to}|${b.relPath}|${b.specifier}`,
+    ),
+  )
+  const yaDicho = new Set<string>()
+  const findings: string[] = []
+  for (const edge of ordenadas) {
+    if (!alcanzablesDesde(edge.to).has(edge.from)) continue
+    const par = [edge.from, edge.to].sort().join(' <-> ')
+    if (yaDicho.has(par)) continue
+    yaDicho.add(par)
+    findings.push(
+      `ciclo entre modulos (${par}): ${edge.relPath} importa '${edge.specifier}', y '${edge.to}' vuelve a '${edge.from}' (R14)`,
+    )
+  }
+  return findings
+}
+
+// ---------------------------------------------------------------------------
 // Datos del repo real, calculados una vez
 // ---------------------------------------------------------------------------
 
@@ -792,6 +877,8 @@ const modelOwners = extractModelOwners(schemaSource)
 const drivenFiles = allSourceFiles
   .filter((file) => layerOfPath(file.relPath) === 'driven')
   .map((file) => ({ relPath: file.relPath, module: moduleOfPath(file.relPath) as string, content: file.content }))
+
+const moduleEdges = collectModuleEdges(allSourceFiles)
 
 const docSource = readFileSync(join(repoRoot, 'docs', 'architecture.md'), 'utf8')
 
@@ -1783,4 +1870,101 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
       expect(specifiers).toContain('@/lib/modules/identity/adapters/driving/route-guard-middleware')
     })
   })
+
+  // -------------------------------------------------------------------------
+  // BLOQUE 15 — sin ciclos entre modulos, y en particular sin `pedidos -> asignaciones`
+  // (QC-102 R14)
+  // -------------------------------------------------------------------------
+  describe('bloque 15 — el grafo entre modulos es aciclico (R14)', () => {
+    /** Recalcula las aristas del repo REAL sustituyendo el contenido de UN archivo real por el
+     *  mutado. Pasa por el mismo `extractImportSpecifiers` + `classifyImportTarget` que el gate,
+     *  asi que lo que se prueba es la tuberia entera y no una arista inventada a mano. */
+    function aristasConArchivoMutado(relPath: string, mutar: (contenido: string) => string): readonly ModuleEdge[] {
+      const original = allSourceFiles.find((file) => file.relPath === relPath)
+      expect(original, `no se encontro el archivo real ${relPath}`).toBeDefined()
+      const real = original as (typeof allSourceFiles)[number]
+      const contenido = mutar(real.content)
+      expect(contenido, `la mutacion de ${relPath} no cambio nada`).not.toBe(real.content)
+      const mutado = {
+        relPath: real.relPath,
+        resolvedTargets: extractImportSpecifiers(contenido).map((specifier) => ({
+          specifier,
+          target: classifyImportTarget(real.absPath, specifier, repoRoot, existsInRepo),
+        })),
+      }
+      return collectModuleEdges([
+        ...allSourceFiles.filter((file) => file.relPath !== relPath),
+        mutado,
+      ])
+    }
+
+    it('el grafo real tiene aristas, incluida `asignaciones -> pedidos`, y ningun ciclo', () => {
+      expect(moduleEdges.length, 'no se encontro ninguna arista entre modulos').toBeGreaterThan(0)
+      // La flecha que SI existe hoy y que es la razon de R14: `asignaciones` consume `OrderCatalog`.
+      expect(moduleEdges.some((edge) => edge.from === 'asignaciones' && edge.to === 'pedidos')).toBe(true)
+      expect(findModuleCycleFindings(moduleEdges)).toEqual([])
+    })
+
+    it('ningun archivo de `pedidos` importa `asignaciones`, ni por contrato ni por ruta profunda', () => {
+      const prohibidas = moduleEdges.filter((edge) => edge.from === 'pedidos' && edge.to === 'asignaciones')
+      expect(
+        prohibidas.map((edge) => `${edge.relPath} -> ${edge.specifier}`),
+        'La composicion del lote vive en `app/**` a proposito (design.md > 1): metida en `pedidos` ' +
+          'cerraria el ciclo pedidos -> asignaciones -> pedidos (R14).',
+      ).toEqual([])
+    })
+
+    it('MUERE si se muta un archivo REAL de `pedidos` para importar el CONTRATO de `asignaciones`', () => {
+      const aristas = aristasConArchivoMutado('lib/modules/pedidos/domain/list-orders.ts', (contenido) =>
+        `import type { OrderResponsible } from '@/lib/modules/asignaciones';\n${contenido}`,
+      )
+      expect(aristas.some((edge) => edge.from === 'pedidos' && edge.to === 'asignaciones')).toBe(true)
+
+      const findings = findModuleCycleFindings(aristas)
+      expect(findings).toHaveLength(1)
+      expect(findings[0]).toContain('ciclo entre modulos (asignaciones <-> pedidos)')
+    })
+
+    it('MUERE tambien por RUTA PROFUNDA, y ahi saltan las dos reglas: el ciclo y el bloque 5', () => {
+      const especificador = '@/lib/modules/asignaciones/domain/responsible-order'
+      const aristas = aristasConArchivoMutado('lib/modules/pedidos/domain/list-orders.ts', (contenido) =>
+        `import { compareResponsibles } from '${especificador}';\n${contenido}`,
+      )
+      expect(findModuleCycleFindings(aristas).join(' | ')).toContain('asignaciones <-> pedidos')
+      expect(
+        findCrossModuleDeepImportFinding(
+          'lib/modules/pedidos/domain/list-orders.ts',
+          especificador,
+          internalTarget('lib/modules/asignaciones/domain/responsible-order.ts'),
+        ),
+      ).toContain('ruta profunda a otro modulo')
+    })
+
+    it('`OrderAssignment` es de `asignaciones`, y MUERE si el driven de `pedidos` lo consulta', () => {
+      // La segunda mitad de R14: «ningun modulo distinto de `asignaciones` consulta
+      // `order_assignments` con el cliente Prisma». La regla es la del bloque 10 (R16); lo que
+      // anade este caso es la mutacion del adaptador REAL de `pedidos`.
+      expect(modelOwners.get('OrderAssignment')).toBe('asignaciones')
+
+      const relPath = 'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts'
+      const real = allSourceFiles.find((file) => file.relPath === relPath)
+      expect(real, `no se encontro el adaptador real ${relPath}`).toBeDefined()
+      const mutado = {
+        relPath,
+        module: 'pedidos',
+        content: `${(real as { content: string }).content}\nexport const fuga = () => prisma.orderAssignment.findMany({});\n`,
+      }
+
+      expect(findModelAccessFindings(modelOwners, [mutado])).toEqual([
+        `${relPath} accede a 'prisma.orderAssignment' (modelo 'OrderAssignment', dueño 'asignaciones') desde el modulo 'pedidos' (R16)`,
+      ])
+      // Y el adaptador de verdad, sin mutar, no produce ningun hallazgo.
+      expect(
+        findModelAccessFindings(modelOwners, [
+          { relPath, module: 'pedidos', content: (real as { content: string }).content },
+        ]),
+      ).toEqual([])
+    })
+  })
+
 })

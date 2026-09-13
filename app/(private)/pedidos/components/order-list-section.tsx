@@ -1,4 +1,10 @@
 import type { DataTableParams } from '@/components/shared/data-table';
+import { identity } from '@/lib/composition';
+import { canModifyAssignments } from '@/lib/modules/asignaciones';
+import type { OrderResponsible } from '@/lib/modules/asignaciones';
+import { listResponsiblesForOrdersAction } from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
+import { listUsersAction } from '@/lib/modules/identity/adapters/driving/user-actions';
+import { listWorkGroupsAction } from '@/lib/modules/identity/adapters/driving/work-group-actions';
 import { listOrdersAction } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import { listRecipesAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
@@ -6,6 +12,10 @@ import type { UnitView } from '@/lib/modules/unidades';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 import { OrderListEmpty } from './order-list-empty';
+import {
+  EMPTY_RESPONSIBLES_CATALOG,
+  type OrderResponsiblesCatalog,
+} from './order-responsibles';
 import { OrderListError } from './order-list-error';
 import { FIRST_PAGE, orderListHref } from './order-list-params';
 import { OrderSheet } from './order-sheet';
@@ -88,6 +98,101 @@ async function loadFormCatalogs(): Promise<{
   };
 }
 
+// ---------------------------------------------------------------------------------------------
+// QC-102 T11 y T15 — Los responsables de la PAGINA, compuestos AQUI y no dentro de `pedidos`
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * `true` si la sesion trae `asignaciones.modificar` (QC-102 R28, `design.md > 3.4`).
+ *
+ * **No es autorizacion, es PRESENTACION**: decide que controles se EMITEN en el HTML, no que se
+ * puede hacer. Quien autoriza de verdad es `requirePermission` en la primera linea de los cuatro
+ * casos de uso de QC-87, que rechaza igual aunque esta pantalla se saltara —y hay test suyo que lo
+ * afirma, `tests/unit/asignaciones/authorization.test.ts`—: anticipar aqui no es autorizar alli.
+ *
+ * **La pertenencia la resuelve `canModifyAssignments`, del propio modulo `asignaciones`, y nada
+ * mas**: el predicado acepta directamente el `SessionUser` de `identity.getSessionUser()`, delega
+ * en `assertPermission` por dentro y nunca lanza, asi que el literal `'asignaciones.modificar'`
+ * vive dentro de `asignaciones` y no se repite aqui (R29, R50). Con la sesion caida devuelve
+ * `false`, la direccion segura.
+ *
+ * **El componente de cliente NO lee cookies ni permisos** (R28): este booleano baja por props.
+ */
+async function canModifyResponsibles(): Promise<boolean> {
+  return canModifyAssignments(await identity.getSessionUser());
+}
+
+/**
+ * Los responsables de los pedidos de ESTA pagina, en **UNA sola** llamada (R16, decision cerrada
+ * 5, `design.md > 1`).
+ *
+ * **Se compone aqui, en la PANTALLA, y no dentro de `listOrders`.** `asignaciones` ya depende de
+ * `pedidos` —su caso de uso recibe el `OrderCatalog` del contrato publico—, asi que meter esta
+ * lectura en `pedidos` cerraria el ciclo `pedidos → asignaciones → pedidos`. `app/**` si puede
+ * llamar a los dos modulos, y es justo lo que esta funcion hace. Decidido en `design.md > 1` con
+ * tres alternativas descartadas.
+ *
+ * **Ni una consulta por fila**: el argumento es el array entero de identificadores de la pagina.
+ * Como `pageSize` nunca supera `MAX_PAGE_SIZE` y el tope del lote ES `MAX_PAGE_SIZE`, la pagina
+ * entera cabe siempre; no se recorta nada aqui, porque recortar dejaria filas sin responsables en
+ * silencio (`design.md > 0` H4).
+ *
+ * **Si falla, DEGRADA** (R20): devuelve el reparto vacio y la lista se sigue pintando con la
+ * columna sin resolver. El estado de error de la pantalla sigue siendo el de la LISTA de pedidos
+ * —el mismo criterio con el que `loadFormCatalogs` degrada los catalogos del panel—.
+ */
+async function loadResponsibles(
+  orderIds: readonly string[],
+): Promise<Readonly<Record<string, readonly OrderResponsible[]>>> {
+  const result = await listResponsiblesForOrdersAction(orderIds);
+
+  if (result.status === 'error') return {};
+
+  // El reparto por fila se hace EN EL SERVIDOR: a la tabla baja un `Record` plano y serializable,
+  // nunca un `Map` ni una funcion.
+  const byOrder: Record<string, readonly OrderResponsible[]> = {};
+  for (const entry of result.data) {
+    byOrder[entry.orderId] = entry.responsibles;
+  }
+  return byOrder;
+}
+
+/**
+ * Los dos catalogos que el panel ofrece para asignar, **por props** (R27) y **solo si el actor
+ * puede escribir**: sin `asignaciones.modificar` no se monta ningun control de escritura, asi que
+ * pedirlos seria trabajo tirado.
+ *
+ * **Degrada como `loadFormCatalogs`** (`design.md > 0` H1): `listUsersAction` y
+ * `listWorkGroupsAction` exigen `usuarios.consultar`, que la decision cerrada 2 no nombra. Quien
+ * tenga `asignaciones.modificar` sin ese permiso ve el panel con los catalogos **vacios** y su
+ * texto de lista vacia; no se inventa ningun permiso nuevo (R15) y no se tumba la lista.
+ *
+ * El tamano es `MAX_PAGE_SIZE`, el tope que los propios casos de uso imponen: el buscador filtra
+ * sobre lo que ya llego (R27).
+ */
+async function loadResponsiblesCatalog(): Promise<OrderResponsiblesCatalog> {
+  const canWrite = await canModifyResponsibles();
+
+  if (!canWrite) return EMPTY_RESPONSIBLES_CATALOG;
+
+  const [users, groups] = await Promise.all([
+    listUsersAction({ page: FIRST_PAGE, pageSize: MAX_PAGE_SIZE }),
+    listWorkGroupsAction({ page: FIRST_PAGE, pageSize: MAX_PAGE_SIZE }),
+  ]);
+
+  return {
+    canWrite,
+    people:
+      users.status === 'success'
+        ? users.data.items.map((user) => ({ id: user.id, displayName: user.displayName }))
+        : [],
+    workGroups:
+      groups.status === 'success'
+        ? groups.data.items.map((group) => ({ id: group.id, name: group.name }))
+        : [],
+  };
+}
+
 export async function OrderListSection({ params }: OrderListSectionProps) {
   const result = await listOrdersAction(params);
 
@@ -115,6 +220,20 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
     );
   }
 
+  /*
+    QC-102 R16 — La SEGUNDA llamada, seguida y con los ids de ESTA pagina. Va DESPUES de
+    `listOrdersAction` porque los identificadores salen de su resultado: es una dependencia real,
+    no una secuencia por descuido. Y va despues del estado VACIO porque con cero pedidos no hay
+    nada que preguntar. Se emite **UNA vez por render**, nunca una por fila.
+
+    Las dos lecturas de aqui si van en paralelo entre si: el catalogo del panel no depende del
+    lote, y esperarlas en fila solo sumaria latencia.
+  */
+  const [responsiblesByOrder, responsiblesCatalog] = await Promise.all([
+    loadResponsibles(items.map((order) => order.id)),
+    loadResponsiblesCatalog(),
+  ]);
+
   return (
     <div className="flex flex-col gap-4" data-testid="order-list">
       {/*
@@ -137,6 +256,8 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
         totalPages={totalPages}
         recipes={recipes}
         units={units}
+        responsiblesByOrder={responsiblesByOrder}
+        responsiblesCatalog={responsiblesCatalog}
       />
     </div>
   );

@@ -145,3 +145,61 @@ describe('la pantalla vive donde dice la constante (R1, R40)', () => {
     expect(codigo).not.toContain("from '@/lib/modules/pedidos'");
   });
 });
+
+// QC-102 T10 — R36: los componentes que esta feature anade viven bajo `components/` y salen por el
+// BARREL; la pagina no los importa por ruta profunda.
+//
+// El caso de «la pagina importa desde el barrel» ya esta arriba (R40 de QC-35, que es el mismo
+// requisito de arquitectura). Lo que falta y se anade aqui es lo especifico de QC-102: que los DOS
+// archivos nuevos existan donde deben, que el barrel los reexporte y que **ellos** declaren su
+// `'use client'` —nunca el `index.ts`, que convertirlo en frontera cliente/servidor arrastraria la
+// pagina entera al navegador—.
+describe('los componentes de responsables viven en components/ y salen por el barrel (R36)', () => {
+  const CARPETA = `app/(private)${ORDERS_ROUTE}/components`;
+  const NUEVOS = ['responsible-avatars.tsx', 'order-responsibles.tsx'] as const;
+
+  it('los dos archivos nuevos estan dentro de `components/`, no sueltos junto a `page.tsx`', () => {
+    for (const archivo of NUEVOS) {
+      expect(existsSync(`${CARPETA}/${archivo}`), `falta ${archivo}`).toBe(true);
+      expect(existsSync(`app/(private)${ORDERS_ROUTE}/${archivo}`)).toBe(false);
+    }
+  });
+
+  it('el barrel reexporta los dos, y por su ruta relativa', () => {
+    const barrel = fuenteSinComentarios(`${CARPETA}/index.ts`);
+
+    expect(barrel).toContain("from './responsible-avatars'");
+    expect(barrel).toContain("from './order-responsibles'");
+  });
+
+  it('cada componente declara su `use client`; el barrel sigue sin declararlo', () => {
+    for (const archivo of NUEVOS) {
+      expect(readFileSync(`${CARPETA}/${archivo}`, 'utf8').startsWith("'use client'")).toBe(true);
+    }
+    expect(fuenteSinComentarios(`${CARPETA}/index.ts`)).not.toContain('use client');
+  });
+
+  it('el barrel nombra los simbolos nuevos, que es por donde se consumen (R36)', () => {
+    // Se afirma sobre el TEXTO del barrel y no importandolo: este archivo corre en el proyecto
+    // `node` y cargar un modulo de cliente aqui traeria `sonner` y `next/navigation` sin DOM.
+    // Que los simbolos se puedan importar de verdad lo ejercitan los `*.test.tsx` de al lado,
+    // que es donde hay jsdom.
+    const barrel = fuenteSinComentarios(`${CARPETA}/index.ts`);
+
+    for (const simbolo of ['ResponsibleAvatars', 'OrderResponsibles', 'groupResponsiblesByOrigin']) {
+      expect(barrel, `el barrel no exporta ${simbolo}`).toContain(simbolo);
+    }
+  });
+
+  it('consumen las acciones de QC-87 por su RUTA EXACTA, nunca por el barrel del modulo (R40)', () => {
+    const codigo = fuenteSinComentarios(`${CARPETA}/order-responsibles.tsx`);
+
+    expect(codigo).toContain(
+      "from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions'",
+    );
+    // Del barrel del modulo solo puede venir el TIPO `OrderResponsible`, nunca una accion.
+    expect(codigo).not.toMatch(
+      /import\s+\{[^}]*Action[^}]*\}\s+from\s+'@\/lib\/modules\/asignaciones'/,
+    );
+  });
+});

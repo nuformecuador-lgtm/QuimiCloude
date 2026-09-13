@@ -1,6 +1,7 @@
 'use client';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
+import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import type { UnitView } from '@/lib/modules/unidades';
 
@@ -9,7 +10,11 @@ import {
   PRIORITY_COLUMN_ID,
   STATUS_COLUMN_ID,
 } from './order-list-params';
-import { OrderRowSheetActions } from './order-sheet';
+import {
+  EMPTY_RESPONSIBLES_CATALOG,
+  type OrderResponsiblesCatalog,
+} from './order-responsibles';
+import { OrderRowResponsibles, OrderRowSheetActions } from './order-sheet';
 import type { RecipePickerPage } from './recipe-picker';
 import {
   ORDER_PRIORITY_FILTER_OPTIONS,
@@ -52,6 +57,12 @@ import {
  *
  * **QC-35bis (2026-09-07): no hay columna de unidad ni de precio unitario.** Salieron del pedido
  * entero -formulario, contrato del modulo y tabla `orders`-, asi que no queda dato que pintar.
+ *
+ * **QC-102 (2026-09-13): NUEVE columnas.** Se anade la de RESPONSABLES (R16), entre el motivo de
+ * cancelacion y las acciones. Los responsables NO viajan en `OrderSummary` -`pedidos` no conoce
+ * `asignaciones` (R14)-: los trae un lote aparte que el Server Component de la seccion pide UNA
+ * vez por pagina y reparte por fila (`design.md > 1`). La columna **no ordena y no filtra**, y el
+ * esqueleto sube a nueve con ella (R22).
  */
 
 /** Id de la columna del correlativo. Se exporta porque la tabla la fija por defecto (R19). */
@@ -61,6 +72,8 @@ export const ORDER_NUMBER_COLUMN_ID = 'orderNumber';
 export const RECIPE_NAME_COLUMN_ID = 'recipeName';
 export const QUANTITY_COLUMN_ID = 'quantity';
 export const CANCELLATION_REASON_COLUMN_ID = 'cancellationReason';
+/** QC-102 R16 — la columna propia de responsables. */
+export const RESPONSIBLES_COLUMN_ID = 'responsibles';
 export const ACTIONS_COLUMN_ID = 'actions';
 
 /**
@@ -105,6 +118,18 @@ function formatRequestDate(value: Date): string {
 export type OrderColumnsDeps = {
   readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
+  /**
+   * QC-102 R16, R26 — los responsables **ya repartidos por fila** por el Server Component de la
+   * seccion: un `Record` plano y serializable, `orderId` → responsables de ese pedido. Aqui no se
+   * consulta nada y no se consulta por fila; el lote se pidio UNA vez por pagina
+   * (`design.md > 1`).
+   *
+   * Opcional y con `{}` por defecto **a proposito**: si el lote fallo, la columna se pinta **sin
+   * resolver** —marcador de ausencia— y la lista se sigue viendo entera (R20).
+   */
+  readonly responsiblesByOrder?: Readonly<Record<string, readonly OrderResponsible[]>>;
+  /** QC-102 R27, R28 — catalogos y `canWrite` del panel, compuestos una vez en el servidor. */
+  readonly responsiblesCatalog?: OrderResponsiblesCatalog;
 };
 
 /**
@@ -117,6 +142,8 @@ export type OrderColumnsDeps = {
 export function buildOrderColumns({
   recipes,
   units,
+  responsiblesByOrder = {},
+  responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
 }: OrderColumnsDeps): readonly DataTableColumn<OrderSummary>[] {
   return [
     {
@@ -178,13 +205,42 @@ export function buildOrderColumns({
         order.cancellationReason ?? <MissingValue field={CANCELLATION_REASON_COLUMN_ID} />,
     },
     {
+      id: RESPONSIBLES_COLUMN_ID,
+      label: 'Responsables',
+      align: 'start',
+      // QC-102 R16: columna PROPIA. **Sin `sortable`**: el orden de la lista lo manda `pedidos`
+      // (QC-57) y responsables es un dato de otro modulo que ni siquiera viaja en la fila, asi
+      // que una cabecera que ordenara aqui mentiria. **Sin `filter`**: no aparece en la barra de
+      // filtros por el mismo motivo. `pinnable` por defecto, como las demas columnas de datos.
+      cell: (order) => (
+        <OrderRowResponsibles
+          order={order}
+          recipes={recipes}
+          units={units}
+          // R20: si el lote fallo, esta clave no existe y la celda pinta el marcador de ausencia.
+          responsibles={responsiblesByOrder[order.id] ?? []}
+          responsiblesCatalog={responsiblesCatalog}
+        />
+      ),
+    },
+    {
       id: ACTIONS_COLUMN_ID,
       label: 'Acciones',
       align: 'end',
       // Sin `sortable` (no ordena) y sin `filter` (no aparece en la barra de filtros).
       // `pinnable: false` para que el usuario no pueda fijarla y tapar la del correlativo.
       pinnable: false,
-      cell: (order) => <OrderRowSheetActions order={order} recipes={recipes} units={units} />,
+      cell: (order) => (
+        <OrderRowSheetActions
+          order={order}
+          recipes={recipes}
+          units={units}
+          // QC-102 R24, R26: la entrada «Responsables» abre el panel con lo que el lote YA trajo
+          // para esta fila. Sin esto, el panel abriria vacio y tendria que consultar.
+          responsibles={responsiblesByOrder[order.id] ?? []}
+          responsiblesCatalog={responsiblesCatalog}
+        />
+      ),
     },
   ];
 }
