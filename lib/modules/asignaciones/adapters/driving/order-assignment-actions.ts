@@ -32,7 +32,12 @@
 
 import { asignaciones, identity, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
-import { AsignacionesError, type Actor, type OrderResponsible } from '@/lib/modules/asignaciones';
+import {
+  AsignacionesError,
+  type Actor,
+  type OrderResponsible,
+  type OrderResponsiblesEntry,
+} from '@/lib/modules/asignaciones';
 
 export type AssignResponsiblesFormState =
   | { status: 'idle' }
@@ -179,6 +184,39 @@ export async function listOrderResponsiblesAction(
 
   try {
     const data = await asignaciones.listOrderResponsibles(actor, orderId);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// QC-102 T6 - La consulta EN LOTE: argumento YA TIPADO, ningun `FormData` (R13). Bloque NUEVO al
+// final del archivo: no reordena ni reformatea ninguna de las cuatro funciones de arriba.
+// ---------------------------------------------------------------------------------------------
+
+/** Lo que devuelve la consulta en lote: un ARRAY -no un `Map`- plano, ordenado y serializable sin
+ *  depender de que estructuras admita el serializador de RSC. */
+export type OrderResponsiblesBatchResult =
+  | { status: 'success'; data: readonly OrderResponsiblesEntry[] }
+  | ErrorState;
+
+/**
+ * Los responsables de VARIOS pedidos (QC-102 R1, R13): lo que el listado pide UNA vez por pagina.
+ *
+ * Misma capa tonta que las otras cuatro: resuelve el actor de las DOS caras de la sesion, llama al
+ * caso de uso y traduce el error por su `code`. **Ningun permiso se comprueba aqui** -la frontera
+ * es `requirePermission(actor, 'pedidos.consultar')` en la primera linea del caso de uso (R2)- y
+ * **ninguna validacion se adelanta**: los identificadores viajan CRUDOS al esquema del dominio,
+ * que es quien decide que son uuid y cuantos caben (R9).
+ */
+export async function listResponsiblesForOrdersAction(
+  orderIds: readonly string[],
+): Promise<OrderResponsiblesBatchResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await asignaciones.listResponsiblesForOrders(actor, orderIds);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

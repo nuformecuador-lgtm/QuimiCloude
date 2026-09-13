@@ -35,6 +35,7 @@ import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/mo
 import { getRecipeAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeQueryResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeLineView } from '@/lib/modules/recetas';
+import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { UnitView } from '@/lib/modules/unidades';
 import { OrderField } from './order-field';
 import { OrderIngredientsTable } from './order-ingredients-table';
@@ -45,7 +46,27 @@ import {
   type RecipePickerOption,
   type RecipePickerPage,
 } from './recipe-picker';
+import {
+  EMPTY_RESPONSIBLES_CATALOG,
+  OrderResponsibles,
+  type OrderResponsiblesCatalog,
+} from './order-responsibles';
+import { isFinalOrderStatus } from './order-row-actions';
 import { ORDER_PRIORITY_LABELS, ORDER_STATUS_LABELS } from './order-status-badge';
+
+/**
+ * QC-102 T14 — EN QUE SECCION abre el panel (R23, R24).
+ *
+ * Es una union de dos literales y no un booleano `openResponsibles` a proposito: el dia que el
+ * panel tenga una tercera seccion, anadirla aqui rompe el `typecheck` de quien no la contemple.
+ *
+ * **No hay panel nuevo, ni ruta nueva, ni pantalla aparte**: el panel es EL MISMO
+ * (`SheetContent`), y esto solo decide a donde va el foco al abrirlo.
+ */
+export type OrderSheetSection = 'form' | 'responsibles';
+
+/** La seccion de responsables, dentro del panel que ya existe. Se localiza por este `data-testid`. */
+export const ORDER_SHEET_RESPONSIBLES_TESTID = 'order-sheet-responsibles';
 
 /**
  * Formulario de alta y edicion de pedido (R26-R30, R33, R34, R39, R45, `design.md > 8`).
@@ -287,12 +308,45 @@ export type OrderFormProps = {
   readonly units: readonly UnitView[];
   /** Lo llama el panel cuando la operacion termina bien: cerrar, avisar y refrescar (R35). */
   readonly onSaved: () => void;
+  /**
+   * QC-102 R26 — los responsables que **la fila del listado ya trajo**. Al abrir el panel NO se
+   * consulta nada: se pinta lo que ya esta en memoria.
+   */
+  readonly responsibles?: readonly OrderResponsible[];
+  /** QC-102 R27, R28 — catalogos y `canWrite`, por props desde el servidor. */
+  readonly responsiblesCatalog?: OrderResponsiblesCatalog;
+  /** QC-102 R24 — en que seccion abre. Por defecto, el formulario de siempre. */
+  readonly section?: OrderSheetSection;
 };
 
-export function OrderForm({ order, recipes, units, onSaved }: OrderFormProps) {
+export function OrderForm({
+  order,
+  recipes,
+  units,
+  onSaved,
+  responsibles = [],
+  responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
+  section = 'form',
+}: OrderFormProps) {
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
   const isEdit = order !== undefined;
+
+  /**
+   * QC-102 T14 — La seccion de responsables, DENTRO de este mismo panel (R23). Cuando el panel se
+   * abre desde la entrada «Responsables» de la fila, el foco va aqui: sin scroll a ciegas y sin
+   * obligar a recorrer el formulario. `scrollIntoView` se llama solo si existe —jsdom no lo
+   * implementa— y el contenedor es `tabIndex={-1}` para poder recibir foco sin entrar en el orden
+   * de tabulacion.
+   */
+  const responsiblesRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (section !== 'responsibles') return;
+    const node = responsiblesRef.current;
+    if (node === null) return;
+    node.focus({ preventScroll: true });
+    if (typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'start' });
+  }, [section]);
 
   /*
     Eleccion VIGENTE de receta: con ella se pintan la CABECERA, la IMAGEN y la tabla de
@@ -601,6 +655,35 @@ export function OrderForm({ order, recipes, units, onSaved }: OrderFormProps) {
             loading={ingredientsLoading}
             error={ingredientsError}
           />
+        )}
+
+        {/*
+          QC-102 R23 — LA SECCION DE RESPONSABLES, dentro del panel que ya existe. No hay panel
+          nuevo, ni ruta nueva, ni pantalla aparte: es una seccion mas del mismo `SheetContent`.
+
+          Solo en la EDICION: sin pedido creado no hay a quien asignar, y las tres operaciones de
+          QC-87 piden un `orderId` que en el alta todavia no existe.
+
+          R26: lo que pinta son los responsables que **la fila ya trajo**; no se consulta nada al
+          abrir. R29: con el pedido en estado final, `isFinal` apaga los controles de escritura
+          —y la seccion no dice por que—.
+        */}
+        {order === undefined ? null : (
+          <div
+            ref={responsiblesRef}
+            tabIndex={-1}
+            data-testid={ORDER_SHEET_RESPONSIBLES_TESTID}
+            data-section={section}
+          >
+            <OrderResponsibles
+              orderId={order.id}
+              responsibles={responsibles}
+              canWrite={responsiblesCatalog.canWrite}
+              isFinal={isFinalOrderStatus(order.status)}
+              people={responsiblesCatalog.people}
+              workGroups={responsiblesCatalog.workGroups}
+            />
+          </div>
         )}
       </div>
     </SheetContent>

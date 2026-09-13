@@ -88,3 +88,19 @@ export {
   createListOrderResponsibles,
   type ListOrderResponsiblesDeps,
 } from './domain/list-order-responsibles';
+
+// ---------------------------------------------------------------------------------------
+// QC-102 T6 - La consulta EN LOTE. Bloque NUEVO al final: no reordena ni reformatea nada de lo
+// de arriba, y sigue sin arrastrar `next/*`, `@prisma/client` ni ningun `'use server'` en su
+// cierre de imports.
+//
+// Se publica la FACTORY con su tipo `*Deps` -quien la cablea es `lib/composition`- y el tipo de
+// la SALIDA, que es lo que la pantalla de pedidos reparte por fila. La Server Action de esta
+// operacion NO se reexporta aqui (R14, QC-87 R46): `app/**` la importa por su RUTA EXACTA.
+// ---------------------------------------------------------------------------------------
+export {
+  createListResponsiblesForOrders,
+  MAX_ORDERS_PER_BATCH,
+  type ListResponsiblesForOrdersDeps,
+  type OrderResponsiblesEntry,
+} from './domain/list-responsibles-for-orders';

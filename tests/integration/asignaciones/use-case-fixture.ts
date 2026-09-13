@@ -40,6 +40,7 @@ import { Prisma } from '@prisma/client';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
 import { createAssignResponsibles } from '@/lib/modules/asignaciones/domain/assign-responsibles';
 import { createListOrderResponsibles } from '@/lib/modules/asignaciones/domain/list-order-responsibles';
+import { createListResponsiblesForOrders } from '@/lib/modules/asignaciones/domain/list-responsibles-for-orders';
 import { createRemoveWorkGroupFromOrder } from '@/lib/modules/asignaciones/domain/remove-work-group-from-order';
 import { createUnassignResponsible } from '@/lib/modules/asignaciones/domain/unassign-responsible';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
@@ -52,6 +53,7 @@ import { setCurrentTx } from './prisma-tx-holder';
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { AssignOutcome } from '@/lib/modules/asignaciones/domain/assign-responsibles';
 import type { OrderResponsible } from '@/lib/modules/asignaciones/domain/assignment-view';
+import type { OrderResponsiblesEntry } from '@/lib/modules/asignaciones/domain/list-responsibles-for-orders';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 
 // ---------------------------------------------------------------------------------------------
@@ -76,6 +78,11 @@ export type UseCases = {
     actor: Actor | null | undefined,
     orderId: string,
   ) => Promise<readonly OrderResponsible[]>;
+  /** QC-102 T2/T4 — la consulta EN LOTE: varios pedidos de una vez, con UNA sola sentencia. */
+  readonly listForOrders: (
+    actor: Actor | null | undefined,
+    orderIds: unknown,
+  ) => Promise<readonly OrderResponsiblesEntry[]>;
 };
 
 function wireUseCases(tx: Prisma.TransactionClient, now: Date): UseCases {
@@ -94,6 +101,14 @@ function wireUseCases(tx: Prisma.TransactionClient, now: Date): UseCases {
     unassign: createUnassignResponsible({ orders, assignments }),
     // El reloj entra por parametro tambien en la consulta: aqui no hay ni un `new Date()` escondido.
     list: createListOrderResponsibles({ orders, assignments, people: assignmentDirectoryPrisma, now: () => now }),
+    // QC-102: SIN `orders` a proposito (hallazgo H3). El lote no comprueba pedido a pedido que el
+    // pedido viva —costaria una consulta por pedido— y devuelve entrada vacia para lo que no
+    // encuentra (R7).
+    listForOrders: createListResponsiblesForOrders({
+      assignments,
+      people: assignmentDirectoryPrisma,
+      now: () => now,
+    }),
   };
 }
 

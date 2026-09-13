@@ -99,6 +99,38 @@ const {
   };
 });
 
+// QC-102 T14 — El panel monta ahora la SECCION DE RESPONSABLES dentro de si mismo (R23), y esa
+// seccion es un modulo de cliente que usa `useRouter` y las Server Actions de QC-87.
+//
+// **No es un cambio de guion de este archivo**: no toca ni un `it(...)`, ni un selector, ni una
+// asercion. Son los dos dobles que el borde nuevo exige —el router de la App Router, que jsdom no
+// monta, y las actions de `asignaciones`, que este archivo no ejercita— con el mismo criterio con
+// el que ya estan aislados los bordes de `pedidos` y `recetas`.
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+}));
+
+vi.mock('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions', () => {
+  const noDebeInvocarse = (nombre: string) => () => {
+    throw new Error(`${nombre} no debe invocarse desde el formulario de pedido`);
+  };
+  return {
+    assignResponsiblesAction: vi.fn(noDebeInvocarse('assignResponsiblesAction')),
+    unassignResponsibleAction: vi.fn(noDebeInvocarse('unassignResponsibleAction')),
+    removeWorkGroupFromOrderAction: vi.fn(noDebeInvocarse('removeWorkGroupFromOrderAction')),
+    listOrderResponsiblesAction: vi.fn(noDebeInvocarse('listOrderResponsiblesAction')),
+    listResponsiblesForOrdersAction: vi.fn(noDebeInvocarse('listResponsiblesForOrdersAction')),
+  };
+});
+
 vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   createOrderAction: createOrderActionMock,
   updateOrderAction: updateOrderActionMock,

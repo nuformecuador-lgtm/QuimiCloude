@@ -28,14 +28,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   OrderAssignmentNotFoundError,
   OrderDeliveredFrozenError,
+  ValidationError,
   createAssignResponsibles,
   createListOrderResponsibles,
+  createListResponsiblesForOrders,
   createRemoveWorkGroupFromOrder,
   createUnassignResponsible,
 } from '@/lib/modules/asignaciones';
 import {
   assignResponsiblesAction,
   listOrderResponsiblesAction,
+  listResponsiblesForOrdersAction,
   removeWorkGroupFromOrderAction,
   unassignResponsibleAction,
 } from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
@@ -52,6 +55,7 @@ const {
   removeWorkGroupFromOrderMock,
   unassignResponsibleMock,
   listOrderResponsiblesMock,
+  listResponsiblesForOrdersMock,
 } = vi.hoisted(() => ({
   getSessionUserMock: vi.fn(),
   getSessionContextMock: vi.fn(),
@@ -59,6 +63,7 @@ const {
   removeWorkGroupFromOrderMock: vi.fn(),
   unassignResponsibleMock: vi.fn(),
   listOrderResponsiblesMock: vi.fn(),
+  listResponsiblesForOrdersMock: vi.fn(),
 }));
 
 // QC-71 (R7, R13): el adaptador driving pide a la composicion la LECTURA de la cabecera del
@@ -80,6 +85,7 @@ vi.mock('@/lib/composition', () => ({
     removeWorkGroupFromOrder: removeWorkGroupFromOrderMock,
     unassignResponsible: unassignResponsibleMock,
     listOrderResponsibles: listOrderResponsiblesMock,
+    listResponsiblesForOrders: listResponsiblesForOrdersMock,
   },
 }));
 
@@ -384,6 +390,7 @@ function puertosQueNoDebenLlamarse(): PuertosQueRevientan {
   const assignments = {
     insertMissing: explota('insertMissing'),
     listByOrderInCompany: explota('listByOrderInCompany'),
+    listByOrdersInCompany: explota('listByOrdersInCompany'),
     deleteOne: explota('deleteOne'),
     deleteByWorkGroup: explota('deleteByWorkGroup'),
   };
@@ -420,6 +427,7 @@ function cablearCasosDeUsoReales(): PuertosQueRevientan {
   const removeGroup = createRemoveWorkGroupFromOrder({ orders, assignments });
   const unassign = createUnassignResponsible({ orders, assignments });
   const list = createListOrderResponsibles({ orders, assignments, people });
+  const listForOrders = createListResponsiblesForOrders({ assignments, people });
 
   assignResponsiblesMock.mockImplementation((actor: Actor | null, input: unknown, now: Date) =>
     assign(actor, input, now),
@@ -432,6 +440,9 @@ function cablearCasosDeUsoReales(): PuertosQueRevientan {
   );
   listOrderResponsiblesMock.mockImplementation((actor: Actor | null, orderId: string) =>
     list(actor, orderId),
+  );
+  listResponsiblesForOrdersMock.mockImplementation((actor: Actor | null, orderIds: unknown) =>
+    listForOrders(actor, orderIds),
   );
 
   return puertos;
@@ -516,6 +527,8 @@ const LAS_CUATRO_ACCIONES = [
       ),
   ],
   ['listOrderResponsiblesAction', () => listOrderResponsiblesAction(ORDER_ID)],
+  // QC-102 T6: la QUINTA accion recorre los MISMOS cortes de sesion que las otras cuatro.
+  ['listResponsiblesForOrdersAction', () => listResponsiblesForOrdersAction([ORDER_ID])],
 ] as const satisfies readonly (readonly [string, () => Promise<unknown>])[];
 
 describe('R43 — falta la PRIMERA cara: no hay getSessionUser', () => {
@@ -590,6 +603,97 @@ describe('R43 — con las DOS caras el actor lleva id, empresa y permisos, y nad
     );
 
     expect(unassignResponsibleMock.mock.calls[0]?.[0]).toEqual({
+      ...ACTOR_ESPERADO,
+      permissions: [],
+    });
+    expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
+    for (const metodo of puertos.metodos) expect(metodo).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// QC-102 T6 (R13) - la consulta EN LOTE: argumentos ya tipados, array de salida y error por `code`
+// ---------------------------------------------------------------------------------------------
+
+describe('QC-102 R13 - listResponsiblesForOrdersAction', () => {
+  it('recibe la lista YA TIPADA -aridad UNO- y la entrega CRUDA al caso de uso', async () => {
+    listResponsiblesForOrdersMock.mockResolvedValue([]);
+
+    await listResponsiblesForOrdersAction([ORDER_ID, OTRO_USER_ID]);
+
+    // Ningun `FormData` por firma, y ninguna validacion adelantada: quien decide que son uuid y
+    // cuantos caben es el esquema del DOMINIO (R9).
+    expect(listResponsiblesForOrdersAction).toHaveLength(1);
+    expect(listResponsiblesForOrdersMock).toHaveBeenCalledWith(ACTOR_ESPERADO, [
+      ORDER_ID,
+      OTRO_USER_ID,
+    ]);
+  });
+
+  it('devuelve un ARRAY de entradas, no un Map: plano y serializable', async () => {
+    const entradas = [
+      {
+        orderId: ORDER_ID,
+        responsibles: [{ userId: USER_ID, displayName: 'Ana Perez', origin: { kind: 'direct' } }],
+      },
+      { orderId: OTRO_USER_ID, responsibles: [] },
+    ];
+    listResponsiblesForOrdersMock.mockResolvedValue(entradas);
+
+    const resultado = await listResponsiblesForOrdersAction([ORDER_ID, OTRO_USER_ID]);
+
+    expect(resultado).toEqual({ status: 'success', data: entradas });
+    expect(Array.isArray((resultado as { data: unknown }).data)).toBe(true);
+    // Serializable sin perder nada: un `Map` habria viajado como `{}`.
+    expect(JSON.parse(JSON.stringify(resultado))).toEqual({ status: 'success', data: entradas });
+  });
+
+  it('la lista vacia es un EXITO, no un error', async () => {
+    listResponsiblesForOrdersMock.mockResolvedValue([]);
+
+    expect(await listResponsiblesForOrdersAction([])).toEqual({ status: 'success', data: [] });
+  });
+
+  it('traduce el error por su CODE aunque se mute el texto del mensaje', async () => {
+    const error = new ValidationError();
+    Object.defineProperty(error, 'message', { value: 'un texto que nadie debe mirar' });
+    listResponsiblesForOrdersMock.mockRejectedValue(error);
+
+    const resultado = await listResponsiblesForOrdersAction(['no-soy-un-uuid']);
+
+    expect(resultado).toMatchObject({ status: 'error', code: 'invalid_input' });
+    expect(JSON.stringify(resultado)).not.toContain('un texto que nadie debe mirar');
+  });
+
+  it('una entrada invalida la rechaza el ESQUEMA del dominio, sin tocar ningun puerto', async () => {
+    const puertos = cablearCasosDeUsoReales();
+
+    const resultado = await listResponsiblesForOrdersAction(['no-soy-un-uuid']);
+
+    expect(resultado).toMatchObject({ status: 'error', code: 'invalid_input' });
+    for (const metodo of puertos.metodos) expect(metodo).not.toHaveBeenCalled();
+  });
+
+  it('un error ajeno al dominio sale como unexpected, con referencia y sin filtrar su texto', async () => {
+    listResponsiblesForOrdersMock.mockRejectedValue(new Error('connection terminated unexpectedly'));
+
+    const resultado = await listResponsiblesForOrdersAction([ORDER_ID]);
+
+    expect(resultado).toMatchObject({
+      status: 'error',
+      code: 'unexpected',
+      reference: REQUEST_ID_DE_PRUEBA,
+    });
+    expect(JSON.stringify(resultado)).not.toContain('connection terminated');
+  });
+
+  it('NO comprueba ningun permiso: el actor sin permisos llega igual y lo rechaza el caso de uso', async () => {
+    getSessionUserMock.mockResolvedValue({ ...SESSION_USER, permissions: [] });
+    const puertos = cablearCasosDeUsoReales();
+
+    const resultado = await listResponsiblesForOrdersAction([ORDER_ID]);
+
+    expect(listResponsiblesForOrdersMock.mock.calls[0]?.[0]).toEqual({
       ...ACTOR_ESPERADO,
       permissions: [],
     });

@@ -6,6 +6,7 @@ import type {
   AssignmentRow,
   NewAssignment,
   OrderAssignmentRepository,
+  OrderAssignmentRowWithOrder,
 } from '../../../ports/order-assignment-repository';
 
 /**
@@ -104,6 +105,34 @@ export function createOrderAssignmentRepository(db: PrismaLike = prisma): OrderA
         where: { orderId, companyId },
         select: ASSIGNMENT_SELECT,
         orderBy: { userId: 'asc' },
+      });
+    },
+
+    /**
+     * QC-102 T2 — la consulta EN LOTE: UN SOLO `findMany` para TODOS los pedidos de la pagina
+     * (R4), **sin `include` y sin join** (R5).
+     *
+     * `orderId` entra en el `select` —y solo aqui— porque es lo que AGRUPA: el caso de uso reparte
+     * en memoria con el identificador ya leido, exactamente como `list-orders.ts` compone el nombre
+     * de la receta. Entre `orders` y `order_assignments` no hay `@relation` que navegar (QC-33
+     * dejo las FK como escalares a proposito) y esta ficha no la crea: lo vigila
+     * `tests/guards/guard-lote-sin-join.test.ts`.
+     *
+     * El `orderBy` es barato y TOTAL: la PK de `order_assignments` es `(order_id, user_id)`
+     * —QC-86—, asi que la lectura ya es determinista ANTES de resolver nombres; el orden final por
+     * nombre mostrable lo pone el caso de uso, que es el unico que puede (`users` no es de este
+     * modulo).
+     *
+     * `orderIds` vacio NO llega aqui: el caso de uso corta antes (R8).
+     */
+    async listByOrdersInCompany(
+      companyId: string,
+      orderIds: readonly string[],
+    ): Promise<readonly OrderAssignmentRowWithOrder[]> {
+      return db.orderAssignment.findMany({
+        where: { companyId, orderId: { in: [...orderIds] } },
+        select: { ...ASSIGNMENT_SELECT, orderId: true },
+        orderBy: [{ orderId: 'asc' }, { userId: 'asc' }],
       });
     },
 

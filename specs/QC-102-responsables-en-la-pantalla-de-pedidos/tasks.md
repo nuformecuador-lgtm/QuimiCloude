@@ -9,7 +9,7 @@ cambiarlos, está mal escrita.
 
 ## Tanda A — el backend en lote (T1 → T6, en orden)
 
-- [ ] **T1. El puerto gana `listByOrdersInCompany`.**
+- [x] **T1. El puerto gana `listByOrdersInCompany`.**
       `lib/modules/asignaciones/ports/order-assignment-repository.ts`: método nuevo y tipo
       `OrderAssignmentRowWithOrder`, `companyId` como **primer** parámetro. No se toca ninguno de
       los tres métodos existentes.
@@ -17,27 +17,27 @@ cambiarlos, está mal escrita.
       (`tests/unit/asignaciones/order-assignment-repository.test.ts`) afirma que una llamada sin
       `companyId` no compila.
 
-- [ ] **T2. El adaptador driven lo implementa.** (depende de T1)
+- [x] **T2. El adaptador driven lo implementa.** (depende de T1)
       Un solo `findMany` con `orderId: { in }`, `select` con `orderId`, `orderBy`
       `[orderId, userId]`. **Sin `include` y sin `join`.**
       **Hecho**: test de integración contra Postgres real con dos pedidos de una empresa y uno de
       otra; el de la otra empresa **no vuelve**. Archivo declarado en
       `tests/integration/aislamiento.json`.
 
-- [ ] **T3. Se extrae el comparador y `toOrigin` a `domain/responsible-order.ts`.** (depende de T1)
+- [x] **T3. Se extrae el comparador y `toOrigin` a `domain/responsible-order.ts`.** (depende de T1)
       `list-order-responsibles.ts` pasa a importarlos; **su comportamiento no cambia**.
       **Hecho**: los tests ya existentes de `list-order-responsibles` pasan **sin tocar su guion**.
 
-- [ ] **T4. El caso de uso `createListResponsiblesForOrders`.** (depende de T2, T3)
+- [x] **T4. El caso de uso `createListResponsiblesForOrders`.** (depende de T2, T3)
       Permiso primero, zod después, corte por lista vacía, dos consultas, agrupado y orden.
       **Hecho**: unit tests de R1, R2, R4, R6, R7, R8, R9, R10, R11, R12 con puertos falsos que
       **cuentan invocaciones**.
 
-- [ ] **T5. Cableado en `lib/composition/index.ts`.** (depende de T4)
+- [x] **T5. Cableado en `lib/composition/index.ts`.** (depende de T4)
       Una factory más en el bloque `asignaciones`; ningún adaptador nuevo.
       **Hecho**: el test de la fachada de composición lista la quinta operación y `typecheck` verde.
 
-- [ ] **T6. Server Action `listResponsiblesForOrdersAction` + barrel del módulo.** (depende de T5)
+- [x] **T6. Server Action `listResponsiblesForOrdersAction` + barrel del módulo.** (depende de T5)
       Al final de `order-assignment-actions.ts`, argumentos tipados; bloque nuevo al final de
       `index.ts` del módulo.
       **Hecho**: `tests/unit/asignaciones/module-contract.test.ts` sigue verde (el contrato no
@@ -45,46 +45,46 @@ cambiarlos, está mal escrita.
 
 ## Tanda B — piezas de pantalla sin dependencias entre sí (T7 → T10, `[P]`)
 
-- [ ] **T7. `[P]` `responsible-avatars.tsx`.**
+- [x] **T7. `[P]` `responsible-avatars.tsx`.**
       Tres iniciales + `+N`, ancho constante, `button` de 44x44 con `aria-label`, tooltip con los
       nombres que faltan, marcador de ausencia cuando no hay nadie.
       **Hecho**: unit tests de R17, R18, R19, R21 y del `aria-label`.
 
-- [ ] **T8. `[P]` `order-responsibles.tsx` — modo LECTURA.**
+- [x] **T8. `[P]` `order-responsibles.tsx` — modo LECTURA.**
       Todos los responsables, agrupados por origen, con el nombre de grupo congelado. Sin límite.
       **Hecho**: unit tests de R25 y R12 (renombrar el grupo después no cambia lo que se pinta:
       el nombre llega en el dato).
 
-- [ ] **T9. `[P]` `order-responsibles.tsx` — modo ESCRITURA.** (mismo archivo que T8; si T8 y T9 las
+- [x] **T9. `[P]` `order-responsibles.tsx` — modo ESCRITURA.** (mismo archivo que T8; si T8 y T9 las
       toman dos personas, T9 espera)
       Buscador de personas, selector de grupos, quitar persona, quitar grupo; toast con `added`,
       `router.refresh()`, error por `code` dentro del panel.
       **Hecho**: unit tests de R30, R31, R32, R33, R34 con las acciones mockeadas, comprobando que
       quitar un grupo emite **una** llamada y no N.
 
-- [ ] **T10. `[P]` Esqueleto y barrel.**
+- [x] **T10. `[P]` Esqueleto y barrel.**
       `ORDER_SKELETON_COLUMN_COUNT` +1 y exports nuevos en `components/index.ts`.
       **Hecho**: test de R22 (esqueleto y tabla declaran el mismo número de columnas) y de R36 (la
       página no importa por ruta profunda).
 
 ## Tanda C — enganches en la pantalla (T11 → T14, en orden)
 
-- [ ] **T11. `order-list-section.tsx` compone el lote.** (depende de T6)
+- [x] **T11. `order-list-section.tsx` compone el lote.** (depende de T6)
       Segunda llamada con los ids de la página, reparto por fila, degradación si falla.
       **Hecho**: tests de R16 y R20; y un test que cuenta llamadas y comprueba **una sola** por
       render, no una por fila.
 
-- [ ] **T12. Columna nueva en `order-columns.tsx`.** (depende de T7, T11)
+- [x] **T12. Columna nueva en `order-columns.tsx`.** (depende de T7, T11)
       `sortable: false`, sin `filter`, `pinnable` por defecto.
       **Hecho**: test de R16 sobre la declaración de columnas, y el de QC-35 que cuenta columnas
       actualizado **solo en su número**, no en su guion.
 
-- [ ] **T13. Cuarto botón de fila «Responsables».** (depende de T12)
+- [x] **T13. Cuarto botón de fila «Responsables».** (depende de T12)
       `onResponsibles?` en `order-row-actions.tsx`; **no** se deshabilita en estado final.
       **Hecho**: tests de R24 y del caso `ENTREGADO` (el botón sigue activo, los de editar/cancelar/
       eliminar siguen deshabilitados y `FINAL_ORDER_REASON` sigue visible).
 
-- [ ] **T14. El panel abre en la sección de responsables.** (depende de T8, T9, T13)
+- [x] **T14. El panel abre en la sección de responsables.** (depende de T8, T9, T13)
       `OrderSheet`/`OrderRowSheetActions` aceptan en qué sección abrir; la sección se monta dentro
       del panel existente.
       **Hecho**: tests de R23 (no hay panel nuevo ni ruta nueva), R26 (abrir **no** dispara ninguna
@@ -92,7 +92,7 @@ cambiarlos, está mal escrita.
 
 ## Tanda D — permisos, E2E y cierre (T15 → T18)
 
-- [ ] **T15. `puedeEscribir` por props desde el servidor.** (depende de T14)
+- [x] **T15. `puedeEscribir` por props desde el servidor.** (depende de T14)
       El Server Component lee la sesión y baja el booleano; el cliente no lee cookies.
       **Hecho**: test de R28 en los dos sentidos — sin el permiso no se monta ningún control de
       escritura, **y** la Server Action rechaza igual (el test de autorización de QC-87 se invoca,
