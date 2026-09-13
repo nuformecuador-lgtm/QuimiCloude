@@ -8,6 +8,7 @@ import { USER_ACCOUNT_STATUSES } from '../../../domain/account-status';
 import { NO_CREDENTIAL_SENTINEL } from '../../../domain/credential-setup-link';
 import { buildDisplayName } from '../../../domain/display-name';
 import { ROLE_ADMINISTRADOR } from '../../../domain/roles';
+import { changeRevokesSessions, floorToSecond } from '../../../domain/session-revocation';
 
 import { insensitiveContainsCondition, selectCondition } from './list-query-sql';
 
@@ -580,6 +581,36 @@ function wouldLeaveNoAdministrator(
 }
 
 /**
+ * QC-23 T14 (R33, R34, R35, R36, R38) — el trozo de `data` que sube el sello «sesiones validas
+ * desde», o **nada**.
+ *
+ * Devuelve un objeto que se ESPARCE dentro del `data` del `UPDATE` que ya existe, y esa es toda la
+ * gracia: el sello no viaja en una segunda escritura ni en una segunda transaccion, sino como una
+ * columna mas del **MISMO** `UPDATE`. Si la escritura no se confirma, el sello no sube; si el sello
+ * no puede subir, la escritura no se confirma (R38). Por eso aqui no hay ningun caso de uso
+ * «revocar»: serian dos escrituras sobre la misma fila y una ventana en la que la cuenta ya esta
+ * bloqueada pero sus cookies todavia valen (`design.md > 5.5`).
+ *
+ * **La DECISION no vive aqui**: vive en `changeRevokesSessions`, funcion pura del dominio, que es
+ * quien sabe que `blocked` e `inactive` cortan, que `pending` y `active` no (R36), que el rol corta
+ * solo si cambio de verdad (R35) y que el borrado corta siempre (R34). Un driven puede importar su
+ * propio `domain/` (`docs/architecture.md > La regla de dependencias`), asi que la regla sigue
+ * estando en un solo sitio testeable con objetos planos.
+ *
+ * **Truncado al segundo** (`floorToSecond`, `design.md > 2.3`): `iat` viaja en segundos dentro del
+ * contenido firmado, y mezclar granularidades dejaria un hueco de hasta 999 ms.
+ *
+ * El objeto vacio cuando no corta no es un detalle de estilo: escribir `sessions_valid_from` con su
+ * valor actual seria una escritura igual, y reactivar una cuenta NO debe tocar el sello (R37).
+ */
+function sessionStampFor(
+  change: Parameters<typeof changeRevokesSessions>[0],
+  now: Date,
+): { readonly sessionsValidFrom?: Date } {
+  return changeRevokesSessions(change) ? { sessionsValidFrom: floorToSecond(now) } : {};
+}
+
+/**
  * `updateAliveInCompany` del puerto (R19, R20, R22, R33, R34): **REEMPLAZO COMPLETO** de los nueve
  * campos editables, nunca un PATCH campo a campo.
  *
@@ -637,11 +668,36 @@ export async function updateAliveInCompany(
       return 'last_administrator';
     }
 
+    // 3 bis. QC-23 T14 (R35, R38): ¿el rol cambia DE VERDAD? R19 es reemplazo completo y casi toda
+    // edicion reescribe el mismo `role_id`, asi que cortar por el mero hecho de aparecer en el
+    // `data` echaria a la persona cada vez que un administrador le corrige el telefono. Hace falta
+    // el rol ACTUAL para saberlo, y se lee DENTRO de la misma transaccion, nunca antes de abrirla.
+    //
+    // La lectura no necesita su propio `FOR UPDATE`: toda edicion de un usuario de esta empresa
+    // -esta y `applyGuardedChange`- pasa primero por `lockActiveAdministratorIds`, que serializa
+    // las transacciones de la empresa detras del mismo conjunto de filas. El hueco declarado, para
+    // que nadie lo descubra de sorpresa: si la empresa no tiene NINGUN administrador en `active`,
+    // ese conjunto esta vacio, no bloquea nada y dos ediciones simultaneas del mismo usuario
+    // podrian leer el mismo rol previo. El peor efecto posible es no subir el sello en una de las
+    // dos, que es exactamente el estado en el que ya se queda una edicion que no cambia el rol.
+    //
+    // Si la fila no existe, esta borrada o es de otra empresa, `current` es `null`: no hay cambio
+    // de rol que sellar y el `updateMany` de abajo responde `'not_found'` por su propio `where`.
+    const current = await tx.user.findFirst({
+      where: { id, companyId, deletedAt: null },
+      select: { roleId: true },
+    });
+    const roleStamp = sessionStampFor(
+      { kind: 'role', changed: current !== null && current.roleId !== data.roleId },
+      now,
+    );
+
     // 4. La escritura, en la MISMA transaccion que el bloqueo.
     try {
       const { count } = await tx.user.updateMany({
         where: { id, companyId, deletedAt: null },
         data: {
+          ...roleStamp,
           firstNames: data.firstNames,
           lastNames: data.lastNames,
           birthDate: data.birthDate,
@@ -707,14 +763,26 @@ export async function applyGuardedChange(input: GuardedChange): Promise<GuardedO
       return 'last_administrator';
     }
 
+    // 3 bis. QC-23 T14 (R33, R34, R36, R38): el sello, decidido por la funcion pura del dominio.
+    // El borrado corta siempre; el estado corta en `blocked` e `inactive` y NO en `pending` ni en
+    // `active`. Va esparcido en el `data` de abajo, en el MISMO `UPDATE` y la MISMA transaccion:
+    // si esta aborta -por `last_administrator` o por lo que sea-, el sello tampoco subio.
+    const sessionStamp = sessionStampFor(
+      input.kind === 'delete'
+        ? { kind: 'delete' }
+        : { kind: 'account_status', next: input.accountStatus },
+      input.now,
+    );
+
     // 4. La escritura, en la MISMA transaccion. `updateMany` con el ambito completo en el `where`
     // (R33, R34): un objetivo inexistente, borrado o de otra empresa da `count === 0`.
     const { count } = await tx.user.updateMany({
       where: { id: input.id, companyId: input.companyId, deletedAt: null },
       data:
         input.kind === 'delete'
-          ? { deletedAt: input.now, updatedAt: input.now }
+          ? { ...sessionStamp, deletedAt: input.now, updatedAt: input.now }
           : {
+              ...sessionStamp,
               accountStatus: input.accountStatus,
               accountStatusChangedAt: input.now,
               accountStatusChangedBy: input.changedBy,

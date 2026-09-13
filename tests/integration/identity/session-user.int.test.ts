@@ -23,6 +23,12 @@
  * peticion». El fixture crea su PROPIO catalogo efimero (`qc74-<uuid>`) y no toca el catalogo
  * real: `permissions.code` es clave primaria global, igual que `companies_name_unique`.
  *
+ * QC-23 (T9, R11, R14) — el mismo `select` trae ahora el sello `sessions_valid_from` y, por la
+ * relacion `User.revokedSessions` acotada al `sid` de la sesion en curso, el `revoked_at` de la
+ * fila del registro de sesiones cerradas. Se afirma aqui, contra Postgres, que los dos salen de
+ * verdad y que siguen saliendo en UNA SOLA llamada a `findFirst`: la condicion de R14 era «ni una
+ * invocacion nueva del puerto por peticion». El `sid` del caso corriente es uno que nadie cerro.
+ *
  * EL ROL NO SE MUEVE (R13, R14): sigue saliendo de `users.role_id`, en el mismo `select` y sin
  * ninguna consulta adicional. El caso «el rol cambiado entre dos lecturas devuelve el nuevo»
  * ya lo demuestra, y esta ficha lo deja intacto a proposito.
@@ -46,6 +52,9 @@ let rolAlternativoId = '';
 let empresaId = '';
 /** QC-74: catalogo efimero de este fixture. `module` es irrepetible por el `@@unique`. */
 const moduloDePrueba = `qc74-${sufijo}`;
+/** QC-23 T9: el `sid` de la sesion en curso del caso corriente. Nadie lo cerro, asi que el
+ *  registro de sesiones cerradas no tiene fila para el y `sessionRevokedAt` sale `null`. */
+const SID_SIN_CERRAR = randomUUID();
 const CODIGO_CONSULTAR = `${moduloDePrueba}.consultar`;
 const CODIGO_MODIFICAR = `${moduloDePrueba}.modificar`;
 
@@ -139,7 +148,7 @@ afterAll(async () => {
 describe('findActiveSessionUserById contra Postgres real', () => {
   it('un usuario activo devuelve nombres, username y el rol actual', async () => {
     // R10 — consulta por sub (id de la fila real).
-    const resultado = await findActiveSessionUserById(usuarioId);
+    const resultado = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
 
     expect(resultado).toEqual({
       id: usuarioId,
@@ -157,6 +166,10 @@ describe('findActiveSessionUserById contra Postgres real', () => {
       // QC-78 R20: el estado de cuenta y el plazo de bloqueo, en la misma fila.
       accountStatus: 'active',
       lockedUntil: null,
+      // QC-23 R7, R11: el sello —que toda fila tiene, por el `DEFAULT now()` de la migracion— y
+      // el instante de cierre de ESTA sesion, que nadie cerro.
+      sessionsValidFrom: expect.any(Date),
+      sessionRevokedAt: null,
     });
     expect(resultado?.permissions).toHaveLength(2);
   });
@@ -167,7 +180,7 @@ describe('findActiveSessionUserById contra Postgres real', () => {
     await prisma.user.update({ where: { id: usuarioId }, data: { roleId: rolAlternativoId } });
 
     try {
-      const resultado = await findActiveSessionUserById(usuarioId);
+      const resultado = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
 
       expect(resultado?.roleName).toBe(`qc8-session-alt-${sufijo}`);
       expect(resultado?.permissions).toEqual([]);
@@ -185,7 +198,7 @@ describe('findActiveSessionUserById contra Postgres real', () => {
     const espiaAsignaciones = vi.spyOn(prisma.rolePermission, 'findMany');
 
     try {
-      const resultado = await findActiveSessionUserById(usuarioId);
+      const resultado = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
 
       expect(resultado?.permissions).toHaveLength(2);
       expect(espiaUsuario).toHaveBeenCalledTimes(1);
@@ -201,7 +214,7 @@ describe('findActiveSessionUserById contra Postgres real', () => {
     await prisma.user.update({ where: { id: usuarioId }, data: { deletedAt: new Date() } });
 
     try {
-      expect(await findActiveSessionUserById(usuarioId)).toBeNull();
+      expect(await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR)).toBeNull();
     } finally {
       await prisma.user.update({ where: { id: usuarioId }, data: { deletedAt: null } });
     }
@@ -209,18 +222,18 @@ describe('findActiveSessionUserById contra Postgres real', () => {
 
   it('un id inexistente devuelve null', async () => {
     // R11 — sin fila, sin excepcion.
-    expect(await findActiveSessionUserById(randomUUID())).toBeNull();
+    expect(await findActiveSessionUserById(randomUUID(), SID_SIN_CERRAR)).toBeNull();
   });
 
   it('el rol cambiado entre dos lecturas devuelve el nuevo', async () => {
     // R12 — el rol es siempre el actual, nunca el que tenia al iniciar sesion.
-    const primeraLectura = await findActiveSessionUserById(usuarioId);
+    const primeraLectura = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
     expect(primeraLectura?.roleName).toBe(`qc8-session-${sufijo}`);
 
     await prisma.user.update({ where: { id: usuarioId }, data: { roleId: rolAlternativoId } });
 
     try {
-      const segundaLectura = await findActiveSessionUserById(usuarioId);
+      const segundaLectura = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
       expect(segundaLectura?.roleName).toBe(`qc8-session-alt-${sufijo}`);
     } finally {
       await prisma.user.update({ where: { id: usuarioId }, data: { roleId: rolId } });
@@ -234,7 +247,7 @@ describe('findActiveSessionUserById contra Postgres real', () => {
     await prisma.company.update({ where: { id: empresaId }, data: { deletedAt: bajada } });
 
     try {
-      const resultado = await findActiveSessionUserById(usuarioId);
+      const resultado = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
 
       expect(resultado?.companyId).toBe(empresaId);
       expect(resultado?.companyDeletedAt).toEqual(bajada);
@@ -257,7 +270,7 @@ describe('findActiveSessionUserById contra Postgres real', () => {
     const espia = vi.spyOn(prisma.user, 'findFirst');
 
     try {
-      const resultado = await findActiveSessionUserById(usuarioId);
+      const resultado = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
 
       expect(resultado?.accountStatus).toBe('blocked');
       expect(resultado?.lockedUntil).toEqual(plazo);
@@ -271,13 +284,45 @@ describe('findActiveSessionUserById contra Postgres real', () => {
     }
   });
 
+  // QC-23 (T9, R11, R14) — el caso que importa: ESTA sesion esta en el registro de cerradas, asi
+  // que `sessionRevokedAt` sale con su instante; y sale en la MISMA unica consulta, por
+  // `revoked_sessions_session_id_key`. La fila se devuelve igualmente —el adaptador no filtra por
+  // revocacion, el corte 8 es del dominio— igual que no filtra por empresa muerta ni por estado.
+  it('trae sessionRevokedAt de la fila del registro en la misma unica consulta', async () => {
+    const sidCerrado = randomUUID();
+    const cerradaEn = new Date('2026-09-01T09:00:00.000Z');
+    await prisma.revokedSession.create({
+      data: {
+        sessionId: sidCerrado,
+        userId: usuarioId,
+        // Caducidad NATURAL en el futuro: una fila ya caducada seria carne de la purga de R39.
+        expiresAt: new Date('2099-01-01T00:00:00.000Z'),
+        revokedAt: cerradaEn,
+      },
+    });
+    const espia = vi.spyOn(prisma.user, 'findFirst');
+
+    try {
+      const cerrada = await findActiveSessionUserById(usuarioId, sidCerrado);
+      const otra = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
+
+      expect(cerrada?.sessionRevokedAt).toEqual(cerradaEn);
+      // R20: cerrar UNA sesion no toca las demas de la misma persona.
+      expect(otra?.sessionRevokedAt).toBeNull();
+      expect(espia).toHaveBeenCalledTimes(2);
+    } finally {
+      espia.mockRestore();
+      await prisma.revokedSession.deleteMany({ where: { sessionId: sidCerrado } });
+    }
+  });
+
   // QC-48 R13 — la condicion dura de `design.md > 4.1`: empresa y estado salen del MISMO
   // `findFirst`. Si alguien anadiera una segunda ida a la base, este contador lo delata.
   it('trae empresa y estado sin una segunda consulta', async () => {
     const espia = vi.spyOn(prisma.user, 'findFirst');
 
     try {
-      const resultado = await findActiveSessionUserById(usuarioId);
+      const resultado = await findActiveSessionUserById(usuarioId, SID_SIN_CERRAR);
 
       expect(resultado?.companyId).toBe(empresaId);
       expect(resultado?.companyDeletedAt).toBeNull();

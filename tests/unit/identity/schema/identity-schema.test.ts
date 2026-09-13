@@ -209,6 +209,26 @@ const ACCOUNT_STATUS_FIELDS: ReadonlyArray<readonly [string, string]> = [
   ['accountStatusChangedBy', 'account_status_changed_by'],
 ]
 
+/**
+ * QC-23 / R7, R8 — el sello «sesiones validas desde». Estado actual del usuario sobre su propia
+ * fila, no historico: una sola columna que dice desde cuando valen sus sesiones, igual que
+ * `LOCKOUT_FIELDS` y `ACCOUNT_STATUS_FIELDS` y por el mismo motivo. El registro de sesiones
+ * cerradas UNA A UNA (R10) NO vive aqui: es la tabla `revoked_sessions`, no una columna de
+ * `users`, asi que no entra en este censo de escalares.
+ *
+ * ANADIDO EL 2026-09-12 (QC-23) PARA RETENSAR ESTA GUARDIA, no para relajarla: el censo de
+ * escalares de `User` de mas abajo sigue siendo una igualdad EXACTA -no se cambio por ningun
+ * `toContain`- y este nombre entra en el, en su propio bloque, al estilo de QC-65. Si alguien
+ * anade una segunda columna de sesiones, o quita esta, el caso cae.
+ *
+ * El contrato completo del sello -el `@default(now())`, el `@db.Timestamptz(6)`, que no sea
+ * opcional y que no lleve indice- lo vigila
+ * `tests/unit/identity/schema/session-revocation-migration.test.ts`; aqui solo entra el censo.
+ */
+const SESSION_STAMP_FIELDS: ReadonlyArray<readonly [string, string]> = [
+  ['sessionsValidFrom', 'sessions_valid_from'],
+]
+
 describe('db/schema.prisma — modelo de usuarios y roles', () => {
   it('el modelo User declara los nueve datos del usuario', () => {
     for (const [name] of BUSINESS_FIELDS) {
@@ -238,6 +258,10 @@ describe('db/schema.prisma — modelo de usuarios y roles', () => {
         // se cambio por ningun `toContain`-: si alguien anade una cuarta columna de estado, o
         // quita una de estas, este caso cae, que es justo lo que la guardia existe para hacer.
         ...ACCOUNT_STATUS_FIELDS.map(([name]) => name),
+        // QC-23 (R7): el sello de sesiones. La igualdad sigue siendo EXACTA por el mismo motivo
+        // que la anoto QC-65; `revokedSessions` NO aparece aqui porque es una LISTA (el filtro de
+        // arriba tira los `isList`) y porque no es ninguna columna de `users`.
+        ...SESSION_STAMP_FIELDS.map(([name]) => name),
       ].sort(),
     )
 

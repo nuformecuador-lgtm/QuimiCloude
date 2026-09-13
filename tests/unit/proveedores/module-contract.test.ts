@@ -482,6 +482,44 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
       .sort()
   }
 
+  /**
+   * AÑADIDO 2026-09-12 (QC-23) — el dueño declarado de cada modelo, leido del `/// @module` que
+   * la regla 5 de `docs/architecture.md` obliga a escribir encima de cada `model` en
+   * `db/schema.prisma`. El dmmf NO trae esa anotacion (Prisma la ve como comentario de
+   * documentacion del modelo, no como estructura), asi que se lee del esquema.
+   *
+   * Para que sirve aqui: las dos listas EXACTAS de relaciones de `User` de mas abajo crecen cada
+   * vez que una ficha de `identity` anade una tabla que cuelga de `users`. Una lista que solo
+   * crece termina admitiendo cualquier relacion con tal de escribirla, y eso SI seria aflojar el
+   * caso. Con esto, cada nombre de la lista se puede contrastar contra su modulo, y lo que se
+   * afirma no es «estos nombres» sino «ninguna relacion de `User` apunta a un modelo de
+   * `proveedores`», dicho sobre el censo entero y no sobre dos nombres conocidos.
+   */
+  function moduloDelModelo(modelName: string): string | null {
+    const esquema = readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8')
+    const inicio = esquema.search(new RegExp(`^model ${modelName}\\s*\\{`, 'm'))
+    if (inicio === -1) return null
+    const previas = esquema.slice(0, inicio).split('\n')
+    // Se sube por el bloque de `///` inmediatamente anterior al `model`: el `@module` puede estar
+    // en cualquier linea de esa cabecera, no solo en la ultima.
+    for (let i = previas.length - 1; i >= 0; i -= 1) {
+      const linea = (previas[i] as string).trim()
+      if (linea === '') continue
+      if (!linea.startsWith('///')) break
+      const encaje = /^\/\/\/\s*@module\s+(\S+)/.exec(linea)
+      if (encaje !== null) return encaje[1] as string
+    }
+    return null
+  }
+
+  /** Los modelos que el esquema declara del modulo `proveedores`, por su `/// @module`. */
+  function modelosDeProveedores(): readonly string[] {
+    return Prisma.dmmf.datamodel.models
+      .map((m) => m.name)
+      .filter((name) => moduloDelModelo(name) === 'proveedores')
+      .sort()
+  }
+
   it('la UNICA relacion que el cliente generado conoce entre SupplierCatalogLine y Supplier es mutua, e intra-modulo', () => {
     // `presentationId` y `unitId` son escalares sin `@relation`: no generan campo de
     // relacion. Por eso el dmmf de `SupplierCatalogLine` no puede traer nada mas que
@@ -592,12 +630,39 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
     // RETENSADO 2026-09-11 (QC-79): entra `CredentialSetupToken` -R11, el lado inverso de
     // `credential_setup_tokens.user_id`, que Prisma EXIGE para el `@relation` del enlace-.
     // Sigue siendo igualdad EXACTA sobre el conjunto entero, no un `toContain`.
+    // RETENSADO 2026-09-12 (QC-23): entra `RevokedSession` -R10, el lado inverso de
+    // `revoked_sessions.user_id`, que Prisma EXIGE para el `@relation` del registro de sesiones
+    // cerradas-. Sigue siendo igualdad EXACTA sobre el conjunto entero, no un `toContain`.
     expect(relationTargets('User')).toEqual([
       'Company',
       'CredentialSetupToken',
       'DocumentType',
+      'RevokedSession',
       'Role',
     ])
+
+    // Y la entrada nueva se PAGA, porque una lista que solo crece no vigila nada (QC-23):
+    //  a) `RevokedSession` es de OTRO modulo, y lo dice el esquema, no este test. Si lo que se
+    //     colara en la lista fuese un modelo de `proveedores`, su `/// @module` seria
+    //     `proveedores` y esto caeria.
+    //  b) NINGUNA relacion de `User` apunta a un modelo de `proveedores`, dicho sobre el censo
+    //     ENTERO de modelos del modulo -derivado del esquema- y no sobre dos nombres escritos a
+    //     mano. Un `Supplier` nuevo, o una tercera tabla de proveedores que manana cuelgue de
+    //     `users`, cae aqui sin tocar este archivo.
+    expect(
+      moduloDelModelo('RevokedSession'),
+      'RevokedSession entra en la lista de relaciones de User como modelo de identity: si el ' +
+        'esquema dice otro modulo, esta excepcion no es la que se aprobo',
+    ).toBe('identity')
+
+    const deProveedores = modelosDeProveedores()
+    expect(deProveedores, 'el esquema deberia declarar los modelos del modulo proveedores').toEqual(
+      ['Supplier', 'SupplierCatalogLine'],
+    )
+    expect(
+      relationTargets('User').filter((modelo) => deProveedores.includes(modelo)),
+      'User no puede tener ninguna relacion hacia un modelo del modulo proveedores',
+    ).toEqual([])
   })
 
   it('User NO gana ningun campo de relacion de vuelta hacia Supplier', () => {
@@ -608,13 +673,34 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
     // RETENSADO 2026-09-11 (QC-79): entra `CredentialSetupToken` -R11, el lado inverso de
     // `credential_setup_tokens.user_id`, que Prisma EXIGE para el `@relation` del enlace-.
     // Sigue siendo igualdad EXACTA sobre el conjunto entero, no un `toContain`.
+    // RETENSADO 2026-09-12 (QC-23): entra `RevokedSession` -R10, el lado inverso de
+    // `revoked_sessions.user_id`, que Prisma EXIGE para el `@relation` del registro de sesiones
+    // cerradas-. Es una tabla de `identity` que cuelga 1-a-N de `users`
+    // (`specs/QC-23-registro-de-sesiones/design.md > 2.2`), no de `proveedores`: sigue sin haber
+    // ni un campo de `User` hacia este modulo, que es lo que este caso vigila. Y sigue siendo
+    // igualdad EXACTA sobre el conjunto entero, no un `toContain`.
     expect(relationTargets('User')).toEqual([
       'Company',
       'CredentialSetupToken',
       'DocumentType',
+      'RevokedSession',
       'Role',
     ])
     expect(relationTargets('User')).not.toContain('Supplier')
     expect(relationTargets('User')).not.toContain('SupplierCatalogLine')
+
+    // RETENSADO 2026-09-12 (QC-23), por la misma razon que en el caso de arriba: cada ficha de
+    // `identity` que cuelgue una tabla de `users` alarga esta lista, y una lista que solo crece
+    // deja de vigilar. Los dos `not.toContain` de arriba nombran DOS modelos a mano; esto lo dice
+    // sobre el censo ENTERO del modulo `proveedores` derivado del esquema, asi que una tercera
+    // tabla de proveedores que manana apuntara a `User` caeria aqui sin tocar este archivo.
+    const deProveedores = modelosDeProveedores()
+    expect(deProveedores, 'el esquema deberia declarar los modelos del modulo proveedores').toEqual(
+      ['Supplier', 'SupplierCatalogLine'],
+    )
+    expect(
+      relationTargets('User').filter((modelo) => deProveedores.includes(modelo)),
+      'User no puede tener ninguna relacion hacia un modelo del modulo proveedores',
+    ).toEqual([])
   })
 })
