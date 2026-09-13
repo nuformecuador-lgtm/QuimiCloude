@@ -1272,7 +1272,7 @@
       "epic_name": "Identidad y acceso",
       "name": "pantalla-de-grupos-de-trabajo",
       "description": "La pantalla donde el Administrador ve los grupos de trabajo de su empresa, crea uno, le cambia el nombre, mete y saca personas, y lo borra con confirmacion. Cada grupo muestra cuantas personas tiene y quienes son. Se decide al acotar si es una pantalla propia o una seccion dentro de la pantalla de usuarios (QC-67), que todavia no esta especificada. Las dos opciones son razonables y la decision cambia la ficha, asi que no se da por supuesta aqui. Reutiliza lo que ya existe y no lo vuelve a montar: la tabla de datos compartida (QC-55), busqueda y orden (QC-57), el panel lateral y el dialogo de borrado del patron de QC-45, y el corte por permiso de pantalla de QC-75. Lo que NO entra: el modelo (QC-83) ni los casos de uso (QC-84). Asignar trabajo a un grupo se hace desde la pantalla de pedidos, en QC-87. Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "frontend",
@@ -1307,10 +1307,10 @@
       "epic_name": "Pedidos",
       "name": "asignar-responsables-a-un-pedido",
       "description": "Desde la pantalla de pedidos, el Administrador asigna quien prepara cada pedido: marca personas sueltas, elige uno o varios grupos de trabajo, o mezcla las dos cosas. Y puede desasignar. El listado de pedidos y el detalle muestran a los responsables como un grupo de avatares. Cuando la asignacion vino de un grupo de trabajo, se muestra el NOMBRE DEL GRUPO junto a los avatares de sus personas, no solo las caras sueltas: quien mira el tablero tiene que poder distinguir \"Turno noche\" de cinco personas elegidas a mano. Un pedido cancelado no admite asignacion nueva. Que pasa con la asignacion de un pedido ya entregado se decide al acotar. Reutiliza la tabla de datos compartida (QC-55) y la pantalla de pedidos de QC-35, que no se rehace. Lo que NO entra: la tabla de asignacion (QC-86), que esta ficha consume. El listado del Operador va en QC-88. Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
-      "complexity": null,
-      "zone": "fullstack",
+      "complexity": "medium",
+      "zone": "backend",
       "branch": "feature/QC-87-asignar-responsables-a-un-pedido",
       "depends_on": [
         "QC-86",
@@ -1507,6 +1507,23 @@
         "QC-84"
       ],
       "spec_path": "specs/QC-100-conteo-de-miembros-de-un-grupo"
+    },
+    {
+      "key": "QC-102",
+      "id": 102,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "responsables-en-la-pantalla-de-pedidos",
+      "description": "La mitad de PANTALLA de QC-87, que se partio en backend + frontend el 2026-09-12 (F1.0). En el panel lateral del pedido: buscador para marcar personas sueltas, selector de grupos y accion para sacar a alguien, con el patron de QC-45/QC-67/QC-85. El listado y el detalle muestran a los responsables como avatares, y cuando la asignacion vino de un grupo se muestra EL NOMBRE DEL GRUPO junto a los avatares de sus personas. Ver los avatares basta con poder ver pedidos; asignar y desasignar exige asignaciones.modificar, y el corte real lo ejerce el caso de uso. Un pedido ENTREGADO o CANCELADO no admite cambios: la pantalla no ofrece las acciones. Reutiliza QC-55, QC-57, el panel lateral y la pantalla de pedidos de QC-35, que NO se rehace; la primitiva avatar ya existe. El E2E del recorrido completo entra aqui. Lo que NO entra: los casos de uso (QC-87), el modelo (QC-86), el listado del Operador (QC-88).",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-102-responsables-en-la-pantalla-de-pedidos",
+      "depends_on": [
+        "QC-87"
+      ],
+      "spec_path": "specs/QC-102-responsables-en-la-pantalla-de-pedidos"
     }
   ]
 }

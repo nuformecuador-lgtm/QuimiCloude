@@ -3259,3 +3259,76 @@ el worktree y deja el árbol en disco (`fatal: … is not a working tree`, node_
 remató a mano. De paso se barrieron **tres directorios huérfanos anteriores** que arrastraban el
 mismo fallo y cuyas ramas ya estaban mergeadas: QC-67, QC-76 y QC-94. `.worktrees/` queda con los
 dos vivos y nada más: QC-23 y QC-85. **La ficha de arnés para `wt.sh` en Windows sigue sin existir.**
+
+## QC-85 — pantalla-de-grupos-de-trabajo: CERRADA el 2026-09-12 (PR #64, merge `5188c71`)
+
+La **pestaña «Grupos»** dentro de `/configuracion/usuarios`: crear, renombrar, meter y sacar
+personas y borrar con confirmación, con los miembros en el **panel lateral** y su buscador. **43
+requisitos, los 43 con test**, más el **E2E completo del recorrido** — el que QC-84 había diferido
+aquí. `reviewer` **APROBADO con condiciones** (2 mayores, 4 menores, 8 mutaciones probadas); las dos
+condiciones eran commitear y fusionar, y quedaron cumplidas.
+
+**Sin backend, y medido**: `lib/modules/**`, `db/**`, `lib/composition/**` y `package.json` con
+**diff vacío**. El menú no ganó ningún ítem. La tabla **no muestra conteo de miembros** —eso es
+**QC-100**—, con un test que afirma que ninguna celda pinta un dígito.
+
+### La acotación destapó que la ficha pedía algo imposible
+
+El board pedía que «cada grupo muestre cuántas personas tiene». **`WorkGroupRow` tiene exactamente
+`id` y `name`, con un test que congela esas claves**, así que ningún número era alcanzable desde el
+frontend. El conteo salió del alcance, **nació QC-100** y el board se corrigió **antes** de sembrar.
+Es el tercer caso del mismo patrón, después de QC-63 y QC-80: **la ficha escrita sobre un supuesto
+que el código desmiente**.
+
+### La dependencia que se coló por la puerta de atrás
+
+`shadcn add tabs` genera el componente **y añade `cn@0.3.0`** a `package.json` y al lock. No es un
+typosquat —es oficial, MIT—, pero `lib/utils.ts` **ya es exactamente `twMerge(clsx(inputs))`** y
+**21 de las 23 primitivas** importan `cn` desde `@/lib/utils`: la dependencia era **redundante**, no
+una capacidad que faltara. El `implementer` **paró antes de instalar nada** y dejó el árbol limpio
+—lock revertido, `node_modules` reinstalado desde el original, el archivo generado fuera del repo—.
+Por **decisión humana**: se conserva el archivo de la CLI con **una sola línea cambiada** y **no
+entra ninguna dependencia**, más una guardia anti-reincidencia. Es la regla 7 funcionando: la
+dependencia se vio, se midió y la decidió una persona.
+
+### Cuatro centinelas tensados, y dos hallazgos que valen más que la feature
+
+Ninguno era un fallo del producto: **los cuatro medían mal**.
+
+1. **Medir «lo que aporta la rama» partido en dos mitades es frágil.** Cuatro casos exigían
+   «nada en el diff» por un lado y «esto sin seguimiento» por otro, y **se pusieron rojos sin que
+   cambiara un byte**: un archivo pasó de *sin seguimiento* a *en el diff* al commitear. Ahora miden
+   **lo aportado** (diff + sin seguimiento) contra una sola lista cerrada, lo que además **cierra un
+   agujero simétrico**: antes, modificar una primitiva existente y no commitearla se colaba por la
+   rendija entre los dos casos.
+2. **El último SHA congelado del repo dejó de ser teórico.** `unidades-convenciones.test.ts` estaba
+   verde y se decidió no tocarlo. **El merge lo puso rojo**: `resend`, que QC-79 metió en `dev`, hizo
+   que la guardia dijera que «la feature de unidades toca el manifiesto» **sin que QC-39 hubiera
+   abierto un solo intocable**. Curado con merge-base y precondición de rama. **Ya no queda ningún
+   SHA congelado en uso en el repo.**
+
+### Dos cosas que se hicieron mal y conviene no repetir
+
+- **Un `./init.sh --rapido` en verde que no probó nada.** Con el trabajo **sin commitear**, `HEAD`
+  *era* la merge-base: el rango salía vacío, el gate imprimió «nada que relacionar» y corrió **solo
+  las guardias**. El leader lo dio por bueno. Lo cazó el `reviewer`. **Un gate rápido sobre una rama
+  sin commits no es una verificación**, y conviene que el propio script lo grite.
+- **Dos corridas del gate completo muertas por falta de memoria** —4,4 GB libres de 23,8 con 16
+  procesos de node de las sesiones paralelas—. Salió a la tercera **bajando Vitest a 2 hilos**.
+  Material de ficha de arnés: el gate largo debería limitar su concurrencia solo.
+
+### Deuda que deja, con nombre y dueño
+
+- **El texto de R35 contradice a R30.** El `reviewer` dictaminó que **el código es correcto** —el
+  panel permanece abierto— y que **lo que hay que enmendar es el requisito**. Decide el humano.
+- **`pnpm e2e` completo está rojo por 23 fallos ajenos**, con causa medida: en una base **limpia** el
+  rol **Operador no tiene `dashboard.consultar`**, aterriza en `/inventario` y revienta el
+  `waitForURL` de todo spec que espere el dashboard con un fixture no-Administrador. En el repo
+  principal pasan **porque su base arrastra estado acumulado**. **La suite E2E no sobrevive a una
+  base limpia**, y se ha visto solo porque estas fichas empezaron a usar base propia.
+- **El baseline ya tiene OCHO archivos que pasan**, cuatro de ellos curados en esta misma ficha.
+  Cada uno está apagado entero para el comparador.
+- **Duodécima vez que `wt.sh done` falla en Windows**, y esta vez peor: el árbol quedó **vaciado
+  pero con el directorio retenido** por un proceso, así que `wt.sh` falló por `.git` inexistente y
+  hubo que desregistrar a mano. El directorio vacío sigue en `.worktrees/`. La rama se borró en local
+  y en `origin`.
