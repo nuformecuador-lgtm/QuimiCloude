@@ -504,3 +504,119 @@ el gate canto OK con la integracion abortada. Las dos suites nuevas de la ficha 
 `session-revocation.int.test.ts` (12) y `session-stamp-writes.int.test.ts` (13).
 
 No se toco `feature_list.json` ni Jira: eso es F2.5, y lo hace el leader cuando el humano mergee.
+
+---
+
+## F2.3 bis — el PR #66 quedo CONFLICTING y hubo que rehacer el merge (2026-09-13)
+
+**Por que.** `dev` avanzo DESPUES de abrirse el PR #66: entro el merge del **PR #67, QC-87
+(asignar-responsables-a-un-pedido)**, 6 commits. GitHub marco el #66 como `CONFLICTING`.
+
+**Que traia `dev`** (57 archivos, `git diff --name-only HEAD...origin/dev`): el modulo
+`asignaciones` entero —cuatro casos de uso, puerto, adaptador Prisma y tres Server Actions—, los
+dos contratos de directorio en `identity` (`PeopleDirectory`, `WorkGroupDirectory`) con su
+adaptador `assignment-directory-prisma.ts`, el cableado en `lib/composition` y sus tests.
+
+**Migraciones: ninguna nueva, y se comprobo antes de mergear.** Comparados los nombres de carpeta
+bajo `prisma/migrations/` entre `origin/dev` y la rama: identicos salvo
+`20260912103000_session_revocation`, que es de esta ficha. `dev` no aporta ni una. **No se corrio
+`prisma migrate deploy`** sobre `QuimiCloude_QC23`, y no hacia falta.
+
+### Los dos conflictos, y por que la resolucion no era una eleccion
+
+Conflictaron **exactamente dos archivos** —no aparecio un tercero— y los dos son **puramente
+aditivos sobre el mismo ancla**: las dos ramas apendan un bloque al final de la misma lista, sin
+pisarse un simbolo y sin reordenar nada de arriba. No hubo que elegir entre versiones ni reescribir
+codigo ajeno. **Se conservaron LOS DOS LADOS INTEGROS**, con el bloque que ya venia de `dev`
+primero y el de QC-23 despues.
+
+1. **`lib/modules/identity/index.ts`** — QC-87 anade al final del barril los dos contratos
+   (`PersonRef`/`PeopleDirectory`, `WorkGroupSnapshot`/`WorkGroupDirectory`); QC-23 anade al final
+   los tres casos de uso del cierre de sesion (`createEndSession`, `createEndAllSessions`,
+   `createEndOtherSessions` y sus `*Deps`). Los dos bloques dicen en su propio comentario que son
+   bloque NUEVO que no reordena nada, y los dos exportan solo simbolos de `./domain`. Ancla comun:
+   el export de `list-work-group-members`.
+
+2. **`tests/unit/identity/account-status-scope.test.ts`** — las dos ramas anaden entradas al final
+   de `SITIOS_PERMITIDOS`, cada una con su bloque de comentario que nombra **quien autoriza** la
+   excepcion. QC-87 mete `adapters/driven/persistence/assignment-directory-prisma.ts`,
+   `domain/people-directory.ts` y `domain/work-group-directory.ts` (autoriza QC-87 R21); QC-23 mete
+   `domain/session-revocation.ts` (autorizan QC-23 R33 y R36).
+
+   **Los comentarios de QC-87 se conservaron palabra por palabra, sin resumir ni fundir con los de
+   QC-23.** No es cosmetica: esos textos son la justificacion de por que cada archivo esta en la
+   lista, y son lo que permite que la guardia siga siendo una **IGUALDAD** en vez de degenerar en un
+   patron laxo. Resumirlos habria aflojado la guardia sin tocar ni una asercion.
+
+**Commit del merge: `32ed515`.** El mensaje dice que trajo `dev`, que los dos conflictos eran
+aditivos sobre el mismo ancla y que se resolvieron conservando ambos lados.
+
+### Verificacion: `./init.sh` COMPLETO, sin flags, rehecho sobre el arbol mergeado
+
+La corrida verde anterior (419 archivos / 6028 verdes) **ya no valia** para este arbol. Se volvio a
+correr el gate completo desde el worktree, contra `QuimiCloude_QC23`. Salida real:
+
+```
+✓ typecheck paso
+✓ lint paso
+✓ los tres proyectos corrieron (ui, node, integration)
+✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 8); 8 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
+```
+
+```
+ Test Files  439 passed (439)
+      Tests  6266 passed | 66 skipped (6332)
+   Duration  230.06s
+```
+
+**Exit 0. 439 archivos, 6266 verdes, 66 saltados, CERO rojos**, ni siquiera los 8 del baseline
+—que hoy pasan y el gate reporta como «8 por limpiar», aviso ajeno a esta ficha y material para
+QC-99—.
+
+Las cifras suben respecto de la corrida anterior de esta bitacora (419 archivos / 6028 verdes)
+porque aquella fue **antes** de mergear `dev` con QC-87 dentro: los 20 archivos de mas y los 238
+tests de mas **son de `dev`**, no de aqui. Ninguna cifra propia de esta ficha cambio.
+
+**Integracion:** 54 archivos, **709 verdes, cero rojos**, contados sobre el informe JSON del propio
+gate (`.vitest-rojos.json`), no a ojo. Las dos suites de la ficha siguen dentro:
+`session-revocation.int.test.ts` (12) y `session-stamp-writes.int.test.ts` (13).
+
+**Las guardias que tocaban los archivos en conflicto quedaron verdes**, que era justo el riesgo de
+esta resolucion:
+
+- `tests/unit/identity/account-status-scope.test.ts` — verde en el gate y **reejecutada aparte**
+  para mirarla de cerca: **9 verdes, 3 saltados**. La comparacion sigue siendo una igualdad y las
+  cuatro entradas nuevas (tres de QC-87, una de QC-23) estan todas dentro.
+- Las guardias de arquitectura de modulos sobre el barril de `identity` — verdes: el barril
+  mergeado sigue exportando solo simbolos de `./domain`, sin filtrar `ports/` ni
+  `adapters/driven/**`, que es lo que ambos bloques prometen en su comentario.
+
+**Nada se metio al baseline y nada se "arreglo" para que saliera verde.** El gate salio verde tal
+cual.
+
+### Estado del PR
+
+`git push` sobre la misma rama: el **PR #66 se actualizo solo, no se abrio otro**. Quedo
+**`mergeable: MERGEABLE`, `mergeStateStatus: CLEAN`**, `state: OPEN`. Se actualizo el cuerpo
+(`gh pr edit 66`) con las cifras de ESTA corrida y una seccion nueva que explica el merge de `dev`
+con QC-87 y como se resolvieron los dos conflictos. **El titulo no se toco.**
+
+**No se marco la feature como `done`, ni se toco `feature_list.json` ni Jira**: eso es F2.5 y lo
+hace el leader cuando el humano mergee.
+
+### Lo que hizo dudar
+
+Nada bloqueante, pero dos cosas que el revisor deberia saber:
+
+1. **La cifra de integracion del cuerpo del PR anterior decia «249/249» y ahora dice 709.** El
+   salto no es solo QC-87. La cifra vieja no se pudo reproducir con el metodo de conteo actual
+   (sumar `assertionResults` de los archivos bajo `tests/integration/` en el informe JSON), asi que
+   **no se presento como una comparacion**: se sustituyo por la medida nueva, declarando el metodo.
+   Si el revisor necesita la serie historica, la vieja no es comparable.
+
+2. **El gate avisa de 8 archivos del baseline que ya pasan.** Sigue igual que antes del merge, no
+   lo introdujo QC-87, y **no se limpiaron aqui**: no es de esta ficha y ya tiene destinatario
+   (QC-99).
