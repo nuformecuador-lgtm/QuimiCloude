@@ -82,11 +82,19 @@ function absOf(relPath: string): string {
  * El orden importa: primero los comentarios de LINEA y despues los de BLOQUE. Al reves, un `//`
  * que contenga una apertura de bloque abre un bloque falso que se traga el resto del archivo
  * (el defecto que QC-9 documenta en su guardia) y el test pasaria en verde sin mirar nada.
+ *
+ * **CORREGIDO 2026-09-13 por QC-87**: el patron era `/\/\/.*$/` y en este repo —archivos con
+ * CRLF— NO borraba nada. En JavaScript el `.` no casa `\r`, y sin la bandera `m` el `$` solo casa
+ * al final de la cadena: en una linea acabada en `\r` la expresion no encontraba final y el
+ * comentario sobrevivia entero. El efecto era el que este mismo bloque dice que hay que evitar:
+ * una MENCION en un comentario de linea contaba como infraccion. `[^\n]` si casa `\r`, y con eso
+ * el comportamiento vuelve a ser el documentado. El caso sintetico que lo afirmaba pasaba porque
+ * sus cadenas literales usan `\n`.
  */
 export function stripComments(source: string): string {
   return source
     .split('\n')
-    .map((line) => line.replace(/\/\/.*$/, ''))
+    .map((line) => line.replace(/\/\/[^\n]*$/, ''))
     .join('\n')
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
 }
@@ -142,14 +150,24 @@ export function moduleOfPath(relPath: string): string | null {
 // ---------------------------------------------------------------------------
 
 /**
- * `asignaciones` nace con `index.ts` y una sola carpeta, `domain/` (`design.md > 3`).
+ * `asignaciones` nacio con `index.ts` y una sola carpeta, `domain/` (QC-86 `design.md > 3`).
  *
- * La guardia generica admite ademas `ports/` y `adapters/` —son legitimas para cualquier modulo—,
- * asi que ninguna de las dos la pondria roja. Aqui SI son un hallazgo: un puerto sin caso de uso
- * que lo pida, o un adaptador sin repositorio que implementar, es exactamente el alcance que R36
- * deja fuera de esta ficha. Quien estrene la primera operacion (QC-87) creara esas carpetas
- * entonces, y retensara este caso nombrando su ficha.
+ * **RETENSADO 2026-09-13 por QC-87**, que es la ficha que este mismo caso nombraba de antemano:
+ * «quien estrene la primera operacion (QC-87) creara esas carpetas entonces, y retensara este
+ * caso nombrando su ficha». Eso es lo que pasa aqui, y se hace **ampliando la lista cerrada, no
+ * retirando la asercion**.
+ *
+ * QC-87 estrena los cuatro casos de uso del modulo, y con ellos:
+ *   - `ports/` — el puerto `OrderAssignmentRepository` (QC-87 T4, su R45/R47);
+ *   - `adapters/` — el adaptador Prisma del puerto y las Server Actions (QC-87 T5 y T12).
+ *
+ * Lo que NO se relaja: la comparacion sigue siendo contra una **lista cerrada de tres carpetas**.
+ * Una cuarta carpeta cualquiera —`utils/`, `helpers/`, `lib/`— sigue siendo un hallazgo, y un
+ * archivo suelto en la raiz del modulo tambien. Lo unico que cambio es CUALES son las carpetas
+ * legitimas, y cada una entra con la task de QC-87 que la crea.
  */
+const CARPETAS_PERMITIDAS = ['adapters', 'domain', 'ports'] as const
+
 export function findModuleShapeFindings(
   entries: ReadonlyArray<{ name: string; isDirectory: boolean }>,
 ): readonly string[] {
@@ -161,8 +179,8 @@ export function findModuleShapeFindings(
     if (entry.name === 'index.ts' && !entry.isDirectory) continue
     if (!entry.isDirectory) {
       findings.push(`${ASIGNACIONES}/${entry.name}: archivo ajeno al contrato en la raiz del modulo (R31)`)
-    } else if (entry.name !== 'domain') {
-      findings.push(`${ASIGNACIONES}/${entry.name}/: carpeta fuera del alcance de esta ficha (R36)`)
+    } else if (!(CARPETAS_PERMITIDAS as readonly string[]).includes(entry.name)) {
+      findings.push(`${ASIGNACIONES}/${entry.name}/: carpeta fuera del alcance del modulo (R36)`)
     }
   }
   return findings
@@ -175,10 +193,24 @@ export function findModuleShapeFindings(
 const CLIENTE_PRISMA_COMPARTIDO = 'lib/shared/db/prisma'
 
 /**
- * Un archivo de `asignaciones` solo puede llegar a otro modulo por su BARRIL, y no puede tocar el
- * cliente Prisma compartido (R31): hoy el modulo no conoce a nadie, y el dia que necesite el
- * pedido, la persona o el grupo, los pedira a `@/lib/modules/<otro>` —nunca a `.../domain/x`—.
+ * Un archivo de `asignaciones` solo puede llegar a otro modulo por su BARRIL (R31): el dia que
+ * necesite el pedido, la persona o el grupo, los pedira a `@/lib/modules/<otro>` —nunca a
+ * `.../domain/x`—. QC-87 lo cumple al pie de la letra con los tres contratos de su `design.md > 2`.
+ *
+ * **RETENSADO 2026-09-13 por QC-87** en la mitad del cliente Prisma. QC-86 escribio «no puede
+ * tocar el cliente Prisma compartido» cuando el modulo **no tenia adaptadores**: entonces esa
+ * frase y «ningun archivo» querian decir lo mismo. QC-87 estrena el adaptador driven de
+ * persistencia, que es **por definicion** el archivo que habla con Prisma
+ * (`docs/architecture.md > Modulos y arquitectura hexagonal`).
+ *
+ * La regla no se retira: **se acota**. El cliente compartido solo puede entrar por
+ * `adapters/driven/persistence/`; en `domain/`, en `ports/` y en el barril sigue siendo un
+ * hallazgo, que es donde importaba que lo fuera —un dominio que importa Prisma es exactamente el
+ * anti-patron que R31 vino a impedir—. Prohibirlo tambien en el adaptador obligaria a que el
+ * modulo no pudiera persistir nada.
  */
+const PERSISTENCIA_DRIVEN = `${ASIGNACIONES}/adapters/driven/persistence/`
+
 export function findModuleBoundaryFindings(file: {
   relPath: string
   content: string
@@ -189,7 +221,9 @@ export function findModuleBoundaryFindings(file: {
     const target = resolveSpecifier(file.relPath, specifier)
     if (target === null) continue // paquete externo: lo juzga (c), no esta regla
     if (target === CLIENTE_PRISMA_COMPARTIDO) {
-      findings.push(`${file.relPath} importa el cliente Prisma compartido '${specifier}' (R31)`)
+      if (!file.relPath.startsWith(PERSISTENCIA_DRIVEN)) {
+        findings.push(`${file.relPath} importa el cliente Prisma compartido '${specifier}' (R31)`)
+      }
       continue
     }
     const targetModule = moduleOfPath(target)
@@ -315,7 +349,7 @@ export function findForeignPrismaAccessFindings(
 }
 
 // ---------------------------------------------------------------------------
-// (e) R29 en negativo: los dos permisos se declaran y no se consumen
+// (e) R29 en negativo: los dos permisos se declaran y casi nadie los consume
 // ---------------------------------------------------------------------------
 
 export const CODIGOS_NUEVOS = ['asignaciones.consultar', 'asignaciones.modificar'] as const
@@ -340,7 +374,39 @@ export function isScopedForPermissionCodes(relPath: string): boolean {
   return RAICES_VIGILADAS.some((raiz) => relPath.startsWith(raiz))
 }
 
-/** Ningun punto del codigo consume todavia los dos permisos nuevos (R29). */
+/**
+ * **ENMENDADO 2026-09-13 por QC-87**, y es la ficha que invalida a proposito la mitad de esta
+ * regla: QC-86 R29 decia que los dos permisos se declaraban y **nadie** los exigia todavia, porque
+ * QC-86 no traia ninguna operacion. QC-87 estrena los **tres casos de uso de escritura** del
+ * modulo, y su **R1** exige `asignaciones.modificar` en la PRIMERA LINEA de cada uno: mantener la
+ * regla tal cual obligaria a elegir entre R29 de QC-86 y R1 de QC-87, y el trabajo que R1 manda
+ * hacer saldria rojo.
+ *
+ * La enmienda **abre exactamente una puerta y ni un milimetro mas**:
+ *
+ *   - `asignaciones.modificar` es legitimo **solo** en `lib/modules/asignaciones/domain/**`, que es
+ *     donde vive la frontera de autorizacion (`docs/architecture.md > Acceso a datos y
+ *     autorizacion`). Ni en sus adaptadores —el driving NO comprueba permisos por su cuenta
+ *     (QC-87 R43)—, ni en otro modulo, ni en `lib/shared/**`.
+ *   - `asignaciones.consultar` **sigue prohibido en todas partes**. No es descuido: es el hallazgo 3
+ *     de `design.md > 0` de QC-87 —lo estrena QC-88— y el riesgo 3 de su `> 10`, «que alguien lo
+ *     exija en la consulta de responsables porque se llama asi». Exigirlo aqui dejaria sin ver los
+ *     avatares a quien puede ver el pedido (QC-87 R3).
+ *   - `app/**` y `components/**` **siguen sin poder nombrar ninguno de los dos**, que es donde esta
+ *     el valor de la regla: R29 de QC-86 y **R50** de QC-87 —la pantalla es de QC-102—.
+ */
+const CONSUMO_LEGITIMO: ReadonlyArray<{ readonly prefijo: string; readonly codigo: string }> = [
+  { prefijo: `${ASIGNACIONES}/domain/`, codigo: 'asignaciones.modificar' },
+]
+
+/** ¿Ese archivo puede exigir ESE codigo, por la enmienda de QC-87? */
+export function isLegitimatePermissionConsumer(relPath: string, codigo: string): boolean {
+  return CONSUMO_LEGITIMO.some(
+    (permitido) => codigo === permitido.codigo && relPath.startsWith(permitido.prefijo),
+  )
+}
+
+/** Nadie consume los dos permisos nuevos fuera de la unica puerta que QC-87 abre (R29, R50). */
 export function findPermissionUsageFindings(
   files: ReadonlyArray<{ relPath: string; content: string }>,
 ): readonly string[] {
@@ -349,7 +415,9 @@ export function findPermissionUsageFindings(
     if (!isScopedForPermissionCodes(file.relPath)) continue
     const code = stripComments(file.content)
     for (const codigo of CODIGOS_NUEVOS) {
-      if (code.includes(codigo)) findings.push(`${file.relPath} nombra '${codigo}' (R29)`)
+      if (!code.includes(codigo)) continue
+      if (isLegitimatePermissionConsumer(file.relPath, codigo)) continue
+      findings.push(`${file.relPath} nombra '${codigo}' (R29)`)
     }
   }
   return findings
@@ -412,7 +480,7 @@ const barrilContent = readFileSync(absOf(BARRIL), 'utf8')
 
 describe('lib/modules/asignaciones — contrato del modulo y frontera (QC-86 T11)', () => {
   describe('(a) forma del modulo: index.ts y solo domain/ (R36)', () => {
-    it('el modulo real tiene index.ts y solo la carpeta domain/, sin ports/ ni adapters/ (R36)', () => {
+    it('el modulo real tiene index.ts y exactamente domain/, ports/ y adapters/ (R36, QC-87)', () => {
       expect(asignacionesEntries.length, 'lib/modules/asignaciones esta vacio').toBeGreaterThan(0)
       expect(findModuleShapeFindings(asignacionesEntries)).toEqual([])
       // Dicho tambien en positivo, para que el mensaje de un futuro rojo sea legible.
@@ -421,24 +489,39 @@ describe('lib/modules/asignaciones — contrato del modulo y frontera (QC-86 T11
           .filter((entry) => entry.isDirectory)
           .map((entry) => entry.name)
           .sort(),
-      ).toEqual(['domain'])
-      expect(existsSync(absOf(`${ASIGNACIONES}/ports`))).toBe(false)
-      expect(existsSync(absOf(`${ASIGNACIONES}/adapters`))).toBe(false)
+      ).toEqual(['adapters', 'domain', 'ports'])
+      // RETENSADO por QC-87: donde antes se exigia que NO existieran, ahora se exige que SI
+      // existan. La asercion no desaparece, cambia de signo — si alguien borrara el puerto o el
+      // adaptador, esto se pondria rojo igual que antes se ponia al crearlos.
+      expect(existsSync(absOf(`${ASIGNACIONES}/ports`))).toBe(true)
+      expect(existsSync(absOf(`${ASIGNACIONES}/adapters`))).toBe(true)
     })
 
-    it('detecta un modulo sin index.ts y con ports/ o adapters/, y un archivo suelto en su raiz (R36)', () => {
+    it('detecta un modulo sin index.ts, una carpeta fuera de la lista y un archivo suelto en su raiz (R36)', () => {
+      // RETENSADO por QC-87: `ports/` y `adapters/` ya NO son un hallazgo —son suyas—, asi que la
+      // pasada sintetica usa carpetas que siguen estando fuera de la lista cerrada. Si esto se
+      // hubiera limitado a borrar las dos aserciones viejas, la lista habria dejado de vigilar
+      // que NINGUNA otra carpeta entra, que es lo unico que este caso protege.
       const findings = findModuleShapeFindings([
         { name: 'domain', isDirectory: true },
         { name: 'ports', isDirectory: true },
         { name: 'adapters', isDirectory: true },
+        { name: 'utils', isDirectory: true },
+        { name: 'helpers', isDirectory: true },
         { name: 'order-assignment-repository.ts', isDirectory: false },
       ])
       expect(findings).toContainEqual('lib/modules/asignaciones/: falta el contrato publico index.ts (R31)')
-      expect(findings).toContainEqual('lib/modules/asignaciones/ports/: carpeta fuera del alcance de esta ficha (R36)')
-      expect(findings).toContainEqual('lib/modules/asignaciones/adapters/: carpeta fuera del alcance de esta ficha (R36)')
+      expect(findings).toContainEqual('lib/modules/asignaciones/utils/: carpeta fuera del alcance del modulo (R36)')
+      expect(findings).toContainEqual('lib/modules/asignaciones/helpers/: carpeta fuera del alcance del modulo (R36)')
       expect(findings).toContainEqual(
         'lib/modules/asignaciones/order-assignment-repository.ts: archivo ajeno al contrato en la raiz del modulo (R31)',
       )
+      // Y las tres legitimas NO generan hallazgo: sin esto, un `includes` roto pasaria inadvertido.
+      expect(findings).not.toContainEqual('lib/modules/asignaciones/ports/: carpeta fuera del alcance del modulo (R36)')
+      expect(findings).not.toContainEqual(
+        'lib/modules/asignaciones/adapters/: carpeta fuera del alcance del modulo (R36)',
+      )
+      expect(findings).not.toContainEqual('lib/modules/asignaciones/domain/: carpeta fuera del alcance del modulo (R36)')
     })
 
     it('el caso simetrico —index.ts y solo domain/— no genera ningun hallazgo (R36)', () => {
@@ -455,6 +538,33 @@ describe('lib/modules/asignaciones — contrato del modulo y frontera (QC-86 T11
     it('ningun archivo real de lib/modules/asignaciones importa una ruta interna de otro modulo ni el cliente Prisma (R31)', () => {
       expect(asignacionesSources.length, 'no se leyo ningun fuente de lib/modules/asignaciones').toBeGreaterThan(0)
       expect(asignacionesSources.flatMap(findModuleBoundaryFindings)).toEqual([])
+    })
+
+    it('el cliente Prisma solo se admite en adapters/driven/persistence/, y en ningun otro sitio (R31, QC-87)', () => {
+      // La excepcion que QC-87 abre, probada POR SUS DOS LADOS. Sin el lado negativo, ensanchar
+      // manana el permiso a todo `adapters/` —o al modulo entero— no rompería nada.
+      const importPrisma = "import { prisma } from '@/lib/shared/db/prisma';"
+      const hallazgoDe = (relPath: string) =>
+        findModuleBoundaryFindings({ relPath, content: importPrisma }).filter((f) =>
+          f.includes('cliente Prisma compartido'),
+        )
+
+      // PERMITIDO: el adaptador driven de persistencia es quien habla con Prisma por definicion.
+      expect(hallazgoDe(`${ASIGNACIONES}/adapters/driven/persistence/order-assignment-prisma.ts`)).toEqual([])
+
+      // PROHIBIDO en todo lo demas, incluido el resto de `adapters/`: el driving traduce
+      // `FormData` y errores, no persiste (QC-87 R43).
+      for (const relPath of [
+        `${ASIGNACIONES}/domain/assign-responsibles.ts`,
+        `${ASIGNACIONES}/ports/order-assignment-repository.ts`,
+        `${ASIGNACIONES}/index.ts`,
+        `${ASIGNACIONES}/adapters/driving/order-assignment-actions.ts`,
+        `${ASIGNACIONES}/adapters/driven/config/algo.ts`,
+      ]) {
+        expect(hallazgoDe(relPath), `${relPath} deberia seguir siendo un hallazgo`).toEqual([
+          `${relPath} importa el cliente Prisma compartido '@/lib/shared/db/prisma' (R31)`,
+        ])
+      }
     })
 
     it('detecta la ruta interna de otro modulo —por alias y por ruta relativa— y el import de @/lib/shared/db/prisma (R31)', () => {
@@ -607,8 +717,8 @@ describe('lib/modules/asignaciones — contrato del modulo y frontera (QC-86 T11
     })
   })
 
-  describe('(e) R29 en negativo: los dos permisos se declaran y nadie los exige', () => {
-    it('asignaciones.consultar y asignaciones.modificar solo aparecen en lib/modules/identity/domain/permissions.ts (R29)', () => {
+  describe('(e) R29 en negativo, ENMENDADO por QC-87: quien puede exigirlos y quien no', () => {
+    it('nadie los nombra fuera del catalogo, salvo los casos de uso de asignaciones/domain (R29, R50)', () => {
       expect(findPermissionUsageFindings(appSources)).toEqual([])
       // La otra mitad: el catalogo SI los declara. Sin esto, borrar los dos permisos del repo
       // entero dejaria este caso en verde.
@@ -644,6 +754,50 @@ describe('lib/modules/asignaciones — contrato del modulo y frontera (QC-86 T11
         "lib/shared/navigation/menu.ts nombra 'asignaciones.consultar' (R29)",
         "lib/modules/pedidos/domain/assign.ts nombra 'asignaciones.modificar' (R29)",
       ])
+    })
+
+    /**
+     * La puerta que QC-87 abre, y los tres portazos que siguen cerrados. Este caso es el que cae si
+     * alguien «arregla» la enmienda ensanchandola: bastaria con permitir todo el modulo, o con
+     * permitir los dos codigos, para que alguna de las tres ultimas lineas dejara de dar hallazgo.
+     */
+    it('la enmienda de QC-87 abre UNA puerta: `asignaciones.modificar` en asignaciones/domain/ y nada mas (R29, R1)', () => {
+      const findings = findPermissionUsageFindings([
+        // (1) LEGITIMO: es literalmente lo que R1 manda escribir.
+        {
+          relPath: `${ASIGNACIONES}/domain/assign-responsibles.ts`,
+          content: "requirePermission(actor, 'asignaciones.modificar');",
+        },
+        // (2) El OTRO codigo, en el mismo sitio: sigue siendo hallazgo. Lo estrena QC-88, y
+        //     exigirlo en la consulta de responsables es el riesgo 3 de `design.md > 10`.
+        {
+          relPath: `${ASIGNACIONES}/domain/list-order-responsibles.ts`,
+          content: "requirePermission(actor, 'asignaciones.consultar');",
+        },
+        // (3) El MISMO codigo, en el adaptador driving del propio modulo: la autorizacion no vive
+        //     ahi (QC-87 R43), y por eso la puerta es `domain/` y no el modulo entero.
+        {
+          relPath: `${ASIGNACIONES}/adapters/driving/order-assignment-actions.ts`,
+          content: "if (!actor.permissions.includes('asignaciones.modificar')) return;",
+        },
+        // (4) Y en la pantalla, que es donde R50 pone el limite: QC-102.
+        {
+          relPath: 'app/(private)/pedidos/[id]/page.tsx',
+          content: "const puede = permisos.includes('asignaciones.modificar');",
+        },
+      ])
+
+      expect(findings).toEqual([
+        `${ASIGNACIONES}/domain/list-order-responsibles.ts nombra 'asignaciones.consultar' (R29)`,
+        `${ASIGNACIONES}/adapters/driving/order-assignment-actions.ts nombra 'asignaciones.modificar' (R29)`,
+        "app/(private)/pedidos/[id]/page.tsx nombra 'asignaciones.modificar' (R29)",
+      ])
+      expect(
+        isLegitimatePermissionConsumer(`${ASIGNACIONES}/domain/assign-responsibles.ts`, 'asignaciones.modificar'),
+      ).toBe(true)
+      expect(
+        isLegitimatePermissionConsumer(`${ASIGNACIONES}/domain/assign-responsibles.ts`, 'asignaciones.consultar'),
+      ).toBe(false)
     })
 
     it('el alcance excluye permissions.ts, tests/, db/ y specs/, y tambien las simples menciones en comentarios (R29)', () => {
@@ -683,11 +837,14 @@ describe('lib/modules/asignaciones — contrato del modulo y frontera (QC-86 T11
   // violacion, y exige rojo. Si el barrido no ve nada, estas mutaciones tampoco disparan y el
   // test cae, que es lo que se quiere.
   describe('mutaciones — cada regla dispara sobre los datos REALES del repo', () => {
-    it('mutacion (a): añadir ports/ al arbol real del modulo pone la regla en rojo (R36)', () => {
+    it('mutacion (a): añadir una carpeta fuera de la lista al arbol real del modulo pone la regla en rojo (R36)', () => {
+      // RETENSADO por QC-87: la mutacion ya no puede ser `ports/` —ahora es legitima—, asi que usa
+      // una carpeta que sigue estando fuera de la lista cerrada. El proposito del bloque no
+      // cambia: partir del arbol REAL leido del disco, meterle la violacion y exigir rojo.
       expect(findModuleShapeFindings(asignacionesEntries)).toEqual([])
       expect(
-        findModuleShapeFindings([...asignacionesEntries, { name: 'ports', isDirectory: true }]),
-      ).toContainEqual('lib/modules/asignaciones/ports/: carpeta fuera del alcance de esta ficha (R36)')
+        findModuleShapeFindings([...asignacionesEntries, { name: 'utils', isDirectory: true }]),
+      ).toContainEqual('lib/modules/asignaciones/utils/: carpeta fuera del alcance del modulo (R36)')
     })
 
     it('mutacion (b): añadir un import de ruta interna de otro modulo al barril real pone la regla en rojo (R31)', () => {
@@ -741,6 +898,23 @@ describe('lib/modules/asignaciones — contrato del modulo y frontera (QC-86 T11
           : file,
       )
       expect(findPermissionUsageFindings(mutados)).toEqual([`${objetivo.relPath} nombra 'asignaciones.modificar' (R29)`])
+    })
+
+    /**
+     * La otra mitad de la mutacion (e), que QC-87 añade con su enmienda: la puerta abierta no tapa
+     * `asignaciones.consultar`. Se hace sobre el fuente REAL del caso de uso que mas cerca esta de
+     * caer en la tentacion —la consulta de responsables—, que hoy exige `pedidos.consultar`.
+     */
+    it('mutacion (e2): exigir asignaciones.consultar desde un caso de uso real de asignaciones pone la regla en rojo (R29)', () => {
+      const objetivo = `${ASIGNACIONES}/domain/list-order-responsibles.ts`
+      const caso = appSources.find((file) => file.relPath === objetivo)
+      expect(caso, `no se leyo ${objetivo}`).toBeDefined()
+      const mutados = appSources.map((file) =>
+        file.relPath === objetivo
+          ? { relPath: file.relPath, content: `${file.content}\nconst p = 'asignaciones.consultar';` }
+          : file,
+      )
+      expect(findPermissionUsageFindings(mutados)).toEqual([`${objetivo} nombra 'asignaciones.consultar' (R29)`])
     })
   })
 })

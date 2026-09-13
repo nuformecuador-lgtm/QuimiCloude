@@ -56,6 +56,12 @@ export const ERROR_MESSAGE_KEY = {
   work_group_member_exists_inactive: 'errors.work_group_member_exists_inactive',
   work_group_member_exists_blocked: 'errors.work_group_member_exists_blocked',
   work_group_member_not_found: 'errors.work_group_member_not_found',
+  // `asignaciones` (QC-87): la SEPTIMA familia del catalogo, abierta por la quinta enmienda
+  // (2026-09-13) que se redacta en la cabecera de `error-codes.ts`.
+  order_delivered_frozen: 'errors.order_delivered_frozen',
+  order_cancelled_not_assignable: 'errors.order_cancelled_not_assignable',
+  order_assignment_not_found: 'errors.order_assignment_not_found',
+  user_not_assignable: 'errors.user_not_assignable',
 } as const satisfies Record<ErrorCode, string>;
 
 /** La union cerrada de las claves estables (R1, R5). */
@@ -131,4 +137,17 @@ export const ERROR_MESSAGES_ES = {
   'errors.work_group_member_exists_blocked':
     'Esa persona ya pertenece al grupo; no aparece en la lista porque su cuenta esta bloqueada.',
   'errors.work_group_member_not_found': 'Esa persona no pertenece al grupo.',
+  // QC-87 (R10, R11): dos estados del pedido, dos textos. No dicen «no tienes permiso» ni «no
+  // existe» —el pedido existe y quien lo intenta tiene permiso—: dicen que ese pedido ya no es
+  // sitio para mover responsables. El de entregado se redacta en positivo a proposito, porque
+  // describe lo que SI pasa con lo ya asignado (R10: no se crea, no se modifica, no se borra).
+  'errors.order_delivered_frozen': 'Un pedido entregado conserva sus responsables tal como estaban.',
+  'errors.order_cancelled_not_assignable': 'Un pedido cancelado no admite responsables nuevos.',
+  // QC-87 (R30): desasignar a quien no es responsable de ESE pedido. Se distingue de
+  // `work_group_member_not_found` —que habla de un grupo— y de `user_not_found` —que habla de una
+  // persona que no existe—: aqui la persona existe y el pedido tambien.
+  'errors.order_assignment_not_found': 'Esa persona no es responsable de este pedido.',
+  // QC-87 (R18): la cuenta no esta activa. El texto no dice cual de los tres estados es, porque el
+  // catalogo no interpola (R4, R7) y los tres llevan a la misma accion de quien lee.
+  'errors.user_not_assignable': 'No se puede asignar a una persona cuya cuenta no esta activa.',
 } as const satisfies Record<ErrorMessageKey, string>;

@@ -36,6 +36,19 @@
  * nombre repetido, la pertenencia duplicada con sus tres motivos de ocultacion y la persona que no
  * pertenece— y cada uno necesita UN mensaje propio. No abre una familia nueva ni un modulo nuevo:
  * las dos tablas son de `identity` desde QC-83. Aprobada por el humano el 2026-09-11.
+ *
+ * **Quinta enmienda, el 2026-09-13 (QC-87)**: el catalogo abre una SEPTIMA familia,
+ * `asignaciones`, con CUATRO codigos. A diferencia de la cuarta enmienda —que amplio una familia
+ * ya existente—, esta abre una nueva, y por eso se escribe en vez de darse por supuesta: asignar
+ * responsables a un pedido tiene fallos que no son de `pedidos` —`pedidos` no sabe que existen las
+ * asignaciones— ni de `identity` —la persona existe y esta bien, lo que no admite responsables es
+ * el pedido—. Son cuatro situaciones distinguibles con cuatro frases distintas: el pedido
+ * entregado, el pedido cancelado, la persona que no es responsable de ese pedido y la persona cuya
+ * cuenta no esta activa.
+ *
+ * Esta enmienda NO redefine ningun codigo anterior: `unauthorized`, `invalid_input`,
+ * `order_not_found`, `user_not_found` y `work_group_not_found` se REUTILIZAN tal cual y no se
+ * tocan. Aprobada por el humano el 2026-09-13.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -90,6 +103,17 @@ export const ERROR_CODES = [
   'work_group_member_exists_inactive',
   'work_group_member_exists_blocked',
   'work_group_member_not_found',
+  // `asignaciones` (QC-87): la SEPTIMA familia del catalogo. Ver la quinta enmienda en la
+  // cabecera. Los dos primeros son estados del PEDIDO que no admiten escritura, y son dos codigos
+  // y no uno porque R4 prohibe que dos codigos compartan texto y «entregado» y «cancelado» son dos
+  // frases distintas para quien las lee (QC-87 R10, R11). Los dos ultimos son el de la persona que
+  // no es responsable de ese pedido (R30) y el de la cuenta que no esta activa (R18), que se
+  // distingue de `user_not_found` a proposito: la persona existe, lo que no admite es que se le
+  // asigne trabajo hoy.
+  'order_delivered_frozen',
+  'order_cancelled_not_assignable',
+  'order_assignment_not_found',
+  'user_not_assignable',
 ] as const;
 
 /** La union cerrada de los codigos declarados arriba (R2). */

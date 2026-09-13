@@ -1,6 +1,7 @@
 {
   "_nota": "Censo de aislamiento de los archivos de tests/integration/** (QC-77, R18). Cada archivo *.int.test.ts declara COMO se aisla: 'transaccion' (transaccion interactiva que termina en ROLLBACK, con SAVEPOINT para lo que se espera que falle: el patron heredado de QC-4 y ampliado en QC-47) o 'commit' (escribe de verdad y se limpia el solo, o no escribe nada). Toda entrada de 'commit' necesita motivo y desde; sin eso el censo se vuelve el sitio donde se mete lo que estorba, que es la leccion escrita de tests/baseline-rojos.json. Rutas relativas a tests/integration/ y SIEMPRE con '/', para que el archivo sea identico en Windows y en Linux. Lo vigila tests/guards/guard-aislamiento-integracion.test.ts. Ver specs/QC-77-aislamiento-de-la-base-en-tests-de-integracion/design.md > 8.",
   "transaccion": [
+    "asignaciones/order-assignment-prisma.int.test.ts",
     "asignaciones/order-assignments-constraints.int.test.ts",
     "identity/identity-constraints.int.test.ts",
     "identity/identity-seed.int.test.ts",
@@ -21,6 +22,11 @@
     "unidades/unidades-constraints.int.test.ts"
   ],
   "commit": [
+    {
+      "archivo": "identity/assignment-directory.int.test.ts",
+      "motivo": "QC-87 T3: ejercita el adaptador driven assignment-directory-prisma, que habla con el cliente Prisma GLOBAL y reutiliza listMembersAliveInCompany de QC-84, tambien global. Envolver esas llamadas en una transaccion del test seria un aislamiento de mentira -correrian en otra conexion del pool y no verian ni una fila del fixture-. Cada caso fabrica su empresa efimera (randomUUID) y la borra en un finally en el orden que respetan las FK; el afterAll afirma que no quedo ninguna. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-13"
+    },
     {
       "archivo": "identity/credential-setup.int.test.ts",
       "motivo": "Nacido antes de QC-77 (QC-79 T20): ejercita los dos adaptadores Prisma del enlace de establecimiento de credencial, que hablan con el cliente GLOBAL, y afirma sobre el INDICE UNICO PARCIAL 'credential_setup_tokens_one_live_per_user' con intentos que necesitan ver filas confirmadas. Committea y limpia lo suyo; se apoya en que la base de la corrida es suya.",

@@ -1,0 +1,67 @@
+// lib/modules/asignaciones/domain/order-state.ts
+/**
+ * QC-87 T7 — La tabla de estados de `design.md > 4`, en UN solo sitio (R8-R12).
+ *
+ * Las TRES escrituras del modulo -asignar, quitar un grupo y desasignar- comparten exactamente la
+ * misma tabla, y por eso vive aqui y no dentro de un caso de uso: tres copias de la misma tabla
+ * divergen el dia que QC-34 anada un estado, y divergirian **en silencio**.
+ *
+ * | Estado del pedido   | las TRES escrituras                       |
+ * | ------------------- | ----------------------------------------- |
+ * | `PENDIENTE`         | admitida (R9)                             |
+ * | `EN_CURSO`          | admitida (R9)                             |
+ * | `ENTREGADO`         | `order_delivered_frozen` (R10)            |
+ * | `CANCELADO`         | `order_cancelled_not_assignable` (R11)    |
+ * | no existe / de baja | `order_not_found` (R8)                    |
+ *
+ * **La consulta NO pasa por aqui** (R13): devuelve lo mismo en los cuatro estados y solo exige que
+ * el pedido exista.
+ *
+ * DOS decisiones que son el requisito y no estilo:
+ *
+ *   1. **Se decide sobre la LECTURA del pedido, nunca en el `WHERE` de la escritura** (R12). Es el
+ *      riesgo 4 de `design.md > 10`: metida en el `where` de un `DELETE` o de un `INSERT`, «el
+ *      pedido no existe» y «el pedido esta entregado» devolverian lo mismo, y la pantalla diria
+ *      `order_not_found` de un pedido que el usuario esta viendo. Por eso esta funcion recibe el
+ *      pedido YA LEIDO -o `null`- y no ningun filtro.
+ *   2. **El mapa es TOTAL sobre `OrderStatus`** (`satisfies Record<...>`), con el mismo criterio
+ *      que `MOTIVO_POR_ESTADO` de QC-84: si manana el catalogo de estados crece, este archivo **no
+ *      compila** -falta la clave- en vez de clasificar el estado nuevo como «admitida» por
+ *      descuido. Un estado sin clasificar seria una escritura colada sobre un pedido cerrado.
+ *
+ * **No se usa `assertTransition` de `pedidos`** aunque este publicado (`design.md > 4`): esa tabla
+ * dice que CAMBIOS DE ESTADO son legales al editar un pedido, y aqui no se cambia ningun estado.
+ */
+import type { OrderAssignmentTarget, OrderStatus } from '@/lib/modules/pedidos';
+
+import {
+  OrderCancelledNotAssignableError,
+  OrderDeliveredFrozenError,
+  OrderNotFoundError,
+  type AsignacionesError,
+} from './errors';
+
+/** `null` = ese estado ADMITE las escrituras. Los dos que no, con su error propio y distinto
+ *  (R10, R11): son dos frases distintas para quien las lee, no un matiz de redaccion. */
+const ERROR_POR_ESTADO = {
+  PENDIENTE: null,
+  EN_CURSO: null,
+  ENTREGADO: (): AsignacionesError => new OrderDeliveredFrozenError(),
+  CANCELADO: (): AsignacionesError => new OrderCancelledNotAssignableError(),
+} satisfies Record<OrderStatus, (() => AsignacionesError) | null>;
+
+/**
+ * Deja pasar si el pedido existe y su estado admite escrituras; lanza en cualquier otro caso.
+ *
+ * `order` es lo que devolvio `OrderCatalog.findAliveById`: `null` significa «no existe **o** esta
+ * dado de baja», que para quien pregunta son el mismo caso (R8, QC-34 R33).
+ */
+export function assertOrderAcceptsWrites(
+  order: OrderAssignmentTarget | null,
+): asserts order is OrderAssignmentTarget {
+  // R8: primero la existencia. Que este error sea distinto del de R10/R11 es el requisito R12.
+  if (order === null) throw new OrderNotFoundError();
+
+  const error = ERROR_POR_ESTADO[order.status];
+  if (error !== null) throw error();
+}

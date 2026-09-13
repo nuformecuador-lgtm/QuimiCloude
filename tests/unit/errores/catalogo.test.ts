@@ -44,7 +44,7 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 41 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 45 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // 25 de `design.md > 3` + los SIETE de la administracion de usuarios que entraron el
       // 2026-09-10 con la enmienda a R25 (QC-66) + los DOS de QC-79 (el enlace invalido y la
       // cuenta que ya no esta pendiente) + los SIETE de los grupos de trabajo (QC-84
@@ -53,9 +53,10 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       //
       // EL CONTEO ES LA UNION, y por eso no vale ninguno de los dos numeros que traia cada rama al
       // mergear: QC-79 dejo 34 (32+2) y QC-84 dejo 39 (32+7), y los dos serian FALSOS ahora que
-      // conviven. 25+7+2+7 = 41. Sigue siendo un conteo LITERAL a proposito: un codigo nuevo que
-      // nadie anote aqui pone esta linea en rojo.
-      expect(ERROR_CODES).toHaveLength(41)
+      // conviven. 25+7+2+7 = 41, mas los CUATRO de `asignaciones` que entraron el 2026-09-13 con
+      // la QUINTA enmienda (QC-87), la primera que abre una familia nueva: 45. Sigue siendo un
+      // conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
+      expect(ERROR_CODES).toHaveLength(45)
       expect(new Set(ERROR_CODES).size).toBe(ERROR_CODES.length)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
@@ -66,7 +67,7 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       expect(Object.keys(ERROR_MESSAGES_ES).sort()).toEqual([...claves].sort())
     })
 
-    it('errorMessage devuelve el texto del catalogo para los 41 codigos', () => {
+    it('errorMessage devuelve el texto del catalogo para los 45 codigos', () => {
       for (const code of ERROR_CODES) {
         expect(errorMessage(code)).toBe(ERROR_MESSAGES_ES[ERROR_MESSAGE_KEY[code]])
         expect(errorMessage(code).trim().length).toBeGreaterThan(0)
