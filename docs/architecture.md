@@ -107,6 +107,13 @@ del dominio.
    ni consumo que elija de que lote sale lo que se despacha, ni aviso por vencer-, y esta sin
    decidir que cuenta como lote vivo. Detalle en
    `specs/QC-90-alta-del-primer-lote/requirements.md`.
+   **Corregido el 2026-09-13 (QC-81): `lot` deja de ser opcional.** Pasa a ser obligatorio, con
+   **correlativo generado por el backend**, numero simple **unico por empresa** y serie que
+   continua desde el mas alto; los lotes que hoy lo tienen vacio se rellenan al migrar. Entra
+   ademas la **fecha de compra**, que no existia -`expiry_date` es otra cosa-: obligatoria, con
+   hoy por defecto y **nunca futura**. `expiry_date` **sigue siendo opcional**. Esto **no cierra
+   la pregunta**: lo que sigue abierto es el resto, que nada consume todavia el lote ni el
+   vencimiento. Detalle en `specs/QC-81-lote-y-fecha-de-compra/requirements.md`.
 3. **Fichas de seguridad y clasificacion de peligro.** ¿El sistema debe almacenar FDS/SDS,
    clasificacion GHS, o restricciones de almacenamiento/transporte por incompatibilidad?
    Eso decide si hay gestion de archivos (Supabase Storage) y reglas de validacion.
