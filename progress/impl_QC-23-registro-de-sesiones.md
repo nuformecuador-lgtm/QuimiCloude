@@ -411,3 +411,59 @@ concurrencia de **QC-79**, y el camino que falla es el de **emision**, que esta 
 es un **flake dependiente de la carga**, con su timeout de transaccion a 5 s. **No se anadio al
 baseline**: meter un flake ajeno al baseline desde esta ficha seria apagar una prueba de
 concurrencia que hoy funciona, y el baseline es global.
+
+## F2.3 otra vez: QC-77 entra en `dev`, y destapa dos cosas peores
+
+`dev` volvio a moverse (15 commits, QC-77 por el PR #65). Unico conflicto: el centinela de alcance de
+QC-85, que **QC-77 tambien arreglo por su cuenta** (`b4a3983`, `5f687c2`). **Se resolvio a favor de
+`dev`, no de lo nuestro**, y no por cortesia: su version distingue «no hay nada que medir» —el estado
+normal desde que QC-85 se mergeo— de «la senal no esta», asi que sigue afirmando algo cuando corre,
+mientras que la nuestra, al meter la precondicion delante, quedaba **tautologica**. El archivo queda
+byte a byte como en `dev`.
+
+### El verde falso del gate, que es lo grave
+
+Tras ese merge, `./init.sh` canto **`== init OK ==` con la integracion ABORTADA en el arranque y cero
+tests corridos**. No es una exageracion: el `global setup` de la integracion murio construyendo su
+base de plantilla, vitest salio con codigo 1, y el gate lo dio por bueno porque **el veredicto sale
+solo del JSON de rojos** — y un proyecto que no arranca no escribe rojos, luego era **invisible**.
+
+Se detecto mirando a mano por que no aparecian las cifras por proyecto, no porque nada fallara: el
+gate decia que todo estaba bien. **Un gate que da verde con una suite caida es peor que uno rojo.**
+
+### La causa del arranque caido: la receta de QC-77 sembraba con el esquema a medias
+
+`buildTemplateSchema` hacia `migrate deploy` —que **se detiene a proposito** en la migracion de QC-49,
+que exige la empresa inicial—, y **sembraba ahi**, con las migraciones posteriores **sin aplicar**.
+QC-23 anade `users.sessions_valid_from` despues de ese corte, y `@default(now())` **lo rellena Prisma
+del lado del cliente**: el `INSERT` del seed incluia una columna que en ese instante no existia.
+
+**No era un problema de QC-23**: QC-79 no lo destapo porque solo anadio una **tabla** que el seed no
+toca. **Somos los primeros en anadir una COLUMNA despues del corte**, y toda ficha futura que anada
+una con default de cliente lo habria pisado igual.
+
+**Arreglado desde aqui, por decision del humano**: la receta pasa a sembrar **solo la empresa
+inicial** en el punto donde QC-49 lo exige —con SQL crudo, que es lo unico que no depende del cliente
+desincronizado—, aplicar el resto de migraciones, y correr el **seed completo al final**, con el
+esquema ya entero. Probado por **mutacion**: con el arreglo la plantilla se construye y la integracion
+da **249/249**; devolviendo el seed al punto intermedio **vuelve a romperse con el mismo error**. La
+idempotencia del seed se **verifico**, no se supuso.
+
+### Y el gate ya no puede volver a mentir asi
+
+`init.sh` gana dos garantias, con el incidente escrito en el propio script:
+
+1. **Los tres proyectos** —`ui`, `node`, `integration`— tienen que aparecer en el informe; si falta
+   uno entero, es rojo **y el mensaje dice cual**. Es la comprobacion que nos habria salvado.
+2. **Contradiccion = rojo**: si el proceso de tests sale distinto de cero y el informe no trae ningun
+   archivo rojo que lo explique, algo fallo **fuera** de los tests y el gate falla en vez de dar verde.
+
+El `|| true` de la linea 227 **no se quito a ciegas** —sin el, `set -e` corta antes de comparar contra
+el baseline—: se captura el codigo de salida y se usa.
+
+### Tercer y cuarto ejemplar para QC-99
+
+Van **cuatro** en esta ficha, y los dos nuevos son de la misma familia que los dos primeros: piezas
+que **pasan en `dev`** —donde nada las activa— y **rompen a la siguiente feature**. El censo de
+aislamiento de QC-77 pide ademas que **cada** archivo de integracion nuevo se declare, asi que los dos
+de esta ficha entran en `tests/integration/aislamiento.json`. **No se abre ficha: QC-99 ya existe.**
