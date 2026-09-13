@@ -1,0 +1,35 @@
+
+ RUN  v4.1.10 C:/Users/Cristian/Documents/trabajo/arc/labs/.worktrees/QC-77-aislamiento-de-la-base-en-tests-de-integracion
+
+test-db: plantilla reutilizada: qct_tpl_1db8043a68e0 (las migraciones no han cambiado)
+test-db: la corrida de integracion va contra qct_qc77_7a512e99_mtypz1eu_q0g (copia de qct_tpl_1db8043a68e0).
+stdout | tests/integration/infra/ciclo-de-vida-de-la-base.int.test.ts
+test-db: plantilla reutilizada: qct_tpl_1db8043a68e0 (las migraciones no han cambiado)
+
+stdout | tests/integration/infra/ciclo-de-vida-de-la-base.int.test.ts
+test-db: borrada qct_qc77_4a0693b1_mtypzlel_lflr: la dejo la corrida del pid 999999 (creada 2026-09-12T18:30:02.710Z), que ya no esta viva.
+
+ ❯ |integration| tests/integration/infra/ciclo-de-vida-de-la-base.int.test.ts (5 tests | 2 skipped) 38270ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |integration| tests/integration/infra/ciclo-de-vida-de-la-base.int.test.ts > R9 — la corrida siguiente recoge lo que dejo una corrida muerta
+Error: Hook timed out in 15000ms.
+If this is a long-running hook, pass a timeout value as the last argument or configure it globally with "hookTimeout".
+ ❯ tests/integration/infra/ciclo-de-vida-de-la-base.int.test.ts:277:3
+    275|   let reclamadas: string[]
+    276|
+    277|   beforeAll(async () => {
+       |   ^
+    278|     mio = worktreeTemporal()
+    279|     const otro = worktreeTemporal()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  64 passed | 2 skipped (66)
+   Start at  13:29:31
+   Duration  52.19s (transform 1.79s, setup 102ms, import 4.27s, tests 40.66s, environment 1ms)
+
+test-db: borrada la base de la corrida: qct_qc77_7a512e99_mtypz1eu_q0g.

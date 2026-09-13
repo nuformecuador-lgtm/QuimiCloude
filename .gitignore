@@ -53,3 +53,6 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /.playwright/
+
+# rastros de las bases efimeras de los tests de integracion (QC-77, tests/helpers/test-database.ts)
+/.qc-test-db/

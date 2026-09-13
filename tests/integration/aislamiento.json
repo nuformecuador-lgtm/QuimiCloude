@@ -1,0 +1,145 @@
+{
+  "_nota": "Censo de aislamiento de los archivos de tests/integration/** (QC-77, R18). Cada archivo *.int.test.ts declara COMO se aisla: 'transaccion' (transaccion interactiva que termina en ROLLBACK, con SAVEPOINT para lo que se espera que falle: el patron heredado de QC-4 y ampliado en QC-47) o 'commit' (escribe de verdad y se limpia el solo, o no escribe nada). Toda entrada de 'commit' necesita motivo y desde; sin eso el censo se vuelve el sitio donde se mete lo que estorba, que es la leccion escrita de tests/baseline-rojos.json. Rutas relativas a tests/integration/ y SIEMPRE con '/', para que el archivo sea identico en Windows y en Linux. Lo vigila tests/guards/guard-aislamiento-integracion.test.ts. Ver specs/QC-77-aislamiento-de-la-base-en-tests-de-integracion/design.md > 8.",
+  "transaccion": [
+    "asignaciones/order-assignments-constraints.int.test.ts",
+    "identity/identity-constraints.int.test.ts",
+    "identity/identity-seed.int.test.ts",
+    "identity/work-groups-constraints.int.test.ts",
+    "inventario/company-scope.int.test.ts",
+    "inventario/inventario-constraints.int.test.ts",
+    "inventario/presentation-uniqueness.int.test.ts",
+    "inventario/product-batch-write.int.test.ts",
+    "pedidos/order-crud.int.test.ts",
+    "pedidos/order-sequence.int.test.ts",
+    "pedidos/pedidos-constraints.int.test.ts",
+    "proveedores/catalog-line.int.test.ts",
+    "proveedores/proveedores-constraints.int.test.ts",
+    "proveedores/supplier-crud.int.test.ts",
+    "recetas/recetas-constraints.int.test.ts",
+    "recetas/recipe-crud.int.test.ts",
+    "recetas/recipe-lines.int.test.ts",
+    "unidades/unidades-constraints.int.test.ts"
+  ],
+  "commit": [
+    {
+      "archivo": "identity/credential-setup.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-79 T20): ejercita los dos adaptadores Prisma del enlace de establecimiento de credencial, que hablan con el cliente GLOBAL, y afirma sobre el INDICE UNICO PARCIAL 'credential_setup_tokens_one_live_per_user' con intentos que necesitan ver filas confirmadas. Committea y limpia lo suyo; se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "identity/last-administrator.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-66 T17): prueba que 'SELECT ... FOR UPDATE' serializa DOS transacciones que CONFIRMAN, y para eso instancia dos PrismaClient con pools distintos. Una transaccion del test que se deshace es incompatible por construccion con lo que aqui se mide. Construccion propia + limpieza propia; se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "identity/login.int.test.ts",
+      "motivo": "Nacido antes de QC-77: la cabecera del propio archivo dice que NO usa el patron de transaccion con rollback, a proposito. Ejercita el adaptador real ('$queryRaw' contra el indice funcional parcial 'users_username_unique') y las dos escrituras de bloqueo con bcrypt de verdad, todo contra el cliente Prisma global. Fixture propio y limpieza en afterAll; se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "identity/role-catalog.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-94 T7). Caso aparte: NO ESCRIBE NADA -no crea, no edita, no borra ninguna fila-, asi que no hay nada que deshacer y no necesita transaccion. Solo LEE el catalogo global de roles, que cambia unicamente por migracion y seed; se apoya en que la base de la corrida trae ese seed.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "identity/session-user.int.test.ts",
+      "motivo": "Nacido antes de QC-77: ejercita el adaptador 'findActiveSessionUserById' contra el cliente Prisma global con fixture propio (empresa efimera + usuario) y barrido en afterAll en orden users -> companies, por el ON DELETE RESTRICT de 'users_company_id_fkey'. Committea; se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "identity/user-crud.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-66 T16): llama a los cinco metodos del adaptador de produccion, que usan el cliente Prisma GLOBAL, asi que envolverlos en una transaccion del test seria un aislamiento de mentira -correrian en otra conexion del pool-. Construccion propia + limpieza propia, y afirma sobre los tres indices unicos POR EMPRESA de QC-47.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "identity/work-group-assignments.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-84 T16): mira la TABLA 'order_assignments' de verdad, antes y despues de renombrar y de dar de baja un grupo, para demostrar que nadie toca esas filas. Esa comparacion exige estado confirmado. Committea y limpia lo suyo; se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "identity/work-group-crud.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-84 T14). OJO, es el archivo que hace FALSA la clasificacion por grep (design.md > 0, observacion del ancla 2, y > 9 alternativa A7): define su propio 'RollbackSignal' para un SONDEO puntual del 23505 con una funcion pg_temp, pero el RESTO de sus casos COMMITEA. Llega por la fachada de @/lib/composition, que habla con el cliente Prisma global, asi que una transaccion del test no lo envolveria.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "identity/work-group-membership.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-84 T15): los casos de uso de pertenencia abren su PROPIA transaccion contra el cliente global, asi que envolverlos desde el test seria aislamiento de mentira y ademas los bloquearia. Necesita filas confirmadas para probar que dos altas a la vez no crean la de mas. Construccion y limpieza propias.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "infra/ciclo-de-vida-de-la-base.int.test.ts",
+      "motivo": "No usa la transaccion con ROLLBACK de QC-4/QC-47 porque no escribe NINGUNA fila: hace DDL contra pg_database (CREATE DATABASE ... TEMPLATE y DROP DATABASE) para probar el ciclo de vida de la base efimera (R7, R8, R9), y ese DDL no es transaccionable del mismo modo -CREATE/DROP DATABASE no se pueden ejecutar dentro de un bloque de transaccion-. Crea sus PROPIAS bases desde la plantilla, con worktrees temporales, y las borra en afterAll comprobando contra pg_database que no quedo ninguna; la base de la corrida no se toca.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "inventario/company-scope-queries.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-49 T13): siembra filas de DOS empresas a la vez y llama a los adaptadores driven directamente para demostrar que el WHERE del SQL acota por empresa. Esos adaptadores usan el cliente Prisma global; committea y borra lo suyo. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "inventario/list-query-indexes.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-57 T5/T6): afirma sobre el estado RESULTANTE de la migracion '20260904160000_list_query_indexes' -que pg_trgm existe, que los indices se aplicaron- y recorre TODAS las filas de products para comprobar el backfill de 'name_normalized'. Eso es una lectura del catalogo del motor y del contenido entero de una tabla, no algo que una transaccion del test pueda deshacer.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "inventario/list-query-presentations.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-57 T15): siembra MAS FILAS QUE UNA PAGINA y afirma sobre el listado completo paginado por el motor. El adaptador llama al cliente Prisma global, asi que una transaccion que se deshace no lo envuelve; borra lo suyo en el afterAll.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "inventario/list-query-products.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-57 T14): la propia cabecera lo explica -'listAliveProducts' llama al cliente Prisma GLOBAL, no a un tx inyectado, asi que una transaccion que se deshace NO lo envuelve-. Siembra mas filas que una pagina y las borra en el afterAll por su identificador exacto.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "inventario/presentation-unit.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-80 T13): ejercita los casos de uso de escritura de presentacion desde @/lib/composition -el camino real de una Server Action- y espera el rechazo REAL de 'presentations_unit_id_fkey'. El caso de uso abre su propia transaccion contra el cliente global. Committea y limpia lo suyo.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "inventario/product-crud.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-20): su cabecera dice que el adaptador 'product-prisma.ts' llama al cliente Prisma GLOBAL y que por eso cada caso crea sus datos y los borra en un finally por su id exacto. AVISO APARTE: este archivo esta hoy en tests/baseline-rojos.json por un flake de saturacion documentado en QC-58; eso es otra cosa distinta del aislamiento y se sigue alli.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "pedidos/list-query-orders.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-57 T20): siembra mas filas que una pagina y afirma sobre el orden que decide el MOTOR -el enum de prioridad por su orden de declaracion y el par (order_year, order_sequence) detras de 'orderNumber'-. El adaptador usa el cliente global; committea y borra lo suyo en el afterAll.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "pedidos/order-repository.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-34). Existe justamente como contrapunto de 'order-crud.int.test.ts', que si se aisla por transaccion pero ejecutando su PROPIA copia de las sentencias: aqui se llaman las funciones REALES del adaptador que cablea lib/composition, y esas hablan con el cliente Prisma global. Committea y limpia lo suyo.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "proveedores/list-query-catalog-lines.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-57 T18): siembra mas filas que una pagina y afirma sobre lo que solo el motor decide -los nulos SIEMPRE al final en las dos direcciones, y los rangos comparados como Prisma.Decimal y no como coma flotante-. El adaptador usa el cliente global; committea y borra lo suyo.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "proveedores/list-query-suppliers.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-57 T17): su cabecera dice que 'listAliveSuppliers' llama al cliente Prisma GLOBAL y que por eso una transaccion que se deshace no lo envuelve. Crea filas reales y las borra por id exacto en el afterAll.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "recetas/list-query-recipes.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-57 T16): 'listAliveRecipes' llama al cliente Prisma GLOBAL, asi que una transaccion que se deshace no lo envuelve. Siembra mas filas que una pagina y limpia en el afterAll por el marcador que llevan todas en el nombre.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "unidades/list-query-units.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-57 T19): sus DOS lecturas -la del catalogo entero y la paginada- llaman al cliente Prisma GLOBAL. Siembra mas filas que una pagina para probar que el motor ordena y busca ANTES de paginar, y borra en el afterAll por el marcador del nombre.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "unidades/unit-repository.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-26): importa 'unit-prisma.ts' por ruta profunda para vigilar el 'take' y el 'ORDER BY' del SQL real, que solo la base puede contestar. El adaptador usa el cliente global; crea sus filas y las borra el mismo.",
+      "desde": "2026-09-12"
+    },
+    {
+      "archivo": "unidades/unit-write.int.test.ts",
+      "motivo": "Nacido antes de QC-77 (QC-38): su cabecera explica POR QUE no usa el patron de rollback de 'unidades-constraints.int.test.ts' -los tres casos de uso, via 'unit-write-prisma.ts', llaman al cliente Prisma GLOBAL, asi que una llamada dentro del callback de prisma.$transaction correria en otra conexion del pool y no veria las filas-. Cada caso crea sus filas y las borra el mismo.",
+      "desde": "2026-09-12"
+    }
+  ]
+}

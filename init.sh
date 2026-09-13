@@ -158,6 +158,49 @@ elif [ -f .env ]; then
   ok ".env cargado en el entorno del gate"
 fi
 
+# 6.c El estado de la base de DESARROLLO, ANTES de los tests y en los DOS modos (R14-R16).
+# Va aqui y no antes: el 6.b es quien deja `DATABASE_URL` en el entorno, y sin ella no hay base
+# que consultar. Y va antes de los tests porque su razon de ser es explicar un rojo ANTES de
+# verlo: el 2026-09-12 la base iba cuatro migraciones atras y eso dejo 22 archivos en rojo sin
+# que nada dijera la causa.
+#
+# AVISA, NO FALLA (R15). El codigo de salida del gate no cambia por el estado de una base local:
+# bloquear un PR por eso seria un gate que se ignora. De ahi el `|| true` — sin el, `set -e`
+# cortaria el init si `db:test status` devolviera no-cero.
+#
+# Lo que SI es `fail` es que falte el script. `docs/verification.md > El anti-patron: la
+# validacion opcional`: un check colgado de `[ -f <script> ]` con un `warn` en el `else` no es un
+# check, se salta entero y el gate sigue verde. Que `scripts/test-db.ts` no exista es una rotura
+# del arnes, no una circunstancia.
+[ -f scripts/test-db.ts ] || fail "falta scripts/test-db.ts: sin el, el gate no puede decir si la base de desarrollo va atrasada"
+echo "-> pnpm run db:test status"
+# `2>&1` a proposito: `$(...)` captura solo stdout, y este bloque SI reimprime lo capturado. Si
+# el detalle se fuera por stderr, el aviso prometeria una razon que no entrega.
+SALIDA_DB=$(pnpm run db:test status 2>&1) || true
+# Alternacion de literales, no `[✓!✗]`: una clase de caracteres con multibyte puede casar por
+# byte suelto y cazar cualquier otro simbolo Unicode.
+VEREDICTO_DB=$(printf '%s\n' "$SALIDA_DB" | grep -E '^(✓|!|✗)' || true)
+if [ -z "$VEREDICTO_DB" ]; then
+  warn "no se pudo comprobar el estado de la base de desarrollo; salida de 'pnpm run db:test status':"
+  printf '%s\n' "$SALIDA_DB"
+elif printf '%s\n' "$VEREDICTO_DB" | grep -q '^✓'; then
+  printf '%s\n' "$VEREDICTO_DB" | while IFS= read -r LINEA_DB; do
+    LINEA_DB=${LINEA_DB#✓ }
+    ok "$LINEA_DB"
+  done
+else
+  printf '%s\n' "$VEREDICTO_DB" | while IFS= read -r LINEA_DB; do
+    LINEA_DB=${LINEA_DB#! }; LINEA_DB=${LINEA_DB#✗ }
+    warn "$LINEA_DB"
+  done
+  # La coletilla solo cuando la base VA ATRAS: si no se pudo consultar, decir que «la app a mano
+  # si se ve afectada» seria afirmar algo que el gate no sabe.
+  case "$VEREDICTO_DB" in
+    *atras*)
+      warn "Los tests de integracion NO se ven afectados (corren sobre base propia), pero la app a mano si." ;;
+  esac
+fi
+
 if [ -f package.json ]; then
   run_if typecheck
   run_if lint
