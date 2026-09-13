@@ -58,6 +58,34 @@ export type SessionUserRecord = {
    * `companyDeletedAt`. Y no cuesta ninguna consulta: los dos salen del mismo `findFirst`.
    */
   readonly lockedUntil: Date | null;
+  /**
+   * QC-23 (T9, R7, R8, R14): el sello «sesiones validas desde» de esa persona, tal y como esta
+   * HOY en `users.sessions_valid_from`. Es una columna de `users`, o sea la MISMA fila que ya se
+   * leia: **coste cero**, ni un `JOIN` mas ni una consulta mas por peticion.
+   *
+   * Obligatorio y nunca nulo: toda fila de usuario tiene sello, incluidas las que ya existian
+   * (R7). Viaja CRUDO —la marca de tiempo, no un «esta sesion vale»—: la comparacion `<=` contra
+   * el `iat` es regla de dominio y vive en `domain/session-revocation.ts > isStampedOut`, que es
+   * el UNICO cuerpo de esa desigualdad en el repositorio. Mismo argumento que ya esta escrito
+   * arriba para `companyDeletedAt` y `lockedUntil`.
+   */
+  readonly sessionsValidFrom: Date;
+  /**
+   * QC-23 (T9, R11, R14): el `revoked_at` de la fila del registro de sesiones cerradas para EL
+   * `sid` de la sesion en curso, o `null` si esa sesion no fue cerrada una a una.
+   *
+   * De ahi viene el segundo parametro de `findActiveById`: sin el `sid` no hay nada que buscar.
+   * Sale del MISMO `findFirst`, por la relacion `User.revokedSessions`, o sea por
+   * `revoked_sessions_session_id_key`: **ni una invocacion nueva del puerto por peticion** (R14),
+   * que era la condicion. El coste declarado —una busqueda por indice unico mas, de 0 o 1 filas—
+   * esta escrito en `design.md > 4` y es justo lo que QC-28 viene a quitar.
+   *
+   * Otra vez CRUDO, y con el instante y no con un `estaRevocada` ya cocinado, por el mismo
+   * motivo de siempre: quien decide es el corte 8 de `resolve-session.ts`. Y porque el par
+   * `(sessionsValidFrom, sessionRevokedAt)` es exactamente lo que QC-28 podra cachear detras de
+   * este puerto sin tocar el dominio (`design.md > 4`).
+   */
+  readonly sessionRevokedAt: Date | null;
 };
 
 /**
@@ -66,5 +94,12 @@ export type SessionUserRecord = {
  * siempre los actuales, nunca los de cuando se emitio la cookie (R10, R12).
  */
 export interface SessionUserReader {
-  findActiveById(id: string): Promise<SessionUserRecord | null>;
+  /**
+   * QC-23 (T9, R14): el `sessionId` entra como SEGUNDO parametro y es obligatorio. No es un dato
+   * de busqueda de la persona —la fila se sigue buscando por su clave primaria— sino el `sid`
+   * contra el que se resuelve `sessionRevokedAt` en la MISMA lectura. Las dos comprobaciones de
+   * QC-23 —sello y registro— se resuelven asi con **una sola invocacion** de este puerto, que es
+   * la que ya se hacia.
+   */
+  findActiveById(id: string, sessionId: string): Promise<SessionUserRecord | null>;
 }

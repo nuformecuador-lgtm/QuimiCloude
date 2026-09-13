@@ -7,6 +7,7 @@
 
 import { createResolveSessionUser } from '@/lib/modules/identity/domain/resolve-session-user';
 
+import type { ResolveSessionDeps } from '@/lib/modules/identity/domain/resolve-session';
 import type { SessionClaims } from '@/lib/modules/identity/domain/session-claims';
 import type { SessionReader } from '@/lib/modules/identity/ports/session-reader';
 import type { SessionUserReader, SessionUserRecord } from '@/lib/modules/identity/ports/session-user-reader';
@@ -20,10 +21,15 @@ const AHORA = new Date('2026-09-01T10:00:00.000Z');
 // los fixtures sigan siendo `SessionClaims` validos; los cortes que la usan llegan con T7.
 const COMPANY_ID = '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13';
 
+// QC-23 R1: desde `v4` el contenido firmado lleva el identificador de ESTA sesion.
+const SID_CLAIMS = '5b6f3d21-9c4e-4a7f-8b03-6d2e1f5a9c44';
+
 const CLAIMS_VIGENTES: SessionClaims = {
   sub: SUB,
   roleName: 'Rol firmado que ya no vale',
   companyId: COMPANY_ID,
+  // QC-23 R1: desde `v4` los claims llevan el identificador de ESTA sesion.
+  sessionId: SID_CLAIMS,
   issuedAt: new Date('2026-09-01T08:00:00.000Z'),
   expiresAt: new Date('2026-09-01T16:00:00.000Z'),
 };
@@ -32,6 +38,8 @@ const CLAIMS_CADUCADOS: SessionClaims = {
   sub: SUB,
   roleName: 'Rol firmado que ya no vale',
   companyId: COMPANY_ID,
+  // QC-23 R1: desde `v4` los claims llevan el identificador de ESTA sesion.
+  sessionId: SID_CLAIMS,
   issuedAt: new Date('2026-09-01T00:00:00.000Z'),
   expiresAt: new Date('2026-09-01T08:00:00.000Z'),
 };
@@ -56,10 +64,24 @@ const RECORD: SessionUserRecord = {
   // cuenta corriente: `active` y sin plazo, o sea la que si tiene sesion.
   accountStatus: 'active',
   lockedUntil: null,
+  // QC-23 T9 (R7, R8, R11): el record trae ahora el sello del usuario y el instante en que ESTA
+  // sesion fue cerrada una a una, los dos crudos. El caso corriente es un sello ANTERIOR a la
+  // emision y ninguna fila en el registro; los cortes 7 y 8 tienen sus casos propios en
+  // `resolve-session.test.ts`. Ni una asercion de este archivo cambia.
+  sessionsValidFrom: new Date('2026-08-01T00:00:00.000Z'),
+  sessionRevokedAt: null,
 };
 
 /** QC-74 T8 (R14): un rol al que nadie asigno nada. «Sin permisos» es `[]`, no un hueco. */
 const RECORD_SIN_PERMISOS: SessionUserRecord = { ...RECORD, permissions: [] };
+
+// QC-23 T10 (R16, R17): la resolucion gana UNA dependencia mas —a donde va la causa cuando la
+// comprobacion no se puede hacer—. Aqui se cablea muda: este archivo prueba la PROYECCION, no el
+// registro del servidor. Ni una asercion cambia; solo se completa la dependencia que el tipo
+// exige.
+const REGISTRO_QC23 = {
+  log: { log: () => undefined },
+} satisfies Pick<ResolveSessionDeps, 'log'>;
 
 /** Puerto falso de sesion: siempre devuelve el mismo `claims`, contando llamadas si hace falta. */
 function fakeSessionReader(claims: SessionClaims | null): SessionReader {
@@ -80,7 +102,7 @@ describe('createResolveSessionUser', () => {
   it('sin claims resuelve null sin lanzar', async () => {
     const session = fakeSessionReader(null);
     const users = fakeUserReader(RECORD);
-    const resolveSessionUser = createResolveSessionUser({ session, users });
+    const resolveSessionUser = createResolveSessionUser({ session, users, ...REGISTRO_QC23 });
 
     await expect(resolveSessionUser(AHORA)).resolves.toBeNull();
   });
@@ -89,7 +111,7 @@ describe('createResolveSessionUser', () => {
   it('con claims null no se consulta al lector de usuario', async () => {
     const session = fakeSessionReader(null);
     const users = fakeUserReader(RECORD);
-    const resolveSessionUser = createResolveSessionUser({ session, users });
+    const resolveSessionUser = createResolveSessionUser({ session, users, ...REGISTRO_QC23 });
 
     await resolveSessionUser(AHORA);
 
@@ -100,7 +122,7 @@ describe('createResolveSessionUser', () => {
   it('con sesion caducada no se consulta al lector de usuario', async () => {
     const session = fakeSessionReader(CLAIMS_CADUCADOS);
     const users = fakeUserReader(RECORD);
-    const resolveSessionUser = createResolveSessionUser({ session, users });
+    const resolveSessionUser = createResolveSessionUser({ session, users, ...REGISTRO_QC23 });
 
     const resultado = await resolveSessionUser(AHORA);
 
@@ -112,11 +134,14 @@ describe('createResolveSessionUser', () => {
   it('con claims vigentes consulta al lector de usuario por el sub', async () => {
     const session = fakeSessionReader(CLAIMS_VIGENTES);
     const users = fakeUserReader(RECORD);
-    const resolveSessionUser = createResolveSessionUser({ session, users });
+    const resolveSessionUser = createResolveSessionUser({ session, users, ...REGISTRO_QC23 });
 
     await resolveSessionUser(AHORA);
 
-    expect(users.findActiveById).toHaveBeenCalledWith(SUB);
+    // QC-23 T9 (R14): la consulta sigue siendo POR EL `sub` —la fila se busca por su clave
+    // primaria— y gana el `sid` como segundo argumento, que es contra lo que se resuelve la
+    // pertenencia al registro de sesiones cerradas en esa MISMA lectura.
+    expect(users.findActiveById).toHaveBeenCalledWith(SUB, SID_CLAIMS);
     expect(users.findActiveById).toHaveBeenCalledTimes(1);
   });
 
@@ -125,7 +150,7 @@ describe('createResolveSessionUser', () => {
   it('sin registro de usuario activo resuelve null aunque la sesion sea valida', async () => {
     const session = fakeSessionReader(CLAIMS_VIGENTES);
     const users = fakeUserReader(null);
-    const resolveSessionUser = createResolveSessionUser({ session, users });
+    const resolveSessionUser = createResolveSessionUser({ session, users, ...REGISTRO_QC23 });
 
     await expect(resolveSessionUser(AHORA)).resolves.toBeNull();
   });
@@ -134,7 +159,7 @@ describe('createResolveSessionUser', () => {
   it('con usuario activo compone el SessionUser con displayName y roleName actuales', async () => {
     const session = fakeSessionReader(CLAIMS_VIGENTES);
     const users = fakeUserReader(RECORD);
-    const resolveSessionUser = createResolveSessionUser({ session, users });
+    const resolveSessionUser = createResolveSessionUser({ session, users, ...REGISTRO_QC23 });
 
     const resultado = await resolveSessionUser(AHORA);
 
@@ -157,7 +182,7 @@ describe('createResolveSessionUser', () => {
   it('los permisos del record viajan al SessionUser sin normalizar ni reordenar', async () => {
     const session = fakeSessionReader(CLAIMS_VIGENTES);
     const users = fakeUserReader(RECORD);
-    const resolveSessionUser = createResolveSessionUser({ session, users });
+    const resolveSessionUser = createResolveSessionUser({ session, users, ...REGISTRO_QC23 });
 
     const resultado = await resolveSessionUser(AHORA);
 
@@ -169,7 +194,7 @@ describe('createResolveSessionUser', () => {
   it('un rol sin asignaciones resuelve permissions vacio y no null', async () => {
     const session = fakeSessionReader(CLAIMS_VIGENTES);
     const users = fakeUserReader(RECORD_SIN_PERMISOS);
-    const resolveSessionUser = createResolveSessionUser({ session, users });
+    const resolveSessionUser = createResolveSessionUser({ session, users, ...REGISTRO_QC23 });
 
     const resultado = await resolveSessionUser(AHORA);
 
@@ -181,7 +206,7 @@ describe('createResolveSessionUser', () => {
   it('con now igual a expiresAt no consulta al lector de usuario', async () => {
     const session = fakeSessionReader(CLAIMS_VIGENTES);
     const users = fakeUserReader(RECORD);
-    const resolveSessionUser = createResolveSessionUser({ session, users });
+    const resolveSessionUser = createResolveSessionUser({ session, users, ...REGISTRO_QC23 });
 
     const resultado = await resolveSessionUser(CLAIMS_VIGENTES.expiresAt);
 

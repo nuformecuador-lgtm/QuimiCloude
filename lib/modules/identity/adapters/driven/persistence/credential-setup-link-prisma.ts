@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { floorToSecond } from '../../../domain/session-revocation';
+
 import type { UserAccountStatus } from '../../../domain/account-status';
 import type { ApplyOutcome, IssueOutcome } from '../../../ports/credential-setup-link-repository';
 
@@ -169,9 +171,19 @@ export async function applyCredentialAndActivate(input: {
       //
       //    `account_status_changed_by = NULL` es el `NULL` de QC-65 R10: «lo cambio el sistema, no
       //    una persona». Aqui no hay actor ni sesion (R18).
+      //
+      //    QC-23 T15 (R30, R32, R38): `sessions_valid_from` es una columna MAS de este mismo `SET`,
+      //    no una segunda escritura. La regla de QC-23 no es «acordarse de llamar a una funcion»,
+      //    es una regla sobre la escritura: toda transaccion que escriba `users.password_hash` sube
+      //    el sello en la MISMA sentencia (decision cerrada 2, `design.md > 5.4`). Aqui su efecto
+      //    medible es nulo -la cuenta venia de `pending` y nunca tuvo sesion- y se escribe igual:
+      //    es la puerta que queda cerrada si QC-89 o QC-96 reutilizan este camino. Truncado al
+      //    segundo por `floorToSecond`, la misma granularidad con la que `iat` viaja firmado
+      //    (`design.md > 2.3`). Lo vigila `tests/guards/guard-sesiones-cortadas.test.ts`.
       const activated = await tx.$executeRaw(Prisma.sql`
         UPDATE "users"
            SET "password_hash" = ${input.credentialHash},
+               "sessions_valid_from" = ${floorToSecond(input.now)},
                "account_status" = ${ACTIVE_ACCOUNT_STATUS}::"UserAccountStatus",
                "account_status_changed_at" = ${input.now},
                "account_status_changed_by" = NULL

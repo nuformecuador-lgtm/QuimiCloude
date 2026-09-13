@@ -222,12 +222,77 @@ if [ -f package.json ]; then
     # que encontrarse con que no hay reporte —y fallar— en vez de leer el de la corrida
     # anterior y dar verde sobre datos viejos.
     rm -f .vitest-rojos.json
-    # El `|| true` es imprescindible: sin el, `set -e` corta aqui y no se llega a comparar.
-    # Que la suite acabe roja ya no decide por si solo; lo decide el comparador.
-    pnpm run test:json || true
+    # EL INCIDENTE DEL 2026-09-13, que es por lo que las dos comprobaciones de abajo existen:
+    # `./init.sh` canto `== init OK ==` con la INTEGRACION ABORTADA EN EL ARRANQUE y CERO tests
+    # corridos. El `global setup` de integracion (`tests/integration/_global-setup.ts` ->
+    # `tests/helpers/test-database.ts`) murio construyendo la base de plantilla, vitest salio con
+    # codigo 1, y el gate lo dio por bueno porque el veredicto salia SOLO del JSON de rojos: un
+    # proyecto que no arranca no escribe rojos, luego era invisible. No simplifiques esto.
+    #
+    # El `|| true` de antes era imprescindible —sin el, `set -e` corta aqui y no se llega a
+    # comparar— pero tiraba el codigo de salida a la basura. Ahora se CAPTURA: sigue sin decidir
+    # por si solo (lo decide el comparador), pero deja de perderse.
+    ESTADO_TESTS=0
+    pnpm run test:json || ESTADO_TESTS=$?
     # stderr sale directo a la consola a proposito: asi el detalle esta de verdad "justo
     # arriba" y el mensaje de fallo no promete algo que no entrega.
     COMPARACION=$(node scripts/comparar-baseline-rojos.mjs .vitest-rojos.json) || fail "hay rojos NUEVOS respecto del baseline (el detalle esta justo arriba)"
+
+    # GARANTIA 1: LOS TRES PROYECTOS APARECEN EN EL INFORME. Es la comprobacion que nos habria
+    # salvado el 2026-09-13. Los nombres salen de `vitest.config.mts` (`ui`, `node`,
+    # `integration`) y el reparto es el mismo de ahi, por convencion de nombre y carpeta,
+    # porque el informe JSON de vitest NO trae el proyecto de cada archivo: solo su ruta.
+    # Si falta un proyecto ENTERO, no corrio, y el gate no puede afirmar nada sobre el.
+    LEER_PROYECTOS=$(cat <<'JS'
+const { readFileSync } = require('node:fs');
+const { relative, resolve } = require('node:path');
+const ESPERADOS = ['ui', 'node', 'integration'];
+const rutaInforme = process.argv[1];
+let informe;
+try {
+  informe = JSON.parse(readFileSync(rutaInforme, 'utf8'));
+} catch (err) {
+  console.log(`no se pudo leer el informe ${rutaInforme}: ${err.message}`);
+  process.exit(1);
+}
+const norm = (p) => relative(process.cwd(), resolve(p)).split('\\').join('/');
+const proyecto = (r) =>
+  r.endsWith('.test.tsx') || r.startsWith('tests/ui/')
+    ? 'ui'
+    : r.startsWith('tests/integration/')
+      ? 'integration'
+      : 'node';
+const vistos = new Set();
+for (const suite of informe.testResults ?? []) vistos.add(proyecto(norm(suite.name)));
+const faltan = ESPERADOS.filter((p) => !vistos.has(p));
+if (faltan.length > 0) {
+  console.log(`el informe no trae NI UN archivo del proyecto: ${faltan.join(', ')}.`);
+  console.log(`ese proyecto no llego a correr (global setup, config o un proceso caido), asi que el gate no puede afirmar nada sobre el.`);
+  process.exit(1);
+}
+console.log(`los tres proyectos corrieron (${ESPERADOS.join(', ')})`);
+JS
+)
+    PROYECTOS=$(node -e "$LEER_PROYECTOS" .vitest-rojos.json 2>&1) || fail "$PROYECTOS"
+    ok "$PROYECTOS"
+
+    # GARANTIA 2: CONTRADICCION = ROJO. `test:json` salio distinto de cero, el comparador no ve
+    # rojos nuevos y el informe NO TRAE NI UN ARCHIVO EN ROJO que explique ese codigo. Eso es
+    # contradictorio: algo fallo FUERA de los tests (arranque, global setup, configuracion, un
+    # proceso que se cayo). Ahi no se da verde.
+    #
+    # El disparador NO es "codigo distinto de cero y sin rojos NUEVOS" a secas, y la diferencia
+    # importa: con rojos HEREDADOS en el baseline (hoy son 8 archivos) la suite sana termina
+    # distinta de cero en cada corrida, asi que esa version pondria el gate rojo SIEMPRE y en
+    # dos dias se ignoraria. Lo contradictorio es que el informe no explique el codigo: si hay
+    # al menos un archivo en rojo, el codigo ya tiene duena y el baseline sigue mandando.
+    ROJOS_EN_INFORME=$(node -e "const {readFileSync} = require('node:fs'); const i = JSON.parse(readFileSync(process.argv[1], 'utf8')); console.log((i.testResults ?? []).filter((s) => s.status === 'failed').length)" .vitest-rojos.json 2>/dev/null || echo 0)
+    if [ "$ESTADO_TESTS" -ne 0 ] && [ "$ROJOS_EN_INFORME" -eq 0 ]; then
+      fail "contradiccion: 'pnpm run test:json' salio con codigo $ESTADO_TESTS y el informe no trae NI UN archivo en rojo.
+algo fallo FUERA de los tests (arranque, global setup, configuracion, un proceso caido); un fallo asi no escribe rojos y por eso era invisible.
+Que hacer: mira la salida de vitest de aqui arriba, arreglalo y vuelve a correr el gate."
+    fi
+
     ok "tests: $COMPARACION"
   fi
 fi

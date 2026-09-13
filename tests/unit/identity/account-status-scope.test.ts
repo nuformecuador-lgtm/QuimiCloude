@@ -319,6 +319,46 @@ const SITIOS_PERMITIDOS = [
   'lib/modules/identity/domain/list-work-group-members.ts',
   'lib/modules/identity/domain/work-group-queryable.ts',
   'lib/modules/identity/ports/work-group-repository.ts',
+
+  // ---------------------------------------------------------------------------------------
+  // QC-87 T3 — LOS DOS CONTRATOS CON LOS QUE OTRO MODULO PREGUNTA POR PERSONAS Y POR GRUPOS.
+  //
+  // Tres archivos mas, y por el mismo motivo que el bloque de QC-84: la lista se RETENSA
+  // NOMBRANDO LA EXCEPCION, no relajando la asercion.
+  //
+  // QUIEN LOS AUTORIZA: **QC-87 R21**, que manda decidir quien se asigna al aplicar un grupo
+  // con la MISMA definicion que decide quien aparece en la lista de miembros, y prohibe por
+  // escrito un `WHERE account_status = 'active'` a secas. Ninguno de los tres declara una
+  // segunda definicion del estado: el adaptador PASA POR `effectiveAccountStatus` -la unica de
+  // QC-78 R7- y los dos de `domain/` solo la nombran al explicar que significa `isActive`.
+  //
+  //   - `assignment-directory-prisma.ts` TRAE la columna y el plazo en su `select` y los
+  //     traduce con `effectiveAccountStatus(view, now)`, con el `now` que le pasan: no hay ni
+  //     un `if` sobre el valor de la columna, y no escribe el estado jamas.
+  //   - `people-directory.ts` y `work-group-directory.ts` lo nombran en la DOCUMENTACION de
+  //     `isActive` y de `activeMemberIds` -«estado EFECTIVO, no la columna»-, que es justo lo
+  //     que hay que decir para que nadie lo reimplemente. `MENCION_DEL_ESTADO` mira el archivo
+  //     entero y una excepcion nombrada es mas honesta que ensanchar el patron.
+  'lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma.ts',
+  'lib/modules/identity/domain/people-directory.ts',
+  'lib/modules/identity/domain/work-group-directory.ts',
+
+  // RETENSADO 2026-09-12 (QC-23, registro-de-sesiones). Mismo trato y mismo criterio que los
+  // bloques de QC-78, QC-66, QC-79, QC-67 y QC-84: la lista CRECE con lo que un spec aprobado
+  // autoriza, la comparacion sigue siendo una IGUALDAD y cualquier archivo fuera de ella sigue
+  // poniendo esto en rojo. Bloque ADITIVO al final: no se reordena ni se reformatea nada.
+  //
+  // QUIEN LO AUTORIZA: **QC-23 R33 y R36**, que mandan decidir QUE CAMBIO corta las sesiones
+  // vivas — `blocked` e `inactive` cortan, `pending` y `active` NO—. Esa decision es dominio puro
+  // y vive en UNA funcion (`changeRevokesSessions`), asi que el archivo nombra los cuatro valores
+  // del conjunto cerrado por fuerza: es la tabla del requisito escrita en codigo.
+  //
+  // Lo que NO hace, y por eso no ensancha nada: no declara una segunda definicion del conjunto
+  // —importa `UserAccountStatus` de `account-status.ts`, la unica de QC-65 R3—, no traduce
+  // «lo que dice la columna» a «lo que significa ahora» —eso sigue siendo `effectiveAccountStatus`
+  // de QC-78 R7, y QC-23 R37 dice expresamente que el corte INMEDIATO por estado no se duplica—,
+  // y no lee ni escribe la columna: quien la escribe sigue siendo `user-admin-prisma.ts`.
+  'lib/modules/identity/domain/session-revocation.ts',
 ] as const;
 
 /**

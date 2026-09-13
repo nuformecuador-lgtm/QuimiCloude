@@ -348,10 +348,21 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // NINGUN otro modulo, ninguna pantalla y ningun script toquen `orders`, y que dentro de
     // `pedidos` solo lo haga el driven- se vigila ahora mejor: cualquier segundo archivo, aqui
     // o en cualquier otra carpeta del repo, pone esto rojo.
-    const DUENO_DE_ORDERS = 'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts'
+    //
+    // RETENSADO 2026-09-13 (QC-87, T2). La lista nombrada pasa de UNO a DOS archivos, los dos
+    // en `adapters/driven/persistence/` de `pedidos`: el repositorio de QC-34 y el adaptador
+    // del contrato publico `OrderCatalog` (QC-87 R45), que existe precisamente para que
+    // `asignaciones` sepa el estado de un pedido SIN escribir `prisma.order`. Es decir: el
+    // segundo archivo esta aqui para que no aparezca un tercero fuera de `pedidos`. Lo que se
+    // sigue afirmando, y con la misma fuerza, es que NINGUN otro modulo, ninguna pantalla y
+    // ningun script tocan `orders`.
+    const DUENOS_DE_ORDERS = [
+      'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
+      'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts',
+    ]
     expect(todoElCodigo.length).toBeGreaterThan(0)
     expect(entradasReales).toHaveLength(todoElCodigo.length)
-    expect(nombresQueConsultan(entradasReales, 'order')).toEqual([DUENO_DE_ORDERS])
+    expect(nombresQueConsultan(entradasReales, 'order')).toEqual(DUENOS_DE_ORDERS)
 
     // Y la MISMA funcion, sobre los MISMOS archivos reales mas una entrada sintetica con una
     // consulta de verdad, devuelve exactamente esa entrada. Esto es lo que impide que la lista
@@ -362,7 +373,7 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       fuente: 'export async function x(prisma: unknown) { await prisma.order.findMany({}) }',
     }
     expect(nombresQueConsultan([...entradasReales, sintetico], 'order')).toEqual([
-      DUENO_DE_ORDERS,
+      ...DUENOS_DE_ORDERS,
       '<sintetico>',
     ])
 
@@ -373,7 +384,7 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       fuente: 'await db.order.create({ data })',
     }
     expect(nombresQueConsultan([...entradasReales, conOtroReceptor], 'order')).toEqual([
-      DUENO_DE_ORDERS,
+      ...DUENOS_DE_ORDERS,
       '<sintetico-db>',
     ])
   })
@@ -443,16 +454,29 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // solo dueno»: el dominio y los puertos siguen sin poder verlo -que es lo que los hace
     // testeables sin base-, y un segundo archivo del modulo que importe el cliente sigue
     // poniendo esto rojo.
+    //
+    // RETENSADO 2026-09-13 (QC-87, T2). Se separan las DOS cosas que antes decia una sola
+    // lista, porque han dejado de coincidir: `@prisma/client` -los tipos generados, el
+    // `Prisma.Decimal`, el `PrismaClientKnownRequestError`- lo sigue importando UN SOLO
+    // archivo, y el CLIENTE compartido lo importan DOS, los dos en `adapters/driven/`: el
+    // repositorio de QC-34 y el adaptador del contrato publico `OrderCatalog` (QC-87 R45). El
+    // dominio y los puertos siguen sin ver ninguno de los dos, que es lo que los hace
+    // testeables sin base, y cualquier archivo fuera de `adapters/` que importe el cliente
+    // sigue poniendo esto rojo.
     const DUENO_DE_PRISMA = 'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts'
+    const DUENOS_DEL_CLIENTE = [
+      'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
+      DUENO_DE_PRISMA,
+    ]
     expect(
       pedidosSources.filter((file) => /@prisma\/client/.test(read(file))).map(etiqueta),
     ).toEqual([DUENO_DE_PRISMA])
     expect(
       pedidosSources.filter((file) => /@\/lib\/shared\/(db|prisma)/.test(read(file))).map(etiqueta),
-    ).toEqual([DUENO_DE_PRISMA])
+    ).toEqual(DUENOS_DEL_CLIENTE)
     // Y ni el dominio ni los puertos lo ven, dicho aparte para que se lea como lo que es.
     for (const file of pedidosSources) {
-      if (etiqueta(file) === DUENO_DE_PRISMA) continue
+      if (DUENOS_DEL_CLIENTE.includes(etiqueta(file))) continue
       const source = read(file)
       expect(source, `${etiqueta(file)} importa @prisma/client`).not.toMatch(/@prisma\/client/)
       expect(source, `${etiqueta(file)} importa el cliente compartido`).not.toMatch(

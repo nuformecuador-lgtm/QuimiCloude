@@ -1,7 +1,16 @@
 {
   "_nota": "Censo de aislamiento de los archivos de tests/integration/** (QC-77, R18). Cada archivo *.int.test.ts declara COMO se aisla: 'transaccion' (transaccion interactiva que termina en ROLLBACK, con SAVEPOINT para lo que se espera que falle: el patron heredado de QC-4 y ampliado en QC-47) o 'commit' (escribe de verdad y se limpia el solo, o no escribe nada). Toda entrada de 'commit' necesita motivo y desde; sin eso el censo se vuelve el sitio donde se mete lo que estorba, que es la leccion escrita de tests/baseline-rojos.json. Rutas relativas a tests/integration/ y SIEMPRE con '/', para que el archivo sea identico en Windows y en Linux. Lo vigila tests/guards/guard-aislamiento-integracion.test.ts. Ver specs/QC-77-aislamiento-de-la-base-en-tests-de-integracion/design.md > 8.",
   "transaccion": [
+    "asignaciones/active-members-only.int.test.ts",
+    "asignaciones/atomicity.int.test.ts",
+    "asignaciones/company-scope.int.test.ts",
+    "asignaciones/frozen-name.int.test.ts",
+    "asignaciones/list-order-responsibles.int.test.ts",
+    "asignaciones/order-assignment-prisma.int.test.ts",
     "asignaciones/order-assignments-constraints.int.test.ts",
+    "asignaciones/reapply-work-group.int.test.ts",
+    "asignaciones/remove-work-group.int.test.ts",
+    "asignaciones/unassign.int.test.ts",
     "identity/identity-constraints.int.test.ts",
     "identity/identity-seed.int.test.ts",
     "identity/work-groups-constraints.int.test.ts",
@@ -22,6 +31,11 @@
   ],
   "commit": [
     {
+      "archivo": "identity/assignment-directory.int.test.ts",
+      "motivo": "QC-87 T3: ejercita el adaptador driven assignment-directory-prisma, que habla con el cliente Prisma GLOBAL y reutiliza listMembersAliveInCompany de QC-84, tambien global. Envolver esas llamadas en una transaccion del test seria un aislamiento de mentira -correrian en otra conexion del pool y no verian ni una fila del fixture-. Cada caso fabrica su empresa efimera (randomUUID) y la borra en un finally en el orden que respetan las FK; el afterAll afirma que no quedo ninguna. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-13"
+    },
+    {
       "archivo": "identity/credential-setup.int.test.ts",
       "motivo": "Nacido antes de QC-77 (QC-79 T20): ejercita los dos adaptadores Prisma del enlace de establecimiento de credencial, que hablan con el cliente GLOBAL, y afirma sobre el INDICE UNICO PARCIAL 'credential_setup_tokens_one_live_per_user' con intentos que necesitan ver filas confirmadas. Committea y limpia lo suyo; se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-12"
@@ -40,6 +54,16 @@
       "archivo": "identity/role-catalog.int.test.ts",
       "motivo": "Nacido antes de QC-77 (QC-94 T7). Caso aparte: NO ESCRIBE NADA -no crea, no edita, no borra ninguna fila-, asi que no hay nada que deshacer y no necesita transaccion. Solo LEE el catalogo global de roles, que cambia unicamente por migracion y seed; se apoya en que la base de la corrida trae ese seed.",
       "desde": "2026-09-12"
+    },
+    {
+      "archivo": "identity/session-revocation.int.test.ts",
+      "motivo": "Nacida con QC-77 ya en pie (QC-23 T21): ejercita el adaptador de produccion 'session-revocation-prisma.ts', cuyas DOS operaciones abren SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL -el cierre de un 'sid' con su purga perezosa dentro, y 'stampAll'-. Llamarlas desde dentro del callback de un '$transaction' del test seria aislamiento de mentira: correrian en otra conexion del pool y se quedarian esperando un bloqueo que tiene el propio test. Ademas necesita ver filas CONFIRMADAS para afirmar sobre el indice unico 'revoked_sessions_session_id_key' (el 23505 traducido a exito, R12). Construccion propia con randomUUID() y limpieza por caso en un 'finally', en el unico orden que respetan las FK: primero 'revoked_sessions' -porque 'revoked_sessions_user_id_fkey' es ON DELETE RESTRICT-, despues los enlaces de QC-79, despues 'account_status_changed_by', despues los usuarios y solo entonces la empresa. El afterAll comprueba que no quedo ninguna.",
+      "desde": "2026-09-13"
+    },
+    {
+      "archivo": "identity/session-stamp-writes.int.test.ts",
+      "motivo": "Nacida con QC-77 ya en pie (QC-23 T14/T15): ejercita las transacciones con bloqueo de 'user-admin-prisma.ts' ('applyGuardedChange' con su 'SELECT ... FOR UPDATE' de ultimo administrador, y 'updateAliveInCompany') y el '$executeRaw' de 'applyCredentialAndActivate' en 'credential-setup-link-prisma.ts'. Los tres abren su PROPIA transaccion contra el cliente global, asi que el '$transaction' del test no los envolveria y ademas chocaria contra su bloqueo. Y lo que aqui se mide es precisamente que la escritura CONFIRMO o REVIRTIO entera -R38 se prueba por su lado dificil: cuando la transaccion aborta por 'last_administrator', el sello no cambio-, que es incompatible por construccion con una transaccion del test que se deshace. Construccion propia con randomUUID() y limpieza por caso en un 'finally' (enlaces -> 'account_status_changed_by' -> usuarios -> empresa, por los ON DELETE RESTRICT); el afterAll comprueba que no quedo ninguna.",
+      "desde": "2026-09-13"
     },
     {
       "archivo": "identity/session-user.int.test.ts",
