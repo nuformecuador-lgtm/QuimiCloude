@@ -1307,7 +1307,7 @@
       "epic_name": "Pedidos",
       "name": "asignar-responsables-a-un-pedido",
       "description": "Desde la pantalla de pedidos, el Administrador asigna quien prepara cada pedido: marca personas sueltas, elige uno o varios grupos de trabajo, o mezcla las dos cosas. Y puede desasignar. El listado de pedidos y el detalle muestran a los responsables como un grupo de avatares. Cuando la asignacion vino de un grupo de trabajo, se muestra el NOMBRE DEL GRUPO junto a los avatares de sus personas, no solo las caras sueltas: quien mira el tablero tiene que poder distinguir \"Turno noche\" de cinco personas elegidas a mano. Un pedido cancelado no admite asignacion nueva. Que pasa con la asignacion de un pedido ya entregado se decide al acotar. Reutiliza la tabla de datos compartida (QC-55) y la pantalla de pedidos de QC-35, que no se rehace. Lo que NO entra: la tabla de asignacion (QC-86), que esta ficha consume. El listado del Operador va en QC-88. Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",

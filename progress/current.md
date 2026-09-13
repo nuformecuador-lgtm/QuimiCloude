@@ -11,12 +11,11 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
-| QC-87 | asignar-responsables-a-un-pedido | Pedidos | backend | in_progress | feature/QC-87-asignar-responsables-a-un-pedido | **Acotada el 2026-09-12** (ver *Evaluaciones*): 12 decisiones cerradas, cero preguntas abiertas, y **cierra las TRES preguntas que venian arrastrandose** de QC-86 y QC-85. **F1.0 hecho, con particion**: era `fullstack` y se partio en **backend (esta) + frontend (QC-102)**, con el issue creado, enlazado «is blocked by» y las dos descripciones reescritas para que ninguna mienta. `complexity: medium`, worktree montado desde `origin/dev`. `spec_author` entrego **R1-R51** y **15 tasks**, con la semilla **verificada intacta**. Las 12 decisiones mapeadas -las de pantalla al requisito de **limite R50**- y **cinco hallazgos en `design.md > 0`** sin tocar ninguna. Tarjeta a *En revision* (F1.3). **TRES preguntas abiertas, cada una con el requisito que cae si se decide lo contrario**: si se puede asignar suelta a una cuenta no `active` (hoy R18 lo rechaza), si un `CANCELADO` admite desasignar (hoy R11 lo trata como el entregado) y si «quitar un grupo» es de esta mitad o de QC-102 (hoy R32-R34). **Spec APROBADO por el humano el 2026-09-12** (F1.4), y las **tres preguntas abiertas quedan ABIERTAS** con su respuesta por defecto ya escrita como requisito (R18, R11 y R32-R34). **PERO LA IMPLEMENTACION NO ARRANCA, y esta medido**: `backend` tiene **3 `in_progress`** -QC-23 y QC-77, de sesiones paralelas, mas esta- y el tope son **2**. Ademas **QC-77 esta reescribiendo el aislamiento de la base en los tests de integracion**, que es exactamente donde QC-87 va a escribir los suyos: es el choque de archivos que la regla existe para evitar, el mismo trato que QC-83 frente a QC-65. Decision humana: **espera a que QC-23 o QC-77 pase a `done`**. Tarjeta devuelta a *En revision* para que el board no diga que hay trabajo en curso que no lo hay. Worktree montado y spec listo: **DESBLOQUEADA el 2026-09-13**: QC-77 se mergeo en `dev` (PR #65), asi que el motivo real de la espera -que reescribia el aislamiento de la base bajo los tests de integracion- **desaparecio**: QC-87 escribe encima de la forma nueva en vez de sobre algo que se movia. Su ficha sigue `in_progress` en el JSON porque **esa sesion no ha corrido su F2.5**; verificado que el PR esta mergeado. `implementer` en curso (F2.1), con el encargo de **fusionar `dev` ANTES de escribir un solo test de integracion** |
-| QC-102 | responsables-en-la-pantalla-de-pedidos | Pedidos | frontend | pending | feature/QC-102-responsables-en-la-pantalla-de-pedidos | **Nacida el 2026-09-12 al partir QC-87** en F1.0. El panel lateral de responsables, los avatares con el nombre del grupo y **el E2E del recorrido completo**. `depends_on: QC-87`: **no arranca hasta que la mitad backend este `done`**. Sin `complexity` todavia; las decisiones cerradas de las dos mitades viven en la semilla de QC-87. La primitiva `avatar` **ya existe**, verificado en disco, asi que no hay que invocar la CLI de shadcn |
+| QC-102 | responsables-en-la-pantalla-de-pedidos | Pedidos | frontend | pending | feature/QC-102-responsables-en-la-pantalla-de-pedidos | **Nacida el 2026-09-12 al partir QC-87** en F1.0. El panel lateral de responsables, los avatares con el nombre del grupo y **el E2E del recorrido completo**. `depends_on: QC-87`: **DESBLOQUEADA el 2026-09-13**, la mitad backend se mergeo en `dev` (PR #67) y esta `done`. Lista para F1.0. Sin `complexity` todavia; las decisiones cerradas de las dos mitades viven en la semilla de QC-87. La primitiva `avatar` **ya existe**, verificado en disco, asi que no hay que invocar la CLI de shadcn |
 | QC-63 | ejecutar-receta-operador | Recetas | fullstack | pending | feature/QC-63-ejecutar-receta-operador | **Acotada con `/afinar-feature` el 2026-09-08 y BLOQUEADA**: la acotación destapó que el Operador entra por **pedidos asignados**, no por recetas, y creó seis fichas (QC-83…QC-88). `depends_on: QC-62, QC-64, QC-88`. No arranca; worktree desmontado |
 | QC-81 | lote-y-fecha-de-compra | Inventario | backend | pending | feature/QC-81-lote-y-fecha-de-compra | **Nacida del chat el 2026-09-08**, creada en el board y enlazada «is blocked by QC-49». `complexity: medium`. **DESBLOQUEADA el 2026-09-12**: QC-49 cerro y `products.company_id` ya esta en `dev`, asi que la unicidad de `lote` por empresa es construible. Lista para F1.0 |
 | QC-82 | registro-de-ejecucion-de-receta | Recetas | backend | pending | feature/QC-82-registro-de-ejecucion-de-receta | **Nacida del chat el 2026-09-08** y creada en el board (QC-27), enlazada «relates to QC-63». `complexity: medium`, sin dependencias. **Pendiente F1.0 y F1.2**: ampliada el 2026-09-08 con `canceled` en el enum y un `reason` anulable; cerrado que cancelar sin motivo no se puede; quedan SEIS preguntas abiertas -entre ellas si el motivo vale fuera de la cancelacion, que se guarda en el paso y que significa «el tiempo»-, asi que toca `/afinar-feature` antes del `spec_author` |
-| QC-23 | registro-de-sesiones | Identidad y acceso | backend | pending | feature/QC-23-registro-de-sesiones | **RE-ACOTADA el 2026-09-12** con `/afinar-feature`, tras descubrir en F1.4 que su spec era del 2026-09-03 y no mencionaba QC-65, QC-66, QC-67, QC-70, QC-71, QC-78 ni QC-79. Las **25 decisiones cerradas** y las **cero preguntas abiertas** viven en `specs/QC-23-registro-de-sesiones/requirements.md`; no se copian aqui. `complexity: high` reevaluada. **Rama REHECHA desde `origin/dev`** por decision humana —no mergeada—, con el spec viejo conservado en la etiqueta `spec-descartado/QC-23-2026-09-03`. Worktree con **base propia `QuimiCloude_QC23`**, 27 migraciones y seed. **Siguiente paso: `spec_author` (F1.2)** |
+| QC-23 | registro-de-sesiones | Identidad y acceso | backend | pending | feature/QC-23-registro-de-sesiones | **RE-ACOTADA el 2026-09-12** con `/afinar-feature`, tras descubrir en F1.4 que su spec era del 2026-09-03 y no mencionaba QC-65, QC-66, QC-67, QC-70, QC-71, QC-78 ni QC-79. Las **25 decisiones cerradas** y las **cero preguntas abiertas** viven en `specs/QC-23-registro-de-sesiones/requirements.md`; no se copian aqui. `complexity: high` reevaluada. **Rama REHECHA desde `origin/dev`** por decision humana —no mergeada—, con el spec viejo conservado en la etiqueta `spec-descartado/QC-23-2026-09-03`. Worktree con **base propia `QuimiCloude_QC23`**, 27 migraciones y seed. **Esa linea estaba CONGELADA en el 2026-09-12 y era falsa: la feature esta a un merge de cerrar.** Estado real verificado en disco el 2026-09-13: `spec_author` entrego **R1-R51** y **24 tasks, las 24 marcadas**; `implementer` cerro F2.1 con 7 commits propios; **F2.2 APROBADO por el `reviewer`** en segunda ronda -la primera fue RECHAZADO por 1 mayor, ya corregido-, queda solo un menor 8 de documentacion de cabecera que se puede cerrar al paso en QC-89; **F2.3 hecho** (`origin/dev` mergeado, 15 commits con QC-77 dentro, y el centinela de QC-85 resuelto a favor de `dev`). **F2.4 CERRADO el 2026-09-13**: se committeo la tanda que quedaba suelta -el arreglo del arranque caido de integracion en `tests/helpers/test-database.ts`, las DOS garantias nuevas de `init.sh` y las dos entradas nuevas del censo `aislamiento.json`- y el gate completo dio **`== init OK ==`, exit 0: 419 archivos, 6028 verdes, 66 saltados y CERO rojos**, ni siquiera los 8 heredados. **PR #66 abierto** hacia `dev` (https://github.com/singularis-co/QuimiCloude/pull/66). **Ya existia de una pasada anterior**, asi que no se abrio otro: se le reescribio el cuerpo con las cifras de esta corrida y la seccion del arreglo del gate, y se conservo su titulo. **Siguiente paso: F2.5, que espera a que el humano mergee el PR** |
 
 ## Evaluaciones
 
@@ -30,27 +29,6 @@ Alcance, **10 decisiones cerradas** y **cero preguntas abiertas** en
 real son **23 fallos** en trece suites sobre base limpia. Ninguna ficha nueva y ninguna cancelada:
 QC-93 **absorbe** el hallazgo de los 23 que reporto la sesion de QC-85 y que no tenia ficha. Sigue
 `pending` en Backlog.
-
-### QC-87 - acotada con `/afinar-feature` (2026-09-12)
-
-Alcance, **12 decisiones cerradas** y **cero preguntas abiertas** en
-`specs/QC-87-asignar-responsables-a-un-pedido/requirements.md`. No se copian aqui.
-
-**Esta acotacion CIERRA LAS TRES preguntas abiertas que venian arrastrandose**, y ese es su
-valor principal: las dos que dejo **QC-86** -que estados admiten asignacion, y que pasa al
-reaplicar un grupo- y la que **QC-85** dejo escrita expresamente para esta ficha -si se asigna a
-cuentas no activas-. Las tres estaban escritas, ninguna se redescubrio implementando.
-
-**El board se corrigio antes de sembrar**: su `description` decia que lo del pedido entregado
-«se decide al acotar». Ahora dice la decision: **ENTREGADO congela la asignacion y CANCELADO no
-admite asignacion nueva; solo se asigna sobre PENDIENTE y EN_CURSO**. Los otros tres campos
-seguian diciendo la verdad y las dos fichas del «Lo que NO entra» (QC-86, QC-88) existen.
-
-**Sigue siendo `fullstack`: se parte en backend + frontend en F1.0**, no aqui.
-
-**Y se verifico en disco lo que en QC-85 costo una parada**: la primitiva `avatar` **ya existe**
-en `components/ui/`, asi que no hay que invocar la CLI de shadcn ni arriesgar otra dependencia
-arrastrada como `cn@0.3.0`.
 
 ### QC-23 — re-acotada con `/afinar-feature` (2026-09-12) y F1.0 rehecho
 
@@ -114,6 +92,23 @@ porque es validacion de entrada y no una regla nueva de dominio.
 
 ## Deudas y cosas abiertas
 
+### Ocho archivos del baseline de rojos YA PASAN (2026-09-13)
+
+El `./init.sh` completo de QC-87 avisa: `8 archivo(s) del baseline ya pasan; toca limpiarlos`
+—`inventario/product-crud.int.test.ts`, los cuatro de convenciones de `configuracion-ui`,
+`navegacion/qc75-convenciones.test.ts`, `recetas-ui/recipe-route-contract.test.ts`,
+`recetas/module-contract.test.ts` y los dos de `unidades`—. **No es de QC-87 y no se toco ahi**:
+sacar archivos del baseline es decision del humano. Probablemente los arreglo el aislamiento por
+corrida de QC-77, que ahora crea y borra una base por ejecucion.
+
+### Un pedido de OTRA empresa es distinguible por el codigo del rechazo (2026-09-13)
+
+Hallazgo menor de la review de QC-87, **no bloqueante y declarado por escrito antes de
+implementar** (`design.md > 0`, hallazgo 4): `findAliveOrderTargetById` busca el pedido **sin
+`companyId`**, asi que un actor puede distinguir un `ENTREGADO` ajeno por el `code` del error. La
+causa es que **`orders` no tiene `company_id` todavia**; se cierra en **QC-46**. Anotado para que
+no se pierda al cerrar la feature.
+
 ### El gate de `dev` queda en rojo por la BASE COMPARTIDA, no por `dev` (2026-09-12)
 
 Al cerrar QC-49 y QC-79 el leader corrió `./init.sh` completo sobre `dev` y salió **rojo con 22
@@ -142,3 +137,23 @@ Dos cosas que esto deja escritas y que no se tocan sin decisión humana:
    entorno nuevo es migrar → `pnpm run db:seed` → `prisma migrate resolve --rolled-back
    20260911130000_inventory_company_scope` → migrar. Está bien que falle cerrado; lo que no está
    escrito en ningún sitio es la receta.
+
+### El baseline de rojos tiene 8 archivos que hoy pasan TODOS (2026-09-13)
+
+El `./init.sh` completo de QC-23 (F2.4, sobre su base propia `QuimiCloude_QC23`) salio con
+**419 archivos, 6028 verdes, 66 saltados y CERO rojos**, y el propio gate reporta los 8 del
+baseline como **«8 por limpiar»**. Entre ellos `tests/unit/configuracion-ui/unidades-convenciones.test.ts`,
+que entro por `resend` de QC-79.
+
+Un baseline que perdona archivos que ya no fallan es un permiso abierto: el dia que uno de esos 8
+se rompa de verdad, el gate no lo dira. **No se limpia desde aqui** —es material de QC-99 y no de
+QC-23, que no toca ninguno de los 8—, pero queda medido y con fecha.
+
+### El gate dice «max-2-por-zona respetada» con `in_progress=3` (2026-09-13)
+
+En la misma corrida, `scripts/validate-features.mjs` imprimio
+`regla max-2-por-zona respetada (in_progress=3)`. Las tres son **QC-23 y QC-87 en `backend`** mas
+la de la sesion paralela; el mensaje suma el total global en vez de decir el conteo **por zona**,
+asi que tranquiliza y no informa. No es un falso verde de la regla —el reparto por zona se sigue
+cumpliendo—, es el **mensaje** el que no permite comprobarlo de un vistazo. Arreglo de una linea,
+pero es el arnes: entra por `/afinar-regla`, no en caliente.

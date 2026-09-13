@@ -3407,3 +3407,53 @@ QC-67, ahora entre dos sesiones en vez de entre dos fichas.
   QC-77 ni de QC-87, y no tiene ficha.**
 - **`wt.sh done` volvió a fallar en Windows**, y el patrón del centinela que mide a quién no debe
   sigue **sin un sitio donde esté escrito una sola vez**. Los dos son candidatos a ficha del arnés.
+
+---
+
+## QC-87 — asignar-responsables-a-un-pedido (mitad backend) · 2026-09-13
+
+**PR #67**, mergeada en `dev` (`f1b3414`). `complexity: medium`, zona `backend`. Ciclo SDD completo:
+spec aprobado el 2026-09-12, 15 tareas, R1–R51, review con **0 hallazgos mayores** y `./init.sh`
+completo en verde antes del PR (428 archivos, 6095 tests, 0 rojos nuevos).
+
+Entra el módulo `asignaciones`: cuatro casos de uso —asignar, desasignar a una persona, quitar un
+grupo del pedido y listar responsables—, el puerto, su adaptador Prisma, tres Server Actions y el
+cableado. La asignación **se congela**: al elegir un grupo, el pedido guarda las personas que ese
+grupo tenía **en ese momento**, con su origen y el nombre del grupo, así que mover a alguien de
+grupo mañana no le quita un pedido que ya estaba ejecutando.
+
+### La ficha esperó por un motivo, y el motivo caducó
+
+Llegó a F2.0 aprobada y **no arrancó**: `backend` tenía tres `in_progress` con tope de dos, y sobre
+todo **QC-77 estaba reescribiendo el aislamiento de la base bajo los tests de integración**, que es
+exactamente donde QC-87 iba a escribir los suyos. La espera no fue burocracia: al mergear QC-77, esta
+ficha escribió sobre la forma nueva en vez de sobre algo que se movía, y de paso **retiró la
+relajación del invariante «el catálogo arranca solo con CC»** que la base compartida había obligado a
+aceptar. Esa retirada estaba escrita en el historial de QC-77 con nombre y dueño, y se cumplió.
+
+### El hallazgo que justifica el criterio de mutación
+
+Durante la implementación se coló a HEAD un `deleteOne` con el `where` **sin `userId`**: desasignar a
+*una* persona habría borrado a **todos** los responsables del pedido. No lo encontró una revisión de
+código: lo cazaron los tests de integración de T14, y quedó corregido en `52fc99b`. Entró por un
+`git add` de ruta amplia mientras un subagente mutaba archivos — **lección operativa: no hacer
+`git add lib/` con subagentes trabajando**.
+
+Además, **R38 estaba documentado pero no implementado**: el desempate por `userId` vivía en el
+comentario del comparador y no en el código, así que el orden no era total y dos homónimas salían
+según el orden de llegada de las filas. Y el **centinela de QC-86 no vigilaba nada** en los
+comentarios `//`: su `stripComments` usaba `/\/\/.*$/`, y sin bandera `m` —y con `.` sin casar `\r`—
+en un repo con CRLF no borraba ningún comentario de línea.
+
+### Deuda que deja, con nombre y dueño
+
+- **Un pedido de otra empresa es distinguible por el `code` del rechazo**: `findAliveOrderTargetById`
+  busca sin `companyId` porque **`orders` no tiene `company_id` todavía**. Declarado por escrito en
+  `design.md > 0` **antes** de implementar y diferido a **QC-46**. No es un descubrimiento tardío.
+- **Los 8 archivos del baseline que ya pasan** siguen sin ficha y sin retirar. El aviso del gate va
+  por su tercera ficha consecutiva.
+- **`wt.sh done` volvió a fallar en Windows**, por segunda vez seguida: desregistró el worktree pero
+  dejó `node_modules` sin borrar. Se limpió a mano más `git worktree prune`. Ya era candidato a ficha
+  del arnés; ahora tiene dos ocurrencias medidas.
+
+**QC-102** (la mitad de pantalla) queda **desbloqueada**.
