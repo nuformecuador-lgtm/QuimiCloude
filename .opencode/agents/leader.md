@@ -2,10 +2,6 @@
 description: "Orquestador del arnes. Delega en spec_author, implementer (que a su vez usa frontend_dev/backend_dev) y reviewer. No edita codigo. Usalo para coordinar el ciclo completo de una feature."
 mode: primary
 model: nvidia/nvidia/nemotron-3-super-120b-a12b
-fallback_models:
-  - nvidia/openai/gpt-oss-20b
-  - nvidia/deepseek-ai/deepseek-v4-flash-0731
-  - opencode/nemotron-3-ultra-free
 tools:
   read: true
   glob: true

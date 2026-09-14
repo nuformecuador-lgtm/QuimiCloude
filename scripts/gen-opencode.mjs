@@ -181,9 +181,12 @@ function agente(archivo) {
     '---',
     `description: ${yamlValor(meta.description)}`,
     `mode: ${MODO[nombre] || 'subagent'}`,
+    // Solo `model`. `fallback_models` NO puede ir aqui: opencode 1.18.30 filtra el frontmatter
+    // del agente a la peticion del modelo, y NVIDIA la rechaza con
+    // `400 Validation: Unsupported parameter(s): fallback_models`. El arnes no arrancaba. Lo
+    // mismo pasa declarandolo en el bloque `agent` de opencode.json. La cadena vive en
+    // `.opencode/opencode-fallback.jsonc`, que es del plugin y no viaja a la API.
     `model: ${cadena[0]}`,
-    'fallback_models:',
-    ...cadena.slice(1).map((m) => `  - ${m}`),
     'tools:',
     // Las omitidas se apagan EXPLICITAMENTE. Callarlas dejaria que el default de opencode le
     // devuelva `bash` al reviewer, que en Claude Code no lo tiene.
@@ -269,11 +272,10 @@ const comandos = emitir('.claude/commands', '.opencode/commands', comando);
 // en dos sitios seria la receta para que diverjan, asi que sale del mismo MODELOS que el resto.
 const rutaConfig = join(RAIZ, 'opencode.json');
 const config = JSON.parse(readFileSync(rutaConfig, 'utf8'));
+// Solo el primario por agente. La cadena de respaldo es GLOBAL y vive en el config del plugin;
+// ponerla aqui rompe el arranque igual que en el frontmatter (ver la nota de `agente()`).
 config.agent = Object.fromEntries(
-  Object.entries(MODELOS).map(([nombre, cadena]) => [
-    nombre,
-    { model: cadena[0], fallback_models: cadena.slice(1) },
-  ]),
+  Object.entries(MODELOS).map(([nombre, cadena]) => [nombre, { model: cadena[0] }]),
 );
 
 // `provider.nvidia.models` tambien se emite desde la misma tabla, y no es cosmetico.
@@ -292,6 +294,40 @@ config.provider.nvidia.models = Object.fromEntries(
   }),
 );
 escribir(rutaConfig, `${JSON.stringify(config, null, 2)}\n`);
+
+// La cadena de respaldo, global, dentro del config del plugin. Se emite desde la misma tabla
+// MODELOS que los primarios, reemplazando SOLO el array para no perder los comentarios del
+// archivo. El orden sale de cuantos agentes usan cada modelo como primario: primero el mas
+// usado, y los de Zen al final.
+const frecuencia = new Map();
+for (const cadena of Object.values(MODELOS)) {
+  for (const [i, m] of cadena.entries()) frecuencia.set(m, (frecuencia.get(m) || 0) + (i === 0 ? 10 : 1));
+}
+//
+// Los modelos de Zen quedan FUERA de la cadena, y no es un descuido. Un eslabon sin credencial
+// no es un respaldo: es donde muere la corrida. Con `opencode/big-pickle` al final, la primera
+// prueba real termino asi -del log del plugin-:
+//
+//   model: opencode/big-pickle  errorName: MessageAbortedError
+//   error not retryable and not in fallback chain, skipping
+//
+// ...y el `task` al subagente quedo en "Task cancelled". `opencode auth list` mostraba
+// credenciales de Nvidia y MiniMax, ninguna de Zen. Si algun dia se hace `/connect`, se añade
+// el modelo de Zen aqui a mano y se comprueba que la corrida sobrevive a llegar hasta el.
+const CADENA_GLOBAL = [...frecuencia.keys()]
+  .filter((m) => !m.startsWith('opencode/'))
+  .sort((a, b) => frecuencia.get(b) - frecuencia.get(a) || a.localeCompare(b));
+
+const rutaPlugin = join(RAIZ, '.opencode', 'opencode-fallback.jsonc');
+if (existsSync(rutaPlugin)) {
+  const texto = readFileSync(rutaPlugin, 'utf8');
+  const array = `"fallback_models": [\n${CADENA_GLOBAL.map((m) => `    "${m}"`).join(',\n')}\n  ]`;
+  const nuevo = texto.replace(/"fallback_models":\s*\[[^\]]*\]/, array);
+  if (nuevo === texto && !texto.includes('"fallback_models"')) {
+    throw new Error('.opencode/opencode-fallback.jsonc: falta la clave `fallback_models` que emitir');
+  }
+  escribir(rutaPlugin, nuevo);
+}
 
 if (CHECK) {
   if (desfasados.length > 0 || huerfanos.length > 0) {

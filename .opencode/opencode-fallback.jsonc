@@ -19,6 +19,12 @@
 
   "max_fallback_attempts": 10,
 
+  "fallback_models": [
+    "nvidia/deepseek-ai/deepseek-v4-flash-0731",
+    "nvidia/nvidia/nemotron-3-super-120b-a12b",
+    "nvidia/openai/gpt-oss-20b"
+  ],
+
   "retry_on_errors": [429, 500, 502, 503, 504],
 
   // `model not found` es la forma que toma una retirada de modelo, que es justo el caso que

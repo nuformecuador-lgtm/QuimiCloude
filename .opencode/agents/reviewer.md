@@ -2,10 +2,6 @@
 description: "Revisa una feature implementada contra su spec, docs/ y CHECKPOINTS.md. Verifica trazabilidad R<n>->test. No edita codigo; trata los hallazgos mayores como bloqueantes. Usalo despues del implementer."
 mode: subagent
 model: nvidia/nvidia/nemotron-3-super-120b-a12b
-fallback_models:
-  - nvidia/openai/gpt-oss-20b
-  - nvidia/deepseek-ai/deepseek-v4-flash-0731
-  - opencode/nemotron-3-ultra-free
 tools:
   read: true
   glob: true

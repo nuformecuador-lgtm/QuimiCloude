@@ -2,10 +2,6 @@
 description: "Implementa controllers, services, repositories, migraciones Prisma, RLS en Supabase, Server Actions y tests unitarios/integracion. No toca UI."
 mode: subagent
 model: nvidia/deepseek-ai/deepseek-v4-flash-0731
-fallback_models:
-  - nvidia/nvidia/nemotron-3-super-120b-a12b
-  - nvidia/openai/gpt-oss-20b
-  - opencode/big-pickle
 tools:
   read: true
   glob: true

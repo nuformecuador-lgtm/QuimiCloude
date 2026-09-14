@@ -76,60 +76,25 @@
   },
   "agent": {
     "leader": {
-      "model": "nvidia/nvidia/nemotron-3-super-120b-a12b",
-      "fallback_models": [
-        "nvidia/openai/gpt-oss-20b",
-        "nvidia/deepseek-ai/deepseek-v4-flash-0731",
-        "opencode/nemotron-3-ultra-free"
-      ]
+      "model": "nvidia/nvidia/nemotron-3-super-120b-a12b"
     },
     "spec_author": {
-      "model": "nvidia/deepseek-ai/deepseek-v4-flash-0731",
-      "fallback_models": [
-        "nvidia/nvidia/nemotron-3-super-120b-a12b",
-        "nvidia/openai/gpt-oss-20b",
-        "opencode/big-pickle"
-      ]
+      "model": "nvidia/deepseek-ai/deepseek-v4-flash-0731"
     },
     "implementer": {
-      "model": "nvidia/deepseek-ai/deepseek-v4-flash-0731",
-      "fallback_models": [
-        "nvidia/nvidia/nemotron-3-super-120b-a12b",
-        "nvidia/openai/gpt-oss-20b",
-        "opencode/big-pickle"
-      ]
+      "model": "nvidia/deepseek-ai/deepseek-v4-flash-0731"
     },
     "frontend_dev": {
-      "model": "nvidia/deepseek-ai/deepseek-v4-flash-0731",
-      "fallback_models": [
-        "nvidia/nvidia/nemotron-3-super-120b-a12b",
-        "nvidia/openai/gpt-oss-20b",
-        "opencode/big-pickle"
-      ]
+      "model": "nvidia/deepseek-ai/deepseek-v4-flash-0731"
     },
     "backend_dev": {
-      "model": "nvidia/deepseek-ai/deepseek-v4-flash-0731",
-      "fallback_models": [
-        "nvidia/nvidia/nemotron-3-super-120b-a12b",
-        "nvidia/openai/gpt-oss-20b",
-        "opencode/big-pickle"
-      ]
+      "model": "nvidia/deepseek-ai/deepseek-v4-flash-0731"
     },
     "reviewer": {
-      "model": "nvidia/nvidia/nemotron-3-super-120b-a12b",
-      "fallback_models": [
-        "nvidia/openai/gpt-oss-20b",
-        "nvidia/deepseek-ai/deepseek-v4-flash-0731",
-        "opencode/nemotron-3-ultra-free"
-      ]
+      "model": "nvidia/nvidia/nemotron-3-super-120b-a12b"
     },
     "extractor": {
-      "model": "nvidia/nvidia/nemotron-3-super-120b-a12b",
-      "fallback_models": [
-        "nvidia/openai/gpt-oss-20b",
-        "nvidia/deepseek-ai/deepseek-v4-flash-0731",
-        "opencode/mimo-v2.5-free"
-      ]
+      "model": "nvidia/nvidia/nemotron-3-super-120b-a12b"
     }
   }
 }

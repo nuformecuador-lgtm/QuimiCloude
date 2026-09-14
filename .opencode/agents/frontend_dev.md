@@ -2,10 +2,6 @@
 description: "Implementa componentes, paginas, hooks y layouts con shadcn/ui, Tailwind CSS, SWR y Server Components de Next.js. No toca backend, DB ni APIs."
 mode: subagent
 model: nvidia/deepseek-ai/deepseek-v4-flash-0731
-fallback_models:
-  - nvidia/nvidia/nemotron-3-super-120b-a12b
-  - nvidia/openai/gpt-oss-20b
-  - opencode/big-pickle
 tools:
   read: true
   glob: true
