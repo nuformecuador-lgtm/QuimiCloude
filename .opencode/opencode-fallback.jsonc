@@ -12,9 +12,10 @@
 // pasa a menudo en la capa gratuita- corta el turno en vez de saltar al siguiente modelo.
 //
 {
-  // Respaldo de modelo en caliente. Las cadenas por agente NO viven aqui: viven en el
-  // frontmatter de cada `.opencode/agents/*.md` (`fallback_models`), que a su vez sale de
-  // `scripts/gen-opencode.mjs`. Este archivo solo fija el comportamiento comun.
+  // Respaldo de modelo en caliente. La cadena es GLOBAL y vive aqui abajo, en `fallback_models`,
+  // emitida por `scripts/gen-opencode.mjs`. NO puede ir en el frontmatter de los agentes ni en el
+  // bloque `agent` de opencode.json: opencode filtra esas claves a la peticion del modelo y NVIDIA
+  // la rechaza con 400, dejando el arnes sin arrancar.
   "enabled": true,
 
   // El toast es util cuando hay alguien mirando la TUI, y este arnes esta pensado para correr

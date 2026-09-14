@@ -59,10 +59,13 @@ amplio, la regla 7 del arnés —ninguna dependencia entra sin aprobación human
 
 ## El enrutado de modelos
 
-Cada agente lleva primario + tres respaldos. Los tres primeros son de NVIDIA; el último es un
-modelo gratuito de opencode Zen, para que el arnés siga en pie cuando la cuenta de NVIDIA entera
-esté en 429 — el techo de ritmo parece ser de cuenta, no por modelo, así que una cadena que no
-salga de NVIDIA no protege del fallo más probable.
+Cada agente fija su **primario** en el bloque `agent` de `opencode.json`. La cadena de respaldo
+**no es por agente: es global**, y vive en `.opencode/opencode-fallback.jsonc`. Las dos salen de
+la misma tabla `MODELOS` de `scripts/gen-opencode.mjs`.
+
+Que sea global no fue una preferencia: `fallback_models` en el frontmatter de un agente —o en el
+bloque `agent`— hace que opencode filtre esa clave a la petición del modelo, y NVIDIA la rechaza
+con `400 Validation: Unsupported parameter(s)`. El arnés no arrancaba.
 
 | Agente | Primario | Por qué |
 | --- | --- | --- |
@@ -83,54 +86,53 @@ El reparto está elegido por capacidad **dentro de los que responden en segundos
 anterior lo eligió sólo por capacidad, y sus primarios tardaban entre 85 y 124 segundos por
 turno.
 
-## Credenciales: dos, no seis
+## Credenciales: una
 
-Las keys son **por proveedor, no por modelo**. Los seis modelos que usa el arnés se cubren con
-dos credenciales, porque cada proveedor sirve todos los suyos por el mismo endpoint:
+El arnés usa tres modelos y **una sola credencial**:
 
 | Credencial | Cubre | Dónde se saca |
 | --- | --- | --- |
 | `NVIDIA_API_KEY` | `nemotron-3-super-120b-a12b`, `deepseek-v4-flash-0731`, `gpt-oss-20b` | https://build.nvidia.com |
-| La sesión de opencode (`/connect`) | `big-pickle`, `nemotron-3-ultra-free`, `mimo-v2.5-free` | https://opencode.ai/auth |
 
-Los modelos de NVIDIA —primarios y de respaldo— entran por **la misma** key, porque los
-sirve el mismo endpoint (`integrate.api.nvidia.com/v1`). Lo mismo con los tres de Zen. Añadir un
-modelo a una cadena de respaldo **no** añade una credencial mientras sea del mismo proveedor.
+**Una sola credencial, para los tres modelos.** Las keys son por *proveedor*, no por modelo: los
+sirve el mismo endpoint (`integrate.api.nvidia.com/v1`) y lo único que cambia entre uno y otro es
+el campo `model` del cuerpo. El botón "Get API Key" que aparece en la ficha de cada modelo y el
+de `build.nvidia.com/settings/api-keys` llevan al mismo generador. Añadir un modelo de NVIDIA a
+la cadena **no** añade una credencial.
 
-Zen **no lleva variable de entorno**: `/connect` en la TUI guarda la credencial en el almacén de
-opencode y con eso basta. `opencode.json` no declara `provider.opencode` a propósito — si lo
-hiciera apuntando a una variable vacía, esa cadena vacía podría ensombrecer la credencial que ya
-guardó el login. Para un entorno headless sin TUI, añade el bloque entonces y no antes.
+**Los modelos de opencode Zen salieron de la cadena.** `opencode auth list` no mostraba
+credencial de Zen, y con `opencode/big-pickle` de último eslabón la primera prueba real murió ahí
+con `MessageAbortedError`, dejando el `task` al subagente en `Task cancelled`. Un eslabón sin
+credencial no es un respaldo: es donde muere la corrida. Si algún día haces `/connect`, se añade
+a mano **y se comprueba** que la corrida sobrevive a llegar hasta él.
 
-## El respaldo en caliente
+## El respaldo en caliente: DESACTIVADO, y por qué
 
-Lo pone el plugin `opencode-runtime-fallback`, declarado en la clave `plugin` de `opencode.json`.
-**No hay que instalarlo a mano ni con `pnpm`**: opencode lo descarga solo al arrancar, a su propia
-caché (`~/.cache/opencode/packages/`), no a los `node_modules` del proyecto. Para forzar una
-versión concreta o instalarlo en la config global existe `opencode plugin <modulo>` (con `-g`
-global, `-f` para reemplazar la versión instalada).
+El plugin `opencode-runtime-fallback` **no está declarado** en la clave `plugin` de
+`opencode.json`. `.opencode/opencode-fallback.jsonc` se conserva —la cadena se sigue generando y
+el paso `4c` del gate la verifica— pero hoy no tiene efecto.
 
-Que está vivo y leyendo las cadenas se comprueba en su log,
-`~/.config/opencode/opencode-fallback.log`:
+**Su aborto-y-reenvío mata la tarea de un subagente en vez de reintentarla.** Medido: con el
+plugin cargado, delegar en el `reviewer` falló 3 de 3 veces con `Task cancelled`; con `--pure`
+—sin plugins externos— funcionó a la primera. Un arnés de siete agentes vive de delegar, así que
+entre respaldo y delegación gana delegación.
 
-```
-[opencode-fallback] Plugin initialized with 7 agents
-```
+**El coste es real:** sin él, un `Provider is overloaded` de NVIDIA —frecuente en la capa
+gratuita— corta el turno en vez de saltar al siguiente modelo. Hay que relanzar a mano.
 
-Ese `7 agents` es la prueba de que recoge los `fallback_models` de cada agente. Si dijera `0`,
-las cadenas no le estarían llegando.
+Para reactivarlo: añadir `"plugin": ["opencode-runtime-fallback"]` a `opencode.json`. No hay que
+instalarlo, opencode lo descarga solo a `~/.cache/opencode/packages/`. Y antes de confiar en él,
+comprobar que la delegación a un subagente sigue completando.
 
-Su comportamiento se afina en `.opencode/opencode-fallback.jsonc`. Dispara con
-429, 5xx, cuota agotada y `model not found`, reenvía el mensaje al siguiente de la cadena y avisa
-con un toast.
+Cuando estuvo activo quedó demostrado que **la cadena sí actúa** (`Fallback replay succeeded`),
+y que su log `~/.config/opencode/opencode-fallback.log` dice `Plugin initialized with N agents`.
 
-Dos cosas que el plugin **no** resuelve:
+Dos cosas que el plugin no resolvía ni estando activo:
 
-1. **Un id retirado no es un fallo transitorio.** El plugin mete el modelo en cooldown y lo
-   reintenta al expirar: contra un 404 permanente son llamadas quemadas cada cinco minutos. Por
-   eso el cooldown está en 300s y no en los 60 por defecto, y por eso existe el paso `4c` del
-   gate (`scripts/check-modelos.mjs`), que cruza cada id contra el catálogo de NVIDIA y deja el
-   gate en rojo si desapareció.
+1. **Un id retirado no es un fallo transitorio.** Lo mete en cooldown y lo reintenta: contra un
+   404 permanente son llamadas quemadas cada pocos minutos. Por eso existe el paso `4c` del gate
+   (`scripts/check-modelos.mjs`), que cruza cada id contra el catálogo y deja el gate en rojo si
+   desapareció.
 2. **Un toast es chat.** Este arnés está pensado para correr solo, y su regla 3 dice que el
    estado va a disco. El aviso que sobrevive a que no estés delante es el gate en rojo.
 
@@ -156,8 +158,9 @@ Por eso el arnés trae un lanzador que lo carga antes de arrancar.
 #    No lleva variable de entorno: /connect guarda la credencial en el almacén de opencode.
 opencode auth login   # o /connect dentro de la TUI
 
-# 4. Que opencode no lea la configuración de Claude Code por detrás
-export OPENCODE_DISABLE_CLAUDE_CODE=1
+# 4. (Opcional) Que opencode no cargue las skills de ~/.claude/. Ver la nota de abajo:
+#    lo unico que cambia es una skill, no hay duplicacion de comandos. Si la quieres,
+#    ponla en .env y el wrapper la carga sola.
 
 # 5. El plugin de respaldo NO se instala a mano: opencode lo baja solo porque
 #    `opencode.json` lo declara en la clave `plugin`. Se comprueba en su log.
@@ -207,8 +210,20 @@ anunciarse como *"the fastest 30B A3B MoE model"*, y tres modelos del catálogo 
 `/v1/models` los liste**. Eso acota lo que `scripts/check-modelos.mjs` puede prometer: verifica
 que el id esté **listado**, no que **responda**.
 
-El paso 3 no es cosmético: opencode escanea `~/.claude/skills/` y sincroniza comandos de Claude
-Code, así que sin él te aparecen los comandos del arnés duplicados y con sintaxis distinta.
+**`OPENCODE_DISABLE_CLAUDE_CODE` es opcional, y probablemente no la quieras.** Medido en este
+repo, comparando `opencode debug config` y `opencode debug skill` con y sin ella:
+
+| | Sin la variable | Con la variable |
+| --- | --- | --- |
+| Comandos del arnés | 4 | 4 |
+| Skills | 3 (incluye `codebase-memory` de `~/.claude/skills/`) | 2 |
+
+**Lo único que cambia es que deja de cargar una skill.** Ninguna duplicación de comandos, que es
+lo que una versión anterior de este documento afirmaba sin haberlo medido — venía del título de
+una issue, no de una comprobación.
+
+Si algún día la necesitas, va en `.env` como el resto: el wrapper lo carga al entorno antes de
+arrancar, así que no hay que tocar variables de la máquina ni escribirla en cada sesión.
 
 ## Una herramienta a la vez
 
