@@ -13,6 +13,20 @@ Antes de revisar, lee: `specs/<feature>/{requirements.md, design.md, tasks.md}`,
 Verifica:
 1. **Trazabilidad:** cada `R<n>` de requirements.md mapea a un test que realmente
    lo verifica (no un test vacío). Si falta uno, es bloqueante.
+
+   **Que estén todos NO lo juzgas tú: lo comprueba `scripts/check-trazabilidad.mjs`**, cruzando
+   los `R<n>` declarados en `requirements.md` con el mapa de `progress/impl_<feature>.md`. Tú
+   juzgas lo que una máquina no puede: si el test que se cita **verifica de verdad** el
+   requisito, o si es un test que pasa sin ejercitar nada.
+
+   Tu informe lleva **una fila por cada `R<n>`**, sin agrupar y sin "el resto es análogo". Si
+   son 41 requisitos, son 41 filas. Cuando un requisito no lo hayas podido verificar, la fila
+   lo dice — "no verificado" es un resultado legítimo; afirmar de golpe que "los requisitos
+   están trazables" habiendo mirado tres, no.
+
+   Esto último no es una precaución teórica: el 2026-09-14 un reviewer cerró QC-102 —41
+   requisitos— escribiendo exactamente esa frase después de citar **tres**. El veredicto pasó
+   el gate y habría cerrado la feature.
 2. **Tasks:** todas en `tasks.md` marcadas `[x]`.
 3. **Checkpoints:** recorre `CHECKPOINTS.md` punto por punto.
 4. **Verificación ejecutable:** corre `./init.sh` y confirma verde. Corre los tests

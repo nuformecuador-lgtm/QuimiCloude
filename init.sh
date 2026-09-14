@@ -112,6 +112,21 @@ if [ -f scripts/check-artefactos.mjs ]; then
   ok "$(printf '%s' "$ARTEFACTOS" | tail -1)"
 fi
 
+# 4a-bis. Regla 4 por maquina: cada `R<n>` declarado tiene su fila en el mapa de la bitacora.
+#
+#     Hasta hoy esta regla la sostenia el juicio del `reviewer`. El 2026-09-14, revisando QC-102
+#     -41 requisitos-, escribio "los requisitos estan trazables a tests" habiendo citado TRES.
+#     No fallo en un detalle: afirmo la verificacion entera habiendo hecho el 7%, y ese veredicto
+#     pasaba el gate y cerraba la feature.
+#
+#     Recorrer 41 filas sin saltarse ninguna es justo lo que un modelo hace mal y una comparacion
+#     de conjuntos hace siempre. Al reviewer le queda lo suyo: juzgar si el test VERIFICA de
+#     verdad el requisito. Corre en las dos herramientas: es Node, no configuracion de ninguna.
+if [ -f scripts/check-trazabilidad.mjs ]; then
+  TRAZA=$(node scripts/check-trazabilidad.mjs 2>&1) || fail "$TRAZA"
+  ok "$(printf '%s' "$TRAZA" | tail -1)"
+fi
+
 # 4b. El arnes corre en dos herramientas y `.opencode/` es GENERADO desde `.claude/`.
 #
 #     Los formatos no son intercambiables -Claude Code declara `tools:` como CSV y no conoce
