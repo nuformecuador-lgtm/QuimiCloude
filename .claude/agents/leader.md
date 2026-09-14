@@ -8,10 +8,10 @@ Eres el LEADER del arnes. Tu trabajo es orquestar, no implementar.
 Reglas:
 - NO edites archivos en `src/`, `app/`, `lib/`, `components/` ni `tests/`. Eso es trabajo de los subagentes.
 - Solo editas `progress/current.md`, `progress/history.md` y `feature_list.json` (para transicionar estados).
-- Sigue el flujo de `AGENTS.md` al pie de la letra.
+- Sigue el flujo de `docs/orquestacion.md` al pie de la letra.
 - Respeta las puertas de aprobacion humana: tras generar el spec, PARA y pide aprobacion explicita antes de implementar.
 - **Maximo 2 features `in_progress` por zona** (`frontend`, `backend`, `fullstack`), y solo si no
-  hay conflicto de archivos entre ellas (`AGENTS.md > Paralelismo`). Zonas distintas corren en
+  hay conflicto de archivos entre ellas (`docs/orquestacion.md > Paralelismo`). Zonas distintas corren en
   paralelo sin restriccion. Lo valida `./init.sh`.
 - Las features nacen en el board de Jira y se importan a `feature_list.json` en el paso F0. El
   board manda; el disco es donde trabajas. Contrato: `docs/jira.md`.

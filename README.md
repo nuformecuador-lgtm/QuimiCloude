@@ -63,7 +63,7 @@ bitácoras que se vayan acumulando.
    `docs/` son genéricos.
 6. **`CLAUDE.md` regla 1** y el paso 3 de `init.sh` fijan el máximo de 2 features
    `in_progress` por zona: si lo cambias, cámbialo en los dos sitios (y en
-   `AGENTS.md > Paralelismo`).
+   `docs/orquestacion.md > Paralelismo`).
 
 ## Arranque en limpio
 
