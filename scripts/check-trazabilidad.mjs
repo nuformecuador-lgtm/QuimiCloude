@@ -58,6 +58,23 @@ for (const f of features) {
   const req = join(RAIZ, 'specs', base, 'requirements.md');
   const impl = join(RAIZ, 'progress', `impl_${base}.md`);
 
+  // Una feature EN VUELO no tiene por que tener el mapa completo: a mitad de la fase 2 hay
+  // cinco requisitos mapeados de cuarenta y uno, y eso es trabajo normal, no un incumplimiento.
+  // Exigirlo ahi pondria el gate en rojo en cada `--rapido` de la fase 2, que es justo cuando
+  // mas se corre; una guardia que estorba durante el trabajo normal se acaba desactivando.
+  //
+  // La señal de "ya deberia estar completo" es la que el propio flujo usa: TODAS las tasks
+  // marcadas `[x]`. Es el momento en que entra el reviewer (F2.2) y en que se abre el PR
+  // (F2.4), o sea antes de que nada se cierre, que es cuando esto tiene que morder.
+  if (f.status === 'in_progress') {
+    const tareas = join(RAIZ, 'specs', base, 'tasks.md');
+    if (!existsSync(tareas)) continue;
+    const texto = readFileSync(tareas, 'utf8');
+    const pendientes = (texto.match(/^\s*[-*+]\s*\[ \]/gm) || []).length;
+    const hechas = (texto.match(/^\s*[-*+]\s*\[x\]/gim) || []).length;
+    if (pendientes > 0 || hechas === 0) continue;
+  }
+
   // Sin spec o sin bitacora todavia no hay nada que cruzar. Que existan lo vigila
   // `check-artefactos.mjs`, que es su trabajo y no el de esta guardia.
   if (!existsSync(req) || !existsSync(impl)) continue;

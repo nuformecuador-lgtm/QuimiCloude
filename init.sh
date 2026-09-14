@@ -136,10 +136,20 @@ fi
 #     distinto al mismo agente en Claude Code, que es el peor momento para enterarse.
 #
 #     Va en los DOS modos: es instantaneo y no toca la red.
+#     REGENERA en vez de fallar, igual que el paso 2 hace con prisma y next. Fallar castigaba a
+#     quien solo usa Claude Code: editas `.claude/agents/reviewer.md`, que es lo que hace
+#     `/afinar-regla`, y el gate se pone rojo por un directorio que no usas. Una guardia que
+#     estorba en el trabajo normal se acaba desactivando, y entonces no guarda nada.
+#
+#     Regenerar no pierde nada: la fuente es `.claude/`, asi que el resultado es siempre el
+#     correcto. Si cambia algo, se avisa para que entre en el commit; no se falla.
 if [ -f scripts/gen-opencode.mjs ]; then
-  DERIVA=$(node scripts/gen-opencode.mjs --check 2>&1) || fail "el arnes de opencode esta desfasado:
-$DERIVA"
-  ok "$(printf '%s' "$DERIVA" | head -1)"
+  node scripts/gen-opencode.mjs >/dev/null 2>&1 || fail "scripts/gen-opencode.mjs fallo al regenerar .opencode/"
+  if git rev-parse --git-dir >/dev/null 2>&1 && ! git diff --quiet -- .opencode opencode.json 2>/dev/null; then
+    warn "se regenero .opencode/ desde .claude/: incluye esos archivos en tu commit"
+  else
+    ok "arnes de opencode al dia con .claude/"
+  fi
 fi
 
 # 4c. Los ids de modelo configurados siguen existiendo.
