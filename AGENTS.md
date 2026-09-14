@@ -389,6 +389,28 @@ Ademas el subagente **no tiene el contexto para juzgar un rojo ajeno**: no sabe 
 `CuentasPorPagarTable` es el flake conocido de jsdom de esta maquina o una regresion suya. El
 leader si. Un rojo mal diagnosticado por un subagente cuesta mas que la corrida que se ahorro.
 
+## Si un subagente falla, el leader NO hace su trabajo
+
+Cuando una delegación falla —el subagente se cae, la tarea se cancela, el modelo no responde—
+el leader **para y lo reporta**. No suple al subagente, ni "adelanta" su parte, ni escribe su
+archivo.
+
+No es celo procedimental. El 2026-09-14, probando el arnés en opencode, la delegación al
+`reviewer` falló con `Task cancelled` y el leader **hizo la revisión él mismo**: escribió
+`progress/review_QC-102-....md` con 72 líneas y el checklist entero marcado, frente a las 405
+del informe real, sin verificar los 41 requisitos uno a uno. El archivo llevaba el nombre del
+reviewer y nadie habría sabido que no lo escribió él.
+
+Se rompen dos reglas a la vez y en silencio: el leader no revisa, y la revisión tiene que ser
+independiente de quien orquesta. Un veredicto firmado por el orquestador no es una revisión, es
+una opinión sobre el propio trabajo.
+
+Lo mismo vale para `spec_author` e `implementer`: si el subagente no completó, el estado NO
+avanza. Reintentar la delegación sí; sustituirla no.
+
+`scripts/check-artefactos.mjs` cubre la mitad comprobable de esto —que el archivo exista y tenga
+contenido— pero no puede saber quién lo escribió. Esa mitad la sostiene esta regla.
+
 ## Regla anti telefono-descompuesto
 
 Los subagentes **no** devuelven todo su trabajo por el chat. Escriben en disco y

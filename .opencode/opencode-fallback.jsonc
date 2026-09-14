@@ -1,3 +1,16 @@
+// DESACTIVADO. El plugin no esta declarado en la clave `plugin` de opencode.json, asi que
+// opencode no lo carga y este archivo no tiene efecto. Se conserva porque la cadena sigue
+// generandose desde scripts/gen-opencode.mjs y porque reactivarlo es quitar esta nota y
+// volver a declararlo.
+//
+// POR QUE. Su aborto-y-reenvio MATA la tarea de un subagente en vez de reintentarla. Con el
+// plugin cargado, delegar en el `reviewer` fallo 3 de 3 veces con "Task cancelled"; con
+// `--pure` -sin plugins externos- funciono a la primera. Un arnes de siete agentes vive de
+// delegar, asi que entre respaldo y delegacion gana delegacion.
+//
+// El coste es real y hay que saberlo: sin el, un "Provider is overloaded" de NVIDIA -que
+// pasa a menudo en la capa gratuita- corta el turno en vez de saltar al siguiente modelo.
+//
 {
   // Respaldo de modelo en caliente. Las cadenas por agente NO viven aqui: viven en el
   // frontmatter de cada `.opencode/agents/*.md` (`fallback_models`), que a su vez sale de

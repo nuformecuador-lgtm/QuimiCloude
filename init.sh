@@ -95,6 +95,23 @@ $VALIDACION"
   done
 fi
 
+# 4a. Los artefactos que el ciclo dice haber producido existen de verdad.
+#
+#     El 2026-09-14, revisando QC-102 con el arnes en opencode, el subagente `reviewer` termino
+#     su turno afirmando "El informe detallado se encuentra en progress/review_QC-102-...md".
+#     Ese archivo no existia. El leader lo habria dado por revisado y seguido a PR con un
+#     veredicto que nadie escribio.
+#
+#     Es el peor fallo posible para este arnes porque no se parece a un fallo: el turno termina
+#     en verde, con un veredicto plausible y una ruta que suena bien. La regla 3 -estado en
+#     disco, no en el chat- deja de cumplirse sin que nada proteste, y con ella cae la regla 4.
+#
+#     Va en los DOS modos: es instantaneo y no toca la red.
+if [ -f scripts/check-artefactos.mjs ]; then
+  ARTEFACTOS=$(node scripts/check-artefactos.mjs 2>&1) || fail "$ARTEFACTOS"
+  ok "$(printf '%s' "$ARTEFACTOS" | tail -1)"
+fi
+
 # 4b. El arnes corre en dos herramientas y `.opencode/` es GENERADO desde `.claude/`.
 #
 #     Los formatos no son intercambiables -Claude Code declara `tools:` como CSV y no conoce

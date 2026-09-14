@@ -2,9 +2,6 @@
   "$schema": "https://opencode.ai/config.json",
   "default_agent": "leader",
   "subagent_depth": 3,
-  "plugin": [
-    "opencode-runtime-fallback"
-  ],
   "provider": {
     "nvidia": {
       "npm": "@ai-sdk/openai-compatible",

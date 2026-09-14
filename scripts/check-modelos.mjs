@@ -48,6 +48,19 @@ for (const archivo of readdirSync(DIR).filter((f) => f.endsWith('.md'))) {
   }
 }
 
+// La cadena de respaldo ya no vive en el frontmatter -ahi rompia toda peticion- sino en el
+// config del plugin. Hay que leerla tambien: al moverla, este guardia dejo de ver `gpt-oss-20b`
+// y pasó de vigilar tres ids a vigilar dos, en silencio. Un id de respaldo retirado es
+// exactamente igual de mortal que uno primario, solo que se descubre mas tarde.
+const PLUGIN = join(process.cwd(), '.opencode', 'opencode-fallback.jsonc');
+if (existsSync(PLUGIN)) {
+  const bloque = readFileSync(PLUGIN, 'utf8').match(/"fallback_models"\s*:\s*\[([^\]]*)\]/);
+  for (const m of bloque ? bloque[1].matchAll(/"([^"]+)"/g) : []) {
+    if (!usos.has(m[1])) usos.set(m[1], []);
+    usos.get(m[1]).push('cadena de respaldo');
+  }
+}
+
 const nvidia = [...usos.keys()].filter((id) => id.startsWith('nvidia/')).sort();
 const zen = [...usos.keys()].filter((id) => id.startsWith('opencode/')).sort();
 
