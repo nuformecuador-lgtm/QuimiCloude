@@ -51,42 +51,33 @@ for (const archivo of readdirSync(DIR).filter((f) => f.endsWith('.md'))) {
 const nvidia = [...usos.keys()].filter((id) => id.startsWith('nvidia/')).sort();
 const zen = [...usos.keys()].filter((id) => id.startsWith('opencode/')).sort();
 
-const clave = process.env.NVIDIA_API_KEY;
-if (!clave) {
-  // El error facil, y ya cometido una vez: pegar la clave en `.env`. Ahi la leen Next y Prisma,
-  // pero NO opencode, que resuelve `{env:NVIDIA_API_KEY}` contra el entorno del proceso. La
-  // clave parece puesta, el gate no se queja, y los siete agentes mueren al primer turno. Si
-  // esta en `.env` y no en el entorno, hay que decirlo con todas las letras.
-  let enDotenv = false;
+// La clave vale igual en el entorno o en `.env`, y el entorno manda -es el orden de dotenv, y
+// permite pisar el archivo para una corrida suelta-. Se miran los dos porque el gate se lanza
+// desde bash sin cargar nada, y opencode la recibe del wrapper `scripts/opencode.ps1` / `.sh`.
+function claveDeDotenv() {
   try {
-    enDotenv = /^NVIDIA_API_KEY=.+$/m.test(readFileSync(join(process.cwd(), '.env'), 'utf8'));
+    // El `\r?` no sobra: el `.env` de Windows viene con CRLF y sin el, `$` no casa nunca y la
+    // clave parece ausente estando puesta. El BOM se descarta por el mismo motivo.
+    const texto = readFileSync(join(process.cwd(), '.env'), 'utf8').replace(/^﻿/, '');
+    const m = texto.match(/^NVIDIA_API_KEY=(.+?)\r?$/m);
+    return m ? m[1].trim().replace(/^["']|["']$/g, '') : null;
   } catch {
-    /* sin .env, nada que avisar */
+    return null;
   }
-  if (enDotenv) {
-    console.log(
-      'check-modelos: NVIDIA_API_KEY esta en `.env` pero NO en el entorno, y opencode no lee ' +
-        '`.env`. Exportala como variable de entorno o los modelos no resolveran. ' +
-        'Receta en docs/opencode.md > Montarlo.',
-    );
-  } else {
-    console.log(
-      `check-modelos: NVIDIA_API_KEY sin definir, ${nvidia.length} ids de NVIDIA ` +
-        `y ${zen.length} de Zen sin comprobar.`,
-    );
-  }
-  process.exit(0);
 }
 
+// El catalogo NO pide credencial: comprobado, responde 200 con los 81 modelos sin cabecera de
+// autorizacion y tambien con una clave inventada. Asi que este guardia corre siempre, tengas o
+// no la key configurada, y verifica lo unico que puede verificar: que los ids existen.
+//
+// Lo que NO demuestra, y por eso no lo insinua en su salida: que TU clave sirva. Una clave
+// equivocada da exactamente el mismo verde aqui y falla al primer turno real.
 let catalogo;
 try {
-  const r = await fetch(CATALOGO, {
-    headers: { Authorization: `Bearer ${clave}` },
-    signal: AbortSignal.timeout(30_000),
-  });
+  const r = await fetch(CATALOGO, { signal: AbortSignal.timeout(30_000) });
   if (!r.ok) {
-    // Un fallo del catalogo NO es un id muerto: puede ser la key, la red o un 429. Se avisa y
-    // se sigue, porque dejar el gate en rojo por eso bloquearia el trabajo sin motivo.
+    // Un fallo del catalogo NO es un id muerto: puede ser la red o un corte del servicio. Se
+    // avisa y se sigue, porque dejar el gate en rojo por eso bloquearia el trabajo sin motivo.
     console.log(`check-modelos: el catalogo respondio HTTP ${r.status}, no se pudo comprobar.`);
     process.exit(0);
   }
@@ -118,7 +109,16 @@ if (muertos.length > 0) {
   console.error('Corrige el bloque NVIDIA de scripts/gen-opencode.mjs y regenera.');
   process.exit(1);
 }
+// Si no hay credencial en ningun sitio se dice aparte, para no mezclarlo con lo anterior: los
+// ids pueden estar perfectos y el arnes no arrancar igualmente por falta de clave.
+const hayClave = Boolean(process.env.NVIDIA_API_KEY || claveDeDotenv());
 console.log(
   `\ncheck-modelos: los ${nvidia.length} ids de NVIDIA existen en el catalogo ` +
-    `(${catalogo.size} modelos disponibles).`,
+    `(${catalogo.size} modelos disponibles). El catalogo es publico: esto NO valida tu clave.`,
 );
+if (!hayClave) {
+  console.log(
+    'check-modelos: aviso, NVIDIA_API_KEY no esta ni en el entorno ni en .env. ' +
+      'Sin ella los modelos no resolveran.',
+  );
+}

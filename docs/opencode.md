@@ -136,28 +136,61 @@ Dos cosas que el plugin **no** resuelve:
 
 ## Montarlo
 
-```bash
-# 1. La clave de NVIDIA en el entorno (ver .env.example)
-#    Windows: [Environment]::SetEnvironmentVariable("NVIDIA_API_KEY", "nvapi-...", "User")
-#    y abrir una terminal NUEVA: una variable de usuario no entra en procesos ya vivos.
+La clave de NVIDIA vale igual en `.env` que como variable de entorno. **Pero opencode no carga
+el `.env` por su cuenta**, y eso está medido: con el valor sólo en `.env`, un `{env:...}` se
+resuelve a **cadena vacía** y la petición sale con la credencial en blanco, sin error ni aviso.
+Por eso el arnés trae un lanzador que lo carga antes de arrancar.
 
-# 2. Los modelos gratuitos de Zen, para el último eslabón de cada cadena.
-#    No lleva variable de entorno: /connect guarda la credencial en el almacén de
-#    opencode y con eso basta. Una key en el entorno solo hace falta headless (CI).
+```bash
+# 1. La clave en .env, junto al resto de la configuración del repo:
+#       NVIDIA_API_KEY=nvapi-...
+#    Una sola cubre los cinco modelos de NVIDIA. Si prefieres variable de entorno del
+#    usuario, también vale y manda sobre el .env.
+
+# 2. Lanzar opencode SIEMPRE por el wrapper, que carga .env al entorno del proceso.
+./scripts/opencode.ps1                 # Windows / PowerShell
+./scripts/opencode.sh                  # Git Bash, WSL, Linux
+./scripts/opencode.ps1 agent list      # los argumentos pasan tal cual
+
+# 3. Los modelos gratuitos de Zen, para el último eslabón de cada cadena.
+#    No lleva variable de entorno: /connect guarda la credencial en el almacén de opencode.
 opencode auth login   # o /connect dentro de la TUI
 
-# 3. Que opencode no lea la configuración de Claude Code por detrás
+# 4. Que opencode no lea la configuración de Claude Code por detrás
 export OPENCODE_DISABLE_CLAUDE_CODE=1
 
-# 4. El plugin de respaldo NO se instala a mano: opencode lo baja solo porque
+# 5. El plugin de respaldo NO se instala a mano: opencode lo baja solo porque
 #    `opencode.json` lo declara en la clave `plugin`. Se comprueba en su log.
 grep "Plugin initialized" ~/.config/opencode/opencode-fallback.log | tail -2
 #    Tiene que decir "with 7 agents". Si dice 0, las cadenas no le llegan.
 
-# 5. Comprobar que carga los siete agentes con sus modos
-opencode agent list
-opencode debug agent reviewer
+# 6. Comprobar que carga los siete agentes con sus modos
+./scripts/opencode.ps1 agent list
+./scripts/opencode.ps1 debug agent reviewer
 ```
+
+Si lanzas `opencode` a pelo con la clave sólo en `.env`, arranca sin quejarse y falla al primer
+turno. El wrapper avisa antes de lanzar si `NVIDIA_API_KEY` sigue vacía.
+
+## Latencia: medido, y no es menor
+
+Petición real de un prompt trivial a cada modelo de las cadenas, con una clave válida:
+
+| Modelo | Respuesta |
+| --- | --- |
+| `nemotron-3-super-120b-a12b` | 0,6 s |
+| `deepseek-v4-flash-0731` | 8,4 s |
+| `nemotron-3-ultra-550b-a55b` | **85 s** |
+| `kimi-k3` | **sin respuesta en 120 s** |
+| `nemotron-3.5-lightning-30b-a3b` | **sin respuesta en 120 s** |
+
+Todos devuelven `reasoning_content`: razonan antes de emitir, así que la primera palabra tarda.
+El techo de ~40 peticiones/minuto de la cuenta deja de ser el cuello de botella frente a esto.
+
+Antes de dar por buena una cadena, **mídela**. El reparto de modelos de este documento está
+elegido por capacidad, no por latencia, y con estos números puede convenir mover
+`nemotron-3-super` —el único rápido— más arriba en las cadenas de los agentes que más turnos
+gastan.
 
 El paso 3 no es cosmético: opencode escanea `~/.claude/skills/` y sincroniza comandos de Claude
 Code, así que sin él te aparecen los comandos del arnés duplicados y con sintaxis distinta.
