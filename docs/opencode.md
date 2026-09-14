@@ -104,7 +104,23 @@ guardó el login. Para un entorno headless sin TUI, añade el bloque entonces y 
 
 ## El respaldo en caliente
 
-Lo pone el plugin `opencode-runtime-fallback` (`.opencode/opencode-fallback.jsonc`). Dispara con
+Lo pone el plugin `opencode-runtime-fallback`, declarado en la clave `plugin` de `opencode.json`.
+**No hay que instalarlo a mano ni con `pnpm`**: opencode lo descarga solo al arrancar, a su propia
+caché (`~/.cache/opencode/packages/`), no a los `node_modules` del proyecto. Para forzar una
+versión concreta o instalarlo en la config global existe `opencode plugin <modulo>` (con `-g`
+global, `-f` para reemplazar la versión instalada).
+
+Que está vivo y leyendo las cadenas se comprueba en su log,
+`~/.config/opencode/opencode-fallback.log`:
+
+```
+[opencode-fallback] Plugin initialized with 7 agents
+```
+
+Ese `7 agents` es la prueba de que recoge los `fallback_models` de cada agente. Si dijera `0`,
+las cadenas no le estarían llegando.
+
+Su comportamiento se afina en `.opencode/opencode-fallback.jsonc`. Dispara con
 429, 5xx, cuota agotada y `model not found`, reenvía el mensaje al siguiente de la cadena y avisa
 con un toast.
 
@@ -113,7 +129,8 @@ Dos cosas que el plugin **no** resuelve:
 1. **Un id retirado no es un fallo transitorio.** El plugin mete el modelo en cooldown y lo
    reintenta al expirar: contra un 404 permanente son llamadas quemadas cada cinco minutos. Por
    eso el cooldown está en 300s y no en los 60 por defecto, y por eso existe el paso `4c` del
-   gate (`scripts/check-modelos.mjs`), que hace ping a cada id y deja el gate en rojo si murió.
+   gate (`scripts/check-modelos.mjs`), que cruza cada id contra el catálogo de NVIDIA y deja el
+   gate en rojo si desapareció.
 2. **Un toast es chat.** Este arnés está pensado para correr solo, y su regla 3 dice que el
    estado va a disco. El aviso que sobrevive a que no estés delante es el gate en rojo.
 
@@ -132,7 +149,12 @@ opencode auth login   # o /connect dentro de la TUI
 # 3. Que opencode no lea la configuración de Claude Code por detrás
 export OPENCODE_DISABLE_CLAUDE_CODE=1
 
-# 4. Comprobar que carga los siete agentes con sus modos
+# 4. El plugin de respaldo NO se instala a mano: opencode lo baja solo porque
+#    `opencode.json` lo declara en la clave `plugin`. Se comprueba en su log.
+grep "Plugin initialized" ~/.config/opencode/opencode-fallback.log | tail -2
+#    Tiene que decir "with 7 agents". Si dice 0, las cadenas no le llegan.
+
+# 5. Comprobar que carga los siete agentes con sus modos
 opencode agent list
 opencode debug agent reviewer
 ```
