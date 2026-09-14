@@ -53,10 +53,28 @@ const zen = [...usos.keys()].filter((id) => id.startsWith('opencode/')).sort();
 
 const clave = process.env.NVIDIA_API_KEY;
 if (!clave) {
-  console.log(
-    `check-modelos: NVIDIA_API_KEY sin definir, ${nvidia.length} ids de NVIDIA ` +
-      `y ${zen.length} de Zen sin comprobar.`,
-  );
+  // El error facil, y ya cometido una vez: pegar la clave en `.env`. Ahi la leen Next y Prisma,
+  // pero NO opencode, que resuelve `{env:NVIDIA_API_KEY}` contra el entorno del proceso. La
+  // clave parece puesta, el gate no se queja, y los siete agentes mueren al primer turno. Si
+  // esta en `.env` y no en el entorno, hay que decirlo con todas las letras.
+  let enDotenv = false;
+  try {
+    enDotenv = /^NVIDIA_API_KEY=.+$/m.test(readFileSync(join(process.cwd(), '.env'), 'utf8'));
+  } catch {
+    /* sin .env, nada que avisar */
+  }
+  if (enDotenv) {
+    console.log(
+      'check-modelos: NVIDIA_API_KEY esta en `.env` pero NO en el entorno, y opencode no lee ' +
+        '`.env`. Exportala como variable de entorno o los modelos no resolveran. ' +
+        'Receta en docs/opencode.md > Montarlo.',
+    );
+  } else {
+    console.log(
+      `check-modelos: NVIDIA_API_KEY sin definir, ${nvidia.length} ids de NVIDIA ` +
+        `y ${zen.length} de Zen sin comprobar.`,
+    );
+  }
   process.exit(0);
 }
 
