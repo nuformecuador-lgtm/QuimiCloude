@@ -63,6 +63,7 @@ import {
   updateAliveInCompany,
 } from '@/lib/modules/identity/adapters/driven/persistence/user-admin-prisma';
 import { createCredentialSetupSecret } from '@/lib/modules/identity/adapters/driven/security/credential-setup-secret-crypto';
+import { clearedLockState } from '@/lib/modules/identity/domain/effective-account-status';
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
 import { floorToSecond } from '@/lib/modules/identity/domain/session-revocation';
 import { prisma } from '@/lib/shared/db/prisma';
@@ -240,6 +241,7 @@ describe('QC-23 T14 — el estado de cuenta sube el sello dentro de su propia tr
           now,
           accountStatus: transicion.next,
           changedBy: actorId,
+          lockState: transicion.next === 'blocked' ? null : clearedLockState(),
         });
         expect(outcome).toBe('ok');
 
@@ -296,6 +298,7 @@ describe('QC-23 T14 — el estado de cuenta sube el sello dentro de su propia tr
         now: bloqueo,
         accountStatus: 'blocked',
         changedBy: actorId,
+        lockState: null,
       });
       const trasBloquear = await stampOf(targetId);
       expect(trasBloquear).toEqual(floorToSecond(bloqueo));
@@ -308,6 +311,7 @@ describe('QC-23 T14 — el estado de cuenta sube el sello dentro de su propia tr
         now: reactivacion,
         accountStatus: 'active',
         changedBy: actorId,
+        lockState: clearedLockState(),
       });
 
       // Ni sube ni baja: las cookies emitidas antes del bloqueo siguen muertas para siempre. Ese es
@@ -333,6 +337,7 @@ describe('QC-23 T14 — el estado de cuenta sube el sello dentro de su propia tr
         now: instantWithMillis(),
         accountStatus: 'blocked',
         changedBy: adminId,
+        lockState: null,
       });
       expect(outcome).toBe('last_administrator');
 
@@ -362,6 +367,7 @@ describe('QC-23 T14 — el estado de cuenta sube el sello dentro de su propia tr
         now: instantWithMillis(),
         accountStatus: 'blocked',
         changedBy: actorId,
+        lockState: null,
       });
       expect(outcome).toBe('not_found');
       expect(await stampOf(targetId)).toEqual(antes);
@@ -530,6 +536,99 @@ describe('QC-23 T15 — establecer la contrasena por el enlace sube el sello (R3
         select: { passwordHash: true },
       });
       expect(fila.passwordHash).not.toBe(FAKE_LINK_HASH);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// QC-95 — al salir de `blocked`, la misma escritura limpia los contadores (R1, R2, R3)
+// ---------------------------------------------------------------------------
+
+describe('QC-95 — el cambio de estado escribe los contadores de bloqueo en el MISMO `UPDATE` (R1, R2, R3)', () => {
+  it('R1/R3: mover a `active` limpia los tres contadores en la misma escritura', async () => {
+    await withCompany(async (companyId) => {
+      const actorId = await createUser(companyId, newUserData());
+      const targetId = await createUser(companyId, newUserData());
+
+      // Un estado de bloqueo «suelto» que el desbloqueo administrativo tiene que retirar: lo que
+      // dejaria la politica de intentos de QC-19 si nadie lo limpiara.
+      await prisma.user.update({
+        where: { id: targetId },
+        data: {
+          failedLoginAttempts: 3,
+          lockLevel: 2,
+          lockedUntil: new Date('2099-01-01T00:00:00.000Z'),
+        },
+      });
+
+      const outcome = await applyGuardedChange({
+        kind: 'account_status',
+        companyId,
+        id: targetId,
+        adminRoleName: ROLE_ADMINISTRADOR,
+        now: instantWithMillis(),
+        accountStatus: 'active',
+        changedBy: actorId,
+        lockState: clearedLockState(),
+      });
+      expect(outcome).toBe('ok');
+
+      // La fila releida: estado y los tres contadores, de la misma escritura (R3). Un
+      // `locked_until` futuro que sobreviva dejaria la cuenta efectivamente `blocked` (QC-78 R11):
+      // aqui no queda.
+      const fila = await prisma.user.findFirstOrThrow({
+        where: { id: targetId },
+        select: {
+          accountStatus: true,
+          failedLoginAttempts: true,
+          lockLevel: true,
+          lockedUntil: true,
+        },
+      });
+      expect(fila.accountStatus).toBe('active');
+      expect(fila.failedLoginAttempts).toBe(0);
+      expect(fila.lockLevel).toBe(0);
+      expect(fila.lockedUntil).toBeNull();
+    });
+  });
+
+  it('R2: mover a `blocked` NO toca los contadores, aunque se escriba el estado', async () => {
+    await withCompany(async (companyId) => {
+      const actorId = await createUser(companyId, newUserData());
+      const targetId = await createUser(companyId, newUserData());
+      const bloqueado = {
+        failedLoginAttempts: 4,
+        lockLevel: 3,
+        lockedUntil: new Date('2099-06-01T00:00:00.000Z'),
+      };
+
+      await prisma.user.update({ where: { id: targetId }, data: bloqueado });
+
+      const outcome = await applyGuardedChange({
+        kind: 'account_status',
+        companyId,
+        id: targetId,
+        adminRoleName: ROLE_ADMINISTRADOR,
+        now: instantWithMillis(),
+        accountStatus: 'blocked',
+        changedBy: actorId,
+        lockState: null,
+      });
+      expect(outcome).toBe('ok');
+
+      const fila = await prisma.user.findFirstOrThrow({
+        where: { id: targetId },
+        select: {
+          accountStatus: true,
+          failedLoginAttempts: true,
+          lockLevel: true,
+          lockedUntil: true,
+        },
+      });
+      expect(fila.accountStatus).toBe('blocked');
+      expect(fila.failedLoginAttempts).toBe(bloqueado.failedLoginAttempts);
+      expect(fila.lockLevel).toBe(bloqueado.lockLevel);
+      expect(fila.lockedUntil).toEqual(bloqueado.lockedUntil);
     });
   });
 });
