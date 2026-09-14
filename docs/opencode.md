@@ -176,21 +176,27 @@ turno. El wrapper avisa antes de lanzar si `NVIDIA_API_KEY` sigue vacía.
 
 Petición real de un prompt trivial a cada modelo de las cadenas, con una clave válida:
 
-| Modelo | Respuesta |
-| --- | --- |
-| `nemotron-3-super-120b-a12b` | 0,6 s |
-| `deepseek-v4-flash-0731` | 8,4 s |
-| `nemotron-3-ultra-550b-a55b` | **85 s** |
-| `kimi-k3` | **sin respuesta en 120 s** |
-| `nemotron-3.5-lightning-30b-a3b` | **sin respuesta en 120 s** |
+| Modelo | Respuesta a un prompt trivial | Rol donde está hoy |
+| --- | --- | --- |
+| `nemotron-3-super-120b-a12b` | **0,6 s** | sólo respaldo |
+| `deepseek-v4-flash-0731` | **8,4 s** | sólo respaldo |
+| `nemotron-3-ultra-550b-a55b` | **85 s** | primario de `leader` y `reviewer` |
+| `kimi-k3` | **144 s** | primario de otros cinco |
+| `nemotron-3.5-lightning-30b-a3b` | **285 s** | respaldo de `extractor` |
 
-Todos devuelven `reasoning_content`: razonan antes de emitir, así que la primera palabra tarda.
-El techo de ~40 peticiones/minuto de la cuenta deja de ser el cuello de botella frente a esto.
+Devolver "4" a la pregunta "2+2?" le costó a `kimi-k3` dos minutos y medio, y a
+`nemotron-3.5-lightning` —anunciado como *"the fastest 30B A3B MoE model"*— casi cinco. No es
+falta de presupuesto de tokens: se repitió con `max_tokens` amplio y el resultado fue el mismo.
+Todos devuelven `reasoning_content`: razonan antes de emitir la primera palabra visible.
 
-Antes de dar por buena una cadena, **mídela**. El reparto de modelos de este documento está
-elegido por capacidad, no por latencia, y con estos números puede convenir mover
-`nemotron-3-super` —el único rápido— más arriba en las cadenas de los agentes que más turnos
-gastan.
+**Esto invierte el criterio de reparto.** El techo de ~40 peticiones/minuto deja de ser el
+cuello de botella: en un ciclo agéntico, donde cada tarea son decenas de idas y vueltas, un
+primario de 144 s convierte una feature en una jornada. Los dos únicos modelos con latencia de
+trabajo son `nemotron-3-super` (0,6 s, RULER@1M 91,75 e IFBench 72,56 — muy cerca del Ultra) y
+`deepseek-v4-flash` (8,4 s, Terminal-Bench 82,7).
+
+Son medidas de una sola muestra, en capa gratuita y en un momento dado; repítelas antes de
+rediseñar una cadena. Pero el orden de magnitud no es un matiz.
 
 El paso 3 no es cosmético: opencode escanea `~/.claude/skills/` y sincroniza comandos de Claude
 Code, así que sin él te aparecen los comandos del arnés duplicados y con sintaxis distinta.
