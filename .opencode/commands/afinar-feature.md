@@ -1,6 +1,6 @@
 ---
 description: "Interroga una feature del board, detecta las decisiones que omitiste y siembra su requirements.md (argumento: <el key de la feature (QC-14)>)"
-model: nvidia/moonshotai/kimi-k3
+model: nvidia/deepseek-ai/deepseek-v4-flash-0731
 ---
 <!-- GENERADO por scripts/gen-opencode.mjs desde .claude/ - no editar a mano -->
 

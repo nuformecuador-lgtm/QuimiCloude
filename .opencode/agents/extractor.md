@@ -1,10 +1,10 @@
 ---
 description: "Lee un modulo ya implementado del repo, inventaria su estructura y sus decisiones implicitas, y redacta un prompt portable + un cuestionario en extracciones/<slug>/. No modifica el modulo. Usalo desde /extraer-modulo."
 mode: subagent
-model: nvidia/moonshotai/kimi-k3
+model: nvidia/nvidia/nemotron-3-super-120b-a12b
 fallback_models:
+  - nvidia/openai/gpt-oss-20b
   - nvidia/deepseek-ai/deepseek-v4-flash-0731
-  - nvidia/nvidia/nemotron-3.5-lightning-30b-a3b
   - opencode/mimo-v2.5-free
 tools:
   read: true

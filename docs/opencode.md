@@ -66,34 +66,34 @@ salga de NVIDIA no protege del fallo más probable.
 
 | Agente | Primario | Por qué |
 | --- | --- | --- |
-| `leader` | `nemotron-3-ultra-550b-a55b` | Retiene el estado del ciclo entero y no escribe código: RULER@1M de 94.7 |
-| `spec_author` | `kimi-k3` | Redactar EARS correcto es juicio, no checklist |
-| `implementer` | `kimi-k3` | Coordina y hace terminal: Terminal-Bench 88.3 |
-| `frontend_dev` | `kimi-k3` | FrontierSWE 81.2 |
-| `backend_dev` | `kimi-k3` | Migraciones y RLS: lo más caro de equivocar |
-| `reviewer` | `nemotron-3-ultra-550b-a55b` | Buscar el test que falta es recuperación a profundidad |
-| `extractor` | `kimi-k3` | La pasada 2 es síntesis |
+| `leader` | `nemotron-3-super` | Retiene el ciclo entero y no escribe código: RULER@1M 91,75, a tres puntos del Ultra y 85 veces más rápido |
+| `spec_author` | `deepseek-v4-flash` | Redactar EARS correcto es juicio; el más capaz de los tres rápidos |
+| `implementer` | `deepseek-v4-flash` | Coordina y hace terminal: Terminal-Bench 82,7 |
+| `frontend_dev` | `deepseek-v4-flash` | Mejor capacidad de código con latencia de trabajo |
+| `backend_dev` | `deepseek-v4-flash` | Migraciones y RLS: lo más caro de equivocar |
+| `reviewer` | `nemotron-3-super` | Buscar el test que falta es recuperación a profundidad |
+| `extractor` | `nemotron-3-super` | Lectura exhaustiva, rápida |
 
-**El `reviewer` no lleva `kimi-k3` en ninguna posición de su cadena, y es deliberado.** Revisa lo
-que escribió el `implementer`, que sí lo lleva. Un reviewer que cae al mismo modelo que produjo
-el código aprueba sus propios puntos ciegos, y el aviso del fallback dice "cambié de modelo", no
-"acabas de perder la revisión cruzada".
+**En la cadena del `reviewer`, `deepseek` va el último de los tres, y es deliberado.** Es el
+primario del `implementer`: un reviewer que cae en el mismo modelo que escribió el código aprueba
+sus propios puntos ciegos, y el aviso del fallback dice "cambié de modelo", no "acabas de perder
+la revisión cruzada".
 
-Cuando exista `scripts/next-feature.mjs` y el `leader` deje de cargar `feature_list.json` entero,
-su eje deja de ser retención y pasa a ser disciplina de orquestación: ahí el primario correcto
-pasa a ser `kimi-k3`. Es un cambio de una línea en `MODELOS`.
+El reparto está elegido por capacidad **dentro de los que responden en segundos**. La versión
+anterior lo eligió sólo por capacidad, y sus primarios tardaban entre 85 y 124 segundos por
+turno.
 
-## Credenciales: dos, no ocho
+## Credenciales: dos, no seis
 
-Las keys son **por proveedor, no por modelo**. Los ocho modelos que usa el arnés se cubren con
+Las keys son **por proveedor, no por modelo**. Los seis modelos que usa el arnés se cubren con
 dos credenciales, porque cada proveedor sirve todos los suyos por el mismo endpoint:
 
 | Credencial | Cubre | Dónde se saca |
 | --- | --- | --- |
-| `NVIDIA_API_KEY` | `kimi-k3`, `deepseek-v4-flash-0731`, `nemotron-3-ultra-550b-a55b`, `nemotron-3-super-120b-a12b`, `nemotron-3.5-lightning-30b-a3b` | https://build.nvidia.com |
+| `NVIDIA_API_KEY` | `nemotron-3-super-120b-a12b`, `deepseek-v4-flash-0731`, `gpt-oss-20b` | https://build.nvidia.com |
 | La sesión de opencode (`/connect`) | `big-pickle`, `nemotron-3-ultra-free`, `mimo-v2.5-free` | https://opencode.ai/auth |
 
-Los cinco modelos de NVIDIA —primarios y de respaldo— entran por **la misma** key, porque los
+Los modelos de NVIDIA —primarios y de respaldo— entran por **la misma** key, porque los
 sirve el mismo endpoint (`integrate.api.nvidia.com/v1`). Lo mismo con los tres de Zen. Añadir un
 modelo a una cadena de respaldo **no** añade una credencial mientras sea del mismo proveedor.
 
@@ -176,27 +176,36 @@ turno. El wrapper avisa antes de lanzar si `NVIDIA_API_KEY` sigue vacía.
 
 Petición real de un prompt trivial a cada modelo de las cadenas, con una clave válida:
 
-| Modelo | Respuesta a un prompt trivial | Rol donde está hoy |
+Petición real **con herramientas declaradas**, que es lo único que hace un agente. Los seis
+candidatos emitieron el `tool_call` correcto, así que el soporte de herramientas no discrimina.
+Lo que separa es la latencia:
+
+| Modelo | Con herramientas | En las cadenas |
 | --- | --- | --- |
-| `nemotron-3-super-120b-a12b` | **0,6 s** | sólo respaldo |
-| `deepseek-v4-flash-0731` | **8,4 s** | sólo respaldo |
-| `nemotron-3-ultra-550b-a55b` | **85 s** | primario de `leader` y `reviewer` |
-| `kimi-k3` | **144 s** | primario de otros cinco |
-| `nemotron-3.5-lightning-30b-a3b` | **285 s** | respaldo de `extractor` |
+| `nemotron-3-super-120b-a12b` | **1,0 s** | primario de `leader`, `reviewer`, `extractor` |
+| `gpt-oss-20b` | **1,5 s** | primer respaldo de todos |
+| `deepseek-v4-flash-0731` | **4,4 s** | primario de los cuatro que escriben |
+| `glm-5.3-flash` | 78 s | descartado |
+| `nemotron-3-ultra-550b-a55b` | 85 s | descartado |
+| `kimi-k3` | 124 s | descartado |
 
-Devolver "4" a la pregunta "2+2?" le costó a `kimi-k3` dos minutos y medio, y a
-`nemotron-3.5-lightning` —anunciado como *"the fastest 30B A3B MoE model"*— casi cinco. No es
-falta de presupuesto de tokens: se repitió con `max_tokens` amplio y el resultado fue el mismo.
-Todos devuelven `reasoning_content`: razonan antes de emitir la primera palabra visible.
+**Medir sin herramientas medía la tarea equivocada**, y medir una sola vez, peor todavía:
+`nemotron-3-super` devolvió `HTTP 500` en el primer intento y respondió en 1 segundo en el
+segundo; `deepseek` pasó de "sin respuesta en 90 s" a 4,4 s. En esta capa gratuita **una muestra
+no significa nada**, y eso tiene una consecuencia directa: el plugin de respaldo no es una
+comodidad por si retiran un modelo, es lo que absorbe los 500 y los cuelgues que forman parte
+del funcionamiento normal aquí.
 
-**Esto invierte el criterio de reparto.** El techo de ~40 peticiones/minuto deja de ser el
-cuello de botella: en un ciclo agéntico, donde cada tarea son decenas de idas y vueltas, un
-primario de 144 s convierte una feature en una jornada. Los dos únicos modelos con latencia de
-trabajo son `nemotron-3-super` (0,6 s, RULER@1M 91,75 e IFBench 72,56 — muy cerca del Ultra) y
-`deepseek-v4-flash` (8,4 s, Terminal-Bench 82,7).
+Lo que sí es real es el orden de magnitud. `kimi-k3` y `nemotron-3-ultra` eran los primarios de
+los siete agentes y tardan dos minutos y minuto y medio por turno: en un ciclo agéntico, donde
+cada tarea son decenas de idas y vueltas, eso convierte una feature en una jornada. Por eso
+salieron. El techo de ~40 peticiones/minuto de la cuenta nunca fue el cuello de botella.
 
-Son medidas de una sola muestra, en capa gratuita y en un momento dado; repítelas antes de
-rediseñar una cadena. Pero el orden de magnitud no es un matiz.
+Dos ausencias que conviene conocer: `nemotron-3.5-lightning-30b-a3b` tardó **285 s** pese a
+anunciarse como *"the fastest 30B A3B MoE model"*, y tres modelos del catálogo —`kimi-k2.6`,
+`nemotron-nano-3-30b-a3b`, `llama-3.1-nemotron-ultra-253b-v1`— **devuelven 404 al inferir aunque
+`/v1/models` los liste**. Eso acota lo que `scripts/check-modelos.mjs` puede prometer: verifica
+que el id esté **listado**, no que **responda**.
 
 El paso 3 no es cosmético: opencode escanea `~/.claude/skills/` y sincroniza comandos de Claude
 Code, así que sin él te aparecen los comandos del arnés duplicados y con sintaxis distinta.

@@ -26,12 +26,21 @@ const AVISO = '<!-- GENERADO por scripts/gen-opencode.mjs desde .claude/ - no ed
 // el implementer, que si lo lleva. Un reviewer que cae al mismo modelo que produjo el codigo
 // aprueba sus propios puntos ciegos, y el toast del fallback avisa del cambio de modelo, no
 // de que acabas de perder la revision cruzada.
+// Los tres que quedan se eligieron MIDIENDO, con una peticion real que incluye herramientas
+// -que es lo unico que hace un agente-. Los seis candidatos emiten `tool_call` correcto, asi
+// que el soporte de herramientas no discrimina; lo que separa es la latencia, por dos ordenes
+// de magnitud:
+//
+//   nemotron-3-super   1,0 s      deepseek-v4-flash   4,4 s      gpt-oss-20b   1,5 s
+//   glm-5.3-flash     78 s        nemotron-3-ultra   85 s        kimi-k3     124 s
+//
+// Por eso salieron de las cadenas `kimi-k3` y `nemotron-3-ultra`, que eran primarios de los
+// siete agentes: dos minutos por turno convierten una feature en una jornada. Tambien salio
+// `nemotron-3.5-lightning` (285 s), pese a anunciarse como "the fastest 30B A3B MoE model".
 const NVIDIA = {
-  kimi: 'nvidia/moonshotai/kimi-k3',
   deepseek: 'nvidia/deepseek-ai/deepseek-v4-flash-0731',
-  ultra: 'nvidia/nvidia/nemotron-3-ultra-550b-a55b',
   super: 'nvidia/nvidia/nemotron-3-super-120b-a12b',
-  lightning: 'nvidia/nvidia/nemotron-3.5-lightning-30b-a3b',
+  gptoss: 'nvidia/openai/gpt-oss-20b',
 };
 const ZEN = {
   pickle: 'opencode/big-pickle',
@@ -41,28 +50,27 @@ const ZEN = {
 
 // Nombre legible de cada modelo de NVIDIA, para el bloque `provider` de opencode.json.
 const NOMBRES = {
-  [NVIDIA.kimi]: 'Kimi K3',
   [NVIDIA.deepseek]: 'DeepSeek V4 Flash',
-  [NVIDIA.ultra]: 'Nemotron 3 Ultra',
   [NVIDIA.super]: 'Nemotron 3 Super',
-  [NVIDIA.lightning]: 'Nemotron 3.5 Lightning',
+  [NVIDIA.gptoss]: 'GPT-OSS 20B',
 };
 
 const MODELOS = {
-  // Retiene el estado del ciclo entero; no escribe codigo. RULER@1M de 94.7 manda aqui.
-  // Cuando exista `scripts/next-feature.mjs` su contexto se desploma y el eje pasa a ser
-  // disciplina de orquestacion: ahi el primario correcto es kimi-k3.
-  leader: [NVIDIA.ultra, NVIDIA.kimi, NVIDIA.deepseek, ZEN.ultraFree],
-  // Redactar EARS correcto es juicio, no checklist. Se llama una vez por feature.
-  spec_author: [NVIDIA.kimi, NVIDIA.ultra, NVIDIA.deepseek, ZEN.pickle],
-  // Coordina pero tambien hace terminal: tests, commit, `gh pr create`.
-  implementer: [NVIDIA.kimi, NVIDIA.deepseek, NVIDIA.ultra, ZEN.pickle],
-  frontend_dev: [NVIDIA.kimi, NVIDIA.deepseek, NVIDIA.super, ZEN.pickle],
+  // Retiene el estado del ciclo entero y no escribe codigo: RULER@1M de 91,75 -a tres puntos
+  // del Ultra- a 1 segundo en vez de 85.
+  leader: [NVIDIA.super, NVIDIA.gptoss, NVIDIA.deepseek, ZEN.ultraFree],
+  // Redactar EARS correcto es juicio; deepseek es el mas capaz de los tres rapidos.
+  spec_author: [NVIDIA.deepseek, NVIDIA.super, NVIDIA.gptoss, ZEN.pickle],
+  // Coordina pero tambien hace terminal: tests, commit, `gh pr create`. Terminal-Bench 82,7.
+  implementer: [NVIDIA.deepseek, NVIDIA.super, NVIDIA.gptoss, ZEN.pickle],
+  frontend_dev: [NVIDIA.deepseek, NVIDIA.super, NVIDIA.gptoss, ZEN.pickle],
   // Migraciones Prisma y RLS son lo mas caro de equivocar en este stack.
-  backend_dev: [NVIDIA.kimi, NVIDIA.deepseek, NVIDIA.super, ZEN.pickle],
-  // Sin kimi-k3 a proposito. Ver la nota de arriba.
-  reviewer: [NVIDIA.ultra, NVIDIA.super, NVIDIA.deepseek, ZEN.ultraFree],
-  extractor: [NVIDIA.kimi, NVIDIA.deepseek, NVIDIA.lightning, ZEN.mimo],
+  backend_dev: [NVIDIA.deepseek, NVIDIA.super, NVIDIA.gptoss, ZEN.pickle],
+  // Buscar el test que falta es recuperacion a profundidad: RULER manda. Y `deepseek` va el
+  // ULTIMO de los tres a proposito: es el primario del implementer, y un reviewer que cae en
+  // el mismo modelo que escribio el codigo aprueba sus propios puntos ciegos.
+  reviewer: [NVIDIA.super, NVIDIA.gptoss, NVIDIA.deepseek, ZEN.ultraFree],
+  extractor: [NVIDIA.super, NVIDIA.gptoss, NVIDIA.deepseek, ZEN.mimo],
 };
 
 // --- Vallas de escritura -----------------------------------------------------------------
@@ -120,8 +128,8 @@ const PERMISOS = {
 // `spec_author` lleva kimi-k3. Los otros dos se quedan con el del leader: `/extraer-modulo`
 // delega en el subagente `extractor` y `/jira-connect` solo encadena llamadas al MCP.
 const MODELO_COMANDO = {
-  'afinar-feature': NVIDIA.kimi,
-  'afinar-regla': NVIDIA.kimi,
+  'afinar-feature': NVIDIA.deepseek,
+  'afinar-regla': NVIDIA.deepseek,
 };
 
 const MODO = { leader: 'primary' };

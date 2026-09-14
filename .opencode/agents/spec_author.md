@@ -1,10 +1,10 @@
 ---
 description: "Escribe la especificacion de una feature (requirements EARS, design, tasks) en specs/<feature>/. No escribe codigo de produccion. Usalo en la fase 1 de cada feature SDD."
 mode: subagent
-model: nvidia/moonshotai/kimi-k3
+model: nvidia/deepseek-ai/deepseek-v4-flash-0731
 fallback_models:
-  - nvidia/nvidia/nemotron-3-ultra-550b-a55b
-  - nvidia/deepseek-ai/deepseek-v4-flash-0731
+  - nvidia/nvidia/nemotron-3-super-120b-a12b
+  - nvidia/openai/gpt-oss-20b
   - opencode/big-pickle
 tools:
   read: true

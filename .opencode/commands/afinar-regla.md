@@ -1,6 +1,6 @@
 ---
 description: "Interroga una mejora al arnes, detecta los ejes que omitiste y propone el parche exacto (argumento: <la mejora en bruto, en una frase>)"
-model: nvidia/moonshotai/kimi-k3
+model: nvidia/deepseek-ai/deepseek-v4-flash-0731
 ---
 <!-- GENERADO por scripts/gen-opencode.mjs desde .claude/ - no editar a mano -->
 
