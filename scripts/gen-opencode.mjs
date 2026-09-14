@@ -179,6 +179,11 @@ function agente(archivo) {
     'tools:',
     // Las omitidas se apagan EXPLICITAMENTE. Callarlas dejaria que el default de opencode le
     // devuelva `bash` al reviewer, que en Claude Code no lo tiene.
+    //
+    // OJO con `write` y `edit`: aqui son informativos. Comprobado con `opencode debug agent`,
+    // quien decide si el agente puede escribir es el bloque `permission.edit` de mas abajo, no
+    // esta lista: con `permission.edit: {"*": deny}` salen los dos en false aunque digan true,
+    // y con `allow` salen en true aunque digan false. La valla real es el permiso.
     ...TODAS.map((t) => `  ${t}: ${permitidas.has(t)}`),
     ...bloquePermisos(nombre),
     '---',
@@ -209,6 +214,7 @@ function comando(archivo) {
 // bien. Lo que importa es si lo generado esta al dia con su fuente, no si esta commiteado.
 const CHECK = process.argv.includes('--check');
 const desfasados = [];
+const huerfanos = [];
 
 function escribir(ruta, texto) {
   if (!CHECK) {
@@ -228,6 +234,17 @@ function emitir(origen, destino, fn) {
   for (const archivo of archivos) {
     const { texto } = fn(join(RAIZ, origen, archivo));
     escribir(join(RAIZ, destino, archivo), texto);
+  }
+
+  // En modo normal el directorio se borra entero antes de emitir, asi que un huerfano no
+  // sobrevive. En `--check` no se borra nada, y comparar archivo a archivo NO basta: si
+  // alguien elimina `.claude/agents/foo.md`, el `.opencode/agents/foo.md` generado se queda
+  // ahi para siempre y opencode sigue cargando un agente fantasma, con el gate en verde.
+  if (CHECK && existsSync(join(RAIZ, destino))) {
+    const esperados = new Set(archivos);
+    for (const f of readdirSync(join(RAIZ, destino)).filter((f) => f.endsWith('.md'))) {
+      if (!esperados.has(f)) huerfanos.push(`${destino}/${f}`);
+    }
   }
   return archivos.length;
 }
@@ -269,9 +286,15 @@ config.provider.nvidia.models = Object.fromEntries(
 escribir(rutaConfig, `${JSON.stringify(config, null, 2)}\n`);
 
 if (CHECK) {
-  if (desfasados.length > 0) {
-    console.error('gen-opencode --check: desfasados respecto a `.claude/`:');
-    for (const f of desfasados) console.error(`  - ${f}`);
+  if (desfasados.length > 0 || huerfanos.length > 0) {
+    if (desfasados.length > 0) {
+      console.error('gen-opencode --check: desfasados respecto a `.claude/`:');
+      for (const f of desfasados) console.error(`  - ${f}`);
+    }
+    if (huerfanos.length > 0) {
+      console.error('gen-opencode --check: sin fuente en `.claude/` (agentes fantasma):');
+      for (const f of huerfanos) console.error(`  - ${f}`);
+    }
     console.error('Corre `node scripts/gen-opencode.mjs` y commitea el resultado.');
     process.exit(1);
   }
