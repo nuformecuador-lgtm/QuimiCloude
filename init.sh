@@ -95,6 +95,41 @@ $VALIDACION"
   done
 fi
 
+# 4b. El arnes corre en dos herramientas y `.opencode/` es GENERADO desde `.claude/`.
+#
+#     Los formatos no son intercambiables -Claude Code declara `tools:` como CSV y no conoce
+#     `mode:` ni `permission:`; opencode quiere booleanos y globs de escritura- asi que la
+#     prosa vive una sola vez y `scripts/gen-opencode.mjs` la emite. Sin este check, los 22
+#     archivos divergen en silencio y te enteras el dia que un agente de opencode se comporta
+#     distinto al mismo agente en Claude Code, que es el peor momento para enterarse.
+#
+#     Va en los DOS modos: es instantaneo y no toca la red.
+if [ -f scripts/gen-opencode.mjs ]; then
+  DERIVA=$(node scripts/gen-opencode.mjs --check 2>&1) || fail "el arnes de opencode esta desfasado:
+$DERIVA"
+  ok "$(printf '%s' "$DERIVA" | head -1)"
+fi
+
+# 4c. Los ids de modelo configurados siguen existiendo.
+#
+#     El 2026-07-31 el id `opus-4.8` dejo de estar disponible y un `backend_dev` murio al
+#     arrancar sin escribir una linea. La respuesta de entonces fue prohibir que los agentes
+#     fijaran modelo; ahora vuelven a fijarlo -es lo que hace viable repartir siete roles entre
+#     modelos gratuitos- asi que el agujero se tapa por el otro lado: el id muerto sale aqui y
+#     no a mitad de una feature.
+#
+#     Solo en gate completo: son llamadas reales contra la API y la cuenta tiene techo de
+#     ritmo. Sin `NVIDIA_API_KEY` el script avisa y sigue, no falla.
+if [ "$MODO" = "completo" ] && [ -f scripts/check-modelos.mjs ]; then
+  MODELOS_OUT=$(node scripts/check-modelos.mjs 2>&1) || fail "hay ids de modelo retirados:
+$MODELOS_OUT"
+  # Se imprime por sustitucion y no con `while read`: con `printf '%s'` la ultima linea sale
+  # SIN salto final, `read` devuelve falso al leerla y el cuerpo del bucle no corre nunca. El
+  # paso quedaba mudo y en verde, que es exactamente el agujero que este archivo ya describe
+  # dos veces mas arriba.
+  ok "$(printf '%s' "$MODELOS_OUT" | tail -1 | sed 's/^ *//')"
+fi
+
 # 5. Worktrees acumulados. Es `warn`, NO `fail`, a proposito: poner el gate en rojo por
 #    tareas domesticas bloquearia trabajo real y la respuesta previsible seria ignorar el
 #    gate — justo lo que la regla 5 del CLAUDE.md intenta evitar. Pero tampoco puede ser
