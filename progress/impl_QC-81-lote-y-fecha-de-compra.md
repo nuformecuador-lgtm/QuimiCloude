@@ -765,6 +765,173 @@ con ellos queda **R1..R36 sin ningun requisito huerfano**:
 | R35 | `product-batch-input.test.ts` «R35: 59 digitos se aceptan y llegan tal cual» y «R35: 60 caracteres con una letra o un guion se aceptan y llegan tal cual»; el mismo `it` de integracion (paso 1) |
 | R36 | el mismo `it` de integracion (pasos 2 y 3) |
 
+### Limpieza de comentarios (B1, n1 y n2 de la segunda revision) · 8 `backend_dev` en paralelo · 2026-09-15
+
+**Por que.** La segunda revision rechazo con B1 (mayor): los comentarios de la rama citaban fichas,
+requisitos y `design.md`, contra la regla nueva «Comentarios (2026-09-15)» de `docs/conventions.md`.
+Esa regla vive en el arbol principal, sin commitear. El humano decidio el 2026-09-15 que se aplica a
+**QC-81 entera**: todo archivo de produccion y de test que la rama toca frente al merge-base con
+`origin/dev`, sin contar `specs/**` ni `progress/**`, se limpia **entero**. Cada archivo va en su
+propio commit `chore`, que cambia solo comentarios y ningun codigo. n1 va en la limpieza de
+`migration.sql`; n2 queda cubierto por la limpieza de los tests.
+
+**Como se comprobo «cero cambios de codigo».** Se uso un comprobador propio, fuera del repo, en
+`scratchpad/solo-comentarios.mjs`. Compara cada archivo contra `61220c4`, el ultimo commit antes de
+la limpieza:
+- **TS:** tokens del AST de TypeScript, sin trivia ni JSDoc. Una cadena o un literal de plantilla
+  cambiado da `NO`.
+- **SQL:** el texto sin comentarios `--` ni `/* */`, respetando las comillas, con los espacios
+  normalizados.
+- **Prisma:** el texto sin comentarios `//` ni `///`, respetando las comillas.
+- **Ademas:** que no cambie el numero de directivas que abren un comentario (`// @ts-expect-error`,
+  `/* eslint-disable`, etc.) ni el de `/// @module`, y el recuento de lineas de comentario y de lineas
+  con cita.
+
+La primera version contaba tambien las directivas mencionadas en prosa. Se endurecio a mitad de la
+tanda y se volvio a pasar sobre todo lo ya commiteado: sigue limpio.
+
+**Resultado por archivo.** Lineas de comentario y lineas con cita (`QC-n`, `R-n`, `D-n`, `T-n`,
+`design.md`, `requirements.md`, `tasks.md`, «decision cerrada»), antes y despues. En los 28, el codigo,
+las directivas y `@module` quedan identicos.
+
+| Archivo | Comentario antes -> despues | Citas antes -> despues |
+|---|---|---|
+| `lib/modules/inventario/domain/create-product.ts` | 119 -> 37 | 46 -> 0 |
+| `lib/modules/inventario/domain/errors.ts` | 48 -> 9 | 16 -> 0 |
+| `lib/modules/inventario/domain/product-batch-input.ts` | 138 -> 42 | 42 -> 0 |
+| `lib/modules/inventario/domain/product-batch.ts` | 35 -> 10 | 13 -> 0 |
+| `lib/modules/inventario/index.ts` | 30 -> 5 | 14 -> 0 |
+| `lib/modules/errores/domain/error-catalog.ts` | 54 -> 21 | 23 -> 0 |
+| `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts` | 582 -> 85 | 124 -> 0 |
+| `lib/modules/inventario/adapters/driving/product-actions.ts` | 163 -> 17 | 48 -> 0 |
+| `db/migrations/20260913120000_product_batch_lot_and_purchase_date/migration.sql` | 147 -> 22 | 39 -> 0 |
+| `tests/unit/inventario/schema/inventario-schema.test.ts` | 438 -> 87 | 138 -> 0 |
+| `tests/unit/inventario/qc81-alcance.test.ts` | 113 -> 68 | 29 -> 0 |
+| `tests/unit/inventario/create-product.test.ts` | 123 -> 53 | 41 -> 0 |
+| `tests/unit/inventario/product-actions.test.ts` | 134 -> 53 | 41 -> 0 |
+| `tests/unit/inventario/product-batch-input.test.ts` | 49 -> 28 | 28 -> 0 |
+| `tests/unit/inventario/product-batch-lot-retry.test.ts` | 25 -> 11 | 6 -> 0 |
+| `tests/unit/errores/catalogo.test.ts` | 57 -> 22 | 28 -> 0 |
+| `tests/unit/recetas-ui/recipe-route-contract.test.ts` | 472 -> 76 | 128 -> 0 |
+| `tests/guards/guard-identificador-de-request.test.ts` | 249 -> 42 | 62 -> 0 |
+| `tests/integration/inventario/product-batch-lot.int.test.ts` | 181 -> 65 | 23 -> 0 |
+| `tests/integration/inventario/product-batch-write.int.test.ts` | 131 -> 45 | 25 -> 0 |
+| `tests/integration/inventario/company-scope-queries.int.test.ts` | 154 -> 49 | 22 -> 0 |
+| `tests/integration/inventario/company-scope.int.test.ts` | 175 -> 58 | 29 -> 0 |
+| `tests/integration/inventario/list-query-products.int.test.ts` | 103 -> 39 | 29 -> 0 |
+| `tests/integration/inventario/presentation-uniqueness.int.test.ts` | 106 -> 32 | 19 -> 0 |
+| `tests/integration/inventario/presentation-unit.int.test.ts` | 92 -> 33 | 18 -> 0 |
+| `tests/integration/recetas/recetas-constraints.int.test.ts` | 291 -> 81 | 62 -> 0 |
+| `tests/integration/unidades/unidades-constraints.int.test.ts` | 412 -> 96 | 123 -> 0 |
+| `e2e/aislamiento-inventario.spec.ts` | 155 -> 56 | 24 -> 0 |
+| **Total (28 archivos)** | **4776 -> 1242** | **1240 -> 0** |
+
+**28 commits, del primero `fe3a786` al ultimo `6a8772a`**, uno por archivo:
+`chore(QC-81): limpia comentarios de <archivo>`.
+
+`tests/integration/aislamiento.json` es JSON y no tiene comentarios. Sus `motivo` son datos y no se
+tocan.
+
+**RETENIDOS: 4 archivos sin limpiar, porque un test EXIGE un comentario con cita.** Por instruccion
+del leader, no se tocaron ni se debilito ninguna asercion. Queda para decision humana:
+
+| Archivo retenido | Comentario / citas hoy | Test que exige la cita |
+|---|---|---|
+| `lib/modules/errores/domain/error-codes.ts` | 93 / 33 | `tests/unit/errores/catalogo.test.ts`, caso «la cabecera de error-codes.ts redacta la sexta enmienda con su fecha y su aprobacion» (hoy hacia `:183-187`): exige `'**Sexta enmienda, el 2026-09-15 (QC-81)**'` y `'Aprobada por el humano el 2026-09-15 en la puerta F1.4 de QC-81'` |
+| `db/migrations/20260913120000_product_batch_lot_and_purchase_date/down.sql` | 52 / 7 | `tests/unit/inventario/schema/product-batch-lot-migration.test.ts:351-359` (`downHeaderStatesItsLimits`, usado en `:594`): exige `/\(R23\)/`. Lo demas que exige (`NO VACIA NINGUN \`lot\``, `SI PIERDE`, `purchase_date`) no es cita |
+| `tests/unit/inventario/schema/product-batch-lot-migration.test.ts` | 117 / 28 | Retenido junto a `down.sql`: la asercion anterior es suya |
+| `db/schema.prisma` | 824 / 245 | `tests/unit/identity/schema/credential-setup-migration.test.ts:816-819` exige `QC-79.` y `tests/unit/identity/schema/session-revocation-migration.test.ts:887-890` exige `QC-23.` en comentarios del esquema. Con la version limpia puesta, los dos dieron rojo |
+
+- **Version limpia de `schema.prisma`, preparada.** Esta en
+  `scratchpad/limpieza-A-schema.prisma.propuesta`. En el sitio dio 0 citas y codigo, directivas y
+  `@module` identicos.
+- **Un tercer test que tambien lee ese esquema:** `unidades-schema.test.ts:294-296` pide nombrar
+  `units_equivalence_and_scope`. No es una cita, y la propuesta la respeta. No se probo en el sitio,
+  porque el archivo ya estaba restaurado.
+
+**Porques conservados, cortos y sin citas (ejemplos que tenian que sobrevivir).**
+- El lock de aviso va como sentencia aparte y antes del `SELECT max`: en READ COMMITTED cada
+  sentencia toma su instantanea.
+- `numeric` y `BigInt` sobre texto: sin techo, y `Number` redondea a partir de 2^53.
+- El duplicado se reconoce por las columnas de `meta.target`, igual que en `unit-write-prisma.ts`.
+- El reintento va fuera de `prisma.$transaction`: una transaccion abortada no admite mas sentencias.
+- El parentesis `NO FORCE` / `FORCE` de RLS, `AT TIME ZONE 'UTC'` y el desempate por `id` en la
+  migracion.
+- `/^[0-9]+$/` (el mismo conjunto que la serie) y `abort: true` en `lotSchema`.
+- Por que la carrera exige un pool de mas de una conexion, y por que espera con `Promise.allSettled`.
+
+**n1 hecho** en `migration.sql:63`: «Limite conocido: solo aborta si una empresa tiene un lote de 60
+nueves y ademas filas sin lote que rellenar.»
+
+**Motivos que se quitaron por falsos o no verificados, en vez de reescribirlos.** Lo manda la regla:
+«si el motivo no esta verificado, no se escribe».
+- `product-prisma.ts`: decia que la fecha se corre de dia en las zonas negativas; es al reves. El
+  comentario nuevo no da el signo.
+- `product-prisma.ts`, `addBatchToAlive`: decia que la transaccion impide borrar el producto antes del
+  `INSERT`, y sin `FOR UPDATE` no lo impide.
+- `product-actions.ts`: decia que `z.number().int()` aceptaria `NaN`, y con zod 4.4.3 se rechaza. Se
+  conserva el porque que si se sostiene: sin el patron, `'1e3'` o `'0x10'` pasarian.
+- `errors.ts`: el motivo de `Object.setPrototypeOf` (que TypeScript rompe la cadena de prototipos) no
+  se sostiene con `target: ES2017`. La linea de codigo queda intacta; si sigue haciendo falta es otra
+  decision.
+- `create-product.test.ts`: decia que el borde manda `null` con el campo vacio, y
+  `readOptionalFormString` devuelve `undefined`.
+- `product-actions.test.ts`: que sin `readRequestIdHeader` en el doble el modulo no carga. No
+  verificado.
+- Integracion de inventario: seis motivos no verificados. Entre ellos, que Prisma ejecuta cada
+  `migration.sql` en una sola transaccion; se sustituyo por el porque que el propio test muestra.
+  Lista completa en el informe del grupo F.
+
+**Desviaciones frente a instrucciones anteriores.** Gana la regla, por decision humana del 2026-09-15.
+- **`tasks.md > T13`** ordenaba que el docblock de `lotSchema` citara D13 y R34, y que el «LIMITE
+  CONOCIDO» de `resolveLot` remitiera a P1. Esas citas se quitan y queda solo el porque. `specs/` no se
+  toca.
+- **m2:** la cabecera de `inventario-schema.test.ts` que nombraba las inversiones aprobadas el
+  2026-09-15 era historia y se quita.
+- **T11:** el comentario de `E2E_TOLERADO` en `qc81-alcance.test.ts`, que citaba la decision humana del
+  E2E, se reescribe sin citas. La excepcion sigue escrita en la seccion DECISION de esta bitacora.
+- **La excepcion de R29:** en `e2e/aislamiento-inventario.spec.ts`, el comentario de la preparacion del
+  lote citaba la ficha y el requisito, no explicaba un porque y se quita. `lot` y `purchaseDate`, el
+  recorrido y las aserciones siguen identicos (comprobador: codigo igual).
+
+**Citas que quedan en CODIGO, fuera del alcance de la regla (que es de comentarios).** No se tocaron:
+- mensajes de `RAISE EXCEPTION` de la migracion, como `'QC-81: tras el relleno siguen % fila(s) ...
+  (R7, R22)'` (`migration.sql:96`) y la guardia de duplicados;
+- literales de `expect` que tienen que coincidir con esos mensajes: `toContain('QC-81: hay 1 lote(s)
+  repetido(s)')` y `toContain('QC-49 down')`;
+- identificadores como `MIGRACION_QC34` en `recipe-route-contract.test.ts`;
+- los nombres de los casos con `R<n>`, que la regla permite.
+
+Cambiar cualquiera de ellos seria un cambio de codigo, y lo decide el leader.
+
+**Verificacion tras la limpieza** (el implementer, sobre el HEAD `6a8772a`)
+```
+$ pnpm run typecheck   -> exit_typecheck=0
+$ pnpm run lint        -> exit_lint=0
+$ pnpm exec vitest run guard
+ Test Files  39 passed (39)
+      Tests  407 passed | 9 skipped (416)
+$ pnpm exec vitest related --run --project node --project ui <los 8 archivos de lib limpiados>
+ Test Files  242 passed (242)
+      Tests  3652 passed | 20 skipped (3672)
+$ pnpm exec vitest run --project node --project ui schema migration tests/unit/inventario/ tests/unit/errores/ tests/unit/unidades/module-contract.test.ts tests/unit/recetas-ui/recipe-route-contract.test.ts tests/unit/identity/usuarios/scope.test.ts
+ FAIL  |node| tests/unit/identity/usuarios/scope.test.ts > ... > R45 — ningun archivo de produccion de la feature lee ni escribe los tres contadores de bloqueo de QC-19
+AssertionError: ... lib/modules/identity/adapters/driven/persistence/user-admin-prisma.ts: failedLoginAttempts; ... lockLevel; ... lockedUntil
+ Test Files  1 failed | 59 passed (60)
+      Tests  1 failed | 1099 passed | 5 skipped (1105)
+```
+
+**Ese unico rojo NO es de QC-81.**
+- **Origen:** protesta contra `lib/modules/identity/adapters/driven/persistence/user-admin-prisma.ts`,
+  que no esta en el diff de la rama (`git diff --name-only <merge-base> HEAD | grep -c user-admin-prisma`
+  da 0). Lo cambio por ultima vez `f728d15 feat(QC-95): implementa desbloqueo-manual-limpia-el-conteo`,
+  que ya esta en `origin/dev`.
+- **Antes de la limpieza:** el grupo A lo vio rojo antes de tocar nada.
+- **Baseline:** no esta en `tests/baseline-rojos.json`, asi que el gate completo lo marcara. Es deuda
+  de `dev` para el leader.
+
+No se corrio integracion ni E2E: el codigo es identico por tokens en todos los archivos.
+
 ## Estado final de F2.1
 
 | Task | Estado |
