@@ -1,17 +1,8 @@
-// lib/modules/inventario/index.ts — CONTRATO PUBLICO del modulo inventario.
-// Regla: solo reexporta de ./domain. Nada de 'use server', nada de Prisma, nada de next/*.
-// Debe poder importarse desde un componente de cliente sin arrastrar servidor (R31,
-// `design.md > 3`) -QC-22 lo hara-.
+// Contrato publico del modulo. Lo importa un componente de cliente, asi que no puede arrastrar
+// servidor.
 export { requirePermission, type Actor } from './domain/actor';
-// QC-49 (R13): el AMBITO por empresa. Se publica en el contrato -como `UnitScope` en
-// `unidades`- porque lo exigen las doce firmas de los dos puertos y lo construyen los nueve
-// casos de uso: quien implemente un adaptador o escriba un doble de test lo necesita, y debe
-// poder pedirlo por el barrel y no por una ruta profunda. Es solo un tipo: no arrastra nada.
+// Lo piden las firmas de los puertos: quien escriba un adaptador o un doble de test lo toma de aqui.
 export type { InventoryScope } from './domain/inventory-scope';
-// QC-70 (R17, R18): `NotFoundError` se abrio en `ProductNotFoundError` y
-// `PresentationNotFoundError`, y `DuplicateNameError` paso a `PresentationDuplicateNameError`.
-// El codigo generico no podia tener UN mensaje que dijera a la vez «el producto» y «la
-// presentacion», que es lo que el catalogo unico exige (`design.md > 3`, `> 4.1`).
 export {
   InventarioError,
   UnauthorizedError,
@@ -20,13 +11,9 @@ export {
   PresentationDuplicateNameError,
   PresentationInUseError,
   ValidationError,
-  // QC-81 (R13): el lote escrito a mano repetido en la empresa. Se publica como los demas errores
-  // de la familia: quien escriba un doble del repositorio o pinte el rechazo lo pide por aqui.
   BatchDuplicateLotError,
 } from './domain/errors';
 export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
-// QC-57 (R24, R31): el contrato generico de consulta de lista. `productQuerySchema` y
-// `ProductQuery` se fueron con el: el listado de productos ya no tiene busqueda propia.
 export {
   type ListFilterKind,
   type ListFilterValue,
@@ -41,9 +28,6 @@ export {
 export { PRESENTATION_QUERYABLE } from './domain/presentation-queryable';
 export { PRODUCT_QUERYABLE } from './domain/product-queryable';
 export { normalizePresentationName } from './domain/presentation-name';
-// QC-57 (R19): la UNICA definicion de «mismo nombre de producto». Se publica en el contrato
-// -como las otras cuatro `normalize*Name`- para que sus tests la importen por aqui y no por
-// una ruta profunda: si el barrel dejara de exportarla, el test no compilaria.
 export { normalizeProductName } from './domain/product-name';
 export {
   createPresentationSchema,
@@ -57,22 +41,15 @@ export {
   type CreateProductInput,
   type UpdateProductInput,
 } from './domain/product-input';
-// QC-90 (R24, R27): el esquema del alta CON su primer lote. Se publica porque lo usan los
-// DOS lados -el formulario de cliente y el caso de uso-, y ese es justo el motivo de que este
-// barrel tenga que seguir siendo client-safe: no arrastra `next/*`, ni `'use server'`, ni
-// Prisma. `createProductSchema` sigue publicandose aparte: es el de la edicion (R26).
 export {
   PRODUCT_BATCH_LOT_MAX_LENGTH,
   createProductWithFirstBatchSchema,
   type CreateProductWithFirstBatchInput,
 } from './domain/product-batch-input';
-// Solo el TIPO del lote que se escribe (R30): el contrato no expone -ni expondra en esta
-// ficha- ninguna operacion de listar, editar ni borrar lotes.
 export { type NewProductBatch } from './domain/product-batch';
 export { type NewProduct, type ProductView } from './domain/product-view';
 export { type PresentationView } from './domain/presentation-view';
 
-// Las nueve factories de caso de uso (`design.md > 3`).
 export { createCreateProduct, type CreateProductDeps } from './domain/create-product';
 export { createUpdateProduct, type UpdateProductDeps } from './domain/update-product';
 export { createDeleteProduct, type DeleteProductDeps } from './domain/delete-product';
@@ -83,8 +60,6 @@ export { createUpdatePresentation, type UpdatePresentationDeps } from './domain/
 export { createDeletePresentation, type DeletePresentationDeps } from './domain/delete-presentation';
 export { createListPresentations, type ListPresentationsDeps } from './domain/list-presentations';
 
-// --- Costura hacia otros modulos, aportada por QC-24 ---------------------------------
-// Publica SOLO TIPOS: es por donde `recetas` apunta a un producto sin tocar la tabla
-// `products` ni el cliente Prisma. La implementacion de `ProductCatalog` es un adaptador
-// driven de ESTE modulo y su cableado vive en `lib/composition`; las trae QC-25.
+// Solo tipos: por aqui otros modulos apuntan a un producto sin tocar la tabla ni Prisma. La
+// implementacion se cablea en `lib/composition`.
 export type { ProductCatalog, ProductId, ProductRef } from './domain/product-catalog';
