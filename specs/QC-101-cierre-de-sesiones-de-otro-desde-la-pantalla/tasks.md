@@ -38,7 +38,7 @@
 
 ## Mitad pantalla
 
-- [ ] **T4 [P] — Textos.** Anadir a
+- [x] **T4 [P] — Textos.** Anadir a
       `app/(private)/configuracion/usuarios/components/user-labels.ts`:
       `endUserSessionsLabel(displayName)`, el texto del dialogo (nombre dentro + «tendra que volver a
       entrar») y el del aviso de exito. **Ninguno promete numero** (R19). Actualizar
@@ -46,7 +46,7 @@
       **Hecho:** los textos existen en un solo sitio y ningun test copia literales.
       *Depende de: nada. Paralelo a T1.*
 
-- [ ] **T5 — El dialogo.** Crear
+- [x] **T5 — El dialogo.** Crear
       `app/(private)/configuracion/usuarios/components/end-user-sessions-dialog.tsx` (`'use client'`)
       con la forma de `delete-user-dialog.tsx`: `AlertDialog`, `useActionState`, `<form>` con el `id`
       oculto, error **dentro** por `data-code` con `UnexpectedErrorNotice` para `unexpected`, y en
@@ -55,7 +55,7 @@
       **Hecho:** el componente monta aislado en un test y no invoca la action al abrirse.
       *Depende de: T1 (la action) y T4 (los textos).*
 
-- [ ] **T6 — El disparador dentro del panel.** Modificar `user-form.tsx` para aceptar
+- [x] **T6 — El disparador dentro del panel.** Modificar `user-form.tsx` para aceptar
       `onEndSessions?: () => void` y pintar el control (`type="button"`, etiqueta accesible con el
       nombre) **solo si llega**; modificar `user-sheet.tsx` para calcular
       `canEndSessions = user !== null && user.accountStatus === 'active' && user.id !== currentUserId`,
@@ -63,19 +63,19 @@
       **Hecho:** sin callback no se emite nada en el DOM, ni un contenedor vacio.
       *Depende de: T5.*
 
-- [ ] **T7 — El `currentUserId` baja por props.** `page.tsx`: `canModifyUsers()` pasa a devolver
+- [x] **T7 — El `currentUserId` baja por props.** `page.tsx`: `canModifyUsers()` pasa a devolver
       `{ canModify, currentUserId }` de la **misma** lectura de `getSessionUser()`; propagarlo por
       `UserListSection` → `UserTable` → `UserSheet`. Ningun componente de cliente lee la sesion (R16).
       **Hecho:** `pnpm run typecheck` verde y la cadena de props completa.
       *Depende de: T6.*
 
-- [ ] **T8 — Barrel.** Republicar en
+- [x] **T8 — Barrel.** Republicar en
       `app/(private)/configuracion/usuarios/components/index.ts` **todos** los nombres nuevos
       (componente, props y `*_TESTID`), y actualizar las props cambiadas.
       **Hecho:** `usuarios-convenciones.test.ts` verde por los dos lados.
       *Depende de: T7.*
 
-- [ ] **T9 — Tests de componente.** En `tests/unit/configuracion-ui/`:
+- [x] **T9 — Tests de componente.** En `tests/unit/configuracion-ui/`:
       `end-user-sessions-dialog.test.tsx` (R9 nombre dentro y no invoca al abrir, R10 una sola
       invocacion, R13 exito, R14 error dentro y dialogo abierto) y ampliaciones de
       `user-sheet.test.tsx` / `user-form.test.tsx` (R7 se ofrece sobre otro activo; **R11** cuenta no

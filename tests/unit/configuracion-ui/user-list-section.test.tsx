@@ -103,6 +103,18 @@ vi.mock('@/lib/modules/identity/adapters/driving/role-actions', () => ({
 //
 // Que las SIETE lancen **TENSA** lo que el archivo afirma —la pestana de personas no consulta ni
 // escribe NADA de grupos— en vez de relajarlo (QC-85 R6).
+// QC-101 T7 — La Server Action del CIERRE DE SESIONES, doble que FALLA si se la llama.
+//
+// Mismo motivo que el bloque de grupos: el panel de detalle monta ahora el dialogo del cierre de
+// sesiones, y `session-actions.ts` lee `observabilidad` de `@/lib/composition` al cargarse —y el
+// doble de composicion de este archivo declara solo `identity`—. Pintar la lista no cierra la
+// sesion de nadie: si alguien la llamara, el caso se pondria rojo.
+vi.mock('@/lib/modules/identity/adapters/driving/session-actions', () => ({
+  endAllSessionsAction: vi.fn(() => {
+    throw new Error('endAllSessionsAction no debe invocarse al pintar la lista');
+  }),
+}));
+
 vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => {
   const noDebeInvocarse = (nombre: string) => () => {
     throw new Error(`${nombre} no debe invocarse desde la pestana de personas`);
@@ -165,7 +177,7 @@ function parametros(overrides: Partial<DataTableParams> = {}): DataTableParams {
 
 /** Monta la seccion REAL, resolviendo antes el Server Component `async`. */
 async function renderSeccion(params: DataTableParams = parametros(), canModify = true) {
-  return render(await UserListSection({ params, canModify }));
+  return render(await UserListSection({ params, canModify, currentUserId: null }));
 }
 
 /** Fuente de la seccion sin comentarios: el JSDoc NOMBRA lo que el codigo no debe hacer. */

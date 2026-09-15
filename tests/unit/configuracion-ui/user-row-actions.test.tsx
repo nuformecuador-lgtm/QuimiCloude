@@ -21,6 +21,7 @@ import {
   changeUserStatusLabel,
   deleteUserLabel,
   editUserLabel,
+  endUserSessionsLabel,
 } from '@/app/(private)/configuracion/usuarios/components';
 import { USER_ACCOUNT_STATUSES, type UserRow } from '@/lib/modules/identity';
 
@@ -157,6 +158,24 @@ describe('los disparadores avisan con la fila, y no hacen nada mas (R36)', () =>
     }
 
     expect(screen.getAllByRole('button')).toHaveLength(3);
+  });
+
+  it('R8 — QC-101 no anade nada a la fila: exactamente tres controles, ninguno de sesiones y sin menu', () => {
+    render(<UserRowActions user={USUARIO} canModify />);
+
+    const celda = screen.getByTestId(USER_ROW_ACTIONS_TESTID);
+    // Exactamente los tres de hoy, identificados uno a uno, y ni uno mas de ningun tipo.
+    expect(celda.querySelectorAll('button, a, [role="button"], [role="menuitem"]')).toHaveLength(3);
+    expect(
+      [...celda.querySelectorAll('button')].map((boton) => boton.getAttribute('data-testid')).sort(),
+    ).toEqual([USER_ACTION_DELETE_TESTID, USER_ACTION_EDIT_TESTID, USER_ACTION_STATUS_TESTID].sort());
+    // El cierre de sesiones vive en el panel de detalle, nunca en la fila.
+    expect(
+      screen.queryByRole('button', { name: endUserSessionsLabel(USUARIO.displayName) }),
+    ).toBeNull();
+    // Y no se introduce ningun menu desplegable de fila.
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(celda.querySelectorAll('[aria-haspopup]')).toHaveLength(0);
   });
 
   it('la celda lleva el identificador de la fila como DATO, no como texto visible', () => {

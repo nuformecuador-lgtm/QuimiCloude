@@ -72,8 +72,10 @@ const BARREL_DE_LA_RUTA = `@/${CARPETA_DE_COMPONENTES}`;
  * | QC-85 T8-T11 | `work-group-form.tsx`, `work-group-members.tsx`, `work-group-sheet.tsx` y
  * |              | `delete-work-group-dialog.tsx`: las escrituras de grupos —el nombre, los
  * |              | miembros, el panel que los junta y la confirmacion del borrado| 27 |
+ * | QC-101 T5 | `end-user-sessions-dialog.tsx`: la confirmacion del cierre de todas las sesiones
+ * |           | de otra persona, montada desde el panel de detalle | 28 |
  */
-const COMPONENTES_ESPERADOS = 27;
+const COMPONENTES_ESPERADOS = 28;
 
 /** Carpetas del repo que se barren buscando importes por ruta profunda (R38). */
 const CARPETAS_DEL_REPO = ['app', 'components', 'lib', 'tests'] as const;
@@ -137,11 +139,21 @@ const ACCIONES_DE_GRUPO = [
   'listWorkGroupMembersAction',
 ] as const;
 
+/**
+ * La Server Action del CIERRE DE SESIONES (QC-101 T1), en SU propio archivo y tambien por su ruta
+ * exacta. Alta de QC-101 con el mismo criterio que la de grupos: la lista se TENSA, nunca se relaja,
+ * y el dialogo del panel queda medido igual que los otros quince usos.
+ */
+const RUTA_DE_LAS_ACCIONES_DE_SESION = '@/lib/modules/identity/adapters/driving/session-actions';
+
+const ACCIONES_DE_SESION = ['endAllSessionsAction'] as const;
+
 /** Ruta exacta -> acciones que solo pueden entrar por ella. */
 const ACCIONES_POR_RUTA = [
   [RUTA_DE_LAS_ACCIONES_DE_USUARIO, ACCIONES_DE_USUARIO],
   [RUTA_DE_LAS_ACCIONES_DE_ROL, ACCIONES_DE_ROL],
   [RUTA_DE_LAS_ACCIONES_DE_GRUPO, ACCIONES_DE_GRUPO],
+  [RUTA_DE_LAS_ACCIONES_DE_SESION, ACCIONES_DE_SESION],
 ] as const;
 
 /** Todas las acciones juntas: lo que JAMAS puede salir del barrel del modulo (R36). */
@@ -149,6 +161,7 @@ const TODAS_LAS_ACCIONES = [
   ...ACCIONES_DE_USUARIO,
   ...ACCIONES_DE_ROL,
   ...ACCIONES_DE_GRUPO,
+  ...ACCIONES_DE_SESION,
 ] as const;
 
 /** Barrel del modulo: por aqui salen contratos y tipos, JAMAS una Server Action (R36). */

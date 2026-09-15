@@ -41,6 +41,10 @@ export {
   changeUserStatusLabel,
   deleteUserLabel,
   editUserLabel,
+  endUserSessionsLabel,
+  endUserSessionsMessage,
+  endUserSessionsSuccess,
+  endUserSessionsTitle,
   toDateInputValue,
 } from './user-labels';
 export {
@@ -56,6 +60,19 @@ export {
   DeleteUserDialog,
   type DeleteUserDialogProps,
 } from './delete-user-dialog';
+export {
+  END_USER_SESSIONS_CONFIRM_TESTID,
+  END_USER_SESSIONS_DIALOG_TESTID,
+  END_USER_SESSIONS_DISMISS_TESTID,
+  END_USER_SESSIONS_ERROR_MESSAGE_TESTID,
+  END_USER_SESSIONS_ERROR_TESTID,
+  END_USER_SESSIONS_FORM_TESTID,
+  END_USER_SESSIONS_ID_FIELD,
+  END_USER_SESSIONS_ID_TESTID,
+  END_USER_SESSIONS_MESSAGE_TESTID,
+  EndUserSessionsDialog,
+  type EndUserSessionsDialogProps,
+} from './end-user-sessions-dialog';
 export {
   ACTIONS_COLUMN_ID,
   DISPLAY_NAME_COLUMN_ID,
@@ -122,6 +139,7 @@ export {
   USER_FIELD_TESTIDS,
   USER_FIRST_NAMES_FIELD,
   USER_FORM_CANCEL_TESTID,
+  USER_FORM_END_SESSIONS_TESTID,
   USER_FORM_ERROR_CODE_TESTID,
   USER_FORM_ERROR_TESTID,
   USER_FORM_SUBMIT_TESTID,
@@ -135,6 +153,7 @@ export {
   USER_USERNAME_FIELD,
   UserForm,
   type UserFieldName,
+  type UserFormEndSessions,
   type UserFormProps,
 } from './user-form';
 export {
