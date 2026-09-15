@@ -36,11 +36,11 @@
 //
 // **Por que este archivo no se pondra rojo por trabajo ajeno.** El rango es inmutable. Lo que
 // hagan las fichas siguientes con `db/`, `app/` o `package.json` no entra en el rango, asi que no
-// repite el fallo de las seis guardias de `tests/baseline-rojos.json`. Su unica dependencia del
-// arbol vivo es que las rutas de R8 existan, y es a proposito (ver `RUTAS_R8`).
+// repite el fallo de las seis guardias de `tests/baseline-rojos.json`. Tampoco depende del arbol
+// vivo: que las rutas de R8 existan se comprueba en el arbol del merge, no en disco (ver `RUTAS_R8`).
 
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -75,6 +75,11 @@ export const MERGE_DEL_PR_70 = 'f777c56f941b0fdae1566663d24f82fd413fd1b5'
 
 /** El unico commit de la feature (segundo padre de `MERGE_DEL_PR_70`). */
 export const COMMIT_DE_LA_FEATURE = 'f728d154cd3dff6a20f1de0ca9c79ad9b743e102'
+
+/** SHA abreviado para los titulos: salen de las constantes y no pueden desalinearse de ellas. */
+export function corto(sha: string): string {
+  return sha.slice(0, 7)
+}
 
 /** Los tres archivos de produccion de QC-95: si el rango no los trae, no es el rango de QC-95. */
 export const PRODUCCION_DE_QC95 = [
@@ -126,9 +131,10 @@ export const CARPETA_DEL_SPEC_DE_QC95 = 'specs/QC-95-desbloqueo-manual-limpia-el
  * - `lib/composition/index.ts`: cablea el login, pero R8 no lo nombra. Su intangibilidad la
  *   revisa la review (§2), no este requisito.
  *
- * Por que cada ruta tambien tiene que EXISTIR en disco: si alguien renombra una, la lista pasaria
- * a vigilar una ruta que ya no esta y el caso seguiria verde sin mirar nada. Asi cae y obliga a
- * actualizar la lista.
+ * Por que cada ruta tambien tiene que EXISTIR en el arbol del merge: una ruta mal escrita no
+ * coincidiria nunca con nada del rango y el caso seguiria verde sin mirar nada. Se mira el arbol
+ * del merge y no el disco para que un renombrado posterior, de otra ficha, no ponga roja esta
+ * guardia: lo que importa es que el rango habria visto la ruta.
  */
 export const RUTAS_R8 = [
   'lib/modules/identity/domain/account-lock.ts',
@@ -265,6 +271,22 @@ export function padresDe(sha: string, git: EjecutorGit): string[] {
     .filter((padre) => padre.length > 0)
 }
 
+/**
+ * Las de `rutas` que NO estan en el arbol de `MERGE_DEL_PR_70`. LANZA con `mensajeNoComprobado` si
+ * el propio merge no esta en el clon: eso no es una ruta ausente, es no haber podido mirar.
+ */
+export function rutasAusentesEnElMerge(rutas: readonly string[], git: EjecutorGit): string[] {
+  exigirCommit(MERGE_DEL_PR_70, 'merge del PR #70', git)
+  return rutas.filter((ruta) => {
+    try {
+      git(['cat-file', '-e', `${MERGE_DEL_PR_70}:${ruta}`])
+      return false
+    } catch {
+      return true
+    }
+  })
+}
+
 // ---------------------------------------------------------------------------------------------
 // Anclas (puras)
 // ---------------------------------------------------------------------------------------------
@@ -364,7 +386,7 @@ function auditoriaReal(): AuditoriaDelPr {
 // ---------------------------------------------------------------------------------------------
 
 describe('QC-95 — el alcance del PR #70, medido sobre su rango inmutable (R8, R9, R10)', () => {
-  it('ancla (1): el merge f777c56 tiene exactamente los padres 0ed8431 (dev) y f728d15 (la feature)', () => {
+  it(`ancla (1): el merge ${corto(MERGE_DEL_PR_70)} tiene exactamente los padres ${corto(BASE_DEL_PR_70)} (dev) y ${corto(COMMIT_DE_LA_FEATURE)} (la feature)`, () => {
     const { padresDelMerge } = auditoriaReal()
     expect(anclaPadres(padresDelMerge), anclaPadres(padresDelMerge).join('\n')).toEqual([])
   })
@@ -408,13 +430,15 @@ describe('QC-95 — el alcance del PR #70, medido sobre su rango inmutable (R8, 
     ).toEqual([])
   })
 
-  it('R8: cada archivo vigilado por R8 existe en disco (un renombrado tira la guardia en vez de medir aire)', () => {
-    const ausentes = RUTAS_R8.filter((ruta) => !existsSync(join(repoRoot, ruta)))
+  it(`R8: cada archivo vigilado por R8 existe en el arbol del merge ${corto(MERGE_DEL_PR_70)} (una ruta mal escrita tira la guardia en vez de medir aire)`, () => {
+    const ausentes = rutasAusentesEnElMerge(RUTAS_R8, gitReal)
     expect(
       ausentes,
-      `Rutas de R8 que ya no estan en disco:\n${ausentes.join('\n')}\n` +
-        'Si se renombraron, actualiza RUTAS_R8 con la ruta nueva Y mira si ese renombrado vino de ' +
-        'QC-95 (no deberia: R8). Si se borraron, decide si el requisito sigue teniendo objeto.',
+      `Rutas de RUTAS_R8 que no existian en el arbol del merge ${MERGE_DEL_PR_70} del PR #70:\n` +
+        `${ausentes.join('\n')}\n` +
+        `El rango ${BASE_DEL_PR_70}..${MERGE_DEL_PR_70} no las habria visto nunca, asi que R8 estaria ` +
+        'midiendo aire: la ruta esta mal escrita. Corrigela con la ruta que tenia el archivo en ese ' +
+        'merge (un renombrado posterior no cuenta: el rango es el del PR #70).',
     ).toEqual([])
   })
 })
@@ -445,6 +469,8 @@ interface ClonFalso {
   /** Clave `base..punta`, con la misma grafia que recibe `archivosDelRango`. */
   readonly diffs?: Readonly<Record<string, readonly string[]>>
   readonly diffRoto?: boolean
+  /** Rutas presentes en el arbol de cada commit, para `cat-file -e <sha>:<ruta>`. */
+  readonly arboles?: Readonly<Record<string, readonly string[]>>
 }
 
 function falloDeGit(que: string): never {
@@ -465,6 +491,13 @@ function gitFalso(clon: ClonFalso): EjecutorGit {
     }
     if (args[0] === 'cat-file') {
       const rev = args[args.length - 1] ?? ''
+      const separador = rev.indexOf(':')
+      if (separador !== -1) {
+        const sha = rev.slice(0, separador)
+        const ruta = rev.slice(separador + 1)
+        const enElArbol = clon.commits.includes(sha) && (clon.arboles?.[sha] ?? []).includes(ruta)
+        return enElArbol ? '' : falloDeGit(`path '${ruta}' does not exist in '${sha}'`)
+      }
       return existe(rev) ? '' : falloDeGit(`Not a valid object name ${rev}`)
     }
     if (args[0] === 'show') {
@@ -616,5 +649,33 @@ describe('QC-95 — los detectores de alcance MUERDEN (casos sinteticos)', () =>
     expect(() => archivosDelRango(BASE_DEL_PR_70, MERGE_DEL_PR_70, gitFalso(clon))).toThrow(
       /NO se han comprobado[\s\S]*git fetch --unshallow/,
     )
+  })
+
+  it('R8: una ruta que no esta en el arbol del merge es hallazgo y se nombra (ruta mal escrita)', () => {
+    const malEscrita = 'lib/modules/identity/domain/session-user-prisma.ts'
+    const clon: ClonFalso = {
+      ...clonSano(ARCHIVOS_DEL_PR_70_A_MANO),
+      arboles: { [MERGE_DEL_PR_70]: [...RUTAS_R8] },
+    }
+    expect(rutasAusentesEnElMerge([...RUTAS_R8, malEscrita], gitFalso(clon))).toEqual([malEscrita])
+  })
+
+  it('R8: con todas las rutas en el arbol del merge no hay hallazgos', () => {
+    const clon: ClonFalso = {
+      ...clonSano(ARCHIVOS_DEL_PR_70_A_MANO),
+      arboles: { [MERGE_DEL_PR_70]: [...RUTAS_R8] },
+    }
+    expect(rutasAusentesEnElMerge(RUTAS_R8, gitFalso(clon))).toEqual([])
+  })
+
+  it('R8: si el merge no esta en el clon, la existencia de las rutas lanza con `git fetch`, no las da por ausentes ni salta', () => {
+    const clon: ClonFalso = {
+      ...clonSano(ARCHIVOS_DEL_PR_70_A_MANO),
+      commits: [BASE_DEL_PR_70, COMMIT_DE_LA_FEATURE],
+      arboles: { [MERGE_DEL_PR_70]: [...RUTAS_R8] },
+    }
+    expect(() => rutasAusentesEnElMerge(RUTAS_R8, gitFalso(clon))).toThrow(/git fetch origin dev/)
+    expect(() => rutasAusentesEnElMerge(RUTAS_R8, gitFalso(clon))).toThrow(/NO se han comprobado/)
+    expect(() => rutasAusentesEnElMerge(RUTAS_R8, gitFalso(clon))).toThrow(new RegExp(MERGE_DEL_PR_70))
   })
 })

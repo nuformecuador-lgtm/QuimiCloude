@@ -119,7 +119,10 @@
   - B1 retensa la unica guardia que enumeraba escritores de los contadores (`usuarios/scope.test.ts`, commit `fdea487`).
   - Se crea la guardia de alcance de la ficha, `tests/guards/guard-qc95-alcance-del-pr-70.test.ts` (R8, R9, R10; commit `16249df`).
   - `vitest run guard` sale verde: 40 archivos, 426 casos.
-  - El mapa `R<n> -> test` esta en `progress/impl_QC-95-guardia-r45-de-qc-66.md`.
+  - El mapa `R<n> -> test` real (diez filas) ya esta en
+    `progress/impl_QC-95-desbloqueo-manual-limpia-el-conteo.md`, como pide esta task. Sustituye al
+    mapa falso original y lleva una nota fechada (B-N1 de la segunda review). El detalle del arreglo
+    esta en `progress/impl_QC-95-guardia-r45-de-qc-66.md`.
 
 - Verificar que las guardias por-ficha de QC-19/QC-78/QC-65 (`qc78-alcance.test.ts`,
   `account-status-scope.test.ts`, `credential-policy-contract.test.ts`) quedan **mudas/verdes**

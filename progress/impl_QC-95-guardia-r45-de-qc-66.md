@@ -171,7 +171,7 @@ lanza. No hay ningun `ctx.skip`.
 | R5 | `set-user-account-status-lock.test.ts` «R5 — `blocked` -> `active` por el caso de uso, y un fallo de login registra `failedAttempts = 1` sin rebloquear», con su control «control: la MISMA fila, sin pasar por el caso de uso, el login la trata como bloqueada»; complementa `tests/unit/identity/verify-credentials.test.ts:1051` «tras clearedLockState el siguiente fallo cuenta como el primero y no rebloquea» |
 | R6 | `tests/unit/identity/usuarios/set-user-account-status-cleared-lock-state.test.ts` «R6 — destino `active`: se llama a `clearedLockState()` una vez y el puerto recibe ESE MISMO objeto» (y `pending`, `inactive`) + «R6/R2 — destino `blocked`: …»; en el adaptador, `tests/unit/identity/usuarios/scope.test.ts` exige que el spread lea de `input.lockState` y no escriba literales |
 | R7 | `tests/unit/identity/usuarios/authorization.test.ts`, fila `setUserAccountStatus` (252-258): «R1 — cada caso de uso avanza con EXACTAMENTE el codigo de su fila y con ningun otro», «R3 — solo `usuarios.consultar` no abre ninguna de las cuatro escrituras» y «R1 — el permiso se comprueba ANTES de zod: …» + `tests/unit/identity/usuarios/admin-guards.test.ts` «R21 — rechaza setUserAccountStatus con `self_operation` y no modifica ninguna fila» y «R22 — mover el estado del ultimo administrador activo se traduce a `last_administrator`» |
-| R8 | `tests/guards/guard-qc95-alcance-del-pr-70.test.ts` «R8: el PR #70 no modifica la politica de bloqueo por intentos, el estado efectivo, el login ni la resolucion de sesion» y «R8: cada archivo vigilado por R8 existe en disco (…)», con las anclas (1)-(3) y los sinteticos «R8: cada archivo del bloqueo por intentos, … es hallazgo por separado» y «un rango sintetico con archivos prohibidos: …» |
+| R8 | `tests/guards/guard-qc95-alcance-del-pr-70.test.ts` «R8: el PR #70 no modifica la politica de bloqueo por intentos, el estado efectivo, el login ni la resolucion de sesion» y «R8: cada archivo vigilado por R8 existe en el arbol del merge f777c56 (una ruta mal escrita tira la guardia en vez de medir aire)» (m-A de la segunda review; antes miraba el disco), con las anclas (1)-(3) y los sinteticos «R8: cada archivo del bloqueo por intentos, … es hallazgo por separado» y «un rango sintetico con archivos prohibidos: …» |
 | R9 | mismo archivo: «R9: el PR #70 no toca `db/schema.prisma`, `db/migrations/`, `package.json` ni `pnpm-lock.yaml`», con los sinteticos «R9: `db/schema.prisma`, una migracion, `package.json` y `pnpm-lock.yaml` son hallazgo cada uno por separado» y «un commit ausente en un clon SUPERFICIAL lanza con `git fetch --unshallow`, nunca salta» |
 | R10 | mismo archivo: «R10: el PR #70 no trae nada bajo `app/` ni `components/`», con el sintetico «R10: una pagina bajo `app/` y un componente bajo `components/` son hallazgo» |
 
@@ -245,3 +245,39 @@ test-db: borrada la base de la corrida: qct_qc95_0a1ff440_mu2zjhmm_b00.
    `.github/workflows` en el repo.
 5. **`pnpm exec` no encuentra los binarios en este worktree** (el entorno, no el codigo):
    conviene saberlo antes del gate.
+
+## Segunda vuelta (2026-09-15, `progress/review_QC-95-guardia-r45-de-qc-66.md`: 1 bloqueante y 2 menores)
+
+Commit de la segunda vuelta, sobre `4d8ccc2`, que ya lleva `origin/dev` mergeado en `04277dc`:
+`fix(QC-95): mapa real en la bitacora canonica y guardia de rango sin disco ni SHAs a mano`.
+
+- **B-N1 (cierra el punto abierto 2 de arriba):** en
+  `progress/impl_QC-95-desbloqueo-manual-limpia-el-conteo.md`, la tabla falsa se sustituye por las
+  diez filas de esta bitacora, con una nota fechada. No quedan dos tablas y el resto de ese archivo
+  no se toca. Aplicadas a mano las regex de `check-trazabilidad.mjs` sobre los archivos del
+  worktree: declarados R1-R10, mapeados R1-R10, no falta ninguno.
+  La nota de T6 en `tasks.md` apunta ahora a esa bitacora; la casilla sigue `[ ]`.
+- **m-A:** `rutasAusentesEnElMerge(rutas, git)` comprueba cada ruta de R8 con
+  `git cat-file -e f777c56…:<ruta>`, no con `existsSync`.
+  - Si falta el merge, lanza el mismo mensaje «NO se han comprobado» / `git fetch`, nunca salta.
+  - Tres sinteticos nuevos: una ruta ausente es hallazgo; todas presentes, ninguno; merge ausente,
+    lanza.
+- **m-B:** helper `corto(sha)`; los titulos se construyen desde `BASE_DEL_PR_70`,
+  `MERGE_DEL_PR_70` y `COMMIT_DE_LA_FEATURE`. Con el merge mutado a `a271eec`, el titulo de
+  ancla (1) dice `a271eec`.
+- **Mutaciones:**
+  - Repetida por el implementer: `lib/modules/identity/adapters/driving/session-actions.ts`, que
+    existe en disco pero no en `f777c56`, añadida a `RUTAS_R8`. Resultado: 1 rojo, 21 verdes, con
+    «Rutas de RUTAS_R8 que no existian en el arbol del merge f777c56… del PR #70:
+    lib/modules/identity/adapters/driving/session-actions.ts». Restaurado con `cp` y `cmp` identico.
+  - Del subagente:
+    - una ruta inexistente en `RUTAS_R8`: 1 rojo;
+    - `MERGE_DEL_PR_70` inexistente: 7 rojos, 0 saltados, con el mensaje de `git fetch`;
+    - merge a `a271eec`: titulos con `a271eec`, 3 anclas rojas.
+- **Verificacion final (implementer):**
+  - `tsc --noEmit`: exit 0.
+  - `eslint` sobre la guardia y `usuarios/scope.test.ts`: exit 0.
+  - `vitest run` sobre `tests/guards/guard-qc95-alcance-del-pr-70.test.ts` y
+    `tests/unit/identity/usuarios/scope.test.ts`: 2 archivos, 41 verdes y 5 saltados (los de rama
+    de QC-66 de `scope.test.ts`). La guardia tiene 22 casos, todos verdes.
+  - No se corrio `./init.sh` ni la suite completa.
