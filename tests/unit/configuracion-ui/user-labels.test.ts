@@ -19,6 +19,10 @@ import {
   changeUserStatusLabel,
   deleteUserLabel,
   editUserLabel,
+  endUserSessionsLabel,
+  endUserSessionsMessage,
+  endUserSessionsSuccess,
+  endUserSessionsTitle,
   toDateInputValue,
 } from '@/app/(private)/configuracion/usuarios/components';
 import { USER_ACCOUNT_STATUSES } from '@/lib/modules/identity';
@@ -74,6 +78,50 @@ describe('los nombres accesibles NOMBRAN al usuario (R41)', () => {
     const nombres = [editUserLabel(NOMBRE), deleteUserLabel(NOMBRE), changeUserStatusLabel(NOMBRE)];
 
     expect(new Set(nombres).size).toBe(3);
+  });
+});
+
+// QC-101 T4 — Los textos del cierre de sesiones de otra persona: R7, R9, R13 y R19.
+//
+// Igual que arriba, **ningun caso copia el copy**: se comprueba que cada texto NOMBRA a la persona,
+// que los cuatro se distinguen, y que ninguno promete numero (R19) —ni cabe un digito en lo que
+// escribe esta capa, ni hay parametro por el que pudiera entrar una cantidad—.
+describe('los textos del cierre de sesiones NOMBRAN a la persona y no prometen numero (QC-101)', () => {
+  const TEXTOS_DE_CIERRE = [
+    endUserSessionsLabel,
+    endUserSessionsTitle,
+    endUserSessionsMessage,
+    endUserSessionsSuccess,
+  ] as const;
+
+  it('el disparador (R7), el dialogo (R9) y el aviso de exito (R13) incluyen el nombre mostrable', () => {
+    for (const componer of TEXTOS_DE_CIERRE) {
+      expect(componer(NOMBRE)).toContain(NOMBRE);
+    }
+  });
+
+  it('los cuatro se distinguen entre si y de las tres acciones de la fila', () => {
+    const textos = [
+      ...TEXTOS_DE_CIERRE.map((componer) => componer(NOMBRE)),
+      editUserLabel(NOMBRE),
+      deleteUserLabel(NOMBRE),
+      changeUserStatusLabel(NOMBRE),
+    ];
+
+    expect(new Set(textos).size).toBe(textos.length);
+  });
+
+  it('ningun texto contiene un digito fuera del nombre: no se afirma cuantas se cerraron (R19)', () => {
+    // El nombre se retira antes de mirar, para que un nombre con cifras no tape ni fabrique un fallo.
+    for (const componer of TEXTOS_DE_CIERRE) {
+      expect(componer(NOMBRE).replaceAll(NOMBRE, '')).not.toMatch(/\d/);
+    }
+  });
+
+  it('ninguno recibe mas que el nombre: no hay por donde meter una cantidad (R19)', () => {
+    for (const componer of TEXTOS_DE_CIERRE) {
+      expect(componer.length).toBe(1);
+    }
   });
 });
 

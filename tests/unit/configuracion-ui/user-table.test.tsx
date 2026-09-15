@@ -125,6 +125,7 @@ function montar(overrides: Partial<DataTableParams> = {}, totalPages = 3, canMod
       params={params}
       totalPages={totalPages}
       canModify={canModify}
+      currentUserId={null}
       roles={[{ id: 'r1', name: 'Operador' }]}
       rolesError={null}
     />,

@@ -173,3 +173,122 @@ describe('endAllSessions — alcance de la ficha (R51)', () => {
     expect(fuente).not.toMatch(/SessionWriter/);
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+// QC-101 T3 — bloque NUEVO al final, aditivo: no reescribe ni reordena ningun caso de QC-23.
+//
+// `CHECKPOINTS.md > Permisos` pide que la autorizacion de ESTA ficha tenga test propio nombrado
+// con su requisito, aunque QC-23 ya cubra la misma regla arriba. R3 y R4 son de
+// `specs/QC-101-cierre-de-sesiones-de-otro-desde-la-pantalla/requirements.md`.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Doble EN MEMORIA del puerto, con el mismo ambito que su implementacion real
+ * (`WHERE id = ? AND company_id = ? AND deleted_at IS NULL`): asi los tres casos de no-encontrado
+ * de R4 son tres situaciones DISTINTAS de verdad —no existe, borrada, de otra empresa— y no tres
+ * veces el mismo `'not_found'` fijado a mano.
+ */
+function puertoEnMemoria(
+  filas: ReadonlyArray<{ id: string; companyId: string; deletedAt: Date | null }>,
+) {
+  const stampAll = vi.fn(async (input: { userId: string; companyId: string; validFrom: Date }) =>
+    filas.some(
+      (fila) =>
+        fila.id === input.userId && fila.companyId === input.companyId && fila.deletedAt === null,
+    )
+      ? ('ok' as const)
+      : ('not_found' as const),
+  );
+  const revokeSession = vi.fn(async () => {});
+  const revocations: SessionRevocationRepository = { stampAll, revokeSession };
+  return { revocations, stampAll, revokeSession };
+}
+
+describe('QC-101 R3 — sobre OTRA persona sin usuarios.modificar se rechaza en el service', () => {
+  const sinModificar: ReadonlyArray<readonly [string, Actor]> = [
+    ['con el conjunto vacio', { id: ACTOR_ID, companyId: COMPANY_ID, permissions: [] }],
+    [
+      'con solo usuarios.consultar',
+      { id: ACTOR_ID, companyId: COMPANY_ID, permissions: ['usuarios.consultar'] },
+    ],
+    [
+      'con otros permisos de modificar que no son usuarios.modificar',
+      {
+        id: ACTOR_ID,
+        companyId: COMPANY_ID,
+        permissions: ['usuarios.consultar', 'roles.consultar', 'inventario.modificar'],
+      },
+    ],
+  ];
+
+  for (const [caso, actor] of sinModificar) {
+    it(`QC-101 R3: ${caso}, rechaza con code unauthorized y stampAll registra CERO llamadas`, async () => {
+      // El objetivo EXISTE, esta vivo y es de la empresa del actor: si el rechazo dependiera de
+      // otra cosa que el permiso, aqui el puerto contestaria 'ok' y el caso se pondria rojo.
+      const repo = puertoEnMemoria([{ id: TARGET_ID, companyId: COMPANY_ID, deletedAt: null }]);
+      const endAllSessions = createEndAllSessions({ revocations: repo.revocations });
+
+      const error = await endAllSessions(actor, TARGET_ID).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(UnauthorizedError);
+      expect((error as UnauthorizedError).code).toBe('unauthorized');
+      expect(repo.stampAll).toHaveBeenCalledTimes(0);
+      expect(repo.revokeSession).toHaveBeenCalledTimes(0);
+    });
+  }
+
+  it('QC-101 R3: el mismo actor CON usuarios.modificar si llega al puerto (el rechazo es por el permiso)', async () => {
+    const repo = puertoEnMemoria([{ id: TARGET_ID, companyId: COMPANY_ID, deletedAt: null }]);
+    const endAllSessions = createEndAllSessions({ revocations: repo.revocations });
+
+    await expect(endAllSessions(ADMIN, TARGET_ID)).resolves.toBeUndefined();
+    expect(repo.stampAll).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('QC-101 R4 — no existe, borrada u otra empresa: el MISMO user_not_found', () => {
+  const OTRA_EMPRESA = '88888888-8888-4888-8888-888888888888';
+
+  const casos: ReadonlyArray<
+    readonly [string, ReadonlyArray<{ id: string; companyId: string; deletedAt: Date | null }>]
+  > = [
+    ['el objetivo no existe', []],
+    [
+      'el objetivo esta borrado logicamente',
+      [{ id: TARGET_ID, companyId: COMPANY_ID, deletedAt: new Date('2026-09-01T00:00:00.000Z') }],
+    ],
+    [
+      'el objetivo pertenece a otra empresa',
+      [{ id: TARGET_ID, companyId: OTRA_EMPRESA, deletedAt: null }],
+    ],
+  ];
+
+  async function errorDe(
+    filas: ReadonlyArray<{ id: string; companyId: string; deletedAt: Date | null }>,
+  ): Promise<unknown> {
+    const repo = puertoEnMemoria(filas);
+    const endAllSessions = createEndAllSessions({ revocations: repo.revocations });
+    return endAllSessions(ADMIN, TARGET_ID).catch((e: unknown) => e);
+  }
+
+  for (const [caso, filas] of casos) {
+    it(`QC-101 R4: si ${caso}, responde user_not_found y no unauthorized`, async () => {
+      const error = await errorDe(filas);
+
+      expect(error).toBeInstanceOf(UserNotFoundError);
+      expect(error).not.toBeInstanceOf(UnauthorizedError);
+      expect((error as UserNotFoundError).code).toBe('user_not_found');
+    });
+  }
+
+  it('QC-101 R4: los tres casos son INDISTINGUIBLES (misma clase, mismo code, mismo mensaje)', async () => {
+    const errores = await Promise.all(casos.map(([, filas]) => errorDe(filas)));
+
+    const huellas = errores.map((error) => {
+      const e = error as UserNotFoundError;
+      return { clase: e.constructor.name, code: e.code, message: e.message };
+    });
+
+    expect(new Set(huellas.map((h) => JSON.stringify(h))).size).toBe(1);
+  });
+});

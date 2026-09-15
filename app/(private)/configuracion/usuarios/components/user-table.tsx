@@ -132,6 +132,11 @@ export type UserTableProps = {
    */
   readonly canModify: boolean;
   /**
+   * El identificador del actor de la sesion, o `null` (QC-101 R12, R16). Resuelto por la pagina en
+   * el servidor y bajado por props: la tabla solo lo entrega al panel de detalle.
+   */
+  readonly currentUserId: string | null;
+  /**
    * El catalogo de roles del selector del panel (R24), tal cual lo trajo `listRolesAction`. Vacio
    * si esa consulta fallo: entonces `rolesError` lo dice y el panel **no inventa opciones**.
    *
@@ -148,6 +153,7 @@ export function UserTable({
   params,
   totalPages,
   canModify,
+  currentUserId,
   roles,
   rolesError,
 }: UserTableProps) {
@@ -222,6 +228,7 @@ export function UserTable({
         <UserSheet
           key={`${sheetPanel.mode}:${sheetPanel.user?.id ?? ''}`}
           user={sheetPanel.user}
+          currentUserId={currentUserId}
           roles={roles}
           rolesError={rolesError}
           open

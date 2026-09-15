@@ -17,7 +17,8 @@ import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
 import type { RoleOption, UserDetail, UserRow } from '@/lib/modules/identity';
 import { getUserAction } from '@/lib/modules/identity/adapters/driving/user-actions';
 
-import { USER_SHEET_TESTID, UserForm } from './user-form';
+import { EndUserSessionsDialog } from './end-user-sessions-dialog';
+import { USER_SHEET_TESTID, UserForm, type UserFormEndSessions } from './user-form';
 
 /**
  * El panel lateral del alta y de la edicion de usuario (R22, R26, R28, R29; `design.md > 8`).
@@ -44,6 +45,14 @@ import { USER_SHEET_TESTID, UserForm } from './user-form';
  * El aviso del alta es **neutro** (R28): no anuncia ninguna credencial, ningun enlace para
  * establecer la contrasena y ninguna via de acceso. `createUserAction` devuelve el `id` creado y
  * esta pantalla **lo ignora** a proposito: no hay pagina de detalle a la que navegar.
+ *
+ * **QC-101: el cierre de TODAS las sesiones de la persona del panel** (R7, R11, R12, R16;
+ * `design.md > 2`). Este panel es el dueno del estado de su dialogo, igual que la tabla lo es de
+ * los suyos: decide SI se ofrece, entrega a `UserForm` el disparador solo entonces, y monta
+ * `EndUserSessionsDialog` solo mientras esta abierto. El dialogo cuelga de la raiz del `Sheet` —asi
+ * el primitivo lo reconoce como dialogo anidado— pero **fuera** del `<form>` de edicion, y su
+ * contenido va en portal: su propio `<form>` no se anida en el del panel. Todo llega por props
+ * (R16): aqui no se lee la sesion ni se importa la composicion.
  */
 
 export const USER_SHEET_LOADING_TESTID = 'user-sheet-loading';
@@ -71,6 +80,11 @@ type DetailState =
 export type UserSheetProps = {
   /** La fila que se edita, o `null` en el alta. Del alta solo se sabe que no tiene sujeto. */
   readonly user: UserRow | null;
+  /**
+   * El identificador del actor de la sesion, o `null` sin sesion (QC-101 R12, R16). Lo resolvio la
+   * pagina en el servidor y baja por props: este componente no lee la sesion.
+   */
+  readonly currentUserId: string | null;
   /** El catalogo de roles (R24) y su error, bajados por props desde el servidor (R8). */
   readonly roles: readonly RoleOption[];
   readonly rolesError: ErrorState | null;
@@ -78,11 +92,19 @@ export type UserSheetProps = {
   readonly onOpenChange: (open: boolean) => void;
 };
 
-export function UserSheet({ user, roles, rolesError, open, onOpenChange }: UserSheetProps) {
+export function UserSheet({
+  user,
+  currentUserId,
+  roles,
+  rolesError,
+  open,
+  onOpenChange,
+}: UserSheetProps) {
   const router = useRouter();
   const isEdit = user !== null;
   const userId = user?.id;
   const [detail, setDetail] = useState<DetailState>({ status: 'loading' });
+  const [endSessionsOpen, setEndSessionsOpen] = useState(false);
 
   useEffect(() => {
     if (!open || userId === undefined) return;
@@ -113,6 +135,25 @@ export function UserSheet({ user, roles, rolesError, open, onOpenChange }: UserS
     router.refresh();
   }, [isEdit, onOpenChange, router]);
 
+  const openEndSessions = useCallback(() => setEndSessionsOpen(true), []);
+
+  /**
+   * QC-101 R11 y R12: el cierre de sesiones se ofrece SOLO sobre otra persona con la cuenta
+   * `active`. Sin cumplirse, el disparador no existe en el DOM —ni deshabilitado ni explicado—.
+   *
+   * **Es la SEGUNDA barrera contra «uno mismo», a proposito** (`design.md > 3`, alternativa C). La
+   * primera es que el actor no aparece en su propia lista (`list-users.ts:73`, `excludeUserId`
+   * obligatorio), asi que hoy `user.id === currentUserId` no llega a pasar. Esta comparacion existe
+   * para que la regla de ESTA pantalla este escrita donde se lee y tenga test, en vez de colgar de
+   * una invariante de otra feature que podria cambiar sin poner nada en rojo.
+   *
+   * Ocultar no es autorizar: quien decide si se puede es `end-all-sessions.ts`, en el service.
+   */
+  const endSessions: UserFormEndSessions | undefined =
+    user !== null && user.accountStatus === 'active' && user.id !== currentUserId
+      ? { displayName: user.displayName, onEndSessions: openEndSessions }
+      : undefined;
+
   // Lo que se pinta: la respuesta solo vale si es la del usuario que se esta editando.
   const shown: DetailState =
     detail.status === 'loading' || detail.forId !== userId ? { status: 'loading' } : detail;
@@ -125,6 +166,7 @@ export function UserSheet({ user, roles, rolesError, open, onOpenChange }: UserS
           roles={roles}
           rolesError={rolesError}
           onSaved={handleSaved}
+          endSessions={endSessions}
         />
       ) : (
         <SheetContent
@@ -171,6 +213,14 @@ export function UserSheet({ user, roles, rolesError, open, onOpenChange }: UserS
           </div>
         </SheetContent>
       )}
+
+      {/*
+        QC-101: una instancia, y solo mientras esta abierta, para que un rechazo anterior no
+        reaparezca. Hermana de `UserForm` y NO hija suya: fuera del `<form>` de edicion.
+      */}
+      {user !== null && endSessions !== undefined && endSessionsOpen ? (
+        <EndUserSessionsDialog user={user} open onOpenChange={setEndSessionsOpen} />
+      ) : null}
     </Sheet>
   );
 }
