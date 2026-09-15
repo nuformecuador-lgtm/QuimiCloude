@@ -222,6 +222,79 @@ dia en la tanda 3:
 5. Un lote ya existente de mas de 60 caracteres haria abortar la migracion con un 23514 generico,
    sin mensaje propio. Sigue siendo atomica; el design no pide guardia para eso.
 
+### Tanda 3a — T9, T7, T10 y T6 (parcial) · `backend_dev`
+
+**Archivos**
+- **T9:**
+  - `lib/modules/errores/domain/error-codes.ts`: la sexta enmienda en la cabecera y `'batch_duplicate_lot'`.
+  - `lib/modules/errores/domain/error-catalog.ts`: la clave y el texto exacto «Ya existe un lote con
+    ese valor en esta empresa.».
+  - `lib/modules/inventario/domain/errors.ts`: `BatchDuplicateLotError`.
+  - `tests/unit/errores/catalogo.test.ts`: el conteo pasa de 45 a 46 y hay un bloque R13.
+- **T7:** `lib/modules/inventario/index.ts` reexporta `BatchDuplicateLotError` como los demas errores.
+  Puertos sin cambio de firma y `lib/composition/index.ts` sin tocar.
+- **T10:** `lib/modules/inventario/adapters/driving/product-actions.ts` gana
+  `purchaseDate: readOptionalFormString(formData, 'purchaseDate')` en `buildCreateProductCandidate`,
+  sin tocar `buildUpdateProductCandidate`; cuatro casos en `tests/unit/inventario/product-actions.test.ts`.
+  El traductor unico de errores del modulo reconoce cualquier subclase de `InventarioError`, asi que el
+  borde entrega `batch_duplicate_lot` sin mas cambios, y un test lo fija.
+- **T6 (parcial):** `product-prisma.ts` con `resolveLot`:
+  - el lock `pg_advisory_xact_lock(81, hashtext('product_batches_lot:' || companyId))` va con
+    `$executeRaw` como sentencia propia y ANTES del `SELECT max`, con un docblock sobre READ COMMITTED;
+  - el maximo se toma sobre `'^[0-9]{1,18}$'` con la empresa de `companyScopeColumns(scope)` (R27);
+  - el lote escrito a mano no pide lock ni calcula maximo;
+  - estan `toBatchPurchaseDate` y `purchaseDate` en `toBatchCreateData`, en los dos caminos
+    (`createWithFirstBatch` y `addBatchToAlive`).
+
+**Salida real**
+```
+$ pnpm exec vitest run --project node --project ui tests/unit/inventario tests/unit/errores
+ Test Files  36 passed (36)
+      Tests  564 passed (564)
+$ pnpm exec vitest run guard
+ Test Files  39 passed (39)
+      Tests  407 passed | 9 skipped (416)
+$ pnpm run lint  -> exit 0
+```
+
+**Correccion al design decidida por el implementer: como se reconoce el lote duplicado (T6)**
+
+design §3.3 y §4.4 piden que `isDuplicateBatchLot` reconozca el `P2002` por el **nombre del indice**
+`product_batches_company_lot_unique`, siguiendo a `isDuplicateOrderNumber`. Con `@prisma/client`
+6.19.3 contra Postgres **eso no casa nunca**:
+- La API tipada que manda §3.2 paso 3 trae en `meta.target` las **columnas**, no el nombre del indice.
+- Esta verificado contra base real y escrito en `lib/modules/unidades/adapters/driven/persistence/unit-write-prisma.ts:21-48`
+  (QC-76, donde fue un bug real con R11 y R12 rotos). Tambien lo siguen `recipe-prisma.ts`,
+  `supplier-prisma.ts` y `tests/integration/identity/credential-setup.int.test.ts:59-61`.
+- `isDuplicateOrderNumber` si encuentra el nombre, pero solo porque `pedidos` inserta con SQL crudo y
+  lo busca en el texto del mensaje.
+
+Implementado al pie de la letra, R13 saldria como `unexpected` y R15 no reintentaria nunca.
+
+**Decision: opcion A, reconocer por columnas** (`P2002` y `meta.target` = `company_id` + `lot`).
+- Conserva la intencion del design entera: dos condiciones, y relanzar lo que no se reconoce.
+- `product_batches` no tiene otro unico sobre esas columnas.
+- **No se improvisa.** Es la convencion ya documentada del repo para este motor y esta version, y
+  no cambia ningun requisito.
+- **Descartadas:**
+  - B, aceptar nombre o columnas: añade una rama muerta;
+  - C, pasar el `INSERT` a `$queryRaw`: contradice §3.2 paso 3.
+- **Lo prueba T8 caso 4 contra base real:** si el mecanismo fuese falso, ese caso da rojo.
+
+Lo que faltaba de T6 (`isDuplicateBatchLot`, el reintento acotado a 3, la traduccion a
+`BatchDuplicateLotError` y el unitario del reintento) se delega en un `backend_dev` nuevo con esta
+decision fijada.
+
+**Notas para el reviewer**
+1. El design no fija el entero del namespace del lock (`<ns>`). Se eligio `81` en la constante
+   `BATCH_LOT_LOCK_NAMESPACE`. La forma de dos enteros no colisiona con el `pg_advisory_lock(bigint)`
+   de `tests/helpers/test-database.ts`.
+2. El lock va con `$executeRaw` porque `pg_advisory_xact_lock` devuelve `void`. Su efecto real lo
+   prueba T8 caso 7 (la carrera).
+3. `vitest related` saca en rojo `tests/unit/recetas-ui/recipe-route-contract.test.ts` («la feature
+   no toca lib/modules/recetas ni db/»), porque la migracion de T1 aparece en el diff de la rama. Ese
+   archivo esta en `tests/baseline-rojos.json`; se revisa aparte (ver «Rojos ajenos»).
+
 ### Tanda 3b — fixtures, excepcion del E2E, guardia de migraciones y T11 · `backend_dev`
 
 **Archivos**

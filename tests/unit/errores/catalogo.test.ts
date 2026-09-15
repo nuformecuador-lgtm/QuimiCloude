@@ -54,9 +54,11 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // EL CONTEO ES LA UNION, y por eso no vale ninguno de los dos numeros que traia cada rama al
       // mergear: QC-79 dejo 34 (32+2) y QC-84 dejo 39 (32+7), y los dos serian FALSOS ahora que
       // conviven. 25+7+2+7 = 41, mas los CUATRO de `asignaciones` que entraron el 2026-09-13 con
-      // la QUINTA enmienda (QC-87), la primera que abre una familia nueva: 45. Sigue siendo un
-      // conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
-      expect(ERROR_CODES).toHaveLength(45)
+      // la QUINTA enmienda (QC-87), la primera que abre una familia nueva: 45. Mas UNO de
+      // `inventario` que entro el 2026-09-15 con la SEXTA enmienda (QC-81, `batch_duplicate_lot`),
+      // que amplia una familia ya existente: 46. Sigue siendo un conteo LITERAL a proposito: un
+      // codigo nuevo que nadie anote aqui pone esta linea en rojo.
+      expect(ERROR_CODES).toHaveLength(46)
       expect(new Set(ERROR_CODES).size).toBe(ERROR_CODES.length)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
@@ -67,7 +69,7 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       expect(Object.keys(ERROR_MESSAGES_ES).sort()).toEqual([...claves].sort())
     })
 
-    it('errorMessage devuelve el texto del catalogo para los 45 codigos', () => {
+    it('errorMessage devuelve el texto del catalogo para los 46 codigos', () => {
       for (const code of ERROR_CODES) {
         expect(errorMessage(code)).toBe(ERROR_MESSAGES_ES[ERROR_MESSAGE_KEY[code]])
         expect(errorMessage(code).trim().length).toBeGreaterThan(0)
@@ -176,6 +178,34 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       ]) {
         expect(codigos, `falta ${code}`).toContain(code)
       }
+    })
+  })
+
+  // QC-81 (R13), SEXTA enmienda al catalogo cerrado (2026-09-15): el lote escrito a mano que ya
+  // existe en la empresa tiene codigo y texto PROPIOS. Lo que se afirma aqui es la parte que el
+  // compilador no ve: el texto EXACTO aprobado en F1.4 y que no se confunde con los dos codigos con
+  // los que podria mezclarse -la entrada invalida, que era el plan B, y el correlativo de pedidos,
+  // que es el precedente-.
+  describe('QC-81 R13 — el lote duplicado en la empresa tiene codigo y texto propios', () => {
+    it('batch_duplicate_lot esta en el catalogo con su clave y su texto exacto', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('batch_duplicate_lot')
+      expect(ERROR_MESSAGE_KEY.batch_duplicate_lot).toBe('errors.batch_duplicate_lot')
+      expect(errorMessage('batch_duplicate_lot')).toBe(
+        'Ya existe un lote con ese valor en esta empresa.',
+      )
+    })
+
+    it('se distingue de invalid_input y de duplicate_number', () => {
+      const texto = errorMessage('batch_duplicate_lot')
+      expect(texto).not.toBe(errorMessage('invalid_input'))
+      expect(texto).not.toBe(errorMessage('duplicate_number'))
+    })
+
+    it('la cabecera de error-codes.ts redacta la sexta enmienda con su fecha y su aprobacion', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toContain('**Sexta enmienda, el 2026-09-15 (QC-81)**')
+      expect(source).toContain('Aprobada por el humano el 2026-09-15 en la puerta F1.4 de QC-81')
     })
   })
 

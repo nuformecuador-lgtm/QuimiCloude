@@ -49,6 +49,17 @@
  * Esta enmienda NO redefine ningun codigo anterior: `unauthorized`, `invalid_input`,
  * `order_not_found`, `user_not_found` y `work_group_not_found` se REUTILIZAN tal cual y no se
  * tocan. Aprobada por el humano el 2026-09-13.
+ *
+ * **Sexta enmienda, el 2026-09-15 (QC-81)**: la familia `inventario`, que ya es del catalogo desde
+ * QC-70, gana UN codigo, `batch_duplicate_lot`. Como la cuarta enmienda —y a diferencia de la
+ * quinta—, amplia una familia ya existente y NO abre ninguna nueva. Hace falta porque QC-81 R13
+ * exige que el lote escrito a mano que ya existe en la empresa se rechace con un error
+ * DISTINGUIBLE —codigo propio, mensaje propio—: con `invalid_input` quien da de alta leeria «La
+ * entrada recibida no es valida» sobre un formulario entero sin saber que el problema es el lote.
+ * El precedente exacto es `duplicate_number`, que existe para el correlativo de pedidos.
+ *
+ * Esta enmienda NO redefine ningun codigo anterior: `invalid_input` y `duplicate_number` siguen
+ * tal cual. Aprobada por el humano el 2026-09-15 en la puerta F1.4 de QC-81.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -114,6 +125,11 @@ export const ERROR_CODES = [
   'order_cancelled_not_assignable',
   'order_assignment_not_found',
   'user_not_assignable',
+  // `inventario` (QC-81): el lote escrito a mano que ya existe en la empresa (R13). Ver la sexta
+  // enmienda en la cabecera. Amplia la familia `inventario` —no abre ninguna— y se distingue de
+  // `invalid_input` a proposito: la entrada tiene la forma correcta, lo que choca es el valor
+  // contra la unicidad `(empresa, lote)` de la base.
+  'batch_duplicate_lot',
 ] as const;
 
 /** La union cerrada de los codigos declarados arriba (R2). */

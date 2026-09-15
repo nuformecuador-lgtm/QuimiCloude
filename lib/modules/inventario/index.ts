@@ -20,6 +20,9 @@ export {
   PresentationDuplicateNameError,
   PresentationInUseError,
   ValidationError,
+  // QC-81 (R13): el lote escrito a mano repetido en la empresa. Se publica como los demas errores
+  // de la familia: quien escriba un doble del repositorio o pinte el rechazo lo pide por aqui.
+  BatchDuplicateLotError,
 } from './domain/errors';
 export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
 // QC-57 (R24, R31): el contrato generico de consulta de lista. `productQuerySchema` y

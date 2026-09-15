@@ -213,6 +213,13 @@ function buildProductFields(formData: FormData): Record<string, unknown> | typeo
  * son `nullish()` en el esquema, asi que `undefined` es valido y `''` seria `invalid_input`.
  * `readOptionalFormString` ya devuelve `undefined` cuando el campo falta o queda vacio al
  * recortar, que es exactamente la traduccion que hace falta (R12).
+ *
+ * QC-81 (R2, `design.md > 4.5`): se lee TAMBIEN `purchaseDate`, con el mismo
+ * `readOptionalFormString` y por el mismo motivo. Vacio o ausente llega `undefined`, y el caso de
+ * uso pone «hoy» a partir del mismo instante que usa para `created_at`: esta action no calcula
+ * ninguna fecha ni lee ningun reloj. La fecha viaja como la cadena civil que se escribio, sin
+ * convertirla a `Date` -la conversion es del adaptador driven-. El lote se sigue leyendo igual:
+ * ausente significa «que lo genere el backend» (QC-81 R8), y esa decision tampoco es de aqui.
  */
 function buildCreateProductCandidate(formData: FormData): unknown | typeof INVALID_NUMBER {
   const fields = buildProductFields(formData);
@@ -225,6 +232,7 @@ function buildCreateProductCandidate(formData: FormData): unknown | typeof INVAL
     totalCost: readOptionalFormString(formData, 'totalCost'),
     lot: readOptionalFormString(formData, 'lot'),
     expiryDate: readOptionalFormString(formData, 'expiryDate'),
+    purchaseDate: readOptionalFormString(formData, 'purchaseDate'),
   };
 }
 

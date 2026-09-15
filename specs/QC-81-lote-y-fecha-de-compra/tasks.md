@@ -107,7 +107,7 @@
       `@prisma/client`; ningún `catch` vacío; el lote escrito a mano no pide lock ni calcula máximo.
       Cubre **R8, R9, R10, R13, R15, R25, R27** (verificados en T8).
 
-- [ ] **T7 [P] — Cableado y contrato del módulo.** Depende de T6.
+- [x] **T7 [P] — Cableado y contrato del módulo.** Depende de T6.
       Archivos: `lib/composition/index.ts` (si cambia algo), `lib/modules/inventario/index.ts`.
       El puerto **no cambia de firma** (`design.md > 3.1`), así que esto debería ser casi vacío: la
       task existe para comprobarlo, no para hacer trabajo.
@@ -138,7 +138,7 @@
       afirma sobre filas que no creó él mismo; limpieza en `finally` en orden de FK.
       Cubre **R3, R7, R9, R11, R12, R13, R14, R16, R18, R19, R20, R21, R25, R27, R33**.
 
-- [ ] **T9 — Error de lote duplicado.** Depende de **T0** y T6.
+- [x] **T9 — Error de lote duplicado.** Depende de **T0** y T6.
       Archivos: según la respuesta de T0 — si se aprueba:
       `lib/modules/errores/domain/error-codes.ts`, `lib/modules/errores/domain/error-catalog.ts`,
       `lib/modules/inventario/domain/errors.ts`, `tests/unit/errores/catalogo.test.ts`.
@@ -150,7 +150,7 @@
 
 ## Tanda 4 — borde y límites
 
-- [ ] **T10 [P] — Server Action.** Depende de T5.
+- [x] **T10 [P] — Server Action.** Depende de T5.
       Archivos: `lib/modules/inventario/adapters/driving/product-actions.ts`,
       `tests/unit/inventario/product-actions.test.ts`.
       Una línea: `purchaseDate: readOptionalFormString(formData, 'purchaseDate')` en

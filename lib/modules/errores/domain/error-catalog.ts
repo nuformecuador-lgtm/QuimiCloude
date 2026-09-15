@@ -62,6 +62,9 @@ export const ERROR_MESSAGE_KEY = {
   order_cancelled_not_assignable: 'errors.order_cancelled_not_assignable',
   order_assignment_not_found: 'errors.order_assignment_not_found',
   user_not_assignable: 'errors.user_not_assignable',
+  // `inventario` (QC-81): la sexta enmienda (2026-09-15), redactada en la cabecera de
+  // `error-codes.ts`. Amplia la familia `inventario`, no abre ninguna nueva.
+  batch_duplicate_lot: 'errors.batch_duplicate_lot',
 } as const satisfies Record<ErrorCode, string>;
 
 /** La union cerrada de las claves estables (R1, R5). */
@@ -150,4 +153,8 @@ export const ERROR_MESSAGES_ES = {
   // QC-87 (R18): la cuenta no esta activa. El texto no dice cual de los tres estados es, porque el
   // catalogo no interpola (R4, R7) y los tres llevan a la misma accion de quien lee.
   'errors.user_not_assignable': 'No se puede asignar a una persona cuya cuenta no esta activa.',
+  // QC-81 (R13): el lote escrito a mano ya existe en la empresa de quien da de alta. Dice «en esta
+  // empresa» porque la unicidad es POR EMPRESA (D2): otra empresa si puede tener ese mismo valor. No
+  // interpola el lote (R4, R7): la pantalla sabe cual acaba de escribir.
+  'errors.batch_duplicate_lot': 'Ya existe un lote con ese valor en esta empresa.',
 } as const satisfies Record<ErrorMessageKey, string>;

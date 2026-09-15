@@ -90,6 +90,23 @@ export class PresentationInUseError extends InventarioError {
   }
 }
 
+/**
+ * QC-81 (R13): el lote ESCRITO A MANO ya existe en la empresa del actor. Lo lanza el adaptador
+ * driven al reconocer el choque contra el indice unico `(company_id, lot)`, y SOLO con el lote
+ * escrito a mano: con el lote generado el choque se reintenta y nunca llega aqui (R15).
+ *
+ * Es un codigo propio y no `ValidationError` porque R13 pide un rechazo DISTINGUIBLE: la entrada
+ * tiene la forma correcta, lo que choca es su valor contra la base (sexta enmienda al catalogo,
+ * `lib/modules/errores/domain/error-codes.ts`).
+ */
+export class BatchDuplicateLotError extends InventarioError {
+  readonly code = 'batch_duplicate_lot';
+
+  constructor(diagnostic?: string) {
+    super('batch_duplicate_lot', diagnostic);
+  }
+}
+
 /** R9, R10, R11, R37: entrada que no cumple el esquema de validacion. */
 export class ValidationError extends InventarioError {
   readonly code = 'invalid_input';

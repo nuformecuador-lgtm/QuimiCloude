@@ -20,6 +20,7 @@ import {
 } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import { errorMessage } from '@/lib/modules/errores';
 import {
+  BatchDuplicateLotError,
   ProductNotFoundError,
   UnauthorizedError,
   ValidationError,
@@ -573,6 +574,100 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
       if (!linea.includes('unitCost') && !linea.includes('totalCost')) continue;
       expect(linea).not.toMatch(/Number\(|parseFloat|readOptionalFormInt/);
     }
+  });
+});
+
+/**
+ * QC-81 (T10) — la fecha de compra cruza la Server Action, y el lote duplicado vuelve con su codigo.
+ *
+ * Cubre el lado BORDE de **R2** -ausente o vacia, la fecha llega `undefined` y el caso de uso pone
+ * «hoy»; escrita, llega tal cual-, **QC-90 R26** reafirmado con el campo nuevo -la edicion sigue sin
+ * ningun campo de lote- y el lado borde de **R13** -`BatchDuplicateLotError` sale al llamante con
+ * `batch_duplicate_lot` y el texto del catalogo, como los demas codigos de `inventario`-.
+ */
+describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () => {
+  it('hace llegar purchaseDate al caso de uso tal cual, como la cadena civil escrita (R2, R3)', async () => {
+    createProductMock.mockResolvedValue({ id: 'product-1' });
+
+    await createProductAction(
+      CREATE_INITIAL,
+      formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS, purchaseDate: '2026-09-01' }),
+    );
+
+    const [candidato] = createProductMock.mock.calls[0] as [Record<string, unknown>];
+    // Objeto EXACTO: el esquema del alta es `strictObject`, asi que un campo de mas o con otro
+    // nombre no seria un detalle sino un `invalid_input`.
+    expect(candidato).toEqual({
+      name: 'Bidon 20 L',
+      stock: 10,
+      qtyAlert: 2,
+      presentationId: '11111111-1111-4111-8111-111111111111',
+      unitCost: '12.3456',
+      totalCost: '123.4560',
+      lot: 'L-2026-001',
+      expiryDate: '2027-01-31',
+      purchaseDate: '2026-09-01',
+    });
+    // Cadena y no `Date`: convertir es del adaptador driven, y un `Date` aqui ya habria elegido zona.
+    expect(typeof candidato.purchaseDate).toBe('string');
+  });
+
+  it('sin purchaseDate en el FormData, o vacia, llega undefined para que el caso de uso ponga hoy (R2)', async () => {
+    createProductMock.mockResolvedValue({ id: 'product-1' });
+
+    // Ausente: el formulario de hoy no la pinta (la pantalla es QC-103).
+    await createProductAction(CREATE_INITIAL, formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS }));
+    // Vacia y en blanco: un `<input type="date">` sin rellenar viaja como ''.
+    await createProductAction(
+      CREATE_INITIAL,
+      formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS, purchaseDate: '' }),
+    );
+    await createProductAction(
+      CREATE_INITIAL,
+      formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS, purchaseDate: '   ' }),
+    );
+
+    expect(createProductMock).toHaveBeenCalledTimes(3);
+    for (const [candidato] of createProductMock.mock.calls as Array<[Record<string, unknown>]>) {
+      expect(candidato.purchaseDate).toBeUndefined();
+      // Ancla: el candidato es el del alta y trae su lote; sin esto `toBeUndefined` pasaria por vacio.
+      expect(candidato.presentationId).toBe('11111111-1111-4111-8111-111111111111');
+    }
+  });
+
+  it('la edicion sigue sin ningun campo de lote, tampoco purchaseDate, aunque el FormData lo traiga', async () => {
+    updateProductMock.mockResolvedValue(undefined);
+
+    await updateProductAction(
+      'product-1',
+      MUTATION_INITIAL,
+      formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS, purchaseDate: '2026-09-01' }),
+    );
+
+    const [, candidato] = updateProductMock.mock.calls[0] as [string, Record<string, unknown>];
+    // `updateProductSchema` es `strictObject` y no conoce el lote (QC-90 R26).
+    expect(candidato).toEqual({ name: 'Bidon 20 L', stock: 10, qtyAlert: 2 });
+    for (const campo of [...Object.keys(VALID_BATCH_FIELDS), 'purchaseDate']) {
+      expect(Object.keys(candidato)).not.toContain(campo);
+    }
+  });
+
+  it('entrega batch_duplicate_lot al llamante con el texto del catalogo, como los demas codigos (R13)', async () => {
+    createProductMock.mockRejectedValue(new BatchDuplicateLotError('company-a: lote L-2026-001'));
+
+    const result = await createProductAction(
+      CREATE_INITIAL,
+      formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS }),
+    );
+
+    // Estado EXACTO: codigo propio, mensaje del catalogo y NADA mas. El diagnostico (empresa y lote)
+    // va al registro del servidor y no cruza al navegador (QC-70 R28-R30).
+    expect(result).toEqual({
+      status: 'error',
+      code: 'batch_duplicate_lot',
+      message: errorMessage('batch_duplicate_lot'),
+    });
+    expect(JSON.stringify(result)).not.toContain('L-2026-001');
   });
 });
 
