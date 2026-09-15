@@ -54,8 +54,9 @@
 > viven los dos campos, D5 forma del correlativo, D6 la serie continúa desde el más alto, D7 los
 > lotes vacíos de hoy y el `NOT NULL`, D8 qué fecha reciben las filas existentes, D9 nunca futura,
 > D10 la pantalla no entra, D11 qué verificación se exige, D12 autorización/idioma/borrado/forma de
-> la fecha, y D13 —añadida en la enmienda del 2026-09-15— el lote tecleado de solo dígitos que no
-> puede llegar a 60 caracteres. **D4 no lleva requisito propio a propósito**: es el sujeto de R1–R27
+> la fecha, D13 —añadida en la enmienda del 2026-09-15— el lote tecleado de solo dígitos que no
+> puede llegar a 60 caracteres, y D14 —añadida en la segunda enmienda del mismo día— arreglar en
+> QC-81 el alta sobre un producto que se borra a la vez. **D4 no lleva requisito propio a propósito**: es el sujeto de R1–R27
 > —todos hablan de `product_batches`— y ningún requisito menciona `products` como sede de estos dos
 > campos.
 >
@@ -66,9 +67,14 @@
 >   (menor m3).
 > - Nace **D13**, con sus requisitos **R34–R36**.
 > - Se abre la **pregunta P1**, sobre la migración, y queda **cerrada el mismo 2026-09-15 con la
->   opción D**: no hay guardia y no nace R37.
+>   opción D**: no hay guardia y no nace ningún requisito de ella.
 >
 > Ningún otro requisito cambia de texto ni de número.
+>
+> **Segunda enmienda del 2026-09-15.** Sale de la limpieza de comentarios. Añade **D14** («Arreglar en
+> QC-81») y su requisito **R37**: el alta de un lote sobre un producto que se borra a la vez. El
+> número R37 lo toma D14; P1 no llegó a usarlo. Tampoco esta enmienda cambia el texto ni el número de
+> ningún requisito anterior.
 
 ### La fecha de compra
 
@@ -224,7 +230,7 @@ solo unitaria con la base simulada— del **correlativo**, de la **unicidad por 
 > **«Solo dígitos»** son los caracteres `0`–`9`: el mismo conjunto con el que la serie decide qué
 > lote es numérico (R9). Qué hace la migración si un lote así ya está escrito fue la pregunta
 > **P1**, cerrada el 2026-09-15 con la opción D («no los hay, es nuevo todo»). No lleva guardia ni
-> requisito: no hay R37.
+> requisito propio.
 
 **R34.** SI el alta trae un lote escrito que, **tras recortar los espacios de los extremos**, está
 formado **solo por dígitos** y llega a los **60 caracteres** —contando también los ceros a la
@@ -239,6 +245,31 @@ dos se guardan tal cual, como dice R10. [D13, D5]
 **R36.** CUANDO el lote de solo dígitos más alto de una empresa tiene **59 caracteres**, el siguiente
 lote generado para esa empresa DEBE escribirse con sus **60 caracteres**, sin ningún rechazo, sin
 reintento y sin error. [D13, D6]
+
+### Segunda enmienda del 2026-09-15: el alta sobre un producto que se borra a la vez
+
+> Sale de la limpieza de comentarios de QC-81. El alta de un lote sobre un producto que ya existe
+> comprueba que el producto está vivo, pero no impide que otro lo borre antes de escribir el lote:
+> un borrado ya confirmado puede acabar con un lote nuevo dentro. Es comportamiento **heredado de
+> QC-90** y se arregla aquí por **D14**.
+>
+> Qué debe pasar **en general** con los lotes de un producto borrado es la pregunta 3 que QC-90 dejó
+> abierta, y esta enmienda **no** la responde: R37 solo ordena la concurrencia.
+
+**R37.** SI un producto se borra de forma concurrente con el alta de un lote sobre ese mismo
+producto, ENTONCES el sistema NO DEBE confirmar ningún lote nuevo sobre un producto cuyo borrado ya
+estaba confirmado, y DEBE resolver la concurrencia en uno de estos dos órdenes y en ningún otro:
+[D14]
+
+- **(a) El borrado gana.** CUANDO el borrado se confirma antes de que el alta llegue al producto, el
+  alta DEBE rechazarse con `product_not_found` —el código que ya existe—, sin escribir ningún lote y
+  sin crear ningún producto. Quien borra recibe éxito. Si quien da de alta reintenta, el alta vuelve a
+  resolverse por nombre desde el principio.
+- **(b) El alta gana.** CUANDO el alta llega al producto antes que el borrado, el borrado DEBE esperar
+  a que el alta termine.
+  - Si el alta se confirma, las dos operaciones reciben éxito y el producto queda borrado con el lote
+    nuevo dentro, igual que si el borrado hubiera llegado después.
+  - Si el alta falla, el borrado sigue y no queda ningún lote nuevo.
 
 ## Preguntas abiertas
 
@@ -256,7 +287,7 @@ lote de solo dígitos de 60 caracteres?**
 >
 > **Consecuencia:**
 > - **La migración no lleva guardia para ese caso.**
-> - **No nace R37.**
+> - **No nace ningún requisito** de P1. El número R37 lo tomó después D14, en la segunda enmienda.
 > - **T15 queda cancelada** («NO APLICA»).
 >
 > Por el mismo motivo tampoco se protege el caso vecino, el de los lotes ya escritos de **más** de 60
@@ -300,7 +331,18 @@ mensaje genérico (desviación 5 de la Tanda 1 de la bitácora). Es un caso veci
 incluye sin respuesta.
 
 ~~**Hasta que haya respuesta, T15 no se empieza**, y el requisito que nazca de ella (R37) no existe.~~
-*Superado por el cierre del 2026-09-15: la respuesta fue D, T15 no aplica y R37 no nace.*
+*Superado por el cierre del 2026-09-15: la respuesta fue D, T15 no aplica y P1 no hizo nacer ningún
+requisito. El R37 de hoy es el de D14, más abajo.*
+
+**P2 no se abre** (segunda enmienda, 2026-09-15). El encargo pedía abrirla si el orden «el alta gana
+y luego se borra el producto con su lote dentro» exigía una decisión humana. **Para R37 no la exige:**
+- Ese estado es **exactamente** el de borrar un producto que ya tenía lotes, y el borrado lo permite
+  hoy: `lib/modules/inventario/domain/delete-product.ts:40-43` no mira los lotes.
+- Qué debe pasar con los lotes de un producto borrado —ocultarlos, impedir el borrado u otra cosa— es
+  la **pregunta 3 que QC-90 dejó abierta** (`specs/QC-90-alta-del-primer-lote/requirements.md:179-181`).
+  Sigue abierta y **no se responde aquí**.
+
+Si el humano quiere otro desenlace para ese orden, se decide en la F1.4 de esta enmienda.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -318,8 +360,14 @@ incluye sin respuesta.
 | 2026-09-13 | ¿Entra la pantalla? | **No**: va en **QC-103**, `zone: frontend`, bloqueada por esta. Mantiene la zona limpia y el cupo de paralelismo intacto, igual que QC-87 → QC-102 |
 | 2026-09-13 | ¿Qué verificación se exige? | **Integración contra base real**, que es donde viven estas reglas: el correlativo, la unicidad por empresa, el backfill y **dos altas compitiendo por el mismo número**. Un unitario con la base simulada no puede demostrar ninguna de las dos últimas. **El E2E se difiere a QC-103**, que es la que tendrá algo que mirar |
 | 2026-09-13 | Autorización, idioma, borrado y forma de la fecha | **Heredados, no se reabren.** Autorización **en el service** con `inventario.modificar` (**QC-20**, **QC-90**); identificadores de base **en inglés** y borrado **lógico** (**feature 4**, **QC-14**, **QC-90**); la fecha viaja como **fecha civil `YYYY-MM-DD`** y la convierte el adaptador (**QC-90**, `expiryDate`) |
-| 2026-09-15 | Con la serie ya sin techo (m4), si el lote de solo dígitos más alto de una empresa tiene 60 caracteres, el siguiente generado tendría 61 y no cabe en el largo máximo de 60: en el alta es un error de base sin traducir y en la migración un aborto genérico. ¿Qué se hace? | **Un lote tecleado que sea solo dígitos no puede tener 60 caracteres**, para que el siguiente generado quepa siempre en el largo máximo de 60. **Precisa el alcance de D5**: el lote sigue siendo texto y un lote con al menos un carácter que no sea dígito conserva sus 60. Salió de la revisión de QC-81 y se decidió en la enmienda del spec. **Nota de cierre (2026-09-15, P1 → opción D):** con un lote así **ya escrito**, la migración **no lleva guardia**, y tampoco para los lotes ya escritos de más de 60 caracteres. Motivo textual del humano: «no los hay, es nuevo todo». No nace R37 |
+| 2026-09-15 | Con la serie ya sin techo (m4), si el lote de solo dígitos más alto de una empresa tiene 60 caracteres, el siguiente generado tendría 61 y no cabe en el largo máximo de 60: en el alta es un error de base sin traducir y en la migración un aborto genérico. ¿Qué se hace? | **Un lote tecleado que sea solo dígitos no puede tener 60 caracteres**, para que el siguiente generado quepa siempre en el largo máximo de 60. **Precisa el alcance de D5**: el lote sigue siendo texto y un lote con al menos un carácter que no sea dígito conserva sus 60. Salió de la revisión de QC-81 y se decidió en la enmienda del spec. **Nota de cierre (2026-09-15, P1 → opción D):** con un lote así **ya escrito**, la migración **no lleva guardia**, y tampoco para los lotes ya escritos de más de 60 caracteres. Motivo textual del humano: «no los hay, es nuevo todo». No nace ningún requisito nuevo |
+| 2026-09-15 | Al limpiar comentarios apareció que el alta de un lote sobre un producto existente comprueba que el producto está vivo **sin bloquear su fila**: un borrado lógico concurrente puede confirmarse entre esa comprobación y la escritura del lote, y el lote queda colgando de un producto borrado. Es comportamiento **heredado de QC-90**, no de QC-81. ¿Se arregla aquí? | **«Arreglar en QC-81».** Decidido sabiendo que exige una enmienda del spec y otra vuelta de implementación y revisión |
 
 *La fila D13 la escribió `spec_author` el 2026-09-15 en la enmienda F1.2. Transcribe la decisión humana
 que transmitió el leader, y el humano la **aprobó** el 2026-09-15 (F1.4 de la enmienda). La nota de
-cierre de P1 se añadió ese mismo día con la respuesta del humano. Las filas D1–D12 no se tocaron.*
+cierre de P1 se añadió ese mismo día con la respuesta del humano.*
+
+*La fila D14 la escribió `spec_author` el 2026-09-15 en la segunda enmienda. Transcribe la decisión
+humana textual que transmitió el leader y está sujeta a la aprobación F1.4 de esa enmienda.*
+
+*Las filas D1–D12 no se tocaron.*

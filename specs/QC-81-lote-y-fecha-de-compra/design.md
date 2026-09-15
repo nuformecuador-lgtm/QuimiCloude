@@ -18,6 +18,14 @@
 >
 > Las referencias de línea al código de las secciones 0–7 son las del 2026-09-13 y se dejan como
 > estaban. Las de esta enmienda son las del commit `e10f626`.
+>
+> **Segunda enmienda del 2026-09-15 (D14 → R37).** El alta de un lote sobre un producto existente
+> comprobaba que el producto estaba vivo sin bloquear su fila, y un borrado concurrente podía dejar el
+> lote colgando. Es herencia de QC-90 y se arregla aquí.
+> - §10 recoge la verificación en el código, el lock de fila, el orden de adquisición frente al lock
+>   del correlativo y por qué `createWithFirstBatch` no lo necesita.
+> - §6 G, H e I recogen las alternativas descartadas, §8 la verificación y §9.7 el límite.
+> - Las referencias de línea de §10 son las del worktree **después** de la limpieza de comentarios.
 
 ## 0. Hallazgos
 
@@ -600,6 +608,38 @@ cortar en la entrada.** Con esto, el alta de la empresa con 60 nueves dejaría d
 
 D13 lo decidió en la entrada, y ahí se aplica.
 
+**G. `FOR SHARE` en lugar de `FOR NO KEY UPDATE`** (segunda enmienda, §10). También choca con el lock del
+borrado y además dejaría hacer en paralelo dos altas sobre el mismo producto. **Se descarta:**
+- Dos transacciones con `FOR SHARE` sobre la misma fila que después intenten escribirla **se
+  interbloquean**. Hoy el alta no escribe la fila del producto, pero en cuanto una escritura la toque
+  dentro de esa transacción, dos altas simultáneas quedarían bloqueadas entre sí, y ese fallo solo se
+  ve con concurrencia.
+- La ganancia es poca: las altas con lote generado ya hacen cola por empresa en el lock de aviso.
+
+`FOR KEY SHARE` ni siquiera sirve: es el lock que ya toma la FK, y es compatible con el del borrado
+(§10.1).
+
+**H. Un disparador `BEFORE INSERT` en `product_batches` que rechace el producto borrado**, bloqueando
+dentro la fila del producto. Daría defensa en la base para cualquier vía de escritura. **Se descarta:**
+- Sería la **primera** regla de «vivo» (`deleted_at`) escrita en la base. El borrado lógico se filtra en
+  los adaptadores, y ningún objeto de la base lo conoce.
+- Exige cambiar la migración y su huella, traducir un error de base nuevo a `ProductNotFoundError` y
+  tocar los tests de esquema.
+- La aplicación tiene una sola vía que escribe lotes sobre un producto existente (R32 no deja otras), y
+  un lock de fila en esa vía cierra R37.
+
+Lo que queda sin cubrir va como límite en §9.7.
+
+**I. Subir el aislamiento de la transacción.** **Se descarta:**
+- **`REPEATABLE READ` ni siquiera detecta la carrera.** El alta no escribe la fila del producto, así
+  que un borrado confirmado no entra en conflicto con ella.
+- **`SERIALIZABLE` sí la detectaría, pero rompe dos cosas:**
+  - fija la instantánea en la primera sentencia, así que el lock de aviso del correlativo dejaría de
+    servir (§3.2 depende de que en READ COMMITTED cada sentencia tome su propia instantánea) y R14
+    caería;
+  - obligaría a reintentar **toda** alta ante un fallo de serialización (`40001`), por un motivo que
+    hoy no existe.
+
 ## 7. Dependencias y catálogo de errores
 
 ### 7.1. Dependencias: **ninguna**
@@ -684,6 +724,22 @@ aislamiento de mentira —el precedente y el argumento están escritos en
   generado se escribe con **60** caracteres, y el de después también. Es lo único que demuestra de
   verdad que el `CHECK` de largo no muerde en esa frontera.
 
+**El borrado concurrente (R37, segunda enmienda)** se prueba contra base real con dos casos
+deterministas (T16). Tienen tres cosas en común:
+- **No duermen ni dependen de tiempos.** Un `Client` de `pg` aparte sujeta un lock y el test espera
+  mirando `pg_stat_activity` hasta ver al otro backend bloqueado.
+- **Cada caso tiene su orden de R37:**
+  - **(a) El borrado gana.** El `Client` deja sin confirmar el `UPDATE` del borrado; el alta tiene que
+    **esperar** a la fila y, tras el `COMMIT`, devolver `null` sin escribir ningún lote.
+  - **(b) El alta gana.** El `Client` sujeta el lock de aviso del correlativo para pausar un alta que
+    ya tiene la fila; el borrado tiene que **esperar**, y el alta se confirma antes que él.
+- **Muerden.** Sin el `FOR NO KEY UPDATE`, el alta de (a) no espera y escribe su lote, y el borrado de
+  (b) no espera y se confirma antes: los dos dan rojo con su propio mensaje. La mutación se hace con
+  copia y restauración, como la del lock de aviso.
+
+Un unitario con dobles fija además el **orden**: la lectura con lock de fila va antes que el lock de
+aviso (§10.3).
+
 **El relleno (R18-R21)** se prueba aplicando el `migration.sql` sobre una copia con filas sembradas
 a mano antes de la migración. Si eso resulta impracticable contra la base ya migrada de la corrida,
 la alternativa aceptada es un test de **esquema** que lee el SQL —patrón de
@@ -733,7 +789,7 @@ Es una excepción consciente a `CHECKPOINTS.md:20` y va anotada en el `impl_`.
    - **Motivo del humano, textual:** «no los hay, es nuevo todo». No hay datos previos con lotes de
      solo dígitos de 60 caracteres o más.
    - **Consecuencia:** la migración **no** lleva guardia para este caso, no cambia ninguna sentencia de
-     `migration.sql`, no nace R37 y T15 no aplica.
+     `migration.sql`, no nace ningún requisito y T15 no aplica. El R37 actual es de D14, §10.
    - **El caso vecino tampoco se protege, y por el mismo motivo.** Son los lotes ya escritos de **más**
      de 60 caracteres de cualquier forma (desviación 5 de la Tanda 1 de la bitácora), que harían
      abortar la migración entera al crear `product_batches_lot_length`, con el mensaje genérico.
@@ -770,3 +826,138 @@ Es una excepción consciente a `CHECKPOINTS.md:20` y va anotada en el `impl_`.
    sentencia nueva. El comentario del paso 4 de `migration.sql` sigue diciendo «LIMITE CONOCIDO»,
    que es exactamente lo que ahora es, y **no** se toca en esta enmienda. Este punto es un **límite
    aceptado**, con el motivo escrito arriba.
+7. **Una escritura de lote por otra vía que no sea la aplicación puede colgarlo de un producto
+   borrado** (segunda enmienda del 2026-09-15). R37 se cierra con un lock de fila en la única vía de
+   la aplicación que escribe lotes sobre un producto existente (§10). La base no rechaza un lote sobre
+   un producto con `deleted_at` puesto, porque el disparador se descartó (§6 H).
+
+## 10. Segunda enmienda del 2026-09-15: el alta sobre un producto que se borra a la vez (D14, R37)
+
+### 10.1. La carrera existe: comprobado en el código
+
+Las referencias de línea son las del worktree **después** de la limpieza de comentarios.
+
+| Pieza | Qué hace | ¿Impide la carrera? |
+|---|---|---|
+| Borrado lógico, `softDeleteAliveProduct` (`product-prisma.ts:117-130`) | Un `updateMany` con `deleted_at IS NULL` que escribe `deleted_at` y `updated_at`. Es un `UPDATE` suelto, fuera de transacción interactiva. Como no cambia ninguna columna con índice único, Postgres toma sobre la fila el lock **`FOR NO KEY UPDATE`** hasta su commit | Es el lock con el que hay que chocar |
+| Comprobación de «vivo» en `addBatchToAlive` (`:525-529`) | Un `findFirst` **sin lock**. En READ COMMITTED lee la última versión confirmada y no bloquea nada | No |
+| Correlativo (`resolveBatchLot`, `:532`) | Pide `pg_advisory_xact_lock` **después** de la comprobación; con altas en cola, la espera **ensancha** la ventana | No; la agranda |
+| FK `product_batches_product_id_fkey` (`20260909120000_product_batches/migration.sql:37`) | El `INSERT` del lote toma `FOR KEY SHARE` sobre la fila del producto, que es **compatible** con `FOR NO KEY UPDATE`. Su `ON DELETE RESTRICT` solo actúa en un borrado **físico** | No |
+| Disparador `product_batches_check_company` (`20260911130000_inventory_company_scope/migration.sql:264-301`) | Lee `company_id` del producto, sin lock y sin mirar `deleted_at` | No |
+| Disparadores y `CHECK` sobre `products` | No hay ninguno. Los tres disparadores del repo son `units_check_derivation_trigger`, `product_batches_check_company_trigger` y `presentations_check_unit_scope_trigger` | No |
+| Caso de uso del borrado (`delete-product.ts:40-43`) | No mira los lotes | No |
+
+**La secuencia que falla hoy:**
+1. El alta A comprueba que el producto está vivo.
+2. El borrado B se confirma.
+3. A escribe el lote y confirma.
+
+A recibe éxito, pero su lote cuelga de un producto que ya no se ve. Con el arreglo, A recibe
+`product_not_found`, por la rama del caso de uso que ya existe para `addBatchToAlive` devolviendo
+`null`. Al reintentar, la resolución por nombre ya no encuentra el producto y crea uno nuevo (QC-90
+R19).
+
+### 10.2. El arreglo: bloquear la fila del producto al comprobarlo
+
+En `addBatchToAlive`, el `findFirst` pasa a ser esta consulta, como **primera sentencia** de la
+transacción:
+
+```sql
+SELECT "id"
+  FROM "products"
+ WHERE "id" = :productId
+   AND "company_id" = :companyId      -- de companyScopeColumns(scope)
+   AND "deleted_at" IS NULL
+   FOR NO KEY UPDATE
+```
+
+- **Con `tx.$queryRaw`**, porque la API tipada de Prisma no expresa locks de fila. La empresa sale de
+  `companyScopeColumns(scope)`, igual que en `resolveLot`: la guardia de ámbito exige que el `scope`
+  llegue a las envolturas de `./company-scope` (`tests/guards/guard-ambito-empresa-inventario.test.ts`).
+- **Sin fila, `null`**, como hoy. Ni el puerto ni el caso de uso cambian de firma ni de significado.
+- **Por qué `FOR NO KEY UPDATE` y no `FOR UPDATE`.** Es de la misma familia que el `SELECT … FOR
+  UPDATE` del encargo y basta:
+  - choca con el lock del borrado, que es el mismo modo, y con el de la edición (`updateAliveProduct`,
+    `:98-115`, también un `UPDATE` sin columnas únicas);
+  - `FOR UPDATE` bloquearía además los `FOR KEY SHARE` que toman los `INSERT` de otras tablas con FK a
+    `products`, sin proteger nada más. Son las líneas de receta
+    (`20260902163256_recipes_and_recipe_lines/migration.sql:68`) y las del catálogo de proveedor
+    (`20260903131417_suppliers_and_supplier_catalog_lines/migration.sql:75`).
+- **Por qué basta con esa fila.** «Vivo» es `deleted_at IS NULL` **en esa fila** y nada más: ninguna otra
+  fila decide si el producto está vivo. Toda escritura que pueda volver falso el predicado es un `UPDATE`
+  de esa fila y tiene que esperar.
+  - **Si el borrado va primero:** el `SELECT … FOR NO KEY UPDATE` espera a que se confirme, y en READ
+    COMMITTED Postgres **vuelve a evaluar el `WHERE` sobre la versión nueva** de la fila. `deleted_at`
+    ya no es nulo, la fila no sale y el alta devuelve `null` (R37 a).
+  - **Si el alta va primero:** mantiene el lock hasta su commit o rollback, cubriendo el correlativo y
+    el `INSERT`, y el borrado espera (R37 b).
+- **Reintentos.** Cada reintento del correlativo (§3.3) abre una transacción nueva y vuelve a tomar el
+  lock de fila. Si entre dos intentos se confirma un borrado, el intento siguiente devuelve `null`.
+
+### 10.3. El orden de adquisición, fijado
+
+Dentro de la transacción de `addBatchToAlive`, **siempre** en este orden:
+1. la fila de `products`, con `FOR NO KEY UPDATE`;
+2. el `pg_advisory_xact_lock` del correlativo de la empresa, solo si hay que generar (§3.2);
+3. el `INSERT` del lote. Su `FOR KEY SHARE` de la FK cae sobre la fila que la misma transacción ya
+   tiene, así que no espera.
+
+**No hay interbloqueo posible.** Estos son los locks de cada transacción que toca alguna de las dos
+cosas:
+
+| Transacción | Fila de `products` ya existente | Lock de aviso del correlativo |
+|---|---|---|
+| Alta sobre producto existente (`addBatchToAlive`) | 1.º | 2.º, solo si genera |
+| Alta con producto nuevo (`createWithFirstBatch`) | ninguna: la fila que crea no la ve nadie | sí |
+| Borrado lógico y edición del producto | sí, por su `UPDATE` | no |
+| Alta de línea de receta o de catálogo | `FOR KEY SHARE`, compatible | no |
+
+Ninguna transacción toma el lock de aviso y **después** una fila de producto existente, así que no se
+forma ningún ciclo. **Regla para quien toque esto después:** ninguna transacción puede pedir el lock de
+aviso del correlativo y, a continuación, bloquear una fila de `products` que ya existe.
+
+**Por qué este orden y no el contrario.** El contrario tampoco formaría un ciclo hoy, pero tiene dos
+costes:
+- un alta que espera al borrado de **un** producto retendría la cola de correlativos de **toda** la
+  empresa mientras espera;
+- pediría el lock de aviso para un producto que quizá ya no está vivo, algo que el orden actual de
+  `addBatchToAlive` ya evita.
+
+### 10.4. `createWithFirstBatch` no necesita el lock
+
+- **No hay ventana que cerrar.** El producto se inserta en la misma transacción que su lote, y nadie
+  más lo ve hasta el commit:
+  - un borrado concurrente no lo encuentra: su `UPDATE` afecta a cero filas y el borrado sale con
+    `product_not_found`;
+  - un borrado posterior es un borrado secuencial de un producto que ya tiene lotes.
+- **La resolución por nombre tampoco cambia**, aunque va fuera de la transacción. Si el producto se borra
+  entre esa lectura y `addBatchToAlive`, el caso es R37 (a).
+
+### 10.5. Qué ve quien llama, y qué no cambia
+
+- **(a) El borrado gana:** el alta recibe `product_not_found` («El producto solicitado no existe.») y
+  el borrado, éxito.
+- **(b) El alta gana:** las dos reciben éxito, y el borrado tarda lo que tarde el alta en confirmarse.
+- **Nada más cambia:** ni código de error, ni puerto, ni migración, ni pantalla (R28), ni dependencias
+  (R30).
+
+### 10.6. Coste aceptado
+
+- **Esperas del borrado y la edición.** Un borrado o una edición de un producto esperan a que termine
+  cualquier alta en curso sobre ese mismo producto. Si el alta genera lote, la espera incluye su turno
+  en la cola del correlativo de la empresa (§3.4).
+- **Cola entre altas.** Dos altas sobre el mismo producto hacen cola aunque las dos traigan lote
+  tecleado, cosa que hoy no pasa.
+- **Límite de tiempo.** La espera del alta sobre el lock de fila cuenta dentro del límite de tiempo de
+  la transacción interactiva de Prisma. El adaptador no pasa opciones a `$transaction`, así que rige
+  el valor por defecto del cliente: es la misma cota que ya tiene la espera del lock de aviso.
+
+### 10.7. Comentarios del código
+
+El porqué que se quitó del docblock de `addBatchToAlive` era falso. Si el código nuevo lleva
+comentario, explica solo el porqué que el código no muestra:
+- sin el lock de fila, un borrado confirmado entre la comprobación y el `INSERT` deja el lote colgando;
+- el orden es fila primero y lock de aviso después.
+
+No cita fichas, requisitos ni este documento (`docs/conventions.md > Comentarios (2026-09-15)`).
+**Este spec no ordena citar D14 ni R37 en ningún comentario**; R37 va solo en el nombre de los tests.

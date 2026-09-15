@@ -198,9 +198,12 @@
         `>= PRODUCT_BATCH_LOT_MAX_LENGTH`, con el mensaje propuesto en §4.6.
       
       El patrón es una constante **no exportada**, y su docblock dice que es el mismo conjunto
-      que `'^[0-9]+$'` de `resolveLot` y del relleno. El docblock de `lotSchema` cita D13 y R34.
+      que `'^[0-9]+$'` de `resolveLot` y del relleno. ~~El docblock de `lotSchema` cita D13 y R34.
       En `resolveLot`, el «LÍMITE CONOCIDO» pasa a decir que desde R34 solo lo alcanzan datos ya
-      escritos o escritos por otra vía, y remite a P1.
+      escritos o escritos por otra vía, y remite a P1.~~
+      *(Corregido el 2026-09-15: esa orden de citar fichas y requisitos en comentarios contradecía
+      `docs/conventions.md > Comentarios (2026-09-15)`, y el implementer ya la sustituyó por el porqué
+      solo. Los comentarios explican el porqué sin citas.)*
       **Hecho:**
       - `product-batch-input.test.ts`, con un caso por fila:
         - 60 dígitos ⇒ **un solo** issue, con ruta `lot` y código `custom` (R34);
@@ -239,7 +242,7 @@
       nuevo todo»; no hay datos previos con lotes de solo dígitos de 60 caracteres o más.
       **Consecuencia:**
       - la migración **no** lleva guardia y **no** cambia;
-      - **no nace R37**;
+      - **no nace ningún requisito** (el número R37 lo tomó después D14, con T16);
       - el caso vecino, los lotes de más de 60 caracteres, tampoco se protege
         (`requirements.md > Preguntas abiertas > P1`, `design.md > 9.6`).
       
@@ -254,7 +257,7 @@
         1, junto a la de duplicados, con la condición exacta de la opción elegida (`design.md >
         9.6`). Se escribe con el mismo formato de `RAISE EXCEPTION` que R21: cuántas empresas o
         filas son, la consulta para localizarlas y qué hacer. Se añade el requisito que corresponda
-        (**R37**) con su test de integración (aborta entero y no deja nada a medias) y su test
+        (el que entonces habría sido R37; hoy ese número es de D14) con su test de integración (aborta entero y no deja nada a medias) y su test
         estático (la guardia va antes de todo cambio).
       - **Respuesta D** (se acepta como límite): no cambia ninguna sentencia. Solo cambia el
         comentario del paso 4 de `migration.sql`, que cita D13 y R34 y dice que el límite ya solo
@@ -266,14 +269,89 @@
       **Hecho:** la respuesta a P1 está escrita en `progress/impl_QC-81-lote-y-fecha-de-compra.md`.
       Los tests de la opción elegida están en verde. Si la respuesta es A o B, el test de la
       guardia **se pone rojo** al quitar la guardia (mutación con copia y restauración, como en m4).
-      ~~Cubre **R37**, si nace.~~ *No nace: T15 no aplica (2026-09-15).*
+      ~~Cubría el requisito que naciera de P1.~~ *No nació ninguno: T15 no aplica (2026-09-15).*
+
+## Tanda 7 — segunda enmienda del 2026-09-15: el alta sobre un producto que se borra a la vez (D14)
+
+> **No se empieza sin la aprobación humana de esta segunda enmienda** (F1.4).
+>
+> Los comentarios de los archivos que se toquen siguen `docs/conventions.md > Comentarios
+> (2026-09-15)`: explican el porqué y **no citan** fichas, requisitos ni `design.md`. `R37` va
+> **solo** en el nombre de los tests.
+
+- [x] **T16 — Bloquear la fila del producto en el alta sobre un producto existente.** Depende de la
+      aprobación. Comparte `product-batch-lot.int.test.ts` con T14: no se editan a la vez.
+      Archivos:
+      - `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`, solo `addBatchToAlive`;
+      - `tests/unit/inventario/product-batch-lot-retry.test.ts`;
+      - `tests/integration/inventario/product-batch-lot.int.test.ts`, con dos casos nuevos. El archivo
+        ya está censado en `tests/integration/aislamiento.json` como `commit`.
+      
+      Qué se hace (`design.md > 10.2` y `> 10.3`):
+      - el `findFirst` que comprueba que el producto está vivo pasa a ser el `SELECT "id" … FOR NO KEY
+        UPDATE` con `tx.$queryRaw`, con la empresa de `companyScopeColumns(scope)`, y es la **primera**
+        sentencia de la transacción;
+      - el orden queda fijo: fila → `resolveBatchLot()` → `INSERT`. Sin fila, devuelve `null` sin pedir el
+        lock de aviso y sin escribir, como hoy;
+      - `createWithFirstBatch` **no** se toca (§10.4).
+      
+      **Hecho:**
+      - **Unitario** (`product-batch-lot-retry.test.ts`, con los dobles de Prisma):
+        - los casos de `addBatchToAlive` que hoy doblan `product.findFirst` pasan a doblar la lectura
+          por `$queryRaw`, sin cambiar lo que afirman;
+        - caso nuevo «R37: addBatchToAlive bloquea la fila del producto con FOR NO KEY UPDATE antes de
+          pedir el lock del correlativo»: la primera llamada de la transacción es un `$queryRaw` cuyo
+          SQL contiene `FOR NO KEY UPDATE` y `deleted_at`, y va **antes** que el `$executeRaw` del lock
+          de aviso;
+        - sin fila ⇒ `null`, con cero `$executeRaw` y cero `productBatch.create`.
+      - **Integración contra base real**, con dos casos. Cómo se montan los dos:
+        - son **deterministas, sin `sleep`**: se espera mirando `pg_stat_activity` de la base de la
+          corrida, con una cota de unos 3 s, por debajo del límite de la transacción interactiva;
+        - usan un `Client` de `pg` aparte para sujetar los locks;
+        - necesitan un pool de Prisma de más de una conexión, igual que el de R14.
+        
+        Los casos:
+        1. «R37: con el borrado confirmado antes, el alta espera la fila, devuelve null y no escribe
+           ningún lote»:
+           - el `Client` abre transacción y ejecuta el `UPDATE` del borrado lógico **sin confirmarlo**;
+           - se lanza `addBatchToAlive` con un lote tecleado único, sin `await`;
+           - se espera a ver un backend con `wait_event_type = 'Lock'` y `wait_event` igual a
+             `transactionid` o `tuple`. Si el alta termina antes, **falla** con el mensaje de que el
+             alta no esperó a la fila;
+           - `COMMIT` del `Client`;
+           - el alta resuelve `null` y el producto tiene **cero** lotes nuevos.
+        2. «R37: con el alta llegando antes, el borrado espera a que el alta confirme y el lote queda
+           escrito antes del borrado»:
+           - el `Client` abre transacción y toma el **mismo** lock de aviso del correlativo de esa
+             empresa, con las mismas claves que el adaptador, para pausar un alta con lote generado;
+           - se lanza `addBatchToAlive` sin `await` y se espera a ver un backend con
+             `wait_event = 'advisory'`;
+           - se lanza `softDeleteAliveProduct` sin `await` y se espera a verlo esperando un lock de fila.
+             Si el borrado resuelve antes, **falla** diciendo que el borrado no esperó al alta;
+           - `COMMIT` del `Client`;
+           - el alta resuelve con su `batchId` **antes** que el borrado (el orden se registra al
+             asentarse cada promesa), el borrado devuelve `true` y el lote existe.
+        
+        En los dos: empresa y producto propios, `Promise.allSettled` antes de afirmar y de limpiar,
+        limpieza en `finally` en orden de FK, y el `Client` se libera pase lo que pase.
+      - **Muerde, y se mide, no se razona.** Con copia y restauración, como en m4, se quita `FOR NO KEY
+        UPDATE` de la consulta: **los dos casos se ponen rojos**, cada uno con su propio mensaje. Al
+        restaurar, `git diff lib/` sale vacío y los dos vuelven a verde. La salida literal va en la
+        bitácora.
+      - `pnpm typecheck`, `pnpm lint`, `vitest related` sobre los archivos tocados,
+        `tests/guards/guard-ambito-empresa-inventario.test.ts` y
+        `tests/unit/inventario/company-scope.test.ts`, todo en verde.
+      - Ningún comentario nuevo cita fichas, requisitos ni el spec.
+      
+      Cubre **R37**.
 
 ## Tanda 5 — cierre
 
-- [ ] **T12 — Trazabilidad y gate.** Depende de todas, **incluidas T13 y T14** de la enmienda. T15 no
-      aplica.
+- [ ] **T12 — Trazabilidad y gate.** Depende de todas, **incluidas T13 y T14** de la enmienda y **T16**
+      de la segunda enmienda. T15 no aplica.
       Archivos: `progress/impl_QC-81-lote-y-fecha-de-compra.md`.
-      El mapa `R1..R36 -> test` completo, sin ningún requisito huérfano. R37 no existe. R4 va citado
+      El mapa `R1..R37 -> test` completo, sin ningún requisito huérfano. R37 es el de D14, con sus dos
+      casos de integración y la salida literal de la mutación sin el lock de fila. R4 va citado
       con su redacción precisada (m3). Se escribe el cierre de P1 (opción D, 2026-09-15). Y se pega la salida real de
       `./init.sh` **completo** pegada; la nota del E2E diferido a QC-103 con su motivo (excepción
       consciente a `CHECKPOINTS.md`); y la respuesta de T0 escrita.
@@ -312,9 +390,12 @@
 | R34 | T13 (esquema de entrada y caso de uso), T14 (caso 4) |
 | R35 | T13 (59 dígitos y 60 caracteres con letra), T14 (caso 1) |
 | R36 | T14 (casos 2 y 3) |
+| R37 | T16 (unitario del orden de locks; integración casos 1 y 2, que se ponen rojos sin el lock de fila) |
 
 *Enmienda del 2026-09-15:*
 - **R4** cambia de redacción (m3) pero **no** de task: lo sigue cubriendo T5, con el test que ya
   afirma `invalid_input` y el `diagnostic` con `purchaseDate`.
 - **R6** se precisa por el mismo motivo y lo sigue cubriendo T4.
-- **No hay R37.** P1 se cerró con la opción D, así que T15 no aplica y no figura en este mapa.
+- **P1 no tiene requisito.** Se cerró con la opción D, así que T15 no aplica y no figura en este mapa.
+- **R37 es de D14** (segunda enmienda del 2026-09-15), no de P1: el número quedó libre y lo tomó
+  D14. Lo cubre T16.
