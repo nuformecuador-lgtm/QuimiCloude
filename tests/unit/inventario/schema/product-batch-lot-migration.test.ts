@@ -1,22 +1,8 @@
-// T3 (QC-81, lote-y-fecha-de-compra) — Contrato ESTATICO del SQL de
-// `20260913120000_product_batch_lot_and_purchase_date`.
-//
-// POR QUE EXISTE: la migracion esta ESCRITA ENTERA A MANO (`design.md > 2`) y lo que la hace
-// correcta es el ORDEN y unas pocas lineas que Prisma no modela ni regenera: el parentesis de RLS,
-// la guardia de duplicados, los dos rellenos antes de los `SET NOT NULL`, los dos CHECK y el indice
-// unico despues del relleno, y un `down.sql` que no vacia ningun lote. Una edicion futura puede
-// perder cualquiera de esas cosas en silencio y ningun tipo generado se enteraria.
-//
-// PATRON, el de `inventory-company-scope-migration.test.ts` (QC-49): cada afirmacion es un
-// PREDICADO PURO EXPORTADO que recibe el texto SQL, y se aplica DOS VECES --al SQL real y a una
-// version MUTADA EN MEMORIA--. El archivo en disco no se toca nunca, y cada mutacion comprueba con
-// `not.toBe(...)` que muto de verdad: un test que no puede fallar no vigila nada.
-//
-// LO QUE ESTE ARCHIVO NO PRUEBA: que el relleno numere bien ni que las restricciones MUERDAN en la
-// base. Eso es integracion contra base real (T8, `tests/integration/inventario/product-batch-lot.int.test.ts`).
-// Aqui se prueba que estan ESCRITAS y en su sitio.
-//
-// Cubre R17, R22, R23 y R26 (y la mitad escrita de R19 y R21).
+// La migracion esta escrita a mano y su correccion depende del orden y de lineas que Prisma no
+// modela ni regenera: una edicion futura puede perderlas sin que ningun tipo generado se entere.
+// Cada predicado se aplica al SQL real y a una version mutada en memoria, y cada mutacion comprueba
+// con `not.toBe(...)` que muto de verdad: un test que no puede fallar no vigila nada. Que las
+// restricciones muerdan en la base lo prueba la integracion, no este archivo.
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -24,7 +10,6 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-/** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
   let dir = startDir
   for (;;) {
@@ -42,7 +27,7 @@ function findRepoRoot(startDir: string): string {
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)))
 const migrationsDir = join(repoRoot, 'db', 'migrations')
 
-/** Se localiza por PATRON, no por el timestamp: renombrar la marca de tiempo no debe romperlo. */
+/** Por patron y no por timestamp: renombrar la marca de tiempo no debe romperlo. */
 const lotDirs = readdirSync(migrationsDir).filter((name) =>
   name.endsWith('_product_batch_lot_and_purchase_date'),
 )
@@ -51,7 +36,7 @@ const migrationDir = join(migrationsDir, lotDirs[0] ?? '__no_existe__')
 const upSource = readFileSync(join(migrationDir, 'migration.sql'), 'utf8')
 const downSource = readFileSync(join(migrationDir, 'down.sql'), 'utf8')
 
-/** Quita comentarios de linea y de bloque: lo que se afirma es SQL ejecutable, no prosa. */
+/** Lo que se afirma es SQL ejecutable, no prosa. */
 export function stripSqlComments(sql: string): string {
   return sql
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
@@ -60,16 +45,15 @@ export function stripSqlComments(sql: string): string {
     .join('\n')
 }
 
-/** El SQL ejecutable en una sola linea, con los espacios normalizados, para medir POSICIONES. */
+/** En una sola linea y con espacios normalizados, para medir posiciones. */
 export function executable(sql: string): string {
   return stripSqlComments(sql).replace(/\s+/g, ' ')
 }
 
 /**
- * Sentencias ejecutables normalizadas. Parte por `;`, igual que los precedentes: los bloques
- * `DO $$ ... $$` salen partidos, pero ningun trozo suyo empieza por `ALTER`, `CREATE` ni `DROP`,
- * asi que no ensucian las afirmaciones ancladas con `^`. Lo que se afirma SOBRE UN BLOQUE se mide
- * contra el texto completo.
+ * Partir por `;` rompe los bloques `DO $$ ... $$`, pero ningun trozo suyo empieza por `ALTER`,
+ * `CREATE` ni `DROP` y no ensucia las afirmaciones ancladas con `^`. Lo que se afirma sobre un
+ * bloque se mide contra el texto completo.
  */
 export function statements(sql: string): readonly string[] {
   return stripSqlComments(sql)
@@ -78,7 +62,6 @@ export function statements(sql: string): readonly string[] {
     .filter((statement) => statement.length > 0)
 }
 
-/** Los bloques `DO $$ ... $$` del texto, en orden. */
 export function doBlocks(sql: string): readonly string[] {
   return executable(sql).match(/DO \$\$[\s\S]*?\$\$/g) ?? []
 }
@@ -90,12 +73,11 @@ const FORCE = /^ALTER TABLE "product_batches" FORCE ROW LEVEL SECURITY$/
 // --- Predicados del UP ----------------------------------------------------------------------
 
 /**
- * R22 (y la mina de QC-49). ¿El parentesis de RLS se ABRE en la primera sentencia y se CIERRA
- * --`ENABLE` y luego `FORCE`-- en las dos ultimas?
+ * ¿El parentesis de RLS se abre en la primera sentencia y se cierra --`ENABLE` y luego `FORCE`--
+ * en las dos ultimas?
  *
- * Bajo `FORCE` y sin ninguna policy, Postgres deniega al dueno de la tabla tambien el `SELECT`: la
- * guardia leeria cero duplicados y los `UPDATE` tocarian cero filas. Abrirlo tarde deja lecturas
- * fuera; cerrarlo pronto, o no cerrarlo, deja la tabla menos protegida que antes de migrar.
+ * Bajo `FORCE` y sin policies la RLS deniega tambien al dueno: la guardia leeria cero duplicados y
+ * los `UPDATE` tocarian cero filas. No cerrarlo deja la tabla menos protegida que antes de migrar.
  */
 export function wrapsInRlsParenthesis(sql: string): boolean {
   const source = statements(sql)
@@ -107,9 +89,9 @@ export function wrapsInRlsParenthesis(sql: string): boolean {
 }
 
 /**
- * R21. ¿La guardia de duplicados es un bloque `DO $$` que va ANTES de cualquier cambio de esquema,
- * agrupa por `(company_id, lot)` excluyendo los lotes en blanco, y aborta con un mensaje que dice
- * CUANTOS son y QUE HACER?
+ * ¿La guardia de duplicados es un bloque `DO $$` que va antes de cualquier cambio de esquema,
+ * agrupa por `(company_id, lot)` excluyendo los lotes en blanco, y aborta diciendo cuantos son y
+ * que hacer?
  */
 export function guardsDuplicateLotsBeforeAnySchemaChange(sql: string): boolean {
   const text = executable(sql)
@@ -135,11 +117,10 @@ export function guardsDuplicateLotsBeforeAnySchemaChange(sql: string): boolean {
 }
 
 /**
- * R1, R26. ¿`purchase_date` nace como `DATE` ANULABLE y SIN `DEFAULT`, y ninguna sentencia usa la
- * fecha del reloj?
+ * ¿`purchase_date` nace `DATE` anulable y sin `DEFAULT`, y ninguna sentencia usa el reloj?
  *
- * Un `DEFAULT CURRENT_DATE` afirmaria para todas las filas viejas una fecha de compra falsa (D8), y
- * un `TIMESTAMPTZ` o un `TEXT` no es la fecha civil que R26 exige.
+ * Un `DEFAULT CURRENT_DATE` daria a las filas viejas una fecha de compra falsa, y un `TIMESTAMPTZ`
+ * no es una fecha civil.
  */
 export function addsPurchaseDateAsNullableDateWithoutDefault(sql: string): boolean {
   const source = statements(sql)
@@ -154,10 +135,8 @@ export function addsPurchaseDateAsNullableDateWithoutDefault(sql: string): boole
 }
 
 /**
- * R19. ¿La fecha de compra se rellena con la fecha civil EN UTC de `created_at` de cada fila?
- *
- * Sin el `AT TIME ZONE 'UTC'` explicito, la conversion usaria la zona de la sesion y la misma base
- * migrada en dos maquinas daria dos dias distintos para la misma fila.
+ * Sin el `AT TIME ZONE 'UTC'` la conversion usaria la zona de la sesion, y la misma base migrada
+ * en dos maquinas daria dos dias distintos para la misma fila.
  */
 export function fillsPurchaseDateFromCreatedAtInUtc(sql: string): boolean {
   return /UPDATE "product_batches" SET "purchase_date" = \("created_at" AT TIME ZONE 'UTC'\)::date;/i.test(
@@ -166,13 +145,11 @@ export function fillsPurchaseDateFromCreatedAtInUtc(sql: string): boolean {
 }
 
 /**
- * R18. ¿El relleno de lote toma SOLO las filas en blanco, las numera por empresa y por orden de
- * creacion con el `id` de desempate, y continua desde el maximo numerico SIN TECHO?
+ * ¿El relleno de lote toma solo las filas en blanco, las numera por empresa y orden de creacion con
+ * el `id` de desempate, y continua desde el maximo numerico sin techo?
  *
- * El maximo se lee con `::numeric` sobre `'^[0-9]+$'` (hallazgo m4, decision del humano del
- * 2026-09-15). Ni `::bigint` ni la cota `{1,18}` que lo protegia: con ellos un lote de 19 digitos
- * quedaba fuera del maximo y la serie tenia techo. Se exige tambien que NO quede ningun `::bigint`
- * sobre `lot` en el SQL ejecutable, para que una vuelta atras a medias no pase.
+ * Con `::bigint` y la cota `{1,18}` que lo protege, un lote de 19 digitos quedaria fuera del
+ * maximo. Se exige que no quede ningun `::bigint` para que una vuelta atras a medias no pase.
  */
 export function fillsLotBySeriesPerCompany(sql: string): boolean {
   const text = executable(sql)
@@ -188,10 +165,10 @@ export function fillsLotBySeriesPerCompany(sql: string): boolean {
 }
 
 /**
- * R22. ¿Cada relleno comprueba su `ROW_COUNT` y aborta si no cuadra?
+ * ¿Cada relleno comprueba su `ROW_COUNT` y aborta si no cuadra?
  *
- * El de la fecha contra el TOTAL de la tabla (escribe todas las filas, literal QC-49); el del lote
- * contra las filas SIN LOTE contadas justo antes (las que ya tienen lote lo conservan, R18).
+ * El de la fecha contra el total de la tabla; el del lote contra las filas sin lote contadas justo
+ * antes, porque las que ya tienen lote lo conservan.
  */
 export function checksRowCountOfBothFills(sql: string): boolean {
   const fill = doBlocks(sql).find((block) => block.includes('SET "purchase_date"'))
@@ -205,14 +182,10 @@ export function checksRowCountOfBothFills(sql: string): boolean {
   )
 }
 
-/** Posicion del primer match en el SQL ejecutable, o -1. */
 function positionOf(sql: string, pattern: RegExp): number {
   return executable(sql).search(pattern)
 }
 
-/**
- * R22. ¿Los DOS rellenos van ANTES de sus `SET NOT NULL`, y la columna nueva antes que su relleno?
- */
 export function fillsBeforeNotNull(sql: string): boolean {
   const addColumn = positionOf(sql, /ADD COLUMN "purchase_date"/)
   const fillDate = positionOf(sql, /SET "purchase_date" =/)
@@ -223,10 +196,7 @@ export function fillsBeforeNotNull(sql: string): boolean {
   return addColumn < fillDate && fillDate < dateNotNull && fillLot < lotNotNull
 }
 
-/**
- * R7, R11, R22. ¿Los dos CHECK y el indice unico existen con su forma exacta, el indice NO es
- * parcial ni funcional, y los tres van DESPUES de los dos rellenos y de los `SET NOT NULL`?
- */
+/** El indice no puede ser parcial ni funcional, y va despues de los rellenos. */
 export function constraintsAfterFill(sql: string): boolean {
   const source = statements(sql)
   const notBlank = source.includes(
@@ -253,11 +223,8 @@ export function constraintsAfterFill(sql: string): boolean {
 }
 
 /**
- * R22. ¿El archivo NO abre ni cierra transacciones propias?
- *
- * Prisma lo ejecuta dentro de UNA transaccion; un `COMMIT` a mitad dejaria confirmada la columna
- * nueva aunque un `RAISE EXCEPTION` posterior abortara, que es justo la «columna a medias» que R21
- * y R22 prohiben.
+ * Un `COMMIT` a mitad dejaria confirmada la columna nueva aunque un `RAISE EXCEPTION` posterior
+ * abortara.
  */
 export function opensNoTransactionOfItsOwn(sql: string): boolean {
   const text = executable(sql)
@@ -267,10 +234,6 @@ export function opensNoTransactionOfItsOwn(sql: string): boolean {
   return !ownTransaction && !/\b(COMMIT|ROLLBACK)\b/i.test(text)
 }
 
-/**
- * R26. ¿Nada de borrado, ni de marcas de tiempo, ni de otras tablas, e identificadores nuevos en
- * ingles y `snake_case`?
- */
 export function staysInScopeAndInEnglish(sql: string): boolean {
   const text = executable(sql)
   const touchesDeletion = /deleted_at/i.test(text)
@@ -313,10 +276,6 @@ export function staysInScopeAndInEnglish(sql: string): boolean {
 
 // --- Predicados del DOWN --------------------------------------------------------------------
 
-/**
- * R17. ¿El DOWN quita CADA cosa que anadio el UP --indice, dos CHECK, `NOT NULL` de `lot` y la
- * columna `purchase_date`-- y lo que cuelga de `lot` cae ANTES de soltar su `NOT NULL`?
- */
 export function downRevertsEveryAddition(sql: string): boolean {
   const source = statements(sql)
   const at = (pattern: RegExp): number => source.findIndex((statement) => pattern.test(statement))
@@ -334,10 +293,8 @@ export function downRevertsEveryAddition(sql: string): boolean {
 }
 
 /**
- * R23. ¿El DOWN NO vacia ningun lote, ni quita la columna `lot`, ni borra filas?
- *
- * Los lotes que escribio el relleno y los que escribio una persona no se pueden distinguir: vaciar
- * cualquiera tiraria dato ajeno. Por eso el DOWN no tiene NINGUN `UPDATE`.
+ * Los lotes del relleno y los escritos a mano no se distinguen: vaciar cualquiera tiraria dato
+ * ajeno, asi que el down no admite ningun `UPDATE`.
  */
 export function downNeverEmptiesLot(sql: string): boolean {
   const text = executable(sql)
@@ -348,7 +305,6 @@ export function downNeverEmptiesLot(sql: string): boolean {
   )
 }
 
-/** R23. ¿La cabecera del DOWN dice lo que NO hace y lo que SI pierde? */
 export function downHeaderStatesItsLimits(sql: string): boolean {
   return (
     /NO VACIA NINGUN `lot`/.test(sql) &&
@@ -378,7 +334,7 @@ describe('QC-81 migration.sql — orden, relleno y restricciones', () => {
     expect(sinCerrar, 'la mutacion no quito el FORCE final').not.toBe(upSource)
     expect(wrapsInRlsParenthesis(sinCerrar)).toBe(false)
 
-    // Abrirlo TARDE --despues de la guardia-- deja la guardia leyendo bajo FORCE.
+    // Abrirlo despues de la guardia deja la guardia leyendo bajo FORCE.
     const abiertoTarde = upSource
       .replace('ALTER TABLE "product_batches" NO FORCE ROW LEVEL SECURITY;', '')
       .replace(
@@ -400,9 +356,7 @@ describe('QC-81 migration.sql — orden, relleno y restricciones', () => {
     expect(sinGuardia).not.toBe(upSource)
     expect(guardsDuplicateLotsBeforeAnySchemaChange(sinGuardia)).toBe(false)
 
-    // Guardia DESPUES de anadir la columna: ya habria esquema a medias cuando aborta... salvo por
-    // la transaccion, pero el orden de design.md > 2.1 es parte del contrato.
-    // Reemplazo en FUNCION: el bloque lleva `$$`, que como cadena de reemplazo se colapsa a `$`.
+    // Reemplazo en funcion: el bloque lleva `$$`, que como cadena de reemplazo se colapsa a `$`.
     const guardBlock = guard[0]
     const guardiaTarde = upSource
       .replace(guardBlock, () => '')
@@ -414,7 +368,7 @@ describe('QC-81 migration.sql — orden, relleno y restricciones', () => {
     expect(guardiaTarde).not.toBe(upSource)
     expect(guardsDuplicateLotsBeforeAnySchemaChange(guardiaTarde)).toBe(false)
 
-    // Agrupando GLOBAL y no por empresa, dos empresas con el mismo lote abortarian (contra R12).
+    // Agrupando global y no por empresa, dos empresas con el mismo lote abortarian.
     const global = upSource.replace('GROUP BY "company_id", "lot"', 'GROUP BY "lot"')
     expect(global).not.toBe(upSource)
     expect(guardsDuplicateLotsBeforeAnySchemaChange(global)).toBe(false)
@@ -452,11 +406,9 @@ describe('QC-81 migration.sql — orden, relleno y restricciones', () => {
     expect(sinDesempate).not.toBe(upSource)
     expect(fillsLotBySeriesPerCompany(sinDesempate)).toBe(false)
 
-    // m4 (2026-09-15): la serie NO tiene techo. Las dos vueltas atras que la reintroducirian dan
-    // rojo. `replaceAll`: el literal aparece antes en un COMENTARIO del archivo, y un `replace`
-    // simple mutaria la prosa y dejaria el SQL intacto. Y el reemplazo va en FUNCION: como cadena,
-    // el `$'` de `'^[0-9]+$'` es un patron especial de `replace` que reinserta el resto del texto
-    // --con el literal original dentro-- y la mutacion no mutaria nada.
+    // `replaceAll`: el literal tambien aparece en un comentario del SQL, y un `replace` simple
+    // mutaria la prosa. En funcion: como cadena, el `$'` de `'^[0-9]+$'` reinserta el resto del
+    // texto, con el literal original dentro, y la mutacion no mutaria nada.
     const conCota = upSource.replaceAll(`'^[0-9]+$'`, () => `'^[0-9]{1,18}$'`)
     expect(conCota, 'la mutacion no reintrodujo la cota {1,18}').not.toBe(upSource)
     expect(fillsLotBySeriesPerCompany(conCota)).toBe(false)
@@ -511,12 +463,12 @@ describe('QC-81 migration.sql — orden, relleno y restricciones', () => {
     expect(indiceAntes).not.toBe(upSource)
     expect(constraintsAfterFill(indiceAntes)).toBe(false)
 
-    // Unicidad GLOBAL de lote en vez de por empresa: rompe R12.
+    // Unicidad global de lote en vez de por empresa.
     const soloLote = upSource.replace('ON "product_batches" ("company_id", "lot")', 'ON "product_batches" ("lot")')
     expect(soloLote).not.toBe(upSource)
     expect(constraintsAfterFill(soloLote)).toBe(false)
 
-    // Sin el CHECK de lote en blanco, R7 se esquiva con ''.
+    // Sin el CHECK de lote en blanco, `''` pasaria como lote.
     const sinNoBlank = upSource.replace(
       /ALTER TABLE "product_batches" ADD CONSTRAINT "product_batches_lot_not_blank"[\s\S]*?;/,
       '',
