@@ -1,17 +1,10 @@
-// Esquema de QuimiCloude. Vive en `db/schema.prisma`, no en `prisma/` (la ruta se
-// declara en `package.json > prisma.schema`). Ver `docs/architecture.md > Migraciones
-// up/down`.
-//
-// Convencion: identificadores de base en INGLES y `snake_case` (via `@@map`/`@map`);
-// los campos del cliente Prisma en `camelCase`. Todo texto es `text`: no se usan
-// `varchar(n)` arbitrarios.
+// Vive en `db/` y no en `prisma/`: la ruta se declara en `prisma.config.ts`.
 
 datasource db {
   provider  = "postgresql"
-  // Runtime: pooler transaccional (:6543). Ver `lib/db/prisma-client.ts`.
+  // Runtime: pooler transaccional (:6543).
   url       = env("DATABASE_URL")
-  // Migraciones: conexion en modo sesion (:5432). `prisma.config.ts` la iguala a
-  // DATABASE_URL cuando no esta definida (local, sin pooler).
+  // Migraciones: modo sesion (:5432). `prisma.config.ts` la iguala a DATABASE_URL si no esta definida.
   directUrl = env("DIRECT_URL")
 }
 
@@ -19,8 +12,7 @@ generator client {
   provider = "prisma-client-js"
 }
 
-/// Catalogo del conjunto cerrado de tipos de documento de identidad (design.md > 3).
-/// No lleva `deletedAt` a proposito: un tipo no se borra, se desactiva con `isActive`.
+/// Sin `deletedAt`: un tipo no se borra, se desactiva con `isActive`.
 /// @module identity
 model DocumentType {
   code      String   @id
@@ -34,9 +26,8 @@ model DocumentType {
   @@map("document_types")
 }
 
-/// Catalogo de roles. NO lleva `deletedAt` deliberadamente (design.md > 2.2): el
-/// borrado logico es un UPDATE y una FK no puede bloquear un UPDATE, asi que anadir
-/// la columna neutralizaria en silencio la unica garantia real de R17.
+/// Sin `deletedAt`: el borrado logico es un UPDATE, que ninguna FK bloquea, y dejaria sin efecto el
+/// RESTRICT que impide borrar un rol en uso.
 /// @module identity
 model Role {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -51,16 +42,8 @@ model Role {
   @@map("roles")
 }
 
-/// Catalogo cerrado de permisos (QC-74, R1, R2). Como `roles`, NO lleva `deletedAt`: un
-/// permiso no se da de baja, se retira con una migracion.
-///
-/// `code` es la clave primaria DE TEXTO (`'inventario.consultar'`), no un uuid: mismo patron
-/// que `document_types.code`, y hace legible `role_permissions` sin un JOIN mas. `module` y
-/// `action` van desnormalizados en columnas propias porque la guardia y las consultas por
-/// modulo preguntan por ellas, y partir la cadena en SQL en cada consulta es peor.
-///
-/// El catalogo y sus asignaciones NO se administran por la aplicacion (R5): los siembra
-/// `seedInitialAccess` y se cambian por migracion.
+/// `code` es clave de texto para que `role_permissions` se lea sin JOIN. La aplicacion no administra
+/// este catalogo: lo siembra `seedInitialAccess` y cambia por migracion.
 /// @module identity
 model Permission {
   code        String   @id
@@ -76,14 +59,7 @@ model Permission {
   @@map("permissions")
 }
 
-/// Permisos asignados a un rol (QC-74, R7, R8, R9). SIN columna de empresa (R6): el permiso
-/// cuelga del rol y de nada mas (`docs/architecture.md > Dominio`).
-///
-/// Clave primaria compuesta: una asignacion no puede duplicarse y el indice de la PK cubre la
-/// consulta caliente (`WHERE role_id = ?`), que es la que hace la lectura de sesion.
-/// `@@index([permissionCode])` sirve el sentido inverso. `onDelete: Restrict` en las dos FKs,
-/// igual que `users.role_id`: no se borran roles ni permisos arrastrando asignaciones en
-/// silencio. `users` NO cambia: el rol sigue siendo `users.role_id` (QC-47 R13/R14).
+/// Sin columna de empresa: el permiso cuelga del rol y de nada mas.
 /// @module identity
 model RolePermission {
   roleId         String   @map("role_id") @db.Uuid
@@ -98,29 +74,8 @@ model RolePermission {
   @@map("role_permissions")
 }
 
-/// Estado de la cuenta de un usuario (QC-65, decisiones cerradas 1 y 2). Conjunto CERRADO en
-/// el propio esquema: anadir un quinto valor es una migracion (`ALTER TYPE ... ADD VALUE`), y
-/// el humano lo asumio a conciencia — este conjunto NO tiene que crecer sin desplegar.
-/// Se aparta del precedente de `DocumentType` (QC-4) y del catalogo `Unit` (QC-32), que son
-/// TABLAS porque debian crecer con un INSERT; sigue el de `OrderStatus` (QC-33).
-///
-/// Los valores van en INGLES y en minuscula, literalmente como los fijo la decision cerrada 1.
-/// Se apartan de `OrderStatus`/`OrderPriority`, que son MAYUSCULAS en espanol, a proposito:
-/// la decision escribe los cuatro nombres, y tener una segunda grafia («ACTIVE» en el codigo,
-/// «active» en la ficha) es exactamente la clase de traduccion silenciosa que se desincroniza.
-///
-/// QUE SIGNIFICA CADA UNO (decision cerrada 2):
-///   active   — la cuenta funciona.
-///   pending  — creada, aun no habilitada para entrar.
-///   inactive — apagada a proposito por un administrador. REVERSIBLE.
-///   blocked  — bloqueada por seguridad. Es LA MISMA COSA que el bloqueo por intentos
-///              fallidos de QC-19, pero QC-65 no los unifica: eso es QC-78.
-/// NADIE lee todavia este valor para decidir nada (R19).
-///
-/// El orden de declaracion NO significa nada aqui (a diferencia de `OrderPriority`), pero es
-/// el mismo de la decision cerrada 1 y el de `USER_ACCOUNT_STATUSES`
-/// (`lib/modules/identity/domain/account-status.ts`), que es la UNICA definicion del conjunto:
-/// asi el test puede compararlos con una igualdad ORDENADA y no con un conjunto.
+/// Enum y no tabla: el conjunto es cerrado a proposito y anadir un valor es una migracion.
+/// El orden coincide con `USER_ACCOUNT_STATUSES`, y un test los compara en orden.
 enum UserAccountStatus {
   active
   pending
@@ -128,33 +83,11 @@ enum UserAccountStatus {
   blocked
 }
 
-/// Usuario del ERP. Borrado logico: `deletedAt` NULL = usuario vivo.
-///
-/// OJO 0 — EL ROL DE UNA PERSONA VIVE EN ESTA TABLA, en `roleId`, y QC-47 NO lo mueve
-/// (R13, R14): mismo nombre, mismo tipo, `NOT NULL`, misma FK `users_role_id_fkey`
-/// (`ON DELETE RESTRICT ON UPDATE CASCADE`) y mismo indice `users_role_id_idx` que dejo
-/// QC-4. Un usuario tiene UN solo rol y pertenece a UNA sola empresa; no hay ninguna tabla
-/// intermedia entre usuario y empresa, y no debe aparecer (R12). Quien saque el rol de aqui
-/// parte en dos la verdad sobre el rol y rompe el login, la sesion y el seed, que lo leen
-/// todos de esta columna sin ninguna consulta adicional.
-///
-/// OJO — las tres unicidades de esta tabla (correo, nombre de usuario y la pareja
-/// tipo+numero de documento) NO estan aqui como `@unique`/`@@unique` y eso es
-/// deliberado: son indices unicos FUNCIONALES (`lower(...)`) y PARCIALES
-/// (`WHERE deleted_at IS NULL`), y Prisma no modela ninguna de las dos cosas.
-/// Viven escritos a mano en `db/migrations/<ts>_users_and_roles/migration.sql`
-/// (`users_email_unique`, `users_username_unique`, `users_document_unique`) y ese es
-/// el unico sitio donde existen. El porque esta en `design.md > 4` y `> 5`; el test
-/// `tests/unit/schema/identity-migration.test.ts` los vigila. Si alguien anade aqui
-/// un `@unique`, la unicidad deja de respetar mayusculas/minusculas y el borrado
-/// logico quema el correo y el documento para siempre.
-///
-/// OJO 2 — desde QC-47 esos tres indices llevan `company_id` COMO PRIMERA COLUMNA: el correo,
-/// el nombre de usuario y la pareja tipo+numero de documento son unicos DENTRO de la empresa,
-/// no en todo el sistema (R16, R17, R18). Dos empresas pueden tener cada una su `admin`.
-/// `users_company_id_idx` NO es redundante con ellos: los tres son PARCIALES
-/// (`WHERE deleted_at IS NULL`) y la verificacion del `RESTRICT` al borrar una empresa tiene
-/// que mirar tambien a los usuarios dados de baja.
+/// Las unicidades de correo, nombre de usuario y documento no son `@unique`: son indices unicos
+/// funcionales (`lower(...)`), parciales (`WHERE deleted_at IS NULL`) y con `company_id` delante,
+/// escritos a mano en la migracion. Un `@unique` aqui distinguiria mayusculas y quemaria el valor
+/// de los usuarios dados de baja. `users_company_id_idx` no sobra: el RESTRICT al borrar una empresa
+/// tiene que ver tambien a los dados de baja, que esos indices parciales no cubren.
 /// @module identity
 model User {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -168,11 +101,7 @@ model User {
   username         String
   passwordHash     String    @map("password_hash")
   roleId           String    @map("role_id") @db.Uuid
-  /// La UNICA empresa a la que pertenece esta persona (QC-47 R9). OBLIGATORIA en la base:
-  /// `NOT NULL` + `users_company_id_fkey` `ON DELETE RESTRICT ON UPDATE CASCADE` (R10, R11).
-  /// Lleva `@relation` de Prisma —y no un escalar suelto como `products.unit_id`— porque
-  /// `User` y `Company` son los dos de `identity` y no hay frontera de modulo que proteger,
-  /// asi que la FK la genera Prisma en vez de quedar como drift manual.
+  /// Con `@relation`, a diferencia de otras FK: `User` y `Company` son del mismo modulo.
   companyId        String    @map("company_id") @db.Uuid
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -182,99 +111,39 @@ model User {
   lockLevel           Int       @default(0) @map("lock_level")
   lockedUntil         DateTime? @map("locked_until") @db.Timestamptz(6)
 
-  /// TRUE = esta persona tiene que cambiar su contrasena la primera vez que entre.
-  /// El nombre evita el segmento `password` a proposito (design.md > 2). Quien la LEE y
-  /// bloquea el acceso es QC-7; esta ficha solo la escribe.
+  /// El nombre evita el segmento `password`: la guardia de contrasenas en claro lo marcaria.
   mustChangeCredential Boolean @default(false) @map("must_change_credential")
 
-  /// QC-65 (R1, R5). Estado de la cuenta. NOT NULL con `@default(pending)`: una cuenta nueva
-  /// nace PENDIENTE (decision cerrada 3), y la migracion deja en `active` a las filas que ya
-  /// existian (R6). SIN indice a proposito: hoy no hay ninguna consulta que filtre por el
-  /// (R19); el que haga falta lo anade quien estrene la consulta (QC-67).
   accountStatus UserAccountStatus @default(pending) @map("account_status")
 
-  /// QC-65 (R8, R9). CUANDO cambio el estado por ultima vez. NOT NULL con `@default(now())`:
-  /// en una fila recien creada vale lo mismo que `createdAt`, y eso es correcto — el estado
-  /// cambio, de nada a `pending`, en ese instante.
   accountStatusChangedAt DateTime @default(now()) @map("account_status_changed_at") @db.Timestamptz(6)
 
-  /// QC-65 (R10, R11, R12). QUIEN lo cambio. OPCIONAL: NULL significa «lo cambio el sistema,
-  /// no una persona» —el backfill de la migracion, el seed, y manana el bloqueo automatico de
-  /// QC-19 cuando QC-78 lo unifique—, nunca «se perdio el dato».
-  ///
-  /// OJO — es un ESCALAR uuid SIN `@relation`, y es deliberado (`design.md > 1.3`). La FK real
-  /// (`users_account_status_changed_by_fkey`, ON DELETE RESTRICT ON UPDATE CASCADE) vive
-  /// escrita A MANO en la migracion. Es DRIFT para Prisma: toda migracion futura de `users`
-  /// hay que revisarla a mano para que no emita su `DROP CONSTRAINT`, igual que ya pasa con
-  /// los tres indices unicos funcionales de QC-4.
+  /// NULL = lo cambio el sistema, no una persona. La FK `users_account_status_changed_by_fkey` esta
+  /// escrita a mano, sin `@relation`, y es drift para Prisma.
   accountStatusChangedBy String? @map("account_status_changed_by") @db.Uuid
 
-  /// QC-23 (R7, R8). Sello «sesiones validas desde»: toda sesion cuyo `iat` sea ANTERIOR O
-  /// IGUAL a este instante es invalida. NOT NULL con `@default(now())` —una fila nueva nace sin
-  /// ninguna sesion emitida, asi que el sello puede ser el instante de su nacimiento— y la
-  /// migracion rellena las filas existentes con `CURRENT_TIMESTAMP`, que es justo el efecto
-  /// aceptado por escrito: al desplegar, todo lo vivo cae (y ya caia, por la subida a `v4`).
-  /// SE GUARDA TRUNCADO AL SEGUNDO, que es la granularidad con la que `iat` viaja firmado
-  /// (`session-token.ts > toEpochSeconds`). Ver `specs/QC-23-registro-de-sesiones/design.md > 2.3`.
-  /// SIN indice a proposito: nunca se filtra por esta columna, solo se lee de la fila que ya se
-  /// lee por PK en cada peticion (R14).
+  /// Toda sesion con `iat` anterior o igual a este instante es invalida. Las escrituras lo truncan al
+  /// segundo, que es la granularidad de `iat`.
   sessionsValidFrom DateTime @default(now()) @map("sessions_valid_from") @db.Timestamptz(6)
 
   documentType          DocumentType           @relation(fields: [documentTypeCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
   role                  Role                   @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   company               Company                @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  /// QC-79. Lado inverso de `credential_setup_tokens.user_id`. Prisma EXIGE este campo para
-  /// el `@relation` de `CredentialSetupToken`; es virtual y NO anade ninguna columna ni ningun
-  /// indice a `users` (R37).
   credentialSetupTokens CredentialSetupToken[]
-  /// QC-23. Lado inverso de `revoked_sessions.user_id`. Prisma EXIGE este campo para el
-  /// `@relation` de `RevokedSession`; es virtual y NO anade ninguna columna ni ningun indice a
-  /// `users`. Es por donde la comprobacion por peticion trae `revoked_at` en el MISMO
-  /// `findFirst` que ya se hacia (design.md > 4).
   revokedSessions       RevokedSession[]
 
   @@unique([id, companyId], map: "users_id_company_id_key")
   @@index([roleId], map: "users_role_id_idx")
   @@index([companyId], map: "users_company_id_idx")
   @@index([documentTypeCode], map: "users_document_type_code_idx")
-  /// QC-65 (R11, R12). El lado hijo de `users_account_status_changed_by_fkey`, que Postgres no
-  /// indexa solo: por ahi pasa la verificacion del RESTRICT en cada intento de borrado fisico.
+  /// Postgres no indexa solo el lado hijo de una FK, y el RESTRICT lo recorre en cada borrado.
   @@index([accountStatusChangedBy], map: "users_account_status_changed_by_idx")
   @@map("users")
 }
 
-/// Empresa del ERP (QC-47). Borrado LOGICO: `deletedAt` NULL = empresa viva (R5). Nace con
-/// la tabla y NADIE la escribe en esta ficha: no hay alta, edicion ni baja de empresas
-/// (R28), solo el modelo y la empresa inicial que crea el seed.
-///
-/// LA EMPRESA DE UNA PERSONA ES UNA COLUMNA DEL USUARIO, no una tabla intermedia:
-/// `users.company_id`, OBLIGATORIA (R9), con FK `users_company_id_fkey`
-/// `ON DELETE RESTRICT` (R10, R11). Un usuario
-/// pertenece a UNA sola empresa y no hay ninguna forma de asociarlo a una segunda (R12); el
-/// `users User[]` de abajo es solo el lado inverso de esa columna. Si algun dia hiciera falta
-/// que una persona trabaje en dos empresas, es ficha propia, migracion de datos y una decision
-/// sobre como identifica el login a quien entra (QC-48), no una relacion que se anada aqui.
-///
-/// Vive en `identity` y no en un modulo propio (design.md > 1): la empresa se referencia desde
-/// una columna del propio usuario, no desde una tabla intermedia, y partir esas dos filas en
-/// dos modulos costaria una FK escrita a mano y la transaccion unica del seed. Si algun dia
-/// nace un CRUD de empresas, la mudanza es barata MIENTRAS nadie lea `companies` desde fuera
-/// — y eso ya lo prohibe R27.
-///
-/// OJO — la unicidad del nombre NO esta aqui como `@@unique` y es deliberado, igual que en
-/// `Recipe` y `Supplier`: es un indice unico FUNCIONAL (`lower(...)`) y PARCIAL
-/// (`WHERE deleted_at IS NULL`) sobre `name_normalized`, y Prisma no modela ninguna de las
-/// dos cosas. Vive escrito a mano en `migration.sql` (`companies_name_unique`) y ese es el
-/// unico sitio donde existe. Si alguien "arregla" el esquema anadiendo el `@@unique`, la
-/// unicidad pasa a ser TOTAL sin que nadie se entere y una empresa dada de baja quema su
-/// nombre para siempre.
-///
-/// Es la UNICA garantia de R4: no hay `SELECT` previo por igualdad —seria una carrera, entre
-/// el `SELECT` y el `INSERT` cabe otra transaccion— y el choque se traduce del SQLSTATE
-/// `23505`, mismo criterio que `Presentation`, `Unit` y `Supplier`.
-///
-/// `nameNormalized` la calcula `normalizeCompanyName` (dominio de `identity`, funcion pura) y
-/// se persiste junto a `name` en toda escritura (R3).
+/// La unicidad del nombre no es `@@unique`: `companies_name_unique` es un indice funcional
+/// (`lower(...)`) y parcial (`WHERE deleted_at IS NULL`) escrito a mano en la migracion. Con
+/// `@@unique` pasaria a ser total y una empresa dada de baja quemaria su nombre.
 /// @module identity
 model Company {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -290,40 +159,10 @@ model Company {
   @@map("companies")
 }
 
-/// Grupo de trabajo (QC-83): un conjunto de personas con nombre —«Turno noche», «Planta 2»—
-/// dentro de UNA empresa. Vive en `identity` porque un grupo es un conjunto de personas y las
-/// personas ya viven aqui (Alcance de la ficha, design.md > 9.5).
-///
-/// Borrado LOGICO: `deletedAt` NULL = grupo vivo (R7). Nace con la tabla y NADIE la escribe en
-/// esta ficha: no hay alta, edicion, baja ni lectura de grupos (R27) — eso es QC-84.
-///
-/// OJO — la unicidad del nombre NO esta aqui como `@@unique` y es deliberado (R4, R5, R6),
-/// igual que en `Company`, `Recipe`, `Supplier` y `Unit`: `work_groups_name_unique` es un
-/// indice COMPUESTO con `company_id`, FUNCIONAL (`lower(...)`) y PARCIAL
-/// (`WHERE deleted_at IS NULL`), y Prisma no modela ninguna de las tres cosas. Vive escrito a
-/// mano en el `migration.sql` de esta ficha y ese es el unico sitio donde existe. Si alguien
-/// "arregla" el esquema anadiendo `@@unique([companyId, nameNormalized])`, la unicidad pasa a
-/// ser TOTAL sin que nadie se entere —R6 muerto, y sin ningun error— y un grupo dado de baja
-/// quema su nombre para siempre (riesgo 3 de `design.md > 8`).
-///
-/// Es la UNICA garantia de R4: no hay `SELECT` previo por igualdad —seria una carrera— y el
-/// choque se traduce del SQLSTATE `23505`.
-///
-/// `nameNormalized` la calcula `normalizeWorkGroupName` (dominio de `identity`, funcion pura,
-/// la UNICA definicion de «mismo nombre de grupo») y se persiste junto a `name` (R3).
-///
-/// `companyId` SI lleva `@relation` —a diferencia de las FK de `WorkGroupMember`— por la razon
-/// exacta que QC-47 escribio para `users.company_id`: `WorkGroup` y `Company` son los dos de
-/// `identity`, no hay frontera de modulo que proteger, y asi la FK la genera Prisma en vez de
-/// quedar como drift manual. `ON DELETE RESTRICT` (R10): borrar una empresa con grupos —vivos
-/// o de baja— falla con `23503`.
-///
-/// `work_groups_company_id_idx` NO es redundante con el unico del nombre: ese es PARCIAL, y la
-/// verificacion del RESTRICT tiene que ver tambien los grupos dados de baja.
-/// `work_groups_id_company_id_key` es unico TRIVIALMENTE —`id` ya es la PK— y no lo pide
-/// ningun requisito de negocio: existe para que la FK compuesta de `work_group_members` tenga
-/// a donde apuntar (una FK compuesta exige una restriccion unica en el padre, o `42830`). Se
-/// declara aqui para que NO sea drift.
+/// La unicidad del nombre no es `@@unique`: `work_groups_name_unique` es compuesto con
+/// `company_id`, funcional y parcial, escrito a mano en la migracion. Con `@@unique` seria total y
+/// un grupo dado de baja quemaria su nombre. `work_groups_id_company_id_key` es trivialmente unico:
+/// existe como destino de las FK compuestas que llevan `company_id`.
 /// @module identity
 model WorkGroup {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -341,48 +180,11 @@ model WorkGroup {
   @@map("work_groups")
 }
 
-/// Pertenencia de una persona a un grupo de trabajo (QC-83). PK compuesta
-/// `(work_group_id, user_id)`: la misma persona no puede estar dos veces en el mismo grupo
-/// (R16), y el indice de la PK cubre la consulta caliente «quienes estan en este grupo».
-/// `work_group_members_user_id_idx` sirve el sentido inverso, «en que grupos esta esta
-/// persona», que la PK no cubre. Mismo patron que `RolePermission` (QC-74).
-///
-/// OJO 1 — las DOS FK de esta tabla son COMPUESTAS y llevan `company_id`, y por eso NINGUNA de
-/// las tres columnas de referencia declara `@relation`:
-///   ("work_group_id","company_id") -> work_groups("id","company_id")  ON DELETE CASCADE
-///   ("user_id","company_id")       -> users("id","company_id")        ON DELETE RESTRICT
-/// La fila declara UNA empresa y esa empresa tiene que ser a la vez la del grupo Y la de la
-/// persona: como la igualdad es transitiva, grupo y persona son de la misma empresa POR
-/// CONSTRUCCION, sin ningun estado intermedio (R13, R14, R15, decision cerrada 1). No es una
-/// comprobacion que alguien pueda olvidarse de llamar; es la definicion de la tabla, y por eso
-/// no la puede saltar un seed, un script ni un bug de manana.
-/// Aqui NO aplica el argumento habitual del repo (evitar que un `include` cruce de modulo):
-/// los tres padres son de `identity`. La razon es otra (`design.md > 2.2`): son FK COMPUESTAS
-/// que COMPARTEN la columna `company_id`, no hay ninguna FK compuesta en este esquema y que
-/// Prisma admita dos relaciones reutilizando el mismo escalar es un DESCONOCIDO — regla 6 de
-/// `CLAUDE.md`: no se apuesta. Van escritas A MANO en el `migration.sql`.
-/// LO QUE ESO CUESTA, y se acepta: las dos FK son DRIFT para Prisma. Toda migracion futura que
-/// toque esta tabla va a emitir su `DROP CONSTRAINT` y HAY QUE BORRARLO A MANO del SQL
-/// generado, igual que ya pasa con las FK de `orders`, `products` y `recipe_lines` (riesgo 2
-/// de `design.md > 8`). Si alguien las simplifica a `FOREIGN KEY ("user_id")
-/// REFERENCES "users"("id")`, todo sigue verde y la decision cerrada 1 deja de existir: lo
-/// unico que se pone rojo es el test de esquema de la ficha.
-///
-/// OJO 2 — NO hay `deleted_at`, y es un requisito con nombre (R18, decision cerrada 4): sacar
-/// a una persona del grupo BORRA la fila. Es la EXCEPCION EXPLICITA al borrado logico de QC-4,
-/// y se escribe porque en la misma migracion es facil confundirla: el `deleted_at` es del
-/// GRUPO, no de la pertenencia. La pertenencia no es una transaccion, es una relacion viva; el
-/// historico que importa —quien era responsable de un pedido— lo congela QC-86 al asignar y no
-/// lee esta tabla. Anadir aqui `deleted_at` «por coherencia» rompe ademas la PK —
-/// `(work_group_id, user_id)` dejaria de ser unico al haber filas muertas— y obliga a TODA
-/// lectura de miembros, para siempre, a acordarse de filtrar (riesgo 4 de `design.md > 8`).
-/// Consecuencia contraintuitiva y buscada: dar de baja un grupo (R21) o una persona (R20) NO
-/// borra ninguna pertenencia —ninguna FK reacciona a un `UPDATE`—; quien filtra al leer es
-/// QC-84.
-///
-/// `createdAt`/`updatedAt` van igual (R11) aunque la fila nunca se actualice: una pertenencia
-/// se crea o se borra, no se edita. `updatedAt` es NOT NULL SIN default de base —lo rellena
-/// `@updatedAt` del cliente—, asi que un `INSERT` crudo que no la ponga falla.
+/// Las dos FK son compuestas con `company_id` y comparten esa columna, y por eso van escritas a mano
+/// y sin `@relation`: asi grupo y persona son de la misma empresa por construccion. Son drift: toda
+/// migracion generada sobre esta tabla emitira su `DROP CONSTRAINT`, y hay que borrarlo a mano.
+/// Sin `deleted_at`: sacar a alguien del grupo borra la fila, y con filas muertas la PK dejaria de
+/// ser unica.
 /// @module identity
 model WorkGroupMember {
   workGroupId String   @map("work_group_id") @db.Uuid
@@ -396,22 +198,10 @@ model WorkGroupMember {
   @@map("work_group_members")
 }
 
+/// Guarda la huella SHA-256 del enlace, nunca el secreto. «Un solo enlace vivo por persona» es el
+/// indice unico parcial `credential_setup_tokens_one_live_per_user`, escrito a mano porque Prisma no
+/// modela indices parciales: un `@@unique([userId])` lo volveria total.
 /// @module identity
-/// QC-79. Enlace de un solo uso con el que una persona ESTABLECE su contrasena la primera vez.
-/// NO guarda el secreto: guarda su HUELLA (`token_digest`, SHA-256 en hexadecimal). Ver design.md > 4.
-///
-/// OJO — «como maximo UN enlace vivo por persona» (R11) NO esta aqui: es el indice unico
-/// PARCIAL `credential_setup_tokens_one_live_per_user`
-/// (`ON ("user_id") WHERE "consumed_at" IS NULL AND "superseded_at" IS NULL`), y Prisma no
-/// modela indices parciales. Vive escrito A MANO en
-/// `db/migrations/<ts>_credential_setup_tokens/migration.sql` y ese es el unico sitio donde
-/// existe — drift declarado, igual que los tres indices unicos funcionales de QC-4/QC-47.
-/// Quien anada aqui un `@@unique([userId])` lo convierte en TOTAL y mata R11 en silencio.
-///
-/// SIN columna de empresa (R37): no es una tabla de operacion, cuelga 1-a-N de `users` y su
-/// empresa es, por definicion, la del usuario al que apunta. SIN `updated_at`: una fila tiene
-/// exactamente tres transiciones —nace, se consume, se sustituye— y cada una tiene su propia
-/// columna con su instante. Nada se borra fisicamente (R12): consumir y sustituir son UPDATE.
 model CredentialSetupToken {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId       String    @map("user_id") @db.Uuid
@@ -428,23 +218,14 @@ model CredentialSetupToken {
   @@map("credential_setup_tokens")
 }
 
+/// Sin `updated_at` ni `deleted_at`: una sesion cerrada es un hecho inmutable, y lo unico que le
+/// pasa despues es el borrado fisico de la purga.
 /// @module identity
-/// QC-23. Las sesiones cerradas UNA A UNA (R10). Una fila = un `sid` que ya no vale.
-/// SIN columna de empresa (R44): no es tabla de operacion, cuelga 1-a-N de `users` y su empresa
-/// es la de la persona. Mismo criterio y mismo precedente que `credential_setup_tokens`.
-/// SIN `updated_at` y SIN `deleted_at` (R45): la fila es un hecho inmutable —una sesion cerrada—
-/// y su unica escritura posterior es el borrado FISICO de la purga (R39).
-///
-/// `revoked_sessions_session_id_key` ES R11 y R12: la comprobacion por peticion es UNA busqueda
-/// por indice unico, y registrar dos veces el mismo cierre choca con `23505` y se traduce a «ya
-/// estaba», no a un error. `revoked_sessions_user_id_expires_at_idx` ES R39: la purga es un
-/// `DELETE ... WHERE user_id = ? AND expires_at <= ?`, que es exactamente ese indice.
 model RevokedSession {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   sessionId String   @map("session_id") @db.Uuid
   userId    String   @map("user_id") @db.Uuid
-  /// Caducidad NATURAL del token cerrado (su `exp`). Es lo que hace posible la purga de R39:
-  /// pasada esta fecha la fila ya no protege de nada.
+  /// Caducidad natural del token cerrado: pasada, la fila ya no protege de nada y se puede purgar.
   expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
   revokedAt DateTime @map("revoked_at") @db.Timestamptz(6)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -456,69 +237,11 @@ model RevokedSession {
   @@map("revoked_sessions")
 }
 
-/// Presentacion comercial que clasifica los productos (design.md > 2.1). Catalogo
-/// compartido: una misma presentacion la usan muchos productos, y no se puede borrar
-/// mientras tenga alguno asignado (R14, via ON DELETE RESTRICT).
-///
-/// NO lleva `deletedAt`, igual que `Role` en `identity`: el borrado logico es un UPDATE y
-/// una FK no puede bloquear un UPDATE, asi que la columna neutralizaria en silencio la
-/// unica garantia real de R14. Ver `design.md > 9` (pregunta abierta 2).
-///
-/// `nameNormalized` la calcula el dominio de `inventario` (funcion pura, sin acentos ni
-/// signos) y la persiste junto a `name` en toda escritura (R17). El `@@unique` es la
-/// **unica** garantia de la unicidad (R18, R20, QC-20 design.md > 2.2): no hay comprobacion
-/// previa por igualdad -- seria una carrera, entre el `SELECT` y el `INSERT` cabe otra
-/// transaccion -- y el `PresentationRepository` no expone ningun metodo de busqueda. El
-/// mensaje al usuario sale de traducir el SQLSTATE `23505` que Postgres devuelve al chocar
-/// con este indice (`design.md > 11.4`).
-///
-/// QC-57 (`design.md > 10.2`): los indices de orden, filtro y busqueda de esta tabla NO estan
-/// aqui. El GIN de trigramas `presentations_name_normalized_trgm_idx` -- que es lo que sirve una
-/// busqueda por SUBCADENA, cosa que el `@@unique` btree de abajo NO hace-- y los btree
-/// `presentations_name_idx`, `presentations_created_at_idx` y `presentations_updated_at_idx`
-/// viven escritos a mano en `db/migrations/20260904160000_list_query_indexes/migration.sql`:
-/// Prisma no modela indices GIN. Esta tabla NO tiene `deletedAt`, asi que los suyos son
-/// TOTALES, no parciales.
-///
-/// OJO — `unitId` la anade QC-80 (R1, design.md > 3) y es la unidad de la presentacion:
-/// NOT NULL y SIN `@default`. Es un campo ESCALAR uuid SIN `@relation`, y es DELIBERADO:
-/// `Unit` es del modulo `unidades` y `Presentation` de `inventario`, asi que con `@relation`
-/// el cliente Prisma ofreceria `include: { unit: true }` --una lectura de la tabla de
-/// `unidades` desde `inventario` que NINGUNA guardia detecta, porque no es un import ni un
-/// `prisma.unit`-- y ademas obligaria a declarar `presentations Presentation[]` dentro de
-/// `Unit`, que es de otro modulo. Es el mismo patron que tenia `products.unit_id` (QC-32 R18)
-/// y que tiene `units.company_id` (QC-76). Lo que `inventario` sepa de una unidad llega por
-/// `@/lib/modules/unidades`.
-/// CONSECUENCIA QUE HAY QUE SABER: la FK real `presentations_unit_id_fkey`
-/// (ON DELETE RESTRICT ON UPDATE CASCADE, R2) vive escrita A MANO en
-/// `db/migrations/20260911120000_presentation_unit/migration.sql` y es por tanto DRIFT para
-/// Prisma. TODA MIGRACION FUTURA DE `presentations` HAY QUE REVISARLA A MANO: si el drift la
-/// borra, el esquema sigue validando y el cliente sigue compilando, y no se entera nadie.
-/// El `@@index` de abajo SI lo declara Prisma (R3); no es unico, muchas presentaciones
-/// comparten unidad.
-///
-/// OJO 2 — `companyId` la anade QC-49 (R1): la presentacion es DE LA EMPRESA, sin catalogo
-/// compartido (decision cerrada 3). Es NOT NULL y se aparta a conciencia de `units.companyId`
-/// (QC-76), que es OPCIONAL justo para que existan las unidades DE SISTEMA: aqui no hay
-/// presentaciones de sistema, y una columna opcional significaria «fila que ve todo el mundo».
-/// Es un campo ESCALAR uuid SIN `@relation`, y es DELIBERADO: `Company` es del modulo
-/// `identity` y `Presentation` de `inventario`, asi que con `@relation` el cliente Prisma
-/// ofreceria `include: { company: true }` --una lectura de otro modulo que NINGUNA guardia
-/// detecta, porque no es un import ni un `prisma.company`--. Mismo patron que `unitId`.
-/// CONSECUENCIA QUE HAY QUE SABER: la FK real `presentations_company_id_fkey`
-/// (ON DELETE RESTRICT ON UPDATE CASCADE) vive escrita A MANO en
-/// `db/migrations/20260911130000_inventory_company_scope/migration.sql` y es por tanto DRIFT
-/// para Prisma, igual que `presentations_unit_id_fkey`. Ahi vive tambien el disparador
-/// `presentations_check_unit_scope`, que exige que la unidad sea de la misma empresa o de
-/// sistema (R23) y que Prisma tampoco modela.
-///
-/// OJO 3 — la unicidad del nombre normalizado es POR EMPRESA desde QC-49 (R20): el indice
-/// GLOBAL `presentations_name_normalized_key` de QC-20 CAYO, y dos empresas pueden tener cada
-/// una su «Garrafa 20 L». A diferencia de los cuatro indices parciales de QC-76, este es
-/// compuesto y NO parcial --`companyId` es NOT NULL--, asi que Prisma SI sabe modelarlo y se
-/// declara aqui abajo: no hay drift en este punto y el `P2002` se sigue traduciendo a
-/// `'duplicate'`. Volver a ponerlo sobre `nameNormalized` a secas le quitaria «Garrafa 20 L» a
-/// todas las empresas menos a la primera que la cree, y en silencio.
+/// Sin `deletedAt`: el borrado logico es un UPDATE, que ninguna FK bloquea, y dejaria sin efecto el
+/// RESTRICT que impide borrar una presentacion en uso. `unitId` y `companyId` no llevan `@relation`
+/// porque apuntan a otros modulos y un `include` cruzaria la frontera sin que ninguna guardia lo vea;
+/// sus FK estan escritas a mano y son drift. El disparador `presentations_check_unit_scope` y los
+/// indices de busqueda y orden solo existen en las migraciones.
 /// @module inventario
 model Presentation {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -536,89 +259,11 @@ model Presentation {
   @@map("presentations")
 }
 
-/// Producto del catalogo quimico. Es TAMBIEN el elemento de inventario: una sola tabla
-/// (decision cerrada 1 de QC-14), con lo que HAY de el (`stock`, `qtyAlert`). Ya NO declara
-/// ni presentacion (se mudo a `ProductBatch` en QC-90) ni unidad (QC-80 la elimino: se deriva
-/// de la presentacion del lote mas reciente; ver OJO 2).
-///
-/// OJO 0 — QC-52 le QUITO `cost`, `minPurchase` y `deliveryTime` (su decision cerrada 1,
-/// R1). No son propiedades de la cosa sino TERMINOS COMERCIALES, y dependen de a quien se
-/// la compres: viven ahora en `SupplierCatalogLine`, una linea por proveedor. Las tres
-/// columnas se fueron de la base en `<ts>_split_product_and_supplier_catalog`, con ellas se
-/// fueron los CHECK `products_cost_non_negative` y `products_min_purchase_non_negative`
-/// (Postgres se lleva el CHECK con la columna que solo el menciona), y el `down.sql` de esa
-/// migracion los recrea A MANO porque no vuelven solos con el `ADD COLUMN`.
-/// El producto CONSERVA todo lo demas: lo que la cosa ES y lo que HAY de ella.
-///
-/// OJO 0.1 — `imagePath` esta declarada aqui desde QC-52 (R4) y la columna existe en la base
-/// desde `20260903200000_product_image_path`. Estuvo un tiempo en la base y NO en el modelo:
-/// eso es DRIFT, y significaba que cualquier `prisma migrate dev` sobre `products` emitiria
-/// `DROP COLUMN "image_path"` -- justo mezclado entre los DROP que si se querian. Declararla
-/// no cambia la base ni un byte y desarma esa mina para toda migracion futura. Sigue SIN
-/// CHECK, SIN DEFAULT y SIN indice: la forma de la ruta no esta acordada en el repo (P1).
-///
-/// `name` NO tiene indice unico, y es deliberado (decision cerrada 6, R16): dos productos
-/// pueden llamarse igual. Se aparta a proposito del precedente de `users`.
-///
-/// La presentacion (`presentationId`) VIVIA aqui y se MUDO a `ProductBatch` el 2026-09-09:
-/// el producto -catalogo- ya no declara en que presentacion viene; lo hace cada lote. Con ella
-/// se fueron `products_presentation_id_fkey` y `products_presentation_id_idx` (la migracion
-/// `<ts>_product_batches` las DROPPEA junto con su columna).
-///
-/// La auditoria `createdBy`/`updatedBy` VIVIA aqui (QC-20, design.md > 2.1) y se MUDO a
-/// `ProductBatch` el 2026-09-09: el autor ya no se registra sobre el producto (catalogo) sino
-/// sobre el lote, que es la unidad de inventario que se mueve y vence. Con ellas se fueron
-/// `products_created_by_fkey` y `products_updated_by_fkey` (la migracion
-/// `<ts>_product_batches` las DROPPEA junto con sus columnas). El producto ya no tiene, por
-/// tanto, ningun rastro de autoria: quien lo creo o lo edito se sabe por sus lotes.
-///
-/// OJO 2 — el producto YA NO DECLARA UNIDAD. `unitId` vivia aqui desde QC-32 (escalar uuid
-/// sin `@relation`, OPCIONAL) y QC-80 se la QUITO (R7, R21, decision cerrada del 2026-09-08):
-/// con ella se fueron la columna `products.unit_id`, su indice `products_unit_id_idx` y su FK
-/// `products_unit_id_fkey`, que la migracion `<ts>_presentation_unit` DROPPEA. No se perdio
-/// ningun dato: la columna estaba vacia en las 7 filas vivas, comprobado contra la base.
-/// La unidad de un producto se DERIVA ahora de la PRESENTACION DE SU LOTE MAS RECIENTE
-/// --`created_at DESC`, desempatando por `id DESC`-- y no se almacena en ninguna columna de
-/// esta tabla (R22): quien la declara es `presentations.unit_id`, que es NOT NULL desde
-/// QC-80. Un producto SIN lotes no tiene unidad derivada, y eso es «ninguna», no un error
-/// (R23). NO se le devuelve al producto ninguna `presentation_id` (R25): la presentacion vive
-/// SOLO en `product_batches` desde QC-90. Y NO se guarda aqui una copia denormalizada
-/// (QC-80 design.md > 11, alternativa B): dos sitios que dicen la unidad de un producto es
-/// como se acaba con dos que discrepan.
-///
-/// OJO 3 — `nameNormalized` la anade QC-57 (R19, R23) y es la columna contra la que BUSCA el
-/// listado, no una clave: `products.name` NO es unico (decision cerrada 6 de QC-14) y esta
-/// columna NO lleva indice unico, a diferencia de las de `presentations`, `recipes`,
-/// `suppliers`, `supplier_catalog_lines` y `units`. La calcula `normalizeProductName`
-/// (dominio de `inventario`, funcion pura) y se persiste junto a `name` en TODA escritura;
-/// no se escribe otra definicion de «mismo nombre» en el modulo. Las filas que ya existian
-/// se rellenaron con el backfill de `<ts>_list_query_indexes`.
-///
-/// OJO 4 — los indices de orden, filtro y busqueda de esta tabla NO estan aqui y es
-/// deliberado (QC-57, `design.md > 10.2`): son PARCIALES (`WHERE deleted_at IS NULL`) o GIN
-/// de trigramas, y Prisma no modela ninguna de las dos cosas —mismo caso que
-/// `recipes_name_unique` y `suppliers_name_unique`—. Viven escritos a mano en
-/// `db/migrations/20260904160000_list_query_indexes/migration.sql`:
-/// `products_name_normalized_trgm_idx`, `products_name_idx`, `products_stock_idx`,
-/// `products_qty_alert_idx`, `products_created_at_idx` y `products_updated_at_idx`.
-///
-/// OJO 5 — `companyId` la anade QC-49 (R1): todo producto es DE UNA EMPRESA, NOT NULL. Es un
-/// campo ESCALAR uuid SIN `@relation`, y es DELIBERADO: `Company` es del modulo `identity` y
-/// `Product` de `inventario`, asi que con `@relation` el cliente Prisma ofreceria
-/// `include: { company: true }` --una lectura de otro modulo que NINGUNA guardia detecta,
-/// porque no es un import ni un `prisma.company`--. Mismo patron que `units.company_id`
-/// (QC-76) y que `presentations.unit_id` (QC-80).
-/// CONSECUENCIA QUE HAY QUE SABER: la FK real `products_company_id_fkey`
-/// (ON DELETE RESTRICT ON UPDATE CASCADE) vive escrita A MANO en
-/// `db/migrations/20260911130000_inventory_company_scope/migration.sql` y es por tanto DRIFT
-/// para Prisma. TODA MIGRACION FUTURA DE `products` HAY QUE REVISARLA A MANO: si el drift la
-/// borra, el esquema sigue validando y el cliente sigue compilando, y no se entera nadie.
-/// El `@@index` de abajo SI lo declara Prisma (R10) y NO es parcial a proposito: por el pasa la
-/// verificacion del `RESTRICT`, que tiene que ver tambien los productos con borrado logico.
-/// `products` SIGUE SIN unicidad de nombre (R21): dos productos pueden llamarse igual DENTRO de
-/// la misma empresa, como desde QC-20. Lo que si acota QC-49 es la RESOLUCION por nombre del
-/// alta, que mira solo los vivos de la empresa del actor: eso es filtro del repositorio, no
-/// restriccion del esquema.
+/// `name` no es unico, a proposito: dos productos pueden llamarse igual. La unidad no se guarda: se
+/// deriva de la presentacion del lote mas reciente. `companyId` no lleva `@relation` porque
+/// `Company` es de otro modulo; su FK esta escrita a mano y es drift, y su indice no es parcial
+/// porque el RESTRICT tiene que ver tambien los productos dados de baja. Los indices de busqueda
+/// son parciales o GIN y viven en la migracion `list_query_indexes`.
 /// @module inventario
 model Product {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -638,78 +283,12 @@ model Product {
   @@map("products")
 }
 
-/// Lote de un producto del inventario (2026-09-09). Un producto puede tener VARIOS lotes
-/// (1:N), cada uno con su propia existencia (`stock`), su numero de lote (`lot`) y
-/// su fecha de vencimiento (`expiryDate`, OPCIONAL). Es la unidad sobre la que se lleva la
-/// autoria: `createdBy`/`updatedBy` se mudaron AQUI desde `products`.
-///
-/// OJO — `createdBy`/`updatedBy` son FK REALES a `users` declaradas como ESCALARES SIN
-/// `@relation` a proposito, igual que las que tuvo `products` (QC-20 design.md > 2.1) y las
-/// de `recipes`/`suppliers`/`orders`: con `@relation`, el cliente Prisma habilitaria
-/// `include: { createdByUser: true }` desde `inventario` —una lectura de `users` de otro
-/// modulo que ninguna guardia detecta, porque no es un import ni un `prisma.user`—. Las FK
-/// viven escritas a mano en la migracion `<ts>_product_batches`
-/// (`product_batches_created_by_fkey`, `product_batches_updated_by_fkey`) y son DRIFT para
-/// Prisma: toda migracion futura de `product_batches` hay que revisarla a mano. Son anulables
-/// por el mismo motivo que las de `products`: NULL significa «no lo creo una persona», no «se
-/// perdio el dato».
-///
-/// `productId` SI lleva `@relation` —a diferencia de `recipe_lines.product_id`— porque
-/// `Product` y `ProductBatch` son los dos de `inventario`: no hay frontera de modulo que
-/// proteger, asi que la FK la genera Prisma en vez de quedar como drift. `ON DELETE RESTRICT`
-/// (mismo criterio que tenia `products.presentation_id`): el borrado de producto es LOGICO y
-/// nunca dispara esta FK en operacion normal, pero un borrado fisico con lotes vivos debe ser
-/// ruidoso, no arrastrarlos en silencio.
-///
-/// `presentationId` SI lleva `@relation` por la misma razon: `ProductBatch` y `Presentation`
-/// son los dos de `inventario`. Es NOT NULL sin `@default` (decision 2026-09-09): todo lote
-/// declara su presentacion, que es la que se mudo aqui desde `products`.
-///
-/// `stock` es NOT NULL sin `@default`: un lote nace con su cantidad, la ausencia no es un
-/// valor valido (a diferencia de `products.stock`, que conserva su propia columna anulable).
-/// El CHECK `product_batches_stock_non_negative` (escrito a mano en la migracion) replica el
-/// de `products_stock_non_negative`: un lote no puede tener existencia negativa.
-///
-/// `unitCost` es el coste unitario del lote: `Decimal(14,4)` NOT NULL (misma precision que el
-/// dinero de QC-33), nunca coma flotante (`docs/architecture.md > Dominio` n.º 4). El CHECK
-/// `product_batches_unit_cost_positive` (escrito a mano en la migracion, mismo patron que
-/// `supplier_catalog_lines_cost_positive` de QC-43) lo exige `> 0`. NO hay columna de coste
-/// TOTAL a proposito, igual que en pedidos: `totalCost` es `stock * unitCost` y se calcula al
-/// leer, para que no pueda contradecir a sus factores.
-///
-/// `expiryDate` es OPCIONAL: no todo lote lleva fecha de vencimiento. Es `@db.Date` (fecha sin
-/// hora), como `users.birth_date`.
-///
-/// QC-81 (2026-09-13) — `lot` pasa a OBLIGATORIO y nace `purchaseDate`. Hasta QC-81 `lot` era
-/// OPCIONAL (QC-90 R12 lo dejo asi a proposito); el humano decidio lo contrario al acotar QC-81
-/// (decision cerrada D7) y la migracion `20260913120000_product_batch_lot_and_purchase_date`
-/// relleno las filas sin lote con un correlativo por empresa antes de apretar la columna.
-///   - `lot` es TEXTO, NOT NULL y UNICO POR EMPRESA: `@@unique([companyId, lot])` de abajo, con
-///     el nombre de la base `product_batches_company_lot_unique` (R11, R12). Dos empresas pueden
-///     repetir valor; una empresa no. La unicidad es del texto EXACTO, sin normalizar. Si el alta
-///     no trae lote lo genera el backend (numero simple que continua desde el mas alto de la
-///     empresa, D5/D6); sigue siendo texto para que se pueda teclear «ACME-2026-07» a mano.
-///     Los CHECK `product_batches_lot_not_blank` (sin lote en blanco, R7) y
-///     `product_batches_lot_length` (<= 60) viven escritos A MANO en esa migracion: Prisma no
-///     modela CHECK.
-///   - `purchaseDate` es la fecha de COMPRA del lote, `@db.Date` (fecha civil, sin hora ni zona)
-///     y NOT NULL sin `@default` (R1, R26): el «hoy» por defecto lo pone el caso de uso con su
-///     propio reloj, no la base, y las filas previas a QC-81 recibieron la fecha civil (UTC) de su
-///     `created_at`. Que no sea futura (R4) NO esta en la base: vive solo en la aplicacion.
-///
-/// OJO — `companyId` la anade QC-49 (R2) y es COLUMNA PROPIA DEL LOTE, no se deriva por `join`
-/// con su producto (decision cerrada 2): QC-81 necesita la unicidad `(company_id, lot)` y un
-/// indice no puede indexar la columna de otra tabla. NOT NULL. Es un campo ESCALAR uuid SIN
-/// `@relation`, por el mismo motivo que `createdBy`/`updatedBy`: `Company` es de `identity` y
-/// `ProductBatch` de `inventario`, y con `@relation` el cliente ofreceria
-/// `include: { company: true }`, un cruce de modulos que ninguna guardia detecta.
-/// CONSECUENCIA QUE HAY QUE SABER: la FK real `product_batches_company_id_fkey`
-/// (ON DELETE RESTRICT ON UPDATE CASCADE) vive escrita A MANO en
-/// `db/migrations/20260911130000_inventory_company_scope/migration.sql`, junto con las dos de
-/// auditoria, y es DRIFT para Prisma. Ahi vive tambien el disparador
-/// `product_batches_check_company`, que exige que la empresa del lote coincida con la de su
-/// producto Y con la de su presentacion (R22) --lo que ni un CHECK ni una FK pueden decir, y
-/// que Prisma tampoco modela--. El `@@index` de abajo SI lo declara Prisma (R10).
+/// `createdBy`, `updatedBy` y `companyId` no llevan `@relation` porque apuntan a otros modulos; sus
+/// FK estan escritas a mano y son drift. NULL en la autoria = no lo creo una persona.
+/// `companyId` es columna propia del lote, y no se deriva del producto, porque la unicidad
+/// `(company_id, lot)` no puede indexar otra tabla; `product_batches_check_company` exige que
+/// coincida con la del producto y la de la presentacion. Los CHECK de `stock`, `unitCost` y `lot`
+/// estan escritos a mano. No hay coste total: se calcula al leer.
 /// @module inventario
 model ProductBatch {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -717,7 +296,10 @@ model ProductBatch {
   presentationId String    @map("presentation_id") @db.Uuid
   stock          Int
   unitCost       Decimal   @map("unit_cost") @db.Decimal(14, 4)
+  /// Texto exacto, sin normalizar: la unicidad por empresa distingue mayusculas.
   lot            String    @map("lot")
+  /// Sin `@default`: el «hoy» lo pone el caso de uso con su reloj, y que no sea futura solo lo
+  /// comprueba la aplicacion.
   purchaseDate   DateTime  @map("purchase_date") @db.Date
   expiryDate     DateTime? @map("expiry_date") @db.Date
   companyId      String    @map("company_id") @db.Uuid
@@ -738,26 +320,9 @@ model ProductBatch {
   @@map("product_batches")
 }
 
-/// Receta (formula) del ERP quimico. Borrado LOGICO: `deletedAt` NULL = receta viva.
-///
-/// OJO 1 — `createdBy` y `updatedBy` son FK REALES a `users`, pero se declaran como
-/// ESCALARES SIN `@relation` a proposito (decision cerrada 3, R19): la FK esta escrita a
-/// mano en `migration.sql`. Asi la base garantiza la integridad y, a la vez, el cliente
-/// Prisma NO puede atravesar de `recetas` a `users` con un `include`. La guardia de modulos
-/// NO detectaria ese cruce, porque no es un import.
-/// Son ANULABLES (decision cerrada 22, R33): NULL significa «no la creo una persona»
-/// —una importacion, un seed—, no «se perdio el dato».
-///
-/// OJO 2 — la unicidad del nombre NO esta aqui como `@unique` y es deliberado: es un indice
-/// unico PARCIAL (`WHERE deleted_at IS NULL`) sobre `name_normalized`, y Prisma no modela
-/// indices parciales. Vive escrito a mano en `migration.sql` (`recipes_name_unique`).
-///
-/// OJO 3 — QC-57 (`design.md > 10.2`): los indices de orden, filtro y busqueda tampoco estan
-/// aqui, por la misma razon que `recipes_name_unique`: son PARCIALES
-/// (`WHERE deleted_at IS NULL`) o GIN de trigramas. Escritos a mano en
-/// `db/migrations/20260904160000_list_query_indexes/migration.sql`:
-/// `recipes_name_normalized_trgm_idx`, `recipes_name_idx`, `recipes_created_at_idx` y
-/// `recipes_updated_at_idx`.
+/// `createdBy` y `updatedBy` no llevan `@relation`: un `include` cruzaria a `users` sin que la
+/// guardia de modulos lo vea. Sus FK estan escritas a mano. NULL = no la creo una persona.
+/// `recipes_name_unique` y los indices de busqueda son parciales o GIN y viven en las migraciones.
 /// @module recetas
 model Recipe {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -779,28 +344,9 @@ model Recipe {
   @@map("recipes")
 }
 
-/// Linea de una receta: la pareja receta-producto como ENTIDAD PROPIA, con su cantidad y su
-/// unidad (decision cerrada 12).
-///
-/// NO lleva `deletedAt` a proposito (decision cerrada 5, R24): la linea es parte de la
-/// receta, no un hecho historico, y corregir una formula es una edicion normal.
-///
-/// OJO — `productId` es una FK REAL a `products` declarada como ESCALAR SIN `@relation`
-/// (decision cerrada 3 aplicada a la frontera con `inventario`, R19). La FK esta escrita a
-/// mano en `migration.sql`. Lo que `recetas` sabe del producto llega por el contrato publico
-/// `@/lib/modules/inventario`, nunca por un `include` ni por `prisma.product`.
-///
-/// OJO 2 — `unitId` (QC-32, decision cerrada 13, R11, R18) es exactamente lo mismo en la
-/// frontera con el modulo `unidades`: campo ESCALAR uuid SIN `@relation`, con la FK real
-/// (`recipe_lines_unit_id_fkey`, ON DELETE RESTRICT ON UPDATE CASCADE) escrita A MANO en el
-/// SQL de la migracion `<ts>_units_catalog` (`specs/QC-32-modelo-unidades/design.md`
-/// secciones 4.3 y 8.1). Con `@relation`, Prisma habilitaria `include: { unit: true }` desde
-/// `recetas` —un cruce de frontera que la guardia de modulos NO ve, porque no es un import—
-/// y obligaria a declarar `lines RecipeLine[]` dentro de `Unit`, que es de otro modulo. Es
-/// DRIFT para Prisma: toda migracion futura de `recipe_lines` hay que revisarla a mano para
-/// que no borre esa FK. Antes de QC-32 esto era `unit String`, texto libre; ahora es una
-/// referencia al catalogo, OBLIGATORIA (decision cerrada 8, R11) y sigue siendo ANOTATIVA:
-/// no hay conversion entre unidades y la linea no hereda la del producto (R14).
+/// Sin `deletedAt`: la linea es parte de la receta, y corregir una formula es una edicion normal.
+/// `productId` y `unitId` no llevan `@relation` porque apuntan a otros modulos; sus FK estan
+/// escritas a mano y son drift. La unidad es anotativa: no hay conversion.
 /// @module recetas
 model RecipeLine {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -819,32 +365,10 @@ model RecipeLine {
   @@map("recipe_lines")
 }
 
-/// Proveedor del ERP quimico. Borrado LOGICO: `deletedAt` NULL = proveedor vivo.
-/// NO hay estado activo/inactivo aparte (decision cerrada 10, R26): un segundo estado que
-/// nadie sabe distinguir del primero es deuda, no informacion.
-///
-/// OJO 1 — `createdBy` y `updatedBy` son FK REALES a `users`, pero se declaran como
-/// ESCALARES SIN `@relation` a proposito (decision cerrada 14, R22): la FK esta escrita a
-/// mano en `migration.sql`. Asi la base garantiza la integridad y, a la vez, el cliente
-/// Prisma NO puede atravesar de `proveedores` a `users` con un `include`. La guardia de
-/// modulos NO detectaria ese cruce, porque no es un import.
-/// Son ANULABLES: NULL significa «no lo creo una persona» —una importacion, un seed—, no
-/// «se perdio el dato». Heredado de QC-24 (decision cerrada 22 de aquella ficha).
-///
-/// OJO 2 — la unicidad del nombre NO esta aqui como `@unique` y es deliberado: es un indice
-/// unico PARCIAL (`WHERE deleted_at IS NULL`) sobre `name_normalized`, y Prisma no modela
-/// indices parciales. Vive escrito a mano en `migration.sql` (`suppliers_name_unique`).
-///
-/// OJO 3 — la regla cruzada «al menos telefono o correo» (decision cerrada 7, R4) es un
-/// CHECK en la base (`suppliers_contact_required`) y Prisma NO modela CHECK: por eso las dos
-/// columnas se ven aqui como simplemente opcionales. Vive escrito a mano en `migration.sql`.
-///
-/// OJO 4 — QC-57 (`design.md > 10.2`): los indices de orden, filtro y busqueda tampoco estan
-/// aqui, por la misma razon que `suppliers_name_unique`: son PARCIALES
-/// (`WHERE deleted_at IS NULL`) o GIN de trigramas. Escritos a mano en
-/// `db/migrations/20260904160000_list_query_indexes/migration.sql`:
-/// `suppliers_name_normalized_trgm_idx`, `suppliers_name_idx`, `suppliers_created_at_idx` y
-/// `suppliers_updated_at_idx`.
+/// `createdBy` y `updatedBy` no llevan `@relation`: un `include` cruzaria a `users` sin que la
+/// guardia de modulos lo vea. Sus FK estan escritas a mano. `phone` y `email` parecen opcionales
+/// pero el CHECK `suppliers_contact_required` exige al menos uno. `suppliers_name_unique` y los
+/// indices de busqueda son parciales o GIN y viven en las migraciones.
 /// @module proveedores
 model Supplier {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -865,75 +389,12 @@ model Supplier {
   @@map("suppliers")
 }
 
-/// Linea del catalogo de un proveedor: COMO VENDE ESTE PROVEEDOR ESTA COSA. Entidad propia,
-/// con su nombre, su presentacion, su unidad, su costo, su minimo de compra y su tiempo de
-/// entrega (QC-42 decision cerrada 3, reformada entera por QC-52).
-///
-/// OJO 0 — LA LINEA YA NO CONOCE EL PRODUCTO. QC-52 le quito `productId`, su FK
-/// `supplier_catalog_lines_product_id_fkey` y su indice unico
-/// `supplier_catalog_lines_supplier_id_product_id_key` (su decision cerrada 3, R9, R18). NO
-/// hay vinculo entre esta tabla y `products`, ni siquiera opcional, y se descarto
-/// expresamente una referencia anulable: es lo que permite que el catalogo de un proveedor
-/// incluya cosas que aun no tienes dadas de alta. CONSECUENCIA ACEPTADA Y ESCRITA: el sistema
-/// NO PUEDE responder «a cuanto me vende cada proveedor este producto» ni comparar precios
-/// entre proveedores. Si algun dia se quiere, es ficha propia y la via razonable es una tabla
-/// de equivalencias, no devolver esta columna.
-/// A cambio, la linea gana la estructura del producto MENOS `stock` y `qty_alert` -- cuanto
-/// tienes es tuyo, no del proveedor--: `name`, `nameNormalized`, `presentationId`, `unitId`,
-/// `imagePath` y `deletedAt`.
-///
-/// OJO 1 — LA IDENTIDAD DE LA LINEA es ahora `(supplier_id, name_normalized, presentation_id)`
-/// sobre las VIVAS. NO esta aqui como `@@unique` y es deliberado: es un indice unico PARCIAL
-/// (`WHERE deleted_at IS NULL`) y Prisma no modela indices parciales. Vive escrito a mano en
-/// `<ts>_split_product_and_supplier_catalog/migration.sql`
-/// (`supplier_catalog_lines_name_presentation_unique`), mismo patron que `suppliers_name_unique`
-/// y `recipes_name_unique`. Es la UNICA garantia de la unicidad (R15): no hay `SELECT` previo
-/// por igualdad -- seria una carrera-- y el puerto no expone busqueda por nombre. El mensaje al
-/// usuario sale de traducir el SQLSTATE `23505`. `presentationId` es OBLIGATORIA por eso mismo:
-/// forma parte de la clave. Que `deletedAt` libere la combinacion es R17, y por eso el indice
-/// es parcial y no total como era el de `(supplier_id, product_id)`.
-///
-/// OJO 2 — `presentationId`, `unitId`, `createdBy` y `updatedBy` son FK REALES -a
-/// `presentations`, `units` y `users`- declaradas como ESCALARES SIN `@relation` (QC-42
-/// decision cerrada 13/14, QC-52 decision cerrada 10, R30). Las cuatro estan escritas A MANO
-/// en SQL. Con `@relation`, el cliente Prisma ofreceria `include: { presentation: true }`
-/// desde `proveedores` -- una lectura de la tabla de otro modulo que NINGUNA guardia detecta,
-/// porque no es un import ni un `prisma.presentation`-- y ademas obligaria a declarar
-/// `catalogLines SupplierCatalogLine[]` dentro de `Presentation`, `Unit` y `User`, que son de
-/// otros modulos. Es por tanto DRIFT para Prisma: TODA MIGRACION FUTURA sobre esta tabla hay
-/// que revisarla A MANO para que no emita un `DROP CONSTRAINT` sobre esas cuatro FK. Las dos
-/// nuevas van `ON DELETE RESTRICT ON UPDATE CASCADE`, no `CASCADE` ni `SET NULL`:
-/// `presentations` no tiene borrado logico, y el RESTRICT es justo lo que impide que borrar
-/// una presentacion deje lineas apuntando al vacio.
-///
-/// OJO 3 — `deletedAt` la gana QC-52 (su decision cerrada 5, R21): borrado LOGICO, la fila
-/// nunca se elimina. Al dar de baja un proveedor sus lineas caen con el, en la MISMA
-/// transaccion y con LA MISMA MARCA DE TIEMPO (R20). El `onDelete: Cascade` hacia `suppliers`
-/// se conserva tal cual, pero ya no es la politica: es solo la red de un borrado FISICO -- una
-/// purga, un `down.sql`--, y no se dispara nunca en operacion normal porque ninguna FK
-/// reacciona a un UPDATE.
-///
-/// OJO 4 — MANDAN LOS TIPOS ESTRICTOS DE LA LINEA, no los del producto (decision cerrada 6):
-/// `cost` sigue NOT NULL y `> 0`, y `minPurchase` sigue `Decimal(14,4)`, no entero. Copiar el
-/// producto al pie de la letra habria hecho el costo opcional y el minimo entero. Los CHECK de
-/// `cost` (`> 0` desde QC-43), `min_purchase` y `delivery_time` (`>= 0`) son SQL escrito a
-/// mano: Prisma no modela CHECK. Ver `design.md > 4.4` de QC-42 y `> 2.2` de QC-43.
-///
-/// `nameNormalized` la calcula `normalizeSupplierName` (dominio de `proveedores`, funcion
-/// pura) y se persiste junto a `name` en toda escritura (R14). No se escribe otra: dos
-/// definiciones de «mismo nombre» en el mismo modulo divergen.
-///
-/// `imagePath` va SIN CHECK, SIN DEFAULT y SIN indice, igual que `products.image_path`: la
-/// forma de la ruta no esta acordada en el repo y no hay flujo de subida todavia (P1).
-///
-/// OJO 5 — QC-57 (`design.md > 10.2`): los indices de orden, filtro y busqueda tampoco estan
-/// aqui, por la misma razon que `supplier_catalog_lines_name_presentation_unique`: son
-/// PARCIALES (`WHERE deleted_at IS NULL`) o GIN de trigramas. Escritos a mano en
-/// `db/migrations/20260904160000_list_query_indexes/migration.sql`:
-/// `supplier_catalog_lines_name_normalized_trgm_idx` -- el unico que sirve una busqueda por
-/// SUBCADENA: en el indice unico de arriba `name_normalized` NO va en cabeza--,
-/// `supplier_catalog_lines_name_idx`, `_cost_idx`, `_min_purchase_idx`, `_delivery_time_idx`,
-/// `_created_at_idx` y `_updated_at_idx`.
+/// No hay vinculo con `products`, a proposito: el catalogo de un proveedor puede incluir cosas que
+/// no estan dadas de alta. La identidad `(supplier_id, name_normalized, presentation_id)` sobre las
+/// vivas es un indice unico parcial escrito a mano. Las FK a otros modulos van sin `@relation` y
+/// son drift. El `Cascade` hacia `suppliers` solo actua en un borrado fisico: la baja del proveedor
+/// es logica y marca sus lineas en la misma transaccion. Los CHECK de costo, minimo y plazo, y los
+/// indices de busqueda, estan escritos a mano en las migraciones.
 /// @module proveedores
 model SupplierCatalogLine {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -961,53 +422,13 @@ model SupplierCatalogLine {
   @@map("supplier_catalog_lines")
 }
 
-/// Catalogo de unidades de medida (QC-32). Modulo propio `unidades`: `inventario`,
-/// `recetas` y lo que venga lo consumen por su contrato publico `@/lib/modules/unidades`,
-/// nunca por esta tabla.
-///
-/// NO lleva `deletedAt` a proposito (decision cerrada 11 de QC-32, R8; QC-76 R32 lo
-/// reafirma), igual que `Role` y `Presentation`: el borrado logico es un UPDATE y una FK no
-/// puede bloquear un UPDATE, asi que la columna neutralizaria en silencio la unica garantia
-/// real de R13 -- y, desde QC-76, tambien la del `units_unit_id_fkey`.
-///
-/// `nameNormalized` la calcula el dominio de `unidades` (`normalizeUnitName`, funcion pura) y
-/// se persiste junto a `name` en toda escritura. La unicidad la garantiza un INDICE, nunca una
-/// comprobacion previa por igualdad -- seria una carrera.
-///
-/// QC-76 (`design.md > 2.1` y `2.3`): AQUI NO HAY, NI DEBE HABER, NINGUN `@@unique` NI
-/// `@unique`. La unicidad del nombre normalizado y la del simbolo pasaron a ser POR AMBITO
-/// --dentro de la empresa, y las de sistema entre ellas (R14, R15)--, y eso son CUATRO indices
-/// unicos PARCIALES (`units_company_name_unique`, `units_system_name_unique`,
-/// `units_company_symbol_unique`, `units_system_symbol_unique`) que Prisma no sabe modelar.
-/// Viven escritos a mano en
-/// `db/migrations/20260907190000_units_equivalence_and_scope/migration.sql`, junto con los
-/// tres CHECK, las dos FK y el disparador `units_check_derivation`. Mismo patron que
-/// `users_email_unique` (QC-4) y `companies_name_unique` (QC-47).
-/// Volver a declarar aqui `@@unique([nameNormalized])` NO es cosmetico: el siguiente
-/// `prisma migrate dev` generaria de nuevo el indice GLOBAL `units_name_normalized_key` y la
-/// unicidad dejaria de ser por ambito EN SILENCIO --dos empresas no podrian tener cada una su
-/// «kilogramo»--, rompiendo R14 sin que nada deje de compilar. Lo vigila
-/// `tests/unit/unidades/schema/unidades-schema.test.ts`.
-///
-/// `companyId` y `baseUnitId` son ESCALARES SIN `@relation` a proposito (`design.md > 2.1`):
-/// `Company` es de `identity`, asi que ninguna consulta puede atravesar de una unidad a una
-/// empresa con un `include` --mismo criterio que `products.unit_id` (QC-32 R18)--, y la
-/// auto-referencia obligaria a declarar un lado inverso (`derived Unit[]`) que nadie consulta:
-/// la conversion se calcula en el dominio a partir de dos descriptores, nunca navegando.
-/// Las FK reales (`units_company_id_fkey`, `units_unit_id_fkey`, las dos
-/// `ON DELETE RESTRICT ON UPDATE CASCADE`) las escribe la migracion a mano.
-///
-/// `factor` dice cuantas unidades de `baseUnitId` caben en una de esta (R3): `decimal(14,4)`,
-/// exacto, nunca coma flotante, la misma precision que el dinero de QC-33. Va con `baseUnitId`
-/// JUNTOS O NINGUNO, y eso lo garantiza `units_derivation_pair_check` (R2), no el esquema.
-///
-/// QC-57 (`design.md > 10.2`): los indices de orden, filtro y busqueda NO estan aqui. El GIN
-/// de trigramas `units_name_normalized_trgm_idx` -- lo que sirve una busqueda por SUBCADENA,
-/// que un btree no hace-- y los btree `units_name_idx`,
-/// `units_symbol_idx` (orden, NO unicidad), `units_created_at_idx` y `units_updated_at_idx`
-/// viven escritos a mano en
-/// `db/migrations/20260904160000_list_query_indexes/migration.sql`. Esta tabla NO tiene
-/// `deletedAt`, asi que los suyos son TOTALES, no parciales.
+/// Sin `deletedAt`: el borrado logico es un UPDATE, que ninguna FK bloquea. Sin `@@unique`, a
+/// proposito: la unicidad de nombre y simbolo es por ambito (empresa o sistema) con cuatro indices
+/// parciales escritos a mano en `units_equivalence_and_scope`, y un `@@unique` haria que
+/// `migrate dev` regenerara un indice global.
+/// `companyId` y `baseUnitId` van sin `@relation`: `Company` es de otro modulo y la auto-referencia
+/// exigiria un lado inverso que nadie consulta. `factor` y `baseUnitId` van juntos o ninguno por el
+/// CHECK `units_derivation_pair_check`.
 /// @module unidades
 model Unit {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -1025,27 +446,17 @@ model Unit {
   @@map("units")
 }
 
-/// Estado del pedido (QC-33, decision cerrada 4). Conjunto CERRADO en el propio esquema:
-/// anadir un valor es una migracion del tipo en Postgres, y el humano lo asumio a conciencia.
-/// Se aparta a proposito de `DocumentType` (QC-4), que resolvio el mismo problema con una
-/// tabla porque el conjunto DEBIA crecer sin migrar; aqui no debe.
-/// Que transiciones son validas NO se decide aqui: es QC-34 (R19).
+/// Enum y no tabla: el conjunto es cerrado a proposito y anadir un valor es una migracion.
 enum OrderStatus {
   PENDIENTE
   EN_CURSO
   ENTREGADO
-  /// QC-34 (decision cerrada 3): CUARTO valor, anadido por la migracion `_order_cancellation`
-  /// con `ALTER TYPE ... ADD VALUE`. Es el coste que QC-33 asumio al elegir enum en vez de
-  /// tabla. Va el ULTIMO: el orden de declaracion de este tipo no significa nada —a diferencia
-  /// del de `OrderPriority`—, pero reordenarlo obligaria a recrear el tipo en vez de anadir un
-  /// valor. `CANCELADO` es FINAL: no se sale de el (QC-34 R21, R22).
+  /// Va el ultimo: reordenar obligaria a recrear el tipo en vez de anadir un valor.
   CANCELADO
 }
 
-/// Prioridad del pedido (QC-33, decision cerrada 4). EL ORDEN DE DECLARACION ES EL ORDEN DE
-/// LA PRIORIDAD, de menor a mayor: reordenar estas cuatro lineas cambia el significado del
-/// dato y el `ORDER BY priority` de cualquier consulta futura. Postgres ordena un enum por su
-/// orden de declaracion, no alfabeticamente.
+/// El orden de declaracion es el de la prioridad, de menor a mayor: Postgres ordena un enum por
+/// declaracion, asi que reordenar cambia el `ORDER BY priority`.
 enum OrderPriority {
   BAJA
   MEDIA
@@ -1053,48 +464,11 @@ enum OrderPriority {
   CRITICA
 }
 
-/// Pedido del ERP (QC-33). Una sola LINEA: receta, cantidad, unidad y precio UNITARIO
-/// (decision cerrada 1). No hay cabecera ni items, y no hay cliente ni destinatario
-/// (decision cerrada 8, R3): eso es deliberado y anadirlo despues obliga a decidir que
-/// cliente llevaban los pedidos ya cargados.
-///
-/// NO hay columna de total y es deliberado (decision cerrada 5, R10): el total es
-/// `quantity * unitPrice`, se calcula al leer y no se guarda, para que no pueda contradecir
-/// a sus factores. Tampoco hay impuestos ni facturacion: este ERP no factura
-/// (`docs/architecture.md > Dominio`, pregunta abierta 4, cerrada por esta ficha).
-///
-/// NO hay columna de fecha de solicitud (decision cerrada 10, R4): la pone el sistema y no se
-/// edita, o sea que es exactamente `createdAt`. Dos columnas con el mismo dato solo divergen.
-///
-/// OJO 1 — el correlativo son DOS columnas, `orderYear` + `orderSequence`, con indice unico
-/// COMPUESTO y TOTAL (R21, R22). NO es parcial, a diferencia de `recipes_name_unique`: un
-/// pedido borrado logicamente conserva su numero y NO lo libera (decision cerrada 9). El
-/// numero visible `2026-0000001` NO se guarda: lo compone `formatOrderNumber` del dominio (R24).
-/// `orderYear` es el ano de `createdAt` MEDIDO EN UTC, y lo garantiza el CHECK
-/// `orders_order_year_matches_created_at` (decision cerrada 28, R41): quien inserte con otro
-/// reloj se lleva un 23514.
-///
-/// OJO 2 — `recipeId`, `createdBy` y `updatedBy` son FK REALES pero se declaran como
-/// ESCALARES SIN `@relation` a proposito (decision cerrada 17 y su aplicacion a las otras dos
-/// fronteras, R33): las TRES FK estan escritas A MANO en `migration.sql`. Eran cuatro hasta el
-/// 2026-09-07, cuando la decision humana de quitar la unidad y el precio unitario del pedido se
-/// llevo `unit_id`, `unit_price` y con ellos `orders_unit_id_fkey`
-/// (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`). Asi la base
-/// garantiza la integridad y, a la vez, el cliente Prisma NO puede atravesar de `pedidos` a
-/// `recetas`, `unidades` ni `users` con un `include`. La guardia de modulos NO detectaria ese
-/// cruce, porque no es un import. Es DRIFT para Prisma: toda migracion futura de `orders` hay
-/// que revisarla a mano para que no borre las cuatro FK, los cinco CHECK ni el RLS.
-///
-/// `createdBy`/`updatedBy` son ANULABLES (decision cerrada 18, R26): NULL significa «no lo creo
-/// una persona» —una importacion, un seed—, no «se perdio el dato».
-///
-/// OJO 3 — QC-57 (`design.md > 10.2`): los indices de orden y filtro de esta tabla NO estan
-/// aqui porque son PARCIALES (`WHERE deleted_at IS NULL`) y Prisma no los modela. Escritos a
-/// mano en `db/migrations/20260904160000_list_query_indexes/migration.sql`:
-/// `orders_status_idx`, `orders_priority_idx`, `orders_created_at_idx` y `orders_quantity_idx`
-/// (`orders_unit_price_idx` cayo con la columna el 2026-09-07). NO hay indice de busqueda: `orders` no tiene `name` y la
-/// busqueda se omite (R17). El correlativo lo ordena `orders_order_year_order_sequence_key`,
-/// que ya existia.
+/// Sin fecha de solicitud: es `createdAt`. El correlativo es un indice unico total, no parcial: un
+/// pedido dado de baja conserva su numero. `orderYear` es el ano de `createdAt` en UTC, y lo exige
+/// el CHECK `orders_order_year_matches_created_at`. `recipeId`, `createdBy` y `updatedBy` van sin
+/// `@relation` porque apuntan a otros modulos; sus FK y CHECK estan escritos a mano y son drift.
+/// Los indices de listado son parciales y viven en la migracion `list_query_indexes`.
 /// @module pedidos
 model Order {
   id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -1104,11 +478,8 @@ model Order {
   quantity           Decimal       @db.Decimal(14, 4)
   priority           OrderPriority @default(BAJA)
   status             OrderStatus   @default(PENDIENTE)
-  /// QC-34 (decision cerrada 4, R27, R30): motivo de la cancelacion. ANULABLE, porque solo
-  /// existe en un pedido cancelado, y `TEXT` SIN longitud: el tope de 500 vive en `zod`
-  /// (`order-input.ts`), no en el tipo de la columna —cambiarlo no puede ser una migracion—.
-  /// Que exista si y solo si `status = 'CANCELADO'` lo garantiza el CHECK
-  /// `orders_cancellation_reason_matches_status`, escrito a mano en la migracion.
+  /// Sin longitud en la columna: el tope vive en la validacion de entrada. Que exista solo en un
+  /// pedido cancelado lo exige el CHECK `orders_cancellation_reason_matches_status`.
   cancellationReason String?       @map("cancellation_reason")
   createdBy          String?       @map("created_by") @db.Uuid
   updatedBy          String?       @map("updated_by") @db.Uuid
@@ -1123,87 +494,12 @@ model Order {
   @@map("orders")
 }
 
-/// Asignacion de un pedido a una persona responsable (QC-86). PK compuesta
-/// `(order_id, user_id)`: la misma persona no puede estar dos veces en el mismo pedido, VENGA
-/// POR DONDE VENGA —marcada suelta, dentro de un grupo o dentro de un segundo grupo— (R3, R5,
-/// decision cerrada 3, «gana el primero que la trajo»). El indice de la PK cubre ademas la
-/// consulta caliente «quienes son los responsables de este pedido» y, por su prefijo
-/// `order_id`, el barrido de un pedido entero. Mismo patron que `WorkGroupMember` (QC-83) y
-/// `RolePermission` (QC-74).
-/// `order_assignments_user_id_idx` sirve el sentido inverso, «que pedidos tengo asignados»
-/// (QC-88, R22), que la PK no cubre; `order_assignments_work_group_id_idx` sirve la
-/// verificacion del RESTRICT hacia `work_groups` (R10) y el «quitar este grupo de este pedido»
-/// de QC-87 (R17). NO hay indice por `company_id` y es deliberado: nadie consulta asignaciones
-/// por empresa, y las dos verificaciones de RESTRICT entran por `user_id` y `work_group_id`.
-/// NO hay `id` propio: la identidad de la fila es `(order_id, user_id)` y nadie la referencia
-/// desde fuera.
-///
-/// OJO 1 — las TRES FK y el CHECK de esta tabla van escritos A MANO en el `migration.sql`, y
-/// por eso NINGUNA columna declara `@relation`:
-///   ("order_id")                -> orders("id")                        ON DELETE RESTRICT
-///   ("user_id","company_id")    -> users("id","company_id")            ON DELETE RESTRICT
-///   ("work_group_id","company_id") -> work_groups("id","company_id")   ON DELETE RESTRICT
-///   CHECK `order_assignments_work_group_name_matches_group` (R7)
-/// Aqui valen los DOS argumentos del repo a la vez: dos de los tres padres son de OTROS
-/// modulos (`pedidos`, `identity`), asi que un `include` de Prisma podria atravesar la frontera
-/// sin que ninguna guardia de imports lo viera —es la misma nota que `Order` lleva escrita para
-/// sus tres FK—; y dos de las FK son COMPUESTAS y COMPARTEN `company_id`, que Prisma no modela
-/// (mismo caso que `WorkGroupMember`).
-/// LO QUE ESO CUESTA, y se acepta: las tres FK y el CHECK son DRIFT para Prisma. Toda migracion
-/// futura que toque `order_assignments` va a emitir `DROP CONSTRAINT` sobre ellos y HAY QUE
-/// BORRARLO A MANO del SQL generado, igual que ya se hace con `orders`, `products`,
-/// `recipe_lines` y `work_group_members` (riesgo 5 de `design.md > 8`). Lo unico que se pone
-/// rojo si desaparecen es el test de esquema de la ficha.
-///
-/// OJO 2 — las DOS FK hacia `identity` (`users`, `work_groups`) son COMPUESTAS y llevan
-/// `company_id` (decision cerrada 6, R11, R12). La fila declara UNA empresa y esa empresa tiene
-/// que ser a la vez la de la persona Y —si hay grupo— la del grupo: como la igualdad es
-/// transitiva, persona y grupo son de la misma empresa POR CONSTRUCCION, sin ningun estado
-/// intermedio. Apuntan a `users_id_company_id_key` y `work_groups_id_company_id_key`, que YA
-/// EXISTEN desde QC-83 —sin ellas la migracion fallaria con `42830`—. Si alguien las simplifica
-/// a `FOREIGN KEY ("user_id") REFERENCES "users"("id")`, el esquema valida, el cliente compila,
-/// todo sigue verde y la coherencia de empresa (R11) DEJA DE EXISTIR EN SILENCIO hasta que
-/// QC-88 liste pedidos ajenos (riesgo 1 de `design.md > 8`). La FK del pedido, en cambio, es
-/// SIMPLE a proposito: `orders` no tiene `company_id` —eso es la epica QC-46— y esta ficha NO
-/// se lo anade (R14).
-///
-/// OJO 3 — `MATCH SIMPLE` (el de Postgres por defecto) ES A PROPOSITO en la FK del grupo, y NO
-/// se escribe `MATCH FULL`. `MATCH SIMPLE` no verifica nada si alguna columna referenciante es
-/// NULL, que es justo lo que se quiere: una asignacion suelta tiene `work_group_id IS NULL`, la
-/// FK no se evalua y la fila se acepta (R13). `MATCH FULL` MATARIA R13, porque exigiria que las
-/// dos columnas fueran NULL a la vez y `company_id` es NOT NULL: NINGUNA asignacion suelta
-/// podria existir (riesgo 2 de `design.md > 8`). El test de esquema comprueba que la cadena no
-/// aparece en el SQL.
-///
-/// OJO 4 — `workGroupName` es un SNAPSHOT: el nombre que el grupo tenia EN EL INSTANTE DE
-/// ASIGNAR (R6, R8, decision cerrada 7), no una desnormalizacion que un `JOIN` pueda sustituir.
-/// Un `JOIN` a `work_groups` devolveria el nombre DE HOY, y el requisito es el de ENTONCES:
-/// renombrar el grupo manana no puede cambiar quien figuraba como responsable de un pedido ya
-/// en ejecucion (riesgo 3 de `design.md > 8`). Va `TEXT` sin longitud, como su origen
-/// `work_groups.name` (QC-83 R2): poner aqui un tope que el origen no tiene convertiria un
-/// renombrado legitimo en un error de asignacion. `workGroupId` y `workGroupName` van JUNTOS O
-/// NINGUNO, y eso no es una convencion amable: lo garantiza el CHECK
-/// `order_assignments_work_group_name_matches_group` (R7), no el esquema. La marca de «vino de
-/// un grupo» NO es una columna aparte: es `work_group_id IS NOT NULL`.
-///
-/// OJO 5 — NO hay `deleted_at`, y es un requisito con nombre (R15, decision cerrada 5): sacar a
-/// alguien de un pedido BORRA la fila. Es la EXCEPCION EXPLICITA al borrado logico de
-/// `docs/architecture.md > Anti-patrones`, heredada de QC-83, y se escribe porque en la misma
-/// migracion es facil confundirla: el `deleted_at` es del PEDIDO, no de la asignacion. El
-/// historico que importa es el CONGELADO —quien era responsable, con el nombre del grupo tal
-/// como era—, no quien estuvo asignado veinte minutos por error. Anadir aqui `deleted_at` «por
-/// coherencia con el resto del repo» rompe ademas la PK —`(order_id, user_id)` dejaria de ser
-/// unico al haber filas muertas—, obliga a degradarla a un indice unico PARCIAL y obliga a TODA
-/// lectura de responsables, para siempre, a acordarse de filtrar: la que se olvide una vez
-/// ensena un pedido a alguien a quien ya se lo quitaron, y esa lectura es la de QC-88, que
-/// decide que ve un Operador (riesgo 4 de `design.md > 8`).
-/// Consecuencia contraintuitiva y buscada: dar de baja el pedido (R19) o la persona (R21) NO
-/// borra ninguna asignacion —ninguna FK reacciona a un `UPDATE`—; quien filtra al leer es QC-88.
-///
-/// `createdAt`/`updatedAt` van igual (R23, decision cerrada 13) aunque la fila casi nunca se
-/// actualice. `updatedAt` es NOT NULL SIN default de base —lo rellena `@updatedAt` del
-/// cliente—, asi que un `INSERT` crudo que no la ponga falla. Misma nota que QC-4, QC-47 y
-/// QC-83.
+/// Las tres FK y el CHECK van escritos a mano y sin `@relation`, porque los padres son de otros
+/// modulos, y son drift: hay que borrar a mano su `DROP CONSTRAINT` de toda migracion generada. Las
+/// FK a persona y grupo son compuestas con `company_id`: ambos son de la misma empresa por
+/// construccion. La del grupo es `MATCH SIMPLE` a proposito, porque `MATCH FULL` impediria una
+/// asignacion sin grupo. `workGroupName` es una foto del nombre al asignar. Sin `deleted_at`: quitar
+/// a alguien borra la fila, y con filas muertas la PK dejaria de ser unica.
 /// @module asignaciones
 model OrderAssignment {
   orderId       String   @map("order_id") @db.Uuid
