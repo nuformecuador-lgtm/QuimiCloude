@@ -4,6 +4,11 @@
 > de su tanda. Ningun subagente corre la suite completa: cada task cierra con `pnpm typecheck`,
 > `pnpm lint` y `pnpm exec vitest related --run <sus archivos>`. El gate lo corre el leader.
 >
+> **Revision del 2026-09-15 (F1.4), sin tiempos.**
+> - Se retira **T9** (tiempos antes y despues). **El hueco se deja**: T10-T12 conservan su numero.
+> - Se retira el script `scripts/medir-sesion-por-peticion.ts`: el conteo se hace a mano con el
+>   metodo escrito (`design.md > 6`).
+>
 > **Conflictos declarados con QC-81** (`backend`, `in_progress`):
 > - **T3** toca `lib/composition/index.ts` (~8 lineas: import + `:297-344`). QC-81 T7 puede tocarlo.
 > - **T4** toca `lib/modules/inventario/adapters/driving/product-actions.ts`, en `currentActor`
@@ -11,21 +16,26 @@
 >
 > Lo valida el leader antes de lanzar T3 y T4.
 
-## Tanda 0 — medir ANTES de cambiar nada
+## Tanda 0 — contar ANTES de cambiar nada
 
 - [ ] **T1 — Conteo en ejecucion, ANTES (R16).** Sin dependencias. **Debe hacerse antes de T3 y T4
       sobre este arbol**, o sobre un checkout del merge-base con `dev`.
-      Archivos:
-      - `scripts/medir-sesion-por-peticion.ts` (nuevo): el modo «conteo»;
-      - `progress/medicion_QC-104-sesion-una-sola-vez-por-peticion.md` (nuevo).
+      Archivos: `progress/medicion_QC-104-sesion-una-sola-vez-por-peticion.md` (nuevo). **Ningun
+      script.**
+      Con `next build && next start` contra la base local, y siguiendo `design.md > 6.1`:
+      1. Comprobar cual de las dos vias esta disponible (`pg_stat_statements` o `log_statement`).
+      2. Comprobar que el marcador `revoked_sessions` solo lo emite la resolucion de sesion en las
+         pantallas medidas. Si no, elegir otro.
+      3. Contar las lecturas en `/configuracion/usuarios`, `/pedidos`, `/configuracion/unidades` y
+         al crear una unidad.
 
-      Comprobar cual de las dos vias de `design.md > 6.1` esta disponible en la base local
-      (`pg_stat_statements` o `log_statement`) y dejarlo escrito. Con `next build && next start`,
-      contar las lecturas de la ficha en `/configuracion/usuarios`, `/pedidos`,
-      `/configuracion/unidades` y en crear una unidad.
-      **Hecho:** el archivo de medicion tiene las secciones `Metodo`, `Conteo en ejecucion` (columna
-      «antes» rellena, con la cifra real que corrige o confirma H3) y `Tiempos` con la linea
-      `PENDIENTE: Pregunta abierta 1`. Ninguna linea de log anadida a la aplicacion.
+      **Hecho:**
+      - el archivo tiene la seccion `Metodo`, con la via elegida, el marcador y las sentencias SQL
+        exactas;
+      - tiene la seccion `Conteo en ejecucion`, con la columna «antes» rellena para las tres
+        pantallas y el guardado; es la cifra real que corrige o confirma H3;
+      - no hay ninguna seccion de tiempos;
+      - no se anadio ninguna linea de log a la aplicacion.
 
 ## Tanda 1 — el mecanismo
 
@@ -117,37 +127,28 @@
       - la salida roja de las dos mutaciones y la verde tras restaurar, pegadas en el `impl_`;
       - `git diff` de produccion identico al de T3 y T4.
 
-## Tanda 3 — medir DESPUES y cerrar
+## Tanda 3 — contar DESPUES y cerrar
 
 - [ ] **T8 — Conteo en ejecucion, DESPUES (R16).** Depende de T3, T4 y T1.
       Archivos: `progress/medicion_QC-104-sesion-una-sola-vez-por-peticion.md`.
-      El mismo metodo de T1, sobre la rama. Si algun numero «despues» es mayor que 1 en una pantalla
-      que no sea respuesta a un POST, **se para y se sube al leader**: contradiria `design.md > 2.2`.
-      **Hecho:** columna «despues» rellena para las tres pantallas y el guardado, sin umbral y sin
-      recomendacion (R19).
+      El mismo metodo de T1, sobre la rama y con la misma via y el mismo marcador. Si algun numero
+      «despues» es mayor que 1 en una pantalla que no sea respuesta a un POST, **se para y se sube
+      al leader**: contradiria `design.md > 2.2`.
+      **Hecho:** columna «despues» rellena para las tres pantallas y el guardado; el guardado dice
+      si su total incluye el repintado (H2).
 
-- [ ] **T9 — Tiempos antes y despues (R17, R18).** **BLOQUEADA por la Pregunta abierta 1.** Depende
-      de T8 y de que el humano responda.
-      Archivos:
-      - `scripts/medir-sesion-por-peticion.ts` (modo «tiempos»);
-      - `progress/medicion_QC-104-sesion-una-sola-vez-por-peticion.md`.
+- **T9 — RETIRADA en la revision de F1.4** (eran los tiempos antes y despues). El numero no se
+  reutiliza.
 
-      Metodo de `design.md > 6.2`. «Antes» sobre un checkout del merge-base con `dev`, «despues»
-      sobre la rama, alternando corridas. Mientras siga bloqueada, la seccion `Tiempos` conserva
-      `PENDIENTE: Pregunta abierta 1`.
-      **Hecho:**
-      - mediana y p95 de las tres pantallas y del guardado, antes y despues, con el metodo;
-      - la linea `PENDIENTE` retirada;
-      - ningun umbral.
+- [ ] **T10 [P] — Test del artefacto del conteo (R16).** Depende de T8.
+      Archivos: `tests/unit/identity/session-count-artifact.test.ts` (nuevo).
+      Afirmaciones de `design.md > 5.6`:
+      - las secciones `Metodo` y `Conteo en ejecucion` existen;
+      - hay una fila por pantalla y por guardado, con «antes» y «despues» numericos;
+      - no hay ninguna seccion de tiempos.
 
-      **La ficha no puede pasar a `done` con esta task abierta** salvo decision humana escrita.
-
-- [ ] **T10 [P] — Test del artefacto de medicion (R16-R19).** Depende de T8.
-      Archivos: `tests/unit/identity/session-measurement-artifact.test.ts` (nuevo).
-      Afirmaciones de `design.md > 5.6`. Tiene que pasar tanto con `Tiempos` en `PENDIENTE` como con
-      numeros, nunca con las dos cosas.
-      **Hecho:** en verde contra el archivo real, y rojo con dos mutaciones de copia (quitar
-      `Metodo`; anadir una linea con «umbral»), probadas y restauradas.
+      **Hecho:** en verde contra el archivo real, y rojo con dos mutaciones sobre una copia (quitar
+      `Metodo`; vaciar una celda «despues»), probadas y restauradas.
 
 - [ ] **T11 [P] — Nota en la arquitectura.** Depende de T3.
       Archivos: `docs/architecture.md`, solo `## Permisos y autenticacion`, parrafo «El layout
@@ -157,12 +158,14 @@
       **Hecho:** `tests/guards/guard-arquitectura-modulos.test.ts` (bloque 12 lee este documento) en
       verde; el parrafo no promete nada que no pruebe T5.
 
-- [ ] **T12 — Mapa de trazabilidad.** Depende de T5, T6, T7, T8 y T10 (y de T9 si se desbloquea).
+- [ ] **T12 — Mapa de trazabilidad.** Depende de T5, T6, T7, T8 y T10.
       Archivos: `progress/impl_QC-104-sesion-una-sola-vez-por-peticion.md`.
-      Mapa `R1..R22 → test` segun `design.md > 9`, con el nombre exacto de cada caso.
+      Mapa `R<n> → test` para **R1-R16 y R20-R22** (19 requisitos; R17-R19 retirados) segun
+      `design.md > 9`, con el nombre exacto de cada caso.
       R8 y R21 (`e2e/session.spec.ts`) y R22 apuntan a tests **existentes**. El E2E lo corre el
       **leader** al cerrar la feature, no el subagente.
       **Hecho:**
-      - los 22 requisitos con al menos un test;
-      - las Preguntas abiertas 1 y 2 citadas con su estado;
+      - los 19 requisitos con al menos un test;
+      - la Pregunta abierta 1 citada como cerrada sin objeto;
+      - la Pregunta abierta 2 citada con su estado;
       - `typecheck` y `lint` en verde.

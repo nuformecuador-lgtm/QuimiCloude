@@ -2,6 +2,15 @@
 
 > Escrito por `spec_author` el 2026-09-15 (F1.2). Todo lo que se cita con `archivo:linea` se leyo
 > en disco ese dia. Donde algo no se pudo comprobar, se dice.
+>
+> **Revision del 2026-09-15 (F1.4), por decision humana: sin tiempos.**
+> - Salen la medicion de tiempos, el Supabase real, el umbral y el script de medicion.
+> - La comprobacion en la aplicacion real se queda como **conteo de consultas contra la base
+>   local**, hecho a mano con un metodo escrito (`> 6`).
+> - El test del artefacto (`> 5.6`) se simplifica a eso.
+> - H1-H5 no cambian.
+> - Las referencias a «decision N» de este archivo usan la numeracion de 12 filas de la tabla
+>   revisada.
 
 ## 0. Hallazgos (para el humano; no se resuelven aqui)
 
@@ -94,7 +103,7 @@ tecnico nuevo, y la «peticion» sale de una de estas dos fuentes:
 
 Si no hay ninguno de los dos, **no se memoiza nada** y se lee como hoy (R7). El dominio no cambia.
 `resolveSession` sigue construyendose **una** vez, y las dos proyecciones conservan nombre y firma
-(decision 7).
+(decision 8).
 
 ### 2.2 Por que `React.cache` sirve para el pintado y no para las acciones (evidencia de H1)
 
@@ -128,8 +137,9 @@ ver el cierre de este apartado):
 funcion en cada llamada. Una accion invocada **desde un componente de servidor mientras se pinta**
 si esta dentro del `requestStorage` de React, y ahi si comparte.
 
-**Lo que NO esta verificado:** que las compilaciones de produccion se comporten igual. Por eso la
-medicion en ejecucion de R16 (T1 y T8) cuenta un guardado real y lo deja escrito.
+**Lo que NO esta verificado:** que las compilaciones de produccion se comporten igual. Por eso el
+conteo en ejecucion de R16 (T1 y T8), con `next build && next start`, cuenta un guardado real y lo
+deja escrito.
 
 ### 2.3 El helper: `lib/shared/request-scope.ts` (nuevo)
 
@@ -235,11 +245,11 @@ proyeccion memoizada. El test de R13 lo fija. **Regla para quien venga despues:*
 Al memoizar su promesa:
 
 - todos los lectores de la peticion reciben ese mismo `null`, asi que layout y pagina ya no pueden
-  discrepar (decision 6);
+  discrepar (decision 7);
 - el `catch` corre **una** vez, asi que hay una sola linea de registro por peticion en vez de una
   por lector (R10).
 
-No se anade ningun `console` ni ningun log (R14, decision 8).
+No se anade ningun `console` ni ningun log (R14, decision 9).
 
 ## 3. Contratos de entrada y salida
 
@@ -248,7 +258,7 @@ No se anade ningun `console` ni ningun log (R14, decision 8).
   (`lib/modules/identity/ports/session-provider.ts:4-15`).
 - `lib/shared/request-scope.ts`: el contrato de `> 2.3`. Es nuevo y solo lo consumen
   `lib/composition/index.ts` y los 8 adaptadores driving.
-- Ninguna ruta, pantalla ni endpoint nuevo. `app/` y `components/` no se tocan (decision 11).
+- Ninguna ruta, pantalla ni endpoint nuevo. `app/` y `components/` no se tocan (decision 12).
 
 ## 4. Modelo de datos
 
@@ -335,55 +345,68 @@ comprueba que su caso se pone rojo. Se restaura. La salida se pega en `progress/
   cambia nada.
 - `e2e/session.spec.ts` entero, incluido `:352` (R8, R21).
 
-### 5.6 Artefacto de medicion (R16-R19)
+### 5.6 Artefacto del conteo en ejecucion (R16), simplificado en la revision de F1.4
 
-`tests/unit/identity/session-measurement-artifact.test.ts` (nuevo, `node`) lee
+**Se conserva, reducido.** Sin tiempos, se caen la seccion `Tiempos`, la regla de `PENDIENTE` y la
+comprobacion de «umbral». Queda un proposito: que R16 tenga un test concreto (regla 4), porque el
+conteo en la app real se hace a mano y no puede correr en el gate (necesita `next start` y una
+base).
+
+`tests/unit/identity/session-count-artifact.test.ts` (nuevo, `node`) lee
 `progress/medicion_QC-104-sesion-una-sola-vez-por-peticion.md` y afirma:
 
-- existen las secciones `Metodo`, `Conteo en ejecucion` y `Tiempos`;
-- `Conteo en ejecucion` trae antes y despues de las tres pantallas y un guardado;
-- `Tiempos` trae numeros **o** la linea `PENDIENTE: Pregunta abierta 1`, y nunca las dos cosas (R18);
-- ninguna linea contiene `umbral` ni una recomendacion sobre Redis o QC-28 (R19).
+- existen las secciones `Metodo` y `Conteo en ejecucion`;
+- `Conteo en ejecucion` trae una fila por cada pantalla de R2 y una por el guardado, con las
+  columnas «antes» y «despues» rellenas con un numero;
+- no hay ninguna seccion de tiempos (decision 5).
 
-## 6. Medicion, una sola vez
+**Lo que este test NO prueba**, y hay que saberlo: que los numeros sean ciertos. Solo prueba que la
+comprobacion se hizo y quedo escrita con su metodo. La veracidad la sostiene el metodo repetible y el
+reviewer.
+
+## 6. Conteo en ejecucion, una sola vez (R16)
 
 **Archivo:** `progress/medicion_QC-104-sesion-una-sola-vez-por-peticion.md`. Esta en disco y
 versionado, no en el chat (regla 3).
 
-**Script:** `scripts/medir-sesion-por-peticion.ts` (nuevo). Solo se corre a mano, no entra en el
-gate y no escribe logs en la aplicacion (decisiones 2 y 8).
+**Sin script.** La revision de F1.4 quito el script de tiempos, y para contar tampoco aporta: son
+cuatro comprobaciones, una sola vez, y todo lo que haria (resetear estadisticas, abrir una pantalla,
+leer un contador) son dos sentencias SQL y una navegacion. Un script propio seria codigo que
+mantener para una corrida. **El metodo va escrito paso a paso en el archivo de medicion**, que es lo
+que exige R16 («el metodo para repetirlo»).
 
-### 6.1 Conteo en ejecucion (R16): base local, no depende de la Pregunta abierta 1
+### 6.1 Metodo
 
-- **Que se cuenta:** en `next build && next start`, las ejecuciones de la consulta de
-  `findActiveSessionUserById` por peticion en:
-  - `/configuracion/usuarios`, `/pedidos` y `/configuracion/unidades`;
-  - un guardado: crear una unidad en `/configuracion/unidades`.
-- **Donde se cuenta: en la base, no en la aplicacion.** Hay dos opciones:
-  - (a) `pg_stat_statements`: reset, N peticiones, leer `calls` de la sentencia;
-  - (b) `log_statement = 'all'` en la sesion de medicion de la base local.
+1. **Aplicacion real:** `next build && next start` contra la base local del `.env` (`localhost`).
+   No `next dev`: el objetivo es confirmar en produccion lo que `> 2.2` solo leyo en las
+   compilaciones de desarrollo.
+2. **Que se cuenta:** las consultas de la resolucion de sesion. Prisma la resuelve en varias
+   sentencias. La del registro de cerradas (`SELECT ... FROM revoked_sessions WHERE user_id = ? AND
+   session_id = ?`, descrita en `session-user-prisma.ts:61-66`) sale **una por lectura**, asi que se
+   usa como marcador de «una lectura de la ficha».
+   **Desconocido:** que ninguna otra pantalla de las medidas consulte `revoked_sessions`. T1 lo
+   comprueba antes de fiarse del marcador, y si no se cumple elige otro y lo deja escrito.
+3. **Donde se cuenta: en la base, no en la aplicacion** (sin logs, decision 9). Hay dos vias:
+   - (a) `pg_stat_statements`: `SELECT pg_stat_statements_reset();`, una accion en el navegador, y
+     `SELECT calls, query FROM pg_stat_statements` filtrando por el marcador;
+   - (b) si (a) no existe, `log_statement = 'all'` solo durante la sesion de conteo, y contar las
+     lineas del marcador en el log **de Postgres**.
 
-  **Desconocido:** cual de las dos esta disponible en la base local de este repo (`.env` apunta a
-  `localhost`). T1 lo comprueba y deja escrito cual uso.
-- **Antes:** se mide sobre el arbol **sin** el cambio (T1, antes de T2). **Despues:** sobre la rama
-  (T8).
-- Esta medicion confirma en produccion lo que `> 2.2` solo leyo en las compilaciones de desarrollo.
-
-### 6.2 Tiempos (R17, R18): **bloqueado por la Pregunta abierta 1**
-
-- **Montaje:** `next build && next start` en local, contra el Supabase acordado y con el usuario
-  acordado, en la misma maquina y la misma red para antes y despues. Las corridas se alternan para
-  no medir la hora del dia.
-- **Pantallas:** para cada una de las tres, 5 peticiones de calentamiento y 30 medidas con la cookie
-  de sesion. Se registran la mediana y el p95 del tiempo hasta el primer byte.
-- **Guardado:** el mismo guardado de `> 6.1`, medido con Playwright (ya instalado) desde el clic
-  hasta la respuesta del POST, 30 veces.
-- **Antes:** un checkout del merge-base con `dev`. **Despues:** la rama.
-- **Sin umbral y sin recomendacion** (decision 4, R19).
+   **Desconocido:** cual de las dos esta disponible en la base local de este repo. T1 lo comprueba y
+   deja escrito cual uso.
+4. **Casos:** una sesion con los permisos de las tres pantallas. Para cada una: reset, una carga
+   completa (recarga, no navegacion de cliente) y lectura del contador.
+   - `/configuracion/usuarios`
+   - `/pedidos`
+   - `/configuracion/unidades`
+   - **un guardado:** crear una unidad en `/configuracion/unidades`. Si Next repinta en la misma
+     respuesta, se anota el total y se dice que incluye el repintado (H2, Pregunta abierta 2).
+5. **Antes:** sobre el arbol **sin** el cambio (T1, antes de T3 y T4), o sobre un checkout del
+   merge-base con `dev`. **Despues:** sobre la rama (T8).
 
 ## 7. Alternativas descartadas
 
-1. **Solo `React.cache` en la composicion** (lo que sugeria la decision 9). **Descartada como
+1. **Solo `React.cache` en la composicion** (lo que sugeria la decision 10). **Descartada como
    mecanismo unico:**
    - no alcanza a las acciones invocadas desde el navegador (H1, `> 2.2`);
    - en Vitest es un paso directo (H5), asi que el gate no veria nada.
@@ -391,12 +414,12 @@ gate y no escribe logs en la aplicacion (decisiones 2 y 8).
    Se conserva como **una de las dos fuentes** de ambito.
 2. **Una tercera clave en la fachada, `identity.getSession()`, que devuelva las dos proyecciones
    juntas, y que las 8 acciones la usen.** Descartada:
-   - la decision 7 fija «una instancia con **sus dos** proyecciones» y una tercera puerta a la misma
+   - la decision 8 fija «una instancia con **sus dos** proyecciones» y una tercera puerta a la misma
      resolucion es una forma mas de pedirla;
    - no arregla nada del pintado, que es donde esta la mayoria de las lecturas (H3).
 3. **Deduplicar a nivel de modulo las consultas en vuelo, con la cookie o el `sid` como clave.**
    Descartada: dos peticiones simultaneas con la misma cookie compartirian una lectura, y eso es
-   reutilizar **entre peticiones** (decision 5, R5). Ademas, un fallo de clave mezclaria sesiones de
+   reutilizar **entre peticiones** (decision 6, R5). Ademas, un fallo de clave mezclaria sesiones de
    personas distintas.
 4. **Usar como clave la identidad del objeto que devuelve `await cookies()` o `await headers()`.**
    Descartada: que ese objeto sea el mismo durante toda la peticion es un detalle interno de Next,
@@ -406,7 +429,7 @@ gate y no escribe logs en la aplicacion (decisiones 2 y 8).
    - el App Router pinta layout y pagina **en paralelo** y la pagina no recibe props del layout
      (`require-page-permission.ts:39-42`);
    - `requirePagePermission` devuelve `void` a proposito (`:44-46`);
-   - tocaria `app/`, contra la decision 11.
+   - tocaria `app/`, contra la decision 12.
 6. **Abrir `runInRequestScope` alrededor del cuerpo de cada Server Action exportada**, en vez de
    dentro de `currentActor`. Cubriria una segunda lectura futura fuera de `currentActor`, pero:
    - toca cada accion exportada (decenas), no 8 helpers;
@@ -414,24 +437,29 @@ gate y no escribe logs en la aplicacion (decisiones 2 y 8).
      obligaria a vigilar `> 2.7` accion por accion.
 
    El test de R15 cubre el riesgo que deja la opcion elegida.
-7. **Una dependencia de cache por peticion.** Descartada por la decision 9: `React.cache` y
+7. **Una dependencia de cache por peticion.** Descartada por la decision 10: `React.cache` y
    `AsyncLocalStorage` ya estan en el repo y en Node. No se propone ninguna libreria, asi que no hay
    cuatro checks que pasar.
+8. **Un script propio para el conteo en ejecucion** (revision de F1.4). Descartada: ver `> 6`.
+   Automatiza una corrida unica que son dos sentencias SQL por caso, y dejaria en `scripts/` codigo
+   sin segundo uso.
 
 ## 8. Costes y riesgos aceptados
 
 - **La deteccion del ambito de pintado se apoya en el contrato de `React.cache`**: misma peticion,
   mismo resultado; fuera, se reevalua. Si React lo cambiara, el efecto seria **volver a leer como
-  hoy**, nunca compartir entre peticiones. Falla hacia lo seguro. El test del helper y la medicion
-  lo vigilan.
+  hoy**, nunca compartir entre peticiones. Falla hacia lo seguro. El test del helper y el conteo en
+  ejecucion lo vigilan.
 - **Una accion futura que lea la sesion fuera de `currentActor`** no se memoiza. Queda cubierta si
   entra en la lista de `> 5.3`, y hay que anadirla.
 - **Una respuesta POST que revalida** cuesta hasta dos lecturas mientras la Pregunta abierta 2 siga
   abierta (H2).
 - **El conteo del gate prueba cableado, no React** (H5). La prueba de React en ejecucion se hace
-  una vez (R16).
+  una vez, a mano (R16), y su test solo comprueba que quedo escrita (`> 5.6`).
 
 ## 9. Trazabilidad prevista (`R<n>` → test)
+
+R17, R18 y R19 se retiraron en la revision de F1.4. Los huecos son intencionados.
 
 | R | Test |
 |---|---|
@@ -448,7 +476,7 @@ gate y no escribe logs en la aplicacion (decisiones 2 y 8).
 | R13 | `session-once-per-request-actions.test.ts` |
 | R14 | `session-once-per-request-render.test.tsx` (sin `console.*` en el camino feliz) |
 | R15 | los dos tests de conteo + prueba de que muerden en `progress/impl_QC-104-...md` |
-| R16, R17, R18, R19 | `tests/unit/identity/session-measurement-artifact.test.ts` |
+| R16 | `tests/unit/identity/session-count-artifact.test.ts` |
 | R20 | `tests/guards/guard-dependencias-aprobadas.test.ts` (existente) + prueba de fuente en `request-scope.test.ts` |
 | R21 | `e2e/session.spec.ts` (existente, entero) |
 | R22 | `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`, `tests/unit/navegacion/private-layout-menu.test.tsx`, `tests/unit/identity/require-page-permission.test.ts`, `tests/unit/private-layout.test.tsx` (existentes) |
