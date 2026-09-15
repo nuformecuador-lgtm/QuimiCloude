@@ -240,6 +240,10 @@ El titulo cambia («acaba fuera» ya no describe lo que pasa) pero **conserva el
 origen** (R13): esa etiqueta es el mapa `R<n> -> test` de QC-20/QC-25/QC-34/QC-43 y romperla dejaria
 huerfanos cuatro requisitos de otras fichas.
 
+**Enmienda del 2026-09-15:** en el caso de inventario `operatorUser` no sirve, porque el Operador
+**si** tiene `inventario.consultar`. Ese caso entra con el usuario de un rol efimero sin permisos
+(R25-R28). La plantilla de arriba no cambia; cambia quien entra. Detalle en `## 9`.
+
 ## 5. El caso nuevo de `login.spec.ts` (R14-R18)
 
 El fixture ya existe: `createTestUser()` cuelga del rol efimero **sin permisos** de
@@ -298,3 +302,141 @@ de `docs/architecture.md > Dependencias de terceros`.
   manda R18.
 - **La guardia de R9 puede dar falsos positivos** en un spec futuro con `returnTo`. Por eso la lista
   de excepciones es explicita y con motivo, no un regex mas laxo.
+
+## 9. Enmienda del 2026-09-15: el caso de inventario entra con un rol sin `inventario.consultar`
+
+Vuelta a F1.2 con la feature `in_progress`. Origen: el bloqueo que el implementer anoto en
+`progress/impl_QC-93-... > 0.1.4`, y el unico rojo de causa «premisa» que dejo la corrida T12
+(`e2e/inventario.spec.ts:564`). Todo lo de esta seccion esta medido en el worktree.
+
+### 9.1 Por que ese caso no se podia cumplir con el Operador
+
+- El Operador tiene `inventario.consultar` (`lib/modules/identity/domain/permissions.ts:165`, QC-74 R9,
+  con `asignaciones.consultar` sumado por QC-86 R26).
+- Su destino derivado es `/inventario`. El primer item de `PRIVATE_NAV_ITEMS` es el dashboard, que
+  exige `dashboard.consultar` y el Operador no lo tiene (`lib/shared/navigation/private-nav.ts:232-238`).
+  El segundo es inventario (`:240-248`). `asignaciones.consultar` no abre ningun item.
+- `/inventario` exige justo ese permiso (`app/(private)/inventario/page.tsx:57`), asi que al Operador le
+  responde 200 con el catalogo. El `expect(landing).not.toBe(INVENTORY_ROUTE)` de la plantilla de `## 4`
+  es falso, y R12 y R13 tambien.
+- **No existe ningun rol del seed sin ese permiso**: el seed solo crea `Administrador` y `Operador`
+  (`lib/modules/identity/domain/roles.ts:16`), y los dos lo tienen (`permissions.ts:150` y `:165`).
+
+### 9.2 Los otros tres casos siguen con el Operador (confirmado)
+
+| Caso | Permiso que exige la pantalla | ¿Lo tiene el Operador? | Destino derivado | Corrida T12 |
+|---|---|---|---|---|
+| `e2e/pedidos.spec.ts:440` (R49) | `pedidos.consultar` (`app/(private)/pedidos/page.tsx:60`) | no | `/inventario` | verde en los dos motores |
+| `e2e/proveedores.spec.ts:455` (R52) | `proveedores.consultar` (`app/(private)/proveedores/page.tsx:59`) | no | `/inventario` | verde en los dos motores |
+| `e2e/recetas.spec.ts:369` (R6) | `recetas.consultar` (`app/(private)/produccion/formulas/page.tsx:62`) | no | `/inventario` | verde en los dos motores |
+
+Fuente de la ultima columna: `progress/impl_QC-93-... > T12`, «Curados por esta ficha». En estos tres
+no se toca nada.
+
+### 9.3 El fixture: un rol efimero sin permisos, dentro de `inventario.spec.ts`
+
+**¿Hay uno que reutilizar?** Como import, no:
+
+- El rol sin permisos del caso nuevo de `login.spec.ts` (R14) es **local a ese archivo**. Lo crea su
+  `beforeAll` (`e2e/login.spec.ts:287-294`, prefijo `qc7_e2e_rol_` en `:97`), lo borra su `afterAll`
+  (`:343`) y lo barre su limpieza de huerfanos (`:242-284`). `createTestUser` (`:137`) no se exporta.
+- Importar un `*.spec.ts` desde otro registraria sus tests en el que importa, y `e2e/helpers/` solo
+  contiene el helper de aterrizaje.
+- `e2e/establecer-contrasena.spec.ts:125-132` repite el mismo patron, tambien local.
+
+Lo que se reutiliza es **el patron**, que ya esta probado en verde en Chromium y en WebKit
+(`e2e/login.spec.ts:386`, corrida T12).
+
+**Como queda en `e2e/inventario.spec.ts`:**
+
+1. **Rol (R27).** En el `beforeAll`, despues de crear la empresa (`:324-329`), se hace
+   `prisma.role.create` con nombre `${FIXTURE_PREFIX}rol_${RUN_ID}` y **sin `permissions`**.
+2. **Usuario.** Se crea con el `createUserWithRole` que ya existe (`:168-202`). Sirve tal cual porque
+   busca el rol **por nombre** (`:172`). Queda en la **misma empresa** en la que el Administrador da de
+   alta el catalogo, asi que la cuenta cero de R13 no puede salir en verde solo porque mira otra empresa.
+3. **Sustituye a `operatorUser`.** `operatorUser` solo aparece en `:90`, `:332`, `:357` y `:567`, todas
+   al servicio de este caso. Se reemplaza por un usuario con nombre en ingles (p. ej. `noInventoryUser`,
+   R1 / QC-4), y desaparecen los imports que queden sin uso: `ROLE_OPERADOR` (`:59`) y `DASHBOARD_ROUTE`
+   (`:63`), que hoy solo usa la espera de la redireccion retirada (`:573`). Si no se quitan, falla el lint.
+4. **Destino.** Sin permisos, el menu filtrado queda vacio y `firstVisibleNavHref` devuelve `null`
+   (`tests/unit/navegacion/nav-filtrado.test.ts:214-219`). El login cae en `DASHBOARD_ROUTE`
+   (`lib/modules/identity/adapters/driving/login-action.ts:122-126`), y `/dashboard` exige
+   `dashboard.consultar` (`app/(private)/dashboard/page.tsx:41`): **404 dentro del layout privado**. La
+   premisa `landing !== INVENTORY_ROUTE` es cierta; despues, `/inventario` responde 404 en su sitio
+   (`page.tsx:57`) y la plantilla de `## 4` encaja entera.
+5. **Premisa leida de la base (R26).**
+   `expect(await permissionsForUsername(noInventoryUser.username)).not.toContain('inventario.consultar')`,
+   antes de entrar. Precedente: `e2e/login.spec.ts:394`.
+6. **Limpieza (R27).** En la lista de pasos del `afterAll` (`:346-362`), el `user.deleteMany` incluye al
+   usuario nuevo. Justo despues va un paso `prisma.role.deleteMany` por el **nombre exacto** del rol:
+   despues de los usuarios (FK `users.role_id` `Restrict`) y antes de la empresa. No hace falta borrar
+   `revoked_sessions`, porque este caso no cierra sesion. La regresion de `login.spec.ts` que arreglo
+   `c0182c7` venia de un cierre de sesion.
+7. **Barrido de huerfanos (R28).** En `:313-320`, se localizan primero los roles
+   `${FIXTURE_PREFIX}rol_*` con mas de una hora. Despues se borran los usuarios del prefijo cuyo rol este
+   entre esos, aunque sean recientes. Luego los roles, y al final las empresas. Es el orden de
+   `login.spec.ts:231-284`, que deja escrito el motivo: el rol nace unos segundos antes que su usuario.
+8. **Comentario de cabecera.** `inventario.spec.ts:41-45` dice que el spec no crea roles y habla de una
+   «regla ruta→rol» que QC-75 retiro. Se corrige en la misma edicion (sigue siendo `e2e/**`, R21).
+
+### 9.4 Lo que NO cambia, comprobado
+
+- **Produccion:** R19-R21 quedan como estaban. `permissions.ts`, `db/**` y `app/**` no se tocan, y el
+  Operador conserva exactamente `inventario.consultar` y `asignaciones.consultar`.
+- **La guardia de R9:** el caso sigue entrando por `loginAndLand`, asi que no hace falta ninguna
+  excepcion nueva.
+- **Tests que listan roles:** `tests/integration/identity/role-catalog.int.test.ts:64-104` compara
+  contra la propia base (conteo y `ORDER BY`), asi que tolera roles efimeros, como ya toleraba los de
+  `login` y `establecer-contrasena`. `identity-seed.int.test.ts` solo resetea los roles del seed por
+  nombre (`:259`, `:267`).
+- **Fichas abiertas:** `specs/QC-63-ejecutar-receta-operador/requirements.md:38` da por hecho que el
+  Operador nace con `inventario.consultar` y `asignaciones.consultar`, y sigue siendo cierto. QC-88,
+  QC-91 y QC-92 no tienen carpeta de spec, y sus descripciones del board (`feature_list.json:1327`,
+  `:1374`, `:1391`) no suponen nada sobre el Operador e inventario. No hay nada que anotar en otras
+  fichas.
+
+### 9.5 Alternativas descartadas
+
+**a) Retirar `inventario.consultar` al Operador**, dentro de QC-93 o en ficha aparte. **El humano la
+considero y la rechazo el 2026-09-15** («deja el permiso de consulta»). Ademas choca con el alcance
+aprobado: seria cambiar el producto para acomodar una prueba. Coste medido antes de rechazarla:
+
+- El seed solo **anade** asignaciones y nunca borra (`lib/modules/identity/domain/seed-initial-access.ts:217-237`),
+  asi que las bases existentes necesitaban una migracion de datos.
+- Al menos seis archivos de test afirman el conjunto exacto del Operador:
+  - `tests/unit/identity/permissions.test.ts:142-188`
+  - `tests/unit/identity/seed/seed-initial-access.test.ts:731-756` y `:812`
+  - `tests/integration/identity/identity-seed.int.test.ts:592-602`, `:777-828` y `:895-950`
+  - `tests/unit/navegacion/private-layout-menu.test.tsx:254-288`
+  - `tests/unit/configuracion-ui/private-nav-configuracion.test.ts:130`
+  - `tests/unit/e2e-helpers/landing.test.ts:35`
+- `e2e/permisos.spec.ts:201-218` (QC-75 R21) apoya su recorrido entero en que el Operador aterriza en
+  `/inventario`.
+- Y el Operador se quedaria sin ninguna pantalla util hasta QC-88.
+
+**b) Reescribir el caso para que el Operador afirme otra cosa** (p. ej. «ve el catalogo pero no
+puede modificar»). Descartada: cambia el significado del R4 de origen, y esa afirmacion ya la cubren
+`presentaciones.spec.ts:338` y los tests unitarios de `inventario.modificar`.
+
+**c) Borrar el caso.** Descartada: deja huerfano el R4 de la ficha de origen, que es justo lo que R13
+protege.
+
+**d) Mover el rol sin permisos a un fixture compartido en `e2e/helpers/`** para que lo usen
+`login.spec.ts` y `inventario.spec.ts`. Descartada: seria infraestructura nueva para un solo caso y
+tocaria un `login.spec.ts` que ya esta verde. Ademas, meterlo en el helper de aterrizaje ampliaria su
+contrato (R1-R7) con algo que no es aterrizaje.
+
+**e) Un rol efimero con OTRO permiso** (p. ej. solo `pedidos.consultar`). Aterrizaria en `/pedidos` y
+ejercitaria un destino que no es el respaldo. Descartada por coste: obliga a escribir en
+`role_permissions` desde el E2E, y su limpieza suma otra FK `Restrict` (`role_permissions -> roles`,
+`db/migrations/20260907183034_permissions_and_role_permissions/migration.sql:73`). El destino derivado
+distinto del respaldo ya lo ejercitan los tres casos del Operador (`/inventario`) y `permisos.spec.ts`.
+
+### 9.6 Riesgos de la enmienda
+
+- **Rol huerfano si la corrida muere entre crear el rol y crear el usuario.** Lo cubre R28.
+- **La carrera de QC-23** (`progress/impl_QC-93-... > T12`, hallazgo 2). Para este usuario el destino
+  derivado es `DASHBOARD_ROUTE`, el mismo al que cae un login con la sesion ya muerta, asi que la
+  entrada no la delata. **No da un verde falso**: con sesion nula, `/inventario` redirige al login en
+  vez de responder 404, y el `expect(status).toBe(404)` falla nombrando la diferencia. Su causa sigue
+  siendo de QC-23.

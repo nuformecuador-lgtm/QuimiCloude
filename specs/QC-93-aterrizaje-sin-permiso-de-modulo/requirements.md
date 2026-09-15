@@ -31,7 +31,6 @@
 > *Sembrado por `/afinar-feature` el 2026-09-13. El bloque de Alcance y la tabla de «Decisiones
 > cerradas» los fijo el humano ANTES del spec. `spec_author` los respeta, no los reabre y no los
 > reescribe: su trabajo aqui es `## Requisitos (EARS)`.*
-
 ## Requisitos (EARS)
 
 ### El helper unico y su contrato
@@ -86,10 +85,15 @@ contrario.
 
 ### Los cuatro casos de «acaba fuera»
 
-**R11.** CUANDO el fixture **Operador** entre en los cuatro casos —`e2e/inventario.spec.ts` (R4),
-`e2e/pedidos.spec.ts` (R49), `e2e/proveedores.spec.ts` (R52) y `e2e/recetas.spec.ts` (R6)—, cada uno
-DEBE afirmar el aterrizaje **derivado de sus permisos** (hoy `/inventario`, por
-`permissions.ts:165`) y NO `DASHBOARD_ROUTE`.
+**R11.** *(Enmendado el 2026-09-15.)* CUANDO el usuario de cada uno de los cuatro casos entre
+—el fixture **Operador** en `e2e/pedidos.spec.ts` (R49), `e2e/proveedores.spec.ts` (R52) y
+`e2e/recetas.spec.ts` (R6), y el usuario **sin `inventario.consultar`** de R25 en
+`e2e/inventario.spec.ts` (R4)—, cada caso DEBE afirmar el aterrizaje **derivado de sus permisos**
+mediante el helper de R1, y DEBE afirmar que ese destino **no es la ruta del modulo** que comprueba.
+*Antes decia: «CUANDO el fixture Operador entre en los cuatro casos [...] cada uno DEBE afirmar el
+aterrizaje derivado de sus permisos (hoy `/inventario`, por `permissions.ts:165`) y NO
+`DASHBOARD_ROUTE`». Para los tres casos del Operador el destino derivado sigue siendo `/inventario`;
+para el de inventario, `DASHBOARD_ROUTE` por el respaldo de R3. Ninguno se escribe a mano.*
 
 **R12.** CUANDO ese usuario pida por URL la ruta del modulo que no puede consultar, los cuatro casos
 DEBEN afirmar que la respuesta tiene **estado 404**, que **no hay redireccion** —la URL sigue siendo
@@ -100,6 +104,32 @@ el comportamiento heredado de QC-75/QC-90: aqui **solo se comprueba**.
 (cuenta cero de los `data-testid` de titulo, tabla, lista y estado vacio) y DEBEN seguir nombrando en
 su titulo el requisito de origen (`R4`, `R49`, `R52`, `R6`), para que la trazabilidad de esas fichas
 no se pierda al reescribir el caso.
+
+*(Nota de la enmienda del 2026-09-15.) Con el fixture Operador el caso de inventario (R4) **no
+podia** cumplir R11-R13: el Operador tiene `inventario.consultar` (`permissions.ts:165`, QC-74 R9),
+su destino derivado es `/inventario` y la pantalla le responde 200 con el catalogo
+(`progress/impl_QC-93-... > 0.1.4`). Con el usuario de R25, R11-R13 se exigen **a los cuatro casos
+sin salvedad**, y «ese usuario» de R12 y R13 es, en el caso de inventario, el de R25.*
+
+### El usuario sin `inventario.consultar` del caso de inventario (enmienda del 2026-09-15)
+
+**R25.** El caso de `e2e/inventario.spec.ts` que conserva la etiqueta `R4` DEBE entrar con un usuario
+cuyo rol **no tenga `inventario.consultar`**, y NO DEBE usar el fixture Operador ni ninguno de los
+roles que siembra el seed, que tienen ese permiso los dos (`permissions.ts:150` y `:165`).
+
+**R26.** Antes de entrar, ese caso DEBE afirmar con el helper de R1, **leyendolo de la base**, que los
+permisos de su usuario no contienen `inventario.consultar`. SI los contuvieran, ENTONCES el caso DEBE
+fallar en esa afirmacion, y NO DEBE seguir hasta un verde que ya no comprobaria lo que dice su titulo.
+
+**R27.** El rol de ese usuario DEBE ser **efimero de la propia suite**: nace en su preparacion con el
+prefijo y el `RUN_ID` de la suite, sin ninguna asignacion de permisos, y su usuario pertenece a la
+misma empresa efimera en la que el Administrador de la suite da de alta el catalogo. Al terminar, la
+suite DEBE borrarlo **despues** de sus usuarios. NO DEBE crear, modificar ni borrar ningun rol del
+seed ni ninguna fila de `role_permissions`.
+
+**R28.** SI una corrida anterior interrumpida dejo ese rol huerfano, ENTONCES la limpieza defensiva de
+la suite DEBE borrarlo junto con sus usuarios, aunque esos usuarios sean recientes, y NO DEBE fallar
+por la FK usuario→rol (`onDelete: Restrict`).
 
 ### El caso nuevo de `login.spec.ts`
 
@@ -164,6 +194,7 @@ esta y con destino propio (ficha o baseline).
 | 8 · verificacion: E2E completa, dos motores, base limpia | R23, R24 |
 | 9 · cuatro casos «acaba fuera» y el dano medido | R11, R12, R13, R23 |
 | 10 · identificadores en ingles | R1 |
+| 11 · (2026-09-15) caso de inventario con un rol sin el permiso; el del Operador no se toca | R11, R12, R13, R19, R25, R26, R27, R28 |
 
 ## Preguntas abiertas
 
@@ -183,3 +214,4 @@ Ninguna.
 | 2026-09-13 | ¿Que verificacion se exige, si `init.sh` no corre Playwright? | **La suite E2E COMPLETA, en Chromium y WebKit, sobre base limpia**, con el resultado escrito en el PR. Precedente: QC-79 y QC-49. Aqui es especialmente exigible porque **la ficha ES la suite E2E**: un gate verde no dice nada de ella |
 | 2026-09-13 | Cuantos casos de «acaba fuera» hay, y cuanto dano | **Cuatro, no tres**: inventario R4, pedidos R49, proveedores R52 y **recetas R6**, que la ficha no listaba. Y **23 fallos** en trece suites sobre base limpia, medido por la sesion de QC-85 el 2026-09-13. El board se corrigio antes de sembrar |
 | 2026-09-13 | Idioma de los identificadores | **Ingles**, heredado de QC-4. No se reabre |
+| 2026-09-15 | El Operador tiene `inventario.consultar` (QC-74 R9, `permissions.ts:165`), asi que el caso de inventario (R4) no puede afirmar con el «sin permiso no ve el catalogo». ¿Que se hace? | **El caso de inventario no usa al Operador, porque si tiene el permiso: usa un rol sin el. El permiso del Operador no se toca.** Se considero retirarle `inventario.consultar` dentro de esta ficha, y el humano lo rechazo el mismo dia («deja el permiso de consulta»). Los otros tres casos (pedidos R49, proveedores R52 y recetas R6) siguen con el Operador, que de verdad no tiene esos permisos. La fila del 2026-09-13 «¿Test o permiso?» queda **intacta** |

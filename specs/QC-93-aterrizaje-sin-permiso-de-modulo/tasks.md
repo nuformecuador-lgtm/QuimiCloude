@@ -62,6 +62,10 @@ pasa a **404 sin redireccion + `private-not-found` + cuenta cero**, y el titulo 
 **Hecho cuando:** cada archivo pasa **solo**, en los dos motores:
 `pnpm exec playwright test e2e/<archivo>.spec.ts`.
 
+> **Enmienda del 2026-09-15.** Pedidos, proveedores y recetas ya estan (`progress/impl_QC-93-... > T5`).
+> El caso de inventario **no** se cierra con el Operador, que tiene `inventario.consultar`: se cierra en
+> **T14**, con el usuario de R25. T5 se marca `[x]` cuando T14 este hecha.
+
 ## [x] T6 — Migrar las otras nueve suites  ·  R8
 
 Depende de T2. Paralelizable en dos tandas:
@@ -123,6 +127,9 @@ y `specs/`+`progress/`.
 `./init.sh` completo. **Hecho cuando:** verde, con la guardia nueva ejecutandose (aparece en la
 salida) y sin archivos rojos fuera de `tests/baseline-rojos.json`.
 
+> **Enmienda del 2026-09-15:** lo corre el leader **despues de T14**, porque T14 toca `e2e/inventario.spec.ts`,
+> que la guardia de R9 recorre.
+
 ## [x] T12 — La verificacion que esta ficha exige de verdad  ·  R23, R24
 
 Depende de todo lo anterior. **Es la tarea final y no es opcional: `init.sh` no corre Playwright, asi
@@ -144,3 +151,74 @@ Toca: **`progress/impl_QC-93-aterrizaje-sin-permiso-de-modulo.md`**.
 **Hecho cuando:** existe el mapa completo `R1..R24 -> test concreto` (archivo y nombre del caso), con
 los negativos R19-R22 mapeados a la auditoria de T10 y R23/R24 a la corrida de T12. Un requisito sin
 test es un fallo de la feature (`CHECKPOINTS.md > Trazabilidad`).
+
+---
+
+## Enmienda del 2026-09-15: el caso de inventario con un rol sin `inventario.consultar`
+
+Motivo y diseno en `design.md > 9`. **No se desmarca ninguna `[x]`.** Las tasks cerradas a las que
+alcanza el cambio (T10, T12 y T13) tienen aqui su task de **revision**. T4, T7 y T9 no cambian: el
+helper, `session.spec.ts`, `permisos.spec.ts` y la guardia se quedan como estan.
+
+## T14 — Caso de inventario (R4) con un rol efimero sin permisos  ·  R11, R12, R13, R25, R26, R27, R28
+
+Toca: **solo `e2e/inventario.spec.ts`**. Depende de T2 (hecha). Cierra la parte pendiente de T5.
+
+1. `beforeAll`: se crea el rol `${FIXTURE_PREFIX}rol_${RUN_ID}` sin permisos, despues de la empresa.
+   Su usuario se crea con `createUserWithRole` en la misma empresa (`design.md > 9.3`, pasos 1-2).
+2. `operatorUser` se sustituye por el usuario nuevo, con nombre en ingles. Se quitan los imports que
+   queden sin uso (`ROLE_OPERADOR`, `DASHBOARD_ROUTE`).
+3. Se reescribe el caso `:564` con la plantilla de `design.md > 4`. Antes de entrar, la premisa de R26
+   con `permissionsForUsername`. Despues: `landing !== INVENTORY_ROUTE`, 404, pathname sin cambiar,
+   `private-not-found` visible y cuenta cero de `inventario-title`, `data-table` y
+   `product-list-empty`. El titulo conserva `(R4)`.
+4. `afterAll`: se borra el rol por nombre exacto, despues de los usuarios y antes de la empresa (R27).
+5. Barrido de huerfanos: primero los roles viejos del prefijo, luego sus usuarios aunque sean
+   recientes, luego los roles y al final las empresas (R28, orden de `login.spec.ts:231-284`).
+6. Se corrige el comentario de cabecera `:41-45`.
+
+**Hecho cuando:**
+- (a) `pnpm run typecheck` y `pnpm run lint` verdes.
+- (b) `pnpm exec vitest run tests/guards/guard-e2e-landing.test.ts` verde.
+- (c) `grep -n "ROLE_OPERADOR\|operatorUser" e2e/inventario.spec.ts` no devuelve nada.
+- (d) `pnpm exec playwright test e2e/inventario.spec.ts` deja **verde el caso R4 en Chromium y en
+  WebKit**. Los rojos B de ese archivo (QC-80, `progress/impl_QC-93-... > T12`) pueden seguir, con
+  su causa.
+- (e) Tras esa corrida, cero roles `qc22_e2e_rol_*` y cero usuarios `qc22_e2e_*` del `RUN_ID` en la base.
+- (f) **Se prueba que R26 muerde:** se copia el archivo con `cp` y se le da al rol efimero
+  `inventario.consultar` en el `beforeAll`. El caso sale rojo **en la premisa**, no mas adelante. Se
+  restaura desde la copia y se confirma con `git diff --stat -- e2e/inventario.spec.ts` que solo queda
+  el cambio de T14.
+
+## T15 — Revision de T10: auditoria del diff prohibido  ·  R19, R20, R21, R22
+
+Toca: nada. Depende de T14.
+
+Los mismos comandos de T10, sobre el arbol con T14.
+
+**Hecho cuando:** la salida sobre `app lib db scripts package.json pnpm-lock.yaml` sigue **vacia**,
+`permissions.ts:165` sigue siendo `['inventario.consultar', 'asignaciones.consultar']`, y lo pegado en
+el progreso lo dice con la fecha de la revision.
+
+## T16 — Revision de T12: la corrida de despues, otra vez  ·  R23, R24
+
+Depende de T14 y T15. Base limpia **nueva**, copiada de la plantilla, igual que en T12. Suite
+`pnpm exec playwright test` **completa**, Chromium y WebKit.
+
+**Hecho cuando:**
+- El PR y el progreso tienen el resultado nuevo junto al de T1 y al de T12.
+- La fila «premisa del caso bloqueada» de la tabla de rojos de T12 **desaparece**, con
+  `inventario.spec.ts` (R4) en verde en los dos motores.
+- Cada rojo que quede tiene causa nombrada y distinta del aterrizaje (R24).
+- Ningun rojo nuevo sin causa.
+
+## T17 — Revision de T13: trazabilidad  ·  R1..R28
+
+Toca: **`progress/impl_QC-93-aterrizaje-sin-permiso-de-modulo.md`**. Depende de T16.
+
+**Hecho cuando:**
+- El mapa llega a **R28**.
+- R11, R12 y R13 apuntan a los **cuatro** casos, sin la marca «BLOQUEADO» de inventario.
+- R25 y R26 apuntan al caso de inventario y a la prueba de que muerde de T14 (f).
+- R27 y R28 apuntan a la comprobacion de residuo de T14 (e).
+- R19 sigue apuntando a la auditoria de T15.
