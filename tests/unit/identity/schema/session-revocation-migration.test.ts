@@ -885,8 +885,8 @@ describe('db/schema.prisma — el modelo nuevo es de identity y no arrastra colu
     // Sensibilidad: un modelo sin dueno cae —y es ademas un hallazgo de
     // `tests/guards/guard-arquitectura-modulos.test.ts`—.
     const sinDueno = rawSchema.replace(
-      '/// @module identity\n/// QC-23. Las sesiones cerradas',
-      '/// QC-23. Las sesiones cerradas',
+      /\/\/\/ @module identity\n((?:\/\/\/[^\n]*\n)*model RevokedSession \{)/,
+      '$1',
     )
     expect(sinDueno, 'la mutacion no quito el @module').not.toBe(rawSchema)
     expect(moduleOwnerOf(sinDueno, 'RevokedSession')).toBeNull()

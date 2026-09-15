@@ -814,8 +814,8 @@ describe('db/schema.prisma — el modelo nuevo es de identity y no se lleva la u
     // Sensibilidad: un modelo sin dueno cae —y es ademas un hallazgo de
     // `tests/guards/guard-arquitectura-modulos.test.ts`—.
     const sinDueno = rawSchema.replace(
-      '/// @module identity\n/// QC-79. Enlace de un solo uso',
-      '/// QC-79. Enlace de un solo uso',
+      /\/\/\/ @module identity\n((?:\/\/\/[^\n]*\n)*model CredentialSetupToken \{)/,
+      '$1',
     )
     expect(sinDueno, 'la mutacion no quito el @module').not.toBe(rawSchema)
     expect(moduleOwnerOf(sinDueno, 'CredentialSetupToken')).toBeNull()
