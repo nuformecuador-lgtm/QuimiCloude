@@ -1,29 +1,53 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  Suspense,
+  cloneElement,
+  isValidElement,
+  use,
+  useEffect,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import {
   REFERENCIA_DEL_CASO,
   errorInesperado,
   esperarSinIdentificador,
 } from '../../helpers/identificador-de-request';
-import { setupUser } from '../../helpers/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 
 import PrivateLayout from '@/app/(private)/layout';
 import ProveedoresPage from '@/app/(private)/proveedores/page';
 import {
+  ACTIONS_COLUMN_ID,
+  CREATED_AT_COLUMN_ID,
+  CREATED_FROM_PARAM,
+  CREATED_TO_PARAM,
+  FIRST_PAGE,
   PAGE_PARAM,
   PAGE_SIZE_OPTIONS,
   PAGE_SIZE_PARAM,
-  SUPPLIER_COLUMNS,
+  SEARCH_PARAM,
+  SORT_PARAM,
+  SORT_SEPARATOR,
+  SUPPLIER_DEFAULT_PINNED_COLUMNS,
+  SUPPLIER_SKELETON_COLUMN_COUNT,
+  buildSupplierColumns,
   parseSupplierListParams,
 } from '@/app/(private)/proveedores/components';
+import { SEARCH_DEBOUNCE_MS, type SortDirection } from '@/components/shared/data-table';
 import {
   UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
   UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
   UNEXPECTED_ERROR_NOTICE_TESTID,
 } from '@/components/shared/unexpected-error-notice';
 import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
-import { createSupplierSchema, type SupplierView } from '@/lib/modules/proveedores';
+import {
+  SUPPLIER_QUERYABLE,
+  createSupplierSchema,
+  type SupplierView,
+} from '@/lib/modules/proveedores';
 import type {
   CreateSupplierFormState,
   SupplierListResult,
@@ -41,26 +65,14 @@ import {
 } from '../../helpers/viewport';
 
 /**
- * Pantalla de la lista de proveedores, render dentro del armazon privado: R1, R7, R9, R11, R12,
- * R13, R14, R15, R16, R17, R18, R47 y R48
- * (`specs/QC-44-pantalla-de-proveedores/tasks.md > T4, T5, T6`).
+ * Pantalla de la lista de proveedores, montada dentro del armazon privado con el arbol real de
+ * `page.tsx`.
  *
- * La pantalla se monta **dentro del layout privado** —igual que en produccion— reutilizando el
- * patron de mocks de `tests/unit/private-layout.test.tsx` (`next/headers`, `next/navigation`,
- * `@/lib/composition`) y el helper `tests/helpers/viewport.ts`: jsdom no implementa `matchMedia`
- * y el layout lo usa.
+ * `listSuppliersAction` esta mockeada: es el borde del modulo, y sustituirla es lo unico que
+ * permite ejercitar los estados de la lista sin base de datos.
  *
- * **`listSuppliersAction` esta mockeada.** No es un atajo: es el borde del modulo `proveedores`
- * (QC-43/QC-52, `done` y mergeado), que esta ficha no abre (R49), y sustituirla es lo unico que
- * permite ejercitar los tres estados de la lista sin base de datos.
- *
- * **Los asserts van sobre roles ARIA, `data-testid` y constantes exportadas**, nunca sobre
- * literales de copy (decision del 2026-09-04). Donde aparece texto es **dato del fixture** —el
- * nombre de un proveedor, el mensaje que devuelve la action—, no copy de la pantalla.
- *
- * **R11 y R12 son tests en negativo a proposito**: mostrar quien creo el proveedor, o colar un
- * buscador que solo filtraria la pagina visible, son justo las cosas que una feature posterior
- * puede anadir sin que nada se ponga rojo.
+ * Los asserts van sobre roles ARIA, `data-testid` y constantes exportadas. El texto que aparece es
+ * dato del fixture, no copy de la pantalla.
  */
 
 type CookieStoreStub = {
@@ -72,12 +84,7 @@ const USUARIO_DEL_TEST: SessionUser = {
   username: 'carla.duarte',
   displayName: 'Carla Duarte Salas',
   roleName: 'Administrador',
-  // QC-75 (T6): las pantallas privadas exigen `<modulo>.consultar` con `requirePagePermission`
-  // antes de pintar nada, asi que un usuario sin permisos aqui daria 404 en vez de la pantalla
-  // que este archivo mide. Se le da el CATALOGO ENTERO, derivado de `PERMISSIONS` y nunca escrito
-  // a mano: este archivo no prueba autorizacion -eso es
-  // `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`-, prueba lo que se ve cuando SI se
-  // puede ver, y con el catalogo entero el menu filtrado tampoco pierde ningun item.
+  // Catalogo entero de permisos: este archivo mide lo que se ve cuando SI se puede ver.
   permissions: PERMISSIONS.map((permiso) => permiso.code),
 };
 
@@ -145,25 +152,37 @@ vi.mock('@/lib/modules/proveedores/adapters/driving/supplier-actions', () => ({
   deleteSupplierAction: deleteSupplierActionMock,
 }));
 
+const PREFIJO_FILA = 'data-table-row-';
+
 const testId = {
   content: 'private-content',
   titulo: 'proveedores-title',
   lista: 'supplier-list',
   tabla: 'supplier-table',
-  fila: 'supplier-row',
+  tablaCompartida: 'data-table',
+  fila: new RegExp(`^${PREFIJO_FILA}`),
   enlaceDetalle: 'supplier-detail-link',
   esqueleto: 'supplier-table-skeleton',
   filaEsqueleto: 'supplier-row-skeleton',
   vacio: 'supplier-list-empty',
   primeraPagina: 'supplier-list-first-page',
+  sinResultados: 'supplier-list-no-results',
+  limpiarBusqueda: 'supplier-list-clear-search',
+  sinResultadosPrimeraPagina: 'supplier-list-no-results-first-page',
+  vacioDeLaTabla: 'data-table-empty',
   error: 'supplier-list-error',
   errorMensaje: 'supplier-list-error-message',
   errorCodigo: 'supplier-list-error-code',
   reintentar: 'supplier-list-retry',
-  tamanoPagina: 'supplier-page-size',
-  paginaAnterior: 'supplier-page-previous',
-  paginaSiguiente: 'supplier-page-next',
-  estadoPagina: 'supplier-page-status',
+  busqueda: 'data-table-search',
+  filtroFecha: `data-table-filter-date-${CREATED_AT_COLUMN_ID}`,
+  limpiarFiltroFecha: `data-table-filter-clear-${CREATED_AT_COLUMN_ID}`,
+  atajoUltimaSemana: 'data-table-date-last-week',
+  paginacion: 'data-table-pagination',
+  tamanoPagina: 'data-table-page-size',
+  paginaAnterior: 'data-table-previous',
+  paginaSiguiente: 'data-table-next',
+  estadoPagina: 'data-table-page-indicator',
   abrirAlta: 'supplier-create-open',
   abrirEdicion: 'supplier-edit-open',
   panel: 'supplier-sheet',
@@ -179,14 +198,12 @@ const testId = {
   confirmarBaja: 'delete-supplier-confirm',
 } as const;
 
-/**
- * Datos validos del formulario de proveedor. Valores del test, nunca los del fixture de lista:
- * asi un assert sobre lo enviado no puede pasar por casualidad.
- *
- * Lleva telefono Y correo a proposito: el esquema del contrato publico exige **al menos uno** de
- * los dos (`supplier-input.ts`, regla cruzada de QC-42/QC-43), y el caso de que falten los dos
- * tiene su propio test.
- */
+const COLUMNAS = buildSupplierColumns({ rowActions: () => null });
+
+const COLUMNAS_SIN_ORDEN = ['phone', 'email', ACTIONS_COLUMN_ID] as const;
+
+// Valores distintos de los del fixture de lista, para que un assert sobre lo enviado no pase por
+// casualidad. Lleva telefono y correo porque el esquema exige al menos uno de los dos.
 const ALTA_VALIDA: Readonly<Record<string, string>> = {
   name: 'Ácido Cítrico del Bajío',
   phone: '+52 33 9876 5432',
@@ -206,13 +223,11 @@ async function rellenarFormulario(
   }
 }
 
-/**
- * Ids de autoria del fixture. Son cadenas **inconfundibles** a proposito: el test en negativo de
- * R12 busca su ausencia en todo el documento, y con un id realista no distinguiria entre «no se
- * muestra» y «se muestra pero parece otra cosa».
- */
+// Cadenas inconfundibles: con un valor realista, «no se muestra» y «se muestra pero parece otra
+// cosa» serian indistinguibles al buscar su ausencia en el documento.
 const AUTOR_QUE_NO_DEBE_VERSE = 'AUTOR-CREADOR-NO-VISIBLE';
 const EDITOR_QUE_NO_DEBE_VERSE = 'AUTOR-EDITOR-NO-VISIBLE';
+const NORMALIZADO_QUE_NO_DEBE_VERSE = 'NOMBRE-NORMALIZADO-NO-VISIBLE';
 
 function proveedor(overrides: Partial<SupplierView> = {}): SupplierView {
   const name = overrides.name ?? 'Químicos del Norte';
@@ -250,15 +265,9 @@ function paginaDeProveedores(
 }
 
 /**
- * Resuelve los Server Components `async` del arbol antes de entregarselo al renderer de cliente.
- *
- * **No es un atajo, es una limitacion real del entorno**: `react-dom` en jsdom no sabe ejecutar
- * un componente `async` —se queda suspendido para siempre—, asi que sin esto la lista no llegaria
- * a pintarse nunca. Lo que se conserva es el arbol REAL de `page.tsx`: la `<Suspense>`, su `key`
- * y su `fallback` siguen siendo los que declara la pagina.
- *
- * El test de R17 se apoya justamente en lo contrario: renderizar el arbol SIN resolver deja la
- * seccion suspendida y obliga a `<Suspense>` a pintar su `fallback`, que es lo que se afirma.
+ * Resuelve los Server Components `async` del arbol antes de entregarselo al renderer de cliente:
+ * `react-dom` en jsdom no ejecuta un componente `async` y se queda suspendido para siempre. La
+ * `<Suspense>` y su `fallback` siguen siendo los que declara la pagina.
  */
 async function resolverServerComponents(nodo: ReactNode): Promise<ReactNode> {
   if (Array.isArray(nodo)) {
@@ -279,9 +288,8 @@ async function resolverServerComponents(nodo: ReactNode): Promise<ReactNode> {
 
   const resueltos = await resolverServerComponents(hijos);
 
-  // Los hijos se pasan SUELTOS y no como un array: un array como tercer argumento de
-  // `cloneElement` es «una lista» para React y exige `key` en cada elemento, aunque en el JSX
-  // original fueran hijos estaticos.
+  // Hijos sueltos y no un array: un array como tercer argumento de `cloneElement` exige `key` en
+  // cada elemento aunque en el JSX original fueran hijos estaticos.
   return Array.isArray(resueltos)
     ? cloneElement(elemento, undefined, ...(resueltos as ReactNode[]))
     : cloneElement(elemento, undefined, resueltos);
@@ -294,15 +302,78 @@ async function arbolDeLaPantalla(searchParams: Consulta = {}) {
   return ProveedoresPage({ searchParams: Promise.resolve(searchParams) });
 }
 
-/** Monta la pantalla dentro del layout privado, con la lista ya resuelta. */
-async function renderPantalla(searchParams: Consulta = {}) {
+/** La pantalla dentro del layout privado, con la lista ya resuelta. */
+async function pantallaMontada(searchParams: Consulta = {}) {
   const arbol = await resolverServerComponents(await arbolDeLaPantalla(searchParams));
-  return render(await PrivateLayout({ children: arbol }));
+  return PrivateLayout({ children: arbol });
 }
 
-/** Monta la pantalla con la lista aun en vuelo: `<Suspense>` pinta su `fallback` (R17). */
+async function renderPantalla(searchParams: Consulta = {}) {
+  return render(await pantallaMontada(searchParams));
+}
+
+/** Monta la pantalla con la lista aun en vuelo: `<Suspense>` pinta su `fallback`. */
 async function renderPantallaCargando(searchParams: Consulta = {}) {
   return render(await PrivateLayout({ children: await arbolDeLaPantalla(searchParams) }));
+}
+
+// El `router.push` simulado termina al instante y la transicion no llegaria a verse en vuelo.
+// Suspender una actualizacion dentro de esa misma transicion la retiene, como una navegacion que
+// aun no ha recibido la pagina nueva.
+const NAVEGACION_QUE_NO_TERMINA = new Promise<never>(() => {});
+let retenerNavegacion: (() => void) | null = null;
+
+function NavegacionEnVuelo() {
+  const [enVuelo, setEnVuelo] = useState(false);
+
+  useEffect(() => {
+    retenerNavegacion = () => setEnVuelo(true);
+    return () => {
+      retenerNavegacion = null;
+    };
+  }, []);
+
+  if (enVuelo) use(NAVEGACION_QUE_NO_TERMINA);
+  return null;
+}
+
+function orden(columnId: string, direction: SortDirection): string {
+  return `${columnId}${SORT_SEPARATOR}${direction}`;
+}
+
+function consultaDe(href: string | null | undefined): URLSearchParams {
+  return new URLSearchParams(String(href).split('?')[1]);
+}
+
+function paramsDe(href: string | null | undefined) {
+  return parseSupplierListParams(Object.fromEntries(consultaDe(href)));
+}
+
+function ultimoDestino(): URLSearchParams {
+  const llamada = routerMock.push.mock.calls.at(-1);
+  if (llamada === undefined) throw new Error('la pantalla no navego');
+  return consultaDe(llamada[0]);
+}
+
+function filaDe(id: string): string {
+  return `${PREFIJO_FILA}${id}`;
+}
+
+function idsDeLasFilas(): string[] {
+  return screen
+    .queryAllByTestId(testId.fila)
+    .map((fila) => String(fila.getAttribute('data-testid')).slice(PREFIJO_FILA.length));
+}
+
+function cabecera(columnId: string): HTMLElement {
+  return screen.getByTestId(`data-table-head-${columnId}`);
+}
+
+/** Botones de la cabecera que no son el disparador de su menu: el de orden, si existe. */
+function botonesDeOrden(columnId: string): HTMLElement[] {
+  return within(cabecera(columnId))
+    .queryAllByRole('button')
+    .filter((boton) => boton.getAttribute('data-testid') !== `data-table-header-menu-${columnId}`);
 }
 
 let toastExito: ReturnType<typeof vi.spyOn>;
@@ -323,6 +394,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
   toast.dismiss();
   vi.restoreAllMocks();
@@ -330,9 +402,8 @@ afterEach(() => {
   clearSidebarStateCookie();
 });
 
-describe('pantalla de proveedores — lista', () => {
-  it('se renderiza dentro del armazon privado y no declara un landmark principal propio', async () => {
-    // R1 — `SidebarInset` del layout privado ya es el `main`, y tiene que seguir siendo unico.
+describe('pantalla de proveedores — lista sobre la tabla compartida', () => {
+  it('R1: se renderiza dentro del armazon privado con la tabla compartida, sin tabla ni paginacion propias', async () => {
     await renderPantalla();
 
     const principales = screen.getAllByRole('main');
@@ -341,80 +412,322 @@ describe('pantalla de proveedores — lista', () => {
     const armazon = screen.getByTestId(testId.content);
     expect(armazon).toBe(principales[0]);
     expect(armazon).toContainElement(screen.getByTestId(testId.titulo));
-    expect(armazon).toContainElement(screen.getByTestId(testId.tabla));
+
+    const compartida = within(screen.getByTestId(testId.lista)).getByTestId(testId.tablaCompartida);
+    expect(armazon).toContainElement(compartida);
+
+    expect(screen.getAllByRole('table')).toHaveLength(1);
+    expect(compartida).toContainElement(screen.getByRole('table'));
+    expect(screen.getAllByTestId(testId.paginacion)).toHaveLength(1);
+    expect(compartida).toContainElement(screen.getByTestId(testId.paginacion));
   });
 
-  it('la tabla presenta las columnas de negocio declaradas', async () => {
-    // R14 — se itera la DECLARACION de columnas en vez de listar los literales uno a uno: quitar
-    // una columna deja este test sin encabezado que encontrar.
+  it('R2, R18: presenta exactamente nombre, telefono, correo, creado, actualizado y acciones, y el esqueleto cuenta las mismas', async () => {
     const elProveedor = proveedor();
     listSuppliersActionMock.mockResolvedValue(paginaDeProveedores([elProveedor]));
 
     await renderPantalla();
 
-    for (const columna of SUPPLIER_COLUMNS) {
+    const ids = COLUMNAS.map((columna) => columna.id);
+    expect(ids).toEqual(['name', 'phone', 'email', 'createdAt', 'updatedAt', ACTIONS_COLUMN_ID]);
+
+    const fila = within(screen.getByTestId(filaDe(elProveedor.id)));
+    for (const id of ids) {
+      expect(cabecera(id), `falta el encabezado de «${id}»`).toBeInTheDocument();
+      expect(fila.getByTestId(`data-table-cell-${id}`), `falta la celda de «${id}»`).toBeInTheDocument();
+    }
+    expect(within(screen.getByRole('table')).getAllByRole('columnheader')).toHaveLength(ids.length);
+
+    expect(fila.getByTestId('data-table-cell-name')).toHaveTextContent(elProveedor.name);
+    expect(fila.getByTestId('data-table-cell-phone')).toHaveTextContent(String(elProveedor.phone));
+    expect(fila.getByTestId('data-table-cell-email')).toHaveTextContent(String(elProveedor.email));
+
+    expect(SUPPLIER_SKELETON_COLUMN_COUNT).toBe(COLUMNAS.length);
+  });
+
+  it('R3: no muestra el id tecnico, el nombre normalizado ni los ids de autoria', async () => {
+    const elProveedor = proveedor({ nameNormalized: NORMALIZADO_QUE_NO_DEBE_VERSE });
+    listSuppliersActionMock.mockResolvedValue(paginaDeProveedores([elProveedor]));
+
+    await renderPantalla();
+
+    const texto = document.body.textContent;
+    for (const oculto of [
+      elProveedor.id,
+      NORMALIZADO_QUE_NO_DEBE_VERSE,
+      AUTOR_QUE_NO_DEBE_VERSE,
+      EDITOR_QUE_NO_DEBE_VERSE,
+    ]) {
+      expect(texto, `«${oculto}» no debe llegar al documento`).not.toContain(oculto);
+    }
+
+    for (const prohibida of ['id', 'nameNormalized', 'createdBy', 'updatedBy']) {
       expect(
-        screen.getByTestId(columna.testId),
-        `falta el encabezado de «${columna.key}»`,
-      ).toBeInTheDocument();
-      expect(screen.getByTestId(`supplier-cell-${columna.key}`)).toHaveTextContent(
-        columna.value(elProveedor),
+        COLUMNAS.some((columna) => String(columna.id) === prohibida),
+        `«${prohibida}» no puede ser columna`,
+      ).toBe(false);
+      expect(screen.queryByTestId(`data-table-head-${prohibida}`)).toBeNull();
+      expect(screen.queryByTestId(`data-table-cell-${prohibida}`)).toBeNull();
+    }
+  });
+
+  it('R4: cada fila enlaza al detalle de su proveedor con la ruta del helper', async () => {
+    const proveedores = [proveedor({ name: 'Químicos del Sur' }), proveedor({ name: 'Solventes Pacífico' })];
+    listSuppliersActionMock.mockResolvedValue(paginaDeProveedores(proveedores));
+
+    await renderPantalla();
+
+    for (const elProveedor of proveedores) {
+      const enlace = within(screen.getByTestId(filaDe(elProveedor.id))).getByTestId(
+        testId.enlaceDetalle,
+      );
+      expect(enlace.tagName).toBe('A');
+      expect(enlace).toHaveAttribute('href', supplierDetailRoute(elProveedor.id));
+    }
+  });
+
+  it('R6, R7, R10: ofrece busqueda y orden por cabecera en nombre y fechas, y pinta las filas del simulador en su orden', async () => {
+    const user = setupUser();
+    const filas = [
+      proveedor({ name: 'Zeta Química' }),
+      proveedor({ name: 'Alfa Reactivos' }),
+      proveedor({ name: 'Mu Solventes' }),
+    ];
+    listSuppliersActionMock.mockResolvedValue(paginaDeProveedores(filas));
+
+    await renderPantalla();
+
+    const busquedas = screen.getAllByRole('searchbox');
+    expect(busquedas).toHaveLength(1);
+    expect(busquedas[0]).toBe(screen.getByTestId(testId.busqueda));
+
+    for (const id of SUPPLIER_QUERYABLE.sortable) {
+      expect(cabecera(id), id).toHaveAttribute('aria-sort', 'none');
+      expect(botonesDeOrden(id), id).toHaveLength(1);
+    }
+    for (const id of COLUMNAS_SIN_ORDEN) {
+      expect(cabecera(id), id).not.toHaveAttribute('aria-sort');
+      expect(botonesDeOrden(id), id).toHaveLength(0);
+    }
+
+    for (const id of SUPPLIER_QUERYABLE.sortable) {
+      await user.click(botonesDeOrden(id)[0]);
+      expect(ultimoDestino().get(SORT_PARAM), id).toBe(orden(id, 'asc'));
+    }
+    expect(routerMock.push).toHaveBeenCalledTimes(SUPPLIER_QUERYABLE.sortable.length);
+
+    expect(idsDeLasFilas()).toEqual(filas.map((fila) => fila.id));
+    expect(listSuppliersActionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('R6: el orden de la URL llega a la accion y a aria-sort, y el menu de la cabecera navega con el orden elegido', async () => {
+    const user = setupUser();
+
+    await renderPantalla({ [SORT_PARAM]: orden('createdAt', 'desc') });
+
+    expect(listSuppliersActionMock).toHaveBeenCalledWith({
+      page: FIRST_PAGE,
+      pageSize: DEFAULT_PAGE_SIZE,
+      sort: { columnId: 'createdAt', direction: 'desc' },
+      filters: {},
+      search: '',
+    });
+    expect(cabecera('createdAt')).toHaveAttribute('aria-sort', 'descending');
+    expect(cabecera('name')).toHaveAttribute('aria-sort', 'none');
+    expect(cabecera('updatedAt')).toHaveAttribute('aria-sort', 'none');
+
+    await user.click(botonesDeOrden('createdAt')[0]);
+    expect(ultimoDestino().get(SORT_PARAM)).toBe(orden('createdAt', 'asc'));
+
+    await user.click(screen.getByTestId('data-table-header-menu-name'));
+    await user.click(await esperarInteractiva(await screen.findByTestId('data-table-sort-desc-name')));
+
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalledTimes(2));
+    expect(ultimoDestino().get(SORT_PARAM)).toBe(orden('name', 'desc'));
+  });
+
+  it('R7: telefono, correo y acciones no ofrecen orden ni en la cabecera ni en su menu', async () => {
+    const user = setupUser();
+    expect(
+      COLUMNAS.filter((columna) => columna.sortable === true).map((columna) => columna.id),
+    ).toEqual([...SUPPLIER_QUERYABLE.sortable]);
+
+    await renderPantalla();
+
+    for (const id of ['phone', 'email']) {
+      await user.click(screen.getByTestId(`data-table-header-menu-${id}`));
+      const menu = await screen.findByTestId(`data-table-header-menu-content-${id}`);
+
+      // El fijado si esta: prueba que el menu se abrio y que la ausencia del orden es real.
+      expect(await esperarInteractiva(within(menu).getByTestId(`data-table-pin-${id}`))).toBeVisible();
+      expect(within(menu).queryByTestId(`data-table-sort-asc-${id}`)).toBeNull();
+      expect(within(menu).queryByTestId(`data-table-sort-desc-${id}`)).toBeNull();
+
+      await user.keyboard('{Escape}');
+      await waitFor(() =>
+        expect(screen.queryByTestId(`data-table-header-menu-content-${id}`)).toBeNull(),
       );
     }
 
-    // Las cinco columnas que pide R14, por su clave y en su orden de lectura.
-    expect(SUPPLIER_COLUMNS.map((columna) => columna.key)).toEqual([
-      'name',
-      'phone',
-      'email',
-      'createdAt',
-      'updatedAt',
-    ]);
+    expect(screen.queryByTestId(`data-table-header-menu-${ACTIONS_COLUMN_ID}`)).toBeNull();
+    expect(within(cabecera(ACTIONS_COLUMN_ID)).queryAllByRole('button')).toHaveLength(0);
+    expect(routerMock.push).not.toHaveBeenCalled();
   });
 
-  it('ninguna columna es createdBy ni updatedBy, y esos ids no llegan al documento', async () => {
-    // R12 — test **en negativo**: los ids de autoria estan en los datos (`SupplierView` los trae)
-    // y no pueden llegar a la pantalla. Anadir una columna que los pinte pone esto rojo.
+  it('R8: la busqueda navega con el termino al cumplirse SEARCH_DEBOUNCE_MS, y vaciarla navega sin termino', async () => {
+    await renderPantalla();
+    vi.useFakeTimers();
+
+    const busqueda = screen.getByTestId(testId.busqueda);
+    fireEvent.change(busqueda, { target: { value: 'norte' } });
+
+    await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS - 1);
+    expect(routerMock.push).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(routerMock.push).toHaveBeenCalledTimes(1);
+    expect(ultimoDestino().get(SEARCH_PARAM)).toBe('norte');
+
+    fireEvent.change(busqueda, { target: { value: '' } });
+    await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
+
+    expect(routerMock.push).toHaveBeenCalledTimes(2);
+    expect(ultimoDestino().has(SEARCH_PARAM)).toBe(false);
+    expect(listSuppliersActionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('R9: el atajo de fecha navega con el rango de creacion, limpiarlo navega sin rango, y ninguna otra columna filtra', async () => {
+    const user = setupUser();
+    expect(
+      COLUMNAS.filter((columna) => columna.filter !== undefined).map((columna) => columna.id),
+    ).toEqual([CREATED_AT_COLUMN_ID]);
+
+    await renderPantalla({ [CREATED_FROM_PARAM]: '2026-01-01', [CREATED_TO_PARAM]: '2026-01-31' });
+
+    expect(listSuppliersActionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filters: { [CREATED_AT_COLUMN_ID]: { kind: 'dateRange', from: '2026-01-01', to: '2026-01-31' } },
+      }),
+    );
+    expect(screen.getAllByTestId(/^data-table-filter-date-/)).toEqual([
+      screen.getByTestId(testId.filtroFecha),
+    ]);
+    expect(screen.getAllByTestId(/^data-table-filter-clear-/)).toEqual([
+      screen.getByTestId(testId.limpiarFiltroFecha),
+    ]);
+
+    await user.click(screen.getByTestId(testId.filtroFecha));
+    await user.click(await esperarInteractiva(await screen.findByTestId(testId.atajoUltimaSemana)));
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalledTimes(1));
+
+    const conRango = ultimoDestino();
+    const desde = conRango.get(CREATED_FROM_PARAM);
+    const hasta = conRango.get(CREATED_TO_PARAM);
+    expect(parseSupplierListParams(Object.fromEntries(conRango)).filters).toEqual({
+      [CREATED_AT_COLUMN_ID]: { kind: 'dateRange', from: desde, to: hasta },
+    });
+    expect(String(desde) < String(hasta)).toBe(true);
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByTestId(testId.atajoUltimaSemana)).toBeNull());
+
+    await user.click(screen.getByTestId(testId.limpiarFiltroFecha));
+    expect(routerMock.push).toHaveBeenCalledTimes(2);
+    expect(ultimoDestino().has(CREATED_FROM_PARAM)).toBe(false);
+    expect(ultimoDestino().has(CREATED_TO_PARAM)).toBe(false);
+  });
+
+  it('R10: pinta las filas tal cual llegan aunque la URL pida otro orden y un termino que no coincide', async () => {
+    const user = setupUser();
+    const filas = [
+      proveedor({ name: 'Mu Solventes' }),
+      proveedor({ name: 'Zeta Química' }),
+      proveedor({ name: 'Alfa Reactivos' }),
+    ];
+    listSuppliersActionMock.mockResolvedValue(paginaDeProveedores(filas));
+
+    await renderPantalla({ [SORT_PARAM]: orden('name', 'asc'), [SEARCH_PARAM]: 'sin-coincidencias' });
+
+    expect(idsDeLasFilas()).toEqual(filas.map((fila) => fila.id));
+
+    await user.click(botonesDeOrden('name')[0]);
+    expect(ultimoDestino().get(SORT_PARAM)).toBe(orden('name', 'desc'));
+    expect(idsDeLasFilas()).toEqual(filas.map((fila) => fila.id));
+  });
+
+  it('R14: con la navegacion en vuelo la tabla se marca aria-busy y la busqueda conserva el foco y el texto', async () => {
+    const user = setupUser();
+    render(
+      <>
+        {await pantallaMontada()}
+        <Suspense fallback={null}>
+          <NavegacionEnVuelo />
+        </Suspense>
+      </>,
+    );
+    routerMock.push.mockImplementationOnce(() => retenerNavegacion?.());
+
+    expect(screen.getByTestId(testId.tabla)).toHaveAttribute('aria-busy', 'false');
+
+    const busqueda = screen.getByTestId(testId.busqueda);
+    await user.type(busqueda, 'norte');
+
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByTestId(testId.tabla)).toHaveAttribute('aria-busy', 'true'));
+
+    expect(screen.getByTestId(testId.busqueda)).toBe(busqueda);
+    expect(busqueda).toHaveFocus();
+    expect(busqueda).toHaveValue('norte');
+  });
+
+  it('R21: la columna de acciones no se puede fijar y sus controles se ven sin puntero, con area tactil de 44x44', async () => {
+    expect(COLUMNAS.find((columna) => columna.id === ACTIONS_COLUMN_ID)?.pinnable).toBe(false);
+    for (const columna of COLUMNAS.filter((c) => c.id !== ACTIONS_COLUMN_ID)) {
+      expect(columna.pinnable, columna.id).not.toBe(false);
+    }
+
+    const elProveedor = proveedor();
+    listSuppliersActionMock.mockResolvedValue(paginaDeProveedores([elProveedor]));
     await renderPantalla();
 
-    expect(document.body.textContent).not.toContain(AUTOR_QUE_NO_DEBE_VERSE);
-    expect(document.body.textContent).not.toContain(EDITOR_QUE_NO_DEBE_VERSE);
+    expect(screen.queryByTestId(`data-table-header-menu-${ACTIONS_COLUMN_ID}`)).toBeNull();
+    expect(screen.queryByTestId(`data-table-pin-${ACTIONS_COLUMN_ID}`)).toBeNull();
 
-    for (const prohibida of ['createdBy', 'updatedBy', 'id', 'nameNormalized']) {
-      expect(
-        SUPPLIER_COLUMNS.some((columna) => String(columna.key) === prohibida),
-        `«${prohibida}» no puede ser columna`,
-      ).toBe(false);
-      expect(screen.queryByTestId(`supplier-cell-${prohibida}`)).toBeNull();
+    const celda = within(screen.getByTestId(filaDe(elProveedor.id))).getByTestId(
+      `data-table-cell-${ACTIONS_COLUMN_ID}`,
+    );
+    for (const accion of [testId.abrirEdicion, testId.abrirBaja]) {
+      const control = within(celda).getByTestId(accion);
+      expect(control, accion).toBeVisible();
+      expect(control.className, accion).toContain('min-h-11');
+      expect(control.className, accion).toContain('min-w-11');
+      expect(control.className, accion).not.toContain('hidden');
     }
   });
 
-  it('cada fila enlaza al detalle con la ruta que devuelve el helper, no con un literal', async () => {
-    // R15, R3 — el destino se DERIVA de `supplierDetailRoute(id)`: si alguien lo escribiera a
-    // mano y el helper cambiara de forma, esta comparacion cae.
+  it('R24: la columna fijada por defecto es el nombre', async () => {
+    expect(SUPPLIER_DEFAULT_PINNED_COLUMNS).toEqual(['name']);
+
     const elProveedor = proveedor();
     listSuppliersActionMock.mockResolvedValue(paginaDeProveedores([elProveedor]));
-
     await renderPantalla();
 
-    const enlace = within(screen.getByTestId(testId.fila)).getByTestId(testId.enlaceDetalle);
-    expect(enlace.getAttribute('href')).toBe(supplierDetailRoute(elProveedor.id));
-    expect(enlace.getAttribute('href')?.startsWith(SUPPLIERS_ROUTE)).toBe(true);
-    // Y es un enlace de verdad, no un boton que finge navegar.
-    expect(enlace.tagName).toBe('A');
+    await waitFor(() => expect(cabecera('name')).toHaveAttribute('data-pinned', 'left'));
+    const fila = within(screen.getByTestId(filaDe(elProveedor.id)));
+    expect(fila.getByTestId('data-table-cell-name')).toHaveAttribute('data-pinned', 'left');
+    for (const id of COLUMNAS.map((columna) => columna.id).filter((id) => id !== 'name')) {
+      expect(cabecera(id), id).not.toHaveAttribute('data-pinned');
+    }
   });
 
-  it('el desbordamiento horizontal lo absorbe el envoltorio de la tabla y ningun ancestro', async () => {
-    // R13 — el scroll horizontal es de la tabla, nunca del documento; y nada de `100vh`
-    // (R48: en movil la barra de direcciones lo convierte en un alto que no existe).
+  it('R24: el desbordamiento horizontal lo absorbe el envoltorio de la tabla y ningun ancestro', async () => {
     await renderPantalla();
 
-    const tabla = screen.getByTestId(testId.tabla);
+    const tabla = within(screen.getByTestId(testId.tabla)).getByRole('table');
     const envoltorio = tabla.closest('[data-slot="table-container"]');
 
     expect(envoltorio).not.toBeNull();
     expect((envoltorio as HTMLElement).className).toContain('overflow-x-auto');
-    expect(envoltorio).toContainElement(tabla);
 
     for (
       let ancestro = (envoltorio as HTMLElement).parentElement;
@@ -429,57 +742,80 @@ describe('pantalla de proveedores — lista', () => {
     }
   });
 
-  it('la lista y sus acciones de fila se usan igual en viewport angosto y en ancho', async () => {
-    // R48 — mismo criterio que QC-11 y QC-22: se comprueba en los dos anchos, sin excepcion de
-    // escritorio. El area tactil de la accion de fila llega a 44x44 px (`min-h-11 min-w-11`) y
-    // **no depende de `:hover`** para descubrirse.
+  it('R21, R24: orden, busqueda, filtro, paginacion y acciones se ven y se alcanzan en viewport angosto y en ancho', async () => {
+    const elProveedor = proveedor();
+    listSuppliersActionMock.mockResolvedValue(paginaDeProveedores([elProveedor]));
+
     for (const ancho of [NARROW_VIEWPORT, WIDE_VIEWPORT]) {
       setViewportWidth(ancho);
       await renderPantalla();
 
       expect(screen.getByTestId(testId.tabla), `tabla a ${ancho}px`).toBeVisible();
       expect(screen.getByTestId(testId.tamanoPagina), `tamano a ${ancho}px`).toBeVisible();
+      expect(screen.getByTestId(testId.filtroFecha), `filtro a ${ancho}px`).toBeVisible();
 
-      const enlace = screen.getByTestId(testId.enlaceDetalle);
-      expect(enlace, `enlace al detalle a ${ancho}px`).toBeVisible();
-      expect(enlace.className, `area tactil a ${ancho}px`).toContain('min-h-11');
-      expect(enlace.className, `area tactil a ${ancho}px`).toContain('min-w-11');
-      expect(enlace.className, `nada oculto tras el puntero a ${ancho}px`).not.toContain('hidden');
+      const busqueda = screen.getByTestId(testId.busqueda);
+      expect(busqueda, `busqueda a ${ancho}px`).toBeVisible();
+      // Por debajo de 16 px Safari en iOS hace zoom al enfocar.
+      expect(busqueda.className, `busqueda a ${ancho}px`).toContain('text-base');
+
+      for (const id of SUPPLIER_QUERYABLE.sortable) {
+        const [boton] = botonesDeOrden(id);
+        expect(boton, `orden de ${id} a ${ancho}px`).toBeVisible();
+        expect(boton.className, `orden de ${id} a ${ancho}px`).toContain('min-h-11');
+      }
+
+      const fila = within(screen.getByTestId(filaDe(elProveedor.id)));
+      for (const control of [
+        fila.getByTestId(testId.enlaceDetalle),
+        fila.getByTestId(testId.abrirEdicion),
+        fila.getByTestId(testId.abrirBaja),
+      ]) {
+        const nombre = String(control.getAttribute('data-testid'));
+        expect(control, `${nombre} a ${ancho}px`).toBeVisible();
+        expect(control.className, `${nombre} a ${ancho}px`).toContain('min-h-11');
+        expect(control.className, `${nombre} a ${ancho}px`).toContain('min-w-11');
+        expect(control.className, `${nombre} a ${ancho}px`).not.toContain('hidden');
+      }
 
       cleanup();
     }
   });
 
-  it('el selector de tamano de pagina ofrece 10 y 25, usa 10 por defecto y al cambiar recarga', async () => {
-    // R8 — el defecto se observa en lo que se le PIDE al backend, que es quien decide la
-    // consulta; las dos opciones, en el selector; y cambiarlo NAVEGA, no guarda estado local.
+  it('R15, R22: pide la lista una sola vez con 10 por defecto, ofrece 10 y 25, y cambiar el tamano navega a la primera pagina', async () => {
     const user = setupUser();
     listSuppliersActionMock.mockResolvedValue(paginaDeProveedores([proveedor()], { total: 40 }));
 
     await renderPantalla();
 
     expect(listSuppliersActionMock).toHaveBeenCalledTimes(1);
-    expect(listSuppliersActionMock).toHaveBeenCalledWith({ page: 1, pageSize: DEFAULT_PAGE_SIZE });
+    expect(listSuppliersActionMock).toHaveBeenCalledWith({
+      page: FIRST_PAGE,
+      pageSize: DEFAULT_PAGE_SIZE,
+      sort: null,
+      filters: {},
+      search: '',
+    });
 
     await user.click(screen.getByTestId(testId.tamanoPagina));
 
     const opciones = await screen.findAllByRole('option');
     expect(opciones).toHaveLength(PAGE_SIZE_OPTIONS.length);
     for (const tamano of PAGE_SIZE_OPTIONS) {
-      expect(screen.getByTestId(`supplier-page-size-${tamano}`)).toBeInTheDocument();
+      expect(screen.getByTestId(`data-table-page-size-${tamano}`)).toBeInTheDocument();
     }
 
-    await user.click(screen.getByTestId(`supplier-page-size-${MAX_PAGE_SIZE}`));
+    await user.click(
+      await esperarInteractiva(screen.getByTestId(`data-table-page-size-${MAX_PAGE_SIZE}`)),
+    );
     await waitFor(() => expect(routerMock.push).toHaveBeenCalledTimes(1));
 
-    const destino = new URLSearchParams(String(routerMock.push.mock.calls[0][0]).split('?')[1]);
+    const destino = ultimoDestino();
     expect(destino.get(PAGE_SIZE_PARAM)).toBe(String(MAX_PAGE_SIZE));
-    // Cambiar el tamano vuelve a la primera pagina: la «pagina 7» de 10 puede no existir con 25.
-    expect(destino.get(PAGE_PARAM)).toBe('1');
+    expect(destino.get(PAGE_PARAM)).toBe(String(FIRST_PAGE));
   });
 
-  it('permite avanzar y retroceder de pagina e indica la pagina actual y el total', async () => {
-    // R9
+  it('R23: permite avanzar y retroceder de pagina e indica la pagina actual y el total', async () => {
     const user = setupUser();
     listSuppliersActionMock.mockResolvedValue(
       paginaDeProveedores([proveedor()], { page: 2, total: 30, totalPages: 3 }),
@@ -492,18 +828,13 @@ describe('pantalla de proveedores — lista', () => {
     expect(estado).toHaveTextContent('3');
 
     await user.click(screen.getByTestId(testId.paginaSiguiente));
-    expect(
-      new URLSearchParams(String(routerMock.push.mock.calls[0][0]).split('?')[1]).get(PAGE_PARAM),
-    ).toBe('3');
+    expect(ultimoDestino().get(PAGE_PARAM)).toBe('3');
 
     await user.click(screen.getByTestId(testId.paginaAnterior));
-    expect(
-      new URLSearchParams(String(routerMock.push.mock.calls[1][0]).split('?')[1]).get(PAGE_PARAM),
-    ).toBe('1');
+    expect(ultimoDestino().get(PAGE_PARAM)).toBe('1');
   });
 
-  it('en los extremos no ofrece avanzar ni retroceder mas alla', async () => {
-    // R9 — el indicador no puede prometer una pagina que no existe.
+  it('R23: en los extremos no ofrece avanzar ni retroceder mas alla', async () => {
     listSuppliersActionMock.mockResolvedValue(
       paginaDeProveedores([proveedor()], { page: 1, total: 5, totalPages: 1 }),
     );
@@ -513,46 +844,32 @@ describe('pantalla de proveedores — lista', () => {
     expect(screen.getByTestId(testId.paginaAnterior)).toBeDisabled();
     expect(screen.getByTestId(testId.paginaSiguiente)).toBeDisabled();
   });
-
-  it('la pantalla no ofrece busqueda ni control de orden', async () => {
-    // R11 — test **en negativo**: filtrar en cliente solo buscaria dentro de la pagina visible,
-    // y el backend (`pageQuerySchema`) solo acepta `page` y `pageSize`.
-    await renderPantalla();
-
-    expect(screen.queryAllByRole('searchbox')).toHaveLength(0);
-    expect(screen.queryAllByRole('textbox')).toHaveLength(0);
-
-    // El unico control de seleccion de la lista es el tamano de pagina.
-    const combos = screen.queryAllByRole('combobox');
-    expect(combos).toHaveLength(1);
-    expect(combos[0]).toBe(screen.getByTestId(testId.tamanoPagina));
-
-    // Y ningun encabezado de columna es un control: nada de ordenar pulsando el titulo.
-    for (const encabezado of screen.getAllByRole('columnheader')) {
-      expect(within(encabezado).queryAllByRole('button')).toHaveLength(0);
-      expect(within(encabezado).queryAllByRole('link')).toHaveLength(0);
-    }
-  });
 });
 
-describe('pantalla de proveedores — los tres estados', () => {
-  it('los tres estados se distinguen por data-testid distintos', async () => {
-    // R16, R17, R18 y R47 — vacio, cargando y error no pueden confundirse entre si: cada uno
-    // tiene su identificador estable y ninguno es el de otro.
-    const identificadores = [testId.vacio, testId.esqueleto, testId.error];
-    expect(new Set(identificadores).size).toBe(identificadores.length);
+describe('pantalla de proveedores — estados', () => {
+  it('R20: vacio, sin resultados, cargando y error son mutuamente excluyentes y se distinguen por data-testid', async () => {
+    const estados = [testId.vacio, testId.sinResultados, testId.esqueleto, testId.error];
+    expect(new Set(estados).size).toBe(estados.length);
+
+    const soloEste = (visible: string) => {
+      expect(screen.getByTestId(visible), visible).toBeInTheDocument();
+      for (const otro of estados.filter((estado) => estado !== visible)) {
+        expect(screen.queryByTestId(otro), `${otro} junto a ${visible}`).toBeNull();
+      }
+    };
 
     listSuppliersActionMock.mockResolvedValue(paginaDeProveedores([], { total: 0 }));
     await renderPantalla();
-    expect(screen.getByTestId(testId.vacio)).toBeInTheDocument();
-    expect(screen.queryByTestId(testId.esqueleto)).toBeNull();
-    expect(screen.queryByTestId(testId.error)).toBeNull();
+    soloEste(testId.vacio);
+    expect(screen.queryByTestId(testId.tablaCompartida)).toBeNull();
+    cleanup();
+
+    await renderPantalla({ [SEARCH_PARAM]: 'sin-coincidencias' });
+    soloEste(testId.sinResultados);
     cleanup();
 
     await renderPantallaCargando();
-    expect(screen.getByTestId(testId.esqueleto)).toBeInTheDocument();
-    expect(screen.queryByTestId(testId.vacio)).toBeNull();
-    expect(screen.queryByTestId(testId.error)).toBeNull();
+    soloEste(testId.esqueleto);
     cleanup();
 
     listSuppliersActionMock.mockResolvedValue({
@@ -561,60 +878,62 @@ describe('pantalla de proveedores — los tres estados', () => {
       message: 'La consulta no es válida.',
     });
     await renderPantalla();
-    expect(screen.getByTestId(testId.error)).toBeInTheDocument();
-    expect(screen.queryByTestId(testId.vacio)).toBeNull();
-    expect(screen.queryByTestId(testId.esqueleto)).toBeNull();
+    soloEste(testId.error);
   });
 
-  it('sin proveedores presenta el estado vacio en lugar de una tabla sin filas', async () => {
-    // R16 — una tabla con cero filas dice lo mismo que una consulta que fallo: no sirve.
+  it('R16: sin proveedores ni busqueda presenta el estado vacio con la accion de crear, fuera de la tabla', async () => {
     listSuppliersActionMock.mockResolvedValue(paginaDeProveedores([], { total: 0 }));
 
     await renderPantalla();
 
-    expect(screen.getByTestId(testId.vacio)).toBeInTheDocument();
+    const vacio = screen.getByTestId(testId.vacio);
+    expect(within(vacio).getByTestId(testId.abrirAlta)).toBeInTheDocument();
     expect(screen.queryByTestId(testId.tabla)).toBeNull();
+    expect(screen.queryByTestId(testId.tablaCompartida)).toBeNull();
     expect(screen.queryByTestId(testId.lista)).toBeNull();
-    // Lista realmente vacia: no se ofrece «volver a la primera pagina», que ya es esta.
+    expect(screen.queryByTestId(testId.sinResultados)).toBeNull();
     expect(screen.queryByTestId(testId.primeraPagina)).toBeNull();
   });
 
-  it('una pagina que se quedo atras ofrece volver a la primera', async () => {
-    // R10 + R16 — caso «la pagina se vacio tras una baja»: no es un error, es un vacio con
-    // salida, y el destino se deriva de la constante de ruta (R2), no de un literal.
+  it('R17: una pagina que se quedo atras sin busqueda ofrece volver a la primera conservando tamano y orden', async () => {
     listSuppliersActionMock.mockResolvedValue(
-      paginaDeProveedores([], { page: 4, total: 12, totalPages: 2 }),
+      paginaDeProveedores([], { page: 4, pageSize: MAX_PAGE_SIZE, total: 12, totalPages: 1 }),
     );
 
-    await renderPantalla({ [PAGE_PARAM]: '4' });
+    await renderPantalla({
+      [PAGE_PARAM]: '4',
+      [PAGE_SIZE_PARAM]: String(MAX_PAGE_SIZE),
+      [SORT_PARAM]: orden('name', 'desc'),
+    });
 
     const destino = screen.getByTestId(testId.primeraPagina).closest('a')?.getAttribute('href');
 
     expect(destino?.startsWith(SUPPLIERS_ROUTE)).toBe(true);
-    expect(
-      parseSupplierListParams(
-        Object.fromEntries(new URLSearchParams(String(destino).split('?')[1])),
-      ),
-    ).toEqual({ page: 1, pageSize: DEFAULT_PAGE_SIZE });
+    expect(paramsDe(destino)).toEqual({
+      page: FIRST_PAGE,
+      pageSize: MAX_PAGE_SIZE,
+      sort: { columnId: 'name', direction: 'desc' },
+      filters: {},
+      search: '',
+    });
   });
 
-  it('mientras carga presenta el esqueleto en lugar de la tabla', async () => {
-    // R17 — la seccion es un Server Component async: sin resolver queda suspendida y el
-    // `<Suspense>` de la pagina pinta su `fallback`, que es exactamente lo que se afirma.
+  it('R18: mientras carga presenta el esqueleto propio con tantas filas como el tamano pedido', async () => {
     await renderPantallaCargando({ [PAGE_SIZE_PARAM]: String(MAX_PAGE_SIZE) });
 
     const esqueleto = screen.getByTestId(testId.esqueleto);
     expect(esqueleto).toHaveAttribute('aria-busy', 'true');
     expect(screen.queryByTestId(testId.tabla)).toBeNull();
+    expect(screen.queryByTestId(testId.tablaCompartida)).toBeNull();
     expect(screen.queryByTestId(testId.lista)).toBeNull();
 
-    // Tantas filas como el tamano de pagina pedido: el esqueleto dice la verdad sobre cuanto se
-    // esta pidiendo.
     expect(within(esqueleto).getAllByTestId(testId.filaEsqueleto)).toHaveLength(MAX_PAGE_SIZE);
+    expect(within(esqueleto).getAllByRole('columnheader')).toHaveLength(
+      SUPPLIER_SKELETON_COLUMN_COUNT,
+    );
   });
 
-  it('un error de la consulta presenta el estado de error con reintento y NO una tabla vacia', async () => {
-    // R18 — confundir «fallo» con «no hay nada» es justo lo que este requisito impide.
+  it('R19: un error de la consulta presenta el estado de error con reintento y no una tabla vacia', async () => {
     const user = setupUser();
     listSuppliersActionMock.mockResolvedValue({
       status: 'error',
@@ -628,22 +947,17 @@ describe('pantalla de proveedores — los tres estados', () => {
     expect(screen.getByTestId(testId.errorMensaje)).toHaveTextContent('La consulta no es válida.');
     expect(screen.getByTestId(testId.errorCodigo)).toHaveTextContent('invalid_input');
 
-    // Ni tabla, ni lista, ni estado vacio: el fallo no se disfraza de catalogo sin proveedores.
     expect(screen.queryByTestId(testId.tabla)).toBeNull();
-    expect(screen.queryByTestId(testId.lista)).toBeNull();
+    expect(screen.queryByTestId(testId.tablaCompartida)).toBeNull();
     expect(screen.queryByTestId(testId.vacio)).toBeNull();
+    expect(screen.queryByTestId(testId.sinResultados)).toBeNull();
     expect(screen.queryAllByTestId(testId.fila)).toHaveLength(0);
 
     await user.click(screen.getByTestId(testId.reintentar));
     expect(routerMock.refresh).toHaveBeenCalledTimes(1);
   });
 
-  it('un unauthorized de la operacion no muestra ningun dato de proveedores', async () => {
-    // R7 — la pantalla no repite `requireAdmin` ni lee la sesion para decidir que pinta: si la
-    // operacion corta, se presenta el error y **no** se ensena ni un dato. Consecuencia
-    // deliberada de `design.md > 3`: sin la regla ruta->rol, la pantalla se veria pero seguiria
-    // sin mostrar nada.
-    const nombreQueNoDebeVerse = 'PROVEEDOR-QUE-NO-DEBE-VERSE';
+  it('R19: un unauthorized de la operacion no muestra ningun dato de proveedores', async () => {
     listSuppliersActionMock.mockResolvedValue({
       status: 'error',
       code: 'unauthorized',
@@ -656,8 +970,95 @@ describe('pantalla de proveedores — los tres estados', () => {
     expect(screen.queryByTestId(testId.tabla)).toBeNull();
     expect(screen.queryAllByTestId(testId.fila)).toHaveLength(0);
     expect(screen.queryAllByTestId(testId.enlaceDetalle)).toHaveLength(0);
-    expect(document.body.textContent).not.toContain(nombreQueNoDebeVerse);
     expect(document.body.textContent).not.toContain(AUTOR_QUE_NO_DEBE_VERSE);
+  });
+
+  it('R32, R33: con busqueda o filtro y cero filas presenta «sin resultados» dentro de la tabla, sin crear, con la busqueda y el filtro a la vista', async () => {
+    listSuppliersActionMock.mockResolvedValue(
+      paginaDeProveedores([], { pageSize: MAX_PAGE_SIZE, total: 0 }),
+    );
+
+    await renderPantalla({
+      [SEARCH_PARAM]: 'sin-coincidencias',
+      [PAGE_SIZE_PARAM]: String(MAX_PAGE_SIZE),
+      [SORT_PARAM]: orden('name', 'desc'),
+      [CREATED_FROM_PARAM]: '2026-01-01',
+      [CREATED_TO_PARAM]: '2026-01-31',
+    });
+
+    const sinResultados = screen.getByTestId(testId.sinResultados);
+    const vacioDeLaTabla = screen.getByTestId(testId.vacioDeLaTabla);
+    expect(vacioDeLaTabla).toContainElement(sinResultados);
+    expect(within(vacioDeLaTabla).queryByTestId(testId.abrirAlta)).toBeNull();
+    expect(screen.queryByTestId(testId.vacio)).toBeNull();
+    expect(screen.queryAllByTestId(testId.fila)).toHaveLength(0);
+    expect(screen.queryByTestId(testId.sinResultadosPrimeraPagina)).toBeNull();
+
+    expect(screen.getByTestId(testId.busqueda)).toHaveValue('sin-coincidencias');
+    expect(screen.getByTestId(testId.filtroFecha)).toBeVisible();
+
+    const destino = within(sinResultados).getByTestId(testId.limpiarBusqueda).getAttribute('href');
+    expect(destino?.startsWith(SUPPLIERS_ROUTE)).toBe(true);
+    for (const parametro of [SEARCH_PARAM, CREATED_FROM_PARAM, CREATED_TO_PARAM]) {
+      expect(consultaDe(destino).has(parametro), parametro).toBe(false);
+    }
+    expect(paramsDe(destino)).toEqual({
+      page: FIRST_PAGE,
+      pageSize: MAX_PAGE_SIZE,
+      sort: { columnId: 'name', direction: 'desc' },
+      filters: {},
+      search: '',
+    });
+  });
+
+  it('R32: con busqueda, cero filas y una pagina posterior ofrece volver a la primera conservando busqueda, filtros, tamano y orden', async () => {
+    listSuppliersActionMock.mockResolvedValue(
+      paginaDeProveedores([], { page: 3, pageSize: MAX_PAGE_SIZE, total: 0, totalPages: 1 }),
+    );
+
+    await renderPantalla({
+      [PAGE_PARAM]: '3',
+      [SEARCH_PARAM]: 'sin-coincidencias',
+      [PAGE_SIZE_PARAM]: String(MAX_PAGE_SIZE),
+      [SORT_PARAM]: orden('name', 'asc'),
+      [CREATED_FROM_PARAM]: '2026-01-01',
+    });
+
+    const sinResultados = screen.getByTestId(testId.sinResultados);
+    expect(within(sinResultados).getByTestId(testId.limpiarBusqueda)).toBeInTheDocument();
+
+    const destino = within(sinResultados)
+      .getByTestId(testId.sinResultadosPrimeraPagina)
+      .getAttribute('href');
+    expect(destino?.startsWith(SUPPLIERS_ROUTE)).toBe(true);
+    expect(paramsDe(destino)).toEqual({
+      page: FIRST_PAGE,
+      pageSize: MAX_PAGE_SIZE,
+      sort: { columnId: 'name', direction: 'asc' },
+      filters: { [CREATED_AT_COLUMN_ID]: { kind: 'dateRange', from: '2026-01-01', to: null } },
+      search: 'sin-coincidencias',
+    });
+  });
+
+  it('R33: al pasar de filas a «sin resultados» con el mismo arbol, la busqueda conserva el foco y lo escrito', async () => {
+    const user = setupUser();
+    listSuppliersActionMock.mockResolvedValue(paginaDeProveedores([proveedor()]));
+
+    const { rerender } = render(await pantallaMontada({ [SEARCH_PARAM]: 'nor' }));
+
+    const busqueda = screen.getByTestId(testId.busqueda);
+    await user.type(busqueda, 'te');
+    expect(busqueda).toHaveFocus();
+    expect(busqueda).toHaveValue('norte');
+
+    listSuppliersActionMock.mockResolvedValue(paginaDeProveedores([]));
+    rerender(await pantallaMontada({ [SEARCH_PARAM]: 'norte' }));
+
+    expect(screen.getByTestId(testId.sinResultados)).toBeInTheDocument();
+    expect(screen.getByTestId(testId.busqueda)).toBe(busqueda);
+    expect(busqueda).toHaveFocus();
+    expect(busqueda).toHaveValue('norte');
+    expect(screen.getByTestId(testId.filtroFecha)).toBeInTheDocument();
   });
 });
 
@@ -673,7 +1074,13 @@ describe('pantalla de proveedores — alta y edicion en panel lateral', () => {
 
     await renderPantalla({ [PAGE_PARAM]: '2', [PAGE_SIZE_PARAM]: String(MAX_PAGE_SIZE) });
 
-    expect(listSuppliersActionMock).toHaveBeenCalledWith({ page: 2, pageSize: MAX_PAGE_SIZE });
+    expect(listSuppliersActionMock).toHaveBeenCalledWith({
+      page: 2,
+      pageSize: MAX_PAGE_SIZE,
+      sort: null,
+      filters: {},
+      search: '',
+    });
 
     await user.click(screen.getByTestId(testId.abrirAlta));
 
@@ -957,7 +1364,7 @@ describe('pantalla de proveedores — alta y edicion en panel lateral', () => {
       await renderPantalla();
 
       // Las acciones de fila son SIEMPRE visibles: nada detras de `:hover`.
-      const fila = screen.getByTestId(testId.fila);
+      const [fila] = screen.getAllByTestId(testId.fila);
       for (const accion of [testId.abrirEdicion, testId.abrirBaja]) {
         const control = within(fila).getByTestId(accion);
         expect(control, `${accion} a ${ancho}px`).toBeVisible();
