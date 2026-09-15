@@ -631,4 +631,75 @@ describe('QC-95 — el cambio de estado escribe los contadores de bloqueo en el 
       expect(fila.lockedUntil).toEqual(bloqueado.lockedUntil);
     });
   });
+
+  // R3, «si una no se aplica, la otra tampoco», por su lado dificil: el mismo patron que el caso R38
+  // de QC-23 de arriba. Si los contadores viajaran en una escritura previa al chequeo de R22, aqui
+  // quedarian limpios con la cuenta intacta.
+  it('R3: si la transaccion aborta por `last_administrator`, ni el estado ni los tres contadores cambian', async () => {
+    await withCompany(async (companyId) => {
+      // El UNICO administrador `active` de la empresa: moverlo a `inactive` la dejaria sin ninguno.
+      const adminId = await createUser(companyId, newUserData({ roleId: administradorRoleId }));
+      const sembrado = {
+        accountStatus: 'active',
+        failedLoginAttempts: 3,
+        lockLevel: 2,
+        lockedUntil: new Date('2099-01-01T00:00:00.000Z'),
+      } as const;
+      await prisma.user.update({ where: { id: adminId }, data: sembrado });
+
+      const outcome = await applyGuardedChange({
+        kind: 'account_status',
+        companyId,
+        id: adminId,
+        adminRoleName: ROLE_ADMINISTRADOR,
+        now: instantWithMillis(),
+        accountStatus: 'inactive',
+        changedBy: adminId,
+        lockState: clearedLockState(),
+      });
+      expect(outcome).toBe('last_administrator');
+
+      expect(await lockRowOf(adminId)).toEqual(sembrado);
+    });
+  });
+
+  it('R3: un objetivo de otra empresa (`not_found`) conserva sus tres contadores', async () => {
+    const companyA = await createCompany();
+    const companyB = await createCompany();
+    try {
+      const targetId = await createUser(companyA, newUserData());
+      await prisma.user.update({
+        where: { id: targetId },
+        data: { failedLoginAttempts: 3, lockLevel: 2, lockedUntil: new Date('2099-01-01T00:00:00.000Z') },
+      });
+      const antes = await lockRowOf(targetId);
+      const actorId = await createUser(companyB, newUserData());
+
+      const outcome = await applyGuardedChange({
+        kind: 'account_status',
+        companyId: companyB,
+        id: targetId,
+        adminRoleName: ROLE_ADMINISTRADOR,
+        now: instantWithMillis(),
+        accountStatus: 'active',
+        changedBy: actorId,
+        lockState: clearedLockState(),
+      });
+      expect(outcome).toBe('not_found');
+
+      expect(await lockRowOf(targetId)).toEqual(antes);
+      expect(antes.failedLoginAttempts).toBe(3);
+    } finally {
+      await dropCompany(companyB);
+      await dropCompany(companyA);
+    }
+  });
 });
+
+/** El estado de cuenta y los tres contadores de bloqueo de una fila, releidos de la base. */
+async function lockRowOf(userId: string) {
+  return prisma.user.findFirstOrThrow({
+    where: { id: userId },
+    select: { accountStatus: true, failedLoginAttempts: true, lockLevel: true, lockedUntil: true },
+  });
+}

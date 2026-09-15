@@ -13,7 +13,7 @@
  *    (QC-43/QC-52) y de `inventario` (QC-20) contra Postgres, mas `router.refresh()`. En jsdom
  *    todas esas actions son dobles; aqui son las de verdad.
  *  - **El corte por rol de verdad** (R52): en unit se afirma la DECISION (`decideRouteAccess`);
- *    aqui se afirma que el usuario acaba fuera y sin ver ni un dato.
+ *    aqui se afirma que recibe 404 en su sitio y no ve ni un dato.
  *  - El selector de presentacion con su alta en linea (R38) tal como lo ve un navegador: es la
  *    primitiva `Select` de base-ui, con su portal, y la creacion invoca la Server Action desde
  *    el manejador sin anidar formularios. jsdom no ejercita igual ninguna de las dos cosas.
@@ -66,12 +66,9 @@ import {
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { normalizeSupplierName } from '@/lib/modules/proveedores';
 import { prisma } from '@/lib/shared/db/prisma';
-import {
-  DASHBOARD_ROUTE,
-  LOGIN_ROUTE,
-  SUPPLIERS_ROUTE,
-  supplierDetailRoute,
-} from '@/lib/shared/routes';
+import { SUPPLIERS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
+
+import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc44_e2e_';
@@ -174,15 +171,6 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
     },
     select: { id: true },
   });
-}
-
-/** Entra por el formulario real y aterriza en el dashboard. */
-async function login(page: Page, user: Credentials): Promise<void> {
-  await page.goto(LOGIN_ROUTE);
-  await page.getByTestId('login-username').fill(user.username);
-  await page.getByTestId('login-password').fill(user.password);
-  await page.getByTestId('login-submit').click();
-  await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
 }
 
 /**
@@ -387,7 +375,7 @@ test.describe('proveedores', () => {
   test('el Administrador entra, da de alta un proveedor, abre su detalle, anade una linea de catalogo y la ve en la lista (R51)', async ({
     page,
   }) => {
-    await login(page, adminUser);
+    await loginAndLand(page, adminUser);
 
     // --- 1. La pantalla se sirve a un Administrador (R52, la mitad que deja pasar). La URL sale
     // de la constante, nunca de un literal (R2).
@@ -489,7 +477,7 @@ test.describe('proveedores', () => {
     const NAME_COLUMN_ID = 'name';
     const NAME_DESC = `${NAME_COLUMN_ID}:desc`;
 
-    await login(page, adminUser);
+    await loginAndLand(page, adminUser);
     await page.goto(`${SUPPLIERS_ROUTE}?${PAGE_SIZE_PARAM}=${LIST_PAGE_SIZE}`);
     await expect(page.getByTestId('data-table')).toBeVisible({ timeout: 60_000 });
 
@@ -539,16 +527,31 @@ test.describe('proveedores', () => {
       .toEqual([orderSupplierBName, orderSupplierAName]);
   });
 
-  test('un usuario que no es Administrador acaba fuera y no ve ningun dato de proveedores (R52)', async ({
+  test('un usuario sin proveedores.consultar recibe 404 dentro del layout privado y no ve ningun dato de proveedores (R52)', async ({
     page,
   }) => {
-    await login(page, operatorUser);
+    // El Operador del seed no lleva `proveedores.consultar`. Su aterrizaje NO se escribe aqui: lo
+    // deriva el helper de sus permisos reales (QC-93 R11), y la premisa del caso -que no aterriza
+    // ya en proveedores- se dice en voz alta para que un cambio de permisos no la vuelva muda.
+    const landing = await loginAndLand(page, operatorUser);
+    expect(landing, 'la premisa del caso: el usuario no aterriza en proveedores').not.toBe(
+      SUPPLIERS_ROUTE,
+    );
 
-    // Sesion valida, rol distinto: la regla ruta-rol lo saca al dashboard SIN renderizar nada de
-    // la pantalla. No es «no autenticado»: acaba en el dashboard, no en el login, y esa
-    // diferencia es justo lo que R52 pide y lo que un redirect al login enmascararia.
-    await page.goto(SUPPLIERS_ROUTE);
-    await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+    // Sesion valida, permiso ausente: **404 en su sitio, sin redireccion** (QC-75). La regla
+    // ruta-rol que lo sacaba al dashboard ya no existe. No es «no autenticado»: no acaba en el
+    // login, y esa diferencia es lo que R52 pide y lo que un redirect al login enmascararia.
+    const response = await page.goto(SUPPLIERS_ROUTE);
+    expect(
+      response?.status(),
+      'una ruta privada sin permiso debe responder 404, indistinguible de una que no existe',
+    ).toBe(404);
+    expect(new URL(page.url()).pathname, 'el 404 no redirige: la URL sigue siendo la pedida').toBe(
+      SUPPLIERS_ROUTE,
+    );
+
+    // Y ese 404 se pinta DENTRO del layout privado (QC-75 R8).
+    await expect(page.getByTestId('private-not-found')).toBeVisible({ timeout: 60_000 });
 
     await expect(page.getByTestId('proveedores-title')).toHaveCount(0);
     await expect(page.getByTestId('supplier-table')).toHaveCount(0);

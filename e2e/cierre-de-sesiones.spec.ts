@@ -53,7 +53,10 @@ import {
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { SESSION_COOKIE_NAME } from '@/lib/modules/identity/adapters/driven/session/session-token';
 import { prisma } from '@/lib/shared/db/prisma';
-import { DASHBOARD_ROUTE, INVENTORY_ROUTE, LOGIN_ROUTE, USERS_ROUTE } from '@/lib/shared/routes';
+import { INVENTORY_ROUTE, LOGIN_ROUTE, USERS_ROUTE } from '@/lib/shared/routes';
+
+// QC-93: la entrada y su aterrizaje, derivado de los permisos del usuario en la base.
+import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc101_e2e_';
@@ -76,9 +79,6 @@ const LIST_PAGE_SIZE = '25';
 
 /** `data-testid` de las pantallas que recorre el test (constantes locales: ver cabecera). */
 const LOGIN_FORM_TESTID = 'login-form';
-const LOGIN_USERNAME_TESTID = 'login-username';
-const LOGIN_PASSWORD_TESTID = 'login-password';
-const LOGIN_SUBMIT_TESTID = 'login-submit';
 const INVENTORY_TITLE_TESTID = 'inventario-title';
 const PRIVATE_USER_NAME_TESTID = 'private-user-name';
 const USERS_TITLE_TESTID = 'usuarios-title';
@@ -169,19 +169,6 @@ async function createUserWithRole(
     select: { id: true },
   });
   return created.id;
-}
-
-/**
- * Entra por el formulario real y aterriza donde le corresponde a ese usuario (QC-75 R11: el primer
- * item del menu que puede ver). El Administrador aterriza en `DASHBOARD_ROUTE`; el Operador, en
- * `INVENTORY_ROUTE`.
- */
-async function login(page: Page, user: Credentials, landing: string): Promise<void> {
-  await page.goto(LOGIN_ROUTE);
-  await page.getByTestId(LOGIN_USERNAME_TESTID).fill(user.username);
-  await page.getByTestId(LOGIN_PASSWORD_TESTID).fill(user.password);
-  await page.getByTestId(LOGIN_SUBMIT_TESTID).click();
-  await page.waitForURL((url) => url.pathname === landing, { timeout: 60_000 });
 }
 
 /** URL de la lista, SIEMPRE derivada de `USERS_ROUTE`, con la busqueda del `RUN_ID` ya puesta. */
@@ -289,7 +276,7 @@ test.describe('cierre de sesiones de otra persona desde la pantalla', () => {
 
       // --- 1. LA VICTIMA ENTRA por el formulario real y aterriza en una pantalla privada. Esta es
       // la sesion viva que la ficha promete cortar.
-      await login(victimPage, victimUser, INVENTORY_ROUTE);
+      await loginAndLand(victimPage, victimUser);
       await expect(victimPage.getByTestId(INVENTORY_TITLE_TESTID)).toBeVisible({
         timeout: 60_000,
       });
@@ -301,7 +288,7 @@ test.describe('cierre de sesiones de otra persona desde la pantalla', () => {
 
       // --- 2. EL ADMINISTRADOR ENTRA en SU contexto y abre la lista por URL derivada de
       // `USERS_ROUTE`, con la busqueda del `RUN_ID` ya puesta.
-      await login(adminPage, adminUser, DASHBOARD_ROUTE);
+      await loginAndLand(adminPage, adminUser);
       const listUrl = usersUrl(SEARCH_TERM);
       await adminPage.goto(listUrl);
       await expect(adminPage.getByTestId(USERS_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
