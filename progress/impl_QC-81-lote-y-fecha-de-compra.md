@@ -653,6 +653,118 @@ $ pnpm exec vitest run tests/unit/inventario/qc81-alcance.test.ts
 - **R18:** «R18: el relleno continua SIN TECHO desde un lote de 18 o mas digitos, sin chocar con uno de 19 ya escrito y sin reventar con uno de 40».
 - **R14:** el mismo `it`, con `Promise.allSettled` (m5).
 
+### Tanda 6 — T13 y T14, enmienda D13 · `backend_dev` · 2026-09-15
+
+El humano aprobo la enmienda del spec el 2026-09-15 (commit `c697bc0`): D13, R34-R36, `design.md §4.6`
+y §6 E/F. **Tasks cerradas aqui: T13 y T14.** Marcarlas `[x]` en `tasks.md` lo hace el leader al juntar
+este commit con la edicion del spec_author: desde la implementacion no se edita `tasks.md`. **T15
+queda CANCELADA** (P1 cerrada con D: no hay datos previos, asi que la migracion no lleva guardia) y
+no se ha implementado.
+
+**Archivos (solo estos 5)**
+- `lib/modules/inventario/domain/product-batch-input.ts` (T13).
+  - Se añaden dos constantes **no exportadas**, cada una con su docblock:
+    `NUMERIC_LOT_PATTERN = /^[0-9]+$/`, que remite a `'^[0-9]+$'` de `resolveLot` y del relleno, y
+    `MESSAGE_LOTE_NUMERICO_LARGO = 'Un lote de solo números puede tener hasta 59 caracteres.'`.
+  - `lotSchema` queda como
+    `z.string().trim().min(1).max(PRODUCT_BATCH_LOT_MAX_LENGTH, { abort: true }).refine(v => !(NUMERIC_LOT_PATTERN.test(v) && v.length >= PRODUCT_BATCH_LOT_MAX_LENGTH), { message })`,
+    con un docblock que cita D13, R34, R35, R36 y el porque de `abort: true`.
+  - **Ningun export nuevo** (verificado en el diff por el implementer).
+- `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts` (T13, **solo el comentario**).
+  El «LIMITE CONOCIDO» de `resolveLot` dice ahora que el `23514` sale `unexpected` sin traducir
+  (§6 F), que desde R34 solo lo alcanzan datos ya escritos o escritos por otra via, y que P1 se cerro
+  con D.
+- `tests/unit/inventario/product-batch-input.test.ts` (T13): bloque «QC-81 D13», 7 casos.
+- `tests/unit/inventario/create-product.test.ts` (T13): bloque «QC-81 R34», 1 caso.
+- `tests/integration/inventario/product-batch-lot.int.test.ts` (T14): 1 caso con los 4 pasos, por el
+  caso de uso con el repositorio real y una empresa propia.
+
+Sin `CHECK` en la base, sin traducir el `23514` y sin tocar la migracion ni `app/**`.
+
+**Salida real**
+```
+$ pnpm run typecheck -> EXIT=0          $ pnpm run lint -> EXIT=0
+$ pnpm exec vitest related --run lib/modules/inventario/domain/product-batch-input.ts lib/modules/inventario/adapters/driven/persistence/product-prisma.ts --project node --project ui
+ Test Files  131 passed (131)
+      Tests  2033 passed | 1 skipped (2034)
+$ pnpm exec vitest run tests/unit/inventario/module-contract.test.ts tests/unit/inventario/qc81-alcance.test.ts
+ Test Files  2 passed (2)
+      Tests  19 passed (19)
+$ pnpm exec vitest run guard
+ Test Files  39 passed (39)
+      Tests  407 passed | 9 skipped (416)
+$ pnpm exec vitest run --project integration tests/integration/inventario/product-batch-lot.int.test.ts
+test-db: la corrida de integracion va contra qct_qc81_75ea7fee_mu305liw_jdo (copia de qct_tpl_a365fb82c2bf).
+ ✓ ... > R35, R36, R34: por el caso de uso, 59 nueves tecleados se escriben, los dos siguientes generados tienen 60 caracteres sin reintento y 60 digitos tecleados dan ValidationError sin filas nuevas 33ms
+ Test Files  1 passed (1)
+      Tests  17 passed (17)
+test-db: borrada la base de la corrida: qct_qc81_75ea7fee_mu305liw_jdo.
+```
+
+**La regla muerde (mutacion con copia y restauracion, `cmp` identico).** Con el `refine` desactivado
+(`(value) => true || ...`):
+```
+--- MUTANTE: unit ---
+ FAIL ... R34: con un lote de 60 digitos lanza ValidationError (invalid_input) y el repositorio recibe cero llamadas
+ FAIL ... R34: 60 digitos se rechazan con UN solo issue en lot, de codigo custom y con su mensaje
+ FAIL ... R34: 60 digitos con ceros a la izquierda se rechazan igual (cuenta caracteres, no magnitud)
+ FAIL ... R34: 60 digitos rodeados de espacios se rechazan, porque cuenta el valor recortado
+      Tests  4 failed | 74 passed (78)
+--- MUTANTE: integration ---
+ FAIL |integration| ... R35, R36, R34: por el caso de uso, 59 nueves tecleados se escriben, ...
+AssertionError: expected null to be an instance of ValidationError
+RESTAURADO identico
+```
+El `abort: true` no tiene mutacion propia. Lo cubre el caso de 61 digitos, que afirma **un solo** issue
+y de codigo `too_big`.
+
+**Tests por requisito**
+- **R34:**
+  - `product-batch-input.test.ts`:
+    - «R34: 60 digitos se rechazan con UN solo issue en lot, de codigo custom y con su mensaje»
+    - «R34: 60 digitos con ceros a la izquierda se rechazan igual (cuenta caracteres, no magnitud)»
+    - «R34: 60 digitos rodeados de espacios se rechazan, porque cuenta el valor recortado»
+    - «R34: 61 digitos cobran UN solo issue, el del largo, y no tambien el de solo digitos»
+  - `create-product.test.ts`: «R34: con un lote de 60 digitos lanza ValidationError (invalid_input) y el repositorio recibe cero llamadas».
+  - `product-batch-lot.int.test.ts`: el caso de T14, paso 4 (cero `$transaction` y cero filas nuevas).
+- **R35:**
+  - `product-batch-input.test.ts`: «R35: 59 digitos se aceptan y llegan tal cual» y «R35: 60 caracteres con una letra o un guion se aceptan y llegan tal cual».
+  - El caso de T14, paso 1.
+- **R36:** el caso de T14, pasos 2 y 3. Genera `'1' + 59 ceros` y luego `'1' + 58 ceros + '1'`, los dos
+  de 60 caracteres, con una sola `$transaction` por alta.
+- **R8, sin regresion:** «R8: el lote ausente o en null sigue siendo valido (sin regresion por la regla nueva)».
+
+**La pantalla: por lectura de codigo, no por test.** Se comprobo sin tocar `app/**`:
+- `product-form.tsx:309-318` valida con `createProductWithFirstBatchSchema` antes de llamar a la
+  operacion.
+- `:327-332` reparte los issues por `issue.path[0]`, y `lot` esta en `FIELD_MESSAGES`.
+- `fieldMessage` (`:198-208`) devuelve `issue.message` para los issues `custom`, que es el caso de `lot`.
+- `:573` pasa `error={fieldErrors.lot}`, y `product-field.tsx:120-122` lo pinta con `aria-invalid` y
+  `aria-describedby`.
+
+Con 60 digitos el campo del lote muestra «Un lote de solo números puede tener hasta 59 caracteres.»;
+con 61, el generico «Escribe un lote de 1 a 60 caracteres.», que para ese caso es cierto. **Ningun
+test de UI afirma el mensaje de `lot`**: los usos de `lot` en `product-page.test.tsx` son para otras
+cosas. Si se quiere cubrir, seria un caso en `product-page.test.tsx`, que encaja en QC-103 o donde
+decida el leader. Aqui no se escribieron tests de UI.
+
+**Observacion para el spec_author (no tocado).** El comentario de
+`db/migrations/20260913120000_product_batch_lot_and_purchase_date/migration.sql:163-164` («LIMITE
+CONOCIDO: si una empresa ya tiene un lote de 60 nueves, su siguiente correlativo tendria 61
+caracteres y el CHECK product_batches_lot_length aborta la migracion ENTERA.») **no es falso**:
+habla de datos ya escritos. Pero **esta incompleto** frente al spec enmendado, porque no cita D13 ni
+R34 ni dice que P1 se cerro con D. La variante D de la T15 cancelada preveia cambiarlo; como la
+migracion no se toca, se queda asi y lo decide el leader o el spec_author.
+
+**Adenda al mapa R -> test (final): R34-R36.** Los tests de arriba se suman al mapa sin quitar nada, y
+con ellos queda **R1..R36 sin ningun requisito huerfano**:
+
+| R | Test(s) |
+|---|---|
+| R34 | `product-batch-input.test.ts`: los cuatro `it` «R34: ...»; `create-product.test.ts` «R34: con un lote de 60 digitos lanza ValidationError (invalid_input) y el repositorio recibe cero llamadas»; `product-batch-lot.int.test.ts` «R35, R36, R34: por el caso de uso, 59 nueves tecleados se escriben, los dos siguientes generados tienen 60 caracteres sin reintento y 60 digitos tecleados dan ValidationError sin filas nuevas» (paso 4) |
+| R35 | `product-batch-input.test.ts` «R35: 59 digitos se aceptan y llegan tal cual» y «R35: 60 caracteres con una letra o un guion se aceptan y llegan tal cual»; el mismo `it` de integracion (paso 1) |
+| R36 | el mismo `it` de integracion (pasos 2 y 3) |
+
 ## Estado final de F2.1
 
 | Task | Estado |

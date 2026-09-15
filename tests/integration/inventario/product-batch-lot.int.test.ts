@@ -21,7 +21,8 @@
  * esta maquina Postgres responde en espanol-. Y el `migration.sql` tiene varias sentencias y
  * bloques `DO`, que solo el protocolo simple de `pg` ejecuta de una vez.
  *
- * Requisitos cubiertos: R3, R7, R8, R9, R11, R12, R13, R14, R16, R18, R19, R20, R21, R25, R27, R33.
+ * Requisitos cubiertos: R3, R7, R8, R9, R11, R12, R13, R14, R16, R18, R19, R20, R21, R25, R27, R33,
+ * y los de la enmienda del 2026-09-15 (D13): R34, R35, R36 (T14).
  */
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -32,7 +33,7 @@ import { Client } from 'pg';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
-import { BatchDuplicateLotError, createCreateProduct } from '@/lib/modules/inventario';
+import { BatchDuplicateLotError, createCreateProduct, ValidationError } from '@/lib/modules/inventario';
 import {
   addBatchToAlive,
   createProduct,
@@ -662,6 +663,96 @@ describe('R3: la fecha de compra se guarda sin corrimiento de dia', () => {
       );
       expect(await purchaseDateOf({ productId: conFecha.id })).toBe('2026-02-14');
     } finally {
+      await dropFixture(fixture);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D13: el lote numerico generado cabe siempre (enmienda del 2026-09-15)
+// ---------------------------------------------------------------------------
+
+/** El lote del UNICO lote de ese producto. Cada alta del caso usa un nombre irrepetible. */
+async function lotOfProduct(productId: string): Promise<string> {
+  const filas = await prisma.productBatch.findMany({ where: { productId }, select: { lot: true } });
+  const unica = filas[0];
+  if (filas.length !== 1 || unica === undefined) {
+    throw new Error(`se esperaba exactamente un lote del producto y hay ${String(filas.length)}`);
+  }
+  return unica.lot;
+}
+
+describe('R34, R35, R36: el lote tecleado de solo digitos no llega a 60 y el generado cabe siempre', () => {
+  it('R35, R36, R34: por el caso de uso, 59 nueves tecleados se escriben, los dos siguientes generados tienen 60 caracteres sin reintento y 60 digitos tecleados dan ValidationError sin filas nuevas', async () => {
+    // Por el CASO DE USO con el repositorio REAL: el esquema (D13) solo se aplica ahi, y el
+    // correlativo solo lo calcula el adaptador contra la base. El espia de `prisma.$transaction`
+    // mide que ninguna alta generada choca: `findAliveIdByName` no abre transaccion, asi que UNA
+    // sola por alta es la escritura sin reintento.
+    const fixture = await createFixture();
+    const spy = vi.spyOn(prisma, '$transaction');
+    try {
+      const altaDeProducto = createCreateProduct({ products: repositorioReal, now: () => new Date() });
+      const actor = {
+        id: fixture.actorId,
+        companyId: fixture.companyId,
+        permissions: ['inventario.modificar'],
+      };
+      const alta = (lot?: string) =>
+        altaDeProducto(
+          {
+            name: `Producto ${token()}`,
+            stock: 2,
+            qtyAlert: 1,
+            presentationId: fixture.presentationId,
+            unitCost: '1.5000',
+            ...(lot === undefined ? {} : { lot }),
+          },
+          actor,
+        );
+
+      const nueves59 = '9'.repeat(59);
+      const primeroGenerado = `1${'0'.repeat(59)}`;
+      const segundoGenerado = `1${'0'.repeat(58)}1`;
+
+      // 1. R35: 59 nueves tecleados se aceptan y se escriben tal cual.
+      const tecleado = await alta(nueves59);
+      expect(await lotOfProduct(tecleado.id)).toBe(nueves59);
+
+      // 2. R36: el siguiente generado es 10^59, de 60 caracteres, sin 23514 y sin reintento. Si el
+      //    CHECK de largo lo rechazara, el alta rechazaria con `unexpected` y el caso daria rojo aqui.
+      spy.mockClear();
+      const primera = await alta();
+      expect(await lotOfProduct(primera.id)).toBe(primeroGenerado);
+      expect(primeroGenerado).toHaveLength(60);
+      expect(spy, 'la primera alta generada no reintenta').toHaveBeenCalledTimes(1);
+
+      // 3. R36: y el siguiente, 10^59 + 1, tambien de 60 caracteres.
+      spy.mockClear();
+      const segunda = await alta();
+      expect(await lotOfProduct(segunda.id)).toBe(segundoGenerado);
+      expect(segundoGenerado).toHaveLength(60);
+      expect(spy, 'la segunda alta generada no reintenta').toHaveBeenCalledTimes(1);
+
+      expect(await lotsOfCompany(fixture)).toEqual([primeroGenerado, segundoGenerado, nueves59].sort());
+
+      // 4. R34: 60 digitos tecleados se rechazan en la entrada, antes de la base.
+      const productosAntes = await prisma.product.count({ where: { companyId: fixture.companyId } });
+      const lotesAntes = await prisma.productBatch.count({ where: { companyId: fixture.companyId } });
+      spy.mockClear();
+
+      const rechazo = await alta('9'.repeat(60)).then(
+        () => null,
+        (error: unknown) => error,
+      );
+
+      expect(rechazo).toBeInstanceOf(ValidationError);
+      expect((rechazo as ValidationError).code).toBe('invalid_input');
+      expect(spy, 'el rechazo de la entrada no abre ninguna transaccion').not.toHaveBeenCalled();
+      expect(await prisma.product.count({ where: { companyId: fixture.companyId } })).toBe(productosAntes);
+      expect(await prisma.productBatch.count({ where: { companyId: fixture.companyId } })).toBe(lotesAntes);
+      expect(await lotsOfCompany(fixture)).toEqual([primeroGenerado, segundoGenerado, nueves59].sort());
+    } finally {
+      spy.mockRestore();
       await dropFixture(fixture);
     }
   });

@@ -275,6 +275,76 @@ describe('createProductWithFirstBatchSchema', () => {
     });
   });
 
+  describe('QC-81 D13 — el lote tecleado de solo digitos no llega a 60 caracteres', () => {
+    const MENSAJE = 'Un lote de solo números puede tener hasta 59 caracteres.';
+
+    /** Los issues ENTEROS de un rechazo: aqui importan cuantos son, su ruta, su codigo y su texto. */
+    function issuesDe(input: unknown) {
+      const result = createProductWithFirstBatchSchema.safeParse(input);
+      expect(result.success, 'se esperaba un rechazo y el esquema acepto la entrada').toBe(false);
+      return result.success ? [] : result.error.issues;
+    }
+
+    it('R34: 60 digitos se rechazan con UN solo issue en lot, de codigo custom y con su mensaje', () => {
+      const issues = issuesDe({ ...VALIDA, lot: '9'.repeat(60) });
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0]?.path).toEqual(['lot']);
+      expect(issues[0]?.code).toBe('custom');
+      expect(issues[0]?.message).toBe(MENSAJE);
+    });
+
+    it('R34: 60 digitos con ceros a la izquierda se rechazan igual (cuenta caracteres, no magnitud)', () => {
+      const lote = `${'0'.repeat(59)}1`;
+      expect(lote).toHaveLength(60);
+
+      const issues = issuesDe({ ...VALIDA, lot: lote });
+      expect(issues).toHaveLength(1);
+      expect(issues[0]?.path).toEqual(['lot']);
+      expect(issues[0]?.code).toBe('custom');
+    });
+
+    it('R34: 60 digitos rodeados de espacios se rechazan, porque cuenta el valor recortado', () => {
+      const issues = issuesDe({ ...VALIDA, lot: `  ${'1'.repeat(60)}  ` });
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0]?.path).toEqual(['lot']);
+      expect(issues[0]?.code).toBe('custom');
+      expect(issues[0]?.message).toBe(MENSAJE);
+    });
+
+    it('R34: 61 digitos cobran UN solo issue, el del largo, y no tambien el de solo digitos', () => {
+      const issues = issuesDe({ ...VALIDA, lot: '9'.repeat(61) });
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0]?.path).toEqual(['lot']);
+      expect(issues[0]?.code).toBe('too_big');
+      expect(issues[0]?.message).not.toBe(MENSAJE);
+    });
+
+    it('R35: 59 digitos se aceptan y llegan tal cual', () => {
+      const lote = '9'.repeat(59);
+      const result = createProductWithFirstBatchSchema.safeParse({ ...VALIDA, lot: lote });
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.lot).toBe(lote);
+    });
+
+    it('R35: 60 caracteres con una letra o un guion se aceptan y llegan tal cual', () => {
+      for (const lote of [`${'9'.repeat(59)}A`, `${'9'.repeat(30)}-${'9'.repeat(29)}`, `L${'0'.repeat(59)}`]) {
+        expect(lote).toHaveLength(60);
+        const result = createProductWithFirstBatchSchema.safeParse({ ...VALIDA, lot: lote });
+        expect(result.success, `${lote} deberia aceptarse`).toBe(true);
+        if (result.success) expect(result.data.lot).toBe(lote);
+      }
+    });
+
+    it('R8: el lote ausente o en null sigue siendo valido (sin regresion por la regla nueva)', () => {
+      expect(createProductWithFirstBatchSchema.safeParse({ ...VALIDA }).success).toBe(true);
+      expect(createProductWithFirstBatchSchema.safeParse({ ...VALIDA, lot: null }).success).toBe(true);
+    });
+  });
+
   it('acepta la existencia 0 mientras venga el costo unitario', () => {
     // R3: una existencia de 0 no es motivo de rechazo por si sola; solo lo es cuando hay que
     // dividir el total entre ella (R8).

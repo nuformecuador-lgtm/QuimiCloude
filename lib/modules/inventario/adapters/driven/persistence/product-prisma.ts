@@ -600,7 +600,13 @@ type BatchLotTopRow = { readonly top: string | null };
  *
  * **LIMITE CONOCIDO, no resuelto aqui:** si el maximo de la empresa tiene 60 digitos y son todos
  * nueves, el siguiente tendria 61 caracteres y el `INSERT` lo rechaza el CHECK
- * `product_batches_lot_length` en cada alta con lote generado de esa empresa.
+ * `product_batches_lot_length` en cada alta con lote generado de esa empresa (sale `unexpected`:
+ * el `23514` de largo no se traduce, `design.md > 6 F`). Desde QC-81 R34 (D13) la entrada ya no
+ * deja teclear un lote de solo digitos de 60 caracteres -`lotSchema` en
+ * `domain/product-batch-input.ts`-, asi que este limite SOLO lo alcanzan datos ya escritos antes de
+ * la regla o escritos por otra via que no pase por el esquema. La pregunta P1 se cerro el
+ * 2026-09-15 con la opcion D: no hay datos previos, se acepta como limite y la migracion no lleva
+ * guardia (`requirements.md > P1`, `design.md > 9.6`).
  *
  * **La empresa sale del AMBITO** (R27) y del unico punto que la define (`companyScopeColumns`),
  * nunca de `NewProductBatch` -que no la lleva-: el correlativo se calcula contra la misma empresa

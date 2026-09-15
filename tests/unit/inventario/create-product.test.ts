@@ -628,6 +628,20 @@ describe('QC-81 R4 — la fecha de compra futura se rechaza sin tocar el puerto'
   });
 });
 
+describe('QC-81 R34 — un lote tecleado de 60 digitos se rechaza sin tocar el puerto', () => {
+  it('R34: con un lote de 60 digitos lanza ValidationError (invalid_input) y el repositorio recibe cero llamadas', async () => {
+    // Ni se escribe ni se genera correlativo: el rechazo es de la entrada y ocurre antes del puerto,
+    // asi que tampoco se sustituye el lote por uno generado.
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA });
+
+    const error = await capturarRechazo(createProduct({ ...ALTA_VALIDA, lot: '9'.repeat(60) }, ADMIN));
+
+    expect(error.code).toBe('invalid_input');
+    afirmarPuertoIntacto(products);
+  });
+});
+
 describe('QC-81 R24 — sin permiso no se valida, no se toca el puerto ni se calcula ninguna fecha', () => {
   it.each([
     ['sin ningun permiso', SIN_PERMISO],

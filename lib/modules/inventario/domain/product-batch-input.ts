@@ -49,6 +49,19 @@ const presentationIdSchema = z.string().uuid();
 export const PRODUCT_BATCH_LOT_MAX_LENGTH = 60;
 
 /**
+ * «Lote de solo digitos» (QC-81 D13, R34). NO se exporta: fuera de este archivo no hace falta.
+ *
+ * `[0-9]` y no `\d`, a proposito: es el MISMO conjunto, escrito con el MISMO texto, que el
+ * `'^[0-9]+$'` con el que `resolveLot` (`adapters/driven/persistence/product-prisma.ts`) y el
+ * relleno de la migracion `20260913120000_product_batch_lot_and_purchase_date` deciden que lote es
+ * numerico y cuenta para la serie (R9). La regla de la entrada y la serie tienen que coincidir en
+ * que es un lote numerico, y con el mismo texto eso se ve a simple vista.
+ */
+const NUMERIC_LOT_PATTERN = /^[0-9]+$/;
+
+const MESSAGE_LOTE_NUMERICO_LARGO = 'Un lote de solo números puede tener hasta 59 caracteres.';
+
+/**
  * Lote: OPCIONAL EN LA ENTRADA, OBLIGATORIO EN LA FILA (QC-81 R7, R8, R10).
  *
  * Son dos cosas distintas y no se contradicen. Desde QC-81 la columna `product_batches.lot` es
@@ -65,8 +78,27 @@ export const PRODUCT_BATCH_LOT_MAX_LENGTH = 60;
  * `min(1)`, como en el nombre del producto: si se aplicara despues, `'   '` pasaria el minimo y
  * solo se recortaria tras la validacion. Un lote de solo espacios no es un lote, es un campo
  * vacio, y se rechaza en vez de confundirse con «generalo».
+ *
+ * **Un lote TECLEADO de solo digitos no llega a 60 caracteres (D13, R34).** Si ya recortado casa con
+ * `NUMERIC_LOT_PATTERN` y tiene `PRODUCT_BATCH_LOT_MAX_LENGTH` caracteres o mas, se rechaza en el
+ * campo `lot` con su propio mensaje. Asi el mayor lote numerico tecleable es 10^59 - 1 y el siguiente
+ * GENERADO, como mucho 10^59, tiene 60 caracteres y cabe siempre (R36). Cuenta CARACTERES, no
+ * magnitud: un `'000…001'` de 60 se rechaza aunque valga 1. Un lote con algun caracter que no sea
+ * digito conserva sus 60 (R35). Los lotes generados no pasan por aqui (`design.md > 4.6`).
+ *
+ * `abort: true` en el `max`, por el mismo motivo que en `purchaseDateSchema`: zod v4 ejecuta el
+ * `refine` aunque el `max` haya fallado, y un lote de 61 digitos cobraria DOS rechazos. Con el corte,
+ * cada lote mal escrito recibe uno solo (R34).
  */
-const lotSchema = z.string().trim().min(1).max(PRODUCT_BATCH_LOT_MAX_LENGTH);
+const lotSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(PRODUCT_BATCH_LOT_MAX_LENGTH, { abort: true })
+  .refine(
+    (value) => !(NUMERIC_LOT_PATTERN.test(value) && value.length >= PRODUCT_BATCH_LOT_MAX_LENGTH),
+    { message: MESSAGE_LOTE_NUMERICO_LARGO },
+  );
 
 /** Forma de la fecha CIVIL `YYYY-MM-DD` que comparten la expiracion y la compra. */
 const CIVIL_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
