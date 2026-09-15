@@ -1,5 +1,6 @@
 'use client';
 
+import { LogOutIcon } from 'lucide-react';
 import { useActionState, useEffect, useId } from 'react';
 import { useFormStatus } from 'react-dom';
 
@@ -33,7 +34,7 @@ import {
   updateUserAction,
 } from '@/lib/modules/identity/adapters/driving/user-actions';
 
-import { toDateInputValue } from './user-labels';
+import { endUserSessionsLabel, toDateInputValue } from './user-labels';
 
 /**
  * El formulario del alta y de la edicion de usuario (R23, R24, R25, R26, R27, R35, R36;
@@ -99,6 +100,12 @@ export const USER_FORM_ERROR_TESTID = 'user-form-error';
 export const USER_FORM_ERROR_CODE_TESTID = 'user-form-error-code';
 export const USER_FORM_SUBMIT_TESTID = 'user-form-submit';
 export const USER_FORM_CANCEL_TESTID = 'user-form-cancel';
+
+/**
+ * `data-testid` del disparador del cierre de todas las sesiones de la persona del panel (QC-101 R7).
+ * Solo existe en el DOM cuando el panel entrega `endSessions` (R11, R12).
+ */
+export const USER_FORM_END_SESSIONS_TESTID = 'user-form-end-sessions';
 
 /** Un `data-testid` por campo, para localizarlos sin depender de su etiqueta (R41). */
 export const USER_FIELD_TESTIDS: Readonly<Record<UserFieldName, string>> = {
@@ -296,9 +303,28 @@ export type UserFormProps = {
   readonly rolesError: ErrorState | null;
   /** Exito: cerrar, avisar y refrescar lo decide el panel (R28, R29). */
   readonly onSaved: () => void;
+  /**
+   * El disparador del cierre de todas las sesiones de la persona del panel (QC-101 R7, R11, R12).
+   * **Sin esta prop no se emite NADA**, ni un contenedor vacio: la ausencia es la unica senal. Quien
+   * decide si llega es el panel, con datos bajados por props (R16); este formulario no decide.
+   */
+  readonly endSessions?: UserFormEndSessions;
 };
 
-export function UserForm({ user, roles, rolesError, onSaved }: UserFormProps) {
+/**
+ * Lo que el panel entrega para ofrecer el cierre de sesiones (QC-101 `design.md > 2`).
+ *
+ * Lleva el `displayName` ademas del callback porque la ficha (`UserDetail`) no lo trae y el nombre
+ * accesible del disparador tiene que nombrar a la persona (R7). Componerlo aqui con nombres y
+ * apellidos seria una segunda copia de `buildDisplayName`: el nombre llega hecho desde la fila.
+ */
+export type UserFormEndSessions = {
+  readonly displayName: string;
+  /** Abre la confirmacion. No escribe nada: la escritura es del dialogo (R9). */
+  readonly onEndSessions: () => void;
+};
+
+export function UserForm({ user, roles, rolesError, onSaved, endSessions }: UserFormProps) {
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
   const isEdit = user !== undefined;
@@ -463,6 +489,28 @@ export function UserForm({ user, roles, rolesError, onSaved }: UserFormProps) {
           optionTestId={USER_ROLE_OPTION_TESTID}
           options={roles.map((role) => ({ value: role.id, label: role.name }))}
         />
+
+        {/*
+          QC-101 R7, R11, R12, R15: el cierre de todas las sesiones de la persona del panel, al pie
+          del cuerpo. SOLO si el panel lo entrega; sin `endSessions` no se emite ni un contenedor.
+          `type="button"` es OBLIGATORIO: todo el panel es un `<form>` y un boton sin tipo enviaria
+          la edicion. Pulsarlo solo abre la confirmacion; la escritura es del dialogo (R9, R10).
+        */}
+        {endSessions === undefined ? null : (
+          <div className="border-t pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              className={`w-full ${TOUCH_TARGET}`}
+              aria-label={endUserSessionsLabel(endSessions.displayName)}
+              data-testid={USER_FORM_END_SESSIONS_TESTID}
+              onClick={endSessions.onEndSessions}
+            >
+              <LogOutIcon aria-hidden="true" />
+              {endUserSessionsLabel(endSessions.displayName)}
+            </Button>
+          </div>
+        )}
       </div>
     </SheetContent>
   );

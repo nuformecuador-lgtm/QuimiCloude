@@ -90,7 +90,7 @@ function paginaVacia(extra: { page?: number; totalPages?: number } = {}) {
 }
 
 async function renderSeccion(params: DataTableParams) {
-  return render(await UserListSection({ params, canModify: true }));
+  return render(await UserListSection({ params, canModify: true, currentUserId: null }));
 }
 
 beforeEach(() => {
