@@ -1,35 +1,9 @@
 /**
- * QC-80 T13 — la unidad de la presentacion por el CAMINO DE USO, contra Postgres REAL.
- *
- * QUE PRUEBA ESTE ARCHIVO Y QUE NO. Aqui se ejercitan los CASOS DE USO de escritura de
- * presentacion (`inventario.createPresentation` y `inventario.updatePresentation`) cableados con
- * el adaptador Prisma de verdad -no un doble-, tal como los consume una Server Action: se
- * importan de `@/lib/composition`, igual que hace `tests/integration/unidades/unit-write.int.test.ts`
- * con `unidades`. Lo que se vigila es lo que solo la base puede demostrar: que un `unitId` que no
- * corresponde a ninguna unidad del catalogo vuelve como `invalid_input` -traducido desde el
- * rechazo REAL de `presentations_unit_id_fkey`, no desde una comprobacion previa optimista- y no
- * deja fila; que la edicion REEMPLAZA la unidad de verdad en la columna; y que ninguno de los dos
- * caminos escribe en `product_batches` ni mueve ningun importe.
- *
- * La ESTRUCTURA -que la columna sea NOT NULL, que la FK sea RESTRICT, el indice- la prueban
- * `inventario-constraints.int.test.ts` (R1, R2) y los tests estaticos sobre el SQL de la
- * migracion. La unidad DERIVADA del lote mas reciente (R22, R23) la prueba
- * `list-query-products.int.test.ts` por el camino del listado.
- *
- * POR QUE NO HAY `prisma.$transaction` CON ROLLBACK: los casos de uso, a traves del adaptador
- * `presentation-prisma.ts`, llaman al cliente Prisma GLOBAL (`@/lib/shared/db/prisma`), no a un
- * `tx` inyectado; una llamada hecha «dentro» del callback de `$transaction` correria en OTRA
- * conexion del pool y no veria las filas de la transaccion. Se usa entonces la estrategia de
- * `unit-write.int.test.ts`: cada caso siembra sus filas con `prisma` real y las borra por su `id`
- * EXACTO, en el orden que exigen las FK (lotes -> productos -> presentaciones -> unidades).
- *
- * NINGUNA AFIRMACION GLOBAL: no se afirma «la tabla esta vacia» ni «hay N filas». Cada caso mira
- * solo lo que el mismo sembro, localizado por `id` o por un marcador irrepetible. Las unidades de
- * apoyo se crean aqui; la unidad de SISTEMA que algun caso necesita se resuelve por
- * `name_normalized` -NUNCA por un uuid escrito a mano: los identificadores los genera
- * `gen_random_uuid()` y son distintos en cada base-.
- *
- * Cubre R12, R13 y R28.
+ * Casos de uso cableados con el adaptador Prisma real, porque solo la base demuestra que una unidad
+ * inexistente vuelve como `invalid_input` traducida del rechazo de la FK y no de una comprobacion
+ * previa.
+ * Sin transaccion con ROLLBACK: el adaptador usa el cliente Prisma global, que corre en otra
+ * conexion y no veria las filas de la transaccion. Cada fila se borra en el `afterAll` por su `id`.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -41,28 +15,13 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import type { Actor } from '@/lib/modules/inventario';
 
-// ---------------------------------------------------------------------------
-// Datos de apoyo -sin transaccion, ver cabecera-
-// ---------------------------------------------------------------------------
-
 /** Marcador irrepetible de solo letras y digitos: sobrevive a cualquier normalizacion. */
 function token(): string {
   return randomUUID().replace(/-/gu, '');
 }
 
-/**
- * Empresa propia del archivo (QC-49 R1, R11, R17).
- *
- * Desde `<ts>_inventory_company_scope` el `Actor` de `inventario` lleva la empresa en cuyo
- * nombre se opera, y las tres tablas del modulo tienen `company_id` NOT NULL. Este archivo
- * mezcla filas sembradas DIRECTO por Prisma con filas creadas POR EL CASO DE USO, y las dos
- * caras tienen que caer en la MISMA empresa o dejarian de verse entre si: por eso hay una sola,
- * efimera, para todo el archivo.
- *
- * ESTE ARCHIVO NO PRUEBA EL AISLAMIENTO: sigue probando exactamente lo mismo que QC-80 -la
- * unidad de la presentacion y lo que la base hace con ella-. El aislamiento es
- * `company-scope-queries.int.test.ts`.
- */
+/** Una sola empresa para el archivo: las filas sembradas por Prisma y las creadas por el caso de
+ *  uso tienen que caer en la misma o dejarian de verse entre si. */
 let empresaDelArchivo: string;
 
 beforeAll(async () => {
@@ -84,9 +43,8 @@ const productosSembrados: string[] = [];
 const presentacionesSembradas: string[] = [];
 const unidadesSembradas: string[] = [];
 
-/** Unidad de apoyo. SIN empresa -de sistema- y con simbolo derivado del nombre: desde QC-76
- *  (R15) el simbolo es unico dentro del ambito y un literal fijo chocaria con el catalogo
- *  arrancador. Ningun aserto de este archivo lee el simbolo. */
+/** Simbolo derivado del marcador: es unico dentro del ambito y un literal fijo chocaria con el
+ *  catalogo arrancador. */
 async function sembrarUnidad(): Promise<string> {
   const marca = token();
   const { id } = await prisma.unit.create({
@@ -97,8 +55,7 @@ async function sembrarUnidad(): Promise<string> {
   return id;
 }
 
-/** Presentacion sembrada DIRECTO por Prisma -sin pasar por el caso de uso-, para construir el
- *  estado de partida de un caso. */
+/** Sin pasar por el caso de uso, para construir el estado de partida. */
 async function sembrarPresentacion(unitId: string): Promise<{ id: string; marca: string }> {
   const marca = token();
   const { id } = await prisma.presentation.create({
@@ -124,12 +81,11 @@ async function sembrarProducto(): Promise<string> {
   return id;
 }
 
-/** Lote con existencia e importe REALES: es la fila que R28 no deja tocar. */
+/** Existencia e importe reales: es la fila que escribir una presentacion no debe tocar. */
 async function sembrarLote(productId: string, presentationId: string): Promise<string> {
   const { id } = await prisma.productBatch.create({
-    // QC-49 R2/R22: el lote declara SU empresa, y `product_batches_check_company` exige que
-    // coincida con la de su producto Y con la de su presentacion. Las tres son la del archivo.
-    // QC-81: lote obligatorio y unico por empresa, y fecha de compra obligatoria (fecha civil).
+    // `product_batches_check_company` exige la misma empresa en lote, producto y presentacion,
+    // y `lot` es unico por empresa.
     data: {
       productId,
       presentationId,
@@ -152,24 +108,20 @@ function anotarParaBorrar(id: string): string {
 }
 
 afterAll(async () => {
-  // Por `id` EXACTO y en el orden que exigen las FK, todas ON DELETE RESTRICT.
+  // Por `id` exacto y en el orden que exigen las FK.
   await prisma.productBatch.deleteMany({ where: { id: { in: lotesSembrados } } });
   await prisma.product.deleteMany({ where: { id: { in: productosSembrados } } });
   await prisma.presentation.deleteMany({ where: { id: { in: presentacionesSembradas } } });
   await prisma.unit.deleteMany({ where: { id: { in: unidadesSembradas } } });
-  // La empresa del archivo va la ULTIMA: las tres FK a `companies` son ON DELETE RESTRICT.
+  // La empresa va la ultima: la referencian las tres tablas de inventario.
   await prisma.company.deleteMany({ where: { id: empresaDelArchivo } });
   await prisma.$disconnect();
 });
 
-// ---------------------------------------------------------------------------
-
 describe('R13 — la unidad que no existe en el catalogo se rechaza con invalid_input y no escribe nada', () => {
   it('el ALTA con una unidad inexistente falla y no deja ninguna presentacion', async () => {
-    // R13. El uuid es sintacticamente valido -pasa zod- y no corresponde a ninguna fila de
-    // `units`: el unico que puede rechazarlo es `presentations_unit_id_fkey`. Eso es lo que este
-    // archivo aporta sobre el unitario, que puede afirmar la traduccion del `'invalid_unit'` pero
-    // no que la base lo produzca.
+    // El uuid pasa zod y no existe en `units`: solo `presentations_unit_id_fkey` puede
+    // rechazarlo, y eso es lo que el unitario no demuestra.
     const marca = token();
     const nombre = `Bidon fantasma ${marca}`;
 
@@ -177,7 +129,6 @@ describe('R13 — la unidad que no existe en el catalogo se rechaza con invalid_
       inventario.createPresentation({ name: nombre, unitId: randomUUID() }, actorAutorizado()),
     ).rejects.toBeInstanceOf(ValidationError);
 
-    // «Sin escribir nada»: se busca lo que el intento habria escrito, no el total de la tabla.
     const supervivientes = await prisma.presentation.findMany({
       where: { name: nombre },
       select: { id: true },
@@ -186,9 +137,8 @@ describe('R13 — la unidad que no existe en el catalogo se rechaza con invalid_
   });
 
   it('el rechazo por unidad inexistente es DISTINGUIBLE del rechazo por nombre duplicado', async () => {
-    // R13, la mitad que de verdad muerde: los dos caminos fallan, pero no con el mismo error. Si
-    // el adaptador tradujera cualquier rechazo de la base a «ya existe ese nombre», la pantalla
-    // pediria cambiar el nombre ante una unidad rota, y el usuario no saldria nunca de ahi.
+    // Si el adaptador tradujera cualquier rechazo a «ya existe ese nombre», la pantalla pediria
+    // cambiar el nombre ante una unidad rota.
     const unitId = await sembrarUnidad();
     const marca = token();
     const nombre = `Caneca ${marca}`;
@@ -207,8 +157,7 @@ describe('R13 — la unidad que no existe en el catalogo se rechaza con invalid_
       ),
     ).rejects.toBeInstanceOf(ValidationError);
 
-    // Y el error de unidad NO es un duplicado disfrazado: `ValidationError` no hereda de
-    // `PresentationDuplicateNameError` ni al reves, y el codigo que viaja a la pantalla es otro.
+    // Descarta que el error de unidad sea un duplicado por herencia.
     await expect(
       inventario.createPresentation(
         { name: `Caneca otra ${marca}`, unitId: randomUUID() },
@@ -220,8 +169,7 @@ describe('R13 — la unidad que no existe en el catalogo se rechaza con invalid_
   });
 
   it('la EDICION con una unidad inexistente falla y deja la presentacion con su unidad anterior', async () => {
-    // R13 en el otro camino. Lo que se comprueba despues del rechazo es que la fila no quedo a
-    // medias: ni el nombre nuevo sin la unidad nueva, ni al reves.
+    // La fila no puede quedar a medias: ni el nombre nuevo sin la unidad nueva, ni al reves.
     const unitId = await sembrarUnidad();
     const { id, marca } = await sembrarPresentacion(unitId);
 
@@ -243,8 +191,7 @@ describe('R13 — la unidad que no existe en el catalogo se rechaza con invalid_
 
 describe('R12 — la edicion REEMPLAZA la unidad', () => {
   it('editar con otra unidad deja la nueva en la columna, y no conserva la anterior', async () => {
-    // R12. La edicion es reemplazo completo: nombre Y unidad. El caso pide las dos cosas a la vez
-    // para que un adaptador que escribiera solo `name` -olvidandose de `unit_id`- se pusiera rojo.
+    // Nombre y unidad a la vez, para que un adaptador que escribiera solo `name` se ponga rojo.
     const unidadVieja = await sembrarUnidad();
     const unidadNueva = await sembrarUnidad();
     const { id, marca } = await sembrarPresentacion(unidadVieja);
@@ -262,14 +209,12 @@ describe('R12 — la edicion REEMPLAZA la unidad', () => {
     expect(despues.unitId).toBe(unidadNueva);
     expect(despues.unitId).not.toBe(unidadVieja);
     expect(despues.name).toBe(`Presentacion editada ${marca}`);
-    // El nombre normalizado se recalcula en la misma escritura: sin esto, la presentacion
-    // quedaria encontrable por su nombre VIEJO, en silencio.
+    // Sin esto, la presentacion quedaria encontrable por su nombre viejo, en silencio.
     expect(despues.nameNormalized).toBe(`presentacioneditada${marca}`);
   });
 
   it('la unidad tambien se puede editar SIN cambiar el nombre', async () => {
-    // R12, el borde que un reemplazo mal escrito se come: si la edicion solo tocara `unit_id`
-    // cuando el nombre cambia, este caso se quedaria con la unidad vieja.
+    // Si la edicion solo tocara `unit_id` cuando cambia el nombre, aqui quedaria la unidad vieja.
     const unidadVieja = await sembrarUnidad();
     const unidadNueva = await sembrarUnidad();
     const { id, marca } = await sembrarPresentacion(unidadVieja);
@@ -290,9 +235,8 @@ describe('R12 — la edicion REEMPLAZA la unidad', () => {
 
 describe('R28 — ni el alta ni la edicion de una presentacion mueven ninguna existencia ni ningun importe', () => {
   it('crear y editar presentaciones deja el lote del producto identico, hasta el ultimo decimal', async () => {
-    // R28. El lote se siembra con existencia (17) e importe (123.4500) y APUNTA a la presentacion
-    // que luego se edita: es el caso en el que una escritura descuidada -un `update` en cascada,
-    // un recalculo «de conveniencia»- se llevaria algo por delante.
+    // El lote apunta a la presentacion que se edita: un `update` en cascada o un recalculo se lo
+    // llevaria por delante.
     const unidadVieja = await sembrarUnidad();
     const unidadNueva = await sembrarUnidad();
     const { id: presentationId, marca } = await sembrarPresentacion(unidadVieja);
@@ -301,9 +245,8 @@ describe('R28 — ni el alta ni la edicion de una presentacion mueven ninguna ex
 
     const loteAntes = await prisma.productBatch.findUniqueOrThrow({ where: { id: loteId } });
     const lotesAntes = await prisma.productBatch.count({ where: { productId } });
-    // La cuenta de pedidos se compara CONSIGO MISMA antes y despues, en la misma consulta y con
-    // milisegundos de diferencia: no es una afirmacion sobre cuantos pedidos hay en la base -eso
-    // seria fragil-, sino sobre que este camino no escribe ninguno.
+    // La cuenta de pedidos se compara consigo misma: no afirma cuantos hay, sino que este camino
+    // no escribe ninguno.
     const pedidosAntes = await prisma.order.count();
 
     const creada = await inventario.createPresentation(
@@ -317,19 +260,15 @@ describe('R28 — ni el alta ni la edicion de una presentacion mueven ninguna ex
       actorAutorizado(),
     );
 
-    // El lote entero, columna por columna: misma existencia, mismo costo unitario, misma
-    // presentacion y NI SIQUIERA otra marca de modificacion.
     const loteDespues = await prisma.productBatch.findUniqueOrThrow({ where: { id: loteId } });
     expect(loteDespues).toEqual(loteAntes);
     expect(loteDespues.stock).toBe(17);
     expect(loteDespues.unitCost.toFixed(4)).toBe('123.4500');
     expect(loteDespues.presentationId).toBe(presentationId);
 
-    // Ni un lote de mas ni uno de menos para ese producto, y ningun pedido nuevo.
     expect(await prisma.productBatch.count({ where: { productId } })).toBe(lotesAntes);
     expect(await prisma.order.count()).toBe(pedidosAntes);
 
-    // Y el producto tampoco se movio: sigue sin declarar unidad (R21) y con sus propias marcas.
     const producto = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
     expect(Object.keys(producto)).not.toContain('unitId');
   });
