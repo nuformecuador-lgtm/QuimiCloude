@@ -112,9 +112,13 @@
       **Hecho:** las reglas disparan con datos fabricados y estan verdes con el repo real.
       *Depende de: T1..T10 (mide el diff entero).*
 
-- [x] **T12 — Trazabilidad y cierre.** Escribir el mapa `R1..R22 -> test` en
+- [ ] **T12 — Trazabilidad y cierre.** Escribir el mapa `R1..R22 -> test` en
       `progress/impl_QC-101-cierre-de-sesiones-de-otro-desde-la-pantalla.md` y correr `./init.sh`
       completo.
       **Hecho:** gate en verde, ningun `R<n>` sin test, y la deuda de `current-actor.ts`
       (`design.md > 7`) anotada para el leader.
       *Depende de: T11.*
+      **Estado (implementer, 2026-09-15, vuelta de review m3):** abierta a proposito. El mapa
+      `R1..R22 -> test` y la deuda de `current-actor.ts` estan escritos en la bitacora; el
+      `./init.sh` completo **lo corre el leader** (AGENTS.md > «Regla del gate»), y hasta que
+      su salida no este en verde y en la bitacora, «gate en verde» no se cumple.
