@@ -47,7 +47,7 @@ que es puro y no necesita base.
 **Hecho cuando:** los cuatro casos pasan en `pnpm test` y el mapa `R2, R3 -> este archivo` esta
 escrito en el progreso. (R4/R5 se cierran en T11 con la corrida real, que es donde hay base.)
 
-## T5 — Migrar los **cuatro casos** de «acaba fuera»  ·  R11, R12, R13
+## [x] T5 — Migrar los **cuatro casos** de «acaba fuera»  ·  R11, R12, R13
 
 Toca, uno por tarea paralela:
 
@@ -160,7 +160,7 @@ Motivo y diseno en `design.md > 9`. **No se desmarca ninguna `[x]`.** Las tasks 
 alcanza el cambio (T10, T12 y T13) tienen aqui su task de **revision**. T4, T7 y T9 no cambian: el
 helper, `session.spec.ts`, `permisos.spec.ts` y la guardia se quedan como estan.
 
-## T14 — Caso de inventario (R4) con un rol efimero sin permisos  ·  R11, R12, R13, R25, R26, R27, R28
+## [x] T14 — Caso de inventario (R4) con un rol efimero sin permisos  ·  R11, R12, R13, R25, R26, R27, R28
 
 Toca: **solo `e2e/inventario.spec.ts`**. Depende de T2 (hecha). Cierra la parte pendiente de T5.
 
@@ -190,7 +190,7 @@ Toca: **solo `e2e/inventario.spec.ts`**. Depende de T2 (hecha). Cierra la parte 
   restaura desde la copia y se confirma con `git diff --stat -- e2e/inventario.spec.ts` que solo queda
   el cambio de T14.
 
-## T15 — Revision de T10: auditoria del diff prohibido  ·  R19, R20, R21, R22
+## [x] T15 — Revision de T10: auditoria del diff prohibido  ·  R19, R20, R21, R22
 
 Toca: nada. Depende de T14.
 

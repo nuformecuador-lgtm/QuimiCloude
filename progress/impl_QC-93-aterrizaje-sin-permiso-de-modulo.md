@@ -355,6 +355,117 @@ viene despues, y esa no se puede arreglar sin reabrir R11-R13.
 `sessions_valid_from` sin truncar contra `iat <= sello`) necesita su propia ficha: tumbo `pedidos.spec.ts:440` y
 `recetas.spec.ts:317` en el intento 2 y puede tumbar cualquier suite que entre en el mismo segundo en que crea su usuario.
 
+## Enmienda del 2026-09-15 — T14 a T17
+
+El humano aprobo la enmienda del spec (commit `77c9016`): **el Operador CONSERVA `inventario.consultar`** (R19
+intacto) y el caso R4 de `e2e/inventario.spec.ts` entra con un **rol efimero de la suite sin permisos** (R25-R28, R11
+enmendado, `design.md > 9`). Resuelve el bloqueo de §0.1.4.
+
+### T14 — El caso R4 con un rol efimero sin permisos (R11-R13, R25-R28) · `frontend_dev`
+
+Commit `e40203b`. Solo `e2e/inventario.spec.ts`:
+
+- **Rol (R27):** `prisma.role.create` con nombre `qc22_e2e_rol_<RUN_ID>` (constante `noPermissionsRoleName`, prefijo
+  `ROLE_NAME_PREFIX` colgado de `FIXTURE_PREFIX`) y **sin `permissions`**, justo despues de la empresa efimera.
+- **Usuario (R25):** `noInventoryUser` (`qc22_e2e_noinv_<RUN_ID>`), creado con el `createUserWithRole` existente en la
+  **misma empresa** que el Administrador que da de alta el catalogo. Sustituye a `operatorUser`; fuera los imports
+  `ROLE_OPERADOR` y `DASHBOARD_ROUTE`.
+- **El caso** (`:606`) — `un usuario sin inventario.consultar recibe 404 dentro del layout privado y no ve el catalogo (R4)`:
+  premisa de R26 leida de la base (`permissionsForUsername(...)` no contiene `inventario.consultar`, con mensaje propio),
+  `landing !== INVENTORY_ROUTE`, `status 404`, pathname sin redireccion, `private-not-found` visible y cuenta cero de
+  `inventario-title`, `data-table` y `product-list-empty`. Titulo con `(R4)`.
+- **`afterAll` (R27):** el borrado de usuarios incluye a `noInventoryUser`; despues, el rol por su **nombre exacto**, y
+  despues la empresa. No toca `revoked_sessions`: este caso no cierra sesion.
+- **Barrido de huerfanos (R28):** primero los roles `qc22_e2e_rol_*` con mas de una hora; luego los usuarios del prefijo
+  viejos **o** cuyo rol este entre esos (aunque sean recientes); luego esos roles; al final las empresas. El prefijo
+  propio es condicion en todas las ramas.
+- **Cabecera** (`:14-15`, `:41-45`) corregida: ya no dice que el spec no crea roles ni habla de la regla ruta->rol.
+- Revisado el diff por el implementer. Queda un resto que el subagente vio y no toco por estar fuera de los seis pasos:
+  el mensaje de error de `createUserWithRole` (~`:185`) sigue citando «la regla ruta-rol»; solo se veria si faltara un
+  rol, y no cambia ninguna afirmacion.
+
+**(a)-(c) — verificacion del implementer antes del commit:**
+
+```
+pnpm run typecheck                                            -> EXIT=0
+pnpm run lint                                                 -> EXIT=0
+pnpm exec vitest run tests/guards/guard-e2e-landing.test.ts   -> EXIT=0   Tests  16 passed (16)
+grep -n "ROLE_OPERADOR\|operatorUser" e2e/inventario.spec.ts  -> (nada; exit 1)
+pnpm exec playwright test --list                              -> Total: 80 tests in 18 files
+```
+
+**(d) — `e2e/inventario.spec.ts` solo, chromium + webkit** (`e40203b`, base recien copiada de la plantilla,
+`--workers=3`; log `progress/e2e_QC-93_T14_inventario.log`): `6 failed / 2 passed (2.5m)`.
+
+```
+✓ [chromium] › e2e\inventario.spec.ts:606:7 › ... un usuario sin inventario.consultar recibe 404 dentro del layout privado y no ve el catalogo (R4)
+✓ [webkit]   › e2e\inventario.spec.ts:606:7 › ... un usuario sin inventario.consultar recibe 404 dentro del layout privado y no ve el catalogo (R4)
+✘ :426, :494, :550 en los dos motores -> expect(getByTestId('presentation-create')).toHaveCount(0): Received 1   (causa B, QC-80)
+```
+
+El caso R4 queda **verde en los dos motores**. Los 6 rojos del archivo son la causa B de T1/T12 (la unidad de la
+presentacion es obligatoria desde QC-80 y el alta no la elige), que `tasks.md > T14 (d)` permite que sigan.
+
+**(e) — residuo tras esa corrida** (sonda de solo lectura por prefijo `qc22_e2e_`):
+
+```
+roles qc22_e2e_rol_*: 0
+usuarios qc22_e2e_*: 0
+empresas qc22_e2e_*: 0
+roles del seed: Administrador, Operador
+role_permissions totales: 17
+```
+
+Cero residuo de la suite, los roles del seed intactos y `role_permissions` en las 17 filas de la plantilla: la suite no
+escribio ni un permiso (R27).
+
+**(f) — la premisa de R26 muerde** (log `progress/e2e_QC-93_T14_mutacion_R26.log`, 2026-09-15 11:21:50).
+Copia de `e2e/inventario.spec.ts` con `cp` al scratchpad; mutacion aplicada por reemplazo exacto (1 coincidencia) en el
+`role.create` del rol efimero; solo el caso R4 (`-g "sin inventario.consultar"`), chromium + webkit; restauracion con `cp`:
+
+```
+mutacion aplicada: 1
++      name: noPermissionsRoleName, permissions: { create: [{ permissionCode: 'inventario.consultar' }] },
+  2 failed                                   (chromium y webkit, los dos en el mismo punto)
+  Error: la premisa del caso: si el usuario tuviera inventario.consultar, este caso no comprobaria su titulo
+  expect(received).not.toContain(expected) // indexOf
+  Expected value: not "inventario.consultar"
+  Received array:     ["inventario.consultar"]
+  > 614 |     ).not.toContain('inventario.consultar');
+restaurado con cp
+git diff --stat -- e2e/inventario.spec.ts (debe estar vacio): []
+```
+
+Sale rojo **en la premisa** (`:614`), antes de `loginAndLand` (`:617`): con un rol que SI tuviera el permiso, el caso no
+llega a un verde que ya no comprobaria su titulo. HEAD siguio en `e40203b`.
+
+Residuo que dejo la corrida mutada, medido y esperado: `roles qc22_e2e_rol_*: 2`, cada uno con `permissions: 1` y
+`users: 0`; `usuarios` y `empresas` del prefijo: 0; `role_permissions` 19 (17 + las dos filas de la mutacion). El
+`afterAll` no puede borrar un rol con permisos (`role.deleteMany`, `:400`, FK de `role_permissions -> roles`
+`Restrict`). **Limite anotado, no defecto:** el barrido de huerfanos de R28 chocaria con esa misma FK ante un rol del
+prefijo CON permisos; R27 prohibe que exista fuera de esta mutacion, y la base se recrea desde la plantilla antes de T16.
+
+Con (a)-(f), **T14 queda hecha y cierra la parte pendiente de T5**: los cuatro casos de «acaba fuera» estan migrados.
+
+### T15 — Revision de T10: auditoria del diff prohibido (R19-R22)
+
+Revision del 2026-09-15 11:18:42 sobre `e40203b` (arbol con T14):
+
+```
+git diff --stat origin/dev...HEAD -- app lib db scripts package.json pnpm-lock.yaml   -> (vacio)
+git status --porcelain -- app lib db scripts package.json pnpm-lock.yaml             -> (vacio)
+lib/modules/identity/domain/permissions.ts:            cambios=0
+lib/modules/identity/adapters/driving/login-action.ts: cambios=0
+lib/shared/navigation/private-nav.ts:                  cambios=0
+app/(private)/not-found.tsx:                           cambios=0
+package.json:                                          cambios=0
+pnpm-lock.yaml:                                        cambios=0
+permissions.ts:165   [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar'],
+```
+
+La feature sigue tocando solo `e2e/**` (helper + 14 suites), `tests/guards/guard-e2e-landing.test.ts`,
+`tests/unit/e2e-helpers/landing.test.ts`, `specs/QC-93-*` y `progress/`.
+
 ## Mapa R -> test (T13)
 
 | R | Test / evidencia |
