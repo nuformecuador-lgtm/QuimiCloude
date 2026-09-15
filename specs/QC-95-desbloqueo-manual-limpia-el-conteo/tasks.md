@@ -19,6 +19,10 @@
 
 ### T1. El puerto gana el campo `lockState`
 
+- [x] **T1 hecha** (comprobado 2026-09-15): `lockState: AccountLockState | null` en la variante
+  `account_status` de `GuardedChange` (`user-admin-repository.ts:137`) con su JSDoc (131-136);
+  `tsc --noEmit` exit 0 en el worktree.
+
 - En `lib/modules/identity/ports/user-admin-repository.ts`: la variante `account_status` de
   `GuardedChange` gana `lockState: AccountLockState | null` (importando `AccountLockState` de
   `../domain/account-lock`).
@@ -28,6 +32,13 @@
 ---
 
 ### T2. El adaptador escribe los contadores en la misma escritura (R1, R3)
+
+- [x] **T2 hecha** (cerrada 2026-09-15, commit `394a6d7`, menor m4 de la re-review): el «Hecho»
+  que faltaba lo da `tests/unit/identity/usuarios/user-admin-prisma-lock-state.test.ts`, que
+  prueba un unico `updateMany` con `accountStatus` y los tres contadores en el MISMO `data`
+  cuando `lockState` no es `null`, y sin ninguno cuando es `null`. Cae si los contadores van en
+  un segundo `updateMany`. El aborto (`last_administrator`, `not_found`) con los contadores
+  intactos esta en `session-stamp-writes.int.test.ts`.
 
 - En `lib/modules/identity/adapters/driven/persistence/user-admin-prisma.ts`, dentro de
   `applyGuardedChange`, el `data` del `updateMany` de la variante `account_status` añade
@@ -44,6 +55,10 @@
 
 ### T3. El caso de uso decide por el destino y llama a `clearedLockState` (R1, R2, R4, R6)
 
+- [x] **T3 hecha** (comprobado 2026-09-15): `set-user-account-status.ts:69` calcula `lockState`
+  con `clearedLockState()` y lo pasa al puerto; el archivo no contiene `failedAttempts`,
+  `lockLevel`, `lockedUntil` ni ningun literal cero/cero/null (grep vacio); `tsc --noEmit` exit 0.
+
 - En `lib/modules/identity/domain/set-user-account-status.ts`: importar `clearedLockState` de
   `./effective-account-status` por ruta relativa.
 - Calcular `const lockState = parsed.data.accountStatus === 'blocked' ? null : clearedLockState();`
@@ -55,6 +70,14 @@
 ---
 
 ### T4. Tests del caso de uso (R1, R2, R4, R5)
+
+- [x] **T4 hecha** (completada 2026-09-15, commit `394a6d7`, B2 y m3 de la re-review):
+  `set-user-account-status-lock.test.ts` cubre R1, R2 y R4, y R5 con un encadenado real
+  (caso de uso -> `verify-credentials`) en lugar del caso tautologico.
+  `set-user-account-status-cleared-lock-state.test.ts` cubre R6 con un doble centinela y `toBe`.
+  `admin-guards.test.ts` sigue verde sin cambios de expectativa. Corrida con `vitest run` sobre los
+  archivos tocados, sus relacionados y las guardias que leen disco: 13 archivos, 279 verdes y
+  12 skipped (de rama, ajenos).
 
 - En `tests/unit/identity/usuarios/` (ampliando `admin-guards.test.ts` o un archivo nuevo
   `set-user-account-status-lock.test.ts`), con dobles del puerto:
@@ -75,6 +98,12 @@
 
 ### T5. Comentarios obsoletos y grep de control
 
+- [x] **T5 hecha** (cerrada 2026-09-15, commit `fdea487`, menor m1 de la re-review): se
+  reescribieron las dos notas que seguian obsoletas (`user-input.ts:20-23`, `user-view.ts:15-17`).
+  El grep de la task, ampliado con `no (los )?lee(n)? ni (los )?escribe`, ya no devuelve ninguna
+  nota que contradiga el codigo; cada linea restante esta justificada en
+  `progress/impl_QC-95-guardia-r45-de-qc-66.md`.
+
 - `grep -rn "R45\|es de QC-78\|limpiar" lib/modules/identity/` para localizar TODAS las notas
   que decían «no se toca / es de QC-78» y dejarlas actualizadas a «QC-95 enmienda R45: se limpia
   al salir de `blocked`». No debe quedar ninguna nota que afirme lo contrario de lo que el código
@@ -84,6 +113,13 @@
 ---
 
 ### T6. Guardias de alcance y gate completo
+
+- [ ] **T6 NO cerrada** (2026-09-15): falta su «Hecho», `./init.sh` completo en verde, que corre
+  el leader. El resto esta hecho:
+  - B1 retensa la unica guardia que enumeraba escritores de los contadores (`usuarios/scope.test.ts`, commit `fdea487`).
+  - Se crea la guardia de alcance de la ficha, `tests/guards/guard-qc95-alcance-del-pr-70.test.ts` (R8, R9, R10; commit `16249df`).
+  - `vitest run guard` sale verde: 40 archivos, 426 casos.
+  - El mapa `R<n> -> test` esta en `progress/impl_QC-95-guardia-r45-de-qc-66.md`.
 
 - Verificar que las guardias por-ficha de QC-19/QC-78/QC-65 (`qc78-alcance.test.ts`,
   `account-status-scope.test.ts`, `credential-policy-contract.test.ts`) quedan **mudas/verdes**
