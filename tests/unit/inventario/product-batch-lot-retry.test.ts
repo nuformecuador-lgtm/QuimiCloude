@@ -7,12 +7,12 @@ import { Prisma } from '@prisma/client';
 
 const doble = vi.hoisted(() => {
   const productCreate = vi.fn();
-  const productFindFirst = vi.fn();
   const batchCreate = vi.fn();
   const executeRaw = vi.fn();
   const queryRaw = vi.fn();
+  // Sin `product.findFirst`: si el alta volviera a leer el producto sin lock, fallaria aqui.
   const tx = {
-    product: { create: productCreate, findFirst: productFindFirst },
+    product: { create: productCreate },
     productBatch: { create: batchCreate },
     $executeRaw: executeRaw,
     $queryRaw: queryRaw,
@@ -20,7 +20,6 @@ const doble = vi.hoisted(() => {
   return {
     tx,
     productCreate,
-    productFindFirst,
     batchCreate,
     executeRaw,
     queryRaw,
@@ -88,7 +87,6 @@ beforeEach(() => {
     async (run: (client: typeof doble.tx) => Promise<unknown>) => run(doble.tx),
   );
   doble.productCreate.mockResolvedValue({ id: PRODUCTO_ID });
-  doble.productFindFirst.mockResolvedValue({ id: PRODUCTO_ID });
   doble.batchCreate.mockResolvedValue({ id: LOTE_ID });
   doble.executeRaw.mockResolvedValue(0);
   doble.queryRaw.mockResolvedValue([{ top: '41' }]);
@@ -219,9 +217,31 @@ describe('createWithFirstBatch — lote ESCRITO A MANO que choca: rechazo distin
   });
 });
 
+/** El SQL de una llamada al doble de `$queryRaw`, que recibe un `Prisma.Sql`. */
+function sqlDe(llamada: unknown): string {
+  return (llamada as Prisma.Sql).sql;
+}
+
+/**
+ * El alta sobre producto existente hace dos lecturas crudas: la de la fila del producto y la del
+ * maximo. Se reparten por la tabla que leen, no por el orden, para que un cambio de orden no
+ * cambie lo que devuelve cada una.
+ */
+function doblarLecturas(producto: { id: string } | null, maximos: readonly string[] = []): void {
+  const pendientes = [...maximos];
+  doble.queryRaw.mockImplementation(async (consulta: unknown) => {
+    if (sqlDe(consulta).includes('FROM "products"')) return producto === null ? [] : [producto];
+    return [{ top: pendientes.shift() ?? null }];
+  });
+}
+
 describe('addBatchToAlive — el mismo reintento en el otro camino que escribe lote (R13, R15)', () => {
+  beforeEach(() => {
+    doblarLecturas({ id: PRODUCTO_ID }, ['41']);
+  });
+
   it('con lote generado reintenta y a la segunda escribe', async () => {
-    doble.queryRaw.mockResolvedValueOnce([{ top: '7' }]).mockResolvedValueOnce([{ top: '8' }]);
+    doblarLecturas({ id: PRODUCTO_ID }, ['7', '8']);
     doble.batchCreate.mockRejectedValueOnce(choqueDeLote()).mockResolvedValueOnce({ id: LOTE_ID });
 
     await expect(addBatchToAlive(PRODUCTO_ID, LOTE_GENERADO, AHORA, AMBITO)).resolves.toEqual({
@@ -243,12 +263,54 @@ describe('addBatchToAlive — el mismo reintento en el otro camino que escribe l
   });
 
   it('con el producto borrado o ajeno devuelve null sin pedir lock ni escribir', async () => {
-    doble.productFindFirst.mockResolvedValueOnce(null);
+    doblarLecturas(null);
 
     await expect(addBatchToAlive(PRODUCTO_ID, LOTE_GENERADO, AHORA, AMBITO)).resolves.toBeNull();
 
     expect(doble.transaction).toHaveBeenCalledTimes(1);
     expect(doble.executeRaw).not.toHaveBeenCalled();
     expect(doble.batchCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe('addBatchToAlive — la fila del producto se bloquea antes que el correlativo (R37)', () => {
+  it('R37: addBatchToAlive bloquea la fila del producto con FOR NO KEY UPDATE antes de pedir el lock del correlativo', async () => {
+    doblarLecturas({ id: PRODUCTO_ID }, ['41']);
+
+    await expect(addBatchToAlive(PRODUCTO_ID, LOTE_GENERADO, AHORA, AMBITO)).resolves.toEqual({
+      batchId: LOTE_ID,
+    });
+
+    const ordenDe = (mock: { mock: { invocationCallOrder: number[] } }): number[] =>
+      mock.mock.invocationCallOrder;
+    const llamadasDeLaTransaccion = [
+      ...ordenDe(doble.queryRaw),
+      ...ordenDe(doble.executeRaw),
+      ...ordenDe(doble.batchCreate),
+      ...ordenDe(doble.productCreate),
+    ];
+    const primeraLectura = ordenDe(doble.queryRaw)[0];
+    const lockDeAviso = ordenDe(doble.executeRaw)[0];
+
+    expect(primeraLectura).toBe(Math.min(...llamadasDeLaTransaccion));
+    expect(lockDeAviso).toBeDefined();
+    expect(primeraLectura).toBeLessThan(lockDeAviso as number);
+
+    const consulta = doble.queryRaw.mock.calls[0]?.[0] as Prisma.Sql;
+    expect(consulta.sql).toContain('FOR NO KEY UPDATE');
+    expect(consulta.sql).toContain('deleted_at');
+    expect(consulta.values).toEqual([PRODUCTO_ID, EMPRESA]);
+    expect(sqlDe(doble.executeRaw.mock.calls[0]?.[0])).toContain('pg_advisory_xact_lock');
+  });
+
+  it('R37: sin fila viva que bloquear, addBatchToAlive devuelve null con la lectura bloqueante como unica sentencia', async () => {
+    doblarLecturas(null);
+
+    await expect(addBatchToAlive(PRODUCTO_ID, LOTE_GENERADO, AHORA, AMBITO)).resolves.toBeNull();
+
+    expect(doble.queryRaw).toHaveBeenCalledTimes(1);
+    expect(sqlDe(doble.queryRaw.mock.calls[0]?.[0])).toContain('FOR NO KEY UPDATE');
+    expect(doble.executeRaw).toHaveBeenCalledTimes(0);
+    expect(doble.batchCreate).toHaveBeenCalledTimes(0);
   });
 });

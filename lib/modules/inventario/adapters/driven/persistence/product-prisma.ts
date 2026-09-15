@@ -513,6 +513,8 @@ export async function createWithFirstBatch(
   });
 }
 
+type AliveProductRow = { readonly id: string };
+
 /** Con `productId` escalar y no como escritura anidada desde `product`, que dispararia el
  *  `@updatedAt` de `products`. */
 export async function addBatchToAlive(
@@ -521,14 +523,24 @@ export async function addBatchToAlive(
   now: Date,
   scope: InventoryScope,
 ): Promise<{ batchId: string } | null> {
-  return writeBatchWithLotRetry(batch, scope, async (tx, resolveBatchLot) => {
-    const alive = await tx.product.findFirst({
-      where: { AND: [productCompanyScope(scope), { id: productId, deletedAt: null }] },
-      select: { id: true },
-    });
-    if (alive === null) return null;
+  const { companyId } = companyScopeColumns(scope);
 
-    // Despues de confirmar el producto: un alta que no va a escribir no pide lock.
+  return writeBatchWithLotRetry(batch, scope, async (tx, resolveBatchLot) => {
+    // El borrado logico toma este mismo lock sobre la fila, asi que uno espera al otro. En READ
+    // COMMITTED, el SELECT que espera vuelve a evaluar el WHERE y ya no ve la fila borrada.
+    const rows = await tx.$queryRaw<ReadonlyArray<AliveProductRow>>(Prisma.sql`
+      SELECT "id"
+        FROM "products"
+       WHERE "id" = ${productId}::uuid
+         AND "company_id" = ${companyId}::uuid
+         AND "deleted_at" IS NULL
+         FOR NO KEY UPDATE
+    `);
+    const alive = rows[0];
+    if (alive === undefined) return null;
+
+    // Despues de la fila: un alta que no va a escribir no pide lock, y el orden fila -> lock de
+    // aviso no puede formar un ciclo con el borrado, que solo toma la fila.
     const lot = await resolveBatchLot();
 
     const createdBatch = await tx.productBatch.create({

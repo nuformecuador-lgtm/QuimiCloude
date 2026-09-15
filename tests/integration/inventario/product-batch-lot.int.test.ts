@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { Prisma } from '@prisma/client';
 import { Client } from 'pg';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
@@ -485,6 +486,164 @@ describe('R14: altas simultaneas de la misma empresa obtienen lotes distintos y 
       expect((await lotsOfCompany(fixture)).length).toBe(ALTAS_POR_RONDA * RONDAS);
     } finally {
       spy.mockRestore();
+      await dropFixture(fixture);
+    }
+  });
+});
+
+/** Las mismas claves que el lock de aviso del correlativo en el adaptador. */
+const CORRELATIVO_LOCK_NAMESPACE = 81;
+const CORRELATIVO_LOCK_PREFIJO = 'product_batches_lot:';
+
+/** Muy por debajo de los 5 s por defecto de la transaccion interactiva de Prisma. */
+const COTA_DE_BLOQUEO_MS = 3_000;
+
+type Vigilada<T> = {
+  readonly operacion: Promise<T>;
+  readonly haTerminado: () => boolean;
+};
+
+/** Anota el nombre en `orden` cuando la operacion se asienta, salga bien o mal. */
+function vigilar<T>(nombre: string, operacion: Promise<T>, orden: string[]): Vigilada<T> {
+  let terminada = false;
+  const anotar = (): void => {
+    terminada = true;
+    orden.push(nombre);
+  };
+  void operacion.then(anotar, anotar);
+  return { operacion, haTerminado: () => terminada };
+}
+
+/**
+ * Espera a ver un backend de la base de la corrida bloqueado en uno de esos `wait_event`. Se lee
+ * por el pool de Prisma y no por el `Client` que sujeta el lock: dentro de una transaccion,
+ * `pg_stat_activity` se congela en la primera lectura.
+ */
+async function esperarBloqueo(
+  waitEvents: readonly string[],
+  observada: { readonly haTerminado: () => boolean },
+  siTerminaAntes: string,
+): Promise<void> {
+  const limite = Date.now() + COTA_DE_BLOQUEO_MS;
+  for (;;) {
+    const filas = await prisma.$queryRaw<ReadonlyArray<{ n: number }>>`
+      SELECT count(*)::int AS "n"
+        FROM pg_stat_activity
+       WHERE datname = current_database()
+         AND wait_event_type = 'Lock'
+         AND wait_event IN (${Prisma.join([...waitEvents])})`;
+    if ((filas[0]?.n ?? 0) > 0) return;
+    if (observada.haTerminado()) throw new Error(siTerminaAntes);
+    if (Date.now() > limite) {
+      throw new Error(`${siTerminaAntes}: nadie espero un lock ${waitEvents.join(' o ')} en ${COTA_DE_BLOQUEO_MS} ms`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+describe('R37: el alta de un lote y el borrado del mismo producto a la vez', () => {
+  // Exigen un pool de Prisma de mas de una conexion: el alta ocupa una mientras otra lee
+  // `pg_stat_activity`.
+
+  it('R37: con el borrado confirmado antes, el alta espera la fila, devuelve null y no escribe ningun lote', async () => {
+    const fixture = await createFixture();
+    const sujetador = new Client({ connectionString: connectionString() });
+    const orden: string[] = [];
+    const pendientes: Promise<unknown>[] = [];
+    try {
+      await sujetador.connect();
+      const base = await altaConLote(fixture, `BASE-${token()}`);
+      const lotesAntes = await lotsOfCompany(fixture);
+
+      await sujetador.query('BEGIN');
+      const borrado = await sujetador.query(
+        `UPDATE "products" SET "deleted_at" = now(), "updated_at" = now()
+          WHERE "id" = $1::uuid AND "company_id" = $2::uuid AND "deleted_at" IS NULL`,
+        [base.productId, fixture.companyId],
+      );
+      expect(borrado.rowCount).toBe(1);
+
+      const loteTecleado = `R37-${token()}`;
+      const alta = vigilar(
+        'alta',
+        addBatchToAlive(base.productId, newBatch(fixture, { lot: loteTecleado }), new Date(), ambito(fixture)),
+        orden,
+      );
+      pendientes.push(alta.operacion);
+
+      await esperarBloqueo(['transactionid', 'tuple'], alta, 'el alta no espero a la fila');
+      await sujetador.query('COMMIT');
+
+      const [resultado] = await Promise.allSettled([alta.operacion]);
+      if (resultado.status === 'rejected') {
+        const causa: unknown = resultado.reason;
+        throw causa;
+      }
+
+      expect(resultado.value).toBeNull();
+      expect(await lotsOfCompany(fixture)).toEqual(lotesAntes);
+      expect(await prisma.productBatch.count({ where: { productId: base.productId } })).toBe(1);
+    } finally {
+      // Cerrar la conexion deshace lo que no se confirmo y suelta los locks antes de limpiar.
+      await sujetador.end().catch(() => undefined);
+      await Promise.allSettled(pendientes);
+      await dropFixture(fixture);
+    }
+  });
+
+  it('R37: con el alta llegando antes, el borrado espera a que el alta confirme y el lote queda escrito antes del borrado', async () => {
+    const fixture = await createFixture();
+    const sujetador = new Client({ connectionString: connectionString() });
+    const orden: string[] = [];
+    const pendientes: Promise<unknown>[] = [];
+    try {
+      await sujetador.connect();
+      const base = await altaConLote(fixture, `BASE-${token()}`);
+
+      // Pausa el alta despues de bloquear la fila y antes de escribir el lote.
+      await sujetador.query('BEGIN');
+      await sujetador.query('SELECT pg_advisory_xact_lock($1::int, hashtext($2::text))', [
+        CORRELATIVO_LOCK_NAMESPACE,
+        CORRELATIVO_LOCK_PREFIJO + fixture.companyId,
+      ]);
+
+      const alta = vigilar(
+        'alta',
+        addBatchToAlive(base.productId, newBatch(fixture), new Date(), ambito(fixture)),
+        orden,
+      );
+      pendientes.push(alta.operacion);
+      await esperarBloqueo(['advisory'], alta, 'el alta no espero al lock de aviso del correlativo');
+
+      const borrado = vigilar('borrado', softDeleteAliveProduct(base.productId, new Date(), ambito(fixture)), orden);
+      pendientes.push(borrado.operacion);
+      await esperarBloqueo(['transactionid', 'tuple'], borrado, 'el borrado no espero al alta');
+
+      await sujetador.query('COMMIT');
+
+      const [resultadoAlta, resultadoBorrado] = await Promise.allSettled([alta.operacion, borrado.operacion]);
+      if (resultadoAlta.status === 'rejected') {
+        const causa: unknown = resultadoAlta.reason;
+        throw causa;
+      }
+      if (resultadoBorrado.status === 'rejected') {
+        const causa: unknown = resultadoBorrado.reason;
+        throw causa;
+      }
+
+      expect(orden).toEqual(['alta', 'borrado']);
+      const escrito = resultadoAlta.value;
+      if (escrito === null) throw new Error('addBatchToAlive devolvio null con el producto vivo');
+      expect(resultadoBorrado.value).toBe(true);
+      expect(await prisma.productBatch.count({ where: { id: escrito.batchId, productId: base.productId } })).toBe(1);
+      const producto = await prisma.product.findUniqueOrThrow({
+        where: { id: base.productId },
+        select: { deletedAt: true },
+      });
+      expect(producto.deletedAt).not.toBeNull();
+    } finally {
+      await sujetador.end().catch(() => undefined);
+      await Promise.allSettled(pendientes);
       await dropFixture(fixture);
     }
   });
