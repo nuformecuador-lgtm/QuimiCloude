@@ -367,15 +367,18 @@ describe('R13: la fecha de expiracion se guarda sin corrimiento de dia', () => {
   });
 });
 
-describe('R12 (lado base): lote y expiracion ausentes quedan en NULL', () => {
-  it('deja lot y expiry_date en NULL cuando no vienen', async () => {
+// PARTIDO EL 2026-09-15 POR QC-81 (design.md > 0.2, fila 10). Hasta QC-81 un solo caso afirmaba
+// que lote y expiracion ausentes quedaban en NULL (QC-90 R12). D7 deroga la mitad del lote: la
+// columna es NOT NULL y el lote ausente lo genera el backend. La mitad de la expiracion sigue igual.
+describe('R12 (lado base): la expiracion ausente queda en NULL y el lote ausente lleva correlativo', () => {
+  it('deja expiry_date en NULL cuando no viene', async () => {
     const fixture = await createFixture();
     const productIds: string[] = [];
 
     try {
       const creado = await createWithFirstBatch(
         newProduct(),
-        newBatch(fixture, { lot: null, expiryDate: null }),
+        newBatch(fixture, { expiryDate: null }),
         new Date(),
         ambito(fixture),
       );
@@ -383,8 +386,28 @@ describe('R12 (lado base): lote y expiracion ausentes quedan en NULL', () => {
 
       const fila = await readBatchAsText(creado.batchId);
       // NULL de verdad, no cadena vacia: ausente significa ausente.
-      expect(fila.lot).toBeNull();
       expect(fila.expiry_date).toBeNull();
+    } finally {
+      await dropFixture(fixture, productIds);
+    }
+  });
+
+  it('QC-81 R8, R9: escribe el lot ausente con el correlativo generado, no NULL', async () => {
+    const fixture = await createFixture();
+    const productIds: string[] = [];
+
+    try {
+      const creado = await createWithFirstBatch(
+        newProduct(),
+        newBatch(fixture, { lot: null }),
+        new Date(),
+        ambito(fixture),
+      );
+      productIds.push(creado.id);
+
+      const fila = await readBatchAsText(creado.batchId);
+      // La empresa del fixture nace sin lotes: el primer correlativo de su serie es '1'.
+      expect(fila.lot).toBe('1');
     } finally {
       await dropFixture(fixture, productIds);
     }

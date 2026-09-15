@@ -115,7 +115,7 @@
       ámbito de empresa en verde; el contrato público **no** expone listar/editar/borrar lotes
       (**R32**).
 
-- [ ] **T8 — Integración contra base real, incluida la carrera.** Depende de T6 y T7.
+- [x] **T8 — Integración contra base real, incluida la carrera.** Depende de T6 y T7.
       Archivos: `tests/integration/inventario/product-batch-lot.int.test.ts` (nuevo),
       `tests/integration/aislamiento.json` (entrada nueva en **`commit`** con motivo y `desde`).
       Casos exigidos, y ninguno se puede sustituir por un unitario:

@@ -452,7 +452,155 @@ $ pnpm exec vitest run guard
 3. `vitest related`: tres archivos de integracion con `Argument lot is missing`, que son los mismos
    fixtures.
 
-## Estado al parar (F2.1 detenida por el bloqueo del E2E)
+### Tanda 3c — T8, integracion contra base real con la carrera · `backend_dev`
+
+**Archivos**
+- `tests/integration/inventario/product-batch-lot.int.test.ts` (nuevo, 14 casos).
+- `tests/integration/aislamiento.json`: entrada nueva en `commit` para
+  `inventario/product-batch-lot.int.test.ts`, con `motivo` y `desde: 2026-09-15`.
+- `tests/integration/inventario/product-batch-write.int.test.ts`: el caso «deja lot y expiry_date en
+  NULL cuando no vienen» se parte en dos, como pide design §0.2 fila 10:
+  - «deja expiry_date en NULL cuando no viene»;
+  - «QC-81 R8, R9: escribe el lot ausente con el correlativo generado, no NULL».
+- `tests/unit/recetas-ui/recipe-route-contract.test.ts`: la migracion de QC-81 entra en
+  `DB_PERMITIDAS`, con el formato de la de QC-23. Cierra el rojo de «la feature no toca
+  lib/modules/recetas ni db/».
+
+**Metodo del caso 10: el SQL REAL de disco, no reimplementado**
+1. Se crea un esquema de usar y tirar con `CREATE TABLE ... (LIKE public.product_batches INCLUDING
+   DEFAULTS INCLUDING CONSTRAINTS INCLUDING INDEXES)`.
+2. Se renombra el indice unico de la copia a `product_batches_company_lot_unique`: `LIKE` no conserva
+   los nombres de indice y el `down.sql` no lo encontraria.
+3. Se comprueba que la copia es fiel al estado migrado.
+4. Con `search_path` solo a ese esquema, se ejecuta `down.sql` leido de disco.
+5. Se siembra, se ejecuta `migration.sql` leido de disco en una sola transaccion y se afirma.
+6. En `finally`, `DROP SCHEMA ... CASCADE`.
+
+`public.product_batches` no se bloquea ni se escribe.
+
+**Salida real**
+```
+$ pnpm run typecheck -> exit=0      $ pnpm run lint -> exit=0
+$ pnpm exec vitest run --project integration tests/integration/inventario/
+test-db: la corrida de integracion va contra qct_qc81_75ea7fee_mu2vuwjs_hrw (copia de qct_tpl_92d13dc6eb14).
+ Test Files  11 passed (11)
+      Tests  135 passed (135)
+test-db: borrada la base de la corrida: qct_qc81_75ea7fee_mu2vuwjs_hrw.
+$ pnpm exec vitest run tests/unit/recetas-ui/recipe-route-contract.test.ts tests/unit/inventario/qc81-alcance.test.ts
+ Test Files  2 passed (2)
+      Tests  40 passed (40)
+$ pnpm exec vitest run guard
+ Test Files  39 passed (39)
+      Tests  407 passed | 9 skipped (416)
+```
+
+**La carrera MUERDE: mutacion hecha por el implementer, no razonada**
+
+Hecho con copia en el scratchpad y restauracion con `cp`, como pide `docs/verification.md > Probar que
+muerde`. En `product-prisma.ts:610` se sustituyo `SELECT pg_advisory_xact_lock(` por
+`SELECT num_nonnulls(`, que evalua los mismos argumentos **sin tomar el lock**, y se corrio solo el
+archivo nuevo:
+```
+test-db: la corrida de integracion va contra qct_qc81_75ea7fee_mu2vz6ai_i28 (copia de qct_tpl_92d13dc6eb14).
+     × R14, R15: 3 rondas de 8 altas con Promise.all resuelven todas, sin excepcion, sin reintentos y con lotes consecutivos 709ms
+Error: no se pudo escribir un lote generado sin chocar con el indice unico (company_id, lot): empresa 5d1fc4e1-..., ultimo lote intentado '4', 3 intentos
+Caused by: PrismaClientKnownRequestError:
+Serialized Error: { code: 'P2002', meta: { modelName: 'ProductBatch', target: [ 'company_id', 'lot' ] }, clientVersion: '6.19.3', batchRequestIdx: undefined }
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 passed (14)
+```
+Tras restaurar, `git diff lib/` sale vacio y el archivo vuelve a verde (ver abajo). La salida demuestra
+tres cosas:
+1. **Sin el lock, R14 cae** y el test lo detecta.
+2. El `P2002` **real** de Prisma 6.19.3 trae `target: ['company_id', 'lot']`: queda confirmada contra
+   base la decision de reconocer el duplicado por columnas (Tanda 3a).
+3. El reintento acotado de R15 **no** tapa la carrera: con 8 altas simultaneas se agota y falla ruidoso,
+   con contexto y `cause`.
+
+**Notas para el reviewer**
+1. R16: la serie se lleva a `3` generando tres lotes, luego se teclea `'50'` y el siguiente es `'51'`.
+   El requisito dice «iba por 7»; se afirma lo mismo con menos altas.
+2. Los casos 4 y 7 espian `prisma.$transaction`: 1 llamada por intento en el 4, y exactamente 8 por
+   ronda en el 7. «Sin reintento» queda medido, no deducido.
+3. Casos 6 y 9: SQL crudo por `pg`, afirmando sobre los campos estructurados `code` y `constraint`,
+   nunca sobre el texto del mensaje.
+4. Observacion ajena, no tocada: `inventario/product-batch-write.int.test.ts` esta censado como
+   `transaccion`, pero la mayoria de sus casos committean, como dice su cabecera; la guardia no lo
+   comprueba a proposito (`docs/verification.md`). El design §8 lo citaba como precedente de `commit`.
+
+## Estado final de F2.1
+
+| Task | Estado |
+|---|---|
+| T0 | [x] `batch_duplicate_lot` aprobado por el humano (F1.4, 2026-09-15) |
+| T1 | [x] migracion verificada: base de desarrollo aplicada y revertida, base vacia, filas sembradas |
+| T2 | [x] esquema; typecheck en verde en todo el repo |
+| T3 | [x] test de esquema y de migracion |
+| T4, T5 | [x] entrada y caso de uso |
+| T6 | [x] correlativo, lock, reintento y rechazo del duplicado a mano (por columnas) |
+| T7 | [x] contrato: solo reexporta `BatchDuplicateLotError`; puertos sin cambio |
+| T8 | [x] 14 casos contra base real; la carrera muerde sin el lock |
+| T9 | [x] sexta enmienda al catalogo |
+| T10 | [x] `purchaseDate` en la Server Action |
+| T11 | [x] limites de alcance, con la excepcion del E2E |
+| T12 | [ ] mapa hecho (abajo); **falta el gate completo, que corre el leader** |
+
+**Base de desarrollo compartida:** revertida desde la tanda 1 y **no se ha vuelto a migrar**. Toda la
+integracion corrio sobre bases temporales `qct_qc81_*`, ya borradas.
+
+## Mapa R1..R33 -> test (final)
+
+Rutas relativas al worktree. `lot-int` = `tests/integration/inventario/product-batch-lot.int.test.ts`;
+`mig` = `tests/unit/inventario/schema/product-batch-lot-migration.test.ts`; `schema` =
+`tests/unit/inventario/schema/inventario-schema.test.ts`; `cp` = `tests/unit/inventario/create-product.test.ts`;
+`input` = `tests/unit/inventario/product-batch-input.test.ts`; `retry` =
+`tests/unit/inventario/product-batch-lot-retry.test.ts`; `actions` =
+`tests/unit/inventario/product-actions.test.ts`; `alcance` = `tests/unit/inventario/qc81-alcance.test.ts`.
+
+| R | Test(s) |
+|---|---|
+| R1 | `schema`: `purchaseDate.isOptional === false` y `@db.Date` sin `@default`; `lot-int` «R20: con la tabla vacia la migracion aplica sin error y deja NOT NULL, los dos CHECK y el indice unico» |
+| R2 | `cp` «pasa al puerto la fecha civil UTC del now inyectado, y el MISMO instante como now»; `input` «acepta el alta sin purchaseDate, ausente o en null (ausente = hoy, lo resuelve el caso de uso)»; `actions` «sin purchaseDate en el FormData, o vacia, llega undefined para que el caso de uso ponga hoy (R2)»; `lot-int` «R3, R2: por el caso de uso, sin fecha llega el dia UTC del now inyectado y con fecha llega la escrita» |
+| R3 | `lot-int` «R3: una fecha escrita llega identica a purchase_date, por los dos caminos del adaptador»; `cp` «pasa tal cual una fecha de la semana pasada»; `actions` «hace llegar purchaseDate al caso de uso tal cual, como la cadena civil escrita (R2, R3)» |
+| R4 | `cp` «rechaza la fecha de manana con ValidationError senalando purchaseDate y cero llamadas al repositorio»; `cp` «decide «futura» contra el dia UTC del now inyectado, no contra el reloj de la maquina» |
+| R5 | `cp` «acepta hoy y una fecha de meses atras sin corregirlas» |
+| R6 | `input` «rechaza la fecha sin forma YYYY-MM-DD con un solo issue en purchaseDate»; `input` «rechaza la fecha con forma correcta que no existe en el calendario»; `cp` «rechaza el alta con una fecha de compra sin forma YYYY-MM-DD (QC-81 R6)» / «... que no existe (QC-81 R6)» |
+| R7 | `lot-int` «R7: lot = "" y lot = "   " los rechaza product_batches_lot_not_blank (23514) y lot = NULL da 23502»; `schema` `lot.isOptional === false`; `mig` «R7, R11 y R22...» |
+| R8 | `lot-int` «R8, R9: empresa sin lotes, el alta con lot ausente genera "1" y la siguiente "2"»; `lot-int` «R8, R9: por el camino de lote a producto existente (addBatchToAlive) tambien genera "1" y "2"»; `cp` «pasa lot null al puerto -«generalo»- cuando el lote no viene...»; `product-batch-write.int.test.ts` «QC-81 R8, R9: escribe el lot ausente con el correlativo generado, no NULL» |
+| R9 | `lot-int` (los dos de R8) y «R9: "ACME-2026-07" no altera la serie y "007" cuenta como 7, asi que el siguiente es "8" sin ceros» |
+| R10 | `cp` «pasa el lote escrito tal cual, recortado, sin sustituirlo -QC-81 R10-»; `retry` «no reintenta, no pide lock ni maximo, y sale BatchDuplicateLotError»; `lot-int` caso R13 (sin lote sustituto) |
+| R11 | `lot-int` «R11: un duplicado dentro de la empresa por SQL crudo lo rechaza product_batches_company_lot_unique con 23505»; `schema` `@@unique([companyId, lot], map: "product_batches_company_lot_unique")` |
+| R12 | `lot-int` «R12, R27: dos empresas escriben el MISMO lote, y B sin lotes genera "1" aunque A tenga "50"»; `schema` «ninguna unicidad GLOBAL de lote (R12)» |
+| R13 | `lot-int` «R13, R25: rechaza con BatchDuplicateLotError (batch_duplicate_lot), sin reintentar ni sustituir y con cero filas escritas»; `retry` «con lote escrito a mano no reintenta y sale BatchDuplicateLotError»; `tests/unit/errores/catalogo.test.ts` «batch_duplicate_lot esta en el catalogo con su clave y su texto exacto» y «se distingue de invalid_input y de duplicate_number»; `actions` «entrega batch_duplicate_lot al llamante con el texto del catalogo, como los demas codigos (R13)» |
+| R14 | `lot-int` «R14, R15: 3 rondas de 8 altas con Promise.all resuelven todas, sin excepcion, sin reintentos y con lotes consecutivos», con la **mutacion sin lock en rojo** (arriba) |
+| R15 | `retry` «reintenta en una transaccion nueva, con maximo nuevo, y a la segunda escribe», «se para en 3 intentos y lanza un Error con empresa, ultimo lote e intentos, con el choque como cause», «un P2002 ajeno se relanza tal cual y sin reintentar», «es falso con P2002 sobre otras columnas»; mutacion sin lock: el `Error` con contexto real |
+| R16 | `lot-int` «R16: con "50" tecleado a mano cuando la serie iba por 3, el siguiente generado es "51" y nunca uno existente» |
+| R17 | `mig` «R17: existe exactamente UNA migracion...» y «R17: el down quita indice, CHECK, NOT NULL de lot y purchase_date, en orden inverso»; `lot-int` caso 10, que ejecuta el `down.sql` real |
+| R18 | `lot-int` «R18, R19: numera las filas sin lote por orden de creacion y por empresa desde el maximo, conserva los lotes y pone el dia UTC de created_at»; `mig` «R18: el relleno de lote numera por empresa...» |
+| R19 | `lot-int` (el de R18); `mig` «R19 y R26: purchase_date nace DATE anulable sin DEFAULT y se rellena con created_at en UTC» |
+| R20 | `lot-int` «R20: con la tabla vacia la migracion aplica sin error y deja NOT NULL, los dos CHECK y el indice unico»; ademas, la plantilla de QC-77 se construye con esta migracion sobre `product_batches` vacia (Tanda 1) |
+| R21 | `lot-int` «R21: con dos filas de la misma empresa y el mismo lote la migracion aborta con su mensaje y no deja nada a medias»; `mig` «R21: la guardia de duplicados por empresa va antes de todo cambio...» |
+| R22 | `mig`: parentesis de RLS, «cada relleno comprueba su ROW_COUNT», «los rellenos van ANTES de los SET NOT NULL», «los dos CHECK y el indice unico van DESPUES del relleno», «no abre ni confirma transacciones propias»; `lot-int` R21, que no deja nada a medias |
+| R23 | `mig` «R23: el down no contiene ningun UPDATE que vacie lot, y su cabecera dice lo que pierde»; prueba real de la Tanda 1 (el DOWN no vacio ningun lote en 15 filas) |
+| R24 | `cp` «rechaza a un actor %s con UnauthorizedError sin llamar al reloj ni al puerto» (x4) |
+| R25 | `lot-int` «R13, R25: ... con cero filas escritas»; `retry` «reintenta en una transaccion nueva...» |
+| R26 | `mig` «R26: sin borrado, sin marcas de tiempo, sin otras tablas e identificadores en ingles»; `schema` (`purchaseDate` `DateTime @db.Date`) |
+| R27 | `lot-int` «R12, R27: ... B sin lotes genera "1" aunque A tenga "50"»; `tests/guards/guard-ambito-empresa-inventario.test.ts` «product-prisma.ts: toda funcion que toca la base declara y consume el ambito»; `tests/unit/inventario/company-scope.test.ts` «solo `company-scope.ts` escribe `companyId: scope.companyId`» |
+| R28 | `alcance` «R28: el diff de la rama no trae ningun archivo bajo app/ ni components/» y «R28: el detector muerde con app/ y components/, y no con lo que solo se les parece» |
+| R29 | `alcance` «R29: bajo e2e/ el diff trae como mucho exactamente el spec tolerado», «R29: un diff sintetico con otro archivo bajo e2e/ da rojo», «R29: un diff sintetico con solo el archivo tolerado (o sin e2e) da verde» (excepcion acotada del 2026-09-15; ver DECISION) |
+| R30 | `alcance` «R30: el diff de la rama no toca package.json ni pnpm-lock.yaml» y «R30: el detector muerde con el manifiesto y con el lock solo, y no con parecidos» |
+| R31 | `alcance` «R31: ningun archivo del modulo inventario suma lotes, ajusta ni consume», «R31: products.stock se sigue escribiendo como lo dejo QC-90», y los dos detectores sinteticos |
+| R32 | `alcance` «R32: ningun export del contrato publico denota listar, editar ni borrar lotes», «R32: y el puerto de producto tampoco declara ninguna», «R32: el detector muerde con listar, editar y borrar lotes, y no con el alta»; `tests/unit/inventario/module-contract.test.ts` «ningun export del contrato denota listar, editar ni borrar lotes» |
+| R33 | `lot-int` entero: correlativo (R8, R9, R16), unicidad por empresa (R11, R12), relleno de la migracion (R18-R21) y altas compitiendo (R14) |
+
+Ningun requisito queda sin test.
+
+**E2E diferido a QC-103, con motivo.** Excepcion consciente a `CHECKPOINTS.md`: esta ficha no tiene
+pantalla ni recorrido nuevo que mirar (R29, D11); la verificacion exigida es integracion contra base
+real, arriba. El unico cambio bajo `e2e/**` es la preparacion permitida por la excepcion del
+2026-09-15, y el E2E no se ejecuto en esta ficha.
+
+## Historico: estado al parar (F2.1 detenida por el bloqueo del E2E, ya resuelto)
 
 | Task | Estado |
 |---|---|
@@ -475,7 +623,7 @@ no puede salir verde sin ella, y T11 tiene que saber si tolera ese archivo.
 - tanda 4: T10 [P] y T11 [P], con T11 ajustado a la decision del E2E;
 - T12: mapa R1..R33 -> test y gate completo, **pendiente del leader**.
 
-## Mapa R -> test (parcial, se completa en T12)
+## Historico: mapa R -> test parcial al parar (sustituido por «Mapa R1..R33 -> test (final)», arriba)
 
 | R | Test (hasta ahora) |
 |---|---|
@@ -502,5 +650,39 @@ no puede salir verde sin ella, y T11 tiene que saber si tolera ese archivo.
 
 ## Gate
 
-**Pendiente del leader.** Ni el implementer ni los subagentes corren `./init.sh` ni la suite completa
-(`AGENTS.md > Regla del gate`). Hoy el gate saldria rojo por los rojos abiertos de arriba.
+**Gate completo (`./init.sh`): PENDIENTE DEL LEADER.** Ni el implementer ni los subagentes corren
+`./init.sh` ni la suite completa (`AGENTS.md > Regla del gate`). Los rojos que registraba la seccion
+historica de arriba estan todos cerrados.
+
+**Ultima verificacion acotada, hecha por el implementer tras restaurar el adaptador de la mutacion:**
+```
+$ git diff --quiet lib/ && echo "lib limpio"
+lib limpio
+$ pnpm exec vitest run --project integration tests/integration/inventario/product-batch-lot.int.test.ts
+test-db: la corrida de integracion va contra qct_qc81_75ea7fee_mu2w0hle_l8w (copia de qct_tpl_92d13dc6eb14).
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+test-db: borrada la base de la corrida: qct_qc81_75ea7fee_mu2w0hle_l8w.
+```
+
+Resumen de lo que salio verde, por tanda (comando exacto y salida en cada seccion):
+- `pnpm run typecheck`: exit 0 en todo el repo, tras T6 y T8.
+- `pnpm run lint`: exit 0.
+- `tests/unit/inventario` + `tests/unit/errores`: 37 archivos, 578 tests.
+- `vitest run guard`: 39 archivos, 407 pasan y 9 saltados.
+- `tests/integration/inventario/`: 11 archivos, 135 tests.
+- Los otros archivos de integracion con fixtures tocados: 6 archivos, 94 tests.
+- `qc81-alcance` + `recipe-route-contract`: 40 tests.
+
+**Lo que el leader tiene que saber antes de correr el gate:**
+1. **`tests/unit/recetas-ui/recipe-route-contract.test.ts`** esta en `tests/baseline-rojos.json`; en
+   esta rama su caso de diff ya pasa, con la migracion en `DB_PERMITIDAS`. Si el gate avisa de que
+   un archivo del baseline ya pasa, es este y es esperado.
+2. **La base de desarrollo compartida sigue sin la migracion de QC-81** (el aviso amarillo de
+   «va 1 atras» de `init.sh` 6.c es esperado). Aplicarla es el paso manual cuando la rama entre en
+   `dev` y QC-101 haya soltado la base.
+3. **El E2E no se ha ejecutado** en esta ficha (excepcion acotada, y QC-101 usa la base).
+4. **Deuda anotada, no de QC-81:**
+   - la frase «UNICO archivo del modulo que importa `@prisma/client`» en docblocks previos de
+     inventario;
+   - el censo de `product-batch-write.int.test.ts` como `transaccion`.

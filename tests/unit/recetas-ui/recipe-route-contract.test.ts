@@ -567,6 +567,29 @@ const MIGRACION_QC23 = [
   'db/migrations/20260912103000_session_revocation/down.sql',
 ];
 
+// RETENSADO 2026-09-15 (QC-81), con el MISMO criterio que los retensados de arriba: el rango
+// `origin/dev...HEAD` mide la rama que corre el gate, asi que cada archivo legitimo de `db/`
+// posterior se NOMBRA uno a uno o el caso deja de vigilar nada.
+//
+// POR QUE `db/` cambia aqui: QC-81 hace obligatorio el lote de `product_batches` con correlativo y
+// unicidad por empresa, y anade la fecha de compra (`purchase_date`). Rellenar las filas que ya
+// existen, pasar `lot` a NOT NULL, crear la columna nueva, los dos CHECK y el indice unico
+// `product_batches_company_lot_unique` es una migracion de esquema por definicion. Son EXACTAMENTE
+// los dos archivos de UNA carpeta de migracion, con su `down.sql` como manda el arnes
+// (`specs/QC-81-lote-y-fecha-de-compra/design.md > 2`). `db/schema.prisma` no se repite aqui: ya
+// esta nombrado en `MIGRACION_QC34`.
+//
+// Y POR QUE ESTO NO ES TOCAR `lib/modules/recetas`, que es lo que este caso vigila de verdad:
+// `product_batches` es del modulo `inventario` y toda la logica de esta ficha vive en
+// `lib/modules/inventario` (y el codigo de error en `lib/modules/errores`). `recetas` no cambia ni
+// un archivo —el filtro de `tocaRecetas` lo sigue exigiendo sin ninguna excepcion nueva—.
+//
+// Cualquier OTRO archivo de `db/` sigue poniendo este caso rojo.
+const MIGRACION_QC81 = [
+  'db/migrations/20260913120000_product_batch_lot_and_purchase_date/migration.sql',
+  'db/migrations/20260913120000_product_batch_lot_and_purchase_date/down.sql',
+];
+
 /** Toda ruta de `lib/modules/recetas/` cuyo cambio esta aprobado y nombrado por una ficha. */
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
@@ -585,6 +608,7 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC86,
   ...MIGRACION_QC49,
   ...MIGRACION_QC23,
+  ...MIGRACION_QC81,
 ];
 
 /**
