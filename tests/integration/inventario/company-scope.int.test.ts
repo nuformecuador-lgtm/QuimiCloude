@@ -319,11 +319,13 @@ describe('R1 — la empresa es obligatoria y tiene que existir, en las tres tabl
       // un producto que SI declara empresa, y aun asi se rechaza: si la columna del lote se
       // hubiera modelado como derivacion por `join` -decision cerrada 2, que la descarta-,
       // este caso seria verde y QC-81 no tendria donde colgar la unicidad `(empresa, lote)`.
+      // QC-81: `lot` y `purchase_date` son NOT NULL y van ANTES que `company_id` en el orden de
+      // columnas; sin darlos, el 23502 saldria por ellos y no por la empresa, que es lo que se prueba.
       const lote = await expectRejectedByDatabase(
         tx,
         () => tx.$executeRaw`
-          INSERT INTO "product_batches" ("product_id", "presentation_id", "stock", "unit_cost", "updated_at")
-          VALUES (CAST(${productId} AS uuid), CAST(${presentationId} AS uuid), 1, 1.0000, CURRENT_TIMESTAMP)`,
+          INSERT INTO "product_batches" ("product_id", "presentation_id", "stock", "unit_cost", "lot", "purchase_date", "updated_at")
+          VALUES (CAST(${productId} AS uuid), CAST(${presentationId} AS uuid), 1, 1.0000, ${`L-${randomUUID()}`}, DATE '2026-09-01', CURRENT_TIMESTAMP)`,
         'lote sin empresa, con un producto que si la declara',
       )
       expect(lote.sqlState).toBe(NOT_NULL_VIOLATION)
@@ -468,6 +470,9 @@ describe('R22 — la empresa del lote tiene que ser la de su producto Y la de su
           presentationId,
           stock: 1,
           unitCost: new Prisma.Decimal('1.0000'),
+          // QC-81: lote obligatorio y unico por empresa, y fecha de compra obligatoria.
+          lot: `L-${randomUUID()}`,
+          purchaseDate: new Date('2026-09-01T00:00:00Z'),
           companyId: empresaA,
         },
         select: { id: true },
@@ -676,12 +681,15 @@ describe('R3 — el backfill asigna TODAS las filas que ya existian a «QuimiClo
         `presentacion${marcador}`,
         unitId,
       )
+      // QC-81: `lot` y `purchase_date` son NOT NULL desde esa ficha y este caso solo afloja
+      // `company_id`, asi que el lote sin empresa los lleva con valor.
       await tx.$executeRawUnsafe(
-        `INSERT INTO "product_batches" ("id","product_id","presentation_id","stock","unit_cost","updated_at")
-         VALUES ($1::uuid, $2::uuid, $3::uuid, 1, 1.0000, CURRENT_TIMESTAMP)`,
+        `INSERT INTO "product_batches" ("id","product_id","presentation_id","stock","unit_cost","lot","purchase_date","updated_at")
+         VALUES ($1::uuid, $2::uuid, $3::uuid, 1, 1.0000, $4, DATE '2026-09-01', CURRENT_TIMESTAMP)`,
         lote,
         vivo,
         presentacion,
+        `L-${randomUUID()}`,
       )
 
       const antes = {

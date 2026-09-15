@@ -129,7 +129,16 @@ async function sembrarLote(productId: string, presentationId: string): Promise<s
   const { id } = await prisma.productBatch.create({
     // QC-49 R2/R22: el lote declara SU empresa, y `product_batches_check_company` exige que
     // coincida con la de su producto Y con la de su presentacion. Las tres son la del archivo.
-    data: { productId, presentationId, stock: 17, unitCost: '123.4500', companyId: empresaDelArchivo },
+    // QC-81: lote obligatorio y unico por empresa, y fecha de compra obligatoria (fecha civil).
+    data: {
+      productId,
+      presentationId,
+      stock: 17,
+      unitCost: '123.4500',
+      lot: `L-${randomUUID()}`,
+      purchaseDate: new Date('2026-09-01T00:00:00Z'),
+      companyId: empresaDelArchivo,
+    },
     select: { id: true },
   });
   lotesSembrados.push(id);

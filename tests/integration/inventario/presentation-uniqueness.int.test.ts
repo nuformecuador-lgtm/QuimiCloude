@@ -182,7 +182,16 @@ async function createBatchFor(
   const batch = await tx.productBatch.create({
     // QC-49 R2/R22: el lote declara SU empresa y `product_batches_check_company` exige que sea
     // la misma que la de su producto Y la de su presentacion. Las tres son la del caso.
-    data: { productId: product.id, presentationId, stock: 10, unitCost: '1.0000', companyId },
+    // QC-81: lote obligatorio y unico por empresa, y fecha de compra obligatoria (fecha civil).
+    data: {
+      productId: product.id,
+      presentationId,
+      stock: 10,
+      unitCost: '1.0000',
+      lot: `L-${randomUUID()}`,
+      purchaseDate: new Date('2026-09-01T00:00:00Z'),
+      companyId,
+    },
     select: { id: true },
   });
   return { productId: product.id, batchId: batch.id };

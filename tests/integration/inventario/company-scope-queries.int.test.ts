@@ -210,6 +210,9 @@ async function sembrarLote(
       presentationId,
       stock: 7,
       unitCost: '3.0000',
+      // QC-81: lote obligatorio y unico por empresa, y fecha de compra obligatoria (fecha civil).
+      lot: `L-${randomUUID()}`,
+      purchaseDate: new Date('2026-09-01T00:00:00Z'),
       createdBy: empresa.userId,
       updatedBy: empresa.userId,
       // R2/R22: el lote declara SU empresa y el disparador exige que coincida con la de su
@@ -228,6 +231,8 @@ function loteNuevo(empresa: Empresa, presentationId: string): NewProductBatch {
     stock: 2,
     unitCost: '1.5000',
     lot: null,
+    // QC-81: la fecha de compra es obligatoria en `NewProductBatch` (fecha civil).
+    purchaseDate: '2026-09-01',
     expiryDate: null,
     createdBy: empresa.userId,
   };

@@ -267,6 +267,9 @@ function newBatch(fixture: Fixture, overrides: Partial<NewProductBatch> = {}): N
     stock: 3,
     unitCost: '2.5000',
     lot: null,
+    // QC-81: la fecha de compra es obligatoria en `NewProductBatch`; un caso que la necesite
+    // distinta la pasa por `overrides`.
+    purchaseDate: '2026-09-01',
     expiryDate: null,
     createdBy: fixture.actorId,
     ...overrides,
@@ -425,12 +428,14 @@ describe('R5 (lado base): la base rechaza un costo unitario de 0', () => {
         // QC-49 (R1, R2, R22): el lote declara SU empresa, NOT NULL, y tiene que ser la misma
         // que la de su producto y la de su presentacion. Sin ella el rechazo llegaria como
         // 23502 y el caso dejaria de probar el CHECK del costo, que es lo suyo.
+        // QC-81: por lo mismo, `lot` y `purchase_date` (NOT NULL desde esa ficha) van con valor.
         () => tx.$executeRaw`
           INSERT INTO "product_batches" (
-            "product_id", "presentation_id", "stock", "unit_cost",
+            "product_id", "presentation_id", "stock", "unit_cost", "lot", "purchase_date",
             "company_id", "created_by", "updated_by", "updated_at"
           ) VALUES (
             ${producto.id}::uuid, ${presentationId}::uuid, 1, 0::numeric,
+            ${`L-${randomUUID()}`}, DATE '2026-09-01',
             ${companyId}::uuid, ${actorId}::uuid, ${actorId}::uuid, now()
           )
         `,

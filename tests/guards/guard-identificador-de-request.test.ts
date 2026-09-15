@@ -216,6 +216,12 @@ export const MIGRACIONES_ESPERADAS = [
   // DEL SERVIDOR cuando la comprobacion falla (su R17); no lo persiste en ninguna columna, y su
   // SQL no nombra ninguno de `TERMINOS_DEL_IDENTIFICADOR`, que es lo que R19 protege de verdad.
   '20260912103000_session_revocation',
+  // Es de QC-81 (lote y fecha de compra: `product_batches.lot` pasa a obligatorio y unico por
+  // empresa, y nace `product_batches.purchase_date`), no de QC-71. Se anade aqui por lo mismo que
+  // las de arriba: es justo lo que pide el mensaje de `hallazgosDeMigraciones` -- la ficha que trae
+  // la migracion actualiza esta lista. QC-81 no persiste ningun identificador de peticion: su SQL
+  // no nombra ninguno de `TERMINOS_DEL_IDENTIFICADOR`, que es lo que R19 protege de verdad.
+  '20260913120000_product_batch_lot_and_purchase_date',
 ] as const
 
 export function hallazgosDeMigraciones(

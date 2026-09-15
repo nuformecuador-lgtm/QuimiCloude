@@ -946,6 +946,9 @@ describe('estructura de la linea de receta', () => {
             presentationId: presentation.id,
             stock: 1,
             unitCost: new Prisma.Decimal('1.0000'),
+            // QC-81: lote obligatorio y unico por empresa, y fecha de compra obligatoria.
+            lot: `L-${randomUUID()}`,
+            purchaseDate: new Date('2026-09-01T00:00:00Z'),
             companyId: await inventoryCompanyOf(tx),
           },
           select: { id: true },

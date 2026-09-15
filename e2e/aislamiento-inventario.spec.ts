@@ -214,6 +214,10 @@ async function seedCompanyInventory(input: {
       companyId: company.id,
       stock: 10,
       unitCost: '3.5000',
+      // QC-81, excepcion acotada a su R29 aprobada el 2026-09-15: lote y fecha de compra pasaron a
+      // ser obligatorios en el esquema; solo se completa esta preparacion, el recorrido no cambia.
+      lot: `E2E-${RUN_ID}`,
+      purchaseDate: new Date('2026-09-01T00:00:00Z'),
     },
     select: { id: true },
   });

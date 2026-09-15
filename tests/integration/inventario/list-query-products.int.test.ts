@@ -171,6 +171,9 @@ async function sembrarLote(
       presentationId,
       stock: 1,
       unitCost: '1.0000',
+      // QC-81: lote obligatorio y unico por empresa, y fecha de compra obligatoria (fecha civil).
+      lot: `L-${randomUUID()}`,
+      purchaseDate: new Date('2026-09-01T00:00:00Z'),
       createdAt,
       // QC-49 R2/R22: el lote declara SU empresa, y `product_batches_check_company` exige que
       // coincida con la de su producto Y con la de su presentacion. Las tres son la del archivo.

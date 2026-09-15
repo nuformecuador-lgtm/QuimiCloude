@@ -92,29 +92,38 @@ rotas por el esquema de la tanda 1, no por el dominio (ver «Bloqueo» y «Arras
 
 **Tests por requisito (tanda 2)**: ver el mapa consolidado en T12.
 
-## BLOQUEO — un E2E existente deja de compilar con el esquema de T2
+## DECISION — excepcion acotada a R29 (2026-09-15, humano)
 
-`e2e/aislamiento-inventario.spec.ts:210-219` siembra el lote con `prisma.productBatch.create` **sin
-`lot` ni `purchaseDate`**. Con el esquema de T2 (`lot String`, `purchaseDate` obligatorio, sin
-`DEFAULT` en la base, design §2.1 paso 2), `pnpm run typecheck` da rojo en ese archivo:
+**Lo que motivo la parada.** `e2e/aislamiento-inventario.spec.ts:210-219` siembra el lote con
+`prisma.productBatch.create` **sin `lot` ni `purchaseDate`**. Con el esquema de T2 (`lot String`,
+`purchaseDate` obligatorio, sin `DEFAULT` en la base, design §2.1 paso 2), `pnpm run typecheck` daba
+rojo:
 
 ```
 e2e/aislamiento-inventario.spec.ts(211,5): error TS2322: ... missing the following properties from type 'ProductBatchUncheckedCreateInput': lot, purchaseDate
 ```
 
-y en ejecucion la siembra fallaria por `NOT NULL`. Arreglarlo exige **modificar un E2E existente**:
-- R29: «NO DEBE añadir ningun test E2E nuevo **ni modificar los existentes**».
-- T11 / R28-R29: el diff de la rama bajo `e2e/**` debe ser vacio.
-- Instruccion del leader para F2.1: cero archivos bajo `e2e/**`; si una task lo pide, parar y avisar.
+Ademas, en ejecucion la siembra fallaria por `NOT NULL`. Ponerlo verde exigia modificar un E2E
+existente, y R29 lo prohibe («ni modificar los existentes»). F2.1 se paro en el commit `93edbd3` y se
+subio al leader.
 
-**No se ha tocado `e2e/**`.** Esto contradice el spec y lo tiene que decidir el leader/humano. Opciones
-que veo, sin elegir ninguna:
-- (a) **Excepcion acotada a R29**: tocar solo la siembra de `e2e/aislamiento-inventario.spec.ts:210-219`
-  (añadir `lot` y `purchaseDate` al fixture), sin recorrido nuevo ni cambio de aserciones, y que T11
-  tolere exactamente ese archivo.
-- (b) Cambiar el diseño para que la siembra por Prisma siga compilando sin esos campos, es decir con
-  `DEFAULT` en la base para `purchase_date` **y** generacion del lote en la base. Choca con design §2.1
-  paso 2, §3.1 y §6, y con D8 para el `DEFAULT`. No lo recomiendo; lo nombro para que conste.
+**Decision del humano, 2026-09-15: opcion (a), una excepcion acotada a R29.** La transmitio el leader
+al retomar F2.1.
+- **Se permite solo esto:** en `e2e/aislamiento-inventario.spec.ts:210-219`, dentro de la
+  preparacion de `prisma.productBatch.create`, añadir `lot` (un valor legible y unico por corrida) y
+  `purchaseDate` (una fecha civil pasada convertida con `T00:00:00Z`, como hace el adaptador). Sin
+  cambiar el recorrido, ni las aserciones, ni ningun otro archivo de `e2e/**`.
+- **T11:** R29 tolera **exactamente ese archivo**, nombrado en el test con un comentario que cita la
+  decision. Cualquier otro archivo bajo `e2e/**` sigue dando rojo. R28 (`app/**`, `components/**`) y
+  R30 no cambian.
+- **Descartada** la opcion (b), el `DEFAULT` en la base.
+- **El texto de R29 en `requirements.md` NO se edita.** La enmienda queda escrita en
+  `progress/current.md` (leader), en el issue y en esta bitacora.
+- **El E2E no se ejecuta en esta ficha**: QC-101 corre ahora mismo el suyo contra la misma base.
+
+**Base de datos compartida.** Instruccion del leader al retomar: la base de desarrollo
+`localhost:5432/QuimiCloude` queda revertida y **no se vuelve a migrar** con QC-81, porque QC-101 la
+esta usando. La integracion (T8) corre sobre la base temporal por corrida de QC-77.
 
 ## Arrastre fuera de las listas de archivos de `tasks.md` (no es bloqueo)
 
@@ -213,7 +222,83 @@ dia en la tanda 3:
 5. Un lote ya existente de mas de 60 caracteres haria abortar la migracion con un 23514 generico,
    sin mensaje propio. Sigue siendo atomica; el design no pide guardia para eso.
 
-## Rojos abiertos al cerrar las tandas 1 y 2
+### Tanda 3b — fixtures, excepcion del E2E, guardia de migraciones y T11 · `backend_dev`
+
+**Archivos**
+- **Fixtures de integracion.** Solo se cambio la preparacion, ninguna asercion; `lot` unico con
+  `randomUUID` alli donde una empresa siembra varios lotes, y `purchaseDate` fijo `2026-09-01`:
+  - `tests/integration/inventario/company-scope-queries.int.test.ts` (`sembrarLote`, `loteNuevo`)
+  - `tests/integration/inventario/product-batch-write.int.test.ts` (`newBatch` con `purchaseDate` por
+    defecto; el caso `:368-383` se deja para T8)
+  - `tests/integration/inventario/company-scope.int.test.ts` (`:466`)
+  - `tests/integration/inventario/list-query-products.int.test.ts`
+  - `tests/integration/inventario/presentation-uniqueness.int.test.ts`
+  - `tests/integration/inventario/presentation-unit.int.test.ts`
+  - `tests/integration/recetas/recetas-constraints.int.test.ts` (`:944`)
+  - `tests/integration/unidades/unidades-constraints.int.test.ts`
+- **Tres `INSERT` crudos que el typecheck no marcaba y habria que arreglar igual:**
+  - `product-batch-write.int.test.ts:429`: sin el cambio daba 23502 donde el test espera 23514,
+    porque Postgres comprueba el NOT NULL antes que el CHECK.
+  - `company-scope.int.test.ts:680`: sin el cambio fallaba con 23502.
+  - `company-scope.int.test.ts:325`: sin el cambio seguia en verde, pero con el 23502 saliendo por
+    `lot` y no por `company_id`, que es lo que prueba.
+  
+  No se tocaron `:380`, `:414` ni `:443`: el disparador de empresa rechaza antes y el archivo pasa. La
+  busqueda de `productBatch.create|createMany|upsert` e `INSERT INTO product_batches` en `tests/**`,
+  `scripts/**`, `db/**` y `e2e/**` no encuentra ningun otro.
+- `e2e/aislamiento-inventario.spec.ts`: **la excepcion acotada**, y nada mas. Diff completo,
+  verificado por el implementer:
+  ```diff
+  @@ -214,6 +214,10 @@ async function seedCompanyInventory(input: {
+         companyId: company.id,
+         stock: 10,
+         unitCost: '3.5000',
+  +      // QC-81, excepcion acotada a su R29 aprobada el 2026-09-15: lote y fecha de compra pasaron a
+  +      // ser obligatorios en el esquema; solo se completa esta preparacion, el recorrido no cambia.
+  +      lot: `E2E-${RUN_ID}`,
+  +      purchaseDate: new Date('2026-09-01T00:00:00Z'),
+       },
+  ```
+  `RUN_ID` ya existia (un `randomUUID` unico por corrida). El E2E **no** se ejecuto.
+- `tests/guards/guard-identificador-de-request.test.ts`: la migracion de QC-81 entra en
+  `MIGRACIONES_ESPERADAS`, con su comentario.
+- `tests/unit/inventario/qc81-alcance.test.ts` (nuevo, T11). `E2E_TOLERADO =
+  'e2e/aislamiento-inventario.spec.ts'` lleva el comentario con la decision del 2026-09-15. Mide contra
+  el merge-base con `origin/dev` primero y `dev` despues, porque el `dev` local va por detras y
+  arrastraria el trabajo de QC-95. Fuera de la rama de QC-81 se salta con un aviso; en la rama, si no
+  puede calcular la base, da rojo.
+
+**Salida real**
+```
+$ pnpm run typecheck      (con el T6 del agente A ya en disco)
+> tsc --noEmit
+(cero errores en todo el repo)
+$ pnpm run lint   -> exit 0
+$ pnpm exec vitest run --project integration <los 6 fixtures que siembran sin pasar por el adaptador>
+test-db: la corrida de integracion va contra qct_qc81_75ea7fee_mu2utj26_lns (copia de qct_tpl_92d13dc6eb14).
+ Test Files  6 passed (6)
+      Tests  94 passed (94)
+test-db: borrada la base de la corrida: qct_qc81_75ea7fee_mu2utj26_lns.
+$ pnpm exec vitest run tests/unit/inventario/qc81-alcance.test.ts
+ Test Files  1 passed (1)
+      Tests  15 passed (15)          (0 skipped: en esta rama midieron de verdad)
+$ pnpm exec vitest run guard
+ Test Files  39 passed (39)
+      Tests  407 passed | 9 skipped (416)
+```
+
+**Notas para el reviewer**
+1. `tasks.md` T11 y R29 en `requirements.md` siguen diciendo «cero archivos bajo `e2e/**`». **No se
+   han editado**, por instruccion expresa del leader. La enmienda esta en la seccion DECISION de esta
+   bitacora, en `progress/current.md` y en el issue.
+2. El caso R31 «products.stock se sigue escribiendo como lo dejo QC-90» busca el texto
+   `stock: product.stock ?? null` dentro de `createWithFirstBatch`. Si alguien mueve esa escritura a un
+   helper se pone rojo con un mensaje explicito, y habra que juzgar si es regresion o refactor.
+3. R32 revisa ademas los metodos del puerto `ProductRepository`, no solo el contrato.
+4. La mordida se demuestra con diffs sinteticos (otro archivo bajo `e2e/` da rojo; el tolerado solo,
+   verde). No se creo ningun archivo real en carpetas prohibidas para probarlo.
+
+## Rojos abiertos al cerrar las tandas 1 y 2 (los tres quedan cerrados por las tandas 3a y 3b)
 
 1. **Guardia** `tests/guards/guard-identificador-de-request.test.ts:161-219`: su lista cerrada
    `MIGRACIONES_ESPERADAS` necesita `20260913120000_product_batch_lot_and_purchase_date` con su

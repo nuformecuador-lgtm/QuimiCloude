@@ -158,7 +158,7 @@
       **Hecho:** test de que el campo viaja tal cual cuando viene y llega `undefined` cuando no, y
       de que la edición sigue sin ningún campo de lote. Cubre el lado borde de **R2**.
 
-- [ ] **T11 [P] — Los límites de alcance, con test.** Depende de nada.
+- [x] **T11 [P] — Los límites de alcance, con test.** Depende de nada.
       Archivos: `tests/unit/inventario/qc81-alcance.test.ts` (nuevo; patrón de
       `tests/unit/identity/qc78-alcance.test.ts`).
       Afirma contra el **diff de la rama** frente al merge-base con `origin/dev`: cero archivos bajo
