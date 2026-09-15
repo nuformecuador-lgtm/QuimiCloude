@@ -1,0 +1,18 @@
+2026-09-15T13:14:08-05:00
+f7850c0511f876da29cc9d5040a3fb2f3790a683
+e2e/cierre-de-sesiones.spec.ts solo, chromium + webkit, workers=2 · base recien copiada de qct_tpl_5a5346ed8f4d · libre MB 6701 · puerto 3117 escuchando antes: 0
+[WebServer] ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+[WebServer] 
+[WebServer]   To migrate automatically, run:
+[WebServer]   npx @next/codemod@canary middleware-to-proxy .
+[WebServer] 
+[WebServer]   Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+Running 2 tests using 2 workers
+
+  ✓  2 [chromium] › e2e\cierre-de-sesiones.spec.ts:264:7 › cierre de sesiones de otra persona desde la pantalla › el administrador cierra las sesiones de otra persona y esa persona acaba en el login (11.9s)
+  ✓  1 [webkit] › e2e\cierre-de-sesiones.spec.ts:264:7 › cierre de sesiones de otra persona desde la pantalla › el administrador cierra las sesiones de otra persona y esa persona acaba en el login (16.0s)
+
+  2 passed (52.7s)
+EXIT=0
+2026-09-15T13:15:04-05:00

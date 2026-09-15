@@ -530,6 +530,69 @@ amplia la lista a diez calcando el precedente del archivo (nota «AMPLIADA POR S
 entrada y conteo del titulo y del mensaje). Delegado a `backend_dev`; verificacion y commit abajo. El otro rojo del gate,
 `tests/unit/identity/usuarios/scope.test.ts` (QC-66 R45), no es de esta feature (QC-95) y no se toca.
 
+### Sincronizacion con `dev` tras QC-101 (F2.3) y migracion de `e2e/cierre-de-sesiones.spec.ts`
+
+**Sincronizacion.** `git fetch origin dev` + `git merge origin/dev` (la rama iba 19 commits por detras; `a271eec`, el
+merge de QC-101 / PR #71, esta en `origin/dev`): merge `7a99fc8`, **sin conflictos**. **Ninguna migracion nueva**
+(`git diff --name-only HEAD...origin/dev -- db/migrations` vacio); `prisma migrate status` sobre `QuimiCloude_QC93`:
+`28 migrations found ... Database schema is up to date!`. Unico E2E nuevo: `A e2e/cierre-de-sesiones.spec.ts`.
+
+**La copia numero quince.** La guardia de R9, corrida sobre el arbol recien mergeado y ANTES de tocar nada:
+
+```
+pnpm exec vitest run tests/guards/guard-e2e-landing.test.ts   -> EXIT=1   Tests  1 failed | 15 passed (16)
+  - e2e/cierre-de-sesiones.spec.ts:179  define su propia funcion `login`: la entrada es `loginAndLand` de e2e/helpers/landing.ts
+```
+
+Es exactamente lo que la guardia existe para cazar: QC-101 nacio despues de QC-93 con su `login(page, user, landing)` y
+la ruta escrita en la llamada (`INVENTORY_ROUTE` en `:292`, `DASHBOARD_ROUTE` en `:304`). **No marca** el
+`waitForURL(LOGIN_ROUTE)` de `:368`: es la victima acabando en el login tras el cierre, dentro de
+`contarRedireccionesDeNavegacion` y despues de un `goto`, no un aterrizaje tras `login-submit`. Se queda intacto.
+
+**Por que el helper encaja en los dos logins** (leido antes de delegar): la `login` local (`:174-185`) hacia lo mismo que
+`loginAndLand` —`goto(LOGIN_ROUTE)`, formulario real, `login-submit`, espera del destino—; cada llamada recibe la pagina de
+SU `browser.newContext()` (`victimPage` y `adminPage`), asi que las dos sesiones siguen vivas y separadas, y la victima
+sigue entrando por el formulario real. Su destino derivado (Operador) es `/inventario`, el mismo que tenia escrito; el del
+Administrador, `/dashboard`. Nada de lo que sigue a los logins usa la ruta de aterrizaje.
+
+**La migracion** (delegada a `frontend_dev`, commit **`f7850c0`**, solo `e2e/cierre-de-sesiones.spec.ts`, 6+/19-):
+se borra la `login` local y su JSDoc; `loginAndLand` entra con import relativo `./helpers/landing`; las llamadas pasan a
+`loginAndLand(victimPage, victimUser)` (`:279`) y `loginAndLand(adminPage, adminUser)` (`:291`), sin parametro de
+aterrizaje; salen los sin uso `DASHBOARD_ROUTE`, `LOGIN_USERNAME_TESTID`, `LOGIN_PASSWORD_TESTID` y
+`LOGIN_SUBMIT_TESTID`; se quedan `INVENTORY_ROUTE`, `LOGIN_ROUTE`, `USERS_ROUTE`, `LOGIN_FORM_TESTID`, `Page` y el
+`Credentials` local, que siguen en uso. Revisado el diff por el implementer: la unica navegacion o espera eliminada es el
+`goto(LOGIN_ROUTE)` de dentro de la funcion borrada (lo hace el helper); **ningun assert cambia** y la espera de la victima
+en el login tras el cierre sigue intacta (`:355`, antes `:368`).
+
+Verificacion re-ejecutada por el implementer antes del commit:
+
+```
+pnpm exec vitest run tests/guards/guard-e2e-landing.test.ts        -> EXIT=0   Tests  16 passed (16)
+pnpm exec vitest run tests/unit/shared/data-table-alcance.test.ts  -> EXIT=0   Tests  14 passed (14)
+pnpm run typecheck                                                 -> EXIT=0
+pnpm run lint                                                      -> EXIT=0
+```
+
+Reportado por el subagente: `playwright test --list e2e/cierre-de-sesiones.spec.ts` da 2 tests (chromium + webkit) antes
+y despues; `grep "function login(\|DASHBOARD_ROUTE"` sobre el archivo, vacio.
+
+Base para la corrida: `QuimiCloude_QC93` recreada desde `qct_tpl_5a5346ed8f4d` (`companies=1 users=1 roles=2
+role_permissions=17 revoked_sessions=0 migraciones=28`).
+
+**La corrida E2E** (`f7850c0`, `e2e/cierre-de-sesiones.spec.ts` solo, chromium + webkit, `--workers=2`, 6,7 GB libres,
+puerto 3117 libre; log `progress/e2e_QC-93_cierre-de-sesiones.log`, 2026-09-15 13:14:08 a 13:15:04):
+
+```
+✓ [chromium] › e2e\cierre-de-sesiones.spec.ts:264:7 › cierre de sesiones de otra persona desde la pantalla › el administrador cierra las sesiones de otra persona y esa persona acaba en el login
+✓ [webkit]   › e2e\cierre-de-sesiones.spec.ts:264:7 › cierre de sesiones de otra persona desde la pantalla › el administrador cierra las sesiones de otra persona y esa persona acaba en el login
+  2 passed (52.7s)
+EXIT=0
+```
+
+Verde en los dos motores con las dos entradas por `loginAndLand`. La carrera de QC-23 (hallazgo 2 de T12) **no aparecio**
+en esta corrida; no hay rojo que atribuirle. Con esta, son **quince** las suites que entran por el helper unico, y la
+guardia de R9 vuelve a verde sobre el arbol sincronizado con `dev`.
+
 ## Mapa R -> test (T13, revisado en T17: R1-R28)
 
 | R | Test / evidencia |
