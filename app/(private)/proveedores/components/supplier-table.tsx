@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useTransition, type ReactNode } from 'react';
+import { useMemo, useTransition, type MouseEvent, type ReactNode } from 'react';
 
 import {
   DataTable,
@@ -58,6 +58,13 @@ export type SupplierTableProps = {
   readonly noResults?: { readonly clearHref: string; readonly firstPageHref?: string };
 };
 
+// Con modificadores o botón central se deja al navegador abrir otra pestaña.
+function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
+  return (
+    event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
+  );
+}
+
 export function SupplierTable({ suppliers, params, totalPages, noResults }: SupplierTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -85,7 +92,8 @@ export function SupplierTable({ suppliers, params, totalPages, noResults }: Supp
     });
   };
 
-  const navigateInTransition = (href: string) => (event: { preventDefault: () => void }) => {
+  const navigateOnPlainClick = (href: string) => (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!isPlainClick(event)) return;
     event.preventDefault();
     navigate(href);
   };
@@ -99,7 +107,7 @@ export function SupplierTable({ suppliers, params, totalPages, noResults }: Supp
       >
         <Link
           href={noResults.clearHref}
-          onNavigate={navigateInTransition(noResults.clearHref)}
+          onClick={navigateOnPlainClick(noResults.clearHref)}
           data-slot="button"
           data-testid="supplier-list-clear-search"
           className={LINK_BUTTON_CLASS}
@@ -109,7 +117,7 @@ export function SupplierTable({ suppliers, params, totalPages, noResults }: Supp
         {noResults.firstPageHref === undefined ? null : (
           <Link
             href={noResults.firstPageHref}
-            onNavigate={navigateInTransition(noResults.firstPageHref)}
+            onClick={navigateOnPlainClick(noResults.firstPageHref)}
             data-slot="button"
             data-testid="supplier-list-no-results-first-page"
             className={LINK_BUTTON_CLASS}

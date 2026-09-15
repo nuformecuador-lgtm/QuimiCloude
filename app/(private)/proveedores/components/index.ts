@@ -2,13 +2,8 @@
 export { DeleteSupplierDialog } from './delete-supplier-dialog';
 export {
   ACTIONS_COLUMN_ID,
-  ACTIONS_COLUMN_LABEL,
-  EMPTY_CELL,
   SUPPLIER_DEFAULT_PINNED_COLUMNS,
   buildSupplierColumns,
-  type SupplierColumn,
-  type SupplierColumnId,
-  type SupplierColumnsDeps,
 } from './supplier-columns';
 export { SUPPLIER_SKELETON_COLUMN_COUNT } from './supplier-columns-skeleton';
 export { SupplierField } from './supplier-field';

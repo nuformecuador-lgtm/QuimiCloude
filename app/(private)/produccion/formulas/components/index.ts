@@ -3,15 +3,11 @@
 export { DeleteRecipeDialog } from './delete-recipe-dialog';
 export {
   ACTIONS_COLUMN_ID,
-  ACTIONS_COLUMN_LABEL,
-  EMPTY_CELL,
   IMAGE_COLUMN_ID,
-  IMAGE_COLUMN_LABEL,
   RECIPE_DEFAULT_PINNED_COLUMNS,
   buildRecipeColumns,
   type RecipeColumn,
   type RecipeColumnId,
-  type RecipeColumnsDeps,
 } from './recipe-columns';
 export { RECIPE_SKELETON_COLUMN_COUNT } from './recipe-columns-skeleton';
 export { RecipeListEmpty } from './recipe-list-empty';

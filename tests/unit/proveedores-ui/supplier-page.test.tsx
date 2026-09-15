@@ -355,6 +355,24 @@ function ultimoDestino(): URLSearchParams {
   return consultaDe(llamada[0]);
 }
 
+const FORMATO_DE_DIA = /^\d{4}-\d{2}-\d{2}$/;
+
+// Sin rango vigente el calendario abre en el mes en curso.
+function diaDelMesEnCurso(dia: number): string {
+  const hoy = new Date();
+  const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+  return `${hoy.getFullYear()}-${mes}-${String(dia).padStart(2, '0')}`;
+}
+
+// Por el `data-day` ISO de la celda: la etiqueta del boton depende del idioma.
+async function botonDelDia(iso: string): Promise<HTMLElement> {
+  const celda = (await screen.findAllByRole('gridcell')).find(
+    (candidata) => candidata.getAttribute('data-day') === iso,
+  );
+  if (celda === undefined) throw new Error(`el calendario no muestra el dia ${iso}`);
+  return esperarInteractiva(within(celda).getByRole('button'));
+}
+
 function filaDe(id: string): string {
   return `${PREFIJO_FILA}${id}`;
 }
@@ -658,6 +676,32 @@ describe('pantalla de proveedores — lista sobre la tabla compartida', () => {
     expect(routerMock.push).toHaveBeenCalledTimes(2);
     expect(ultimoDestino().has(CREATED_FROM_PARAM)).toBe(false);
     expect(ultimoDestino().has(CREATED_TO_PARAM)).toBe(false);
+  });
+
+  it('R9: elegir a mano en el calendario un dia de inicio y otro de fin navega con ese rango en YYYY-MM-DD', async () => {
+    const user = setupUser();
+    const inicio = diaDelMesEnCurso(10);
+    const fin = diaDelMesEnCurso(20);
+
+    const { rerender } = render(await pantallaMontada());
+
+    await user.click(screen.getByTestId(testId.filtroFecha));
+    await user.click(await botonDelDia(inicio));
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalledTimes(1));
+    expect(ultimoDestino().get(CREATED_FROM_PARAM)).toBe(inicio);
+
+    // El calendario es controlado por la URL: sin volver a pintar con ella no recordaria el inicio.
+    rerender(await pantallaMontada(Object.fromEntries(ultimoDestino())));
+
+    await user.click(await botonDelDia(fin));
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalledTimes(2));
+
+    const destino = ultimoDestino();
+    expect(destino.get(CREATED_FROM_PARAM)).toMatch(FORMATO_DE_DIA);
+    expect(destino.get(CREATED_TO_PARAM)).toMatch(FORMATO_DE_DIA);
+    expect(parseSupplierListParams(Object.fromEntries(destino)).filters).toEqual({
+      [CREATED_AT_COLUMN_ID]: { kind: 'dateRange', from: inicio, to: fin },
+    });
   });
 
   it('R10: pinta las filas tal cual llegan aunque la URL pida otro orden y un termino que no coincide', async () => {
@@ -997,6 +1041,7 @@ describe('pantalla de proveedores — estados', () => {
   });
 
   it('R32, R33: con busqueda o filtro y cero filas presenta «sin resultados» dentro de la tabla, sin crear, con la busqueda y el filtro a la vista', async () => {
+    const user = setupUser();
     listSuppliersActionMock.mockResolvedValue(
       paginaDeProveedores([], { pageSize: MAX_PAGE_SIZE, total: 0 }),
     );
@@ -1020,7 +1065,8 @@ describe('pantalla de proveedores — estados', () => {
     expect(screen.getByTestId(testId.busqueda)).toHaveValue('sin-coincidencias');
     expect(screen.getByTestId(testId.filtroFecha)).toBeVisible();
 
-    const destino = within(sinResultados).getByTestId(testId.limpiarBusqueda).getAttribute('href');
+    const limpiar = within(sinResultados).getByTestId(testId.limpiarBusqueda);
+    const destino = limpiar.getAttribute('href');
     expect(destino?.startsWith(SUPPLIERS_ROUTE)).toBe(true);
     for (const parametro of [SEARCH_PARAM, CREATED_FROM_PARAM, CREATED_TO_PARAM]) {
       expect(consultaDe(destino).has(parametro), parametro).toBe(false);
@@ -1032,6 +1078,9 @@ describe('pantalla de proveedores — estados', () => {
       filters: {},
       search: '',
     });
+
+    await user.click(limpiar);
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalledWith(destino));
   });
 
   it('R32: con busqueda, cero filas y una pagina posterior ofrece volver a la primera conservando busqueda, filtros, tamano y orden', async () => {

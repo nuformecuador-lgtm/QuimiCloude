@@ -285,6 +285,24 @@ function ultimoDestino(): URLSearchParams {
   return consulta(routerMock.push.mock.calls.at(-1)?.[0]);
 }
 
+const FORMATO_DE_DIA = /^\d{4}-\d{2}-\d{2}$/;
+
+// Sin rango vigente el calendario abre en el mes en curso.
+function diaDelMesEnCurso(dia: number): string {
+  const hoy = new Date();
+  const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+  return `${hoy.getFullYear()}-${mes}-${String(dia).padStart(2, '0')}`;
+}
+
+// Por el `data-day` ISO de la celda: la etiqueta del boton depende del idioma.
+async function botonDelDia(iso: string): Promise<HTMLElement> {
+  const celda = (await screen.findAllByRole('gridcell')).find(
+    (candidata) => candidata.getAttribute('data-day') === iso,
+  );
+  if (celda === undefined) throw new Error(`el calendario no muestra el dia ${iso}`);
+  return esperarInteractiva(within(celda).getByRole('button'));
+}
+
 function botonDeOrden(columnId: string): HTMLElement | undefined {
   const cabecera = screen.getByTestId(`data-table-head-${columnId}`);
   return within(cabecera)
@@ -635,6 +653,32 @@ describe('pantalla de recetas — orden, busqueda y filtro', () => {
       .map((columna) => columna.id);
     expect(filtrables).toEqual([CREATED_AT_COLUMN_ID]);
     expect(document.querySelectorAll('[data-testid^="data-table-filter-date-"]')).toHaveLength(1);
+  });
+
+  it('R9: elegir a mano en el calendario un dia de inicio y otro de fin navega con ese rango en YYYY-MM-DD', async () => {
+    const user = setupUser();
+    const inicio = diaDelMesEnCurso(10);
+    const fin = diaDelMesEnCurso(20);
+
+    const { rerender } = await renderPantalla();
+
+    await user.click(screen.getByTestId(testId.filtroFecha));
+    await user.click(await botonDelDia(inicio));
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalledTimes(1));
+    expect(ultimoDestino().get(CREATED_FROM_PARAM)).toBe(inicio);
+
+    // El calendario es controlado por la URL: sin volver a pintar con ella no recordaria el inicio.
+    rerender(await montaje(Object.fromEntries(ultimoDestino())));
+
+    await user.click(await botonDelDia(fin));
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalledTimes(2));
+
+    const destino = ultimoDestino();
+    expect(destino.get(CREATED_FROM_PARAM)).toMatch(FORMATO_DE_DIA);
+    expect(destino.get(CREATED_TO_PARAM)).toMatch(FORMATO_DE_DIA);
+    expect(parseRecipeListParams(Object.fromEntries(destino)).filters).toEqual({
+      [CREATED_AT_COLUMN_ID]: { kind: 'dateRange', from: inicio, to: fin },
+    });
   });
 
   it('R10: las filas son las que devolvio la operacion y en su orden, aunque la URL pida otro orden', async () => {
