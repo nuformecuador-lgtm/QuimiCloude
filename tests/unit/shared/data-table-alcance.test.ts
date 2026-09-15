@@ -466,7 +466,7 @@ describe('Alcance QC-56: la migracion no abre la tabla compartida (R20)', () => 
       delRango = git(`git diff --name-only ${RANGO}`)
     } catch (error) {
       throw new Error(
-        `No se pudo calcular el diff \`${RANGO}\`, asi que R20 NO se ha comprobado. ` +
+        `No se pudo calcular el diff \`${RANGO}\`, asi que ni R20 ni R28 se han comprobado. ` +
           `Esta guardia falla en vez de pasar en silencio. Causa: ${String(error)}`,
       )
     }
@@ -504,5 +504,28 @@ describe('Alcance QC-56: la migracion no abre la tabla compartida (R20)', () => 
 
     const violaciones = tocados.filter((ruta) => ruta.startsWith(CARPETA_DE_LA_TABLA))
     expect(violaciones, 'la migracion no puede modificar la tabla compartida (R20)').toEqual([])
+  })
+
+  it('R28: fuera de las dos rutas, tests, E2E, specs y progreso la rama solo toca el barrel de proveedores', (ctx) => {
+    const tocados = archivosTocados()
+    saltarSiNoEsLaRamaDeQC56(ctx, tocados)
+
+    const dentroDelAlcance = [
+      `app/(private)${FORMULAS_ROUTE}/`,
+      `app/(private)${SUPPLIERS_ROUTE}/`,
+      'tests/',
+      'e2e/',
+      'specs/',
+      'progress/',
+    ]
+    const fuera = tocados.filter((ruta) => !dentroDelAlcance.some((prefijo) => ruta.startsWith(prefijo)))
+
+    expect(fuera, 'el unico cambio fuera de las rutas es publicar la lista blanca de proveedores (R28, R31)').toEqual([
+      'lib/modules/proveedores/index.ts',
+    ])
+    expect(
+      tocados.filter((ruta) => ruta.startsWith('db/')),
+      'la migracion no toca el esquema de datos (R28)',
+    ).toEqual([])
   })
 })

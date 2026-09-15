@@ -838,6 +838,40 @@ describe('contrato de la ruta de recetas', () => {
     }
   });
 
+  it('R30: la lista no conserva tabla ni barra propias y si su vacio, su error y su esqueleto', () => {
+    const nombres = readdirSync(join(RAIZ, COMPONENTES_PATH));
+    const esqueleto = enRutaDePosix(join(COMPONENTES_PATH, 'recipe-table-skeleton.tsx'));
+    const tabla = enRutaDePosix(join(COMPONENTES_PATH, 'recipe-table.tsx'));
+
+    for (const borrado of ['recipe-list-toolbar.tsx', 'recipe-columns.ts']) {
+      expect(nombres, `${COMPONENTES_PATH} no deberia tener ${borrado}`).not.toContain(borrado);
+    }
+    expect(
+      nombres.filter((nombre) => /toolbar|pagination/i.test(nombre)),
+      'la barra y la paginacion las pinta la tabla compartida',
+    ).toEqual([]);
+
+    const importaTablaPrimitiva = /from\s*['"]@\/components\/ui\/table['"]/;
+    expect(
+      FUENTES_DE_LA_RUTA.filter(
+        (ruta) => ruta !== esqueleto && importaTablaPrimitiva.test(fuenteSinComentarios(ruta)),
+      ),
+      'solo el esqueleto puede seguir montando la tabla primitiva',
+    ).toEqual([]);
+
+    for (const conservado of [
+      enRutaDePosix(join(COMPONENTES_PATH, 'recipe-list-empty.tsx')),
+      enRutaDePosix(join(COMPONENTES_PATH, 'recipe-list-error.tsx')),
+      esqueleto,
+    ]) {
+      expect(existsSync(join(RAIZ, conservado)), `deberia existir ${conservado}`).toBe(true);
+    }
+
+    expect(fuenteSinComentarios(tabla)).toMatch(
+      /from\s*['"]@\/components\/shared\/data-table['"]/,
+    );
+  });
+
   it('la imagen se pinta con la direccion que entrega la consulta y ningun archivo compone una URL de almacenamiento', () => {
     // R18 — nada de variables de entorno de storage, ni concatenacion, ni cliente de Supabase.
     ningunArchivoContiene(['process.env', 'NEXT_PUBLIC_SUPABASE', 'supabase', '.storage.']);
