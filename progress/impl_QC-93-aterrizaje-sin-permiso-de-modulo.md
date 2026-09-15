@@ -469,6 +469,53 @@ permissions.ts:165   [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.con
 La feature sigue tocando solo `e2e/**` (helper + 14 suites), `tests/guards/guard-e2e-landing.test.ts`,
 `tests/unit/e2e-helpers/landing.test.ts`, `specs/QC-93-*` y `progress/`.
 
+### T16 — Revision de T12: la corrida de despues, otra vez (R23, R24)
+
+- Commit medido: `e40203b` (T14 incluida; `d2c0aff` y `4c986c0`, posteriores, solo tocan `progress/` y `tasks.md`).
+- Base: `QuimiCloude_QC93` **nueva**, recreada desde `qct_tpl_5a5346ed8f4d` en el mismo comando que la corrida (medido al
+  crearla: `companies=1 users=1 roles=2 role_permissions=17 revoked_sessions=0`; borra el residuo de la mutacion de T14).
+- Comando: `pnpm exec playwright test --workers=3`, chromium + webkit, suite completa. 8,0 GB libres al empezar, puerto
+  3117 libre.
+- Log completo: `progress/e2e_QC-93_despues_T16.log` (2026-09-15 11:23:02 a 11:32:17).
+
+**Resultado: `21 failed / 59 passed` (80), 9.2 min.**
+
+| | T1 (`0d8f05d`) | T12 (`c0182c7`) | **T16 (`e40203b`)** |
+|---|---|---|---|
+| tests | 78 | 80 | 80 |
+| passed | 51 | 60 | **59** |
+| failed | 27 | 20 | **21** |
+| rojos cuya causa es el aterrizaje | 8 | 0 (+2 de premisa bloqueada) | **0** |
+
+**Lo que cierra la enmienda:** `e2e/inventario.spec.ts:606` (R4) pasa en **chromium y webkit**. La fila «premisa del caso
+bloqueada» de la tabla de T12 **desaparece**. Tambien verdes en los dos motores: `pedidos.spec.ts:440` (R49),
+`recetas.spec.ts:369` (R6), `login.spec.ts:386` (QC-93 R14-R18, la sonda R18 sigue sin ver ni un dato) y
+`login.spec.ts:431` (el test de la regresion arreglada en `c0182c7`). `proveedores.spec.ts:455` (R52) pasa en webkit y
+cae en chromium por la carrera de QC-23 (abajo).
+
+**Los 21 rojos, cada uno con causa nombrada, distinta del aterrizaje derivado, y destino (R24):**
+
+| Ejec. | Tests | Causa | Destino propuesto |
+|---|---|---|---|
+| 10 | `inventario.spec.ts:426`, `:494`, `:550`; `proveedores.spec.ts:360`; `presentaciones.spec.ts:280` (los dos motores) | **B · QC-80**: la unidad de la presentacion es obligatoria y el alta no la elige; `presentation-create` / `SHEET_TESTID` no se cierra | ficha: actualizar esos E2E a QC-80 |
+| 2 | `errores.spec.ts:197` (los dos) | **C · QC-65**: su usuario nace `pending`; el login lo rechaza y `loginAndLand` agota la espera (`landing.ts:79`). Es Administrador | ficha: fixture con `accountStatus: 'active'` |
+| 2 | `permisos.spec.ts:201` (los dos) | **D · enmienda 2026-09-07**: `private-user-trigger` ya no existe (`:263`). R10 deja el archivo fuera | ficha: actualizar al boton directo `private-logout` |
+| 2 | `usuarios.spec.ts:305` (los dos) | **F**: la limpieza no borra `credential_setup_tokens`; el `finally` lo tapa con el error de la empresa (`:293`) | ficha: limpieza de `usuarios.spec.ts` |
+| 1 | `session.spec.ts:241` (webkit) | **E · QC-23**: la limpieza no borra `revoked_sessions` (`:197`, FK violada). R10 deja el archivo fuera | ficha: limpieza de `session.spec.ts` (el arreglo de `c0182c7`) |
+| 4 | **chromium**: `presentaciones.spec.ts:338`, `proveedores.spec.ts:455` (R52), `session.spec.ts:241`, `session.spec.ts:289` | **Carrera de QC-23** (hallazgo 2 de T12): la sesion nace revocada si el login cae en el mismo segundo en que el fixture crea el usuario (`sessions_valid_from @default(now())` con milisegundos contra `iat` en segundos, `isStampedOut` con `<=`). Evidencia: en `:338` y `:455`, traza de URLs `/dashboard` -> `/login?sesion=fin` dentro de `loginAndLand`; en los dos de `session.spec.ts`, el snapshot de Playwright muestra el **formulario de login** (`textbox "Usuario"`) donde tenia que estar `inventario-title` (`:261`, `:306`), justo despues de aterrizar | ficha para QC-23 (o fixtures E2E con el sello truncado / en el pasado) |
+
+Total: 10 + 2 + 2 + 2 + 1 + 4 = **21**.
+
+**Diferencia con T12, explicada:** 20 -> 21 no es una regresion. Los rojos estables son los mismos (B, C, D, F y E); el
+de premisa bloqueada (2) se va; y la carrera de QC-23, que en T12 no aparecio, tira esta vez **4 ejecuciones, todas en
+chromium**. Tres de ellas estan en archivos cuyo codigo esta feature no cambia salvo la entrada (`presentaciones:338`) o no
+toca (`session.spec.ts`, R10). La que cae sobre un caso de esta ficha (`proveedores:455`, R52) pasa en webkit en la misma
+corrida y en los dos motores en T12, y su traza muestra la sesion anulada, no un aterrizaje distinto. Ningun rojo nuevo sin
+causa. **Ninguno tiene como causa el aterrizaje derivado del menu.**
+
+**Riesgo que la enmienda ya preveia** (`design.md > 9.6`): la carrera no toco el caso de inventario `:606` en esta
+corrida; si lo tocara, falla en `expect(status).toBe(404)` porque `/inventario` redirige al login, nunca da un verde falso.
+
 ## Mapa R -> test (T13, revisado en T17: R1-R28)
 
 | R | Test / evidencia |

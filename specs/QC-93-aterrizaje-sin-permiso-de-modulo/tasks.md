@@ -200,7 +200,7 @@ Los mismos comandos de T10, sobre el arbol con T14.
 `permissions.ts:165` sigue siendo `['inventario.consultar', 'asignaciones.consultar']`, y lo pegado en
 el progreso lo dice con la fecha de la revision.
 
-## T16 — Revision de T12: la corrida de despues, otra vez  ·  R23, R24
+## [x] T16 — Revision de T12: la corrida de despues, otra vez  ·  R23, R24
 
 Depende de T14 y T15. Base limpia **nueva**, copiada de la plantilla, igual que en T12. Suite
 `pnpm exec playwright test` **completa**, Chromium y WebKit.
@@ -212,7 +212,7 @@ Depende de T14 y T15. Base limpia **nueva**, copiada de la plantilla, igual que 
 - Cada rojo que quede tiene causa nombrada y distinta del aterrizaje (R24).
 - Ningun rojo nuevo sin causa.
 
-## T17 — Revision de T13: trazabilidad  ·  R1..R28
+## [x] T17 — Revision de T13: trazabilidad  ·  R1..R28
 
 Toca: **`progress/impl_QC-93-aterrizaje-sin-permiso-de-modulo.md`**. Depende de T16.
 
