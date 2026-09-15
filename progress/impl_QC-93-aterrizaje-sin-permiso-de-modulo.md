@@ -259,7 +259,22 @@ Lo que toca la feature (`git diff --stat origin/dev...HEAD`): `e2e/helpers/landi
 - Consecuencia fuera de la corrida: ese residuo, pasada una hora (`ORPHAN_MIN_AGE_MS`), haria reventar tambien el
   barrido de huerfanos del `beforeAll` (`:259-268`, sin `try`) en cualquier corrida futura sobre esa base.
 - Arreglo (dentro de R21, `e2e/**`): borrar las `RevokedSession` de los usuarios del prefijo antes de borrar los
-  usuarios, en el `afterAll` y en el barrido del `beforeAll`. Delegado a `frontend_dev`; ver abajo.
+  usuarios, en el `afterAll` y en el barrido del `beforeAll`. Delegado a `frontend_dev`, **commit `c0182c7`**:
+  - barrido del `beforeAll`: `prisma.revokedSession.deleteMany` con el MISMO `where` que el `user.deleteMany` que le
+    sigue (prefijo propio + `OR` de edad/rol/empresa, via la relacion `user`), sin `try`, como el resto del barrido;
+  - `afterAll`: `prisma.revokedSession.deleteMany` por `${USERNAME_PREFIX}${RUN_ID}`, en su propio `try`, antes del de
+    usuarios.
+  - El subagente comprobo que la unica otra FK hacia `users` es `credential_setup_tokens`, en la que este spec no
+    escribe. No se toco el caso nuevo ni la politica de `catch` del hook.
+  - Verificacion re-ejecutada por el implementer antes del commit:
+
+    ```
+    pnpm run typecheck                                            -> EXIT=0
+    pnpm exec eslint e2e/login.spec.ts                            -> EXIT=0
+    pnpm exec vitest run tests/guards/guard-e2e-landing.test.ts   -> EXIT=0   Tests  16 passed (16)
+    pnpm exec playwright test --list                              -> Total: 80 tests in 18 files
+    ```
+  - La confirmacion con navegador de que `:408` vuelve a verde es la corrida definitiva de T12.
 
 ### Hallazgo 2 — causa AJENA: `pedidos.spec.ts:440` (R49) con la sesion muerta al nacer
 
