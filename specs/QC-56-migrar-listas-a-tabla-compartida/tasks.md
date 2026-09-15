@@ -274,7 +274,7 @@
   compartida. No se amplía.
 - **Hecho:** sigue verde en los dos motores.
 
-### T17 [P] — E2E de proveedores: búsqueda y orden
+### [x] T17 [P] — E2E de proveedores: búsqueda y orden
 - **Archivos:** `e2e/proveedores.spec.ts`.
 - **Depende de:** T9.
 - **Requisitos:** R26.
@@ -290,7 +290,7 @@
 
 ## Tanda 6 — Cierre
 
-### T18 — Trazabilidad y entrega
+### [x] T18 — Trazabilidad y entrega
 - **Archivos:** `progress/impl_QC-56-migrar-listas-a-tabla-compartida.md`.
 - **Depende de:** T1–T17.
 - **Requisitos:** R1–R33.
