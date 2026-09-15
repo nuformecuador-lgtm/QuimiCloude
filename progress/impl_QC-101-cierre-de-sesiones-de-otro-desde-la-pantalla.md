@@ -206,4 +206,96 @@ Verificados contra el disco tras el merge de `origin/dev` (QC-102 y QC-95). QC-9
 ## Deuda registrada para el leader
 
 - **Quinta copia de `currentActor()`** en `lib/modules/identity/adapters/driving/session-actions.ts`, con su comentario de deuda que apunta a la extraccion a `adapters/driving/current-actor.ts` (`design.md > 3` alternativa B y `> 7`). La promesa de `role-actions.ts:67-71` («cuando aparezca la TERCERA copia se extrae») ya se incumplio tres veces dentro de `identity`, y en todo el repo hay **12 copias** (13 con esta). No se refactoriza aqui por decision del spec; se propone ficha propia y el leader decide si la abre. *Matiz del comentario:* nombra las cuatro copias de `identity`, pero el subagente solo verifico que el cuerpo coincide con `user-actions.ts` y `role-actions.ts`.
-- **Pendiente del leader:** `./init.sh --rapido` y `./init.sh` completo (segunda mitad de T12). La suite completa no se ha corrido.
+- **Pendiente del leader:** `./init.sh` completo (segunda mitad de T12). Tras la vuelta de review ya se corrio la suite **unitaria** completa (`ui` + `node`, ver abajo); el proyecto `integration` y `./init.sh` no.
+
+## Vuelta de review (2026-09-15)
+
+La review (`progress/review_QC-101-cierre-de-sesiones-de-otro-desde-la-pantalla.md`, HEAD revisado `58d3ae8`) devolvio la ficha **RECHAZADA con 4 mayores y 3 menores**. Producto y trazabilidad quedaron aprobados (22/22). Lo que fallaba era el gate: cinco guardias o tests de alcance que leen el disco o el fuente, y que `vitest related` no selecciona, estaban en rojo por este diff. **La leccion para la proxima vez:** en una ficha que anade un E2E, un sitio que nombra el estado de cuenta o un test de UI, `vitest related` no basta. Hay que correr las guardias y los tests de alcance de la carpeta (`test:rapido` como minimo).
+
+### Correcciones, un commit por hallazgo
+
+Solo se toco codigo de test y `tasks.md`; nada de produccion. No se toco `tests/baseline-rojos.json`, ni `ADAPTADORES_DRIVING`, ni `tests/unit/identity/usuarios/scope.test.ts`.
+
+| Hallazgo | Commit | Archivo(s) | Que se hizo |
+| --- | --- | --- | --- |
+| M1 | `1012f97` | `tests/guards/guard-identificador-de-request.test.ts` | Alta de `cierre-de-sesiones.spec.ts` en `E2E_ESPERADOS`, con comentario `QC-101 T10 / R17`. El comentario describe el recorrido y deja dicho que **NO** ejercita el cruce borde -> accion del identificador de peticion (el spec no lee ni afirma nada sobre el identificador ni sobre `reference`), asi que el diferimiento de QC-71 R21 sigue intacto. |
+| M2 | `9350743` | `tests/unit/configuracion-ui/grupos/alcance.test.ts` | El caso QC-85 R36 «cada operacion entra por su RUTA EXACTA, nunca por el barrel del modulo» recibe `ctx` y llama a `baseDeEstaRama(ctx)`, como sus hermanos. El comentario cita a QC-101 como la rama que lo destapo: era una guardia de alcance sin precondicion de rama. En esta rama sale **saltado** («esta NO es la rama de QC-85»), no en verde. |
+| M3 | `bccce2e` | `tests/unit/identity/account-status-scope.test.ts` | Alta de `app/(private)/configuracion/usuarios/components/user-sheet.tsx` en `SITIOS_PERMITIDOS`, como bloque aditivo al final con comentario `QC-101 R11`: compara el estado que ya viaja en la `UserRow`, sin lectura nueva, y la autorizacion sigue en el service. La comparacion sigue siendo una igualdad. |
+| M4 | `fd30f77` | `tests/unit/configuracion-ui/end-user-sessions-dialog.test.tsx` | `getByText(endUserSessionsTitle(...))` pasa a `within(dialogo).getByRole('heading', { name: endUserSessionsTitle(FILA.displayName) })`. `AlertDialogTitle` se pinta como `h2`. No hizo falta testid nuevo, y el barrel no cambia. No quedan otros `ByText`, `ByLabelText`, `ByPlaceholderText` ni `ByDisplayValue` ahi ni en los casos QC-101 de `user-sheet.test.tsx` y `user-form.test.tsx`. |
+| m1 | `2f94de4` | `user-list-section.test.tsx`, `usuarios-page.test.tsx`, `usuarios-viewport.test.tsx`, `grupos/usuarios-page.test.tsx` | Solo reordenar: el bloque del `vi.mock` de `session-actions` va antes del comentario de grupos, que queda pegado a su `vi.mock` de `work-group-actions`, como en `work-group-a11y.test.tsx`. Ninguna linea de texto cambia. |
+| m2 | — | — | Solo constancia (T4-T9 en un commit, ya declarado arriba). No se rehace la historia. |
+| m3 | `92ff837` | `specs/QC-101-.../tasks.md` | T12 **desmarcada**, con nota de estado: el mapa y la deuda estan escritos, y el `./init.sh` completo lo corre el leader. «Gate en verde» no se cumple hasta que su salida este en la bitacora. |
+
+### Salidas (reales, sobre HEAD `2f94de4`)
+
+**Antes, confirmando los rojos (subagentes):**
+```
+guard-identificador-de-request.test.ts   Tests  1 failed | 22 passed (23)            EXIT=1
+account-status-scope.test.ts             Tests  1 failed | 8 passed | 3 skipped (12) EXIT=1
+alcance + end-user-sessions-dialog + configuracion-convenciones + unidades-convenciones
+  × ninguna consulta de la carpeta identifica por texto de interfaz   (configuracion-convenciones, R35)
+  × ninguna consulta de la carpeta identifica por texto de interfaz   (unidades-convenciones, R49)
+  × cada operacion entra por su RUTA EXACTA, nunca por el barrel del modulo   (grupos/alcance, R36)
+  Test Files  3 failed | 1 passed (4)   Tests  3 failed | 72 passed | 20 skipped (95)   EXIT=1
+```
+
+**Despues, por archivo (subagentes):**
+```
+guard-identificador-de-request.test.ts   Tests  23 passed (23)             EXIT=0
+account-status-scope.test.ts             Tests  9 passed | 3 skipped (12)  EXIT=0
+pnpm run typecheck                       EXIT=0
+pnpm run lint                            EXIT=0
+vitest run (alcance, end-user-sessions-dialog, 3 convenciones, 4 de m1)
+  Test Files  9 passed (9)   Tests  168 passed | 25 skipped (193)   EXIT=0
+```
+
+**`pnpm run test:rapido` (implementer):**
+```
+[test:rapido] -> vitest related --run --passWithNoTests <diff de la rama>
+ Test Files  36 passed (36)
+      Tests  613 passed | 23 skipped (636)
+[guardias]
+ Test Files  39 passed (39)
+      Tests  407 passed | 9 skipped (416)
+EXIT test:rapido=0
+```
+
+**Los seis archivos de la tabla de atribucion (implementer, `--reporter=verbose`):**
+```
+tests/guards/guard-identificador-de-request.test.ts
+tests/unit/configuracion-ui/grupos/alcance.test.ts
+tests/unit/identity/account-status-scope.test.ts
+tests/unit/configuracion-ui/configuracion-convenciones.test.ts
+tests/unit/configuracion-ui/unidades-convenciones.test.ts
+tests/unit/identity/usuarios/scope.test.ts
+
+ × |node| tests/unit/identity/usuarios/scope.test.ts > alcance de QC-66 (crud-de-usuarios) — CONTENIDO: muerde siempre, tambien dentro de dev > R45 — ningun archivo de produccion de la feature lee ni escribe los tres contadores de bloqueo de QC-...
+AssertionError: QC-66 toca el mecanismo de bloqueo de QC-19/QC-78, y R45 se lo prohibe:
++   "lib/modules/identity/adapters/driven/persistence/user-admin-prisma.ts: failedLoginAttempts",
++   "lib/modules/identity/adapters/driven/persistence/user-admin-prisma.ts: lockLevel",
++   "lib/modules/identity/adapters/driven/persistence/user-admin-prisma.ts: lockedUntil",
+ Test Files  1 failed | 5 passed (6)
+      Tests  1 failed | 104 passed | 29 skipped (134)
+EXIT seis=1
+```
+
+**Suite unitaria completa, `pnpm exec vitest run --project ui --project node` (implementer):**
+```
+ FAIL  |node| tests/unit/identity/usuarios/scope.test.ts
+ Test Files  1 failed | 403 passed (404)
+      Tests  1 failed | 5839 passed | 75 skipped (5915)
+   Duration  248.65s
+EXIT suite-ui-node=1
+```
+
+### Lectura del resultado
+
+- **El unico rojo es `tests/unit/identity/usuarios/scope.test.ts`, y no es de QC-101.** Acusa a `lib/modules/identity/adapters/driven/persistence/user-admin-prisma.ts`, cuyo ultimo commit es `f728d15 feat(QC-95)`. `git diff --name-only d6008f1..HEAD` para esa ruta: **0**. No se toco: lo decide el humano (arreglarlo en `dev` o darlo de alta en el baseline). `./init.sh` completo lo va a contar como rojo nuevo tambien en esta rama, porque no esta en `tests/baseline-rojos.json`.
+- **Frente a la review: de 6 archivos rojos a 1.** Los 4 que provocaba este diff (M1-M4) estan en verde, y `grupos/alcance` ademas salta su caso R36 fuera de la rama de QC-85.
+- **Desvio respecto a lo esperado en `configuracion-convenciones` y `unidades-convenciones`:** se esperaba que les quedara solo el rojo documentado en el baseline (los casos de `package.json`, desde QC-79). **No les queda ninguno.** Esos casos salen saltados por precondicion de rama:
+  - «(R31) > no toca `package.json` ni `components/ui/`»: «esta NO es la rama de QC-45»
+  - «(R45) > `package.json` no aparece en el diff contra la base de fusion»: «esta NO es la rama de QC-39»
+
+  **Sus dos entradas en `tests/baseline-rojos.json` parecen obsoletas** (su motivo ya no se reproduce), y el propio comparador deberia avisarlo. No se tocaron: es decision del leader.
+- **Base compartida:** nada de lo corrido en esta vuelta abre conexion (proyectos `ui` y `node`). No se corrio `integration` ni E2E. No se observo ninguna interferencia.
+- **Hallazgo lateral, sin tocar (no lo pedia la review):** en `grupos/alcance.test.ts`, el caso vecino «ningun archivo de la pantalla llama a una ruta propia con `fetch`» (~l.591) tambien lee `archivosDeLaPantalla()` sin `ctx`. Es la misma especie de bomba que M2, hoy en verde solo porque nada en la pantalla usa `fetch`. Queda anotado para quien lo decida.
