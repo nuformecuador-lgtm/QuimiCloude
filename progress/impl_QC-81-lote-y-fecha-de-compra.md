@@ -932,6 +932,252 @@ AssertionError: ... lib/modules/identity/adapters/driven/persistence/user-admin-
 
 No se corrio integracion ni E2E: el codigo es identico por tokens en todos los archivos.
 
+### Los 4 retenidos de la limpieza, decididos por el humano (2026-09-15)
+
+La seccion anterior dejo **retenidos** 4 archivos, porque un test exigia un comentario con cita.
+El humano los decidio el 2026-09-15 y el leader lo transmitio.
+
+**1-3. `error-codes.ts`, `down.sql` y `product-batch-lot-migration.test.ts`: excepcion a la regla,
+conservan su cita.** Los tests **no se cambian**. De cada archivo se conserva exactamente el literal
+que su test exige, en la linea que lo contiene; el resto se limpia igual que los otros 28.
+
+**Excepciones vigentes**, verificadas en el HEAD tras los commits:
+
+| Archivo | Linea | Literal conservado | Test que lo exige |
+|---|---|---|---|
+| `lib/modules/errores/domain/error-codes.ts` | 6 | `**Sexta enmienda, el 2026-09-15 (QC-81)**` | `tests/unit/errores/catalogo.test.ts`, caso «la cabecera de error-codes.ts redacta la sexta enmienda con su fecha y su aprobacion» (`toContain`, hacia `:185-186`) |
+| `lib/modules/errores/domain/error-codes.ts` | 7 | `Aprobada por el humano el 2026-09-15 en la puerta F1.4 de QC-81` | el mismo caso de `catalogo.test.ts` |
+| `db/migrations/20260913120000_product_batch_lot_and_purchase_date/down.sql` | 4 | `(R23)`, en la linea «NO VACIA NINGUN `lot` (R23): no se distingue lo que escribio el relleno de lo escrito a mano.» | `tests/unit/inventario/schema/product-batch-lot-migration.test.ts:355` (`downHeaderStatesItsLimits`, `/\(R23\)/`) |
+
+- **Enmiendas anteriores de `error-codes.ts`.** Se busco en `tests/` si algun test o guardia exigia
+  sus citas, tambien en `guard-catalogo-de-errores` y `catalogo.test.ts`. Nadie las exige, asi que se
+  limpiaron.
+- **`down.sql` conserva ademas** «NO VACIA NINGUN `lot`», «SI PIERDE» y `purchase_date`, que el mismo
+  test pide. No son citas.
+- **Nombres de caso.** `product-batch-lot-migration.test.ts` conserva `QC-81` en el nombre de dos
+  `describe`, que es codigo y no comentario.
+
+| Archivo | Comentario antes -> despues | Citas antes -> despues | Commit |
+|---|---|---|---|
+| `lib/modules/errores/domain/error-codes.ts` | 93 -> 17 | 33 -> 2 (las dos exceptuadas) | `66b2109` |
+| `db/migrations/20260913120000_product_batch_lot_and_purchase_date/down.sql` | 52 -> 8 | 7 -> 1 (la exceptuada) | `7d64054` |
+| `tests/unit/inventario/schema/product-batch-lot-migration.test.ts` | 117 -> 69 | 28 -> 0 | `a3c5f62` |
+
+El comprobador contra `61220c4` da en los tres codigo, directivas y `@module` identicos.
+El agente corrio `tests/unit/errores/`, `guard-catalogo-de-errores` y
+`product-batch-lot-migration.test.ts`: 4 archivos, 76 tests en verde.
+
+**4. `db/schema.prisma`: se limpia entero, y los dos tests que lo anclaban se re-anclan.**
+
+- **Re-anclado (cambio de codigo, commit propio `c19540a`,
+  `test(QC-81): re-ancla la mutacion de @module en el nombre del modelo`).**
+  - **Antes**, `tests/unit/identity/schema/credential-setup-migration.test.ts:816-821` y
+    `tests/unit/identity/schema/session-revocation-migration.test.ts:887-892` quitaban el
+    `/// @module identity` de su modelo reemplazando un texto que incluia la primera linea del
+    comentario siguiente (`/// QC-79. Enlace de un solo uso`, `/// QC-23. Las sesiones cerradas`).
+  - **Ahora** usan una regex anclada en el `/// @module identity` pegado al modelo:
+    `/\/\/\/ @module identity\n((?:\/\/\/[^\n]*\n)*model CredentialSetupToken \{)/` y la misma con
+    `model RevokedSession \{`. Se sustituye por `'$1'`.
+  - **Por que no depende del comentario:** solo cruza lineas `///` contiguas hasta el
+    `model <Nombre> {`. Si hubiera codigo en medio no casaria, y la afirmacion
+    `expect(sinDueno, 'la mutacion no quito el @module').not.toBe(rawSchema)` lo haria caer.
+  - **Pruebas del agente:**
+    - los dos tests, 58/58;
+    - la misma logica de ancla aplicada por script al esquema actual y a la propuesta limpia: en
+      los dos, la mutacion encuentra el modelo, le quita el `@module` y `moduleOwnerOf` da `null`;
+    - **mutacion del propio test**, con el ancla rota y copia y restauracion con `cp`: los dos tests
+      dan ROJO por `not.toBe(rawSchema)`, y vuelven a verde tras restaurar;
+    - `vitest run schema`: 28 archivos, 593 tests;
+    - eslint en 0.
+- **Limpieza de esos dos tests y de `schema.prisma`:** delegada en un `backend_dev` sobre el commit
+  del ancla. Ver la subseccion siguiente.
+
+**Limpieza de `schema.prisma` y de los dos tests de identidad (tras el re-anclado)**
+
+| Archivo | Comentario antes -> despues | Citas antes -> despues | Base del comprobador | Commit |
+|---|---|---|---|---|
+| `db/schema.prisma` | 824 -> 120 | 245 -> 0 | `61220c4` | `b9548ac` |
+| `tests/unit/identity/schema/credential-setup-migration.test.ts` | 188 -> 67 | 39 -> 0 | `c19540a` | `bd54795` |
+| `tests/unit/identity/schema/session-revocation-migration.test.ts` | 179 -> 66 | 32 -> 0 | `c19540a` | `46acb5c` |
+
+- El codigo, las directivas y `@module` quedan identicos en los tres. Los 12 `/// @module` del esquema
+  siguen justo encima de su `model`.
+- No se toco ni una regex ni un literal de los tests, tampoco la mutacion re-anclada.
+
+**La propuesta limpia del grupo A se reviso antes de aplicarla, y tenia 6 datos falsos o imprecisos,
+ya corregidos:**
+1. **Cabecera, dato falso.** Decia que la ruta `db/` se declara en `package.json > prisma.schema`. En
+   realidad esta en `prisma.config.ts:30`.
+2. **`Company`, dato falso.** Decia «no hay `SELECT` previo». El seed si hace `findFirst` antes del
+   `create` (`initial-access-repository-prisma.ts:42`). Se quita la frase.
+3. **`User.sessionsValidFrom`, impreciso.** Decia «se guarda truncado al segundo». Lo truncan las
+   escrituras de la aplicacion, no el `@default(now())`.
+4. **`User.accountStatusChangedBy`, causalidad no verificada.** Presentaba la FK escrita a mano como
+   el motivo. Queda solo el hecho: la FK existe sin `@relation` y es drift.
+5. **`Presentation`, impreciso.** Llamaba drift a un disparador, y Prisma no introspecta
+   disparadores. Ademas omitia los indices btree de orden.
+6. **`OrderAssignment`, dato falso.** Decia «dos padres son de otros modulos». Son los tres.
+
+Ademas se quito, en `WorkGroupMember` y `OrderAssignment`, una observacion sobre `@updatedAt` sin
+default de base. Es cierta, pero vale para todo el esquema y no explica esas dos tablas.
+
+**Motivos quitados por no verificados:**
+- **`Permission`:** decia «`module` y `action` van en columnas propias porque se consulta por ellas».
+  Nadie consulta por ellas.
+- **Tests de identidad:** decian «`pgcrypto` ya existe y medio repo depende de ella». Queda solo lo
+  verificado: «ya la crean migraciones anteriores».
+
+`unidades-schema.test.ts:294-296` sigue satisfecho: el bloque de `Unit` nombra
+`units_equivalence_and_scope` y los indices parciales.
+
+**Salida del agente**
+```
+$ pnpm exec prisma validate
+The schema at db\schema.prisma is valid 🚀
+$ pnpm exec eslint <los dos tests>   -> exit 0
+$ pnpm exec vitest run schema
+ Test Files  28 passed (28)
+      Tests  593 passed (593)
+$ pnpm exec vitest run guard
+ Test Files  39 passed (39)
+      Tests  407 passed | 9 skipped (416)
+```
+
+Probo ademas los 19 unitarios que leen `schema.prisma` fuera de `schema` y `guard`. Solo falla
+`tests/unit/identity/usuarios/scope.test.ts` (R45), y **tambien falla con el `schema.prisma`
+original**: es el rojo previo de QC-95 anotado arriba.
+
+**La limpieza de comentarios de QC-81 queda completa: los 32 archivos que toca la rama estan limpios.**
+- **Citas que se conservan en comentarios:** solo las tres excepciones decididas por el humano, en
+  `error-codes.ts:6-7` y `down.sql:4`.
+- **Commits de esta tanda:**
+  - `66b2109`, `7d64054` y `a3c5f62`: `chore`, excepciones;
+  - `c19540a`: `test`, ancla;
+  - `b9548ac`, `bd54795` y `46acb5c`: `chore`, esquema y los dos tests.
+
+**Verificacion final de la limpieza de los retenidos y de T16**, hecha por el implementer sobre
+`6d6ff4d`:
+```
+$ pnpm run typecheck   -> exit_typecheck=0
+$ pnpm run lint        -> exit_lint=0
+$ pnpm exec vitest run guard
+ Test Files  39 passed (39)
+      Tests  407 passed | 9 skipped (416)
+$ pnpm exec vitest run --project node --project ui schema tests/unit/identity/usuarios/scope.test.ts
+ FAIL  |node| tests/unit/identity/usuarios/scope.test.ts > ... > R45 — ningun archivo de produccion de la feature lee ni escribe los tres contadores de bloqueo de QC-19
+ Test Files  1 failed | 28 passed (29)
+      Tests  1 failed | 603 passed | 5 skipped (609)
+$ pnpm exec vitest related --run --project node --project ui product-prisma.ts error-codes.ts product-batch-lot-retry.test.ts product-batch-lot-migration.test.ts credential-setup-migration.test.ts session-revocation-migration.test.ts
+ Test Files  245 passed (245)
+      Tests  3724 passed | 20 skipped (3744)
+```
+Los 28 archivos de `schema` estan en verde. El unico rojo es el ajeno de QC-95, ya anotado: tambien
+fallaba con el `schema.prisma` original y no esta en `tests/baseline-rojos.json`.
+
+### Tanda 8 — T16, el lock de fila del producto en `addBatchToAlive` · `backend_dev` · 2026-09-15
+
+El humano aprobo el 2026-09-15 la segunda enmienda: D14, R37 y T16, en `design.md §10`, §6 G/H/I,
+§8 y §9.7. El spec lo commitea el leader. **T16 queda cerrada aqui.** Marcarla `[x]` en `tasks.md` le
+toca al leader: desde la implementacion no se edita `specs/`.
+
+**Commit `6d6ff4d`** (`feat(QC-81): T16 — addBatchToAlive bloquea la fila del producto antes del
+correlativo`), con tres archivos:
+- `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`, solo `addBatchToAlive` y
+  su tipo de fila:
+  - el `findFirst` sin lock pasa a ser
+    `SELECT "id" FROM "products" WHERE "id" = $1::uuid AND "company_id" = $2::uuid AND "deleted_at" IS NULL FOR NO KEY UPDATE`
+    con `tx.$queryRaw`, y es la **primera** sentencia de la transaccion;
+  - la empresa sale de `companyScopeColumns(scope)`;
+  - orden fijo: fila, luego `resolveBatchLot()` (el lock de aviso) y luego `INSERT`;
+  - sin fila devuelve `null`, sin lock de aviso y sin escribir;
+  - `createWithFirstBatch` no se toca;
+  - dos comentarios cortos y sin citas: por que el borrado espera o el alta deja de ver la fila, y
+    por que el orden fila → lock de aviso no forma ciclo.
+- `tests/unit/inventario/product-batch-lot-retry.test.ts`:
+  - los tres casos previos de `addBatchToAlive` doblan ahora la lectura por `$queryRaw`, sin cambiar
+    lo que afirman;
+  - se quita `product.findFirst` del doble, asi que una lectura sin lock revienta el test.
+- `tests/integration/inventario/product-batch-lot.int.test.ts`: dos casos nuevos.
+
+**Tests por requisito (R37)**
+- **Unitario:**
+  - «R37: addBatchToAlive bloquea la fila del producto con FOR NO KEY UPDATE antes de pedir el lock
+    del correlativo». La primera llamada de la transaccion es `$queryRaw`, con `FOR NO KEY UPDATE` y
+    `deleted_at` y los valores `[producto, empresa]`, y va antes del `$executeRaw` del lock de aviso
+    (`invocationCallOrder`).
+  - «R37: sin fila viva que bloquear, addBatchToAlive devuelve null con la lectura bloqueante como
+    unica sentencia». Da `null`, con un solo `$queryRaw`, cero `$executeRaw` y cero
+    `productBatch.create`.
+- **Integracion** (`describe` «R37: el alta de un lote y el borrado del mismo producto a la vez»):
+  - «R37: con el borrado confirmado antes, el alta espera la fila, devuelve null y no escribe ningun
+    lote»;
+  - «R37: con el alta llegando antes, el borrado espera a que el alta confirme y el lote queda
+    escrito antes del borrado».
+
+  Son deterministas y sin `sleep`:
+  - `esperarBloqueo` sondea `pg_stat_activity` cada 10 ms, con una cota de 3.000 ms;
+  - un `Client` de `pg` aparte sujeta los locks: el `UPDATE` del borrado sin confirmar en el caso 1, y
+    el mismo `pg_advisory_xact_lock(81, hashtext('product_batches_lot:' || companyId))` en el caso 2;
+  - `Promise.allSettled` antes de afirmar y de limpiar;
+  - limpieza en `finally` en orden de FK, y el `Client` se libera siempre.
+
+**Muerde, repetido por el implementer.** Con copia del adaptador y restauracion con `cp`, `sed`
+quita ` FOR NO KEY UPDATE`:
+```
+     × R37: con el borrado confirmado antes, el alta espera la fila, devuelve null y no escribe ningun lote 336ms
+     × R37: con el alta llegando antes, el borrado espera a que el alta confirme y el lote queda escrito antes del borrado 264ms
+ FAIL ... > R37: con el borrado confirmado antes, ...
+Error: el alta no espero a la fila
+ FAIL ... > R37: con el alta llegando antes, ...
+Error: el borrado no espero al alta
+      Tests  2 failed | 17 passed (19)
+RESTAURADO: git diff lib identico al de antes de mutar
+restaurado exit=0
+      Tests  19 passed (19)
+```
+Antes de mutar, el archivo de integracion se corrio **3 veces seguidas**: 19/19 en las tres. El agente
+lo habia corrido ademas en 5 corridas instrumentadas y con toda la carpeta
+`tests/integration/inventario/` (11 archivos, 140 tests).
+
+**Timeout de la transaccion interactiva: medido, no cambiado.**
+- **Que rige, verificado en `node_modules`.**
+  - `@prisma/client` 6.19.3, `runtime/library.js`:
+    `transactionOptions:{maxWait:…??2e3,timeout:…??5e3,…}`.
+  - `runtime/library.d.ts`: «maxWait ?= 2000 / timeout ?= 5000».
+  - `lib/shared/db/prisma.ts` crea `new PrismaClient()` sin opciones, y `writeBatchWithLotRetry` llama
+    a `prisma.$transaction(cb)` sin opciones.
+  - Por tanto rige **`timeout` = 5.000 ms** para el cuerpo, que ahora incluye la espera del lock de
+    fila, y **`maxWait` = 2.000 ms** para abrir la transaccion.
+- **Lo medido en los tests**, en 5 corridas desde el `xact_start` del alta hasta el `COMMIT` del
+  `Client`:
+  - caso 1: 22–66 ms en servidor y 55–72 ms en cliente;
+  - caso 2: 81–100 ms en servidor y 83–101 ms en cliente;
+  - **como mucho, un ~2 % del limite.**
+- **La cota de sondeo del test (3.000 ms) tambien queda por debajo:** si un bloqueo no aparece, el test
+  falla con su propio mensaje antes de que Prisma aborte.
+- **Riesgo de produccion, no del test:** un borrado logico que tardara mas de ~5 s en confirmar haria
+  que el alta concurrente abortara por timeout de Prisma, en vez de esperar. El borrado es un
+  `UPDATE` suelto y corto, asi que hoy no es alcanzable. Queda anotado, no cambiado.
+
+**Desviaciones y notas**
+1. **Donde se sondea `pg_stat_activity`.** Se hace por el pool de Prisma, no por el `Client` que
+   sujeta los locks: dentro de una transaccion, Postgres congela lo que muestra `pg_stat_activity`. El
+   `Client` sigue siendo el unico que sujeta los locks.
+2. **Claves del lock de aviso copiadas en el test** (`81` y `'product_batches_lot:'`): el adaptador no
+   las exporta y T16 limita el cambio de produccion a `addBatchToAlive`. Si cambian, el caso 2 falla
+   por su cota con mensaje propio, no en silencio.
+3. **Riesgo teorico del caso 2: el orden «alta antes que borrado».** Postgres suelta los locks del
+   alta en su commit antes de responderle, y el borrado aun tiene que escribir y confirmar. En la
+   practica el alta llega antes, pero el protocolo no lo garantiza. No se observo ninguna inversion en
+   12 corridas o mas. Si algun dia apareciera como flake, esa es la causa.
+4. **El `::uuid` en la consulta.** Un `productId` que no fuera uuid daria error de Postgres en vez de
+   error del cliente tipado. No es alcanzable: el unico llamador pasa el id que devuelve
+   `findAliveIdByName`.
+5. **Contradicciones spec ↔ codigo:** ninguna.
+
+**Adenda al mapa R -> test: R37.** Lo cubren los dos unitarios y los dos casos de integracion de
+arriba. Con ellos, el mapa queda **R1..R37 sin requisitos huerfanos**.
+
 ## Estado final de F2.1
 
 | Task | Estado |
