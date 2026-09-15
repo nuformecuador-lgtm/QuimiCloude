@@ -359,6 +359,18 @@ const SITIOS_PERMITIDOS = [
   // de QC-78 R7, y QC-23 R37 dice expresamente que el corte INMEDIATO por estado no se duplica—,
   // y no lee ni escribe la columna: quien la escribe sigue siendo `user-admin-prisma.ts`.
   'lib/modules/identity/domain/session-revocation.ts',
+
+  // RETENSADO 2026-09-15 (QC-101, cierre-de-sesiones-de-otro-desde-la-pantalla). Mismo trato y
+  // mismo criterio que los bloques de QC-78, QC-79, QC-67 y QC-23: la lista CRECE con lo que un
+  // spec aprobado autoriza, la comparacion sigue siendo una IGUALDAD y cualquier archivo fuera de
+  // ella sigue poniendo esto en rojo. Bloque ADITIVO al final: no se reordena ni se reformatea nada.
+  //
+  // QC-101 R11 — el panel de detalle ofrece «Cerrar todas las sesiones» SOLO sobre cuentas
+  // `active` (`user.accountStatus === 'active'`), con el estado que YA viaja en la `UserRow` que
+  // recibe por props: ninguna lectura nueva, ni de la columna ni de la ficha. No declara una
+  // segunda definicion del conjunto ni escribe el estado. Ocultar no es autorizar: la autorizacion
+  // sigue en el service (`end-all-sessions.ts`), no en esta comparacion.
+  'app/(private)/configuracion/usuarios/components/user-sheet.tsx',
 ] as const;
 
 /**
