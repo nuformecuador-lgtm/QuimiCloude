@@ -114,7 +114,7 @@
 
 ### T6. Guardias de alcance y gate completo
 
-- [ ] **T6 NO cerrada** (2026-09-15): falta su «Hecho», `./init.sh` completo en verde, que corre
+- [x] **T6 cerrada** (2026-09-15): `./init.sh` completo en VERDE, corrido por el leader: 463 archivos, 6594 verdes, 82 saltados, 0 rojos nuevos. Antes decia que faltaba ese gate, que corre
   el leader. El resto esta hecho:
   - B1 retensa la unica guardia que enumeraba escritores de los contadores (`usuarios/scope.test.ts`, commit `fdea487`).
   - Se crea la guardia de alcance de la ficha, `tests/guards/guard-qc95-alcance-del-pr-70.test.ts` (R8, R9, R10; commit `16249df`).
