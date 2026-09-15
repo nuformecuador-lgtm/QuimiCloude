@@ -3,6 +3,20 @@
 > Decisiones técnicas para los requisitos de `requirements.md`. El **alcance y la tabla de
 > decisiones cerradas** los fijó el humano el 2026-09-13 y aquí no se reabren: lo que sigue es
 > **cómo** se cumplen, no **si** se cumplen.
+>
+> **Enmienda del 2026-09-15**, sobre el spec aprobado e implementado. Recoge los menores de la
+> revisión que tocan el spec (`progress/review_QC-81-lote-y-fecha-de-compra.md > 6`) y una decisión
+> humana nueva:
+> - **m1**: el `P2002` del lote se reconoce por el **conjunto de columnas** y no por el nombre del
+>   índice (§3.3, §4.4).
+> - **m3**: el rechazo de R4 no llega con campo a quien llama. Es una herencia para QC-103 (§9.5).
+> - **m4**: el máximo de la serie se lee con `numeric`, **sin techo de dígitos** (§2.3, §3.2, §9).
+>   §8 recoge además cómo quedó el test de la carrera (m5).
+> - **D13 → R34–R36**: el lote tecleado de solo dígitos no puede tener 60 caracteres (§4.6, §6 E y F,
+>   §9.6). Deja abierta la pregunta **P1** sobre la migración.
+>
+> Las referencias de línea al código de las secciones 0–7 son las del 2026-09-13 y se dejan como
+> estaban. Las de esta enmienda son las del commit `e10f626`.
 
 ## 0. Hallazgos
 
@@ -121,7 +135,10 @@ product_batches
   siendo texto, así que quien quiera escribir "ACME-2026-07" a mano puede»—. El correlativo es un
   número **escrito en texto**.
 - El largo máximo (60) sigue viviendo en la validación y no en el tipo de la columna
-  (`PRODUCT_BATCH_LOT_MAX_LENGTH`, `product-batch-input.ts:49`). No se cambia.
+  (`PRODUCT_BATCH_LOT_MAX_LENGTH`, `product-batch-input.ts:49`). No se cambia. La base lo replica
+  con el `CHECK` `product_batches_lot_length` (§1.2). **Enmienda del 2026-09-15:** D13 añade una
+  regla de entrada solo para el lote de **solo dígitos**, que no puede llegar a 60 (R34). Vive en
+  el mismo esquema y **no** baja a la base (§4.6, §6 E).
 
 ### 1.2. Las tres restricciones nuevas
 
@@ -202,9 +219,9 @@ efecto colateral, y lleva test propio.
 
 ```sql
 WITH base AS (
-  SELECT "company_id", max(("lot")::bigint) AS top
+  SELECT "company_id", max(("lot")::numeric) AS top
     FROM "product_batches"
-   WHERE "lot" ~ '^[0-9]{1,18}$'
+   WHERE "lot" ~ '^[0-9]+$'
    GROUP BY "company_id"
 ), pendientes AS (
   SELECT "id", "company_id",
@@ -218,8 +235,22 @@ UPDATE "product_batches" AS b
  WHERE b."id" = pendientes."id";
 ```
 
-- `'^[0-9]{1,18}$'` acota a lo que cabe en `bigint`: sin la cota, un lote de 40 dígitos tecleado a
-  mano reventaría el `::bigint` con un `22003` en mitad de la migración.
+- **Sin techo de dígitos: `'^[0-9]+$'` y `::numeric`** (enmienda del 2026-09-15, menor m4, decisión
+  humana).
+  - **Antes** era `'^[0-9]{1,18}$'` con `::bigint`. La cota solo existía para que el `::bigint` no
+    reventara con un `22003`, y le ponía techo a la serie: un lote de 19 dígitos se quedaba fuera
+    del máximo, y el generador volvía a proponer un valor que ya existía.
+  - **Ahora** `numeric` no tiene techo práctico. Lo que acota el largo es el `CHECK`
+    `product_batches_lot_length` y, desde R34, la regla del lote tecleado (§4.6).
+  - Un lote de 40 dígitos tecleado **entra** en la serie y la continúa; ya no se ignora.
+- **El texto del resultado.** `numeric` de escala 0 más el `row_number()` da `numeric` de escala 0,
+  y su `::text` sale sin parte decimal y sin ceros a la izquierda. Medido contra base efímera:
+  `max(x::numeric)` sobre `'007'`, `'0999999999999999999'` y `'42'` da `999999999999999999`.
+- **Mismo criterio que el alta** (`resolveLot`, §3.2), para que la migración y el alta no discrepen
+  sobre cuál es «el más alto».
+- **Límite: 60 nueves.** Si una empresa ya tiene un lote de 60 nueves **y** alguna fila sin lote, el
+  relleno escribe 61 caracteres y la migración aborta **entera** al crear el `CHECK` de largo, con el
+  mensaje genérico de Postgres. No deja nada a medias. Qué hacer ahí es la pregunta **P1** (§9.6).
 - Lo **no numérico** (`'ACME-2026-07'`) no entra en el máximo. «El más alto que existe» se lee sobre
   la serie numérica, que es la única que tiene orden; un lote con letras no es un número mayor ni
   menor, simplemente no está en la serie. Es la lectura que hace que D5 y D6 sean compatibles.
@@ -273,10 +304,20 @@ docblock y el test no den.
 
 ```
 1. SELECT pg_advisory_xact_lock(<ns>, hashtext('product_batches_lot:' || :companyId))   -- solo si hay que generar
-2. SELECT max(("lot")::bigint) FROM "product_batches"
-    WHERE "company_id" = :companyId AND "lot" ~ '^[0-9]{1,18}$'
+2. SELECT max(("lot")::numeric)::text AS "top" FROM "product_batches"
+    WHERE "company_id" = :companyId AND "lot" ~ '^[0-9]+$'
 3. INSERT ... (la API tipada de Prisma, con toBatchCreateData)
 ```
+
+**El máximo, sin techo** (enmienda del 2026-09-15, m4, mismo criterio que el relleno de §2.3):
+- Se lee con `::numeric` y sin cota de dígitos.
+- Llega al adaptador **como texto**, porque un lote de más de 15 dígitos ya no cabe en un `number`
+  sin perder precisión.
+- El siguiente se calcula con `BigInt` sobre ese texto: `BigInt(top ?? '0') + 1n`. **Nunca** con
+  `number`, que redondea a partir de 2^53.
+- Sin ningún lote numérico, `top` es `NULL` y el primero es `'1'`.
+- Con la cota antigua de 18 dígitos, un `'999999999999999999'` tecleado bloqueaba para siempre la
+  generación de esa empresa (R16 roto). Eso ya no pasa y lo fija un test de integración.
 
 **Por qué el lock es una sentencia aparte y va ANTES del `SELECT`, y no dentro de una función
 evaluada en el `INSERT`.** Prisma trabaja en `READ COMMITTED`, donde **cada sentencia toma su propia
@@ -298,7 +339,19 @@ que consultar y serializar altas que no compiten sería cola gratis.
 ### 3.3. Y si aun así chocan (R15)
 
 El índice único es la garantía; el lock es solo la manera de no chocar casi nunca. Si llega un
-`P2002` sobre `product_batches_company_lot_unique`:
+`P2002` cuyo `meta.target` es **exactamente el conjunto de columnas `{company_id, lot}`** —el de
+`product_batches_company_lot_unique`—:
+
+> **Cómo se reconoce el choque** (enmienda del 2026-09-15, m1). **No** por el nombre del índice.
+> Con `@prisma/client` 6.19.3, por la API tipada que usa el paso 3, `meta.target` trae las
+> **columnas** (`['company_id', 'lot']`) y nunca el nombre del índice. Comparar contra el nombre no
+> casaría jamás: R13 saldría como `unexpected` y R15 no reintentaría nunca. Así lo documenta QC-76 en
+> `lib/modules/unidades/adapters/driven/persistence/unit-write-prisma.ts:21-48`, donde fue un
+> defecto real, y lo siguen `recipe-prisma.ts` y `supplier-prisma.ts`. Además lo confirmó contra
+> base real la mutación sin lock del test de la carrera (`target: [ 'company_id', 'lot' ]`).
+> `isDuplicateOrderNumber` sí usa el nombre, pero porque `pedidos` inserta con SQL crudo y lo busca
+> en el mensaje: es otro camino. Se compara el **conjunto exacto**, no un «contiene». Un `target`
+> con una tercera columna, con otras columnas o como cadena suelta **no** se reconoce y se relanza.
 
 - **con lote generado** ⇒ se **reintenta la operación entera** —transacción nueva, instantánea
   nueva, máximo nuevo—, hasta **3 intentos** en total. El reintento va **fuera** de
@@ -373,16 +426,103 @@ instante que ya se usa para `created_at`/`updated_at` (`:120`, `instante`). Un s
   copia literal de `toBatchExpiryDate` (`:512-514`) sin la rama del nulo.
 - `toBatchCreateData` gana `purchaseDate` y recibe el `lot` **ya resuelto**.
 - `resolveLot(tx, batch, scope)`: los pasos 1-2 de §3.2; devuelve el lote a escribir.
-- `isDuplicateBatchLot(error)`: `P2002` **y** que el `meta.target` nombre
-  `product_batches_company_lot_unique` — dos condiciones, mismo criterio conservador que
-  `isBatchCompanyScopeViolation` (`:631-641`) e `isDuplicateOrderNumber` (`order-prisma.ts:128-139`).
-  Un `P2002` que no se sabe identificar **se relanza**.
+- `isDuplicateBatchLot(error)`: tiene que ser un `PrismaClientKnownRequestError` con código `P2002`
+  **y** con un `meta.target` cuyo **conjunto de columnas** sea exactamente `{company_id, lot}`, en
+  cualquier orden. `meta.target` se normaliza antes de mirarlo: una cadena suelta cuenta como una
+  sola columna, y un valor no inspeccionable, como ninguna. Mismo criterio conservador que
+  `isBatchCompanyScopeViolation`, y **el mismo mecanismo que `unit-write-prisma.ts`**. Un `P2002`
+  que no se sabe identificar **se relanza**.
+  *(Enmienda del 2026-09-15, m1: antes decía «que el `meta.target` nombre
+  `product_batches_company_lot_unique`», con `isDuplicateOrderNumber` como precedente. Con Prisma
+  6.19.3 eso no casa nunca; el porqué está en §3.3.)*
 
 ### 4.5. Server Action (`adapters/driving/product-actions.ts`)
 
 `buildCreateProductCandidate` gana una línea: `purchaseDate: readOptionalFormString(formData,
 'purchaseDate')` (`:217-229`). Vacío ⇒ `undefined` ⇒ hoy. `buildUpdateProductCandidate` **no** se
 toca: la edición sigue sin conocer ningún campo de lote (QC-90 R26). No hay ruta ni endpoint nuevo.
+
+### 4.6. El lote de solo dígitos no llega a 60 (enmienda del 2026-09-15: D13, R34–R36)
+
+**Dónde se rechaza: en `lotSchema`** (`domain/product-batch-input.ts:69`), al lado de
+`PRODUCT_BATCH_LOT_MAX_LENGTH` (`:49`), que es de donde sale el 60. Ni en el caso de uso ni en el
+adaptador:
+- **Es una regla de la entrada y no necesita nada más.** No depende del reloj, que era lo que sacó R4
+  del esquema (§4.1), ni de la base.
+- **Un solo esquema la aplica en los dos lados.** El formulario valida en el cliente con ese esquema, y
+  el caso de uso lo vuelve a pasar en el servidor (`create-product.ts:137-138`). Una sola definición
+  cubre las dos cosas.
+- **Pasan por ahí todos los lotes tecleados.** Los dos caminos del alta (`createWithFirstBatch` y
+  `addBatchToAlive`) salen del mismo caso de uso, y no hay otro camino que escriba un lote tecleado:
+  R32 no deja editar lotes.
+- **Los lotes generados no pasan por el esquema, y está bien que no pasen.** R36 exige que el generado
+  pueda tener 60.
+
+**Forma:**
+
+```ts
+const NUMERIC_LOT_PATTERN = /^[0-9]+$/;   // NO exportada
+
+const lotSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(PRODUCT_BATCH_LOT_MAX_LENGTH, { abort: true })
+  .refine(
+    (value) => !(NUMERIC_LOT_PATTERN.test(value) && value.length >= PRODUCT_BATCH_LOT_MAX_LENGTH),
+    { message: MESSAGE_LOTE_NUMERICO_LARGO },
+  );
+```
+
+- **`/^[0-9]+$/` y no `\d`**: es el **mismo texto** que `'^[0-9]+$'` de `resolveLot` y del relleno.
+  La regla y la serie tienen que coincidir en qué es un lote numérico, y con el mismo texto eso se ve
+  a simple vista.
+- **Ceros a la izquierda.** La regla mira el **valor recortado**: `trim()` va antes. Cuenta
+  **caracteres**, no magnitud, así que un `'000…001'` de 60 caracteres se rechaza aunque valga 1.
+  Así lo dice D13 («no puede tener 60 caracteres») y así se aplica, sin reinterpretarlo.
+- **`abort: true` en el `max`**: el mismo motivo que ya escribió `purchaseDateSchema` (`:112-116`). Sin
+  el corte, zod v4 ejecuta también el `refine` y un lote de 61 dígitos cobraría dos rechazos. Con el
+  corte, cada lote mal escrito recibe **uno solo**, como exige R34.
+- **Ningún export nuevo.** `PRODUCT_BATCH_LOT_MAX_LENGTH` ya es público y el patrón no hace falta
+  fuera. Así `module-contract.test.ts` y `qc81-alcance.test.ts` no cambian.
+
+**Código de error: `invalid_input`. No se propone ningún código nuevo.**
+- Un lote de 60 dígitos tiene una forma que la regla no admite, así que es **entrada inválida** en el
+  sentido exacto del catálogo.
+- No es un choque contra la base, que es lo que justificó `batch_duplicate_lot`.
+- El caso de uso ya convierte cualquier fallo de zod en `ValidationError` → `invalid_input`
+  (`create-product.ts:138`), así que en el caso de uso no se escribe ni una línea nueva.
+
+**Qué ve quien llama**, dicho con la misma precisión que ahora pide R4:
+- **En la pantalla de hoy, sin tocar `app/**`:** el rechazo aparece **en el campo del lote y con su
+  propio texto**. El formulario reparte los errores por `issue.path[0]` y, para los issues `custom`
+  —un `refine` lo es—, pinta `issue.message` (`app/(private)/inventario/components/product-form.tsx:198-208`,
+  `:327-331`). Si el mensaje no fuera propio, se leería el genérico «Escribe un lote de 1 a 60
+  caracteres.» (`:86`), que para este caso es falso. **Texto propuesto**, a aprobar con la enmienda:
+  «Un lote de solo números puede tener hasta 59 caracteres.».
+- **Quien llama a la Server Action sin pasar por el formulario** recibe `invalid_input` sin campo. Es
+  el mismo contrato que R4 y R6 (§9.5).
+
+**Por qué con esto el siguiente generado cabe siempre, y dónde deja de ser «siempre»:**
+- Si ningún lote tecleado de solo dígitos pasa de 59 caracteres, el mayor posible es 10^59 − 1, y el
+  siguiente generado es como mucho 10^59, que tiene **60** caracteres y cabe (R36).
+- La serie generada solo llegaría a 61 caracteres después de generar unos 9·10^59 lotes a partir de
+  ahí, cosa que no va a ocurrir.
+- Los únicos caminos reales a 61 son **datos que ya estén escritos** (pregunta P1, §9.6) o
+  **escrituras por otra vía**, que tampoco pasan por la regla de largo del esquema.
+
+**Sin `CHECK` en la base, a propósito.** Se descarta en §6 E. En resumen:
+- La base **no sabe** si un lote se tecleó o se generó: no hay columna que lo diga, que es el mismo
+  motivo de R23.
+- La única versión que puede expresar es «ningún lote de solo dígitos llega a 60», y esa rechazaría el
+  generado de 60 que R36 exige. Reproduciría el mismo fallo un dígito antes: con 59 nueves, el
+  siguiente sería 10^59 y lo rechazaría el `CHECK`.
+- «Las dos defensas no se sustituyen» vale cuando las dos expresan **la misma regla**. Aquí la base
+  conserva la suya, que es la invariante que sí comparten los dos lados: `product_batches_lot_length`,
+  60 para todo lote.
+
+**El adaptador no traduce el `23514` de largo.** Sigue saliendo como `unexpected`, y desde R34 solo lo
+alcanzan los datos de P1 o las escrituras por otra vía. Se descarta en §6 F.
 
 ## 5. Autorización, RLS y ámbito
 
@@ -428,6 +568,33 @@ DDL al vuelo. **Descartada** por lo mismo que A —no sabe de los lotes tecleado
 mantiene el lock de fila hasta el commit, es decir, hace exactamente la misma cola que el lock de
 aviso pero añadiendo una tabla, una migración y un segundo sitio donde la verdad puede desincronarse
 de `product_batches`.
+
+**E. Un `CHECK` en la base para D13** (enmienda del 2026-09-15). Por ejemplo,
+`CHECK ("lot" !~ '^[0-9]+$' OR char_length("lot") <= 59)`, como segunda defensa de R34, siguiendo el
+criterio de «las dos defensas no se sustituyen» de §1.2. **Se descarta porque la base no puede
+expresar D13 sin romper R36:**
+- D13 habla de lotes **tecleados**, y la fila no guarda si el lote se tecleó o se generó (el mismo
+  límite que R23).
+- Un `CHECK` solo puede decir «ningún lote de solo dígitos llega a 60», y eso **también** rechaza el
+  generado de 60 caracteres. Con 59 nueves en la empresa, el siguiente generado (10^59) lo rechazaría
+  el `CHECK`: es el fallo que D13 quiere evitar, trasladado un dígito antes.
+- Añadir una columna de procedencia para poder escribir el `CHECK` sería ampliar el modelo de datos
+  por una frontera que no se alcanza, y nadie lo ha pedido.
+
+La base mantiene la defensa que **sí** comparten los dos lados: `product_batches_lot_length`, 60 para
+todo lote.
+
+**F. Traducir en el adaptador el `23514` de `product_batches_lot_length` a `invalid_input`, en vez de
+cortar en la entrada.** Con esto, el alta de la empresa con 60 nueves dejaría de salir como
+`unexpected`. **Se descarta:**
+- Cura el síntoma a 61 caracteres, pero **no** la causa: la generación de esa empresa seguiría
+  bloqueada para siempre.
+- Para un lote **generado** mentiría: quien da de alta no escribió nada, así que no hay entrada
+  inválida que corregir.
+- Contradice el criterio conservador de `translateBatchWriteError` (`product-prisma.ts:788-792`), que
+  relanza lo que no es entrada del llamante.
+
+D13 lo decidió en la entrada, y ahí se aplica.
 
 ## 7. Dependencias y catálogo de errores
 
@@ -480,11 +647,38 @@ aislamiento de mentira —el precedente y el argumento están escritos en
 `product-batch-write.int.test.ts:14-21`—. Cada caso fabrica su empresa y su producto con
 `randomUUID` y limpia en `finally` en orden de FK; la base de la corrida es suya (QC-77).
 
-**La carrera (R14) se prueba de verdad:** dos `createWithFirstBatch` de la **misma empresa**
-lanzados con `Promise.all`, sin `await` intermedio, y se afirma que las dos resuelven, que los dos
-lotes son **distintos**, **consecutivos** y que no hubo excepción. Con el lock, el segundo espera; sin
-el lock, el test da rojo por `P2002` o por lotes repetidos. Es un test que **puede fallar si el
-diseño está mal**, que es la única clase que vale aquí.
+**La carrera (R14) se prueba de verdad.** Así quedó implementado, y así lo recoge la enmienda del
+2026-09-15 (m5):
+- **Qué se lanza.** **3 rondas de 8** `createWithFirstBatch` de la **misma empresa**, a la vez y sin
+  `await` intermedio.
+- **Cómo se espera.** Cada ronda se espera con **`Promise.allSettled`**. El **primer rechazo se relanza
+  tal cual**, antes de afirmar nada y antes de limpiar. Con `Promise.all`, el `finally` limpiaba
+  mientras otras altas seguían escribiendo, y la violación de FK de la limpieza tapaba la causa real.
+  El nombre del `it` sigue diciendo «con Promise.all», para no romper las referencias del mapa.
+- **Qué se afirma.**
+  - Todas resuelven, sin excepción.
+  - Hay **exactamente 8** `$transaction` por ronda, es decir, ningún reintento, y eso queda medido, no
+    deducido.
+  - Los lotes son **distintos y consecutivos**.
+- **Requisito de entorno.** El test solo tiene sentido con un **pool de Prisma de más de una
+  conexión**. Con `connection_limit=1` las altas se serializarían en el pool y pasaría **sin** lock.
+  Lo dice un comentario en el propio test.
+- **Muerde.** Si se quita el lock (mutación con `num_nonnulls(`), el test da rojo con la causa real: el
+  `P2002` agotado a los 3 intentos, con contexto y `cause`. Es un test que **puede fallar si el diseño
+  está mal**, que es la única clase que vale aquí.
+
+**La serie sin techo (m4)** tiene dos casos de integración:
+- Con `'999999999999999999'` tecleado, las dos altas siguientes generan `'1000000000000000000'` y
+  `'1000000000000000001'` sin chocar (R16).
+- El relleno, con el SQL real de disco, continúa desde lotes de 18 dígitos o más sin chocar con uno de
+  19 y sin reventar con uno de 40 (R18).
+
+**D13 (R34–R36)** se prueba en dos niveles (T13 y T14):
+- **Unitario del esquema y del caso de uso**, que cubre el rechazo de 60 dígitos con un solo issue en
+  `lot`, el borde de 59 y el lote de 60 caracteres con letras.
+- **Integración por el caso de uso con el repositorio real.** Con 59 nueves tecleados, el siguiente
+  generado se escribe con **60** caracteres, y el de después también. Es lo único que demuestra de
+  verdad que el `CHECK` de largo no muerde en esa frontera.
 
 **El relleno (R18-R21)** se prueba aplicando el `migration.sql` sobre una copia con filas sembradas
 a mano antes de la migración. Si eso resulta impracticable contra la base ya migrada de la corrida,
@@ -501,6 +695,9 @@ Es una excepción consciente a `CHECKPOINTS.md:20` y va anotada en el `impl_`.
 1. **R4 no está en la base** (§1.3, §6 C). Una escritura por otra vía puede meter una fecha futura.
 2. **La unicidad no normaliza** (§1.2): `'L1'` y `'l1'` conviven en la misma empresa.
 3. **Un `'9000'` tecleado deja la serie saltada para siempre.** Lo acepta D6 por escrito.
+   **Enmienda del 2026-09-15:** desde m4 el salto **no tiene techo**. Un lote de 40 dígitos tecleado
+   salta la serie a 40 dígitos, y desde D13 el salto llega como mucho a 59 dígitos. **Los dieciocho
+   nueves de m4 dejan de ser un límite**: con `numeric` quedan resueltos y tienen test (§8).
 4. **Bajo el `postgres` superusuario del `.env` local, el paréntesis de RLS de la migración no hace
    nada** y no se puede distinguir de no escribirlo —la trampa que QC-49 documentó en voz alta
    (`migration.sql:88-94`)—. Lo verificable en local es que las líneas están escritas y el
@@ -509,3 +706,50 @@ Es una excepción consciente a `CHECKPOINTS.md:20` y va anotada en el `impl_`.
    generado tras el alta. Esta ficha lo **escribe** pero no lo devuelve a la pantalla:
    `CreateProductFormState` sigue devolviendo solo el `id` (`product-actions.ts:262-263`) y no se
    cambia, porque cambiarlo sería tocar el borde de una pantalla que no entra.
+   **Enmienda del 2026-09-15: hereda también el rechazo de la fecha futura (m3, R4).**
+   - **Qué pasa hoy.** Una fecha de compra posterior a hoy sale como `ValidationError`: quien llama
+     recibe `invalid_input` y su mensaje del catálogo, **sin campo**. El `diagnostic` que nombra
+     `purchaseDate` va solo al registro del servidor (`create-product.ts:87-89`).
+   - **No es una asimetría nueva.** Cualquier fallo de zod dentro del caso de uso ya sale sin campo
+     (`create-product.ts:138`), y R6 tampoco llega con campo a quien llama en el servidor.
+   - **La diferencia con R6 está en el formulario.** R6 y R34 los caza el esquema **en el cliente** y
+     se pintan en su campo; R4 **no** puede cazarlo el esquema (§4.1), así que en la pantalla de hoy
+     llega como un error general del formulario.
+   - **QC-103 elige una de dos, y la elección es suya:**
+     - (a) **Pintar el rechazo en el campo `purchaseDate`**, comprobando «no futura» también en el
+       cliente, con su propio «hoy» y sabiendo que puede discrepar del servidor en el cambio de día.
+       El servidor sigue siendo el que decide.
+     - (b) **Cambiar el contrato** de errores del borde para que un `invalid_input` pueda llevar el
+       campo. Afecta al traductor único `createErrorStateTranslator` y, por tanto, a los siete
+       adaptadores driving: no es una decisión de inventario solo.
+   - **Y hereda el texto del lote numérico (R34, §4.6)**, que ya se pinta en el campo `lot` sin tocar
+     la pantalla. QC-103 solo tiene que revisar la redacción.
+6. **Un lote de solo dígitos de 60 caracteres ya escrito antes de D13** (enmienda del 2026-09-15,
+   pregunta **P1** abierta). D13 impide teclearlo desde ahora, pero no dice nada de los datos previos
+   ni de las escrituras por otra vía. Medido contra base efímera (bitácora, «Correcciones de la
+   revision»):
+   - **En la migración:** si una empresa tiene 60 nueves **y** alguna fila sin lote, el relleno escribe
+     61 caracteres y el `CHECK` `product_batches_lot_length` aborta la migración **entera**, con el
+     mensaje genérico «violada por alguna fila». No deja nada a medias.
+   - **En el alta:** si el máximo numérico de una empresa son 60 nueves, cada alta con lote generado
+     de esa empresa la rechaza el `CHECK` con `23514`. Llega como `PrismaClientUnknownRequestError`
+     crudo y el borde lo devuelve como `unexpected`. Abre una sola transacción y no escribe nada, pero
+     **bloquea para siempre la generación en esa empresa**, y R32 no deja arreglarlo desde la
+     aplicación. Las altas con lote tecleado siguen funcionando.
+   - **Con 60 dígitos que no son todos nueves no falla nada**, ni en la migración ni en el alta.
+
+   Las opciones de P1, en términos de SQL, para que T15 no tenga que inventar la condición:
+   - **A**: guardia en el paso 1 que aborta si existe
+     `"lot" ~ '^[0-9]+$' AND char_length("lot") >= 60`.
+   - **B**: guardia en el paso 1 que aborta si, para alguna empresa,
+     `max(("lot")::numeric) FILTER (WHERE "lot" ~ '^[0-9]+$') >= (10::numeric ^ 60) - 1`. Es la
+     condición **exacta** de los dos fallos de arriba. La potencia tiene que ser `numeric`: con
+     enteros, Postgres la calcula en `double precision` y el `- 1` se pierde por redondeo. La condición
+     atrapa también los lotes de solo dígitos de más de 60 caracteres, que de todos modos abortarían
+     en el `CHECK`, así que les da el mensaje legible.
+   - **D**: ninguna sentencia nueva. Solo cambia el comentario del paso 4 para citar D13, y este punto
+     queda como límite aceptado.
+
+   Con A o B, el mensaje sigue el formato de R21: cuántas son, la consulta para localizarlas y qué
+   hacer (renombrar por SQL antes de migrar). **Hasta que P1 tenga respuesta, este punto es un límite
+   abierto, no aceptado.**

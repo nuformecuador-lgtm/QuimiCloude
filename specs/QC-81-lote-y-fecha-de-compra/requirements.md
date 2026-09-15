@@ -54,8 +54,20 @@
 > viven los dos campos, D5 forma del correlativo, D6 la serie continúa desde el más alto, D7 los
 > lotes vacíos de hoy y el `NOT NULL`, D8 qué fecha reciben las filas existentes, D9 nunca futura,
 > D10 la pantalla no entra, D11 qué verificación se exige, D12 autorización/idioma/borrado/forma de
-> la fecha. **D4 no lleva requisito propio a propósito**: es el sujeto de R1–R27 —todos hablan de
-> `product_batches`— y ningún requisito menciona `products` como sede de estos dos campos.
+> la fecha, y D13 —añadida en la enmienda del 2026-09-15— el lote tecleado de solo dígitos que no
+> puede llegar a 60 caracteres. **D4 no lleva requisito propio a propósito**: es el sujeto de R1–R27
+> —todos hablan de `product_batches`— y ningún requisito menciona `products` como sede de estos dos
+> campos.
+>
+> **Enmienda del 2026-09-15 (F1.2 sobre el spec ya aprobado e implementado).** Sale de la revisión
+> (`progress/review_QC-81-lote-y-fecha-de-compra.md > 6`) y cambia tres cosas de este archivo, ninguna
+> más:
+> - **R4**, y R6 por el mismo motivo, dicen ahora qué ve quien llama y qué se queda en el registro
+>   (menor m3).
+> - Nace **D13**, con sus requisitos **R34–R36**.
+> - Se abre la **pregunta P1**, sobre la migración.
+>
+> Ningún otro requisito cambia de texto ni de número.
 
 ### La fecha de compra
 
@@ -72,15 +84,23 @@ sistema DEBE guardar **la misma fecha civil** que se escribió, sin corrimiento 
 horaria ni por hora del día del servidor. [D12]
 
 **R4.** SI la fecha de compra recibida es **posterior a hoy**, ENTONCES el sistema DEBE rechazar el
-alta con `invalid_input` señalando el campo `purchaseDate`, y NO DEBE escribir ni el producto ni el
-lote. [D9]
+alta con `invalid_input` y NO DEBE escribir ni el producto ni el lote. Quien llama recibe **ese
+código y su mensaje del catálogo, sin indicación de campo**, igual que con cualquier otra entrada
+inválida. El motivo, que nombra `purchaseDate`, DEBE quedar en el **diagnóstico** del error, que va
+al registro del servidor y no a quien llama. [D9]
+*(Precisado el 2026-09-15, menor m3: la redacción anterior prometía «señalando el campo
+`purchaseDate`», y ese campo solo llega al registro. Pintar el rechazo en el campo es herencia de
+QC-103, `design.md > 9.5`.)*
 
 **R5.** El sistema DEBE **aceptar** cualquier fecha de compra **anterior o igual a hoy**, incluida
 una de días o meses atrás, sin rechazarla y sin corregirla. [D9]
 
 **R6.** SI la fecha de compra recibida no tiene la forma `YYYY-MM-DD` o no es una fecha de calendario
-existente, ENTONCES el sistema DEBE rechazar el alta con `invalid_input` señalando `purchaseDate`,
-sin escribir nada. [D9]
+existente, ENTONCES el sistema DEBE rechazar el alta con `invalid_input`, sin escribir nada, y la
+**validación de entrada** DEBE señalar el campo `purchaseDate`. Quien llama al alta en el servidor
+recibe, como en R4, el código sin campo. [D9]
+*(Precisado el 2026-09-15 por el mismo motivo que R4. No cambia ningún test: el campo ya se afirma
+sobre la validación de entrada.)*
 
 ### El lote es obligatorio y lo genera el backend
 
@@ -194,10 +214,73 @@ el contrato público de `inventario` no expone ninguna de las tres (se mantiene 
 solo unitaria con la base simulada— del **correlativo**, de la **unicidad por empresa**, del
 **relleno de la migración** y de **dos altas compitiendo por el mismo número**. [D11]
 
+### Enmienda del 2026-09-15: el lote numérico generado cabe siempre
+
+> Sale de la corrección m4. Con la serie sin techo, si el lote de solo dígitos más alto de una
+> empresa tiene 60 caracteres, el siguiente generado tendría 61 y no cabría en el largo máximo del
+> lote. D13 lo corta en la entrada.
+>
+> **«Solo dígitos»** son los caracteres `0`–`9`: el mismo conjunto con el que la serie decide qué
+> lote es numérico (R9). Lo que **no** decide todavía esta enmienda —qué hace la migración si un
+> lote así ya está escrito— es la pregunta **P1**, y no tiene requisito hasta que se responda.
+
+**R34.** SI el alta trae un lote escrito que, **tras recortar los espacios de los extremos**, está
+formado **solo por dígitos** y llega a los **60 caracteres** —contando también los ceros a la
+izquierda—, ENTONCES el sistema DEBE rechazar el alta con `invalid_input`, NO DEBE escribir ni el
+producto ni el lote, y NO DEBE sustituirlo por un correlativo generado. Además, la **validación de
+entrada** DEBE señalar el campo `lot` con **un solo** rechazo. [D13]
+
+**R35.** El sistema DEBE seguir **aceptando** un lote escrito de hasta 60 caracteres que contenga
+**al menos un carácter que no sea dígito**, y uno de **solo dígitos de hasta 59 caracteres**. Los
+dos se guardan tal cual, como dice R10. [D13, D5]
+
+**R36.** CUANDO el lote de solo dígitos más alto de una empresa tiene **59 caracteres**, el siguiente
+lote generado para esa empresa DEBE escribirse con sus **60 caracteres**, sin ningún rechazo, sin
+reintento y sin error. [D13, D6]
+
 ## Preguntas abiertas
 
-Ninguna. Las dos que la ficha arrastraba desde el 2026-09-08 —la forma exacta del correlativo y que
-valor reciben las filas existentes en el backfill— quedan cerradas en la tabla de abajo.
+Las dos que la ficha arrastraba desde el 2026-09-08 —la forma exacta del correlativo y qué valor
+reciben las filas existentes en el backfill— están cerradas en la tabla de abajo. La enmienda del
+2026-09-15 abre **una**.
+
+**P1 (2026-09-15). ¿Qué hace la migración si una empresa ya tiene escrito un lote de solo dígitos de
+60 caracteres?**
+
+D13 impide **teclearlo** desde ahora, pero no dice nada de los que ya estén en la base. Hoy no consta
+ninguno: en la base de desarrollo hay una sola fila y **no se ha medido producción**. Lo que pasa
+ahora mismo, medido contra base efímera (`progress/impl_QC-81-lote-y-fecha-de-compra.md >
+Correcciones de la revision`):
+
+- **Con 60 nueves y alguna fila sin lote en esa empresa**, la migración aborta **entera** al crear el
+  `CHECK` de largo, con el mensaje genérico de Postgres. No deja nada a medias.
+- **Con 60 nueves y ninguna fila sin lote**, la migración pasa. A partir de ahí, **toda** alta con lote
+  generado de esa empresa falla como `unexpected`. Como R32 no deja editar lotes, no hay arreglo desde
+  la aplicación.
+- **Con 60 dígitos que no son todos nueves**, no falla nada. Ni el relleno ni el alta pasan de 60
+  hasta que la serie llegue a 60 nueves, y por generación eso no ocurre en la práctica.
+
+Opciones, con su coste (detalle en `design.md > 9.6`):
+
+- **A.** La migración aborta con **mensaje propio**, como R21, si **cualquier** empresa tiene un lote
+  de solo dígitos de 60 caracteres. Es coherente al pie de la letra con D13, pero bloquea la migración
+  también por datos que no rompen nada. Hay que renombrarlos a mano por SQL antes de migrar.
+- **B.** La migración aborta con **mensaje propio** solo si **alguna empresa tiene como máximo numérico
+  60 nueves**, que es el único dato que rompe algo: el relleno o el alta. Cambia el aborto genérico por
+  uno legible y cierra el bloqueo del alta, sin frenar la migración por datos inocuos.
+- **D.** No se hace nada. Se acepta como límite conocido (`design.md > 9.6`), con el aborto genérico y
+  el posible bloqueo del alta en esa empresa.
+
+Hay una cuarta vía que **no** se ofrece, porque contradice D6: que la serie **ignore** esos lotes al
+calcular el máximo. Para eso habría que enmendar D6, no responder P1.
+
+Opinión técnica de `spec_author`, **no** decisión: la **B** es la que elimina los dos fallos reales
+con la condición más estrecha. Al responder, conviene decir también si la guardia debe cubrir los
+lotes ya escritos de **más** de 60 caracteres de cualquier forma, que hoy abortan con el mismo
+mensaje genérico (desviación 5 de la Tanda 1 de la bitácora). Es un caso vecino, no es D13, y no se
+incluye sin respuesta.
+
+**Hasta que haya respuesta, T15 no se empieza**, y el requisito que nazca de ella (R37) no existe.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -215,3 +298,8 @@ valor reciben las filas existentes en el backfill— quedan cerradas en la tabla
 | 2026-09-13 | ¿Entra la pantalla? | **No**: va en **QC-103**, `zone: frontend`, bloqueada por esta. Mantiene la zona limpia y el cupo de paralelismo intacto, igual que QC-87 → QC-102 |
 | 2026-09-13 | ¿Qué verificación se exige? | **Integración contra base real**, que es donde viven estas reglas: el correlativo, la unicidad por empresa, el backfill y **dos altas compitiendo por el mismo número**. Un unitario con la base simulada no puede demostrar ninguna de las dos últimas. **El E2E se difiere a QC-103**, que es la que tendrá algo que mirar |
 | 2026-09-13 | Autorización, idioma, borrado y forma de la fecha | **Heredados, no se reabren.** Autorización **en el service** con `inventario.modificar` (**QC-20**, **QC-90**); identificadores de base **en inglés** y borrado **lógico** (**feature 4**, **QC-14**, **QC-90**); la fecha viaja como **fecha civil `YYYY-MM-DD`** y la convierte el adaptador (**QC-90**, `expiryDate`) |
+| 2026-09-15 | Con la serie ya sin techo (m4), si el lote de solo dígitos más alto de una empresa tiene 60 caracteres, el siguiente generado tendría 61 y no cabe en el largo máximo de 60: en el alta es un error de base sin traducir y en la migración un aborto genérico. ¿Qué se hace? | **Un lote tecleado que sea solo dígitos no puede tener 60 caracteres**, para que el siguiente generado quepa siempre en el largo máximo de 60. **Precisa el alcance de D5**: el lote sigue siendo texto y un lote con al menos un carácter que no sea dígito conserva sus 60. Salió de la revisión de QC-81 y se decidió en la enmienda del spec. Qué hace la migración con un lote así **ya escrito** queda abierto (**P1**) |
+
+*La fila D13 la escribió `spec_author` el 2026-09-15 en la enmienda F1.2. Transcribe la decisión humana
+que transmitió el leader, y está sujeta a la aprobación F1.4 de la enmienda. Las filas D1–D12 no se
+tocaron.*

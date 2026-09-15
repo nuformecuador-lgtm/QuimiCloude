@@ -99,9 +99,15 @@
       `resolveLot(tx, batch, scope)` con los tres pasos de `design.md > 3.2`: `pg_advisory_xact_lock`
       **como sentencia aparte y antes** del `SELECT` del máximo —el docblock **tiene que** explicar
       el porqué de `READ COMMITTED`, es lo que impide que alguien lo «simplifique» metiéndolo dentro
-      del `INSERT`—, el máximo sobre `'^[0-9]{1,18}$'` acotado a la empresa del ámbito, y el
+      del `INSERT`—, el máximo con `max(("lot")::numeric)::text` sobre `'^[0-9]+$'` —**sin cota de
+      dígitos**, con la suma en `BigInt` sobre el texto— acotado a la empresa del ámbito, y el
       `INSERT` con la API tipada. `toBatchPurchaseDate` calcado de `toBatchExpiryDate`.
-      `isDuplicateBatchLot`: `P2002` **y** el nombre del índice; cualquier otro `P2002` se relanza.
+      `isDuplicateBatchLot`: `P2002` **y** que el **conjunto de columnas** de `meta.target` sea
+      exactamente `{company_id, lot}` (no el nombre del índice: Prisma 6.19.3 entrega columnas, mismo
+      criterio que `unit-write-prisma.ts`); cualquier otro `P2002` se relanza.
+      *(Enmendado el 2026-09-15: m4 cambió `'^[0-9]{1,18}$'` + `::bigint` por `'^[0-9]+$'` +
+      `::numeric`, y m1 cambió «nombre del índice» por «conjunto de columnas». Los dos cambios
+      recogen lo que ya está implementado; la task sigue hecha.)*
       Reintento acotado (3) **fuera** de `prisma.$transaction`, solo para el lote **generado**.
       **Hecho:** typecheck y lint en verde; el archivo sigue siendo el único del módulo que importa
       `@prisma/client`; ningún `catch` vacío; el lote escrito a mano no pide lock ni calcula máximo.
@@ -169,11 +175,96 @@
       **Hecho:** el test en verde y **rojo si alguien toca la pantalla**. Cubre **R28, R29, R30,
       R31, R32**.
 
+## Tanda 6 — enmienda del 2026-09-15: el lote numérico cabe siempre (D13)
+
+> **No se empieza nada de esta tanda sin la aprobación humana de la enmienda** (F1.4 de la
+> enmienda). T13 y T14 no dependen de la pregunta P1 y pueden ir en cuanto se apruebe. **T15 sí
+> depende de P1** y no se empieza sin respuesta escrita.
+>
+> Los archivos de esta tanda **siguen sin tocar** `app/**`, `components/**` ni `e2e/**` (R28,
+> R29), y **no** añaden ningún export al contrato público de `inventario`. Si alguna task acaba
+> pidiendo un export nuevo, hay que tocar `tests/unit/inventario/module-contract.test.ts:133` y
+> `tests/unit/inventario/qc81-alcance.test.ts:611`, y eso se anota como desviación.
+
+- [ ] **T13 [P] — La regla en el esquema de entrada del lote.** Depende de la aprobación de la
+      enmienda.
+      Archivos: `lib/modules/inventario/domain/product-batch-input.ts`,
+      `tests/unit/inventario/product-batch-input.test.ts`,
+      `tests/unit/inventario/create-product.test.ts`, y el docblock de `resolveLot` en
+      `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts` (**solo el
+      comentario**).
+      Qué se hace en `lotSchema`, según `design.md > 4.6`:
+      - `.max(PRODUCT_BATCH_LOT_MAX_LENGTH, { abort: true })`;
+      - un `refine` que rechaza el valor ya recortado cuando casa con `/^[0-9]+$/` y su largo es
+        `>= PRODUCT_BATCH_LOT_MAX_LENGTH`, con el mensaje propuesto en §4.6.
+      
+      El patrón es una constante **no exportada**, y su docblock dice que es el mismo conjunto
+      que `'^[0-9]+$'` de `resolveLot` y del relleno. El docblock de `lotSchema` cita D13 y R34.
+      En `resolveLot`, el «LÍMITE CONOCIDO» pasa a decir que desde R34 solo lo alcanzan datos ya
+      escritos o escritos por otra vía, y remite a P1.
+      **Hecho:**
+      - `product-batch-input.test.ts`, con un caso por fila:
+        - 60 dígitos ⇒ **un solo** issue, con ruta `lot` y código `custom` (R34);
+        - 60 dígitos con ceros a la izquierda ⇒ se rechaza igual (R34);
+        - 60 dígitos rodeados de espacios ⇒ se rechaza, porque cuenta el valor recortado (R34);
+        - 61 dígitos ⇒ **un solo** issue, el del largo, y no dos (R34);
+        - 59 dígitos ⇒ se acepta (R35);
+        - 60 caracteres con una letra o un guion ⇒ se acepta (R35);
+        - el lote ausente sigue siendo válido (R8, sin regresión).
+      - `create-product.test.ts`: con un lote de 60 dígitos, el caso de uso lanza
+        `ValidationError` (`invalid_input`) y el repositorio recibe **cero** llamadas, así que ni
+        se escribe ni se genera correlativo (R34).
+      - `pnpm typecheck`, `pnpm lint` y `vitest related` sobre los archivos tocados, en verde.
+      
+      Cubre **R34, R35**.
+
+- [ ] **T14 — La frontera contra base real.** Depende de T13.
+      Archivos: `tests/integration/inventario/product-batch-lot.int.test.ts` (casos nuevos; el
+      archivo ya está censado en `tests/integration/aislamiento.json`, así que no hace falta
+      entrada nueva).
+      Por el **caso de uso con el repositorio real**, como el caso «R3, R2: por el caso de uso»
+      que ya existe, y con una empresa propia:
+      1. se teclea un lote de **59 nueves** y se escribe (R35);
+      2. la alta siguiente, sin lote, genera `'1' + 59 ceros`, **de 60 caracteres**, y se escribe
+         sin `23514`, con una sola `$transaction` y sin reintento (R36);
+      3. la alta siguiente genera `'1' + 58 ceros + '1'`, también de 60 caracteres (R36);
+      4. un lote tecleado de 60 dígitos ⇒ `ValidationError` y **cero** filas nuevas en la empresa
+         (R34).
+      **Hecho:** `pnpm exec vitest run --project integration` sobre ese archivo, en verde contra la
+      base efímera de QC-77. Ningún caso afirma sobre filas que no creó él mismo, y la limpieza va
+      en `finally` en orden de FK. Cubre **R34, R35, R36**.
+
+- [ ] **T15 — La migración ante un lote numérico de 60 caracteres ya escrito.** **Bloqueada por
+      P1** (`requirements.md > Preguntas abiertas`).
+      Archivos, según la respuesta:
+      `db/migrations/20260913120000_product_batch_lot_and_purchase_date/migration.sql`,
+      `tests/unit/inventario/schema/product-batch-lot-migration.test.ts`,
+      `tests/integration/inventario/product-batch-lot.int.test.ts` (escenario del caso 10, con el
+      SQL real de disco).
+      - **Respuesta A o B** (una guardia que aborta con mensaje propio): la guardia va en el paso
+        1, junto a la de duplicados, con la condición exacta de la opción elegida (`design.md >
+        9.6`). Se escribe con el mismo formato de `RAISE EXCEPTION` que R21: cuántas empresas o
+        filas son, la consulta para localizarlas y qué hacer. Se añade el requisito que corresponda
+        (**R37**) con su test de integración (aborta entero y no deja nada a medias) y su test
+        estático (la guardia va antes de todo cambio).
+      - **Respuesta D** (se acepta como límite): no cambia ninguna sentencia. Solo cambia el
+        comentario del paso 4 de `migration.sql`, que cita D13 y R34 y dice que el límite ya solo
+        lo alcanzan datos previos. `design.md > 9.6` se deja como límite aceptado, con la fecha de
+        la respuesta.
+      - **En los dos casos**: la migración todavía no ha llegado a `dev`, así que cambiarla está
+        permitido (precedente de m4). La huella de migraciones cambia y la plantilla de QC-77 se
+        reconstruye sola. **No** se migra la base de desarrollo compartida.
+      **Hecho:** la respuesta a P1 está escrita en `progress/impl_QC-81-lote-y-fecha-de-compra.md`.
+      Los tests de la opción elegida están en verde. Si la respuesta es A o B, el test de la
+      guardia **se pone rojo** al quitar la guardia (mutación con copia y restauración, como en m4).
+      Cubre **R37**, si nace.
+
 ## Tanda 5 — cierre
 
-- [ ] **T12 — Trazabilidad y gate.** Depende de todas.
+- [ ] **T12 — Trazabilidad y gate.** Depende de todas, **incluidas T13, T14 y T15** de la enmienda.
       Archivos: `progress/impl_QC-81-lote-y-fecha-de-compra.md`.
-      El mapa `R1..R33 -> test` completo, sin ningún requisito huérfano; la salida real de
+      El mapa `R1..R36 -> test` completo (`R1..R37` si P1 hace nacer R37), sin ningún requisito
+      huérfano, con R4 citado con su redacción precisada (m3); la respuesta a P1 escrita; la salida real de
       `./init.sh` **completo** pegada; la nota del E2E diferido a QC-103 con su motivo (excepción
       consciente a `CHECKPOINTS.md`); y la respuesta de T0 escrita.
       **Hecho:** gate completo en verde, ningún archivo rojo fuera de `tests/baseline-rojos.json`.
@@ -208,3 +299,12 @@
 | R27 | T6, T8 |
 | R28, R29, R30, R31, R32 | T11 |
 | R33 | T8 |
+| R34 | T13 (esquema de entrada y caso de uso), T14 (caso 4) |
+| R35 | T13 (59 dígitos y 60 caracteres con letra), T14 (caso 1) |
+| R36 | T14 (casos 2 y 3) |
+| R37 (solo si P1 lo hace nacer) | T15 |
+
+*Enmienda del 2026-09-15:*
+- **R4** cambia de redacción (m3) pero **no** de task: lo sigue cubriendo T5, con el test que ya
+  afirma `invalid_input` y el `diagnostic` con `purchaseDate`.
+- **R6** se precisa por el mismo motivo y lo sigue cubriendo T4.
