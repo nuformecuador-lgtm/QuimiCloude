@@ -574,7 +574,30 @@ describe('pantalla de proveedores — lista sobre la tabla compartida', () => {
     expect(routerMock.push).not.toHaveBeenCalled();
   });
 
-  it('R8: la busqueda navega con el termino al cumplirse SEARCH_DEBOUNCE_MS, y vaciarla navega sin termino', async () => {
+  it('R7, R11: cada columna ordena y filtra exactamente lo que declara la lista blanca, y nada de la lista blanca queda sin columna', () => {
+    const columnas = buildSupplierColumns({ rowActions: () => null });
+    const ids: readonly string[] = columnas.map((columna) => columna.id);
+
+    for (const columna of columnas) {
+      expect(Boolean(columna.sortable), `orden de «${columna.id}»`).toBe(
+        SUPPLIER_QUERYABLE.sortable.includes(columna.id),
+      );
+
+      const declarado = Object.hasOwn(SUPPLIER_QUERYABLE.filterable, columna.id)
+        ? SUPPLIER_QUERYABLE.filterable[columna.id]
+        : undefined;
+      expect(columna.filter?.kind, `filtro de «${columna.id}»`).toBe(declarado);
+    }
+
+    for (const campo of SUPPLIER_QUERYABLE.sortable) {
+      expect(ids, `«${campo}» ordena en el servidor y no tiene columna`).toContain(campo);
+    }
+    for (const campo of Object.keys(SUPPLIER_QUERYABLE.filterable)) {
+      expect(ids, `«${campo}» filtra en el servidor y no tiene columna`).toContain(campo);
+    }
+  });
+
+  it('R8:la busqueda navega con el termino al cumplirse SEARCH_DEBOUNCE_MS, y vaciarla navega sin termino', async () => {
     await renderPantalla();
     vi.useFakeTimers();
 
