@@ -13,7 +13,8 @@
  *   - `mustChangeCredential` — **R31**, **R32**: tambien es dato de credencial, y la pantalla de
  *     QC-67 no lo muestra ni lo edita.
  *   - `failedLoginAttempts`, `lockLevel`, `lockedUntil` — **R45**: los tres contadores de QC-19 no
- *     los lee ni los escribe esta ficha; el mecanismo de bloqueo es de QC-19/QC-78.
+ *     salen por ninguna consulta y ninguna consulta los lee. Los escribe SOLO `applyGuardedChange`
+ *     al salir de `blocked` (QC-95, que enmienda R45 de QC-66).
  *   - `companyId` — **R33**: toda consulta esta ya acotada a la empresa del actor por el puerto,
  *     asi que seria siempre la misma y solo invitaria a filtrar en memoria lo que ya filtro la
  *     consulta. Y no es editable (R20).

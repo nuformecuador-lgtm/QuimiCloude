@@ -18,7 +18,9 @@
  *     operacion, con su propio esquema (`setAccountStatusSchema`) y su propio permiso de escritura.
  *   - `mustChangeCredential` — **R13**: nace en VERDADERO, lo escribe el puerto, no el llamante.
  *   - `failedLoginAttempts`, `lockLevel`, `lockedUntil` — **R45**: los tres contadores de QC-19 no
- *     se leen ni se escriben en esta ficha; limpiarlos al salir de `blocked` es de QC-78.
+ *     entran por ningun esquema de entrada (`strictObject` los rechaza). Los escribe SOLO
+ *     `applyGuardedChange` al salir de `blocked`, con el estado de `clearedLockState()` (QC-95,
+ *     que enmienda R45 de QC-66).
  *
  * **Sin validacion de FORMATO de correo ni de telefono, y sin normalizacion del nombre de usuario
  * mas alla de `trim`** (`design.md > 6.1`): es lo que hace el modelo hoy —los tres indices unicos
