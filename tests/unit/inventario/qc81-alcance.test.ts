@@ -1,28 +1,9 @@
-// QC-81 T11 — LOS LIMITES DE ALCANCE de la ficha «lote y fecha de compra». Cubre R28-R32.
+// Limites de alcance de la rama, todos de ausencia. Los de diff se miden contra la base de fusion
+// con `origin/dev` (o `dev`), contando arbol de trabajo y archivos sin seguimiento; los de codigo
+// se leen del modulo.
 //
-// Los cinco son requisitos de AUSENCIA: dicen lo que esta ficha NO hace.
-//
-//   R28 — cero archivos bajo `app/**` y `components/**`: la pantalla es QC-103.
-//   R29 — ningun E2E nuevo ni modificado, CON UNA EXCEPCION ACOTADA (ver `E2E_TOLERADO`).
-//   R30 — `package.json` y `pnpm-lock.yaml` intactos.
-//   R31 — ni existencia por lote (QC-91) ni ajuste de inventario (QC-92): `products.stock` se
-//         escribe como lo dejo QC-90 y no aparece ninguna operacion de ajuste, suma ni consumo.
-//   R32 — el contrato publico de `inventario` no expone listar, editar ni borrar lotes.
-//
-// R28-R30 se MIDEN sobre el diff de la rama (commits + arbol de trabajo + archivos sin seguimiento)
-// contra la base de fusion con `origin/dev` (o `dev` si no hay remoto). R31 y R32 se leen del
-// codigo, porque no hablan del cambio sino de lo que el modulo ofrece.
-//
-// POR QUE LOS CASOS DE DIFF SE ACOTAN A SU RAMA. `tests/baseline-rojos.json` documenta seis
-// archivos rojos de la misma especie: guardias «MI ficha no toca X» escritas como censo del diff
-// que, ya mergeadas en `dev`, se pusieron rojas con el trabajo legitimo de la ficha siguiente. De
-// ahi, copiando `tests/guards/guard-qc102-limites-de-la-ficha.test.ts`:
-//   - fuera de `feature/QC-81-lote-y-fecha-de-compra` los casos de diff hacen `ctx.skip` RUIDOSO,
-//     diciendo que no han comprobado nada. Nunca verdes, nunca rojos sobre trabajo ajeno;
-//   - EN la rama, «no puedo calcular la base» es ROJO (como `qc78-alcance`): una guardia que se
-//     apaga sola donde tiene que mirar es indistinguible de una guardia rota;
-//   - cada detector es una funcion pura que se demuestra MORDIENDO con datos fabricados, ademas
-//     del caso real, para que el verde no pueda ser vacio.
+// Fuera de su rama, los casos de diff se saltan: una guardia de «la rama no toca X» ya mergeada se
+// pondria roja con el trabajo legitimo de la siguiente. En su rama, no poder calcular la base es rojo.
 
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -54,16 +35,12 @@ const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
 // LA RAMA Y SU DIFF
 // ---------------------------------------------------------------------------------------------
 
-/** La rama de ESTA ficha. Fuera de ella, los casos de diff se saltan: no tienen nada que decir. */
 export const RAMA_DE_LA_FICHA = 'feature/QC-81-lote-y-fecha-de-compra';
 
-/** Carpeta del spec: ancla anti-vacuidad del diff (nace y vive solo en el rango de esta rama). */
+/** Ancla anti-vacuidad: la carpeta del spec solo existe en el rango de esta rama. */
 const CARPETA_SPEC = 'specs/QC-81-lote-y-fecha-de-compra/';
 
-/**
- * Candidatos de base, en orden. `origin/dev` PRIMERO: el `dev` local de este repo suele ir por
- * detras del remoto, y su merge-base arrastraria al rango trabajo ajeno ya mergeado.
- */
+/** `origin/dev` primero: un `dev` local atrasado arrastraria al rango trabajo ajeno ya mergeado. */
 const BASES = ['origin/dev', 'dev'] as const;
 
 function git(args: readonly string[]): string | null {
@@ -100,9 +77,8 @@ function lineas(salida: string | null): string[] {
 }
 
 /**
- * Archivos que esta rama cambia respecto del merge-base: los commits y el arbol de trabajo
- * (`git diff --name-only <base>`) MAS los archivos sin seguimiento, que `git diff` no ve y que son
- * justo lo NUEVO (un `e2e/qc81.spec.ts` recien creado y sin `git add` tiene que contar).
+ * Commits y arbol de trabajo, mas los archivos sin seguimiento: `git diff` no los ve y son justo
+ * lo nuevo.
  */
 function archivosDeLaRama(mergeBase: string): readonly string[] {
   const seguidos = git(['diff', '--name-only', mergeBase]);
@@ -170,33 +146,27 @@ function archivosOSalto(ctx: { skip: (nota?: string) => void }): readonly string
 // LOS DETECTORES DEL DIFF (puros)
 // ---------------------------------------------------------------------------------------------
 
-/** R28 — la pantalla. */
 export function infraccionesDePantalla(archivos: readonly string[]): string[] {
   return archivos.filter((a) => a.startsWith('app/') || a.startsWith('components/')).sort();
 }
 
 /**
- * R29 — la UNICA ruta bajo `e2e/**` que este diff puede traer.
- *
- * DECISION 2026-09-15: el humano aprobo una excepcion acotada a R29: solo la preparacion del lote
- * de ese spec, porque el esquema de QC-81 lo dejaba sin compilar (`lot` y `purchase_date` pasaron
- * a NOT NULL y su `prisma.productBatch.create` no los daba). NO es permiso para tocar su
- * recorrido ni sus aserciones, ni para ningun otro archivo de `e2e/**`.
+ * Unico E2E que el diff puede traer: su preparacion crea un lote con `prisma.productBatch.create`
+ * y dejo de compilar cuando `lot` y `purchase_date` pasaron a obligatorios. Cualquier otro archivo
+ * bajo `e2e/` da rojo.
  */
 export const E2E_TOLERADO = 'e2e/aislamiento-inventario.spec.ts';
 
-/** R29 — todo lo que caiga bajo `e2e/` y no sea EXACTAMENTE el tolerado. */
 export function infraccionesDeE2e(archivos: readonly string[]): string[] {
   return archivos.filter((a) => a.startsWith('e2e/') && a !== E2E_TOLERADO).sort();
 }
 
-/** R30 — el manifiesto y su sombra, el lock. */
 export function infraccionesDeDependencias(archivos: readonly string[]): string[] {
   return archivos.filter((a) => a === 'package.json' || a === 'pnpm-lock.yaml').sort();
 }
 
 // ---------------------------------------------------------------------------------------------
-// LECTURA DE CODIGO (R31, R32)
+// LECTURA DE CODIGO
 // ---------------------------------------------------------------------------------------------
 
 /**
@@ -248,7 +218,6 @@ function palabras(identificador: string): readonly string[] {
     .filter((p) => p.length > 0);
 }
 
-/** Palabras que denotan AJUSTE de inventario (QC-92) o CONSUMO de lote (QC-91). */
 const PALABRAS_DE_AJUSTE_O_CONSUMO = new Set([
   'adjust',
   'adjusts',
@@ -267,12 +236,8 @@ const PALABRAS_DE_AJUSTE_O_CONSUMO = new Set([
 ]);
 
 /**
- * R31 — hallazgos de «existencia por lote / ajuste / consumo» en un fuente, ya sin comentarios.
- *
- * Tres familias: una SUMA (el `_sum` de Prisma o un `SUM(` en SQL, que es como se calcularia la
- * existencia como suma de lotes), un INCREMENTO/DECREMENTO de columna (que es como se escribiria
- * un ajuste o un consumo) y cualquier identificador que se llame ajuste/consumo. `max(` NO esta:
- * es como T6 calcula el correlativo del lote, y no suma nada.
+ * Una suma es como se calcularia la existencia por lotes, y un incremento o decremento como se
+ * escribiria un ajuste o un consumo. `max(` no cuenta: no suma nada.
  */
 export function hallazgosDeAjusteOSuma(fuente: string): string[] {
   const codigo = stripComments(fuente);
@@ -298,14 +263,7 @@ function cuerpoDe(codigo: string, nombre: string): string | null {
   return codigo.slice(inicio, fin === -1 ? codigo.length : fin);
 }
 
-/**
- * R31 — `products.stock` se escribe como lo dejo QC-90, leido del adaptador de producto:
- *   - `createWithFirstBatch` escribe el producto con la MISMA existencia que trae la entrada
- *     (`stock: product.stock ?? null`), la duplicacion transitoria hasta QC-91;
- *   - `addBatchToAlive` NO escribe en `products`: ni `update`, ni `updateMany`, ni `upsert`, ni un
- *     `UPDATE "products"` crudo. Si la existencia del producto se recalculara al agregar un lote,
- *     seria aqui.
- */
+/** Si la existencia del producto se recalculara al agregar un lote, seria en `addBatchToAlive`. */
 export function hallazgosDeStockDeProducto(fuente: string): string[] {
   const codigo = stripComments(fuente);
   const hallazgos: string[] = [];
@@ -331,17 +289,15 @@ export function hallazgosDeStockDeProducto(fuente: string): string[] {
   return hallazgos;
 }
 
-/** Palabras que hacen que un nombre hable de LOTES. */
 const PALABRAS_DE_LOTE = new Set(['batch', 'batches', 'lot', 'lots', 'lote', 'lotes']);
 
-/** Verbos de las TRES operaciones que R32 prohibe. `create`/`add` NO: el alta es de QC-90. */
+/** `create` y `add` no estan: el alta de lotes si existe. */
 const OPERACIONES_PROHIBIDAS = new Set([
   'list', 'listar', 'get', 'find', 'fetch', 'read', 'query', 'search', 'buscar', 'obtener',
   'update', 'edit', 'patch', 'modify', 'actualizar', 'editar', 'modificar',
   'delete', 'remove', 'destroy', 'archive', 'borrar', 'eliminar',
 ]);
 
-/** R32 — los nombres que juntan una palabra de lote con listar/editar/borrar. */
 export function operacionesDeLoteProhibidas(nombres: readonly string[]): string[] {
   return nombres
     .filter((nombre) => {
@@ -390,14 +346,13 @@ describe('QC-81 T11 — la precondicion de rama', () => {
     expect(preparar('feature/QC-999-lo-que-venga', 'abc123').tipo).toBe('saltar');
     expect(preparar(null, 'abc123').tipo).toBe('saltar');
 
-    // En SU rama, no poder mirar es rojo, no un salto.
     expect(preparar(RAMA_DE_LA_FICHA, null).tipo).toBe('fallar');
     expect(preparar(RAMA_DE_LA_FICHA, 'abc123')).toEqual({ tipo: 'medir', mergeBase: 'abc123' });
   });
 });
 
 // ---------------------------------------------------------------------------------------------
-// R28 — la pantalla
+// LA PANTALLA
 // ---------------------------------------------------------------------------------------------
 
 describe('QC-81 R28 — el diff no toca app/** ni components/**', () => {
@@ -427,7 +382,7 @@ describe('QC-81 R28 — el diff no toca app/** ni components/**', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// R29 — E2E, con la excepcion acotada
+// E2E, CON LA EXCEPCION ACOTADA
 // ---------------------------------------------------------------------------------------------
 
 describe('QC-81 R29 — ningun E2E nuevo ni modificado, salvo la excepcion aprobada', () => {
@@ -460,7 +415,7 @@ describe('QC-81 R29 — ningun E2E nuevo ni modificado, salvo la excepcion aprob
 });
 
 // ---------------------------------------------------------------------------------------------
-// R30 — dependencias
+// DEPENDENCIAS
 // ---------------------------------------------------------------------------------------------
 
 describe('QC-81 R30 — package.json y pnpm-lock.yaml intactos', () => {
@@ -483,7 +438,7 @@ describe('QC-81 R30 — package.json y pnpm-lock.yaml intactos', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// R31 — ni existencia por lote ni ajuste
+// NI EXISTENCIA POR LOTE NI AJUSTE
 // ---------------------------------------------------------------------------------------------
 
 describe('QC-81 R31 — ni existencia por lote (QC-91) ni ajuste de inventario (QC-92)', () => {
@@ -579,7 +534,7 @@ describe('QC-81 R31 — ni existencia por lote (QC-91) ni ajuste de inventario (
 });
 
 // ---------------------------------------------------------------------------------------------
-// R32 — ni listar, ni editar, ni borrar lotes
+// NI LISTAR, NI EDITAR, NI BORRAR LOTES
 // ---------------------------------------------------------------------------------------------
 
 describe('QC-81 R32 — el contrato de inventario no expone listar, editar ni borrar lotes', () => {
