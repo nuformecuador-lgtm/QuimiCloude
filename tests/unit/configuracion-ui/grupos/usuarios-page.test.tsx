@@ -99,9 +99,6 @@ vi.mock('@/lib/modules/identity/adapters/driving/role-actions', () => ({
   listRolesAction: listRolesActionMock,
 }));
 
-// Las SIETE Server Actions de GRUPOS. Solo la de listar responde: la pestana de grupos LEE, y las
-// cinco mutaciones mas la lista de miembros FALLAN si se les llama, porque pintar una pestana no
-// muta nada ni abre ningun panel (R36).
 // QC-101 T7 — La Server Action del CIERRE DE SESIONES, doble que FALLA si se la llama.
 //
 // Mismo motivo que el bloque de grupos: el panel de detalle de personas monta ahora el dialogo del
@@ -114,6 +111,9 @@ vi.mock('@/lib/modules/identity/adapters/driving/session-actions', () => ({
   }),
 }));
 
+// Las SIETE Server Actions de GRUPOS. Solo la de listar responde: la pestana de grupos LEE, y las
+// cinco mutaciones mas la lista de miembros FALLAN si se les llama, porque pintar una pestana no
+// muta nada ni abre ningun panel (R36).
 vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => {
   const noDebeInvocarse = (nombre: string) => () => {
     throw new Error(`${nombre} no debe invocarse al pintar la pantalla`);

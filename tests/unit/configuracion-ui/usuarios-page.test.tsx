@@ -90,16 +90,6 @@ vi.mock('@/lib/modules/identity/adapters/driving/role-actions', () => ({
   listRolesAction: listRolesActionMock,
 }));
 
-// QC-85 T7 — Las SIETE Server Actions de GRUPOS, dobles que FALLAN si se les llama.
-//
-// **No es un cambio de guion de este archivo**: no toca ni un `test(...)`, ni un selector, ni una
-// asercion. Desde que la pantalla de usuarios sirve DOS pestanas, su barrel arrastra
-// `work-group-actions.ts`, que lee `observabilidad` de `@/lib/composition` **al cargarse** —y el
-// doble de composicion de este archivo declara solo `identity`—. Aislar ese borde es exactamente
-// lo que este archivo ya hacia con `user-actions` y `role-actions`.
-//
-// Que las SIETE lancen **TENSA** lo que el archivo afirma —la pestana de personas no consulta ni
-// escribe NADA de grupos— en vez de relajarlo (QC-85 R6).
 // QC-101 T7 — La Server Action del CIERRE DE SESIONES, doble que FALLA si se la llama.
 //
 // Mismo motivo que el bloque de grupos: el panel de detalle monta ahora el dialogo del cierre de
@@ -112,6 +102,16 @@ vi.mock('@/lib/modules/identity/adapters/driving/session-actions', () => ({
   }),
 }));
 
+// QC-85 T7 — Las SIETE Server Actions de GRUPOS, dobles que FALLAN si se les llama.
+//
+// **No es un cambio de guion de este archivo**: no toca ni un `test(...)`, ni un selector, ni una
+// asercion. Desde que la pantalla de usuarios sirve DOS pestanas, su barrel arrastra
+// `work-group-actions.ts`, que lee `observabilidad` de `@/lib/composition` **al cargarse** —y el
+// doble de composicion de este archivo declara solo `identity`—. Aislar ese borde es exactamente
+// lo que este archivo ya hacia con `user-actions` y `role-actions`.
+//
+// Que las SIETE lancen **TENSA** lo que el archivo afirma —la pestana de personas no consulta ni
+// escribe NADA de grupos— en vez de relajarlo (QC-85 R6).
 vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => {
   const noDebeInvocarse = (nombre: string) => () => {
     throw new Error(`${nombre} no debe invocarse desde la pestana de personas`);
