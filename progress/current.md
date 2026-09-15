@@ -11,13 +11,67 @@
 
 | key | feature | épica | zone | status | branch | quién la tiene |
 |---|---|---|---|---|---|---|
+| QC-101 | cierre-de-sesiones-de-otro-desde-la-pantalla | Identidad y acceso | fullstack | spec_ready | feature/QC-101-cierre-de-sesiones-de-otro-desde-la-pantalla | **F1.0-F1.3 hechos el 2026-09-13; PARADA EN F1.4 esperando aprobacion humana**. Acotada hoy (ver *Evaluaciones*): **10 decisiones cerradas, cero abiertas**; la `zone` paso de `frontend` a `fullstack` porque falta la Server Action, no solo el boton. `spec_author` entrego **R1-R22** y **12 tasks** (commit `5398340`), **semilla verificada intacta por diff**, y **nada contradice ninguna decision cerrada**. **El E2E con dos sesiones vivas NO tenia patron en el repo** -lo que habia solo clona `storageState`, la MISMA sesion-: se crea con dos `newContext()`, la victima entra por el formulario real, el administrador cierra **desde el panel** sin escribir por Prisma -lo que `session.spec.ts:313` simulaba-, la victima acaba en el login en **una sola redireccion de documento**, y se verifica que **la sesion del administrador SIGUE VIVA**, para distinguir «se corto a quien tocaba» de «se corto a todos». **Dos cosas para mirar al aprobar**: (1) el panel de detalle es el de **edicion** y su `SheetContent` **es un `<form>`** (`user-form.tsx:347-349`), de ahi el disparador `type="button"` y R10 como test de que no envia el formulario; (2) **deuda declarada, no ocultada**: `currentActor()` ya esta copiado **cuatro** veces pese a que `role-actions.ts:67-71` prometio extraerlo en la tercera, y esta escribe la quinta con su comentario y propone ficha aparte. La guardia de alcance de QC-23 queda **dormida** mientras no se toque el puerto de revocacion. Sin dependencias nuevas |
 | QC-93 | aterrizaje-sin-permiso-de-modulo | Identidad y acceso | fullstack | spec_ready | feature/QC-93-aterrizaje-sin-permiso-de-modulo | **F1.0-F1.3 hechos el 2026-09-13; PARADA EN F1.4 esperando aprobacion humana**. Acotada el 2026-09-13: 10 decisiones cerradas, cero abiertas. **NO se parte en backend + frontend**, y no es un olvido: la decision cerrada dice que los 23 fallos son una unica causa raiz y que partirla dejaria media suite rota con dos fichas tocando los mismos archivos. Cupo comprobado: `fullstack` tenia **0 `in_progress`**. Worktree desde `origin/dev`, con el merge de QC-87 (PR #67) dentro. `spec_author` entrego **R1-R24** y **13 tasks** (commit `679f340`), con la **semilla verificada intacta por diff** contra `f5d310a`. **Tres hallazgos medidos en `design.md > 0`, ninguno tocado**: (1) **no hay indicio de agujero real de permisos** -el corte va en cada `page.tsx` con `requirePagePermission` y los items ocultos no viajan en el HTML-; (2) **tres de las cuatro lineas de la ficha estan desplazadas** -inventario `:571` y no `:306`, pedidos `:447`, proveedores `:467`; recetas `:376` es exacta-; (3) **los 23 fallos NO se reconstruyen en disco**: la causa raiz alcanza a 4 tests = 8 ejecuciones rojas en dos motores, y `errores.spec.ts` solo crea Administrador, asi que su rojo es de otra cosa. **La cifra no se forzo**: T1 mide antes, T12 despues y R24 exige causa nombrada por cada rojo superviviente. Tarjeta en *En revision* con la ruta comentada. **Una decision para el humano al aprobar**: el spec anade una **guardia en `tests/guards/`** (R9) y un unit test del helper -lo unico de esta feature que el gate puede ejecutar-. Sin dependencias nuevas |
-| QC-102 | responsables-en-la-pantalla-de-pedidos | Pedidos | fullstack | in_progress | feature/QC-102-responsables-en-la-pantalla-de-pedidos | **ACOTADA con `/afinar-feature` el 2026-09-13**: alcance, **13 decisiones cerradas** y **cero preguntas abiertas** en `specs/QC-102-responsables-en-la-pantalla-de-pedidos/requirements.md`. No se copian aqui. **Nacida el 2026-09-12 al partir QC-87** en F1.0. El panel lateral de responsables, los avatares con el nombre del grupo y **el E2E del recorrido completo**. `depends_on: QC-87`: **DESBLOQUEADA el 2026-09-13**, la mitad backend se mergeo en `dev` (PR #67) y esta `done`. Lista para F1.0. Sin `complexity` todavia; las decisiones cerradas de las dos mitades viven en la semilla de QC-87. La primitiva `avatar` **ya existe**, verificado en disco, asi que no hay que invocar la CLI de shadcn **F1.0 y F1.1 hechos el 2026-09-13**: worktree montado desde `origin/dev` y **adelantado con `--ff-only` hasta `4a9bc4f`** para que la semilla viaje dentro (`.env` copiado del principal). **NO se parte en backend + frontend**, y es deliberado: ya ES la mitad de pantalla de QC-87, y lo que la hizo crecer a `fullstack` al acotar es **una sola consulta en lote** —responsables de varios pedidos a la vez, una por pagina, ni un join ni una consulta por fila—; partirla crearia una tercera ficha para una funcion. Mismo criterio que QC-93 hoy. Cupo comprobado: `fullstack` con **0 `in_progress`**; `depends_on: QC-87`, **`done`**. Labels del board verificados (`zone:fullstack`, `complexity:high`): **el leader los piso por error y los restauro en el acto** —comparo el board contra una foto de `feature_list.json` ANTERIOR al merge de `origin/dev` y creyo ver una divergencia que no existia—. **F1.2 entregado** (`48f5af7`): **41 requisitos EARS** -R1-R15 el lote, R16-R36 la pantalla, R37-R38 el E2E, R39-R41 los limites-, **18 tasks**, **4 alternativas descartadas** y **5 hallazgos**, con la semilla **verificada por el leader**: la unica linea que cambia del archivo sembrado es el marcador `_Pendiente_`. Lo que la semilla dejaba abierto -DONDE se compone el lote, que era diseno y no acotacion- se decide **en la pantalla**, en el Server Component, porque `asignaciones` ya importa el contrato de `pedidos` y hacerlo dentro de `listOrders` cerraria el ciclo. Tarjeta a *En revision* y ruta comentada en el issue (F1.3). **Spec APROBADO por el humano el 2026-09-13** (F1.4), tarjeta en *En curso* (F2.0). Sin dependencia nueva, asi que no hay fila que anadir a `docs/dependencias.md` —verificado en el `design.md > 5`—. `implementer` en curso (F2.1). El hallazgo 1 pide mirada: el buscador de personas y el selector de grupos exigen **`usuarios.consultar`**, un TERCER permiso que la decision 2 no nombra; hoy el spec lo degrada como ya hace `loadFormCatalogs` |
+| QC-102 | responsables-en-la-pantalla-de-pedidos | Pedidos | fullstack | in_progress | feature/QC-102-responsables-en-la-pantalla-de-pedidos | **ACOTADA con `/afinar-feature` el 2026-09-13**: alcance, **13 decisiones cerradas** y **cero preguntas abiertas** en `specs/QC-102-responsables-en-la-pantalla-de-pedidos/requirements.md`. No se copian aqui. **Nacida el 2026-09-12 al partir QC-87** en F1.0. El panel lateral de responsables, los avatares con el nombre del grupo y **el E2E del recorrido completo**. `depends_on: QC-87`: **DESBLOQUEADA el 2026-09-13**, la mitad backend se mergeo en `dev` (PR #67) y esta `done`. Lista para F1.0. Sin `complexity` todavia; las decisiones cerradas de las dos mitades viven en la semilla de QC-87. La primitiva `avatar` **ya existe**, verificado en disco, asi que no hay que invocar la CLI de shadcn **F1.0 y F1.1 hechos el 2026-09-13**: worktree montado desde `origin/dev` y **adelantado con `--ff-only` hasta `4a9bc4f`** para que la semilla viaje dentro (`.env` copiado del principal). **NO se parte en backend + frontend**, y es deliberado: ya ES la mitad de pantalla de QC-87, y lo que la hizo crecer a `fullstack` al acotar es **una sola consulta en lote** —responsables de varios pedidos a la vez, una por pagina, ni un join ni una consulta por fila—; partirla crearia una tercera ficha para una funcion. Mismo criterio que QC-93 hoy. Cupo comprobado: `fullstack` con **0 `in_progress`**; `depends_on: QC-87`, **`done`**. Labels del board verificados (`zone:fullstack`, `complexity:high`): **el leader los piso por error y los restauro en el acto** —comparo el board contra una foto de `feature_list.json` ANTERIOR al merge de `origin/dev` y creyo ver una divergencia que no existia—. **F1.2 entregado** (`48f5af7`): **41 requisitos EARS** -R1-R15 el lote, R16-R36 la pantalla, R37-R38 el E2E, R39-R41 los limites-, **18 tasks**, **4 alternativas descartadas** y **5 hallazgos**, con la semilla **verificada por el leader**: la unica linea que cambia del archivo sembrado es el marcador `_Pendiente_`. Lo que la semilla dejaba abierto -DONDE se compone el lote, que era diseno y no acotacion- se decide **en la pantalla**, en el Server Component, porque `asignaciones` ya importa el contrato de `pedidos` y hacerlo dentro de `listOrders` cerraria el ciclo. Tarjeta a *En revision* y ruta comentada en el issue (F1.3). **Spec APROBADO por el humano el 2026-09-13** (F1.4), tarjeta en *En curso* (F2.0). Sin dependencia nueva, asi que no hay fila que anadir a `docs/dependencias.md` —verificado en el `design.md > 5`—. **F2.1 entregado**: 18/18 tasks y 41/41 requisitos mapeados. **F2.2 APROBADO por el `reviewer`, 0 mayores y 6 menores**, con el gate completo corrido POR EL y las cinco cosas de riesgo verificadas ejecutando: la trazabilidad uno a uno, que la composicion vive en `OrderListSection` y `listOrders` no gana una linea, que `canModifyAssignments` **no enmienda** la guardia -`module-contract.test.ts` ni aparece en el diff, al contrario que en QC-87-, que la guardia de R40 acotada muerde MAS, y que los 2 E2E rojos son **heredados por tres vias**. **F2.3**: `origin/dev` no se habia movido, sin conflictos ni migraciones. **F2.4 CERRADO**: gate completo `== init OK ==` -456 archivos, 6482 pasados, 66 saltados, cero rojos nuevos- y **PR #68 abierto** (https://github.com/singularis-co/QuimiCloude/pull/68), MERGEABLE/CLEAN. **Siguiente: F2.5, espera el merge humano.** El hallazgo 1 pide mirada: el buscador de personas y el selector de grupos exigen **`usuarios.consultar`**, un TERCER permiso que la decision 2 no nombra; hoy el spec lo degrada como ya hace `loadFormCatalogs` |
 | QC-63 | ejecutar-receta-operador | Recetas | fullstack | pending | feature/QC-63-ejecutar-receta-operador | **Acotada con `/afinar-feature` el 2026-09-08 y BLOQUEADA**: la acotación destapó que el Operador entra por **pedidos asignados**, no por recetas, y creó seis fichas (QC-83…QC-88). `depends_on: QC-62, QC-64, QC-88`. No arranca; worktree desmontado |
 | QC-81 | lote-y-fecha-de-compra | Inventario | backend | spec_ready | feature/QC-81-lote-y-fecha-de-compra | **F1.0-F1.3 hechos el 2026-09-13; PARADA EN F1.4 esperando aprobacion humana**. Acotada hoy (ver *Evaluaciones*): **12 decisiones cerradas, cero abiertas**. La ficha estaba **derogada en su premisa**; el board se corrigio antes de sembrar y nacio **QC-103** con la pantalla. Cupo libre: cero `in_progress` en toda zona. `spec_author` entrego **R1-R33** y **13 tasks** (commit `be486b5`), **semilla verificada intacta por diff**, y cada decision citada como `[D1]-[D12]` en al menos un requisito. **La concurrencia se resuelve en la base**: `max(lot::bigint)+1` dentro de la misma transaccion que inserta, con `pg_advisory_xact_lock` por empresa **como sentencia anterior al SELECT** -en `READ COMMITTED` un lock pedido dentro del calculo leeria un maximo viejo-, e indice unico `(company_id, lot)` como garantia dura; choque en lote generado reintenta 3 veces, choque en lote tecleado **nunca** reintenta. **DOS COSAS ESPERAN DECISION HUMANA en F1.4**: (1) `tests/unit/inventario/schema/inventario-schema.test.ts:1082` **se pondra rojo por hacer justo lo que la ficha pide** -afirma que `lot` es opcional-, y T3 lo actualiza con el precedente del propio archivo; (2) `batch_duplicate_lot`, **sexta enmienda al catalogo cerrado de errores**, con plan B escrito. **Doce sitios asumen hoy `lot` nulo**, tabulados con `archivo:linea` en `design.md > 0`. Sin dependencias nuevas |
 | QC-82 | registro-de-ejecucion-de-receta | Recetas | backend | pending | feature/QC-82-registro-de-ejecucion-de-receta | **Nacida del chat el 2026-09-08** y creada en el board (QC-27), enlazada «relates to QC-63». `complexity: medium`, sin dependencias. **Pendiente F1.0 y F1.2**: ampliada el 2026-09-08 con `canceled` en el enum y un `reason` anulable; cerrado que cancelar sin motivo no se puede; quedan SEIS preguntas abiertas -entre ellas si el motivo vale fuera de la cancelacion, que se guarda en el paso y que significa «el tiempo»-, asi que toca `/afinar-feature` antes del `spec_author` |
 
 ## Evaluaciones
+
+### QC-28 - acotada con `/afinar-feature` (2026-09-13)
+
+Alcance, **9 decisiones cerradas** y **cero preguntas abiertas** en
+`specs/QC-28-cache-de-sesion-en-redis/requirements.md`. No se copian aqui.
+
+**La premisa se comprobo ANTES de acotar, y esta vez SI estaba viva**: `resolveSession()` lee los
+claims de la cookie y **consulta la base** en cada peticion (`lib/composition/index.ts:296`). Se
+comprobo porque **QC-23, QC-81 y QC-102 llegaron las tres con la premisa derogada**; esta no.
+
+**Lo que la acotacion evito**: la ficha es del 2026-09-02 y enumeraba dos motivos de borrado -baja y
+cambio de rol-. **QC-23 cerro despues y trajo la revocacion de sesiones**, que la ficha no podia
+mencionar. Sin anadirla, **QC-28 habria debilitado una garantia recien construida**: revocar habria
+tardado hasta un minuto en surtir efecto, apoyado solo en el TTL que la propia ficha dice que **no
+es el mecanismo principal**. La invalidacion pasa a cubrir **seis** caminos. El board suma
+`depends_on: QC-23` con su enlace «is blocked by».
+
+**Dependencia APROBADA por el humano**: `@upstash/redis`, con **los cuatro checks verificados contra
+el registro de npm ese mismo dia** -sin `deprecated`, `1.38.4` del 2026-09-04, **3.811.925**
+descargas semanales, **MIT**-. Es el cliente **REST**: no mantiene conexiones TCP abiertas, que es lo
+que rompe a los clientes Redis clasicos en funciones. **Su fila en `docs/dependencias.md` la escribe
+el leader en F1.4**, como QC-25 y QC-55.
+
+**Y una decision que existe por el gate**: la cache entra **por un puerto**, con adaptador **en
+memoria** en tests y local. `./init.sh` corre **sin red**, asi que sin el puerto ningun test podria
+ejercitar caducidad, invalidacion ni respaldo, y el unico sitio donde ese codigo correria seria
+produccion.
+
+`zone` sigue **`backend`** -el E2E que entra es un test, no una pantalla- y `complexity` sigue
+**`high`**.
+
+**Y DESPUES DE CERRAR LAS NUEVE, el humano pregunto «¿para que el Redis?» y la ficha quedo
+CONDICIONADA A UNA MEDICION.** Es el hallazgo mas util del dia y nacio de esa pregunta, no de la
+acotacion:
+
+- **La ficha daba por hecha la conclusion.** No hay **ni un numero** que la sostenga, ni en la
+  tarjeta ni en el repo, y la app **no tiene carga real**. Ademas el cliente REST de Upstash **es
+  tambien una llamada de red**: no se cambia red por memoria, se cambia Postgres-por-red por
+  Redis-por-HTTP, y que eso gane depende de las regiones y de que Postgres sea el cuello de botella.
+  **Ninguna de las dos cosas esta medida.**
+- **El diagnostico se quedaba corto, y eso SI esta medido**: la sesion se resuelve **DOS O TRES
+  VECES POR PAGINA** -`layout.tsx:59`, el `requirePagePermission` de cada `page.tsx`, y una tercera
+  en `/configuracion/usuarios`- **sin ninguna memoizacion**, y cada una trae `users` + `role` + sus
+  permisos + `company` + `revoked_sessions`.
+- **Nace QC-104** (`sesion-una-sola-vez-por-peticion`, `backend`, sin `complexity`), enlazada
+  «blocks» hacia QC-28: colapsar esas repeticiones dentro de la misma peticion. Sin servicio, sin
+  dependencia, sin riesgo en la autenticacion, y **no puede quedarse obsoleto por construccion**.
+  **Deja ademas la medicion que QC-28 no tiene.**
+- **La aprobacion de `@upstash/redis` queda EN SUSPENSO**: no se instala nada, y sus cuatro checks
+  **se vuelven a verificar en F1.4**, porque para entonces estaran caducados.
+
+QC-28 sigue `pending` en Backlog y **no pasa a `spec_author`**; QC-104 nace `pending`. La semilla
+lleva el aviso en su cabecera y las tres decisiones nuevas (10 a 12) al final de su tabla.
 
 ### QC-102 - acotada con `/afinar-feature` (2026-09-13)
 
@@ -50,6 +104,29 @@ una cosa y callara la otra.
 lote **no puede crear un ciclo** `pedidos -> asignaciones`. Donde se compone lo decide el diseno.
 
 Ninguna ficha nueva y ninguna cancelada. Sigue `pending` en Backlog: la mueve el leader en F1.3.
+
+### QC-101 - acotada con `/afinar-feature` (2026-09-13)
+
+Alcance, **10 decisiones cerradas** y **cero preguntas abiertas** en
+`specs/QC-101-cierre-de-sesiones-de-otro-desde-la-pantalla/requirements.md`. No se copian aqui.
+
+**El hallazgo que justifica la acotacion: la ZONA estaba mal.** La ficha nacio `frontend` creyendo
+que solo faltaba un boton, y **falta tambien la puerta por la que ese boton llama**: el caso de uso
+`end-all-sessions` existe en el dominio y esta probado, pero **nada lo expone** —no hay Server
+Action—. Pasa a **`fullstack`** e incluye esa accion, en vez de partir una ficha `backend` de un
+solo archivo que no le sirve a nadie sola.
+
+**TRES de las cinco preguntas abiertas las contesto el disco, no el humano**, y esa es la otra
+mitad del valor: no hay menu de fila —son tres botones de icono en `user-row-actions.tsx:98,110,122`
+y la pregunta daba por hecho un menu inexistente—; no se puede saber si no habia ninguna sesion
+abierta, porque `end-all-sessions.ts:64` devuelve `void`; y **no existe ninguna lista de sesiones
+vivas**, porque la revocacion es un **sello de tiempo** y QC-23 descarto esa lectura a proposito.
+Preguntarlas habria sido pedirle al humano que decidiera sobre cosas que el codigo ya cerro.
+
+**El board se actualizo ANTES de sembrar**: `zone` a `fullstack`, `complexity:medium` —nacio vacia
+a proposito— y la `description` reescrita. **Ninguna ficha nueva y ninguna huerfana**: QC-53 sigue
+siendo el boton del propio usuario, y ahora ademas es donde vive la autoaplicacion que aqui se
+excluye. Sigue `pending` en Backlog.
 
 ### QC-81 - acotada con `/afinar-feature` (2026-09-13)
 
@@ -258,3 +335,15 @@ Lo que queda en `.worktrees/QC-23-registro-de-sesiones/` son **17 entradas de re
 retenido. Pero es exactamente la basura que esa doctrina existe para evitar —80 worktrees
 acumulados en el proyecto anterior—, así que conviene barrerlo pronto: `rm -rf` del directorio, y si
 Windows se queja, cerrar antes lo que tenga `node_modules` abierto.
+
+### El catálogo del panel de responsables se queda en 25 personas (2026-09-13)
+
+QC-102 pide el catálogo del panel con `pageSize: MAX_PAGE_SIZE` (25) y **el buscador filtra sobre lo
+ya traído**, así que en una empresa con más de 25 personas **no todas son asignables desde esa
+pantalla**. Lo señaló el `implementer` sin decidirlo —que es lo correcto— y el `reviewer` lo juzgó
+**ficha aparte y no hallazgo mayor**: ningún `R<n>` ni decisión cerrada de QC-102 exige catálogo
+completo, el tope lo imponen `listUsers` / `listWorkGroups` y no esta ficha, y exigirlo ahora sería
+meter alcance que nadie pidió.
+
+**No se ha creado la ficha todavía: espera decisión humana.** El patrón a copiar está identificado:
+el `recipe-picker` de QC-35, que **busca en servidor** en vez de filtrar lo ya traído.

@@ -104,7 +104,7 @@ fantasma que va a salir. Un `fail` aquí dejaría sin gate a quien tenga el ento
 **Lo que esto NO cubre, y sigue siendo manual:** aplicar a la base las **migraciones** que traiga
 un merge con `dev`. El gate regenera el *cliente* de Prisma, no ejecuta `migrate deploy`. Si tu
 rama sincroniza y `dev` traía una migración, los tests de integración darán rojos que no son
-tuyos hasta que la apliques. Está escrito en `AGENTS.md > F2.3`.
+tuyos hasta que la apliques. Está escrito en `docs/orquestacion.md > F2.3`.
 
 ## Qué cuenta como evidencia
 - Salida real de los tests pasando, pegada en `progress/impl_<feature>.md`.

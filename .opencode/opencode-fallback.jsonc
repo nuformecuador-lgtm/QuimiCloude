@@ -1,0 +1,57 @@
+// DESACTIVADO. El plugin no esta declarado en la clave `plugin` de opencode.json, asi que
+// opencode no lo carga y este archivo no tiene efecto. Se conserva porque la cadena sigue
+// generandose desde scripts/gen-opencode.mjs y porque reactivarlo es quitar esta nota y
+// volver a declararlo.
+//
+// POR QUE. Su aborto-y-reenvio MATA la tarea de un subagente en vez de reintentarla. Con el
+// plugin cargado, delegar en el `reviewer` fallo 3 de 3 veces con "Task cancelled"; con
+// `--pure` -sin plugins externos- funciono a la primera. Un arnes de siete agentes vive de
+// delegar, asi que entre respaldo y delegacion gana delegacion.
+//
+// El coste es real y hay que saberlo: sin el, un "Provider is overloaded" de NVIDIA -que
+// pasa a menudo en la capa gratuita- corta el turno en vez de saltar al siguiente modelo.
+//
+{
+  // Respaldo de modelo en caliente. La cadena es GLOBAL y vive aqui abajo, en `fallback_models`,
+  // emitida por `scripts/gen-opencode.mjs`. NO puede ir en el frontmatter de los agentes ni en el
+  // bloque `agent` de opencode.json: opencode filtra esas claves a la peticion del modelo y NVIDIA
+  // la rechaza con 400, dejando el arnes sin arrancar.
+  "enabled": true,
+
+  // El toast es util cuando hay alguien mirando la TUI, y este arnes esta pensado para correr
+  // solo. Por eso el aviso de verdad no es este: es el paso de `./init.sh` que hace ping a
+  // cada id configurado (`scripts/check-modelos.mjs`) y deja el gate en rojo si uno murio.
+  "notify_on_fallback": true,
+
+  // 300s y no los 60 por defecto. El 429 de NVIDIA parece ser de cuenta, no por modelo: si
+  // reintentas al minuto vuelves al mismo muro y gastas la llamada en el rebote.
+  "cooldown_seconds": 300,
+
+  // Aborta un modelo que acepta la conexion y no emite un solo token. Sin esto, un agente
+  // colgado se come el turno entero sin que salte ningun error.
+  "timeout_seconds": 30,
+
+  "max_fallback_attempts": 10,
+
+  "fallback_models": [
+    "nvidia/deepseek-ai/deepseek-v4-flash-0731",
+    "nvidia/nvidia/nemotron-3-super-120b-a12b",
+    "nvidia/openai/gpt-oss-20b"
+  ],
+
+  "retry_on_errors": [429, 500, 502, 503, 504],
+
+  // `model not found` es la forma que toma una retirada de modelo, que es justo el caso que
+  // este arnes ya sufrio una vez con `opus-4.8` el 2026-07-31.
+  "retryable_error_patterns": [
+    "rate.?limit",
+    "too many requests",
+    "quota exceeded",
+    "usage.?limit",
+    "credit balance too low",
+    "model not found",
+    "model not supported",
+    "service unavailable",
+    "overloaded"
+  ]
+}

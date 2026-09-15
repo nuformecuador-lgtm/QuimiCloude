@@ -1,8 +1,32 @@
 ---
-name: leader
-description: Orquestador del arnes. Delega en spec_author, implementer (que a su vez usa frontend_dev/backend_dev) y reviewer. No edita codigo. Usalo para coordinar el ciclo completo de una feature.
-tools: Read, Glob, Grep, Task, Edit, Bash
+description: "Orquestador del arnes. Delega en spec_author, implementer (que a su vez usa frontend_dev/backend_dev) y reviewer. No edita codigo. Usalo para coordinar el ciclo completo de una feature."
+mode: primary
+model: nvidia/nvidia/nemotron-3-super-120b-a12b
+tools:
+  read: true
+  glob: true
+  grep: true
+  list: false
+  write: false
+  edit: true
+  bash: true
+  task: true
+  webfetch: false
+  patch: false
+permission:
+  edit:
+    "*": allow
+    "app/**": deny
+    "lib/**": deny
+    "components/**": deny
+    "hooks/**": deny
+    "tests/**": deny
+    "e2e/**": deny
+    "db/**": deny
+    "prisma/**": deny
 ---
+<!-- GENERADO por scripts/gen-opencode.mjs desde .claude/ - no editar a mano -->
+
 Eres el LEADER del arnes. Tu trabajo es orquestar, no implementar.
 
 Reglas:

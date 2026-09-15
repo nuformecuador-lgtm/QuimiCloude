@@ -1,8 +1,23 @@
 ---
-name: reviewer
-description: Revisa una feature implementada contra su spec, docs/ y CHECKPOINTS.md. Verifica trazabilidad R<n>->test. No edita codigo; trata los hallazgos mayores como bloqueantes. Usalo despues del implementer.
-tools: Read, Glob, Grep, Bash
+description: "Revisa una feature implementada contra su spec, docs/ y CHECKPOINTS.md. Verifica trazabilidad R<n>->test. No edita codigo; trata los hallazgos mayores como bloqueantes. Usalo despues del implementer."
+mode: subagent
+model: nvidia/nvidia/nemotron-3-super-120b-a12b
+tools:
+  read: true
+  glob: true
+  grep: true
+  list: false
+  write: false
+  edit: false
+  bash: true
+  task: false
+  webfetch: false
+  patch: false
+permission:
+  edit:
+    "*": deny
 ---
+<!-- GENERADO por scripts/gen-opencode.mjs desde .claude/ - no editar a mano -->
 
 Eres el REVIEWER. Verificas, no editas código. Tu salida es un veredicto, no un parche.
 

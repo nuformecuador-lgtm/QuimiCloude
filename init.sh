@@ -95,6 +95,83 @@ $VALIDACION"
   done
 fi
 
+# 4a. Los artefactos que el ciclo dice haber producido existen de verdad.
+#
+#     El 2026-09-14, revisando QC-102 con el arnes en opencode, el subagente `reviewer` termino
+#     su turno afirmando "El informe detallado se encuentra en progress/review_QC-102-...md".
+#     Ese archivo no existia. El leader lo habria dado por revisado y seguido a PR con un
+#     veredicto que nadie escribio.
+#
+#     Es el peor fallo posible para este arnes porque no se parece a un fallo: el turno termina
+#     en verde, con un veredicto plausible y una ruta que suena bien. La regla 3 -estado en
+#     disco, no en el chat- deja de cumplirse sin que nada proteste, y con ella cae la regla 4.
+#
+#     Va en los DOS modos: es instantaneo y no toca la red.
+if [ -f scripts/check-artefactos.mjs ]; then
+  ARTEFACTOS=$(node scripts/check-artefactos.mjs 2>&1) || fail "$ARTEFACTOS"
+  ok "$(printf '%s' "$ARTEFACTOS" | tail -1)"
+fi
+
+# 4a-bis. Regla 4 por maquina: cada `R<n>` declarado tiene su fila en el mapa de la bitacora.
+#
+#     Hasta hoy esta regla la sostenia el juicio del `reviewer`. El 2026-09-14, revisando QC-102
+#     -41 requisitos-, escribio "los requisitos estan trazables a tests" habiendo citado TRES.
+#     No fallo en un detalle: afirmo la verificacion entera habiendo hecho el 7%, y ese veredicto
+#     pasaba el gate y cerraba la feature.
+#
+#     Recorrer 41 filas sin saltarse ninguna es justo lo que un modelo hace mal y una comparacion
+#     de conjuntos hace siempre. Al reviewer le queda lo suyo: juzgar si el test VERIFICA de
+#     verdad el requisito. Corre en las dos herramientas: es Node, no configuracion de ninguna.
+if [ -f scripts/check-trazabilidad.mjs ]; then
+  TRAZA=$(node scripts/check-trazabilidad.mjs 2>&1) || fail "$TRAZA"
+  ok "$(printf '%s' "$TRAZA" | tail -1)"
+fi
+
+# 4b. El arnes corre en dos herramientas y `.opencode/` es GENERADO desde `.claude/`.
+#
+#     Los formatos no son intercambiables -Claude Code declara `tools:` como CSV y no conoce
+#     `mode:` ni `permission:`; opencode quiere booleanos y globs de escritura- asi que la
+#     prosa vive una sola vez y `scripts/gen-opencode.mjs` la emite. Sin este check, los 22
+#     archivos divergen en silencio y te enteras el dia que un agente de opencode se comporta
+#     distinto al mismo agente en Claude Code, que es el peor momento para enterarse.
+#
+#     Va en los DOS modos: es instantaneo y no toca la red.
+#     REGENERA en vez de fallar, igual que el paso 2 hace con prisma y next. Fallar castigaba a
+#     quien solo usa Claude Code: editas `.claude/agents/reviewer.md`, que es lo que hace
+#     `/afinar-regla`, y el gate se pone rojo por un directorio que no usas. Una guardia que
+#     estorba en el trabajo normal se acaba desactivando, y entonces no guarda nada.
+#
+#     Regenerar no pierde nada: la fuente es `.claude/`, asi que el resultado es siempre el
+#     correcto. Si cambia algo, se avisa para que entre en el commit; no se falla.
+if [ -f scripts/gen-opencode.mjs ]; then
+  node scripts/gen-opencode.mjs >/dev/null 2>&1 || fail "scripts/gen-opencode.mjs fallo al regenerar .opencode/"
+  if git rev-parse --git-dir >/dev/null 2>&1 && ! git diff --quiet -- .opencode opencode.json 2>/dev/null; then
+    warn "se regenero .opencode/ desde .claude/: incluye esos archivos en tu commit"
+  else
+    ok "arnes de opencode al dia con .claude/"
+  fi
+fi
+
+# 4c. Los ids de modelo configurados siguen existiendo.
+#
+#     El 2026-07-31 el id `opus-4.8` dejo de estar disponible y un `backend_dev` murio al
+#     arrancar sin escribir una linea. La respuesta de entonces fue prohibir que los agentes
+#     fijaran modelo; ahora vuelven a fijarlo -es lo que hace viable repartir siete roles entre
+#     modelos gratuitos- asi que el agujero se tapa por el otro lado: el id muerto sale aqui y
+#     no a mitad de una feature.
+#
+#     Solo en gate completo: son llamadas reales contra la API y la cuenta tiene techo de
+#     ritmo. Sin `NVIDIA_API_KEY` el script avisa y sigue, no falla.
+if [ "$MODO" = "completo" ] && [ -f scripts/check-modelos.mjs ]; then
+  MODELOS_OUT=$(node scripts/check-modelos.mjs 2>&1) || fail "hay ids de modelo retirados:
+$MODELOS_OUT"
+  # Se imprime por sustitucion y no con `while read`: con `printf '%s'` la ultima linea sale
+  # SIN salto final, `read` devuelve falso al leerla y el cuerpo del bucle no corre nunca. El
+  # paso quedaba mudo y en verde, que es exactamente el agujero que este archivo ya describe
+  # dos veces mas arriba.
+  ok "$(printf '%s' "$MODELOS_OUT" | tail -1 | sed 's/^ *//')"
+fi
+
 # 5. Worktrees acumulados. Es `warn`, NO `fail`, a proposito: poner el gate en rojo por
 #    tareas domesticas bloquearia trabajo real y la respuesta previsible seria ignorar el
 #    gate — justo lo que la regla 5 del CLAUDE.md intenta evitar. Pero tampoco puede ser

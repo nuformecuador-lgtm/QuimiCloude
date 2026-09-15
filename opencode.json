@@ -1,0 +1,107 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "leader",
+  "subagent_depth": 3,
+  "provider": {
+    "nvidia": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "NVIDIA NIM",
+      "options": {
+        "baseURL": "https://integrate.api.nvidia.com/v1",
+        "apiKey": "{env:NVIDIA_API_KEY}"
+      },
+      "models": {
+        "deepseek-ai/deepseek-v4-flash-0731": {
+          "name": "DeepSeek V4 Flash"
+        },
+        "nvidia/nemotron-3-super-120b-a12b": {
+          "name": "Nemotron 3 Super"
+        },
+        "openai/gpt-oss-20b": {
+          "name": "GPT-OSS 20B"
+        }
+      }
+    }
+  },
+  "mcp": {
+    "supabase": {
+      "type": "remote",
+      "url": "https://mcp.supabase.com/mcp?project_ref={env:SUPABASE_PROJECT_REF}",
+      "enabled": true
+    },
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": true,
+      "headers": {
+        "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"
+      }
+    },
+    "atlassian": {
+      "type": "remote",
+      "url": "https://mcp.atlassian.com/v1/mcp",
+      "enabled": true,
+      "headers": {
+        "Authorization": "Basic {env:ATLASSIAN_MCP_AUTH}"
+      }
+    }
+  },
+  "permission": {
+    "webfetch": "ask",
+    "bash": {
+      "*": "ask",
+      "./init.sh": "allow",
+      "./init.sh *": "allow",
+      "./scripts/wt.sh *": "allow",
+      "pnpm run *": "allow",
+      "node scripts/*": "allow",
+      "npx prisma *": "allow",
+      "cat lib/interfaces": "allow",
+      "find lib *": "allow",
+      "ls -la lib": "allow",
+      "ls prisma/": "allow",
+      "cd *": "allow",
+      "git checkout *": "allow",
+      "git fetch *": "allow",
+      "git worktree list *": "allow",
+      "pnpm typecheck": "allow",
+      "pnpm lint": "allow",
+      "pnpm exec vitest *": "allow",
+      "pnpm exec prisma *": "allow",
+      "pnpm exec next *": "allow",
+      "pnpm exec tsc *": "allow",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "git add *": "allow",
+      "pnpm add *": "ask",
+      "pnpm remove *": "ask",
+      "npm uninstall *": "ask",
+      "npm install *": "ask",
+      "pnpm install *": "ask"
+    }
+  },
+  "agent": {
+    "leader": {
+      "model": "nvidia/nvidia/nemotron-3-super-120b-a12b"
+    },
+    "spec_author": {
+      "model": "nvidia/deepseek-ai/deepseek-v4-flash-0731"
+    },
+    "implementer": {
+      "model": "nvidia/deepseek-ai/deepseek-v4-flash-0731"
+    },
+    "frontend_dev": {
+      "model": "nvidia/deepseek-ai/deepseek-v4-flash-0731"
+    },
+    "backend_dev": {
+      "model": "nvidia/deepseek-ai/deepseek-v4-flash-0731"
+    },
+    "reviewer": {
+      "model": "nvidia/nvidia/nemotron-3-super-120b-a12b"
+    },
+    "extractor": {
+      "model": "nvidia/nvidia/nemotron-3-super-120b-a12b"
+    }
+  }
+}
