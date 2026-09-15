@@ -1,32 +1,7 @@
-// T4 — Contrato estatico del SQL de la migracion del enlace de credencial (QC-79).
-//
-// Cubre R35 (RLS activada Y forzada, sin ninguna policy, e identificadores en ingles
-// snake_case), R36 (el `down.sql` es el inverso exacto del UP y no toca ningun otro objeto) y
-// R37 (la tabla no lleva columna de empresa, y la migracion NO anade, quita ni modifica nada
-// de `users` ni ninguno de los tres indices unicos de QC-47).
-//
-// Lo que se vigila aqui NO esta en `db/schema.prisma` y Prisma no lo regenera nunca:
-//
-//   1. EL INDICE UNICO PARCIAL `credential_setup_tokens_one_live_per_user` (R11,
-//      `design.md > 3.2`). ES el requisito: es lo unico que hace que dos emisiones simultaneas
-//      para la misma persona acaben con UN solo enlace vivo. Prisma no modela indices
-//      parciales, asi que solo existe en este `migration.sql`. Quitarle el `WHERE` lo vuelve
-//      TOTAL —y entonces el reenvio de R16 falla siempre, porque el enlace sustituido sigue
-//      ocupando la ranura—; quitarlo entero deja la carrera abierta. Ninguna de las dos cosas
-//      rompe el typecheck ni ninguna otra prueba.
-//   2. LOS DOS `ALTER ... ROW LEVEL SECURITY` (R35). Sin `FORCE`, el dueno de la tabla —que es
-//      con quien se conecta Prisma— ignora la RLS entera y la defensa en profundidad no
-//      defiende de nada.
-//   3. QUE EL UP NO TOQUE `users` (R37). `prisma migrate dev --create-only` emitio veintiun
-//      `DROP CONSTRAINT` y nueve `DROP INDEX` por el drift ya conocido del repo —entre ellos
-//      `users_account_status_changed_by_fkey`— y se borraron a mano, igual que en QC-65. Si
-//      uno se colara, el esquema seguiria validando, el cliente compilaria y la suite seguiria
-//      verde: solo se entera este archivo.
-//
-// Cada afirmacion se escribe como un PREDICADO PURO EXPORTADO que recibe el texto SQL y
-// devuelve el veredicto, y se aplica dos veces: al SQL real y a una copia MUTADA EN MEMORIA.
-// El archivo en disco NO se toca. Un test que no puede fallar no vigila nada; es el mismo
-// patron de `tests/unit/identity/schema/work-groups-migration.test.ts`.
+// Lo que se vigila aqui no esta en `db/schema.prisma` y Prisma no lo regenera: el indice unico
+// parcial del enlace vivo, la RLS forzada y que la migracion no toque `users`. Si desaparece,
+// ninguna de las tres cosas rompe el typecheck ni otra prueba, y por eso cada predicado se aplica
+// tambien a una copia mutada en memoria.
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -34,7 +9,6 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-/** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
   let dir = startDir
   for (;;) {
@@ -52,11 +26,8 @@ function findRepoRoot(startDir: string): string {
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)))
 const migrationsDir = join(repoRoot, 'db', 'migrations')
 
-/**
- * La carpeta se localiza por PATRON, no por el timestamp escrito a pelo: si la migracion se
- * regenera con otra marca de tiempo, el test tiene que seguir apuntando a ella y no romperse
- * por una razon que no es la suya.
- */
+// Por patron y no por timestamp: si la migracion se regenera con otra marca de tiempo, el test
+// la sigue encontrando.
 const credentialSetupDirs = readdirSync(migrationsDir).filter((name) =>
   /_credential_setup_tokens$/.test(name),
 )
@@ -66,13 +37,9 @@ expect(
 ).toHaveLength(1)
 const migrationDir = join(migrationsDir, credentialSetupDirs[0] as string)
 
-// --- Lectura y troceado del SQL ------------------------------------------------------------
-
 /**
- * Quita comentarios de linea y de bloque: lo que se afirma es SQL EJECUTABLE, no prosa. La
- * cabecera de esta migracion nombra a proposito `users` y los tres indices de QC-47 —para
- * dejar escrito que NO se tocan—, asi que mirar el texto crudo daria falsos positivos en todas
- * las afirmaciones en negativo de mas abajo.
+ * Se afirma sobre SQL ejecutable: la cabecera de la migracion nombra `users` y sus indices unicos
+ * para dejar escrito que no los toca, y el texto crudo daria falsos positivos.
  */
 function stripSqlComments(sql: string): string {
   return sql
@@ -82,7 +49,6 @@ function stripSqlComments(sql: string): string {
     .join('\n')
 }
 
-/** Sentencias ejecutables, con los espacios normalizados para poder afirmar sobre ellas. */
 function statements(sql: string): readonly string[] {
   return stripSqlComments(sql)
     .split(';')
@@ -102,34 +68,21 @@ function findStatement(source: readonly string[], pattern: RegExp): string {
   return found[0] as string
 }
 
-// --- Predicados puros: el indice parcial que ES R11 -----------------------------------------
-
-/** Las dos propiedades de `credential_setup_tokens_one_live_per_user`, por separado. */
 export interface IndiceDeEnlaceVivo {
-  /** R11: es UNICO sobre `user_id`, asi que la base rechaza el segundo enlace con 23505. */
   readonly unicoPorUsuario: boolean
-  /**
-   * R11: es PARCIAL, y su predicado es exactamente «ni consumido ni sustituido». Sin el, la
-   * unicidad seria TOTAL y nadie podria tener nunca un segundo enlace, ni siquiera despues de
-   * consumir el primero: el reenvio de R16 fallaria SIEMPRE.
-   */
+  /** Sin el predicado la unicidad seria total, y el reenvio de un enlace fallaria siempre. */
   readonly parcialSoloVivos: boolean
 }
 
-/**
- * R11. Las dos propiedades del indice, leidas del SQL. Se devuelven por separado a proposito:
- * un unico booleano no distinguiria cual de las dos se perdio, y cada una muere de una forma
- * distinta y en silencio.
- */
+/** Por separado: un solo booleano no diria cual de las dos propiedades se perdio. */
 export function liveLinkIndex(sql: string): IndiceDeEnlaceVivo | null {
   const encontrados = statements(sql).filter((statement) =>
     /^CREATE UNIQUE INDEX "credential_setup_tokens_one_live_per_user"/i.test(statement),
   )
   if (encontrados.length !== 1) return null
   const indice = encontrados[0] as string
-  // Las columnas son todo lo que va delante del `WHERE`. Se recorta asi —y no con un patron de
-  // parentesis— para que las dos propiedades sean INDEPENDIENTES: leidas juntas, quitar el
-  // `WHERE` tumbaria tambien `unicoPorUsuario` y la mutacion no demostraria lo que dice.
+  // Se recorta el `WHERE` en vez de leer parentesis para que las dos propiedades sean
+  // independientes: si no, quitar el `WHERE` tumbaria tambien `unicoPorUsuario`.
   const sinWhere = indice.replace(/ WHERE .*$/i, '')
   return {
     unicoPorUsuario: /ON "credential_setup_tokens" \("user_id"\)$/i.test(sinWhere),
@@ -137,9 +90,6 @@ export function liveLinkIndex(sql: string): IndiceDeEnlaceVivo | null {
   }
 }
 
-// --- Predicados puros: las claves foraneas --------------------------------------------------
-
-/** Una `ADD CONSTRAINT ... FOREIGN KEY` tal como esta ESCRITA en el SQL. */
 export interface ClaveForanea {
   readonly tabla: string
   readonly columnas: readonly string[]
@@ -149,7 +99,6 @@ export interface ClaveForanea {
   readonly onUpdate: string | null
 }
 
-/** Lee del SQL la clave foranea con ese nombre, o `null` si no esta declarada. */
 export function foreignKey(sql: string, name: string): ClaveForanea | null {
   const patron = new RegExp(
     `^ALTER TABLE "?(\\w+)"? ADD CONSTRAINT "${name}" FOREIGN KEY \\(([^)]*)\\) ` +
@@ -181,13 +130,7 @@ export function foreignKey(sql: string, name: string): ClaveForanea | null {
   }
 }
 
-// --- Predicados puros: columnas, RLS y DDL ajeno --------------------------------------------
-
-/**
- * Las columnas declaradas por un `CREATE TABLE`, con su definicion literal. El troceado
- * respeta los parentesis: `TIMESTAMPTZ(6)` y `PRIMARY KEY ("a","b")` llevan comas y parentesis
- * dentro y partir por comas a secas los rompe.
- */
+/** Trocea respetando parentesis: `TIMESTAMPTZ(6)` y `PRIMARY KEY ("a","b")` llevan comas dentro. */
 export function tableColumns(sql: string, table: string): ReadonlyMap<string, string> {
   const columnas = new Map<string, string>()
   const create = statements(sql).find((statement) =>
@@ -218,7 +161,7 @@ export function tableColumns(sql: string, table: string): ReadonlyMap<string, st
   return columnas
 }
 
-/** R35. ¿La tabla queda con RLS activada Y forzada? Sin `FORCE`, el dueno la ignora entera. */
+/** Sin `FORCE`, el dueno de la tabla, que es con quien conecta Prisma, ignora la RLS. */
 export function hasRlsEnabledAndForced(sql: string, table: string): boolean {
   const source = statements(sql)
   const enable = new RegExp(`^ALTER TABLE "?${table}"? ENABLE ROW LEVEL SECURITY$`, 'i')
@@ -230,10 +173,8 @@ export function hasRlsEnabledAndForced(sql: string, table: string): boolean {
 }
 
 /**
- * R35 y `design.md > 3.3`. ¿Los `ALTER ... ROW LEVEL SECURITY` son el ULTIMO bloque del
- * archivo? NO es cosmetico: `FORCE` sin policies deniega tambien al dueno de la tabla cuando
- * ese dueno no es superusuario, asi que cualquier escritura futura colocada detras de ellos
- * podria no escribir nada EN SILENCIO (leccion de QC-32 y QC-74).
+ * `FORCE` sin policies deniega tambien al dueno cuando no es superusuario: una escritura colocada
+ * detras de los `ALTER` podria no escribir nada, en silencio.
  */
 export function rowLevelSecurityGoesLast(sql: string): boolean {
   const source = statements(sql)
@@ -244,15 +185,13 @@ export function rowLevelSecurityGoesLast(sql: string): boolean {
 }
 
 /**
- * R35. Toda sentencia que declare una POLICY. Tiene que quedar vacia: una policy no cuenta
- * como permiso implementado —Prisma se conecta como dueno y no setea `auth.uid()`— y tenerla
- * aqui daria la falsa impresion de que la autorizacion vive en la base y no en el service.
+ * Una policy no filtra nada en esta app, porque Prisma conecta como dueno y no setea `auth.uid()`,
+ * y daria la falsa impresion de que la autorizacion vive en la base.
  */
 export function policyStatements(sql: string): readonly string[] {
   return statements(sql).filter((statement) => /\bPOLICY\b/i.test(statement))
 }
 
-/** DDL cuyo SUJETO es esa tabla: `ALTER/CREATE/DROP TABLE`, `TRUNCATE` o un indice sobre ella. */
 export function ddlStatementsOn(sql: string, table: string): readonly string[] {
   const patron = new RegExp(
     `^(ALTER TABLE|DROP TABLE|CREATE TABLE|TRUNCATE)\\s+(IF EXISTS )?(ONLY )?"?${table}"?\\b|` +
@@ -262,21 +201,16 @@ export function ddlStatementsOn(sql: string, table: string): readonly string[] {
   return statements(sql).filter((statement) => patron.test(statement))
 }
 
-/** Sentencias EJECUTABLES que nombran ese identificador, sea como sujeto o dentro de otro nombre. */
 export function statementsMentioning(sql: string, needle: string): readonly string[] {
   return statements(sql).filter((statement) => new RegExp(needle, 'i').test(statement))
 }
 
-/**
- * R36. ¿El SQL escribe alguna fila? `ON DELETE`/`ON UPDATE` no cuentan: son parte de la
- * definicion de una clave foranea, no escrituras.
- */
+/** `ON DELETE`/`ON UPDATE` de una FK no cuentan como escritura. */
 export function writesRows(sql: string): boolean {
   const ejecutable = stripSqlComments(sql).replace(/\s+/g, ' ')
   return /(?<!ON )\b(INSERT|UPDATE|DELETE|TRUNCATE)\b/i.test(ejecutable)
 }
 
-/** Identificadores que CREA la migracion: tablas, columnas, indices y restricciones. */
 export function createdIdentifiers(source: readonly string[]): readonly string[] {
   const nombres = new Set<string>()
   for (const statement of source) {
@@ -292,13 +226,8 @@ export function createdIdentifiers(source: readonly string[]): readonly string[]
   return [...nombres]
 }
 
-/**
- * Vocabulario ingles admitido para los identificadores de esta feature (R35). Cada
- * identificador se parte por `_` y cada pieza tiene que estar en esta lista. Es una lista
- * cerrada a proposito, con el precedente de `work-groups-migration.test.ts`: una columna nueva
- * obliga a pasar por aqui, y una en espanol (`enlace`, `huella`, `caduca`) no encuentra sus
- * piezas y cae. Un patron `^[a-z_]+$` no distinguiria el idioma, solo la forma.
- */
+// Lista cerrada: un identificador en espanol no encuentra sus piezas y cae. Un patron
+// `^[a-z_]+$` solo miraria la forma, no el idioma.
 const VOCABULARIO_INGLES = new Set([
   'at',
   'consumed',
@@ -321,15 +250,11 @@ const VOCABULARIO_INGLES = new Set([
   'user',
 ])
 
-/** R35. ¿El identificador es snake_case ASCII y todas sus piezas son palabras inglesas? */
 export function isEnglishSnakeCase(identifier: string): boolean {
   if (!/^[a-z][a-z0-9_]*$/.test(identifier)) return false
   return identifier.split('_').every((pieza) => VOCABULARIO_INGLES.has(pieza))
 }
 
-// --- Predicados puros: el esquema de Prisma -------------------------------------------------
-
-/** El cuerpo de un `model` del esquema, sin sus comentarios `//`, o `null` si no existe. */
 export function modelBody(schema: string, model: string): string | null {
   const match = new RegExp(`^model\\s+${model}\\s*\\{([\\s\\S]*?)^\\}`, 'm').exec(schema)
   if (match === null || match[1] === undefined) return null
@@ -339,20 +264,15 @@ export function modelBody(schema: string, model: string): string | null {
     .join('\n')
 }
 
-/**
- * El modulo declarado JUSTO ENCIMA del modelo, o `null` si no lo tiene. Se lee del texto
- * CRUDO: `/// @module` ES un comentario, y es justo lo que se vigila.
- */
+/** Se lee del texto crudo porque `/// @module` es un comentario. */
 export function moduleOwnerOf(schema: string, model: string): string | null {
   const match = new RegExp(`/// @module (\\w+)\\n(?:///[^\\n]*\\n)*model ${model} \\{`).exec(schema)
   return match === null ? null : (match[1] as string)
 }
 
 /**
- * R11, el riesgo silencioso del esquema. Toda declaracion de unicidad del modelo que nombre
- * `userId`. Tiene que quedar vacia: la unicidad del enlace vivo es PARCIAL y solo existe en el
- * `migration.sql`. Un `@@unique([userId])` aqui la volveria TOTAL sin ningun error, y el
- * reenvio de R16 empezaria a fallar siempre.
+ * La unicidad del enlace vivo es parcial y solo existe en `migration.sql`: un `@@unique([userId])`
+ * la volveria total sin ningun error.
  */
 export function userUniquesIn(schema: string, model: string): readonly string[] {
   const body = modelBody(schema, model)
@@ -368,10 +288,8 @@ export function userUniquesIn(schema: string, model: string): readonly string[] 
 }
 
 /**
- * Mutacion EN MEMORIA acotada a UN modelo del esquema. Sin esto, un `replace` a secas sobre el
- * texto del `.prisma` cae en el primer modelo que comparta la linea —media docena declaran el
- * mismo `userId`— y la mutacion no tocaria el modelo que se pretende romper: el test seguiria
- * verde por la razon equivocada.
+ * Acotada a un modelo: varios declaran la misma linea `userId`, y un `replace` a secas mutaria el
+ * primero que la tenga y no el que se pretende romper.
  */
 function mutateModel(schema: string, model: string, from: string, to: string): string {
   const inicio = schema.indexOf(`model ${model} {`)
@@ -382,8 +300,6 @@ function mutateModel(schema: string, model: string, from: string, to: string): s
   return schema.slice(0, inicio) + bloque.replace(from, to) + schema.slice(fin)
 }
 
-// === El UP: la tabla y sus columnas ========================================================
-
 describe('migration.sql — el UP crea la tabla del enlace y solo esa', () => {
   it('crea `credential_setup_tokens` y ninguna otra tabla', () => {
     const creadas = up
@@ -391,13 +307,13 @@ describe('migration.sql — el UP crea la tabla del enlace y solo esa', () => {
       .filter((match): match is RegExpExecArray => match !== null)
       .map((match) => match[1] as string)
     expect(creadas).toEqual(['credential_setup_tokens'])
-    // Y no declara ninguna extension: `pgcrypto` ya existe y medio repo depende de ella.
+    // `pgcrypto` ya la crean migraciones anteriores.
     expect(up.filter((statement) => /EXTENSION/i.test(statement))).toEqual([])
   })
 
   it('declara exactamente las siete columnas del diseno, sin empresa y sin updated_at (R37)', () => {
-    // `design.md > 3.1`: sin `company_id` —la empresa es la del usuario al que apunta— y sin
-    // `updated_at` —una fila tiene tres transiciones y cada una tiene su propio instante—.
+    // Sin empresa, porque es la del usuario al que apunta, y sin `updated_at`, porque cada una de
+    // las tres transiciones tiene su propia columna de instante.
     const columnas = tableColumns(upSource, 'credential_setup_tokens')
     expect([...columnas.keys()]).toEqual([
       'id',
@@ -411,8 +327,6 @@ describe('migration.sql — el UP crea la tabla del enlace y solo esa', () => {
     expect(columnas.has('company_id')).toBe(false)
     expect(columnas.has('updated_at')).toBe(false)
 
-    // Sensibilidad: anadir la columna de empresa cae. La afirmacion de arriba no es un
-    // `expect(false)` disfrazado sobre un archivo que nunca menciona `company_id`.
     const conEmpresa = upSource.replace(
       '"user_id" UUID NOT NULL,',
       '"user_id" UUID NOT NULL,\n    "company_id" UUID NOT NULL,',
@@ -422,10 +336,8 @@ describe('migration.sql — el UP crea la tabla del enlace y solo esa', () => {
   })
 
   it('la huella y la caducidad son obligatorias, y los dos instantes de muerte nacen vacios', () => {
-    // R9: en la base queda la HUELLA (`token_digest`), nunca el secreto; es NOT NULL porque una
-    // fila sin huella no es comprobable por nadie. R12: `consumed_at`/`superseded_at` son
-    // anulables porque NULL es precisamente «el enlace sigue vivo», que es lo que lee el indice
-    // parcial de abajo.
+    // En la base queda la huella, nunca el secreto. NULL en `consumed_at` y `superseded_at` es
+    // precisamente «enlace vivo», que es lo que lee el indice parcial.
     const columnas = tableColumns(upSource, 'credential_setup_tokens')
     expect(columnas.get('id')).toBe('"id" UUID NOT NULL DEFAULT gen_random_uuid()')
     expect(columnas.get('user_id')).toBe('"user_id" UUID NOT NULL')
@@ -437,7 +349,7 @@ describe('migration.sql — el UP crea la tabla del enlace y solo esa', () => {
       '"created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP',
     )
 
-    // Sensibilidad: un `consumed_at` NOT NULL hace imposible insertar un enlace vivo...
+    // Un `consumed_at` NOT NULL haria imposible insertar un enlace vivo...
     const consumoObligatorio = upSource.replace(
       '"consumed_at" TIMESTAMPTZ(6),',
       '"consumed_at" TIMESTAMPTZ(6) NOT NULL,',
@@ -459,28 +371,22 @@ describe('migration.sql — el UP crea la tabla del enlace y solo esa', () => {
 
   it('no escribe ni una fila: la tabla nace vacia', () => {
     expect(writesRows(upSource)).toBe(false)
-    // Sensibilidad: el predicado no confunde el `ON DELETE`/`ON UPDATE` de una FK con una
-    // escritura...
     expect(
       writesRows(
         'ALTER TABLE "t" ADD CONSTRAINT "f" FOREIGN KEY ("a") REFERENCES "u"("a") ' +
           'ON DELETE RESTRICT ON UPDATE CASCADE;',
       ),
     ).toBe(false)
-    // ...pero si ve un backfill colado al final.
     expect(
       writesRows(`${upSource}\nINSERT INTO "credential_setup_tokens" ("user_id") VALUES ('x');`),
     ).toBe(true)
   })
 })
 
-// === El UP: la clave foranea ==============================================================
-
 describe('migration.sql — el enlace cuelga del usuario, y borrarlo a lo bruto hace ruido', () => {
   it('la FK apunta a users con RESTRICT en el borrado y CASCADE en la actualizacion', () => {
-    // `design.md > 3.1`: el borrado de usuario es LOGICO (QC-66 R37), asi que en operacion
-    // normal no se dispara; un borrado fisico con enlaces colgando tiene que ser ruidoso, no
-    // arrastrarlos en silencio. Mismo criterio que `product_batches_*_fkey`.
+    // El borrado de usuario es logico: el RESTRICT solo salta en un borrado fisico, y ahi tiene que
+    // ser ruidoso en vez de arrastrar los enlaces.
     const fk = foreignKey(upSource, 'credential_setup_tokens_user_id_fkey')
     expect(fk?.tabla).toBe('credential_setup_tokens')
     expect(fk?.columnas).toEqual(['user_id'])
@@ -498,7 +404,7 @@ describe('migration.sql — el enlace cuelga del usuario, y borrarlo a lo bruto 
     expect(conCascade, 'la mutacion no cambio el ON DELETE').not.toBe(upSource)
     expect(foreignKey(conCascade, 'credential_setup_tokens_user_id_fkey')?.onDelete).toBe('CASCADE')
 
-    // Y borrar la FK entera tambien: sin ella, un enlace podria apuntar a nadie.
+    // Sin la FK, un enlace podria apuntar a nadie.
     const sinFk = upSource.replace(
       /ALTER TABLE "credential_setup_tokens" ADD CONSTRAINT "credential_setup_tokens_user_id_fkey"[^;]*;/,
       '',
@@ -508,12 +414,9 @@ describe('migration.sql — el enlace cuelga del usuario, y borrarlo a lo bruto 
   })
 })
 
-// === El UP: los dos indices de Prisma =====================================================
-
 describe('migration.sql — la huella es unica y el lado hijo de la FK esta indexado', () => {
   it('crea el indice unico de la huella y el indice de user_id', () => {
-    // El unico de `token_digest` es lo que hace que comprobar un enlace sea UNA busqueda por
-    // indice (`design.md > 4.3`) y no un recorrido de todas las filas vivas.
+    // Unico en `token_digest`: comprobar un enlace es una busqueda por indice y no un recorrido.
     expect(findStatement(up, /^CREATE UNIQUE INDEX "credential_setup_tokens_token_digest_key"/i)).toBe(
       'CREATE UNIQUE INDEX "credential_setup_tokens_token_digest_key" ON ' +
         '"credential_setup_tokens"("token_digest")',
@@ -536,8 +439,6 @@ describe('migration.sql — la huella es unica y el lado hijo de la FK esta inde
   })
 })
 
-// === El UP: el indice parcial, que ES el requisito R11 ====================================
-
 describe('migration.sql — como maximo un enlace vivo por persona, y lo garantiza la base', () => {
   it('el indice es unico sobre user_id y parcial sobre los dos instantes de muerte (R11)', () => {
     // Prisma no modela indices parciales: este indice solo existe aqui. Es lo unico que hace
@@ -554,9 +455,8 @@ describe('migration.sql — como maximo un enlace vivo por persona, y lo garanti
   })
 
   it('SENSIBILIDAD — quitarle el WHERE lo tumba: el reenvio de R16 fallaria siempre', () => {
-    // Mutacion EN MEMORIA; el archivo en disco no se toca. Sin el `WHERE`, la unicidad pasa a
-    // ser TOTAL: el enlace ya sustituido o ya consumido sigue ocupando la ranura y nadie puede
-    // recibir un segundo enlace nunca. El esquema seguiria validando y la suite, verde.
+    // Sin el `WHERE`, el enlace consumido o sustituido seguiria ocupando la ranura y nadie
+    // recibiria un segundo enlace.
     const total = upSource.replace(
       '  ON "credential_setup_tokens" ("user_id")\n' +
         '  WHERE "consumed_at" IS NULL AND "superseded_at" IS NULL;',
@@ -564,11 +464,9 @@ describe('migration.sql — como maximo un enlace vivo por persona, y lo garanti
     )
     expect(total, 'la mutacion no quito el WHERE').not.toBe(upSource)
     expect(liveLinkIndex(total)?.parcialSoloVivos).toBe(false)
-    // Y la otra propiedad sigue en pie: la mutacion es quirurgica y cada una se vigila aparte.
     expect(liveLinkIndex(total)?.unicoPorUsuario).toBe(true)
 
-    // Relajarlo a una sola de las dos condiciones tampoco vale: un enlace consumido liberaria
-    // la ranura pero uno sustituido no, o al reves, y la mitad de R11 moriria callada.
+    // Con una sola condicion, solo uno de los dos estados liberaria la ranura.
     const medioWhere = upSource.replace(
       'WHERE "consumed_at" IS NULL AND "superseded_at" IS NULL;',
       'WHERE "consumed_at" IS NULL;',
@@ -576,8 +474,6 @@ describe('migration.sql — como maximo un enlace vivo por persona, y lo garanti
     expect(medioWhere, 'la mutacion no recorto el WHERE').not.toBe(upSource)
     expect(liveLinkIndex(medioWhere)?.parcialSoloVivos).toBe(false)
 
-    // Y si el indice desaparece entero, tampoco pasa: un indice ausente y uno relajado son la
-    // misma cosa para un assert distraido.
     const sinIndice = upSource.replace(
       /CREATE UNIQUE INDEX "credential_setup_tokens_one_live_per_user"[^;]*;/,
       '',
@@ -594,7 +490,7 @@ describe('migration.sql — como maximo un enlace vivo por persona, y lo garanti
     expect(noUnico, 'la mutacion no quito el UNIQUE').not.toBe(upSource)
     expect(liveLinkIndex(noUnico)).toBeNull()
 
-    // Y anadirle una segunda columna tambien: la unicidad dejaria de ser «por persona».
+    // Con una segunda columna, la unicidad dejaria de ser por persona.
     const compuesto = upSource.replace(
       'ON "credential_setup_tokens" ("user_id")\n',
       'ON "credential_setup_tokens" ("user_id", "token_digest")\n',
@@ -605,10 +501,8 @@ describe('migration.sql — como maximo un enlace vivo por persona, y lo garanti
   })
 
   it('el predicado NO usa now(): un indice con una funcion no inmutable no existe', () => {
-    // `design.md > 3.2`: definir «vivo» incluyendo `expires_at > now()` haria el indice no
-    // inmutable y Postgres lo rechazaria. No es una concesion: es la razon por la que la
-    // definicion correcta es la de arriba, y por la que un enlace caducado ocupa la ranura
-    // hasta que el reenvio lo sustituye explicitamente.
+    // Postgres rechaza en el predicado de un indice las funciones no inmutables como `now()`: por
+    // eso un enlace caducado ocupa la ranura hasta que el reenvio lo sustituye.
     const parcial = findStatement(up, /"credential_setup_tokens_one_live_per_user"/)
     expect(parcial).not.toMatch(/now\(\)/i)
     expect(parcial).not.toMatch(/CURRENT_TIMESTAMP/i)
@@ -616,17 +510,13 @@ describe('migration.sql — como maximo un enlace vivo por persona, y lo garanti
   })
 })
 
-// === El UP: la RLS ========================================================================
-
 describe('migration.sql — la tabla nace con RLS activada y forzada, y sin ninguna policy', () => {
   it('queda con ENABLE y con FORCE (R35)', () => {
     expect(hasRlsEnabledAndForced(upSource, 'credential_setup_tokens')).toBe(true)
   })
 
   it('SENSIBILIDAD — sin el FORCE, el dueno de la tabla ignora la RLS entera', () => {
-    // Prisma se conecta como dueno y Postgres NO le aplica RLS salvo `FORCE`
-    // (`docs/architecture.md > Acceso a datos y autorizacion`). Quitarlo deja la defensa en
-    // profundidad sin defender nada, y ningun otro test del repo se entera.
+    // Prisma conecta como dueno, y Postgres no le aplica la RLS salvo con `FORCE`.
     const sinForce = upSource.replace(
       'ALTER TABLE "credential_setup_tokens" FORCE ROW LEVEL SECURITY;',
       '',
@@ -634,7 +524,6 @@ describe('migration.sql — la tabla nace con RLS activada y forzada, y sin ning
     expect(sinForce, 'la mutacion no quito el FORCE').not.toBe(upSource)
     expect(hasRlsEnabledAndForced(sinForce, 'credential_setup_tokens')).toBe(false)
 
-    // Y quitar el ENABLE tambien: son las dos mitades de la misma cosa.
     const sinEnable = upSource.replace(
       'ALTER TABLE "credential_setup_tokens" ENABLE ROW LEVEL SECURITY;',
       '',
@@ -645,8 +534,6 @@ describe('migration.sql — la tabla nace con RLS activada y forzada, y sin ning
 
   it('no declara ninguna policy: la autorizacion vive en el service (R35)', () => {
     expect(policyStatements(upSource)).toEqual([])
-    // Sensibilidad: una policy colada al final cae. Una policy NO cuenta como permiso
-    // implementado y tenerla aqui daria la falsa impresion de que si.
     const conPolicy = `${upSource}\nCREATE POLICY "p" ON "credential_setup_tokens" USING (true);`
     expect(policyStatements(conPolicy)).toHaveLength(1)
   })
@@ -657,42 +544,34 @@ describe('migration.sql — la tabla nace con RLS activada y forzada, y sin ning
     const rlsArriba = `ALTER TABLE "credential_setup_tokens" ENABLE ROW LEVEL SECURITY;\n${upSource}`
     expect(rowLevelSecurityGoesLast(rlsArriba), 'un RLS al principio deberia caer').toBe(false)
 
-    // Y cualquier DDL colado detras de los ALTER tambien: es el caso real que esto vigila.
     const ddlDetras = `${upSource}\nCREATE INDEX "credential_setup_tokens_expires_at_idx" ON "credential_setup_tokens"("expires_at");`
     expect(rowLevelSecurityGoesLast(ddlDetras)).toBe(false)
   })
 })
 
-// === El UP: lo que NO toca (R37) ==========================================================
-
 describe('migration.sql — esta migracion no toca users ni ninguna tabla ajena (R37)', () => {
   it('no ejecuta ningun DDL cuyo sujeto sea `users`', () => {
-    // La FK `credential_setup_tokens_user_id_fkey` NOMBRA `users` en su `REFERENCES`, pero su
-    // sujeto es la tabla nueva: ese es exactamente el limite que este predicado distingue.
+    // La FK nombra `users` en su `REFERENCES`, pero su sujeto es la tabla nueva: por eso se mira el
+    // sujeto y no la mencion.
     expect(ddlStatementsOn(upSource, 'users')).toEqual([])
 
-    // Sensibilidad: cualquier linea sobre `users` cae, aunque sea inocente.
     const conColumna = `${upSource}\nALTER TABLE "users" ADD COLUMN "credential_setup_token_id" UUID;`
     expect(ddlStatementsOn(conColumna, 'users')).toHaveLength(1)
     const conIndice = `${upSource}\nCREATE INDEX "users_account_status_idx" ON "users"("account_status");`
     expect(ddlStatementsOn(conIndice, 'users')).toHaveLength(1)
-    // Y el `DROP CONSTRAINT` por drift que `migrate dev` emitio y se borro a mano: es el caso
-    // real que este test vigila.
+    // `migrate dev` emite este `DROP` por el drift de `users`.
     const conDrift = `${upSource}\nALTER TABLE "users" DROP CONSTRAINT "users_account_status_changed_by_fkey";`
     expect(ddlStatementsOn(conDrift, 'users')).toHaveLength(1)
-    // Pero nombrar `users` en un comentario NO cae: hablar de ella para decir que no se toca vale.
     expect(ddlStatementsOn(`${upSource}\n-- ALTER TABLE "users" ...`, 'users')).toEqual([])
   })
 
   it('no menciona ninguno de los tres indices unicos de QC-47 (R37)', () => {
-    // Son FUNCIONALES y PARCIALES, solo existen escritos a mano en las migraciones de QC-4 y
-    // QC-47, y son drift para Prisma: un `DROP INDEX` por drift colado aqui los borraria y la
-    // unicidad del correo, del nombre de usuario y del documento desapareceria en silencio.
+    // Son parciales, escritos a mano y drift para Prisma: un `DROP INDEX` colado aqui se llevaria en
+    // silencio la unicidad del correo, del nombre de usuario o del documento.
     for (const indice of ['users_email_unique', 'users_username_unique', 'users_document_unique']) {
       expect(statementsMentioning(upSource, indice), `no debe mencionar ${indice}`).toEqual([])
     }
 
-    // Sensibilidad: los tres `DROP INDEX` que `migrate dev` sabe emitir por drift caen.
     const conDrop = `${upSource}\nDROP INDEX "users_email_unique";`
     expect(statementsMentioning(conDrop, 'users_email_unique')).toHaveLength(1)
     const recreado = `${upSource}\nCREATE UNIQUE INDEX "users_username_unique" ON "users" (lower("username"));`
@@ -723,7 +602,6 @@ describe('migration.sql — esta migracion no toca users ni ninguna tabla ajena 
       expect(ddlStatementsOn(upSource, tabla), `no debe tocar ${tabla}`).toEqual([])
     }
 
-    // Sensibilidad: un `DROP CONSTRAINT` por drift, escondido al final, cae.
     const conDrift = `${upSource}\nALTER TABLE "orders" DROP CONSTRAINT "orders_recipe_id_fkey";`
     expect(ddlStatementsOn(conDrift, 'orders')).toHaveLength(1)
   })
@@ -754,13 +632,10 @@ describe('migration.sql — esta migracion no toca users ni ninguna tabla ajena 
     expect(isEnglishSnakeCase('credential_setup_tókens')).toBe(false)
     expect(isEnglishSnakeCase('credentialSetupTokens')).toBe(false)
     expect(isEnglishSnakeCase('CREDENTIAL_SETUP_TOKENS')).toBe(false)
-    // Y sigue aceptando los que si son ingleses: no es un `expect(false)` disfrazado.
     expect(isEnglishSnakeCase('credential_setup_tokens')).toBe(true)
     expect(isEnglishSnakeCase('superseded_at')).toBe(true)
   })
 })
-
-// === El DOWN (R36) ========================================================================
 
 describe('down.sql — revertir deja el esquema exactamente como estaba', () => {
   it('borra el indice parcial y la tabla, y nada mas: dos sentencias', () => {
@@ -771,8 +646,8 @@ describe('down.sql — revertir deja el esquema exactamente como estaba', () => 
   })
 
   it('no toca `users` en ninguna linea ejecutable (R37)', () => {
-    // El UP no le toco nada, asi que el DOWN no tiene nada que restaurar. Cualquier linea aqui
-    // sobre `users` dejaria la tabla distinta de como estaba y el rollback terminaria en verde.
+    // El UP no toca `users`: cualquier linea aqui la dejaria distinta y el rollback terminaria en
+    // verde.
     expect(statementsMentioning(downSource, 'users')).toEqual([])
     expect(ddlStatementsOn(downSource, 'users')).toEqual([])
 
@@ -805,14 +680,10 @@ describe('down.sql — revertir deja el esquema exactamente como estaba', () => 
   })
 })
 
-// === El esquema de Prisma =================================================================
-
 describe('db/schema.prisma — el modelo nuevo es de identity y no se lleva la unicidad al esquema', () => {
   it('CredentialSetupToken declara su dueno (`/// @module identity`)', () => {
     expect(moduleOwnerOf(rawSchema, 'CredentialSetupToken')).toBe('identity')
 
-    // Sensibilidad: un modelo sin dueno cae —y es ademas un hallazgo de
-    // `tests/guards/guard-arquitectura-modulos.test.ts`—.
     const sinDueno = rawSchema.replace(
       /\/\/\/ @module identity\n((?:\/\/\/[^\n]*\n)*model CredentialSetupToken \{)/,
       '$1',
@@ -822,12 +693,8 @@ describe('db/schema.prisma — el modelo nuevo es de identity y no se lleva la u
   })
 
   it('no declara ningun @@unique ni @unique de userId (R11)', () => {
-    // Si alguien "arregla" el esquema con `@@unique([userId])`, la unicidad pasa a ser TOTAL en
-    // silencio: nadie podria recibir un segundo enlace nunca y el reenvio de R16 fallaria
-    // siempre, sin que salte ningun error en ninguna parte.
     expect(userUniquesIn(rawSchema, 'CredentialSetupToken')).toEqual([])
 
-    // Sensibilidad: el `@@unique` compuesto cae...
     const conUnique = mutateModel(
       rawSchema,
       'CredentialSetupToken',
@@ -837,7 +704,6 @@ describe('db/schema.prisma — el modelo nuevo es de identity y no se lleva la u
     expect(conUnique, 'la mutacion no anadio el @@unique').not.toBe(rawSchema)
     expect(userUniquesIn(conUnique, 'CredentialSetupToken')).toEqual(['[userId]'])
 
-    // ...y un `@unique` en la propia columna tambien, que es la otra forma de romperlo.
     const enColumna = mutateModel(
       rawSchema,
       'CredentialSetupToken',
@@ -853,7 +719,7 @@ describe('db/schema.prisma — el modelo nuevo es de identity y no se lleva la u
     expect(body).not.toBeNull()
     expect(body as string).not.toMatch(/companyId/)
     expect(body as string).not.toMatch(/company_id/)
-    // Y `User` si la declara: la afirmacion de arriba no es un `expect(false)` disfrazado.
+    // `User` si la declara: asi el patron de arriba puede fallar.
     expect(modelBody(rawSchema, 'User') as string).toMatch(/companyId/)
   })
 })
