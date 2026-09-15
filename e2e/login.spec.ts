@@ -256,6 +256,20 @@ test.beforeAll(async () => {
 
   // El prefijo propio sigue siendo condicion en AMBAS ramas del `OR`: ampliar el barrido a los
   // usuarios de los roles condenados no puede convertirse en una puerta para tocar filas ajenas.
+  // Antes, las sesiones cerradas de EXACTAMENTE esos usuarios (mismo `where`, via la relacion):
+  // `revoked_sessions.user_id` es `onDelete: Restrict` (QC-23) y el caso de QC-93 cierra sesion.
+  await prisma.revokedSession.deleteMany({
+    where: {
+      user: {
+        username: { startsWith: USERNAME_PREFIX },
+        OR: [
+          { createdAt: { lt: orphanCutoff } },
+          { roleId: { in: orphanRoleIds } },
+          { companyId: { in: orphanCompanyIds } },
+        ],
+      },
+    },
+  });
   await prisma.user.deleteMany({
     where: {
       username: { startsWith: USERNAME_PREFIX },
@@ -309,6 +323,15 @@ test.afterAll(async () => {
   // borra por prefijo de `RUN_ID` (no por ids acumulados en memoria) y cada paso va en su
   // propio `try`/`catch`, para que un fallo al borrar usuarios no impida borrar el rol ni
   // cerrar la conexion. Usuarios primero: la FK `users.role_id` es `onDelete: Restrict`.
+  // Y antes que los usuarios, sus sesiones cerradas: `revoked_sessions.user_id` es
+  // `onDelete: Restrict` (QC-23) y el caso de QC-93 cierra sesion.
+  try {
+    await prisma.revokedSession.deleteMany({
+      where: { user: { username: { startsWith: `${USERNAME_PREFIX}${RUN_ID}` } } },
+    });
+  } catch {
+    // se intenta borrar los usuarios igualmente
+  }
   try {
     await prisma.user.deleteMany({
       where: { username: { startsWith: `${USERNAME_PREFIX}${RUN_ID}` } },
