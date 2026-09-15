@@ -54,6 +54,44 @@ function resolverCostoUnitario(entrada: EntradaValidada): string {
 }
 
 /**
+ * «Hoy» como fecha CIVIL en UTC (`YYYY-MM-DD`), a partir del instante que se le pasa.
+ *
+ * UTC y no la zona del servidor por coherencia con el adaptador, que escribe la fecha civil como
+ * `YYYY-MM-DDT00:00:00Z`, y con el relleno de la migracion, que lee `created_at AT TIME ZONE
+ * 'UTC'` (`design.md > 2.1`, `> 4.3`). Con la zona local, la misma alta daria dos «hoy» distintos
+ * segun la maquina.
+ */
+function fechaCivilUtc(instante: Date): string {
+  return instante.toISOString().slice(0, 10);
+}
+
+/**
+ * Fecha de compra que se guarda (QC-81 R2, R3, R4, R5).
+ *
+ * - No vino ⇒ HOY, derivado del instante que recibe, que es el MISMO que el alta usa para
+ *   `created_at`/`updated_at` (R2). No se lee un segundo reloj: con dos, un alta hecha justo en el
+ *   cambio de dia podria guardar la compra un dia y la creacion otro.
+ * - Vino y es posterior a hoy ⇒ `ValidationError` con `purchaseDate` en el diagnostico (R4). Lo que
+ *   aun no llego no es existencia.
+ * - Vino y es hoy o antes ⇒ TAL CUAL, sin corregirla (R3, R5).
+ *
+ * La comparacion es entre CADENAS civiles `YYYY-MM-DD`: con año, mes y dia de ancho fijo el orden
+ * lexicografico es el del calendario, y asi no se convierte ninguna fecha a instante -que es por
+ * donde entra el corrimiento de dia-. La forma y que el dia exista ya los garantizo el esquema (R6).
+ */
+function resolverFechaDeCompra(entrada: EntradaValidada, instante: Date): string {
+  const hoy = fechaCivilUtc(instante);
+
+  if (entrada.purchaseDate == null) return hoy;
+
+  if (entrada.purchaseDate > hoy) {
+    throw new ValidationError(`purchaseDate: fecha de compra futura (${entrada.purchaseDate} > ${hoy})`);
+  }
+
+  return entrada.purchaseDate;
+}
+
+/**
  * Alta de producto CON su primer lote (QC-90 R1). No hay un segundo caso de uso al lado:
  * dejar dos altas de producto significaria dejar una capaz de crear un producto sin lote,
  * que es justo lo que R1 prohibe (`design.md > 10 C`).
@@ -61,8 +99,15 @@ function resolverCostoUnitario(entrada: EntradaValidada): string {
  * `requirePermission(actor, 'inventario.modificar')` es la PRIMERA linea, antes de zod y
  * antes de tocar el puerto (R23): un actor sin permiso ni siquiera dispara la validacion.
  *
- * Orden fijo (`design.md > 3`): permiso -> zod -> derivacion del costo -> resolucion por
- * nombre -> escritura.
+ * Orden fijo (QC-81 `design.md > 4.3`, que amplia el de QC-90): permiso -> zod -> fecha de
+ * compra (hoy por defecto, rechazo de la futura) -> derivacion del costo -> resolucion por
+ * nombre -> escritura. La fecha va ANTES de tocar el puerto: una fecha futura se rechaza sin
+ * consultar el nombre y sin escribir nada (QC-81 R4).
+ *
+ * QC-81 (R2): el instante se lee UNA vez, justo despues de zod, y de el salen «hoy» para la fecha
+ * de compra Y el `now` que el puerto escribe en `created_at`/`updated_at`. Hasta QC-81 se leia
+ * tras la consulta por nombre; adelantarlo unas lineas es lo que permite que haya un solo reloj.
+ * Sigue sin leerse antes del permiso: un actor sin permiso no dispara ni el reloj (R24).
  *
  * QC-49 (R17, R18): la empresa que se escribe en las filas es LA DEL ACTOR y sale de un solo
  * sitio, el ambito que se construye aqui tras el permiso. No entra por la entrada del llamante
@@ -93,34 +138,44 @@ export function createCreateProduct(
     if (!parsed.success) throw new ValidationError();
     const entrada = parsed.data;
 
-    // 3. Costo (R6, R7, R9, R10).
+    // 3. Fecha de compra (QC-81 R2, R4, R5), con el UNICO instante del alta. Antes del costo y
+    //    antes del puerto: una fecha futura no llega a consultar el nombre.
+    const instante = now();
+    const purchaseDate = resolverFechaDeCompra(entrada, instante);
+
+    // 4. Costo (R6, R7, R9, R10).
     const batch: NewProductBatch = {
       presentationId: entrada.presentationId,
       // R3: una existencia de `0` crea el lote igualmente, con `stock` 0. El `CHECK` de la
       // columna es `>= 0`, asi que no es motivo de rechazo por si sola.
       stock: entrada.stock,
       unitCost: resolverCostoUnitario(entrada),
-      // R12: lote y expiracion ausentes o vacios -el esquema ya recorto y rechazo el lote
-      // de solo espacios- se guardan como `NULL`. `?? null` colapsa `undefined` y `null`,
-      // que es lo que `nullish()` deja llegar.
+      // QC-81 (R8, R10): el lote ausente viaja como `null`, y `null` ya NO significa «se guarda
+      // vacio» -la columna es NOT NULL desde QC-81- sino «que lo genere el backend»: el adaptador
+      // calcula el correlativo dentro de la transaccion que escribe (`design.md > 3.1`). El lote
+      // escrito llega recortado por el esquema, que tambien rechazo el de solo espacios, y se
+      // pasa tal cual. `?? null` colapsa `undefined` y `null`, que es lo que `nullish()` deja
+      // llegar.
       lot: entrada.lot ?? null,
+      // R12 (QC-90): la expiracion SI sigue siendo opcional y ausente se guarda `NULL`.
       expiryDate: entrada.expiryDate ?? null,
+      // QC-81 (R1, R3): siempre escrita, ya resuelta en el paso 3.
+      purchaseDate,
       // R22: la autoria del lote es el ACTOR DE LA SESION. Es para lo que la migracion del
       // 2026-09-09 mudo `created_by`/`updated_by` desde `products` hasta aqui; el actor ya
       // no se usaba mas que para el permiso y ahora si viaja al puerto.
       createdBy: actor.id,
     };
 
-    // 4. ¿El producto ya existe? Se decide POR NOMBRE contra los productos vivos (R15), no
+    // 5. ¿El producto ya existe? Se decide POR NOMBRE contra los productos vivos (R15), no
     //    por un identificador que envie el navegador (`design.md > 10 A`). Normalizar y
     //    filtrar los borrados es del adaptador: aqui solo se pasa el nombre.
     //    R20 -que con homonimos vivos se elija siempre el mismo- se cierra en el adaptador
     //    con su `orderBy`; el caso de uso usa lo que el puerto devuelva, sea cual sea.
     const existente = await deps.products.findAliveIdByName(entrada.name, scope);
-    const instante = now();
 
     if (existente !== null) {
-      // 5a. R17: se le agrega el lote a ESE producto y NO se crea otro. R18: el candidato
+      // 6a. R17: se le agrega el lote a ESE producto y NO se crea otro. R18: el candidato
       //     del producto -nombre, existencia, alerta- NO VIAJA; lo que no se pasa
       //     no se puede escribir por accidente.
       const agregado = await deps.products.addBatchToAlive(existente, batch, instante, scope);
@@ -139,7 +194,7 @@ export function createCreateProduct(
       return { id: existente };
     }
 
-    // 5b. R16: producto nuevo. La existencia escrita va en LAS DOS filas -producto y lote-,
+    // 6b. R16: producto nuevo. La existencia escrita va en LAS DOS filas -producto y lote-,
     //     transitoriamente, hasta que QC-91 la convierta en la suma de los lotes (decision
     //     cerrada del 2026-09-10). R21 -las dos escrituras en una transaccion- es del
     //     adaptador: el puerto ofrece UNA operacion, no dos, justo para que el dominio no

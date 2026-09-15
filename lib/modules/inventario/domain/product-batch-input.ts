@@ -49,18 +49,80 @@ const presentationIdSchema = z.string().uuid();
 export const PRODUCT_BATCH_LOT_MAX_LENGTH = 60;
 
 /**
- * Lote: opcional (R12) y recortado (R14). `trim()` va ANTES de `min(1)`, como en el nombre
- * del producto: si se aplicara despues, `'   '` pasaria el minimo y solo se recortaria tras
- * la validacion. Un lote de solo espacios no es un lote, es un campo vacio.
+ * Lote: OPCIONAL EN LA ENTRADA, OBLIGATORIO EN LA FILA (QC-81 R7, R8, R10).
+ *
+ * Son dos cosas distintas y no se contradicen. Desde QC-81 la columna `product_batches.lot` es
+ * `NOT NULL`, tiene un `CHECK` que rechaza el blanco y es unica por empresa: ninguna fila queda sin
+ * lote. Pero el CAMPO de esta entrada sigue declarado `nullish()`, porque «no escribi lote» es una
+ * peticion valida: significa «que lo genere el backend» (R8), y quien lo genera es el adaptador,
+ * dentro de la transaccion que escribe (`design.md > 3.1`). El caso de uso lo traduce a
+ * `lot: null` en `NewProductBatch`, que ya no quiere decir «se guarda vacio».
+ *
+ * Esto DEROGA la mitad del lote de QC-90 R12 («lote opcional, se guarda `NULL`»); la mitad de la
+ * expiracion sigue igual.
+ *
+ * Cuando SI viene, se recorta (R14) y se guarda tal cual (QC-81 R10). `trim()` va ANTES de
+ * `min(1)`, como en el nombre del producto: si se aplicara despues, `'   '` pasaria el minimo y
+ * solo se recortaria tras la validacion. Un lote de solo espacios no es un lote, es un campo
+ * vacio, y se rechaza en vez de confundirse con «generalo».
  */
 const lotSchema = z.string().trim().min(1).max(PRODUCT_BATCH_LOT_MAX_LENGTH);
+
+/** Forma de la fecha CIVIL `YYYY-MM-DD` que comparten la expiracion y la compra. */
+const CIVIL_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Fecha de expiracion: opcional (R12) y como fecha CIVIL `YYYY-MM-DD`, no como instante
  * (R13). Se valida la FORMA con un patron y no se convierte a `Date` aqui: convertirla en el
  * borde es justo por donde se cuela el corrimiento de dia por zona horaria.
  */
-const expiryDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const expiryDateSchema = z.string().regex(CIVIL_DATE_PATTERN);
+
+/**
+ * ¿La cadena `YYYY-MM-DD` es un dia que EXISTE en el calendario? (QC-81 R6).
+ *
+ * El patron solo mira la forma: `2026-02-30` y `2026-13-01` la cumplen. Aqui se compone el
+ * instante con `Date.UTC` y se comprueba que el año, el mes y el dia VUELVEN IGUALES: `Date.UTC`
+ * no rechaza un dia fuera de rango, lo desborda (`2026-02-30` -> 2 de marzo), y ese desborde es
+ * justo lo que delata la fecha inexistente.
+ *
+ * Todo en UTC, sin zona local: la lectura no depende de la maquina que valide. El `Date` que se
+ * construye es un medio de la comprobacion y MUERE AQUI; lo que el esquema entrega sigue siendo la
+ * cadena, igual que la expiracion (`design.md > 4.1`).
+ *
+ * Limite sabido e inocuo: `Date.UTC` lee los años `0000`-`0099` como 1900-1999, asi que esos
+ * años no vuelven iguales y se rechazan. Ninguna compra real cae ahi.
+ */
+function esDiaDeCalendario(value: string): boolean {
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(5, 7));
+  const day = Number(value.slice(8, 10));
+  const instante = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    instante.getUTCFullYear() === year &&
+    instante.getUTCMonth() === month - 1 &&
+    instante.getUTCDate() === day
+  );
+}
+
+/**
+ * Fecha de compra (QC-81 R3, R6): fecha CIVIL `YYYY-MM-DD` que ademas EXISTE en el calendario.
+ *
+ * `abort: true` en el patron no es adorno: zod v4 ejecuta las comprobaciones siguientes aunque
+ * una anterior haya fallado, y sin el corte un `31/12/2026` cobraria DOS rechazos en
+ * `purchaseDate` -el de forma y el de calendario- para un solo error. Con el corte, la
+ * comprobacion de calendario solo recibe cadenas que ya tienen la forma, que es lo unico que
+ * `esDiaDeCalendario` sabe leer.
+ *
+ * Lo que este esquema NO comprueba es que la fecha no sea futura (R4): zod no conoce el reloj del
+ * caso de uso, y meterlo aqui haria que el mismo esquema diera veredictos distintos en el navegador
+ * y en el servidor. Eso vive en `create-product.ts`, con el `now()` inyectado.
+ */
+const purchaseDateSchema = z
+  .string()
+  .regex(CIVIL_DATE_PATTERN, { abort: true })
+  .refine(esDiaDeCalendario);
 
 /** ¿Ese importe pasa su propia validacion de campo? (R4, R5). */
 function esImporteAceptado(amount: unknown): boolean {
@@ -85,6 +147,15 @@ export const createProductWithFirstBatchSchema = z
     totalCost: amountSchema.nullish(),
     lot: lotSchema.nullish(),
     expiryDate: expiryDateSchema.nullish(),
+    /**
+     * QC-81 (R2, R3, R6): `nullish()` y NO obligatorio, aunque la columna sea NOT NULL. Ausente
+     * significa HOY -es literalmente la decision D3, «su valor por defecto es la fecha actual»- y
+     * lo resuelve el caso de uso con su `now()`. Es tambien lo que mantiene la pantalla de hoy
+     * funcionando SIN TOCARLA: el formulario de alta no manda este campo, y si el esquema lo
+     * exigiera toda alta desde la pantalla moriria con `invalid_input` hasta que QC-103 lo pinte
+     * (QC-81 R28 prohibe tocar `app/**`). QC-103 solo tiene que anadir el campo.
+     */
+    purchaseDate: purchaseDateSchema.nullish(),
   })
   /**
    * Las tres reglas cruzadas del costo, cada una con su `path` EXPLICITO. El `path` no es

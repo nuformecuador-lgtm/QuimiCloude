@@ -19,8 +19,24 @@ export type NewProductBatch = {
    */
   readonly unitCost: string;
 
-  /** Lote, ya recortado (R14). `null` cuando no se escribio (R12). */
+  /**
+   * Lote, ya recortado (R14). `null` significa «no vino: que lo genere el backend» (QC-81 R8),
+   * NO «este lote se queda sin valor»: desde QC-81 la columna es NOT NULL, con un `CHECK` contra
+   * el blanco y unica por empresa. El correlativo lo calcula el ADAPTADOR, dentro de la misma
+   * transaccion que escribe (`design.md > 3.1`): el dominio no consulta la base y un «pide el
+   * numero y luego escribe» partido en dos viajes dejaria abierta la carrera. Un string es el lote
+   * escrito a mano y se guarda tal cual (QC-81 R10).
+   */
   readonly lot: string | null;
+
+  /**
+   * Fecha de compra como fecha CIVIL `YYYY-MM-DD` (QC-81 R1, R3). OBLIGATORIA y YA RESUELTA: si el
+   * alta no la trajo, el caso de uso pone aqui «hoy» a partir del mismo instante que usa para
+   * `created_at` (R2), y si era futura ya la rechazo (R4). Por eso no admite `null`: el puerto no
+   * tiene que decidir nada sobre ella. Viaja como texto por la misma razon que `expiryDate`: la
+   * conversion a la `@db.Date` es del adaptador.
+   */
+  readonly purchaseDate: string;
 
   /**
    * Fecha de expiracion como fecha CIVIL `YYYY-MM-DD`, no como instante (R13). Viajar como

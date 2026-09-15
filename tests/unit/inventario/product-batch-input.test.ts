@@ -4,6 +4,9 @@ import { createProductWithFirstBatchSchema } from '@/lib/modules/inventario';
  * Esquema de entrada del alta CON su primer lote (QC-90, T3; `design.md > 4`). Cubre **R2,
  * R4, R5, R8, R10, R11, R12, R14 y R24**.
  *
+ * QC-81 (T4) anade `purchaseDate`: cubre **R6** y el lado ENTRADA de **R2** y **R8** (el bloque
+ * `QC-81 — purchaseDate`).
+ *
  * Se importa por el CONTRATO PUBLICO del modulo, no por la ruta profunda: el formulario de
  * cliente lo consume por ahi (R24, R27), y si el barrel dejara de exportarlo este archivo no
  * compilaria.
@@ -192,6 +195,84 @@ describe('createProductWithFirstBatchSchema', () => {
 
     expect(parsed.unitCost).toBe('2.0000');
     expect(parsed.totalCost).toBe('999');
+  });
+
+  describe('QC-81 — purchaseDate', () => {
+    it('acepta una fecha civil YYYY-MM-DD existente y la entrega como la misma cadena', () => {
+      // R3: sale TEXTO, no `Date`. Incluye un 29 de febrero de año bisiesto, que existe.
+      for (const valida of ['2026-09-10', '2024-02-29', '2026-12-31', '2026-01-01']) {
+        const result = createProductWithFirstBatchSchema.safeParse({ ...VALIDA, purchaseDate: valida });
+        expect(result.success, `${valida} deberia aceptarse`).toBe(true);
+        if (result.success) expect(result.data.purchaseDate).toBe(valida);
+      }
+    });
+
+    it('rechaza la fecha sin forma YYYY-MM-DD con un solo issue en purchaseDate', () => {
+      // R6. Un solo issue: el corte del patron evita que la comprobacion de calendario sume otro.
+      for (const invalida of [
+        '10/09/2026',
+        '2026-9-1',
+        '2026-09-10T00:00:00Z',
+        '20260910',
+        '',
+        ' 2026-09-10',
+      ]) {
+        expect(camposRechazados({ ...VALIDA, purchaseDate: invalida }), invalida).toEqual([
+          'purchaseDate',
+        ]);
+      }
+      expect(camposRechazados({ ...VALIDA, purchaseDate: 20260910 })).toEqual(['purchaseDate']);
+    });
+
+    it('rechaza la fecha con forma correcta que no existe en el calendario', () => {
+      // R6: el patron solo no distingue estas. `2025-02-29` es un 29 de febrero de año NO bisiesto.
+      for (const inexistente of ['2026-02-30', '2025-02-29', '2026-04-31', '2026-13-01', '2026-00-10', '2026-09-00']) {
+        expect(camposRechazados({ ...VALIDA, purchaseDate: inexistente }), inexistente).toEqual([
+          'purchaseDate',
+        ]);
+      }
+    });
+
+    it('acepta el alta sin purchaseDate, ausente o en null (ausente = hoy, lo resuelve el caso de uso)', () => {
+      // R2, lado entrada. `nullish()` es lo que mantiene funcionando la pantalla de hoy, que no
+      // manda el campo (QC-81 R28): el esquema deja pasar y «hoy» lo pone `create-product.ts`.
+      const ausente = createProductWithFirstBatchSchema.parse({ ...VALIDA });
+      expect(ausente.purchaseDate).toBeUndefined();
+
+      const enNulo = createProductWithFirstBatchSchema.parse({ ...VALIDA, purchaseDate: null });
+      expect(enNulo.purchaseDate).toBeNull();
+    });
+
+    it('no rechaza una fecha futura: la no-futuridad es del caso de uso, que tiene el reloj', () => {
+      // R4 NO vive aqui (`design.md > 4.1`): zod no conoce el `now()` inyectado. Este caso fija el
+      // limite para que nadie meta un `new Date()` en el esquema creyendo que falta.
+      expect(
+        createProductWithFirstBatchSchema.safeParse({ ...VALIDA, purchaseDate: '2999-01-01' }).success,
+      ).toBe(true);
+    });
+
+    it('sigue rechazando un campo desconocido parecido a la fecha de compra (strictObject)', () => {
+      // R24 de QC-90 sigue en pie tras anadir el campo: solo `purchaseDate` es conocido.
+      for (const desconocido of ['purchasedAt', 'purchase_date', 'fechaCompra']) {
+        const result = createProductWithFirstBatchSchema.safeParse({
+          ...VALIDA,
+          [desconocido]: '2026-09-10',
+        });
+
+        expect(result.success, `${desconocido} deberia rechazarse`).toBe(false);
+        if (result.success) continue;
+        const rechazo = result.error.issues.find((issue) => issue.code === 'unrecognized_keys');
+        expect(rechazo && 'keys' in rechazo ? rechazo.keys : []).toContain(desconocido);
+      }
+    });
+
+    it('lot sigue siendo opcional en la ENTRADA: ausente pide generarlo, no es un rechazo', () => {
+      // QC-81 R8, lado entrada: lo obligatorio es la FILA, no el campo.
+      const parsed = createProductWithFirstBatchSchema.parse({ ...VALIDA });
+      expect(parsed.lot ?? null).toBeNull();
+      // Pero el de solo espacios sigue rechazandose: no se confunde con «generalo».
+      expect(camposRechazados({ ...VALIDA, lot: '   ' })).toEqual(['lot']);
+    });
   });
 
   it('acepta la existencia 0 mientras venga el costo unitario', () => {

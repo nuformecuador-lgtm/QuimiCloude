@@ -161,6 +161,8 @@ describe('R24 — la entrada invalida se rechaza sin tocar el puerto', () => {
     ['con un lote de mas de 60 caracteres (R14)', { lot: 'x'.repeat(61) }],
     ['con una expiracion que no es una fecha civil (R13)', { expiryDate: '10/09/2026' }],
     ['con un campo desconocido (R24)', { colorDelBidon: 'azul' }],
+    ['con una fecha de compra sin forma YYYY-MM-DD (QC-81 R6)', { purchaseDate: '10/09/2026' }],
+    ['con una fecha de compra que no existe (QC-81 R6)', { purchaseDate: '2026-02-30' }],
   ])('rechaza el alta %s', async (_etiqueta, sobra) => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
@@ -297,8 +299,16 @@ describe('R6, R7, R10 — el costo que se guarda', () => {
   });
 });
 
-describe('R12 — lote y expiracion opcionales', () => {
-  it('los guarda en null cuando no vienen', async () => {
+describe('QC-81 R8, R10 y QC-90 R12 — lote que pide generarse y expiracion opcional', () => {
+  // QC-81 cambio lo que significa el `null` del lote. Hasta QC-90 decia «se guarda NULL»; desde
+  // QC-81 la columna es NOT NULL y `null` en `NewProductBatch.lot` dice «que lo genere el
+  // backend». El correlativo NO lo calcula el caso de uso: lo calcula el adaptador, dentro de la
+  // transaccion que escribe (`design.md > 3.1`), y se prueba contra la base en T8. Por eso este
+  // unitario NO afirma ningun numero generado -el doble del puerto no genera nada y afirmarlo
+  // aqui seria afirmar la premisa-: afirma lo que le toca al dominio, que es PEDIR la generacion
+  // con `null` cuando el lote no vino. La tabla `design.md > 0.2` fila 9 decia «pasan a afirmar
+  // el correlativo generado»; se lee subordinada a `> 3.1`, que fija que el puerto no cambia.
+  it('pasa lot null al puerto -«generalo»- cuando el lote no viene, y deja la expiracion en null', async () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -316,6 +326,28 @@ describe('R12 — lote y expiracion opcionales', () => {
     );
     expect(loteCreado(otros).lot).toBeNull();
     expect(loteCreado(otros).expiryDate).toBeNull();
+  });
+
+  it('pide la generacion tambien por el camino del producto que ya existe', async () => {
+    const products = montarRepositorio({
+      findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => 'producto-9'),
+    });
+    const createProduct = createCreateProduct({ products, now: () => AHORA });
+
+    await createProduct(ALTA_VALIDA, ADMIN);
+
+    expect(products.addBatchToAlive.mock.calls[0][1].lot).toBeNull();
+  });
+
+  it('pasa el lote escrito tal cual, recortado, sin sustituirlo -QC-81 R10-', async () => {
+    // Un lote con forma numerica tampoco se reinterpreta: el dominio no decide si «7» es de la
+    // serie o no, lo pasa escrito.
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA });
+
+    await createProduct({ ...ALTA_VALIDA, lot: '  7  ' }, ADMIN);
+
+    expect(loteCreado(products).lot).toBe('7');
   });
 
   it('los guarda cuando vienen, con el lote recortado (R14) y la fecha como texto civil (R13)', async () => {
@@ -392,11 +424,13 @@ describe('R17, R18 — el nombre corresponde a un producto que ya existe', () =>
     expect(llamada[3]).toEqual({ companyId: EMPRESA });
     // El lote lleva SU existencia -la escrita, que es la del lote que se agrega-, pero no
     // lleva ningun campo del producto: nada que permita tocar `name`, `qty_alert` ni `unit_id`.
+    // QC-81 (R1): `purchaseDate` es campo DEL LOTE, no del producto, y por eso si esta.
     expect(Object.keys(llamada[1]).sort()).toEqual([
       'createdBy',
       'expiryDate',
       'lot',
       'presentationId',
+      'purchaseDate',
       'stock',
       'unitCost',
     ]);
@@ -461,6 +495,158 @@ describe('R19 — sin id del puerto, el alta crea producto nuevo', () => {
 
     expect(products.createWithFirstBatch).toHaveBeenCalledTimes(1);
     expect(products.addBatchToAlive).not.toHaveBeenCalled();
+  });
+});
+
+/** `AHORA` es 2026-09-10T10:00Z: «hoy» civil en UTC es este dia. */
+const HOY = '2026-09-10';
+const MANANA = '2026-09-11';
+const SEMANA_PASADA = '2026-09-03';
+
+/** El `ValidationError` que lanzo el alta, para mirar su diagnostico. */
+async function capturarRechazo(promesa: Promise<unknown>): Promise<ValidationError> {
+  const error = await promesa.then(
+    () => {
+      throw new Error('se esperaba un rechazo y el alta resolvio');
+    },
+    (motivo: unknown) => motivo,
+  );
+  expect(error).toBeInstanceOf(ValidationError);
+  return error as ValidationError;
+}
+
+describe('QC-81 R2 — sin fecha de compra, al puerto le llega HOY del mismo reloj', () => {
+  it('pasa al puerto la fecha civil UTC del now inyectado, y el MISMO instante como now', async () => {
+    // 23:30 UTC a proposito: en una zona al este de UTC ya seria el dia siguiente. Si «hoy» se
+    // calculara con la zona local del proceso, este caso cambiaria de resultado segun la maquina.
+    const instante = new Date('2026-03-05T23:30:00.000Z');
+    const now = vi.fn(() => instante);
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now });
+
+    await createProduct(ALTA_VALIDA, ADMIN);
+
+    expect(loteCreado(products).purchaseDate).toBe('2026-03-05');
+    // Un solo reloj: se lee UNA vez y el instante que se escribe en `created_at` es ese mismo.
+    expect(now).toHaveBeenCalledTimes(1);
+    expect(products.createWithFirstBatch.mock.calls[0][2]).toBe(instante);
+  });
+
+  it('tambien cuando la fecha viene explicitamente en null, y por el camino del producto existente', async () => {
+    const products = montarRepositorio({
+      findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => 'producto-9'),
+    });
+    const now = vi.fn(() => AHORA);
+    const createProduct = createCreateProduct({ products, now });
+
+    await createProduct({ ...ALTA_VALIDA, purchaseDate: null }, ADMIN);
+
+    const llamada = products.addBatchToAlive.mock.calls[0];
+    expect(llamada[1].purchaseDate).toBe(HOY);
+    expect(now).toHaveBeenCalledTimes(1);
+    expect(llamada[2]).toBe(AHORA);
+  });
+});
+
+describe('QC-81 R3, R5 — la fecha escrita, si no es futura, llega al puerto identica', () => {
+  it('pasa tal cual una fecha de la semana pasada', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA });
+
+    await createProduct({ ...ALTA_VALIDA, purchaseDate: SEMANA_PASADA }, ADMIN);
+
+    // R3: la misma CADENA civil, sin pasar por `Date` y sin corrimiento de dia.
+    expect(loteCreado(products).purchaseDate).toBe(SEMANA_PASADA);
+  });
+
+  it('acepta hoy y una fecha de meses atras sin corregirlas', async () => {
+    // R5: «anterior o igual a hoy». El limite exacto -hoy- es donde un `>=` mal puesto rechazaria.
+    for (const fecha of [HOY, '2026-01-15', '2019-12-31']) {
+      const products = montarRepositorio();
+      await createCreateProduct({ products, now: () => AHORA })(
+        { ...ALTA_VALIDA, purchaseDate: fecha },
+        ADMIN,
+      );
+      expect(loteCreado(products).purchaseDate, `${fecha} deberia llegar identica`).toBe(fecha);
+    }
+  });
+
+  it('pasa la fecha escrita identica tambien al agregar el lote a un producto existente', async () => {
+    const products = montarRepositorio({
+      findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => 'producto-9'),
+    });
+    const createProduct = createCreateProduct({ products, now: () => AHORA });
+
+    await createProduct({ ...ALTA_VALIDA, purchaseDate: SEMANA_PASADA }, ADMIN);
+
+    expect(products.addBatchToAlive.mock.calls[0][1].purchaseDate).toBe(SEMANA_PASADA);
+  });
+});
+
+describe('QC-81 R4 — la fecha de compra futura se rechaza sin tocar el puerto', () => {
+  it('rechaza la fecha de manana con ValidationError senalando purchaseDate y cero llamadas al repositorio', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA });
+
+    const error = await capturarRechazo(
+      createProduct({ ...ALTA_VALIDA, purchaseDate: MANANA }, ADMIN),
+    );
+
+    expect(error.code).toBe('invalid_input');
+    // `ValidationError` no lleva ruta de campo -solo el codigo del catalogo y el diagnostico, que va
+    // al log y nunca al navegador (QC-70 R29, R30)-: el campo se senala en el diagnostico.
+    expect(error.diagnostic).toContain('purchaseDate');
+    // Ni siquiera la consulta por nombre: el rechazo ocurre antes del puerto (`design.md > 4.3`).
+    afirmarPuertoIntacto(products);
+  });
+
+  it('decide «futura» contra el dia UTC del now inyectado, no contra el reloj de la maquina', async () => {
+    // Con un `now` de 1999, una fecha de 2000 ya es futura aunque en el reloj real sea pasado:
+    // prueba que no hay un segundo reloj escondido.
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({
+      products,
+      now: () => new Date('1999-12-31T23:59:59.000Z'),
+    });
+
+    await capturarRechazo(createProduct({ ...ALTA_VALIDA, purchaseDate: '2000-01-01' }, ADMIN));
+    afirmarPuertoIntacto(products);
+  });
+
+  it('valida la forma con zod ANTES de mirar si la fecha es futura', async () => {
+    // Orden permiso -> zod -> fecha. Un rechazo de zod no lleva diagnostico; el de la fecha si.
+    // Con una entrada que falla las dos cosas, el rechazo tiene que ser el de zod.
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA });
+
+    const error = await capturarRechazo(
+      createProduct({ ...ALTA_VALIDA, purchaseDate: MANANA, colorDelBidon: 'azul' }, ADMIN),
+    );
+
+    expect(error.diagnostic).toBeUndefined();
+    afirmarPuertoIntacto(products);
+  });
+});
+
+describe('QC-81 R24 — sin permiso no se valida, no se toca el puerto ni se calcula ninguna fecha', () => {
+  it.each([
+    ['sin ningun permiso', SIN_PERMISO],
+    ['con inventario.consultar pero sin modificar', SOLO_CONSULTA],
+    ['ausente (null)', null],
+    ['ausente (undefined)', undefined],
+  ])('rechaza a un actor %s con UnauthorizedError sin llamar al reloj ni al puerto', async (_etiqueta, actor) => {
+    // Una fecha FUTURA a proposito: si la fecha se resolviera antes del permiso, el error seria el
+    // de validacion y no el de autorizacion.
+    const now = vi.fn(() => AHORA);
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now });
+
+    await expect(
+      createProduct({ ...ALTA_VALIDA, purchaseDate: MANANA }, actor),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+
+    expect(now).not.toHaveBeenCalled();
+    afirmarPuertoIntacto(products);
   });
 });
 

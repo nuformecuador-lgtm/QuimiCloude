@@ -17,7 +17,7 @@
 
 ## Tanda 0 — la puerta que no se puede saltar
 
-- [ ] **T0 — Confirmar la enmienda del catálogo de errores.**
+- [x] **T0 — Confirmar la enmienda del catálogo de errores.**
       Archivos: ninguno todavía.
       `design.md > 7.2` propone `batch_duplicate_lot` como **sexta enmienda** al catálogo cerrado, y
       el propio `error-codes.ts` exige que la apruebe una persona. Se resuelve en la puerta F1.4,
@@ -66,7 +66,7 @@
 
 ## Tanda 2 — dominio y contratos
 
-- [ ] **T4 [P] — Fecha de compra en el esquema de entrada.** Depende de T0 (no), independiente de la
+- [x] **T4 [P] — Fecha de compra en el esquema de entrada.** Depende de T0 (no), independiente de la
       tanda 1.
       Archivos: `lib/modules/inventario/domain/product-batch-input.ts`,
       `tests/unit/inventario/product-batch-input.test.ts`.
@@ -77,7 +77,7 @@
       **Hecho:** tests de forma válida, forma inválida, fecha inexistente, campo ausente y campo
       desconocido (sigue siendo `strictObject`). Cubre **R6** y el lado entrada de **R2, R8**.
 
-- [ ] **T5 — Tipo del lote y caso de uso.** Depende de T4.
+- [x] **T5 — Tipo del lote y caso de uso.** Depende de T4.
       Archivos: `lib/modules/inventario/domain/product-batch.ts`,
       `lib/modules/inventario/domain/create-product.ts`,
       `tests/unit/inventario/create-product.test.ts`.
