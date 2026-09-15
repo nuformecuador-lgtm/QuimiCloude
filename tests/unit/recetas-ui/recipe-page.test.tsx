@@ -41,7 +41,7 @@ import {
 } from '@/app/(private)/produccion/formulas/components';
 import { PRIVATE_NAV_ITEMS, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
 import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
-import type { RecipeSummary } from '@/lib/modules/recetas';
+import { RECIPE_QUERYABLE, type RecipeSummary } from '@/lib/modules/recetas';
 import type {
   DeleteRecipeFormState,
   RecipeListResult,
@@ -452,6 +452,29 @@ describe('pantalla de recetas — columnas', () => {
 
   it('R18: el esqueleto cuenta tantas celdas como columnas declara la lista', () => {
     expect(RECIPE_SKELETON_COLUMN_COUNT).toBe(buildRecipeColumns({ rowActions: () => null }).length);
+  });
+
+  it('R7, R11: cada columna ordena y filtra exactamente lo que declara la lista blanca, y nada de la lista blanca queda sin columna', () => {
+    const columnas = buildRecipeColumns({ rowActions: () => null });
+    const ids: readonly string[] = columnas.map((columna) => columna.id);
+
+    for (const columna of columnas) {
+      expect(Boolean(columna.sortable), `orden de «${columna.id}»`).toBe(
+        RECIPE_QUERYABLE.sortable.includes(columna.id),
+      );
+
+      const declarado = Object.hasOwn(RECIPE_QUERYABLE.filterable, columna.id)
+        ? RECIPE_QUERYABLE.filterable[columna.id]
+        : undefined;
+      expect(columna.filter?.kind, `filtro de «${columna.id}»`).toBe(declarado);
+    }
+
+    for (const campo of RECIPE_QUERYABLE.sortable) {
+      expect(ids, `«${campo}» ordena en el servidor y no tiene columna`).toContain(campo);
+    }
+    for (const campo of Object.keys(RECIPE_QUERYABLE.filterable)) {
+      expect(ids, `«${campo}» filtra en el servidor y no tiene columna`).toContain(campo);
+    }
   });
 
   it('R21: las acciones van en una columna que no se puede fijar, siempre visibles y con area tactil de 44x44', async () => {
