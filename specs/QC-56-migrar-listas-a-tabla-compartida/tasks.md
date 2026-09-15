@@ -20,7 +20,7 @@
 
 ## Tanda 1 — Piezas puras, declaraciones y specs
 
-### T1 [P] — Publicar `SUPPLIER_QUERYABLE` por el barrel (D13)
+### [x] T1 [P] — Publicar `SUPPLIER_QUERYABLE` por el barrel (D13)
 - **Archivos:** `lib/modules/proveedores/index.ts`; `tests/unit/proveedores-ui/supplier-list-params.test.ts`
   (el caso del barrel lo añade T3 en ese archivo; aquí solo la línea de producción).
 - **Requisitos:** R28, R31.
@@ -32,7 +32,7 @@
   - Se ha buscado en `tests/` si algún test cierra la lista de exportaciones de ese barrel; si lo hay,
     se amplía aquí y se añade a la lista de archivos.
 
-### T2 [P] — Parser y serializador de recetas
+### [x] T2 [P] — Parser y serializador de recetas
 - **Archivos:** `F/components/recipe-list-params.ts`, `tests/unit/recetas-ui/recipe-list-params.test.ts`.
 - **Requisitos:** R11, R12, R13, R22, R32, R33.
 - **Exporta:**
@@ -48,7 +48,7 @@
   - `hasActiveSearchOrFilter`: `false` con solo orden o tamaño, `true` con término y `true` con rango;
   - `clearSearchAndFilters` vacía búsqueda y filtros, vuelve a la página 1 y conserva orden y tamaño.
 
-### T3 — Parser y serializador de proveedores
+### [x] T3 — Parser y serializador de proveedores
 - **Archivos:** `S/components/supplier-list-params.ts`, `tests/unit/proveedores-ui/supplier-list-params.test.ts`.
 - **Depende de:** T1.
 - **Requisitos:** R11, R12, R13, R22, R31, R32, R33.
@@ -56,7 +56,7 @@
   - Lo mismo que T2, con `SUPPLIER_QUERYABLE` importado de `@/lib/modules/proveedores`.
   - Un caso afirma que es **el mismo objeto** que el de `domain/supplier-queryable` (R31).
 
-### T4 [P] — Columnas de recetas, sin descripción (D14)
+### [x] T4 [P] — Columnas de recetas, sin descripción (D14)
 - **Archivos:**
   - borrar `F/components/recipe-columns.ts`;
   - crear `F/components/recipe-columns.tsx`;
@@ -71,7 +71,7 @@
   - `recipe-columns-skeleton.ts` exporta `RECIPE_SKELETON_COLUMN_COUNT = 6`, sin `'use client'`.
   - `id: 'description'` y `id: 'createdBy'` no compilan.
 
-### T5 [P] — Columnas de proveedores
+### [x] T5 [P] — Columnas de proveedores
 - **Archivos:**
   - borrar `S/components/supplier-columns.ts`;
   - crear `S/components/supplier-columns.tsx`;
@@ -84,7 +84,7 @@
   - La celda de nombre es el `Link` de `supplierDetailRoute` con `supplier-detail-link` y
     `min-h-11 min-w-11`.
 
-### T14 [P] — Enmiendas a QC-26 R8, QC-26 R14 y QC-44 R11
+### [x] T14 [P] — Enmiendas a QC-26 R8, QC-26 R14 y QC-44 R11
 - **Archivos:**
   - `specs/QC-26-pantalla-de-recetas/requirements.md`: un bloque debajo de R8 (D14) y otro debajo de
     R14, en l.107 (D2);

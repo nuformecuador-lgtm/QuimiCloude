@@ -1,105 +1,145 @@
+import {
+  PAGE_SIZE_OPTIONS as SHARED_PAGE_SIZE_OPTIONS,
+  type DataTableFilterValue,
+  type DataTableParams,
+  type DataTableSort,
+} from '@/components/shared/data-table';
+import { RECIPE_QUERYABLE } from '@/lib/modules/recetas';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
+import { FORMULAS_ROUTE } from '@/lib/shared/routes';
 
-/**
- * Parser puro de los parametros de lista de la pantalla de recetas (R11, R12, R13,
- * `design.md > 4.2`).
- *
- * **Sin DOM, sin React y sin `next/*` a proposito**: el estado de lista vive en la cadena de
- * consulta, asi que quien lo lee es el Server Component de la pagina *antes* de que exista nada
- * de cliente. Que este archivo sea una funcion pura es lo que permite probar R13 sin montar la
- * pantalla. Copia casi literal de `app/(private)/inventario/components/product-list-params.ts`
- * (QC-22), mismo criterio.
- *
- * **Acotar aqui no duplica ninguna regla de negocio.** Quien valida la consulta de lista es
- * `createListQuerySchema()`, dentro del caso de uso `listRecipes` (QC-57), y *rechaza* `page: 0`
- * con `ValidationError`: esta pantalla mostraria un error donde el usuario solo esperaba la
- * primera pagina. Acotar es de la capa de presentacion; validar sigue siendo del dominio.
- *
- * **Que este parser lea SOLO `page` y `pageSize` es decision de esta pantalla, no un limite del
- * dominio.** Desde QC-57 el contrato de lista acepta ademas `sort`, `filters` y `search`, podados
- * contra la lista blanca `RECIPE_QUERYABLE`; `pageQuerySchema` sigue existiendo pero ya no es
- * quien valida este listado. Emitir esos campos desde la pantalla es de QC-56, no de aqui
- * (`specs/QC-57-orden-y-filtro-en-listados/tasks.md > Lo que esta ficha NO hace`).
- */
+// Sin React ni `next/*`: la pagina lo lee en el servidor antes de que exista nada de cliente.
+// Se acota en vez de validar porque el caso de uso rechaza `page: 0` y la pantalla mostraria un
+// error donde el usuario solo esperaba la primera pagina.
 
-/**
- * Nombres de los dos parametros de consulta. Constantes porque las comparten el parser, la
- * barra de herramientas y los tests: un literal repetido es como se acaba con `pagesize` y
- * `pageSize` conviviendo.
- */
 export const PAGE_PARAM = 'page';
 export const PAGE_SIZE_PARAM = 'pageSize';
+export const SORT_PARAM = 'sort';
+export const SEARCH_PARAM = 'q';
+export const CREATED_FROM_PARAM = 'createdFrom';
+export const CREATED_TO_PARAM = 'createdTo';
 
-/**
- * Las DOS opciones de tamano de pagina (R11). Salen de `lib/shared/pagination` -10 es el
- * defecto del backend y 25 su tope- en vez de escribirse a mano: si el backend moviera
- * cualquiera de los dos, esta lista se mueve con el.
- */
+export const CREATED_AT_COLUMN_ID = 'createdAt';
+
+export const SORT_SEPARATOR = ':';
+
+export const FIRST_PAGE = 1;
+
 export const PAGE_SIZE_OPTIONS = [DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE] as const;
 
-export type RecipePageSize = (typeof PAGE_SIZE_OPTIONS)[number];
+// Lo que pinta el selector de la tabla compartida; un test lo ata a lo que acota este parser.
+export const SHARED_PAGE_SIZES: readonly number[] = SHARED_PAGE_SIZE_OPTIONS;
 
-export type RecipeListParams = {
-  readonly page: number;
-  readonly pageSize: RecipePageSize;
-};
+type RecipeListSearchParams = Readonly<Record<string, string | readonly string[] | undefined>>;
 
-/** La forma que entrega `searchParams` del App Router: repetir `?page=1&page=2` da un array. */
-export type RecipeListSearchParams = Readonly<
-  Record<string, string | readonly string[] | undefined>
->;
-
-/** La primera pagina es siempre el destino seguro: ningun parametro invalido produce un error. */
-const FIRST_PAGE = 1;
-
-/**
- * De un parametro repetido se toma el PRIMER valor. Cualquier otra convencion (el ultimo, o
- * descartar el parametro) es igual de arbitraria; esta se elige por ser la de `URLSearchParams.get`.
- */
+// Mismo criterio que `URLSearchParams.get`: gana el primero.
 function firstValue(raw: string | readonly string[] | undefined): string | undefined {
   if (raw === undefined) return undefined;
   return typeof raw === 'string' ? raw : raw[0];
 }
 
-/**
- * Entero decimal sin signo. `Number('1.5')` da `1.5` y `Number(' 2 ')` da `2`, asi que la
- * comprobacion es sobre el TEXTO y no sobre el resultado de convertir: `'1.5'`, `'1e3'`, `'0x2'`
- * y `' 2 '` no son lo que el usuario escribio en una URL de paginacion.
- */
+// Se comprueba el texto y no el numero: `Number` acepta `'1.5'`, `'1e3'` y `' 2 '`.
 function parsePositiveInt(raw: string | undefined): number | undefined {
   if (raw === undefined || !/^\d+$/.test(raw)) return undefined;
   const value = Number(raw);
   return Number.isSafeInteger(value) ? value : undefined;
 }
 
-function isPageSize(value: number): value is RecipePageSize {
+function isPageSize(value: number): boolean {
   return PAGE_SIZE_OPTIONS.some((option) => option === value);
 }
 
-/**
- * Acota los parametros de la URL a un par siempre valido (R13): `page` entero >= 1 con defecto
- * 1, y `pageSize` una de las dos opciones con defecto `DEFAULT_PAGE_SIZE`.
- */
+function parseSort(raw: string | undefined): DataTableSort | null {
+  if (raw === undefined) return null;
+  const separator = raw.indexOf(SORT_SEPARATOR);
+  if (separator <= 0) return null;
+
+  const columnId = raw.slice(0, separator);
+  const direction = raw.slice(separator + SORT_SEPARATOR.length);
+  if (!RECIPE_QUERYABLE.sortable.includes(columnId)) return null;
+  if (direction !== 'asc' && direction !== 'desc') return null;
+
+  return { columnId, direction };
+}
+
+// `Date.parse` da por buena `2026-02-30` en V8, asi que la existencia se comprueba componente a
+// componente. `setUTCFullYear` evita que los años 0-99 se lean como 1900-1999.
+function parseIsoDate(raw: string | undefined): string | null {
+  if (raw === undefined) return null;
+  const value = raw.trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (match === null) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const date = new Date(0);
+  date.setUTCFullYear(year, month, day);
+  const exists =
+    date.getUTCFullYear() === year && date.getUTCMonth() === month && date.getUTCDate() === day;
+  return exists ? value : null;
+}
+
 export function parseRecipeListParams(
   searchParams: RecipeListSearchParams | undefined,
-): RecipeListParams {
+): DataTableParams {
   const rawPage = parsePositiveInt(firstValue(searchParams?.[PAGE_PARAM]));
   const rawPageSize = parsePositiveInt(firstValue(searchParams?.[PAGE_SIZE_PARAM]));
+
+  const filters: Record<string, DataTableFilterValue> = {};
+  if (RECIPE_QUERYABLE.filterable[CREATED_AT_COLUMN_ID] === 'dateRange') {
+    const from = parseIsoDate(firstValue(searchParams?.[CREATED_FROM_PARAM]));
+    const to = parseIsoDate(firstValue(searchParams?.[CREATED_TO_PARAM]));
+    if (from !== null || to !== null) {
+      filters[CREATED_AT_COLUMN_ID] = { kind: 'dateRange', from, to };
+    }
+  }
+
+  const search = RECIPE_QUERYABLE.searchable
+    ? (firstValue(searchParams?.[SEARCH_PARAM]) ?? '').trim()
+    : '';
 
   return {
     page: rawPage === undefined || rawPage < FIRST_PAGE ? FIRST_PAGE : rawPage,
     pageSize: rawPageSize !== undefined && isPageSize(rawPageSize) ? rawPageSize : DEFAULT_PAGE_SIZE,
+    sort: parseSort(firstValue(searchParams?.[SORT_PARAM])),
+    filters,
+    search,
   };
 }
 
-/**
- * Cadena de consulta canonica de unos parametros de lista. La comparten la barra de
- * herramientas (al navegar) y el estado vacio (al volver a la primera pagina), de modo que la
- * URL que produce la pantalla es siempre la misma forma que el parser sabe leer.
- */
-export function buildRecipeListQuery(params: RecipeListParams): string {
+// Sin claves vacias: `?q=` haria creer que la lista esta filtrada.
+export function buildRecipeListQuery(params: DataTableParams): string {
   const query = new URLSearchParams();
   query.set(PAGE_PARAM, String(params.page));
   query.set(PAGE_SIZE_PARAM, String(params.pageSize));
+
+  if (params.sort !== null) {
+    query.set(SORT_PARAM, `${params.sort.columnId}${SORT_SEPARATOR}${params.sort.direction}`);
+  }
+
+  const search = params.search.trim();
+  if (search !== '') query.set(SEARCH_PARAM, search);
+
+  const createdAt = params.filters[CREATED_AT_COLUMN_ID];
+  if (createdAt?.kind === 'dateRange') {
+    if (createdAt.from !== null) query.set(CREATED_FROM_PARAM, createdAt.from);
+    if (createdAt.to !== null) query.set(CREATED_TO_PARAM, createdAt.to);
+  }
+
   return query.toString();
+}
+
+export function recipeListHref(params: DataTableParams): string {
+  return `${FORMULAS_ROUTE}?${buildRecipeListQuery(params)}`;
+}
+
+// El orden y el tamaño de pagina no cuentan: decide entre el vacio y «sin resultados».
+export function hasActiveSearchOrFilter(params: DataTableParams): boolean {
+  return params.search !== '' || Object.keys(params.filters).length > 0;
+}
+
+// Vuelve a la primera pagina porque, limpiando desde la tercera, podria caer en otro vacio.
+export function clearSearchAndFilters(params: DataTableParams): DataTableParams {
+  return { ...params, search: '', filters: {}, page: FIRST_PAGE };
 }
