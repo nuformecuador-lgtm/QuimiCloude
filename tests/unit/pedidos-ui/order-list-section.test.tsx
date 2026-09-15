@@ -37,7 +37,37 @@ const {
   getOrderActionMock,
   listRecipesActionMock,
   listUnitsActionMock,
+  listResponsiblesForOrdersActionMock,
+  listOrderResponsiblesActionMock,
+  getSessionUserMock,
+  listUsersActionMock,
+  listWorkGroupsActionMock,
 } = vi.hoisted(() => ({
+  // QC-102 T11: la SEGUNDA llamada de la seccion, el lote de responsables de la pagina. Es el
+  // borde del modulo `asignaciones` (QC-87 + T6, ya en disco) y se sustituye igual que la lista:
+  // sin doble, leeria la cookie de sesion real.
+  listResponsiblesForOrdersActionMock: vi.fn(async () => ({
+    status: 'success' as const,
+    data: [] as readonly { orderId: string; responsibles: readonly unknown[] }[],
+  })),
+  // Doble que FALLA si se le llama: la consulta de UN pedido no tiene nada que hacer en el
+  // listado (decision cerrada 5: un lote por pagina, jamas una consulta por fila).
+  listOrderResponsiblesActionMock: vi.fn(() => {
+    throw new Error('listOrderResponsiblesAction no debe invocarse desde la lista');
+  }),
+  // QC-102 T15: la sesion, que es de donde sale `canWrite`. Por defecto, CON el permiso.
+  getSessionUserMock: vi.fn(async () => ({
+    id: '55555555-5555-4555-8555-555555555555',
+    permissions: ['pedidos.consultar', 'asignaciones.modificar', 'usuarios.consultar'],
+  })),
+  listUsersActionMock: vi.fn(async () => ({
+    status: 'success' as const,
+    data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 },
+  })),
+  listWorkGroupsActionMock: vi.fn(async () => ({
+    status: 'success' as const,
+    data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 },
+  })),
   // T10: la seccion pide ademas los dos catalogos que alimentan el panel lateral de alta
   // (`design.md > 9`). Son el borde de modulos que esta ficha no abre (R46) y se sustituyen igual
   // que la lista: sin ellos, `listRecipesAction` intentaria leer la cookie de sesion real.
@@ -95,6 +125,29 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
 
 vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
   listUnitsAction: listUnitsActionMock,
+}));
+
+// QC-102 — el borde de `asignaciones`, importado por su RUTA EXACTA (R40), nunca por el barrel.
+vi.mock('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions', () => ({
+  listResponsiblesForOrdersAction: listResponsiblesForOrdersActionMock,
+  listOrderResponsiblesAction: listOrderResponsiblesActionMock,
+  assignResponsiblesAction: vi.fn(),
+  unassignResponsibleAction: vi.fn(),
+  removeWorkGroupFromOrderAction: vi.fn(),
+}));
+
+// QC-102 T15 — la sesion. `lib/composition` arrastra Prisma, asi que se sustituye como ya hacen
+// las suites de `configuracion-ui`.
+vi.mock('@/lib/composition', () => ({
+  identity: { getSessionUser: getSessionUserMock },
+}));
+
+vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => ({
+  listUsersAction: listUsersActionMock,
+}));
+
+vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => ({
+  listWorkGroupsAction: listWorkGroupsActionMock,
 }));
 
 const testId = {
@@ -312,5 +365,160 @@ describe('lista de pedidos — el identificador del error inesperado (QC-71 R17,
 
     expect(screen.getByTestId(testId.errorCodigo)).toHaveTextContent('unauthorized');
     esperarSinIdentificador();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// QC-102 T11 — El lote de responsables se compone AQUI, en el Server Component: R16, R20.
+//
+// `design.md > 1`: la segunda llamada vive en la PANTALLA y no dentro de `listOrders`, porque
+// `asignaciones` ya depende de `pedidos` y meterla alli cerraria el ciclo. Lo que estos casos
+// vigilan es exactamente eso: que la seccion pida el lote **una vez**, con los ids de la pagina,
+// y que un fallo del lote NO se lleve por delante la lista.
+// ---------------------------------------------------------------------------------------------
+
+const OTRO_PEDIDO = '44444444-4444-4444-8444-444444444444';
+
+const ANA = {
+  userId: '0000000a-0000-4000-8000-00000000000a',
+  displayName: 'Ana Torres',
+  origin: { kind: 'direct' as const },
+};
+
+describe('QC-102 — el listado trae los responsables de su pagina (R16)', () => {
+  it('pide el lote UNA sola vez por render, con los ids de la pagina y en una sola llamada', async () => {
+    listOrdersActionMock.mockResolvedValue(
+      pagina([pedido(), pedido({ id: OTRO_PEDIDO, numberText: 'PED-2026-0002' })]),
+    );
+
+    render(await OrderListSection({ params: parametros() }));
+
+    // UNA, no una por fila: son dos pedidos y sigue siendo una sola invocacion.
+    expect(listResponsiblesForOrdersActionMock).toHaveBeenCalledTimes(1);
+    expect(listResponsiblesForOrdersActionMock).toHaveBeenCalledWith([
+      pedido().id,
+      OTRO_PEDIDO,
+    ]);
+    // Y jamas la consulta de UN pedido: ese doble lanzaria si se le llamara.
+    expect(listOrderResponsiblesActionMock).not.toHaveBeenCalled();
+  });
+
+  it('la llamada del lote va DESPUES de la de la lista: sus ids salen de ella', async () => {
+    const orden: string[] = [];
+    listOrdersActionMock.mockImplementation(async () => {
+      orden.push('pedidos');
+      return pagina([pedido()]);
+    });
+    listResponsiblesForOrdersActionMock.mockImplementation(async () => {
+      orden.push('responsables');
+      return { status: 'success' as const, data: [] };
+    });
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(orden).toEqual(['pedidos', 'responsables']);
+  });
+
+  it('cada fila recibe los suyos: el reparto se hace en el SERVIDOR y baja ya repartido', async () => {
+    listOrdersActionMock.mockResolvedValue(
+      pagina([pedido(), pedido({ id: OTRO_PEDIDO, numberText: 'PED-2026-0002' })]),
+    );
+    listResponsiblesForOrdersActionMock.mockResolvedValue({
+      status: 'success',
+      data: [
+        { orderId: pedido().id, responsibles: [ANA] },
+        { orderId: OTRO_PEDIDO, responsibles: [] },
+      ],
+    });
+
+    render(await OrderListSection({ params: parametros() }));
+
+    // La fila con responsable pinta su circulo con el nombre COMPLETO como nombre accesible; la
+    // otra, el marcador de ausencia de esta pantalla (R19). Dos filas, dos celdas distintas.
+    expect(screen.getByRole('img', { name: ANA.displayName })).toBeInTheDocument();
+    expect(screen.getAllByTestId('order-missing-responsibles')).toHaveLength(1);
+  });
+
+  it('sin ningun pedido no se pregunta por responsables de nadie', async () => {
+    listOrdersActionMock.mockResolvedValue(pagina([]));
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(screen.getByTestId(testId.vacio)).toBeInTheDocument();
+    expect(listResponsiblesForOrdersActionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-102 — si el lote falla, la lista NO se cae (R20)', () => {
+  it.each(['unauthorized', 'invalid_input', 'unexpected'] as const)(
+    'con el lote en `%s` se siguen pintando los pedidos y la columna queda sin resolver',
+    async (code) => {
+      listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+      listResponsiblesForOrdersActionMock.mockResolvedValue({
+        status: 'error',
+        code,
+        message: 'No se pudieron leer los responsables.',
+      } as never);
+
+      render(await OrderListSection({ params: parametros() }));
+
+      // La lista entera sigue ahi, con su tabla y su fila.
+      expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
+      expect(screen.getByRole('table')).toBeInTheDocument();
+      // La fila del pedido sigue viva, con sus acciones: no es una tabla sin filas.
+      expect(screen.getByTestId('order-row-actions')).toHaveAttribute('data-order-id', pedido().id);
+
+      // La columna, sin resolver: el marcador de ausencia, nunca un identificador tecnico.
+      expect(screen.getByTestId('order-missing-responsibles')).toBeInTheDocument();
+
+      // Y el estado de error de la pantalla NO se monta: el error, el vacio y el esqueleto
+      // siguen siendo los de la LISTA DE PEDIDOS.
+      expect(screen.queryByTestId(testId.error)).toBeNull();
+      expect(screen.queryByTestId(testId.vacio)).toBeNull();
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------------------------
+// QC-102 T15 — `canWrite` baja por props desde el servidor: R28 (la mitad de pantalla).
+// ---------------------------------------------------------------------------------------------
+
+describe('QC-102 — los catalogos del panel solo se piden si el actor puede escribir (R27, R28)', () => {
+  it('con `asignaciones.modificar` se piden los dos, una vez cada uno', async () => {
+    listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(listUsersActionMock).toHaveBeenCalledTimes(1);
+    expect(listWorkGroupsActionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('sin el permiso no se pide ningun catalogo: no hay control de escritura que alimentar', async () => {
+    getSessionUserMock.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      permissions: ['pedidos.consultar'],
+    });
+    listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(listUsersActionMock).not.toHaveBeenCalled();
+    expect(listWorkGroupsActionMock).not.toHaveBeenCalled();
+    // Y la lista se pinta igual: el permiso de escritura no condiciona la LECTURA.
+    expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
+  });
+
+  it('si un catalogo falla, el panel se degrada y la lista NO se tumba (H1)', async () => {
+    listUsersActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No tienes permiso para consultar usuarios.',
+    } as never);
+    listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
+    expect(screen.queryByTestId(testId.error)).toBeNull();
   });
 });

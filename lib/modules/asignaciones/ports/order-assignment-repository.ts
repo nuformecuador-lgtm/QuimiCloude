@@ -5,7 +5,7 @@
  *
  * Cuatro propiedades de este puerto son el requisito, no un estilo:
  *
- *   1. **`companyId` es el PRIMER parametro de los tres metodos que lo llevan**, con el mismo
+ *   1. **`companyId` es el PRIMER parametro de los CUATRO metodos que lo llevan**, con el mismo
  *      criterio que `WorkGroupRepository`: una llamada que lo olvide **no compila**, en vez de
  *      leer o borrar sobre la empresa equivocada (R7). El caso negativo esta escrito y vigilado
  *      en `tests/unit/asignaciones/order-assignment-repository.test.ts`.
@@ -43,12 +43,35 @@ export type AssignmentRow = {
   readonly workGroupName: string | null;
 };
 
+/**
+ * QC-102 T1 — una fila leida por la consulta EN LOTE, que SI necesita saber de que pedido es:
+ * `orderId` es lo que la agrupa, y sin el una sola sentencia para varios pedidos no podria
+ * repartirse (R1). **EXTIENDE `AssignmentRow`, no lo redefine**: asi el dia que la fila leida gane
+ * o pierda una clave, las dos lecturas cambian juntas y no pueden diverger.
+ */
+export type OrderAssignmentRowWithOrder = AssignmentRow & { readonly orderId: string };
+
 export interface OrderAssignmentRepository {
   /** Inserta las filas que FALTAN y no toca las que ya estan (R15, R22). Devuelve cuantas creo
    *  (R16). Una sola sentencia, dentro de una transaccion con el resto de la operacion (R27). */
   insertMissing(rows: readonly NewAssignment[], now: Date): Promise<number>;
   /** Las filas del pedido de ESA empresa, ordenadas por el adaptador (R7, R38). */
   listByOrderInCompany(companyId: string, orderId: string): Promise<readonly AssignmentRow[]>;
+  /**
+   * QC-102 (R1, R4, R5) — las filas de ESOS pedidos en ESA empresa, en **UNA sola sentencia**.
+   *
+   * Es lo que permite resolver una pagina entera del listado con un numero de consultas CONSTANTE
+   * (R4): ni una por fila ni una por responsable. La composicion se hace despues **en memoria**,
+   * con los identificadores ya leidos, y NO navegando ninguna relacion entre `orders` y
+   * `order_assignments` —que no existe, y R5 prohibe crear—.
+   *
+   * `companyId` primero, como en los otros metodos: una llamada que lo olvide **no compila** (R3).
+   * La lista vacia NO llega aqui: el caso de uso corta antes, sin tocar ningun puerto (R8).
+   */
+  listByOrdersInCompany(
+    companyId: string,
+    orderIds: readonly string[],
+  ): Promise<readonly OrderAssignmentRowWithOrder[]>;
   /** Borrado FISICO de UNA fila (R29). `'not_found'` = esa persona no es responsable (R30). */
   deleteOne(companyId: string, orderId: string, userId: string): Promise<'ok' | 'not_found'>;
   /** Borrado FISICO de las filas de ese pedido con ESE origen (R32). Devuelve cuantas (R34). */

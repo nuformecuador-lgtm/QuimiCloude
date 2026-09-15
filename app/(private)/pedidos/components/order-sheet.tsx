@@ -7,14 +7,20 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
+import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { OrderSummary } from '@/lib/modules/pedidos';
 import type { UnitView } from '@/lib/modules/unidades';
 
 import { CancelOrderDialog } from './cancel-order-dialog';
 import { DeleteOrderDialog } from './delete-order-dialog';
-import { OrderForm } from './order-form';
+import { OrderForm, type OrderSheetSection } from './order-form';
+import {
+  EMPTY_RESPONSIBLES_CATALOG,
+  type OrderResponsiblesCatalog,
+} from './order-responsibles';
 import { OrderRowActions } from './order-row-actions';
 import type { RecipePickerPage } from './recipe-picker';
+import { ResponsibleAvatars } from './responsible-avatars';
 
 /**
  * Panel lateral de alta y edicion de pedido (R25, R35, R36, `design.md > 8`).
@@ -71,9 +77,27 @@ export type OrderSheetProps = {
   /** Apertura controlada desde fuera. Ausente = el panel trae su propio disparador de alta. */
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
+  /** QC-102 R26 — los responsables que la fila ya trajo. Abrir el panel NO consulta nada. */
+  readonly responsibles?: readonly OrderResponsible[];
+  /** QC-102 R27, R28 — catalogos y `canWrite`, por props desde el servidor. */
+  readonly responsiblesCatalog?: OrderResponsiblesCatalog;
+  /**
+   * QC-102 R23, R24 — EN QUE SECCION abre. **Es el mismo panel**: esta prop no crea otro, solo
+   * decide a donde va el foco. Por defecto, el formulario de siempre.
+   */
+  readonly section?: OrderSheetSection;
 };
 
-export function OrderSheet({ order, recipes, units, open, onOpenChange }: OrderSheetProps) {
+export function OrderSheet({
+  order,
+  recipes,
+  units,
+  open,
+  onOpenChange,
+  responsibles = [],
+  responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
+  section = 'form',
+}: OrderSheetProps) {
   const [selfOpen, setSelfOpen] = useState(false);
   /** Instancia del formulario: cambia en cada apertura para que arranque SIEMPRE vacio (2026-09-09). */
   const [openKey, setOpenKey] = useState(0);
@@ -124,6 +148,9 @@ export function OrderSheet({ order, recipes, units, open, onOpenChange }: OrderS
         recipes={recipes}
         units={units}
         onSaved={handleSaved}
+        responsibles={responsibles}
+        responsiblesCatalog={responsiblesCatalog}
+        section={section}
       />
     </Sheet>
   );
@@ -133,6 +160,10 @@ export type OrderRowSheetActionsProps = {
   readonly order: OrderSummary;
   readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
+  /** QC-102 R26 — los responsables de ESTA fila, ya traidos por el lote de la seccion. */
+  readonly responsibles?: readonly OrderResponsible[];
+  /** QC-102 R27, R28 — catalogos y `canWrite`, compuestos una vez en el servidor. */
+  readonly responsiblesCatalog?: OrderResponsiblesCatalog;
 };
 
 /**
@@ -152,18 +183,35 @@ export type OrderRowSheetActionsProps = {
  * Es lo que la celda de acciones de `buildOrderColumns` renderiza por fila: sin esta pieza, los
  * tres botones de `OrderRowActions` no abririan nada.
  */
-export function OrderRowSheetActions({ order, recipes, units }: OrderRowSheetActionsProps) {
+export function OrderRowSheetActions({
+  order,
+  recipes,
+  units,
+  responsibles = [],
+  responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
+}: OrderRowSheetActionsProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  /**
+   * QC-102 R23 — EN QUE SECCION abre el UNICO panel de esta fila. No hay un segundo `OrderSheet`
+   * para responsables: editar y responsables abren **el mismo**, y esto es lo que los distingue.
+   */
+  const [section, setSection] = useState<OrderSheetSection>('form');
+
+  const openSection = (next: OrderSheetSection) => {
+    setSection(next);
+    setEditOpen(true);
+  };
 
   return (
     <>
       <OrderRowActions
         order={order}
-        onEdit={() => setEditOpen(true)}
+        onEdit={() => openSection('form')}
         onCancel={() => setCancelOpen(true)}
         onDelete={() => setDeleteOpen(true)}
+        onResponsibles={() => openSection('responsibles')}
       />
       <OrderSheet
         order={order}
@@ -171,12 +219,69 @@ export function OrderRowSheetActions({ order, recipes, units }: OrderRowSheetAct
         units={units}
         open={editOpen}
         onOpenChange={setEditOpen}
+        responsibles={responsibles}
+        responsiblesCatalog={responsiblesCatalog}
+        section={section}
       />
       {cancelOpen ? (
         <CancelOrderDialog order={order} open onOpenChange={setCancelOpen} />
       ) : null}
       {deleteOpen ? (
         <DeleteOrderDialog order={order} open onOpenChange={setDeleteOpen} />
+      ) : null}
+    </>
+  );
+}
+
+
+export type OrderRowResponsiblesProps = {
+  readonly order: OrderSummary;
+  readonly recipes: RecipePickerPage;
+  readonly units: readonly UnitView[];
+  /** Los responsables de ESTA fila, del lote que la seccion pidio una sola vez (R16, R26). */
+  readonly responsibles: readonly OrderResponsible[];
+  readonly responsiblesCatalog?: OrderResponsiblesCatalog;
+};
+
+/**
+ * QC-102 T12/T14 — La CELDA de la columna de responsables (R16, R17, R35).
+ *
+ * Pinta los avatares y, al pulsar el `+N`, abre **el panel que ya existe** en su seccion de
+ * responsables: la segunda puerta al dato que R35 exige, la que no depende de `:hover` ni de que
+ * el tooltip llegue a abrir en tactil (`design.md > 0` H5).
+ *
+ * **Vive en ESTE archivo, junto a `OrderRowSheetActions`, y no en `responsible-avatars.tsx`** por
+ * una razon concreta: `responsible-avatars.tsx` es la pieza de presentacion pura —no conoce
+ * paneles y no debe conocerlos—, y quien sabe abrir el panel de un pedido es este modulo. Asi la
+ * columna de avatares y la de acciones abren **el mismo** `OrderSheet` (R23), no dos.
+ *
+ * **El panel se monta SOLO mientras esta abierto** (`{open ? ... : null}`): con la celda cerrada
+ * no hay ningun panel en el arbol de la fila, que es lo que el test de R23 comprueba contando
+ * instancias.
+ */
+export function OrderRowResponsibles({
+  order,
+  recipes,
+  units,
+  responsibles,
+  responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
+}: OrderRowResponsiblesProps) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <ResponsibleAvatars responsibles={responsibles} onShowAll={() => setOpen(true)} />
+      {open ? (
+        <OrderSheet
+          order={order}
+          recipes={recipes}
+          units={units}
+          open
+          onOpenChange={setOpen}
+          responsibles={responsibles}
+          responsiblesCatalog={responsiblesCatalog}
+          section="responsibles"
+        />
       ) : null}
     </>
   );

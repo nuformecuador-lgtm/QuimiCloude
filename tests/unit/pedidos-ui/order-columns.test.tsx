@@ -27,6 +27,7 @@ import {
   ORDER_STATUS_LABELS,
   PRIORITY_COLUMN_ID,
   QUANTITY_COLUMN_ID,
+  RESPONSIBLES_COLUMN_ID,
   STATUS_COLUMN_ID,
   RECIPE_NAME_COLUMN_ID,
   buildOrderColumns,
@@ -98,8 +99,8 @@ afterEach(() => {
 // QC-35bis (2026-09-07): eran DIEZ. La unidad y el precio unitario salieron del pedido -de la
 // tabla `orders` hacia arriba-, asi que sus dos columnas ya no tienen dato que pintar y la lista
 // acordada baja a ocho. Sigue siendo cerrada y en el orden de `design.md > 7`.
-describe('las columnas declaradas son exactamente las ocho acordadas (R8)', () => {
-  it('en positivo: los ocho ids, en el orden de `design.md > 7`', () => {
+describe('las columnas declaradas son exactamente las nueve acordadas (R8)', () => {
+  it('en positivo: los nueve ids, en el orden de `design.md > 7`', () => {
     expect(ORDER_COLUMNS.map((column) => column.id)).toEqual([
       ORDER_NUMBER_COLUMN_ID,
       STATUS_COLUMN_ID,
@@ -108,9 +109,10 @@ describe('las columnas declaradas son exactamente las ocho acordadas (R8)', () =
       QUANTITY_COLUMN_ID,
       CREATED_AT_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
+      RESPONSIBLES_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
-    expect(ORDER_COLUMNS).toHaveLength(8);
+    expect(ORDER_COLUMNS).toHaveLength(9);
   });
 
   it('en negativo: ninguna columna es `total`, `createdBy`, `updatedBy`, unidad ni precio', () => {
@@ -153,6 +155,7 @@ describe('solo cuatro columnas ordenan, y son las de la lista blanca menos la no
       RECIPE_NAME_COLUMN_ID,
       QUANTITY_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
+      RESPONSIBLES_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
     // Esta en `ORDER_QUERYABLE.sortable` pero la decision cerrada NO pide su cabecera.
@@ -286,5 +289,58 @@ describe('estado y prioridad se leen como etiqueta, no como valor crudo del enum
     const badge = screen.getByTestId('order-priority');
     expect(badge).toHaveAttribute('data-priority', 'CRITICA');
     expect(badge).toHaveTextContent(ORDER_PRIORITY_LABELS.CRITICA);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// QC-102 T12 — La columna de RESPONSABLES: R16.
+//
+// Aqui se afirma solo sobre la DECLARACION —que es lo que este archivo hace con las demas—: el
+// DOM de la celda vive en `order-sheet-responsibles.test.tsx`, que si monta el panel y por eso
+// necesita el router. La declaracion no debe necesitar ninguno de los dos.
+// ---------------------------------------------------------------------------------------------
+
+describe('QC-102 — la columna propia de responsables (R16)', () => {
+  it('existe una columna `responsibles`, y va antes de las acciones', () => {
+    const ids = ORDER_COLUMNS.map((column) => column.id);
+
+    expect(ids).toContain(RESPONSIBLES_COLUMN_ID);
+    expect(ids.indexOf(RESPONSIBLES_COLUMN_ID)).toBeLessThan(ids.indexOf(ACTIONS_COLUMN_ID));
+  });
+
+  it('no ordena, no filtra y se puede fijar como cualquier otra columna de datos', () => {
+    const responsables = ORDER_COLUMNS.find((column) => column.id === RESPONSIBLES_COLUMN_ID);
+
+    // `sortable: false` se expresa NO declarandolo: el orden de la lista lo manda `pedidos`.
+    expect(responsables?.sortable).not.toBe(true);
+    expect(responsables?.filter).toBeUndefined();
+    // `pinnable` por defecto: la unica columna que no se puede fijar sigue siendo la de acciones.
+    expect(responsables?.pinnable).not.toBe(false);
+  });
+
+  it('la celda se pinta con lo que el lote ya trajo para ESA fila, sin pedir nada', () => {
+    const RESPONSABLE = {
+      userId: '0000000a-0000-4000-8000-00000000000a',
+      displayName: 'Ana Torres',
+      origin: { kind: 'direct' } as const,
+    };
+    const order = pedido();
+    const columnas = buildOrderColumns({
+      recipes: { items: [], totalPages: 1 },
+      units: [],
+      responsiblesByOrder: { [order.id]: [RESPONSABLE] },
+    });
+    const columna = columnas.find((candidate) => candidate.id === RESPONSIBLES_COLUMN_ID);
+
+    // La celda es un elemento y recibe por props los responsables de SU fila: se comprueba sobre
+    // el arbol declarado, sin renderizar —montar el panel exige el router, y esa es otra suite—.
+    const celda = columna?.cell(order) as { props: { responsibles: readonly unknown[] } };
+    expect(celda.props.responsibles).toEqual([RESPONSABLE]);
+
+    // Y una fila sin entrada en el lote no rompe: recibe la lista vacia (R19, R20).
+    const otra = columna?.cell(pedido({ id: '99999999-9999-4999-8999-999999999999' })) as {
+      props: { responsibles: readonly unknown[] };
+    };
+    expect(otra.props.responsibles).toEqual([]);
   });
 });

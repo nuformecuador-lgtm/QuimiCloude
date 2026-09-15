@@ -88,3 +88,30 @@ export {
   createListOrderResponsibles,
   type ListOrderResponsiblesDeps,
 } from './domain/list-order-responsibles';
+
+// ---------------------------------------------------------------------------------------
+// QC-102 T6 - La consulta EN LOTE. Bloque NUEVO al final: no reordena ni reformatea nada de lo
+// de arriba, y sigue sin arrastrar `next/*`, `@prisma/client` ni ningun `'use server'` en su
+// cierre de imports.
+//
+// Se publica la FACTORY con su tipo `*Deps` -quien la cablea es `lib/composition`- y el tipo de
+// la SALIDA, que es lo que la pantalla de pedidos reparte por fila. La Server Action de esta
+// operacion NO se reexporta aqui (R14, QC-87 R46): `app/**` la importa por su RUTA EXACTA.
+// ---------------------------------------------------------------------------------------
+export {
+  createListResponsiblesForOrders,
+  MAX_ORDERS_PER_BATCH,
+  type ListResponsiblesForOrdersDeps,
+  type OrderResponsiblesEntry,
+} from './domain/list-responsibles-for-orders';
+
+// QC-102 - El predicado de escritura. Se publica porque R28 exige que la pantalla muestre el panel
+// en SOLO LECTURA a quien no puede escribir, y ese `canWrite` baja por props desde el Server
+// Component: sin esta funcion, la unica forma de calcularlo seria escribir la cadena
+// 'asignaciones.modificar' en `app/**`, que es exactamente lo que R29/R50 prohiben y lo que vigila
+// la regla (e) de `tests/unit/asignaciones/module-contract.test.ts`. Sale la RESPUESTA; el codigo
+// del permiso se queda dentro del modulo.
+//
+// NO sustituye a `requirePermission`: anticipar no es autorizar. El corte real sigue siendo la
+// primera linea de los tres casos de uso de escritura de QC-87.
+export { canModifyAssignments } from './domain/actor';

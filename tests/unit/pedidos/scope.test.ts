@@ -355,13 +355,22 @@ describe('QC-34 — limite de alcance de la feature', () => {
     ])
   })
 
-  it('el unico spec E2E de pedidos es el que trajo QC-35, y la lista es cerrada (R57)', () => {
-    // CENTINELA INVERTIDO el 2026-09-07 (QC-35). El E2E estaba diferido a esta ficha y el
-    // humano lo aprobo el 2026-09-06 (R48, R49). La lista es CERRADA: un segundo spec de
-    // pedidos sin ficha que lo respalde vuelve a poner esto en rojo.
+  it('los specs E2E de pedidos son estos DOS -QC-35 y QC-102-, y la lista sigue cerrada (R57)', () => {
+    // CENTINELA INVERTIDO el 2026-09-07 (QC-35). El E2E estaba diferido a esa ficha y el
+    // humano lo aprobo el 2026-09-06 (R48, R49). La lista es CERRADA: un spec de pedidos sin
+    // ficha que lo respalde vuelve a poner esto en rojo.
+    //
+    // AMPLIADA el 2026-09-13 (QC-102, responsables-en-la-pantalla-de-pedidos, T16, R37): entra la
+    // SEGUNDA entrada, el spec e2e/pedidos-responsables.spec.ts. Su recorrido abre un pedido, marca a una
+    // persona, aplica un grupo, saca a alguien y vuelve al LISTADO a comprobar los avatares de la
+    // fila y el nombre del GRUPO CONGELADO. No sustituye al de QC-35 -que recorre el alta y la
+    // edicion del pedido- porque lo que ejercita es otra cosa: los responsables. La lista se AMPLIA
+    // y se TENSA -el ancla pasa de una entrada a dos-, nunca se afloja: sigue CERRADA y un TERCER
+    // spec de pedidos sin ficha que lo respalde vuelve a ponerla en rojo.
     expect(rutasE2e.length).toBeGreaterThan(0)
-    expect(specsE2eDePedidos(rutasE2e)).toEqual(['e2e/pedidos.spec.ts'])
+    expect(specsE2eDePedidos(rutasE2e)).toEqual(['e2e/pedidos-responsables.spec.ts', 'e2e/pedidos.spec.ts'])
     expect(specsE2eDePedidos([...rutasE2e, 'e2e/orders-extra.spec.ts'])).toEqual([
+      'e2e/pedidos-responsables.spec.ts',
       'e2e/pedidos.spec.ts',
       'e2e/orders-extra.spec.ts',
     ])

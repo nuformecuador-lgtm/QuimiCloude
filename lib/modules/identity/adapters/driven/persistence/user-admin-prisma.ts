@@ -47,10 +47,12 @@ import type {
  *      indice: ver el bloque de constantes, que deja escrito lo que la base devuelve DE VERDAD.
  *   4. **El borrado es LOGICO** (R37): un `UPDATE` de `deleted_at`. En este archivo no hay —ni puede
  *      haber— ningun `delete`/`deleteMany` sobre `users`.
- *   5. **R45: ninguna de las cinco operaciones lee ni escribe los tres contadores de acceso de
- *      QC-19.** Sus nombres de columna no aparecen en este archivo —ni en ningun `select`, ni en
- *      ningun `data`, ni en un comentario— a proposito: el mecanismo de bloqueo por intentos fallidos
- *      es de QC-19/QC-78, y esta feature no lo toca.
+ *   5. **Los tres contadores de acceso de QC-19 los escribe SOLO `applyGuardedChange`, y solo
+ *      cuando el destino del estado no es `blocked`** (QC-95, enmienda R45 de QC-66): el cambio
+ *      de estado los limpia en la MISMA escritura. `create`, `updateAliveInCompany`,
+ *      `findAliveInCompany` y `listAliveInCompany` no los leen ni los escriben —sus
+ *      nombres de columna no aparecen en ningun `select` de este archivo—; el mecanismo de
+ *      bloqueo por intentos fallidos es de QC-19/QC-78, y esas cuatro operaciones no lo tocan.
  *
  * **R38/R43: no se toca ningun objeto del esquema.** Los tres indices unicos funcionales y parciales
  * de QC-47 se consumen tal cual; esta feature no aporta ninguna migracion de esquema.
@@ -743,8 +745,11 @@ export async function updateAliveInCompany(
  * autor. Aqui el autor nunca es nulo —el `NULL` de QC-65 R10 es solo el del nacimiento de la cuenta
  * (R49)—.
  *
- * Los tres contadores de acceso de QC-19 no se tocan (R45): ni se leen ni se escriben, ni aparecen
- * por su nombre. Limpiarlos al salir de `blocked` es de QC-78, duena de ese mecanismo.
+ * **Los tres contadores de acceso de QC-19 se escriben aqui SOLO cuando el destino no es
+ * `blocked`** (QC-95, enmienda R45 de QC-66): al salir de `blocked`, la misma escritura
+ * que mueve el estado limpia los tres a la vez (cero, cero, null, via `clearedLockState`).
+ * Cuando el destino es `blocked`, `lockState` llega `null` y las tres columnas
+ * no aparecen en el `data` (R2).
  */
 export async function applyGuardedChange(input: GuardedChange): Promise<GuardedOutcome> {
   return prisma.$transaction(async (tx) => {
@@ -787,6 +792,12 @@ export async function applyGuardedChange(input: GuardedChange): Promise<GuardedO
               accountStatusChangedAt: input.now,
               accountStatusChangedBy: input.changedBy,
               updatedAt: input.now,
+              // QC-95 R1, R3: los tres contadores, solo cuando el destino no es `blocked`.
+              ...(input.lockState === null ? {} : {
+                failedLoginAttempts: input.lockState.failedAttempts,
+                lockLevel: input.lockState.lockLevel,
+                lockedUntil: input.lockState.lockedUntil,
+              }),
             },
     });
     return count === 1 ? 'ok' : 'not_found';
