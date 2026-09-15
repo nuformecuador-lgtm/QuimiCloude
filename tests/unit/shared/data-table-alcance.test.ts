@@ -394,14 +394,20 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // las celdas: la lista de pedidos ES la tabla compartida. Se anade la fila y se TENSA el
   // centinela, nunca se afloja: la lista sigue CERRADA, el E2E de recetas sigue fuera y un DECIMO
   // spec que referencie `data-table` vuelve a ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos nueve', () => {
+  //
+  // 2026-09-15: entran los dos E2E de recetas, que ya localizan la tabla compartida.
+  // `e2e/errores.spec.ts` sigue fuera: solo mira el error de la pagina de edicion.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos once', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
       .filter((file) => /data-table/.test(readSource(file)))
       .map((file) => relative(repoRoot, file).split(sep).join('/'))
       .sort()
-    expect(referencian, 'solo estos nueve E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
+      'e2e/errores.spec.ts',
+    )
+    expect(referencian, 'solo estos once E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
       // ya consumen la tabla compartida -inventario y presentaciones- y localiza
       // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
@@ -420,6 +426,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // sexto spec que referencie `data-table` vuelve a ponerla en rojo.
       'e2e/presentaciones.spec.ts',
       'e2e/proveedores.spec.ts',
+      // '-' precede a '.', igual que en pedidos.
+      'e2e/recetas-pasos.spec.ts',
+      'e2e/recetas.spec.ts',
       // La QUINTA la trae QC-39 el 2026-09-08 (R50): el E2E de la pantalla de unidades localiza
       // las celdas y la fila de la tabla compartida, que es la que su lista monta (QC-39 R15).
       'e2e/unidades.spec.ts',

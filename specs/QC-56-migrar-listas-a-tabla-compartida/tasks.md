@@ -173,7 +173,7 @@
 
 ## Tanda 4 — Tests unitarios y centinela
 
-### T10 [P] — Tests de la pantalla de recetas
+### [x] T10 [P] — Tests de la pantalla de recetas
 - **Archivos:** `tests/unit/recetas-ui/recipe-page.test.tsx`.
 - **Depende de:** T8.
 - **Requisitos:** R1–R10, R14–R24, R32, R33.
@@ -205,7 +205,7 @@
   - **re-render del mismo árbol** de filas a cero filas con el foco en `data-table-search`: el foco y
     el valor se conservan (R33).
 
-### T11 [P] — Contrato de ruta de recetas
+### [x] T11 [P] — Contrato de ruta de recetas
 - **Archivos:** `tests/unit/recetas-ui/recipe-route-contract.test.ts`.
 - **Depende de:** T8.
 - **Requisitos:** R2, R3, R10, R11, R15, R30.
@@ -218,7 +218,7 @@
   - Se revisan l.996 (`CARPETAS_LEGITIMAS`) y l.1233 (`exportadas`), y se actualizan si cierran
     listas; su contenido exacto no se verificó en el spec.
 
-### T12 [P] — Tests de la pantalla de proveedores
+### [x] T12 [P] — Tests de la pantalla de proveedores
 - **Archivos:** `tests/unit/proveedores-ui/supplier-page.test.tsx`. Además
   `tests/unit/proveedores/supplier-route-contract.test.ts` **solo si** cierra la lista de archivos de
   la lista (comprobarlo y declararlo en `progress/impl_*`).
@@ -231,7 +231,7 @@
     sin orden.
   - La columna fijada por defecto es `name`.
 
-### T13 — Centinela de consumidores y componente intacto
+### [x] T13 — Centinela de consumidores y componente intacto
 - **Archivos:** `tests/unit/shared/data-table-alcance.test.ts`.
 - **Depende de:** T8, T15, T16.
 - **Requisitos:** R20, R29.
@@ -252,7 +252,7 @@
 
 ## Tanda 5 — E2E (líneas declaradas para el choque con QC-93, H5)
 
-### T15 [P] — E2E de recetas: búsqueda y orden
+### [x] T15 [P] — E2E de recetas: búsqueda y orden
 - **Archivos:** `e2e/recetas.spec.ts`.
 - **Depende de:** T8.
 - **Requisitos:** R26.
@@ -266,7 +266,7 @@
   - Dentro del bloque de QC-93, solo l.386-387.
 - **Hecho:** el recorrido de `design.md > 9` está verde en Chromium y WebKit, sin filas huérfanas.
 
-### T16 [P] — E2E de pasos de receta: helper
+### [x] T16 [P] — E2E de pasos de receta: helper
 - **Archivos:** `e2e/recetas-pasos.spec.ts`.
 - **Depende de:** T8.
 - **Requisitos:** R1.
