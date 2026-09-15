@@ -764,6 +764,7 @@ con ellos queda **R1..R36 sin ningun requisito huerfano**:
 | R34 | `product-batch-input.test.ts`: los cuatro `it` «R34: ...»; `create-product.test.ts` «R34: con un lote de 60 digitos lanza ValidationError (invalid_input) y el repositorio recibe cero llamadas»; `product-batch-lot.int.test.ts` «R35, R36, R34: por el caso de uso, 59 nueves tecleados se escriben, los dos siguientes generados tienen 60 caracteres sin reintento y 60 digitos tecleados dan ValidationError sin filas nuevas» (paso 4) |
 | R35 | `product-batch-input.test.ts` «R35: 59 digitos se aceptan y llegan tal cual» y «R35: 60 caracteres con una letra o un guion se aceptan y llegan tal cual»; el mismo `it` de integracion (paso 1) |
 | R36 | el mismo `it` de integracion (pasos 2 y 3) |
+| R37 | `retry` «R37: addBatchToAlive bloquea la fila del producto con FOR NO KEY UPDATE antes de pedir el lock del correlativo» y «R37: sin fila viva que bloquear, addBatchToAlive devuelve null con la lectura bloqueante como unica sentencia»; `lot-int` «R37: con el borrado confirmado antes, el alta espera la fila, devuelve null y no escribe ningun lote» y el caso 2 de ese mismo `describe`, con el borrado esperando; `create-product.test.ts:402` para el `product_not_found` del orden (a) |
 
 ### Limpieza de comentarios (B1, n1 y n2 de la segunda revision) · 8 `backend_dev` en paralelo · 2026-09-15
 
@@ -1054,6 +1055,18 @@ original**: es el rojo previo de QC-95 anotado arriba.
   - `66b2109`, `7d64054` y `a3c5f62`: `chore`, excepciones;
   - `c19540a`: `test`, ancla;
   - `b9548ac`, `bd54795` y `46acb5c`: `chore`, esquema y los dos tests.
+
+**Precision sobre «solo comentarios»: tres directivas cambiaron de TEXTO (hallazgo n3 de la tercera
+revision).** En `tests/unit/errores/catalogo.test.ts`, los comentarios de las tres directivas
+`@ts-expect-error` perdieron su cita y quedaron reescritos. Estan en los tres casos que comprueban que
+un codigo fuera del catalogo no compila: hoy en las lineas 71, 73 y 75 del archivo.
+- **Lo que NO cambio:** el numero de directivas (3 antes y 3 despues), su posicion —cada una sigue
+  pegada a la linea que marca— ni el codigo. El archivo pasa 30/30.
+- **Por que se anota aparte:** el texto de un `@ts-expect-error` es lo unico que dice al siguiente
+  lector que error se espera, asi que no es un comentario cualquiera. Quitar la cita es lo que manda la
+  regla; lo que faltaba era decirlo en vez de contarlo dentro de «solo comentarios».
+- El comprobador del implementer cuenta las directivas que **abren** comentario, asi que este cambio de
+  texto no las altera.
 
 **Verificacion final de la limpieza de los retenidos y de T16**, hecha por el implementer sobre
 `6d6ff4d`:
