@@ -516,6 +516,20 @@ causa. **Ninguno tiene como causa el aterrizaje derivado del menu.**
 **Riesgo que la enmienda ya preveia** (`design.md > 9.6`): la carrera no toco el caso de inventario `:606` en esta
 corrida; si lo tocara, falla en `expect(status).toBe(404)` porque `/inventario` redirige al login, nunca da un verde falso.
 
+### T11 (gate del leader) — rojo propio en `tests/unit/shared/data-table-alcance.test.ts:395`, arreglado
+
+El `./init.sh` completo del leader (`progress/init_QC-93_completo.log:3954`) sale rojo en `la lista de specs E2E que
+referencian data-table es cerrada, y son estos nueve` (QC-55 R36): hay diez, entra `e2e/login.spec.ts`. **Causa: esta
+feature.** La sonda de QC-93 R18 (`MODULE_DATA_TESTIDS`, `login.spec.ts:62-83`) incluye `data-table`, el `data-testid`
+real del contenedor de la tabla compartida (`components/shared/data-table/data-table.tsx:244`). Verificado antes de tocar:
+la palabra aparece una sola vez en el archivo (`:65`) y la constante solo se usa en `:408-413`, en `toHaveCount(0)`:
+**afirma ausencia, no consume la tabla**. R36 (`specs/QC-55-.../requirements.md:204-207`) prohibe a QC-55 anadir E2E y
+el centinela convierte cada E2E que referencia `data-table` en una decision nombrada; seis fichas ya lo ampliaron con su
+propio requisito, asi que ampliarlo con QC-93 R18 **no contradice R36**. `data-table` se queda en la sonda (R18). Se
+amplia la lista a diez calcando el precedente del archivo (nota «AMPLIADA POR SEPTIMA VEZ», comentario que fecha la
+entrada y conteo del titulo y del mensaje). Delegado a `backend_dev`; verificacion y commit abajo. El otro rojo del gate,
+`tests/unit/identity/usuarios/scope.test.ts` (QC-66 R45), no es de esta feature (QC-95) y no se toca.
+
 ## Mapa R -> test (T13, revisado en T17: R1-R28)
 
 | R | Test / evidencia |
