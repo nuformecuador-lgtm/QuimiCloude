@@ -250,7 +250,7 @@ Lo que toca la feature (`git diff --stat origin/dev...HEAD`): `e2e/helpers/landi
   falla en 0 ms. En T1 pasaba.
 - Error real (`test-results/login-login-en-navegador-r-7c22e-.../error-context.md`): `Unique constraint failed on the
   fields: (name)` en `prisma.role.create()` del `beforeAll` (`login.spec.ts:273`).
-- Mecanismo: el caso nuevo de T8 (`:363`) cierra sesion, y eso escribe `revoked_sessions` (FK a `users`
+- Mecanismo: el caso nuevo de T8 (`:386` tras el arreglo; `:363` cuando fallo) cierra sesion, y eso escribe `revoked_sessions` (FK a `users`
   `onDelete: Restrict`, `schema.prisma:452`). El `afterAll` (`:307-335`) no borra esa fila: su `user.deleteMany` falla,
   el `catch` vacio lo traga (`:316`), y el rol tampoco se puede borrar porque el usuario lo referencia (`:320`). Con
   `fullyParallel`, el mismo worker vuelve a ejecutar los hooks del archivo con el mismo `RUN_ID` de modulo, y el segundo
