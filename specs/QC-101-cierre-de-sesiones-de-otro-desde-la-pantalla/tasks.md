@@ -87,7 +87,7 @@
 
 ## El recorrido completo
 
-- [ ] **T10 — E2E con dos sesiones vivas.** Crear `e2e/cierre-de-sesiones.spec.ts` segun
+- [x] **T10 — E2E con dos sesiones vivas.** Crear `e2e/cierre-de-sesiones.spec.ts` segun
       `design.md > 5`: prefijo `qc101_e2e_`, empresa efimera, roles reales del seed, limpieza de
       huerfanos por edad, `test.setTimeout(180_000)`; **dos `browser.newContext()`**, victima con
       sesion viva en `INVENTORY_ROUTE`, el administrador cierra **desde el panel** (ninguna escritura

@@ -637,7 +637,7 @@ describe('toda lectura y toda escritura pasan por las Server Actions del modulo 
     expect(culpables, culpables.join(', ')).toEqual([]);
   });
 
-  it('ninguna de las CATORCE Server Actions se usa sin importarla por su ruta exacta', () => {
+  it('ninguna de las QUINCE Server Actions se usa sin importarla por su ruta exacta', () => {
     const culpables = FUENTES_DE_LA_RUTA.flatMap((archivo) =>
       accionesSinRutaExacta(leer(archivo)).map((detalle) => `${archivo}: ${detalle}`),
     );
