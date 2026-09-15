@@ -29,7 +29,171 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+> **Glosario mínimo.** **Las dos listas**: la lista de recetas, servida en la URL de la constante de
+> ruta de fórmulas, y la lista de proveedores, servida en la URL de la constante de ruta de
+> proveedores. No incluye el catálogo de un proveedor ni ninguna otra pantalla. **Tabla compartida**:
+> el componente de QC-55, consumido por su contrato público. **Lista blanca**: lo que el módulo de
+> cada lista declara ordenable, filtrable y buscable (`RECIPE_QUERYABLE`, `SUPPLIER_QUERYABLE`, QC-57).
+> **Gesto de lista**: cambiar de página, de tamaño de página, de orden, de término de búsqueda o de
+> rango de fecha de creación. **Operación de listado**: la Server Action de listado del módulo de
+> cada lista.
+>
+> Cada requisito cita entre corchetes la fila de `## Decisiones cerradas` de la que sale (D1 = primera
+> fila, D11 = última) y, cuando conserva o invierte un requisito de otra ficha, cuál.
+
+### Montaje
+
+**R1** — Cada una de las dos listas DEBE presentarse con la tabla compartida, consumida por su
+contrato público, y NO DEBE declarar tabla, barra de paginación ni selector de tamaño de página
+propios. *[D1; Alcance]*
+
+**R2** — La lista de recetas DEBE presentar las columnas imagen, nombre, descripción, número de
+pasos, fecha de creación, fecha de actualización y acciones; la de proveedores, nombre, teléfono,
+correo electrónico, fecha de creación, fecha de actualización y acciones. *[D2; conserva QC-26 R8 y
+R18, QC-44 R14]*
+
+**R3** — Ninguna de las dos listas DEBE mostrar el identificador técnico de la fila, los
+identificadores de quien la creó o modificó, ni —en proveedores— la forma normalizada del nombre.
+*[D2; conserva QC-26 R9, QC-44 R12]*
+
+**R4** — Cada fila de la lista de proveedores DEBE ofrecer la navegación a la página de detalle de
+ese proveedor, construida con el helper de ruta de detalle. *[D2; conserva QC-44 R3, R15]*
+
+**R5** — La celda de imagen de la lista de recetas DEBE usar la dirección de imagen que entrega la
+operación de listado tal cual y, SI la receta no tiene imagen, ENTONCES DEBE presentar un marcador
+identificable sin emitir una imagen con dirección vacía. *[D2; conserva QC-26 R18]*
+
+### Orden, búsqueda y filtro (se igualan a productos)
+
+**R6** — CUANDO el usuario active la cabecera de la columna de nombre, de fecha de creación o de
+fecha de actualización —o elija un orden ascendente o descendente en el menú de esa columna—, el
+sistema DEBE volver a pedir la lista al servidor con ese campo y esa dirección, y la cabecera DEBE
+exponer el orden vigente de forma accesible. *[D2; invierte QC-26 R14 y QC-44 R11]*
+
+**R7** — Ninguna columna cuyo campo no esté en la lista ordenable de su lista blanca —imagen,
+descripción, número de pasos, teléfono, correo electrónico y acciones— DEBE ofrecer control de
+orden. *[D2]*
+
+**R8** — CUANDO el usuario escriba un término en el campo de búsqueda de una de las dos listas, el
+sistema DEBE volver a pedir esa lista al servidor con ese término, y CUANDO lo vacíe, DEBE volver a
+pedirla sin búsqueda. *[D2; invierte QC-26 R14 y QC-44 R11]*
+
+**R9** — CUANDO el usuario fije, cambie o limpie el rango de fecha de creación —a mano o con un
+atajo—, el sistema DEBE volver a pedir la lista al servidor con ese rango, o sin él. Ninguna otra
+columna de las dos listas DEBE ofrecer filtro. *[D2]*
+
+**R10** — Ningún gesto de lista DEBE ordenar, filtrar, buscar ni recortar en el navegador las filas
+ya recibidas: las filas presentadas DEBEN ser exactamente las que devolvió la última invocación de
+la operación de listado, y en su mismo orden. *[D2: lo que protegían QC-26 R14 y QC-44 R11 sigue
+en pie]*
+
+**R11** — Los campos que cada lista acepta como orden, filtro y búsqueda DEBEN derivarse de la
+lista blanca publicada por su módulo; ningún archivo de las dos listas DEBE mantener una copia
+escrita a mano de esos campos. *[D2]*
+
+**R12** — El estado de cada lista —página, tamaño, orden, término de búsqueda y rango de fecha de
+creación— DEBE viajar en la URL, de modo que CUANDO se cargue una URL de la lista con esos
+parámetros, el sistema DEBE pedir y presentar la lista con ellos. *[D2]*
+
+**R13** — SI los parámetros de lista recibidos son inválidos —página no entera o menor que uno,
+tamaño fuera de las opciones, orden sobre un campo no ordenable o con dirección desconocida, fecha
+inexistente o término formado solo por espacios—, ENTONCES el sistema DEBE descartar o acotar cada
+uno por separado y presentar la lista, y NO DEBE fallar ni mostrar un error. *[D2; amplía QC-26 R13
+y QC-44 R10]*
+
+**R14** — MIENTRAS un gesto de lista esté en vuelo, el sistema DEBE señalar de forma identificable
+que la lista se está recalculando, y el campo de búsqueda y el de filtro NO DEBEN desmontarse ni
+perder el foco ni el texto que se está escribiendo. *[D2: patrón de productos del 2026-09-07; D5]*
+
+### Datos y estados
+
+**R15** — La pantalla de cada lista DEBE obtener sus filas en el servidor con **una sola**
+invocación de la operación de listado por render, y entregarlas a la tabla por props; ningún
+componente de cliente de las dos listas DEBE invocar la operación de listado. *[D5; conserva QC-26
+R10]*
+
+**R16** — MIENTRAS la operación de listado no haya fallado y no devuelva ninguna fila, el sistema
+DEBE presentar un estado vacío identificable, en lugar de una tabla sin filas, que ofrezca la
+acción de crear: navegar a la página de alta en recetas, abrir el panel de alta en proveedores.
+*[D5; conserva QC-26 R15, R20 y QC-44 R16]*
+
+**R17** — SI la página pedida queda sin filas por ser mayor que el total, ENTONCES el estado vacío
+DEBE ofrecer además volver a la primera página, conservando el tamaño, el orden, la búsqueda y el
+rango vigentes. *[D5; D2]*
+
+**R18** — MIENTRAS la lista se esté obteniendo por primera vez, el sistema DEBE presentar un
+indicador de carga identificable en lugar de las filas. *[D5; conserva QC-26 R16, QC-44 R17]*
+
+**R19** — SI la operación de listado responde con error, ENTONCES el sistema DEBE presentar un
+estado de error identificable que NO DEBE confundirse con el vacío ni mostrar ningún dato de la
+lista, que ofrezca reintentar y que, SI el error es inesperado, conserve el identificador de la
+petición. *[D5; conserva QC-26 R17, QC-44 R18, QC-71 R17]*
+
+**R20** — Los estados vacío, cargando y error de las dos listas DEBE presentarlos la tabla
+compartida, y DEBEN ser mutuamente excluyentes y distinguibles por `data-testid` o rol. *[D5]*
+> Ver `design.md > 0`, hallazgo H1: esta mitad de D5 choca con la implementación de referencia de
+> D2 y con R19. No se resuelve aquí.
+
+### Acciones, paginación y plataforma
+
+**R21** — Cada fila DEBE ofrecer sus acciones —en recetas, editar (navega a su página) y borrar; en
+proveedores, editar y dar de baja— en una columna propia de la tabla que el usuario NO DEBE poder
+fijar, con cada control siempre visible, sin depender de pasar el puntero por encima, y con un área
+táctil de al menos 44×44 px. *[D4; conserva QC-26 R50 y QC-44 R48]*
+
+**R22** — Cada lista DEBE ofrecer un selector de tamaño de página con exactamente dos opciones,
+iguales al tamaño por defecto y al tope de las constantes de paginación compartidas (10 y 25), y
+DEBE usar el primero cuando no se indique ninguno. CUANDO el usuario cambie el tamaño, el sistema
+DEBE volver a pedir la lista desde la primera página. *[D6; conserva QC-26 R11, QC-44 R8]*
+
+**R23** — CUANDO existan más filas de las que caben en una página, cada lista DEBE permitir avanzar
+y retroceder de página e indicar la página actual y el total de páginas, y NO DEBE ofrecer avanzar
+más allá de la última ni retroceder antes de la primera. *[D6; conserva QC-26 R12, QC-44 R9]*
+
+**R24** — MIENTRAS el ancho disponible no alcance para todas las columnas, cada lista DEBE resolver
+el desbordamiento con scroll horizontal contenido en la propia tabla, sin scroll horizontal del
+documento, y con los controles de acción, orden, búsqueda y filtro alcanzables y operables por
+tacto y por teclado. La feature NO DEBE declarar ninguna excepción de escritorio. *[D7; conserva
+QC-26 R19 y QC-44 R13]*
+
+### Pruebas, dependencias y alcance
+
+**R25** — Los tests de esta feature DEBEN localizar los elementos por rol ARIA, `data-testid` o
+constantes exportadas, y NO DEBEN afirmar sobre literales de copy. *[D8]*
+
+**R26** — Los specs E2E existentes de recetas y de proveedores DEBEN ampliarse, sin crear un spec
+nuevo, con un recorrido que en Chromium y en WebKit busque por el nombre de filas creadas por el
+propio spec y las encuentre, y ordene por nombre y compruebe el orden relativo de esas mismas filas.
+*[D9; D3]*
+
+**R27** — La feature NO DEBE añadir ninguna dependencia a `package.json`. *[D10]*
+
+**R28** — La feature NO DEBE modificar la lógica, la validación ni las listas blancas de las
+operaciones de listado, ni el esquema de datos. *[D11]*
+
+**R29** — La lista cerrada de pantallas autorizadas a consumir la tabla compartida, y la de specs
+E2E que la referencian, DEBEN ampliarse con lo que esta feature estrena, y NO DEBEN aflojarse: una
+pantalla o spec no declarados DEBEN seguir poniendo la guardia en rojo. *[D1]*
+
+**R30** — Tras la migración, NO DEBE quedar en las rutas de las dos listas ningún componente propio
+de tabla, de barra de paginación ni de esqueleto de lista. *[Alcance]*
+> Ver `design.md > 0`, hallazgo H3: productos, la referencia de D2, conservó su esqueleto.
+
+### Cobertura de las decisiones cerradas
+
+| Decisión | Requisitos |
+|---|---|
+| D1 — Recetas y proveedores; reabre la enmienda de QC-44 | R1, R29 |
+| D2 — Se igualan a productos; invierte QC-26 R14 y QC-44 R11 | R2–R14, R17 |
+| D3 — iPhone real a QC-114; E2E en Chromium y WebKit | R26 |
+| D4 — Columna de acciones normal, `pinnable: false`, 44×44 | R21 |
+| D5 — La pantalla trae datos por props; la tabla pinta los tres estados | R14–R20 |
+| D6 — Tamaño 10 y 25 de `lib/shared/pagination` | R22, R23 |
+| D7 — Multiplataforma sin excepción; scroll contenido | R24 |
+| D8 — Asserts por rol, `data-testid` y constantes | R25 |
+| D9 — Se amplían los dos E2E, sin archivo nuevo | R26 |
+| D10 — Ninguna dependencia nueva | R27 |
+| D11 — `frontend` / `medium`; el backend ya lo soporta | R28 |
 
 ## Preguntas abiertas
 
@@ -38,6 +202,25 @@ _Pendiente: los escribe spec_author (F1.2)._
    cabe, arreglarlo **toca el componente compartido**, que QC-45 y las pantallas siguientes no
    tocaron nunca. `spec_author` lo **mide** y, si hace falta tocarlo, **lo declara en `design.md`**
    para aprobarlo en F1.4. No lo decide por su cuenta.
+
+   > **Medido por `spec_author` el 2026-09-15** (detalle en `design.md > 6`): **no hace falta tocar
+   > el componente compartido** para cumplir las decisiones. La única columna que se desborda de
+   > verdad es la **descripción de receta** (hasta 500 caracteres, sin salto de línea), y el
+   > desbordamiento queda contenido en la tabla, igual que hoy. Si se quiere acotar su ancho, se
+   > puede hacer dentro de la celda, sin tocar el componente: es la pregunta 2.
+
+2. **¿Se acota el ancho de la descripción de receta?** *(añadida por `spec_author` el 2026-09-15)*
+   Hoy y después de migrar, una descripción de 500 caracteres ocupa una sola línea y ensancha la
+   tabla hasta dejar las acciones muy lejos a la derecha. Se puede recortar con puntos suspensivos
+   dentro de la propia celda, pero eso **esconde texto** al usuario, y es decisión de producto. Sin
+   respuesta, el spec la deja como está hoy: sin recortar.
+
+3. **¿Qué dice el vacío cuando hay una búsqueda o un filtro activos?** *(añadida por `spec_author`
+   el 2026-09-15)* R16 describe el vacío del catálogo con la acción de crear. Con una búsqueda que no
+   encuentra nada, ese mismo estado diría «todavía no hay recetas», que es falso. Productos tiene
+   hoy ese defecto y además **desmonta la caja de búsqueda** al pintar el vacío fuera de la tabla
+   (`product-list-section.tsx:51-63`), así que el usuario no puede corregir el término sin editar la
+   URL. Está atado al hallazgo H1 de `design.md > 0`. Sin respuesta, R16 no distingue los dos casos.
 
 ## Decisiones cerradas (no reabrir)
 
