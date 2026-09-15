@@ -49,16 +49,27 @@ const PERMISO_DENEGADO = new Error('permiso denegado');
  * la unica que QC-74 R12 dejo en pie: pertenencia exacta, sin implicacion entre permisos y fallando
  * cerrado. Con `user === null` —sesion que se cayo entre las dos lecturas— devuelve `false`, que es
  * la direccion segura.
+ *
+ * **Y el identificador del actor sale de LA MISMA lectura** (QC-101 R12, R16; `design.md > 2`):
+ * sin una segunda llamada a la sesion, y con `null` si no la hay. Baja por props hasta el panel de
+ * detalle, que no ofrece el cierre de sesiones sobre uno mismo. Tampoco esto es autorizacion: quien
+ * decide si se puede es `end-all-sessions.ts`.
  */
-async function canModifyUsers(): Promise<boolean> {
+type UserScreenSession = {
+  readonly canModify: boolean;
+  readonly currentUserId: string | null;
+};
+
+async function canModifyUsers(): Promise<UserScreenSession> {
   const user = await identity.getSessionUser();
+  const currentUserId = user?.id ?? null;
 
   try {
     assertPermission(user, 'usuarios.modificar', () => PERMISO_DENEGADO);
-    return true;
+    return { canModify: true, currentUserId };
   } catch (error) {
     if (error !== PERMISO_DENEGADO) throw error;
-    return false;
+    return { canModify: false, currentUserId };
   }
 }
 
@@ -123,7 +134,7 @@ export default async function UsuariosPage({
 
   const resolved = await searchParams;
   const tab = parseUsuariosTab(resolved);
-  const canModify = await canModifyUsers();
+  const { canModify, currentUserId } = await canModifyUsers();
   const params = parseUserListParams(resolved);
   const workGroupParams = parseWorkGroupListParams(resolved);
 
@@ -149,7 +160,7 @@ export default async function UsuariosPage({
           key={buildUserListQuery(params)}
           fallback={<UserListSkeleton rows={params.pageSize} />}
         >
-          <UserListSection params={params} canModify={canModify} />
+          <UserListSection params={params} canModify={canModify} currentUserId={currentUserId} />
         </Suspense>
       )}
     </div>
