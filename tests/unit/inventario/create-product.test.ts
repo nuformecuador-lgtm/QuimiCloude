@@ -1,10 +1,3 @@
-// QC-90 T5 — El alta de producto CON su primer lote, con doble del puerto (`design.md > 3`,
-// `> 6`). Sin base de datos: aqui se prueba la DECISION que vive en `domain/`, no la
-// implementacion Prisma (esa es T6/T8).
-//
-// Los casos de alta ANTERIORES a QC-90 -nombre vacio, nombre de mas de 120, campo de mas-
-// siguen en `product-service.test.ts` y no se duplican aqui.
-
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -21,8 +14,6 @@ import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-ba
 import type { NewProduct } from '@/lib/modules/inventario/domain/product-view';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 
-/** QC-49 (R11): la empresa EN CUYO NOMBRE opera el actor. Los casos de uso la convierten en
- *  `InventoryScope` y se la pasan al puerto; no autoriza nada por si sola. */
 const EMPRESA = 'company-a';
 
 const ADMIN: Actor = {
@@ -31,23 +22,18 @@ const ADMIN: Actor = {
   permissions: ['inventario.consultar', 'inventario.modificar'],
 };
 
-/** QC-74 (R13, R14): conjunto de permisos VACIO. El Operador de hoy si tiene
- *  `inventario.consultar`, asi que no sirve como caso de rechazo. */
 const SIN_PERMISO: Actor = { id: 'sin-permiso-1', companyId: EMPRESA, permissions: [] };
 
-/** Actor con OTRO permiso del modulo: consultar no concede modificar (QC-74 R13). */
 const SOLO_CONSULTA: Actor = {
   id: 'consulta-1',
   companyId: EMPRESA,
   permissions: ['inventario.consultar'],
 };
 
-/** Instante fijo, inyectado como dependencia (`now`): ver el comentario en `create-product.ts`. */
 const AHORA = new Date('2026-09-10T10:00:00.000Z');
 
 const PRESENTACION = '11111111-1111-4111-8111-111111111111';
 
-/** Entrada valida minima del alta: producto + presentacion + UNO de los dos costos (R11). */
 const ALTA_VALIDA = {
   name: 'Acido sulfurico',
   stock: 4,
@@ -57,14 +43,12 @@ const ALTA_VALIDA = {
 };
 
 /**
- * El puerto ENTERO, con cada metodo como espia. Derivarlo de `ProductRepository` -y no
- * escribir la lista a mano- es lo que hace que un metodo nuevo en el puerto se note aqui, y
- * conserva `.mock.calls` TIPADO: sin esto, afirmar sobre los argumentos exigiria un `as`.
+ * Derivado de `ProductRepository` y no escrito a mano: un metodo nuevo del puerto se nota aqui,
+ * y `.mock.calls` queda TIPADO sin necesidad de `as`.
  */
 type DobleDelPuerto = { [K in keyof ProductRepository]: Mock<ProductRepository[K]> };
 
-/** Doble del puerto que REGISTRA cada llamada. El tipo de retorno lleva `ProductRepository`
- *  en la interseccion a proposito: el objeto tiene que cumplir el puerto entero. */
+/** La interseccion con `ProductRepository` obliga al doble a cumplir el puerto entero. */
 function montarRepositorio(overrides: Partial<DobleDelPuerto> = {}): DobleDelPuerto &
   ProductRepository {
   return {
@@ -79,7 +63,6 @@ function montarRepositorio(overrides: Partial<DobleDelPuerto> = {}): DobleDelPue
       pageSize: 10,
       totalPages: 1,
     })),
-    /** Por defecto NO hay producto vivo homonimo: el alta cae al camino de creacion (R16). */
     findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => null),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
       id: 'producto-nuevo-1',
@@ -94,8 +77,7 @@ function montarRepositorio(overrides: Partial<DobleDelPuerto> = {}): DobleDelPue
 
 type Repositorio = ReturnType<typeof montarRepositorio>;
 
-/** Los OCHO metodos del puerto, sin llamar. Enumerarlos uno a uno -y no en bucle sobre las
- *  claves- es lo que hace que el mensaje de fallo diga cual se llamo. */
+/** Uno a uno y no en bucle sobre las claves: asi el fallo senala que metodo se llamo. */
 function afirmarPuertoIntacto(products: Repositorio): void {
   expect(products.create).not.toHaveBeenCalled();
   expect(products.findAliveById).not.toHaveBeenCalled();
@@ -107,14 +89,12 @@ function afirmarPuertoIntacto(products: Repositorio): void {
   expect(products.addBatchToAlive).not.toHaveBeenCalled();
 }
 
-/** El lote que llego al puerto por el camino de CREACION (R16). */
 function loteCreado(products: Repositorio): NewProductBatch {
   const llamada = products.createWithFirstBatch.mock.calls[0];
   if (llamada === undefined) throw new Error('createWithFirstBatch no fue llamado');
   return llamada[1];
 }
 
-/** El producto que llego al puerto por el camino de CREACION (R16). */
 function productoCreado(products: Repositorio): NewProduct {
   const llamada = products.createWithFirstBatch.mock.calls[0];
   if (llamada === undefined) throw new Error('createWithFirstBatch no fue llamado');
@@ -174,10 +154,8 @@ describe('R24 — la entrada invalida se rechaza sin tocar el puerto', () => {
   });
 
   it('rechaza solo-costo-total con existencia 0 (R8) y con un total insuficiente (R9)', async () => {
-    // R8 y R9 los caza el esquema -con su `path`, que es lo que el formulario necesita para
-    // pintarlos en su campo-. Lo que se mide aqui es que el CASO DE USO los convierte en
-    // `ValidationError` y no llega a escribir: `resolverCostoUnitario` repite la comprobacion
-    // como defensa en profundidad, pero ni siquiera deberia alcanzarla.
+    // Los dos los caza ya el esquema; lo que se mide es que el CASO DE USO los convierte en
+    // `ValidationError` y no llega a escribir.
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -198,28 +176,23 @@ describe('R24 — la entrada invalida se rechaza sin tocar el puerto', () => {
 
 describe('R15, R16, R21 — producto nuevo', () => {
   it('busca por el nombre ESCRITO y crea producto y lote en una sola operacion del puerto', async () => {
-    // R15: la decision de «ya existe» es por nombre contra los productos vivos, no por un
-    // identificador que envie el navegador. Normalizar el nombre y filtrar los borrados es
-    // del adaptador (R20 se cierra alli, con su `orderBy`): el caso de uso pasa el nombre tal
-    // cual y USA lo que el puerto devuelva.
+    // Normalizar el nombre y descartar los borrados es del adaptador: el caso de uso pasa el
+    // nombre tal cual y USA lo que el puerto devuelva.
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
     const resultado = await createProduct(ALTA_VALIDA, ADMIN);
 
-    // QC-49 (R13, R18): el nombre va TAL CUAL y el ambito de la empresa del actor detras.
     expect(products.findAliveIdByName).toHaveBeenCalledWith('Acido sulfurico', { companyId: EMPRESA });
     expect(products.createWithFirstBatch).toHaveBeenCalledTimes(1);
     expect(products.addBatchToAlive).not.toHaveBeenCalled();
     expect(resultado).toEqual({ id: 'producto-nuevo-1' });
-    // R21: UNA operacion del puerto para las dos filas. El dominio no puede dejar la mitad
-    // escrita porque no tiene dos llamadas que descoordinar; la transaccion es del adaptador.
+    // UNA operacion del puerto para las dos filas: el dominio no tiene dos llamadas que
+    // descoordinar, y la transaccion es del adaptador.
     expect(products.createWithFirstBatch.mock.calls[0][2]).toBe(AHORA);
   });
 
   it('escribe LA MISMA existencia en el producto y en el lote', async () => {
-    // R16 + decision cerrada del 2026-09-10: transitoriamente la existencia va en las dos
-    // filas, hasta que QC-91 convierta la del producto en la suma de sus lotes.
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -230,8 +203,7 @@ describe('R15, R16, R21 — producto nuevo', () => {
   });
 
   it('R1 — ningun camino escribe un producto sin lote', async () => {
-    // El puerto no ofrece ninguna forma de crear un producto pelado desde el alta: `create`
-    // -que si la ofrece- no se llama nunca. Es el candado de R1 y de `design.md > 10 C`.
+    // `create` es el metodo del puerto que escribiria un producto sin lote.
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -244,9 +216,8 @@ describe('R15, R16, R21 — producto nuevo', () => {
 
 describe('R3 — existencia cero', () => {
   it('crea el lote igualmente, con stock 0', async () => {
-    // El `CHECK` de la columna es `>= 0`: una existencia de 0 no es motivo de rechazo por si
-    // sola. Solo lo es junto a «solo costo total», y entonces el rechazo va al campo de la
-    // existencia (R8), que se prueba arriba.
+    // El `CHECK` de la columna es `>= 0`: el 0 solo se rechaza junto a «solo costo total», caso
+    // que se prueba arriba.
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -276,14 +247,13 @@ describe('R6, R7, R10 — el costo que se guarda', () => {
       ADMIN,
     );
 
-    // El valor exacto, como CADENA: 10/3 redondeado a los cuatro decimales de la columna.
+    // 10/3 redondeado a los cuatro decimales de la columna.
     expect(loteCreado(products).unitCost).toBe('3.3333');
   });
 
   it('R10 — con los dos costos, guarda el unitario e ignora el total sin rechazar', async () => {
-    // No se comparan uno con otro a proposito (pregunta abierta 4): `total / existencia`
-    // redondea, y una discrepancia de un centimo seria un rechazo incorregible. Aqui el
-    // total es DELIBERADAMENTE incoherente con el unitario y aun asi el alta pasa.
+    // No se comparan a proposito: `total / existencia` redondea, y una discrepancia de un centimo
+    // seria un rechazo incorregible. Por eso el total es incoherente con el unitario.
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -294,31 +264,21 @@ describe('R6, R7, R10 — el costo que se guarda', () => {
 
     expect(products.createWithFirstBatch).toHaveBeenCalledTimes(1);
     expect(loteCreado(products).unitCost).toBe('12.5000');
-    // El total no viaja al puerto: `NewProductBatch` no tiene donde ponerlo (`design.md > 10 D`).
     expect(Object.keys(loteCreado(products))).not.toContain('totalCost');
   });
 });
 
 describe('QC-81 R8, R10 y QC-90 R12 — lote que pide generarse y expiracion opcional', () => {
-  // QC-81 cambio lo que significa el `null` del lote. Hasta QC-90 decia «se guarda NULL»; desde
-  // QC-81 la columna es NOT NULL y `null` en `NewProductBatch.lot` dice «que lo genere el
-  // backend». El correlativo NO lo calcula el caso de uso: lo calcula el adaptador, dentro de la
-  // transaccion que escribe (`design.md > 3.1`), y se prueba contra la base en T8. Por eso este
-  // unitario NO afirma ningun numero generado -el doble del puerto no genera nada y afirmarlo
-  // aqui seria afirmar la premisa-: afirma lo que le toca al dominio, que es PEDIR la generacion
-  // con `null` cuando el lote no vino. La tabla `design.md > 0.2` fila 9 decia «pasan a afirmar
-  // el correlativo generado»; se lee subordinada a `> 3.1`, que fija que el puerto no cambia.
+  // El correlativo lo calcula el adaptador dentro de la transaccion que escribe, y el doble no
+  // genera nada: aqui solo se afirma que el dominio PIDE la generacion con `lot: null`.
   it('pasa lot null al puerto -«generalo»- cuando el lote no viene, y deja la expiracion en null', async () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
-    // Ausentes por completo...
     await createProduct(ALTA_VALIDA, ADMIN);
     expect(loteCreado(products).lot).toBeNull();
     expect(loteCreado(products).expiryDate).toBeNull();
 
-    // ...y explicitamente nulos, que es como los manda el borde cuando el campo va vacio
-    // (`readOptionalFormString` no distingue «no escrito» de «escrito vacio»).
     const otros = montarRepositorio();
     await createCreateProduct({ products: otros, now: () => AHORA })(
       { ...ALTA_VALIDA, lot: null, expiryDate: null },
@@ -357,8 +317,8 @@ describe('QC-81 R8, R10 y QC-90 R12 — lote que pide generarse y expiracion opc
     await createProduct({ ...ALTA_VALIDA, lot: '  L-2026-01  ', expiryDate: '2026-12-31' }, ADMIN);
 
     expect(loteCreado(products).lot).toBe('L-2026-01');
-    // R13: viaja como CADENA `YYYY-MM-DD`, no como `Date`. Convertirla en el dominio es
-    // justo por donde se cuela el corrimiento de dia por zona horaria.
+    // Viaja como CADENA `YYYY-MM-DD`, no como `Date`: convertirla en el dominio es justo por
+    // donde se cuela el corrimiento de dia por zona horaria.
     expect(loteCreado(products).expiryDate).toBe('2026-12-31');
   });
 });
@@ -401,30 +361,21 @@ describe('R17, R18 — el nombre corresponde a un producto que ya existe', () =>
     expect(products.addBatchToAlive).toHaveBeenCalledTimes(1);
     expect(products.createWithFirstBatch).not.toHaveBeenCalled();
     expect(products.create).not.toHaveBeenCalled();
-    // El `id` devuelto es el del producto QUE YA EXISTIA: `CreateProductFormState` no cambia
-    // de forma por esto (`design.md > 7`).
     expect(resultado).toEqual({ id: 'producto-9' });
   });
 
   it('R18 — el candidato del producto NO viaja al puerto', async () => {
-    // Lo que no se pasa no se puede escribir por accidente: `addBatchToAlive` recibe el
-    // identificador, el lote y el instante, y nada mas. El nombre, la existencia, la alerta
-    // y la unidad escritos en el panel se quedan aqui.
+    // Lo que no viaja al puerto no se puede escribir por accidente.
     const { products, createProduct } = montarConExistente();
 
     await createProduct({ ...ALTA_VALIDA, stock: 999, qtyAlert: 888, name: 'Otro nombre' }, ADMIN);
 
     const llamada = products.addBatchToAlive.mock.calls[0];
-    // QC-49 (R13): el cuarto argumento es el AMBITO, no un campo del producto. Lo que R18
-    // vigila -que el candidato del producto no viaje- sigue intacto: se comprueba abajo, sobre
-    // las claves de `llamada[1]`.
     expect(llamada).toHaveLength(4);
     expect(llamada[0]).toBe('producto-9');
     expect(llamada[2]).toBe(AHORA);
     expect(llamada[3]).toEqual({ companyId: EMPRESA });
-    // El lote lleva SU existencia -la escrita, que es la del lote que se agrega-, pero no
-    // lleva ningun campo del producto: nada que permita tocar `name`, `qty_alert` ni `unit_id`.
-    // QC-81 (R1): `purchaseDate` es campo DEL LOTE, no del producto, y por eso si esta.
+    // `stock` y `purchaseDate` son del lote que se agrega; no hay ningun campo del producto.
     expect(Object.keys(llamada[1]).sort()).toEqual([
       'createdBy',
       'expiryDate',
@@ -437,9 +388,8 @@ describe('R17, R18 — el nombre corresponde a un producto que ya existe', () =>
   });
 
   it('R20 — usa el identificador que el puerto devuelve, sea cual sea', async () => {
-    // El desempate entre homonimos vivos -el mas antiguo, por identificador ascendente- se
-    // cierra en el ADAPTADOR, con su `orderBy` (`design.md > 6`), y se prueba en T8 contra la
-    // base. Lo unico que le toca al caso de uso es no aplicar ningun criterio propio.
+    // El desempate entre homonimos vivos es del ADAPTADOR, con su `orderBy`, y se prueba contra
+    // la base. Al caso de uso solo le toca no aplicar ningun criterio propio.
     const products = montarRepositorio({
       findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => 'el-mas-viejo'),
     });
@@ -450,11 +400,9 @@ describe('R17, R18 — el nombre corresponde a un producto que ya existe', () =>
   });
 
   it('rechaza si el producto dejo de estar vivo entre la consulta y la escritura', async () => {
-    // Carrera: `addBatchToAlive` devuelve `null`. Se LANZA en vez de caer al camino de
-    // creacion, porque crear aqui escribiria el nombre, la existencia y la alerta del panel
-    // -que en este camino R18 declara IGNORADOS- y lo haria en silencio. R1 se mantiene: no
-    // se escribio ningun producto, asi que no queda ninguno sin lote. Quien reintenta vuelve
-    // a pasar por `findAliveIdByName`, que ya dira `null`, y creara.
+    // Se LANZA en vez de crear: crear escribiria en silencio el nombre, la existencia y la alerta
+    // del panel, que en este camino se ignoran. Quien reintenta vuelve a pasar por
+    // `findAliveIdByName`, que ya dira `null`, y creara.
     const products = montarRepositorio({
       findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => 'producto-9'),
       addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => null),
@@ -468,21 +416,9 @@ describe('R17, R18 — el nombre corresponde a un producto que ya existe', () =>
 });
 
 describe('R19 — sin id del puerto, el alta crea producto nuevo', () => {
-  // ESTE NO ES EL TEST PRINCIPAL DE R19, y el nombre del `describe` ya no finge que lo sea.
-  // R19 dice «el nombre solo coincide con productos BORRADOS logicamente», y esa distincion
-  // -vivo contra borrado- vive entera en el ADAPTADOR, en su `deleted_at IS NULL` (R15).
-  // Desde el caso de uso los dos escenarios son el MISMO montaje: el puerto devuelve `null`
-  // tanto si no hay homonimo como si el unico homonimo esta borrado. Un doble que los
-  // distinguiera solo estaria repitiendo aqui la semantica del adaptador, o sea afirmando la
-  // premisa; por eso este caso se queda midiendo lo unico que si le toca al dominio -que sin
-  // id del puerto se CREA en vez de agregar lote- y la prueba de verdad de R19 se hace contra
-  // Postgres, con homonimos borrados sembrados a proposito:
-  //
-  //   tests/integration/inventario/product-batch-write.int.test.ts
-  //   «devuelve null cuando todos los homonimos estan borrados logicamente»
-  //
-  // (Hallazgo m3 de la revision de QC-90. Si alguien viene a QC-90 buscando «¿donde se prueba
-  // R19?», la respuesta es ese archivo, no este.)
+  // Vivo contra borrado lo distingue el ADAPTADOR (`deleted_at IS NULL`): desde el dominio, sin
+  // homonimo y con el homonimo borrado son el mismo `null`. Lo borrado se prueba contra Postgres
+  // en `tests/integration/inventario/product-batch-write.int.test.ts`.
   it('crea un producto nuevo en vez de agregarle el lote a otro', async () => {
     // El `null` explicito repite el valor por defecto del doble a proposito: deja el escenario
     // escrito en el propio caso en vez de obligar a ir a leer `montarRepositorio`.
@@ -503,7 +439,6 @@ const HOY = '2026-09-10';
 const MANANA = '2026-09-11';
 const SEMANA_PASADA = '2026-09-03';
 
-/** El `ValidationError` que lanzo el alta, para mirar su diagnostico. */
 async function capturarRechazo(promesa: Promise<unknown>): Promise<ValidationError> {
   const error = await promesa.then(
     () => {
@@ -527,7 +462,8 @@ describe('QC-81 R2 — sin fecha de compra, al puerto le llega HOY del mismo rel
     await createProduct(ALTA_VALIDA, ADMIN);
 
     expect(loteCreado(products).purchaseDate).toBe('2026-03-05');
-    // Un solo reloj: se lee UNA vez y el instante que se escribe en `created_at` es ese mismo.
+    // Un solo reloj: con dos, un alta justo en el cambio de dia guardaria compra y creacion en
+    // dias distintos.
     expect(now).toHaveBeenCalledTimes(1);
     expect(products.createWithFirstBatch.mock.calls[0][2]).toBe(instante);
   });
@@ -555,12 +491,11 @@ describe('QC-81 R3, R5 — la fecha escrita, si no es futura, llega al puerto id
 
     await createProduct({ ...ALTA_VALIDA, purchaseDate: SEMANA_PASADA }, ADMIN);
 
-    // R3: la misma CADENA civil, sin pasar por `Date` y sin corrimiento de dia.
     expect(loteCreado(products).purchaseDate).toBe(SEMANA_PASADA);
   });
 
   it('acepta hoy y una fecha de meses atras sin corregirlas', async () => {
-    // R5: «anterior o igual a hoy». El limite exacto -hoy- es donde un `>=` mal puesto rechazaria.
+    // Hoy es el limite exacto: ahi es donde un `>=` mal puesto rechazaria.
     for (const fecha of [HOY, '2026-01-15', '2019-12-31']) {
       const products = montarRepositorio();
       await createCreateProduct({ products, now: () => AHORA })(
@@ -593,10 +528,8 @@ describe('QC-81 R4 — la fecha de compra futura se rechaza sin tocar el puerto'
     );
 
     expect(error.code).toBe('invalid_input');
-    // `ValidationError` no lleva ruta de campo -solo el codigo del catalogo y el diagnostico, que va
-    // al log y nunca al navegador (QC-70 R29, R30)-: el campo se senala en el diagnostico.
+    // `ValidationError` no lleva ruta de campo: el campo solo puede senalarse en el diagnostico.
     expect(error.diagnostic).toContain('purchaseDate');
-    // Ni siquiera la consulta por nombre: el rechazo ocurre antes del puerto (`design.md > 4.3`).
     afirmarPuertoIntacto(products);
   });
 
@@ -614,8 +547,7 @@ describe('QC-81 R4 — la fecha de compra futura se rechaza sin tocar el puerto'
   });
 
   it('valida la forma con zod ANTES de mirar si la fecha es futura', async () => {
-    // Orden permiso -> zod -> fecha. Un rechazo de zod no lleva diagnostico; el de la fecha si.
-    // Con una entrada que falla las dos cosas, el rechazo tiene que ser el de zod.
+    // Un rechazo de zod no lleva diagnostico y el de la fecha si: eso delata cual de los dos gano.
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -630,8 +562,6 @@ describe('QC-81 R4 — la fecha de compra futura se rechaza sin tocar el puerto'
 
 describe('QC-81 R34 — un lote tecleado de 60 digitos se rechaza sin tocar el puerto', () => {
   it('R34: con un lote de 60 digitos lanza ValidationError (invalid_input) y el repositorio recibe cero llamadas', async () => {
-    // Ni se escribe ni se genera correlativo: el rechazo es de la entrada y ocurre antes del puerto,
-    // asi que tampoco se sustituye el lote por uno generado.
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -666,9 +596,8 @@ describe('QC-81 R24 — sin permiso no se valida, no se toca el puerto ni se cal
 
 describe('R4 — ningun importe pasa por coma flotante', () => {
   it('el caso de uso no convierte ningun importe a numero en su codigo fuente', () => {
-    // Comprobado sobre el TEXTO del archivo y no sobre su comportamiento: un `Number()`
-    // intermedio daria el mismo resultado en todos los casos de arriba y aun asi seria
-    // exactamente lo que R4 prohibe. Mismo criterio que en `unit-cost.test.ts`.
+    // Sobre el TEXTO del archivo y no sobre su comportamiento: un `Number()` intermedio daria el
+    // mismo resultado en todos los casos de arriba y aun asi pasaria el importe por coma flotante.
     const fuente = readFileSync(
       join(
         __dirname,
