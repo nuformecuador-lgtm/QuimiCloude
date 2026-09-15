@@ -62,7 +62,7 @@ pasa a **404 sin redireccion + `private-not-found` + cuenta cero**, y el titulo 
 **Hecho cuando:** cada archivo pasa **solo**, en los dos motores:
 `pnpm exec playwright test e2e/<archivo>.spec.ts`.
 
-## T6 — Migrar las otras nueve suites  ·  R8
+## [x] T6 — Migrar las otras nueve suites  ·  R8
 
 Depende de T2. Paralelizable en dos tandas:
 
@@ -79,14 +79,14 @@ no se escribe en la llamada.
 **Hecho cuando:** `grep -n "DASHBOARD_ROUTE\|async function login(" e2e/*.spec.ts` no devuelve
 ninguna espera de aterrizaje con ruta escrita, y cada archivo pasa solo en los dos motores.
 
-## T7 — `session.spec.ts` y `permisos.spec.ts` se quedan como estan  ·  R10
+## [x] T7 — `session.spec.ts` y `permisos.spec.ts` se quedan como estan  ·  R10
 
 Toca: nada. Es una decision que hay que **dejar escrita**, no un cambio.
 
 **Hecho cuando:** el progreso dice por que cada uno queda fuera (`returnTo` en `session.spec.ts:247-260`;
 aterrizaje ya derivado en `permisos.spec.ts:214`) y `git diff --stat` confirma que no se tocaron.
 
-## T8 — El caso nuevo del usuario sin ningun permiso  ·  R14, R15, R16, R17, R18
+## [x] T8 — El caso nuevo del usuario sin ningun permiso  ·  R14, R15, R16, R17, R18
 
 Toca: **`e2e/login.spec.ts`** (un solo `test` nuevo). Depende de T2 y T6.
 
@@ -96,7 +96,7 @@ Reutiliza `createTestUser()` y su rol efimero sin permisos (`login.spec.ts:229-2
 **Hecho cuando:** el caso pasa en Chromium y WebKit. **Si falla porque el usuario VE datos de algun
 modulo: se para todo, se abre ficha de seguridad y no se sigue** (R18, decision cerrada nº 6).
 
-## T9 — La guardia del patron  ·  R9
+## [x] T9 — La guardia del patron  ·  R9
 
 Toca: **`tests/guards/guard-e2e-landing.test.ts`** (nuevo). Depende de T5, T6, T8.
 
