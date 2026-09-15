@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { requirePermission, type Actor } from '@/lib/modules/asignaciones/domain/actor';
+import { canModifyAssignments, requirePermission, type Actor } from '@/lib/modules/asignaciones/domain/actor';
 import { AsignacionesError, UnauthorizedError } from '@/lib/modules/asignaciones/domain/errors';
 
 import type { PermissionCode } from '@/lib/modules/identity';
@@ -137,5 +137,94 @@ describe('QC-87 — autorizacion de `asignaciones`', () => {
       expect(fuente).toContain("from '@/lib/modules/identity'");
       expect(fuente).not.toMatch(/@\/lib\/modules\/identity\//);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------------------
+// QC-102 — `canModifyAssignments`, el PREDICADO que la pantalla pregunta (R28, R29, R50).
+//
+// Existe para que el codigo `'asignaciones.modificar'` no se escriba fuera del modulo: la pantalla
+// necesita el `canWrite` que R28 baja por props y ahora lo obtiene PREGUNTANDO, no escribiendo la
+// cadena. Estos casos fijan las dos mitades de su contrato:
+//
+//   1. que responda SI/NO y NO LANCE nunca —es una pregunta, no una autorizacion—;
+//   2. que su criterio sea el MISMO que el de `requirePermission`, letra por letra: pertenencia
+//      exacta, sin parecidos, sin comodines y con el mismo fallo cerrado. Los dos comparten
+//      `assertPermission` de `identity`, y el ultimo caso lo comprueba EN PAREJA sobre la misma
+//      matriz de actores en vez de fiarse de que la implementacion siga delegando.
+// ---------------------------------------------------------------------------------------
+describe('QC-102 — `canModifyAssignments` (R28, R29, R50)', () => {
+  it('verdadero cuando el conjunto trae `asignaciones.modificar`', () => {
+    expect(canModifyAssignments(conPermisos(PERMISO_ESCRITURA))).toBe(true);
+    // Y tambien acompañado de otros permisos: lo que importa es que ESE este.
+    expect(canModifyAssignments(conPermisos('pedidos.consultar', PERMISO_ESCRITURA, 'usuarios.consultar'))).toBe(
+      true,
+    );
+  });
+
+  it('falso cuando NO esta, aunque traiga los otros permisos del sistema (R3)', () => {
+    expect(canModifyAssignments(conPermisos('pedidos.consultar', 'usuarios.modificar'))).toBe(false);
+    // `asignaciones.consultar` NO concede la escritura: ninguna implicacion entre permisos.
+    expect(canModifyAssignments(conPermisos('asignaciones.consultar'))).toBe(false);
+  });
+
+  it('falso con un codigo PARECIDO pero distinto: la pertenencia es exacta, no por prefijo (R3)', () => {
+    for (const parecido of [
+      'asignaciones.modificarr',
+      'asignaciones.modifica',
+      'asignaciones.modificar.todo',
+      'super.asignaciones.modificar',
+      'Asignaciones.Modificar',
+      'asignaciones.modificar ',
+      ' asignaciones.modificar',
+    ]) {
+      expect(canModifyAssignments(conPermisos(parecido)), `'${parecido}' no deberia conceder`).toBe(false);
+    }
+  });
+
+  it('falso con un COMODIN: `assertPermission` no los interpreta, y esto lo comprueba (R3)', () => {
+    for (const comodin of ['*', '*.*', 'asignaciones.*', 'asignaciones.**', '.*']) {
+      // La otra mitad, que es la que lo demuestra: `requirePermission` TAMPOCO los acepta. Si
+      // alguien enseñara a una de las dos a expandir comodines, este par dejaria de cuadrar.
+      expect(canModifyAssignments(conPermisos(comodin)), `'${comodin}' no deberia conceder`).toBe(false);
+      expect(() => requirePermission(conPermisos(comodin), PERMISO_ESCRITURA)).toThrow(UnauthorizedError);
+    }
+  });
+
+  it('falla cerrado y NO LANZA ante los mismos cuatro actores que R2 deniega', () => {
+    for (const [nombre, actor] of ACTORES_DENEGADOS) {
+      expect(() => canModifyAssignments(actor), `${nombre}: el predicado no debe lanzar`).not.toThrow();
+      expect(canModifyAssignments(actor), nombre).toBe(false);
+    }
+    // Un conjunto que no es un array tampoco revienta: falla cerrado igual (R14 de QC-74).
+    const roto = { id: PERSONA, companyId: EMPRESA, permissions: 'asignaciones.modificar' } as unknown as Actor;
+    expect(canModifyAssignments(roto)).toBe(false);
+  });
+
+  it('responde EXACTAMENTE lo mismo que `requirePermission` sobre la matriz completa (mismo criterio)', () => {
+    const casos: ReadonlyArray<Actor | null | undefined> = [
+      ...ACTORES_DENEGADOS.map(([, actor]) => actor),
+      conPermisos(PERMISO_ESCRITURA),
+      conPermisos('asignaciones.consultar'),
+      conPermisos('asignaciones.modificarr'),
+      conPermisos('asignaciones.*'),
+      conPermisos(PERMISO_CONSULTA, PERMISO_ESCRITURA),
+    ];
+    for (const actor of casos) {
+      let autorizado = true;
+      try {
+        requirePermission(actor, PERMISO_ESCRITURA);
+      } catch {
+        autorizado = false;
+      }
+      expect(canModifyAssignments(actor), JSON.stringify(actor)).toBe(autorizado);
+    }
+  });
+
+  it('el modulo lo publica en su CONTRATO: es la via por la que la pantalla pregunta (R29, R50)', async () => {
+    const contrato = await import('@/lib/modules/asignaciones');
+    expect(typeof contrato.canModifyAssignments).toBe('function');
+    expect(contrato.canModifyAssignments(conPermisos(PERMISO_ESCRITURA))).toBe(true);
+    expect(contrato.canModifyAssignments(conPermisos('pedidos.consultar'))).toBe(false);
   });
 });

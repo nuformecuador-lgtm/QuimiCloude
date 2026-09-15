@@ -50,6 +50,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { DOCUMENT_TYPE_CC, normalizeCompanyName } from '@/lib/modules/identity';
 import { PERMISSIONS } from '@/lib/modules/identity/domain/permissions';
+import { clearedLockState } from '@/lib/modules/identity/domain/effective-account-status';
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -353,6 +354,7 @@ describe('QC-66 T17 — la guarda del ultimo administrador contra Postgres real'
             now,
             accountStatus: 'inactive',
             changedBy: scenario.actorId,
+            lockState: clearedLockState(),
           });
 
         const resultados = await Promise.all([
@@ -386,6 +388,7 @@ describe('QC-66 T17 — la guarda del ultimo administrador contra Postgres real'
           now,
           accountStatus: 'inactive',
           changedBy: scenario.actorId,
+          lockState: clearedLockState(),
         });
 
       const resultados = await Promise.all([
@@ -420,6 +423,7 @@ describe('R22 — el UNICO administrador activo de la empresa no puede dejar de 
           now: new Date(),
           accountStatus: destino,
           changedBy: scenario.actorId,
+          lockState: destino === 'blocked' ? null : clearedLockState(),
         });
 
         expect(resultado).toBe('last_administrator');
@@ -479,6 +483,7 @@ describe('R22 — el UNICO administrador activo de la empresa no puede dejar de 
         now: new Date(),
         accountStatus: ACTIVE,
         changedBy: scenario.actorId,
+        lockState: clearedLockState(),
       });
 
       expect(resultado).toBe('ok');
@@ -516,6 +521,7 @@ describe('R22 (simetrico) — con DOS administradores activos las tres operacion
         now: new Date(),
         accountStatus: 'inactive',
         changedBy: scenario.actorId,
+        lockState: clearedLockState(),
       });
 
       expect(resultado).toBe('ok');

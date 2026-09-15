@@ -3,6 +3,8 @@
   "transaccion": [
     "asignaciones/active-members-only.int.test.ts",
     "asignaciones/atomicity.int.test.ts",
+    "asignaciones/batch-company-scope.int.test.ts",
+    "asignaciones/batch-states.int.test.ts",
     "asignaciones/company-scope.int.test.ts",
     "asignaciones/frozen-name.int.test.ts",
     "asignaciones/list-order-responsibles.int.test.ts",

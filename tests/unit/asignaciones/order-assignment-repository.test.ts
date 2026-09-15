@@ -29,6 +29,7 @@ import type {
   AssignmentRow,
   NewAssignment,
   OrderAssignmentRepository,
+  OrderAssignmentRowWithOrder,
 } from '@/lib/modules/asignaciones/ports/order-assignment-repository'
 
 const COMPANY = '11111111-1111-4111-8111-111111111111'
@@ -42,6 +43,7 @@ const GROUP = '44444444-4444-4444-8444-444444444444'
 class RepositorioDoble implements OrderAssignmentRepository {
   readonly llamadas: string[] = []
   readonly filas: AssignmentRow[] = []
+  readonly enLote: OrderAssignmentRowWithOrder[] = []
 
   insertMissing(rows: readonly NewAssignment[], now: Date): Promise<number> {
     this.llamadas.push(`insertMissing:${rows.length}:${now.toISOString()}`)
@@ -51,6 +53,17 @@ class RepositorioDoble implements OrderAssignmentRepository {
   listByOrderInCompany(companyId: string, orderId: string): Promise<readonly AssignmentRow[]> {
     this.llamadas.push(`listByOrderInCompany:${companyId}:${orderId}`)
     return Promise.resolve(this.filas)
+  }
+
+  // QC-102 T1 - la consulta EN LOTE, con `companyId` tambien PRIMERO (R3).
+  listByOrdersInCompany(
+    companyId: string,
+    orderIds: readonly string[],
+  ): Promise<readonly OrderAssignmentRowWithOrder[]> {
+    // `String(...)` y no `.join(...)`: el caso NEGATIVO de tipos de abajo invoca este metodo con
+    // la forma EQUIVOCADA a proposito, y el doble no debe reventar antes de que el test afirme.
+    this.llamadas.push(`listByOrdersInCompany:${companyId}:${String(orderIds)}`)
+    return Promise.resolve(this.enLote)
   }
 
   deleteOne(companyId: string, orderId: string, userId: string): Promise<'ok' | 'not_found'> {
@@ -97,23 +110,38 @@ describe('QC-87 T4 — `companyId` primero: el caso NEGATIVO de tipos (R7)', () 
     await expect(repo.deleteByWorkGroup(COMPANY, ORDER, GROUP)).resolves.toBe(0)
   })
 
+  it('QC-102 R3: `listByOrdersInCompany` SIN `companyId` tampoco compila', async () => {
+    const repo: OrderAssignmentRepository = new RepositorioDoble()
+
+    // @ts-expect-error `companyId` es el PRIMER parametro de `listByOrdersInCompany` (QC-102 R3):
+    // pasar solo la lista de pedidos es un error de TIPOS. La consulta EN LOTE resuelve una pagina
+    // entera de una vez, asi que olvidar la empresa aqui seria el fallo mas caro de los cinco
+    // metodos: devolveria las asignaciones de TODAS las empresas para esos identificadores.
+    await repo.listByOrdersInCompany([ORDER])
+
+    // Y la llamada CORRECTA, sin `@ts-expect-error`.
+    await expect(repo.listByOrdersInCompany(COMPANY, [ORDER])).resolves.toEqual([])
+  })
+
   it('la empresa llega al repositorio en la primera posicion, no se pierde por el camino', async () => {
     const repo = new RepositorioDoble()
 
     await repo.listByOrderInCompany(COMPANY, ORDER)
+    await repo.listByOrdersInCompany(COMPANY, [ORDER])
     await repo.deleteOne(COMPANY, ORDER, USER)
     await repo.deleteByWorkGroup(COMPANY, ORDER, GROUP)
 
     expect(repo.llamadas).toEqual([
       `listByOrderInCompany:${COMPANY}:${ORDER}`,
+      `listByOrdersInCompany:${COMPANY}:${ORDER}`,
       `deleteOne:${COMPANY}:${ORDER}:${USER}`,
       `deleteByWorkGroup:${COMPANY}:${ORDER}:${GROUP}`,
     ])
   })
 })
 
-describe('QC-87 T4 — cuatro metodos y ni uno mas', () => {
-  it('el doble que satisface la interfaz expone exactamente esos cuatro nombres', () => {
+describe('QC-87 T4 (+ QC-102 T1) — cinco metodos y ni uno mas', () => {
+  it('el doble que satisface la interfaz expone exactamente esos cinco nombres', () => {
     const nombres = Object.getOwnPropertyNames(RepositorioDoble.prototype)
       .filter((n) => n !== 'constructor')
       .sort()
@@ -123,6 +151,7 @@ describe('QC-87 T4 — cuatro metodos y ni uno mas', () => {
       'deleteOne',
       'insertMissing',
       'listByOrderInCompany',
+      'listByOrdersInCompany',
     ])
   })
 
@@ -134,6 +163,8 @@ describe('QC-87 T4 — cuatro metodos y ni uno mas', () => {
     expect(metodos).toEqual([
       'insertMissing',
       'listByOrderInCompany',
+      // QC-102 T1: el quinto, en el orden en que lo declara el puerto.
+      'listByOrdersInCompany',
       'deleteOne',
       'deleteByWorkGroup',
     ])
