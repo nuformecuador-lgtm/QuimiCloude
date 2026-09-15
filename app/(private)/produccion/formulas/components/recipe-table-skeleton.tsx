@@ -8,30 +8,22 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-import { RECIPE_COLUMNS } from './recipe-columns';
+import { RECIPE_SKELETON_COLUMN_COUNT } from './recipe-columns-skeleton';
 
-/**
- * Estado "cargando" de la lista (R16, `design.md > 4.3`).
- *
- * Se pinta como `fallback` del `<Suspense>` de la pagina, con `rows` = el tamano de pagina
- * pedido: asi el salto de altura al llegar los datos es el minimo posible y el esqueleto dice la
- * verdad sobre cuanto se esta pidiendo. Reutiliza la MISMA declaracion de columnas que la tabla,
- * de modo que no puede quedarse atras cuando se anada una.
- *
- * `role="status"` + `aria-busy`: quien usa lector de pantalla oye que algo se esta cargando en
- * lugar de encontrarse una tabla vacia (que es lo que R16 prohibe confundir).
- */
+// Cuenta con una constante y no con las columnas: esas son una factoría de cliente y este
+// esqueleto lo pinta el servidor como `fallback`.
 export function RecipeTableSkeleton({ rows }: { readonly rows: number }) {
+  const cells = Array.from({ length: RECIPE_SKELETON_COLUMN_COUNT }, (_, index) => index);
+
   return (
     <div role="status" aria-busy="true" data-testid="recipe-table-skeleton">
       <span className="sr-only">Cargando recetas…</span>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead scope="col">Imagen</TableHead>
-            {RECIPE_COLUMNS.map((column) => (
-              <TableHead key={column.key} scope="col">
-                {column.label}
+            {cells.map((cell) => (
+              <TableHead key={cell} scope="col">
+                <Skeleton className="h-4 w-24" />
               </TableHead>
             ))}
           </TableRow>
@@ -39,11 +31,8 @@ export function RecipeTableSkeleton({ rows }: { readonly rows: number }) {
         <TableBody>
           {Array.from({ length: rows }, (_, index) => index).map((index) => (
             <TableRow key={index} data-testid="recipe-row-skeleton">
-              <TableCell>
-                <Skeleton className="h-10 w-10" />
-              </TableCell>
-              {RECIPE_COLUMNS.map((column) => (
-                <TableCell key={column.key}>
+              {cells.map((cell) => (
+                <TableCell key={cell}>
                   <Skeleton className="h-4 w-full" />
                 </TableCell>
               ))}

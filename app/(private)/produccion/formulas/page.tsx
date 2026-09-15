@@ -8,12 +8,7 @@ import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/r
 import { BRAND_LABEL, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
 import { NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
 
-import {
-  parseRecipeListParams,
-  RecipeListSection,
-  RecipeTableSkeleton,
-  type RecipeListSearchParams,
-} from './components';
+import { parseRecipeListParams, RecipeListSection, RecipeTableSkeleton } from './components';
 
 export const metadata: Metadata = {
   title: `${RECIPES_LABEL} · ${BRAND_LABEL}`,
@@ -21,47 +16,15 @@ export const metadata: Metadata = {
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
-/**
- * Pantalla del catalogo de recetas (R1, `design.md > 4.3`).
- *
- * **La ubicacion sale de `FORMULAS_ROUTE`** (`lib/shared/routes.ts`): el nombre de la carpeta es
- * solo la forma en que el App Router materializa esa constante. La marca del titulo y la
- * etiqueta del encabezado llegan importadas (`BRAND_LABEL`, `RECIPES_LABEL`), nunca escritas a
- * mano: `RECIPES_LABEL` es la MISMA constante que usa el item del sidebar (R5).
- *
- * **El contenedor exterior es un `div` y NO declara el landmark `main`** (R1): `SidebarInset`
- * del layout privado ya lo es, y ese layout exige que sea unico.
- *
- * **Los componentes se importan SOLO desde `./components`** (R46), nunca por ruta profunda. El
- * barrel no declara `'use client'`: la frontera la declara cada componente, asi que esta pagina
- * sigue siendo un Server Component aunque importe de el.
- *
- * **El estado de lista vive en la cadena de consulta, no en React** (`design.md > 4.2`): asi
- * recargar, compartir el enlace o volver con «atras» conserva la pagina.
- *
- * **La `key` del `<Suspense>` es lo que hace reaparecer el esqueleto en CADA cambio** de pagina o
- * de tamano, no solo en la primera carga (R16). Sin ella, Next reutiliza el limite y el usuario
- * se queda mirando la pagina anterior sin ninguna senal de que algo esta en vuelo.
- *
- * **El corte por permiso vive AQUI** (QC-75 R6, R7): la primera linea exige `recetas.consultar`
- * con `requirePagePermission` -antes de resolver `searchParams` y antes de pintar nada-, que
- * redirige al login sin sesion y responde 404 sin nombrar el modulo ni mencionar permisos. El
- * middleware ya NO corta por rol (QC-75 R16): en el borde solo quedan firma, caducidad y empresa.
- * La autorizacion sobre los DATOS la siguen aportando los casos de uso de `recetas`.
- *
- * **Crear NAVEGA a su pagina propia** (R20): nunca abre un `sheet` ni un dialogo modal. Y por eso
- * la accion es un `<Link>` real pintado con `buttonVariants`, NO el primitivo `Button` con
- * `render`: lo que navega es un enlace, y hacerlo pasar por el boton de Base UI dispara su aviso
- * de `nativeButton` y termina falseando la semantica del `<a>` con un `role="button"`.
- */
+// El contenedor es un `div`: el landmark principal ya lo pone el layout privado y debe ser único.
 export default async function FormulasPage({
   searchParams,
 }: {
-  searchParams: Promise<RecipeListSearchParams>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await requirePagePermission('recetas.consultar');
 
-  const { page, pageSize } = parseRecipeListParams(await searchParams);
+  const params = parseRecipeListParams(await searchParams);
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -69,6 +32,7 @@ export default async function FormulasPage({
         <h1 data-testid="recipes-title" className="text-2xl font-semibold">
           {RECIPES_LABEL}
         </h1>
+        {/* Un enlace y no `Button` con `render`: Base UI le pondría `role="button"` al `<a>`. */}
         <Link
           href={NEW_RECIPE_ROUTE}
           data-slot="button"
@@ -78,11 +42,9 @@ export default async function FormulasPage({
           Nueva receta
         </Link>
       </div>
-      <Suspense
-        key={`${page}-${pageSize}`}
-        fallback={<RecipeTableSkeleton rows={pageSize} />}
-      >
-        <RecipeListSection page={page} pageSize={pageSize} />
+      {/* Sin `key`: remontar el límite en cada consulta borraría el foco del campo de búsqueda. */}
+      <Suspense fallback={<RecipeTableSkeleton rows={params.pageSize} />}>
+        <RecipeListSection params={params} />
       </Suspense>
     </div>
   );

@@ -100,7 +100,7 @@
 
 ## Tanda 2 — Tablas de cliente
 
-### T6 [P] — Tabla de recetas
+### [x] T6 [P] — Tabla de recetas
 - **Archivos:** `F/components/recipe-table.tsx` (reescrito).
 - **Depende de:** T2, T4.
 - **Requisitos:** R1, R6, R8, R9, R10, R14, R21, R22, R23, R32, R33.
@@ -119,7 +119,7 @@
   - Ningún otro `tableId` vale `'recetas'` (`grep -r "TABLE_ID = '" app`).
   - No importa `components/ui/table`.
 
-### T7 [P] — Tabla de proveedores
+### [x] T7 [P] — Tabla de proveedores
 - **Archivos:** `S/components/supplier-table.tsx` (reescrito).
 - **Depende de:** T3, T5.
 - **Requisitos:** R1, R4, R6, R8, R9, R10, R14, R21, R22, R23, R32, R33.
@@ -131,7 +131,7 @@
 
 ## Tanda 3 — Sección, estados, esqueleto y página (D12, D15)
 
-### T8 [P] — Recetas
+### [x] T8 [P] — Recetas
 - **Archivos:**
   - `F/components/recipe-list-section.tsx`
   - `F/components/recipe-list-empty.tsx` (solo si hace falta ajustar el `firstPageHref`)
@@ -154,7 +154,7 @@
   - El barrel exporta lo nuevo y nada de lo borrado.
   - `F/nueva` y `F/[id]` compilan sin cambios.
 
-### T9 [P] — Proveedores
+### [x] T9 [P] — Proveedores
 - **Archivos:**
   - `S/components/supplier-list-section.tsx`
   - `S/components/supplier-list-empty.tsx` (solo si hace falta ajustar el `firstPageHref`)
