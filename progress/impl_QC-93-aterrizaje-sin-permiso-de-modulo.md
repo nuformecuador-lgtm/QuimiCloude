@@ -146,7 +146,7 @@ Playwright de verdad (puerto fijo 3117 compartido: dos corridas a la vez chocan)
 - **T6:** `errores.spec.ts` solo migra la entrada (su `accountStatus` es la causa C de T1, fuera de alcance).
   `establecer-contrasena.spec.ts` conserva el `waitForURL(LOGIN_PATH, 120_000)` previo y luego `loginAndLand`; su espera
   de aterrizaje baja de 120 s a los 60 s del helper (riesgo anotado por el subagente; el caso tiene 180 s en total).
-- **T8**, un solo caso nuevo: `e2e/login.spec.ts:363` — `sin ningun permiso de modulo entra al destino derivado, ve el 404
+- **T8**, un solo caso nuevo: `e2e/login.spec.ts:386` — `sin ningun permiso de modulo entra al destino derivado, ve el 404
   dentro del layout privado sin un solo dato de modulo y puede cerrar sesion sin volver atras (QC-93 R14-R18)`. Premisa
   `permissionsForUsername(...) === []`; pathname === destino derivado; `private-not-found`, `private-nav`,
   `private-logout`; sonda R18 `MODULE_DATA_TESTIDS` (21 testids, cada uno tomado de la cuenta cero de su suite y
@@ -297,16 +297,74 @@ Lo que toca la feature (`git diff --stat origin/dev...HEAD`): `e2e/helpers/landi
   una consulta ANTES del `goto`, asi que retrasa el login, no lo adelanta. No se arregla aqui. Destino propio: ficha para
   QC-23 (o que los fixtures E2E nazcan con el sello truncado / en el pasado).
 
+### La corrida definitiva (la que cuenta)
+
+- Commit medido: `c0182c7` (todo lo de la feature + el arreglo de `login.spec.ts`). Base: `QuimiCloude_QC93` recien
+  copiada de `qct_tpl_5a5346ed8f4d`, sin ninguna corrida encima.
+- Comando: `pnpm exec playwright test --workers=3` (chromium + webkit), `.env` del worktree exportado.
+- Log completo: `progress/e2e_QC-93_despues.log` (2026-09-15 10:38:32 a 10:49:07).
+- **Diferencias de condiciones con T1, dichas:** `--workers=3` en vez de los workers por defecto (el intento 1 lo mato el
+  sistema por memoria; durante esta corrida la maquina tenia entre 1,7 y 3,9 GB libres, con procesos ajenos grandes
+  abiertos), y 80 tests en vez de 78 (el caso nuevo en los dos motores). Menos workers da mas holgura de tiempo, no
+  cambia ninguna afirmacion.
+
+**Resultado: `20 failed / 60 passed` (80), 10.4 min.**
+
+| | T1 (antes, `0d8f05d`) | T12 (despues, `c0182c7`) |
+|---|---|---|
+| tests | 78 | 80 |
+| passed | 51 | **60** |
+| failed | 27 | **20** |
+| rojos cuya causa es el aterrizaje (A) | **8** | **0** |
+
+**Lo que cambio, caso por caso** (los dos motores salvo donde se dice):
+
+- **Curados por esta ficha (A, 6 ejecuciones):** `pedidos.spec.ts:440` (R49), `proveedores.spec.ts:455` (R52) y
+  `recetas.spec.ts:369` (R6) pasan con 404 en su sitio, sin redireccion y sin datos.
+- **El caso R4 de inventario (A en T1, 2 ejecuciones):** sigue rojo, ahora por su **premisa bloqueada** (§0.1.4), no por
+  el aterrizaje. El helper espera y consigue el destino derivado; el log lo confirma: `navigated to
+  "http://localhost:3117/inventario"`. Luego el cuerpo intacto espera la redireccion al dashboard (`:573`), que no
+  existe desde QC-75, y el Operador SI puede ver inventario.
+- **Nuevo y verde:** `login.spec.ts:386` (QC-93 R14-R18) pasa en chromium y webkit. **La sonda R18 no encontro ni un
+  dato de modulo para un usuario sin permisos: no hay agujero de permisos.**
+- **La regresion propia, corregida:** `login.spec.ts:431` (credenciales incorrectas, el `:408` de antes del arreglo)
+  pasa en los dos motores, y los 5 casos de `login.spec.ts` pasan en los dos.
+- **Intermitentes que esta vez no aparecieron:** `session.spec.ts:289` (G de T1) pasa en los dos; `recetas.spec.ts:317`
+  y `pedidos.spec.ts:440`, que en el intento 2 cayeron por la carrera de QC-23 (hallazgo 2), pasan en los dos. Que no
+  salgan en una corrida no prueba que no existan: la carrera es de temporizacion.
+- **Migradas y verdes:** `aislamiento-inventario`, `establecer-contrasena` (con la espera de aterrizaje en 60 s),
+  `grupos-de-trabajo`, `pedidos-responsables`, `recetas-pasos`, `unidades` (incluido `:445`, Operador con 404),
+  `usuarios:416` (Operador con 404) y `presentaciones:338` (Operador con 404).
+
+**Los 20 rojos que sobreviven, cada uno con causa nombrada, distinta del aterrizaje derivado, y destino (R24):**
+
+| Ejec. | Tests | Causa | Destino propuesto |
+|---|---|---|---|
+| 10 | `inventario.spec.ts:384`, `:452`, `:508`; `proveedores.spec.ts:360`; `presentaciones.spec.ts:280` | **B · QC-80**: la unidad de la presentacion es obligatoria y los E2E solo rellenan el nombre; el bloque/panel de alta no se cierra | ficha nueva: actualizar esos E2E a QC-80 (elegir unidad) |
+| 2 | `errores.spec.ts:197` | **C · QC-65**: su usuario nace `pending` (unica suite sin `accountStatus: 'active'`); el login lo rechaza y `loginAndLand` agota la espera (`landing.ts:79`). Es Administrador: no es aterrizaje | ficha nueva: fixture de `errores.spec.ts` con `accountStatus: 'active'` |
+| 2 | `permisos.spec.ts:201` | **D · enmienda 2026-09-07**: `private-user-trigger` ya no existe; cerrar sesion es el boton directo `private-logout`. Su aterrizaje pasa. R10 lo deja fuera | ficha nueva: actualizar `permisos.spec.ts` al boton directo |
+| 2 | `session.spec.ts:241` | **E · QC-23**: su `afterAll` no borra `revoked_sessions` (FK `Restrict`) y el borrado de usuarios falla. R10 lo deja fuera | ficha nueva: limpieza de `session.spec.ts` (el mismo arreglo que `c0182c7` hizo en `login.spec.ts`) |
+| 2 | `usuarios.spec.ts:305` | **F**: su `afterAll` no borra `credential_setup_tokens` del usuario creado por la pantalla (FK `Restrict`); el `finally` lo tapa con el error de la empresa | ficha nueva: limpieza de `usuarios.spec.ts` |
+| 2 | `inventario.spec.ts:564` (R4) | **premisa del caso bloqueada** (§0.1.4): el Operador tiene `inventario.consultar`; el caso afirma una redireccion retirada por QC-75 | **decision humana dentro de QC-93**: (a) otro fixture sin `inventario.consultar` o (b) reescribir el caso |
+
+Total: 10 + 2 + 2 + 2 + 2 + 2 = **20**. Ninguno tiene como causa el aterrizaje derivado del menu (R24), con la salvedad
+explicita del caso R4 de inventario: su aterrizaje SI es el derivado y lo alcanza; lo que falla es la afirmacion que
+viene despues, y esa no se puede arreglar sin reabrir R11-R13.
+
+**Aparte, y fuera de la tabla porque no es un rojo de esta corrida:** la carrera de QC-23 del hallazgo 2 (fixtures con
+`sessions_valid_from` sin truncar contra `iat <= sello`) necesita su propia ficha: tumbo `pedidos.spec.ts:440` y
+`recetas.spec.ts:317` en el intento 2 y puede tumbar cualquier suite que entre en el mismo segundo en que crea su usuario.
+
 ## Mapa R -> test (T13)
 
 | R | Test / evidencia |
 |---|---|
 | R1 | `e2e/helpers/landing.ts` (unico, ingles) · no recogido por Playwright: `playwright test --list` = 78 antes y despues de crearlo, 0 menciones de `helpers` (T3) · `tests/guards/guard-e2e-landing.test.ts:539` `el recorrido de e2e/ encuentra specs, no recoge el helper y el helper existe` |
 | R2 | `tests/unit/e2e-helpers/landing.test.ts:31` `lleva al dashboard a quien tiene los permisos sembrados del Administrador (R2)`; `:35` `lleva a inventario a quien tiene los permisos sembrados del Operador (R2)`; `:47` `coincide con la composicion de produccion para cada rol del catalogo, sin regla propia (R2)` |
-| R3 | `tests/unit/e2e-helpers/landing.test.ts:39` `cae en el dashboard de respaldo cuando no hay ningun permiso (R3)`; `:43` `... cuando el unico permiso no abre ningun item del menu (R3)` · contra base real: `e2e/login.spec.ts:363` (usuario sin permisos, destino derivado) |
-| R4 | `tests/unit/e2e-helpers/landing.test.ts:66` `devuelve los codigos de permiso del rol y consulta solo usuarios vivos con ese username (R4)`; `:93` `deriva el destino esperado de los permisos que devuelve la base (R4)` · contra base real: cada `loginAndLand` de la corrida T12 (y `e2e/login.spec.ts:363`, premisa `permissionsForUsername === []`) |
+| R3 | `tests/unit/e2e-helpers/landing.test.ts:39` `cae en el dashboard de respaldo cuando no hay ningun permiso (R3)`; `:43` `... cuando el unico permiso no abre ningun item del menu (R3)` · contra base real: `e2e/login.spec.ts:386` (usuario sin permisos, destino derivado) |
+| R4 | `tests/unit/e2e-helpers/landing.test.ts:66` `devuelve los codigos de permiso del rol y consulta solo usuarios vivos con ese username (R4)`; `:93` `deriva el destino esperado de los permisos que devuelve la base (R4)` · contra base real: cada `loginAndLand` de la corrida T12 (y `e2e/login.spec.ts:386`, premisa `permissionsForUsername === []`) |
 | R5 | `tests/unit/e2e-helpers/landing.test.ts:86` `rechaza nombrando el username cuando no hay usuario vivo, sin devolver ninguna ruta (R5)` |
-| R6 | las 14 suites entran por `loginAndLand` y pasan en T12 (ver §T12); p. ej. `e2e/login.spec.ts:342` `entra con credenciales correctas y recibe la cookie de sesion httpOnly` |
+| R6 | las 14 suites entran por `loginAndLand` y pasan en T12 (ver §T12); p. ej. `e2e/login.spec.ts:365` `entra con credenciales correctas y recibe la cookie de sesion httpOnly` |
 | R7 | firma de `loginAndLand(page, credentials)` sin parametro de aterrizaje (`e2e/helpers/landing.ts:72`) · `tests/guards/guard-e2e-landing.test.ts:394` `(b) muerde ante un parametro landing, se llame como se llame la funcion` y `:569` sobre el arbol real |
 | R8 | `tests/guards/guard-e2e-landing.test.ts:569` `ningun spec define su propio login ni espera una ruta fija tras login-submit` (verde sobre el arbol; 25 hallazgos sobre el texto previo) |
 | R9 | `tests/guards/guard-e2e-landing.test.ts` entero (autoprueba `:335-536` + arbol real `:538-`), probado que muerde con dos mutaciones reales (§T9) |
@@ -314,11 +372,11 @@ Lo que toca la feature (`git diff --stat origin/dev...HEAD`): `e2e/helpers/landi
 | R11 | `e2e/pedidos.spec.ts:440` (R49), `e2e/proveedores.spec.ts:455` (R52), `e2e/recetas.spec.ts:369` (R6): premisa `expect(landing).not.toBe(RUTA_DEL_MODULO)` · **`e2e/inventario.spec.ts:564` (R4): BLOQUEADO, §0.1.4** |
 | R12 | los mismos tres: `status 404`, pathname sin redireccion, `private-not-found` visible · inventario R4: bloqueado |
 | R13 | los mismos tres: cuentas cero conservadas y `R49`/`R52`/`R6` en el titulo · inventario R4 conserva titulo y `R4` (sin reescribir) |
-| R14 | `e2e/login.spec.ts:363` (unico caso nuevo) |
-| R15 | `e2e/login.spec.ts:363` paso 1: `pathname === landing` derivado |
-| R16 | `e2e/login.spec.ts:363` paso 2: `private-not-found`, `private-nav`, `private-logout` |
-| R17 | `e2e/login.spec.ts:363` paso 4: cerrar sesion -> `LOGIN_PATH`, `goBack` -> `LOGIN_PATH`, cero armazon privado |
-| R18 | `e2e/login.spec.ts:363` paso 3: cuenta cero de `MODULE_DATA_TESTIDS` · resultado en §T12 |
+| R14 | `e2e/login.spec.ts:386` (unico caso nuevo) |
+| R15 | `e2e/login.spec.ts:386` paso 1: `pathname === landing` derivado |
+| R16 | `e2e/login.spec.ts:386` paso 2: `private-not-found`, `private-nav`, `private-logout` |
+| R17 | `e2e/login.spec.ts:386` paso 4: cerrar sesion -> `LOGIN_PATH`, `goBack` -> `LOGIN_PATH`, cero armazon privado |
+| R18 | `e2e/login.spec.ts:386` paso 3: cuenta cero de `MODULE_DATA_TESTIDS` · resultado en §T12 |
 | R19 | §T10: `permissions.ts` cambios=0; Operador = `['inventario.consultar', 'asignaciones.consultar']` |
 | R20 | §T10: `login-action.ts`, `private-nav.ts`, `app/(private)/not-found.tsx` cambios=0 |
 | R21 | §T10: diff vacio en `app lib db scripts package.json pnpm-lock.yaml` |

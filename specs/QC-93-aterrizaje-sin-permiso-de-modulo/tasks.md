@@ -123,7 +123,7 @@ y `specs/`+`progress/`.
 `./init.sh` completo. **Hecho cuando:** verde, con la guardia nueva ejecutandose (aparece en la
 salida) y sin archivos rojos fuera de `tests/baseline-rojos.json`.
 
-## T12 — La verificacion que esta ficha exige de verdad  ·  R23, R24
+## [x] T12 — La verificacion que esta ficha exige de verdad  ·  R23, R24
 
 Depende de todo lo anterior. **Es la tarea final y no es opcional: `init.sh` no corre Playwright, asi
 que un gate verde no dice nada de esta feature** (decision cerrada nº 8).
@@ -137,7 +137,7 @@ y (d) **para cada rojo que sobreviva, su causa nombrada y distinta de esta** —
 explicitamente resuelto: o pasa, o se dice por que falla y a que ficha va (`design.md > 0.4`)—.
 Ningun rojo que quede puede tener como causa el aterrizaje derivado del menu.
 
-## T13 — Trazabilidad
+## [x] T13 — Trazabilidad
 
 Toca: **`progress/impl_QC-93-aterrizaje-sin-permiso-de-modulo.md`**.
 
