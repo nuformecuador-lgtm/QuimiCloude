@@ -43,6 +43,9 @@
    «fixture Operador» de R11) o (b) reescribir el caso para otra afirmacion (cambia el significado del R4 de origen).
    Las dos reabren un requisito aprobado: **no se improvisa**. Ese caso se migra solo en su entrada al helper, conserva
    su cuerpo, y queda rojo con esta causa hasta que el humano decida.
+   **Resuelto el 2026-09-15** por la enmienda aprobada por el humano (commit `77c9016`): el Operador conserva
+   `inventario.consultar` y el caso entra con un rol efimero de la suite sin permisos (R25-R28). Implementado en T14
+   (`e40203b`); ver «Enmienda del 2026-09-15 — T14 a T17».
 
 ### 0.2 La base limpia
 
@@ -466,7 +469,7 @@ permissions.ts:165   [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.con
 La feature sigue tocando solo `e2e/**` (helper + 14 suites), `tests/guards/guard-e2e-landing.test.ts`,
 `tests/unit/e2e-helpers/landing.test.ts`, `specs/QC-93-*` y `progress/`.
 
-## Mapa R -> test (T13)
+## Mapa R -> test (T13, revisado en T17: R1-R28)
 
 | R | Test / evidencia |
 |---|---|
@@ -480,17 +483,21 @@ La feature sigue tocando solo `e2e/**` (helper + 14 suites), `tests/guards/guard
 | R8 | `tests/guards/guard-e2e-landing.test.ts:569` `ningun spec define su propio login ni espera una ruta fija tras login-submit` (verde sobre el arbol; 25 hallazgos sobre el texto previo) |
 | R9 | `tests/guards/guard-e2e-landing.test.ts` entero (autoprueba `:335-536` + arbol real `:538-`), probado que muerde con dos mutaciones reales (§T9) |
 | R10 | `tests/guards/guard-e2e-landing.test.ts:555` `cada excepcion nombra un spec que existe y dice por que` · diff vacio de `session.spec.ts` y `permisos.spec.ts` (§T7) |
-| R11 | `e2e/pedidos.spec.ts:440` (R49), `e2e/proveedores.spec.ts:455` (R52), `e2e/recetas.spec.ts:369` (R6): premisa `expect(landing).not.toBe(RUTA_DEL_MODULO)` · **`e2e/inventario.spec.ts:564` (R4): BLOQUEADO, §0.1.4** |
-| R12 | los mismos tres: `status 404`, pathname sin redireccion, `private-not-found` visible · inventario R4: bloqueado |
-| R13 | los mismos tres: cuentas cero conservadas y `R49`/`R52`/`R6` en el titulo · inventario R4 conserva titulo y `R4` (sin reescribir) |
+| R11 | los **cuatro** casos, premisa `expect(landing).not.toBe(RUTA_DEL_MODULO)` con el destino derivado por `loginAndLand`: `e2e/pedidos.spec.ts:440` `un usuario sin pedidos.consultar recibe 404 dentro del layout privado y no ve ningun dato de pedidos (R49)`; `e2e/proveedores.spec.ts:455` `... ningun dato de proveedores (R52)`; `e2e/recetas.spec.ts:369` `... ningun dato de recetas (R6)` (los tres con el Operador); y `e2e/inventario.spec.ts:606` `un usuario sin inventario.consultar recibe 404 dentro del layout privado y no ve el catalogo (R4)` con el usuario de R25 · verdes en chromium y webkit: T12 (los tres) y T14 (d) / §T16 (los cuatro) |
+| R12 | los mismos cuatro casos: `status 404`, pathname sin redireccion y `private-not-found` visible · inventario `:606` con `INVENTORY_ROUTE` |
+| R13 | los mismos cuatro casos: cuentas cero conservadas y `R49`/`R52`/`R6`/`R4` en el titulo · inventario `:606`: cuenta cero de `inventario-title`, `data-table` y `product-list-empty`, su usuario en la misma empresa del catalogo |
 | R14 | `e2e/login.spec.ts:386` (unico caso nuevo) |
 | R15 | `e2e/login.spec.ts:386` paso 1: `pathname === landing` derivado |
 | R16 | `e2e/login.spec.ts:386` paso 2: `private-not-found`, `private-nav`, `private-logout` |
 | R17 | `e2e/login.spec.ts:386` paso 4: cerrar sesion -> `LOGIN_PATH`, `goBack` -> `LOGIN_PATH`, cero armazon privado |
 | R18 | `e2e/login.spec.ts:386` paso 3: cuenta cero de `MODULE_DATA_TESTIDS` · resultado en §T12 |
-| R19 | §T10: `permissions.ts` cambios=0; Operador = `['inventario.consultar', 'asignaciones.consultar']` |
-| R20 | §T10: `login-action.ts`, `private-nav.ts`, `app/(private)/not-found.tsx` cambios=0 |
-| R21 | §T10: diff vacio en `app lib db scripts package.json pnpm-lock.yaml` |
-| R22 | §T10: `package.json` y `pnpm-lock.yaml` cambios=0 (la guardia `guard-dependencias-aprobadas` la corre el gate del leader) |
-| R23 | §T1 (antes) y §T12 (despues), suite completa, chromium + webkit, base limpia |
-| R24 | §T12: cada rojo superviviente con causa nombrada y distinta del aterrizaje |
+| R19 | §T10 y su revision §T15 (2026-09-15 11:18:42, `e40203b`, arbol con T14): `permissions.ts` cambios=0; Operador = `['inventario.consultar', 'asignaciones.consultar']` (`permissions.ts:165`) |
+| R20 | §T10 y §T15: `login-action.ts`, `private-nav.ts`, `app/(private)/not-found.tsx` cambios=0 |
+| R21 | §T10 y §T15: diff vacio en `app lib db scripts package.json pnpm-lock.yaml` |
+| R22 | §T10 y §T15: `package.json` y `pnpm-lock.yaml` cambios=0 (la guardia `guard-dependencias-aprobadas` la corre el gate del leader) |
+| R23 | §T1 (antes), §T12 (despues) y su revision §T16 (despues de la enmienda): suite completa, chromium + webkit, base limpia copiada de la plantilla |
+| R24 | §T12 y §T16: cada rojo superviviente con causa nombrada, distinta del aterrizaje y con destino propuesto |
+| R25 | `e2e/inventario.spec.ts:606` `un usuario sin inventario.consultar recibe 404 dentro del layout privado y no ve el catalogo (R4)`: entra `noInventoryUser`, del rol efimero `qc22_e2e_rol_<RUN_ID>`, no el Operador ni un rol del seed · verde en chromium y webkit (§T14 (d)) |
+| R26 | `e2e/inventario.spec.ts:611-614`: `expect(await permissionsForUsername(noInventoryUser.username), 'la premisa del caso: ...').not.toContain('inventario.consultar')` antes de `loginAndLand` · **muerde**: con el rol mutado para tener `inventario.consultar`, rojo en la premisa (`:614`) en chromium y webkit, restaurado con `cp` y diff vacio (§T14 (f), `progress/e2e_QC-93_T14_mutacion_R26.log`) |
+| R27 | `e2e/inventario.spec.ts`: `role.create` sin `permissions` tras la empresa (`:360`), usuario en la misma empresa (`:371`), `afterAll` borra el rol por nombre exacto despues de los usuarios y antes de la empresa (`:400`) · tras la corrida: `roles qc22_e2e_rol_*: 0`, `usuarios qc22_e2e_*: 0`, `empresas qc22_e2e_*: 0`, roles del seed intactos y `role_permissions` en 17 (§T14 (e)) |
+| R28 | `e2e/inventario.spec.ts`, barrido de huerfanos del `beforeAll` (`:326-345`): roles viejos del prefijo primero, sus usuarios aunque sean recientes, luego los roles, luego las empresas · comprobacion de residuo de §T14 (e). Limite anotado en §T14 (f): el barrido no puede borrar un rol del prefijo CON permisos, que R27 prohibe crear |
