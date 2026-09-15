@@ -1,160 +1,174 @@
 # QC-56 — migrar-listas-a-tabla-compartida · tasks.md
 
-> `[P]` = puede ir en paralelo con las demás `[P]` de su tanda (no comparten archivo).
-> Todas las rutas son relativas a la raíz del worktree. `F` = `app/(private)/produccion/formulas/`
-> y `S` = `app/(private)/proveedores/`.
->
-> **Verificación de cada tarea (subagente):** `pnpm typecheck`, `pnpm lint` y
-> `pnpm exec vitest related --run <archivos de la tarea>`. La suite completa y `./init.sh` los corre
-> el leader (`AGENTS.md > Regla del gate`).
+> - `[P]` = puede ir en paralelo con las demás `[P]` de su tanda (no comparten archivo).
+> - Rutas relativas al worktree: `F` = `app/(private)/produccion/formulas/` y
+>   `S` = `app/(private)/proveedores/`.
+> - **Verificación del subagente:** `pnpm typecheck`, `pnpm lint` y
+>   `pnpm exec vitest related --run <archivos de la tarea>`. La suite completa y `./init.sh` los corre
+>   el leader.
+> - **Revisado el 2026-09-15 tras F1.4:** T0 ya no bloquea. T8 y T9 aplican D12. D13 está en T1, D14
+>   en T4, T10, T11 y T14, y D15 en T2, T3, T6–T10 y T12. H6 (`design.md > 0`) queda para confirmar
+>   al aprobar el spec.
 
 ## Tanda 0 — Puerta
 
-### T0 — Respuestas de F1.4 a H1, H2, H3 y a las preguntas abiertas 2 y 3
-- **Archivos:** ninguno de producción. El leader anota las respuestas en `requirements.md` y, si
-  cambian R19, R20 o R30, pide la revisión del spec antes de seguir.
-- **Bloquea:** T1 (H2), T8 y T9 (H1, H3) y T4 (pregunta 2).
-- **Hecho:** cada uno de H1, H2 y H3 tiene una variante elegida por escrito. Las preguntas 2 y 3
-  tienen respuesta o constan como «sin respuesta: se queda como está».
+### T0 — Decisiones de F1.4 — **HECHA**
+- **Archivos:** ninguno.
+- **Hecho:** D12–D15 están en `requirements.md > Decisiones cerradas`. No bloquea ninguna tarea.
+  Lo único pendiente de confirmar es **H6**, que va con la aprobación del spec y afecta a T6–T10 y
+  T12.
 
-## Tanda 1 — Piezas puras y declaraciones
+## Tanda 1 — Piezas puras, declaraciones y specs
 
-### T1 [P] — Publicar `SUPPLIER_QUERYABLE` por el barrel de `proveedores` (H2)
-- **Archivos:** `lib/modules/proveedores/index.ts`.
-- **Depende de:** T0 (H2 aprobado).
-- **Requisitos:** R11, R28.
+### T1 [P] — Publicar `SUPPLIER_QUERYABLE` por el barrel (D13)
+- **Archivos:** `lib/modules/proveedores/index.ts`; `tests/unit/proveedores-ui/supplier-list-params.test.ts`
+  (el caso del barrel lo añade T3 en ese archivo; aquí solo la línea de producción).
+- **Requisitos:** R28, R31.
 - **Hecho:**
-  - Una línea `export { SUPPLIER_QUERYABLE } from './domain/supplier-queryable';` y nada más en
-    `lib/modules/`.
-  - `tests/unit/shared/listas-blancas-listados.test.ts` y `tests/guards/guard-arquitectura-modulos.test.ts`
-    siguen verdes.
-  - Se ha buscado en `tests/` si algún test cierra la lista de exportaciones de ese barrel; si
-    existe, se amplía en esta misma tarea y se añade a la lista de archivos.
+  - Se añade **una línea**, `export { SUPPLIER_QUERYABLE } from './domain/supplier-queryable';`.
+    No cambia nada más en `lib/`.
+  - `tests/unit/shared/listas-blancas-listados.test.ts` y
+    `tests/guards/guard-arquitectura-modulos.test.ts` siguen verdes.
+  - Se ha buscado en `tests/` si algún test cierra la lista de exportaciones de ese barrel; si lo hay,
+    se amplía aquí y se añade a la lista de archivos.
 
-### T2 [P] — Parser y serializador de la lista de recetas
+### T2 [P] — Parser y serializador de recetas
 - **Archivos:** `F/components/recipe-list-params.ts`, `tests/unit/recetas-ui/recipe-list-params.test.ts`.
-- **Requisitos:** R11, R12, R13, R22.
-- **Hecho:**
-  - Exporta `PAGE_PARAM`, `PAGE_SIZE_PARAM`, `SORT_PARAM`, `SEARCH_PARAM`, `CREATED_FROM_PARAM`,
-    `CREATED_TO_PARAM`, `CREATED_AT_COLUMN_ID`, `SORT_SEPARATOR`, `FIRST_PAGE`, `PAGE_SIZE_OPTIONS`,
-    `SHARED_PAGE_SIZES`, `parseRecipeListParams` (devuelve `DataTableParams`), `buildRecipeListQuery`
-    y `recipeListHref` (`design.md > 3`).
+- **Requisitos:** R11, R12, R13, R22, R32, R33.
+- **Exporta:**
+  - constantes `PAGE_PARAM`, `PAGE_SIZE_PARAM`, `SORT_PARAM`, `SEARCH_PARAM`, `CREATED_FROM_PARAM`,
+    `CREATED_TO_PARAM`, `CREATED_AT_COLUMN_ID`, `SORT_SEPARATOR`, `FIRST_PAGE`, `PAGE_SIZE_OPTIONS`
+    y `SHARED_PAGE_SIZES`;
+  - funciones `parseRecipeListParams` (→ `DataTableParams`), `buildRecipeListQuery`,
+    `recipeListHref`, `hasActiveSearchOrFilter` y `clearSearchAndFilters` (`design.md > 3`).
   - `RECIPE_QUERYABLE` se importa de `@/lib/modules/recetas`.
-  - Tests nuevos, uno por fila de la tabla de `design.md > 3`: ida y vuelta `parse(build(p))`,
-    campo de orden fuera de la lista blanca, fecha inexistente, término solo con espacios, y que las
-    dos listas de tamaños coinciden.
-  - Desaparecen del archivo `RecipeListParams` y `RecipePageSize` como forma de salida.
+- **Tests:**
+  - una fila por caso de la tabla de `design.md > 3`;
+  - ida y vuelta `parse(build(p))`;
+  - `hasActiveSearchOrFilter`: `false` con solo orden o tamaño, `true` con término y `true` con rango;
+  - `clearSearchAndFilters` vacía búsqueda y filtros, vuelve a la página 1 y conserva orden y tamaño.
 
-### T3 — Parser y serializador de la lista de proveedores
+### T3 — Parser y serializador de proveedores
 - **Archivos:** `S/components/supplier-list-params.ts`, `tests/unit/proveedores-ui/supplier-list-params.test.ts`.
 - **Depende de:** T1.
-- **Requisitos:** R11, R12, R13, R22.
-- **Hecho:** lo mismo que T2 con `SUPPLIER_QUERYABLE` importado de `@/lib/modules/proveedores` y
-  `supplierListHref` derivado de `SUPPLIERS_ROUTE`.
+- **Requisitos:** R11, R12, R13, R22, R31, R32, R33.
+- **Hecho:**
+  - Lo mismo que T2, con `SUPPLIER_QUERYABLE` importado de `@/lib/modules/proveedores`.
+  - Un caso afirma que es **el mismo objeto** que el de `domain/supplier-queryable` (R31).
 
-### T4 [P] — Fábrica de columnas de recetas
+### T4 [P] — Columnas de recetas, sin descripción (D14)
 - **Archivos:**
   - borrar `F/components/recipe-columns.ts`;
   - crear `F/components/recipe-columns.tsx`;
-  - solo con la variante B de H1: crear `F/components/recipe-columns-skeleton.ts`.
-- **Depende de:** T0 (pregunta 2: si se acota la descripción).
-- **Requisitos:** R2, R3, R5, R7, R9, R21.
+  - crear `F/components/recipe-columns-skeleton.ts`.
+- **Requisitos:** R2, R3, R5, R7, R9, R18, R21.
 - **Hecho:**
-  - `'use client'`.
-  - Exporta `buildRecipeColumns({ rowActions })`, `RecipeColumnId`, `RecipeColumn`, `EMPTY_CELL`,
-    `IMAGE_COLUMN_ID`, `ACTIONS_COLUMN_ID`, `ACTIONS_COLUMN_LABEL` y `RECIPE_DEFAULT_PINNED_COLUMNS`
-    (`[IMAGE_COLUMN_ID]`).
-  - Las columnas y sus flags son exactamente los de `design.md > 4.1`.
-  - Escribir `id: 'createdBy'` no compila.
+  - `recipe-columns.tsx` es `'use client'`.
+  - Exporta `buildRecipeColumns({ rowActions })`, `RecipeColumnId` (con `'description'` en el
+    `Exclude`), `RecipeColumn`, `EMPTY_CELL`, `IMAGE_COLUMN_ID`, `ACTIONS_COLUMN_ID`,
+    `ACTIONS_COLUMN_LABEL` y `RECIPE_DEFAULT_PINNED_COLUMNS = [IMAGE_COLUMN_ID]`.
+  - Declara seis columnas con los flags de `design.md > 4.1`.
+  - `recipe-columns-skeleton.ts` exporta `RECIPE_SKELETON_COLUMN_COUNT = 6`, sin `'use client'`.
+  - `id: 'description'` y `id: 'createdBy'` no compilan.
 
-### T5 [P] — Fábrica de columnas de proveedores
-- **Archivos:** borrar `S/components/supplier-columns.ts`; crear `S/components/supplier-columns.tsx`.
-- **Requisitos:** R2, R3, R4, R7, R9, R21.
+### T5 [P] — Columnas de proveedores
+- **Archivos:**
+  - borrar `S/components/supplier-columns.ts`;
+  - crear `S/components/supplier-columns.tsx`;
+  - crear `S/components/supplier-columns-skeleton.ts`.
+- **Requisitos:** R2, R3, R4, R7, R9, R18, R21.
 - **Hecho:**
-  - `'use client'`.
   - Exporta `buildSupplierColumns({ rowActions })`, `SupplierColumnId`, `SupplierColumn`,
-    `EMPTY_CELL`, `ACTIONS_COLUMN_ID`, `ACTIONS_COLUMN_LABEL` y `SUPPLIER_DEFAULT_PINNED_COLUMNS`
-    (`['name']`).
+    `EMPTY_CELL`, `ACTIONS_COLUMN_ID`, `ACTIONS_COLUMN_LABEL`,
+    `SUPPLIER_DEFAULT_PINNED_COLUMNS = ['name']` y `SUPPLIER_SKELETON_COLUMN_COUNT = 6`.
   - La celda de nombre es el `Link` de `supplierDetailRoute` con `supplier-detail-link` y
     `min-h-11 min-w-11`.
 
-### T14 [P] — Enmiendas a QC-26 R14 y QC-44 R11
-- **Archivos:** `specs/QC-26-pantalla-de-recetas/requirements.md` (bloque nuevo debajo de l.107),
-  `specs/QC-44-pantalla-de-proveedores/requirements.md` (bloque nuevo debajo de la enmienda,
-  l.95-115, sin reescribirla).
-- **Depende de:** T0.
-- **Requisitos:** R6, R8, R10 (trazabilidad de la inversión).
+### T14 [P] — Enmiendas a QC-26 R8, QC-26 R14 y QC-44 R11
+- **Archivos:**
+  - `specs/QC-26-pantalla-de-recetas/requirements.md`: un bloque debajo de R8 (D14) y otro debajo de
+    R14, en l.107 (D2);
+  - `specs/QC-44-pantalla-de-proveedores/requirements.md`: un bloque a continuación de la enmienda
+    de l.95-115, sin reescribirla.
+- **Requisitos:** R2, R6, R8, R10 (trazabilidad).
 - **Hecho:**
-  - Dos bloques «ENMIENDA DEL 2026-09-15 (QC-56, decisión humana)» con el formato de
+  - Bloques «ENMIENDA DEL 2026-09-15 (QC-56, decisión humana)» con el formato de
     `specs/QC-22-pantalla-de-productos/requirements.md:105-121`.
-  - Dicen qué se invierte, qué sigue protegido (nada se filtra en el cliente) y qué cambia de dueño.
-  - El de QC-44 deja escrito que reabre su frase «La lista de PROVEEDORES no cambia» (l.106).
+  - Explican qué se invierte o qué sale, qué sigue protegido y qué cambia de dueño.
+  - El de QC-44 dice que reabre l.106.
   - No se borra ni se renumera ningún requisito.
 
 ## Tanda 2 — Tablas de cliente
 
-### T6 [P] — Tabla de recetas sobre la tabla compartida
+### T6 [P] — Tabla de recetas
 - **Archivos:** `F/components/recipe-table.tsx` (reescrito).
 - **Depende de:** T2, T4.
-- **Requisitos:** R1, R6, R8, R9, R10, R14, R21, R22, R23.
+- **Requisitos:** R1, R6, R8, R9, R10, R14, R21, R22, R23, R32, R33.
 - **Hecho:**
-  - `'use client'`.
-  - Exporta `RECIPE_TABLE_ID = 'recetas'`, `RECIPE_TABLE_TEXTS`, `RecipeTable` y `RecipeTableProps`.
-  - Monta `<DataTable>` con las columnas de T4 y `rowActions` = `Link` a `recipeEditRoute` +
-    `DeleteRecipeDialog`.
-  - Navega con `recipeListHref` dentro de `startTransition`, con `aria-busy` y rótulo mientras
-    `isPending`.
-  - `rows` pasa sin transformar.
-  - `grep -r "TABLE_ID = '" app` muestra que ningún otro `tableId` vale `'recetas'`.
+  - Es `'use client'`.
+  - Exporta `RECIPE_TABLE_ID = 'recetas'`, `RECIPE_TABLE_TEXTS`, `RECIPE_NO_RESULTS_TEXT`,
+    `RecipeTable` y `RecipeTableProps` (con `noResults?: { clearHref: string; firstPageHref?: string }`).
+  - `<DataTable status="idle">` recibe las columnas de T4 y, como `rowActions`, `Link` a
+    `recipeEditRoute` + `DeleteRecipeDialog`.
+  - Navega con `recipeListHref` dentro de `startTransition`, con `aria-busy` y rótulo mientras dura.
+  - Con `noResults` pasa `texts.empty = RECIPE_NO_RESULTS_TEXT` y un `emptyAction` con
+    `recipe-list-no-results`, `recipe-list-clear-search` y, si llega `firstPageHref`,
+    `recipe-list-no-results-first-page` (`design.md > 4.2`).
+  - Se comprueba que `listRecipes` devuelve `totalPages ≥ 1` con cero filas
+    (`lib/shared/pagination.ts:62`); si no, se acota a 1 aquí.
+  - Ningún otro `tableId` vale `'recetas'` (`grep -r "TABLE_ID = '" app`).
   - No importa `components/ui/table`.
 
-### T7 [P] — Tabla de proveedores sobre la tabla compartida
+### T7 [P] — Tabla de proveedores
 - **Archivos:** `S/components/supplier-table.tsx` (reescrito).
 - **Depende de:** T3, T5.
-- **Requisitos:** R1, R4, R6, R8, R9, R10, R14, R21, R22, R23.
+- **Requisitos:** R1, R4, R6, R8, R9, R10, R14, R21, R22, R23, R32, R33.
 - **Hecho:**
-  - Lo mismo que T6 con `SUPPLIER_TABLE_ID = 'proveedores'`.
+  - Lo mismo que T6, con `SUPPLIER_TABLE_ID = 'proveedores'` y `SUPPLIER_NO_RESULTS_TEXT`.
   - `rowActions` = `SupplierSheet` + `DeleteSupplierDialog`.
-  - Ningún otro `tableId` vale `'proveedores'`.
+  - testIds `supplier-list-no-results`, `supplier-list-clear-search` y
+    `supplier-list-no-results-first-page`.
 
-## Tanda 3 — Sección, estados y página (bloqueada por H1 y H3)
+## Tanda 3 — Sección, estados, esqueleto y página (D12, D15)
 
-### T8 [P] — Recetas: sección, estados, página y barrel
+### T8 [P] — Recetas
 - **Archivos:**
   - `F/components/recipe-list-section.tsx`
-  - `F/components/recipe-list-empty.tsx`
-  - `F/components/recipe-table-skeleton.tsx` (se borra con la variante A; con la B se reescribe
-    para contar columnas con `recipe-columns-skeleton.ts`)
+  - `F/components/recipe-list-empty.tsx` (solo si hace falta ajustar el `firstPageHref`)
+  - `F/components/recipe-table-skeleton.tsx` (reescrito con `RECIPE_SKELETON_COLUMN_COUNT`)
   - borrar `F/components/recipe-list-toolbar.tsx`
   - `F/page.tsx`
   - `F/components/index.ts`
-- **NO toca:** `F/components/recipe-list-error.tsx` (lo reutilizan `F/nueva/page.tsx` y
-  `F/[id]/page.tsx`, H4), `F/nueva/**` ni `F/[id]/**`.
-- **Depende de:** T0 (H1, H3), T6.
-- **Requisitos:** R15, R16, R17, R18, R19, R20, R30.
+- **NO toca:** `F/components/recipe-list-error.tsx` (se conserva, H4), `F/nueva/**`, `F/[id]/**` ni
+  `components/shared/data-table/**`.
+- **Depende de:** T6.
+- **Requisitos:** R15, R16, R17, R18, R19, R20, R30, R32, R33.
 - **Hecho:**
+  - La sección sigue exactamente el orden de `design.md > 4.3`:
+    1. error: `RecipeListError`, fuera;
+    2. cero filas sin búsqueda ni filtro: `RecipeListEmpty`, fuera;
+    3. si no, `<div data-testid="recipe-list"><RecipeTable …/></div>` con **el mismo árbol** tenga
+       filas o `noResults`.
   - `listRecipesAction(params)` aparece una sola vez en la ruta.
-  - El `<Suspense>` de `F/page.tsx` no tiene `key`.
-  - Los estados siguen la variante elegida en `design.md > 5`.
-  - «Volver a la primera» usa `recipeListHref({ ...params, page: FIRST_PAGE })`.
-  - El barrel exporta todo lo nuevo y nada de lo borrado.
+  - En `F/page.tsx`, `<Suspense>` sin `key` y con `fallback={<RecipeTableSkeleton rows={params.pageSize} />}`.
+  - El barrel exporta lo nuevo y nada de lo borrado.
   - `F/nueva` y `F/[id]` compilan sin cambios.
 
-### T9 [P] — Proveedores: sección, estados, página y barrel
+### T9 [P] — Proveedores
 - **Archivos:**
   - `S/components/supplier-list-section.tsx`
-  - `S/components/supplier-list-empty.tsx`
-  - `S/components/supplier-list-error.tsx` (se borra con la variante A)
-  - `S/components/supplier-table-skeleton.tsx` (se borra con la A; se reescribe con la B)
+  - `S/components/supplier-list-empty.tsx` (solo si hace falta ajustar el `firstPageHref`)
+  - `S/components/supplier-table-skeleton.tsx` (reescrito con `SUPPLIER_SKELETON_COLUMN_COUNT`)
   - borrar `S/components/supplier-list-toolbar.tsx`
   - `S/page.tsx`
   - `S/components/index.ts`
-- **NO toca:** `S/[id]/**` (el catálogo ya está migrado).
-- **Depende de:** T0 (H1, H3), T7.
-- **Requisitos:** R15, R16, R17, R18, R19, R20, R30.
+- **NO toca:** `S/components/supplier-list-error.tsx` (se conserva), `S/[id]/**` ni
+  `components/shared/data-table/**`.
+- **Depende de:** T7.
+- **Requisitos:** R15, R16, R17, R18, R19, R20, R30, R32, R33.
 - **Hecho:**
-  - Lo mismo que T8 para proveedores.
-  - El `SupplierSheet` de la cabecera de `S/page.tsx` se conserva.
+  - Lo mismo que T8.
+  - Se conservan el `SupplierSheet` de la cabecera de `S/page.tsx` y el del vacío.
   - `S/[id]/page.tsx` compila sin cambios.
 
 ## Tanda 4 — Tests unitarios y centinela
@@ -162,127 +176,143 @@
 ### T10 [P] — Tests de la pantalla de recetas
 - **Archivos:** `tests/unit/recetas-ui/recipe-page.test.tsx`.
 - **Depende de:** T8.
-- **Requisitos:** R1–R10, R14–R24.
-- **Hecho:**
-  - **Mapa `testId` (l.142-169):**
-    - `recipe-table` → el contenedor de `RecipeTable`;
+- **Requisitos:** R1–R10, R14–R24, R32, R33.
+- **Qué se actualiza:**
+  - **Mapa de testIds (l.142-169):**
     - `recipe-row` → `data-table-row-<id>`;
-    - `recipe-page-size`, `-previous`, `-next`, `-status` → `data-table-page-size`,
-      `data-table-previous`, `data-table-next`, `data-table-page-indicator`;
-    - `recipe-table-skeleton` y `recipe-row-skeleton` → según H1/H3.
-  - **l.442-448:** se espera `listRecipesActionMock` con el `DataTableParams` completo.
-  - **l.450-466 (negativo de QC-26 R14):** se reescribe en positivo según `design.md > 7`.
-  - **l.490-500:** «volver a la primera» conserva orden, búsqueda y rango.
-  - **l.502-513:** carga según la variante de H1.
-  - **Casos nuevos**, al menos uno por requisito:
-    - activar la cabecera `name` navega con `SORT_PARAM` (R6);
-    - `description`, `stepCount` e `image` no tienen botón de orden (R7);
-    - escribir en `data-table-search` navega tras `SEARCH_DEBOUNCE_MS` con temporizadores falsos (R8);
-    - un atajo de fecha navega con `CREATED_FROM_PARAM` (R9);
-    - las filas pintadas son las del simulador y en su orden (R10);
-    - `aria-busy` mientras la transición está en vuelo, y el foco sigue en la búsqueda (R14);
-    - `actions` no ofrece `data-table-pin-actions` y sus controles miden `min-h-11 min-w-11` (R21);
-    - vistas angosta y ancha con `tests/helpers/viewport.ts`: sin scroll del documento (R24).
-  - Ningún assert compara copy (R25).
+    - `recipe-page-size`, `-previous`, `-next`, `-status` → `data-table-page-size`, `-previous`,
+      `-next`, `-page-indicator`;
+    - `recipe-table`, `recipe-table-skeleton`, `recipe-row-skeleton`, `recipe-list-empty` y
+      `recipe-list-error` se conservan;
+    - se añaden `recipe-list-no-results` y `recipe-list-clear-search`.
+  - **l.442-448:** la acción se llama con el `DataTableParams` completo.
+  - **l.450-466:** el negativo de QC-26 R14 pasa a positivo (`design.md > 7`).
+  - **l.490-500:** «volver a la primera» conserva el orden.
+  - **l.502-513:** el esqueleto sigue con `MAX_PAGE_SIZE` filas y ya no existe `recipe-table`.
+- **Casos nuevos:**
+  - no hay `data-table-head-description` ni celda de descripción (R2, D14);
+  - ordenar `name` navega (R6); imagen y pasos no ordenan (R7);
+  - la búsqueda navega tras `SEARCH_DEBOUNCE_MS` (R8); el atajo de fecha navega (R9);
+  - las filas llegan tal cual (R10); `aria-busy` en vuelo (R14);
+  - las acciones no son fijables y miden 44×44 (R21);
+  - vistas angosta y ancha (R24);
+  - `RECIPE_SKELETON_COLUMN_COUNT` coincide con `buildRecipeColumns(...).length` (R18);
+  - con `q` y cero filas se ven `recipe-list-no-results` y `data-table-search` con el término, **no**
+    `recipe-list-empty` ni `recipe-create-open` dentro del estado, y `recipe-list-clear-search`
+    apunta a una URL sin `q` ni fechas (R32, R33);
+  - sin `q` y con cero filas se ve `recipe-list-empty` (R16);
+  - con `page=3`, `q` y cero filas aparece `recipe-list-no-results-first-page` (R32);
+  - **re-render del mismo árbol** de filas a cero filas con el foco en `data-table-search`: el foco y
+    el valor se conservan (R33).
 
 ### T11 [P] — Contrato de ruta de recetas
 - **Archivos:** `tests/unit/recetas-ui/recipe-route-contract.test.ts`.
 - **Depende de:** T8.
-- **Requisitos:** R3, R10, R11, R15, R30.
+- **Requisitos:** R2, R3, R10, R11, R15, R30.
 - **Hecho:**
-  - **`ARCHIVOS_DE_LA_LISTA` (l.119-127):** sin `recipe-list-toolbar.tsx`, `recipe-columns.ts`
-    pasa a `.tsx`, y `recipe-table-skeleton.tsx` según H3.
-  - **l.718-719 y l.758:** leen `recipe-columns.tsx`, que es donde vive ahora `recipe.imageUrl`.
-  - **l.749-752 (negativo de QC-26 R14):** sustituido según `design.md > 7.3`.
-  - **l.1327:** mantiene la comprobación sobre `recipe-table.tsx` y `recipe-list-section.tsx`.
-  - **Se revisan y actualizan** si cierran listas de archivos o de exportaciones: l.996
-    (`CARPETAS_LEGITIMAS`) y l.1233 (`exportadas`). Su contenido exacto no se ha verificado en el
-    spec.
+  - `ARCHIVOS_DE_LA_LISTA` (l.119-127): sin `recipe-list-toolbar.tsx`, y con `recipe-columns.tsx` y
+    `recipe-columns-skeleton.ts`.
+  - l.718-719 y l.758 leen `recipe-columns.tsx`, que no contiene `description`.
+  - l.749-752: el negativo se sustituye según `design.md > 7.3`.
+  - l.1327 se mantiene.
+  - Se revisan l.996 (`CARPETAS_LEGITIMAS`) y l.1233 (`exportadas`), y se actualizan si cierran
+    listas; su contenido exacto no se verificó en el spec.
 
 ### T12 [P] — Tests de la pantalla de proveedores
 - **Archivos:** `tests/unit/proveedores-ui/supplier-page.test.tsx`. Además
-  `tests/unit/proveedores/supplier-route-contract.test.ts` **solo si** cierra la lista de archivos
-  de la lista (comprobarlo al empezar y declararlo en `progress/impl_*`).
+  `tests/unit/proveedores/supplier-route-contract.test.ts` **solo si** cierra la lista de archivos de
+  la lista (comprobarlo y declararlo en `progress/impl_*`).
 - **Depende de:** T9.
-- **Requisitos:** R1–R4, R6–R10, R14–R24.
+- **Requisitos:** R1–R4, R6–R10, R14–R24, R32, R33.
 - **Hecho:**
-  - Mapa `testId` (l.148-180) como en T10, con `supplier-detail-link` conservado.
-  - **l.517-535 (negativo de QC-44 R11):** se reescribe en positivo según `design.md > 7`.
-  - Los mismos casos nuevos que T10, cambiando `image`/`description`/`stepCount` por
-    `phone`/`email`.
+  - Mapa de testIds (l.148-180) como en T10, conservando `supplier-detail-link`.
+  - l.517-535: el negativo de QC-44 R11 pasa a positivo.
+  - Los mismos casos nuevos que T10 salvo el de la descripción, con teléfono y correo como columnas
+    sin orden.
   - La columna fijada por defecto es `name`.
 
-### T13 — Centinela de consumidores de la tabla compartida
+### T13 — Centinela de consumidores y componente intacto
 - **Archivos:** `tests/unit/shared/data-table-alcance.test.ts`.
 - **Depende de:** T8, T15, T16.
-- **Requisitos:** R29.
+- **Requisitos:** R20, R29.
 - **Hecho:**
-  - **l.16-23:** importa también `FORMULAS_ROUTE`.
-  - **l.188-197:** añade `FORMULAS_ROUTE` como **séptima** carpeta autorizada, con su comentario
-    fechado.
-  - **l.205 y l.213:** los textos pasan de «seis» a «siete».
-  - **l.221:** el ancla sube a `toBeGreaterThan(6)`.
-  - **l.224-235:** el caso «la pantalla de recetas sigue SIN consumirlo» se **invierte** en «la
-    pantalla de recetas lo consume por el barrel», sin borrar la mitad que prohíbe importar
-    `app/(private)/produccion` desde la tabla compartida (l.237-258).
-  - **l.388-420:** la lista cerrada de E2E añade, en orden, `e2e/recetas-pasos.spec.ts` y
-    `e2e/recetas.spec.ts`: de nueve a once. Se comprueba que `e2e/errores.spec.ts` **no** entra (H4).
+  - l.16-23: importa `FORMULAS_ROUTE`.
+  - l.188-197: séptima carpeta autorizada, con comentario fechado.
+  - l.205 y l.213: «seis» pasa a «siete».
+  - l.221: `toBeGreaterThan(6)`.
+  - l.224-235: el caso «la pantalla de recetas sigue SIN consumirlo» se **invierte**, sin tocar
+    l.237-258.
+  - l.388-420: la lista de E2E añade, en orden, `e2e/recetas-pasos.spec.ts` y `e2e/recetas.spec.ts`
+    (de nueve a once), y se afirma que `e2e/errores.spec.ts` no entra.
+  - **Caso nuevo (R20):** en esta rama, el diff contra la rama base no toca
+    `components/shared/data-table/**`.
+    - Se reutiliza el enfoque de `tests/unit/configuracion-ui/data-table-intacta.test.ts:38-70`: si
+      el rango git no resuelve, **falla ruidosamente**.
+    - Lleva **precondición de rama**, para no morder en otras ramas, y así lo dice su comentario.
 
-## Tanda 5 — E2E (declaración de líneas para el choque con QC-93, H5)
+## Tanda 5 — E2E (líneas declaradas para el choque con QC-93, H5)
 
 ### T15 [P] — E2E de recetas: búsqueda y orden
 - **Archivos:** `e2e/recetas.spec.ts`.
 - **Depende de:** T8.
 - **Requisitos:** R26.
 - **Líneas que se tocan:**
-  - l.94-98: constantes con los dos nombres nuevos `orden_a` y `orden_b`.
-  - l.199-222: `findRecipeCell` pasa a `data-table-cell-name`, `data-table-next` y el contenedor de
-    la lista.
-  - l.224-281: `beforeAll` crea las dos recetas de orden; antes se comprueba en `db/schema.prisma`
-    qué campos exige `Recipe`, y si no se puede con Prisma se crean por la UI.
+  - l.94-98: nombres `orden_a` y `orden_b`.
+  - l.199-222: `findRecipeCell` pasa a `data-table-cell-name` y `data-table-next`.
+  - l.224-281: `beforeAll` crea las dos recetas de orden (antes se mira `db/schema.prisma`; si no se
+    puede con Prisma, por la UI).
   - l.283-317: `afterAll` las borra por nombre exacto.
-  - Un `test(...)` nuevo dentro del `describe` de l.323, **después de l.374 y antes de l.376**.
-  - Dentro del bloque de QC-93 (l.376-388), **solo** l.386-387 (`data-testid`).
-- **Hecho:** el recorrido de `design.md > 9` está verde en Chromium y WebKit y no deja filas huérfanas.
+  - Un `test(...)` nuevo después de l.374 y antes de l.376.
+  - Dentro del bloque de QC-93, solo l.386-387.
+- **Hecho:** el recorrido de `design.md > 9` está verde en Chromium y WebKit, sin filas huérfanas.
 
-### T16 [P] — E2E de pasos de receta: helper de búsqueda de fila
+### T16 [P] — E2E de pasos de receta: helper
 - **Archivos:** `e2e/recetas-pasos.spec.ts`.
 - **Depende de:** T8.
-- **Requisitos:** R1 (no se rompe al migrar).
-- **Líneas que se tocan:** solo l.192-213 (`findRecipeRow` y su comentario): `recipe-row`,
-  `recipe-page-next` y `recipe-list` pasan a los de la tabla compartida. **No se amplía.**
-- **Hecho:** el spec sigue verde en Chromium y WebKit.
+- **Requisitos:** R1.
+- **Líneas que se tocan:** solo l.192-213 (`findRecipeRow`), que pasa a los testIds de la tabla
+  compartida. No se amplía.
+- **Hecho:** sigue verde en los dos motores.
 
 ### T17 [P] — E2E de proveedores: búsqueda y orden
 - **Archivos:** `e2e/proveedores.spec.ts`.
 - **Depende de:** T9.
 - **Requisitos:** R26.
 - **Líneas que se tocan:**
-  - l.106-108: nombres `orden_a` y `orden_b`.
+  - l.106-108: nombres de las dos filas de orden.
   - l.235-259: `findSupplierRow` pasa a `data-table-row-*` y `data-table-next`.
   - l.283-328: `beforeAll` crea los dos proveedores con Prisma.
   - l.330-365: `afterAll` los borra por nombre exacto.
-  - l.402 y l.411: la fila y `supplier-detail-link`, que se conserva.
-  - Un `test(...)` nuevo dentro del `describe` de l.371, **después de l.465 y antes de l.467**.
-  - Dentro del bloque de QC-93 (l.467-483), **solo** l.479-481 (`data-testid`).
+  - l.402 y l.411: la fila y `supplier-detail-link`.
+  - Un `test(...)` nuevo después de l.465 y antes de l.467.
+  - Dentro del bloque de QC-93, solo l.479-481.
 - **Hecho:** igual que T15.
 
 ## Tanda 6 — Cierre
 
-### T18 — Trazabilidad y entrega al leader
+### T18 — Trazabilidad y entrega
 - **Archivos:** `progress/impl_QC-56-migrar-listas-a-tabla-compartida.md`.
 - **Depende de:** T1–T17.
-- **Requisitos:** los treinta.
+- **Requisitos:** R1–R33.
 - **Hecho:**
-  - Mapa `R1…R30 → test concreto` (archivo y nombre del `it`/`test`) sin huecos.
-  - Lista de archivos tocados, que permite comprobar R27 y R28.
-  - Variantes aplicadas de H1, H2 y H3.
-  - Se dice si el componente compartido se tocó (solo si H1-A lo aprobó) y en qué líneas.
-  - `pnpm typecheck` y `pnpm lint` verdes, con `vitest related` sobre todo lo tocado.
-  - `./init.sh --rapido` y `./init.sh` los corre el leader.
+  - Mapa `R1…R33 → test concreto`, sin huecos.
+  - Lista de archivos tocados: fuera de rutas, tests, E2E y specs, solo `lib/modules/proveedores/index.ts`
+    (R28, R31); ninguno en `components/shared/data-table/` (R20).
+  - Resultado de `pnpm typecheck`, `pnpm lint` y `vitest related`.
+  - El gate lo corre el leader.
 
-## Dependencias en una línea
+## Dependencias
 
-`T0 → {T1, T4, T14}` · `T1 → T3` · `{T2, T4} → T6` · `{T3, T5} → T7` · `{T0, T6} → T8` ·
-`{T0, T7} → T9` · `T8 → {T10, T11, T15, T16}` · `T9 → {T12, T17}` · `{T8, T15, T16} → T13` ·
-`todo → T18`
+```text
+T1 → T3
+{T2, T4} → T6
+{T3, T5} → T7
+T6 → T8
+T7 → T9
+T8 → {T10, T11, T15, T16}
+T9 → {T12, T17}
+{T8, T15, T16} → T13
+todo → T18
+```
+
+T14 no depende de nada.

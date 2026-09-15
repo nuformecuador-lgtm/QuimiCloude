@@ -2,111 +2,110 @@
 
 > Zona `frontend` · complejidad `medium`. Sin tablas, sin migraciones, sin RLS, sin rutas nuevas y
 > sin dependencias. Todo lo citado con `archivo:línea` se leyó en el worktree el 2026-09-15.
+>
+> **Revisado el 2026-09-15 tras F1.4.** D12 resuelve H1 y H3, D13 resuelve H2, D14 cierra la
+> pregunta 2 y D15 la 3. H4 y H5 no cambian. Aparece H6, sobre cómo se cumple D15 sin tocar el
+> componente compartido.
 
-## 0. Hallazgos que contradicen la semilla o que el humano debe decidir (NO resueltos)
+## 0. Hallazgos
 
-Se escriben aquí porque `spec_author` no reabre decisiones cerradas. Cada uno dice qué choca, con
-qué evidencia y qué tareas quedan bloqueadas hasta F1.4.
+### H1 — La decisión 5 chocaba con la referencia de la decisión 2 — **RESUELTO por D12**
 
-### H1 — La decisión 5 choca con la implementación de referencia de la decisión 2
+- **Qué se encontró.** D5 decía que la tabla pinta los tres estados, pero productos
+  (`product-list-section.tsx:45-63`, `product-table.tsx:156`), el catálogo
+  (`catalog-list-section.tsx:57-77`) y pedidos (`order-list-section.tsx:199-221`; su
+  `design.md:549-553` descartó la alternativa) los pintan **fuera**.
+- **Por qué importaba.** `DataTableError` no puede pintar reintentar ni la referencia de QC-71
+  (`data-table-states.tsx:49-76`), y `DataTableLoading` pinta 5 filas fijas (`l.79, 95`;
+  `data-table.tsx:259`).
+- **Resolución (D12).** Vacío, error y carga van **fuera** de la tabla, como en productos, sin tocar
+  el componente. El diseño está en §5.
 
-- **D5** dice: «la pantalla trae los datos y los pasa por props; **la tabla pinta los tres estados**».
-- **D2** dice: «se igualan a productos», y productos **no** lo hace así. Las tres pantallas ya
-  migradas pintan el error y el vacío **fuera** de `<DataTable>` y le pasan siempre `status="idle"`:
-  - productos: `product-list-section.tsx:45-63` y `product-table.tsx:156`;
-  - catálogo de proveedor: `catalog-list-section.tsx:57-77` y `catalog-table.tsx:184`;
-  - pedidos: `order-list-section.tsx:199-221`. Su `design.md:549-553` **descartó** a propósito
-    alimentar `status` con esta razón: «el vacío y el error llevan acción propia y copy propio, y el
-    cargando ya lo da el `<Suspense>` del servidor».
-- **Qué se pierde si D5 se aplica al pie de la letra** (variante A):
-  1. `DataTableError` solo recibe `texts.error` y un `errorMessage` de **texto**
-     (`data-table-states.tsx:49-76`). No puede pintar **reintentar**, ni el **código**, ni la
-     referencia de petición del error inesperado (`UnexpectedErrorNotice`, QC-71 R17). R19 lo exige.
-     Cumplir R19 con la variante A **obliga a tocar el componente compartido**, por ejemplo con una
-     prop de contenido de error. Eso necesita aprobación explícita.
-  2. `DataTableLoading` pinta 5 filas fijas (`data-table-states.tsx:79, 95`), y `DataTable` no le
-     pasa `rowCount` (`data-table.tsx:259`). Hoy el esqueleto pinta tantas filas como el tamaño de
-     página y hay test que lo afirma (`recipe-page.test.tsx:512`). Mantenerlo también exige tocar el
-     componente. La otra salida es aceptar las 5 filas y cambiar el test.
-  3. Lo que la variante A **gana**: con `rows=[]` y sin error, la tabla sigue montando la barra de
-     búsqueda (`data-table.tsx:240-254`). Una búsqueda sin resultados **no hace desaparecer la caja
-     de búsqueda**, que es lo que hoy pasa en productos (pregunta abierta 3).
-- **Variante B (igual que productos):** error y vacío fuera de la tabla, con sus componentes propios.
-  El esqueleto propio sigue como `fallback` del `<Suspense>`. No toca el componente, pero **incumple
-  R20 tal como está escrito** (que sale de D5) y **choca con R30** (ver H3).
-- **Tareas bloqueadas hasta decidir:** T8 y T9, y con ellas T10, T12, T15, T16 y T17.
+### H2 — `SUPPLIER_QUERYABLE` no salía por el barrel de `proveedores` — **RESUELTO por D13**
 
-### H2 — `SUPPLIER_QUERYABLE` no se publica por el barrel de `proveedores`
+`lib/modules/proveedores/index.ts:29` solo exporta la lista blanca del catálogo. D13 autoriza **una
+línea** de export. No cambia lógica ni contenido (R28, R31). Tarea T1.
 
-- `lib/modules/proveedores/index.ts:29` solo exporta `SUPPLIER_CATALOG_LINE_QUERYABLE`.
-  `RECIPE_QUERYABLE` sí sale por el suyo (`lib/modules/recetas/index.ts:28`).
-- R11 obliga a derivar lo ordenable de la lista blanca publicada, y `app/**` no puede importar
-  `domain/**` por ruta profunda (`docs/architecture.md > La regla de dependencias`). Hace falta
-  **una línea** de export en `lib/modules/proveedores/index.ts`.
-- D11 dice «el backend ya soporta todo». La línea no cambia comportamiento (R28 sigue en pie), pero
-  **toca `lib/modules/`**. Hay precedente: la enmienda de QC-44 del 2026-09-07 (l.113-115) publicó así
-  la lista blanca del catálogo. Se declara para aprobarla. Afecta a T1.
+### H3 — «Borrar el esqueleto propio» frente a productos — **RESUELTO por D12**
 
-### H3 — «Borran su esqueleto propio» frente a productos, que conservó el suyo
+Productos conserva `ProductTableSkeleton` como `fallback` (`inventario/page.tsx:93`). D12 y el
+Alcance revisado mantienen el esqueleto propio de cada lista, con tantas filas como el tamaño de
+página (R18, R30).
 
-- El Alcance de la semilla y R30 piden borrar el esqueleto propio. Productos, la referencia de D2,
-  **lo conserva**: `ProductTableSkeleton` es el `fallback` de `inventario/page.tsx:93`, y cuenta sus
-  columnas con una constante (`product-columns-skeleton.ts:15`).
-- Solo se puede borrar con la variante A de H1, donde el `fallback` es la propia tabla compartida en
-  `status="loading"`. Con la variante B el esqueleto se queda y R30 hay que reescribirlo.
-
-### H4 — Hay dos E2E más que dependen de los `data-testid` de la lista
-
-La ficha nombra `e2e/recetas.spec.ts` y `e2e/proveedores.spec.ts`. Medido en disco, hay dos más:
+### H4 — Hay dos E2E más que dependen de los `data-testid` de la lista (sin cambios)
 
 - `e2e/recetas-pasos.spec.ts:197-213`: su helper `findRecipeRow` usa `recipe-row`,
   `recipe-page-next` y `recipe-list`. **Se rompe** con la migración y hay que actualizarlo, sin
   ampliarlo. Al pasar a localizar la tabla compartida, **entra en la lista cerrada de E2E** de
-  `tests/unit/shared/data-table-alcance.test.ts:388-420`. No es un archivo nuevo, así que no choca
-  con D9, pero amplía el alcance.
-- `e2e/errores.spec.ts:221-225` afirma `recipe-list-error`, `-message` y `-code`, pero **en la página
-  de edición** (`FORMULAS_ROUTE/<id>`). `RecipeListError` lo reutilizan `formulas/[id]/page.tsx`
-  (l.12, 86, 94, 102) y `formulas/nueva/page.tsx` (l.9, 51, 59), así que **no se borra, sea cual sea
-  la respuesta a H1**, y ese E2E no se toca.
+  `tests/unit/shared/data-table-alcance.test.ts:388-420`.
+- `e2e/errores.spec.ts:221-225` afirma `recipe-list-error`, `-message` y `-code` **en la página de
+  edición**. `RecipeListError` lo reutilizan `formulas/[id]/page.tsx` (l.12, 86, 94, 102) y
+  `formulas/nueva/page.tsx` (l.9, 51, 59). Con D12 **se conserva** y ese E2E no se toca.
 
-### H5 — Coordinación con QC-93
+### H5 — Coordinación con QC-93 (sin cambios)
 
-`specs/QC-93-aterrizaje-sin-permiso-de-modulo/requirements.md:55` (árbol principal) nombra como
-casos suyos «**recetas R6**» y «**proveedores R52**». Son los tests del usuario que «acaba fuera»:
-`e2e/recetas.spec.ts:376-388` y `e2e/proveedores.spec.ts:467-483`. Esta ficha solo toca, dentro de
-esos bloques, las líneas de `data-testid` (`recetas.spec.ts:386-387`, `proveedores.spec.ts:479-481`).
-Lo demás que toca está fuera de ellos (ver `tasks.md` T15 y T17). **No se ha visto el diff de
-QC-93**, que vive en otra rama: el choque exacto lo valida el leader al sincronizar.
+- `specs/QC-93-aterrizaje-sin-permiso-de-modulo/requirements.md:55` (árbol principal) nombra «recetas
+  R6» y «proveedores R52»: `e2e/recetas.spec.ts:376-388` y `e2e/proveedores.spec.ts:467-483`.
+- Dentro de esos bloques esta ficha solo toca las líneas de `data-testid` (`recetas.spec.ts:386-387`,
+  `proveedores.spec.ts:479-481`). El resto de líneas va declarado en `tasks.md` T15 y T17.
+- **No se ha visto el diff de QC-93.** El choque lo valida el leader al sincronizar.
+
+### H6 — «Sin resultados» (D15) se pinta con el hueco de vacío de la tabla compartida — **a confirmar**
+
+**El problema.** D15 exige que la caja de búsqueda **no desaparezca** cuando una búsqueda o un
+filtro no encuentran nada. Esa caja no es de la pantalla: vive dentro de `<DataTable>`, en
+`DataTableFilters` (`data-table.tsx:245-254`, `data-table-filters.tsx:137-139`), y el barrel **no la
+exporta** (`components/shared/data-table/index.ts:1-10`). Si «sin resultados» se pintara fuera de la
+tabla, como el vacío de D12, la tabla se desmontaría y la caja con ella.
+
+**Opciones que no tocan el componente (D12):**
+
+- **(elegida) Montar `<DataTable>` con `rows=[]` y `status="idle"`.** La tabla resuelve `'empty'` y
+  sigue pintando la barra de búsqueda, los filtros y la paginación
+  (`data-table-states.tsx:33-47`, `data-table.tsx:240-262, 325-332`). El copy de «sin resultados»
+  entra por `texts.empty`, que es una prop, y la acción de limpiar por `emptyAction`. El contenido lo
+  decide la pantalla; el marco del estado es el `data-table-empty` del componente.
+- **(descartada) Pintar «sin resultados» fuera, con una caja de búsqueda propia de la ruta.**
+  Duplicaría `DataTableSearchField` (rebote, borrador y emisión) en cada ruta, y los controles de
+  fecha y de orden desaparecerían igual. Ver alternativa 6 de §10.
+
+**Por qué es un hallazgo y no una decisión mía.** D12 dice «vacío, error y carga fuera de la tabla».
+Aquí «sin resultados» es un estado **distinto** del vacío (así lo nombra D15) y va dentro. Si el
+humano entiende que D12 también lo abarca, D15 no se puede cumplir sin duplicar la caja o tocar el
+componente. **Afecta a** T8, T9, T10, T12, R32 y R33.
 
 ## 1. Qué se copia y de dónde
 
-El patrón es el de la migración de productos (`749d850`), en sus archivos actuales:
+Se copia la migración de productos (`749d850`):
 
 | Pieza | Referencia | Recetas | Proveedores |
 |---|---|---|---|
-| Parser y serializador de URL, `DataTableParams` completo, acotado contra la lista blanca | `inventario/components/product-list-params.ts` | `recipe-list-params.ts` (reescrito) | `supplier-list-params.ts` (reescrito) |
-| Fábrica de columnas de cliente con slot `rowActions` | `product-columns.tsx` | `recipe-columns.tsx` (sustituye a `.ts`) | `supplier-columns.tsx` (sustituye a `.ts`) |
-| Tabla de cliente: `<DataTable>`, navegación dentro de `useTransition`, `aria-busy` y rótulo mientras está en vuelo | `product-table.tsx` | `recipe-table.tsx` (reescrito) | `supplier-table.tsx` (reescrito) |
-| Sección de servidor: una llamada y despacho de estados | `product-list-section.tsx` | `recipe-list-section.tsx` | `supplier-list-section.tsx` |
-| Página: `<Suspense>` **sin `key`** | `inventario/page.tsx:93` | `formulas/page.tsx` | `proveedores/page.tsx` |
+| Parser y serializador de URL con `DataTableParams` completo, acotado contra la lista blanca | `inventario/components/product-list-params.ts` | `recipe-list-params.ts` (reescrito) | `supplier-list-params.ts` (reescrito) |
+| Fábrica de columnas de cliente | `product-columns.tsx` | `recipe-columns.tsx` (sustituye a `.ts`) | `supplier-columns.tsx` (sustituye a `.ts`) |
+| Número de columnas del esqueleto, sin `'use client'` | `product-columns-skeleton.ts` | `recipe-columns-skeleton.ts` (nuevo) | `supplier-columns-skeleton.ts` (nuevo) |
+| Tabla de cliente: `<DataTable>` y `useTransition` | `product-table.tsx` | `recipe-table.tsx` (reescrito) | `supplier-table.tsx` (reescrito) |
+| Sección de servidor y estados fuera | `product-list-section.tsx` | `recipe-list-section.tsx` | `supplier-list-section.tsx` |
+| Esqueleto propio | `product-table-skeleton.tsx` | `recipe-table-skeleton.tsx` (reescrito) | `supplier-table-skeleton.tsx` (reescrito) |
+| Página con `<Suspense>` **sin `key`** | `inventario/page.tsx:93` | `formulas/page.tsx` | `proveedores/page.tsx` |
 
-La fecha usa lo que ya hacen pedidos: `CREATED_FROM_PARAM`/`CREATED_TO_PARAM` y `parseIsoDate`
-(`pedidos/components/order-list-params.ts:46-47, 140-146, 174-180, 219-223`).
-
-**Cada ruta mantiene su parser** y no se extrae uno genérico (alternativa 1, §10).
+**Fecha:** se copian los nombres y el acotado de pedidos (`order-list-params.ts:46-47, 140-146,
+174-180, 219-223`). **Cada ruta mantiene su parser** (alternativa 1 de §10).
 
 ## 2. Datos, operaciones y rutas
 
-- **Sin cambios de datos.** No hay tabla, columna, índice, migración, `down.sql` ni RLS nuevos (R28).
-- **Operaciones:** `listRecipesAction(query: unknown)` (`recipe-actions.ts:178`) y
-  `listSuppliersAction(query: unknown)` (`supplier-actions.ts:189`). Reciben el `DataTableParams`
-  **entero y sin traducir**, que es campo a campo `ListQuery` (`recetas/domain/list-query.ts:42-45,
-  99-106`). El esquema es `strictObject`, así que no se inventa ninguna clave. Hoy reciben
-  `{ page, pageSize }` (`recipe-list-section.tsx:34`, `supplier-list-section.tsx:43`).
-- **Listas blancas (sin tocarlas):** las dos declaran `sortable: ['name', 'createdAt', 'updatedAt']`,
+- **Sin cambios de datos** (R28): ni tabla, ni columna, ni índice, ni migración, ni `down.sql`, ni
+  RLS.
+- **Operaciones.** `listRecipesAction(query: unknown)` (`recipe-actions.ts:178`) y
+  `listSuppliersAction(query: unknown)` (`supplier-actions.ts:189`) reciben el `DataTableParams`
+  **entero**: es `ListQuery` campo a campo, con `strictObject` (`recetas/domain/list-query.ts:42-45,
+  99-106`).
+- **Listas blancas.** Las dos declaran `sortable: ['name', 'createdAt', 'updatedAt']`,
   `filterable: { createdAt: 'dateRange' }` y `searchable: true` (`recipe-queryable.ts:13-17`,
-  `supplier-queryable.ts:11-15`). Recetas la importa del barrel; proveedores necesita H2.
-- **Rutas:** las mismas. Destinos derivados de `FORMULAS_ROUTE`, `SUPPLIERS_ROUTE`,
+  `supplier-queryable.ts:11-15`).
+  - Recetas la importa de `@/lib/modules/recetas` (`index.ts:28`).
+  - Proveedores la importa de `@/lib/modules/proveedores` tras la línea de D13:
+    `export { SUPPLIER_QUERYABLE } from './domain/supplier-queryable';`.
+- **Rutas.** Las mismas. Todos los destinos se derivan de `FORMULAS_ROUTE`, `SUPPLIERS_ROUTE`,
   `NEW_RECIPE_ROUTE`, `recipeEditRoute` y `supplierDetailRoute` (`lib/shared/routes.ts:46-75`).
 
 ## 3. Contrato de la URL (R12, R13)
@@ -114,252 +113,295 @@ La fecha usa lo que ya hacen pedidos: `CREATED_FROM_PARAM`/`CREATED_TO_PARAM` y 
 | Parámetro | Constante | Valor | Acotado (nunca da error) |
 |---|---|---|---|
 | `page` | `PAGE_PARAM` | entero ≥ 1 | inválido → 1 |
-| `pageSize` | `PAGE_SIZE_PARAM` | `DEFAULT_PAGE_SIZE` o `MAX_PAGE_SIZE` | otro valor → por defecto |
-| `sort` | `SORT_PARAM` | `campo:asc` o `campo:desc`, separador `SORT_SEPARATOR` | campo fuera de `*_QUERYABLE.sortable` o dirección desconocida → sin orden |
+| `pageSize` | `PAGE_SIZE_PARAM` | `DEFAULT_PAGE_SIZE` o `MAX_PAGE_SIZE` | otro → por defecto |
+| `sort` | `SORT_PARAM` | `campo:asc` o `campo:desc` (`SORT_SEPARATOR`) | campo fuera de `*_QUERYABLE.sortable` o dirección desconocida → sin orden |
 | `q` | `SEARCH_PARAM` | texto | recortado; solo espacios → sin búsqueda |
-| `createdFrom` / `createdTo` | `CREATED_FROM_PARAM` / `CREATED_TO_PARAM` | `YYYY-MM-DD` que exista | cada extremo inválido pasa a `null`; los dos `null` → sin filtro |
+| `createdFrom` / `createdTo` | `CREATED_FROM_PARAM` / `CREATED_TO_PARAM` | `YYYY-MM-DD` que exista | extremo inválido → `null`; los dos `null` → sin filtro |
 
-Los nombres son **los mismos** que productos (`q`) y pedidos (`createdFrom`/`createdTo`). Así una URL
-de un listado se lee igual en todos.
-
-- De un parámetro repetido se toma el primer valor.
-- `parseXListParams(buildXListQuery(p))` devuelve `p`.
-- La clave del filtro en `DataTableParams.filters` es `createdAt`, que es también el id de columna.
-  Solo se acepta si `*_QUERYABLE.filterable.createdAt === 'dateRange'` (R11).
-
-**Volver a la página 1 al buscar, ordenar o filtrar NO entra** (QC-97 punto 4). Las transiciones
-`withSort`, `withFilter` y `withSearch` conservan la página (`data-table-params.ts:63-91`).
+- Ante un parámetro repetido, gana el primero.
+- `parse(build(p))` devuelve `p`.
+- La clave del filtro es `createdAt`, y solo existe si la lista blanca la declara `dateRange` (R11).
+- Cada parser exporta `hasActiveSearchOrFilter(params)`, que devuelve
+  `params.search !== '' || Object.keys(params.filters).length > 0`. Es la definición del glosario y
+  decide entre vacío (R16) y «sin resultados» (R32).
+- Cada parser exporta también `clearSearchAndFilters(params)`, que devuelve
+  `{ ...params, search: '', filters: {}, page: FIRST_PAGE }` (R33).
+  - Volver a la página 1 **aquí** no invade QC-97 punto 4: aquel habla de buscar, ordenar o filtrar,
+    y esto es limpiar.
+  - Sin volver a la 1, limpiar desde la página 3 podría caer en otro vacío. *Decisión de diseño
+    revisable.*
+- **Volver a la página 1 al buscar, ordenar o filtrar NO entra** (QC-97 punto 4;
+  `data-table-params.ts:63-91`).
 
 ## 4. Piezas por pantalla
 
 ### 4.1 Columnas (R2, R3, R4, R5, R7, R9, R21)
 
-Son **fábricas de cliente** (`'use client'`) que devuelven `DataTableColumn<T>[]` con el id acotado
-por tipo. El tipo sigue siendo la primera defensa de R3, como hoy (`recipe-columns.ts:20-28`,
-`supplier-columns.ts:25-33`):
+Son fábricas `'use client'`. El tipo de id es la primera defensa de R3.
 
-- `RecipeColumnId = Exclude<keyof RecipeSummary, 'id' | 'createdBy' | 'updatedBy' | 'imageUrl'> | 'image' | 'actions'`
-- `SupplierColumnId = Exclude<keyof SupplierView, 'id' | 'nameNormalized' | 'createdBy' | 'updatedBy'> | 'actions'`
-
-**Recetas** (`buildRecipeColumns({ rowActions })`):
+**Recetas.** `RecipeColumnId = Exclude<keyof RecipeSummary, 'id' | 'createdBy' | 'updatedBy' |
+'imageUrl' | 'description'> | 'image' | 'actions'`. Añadir `'description'` al `Exclude` hace que una
+columna de descripción **no compile** (D14, R2).
 
 | id | align | sortable | filter | pinnable | celda |
 |---|---|---|---|---|---|
-| `image` | start | — | — | (sí) | `EntityImage` con `recipe.imageUrl` tal cual; testId `recipe-image` o `recipe-image-placeholder` (R5, igual que `recipe-table.tsx:83-87`) |
+| `image` | start | — | — | (sí) | `EntityImage` con `recipe.imageUrl` tal cual; `recipe-image` o `recipe-image-placeholder` (R5) |
 | `name` | start | sí | — | (sí) | nombre |
-| `description` | start | — | — | (sí) | descripción o `EMPTY_CELL` |
 | `stepCount` | end | — | — | (sí) | `String(stepCount)` |
-| `createdAt` | start | sí | `dateRange` | (sí) | `YYYY-MM-DD` en UTC (formato actual) |
+| `createdAt` | start | sí | `dateRange` | (sí) | `YYYY-MM-DD` en UTC |
 | `updatedAt` | start | sí | — | (sí) | `YYYY-MM-DD` en UTC |
 | `actions` | end | — | — | **false** | `rowActions(recipe)` |
 
-**Proveedores** (`buildSupplierColumns({ rowActions })`):
+`RECIPE_SKELETON_COLUMN_COUNT = 6`, en `recipe-columns-skeleton.ts`. Un test lo ata a la longitud
+real de `buildRecipeColumns(...)`, como `product-columns-skeleton.ts:9-15`.
+
+**Proveedores.** `SupplierColumnId = Exclude<keyof SupplierView, 'id' | 'nameNormalized' |
+'createdBy' | 'updatedBy'> | 'actions'`.
 
 | id | align | sortable | filter | pinnable | celda |
 |---|---|---|---|---|---|
-| `name` | start | sí | — | (sí) | `Link` a `supplierDetailRoute(id)`, `min-h-11 min-w-11`, testId `supplier-detail-link` (R4, igual que `supplier-table.tsx:81-89`) |
+| `name` | start | sí | — | (sí) | `Link` a `supplierDetailRoute(id)`, `min-h-11 min-w-11`, `supplier-detail-link` (R4) |
 | `phone` | start | — | — | (sí) | teléfono o `EMPTY_CELL` |
 | `email` | start | — | — | (sí) | correo o `EMPTY_CELL` |
 | `createdAt` | start | sí | `dateRange` | (sí) | `YYYY-MM-DD` en UTC |
 | `updatedAt` | start | sí | — | (sí) | `YYYY-MM-DD` en UTC |
 | `actions` | end | — | — | **false** | `rowActions(supplier)` |
 
-- `sortable` y `filter` **coinciden** con la lista blanca, y el test lo afirma recorriendo la
-  declaración contra `*_QUERYABLE` (R7, R11).
-- **Columna fijada por defecto** (decisión de diseño, revisable en F1.4):
-  - recetas fija `image`, como productos y el catálogo (`product-columns.tsx:93`,
-    `catalog-columns.tsx:90`);
-  - proveedores no tiene imagen y fija `name`, que identifica la fila y lleva el enlace, igual que
-    pedidos fija su correlativo (`order-columns.tsx:84`).
+`SUPPLIER_SKELETON_COLUMN_COUNT = 6`, en `supplier-columns-skeleton.ts`.
 
-### 4.2 Tablas de cliente (R1, R6, R8, R9, R10, R14, R22, R23)
+**Coherencia con la lista blanca.** `sortable` y `filter` coinciden con ella, y hay test que lo
+recorre (R7, R11).
 
-`RecipeTable({ recipes, params, totalPages })` y `SupplierTable({ suppliers, params, totalPages })`
-son `'use client'` y copian `product-table.tsx:94-161`:
+**Columna fijada por defecto** (decisión de diseño, revisable):
 
+- recetas fija `image`, como `product-columns.tsx:93` y `catalog-columns.tsx:90`;
+- proveedores fija `name`, como pedidos fija su correlativo (`order-columns.tsx:84`).
+
+### 4.2 Tablas de cliente (R1, R6, R8, R9, R10, R14, R21–R23, R32, R33)
+
+`RecipeTable` y `SupplierTable` son `'use client'` y copian `product-table.tsx:94-161`.
+
+**Props.**
+- Recetas: `recipes`, `params`, `totalPages` y `noResults?: NoResultsSlot`.
+- Proveedores: lo mismo con `suppliers`.
+
+**Montaje de `<DataTable>`.**
 - `tableId`: `'recetas'` y `'proveedores'`. No chocan con `'inventario'` ni con
   `'proveedor-catalogo'`; T6 y T7 comprueban el resto.
-- `*_TABLE_TEXTS: DataTableTexts` como constantes exportadas. Ningún test las afirma (R25).
-- **Las acciones se montan aquí**, no llegan desde la sección: una función no cruza la frontera
-  servidor→cliente (`catalog-table.tsx:33-38`).
-  - Recetas: `Link` a `recipeEditRoute(id)` con `recipe-edit-open`, más `DeleteRecipeDialog`.
-  - Proveedores: `SupplierSheet` y `DeleteSupplierDialog`.
-  - Los disparadores conservan `min-h-11 min-w-11` (R21).
-- `onParamsChange={(next) => navigate(xListHref(next))}` con `router.push` dentro de
-  `startTransition`. Mientras `isPending` es verdadero: `aria-busy` en el contenedor y un rótulo, sin
-  desmontar la tabla (R14). No se añade una segunda región viva.
-- `searchable` queda en su valor por defecto (`true`), porque las dos listas blancas lo declaran.
-- **No se ordena, filtra ni recorta nada** en el cliente: `rows` se pasa tal cual (R10). La tabla
-  compartida ya pinta `getRowModel()` sin transformar (`data-table.tsx:293-300`).
-- `status` y lo que se pasa en los estados dependen de H1 (§5).
+- `*_TABLE_TEXTS` son constantes exportadas. No se afirman en los tests (R25).
+- `searchable` queda en su valor por defecto (`true`).
+- `status` es **siempre `'idle'`** (D12). Los estados vacío y error nunca llegan a la tabla.
 
-**API de Next usada:** `useRouter` de `next/navigation`, con `router.push(href)` y `router.refresh()`.
-Se comprobó en `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/use-router.md:42-50`,
-leído en el árbol principal porque el worktree no tiene `node_modules`. Es la misma API que ya usan
-`product-table.tsx:95-130` y `recipe-list-error.tsx:36, 66`. No se usa ninguna API nueva.
+**Acciones de fila.** Se montan en la propia tabla, porque una función no cruza la frontera
+servidor→cliente (`catalog-table.tsx:33-38`). Los disparadores conservan `min-h-11 min-w-11`.
+- Recetas: `Link` a `recipeEditRoute` con `recipe-edit-open`, y `DeleteRecipeDialog`.
+- Proveedores: `SupplierSheet` y `DeleteSupplierDialog`.
+
+**Navegación.** `onParamsChange` llama a `router.push(xListHref(next))` dentro de `startTransition`.
+Mientras `isPending`, el contenedor lleva `aria-busy` y un rótulo, y la tabla no se desmonta (R14).
+
+**No se transforma nada en el cliente.** `rows` se pasa tal cual (R10, `data-table.tsx:293-300`).
+
+**«Sin resultados»** (R32, R33, H6).
+- **Qué baja.** `noResults` llega desde la sección solo cuando `rows` está vacío y hay búsqueda o
+  filtro activos. Es serializable: `{ clearHref: string; firstPageHref?: string }`.
+- **Qué hace la tabla.** Pasa a `<DataTable>`:
+  - `texts={{ ...X_TABLE_TEXTS, empty: X_NO_RESULTS_TEXT }}`;
+  - `emptyAction`, que contiene:
+    - un contenedor `data-testid="recipe-list-no-results"` (`supplier-list-no-results` en
+      proveedores);
+    - el enlace «limpiar» `recipe-list-clear-search` / `supplier-list-clear-search`, que navega a
+      `clearHref` con la misma transición;
+    - si llega `firstPageHref`, el enlace `recipe-list-no-results-first-page` /
+      `supplier-list-no-results-first-page`.
+
+**API de Next.** `useRouter` de `next/navigation`, con `router.push` y `router.refresh`
+(`node_modules/next/dist/docs/01-app/03-api-reference/04-functions/use-router.md:42-50`, leído en el
+árbol principal porque el worktree no tiene `node_modules`). Es la misma API que ya usan
+`product-table.tsx:95-130` y `recipe-list-error.tsx:36, 66`.
 
 ### 4.3 Sección, página y barrel
 
-- **Sección** (Server Component): `listXAction(params)` **una sola vez** (R15). Pasa a la tabla
-  `params={{ ...params, page: currentPage }}`. El enlace «volver a la primera» usa
-  `xListHref({ ...params, page: FIRST_PAGE })`, que conserva orden, búsqueda y rango (R17).
-- **Página**: `parseXListParams(await searchParams)` después de `requirePagePermission`, que sigue en
-  la primera línea. El `<Suspense>` **pierde su `key`** (hoy `formulas/page.tsx:82` y
-  `proveedores/page.tsx:71`), por lo mismo que en `inventario/page.tsx:40-43`: remontar borra el foco
-  del campo de búsqueda (R14).
-- **Barrel** `components/index.ts`: deja de exportar `RecipeListToolbar`/`SupplierListToolbar`,
-  `RECIPE_COLUMNS`/`SUPPLIER_COLUMNS` y los tipos `*ListParams`. Exporta las constantes nuevas del
-  parser, la fábrica de columnas, `*_TABLE_ID`, `*_TABLE_TEXTS` y `*_DEFAULT_PINNED_COLUMNS`.
-- **Se borran** (R30): `recipe-list-toolbar.tsx` y `supplier-list-toolbar.tsx` en las dos variantes;
-  `recipe-table-skeleton.tsx` y `supplier-table-skeleton.tsx` solo con la variante A (H3).
+**Sección (Server Component)**, en este orden:
+1. Llama a `listXAction(params)` una sola vez (R15).
+2. Si `status === 'error'`, devuelve `<XListError error={result} />` fuera de la tabla (R19).
+3. Si `items.length === 0` y **no** `hasActiveSearchOrFilter(params)`, devuelve `<XListEmpty>` fuera
+   de la tabla, con la acción de crear y, si `currentPage > FIRST_PAGE`, el `firstPageHref` de
+   `xListHref({ ...params, page: FIRST_PAGE })` (R16, R17).
+4. En cualquier otro caso, filas o «sin resultados», devuelve **la misma estructura**:
+   `<div data-testid="x-list"><XTable … /></div>`, más el disparador de alta en proveedores si hoy
+   está ahí. La diferencia es solo `noResults`:
 
-## 5. Los tres estados, según lo que se responda a H1
+```tsx
+<XTable
+  … rows={items} params={{ ...params, page: currentPage }} totalPages={totalPages}
+  noResults={items.length === 0
+    ? { clearHref: xListHref(clearSearchAndFilters(params)),
+        firstPageHref: currentPage > FIRST_PAGE ? xListHref({ ...params, page: FIRST_PAGE }) : undefined }
+    : undefined}
+/>
+```
 
-| Estado | Variante A (D5 al pie de la letra) | Variante B (igual que productos) |
-|---|---|---|
-| Error | La sección monta la tabla con `rows=[]`, `status="error"` y `errorMessage`. **Para cumplir R19** (reintentar, código, referencia de QC-71) hace falta **una prop nueva en el componente compartido**, que habría que aprobar. Sin ella, R19 se incumple. | `RecipeListError`/`SupplierListError` fuera de la tabla, como hoy. Cumple R19; no cumple R20. |
-| Vacío | Tabla con `rows=[]` y `status="idle"`. Crear y «volver a la primera» van en `emptyAction`. El texto vacío se elige por caso en `texts` (es una prop). La búsqueda sigue a la vista. | `RecipeListEmpty`/`SupplierListEmpty` fuera de la tabla, como hoy. La búsqueda desaparece (pregunta 3). |
-| Primera carga | `fallback` del `<Suspense>`: la tabla con `rows=[]`, `status="loading"` y `totalPages=1` (las props son serializables). Pinta 5 filas fijas (H1.2). | `fallback`: el esqueleto propio, que cuenta columnas con una constante atada por test a la fábrica (`product-columns-skeleton.ts`). |
-| Gesto en vuelo | `useTransition` (§4.2) en las dos variantes | igual |
+**Por qué la misma estructura** (R14, R33). Si «sin resultados» cambiara el elemento padre o la
+posición de `<XTable>`, React remontaría la tabla al volver la navegación, y el campo de búsqueda
+perdería el foco y el borrador justo mientras el usuario escribe. Así, con cero filas sigue montado
+`DataTableSearchField` y su `useState(params.search)` (`data-table-filters.tsx:58`) no se reinicia.
 
-`RecipeListError` **se queda en las dos variantes** (H4). En la variante A,
-`recipe-list-section.tsx` deja de importarlo; `nueva/` y `[id]/` lo siguen usando.
-`SupplierListError` solo lo usa su sección, así que con la variante A queda huérfano y se borra.
+**`totalPages` con cero filas.** `lib/shared/pagination.ts:62` devuelve `1` cuando `total === 0`, así
+que la paginación dice «1 de 1» con los dos botones deshabilitados
+(`data-table-pagination.tsx:55-56`). Que las dos operaciones pasen por esa función **no está
+verificado**: T6 y T7 lo comprueban, y si no, acotan `totalPages` a un mínimo de 1 en la tabla.
 
-## 6. Pregunta abierta 1: ¿caben las columnas? (medición)
+**Página.**
+- `requirePagePermission` sigue en la primera línea, y después
+  `parseXListParams(await searchParams)`.
+- El `<Suspense>` pierde su `key` (hoy `formulas/page.tsx:82`, `proveedores/page.tsx:71`), por lo
+  mismo que `inventario/page.tsx:40-43`.
+- `fallback={<XTableSkeleton rows={params.pageSize} />}` (R18).
 
-**Cómo se midió.** Leyendo el código, sin navegador: en la fase de spec no hay navegador.
+**Esqueleto** (`recipe-table-skeleton.tsx`, `supplier-table-skeleton.tsx`). Deja de importar
+`RECIPE_COLUMNS`/`SUPPLIER_COLUMNS`, que pasan a ser fábricas de cliente, y cuenta con
+`*_SKELETON_COLUMN_COUNT`. Conserva `role="status"`, `aria-busy`, `recipe-table-skeleton` /
+`supplier-table-skeleton` y `*-row-skeleton` × `rows` (R18).
 
-1. **La tabla compartida no fija anchos.** `DataTableColumn` no tiene ancho
-   (`data-table-types.ts:63-75`). `data-table.tsx:153-164` no pasa `size`, y solo usa
-   `getStart`/`getAfter` para el desplazamiento de las columnas fijadas (l.217-226). Las celdas no
-   reciben ancho: el navegador los calcula con el algoritmo automático de tabla.
-2. **El primitivo es el mismo de hoy.** `components/ui/table.tsx:73, 86` pone `whitespace-nowrap`
-   en `th` y `td`, y `l.11` envuelve con `overflow-x-auto`. `recipe-table.tsx` y `supplier-table.tsx`
-   usan hoy **ese mismo** primitivo. La migración **no cambia** cómo se calcula el ancho de las
-   celdas de datos.
-3. **Lo único que crece es la cabecera.** Las columnas ordenables añaden un botón de orden, y todas
-   las fijables un disparador de menú de 44 px (`data-table-header-menu.tsx:100-110, 211-221`). Son
-   unos 44-90 px más por cabecera.
-4. **Contenido más largo posible**, tomado de los esquemas de alta:
+**Vacío y error.**
+- `recipe-list-empty.tsx`, `supplier-list-empty.tsx`, `recipe-list-error.tsx` y
+  `supplier-list-error.tsx` **se conservan** (R30).
+- El error no cambia: sigue con reintentar y con `UnexpectedErrorNotice`.
+- El vacío tampoco cambia salvo que su `firstPageHref` llega ya calculado con `xListHref`, que
+  conserva el orden.
 
-   | Columna | Máximo | Origen |
-   |---|---|---|
-   | Nombre de receta | 120 caracteres | `recipe-input.ts:55` |
-   | **Descripción de receta** | **500 caracteres** | `recipe-input.ts:60` |
-   | Nombre de proveedor | 120 caracteres | `supplier-input.ts:14` |
-   | Teléfono | 40 caracteres | `supplier-input.ts:15` |
-   | Correo electrónico | 160 caracteres | `supplier-input.ts:16` |
-   | Fechas | 10 caracteres | formato `YYYY-MM-DD` |
-   | Pasos | entero | — |
+**Barrel `components/index.ts`.**
+- Deja de exportar `RecipeListToolbar`/`SupplierListToolbar`, `RECIPE_COLUMNS`/`SUPPLIER_COLUMNS` y
+  los tipos `*ListParams`/`*PageSize`.
+- Pasa a exportar las constantes y funciones del parser (incluidas `hasActiveSearchOrFilter` y
+  `clearSearchAndFilters`), la fábrica de columnas, `*_SKELETON_COLUMN_COUNT`, `*_TABLE_ID`,
+  `*_TABLE_TEXTS`, `*_NO_RESULTS_TEXT` y `*_DEFAULT_PINNED_COLUMNS`.
 
-   **Los píxeles no se han medido**: no hay navegador en esta fase. Sin salto de línea, 500
-   caracteres a `text-sm` dan una columna de miles de píxeles.
+**Se borran** (R30): `recipe-list-toolbar.tsx`, `supplier-list-toolbar.tsx`, `recipe-columns.ts` y
+`supplier-columns.ts`; los dos últimos los sustituyen sus versiones `.tsx`.
 
-**Conclusión.**
+## 5. Los estados (D12, D15)
 
-- **No hace falta tocar el componente compartido** para cumplir D7 y R24. El desbordamiento queda
-  contenido en el contenedor del primitivo, igual que hoy. Las acciones siguen alcanzables con el
-  scroll, y la columna fijada por defecto mantiene la fila identificable mientras se desplaza.
-- La descripción es un problema de **legibilidad**, no de que no quepa, y ya existe hoy. Acotarla es
-  posible **dentro de la celda** (un `span` con ancho máximo y `truncate` que devuelve `cell`), sin
-  añadir `width` a `DataTableColumn`. Pero esconde texto: es la pregunta abierta 2.
-- **Deuda anterior, no se arregla aquí:** con **dos o más** columnas fijadas, el desplazamiento sale
-  de `getSize()` de la librería y no del ancho real. Con la fijación por defecto (una sola columna,
-  desplazamiento 0) no se nota. El tamaño por defecto de `@tanstack/table-core` **no se ha podido
-  verificar**: la ruta de `node_modules` no apareció ni en el worktree ni en el árbol principal. Es
-  un dato desconocido y lo verá QC-114 en dispositivo real.
+| Situación | Quién lo pinta | Identificador | Acciones |
+|---|---|---|---|
+| Error de la operación | `XListError`, **fuera** de la tabla | `recipe-list-error` / `supplier-list-error`, `role="alert"` | reintentar (`router.refresh()`); `UnexpectedErrorNotice` si el error es inesperado (QC-71) |
+| Cero filas sin búsqueda ni filtro | `XListEmpty`, **fuera** | `recipe-list-empty` / `supplier-list-empty` | crear; volver a la primera si `page > 1` |
+| Cero filas con búsqueda o filtro | `<DataTable>` con `rows=[]`: marco `data-table-empty`, contenido de la pantalla (H6) | `recipe-list-no-results` / `supplier-list-no-results` | limpiar búsqueda y filtros; volver a la primera si `page > 1`. **Sin** crear |
+| Primera carga | `XTableSkeleton`, **fuera**, como `fallback` | `recipe-table-skeleton` / `supplier-table-skeleton`, `aria-busy` | — (filas = `pageSize`) |
+| Gesto en vuelo | la tabla de cliente (`useTransition`) | `aria-busy` en el contenedor de la tabla | — |
+| Con filas | `<DataTable>` | `data-table-row-<id>` | las de fila |
 
-## 7. Requisitos que se invierten (R6, R8, R10)
+**Exclusión mutua** (R20):
+- error, vacío y filas/«sin resultados» salen de ramas distintas de la sección;
+- el esqueleto solo existe mientras la sección está suspendida;
+- «sin resultados» y «con filas» dependen de `rows.length`, que resuelve la propia tabla
+  (`resolveDataTableState`).
 
-| Requisito | Qué dice hoy | Tests que hoy lo afirman en negativo |
-|---|---|---|
-| QC-26 R14 (`specs/QC-26-pantalla-de-recetas/requirements.md:107`) | La pantalla no ofrece búsqueda ni orden | `tests/unit/recetas-ui/recipe-page.test.tsx:450-466` (sin `searchbox` ni `textbox`, un solo `combobox`, sin botones en las cabeceras); `tests/unit/recetas-ui/recipe-route-contract.test.ts:749-752` (ningún archivo contiene `type="search"`, `orderBy`, `sortBy` ni `sortDirection`) |
-| QC-44 R11, **para la lista de proveedores** (`specs/QC-44-pantalla-de-proveedores/requirements.md:93`, enmienda l.95-115 que decía «la lista de PROVEEDORES no cambia», l.106) | Ninguna de las dos listas ofrece búsqueda ni orden | `tests/unit/proveedores-ui/supplier-page.test.tsx:517-535` (mismas cuatro afirmaciones) |
+**El componente compartido no se toca** (D12, R20). T13 lo afirma sobre el diff.
 
-**Cómo se actualizan** (mismo procedimiento que `749d850` con QC-22 R13):
+## 6. Pregunta abierta 1: medición de anchos (se conserva; la descripción ya no entra)
 
-1. **Enmienda en el spec origen**, sin borrar el requisito. Se añade un bloque «ENMIENDA DEL
-   2026-09-15» debajo de QC-26 R14 y otro que amplía la enmienda de QC-44 (l.95-115), con el formato
-   de `specs/QC-22-pantalla-de-productos/requirements.md:105-121`. Dicen qué se invierte, por qué
-   (la lista blanca de QC-57), que lo que protegía sigue en pie (R10 de esta ficha) y qué cambia de
-   dueño (paginación y tamaño, con los `data-testid` de la tabla compartida).
-2. **Los tests en negativo se reescriben en positivo**, no se borran. El mismo `it` pasa a afirmar:
-   - hay un `searchbox`;
-   - las cabeceras de `name`, `createdAt` y `updatedAt` tienen botón y `aria-sort`;
-   - las de las demás columnas no;
-   - activarlas **navega** con `sort` en la URL (`router.push` simulado);
-   - las filas pintadas son las del simulador de la operación, en su orden (R10).
-3. **El negativo del contrato de ruta** (`recipe-route-contract.test.ts:751`) se sustituye por dos
-   afirmaciones:
-   - «ningún archivo de la lista contiene `.sort(`, `.filter(` ni `.includes(` sobre las filas
-     recibidas», acotado a los archivos de tabla y de columnas;
-   - «el parser importa `RECIPE_QUERYABLE`».
+- **La tabla compartida no fija anchos.** `DataTableColumn` no tiene ancho
+  (`data-table-types.ts:63-75`), y `data-table.tsx` solo usa `getStart`/`getAfter` para fijar columnas
+  (l.217-226).
+- **El primitivo es el mismo que hoy.** `components/ui/table.tsx:73, 86` pone `whitespace-nowrap` y
+  `l.11` envuelve con `overflow-x-auto`. La migración no cambia cómo se mide una celda de datos.
+- **Lo único que crece es la cabecera**: unos 44-90 px por el botón de orden y el menú
+  (`data-table-header-menu.tsx:100-110, 211-221`).
+- **Contenido más largo que queda:** nombre de receta o de proveedor, 120 caracteres
+  (`recipe-input.ts:55`, `supplier-input.ts:14`); teléfono, 40 (`l.15`); correo, 160 (`l.16`). **La
+  descripción de 500 caracteres ya no se pinta (D14)**, y era la única columna problemática.
+- **No se han medido píxeles en un navegador.**
+- **Conclusión:** no hace falta tocar el componente, y el desbordamiento queda contenido (R24).
+- **Deuda anterior, sin arreglar.** Con dos o más columnas fijadas, el desplazamiento sale de
+  `getSize()` de la librería. El tamaño por defecto de `@tanstack/table-core` **no se ha podido
+  verificar**: no apareció su `node_modules`. Queda para QC-114.
 
-   `orderBy` sigue prohibido: es Prisma y no tiene sitio en la UI.
+## 7. Requisitos de otras fichas que cambian
+
+| Requisito | Qué dice hoy | Qué lo cambia | Tests que lo afirman hoy |
+|---|---|---|---|
+| QC-26 R14 (`specs/QC-26-pantalla-de-recetas/requirements.md:107`) | no hay búsqueda ni orden | D2: se **invierte** | `recipe-page.test.tsx:450-466`; `recipe-route-contract.test.ts:749-752` |
+| QC-26 R8 (columnas de la lista) | incluye la descripción | D14: la descripción **sale** | `recipe-page.test.tsx`, que recorre `RECIPE_COLUMNS`; `recipe-route-contract.test.ts:718-719` |
+| QC-44 R11, para la lista de proveedores (`requirements.md:93`; enmienda l.95-115, «la lista de PROVEEDORES no cambia» en l.106) | no hay búsqueda ni orden | D2: se **invierte** | `supplier-page.test.tsx:517-535` |
+
+**Cómo se actualizan** (procedimiento de `749d850` con QC-22 R13):
+
+1. **Enmiendas fechadas** en el spec de origen, con el formato de
+   `specs/QC-22-pantalla-de-productos/requirements.md:105-121`: debajo de QC-26 R8, debajo de QC-26
+   R14 y a continuación de la enmienda de QC-44. No se borra ni se renumera nada.
+2. **Los tests en negativo pasan a positivo** en el mismo `it`, que afirma:
+   - que hay `searchbox`;
+   - que las cabeceras `name`, `createdAt` y `updatedAt` tienen botón y `aria-sort`, y las demás no;
+   - que activarlas navega con `SORT_PARAM`;
+   - que las filas son las del simulador y en su orden.
+3. **El negativo del contrato de ruta** (`recipe-route-contract.test.ts:751`) se sustituye por:
+   - ningún archivo de tabla o de columnas aplica `.sort(`, `.filter(` ni recorte a las filas
+     recibidas;
+   - el parser importa `RECIPE_QUERYABLE` del barrel.
+
+   `orderBy` sigue prohibido.
+4. **La columna de descripción:** el test de columnas afirma que `description` **no** está entre los
+   ids y que no aparece ninguna celda `data-table-cell-description` (R2).
 
 ## 8. Tests y trazabilidad prevista
 
 | Requisitos | Dónde se prueban |
 |---|---|
-| R11, R12, R13, R22 | `recipe-list-params.test.ts`, `supplier-list-params.test.ts`: ida y vuelta, acotado caso por caso, derivado de `*_QUERYABLE` |
-| R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R14, R15, R16, R17, R18, R19, R20, R21, R23, R24 | `recipe-page.test.tsx`, `supplier-page.test.tsx`: árbol real de la página con los simuladores de siempre; vistas angosta y ancha con `tests/helpers/viewport.ts` para R24 |
-| R3, R10, R15, R30 | `recipe-route-contract.test.ts` y el equivalente de proveedores si existe (T12 lo comprueba) |
-| R29 | `tests/unit/shared/data-table-alcance.test.ts` |
-| R26 | `e2e/recetas.spec.ts`, `e2e/proveedores.spec.ts` (§9) |
-| R25 | revisión sobre los propios tests, sin guardia nueva |
+| R11, R12, R13, R22, y las funciones de R32/R33 | `recipe-list-params.test.ts`, `supplier-list-params.test.ts` |
+| R1–R10, R14–R24, R32, R33 | `recipe-page.test.tsx`, `supplier-page.test.tsx`: árbol real de la página; vistas angosta y ancha con `tests/helpers/viewport.ts` (R24); **foco en `data-table-search` que se conserva** al pasar de filas a «sin resultados» con el mismo árbol (R33) |
+| R3, R10, R15, R30 | `recipe-route-contract.test.ts` (y el de proveedores si cierra archivos) |
+| R20 (componente intacto), R29 | `tests/unit/shared/data-table-alcance.test.ts` |
+| R26 | `e2e/recetas.spec.ts`, `e2e/proveedores.spec.ts` |
+| R25 | revisión de los propios tests |
 | R27 | `tests/guards/guard-dependencias-aprobadas.test.ts`, sin cambios |
-| R28 | `tests/unit/shared/listas-blancas-listados.test.ts`, sin cambios, más la lista de archivos tocados en `progress/impl_*` |
+| R28, R31 | `tests/unit/shared/listas-blancas-listados.test.ts` sin cambios, `guard-arquitectura-modulos` y un test que importa `SUPPLIER_QUERYABLE` desde `@/lib/modules/proveedores` y lo compara con el de `domain/` |
 
 ## 9. E2E (R26)
 
-- **Datos:** además de lo que cada spec ya crea, dos filas propias con nombres
-  `${FIXTURE_PREFIX}orden_a_${RUN_ID}` y `${FIXTURE_PREFIX}orden_b_${RUN_ID}`. Se afirma **solo** sobre
-  ellas, nunca sobre «la primera fila» ni sobre totales, porque las tablas son compartidas. Se borran
-  en `afterAll` por su nombre exacto.
-- **Cómo se crean:** en proveedores, con Prisma en `beforeAll` (el proveedor solo exige nombre y una
-  vía de contacto). En recetas, **qué campos obligatorios exige `Recipe` con Prisma no se ha
-  verificado**; T15 lo mira en `db/schema.prisma` antes de elegir entre Prisma y la UI.
-- **Recorrido:**
-  1. Escribir `RUN_ID` en `data-table-search`.
-  2. Esperar a que la URL lleve `SEARCH_PARAM`.
-  3. Afirmar que las dos filas (`[data-testid^="data-table-row-"]` filtrado por nombre) están
-     visibles.
-  4. Pedir `data-table-sort-desc-name`.
-  5. Esperar a que `SORT_PARAM` sea `name:desc` y a que `data-table-head-name` tenga
-     `aria-sort="descending"`.
-  6. Afirmar que la fila `b` va antes que la `a` en el DOM.
-- **Motores:** Chromium y WebKit, con los proyectos que ya tiene la config.
+**Filas propias del spec.** `${FIXTURE_PREFIX}orden_a_${RUN_ID}` y `${FIXTURE_PREFIX}orden_b_${RUN_ID}`.
+Los asserts miran solo esas dos, y `afterAll` las borra por nombre exacto.
+- Proveedores: se crean con Prisma.
+- Recetas: **no se ha verificado qué campos exige `Recipe`**. T15 mira `db/schema.prisma` antes de
+  elegir entre Prisma y la UI.
+
+**Recorrido:**
+1. Escribir `RUN_ID` en `data-table-search`.
+2. Esperar a que la URL lleve `SEARCH_PARAM`.
+3. Comprobar que las dos filas (`data-table-row-*` filtradas por nombre) están visibles.
+4. Pulsar `data-table-sort-desc-name`.
+5. Esperar `SORT_PARAM` y `aria-sort="descending"` en `data-table-head-name`.
+6. Comprobar que la fila `b` va antes que la `a`.
+
+Corre en Chromium y en WebKit.
 
 ## 10. Alternativas descartadas
 
-1. **Un parser de lista genérico compartido por recetas y proveedores**, que tienen la misma lista
-   blanca. *Descartada:* ataría dos rutas por sus componentes internos. El precedente escrito es que
-   cada ruta tenga el suyo (`supplier-list-params.ts:24-26`); productos, pedidos y el catálogo lo
-   cumplen. Promoverlo a `components/shared/` exigiría una API común que hoy no pide nadie
-   (`docs/architecture.md > Regla: sin sobre-ingeniería`).
-2. **Añadir `width`/`minWidth` a `DataTableColumn`** para resolver la pregunta 1 de raíz.
-   *Descartada:* la medición (§6) muestra que no hace falta para cumplir las decisiones, y tocaría el
-   contrato de siete consumidores y la guardia de «componente intacto» de QC-45.
-3. **Conservar la `key` del `<Suspense>`** para que el esqueleto reaparezca en cada gesto, como hoy.
-   *Descartada:* remonta la barra de filtros y pierde el foco y el texto del campo de búsqueda. Es
-   justo lo que productos corrigió (`inventario/page.tsx:40-43`) e incumpliría R14.
-4. **Pasar las acciones de fila como slot desde la sección de servidor.** *Descartada:* una función
-   no cruza la frontera servidor→cliente. Rompió el catálogo de proveedor el 2026-09-07
-   (`catalog-table.tsx:33-38`).
-5. **Búsqueda u orden en el navegador sobre la página ya descargada.** *Descartada* por D2 y R10:
-   miraría solo la página visible y mentiría sobre el total.
+1. **Un parser genérico compartido** entre las dos rutas. *Descartada:* acopla rutas por sus
+   internos; el precedente es un parser por ruta (`supplier-list-params.ts:24-26`).
+2. **Añadir `width` a `DataTableColumn`.** *Descartada:* no hace falta (§6), y D12 prohíbe tocar el
+   componente.
+3. **Conservar la `key` del `<Suspense>`.** *Descartada:* borra el foco del campo de búsqueda
+   (`inventario/page.tsx:40-43`); incumpliría R14 y R33.
+4. **Acciones de fila como slot desde la sección de servidor.** *Descartada:* las funciones no cruzan
+   la frontera (`catalog-table.tsx:33-38`).
+5. **Buscar u ordenar en el navegador.** *Descartada* por D2 y R10.
+6. **«Sin resultados» fuera de la tabla, con una caja de búsqueda propia de la ruta.** *Descartada*
+   (H6): duplica en dos rutas el rebote, el borrador y la emisión de `DataTableSearchField`, que no se
+   exporta; hace desaparecer el control de fecha y el orden, y deja dos cajas distintas según haya
+   filas o no. Montar la tabla con `rows=[]` lo cumple sin código duplicado y sin tocar el
+   componente.
+7. **Pasar `status="error"` o `"loading"` a la tabla** (la antigua variante A). *Descartada por D12.*
 
 ## 11. Dependencias
 
-**Ninguna** (D10, R27). La tabla compartida, `@tanstack/react-table` y `react-day-picker` ya están
-aprobados y montados (`tests/unit/shared/data-table-alcance.test.ts:82-107`).
+**Ninguna** (D10, R27).
 
 ## 12. Riesgos
 
-- **El flake de carga de jsdom** ya documentado en `supplier-page.test.tsx` (`history.md:2286-2288`):
-  un rojo ahí no es por fuerza de esta ficha. Lo diagnostica el leader, no el subagente.
+- **Flake de carga de jsdom** en `supplier-page.test.tsx` (`history.md:2286-2288`). Lo diagnostica el
+  leader.
 - **Choque con QC-93** en los dos E2E (H5).
-- **Barrels de ruta con listas cerradas en sus tests de contrato** (`recipe-route-contract.test.ts`):
-  al cambiar las exportaciones se ponen en rojo a propósito y se actualizan en la misma tarea (T11,
-  T12).
+- **Remontaje accidental de la tabla** si la sección pinta «sin resultados» con otro árbol (§4.3).
+  Hay test que lo afirma.
