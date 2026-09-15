@@ -639,7 +639,7 @@ model Product {
 }
 
 /// Lote de un producto del inventario (2026-09-09). Un producto puede tener VARIOS lotes
-/// (1:N), cada uno con su propia existencia (`stock`), su numero de lote (`lot`, OPCIONAL) y
+/// (1:N), cada uno con su propia existencia (`stock`), su numero de lote (`lot`) y
 /// su fecha de vencimiento (`expiryDate`, OPCIONAL). Es la unidad sobre la que se lleva la
 /// autoria: `createdBy`/`updatedBy` se mudaron AQUI desde `products`.
 ///

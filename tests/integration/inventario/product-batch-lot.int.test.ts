@@ -314,6 +314,41 @@ describe('R16: la serie continua desde el mas alto que existe en la empresa', ()
       await dropFixture(fixture);
     }
   });
+
+  it('R16: con "999999999999999999" tecleado a mano el siguiente es "1000000000000000000" y el siguiente "1000000000000000001", sin techo y sin chocar', async () => {
+    // Hallazgo m4 de la revision. Con el maximo leido como `bigint` sobre `'^[0-9]{1,18}$'`, el
+    // valor de 19 digitos generado aqui quedaba FUERA del maximo: la segunda alta volvia a leer los
+    // dieciocho nueves, proponia otra vez '1000000000000000000', chocaba tres veces y fallaba, y
+    // desde entonces fallaba toda alta con lote generado de la empresa. El espia de
+    // `prisma.$transaction` mide que ninguna de las dos altas choca: una sola transaccion cada una,
+    // sin reintento.
+    const fixture = await createFixture();
+    const spy = vi.spyOn(prisma, '$transaction');
+    try {
+      await altaConLote(fixture, '999999999999999999');
+
+      spy.mockClear();
+      const antesDeLaPrimera = await lotsOfCompany(fixture);
+      const primera = await altaConLote(fixture, null);
+      expect(primera.lot).toBe('1000000000000000000');
+      expect(antesDeLaPrimera).not.toContain(primera.lot);
+      expect(spy, 'la primera alta generada no reintenta').toHaveBeenCalledTimes(1);
+
+      spy.mockClear();
+      const antesDeLaSegunda = await lotsOfCompany(fixture);
+      const segunda = await altaConLote(fixture, null);
+      expect(segunda.lot).toBe('1000000000000000001');
+      expect(antesDeLaSegunda).not.toContain(segunda.lot);
+      expect(spy, 'la segunda alta generada no reintenta').toHaveBeenCalledTimes(1);
+
+      const todos = await lotsOfCompany(fixture);
+      expect(new Set(todos).size).toBe(todos.length);
+      expect(todos).toEqual(['1000000000000000000', '1000000000000000001', '999999999999999999']);
+    } finally {
+      spy.mockRestore();
+      await dropFixture(fixture);
+    }
+  });
 });
 
 describe('R9: solo los lotes puramente numericos cuentan para la serie', () => {
@@ -472,6 +507,19 @@ describe('R14: altas simultaneas de la misma empresa obtienen lotes distintos y 
     //
     // Ocho a la vez y tres rondas para que no pase por suerte de planificacion; son 24 altas
     // cortas, pocos segundos.
+    //
+    // REQUISITO DEL ENTORNO: este test solo tiene sentido con un pool de Prisma de MAS DE UNA
+    // conexion. Con `connection_limit=1` en la URL, las ocho altas se serializarian en el propio
+    // pool -cada `prisma.$transaction` esperaria a que la anterior soltara la unica conexion- y el
+    // test pasaria aunque el lock no existiera. Con el pool por defecto de Prisma (varias conexiones)
+    // si compiten de verdad, y la mutacion sin lock lo pone en rojo.
+    //
+    // CADA RONDA SE ESPERA ENTERA CON `Promise.allSettled`, y no con `Promise.all`, antes de afirmar
+    // y antes del `finally` (hallazgo m5 de la revision). Con `Promise.all`, el primer rechazo corta
+    // la espera mientras las demas altas SIGUEN escribiendo; el `finally` corria `dropFixture` en
+    // mitad de esas escrituras, chocaba con una FK y ese era el error visible, tapando la causa
+    // real. Esperadas todas, se relanza el PRIMER rechazo TAL CUAL -p. ej. el `Error` de reintentos
+    // agotados con el `P2002` como `cause`-, que es el que explica el rojo.
     const fixture = await createFixture();
     const spy = vi.spyOn(prisma, '$transaction');
     try {
@@ -482,7 +530,20 @@ describe('R14: altas simultaneas de la misma empresa obtienen lotes distintos y 
         const altas = Array.from({ length: ALTAS_POR_RONDA }, () =>
           createWithFirstBatch(newProduct(), newBatch(fixture), new Date(), ambito(fixture)),
         );
-        const resultados = await Promise.all(altas);
+        const asentadas = await Promise.allSettled(altas);
+
+        // Todas resuelven: si alguna rechazo, se ve SU error, no uno de la limpieza.
+        const primerRechazo = asentadas.find(
+          (asentada): asentada is PromiseRejectedResult => asentada.status === 'rejected',
+        );
+        if (primerRechazo !== undefined) {
+          const causa: unknown = primerRechazo.reason;
+          throw causa;
+        }
+        const resultados = asentadas.map((asentada) => {
+          if (asentada.status !== 'fulfilled') throw new Error('inalcanzable: ya se relanzo el rechazo');
+          return asentada.value;
+        });
 
         expect(spy).toHaveBeenCalledTimes(ALTAS_POR_RONDA);
 
@@ -874,6 +935,59 @@ describe('R18, R19, R20, R21: la migracion aplicada con su SQL real sobre una co
     });
   });
 
+  it('R18: el relleno continua SIN TECHO desde un lote de 18 o mas digitos, sin chocar con uno de 19 ya escrito y sin reventar con uno de 40', async () => {
+    // Hallazgo m4 de la revision, en su mitad de la migracion. Con el maximo leido como `bigint`
+    // sobre `'^[0-9]{1,18}$'`:
+    //   - en C, el '1000000000000000000' ya tecleado quedaba fuera del maximo, la fila sin lote
+    //     recibia OTRA VEZ '1000000000000000000' y el indice unico abortaba la migracion entera;
+    //   - en B, el lote de 40 digitos quedaba fuera del maximo y la serie arrancaba en '1'.
+    await withMigrationSandbox(async (client, schema) => {
+      const empresaA = randomUUID();
+      const empresaB = randomUUID();
+      const empresaC = randomUUID();
+      const cuarentaDigitos = '1234567890123456789012345678901234567890';
+
+      const filas = {
+        a18: { id: randomUUID(), companyId: empresaA, lot: '999999999999999999', createdAt: '2026-01-01T10:00:00Z' },
+        a1: { id: randomUUID(), companyId: empresaA, lot: null, createdAt: '2026-01-02T10:00:00Z' },
+        a2: { id: randomUUID(), companyId: empresaA, lot: null, createdAt: '2026-01-03T10:00:00Z' },
+        b40: { id: randomUUID(), companyId: empresaB, lot: cuarentaDigitos, createdAt: '2026-01-01T10:00:00Z' },
+        b1: { id: randomUUID(), companyId: empresaB, lot: null, createdAt: '2026-01-02T10:00:00Z' },
+        c18: { id: randomUUID(), companyId: empresaC, lot: '999999999999999999', createdAt: '2026-01-01T10:00:00Z' },
+        c19: { id: randomUUID(), companyId: empresaC, lot: '1000000000000000000', createdAt: '2026-01-01T11:00:00Z' },
+        c1: { id: randomUUID(), companyId: empresaC, lot: null, createdAt: '2026-01-02T10:00:00Z' },
+      } satisfies Record<string, SeedRow>;
+      await seed(client, Object.values(filas));
+
+      await runInTransaction(client, UP_SQL);
+
+      const leidas = await client.query<{ id: string; lot: string }>(
+        `SELECT id::text AS id, lot FROM "product_batches"`,
+      );
+      const loteDe = (fila: SeedRow): string => {
+        const encontrada = leidas.rows.find((r) => r.id === fila.id);
+        if (encontrada === undefined) throw new Error(`falta la fila sembrada ${fila.id}`);
+        return encontrada.lot;
+      };
+
+      // A: continua desde los dieciocho nueves, pasando a 19 digitos.
+      expect(loteDe(filas.a1)).toBe('1000000000000000000');
+      expect(loteDe(filas.a2)).toBe('1000000000000000001');
+      // B: continua desde el lote de 40 digitos, exacto y sin notacion cientifica ni decimales.
+      expect(loteDe(filas.b1)).toBe('1234567890123456789012345678901234567891');
+      // C: el maximo es el de 19 digitos, no los dieciocho nueves, asi que no hay choque.
+      expect(loteDe(filas.c1)).toBe('1000000000000000001');
+      // Los que ya tenian lote lo conservan intacto.
+      expect(loteDe(filas.a18)).toBe('999999999999999999');
+      expect(loteDe(filas.b40)).toBe(cuarentaDigitos);
+      expect(loteDe(filas.c18)).toBe('999999999999999999');
+      expect(loteDe(filas.c19)).toBe('1000000000000000000');
+
+      expect(leidas.rows).toHaveLength(Object.keys(filas).length);
+      expect(await schemaState(client, schema)).toEqual({ ...ESTADO_MIGRADO, rlsForced: true });
+    });
+  });
+
   it('R20: con la tabla vacia la migracion aplica sin error y deja NOT NULL, los dos CHECK y el indice unico', async () => {
     await withMigrationSandbox(async (client, schema) => {
       const vacia = await client.query<{ n: number }>(`SELECT count(*)::int AS n FROM "product_batches"`);
@@ -914,3 +1028,4 @@ describe('R18, R19, R20, R21: la migracion aplicada con su SQL real sobre una co
     });
   });
 });
+

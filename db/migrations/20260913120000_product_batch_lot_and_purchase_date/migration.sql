@@ -152,8 +152,16 @@ BEGIN
   -- 4. `lot` para las filas sin lote (R18, D6, D7), por orden de creacion DENTRO DE SU EMPRESA y
   -- continuando desde el maximo numerico de ESA empresa.
   --
-  --   - `'^[0-9]{1,18}$'` acota a lo que cabe en `bigint`: sin la cota, un lote de 40 digitos
-  --     tecleado a mano reventaria el `::bigint` con un `22003` en mitad de la migracion.
+  --   - El maximo se lee con `::numeric` sobre `'^[0-9]+$'`, SIN COTA DE DIGITOS y sin `bigint`
+  --     (hallazgo m4 de la revision, decision del humano del 2026-09-15). La antigua cota `{1,18}`
+  --     solo existia para que el `::bigint` no reventara con un `22003`, y dejaba la serie con
+  --     techo: un lote de 19 digitos quedaba fuera del maximo, y el alta volvia a proponer un valor
+  --     que ya existia. `numeric` no tiene techo practico; el largo lo acota el CHECK
+  --     `product_batches_lot_length` del paso 6, y es el MISMO criterio que usa el alta
+  --     (`resolveLot` de `product-prisma.ts`). `numeric` + `row_number()` da `numeric` de escala 0,
+  --     cuyo `::text` es un entero sin parte decimal.
+  --   - LIMITE CONOCIDO: si una empresa ya tiene un lote de 60 nueves, su siguiente correlativo
+  --     tendria 61 caracteres y el CHECK `product_batches_lot_length` aborta la migracion ENTERA.
   --   - Lo NO numerico (`'ACME-2026-07'`) no entra en el maximo: no es mayor ni menor, no esta en
   --     la serie. Un `'007'` cuenta como 7 y el siguiente es `'8'`, sin ceros (D5).
   --   - El `id` desempata: dos filas con el mismo `created_at` al microsegundo tendrian orden
@@ -163,9 +171,9 @@ BEGIN
    WHERE "lot" IS NULL OR btrim("lot") = '';
 
   WITH base AS (
-    SELECT "company_id", max(("lot")::bigint) AS top
+    SELECT "company_id", max(("lot")::numeric) AS top
       FROM "product_batches"
-     WHERE "lot" ~ '^[0-9]{1,18}$'
+     WHERE "lot" ~ '^[0-9]+$'
      GROUP BY "company_id"
   ), pendientes AS (
     SELECT "id", "company_id",

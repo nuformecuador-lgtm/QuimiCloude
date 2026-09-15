@@ -528,6 +528,131 @@ tres cosas:
    `transaccion`, pero la mayoria de sus casos committean, como dice su cabecera; la guardia no lo
    comprueba a proposito (`docs/verification.md`). El design §8 lo citaba como precedente de `commit`.
 
+### Correcciones de la revision (m2, m4, m5 y m6) · `backend_dev` · 2026-09-15
+
+El reviewer aprobo (0 mayores, 6 menores) y el humano decidio el 2026-09-15 corregirlos antes del PR.
+A la implementacion le tocan m2, m4, m5 y m6. m1, m3 y el reflejo de m4 en el spec son del
+spec_author. Informe de la revision: `progress/review_QC-81-lote-y-fecha-de-compra.md > 6`.
+
+**Aviso de lectura.** Las secciones anteriores de esta bitacora que hablan de `'^[0-9]{1,18}$'` o de
+`max(("lot")::bigint)` (Tanda 1, Tanda 3a) **describen el estado previo a m4** y quedan superadas por
+esta seccion. En la Tanda 1, «un lote de 25 digitos queda intacto y no revienta» sigue siendo cierto,
+pero ahora el relleno **continua** desde el.
+
+**m2. `tests/unit/inventario/schema/inventario-schema.test.ts`.** La cabecera del bloque dice ahora
+«ACTUALIZADO EL 2026-09-15» y nombra las dos inversiones como **aprobadas explicitamente por el humano
+el 2026-09-15**. Cita la afirmacion ademas del numero de linea, porque las lineas se han movido:
+- `:433`, hoy `:436`: `lot.isOptional === false`;
+- `:1111`, hoy hacia `:1165`: `@@unique([companyId, lot], map: "product_batches_company_lot_unique")`.
+
+No cambia ninguna asercion.
+
+**m4. La serie sin techo.** El maximo se lee con `numeric` y no con `bigint`, y sin cota de digitos:
+- `resolveLot` (`product-prisma.ts`) ejecuta `SELECT max(("lot")::numeric)::text AS "top" ... AND "lot" ~ '^[0-9]+$'`;
+  la suma sigue siendo `BigInt(top) + 1` sobre el texto, sin `Number(`.
+- El relleno de `migration.sql`, paso 4, usa `max(("lot")::numeric) AS top ... WHERE "lot" ~ '^[0-9]+$'`.
+  Cambiar el SQL estaba permitido porque la migracion aun no ha llegado a `dev`.
+- **Ceros a la izquierda y decimales.** Medido contra base efimera: `max(x::numeric)` sobre `'007'`,
+  `'0999999999999999999'` y `'42'` da `"999999999999999999"`, sin ceros ni decimales, asi que `'007'`
+  sigue contando como 7 y el siguiente es `'8'`.
+- **Tests de esquema al dia.** `product-batch-lot-migration.test.ts` exige `::numeric`, rechaza
+  `::bigint` y cualquier cota `{n,m}`, y lleva dos mutaciones sinteticas (`conCota`, `conBigint`) que
+  dan `false`. `product-batch-lot-retry.test.ts` no afirmaba sobre el texto del SQL y no cambia.
+- **Huella de migraciones.** Cambio, y la plantilla se reconstruyo sola sobre bases temporales, sin
+  tocar `QuimiCloude`:
+  `test-db: no hay plantilla para esta huella de migraciones. Construyendo qct_tpl_a365fb82c2bf` (antes `qct_tpl_92d13dc6eb14`).
+- **Tests nuevos** en `tests/integration/inventario/product-batch-lot.int.test.ts`:
+  - «R16: con "999999999999999999" tecleado a mano el siguiente es "1000000000000000000" y el siguiente "1000000000000000001", sin techo y sin chocar».
+    Espia `$transaction` (1 por alta, sin reintento) y comprueba que ningun lote generado existia antes.
+    Con el codigo anterior, la segunda alta agotaba los 3 intentos.
+  - «R18: el relleno continua SIN TECHO desde un lote de 18 o mas digitos, sin chocar con uno de 19 ya escrito y sin reventar con uno de 40».
+    Es un escenario del caso 10, con el SQL real de disco. Una de las empresas era justo el caso en que
+    la cota antigua habria abortado la migracion por el indice unico.
+
+**Limite conocido nuevo, medido y no resuelto (para `design.md §9`).** El CHECK
+`product_batches_lot_length` (60 caracteres) pone un techo a la serie. Se midio con un bloque temporal
+contra base efimera, que despues se borro del archivo:
+- **En el alta:** si el maximo numerico de una empresa son 60 nueves, el siguiente generado tendria 61
+  caracteres. El `INSERT` lo rechaza con `23514 product_batches_lot_length`, que llega como
+  `PrismaClientUnknownRequestError` **crudo** (ni `ValidationError` ni `BatchDuplicateLotError`). El
+  borde lo devuelve como `unexpected`. Es ruidoso, abre una sola transaccion y no escribe nada, pero
+  **bloquea para siempre los lotes generados de esa empresa**. Las altas con lote a mano siguen
+  funcionando.
+- **En la migracion:** con 60 nueves y una fila sin lote en la misma empresa, el relleno escribe 61
+  caracteres y la migracion aborta **entera** al crear el CHECK, con el mensaje generico «violada por
+  alguna fila». No deja nada a medias. Con la cota antigua ese lote se ignoraba y la fila recibia `'1'`.
+  Es el mismo tipo de fallo que la desviacion 5 de la Tanda 1 para lotes de mas de 60 caracteres.
+- No se invento ninguna salida para este caso. Queda anotado en el docblock de `resolveLot` y en el
+  comentario del SQL. La decision de si se acepta como limite o se trata es del leader y del spec_author.
+
+**m5. El test de la carrera ya no oculta su causa.**
+- En el `it` «R14, R15: 3 rondas de 8 altas con Promise.all resuelven todas, sin excepcion, sin
+  reintentos y con lotes consecutivos», cada ronda se espera con `Promise.allSettled` y se relanza el
+  **primer** rechazo tal cual, antes de afirmar y antes de la limpieza. Las afirmaciones no cambian.
+- **Comentario nuevo:** el test solo tiene sentido con un pool de Prisma de mas de una conexion. Con
+  `connection_limit=1` las altas se serializarian en el pool y pasaria sin lock.
+- **Nombre del `it`.** Se deja «con Promise.all», para no romper las referencias del mapa y de la
+  revision. Las altas se siguen lanzando a la vez.
+- **La mutacion muerde con la causa real.** Se repitio (lock por `num_nonnulls`, copia y restauracion
+  con `cp`, y `git diff lib/` identico antes y despues). Salida literal:
+  ```
+  × R14, R15: 3 rondas de 8 altas con Promise.all resuelven todas, sin excepcion, sin reintentos y con lotes consecutivos 209ms
+  Error: no se pudo escribir un lote generado sin chocar con el indice unico (company_id, lot): empresa d587ad9a-..., ultimo lote intentado '4', 3 intentos
+   ❯ writeBatchWithLotRetry lib/modules/inventario/adapters/driven/persistence/product-prisma.ts:917:9
+   ❯ tests/integration/inventario/product-batch-lot.int.test.ts:533:27
+  Caused by: PrismaClientKnownRequestError: ... Unique constraint failed on the fields: (`company_id`,`lot`)
+   Test Files  1 failed (1)
+        Tests  1 failed | 15 passed (16)
+  ```
+  No aparece ninguna FK de la limpieza.
+
+**m6.** En el docblock general de `ProductBatch` (`db/schema.prisma:642`), «su numero de lote (`lot`,
+OPCIONAL)» pasa a «su numero de lote (`lot`)».
+
+**Salida real**
+```
+$ pnpm run typecheck -> EXIT=0          $ pnpm run lint -> EXIT=0
+$ pnpm exec vitest run tests/unit/inventario/schema/ tests/unit/inventario/product-batch-lot-retry.test.ts   (repetido por el implementer)
+ Test Files  9 passed (9)
+      Tests  137 passed (137)
+$ pnpm exec vitest run --project integration tests/integration/inventario/
+test-db: la corrida de integracion va contra qct_qc81_75ea7fee_mu2yervh_c8w (copia de qct_tpl_a365fb82c2bf).
+ Test Files  11 passed (11)
+      Tests  137 passed (137)
+test-db: borrada la base de la corrida: qct_qc81_75ea7fee_mu2yervh_c8w.
+$ pnpm exec vitest run guard
+ Test Files  39 passed (39)
+      Tests  407 passed | 9 skipped (416)
+$ pnpm exec vitest run tests/unit/inventario/qc81-alcance.test.ts
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+```
+
+**Lo que m4 deja obsoleto en el spec (para el spec_author; aqui no se toca `specs/**`)**
+1. **`design.md §2.3` («El relleno del lote, escrito»).**
+   - El bloque SQL dice `max(("lot")::bigint)` y `'^[0-9]{1,18}$'`; hoy es `max(("lot")::numeric)` y `'^[0-9]+$'`.
+   - La viñeta «`'^[0-9]{1,18}$'` acota a lo que cabe en `bigint`: sin la cota, un lote de 40 dígitos...
+     reventaría el `::bigint` con un `22003`» deja de ser cierta: no hay cota, y un lote de 40 digitos
+     entra en la serie.
+2. **`design.md §3.2`, paso 2.** Dice `SELECT max(("lot")::bigint) ... '^[0-9]{1,18}$'`; hoy es
+   `max(("lot")::numeric)::text` con `'^[0-9]+$'`, y la suma se hace en `BigInt` sobre el texto.
+3. **`design.md §9` («Límites conocidos»).**
+   - Falta el limite nuevo de los 60 nueves, descrito arriba.
+   - Los dieciocho nueves (m4) **no** entran como limite: quedan resueltos.
+   - El punto 3 (el «9000» salta la serie) sigue siendo cierto, ahora sin techo: un lote de 40 digitos
+     tecleado salta la serie a 40 digitos.
+4. **`design.md §8`, parrafo de la carrera.** Habla de «dos `createWithFirstBatch` con `Promise.all`».
+   El test son 3 rondas de 8, que ahora esperan con `Promise.allSettled` y relanzan el primer rechazo.
+   Tampoco dice que el test exige un pool de mas de una conexion.
+5. **`tasks.md:102` (T6):** «el máximo sobre `'^[0-9]{1,18}$'`».
+6. **Siguen con el texto previo**, que no se editan desde aqui: `progress/review_QC-81-lote-y-fecha-de-compra.md:79-80`
+   y los tramos historicos de esta bitacora señalados en el aviso de lectura.
+
+**Adenda al mapa R -> test (final).** Se suman los dos `it` nuevos de m4, sin quitar nada:
+- **R16:** «R16: con "999999999999999999" tecleado a mano el siguiente es "1000000000000000000" y el siguiente "1000000000000000001", sin techo y sin chocar».
+- **R18:** «R18: el relleno continua SIN TECHO desde un lote de 18 o mas digitos, sin chocar con uno de 19 ya escrito y sin reventar con uno de 40».
+- **R14:** el mismo `it`, con `Promise.allSettled` (m5).
+
 ## Estado final de F2.1
 
 | Task | Estado |

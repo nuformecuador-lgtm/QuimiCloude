@@ -167,13 +167,20 @@ export function fillsPurchaseDateFromCreatedAtInUtc(sql: string): boolean {
 
 /**
  * R18. ¿El relleno de lote toma SOLO las filas en blanco, las numera por empresa y por orden de
- * creacion con el `id` de desempate, y continua desde el maximo numerico acotado a `bigint`?
+ * creacion con el `id` de desempate, y continua desde el maximo numerico SIN TECHO?
+ *
+ * El maximo se lee con `::numeric` sobre `'^[0-9]+$'` (hallazgo m4, decision del humano del
+ * 2026-09-15). Ni `::bigint` ni la cota `{1,18}` que lo protegia: con ellos un lote de 19 digitos
+ * quedaba fuera del maximo y la serie tenia techo. Se exige tambien que NO quede ningun `::bigint`
+ * sobre `lot` en el SQL ejecutable, para que una vuelta atras a medias no pase.
  */
 export function fillsLotBySeriesPerCompany(sql: string): boolean {
   const text = executable(sql)
   return (
-    /max\(\("lot"\)::bigint\)/i.test(text) &&
-    text.includes(`WHERE "lot" ~ '^[0-9]{1,18}$'`) &&
+    /max\(\("lot"\)::numeric\)/i.test(text) &&
+    !/\("lot"\)::bigint/i.test(text) &&
+    text.includes(`WHERE "lot" ~ '^[0-9]+$'`) &&
+    !/'\^\[0-9\]\{\d+,\d+\}\$'/.test(text) &&
     /row_number\(\) OVER \(PARTITION BY "company_id" ORDER BY "created_at", "id"\)/i.test(text) &&
     /WHERE "lot" IS NULL OR btrim\("lot"\) = ''/i.test(text) &&
     /SET "lot" = \(COALESCE\(base\.top, 0\) \+ pendientes\.rn\)::text/i.test(text)
@@ -445,13 +452,18 @@ describe('QC-81 migration.sql — orden, relleno y restricciones', () => {
     expect(sinDesempate).not.toBe(upSource)
     expect(fillsLotBySeriesPerCompany(sinDesempate)).toBe(false)
 
-    // `replaceAll`: el literal aparece antes en un COMENTARIO del archivo, y un `replace` simple
-    // mutaria la prosa y dejaria el SQL intacto. Y el reemplazo va en FUNCION: como cadena, el `$'`
-    // de `'^[0-9]+$'` es un patron especial de `replace` que reinserta el resto del texto --con el
-    // literal original dentro-- y la mutacion no mutaria nada.
-    const sinCota = upSource.replaceAll(`'^[0-9]{1,18}$'`, () => `'^[0-9]+$'`)
-    expect(sinCota).not.toBe(upSource)
-    expect(fillsLotBySeriesPerCompany(sinCota)).toBe(false)
+    // m4 (2026-09-15): la serie NO tiene techo. Las dos vueltas atras que la reintroducirian dan
+    // rojo. `replaceAll`: el literal aparece antes en un COMENTARIO del archivo, y un `replace`
+    // simple mutaria la prosa y dejaria el SQL intacto. Y el reemplazo va en FUNCION: como cadena,
+    // el `$'` de `'^[0-9]+$'` es un patron especial de `replace` que reinserta el resto del texto
+    // --con el literal original dentro-- y la mutacion no mutaria nada.
+    const conCota = upSource.replaceAll(`'^[0-9]+$'`, () => `'^[0-9]{1,18}$'`)
+    expect(conCota, 'la mutacion no reintrodujo la cota {1,18}').not.toBe(upSource)
+    expect(fillsLotBySeriesPerCompany(conCota)).toBe(false)
+
+    const conBigint = upSource.replaceAll(`max(("lot")::numeric)`, () => `max(("lot")::bigint)`)
+    expect(conBigint, 'la mutacion no volvio a ::bigint').not.toBe(upSource)
+    expect(fillsLotBySeriesPerCompany(conBigint)).toBe(false)
 
     const serieGlobal = upSource.replace('PARTITION BY "company_id" ', '')
     expect(serieGlobal).not.toBe(upSource)

@@ -1049,7 +1049,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
 //
 // Cubre R25.
 //
-// ACTUALIZADO EL 2026-09-13 POR QC-81 (lote-y-fecha-de-compra, `design.md > 0.3`), con la
+// ACTUALIZADO EL 2026-09-15 POR QC-81 (lote-y-fecha-de-compra, `design.md > 0.3`), con la
 // aprobacion del humano en F1.4 y por el mismo motivo que QC-80 retiro arriba la guardia de
 // alcance de QC-90: una feature no puede cumplir la afirmacion de alcance de otra. Este bloque
 // exigia TRES cosas que QC-81 tiene que cambiar a proposito, y se habria puesto rojo por hacer
@@ -1060,6 +1060,15 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
 //      cambia lo que QC-90 R12 dejo opcional a proposito--; y
 //   3. la AUSENCIA de `@@unique` sobre `lot` («QC-49 R30: la unicidad (empresa, lote) es QC-81»)
 //      --QC-81 es justo la ficha que la pone, R11--.
+// DOS DE ESAS INVERSIONES VAN MAS ALLA DEL TEXTO LITERAL DE F1.4 Y LAS APROBO EXPLICITAMENTE EL
+// HUMANO EL 2026-09-15 (hallazgo m2 de la revision de QC-81). Con la numeracion de la revision:
+//   - `:433` -> `expect(lot.isOptional, 'lot es NOT NULL desde QC-81 (R7)').toBe(false)` en el caso
+//     «ProductBatch declara la presentacion, el stock, el coste y la autoria mudados desde
+//     products», FUERA de este bloque: la misma afirmacion que el punto 2, repetida alli;
+//   - `:1111` -> el `@@unique([companyId, lot], map: "product_batches_company_lot_unique")` del caso
+//     «R25, R28: ProductBatch conserva las columnas...» de abajo, que antes afirmaba su AUSENCIA
+//     (punto 3).
+// Si las lineas se mueven, valen las afirmaciones, no los numeros.
 // Las tres se INVIERTEN aqui en vez de borrarse: pasan a vigilar la forma que QC-81 fija. El resto
 // del bloque --la presentacion vive solo en el lote, `companyId` obligatorio y sin `@relation`, la
 // forma de `unitCost` y de `expiryDate`-- sigue vigente y NO se toca. Lo que la base garantiza

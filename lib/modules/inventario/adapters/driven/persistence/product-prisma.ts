@@ -546,8 +546,10 @@ const BATCH_LOT_LOCK_NAMESPACE = 81;
  *  en la clave, asi que dos empresas NUNCA se hacen cola entre si. */
 const BATCH_LOT_LOCK_KEY_PREFIX = 'product_batches_lot:';
 
-/** Fila del maximo de la serie. Llega como TEXTO (`::text` en la consulta) y no como `bigint`:
- *  un lote de 18 digitos no cabe en un `number` sin perder precision. */
+/** Fila del maximo de la serie. Llega como TEXTO (`::text` en la consulta) y no como numero: la
+ *  serie no tiene techo -el maximo se lee con `numeric`- y un lote de mas de 15 digitos ya no cabe
+ *  en un `number` sin perder precision. El texto de un `numeric` de escala 0 es un entero sin parte
+ *  decimal, que es lo que `BigInt` necesita para parsearlo. */
 type BatchLotTopRow = { readonly top: string | null };
 
 /**
@@ -561,7 +563,7 @@ type BatchLotTopRow = { readonly top: string | null };
  * **Lote generado (`batch.lot === null`)**, tres pasos DENTRO de la transaccion que escribe:
  *
  *   1. `pg_advisory_xact_lock(<ns>, hashtext('product_batches_lot:' || company_id))`,
- *   2. `SELECT max(lot::bigint)` sobre los lotes PURAMENTE numericos de la empresa,
+ *   2. `SELECT max(lot::numeric)` sobre los lotes PURAMENTE numericos de la empresa,
  *   3. el `INSERT` con la API tipada, que hace quien llama con el valor devuelto.
  *
  * **POR QUE EL LOCK ES UNA SENTENCIA APARTE Y VA ANTES DEL `SELECT`, y no dentro de la sentencia que
@@ -580,12 +582,25 @@ type BatchLotTopRow = { readonly top: string | null };
  * Va con `$executeRaw` y no con `$queryRaw` porque `pg_advisory_xact_lock` devuelve `void`, y el
  * cliente no sabe deserializar una columna de ese tipo; `$executeRaw` no lee filas.
  *
- * **El maximo** se lee sobre `'^[0-9]{1,18}$'`: lo no numerico (`'ACME-2026-07'`) no esta en la
- * serie y no la mueve (R9), un `'007'` cuenta como 7, y la cota de 18 digitos es lo que cabe en
- * `bigint` -sin ella un lote tecleado de 40 digitos reventaria el `::bigint`-. Es el MISMO criterio
- * que el relleno de la migracion (`design.md > 2.3`), para que la migracion y el alta no discrepen
- * sobre cual es «el mas alto». Sin ningun lote numerico el maximo es `NULL` y el primero es `'1'`.
- * El siguiente se escribe sin ceros a la izquierda (D5).
+ * **El maximo** se lee sobre `'^[0-9]+$'` y con `::numeric`: lo no numerico (`'ACME-2026-07'`) no
+ * esta en la serie y no la mueve (R9), y un `'007'` cuenta como 7. SIN COTA DE DIGITOS Y SIN
+ * `bigint`, a proposito (hallazgo m4 de la revision, decision del humano del 2026-09-15): con la
+ * antigua cota `{1,18}` -que solo existia para que el `::bigint` no reventara- un lote tecleado
+ * `'999999999999999999'` generaba `'1000000000000000000'`, que ya no entraba en la expresion; la
+ * siguiente alta volvia a leer los dieciocho nueves, proponia OTRA VEZ el mismo valor, chocaba tres
+ * veces y la generacion de esa empresa quedaba bloqueada para siempre (R16 roto). `numeric` no tiene
+ * techo practico; el largo lo acota el CHECK `product_batches_lot_length` (60 caracteres). Es el
+ * MISMO criterio que el relleno de la migracion, para que la migracion y el alta no discrepen sobre
+ * cual es «el mas alto». Sin ningun lote numerico el maximo es `NULL` y el primero es `'1'`.
+ *
+ * **La suma va en `BigInt`**, de precision arbitraria, sobre el TEXTO del maximo: nunca por `number`,
+ * que redondearia a partir de 2^53. El `::text` de un `numeric` de escala 0 -todo lote que casa con
+ * `'^[0-9]+$'` lo es- sale sin parte decimal y sin ceros a la izquierda, asi que el siguiente se
+ * escribe sin ceros (D5).
+ *
+ * **LIMITE CONOCIDO, no resuelto aqui:** si el maximo de la empresa tiene 60 digitos y son todos
+ * nueves, el siguiente tendria 61 caracteres y el `INSERT` lo rechaza el CHECK
+ * `product_batches_lot_length` en cada alta con lote generado de esa empresa.
  *
  * **La empresa sale del AMBITO** (R27) y del unico punto que la define (`companyScopeColumns`),
  * nunca de `NewProductBatch` -que no la lleva-: el correlativo se calcula contra la misma empresa
@@ -612,10 +627,10 @@ async function resolveLot(
 
   // Paso 2, con una instantanea tomada DESPUES de obtener el lock.
   const rows = await tx.$queryRaw<ReadonlyArray<BatchLotTopRow>>(Prisma.sql`
-    SELECT max(("lot")::bigint)::text AS "top"
+    SELECT max(("lot")::numeric)::text AS "top"
       FROM "product_batches"
      WHERE "company_id" = ${companyId}::uuid
-       AND "lot" ~ '^[0-9]{1,18}$'
+       AND "lot" ~ '^[0-9]+$'
   `);
 
   const top = rows[0]?.top ?? null;
