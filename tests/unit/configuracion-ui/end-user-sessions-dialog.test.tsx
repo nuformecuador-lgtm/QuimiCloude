@@ -142,7 +142,9 @@ describe('la confirmacion nombra a la persona y no cierra nada por si sola (R9)'
     render(<DialogoDePrueba />);
 
     const dialogo = screen.getByTestId(END_USER_SESSIONS_DIALOG_TESTID);
-    expect(within(dialogo).getByText(endUserSessionsTitle(FILA.displayName))).toBeInTheDocument();
+    expect(
+      within(dialogo).getByRole('heading', { name: endUserSessionsTitle(FILA.displayName) }),
+    ).toBeInTheDocument();
     const mensaje = screen.getByTestId(END_USER_SESSIONS_MESSAGE_TESTID);
     expect(mensaje).toHaveTextContent(endUserSessionsMessage(FILA.displayName));
     expect(mensaje).toHaveTextContent(FILA.displayName);
