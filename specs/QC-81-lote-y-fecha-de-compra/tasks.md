@@ -27,7 +27,7 @@
 
 ## Tanda 1 — la base (es donde vive la garantía)
 
-- [ ] **T1 — La migración con su relleno.** Depende de T0 solo para el texto de los comentarios.
+- [x] **T1 — La migración con su relleno.** Depende de T0 solo para el texto de los comentarios.
       Archivos: `db/migrations/20260913120000_product_batch_lot_and_purchase_date/migration.sql`
       (nuevo), `.../down.sql` (nuevo).
       Los siete pasos **en el orden exacto** de `design.md > 2.1`: paréntesis `NO FORCE` de RLS,
@@ -51,7 +51,7 @@
       **Hecho:** `pnpm exec prisma validate` y `pnpm run typecheck` en verde; el cliente generado
       expone `purchaseDate` obligatorio y `lot` no anulable.
 
-- [ ] **T3 [P] — Test de esquema y de migración.** Depende de T1 y T2.
+- [x] **T3 [P] — Test de esquema y de migración.** Depende de T1 y T2.
       Archivos: `tests/unit/inventario/schema/product-batch-lot-migration.test.ts` (nuevo),
       `tests/unit/inventario/schema/inventario-schema.test.ts` (**actualización obligada**,
       `design.md > 0.3`).

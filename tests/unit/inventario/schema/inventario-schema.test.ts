@@ -428,9 +428,12 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(unitCost.attributes).toContain('@map("unit_cost")')
     expect(unitCost.attributes).toMatch(/@db\.Decimal\(14,\s*4\)/)
 
+    // QC-81 R7 (INVERTIDO): `lot` era OPCIONAL por QC-90 R12 y la decision cerrada D7 de QC-81 lo
+    // hace OBLIGATORIO. El porque completo esta en la cabecera del bloque «QC-80 R25/R28», que es
+    // donde vive la guardia de columnas de `ProductBatch`.
     const lot = field(productBatch, 'lot')
     expect(lot.type).toBe('String')
-    expect(lot.isOptional).toBe(true)
+    expect(lot.isOptional, 'lot es NOT NULL desde QC-81 (R7)').toBe(false)
     expect(lot.attributes).toContain('@map("lot")')
 
     const expiryDate = field(productBatch, 'expiryDate')
@@ -1045,15 +1048,38 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
 // la migracion que lo creo conserva sus dos CHECK y su RLS ENABLE+FORCE sin policies.
 //
 // Cubre R25.
+//
+// ACTUALIZADO EL 2026-09-13 POR QC-81 (lote-y-fecha-de-compra, `design.md > 0.3`), con la
+// aprobacion del humano en F1.4 y por el mismo motivo que QC-80 retiro arriba la guardia de
+// alcance de QC-90: una feature no puede cumplir la afirmacion de alcance de otra. Este bloque
+// exigia TRES cosas que QC-81 tiene que cambiar a proposito, y se habria puesto rojo por hacer
+// justo lo que esa ficha pide:
+//   1. la lista EXACTA de escalares de `ProductBatch` --QC-81 anade `purchaseDate`
+//      (`purchase_date`, fecha civil obligatoria, R1/R26)--;
+//   2. `lot.isOptional === true` --QC-81 lo pasa a OBLIGATORIO por decision cerrada D7, que
+//      cambia lo que QC-90 R12 dejo opcional a proposito--; y
+//   3. la AUSENCIA de `@@unique` sobre `lot` («QC-49 R30: la unicidad (empresa, lote) es QC-81»)
+//      --QC-81 es justo la ficha que la pone, R11--.
+// Las tres se INVIERTEN aqui en vez de borrarse: pasan a vigilar la forma que QC-81 fija. El resto
+// del bloque --la presentacion vive solo en el lote, `companyId` obligatorio y sin `@relation`, la
+// forma de `unitCost` y de `expiryDate`-- sigue vigente y NO se toca. Lo que la base garantiza
+// (NOT NULL, CHECK, indice, relleno) lo vigila
+// `tests/unit/inventario/schema/product-batch-lot-migration.test.ts`.
 // =======================================================================================
 
-/** Las columnas que `20260909120000_product_batches` le dio al lote, con su nombre en la base. */
+/**
+ * Las columnas escalares de `ProductBatch`, con su nombre en la base: las que le dio
+ * `20260909120000_product_batches`, la de empresa de QC-49 y la fecha de compra de QC-81.
+ */
 const PRODUCT_BATCH_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['productId', 'product_id'],
   ['presentationId', 'presentation_id'],
   ['stock', 'stock'],
   ['unitCost', 'unit_cost'],
   ['lot', 'lot'],
+  // QC-81 R1/R26: la fecha de COMPRA del lote, fecha civil obligatoria. Vive en el LOTE y no en
+  // el producto (D4): cada entrada de mercancia tiene la suya.
+  ['purchaseDate', 'purchase_date'],
   ['expiryDate', 'expiry_date'],
   // QC-49 R2: el lote declara su empresa en COLUMNA PROPIA y no la deduce de su producto —sin
   // columna, QC-81 no podria construir la unicidad `(empresa, lote)`—.
@@ -1079,11 +1105,26 @@ describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batch
       }
     }
     expect(field(productBatch, 'unitCost').attributes).toMatch(/@db\.Decimal\(14,\s*4\)/)
-    expect(field(productBatch, 'lot').isOptional, 'lot sigue siendo anulable').toBe(true)
+    // QC-81 R7 (INVERTIDO, ver la cabecera del bloque): hasta QC-81 esta linea exigia `lot`
+    // ANULABLE, como lo dejo QC-90 R12. La decision cerrada D7 de QC-81 lo hace OBLIGATORIO y la
+    // migracion `20260913120000_product_batch_lot_and_purchase_date` rellena las filas sin lote
+    // antes de apretar la columna. Sigue siendo TEXTO (D5): «ACME-2026-07» se puede teclear.
+    const lot = field(productBatch, 'lot')
+    expect(lot.isOptional, 'lot es NOT NULL desde QC-81 (R7)').toBe(false)
+    expect(lot.type, 'lot sigue siendo texto, no entero (QC-81 D5)').toBe('String')
+    expect(lot.attributes).not.toMatch(/@default\(/)
+    // QC-81 R1/R26: la fecha de compra es fecha CIVIL obligatoria y sin `@default` --el «hoy» lo
+    // pone el caso de uso con su reloj, no la base--.
+    const purchaseDate = field(productBatch, 'purchaseDate')
+    expect(purchaseDate.type).toBe('DateTime')
+    expect(purchaseDate.isOptional, 'purchase_date es NOT NULL (QC-81 R1)').toBe(false)
+    expect(purchaseDate.attributes).toContain('@db.Date')
+    expect(purchaseDate.attributes).not.toMatch(/@default\(/)
     expect(field(productBatch, 'expiryDate').isOptional, 'expiry_date sigue anulable').toBe(true)
     expect(field(productBatch, 'expiryDate').attributes).toContain('@db.Date')
 
-    // Igualdad EXACTA de escalares: una columna DE MAS es una migracion, y R29 la prohibe.
+    // Igualdad EXACTA de escalares: una columna DE MAS es una migracion. Si una ficha la anade a
+    // proposito, se anota en `PRODUCT_BATCH_COLUMNS` con su motivo (como hizo QC-81).
     const escalares = productBatch.fields
       .filter((candidate) => !['Product', 'Presentation'].includes(candidate.type))
       .map((candidate) => candidate.name)
@@ -1108,10 +1149,17 @@ describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batch
     expect(productBatch.body).toMatch(
       /@@index\(\[companyId\],\s*map:\s*"product_batches_company_id_idx"\)/,
     )
-    // QC-49 R30: el correlativo de lote por empresa es QC-81 y NO entra aqui.
-    expect(productBatch.body, 'la unicidad (empresa, lote) es QC-81, no esta ficha').not.toMatch(
-      /@@unique\([^)]*lot/,
+    // QC-81 R11/R12 (INVERTIDO, ver la cabecera del bloque): esta linea afirmaba la AUSENCIA de
+    // la unicidad `(empresa, lote)` porque QC-49 R30 la dejaba para QC-81. QC-81 la pone: un
+    // unico compuesto, no parcial, con el nombre que tiene en la base. Por empresa y no global:
+    // dos empresas pueden repetir valor de lote (R12), una empresa no (R11).
+    expect(productBatch.body, 'la unicidad (empresa, lote) la declara QC-81 (R11)').toMatch(
+      /@@unique\(\[companyId,\s*lot\],\s*map:\s*"product_batches_company_lot_unique"\)/,
     )
+    expect(productBatch.body, 'ninguna unicidad GLOBAL de lote (R12)').not.toMatch(
+      /@@unique\(\[lot\]/,
+    )
+    expect(productBatch.body).not.toMatch(/\blot\b[^\n]*@unique/)
   })
 
   it('R25, R28: la migracion de product_batches conserva sus dos CHECK y su RLS ENABLE+FORCE sin policies', () => {

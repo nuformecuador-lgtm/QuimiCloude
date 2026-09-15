@@ -130,3 +130,151 @@ dia en la tanda 3:
 - `tests/integration/inventario/presentation-unit.int.test.ts:132`
 - `tests/integration/recetas/recetas-constraints.int.test.ts:944`
 - `tests/integration/unidades/unidades-constraints.int.test.ts:312`
+
+### Tanda 1 — T1, T2 y T3 (base y esquema) · `backend_dev`
+
+**Archivos**
+- `db/migrations/20260913120000_product_batch_lot_and_purchase_date/migration.sql` (nuevo): los siete
+  pasos de design §2.1 en orden, con la guardia de duplicados por empresa (R21), el relleno de la
+  fecha en UTC (R19), el relleno del lote de §2.3 (R18), `SET NOT NULL`, los dos `CHECK`, el indice
+  `product_batches_company_lot_unique` y el cierre `ENABLE`+`FORCE`.
+- `db/migrations/20260913120000_product_batch_lot_and_purchase_date/down.sql` (nuevo): orden inverso,
+  no vacia ningun `lot` (R23) y la cabecera dice que se pierden las `purchase_date`.
+- `db/schema.prisma` (solo `ProductBatch`): `lot String`, `purchaseDate DateTime @db.Date`,
+  `@@unique([companyId, lot], map: "product_batches_company_lot_unique")`.
+- `tests/unit/inventario/schema/product-batch-lot-migration.test.ts` (nuevo, 13 casos, cada predicado
+  probado tambien contra una mutacion en memoria).
+- `tests/unit/inventario/schema/inventario-schema.test.ts` (actualizacion aprobada en F1.4).
+
+**Verificacion real** (extracto literal del informe del agente)
+- Base de desarrollo, que es compartida: `db:migrate` aplico **solo** QC-81, con columnas, CHECK,
+  indice y RLS forzada comprobados por consulta. La fila existente (`lot='1'`) recibio `purchase_date`
+  = dia UTC de su `created_at`. `db:rollback` revirtio todo. **Comprobado por el implementer despues:**
+  ```
+  $ pnpm exec prisma migrate status
+  29 migrations found in prisma/migrations
+  Following migration have not yet been applied:
+  20260913120000_product_batch_lot_and_purchase_date
+  ```
+  La base de desarrollo queda **revertida**, como se decidio arriba.
+- **R20, tabla vacia.** `pnpm run db:test template` reutilizo la plantilla `qct_tpl_92d13dc6eb14`, con
+  la huella de este `migration.sql`, que construyo hoy la corrida de `vitest related` de la tanda 2.
+  Como evidencia propia se repitio la receta literal de la plantilla sobre una base vacia de usar y
+  tirar:
+  ```
+  --- paso 1: migrate deploy (se espera parada en QC-49)   codigo=1  Migration name: 20260911130000_inventory_company_scope
+  --- paso 3: resolve --rolled-back QC-49                  codigo=0
+  --- justo antes del paso 4: estado de product_batches    [{"filas":0}]
+  --- paso 4: migrate deploy (aqui corre QC-81)            codigo=0
+  Applying migration `20260913120000_product_batch_lot_and_purchase_date`
+  All migrations have been successfully applied.
+  --- paso 5: migrate status   codigo=0   Database schema is up to date!
+  --- paso 6: db:seed          codigo=0   [{"lotes_tras_seed":0}]
+  ```
+- **R18, R19, R21 y R23 ejercitados sobre filas sembradas**, en bases de usar y tirar copiadas de la
+  plantilla anterior a QC-81, ya borradas. Tres empresas; la sesion en `America/Guayaquil` para
+  demostrar que manda el UTC. Resultados:
+  - `'50'` a mano ⇒ las filas sin lote reciben 51..55 por orden de `created_at`.
+  - `'007'` ⇒ 8, 9, 10; el empate de `created_at` lo desempata el `id`.
+  - Empresa sin lote numerico ⇒ `1`.
+  - `'ACME-2026-07'` y un lote de 25 digitos quedan intactos y no revientan.
+  - `23:30-05:00` ⇒ `purchase_date` del dia UTC siguiente. Ninguna fila recibe la fecha de hoy y
+    `updated_at` no cambia.
+  - Las restricciones muerden: blanco da 23514 not_blank, NULL da 23502, 61 caracteres dan 23514
+    length, `'50'` repetido en la misma empresa da 23505, y `'50'` en otra empresa se acepta.
+  - DOWN: quita todo, no vacia ningun lote (15 filas intactas); re-UP es un relleno de cero filas.
+  - DUP: dos lotes repetidos ⇒ `P0001 QC-81: hay 2 lote(s) repetido(s)...`, con la consulta para
+    localizarlos y que hacer, y el esquema sin nada a medias.
+- Tests y lint:
+  ```
+  $ pnpm exec vitest run tests/unit/inventario/schema/      (repetido por el implementer)
+   Test Files  8 passed (8)
+        Tests  123 passed (123)
+  $ pnpm exec vitest run schema migration
+   Test Files  28 passed (28)
+        Tests  593 passed (593)
+  $ pnpm run lint   -> exit 0
+  ```
+
+**Desviaciones, anotadas para el reviewer**
+1. **`ROW_COUNT` del relleno de `lot`.** tasks.md T1 dice «cada UPDATE compara su ROW_COUNT contra el
+   total de la tabla». Para `purchase_date` se hace asi. Para `lot`, al pie de la letra, contradice
+   R18: ese UPDATE solo toca las filas **sin** lote, y habria abortado en la base de desarrollo (1 fila
+   con lote, 0 actualizadas). Se compara contra las filas sin lote contadas justo antes y despues se
+   comprueba que no queda ninguna. Es la unica lectura compatible con R18.
+2. **`inventario-schema.test.ts`: tres afirmaciones invertidas, no solo `:1082`.** Tambien chocaban
+   `:433` (otra `lot.isOptional === true`, fuera del bloque QC-80) y `:1111` (la ausencia de
+   `@@unique` sobre `lot`, «es QC-81»). Las tres se invierten con su motivo; no se borra ningun
+   bloque. `:433` va algo mas alla del texto literal de lo aprobado en F1.4, aunque es la misma
+   afirmacion.
+3. La guardia de duplicados excluye los lotes en blanco: el relleno les da numeros distintos.
+4. design §2.4 atribuye al `down.sql` una guardia que lee la tabla. El DOWN es solo DDL y no lee
+   filas, asi que no se invento ninguna guardia; el parentesis de RLS si esta, simetrico.
+5. Un lote ya existente de mas de 60 caracteres haria abortar la migracion con un 23514 generico,
+   sin mensaje propio. Sigue siendo atomica; el design no pide guardia para eso.
+
+## Rojos abiertos al cerrar las tandas 1 y 2
+
+1. **Guardia** `tests/guards/guard-identificador-de-request.test.ts:161-219`: su lista cerrada
+   `MIGRACIONES_ESPERADAS` necesita `20260913120000_product_batch_lot_and_purchase_date` con su
+   comentario, como hicieron QC-79, QC-86 y QC-23. Esta bajo `tests/guards/**`, esta permitido y
+   ninguna task lo lista.
+2. **Typecheck**, 11 errores:
+   - `product-prisma.ts(545,5)`: esperado, lo cierra T6.
+   - Los fixtures de integracion listados en «Arrastre»: tanda 3.
+   - `e2e/aislamiento-inventario.spec.ts(211,5)`: **BLOQUEO**, ver arriba.
+3. `vitest related`: tres archivos de integracion con `Argument lot is missing`, que son los mismos
+   fixtures.
+
+## Estado al parar (F2.1 detenida por el bloqueo del E2E)
+
+| Task | Estado |
+|---|---|
+| T0 | [x] aprobada `batch_duplicate_lot` |
+| T1 | [x] migracion verificada contra bases reales |
+| T2 | [ ] esquema hecho y `prisma validate` en verde; **falta typecheck en verde** (T6 + fixtures + bloqueo E2E) |
+| T3 | [x] 123/123 |
+| T4, T5 | [x] 70/70 |
+| T6-T12 | sin empezar |
+
+**Por que se para aqui y no se abre la tanda 3.** El esquema que exige la ficha deja sin compilar un
+E2E existente. Cualquier camino para ponerlo verde toca `e2e/**`, que R29, T11 y la instruccion del
+leader prohiben, o bien cambia el diseño. Es una contradiccion entre el spec y el codigo real de
+`dev`, y la regla es anotarla y parar. T6-T10 no dependen de esa decision, pero el gate de la tanda
+no puede salir verde sin ella, y T11 tiene que saber si tolera ese archivo.
+
+**Para retomar**, cuando el leader/humano decida sobre el E2E:
+- tanda 3: T6, luego T7 [P] y T9, luego T8, con la actualizacion de los fixtures de «Arrastre» y
+  de la guardia de migraciones;
+- tanda 4: T10 [P] y T11 [P], con T11 ajustado a la decision del E2E;
+- T12: mapa R1..R33 -> test y gate completo, **pendiente del leader**.
+
+## Mapa R -> test (parcial, se completa en T12)
+
+| R | Test (hasta ahora) |
+|---|---|
+| R1 | `inventario-schema.test.ts` (`purchaseDate.isOptional === false`); real: 23502 en base |
+| R2 | `create-product.test.ts` «pasa al puerto la fecha civil UTC del now inyectado, y el MISMO instante como now»; `product-batch-input.test.ts` «acepta el alta sin purchaseDate, ausente o en null...» |
+| R3 | `create-product.test.ts` «pasa tal cual una fecha de la semana pasada», «pasa la fecha escrita identica tambien al agregar el lote a un producto existente» (integracion: T8 caso 8, pendiente) |
+| R4 | `create-product.test.ts` «rechaza la fecha de manana con ValidationError senalando purchaseDate y cero llamadas al repositorio», «decide «futura» contra el dia UTC del now inyectado...» |
+| R5 | `create-product.test.ts` «acepta hoy y una fecha de meses atras sin corregirlas» |
+| R6 | `product-batch-input.test.ts` «rechaza la fecha sin forma YYYY-MM-DD con un solo issue en purchaseDate», «rechaza la fecha con forma correcta que no existe en el calendario» |
+| R7 | `inventario-schema.test.ts` (`lot.isOptional === false`); `product-batch-lot-migration.test.ts` «R7, R11 y R22...» (integracion: T8 caso 9, pendiente) |
+| R8 | `create-product.test.ts` «pasa lot null al puerto -«generalo»- cuando el lote no viene...» (integracion: T8 caso 1, pendiente) |
+| R10 | `create-product.test.ts` «pasa el lote escrito tal cual, recortado, sin sustituirlo -QC-81 R10-» |
+| R11, R12 | `inventario-schema.test.ts` (`@@unique([companyId, lot])`, ninguna unicidad global) (integracion: T8 casos 5 y 6, pendiente) |
+| R17 | `product-batch-lot-migration.test.ts` «R17: existe exactamente UNA migracion...», «R17: el down quita indice, CHECK, NOT NULL...» |
+| R18 | `product-batch-lot-migration.test.ts` «R18: el relleno de lote numera por empresa...» (integracion: T8 caso 10, pendiente) |
+| R19 | `product-batch-lot-migration.test.ts` «R19 y R26: purchase_date nace DATE anulable sin DEFAULT y se rellena con created_at en UTC» |
+| R20 | prueba real sobre base vacia (arriba) (integracion: T8 caso 10, pendiente) |
+| R21 | `product-batch-lot-migration.test.ts` «R21: la guardia de duplicados por empresa va antes de todo cambio...» |
+| R22 | `product-batch-lot-migration.test.ts`: parentesis de RLS, ROW_COUNT, rellenos antes de SET NOT NULL, CHECK e indice despues |
+| R23 | `product-batch-lot-migration.test.ts` «R23: el down no contiene ningun UPDATE que vacie lot...» |
+| R24 | `create-product.test.ts` «rechaza a un actor %s con UnauthorizedError sin llamar al reloj ni al puerto» |
+| R26 | `product-batch-lot-migration.test.ts` «R26: sin borrado, sin marcas de tiempo...»; `inventario-schema.test.ts` |
+| R9, R13, R14, R15, R16, R25, R27, R28-R33 | **pendientes** (T6-T11) |
+
+## Gate
+
+**Pendiente del leader.** Ni el implementer ni los subagentes corren `./init.sh` ni la suite completa
+(`AGENTS.md > Regla del gate`). Hoy el gate saldria rojo por los rojos abiertos de arriba.

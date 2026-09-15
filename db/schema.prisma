@@ -677,8 +677,25 @@ model Product {
 /// TOTAL a proposito, igual que en pedidos: `totalCost` es `stock * unitCost` y se calcula al
 /// leer, para que no pueda contradecir a sus factores.
 ///
-/// `lot` y `expiryDate` son OPCIONALES: no todo lote lleva numero ni fecha de vencimiento.
-/// `expiryDate` es `@db.Date` (fecha sin hora), como `users.birth_date`.
+/// `expiryDate` es OPCIONAL: no todo lote lleva fecha de vencimiento. Es `@db.Date` (fecha sin
+/// hora), como `users.birth_date`.
+///
+/// QC-81 (2026-09-13) — `lot` pasa a OBLIGATORIO y nace `purchaseDate`. Hasta QC-81 `lot` era
+/// OPCIONAL (QC-90 R12 lo dejo asi a proposito); el humano decidio lo contrario al acotar QC-81
+/// (decision cerrada D7) y la migracion `20260913120000_product_batch_lot_and_purchase_date`
+/// relleno las filas sin lote con un correlativo por empresa antes de apretar la columna.
+///   - `lot` es TEXTO, NOT NULL y UNICO POR EMPRESA: `@@unique([companyId, lot])` de abajo, con
+///     el nombre de la base `product_batches_company_lot_unique` (R11, R12). Dos empresas pueden
+///     repetir valor; una empresa no. La unicidad es del texto EXACTO, sin normalizar. Si el alta
+///     no trae lote lo genera el backend (numero simple que continua desde el mas alto de la
+///     empresa, D5/D6); sigue siendo texto para que se pueda teclear «ACME-2026-07» a mano.
+///     Los CHECK `product_batches_lot_not_blank` (sin lote en blanco, R7) y
+///     `product_batches_lot_length` (<= 60) viven escritos A MANO en esa migracion: Prisma no
+///     modela CHECK.
+///   - `purchaseDate` es la fecha de COMPRA del lote, `@db.Date` (fecha civil, sin hora ni zona)
+///     y NOT NULL sin `@default` (R1, R26): el «hoy» por defecto lo pone el caso de uso con su
+///     propio reloj, no la base, y las filas previas a QC-81 recibieron la fecha civil (UTC) de su
+///     `created_at`. Que no sea futura (R4) NO esta en la base: vive solo en la aplicacion.
 ///
 /// OJO — `companyId` la anade QC-49 (R2) y es COLUMNA PROPIA DEL LOTE, no se deriva por `join`
 /// con su producto (decision cerrada 2): QC-81 necesita la unicidad `(company_id, lot)` y un
@@ -700,7 +717,8 @@ model ProductBatch {
   presentationId String    @map("presentation_id") @db.Uuid
   stock          Int
   unitCost       Decimal   @map("unit_cost") @db.Decimal(14, 4)
-  lot            String?   @map("lot")
+  lot            String    @map("lot")
+  purchaseDate   DateTime  @map("purchase_date") @db.Date
   expiryDate     DateTime? @map("expiry_date") @db.Date
   companyId      String    @map("company_id") @db.Uuid
   createdBy      String?   @map("created_by") @db.Uuid
@@ -711,6 +729,7 @@ model ProductBatch {
   product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   presentation Presentation @relation(fields: [presentationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
+  @@unique([companyId, lot], map: "product_batches_company_lot_unique")
   @@index([companyId], map: "product_batches_company_id_idx")
   @@index([productId], map: "product_batches_product_id_idx")
   @@index([presentationId], map: "product_batches_presentation_id_idx")
