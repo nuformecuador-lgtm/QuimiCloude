@@ -99,7 +99,7 @@
 
 ## Limites de alcance
 
-- [ ] **T11 — Test de alcance de la ficha.** `tests/unit/identity/qc101-alcance.test.ts`, con el
+- [x] **T11 — Test de alcance de la ficha.** `tests/unit/identity/qc101-alcance.test.ts`, con el
       molde de `qc23-alcance.test.ts` y **precondicion de rama conjuntiva** (el diff trae
       `lib/modules/identity/adapters/driving/session-actions.ts` **y** algo bajo
       `specs/QC-101-cierre-de-sesiones-de-otro-desde-la-pantalla/`), «no puedo mirar» en rojo y
@@ -112,7 +112,7 @@
       **Hecho:** las reglas disparan con datos fabricados y estan verdes con el repo real.
       *Depende de: T1..T10 (mide el diff entero).*
 
-- [ ] **T12 — Trazabilidad y cierre.** Escribir el mapa `R1..R22 -> test` en
+- [x] **T12 — Trazabilidad y cierre.** Escribir el mapa `R1..R22 -> test` en
       `progress/impl_QC-101-cierre-de-sesiones-de-otro-desde-la-pantalla.md` y correr `./init.sh`
       completo.
       **Hecho:** gate en verde, ningun `R<n>` sin test, y la deuda de `current-actor.ts`
