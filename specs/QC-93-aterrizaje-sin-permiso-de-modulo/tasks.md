@@ -3,7 +3,7 @@
 Orden por dependencias. `[P]` = puede ir en paralelo con las otras `[P]` de su bloque.
 Cada tarea dice **que archivos toca** y **cuando esta hecha**.
 
-## T1 — Medir el rojo ANTES de tocar nada (base limpia, dos motores)
+## [x] T1 — Medir el rojo ANTES de tocar nada (base limpia, dos motores)
 
 Toca: nada. Produce: la corrida de referencia.
 
@@ -15,7 +15,7 @@ Toca: nada. Produce: la corrida de referencia.
 **lista de archivos rojos con su test**. Ese M es el numero de esta ficha, salga 8, 17 o 23; no se
 copia el «23» de la ficha (`design.md > 0.4`).
 
-## T2 — El helper unico  ·  R1, R2, R3, R4, R5, R6, R7
+## [x] T2 — El helper unico  ·  R1, R2, R3, R4, R5, R6, R7
 
 Toca: **`e2e/helpers/landing.ts`** (nuevo).
 
@@ -28,14 +28,14 @@ compartido y **lanza nombrando el username** si no hay usuario vivo.
 nuevo**: solo `@playwright/test`, `@/lib/shared/db/prisma`, `@/lib/shared/navigation/private-nav` y
 `@/lib/shared/routes`.
 
-## T3 — Confirmar que Playwright NO recoge el helper como test  ·  R1
+## [x] T3 — Confirmar que Playwright NO recoge el helper como test  ·  R1
 
 Toca: nada (verificacion). Depende de T2.
 
 **Hecho cuando:** `pnpm exec playwright test --list` no menciona `e2e/helpers/landing.ts` y el conteo
 de tests listados es el mismo que antes de T2.
 
-## T4 — Test unitario del helper  ·  R2, R3, R4, R5
+## [x] T4 — Test unitario del helper  ·  R2, R3, R4, R5
 
 Toca: **`tests/unit/e2e-helpers/landing.test.ts`** (nuevo, proyecto `node`).
 

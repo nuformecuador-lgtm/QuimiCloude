@@ -1,0 +1,6 @@
+
+> quimicloude@0.1.0 db:test C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo
+> tsx scripts/test-db.ts "template"
+
+test-db: plantilla reutilizada: qct_tpl_5a5346ed8f4d (las migraciones no han cambiado)
+✓ plantilla de esta rama: qct_tpl_5a5346ed8f4d (28 migraciones)

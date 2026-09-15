@@ -1,0 +1,840 @@
+2026-09-15T09:54:58-05:00
+0d8f05d53c6e5f9575bcf4d093efc195bd930f24
+[WebServer] ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+[WebServer] 
+[WebServer]   To migrate automatically, run:
+[WebServer]   npx @next/codemod@canary middleware-to-proxy .
+[WebServer] 
+[WebServer]   Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+Running 78 tests using 6 workers
+
+  ✓   6 [chromium] › e2e\establecer-contrasena.spec.ts:179:7 › establecer la contrasena desde el enlace del correo › alta sin contrasena, enlace, contrasena establecida, entrada al dashboard y el enlace ya no sirve (39.4s)
+  ✘   3 [chromium] › e2e\errores.spec.ts:194:7 › un error que no es de dominio, visto desde el navegador › la pantalla sigue en pie, muestra el mensaje neutro de `unexpected` y no filtra ni un detalle interno (R33, R13) (1.2m)
+  ✓   5 [chromium] › e2e\aislamiento-inventario.spec.ts:357:7 › aislamiento por empresa del inventario › con sesion en la empresa A: las listas no traen nada de B, borrar una fila de B conociendo su identificador se rechaza y la fila sigue intacta, y el nombre de una presentacion de B se puede usar en A (R27) (1.3m)
+  ✓   1 [chromium] › e2e\grupos-de-trabajo.spec.ts:362:7 › pestana de grupos de trabajo › crear, renombrar, meter a una persona, sacarla y borrar el grupo, en un solo recorrido (R42) (1.3m)
+  ✓   9 [chromium] › e2e\login-skin.spec.ts:63:7 › piel de la pantalla de login en navegador real › presenta campos y boton con al menos 44 px de alto computado (2.2s)
+  ✓  10 [chromium] › e2e\login-skin.spec.ts:89:7 › piel de la pantalla de login en navegador real › no deja crecer la tarjeta mas alla de 400 px en escritorio (2.2s)
+  ✓  11 [chromium] › e2e\login-skin.spec.ts:102:7 › piel de la pantalla de login en navegador real › en viewport de telefono no provoca scroll horizontal y conserva 16 px de letra (2.2s)
+  ✓  12 [chromium] › e2e\login-skin.spec.ts:134:7 › piel de la pantalla de login en navegador real › oculta la capa de burbujas cuando el sistema pide movimiento reducido (2.1s)
+  ✓  13 [chromium] › e2e\login-skin.spec.ts:154:7 › piel de la pantalla de login en navegador real › pinta las tres burbujas cuando no hay preferencia de movimiento reducido (1.0s)
+  ✓  14 [chromium] › e2e\login.spec.ts:298:7 › login en navegador real › entra con credenciales correctas y recibe la cookie de sesion httpOnly (2.2s)
+  ✓  15 [chromium] › e2e\login.spec.ts:324:7 › login en navegador real › con credenciales incorrectas se queda en el login, avisa y no emite sesion (1.8s)
+  ✓  16 [chromium] › e2e\login.spec.ts:351:7 › login en navegador real › con la empresa dada de baja no entra pese a tener las credenciales correctas (1.4s)
+  ✓  17 [chromium] › e2e\login.spec.ts:378:7 › login en navegador real › una cuenta que no esta activa ve el MISMO mensaje que una contrasena mala, no recibe sesion y no deja rastro (4.9s)
+  ✓  19 [chromium] › e2e\pedidos.spec.ts:342:7 › pantalla de pedidos › el Administrador entra, da de alta un pedido, lo ve por su correlativo y lo cancela con motivo (R48) (12.1s)
+  ✓  18 [chromium] › e2e\pedidos-responsables.spec.ts:516:7 › responsables en la pantalla de pedidos › abrir un pedido, marcar una persona, aplicar un grupo, sacar a alguien y ver los avatares y el nombre del grupo EN EL LISTADO (R37) (22.1s)
+[WebServer] [browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+  ✘   7 [chromium] › e2e\inventario.spec.ts:515:7 › catalogo de productos › elegir un producto que ya existe le agrega un lote y no crea otro producto (QC-90 R17, R18) (1.2m)
+  ✘   2 [chromium] › e2e\inventario.spec.ts:391:7 › catalogo de productos › el Administrador entra, da de alta un producto con una presentacion nueva y lo ve en la lista (R4, R17, R18, R21, R24) (1.9m)
+  ✘   4 [chromium] › e2e\inventario.spec.ts:459:7 › catalogo de productos › el alta con presentacion y solo costo total deja el lote con el costo unitario derivado (QC-90 R32, R7) (1.9m)
+  ✘  21 [chromium] › e2e\permisos.spec.ts:201:7 › la zona privada segun los permisos de quien entra › el Operador entra, aterriza en inventario, ve un menu corto y recibe 404 en un modulo que no puede consultar, con el control de cerrar sesion presente (6.8s)
+[WebServer] [browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+  ✓  23 [chromium] › e2e\presentaciones.spec.ts:356:7 › pantalla de presentaciones › un usuario sin `inventario.modificar` recibe 404 y no ve ni un dato (R6) (6.6s)
+  ✘   8 [chromium] › e2e\inventario.spec.ts:571:7 › catalogo de productos › un usuario que no es Administrador acaba fuera y no ve el catalogo (R4) (1.0m)
+  ✓  26 [chromium] › e2e\recetas-pasos.spec.ts:317:7 › editor y lectura de pasos › el Administrador redacta un paso con negrilla y lista de verificacion, lo guarda, lo reabre igual y recorre la vista previa hasta Finalizar (R28) (28.1s)
+  ✓  27 [chromium] › e2e\recetas.spec.ts:324:7 › catalogo de recetas › el Administrador entra, da de alta una receta con una linea y un paso, y la ve en la lista (R52) (7.8s)
+  ✘  29 [chromium] › e2e\session.spec.ts:241:7 › ciclo de sesion sobre una ruta privada › pide una pantalla privada sin sesion, entra, aterriza en ella, ve su nombre, cierra sesion y atras no muestra la zona privada (4.4s)
+  ✘  20 [chromium] › e2e\pedidos.spec.ts:447:7 › pantalla de pedidos › un usuario que no es Administrador acaba fuera y no ve ningun dato de pedidos (R49) (1.0m)
+  ✓  31 [chromium] › e2e\session.spec.ts:352:7 › ciclo de sesion sobre una ruta privada › una sesion abierta cuya ficha se da de baja tampoco rebota: sale al login en una sola redireccion (3.0s)
+  ✓  32 [chromium] › e2e\theme.spec.ts:174:7 › anti-parpadeo del tema en /login › no pinta el modo claro antes de aplicar el oscuro del sistema (831ms)
+  ✓  33 [chromium] › e2e\theme.spec.ts:192:7 › anti-parpadeo del tema en /login › conserva la preferencia guardada tras recargar y en una sesion nueva del navegador (2.4s)
+  ✓  34 [chromium] › e2e\theme.spec.ts:228:7 › anti-parpadeo del tema en /login › mantiene el modo al navegar entre rutas (1.5s)
+  ✓  35 [chromium] › e2e\theme.spec.ts:244:7 › anti-parpadeo del tema en /login › sigue el cambio de prefers-color-scheme mientras la preferencia es sistema (1.0s)
+  ✘  22 [chromium] › e2e\presentaciones.spec.ts:298:7 › pantalla de presentaciones › el Administrador entra por la URL, da de alta una presentacion y la ve en la lista filtrando por su nombre (R36) (1.1m)
+  ✘  25 [chromium] › e2e\proveedores.spec.ts:467:7 › proveedores › un usuario que no es Administrador acaba fuera y no ve ningun dato de proveedores (R52) (1.0m)
+  ✓  36 [chromium] › e2e\unidades.spec.ts:367:7 › pantalla de unidades › el Administrador entra por la URL, da de alta una unidad derivada y la ve en la lista con su equivalencia armada (R50) (10.8s)
+  ✘  24 [chromium] › e2e\proveedores.spec.ts:372:7 › proveedores › el Administrador entra, da de alta un proveedor, abre su detalle, anade una linea de catalogo y la ve en la lista (R51) (1.3m)
+[WebServer] [browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+  ✓  37 [chromium] › e2e\unidades.spec.ts:463:7 › pantalla de unidades › una sesion valida sin los permisos de unidades recibe 404 dentro del layout privado y no ve la tabla (R12) (11.0s)
+[WebServer] [browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+  ✓  38 [chromium] › e2e\usuarios.spec.ts:428:7 › pantalla de usuarios › una sesion valida sin `usuarios.consultar` recibe 404 dentro del layout privado y no ve la tabla (R4, R42) (12.5s)
+[WebServer] [identity] fallo el envio del enlace para establecer la contrasena: faltan las variables de entorno: RESEND_API_KEY, MAIL_FROM_ADDRESS, APP_BASE_URL
+  ✘  39 [chromium] › e2e\usuarios.spec.ts:317:7 › pantalla de usuarios › el Administrador entra por la URL, da de alta un usuario y lo ve en la lista con estado pending (R42) (15.9s)
+  ✘  28 [chromium] › e2e\recetas.spec.ts:376:7 › catalogo de recetas › un usuario que no es Administrador acaba fuera y no ve el catalogo (R6) (1.0m)
+  ✓  42 [webkit] › e2e\establecer-contrasena.spec.ts:179:7 › establecer la contrasena desde el enlace del correo › alta sin contrasena, enlace, contrasena establecida, entrada al dashboard y el enlace ya no sirve (16.2s)
+  ✘  30 [chromium] › e2e\session.spec.ts:289:7 › ciclo de sesion sobre una ruta privada › una sesion abierta cuya cuenta deja de estar activa no llega a la siguiente pantalla privada y acaba en el login (1.0m)
+[WebServer] ⨯ Error: The destination stream closed early.
+[WebServer]     at ignore-listed frames {
+[WebServer]   digest: '730979982'
+[WebServer] }
+  ✓  40 [webkit] › e2e\aislamiento-inventario.spec.ts:357:7 › aislamiento por empresa del inventario › con sesion en la empresa A: las listas no traen nada de B, borrar una fila de B conociendo su identificador se rechaza y la fila sigue intacta, y el nombre de una presentacion de B se puede usar en A (R27) (35.1s)
+  ✓  43 [webkit] › e2e\grupos-de-trabajo.spec.ts:362:7 › pestana de grupos de trabajo › crear, renombrar, meter a una persona, sacarla y borrar el grupo, en un solo recorrido (R42) (45.1s)
+  ✓  48 [webkit] › e2e\login-skin.spec.ts:63:7 › piel de la pantalla de login en navegador real › presenta campos y boton con al menos 44 px de alto computado (1.4s)
+  ✓  49 [webkit] › e2e\login-skin.spec.ts:89:7 › piel de la pantalla de login en navegador real › no deja crecer la tarjeta mas alla de 400 px en escritorio (1.2s)
+  ✓  50 [webkit] › e2e\login-skin.spec.ts:102:7 › piel de la pantalla de login en navegador real › en viewport de telefono no provoca scroll horizontal y conserva 16 px de letra (1.6s)
+  ✓  51 [webkit] › e2e\login-skin.spec.ts:134:7 › piel de la pantalla de login en navegador real › oculta la capa de burbujas cuando el sistema pide movimiento reducido (1.6s)
+  ✓  52 [webkit] › e2e\login-skin.spec.ts:154:7 › piel de la pantalla de login en navegador real › pinta las tres burbujas cuando no hay preferencia de movimiento reducido (1.3s)
+  ✓  53 [webkit] › e2e\login.spec.ts:298:7 › login en navegador real › entra con credenciales correctas y recibe la cookie de sesion httpOnly (3.8s)
+  ✘  41 [webkit] › e2e\errores.spec.ts:194:7 › un error que no es de dominio, visto desde el navegador › la pantalla sigue en pie, muestra el mensaje neutro de `unexpected` y no filtra ni un detalle interno (R33, R13) (1.1m)
+  ✓  54 [webkit] › e2e\login.spec.ts:324:7 › login en navegador real › con credenciales incorrectas se queda en el login, avisa y no emite sesion (2.8s)
+  ✓  56 [webkit] › e2e\login.spec.ts:351:7 › login en navegador real › con la empresa dada de baja no entra pese a tener las credenciales correctas (3.0s)
+  ✓  55 [webkit] › e2e\login.spec.ts:378:7 › login en navegador real › una cuenta que no esta activa ve el MISMO mensaje que una contrasena mala, no recibe sesion y no deja rastro (8.5s)
+  ✓  58 [webkit] › e2e\pedidos.spec.ts:342:7 › pantalla de pedidos › el Administrador entra, da de alta un pedido, lo ve por su correlativo y lo cancela con motivo (R48) (18.6s)
+  ✓  57 [webkit] › e2e\pedidos-responsables.spec.ts:516:7 › responsables en la pantalla de pedidos › abrir un pedido, marcar una persona, aplicar un grupo, sacar a alguien y ver los avatares y el nombre del grupo EN EL LISTADO (R37) (27.8s)
+  ✘  44 [webkit] › e2e\inventario.spec.ts:391:7 › catalogo de productos › el Administrador entra, da de alta un producto con una presentacion nueva y lo ve en la lista (R4, R17, R18, R21, R24) (1.4m)
+  ✘  47 [webkit] › e2e\inventario.spec.ts:571:7 › catalogo de productos › un usuario que no es Administrador acaba fuera y no ve el catalogo (R4) (1.1m)
+  ✘  46 [webkit] › e2e\inventario.spec.ts:515:7 › catalogo de productos › elegir un producto que ya existe le agrega un lote y no crea otro producto (QC-90 R17, R18) (1.3m)
+  ✘  45 [webkit] › e2e\inventario.spec.ts:459:7 › catalogo de productos › el alta con presentacion y solo costo total deja el lote con el costo unitario derivado (QC-90 R32, R7) (1.4m)
+[WebServer] [browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+  ✘  60 [webkit] › e2e\permisos.spec.ts:201:7 › la zona privada segun los permisos de quien entra › el Operador entra, aterriza en inventario, ve un menu corto y recibe 404 en un modulo que no puede consultar, con el control de cerrar sesion presente (11.6s)
+[WebServer] [browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+  ✓  62 [webkit] › e2e\presentaciones.spec.ts:356:7 › pantalla de presentaciones › un usuario sin `inventario.modificar` recibe 404 y no ve ni un dato (R6) (10.2s)
+  ✓  66 [webkit] › e2e\recetas.spec.ts:324:7 › catalogo de recetas › el Administrador entra, da de alta una receta con una linea y un paso, y la ve en la lista (R52) (29.2s)
+  ✘  59 [webkit] › e2e\pedidos.spec.ts:447:7 › pantalla de pedidos › un usuario que no es Administrador acaba fuera y no ve ningun dato de pedidos (R49) (1.1m)
+  ✓  65 [webkit] › e2e\recetas-pasos.spec.ts:317:7 › editor y lectura de pasos › el Administrador redacta un paso con negrilla y lista de verificacion, lo guarda, lo reabre igual y recorre la vista previa hasta Finalizar (R28) (44.7s)
+  ✓  68 [webkit] › e2e\session.spec.ts:289:7 › ciclo de sesion sobre una ruta privada › una sesion abierta cuya cuenta deja de estar activa no llega a la siguiente pantalla privada y acaba en el login (7.0s)
+  ✘  61 [webkit] › e2e\presentaciones.spec.ts:298:7 › pantalla de presentaciones › el Administrador entra por la URL, da de alta una presentacion y la ve en la lista filtrando por su nombre (R36) (1.2m)
+  ✘  69 [webkit] › e2e\session.spec.ts:241:7 › ciclo de sesion sobre una ruta privada › pide una pantalla privada sin sesion, entra, aterriza en ella, ve su nombre, cierra sesion y atras no muestra la zona privada (8.3s)
+  ✘  64 [webkit] › e2e\proveedores.spec.ts:467:7 › proveedores › un usuario que no es Administrador acaba fuera y no ve ningun dato de proveedores (R52) (1.1m)
+  ✓  71 [webkit] › e2e\theme.spec.ts:174:7 › anti-parpadeo del tema en /login › no pinta el modo claro antes de aplicar el oscuro del sistema (3.1s)
+  ✓  70 [webkit] › e2e\session.spec.ts:352:7 › ciclo de sesion sobre una ruta privada › una sesion abierta cuya ficha se da de baja tampoco rebota: sale al login en una sola redireccion (8.2s)
+  ✓  74 [webkit] › e2e\theme.spec.ts:244:7 › anti-parpadeo del tema en /login › sigue el cambio de prefers-color-scheme mientras la preferencia es sistema (4.6s)
+  ✓  72 [webkit] › e2e\theme.spec.ts:192:7 › anti-parpadeo del tema en /login › conserva la preferencia guardada tras recargar y en una sesion nueva del navegador (8.3s)
+  ✓  73 [webkit] › e2e\theme.spec.ts:228:7 › anti-parpadeo del tema en /login › mantiene el modo al navegar entre rutas (5.7s)
+  ✘  63 [webkit] › e2e\proveedores.spec.ts:372:7 › proveedores › el Administrador entra, da de alta un proveedor, abre su detalle, anade una linea de catalogo y la ve en la lista (R51) (1.5m)
+  ✓  76 [webkit] › e2e\unidades.spec.ts:463:7 › pantalla de unidades › una sesion valida sin los permisos de unidades recibe 404 dentro del layout privado y no ve la tabla (R12) (11.3s)
+[WebServer] [browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+  ✓  78 [webkit] › e2e\usuarios.spec.ts:428:7 › pantalla de usuarios › una sesion valida sin `usuarios.consultar` recibe 404 dentro del layout privado y no ve la tabla (R4, R42) (12.8s)
+  ✓  75 [webkit] › e2e\unidades.spec.ts:367:7 › pantalla de unidades › el Administrador entra por la URL, da de alta una unidad derivada y la ve en la lista con su equivalencia armada (R50) (20.3s)
+[WebServer] [identity] fallo el envio del enlace para establecer la contrasena: faltan las variables de entorno: RESEND_API_KEY, MAIL_FROM_ADDRESS, APP_BASE_URL
+  ✘  77 [webkit] › e2e\usuarios.spec.ts:317:7 › pantalla de usuarios › el Administrador entra por la URL, da de alta un usuario y lo ve en la lista con estado pending (R42) (18.5s)
+  ✘  67 [webkit] › e2e\recetas.spec.ts:376:7 › catalogo de recetas › un usuario que no es Administrador acaba fuera y no ve el catalogo (R6) (1.1m)
+
+
+  1) [chromium] › e2e\errores.spec.ts:194:7 › un error que no es de dominio, visto desde el navegador › la pantalla sigue en pie, muestra el mensaje neutro de `unexpected` y no filtra ni un detalle interno (R33, R13) 
+
+    TimeoutError: page.waitForURL: Timeout 60000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      201 |     await page.getByTestId('login-password').fill(adminUser.password);
+      202 |     await page.getByTestId('login-submit').click();
+    > 203 |     await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+          |                ^
+      204 |
+      205 |     // --- 2. La ficha de una receta cuyo identificador la base no puede ni interpretar. El error
+      206 |     // nace en Prisma, fuera de la familia `RecetasError`.
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\errores.spec.ts:203:16
+
+    Error Context: test-results\errores-un-error-que-no-es-7f702-un-detalle-interno-R33-R13--chromium\error-context.md
+
+    Error Context: test-results\errores-un-error-que-no-es-7f702-un-detalle-interno-R33-R13--chromium\error-context.md
+
+  2) [chromium] › e2e\inventario.spec.ts:391:7 › catalogo de productos › el Administrador entra, da de alta un producto con una presentacion nueva y lo ve en la lista (R4, R17, R18, R21, R24) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('presentation-create')
+    Expected: 0
+    Received: 1
+    Timeout:  60000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 60000ms
+      - waiting for getByTestId('presentation-create')
+        119 × locator resolved to 1 element
+            - unexpected value "1"
+
+
+      417 |     await page.getByTestId('presentation-create-submit').click();
+      418 |
+    > 419 |     await expect(page.getByTestId('presentation-create')).toHaveCount(0, { timeout: 60_000 });
+          |                                                           ^
+      420 |     // Desde el 2026-09-07 el selector es un campo de autocompletado, asi que lo elegido se lee
+      421 |     // en su VALOR y no en su texto contenido.
+      422 |     await expect(page.getByTestId('presentation-select')).toHaveValue(presentationName);
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:419:59
+
+    Error Context: test-results\inventario-catalogo-de-pro-71717-a-lista-R4-R17-R18-R21-R24--chromium\error-context.md
+
+    Error Context: test-results\inventario-catalogo-de-pro-71717-a-lista-R4-R17-R18-R21-R24--chromium\error-context.md
+
+  3) [chromium] › e2e\inventario.spec.ts:459:7 › catalogo de productos › el alta con presentacion y solo costo total deja el lote con el costo unitario derivado (QC-90 R32, R7) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('presentation-create')
+    Expected: 0
+    Received: 1
+    Timeout:  60000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 60000ms
+      - waiting for getByTestId('presentation-create')
+        120 × locator resolved to 1 element
+            - unexpected value "1"
+
+
+      253 |   await page.getByTestId('presentation-create-submit').click();
+      254 |
+    > 255 |   await expect(page.getByTestId('presentation-create')).toHaveCount(0, { timeout: 60_000 });
+          |                                                         ^
+      256 |   // El selector es un campo de autocompletado, asi que lo elegido se lee en su VALOR.
+      257 |   await expect(page.getByTestId('presentation-select')).toHaveValue(nombre, { timeout: 60_000 });
+      258 | }
+        at crearPresentacionEnLinea (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:255:57)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:479:5
+
+    Error Context: test-results\inventario-catalogo-de-pro-a655f-ario-derivado-QC-90-R32-R7--chromium\error-context.md
+
+    Error Context: test-results\inventario-catalogo-de-pro-a655f-ario-derivado-QC-90-R32-R7--chromium\error-context.md
+
+  4) [chromium] › e2e\inventario.spec.ts:515:7 › catalogo de productos › elegir un producto que ya existe le agrega un lote y no crea otro producto (QC-90 R17, R18) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('presentation-create')
+    Expected: 0
+    Received: 1
+    Timeout:  60000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 60000ms
+      - waiting for getByTestId('presentation-create')
+        120 × locator resolved to 1 element
+            - unexpected value "1"
+
+
+      253 |   await page.getByTestId('presentation-create-submit').click();
+      254 |
+    > 255 |   await expect(page.getByTestId('presentation-create')).toHaveCount(0, { timeout: 60_000 });
+          |                                                         ^
+      256 |   // El selector es un campo de autocompletado, asi que lo elegido se lee en su VALOR.
+      257 |   await expect(page.getByTestId('presentation-select')).toHaveValue(nombre, { timeout: 60_000 });
+      258 | }
+        at crearPresentacionEnLinea (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:255:57)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:530:5
+
+    Error Context: test-results\inventario-catalogo-de-pro-4512f-tro-producto-QC-90-R17-R18--chromium\error-context.md
+
+    Error Context: test-results\inventario-catalogo-de-pro-4512f-tro-producto-QC-90-R17-R18--chromium\error-context.md
+
+  5) [chromium] › e2e\inventario.spec.ts:571:7 › catalogo de productos › un usuario que no es Administrador acaba fuera y no ve el catalogo (R4) 
+
+    TimeoutError: page.waitForURL: Timeout 60000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+      navigated to "http://localhost:3117/inventario"
+    ============================================================
+
+      206 |   await page.getByTestId('login-password').fill(user.password);
+      207 |   await page.getByTestId('login-submit').click();
+    > 208 |   await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+          |              ^
+      209 | }
+      210 |
+      211 | /**
+        at login (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:208:14)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:574:5
+
+    Error Context: test-results\inventario-catalogo-de-pro-dd6d4-era-y-no-ve-el-catalogo-R4--chromium\error-context.md
+
+    Error Context: test-results\inventario-catalogo-de-pro-dd6d4-era-y-no-ve-el-catalogo-R4--chromium\error-context.md
+
+  6) [chromium] › e2e\pedidos.spec.ts:447:7 › pantalla de pedidos › un usuario que no es Administrador acaba fuera y no ve ningun dato de pedidos (R49) 
+
+    TimeoutError: page.waitForURL: Timeout 60000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+      navigated to "http://localhost:3117/inventario"
+    ============================================================
+
+      171 |   await page.getByTestId('login-password').fill(user.password);
+      172 |   await page.getByTestId('login-submit').click();
+    > 173 |   await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+          |              ^
+      174 | }
+      175 |
+      176 | /**
+        at login (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\pedidos.spec.ts:173:14)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\pedidos.spec.ts:450:5
+
+    Error Context: test-results\pedidos-pantalla-de-pedido-4c352-ningun-dato-de-pedidos-R49--chromium\error-context.md
+
+    Error Context: test-results\pedidos-pantalla-de-pedido-4c352-ningun-dato-de-pedidos-R49--chromium\error-context.md
+
+  7) [chromium] › e2e\permisos.spec.ts:201:7 › la zona privada segun los permisos de quien entra › el Operador entra, aterriza en inventario, ve un menu corto y recibe 404 en un modulo que no puede consultar, con el control de cerrar sesion presente 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('private-user-trigger')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByTestId('private-user-trigger')
+
+
+      261 |     // exactamente lo que R8 y R14 piden —que la salida sea ALCANZABLE— incluso sin puntero.
+      262 |     const userTrigger = page.getByTestId('private-user-trigger');
+    > 263 |     await expect(userTrigger).toBeVisible();
+          |                               ^
+      264 |     await userTrigger.focus();
+      265 |     await page.keyboard.press('Enter');
+      266 |     await expect(page.getByTestId('private-logout')).toBeVisible();
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\permisos.spec.ts:263:31
+
+    Error Context: test-results\permisos-la-zona-privada-s-4bd03-l-de-cerrar-sesion-presente-chromium\error-context.md
+
+    Error Context: test-results\permisos-la-zona-privada-s-4bd03-l-de-cerrar-sesion-presente-chromium\error-context.md
+
+  8) [chromium] › e2e\presentaciones.spec.ts:298:7 › pantalla de presentaciones › el Administrador entra por la URL, da de alta una presentacion y la ve en la lista filtrando por su nombre (R36) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('presentation-sheet')
+    Expected: 0
+    Received: 1
+    Timeout:  60000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 60000ms
+      - waiting for getByTestId('presentation-sheet')
+        120 × locator resolved to 1 element
+            - unexpected value "1"
+
+
+      328 |     // --- 5. Con exito el panel se cierra y se avisa por el `<Toaster />` que el layout privado YA
+      329 |     // monta (R25, R26). Se afirma que HAY un aviso, no cual es su texto.
+    > 330 |     await expect(page.getByTestId(SHEET_TESTID)).toHaveCount(0, { timeout: 60_000 });
+          |                                                  ^
+      331 |     await expect(page.locator('[data-sonner-toast]').first()).toBeVisible({ timeout: 60_000 });
+      332 |
+      333 |     // --- 6. Y la presentacion esta en la lista sin que el usuario recargue nada (R25), con los
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\presentaciones.spec.ts:330:50
+
+    Error Context: test-results\presentaciones-pantalla-de-6d743-iltrando-por-su-nombre-R36--chromium\error-context.md
+
+    Error Context: test-results\presentaciones-pantalla-de-6d743-iltrando-por-su-nombre-R36--chromium\error-context.md
+
+  9) [chromium] › e2e\proveedores.spec.ts:372:7 › proveedores › el Administrador entra, da de alta un proveedor, abre su detalle, anade una linea de catalogo y la ve en la lista (R51) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('presentation-create')
+    Expected: 0
+    Received: 1
+    Timeout:  60000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 60000ms
+      - waiting for getByTestId('presentation-create')
+        120 × locator resolved to 1 element
+            - unexpected value "1"
+
+
+      196 |
+      197 |     // El sub-formulario se cierra y la presentacion nueva queda SELECCIONADA, sin salir del panel.
+    > 198 |     await expect(page.getByTestId('presentation-create')).toHaveCount(0, { timeout: 60_000 });
+          |                                                           ^
+      199 |     return presentationName;
+      200 |   }
+      201 |
+        at choosePresentation (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\proveedores.spec.ts:198:59)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\proveedores.spec.ts:428:32
+
+    Error Context: test-results\proveedores-proveedores-el-6d2be-go-y-la-ve-en-la-lista-R51--chromium\error-context.md
+
+    Error Context: test-results\proveedores-proveedores-el-6d2be-go-y-la-ve-en-la-lista-R51--chromium\error-context.md
+
+  10) [chromium] › e2e\proveedores.spec.ts:467:7 › proveedores › un usuario que no es Administrador acaba fuera y no ve ningun dato de proveedores (R52) 
+
+    TimeoutError: page.waitForURL: Timeout 60000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+      navigated to "http://localhost:3117/inventario"
+    ============================================================
+
+      178 |   await page.getByTestId('login-password').fill(user.password);
+      179 |   await page.getByTestId('login-submit').click();
+    > 180 |   await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+          |              ^
+      181 | }
+      182 |
+      183 | /**
+        at login (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\proveedores.spec.ts:180:14)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\proveedores.spec.ts:470:5
+
+    Error Context: test-results\proveedores-proveedores-un-3f1a8-un-dato-de-proveedores-R52--chromium\error-context.md
+
+    Error Context: test-results\proveedores-proveedores-un-3f1a8-un-dato-de-proveedores-R52--chromium\error-context.md
+
+  11) [chromium] › e2e\recetas.spec.ts:376:7 › catalogo de recetas › un usuario que no es Administrador acaba fuera y no ve el catalogo (R6) 
+
+    TimeoutError: page.waitForURL: Timeout 60000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+      navigated to "http://localhost:3117/inventario"
+    ============================================================
+
+      151 |   await page.getByTestId('login-password').fill(user.password);
+      152 |   await page.getByTestId('login-submit').click();
+    > 153 |   await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+          |              ^
+      154 | }
+      155 |
+      156 | /**
+        at login (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\recetas.spec.ts:153:14)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\recetas.spec.ts:377:5
+
+    Error Context: test-results\recetas-catalogo-de-receta-999a1-era-y-no-ve-el-catalogo-R6--chromium\error-context.md
+
+    Error Context: test-results\recetas-catalogo-de-receta-999a1-era-y-no-ve-el-catalogo-R6--chromium\error-context.md
+
+  12) [chromium] › e2e\session.spec.ts:241:7 › ciclo de sesion sobre una ruta privada › pide una pantalla privada sin sesion, entra, aterriza en ella, ve su nombre, cierra sesion y atras no muestra la zona privada 
+
+    PrismaClientKnownRequestError: 
+    Invalid `prisma.user.deleteMany()` invocation in
+    C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\session.spec.ts:197:23
+
+      194 // absoluto —borrar por `name: ROLE_ADMINISTRADOR` se llevaria por delante el rol real que usan
+      195 // otros tests y el propio seed—.
+      196 try {
+    → 197   await prisma.user.deleteMany(
+    Foreign key constraint violated on the (not available)
+
+      195 |   // otros tests y el propio seed—.
+      196 |   try {
+    > 197 |     await prisma.user.deleteMany({
+          |                       ^
+      198 |       where: { username: { startsWith: `${USERNAME_PREFIX}${RUN_ID}` } },
+      199 |     });
+      200 |     // La empresa, DESPUES de los usuarios: `users.company_id` es `onDelete: Restrict` (R11).
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\session.spec.ts:197:23
+        at ei.handleRequestError (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:228:13)
+        at ei.handleAndLogRequestError (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:174:12)
+        at ei.request (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:143:12)
+        at a (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:833:24)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\session.spec.ts:197:5
+
+    Error Context: test-results\session-ciclo-de-sesion-so-d3c62--no-muestra-la-zona-privada-chromium\error-context.md
+
+  13) [chromium] › e2e\session.spec.ts:289:7 › ciclo de sesion sobre una ruta privada › una sesion abierta cuya cuenta deja de estar activa no llega a la siguiente pantalla privada y acaba en el login 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('inventario-title')
+    Expected: visible
+    Timeout: 60000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 60000ms
+      - waiting for getByTestId('inventario-title')
+
+
+      304 |     await page.getByTestId('login-submit').click();
+      305 |     await page.waitForURL((url) => url.pathname === INVENTORY_ROUTE, { timeout: 60_000 });
+    > 306 |     await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
+          |                                                        ^
+      307 |
+      308 |     // --- 2. La cuenta se apaga POR FUERA, sin tocar la sesion ni la cookie. Es un `update`
+      309 |     // directo a proposito: simula la accion administrativa de QC-66, que todavia no existe.
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\session.spec.ts:306:56
+
+    Error Context: test-results\session-ciclo-de-sesion-so-74f45-privada-y-acaba-en-el-login-chromium\error-context.md
+
+    Error Context: test-results\session-ciclo-de-sesion-so-74f45-privada-y-acaba-en-el-login-chromium\error-context.md
+
+  14) [chromium] › e2e\usuarios.spec.ts:317:7 › pantalla de usuarios › el Administrador entra por la URL, da de alta un usuario y lo ve en la lista con estado pending (R42) 
+
+    PrismaClientKnownRequestError: 
+    Invalid `prisma.company.deleteMany()` invocation in
+    C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\usuarios.spec.ts:305:28
+
+      302   });
+      303 } finally {
+      304   try {
+    → 305     await prisma.company.deleteMany(
+    Foreign key constraint violated on the (not available)
+
+      303 |   } finally {
+      304 |     try {
+    > 305 |       await prisma.company.deleteMany({ where: { name: companyName } });
+          |                            ^
+      306 |     } finally {
+      307 |       await prisma.$disconnect();
+      308 |     }
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\usuarios.spec.ts:305:28
+        at ei.handleRequestError (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:228:13)
+        at ei.handleAndLogRequestError (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:174:12)
+        at ei.request (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:143:12)
+        at a (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:833:24)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\usuarios.spec.ts:305:7
+
+    Error Context: test-results\usuarios-pantalla-de-usuar-265ce-sta-con-estado-pending-R42--chromium\error-context.md
+
+  15) [webkit] › e2e\errores.spec.ts:194:7 › un error que no es de dominio, visto desde el navegador › la pantalla sigue en pie, muestra el mensaje neutro de `unexpected` y no filtra ni un detalle interno (R33, R13) 
+
+    TimeoutError: page.waitForURL: Timeout 60000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      201 |     await page.getByTestId('login-password').fill(adminUser.password);
+      202 |     await page.getByTestId('login-submit').click();
+    > 203 |     await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+          |                ^
+      204 |
+      205 |     // --- 2. La ficha de una receta cuyo identificador la base no puede ni interpretar. El error
+      206 |     // nace en Prisma, fuera de la familia `RecetasError`.
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\errores.spec.ts:203:16
+
+    Error Context: test-results\errores-un-error-que-no-es-7f702-un-detalle-interno-R33-R13--webkit\error-context.md
+
+    Error Context: test-results\errores-un-error-que-no-es-7f702-un-detalle-interno-R33-R13--webkit\error-context.md
+
+  16) [webkit] › e2e\inventario.spec.ts:391:7 › catalogo de productos › el Administrador entra, da de alta un producto con una presentacion nueva y lo ve en la lista (R4, R17, R18, R21, R24) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('presentation-create')
+    Expected: 0
+    Received: 1
+    Timeout:  60000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 60000ms
+      - waiting for getByTestId('presentation-create')
+        120 × locator resolved to 1 element
+            - unexpected value "1"
+
+
+      417 |     await page.getByTestId('presentation-create-submit').click();
+      418 |
+    > 419 |     await expect(page.getByTestId('presentation-create')).toHaveCount(0, { timeout: 60_000 });
+          |                                                           ^
+      420 |     // Desde el 2026-09-07 el selector es un campo de autocompletado, asi que lo elegido se lee
+      421 |     // en su VALOR y no en su texto contenido.
+      422 |     await expect(page.getByTestId('presentation-select')).toHaveValue(presentationName);
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:419:59
+
+    Error Context: test-results\inventario-catalogo-de-pro-71717-a-lista-R4-R17-R18-R21-R24--webkit\error-context.md
+
+    Error Context: test-results\inventario-catalogo-de-pro-71717-a-lista-R4-R17-R18-R21-R24--webkit\error-context.md
+
+  17) [webkit] › e2e\inventario.spec.ts:459:7 › catalogo de productos › el alta con presentacion y solo costo total deja el lote con el costo unitario derivado (QC-90 R32, R7) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('presentation-create')
+    Expected: 0
+    Received: 1
+    Timeout:  60000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 60000ms
+      - waiting for getByTestId('presentation-create')
+        120 × locator resolved to 1 element
+            - unexpected value "1"
+
+
+      253 |   await page.getByTestId('presentation-create-submit').click();
+      254 |
+    > 255 |   await expect(page.getByTestId('presentation-create')).toHaveCount(0, { timeout: 60_000 });
+          |                                                         ^
+      256 |   // El selector es un campo de autocompletado, asi que lo elegido se lee en su VALOR.
+      257 |   await expect(page.getByTestId('presentation-select')).toHaveValue(nombre, { timeout: 60_000 });
+      258 | }
+        at crearPresentacionEnLinea (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:255:57)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:479:5
+
+    Error Context: test-results\inventario-catalogo-de-pro-a655f-ario-derivado-QC-90-R32-R7--webkit\error-context.md
+
+    Error Context: test-results\inventario-catalogo-de-pro-a655f-ario-derivado-QC-90-R32-R7--webkit\error-context.md
+
+  18) [webkit] › e2e\inventario.spec.ts:515:7 › catalogo de productos › elegir un producto que ya existe le agrega un lote y no crea otro producto (QC-90 R17, R18) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('presentation-create')
+    Expected: 0
+    Received: 1
+    Timeout:  60000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 60000ms
+      - waiting for getByTestId('presentation-create')
+        120 × locator resolved to 1 element
+            - unexpected value "1"
+
+
+      253 |   await page.getByTestId('presentation-create-submit').click();
+      254 |
+    > 255 |   await expect(page.getByTestId('presentation-create')).toHaveCount(0, { timeout: 60_000 });
+          |                                                         ^
+      256 |   // El selector es un campo de autocompletado, asi que lo elegido se lee en su VALOR.
+      257 |   await expect(page.getByTestId('presentation-select')).toHaveValue(nombre, { timeout: 60_000 });
+      258 | }
+        at crearPresentacionEnLinea (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:255:57)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:530:5
+
+    Error Context: test-results\inventario-catalogo-de-pro-4512f-tro-producto-QC-90-R17-R18--webkit\error-context.md
+
+    Error Context: test-results\inventario-catalogo-de-pro-4512f-tro-producto-QC-90-R17-R18--webkit\error-context.md
+
+  19) [webkit] › e2e\inventario.spec.ts:571:7 › catalogo de productos › un usuario que no es Administrador acaba fuera y no ve el catalogo (R4) 
+
+    TimeoutError: page.waitForURL: Timeout 60000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+      navigated to "http://localhost:3117/inventario"
+    ============================================================
+
+      206 |   await page.getByTestId('login-password').fill(user.password);
+      207 |   await page.getByTestId('login-submit').click();
+    > 208 |   await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+          |              ^
+      209 | }
+      210 |
+      211 | /**
+        at login (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:208:14)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:574:5
+
+    Error Context: test-results\inventario-catalogo-de-pro-dd6d4-era-y-no-ve-el-catalogo-R4--webkit\error-context.md
+
+    Error Context: test-results\inventario-catalogo-de-pro-dd6d4-era-y-no-ve-el-catalogo-R4--webkit\error-context.md
+
+  20) [webkit] › e2e\pedidos.spec.ts:447:7 › pantalla de pedidos › un usuario que no es Administrador acaba fuera y no ve ningun dato de pedidos (R49) 
+
+    TimeoutError: page.waitForURL: Timeout 60000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+      navigated to "http://localhost:3117/inventario"
+    ============================================================
+
+      171 |   await page.getByTestId('login-password').fill(user.password);
+      172 |   await page.getByTestId('login-submit').click();
+    > 173 |   await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+          |              ^
+      174 | }
+      175 |
+      176 | /**
+        at login (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\pedidos.spec.ts:173:14)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\pedidos.spec.ts:450:5
+
+    Error Context: test-results\pedidos-pantalla-de-pedido-4c352-ningun-dato-de-pedidos-R49--webkit\error-context.md
+
+    Error Context: test-results\pedidos-pantalla-de-pedido-4c352-ningun-dato-de-pedidos-R49--webkit\error-context.md
+
+  21) [webkit] › e2e\permisos.spec.ts:201:7 › la zona privada segun los permisos de quien entra › el Operador entra, aterriza en inventario, ve un menu corto y recibe 404 en un modulo que no puede consultar, con el control de cerrar sesion presente 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('private-user-trigger')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByTestId('private-user-trigger')
+
+
+      261 |     // exactamente lo que R8 y R14 piden —que la salida sea ALCANZABLE— incluso sin puntero.
+      262 |     const userTrigger = page.getByTestId('private-user-trigger');
+    > 263 |     await expect(userTrigger).toBeVisible();
+          |                               ^
+      264 |     await userTrigger.focus();
+      265 |     await page.keyboard.press('Enter');
+      266 |     await expect(page.getByTestId('private-logout')).toBeVisible();
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\permisos.spec.ts:263:31
+
+    Error Context: test-results\permisos-la-zona-privada-s-4bd03-l-de-cerrar-sesion-presente-webkit\error-context.md
+
+    Error Context: test-results\permisos-la-zona-privada-s-4bd03-l-de-cerrar-sesion-presente-webkit\error-context.md
+
+  22) [webkit] › e2e\presentaciones.spec.ts:298:7 › pantalla de presentaciones › el Administrador entra por la URL, da de alta una presentacion y la ve en la lista filtrando por su nombre (R36) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('presentation-sheet')
+    Expected: 0
+    Received: 1
+    Timeout:  60000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 60000ms
+      - waiting for getByTestId('presentation-sheet')
+        117 × locator resolved to 1 element
+            - unexpected value "1"
+
+
+      328 |     // --- 5. Con exito el panel se cierra y se avisa por el `<Toaster />` que el layout privado YA
+      329 |     // monta (R25, R26). Se afirma que HAY un aviso, no cual es su texto.
+    > 330 |     await expect(page.getByTestId(SHEET_TESTID)).toHaveCount(0, { timeout: 60_000 });
+          |                                                  ^
+      331 |     await expect(page.locator('[data-sonner-toast]').first()).toBeVisible({ timeout: 60_000 });
+      332 |
+      333 |     // --- 6. Y la presentacion esta en la lista sin que el usuario recargue nada (R25), con los
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\presentaciones.spec.ts:330:50
+
+    Error Context: test-results\presentaciones-pantalla-de-6d743-iltrando-por-su-nombre-R36--webkit\error-context.md
+
+    Error Context: test-results\presentaciones-pantalla-de-6d743-iltrando-por-su-nombre-R36--webkit\error-context.md
+
+  23) [webkit] › e2e\proveedores.spec.ts:372:7 › proveedores › el Administrador entra, da de alta un proveedor, abre su detalle, anade una linea de catalogo y la ve en la lista (R51) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('presentation-create')
+    Expected: 0
+    Received: 1
+    Timeout:  60000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 60000ms
+      - waiting for getByTestId('presentation-create')
+        117 × locator resolved to 1 element
+            - unexpected value "1"
+
+
+      196 |
+      197 |     // El sub-formulario se cierra y la presentacion nueva queda SELECCIONADA, sin salir del panel.
+    > 198 |     await expect(page.getByTestId('presentation-create')).toHaveCount(0, { timeout: 60_000 });
+          |                                                           ^
+      199 |     return presentationName;
+      200 |   }
+      201 |
+        at choosePresentation (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\proveedores.spec.ts:198:59)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\proveedores.spec.ts:428:32
+
+    Error Context: test-results\proveedores-proveedores-el-6d2be-go-y-la-ve-en-la-lista-R51--webkit\error-context.md
+
+    Error Context: test-results\proveedores-proveedores-el-6d2be-go-y-la-ve-en-la-lista-R51--webkit\error-context.md
+
+  24) [webkit] › e2e\proveedores.spec.ts:467:7 › proveedores › un usuario que no es Administrador acaba fuera y no ve ningun dato de proveedores (R52) 
+
+    TimeoutError: page.waitForURL: Timeout 60000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+      navigated to "http://localhost:3117/inventario"
+    ============================================================
+
+      178 |   await page.getByTestId('login-password').fill(user.password);
+      179 |   await page.getByTestId('login-submit').click();
+    > 180 |   await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+          |              ^
+      181 | }
+      182 |
+      183 | /**
+        at login (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\proveedores.spec.ts:180:14)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\proveedores.spec.ts:470:5
+
+    Error Context: test-results\proveedores-proveedores-un-3f1a8-un-dato-de-proveedores-R52--webkit\error-context.md
+
+    Error Context: test-results\proveedores-proveedores-un-3f1a8-un-dato-de-proveedores-R52--webkit\error-context.md
+
+  25) [webkit] › e2e\recetas.spec.ts:376:7 › catalogo de recetas › un usuario que no es Administrador acaba fuera y no ve el catalogo (R6) 
+
+    TimeoutError: page.waitForURL: Timeout 60000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+      navigated to "http://localhost:3117/inventario"
+    ============================================================
+
+      151 |   await page.getByTestId('login-password').fill(user.password);
+      152 |   await page.getByTestId('login-submit').click();
+    > 153 |   await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+          |              ^
+      154 | }
+      155 |
+      156 | /**
+        at login (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\recetas.spec.ts:153:14)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\recetas.spec.ts:377:5
+
+    Error Context: test-results\recetas-catalogo-de-receta-999a1-era-y-no-ve-el-catalogo-R6--webkit\error-context.md
+
+    Error Context: test-results\recetas-catalogo-de-receta-999a1-era-y-no-ve-el-catalogo-R6--webkit\error-context.md
+
+  26) [webkit] › e2e\session.spec.ts:241:7 › ciclo de sesion sobre una ruta privada › pide una pantalla privada sin sesion, entra, aterriza en ella, ve su nombre, cierra sesion y atras no muestra la zona privada 
+
+    PrismaClientKnownRequestError: 
+    Invalid `prisma.user.deleteMany()` invocation in
+    C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\session.spec.ts:197:23
+
+      194 // absoluto —borrar por `name: ROLE_ADMINISTRADOR` se llevaria por delante el rol real que usan
+      195 // otros tests y el propio seed—.
+      196 try {
+    → 197   await prisma.user.deleteMany(
+    Foreign key constraint violated on the (not available)
+
+      195 |   // otros tests y el propio seed—.
+      196 |   try {
+    > 197 |     await prisma.user.deleteMany({
+          |                       ^
+      198 |       where: { username: { startsWith: `${USERNAME_PREFIX}${RUN_ID}` } },
+      199 |     });
+      200 |     // La empresa, DESPUES de los usuarios: `users.company_id` es `onDelete: Restrict` (R11).
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\session.spec.ts:197:23
+        at ei.handleRequestError (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:228:13)
+        at ei.handleAndLogRequestError (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:174:12)
+        at ei.request (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:143:12)
+        at a (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:833:24)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\session.spec.ts:197:5
+
+    Error Context: test-results\session-ciclo-de-sesion-so-d3c62--no-muestra-la-zona-privada-webkit\error-context.md
+
+  27) [webkit] › e2e\usuarios.spec.ts:317:7 › pantalla de usuarios › el Administrador entra por la URL, da de alta un usuario y lo ve en la lista con estado pending (R42) 
+
+    PrismaClientKnownRequestError: 
+    Invalid `prisma.company.deleteMany()` invocation in
+    C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\usuarios.spec.ts:305:28
+
+      302   });
+      303 } finally {
+      304   try {
+    → 305     await prisma.company.deleteMany(
+    Foreign key constraint violated on the (not available)
+
+      303 |   } finally {
+      304 |     try {
+    > 305 |       await prisma.company.deleteMany({ where: { name: companyName } });
+          |                            ^
+      306 |     } finally {
+      307 |       await prisma.$disconnect();
+      308 |     }
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\usuarios.spec.ts:305:28
+        at ei.handleRequestError (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:228:13)
+        at ei.handleAndLogRequestError (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:174:12)
+        at ei.request (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:143:12)
+        at a (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:833:24)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\usuarios.spec.ts:305:7
+
+    Error Context: test-results\usuarios-pantalla-de-usuar-265ce-sta-con-estado-pending-R42--webkit\error-context.md
+
+  27 failed
+    [chromium] › e2e\errores.spec.ts:194:7 › un error que no es de dominio, visto desde el navegador › la pantalla sigue en pie, muestra el mensaje neutro de `unexpected` y no filtra ni un detalle interno (R33, R13) 
+    [chromium] › e2e\inventario.spec.ts:391:7 › catalogo de productos › el Administrador entra, da de alta un producto con una presentacion nueva y lo ve en la lista (R4, R17, R18, R21, R24) 
+    [chromium] › e2e\inventario.spec.ts:459:7 › catalogo de productos › el alta con presentacion y solo costo total deja el lote con el costo unitario derivado (QC-90 R32, R7) 
+    [chromium] › e2e\inventario.spec.ts:515:7 › catalogo de productos › elegir un producto que ya existe le agrega un lote y no crea otro producto (QC-90 R17, R18) 
+    [chromium] › e2e\inventario.spec.ts:571:7 › catalogo de productos › un usuario que no es Administrador acaba fuera y no ve el catalogo (R4) 
+    [chromium] › e2e\pedidos.spec.ts:447:7 › pantalla de pedidos › un usuario que no es Administrador acaba fuera y no ve ningun dato de pedidos (R49) 
+    [chromium] › e2e\permisos.spec.ts:201:7 › la zona privada segun los permisos de quien entra › el Operador entra, aterriza en inventario, ve un menu corto y recibe 404 en un modulo que no puede consultar, con el control de cerrar sesion presente 
+    [chromium] › e2e\presentaciones.spec.ts:298:7 › pantalla de presentaciones › el Administrador entra por la URL, da de alta una presentacion y la ve en la lista filtrando por su nombre (R36) 
+    [chromium] › e2e\proveedores.spec.ts:372:7 › proveedores › el Administrador entra, da de alta un proveedor, abre su detalle, anade una linea de catalogo y la ve en la lista (R51) 
+    [chromium] › e2e\proveedores.spec.ts:467:7 › proveedores › un usuario que no es Administrador acaba fuera y no ve ningun dato de proveedores (R52) 
+    [chromium] › e2e\recetas.spec.ts:376:7 › catalogo de recetas › un usuario que no es Administrador acaba fuera y no ve el catalogo (R6) 
+    [chromium] › e2e\session.spec.ts:241:7 › ciclo de sesion sobre una ruta privada › pide una pantalla privada sin sesion, entra, aterriza en ella, ve su nombre, cierra sesion y atras no muestra la zona privada 
+    [chromium] › e2e\session.spec.ts:289:7 › ciclo de sesion sobre una ruta privada › una sesion abierta cuya cuenta deja de estar activa no llega a la siguiente pantalla privada y acaba en el login 
+    [chromium] › e2e\usuarios.spec.ts:317:7 › pantalla de usuarios › el Administrador entra por la URL, da de alta un usuario y lo ve en la lista con estado pending (R42) 
+    [webkit] › e2e\errores.spec.ts:194:7 › un error que no es de dominio, visto desde el navegador › la pantalla sigue en pie, muestra el mensaje neutro de `unexpected` y no filtra ni un detalle interno (R33, R13) 
+    [webkit] › e2e\inventario.spec.ts:391:7 › catalogo de productos › el Administrador entra, da de alta un producto con una presentacion nueva y lo ve en la lista (R4, R17, R18, R21, R24) 
+    [webkit] › e2e\inventario.spec.ts:459:7 › catalogo de productos › el alta con presentacion y solo costo total deja el lote con el costo unitario derivado (QC-90 R32, R7) 
+    [webkit] › e2e\inventario.spec.ts:515:7 › catalogo de productos › elegir un producto que ya existe le agrega un lote y no crea otro producto (QC-90 R17, R18) 
+    [webkit] › e2e\inventario.spec.ts:571:7 › catalogo de productos › un usuario que no es Administrador acaba fuera y no ve el catalogo (R4) 
+    [webkit] › e2e\pedidos.spec.ts:447:7 › pantalla de pedidos › un usuario que no es Administrador acaba fuera y no ve ningun dato de pedidos (R49) 
+    [webkit] › e2e\permisos.spec.ts:201:7 › la zona privada segun los permisos de quien entra › el Operador entra, aterriza en inventario, ve un menu corto y recibe 404 en un modulo que no puede consultar, con el control de cerrar sesion presente 
+    [webkit] › e2e\presentaciones.spec.ts:298:7 › pantalla de presentaciones › el Administrador entra por la URL, da de alta una presentacion y la ve en la lista filtrando por su nombre (R36) 
+    [webkit] › e2e\proveedores.spec.ts:372:7 › proveedores › el Administrador entra, da de alta un proveedor, abre su detalle, anade una linea de catalogo y la ve en la lista (R51) 
+    [webkit] › e2e\proveedores.spec.ts:467:7 › proveedores › un usuario que no es Administrador acaba fuera y no ve ningun dato de proveedores (R52) 
+    [webkit] › e2e\recetas.spec.ts:376:7 › catalogo de recetas › un usuario que no es Administrador acaba fuera y no ve el catalogo (R6) 
+    [webkit] › e2e\session.spec.ts:241:7 › ciclo de sesion sobre una ruta privada › pide una pantalla privada sin sesion, entra, aterriza en ella, ve su nombre, cierra sesion y atras no muestra la zona privada 
+    [webkit] › e2e\usuarios.spec.ts:317:7 › pantalla de usuarios › el Administrador entra por la URL, da de alta un usuario y lo ve en la lista con estado pending (R42) 
+  51 passed (7.5m)
+EXIT=1
+2026-09-15T10:02:27-05:00
