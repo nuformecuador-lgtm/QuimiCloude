@@ -65,7 +65,8 @@
 > - **R4**, y R6 por el mismo motivo, dicen ahora qué ve quien llama y qué se queda en el registro
 >   (menor m3).
 > - Nace **D13**, con sus requisitos **R34–R36**.
-> - Se abre la **pregunta P1**, sobre la migración.
+> - Se abre la **pregunta P1**, sobre la migración, y queda **cerrada el mismo 2026-09-15 con la
+>   opción D**: no hay guardia y no nace R37.
 >
 > Ningún otro requisito cambia de texto ni de número.
 
@@ -221,8 +222,9 @@ solo unitaria con la base simulada— del **correlativo**, de la **unicidad por 
 > lote. D13 lo corta en la entrada.
 >
 > **«Solo dígitos»** son los caracteres `0`–`9`: el mismo conjunto con el que la serie decide qué
-> lote es numérico (R9). Lo que **no** decide todavía esta enmienda —qué hace la migración si un
-> lote así ya está escrito— es la pregunta **P1**, y no tiene requisito hasta que se responda.
+> lote es numérico (R9). Qué hace la migración si un lote así ya está escrito fue la pregunta
+> **P1**, cerrada el 2026-09-15 con la opción D («no los hay, es nuevo todo»). No lleva guardia ni
+> requisito: no hay R37.
 
 **R34.** SI el alta trae un lote escrito que, **tras recortar los espacios de los extremos**, está
 formado **solo por dígitos** y llega a los **60 caracteres** —contando también los ceros a la
@@ -240,12 +242,29 @@ reintento y sin error. [D13, D6]
 
 ## Preguntas abiertas
 
-Las dos que la ficha arrastraba desde el 2026-09-08 —la forma exacta del correlativo y qué valor
-reciben las filas existentes en el backfill— están cerradas en la tabla de abajo. La enmienda del
-2026-09-15 abre **una**.
+**Ninguna.** Las dos que la ficha arrastraba desde el 2026-09-08 —la forma exacta del correlativo y
+qué valor reciben las filas existentes en el backfill— están cerradas en la tabla de abajo. La que
+abrió la enmienda del 2026-09-15, **P1**, también está cerrada: se deja escrita aquí debajo como
+constancia, con su respuesta.
 
-**P1 (2026-09-15). ¿Qué hace la migración si una empresa ya tiene escrito un lote de solo dígitos de
-60 caracteres?**
+**P1 (abierta y cerrada el 2026-09-15). ¿Qué hace la migración si una empresa ya tiene escrito un
+lote de solo dígitos de 60 caracteres?**
+
+> **CERRADA el 2026-09-15 con la opción D.** Respuesta textual del humano: **«no los hay, es nuevo
+> todo»**. No existen datos previos con lotes de solo dígitos de 60 caracteres o más, porque todo es
+> nuevo.
+>
+> **Consecuencia:**
+> - **La migración no lleva guardia para ese caso.**
+> - **No nace R37.**
+> - **T15 queda cancelada** («NO APLICA»).
+>
+> Por el mismo motivo tampoco se protege el caso vecino, el de los lotes ya escritos de **más** de 60
+> caracteres de cualquier forma. Los dos quedan como límite conocido y aceptado en
+> `design.md > 9.6`. Se registra también como nota de D13, en la tabla de abajo; no abre otra
+> decisión.
+>
+> Lo que sigue es el planteamiento tal como se hizo, sin cambios.
 
 D13 impide **teclearlo** desde ahora, pero no dice nada de los que ya estén en la base. Hoy no consta
 ninguno: en la base de desarrollo hay una sola fila y **no se ha medido producción**. Lo que pasa
@@ -280,7 +299,8 @@ lotes ya escritos de **más** de 60 caracteres de cualquier forma, que hoy abort
 mensaje genérico (desviación 5 de la Tanda 1 de la bitácora). Es un caso vecino, no es D13, y no se
 incluye sin respuesta.
 
-**Hasta que haya respuesta, T15 no se empieza**, y el requisito que nazca de ella (R37) no existe.
+~~**Hasta que haya respuesta, T15 no se empieza**, y el requisito que nazca de ella (R37) no existe.~~
+*Superado por el cierre del 2026-09-15: la respuesta fue D, T15 no aplica y R37 no nace.*
 
 ## Decisiones cerradas (no reabrir)
 
@@ -298,8 +318,8 @@ incluye sin respuesta.
 | 2026-09-13 | ¿Entra la pantalla? | **No**: va en **QC-103**, `zone: frontend`, bloqueada por esta. Mantiene la zona limpia y el cupo de paralelismo intacto, igual que QC-87 → QC-102 |
 | 2026-09-13 | ¿Qué verificación se exige? | **Integración contra base real**, que es donde viven estas reglas: el correlativo, la unicidad por empresa, el backfill y **dos altas compitiendo por el mismo número**. Un unitario con la base simulada no puede demostrar ninguna de las dos últimas. **El E2E se difiere a QC-103**, que es la que tendrá algo que mirar |
 | 2026-09-13 | Autorización, idioma, borrado y forma de la fecha | **Heredados, no se reabren.** Autorización **en el service** con `inventario.modificar` (**QC-20**, **QC-90**); identificadores de base **en inglés** y borrado **lógico** (**feature 4**, **QC-14**, **QC-90**); la fecha viaja como **fecha civil `YYYY-MM-DD`** y la convierte el adaptador (**QC-90**, `expiryDate`) |
-| 2026-09-15 | Con la serie ya sin techo (m4), si el lote de solo dígitos más alto de una empresa tiene 60 caracteres, el siguiente generado tendría 61 y no cabe en el largo máximo de 60: en el alta es un error de base sin traducir y en la migración un aborto genérico. ¿Qué se hace? | **Un lote tecleado que sea solo dígitos no puede tener 60 caracteres**, para que el siguiente generado quepa siempre en el largo máximo de 60. **Precisa el alcance de D5**: el lote sigue siendo texto y un lote con al menos un carácter que no sea dígito conserva sus 60. Salió de la revisión de QC-81 y se decidió en la enmienda del spec. Qué hace la migración con un lote así **ya escrito** queda abierto (**P1**) |
+| 2026-09-15 | Con la serie ya sin techo (m4), si el lote de solo dígitos más alto de una empresa tiene 60 caracteres, el siguiente generado tendría 61 y no cabe en el largo máximo de 60: en el alta es un error de base sin traducir y en la migración un aborto genérico. ¿Qué se hace? | **Un lote tecleado que sea solo dígitos no puede tener 60 caracteres**, para que el siguiente generado quepa siempre en el largo máximo de 60. **Precisa el alcance de D5**: el lote sigue siendo texto y un lote con al menos un carácter que no sea dígito conserva sus 60. Salió de la revisión de QC-81 y se decidió en la enmienda del spec. **Nota de cierre (2026-09-15, P1 → opción D):** con un lote así **ya escrito**, la migración **no lleva guardia**, y tampoco para los lotes ya escritos de más de 60 caracteres. Motivo textual del humano: «no los hay, es nuevo todo». No nace R37 |
 
 *La fila D13 la escribió `spec_author` el 2026-09-15 en la enmienda F1.2. Transcribe la decisión humana
-que transmitió el leader, y está sujeta a la aprobación F1.4 de la enmienda. Las filas D1–D12 no se
-tocaron.*
+que transmitió el leader, y el humano la **aprobó** el 2026-09-15 (F1.4 de la enmienda). La nota de
+cierre de P1 se añadió ese mismo día con la respuesta del humano. Las filas D1–D12 no se tocaron.*

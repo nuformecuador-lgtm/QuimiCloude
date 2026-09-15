@@ -177,16 +177,15 @@
 
 ## Tanda 6 — enmienda del 2026-09-15: el lote numérico cabe siempre (D13)
 
-> **No se empieza nada de esta tanda sin la aprobación humana de la enmienda** (F1.4 de la
-> enmienda). T13 y T14 no dependen de la pregunta P1 y pueden ir en cuanto se apruebe. **T15 sí
-> depende de P1** y no se empieza sin respuesta escrita.
+> **Enmienda aprobada por el humano el 2026-09-15** (F1.4). T13 y T14 están en marcha. **T15 no
+> aplica**: P1 se cerró con la opción D ese mismo día.
 >
 > Los archivos de esta tanda **siguen sin tocar** `app/**`, `components/**` ni `e2e/**` (R28,
 > R29), y **no** añaden ningún export al contrato público de `inventario`. Si alguna task acaba
 > pidiendo un export nuevo, hay que tocar `tests/unit/inventario/module-contract.test.ts:133` y
 > `tests/unit/inventario/qc81-alcance.test.ts:611`, y eso se anota como desviación.
 
-- [ ] **T13 [P] — La regla en el esquema de entrada del lote.** Depende de la aprobación de la
+- [x] **T13 [P] — La regla en el esquema de entrada del lote.** Depende de la aprobación de la
       enmienda.
       Archivos: `lib/modules/inventario/domain/product-batch-input.ts`,
       `tests/unit/inventario/product-batch-input.test.ts`,
@@ -218,7 +217,7 @@
       
       Cubre **R34, R35**.
 
-- [ ] **T14 — La frontera contra base real.** Depende de T13.
+- [x] **T14 — La frontera contra base real.** Depende de T13.
       Archivos: `tests/integration/inventario/product-batch-lot.int.test.ts` (casos nuevos; el
       archivo ya está censado en `tests/integration/aislamiento.json`, así que no hace falta
       entrada nueva).
@@ -234,8 +233,18 @@
       base efímera de QC-77. Ningún caso afirma sobre filas que no creó él mismo, y la limpieza va
       en `finally` en orden de FK. Cubre **R34, R35, R36**.
 
-- [ ] **T15 — La migración ante un lote numérico de 60 caracteres ya escrito.** **Bloqueada por
-      P1** (`requirements.md > Preguntas abiertas`).
+- ~~**T15 — La migración ante un lote numérico de 60 caracteres ya escrito.**~~ **NO APLICA —
+      cancelada el 2026-09-15.**
+      **Motivo:** P1 se cerró con la **opción D**. Respuesta textual del humano: «no los hay, es
+      nuevo todo»; no hay datos previos con lotes de solo dígitos de 60 caracteres o más.
+      **Consecuencia:**
+      - la migración **no** lleva guardia y **no** cambia;
+      - **no nace R37**;
+      - el caso vecino, los lotes de más de 60 caracteres, tampoco se protege
+        (`requirements.md > Preguntas abiertas > P1`, `design.md > 9.6`).
+      
+      Nadie la implementa. Lo que sigue es el texto original, que se conserva como constancia:
+      ~~**Bloqueada por P1** (`requirements.md > Preguntas abiertas`).~~
       Archivos, según la respuesta:
       `db/migrations/20260913120000_product_batch_lot_and_purchase_date/migration.sql`,
       `tests/unit/inventario/schema/product-batch-lot-migration.test.ts`,
@@ -257,14 +266,15 @@
       **Hecho:** la respuesta a P1 está escrita en `progress/impl_QC-81-lote-y-fecha-de-compra.md`.
       Los tests de la opción elegida están en verde. Si la respuesta es A o B, el test de la
       guardia **se pone rojo** al quitar la guardia (mutación con copia y restauración, como en m4).
-      Cubre **R37**, si nace.
+      ~~Cubre **R37**, si nace.~~ *No nace: T15 no aplica (2026-09-15).*
 
 ## Tanda 5 — cierre
 
-- [ ] **T12 — Trazabilidad y gate.** Depende de todas, **incluidas T13, T14 y T15** de la enmienda.
+- [ ] **T12 — Trazabilidad y gate.** Depende de todas, **incluidas T13 y T14** de la enmienda. T15 no
+      aplica.
       Archivos: `progress/impl_QC-81-lote-y-fecha-de-compra.md`.
-      El mapa `R1..R36 -> test` completo (`R1..R37` si P1 hace nacer R37), sin ningún requisito
-      huérfano, con R4 citado con su redacción precisada (m3); la respuesta a P1 escrita; la salida real de
+      El mapa `R1..R36 -> test` completo, sin ningún requisito huérfano. R37 no existe. R4 va citado
+      con su redacción precisada (m3). Se escribe el cierre de P1 (opción D, 2026-09-15). Y se pega la salida real de
       `./init.sh` **completo** pegada; la nota del E2E diferido a QC-103 con su motivo (excepción
       consciente a `CHECKPOINTS.md`); y la respuesta de T0 escrita.
       **Hecho:** gate completo en verde, ningún archivo rojo fuera de `tests/baseline-rojos.json`.
@@ -302,9 +312,9 @@
 | R34 | T13 (esquema de entrada y caso de uso), T14 (caso 4) |
 | R35 | T13 (59 dígitos y 60 caracteres con letra), T14 (caso 1) |
 | R36 | T14 (casos 2 y 3) |
-| R37 (solo si P1 lo hace nacer) | T15 |
 
 *Enmienda del 2026-09-15:*
 - **R4** cambia de redacción (m3) pero **no** de task: lo sigue cubriendo T5, con el test que ya
   afirma `invalid_input` y el `diagnostic` con `purchaseDate`.
 - **R6** se precisa por el mismo motivo y lo sigue cubriendo T4.
+- **No hay R37.** P1 se cerró con la opción D, así que T15 no aplica y no figura en este mapa.

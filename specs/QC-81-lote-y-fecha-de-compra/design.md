@@ -13,7 +13,8 @@
 > - **m4**: el máximo de la serie se lee con `numeric`, **sin techo de dígitos** (§2.3, §3.2, §9).
 >   §8 recoge además cómo quedó el test de la carrera (m5).
 > - **D13 → R34–R36**: el lote tecleado de solo dígitos no puede tener 60 caracteres (§4.6, §6 E y F,
->   §9.6). Deja abierta la pregunta **P1** sobre la migración.
+>   §9.6). La pregunta **P1** sobre la migración se abrió y se **cerró el 2026-09-15 con la opción
+>   D**: no hay datos previos, así que no hay guardia y el caso queda como límite aceptado (§9.6).
 >
 > Las referencias de línea al código de las secciones 0–7 son las del 2026-09-13 y se dejan como
 > estaban. Las de esta enmienda son las del commit `e10f626`.
@@ -250,7 +251,8 @@ UPDATE "product_batches" AS b
   sobre cuál es «el más alto».
 - **Límite: 60 nueves.** Si una empresa ya tiene un lote de 60 nueves **y** alguna fila sin lote, el
   relleno escribe 61 caracteres y la migración aborta **entera** al crear el `CHECK` de largo, con el
-  mensaje genérico de Postgres. No deja nada a medias. Qué hacer ahí es la pregunta **P1** (§9.6).
+  mensaje genérico de Postgres. No deja nada a medias. Es un **límite aceptado**: P1 se cerró con la
+  opción D el 2026-09-15, porque no hay datos previos (§9.6).
 - Lo **no numérico** (`'ACME-2026-07'`) no entra en el máximo. «El más alto que existe» se lee sobre
   la serie numérica, que es la única que tiene orden; un lote con letras no es un número mayor ni
   menor, simplemente no está en la serie. Es la lectura que hace que D5 y D6 sean compatibles.
@@ -508,7 +510,8 @@ const lotSchema = z
   siguiente generado es como mucho 10^59, que tiene **60** caracteres y cabe (R36).
 - La serie generada solo llegaría a 61 caracteres después de generar unos 9·10^59 lotes a partir de
   ahí, cosa que no va a ocurrir.
-- Los únicos caminos reales a 61 son **datos que ya estén escritos** (pregunta P1, §9.6) o
+- Los únicos caminos reales a 61 son **datos que ya estén escritos**, que según el humano no existen
+  (P1, cerrada con la opción D, §9.6), o
   **escrituras por otra vía**, que tampoco pasan por la regla de largo del esquema.
 
 **Sin `CHECK` en la base, a propósito.** Se descarta en §6 E. En resumen:
@@ -521,8 +524,9 @@ const lotSchema = z
   conserva la suya, que es la invariante que sí comparten los dos lados: `product_batches_lot_length`,
   60 para todo lote.
 
-**El adaptador no traduce el `23514` de largo.** Sigue saliendo como `unexpected`, y desde R34 solo lo
-alcanzan los datos de P1 o las escrituras por otra vía. Se descarta en §6 F.
+**El adaptador no traduce el `23514` de largo.** Sigue saliendo como `unexpected`. Desde R34 solo lo
+alcanzarían datos previos, que no existen (P1, opción D), o escrituras por otra vía. Se descarta en
+§6 F.
 
 ## 5. Autorización, RLS y ámbito
 
@@ -724,10 +728,22 @@ Es una excepción consciente a `CHECKPOINTS.md:20` y va anotada en el `impl_`.
        adaptadores driving: no es una decisión de inventario solo.
    - **Y hereda el texto del lote numérico (R34, §4.6)**, que ya se pinta en el campo `lot` sin tocar
      la pantalla. QC-103 solo tiene que revisar la redacción.
-6. **Un lote de solo dígitos de 60 caracteres ya escrito antes de D13** (enmienda del 2026-09-15,
-   pregunta **P1** abierta). D13 impide teclearlo desde ahora, pero no dice nada de los datos previos
-   ni de las escrituras por otra vía. Medido contra base efímera (bitácora, «Correcciones de la
-   revision»):
+6. **Un lote de solo dígitos de 60 caracteres ya escrito antes de D13: LÍMITE CONOCIDO Y ACEPTADO**
+   (pregunta **P1**, abierta y cerrada el 2026-09-15 con la **opción D**).
+   - **Motivo del humano, textual:** «no los hay, es nuevo todo». No hay datos previos con lotes de
+     solo dígitos de 60 caracteres o más.
+   - **Consecuencia:** la migración **no** lleva guardia para este caso, no cambia ninguna sentencia de
+     `migration.sql`, no nace R37 y T15 no aplica.
+   - **El caso vecino tampoco se protege, y por el mismo motivo.** Son los lotes ya escritos de **más**
+     de 60 caracteres de cualquier forma (desviación 5 de la Tanda 1 de la bitácora), que harían
+     abortar la migración entera al crear `product_batches_lot_length`, con el mensaje genérico.
+   - **Qué queda cubierto, tras D13.** Desde D13 ninguno de los dos se puede crear por la aplicación:
+     R34 para los de solo dígitos y el largo máximo del esquema para el resto. Lo único que podría
+     alcanzarlos es una escritura por otra vía, que ya estaba fuera de las defensas del esquema.
+
+   Se deja a continuación lo que se midió y las opciones que se plantearon, como constancia de qué se
+   aceptó. D13 impide teclearlo desde ahora, pero no dice nada de los datos previos ni de las
+   escrituras por otra vía. Medido contra base efímera (bitácora, «Correcciones de la revision»):
    - **En la migración:** si una empresa tiene 60 nueves **y** alguna fila sin lote, el relleno escribe
      61 caracteres y el `CHECK` `product_batches_lot_length` aborta la migración **entera**, con el
      mensaje genérico «violada por alguna fila». No deja nada a medias.
@@ -738,7 +754,7 @@ Es una excepción consciente a `CHECKPOINTS.md:20` y va anotada en el `impl_`.
      aplicación. Las altas con lote tecleado siguen funcionando.
    - **Con 60 dígitos que no son todos nueves no falla nada**, ni en la migración ni en el alta.
 
-   Las opciones de P1, en términos de SQL, para que T15 no tenga que inventar la condición:
+   Las opciones que se plantearon para P1, en términos de SQL (constancia; se eligió D):
    - **A**: guardia en el paso 1 que aborta si existe
      `"lot" ~ '^[0-9]+$' AND char_length("lot") >= 60`.
    - **B**: guardia en el paso 1 que aborta si, para alguna empresa,
@@ -750,6 +766,7 @@ Es una excepción consciente a `CHECKPOINTS.md:20` y va anotada en el `impl_`.
    - **D**: ninguna sentencia nueva. Solo cambia el comentario del paso 4 para citar D13, y este punto
      queda como límite aceptado.
 
-   Con A o B, el mensaje sigue el formato de R21: cuántas son, la consulta para localizarlas y qué
-   hacer (renombrar por SQL antes de migrar). **Hasta que P1 tenga respuesta, este punto es un límite
-   abierto, no aceptado.**
+   Con A o B, el mensaje habría seguido el formato de R21. **Se eligió D el 2026-09-15**: ninguna
+   sentencia nueva. El comentario del paso 4 de `migration.sql` sigue diciendo «LIMITE CONOCIDO»,
+   que es exactamente lo que ahora es, y **no** se toca en esta enmienda. Este punto es un **límite
+   aceptado**, con el motivo escrito arriba.
