@@ -56,7 +56,7 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 // `normalizeCompanyName` es la UNICA definicion de «mismo nombre de empresa» (QC-47 R3) y
 // `ROLE_ADMINISTRADOR` la unica fuente del nombre del rol (QC-54): los dos por el barrel, nunca
@@ -68,7 +68,10 @@ import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/secur
 import { normalizePresentationName, normalizeProductName } from '@/lib/modules/inventario';
 import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
-import { DASHBOARD_ROUTE, INVENTORY_ROUTE, LOGIN_ROUTE, PRESENTATIONS_ROUTE } from '@/lib/shared/routes';
+import { INVENTORY_ROUTE, PRESENTATIONS_ROUTE } from '@/lib/shared/routes';
+
+// QC-93 (R8): el aterrizaje tras el login se deriva de los permisos del usuario en el helper unico.
+import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc49_e2e_';
@@ -226,15 +229,6 @@ async function seedCompanyInventory(input: {
   };
 }
 
-/** Entra por el formulario real y aterriza en el dashboard. */
-async function login(page: Page): Promise<void> {
-  await page.goto(LOGIN_ROUTE);
-  await page.getByTestId('login-username').fill(ADMIN_USERNAME);
-  await page.getByTestId('login-password').fill(ADMIN_PASSWORD);
-  await page.getByTestId('login-submit').click();
-  await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
-}
-
 test.beforeAll(async () => {
   const role = await prisma.role.findUnique({
     where: { name: ROLE_ADMINISTRADOR },
@@ -362,7 +356,7 @@ test.describe('aislamiento por empresa del inventario', () => {
     }
 
     // --- 1. Una sola sesion, la de la empresa A.
-    await login(page);
+    await loginAndLand(page, { username: ADMIN_USERNAME, password: ADMIN_PASSWORD });
 
     // --- 2. `/inventario` buscando el token COMUN a las dos empresas (R14).
     const inventoryResponse = await page.goto(listUrl(INVENTORY_ROUTE, SHARED_TOKEN));

@@ -60,7 +60,9 @@ import {
 } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { prisma } from '@/lib/shared/db/prisma';
-import { DASHBOARD_ROUTE, INVENTORY_ROUTE, LOGIN_ROUTE } from '@/lib/shared/routes';
+import { DASHBOARD_ROUTE, INVENTORY_ROUTE } from '@/lib/shared/routes';
+
+import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc22_e2e_';
@@ -197,15 +199,6 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
     },
     select: { id: true },
   });
-}
-
-/** Entra por el formulario real y aterriza en el dashboard. */
-async function login(page: Page, user: Credentials): Promise<void> {
-  await page.goto(LOGIN_ROUTE);
-  await page.getByTestId('login-username').fill(user.username);
-  await page.getByTestId('login-password').fill(user.password);
-  await page.getByTestId('login-submit').click();
-  await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
 }
 
 /**
@@ -391,7 +384,7 @@ test.describe('catalogo de productos', () => {
   test('el Administrador entra, da de alta un producto con una presentacion nueva y lo ve en la lista (R4, R17, R18, R21, R24)', async ({
     page,
   }) => {
-    await login(page, adminUser);
+    await loginAndLand(page, adminUser);
 
     // --- 1. La pantalla se sirve a un Administrador (R4, la mitad que deja pasar).
     await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
@@ -464,7 +457,7 @@ test.describe('catalogo de productos', () => {
     // justo eso: que el importe salga del `<input>` como CADENA, cruce la Server Action sin
     // convertirse en `number` y llegue a `decimal(14,4)` con sus cuatro decimales. Un `parseFloat`
     // colado en el formulario dejaria los otros dos tests en verde y solo este en rojo.
-    await login(page, adminUser);
+    await loginAndLand(page, adminUser);
 
     await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
     await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
@@ -515,7 +508,7 @@ test.describe('catalogo de productos', () => {
   test('elegir un producto que ya existe le agrega un lote y no crea otro producto (QC-90 R17, R18)', async ({
     page,
   }) => {
-    await login(page, adminUser);
+    await loginAndLand(page, adminUser);
 
     await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
     await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
@@ -571,7 +564,7 @@ test.describe('catalogo de productos', () => {
   test('un usuario que no es Administrador acaba fuera y no ve el catalogo (R4)', async ({
     page,
   }) => {
-    await login(page, operatorUser);
+    await loginAndLand(page, operatorUser);
 
     // Sesion valida, rol distinto: la regla ruta-rol lo saca al dashboard SIN renderizar nada de
     // la pantalla. No es «no autenticado»: acaba en el dashboard, no en el login, y esa
