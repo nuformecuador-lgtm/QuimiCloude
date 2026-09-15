@@ -454,8 +454,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
 })
 
 describe('Alcance QC-56: la migracion no abre la tabla compartida (R20)', () => {
-  // Mide el CAMBIO, no el arbol: `origin/dev...HEAD` mas el arbol de trabajo, para morder antes
-  // de commitear. Si el rango no resuelve, lanza: una guardia que no puede mirar no pasa en verde.
+  // Mide el CAMBIO, no el arbol: R20 mira `origin/dev...HEAD` mas el arbol de trabajo, para morder
+  // antes de commitear; R28 solo el rango commiteado. Si el rango no resuelve, lanza: una guardia
+  // que no puede mirar no pasa en verde.
   //
   // PRECONDICION DE RAMA: solo mide en la rama de QC-56. Una vez mergeada, cualquier otra rama
   // que tuviera motivo para tocar la tabla compartida saldria roja aqui por una regla ajena.
@@ -474,7 +475,8 @@ describe('Alcance QC-56: la migracion no abre la tabla compartida (R20)', () => 
     return ruta.split('\\').join('/')
   }
 
-  function archivosTocados(): readonly string[] {
+  // Solo lo commiteado: el arbol de trabajo lo pueden ensuciar otros cambios en curso.
+  function archivosDelRango(): readonly string[] {
     let delRango: string
     try {
       delRango = git(`git diff --name-only ${RANGO}`)
@@ -490,6 +492,11 @@ describe('Alcance QC-56: la migracion no abre la tabla compartida (R20)', () => 
       const limpia = linea.trim()
       if (limpia.length > 0) tocados.add(aPosix(limpia))
     }
+    return [...tocados].sort()
+  }
+
+  function archivosTocados(): readonly string[] {
+    const tocados = new Set<string>(archivosDelRango())
 
     for (const linea of git('git status --porcelain').split('\n')) {
       if (linea.trim().length === 0) continue
@@ -520,21 +527,25 @@ describe('Alcance QC-56: la migracion no abre la tabla compartida (R20)', () => 
     expect(violaciones, 'la migracion no puede modificar la tabla compartida (R20)').toEqual([])
   })
 
-  it('R28: fuera de las dos rutas, tests, E2E, specs y progreso la rama solo toca el barrel de proveedores', (ctx) => {
-    const tocados = archivosTocados()
+  // Lista de raices de producto, no de exclusiones: asi el board, docs/ o AGENTS.md no cuentan,
+  // y cualquier raiz de codigo nueva tendria que anadirse a proposito.
+  const RAICES_DE_PRODUCTO = ['app/', 'lib/', 'components/', 'hooks/', 'db/']
+  const ARCHIVOS_DE_PRODUCTO = ['middleware.ts', 'package.json', 'pnpm-lock.yaml']
+
+  function esDeProducto(ruta: string): boolean {
+    return ARCHIVOS_DE_PRODUCTO.includes(ruta) || RAICES_DE_PRODUCTO.some((raiz) => ruta.startsWith(raiz))
+  }
+
+  it('R28: en el rango commiteado, fuera de las dos rutas ningun archivo de producto cambia salvo el barrel de proveedores, y nada de db/', (ctx) => {
+    const tocados = archivosDelRango()
     saltarSiNoEsLaRamaDeQC56(ctx, tocados)
 
-    const dentroDelAlcance = [
-      `app/(private)${FORMULAS_ROUTE}/`,
-      `app/(private)${SUPPLIERS_ROUTE}/`,
-      'tests/',
-      'e2e/',
-      'specs/',
-      'progress/',
-    ]
-    const fuera = tocados.filter((ruta) => !dentroDelAlcance.some((prefijo) => ruta.startsWith(prefijo)))
+    const carpetasDeRuta = [`app/(private)${FORMULAS_ROUTE}/`, `app/(private)${SUPPLIERS_ROUTE}/`]
+    const fuera = tocados
+      .filter(esDeProducto)
+      .filter((ruta) => !carpetasDeRuta.some((carpeta) => ruta.startsWith(carpeta)))
 
-    expect(fuera, 'el unico cambio fuera de las rutas es publicar la lista blanca de proveedores (R28, R31)').toEqual([
+    expect(fuera, 'el unico cambio de producto fuera de las rutas es publicar la lista blanca de proveedores (R28, R31)').toEqual([
       'lib/modules/proveedores/index.ts',
     ])
     expect(
