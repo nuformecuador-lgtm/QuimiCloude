@@ -1,20 +1,7 @@
-// QC-81 T6 — el reintento acotado del lote generado y el rechazo del lote escrito a mano, con DOBLE
-// de Prisma. Cubre R13 y R15 en el adaptador (`design.md > 3.3`).
-//
-// HONESTIDAD: este archivo NO toca Postgres. El doble finge el CONTRATO del cliente de Prisma
-// -`$transaction`, `$executeRaw`, `$queryRaw` y los `create`/`findFirst` que usa el adaptador- y los
-// `P2002` se construyen como los construye el motor, con las COLUMNAS en `meta.target` (que es lo que
-// expone `@prisma/client@6.19.3`, ver `unit-write-prisma.ts`). Lo que el doble NO puede demostrar -que
-// el indice unico dispara de verdad ese `P2002`, que el lock serializa dos altas reales y que la
-// transaccion abortada no deja filas (R25)- lo prueba la integracion de T8 contra base real.
-//
-// Por que cada caso importa:
-//   - `isDuplicateBatchLot` exige DOS condiciones. Si bastara el codigo, un `P2002` de otro indice se
-//     reintentaria o se anunciaria como «ya existe ese lote».
-//   - Con lote GENERADO el choque se reintenta abriendo una transaccion NUEVA por intento (R15).
-//   - Con lote ESCRITO A MANO no se reintenta nunca ni se sustituye por un correlativo (R13).
-//   - Se para en 3 y falla con contexto, sin disfrazarse de error de dominio (R15).
-//   - Un `P2002` ajeno sale tal cual y sin reintento.
+// Sin Postgres: el doble finge el contrato del cliente de Prisma, y los `P2002` llevan las COLUMNAS
+// en `meta.target`, que es lo que expone `@prisma/client@6.19.3`. Que el indice unico dispare de
+// verdad, que el lock serialice dos altas y que la transaccion abortada no deje filas lo prueba la
+// integracion contra base real.
 
 import { Prisma } from '@prisma/client';
 
@@ -88,7 +75,6 @@ function choqueDeUnicidad(target: unknown): Prisma.PrismaClientKnownRequestError
 const choqueDeLote = (): Prisma.PrismaClientKnownRequestError =>
   choqueDeUnicidad(['company_id', 'lot']);
 
-/** El `lot` que llego al `INSERT` del lote en la llamada `n`. */
 function loteEscrito(llamada: number): unknown {
   const args = doble.batchCreate.mock.calls[llamada]?.[0] as { data: { lot: unknown } } | undefined;
   return args?.data.lot;
@@ -125,7 +111,7 @@ describe('isDuplicateBatchLot — P2002 Y la pareja de columnas (R13, R15)', () 
 
   it('es falso con P2002 sin meta.target inspeccionable o con target como cadena suelta', () => {
     expect(isDuplicateBatchLot(choqueDeUnicidad(undefined))).toBe(false);
-    // Una cadena cuenta como UNA columna (criterio de `unit-write-prisma.ts`): nunca forma la pareja.
+    // Una cadena cuenta como UNA columna: nunca forma la pareja.
     expect(isDuplicateBatchLot(choqueDeUnicidad('product_batches_company_lot_unique'))).toBe(false);
   });
 
