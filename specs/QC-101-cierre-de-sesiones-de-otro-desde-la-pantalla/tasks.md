@@ -8,7 +8,7 @@
 
 ## Mitad servidor
 
-- [ ] **T1 — La Server Action.** Crear `lib/modules/identity/adapters/driving/session-actions.ts`
+- [x] **T1 — La Server Action.** Crear `lib/modules/identity/adapters/driving/session-actions.ts`
       (`'use server'`) con `EndSessionsFormState` y `endAllSessionsAction(prevState, formData)`,
       segun `design.md > 1`: `id` como campo oculto leido tal cual, actor de las dos caras de la
       sesion (quinta copia de `currentActor()` **con su comentario de deuda**), llamada a
@@ -18,7 +18,7 @@
       `tests/guards/guard-arquitectura-modulos.test.ts` sigue verde.
       *Depende de: nada.*
 
-- [ ] **T2 — Tests de la action.** `tests/unit/identity/sesiones/session-actions.test.ts`, con
+- [x] **T2 — Tests de la action.** `tests/unit/identity/sesiones/session-actions.test.ts`, con
       `@/lib/composition` mockeado al estilo de `tests/unit/identity/usuarios/user-actions.test.ts`.
       Casos: exito devuelve `{ status: 'success' }` **y nada mas** (R5); el actor se construye con
       las dos caras y es `null` si falta cualquiera (R2); `UnauthorizedError` → `unauthorized` y
@@ -28,7 +28,7 @@
       **Hecho:** todos verdes y el mapa `R1, R2, R5, R6 -> caso` anotado.
       *Depende de: T1.*
 
-- [ ] **T3 [P] — Test de la autorizacion en el service para ESTA ficha.** Ampliar
+- [x] **T3 [P] — Test de la autorizacion en el service para ESTA ficha.** Ampliar
       `tests/unit/identity/end-all-sessions.test.ts` (o un archivo hermano) con el caso que
       `CHECKPOINTS.md > Permisos` exige nombrado como R3: sobre **otra** persona sin
       `usuarios.modificar` se rechaza **y el puerto `stampAll` no se llama ni una vez**; y R4: los
