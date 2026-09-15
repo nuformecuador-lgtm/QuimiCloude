@@ -430,10 +430,10 @@ Abreviaturas:
 | R23 | RP «R23: permite avanzar y retroceder e indica la pagina actual y el total»; SP «R23: permite avanzar y retroceder de pagina e indica la pagina actual y el total»; RP y SP «R23: en los extremos no ofrece avanzar ni retroceder mas alla» |
 | R24 | RP «R24: el desbordamiento horizontal lo absorbe el envoltorio de la tabla y ningun ancestro» y «R24: en viewport angosto y ancho la lista, sus acciones, el orden, la busqueda y el filtro estan a la vista y son tactiles»; SP «R24: el desbordamiento horizontal lo absorbe el envoltorio de la tabla y ningun ancestro», «R21, R24: ...» y «R24: la columna fijada por defecto es el nombre» |
 | R25 | `tests/unit/shared/migracion-listas-alcance.test.ts` «R25: los tests de pantalla, parser y contrato no localizan por copy, salvo los casos admitidos», «R25: el recorrido de busqueda y orden de los dos E2E no localiza por copy» y «R25: el detector muerde sobre una muestra con las formas prohibidas» (M3, con mordidas). Hasta la ronda F2.2 no tenia test automatico. |
-| R26 | E2E-R «busca las recetas propias por su nombre y las ordena por nombre descendente (R26)»: **verde en Chromium (35.9 s) y WebKit (11.7 s)**; E2E-P «busca los proveedores propios por su nombre y los ordena por nombre descendente (R26)» |
+| R26 | E2E-R «busca las recetas propias por su nombre y las ordena por nombre descendente (R26)» (`recetas.spec.ts:384`) y E2E-P «busca los proveedores propios por su nombre y los ordena por nombre descendente (R26)» (`proveedores.spec.ts:470`). **Ultima corrida, ya con el merge (HEAD `f4cfd48`): los dos verdes en Chromium y en WebKit** (recetas 1.2m / 21.0s; proveedores 1.2m / 21.2s), ver «E2E tras F2.3» |
 | R27 | `tests/guards/guard-dependencias-aprobadas.test.ts` (sin cambios; verde en el `--rapido` del leader); `git diff --name-only origin/dev...HEAD -- package.json pnpm-lock.yaml` sale vacio |
 | R28 | DTA «R28: en el rango commiteado, fuera de las dos rutas ningun archivo de producto cambia salvo el barrel de proveedores, y nada de db/» (M2, con mordidas); RC «la feature no toca lib/modules/recetas ni db/»; `tests/unit/shared/listas-blancas-listados.test.ts` y `tests/guards/guard-arquitectura-modulos.test.ts` (sin cambios) |
-| R29 | DTA «solo las siete pantallas autorizadas importan components/shared/data-table», «la pantalla de recetas SI consume la tabla compartida (R29)» y «la lista de specs E2E que referencian data-table es cerrada, y son estos once» |
+| R29 | DTA «solo las siete pantallas autorizadas importan components/shared/data-table», «la pantalla de recetas SI consume la tabla compartida (R29)» y «la lista de specs E2E que referencian data-table es cerrada, y son estos doce» (tras el merge de QC-93, que suma `e2e/login.spec.ts`) |
 | R30 | `tests/unit/shared/migracion-listas-alcance.test.ts` «R30: la lista no conserva tabla ni barra propias y si su vacio, su error y su esqueleto» (recetas; movido desde RC, que esta en el baseline: m2); SC «R30: la lista no conserva tabla ni barra propias y si su vacio, su error y su esqueleto» (mordidas hechas) |
 | R31 | SLP «R31: el contrato del modulo publica la misma lista blanca que declara su dominio» y «R11, R31: el parser toma la lista blanca del contrato del modulo, no por ruta profunda ni copiada» |
 | R32 | RLP y SLP «R32: solo orden o tamano no cuentan como busqueda ni filtro», «R32: un termino de busqueda cuenta como activo» y «R32: un rango de fecha de creacion cuenta como activo»; RP «R32, R33: con busqueda y cero filas presenta sin resultados dentro de la tabla, sin crear, y limpiar conserva tamano y orden» y «R32: con busqueda, cero filas y pagina 3 ofrece volver a la primera conservando busqueda, filtro, tamano y orden»; SP «R32, R33: con busqueda o filtro y cero filas presenta «sin resultados» dentro de la tabla, sin crear, con la busqueda y el filtro a la vista» y «R32: con busqueda, cero filas y una pagina posterior ofrece volver a la primera conservando busqueda, filtros, tamano y orden» |
@@ -571,6 +571,34 @@ QC-93 esta dentro y los dos casos usan `loginAndLand`.
 
 **Huerfanas tras las dos corridas:** proveedores 0; recetas `ordenRows: []`, `qc26Recipes: 0`,
 `qc64Recipes: 0`, `fixtureUsers: 0`.
+
+## F2.4 — gate completo y aprobacion (2026-09-15)
+
+**`./init.sh` completo, corrido por el leader** en el worktree sobre HEAD `10defcb`:
+**`== init OK ==`, exit 0 — 466 archivos, 6721 pasados, 78 saltados, 0 rojos nuevos.** Los 8 del
+baseline son heredados y el propio gate avisa de que ya pasan. Log: `scratchpad\qc56-init-completo.log`.
+
+**Review, segunda vuelta: APROBADA** (`progress/review_QC-56-migrar-listas-a-tabla-compartida.md`,
+desde la l.275, commit `5d9f091`): **0 mayores nuevos y 2 menores**. El reviewer volvio a morder M2
+por su cuenta —con el rango `a271eec...HEAD`, que arrastra `lib/` de dev, el caso se pone rojo y
+nombra los tres archivos— y comprobo M3, los conflictos del merge y los cinco admitidos de QC-71.
+Su corrida: 10 archivos, 245/245, typecheck y lint en 0.
+
+**Menores de la segunda vuelta:**
+
+| # | Estado |
+|---|---|
+| n1 | **anotado, sin tocar** (decision del leader): la guardia de R25 cubre **localizar** por copy, no **afirmar** sobre copy. Hoy no hay ninguna infraccion; si aparece, el hueco esta escrito aqui. |
+| n2 | **cerrado**: dos filas del mapa se habian quedado desfasadas tras el merge. R29 decia «estos once» cuando el test ya dice **doce**, y R26 llevaba los tiempos anteriores al merge. Corregidas arriba. |
+
+**Deuda que sale con la feature, por decision humana del 2026-09-15:** M1, m5, m6 y m7 —comentarios
+con citas en `lib/modules/proveedores/index.ts`, en tests y E2E, la limpieza mezclada en commits de
+tanda y los bloques largos de los esqueletos—. La regla de `docs/conventions.md > Comentarios` que
+los exige **no esta en `origin/dev`**, asi que QC-56 no la debe.
+
+**Rojo que sale con la feature:** `proveedores.spec.ts:387` (R51), heredado de **QC-80**. La
+presentacion exige unidad desde `af96771` y `choosePresentation` solo rellena el nombre. Tiene ficha
+propia pendiente; no se toca aqui.
 3. **El clic en «limpiar» de proveedores solo se comprueba por `href`** en vitest, por un limite de `next/link` sin router en jsdom. Recetas usa `onClick` y proveedores `onNavigate`: dos implementaciones distintas de lo mismo.
 4. **Los barrels exportan de mas** respecto a `design.md > 4.3` (detalle en «Tandas 2 y 3»).
 5. **Fecha:** el parser comprueba que `YYYY-MM-DD` sea una fecha real. No usa `Date.parse`, que da por buena `2026-02-30`.
