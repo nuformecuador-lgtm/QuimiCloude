@@ -269,3 +269,131 @@ A mano, las aserciones nuevas cumplen: los literales que hay son datos del simul
 2. M2: el test de R28 acotado a raices de producto y sin depender del arbol de trabajo fuera de ellas. Con mordida anotada.
 3. M3: un caso automatico para R25, con mordida anotada, o una excepcion escrita a la regla 4.
 4. Recomendado, no bloqueante: m2, m3 y m7. m1 es trabajo de F2.3.
+
+---
+
+# Segunda vuelta — F2.2 sobre HEAD 10defcb (2026-09-15)
+
+> Reviewer · rama ya sincronizada (0 commits por detras de origin/dev, QC-93 dentro).
+> Commits revisados: 4049e2a (merge), 19bf82c (M2), e2b15fd (m3, m8, m4), f4cfd48 (M3, m2),
+> 10defcb (bitacora, m9). No se ha editado codigo.
+
+## Veredicto: **APROBADO** — 0 mayores nuevos, 2 menores nuevos
+
+M2 y M3 estan resueltos y los probe mordiendo yo. M1, m5, m6 y m7 quedan como **deuda anotada** por
+decision humana del 2026-09-15 (la regla de comentarios no esta en origin/dev), y no la reabro: no he
+encontrado ningun motivo nuevo para hacerlo.
+
+## Lo que corri yo en esta vuelta
+
+| Que | Resultado |
+|---|---|
+| vitest de los 10 archivos afectados (RP, SP, RC, SC, RLP, SLP, DTA, el nuevo migracion-listas-alcance, guard-e2e-landing y landing) | **10 archivos, 245/245, exit 0**. R20, R28, los tres R25 y los dos R30 **ejecutados, no skipped** |
+| pnpm typecheck | exit 0 |
+| pnpm lint | exit 0 |
+| check-trazabilidad.mjs y check-artefactos.mjs | exit 0 los dos |
+| **Mordida propia de R28**: copia temporal del test con RANGO cambiado a a271eec...HEAD, que arrastra lib/ ajeno de dev | **rojo**, y nombra los tres: lib/modules/identity/domain/user-input.ts, user-view.ts y el barrel. Copia borrada; git status limpio |
+| git diff origin/dev...HEAD sobre e2e/ | solo añadidos de QC-56; las 26 lineas borradas son testIds y comentarios viejos suyos |
+
+## 1. M2 — resuelto
+
+tests/unit/shared/data-table-alcance.test.ts:
+
+- archivosDelRango() (l.479) usa **solo** el rango commiteado y conserva el throw con su mensaje.
+- archivosTocados() (l.498) sigue sumando git status, y lo usa **solo R20** (l.518), que no cambia.
+- esDeProducto() (l.535) es lista de **inclusion**: app/, lib/, components/, hooks/, db/ mas
+  middleware.ts, package.json y pnpm-lock.yaml. El board, docs/ y AGENTS.md dejan de contar.
+- El caso (l.539) quita las dos carpetas de ruta, exige exactamente el barrel y mantiene el db/
+  vacio y la precondicion de rama.
+
+Comprobado por mi: hoy el rango commiteado trae **un solo** archivo de producto fuera de las rutas,
+el barrel, y ningun archivo no-producto; y con un rango que si trae lib/ ajeno el caso **muerde** y
+lo nombra. La regresion que motivaba M2 —el commit de feature_list.json— ya no puede ponerlo rojo:
+ese archivo ni siquiera entra en el filtro.
+
+## 2. M3 — resuelto, con un hueco menor
+
+tests/unit/shared/migracion-listas-alcance.test.ts, tres casos de R25 mas R30.
+
+- Barre RP, SP, RLP, SLP, RC, SC y a si mismo, sin comentarios, con dos patrones: consultas por
+  Text, Title, AltText, DisplayValue, LabelText y PlaceholderText, y ByRole con name literal.
+- **Las 5 excepciones estan nombradas una a una** por archivo, describe y titulo, con motivo: las
+  cinco buscan REFERENCIA_DEL_CASO, el identificador de peticion que devuelve el doble
+  (tests/helpers/identificador-de-request.ts). Ninguna es de QC-56: las cinco son de QC-71.
+  Comprobado que existen y que corresponden a esos casos.
+- La lista **no se puede quedar obsoleta en silencio**: hay una asercion de «admision sobrante» que
+  se pone roja si un admitido deja de consultar por texto o cambia de nombre.
+- El bloque R26 de los dos E2E se barre aparte, y el propio localizador del bloque falla si no
+  encuentra exactamente un test de busqueda por archivo.
+- Muerde: el caso de la muestra sintetica encuentra 3 formas unitarias y 4 de E2E. La muestra se
+  arma concatenando «By» para no acusarse a si misma, igual que el precedente de QC-85.
+- R30 de recetas vive ahora aqui, y este archivo **no** esta en tests/baseline-rojos.json (m2).
+
+## 3. Conflictos del merge — bien resueltos
+
+- No queda **ningun** login propio, DASHBOARD_ROUTE ni LOGIN_ROUTE en los tres specs; la unica
+  aparicion es una linea de prosa en un comentario de proveedores.spec.ts:24.
+- Esta lo de QC-93: loginAndLand en recetas (l.66, 335, 394, 442) y proveedores (l.71, 378, 480,
+  536), el 404 con status() y el private-not-found en los dos.
+- Esta lo de QC-56: los dos R26 (recetas l.384, proveedores l.470), los fixtures de orden con
+  normalizeRecipeName y normalizeSupplierName, el afterAll ampliado y los testIds de la tabla
+  compartida en los helpers.
+- Las negativas de R6 y R52 conservan la version de QC-56 (data-table y data-table-row-), que es la
+  fuerte: los testIds viejos ya no existen y darian cero sin comprobar nada.
+- No hay helper duplicado: findSupplierRow y findCatalogRow son distintos, y el segundo es del
+  catalogo, migrado desde el 2026-09-07.
+- La lista cerrada de E2E queda en doce, con login.spec.ts, y conserva los comentarios de QC-93 y de
+  QC-56 y la asercion de que errores.spec.ts no entra.
+- guard-e2e-landing y el test unitario del helper pasan en mi corrida.
+
+## 4. Menores de la primera vuelta
+
+| # | Estado verificado |
+|---|---|
+| m1 | **cerrado**: merge hecho, conflictos resueltos, E2E repetidos en los dos motores |
+| m2 | **cerrado**: R30 de recetas fuera de recipe-route-contract, que sigue siendo el unico de los dos en el baseline |
+| m3 | **cerrado**: supplier-table.tsx usa isPlainClick mas onClick y preventDefault dentro de la transicion, igual que recetas; SP:1082 pulsa limpiar y espera router.push con el destino |
+| m4 | **cerrado**: los barrels pierden 4 y 5 simbolos; siguen saliendo los que consumen los tests |
+| m5, m6, m7 | **anotados, no se arreglan** (decision humana sobre la regla de comentarios). No los reabro |
+| m8 | **cerrado**: caso nuevo de R9 en RP:658 y SP:681; elige inicio y fin en el calendario por gridcell y data-day, repinta con la URL porque el calendario es controlado, y afirma el rango parseado |
+| m9 | **cerrado**: T0 lleva casilla; 19 tareas marcadas |
+| m10 | **cerrado**: las dos corridas de F2.3 son posteriores a todos los cambios de codigo |
+
+## 5. Trazabilidad tras el merge
+
+Los cuatro requisitos que pediste mirar siguen mapeados, y ahora mejor que antes:
+
+- **R9**: suma el caso a mano en las dos pantallas. Deja de ser parcial.
+- **R25**: pasa de «sin test automatico» a tres casos con mordida.
+- **R28**: el caso nuevo, que mordi yo.
+- **R30**: recetas en el archivo nuevo, proveedores en SC.
+
+El resto del mapa de la primera vuelta sigue en pie: los 245 tests que corri incluyen todos los
+casos citados.
+
+## 6. Menores nuevos
+
+- **n1 — la guardia de R25 cubre la mitad «localizar», no la mitad «afirmar».** R25 dice que los
+  tests no deben *afirmar* sobre literales de copy, y los patrones solo miran los localizadores. El
+  precedente de QC-85 si lleva un tercer patron para el literal afirmado
+  (tests/unit/configuracion-ui/grupos/alcance.test.ts:815, toHaveTextContent con literal). Hoy no
+  hay infraccion: los literales afirmados en RP y SP son mensajes que devuelve el doble, es decir
+  datos de fixture. En E2E tampoco se cubren hasText ni el localizador por texto, que el bloque R26
+  usa solo con nombres de fixture. Añadir el patron, con las admisiones que haga falta, cerraria el
+  requisito entero.
+- **n2 — dos filas del mapa de la bitacora quedaron desfasadas tras el merge.** La de R29 dice «y
+  son estos once» cuando el test ya dice doce (l.436), y la de R26 conserva los tiempos de la
+  corrida anterior al merge (l.433). El contenido correcto esta mas abajo, en «E2E tras F2.3»; es
+  solo la tabla resumen.
+
+## 7. Deuda que sale de esta feature
+
+- **M1, m5, m6 y m7**: comentarios que citan fichas en lib/modules/proveedores/index.ts, en los
+  tests y en los E2E, bloques largos, y la limpieza mezclada con codigo. Cuando la seccion
+  «Comentarios» de docs/conventions.md entre en dev, esto es lo primero que hay que barrer.
+- **R51 de proveedores** sigue rojo, heredado de QC-80, y espera ficha propia.
+- El componente compartido sigue sin anchos de columna; la prueba en iPhone real es QC-114.
+
+## Que falta para cerrar
+
+Nada bloqueante. Quedan el gate completo del leader y el PR.
