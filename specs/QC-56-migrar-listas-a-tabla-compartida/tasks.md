@@ -12,7 +12,7 @@
 
 ## Tanda 0 — Puerta
 
-### T0 — Decisiones de F1.4 — **HECHA**
+### [x] T0 — Decisiones de F1.4 — **HECHA**
 - **Archivos:** ninguno.
 - **Hecho:** D12–D15 están en `requirements.md > Decisiones cerradas`. No bloquea ninguna tarea.
   Lo único pendiente de confirmar es **H6**, que va con la aprobación del spec y afecta a T6–T10 y
