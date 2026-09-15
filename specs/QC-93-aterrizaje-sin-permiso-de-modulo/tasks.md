@@ -122,13 +122,15 @@ Toca: nada. Depende de T5-T9.
 esperados: solo `e2e/**`, `tests/guards/guard-e2e-landing.test.ts`, `tests/unit/e2e-helpers/landing.test.ts`
 y `specs/`+`progress/`.
 
-## T11 — Gate completo  ·  R9, R21, R22
+## [x] T11 — Gate completo  ·  R9, R21, R22
 
 `./init.sh` completo. **Hecho cuando:** verde, con la guardia nueva ejecutandose (aparece en la
 salida) y sin archivos rojos fuera de `tests/baseline-rojos.json`.
 
 > **Enmienda del 2026-09-15:** lo corre el leader **despues de T14**, porque T14 toca `e2e/inventario.spec.ts`,
 > que la guardia de R9 recorre.
+>
+> **Cerrada el 2026-09-15 por el leader**: `./init.sh` completo en VERDE sobre `37e5e13` (con `origin/dev`, que trae QC-101 y el arreglo de QC-95): 465 archivos, 6618 verdes, 82 saltados, 0 rojos nuevos; `guard-e2e-landing.test.ts` corrio (16 tests), igual que `e2e-helpers/landing.test.ts` (8).
 
 ## [x] T12 — La verificacion que esta ficha exige de verdad  ·  R23, R24
 
