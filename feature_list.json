@@ -1438,7 +1438,7 @@
       "epic_name": "Identidad y acceso",
       "name": "desbloqueo-manual-limpia-el-conteo",
       "description": "Cuando un administrador mueve una cuenta de blocked a active, el desbloqueo tiene que surtir efecto: se retira el bloqueo y se reinicia el contador de intentos fallidos.\n\nHOY NO PASA, Y ES UN AGUJERO MEDIDO. QC-66 mueve el estado pero su R45 le prohibe tocar los contadores; QC-78 publico el mecanismo que los limpia (clearedLockState) diciendo que lo llamaria la operacion que mueve el estado a mano. Ninguno de los dos lo llama: el reviewer de QC-66 lo levanto como MAYOR-2 y grep confirma que ningun codigo de produccion lo invoca. El resultado es que la cuenta queda almacenada como active mientras el estado efectivo sigue siendo blocked -el dato equivocado en la direccion peligrosa- y la persona sigue sin poder entrar.\n\nQUE CAMBIA. R45 de QC-66, que es spec aprobado: setUserAccountStatus pasa a llamar a clearedLockState() al salir de blocked. Es lo que QC-78 esperaba.\n\nDECIDIDO POR EL HUMANO EL 2026-09-11, al acotar QC-67: de las tres salidas que dejo el reviewer se elige esta.\n\nNO BLOQUEA A QC-67. La pantalla ofrece el cambio de estado desde el primer dia; hasta que esta ficha este hecha, salir de blocked no surte efecto en el acceso.",
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "low",
       "zone": "backend",
