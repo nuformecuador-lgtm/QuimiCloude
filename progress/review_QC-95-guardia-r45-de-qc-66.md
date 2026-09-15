@@ -327,3 +327,95 @@ derivarlos de las constantes.
 - El punto abierto 3 de la bitácora es corrección de spec, en la línea de m2 y m8 (fuera por
   decisión): R8 atribuye `nextLockState` e `isLocked` a QC-19, y según `git log` nacieron en QC-7.
 - `pnpm exec` no resuelve binarios en este worktree (entorno). Conviene saberlo antes del gate.
+
+---
+
+## Tercera vuelta (2026-09-15) — solo lo rechazado en la segunda
+
+> Commit revisado: `6e358cc`, sobre `4d8ccc2`. **Este veredicto sustituye al de arriba.**
+
+### Veredicto
+
+**APROBADO.** 0 bloqueantes, 0 menores. B-N1, m-A y m-B cerrados y comprobados ejecutando.
+Queda pendiente, y no es hallazgo:
+- **T6** sigue `[ ]` hasta que el leader corra `./init.sh` completo.
+- **m2, m6, m7 y m8** siguen fuera por decisión humana.
+
+### Alcance del cambio desde `4d8ccc2`
+
+`git diff 4d8ccc2..6e358cc --stat` da 4 archivos, y nada fuera de lo encargado:
+- `progress/impl_QC-95-desbloqueo-manual-limpia-el-conteo.md`
+- `progress/impl_QC-95-guardia-r45-de-qc-66.md`: sección «Segunda vuelta» y la fila de R8.
+- `specs/QC-95-desbloqueo-manual-limpia-el-conteo/tasks.md`: solo la nota de T6; la casilla sigue `[ ]`.
+- `tests/guards/guard-qc95-alcance-del-pr-70.test.ts`
+
+Sin producción, sin `package.json`, `db/`, `app/` ni `components/`.
+
+### B-N1 — mapa canónico: CERRADO
+
+- **Un solo hunk** en `impl_QC-95-desbloqueo-manual-limpia-el-conteo.md` (`@@ -45,18 +45,33 @@`),
+  dentro de la sección del mapa. El resto del archivo no cambia.
+- **Una sola tabla**, con diez filas de R1 a R10 y una nota fechada que enlaza a la re-review, a
+  esta review y a `progress/impl_QC-95-guardia-r45-de-qc-66.md`. También deja dicho que la
+  «Salida real de verificación» es de la entrega original.
+- **Las citas existen, una por una.** Busqué con `grep -F` cada título que cita la tabla (29
+  citas) en su archivo, y los 29 están.
+  - `R21 — rechaza setUserAccountStatus con …` es un título de plantilla
+    (`admin-guards.test.ts:191`, `R21 — rechaza ${nombre} con …`) y sale exactamente así.
+  - Todos esos tests pasaron en la segunda vuelta (unitarios, guardias e integración). La guardia
+    ha vuelto a pasar ahora (sección siguiente).
+- **`scripts/check-trazabilidad.mjs`, ejecutado tal cual.** Desde la rama del arnés, con
+  `cwd` en una copia del scratchpad: `feature_list.json` con QC-95 en `done` (en la rama sigue
+  `pending`, m6), y `requirements.md`, `tasks.md` e `impl_…md` del worktree.
+  - **Mapa nuevo:** «10 requisitos mapeados en 1 feature(s)», exit 0.
+  - **Control negativo** (quitando la fila `| R9 |`): «1 de 10 requisitos sin mapear -> R9», exit 1.
+  - **Control del mapa viejo de `4d8ccc2`:** también exit 0. Confirma lo que decía B-N1: el script
+    solo cuenta filas, y la calidad de cada fila la tiene que juzgar la review. Esta vez la juzgué
+    sobre las 10.
+
+### m-A — existencia de las rutas de R8 en el árbol del merge: CERRADO
+
+- **Qué cambia:** `rutasAusentesEnElMerge` sustituye a `existsSync`.
+  - Llama primero a `exigirCommit(MERGE_DEL_PR_70)`, que lanza «NO se han comprobado» con
+    `git fetch`, y después hace `git cat-file -e` con `f777c56…` más la ruta.
+  - Ya no se importa `existsSync`.
+- **Sintéticos nuevos, los tres verdes:**
+  - una ruta ausente se nombra;
+  - con todas presentes, no hay hallazgos;
+  - con el merge ausente, lanza y no salta.
+- **Mutación con git real:** añadí `lib/modules/identity/adapters/driving/session-actions.ts` a
+  `RUTAS_R8`.
+  - Ese archivo existe en disco pero no está en `f777c56`; `git cat-file` lo confirma («exists on
+    disk, but not in 'f777c56'»).
+  - Resultado: **1 rojo y 21 verdes**, con «Rutas de RUTAS_R8 que no existian en el arbol del
+    merge f777c56… : lib/modules/identity/adapters/driving/session-actions.ts».
+  - Restaurado.
+- **No reproducido por mí:** el caso del merge ausente con git real. Lo cubren el sintético y el
+  código leído (`exigirCommit` va antes de cualquier `cat-file`), y en la segunda vuelta ya vi
+  morder ese mismo camino con un SHA inexistente.
+
+### m-B — títulos derivados de las constantes: CERRADO
+
+- **Qué cambia:** hay una función `corto(sha)`, y los títulos de la anclas (1) y del caso de existencia
+  de R8 son plantillas sobre `MERGE_DEL_PR_70`, `BASE_DEL_PR_70` y `COMMIT_DE_LA_FEATURE`.
+- **Mutación:** `MERGE_DEL_PR_70` apuntado a `a271eec`.
+  - Los títulos pasan a decir «el merge a271eec tiene exactamente los padres…» y «existe en el arbol
+    del merge a271eec».
+  - Caen 3 casos (anclas) y pasan 19. Restaurado.
+
+### Comandos (binarios de `labs/node_modules/.bin/`)
+
+| Comando | Resultado |
+| --- | --- |
+| `tsc --noEmit` | exit 0 |
+| `eslint` sobre la guardia y `tests/unit/identity/usuarios/scope.test.ts` | exit 0 |
+| `vitest run --reporter=verbose` sobre la guardia y `usuarios/scope.test.ts` | **2 archivos, 41 verdes y 5 skipped** (casos de rama de QC-66); la guardia, 22/22 |
+
+Mutaciones restauradas con `cp` y `cmp`. `git diff` y `git status --porcelain` quedan vacíos antes
+de este commit. No queda nada corriendo.
+
+### Observación, no hallazgo
+
+En esta rama, `feature_list.json` tiene QC-95 en `pending` (m6, fuera), así que el script real
+sobre el worktree la saltaría. Además `check-trazabilidad.mjs` todavía no está en `dev`. Por eso lo
+ejecuté sobre una copia con QC-95 en `done`.
