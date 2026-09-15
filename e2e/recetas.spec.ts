@@ -14,7 +14,7 @@
  *    dentro de su propio desplegable (R28) y el segundo es la primitiva `Select` de base-ui, con
  *    su propio portal -algo que jsdom no ejercita igual.
  *  - **El corte por rol de verdad** (R6): en unit se afirma la DECISION (`decideRouteAccess`);
- *    aqui se afirma que el usuario acaba fuera y sin ver la tabla.
+ *    aqui se afirma que recibe 404 en su sitio y sin ver la tabla.
  *  - Chromium y WebKit. WebKit es el motor de iOS, y la regla multiplataforma pide ejercitarlo.
  *
  * SIN SUBIDA DE IMAGEN, y el motivo es de diseno, no de pereza (`design.md > 12`): exigiria
@@ -60,7 +60,9 @@ import {
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { normalizeProductName } from '@/lib/modules/inventario/domain/product-name';
 import { prisma } from '@/lib/shared/db/prisma';
-import { DASHBOARD_ROUTE, FORMULAS_ROUTE, LOGIN_ROUTE, NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
+import { FORMULAS_ROUTE, NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
+
+import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc26_e2e_';
@@ -142,15 +144,6 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
   });
 
   return created.id;
-}
-
-/** Entra por el formulario real y aterriza en el dashboard. */
-async function login(page: Page, user: Credentials): Promise<void> {
-  await page.goto(LOGIN_ROUTE);
-  await page.getByTestId('login-username').fill(user.username);
-  await page.getByTestId('login-password').fill(user.password);
-  await page.getByTestId('login-submit').click();
-  await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
 }
 
 /**
@@ -324,7 +317,7 @@ test.describe('catalogo de recetas', () => {
   test('el Administrador entra, da de alta una receta con una linea y un paso, y la ve en la lista (R52)', async ({
     page,
   }) => {
-    await login(page, adminUser);
+    await loginAndLand(page, adminUser);
 
     // --- 1. La pantalla se sirve a un Administrador (R6, la mitad que deja pasar).
     await page.goto(`${FORMULAS_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
@@ -373,14 +366,31 @@ test.describe('catalogo de recetas', () => {
     ).toBe(1);
   });
 
-  test('un usuario que no es Administrador acaba fuera y no ve el catalogo (R6)', async ({ page }) => {
-    await login(page, operatorUser);
+  test('un usuario sin recetas.consultar recibe 404 dentro del layout privado y no ve ningun dato de recetas (R6)', async ({
+    page,
+  }) => {
+    // El Operador del seed no lleva `recetas.consultar`. Su aterrizaje NO se escribe aqui: lo
+    // deriva el helper de sus permisos reales (QC-93 R11), y la premisa del caso -que no aterriza
+    // ya en recetas- se dice en voz alta para que un cambio de permisos no la vuelva muda.
+    const landing = await loginAndLand(page, operatorUser);
+    expect(landing, 'la premisa del caso: el usuario no aterriza en recetas').not.toBe(
+      FORMULAS_ROUTE,
+    );
 
-    // Sesion valida, rol distinto: la regla ruta-rol lo saca al dashboard SIN renderizar nada de
-    // la pantalla. No es «no autenticado»: acaba en el dashboard, no en el login, y esa
-    // diferencia es justo lo que R6 pide y lo que un redirect al login enmascararia.
-    await page.goto(FORMULAS_ROUTE);
-    await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+    // Sesion valida, permiso ausente: **404 en su sitio, sin redireccion** (QC-75). La regla
+    // ruta-rol que lo sacaba al dashboard ya no existe. No es «no autenticado»: no acaba en el
+    // login, y esa diferencia es lo que R6 pide y lo que un redirect al login enmascararia.
+    const response = await page.goto(FORMULAS_ROUTE);
+    expect(
+      response?.status(),
+      'una ruta privada sin permiso debe responder 404, indistinguible de una que no existe',
+    ).toBe(404);
+    expect(new URL(page.url()).pathname, 'el 404 no redirige: la URL sigue siendo la pedida').toBe(
+      FORMULAS_ROUTE,
+    );
+
+    // Y ese 404 se pinta DENTRO del layout privado (QC-75 R8).
+    await expect(page.getByTestId('private-not-found')).toBeVisible({ timeout: 60_000 });
 
     await expect(page.getByTestId('recipes-title')).toHaveCount(0);
     await expect(page.getByTestId('recipe-table')).toHaveCount(0);

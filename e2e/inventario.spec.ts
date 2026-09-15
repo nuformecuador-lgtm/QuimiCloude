@@ -11,8 +11,8 @@
  *  - La cadena entera en un navegador de verdad: cookie firmada por el servidor, middleware,
  *    Server Component de la lista, Server Actions de alta y `router.refresh()`. En jsdom las
  *    seis actions son dobles (T12); aqui son las de QC-20 contra Postgres.
- *  - **El corte por rol de verdad** (R4): en unit se afirma la DECISION (`decideRouteAccess`);
- *    aqui se afirma que el usuario acaba fuera y sin ver la tabla.
+ *  - **El corte por permiso de verdad** (R4): quien no tiene `inventario.consultar` recibe 404 en
+ *    su sitio, dentro del layout privado, y sin ver la tabla.
  *  - Chromium y WebKit. WebKit es el motor de iOS, y la regla multiplataforma pide ejercitarlo,
  *    no suponerlo.
  *
@@ -38,11 +38,11 @@
  *    que borrar los productos primero lo RECHAZA la base y el spec dejaria basura en una base
  *    compartida — que es exactamente lo que pone rojos los tests de integracion que cuentan filas.
  *
- * LO QUE ESTE SPEC NO CREA: los roles. `Administrador` y `Operador` los siembra
- * `pnpm run db:seed` (`lib/modules/identity/domain/roles.ts`), y el rol tiene que llamarse
- * EXACTAMENTE asi porque la regla ruta→rol compara por nombre: un rol efimero con sufijo
- * `RUN_ID` no probaria nada. Si falta, el `beforeAll` falla diciendo que hay que sembrar, en
- * vez de dar un rojo incomprensible en mitad del recorrido.
+ * ROLES: el `Administrador` lo siembra `pnpm run db:seed` (`lib/modules/identity/domain/roles.ts`);
+ * si falta, el `beforeAll` falla diciendo que hay que sembrar. Para el caso R4 la suite crea UN rol
+ * efimero `qc22_e2e_rol_<RUN_ID>` SIN ningun permiso (QC-93 R25-R27): los dos roles del seed tienen
+ * `inventario.consultar`, asi que ninguno sirve para comprobar que el acceso sin permiso responde
+ * 404 en su sitio. Ningun rol del seed se crea, modifica ni borra aqui.
  *
  * VARIABLES DE ENTORNO: no se cargan a mano. `@prisma/client` lee el `.env` del proyecto al
  * importarse y `next dev` -que arranca el `webServer` de la config- carga el suyo.
@@ -53,14 +53,12 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 // `normalizeCompanyName` es la UNICA definicion de <<mismo nombre de empresa>> (QC-47 R3):
 // `companies.name_normalized` se calcula con esta y con ninguna otra.
-import {
-  normalizeCompanyName,
-  ROLE_ADMINISTRADOR,
-  ROLE_OPERADOR,
-} from '@/lib/modules/identity';
+import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { prisma } from '@/lib/shared/db/prisma';
-import { DASHBOARD_ROUTE, INVENTORY_ROUTE, LOGIN_ROUTE } from '@/lib/shared/routes';
+import { INVENTORY_ROUTE } from '@/lib/shared/routes';
+
+import { loginAndLand, permissionsForUsername } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc22_e2e_';
@@ -85,9 +83,19 @@ const adminUser: Credentials = {
   password: `Qc22-Admin-${RUN_ID.slice(0, 12)}`,
 };
 
-const operatorUser: Credentials = {
-  username: `${FIXTURE_PREFIX}oper_${RUN_ID}`,
-  password: `Qc22-Oper-${RUN_ID.slice(0, 12)}`,
+/**
+ * Prefijo del rol efimero sin permisos (QC-93 R27). Cuelga de `FIXTURE_PREFIX`, asi que la regla
+ * «nada fuera del prefijo se toca» sigue valiendo; el barrido de huerfanos lo busca por este.
+ */
+const ROLE_NAME_PREFIX = `${FIXTURE_PREFIX}rol_`;
+
+/** Nombre EXACTO del rol efimero de este worker: nace sin una sola fila en `role_permissions`. */
+const noPermissionsRoleName = `${ROLE_NAME_PREFIX}${RUN_ID}`;
+
+/** Usuario del rol efimero sin permisos: el que entra en el caso R4 (QC-93 R25). */
+const noInventoryUser: Credentials = {
+  username: `${FIXTURE_PREFIX}noinv_${RUN_ID}`,
+  password: `Qc22-NoInv-${RUN_ID.slice(0, 12)}`,
 };
 
 /** Nombres de los datos de catalogo que crea el recorrido del Administrador. */
@@ -199,15 +207,6 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
   });
 }
 
-/** Entra por el formulario real y aterriza en el dashboard. */
-async function login(page: Page, user: Credentials): Promise<void> {
-  await page.goto(LOGIN_ROUTE);
-  await page.getByTestId('login-username').fill(user.username);
-  await page.getByTestId('login-password').fill(user.password);
-  await page.getByTestId('login-submit').click();
-  await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
-}
-
 /**
  * Recorre las paginas de la lista hasta encontrar la celda de nombre pedida.
  *
@@ -317,9 +316,30 @@ test.beforeAll(async () => {
   await prisma.presentation.deleteMany({
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
   });
+
+  // Roles efimeros huerfanos (QC-93 R28). El corte de edad NO vale igual para roles y usuarios: el
+  // rol nace unos segundos ANTES que su usuario, asi que hay una ventana en la que el rol ya es
+  // «viejo» y su usuario todavia no. Borrar entonces el rol chocaria con la FK `users.role_id`
+  // (`onDelete: Restrict`) y el `beforeAll` entero se pondria rojo por la limpieza. Por eso se
+  // decide primero QUE roles se van, y se arrastran sus usuarios aunque sean recientes. Mismo orden
+  // y mismo motivo que `e2e/login.spec.ts`.
+  const orphanRoleIds = (
+    await prisma.role.findMany({
+      where: { name: { startsWith: ROLE_NAME_PREFIX }, createdAt: { lt: orphanCutoff } },
+      select: { id: true },
+    })
+  ).map((role) => role.id);
+
+  // El prefijo propio sigue siendo condicion en AMBAS ramas del `OR`: ampliar el barrido a los
+  // usuarios de los roles condenados no puede convertirse en una puerta para tocar filas ajenas.
   await prisma.user.deleteMany({
-    where: { username: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
+    where: {
+      username: { startsWith: FIXTURE_PREFIX },
+      OR: [{ createdAt: { lt: orphanCutoff } }, { roleId: { in: orphanRoleIds } }],
+    },
   });
+  // Los roles, DESPUES de sus usuarios; `orphanRoleIds` ya solo contiene roles del prefijo.
+  await prisma.role.deleteMany({ where: { id: { in: orphanRoleIds } } });
   // Las empresas huerfanas van DESPUES de sus usuarios: `users.company_id` es
   // `onDelete: Restrict` (QC-47 R11) y borrarlas antes lo rechazaria la base.
   await prisma.company.deleteMany({
@@ -335,8 +355,20 @@ test.beforeAll(async () => {
     })
   ).id;
 
+  // El rol efimero SIN permisos del caso R4 (QC-93 R27): sin `permissions`, o sea sin una sola
+  // fila en `role_permissions`. Nace despues de la empresa y antes de su usuario.
+  await prisma.role.create({
+    data: {
+      name: noPermissionsRoleName,
+      description: 'Rol efimero sin permisos del E2E de inventario (QC-93). Se borra en afterAll.',
+    },
+    select: { id: true },
+  });
+
   await createUserWithRole(adminUser, ROLE_ADMINISTRADOR);
-  await createUserWithRole(operatorUser, ROLE_OPERADOR);
+  // En la MISMA empresa que el Administrador que da de alta el catalogo: asi la cuenta cero del
+  // caso R4 no puede salir en verde solo por mirar otra empresa.
+  await createUserWithRole(noInventoryUser, noPermissionsRoleName);
 });
 
 test.afterAll(async () => {
@@ -361,8 +393,11 @@ test.afterAll(async () => {
     () => prisma.presentation.deleteMany({ where: { name: { startsWith: presentationName } } }),
     () =>
       prisma.user.deleteMany({
-        where: { username: { in: [adminUser.username, operatorUser.username] } },
+        where: { username: { in: [adminUser.username, noInventoryUser.username] } },
       }),
+    // El rol efimero, DESPUES de los usuarios (`users.role_id` es `onDelete: Restrict`) y ANTES de
+    // la empresa. Por su nombre EXACTO, nunca por el prefijo (QC-93 R27).
+    () => prisma.role.deleteMany({ where: { name: noPermissionsRoleName } }),
     // La empresa, DESPUES de los usuarios: `users.company_id` es `onDelete: Restrict`
     // (QC-47 R11). Por el nombre EXACTO de ESTE worker, nunca por el prefijo.
     () => prisma.company.deleteMany({ where: { name: companyName } }),
@@ -391,7 +426,7 @@ test.describe('catalogo de productos', () => {
   test('el Administrador entra, da de alta un producto con una presentacion nueva y lo ve en la lista (R4, R17, R18, R21, R24)', async ({
     page,
   }) => {
-    await login(page, adminUser);
+    await loginAndLand(page, adminUser);
 
     // --- 1. La pantalla se sirve a un Administrador (R4, la mitad que deja pasar).
     await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
@@ -464,7 +499,7 @@ test.describe('catalogo de productos', () => {
     // justo eso: que el importe salga del `<input>` como CADENA, cruce la Server Action sin
     // convertirse en `number` y llegue a `decimal(14,4)` con sus cuatro decimales. Un `parseFloat`
     // colado en el formulario dejaria los otros dos tests en verde y solo este en rojo.
-    await login(page, adminUser);
+    await loginAndLand(page, adminUser);
 
     await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
     await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
@@ -515,7 +550,7 @@ test.describe('catalogo de productos', () => {
   test('elegir un producto que ya existe le agrega un lote y no crea otro producto (QC-90 R17, R18)', async ({
     page,
   }) => {
-    await login(page, adminUser);
+    await loginAndLand(page, adminUser);
 
     await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
     await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
@@ -568,16 +603,35 @@ test.describe('catalogo de productos', () => {
     ).toBe(2);
   });
 
-  test('un usuario que no es Administrador acaba fuera y no ve el catalogo (R4)', async ({
+  test('un usuario sin inventario.consultar recibe 404 dentro del layout privado y no ve el catalogo (R4)', async ({
     page,
   }) => {
-    await login(page, operatorUser);
+    // No entra el Operador: tiene `inventario.consultar` (QC-74 R9) y QC-93 R19 se lo mantiene. Entra
+    // el usuario del rol efimero sin permisos de este archivo (QC-93 R25).
+    expect(
+      await permissionsForUsername(noInventoryUser.username),
+      'la premisa del caso: si el usuario tuviera inventario.consultar, este caso no comprobaria su titulo',
+    ).not.toContain('inventario.consultar');
 
-    // Sesion valida, rol distinto: la regla ruta-rol lo saca al dashboard SIN renderizar nada de
-    // la pantalla. No es «no autenticado»: acaba en el dashboard, no en el login, y esa
-    // diferencia es justo lo que R4 pide y lo que un redirect al login enmascararia.
-    await page.goto(INVENTORY_ROUTE);
-    await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+    // El aterrizaje NO se escribe aqui: lo deriva el helper de sus permisos reales (QC-93 R11).
+    const landing = await loginAndLand(page, noInventoryUser);
+    expect(landing, 'la premisa del caso: el usuario no aterriza en inventario').not.toBe(
+      INVENTORY_ROUTE,
+    );
+
+    // Sesion valida, permiso ausente: 404 en su sitio, sin redireccion (QC-75). No es «no
+    // autenticado»: no acaba en el login, y esa diferencia es lo que R4 pide.
+    const response = await page.goto(INVENTORY_ROUTE);
+    expect(
+      response?.status(),
+      'una ruta privada sin permiso debe responder 404, indistinguible de una que no existe',
+    ).toBe(404);
+    expect(new URL(page.url()).pathname, 'el 404 no redirige: la URL sigue siendo la pedida').toBe(
+      INVENTORY_ROUTE,
+    );
+
+    // Y ese 404 se pinta DENTRO del layout privado (QC-75 R8).
+    await expect(page.getByTestId('private-not-found')).toBeVisible({ timeout: 60_000 });
 
     await expect(page.getByTestId('inventario-title')).toHaveCount(0);
     await expect(page.getByTestId('data-table')).toHaveCount(0);
