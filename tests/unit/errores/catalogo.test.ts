@@ -1,12 +1,7 @@
-// QC-70 T1 — el catalogo unico de errores (R1-R5, R16-R19, R25).
-//
-// Lo que aqui se prueba NO es comportamiento de una funcion: es la FORMA del catalogo. El
-// sistema de tipos ya impide que falte una clave o un texto (`satisfies` en `error-catalog.ts`)
-// y que un codigo inventado compile (R2, con su caso de `@ts-expect-error` mas abajo); lo que
-// el compilador NO puede decir es que dos codigos no compartan frase (R4), que ninguno se
-// llame `not_found` (R16) o que ninguno venga de la AUTENTICACION (R25, enmendado el 2026-09-10:
-// la administracion de usuarios de QC-66 SI entra al catalogo; el login de QC-7 no). Eso se
-// comprueba aqui.
+// Se prueba la FORMA del catalogo. El compilador ya impide que falte una clave o un texto y que
+// compile un codigo inventado (los `@ts-expect-error` de mas abajo); lo que no puede decir es que
+// dos codigos no compartan frase, que ninguno se llame `not_found` o que ninguno venga de la
+// autenticacion.
 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -33,8 +28,8 @@ const moduleFiles = [
 ]
 
 /**
- * QC-79: los codigos que hablan del enlace de ACTIVACION de una cuenta. Rozan el vocabulario de la
- * autenticacion sin serlo, y por eso se declaran aqui uno a uno en vez de relajar el filtro.
+ * Codigos del enlace de ACTIVACION de una cuenta. Rozan el vocabulario de la autenticacion sin
+ * serlo, y por eso se declaran uno a uno en vez de relajar el filtro.
  */
 const CODIGOS_DE_ACTIVACION: readonly ErrorCode[] = ['credential_link_invalid']
 
@@ -45,19 +40,7 @@ function readModuleFile(relPath: string): string {
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
     it('las 45 entradas estan, y cada codigo tiene exactamente una clave', () => {
-      // 25 de `design.md > 3` + los SIETE de la administracion de usuarios que entraron el
-      // 2026-09-10 con la enmienda a R25 (QC-66) + los DOS de QC-79 (el enlace invalido y la
-      // cuenta que ya no esta pendiente) + los SIETE de los grupos de trabajo (QC-84
-      // `design.md > 7.1` y `> 7.3`). Los cuatro grupos viven en la MISMA familia `identity` y se
-      // apoyan en la misma enmienda a R25: ninguno redacta una nueva.
-      //
-      // EL CONTEO ES LA UNION, y por eso no vale ninguno de los dos numeros que traia cada rama al
-      // mergear: QC-79 dejo 34 (32+2) y QC-84 dejo 39 (32+7), y los dos serian FALSOS ahora que
-      // conviven. 25+7+2+7 = 41, mas los CUATRO de `asignaciones` que entraron el 2026-09-13 con
-      // la QUINTA enmienda (QC-87), la primera que abre una familia nueva: 45. Mas UNO de
-      // `inventario` que entro el 2026-09-15 con la SEXTA enmienda (QC-81, `batch_duplicate_lot`),
-      // que amplia una familia ya existente: 46. Sigue siendo un conteo LITERAL a proposito: un
-      // codigo nuevo que nadie anote aqui pone esta linea en rojo.
+      // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
       expect(ERROR_CODES).toHaveLength(46)
       expect(new Set(ERROR_CODES).size).toBe(ERROR_CODES.length)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
@@ -85,14 +68,14 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
 
   describe('R2 — el catalogo es cerrado: un codigo de fuera NO compila', () => {
     it('un codigo inventado y uno de los genericos borrados son error de tipos', () => {
-      // @ts-expect-error un codigo que no esta en ERROR_CODES no es un ErrorCode (R2).
+      // @ts-expect-error un codigo que no esta en ERROR_CODES no es un ErrorCode.
       const inventado: ErrorCode = 'codigo_que_no_existe'
-      // @ts-expect-error `not_found` se borro del catalogo al abrirlo por caso (R16).
+      // @ts-expect-error `not_found` ya no esta en el catalogo.
       const generico: ErrorCode = 'not_found'
-      // @ts-expect-error errorMessage tampoco acepta un codigo de fuera de la lista (R2).
+      // @ts-expect-error errorMessage tampoco acepta un codigo de fuera de la lista.
       const mensaje: string = errorMessage('duplicate_name')
 
-      // Lo que prueba R2 son las TRES directivas de arriba: si el tipo dejara de ser cerrado,
+      // Lo que se prueba son las TRES directivas de arriba: si el tipo dejara de ser cerrado,
       // los `@ts-expect-error` se quedarian sin error y `pnpm run typecheck` se pondria rojo.
       expect([inventado, generico, mensaje]).toHaveLength(3)
     })
@@ -181,11 +164,6 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
     })
   })
 
-  // QC-81 (R13), SEXTA enmienda al catalogo cerrado (2026-09-15): el lote escrito a mano que ya
-  // existe en la empresa tiene codigo y texto PROPIOS. Lo que se afirma aqui es la parte que el
-  // compilador no ve: el texto EXACTO aprobado en F1.4 y que no se confunde con los dos codigos con
-  // los que podria mezclarse -la entrada invalida, que era el plan B, y el correlativo de pedidos,
-  // que es el precedente-.
   describe('QC-81 R13 — el lote duplicado en la empresa tiene codigo y texto propios', () => {
     it('batch_duplicate_lot esta en el catalogo con su clave y su texto exacto', () => {
       const codigos: readonly string[] = ERROR_CODES
@@ -232,18 +210,9 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
     })
   })
 
-  // R25, ENMENDADO el 2026-09-10 (aprobado por el humano). La premisa de R25 —que `identity` solo
-  // devuelve el rechazo generico del login— caduco con QC-66, que anade seis casos de uso de
-  // administracion de usuarios con fallos distinguibles, asi que esos SIETE codigos entran. Lo que
-  // R25 protegia de verdad sigue en pie y es lo que se comprueba aqui: la AUTENTICACION no entra,
-  // el rechazo del login sigue siendo generico y el modulo `errores` no depende de nadie.
-  //
-  // QC-79, el 2026-09-11: el conjunto de codigos AJENOS de abajo y el resto de la comprobacion NO
-  // cambian. Lo que cambia es el filtro por VOCABULARIO, que era un proxy escrito cuando ninguna
-  // palabra del catalogo rozaba la de la autenticacion: `credential_link_invalid` (R22) contiene
-  // `credential` y NO es autenticacion —es el enlace de ACTIVACION de una cuenta, una superficie
-  // publica sin sesion que no emite ninguna ni dice nada del login—. Se declara como excepcion
-  // NOMBRADA, no se borra el filtro, y el caso de mas abajo la acota a esa unica entrada.
+  // El filtro por vocabulario es un proxy: `credential_link_invalid` contiene `credential` y no es
+  // autenticacion, es el enlace de activacion de una cuenta. Por eso va como excepcion nombrada y
+  // el filtro se queda.
   describe('R25 (enmendado) — la autenticacion se queda fuera, la administracion de usuarios entra', () => {
     it('ningun codigo del catalogo sale del login ni de la sesion', () => {
       const codigos: readonly string[] = ERROR_CODES
@@ -264,8 +233,7 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       }
     })
 
-    // La excepcion de arriba, acotada y demostrada: es UNA sola, esta en el catalogo, y lo que la
-    // justifica —que no salga del login— se comprueba, no se promete.
+    // La excepcion, acotada: es UNA sola, esta en el catalogo, y lo que la justifica se comprueba.
     it('la unica excepcion al vocabulario es el enlace de activacion de QC-79, y sigue sin ser autenticacion', () => {
       const codigos: readonly string[] = ERROR_CODES
 
@@ -293,8 +261,6 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       }
     })
 
-    // QC-79 (R34): las DOS entradas nuevas bajo el mismo encabezado de `identity`, sin ninguna
-    // enmienda nueva al catalogo cerrado: se apoyan en la de QC-66 que ya esta arriba.
     it('los dos codigos de QC-79 estan, con su clave y su texto propios', () => {
       const codigos: readonly string[] = ERROR_CODES
       for (const code of ['credential_link_invalid', 'user_not_pending'] as const) {
@@ -302,15 +268,14 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
         expect(ERROR_MESSAGE_KEY[code]).toBe(`errors.${code}`)
         expect(errorMessage(code).trim().length).toBeGreaterThan(0)
       }
-      // R22: la respuesta del enlace invalido es UNA y no nombra ninguno de los seis casos, para
-      // no convertir el enlace en un oraculo sobre si una cuenta existe o en que estado esta.
+      // La respuesta del enlace invalido es UNA y no nombra ningun caso, para no convertir el
+      // enlace en un oraculo sobre si una cuenta existe o en que estado esta.
       const enlace = errorMessage('credential_link_invalid')
       for (const filtracion of ['caduc', 'expir', 'consumid', 'usado', 'sustitu', 'borrad', 'activ', 'existe']) {
         expect(enlace.toLowerCase(), `el texto del enlace invalido revela un caso: ${filtracion}`).not.toContain(
           filtracion,
         )
       }
-      // Y son distinguibles entre si y de los de QC-66 (R4, ya cubierto globalmente arriba).
       expect(errorMessage('user_not_pending')).not.toBe(enlace)
       expect(errorMessage('user_not_pending')).not.toBe(errorMessage('user_not_found'))
     })
