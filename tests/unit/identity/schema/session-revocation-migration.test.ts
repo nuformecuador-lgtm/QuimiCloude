@@ -1,29 +1,7 @@
-// T3 — Contrato estatico del SQL de la migracion del registro de sesiones (QC-23).
-//
-// Cubre R41 (identificadores en ingles snake_case), R42 (RLS activada Y forzada, sin ninguna
-// policy), R43 (el `down.sql` revierte EXACTAMENTE lo que crea el UP y nada mas), R44 (la tabla
-// no lleva columna de empresa), R45 (`created_at` si, `updated_at` y `deleted_at` no) y R7 (el
-// sello nace NOT NULL con DEFAULT, que es lo que rellena las filas que ya existen).
-//
-// Lo que se vigila aqui NO lo regenera Prisma nunca y NO lo ve ninguna otra prueba:
-//
-//   1. LOS DOS `ALTER ... ROW LEVEL SECURITY` (R42). Prisma no modela RLS. Sin `FORCE`, el
-//      dueno de la tabla —que es con quien se conecta Prisma— ignora la RLS entera y la
-//      defensa en profundidad no defiende de nada.
-//   2. QUE ESTA MIGRACION NO SE LLEVE POR DELANTE NADA DE `users`. Es el riesgo real de esta
-//      ficha y no lo era de QC-79: esta migracion SI TOCA `users` —le anade la columna del
-//      sello—, asi que `prisma migrate dev --create-only` emite ademas los `DROP CONSTRAINT` y
-//      `DROP INDEX` del drift ya conocido del repo (los tres indices unicos FUNCIONALES de
-//      QC-4/QC-47, la FK de auditoria de QC-65, el indice PARCIAL de QC-79). Un
-//      `DROP INDEX "users_email_unique"` colado aqui pasaria el typecheck, pasaria la suite y
-//      se llevaria la unicidad del correo EN SILENCIO. Solo se entera este archivo.
-//   3. QUE EL DOWN CUBRA TODO LO QUE EL UP CREA (R43). Un DOWN incompleto no falla: deja la
-//      base con restos y el rollback termina en verde.
-//
-// Cada afirmacion se escribe como un PREDICADO PURO EXPORTADO que recibe el texto SQL y
-// devuelve el veredicto, y se aplica dos veces: al SQL real y a una copia MUTADA EN MEMORIA.
-// Sin la segunda mitad, media docena de estas afirmaciones serian `expect(false)` disfrazados
-// sobre un archivo que nunca dijo esa palabra.
+// Lo que se vigila aqui no lo regenera Prisma ni lo ve otra prueba: la RLS forzada, que la
+// migracion no destruya nada de `users` (le anade una columna, y `migrate dev` emite ademas los
+// `DROP` del drift de esa tabla) y que el DOWN cubra todo lo que crea el UP. Por eso cada
+// predicado se aplica tambien a una copia mutada en memoria.
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -31,7 +9,6 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-/** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
   let dir = startDir
   for (;;) {
@@ -49,11 +26,8 @@ function findRepoRoot(startDir: string): string {
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)))
 const migrationsDir = join(repoRoot, 'db', 'migrations')
 
-/**
- * La carpeta se localiza por PATRON, no por el timestamp escrito a pelo: si la migracion se
- * regenera con otra marca de tiempo, el test tiene que seguir apuntando a ella y no romperse
- * por una razon que no es la suya.
- */
+// Por patron y no por timestamp: si la migracion se regenera con otra marca de tiempo, el test
+// la sigue encontrando.
 const sessionRevocationDirs = readdirSync(migrationsDir).filter((name) =>
   /_session_revocation$/.test(name),
 )
@@ -63,13 +37,9 @@ expect(
 ).toHaveLength(1)
 const migrationDir = join(migrationsDir, sessionRevocationDirs[0] as string)
 
-// --- Lectura y troceado del SQL ------------------------------------------------------------
-
 /**
- * Quita comentarios de linea y de bloque: lo que se afirma es SQL EJECUTABLE, no prosa. La
- * cabecera de esta migracion nombra a proposito `users_email_unique` y compania —para dejar
- * escrito que NO se tocan—, asi que mirar el texto crudo daria falsos positivos en TODAS las
- * afirmaciones en negativo de mas abajo.
+ * Se afirma sobre SQL ejecutable: la cabecera de la migracion nombra los indices unicos de `users`
+ * para dejar escrito que no los toca, y el texto crudo daria falsos positivos.
  */
 function stripSqlComments(sql: string): string {
   return sql
@@ -79,7 +49,6 @@ function stripSqlComments(sql: string): string {
     .join('\n')
 }
 
-/** Sentencias ejecutables, con los espacios normalizados para poder afirmar sobre ellas. */
 function statements(sql: string): readonly string[] {
   return stripSqlComments(sql)
     .split(';')
@@ -99,13 +68,7 @@ function findStatement(source: readonly string[], pattern: RegExp): string {
   return found[0] as string
 }
 
-// --- Predicados puros: columnas y clave foranea ---------------------------------------------
-
-/**
- * Las columnas declaradas por un `CREATE TABLE`, con su definicion literal. El troceado
- * respeta los parentesis: `TIMESTAMPTZ(6)` y `PRIMARY KEY ("a","b")` llevan comas y parentesis
- * dentro, y partir por comas a secas los rompe.
- */
+/** Trocea respetando parentesis: `TIMESTAMPTZ(6)` y `PRIMARY KEY ("a","b")` llevan comas dentro. */
 export function tableColumns(sql: string, table: string): ReadonlyMap<string, string> {
   const columnas = new Map<string, string>()
   const create = statements(sql).find((statement) =>
@@ -136,7 +99,6 @@ export function tableColumns(sql: string, table: string): ReadonlyMap<string, st
   return columnas
 }
 
-/** Una `ADD CONSTRAINT ... FOREIGN KEY` tal como esta ESCRITA en el SQL. */
 export interface ClaveForanea {
   readonly tabla: string
   readonly columnas: readonly string[]
@@ -146,7 +108,6 @@ export interface ClaveForanea {
   readonly onUpdate: string | null
 }
 
-/** Lee del SQL la clave foranea con ese nombre, o `null` si no esta declarada. */
 export function foreignKey(sql: string, name: string): ClaveForanea | null {
   const patron = new RegExp(
     `^ALTER TABLE "?(\\w+)"? ADD CONSTRAINT "${name}" FOREIGN KEY \\(([^)]*)\\) ` +
@@ -178,9 +139,7 @@ export function foreignKey(sql: string, name: string): ClaveForanea | null {
   }
 }
 
-// --- Predicados puros: RLS, policies y DDL ajeno --------------------------------------------
-
-/** R42. ¿La tabla queda con RLS activada Y forzada? Sin `FORCE`, el dueno la ignora entera. */
+/** Sin `FORCE`, el dueno de la tabla, que es con quien conecta Prisma, ignora la RLS. */
 export function hasRlsEnabledAndForced(sql: string, table: string): boolean {
   const source = statements(sql)
   const enable = new RegExp(`^ALTER TABLE "?${table}"? ENABLE ROW LEVEL SECURITY$`, 'i')
@@ -192,10 +151,8 @@ export function hasRlsEnabledAndForced(sql: string, table: string): boolean {
 }
 
 /**
- * R42. ¿Los `ALTER ... ROW LEVEL SECURITY` son el ULTIMO bloque del archivo? NO es cosmetico:
- * `FORCE` sin policies deniega tambien al dueno de la tabla cuando ese dueno no es
- * superusuario, asi que cualquier escritura futura colocada detras de ellos podria no escribir
- * nada EN SILENCIO (leccion de QC-32 y QC-74).
+ * `FORCE` sin policies deniega tambien al dueno cuando no es superusuario: una escritura colocada
+ * detras de los `ALTER` podria no escribir nada, en silencio.
  */
 export function rowLevelSecurityGoesLast(sql: string): boolean {
   const source = statements(sql)
@@ -206,15 +163,13 @@ export function rowLevelSecurityGoesLast(sql: string): boolean {
 }
 
 /**
- * R42. Toda sentencia que declare una POLICY. Tiene que quedar vacia: una policy no cuenta
- * como permiso implementado —Prisma se conecta como dueno y no setea `auth.uid()`— y tenerla
- * aqui daria la falsa impresion de que la autorizacion vive en la base y no en el service.
+ * Una policy no filtra nada en esta app, porque Prisma conecta como dueno y no setea `auth.uid()`,
+ * y daria la falsa impresion de que la autorizacion vive en la base.
  */
 export function policyStatements(sql: string): readonly string[] {
   return statements(sql).filter((statement) => /\bPOLICY\b/i.test(statement))
 }
 
-/** DDL cuyo SUJETO es esa tabla: `ALTER/CREATE/DROP TABLE`, `TRUNCATE` o un indice sobre ella. */
 export function ddlStatementsOn(sql: string, table: string): readonly string[] {
   const patron = new RegExp(
     `^(ALTER TABLE|DROP TABLE|CREATE TABLE|TRUNCATE)\\s+(IF EXISTS )?(ONLY )?"?${table}"?\\b|` +
@@ -224,15 +179,13 @@ export function ddlStatementsOn(sql: string, table: string): readonly string[] {
   return statements(sql).filter((statement) => patron.test(statement))
 }
 
-/** Sentencias EJECUTABLES que nombran ese identificador, sea como sujeto o dentro de otro nombre. */
 export function statementsMentioning(sql: string, needle: string): readonly string[] {
   return statements(sql).filter((statement) => new RegExp(needle, 'i').test(statement))
 }
 
 /**
- * Toda sentencia que DESTRUYE algo: `DROP INDEX`, `DROP CONSTRAINT`, `DROP TABLE`,
- * `DROP COLUMN`. En el UP tiene que quedar vacia: esta migracion solo anade. Es exactamente la
- * forma del ruido de drift que `migrate dev --create-only` emite al tocar `users`.
+ * En el UP tiene que quedar vacia: la migracion solo anade, y un `DROP` es justo la forma del
+ * drift que `migrate dev` emite al tocar `users`.
  */
 export function destructiveStatements(sql: string): readonly string[] {
   return statements(sql).filter((statement) =>
@@ -240,16 +193,12 @@ export function destructiveStatements(sql: string): readonly string[] {
   )
 }
 
-/**
- * R43. ¿El SQL escribe alguna fila? `ON DELETE`/`ON UPDATE` no cuentan: son parte de la
- * definicion de una clave foranea, no escrituras.
- */
+/** `ON DELETE`/`ON UPDATE` de una FK no cuentan como escritura. */
 export function writesRows(sql: string): boolean {
   const ejecutable = stripSqlComments(sql).replace(/\s+/g, ' ')
   return /(?<!ON )\b(INSERT|UPDATE|DELETE|TRUNCATE)\b/i.test(ejecutable)
 }
 
-/** Identificadores que CREA la migracion: tablas, columnas, indices y restricciones. */
 export function createdIdentifiers(source: readonly string[]): readonly string[] {
   const nombres = new Set<string>()
   for (const statement of source) {
@@ -267,15 +216,11 @@ export function createdIdentifiers(source: readonly string[]): readonly string[]
   return [...nombres]
 }
 
-// --- Predicado puro: el DOWN cubre todo lo que el UP crea (R43) ------------------------------
-
-/** Una columna anadida a una tabla que YA existia, o quitada de ella. */
 export interface ColumnaDeTablaAjena {
   readonly tabla: string
   readonly columna: string
 }
 
-/** `CREATE TABLE "x"` → `x`. */
 export function tablesCreatedBy(sql: string): readonly string[] {
   return statements(sql)
     .map((statement) => /^CREATE TABLE (?:IF NOT EXISTS )?"?(\w+)"?/i.exec(statement))
@@ -283,7 +228,6 @@ export function tablesCreatedBy(sql: string): readonly string[] {
     .map((match) => match[1] as string)
 }
 
-/** `DROP TABLE [IF EXISTS] "x"` → `x`. */
 export function tablesDroppedBy(sql: string): readonly string[] {
   return statements(sql)
     .map((statement) => /^DROP TABLE (?:IF EXISTS )?"?(\w+)"?/i.exec(statement))
@@ -302,23 +246,17 @@ function columnasPorAccion(sql: string, accion: 'ADD' | 'DROP'): readonly Column
     .map((match) => ({ tabla: match[1] as string, columna: match[2] as string }))
 }
 
-/** Columnas que el SQL AÑADE a una tabla que ya existia. */
 export function columnsAddedBy(sql: string): readonly ColumnaDeTablaAjena[] {
   return columnasPorAccion(sql, 'ADD')
 }
 
-/** Columnas que el SQL QUITA de una tabla que sigue existiendo. */
 export function columnsDroppedBy(sql: string): readonly ColumnaDeTablaAjena[] {
   return columnasPorAccion(sql, 'DROP')
 }
 
 /**
- * R43. Lo que el UP crea y el DOWN NO deshace. Tiene que salir VACIO.
- *
- * Los indices, la clave primaria y la FK de una tabla que el DOWN borra SI cuentan como
- * cubiertos: se caen con ella, y escribirlos explicitamente falla —un `DROP INDEX` sobre una
- * tabla que ya no existe revienta—. Lo que no se cubre solo es lo que cuelga de una tabla
- * PREEXISTENTE, que aqui es exactamente la columna del sello sobre `users`.
+ * Los indices, la PK y la FK de una tabla que el DOWN borra cuentan como cubiertos: se caen con
+ * ella, y un `DROP INDEX` explicito sobre una tabla ya borrada falla.
  */
 export function upObjectsNotCoveredByDown(upSql: string, downSql: string): readonly string[] {
   const tablasCreadas = tablesCreatedBy(upSql)
@@ -334,8 +272,6 @@ export function upObjectsNotCoveredByDown(upSql: string, downSql: string): reado
     if (tablasBorradas.has(tabla)) continue
     if (!columnasQuitadas.has(`${tabla}.${columna}`)) pendientes.push(`columna ${tabla}.${columna}`)
   }
-  // Indices y restricciones: cubiertos si cuelgan de una tabla que el DOWN borra, o si el DOWN
-  // los borra por su nombre.
   const nombradosEnDown = new Set(
     statements(downSql).flatMap((statement) =>
       [...statement.matchAll(/"([^"]+)"/g)].map((match) => match[1] as string),
@@ -354,15 +290,8 @@ export function upObjectsNotCoveredByDown(upSql: string, downSql: string): reado
   return pendientes
 }
 
-// --- Predicado puro: el idioma de los identificadores (R41) ----------------------------------
-
-/**
- * Vocabulario ingles admitido para los identificadores de esta feature (R41). Cada
- * identificador se parte por `_` y cada pieza tiene que estar en esta lista. Es una lista
- * cerrada a proposito, con el precedente de `credential-setup-migration.test.ts`: una columna
- * nueva obliga a pasar por aqui, y una en espanol (`sesiones`, `sello`, `valido`) no encuentra
- * sus piezas y cae. Un patron `^[a-z_]+$` no distinguiria el idioma, solo la forma.
- */
+// Lista cerrada: un identificador en espanol no encuentra sus piezas y cae. Un patron
+// `^[a-z_]+$` solo miraria la forma, no el idioma.
 const VOCABULARIO_INGLES = new Set([
   'at',
   'created',
@@ -380,15 +309,11 @@ const VOCABULARIO_INGLES = new Set([
   'fkey',
 ])
 
-/** R41. ¿El identificador es snake_case ASCII y todas sus piezas son palabras inglesas? */
 export function isEnglishSnakeCase(identifier: string): boolean {
   if (!/^[a-z][a-z0-9_]*$/.test(identifier)) return false
   return identifier.split('_').every((pieza) => VOCABULARIO_INGLES.has(pieza))
 }
 
-// --- Predicados puros: el esquema de Prisma --------------------------------------------------
-
-/** El cuerpo de un `model` del esquema, sin sus comentarios `//`, o `null` si no existe. */
 export function modelBody(schema: string, model: string): string | null {
   const match = new RegExp(`^model\\s+${model}\\s*\\{([\\s\\S]*?)^\\}`, 'm').exec(schema)
   if (match === null || match[1] === undefined) return null
@@ -398,22 +323,16 @@ export function modelBody(schema: string, model: string): string | null {
     .join('\n')
 }
 
-/**
- * El modulo declarado JUSTO ENCIMA del modelo, o `null` si no lo tiene. Se lee del texto
- * CRUDO: `/// @module` ES un comentario, y es justo lo que se vigila.
- */
+/** Se lee del texto crudo porque `/// @module` es un comentario. */
 export function moduleOwnerOf(schema: string, model: string): string | null {
   const match = new RegExp(`/// @module (\\w+)\\n(?:///[^\\n]*\\n)*model ${model} \\{`).exec(schema)
   return match === null ? null : (match[1] as string)
 }
 
-// === El UP: el sello sobre `users` ==========================================================
-
 describe('migration.sql — el sello nace obligatorio y con valor para las filas que ya existen', () => {
   it('anade `users.sessions_valid_from` NOT NULL con DEFAULT, y eso ES el backfill (R7)', () => {
-    // `design.md > 2.1`: una columna NOT NULL sobre una tabla con filas necesita un DEFAULT o
-    // la migracion no aplica. Ese DEFAULT rellena las existentes con el instante del
-    // despliegue, que es el efecto aceptado por escrito (consecuencia declarada 1).
+    // Una columna NOT NULL sobre una tabla con filas necesita DEFAULT para aplicarse, y ese DEFAULT
+    // rellena las existentes con el instante del despliegue.
     expect(findStatement(up, /ADD COLUMN "sessions_valid_from"/i)).toBe(
       'ALTER TABLE "users" ADD COLUMN "sessions_valid_from" TIMESTAMPTZ(6) NOT NULL ' +
         'DEFAULT CURRENT_TIMESTAMP',
@@ -421,9 +340,7 @@ describe('migration.sql — el sello nace obligatorio y con valor para las filas
   })
 
   it('SENSIBILIDAD — sin el NOT NULL o sin el DEFAULT, el sello deja de ser una garantia', () => {
-    // Una columna anulable convierte «toda fila de usuario tiene sello» (R7) en «casi toda», y
-    // el corte del dominio tendria que decidir que hacer con un NULL: el agujero se abre en el
-    // esquema, no en el codigo.
+    // Anulable, el corte de sesiones tendria que decidir que hacer con un NULL.
     const anulable = upSource.replace(
       '"sessions_valid_from" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP',
       '"sessions_valid_from" TIMESTAMPTZ(6)',
@@ -436,7 +353,6 @@ describe('migration.sql — el sello nace obligatorio y con valor para las filas
       ),
     ).toEqual([])
 
-    // Y borrar la linea entera tambien: sin columna no hay sello y R7 muere en silencio.
     const sinColumna = upSource.replace(/ALTER TABLE "users" ADD COLUMN[^;]*;/, '')
     expect(sinColumna, 'la mutacion no quito el ADD COLUMN').not.toBe(upSource)
     expect(columnsAddedBy(sinColumna)).toEqual([])
@@ -454,7 +370,6 @@ describe('migration.sql — el sello nace obligatorio y con valor para las filas
     expect(statementsMentioning(upSource, 'sessions_valid_from').filter((s) => /INDEX/i.test(s))).toEqual(
       [],
     )
-    // Sensibilidad: un indice colado cae.
     const conIndice = `${upSource}\nCREATE INDEX "users_sessions_valid_from_idx" ON "users"("sessions_valid_from");`
     expect(
       statementsMentioning(conIndice, 'sessions_valid_from').filter((s) => /INDEX/i.test(s)),
@@ -462,12 +377,10 @@ describe('migration.sql — el sello nace obligatorio y con valor para las filas
   })
 })
 
-// === El UP: la tabla del registro y sus columnas ============================================
-
 describe('migration.sql — el UP crea `revoked_sessions` y ninguna otra tabla', () => {
   it('crea exactamente una tabla y no declara ninguna extension', () => {
     expect(tablesCreatedBy(upSource)).toEqual(['revoked_sessions'])
-    // `pgcrypto` ya existe y medio repo depende de ella: declararla aqui seria ruido.
+    // `pgcrypto` ya la crean migraciones anteriores.
     expect(up.filter((statement) => /EXTENSION/i.test(statement))).toEqual([])
   })
 
@@ -481,15 +394,13 @@ describe('migration.sql — el UP crea `revoked_sessions` y ninguna otra tabla',
       'revoked_at',
       'created_at',
     ])
-    // R44: la empresa de una sesion cerrada es, por definicion, la de su persona.
+    // La empresa de una sesion cerrada es la de su persona.
     expect(columnas.has('company_id')).toBe(false)
-    // R45: la fila es un hecho inmutable; la unica escritura posterior es el borrado FISICO de
-    // la purga, asi que un `deleted_at` seria una mentira y un `updated_at` no cambiaria nunca.
+    // La fila es un hecho inmutable y solo la borra la purga: un `deleted_at` seria falso y un
+    // `updated_at` no cambiaria nunca.
     expect(columnas.has('updated_at')).toBe(false)
     expect(columnas.has('deleted_at')).toBe(false)
 
-    // Sensibilidad: anadir la columna de empresa cae. La afirmacion de arriba no es un
-    // `expect(false)` disfrazado sobre un archivo que nunca menciona `company_id`.
     const conEmpresa = upSource.replace(
       '"user_id" UUID NOT NULL,',
       '"user_id" UUID NOT NULL,\n    "company_id" UUID NOT NULL,',
@@ -499,20 +410,20 @@ describe('migration.sql — el UP crea `revoked_sessions` y ninguna otra tabla',
   })
 
   it('las cinco columnas de negocio son obligatorias y los dos identificadores son UUID', () => {
-    // `session_id` es UUID y no TEXT porque el `sid` del token se valida con `z.string().uuid()`
-    // (R6) y acaba comparandose contra esta columna: los dos lados tienen que ser el mismo tipo.
+    // `session_id` es UUID porque el `sid` del token se valida como UUID y se compara contra esta
+    // columna.
     const columnas = tableColumns(upSource, 'revoked_sessions')
     expect(columnas.get('id')).toBe('"id" UUID NOT NULL DEFAULT gen_random_uuid()')
     expect(columnas.get('session_id')).toBe('"session_id" UUID NOT NULL')
     expect(columnas.get('user_id')).toBe('"user_id" UUID NOT NULL')
-    // La caducidad NATURAL del token cerrado: es lo que hace posible la purga de R39.
+    // La caducidad natural del token cerrado es lo que permite purgar la fila.
     expect(columnas.get('expires_at')).toBe('"expires_at" TIMESTAMPTZ(6) NOT NULL')
     expect(columnas.get('revoked_at')).toBe('"revoked_at" TIMESTAMPTZ(6) NOT NULL')
     expect(columnas.get('created_at')).toBe(
       '"created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP',
     )
 
-    // Sensibilidad: una caducidad anulable deja una fila que la purga no puede borrar nunca...
+    // Una caducidad anulable dejaria filas que la purga no borra nunca...
     const caducidadAnulable = upSource.replace(
       '"expires_at" TIMESTAMPTZ(6) NOT NULL,',
       '"expires_at" TIMESTAMPTZ(6),',
@@ -529,27 +440,22 @@ describe('migration.sql — el UP crea `revoked_sessions` y ninguna otra tabla',
 
   it('no escribe ni una fila: la tabla nace vacia (R40)', () => {
     expect(writesRows(upSource)).toBe(false)
-    // Sensibilidad: el predicado no confunde el `ON DELETE`/`ON UPDATE` de una FK con una
-    // escritura...
     expect(
       writesRows(
         'ALTER TABLE "t" ADD CONSTRAINT "f" FOREIGN KEY ("a") REFERENCES "u"("a") ' +
           'ON DELETE RESTRICT ON UPDATE CASCADE;',
       ),
     ).toBe(false)
-    // ...pero si ve un backfill colado al final.
     expect(
       writesRows(`${upSource}\nINSERT INTO "revoked_sessions" ("user_id") VALUES ('x');`),
     ).toBe(true)
   })
 })
 
-// === El UP: los dos indices, que SON los requisitos =========================================
-
 describe('migration.sql — los dos indices con su nombre exacto (R11, R12, R39)', () => {
   it('el unico de `session_id` ES R11 y R12', () => {
-    // La comprobacion por peticion es UNA busqueda por indice unico (design.md > 4), y
-    // registrar dos veces el mismo cierre choca con 23505 y se traduce a «ya estaba».
+    // La comprobacion por peticion es una busqueda por indice unico, y registrar dos veces el mismo
+    // cierre choca con 23505 y se traduce a «ya estaba».
     expect(findStatement(up, /^CREATE UNIQUE INDEX "revoked_sessions_session_id_key"/i)).toBe(
       'CREATE UNIQUE INDEX "revoked_sessions_session_id_key" ON "revoked_sessions"("session_id")',
     )
@@ -576,8 +482,8 @@ describe('migration.sql — los dos indices con su nombre exacto (R11, R12, R39)
   })
 
   it('SENSIBILIDAD — quitarle el UNIQUE al de `session_id` deja R12 sin base', () => {
-    // Sin la unicidad, el segundo cierre del mismo `sid` inserta una SEGUNDA fila en vez de
-    // chocar con 23505: R12 muere y nada mas en el repo se entera.
+    // Sin la unicidad, el segundo cierre del mismo `sid` insertaria otra fila en vez de chocar con
+    // 23505.
     const noUnico = upSource.replace(
       'CREATE UNIQUE INDEX "revoked_sessions_session_id_key"',
       'CREATE INDEX "revoked_sessions_session_id_key"',
@@ -589,7 +495,6 @@ describe('migration.sql — los dos indices con su nombre exacto (R11, R12, R39)
       ),
     ).toEqual([])
 
-    // Y borrar cualquiera de los dos indices enteros tambien cae.
     for (const indice of [
       'revoked_sessions_session_id_key',
       'revoked_sessions_user_id_expires_at_idx',
@@ -604,12 +509,10 @@ describe('migration.sql — los dos indices con su nombre exacto (R11, R12, R39)
   })
 })
 
-// === El UP: la clave foranea ================================================================
-
 describe('migration.sql — la sesion cerrada cuelga del usuario, y borrarlo a lo bruto hace ruido', () => {
   it('la FK apunta a users con RESTRICT en el borrado y CASCADE en la actualizacion', () => {
-    // `design.md > 2.2`: el borrado de usuario es LOGICO (QC-66 R37), asi que en operacion
-    // normal no se dispara; un borrado fisico con filas colgando tiene que ser ruidoso.
+    // El borrado de usuario es logico: el RESTRICT solo salta en un borrado fisico, y ahi tiene que
+    // ser ruidoso en vez de arrastrar las filas.
     const fk = foreignKey(upSource, 'revoked_sessions_user_id_fkey')
     expect(fk?.tabla).toBe('revoked_sessions')
     expect(fk?.columnas).toEqual(['user_id'])
@@ -636,17 +539,13 @@ describe('migration.sql — la sesion cerrada cuelga del usuario, y borrarlo a l
   })
 })
 
-// === El UP: la RLS (R42) ====================================================================
-
 describe('migration.sql — la tabla nace con RLS activada y forzada, y sin ninguna policy', () => {
   it('queda con ENABLE y con FORCE (R42)', () => {
     expect(hasRlsEnabledAndForced(upSource, 'revoked_sessions')).toBe(true)
   })
 
   it('SENSIBILIDAD — sin el FORCE, el dueno de la tabla ignora la RLS entera', () => {
-    // Prisma se conecta como dueno y Postgres NO le aplica RLS salvo `FORCE`
-    // (`docs/architecture.md > Acceso a datos y autorizacion`). Quitarlo deja la defensa en
-    // profundidad sin defender nada, y ningun otro test del repo se entera.
+    // Prisma conecta como dueno, y Postgres no le aplica la RLS salvo con `FORCE`.
     const sinForce = upSource.replace(
       'ALTER TABLE "revoked_sessions" FORCE ROW LEVEL SECURITY;',
       '',
@@ -654,7 +553,6 @@ describe('migration.sql — la tabla nace con RLS activada y forzada, y sin ning
     expect(sinForce, 'la mutacion no quito el FORCE').not.toBe(upSource)
     expect(hasRlsEnabledAndForced(sinForce, 'revoked_sessions')).toBe(false)
 
-    // Y quitar el ENABLE tambien: son las dos mitades de la misma cosa.
     const sinEnable = upSource.replace(
       'ALTER TABLE "revoked_sessions" ENABLE ROW LEVEL SECURITY;',
       '',
@@ -666,8 +564,6 @@ describe('migration.sql — la tabla nace con RLS activada y forzada, y sin ning
   it('no declara ninguna policy: la autorizacion vive en el service (R42, R27)', () => {
     expect(policyStatements(upSource)).toEqual([])
     expect(policyStatements(downSource)).toEqual([])
-    // Sensibilidad: una policy colada al final cae. Una policy NO cuenta como permiso
-    // implementado y tenerla aqui daria la falsa impresion de que si.
     const conPolicy = `${upSource}\nCREATE POLICY "p" ON "revoked_sessions" USING (true);`
     expect(policyStatements(conPolicy)).toHaveLength(1)
   })
@@ -683,15 +579,10 @@ describe('migration.sql — la tabla nace con RLS activada y forzada, y sin ning
   })
 })
 
-// === El UP: lo que NO se lleva por delante ==================================================
-
 describe('migration.sql — esta migracion toca users, y no destruye NADA suyo', () => {
   it('el UP no contiene ni un solo DROP: solo anade', () => {
-    // Es exactamente la forma del ruido que `prisma migrate dev --create-only` emite por el
-    // drift del repo. Un `DROP` aqui pasaria el typecheck y la suite entera.
     expect(destructiveStatements(upSource)).toEqual([])
 
-    // Sensibilidad: los tres casos reales que este test existe para cazar.
     expect(
       destructiveStatements(`${upSource}\nDROP INDEX "users_email_unique";`),
     ).toHaveLength(1)
@@ -706,9 +597,8 @@ describe('migration.sql — esta migracion toca users, y no destruye NADA suyo',
   })
 
   it('no menciona ninguno de los indices que solo existen escritos a mano', () => {
-    // Los tres unicos de `users` son FUNCIONALES (`lower(...)`) y PARCIALES, y el de QC-79 es
-    // parcial: los cuatro son DRIFT para Prisma. Un `DROP INDEX` por drift colado aqui borraria
-    // la unicidad del correo, del nombre de usuario y del documento EN SILENCIO.
+    // Existen solo escritos a mano y son drift para Prisma: un `DROP` colado aqui se llevaria en
+    // silencio la unicidad o la FK que protegen.
     for (const objeto of [
       'users_email_unique',
       'users_username_unique',
@@ -722,15 +612,11 @@ describe('migration.sql — esta migracion toca users, y no destruye NADA suyo',
       )
     }
 
-    // Sensibilidad: los `DROP INDEX` que `migrate dev` sabe emitir por drift caen, y tambien un
-    // "recreado" bienintencionado con una definicion distinta de la original.
     const conDrop = `${upSource}\nDROP INDEX "users_email_unique";`
     expect(statementsMentioning(conDrop, 'users_email_unique')).toHaveLength(1)
     const recreado = `${upSource}\nCREATE UNIQUE INDEX "users_username_unique" ON "users" (lower("username"));`
     expect(statementsMentioning(recreado, 'users_username_unique')).toHaveLength(1)
 
-    // Y nombrarlos en un COMENTARIO no cae: la cabecera los nombra a proposito para dejar
-    // escrito que no se tocan.
     expect(statementsMentioning(`${upSource}\n-- DROP INDEX "users_email_unique";`, 'users_email_unique')).toEqual(
       [],
     )
@@ -762,7 +648,6 @@ describe('migration.sql — esta migracion toca users, y no destruye NADA suyo',
       expect(ddlStatementsOn(downSource, tabla), `el DOWN no debe tocar ${tabla}`).toEqual([])
     }
 
-    // Sensibilidad: un `DROP CONSTRAINT` por drift, escondido al final, cae.
     const conDrift = `${upSource}\nALTER TABLE "orders" DROP CONSTRAINT "orders_recipe_id_fkey";`
     expect(ddlStatementsOn(conDrift, 'orders')).toHaveLength(1)
   })
@@ -795,13 +680,10 @@ describe('migration.sql — esta migracion toca users, y no destruye NADA suyo',
     expect(isEnglishSnakeCase('revoked_sessións')).toBe(false)
     expect(isEnglishSnakeCase('revokedSessions')).toBe(false)
     expect(isEnglishSnakeCase('REVOKED_SESSIONS')).toBe(false)
-    // Y sigue aceptando los que si son ingleses: no es un `expect(false)` disfrazado.
     expect(isEnglishSnakeCase('revoked_sessions')).toBe(true)
     expect(isEnglishSnakeCase('sessions_valid_from')).toBe(true)
   })
 })
-
-// === El DOWN (R43) ==========================================================================
 
 describe('down.sql — revertir deja el esquema exactamente como estaba', () => {
   it('borra la tabla y la columna del sello, y nada mas: dos sentencias', () => {
@@ -815,13 +697,12 @@ describe('down.sql — revertir deja el esquema exactamente como estaba', () => 
     // Un DOWN incompleto no falla al ejecutarse: deja restos y el rollback termina en verde.
     expect(upObjectsNotCoveredByDown(upSource, downSource)).toEqual([])
 
-    // Sensibilidad: sin el `DROP TABLE`, la tabla y sus dos indices sobreviven al rollback...
     const sinTabla = downSource.replace('DROP TABLE IF EXISTS "revoked_sessions";', '')
     expect(sinTabla, 'la mutacion no quito el DROP TABLE').not.toBe(downSource)
     expect(upObjectsNotCoveredByDown(upSource, sinTabla)).toContain('tabla revoked_sessions')
 
-    // ...y sin el `DROP COLUMN`, `users` se queda con una columna que ya no esta en el esquema:
-    // la siguiente migracion se aplicaria sobre un estado que Prisma cree que es otro.
+    // Sin el `DROP COLUMN`, la siguiente migracion se aplicaria sobre un estado que Prisma cree
+    // distinto.
     const sinColumna = downSource.replace(
       'ALTER TABLE "users" DROP COLUMN IF EXISTS "sessions_valid_from";',
       '',
@@ -831,7 +712,6 @@ describe('down.sql — revertir deja el esquema exactamente como estaba', () => 
       'columna users.sessions_valid_from',
     ])
 
-    // Y el predicado NO da por bueno un DOWN vacio: detecta las dos cosas a la vez.
     expect(upObjectsNotCoveredByDown(upSource, '')).toEqual([
       'tabla revoked_sessions',
       'columna users.sessions_valid_from',
@@ -862,11 +742,10 @@ describe('down.sql — revertir deja el esquema exactamente como estaba', () => 
     ])
     expect(writesRows(downSource)).toBe(false)
 
-    // Sensibilidad: un `DROP INDEX` de mas en el DOWN se llevaria la unicidad del correo, y el
-    // rollback terminaria en verde...
+    // Un `DROP INDEX` de mas en el DOWN se llevaria la unicidad del correo con el rollback en
+    // verde...
     const conDrop = `${downSource}\nDROP INDEX "users_email_unique";`
     expect(ddlStatementsOn(conDrop, 'users')).toHaveLength(1)
-    // ...y una escritura de filas tambien cae.
     for (const escritura of [
       'DELETE FROM "users" WHERE "account_status" = \'pending\';',
       'UPDATE "users" SET "account_status" = \'active\';',
@@ -876,14 +755,10 @@ describe('down.sql — revertir deja el esquema exactamente como estaba', () => 
   })
 })
 
-// === El esquema de Prisma ===================================================================
-
 describe('db/schema.prisma — el modelo nuevo es de identity y no arrastra columnas de mas', () => {
   it('RevokedSession declara su dueno (`/// @module identity`)', () => {
     expect(moduleOwnerOf(rawSchema, 'RevokedSession')).toBe('identity')
 
-    // Sensibilidad: un modelo sin dueno cae —y es ademas un hallazgo de
-    // `tests/guards/guard-arquitectura-modulos.test.ts`—.
     const sinDueno = rawSchema.replace(
       /\/\/\/ @module identity\n((?:\/\/\/[^\n]*\n)*model RevokedSession \{)/,
       '$1',
@@ -899,7 +774,7 @@ describe('db/schema.prisma — el modelo nuevo es de identity y no arrastra colu
     expect(body as string).not.toMatch(/company_id/)
     expect(body as string).not.toMatch(/updatedAt/)
     expect(body as string).not.toMatch(/deletedAt/)
-    // Y `User` si declara las tres: la afirmacion de arriba no es un `expect(false)` disfrazado.
+    // `User` si declara las tres: asi los patrones de arriba pueden fallar.
     const usuario = modelBody(rawSchema, 'User') as string
     expect(usuario).toMatch(/companyId/)
     expect(usuario).toMatch(/updatedAt/)
@@ -911,9 +786,7 @@ describe('db/schema.prisma — el modelo nuevo es de identity y no arrastra colu
     expect(usuario).toMatch(
       /sessionsValidFrom\s+DateTime\s+@default\(now\(\)\)\s+@map\("sessions_valid_from"\)\s+@db\.Timestamptz\(6\)/,
     )
-    // Obligatorio: `DateTime?` lo volveria anulable y R7 dejaria de ser «toda fila de usuario».
     expect(usuario).not.toMatch(/sessionsValidFrom\s+DateTime\?/)
-    // Sin indice: ningun `@@index` ni `@unique` lo nombra.
     expect(usuario.match(/@@index\(\[[^\]]*sessionsValidFrom[^\]]*\]/g)).toBeNull()
     expect(usuario).not.toMatch(/sessionsValidFrom[^\n]*@unique/)
   })
