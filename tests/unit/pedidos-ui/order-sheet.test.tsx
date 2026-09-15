@@ -120,6 +120,54 @@ vi.mock('@/lib/composition', () => ({
   identity: { getSessionUser: getSessionUserMock, endSession: vi.fn<() => Promise<void>>() },
 }));
 
+// QC-102 T10 — El BARREL de la ruta exporta ahora la seccion de responsables, que importa las
+// Server Actions de QC-87 **por su ruta exacta**. Se mockean por la MISMA razon, y con el mismo
+// criterio, que las de `pedidos` justo aqui arriba: son el borde de un modulo que este archivo no
+// ejercita, y sin el doble la importacion del barrel arrastraria `@/lib/composition` entero.
+// **El guion de este archivo no cambia**: solo se anade el doble que faltaba.
+// QC-102 T11 — El barrel arrastra ahora `order-list-section.tsx`, que compone el LOTE de
+// responsables y resuelve `canWrite` leyendo la sesion. Con el llegan dos bordes mas de
+// `identity` —`user-actions.ts` y `work-group-actions.ts`—, que leen `observabilidad` de
+// `@/lib/composition` **al cargarse**, y el doble de composicion de este archivo declara solo
+// `identity`.
+//
+// **No es un cambio de guion**: no toca ni un `it(...)`, ni un selector, ni una asercion. Es el
+// mismo aislamiento de bordes que este archivo ya hace con `pedidos`, `recetas` y `asignaciones`,
+// y con dobles que FALLAN, que TENSAN lo afirmado en vez de relajarlo: esta suite no consulta
+// usuarios ni grupos.
+// La pagina vacia se construye DENTRO de cada factoria: `vi.mock` se iza por encima de los
+// `const` del modulo, y una constante compartida aqui arriba seria una trampa de zona muerta.
+vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => ({
+  listUsersAction: vi.fn(async () => ({
+    status: 'success' as const,
+    data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 },
+  })),
+}));
+
+vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => ({
+  listWorkGroupsAction: vi.fn(async () => ({
+    status: 'success' as const,
+    data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 },
+  })),
+}));
+
+vi.mock('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions', () => {
+  const noDebeInvocarse = (nombre: string) => () => {
+    throw new Error(`${nombre} no debe invocarse desde este archivo`);
+  };
+  return {
+    assignResponsiblesAction: vi.fn(noDebeInvocarse('assignResponsiblesAction')),
+    unassignResponsibleAction: vi.fn(noDebeInvocarse('unassignResponsibleAction')),
+    removeWorkGroupFromOrderAction: vi.fn(noDebeInvocarse('removeWorkGroupFromOrderAction')),
+    listOrderResponsiblesAction: vi.fn(noDebeInvocarse('listOrderResponsiblesAction')),
+    // QC-102 T11: la consulta EN LOTE **SI** se invoca —la seccion de lista la pide una vez por
+    // pagina—, asi que su doble RESUELVE en vez de lanzar. Devuelve el lote vacio: estos archivos
+    // no afirman nada sobre responsables, y con el lote vacio la columna pinta su marcador de
+    // ausencia sin cambiar una sola asercion de aqui.
+    listResponsiblesForOrdersAction: vi.fn(async () => ({ status: 'success', data: [] })),
+  };
+});
+
 vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   listOrdersAction: listOrdersActionMock,
   createOrderAction: createOrderActionMock,

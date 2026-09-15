@@ -4,10 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useTransition } from 'react';
 
 import { DataTable, type DataTableParams, type DataTableTexts } from '@/components/shared/data-table';
+import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { OrderSummary } from '@/lib/modules/pedidos';
 import type { UnitView } from '@/lib/modules/unidades';
 
 import { ORDER_DEFAULT_PINNED_COLUMNS, buildOrderColumns } from './order-columns';
+import type { OrderResponsiblesCatalog } from './order-responsibles';
 import { orderListHref } from './order-list-params';
 import type { RecipePickerPage } from './recipe-picker';
 
@@ -90,14 +92,33 @@ export type OrderTableProps = {
    */
   readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
+  /**
+   * QC-102 R16 — los responsables de la pagina, **ya repartidos por fila en el SERVIDOR**: un
+   * `Record` plano y serializable. La tabla solo lo atraviesa hasta la celda; aqui no se agrupa,
+   * no se ordena y no se pide nada.
+   */
+  readonly responsiblesByOrder?: Readonly<Record<string, readonly OrderResponsible[]>>;
+  /** QC-102 R27, R28 — catalogos y `canWrite` del panel, tambien de paso. */
+  readonly responsiblesCatalog?: OrderResponsiblesCatalog;
 };
 
-export function OrderTable({ orders, params, totalPages, recipes, units }: OrderTableProps) {
+export function OrderTable({
+  orders,
+  params,
+  totalPages,
+  recipes,
+  units,
+  responsiblesByOrder,
+  responsiblesCatalog,
+}: OrderTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   // Las columnas se construyen con sus dependencias (`buildOrderColumns`). `useMemo` para que la
   // identidad del array no cambie en cada render y la tabla compartida no se reconstruya entera.
-  const columns = useMemo(() => buildOrderColumns({ recipes, units }), [recipes, units]);
+  const columns = useMemo(
+    () => buildOrderColumns({ recipes, units, responsiblesByOrder, responsiblesCatalog }),
+    [recipes, units, responsiblesByOrder, responsiblesCatalog],
+  );
 
   /*
     La navegacion va DENTRO de una transicion (`startTransition`), y su `isPending` es la senal de

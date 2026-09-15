@@ -285,7 +285,7 @@
       "epic_name": "Identidad y acceso",
       "name": "registro-de-sesiones",
       "description": "Hoy cerrar sesion retira la cookie del navegador, pero el codigo de sesion sigue siendo valido hasta que caduque: una copia hecha antes seguiria funcionando. Hace falta que cerrar sesion invalide el codigo de verdad, y poder cerrar todas las sesiones abiertas de un usuario desde cualquiera de sus dispositivos. Solo el mecanismo y sus operaciones: sin pantalla.\n\nLas dos acciones NO son la misma y se resuelven distinto. Cerrar sesion en un dispositivo cierra SOLO ese dispositivo: quien sale en el movil sigue dentro en la oficina. En cambio cerrar todas las sesiones las cierra todas, incluida la actual. Y cuando el cierre lo ordena un administrador sobre otro usuario es SIEMPRE total, nunca una sesion suelta: el administrador no elige dispositivo.\n\nCambiar el rol de alguien o darlo de baja tambien corta todas sus sesiones en el acto, y tiene que volver a entrar. Eso cierra la deuda que dejo escrita la ficha de proteccion de rutas privadas, donde el rol viaja firmado dentro del codigo de sesion y hasta hoy un cambio de rol tardaba en surtir efecto lo que tardara la sesion en caducar.\n\nSi el sistema no puede comprobar si una sesion fue cerrada -porque la base no responde, o porque falle la memoria rapida cuando exista- la sesion se trata como invalida y la persona vuelve al login. Ante la duda se corta: una revocacion que se puede saltar provocando un fallo no es una revocacion.\n\nEl administrador puede cerrar las sesiones de otro usuario; el permiso se comprueba en el servicio y lleva su prueba.\n\nQue el usuario pueda VER la lista de sus dispositivos abiertos y cerrar uno concreto de la lista NO entra, y no habra ficha para ello: se descarto a proposito porque obliga a una lectura por peticion sin dar nada que no de el cierre total. Los botones tampoco entran aqui: el del usuario va en ficha aparte. Guardar en memoria rapida la comprobacion va en la ficha de cache de sesion.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "high",
       "zone": "backend",
@@ -1124,7 +1124,7 @@
       "epic_name": "Plataforma",
       "name": "aislamiento-de-la-base-en-tests-de-integracion",
       "description": "Los tests de integracion corren contra UNA base real compartida y no limpian lo que dejan, asi que una corrida encuentra las filas de la anterior y falla por ellas.\n\nEL CASO MEDIDO, en el gate completo del 2026-09-07 sobre dev: tests/integration/pedidos/order-repository.int.test.ts revienta con \"Raw query failed. Code: 23505. Message: Ya existe la llave (order_year, order_sequence)=(2882, 1)\". El correlativo del pedido choca con una fila que ya estaba.\n\nQUE DEMUESTRA QUE NO ES UN FALLO DE LA REGLA DEL CORRELATIVO: el archivo corrido SOLO pasa 7/7 en 1,5 s. Falla unicamente dentro de la bateria completa. O sea que lo que cambia no es el codigo sino el estado en que cada corrida encuentra la base.\n\nQUE DESCARTA EL PARALELISMO COMO CAUSA: el proyecto `integration` de vitest.config.mts ya corre con fileParallelism: false, y lo hace a proposito -esta escrito ahi- porque estos tests afirman sobre el estado global de una tabla. Aun asi choca, asi que no es que dos archivos corran a la vez: es que el de hoy ve lo que dejo el de ayer.\n\nDE DONDE SALE: se destapo al acotar QC-58 el 2026-09-07 y se dejo FUERA de esa ficha a proposito. QC-58 arregla el PLAZO de los tests (el \"Test timed out in 5000ms\" por maquina cargada); esto es ESTADO RESIDUAL. Son causas distintas y mezclarlas haria que ninguna de las dos se pueda dar por probada.\n\nQUE HAY QUE DECIDIR AL ACOTAR ESTA FICHA, y por eso no trae complexity: si cada corrida arranca de una base limpia, si cada archivo limpia lo suyo al terminar, o si los datos de prueba se generan de forma que no puedan chocar entre corridas. Tambien si cada worktree merece su propia base -el drift de base entre worktrees ya bloqueo cuatro features, y esta anotado en progress/current.md-.\n\nNO ENTRA: cambiar la regla de negocio del correlativo del pedido, que es de QC-33 y no esta rota.\n\nALCANCE CERRADO (2026-09-12, /afinar-feature): base efimera por corrida, creada desde una plantilla ya migrada y sembrada y borrada por la propia corrida; los 23 archivos que hoy no se aislan por si mismos NO se reescriben y entra una guardia que se lo exige a los nuevos; sin dependencia nueva, sobre el Postgres local ya instalado; el gate AVISA -no falla- si la base de desarrollo tiene migraciones pendientes; misma regla en --rapido que en el gate completo; los E2E de Playwright quedan fuera, con motivo; y entra un subcomando que lista y borra las bases de test sin worktree vivo. Las decisiones completas viven en specs/QC-77-aislamiento-de-la-base-en-tests-de-integracion/requirements.md. Complexity evaluada: medium.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
@@ -1205,8 +1205,8 @@
       "epic": "QC-18",
       "epic_name": "Inventario",
       "name": "lote-y-fecha-de-compra",
-      "description": "Cada producto registra el lote al que pertenece y la fecha en que se compro.\n\nEl lote es un texto correlativo ascendente. Si quien da de alta el producto no lo escribe, el sistema se lo asigna solo, continuando la serie. Dos productos de la misma empresa no pueden compartir lote; dos empresas distintas si pueden repetirlo entre ellas.\n\nLa fecha de compra es obligatoria. Si no viene informada al dar de alta, queda la fecha del dia.\n\nDECISIONES YA CERRADAS CON EL HUMANO EL 2026-09-08:\n- El lote lo genera el backend cuando el front no lo manda, nunca el front por su cuenta.\n- La unicidad del lote es POR EMPRESA, no global.\n- La fecha de compra no admite vacio y su valor por defecto es la fecha actual.\n\nDEPENDE DE QC-49 Y NO ES NEGOCIABLE: `products` NO TIENE HOY `company_id` -solo lo tienen `users` y `units`-, asi que la constraint unica por empresa no se puede construir. Esa columna la introduce el aislamiento por empresa en inventario. Meterla aqui seria hacer QC-49 de contrabando dentro de otra ficha.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO: la forma exacta del correlativo -si es un entero formateado, si lleva prefijo, si la serie es por empresa o global- y que valor reciben las filas que ya existen en el backfill de una columna que acaba NOT NULL.",
-      "status": "pending",
+      "description": "Cada entrada de mercancia registra el lote al que pertenece y la fecha en que se compro.\n\nEl lote es un texto correlativo ascendente. Si quien da de alta no lo escribe, el sistema se lo asigna solo, continuando la serie. Dos lotes de la misma empresa no pueden compartir el mismo valor; dos empresas distintas si pueden repetirlo entre ellas. La fecha de compra es obligatoria y, si no viene informada, queda la fecha del dia.\n\nLA PREMISA DE ESTA FICHA ESTABA DEROGADA Y SE CORRIGIO EL 2026-09-13 AL ACOTAR. Se escribio el 2026-09-08 diciendo que el lote es un campo del PRODUCTO y que habia que esperar a que products tuviera company_id. Desde entonces cerro QC-90: el lote YA EXISTE, en product_batches.lot -anulable, sin unicidad y sin correlativo-, un producto puede tener varios lotes, y product_batches ya tiene company_id desde QC-49. La fecha de compra, en cambio, NO EXISTE en ninguna parte: lo que hay es expiry_date, que es otra cosa.\n\nALCANCE CERRADO (2026-09-13, /afinar-feature): los dos campos viven en product_batches y no en products; el correlativo es un NUMERO SIMPLE por empresa y el lote sigue siendo texto; la serie CONTINUA DESDE EL MAS ALTO que ya existe en esa empresa, asi que el generador nunca propone un valor que ya existe; el lote pasa a ser OBLIGATORIO, lo que CAMBIA lo que decidio QC-90, y los que hoy estan vacios se rellenan al migrar por orden de creacion; la fecha de compra admite hoy o antes, NUNCA futura, y las filas existentes reciben su propio created_at; el lote lo genera el BACKEND y nunca el front; y la autorizacion va en el service con inventario.modificar, con identificadores en ingles, borrado logico y fecha civil YYYY-MM-DD, todo heredado.\n\nLO QUE NO ENTRA: la PANTALLA, que es QC-103 y esta bloqueada por esta; el E2E, diferido CON MOTIVO a QC-103, porque aqui la verificacion exigida es INTEGRACION CONTRA BASE REAL -correlativo, unicidad por empresa, backfill y dos altas compitiendo por el mismo numero-; que la existencia salga de los lotes (QC-91) y el ajuste de inventario (QC-92); y consumir el lote -de que lote sale lo despachado, avisos por vencer, que cuenta como lote vivo-, que sigue siendo la pregunta 2 del dominio, abierta.\n\nLas decisiones completas -12 filas, cero preguntas abiertas- viven en specs/QC-81-lote-y-fecha-de-compra/requirements.md. Complexity: medium.",
+      "status": "spec_ready",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
@@ -1272,7 +1272,7 @@
       "epic_name": "Identidad y acceso",
       "name": "pantalla-de-grupos-de-trabajo",
       "description": "La pantalla donde el Administrador ve los grupos de trabajo de su empresa, crea uno, le cambia el nombre, mete y saca personas, y lo borra con confirmacion. Cada grupo muestra cuantas personas tiene y quienes son. Se decide al acotar si es una pantalla propia o una seccion dentro de la pantalla de usuarios (QC-67), que todavia no esta especificada. Las dos opciones son razonables y la decision cambia la ficha, asi que no se da por supuesta aqui. Reutiliza lo que ya existe y no lo vuelve a montar: la tabla de datos compartida (QC-55), busqueda y orden (QC-57), el panel lateral y el dialogo de borrado del patron de QC-45, y el corte por permiso de pantalla de QC-75. Lo que NO entra: el modelo (QC-83) ni los casos de uso (QC-84). Asignar trabajo a un grupo se hace desde la pantalla de pedidos, en QC-87. Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "frontend",
@@ -1307,10 +1307,10 @@
       "epic_name": "Pedidos",
       "name": "asignar-responsables-a-un-pedido",
       "description": "Desde la pantalla de pedidos, el Administrador asigna quien prepara cada pedido: marca personas sueltas, elige uno o varios grupos de trabajo, o mezcla las dos cosas. Y puede desasignar. El listado de pedidos y el detalle muestran a los responsables como un grupo de avatares. Cuando la asignacion vino de un grupo de trabajo, se muestra el NOMBRE DEL GRUPO junto a los avatares de sus personas, no solo las caras sueltas: quien mira el tablero tiene que poder distinguir \"Turno noche\" de cinco personas elegidas a mano. Un pedido cancelado no admite asignacion nueva. Que pasa con la asignacion de un pedido ya entregado se decide al acotar. Reutiliza la tabla de datos compartida (QC-55) y la pantalla de pedidos de QC-35, que no se rehace. Lo que NO entra: la tabla de asignacion (QC-86), que esta ficha consume. El listado del Operador va en QC-88. Nace el 2026-09-08 al acotar QC-63 con /afinar-feature.",
-      "status": "pending",
+      "status": "done",
       "sdd": true,
-      "complexity": null,
-      "zone": "fullstack",
+      "complexity": "medium",
+      "zone": "backend",
       "branch": "feature/QC-87-asignar-responsables-a-un-pedido",
       "depends_on": [
         "QC-86",
@@ -1405,10 +1405,10 @@
       "epic": "QC-17",
       "epic_name": "Identidad y acceso",
       "name": "aterrizaje-sin-permiso-de-modulo",
-      "description": "Los casos E2E que afirman «un usuario que no es Administrador acaba FUERA y no ve el catalogo» quedaron sin premisa, y al menos uno esta ROJO en dev.\n\nNace el 2026-09-10, al revisar QC-90. QC-75 retiro la regla ruta -> rol (route-access.ts) y desde entonces el login aterriza en el PRIMER ITEM VISIBLE DEL MENU: un Operador acaba en /inventario, asi que el waitForURL(DASHBOARD_ROUTE) del caso no se cumple nunca.\n\nEL CASO NO AFIRMA NADA HOY, Y ESO ES LO GRAVE: es un E2E de PERMISOS. Mientras siga rojo por una premisa derogada, nadie sabe si la proteccion que deberia vigilar sigue en pie.\n\nEl patron esta repetido en TRES suites: e2e/inventario.spec.ts:306 (R4, el confirmado rojo), e2e/pedidos.spec.ts:443 (R49) y e2e/proveedores.spec.ts:463 (R52).\n\nNO se arreglo dentro de QC-90 porque esa rama no toca identity, ni la navegacion, ni route-access.ts. Ademas ./init.sh NO corre Playwright, asi que esto no enrojece el gate.\n\nQUEDA ABIERTO: a donde aterriza quien no es Administrador y si se afirma por ruta concreta o por «el primer item visible de SU menu»; que afirma ahora cada uno de los tres casos; y si hace falta un caso para quien no tiene NINGUN permiso de modulo.",
-      "status": "pending",
+      "description": "Los casos E2E que afirman «un usuario que no es Administrador acaba FUERA y no ve el catalogo» quedaron sin premisa, y al menos uno esta ROJO en dev.\n\nNace el 2026-09-10, al revisar QC-90. QC-75 retiro la regla ruta -> rol (route-access.ts) y desde entonces el login aterriza en el PRIMER ITEM VISIBLE DEL MENU: un Operador acaba en /inventario, asi que el waitForURL(DASHBOARD_ROUTE) del caso no se cumple nunca.\n\nEL CASO NO AFIRMA NADA HOY, Y ESO ES LO GRAVE: es un E2E de PERMISOS. Mientras siga rojo por una premisa derogada, nadie sabe si la proteccion que deberia vigilar sigue en pie.\n\nEl patron esta repetido en TRES suites: e2e/inventario.spec.ts:306 (R4, el confirmado rojo), e2e/pedidos.spec.ts:443 (R49) y e2e/proveedores.spec.ts:463 (R52).\n\nNO se arreglo dentro de QC-90 porque esa rama no toca identity, ni la navegacion, ni route-access.ts. Ademas ./init.sh NO corre Playwright, asi que esto no enrojece el gate.\n\nQUEDA ABIERTO: a donde aterriza quien no es Administrador y si se afirma por ruta concreta o por «el primer item visible de SU menu»; que afirma ahora cada uno de los tres casos; y si hace falta un caso para quien no tiene NINGUN permiso de modulo.\n\nEL DANO ES MAYOR DE LO QUE DECIA ESTA FICHA (corregido el 2026-09-13 al acotar): son CUATRO los casos de «acaba fuera», no tres -falta e2e/recetas.spec.ts:376 (R6)-, y la suite E2E completa da 23 FALLOS sobre base limpia, repartidos por trece suites, todos por la misma causa raiz.\n\nALCANCE CERRADO (2026-09-13, /afinar-feature): se arreglan los 23, no solo los cuatro; el destino se afirma DERIVANDOLO del menu filtrado por los permisos de ese usuario y no con una ruta fija; el patron se centraliza en UN HELPER unico que usan las trece suites; entra un caso nuevo en login.spec.ts para quien no tiene NINGUN permiso de modulo; NO se toca el permiso del rol Operador; si aparece un agujero REAL de permisos se PARA y se reporta con ficha propia; el aterrizaje y el 404 se heredan de QC-75 y QC-90; y la verificacion es la SUITE E2E COMPLETA en Chromium y WebKit sobre base limpia, escrita en el PR. Las decisiones completas viven en specs/QC-93-aterrizaje-sin-permiso-de-modulo/requirements.md. Complexity evaluada: medium.\n\nABSORBE el hallazgo de los 23 fallos reportado por la sesion de QC-85 el 2026-09-13, que no tenia ficha.",
+      "status": "spec_ready",
       "sdd": true,
-      "complexity": null,
+      "complexity": "medium",
       "zone": "fullstack",
       "branch": "feature/QC-93-aterrizaje-sin-permiso-de-modulo",
       "depends_on": [],
@@ -1507,6 +1507,40 @@
         "QC-84"
       ],
       "spec_path": "specs/QC-100-conteo-de-miembros-de-un-grupo"
+    },
+    {
+      "key": "QC-102",
+      "id": 102,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "responsables-en-la-pantalla-de-pedidos",
+      "description": "Ver y gestionar los responsables de un pedido desde la pantalla de pedidos. Nacio el 2026-09-12 como la mitad de PANTALLA de QC-87, y al acotarla el 2026-09-13 CRECIO A FULLSTACK: pintar responsables en el listado necesita una pieza de backend que QC-87 no dejo hecha. EL LISTADO muestra por fila hasta TRES iniciales y un +N, con tooltip que lista por nombre a los que faltan. EL DETALLE Y EL PANEL los muestran todos, sin limite, agrupados por su origen y con EL NOMBRE DEL GRUPO cuando la asignacion vino de uno. Un avatar aqui es un CIRCULO CON INICIALES, sin foto: la proyeccion de salida de QC-87 tiene tres claves y ninguna imagen. getInitials, avatar.tsx y tooltip.tsx ya existen en disco. EL TROZO DE BACKEND QUE ENTRA: una consulta de responsables para VARIOS pedidos a la vez, en el modulo asignaciones. El listado se compone con UNA consulta en lote por pagina, igual que hoy se compone el nombre de la receta en list-orders.ts. NI UN JOIN -R53 y QC-33 R31/R32 lo prohiben- NI UNA CONSULTA POR FILA. El nombre del grupo no necesita join: QC-86 lo congelo dentro de la fila. LOS RESPONSABLES VIVEN EN EL ORDER-SHEET que ya existe, como una seccion, mas una entrada propia Responsables en las acciones de la fila. El panel permite marcar personas sueltas, aplicar grupos, quitar a una persona y QUITAR UN GRUPO ENTERO. Ver los responsables basta con poder ver pedidos: quien consulta pero no tiene asignaciones.modificar abre el panel EN SOLO LECTURA. En un pedido ENTREGADO o CANCELADO los controles de asignar no aparecen. Al abrir el panel NO se consulta de nuevo: la fila ya trae sus responsables. El refresco es router.refresh(), sin revalidatePath. Reutiliza QC-55, QC-57 y la pantalla de pedidos de QC-35, que NO se rehace. Ninguna libreria nueva. El E2E del recorrido completo entra aqui, y ya estaba definido en QC-87 dec. 11 incluyendo el listado. Lo que NO entra: los casos de uso (QC-87, hecho), el modelo (QC-86, hecho) y el listado del Operador (QC-88). Las decisiones cerradas viven en specs/QC-102-responsables-en-la-pantalla-de-pedidos/requirements.md.",
+      "status": "in_progress",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "fullstack",
+      "branch": "feature/QC-102-responsables-en-la-pantalla-de-pedidos",
+      "depends_on": [
+        "QC-87"
+      ],
+      "spec_path": "specs/QC-102-responsables-en-la-pantalla-de-pedidos"
+    },
+    {
+      "key": "QC-103",
+      "id": 103,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "lote-y-fecha-de-compra-en-el-alta",
+      "description": "El panel de alta de producto muestra la fecha de compra y el lote, que hoy no ensena ninguno de los dos.\n\nNACE EL 2026-09-13 AL ACOTAR QC-81, que dejo la pantalla fuera a proposito para no cruzar de zona. QC-81 deja el modelo, la generacion del correlativo y las reglas funcionando y verificadas contra base real; aqui se ven y se escriben. Mismo reparto que se hizo con QC-87 y QC-102.\n\nQUE ENTRA: el campo de FECHA DE COMPRA en el panel de alta -obligatorio, con hoy por defecto y sin admitir fechas futuras-; el campo de LOTE, que ya existe, pasa a explicar que si se deja vacio lo asigna el sistema; mostrar el lote que quedo asignado despues de dar de alta; y EL E2E, que QC-81 difirio EXPRESAMENTE hasta aqui porque es donde por primera vez hay un recorrido que mirar.\n\nQUE NO ENTRA: toda la mitad backend, que es QC-81 y la bloquea; un listado de lotes o cualquier pantalla nueva -esto es el panel de alta que ya existe desde QC-90-; y la edicion del producto, que no conoce el lote (decision de QC-90).\n\nQUEDA POR ACOTAR: si el lote asignado se muestra en un aviso al terminar o en un sitio fijo de la pantalla, y que se ve mientras el sistema lo esta generando. Se cierra con /afinar-feature cuando le toque.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-103-lote-y-fecha-de-compra-en-el-alta",
+      "depends_on": [
+        "QC-81"
+      ],
+      "spec_path": "specs/QC-103-lote-y-fecha-de-compra-en-el-alta"
     }
   ]
 }

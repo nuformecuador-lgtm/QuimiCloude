@@ -376,14 +376,23 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // `components/shared/data-table/`-. No estrena pantalla: la pestana vive dentro de la de usuarios,
   // que ya estaba en esta lista. Se anade la fila y se TENSA el centinela, nunca se afloja: un
   // NOVENO spec que referencie `data-table` vuelve a ponerlo en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos ocho', () => {
+  //
+  // AMPLIADA POR SEXTA VEZ el 2026-09-13 (QC-102, responsables-en-la-pantalla-de-pedidos, T16, R37):
+  // entra la NOVENA entrada, `e2e/pedidos-responsables.spec.ts`, por la MISMA via que la sexta: no
+  // estrena pantalla, recorre la de PEDIDOS, que ya estaba en esta lista desde QC-35. Su E2E abre un
+  // pedido, marca a una persona, aplica un grupo, saca a alguien y vuelve al LISTADO a comprobar los
+  // avatares de la fila y el nombre del grupo CONGELADO; por eso localiza `data-table-row-<id>` y
+  // las celdas: la lista de pedidos ES la tabla compartida. Se anade la fila y se TENSA el
+  // centinela, nunca se afloja: la lista sigue CERRADA, el E2E de recetas sigue fuera y un DECIMO
+  // spec que referencie `data-table` vuelve a ponerla en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos nueve', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
       .filter((file) => /data-table/.test(readSource(file)))
       .map((file) => relative(repoRoot, file).split(sep).join('/'))
       .sort()
-    expect(referencian, 'solo estos ocho E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos nueve E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
       // ya consumen la tabla compartida -inventario y presentaciones- y localiza
       // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
@@ -393,6 +402,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // La OCTAVA la trae QC-85 el 2026-09-12 (R42): ver la nota de arriba.
       'e2e/grupos-de-trabajo.spec.ts',
       'e2e/inventario.spec.ts',
+      // La NOVENA la trae QC-102 el 2026-09-13 (T16, R37): ver la nota de arriba. Va antes que
+      // `e2e/pedidos.spec.ts` porque la lista esta ORDENADA y '-' precede a '.'.
+      'e2e/pedidos-responsables.spec.ts',
       'e2e/pedidos.spec.ts',
       // La CUARTA entrada la trae QC-45 el 2026-09-07: su E2E localiza la tabla compartida porque
       // la pantalla de presentaciones la consume (QC-45 R8, R36). La lista sigue CERRADA: un

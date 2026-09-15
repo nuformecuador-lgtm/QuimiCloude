@@ -3,6 +3,9 @@
 // Prohibido importar adaptadores driving desde aqui: la flecha va driving -> composicion (R12).
 import {
   createCredentialPolicy,
+  createEndAllSessions,
+  createEndOtherSessions,
+  createEndSession,
   createResolveSession,
   createVerifyCredentials,
   seedInitialAccess,
@@ -32,6 +35,26 @@ import type { SessionProvider } from '@/lib/modules/identity/ports/session-provi
 import type { SessionReader } from '@/lib/modules/identity/ports/session-reader';
 import type { SessionUserReader } from '@/lib/modules/identity/ports/session-user-reader';
 import type { SessionWriter } from '@/lib/modules/identity/ports/session-writer';
+// QC-23 T5 — la fabrica del identificador de sesion. El cableado COMPLETO de la ficha (los tres
+// casos de uso nuevos, el eraser, el repositorio de revocaciones y el log) es T17; aqui solo se
+// ata este puerto, que es el que `verifyCredentials` necesita para poder emitir un `sid` (R2).
+import { sessionIdCrypto } from '@/lib/modules/identity/adapters/driven/session/session-id-crypto';
+import type { SessionIdFactory } from '@/lib/modules/identity/ports/session-id-factory';
+// QC-23 T10 — el registro del servidor de la comprobacion de sesion. Se cablea AQUI, y no en
+// T17, porque `createResolveSession` lo exige desde ya: sin el, el `catch` que falla cerrado
+// (R16, R17) quedaria vacio y el arbol no compilaria. El resto del cableado de la ficha sigue
+// siendo T17.
+import { createSessionCheckLogConsole } from '@/lib/modules/identity/adapters/driven/observability/session-check-log-console';
+import type { SessionCheckLog } from '@/lib/modules/identity/ports/session-check-log';
+// QC-23 T17 (`design.md > 8`) — lo que falta del cableado de la ficha: el almacen de la
+// revocacion y el puerto que retira la cookie. Solo adaptadores DRIVEN y contratos de modulo:
+// `lib/composition` no importa ningun driving (R46).
+import {
+  revokeSession,
+  stampAll,
+} from '@/lib/modules/identity/adapters/driven/persistence/session-revocation-prisma';
+import type { SessionEraser } from '@/lib/modules/identity/ports/session-eraser';
+import type { SessionRevocationRepository } from '@/lib/modules/identity/ports/session-revocation-repository';
 import type { UserCredentialsReader } from '@/lib/modules/identity/ports/user-credentials-reader';
 import {
   createCreatePresentation,
@@ -237,6 +260,7 @@ import type { WorkGroupRepository } from '@/lib/modules/identity/ports/work-grou
 import {
   createAssignResponsibles,
   createListOrderResponsibles,
+  createListResponsiblesForOrders,
   createRemoveWorkGroupFromOrder,
   createUnassignResponsible,
 } from '@/lib/modules/asignaciones';
@@ -258,18 +282,65 @@ const loginAttemptRecorder: LoginAttemptRecorder = {
   set: setLoginAttempt,
 };
 const sessionWriter: SessionWriter = { startSession };
+// QC-23 T5 (R1, R2): el UNICO sitio donde `SessionIdFactory` se ata a su implementacion.
+const sessionIds: SessionIdFactory = sessionIdCrypto;
 const sessionReader: SessionReader = { readClaims: readSessionClaims };
 const sessionUserReader: SessionUserReader = { findActiveById: findActiveSessionUserById };
 // QC-48 (T8, `design.md > 6`): UNA SOLA instancia de la cadena de cortes, y de ella salen las DOS
 // salidas. Dos construcciones serian dos cableados que pueden divergir —mismo criterio que
 // `checkCredentialPolicy` en QC-19— y con ellos dos definiciones de «hay sesion», que es
 // justamente lo que R21 prohibe.
-const resolveSession = createResolveSession({ session: sessionReader, users: sessionUserReader });
+// QC-23 T10 (R16, R17): el UNICO sitio donde `SessionCheckLog` se ata a su implementacion. La
+// LECTURA de la cabecera del identificador de peticion entra por parametro en el adaptador —no en
+// el dominio—, que es el reparto que fijo QC-71 R9 para el traductor unico de errores.
+const sessionCheckLog: SessionCheckLog = createSessionCheckLogConsole(readRequestIdHeader);
+const resolveSession = createResolveSession({
+  session: sessionReader,
+  users: sessionUserReader,
+  log: sessionCheckLog,
+});
+// ---------------------------------------------------------------------------------------
+// QC-23 T17 (`design.md > 8`) — el cableado de la revocacion de sesiones. Bloque NUEVO: no
+// reordena ni reformatea ninguna de las lineas de arriba. `resolveSession` se sigue
+// construyendo UNA SOLA VEZ y de esa unica instancia salen las DOS proyecciones (QC-48 R21):
+// esa estructura no se toca.
+//
+// Va AQUI, entre dos bloques existentes, y NO al final del archivo, por la MISMA razon de
+// EJECUCION que dejo escrita QC-66 unas lineas mas abajo: `sessionProvider` y el objeto
+// `identity` se evaluan en su propia linea, asi que una constante declarada despues estaria en
+// su zona muerta y el modulo reventaria al cargarse. Es una desviacion de la LETRA de
+// `design.md > 8` -«un bloque al final»- y no de su fondo: no se toca nada de lo que ya habia.
+//
+// Los dos puertos se atan a su implementacion AQUI y solo aqui (R46).
+// ---------------------------------------------------------------------------------------
+
+/** R22 — retirar la cookie, con el MISMO `clearSession` que hasta hoy se cableaba directo a la
+ *  fachada. No cambia el adaptador: cambia quien lo llama (`design.md > 5.1`). */
+const sessionEraser: SessionEraser = { clear: clearSession };
+
+/** El almacen de la revocacion (R10, R25, R39): las dos escrituras transaccionales, cada una con
+ *  su purga dentro. Sin ningun metodo de listado, que es la decision cerrada 12 escrita en el
+ *  TIPO. El UNICO archivo del repo con `prisma.revokedSession` es su adaptador; aqui solo se
+ *  elige que sea el. */
+const sessionRevocations: SessionRevocationRepository = { revokeSession, stampAll };
+
 const sessionProvider: SessionProvider = {
   getSessionUser: async () => (await resolveSession())?.user ?? null,
   // R19: `null` en exactamente los mismos casos que `getSessionUser`, por construccion.
   getSessionContext: async () => (await resolveSession())?.context ?? null,
-  endSession: clearSession,
+  // QC-23 T17 (R20-R24, `design.md > 5.1`): `endSession` DEJA DE SER un cableado directo a
+  // `clearSession` y pasa a ser el CASO DE USO, que lee el `sid` en curso, registra su cierre
+  // -y purga de paso las caducadas de esa persona- y despues retira la cookie, siempre.
+  //
+  // **La clave conserva su nombre y su firma -sin parametros y sin valor de retorno-, asi que
+  // `logout-action.ts` NO CAMBIA NI UNA LINEA** (R21, contrato congelado por QC-11) y su test
+  // sigue verde sin tocarlo: esa es la red de esta migracion. Cambia el EFECTO, no la firma.
+  endSession: createEndSession({
+    session: sessionReader,
+    revocations: sessionRevocations,
+    cookie: sessionEraser,
+    log: sessionCheckLog,
+  }),
 };
 
 // ---------------------------------------------------------------------------------------
@@ -394,6 +465,7 @@ export const identity = {
     attempts: loginAttemptRecorder,
     hasher: passwordHasher,
     session: sessionWriter,
+    ids: sessionIds,
   }),
   passwordHasher,
   ...sessionProvider,
@@ -483,6 +555,22 @@ export const identity = {
     workGroups: workGroupRepository,
     pagination: workGroupMemberPagination,
     log: identityListQueryLog,
+  }),
+  // QC-23 T17 (`design.md > 8`) — los DOS casos de uso de cierre en bloque, ya cableados. Claves
+  // NUEVAS al FINAL del objeto: ninguna de las de arriba se toca.
+  //
+  // El ACTOR NO se resuelve aqui, mismo criterio que los otros seis modulos (R29): cada uno lo
+  // recibe por PARAMETRO y lo construye quien invoque -que hoy no es nadie, y manana sera QC-101
+  // con el boton del administrador y QC-53 con el del usuario (R51)-. `lib/composition` no
+  // conoce cookies ni sesion; solo ata puerto -> adaptador.
+  //
+  // Ninguna de las dos crea pagina, ruta, componente ni Server Action: esa mitad es de otra
+  // ficha, a proposito.
+  endAllSessions: createEndAllSessions({ revocations: sessionRevocations }),
+  endOtherSessions: createEndOtherSessions({
+    revocations: sessionRevocations,
+    sessions: sessionWriter,
+    ids: sessionIds,
   }),
 } as const;
 
@@ -892,6 +980,19 @@ export const asignaciones = {
   // tests que no lo inyectan.
   listOrderResponsibles: createListOrderResponsibles({
     orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    people: peopleDirectory,
+    now: () => new Date(),
+  }),
+  // QC-102 T5 - la QUINTA operacion: los responsables de VARIOS pedidos a la vez, que es lo que
+  // el listado pide una vez por pagina (`QC-102 design.md > 2.5`). MISMO `orderAssignmentRepository`
+  // y MISMO `peopleDirectory` que los otros cuatro casos de uso: ningun adaptador nuevo.
+  //
+  // **SIN `OrderCatalog`**, y no es un olvido: el hallazgo H3 de QC-102 lo deja escrito. Comprobar
+  // que cada pedido de la pagina existe costaria una consulta POR PEDIDO -lo que su R4 prohibe-,
+  // asi que un identificador desconocido devuelve su entrada VACIA (R7). La empresa la sigue
+  // aplicando el puerto con la del actor (R3).
+  listResponsiblesForOrders: createListResponsiblesForOrders({
     assignments: orderAssignmentRepository,
     people: peopleDirectory,
     now: () => new Date(),

@@ -98,6 +98,9 @@ function montar(opts: {
   const assignments = {
     insertMissing: vi.fn(async (rows: readonly NewAssignment[]) => opts.añadidas ?? rows.length),
     listByOrderInCompany: vi.fn(async () => []),
+    // QC-102 T1: el puerto gano un quinto metodo (la consulta EN LOTE). El doble lo declara
+    // para seguir satisfaciendo la interfaz; ningun caso de uso de QC-87 lo invoca.
+    listByOrdersInCompany: vi.fn(async () => []),
     deleteOne: vi.fn(async () => 'ok' as const),
     deleteByWorkGroup: vi.fn(async () => 0),
   };
@@ -597,6 +600,11 @@ function baseEnMemoria(): {
       return added;
     },
     async listByOrderInCompany(): Promise<readonly never[]> {
+      return [];
+    },
+    // QC-102 T1: el quinto metodo del puerto. Este doble en memoria no lo ejercita: la
+    // consulta EN LOTE es de QC-102 y tiene sus propios tests.
+    async listByOrdersInCompany(): Promise<readonly never[]> {
       return [];
     },
     async deleteOne(): Promise<'ok'> {

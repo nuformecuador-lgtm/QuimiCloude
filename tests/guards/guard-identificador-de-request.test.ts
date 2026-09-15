@@ -97,6 +97,15 @@ export const E2E_ESPERADOS = [
   'login-skin.spec.ts',
   'login.spec.ts',
   'pedidos.spec.ts',
+  // QC-102 T16: la E2E de responsables en la pantalla de pedidos (su R37). Alta por el MISMO
+  // motivo y en el MISMO sitio que las de QC-67, QC-85 y QC-49: esta lista es CERRADA y su punto
+  // de extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo se nombra,
+  // uno a uno-. El recorrido que ejercita: abrir un pedido desde las acciones de fila, marcar una
+  // persona responsable, aplicar un grupo de trabajo, sacar a alguien y comprobar EN EL LISTADO
+  // los avatares de los responsables y el nombre del grupo congelado. NO ejercita el cruce borde
+  // -> Server Action del identificador de peticion: entra por la misma puerta que las anteriores
+  // -«otra ficha y otra decision»-, asi que el diferimiento de QC-71 R21 sigue INTACTO.
+  'pedidos-responsables.spec.ts',
   'permisos.spec.ts',
   'presentaciones.spec.ts',
   'proveedores.spec.ts',
@@ -200,6 +209,13 @@ export const MIGRACIONES_ESPERADAS = [
   // persistir ningun identificador de peticion: su SQL no nombra ninguno de
   // `TERMINOS_DEL_IDENTIFICADOR`, que es lo que R19 protege de verdad.
   '20260911130000_inventory_company_scope',
+  // Es de QC-23 (registro de sesiones: el sello `users.sessions_valid_from` y la tabla
+  // `revoked_sessions`), no de QC-71. Se anade aqui por lo mismo que las de arriba: es justo lo
+  // que pide el mensaje de `hallazgosDeMigraciones` -- la ficha que trae la migracion actualiza
+  // esta lista. QC-23 SI usa el identificador de peticion, pero solo para DEJARLO EN EL REGISTRO
+  // DEL SERVIDOR cuando la comprobacion falla (su R17); no lo persiste en ninguna columna, y su
+  // SQL no nombra ninguno de `TERMINOS_DEL_IDENTIFICADOR`, que es lo que R19 protege de verdad.
+  '20260912103000_session_revocation',
 ] as const
 
 export function hallazgosDeMigraciones(

@@ -185,9 +185,17 @@ revokedSessions: { where: { sessionId }, select: { revokedAt: true }, take: 1 }
 | | Hoy | Con QC-23 |
 | --- | --- | --- |
 | Invocaciones del puerto por petición | 1 | **1** |
-| Sentencias SQL de esa invocación | 1 (`users` + `roles` + `role_permissions` + `companies`) | **2**: la de hoy, más un `SELECT revoked_at FROM revoked_sessions WHERE user_id = ? AND session_id = ? LIMIT 1` |
+| Sentencias SQL de esa invocación | **4** (`users`, `roles`, `role_permissions`, `companies` — Prisma resuelve cada relación en su propia consulta y el esquema no activa `relationJoins`) | **5**: las cuatro de hoy, más un `SELECT revoked_at FROM revoked_sessions WHERE user_id = ? AND session_id = ? LIMIT 1` |
 | Filas que devuelve la segunda | — | **0 o 1**, por `revoked_sessions_session_id_key` |
 | Escrituras en el camino de lectura | 0 | **0** (R40) |
+
+> **Correccion del 2026-09-12, posterior a la revision.** La version aprobada de esta tabla decia
+> «Hoy: 1 sentencia SQL». **Estaba mal por un factor de cuatro**, y no por estimacion sino por no
+> haberlo medido: el reviewer instrumento `PrismaClient` con el evento `query` contra la base real
+> y conto **4 sentencias sin QC-23 y 5 con QC-23**. El **delta sigue siendo exactamente +1**, que
+> es lo unico que el argumento de abajo usa, asi que **ninguna decision cambia**. Se corrige el
+> absoluto porque es el numero que **QC-28** va a leer para dimensionar su cache, y partir de una
+> linea de base cuatro veces menor le haria sobrevalorar lo que su cache ahorra.
 
 Es honesto llamarlo lo que es: **una búsqueda por índice único más por petición**. Es aceptable
 porque (a) es un acceso a un btree único que devuelve como mucho una fila, sobre una tabla que la
@@ -482,7 +490,20 @@ por igual, por el camino de redirección que ya existe.
    transiciones sube el sello. Es consecuencia directa de la decisión 1 y se escribe aquí para que
    nadie la descubra de sorpresa; si algún día molesta, es una línea en
    `changeRevokesSessions` y su test.
-4. **Una caída de la base se ve como un cierre de sesión** (§ 4.2). Precio de la decisión 13.
-5. **E2E diferida a QC-53** (R50): deuda con destinatario, no exención.
-6. **El botón del administrador no existe hasta QC-101** (R51): la operación queda implementada,
+4. **Entrar en el MISMO segundo en que sube el sello rebota al login, y se cura solo** (añadido el
+   2026-09-12, tras la revisión: es consecuencia directa del `<=` de § 2.3 y esta lista no la
+   enumeraba). `isStampedOut` es `<=` e `iat` viaja truncado al segundo, así que un login que
+   ocurra en el **mismo segundo** en que subíó el sello de esa persona —cambio de rol, bloqueo,
+   borrado o el enlace de QC-79— emite una cookie que su **primera** petición ya rechaza: vuelve al
+   login y el segundo intento entra. La ventana es de menos de un segundo y no deja a nadie fuera
+   de forma duradera. **Es el precio correcto**: la alternativa es el `<` estricto, que deja
+   sobrevivir una sesión ajena emitida en el segundo del corte —descartada en § 2.3 y por la
+   decisión cerrada 13—. Hoy **nadie la pisa**, y está comprobado: `applyCredentialAndActivate` no
+   invoca `startSession`, así que consumir el enlace de QC-79 no hace auto-login. **QC-89 y QC-96
+   heredan este borde** el día que decidan entrar a la persona justo después de cambiarle la
+   contraseña; la salida, si alguna vez molesta, es la misma que usa R31: emitir con
+   `firstIssuedAtAfterStamp(sello)` en vez de con `now`.
+5. **Una caída de la base se ve como un cierre de sesión** (§ 4.2). Precio de la decisión 13.
+6. **E2E diferida a QC-53** (R50): deuda con destinatario, no exención.
+7. **El botón del administrador no existe hasta QC-101** (R51): la operación queda implementada,
    probada y sin ninguna vía de invocación desde la interfaz.

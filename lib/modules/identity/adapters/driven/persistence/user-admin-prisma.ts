@@ -8,6 +8,7 @@ import { USER_ACCOUNT_STATUSES } from '../../../domain/account-status';
 import { NO_CREDENTIAL_SENTINEL } from '../../../domain/credential-setup-link';
 import { buildDisplayName } from '../../../domain/display-name';
 import { ROLE_ADMINISTRADOR } from '../../../domain/roles';
+import { changeRevokesSessions, floorToSecond } from '../../../domain/session-revocation';
 
 import { insensitiveContainsCondition, selectCondition } from './list-query-sql';
 
@@ -46,10 +47,12 @@ import type {
  *      indice: ver el bloque de constantes, que deja escrito lo que la base devuelve DE VERDAD.
  *   4. **El borrado es LOGICO** (R37): un `UPDATE` de `deleted_at`. En este archivo no hay —ni puede
  *      haber— ningun `delete`/`deleteMany` sobre `users`.
- *   5. **R45: ninguna de las cinco operaciones lee ni escribe los tres contadores de acceso de
- *      QC-19.** Sus nombres de columna no aparecen en este archivo —ni en ningun `select`, ni en
- *      ningun `data`, ni en un comentario— a proposito: el mecanismo de bloqueo por intentos fallidos
- *      es de QC-19/QC-78, y esta feature no lo toca.
+ *   5. **Los tres contadores de acceso de QC-19 los escribe SOLO `applyGuardedChange`, y solo
+ *      cuando el destino del estado no es `blocked`** (QC-95, enmienda R45 de QC-66): el cambio
+ *      de estado los limpia en la MISMA escritura. `create`, `updateAliveInCompany`,
+ *      `findAliveInCompany` y `listAliveInCompany` no los leen ni los escriben —sus
+ *      nombres de columna no aparecen en ningun `select` de este archivo—; el mecanismo de
+ *      bloqueo por intentos fallidos es de QC-19/QC-78, y esas cuatro operaciones no lo tocan.
  *
  * **R38/R43: no se toca ningun objeto del esquema.** Los tres indices unicos funcionales y parciales
  * de QC-47 se consumen tal cual; esta feature no aporta ninguna migracion de esquema.
@@ -580,6 +583,36 @@ function wouldLeaveNoAdministrator(
 }
 
 /**
+ * QC-23 T14 (R33, R34, R35, R36, R38) — el trozo de `data` que sube el sello «sesiones validas
+ * desde», o **nada**.
+ *
+ * Devuelve un objeto que se ESPARCE dentro del `data` del `UPDATE` que ya existe, y esa es toda la
+ * gracia: el sello no viaja en una segunda escritura ni en una segunda transaccion, sino como una
+ * columna mas del **MISMO** `UPDATE`. Si la escritura no se confirma, el sello no sube; si el sello
+ * no puede subir, la escritura no se confirma (R38). Por eso aqui no hay ningun caso de uso
+ * «revocar»: serian dos escrituras sobre la misma fila y una ventana en la que la cuenta ya esta
+ * bloqueada pero sus cookies todavia valen (`design.md > 5.5`).
+ *
+ * **La DECISION no vive aqui**: vive en `changeRevokesSessions`, funcion pura del dominio, que es
+ * quien sabe que `blocked` e `inactive` cortan, que `pending` y `active` no (R36), que el rol corta
+ * solo si cambio de verdad (R35) y que el borrado corta siempre (R34). Un driven puede importar su
+ * propio `domain/` (`docs/architecture.md > La regla de dependencias`), asi que la regla sigue
+ * estando en un solo sitio testeable con objetos planos.
+ *
+ * **Truncado al segundo** (`floorToSecond`, `design.md > 2.3`): `iat` viaja en segundos dentro del
+ * contenido firmado, y mezclar granularidades dejaria un hueco de hasta 999 ms.
+ *
+ * El objeto vacio cuando no corta no es un detalle de estilo: escribir `sessions_valid_from` con su
+ * valor actual seria una escritura igual, y reactivar una cuenta NO debe tocar el sello (R37).
+ */
+function sessionStampFor(
+  change: Parameters<typeof changeRevokesSessions>[0],
+  now: Date,
+): { readonly sessionsValidFrom?: Date } {
+  return changeRevokesSessions(change) ? { sessionsValidFrom: floorToSecond(now) } : {};
+}
+
+/**
  * `updateAliveInCompany` del puerto (R19, R20, R22, R33, R34): **REEMPLAZO COMPLETO** de los nueve
  * campos editables, nunca un PATCH campo a campo.
  *
@@ -637,11 +670,36 @@ export async function updateAliveInCompany(
       return 'last_administrator';
     }
 
+    // 3 bis. QC-23 T14 (R35, R38): ¿el rol cambia DE VERDAD? R19 es reemplazo completo y casi toda
+    // edicion reescribe el mismo `role_id`, asi que cortar por el mero hecho de aparecer en el
+    // `data` echaria a la persona cada vez que un administrador le corrige el telefono. Hace falta
+    // el rol ACTUAL para saberlo, y se lee DENTRO de la misma transaccion, nunca antes de abrirla.
+    //
+    // La lectura no necesita su propio `FOR UPDATE`: toda edicion de un usuario de esta empresa
+    // -esta y `applyGuardedChange`- pasa primero por `lockActiveAdministratorIds`, que serializa
+    // las transacciones de la empresa detras del mismo conjunto de filas. El hueco declarado, para
+    // que nadie lo descubra de sorpresa: si la empresa no tiene NINGUN administrador en `active`,
+    // ese conjunto esta vacio, no bloquea nada y dos ediciones simultaneas del mismo usuario
+    // podrian leer el mismo rol previo. El peor efecto posible es no subir el sello en una de las
+    // dos, que es exactamente el estado en el que ya se queda una edicion que no cambia el rol.
+    //
+    // Si la fila no existe, esta borrada o es de otra empresa, `current` es `null`: no hay cambio
+    // de rol que sellar y el `updateMany` de abajo responde `'not_found'` por su propio `where`.
+    const current = await tx.user.findFirst({
+      where: { id, companyId, deletedAt: null },
+      select: { roleId: true },
+    });
+    const roleStamp = sessionStampFor(
+      { kind: 'role', changed: current !== null && current.roleId !== data.roleId },
+      now,
+    );
+
     // 4. La escritura, en la MISMA transaccion que el bloqueo.
     try {
       const { count } = await tx.user.updateMany({
         where: { id, companyId, deletedAt: null },
         data: {
+          ...roleStamp,
           firstNames: data.firstNames,
           lastNames: data.lastNames,
           birthDate: data.birthDate,
@@ -687,8 +745,11 @@ export async function updateAliveInCompany(
  * autor. Aqui el autor nunca es nulo —el `NULL` de QC-65 R10 es solo el del nacimiento de la cuenta
  * (R49)—.
  *
- * Los tres contadores de acceso de QC-19 no se tocan (R45): ni se leen ni se escriben, ni aparecen
- * por su nombre. Limpiarlos al salir de `blocked` es de QC-78, duena de ese mecanismo.
+ * **Los tres contadores de acceso de QC-19 se escriben aqui SOLO cuando el destino no es
+ * `blocked`** (QC-95, enmienda R45 de QC-66): al salir de `blocked`, la misma escritura
+ * que mueve el estado limpia los tres a la vez (cero, cero, null, via `clearedLockState`).
+ * Cuando el destino es `blocked`, `lockState` llega `null` y las tres columnas
+ * no aparecen en el `data` (R2).
  */
 export async function applyGuardedChange(input: GuardedChange): Promise<GuardedOutcome> {
   return prisma.$transaction(async (tx) => {
@@ -707,18 +768,36 @@ export async function applyGuardedChange(input: GuardedChange): Promise<GuardedO
       return 'last_administrator';
     }
 
+    // 3 bis. QC-23 T14 (R33, R34, R36, R38): el sello, decidido por la funcion pura del dominio.
+    // El borrado corta siempre; el estado corta en `blocked` e `inactive` y NO en `pending` ni en
+    // `active`. Va esparcido en el `data` de abajo, en el MISMO `UPDATE` y la MISMA transaccion:
+    // si esta aborta -por `last_administrator` o por lo que sea-, el sello tampoco subio.
+    const sessionStamp = sessionStampFor(
+      input.kind === 'delete'
+        ? { kind: 'delete' }
+        : { kind: 'account_status', next: input.accountStatus },
+      input.now,
+    );
+
     // 4. La escritura, en la MISMA transaccion. `updateMany` con el ambito completo en el `where`
     // (R33, R34): un objetivo inexistente, borrado o de otra empresa da `count === 0`.
     const { count } = await tx.user.updateMany({
       where: { id: input.id, companyId: input.companyId, deletedAt: null },
       data:
         input.kind === 'delete'
-          ? { deletedAt: input.now, updatedAt: input.now }
+          ? { ...sessionStamp, deletedAt: input.now, updatedAt: input.now }
           : {
+              ...sessionStamp,
               accountStatus: input.accountStatus,
               accountStatusChangedAt: input.now,
               accountStatusChangedBy: input.changedBy,
               updatedAt: input.now,
+              // QC-95 R1, R3: los tres contadores, solo cuando el destino no es `blocked`.
+              ...(input.lockState === null ? {} : {
+                failedLoginAttempts: input.lockState.failedAttempts,
+                lockLevel: input.lockState.lockLevel,
+                lockedUntil: input.lockState.lockedUntil,
+              }),
             },
     });
     return count === 1 ? 'ok' : 'not_found';

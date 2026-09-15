@@ -3,6 +3,8 @@
   "transaccion": [
     "asignaciones/active-members-only.int.test.ts",
     "asignaciones/atomicity.int.test.ts",
+    "asignaciones/batch-company-scope.int.test.ts",
+    "asignaciones/batch-states.int.test.ts",
     "asignaciones/company-scope.int.test.ts",
     "asignaciones/frozen-name.int.test.ts",
     "asignaciones/list-order-responsibles.int.test.ts",
@@ -54,6 +56,16 @@
       "archivo": "identity/role-catalog.int.test.ts",
       "motivo": "Nacido antes de QC-77 (QC-94 T7). Caso aparte: NO ESCRIBE NADA -no crea, no edita, no borra ninguna fila-, asi que no hay nada que deshacer y no necesita transaccion. Solo LEE el catalogo global de roles, que cambia unicamente por migracion y seed; se apoya en que la base de la corrida trae ese seed.",
       "desde": "2026-09-12"
+    },
+    {
+      "archivo": "identity/session-revocation.int.test.ts",
+      "motivo": "Nacida con QC-77 ya en pie (QC-23 T21): ejercita el adaptador de produccion 'session-revocation-prisma.ts', cuyas DOS operaciones abren SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL -el cierre de un 'sid' con su purga perezosa dentro, y 'stampAll'-. Llamarlas desde dentro del callback de un '$transaction' del test seria aislamiento de mentira: correrian en otra conexion del pool y se quedarian esperando un bloqueo que tiene el propio test. Ademas necesita ver filas CONFIRMADAS para afirmar sobre el indice unico 'revoked_sessions_session_id_key' (el 23505 traducido a exito, R12). Construccion propia con randomUUID() y limpieza por caso en un 'finally', en el unico orden que respetan las FK: primero 'revoked_sessions' -porque 'revoked_sessions_user_id_fkey' es ON DELETE RESTRICT-, despues los enlaces de QC-79, despues 'account_status_changed_by', despues los usuarios y solo entonces la empresa. El afterAll comprueba que no quedo ninguna.",
+      "desde": "2026-09-13"
+    },
+    {
+      "archivo": "identity/session-stamp-writes.int.test.ts",
+      "motivo": "Nacida con QC-77 ya en pie (QC-23 T14/T15): ejercita las transacciones con bloqueo de 'user-admin-prisma.ts' ('applyGuardedChange' con su 'SELECT ... FOR UPDATE' de ultimo administrador, y 'updateAliveInCompany') y el '$executeRaw' de 'applyCredentialAndActivate' en 'credential-setup-link-prisma.ts'. Los tres abren su PROPIA transaccion contra el cliente global, asi que el '$transaction' del test no los envolveria y ademas chocaria contra su bloqueo. Y lo que aqui se mide es precisamente que la escritura CONFIRMO o REVIRTIO entera -R38 se prueba por su lado dificil: cuando la transaccion aborta por 'last_administrator', el sello no cambio-, que es incompatible por construccion con una transaccion del test que se deshace. Construccion propia con randomUUID() y limpieza por caso en un 'finally' (enlaces -> 'account_status_changed_by' -> usuarios -> empresa, por los ON DELETE RESTRICT); el afterAll comprueba que no quedo ninguna.",
+      "desde": "2026-09-13"
     },
     {
       "archivo": "identity/session-user.int.test.ts",

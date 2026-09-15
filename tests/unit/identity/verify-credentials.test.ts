@@ -123,13 +123,23 @@ function montar(usuarios: readonly AuthenticatableUser[] = [USUARIO], nombre = '
   const session = {
     startSession: vi.fn<(ticket: SessionTicket) => Promise<void>>(async () => {}),
   };
+  // QC-23 R2: la fabrica del `sid`. Doble contador, no aleatorio: dos emisiones seguidas tienen
+  // que producir identificadores distintos, y con un contador eso se puede AFIRMAR.
+  let emitidos = 0;
+  const ids = {
+    newSessionId: vi.fn<() => string>(() => {
+      emitidos += 1;
+      return `00000000-0000-4000-8000-${String(emitidos).padStart(12, '0')}`;
+    }),
+  };
 
   return {
     users,
     attempts,
     hasher,
     session,
-    verifyCredentials: createVerifyCredentials({ users, attempts, hasher, session }),
+    ids,
+    verifyCredentials: createVerifyCredentials({ users, attempts, hasher, session, ids }),
   };
 }
 
@@ -652,6 +662,7 @@ describe('verificacion de credenciales', () => {
         },
         hasher: { hash: createPasswordHash, verify: verifyPasswordHash },
         session: { startSession: () => Promise.resolve() },
+        ids: { newSessionId: () => '5b6f3d21-9c4e-4a7f-8b03-6d2e1f5a9c44' },
       });
 
       await verifyCredentials({ username: 'admin', password: CLAVE });
@@ -697,15 +708,16 @@ describe('verificacion de credenciales', () => {
   // QC-19 R17 — y no es que "de la casualidad" de que pase: el caso de uso ni siquiera
   // conoce la politica. Se afirma sobre las dependencias y sobre el fuente.
   it('verifyCredentials no recibe ni llama a la politica', () => {
-    const { users, attempts, hasher, session } = montar();
-    const deps = { users, attempts, hasher, session };
+    const { users, attempts, hasher, session, ids } = montar();
+    const deps = { users, attempts, hasher, session, ids };
 
-    // Se construye con EXACTAMENTE esos cuatro puertos: ni uno mas.
+    // Se construye con EXACTAMENTE esos cinco puertos: ni uno mas. El quinto es `ids`, la
+    // fabrica del identificador de sesion de QC-23 (R2); la politica sigue sin estar.
     const verifyCredentials = createVerifyCredentials(deps);
     expect(typeof verifyCredentials).toBe('function');
-    expect(Object.keys(deps).sort()).toEqual(['attempts', 'hasher', 'session', 'users']);
+    expect(Object.keys(deps).sort()).toEqual(['attempts', 'hasher', 'ids', 'session', 'users']);
 
-    // Y el fuente lo confirma: el tipo de dependencias declara esas cuatro claves y el
+    // Y el fuente lo confirma: el tipo de dependencias declara esas cinco claves y el
     // archivo entero no menciona la politica por ningun nombre.
     expect(FUENTE_DE_VERIFY_CREDENTIALS.length).toBeGreaterThan(0);
     const bloqueDeDeps = /export type VerifyCredentialsDeps = \{([\s\S]*?)\};/.exec(
@@ -715,7 +727,7 @@ describe('verificacion de credenciales', () => {
     const claves = [...(bloqueDeDeps?.[1] ?? '').matchAll(/readonly\s+([A-Za-z_$][\w$]*)\s*:/g)]
       .map((match) => match[1] as string)
       .sort();
-    expect(claves).toEqual(['attempts', 'hasher', 'session', 'users']);
+    expect(claves).toEqual(['attempts', 'hasher', 'ids', 'session', 'users']);
 
     for (const rastro of [
       'checkCredentialPolicy',

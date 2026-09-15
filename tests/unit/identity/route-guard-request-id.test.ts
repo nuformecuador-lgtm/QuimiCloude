@@ -36,6 +36,9 @@ import { createSessionTicket } from '@/lib/modules/identity/domain/session';
 const SECRETO = 'secreto-de-pruebas-de-64-caracteres-para-firmar-la-sesion-qc9-ok';
 const USER_ID = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';
 const COMPANY_ID = '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13';
+// QC-23 R1: desde `v4` el contenido firmado lleva el identificador de ESTA sesion.
+const SESSION_ID = '5b6f3d21-9c4e-4a7f-8b03-6d2e1f5a9c44';
+
 const ORIGEN = 'https://quimicloude.test';
 
 /** Cabeceras internas con las que Next transporta la peticion reescrita (next@16.3.0). */
@@ -49,7 +52,7 @@ let secretoOriginal: string | undefined;
 
 function cookieFirmada(): Promise<string> {
   return buildSessionValue(
-    createSessionTicket(USER_ID, 'Administrador', COMPANY_ID, new Date()),
+    createSessionTicket(USER_ID, 'Administrador', COMPANY_ID, SESSION_ID, new Date()),
     SECRETO,
   );
 }

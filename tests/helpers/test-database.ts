@@ -448,14 +448,72 @@ function expectSuccess(step: string, result: CommandResult): void {
 }
 
 /**
- * Los cuatro pasos de `design.md > 3`, mas la comprobacion final. El paso 1 **falla y eso
- * es lo esperado**: la migracion de QC-49 exige que exista la empresa inicial y falla
+ * La siembra MINIMA que la migracion de QC-49 exige, con SQL crudo (ver
+ * `buildTemplateSchema`: por que no se puede usar aqui el cliente de Prisma).
+ *
+ * Lo unico que QC-49 necesita para elegir empresa esta en su `migration.sql`, bloque 2.1:
+ * una fila de `companies` con `name_normalized = 'quimicloud'` —y como unico fallback, que
+ * haya EXACTAMENTE UNA empresa en la tabla—. Ni roles, ni permisos, ni administrador.
+ *
+ * Las columnas son las que `companies` tiene EN ESE PUNTO de la historia de migraciones
+ * (`20260904180600_companies_and_user_company`, y ninguna posterior la altera):
+ * `id` (default `gen_random_uuid()`), `name`, `name_normalized`, `created_at` (default),
+ * `updated_at` **sin default** —lo pone `@updatedAt` del cliente, asi que un INSERT crudo
+ * tiene que darlo— y `deleted_at`. Los literales son los mismos que el backfill de QC-47
+ * escribe a mano, por la misma razon que alli: desde SQL no se puede llamar a
+ * `INITIAL_COMPANY_NAME` ni a `normalizeCompanyName`.
+ *
+ * El `WHERE NOT EXISTS` no hace falta sobre una base recien creada; se escribe igual para
+ * que este paso se pueda repetir sin chocar con `companies_name_unique`.
+ */
+async function seedInitialCompany(databaseUrl: string): Promise<void> {
+  const client = new Client({ connectionString: databaseUrl })
+  await client.connect()
+  try {
+    await client.query(
+      'INSERT INTO "companies" ("name", "name_normalized", "updated_at") ' +
+        "SELECT 'QuimiCloud', 'quimicloud', CURRENT_TIMESTAMP " +
+        'WHERE NOT EXISTS (SELECT 1 FROM "companies" WHERE "name_normalized" = \'quimicloud\')',
+    )
+  } finally {
+    // Se cierra SIEMPRE: el `ALTER DATABASE ... RENAME` de `ensureTemplateDatabase` exige
+    // cero conexiones contra la base de construccion.
+    await client.end()
+  }
+}
+
+/**
+ * Los pasos de `design.md > 3`, mas la comprobacion final y el sembrado. El paso 1 **falla y
+ * eso es lo esperado**: la migracion de QC-49 exige que exista la empresa inicial y falla
  * cerrado a proposito (QC-49 R3). Lo que NO es esperado es que falle otra migracion; en ese
  * caso se para y se dice cual. Tragarse cualquier fallo del paso 1 convertiria un error
  * real en una plantilla a medias que todas las corridas reutilizarian.
+ *
+ * POR QUE EL SEMBRADO COMPLETO VA AL FINAL Y NO EN EL HUECO DE QC-49 (cambiado en QC-23):
+ * la receta original corria `pnpm run db:seed` justo despues del paso 1, que es el unico
+ * punto donde QC-49 pide la empresa. Pero ahi el esquema esta A MEDIAS: las migraciones
+ * POSTERIORES a QC-49 todavia no estan aplicadas. Y Prisma rellena del lado del CLIENTE los
+ * `@default(...)` de escalares —`now()`, `uuid()`, ...—, asi que el `INSERT` del seed nombra
+ * columnas que en ese instante no existen en la base y Postgres responde «no existe la
+ * columna ...» (QC-23 lo destapo al anadir `users.sessions_valid_from` en
+ * `20260912103000_session_revocation`, con `@default(now())`; el mensaje de Prisma se queda
+ * con una palabra suelta del error en castellano, «existe», que despista).
+ *
+ * No es un problema de una ficha: **cualquier ficha futura que anada a una tabla que el seed
+ * escriba una columna con default de cliente, despues del corte de QC-49, lo rompe igual**, y
+ * no se ve en `dev` mientras no exista ninguna columna asi. QC-79 no lo destapo solo porque
+ * anadio una TABLA que el seed no toca.
+ *
+ * El arreglo, por tanto, es de orden y no de una columna concreta: en el hueco de QC-49 se
+ * siembra SOLO lo que esa migracion exige —la empresa inicial, con SQL crudo, porque el
+ * cliente de Prisma es justo lo que esta desincronizado ahi—, y el sembrado completo se corre
+ * al final, con el esquema ya entero. El seed es idempotente (lee que falta y crea solo eso,
+ * `lib/modules/identity/domain/seed-initial-access.ts`) y resuelve la empresa inicial por
+ * nombre normalizado reutilizandola si ya esta, asi que se encuentra la del paso 2 y no crea
+ * una segunda.
  */
-function buildTemplateSchema(repoRoot: string, databaseUrl: string): void {
-  log('paso 1/5: migrando (se espera que se detenga en la migracion de QC-49)')
+async function buildTemplateSchema(repoRoot: string, databaseUrl: string): Promise<void> {
+  log('paso 1/6: migrando (se espera que se detenga en la migracion de QC-49)')
   const firstDeploy = runRepoCommand(repoRoot, databaseUrl, ['exec', 'prisma', 'migrate', 'deploy'])
   const stoppedAtQc49 = firstDeploy.output.includes(`Migration name: ${EXPECTED_FAILING_MIGRATION}`)
   if (firstDeploy.code !== 0 && !stoppedAtQc49) {
@@ -466,14 +524,15 @@ function buildTemplateSchema(repoRoot: string, databaseUrl: string): void {
     )
   }
 
-  log('paso 2/5: sembrando (roles, permisos, empresa inicial y admin)')
-  expectSuccess(
-    'el sembrado (`pnpm run db:seed`)',
-    runRepoCommand(repoRoot, databaseUrl, ['run', 'db:seed']),
-  )
+  if (stoppedAtQc49) {
+    log('paso 2/6: sembrando SOLO la empresa inicial, que es lo que exige QC-49')
+    await seedInitialCompany(databaseUrl)
+  } else {
+    log('paso 2/6: omitido — el paso 1 no se detuvo en la migracion de QC-49')
+  }
 
   if (stoppedAtQc49) {
-    log(`paso 3/5: marcando ${EXPECTED_FAILING_MIGRATION} como revertida`)
+    log(`paso 3/6: marcando ${EXPECTED_FAILING_MIGRATION} como revertida`)
     expectSuccess(
       '`prisma migrate resolve --rolled-back`',
       runRepoCommand(repoRoot, databaseUrl, [
@@ -487,10 +546,10 @@ function buildTemplateSchema(repoRoot: string, databaseUrl: string): void {
     )
   } else {
     // Si algun dia la migracion de QC-49 deja de fallar sobre base vacia, este paso sobra.
-    log('paso 3/5: omitido — el paso 1 no se detuvo en ninguna migracion')
+    log('paso 3/6: omitido — el paso 1 no se detuvo en ninguna migracion')
   }
 
-  log('paso 4/5: migrando lo que queda')
+  log('paso 4/6: migrando lo que queda')
   expectSuccess(
     'el segundo `migrate deploy`',
     runRepoCommand(repoRoot, databaseUrl, ['exec', 'prisma', 'migrate', 'deploy']),
@@ -498,10 +557,18 @@ function buildTemplateSchema(repoRoot: string, databaseUrl: string): void {
 
   // El paso 4 en verde no basta: lo que decide que la receta fue bien es que Prisma diga
   // que el esquema esta al dia (`design.md > 3`). Se paga una vez por huella, no por corrida.
-  log('paso 5/5: comprobando que el esquema queda al dia')
+  log('paso 5/6: comprobando que el esquema queda al dia')
   expectSuccess(
     '`prisma migrate status`',
     runRepoCommand(repoRoot, databaseUrl, ['exec', 'prisma', 'migrate', 'status']),
+  )
+
+  // Y solo ahora, con el esquema entero, el sembrado completo (roles, permisos, empresa
+  // inicial y admin). Va DESPUES del paso 5 a proposito: ver la nota de cabecera.
+  log('paso 6/6: sembrando (roles, permisos, empresa inicial y admin)')
+  expectSuccess(
+    'el sembrado (`pnpm run db:seed`)',
+    runRepoCommand(repoRoot, databaseUrl, ['run', 'db:seed']),
   )
 }
 
@@ -545,7 +612,7 @@ export async function ensureTemplateDatabase(ctx: TestDatabaseContext): Promise<
       await client.query(`DROP DATABASE IF EXISTS ${quoteIdentifier(buildName)} WITH (FORCE)`)
       await client.query(`CREATE DATABASE ${quoteIdentifier(buildName)}`)
       try {
-        buildTemplateSchema(ctx.repoRoot, withDatabaseName(ctx.developmentUrl, buildName))
+        await buildTemplateSchema(ctx.repoRoot, withDatabaseName(ctx.developmentUrl, buildName))
         // El nombre bueno solo aparece cuando la receta termino entera: ver
         // `templateBuildDatabaseName`.
         await client.query(

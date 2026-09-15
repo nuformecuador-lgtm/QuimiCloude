@@ -6,6 +6,7 @@ import {
   UserNotFoundError,
   ValidationError,
 } from './errors';
+import { clearedLockState } from './effective-account-status';
 import { ROLE_ADMINISTRADOR } from './roles';
 import { setAccountStatusSchema } from './user-input';
 
@@ -32,9 +33,11 @@ export type SetUserAccountStatusDeps = {
  * transiciones prohibidas en esta feature, y por eso no hay aqui ningun `canTransition`. El conjunto
  * cerrado se importa de QC-65 a traves de `setAccountStatusSchema`: el enum no se reescribe.
  *
- * **No se toca el mecanismo de bloqueo por intentos fallidos** (R45): esta operacion no lee ni escribe
- * ninguno de los tres contadores de QC-19. Limpiarlos al salir de `blocked` es de QC-78, duena de ese
- * mecanismo.
+ * **QC-95 enmienda R45 de QC-66: al salir de `blocked` se limpian los tres contadores de QC-19.**
+ * Se decide por el DESTINO (R4): si el destino no es `blocked`, el caso de uso calcula el estado
+ * limpio con `clearedLockState()` (R6) y lo pasa al puerto para que la misma escritura que mueve
+ * el estado lo persista (R1, R3); si el destino es `blocked`, `lockState` va `null` y no se
+ * toca ningun contador (R2).
  */
 export function createSetUserAccountStatus(
   deps: SetUserAccountStatusDeps,
@@ -60,6 +63,11 @@ export function createSetUserAccountStatus(
     // DENTRO de su transaccion con bloqueo (`design.md > 9.2`). R24: el nombre del rol administrador
     // se IMPORTA de `./roles` y viaja como argumento; el literal no se escribe en ningun archivo de
     // esta feature, y el rol del ACTOR no participa en nada (R4).
+    // QC-95 R2/R4: la decision se toma SOLO por el destino. Un destino que no es `blocked` limpia
+    // los tres contadores; `blocked` no toca ninguno. `clearedLockState()` es la UNICA fuente
+    // de «cero, cero, null» (R6), nunca un literal.
+    const lockState = parsed.data.accountStatus === 'blocked' ? null : clearedLockState();
+
     const outcome = await deps.users.applyGuardedChange({
       kind: 'account_status',
       companyId: actor.companyId,
@@ -68,6 +76,7 @@ export function createSetUserAccountStatus(
       accountStatus: parsed.data.accountStatus,
       changedBy: actor.id,
       now: now(),
+      lockState, // QC-95 R1
     });
 
     if (outcome === 'ok') return;

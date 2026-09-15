@@ -543,6 +543,30 @@ const MIGRACION_QC49 = [
   'db/migrations/20260911130000_inventory_company_scope/down.sql',
 ];
 
+// RETENSADO 2026-09-12 (QC-23), con el MISMO criterio que los ocho retensados de arriba: el rango
+// `origin/dev...HEAD` mide la rama que corre el gate, asi que cada archivo legitimo de `db/`
+// posterior se NOMBRA uno a uno o el caso deja de vigilar nada.
+//
+// POR QUE `db/` cambia aqui: QC-23 registra las sesiones cerradas. `users` gana la columna
+// `sessions_valid_from` —el sello «sesiones validas desde» de R7— y nace la tabla
+// `revoked_sessions` con sus dos indices, su FK a `users` y su RLS forzada sin policies (R10,
+// R42). Anadir una columna y crear una tabla es una migracion de esquema por definicion: no hay
+// forma de hacerlo sin tocar `db/`. Son EXACTAMENTE los dos archivos de UNA carpeta de migracion,
+// con su `down.sql` como manda el arnes (`specs/QC-23-registro-de-sesiones/design.md > 2.4`).
+// `db/schema.prisma` no se repite aqui: ya esta nombrado en `MIGRACION_QC34`.
+//
+// Y POR QUE ESTO NO ES TOCAR `lib/modules/recetas`, que es lo que este caso vigila de verdad: las
+// dos tablas son del modulo `identity` (`/// @module identity` en el esquema) y toda la logica de
+// esta ficha vive en `lib/modules/identity`. `recetas` no cambia ni un archivo —el filtro de
+// `tocaRecetas` lo sigue exigiendo sin ninguna excepcion nueva—, y sus pantallas siguen resolviendo
+// la sesion por donde siempre: el layout privado y `requirePagePermission`.
+//
+// Cualquier OTRO archivo de `db/` sigue poniendo este caso rojo.
+const MIGRACION_QC23 = [
+  'db/migrations/20260912103000_session_revocation/migration.sql',
+  'db/migrations/20260912103000_session_revocation/down.sql',
+];
+
 /** Toda ruta de `lib/modules/recetas/` cuyo cambio esta aprobado y nombrado por una ficha. */
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
@@ -560,6 +584,7 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC80,
   ...MIGRACION_QC86,
   ...MIGRACION_QC49,
+  ...MIGRACION_QC23,
 ];
 
 /**
@@ -858,6 +883,21 @@ describe('contrato de la ruta de recetas', () => {
     // ahora a nivel de modulo, en `fueraDelAlcanceDeLaRama`. El motivo esta escrito alli: dentro
     // del `it` la guardia solo se podia ejercitar teniendo commits en la rama, y en una rama
     // recien abierta eso significa no comprobar nada. El criterio no cambia ni un apice.
+    // RETENSADO 2026-09-12 (QC-23). Las dos listas de permitidas llevan nueve fichas creciendo, y
+    // una lista de excepciones que SOLO crece acaba dejando pasar cualquier cosa: basta con que un
+    // nombre quede ahi despues de que su archivo se borre o se renombre para que la ruta siga
+    // abierta sin que nadie lo note. Asi que cada ruta permitida tiene que SEGUIR EXISTIENDO en
+    // disco. Con esto, quitar una migracion sin quitar su entrada pone el caso rojo, y el permiso
+    // deja de poder sobrevivir a lo que permitia. No se afloja nada: es una condicion MAS, y las
+    // dos aserciones de abajo siguen intactas.
+    for (const ruta of [...RECETAS_PERMITIDAS, ...DB_PERMITIDAS]) {
+      expect(
+        existsSync(join(RAIZ, ruta)),
+        `«${ruta}» figura como ruta permitida pero ya no existe: si se borro o se renombro, ` +
+          'quita tambien su entrada de la lista de la ficha que la nombro',
+      ).toBe(true);
+    }
+
     const { tocaRecetas, tocaDb } = fueraDelAlcanceDeLaRama(diff);
 
     expect(

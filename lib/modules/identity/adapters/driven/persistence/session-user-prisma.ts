@@ -52,8 +52,29 @@ import type { SessionUserRecord } from '../../../ports/session-user-reader';
  * mas y una marca de tiempo mas—. **Ninguno de los dos es PII** y ninguno se registra en ningun
  * log, mismo argumento que ya se acepto para `companyDeletedAt`. Y sin `lockedUntil` habria que
  * duplicar aqui la traduccion del plazo, que es justo lo que R7 prohibe.
+ *
+ * QC-23 (T9, R11, R14, `design.md > 4`): el `select` gana `sessionsValidFrom` y la relacion
+ * `revokedSessions` acotada al `sid` de la sesion en curso, otra vez en ESTA MISMA llamada a
+ * `findFirst`. **Ni una invocacion nueva del puerto por peticion**, que era la condicion de R14,
+ * y lo vigila el test con contador de invocaciones igual que ya vigila `role.permissions`.
+ *
+ * El coste, medido y declarado: `sessions_valid_from` es una columna de `users` y **no cuesta
+ * nada** —ya venia en la fila—; `revokedSessions` si anade **una sentencia**, un
+ * `SELECT revoked_at FROM revoked_sessions WHERE user_id = ? AND session_id = ? LIMIT 1` por
+ * `revoked_sessions_session_id_key`, que devuelve 0 o 1 filas sobre una tabla que la purga de
+ * R39 mantiene pequena —solo sesiones cerradas y aun no caducadas, cota natural de 8 h—. Es
+ * exactamente la lectura que QC-28 viene a quitar de la ruta caliente.
+ *
+ * `take: 1` y `select: { revokedAt: true }`: no sale el `sid`, no sale el `id` de la fila y no
+ * sale ningun dato de PII. El `select` de la sesion sigue sin ganar ni un campo sensible.
+ *
+ * **Cero escrituras** (R40): aqui no se purga nada. La purga vive en las dos operaciones de
+ * `session-revocation-prisma.ts`, nunca en el camino de lectura.
  */
-export async function findActiveSessionUserById(id: string): Promise<SessionUserRecord | null> {
+export async function findActiveSessionUserById(
+  id: string,
+  sessionId: string,
+): Promise<SessionUserRecord | null> {
   const usuario = await prisma.user.findFirst({
     where: { id, deletedAt: null },
     select: {
@@ -67,6 +88,12 @@ export async function findActiveSessionUserById(id: string): Promise<SessionUser
       // QC-78 R20, R21: columnas de `users`, en el MISMO `findFirst`.
       accountStatus: true,
       lockedUntil: true,
+      // QC-23 R7, R8: columna de `users`, en el MISMO `findFirst`. Coste cero.
+      sessionsValidFrom: true,
+      // QC-23 R11, R14: la fila del registro para ESE `sid`, y solo su instante. Por el indice
+      // unico `revoked_sessions_session_id_key`: 0 o 1 filas, nunca una lista de dispositivos
+      // (decision cerrada 12).
+      revokedSessions: { where: { sessionId }, select: { revokedAt: true }, take: 1 },
     },
   });
 
@@ -87,5 +114,9 @@ export async function findActiveSessionUserById(id: string): Promise<SessionUser
     // AHORA» es `effectiveAccountStatus`, no este adaptador.
     accountStatus: usuario.accountStatus,
     lockedUntil: usuario.lockedUntil,
+    // QC-23 R8: el sello crudo. Quien compara `iat <= sello` es `isStampedOut`, no este
+    // adaptador: esa desigualdad tiene UN solo cuerpo en el repositorio.
+    sessionRevokedAt: usuario.revokedSessions[0]?.revokedAt ?? null,
+    sessionsValidFrom: usuario.sessionsValidFrom,
   };
 }

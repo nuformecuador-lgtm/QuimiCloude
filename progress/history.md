@@ -3259,3 +3259,278 @@ el worktree y deja el árbol en disco (`fatal: … is not a working tree`, node_
 remató a mano. De paso se barrieron **tres directorios huérfanos anteriores** que arrastraban el
 mismo fallo y cuyas ramas ya estaban mergeadas: QC-67, QC-76 y QC-94. `.worktrees/` queda con los
 dos vivos y nada más: QC-23 y QC-85. **La ficha de arnés para `wt.sh` en Windows sigue sin existir.**
+
+## QC-85 — pantalla-de-grupos-de-trabajo: CERRADA el 2026-09-12 (PR #64, merge `5188c71`)
+
+La **pestaña «Grupos»** dentro de `/configuracion/usuarios`: crear, renombrar, meter y sacar
+personas y borrar con confirmación, con los miembros en el **panel lateral** y su buscador. **43
+requisitos, los 43 con test**, más el **E2E completo del recorrido** — el que QC-84 había diferido
+aquí. `reviewer` **APROBADO con condiciones** (2 mayores, 4 menores, 8 mutaciones probadas); las dos
+condiciones eran commitear y fusionar, y quedaron cumplidas.
+
+**Sin backend, y medido**: `lib/modules/**`, `db/**`, `lib/composition/**` y `package.json` con
+**diff vacío**. El menú no ganó ningún ítem. La tabla **no muestra conteo de miembros** —eso es
+**QC-100**—, con un test que afirma que ninguna celda pinta un dígito.
+
+### La acotación destapó que la ficha pedía algo imposible
+
+El board pedía que «cada grupo muestre cuántas personas tiene». **`WorkGroupRow` tiene exactamente
+`id` y `name`, con un test que congela esas claves**, así que ningún número era alcanzable desde el
+frontend. El conteo salió del alcance, **nació QC-100** y el board se corrigió **antes** de sembrar.
+Es el tercer caso del mismo patrón, después de QC-63 y QC-80: **la ficha escrita sobre un supuesto
+que el código desmiente**.
+
+### La dependencia que se coló por la puerta de atrás
+
+`shadcn add tabs` genera el componente **y añade `cn@0.3.0`** a `package.json` y al lock. No es un
+typosquat —es oficial, MIT—, pero `lib/utils.ts` **ya es exactamente `twMerge(clsx(inputs))`** y
+**21 de las 23 primitivas** importan `cn` desde `@/lib/utils`: la dependencia era **redundante**, no
+una capacidad que faltara. El `implementer` **paró antes de instalar nada** y dejó el árbol limpio
+—lock revertido, `node_modules` reinstalado desde el original, el archivo generado fuera del repo—.
+Por **decisión humana**: se conserva el archivo de la CLI con **una sola línea cambiada** y **no
+entra ninguna dependencia**, más una guardia anti-reincidencia. Es la regla 7 funcionando: la
+dependencia se vio, se midió y la decidió una persona.
+
+### Cuatro centinelas tensados, y dos hallazgos que valen más que la feature
+
+Ninguno era un fallo del producto: **los cuatro medían mal**.
+
+1. **Medir «lo que aporta la rama» partido en dos mitades es frágil.** Cuatro casos exigían
+   «nada en el diff» por un lado y «esto sin seguimiento» por otro, y **se pusieron rojos sin que
+   cambiara un byte**: un archivo pasó de *sin seguimiento* a *en el diff* al commitear. Ahora miden
+   **lo aportado** (diff + sin seguimiento) contra una sola lista cerrada, lo que además **cierra un
+   agujero simétrico**: antes, modificar una primitiva existente y no commitearla se colaba por la
+   rendija entre los dos casos.
+2. **El último SHA congelado del repo dejó de ser teórico.** `unidades-convenciones.test.ts` estaba
+   verde y se decidió no tocarlo. **El merge lo puso rojo**: `resend`, que QC-79 metió en `dev`, hizo
+   que la guardia dijera que «la feature de unidades toca el manifiesto» **sin que QC-39 hubiera
+   abierto un solo intocable**. Curado con merge-base y precondición de rama. **Ya no queda ningún
+   SHA congelado en uso en el repo.**
+
+### Dos cosas que se hicieron mal y conviene no repetir
+
+- **Un `./init.sh --rapido` en verde que no probó nada.** Con el trabajo **sin commitear**, `HEAD`
+  *era* la merge-base: el rango salía vacío, el gate imprimió «nada que relacionar» y corrió **solo
+  las guardias**. El leader lo dio por bueno. Lo cazó el `reviewer`. **Un gate rápido sobre una rama
+  sin commits no es una verificación**, y conviene que el propio script lo grite.
+- **Dos corridas del gate completo muertas por falta de memoria** —4,4 GB libres de 23,8 con 16
+  procesos de node de las sesiones paralelas—. Salió a la tercera **bajando Vitest a 2 hilos**.
+  Material de ficha de arnés: el gate largo debería limitar su concurrencia solo.
+
+### Deuda que deja, con nombre y dueño
+
+- **El texto de R35 contradice a R30.** El `reviewer` dictaminó que **el código es correcto** —el
+  panel permanece abierto— y que **lo que hay que enmendar es el requisito**. Decide el humano.
+- **`pnpm e2e` completo está rojo por 23 fallos ajenos**, con causa medida: en una base **limpia** el
+  rol **Operador no tiene `dashboard.consultar`**, aterriza en `/inventario` y revienta el
+  `waitForURL` de todo spec que espere el dashboard con un fixture no-Administrador. En el repo
+  principal pasan **porque su base arrastra estado acumulado**. **La suite E2E no sobrevive a una
+  base limpia**, y se ha visto solo porque estas fichas empezaron a usar base propia.
+- **El baseline ya tiene OCHO archivos que pasan**, cuatro de ellos curados en esta misma ficha.
+  Cada uno está apagado entero para el comparador.
+- **Duodécima vez que `wt.sh done` falla en Windows**, y esta vez peor: el árbol quedó **vaciado
+  pero con el directorio retenido** por un proceso, así que `wt.sh` falló por `.git` inexistente y
+  hubo que desregistrar a mano. El directorio vacío sigue en `.worktrees/`. La rama se borró en local
+  y en `origin`.
+
+## QC-77 — aislamiento-de-la-base-en-tests-de-integracion: CERRADA el 2026-09-13 (PR #65, merge `12d254f`)
+
+Cada corrida de `tests/integration/**` arranca ahora sobre **su propia base desechable**, creada
+desde una plantilla ya migrada y sembrada y **borrada al terminar pase lo que pase** —incluido
+Ctrl-C, donde el borrado por señal es **síncrono a propósito**: Vitest hace
+`setTimeout(() => process.exit(), 1)` en su handler y un `await` no llega a ejecutarse—. Entra
+además el guardián que aborta si la corrida no apunta a su base efímera, la CLI `db:test`
+(`status`, `list` y un barrido con cinco guardas), el aviso amarillo cuando la base de desarrollo
+tiene migraciones pendientes, y el censo de aislamiento con su guardia para los tests nuevos.
+**31 requisitos, los 31 con test que vuelve a correr. Ninguna dependencia nueva.**
+
+### El daño que arregla, medido antes de empezar
+
+El gate completo sobre `dev` daba **22 archivos de integración en rojo** fuera del baseline. La
+causa de los 22 era **una sola**: la base compartida, cuatro migraciones atrasada. Migrada, queda-
+ban **2**, y los dos eran estado de datos —38 tipos de documento `DOCxxxxxxxx` de corridas viejas,
+y el reset de `identity-seed` que ya no podía borrar empresas porque QC-49 colgó el inventario de
+`companies` con `ON DELETE RESTRICT`—. Sobre base limpia, esos dos daban **61/61 verde**. Ese
+experimento —hacer la base limpia a mano y medir— es lo que convirtió la ficha de sospecha en
+encargo, y la receta que salió de él está ahora escrita en `design.md`.
+
+### Rechazada en primera revisión, y por el motivo correcto
+
+El `implementer` entregó **12 requisitos con test automático y 19 con «medición pegada»**, y fue
+él quien marcó la distinción en su mapa. El `reviewer` la convirtió en el criterio del rechazo:
+**una medición cuenta solo si romper el requisito pone el gate en rojo por sí solo.** Cuatro
+bloqueantes, todos de trazabilidad y ninguno funcional — entre ellos el guardián que protege la
+base de desarrollo y el barrido que ejecuta `DROP DATABASE`, los dos sin test. Segunda vuelta: **38
+casos nuevos**, y aprobado con 31 de 31.
+
+Destapó de paso que **nada estaba commiteado**: con el diff vacío, `--rapido` seleccionaba **cero**
+tests relacionados. No era cosmético.
+
+### Tres cosas que valen más que la feature
+
+- **El `spec_author` no se creyó el brief del leader y acertó.** Se le dijo «18 de 41 archivos usan
+  el patrón de rollback». Fue a comprobarlo: el `grep` obvio devuelve **19**, porque
+  `work-group-crud` usa el patrón para un sondeo suelto y committea el resto. El recuento era
+  correcto; **lo falso era el método**. Por eso la guardia es un censo explícito y no un grep.
+- **El `reviewer` repitió las mutaciones él mismo**, y una salió **verde**: mover la guarda que
+  protege la base de desarrollo detrás de otras dos es **equivalente**, la base sigue retenida. Leer
+  ese verde como correcto —y no como un test que no muerde— es la parte difícil de hacer bien.
+- **Un subagente editó un archivo fuera de su carril** para poder mutar y probar que su test mordía,
+  y **lo declaró** avisando que no podía descartar haber revertido un cambio ajeno. Se verificó en
+  disco: no se perdió nada. El riesgo fue real y lo causó el reparto de archivos del `implementer`.
+
+### Dos sesiones arreglando el mismo centinela el mismo día
+
+El gate salió rojo por **un archivo que no era de esta ficha**: el centinela de alcance de QC-85,
+**rojo ya en `dev`** desde `97c96c2` —verificado corriéndolo allí— porque sus anclas de no-vacuidad
+no tienen nada que medir fuera de su rama. Es la **tercera aparición** de esta especie en el repo.
+Se arregló desde esta rama por decisión humana (`b4a3983`)… y resultó que **la otra sesión lo había
+arreglado a la vez en `dev`** (`5f687c2`, 88 inserciones contra 30). El conflicto se resolvió
+tomando **entera la versión de `dev`**, tras verificar que pasa y que cubre más: el archivo queda
+idéntico al suyo, sin una tercera variante conviviendo. La misma colisión que ya tuvieron QC-49 y
+QC-67, ahora entre dos sesiones en vez de entre dos fichas.
+
+### Deuda que deja, con nombre y dueño
+
+- **8 entradas del baseline ya pasan** y el gate lo avisa en cada corrida; varias caen justamente
+  porque esta ficha quita el residuo. Entre ellas `product-crud.int.test.ts`, cuya propia entrada
+  mandaba retirarla «en cuanto la suite pase tres veces seguidas con el archivo dentro». **Retirarlas
+  es trabajo aparte y sigue sin ficha.**
+- **R10** (dos worktrees corriendo a la vez) queda cubierto **por partes**: probarlo de punta a punta
+  exigía ensuciar la base de desarrollo, o sea provocar el bug para demostrar el arreglo.
+- **La relajación de «el catálogo arranca solo con CC»** que entró por `dev` ya no hace falta: con
+  base efímera el invariante vuelve a ser comprobable. **La retira QC-87**, por decisión humana, para
+  que dos sesiones no se pisen en el mismo archivo.
+- **La suite E2E completa no sobrevive a una base limpia**: 23 fallos, porque el rol Operador no
+  tiene `dashboard.consultar` y aterriza en `/inventario`, reventando el `waitForURL` de todo spec
+  que espere el dashboard con un fixture no-Administrador. Medido por la sesión de QC-85. **No es de
+  QC-77 ni de QC-87, y no tiene ficha.**
+- **`wt.sh done` volvió a fallar en Windows**, y el patrón del centinela que mide a quién no debe
+  sigue **sin un sitio donde esté escrito una sola vez**. Los dos son candidatos a ficha del arnés.
+
+---
+
+## QC-87 — asignar-responsables-a-un-pedido (mitad backend) · 2026-09-13
+
+**PR #67**, mergeada en `dev` (`f1b3414`). `complexity: medium`, zona `backend`. Ciclo SDD completo:
+spec aprobado el 2026-09-12, 15 tareas, R1–R51, review con **0 hallazgos mayores** y `./init.sh`
+completo en verde antes del PR (428 archivos, 6095 tests, 0 rojos nuevos).
+
+Entra el módulo `asignaciones`: cuatro casos de uso —asignar, desasignar a una persona, quitar un
+grupo del pedido y listar responsables—, el puerto, su adaptador Prisma, tres Server Actions y el
+cableado. La asignación **se congela**: al elegir un grupo, el pedido guarda las personas que ese
+grupo tenía **en ese momento**, con su origen y el nombre del grupo, así que mover a alguien de
+grupo mañana no le quita un pedido que ya estaba ejecutando.
+
+### La ficha esperó por un motivo, y el motivo caducó
+
+Llegó a F2.0 aprobada y **no arrancó**: `backend` tenía tres `in_progress` con tope de dos, y sobre
+todo **QC-77 estaba reescribiendo el aislamiento de la base bajo los tests de integración**, que es
+exactamente donde QC-87 iba a escribir los suyos. La espera no fue burocracia: al mergear QC-77, esta
+ficha escribió sobre la forma nueva en vez de sobre algo que se movía, y de paso **retiró la
+relajación del invariante «el catálogo arranca solo con CC»** que la base compartida había obligado a
+aceptar. Esa retirada estaba escrita en el historial de QC-77 con nombre y dueño, y se cumplió.
+
+### El hallazgo que justifica el criterio de mutación
+
+Durante la implementación se coló a HEAD un `deleteOne` con el `where` **sin `userId`**: desasignar a
+*una* persona habría borrado a **todos** los responsables del pedido. No lo encontró una revisión de
+código: lo cazaron los tests de integración de T14, y quedó corregido en `52fc99b`. Entró por un
+`git add` de ruta amplia mientras un subagente mutaba archivos — **lección operativa: no hacer
+`git add lib/` con subagentes trabajando**.
+
+Además, **R38 estaba documentado pero no implementado**: el desempate por `userId` vivía en el
+comentario del comparador y no en el código, así que el orden no era total y dos homónimas salían
+según el orden de llegada de las filas. Y el **centinela de QC-86 no vigilaba nada** en los
+comentarios `//`: su `stripComments` usaba `/\/\/.*$/`, y sin bandera `m` —y con `.` sin casar `\r`—
+en un repo con CRLF no borraba ningún comentario de línea.
+
+### Deuda que deja, con nombre y dueño
+
+- **Un pedido de otra empresa es distinguible por el `code` del rechazo**: `findAliveOrderTargetById`
+  busca sin `companyId` porque **`orders` no tiene `company_id` todavía**. Declarado por escrito en
+  `design.md > 0` **antes** de implementar y diferido a **QC-46**. No es un descubrimiento tardío.
+- **Los 8 archivos del baseline que ya pasan** siguen sin ficha y sin retirar. El aviso del gate va
+  por su tercera ficha consecutiva.
+- **`wt.sh done` volvió a fallar en Windows**, por segunda vez seguida: desregistró el worktree pero
+  dejó `node_modules` sin borrar. Se limpió a mano más `git worktree prune`. Ya era candidato a ficha
+  del arnés; ahora tiene dos ocurrencias medidas.
+
+**QC-102** (la mitad de pantalla) queda **desbloqueada**.
+
+## QC-23 — registro-de-sesiones · CERRADA el 2026-09-13 (PR #66, merge `5f021c7`)
+
+Las sesiones se revocan de verdad, no solo se retira la cookie. `complexity: high`, zona `backend`,
+51 requisitos EARS y 24 tasks. Review en `progress/review_QC-23-registro-de-sesiones.md`; bitácora
+en `progress/impl_QC-23-registro-de-sesiones.md`.
+
+### Lo que entrega, y por qué son DOS mecanismos y no uno
+
+- **Un sello por usuario**, `users.sessions_valid_from`: toda sesión emitida antes o en ese instante
+  deja de valer. Cubre los cortes masivos —baja, bloqueo, cambio de rol, cambio de contraseña,
+  cierre total— y **cuesta cero consultas**: sale del `findFirst` de `users` que ya se hacía.
+- **Una tabla de sesiones CERRADAS**, `revoked_sessions`, para el cierre individual, que el sello no
+  sabe distinguir. Es una **lista negra, no un censo**: no se guardan las sesiones abiertas y el
+  login no escribe ninguna fila. Ausencia significa «válida».
+
+El token sube a `v4` y estrena `sid`, que es lo que permite señalar una sesión concreta.
+
+### Tres decisiones que conviene no volver a discutir
+
+1. **No se guardan las sesiones abiertas** (alternativa 3 del `design.md`): obligaría a escribir en
+   cada login y a leer N filas por petición, justo lo que QC-28 viene a quitar, y regalaría la lista
+   de dispositivos, que está fuera de alcance por la decisión 12.
+2. **La comprobación NO va en el middleware** (alternativa 7): el borde no es la frontera de
+   seguridad ni consulta la base, y `guard-middleware-edge.test.ts` se pondría roja en cuanto el
+   cierre de imports tocara un repositorio. Los dos cortes son pasos 7 y 8 de `resolve-session.ts`.
+3. **El sello se trunca al segundo y la comparación es `<=`, no `<`.** Como `iat` viaja en segundos,
+   el `<` estricto dejaría sobrevivir una sesión ajena emitida en el mismo segundo del corte. El
+   precio es que la sesión reemitida dura un segundo más de ocho horas. Se paga.
+
+### El hallazgo que vale más que la feature: el gate daba VERDE con la integración caída
+
+`./init.sh` cantó `== init OK ==` con el proyecto de integración **abortado en el arranque y cero
+tests corridos**. El veredicto salía solo del JSON de rojos, y un proyecto que no arranca no escribe
+rojos: era invisible. La causa era la receta de plantilla de QC-77, que sembraba con el esquema a
+medias —QC-23 es la **primera ficha que añade una COLUMNA** después del corte de la migración de
+QC-49, y `@default(now())` lo rellena Prisma del lado del cliente—.
+
+Arreglado desde aquí por decisión humana, y el gate gana **dos garantías** para que no pueda volver
+a mentir así: (1) los tres proyectos —`ui`, `node`, `integration`— tienen que aparecer en el informe
+o es rojo, diciendo cuál falta; (2) si el proceso sale distinto de cero y el informe no trae ningún
+archivo rojo que lo explique, algo falló **fuera** de los tests y el gate falla. Probado por
+mutación: devolviendo el seed al punto intermedio, vuelve a romperse con el mismo error.
+
+### Rechazada en primera revisión, y por el motivo correcto
+
+El `reviewer` la rechazó con 1 hallazgo mayor que **no rompía ningún `R<n>` de esta ficha**: rompía
+la promesa que le hace a **QC-89 y QC-96**. El arreglo fue una constante y un caso de test, sin
+tocar producción. Aprobada en segunda ronda, sin mayores.
+
+### Dos conflictos con QC-87, y los dos eran aditivos
+
+QC-87 se mergeó en `dev` (PR #67) entre la apertura del #66 y su merge, y dejó el PR en
+`CONFLICTING`. Conflictaron `lib/modules/identity/index.ts` y
+`tests/unit/identity/account-status-scope.test.ts`: **las dos ramas añadían un bloque al final del
+mismo ancla**. Se resolvió conservando ambos lados íntegros, comentarios incluidos. `dev` no traía
+migraciones, verificado en `db/migrations/` —28 contra 29, la extra es la suya—.
+
+Gate final tras el merge: `== init OK ==`, exit 0 — **439 archivos, 6266 verdes, 66 saltados, cero
+rojos**. Integración: 54 archivos, 709 verdes.
+
+### Deuda que deja, con nombre y dueño
+
+- **La E2E queda diferida a QC-53** (R50), declarada como requisito: esta ficha no añade pantalla,
+  ruta ni botón. Deuda con destinatario, no exención.
+- **El botón del administrador no existe hasta QC-101** (R51): la operación queda implementada y
+  probada, sin ninguna vía de invocación desde la interfaz.
+- **La purga es perezosa y por persona**, así que quien cierra una sesión y no vuelve a cerrar
+  ninguna deja su fila caducada indefinidamente. No crece, no afecta a la corrección y no degrada la
+  consulta —va por índice único—, pero **no está entre las siete consecuencias declaradas del
+  `design.md`**. Destinatario natural: QC-28, que vuelve a tocar esta ruta.
+- **`pending` no corta (R36)**: mover una cuenta `active` → `pending` → `active` dentro de las 8 h
+  **revive** sus cookies. Consecuencia directa de la decisión 1, escrita para que nadie la descubra
+  de sorpresa.
+- **Una caída de la base se ve como un cierre de sesión** (§ 4.2): precio de que la revocación no se
+  pueda saltar provocando un fallo.
+- **Los 8 rojos del baseline pasan todos** y nadie los ha limpiado. Material de QC-99.
