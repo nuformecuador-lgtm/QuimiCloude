@@ -1,11 +1,3 @@
-// T12 — Server Actions de producto (`design.md > 5`, `> 6.4`). Mockea `@/lib/composition`
-// igual que `tests/unit/identity/login-action.test.ts` y `logout-action.test.ts`: la
-// action se testea contra dobles, nunca contra el dominio real ni contra la sesion real.
-//
-// Cubre R28 (nombre EXACTO exigido por `tasks.md > Trazabilidad`), mas: que el actor sale
-// de `identity.getSessionUser()` (`design.md > 5`, D17) y que cada error de dominio se
-// traduce a su `code` estable sin filtrar la excepcion cruda (`design.md > 6.4`).
-
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -41,14 +33,9 @@ const {
   getProductMock: vi.fn(),
   listProductsMock: vi.fn(),
   getSessionUserMock: vi.fn(),
-  // QC-49 (R12): la SEGUNDA cara de la sesion. La action pide las dos en paralelo y la
-  // empresa sale de esta, nunca del `FormData`.
   getSessionContextMock: vi.fn(),
 }));
 
-// QC-71 (T7, R7, R13): el adaptador driving pide a la composicion la LECTURA de la cabecera
-// del identificador y se la pasa al traductor unico de errores. Sin ella en el doble, el
-// modulo ni siquiera carga; con ella, el estado del error inesperado vuelve con ESE id.
 const { REQUEST_ID_DE_PRUEBA, readRequestIdHeaderMock } = vi.hoisted(() => {
   const id = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
   return { REQUEST_ID_DE_PRUEBA: id, readRequestIdHeaderMock: vi.fn(async () => id) };
@@ -70,27 +57,20 @@ const ADMIN_SESSION_USER = {
   id: 'user-admin-1',
   username: 'ana.perez',
   displayName: 'Ana Perez',
-  // `roleName` se queda porque `SessionUser` lo conserva para pintar (display), pero la
-  // action YA NO lo lee: QC-74 (R18) construye el actor con `permissions` y nada mas.
+  // `SessionUser` conserva `roleName` para pintarlo; la action construye el actor sin leerlo.
   roleName: 'Administrador',
   permissions: ['inventario.consultar', 'inventario.modificar'],
 };
 
-/**
- * QC-49 (R12, `design.md > 4.1`): el contexto de sesion del SERVIDOR. De aqui -y solo de
- * aqui- sale la empresa en cuyo nombre opera la action. `SessionUser` no la trae y no va a
- * traerla: son dos proyecciones distintas de la sesion (QC-48).
- */
+/** La empresa sale solo de aqui: `SessionUser` no la trae. */
 const ADMIN_SESSION_CONTEXT = {
   userId: 'user-admin-1',
   companyId: 'company-a',
   roleName: 'Administrador',
 };
 
-/** El actor que la action debe construir a partir de esa sesion (QC-74, design.md > 4). */
 const ADMIN_ACTOR = {
   id: 'user-admin-1',
-  // QC-49 (R11): la empresa viaja DENTRO del actor, tomada del contexto de sesion.
   companyId: 'company-a',
   permissions: ['inventario.consultar', 'inventario.modificar'],
 };
@@ -110,19 +90,14 @@ const VALID_PRODUCT_FIELDS = {
   name: 'Bidon 20 L',
   stock: '10',
   qtyAlert: '2',
-  // QC-80 (R21): AQUI estaba `unitId`. El producto dejo de declarar unidad -la columna
-  // `products.unit_id` ya no existe-, asi que un alta valida con TODOS los campos rellenos son
-  // exactamente estos tres. Que la unidad no llegue al caso de uso NI AUNQUE alguien la meta en
-  // el `FormData` tiene su propio caso, abajo.
 };
 
-/** Un `FormData` manipulado: nadie lo pinta, pero el borde no puede fiarse de eso (R21). */
+/** Un `FormData` manipulado: nadie lo pinta, pero el borde no puede fiarse de eso. */
 const UNIDAD_COLADA = { unitId: '22222222-2222-4222-8222-222222222222' };
 
 /**
- * QC-90 (R25): los CINCO campos del lote que el panel de alta hace viajar. Se declaran
- * aparte de `VALID_PRODUCT_FIELDS` porque la EDICION no los envia (R26) y sus casos siguen
- * usando solo el fixture del producto.
+ * Aparte de `VALID_PRODUCT_FIELDS` porque la EDICION no envia los campos del lote y sus casos
+ * usan solo el fixture del producto.
  */
 const VALID_BATCH_FIELDS = {
   presentationId: '11111111-1111-4111-8111-111111111111',
@@ -196,11 +171,8 @@ describe('createProductAction', () => {
     });
   });
 
-  // QC-70 (R12, R13): antes este caso fijaba el RELANZADO (`rejects.toThrow`). La decision
-  // cerrada del 2026-09-08 lo cambia: el error ajeno a la familia se traduce a `unexpected`
-  // con el mensaje neutro del catalogo, y el detalle real va al log del servidor y solo ahi.
-  // Por eso el caso no solo mira el codigo: comprueba que NINGUN campo del estado -ni el
-  // serializado entero- contiene el texto del error original.
+  // El detalle del error ajeno va al log del servidor y solo ahi: por eso se barre el estado
+  // entero, y no solo su codigo, buscando el texto del error original.
   it('devuelve el estado generico, sin filtrar el error que no es de dominio (R12, R13)', async () => {
     const logSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const ajeno = new Error('fallo de infraestructura');
@@ -212,20 +184,12 @@ describe('createProductAction', () => {
       status: 'error',
       code: 'unexpected',
       message: errorMessage('unexpected'),
-      // QC-71 (R13): el estado del error INESPERADO vuelve con el identificador de la
-      // peticion —el mismo que se escribio en la linea del registro—, y su ausencia ya no
-      // compila (R16). El catalogado sigue sin el (R15).
       reference: REQUEST_ID_DE_PRUEBA,
     });
     expect(JSON.stringify(result)).not.toContain('fallo de infraestructura');
     for (const value of Object.values(result)) {
       expect(String(value)).not.toContain('fallo de infraestructura');
     }
-    // R14: el detalle si llega al registro del servidor, que es el unico sitio donde aparece.
-    // QC-71 (R10, R12): la linea del registro deja de ser el objeto de QC-70 y pasa a ser UNA
-    // linea de texto con el identificador, el origen, el codigo y el detalle del error —nombre,
-    // mensaje y traza, y nada mas—. Lo que este caso fijaba NO se relaja: el texto del error
-    // original sigue llegando entero al registro, y solo ahi.
     expect(logSpy).toHaveBeenCalledTimes(1);
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining(`[error] requestId=${REQUEST_ID_DE_PRUEBA} origen=borde code=unexpected error=${ajeno.name}: ${ajeno.message}`),
@@ -277,12 +241,8 @@ describe('updateProductAction', () => {
   });
 });
 
-// QC-52 (R1, R5): la Server Action dejo de leer `cost`, `minPurchase` y `deliveryTime`
-// del `FormData`. Se prueba con el caso hostil -un `FormData` que SI los trae, como lo
-// enviaria un formulario viejo cacheado o un `curl`-: el candidato que llega al caso de
-// uso no puede contenerlos, porque si los leyera el `strictObject` rechazaria un alta que
-// deberia funcionar. `presentationId` entro al mismo club el 2026-09-09, al mudarse la
-// presentacion a `product_batches`.
+// Con un `FormData` que SI los trae, como un formulario viejo cacheado o un `curl`: si la action
+// los leyera, el `strictObject` rechazaria un alta que deberia funcionar.
 describe('los campos que el producto perdio no cruzan la Server Action', () => {
   it('no los lee del FormData aunque vengan, ni al crear ni al editar', async () => {
     createProductMock.mockResolvedValue({ id: 'product-1' });
@@ -311,11 +271,6 @@ describe('los campos que el producto perdio no cruzan la Server Action', () => {
       expect(Object.keys(candidato)).not.toContain('deliveryTime');
     }
   });
-
-  // `presentationId` estuvo en esta lista desde el 2026-09-09, cuando la presentacion se
-  // mudo de `products` a `product_batches` y el producto dejo de tenerla. QC-90 (R25) la
-  // saca de aqui: el ALTA vuelve a enviarla, pero como campo DEL LOTE, no del producto. La
-  // edicion sigue sin enviarla, y eso lo fija el caso de R26 mas abajo.
 });
 
 describe('deleteProductAction', () => {
@@ -383,11 +338,6 @@ describe('listProductsAction', () => {
   });
 });
 
-/**
- * QC-90 — el primer lote cruza la Server Action (T9). Cubre **R25** por el lado servidor
- * -los cinco campos escritos en el panel viajan al caso de uso-, **R26** por el lado de la
- * action -la edicion no envia ninguno- y **R4** -ningun importe pasa por coma flotante-.
- */
 describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
   it('hace llegar los cinco campos del lote al caso de uso, tal cual, como cadenas (R25)', async () => {
     createProductMock.mockResolvedValue({ id: 'product-1' });
@@ -462,10 +412,8 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
   });
 
   it('no repite el permiso ni ninguna regla: traduce el rechazo del caso de uso y ya', async () => {
-    // La autorizacion es la PRIMERA linea del caso de uso (R23, criterio de QC-20). Con un
-    // doble que lanza `UnauthorizedError`, la action tiene que devolver el estado del
-    // catalogo sin comprobar nada por su cuenta: si repitiera el permiso, el actor de la
-    // sesion -que SI tiene `inventario.modificar`- pasaria y el caso de uso ni se llamaria.
+    // El actor de la sesion SI tiene `inventario.modificar`: el rechazo solo puede venir del
+    // doble, y la action tiene que traducirlo sin decidir el permiso por su cuenta.
     createProductMock.mockRejectedValue(new UnauthorizedError());
 
     const result = await createProductAction(
@@ -504,15 +452,9 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
   });
 
   it('ni el alta ni la edicion leen `unitId` del FormData, aunque venga (QC-80, R21)', async () => {
-    // R21 — «en ningun punto del camino», y este punto es el `FormData`. Que el formulario ya
-    // no pinte el campo NO basta: un `FormData` se construye a mano, y hasta QC-80 esta action
-    // leia `unitId` con `readOptionalFormString`. Lo que se exige es que no lo LEA, de modo que
-    // el candidato no pueda llevarlo ni por accidente.
-    //
-    // Importa que el candidato salga SIN la clave y no que el caso de uso lo rechace despues:
-    // `createProductWithFirstBatchSchema` y `updateProductSchema` son `strictObject`, asi que
-    // colarlo aqui no seria un campo ignorado sino cada alta y cada edicion muertas con
-    // `invalid_input`.
+    // Que el formulario no pinte el campo no basta: un `FormData` se construye a mano. Y el
+    // candidato tiene que salir SIN la clave: los dos esquemas son `strictObject`, asi que colarla
+    // mataria cada alta y cada edicion con `invalid_input`.
     createProductMock.mockResolvedValue({ id: 'producto-1' });
     updateProductMock.mockResolvedValue(undefined);
 
@@ -533,9 +475,8 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
   });
 
   it('no convierte ningun importe a numero de coma flotante en el codigo fuente (R4)', () => {
-    // Comprobacion sobre el TEXTO del archivo, con el mismo patron que
-    // `tests/unit/inventario/unit-cost.test.ts`: una conversion intermedia daria el mismo
-    // resultado en los casos de arriba y aun asi seria exactamente lo que R4 prohibe.
+    // Sobre el TEXTO del archivo: una conversion intermedia daria el mismo resultado en los casos
+    // de arriba y aun asi pasaria el importe por coma flotante.
     const fuente = readFileSync(
       join(
         __dirname,
@@ -552,9 +493,8 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
       'utf8',
     );
 
-    // Los comentarios se quitan primero: este archivo NOMBRA las funciones prohibidas al
-    // explicar por que no las usa sobre los importes, y sin esto el barrido se cazaria a si
-    // mismo.
+    // Los comentarios se quitan primero: un comentario que nombre una funcion prohibida no es
+    // una conversion y no debe poner el barrido en rojo.
     const codigo = fuente.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
     for (const prohibido of ['parseFloat', 'parseInt', 'toFixed', 'Number.parse']) {
@@ -568,8 +508,6 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
     expect(codigo.match(/Number\(/g) ?? []).toHaveLength(1);
     expect(codigo).toContain('return Number(trimmed);');
 
-    // Y ninguna linea de codigo que mencione un importe puede convertirlo ni tratarlo como
-    // entero.
     for (const linea of codigo.split('\n')) {
       if (!linea.includes('unitCost') && !linea.includes('totalCost')) continue;
       expect(linea).not.toMatch(/Number\(|parseFloat|readOptionalFormInt/);
@@ -577,14 +515,6 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
   });
 });
 
-/**
- * QC-81 (T10) — la fecha de compra cruza la Server Action, y el lote duplicado vuelve con su codigo.
- *
- * Cubre el lado BORDE de **R2** -ausente o vacia, la fecha llega `undefined` y el caso de uso pone
- * «hoy»; escrita, llega tal cual-, **QC-90 R26** reafirmado con el campo nuevo -la edicion sigue sin
- * ningun campo de lote- y el lado borde de **R13** -`BatchDuplicateLotError` sale al llamante con
- * `batch_duplicate_lot` y el texto del catalogo, como los demas codigos de `inventario`-.
- */
 describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () => {
   it('hace llegar purchaseDate al caso de uso tal cual, como la cadena civil escrita (R2, R3)', async () => {
     createProductMock.mockResolvedValue({ id: 'product-1' });
@@ -615,7 +545,7 @@ describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () =>
   it('sin purchaseDate en el FormData, o vacia, llega undefined para que el caso de uso ponga hoy (R2)', async () => {
     createProductMock.mockResolvedValue({ id: 'product-1' });
 
-    // Ausente: el formulario de hoy no la pinta (la pantalla es QC-103).
+    // Ausente: el formulario de hoy no la pinta.
     await createProductAction(CREATE_INITIAL, formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS }));
     // Vacia y en blanco: un `<input type="date">` sin rellenar viaja como ''.
     await createProductAction(
@@ -645,7 +575,6 @@ describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () =>
     );
 
     const [, candidato] = updateProductMock.mock.calls[0] as [string, Record<string, unknown>];
-    // `updateProductSchema` es `strictObject` y no conoce el lote (QC-90 R26).
     expect(candidato).toEqual({ name: 'Bidon 20 L', stock: 10, qtyAlert: 2 });
     for (const campo of [...Object.keys(VALID_BATCH_FIELDS), 'purchaseDate']) {
       expect(Object.keys(candidato)).not.toContain(campo);
@@ -660,8 +589,8 @@ describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () =>
       formDataOf({ ...VALID_PRODUCT_FIELDS, ...VALID_BATCH_FIELDS }),
     );
 
-    // Estado EXACTO: codigo propio, mensaje del catalogo y NADA mas. El diagnostico (empresa y lote)
-    // va al registro del servidor y no cruza al navegador (QC-70 R28-R30).
+    // Estado EXACTO: el diagnostico (empresa y lote) va al registro del servidor y no cruza al
+    // navegador.
     expect(result).toEqual({
       status: 'error',
       code: 'batch_duplicate_lot',
@@ -671,12 +600,7 @@ describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () =>
   });
 });
 
-// AMPLIACION 2026-09-11 (QC-49, T14) — LA EMPRESA SALE DE LA SESION Y NO VUELVE AL NAVEGADOR.
-//
-// Cubre R12 (la empresa sale del contexto de sesion del servidor y el borde falla cerrado sin
-// el), R19 (ninguna salida publica la lleva) y R31 (las firmas publicas no cambian).
 describe('QC-49 R12 — la empresa sale de getSessionContext y nunca del FormData', () => {
-  /** Las cinco actions, invocadas con su firma real y con el doble del caso de uso resuelto. */
   const INVOCACIONES: ReadonlyArray<{
     readonly nombre: string;
     readonly mock: ReturnType<typeof vi.fn>;
@@ -709,7 +633,6 @@ describe('QC-49 R12 — la empresa sale de getSessionContext y nunca del FormDat
     },
   ];
 
-  /** El actor que recibio el caso de uso en la ultima llamada del doble. */
   function actorRecibido(mock: ReturnType<typeof vi.fn>): unknown {
     const llamada = mock.mock.calls.at(-1);
     if (llamada === undefined) throw new Error('el caso de uso no fue llamado');
@@ -732,11 +655,8 @@ describe('QC-49 R12 — la empresa sale de getSessionContext y nunca del FormDat
   });
 
   it('sin contexto de sesion el actor es null ENTERO, no un actor a medias sin empresa', async () => {
-    // FALLA CERRADO (R12, `design.md > 4.1`): si falta cualquiera de las dos caras, el actor es
-    // `null` y `requirePermission` -primera linea de los nueve casos de uso- rechaza antes de
-    // tocar el repositorio. Lo que este caso impide es lo OTRO: que el borde construya un actor
-    // a medias, con `companyId: undefined`, y lo deje bajar; el ambito que llegaria entonces a
-    // la consulta no seria de nadie.
+    // Lo que se impide es un actor a medias, con `companyId: undefined`: el ambito que llegaria
+    // a la consulta no seria de nadie.
     const AUSENCIAS = [
       { etiqueta: 'sin contexto de sesion', user: ADMIN_SESSION_USER, context: null },
       { etiqueta: 'sin usuario de sesion', user: null, context: ADMIN_SESSION_CONTEXT },
@@ -763,9 +683,8 @@ describe('QC-49 R12 — la empresa sale de getSessionContext y nunca del FormDat
   });
 
   it('una companyId en el FormData no cambia la empresa ni llega al caso de uso', async () => {
-    // El caso hostil: un campo oculto manipulado, o un `curl`. La empresa de la sesion es A y el
-    // `FormData` pide B. Si el borde leyera la entrada, quien invoca la action ELEGIRIA la
-    // empresa en cuyo nombre se escribe, que es el agujero entero que esta ficha cierra.
+    // Un campo oculto manipulado, o un `curl`: si el borde leyera la entrada, quien invoca la
+    // action ELEGIRIA la empresa en cuyo nombre se escribe.
     createProductMock.mockResolvedValue({ id: 'product-1' });
     updateProductMock.mockResolvedValue(undefined);
 
@@ -783,10 +702,8 @@ describe('QC-49 R12 — la empresa sale de getSessionContext y nunca del FormDat
       const llamada = mock.mock.calls.at(-1);
       if (llamada === undefined) throw new Error('el caso de uso no fue llamado');
 
-      // El actor sigue siendo el de la SESION, empresa A incluida.
       expect(llamada.at(-1)).toEqual(ADMIN_ACTOR);
-      // Y el candidato no lleva la empresa por ningun nombre: no se LEE del `FormData`, asi que
-      // no queda nada que el `strictObject` del esquema tenga que rechazar despues.
+      // Si la empresa llegara en el candidato, el `strictObject` del esquema rechazaria el alta.
       const serializado = JSON.stringify(llamada.slice(0, -1));
       expect(serializado).not.toContain('companyId');
       expect(serializado).not.toContain('company_id');
