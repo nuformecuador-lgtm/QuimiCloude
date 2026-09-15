@@ -295,6 +295,74 @@ decision fijada.
    no toca lib/modules/recetas ni db/»), porque la migracion de T1 aparece en el diff de la rama. Ese
    archivo esta en `tests/baseline-rojos.json`; se revisa aparte (ver «Rojos ajenos»).
 
+### Cierre de T6 — reconocimiento del duplicado, reintento y traduccion · `backend_dev`
+
+**Archivos**
+- `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`:
+  - `BATCH_LOT_UNIQUE_COLUMNS = {company_id, lot}`, con un docblock que explica la correccion al
+    design y cita `unit-write-prisma.ts`, `recipe-prisma.ts` y `supplier-prisma.ts`;
+  - `uniqueTargetsOf` y `isDuplicateBatchLot`, que exige `P2002` y que el conjunto de columnas sea
+    exactamente `{company_id, lot}`;
+  - `BATCH_LOT_MAX_ATTEMPTS = 3`;
+  - `writeBatchWithLotRetry`, el unico sitio de la politica, que usan los dos caminos. Cada intento
+    abre una `prisma.$transaction` nueva. Un choque con lote a mano lanza `BatchDuplicateLotError` sin
+    reintentar. Un choque con lote generado da otra vuelta. Agotados los intentos, lanza `Error`
+    («... empresa <id>, ultimo lote intentado '<lote>', 3 intentos») con `cause`. Lo que no se
+    reconoce pasa por `translateBatchWriteError` como antes. Un solo `catch`, con cuerpo.
+- `tests/unit/inventario/product-batch-lot-retry.test.ts` (nuevo, 14 casos con dobles de Prisma).
+
+**Salida real**
+```
+$ pnpm run typecheck   -> EXIT=0 (todo el repo)
+$ pnpm run lint        -> EXIT=0
+$ pnpm exec vitest run --project node --project ui tests/unit/inventario tests/unit/errores
+ Test Files  37 passed (37)
+      Tests  578 passed (578)
+$ pnpm exec vitest run guard
+ Test Files  39 passed (39)
+      Tests  407 passed | 9 skipped (416)
+$ pnpm exec vitest run --project node tests/unit/inventario/product-batch-lot-retry.test.ts
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+```
+
+**Tests (`product-batch-lot-retry.test.ts`)**
+- R13 y R15, el reconocimiento:
+  - «es verdadero con P2002 y meta.target con las columnas company_id y lot»
+  - «es verdadero con la misma pareja en el otro orden: se compara el conjunto»
+  - «es falso con P2002 sobre otras columnas»
+  - «es falso con P2002 sin meta.target inspeccionable o con target como cadena suelta»
+  - «es falso con otro codigo aunque meta.target traiga company_id y lot»
+  - «es falso con un Error suelto que dice P2002»
+- R15, el reintento:
+  - «reintenta en una transaccion nueva, con maximo nuevo, y a la segunda escribe»
+  - «se para en 3 intentos y lanza un Error con empresa, ultimo lote e intentos, con el choque como cause»
+  - «un P2002 ajeno se relanza tal cual y sin reintentar»
+  - «con lote generado reintenta y a la segunda escribe» (`addBatchToAlive`)
+- R13 y R10:
+  - «no reintenta, no pide lock ni maximo, y sale BatchDuplicateLotError»
+  - «con lote escrito a mano no reintenta y sale BatchDuplicateLotError» (`addBatchToAlive`)
+- No regresion:
+  - «un P2003 de la presentacion sigue saliendo como ValidationError y sin reintentar»
+  - «con el producto borrado o ajeno devuelve null sin pedir lock ni escribir»
+
+**Notas para el reviewer**
+1. **Conjunto exacto de columnas, no «contiene».** Un `target` con una tercera columna no se reconoce
+   y se relanza: un indice futuro no se anuncia como «lote duplicado».
+2. **`target` como cadena** cuenta como una sola columna, igual que en `unit-write-prisma.ts`, asi que
+   se relanza crudo y nunca se traduce mal. Con 6.19.3 llega como array; T8 caso 4 lo prueba contra la
+   base real.
+3. **El «hecho» de T6 dice que el adaptador es el unico archivo del modulo que importa
+   `@prisma/client`.** Eso **ya era inexacto antes de QC-81**: tambien lo importan `company-scope.ts`
+   (`import type`) y `presentation-prisma.ts`, los dos adaptadores driven de persistencia. QC-81 no
+   añade ningun importador, y la guardia de arquitectura (domain y ports sin Prisma) sigue verde. La
+   frase «UNICO archivo del modulo» de los docblocks previos (`product-prisma.ts:33-35`,
+   `presentation-prisma.ts:23`, `domain/product-batch.ts:6`) queda como deuda anotada; no se corrige
+   aqui, porque no es alcance de QC-81.
+4. **`design.md` §3.3/§4.4 y `tasks.md` T6 siguen diciendo «nombre del indice».** No se edita el spec
+   desde la implementacion; la correccion vive en el docblock del adaptador y en la seccion «Tanda 3a»
+   de esta bitacora.
+
 ### Tanda 3b — fixtures, excepcion del E2E, guardia de migraciones y T11 · `backend_dev`
 
 **Archivos**

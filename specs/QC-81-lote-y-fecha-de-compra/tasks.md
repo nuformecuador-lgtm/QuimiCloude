@@ -42,7 +42,7 @@
       no falla (R20 — compruébalo de verdad, es el punto donde el repo ya se quemó con QC-49).
       Cubre **R17, R18, R19, R20, R21, R22, R23** y el lado base de **R7, R11, R12**.
 
-- [ ] **T2 — El esquema Prisma al día.** Depende de T1.
+- [x] **T2 — El esquema Prisma al día.** Depende de T1.
       Archivos: `db/schema.prisma` (modelo `ProductBatch`).
       `lot String` (sin `?`), `purchaseDate DateTime @map("purchase_date") @db.Date`, y
       `@@unique([companyId, lot], map: "product_batches_company_lot_unique")` —modelable porque el
@@ -94,7 +94,7 @@
 
 ## Tanda 3 — persistencia y concurrencia (el corazón de la ficha)
 
-- [ ] **T6 — Generación del correlativo en el adaptador.** Depende de T2, T5 y **T0**.
+- [x] **T6 — Generación del correlativo en el adaptador.** Depende de T2, T5 y **T0**.
       Archivos: `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`.
       `resolveLot(tx, batch, scope)` con los tres pasos de `design.md > 3.2`: `pg_advisory_xact_lock`
       **como sentencia aparte y antes** del `SELECT` del máximo —el docblock **tiene que** explicar

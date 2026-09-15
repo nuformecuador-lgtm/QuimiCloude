@@ -11,7 +11,10 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 // `ProductNotFoundError` (R17)- sigue desaparecido con la columna que lo disparaba: ese
 // renombrado vive en `update-product.ts` y `delete-product.ts`, que son los sitios que de verdad
 // lo lanzan.
-import { ValidationError } from '../../../domain/errors';
+//
+// QC-81 (R13) trae UNO mas, `BatchDuplicateLotError`: el lote escrito a mano que choca contra el
+// indice unico `(company_id, lot)` tambien se escribe desde este archivo.
+import { BatchDuplicateLotError, ValidationError } from '../../../domain/errors';
 import { normalizeProductName } from '../../../domain/product-name';
 
 import { companyScopeColumns, productCompanyScope } from './company-scope';
@@ -514,6 +517,112 @@ function toBatchExpiryDate(expiryDate: string | null): Date | null {
 }
 
 /**
+ * Fecha de compra del lote: fecha CIVIL `YYYY-MM-DD` -> el `Date` que espera una `@db.Date`
+ * (QC-81 R1, R3).
+ *
+ * Copia literal de `toBatchExpiryDate` (`design.md > 4.4`), y el `T00:00:00Z` esta por lo mismo:
+ * sin la zona escrita en la cadena, el lenguaje la leeria en la zona LOCAL, Prisma la serializaria
+ * en UTC y en una maquina con zona negativa la columna guardaria el dia anterior al escrito. Es
+ * tambien la convencion con la que la migracion rellena las filas viejas (`created_at AT TIME ZONE
+ * 'UTC'`), asi que el relleno y el alta hablan del mismo dia.
+ *
+ * SIN la rama del nulo: la fecha de compra es OBLIGATORIA y llega ya resuelta por el caso de uso
+ * -«hoy» si no vino, rechazo si era futura-, asi que aqui no hay ausencia que representar.
+ */
+function toBatchPurchaseDate(purchaseDate: string): Date {
+  return new Date(`${purchaseDate}T00:00:00Z`);
+}
+
+/**
+ * Primer entero del lock de aviso del correlativo de lote (`design.md > 3.2`, `<ns>`). La forma
+ * de DOS enteros es a proposito: vive en un espacio distinto del `pg_advisory_lock(bigint)` que
+ * `tests/helpers/test-database.ts` usa para la plantilla, asi que no pueden colisionar. El valor
+ * solo tiene que ser estable y no compartirlo nadie mas: hoy este es el unico lock de aviso de
+ * dos enteros del repositorio.
+ */
+const BATCH_LOT_LOCK_NAMESPACE = 81;
+
+/** Prefijo de la clave del lock: `hashtext('product_batches_lot:' || company_id)`. La empresa va
+ *  en la clave, asi que dos empresas NUNCA se hacen cola entre si. */
+const BATCH_LOT_LOCK_KEY_PREFIX = 'product_batches_lot:';
+
+/** Fila del maximo de la serie. Llega como TEXTO (`::text` en la consulta) y no como `bigint`:
+ *  un lote de 18 digitos no cabe en un `number` sin perder precision. */
+type BatchLotTopRow = { readonly top: string | null };
+
+/**
+ * El lote que se escribe en la fila (QC-81 R8, R9, R10, R16, R27): el escrito a mano TAL CUAL, o
+ * el siguiente de la serie numerica de la empresa del AMBITO.
+ *
+ * **Lote escrito a mano (`batch.lot !== null`)**: se devuelve sin tocarlo -ya llega recortado por el
+ * esquema- y NO se pide lock ni se calcula maximo (R10, `design.md > 3.2`): no hay serie que
+ * consultar, y serializar altas que no compiten por ningun numero seria cola gratis.
+ *
+ * **Lote generado (`batch.lot === null`)**, tres pasos DENTRO de la transaccion que escribe:
+ *
+ *   1. `pg_advisory_xact_lock(<ns>, hashtext('product_batches_lot:' || company_id))`,
+ *   2. `SELECT max(lot::bigint)` sobre los lotes PURAMENTE numericos de la empresa,
+ *   3. el `INSERT` con la API tipada, que hace quien llama con el valor devuelto.
+ *
+ * **POR QUE EL LOCK ES UNA SENTENCIA APARTE Y VA ANTES DEL `SELECT`, y no dentro de la sentencia que
+ * calcula el maximo ni dentro del `INSERT`.** Prisma trabaja en `READ COMMITTED`, y en ese nivel
+ * CADA SENTENCIA TOMA SU PROPIA INSTANTANEA AL EMPEZAR. Si la sesion B pidiera el lock dentro de la
+ * misma sentencia que lee el maximo, su instantanea ya estaria tomada ANTES de que A comiteara: B
+ * esperaria el lock, lo obtendria, y aun asi leeria el maximo VIEJO -sin la fila de A- y propondria
+ * el mismo numero. El lock no habria servido de nada. Pedido en una sentencia ANTERIOR, B espera
+ * ahi; cuando A comitea y B continua, la sentencia del paso 2 arranca DESPUES y su instantanea SI ve
+ * la fila de A. Eso es lo que cumple R14 sin depender de ningun reintento. Quien «simplifique» esto
+ * juntando las dos sentencias reabre la carrera, y solo se vera con dos altas simultaneas.
+ *
+ * El lock es `xact`: se suelta solo al comitear o al abortar, no hay camino que lo deje tomado, y
+ * como se pide UNO solo no hay orden de adquisicion ni interbloqueo posible.
+ *
+ * Va con `$executeRaw` y no con `$queryRaw` porque `pg_advisory_xact_lock` devuelve `void`, y el
+ * cliente no sabe deserializar una columna de ese tipo; `$executeRaw` no lee filas.
+ *
+ * **El maximo** se lee sobre `'^[0-9]{1,18}$'`: lo no numerico (`'ACME-2026-07'`) no esta en la
+ * serie y no la mueve (R9), un `'007'` cuenta como 7, y la cota de 18 digitos es lo que cabe en
+ * `bigint` -sin ella un lote tecleado de 40 digitos reventaria el `::bigint`-. Es el MISMO criterio
+ * que el relleno de la migracion (`design.md > 2.3`), para que la migracion y el alta no discrepen
+ * sobre cual es «el mas alto». Sin ningun lote numerico el maximo es `NULL` y el primero es `'1'`.
+ * El siguiente se escribe sin ceros a la izquierda (D5).
+ *
+ * **La empresa sale del AMBITO** (R27) y del unico punto que la define (`companyScopeColumns`),
+ * nunca de `NewProductBatch` -que no la lleva-: el correlativo se calcula contra la misma empresa
+ * que se escribe en la fila, asi que ningun lote puede numerarse en la serie de una empresa y
+ * guardarse en otra. Los parametros llevan cast explicito porque en una consulta cruda no hay mapeo
+ * de Prisma que infiera el tipo.
+ *
+ * El lock es solo la manera de NO chocar casi nunca; la GARANTIA de que no haya dos lotes iguales
+ * en una empresa es el indice unico `product_batches_company_lot_unique` de la base (R11).
+ */
+async function resolveLot(
+  tx: Prisma.TransactionClient,
+  batch: NewProductBatch,
+  scope: InventoryScope,
+): Promise<string> {
+  if (batch.lot !== null) return batch.lot;
+
+  const { companyId } = companyScopeColumns(scope);
+
+  // Paso 1, SENTENCIA PROPIA (ver el docblock: READ COMMITTED).
+  await tx.$executeRaw(
+    Prisma.sql`SELECT pg_advisory_xact_lock(${BATCH_LOT_LOCK_NAMESPACE}::int, hashtext(${BATCH_LOT_LOCK_KEY_PREFIX + companyId}::text))`,
+  );
+
+  // Paso 2, con una instantanea tomada DESPUES de obtener el lock.
+  const rows = await tx.$queryRaw<ReadonlyArray<BatchLotTopRow>>(Prisma.sql`
+    SELECT max(("lot")::bigint)::text AS "top"
+      FROM "product_batches"
+     WHERE "company_id" = ${companyId}::uuid
+       AND "lot" ~ '^[0-9]{1,18}$'
+  `);
+
+  const top = rows[0]?.top ?? null;
+  return (BigInt(top ?? '0') + BigInt(1)).toString();
+}
+
+/**
  * `NewProductBatch` del puerto -> la fila de `product_batches`.
  *
  * `createdBy` y `updatedBy` se escriben como ESCALARES (R22): sin `include`, sin `connect` y
@@ -528,10 +637,16 @@ function toBatchExpiryDate(expiryDate: string | null): Date | null {
  *
  * `createdAt`/`updatedAt` usan el `now` inyectado por el caso de uso, no el `DEFAULT` de la
  * base, para que el lote y el producto que se escriben juntos compartan reloj.
+ *
+ * QC-81: recibe el `lot` YA RESUELTO por `resolveLot` -el escrito a mano o el correlativo- como
+ * parametro aparte, y no lo lee de `batch`. Asi el tipo impide escribir la fila con el `null` de
+ * «que lo genere el backend»: esa columna es NOT NULL desde QC-81 y ninguna fila puede llegar a ella
+ * sin haber pasado por el generador. Y escribe `purchaseDate`, obligatoria, en todo camino (R1).
  */
 function toBatchCreateData(
   productId: string,
   batch: NewProductBatch,
+  lot: string,
   now: Date,
   scope: InventoryScope,
 ): Prisma.ProductBatchUncheckedCreateInput {
@@ -541,8 +656,11 @@ function toBatchCreateData(
     // R3: `0` es un valor valido; el `CHECK` de la columna es `>= 0`.
     stock: batch.stock,
     unitCost: toBatchUnitCost(batch.unitCost),
-    // R12: ausente se guarda como `NULL`, no como cadena vacia.
-    lot: batch.lot,
+    // QC-81 (R7, R8, R10): SIEMPRE escrito. Hasta QC-81 el ausente se guardaba como `NULL` (QC-90
+    // R12, derogado en su mitad del lote por D7); ahora llega aqui ya resuelto por `resolveLot`.
+    lot,
+    // QC-81 (R1, R3): fecha civil ya resuelta por el caso de uso, convertida en un unico sitio.
+    purchaseDate: toBatchPurchaseDate(batch.purchaseDate),
     expiryDate: toBatchExpiryDate(batch.expiryDate),
     // QC-49 (R2, R17): el lote lleva SU PROPIA columna de empresa y se escribe desde el unico
     // punto que define el ambito. NO se hereda por `join` con el producto: la unicidad
@@ -659,6 +777,135 @@ function translateBatchWriteError(error: unknown): never {
 }
 
 /**
+ * Columnas que protege el indice unico `product_batches_company_lot_unique` (QC-81 R11,
+ * `db/migrations/20260913120000_product_batch_lot_and_purchase_date`).
+ *
+ * CORRECCION sobre lo que describen `design.md > 3.3`, `> 4.4` y `tasks.md > T6`: alli
+ * `isDuplicateBatchLot` reconocia el `P2002` comparando `error.meta.target` contra el NOMBRE del
+ * indice (`'product_batches_company_lot_unique'`). Con `@prisma/client@6.19.3` contra Postgres eso
+ * no casa nunca: por la API tipada `meta.target` trae las COLUMNAS afectadas (p. ej.
+ * `["company_id","lot"]`), jamas el nombre del indice. Esta verificado empiricamente y escrito en
+ * `lib/modules/unidades/adapters/driven/persistence/unit-write-prisma.ts` (QC-76), donde la
+ * comparacion por nombre fue un defecto real: el `P2002` se relanzaba sin traducir. Implementado
+ * literal, aqui un lote escrito a mano repetido saldria como error crudo en vez de
+ * `batch_duplicate_lot` (R13 roto) y un choque con lote generado no se reintentaria (R15 roto).
+ *
+ * El precedente que cita el design, `isDuplicateOrderNumber` de `order-prisma.ts`, SI usa el
+ * nombre, pero solo porque `pedidos` inserta con SQL crudo y busca el nombre en el texto de su
+ * mensaje; el `INSERT` del lote va por la API tipada (`design.md > 3.2`, paso 3), que es otro
+ * camino. Se discrimina por COLUMNAS, como `unit-write-prisma.ts`, `recipe-prisma.ts`
+ * (`isUniqueNameViolation`) y `supplier-prisma.ts`. La intencion de `design.md > 4.4` se conserva
+ * entera -dos condiciones, y relanzar lo que no se sabe identificar-; cambia el mecanismo, para
+ * que sea el que el motor realmente expone.
+ */
+const BATCH_LOT_UNIQUE_COLUMNS: ReadonlySet<string> = new Set(['company_id', 'lot']);
+
+/** `error.meta.target` puede llegar como cadena o como array de cadenas segun la version del
+ *  motor: se normaliza a un array antes de mirarlo, con el mismo criterio que `targetsOf` de
+ *  `unit-write-prisma.ts`. Si `target` no es inspeccionable -ausente, u otro tipo- se devuelve
+ *  vacio: no se asume nada. */
+function uniqueTargetsOf(error: Prisma.PrismaClientKnownRequestError): readonly string[] {
+  const target: unknown = error.meta?.target;
+  if (typeof target === 'string') return [target];
+  if (Array.isArray(target)) return target.filter((item): item is string => typeof item === 'string');
+  return [];
+}
+
+/**
+ * ¿Es este error el choque contra el indice unico `(company_id, lot)` de `product_batches`?
+ * (QC-81 R13, R15).
+ *
+ * DOS condiciones, y hacen falta las dos: un `PrismaClientKnownRequestError` con `code === 'P2002'`
+ * **y** un `meta.target` cuyo CONJUNTO de columnas es exactamente `{company_id, lot}` -en cualquier
+ * orden-. El conjunto exacto y no «contiene» es el criterio conservador de este archivo: un indice
+ * unico nuevo que nadie mapeo todavia no se anuncia como «ya existe ese lote». Cualquier otro
+ * `P2002` NO es este y quien llama lo relanza.
+ *
+ * Si `target` llegara como una cadena suelta, cuenta como UNA columna, igual que en
+ * `unit-write-prisma.ts`: nunca forma la pareja, asi que no se reconoce y se relanza. Mejor un
+ * error crudo en el log que una traduccion equivocada.
+ *
+ * SE EXPORTA solo para que su unitario pueda probar las dos condiciones sin base.
+ */
+export function isDuplicateBatchLot(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') return false;
+  const targets = new Set(uniqueTargetsOf(error));
+  if (targets.size !== BATCH_LOT_UNIQUE_COLUMNS.size) return false;
+  return [...BATCH_LOT_UNIQUE_COLUMNS].every((column) => targets.has(column));
+}
+
+/** Intentos EN TOTAL -el primero y dos reintentos- de una escritura con lote generado que choca
+ *  contra el indice unico (QC-81 R15, `design.md > 3.3`). Acotado: el lock ya evita el choque en
+ *  la practica, y un choque que se repite tres veces no es mala suerte, es un estado de la base que
+ *  el generador no entiende. */
+const BATCH_LOT_MAX_ATTEMPTS = 3;
+
+/** Lo que se sabe del ultimo intento, para el contexto del error si se agotan. Es un objeto y no un
+ *  `let` suelto porque se escribe desde dentro del callback de la transaccion. */
+type BatchLotAttemptLog = { lastLot: string | null };
+
+/**
+ * Ejecuta una escritura de lote -`write`- en su propia `prisma.$transaction` y aplica la politica de
+ * choque de lote de QC-81 (R13, R15, R25). Es el UNICO sitio de esa politica: `createWithFirstBatch`
+ * y `addBatchToAlive` le pasan solo lo que escriben, asi que el reintento no se duplica.
+ *
+ * `write` recibe el cliente de la transaccion y `resolveBatchLot`, que es `resolveLot` atado a ESTA
+ * transaccion y a este ambito: el lote se resuelve dentro de la misma transaccion que lo escribe
+ * (`design.md > 3.1`).
+ *
+ * **EL REINTENTO VA FUERA DE `prisma.$transaction`**, y cada vuelta del bucle abre una transaccion
+ * NUEVA: una transaccion abortada no admite mas sentencias, y la nueva toma instantanea nueva, pide el
+ * lock otra vez y lee un maximo nuevo. Reintentar es seguro porque la transaccion abortada no dejo ni
+ * producto ni lote (R25).
+ *
+ * Que se hace con cada error, en este orden:
+ *   1. **No es el choque de lote** -FK, disparador de empresa, un `CHECK`, un `P2002` ajeno, una caida
+ *      de conexion- ⇒ `translateBatchWriteError`, que traduce lo que sabe y RELANZA lo demas. Nunca se
+ *      reintenta.
+ *   2. **Choque con lote ESCRITO A MANO** ⇒ `BatchDuplicateLotError` y NUNCA se reintenta (R13):
+ *      reintentar daria el mismo choque para siempre, y sustituirlo por un correlativo escribiria un
+ *      lote que nadie pidio.
+ *   3. **Choque con lote GENERADO** ⇒ se reintenta la operacion entera (R15).
+ *   4. **Agotados los intentos** ⇒ `Error` con contexto -empresa, ultimo lote intentado, intentos- y
+ *      el choque original como `cause`. NO se disfraza de `invalid_input`: no es entrada invalida.
+ *
+ * Ningun `catch` vacio (`docs/conventions.md`).
+ */
+async function writeBatchWithLotRetry<T>(
+  batch: NewProductBatch,
+  scope: InventoryScope,
+  write: (tx: Prisma.TransactionClient, resolveBatchLot: () => Promise<string>) => Promise<T>,
+): Promise<T> {
+  const { companyId } = companyScopeColumns(scope);
+  const attemptLog: BatchLotAttemptLog = { lastLot: null };
+  let lastCollision: unknown = null;
+
+  for (let attempt = 1; attempt <= BATCH_LOT_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await prisma.$transaction((tx) =>
+        write(tx, async () => {
+          const lot = await resolveLot(tx, batch, scope);
+          attemptLog.lastLot = lot;
+          return lot;
+        }),
+      );
+    } catch (error) {
+      if (!isDuplicateBatchLot(error)) translateBatchWriteError(error);
+      if (batch.lot !== null) {
+        // El valor va al `diagnostic`, que acaba en el LOG del servidor y nunca en el navegador.
+        throw new BatchDuplicateLotError(`empresa ${companyId}, lote escrito a mano '${batch.lot}'`);
+      }
+      lastCollision = error;
+    }
+  }
+
+  throw new Error(
+    `no se pudo escribir un lote generado sin chocar con el indice unico (company_id, lot): empresa ${companyId}, ultimo lote intentado '${attemptLog.lastLot ?? '(sin resolver)'}', ${BATCH_LOT_MAX_ATTEMPTS} intentos`,
+    { cause: lastCollision },
+  );
+}
+
+/**
  * `createWithFirstBatch` de `ProductRepository` (R16, R21).
  *
  * LAS DOS ESCRITURAS VAN EN UNA SOLA `prisma.$transaction` y ese es el punto entero de la
@@ -669,7 +916,9 @@ function translateBatchWriteError(error: unknown): never {
  *
  * El `catch` esta FUERA de la transaccion, no dentro: capturarlo dentro del callback lo
  * consumiria y la transaccion se comitearia con el producto ya escrito. Aqui el error sale
- * del callback, Postgres deshace, y solo despues se traduce.
+ * del callback, Postgres deshace, y solo despues se traduce. Desde QC-81 ese `catch` -y el
+ * reintento del lote generado (R15)- vive en `writeBatchWithLotRetry`, compartido con
+ * `addBatchToAlive`: la transaccion la abre el, una por intento.
  *
  * El producto se escribe con `nameNormalized` en la misma llamada que `name`, igual que
  * `createProduct`, y con la MISMA existencia que el lote: es la decision cerrada del
@@ -682,34 +931,34 @@ export async function createWithFirstBatch(
   now: Date,
   scope: InventoryScope,
 ): Promise<{ id: string; batchId: string }> {
-  try {
-    return await prisma.$transaction(async (tx) => {
-      const created = await tx.product.create({
-        data: {
-          name: product.name,
-          nameNormalized: normalizeProductName(product.name),
-          stock: product.stock ?? null,
-          qtyAlert: product.qtyAlert ?? null,
-          // QC-49 (R17): LAS DOS FILAS -el producto y su lote- llevan la MISMA empresa, la del
-          // ambito, y las dos la toman del mismo sitio. Que coincidan no se confia a este
-          // archivo: el disparador `product_batches_check_company` lo verifica en la base.
-          ...companyScopeColumns(scope),
-          createdAt: now,
-          updatedAt: now,
-        },
-        select: { id: true },
-      });
-
-      const createdBatch = await tx.productBatch.create({
-        data: toBatchCreateData(created.id, batch, now, scope),
-        select: { id: true },
-      });
-
-      return { id: created.id, batchId: createdBatch.id };
+  return writeBatchWithLotRetry(batch, scope, async (tx, resolveBatchLot) => {
+    const created = await tx.product.create({
+      data: {
+        name: product.name,
+        nameNormalized: normalizeProductName(product.name),
+        stock: product.stock ?? null,
+        qtyAlert: product.qtyAlert ?? null,
+        // QC-49 (R17): LAS DOS FILAS -el producto y su lote- llevan la MISMA empresa, la del
+        // ambito, y las dos la toman del mismo sitio. Que coincidan no se confia a este
+        // archivo: el disparador `product_batches_check_company` lo verifica en la base.
+        ...companyScopeColumns(scope),
+        createdAt: now,
+        updatedAt: now,
+      },
+      select: { id: true },
     });
-  } catch (error) {
-    translateBatchWriteError(error);
-  }
+
+    // QC-81 (R8, R9, R10, R25, R27): el lote se resuelve DENTRO de esta misma transaccion, justo
+    // antes de escribirlo. Si el lote o su fila fallan, el producto de arriba tampoco queda.
+    const lot = await resolveBatchLot();
+
+    const createdBatch = await tx.productBatch.create({
+      data: toBatchCreateData(created.id, batch, lot, now, scope),
+      select: { id: true },
+    });
+
+    return { id: created.id, batchId: createdBatch.id };
+  });
 }
 
 /**
@@ -743,26 +992,28 @@ export async function addBatchToAlive(
   now: Date,
   scope: InventoryScope,
 ): Promise<{ batchId: string } | null> {
-  try {
-    return await prisma.$transaction(async (tx) => {
-      // QC-49 (R16): «de MI empresa» es un `where`, exactamente como «sigue vivo». Un producto de
-      // otra empresa no devuelve fila y esta funcion sale por `null` -el mismo camino que «no
-      // existe»-, sin escribir ningun lote. Decidirlo con un `if` sobre la fila leida ya seria
-      // haber leido lo ajeno.
-      const alive = await tx.product.findFirst({
-        where: { AND: [productCompanyScope(scope), { id: productId, deletedAt: null }] },
-        select: { id: true },
-      });
-      if (alive === null) return null;
-
-      const createdBatch = await tx.productBatch.create({
-        data: toBatchCreateData(alive.id, batch, now, scope),
-        select: { id: true },
-      });
-
-      return { batchId: createdBatch.id };
+  // QC-81 (R13, R15): la transaccion -una por intento- y la politica de choque de lote las pone
+  // `writeBatchWithLotRetry`, la misma que usa `createWithFirstBatch`.
+  return writeBatchWithLotRetry(batch, scope, async (tx, resolveBatchLot) => {
+    // QC-49 (R16): «de MI empresa» es un `where`, exactamente como «sigue vivo». Un producto de
+    // otra empresa no devuelve fila y esta funcion sale por `null` -el mismo camino que «no
+    // existe»-, sin escribir ningun lote. Decidirlo con un `if` sobre la fila leida ya seria
+    // haber leido lo ajeno.
+    const alive = await tx.product.findFirst({
+      where: { AND: [productCompanyScope(scope), { id: productId, deletedAt: null }] },
+      select: { id: true },
     });
-  } catch (error) {
-    translateBatchWriteError(error);
-  }
+    if (alive === null) return null;
+
+    // QC-81 (R8, R9, R10, R27): DESPUES de confirmar que el producto sigue vivo y es de la
+    // empresa: un alta que no va a escribir nada no pide lock ni consulta la serie.
+    const lot = await resolveBatchLot();
+
+    const createdBatch = await tx.productBatch.create({
+      data: toBatchCreateData(alive.id, batch, lot, now, scope),
+      select: { id: true },
+    });
+
+    return { batchId: createdBatch.id };
+  });
 }
