@@ -336,3 +336,10 @@ ningun codigo de permiso — eso sigue siendo la primera linea del caso de uso (
   generar. Es la unica parte del criterio de «Hecho» de T10 que no se pudo acreditar ejecutando;
   lo que si esta cubierto, por los tests del adaptador que si corren, es que construir la fachada
   no lee ninguna variable de entorno ni carga el par nativo.
+- **La caducidad que se informa es la del reloj del dominio, no la de cada firma.** El caso de uso
+  calcula `expiresAt` **una sola vez por tanda** y sobreescribe el que devuelve el adaptador, a
+  proposito: firmar diez archivos no puede dar diez vencimientos distintos. El efecto secundario,
+  que hasta ahora no estaba escrito en ningun sitio: el instante informado para el **ultimo**
+  archivo queda **ligeramente anterior** al real, porque su firma se emitio unos milisegundos
+  despues. Es **conservador** —nunca dice que un enlace vive mas de lo que vive, asi que no engana
+  a favor de quien sube— y por eso se acepta en vez de corregirse.
