@@ -239,6 +239,16 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         page: 1,
       }),
   },
+  {
+    // La accion captura los errores y devuelve un estado, asi que una entrada invalida no rompe
+    // el caso: lo que esta lista mide es cuantas veces se lee la sesion por invocacion.
+    archivo: 'lib/modules/documentos/adapters/driving/document-upload-actions.ts',
+    nombre: 'issueUploadLinksAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/documentos/adapters/driving/document-upload-actions')
+      ).issueUploadLinksAction({} as never),
+  },
 ];
 
 /**

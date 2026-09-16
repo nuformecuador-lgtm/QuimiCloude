@@ -108,19 +108,30 @@ particion en `progress/current.md > Evaluaciones`.
 | `medium` | 2-3 capas, condiciones, multiples archivos |
 | `high` | multi-feature, webhooks, integraciones externas |
 
-## Modelos
+## Modelos (2026-09-16)
 
-**Ningun subagente fija modelo: todos HEREDAN el de la sesion.** El frontmatter de
-`.claude/agents/*.md` no lleva `model:`, y el leader no pasa override al delegar salvo razon
-concreta para esa llamada.
+**Los tres agentes que ejecutan declaran `model: sonnet`: `frontend_dev`, `backend_dev` y
+`extractor`.** Los otros cuatro —`spec_author`, `reviewer`, `implementer` y `leader`— **heredan el
+de la sesion** y no llevan `model:`: son los que escriben el spec, lo juzgan y coordinan, y ahi un
+error cuesta mas de lo que ahorra el modelo.
 
-Antes habia una tabla que asignaba `opus-4.8` a los seis agentes por igual — la misma columna
-repetida tres veces, o sea que no discriminaba nada por `complexity`. El 2026-07-31 ese id dejo de
-estar disponible y en un proyecto anterior con este arnes **un `backend_dev` murio al arrancar**
-sin escribir una linea;
-`spec_author` y `reviewer` siguieron funcionando porque no fijaban modelo. Un id escrito a mano
-envejece y rompe el arnes entero en silencio; la herencia no. Si algun dia hace falta discriminar por
-`complexity`, se hace en la llamada concreta, no en el frontmatter.
+**Solo el alias, nunca un id con fecha.** Antes habia una tabla que asignaba `opus-4.8` a los seis
+agentes por igual — la misma columna repetida tres veces, o sea que no discriminaba nada por
+`complexity`. El 2026-07-31 ese id dejo de estar disponible y en un proyecto anterior con este arnes
+**un `backend_dev` murio al arrancar** sin escribir una linea; `spec_author` y `reviewer` siguieron
+funcionando porque no fijaban modelo. Un id escrito a mano envejece y rompe el arnes entero en
+silencio; un alias no.
+
+**La excepcion, y como se documenta:** el leader **puede** pasar un override en una llamada
+concreta —un `reviewer` con mas capacidad en una feature `complexity: high`, por ejemplo— y escribe
+**el motivo en `progress/current.md`**. Lo que no vale es cambiar el frontmatter para una feature y
+olvidarse de devolverlo.
+
+**Lo que esto cuesta, dicho en voz alta:** los tres que bajan a sonnet son justo los que escriben
+codigo. Si la calidad cae, se paga en rondas de review, y hoy **nadie mide eso**. Si aparecen mas
+rondas de las habituales, esta es la primera sospechosa.
+
+Lo hace cumplir `tests/guards/guard-modelos-de-agentes.test.ts`.
 
 ## Paralelismo
 
@@ -233,7 +244,9 @@ Feature con `depends_on` no arranca hasta que su dependencia este `done`.
    Si esa acotacion cambia el alcance, el comando **actualiza el board antes de sembrar** y no
    al reves (`docs/jira.md > Cuando el disco descubre que el board esta desactualizado`).
 
-   Lanza `spec_author` con el nombre de la feature y modelo segun complexity. Produce:
+   Lanza `spec_author` con el nombre de la feature. **No pases override de modelo** salvo
+   razon concreta para esa llamada, y entonces escribe el motivo en `progress/current.md`
+   (`## Modelos`). Produce:
    - `specs/<feature>/requirements.md` — requisitos en EARS, numerados `R1`, `R2`…
    - `specs/<feature>/design.md` — decisiones tecnicas + una alternativa descartada.
    - `specs/<feature>/tasks.md` — checklist de pasos discretos.
@@ -256,7 +269,8 @@ Feature con `depends_on` no arranca hasta que su dependencia este `done`.
    `tasks.md` una a una, marcando `[x]`. Escribe su parte en
    `progress/impl_<feature>.md` (archivos tocados, mapa `R<n> -> test`, salida de
    los tests).
-8. (F2.2) Lanza `reviewer` con modelo segun complexity. Verifica contra `docs/`,
+8. (F2.2) Lanza `reviewer`, que hereda el modelo de la sesion; un override puntual va con su
+   motivo en `progress/current.md` (`## Modelos`). Verifica contra `docs/`,
    `specs/<feature>/` y `CHECKPOINTS.md`. Escribe `progress/review_<feature>.md`.
    Si hay hallazgos mayores, son bloqueantes: vuelve al implementer.
 9. (F2.3) **Sincronizacion con `dev`.** El implementer:

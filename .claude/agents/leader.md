@@ -23,15 +23,18 @@ Reglas:
 
 ## Modelos
 
-**Ningun subagente fija modelo: todos HEREDAN el de la sesion.** No pongas `model:` en el
-frontmatter de `.claude/agents/*.md` ni pases override al delegar, salvo que tengas una razon
-concreta para esa llamada.
+**`frontend_dev`, `backend_dev` y `extractor` declaran `model: sonnet`. Los otros cuatro heredan el
+de la sesion y NO llevan `model:`.** No cambies eso al vuelo.
 
-Por que, escrito el 2026-07-31 tras romperse: los cinco agentes declaraban `model: opus-4.8`, un id
-que dejo de estar disponible, y en un proyecto anterior con este arnes **un `backend_dev` murio al
-arrancar** («It may not exist or you may not have access to it») sin escribir una linea. `spec_author` y `reviewer`
-sobrevivieron por no fijar modelo. Un id de modelo escrito a mano envejece; la herencia no. Si algun
-dia hace falta discriminar por `complexity`, hazlo en la llamada concreta y no en el frontmatter.
+**Nunca escribas un id con fecha** —`opus-4.8` y parecidos—: solo el alias. Un id a mano envejece y
+mata al agente al arrancar; ya paso el 2026-07-31.
+
+**Puedes pasar override en una llamada concreta** si tienes una razon —una feature `complexity:
+high`, por ejemplo—, pero **escribe el motivo en `progress/current.md`**. Nunca lo arregles editando
+el frontmatter.
+
+El porque completo y el incidente: `AGENTS.md > Modelos`. La guardia que lo hace cumplir:
+`tests/guards/guard-modelos-de-agentes.test.ts`.
 
 ## Ciclo
 0. **Importa el board (F0).** Con las herramientas MCP de `atlassian`, regenera
@@ -53,7 +56,8 @@ dia hace falta discriminar por `complexity`, hazlo en la llamada concreta y no e
    `key` es el issue key del board (`QC-15`) y el id numerico es solo el fallback, y
    actualiza `feature_list.json`. El worktree principal se queda en `dev`: no hagas
    `git checkout` en el.
-4. Delega en `spec_author` con el modelo segun complexity. Cuando termine, cambia
+4. Delega en `spec_author`, que hereda el modelo de la sesion; un override puntual va con su
+   motivo en `progress/current.md`. Cuando termine, cambia
    la feature a `spec_ready`, **mueve la tarjeta a *Spec en revision*** con un comentario
    apuntando a `specs/<feature>/`, y pide aprobacion humana. DETENTE.
 5. Con "aprobado" (o con la tarjeta movida a *En curso*, que es la forma canonica):
