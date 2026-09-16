@@ -161,7 +161,7 @@
   Depende de: T4.
   Cubre: R3 (parte), R4, R5, R8, R9, R26.
 
-- [ ] **T12 — Integración: restricciones, backfill y reversión.** `[P]`
+- [x] **T12 — Integración: restricciones, backfill y reversión.** `[P]`
   Archivos: `tests/integration/pedidos/company-scope.int.test.ts` (nuevo, declarado en
   `tests/integration/aislamiento.json` con su motivo).
   Contenido: `INSERT` de pedido sin empresa y con empresa inexistente → rechazo; dos pedidos de
