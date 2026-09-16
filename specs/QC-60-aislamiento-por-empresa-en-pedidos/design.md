@@ -29,7 +29,7 @@ R8 y R9. Lo digo aquí porque el leader va a contar.
 
 - `db/schema.prisma:1080-1105`, modelo `Order`: **no hay `companyId`**. Índice único
   `@@unique([orderYear, orderSequence], map: "orders_order_year_order_sequence_key")` (`:1100`).
-  Tres FK escritas a mano (`recipes`, `users` × 2), seis `CHECK`, cuatro índices parciales de QC-57
+  Tres FK escritas a mano (`recipes`, `users` × 2), cinco `CHECK`, cuatro índices parciales de QC-57
   y RLS `ENABLE` + `FORCE`, todo **drift para Prisma** y avisado en los `///` del modelo
   (`:1060-1078`).
 - **Un pedido es `recipe_id` + `quantity`.** No existe ninguna tabla de líneas: la decisión 1 lo
@@ -43,6 +43,9 @@ R8 y R9. Lo digo aquí porque el leader va a contar.
 - La cabecera de esa misma migración (`:22-29`) **documenta el agujero de la secuencia**: solo sabe
   de los números que ella entregó, y quien cargue filas por otra vía tiene que hacer `setval` a
   mano. Este párrafo es la razón principal de §3.
+- **Errata 2026-09-16:** este documento decía «seis `CHECK`» en `orders`; son **cinco**
+  (`orders_unit_price_non_negative` cayó con `20260907120000_orders_drop_unit_and_unit_price`). Se
+  corrigió en §0.3, §1 y §7; ningún diseño cambia.
 - Base de desarrollo: **3 pedidos vivos**, todos de QuimiCloud, correlativos **37, 44 y 77** de
   2026; **0 filas** en `order_assignments`; **48 empresas**, una sola real; 5 recetas.
 - `recipes` **no tiene** `company_id` (QC-50, `pending`).
@@ -90,7 +93,7 @@ y todo archivo nuevo de `tests/integration/**` hay que declararlo en
 
 Lo que **no** se mueve: el contrato genérico de consulta (QC-57), el orden por defecto, la
 paginación, la forma de todos los resultados públicos, la tabla de transiciones, el borrado lógico y
-los seis `CHECK` de `orders` (R34).
+los cinco `CHECK` de `orders` (R34).
 
 **La frontera es el service, no la RLS.** Prisma conecta como dueño de las tablas y no setea
 `request.jwt.claims`: ninguna policy filtra nada. La RLS se conserva activada y forzada como defensa
@@ -251,6 +254,23 @@ correcta aquí** —a diferencia de lo que corrigió QC-81—: el alta inserta c
 conector **no** entrega `meta.target` con las columnas; lo único estructurado es el SQLSTATE y el
 nombre de la restricción, que Postgres nunca traduce. Lo que cambia es **la constante**:
 `ORDER_NUMBER_UNIQUE_INDEX` pasa a valer `'orders_company_year_sequence_key'`.
+
+> **Enmienda 2026-09-16, decisión humana.** El párrafo anterior queda **derogado**: el choque se
+> reconoce por el **SQLSTATE `23505`**, no por el nombre del índice, y sin leer ningún texto del
+> error. **Por qué:** medido contra la base de desarrollo (Postgres 16.1, `lc_messages =
+> Spanish_Colombia.1252`), el `INSERT` crudo dentro de `prisma.$transaction` devuelve
+> `PrismaClientKnownRequestError` con `code: 'P2010'` y `meta = {code: '23505', message: 'Ya existe
+> la llave (company_id, order_year, order_sequence)=(…)'}`: **el nombre del índice no viaja en
+> ningún campo**, así que el reconocimiento por nombre devolvía siempre `false` y el reintento y
+> `'duplicate_number'` eran código muerto. Además el patrón contradecía la regla ya escrita en el
+> repo —«el choque se reconoce por el CÓDIGO, jamás por el texto del error»
+> (`identity/adapters/driven/persistence/credential-setup-link-prisma.ts`,
+> `session-revocation-prisma.ts`)—. **Por qué es seguro reconocer solo el código:** está acotado a
+> ese `INSERT`, que no escribe `id` (`gen_random_uuid()`), así que de los tres únicos de `orders`
+> (`orders_pkey`, `orders_id_company_id_key`, `orders_company_year_sequence_key`) solo puede chocar
+> el del correlativo. La constante `ORDER_NUMBER_UNIQUE_INDEX` desaparece. R15 gana un test de
+> integración que provoca un `23505` auténtico y que fue rojo con el reconocimiento por nombre. El
+> reintento de hasta 3 transacciones y el resultado `'duplicate_number'` no cambian.
 
 Ante ese choque, el adaptador **reintenta la transacción entera hasta 3 veces** —transacción nueva,
 instantánea nueva, máximo nuevo—, con el reintento **fuera** de `prisma.$transaction` porque una
@@ -417,7 +437,7 @@ y no añade ni quita ninguna de sus restricciones (R26).
 
 Una migración nueva, `db/migrations/<ts>_orders_company_scope/`, con `migration.sql` y `down.sql`
 (R5). **Escrita entera a mano**, no generada por `prisma migrate dev`: `orders` y
-`order_assignments` cargan con seis `CHECK`, cinco FK escritas a mano —dos de ellas compuestas—,
+`order_assignments` cargan con seis `CHECK` (cinco de `orders`, uno de `order_assignments`), seis FK escritas a mano —dos de ellas compuestas—,
 cuatro índices parciales y RLS forzada, todo lo cual `migrate dev` lee como drift y propone resetear
 una base con datos. Es el mismo motivo y las mismas palabras que QC-76, QC-80, QC-49 y QC-81. Se
 aplica con `pnpm run db:migrate` (`prisma migrate deploy`), que no mira drift.

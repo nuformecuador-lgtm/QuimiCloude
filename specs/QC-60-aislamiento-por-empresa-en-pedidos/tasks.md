@@ -156,7 +156,7 @@
   la FK compuesta, el `DROP FUNCTION` y el `ENABLE`+`FORCE`; **no contiene ningún `DELETE` ni
   `INSERT`**, **ningún `UPDATE` de `order_sequence`**, **ningún `MATCH FULL`** y **ningún
   `DROP CONSTRAINT` salvo el de la FK simple**; el `down.sql` abre con sus tres guardias, recrea la
-  función y hace el `setval`; identificadores en inglés; los seis `CHECK` y las tres FK previas de
+  función y hace el `setval`; identificadores en inglés; los cinco `CHECK` y las tres FK previas de
   `orders` siguen escritos.
   Depende de: T4.
   Cubre: R3 (parte), R4, R5, R8, R9, R26.
@@ -216,7 +216,7 @@
   Contenido: los seis casos de uso reciben el ámbito **del actor** y no de la entrada; ficha /
   edición / cancelación / borrado de un pedido ajeno → `OrderNotFoundError` y **nunca**
   `UnauthorizedError`; el permiso se exige **antes** del ámbito (actor sin permiso y de otra empresa
-  → error de autorización sin tocar el puerto); una `companyId` en la entrada → `invalid_input`; falta
+  → error de autorización sin tocar el puerto); una `companyId` en la entrada se descarta y la fila se escribe con la empresa del actor (R22 enmendado el 2026-09-16); falta
   el contexto de sesión → la action no llama al caso de uso; ninguna salida pública lleva `companyId`.
   Depende de: T7, T10.
   Cubre: R16, R17, R18, R20, R21, R22, R23, R28.
@@ -272,7 +272,7 @@
 | R12 | `tests/integration/pedidos/company-scope-queries.int.test.ts` | integración |
 | R13 | `tests/integration/pedidos/company-scope.int.test.ts` (backfill) + `company-scope-queries.int.test.ts` (el siguiente es 78) | integración |
 | R14 | `tests/integration/pedidos/order-sequence-race.int.test.ts` | integración |
-| R15 | `order-sequence-race.int.test.ts` + `tests/unit/pedidos/order-prisma.test.ts` (traducción del `23505`) | integración + unit |
+| R15 | `tests/integration/pedidos/order-duplicate-number.int.test.ts` (23505 auténtico → `duplicate_number`) + `order-sequence-race.int.test.ts` + `tests/unit/pedidos/order-prisma-errors.test.ts` (forma real del error) | integración + unit |
 | R16 | `tests/unit/pedidos/company-isolation-service.test.ts` | unit |
 | R17 | `tests/unit/pedidos/order-actions.test.ts` | unit |
 | R18 | `tests/guards/guard-ambito-empresa-pedidos.test.ts` + `tests/unit/pedidos/company-scope.test.ts` + `company-scope-queries.int.test.ts` | guardia + unit + integración |

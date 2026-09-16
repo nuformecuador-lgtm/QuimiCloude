@@ -155,8 +155,13 @@ sistema DEBE rechazarlo **en el service** con el mismo código «el pedido no ex
 modificar ni marcar como borrada ninguna fila, ni de la empresa de quien pide ni de la otra.
 
 **R22.** CUANDO se da de alta un pedido, el sistema DEBE escribir en la fila la empresa **del actor**;
-SI la entrada del llamante trae una empresa, ENTONCES el sistema NO DEBE escribirla, NO DEBE tenerla en
-cuenta y DEBE rechazar la entrada por campo desconocido.
+SI la entrada del llamante trae una empresa, ENTONCES el sistema NO DEBE escribirla y NO DEBE tenerla en
+cuenta.
+
+> **Enmienda 2026-09-16, decisión humana:** la cláusula de rechazo («DEBE rechazar la entrada por campo
+> desconocido») se copió de QC-49 R17 y choca con QC-35bis, que fija el **descarte** de claves
+> desconocidas en el alta de pedidos (`tests/unit/pedidos/order-input.test.ts`). Se quita. La garantía de
+> seguridad —que la empresa de la entrada no se escribe— se conserva y tiene test.
 
 **R23.** El sistema NO DEBE exponer el identificador de empresa en la salida de su contrato público —ni
 en la vista del pedido, ni en el resumen de la lista, ni en el estado que devuelven sus Server
