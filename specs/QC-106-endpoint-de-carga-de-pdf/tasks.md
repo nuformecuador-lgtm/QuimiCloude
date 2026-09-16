@@ -25,7 +25,7 @@
 
 ## Tanda 0 — las dos puertas que no se pueden saltar
 
-- [ ] **T0 — Cerrar la puerta F1.4: dependencia y permiso.**
+- [x] **T0 — Cerrar la puerta F1.4: dependencia y permiso.**
       Archivos: ninguno todavía.
       Dos respuestas humanas, las dos en la aprobación del spec:
       1. **`unpdf` + `@napi-rs/canvas`** con los cuatro checks de `design.md > 8`. Sin «sí», **T8 no
