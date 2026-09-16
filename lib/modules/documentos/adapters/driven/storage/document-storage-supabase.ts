@@ -2,7 +2,10 @@ import { StorageClient } from '@supabase/storage-js';
 
 import { readDocumentStorageConfigFromEnv } from '../config/document-storage-config-env';
 
-import { PROVIDER_UPLOAD_LINK_TTL_SECONDS } from '../../../domain/limits';
+import {
+  MILLISECONDS_PER_SECOND,
+  PROVIDER_UPLOAD_LINK_TTL_SECONDS,
+} from '../../../domain/limits';
 
 import type { SignedUpload } from '../../../ports/document-storage';
 
@@ -56,7 +59,7 @@ export async function createDocumentSignedUpload(path: string): Promise<SignedUp
   }
 
   const expiresAt = new Date(
-    Date.now() + PROVIDER_UPLOAD_LINK_TTL_SECONDS * 1000,
+    Date.now() + PROVIDER_UPLOAD_LINK_TTL_SECONDS * MILLISECONDS_PER_SECOND,
   ).toISOString();
   return { path: data.path, uploadUrl: data.signedUrl, token: data.token, expiresAt };
 }

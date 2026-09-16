@@ -16,6 +16,13 @@
  *      se escribe —o escribir en la carpeta de otra empresa— es inexpresable, no «esta validado».
  *   4. Un enlace firmado por archivo.
  *
+ * **La caducidad que se informa es la del reloj de ESTA operacion, no la de cada firma.** Toda la
+ * tanda recibe un unico instante, calculado una sola vez: diez archivos no pueden vencer en diez
+ * momentos distintos solo porque el reloj avance mientras se firman. El efecto secundario, dicho
+ * entero: como cada firma se emite un poco DESPUES de ese instante, el vencimiento informado del
+ * ultimo archivo queda ligeramente ANTERIOR al real. Es la desviacion CONSERVADORA —el enlace vive
+ * algo mas de lo que se promete, nunca menos—, asi que nunca engaña a favor de quien sube.
+ *
  * **Lo que esta operacion NO hace, y se dice porque la ausencia es el requisito:** no recibe, no lee
  * y no reenvia los BYTES de ningun PDF —viajan del navegador al bucket sin atravesar la aplicacion—;
  * no convierte nada; no devuelve ninguna URL completa de lectura; y no escribe ni lee ninguna fila.
@@ -26,13 +33,10 @@
 import { requirePermission, type Actor, DOCUMENT_UPLOAD_PERMISSION } from './actor';
 import { buildDocumentPath } from './document-path';
 import { ValidationError } from './errors';
-import { PROVIDER_UPLOAD_LINK_TTL_SECONDS } from './limits';
+import { MILLISECONDS_PER_SECOND, PROVIDER_UPLOAD_LINK_TTL_SECONDS } from './limits';
 import { issueUploadLinksSchema } from './upload-input';
 
 import type { DocumentStorage, SignedUpload } from '../ports/document-storage';
-
-/** Un segundo, en milisegundos: el unico factor que hace falta para pasar del TTL a una fecha. */
-const MILLISECONDS_PER_SECOND = 1000;
 
 export type IssueUploadLinksDeps = {
   /** El bucket, dicho sin nombrarlo. Es el UNICO puerto de esta operacion. */

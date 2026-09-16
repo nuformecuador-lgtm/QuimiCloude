@@ -9,6 +9,16 @@
  * Dominio puro: este archivo no importa nada.
  */
 
+/**
+ * Un segundo, en milisegundos.
+ *
+ * No es un limite del negocio sino el factor con el que un plazo —que este modulo cuenta SIEMPRE en
+ * segundos, porque asi lo pide el servicio— se convierte en un instante. Vive aqui por el mismo
+ * motivo que los demas: estaba escrito en dos archivos, y un numero repetido es una divergencia
+ * esperando a que alguien toque uno de los dos.
+ */
+export const MILLISECONDS_PER_SECOND = 1000;
+
 /** Cuantos archivos admite una tanda. Por encima de esto la tanda se rechaza ENTERA. */
 export const MAX_FILES_PER_BATCH = 10;
 
