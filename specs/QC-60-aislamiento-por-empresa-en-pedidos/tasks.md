@@ -236,7 +236,7 @@
 
 ## Bloque 4 — Cierre
 
-- [ ] **T18 — Documentación de la deuda saldada.**
+- [x] **T18 — Documentación de la deuda saldada.**
   Archivos: `docs/architecture.md > Dominio` (quitar `pedidos (QC-60)` de la lista de deuda
   registrada, `:33-37`, dejando el resto intacto); `db/schema.prisma` (comentarios `///` de `Order` y
   de `OrderAssignment`: la FK del pedido ya es compuesta, `OJO 2` deja de decir «esta ficha NO se lo
