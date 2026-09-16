@@ -310,6 +310,8 @@ const EXPORTACIONES_DE_EJECUCION = [
   'isPathInCompany',
   'issueUploadLinksSchema',
   'createIssueUploadLinks',
+  'createIssueReadLink',
+  'createDownloadDocument',
   'createConvertPdfs',
 ] as const;
 
@@ -320,6 +322,7 @@ const EXPORTACIONES_DE_TIPO = [
   'IssueUploadLinksDeps',
   'IssuedUploadBatch',
   'IssueUploadLinksInput',
+  'ReadDocumentDeps',
   'ConversionFailure',
   'ConversionResult',
   'ConversionSuccess',

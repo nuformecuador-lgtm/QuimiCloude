@@ -58,6 +58,16 @@ export {
   type IssuedUploadBatch,
 } from './domain/issue-upload-links';
 
+// Las DOS operaciones de LECTURA, tambien como fabricas y por el mismo motivo. Lo que sale por el
+// contrato son los casos de uso —que comprueban la empresa del actor antes de tocar el puerto— y
+// NUNCA las funciones del puerto: leer o descargar sin esa comprobacion no es una opcion que este
+// modulo ofrezca.
+export {
+  createDownloadDocument,
+  createIssueReadLink,
+  type ReadDocumentDeps,
+} from './domain/read-document';
+
 export {
   createConvertPdfs,
   type ConversionFailure,

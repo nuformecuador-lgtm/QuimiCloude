@@ -273,7 +273,12 @@ import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity
 // `documentos` — las DOS factories salen del CONTRATO del modulo (solo dominio), los dos puertos de
 // `ports/` y las dos implementaciones de `adapters/driven/` por su ruta exacta. La Server Action del
 // modulo NO se importa desde aqui: la flecha va driving -> composicion.
-import { createConvertPdfs, createIssueUploadLinks } from '@/lib/modules/documentos';
+import {
+  createConvertPdfs,
+  createDownloadDocument,
+  createIssueReadLink,
+  createIssueUploadLinks,
+} from '@/lib/modules/documentos';
 import {
   countPages,
   extractPdfText,
@@ -1077,4 +1082,14 @@ export const documentos = {
     now: () => new Date(),
   }),
   convertPdfs: createConvertPdfs({ converter: pdfConverter }),
+  // Las DOS operaciones de LECTURA salen por aqui como CASOS DE USO, no como las funciones del
+  // puerto: reciben el actor, comprueban que la ruta cae bajo su empresa y solo entonces llaman al
+  // almacenamiento. Cablear el puerto a pelo dejaria leer y descargar por ruta sin esa comprobacion,
+  // que es justo lo que no puede existir cuando el aislamiento entre empresas ES la ruta.
+  //
+  // El plazo de la firma de lectura NO se cablea aqui: lo pone el caso de uso desde la definicion
+  // unica del modulo. Tampoco se invoca ninguna de las dos: construir esta fachada sigue sin leer
+  // una variable ni tocar la red.
+  issueReadLink: createIssueReadLink({ storage: documentStorage }),
+  downloadDocument: createDownloadDocument({ storage: documentStorage }),
 } as const;

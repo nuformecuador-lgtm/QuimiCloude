@@ -31,9 +31,14 @@ export function buildDocumentPath(companyId: string): string {
  * `empresa-A2/x.pdf` pasaria como ruta de `empresa-A` y una empresa leeria los archivos de otra
  * solo por como se llama. Ademas se exige que haya algo DESPUES del segmento de empresa: la carpeta
  * de la empresa, sola, no es la ruta de ningun archivo.
+ *
+ * Y NINGUN segmento puede ser `..`, empiece la ruta por donde empiece: `empresa-A/../empresa-B/x.pdf`
+ * arranca con el segmento correcto y, sin embargo, apunta FUERA de la empresa en cuanto alguien la
+ * normalice. Comparar solo el primer segmento dejaria pasar exactamente esa ruta.
  */
 export function isPathInCompany(path: string, companyId: string): boolean {
   if (companyId.length === 0) return false;
   const [head, ...rest] = path.split('/');
-  return head === companyId && rest.length > 0 && rest.join('/').length > 0;
+  if (head !== companyId || rest.length === 0 || rest.join('/').length === 0) return false;
+  return !rest.includes('..');
 }
