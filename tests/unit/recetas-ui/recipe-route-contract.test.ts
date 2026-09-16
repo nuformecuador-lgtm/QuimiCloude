@@ -3,6 +3,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 import { PERMISSIONS } from '@/lib/modules/identity';
+import { RECIPE_QUERYABLE } from '@/lib/modules/recetas';
 import { PRIVATE_NAV_ITEMS, type NavLink } from '@/lib/shared/navigation/private-nav';
 import { FORMULAS_ROUTE, NEW_RECIPE_ROUTE, recipeEditRoute } from '@/lib/shared/routes';
 
@@ -117,17 +118,47 @@ const FUENTES_DE_LA_RUTA = fuentesBajo(CARPETA_RUTA);
 /** Solo los archivos de la LISTA -R10 ampliado exige que ninguno de estos lleve el marcador ni el
  *  aviso de linea con producto de baja, esa senal es solo del formulario-. */
 const ARCHIVOS_DE_LA_LISTA = [
-  join(COMPONENTES_PATH, 'recipe-columns.ts'),
+  join(COMPONENTES_PATH, 'recipe-columns.tsx'),
+  join(COMPONENTES_PATH, 'recipe-columns-skeleton.ts'),
   join(COMPONENTES_PATH, 'recipe-table.tsx'),
   join(COMPONENTES_PATH, 'recipe-table-skeleton.tsx'),
   join(COMPONENTES_PATH, 'recipe-list-empty.tsx'),
   join(COMPONENTES_PATH, 'recipe-list-error.tsx'),
   join(COMPONENTES_PATH, 'recipe-list-params.ts'),
   join(COMPONENTES_PATH, 'recipe-list-section.tsx'),
-  join(COMPONENTES_PATH, 'recipe-list-toolbar.tsx'),
   join(COMPONENTES_PATH, 'delete-recipe-dialog.tsx'),
   PAGE_PATH,
 ].map((ruta) => ruta.split('\\').join('/'));
+
+const COLUMNAS_PATH = enRutaDePosix(join(COMPONENTES_PATH, 'recipe-columns.tsx'));
+const PARSER_PATH = enRutaDePosix(join(COMPONENTES_PATH, 'recipe-list-params.ts'));
+
+/** Los archivos por los que pasan las filas entre la operacion de listado y la tabla compartida. */
+const ARCHIVOS_DE_TABLA_Y_COLUMNAS = [
+  join(COMPONENTES_PATH, 'recipe-list-section.tsx'),
+  join(COMPONENTES_PATH, 'recipe-table.tsx'),
+  join(COMPONENTES_PATH, 'recipe-columns.tsx'),
+  join(COMPONENTES_PATH, 'recipe-columns-skeleton.ts'),
+  join(COMPONENTES_PATH, 'recipe-table-skeleton.tsx'),
+].map(enRutaDePosix);
+
+/** Operaciones de array que reordenan, descartan o recortan una coleccion. */
+const OPERACIONES_SOBRE_FILAS = [
+  '.sort(',
+  '.toSorted(',
+  '.reverse(',
+  '.toReversed(',
+  '.filter(',
+  '.slice(',
+  '.splice(',
+  '.toSpliced(',
+] as const;
+
+/**
+ * Recortes que no tocan ninguna coleccion: la celda de fecha corta la cadena ISO de UN valor. Se
+ * nombran por texto exacto para que cualquier otro `.slice(` siga contando.
+ */
+const RECORTES_DE_TEXTO_PERMITIDOS = ['.toISOString().slice('] as const;
 
 /**
  * EXCEPCION UNICA Y NOMBRADA a la regla «todo archivo de `components/` sale por el barrel» (R46).
@@ -702,7 +733,7 @@ describe('contrato de la ruta de recetas', () => {
     expect(enlace?.permission).toBe(permiso?.code);
   });
 
-  it('la lista no puede pintar quien creo o modifico una receta', () => {
+  it('R2, R3: la lista no puede pintar quien creo o modifico una receta ni su descripcion', () => {
     // R9 — test **en negativo** sobre la fuente: lo prohibido es LEERLO o DECLARARLO como
     // columna, no nombrarlo -la declaracion de columnas nombra los dos campos justamente para
     // EXCLUIRLOS del tipo, y una prohibicion ciega borraria esa defensa al primer cambio-.
@@ -715,12 +746,17 @@ describe('contrato de la ruta de recetas', () => {
       "'recipe-column-updatedBy'",
     ]);
 
-    const columnas = fuenteSinComentarios(
-      join(COMPONENTES_PATH, 'recipe-columns.ts').split('\\').join('/'),
-    );
+    const columnas = fuenteSinComentarios(COLUMNAS_PATH);
     expect(columnas).toContain('Exclude<keyof RecipeSummary');
     expect(columnas).toContain("'createdBy'");
     expect(columnas).toContain("'updatedBy'");
+
+    // Mismo criterio que la autoria: el nombre solo puede aparecer para excluirlo del tipo de id.
+    expect(columnas).toContain("'description'");
+    expect(columnas, `${COLUMNAS_PATH} no debe leer la descripcion`).not.toContain('.description');
+    expect(columnas, `${COLUMNAS_PATH} no debe declarar la columna de descripcion`).not.toMatch(
+      /id:\s*['"`]description['"`]/,
+    );
   });
 
   it('pintar una pagina de lista cuesta una sola invocacion de listado y ningun archivo de la lista lleva la marca de producto de baja', () => {
@@ -746,18 +782,69 @@ describe('contrato de la ruta de recetas', () => {
     );
   });
 
-  it('la pantalla no ofrece busqueda ni control de orden configurable', () => {
-    // R14 — test **en negativo**: el backend solo acepta `page` y `pageSize` y ordena fijo.
-    ningunArchivoContiene(['type="search"', 'orderBy', 'sortBy', 'sortDirection']);
+  it('R10: ningun archivo de tabla o columnas ordena, filtra ni recorta las filas recibidas', () => {
+    for (const ruta of ARCHIVOS_DE_TABLA_Y_COLUMNAS) {
+      let codigo = fuenteSinComentarios(ruta);
+      for (const permitido of RECORTES_DE_TEXTO_PERMITIDOS) {
+        codigo = codigo.split(permitido).join('');
+      }
+      for (const operacion of OPERACIONES_SOBRE_FILAS) {
+        expect(codigo, `${ruta} no debe aplicar «${operacion}» a las filas`).not.toContain(
+          operacion,
+        );
+      }
+    }
+
+    // Las filas llegan a la tabla compartida tal cual las devolvio la operacion de listado.
+    const seccion = fuenteSinComentarios(ARCHIVOS_DE_TABLA_Y_COLUMNAS[0]);
+    expect(seccion).toMatch(/recipes=\{items\}/);
+    const tabla = fuenteSinComentarios(ARCHIVOS_DE_TABLA_Y_COLUMNAS[1]);
+    expect(tabla).toMatch(/rows=\{recipes\}/);
+
+    // Ordenar es cosa del servidor: la ruta no arma consultas.
+    ningunArchivoContiene(['orderBy']);
+  });
+
+  it('R11: el parser deriva los campos de RECIPE_QUERYABLE del barrel y no mantiene copia a mano', () => {
+    const parser = fuenteSinComentarios(PARSER_PATH);
+
+    expect(parser).toMatch(
+      /import\s*\{[^}]*\bRECIPE_QUERYABLE\b[^}]*\}\s*from\s*'@\/lib\/modules\/recetas';/,
+    );
+    expect(parser, 'el parser no puede leer la lista blanca por ruta profunda').not.toContain(
+      "'@/lib/modules/recetas/",
+    );
+    expect(parser).toContain('RECIPE_QUERYABLE.sortable');
+    expect(parser).toContain('RECIPE_QUERYABLE.filterable');
+    expect(parser).toContain('RECIPE_QUERYABLE.searchable');
+
+    // El unico literal de campo admitido es el id de la columna del filtro de fecha, que la
+    // tabla compartida necesita para indexar `filters`; cualquier otro seria una copia.
+    const campos = [
+      ...new Set([...RECIPE_QUERYABLE.sortable, ...Object.keys(RECIPE_QUERYABLE.filterable)]),
+    ];
+    expect(campos.length).toBeGreaterThan(0);
+
+    const lineas = parser.split('\n');
+    for (const campo of campos) {
+      const literales = [`'${campo}'`, `"${campo}"`, `\`${campo}\``];
+      for (const linea of lineas) {
+        if (!literales.some((literal) => linea.includes(literal))) continue;
+        expect(
+          linea,
+          `${PARSER_PATH} escribe a mano el campo «${campo}» fuera de CREATED_AT_COLUMN_ID`,
+        ).toMatch(/^export const CREATED_AT_COLUMN_ID = /);
+      }
+    }
   });
 
   it('la imagen se pinta con la direccion que entrega la consulta y ningun archivo compone una URL de almacenamiento', () => {
     // R18 — nada de variables de entorno de storage, ni concatenacion, ni cliente de Supabase.
     ningunArchivoContiene(['process.env', 'NEXT_PUBLIC_SUPABASE', 'supabase', '.storage.']);
 
-    const tabla = fuenteSinComentarios(join(COMPONENTES_PATH, 'recipe-table.tsx').split('\\').join('/'));
-    expect(tabla).toContain('recipe.imageUrl');
-    expect(tabla).not.toContain('${recipe.imageUrl}');
+    const columnas = fuenteSinComentarios(COLUMNAS_PATH);
+    expect(columnas).toContain('recipe.imageUrl');
+    expect(columnas).not.toContain('${recipe.imageUrl}');
   });
 
   it('el guardado sale por createRecipeAction o updateRecipeAction y no existe ninguna operacion por linea ni por paso', () => {

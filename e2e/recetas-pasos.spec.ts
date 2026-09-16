@@ -178,13 +178,15 @@ async function fillControlled(locator: Locator, value: string): Promise<void> {
 }
 
 /**
- * Recorre las paginas de la lista hasta encontrar la FILA de la receta pedida. Hace falta porque la
- * pantalla no ofrece busqueda y el orden es fijo por nombre: una receta recien creada cae en
- * cualquier pagina. Nunca se mira «la primera fila» ni el total, que otro proyecto puede mover.
+ * Recorre las paginas de la lista hasta encontrar la FILA de la receta pedida: sin buscar, una
+ * receta recien creada cae en cualquier pagina. Nunca se mira «la primera fila» ni el total, que
+ * otro proyecto puede mover.
  */
 async function findRecipeRow(page: Page, name: string): Promise<Locator> {
-  const row = page.getByTestId('recipe-row').filter({ hasText: name });
-  const next = page.getByTestId('recipe-page-next');
+  const row = page
+    .locator('[data-testid^="data-table-row-"]')
+    .filter({ has: page.getByTestId('data-table-cell-name').filter({ hasText: name }) });
+  const next = page.getByTestId('data-table-next');
 
   for (;;) {
     if ((await row.count()) > 0) return row;
@@ -197,7 +199,7 @@ async function findRecipeRow(page: Page, name: string): Promise<Locator> {
       before,
       { timeout: 60_000 },
     );
-    await expect(page.getByTestId('recipe-list')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('data-table')).toBeVisible({ timeout: 60_000 });
   }
 }
 

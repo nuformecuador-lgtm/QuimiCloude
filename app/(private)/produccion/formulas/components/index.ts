@@ -1,33 +1,45 @@
-// Barrel de los componentes de la ruta de recetas (R46,
-// `docs/architecture.md > Componentes > Regla: componentes de ruta en components/ con barrel index.ts`).
-//
-// Sin `'use client'`: la frontera cliente/servidor se declara en CADA archivo de componente,
-// nunca aqui. Asi `page.tsx` sigue siendo Server Component aunque importe desde el barrel.
+// Sin `'use client'`: la frontera la declara cada componente, y así `page.tsx` sigue siendo de
+// servidor aunque importe de aquí.
 export { DeleteRecipeDialog } from './delete-recipe-dialog';
 export {
-  EMPTY_CELL,
-  RECIPE_COLUMNS,
+  ACTIONS_COLUMN_ID,
+  IMAGE_COLUMN_ID,
+  RECIPE_DEFAULT_PINNED_COLUMNS,
+  buildRecipeColumns,
   type RecipeColumn,
-  type RecipeColumnKey,
+  type RecipeColumnId,
 } from './recipe-columns';
+export { RECIPE_SKELETON_COLUMN_COUNT } from './recipe-columns-skeleton';
 export { RecipeListEmpty } from './recipe-list-empty';
 export { RecipeListError } from './recipe-list-error';
 export {
+  CREATED_AT_COLUMN_ID,
+  CREATED_FROM_PARAM,
+  CREATED_TO_PARAM,
+  FIRST_PAGE,
   PAGE_PARAM,
   PAGE_SIZE_OPTIONS,
   PAGE_SIZE_PARAM,
+  SEARCH_PARAM,
+  SHARED_PAGE_SIZES,
+  SORT_PARAM,
+  SORT_SEPARATOR,
   buildRecipeListQuery,
+  clearSearchAndFilters,
+  hasActiveSearchOrFilter,
   parseRecipeListParams,
-  type RecipeListParams,
-  type RecipeListSearchParams,
-  type RecipePageSize,
+  recipeListHref,
 } from './recipe-list-params';
 export { RecipeListSection } from './recipe-list-section';
-export { RecipeListToolbar } from './recipe-list-toolbar';
-export { ACTIONS_COLUMN_LABEL, RecipeTable } from './recipe-table';
+export {
+  RECIPE_NO_RESULTS_TEXT,
+  RECIPE_TABLE_ID,
+  RECIPE_TABLE_TEXTS,
+  RecipeTable,
+  type RecipeTableProps,
+} from './recipe-table';
 export { RecipeTableSkeleton } from './recipe-table-skeleton';
 
-// --- Formulario (T13-T19, `design.md > 5`-`> 10`) ---
 export {
   buildRecipePayload,
   createLocalKey,
@@ -48,9 +60,6 @@ export {
 } from './recipe-form-state';
 export { ProductPicker, type ProductPickerOption, type ProductPickerProps } from './product-picker';
 export { UnitPicker, type UnitPickerProps } from './unit-picker';
-// QC-26bis: las tres reglas del selector de unidad por linea. Modulo PURO -sin React y sin
-// DOM-, como `recipe-form-state.ts`: se reexporta porque el barrel expone TODO componente de la
-// carpeta (R46) y porque asi el test que las prueba las importa por el mismo camino que la ruta.
 export {
   compareDecimalText,
   resolveLineUnitId,
@@ -62,14 +71,7 @@ export { RecipeStepsField, type RecipeStepsFieldProps } from './recipe-steps-fie
 export { RecipeImageField, type RecipeImageFieldProps } from './recipe-image-field';
 export { RecipeForm, type RecipeFormProps } from './recipe-form';
 
-// --- Pasos enriquecidos (QC-64 T3, T5, T6; `design.md > 3`, `> 4`, `> 7`) ---
-// `recipe-step-schema.ts` NO se reexporta aqui, y es la unica excepcion a R46 en esta carpeta:
-// su unico simbolo publico (`RECIPE_STEP_EXTENSIONS`) tiene tipo `Extensions` de `@tiptap/core`,
-// asi que reexportarlo abriria una puerta —el barrel— por la que cualquier archivo del repo
-// podria tocar un tipo de la libreria del editor sin escribir nunca el literal `@tiptap` que
-// vigila `tests/guards/guard-editor-aislado.test.ts`. R25 y `design.md > 7` exigen que la
-// libreria viva en DOS archivos; su unico consumidor es `recipe-step-editor.tsx`, que lo importa
-// por ruta relativa dentro de la misma carpeta. La excepcion esta anotada en el caso del barrel
-// de `tests/unit/recetas-ui/recipe-route-contract.test.ts` y hay una guardia que la sostiene.
+// `recipe-step-schema.ts` no sale por aquí: su export tiene un tipo de la librería del editor, y el
+// barrel dejaría usarlo desde cualquier archivo sin importar la librería, que debe quedar aislada.
 export { editorJsonToStepDocument, stepDocumentToEditorJson } from './recipe-step-document';
 export { RecipeStepEditor, type RecipeStepEditorProps } from './recipe-step-editor';

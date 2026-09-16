@@ -5,15 +5,17 @@
 // monta nada ni importa React: lo que verifica es DONDE viven los archivos y QUE se importa
 // desde donde, no como se comporta el componente (eso va en `data-table-contrato.test.tsx`).
 
+import { execSync } from 'node:child_process'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, type TestContext } from 'vitest'
 
 // La carpeta de la pantalla que estrena la tabla se DERIVA de esta constante, nunca de un
 // literal escrito a mano: asi un cambio de ruta arrastra esta prueba con el mismo commit.
 import {
+  FORMULAS_ROUTE,
   INVENTORY_ROUTE,
   ORDERS_ROUTE,
   PRESENTATIONS_ROUTE,
@@ -173,10 +175,13 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
   // `pinnable: false`. Se anade la fila y se TENSA el resto del centinela -el ancla de consumidores
   // minimos sube de cuatro a cinco-, nunca se afloja: la lista sigue CERRADA, la pantalla de
   // recetas sigue fuera y una SEPTIMA pantalla vuelve a poner esto en rojo.
+  //
+  // AMPLIADO el 2026-09-15 (QC-56): entra la pantalla de recetas como SEPTIMO consumidor
+  // declarado. El caso que la dejaba fuera se invierte; una OCTAVA pantalla sigue en rojo.
   const consumerDirs = ['app', 'lib/modules', 'db', 'e2e']
 
   /**
-   * Las carpetas autorizadas a consumir la tabla compartida. Las cinco se DERIVAN de constantes
+   * Las carpetas autorizadas a consumir la tabla compartida. Todas se DERIVAN de constantes
    * de ruta y nunca de un literal escrito a mano: un cambio de ruta arrastra esta prueba con el
    * mismo commit. La CUARTA -`PRESENTATIONS_ROUTE`- la trae QC-45 (R8): su pantalla consume la
    * tabla compartida por decision de diseno, asi que es un consumidor declarado, no un descuido.
@@ -192,9 +197,13 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     PRESENTATIONS_ROUTE,
     UNITS_ROUTE,
     USERS_ROUTE,
-  ].map((ruta) =>
-    join(repoRoot, 'app', '(private)', ...ruta.split('/').filter((segmento) => segmento.length > 0)),
-  )
+    // 2026-09-15: la pantalla de recetas pasa a montarse sobre la tabla compartida.
+    FORMULAS_ROUTE,
+  ].map(carpetaDeRuta)
+
+  function carpetaDeRuta(ruta: string): string {
+    return join(repoRoot, 'app', '(private)', ...ruta.split('/').filter((segmento) => segmento.length > 0))
+  }
 
   function autorizada(file: string): boolean {
     return carpetasAutorizadas.some(
@@ -202,7 +211,7 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     )
   }
 
-  it('solo las seis pantallas autorizadas importan components/shared/data-table', () => {
+  it('solo las siete pantallas autorizadas importan components/shared/data-table', () => {
     let consumidores = 0
     for (const relDir of consumerDirs) {
       const files = walkCodeFiles(join(repoRoot, ...relDir.split('/')))
@@ -210,28 +219,28 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
         if (!/components\/shared\/data-table/.test(readSource(file))) continue
         expect(
           autorizada(file),
-          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las seis pantallas autorizadas (pedidos, inventario, detalle de proveedor, presentaciones, unidades, usuarios): migrar una septima es una decision, no un descuido (R34)`,
+          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las siete pantallas autorizadas (pedidos, inventario, proveedores, presentaciones, unidades, usuarios, recetas): migrar una octava es una decision, no un descuido (R29, R34)`,
         ).toBe(true)
         consumidores += 1
       }
     }
     // Sin esto, el bucle pasaria en verde por no haber encontrado ningun consumidor. El ancla se
-    // TENSA con cada alta: hoy son SEIS pantallas autorizadas, asi que se exige al menos un
-    // consumidor por pantalla (QC-67, 2026-09-11; antes eran cinco).
-    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(5)
+    // TENSA con cada alta: hoy son SIETE pantallas autorizadas, asi que se exige al menos un
+    // consumidor por pantalla (2026-09-15; antes eran seis).
+    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(6)
   })
 
-  it('la pantalla de recetas sigue SIN consumirlo', () => {
-    // La mitad del centinela que NO se afloja, y la razon de que este bloque siga existiendo.
-    const dir = join(repoRoot, 'app', '(private)', 'produccion')
+  it('la pantalla de recetas SI consume la tabla compartida (R29)', () => {
+    // Invertido el 2026-09-15: sin esto, deshacer la migracion dejaria la lista autorizando una
+    // carpeta que ya no consume nada, y el ancla de arriba lo taparia con los demas consumidores.
+    const dir = carpetaDeRuta(FORMULAS_ROUTE)
     const files = walkCodeFiles(dir)
     expect(files.length, `${relative(repoRoot, dir)} deberia tener archivos que mirar`).toBeGreaterThan(0)
-    for (const file of files) {
-      expect(
-        readSource(file),
-        `${relative(repoRoot, file)} no debe importar components/shared/data-table: la pantalla de recetas no se ha migrado (R34)`,
-      ).not.toMatch(/components\/shared\/data-table/)
-    }
+    const consumidores = files.filter((file) => /components\/shared\/data-table/.test(readSource(file)))
+    expect(
+      consumidores.length,
+      `ningun archivo de ${relative(repoRoot, dir)} importa components/shared/data-table: la pantalla de recetas deberia estar migrada (R29)`,
+    ).toBeGreaterThan(0)
   })
 
   it('ningun archivo de la feature importa app/(private)/inventario/ ni app/(private)/produccion/', () => {
@@ -396,14 +405,20 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // seguiria en verde sin comprobar nada, y esta lista es lo que lo delataria. Se anade la fila y se
   // TENSA el centinela, nunca se afloja: la lista sigue CERRADA, el E2E de recetas sigue fuera y un
   // UNDECIMO spec que referencie `data-table` vuelve a ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos diez', () => {
+  //
+  // 2026-09-15: entran los dos E2E de recetas, que ya localizan la tabla compartida.
+  // `e2e/errores.spec.ts` sigue fuera: solo mira el error de la pagina de edicion.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos doce', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
       .filter((file) => /data-table/.test(readSource(file)))
       .map((file) => relative(repoRoot, file).split(sep).join('/'))
       .sort()
-    expect(referencian, 'solo estos diez E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
+      'e2e/errores.spec.ts',
+    )
+    expect(referencian, 'solo estos doce E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
       // ya consumen la tabla compartida -inventario y presentaciones- y localiza
       // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
@@ -425,6 +440,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // sexto spec que referencie `data-table` vuelve a ponerla en rojo.
       'e2e/presentaciones.spec.ts',
       'e2e/proveedores.spec.ts',
+      // '-' precede a '.', igual que en pedidos.
+      'e2e/recetas-pasos.spec.ts',
+      'e2e/recetas.spec.ts',
       // La QUINTA la trae QC-39 el 2026-09-08 (R50): el E2E de la pantalla de unidades localiza
       // las celdas y la fila de la tabla compartida, que es la que su lista monta (QC-39 R15).
       'e2e/unidades.spec.ts',
@@ -432,5 +450,107 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // celdas y la fila de la tabla compartida, que es la que su lista monta (QC-67 R9).
       'e2e/usuarios.spec.ts',
     ])
+  })
+})
+
+describe('Alcance QC-56: la migracion no abre la tabla compartida (R20)', () => {
+  // Mide el CAMBIO, no el arbol: R20 mira `origin/dev...HEAD` mas el arbol de trabajo, para morder
+  // antes de commitear; R28 solo el rango commiteado. Si el rango no resuelve, lanza: una guardia
+  // que no puede mirar no pasa en verde.
+  //
+  // PRECONDICION DE RAMA: solo mide en la rama de QC-56. Una vez mergeada, cualquier otra rama
+  // que tuviera motivo para tocar la tabla compartida saldria roja aqui por una regla ajena.
+  // La senal es conjuntiva -la pagina de recetas y la carpeta de spec de la ficha-, porque la
+  // carpeta de spec solo aparece en el rango de esta rama. Fuera de ella el caso queda `skipped`.
+  const RANGO = 'origin/dev...HEAD'
+  const CARPETA_DE_LA_TABLA = 'components/shared/data-table/'
+  const PAGINA_DE_RECETAS = `app/(private)${FORMULAS_ROUTE}/page.tsx`
+  const CARPETA_SPEC = 'specs/QC-56-migrar-listas-a-tabla-compartida/'
+
+  function git(comando: string): string {
+    return execSync(comando, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+  }
+
+  function aPosix(ruta: string): string {
+    return ruta.split('\\').join('/')
+  }
+
+  // Solo lo commiteado: el arbol de trabajo lo pueden ensuciar otros cambios en curso.
+  function archivosDelRango(): readonly string[] {
+    let delRango: string
+    try {
+      delRango = git(`git diff --name-only ${RANGO}`)
+    } catch (error) {
+      throw new Error(
+        `No se pudo calcular el diff \`${RANGO}\`, asi que ni R20 ni R28 se han comprobado. ` +
+          `Esta guardia falla en vez de pasar en silencio. Causa: ${String(error)}`,
+      )
+    }
+
+    const tocados = new Set<string>()
+    for (const linea of delRango.split('\n')) {
+      const limpia = linea.trim()
+      if (limpia.length > 0) tocados.add(aPosix(limpia))
+    }
+    return [...tocados].sort()
+  }
+
+  function archivosTocados(): readonly string[] {
+    const tocados = new Set<string>(archivosDelRango())
+
+    for (const linea of git('git status --porcelain').split('\n')) {
+      if (linea.trim().length === 0) continue
+      const camino = linea.slice(3).trim()
+      const destino = camino.includes(' -> ') ? camino.split(' -> ')[1] : camino
+      tocados.add(aPosix(destino.replace(/^"|"$/g, '')))
+    }
+
+    return [...tocados].sort()
+  }
+
+  function saltarSiNoEsLaRamaDeQC56(ctx: Pick<TestContext, 'skip'>, tocados: readonly string[]): void {
+    const esLaRama =
+      tocados.includes(PAGINA_DE_RECETAS) && tocados.some((archivo) => archivo.startsWith(CARPETA_SPEC))
+    if (!esLaRama) {
+      ctx.skip(
+        `el rango \`${RANGO}\` no trae a la vez \`${PAGINA_DE_RECETAS}\` y \`${CARPETA_SPEC}\`: ` +
+          'esta NO es la rama de QC-56, asi que este caso NO ha comprobado nada.',
+      )
+    }
+  }
+
+  it('R20: el diff de la rama no toca ningun archivo de components/shared/data-table/', (ctx) => {
+    const tocados = archivosTocados()
+    saltarSiNoEsLaRamaDeQC56(ctx, tocados)
+
+    const violaciones = tocados.filter((ruta) => ruta.startsWith(CARPETA_DE_LA_TABLA))
+    expect(violaciones, 'la migracion no puede modificar la tabla compartida (R20)').toEqual([])
+  })
+
+  // Lista de raices de producto, no de exclusiones: asi el board, docs/ o AGENTS.md no cuentan,
+  // y cualquier raiz de codigo nueva tendria que anadirse a proposito.
+  const RAICES_DE_PRODUCTO = ['app/', 'lib/', 'components/', 'hooks/', 'db/']
+  const ARCHIVOS_DE_PRODUCTO = ['middleware.ts', 'package.json', 'pnpm-lock.yaml']
+
+  function esDeProducto(ruta: string): boolean {
+    return ARCHIVOS_DE_PRODUCTO.includes(ruta) || RAICES_DE_PRODUCTO.some((raiz) => ruta.startsWith(raiz))
+  }
+
+  it('R28: en el rango commiteado, fuera de las dos rutas ningun archivo de producto cambia salvo el barrel de proveedores, y nada de db/', (ctx) => {
+    const tocados = archivosDelRango()
+    saltarSiNoEsLaRamaDeQC56(ctx, tocados)
+
+    const carpetasDeRuta = [`app/(private)${FORMULAS_ROUTE}/`, `app/(private)${SUPPLIERS_ROUTE}/`]
+    const fuera = tocados
+      .filter(esDeProducto)
+      .filter((ruta) => !carpetasDeRuta.some((carpeta) => ruta.startsWith(carpeta)))
+
+    expect(fuera, 'el unico cambio de producto fuera de las rutas es publicar la lista blanca de proveedores (R28, R31)').toEqual([
+      'lib/modules/proveedores/index.ts',
+    ])
+    expect(
+      tocados.filter((ruta) => ruta.startsWith('db/')),
+      'la migracion no toca el esquema de datos (R28)',
+    ).toEqual([])
   })
 })
