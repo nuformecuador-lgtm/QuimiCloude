@@ -1297,6 +1297,59 @@ $ pnpm exec vitest related --run --project node --project ui <los 11 archivos de
       Tests  3399 passed | 5 skipped (3404)
 ```
 
+### F2.3, segunda vuelta — el PR salio CONFLICTING · 2026-09-15
+
+La primera sincronizacion dejo la rama al dia con el `dev` de las 15:59, pero `dev` siguio avanzando y
+GitHub marco el PR #75 como **CONFLICTING**. El choque no estaba en el area de QC-81, sino en un
+archivo **compartido** que tocaron las dos ramas.
+
+**Merge `16b5966`**, con `origin/dev` 31 commits por delante del merge anterior. `feature_list.json` y
+`progress/current.md` se auto-mergearon. **Ninguna migracion entra**, medido desde la base de fusion
+(`63f1e15`).
+
+**Un solo archivo en conflicto: `tests/unit/recetas-ui/recipe-route-contract.test.ts`, dos regiones.**
+- **Que hizo cada lado.** QC-56 (PR #74) migro las listas a la tabla compartida y reescribio ahi
+  contenido de verdad: cambio el nombre y el alcance de un caso, y sustituyo el test de busqueda y
+  orden por dos nuevos sobre la tabla compartida. Nuestro lado, en esas dos regiones, solo tenia la
+  limpieza de comentarios.
+- **Comprobado antes de elegir, no supuesto.** El diff de nuestra rama contra la base de fusion,
+  filtrando comentarios, deja **solo dos lineas de codigo**: la constante `MIGRACION_QC81` y su volcado
+  en `DB_PERMITIDAS`. Las dos viven fuera de las regiones en conflicto y **siguen intactas** tras el
+  merge (hoy en las lineas 356 y 377). El prefijo `R2, R3:` del nombre del caso **lo añadio `dev`**: no
+  lo habia quitado nuestra limpieza.
+- **Resolucion:** gana el contenido de `dev` en las dos regiones. Despues: cero marcadores de conflicto
+  en todo el arbol y el test pasa con el contenido nuevo.
+
+**La limpieza de comentarios va en su propio commit (`406d8da`).** El contenido entrante traia **una**
+linea de comentario con cita (`R9 —`, en el caso que `dev` reescribio). Se reescribe corta y sin cita,
+conservando el porque verificable: lo prohibido es leer o declarar esos campos como columna, no
+nombrarlos, porque la declaracion de columnas los nombra justo para excluirlos del tipo. El nombre del
+caso conserva su `R<n>`, que la regla permite. Comprobado con el comparador contra el merge: **codigo
+identico, citas 1 -> 0**.
+
+**Verificacion tras el merge**, de una en una por la memoria:
+```
+$ pnpm run typecheck -> exit=0      $ pnpm run lint -> exit=0
+$ pnpm exec vitest run tests/unit/recetas-ui/recipe-route-contract.test.ts
+ Test Files  1 passed (1)
+      Tests  26 passed (26)
+$ pnpm exec vitest run guard
+ Test Files  41 passed (41)
+      Tests  445 passed | 9 skipped (454)
+$ pnpm exec vitest related --run --project node --project ui <los 21 archivos de produccion del merge>
+ Test Files  122 passed (122)
+      Tests  1991 passed | 1 skipped (1992)
+$ pnpm exec vitest run --project integration tests/integration/inventario/product-batch-lot.int.test.ts
+test-db: la corrida de integracion va contra qct_qc81_75ea7fee_mu3hsxt7_2tc (copia de qct_tpl_7d0d301d89fb).
+ Test Files  1 passed (1)
+      Tests  19 passed (19)
+```
+
+**Leccion, para que no se repita:** que el tramo nuevo de `dev` no toque el area de la ficha **no basta**
+para decidir que no hace falta sincronizar. Lo que decide es si toca **algun archivo compartido** que la
+rama tambien haya tocado —aqui, un test de contrato de otra pantalla que la limpieza de comentarios
+habia rozado—. La comprobacion barata es `git merge-tree`, que ve el choque sin tocar el arbol.
+
 ## Estado final de F2.1
 
 | Task | Estado |
