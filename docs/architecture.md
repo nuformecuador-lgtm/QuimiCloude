@@ -413,6 +413,13 @@ redirige si no la hay. Ademas **filtra el menu** con los permisos de esa misma l
 servidor: un item para el que no hay permiso no viaja en el HTML. El middleware ahorra render y da
 la vuelta rapida; no es la unica puerta.
 
+**Esa lectura es una sola por peticion** (QC-104): el layout, el corte por permiso de la pagina y
+las Server Actions que esos componentes invocan mientras se pintan comparten **la misma** lectura de
+sesion en vez de repetirla cada uno por su cuenta, y lo compartido muere con la peticion —**nunca**
+se reutiliza entre peticiones, porque una sesion revocada no puede sobrevivir a la peticion en que
+se leyo—. Lo que esta probado es el **conteo**: una guardia del gate falla si una pantalla o una
+accion supera **una** lectura de sesion por peticion.
+
 **Ni el borde ni la pagina son la frontera de autorizacion.** `## Acceso a datos y autorizacion`
 sigue mandando: la **autorizacion se valida en el service**, antes de tocar el repositorio. El rol
 que viaja firmado en la cookie **no autoriza** nada; es un dato de presentacion (el nombre que
