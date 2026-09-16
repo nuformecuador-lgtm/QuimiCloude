@@ -164,7 +164,8 @@ describe('QC-87 — removeWorkGroupFromOrder', () => {
       // «el grupo existe», tendria que meter un `WorkGroupDirectory` en las deps y este caso de
       // uso dejaria de compilar con las dos que tiene.
       expect(orders.findAliveById).toHaveBeenCalledTimes(1);
-      expect(orders.findAliveById).toHaveBeenCalledWith(PEDIDO);
+      // QC-60 (R27): la empresa del ACTOR entra por la firma del catalogo.
+      expect(orders.findAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA);
     });
 
     it('deja la suelta, la de otro grupo, la de otro pedido y la de otra empresa', async () => {

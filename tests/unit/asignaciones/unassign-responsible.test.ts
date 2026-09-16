@@ -388,7 +388,8 @@ describe('QC-87 — unassignResponsible', () => {
 
       // Se leyo el pedido y NO se llamo al borrado: si el estado viviera en el `where`, el puerto
       // se habria llamado igual y el error habria sido `order_assignment_not_found`.
-      expect(orders.findAliveById).toHaveBeenCalledWith(PEDIDO);
+      // QC-60 (R27): la empresa del ACTOR entra por la firma del catalogo.
+      expect(orders.findAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA);
       expect(assignments.deleteOne).not.toHaveBeenCalled();
     });
   });

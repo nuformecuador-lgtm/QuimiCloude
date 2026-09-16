@@ -46,7 +46,9 @@ describe('asignaciones · la consulta EN LOTE y la empresa (integracion)', () =>
     await inRolledBackTransaction(async (fixture) => {
       const pedidoA = await createOrder(fixture);
       const pedidoB = await createOrder(fixture);
-      const pedidoAjeno = await createOrder(fixture);
+      // QC-60: el pedido AJENO es de la empresa B de verdad. La FK compuesta de
+      // `order_assignments` y el ambito del catalogo ya no dejan asignarlo desde otra empresa.
+      const pedidoAjeno = await createOrder(fixture, { companyId: fixture.companyB });
 
       const propia = await createPerson(fixture, fixture.companyA, { lastNames: 'Alvarez', firstNames: 'Rosa' });
       const otra = await createPerson(fixture, fixture.companyA, { lastNames: 'Bernal', firstNames: 'Luis' });

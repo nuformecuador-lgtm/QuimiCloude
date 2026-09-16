@@ -169,7 +169,8 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
 
     // Hubo LECTURA del pedido, por su identificador y sin ninguna condicion de estado...
     expect(orders.findAliveById).toHaveBeenCalledTimes(1);
-    expect(orders.findAliveById).toHaveBeenCalledWith(PEDIDO);
+    // QC-60 (R27): la empresa del ACTOR entra por la firma del catalogo.
+    expect(orders.findAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA);
     // ...y NO hubo escritura: el estado no pudo viajar en el `WHERE` de ninguna, porque no hubo
     // ninguna.
     expect(assignments.insertMissing).not.toHaveBeenCalled();

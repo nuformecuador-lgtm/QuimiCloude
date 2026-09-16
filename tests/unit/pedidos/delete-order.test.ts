@@ -25,7 +25,12 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
 // porque este archivo ejercita lecturas y escrituras con el mismo fixture.
-const ADMIN: Actor = { id: 'admin-1', permissions: ['pedidos.consultar', 'pedidos.modificar'] }
+// QC-60 (R16): el `Actor` de `pedidos` lleva la EMPRESA desde esta ficha.
+const ADMIN: Actor = {
+  id: 'admin-1',
+  companyId: '33333333-3333-4333-8333-333333333333',
+  permissions: ['pedidos.consultar', 'pedidos.modificar'],
+}
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const AHORA = new Date('2026-09-04T12:00:00.000Z')
 
@@ -82,7 +87,13 @@ describe('deleteOrder — borrado logico (R31, R32, R33)', () => {
     await createDeleteOrder(d)(ORDER_ID, ADMIN)
 
     expect(d.softDeleteAlive).toHaveBeenCalledTimes(1)
-    expect(d.softDeleteAlive.mock.calls[0]).toEqual([ORDER_ID, ADMIN.id, AHORA])
+    // QC-60 (R18): el ambito va AL FINAL de la firma y sale del ACTOR, nunca de la entrada.
+    expect(d.softDeleteAlive.mock.calls[0]).toEqual([
+      ORDER_ID,
+      ADMIN.id,
+      AHORA,
+      { companyId: ADMIN.companyId },
+    ])
   })
 
   it('borra un pedido EN_CURSO (R31)', async () => {

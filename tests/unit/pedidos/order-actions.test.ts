@@ -48,6 +48,7 @@ const {
   cancelOrderMock,
   deleteOrderMock,
   getSessionUserMock,
+  getSessionContextMock,
 } = vi.hoisted(() => ({
   createOrderMock: vi.fn(),
   getOrderMock: vi.fn(),
@@ -56,6 +57,8 @@ const {
   cancelOrderMock: vi.fn(),
   deleteOrderMock: vi.fn(),
   getSessionUserMock: vi.fn(),
+  // QC-60 (R17): la action pide las DOS caras de la sesion. Sin contexto no hay actor.
+  getSessionContextMock: vi.fn(),
 }))
 
 // QC-71 (T7, R7, R13): el adaptador driving pide a la composicion la LECTURA de la cabecera
@@ -68,7 +71,7 @@ const { REQUEST_ID_DE_PRUEBA, readRequestIdHeaderMock } = vi.hoisted(() => {
 
 vi.mock('@/lib/composition', () => ({
   observabilidad: { readRequestIdHeader: readRequestIdHeaderMock },
-  identity: { getSessionUser: getSessionUserMock },
+  identity: { getSessionUser: getSessionUserMock, getSessionContext: getSessionContextMock },
   pedidos: {
     createOrder: createOrderMock,
     getOrder: getOrderMock,
@@ -88,6 +91,9 @@ const ADMIN_SESSION_USER = {
   roleName: 'Administrador',
   permissions: ['pedidos.consultar', 'pedidos.modificar'],
 }
+
+/** QC-60: la empresa sale del CONTEXTO de sesion, nunca del formulario. */
+const SESSION_CONTEXT = { companyId: '33333333-3333-4333-8333-333333333333' }
 
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222'
@@ -134,6 +140,7 @@ function readActionsSource(): string {
 beforeEach(() => {
   vi.clearAllMocks()
   getSessionUserMock.mockResolvedValue(ADMIN_SESSION_USER)
+  getSessionContextMock.mockResolvedValue(SESSION_CONTEXT)
 })
 
 describe('Server Actions de pedidos — actor, forma de entrada y errores', () => {
@@ -154,6 +161,7 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
 
     const ESPERADO = {
       id: 'user-admin-1',
+      companyId: SESSION_CONTEXT.companyId,
       permissions: ['pedidos.consultar', 'pedidos.modificar'],
     }
 
@@ -181,6 +189,7 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     // action-: quien rechaza es el caso de uso (R3, falla cerrado).
     vi.clearAllMocks()
     getSessionUserMock.mockResolvedValue(null)
+    getSessionContextMock.mockResolvedValue(SESSION_CONTEXT)
     createOrderMock.mockRejectedValue(new UnauthorizedError())
     const sinSesion = await createOrderAction(CREATE_INITIAL, formDataOf(VALID_CREATE_FIELDS))
     expect(createOrderMock.mock.calls[0]?.[1]).toBeNull()

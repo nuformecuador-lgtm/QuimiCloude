@@ -241,6 +241,8 @@ async function createUser(tx: Prisma.TransactionClient): Promise<string> {
 /** Todo lo que un pedido necesita al otro lado de sus cuatro FK, mas el producto que da
  *  contexto real a la receta. */
 interface Fixtures {
+  /** QC-60: `orders.company_id` es NOT NULL, asi que el pedido nace en la empresa del fixture. */
+  readonly companyId: string
   readonly productId: string
   readonly unitId: string
   readonly recipeId: string
@@ -283,6 +285,7 @@ async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
   })
   const userId = await createUser(tx)
   return {
+    companyId: company.id,
     productId: product.id,
     unitId,
     recipeId: recipe.id,
@@ -294,6 +297,7 @@ type OrderStatusValue = 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO'
 type OrderPriorityValue = 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA'
 
 interface OrderSeed {
+  readonly companyId: string
   readonly recipeId: string
   readonly year?: number
   readonly sequence?: number
@@ -312,6 +316,7 @@ async function createOrder(tx: Prisma.TransactionClient, seed: OrderSeed): Promi
   nextSequence += 1
   const order = await tx.order.create({
     data: {
+      companyId: seed.companyId,
       orderYear: seed.year ?? currentUtcYear(),
       orderSequence: seed.sequence ?? nextSequence,
       recipeId: seed.recipeId,
@@ -330,6 +335,7 @@ async function createOrder(tx: Prisma.TransactionClient, seed: OrderSeed): Promi
 /** Columnas que un alta cruda puede escribir en `orders`. */
 type WritableColumn =
   | 'id'
+  | 'company_id'
   | 'order_year'
   | 'order_sequence'
   | 'recipe_id'
@@ -383,6 +389,7 @@ function asTimestamptz(value: string): Prisma.Sql {
  */
 function baseColumns(f: Fixtures, sequence: number): Partial<Record<WritableColumn, Prisma.Sql>> {
   return {
+    company_id: asUuid(f.companyId),
     order_year: Prisma.sql`${currentUtcYear()}`,
     order_sequence: Prisma.sql`${sequence}`,
     recipe_id: asUuid(f.recipeId),
@@ -422,6 +429,7 @@ describe('el pedido como fila completa', () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
       const id = await createOrder(tx, {
+        companyId: f.companyId,
         recipeId: f.recipeId,
         quantity: '12.5000',
         status: 'EN_CURSO',
@@ -477,6 +485,7 @@ describe('la cantidad', () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
       const id = await createOrder(tx, {
+        companyId: f.companyId,
         recipeId: f.recipeId,
         quantity: '1234567890.1234',
       })
@@ -576,6 +585,7 @@ describe('la unidad y la receta', () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
       const orderId = await createOrder(tx, {
+        companyId: f.companyId,
         recipeId: f.recipeId,
         quantity: '7.5000',
       })
@@ -676,7 +686,7 @@ describe('el estado y la prioridad', () => {
     // test es lo que demuestra que hoy la base no decide por adelantado.
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
-      const id = await createOrder(tx, { recipeId: f.recipeId })
+      const id = await createOrder(tx, { companyId: f.companyId, recipeId: f.recipeId })
 
       const entregado = await tx.order.update({
         where: { id },
@@ -755,7 +765,7 @@ describe('el correlativo por ano', () => {
       const f = await seedFixtures(tx)
       const sequence = freshSequence()
 
-      const id = await createOrder(tx, { recipeId: f.recipeId, sequence })
+      const id = await createOrder(tx, { companyId: f.companyId, recipeId: f.recipeId, sequence })
 
       const duplicado = await expectRejectedByDatabase(
         tx,
@@ -785,7 +795,7 @@ describe('el correlativo por ano', () => {
       const f = await seedFixtures(tx)
       const sequence = freshSequence()
 
-      const id = await createOrder(tx, { recipeId: f.recipeId, sequence })
+      const id = await createOrder(tx, { companyId: f.companyId, recipeId: f.recipeId, sequence })
       await tx.order.update({ where: { id }, data: { deletedAt: new Date() } })
 
       const borrado = await tx.order.findUniqueOrThrow({
@@ -850,10 +860,11 @@ describe('el correlativo por ano', () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
       const primero = await createOrder(tx, {
+        companyId: f.companyId,
         recipeId: f.recipeId,
         sequence: 1,
       })
-      const quinto = await createOrder(tx, { recipeId: f.recipeId, sequence: 5 })
+      const quinto = await createOrder(tx, { companyId: f.companyId, recipeId: f.recipeId, sequence: 5 })
 
       const filas = await tx.order.findMany({
         where: { id: { in: [primero, quinto] } },
@@ -953,7 +964,7 @@ describe('la autoria, el borrado logico y las marcas de tiempo', () => {
     // cuando la columna tiene valor.
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
-      const id = await createOrder(tx, { recipeId: f.recipeId })
+      const id = await createOrder(tx, { companyId: f.companyId, recipeId: f.recipeId })
 
       const stored = await tx.order.findUniqueOrThrow({
         where: { id },
@@ -970,6 +981,7 @@ describe('la autoria, el borrado logico y las marcas de tiempo', () => {
       const f = await seedFixtures(tx)
       const sequence = freshSequence()
       const id = await createOrder(tx, {
+        companyId: f.companyId,
         recipeId: f.recipeId,
         sequence,
         quantity: '3.2500',
@@ -997,7 +1009,7 @@ describe('la autoria, el borrado logico y las marcas de tiempo', () => {
     // `updated_at` se mantiene solo.
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
-      const id = await createOrder(tx, { recipeId: f.recipeId })
+      const id = await createOrder(tx, { companyId: f.companyId, recipeId: f.recipeId })
 
       const antes = await tx.order.findUniqueOrThrow({
         where: { id },
@@ -1031,6 +1043,7 @@ describe('el CHECK del pedido entregado', () => {
 
       // (a) un pedido ENTREGADO no se puede borrar.
       const entregado = await createOrder(tx, {
+        companyId: f.companyId,
         recipeId: f.recipeId,
         status: 'ENTREGADO',
       })
@@ -1049,7 +1062,7 @@ describe('el CHECK del pedido entregado', () => {
       expect(sigueVivo.status).toBe('ENTREGADO')
 
       // (b) un pedido ya borrado no se puede entregar.
-      const borrado = await createOrder(tx, { recipeId: f.recipeId })
+      const borrado = await createOrder(tx, { companyId: f.companyId, recipeId: f.recipeId })
       await tx.order.update({ where: { id: borrado }, data: { deletedAt: new Date() } })
       const alEntregar = await expectRejectedByDatabase(
         tx,
@@ -1086,7 +1099,7 @@ describe('el CHECK del pedido entregado', () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
 
-      const pendiente = await createOrder(tx, { recipeId: f.recipeId })
+      const pendiente = await createOrder(tx, { companyId: f.companyId, recipeId: f.recipeId })
       const borradoPendiente = await tx.order.update({
         where: { id: pendiente },
         data: { deletedAt: new Date() },
@@ -1096,6 +1109,7 @@ describe('el CHECK del pedido entregado', () => {
       expect(borradoPendiente.status).toBe('PENDIENTE')
 
       const enCurso = await createOrder(tx, {
+        companyId: f.companyId,
         recipeId: f.recipeId,
         status: 'EN_CURSO',
       })
@@ -1107,7 +1121,7 @@ describe('el CHECK del pedido entregado', () => {
       expect(borradoEnCurso.deletedAt).not.toBeNull()
       expect(borradoEnCurso.status).toBe('EN_CURSO')
 
-      const vivo = await createOrder(tx, { recipeId: f.recipeId })
+      const vivo = await createOrder(tx, { companyId: f.companyId, recipeId: f.recipeId })
       const entregado = await tx.order.update({
         where: { id: vivo },
         data: { status: 'ENTREGADO' },

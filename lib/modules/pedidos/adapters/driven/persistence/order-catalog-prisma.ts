@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { orderCompanyScope } from './company-scope';
+
 import type { OrderStatus } from '../../../domain/order-classification';
 import type { OrderAssignmentTarget } from '../../../domain/order-catalog';
 
@@ -22,6 +24,14 @@ import type { OrderAssignmentTarget } from '../../../domain/order-catalog';
  * cruce -a mano y en un solo sitio- que hace `order-prisma.ts`, y lo vigila el caso de
  * `module-contract.test.ts` que compara valor a valor el enum del dominio con el de
  * `db/schema.prisma`.
+ *
+ * QC-60 (R18, R20, R27): esta consulta TAMBIEN se acota por empresa, y **no hay excepcion** —a
+ * diferencia de `findProductRefs` de QC-49 R29, que quedo fuera porque `recetas` lo llama sin
+ * sesion—. Aqui los cuatro llamantes son casos de uso de `asignaciones` cuyo `Actor` ya declara
+ * `companyId`, asi que la empresa entra por la firma. La `string` se convierte al `OrderScope`
+ * interno AQUI, en el adaptador: `OrderScope` es el tipo con el que `pedidos` habla con su propio
+ * adaptador driven y obligar a `asignaciones` a construirlo seria acoplarlos por un dato que ya es
+ * una cadena en los dos lados (`design.md > 6`).
  */
 
 type OrderCatalogRow = {
@@ -36,9 +46,10 @@ export function toOrderAssignmentTarget(row: OrderCatalogRow): OrderAssignmentTa
 
 export async function findAliveOrderTargetById(
   id: string,
+  companyId: string,
 ): Promise<OrderAssignmentTarget | null> {
   const row = await prisma.order.findFirst({
-    where: { id, deletedAt: null },
+    where: { AND: [orderCompanyScope({ companyId }), { id, deletedAt: null }] },
     select: { id: true, status: true },
   });
 

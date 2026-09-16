@@ -31,7 +31,12 @@ import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
 // porque este archivo ejercita lecturas y escrituras con el mismo fixture.
-const ADMIN: Actor = { id: 'admin-1', permissions: ['pedidos.consultar', 'pedidos.modificar'] }
+// QC-60 (R16): el `Actor` de `pedidos` lleva la EMPRESA desde esta ficha.
+const ADMIN: Actor = {
+  id: 'admin-1',
+  companyId: '33333333-3333-4333-8333-333333333333',
+  permissions: ['pedidos.consultar', 'pedidos.modificar'],
+}
 
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222'

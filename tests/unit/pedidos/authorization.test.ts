@@ -153,8 +153,9 @@ async function ejecutar(
   return { error, llamadas }
 }
 
+// QC-60 (R16): el `Actor` de `pedidos` lleva la EMPRESA desde esta ficha.
 function actorCon(...permissions: readonly string[]): Actor {
-  return { id: 'u-1', permissions }
+  return { id: 'u-1', companyId: '33333333-3333-4333-8333-333333333333', permissions }
 }
 
 /** Afirma el rechazo COMPLETO: error del modulo, `code` estable y CERO puertos tocados. */
@@ -255,7 +256,7 @@ describe('QC-74 — falla cerrado (R14)', () => {
   const AUSENTES: readonly (readonly [string, Actor | null | undefined])[] = [
     ['sin actor (null)', null],
     ['sin actor (undefined)', undefined],
-    ['conjunto de permisos vacio', { id: 'u-vacio', permissions: [] }],
+    ['conjunto de permisos vacio', { id: 'u-vacio', companyId: '33333333-3333-4333-8333-333333333333', permissions: [] }],
   ]
 
   for (const [quien, actor] of AUSENTES) {

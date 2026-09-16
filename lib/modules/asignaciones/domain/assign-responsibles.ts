@@ -92,7 +92,7 @@ export function createAssignResponsibles(
     const companyId = actor.companyId;
 
     // 3. R8, R10, R11, R12: sobre la LECTURA, nunca en el `WHERE` de la escritura.
-    assertOrderAcceptsWrites(await deps.orders.findAliveById(orderId));
+    assertOrderAcceptsWrites(await deps.orders.findAliveById(orderId, companyId));
 
     // 4 y 5 EN PARALELO: dos lecturas independientes (`design.md > 5`).
     const [people, snapshots] = await Promise.all([

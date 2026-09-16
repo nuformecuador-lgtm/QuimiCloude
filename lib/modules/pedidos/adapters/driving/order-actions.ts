@@ -110,11 +110,30 @@ const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
  */
 const toErrorState = createErrorStateTranslator(PedidosError, observabilidad.readRequestIdHeader);
 
-/** El actor que exige R5: se resuelve UNA vez por invocacion, nunca dentro del dominio. */
+/**
+ * El actor que exige R5: se resuelve UNA vez por invocacion, nunca dentro del dominio.
+ *
+ * QC-60 (R17): pide las DOS CARAS de la sesion —el usuario y el contexto de empresa— y en
+ * PARALELO, exactamente como `unit-actions.ts`, `product-actions.ts` y
+ * `order-assignment-actions.ts`. Si falta CUALQUIERA de las dos devuelve `null`, o sea que FALLA
+ * CERRADO: con actor `null`, `requirePermission` rechaza en la primera linea del caso de uso, antes
+ * de tocar ningun puerto. Sin contexto no hay actor, y sin actor no hay consulta.
+ *
+ * La empresa sale del CONTEXTO DE SESION del servidor y jamas de la entrada del llamante: si
+ * viajara en el `FormData`, elegir de que empresa se consulta seria escribir otro uuid en el
+ * formulario. Las SEIS firmas publicas de las actions no cambian (R34).
+ */
 async function currentActor(): Promise<Actor | null> {
-  const sessionUser = await identity.getSessionUser();
-  if (sessionUser === null) return null;
-  return { id: sessionUser.id, permissions: sessionUser.permissions };
+  const [sessionUser, sessionContext] = await Promise.all([
+    identity.getSessionUser(),
+    identity.getSessionContext(),
+  ]);
+  if (sessionUser === null || sessionContext === null) return null;
+  return {
+    id: sessionUser.id,
+    companyId: sessionContext.companyId,
+    permissions: sessionUser.permissions,
+  };
 }
 
 function readFormString(formData: FormData, name: string): string {

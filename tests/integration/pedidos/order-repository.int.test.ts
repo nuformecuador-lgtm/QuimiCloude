@@ -66,6 +66,7 @@ import type {
   NewOrder,
   OrderPriority,
   OrderRow,
+  OrderScope,
   OrderStatus,
 } from '@/lib/modules/pedidos'
 
@@ -196,6 +197,13 @@ async function dropFixtures(): Promise<void> {
 
 /** Instante dentro del ano indicado. El adaptador escribe `created_at` y `order_year` desde el
  *  MISMO `now`, asi que el CHECK del ano nunca puede rechazar estas altas. */
+/** QC-60 (R18): el adaptador exige el AMBITO en la firma. Es la empresa efimera del propio
+ *  fixture, asi que el archivo sigue viendo exactamente los pedidos que siembra. Se lee como
+ *  funcion y no como constante porque `companyId` no existe hasta el `beforeAll`. */
+function scope(): OrderScope {
+  return { companyId }
+}
+
 function instantIn(year: number, month: number, day: number, ms = 0): Date {
   return new Date(Date.UTC(year, month, day, 12, 0, 0, ms))
 }
@@ -220,7 +228,7 @@ async function altaReal(
   now: Date,
   overrides: Partial<NewOrder> = {},
 ): Promise<OrderRow> {
-  const resultado = await createOrder(baseOrder(overrides), year, actorId, now)
+  const resultado = await createOrder(baseOrder(overrides), year, actorId, now, scope())
   // Un `'duplicate_number'` aqui no es el caso bajo prueba: seria una secuencia sucia de una
   // corrida anterior, y hay que verlo como fallo del test, no confundirlo con el pedido.
   expect(resultado).not.toBe('duplicate_number')
@@ -273,10 +281,10 @@ function consulta(
  * por este archivo, y cada caso filtra despues por SUS ids.
  */
 async function recorrerTodo(filtros: FiltrosDePrueba = {}): Promise<readonly OrderRow[]> {
-  const primera = await listAliveOrders(consulta(filtros, { pageSize: MAX_PAGE_SIZE }))
+  const primera = await listAliveOrders(consulta(filtros, { pageSize: MAX_PAGE_SIZE }), scope())
   const items = [...primera.items]
   for (let page = 2; page <= primera.totalPages; page += 1) {
-    const siguiente = await listAliveOrders(consulta(filtros, { page, pageSize: MAX_PAGE_SIZE }))
+    const siguiente = await listAliveOrders(consulta(filtros, { page, pageSize: MAX_PAGE_SIZE }), scope())
     items.push(...siguiente.items)
   }
   return items
@@ -287,6 +295,7 @@ async function recorrerTodo(filtros: FiltrosDePrueba = {}): Promise<readonly Ord
 function contarVivos(filters: FiltrosDePrueba = {}): Promise<number> {
   return prisma.order.count({
     where: {
+      companyId,
       deletedAt: null,
       ...(filters.status === undefined ? {} : { status: filters.status }),
       ...(filters.priority === undefined ? {} : { priority: filters.priority }),
@@ -335,7 +344,7 @@ describe('R8 — alta por el adaptador y relectura sin perdida', () => {
       // La posicion la entrega la secuencia del ano, que este archivo estrena: es la primera.
       expect(alta.number.sequence).toBe(1)
 
-      const ficha = await findAliveOrderById(alta.id)
+      const ficha = await findAliveOrderById(alta.id, scope())
       expect(ficha).not.toBeNull()
       expect(ficha?.id).toBe(alta.id)
       expect(ficha?.number).toEqual({ year: YEAR_ALTA, sequence: 1 })
@@ -377,7 +386,7 @@ describe('R35 — el tamano de pagina: defecto de 10 y tope de 25', () => {
       expect(creados).toHaveLength(cuantos)
 
       // (a) `pageSize` OMITIDO -> el defecto, en los elementos Y en la pagina.
-      const porDefecto = await listAliveOrders(consulta())
+      const porDefecto = await listAliveOrders(consulta(), scope())
       const totalVivos = await contarVivos()
       expect(porDefecto.items).toHaveLength(DEFAULT_PAGE_SIZE)
       expect(porDefecto.pageSize).toBe(DEFAULT_PAGE_SIZE)
@@ -391,7 +400,7 @@ describe('R35 — el tamano de pagina: defecto de 10 y tope de 25', () => {
       // el `query.pageSize`, que es el error contra el que avisa el propio adaptador —con el
       // pedido, `totalPages` mentiria aunque el `LIMIT` de SQL fuera correcto—.
       const pedida = 100
-      const acotada = await listAliveOrders(consulta({}, { pageSize: pedida }))
+      const acotada = await listAliveOrders(consulta({}, { pageSize: pedida }), scope())
       expect(acotada.items).toHaveLength(MAX_PAGE_SIZE)
       expect(acotada.pageSize).toBe(MAX_PAGE_SIZE)
       expect(acotada.pageSize).not.toBe(pedida)
@@ -404,7 +413,7 @@ describe('R35 — el tamano de pagina: defecto de 10 y tope de 25', () => {
       expect(toOffsetLimit(1, undefined).limit).toBe(DEFAULT_PAGE_SIZE)
 
       // La consulta NUNCA sale sin limite superior: ni pidiendo un tamano absurdo.
-      const absurda = await listAliveOrders(consulta({}, { pageSize: 999_999 }))
+      const absurda = await listAliveOrders(consulta({}, { pageSize: 999_999 }), scope())
       expect(absurda.items.length).toBeLessThanOrEqual(MAX_PAGE_SIZE)
       expect(absurda.pageSize).toBe(MAX_PAGE_SIZE)
     } finally {
@@ -476,14 +485,14 @@ describe('R40 — el borrado desaparece de la ficha y del listado; el cancelado 
       const now = instantIn(YEAR_BORRADO, 2, 3)
       const pedido = await altaReal(creados, YEAR_BORRADO, now)
 
-      expect(await findAliveOrderById(pedido.id)).not.toBeNull()
+      expect(await findAliveOrderById(pedido.id, scope())).not.toBeNull()
       expect((await recorrerTodo()).some((row) => row.id === pedido.id)).toBe(true)
 
       const despues = instantIn(YEAR_BORRADO, 2, 4)
-      expect(await softDeleteAliveOrder(pedido.id, actorId, despues)).toBe('ok')
+      expect(await softDeleteAliveOrder(pedido.id, actorId, despues, scope())).toBe('ok')
 
       // Desaparece de la ficha Y del listado, las dos por el `where` del puerto.
-      expect(await findAliveOrderById(pedido.id)).toBeNull()
+      expect(await findAliveOrderById(pedido.id, scope())).toBeNull()
       expect((await recorrerTodo()).some((row) => row.id === pedido.id)).toBe(false)
 
       // Pero la fila SIGUE ahi: es borrado logico, no fisico. Se relee con Prisma directo,
@@ -505,11 +514,11 @@ describe('R40 — el borrado desaparece de la ficha y del listado; el cancelado 
       const pedido = await altaReal(creados, YEAR_BORRADO, now)
 
       const motivo = 'El cliente retiro la orden'
-      expect(await cancelAliveOrder(pedido.id, motivo, actorId, instantIn(YEAR_BORRADO, 6, 4))).toBe(
+      expect(await cancelAliveOrder(pedido.id, motivo, actorId, instantIn(YEAR_BORRADO, 6, 4), scope())).toBe(
         'ok',
       )
 
-      const ficha = await findAliveOrderById(pedido.id)
+      const ficha = await findAliveOrderById(pedido.id, scope())
       expect(ficha?.status).toBe('CANCELADO')
       expect(ficha?.cancellationReason).toBe(motivo)
 
@@ -555,14 +564,14 @@ describe('R34/R38 — el `total` es el de los filtros, no el de la pagina', () =
       })
 
       // R34: pagina de DOS sobre seis pedidos propios. El `total` no es 2.
-      const pagina = await listAliveOrders(consulta({}, { pageSize: 2 }))
+      const pagina = await listAliveOrders(consulta({}, { pageSize: 2 }), scope())
       expect(pagina.items).toHaveLength(2)
       expect(pagina.total).toBe(await contarVivos())
       expect(pagina.total).toBeGreaterThanOrEqual(creados.length)
       expect(pagina.total).toBeGreaterThan(pagina.items.length)
 
       // R38, filtro suelto por estado.
-      const porEstado = await listAliveOrders(consulta({ status: 'EN_CURSO' }))
+      const porEstado = await listAliveOrders(consulta({ status: 'EN_CURSO' }), scope())
       expect(porEstado.total).toBe(await contarVivos({ status: 'EN_CURSO' }))
       expect(porEstado.items.every((row) => row.status === 'EN_CURSO')).toBe(true)
       const mismosEstado = (await recorrerTodo({ status: 'EN_CURSO' })).filter((row) =>
@@ -571,7 +580,7 @@ describe('R34/R38 — el `total` es el de los filtros, no el de la pagina', () =
       expect(mismosEstado).toHaveLength(3)
 
       // R38, filtro suelto por prioridad.
-      const porPrioridad = await listAliveOrders(consulta({ priority: 'ALTA' }))
+      const porPrioridad = await listAliveOrders(consulta({ priority: 'ALTA' }), scope())
       expect(porPrioridad.total).toBe(await contarVivos({ priority: 'ALTA' }))
       expect(porPrioridad.items.every((row) => row.priority === 'ALTA')).toBe(true)
       const mismosPrioridad = (await recorrerTodo({ priority: 'ALTA' })).filter((row) =>
@@ -581,7 +590,7 @@ describe('R34/R38 — el `total` es el de los filtros, no el de la pagina', () =
 
       // R38, los dos COMBINADOS: el `and`, no el `or`.
       const combinado = { status: 'EN_CURSO', priority: 'ALTA' } as const
-      const ambos = await listAliveOrders(consulta(combinado))
+      const ambos = await listAliveOrders(consulta(combinado), scope())
       expect(ambos.total).toBe(await contarVivos(combinado))
       const mismosAmbos = (await recorrerTodo(combinado)).filter((row) => creados.includes(row.id))
       expect(mismosAmbos).toHaveLength(2)
@@ -605,8 +614,8 @@ describe('R33/R40 — los discriminantes de las tres escrituras', () => {
 
       // VIVO -> 'ok', y la edicion escribe de verdad.
       const editado = baseOrder({ quantity: '99.0000', priority: 'CRITICA', status: 'EN_CURSO' })
-      expect(await updateAliveOrder(pedido.id, editado, actorId, despues)).toBe('ok')
-      const relectura = await findAliveOrderById(pedido.id)
+      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, scope())).toBe('ok')
+      const relectura = await findAliveOrderById(pedido.id, scope())
       expect(relectura?.quantity).toBe('99.0000')
       expect(relectura?.priority).toBe('CRITICA')
       expect(relectura?.status).toBe('EN_CURSO')
@@ -616,15 +625,15 @@ describe('R33/R40 — los discriminantes de las tres escrituras', () => {
       expect(relectura?.updatedAt.toISOString()).toBe(despues.toISOString())
 
       // INEXISTENTE -> 'not_found' en las tres, sin lanzar.
-      expect(await updateAliveOrder(inexistente, editado, actorId, despues)).toBe('not_found')
-      expect(await cancelAliveOrder(inexistente, 'da igual', actorId, despues)).toBe('not_found')
-      expect(await softDeleteAliveOrder(inexistente, actorId, despues)).toBe('not_found')
+      expect(await updateAliveOrder(inexistente, editado, actorId, despues, scope())).toBe('not_found')
+      expect(await cancelAliveOrder(inexistente, 'da igual', actorId, despues, scope())).toBe('not_found')
+      expect(await softDeleteAliveOrder(inexistente, actorId, despues, scope())).toBe('not_found')
 
       // YA BORRADO -> 'not_found' en las tres. El primer borrado si es 'ok'.
-      expect(await softDeleteAliveOrder(pedido.id, actorId, despues)).toBe('ok')
-      expect(await updateAliveOrder(pedido.id, editado, actorId, despues)).toBe('not_found')
-      expect(await cancelAliveOrder(pedido.id, 'da igual', actorId, despues)).toBe('not_found')
-      expect(await softDeleteAliveOrder(pedido.id, actorId, despues)).toBe('not_found')
+      expect(await softDeleteAliveOrder(pedido.id, actorId, despues, scope())).toBe('ok')
+      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, scope())).toBe('not_found')
+      expect(await cancelAliveOrder(pedido.id, 'da igual', actorId, despues, scope())).toBe('not_found')
+      expect(await softDeleteAliveOrder(pedido.id, actorId, despues, scope())).toBe('not_found')
 
       // Y ninguna de las tres llamadas rechazadas escribio nada: la fila borrada sigue con lo
       // que tenia, no con lo que pedia el `editado` de despues.

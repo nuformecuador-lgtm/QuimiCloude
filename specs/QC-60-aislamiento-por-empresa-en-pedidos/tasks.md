@@ -106,7 +106,7 @@
 
 ## Bloque 2 — Persistencia
 
-- [ ] **T8 — El único punto de consulta.**
+- [x] **T8 — El único punto de consulta.**
   Archivos: `lib/modules/pedidos/adapters/driven/persistence/company-scope.ts` (nuevo).
   Contenido: `companyScope` privada + `orderCompanyScope` (`Prisma.OrderWhereInput`) y
   `companyScopeColumns`; docblock con las reglas de uso de `design.md > 5`, incluida la del SQL crudo
@@ -115,7 +115,7 @@
   Hecho cuando: existe y su test afirma que las dos envolturas devuelven el mismo objeto.
   Cubre: R18.
 
-- [ ] **T9 — Adaptador driven acotado, y el correlativo por empresa.**
+- [x] **T9 — Adaptador driven acotado, y el correlativo por empresa.**
   Archivos: `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts`,
   `.../order-catalog-prisma.ts`.
   Contenido: (a) el ámbito compuesto en `buildOrderWhere` —al lado de `deletedAt: null` y **antes**
@@ -134,7 +134,7 @@
   `companyId`.
   Cubre: R12, R14, R15, R18, R19, R20, R21, R22, R23, R24, R27.
 
-- [ ] **T10 — Server Actions con las dos caras de la sesión, y los llamantes de `asignaciones`.**
+- [x] **T10 — Server Actions con las dos caras de la sesión, y los llamantes de `asignaciones`.**
   Archivos: `lib/modules/pedidos/adapters/driving/order-actions.ts`;
   `lib/modules/asignaciones/domain/{assign-responsibles,list-order-responsibles,unassign-responsible,remove-work-group-from-order}.ts`.
   Contenido: `currentActor()` pide `getSessionUser()` **y** `getSessionContext()` en paralelo y
@@ -148,7 +148,7 @@
 
 ## Bloque 3 — Pruebas
 
-- [ ] **T11 — Test de esquema y de texto de la migración.** `[P]`
+- [x] **T11 — Test de esquema y de texto de la migración.** `[P]`
   Archivos: `tests/unit/pedidos/schema/orders-company-scope-migration.test.ts` (nuevo);
   `tests/unit/pedidos/schema/pedidos-migration.test.ts` (se amplía: la función ya no existe, el único
   cambió de nombre).

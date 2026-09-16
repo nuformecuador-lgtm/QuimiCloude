@@ -306,17 +306,22 @@ export async function addMember(
 let nextSequence = 910_000 + Math.floor(Math.random() * 80_000);
 
 export type OrderOptions = {
+  /** QC-60: la empresa del pedido. Por defecto la propia; el caso del pedido AJENO la cambia. */
+  readonly companyId?: string;
   readonly status?: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'CANCELADO';
   readonly deletedAt?: Date | null;
 };
 
 export async function createOrder(
-  fixture: Pick<Fixture, 'tx' | 'recipeId'>,
+  fixture: Pick<Fixture, 'tx' | 'recipeId' | 'companyA'>,
   options: OrderOptions = {},
 ): Promise<string> {
   nextSequence += 1;
   const order = await fixture.tx.order.create({
     data: {
+      // QC-60: `orders.company_id` es NOT NULL y la FK de la asignacion ya es compuesta, asi que
+      // el pedido nace en la MISMA empresa que sus asignaciones.
+      companyId: options.companyId ?? fixture.companyA,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: nextSequence,
       recipeId: fixture.recipeId,

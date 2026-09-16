@@ -148,6 +148,8 @@ function currentUtcYear(): number {
 }
 
 interface Fixtures {
+  /** QC-60: `orders.company_id` es NOT NULL, asi que el pedido nace en la empresa del fixture. */
+  readonly companyId: string
   readonly unitId: string
   readonly recipeId: string
   readonly userId: string
@@ -208,12 +210,13 @@ async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
     },
     select: { id: true },
   })
-  return { unitId: unit.id, recipeId: recipe.id, userId: user.id }
+  return { companyId: company.id, unitId: unit.id, recipeId: recipe.id, userId: user.id }
 }
 
 /** Columnas que un alta cruda puede escribir en `orders`. */
 type WritableColumn =
   | 'id'
+  | 'company_id'
   | 'order_year'
   | 'order_sequence'
   | 'recipe_id'
@@ -279,6 +282,7 @@ function asStatus(value: string): Prisma.Sql {
  *  sobreescribe la que quiere poner a prueba, y asi solo una restriccion puede dispararse. */
 function baseColumns(f: Fixtures, sequence: number): Partial<Record<WritableColumn, Prisma.Sql>> {
   return {
+    company_id: asUuid(f.companyId),
     order_year: Prisma.sql`${currentUtcYear()}`,
     order_sequence: Prisma.sql`${sequence}`,
     recipe_id: asUuid(f.recipeId),
@@ -305,6 +309,7 @@ async function createOrder(
 ): Promise<string> {
   const order = await tx.order.create({
     data: {
+      companyId: f.companyId,
       orderYear: currentUtcYear(),
       orderSequence: seed.sequence ?? freshSequence(),
       recipeId: f.recipeId,

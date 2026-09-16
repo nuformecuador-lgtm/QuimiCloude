@@ -25,7 +25,8 @@ import { isDuplicateOrderNumber } from '@/lib/modules/pedidos/adapters/driven/pe
  *  aqui a mano a proposito: si alguien lo renombra en el esquema sin tocar el adaptador, este
  *  archivo sigue verde y el que se pone rojo es `schema/pedidos-migration.test.ts`, que es quien
  *  vigila el nombre. Aqui lo que se vigila es la DECISION, no el nombre. */
-const INDICE_DEL_CORRELATIVO = 'orders_order_year_order_sequence_key'
+// QC-60 (R11): la unicidad pasa a medirse DENTRO de la empresa y el indice cambio de nombre.
+const INDICE_DEL_CORRELATIVO = 'orders_company_year_sequence_key'
 
 /**
  * Un error de un `$queryRaw` que viola una restriccion, tal como lo entrega el conector: llega
