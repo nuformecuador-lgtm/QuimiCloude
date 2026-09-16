@@ -43,10 +43,54 @@ import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/secur
 import { SESSION_COOKIE_NAME } from '@/lib/modules/identity/adapters/driven/session/session-token';
 import { GENERIC_CREDENTIALS_ERROR } from '@/lib/modules/identity/adapters/driving/login-form-state';
 import { prisma } from '@/lib/shared/db/prisma';
-import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
+
+// QC-93 (R8): el aterrizaje tras el login se deriva de los permisos del usuario en el helper unico.
+import { loginAndLand, permissionsForUsername } from './helpers/landing';
 
 /** Ruta publica del login (QC-10). No hay constante para ella en `lib/shared/routes.ts`. */
 const LOGIN_PATH = '/login';
+
+/**
+ * La sonda de QC-93 R18: los `data-testid` de DATOS (titulo, tabla, filas, lista y estado vacio) de
+ * inventario, recetas, pedidos, proveedores, unidades, presentaciones y usuarios. Existe para que
+ * «quien no tiene ningun permiso no ve nada» sea algo que alguien nota: si uno solo aparece ante
+ * ese usuario, es un AGUJERO REAL de permisos —se para y se abre ficha, no se arregla en un test—.
+ *
+ * No hay ninguno inventado: cada uno sale de una comprobacion de cuenta cero que ya hace el E2E de
+ * su modulo (`e2e/<modulo>.spec.ts`) y esta confirmado en `app/`/`components/`.
+ */
+const MODULE_DATA_TESTIDS = [
+  // e2e/inventario.spec.ts
+  'inventario-title',
+  'data-table',
+  'product-list-empty',
+  // e2e/recetas.spec.ts
+  'recipes-title',
+  'recipe-table',
+  'recipe-list-empty',
+  // e2e/pedidos.spec.ts
+  'pedidos-title',
+  'order-list',
+  'order-list-empty',
+  // e2e/proveedores.spec.ts
+  'proveedores-title',
+  'supplier-table',
+  'supplier-row',
+  'supplier-list',
+  'supplier-list-empty',
+  // e2e/unidades.spec.ts
+  'unidades-title',
+  'unit-list',
+  'unit-list-empty',
+  // e2e/presentaciones.spec.ts
+  'presentaciones-title',
+  'presentation-list',
+  'presentation-list-empty',
+  // e2e/usuarios.spec.ts
+  'usuarios-title',
+  'user-list',
+  'user-list-empty',
+] as const;
 
 /** Prefijos con los que este spec marca TODO lo que crea. Nada fuera de ellos se toca. */
 const USERNAME_PREFIX = 'qc7_e2e_';
@@ -212,6 +256,20 @@ test.beforeAll(async () => {
 
   // El prefijo propio sigue siendo condicion en AMBAS ramas del `OR`: ampliar el barrido a los
   // usuarios de los roles condenados no puede convertirse en una puerta para tocar filas ajenas.
+  // Antes, las sesiones cerradas de EXACTAMENTE esos usuarios (mismo `where`, via la relacion):
+  // `revoked_sessions.user_id` es `onDelete: Restrict` (QC-23) y el caso de QC-93 cierra sesion.
+  await prisma.revokedSession.deleteMany({
+    where: {
+      user: {
+        username: { startsWith: USERNAME_PREFIX },
+        OR: [
+          { createdAt: { lt: orphanCutoff } },
+          { roleId: { in: orphanRoleIds } },
+          { companyId: { in: orphanCompanyIds } },
+        ],
+      },
+    },
+  });
   await prisma.user.deleteMany({
     where: {
       username: { startsWith: USERNAME_PREFIX },
@@ -265,6 +323,15 @@ test.afterAll(async () => {
   // borra por prefijo de `RUN_ID` (no por ids acumulados en memoria) y cada paso va en su
   // propio `try`/`catch`, para que un fallo al borrar usuarios no impida borrar el rol ni
   // cerrar la conexion. Usuarios primero: la FK `users.role_id` es `onDelete: Restrict`.
+  // Y antes que los usuarios, sus sesiones cerradas: `revoked_sessions.user_id` es
+  // `onDelete: Restrict` (QC-23) y el caso de QC-93 cierra sesion.
+  try {
+    await prisma.revokedSession.deleteMany({
+      where: { user: { username: { startsWith: `${USERNAME_PREFIX}${RUN_ID}` } } },
+    });
+  } catch {
+    // se intenta borrar los usuarios igualmente
+  }
   try {
     await prisma.user.deleteMany({
       where: { username: { startsWith: `${USERNAME_PREFIX}${RUN_ID}` } },
@@ -300,18 +367,13 @@ test.describe('login en navegador real', () => {
     context,
   }) => {
     // Cubre R1 (autentica), R19 (destino) y R9 (cookie httpOnly) en navegador real.
-    const { username, password } = await createTestUser('ok');
+    const user = await createTestUser('ok');
 
-    await page.goto(LOGIN_PATH);
-
-    await page.getByTestId('login-username').fill(username);
-    await page.getByTestId('login-password').fill(password);
-    await page.getByTestId('login-submit').click();
-
-    // Se espera por la RUTA, no por contenido de la pagina: QC-12 esta `pending` y hoy
-    // `/dashboard` devuelve 404. Eso no invalida el test — lo que R19 exige es el destino, y
-    // lo que R9 exige es la cookie; ninguno de los dos dice nada de lo que se pinte alli.
-    await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+    // Se espera por la RUTA, no por contenido de la pagina: lo que R19 exige es el destino, y lo
+    // que R9 exige es la cookie; ninguno de los dos dice nada de lo que se pinte alli. El destino
+    // lo deriva el helper unico de los permisos del usuario (QC-93 R8): el rol efimero de este
+    // archivo no tiene ninguno, asi que es el respaldo del login, pero no se escribe aqui.
+    await loginAndLand(page, user);
 
     const sessionCookie = (await context.cookies()).find(
       (cookie) => cookie.name === SESSION_COOKIE_NAME,
@@ -319,6 +381,51 @@ test.describe('login en navegador real', () => {
 
     expect(sessionCookie, 'no se emitio la cookie de sesion').toBeDefined();
     expect(sessionCookie?.httpOnly).toBe(true);
+  });
+
+  test('sin ningun permiso de modulo entra al destino derivado, ve el 404 dentro del layout privado sin un solo dato de modulo y puede cerrar sesion sin volver atras (QC-93 R14-R18)', async ({
+    page,
+  }) => {
+    // Usuario del rol efimero de este archivo, que nace SIN permisos (ver `beforeAll`).
+    const user = await createTestUser('sinperm');
+
+    // La premisa, dicha en voz alta: si algun dia el rol efimero ganara un permiso, este caso
+    // dejaria de ejercitar lo que dice y tiene que romper aqui, no pasar en verde por otro camino.
+    expect(await permissionsForUsername(user.username)).toEqual([]);
+
+    // --- 1. R15: aterriza en el destino DERIVADO de sus permisos (por R3, el respaldo del login),
+    // que el helper calcula con las funciones de produccion. No se escribe la ruta a mano.
+    const landing = await loginAndLand(page, user);
+    expect(new URL(page.url()).pathname).toBe(landing);
+
+    // --- 2. R16: el 404 se pinta DENTRO del layout privado, con su menu y su salida.
+    await expect(page.getByTestId('private-not-found')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('private-nav')).toBeAttached();
+    const logout = page.getByTestId('private-logout');
+    await expect(logout).toBeVisible();
+
+    // --- 3. R18, la sonda: ni un dato de ningun modulo llega al navegador.
+    for (const testId of MODULE_DATA_TESTIDS) {
+      await expect(
+        page.getByTestId(testId),
+        `«${testId}» visible sin permisos: agujero real de permisos (QC-93 R18)`,
+      ).toHaveCount(0);
+    }
+
+    // --- 4. R17: cerrar sesion lleva al login, y volver atras no devuelve a la zona privada.
+    // Por TECLADO y no con `click()`: en la pantalla de 404 el overlay de `next dev` intercepta el
+    // puntero en WebKit. Motivo completo en `e2e/permisos.spec.ts` (el bloque «POR QUE POR TECLADO»).
+    await logout.focus();
+    await page.keyboard.press('Enter');
+    await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
+
+    // Mismo gesto que `e2e/session.spec.ts`: si el navegador restaurara la pagina privada desde su
+    // cache, la URL no volveria al login y este `waitForURL` fallaria diciendo justo eso.
+    await page.goBack();
+    await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 60_000 });
+    await expect(page.getByTestId('private-not-found')).toHaveCount(0);
+    await expect(page.getByTestId('private-nav')).toHaveCount(0);
+    await expect(page.getByTestId('private-logout')).toHaveCount(0);
   });
 
   test('con credenciales incorrectas se queda en el login, avisa y no emite sesion', async ({

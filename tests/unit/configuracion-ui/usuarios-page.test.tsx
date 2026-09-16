@@ -90,6 +90,18 @@ vi.mock('@/lib/modules/identity/adapters/driving/role-actions', () => ({
   listRolesAction: listRolesActionMock,
 }));
 
+// QC-101 T7 — La Server Action del CIERRE DE SESIONES, doble que FALLA si se la llama.
+//
+// Mismo motivo que el bloque de grupos: el panel de detalle monta ahora el dialogo del cierre de
+// sesiones, y `session-actions.ts` lee `observabilidad` de `@/lib/composition` al cargarse —y el
+// doble de composicion de este archivo declara solo `identity`—. Pintar la pantalla no cierra la
+// sesion de nadie: si alguien la llamara, el caso se pondria rojo.
+vi.mock('@/lib/modules/identity/adapters/driving/session-actions', () => ({
+  endAllSessionsAction: vi.fn(() => {
+    throw new Error('endAllSessionsAction no debe invocarse al pintar la pantalla');
+  }),
+}));
+
 // QC-85 T7 — Las SIETE Server Actions de GRUPOS, dobles que FALLAN si se les llama.
 //
 // **No es un cambio de guion de este archivo**: no toca ni un `test(...)`, ni un selector, ni una
@@ -369,6 +381,15 @@ describe('`canModify` sale de assertPermission y de nada mas (R6, R8)', () => {
         prohibido,
       );
     }
+  });
+
+  it('R16 — QC-101: el `currentUserId` sale de la MISMA lectura de sesion que `canModify` y baja por props', () => {
+    const fuente = fuenteDeLaPagina();
+
+    // Una sola lectura de la sesion en la pagina: la que ya resolvia `canModify`.
+    expect(fuente.match(/getSessionUser\(/g) ?? []).toHaveLength(1);
+    // Y la seccion la recibe por props, sin que ningun componente de cliente la lea.
+    expect(fuente).toMatch(/<UserListSection\b[^>]*\bcurrentUserId=\{currentUserId\}/);
   });
 
   it('la pantalla no se construye sus propios datos: nada de DB ni de fetch a rutas propias', () => {

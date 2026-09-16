@@ -1,0 +1,80 @@
+2026-09-15T10:28:39-05:00
+e006c4d76c39fc6bad54192a2970ea629a3e59a4
+workers=3 (el intento con workers por defecto lo mato el sistema por memoria a las 10:2x con 42 tests hechos)
+[WebServer] ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+[WebServer] 
+[WebServer]   To migrate automatically, run:
+[WebServer]   npx @next/codemod@canary middleware-to-proxy .
+[WebServer] 
+[WebServer]   Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+Running 80 tests using 3 workers
+
+  ✓   3 [chromium] › e2e\establecer-contrasena.spec.ts:182:7 › establecer la contrasena desde el enlace del correo › alta sin contrasena, enlace, contrasena establecida, entrada al dashboard y el enlace ya no sirve (9.9s)
+  ✓   2 [chromium] › e2e\aislamiento-inventario.spec.ts:351:7 › aislamiento por empresa del inventario › con sesion en la empresa A: las listas no traen nada de B, borrar una fila de B conociendo su identificador se rechaza y la fila sigue intacta, y el nombre de una presentacion de B se puede usar en A (R27) (13.2s)
+  ✓   4 [chromium] › e2e\grupos-de-trabajo.spec.ts:356:7 › pestana de grupos de trabajo › crear, renombrar, meter a una persona, sacarla y borrar el grupo, en un solo recorrido (R42) (11.1s)
+  ✘   1 [chromium] › e2e\errores.spec.ts:197:7 › un error que no es de dominio, visto desde el navegador › la pantalla sigue en pie, muestra el mensaje neutro de `unexpected` y no filtra ni un detalle interno (R33, R13) (1.0m)
+  ✓   7 [chromium] › e2e\login-skin.spec.ts:63:7 › piel de la pantalla de login en navegador real › presenta campos y boton con al menos 44 px de alto computado (791ms)
+  ✓   8 [chromium] › e2e\login-skin.spec.ts:89:7 › piel de la pantalla de login en navegador real › no deja crecer la tarjeta mas alla de 400 px en escritorio (548ms)
+  ✓   9 [chromium] › e2e\login-skin.spec.ts:102:7 › piel de la pantalla de login en navegador real › en viewport de telefono no provoca scroll horizontal y conserva 16 px de letra (525ms)
+  ✓  10 [chromium] › e2e\login-skin.spec.ts:134:7 › piel de la pantalla de login en navegador real › oculta la capa de burbujas cuando el sistema pide movimiento reducido (518ms)
+  ✓  11 [chromium] › e2e\login-skin.spec.ts:154:7 › piel de la pantalla de login en navegador real › pinta las tres burbujas cuando no hay preferencia de movimiento reducido (559ms)
+  ✓  12 [chromium] › e2e\login.spec.ts:342:7 › login en navegador real › entra con credenciales correctas y recibe la cookie de sesion httpOnly (1.0s)
+  ✓  13 [chromium] › e2e\login.spec.ts:363:7 › login en navegador real › sin ningun permiso de modulo entra al destino derivado, ve el 404 dentro del layout privado sin un solo dato de modulo y puede cerrar sesion sin volver atras (QC-93 R14-R18) (1.4s)
+  ✘  14 [chromium] › e2e\login.spec.ts:408:7 › login en navegador real › con credenciales incorrectas se queda en el login, avisa y no emite sesion (0ms)
+  -  15 [chromium] › e2e\login.spec.ts:435:7 › login en navegador real › con la empresa dada de baja no entra pese a tener las credenciales correctas
+  ✓  16 [chromium] › e2e\login.spec.ts:462:7 › login en navegador real › una cuenta que no esta activa ve el MISMO mensaje que una contrasena mala, no recibe sesion y no deja rastro (2.7s)
+  ✘   5 [chromium] › e2e\inventario.spec.ts:384:7 › catalogo de productos › el Administrador entra, da de alta un producto con una presentacion nueva y lo ve en la lista (R4, R17, R18, R21, R24) (1.1m)
+  ✓  17 [chromium] › e2e\pedidos-responsables.spec.ts:510:7 › responsables en la pantalla de pedidos › abrir un pedido, marcar una persona, aplicar un grupo, sacar a alguien y ver los avatares y el nombre del grupo EN EL LISTADO (R37) (11.9s)
+  ✘   6 [chromium] › e2e\inventario.spec.ts:508:7 › catalogo de productos › elegir un producto que ya existe le agrega un lote y no crea otro producto (QC-90 R17, R18) (1.1m)
+  ✓  19 [chromium] › e2e\pedidos.spec.ts:335:7 › pantalla de pedidos › el Administrador entra, da de alta un pedido, lo ve por su correlativo y lo cancela con motivo (R48) (7.0s)
+  ✘  18 [chromium] › e2e\inventario.spec.ts:452:7 › catalogo de productos › el alta con presentacion y solo costo total deja el lote con el costo unitario derivado (QC-90 R32, R7) (1.0m)
+[WebServer] [browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+  ✘  20 [chromium] › e2e\inventario.spec.ts:564:7 › catalogo de productos › un usuario que no es Administrador acaba fuera y no ve el catalogo (R4) (1.1m)
+  ✘  22 [chromium] › e2e\permisos.spec.ts:201:7 › la zona privada segun los permisos de quien entra › el Operador entra, aterriza en inventario, ve un menu corto y recibe 404 en un modulo que no puede consultar, con el control de cerrar sesion presente (7.0s)
+  ✘  21 [chromium] › e2e\pedidos.spec.ts:440:7 › pantalla de pedidos › un usuario sin pedidos.consultar recibe 404 dentro del layout privado y no ve ningun dato de pedidos (R49) (1.0m)
+[WebServer] [browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+  ✓  24 [chromium] › e2e\presentaciones.spec.ts:338:7 › pantalla de presentaciones › un usuario sin `inventario.modificar` recibe 404 y no ve ni un dato (R6) (2.5s)
+[WebServer] [browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+  ✓  26 [chromium] › e2e\proveedores.spec.ts:455:7 › proveedores › un usuario sin proveedores.consultar recibe 404 dentro del layout privado y no ve ningun dato de proveedores (R52) (2.2s)
+  ✓  27 [chromium] › e2e\recetas-pasos.spec.ts:305:7 › editor y lectura de pasos › el Administrador redacta un paso con negrilla y lista de verificacion, lo guarda, lo reabre igual y recorre la vista previa hasta Finalizar (R28) (6.4s)
+  ✘  23 [chromium] › e2e\presentaciones.spec.ts:280:7 › pantalla de presentaciones › el Administrador entra por la URL, da de alta una presentacion y la ve en la lista filtrando por su nombre (R36) (1.0m)
+[WebServer] [browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+  ✓  29 [chromium] › e2e\recetas.spec.ts:369:7 › catalogo de recetas › un usuario sin recetas.consultar recibe 404 dentro del layout privado y no ve ningun dato de recetas (R6) (2.2s)
+  ✘  25 [chromium] › e2e\proveedores.spec.ts:360:7 › proveedores › el Administrador entra, da de alta un proveedor, abre su detalle, anade una linea de catalogo y la ve en la lista (R51) (1.1m)
+  ✘  30 [chromium] › e2e\session.spec.ts:241:7 › ciclo de sesion sobre una ruta privada › pide una pantalla privada sin sesion, entra, aterriza en ella, ve su nombre, cierra sesion y atras no muestra la zona privada (2.5s)
+  ✘  28 [chromium] › e2e\recetas.spec.ts:317:7 › catalogo de recetas › el Administrador entra, da de alta una receta con una linea y un paso, y la ve en la lista (R52) (1.0m)
+  ✓  32 [chromium] › e2e\session.spec.ts:352:7 › ciclo de sesion sobre una ruta privada › una sesion abierta cuya ficha se da de baja tampoco rebota: sale al login en una sola redireccion (4.2s)
+  ✓  31 [chromium] › e2e\session.spec.ts:289:7 › ciclo de sesion sobre una ruta privada › una sesion abierta cuya cuenta deja de estar activa no llega a la siguiente pantalla privada y acaba en el login (4.4s)
+  ✓  35 [chromium] › e2e\theme.spec.ts:174:7 › anti-parpadeo del tema en /login › no pinta el modo claro antes de aplicar el oscuro del sistema (1.8s)
+  ✓  34 [chromium] › e2e\theme.spec.ts:228:7 › anti-parpadeo del tema en /login › mantiene el modo al navegar entre rutas (2.7s)
+  ✓  33 [chromium] › e2e\theme.spec.ts:192:7 › anti-parpadeo del tema en /login › conserva la preferencia guardada tras recargar y en una sesion nueva del navegador (3.3s)
+  ✓  36 [chromium] › e2e\theme.spec.ts:244:7 › anti-parpadeo del tema en /login › sigue el cambio de prefers-color-scheme mientras la preferencia es sistema (1.3s)
+[WebServer] [browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+  ✓  38 [chromium] › e2e\unidades.spec.ts:445:7 › pantalla de unidades › una sesion valida sin los permisos de unidades recibe 404 dentro del layout privado y no ve la tabla (R12) (6.9s)
+  ✓  37 [chromium] › e2e\unidades.spec.ts:349:7 › pantalla de unidades › el Administrador entra por la URL, da de alta una unidad derivada y la ve en la lista con su equivalencia armada (R50) (11.1s)
+[WebServer] [identity] fallo el envio del enlace para establecer la contrasena: faltan las variables de entorno: RESEND_API_KEY, MAIL_FROM_ADDRESS, APP_BASE_URL
+[WebServer] [browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+  ✓  40 [chromium] › e2e\usuarios.spec.ts:416:7 › pantalla de usuarios › una sesion valida sin `usuarios.consultar` recibe 404 dentro del layout privado y no ve la tabla (R4, R42) (6.2s)
+  ✘  39 [chromium] › e2e\usuarios.spec.ts:305:7 › pantalla de usuarios › el Administrador entra por la URL, da de alta un usuario y lo ve en la lista con estado pending (R42) (14.2s)
+  ✓  43 [webkit] › e2e\establecer-contrasena.spec.ts:182:7 › establecer la contrasena desde el enlace del correo › alta sin contrasena, enlace, contrasena establecida, entrada al dashboard y el enlace ya no sirve (12.2s)
+  ✓  41 [webkit] › e2e\aislamiento-inventario.spec.ts:351:7 › aislamiento por empresa del inventario › con sesion en la empresa A: las listas no traen nada de B, borrar una fila de B conociendo su identificador se rechaza y la fila sigue intacta, y el nombre de una presentacion de B se puede usar en A (R27) (19.8s)
+  ✓  44 [webkit] › e2e\grupos-de-trabajo.spec.ts:356:7 › pestana de grupos de trabajo › crear, renombrar, meter a una persona, sacarla y borrar el grupo, en un solo recorrido (R42) (25.9s)
+  ✘  42 [webkit] › e2e\errores.spec.ts:197:7 › un error que no es de dominio, visto desde el navegador › la pantalla sigue en pie, muestra el mensaje neutro de `unexpected` y no filtra ni un detalle interno (R33, R13) (1.0m)
+  ✓  47 [webkit] › e2e\login-skin.spec.ts:63:7 › piel de la pantalla de login en navegador real › presenta campos y boton con al menos 44 px de alto computado (1.2s)
+  ✓  48 [webkit] › e2e\login-skin.spec.ts:89:7 › piel de la pantalla de login en navegador real › no deja crecer la tarjeta mas alla de 400 px en escritorio (871ms)
+  ✓  49 [webkit] › e2e\login-skin.spec.ts:102:7 › piel de la pantalla de login en navegador real › en viewport de telefono no provoca scroll horizontal y conserva 16 px de letra (955ms)
+  ✓  50 [webkit] › e2e\login-skin.spec.ts:134:7 › piel de la pantalla de login en navegador real › oculta la capa de burbujas cuando el sistema pide movimiento reducido (932ms)
+  ✓  51 [webkit] › e2e\login-skin.spec.ts:154:7 › piel de la pantalla de login en navegador real › pinta las tres burbujas cuando no hay preferencia de movimiento reducido (843ms)
+  ✓  52 [webkit] › e2e\login.spec.ts:342:7 › login en navegador real › entra con credenciales correctas y recibe la cookie de sesion httpOnly (2.2s)
+  ✓  53 [webkit] › e2e\login.spec.ts:363:7 › login en navegador real › sin ningun permiso de modulo entra al destino derivado, ve el 404 dentro del layout privado sin un solo dato de modulo y puede cerrar sesion sin volver atras (QC-93 R14-R18) (2.8s)
+  ✘  54 [webkit] › e2e\login.spec.ts:408:7 › login en navegador real › con credenciales incorrectas se queda en el login, avisa y no emite sesion (0ms)
+  -  55 [webkit] › e2e\login.spec.ts:435:7 › login en navegador real › con la empresa dada de baja no entra pese a tener las credenciales correctas
+  ✓  56 [webkit] › e2e\login.spec.ts:462:7 › login en navegador real › una cuenta que no esta activa ve el MISMO mensaje que una contrasena mala, no recibe sesion y no deja rastro (6.2s)
+  ✘  45 [webkit] › e2e\inventario.spec.ts:384:7 › catalogo de productos › el Administrador entra, da de alta un producto con una presentacion nueva y lo ve en la lista (R4, R17, R18, R21, R24) (1.2m)
+  ✘  46 [webkit] › e2e\inventario.spec.ts:508:7 › catalogo de productos › elegir un producto que ya existe le agrega un lote y no crea otro producto (QC-90 R17, R18) (1.1m)
+  ✓  57 [webkit] › e2e\pedidos-responsables.spec.ts:510:7 › responsables en la pantalla de pedidos › abrir un pedido, marcar una persona, aplicar un grupo, sacar a alguien y ver los avatares y el nombre del grupo EN EL LISTADO (R37) (26.4s)
+EXIT=1
+2026-09-15T10:34:50-05:00
+EXIT=abortado por el implementer (regresion de login.spec.ts detectada)
+2026-09-15T10:34:55-05:00

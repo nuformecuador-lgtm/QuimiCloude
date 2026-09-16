@@ -89,8 +89,9 @@
 //
 // UN AVISO SOBRE LOS COMENTARIOS. Varios archivos de esta feature NOMBRAN en sus comentarios lo
 // que prometen no tocar: `user-input.ts` y `user-view.ts` explican que `failedLoginAttempts`,
-// `lockLevel` y `lockedUntil` quedan fuera por R45, y `user-actions.ts` dice que no tiene ningun
-// `console.*`. Esa documentacion es informacion util y no puede poner un test rojo. Asi que antes
+// `lockLevel` y `lockedUntil` no entran por ningun esquema ni salen por ninguna consulta, y que
+// solo los escribe `applyGuardedChange` al salir de `blocked` (QC-95, que enmienda R45 de QC-66);
+// y `user-actions.ts` dice que no tiene ningun `console.*`. Esa documentacion es informacion util y no puede poner un test rojo. Asi que antes
 // de buscar se quitan los comentarios (`quitarComentariosTs`, `quitarComentariosSql`), mismo
 // criterio que el retensado de QC-47 en `tests/unit/proveedores/scope.test.ts`. Lo que se mide es
 // CODIGO y SQL de verdad.
@@ -341,6 +342,160 @@ const GRAFIAS_DEL_BLOQUEO = [
 const DUENO_DEL_BLOQUEO =
   'lib/modules/identity/adapters/driven/persistence/user-credentials-prisma.ts';
 
+// ---------------------------------------------------------------------------------------------
+// RETENSADO 2026-09-15 (QC-95, desbloqueo-manual-limpia-el-conteo). LEER ANTES DE TOCAR R45.
+//
+// Informe: `progress/review_QC-95-desbloqueo-manual-limpia-el-conteo-2026-09-15.md > B1`. El caso
+// de contenido de R45 exigia CERO grafias del bloqueo en los veintiun archivos de QC-66. QC-95, con
+// spec aprobado, ENMIENDA R45: al salir de `blocked`, la MISMA escritura que mueve el estado limpia
+// los tres contadores (QC-95 R1, R3, R6). Esa escritura vive en `applyGuardedChange` de
+// `user-admin-prisma.ts` y nombra por fuerza `failedLoginAttempts`, `lockLevel` y `lockedUntil`.
+// El caso quedo ROJO en `dev` con esos tres hallazgos: la guardia lee disco, no importa nada, y
+// `vitest related` no la selecciono antes del merge.
+//
+// Se RETENSA NOMBRANDO LA EXCEPCION -como se enmiendan las fichas entre si en
+// `tests/unit/identity/account-status-scope.test.ts`-, NO relajando el barrido:
+//
+//   1. UNA excepcion, para UN archivo (`user-admin-prisma.ts`) y UN fragmento: el spread
+//      condicional
+//        ...(input.lockState === null ? {} : { failedLoginAttempts: input.lockState.failedAttempts,
+//          lockLevel: input.lockState.lockLevel, lockedUntil: input.lockState.lockedUntil })
+//      El patron tolera espacios y saltos de linea (un reformateo de Prettier no lo rompe), pero
+//      EXIGE la condicion de no nulo y los tres valores leidos de `input.lockState`. Un literal
+//      `0, 0, null` o un spread sin condicion NO encajan y caen en el barrido.
+//   2. Tiene que aparecer EXACTAMENTE UNA VEZ en el archivo, y DENTRO de `applyGuardedChange`
+//      (desde su `export async function` hasta su `}` de cierre en la columna 0, el siguiente
+//      `export` de nivel superior o el final del archivo, lo que llegue antes). Es ROJO si aparece
+//      cero veces (alguien quito la enmienda: hay que revisar la guardia, no dejar una excepcion
+//      huerfana), si aparece dos o si aparece fuera de esa funcion.
+//   3. Se quita ESE fragmento y el resto del archivo pasa el barrido ORIGINAL de las seis grafias.
+//      Sigue siendo hallazgo una columna en un `select`, en `create`, en `updateAliveInCompany` o en
+//      la rama `delete`, una lectura, o un literal.
+//   4. Los otros veinte archivos no cambian: cero grafias.
+//
+// La logica vive en funciones PURAS y EXPORTADAS (`hallazgosDeLaExcepcionQC95` y sus piezas), y el
+// ultimo `describe` las ejercita con fuentes SINTETICAS. Una excepcion probada solo contra el arbol
+// real no demuestra que muerda.
+//
+// El caso de RAMA de R45 sobre `lib/composition/index.ts` NO cambia: QC-95 no toca composicion.
+// ---------------------------------------------------------------------------------------------
+
+/** El UNICO archivo de la feature al que QC-95 (enmienda R45 de QC-66) deja nombrar los contadores. */
+const ARCHIVO_DE_LA_EXCEPCION_QC95 =
+  'lib/modules/identity/adapters/driven/persistence/user-admin-prisma.ts';
+
+/** La firma de la UNICA funcion donde puede vivir el fragmento autorizado. */
+const FIRMA_DE_APPLY_GUARDED_CHANGE = /^export\s+async\s+function\s+applyGuardedChange\b/m;
+
+/** Una secuencia de tokens literales con espacios LIBRES entre ellos (saltos de linea incluidos). */
+function tokensConEspaciosLibres(tokens: readonly string[]): string {
+  return tokens.map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*');
+}
+
+/**
+ * El fragmento que QC-95 autoriza, como FUENTE de expresion regular (se instancia en cada uso para
+ * no arrastrar el `lastIndex` de una `g` compartida). Exige, token a token, la condicion
+ * `input.lockState === null`, la rama vacia y los tres valores leidos de `input.lockState`. Solo
+ * tolera espacios y la coma final que Prettier pone en la version multilinea.
+ */
+const FUENTE_DEL_FRAGMENTO_AUTORIZADO_QC95 =
+  tokensConEspaciosLibres([
+    '...', '(', 'input', '.', 'lockState', '===', 'null', '?', '{', '}', ':', '{',
+    'failedLoginAttempts', ':', 'input', '.', 'lockState', '.', 'failedAttempts', ',',
+    'lockLevel', ':', 'input', '.', 'lockState', '.', 'lockLevel', ',',
+    'lockedUntil', ':', 'input', '.', 'lockState', '.', 'lockedUntil',
+  ]) + '(?:\\s*,)?\\s*\\}\\s*\\)';
+
+interface Tramo {
+  readonly inicio: number;
+  readonly fin: number;
+}
+
+/**
+ * Los limites `[inicio, fin)` de `applyGuardedChange` en `codigo`, o `null` si la funcion no esta.
+ * El fin es lo PRIMERO que llegue de: su `}` de cierre en la columna 0, el siguiente `export` de
+ * nivel superior o el final del archivo. Asi, una funcion NO exportada escrita debajo tampoco cuenta
+ * como «dentro».
+ */
+export function limitesDeApplyGuardedChange(codigo: string): Tramo | null {
+  const firma = FIRMA_DE_APPLY_GUARDED_CHANGE.exec(codigo);
+  if (firma === null) return null;
+  const tras = firma.index + firma[0].length;
+  const resto = codigo.slice(tras);
+  const cierre = /^\}/m.exec(resto);
+  const siguienteExport = /^export\b/m.exec(resto);
+  const candidatos = [codigo.length];
+  if (cierre !== null) candidatos.push(tras + cierre.index + 1);
+  if (siguienteExport !== null) candidatos.push(tras + siguienteExport.index);
+  return { inicio: firma.index, fin: Math.min(...candidatos) };
+}
+
+/** Cada aparicion del fragmento autorizado por QC-95 en `codigo`, en orden. */
+export function aparicionesDelFragmentoAutorizado(codigo: string): readonly Tramo[] {
+  const patron = new RegExp(FUENTE_DEL_FRAGMENTO_AUTORIZADO_QC95, 'g');
+  const apariciones: Tramo[] = [];
+  for (let m = patron.exec(codigo); m !== null; m = patron.exec(codigo)) {
+    apariciones.push({ inicio: m.index, fin: m.index + m[0].length });
+  }
+  return apariciones;
+}
+
+/** El barrido ORIGINAL de R45: que grafias del bloqueo aparecen en `codigo`. */
+export function grafiasDelBloqueoEn(codigo: string): readonly string[] {
+  return GRAFIAS_DEL_BLOQUEO.filter((grafia) => codigo.includes(grafia));
+}
+
+/**
+ * QC-95 enmienda R45 de QC-66: los hallazgos de R45 en `user-admin-prisma.ts`, medidos sobre su
+ * fuente SIN comentarios. Lista vacia = el archivo solo nombra los contadores en el unico spread
+ * condicional autorizado, dentro de `applyGuardedChange`.
+ */
+export function hallazgosDeLaExcepcionQC95(codigo: string): readonly string[] {
+  const hallazgos: string[] = [];
+  const cuerpo = limitesDeApplyGuardedChange(codigo);
+  if (cuerpo === null) {
+    hallazgos.push(
+      'no se encuentra `export async function applyGuardedChange`: la excepcion de QC-95 no tiene ' +
+        'donde anclarse',
+    );
+  }
+
+  const apariciones = aparicionesDelFragmentoAutorizado(codigo);
+  const dentro = apariciones.filter(
+    (tramo) => cuerpo !== null && tramo.inicio >= cuerpo.inicio && tramo.fin <= cuerpo.fin,
+  );
+  const fuera = apariciones.length - dentro.length;
+
+  if (apariciones.length === 0) {
+    hallazgos.push(
+      'el spread condicional que autoriza QC-95 no aparece (0 apariciones): si se quito la ' +
+        'enmienda, hay que retirar tambien esta excepcion en vez de dejarla huerfana',
+    );
+  }
+  if (apariciones.length > 1) {
+    hallazgos.push(
+      `el spread condicional que autoriza QC-95 aparece ${apariciones.length} veces: se autoriza UNA`,
+    );
+  }
+  if (fuera > 0) {
+    hallazgos.push(
+      `el spread condicional que autoriza QC-95 aparece ${fuera} vez/veces FUERA de applyGuardedChange`,
+    );
+  }
+
+  // Se quita UNA sola aparicion, y solo si esta DENTRO de `applyGuardedChange`. Todo lo demas
+  // -una copia, un spread fuera, un literal- pasa el barrido original.
+  const autorizada = dentro[0];
+  const resto =
+    autorizada === undefined
+      ? codigo
+      : `${codigo.slice(0, autorizada.inicio)} ${codigo.slice(autorizada.fin)}`;
+  for (const grafia of grafiasDelBloqueoEn(resto)) {
+    hallazgos.push(`\`${grafia}\` fuera del unico spread condicional autorizado`);
+  }
+  return hallazgos;
+}
+
 /** Un `console.<algo>` de verdad, no la palabra en un comentario (los comentarios ya se quitan). */
 const LLAMADA_A_CONSOLA = /\bconsole\s*\./;
 
@@ -587,12 +742,21 @@ describe('alcance de QC-66 (crud-de-usuarios) — CONTENIDO: muerde siempre, tam
     }
   });
 
-  it('R45 — ningun archivo de produccion de la feature lee ni escribe los tres contadores de bloqueo de QC-19', () => {
-    // R45: «ninguna de las seis operaciones lee ni escribe `failed_login_attempts`, `lock_level`
-    // ni `locked_until`, y limpiar el contador al salir de `blocked` ES DE QC-78». Esta es la
-    // frontera que evita que dos fichas en vuelo se pisen el mismo mecanismo.
+  it('R45 (QC-95 enmienda R45 de QC-66) — ningun archivo de produccion de la feature lee ni escribe los tres contadores de bloqueo de QC-19, salvo el unico spread condicional de applyGuardedChange', () => {
+    // R45 de QC-66, TAL COMO LO ENMIENDA QC-95. El R45 original decia: «ninguna de las seis
+    // operaciones lee ni escribe `failed_login_attempts`, `lock_level` ni `locked_until`, y limpiar
+    // el contador al salir de `blocked` ES DE QC-78». QC-95 enmienda R45 de QC-66: esa limpieza la
+    // hace ahora `applyGuardedChange`, en la misma escritura que mueve el estado, y SOLO cuando el
+    // destino no es `blocked`. Todo lo demas de R45 sigue en pie: ninguna operacion LEE los
+    // contadores y ninguna otra los escribe.
     //
-    // Esta es la mitad de CONTENIDO: los VEINTE archivos que la ficha CREA son suyos y se miden
+    // LA EXCEPCION, y es la unica (ver el bloque «RETENSADO 2026-09-15 (QC-95)» encima de
+    // `ARCHIVO_DE_LA_EXCEPCION_QC95`): en `user-admin-prisma.ts` se tolera UN spread condicional,
+    // dentro de `applyGuardedChange`, con la condicion de no nulo y los tres valores leidos de
+    // `input.lockState`. Tiene que aparecer exactamente una vez. Se quita y el resto del archivo
+    // pasa el barrido original. Los otros veinte archivos se miden como siempre: cero grafias.
+    //
+    // Esta es la mitad de CONTENIDO: los VEINTIUN archivos que la ficha CREA son suyos y se miden
     // enteros, sin git, para siempre. La otra mitad -las lineas que la rama anade al punto de
     // composicion, que es PREEXISTENTE y compartido- es inherentemente de rama y vive mas abajo.
 
@@ -617,16 +781,32 @@ describe('alcance de QC-66 (crud-de-usuarios) — CONTENIDO: muerde siempre, tam
       expect(leer(archivo).length, `${archivo} esta vacio: no prueba nada`).toBeGreaterThan(0);
     }
 
+    // ANCLA DE LA EXCEPCION: el archivo exceptuado ES uno de los veintiuno. Si saliera de la lista,
+    // la excepcion no se aplicaria a nada y nadie lo notaria.
+    expect(
+      (ARCHIVOS_NUEVOS_DE_LA_FEATURE as readonly string[]).includes(ARCHIVO_DE_LA_EXCEPCION_QC95),
+      `${ARCHIVO_DE_LA_EXCEPCION_QC95} ya no esta en la lista de la feature: la excepcion de QC-95 ` +
+        'no se aplica a nada',
+    ).toBe(true);
+
     const hallazgos: string[] = [];
     for (const archivo of ARCHIVOS_NUEVOS_DE_LA_FEATURE) {
       const codigo = quitarComentariosTs(leer(archivo));
+      if (archivo === ARCHIVO_DE_LA_EXCEPCION_QC95) {
+        // QC-95 enmienda R45 de QC-66: la excepcion nombrada, y el barrido original sobre el resto.
+        for (const hallazgo of hallazgosDeLaExcepcionQC95(codigo)) {
+          hallazgos.push(`${archivo}: ${hallazgo}`);
+        }
+        continue;
+      }
       for (const grafia of GRAFIAS_DEL_BLOQUEO) {
         if (codigo.includes(grafia)) hallazgos.push(`${archivo}: ${grafia}`);
       }
     }
     expect(
       hallazgos,
-      'QC-66 toca el mecanismo de bloqueo de QC-19/QC-78, y R45 se lo prohibe: ' +
+      'QC-66 toca el mecanismo de bloqueo de QC-19/QC-78 mas alla de lo que QC-95 enmienda R45 de ' +
+        'QC-66 (un unico spread condicional sobre `input.lockState` dentro de applyGuardedChange): ' +
         hallazgos.join('; '),
     ).toEqual([]);
   });
@@ -966,5 +1146,182 @@ describe('el salto no vacia la guardia: en la rama de QC-66 sigue mordiendo', ()
     expect(migracionesAjenas(legitimo)).toEqual([]);
     expect(infraccionesDeInterfaz(legitimo)).toEqual([]);
     expect(cambiosDeDependencias(legitimo)).toEqual([]);
+  });
+});
+
+/**
+ * QC-95 enmienda R45 de QC-66: QUE LA EXCEPCION MUERDA (RETENSADO 2026-09-15, informe
+ * `progress/review_QC-95-desbloqueo-manual-limpia-el-conteo-2026-09-15.md > B1`).
+ *
+ * Una excepcion que solo se ejercita contra el arbol real demuestra que deja pasar lo legitimo,
+ * no que se niegue a dejar pasar lo demas. Aqui se le dan adaptadores SINTETICOS con cada forma
+ * conocida de colarse, y un caso contra el archivo real que afirma que la excepcion hace falta y
+ * basta.
+ */
+describe('QC-95 enmienda R45 de QC-66: la excepcion de applyGuardedChange muerde', () => {
+  const SPREAD_MULTILINEA = [
+    '...(input.lockState === null ? {} : {',
+    '        failedLoginAttempts: input.lockState.failedAttempts,',
+    '        lockLevel: input.lockState.lockLevel,',
+    '        lockedUntil: input.lockState.lockedUntil,',
+    '      }),',
+  ].join('\n');
+  const SPREAD_EN_UNA_LINEA =
+    '...(input.lockState === null ? {} : { failedLoginAttempts: input.lockState.failedAttempts, ' +
+    'lockLevel: input.lockState.lockLevel, lockedUntil: input.lockState.lockedUntil }),';
+  const SPREAD_SIN_ESPACIOS =
+    '...(input.lockState===null?{}:{failedLoginAttempts:input.lockState.failedAttempts,' +
+    'lockLevel:input.lockState.lockLevel,lockedUntil:input.lockState.lockedUntil}),';
+  const SPREAD_SIN_CONDICION =
+    '...{ failedLoginAttempts: input.lockState.failedAttempts, ' +
+    'lockLevel: input.lockState.lockLevel, lockedUntil: input.lockState.lockedUntil },';
+  const SPREAD_CON_LITERALES =
+    '...(input.lockState === null ? {} : { failedLoginAttempts: 0, lockLevel: 0, lockedUntil: null }),';
+
+  /** Un `user-admin-prisma.ts` en miniatura, con huecos donde inyectar cada variante. */
+  function adaptador(partes: {
+    readonly select?: string;
+    readonly update?: string;
+    readonly apply: string;
+    readonly tras?: string;
+  }): string {
+    return [
+      "import { prisma } from '@/lib/shared/prisma';",
+      '',
+      'const USER_ROW_SELECT = {',
+      '  id: true,',
+      '  accountStatus: true,',
+      partes.select ?? '',
+      '} as const;',
+      '',
+      'export async function updateAliveInCompany(input: Changes): Promise<number> {',
+      '  const { count } = await prisma.user.updateMany({',
+      '    where: { id: input.id, deletedAt: null },',
+      `    data: { updatedAt: input.now, ${partes.update ?? ''} },`,
+      '  });',
+      '  return count;',
+      '}',
+      '',
+      'export async function applyGuardedChange(input: GuardedChange): Promise<GuardedOutcome> {',
+      '  const { count } = await prisma.user.updateMany({',
+      '    where: { id: input.id, deletedAt: null },',
+      "    data: input.kind === 'delete' ? { deletedAt: input.now } : {",
+      '      accountStatus: input.accountStatus,',
+      '      updatedAt: input.now,',
+      `      ${partes.apply}`,
+      '    },',
+      '  });',
+      "  return count === 1 ? 'ok' : 'not_found';",
+      '}',
+      partes.tras ?? '',
+    ].join('\n');
+  }
+
+  const LAS_TRES_GRAFIAS_FUERA = [
+    '`failedLoginAttempts` fuera del unico spread condicional autorizado',
+    '`lockLevel` fuera del unico spread condicional autorizado',
+    '`lockedUntil` fuera del unico spread condicional autorizado',
+  ];
+
+  it('(f) el fragmento legitimo, multilinea, en una linea o sin espacios, no da hallazgos', () => {
+    for (const spread of [SPREAD_MULTILINEA, SPREAD_EN_UNA_LINEA, SPREAD_SIN_ESPACIOS]) {
+      const fuente = adaptador({ apply: spread });
+      expect(aparicionesDelFragmentoAutorizado(fuente), spread).toHaveLength(1);
+      // Sin la excepcion, el barrido original veria las tres: la excepcion es la que las deja pasar.
+      expect(grafiasDelBloqueoEn(fuente)).toEqual(['failedLoginAttempts', 'lockLevel', 'lockedUntil']);
+      expect(hallazgosDeLaExcepcionQC95(fuente), spread).toEqual([]);
+    }
+  });
+
+  it('(a) una segunda aparicion de `lockedUntil` en USER_ROW_SELECT es hallazgo aunque el spread sea legitimo', () => {
+    const fuente = adaptador({ select: '  lockedUntil: true,', apply: SPREAD_MULTILINEA });
+    expect(hallazgosDeLaExcepcionQC95(fuente)).toEqual([
+      '`lockedUntil` fuera del unico spread condicional autorizado',
+    ]);
+  });
+
+  it('(b) el spread FUERA de applyGuardedChange es rojo: en otro export y en una funcion no exportada debajo', () => {
+    const enUpdate = adaptador({ update: SPREAD_EN_UNA_LINEA, apply: '' });
+    expect(hallazgosDeLaExcepcionQC95(enUpdate)).toEqual([
+      'el spread condicional que autoriza QC-95 aparece 1 vez/veces FUERA de applyGuardedChange',
+      ...LAS_TRES_GRAFIAS_FUERA,
+    ]);
+
+    const enHelperDebajo = adaptador({
+      apply: '',
+      tras: ['', 'function conContadores(input: GuardedChange) {', `  return { ${SPREAD_EN_UNA_LINEA} };`, '}'].join(
+        '\n',
+      ),
+    });
+    expect(hallazgosDeLaExcepcionQC95(enHelperDebajo)).toEqual([
+      'el spread condicional que autoriza QC-95 aparece 1 vez/veces FUERA de applyGuardedChange',
+      ...LAS_TRES_GRAFIAS_FUERA,
+    ]);
+  });
+
+  it('(c) el spread SIN la condicion de no nulo no encaja con la excepcion y es rojo', () => {
+    const fuente = adaptador({ apply: SPREAD_SIN_CONDICION });
+    expect(aparicionesDelFragmentoAutorizado(fuente)).toEqual([]);
+    expect(hallazgosDeLaExcepcionQC95(fuente)).toEqual([
+      expect.stringContaining('(0 apariciones)'),
+      ...LAS_TRES_GRAFIAS_FUERA,
+    ]);
+  });
+
+  it('(d) el spread con LITERALES 0, 0, null no encaja con la excepcion y es rojo', () => {
+    const fuente = adaptador({ apply: SPREAD_CON_LITERALES });
+    expect(aparicionesDelFragmentoAutorizado(fuente)).toEqual([]);
+    expect(hallazgosDeLaExcepcionQC95(fuente)).toEqual([
+      expect.stringContaining('(0 apariciones)'),
+      ...LAS_TRES_GRAFIAS_FUERA,
+    ]);
+  });
+
+  it('(e) el spread DUPLICADO dentro de applyGuardedChange es rojo', () => {
+    const fuente = adaptador({ apply: `${SPREAD_MULTILINEA}\n      ${SPREAD_EN_UNA_LINEA}` });
+    expect(hallazgosDeLaExcepcionQC95(fuente)).toEqual([
+      'el spread condicional que autoriza QC-95 aparece 2 veces: se autoriza UNA',
+      ...LAS_TRES_GRAFIAS_FUERA,
+    ]);
+  });
+
+  it('sin la enmienda (cero apariciones) o sin applyGuardedChange, la excepcion huerfana es roja', () => {
+    expect(hallazgosDeLaExcepcionQC95(adaptador({ apply: '' }))).toEqual([
+      expect.stringContaining('(0 apariciones)'),
+    ]);
+
+    const sinLaFuncion = adaptador({ apply: SPREAD_MULTILINEA }).replace(
+      'export async function applyGuardedChange',
+      'export async function applyChange',
+    );
+    expect(hallazgosDeLaExcepcionQC95(sinLaFuncion)).toEqual([
+      expect.stringContaining('no se encuentra `export async function applyGuardedChange`'),
+      'el spread condicional que autoriza QC-95 aparece 1 vez/veces FUERA de applyGuardedChange',
+      ...LAS_TRES_GRAFIAS_FUERA,
+    ]);
+  });
+
+  it('contra el archivo REAL: una unica aparicion, dentro de applyGuardedChange, y cero hallazgos', () => {
+    expect(existsSync(join(RAIZ, ARCHIVO_DE_LA_EXCEPCION_QC95))).toBe(true);
+    const codigo = quitarComentariosTs(leer(ARCHIVO_DE_LA_EXCEPCION_QC95));
+
+    const cuerpo = limitesDeApplyGuardedChange(codigo);
+    expect(cuerpo, 'user-admin-prisma.ts ya no declara applyGuardedChange').not.toBeNull();
+
+    const apariciones = aparicionesDelFragmentoAutorizado(codigo);
+    expect(apariciones, 'QC-95 enmienda R45 de QC-66: el spread autorizado aparece UNA vez').toHaveLength(1);
+    const [unica] = apariciones;
+    expect(unica !== undefined && cuerpo !== null && unica.inicio >= cuerpo.inicio && unica.fin <= cuerpo.fin).toBe(
+      true,
+    );
+
+    // ANCLA: sin la excepcion, el archivo real SI nombra las tres grafias. Si dejara de hacerlo,
+    // la excepcion sobraria y habria que retirarla.
+    expect(grafiasDelBloqueoEn(codigo)).toEqual(['failedLoginAttempts', 'lockLevel', 'lockedUntil']);
+
+    expect(
+      hallazgosDeLaExcepcionQC95(codigo),
+      'QC-95 enmienda R45 de QC-66: el archivo real no deberia tener hallazgos',
+    ).toEqual([]);
   });
 });

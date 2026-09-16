@@ -385,14 +385,25 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // las celdas: la lista de pedidos ES la tabla compartida. Se anade la fila y se TENSA el
   // centinela, nunca se afloja: la lista sigue CERRADA, el E2E de recetas sigue fuera y un DECIMO
   // spec que referencie `data-table` vuelve a ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos nueve', () => {
+  //
+  // AMPLIADA POR SEPTIMA VEZ el 2026-09-15 (QC-93, aterrizaje-sin-permiso-de-modulo, R18): entra la
+  // DECIMA entrada, `e2e/login.spec.ts`, y a diferencia de todas las anteriores no estrena pantalla
+  // y NO consume la tabla compartida: no hace clic, no lee filas ni celdas. La referencia es la
+  // sonda de QC-93 R18 del caso nuevo para quien no tiene ningun permiso de modulo, que recorre los
+  // `data-testid` de datos de todos los modulos y AFIRMA SU AUSENCIA (`toHaveCount(0)`); `data-table`
+  // entra porque es el contenedor de las listas de inventario, presentaciones, unidades, usuarios y
+  // pedidos. Conviene que este AQUI y no fuera: si ese `data-testid` se renombrara, la cuenta cero
+  // seguiria en verde sin comprobar nada, y esta lista es lo que lo delataria. Se anade la fila y se
+  // TENSA el centinela, nunca se afloja: la lista sigue CERRADA, el E2E de recetas sigue fuera y un
+  // UNDECIMO spec que referencie `data-table` vuelve a ponerla en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos diez', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
       .filter((file) => /data-table/.test(readSource(file)))
       .map((file) => relative(repoRoot, file).split(sep).join('/'))
       .sort()
-    expect(referencian, 'solo estos nueve E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos diez E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
       // ya consumen la tabla compartida -inventario y presentaciones- y localiza
       // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
@@ -402,6 +413,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // La OCTAVA la trae QC-85 el 2026-09-12 (R42): ver la nota de arriba.
       'e2e/grupos-de-trabajo.spec.ts',
       'e2e/inventario.spec.ts',
+      // La DECIMA la trae QC-93 el 2026-09-15 (R18): ver la nota de arriba. Es la sonda del usuario
+      // sin permisos de modulo: afirma que `data-table` NO esta, no consume la tabla.
+      'e2e/login.spec.ts',
       // La NOVENA la trae QC-102 el 2026-09-13 (T16, R37): ver la nota de arriba. Va antes que
       // `e2e/pedidos.spec.ts` porque la lista esta ORDENADA y '-' precede a '.'.
       'e2e/pedidos-responsables.spec.ts',

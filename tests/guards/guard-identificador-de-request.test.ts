@@ -56,6 +56,17 @@ export function hallazgosDeVersionDeNext(
 // fallaria alli. Un `.spec.ts` nuevo se nombra aqui a mano.
 export const E2E_ESPERADOS = [
   'aislamiento-inventario.spec.ts',
+  // QC-101 T10 / R17: la E2E del cierre de TODAS las sesiones de otra persona desde la pantalla.
+  // Alta por el MISMO motivo y en el MISMO sitio que las de QC-49, QC-67, QC-79, QC-85 y QC-102:
+  // esta lista es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO
+  // se relaja -el archivo se nombra, uno a uno-. El recorrido que ejercita: dos contextos de
+  // navegador vivos a la vez, el administrador abre el panel de detalle de otra persona, cierra sus
+  // sesiones con la Server Action real y la victima, al volver a navegar con la MISMA cookie, acaba
+  // en el login en UNA sola redireccion; la sesion del administrador sigue viva. NO ejercita el cruce
+  // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
+  // identificador ni sobre `reference`, y entra por la misma puerta que las anteriores -«otra ficha
+  // y otra decision»-, asi que el diferimiento de QC-71 R21 sigue INTACTO.
+  'cierre-de-sesiones.spec.ts',
   'errores.spec.ts',
   'grupos-de-trabajo.spec.ts',
   'inventario.spec.ts',

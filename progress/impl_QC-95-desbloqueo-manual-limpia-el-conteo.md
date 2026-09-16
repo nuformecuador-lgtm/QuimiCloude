@@ -45,18 +45,33 @@ del login existente + el test de R1). Sin migración, sin dependencia, sin UI (R
 
 ## Mapa `R<n> → test`
 
-| R | Dónde se prueba |
+> **Mapa reemplazado el 2026-09-15.** La re-review
+> (`progress/review_QC-95-desbloqueo-manual-limpia-el-conteo-2026-09-15.md`, B2-B4, m3 y m5)
+> demostró que el mapa original era falso en R5, R6, R7, R8, R9 y R10:
+> - R5 citaba un `it` tautológico, borrado en `394a6d7`.
+> - R6 citaba un test que sigue verde con el literal que R6 prohíbe.
+> - A R7 le faltaba `authorization.test.ts`.
+> - R8 citaba guardias que se saltan fuera de su rama.
+> - R9 y R10 se apoyaban en «git status», que no es un test.
+>
+> La segunda review (`progress/review_QC-95-guardia-r45-de-qc-66.md`, B-N1) pidió dejar aquí el
+> mapa real. Las diez filas de abajo apuntan a tests que existen y pasan. El arreglo, las
+> mutaciones que muerden y la verificación están en `progress/impl_QC-95-guardia-r45-de-qc-66.md`.
+> El resto de esta bitácora es la entrega original y no se ha tocado; su «Salida real de
+> verificación» es de entonces.
+
+| R | Test |
 | --- | --- |
-| R1 | `set-user-account-status-lock.test.ts` (destino `active` → `clearedLockState()`) + `session-stamp-writes.int.test.ts` (fila queda en 0,0,null) |
-| R2 | `set-user-account-status-lock.test.ts` (destino `blocked` → `null`) + `session-stamp-writes.int.test.ts` (contadores intactos) |
-| R3 | `session-stamp-writes.int.test.ts` (misma escritura, fila releída tras la operación) |
-| R4 | `set-user-account-status-lock.test.ts` (destino `pending` idem; sin `findAliveInCompany`) |
-| R5 | `verify-credentials.test.ts` (~línea 1051, vía login) + test de R1 (comentario de referencia) |
-| R6 | `set-user-account-status-lock.test.ts` compara contra `clearedLockState()`, no contra literal |
-| R7 | `admin-guards.test.ts` — verde sin cambios de expectativa |
-| R8 | guardias por-ficha `qc78-alcance.test.ts`, `account-status-scope.test.ts`, `credential-policy-contract.test.ts` — mudas/verdes |
-| R9 | guardias: sin diff en `db/` ni `package.json` (verificado por grep de git status) |
-| R10 | guardias: sin archivos en `app/` ni `components/` (verificado por git status) |
+| R1 | `tests/unit/identity/usuarios/set-user-account-status-lock.test.ts` «R1 — destino `active`: el puerto recibe `lockState` IGUAL a `clearedLockState()`» + `tests/integration/identity/session-stamp-writes.int.test.ts` «R1/R3: mover a `active` limpia los tres contadores en la misma escritura» |
+| R2 | `set-user-account-status-lock.test.ts` «R2 — destino `blocked`: `lockState` va `null` y no se escribe ningun contador» + `tests/unit/identity/usuarios/set-user-account-status-cleared-lock-state.test.ts` «R6/R2 — destino `blocked`: `clearedLockState()` NO se llama y `lockState` es `null`» + `tests/unit/identity/usuarios/user-admin-prisma-lock-state.test.ts` «R2/R3 — destino `blocked` con `lockState` null: el `data` lleva `accountStatus` y NINGUNO de los tres contadores» + `session-stamp-writes.int.test.ts` «R2: mover a `blocked` NO toca los contadores, aunque se escriba el estado» |
+| R3 | `user-admin-prisma-lock-state.test.ts` «R3 — destino `active`/`pending`/`inactive` con `clearedLockState()`: un solo `updateMany` y su `data` lleva a la vez `accountStatus` y los tres contadores» y «R3 — los valores de los contadores salen de `lockState`, no de un literal del adaptador» + `session-stamp-writes.int.test.ts` «R1/R3: …», «R3: si la transaccion aborta por `last_administrator`, ni el estado ni los tres contadores cambian» y «R3: un objetivo de otra empresa (`not_found`) conserva sus tres contadores» |
+| R4 | `set-user-account-status-lock.test.ts` «R4 — destino `pending`: idem (la decision es por el destino, no por el estado actual)», y `findAliveInCompany` no se llama en R1, R2 ni R4 + `set-user-account-status-cleared-lock-state.test.ts` «R6 — destino `inactive`: …» |
+| R5 | `set-user-account-status-lock.test.ts` «R5 — `blocked` -> `active` por el caso de uso, y un fallo de login registra `failedAttempts = 1` sin rebloquear», con su control «control: la MISMA fila, sin pasar por el caso de uso, el login la trata como bloqueada»; lo complementa `tests/unit/identity/verify-credentials.test.ts:1051` «tras clearedLockState el siguiente fallo cuenta como el primero y no rebloquea» |
+| R6 | `set-user-account-status-cleared-lock-state.test.ts` «R6 — destino `active`: se llama a `clearedLockState()` una vez y el puerto recibe ESE MISMO objeto» (tambien con `pending` e `inactive`) + «R6/R2 — destino `blocked`: …»; en el adaptador, `tests/unit/identity/usuarios/scope.test.ts` exige que el spread lea de `input.lockState` y no escriba literales |
+| R7 | `tests/unit/identity/usuarios/authorization.test.ts`, fila `setUserAccountStatus`: «R1 — cada caso de uso avanza con EXACTAMENTE el codigo de su fila y con ningun otro», «R3 — solo `usuarios.consultar` no abre ninguna de las cuatro escrituras» y «R1 — el permiso se comprueba ANTES de zod: …» + `tests/unit/identity/usuarios/admin-guards.test.ts` «R21 — rechaza setUserAccountStatus con `self_operation` y no modifica ninguna fila» y «R22 — mover el estado del ultimo administrador activo se traduce a `last_administrator`» |
+| R8 | `tests/guards/guard-qc95-alcance-del-pr-70.test.ts` «R8: el PR #70 no modifica la politica de bloqueo por intentos, el estado efectivo, el login ni la resolucion de sesion» y «R8: cada archivo vigilado por R8 existe en el arbol del merge f777c56 (una ruta mal escrita tira la guardia en vez de medir aire)», con las anclas (1)-(3) y los sinteticos «R8: cada archivo del bloqueo por intentos, del estado efectivo, del login y de la sesion es hallazgo por separado» y «un rango sintetico con archivos prohibidos: la auditoria completa los detecta en R8, R9 y R10» |
+| R9 | `tests/guards/guard-qc95-alcance-del-pr-70.test.ts` «R9: el PR #70 no toca `db/schema.prisma`, `db/migrations/`, `package.json` ni `pnpm-lock.yaml`», con los sinteticos «R9: `db/schema.prisma`, una migracion, `package.json` y `pnpm-lock.yaml` son hallazgo cada uno por separado» y «un commit ausente en un clon SUPERFICIAL lanza con `git fetch --unshallow`, nunca salta» |
+| R10 | `tests/guards/guard-qc95-alcance-del-pr-70.test.ts` «R10: el PR #70 no trae nada bajo `app/` ni `components/`», con el sintetico «R10: una pagina bajo `app/` y un componente bajo `components/` son hallazgo» |
 
 ## Salida real de verificación
 

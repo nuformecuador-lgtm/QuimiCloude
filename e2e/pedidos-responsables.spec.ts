@@ -99,7 +99,10 @@ import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/secur
 import { formatOrderNumber } from '@/lib/modules/pedidos';
 import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
-import { DASHBOARD_ROUTE, LOGIN_ROUTE, ORDERS_ROUTE } from '@/lib/shared/routes';
+import { ORDERS_ROUTE } from '@/lib/shared/routes';
+
+// QC-93: la entrada y su aterrizaje, derivado de los permisos del usuario en la base.
+import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc102_e2e_';
@@ -251,15 +254,6 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
   });
 
   return created.id;
-}
-
-/** Entra por el formulario real y aterriza en el panel. */
-async function login(page: Page, user: Credentials): Promise<void> {
-  await page.goto(LOGIN_ROUTE);
-  await page.getByTestId('login-username').fill(user.username);
-  await page.getByTestId('login-password').fill(user.password);
-  await page.getByTestId('login-submit').click();
-  await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
 }
 
 /** URL de la lista, SIEMPRE derivada de `ORDERS_ROUTE`. Ningun literal de ruta en este spec. */
@@ -536,7 +530,7 @@ test.describe('responsables en la pantalla de pedidos', () => {
       return;
     }
 
-    await login(page, adminUser);
+    await loginAndLand(page, adminUser);
 
     // --- 1. ABRIR EL PEDIDO desde el LISTADO. La fila se localiza por su correlativo y su celda
     // de responsables pinta el MARCADOR DE AUSENCIA (R19): todavia no hay nadie, y eso es un dato,

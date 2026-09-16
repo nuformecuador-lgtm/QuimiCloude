@@ -90,7 +90,10 @@ import {
 } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { prisma } from '@/lib/shared/db/prisma';
-import { DASHBOARD_ROUTE, LOGIN_ROUTE, USERS_ROUTE } from '@/lib/shared/routes';
+import { USERS_ROUTE } from '@/lib/shared/routes';
+
+// QC-93: la entrada y su aterrizaje, derivado de los permisos del usuario en la base.
+import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc85_e2e_';
@@ -239,15 +242,6 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
   return created.id;
 }
 
-/** Entra por el formulario real. El Administrador aterriza en el panel (QC-75 R11). */
-async function login(page: Page, user: Credentials, landing: string): Promise<void> {
-  await page.goto(LOGIN_ROUTE);
-  await page.getByTestId('login-username').fill(user.username);
-  await page.getByTestId('login-password').fill(user.password);
-  await page.getByTestId('login-submit').click();
-  await page.waitForURL((url) => url.pathname === landing, { timeout: 60_000 });
-}
-
 /** Destino de la pestana de grupos, derivado de `USERS_ROUTE` (R3): ningun literal de ruta. */
 function groupsTabUrl(): string {
   return `${USERS_ROUTE}?${new URLSearchParams({ [TAB_PARAM]: GROUPS_TAB }).toString()}`;
@@ -366,7 +360,7 @@ test.describe('pestana de grupos de trabajo', () => {
     expect(memberId, 'el fixture de la persona no existe: fallo el beforeAll').not.toBeNull();
     if (memberId === null) return;
 
-    await login(page, adminUser, DASHBOARD_ROUTE);
+    await loginAndLand(page, adminUser);
 
     // --- 1. ENTRAR A LA PANTALLA DE USUARIOS. Sin `tab` en la direccion, lo que se presenta es la
     // pestana de PERSONAS (R2, R6) y la seccion de grupos no esta en el arbol: se monta UNA sola

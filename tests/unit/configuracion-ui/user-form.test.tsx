@@ -18,6 +18,7 @@ import {
   USER_DOCUMENT_TYPE_OPTION_TESTID,
   USER_ERROR_TESTIDS,
   USER_FIELD_TESTIDS,
+  USER_FORM_END_SESSIONS_TESTID,
   USER_FORM_ERROR_CODE_TESTID,
   USER_FORM_ERROR_TESTID,
   USER_FORM_SUBMIT_TESTID,
@@ -26,7 +27,9 @@ import {
   USER_ROLE_OPTION_TESTID,
   USER_ROLES_ERROR_TESTID,
   UserForm,
+  endUserSessionsLabel,
   type UserFieldName,
+  type UserFormEndSessions,
 } from '@/app/(private)/configuracion/usuarios/components';
 import { Sheet } from '@/components/ui/sheet';
 import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
@@ -397,5 +400,91 @@ describe('el error inesperado ensena su identificador (QC-71 R17, R18)', () => {
 
     await screen.findByTestId(USER_FORM_ERROR_TESTID);
     esperarSinIdentificador();
+  });
+});
+
+// QC-101 T6 — El disparador del cierre de sesiones dentro del panel: R7, R10, R11, R15 y R16.
+//
+// Aqui se prueba el CONTRATO del formulario con su panel: pinta el disparador SOLO si recibe
+// `endSessions`, y pulsarlo no envia la edicion. Quien decide si llega —cuenta activa y no es uno
+// mismo— es `user-sheet.tsx`, y eso se prueba en `user-sheet.test.tsx`.
+describe('el disparador del cierre de sesiones solo existe si el panel lo entrega (QC-101)', () => {
+  const NOMBRE = 'Lopez Perez, Ana';
+
+  function montarConCierre(endSessions: UserFormEndSessions | undefined) {
+    render(
+      <Sheet open onOpenChange={() => {}}>
+        <UserForm
+          roles={ROLES}
+          rolesError={null}
+          onSaved={onSaved}
+          endSessions={endSessions}
+        />
+      </Sheet>,
+    );
+    return screen.getByTestId(USER_FORM_TESTID);
+  }
+
+  it('R11 R12 — sin `endSessions` no se emite NADA: ni el disparador ni un contenedor vacio', () => {
+    const formulario = montarConCierre(undefined);
+
+    expect(screen.queryAllByTestId(USER_FORM_END_SESSIONS_TESTID)).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: endUserSessionsLabel(NOMBRE) })).toBeNull();
+    // El cuerpo acaba en el selector de rol: no queda ningun hueco reservado para el disparador.
+    const cuerpo = screen.getByTestId(USER_FIELD_TESTIDS.roleId).closest('.overflow-y-auto');
+    expect(cuerpo).not.toBeNull();
+    expect(cuerpo!.lastElementChild!.contains(screen.getByTestId(USER_FIELD_TESTIDS.roleId))).toBe(
+      true,
+    );
+    expect(formulario.querySelectorAll('.border-t.pt-4')).toHaveLength(0);
+  });
+
+  it('R7 — con `endSessions` se ofrece dentro del panel, con un nombre accesible que incluye el nombre', () => {
+    const formulario = montarConCierre({ displayName: NOMBRE, onEndSessions: vi.fn() });
+
+    const disparador = screen.getByRole('button', { name: endUserSessionsLabel(NOMBRE) });
+    expect(disparador).toBe(screen.getByTestId(USER_FORM_END_SESSIONS_TESTID));
+    expect(disparador.getAttribute('aria-label')).toContain(NOMBRE);
+    expect(formulario.contains(disparador)).toBe(true);
+  });
+
+  it('R10 — pulsarlo avisa al panel UNA vez y NO envia el formulario de edicion', async () => {
+    const user = setupUser();
+    const onEndSessions = vi.fn();
+    montarConCierre({ displayName: NOMBRE, onEndSessions });
+
+    const disparador = screen.getByTestId(USER_FORM_END_SESSIONS_TESTID);
+    // Todo el panel es un `<form>`: sin `type="button"`, pulsarlo enviaria la edicion.
+    expect(disparador).toHaveAttribute('type', 'button');
+
+    await user.click(disparador);
+
+    expect(onEndSessions).toHaveBeenCalledTimes(1);
+    expect(createUserActionMock).not.toHaveBeenCalled();
+    expect(updateUserActionMock).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it('R10 — el disparador no anade ningun campo al `FormData`: siguen siendo los nueve', () => {
+    const formulario = montarConCierre({ displayName: NOMBRE, onEndSessions: vi.fn() });
+
+    const nombres = [...formulario.querySelectorAll<HTMLElement>('input, select, textarea, button')]
+      .map((control) => control.getAttribute('name'))
+      .filter((nombre): nombre is string => nombre !== null && nombre !== '');
+
+    expect([...new Set(nombres)].sort()).toEqual([...USER_BUSINESS_FIELDS].sort());
+  });
+
+  it('R15 — mide al menos 44x44 px y esta en el DOM sin depender de `:hover`', () => {
+    montarConCierre({ displayName: NOMBRE, onEndSessions: vi.fn() });
+
+    const disparador = screen.getByTestId(USER_FORM_END_SESSIONS_TESTID);
+    for (const clase of ['min-h-11', 'min-w-11']) {
+      expect(disparador.className).toContain(clase);
+    }
+    expect(disparador.className).not.toMatch(/group-hover|hover:(opacity|visible|block|flex|inline)/);
+    const clases = disparador.className.split(/\s+/);
+    expect(clases).not.toContain('invisible');
+    expect(clases).not.toContain('hidden');
   });
 });

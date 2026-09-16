@@ -552,7 +552,15 @@ describe('toda escritura y toda lectura pasan por operaciones YA publicadas (R36
     expect(tocados, `R36: esta ficha escribio backend: ${tocados.join(', ')}`).toEqual([]);
   });
 
-  it('cada operacion entra por su RUTA EXACTA, nunca por el barrel del modulo', () => {
+  it('cada operacion entra por su RUTA EXACTA, nunca por el barrel del modulo', (ctx) => {
+    // QC-101 lo destapo. Este caso miraba `archivosDeLaPantalla()` —que sale del DIFF de la rama—
+    // sin la precondicion de rama que ya protegia a sus hermanos: una guardia de alcance sin
+    // precondicion de rama, la misma «bomba de relojeria» que describen QC-45 y QC-65. Cualquier
+    // rama que tocara la pantalla de usuarios le caia, y QC-101 la toco para montar el cierre de
+    // sesiones. Con el mismo preambulo que sus hermanos, fuera de la rama de QC-85 se salta
+    // ruidosamente, no pasa en verde; dentro de ella mide exactamente lo mismo que antes.
+    baseDeEstaRama(ctx);
+
     // Se miran DOS cosas: que ninguna de las ocho operaciones entre por otra puerta, y que el
     // barrel publico del modulo no aporte NINGUN simbolo terminado en `Action`. Lo segundo es lo
     // que cierra la puerta al `import { listWorkGroupsAction } from '@/lib/modules/identity'` que

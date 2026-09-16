@@ -62,7 +62,7 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 // `normalizeCompanyName` es la UNICA definicion de <<mismo nombre de empresa>> (QC-47 R3):
 // `companies.name_normalized` se calcula con esta y con ninguna otra.
@@ -73,12 +73,10 @@ import {
 } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { prisma } from '@/lib/shared/db/prisma';
-import {
-  DASHBOARD_ROUTE,
-  INVENTORY_ROUTE,
-  LOGIN_ROUTE,
-  PRESENTATIONS_ROUTE,
-} from '@/lib/shared/routes';
+import { PRESENTATIONS_ROUTE } from '@/lib/shared/routes';
+
+// QC-93: la entrada y su aterrizaje, derivado de los permisos del usuario en la base.
+import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc45_e2e_';
@@ -182,22 +180,6 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
 }
 
 /**
- * Entra por el formulario real y aterriza donde le corresponde a ese usuario.
- *
- * **El destino se pasa como parametro desde QC-75 (R11)**: el login ya no lleva a todo el mundo al
- * dashboard, sino al PRIMER item del menu que esa persona puede ver. El Administrador aterriza en
- * `DASHBOARD_ROUTE`; el Operador, que no tiene `dashboard.consultar`, en `INVENTORY_ROUTE`. Dar
- * por hecho el dashboard para los dos dejaba este `waitForURL` colgado hasta agotar el tiempo.
- */
-async function login(page: Page, user: Credentials, landing: string): Promise<void> {
-  await page.goto(LOGIN_ROUTE);
-  await page.getByTestId('login-username').fill(user.username);
-  await page.getByTestId('login-password').fill(user.password);
-  await page.getByTestId('login-submit').click();
-  await page.waitForURL((url) => url.pathname === landing, { timeout: 60_000 });
-}
-
-/**
  * URL de la lista, SIEMPRE derivada de `PRESENTATIONS_ROUTE` (R2), con el termino de busqueda ya
  * puesto.
  *
@@ -298,7 +280,7 @@ test.describe('pantalla de presentaciones', () => {
   test('el Administrador entra por la URL, da de alta una presentacion y la ve en la lista filtrando por su nombre (R36)', async ({
     page,
   }) => {
-    await login(page, adminUser, DASHBOARD_ROUTE);
+    await loginAndLand(page, adminUser);
 
     // --- 1. La pantalla se sirve a un Administrador (R6, la mitad que deja pasar). Se llega POR
     // URL derivada de la constante. El item de menu de Configuracion SI existe (T2), pero aqui no
@@ -356,10 +338,10 @@ test.describe('pantalla de presentaciones', () => {
   test('un usuario sin `inventario.modificar` recibe 404 y no ve ni un dato (R6)', async ({
     page,
   }) => {
-    // El Operador del seed lleva `inventario.consultar` y SOLO ese, asi que aterriza en inventario
-    // (QC-75 R11) y la pantalla de presentaciones, que exige `inventario.modificar`, le esta
-    // cerrada.
-    await login(page, operatorUser, INVENTORY_ROUTE);
+    // El Operador del seed no tiene `inventario.modificar`, asi que la pantalla de presentaciones le
+    // esta cerrada. Donde aterriza lo deriva `loginAndLand` de sus permisos
+    // (`e2e/helpers/landing.ts`).
+    await loginAndLand(page, operatorUser);
 
     // Sesion valida, permiso ausente: **404, sin redireccion**. Antes de QC-75 la regla ruta->rol
     // lo sacaba al dashboard; ahora la respuesta es indistinguible de la de una ruta que no

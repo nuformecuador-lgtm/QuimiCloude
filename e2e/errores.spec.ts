@@ -63,7 +63,10 @@ import { errorMessage, UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { prisma } from '@/lib/shared/db/prisma';
-import { DASHBOARD_ROUTE, FORMULAS_ROUTE, LOGIN_ROUTE } from '@/lib/shared/routes';
+import { FORMULAS_ROUTE } from '@/lib/shared/routes';
+
+// QC-93 (R8): el aterrizaje tras el login se deriva de los permisos del usuario en el helper unico.
+import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc70_e2e_';
@@ -196,11 +199,7 @@ test.describe('un error que no es de dominio, visto desde el navegador', () => {
   }) => {
     // --- 1. Sesion real, con el permiso `recetas.consultar`: sin el, la pagina responde 404 antes
     // de llegar a la consulta y no habria error que observar.
-    await page.goto(LOGIN_ROUTE);
-    await page.getByTestId('login-username').fill(adminUser.username);
-    await page.getByTestId('login-password').fill(adminUser.password);
-    await page.getByTestId('login-submit').click();
-    await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
+    await loginAndLand(page, adminUser);
 
     // --- 2. La ficha de una receta cuyo identificador la base no puede ni interpretar. El error
     // nace en Prisma, fuera de la familia `RecetasError`.
