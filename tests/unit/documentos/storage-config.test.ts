@@ -112,7 +112,7 @@ describe('documentos — configuracion del almacenamiento y aislamiento de su li
 
       let mensaje = '';
       try {
-        await createDocumentSignedUpload('empresa/archivo.pdf', 900);
+        await createDocumentSignedUpload('empresa/archivo.pdf');
       } catch (error) {
         mensaje = error instanceof Error ? error.message : String(error);
       }

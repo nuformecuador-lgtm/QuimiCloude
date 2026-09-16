@@ -26,7 +26,7 @@
 import { requirePermission, type Actor, DOCUMENT_UPLOAD_PERMISSION } from './actor';
 import { buildDocumentPath } from './document-path';
 import { ValidationError } from './errors';
-import { UPLOAD_LINK_TTL_SECONDS } from './limits';
+import { PROVIDER_UPLOAD_LINK_TTL_SECONDS } from './limits';
 import { issueUploadLinksSchema } from './upload-input';
 
 import type { DocumentStorage, SignedUpload } from '../ports/document-storage';
@@ -40,9 +40,9 @@ export type IssueUploadLinksDeps = {
   /**
    * El instante de emision, inyectable, con `() => new Date()` por defecto.
    *
-   * No es comodidad de test: la caducidad que se devuelve se cuenta desde ESTE instante y con la
-   * unica definicion del plazo que tiene el modulo, de modo que la respuesta no dependa del reloj
-   * —ni del criterio— de cada adaptador.
+   * No es comodidad de test: la caducidad que se devuelve se cuenta desde ESTE instante y con el
+   * plazo que el PROVEEDOR le da a un enlace de subida, de modo que la respuesta no dependa del
+   * reloj —ni del criterio— de cada adaptador.
    */
   readonly now?: () => Date;
 };
@@ -73,8 +73,11 @@ export function createIssueUploadLinks(
 
     // La caducidad se calcula UNA vez para toda la tanda: firmar diez archivos no puede dar diez
     // vencimientos distintos solo porque el reloj avance entre llamada y llamada.
+    //
+    // El plazo es el del PROVEEDOR, no uno elegido aqui: la firma de subida no admite ninguno, asi
+    // que lo unico honesto que se puede informar es cuando muere el enlace de verdad.
     const expiresAt = new Date(
-      now().getTime() + UPLOAD_LINK_TTL_SECONDS * MILLISECONDS_PER_SECOND,
+      now().getTime() + PROVIDER_UPLOAD_LINK_TTL_SECONDS * MILLISECONDS_PER_SECOND,
     ).toISOString();
 
     // 3 y 4. Una ruta nueva por archivo, SIEMPRE bajo la empresa del actor. El nombre que mando
@@ -82,13 +85,10 @@ export function createIssueUploadLinks(
     // enlace, y por eso ni siquiera se lee aqui.
     const uploads = await Promise.all(
       parsed.data.files.map(async (): Promise<SignedUpload> => {
-        const firmado = await deps.storage.createSignedUpload(
-          buildDocumentPath(actor.companyId),
-          UPLOAD_LINK_TTL_SECONDS,
-        );
-        // La caducidad que vale es la del modulo: el adaptador entrega la firma, pero el plazo lo
-        // fija la unica constante que lo declara. Asi el dato que ve quien llama no puede
-        // contradecir al plazo con el que se pidio la firma.
+        const firmado = await deps.storage.createSignedUpload(buildDocumentPath(actor.companyId));
+        // La caducidad se reescribe con la de la tanda: el adaptador entrega la firma y la cuenta
+        // desde SU reloj, y dos firmas seguidas darian dos instantes distintos para el mismo plazo.
+        // El plazo en si es el mismo, el del proveedor, en su unica definicion.
         return { ...firmado, expiresAt };
       }),
     );

@@ -17,7 +17,10 @@ import { DOCUMENT_UPLOAD_PERMISSION, type Actor } from '@/lib/modules/documentos
 import { isPathInCompany } from '@/lib/modules/documentos/domain/document-path';
 import { UnauthorizedError, ValidationError } from '@/lib/modules/documentos/domain/errors';
 import { createIssueUploadLinks } from '@/lib/modules/documentos/domain/issue-upload-links';
-import { UPLOAD_LINK_TTL_SECONDS } from '@/lib/modules/documentos/domain/limits';
+import {
+  PROVIDER_UPLOAD_LINK_TTL_SECONDS,
+  READ_LINK_TTL_SECONDS,
+} from '@/lib/modules/documentos/domain/limits';
 
 import type { DocumentStorage, SignedUpload } from '@/lib/modules/documentos/ports/document-storage';
 
@@ -27,8 +30,13 @@ const PERSONA = '11111111-1111-4111-8111-111111111111';
 
 /** El instante de emision, fijo: sin un reloj inyectado la caducidad no se podria afirmar. */
 const EMISION = new Date('2026-09-16T10:00:00.000Z');
-/** Quince minutos despues, escrito a mano a proposito: si el plazo cambiara, este caso se entera. */
-const CADUCIDAD = '2026-09-16T10:15:00.000Z';
+/**
+ * DOS HORAS despues, escrito a mano a proposito: si el plazo cambiara, este caso se entera.
+ *
+ * Dos horas y no quince minutos porque el plazo de un enlace de SUBIDA lo impone el proveedor y este
+ * modulo no lo elige. Los quince minutos son el plazo de LECTURA, que es el unico que si fija aqui.
+ */
+const CADUCIDAD = '2026-09-16T12:00:00.000Z';
 
 function actorAutorizado(companyId: string = EMPRESA): Actor {
   return { id: PERSONA, companyId, permissions: [DOCUMENT_UPLOAD_PERMISSION] };
@@ -42,19 +50,17 @@ function actorAutorizado(companyId: string = EMPRESA): Actor {
  * del camino feliz se pondria rojo con esta fecha de 1999.
  */
 function dobleDeAlmacenamiento() {
-  const llamadas: { path: string; expiresInSeconds: number }[] = [];
+  const llamadas: { path: string }[] = [];
 
-  const createSignedUpload = vi.fn(
-    async (path: string, expiresInSeconds: number): Promise<SignedUpload> => {
-      llamadas.push({ path, expiresInSeconds });
-      return {
-        path,
-        uploadUrl: `https://almacenamiento.invalido/subida/${llamadas.length}`,
-        token: `token-${llamadas.length}`,
-        expiresAt: '1999-01-01T00:00:00.000Z',
-      };
-    },
-  );
+  const createSignedUpload = vi.fn(async (path: string): Promise<SignedUpload> => {
+    llamadas.push({ path });
+    return {
+      path,
+      uploadUrl: `https://almacenamiento.invalido/subida/${llamadas.length}`,
+      token: `token-${llamadas.length}`,
+      expiresAt: '1999-01-01T00:00:00.000Z',
+    };
+  });
 
   const createSignedReadUrl = vi.fn(async (): Promise<string> => {
     throw new Error('la emision de enlaces no firma lecturas');
@@ -242,29 +248,49 @@ describe('documentos — emision de enlaces de subida', () => {
       }
     });
 
-    it('R10 — la caducidad es la emision mas quince minutos, con el reloj inyectado', async () => {
+    it('R10 — la caducidad es la emision mas las DOS HORAS del proveedor, con el reloj inyectado', async () => {
       const doble = dobleDeAlmacenamiento();
 
       const { uploads } = await emisor(doble.storage)(actorAutorizado(), tanda(3));
 
       for (const upload of uploads) {
         expect(upload.expiresAt).toBe(CADUCIDAD);
-        // Y no la fecha absurda del doble: el plazo lo fija el modulo, no el adaptador.
+        // Y no la fecha absurda del doble: la de la tanda se cuenta desde el reloj inyectado.
         expect(upload.expiresAt).not.toBe('1999-01-01T00:00:00.000Z');
       }
-      // El plazo escrito arriba es de verdad el del modulo, y esta en una sola definicion.
-      expect(new Date(CADUCIDAD).getTime() - EMISION.getTime()).toBe(UPLOAD_LINK_TTL_SECONDS * 1000);
-      expect(UPLOAD_LINK_TTL_SECONDS).toBe(15 * 60);
+      // El plazo escrito arriba es de verdad el del proveedor, y esta en una sola definicion.
+      expect(new Date(CADUCIDAD).getTime() - EMISION.getTime()).toBe(
+        PROVIDER_UPLOAD_LINK_TTL_SECONDS * 1000,
+      );
+      expect(PROVIDER_UPLOAD_LINK_TTL_SECONDS).toBe(2 * 60 * 60);
     });
 
-    it('R10 — al puerto se le pide la firma con ese mismo plazo: ningun enlace sale sin caducidad', async () => {
+    it('R10 — la SUBIDA no promete los quince minutos: ese plazo es el de LECTURA y aqui no se usa', async () => {
+      // El agujero que este caso cierra es el de volver a contar la caducidad de la subida con un
+      // plazo que este modulo elija: el enlace seguiria vivo dos horas y la respuesta mentiria.
+      const doble = dobleDeAlmacenamiento();
+
+      const { uploads } = await emisor(doble.storage)(actorAutorizado(), tanda(2));
+
+      const quinceMinutos = new Date(EMISION.getTime() + READ_LINK_TTL_SECONDS * 1000).toISOString();
+      for (const upload of uploads) {
+        expect(upload.expiresAt).not.toBe(quinceMinutos);
+      }
+      expect(READ_LINK_TTL_SECONDS).toBe(15 * 60);
+      expect(PROVIDER_UPLOAD_LINK_TTL_SECONDS).not.toBe(READ_LINK_TTL_SECONDS);
+    });
+
+    it('R10 — al puerto NO se le pasa ningun plazo: quien lo impone es el proveedor', async () => {
+      // Si alguien volviera a pasarle un `expiresInSeconds`, seria un valor que el proveedor ignora
+      // y que nadie puede honrar. La firma recibe la RUTA y nada mas.
       const doble = dobleDeAlmacenamiento();
 
       await emisor(doble.storage)(actorAutorizado(), tanda(3));
 
       expect(doble.llamadas).toHaveLength(3);
-      for (const llamada of doble.llamadas) {
-        expect(llamada.expiresInSeconds).toBe(UPLOAD_LINK_TTL_SECONDS);
+      for (const argumentos of doble.createSignedUpload.mock.calls) {
+        expect(argumentos).toHaveLength(1);
+        expect(typeof argumentos[0]).toBe('string');
       }
     });
 

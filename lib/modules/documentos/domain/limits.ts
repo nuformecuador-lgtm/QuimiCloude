@@ -28,10 +28,24 @@ export const MAX_PDF_PAGES = 50;
 export const PAGE_RENDER_DPI = 150;
 
 /**
- * Cuanto vive un enlace de subida firmado. Tiempo de sobra para subir un archivo grande por una
- * conexion mala, y corto para que un enlace filtrado sirva de poco.
+ * Cuanto vive un enlace de LECTURA firmado.
+ *
+ * Este plazo SI lo elige este modulo: la firma de lectura se pide con el y el servicio lo aplica.
+ * Tiempo de sobra para que quien procese la tanda lea el archivo, y corto para que un enlace
+ * filtrado sirva de poco.
  */
-export const UPLOAD_LINK_TTL_SECONDS = 15 * 60;
+export const READ_LINK_TTL_SECONDS = 15 * 60;
+
+/**
+ * Cuanto vive un enlace de SUBIDA firmado.
+ *
+ * **Lo fija el PROVEEDOR. Este modulo NO lo elige y, por tanto, NO lo promete.** La operacion de
+ * firmar una subida no acepta ningun plazo —solo recibe la ruta—, asi que este numero no viaja a
+ * ninguna llamada: se declara aqui UNICAMENTE para poder informar cuando muere el enlace. Si el
+ * proveedor cambiara su plazo, este valor quedaria obsoleto sin que nada fallara, porque nunca fue
+ * una garantia de este codigo.
+ */
+export const PROVIDER_UPLOAD_LINK_TTL_SECONDS = 2 * 60 * 60;
 
 /**
  * Tamano maximo por archivo, en bytes.

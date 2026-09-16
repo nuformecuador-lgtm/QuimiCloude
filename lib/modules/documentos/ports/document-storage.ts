@@ -21,12 +21,18 @@ export type SignedUpload = {
   readonly uploadUrl: string;
   /** El que consume la subida desde el navegador. */
   readonly token: string;
-  /** ISO-8601: instante de emision mas la vida del enlace. */
+  /** ISO-8601: instante de emision mas la vida que el PROVEEDOR le da al enlace de subida. */
   readonly expiresAt: string;
 };
 
 export interface DocumentStorage {
-  createSignedUpload(path: string, expiresInSeconds: number): Promise<SignedUpload>;
+  /**
+   * Firma la SUBIDA de una ruta. **Sin plazo, a proposito**: el que vive un enlace de subida lo
+   * impone el proveedor y nadie de este lado puede honrar otro. Pedir aqui un `expiresInSeconds`
+   * que se tirara a la basura seria una mentira escrita en el contrato.
+   */
+  createSignedUpload(path: string): Promise<SignedUpload>;
+  /** Firma la LECTURA de una ruta. Este plazo SI se cumple: el servicio lo aplica. */
   createSignedReadUrl(path: string, expiresInSeconds: number): Promise<string>;
   download(path: string): Promise<Uint8Array>;
 }

@@ -2,6 +2,8 @@ import { StorageClient } from '@supabase/storage-js';
 
 import { readDocumentStorageConfigFromEnv } from '../config/document-storage-config-env';
 
+import { PROVIDER_UPLOAD_LINK_TTL_SECONDS } from '../../../domain/limits';
+
 import type { SignedUpload } from '../../../ports/document-storage';
 
 /**
@@ -36,17 +38,16 @@ function bucketApi(): ReturnType<StorageClient['from']> {
 /**
  * `createSignedUpload` del puerto: firma la subida de UNA ruta y devuelve con que caduca.
  *
- * **Sobre el plazo.** La libreria instalada no admite plazo al firmar una subida —su
- * `createSignedUploadUrl` solo recibe la ruta—, asi que `expiresAt` es el instante que declara ESTE
- * modulo: el plazo que el sistema promete y por el que se rige quien consuma el enlace. El servicio
- * puede seguir aceptando la firma despues de ese instante, de modo que el valor es el limite
- * propio, no una garantia del proveedor. Se devuelve calculado y no se inventa una caducidad que la
- * API no acepta.
+ * **Sobre el plazo: son DOS HORAS y las pone el proveedor, no este modulo.** La operacion de la
+ * libreria que firma una subida —`createSignedUploadUrl`— NO ACEPTA ningun plazo: solo recibe la
+ * ruta. El servicio da al enlace una vida fija de dos horas, y no hay forma de pedir otra. Por eso
+ * esta funcion no recibe `expiresInSeconds`: aceptarlo seria admitir un valor que se tiraria a la
+ * basura.
+ *
+ * El instante que se reporta en `expiresAt` es el DEL PROVEEDOR —ahora mas su plazo—, no un limite
+ * propio que el sistema prometa: nadie de este lado puede acortarlo ni alargarlo.
  */
-export async function createDocumentSignedUpload(
-  path: string,
-  expiresInSeconds: number,
-): Promise<SignedUpload> {
+export async function createDocumentSignedUpload(path: string): Promise<SignedUpload> {
   const api = bucketApi();
 
   const { data, error } = await api.createSignedUploadUrl(path);
@@ -54,7 +55,9 @@ export async function createDocumentSignedUpload(
     throw new Error(`fallo al firmar la subida del documento en la ruta ${path}: ${error.message}`);
   }
 
-  const expiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+  const expiresAt = new Date(
+    Date.now() + PROVIDER_UPLOAD_LINK_TTL_SECONDS * 1000,
+  ).toISOString();
   return { path: data.path, uploadUrl: data.signedUrl, token: data.token, expiresAt };
 }
 
@@ -62,6 +65,9 @@ export async function createDocumentSignedUpload(
  * `createSignedReadUrl` del puerto. Existe porque el bucket es PRIVADO: sin ella, quien procese la
  * tanda no tendria forma de leer el archivo sin conocer al proveedor. La URL se devuelve a quien la
  * pide y no se persiste en ninguna parte: caduca sola.
+ *
+ * Aqui el plazo SI se pasa y SI se cumple —a diferencia de la subida—: la operacion de firmar una
+ * lectura lo recibe y el servicio lo aplica.
  */
 export async function createDocumentSignedReadUrl(
   path: string,

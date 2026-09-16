@@ -17,7 +17,6 @@ import {
   type Actor,
 } from '@/lib/modules/documentos/domain/actor';
 import { DocumentosError, UnauthorizedError } from '@/lib/modules/documentos/domain/errors';
-import { UPLOAD_LINK_TTL_SECONDS } from '@/lib/modules/documentos/domain/limits';
 import {
   PERMISSIONS,
   ROLE_ADMINISTRADOR,
@@ -104,7 +103,7 @@ describe('documentos — autorizacion', () => {
         // invirtiera ese orden, estas aserciones se ponen rojas.
         const operacion = () => {
           requirePermission(actor, DOCUMENT_UPLOAD_PERMISSION);
-          return almacenamiento.createSignedUpload('ruta', UPLOAD_LINK_TTL_SECONDS);
+          return almacenamiento.createSignedUpload('ruta');
         };
 
         expect(operacion).toThrow(UnauthorizedError);

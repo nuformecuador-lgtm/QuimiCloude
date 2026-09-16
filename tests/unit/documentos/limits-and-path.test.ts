@@ -15,13 +15,15 @@ import {
   MAX_PDF_BYTES,
   MAX_PDF_PAGES,
   PAGE_RENDER_DPI,
-  UPLOAD_LINK_TTL_SECONDS,
+  PROVIDER_UPLOAD_LINK_TTL_SECONDS,
+  READ_LINK_TTL_SECONDS,
 } from '@/lib/modules/documentos/domain/limits';
 import { isPdfContent } from '@/lib/modules/documentos/domain/pdf-content';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const MODULO = join(repoRoot, 'lib', 'modules', 'documentos');
 const LIMITS = join(MODULO, 'domain', 'limits.ts');
+const PUERTO = join(MODULO, 'ports', 'document-storage.ts');
 
 const EMPRESA = '6b1c0000-0000-4000-8000-000000000001';
 
@@ -110,12 +112,37 @@ describe('documentos — limites, firma del PDF y ruta de empresa', () => {
     });
   });
 
+  describe('cada plazo tiene su dueno, y no son el mismo (R10)', () => {
+    it('R10 — el plazo de LECTURA lo fija este modulo: quince minutos, y el puerto SI los pide', () => {
+      expect(READ_LINK_TTL_SECONDS).toBe(15 * 60);
+      const puerto = stripComments(readFileSync(PUERTO, 'utf8'));
+      expect(puerto).toMatch(/createSignedReadUrl\(path: string, expiresInSeconds: number\)/);
+    });
+
+    it('R10 — el plazo de SUBIDA lo impone el PROVEEDOR: dos horas, y el puerto NO las pide', () => {
+      // Un puerto que pidiera un plazo que el proveedor ignora seria una mentira en el contrato.
+      expect(PROVIDER_UPLOAD_LINK_TTL_SECONDS).toBe(2 * 60 * 60);
+      const puerto = stripComments(readFileSync(PUERTO, 'utf8'));
+      expect(puerto).toMatch(/createSignedUpload\(path: string\)/);
+      expect(puerto).not.toMatch(/createSignedUpload\([^)]*expiresInSeconds/);
+    });
+
+    it('R10 — el docblock del plazo de subida dice que el modulo NO lo elige y NO lo promete', () => {
+      const fuente = readFileSync(LIMITS, 'utf8');
+      expect(fuente).toMatch(/NO lo elige/);
+      expect(fuente).toMatch(/NO lo promete/);
+      // Y los dos plazos son distintos de verdad: si alguien los igualara, uno de los dos sobraria.
+      expect(PROVIDER_UPLOAD_LINK_TTL_SECONDS).not.toBe(READ_LINK_TTL_SECONDS);
+    });
+  });
+
   describe('cada limite vive en UNA sola definicion (R20, R18)', () => {
-    it('R20 — los cinco limites tienen los valores acordados', () => {
+    it('R20 — los seis limites tienen los valores acordados', () => {
       expect(MAX_FILES_PER_BATCH).toBe(10);
       expect(MAX_PDF_PAGES).toBe(50);
       expect(PAGE_RENDER_DPI).toBe(150);
-      expect(UPLOAD_LINK_TTL_SECONDS).toBe(15 * 60);
+      expect(READ_LINK_TTL_SECONDS).toBe(15 * 60);
+      expect(PROVIDER_UPLOAD_LINK_TTL_SECONDS).toBe(2 * 60 * 60);
       expect(MAX_PDF_BYTES).toBe(20 * 1024 * 1024);
     });
 
@@ -126,7 +153,8 @@ describe('documentos — limites, firma del PDF y ruta de empresa', () => {
         'MAX_FILES_PER_BATCH',
         'MAX_PDF_PAGES',
         'PAGE_RENDER_DPI',
-        'UPLOAD_LINK_TTL_SECONDS',
+        'READ_LINK_TTL_SECONDS',
+        'PROVIDER_UPLOAD_LINK_TTL_SECONDS',
         'MAX_PDF_BYTES',
       ]) {
         const declarantes = fuentes.filter((ruta) =>
@@ -143,7 +171,8 @@ describe('documentos — limites, firma del PDF y ruta de empresa', () => {
         ['MAX_FILES_PER_BATCH', /\b10\b/],
         ['MAX_PDF_PAGES', /\b50\b/],
         ['PAGE_RENDER_DPI', /\b150\b/],
-        ['UPLOAD_LINK_TTL_SECONDS', /\b900\b|15\s*\*\s*60/],
+        ['READ_LINK_TTL_SECONDS', /\b900\b|15\s*\*\s*60/],
+        ['PROVIDER_UPLOAD_LINK_TTL_SECONDS', /\b7200\b|2\s*\*\s*60\s*\*\s*60/],
         ['MAX_PDF_BYTES', /\b20971520\b|20\s*\*\s*1024\s*\*\s*1024/],
       ];
       const otros = fuentesDelModulo().filter((ruta) => ruta !== LIMITS);

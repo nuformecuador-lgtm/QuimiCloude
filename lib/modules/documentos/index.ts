@@ -34,7 +34,8 @@ export {
   MAX_PDF_BYTES,
   MAX_PDF_PAGES,
   PAGE_RENDER_DPI,
-  UPLOAD_LINK_TTL_SECONDS,
+  PROVIDER_UPLOAD_LINK_TTL_SECONDS,
+  READ_LINK_TTL_SECONDS,
 } from './domain/limits';
 
 // «¿Esto es un PDF?», respondido por el contenido y no por la extension.
