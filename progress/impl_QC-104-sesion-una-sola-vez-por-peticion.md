@@ -431,6 +431,33 @@ accion y sus cifras siguen valiendo.
 | 4 — el ambito envuelve solo el `Promise.all`, no la invocacion | **Riesgo aceptado ya en `design.md > 2.6` y `> 8`** (alternativa 6 descartada con razones). El MAYOR 1 demuestra que la red que lo cubre no se mantiene sola: por eso ahora la mantiene **el arbol**, no una lista |
 | 5 — el metodo de R16 es repetible como prosa, no como herramienta | **Aceptado por el propio reviewer** y por la decision de F1.4 (sin script en el repo). Las trampas del artefacto son lo que hace repetible el metodo |
 
+### Segunda vuelta: APROBADA, con dos menores mas (y el 6 es la misma leccion otra vez)
+
+El reviewer verifico **por mutacion propia** el caso del arbol y confirmo que ya no queda ningun
+numero congelado. Los dos menores nuevos:
+
+| # | Estado |
+|---|---|
+| 6 — el recorrido del arbol llevaba **una lista de modulos escrita a mano** y no recursaba | **CERRADO**, y no conviene suavizarlo: la funcion que escribi **para que una lista dejara de vigilar el arbol** llevaba dentro **otra lista a mano** (`raices`) y ademas no bajaba a las subcarpetas. Un archivo con las dos caras y sin ambito en un **modulo nuevo** o en una **subcarpeta** de `driving/` quedaba **invisible** —el reviewer lo probo: 2 passed en los dos casos—. Ahora los modulos salen de `readdirSync('lib/modules')` y el recorrido es **en profundidad**: no queda nada escrito a mano |
+| 7 — `docs/architecture.md` prometia `lib/modules/**/adapters/driving/**` | **CERRADO**: los comodines decian mas de lo que el codigo hacia. La frase dice ahora lo que hace —modulos leidos del disco, recorrido en profundidad— y nombra los dos casos que cubre: modulo nuevo y subcarpeta |
+
+**Probado por mutacion con los dos casos del reviewer**, porque un recorrido que no se intenta
+romper no esta probado:
+
+```
+A) modulo NUEVO   lib/modules/qc104probe/adapters/driving/probe.ts    -> 2 casos ROJOS
+B) SUBCARPETA     lib/modules/unidades/adapters/driving/sub/probe.ts  -> 2 casos ROJOS
+   borradas las dos sondas                                            -> 24/24 VERDE
+```
+
+Los dos mensajes nombran el archivo exacto. Con la version anterior de la funcion, **los dos casos
+pasaban en verde** con esos archivos en disco.
+
+**La leccion, dicha sin rodeos:** esta ficha tropezo **tres veces** con la misma piedra —una lista
+de ocho en `design.md` que un merge invalido, un `toBe(8)` que contaba sus propias filas, y una
+constante `raices` dentro del mismo arreglo—. Lo unico que las tres veces detecto el fallo fue
+**intentar romper la comprobacion a proposito**, nunca leerla.
+
 **Verificacion de la correccion:** `typecheck` y `lint` exit 0; los 4 archivos de QC-104
 **52/52**; guardias **41 archivos / 445 tests** en verde, incluido el bloque 12 que lee
 `docs/architecture.md`.

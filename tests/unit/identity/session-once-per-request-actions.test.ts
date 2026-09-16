@@ -19,7 +19,7 @@
 // de las actions carguen.
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import type { SessionClaims } from '@/lib/modules/identity/domain/session-claims';
 import type { SessionUserRecord } from '@/lib/modules/identity/ports/session-user-reader';
@@ -239,24 +239,49 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
  * Esto sustituye a un `expect(...size).toBe(8)` que contaba las filas de `ACCIONES`: como contaba
  * su propia lista, un noveno `currentActor` en disco lo dejaba verde, que es exactamente lo que
  * paso con `session-actions.ts`. Un numero escrito a mano no vigila el arbol; el arbol si.
+ *
+ * **NADA se escribe a mano aqui, y el motivo es esta misma ficha.** La primera version de esta
+ * funcion llevaba la lista de modulos en una constante y no bajaba a las subcarpetas, o sea que
+ * repetia —en el mecanismo que existe para que una lista no vigile el arbol— el defecto que vino
+ * a arreglar: un archivo con las dos caras en un **modulo nuevo** o en una **subcarpeta** de
+ * `driving/` quedaba invisible. Lo encontro el reviewer y lo probo por mutacion. Ahora los
+ * modulos salen de `readdirSync('lib/modules')` y el recorrido es **en profundidad**.
  */
 function archivosConLasDosCaras(): string[] {
-  const raices = ['asignaciones', 'identity', 'inventario', 'pedidos', 'proveedores', 'recetas', 'unidades'];
+  const raizDeModulos = resolve(process.cwd(), 'lib/modules');
   const encontrados: string[] = [];
 
-  for (const modulo of raices) {
-    const carpeta = resolve(process.cwd(), `lib/modules/${modulo}/adapters/driving`);
-    if (!existsSync(carpeta)) continue;
+  /** Recorre en profundidad: una subcarpeta de `driving/` no puede esconder un `currentActor`. */
+  const recorrer = (absoluto: string, relativo: string): void => {
+    for (const entrada of readdirSync(absoluto, { withFileTypes: true })) {
+      const hijoAbsoluto = join(absoluto, entrada.name);
+      const hijoRelativo = `${relativo}/${entrada.name}`;
 
-    for (const archivo of readdirSync(carpeta)) {
-      if (!archivo.endsWith('.ts')) continue;
-      const ruta = `lib/modules/${modulo}/adapters/driving/${archivo}`;
-      const fuente = readFileSync(resolve(process.cwd(), ruta), 'utf8');
+      if (entrada.isDirectory()) {
+        recorrer(hijoAbsoluto, hijoRelativo);
+        continue;
+      }
+      if (!entrada.name.endsWith('.ts')) continue;
+
+      const fuente = readFileSync(hijoAbsoluto, 'utf8');
       // Las dos proyecciones juntas: es la firma de `currentActor`, y lo que R3 acota.
-      if (fuente.includes('identity.getSessionUser()') && fuente.includes('identity.getSessionContext()')) {
-        encontrados.push(ruta);
+      if (
+        fuente.includes('identity.getSessionUser()') &&
+        fuente.includes('identity.getSessionContext()')
+      ) {
+        encontrados.push(hijoRelativo);
       }
     }
+  };
+
+  // Los modulos salen del DISCO, no de una constante: un modulo nuevo entra solo.
+  for (const modulo of readdirSync(raizDeModulos, { withFileTypes: true })) {
+    if (!modulo.isDirectory()) continue;
+
+    const driving = join(raizDeModulos, modulo.name, 'adapters', 'driving');
+    if (!existsSync(driving)) continue;
+
+    recorrer(driving, `lib/modules/${modulo.name}/adapters/driving`);
   }
 
   return encontrados.sort();
