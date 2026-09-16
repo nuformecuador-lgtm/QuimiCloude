@@ -12,6 +12,7 @@ import {
   type UserDetail,
   type UserRow,
 } from '@/lib/modules/identity';
+import { runInRequestScope } from '@/lib/shared/request-scope';
 
 /**
  * QC-66 T14 — Las SEIS Server Actions de la administracion de usuarios
@@ -132,10 +133,11 @@ const toErrorState = createErrorStateTranslator(IdentityError, observabilidad.re
  * lectura ni escritura.
  */
 async function currentActor(): Promise<Actor | null> {
-  const [sessionUser, sessionContext] = await Promise.all([
-    identity.getSessionUser(),
-    identity.getSessionContext(),
-  ]);
+  // QC-104 R3: el ambito envuelve EXACTAMENTE este `Promise.all`, para que las dos caras
+  // compartan UNA sola lectura de la ficha de sesion en esta invocacion (`design.md > 2.6`).
+  const [sessionUser, sessionContext] = await runInRequestScope(() =>
+    Promise.all([identity.getSessionUser(), identity.getSessionContext()]),
+  );
   if (sessionUser === null || sessionContext === null) return null;
   return {
     id: sessionUser.id,

@@ -57,7 +57,7 @@ export function createUnassignResponsible(
 
     // R12: la decision de estado va sobre ESTA lectura y NUNCA en el `WHERE` del borrado. Si
     // viviera alli, «el pedido no existe» y «el pedido esta entregado» serian el mismo error.
-    const order = await deps.orders.findAliveById(orderId);
+    const order = await deps.orders.findAliveById(orderId, actor.companyId);
     assertOrderAcceptsWrites(order);
 
     // R5: la empresa sale del ACTOR y de ningun otro sitio; el esquema ni siquiera la admite.

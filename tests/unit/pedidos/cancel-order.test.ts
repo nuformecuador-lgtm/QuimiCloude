@@ -28,7 +28,12 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
 // porque este archivo ejercita lecturas y escrituras con el mismo fixture.
-const ADMIN: Actor = { id: 'admin-1', permissions: ['pedidos.consultar', 'pedidos.modificar'] }
+// QC-60 (R16): el `Actor` de `pedidos` lleva la EMPRESA desde esta ficha.
+const ADMIN: Actor = {
+  id: 'admin-1',
+  companyId: '33333333-3333-4333-8333-333333333333',
+  permissions: ['pedidos.consultar', 'pedidos.modificar'],
+}
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const AHORA = new Date('2026-09-04T12:00:00.000Z')
 
@@ -100,6 +105,8 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
       'El cliente anulo el pedido',
       ADMIN.id,
       AHORA,
+      // QC-60 (R18): el ambito va AL FINAL de la firma y sale del ACTOR, nunca de la entrada.
+      { companyId: ADMIN.companyId },
     ])
   })
 

@@ -463,25 +463,36 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // dominio y los puertos siguen sin ver ninguno de los dos, que es lo que los hace
     // testeables sin base, y cualquier archivo fuera de `adapters/` que importe el cliente
     // sigue poniendo esto rojo.
+    //
+    // RETENSADO 2026-09-15 (QC-60, T8). `@prisma/client` pasa a importarlo un archivo mas, y
+    // solo por su TIPO: `company-scope.ts` publica el ambito como `Prisma.OrderWhereInput`, que es
+    // justo lo que hace que componerlo sobre otra tabla no compile (`design.md > 5`). Sigue siendo
+    // una lista CERRADA y sigue sin haber nada de Prisma en el dominio ni en los puertos.
     const DUENO_DE_PRISMA = 'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts'
+    const AMBITO_DE_EMPRESA = 'lib/modules/pedidos/adapters/driven/persistence/company-scope.ts'
+    const DUENOS_DE_PRISMA = [AMBITO_DE_EMPRESA, DUENO_DE_PRISMA]
     const DUENOS_DEL_CLIENTE = [
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
       DUENO_DE_PRISMA,
     ]
     expect(
       pedidosSources.filter((file) => /@prisma\/client/.test(read(file))).map(etiqueta),
-    ).toEqual([DUENO_DE_PRISMA])
+    ).toEqual(DUENOS_DE_PRISMA)
     expect(
       pedidosSources.filter((file) => /@\/lib\/shared\/(db|prisma)/.test(read(file))).map(etiqueta),
     ).toEqual(DUENOS_DEL_CLIENTE)
     // Y ni el dominio ni los puertos lo ven, dicho aparte para que se lea como lo que es.
     for (const file of pedidosSources) {
-      if (DUENOS_DEL_CLIENTE.includes(etiqueta(file))) continue
+      const nombreDelArchivo = etiqueta(file)
       const source = read(file)
-      expect(source, `${etiqueta(file)} importa @prisma/client`).not.toMatch(/@prisma\/client/)
-      expect(source, `${etiqueta(file)} importa el cliente compartido`).not.toMatch(
-        /@\/lib\/shared\/(db|prisma)/,
-      )
+      if (!DUENOS_DE_PRISMA.includes(nombreDelArchivo)) {
+        expect(source, `${nombreDelArchivo} importa @prisma/client`).not.toMatch(/@prisma\/client/)
+      }
+      if (!DUENOS_DEL_CLIENTE.includes(nombreDelArchivo)) {
+        expect(source, `${nombreDelArchivo} importa el cliente compartido`).not.toMatch(
+          /@\/lib\/shared\/(db|prisma)/,
+        )
+      }
     }
   })
 

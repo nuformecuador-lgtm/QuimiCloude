@@ -39,6 +39,11 @@ export type { OrderAssignmentTarget, OrderCatalog } from './domain/order-catalog
 export { requirePermission } from './domain/actor';
 export type { Actor } from './domain/actor';
 
+/** El AMBITO por empresa. Solo el TIPO -no hay valor que exportar-, asi que el barrel sigue
+ *  siendo importable desde un componente de cliente. `lib/composition` necesita nombrarlo para
+ *  tipar el repositorio, igual que con `OrderRow`. */
+export type { OrderScope } from './domain/order-scope';
+
 /** Los errores, con su `code` ESTABLE. El adaptador driving traduce por el `code`, nunca por
  *  el texto (R56), y para eso necesita la clase base y el `instanceof`.
  *

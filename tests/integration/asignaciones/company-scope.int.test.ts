@@ -20,9 +20,19 @@
  *   - quitar `companyId` del `where` de `findSnapshotAliveInCompany` -> cae el del grupo ajeno;
  *   - quitar `deletedAt: null` de cualquiera de las dos -> caen los casos de la persona y el
  *     grupo dados de baja;
- *   - quitar `companyId` del `where` de `listByOrderInCompany` -> cae el ultimo caso;
  *   - escribir en el dominio la empresa desde otro sitio que no sea `actor.companyId` -> cae el
- *     primero.
+ *     primero;
+ *   - quitar `companyId` de `OrderCatalog.findAliveById` (QC-60 R27) -> caen los dos ultimos: el
+ *     actor de la otra empresa dejaria de recibir `order_not_found`.
+ *
+ * QC-60 R27 CAMBIO LOS DOS ULTIMOS CASOS. Desde que el pedido tiene empresa, «pedido de A, actor
+ * de B» muere en `findAliveById(id, companyId)` con `order_not_found`, ANTES de llegar a
+ * `listByOrderInCompany` o a `deleteOne`. Por eso quitar `companyId` del `where` de esas dos (y de
+ * `deleteByWorkGroup`) ya NO lo detecta este archivo: lo detecta
+ * `tests/integration/asignaciones/order-assignment-prisma.int.test.ts`, que llama al adaptador
+ * directamente con la otra empresa. Ademas, con la FK compuesta
+ * `order_assignments_order_id_company_id_fkey` una fila `(pedido de A, empresa B)` ya no puede
+ * existir, asi que el filtro por empresa de esas funciones es ahora defensa en profundidad.
  */
 import { describe, expect, it, vi } from 'vitest';
 
@@ -132,34 +142,38 @@ describe('asignaciones · la empresa (integracion)', () => {
     });
   });
 
-  it('R7: la consulta de OTRA empresa no ve las asignaciones ajenas ni revela que existen', async () => {
+  it('R7, QC-60 R27: la consulta de OTRA empresa sobre un pedido ajeno es `order_not_found`, sin revelar sus asignaciones', async () => {
     await inRolledBackTransaction(async (fixture) => {
       const orderId = await createOrder(fixture);
       const userId = await createPerson(fixture, fixture.companyA, { lastNames: 'Alvarez', firstNames: 'Rosa' });
       await fixture.useCases.assign(actorOf(fixture.companyA), { orderId, userIds: [userId], workGroupIds: [] }, NOW);
 
-      // El pedido existe y ES EL MISMO: lo unico que cambia es la empresa del actor. La lista vacia
-      // es exactamente «no hay nada que contarte», no un error que delate la asignacion ajena.
-      expect(await fixture.useCases.list(actorOf(fixture.companyB), orderId)).toEqual([]);
+      // El pedido es de A. Para el actor de B no existe (R27): el mismo `order_not_found` que un id
+      // inventado, asi que ni la asignacion ni el pedido se delatan.
+      const error = await fixture.useCases
+        .list(actorOf(fixture.companyB), orderId)
+        .catch((caught: unknown) => caught);
+      expect(codeOf(error)).toBe('order_not_found');
 
       const propia = await fixture.useCases.list(actorOf(fixture.companyA), orderId);
       expect(propia).toHaveLength(1);
       expect(propia[0]?.userId).toBe(userId);
+      expect(await readRows(fixture.tx, orderId)).toHaveLength(1);
     });
   });
 
-  it('R5, R7: desasignar desde la OTRA empresa no borra nada, y la fila sigue ahi', async () => {
+  it('R5, R7, QC-60 R27: desasignar desde la OTRA empresa es `order_not_found`, no borra nada, y la fila sigue ahi', async () => {
     await inRolledBackTransaction(async (fixture) => {
       const orderId = await createOrder(fixture);
       const userId = await createPerson(fixture, fixture.companyA);
       await fixture.useCases.assign(actorOf(fixture.companyA), { orderId, userIds: [userId], workGroupIds: [] }, NOW);
 
-      // La empresa del actor entra en el `where` del borrado: para la empresa B esa fila no
-      // existe, y el codigo es el de «no es responsable de este pedido» (R30), no un exito mudo.
+      // Para la empresa B el pedido de A no existe (R27): muere antes de `deleteOne`, y no es un
+      // exito mudo. Lo que importa de QC-87 sigue en pie: desde la otra empresa no se borra nada.
       const error = await fixture.useCases
         .unassign(actorOf(fixture.companyB), { orderId, userId })
         .catch((caught: unknown) => caught);
-      expect(codeOf(error)).toBe('order_assignment_not_found');
+      expect(codeOf(error)).toBe('order_not_found');
       expect(await readRows(fixture.tx, orderId)).toHaveLength(1);
     });
   });

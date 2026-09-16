@@ -57,7 +57,7 @@ export function createRemoveWorkGroupFromOrder(
     const { orderId, workGroupId } = parsed.data;
 
     // R12: sobre la LECTURA, nunca en el `WHERE` del borrado.
-    const order = await deps.orders.findAliveById(orderId);
+    const order = await deps.orders.findAliveById(orderId, actor.companyId);
     assertOrderAcceptsWrites(order);
 
     // R5: la empresa, del actor. R32: solo las filas de ESE pedido con ESE origen; las sueltas y
