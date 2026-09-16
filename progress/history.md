@@ -3577,3 +3577,45 @@ rojos**. Integración: 54 archivos, 709 verdes.
    La que funciona es la plantilla de QC-77 (`pnpm run db:test template`), y `docs/worktrees.md` no
    documenta nada de esto —ni `pnpm install`, ni `prisma generate`, ni `next typegen`—.
 3. **n1**: la guardia de R25 cubre *localizar* por copy, no *afirmar* sobre copy.
+
+## QC-81 — lote-y-fecha-de-compra · CERRADA el 2026-09-16 (PR #75, merge `6175700`)
+
+- Cada entrada de mercancía (`product_batches`) registra **lote** y **fecha de compra**, los dos
+  obligatorios. El lote es único por empresa —índice `(company_id, lot)` en la base, no una
+  comprobación en el código—, y si nadie lo escribe lo genera el backend continuando desde el más
+  alto de esa empresa. La fecha admite hoy o antes, nunca futura; ausente, queda hoy. Migración con
+  relleno por orden de creación, que se detiene entera si encuentra duplicados previos.
+- **Requisitos cubiertos: R1–R37**, verificados uno a uno por el reviewer. La pantalla **no entra**
+  (R28): es QC-103. Sin dependencias nuevas.
+- **La concurrencia, que era el corazón de la ficha**: el número sale de `max(lot)` dentro de la
+  misma transacción que inserta, con `pg_advisory_xact_lock` por empresa **como sentencia anterior**
+  al SELECT —en `READ COMMITTED`, pedirlo dentro del cálculo leería un máximo viejo—. El test de dos
+  altas simultáneas **da rojo si se quita el lock**, comprobado por el implementer y por el reviewer.
+- **Decisiones humanas**: `batch_duplicate_lot` como sexta enmienda al catálogo cerrado de errores;
+  excepción acotada a R29 para tocar **solo** la siembra de `e2e/aislamiento-inventario.spec.ts`;
+  **D13/R34–R36**, un lote tecleado de solo dígitos no llega a 60 caracteres para que el generado
+  quepa; y **D14/R37**, que arregla aquí una carrera **heredada de QC-90** —el borrado lógico de un
+  producto podía colarse entre la comprobación de «vivo» y el alta de su lote— con
+  `FOR NO KEY UPDATE` sobre la fila del producto antes del lock del correlativo.
+- **La regla nueva de comentarios de `docs/conventions.md` se aplicó entera**: 34 commits `chore`
+  limpian los comentarios de los 32 archivos de la rama sin tocar código (4.776 → 1.242 líneas de
+  comentario, 1.240 → 3 citas). Las tres que quedan son las que exigen sus tests, exceptuadas por el
+  humano. Tres vueltas de revisión: la segunda rechazó por esos comentarios y la tercera por R37
+  fuera del mapa de trazabilidad.
+- **Verificación, dicha como fue**: E2E verde en Chromium y WebKit; gate completo de **469 archivos
+  y 6718 tests verdes** con **un rojo ajeno** (`credential-setup.int.test.ts`, de QC-79, idéntico a
+  `dev` y **15/15 repetido solo**: falla por su propia guarda de concurrencia bajo carga). El PR se
+  mergeó con esa corrida, así que **T12 quedó sin marcar**.
+- **El gate que se lanzó tras la resincronización final no vale, y el error fue del leader**: seguía
+  corriendo cuando se ejecutó `wt.sh done`, que desregistró el worktree en mitad de la corrida. Sin
+  `.git`, toda la integración —que deriva de git el nombre de su base efímera— y algunas pruebas de
+  UI cayeron a la vez: **32 archivos en rojo que no son una regresión, sino una corrida invalidada**.
+  La lección es de secuencia, no de código: **no se desmonta un worktree con el gate en marcha**.
+- **Deuda que hereda QC-103**: pintar la fecha, mostrar el lote generado y un test de UI que afirme
+  el mensaje de R34 en el campo del lote.
+- **Deuda de arnés encontrada de paso**: la receta para montar una base propia
+  (`docs/verification.md`, `specs/QC-77-…/design.md > 3`) **no corre hoy** —`db:seed` muere con
+  `The column 'existe' does not exist`—; la base de esta ficha se montó copiando la plantilla de
+  integración. Y `merge-tree` entra en el flujo: que el tramo nuevo de `dev` no toque el área de la
+  ficha **no basta** para saltarse la sincronización —el PR salió CONFLICTING por un test de
+  contrato ajeno que la limpieza de comentarios había rozado—.
