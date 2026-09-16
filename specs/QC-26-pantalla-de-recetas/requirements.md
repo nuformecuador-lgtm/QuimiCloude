@@ -82,6 +82,20 @@ presentar ese error y NO DEBE mostrar datos del catálogo.
 que entrega la operación de listado: nombre, descripción, número de pasos, imagen, fecha de
 creación y fecha de actualización.
 
+> **ENMIENDA DEL 2026-09-15 (QC-56, decisión humana).** La lista de recetas **monta la tabla
+> compartida** (`components/shared/data-table`) en lugar de su tabla y su barra de paginación
+> propias. Con ella:
+>
+> - **La descripción SALE de la lista**: la lista deja de presentar esa columna y la descripción se
+>   ve al abrir la receta. La razón es que una descripción de hasta 500 caracteres ocupa una sola
+>   línea y ensancha la tabla (QC-56, pregunta 2, cerrada con la decisión D14).
+> - **Lo demás que R8 protegía sigue en pie**: la lista sigue paginada y sigue presentando nombre,
+>   número de pasos, imagen, fecha de creación y fecha de actualización.
+> - **Cambia de dueño**: las columnas exactas las fija ahora **QC-56 R2** —imagen, nombre, número
+>   de pasos, fecha de creación, fecha de actualización y acciones—, y **QC-56 R7** afirma que las
+>   que no están en la lista blanca (imagen, número de pasos y acciones) no ofrecen control de
+>   orden. La celda de imagen sigue bajo R18, que conserva **QC-56 R5**.
+
 **R9** — La lista NO DEBE mostrar el identificador de la receta ni el identificador o el nombre de
 quien la creó o la modificó.
 
@@ -105,6 +119,21 @@ el tope soportado, ENTONCES el sistema DEBE acotarlos a valores válidos y prese
 DEBE fallar ni mostrar un error.
 
 **R14** — La pantalla NO DEBE ofrecer búsqueda de recetas ni control de ordenación configurable.
+
+> **ENMIENDA DEL 2026-09-15 (QC-56, decisión humana).** Con la tabla compartida (ver la enmienda de
+> R8):
+>
+> - **R14 se INVIERTE**: la pantalla **sí** ofrece orden por cabecera sobre `name`, `createdAt` y
+>   `updatedAt`, búsqueda y filtro por rango de `createdAt`, exactamente lo que declara
+>   `RECIPE_QUERYABLE` (QC-57). La lista se iguala así a productos, como `749d850` invirtió R13 de
+>   QC-22. Todo se calcula en el servidor: cada gesto **navega** y la lista se vuelve a pedir con
+>   esos parámetros, que viajan en la URL.
+> - **Lo que R14 protegía sigue en pie y afirmado**: nada se ordena, filtra, busca ni recorta en el
+>   navegador sobre la página ya descargada; las filas presentadas son exactamente las que devolvió
+>   la operación de listado, y en su mismo orden.
+> - **Cambia de dueño**: el orden es **QC-56 R6** (y R7 para las columnas que no ordenan), la
+>   búsqueda **QC-56 R8**, el filtro de fecha **QC-56 R9**, y la protección de no calcular en el
+>   navegador **QC-56 R10**. R13 de esta ficha se amplía al contrato de lista completo en QC-56 R13.
 
 **R15** — MIENTRAS el catálogo no tenga ninguna receta, el sistema DEBE presentar un estado vacío
 identificable que ofrezca la acción de crear la primera receta, en lugar de una lista sin filas.

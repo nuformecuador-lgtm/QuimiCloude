@@ -59,6 +59,7 @@ import {
 } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { normalizeProductName } from '@/lib/modules/inventario/domain/product-name';
+import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { FORMULAS_ROUTE, NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
 
@@ -98,6 +99,10 @@ const productName = `${FIXTURE_PREFIX}producto_${RUN_ID}`;
 
 /** Nombre de la receta que el recorrido del Administrador da de alta POR LA UI. */
 const recipeName = `${FIXTURE_PREFIX}receta_${RUN_ID}`;
+
+// Solo difieren en la letra: su orden relativo delata el sentido del orden por nombre.
+const orderRecipeAName = `${FIXTURE_PREFIX}orden_a_${RUN_ID}`;
+const orderRecipeBName = `${FIXTURE_PREFIX}orden_b_${RUN_ID}`;
 
 /**
  * Empresa efimera de este worker. QC-47 R9 hizo `users.company_id` obligatoria, asi que el
@@ -190,14 +195,13 @@ async function selectProductByName(page: Page, testId: string, name: string): Pr
 }
 
 /**
- * Recorre las paginas de la lista de recetas hasta encontrar la celda de nombre pedida. Hace
- * falta porque la pantalla NO ofrece busqueda y el orden es fijo por nombre: una receta recien
- * creada puede caer en cualquier pagina. El assert NUNCA mira «la primera fila» ni el total: solo
- * si existe una celda con ESTE nombre.
+ * Recorre las paginas de la lista hasta encontrar la celda de nombre pedida: sin buscar, una
+ * receta recien creada puede caer en cualquier pagina. Nunca mira «la primera fila» ni el total,
+ * que otra ejecucion puede estar moviendo.
  */
 async function findRecipeCell(page: Page, name: string): Promise<Locator> {
-  const cell = page.getByTestId('recipe-cell-name').filter({ hasText: name });
-  const next = page.getByTestId('recipe-page-next');
+  const cell = page.getByTestId('data-table-cell-name').filter({ hasText: name });
+  const next = page.getByTestId('data-table-next');
 
   for (;;) {
     if ((await cell.count()) > 0) return cell;
@@ -210,7 +214,7 @@ async function findRecipeCell(page: Page, name: string): Promise<Locator> {
       before,
       { timeout: 60_000 },
     );
-    await expect(page.getByTestId('recipe-list')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('data-table')).toBeVisible({ timeout: 60_000 });
   }
 }
 
@@ -271,6 +275,15 @@ test.beforeAll(async () => {
       companyId: empresaDelWorker,
     },
   });
+
+  // Con Prisma y no por la UI: el alta por pantalla ya la recorre el primer caso, y una receta
+  // existe sin lineas ni empresa.
+  await prisma.recipe.createMany({
+    data: [orderRecipeAName, orderRecipeBName].map((name) => ({
+      name,
+      nameNormalized: normalizeRecipeName(name),
+    })),
+  });
 });
 
 test.afterAll(async () => {
@@ -279,7 +292,7 @@ test.afterAll(async () => {
   // `users` y sus lineas RESTRICT hacia `products`, asi que ambas tienen que quedar libres antes
   // de tocar usuarios y productos-.
   //
-  // **Por el nombre EXACTO de ESTE worker (`recipeName`), NUNCA por `FIXTURE_PREFIX`**:
+  // **Por los nombres EXACTOS de ESTE worker, NUNCA por `FIXTURE_PREFIX`**:
   // `fullyParallel` reparte los dos tests de este archivo en workers DISTINTOS, cada uno con su
   // propio `RUN_ID` y su propia receta. Borrar por prefijo aqui se llevaria por delante la
   // receta que el OTRO worker acaba de crear -y eso fue exactamente lo que paso la primera vez
@@ -287,7 +300,9 @@ test.afterAll(async () => {
   // receta borraba la del test que si la crea, antes de que su propio assert contra la base
   // corriera-.
   try {
-    await prisma.recipe.deleteMany({ where: { name: recipeName } });
+    await prisma.recipe.deleteMany({
+      where: { name: { in: [recipeName, orderRecipeAName, orderRecipeBName] } },
+    });
   } finally {
     try {
       await prisma.product.deleteMany({ where: { name: productName } });
@@ -366,6 +381,58 @@ test.describe('catalogo de recetas', () => {
     ).toBe(1);
   });
 
+  test('busca las recetas propias por su nombre y las ordena por nombre descendente (R26)', async ({
+    page,
+  }) => {
+    // Mismos valores que exporta `recipe-list-params.ts`; ningun E2E importa de `app/`.
+    const PAGE_SIZE_PARAM = 'pageSize';
+    const SEARCH_PARAM = 'q';
+    const SORT_PARAM = 'sort';
+    const NAME_COLUMN_ID = 'name';
+    const NAME_DESC = `${NAME_COLUMN_ID}:desc`;
+
+    await loginAndLand(page, adminUser);
+    await page.goto(`${FORMULAS_ROUTE}?${PAGE_SIZE_PARAM}=${LIST_PAGE_SIZE}`);
+    await expect(page.getByTestId('data-table')).toBeVisible({ timeout: 60_000 });
+
+    const nameCells = page.getByTestId('data-table-cell-name');
+    const rowOf = (name: string) =>
+      page.locator('[data-testid^="data-table-row-"]').filter({ has: nameCells.filter({ hasText: name }) });
+    const ownOrderNames = async () =>
+      (await nameCells.allTextContents())
+        .map((text) => text.trim())
+        .filter((text) => text === orderRecipeAName || text === orderRecipeBName);
+
+    // Se reintenta porque lo escrito antes de hidratar no emite la busqueda, y WebKit hidrata tarde.
+    const search = page.getByTestId('data-table-search');
+    await expect(async () => {
+      await search.fill('');
+      await search.fill(RUN_ID);
+      await page.waitForURL((url) => url.searchParams.get(SEARCH_PARAM) === RUN_ID, {
+        timeout: 15_000,
+      });
+    }).toPass({ timeout: 120_000 });
+
+    await expect(rowOf(orderRecipeAName)).toBeVisible({ timeout: 60_000 });
+    await expect(rowOf(orderRecipeBName)).toBeVisible({ timeout: 60_000 });
+    await expect.poll(ownOrderNames, { timeout: 60_000 }).toEqual([orderRecipeAName, orderRecipeBName]);
+
+    await page.getByTestId(`data-table-header-menu-${NAME_COLUMN_ID}`).click();
+    await page.getByTestId(`data-table-sort-desc-${NAME_COLUMN_ID}`).click();
+    await page.waitForURL(
+      (url) =>
+        url.searchParams.get(SORT_PARAM) === NAME_DESC && url.searchParams.get(SEARCH_PARAM) === RUN_ID,
+      { timeout: 60_000 },
+    );
+    await expect(page.getByTestId(`data-table-head-${NAME_COLUMN_ID}`)).toHaveAttribute(
+      'aria-sort',
+      'descending',
+      { timeout: 60_000 },
+    );
+
+    await expect.poll(ownOrderNames, { timeout: 60_000 }).toEqual([orderRecipeBName, orderRecipeAName]);
+  });
+
   test('un usuario sin recetas.consultar recibe 404 dentro del layout privado y no ve ningun dato de recetas (R6)', async ({
     page,
   }) => {
@@ -393,7 +460,7 @@ test.describe('catalogo de recetas', () => {
     await expect(page.getByTestId('private-not-found')).toBeVisible({ timeout: 60_000 });
 
     await expect(page.getByTestId('recipes-title')).toHaveCount(0);
-    await expect(page.getByTestId('recipe-table')).toHaveCount(0);
+    await expect(page.getByTestId('data-table')).toHaveCount(0);
     await expect(page.getByTestId('recipe-list-empty')).toHaveCount(0);
   });
 });

@@ -1,107 +1,220 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import {
+  CREATED_AT_COLUMN_ID,
+  CREATED_FROM_PARAM,
+  CREATED_TO_PARAM,
+  FIRST_PAGE,
   PAGE_PARAM,
   PAGE_SIZE_OPTIONS,
   PAGE_SIZE_PARAM,
+  SEARCH_PARAM,
+  SHARED_PAGE_SIZES,
+  SORT_PARAM,
+  SORT_SEPARATOR,
   buildRecipeListQuery,
+  clearSearchAndFilters,
+  hasActiveSearchOrFilter,
   parseRecipeListParams,
+  recipeListHref,
 } from '@/app/(private)/produccion/formulas/components';
+import type { DataTableParams } from '@/components/shared/data-table';
+import { RECIPE_QUERYABLE } from '@/lib/modules/recetas';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
+import { FORMULAS_ROUTE } from '@/lib/shared/routes';
 
-/**
- * Parser de parametros de lista de la pantalla de recetas: R11 (defecto), R13
- * (`specs/QC-26-pantalla-de-recetas/tasks.md > T8`, `design.md > 4.2`).
- *
- * **Sin DOM a proposito.** El parser es puro -no importa `react` ni `next/*`- justamente para
- * que R13 se pueda probar sin montar la pantalla: acotar un parametro roto no depende de que
- * nada se renderice.
- *
- * Los asserts van sobre las **constantes exportadas** (`DEFAULT_PAGE_SIZE`, `MAX_PAGE_SIZE`,
- * `PAGE_SIZE_OPTIONS`), nunca sobre los numeros escritos a mano: si el backend moviera el
- * defecto o el tope, este archivo se mueve con el en vez de mentir.
- */
+const PARSER = join(
+  __dirname,
+  '..',
+  '..',
+  '..',
+  'app',
+  '(private)',
+  'produccion',
+  'formulas',
+  'components',
+  'recipe-list-params.ts',
+);
 
-/** La primera pagina es el destino seguro de cualquier parametro que no sirva. */
-const PRIMERA_PAGINA = 1;
+const POR_DEFECTO: DataTableParams = {
+  page: FIRST_PAGE,
+  pageSize: DEFAULT_PAGE_SIZE,
+  sort: null,
+  filters: {},
+  search: '',
+};
+
+const ORDENABLE = RECIPE_QUERYABLE.sortable[0] as string;
+const NO_ORDENABLE = 'createdBy';
+
+type Caso = {
+  readonly caso: string;
+  readonly entrada: Readonly<Record<string, string | readonly string[] | undefined>>;
+  readonly esperado: DataTableParams;
+};
+
+const CONTRATO: readonly Caso[] = [
+  { caso: 'pagina entera valida', entrada: { [PAGE_PARAM]: '7' }, esperado: { ...POR_DEFECTO, page: 7 } },
+  { caso: 'pagina cero', entrada: { [PAGE_PARAM]: '0' }, esperado: POR_DEFECTO },
+  { caso: 'pagina negativa', entrada: { [PAGE_PARAM]: '-3' }, esperado: POR_DEFECTO },
+  { caso: 'pagina decimal', entrada: { [PAGE_PARAM]: '1.5' }, esperado: POR_DEFECTO },
+  { caso: 'pagina con espacios', entrada: { [PAGE_PARAM]: ' 2 ' }, esperado: POR_DEFECTO },
+  { caso: 'pagina no numerica', entrada: { [PAGE_PARAM]: 'abc' }, esperado: POR_DEFECTO },
+  { caso: 'pagina fuera de entero seguro', entrada: { [PAGE_PARAM]: '9'.repeat(30) }, esperado: POR_DEFECTO },
+  { caso: 'tamano tope', entrada: { [PAGE_SIZE_PARAM]: String(MAX_PAGE_SIZE) }, esperado: { ...POR_DEFECTO, pageSize: MAX_PAGE_SIZE } },
+  { caso: 'tamano fuera de las opciones', entrada: { [PAGE_SIZE_PARAM]: String(MAX_PAGE_SIZE + 1) }, esperado: POR_DEFECTO },
+  { caso: 'tamano no numerico', entrada: { [PAGE_SIZE_PARAM]: 'muchos' }, esperado: POR_DEFECTO },
+  {
+    caso: 'orden ascendente sobre campo ordenable',
+    entrada: { [SORT_PARAM]: `${ORDENABLE}${SORT_SEPARATOR}asc` },
+    esperado: { ...POR_DEFECTO, sort: { columnId: ORDENABLE, direction: 'asc' } },
+  },
+  {
+    caso: 'orden descendente sobre campo ordenable',
+    entrada: { [SORT_PARAM]: `${ORDENABLE}${SORT_SEPARATOR}desc` },
+    esperado: { ...POR_DEFECTO, sort: { columnId: ORDENABLE, direction: 'desc' } },
+  },
+  { caso: 'orden sobre campo no ordenable', entrada: { [SORT_PARAM]: `${NO_ORDENABLE}${SORT_SEPARATOR}asc` }, esperado: POR_DEFECTO },
+  { caso: 'orden con direccion desconocida', entrada: { [SORT_PARAM]: `${ORDENABLE}${SORT_SEPARATOR}arriba` }, esperado: POR_DEFECTO },
+  { caso: 'orden sin separador', entrada: { [SORT_PARAM]: ORDENABLE }, esperado: POR_DEFECTO },
+  { caso: 'orden sin campo', entrada: { [SORT_PARAM]: `${SORT_SEPARATOR}asc` }, esperado: POR_DEFECTO },
+  { caso: 'busqueda recortada', entrada: { [SEARCH_PARAM]: '  acido  ' }, esperado: { ...POR_DEFECTO, search: 'acido' } },
+  { caso: 'busqueda de solo espacios', entrada: { [SEARCH_PARAM]: '   ' }, esperado: POR_DEFECTO },
+  {
+    caso: 'rango completo de fechas existentes',
+    entrada: { [CREATED_FROM_PARAM]: '2026-01-31', [CREATED_TO_PARAM]: '2026-02-28' },
+    esperado: {
+      ...POR_DEFECTO,
+      filters: { [CREATED_AT_COLUMN_ID]: { kind: 'dateRange', from: '2026-01-31', to: '2026-02-28' } },
+    },
+  },
+  {
+    caso: 'solo el extremo inicial',
+    entrada: { [CREATED_FROM_PARAM]: '2024-02-29' },
+    esperado: {
+      ...POR_DEFECTO,
+      filters: { [CREATED_AT_COLUMN_ID]: { kind: 'dateRange', from: '2024-02-29', to: null } },
+    },
+  },
+  {
+    caso: 'extremo final inexistente se descarta solo el',
+    entrada: { [CREATED_FROM_PARAM]: '2026-03-01', [CREATED_TO_PARAM]: '2026-02-30' },
+    esperado: {
+      ...POR_DEFECTO,
+      filters: { [CREATED_AT_COLUMN_ID]: { kind: 'dateRange', from: '2026-03-01', to: null } },
+    },
+  },
+  { caso: 'los dos extremos invalidos', entrada: { [CREATED_FROM_PARAM]: '2026-13-01', [CREATED_TO_PARAM]: 'ayer' }, esperado: POR_DEFECTO },
+  { caso: 'fecha con hora', entrada: { [CREATED_FROM_PARAM]: '2026-01-01T10:00:00Z' }, esperado: POR_DEFECTO },
+  { caso: 'dia 29 de un año no bisiesto', entrada: { [CREATED_TO_PARAM]: '2026-02-29' }, esperado: POR_DEFECTO },
+  {
+    caso: 'parametro repetido gana el primero',
+    entrada: { [PAGE_PARAM]: ['2', '9'], [PAGE_SIZE_PARAM]: [String(MAX_PAGE_SIZE), '999'], [SEARCH_PARAM]: ['uno', 'dos'] },
+    esperado: { ...POR_DEFECTO, page: 2, pageSize: MAX_PAGE_SIZE, search: 'uno' },
+  },
+  { caso: 'parametro repetido vacio', entrada: { [PAGE_PARAM]: [] }, esperado: POR_DEFECTO },
+];
 
 describe('parametros de lista de recetas', () => {
-  it('sin parametros usa la primera pagina y el tamano por defecto', () => {
-    // R11 (defecto) y R13.
-    expect(parseRecipeListParams({})).toEqual({
-      page: PRIMERA_PAGINA,
-      pageSize: DEFAULT_PAGE_SIZE,
-    });
-    expect(parseRecipeListParams(undefined)).toEqual({
-      page: PRIMERA_PAGINA,
-      pageSize: DEFAULT_PAGE_SIZE,
-    });
+  it('R12: sin parametros devuelve la primera pagina, el tamano por defecto y nada acotado', () => {
+    expect(parseRecipeListParams({})).toEqual(POR_DEFECTO);
+    expect(parseRecipeListParams(undefined)).toEqual(POR_DEFECTO);
   });
 
-  it('acepta una pagina y un tamano validos tal cual', () => {
-    // R11, R12 — lo que la barra de herramientas escribe en la URL es lo que el parser lee.
-    for (const tamano of PAGE_SIZE_OPTIONS) {
-      expect(
-        parseRecipeListParams({ [PAGE_PARAM]: '7', [PAGE_SIZE_PARAM]: String(tamano) }),
-      ).toEqual({ page: 7, pageSize: tamano });
-    }
+  it.each(CONTRATO)('R12, R13: $caso', ({ entrada, esperado }) => {
+    expect(parseRecipeListParams(entrada)).toEqual(esperado);
   });
 
-  it('las dos unicas opciones de tamano son el defecto y el tope del backend', () => {
-    // R11 — «exactamente dos opciones, 10 y 25», y salen de las constantes compartidas.
+  it('R22: las dos opciones de tamano son el defecto y el tope, y coinciden con las del selector', () => {
     expect([...PAGE_SIZE_OPTIONS]).toEqual([DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE]);
-    expect(PAGE_SIZE_OPTIONS).toHaveLength(2);
+    expect([...SHARED_PAGE_SIZES].sort()).toEqual([...PAGE_SIZE_OPTIONS].sort());
   });
 
-  it('los parametros invalidos o fuera de rango se acotan a valores validos', () => {
-    // R13 — ninguna de estas entradas puede producir un error ni una consulta imposible.
-    const paginasQueNoSirven = ['abc', '0', '-3', '1.5', ' 2 ', '1e3', '0x2', '', '  '];
+  it('R12: la consulta construida se vuelve a leer igual, con y sin todos los campos', () => {
+    const completos: DataTableParams = {
+      page: 3,
+      pageSize: MAX_PAGE_SIZE,
+      sort: { columnId: ORDENABLE, direction: 'desc' },
+      filters: { [CREATED_AT_COLUMN_ID]: { kind: 'dateRange', from: '2026-01-01', to: null } },
+      search: 'acido citrico',
+    };
 
-    for (const crudo of paginasQueNoSirven) {
-      const { page, pageSize } = parseRecipeListParams({ [PAGE_PARAM]: crudo });
-      expect(page, `«${crudo}» deberia caer en la primera pagina`).toBe(PRIMERA_PAGINA);
-      expect(pageSize).toBe(DEFAULT_PAGE_SIZE);
-    }
-  });
-
-  it('un tamano de pagina fuera de la lista cae al defecto, tambien si excede el tope', () => {
-    // R13 — el tope lo sigue acotando el backend; aqui solo existen las dos opciones ofrecidas.
-    const tamanosQueNoSirven = ['0', '1', '11', '24', '26', '1000', 'muchos', '-10', '25.0'];
-
-    for (const crudo of tamanosQueNoSirven) {
-      const { pageSize } = parseRecipeListParams({ [PAGE_SIZE_PARAM]: crudo });
-      expect(pageSize, `«${crudo}» deberia caer en el tamano por defecto`).toBe(DEFAULT_PAGE_SIZE);
-    }
-  });
-
-  it('un parametro repetido toma el primer valor y sigue acotando', () => {
-    // R13 — `?page=2&page=9` llega como array desde el App Router y no puede reventar.
-    expect(
-      parseRecipeListParams({
-        [PAGE_PARAM]: ['2', '9'],
-        [PAGE_SIZE_PARAM]: [String(MAX_PAGE_SIZE), '999'],
-      }),
-    ).toEqual({ page: 2, pageSize: MAX_PAGE_SIZE });
-
-    expect(parseRecipeListParams({ [PAGE_PARAM]: [] })).toEqual({
-      page: PRIMERA_PAGINA,
-      pageSize: DEFAULT_PAGE_SIZE,
-    });
-  });
-
-  it('una pagina enorme no se corrompe: sigue siendo un entero seguro', () => {
-    // R13 — `Number('9'.repeat(30))` deja de ser entero seguro; eso no puede llegar al backend.
-    expect(parseRecipeListParams({ [PAGE_PARAM]: '9'.repeat(30) }).page).toBe(PRIMERA_PAGINA);
-    expect(parseRecipeListParams({ [PAGE_PARAM]: '999' }).page).toBe(999);
-  });
-
-  it('la consulta que construye la pantalla es la que el propio parser sabe leer', () => {
-    // R11, R12 — ida y vuelta: la URL que produce la barra de herramientas al navegar devuelve
-    // exactamente los mismos parametros al volver a leerse. Sin esto, cambiar de pagina podria
-    // devolver al usuario a otra pagina de la que tenia.
-    for (const tamano of PAGE_SIZE_OPTIONS) {
-      const params = { page: 3, pageSize: tamano };
+    for (const params of [POR_DEFECTO, completos]) {
       const consulta = new URLSearchParams(buildRecipeListQuery(params));
-
       expect(parseRecipeListParams(Object.fromEntries(consulta))).toEqual(params);
     }
+  });
+
+  it('R12: la consulta no escribe busqueda, orden ni fechas cuando estan vacios', () => {
+    const consulta = new URLSearchParams(buildRecipeListQuery(POR_DEFECTO));
+
+    for (const clave of [SEARCH_PARAM, SORT_PARAM, CREATED_FROM_PARAM, CREATED_TO_PARAM]) {
+      expect(consulta.has(clave), clave).toBe(false);
+    }
+  });
+
+  it('R12: el destino se deriva de la constante de ruta de formulas', () => {
+    expect(recipeListHref(POR_DEFECTO)).toBe(`${FORMULAS_ROUTE}?${buildRecipeListQuery(POR_DEFECTO)}`);
+  });
+
+  it('R11: el filtro de fecha solo existe porque la lista blanca declara createdAt como rango de fechas', () => {
+    expect(RECIPE_QUERYABLE.filterable[CREATED_AT_COLUMN_ID]).toBe('dateRange');
+    expect(RECIPE_QUERYABLE.sortable).not.toContain(NO_ORDENABLE);
+  });
+
+  it('R11: el parser toma la lista blanca del contrato del modulo y no mantiene una copia', () => {
+    const fuente = readFileSync(PARSER, 'utf8');
+
+    expect(fuente).toMatch(/import \{ RECIPE_QUERYABLE \} from '@\/lib\/modules\/recetas';/);
+    expect(fuente).not.toMatch(/@\/lib\/modules\/recetas\//);
+    expect(fuente).not.toMatch(/sortable:\s*\[/);
+  });
+});
+
+describe('busqueda o filtro activos y limpiar', () => {
+  it('R32: solo orden o tamano no cuentan como busqueda ni filtro', () => {
+    expect(hasActiveSearchOrFilter(POR_DEFECTO)).toBe(false);
+    expect(
+      hasActiveSearchOrFilter({
+        ...POR_DEFECTO,
+        pageSize: MAX_PAGE_SIZE,
+        sort: { columnId: ORDENABLE, direction: 'asc' },
+      }),
+    ).toBe(false);
+  });
+
+  it('R32: un termino de busqueda cuenta como activo', () => {
+    expect(hasActiveSearchOrFilter({ ...POR_DEFECTO, search: 'acido' })).toBe(true);
+  });
+
+  it('R32: un rango de fecha de creacion cuenta como activo', () => {
+    expect(
+      hasActiveSearchOrFilter({
+        ...POR_DEFECTO,
+        filters: { [CREATED_AT_COLUMN_ID]: { kind: 'dateRange', from: null, to: '2026-01-01' } },
+      }),
+    ).toBe(true);
+  });
+
+  it('R33: limpiar vacia busqueda y filtros, vuelve a la primera pagina y conserva orden y tamano', () => {
+    const vigentes: DataTableParams = {
+      page: 3,
+      pageSize: MAX_PAGE_SIZE,
+      sort: { columnId: ORDENABLE, direction: 'desc' },
+      filters: { [CREATED_AT_COLUMN_ID]: { kind: 'dateRange', from: '2026-01-01', to: '2026-02-01' } },
+      search: 'acido',
+    };
+
+    const limpios = clearSearchAndFilters(vigentes);
+
+    expect(limpios).toEqual({
+      page: FIRST_PAGE,
+      pageSize: MAX_PAGE_SIZE,
+      sort: vigentes.sort,
+      filters: {},
+      search: '',
+    });
+    expect(hasActiveSearchOrFilter(limpios)).toBe(false);
   });
 });

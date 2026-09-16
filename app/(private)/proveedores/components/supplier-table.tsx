@@ -1,106 +1,160 @@
+'use client';
+
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useMemo, useTransition, type MouseEvent, type ReactNode } from 'react';
 
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  DataTable,
+  type DataTableParams,
+  type DataTableTexts,
+} from '@/components/shared/data-table';
+import { buttonVariants } from '@/components/ui/button';
 import type { SupplierView } from '@/lib/modules/proveedores';
-import { supplierDetailRoute } from '@/lib/shared/routes';
+import { cn } from '@/lib/utils';
 
 import { DeleteSupplierDialog } from './delete-supplier-dialog';
-import { SUPPLIER_COLUMNS } from './supplier-columns';
+import { SUPPLIER_DEFAULT_PINNED_COLUMNS, buildSupplierColumns } from './supplier-columns';
+import { supplierListHref } from './supplier-list-params';
 import { SupplierSheet } from './supplier-sheet';
 
-/**
- * Tabla de la lista de proveedores (R13, R14, R15, `design.md > 5.3`).
- *
- * **Sin `'use client'`**: no tiene estado ni manejadores propios. Recibe los proveedores por
- * props desde `SupplierListSection`, que es quien llama a la operacion de consulta (R46). Cada
- * accion de fila es un componente independiente con su propio disparador, asi que la tabla no
- * coordina nada.
- *
- * **El enlace al detalle sale del helper** `supplierDetailRoute(id)` (R3): ni aqui ni en ningun
- * otro archivo de producto se escribe la URL del detalle como literal. Va en la celda de nombre
- * —el propio nombre es lo que se pulsa para entrar— y es **siempre visible**: nada de revelar
- * una accion con `:hover`, que en tactil no existe (R48). Su area tactil llega a 44x44 px con
- * `TOUCH_TARGET`.
- *
- * **R13 lo cumple el primitivo, no una clase escrita aqui**: `components/ui/table.tsx` envuelve
- * el `<table>` en un `div[data-slot=table-container]` con `overflow-x-auto`. El desbordamiento
- * horizontal lo absorbe ese envoltorio y **ningun ancestro** de la pantalla declara scroll
- * horizontal ni `100vh`, de modo que el documento no se desplaza en viewport angosto. No se
- * edita el primitivo (R44) ni se anade columna pegajosa: `position: sticky` horizontal se
- * comporta distinto en WebKit.
- *
- * **La columna final de acciones de fila —editar y dar de baja— la anaden T8 y T9**, y ya esta:
- * cada accion es un componente de cliente independiente con su propio disparador y su propio
- * estado de apertura, asi que la tabla no coordina cual fila esta abierta y sigue sin frontera
- * de cliente propia. Las acciones son **siempre visibles** —nada de revelarlas con `:hover`, que
- * en tactil no existe (R48)— y se alcanzan con el scroll de la propia tabla.
- */
+export const SUPPLIER_TABLE_ID = 'proveedores';
 
-/** Encabezado de la columna de acciones. Constante para que ningun test dependa del literal. */
-export const ACTIONS_COLUMN_LABEL = 'Acciones';
+export const SUPPLIER_TABLE_TEXTS: DataTableTexts = {
+  empty: 'No hay proveedores que mostrar.',
+  loading: 'Cargando proveedores…',
+  error: 'No se pudo cargar la lista de proveedores.',
+  search: 'Buscar proveedor',
+  filters: 'Filtros',
+  columnMenu: 'opciones de la columna',
+  previousPage: 'Página anterior',
+  nextPage: 'Página siguiente',
+  pageIndicator: (page, totalPages) => `Página ${page} de ${totalPages}`,
+  pageSize: 'Proveedores por página',
+  sortAscending: 'Orden ascendente',
+  sortDescending: 'Orden descendente',
+  pinColumn: 'Fijar columna',
+  unpinColumn: 'Soltar columna',
+  filterColumn: 'Filtrar columna',
+  clearFilter: 'Limpiar filtro',
+  lastWeek: 'Última semana',
+  lastMonth: 'Último mes',
+  lastYear: 'Último año',
+};
 
-/** Clase de area tactil minima de R48 (44x44 px). Los primitivos miden 32 px de alto por defecto. */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
+export const SUPPLIER_NO_RESULTS_TEXT = 'Ningún proveedor coincide con la búsqueda o los filtros.';
 
-export function SupplierTable({ suppliers }: { readonly suppliers: readonly SupplierView[] }) {
+const CLEAR_SEARCH_LABEL = 'Limpiar búsqueda y filtros';
+
+const FIRST_PAGE_LABEL = 'Volver a la primera página';
+
+const LINK_BUTTON_CLASS = cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11');
+
+export type SupplierTableProps = {
+  readonly suppliers: readonly SupplierView[];
+  readonly params: DataTableParams;
+  readonly totalPages: number;
+  /** Solo con cero filas y búsqueda o filtro activos. */
+  readonly noResults?: { readonly clearHref: string; readonly firstPageHref?: string };
+};
+
+// Con modificadores o botón central se deja al navegador abrir otra pestaña.
+function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
   return (
-    <Table data-testid="supplier-table">
-      <TableHeader>
-        <TableRow>
-          {SUPPLIER_COLUMNS.map((column) => (
-            <TableHead
-              key={column.key}
-              data-testid={column.testId}
-              className={column.align === 'end' ? 'text-right' : 'text-left'}
-              scope="col"
-            >
-              {column.label}
-            </TableHead>
-          ))}
-          <TableHead scope="col" data-testid="supplier-column-actions" className="text-right">
-            {ACTIONS_COLUMN_LABEL}
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {suppliers.map((supplier) => (
-          <TableRow key={supplier.id} data-testid="supplier-row">
-            {SUPPLIER_COLUMNS.map((column) => (
-              <TableCell
-                key={column.key}
-                data-testid={`supplier-cell-${column.key}`}
-                className={column.align === 'end' ? 'text-right tabular-nums' : 'text-left'}
-              >
-                {column.key === 'name' ? (
-                  <Link
-                    href={supplierDetailRoute(supplier.id)}
-                    className={`${TOUCH_TARGET} inline-flex items-center justify-start rounded-lg font-medium underline-offset-4 hover:underline`}
-                    aria-label={`Ver el detalle de ${supplier.name}`}
-                    data-testid="supplier-detail-link"
-                  >
-                    {column.value(supplier)}
-                  </Link>
-                ) : (
-                  column.value(supplier)
-                )}
-              </TableCell>
-            ))}
-            <TableCell className="text-right" data-testid="supplier-cell-actions">
-              <div className="flex justify-end gap-1">
-                <SupplierSheet supplier={supplier} />
-                <DeleteSupplierDialog supplier={supplier} />
-              </div>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
+  );
+}
+
+export function SupplierTable({ suppliers, params, totalPages, noResults }: SupplierTableProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  // Las acciones se montan aquí y no llegan de la sección: una función no cruza la frontera
+  // servidor-cliente.
+  const columns = useMemo(
+    () =>
+      buildSupplierColumns({
+        rowActions: (supplier) => (
+          <>
+            <SupplierSheet supplier={supplier} />
+            <DeleteSupplierDialog supplier={supplier} />
+          </>
+        ),
+      }),
+    [],
+  );
+
+  // Transición en vez de remontar la tabla: remontarla haría perder el foco y el borrador de la
+  // búsqueda mientras el servidor recalcula.
+  const navigate = (href: string) => {
+    startTransition(() => {
+      router.push(href);
+    });
+  };
+
+  const navigateOnPlainClick = (href: string) => (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!isPlainClick(event)) return;
+    event.preventDefault();
+    navigate(href);
+  };
+
+  let emptyAction: ReactNode;
+  if (noResults !== undefined) {
+    emptyAction = (
+      <div
+        data-testid="supplier-list-no-results"
+        className="flex flex-wrap items-center justify-center gap-2"
+      >
+        <Link
+          href={noResults.clearHref}
+          onClick={navigateOnPlainClick(noResults.clearHref)}
+          data-slot="button"
+          data-testid="supplier-list-clear-search"
+          className={LINK_BUTTON_CLASS}
+        >
+          {CLEAR_SEARCH_LABEL}
+        </Link>
+        {noResults.firstPageHref === undefined ? null : (
+          <Link
+            href={noResults.firstPageHref}
+            onClick={navigateOnPlainClick(noResults.firstPageHref)}
+            data-slot="button"
+            data-testid="supplier-list-no-results-first-page"
+            className={LINK_BUTTON_CLASS}
+          >
+            {FIRST_PAGE_LABEL}
+          </Link>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      data-testid="supplier-table"
+      aria-busy={isPending}
+      className={isPending ? 'opacity-60 transition-opacity' : 'transition-opacity'}
+    >
+      {isPending ? (
+        <p className="text-xs text-muted-foreground">{SUPPLIER_TABLE_TEXTS.loading}</p>
+      ) : null}
+      <DataTable
+        tableId={SUPPLIER_TABLE_ID}
+        columns={columns}
+        rows={suppliers}
+        getRowId={(supplier) => supplier.id}
+        params={params}
+        totalPages={totalPages}
+        onParamsChange={(next) => navigate(supplierListHref(next))}
+        status="idle"
+        texts={
+          noResults === undefined
+            ? SUPPLIER_TABLE_TEXTS
+            : { ...SUPPLIER_TABLE_TEXTS, empty: SUPPLIER_NO_RESULTS_TEXT }
+        }
+        emptyAction={emptyAction}
+        defaultPinnedColumns={SUPPLIER_DEFAULT_PINNED_COLUMNS}
+      />
+    </div>
   );
 }
