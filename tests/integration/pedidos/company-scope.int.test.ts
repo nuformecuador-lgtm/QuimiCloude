@@ -834,6 +834,67 @@ describe('R6 — el DOWN aborta entero si hay pedidos de otra empresa', () => {
       expect(fila.companyId).toBe(ajena)
     })
   })
+
+  it('con una asignacion cuya empresa no es la de su pedido aborta en la guardia 3', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const quimicloud = await quimicloudId(tx)
+      await vaciarPedidos(tx)
+      const ajena = await crearEmpresa(tx, token())
+      const recipeId = await crearReceta(tx)
+      const year = currentUtcYear()
+      // Todos los pedidos son de la empresa del UP y sin parejas repetidas: las guardias 1 y 2
+      // no tienen nada que ver, asi que si el DOWN aborta solo puede hacerlo la 3.
+      const pedido = await insertarPedido(tx, { companyId: quimicloud, recipeId, year, sequence: 5 })
+      await insertarPedido(tx, { companyId: quimicloud, recipeId, year, sequence: 6 })
+      const personaAjena = await crearUsuario(tx, ajena)
+
+      // La FK compuesta impide fabricar el dato cruzado; se suelta solo dentro de esta
+      // transaccion, que termina en ROLLBACK.
+      expect(await fotoDelEsquema(tx)).toEqual({ ...ESQUEMA_UP, rlsForzada: RLS_FORZADA })
+      await tx.$executeRawUnsafe(
+        'ALTER TABLE "order_assignments" DROP CONSTRAINT "order_assignments_order_id_company_id_fkey"',
+      )
+      await insertarAsignacion(tx, { orderId: pedido, userId: personaAjena, companyId: ajena })
+
+      const cruzadas = await tx.$queryRaw<{ n: bigint }[]>`
+        SELECT count(*) AS n
+          FROM "order_assignments" a JOIN "orders" o ON o."id" = a."order_id"
+         WHERE a."company_id" <> o."company_id"`
+      expect(Number(cruzadas[0]?.n)).toBe(1)
+      const ajenos = await tx.$queryRaw<{ n: bigint }[]>`
+        SELECT count(*) AS n FROM "orders" WHERE "company_id" <> CAST(${quimicloud} AS uuid)`
+      expect(Number(ajenos[0]?.n)).toBe(0)
+
+      const esquemaAntes = await fotoDelEsquema(tx)
+      expect(esquemaAntes).toEqual({
+        ...ESQUEMA_UP,
+        fkAsignacionCompuesta: false,
+        rlsForzada: RLS_FORZADA,
+      })
+      const antes = await contarFilas(tx)
+      const asignacionAntes = await tx.$queryRaw<{ company_id: string }[]>`
+        SELECT "company_id"::text AS company_id FROM "order_assignments"
+         WHERE "order_id" = CAST(${pedido} AS uuid) AND "user_id" = CAST(${personaAjena} AS uuid)`
+
+      const aborto = await runScriptExpectingAbort(tx, DOWN, 'DOWN con una asignacion cruzada')
+      // Excepcion levantada por un `RAISE` (P0001) en el bloque de las guardias, que es el primer
+      // `DO` del archivo: ningun DDL posterior llego a ejecutarse.
+      expect(aborto.sqlState).toBe('P0001')
+      expect(aborto.sentencia).toMatch(/^DO\s+\$\$/u)
+      expect(aborto.indice).toBe(DOWN.findIndex((s) => /^DO\s+\$\$/u.test(s)))
+      expect(aborto.texto).toContain('QC-60 down: hay 1 asignacion(es)')
+      expect(aborto.texto).not.toContain('compartida(s)')
+      expect(aborto.texto).not.toContain('pedido(s) que pertenecen')
+
+      expect(await fotoDelEsquema(tx)).toEqual(esquemaAntes)
+      expect(await contarFilas(tx)).toEqual(antes)
+      const asignacionDespues = await tx.$queryRaw<{ company_id: string }[]>`
+        SELECT "company_id"::text AS company_id FROM "order_assignments"
+         WHERE "order_id" = CAST(${pedido} AS uuid) AND "user_id" = CAST(${personaAjena} AS uuid)`
+      expect(asignacionDespues).toEqual(asignacionAntes)
+      expect(asignacionDespues).toEqual([{ company_id: ajena }])
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------
