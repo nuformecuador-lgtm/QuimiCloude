@@ -101,6 +101,22 @@ tests/unit/documentos/document-upload-actions.test.ts
 tests/unit/documentos/qc106-alcance.test.ts
 ```
 
+**Lo que toco despues la enmienda D19** (5 de produccion + 5 de test, ninguno nuevo):
+`domain/limits.ts`, `ports/document-storage.ts`, `domain/issue-upload-links.ts`,
+`adapters/driven/storage/document-storage-supabase.ts`, `index.ts`, y los tests
+`issue-upload-links`, `limits-and-path`, `module-contract`, `authorization` y `storage-config`.
+Los dos cambios de contrato:
+
+| Constante | Valor | Quien lo impone |
+| --- | --- | --- |
+| `READ_LINK_TTL_SECONDS` | `15 * 60` | **Este modulo.** Es el antiguo `UPLOAD_LINK_TTL_SECONDS`, renombrado para que diga de quien es. Viaja de verdad: `createSignedReadUrl(path, expiresInSeconds)` lo conserva y el servicio lo aplica |
+| `PROVIDER_UPLOAD_LINK_TTL_SECONDS` | `2 * 60 * 60` | **El proveedor.** Su docblock dice que este modulo NO lo elige y NO lo promete, y que se declara solo para poder informar cuando muere el enlace |
+
+Y `DocumentStorage.createSignedUpload(path)` **pierde el parametro `expiresInSeconds`**: un puerto
+que pide un plazo que nadie puede honrar es una mentira en el contrato. `createSignedReadUrl` lo
+conserva, porque ahi si se cumple. `lib/composition/index.ts` **no hizo falta tocarlo**: el tipo
+del puerto acepta la funcion con un parametro menos.
+
 **Intactos a proposito, y una guardia de esta ficha lo afirma contra el diff:**
 `db/schema.prisma`, `db/migrations/**`, `app/**` (incluido `app/api/`), `components/**`,
 `e2e/**`, `lib/modules/errores/**`, `lib/modules/identity/domain/permissions.ts`,
@@ -122,7 +138,7 @@ en vez de disimularlo.
 | R7 | `issue-upload-links.test.ts` | «los BYTES no tienen por donde entrar: una tanda que los traiga se rechaza y nada se sube» |
 | R8 | `upload-input.test.ts`, `issue-upload-links.test.ts` | «R8 — una tanda con un archivo de mas se rechaza ENTERA»; «once archivos: `invalid_input` y CERO enlaces firmados, ni siquiera los diez primeros» |
 | R9 | `upload-input.test.ts`, `issue-upload-links.test.ts` | «R9 — una tanda sin ningun archivo se rechaza»; «una tanda vacia se rechaza con `invalid_input` y no llama al almacenamiento» |
-| **R10** | `issue-upload-links.test.ts` | «la caducidad es la emision mas quince minutos, con el reloj inyectado»; «al puerto se le pide la firma con ese mismo plazo»; «toda la tanda caduca a la vez aunque el reloj avance entre firma y firma». **LIMITE: ver la divergencia de abajo — en los enlaces de SUBIDA el plazo no lo impone el proveedor** |
+| R10 | `issue-upload-links.test.ts`, `limits-and-path.test.ts` | **Subida (plazo del proveedor):** «R10 — la caducidad es la emision mas las DOS HORAS del proveedor, con el reloj inyectado»; «R10 — la SUBIDA no promete los quince minutos: ese plazo es el de LECTURA y aqui no se usa»; «R10 — al puerto NO se le pasa ningun plazo: quien lo impone es el proveedor»; «R10 — toda la tanda caduca a la vez aunque el reloj avance entre firma y firma». **Lectura (plazo nuestro):** «R10 — el plazo de LECTURA lo fija este modulo: quince minutos, y el puerto SI los pide»; «R10 — el plazo de SUBIDA lo impone el PROVEEDOR: dos horas, y el puerto NO las pide»; «R10 — el docblock del plazo de subida dice que el modulo NO lo elige y NO lo promete». **Reescrito por la enmienda D19; ya no queda limite abierto** |
 | R11 | `storage-config.test.ts` | «R11, R32 — con las tres presentes resuelve el bucket PROPIO de los documentos, no el de las imagenes»; «R11, R32 — la direccion y la credencial se REUTILIZAN: no nace ninguna variable duplicada» |
 | R12 | `limits-and-path.test.ts`, `issue-upload-links.test.ts` | «R12 — `empresa-A2/x.pdf` NO pasa como ruta de `empresa-A`»; «R12 — la travesia de directorios y la carpeta sola tampoco pasan»; «cada ruta cae bajo el prefijo de LA EMPRESA DEL ACTOR»; «dos actores de empresas distintas con la MISMA entrada caen en prefijos distintos» |
 | R13 | `issue-upload-links.test.ts` | «la salida son rutas y enlaces: ninguna URL de lectura y ninguna conversion» |
@@ -164,42 +180,46 @@ $ pnpm lint
 
 $ pnpm exec vitest run tests/unit/documentos
  Test Files  10 passed (10)
-      Tests  145 passed (145)
-   Duration  4.71s
+      Tests  149 passed (149)
+   Duration  2.45s
 
 $ pnpm exec vitest run guard
- Test Files  1 failed | 40 passed (41)
-      Tests  1 failed | 444 passed | 9 skipped (454)
+ Test Files  41 passed (41)
+      Tests  445 passed | 9 skipped (454)
+   Duration  4.97s
 
 $ pnpm typecheck
 335 errores en total
 0 que mencionen `modules/documentos` o `composition/index`
 ```
 
-### El unico rojo, y es de esta ficha aunque no sea de su codigo
+**Las guardias quedan 41 de 41.** Los 149 casos del modulo son los 145 originales mas los **cuatro
+nuevos** que trajo la enmienda D19, que afirman de quien es cada plazo.
 
-`tests/guards/guard-identificador-de-request.test.ts`, caso «package.json no gana ninguna
-dependencia, ni una libreria de identificadores (R20)»:
+### El rojo bloqueante, CERRADO por decision humana (2026-09-16)
 
-```
-"package.json declara 33 dependencies y se esperaban 31: QC-71 no anade ninguna (R20)."
-```
+Se deja el historial porque explica por que el numero era el que era.
 
-**Lo causa la instalacion aprobada de esta ficha** —`package.json` tenia 31 y las dos
-dependencias de F1.4 lo dejan en 33—, asi que **no es un rojo heredado** y decirlo al reves seria
-falso. **No esta en `tests/baseline-rojos.json`** (comprobado), y por
-`docs/verification.md > Rojos heredados` todo lo que no este ahi y salga rojo es **bloqueante**.
+**Lo que pasaba:** `tests/guards/guard-identificador-de-request.test.ts`, caso «package.json no
+gana ninguna dependencia, ni una libreria de identificadores (R20)», fallaba con «declara 33
+dependencies y se esperaban 31». **Lo causaba la instalacion aprobada de esta ficha** —el
+manifiesto tenia exactamente 31 y las dos dependencias de F1.4 lo dejan en 33—, asi que **no era
+un rojo heredado**; decirlo al reves habria sido falso. **No estaba en `tests/baseline-rojos.json`**,
+y por `docs/verification.md > Rojos heredados` todo lo que no este ahi y salga rojo es
+**bloqueante**.
 
-**No se arreglo, a proposito.** Esa guardia es de **QC-71** y fija el numero **31 a mano**
-(`DEPENDENCIAS_ESPERADAS`). Tocarla seria meter mano en la guardia de otra ficha, que es
-exactamente la linea que `design.md > 12` se nego a cruzar con `BUSINESS_MODULES`. **Es la misma
-especie ya documentada cuatro veces** en el baseline: una guardia que quiso decir «MI ficha no
-anade dependencias» y lo implemento como censo global, asi que la rompe cualquier feature
-posterior con una dependencia legitima —le paso a `resend` con cuatro guardias distintas—.
+**Lo decidido y hecho:** el humano autorizo subir `DEPENDENCIAS_ESPERADAS` de **31 a 33** en esa
+guardia. **No se metio al baseline**, y esa parte importa: listar el archivo lo habria apagado
+entero para el comparador, dejando ciegos tambien sus otros veintidos casos, que es exactamente el
+coste que el propio baseline advierte en cada una de sus entradas.
 
-**Las salidas, y las decide el humano, no el implementer:** (a) llevar el conteo a 33; (b) acotar
-el caso a su propia ficha o a su merge-base, que es la correccion de fondo; o (c) una entrada en
-`tests/baseline-rojos.json` con su motivo y su fecha.
+**Lo que queda dicho y no es de esta ficha:** que el conteo sea un **absoluto** es fragil —no
+distingue «alguien colo una libreria» de «entro una aprobada», asi que lo rompe cualquier feature
+posterior con una legitima, como ya le paso a `resend` con cuatro guardias distintas—. La pregunta
+«¿toda dependencia declarada esta aprobada?» la responde `guard-dependencias-aprobadas`, que
+compara contra el registro y siempre estuvo verde. **El arreglo de fondo es que esa guardia compare
+contra el merge-base de su propia rama en vez de contar absolutos**, y queda propuesto, no hecho:
+es la guardia de otra ficha.
 
 ### Errores fantasma de `@prisma/client`, explicados
 
@@ -211,10 +231,26 @@ sobre su causa. Por lo mismo `tests/unit/composition` no es ejecutable aqui —r
 con 0 tests fallados y 15 saltados—, y esa es la unica parte del criterio de T10 que esta maquina
 no puede acreditar.
 
-## DIVERGENCIA QUE REQUIERE DECISION HUMANA — el plazo del enlace de SUBIDA
+## RESUELTA POR EL HUMANO (2026-09-16) — el plazo del enlace de SUBIDA
 
-**No se resuelve por cuenta propia y no se ha cambiado nada por decidirlo.** Se escribe aqui
-porque afecta a una decision cerrada (**D3**) y a un requisito (**R10**).
+**Decision tomada:** se **aceptan las 2 horas** que impone el proveedor en la **subida**, y los
+**15 minutos de R10 se acotan a los enlaces de LECTURA**, donde `createSignedUrl(path, expiresIn)`
+si los hace exigibles. El humano confirmo el hallazgo contra las declaraciones de tipos **y**
+contra la documentacion de Supabase, que lo dice con todas las letras: los enlaces de subida
+firmados **«are valid for 2 hours»**, fijas y sin parametro.
+
+**Lo que se hizo con esa decision:** se reescribio **R10** en `requirements.md`, se anadio la
+enmienda como **fila nueva (D19)** en la tabla de decisiones cerradas —sin tocar ninguna otra
+fila ni el bloque de Alcance— y **el codigo dejo de prometer lo que no cumple**: el `expiresAt`
+de la emision y el docblock del adaptador declaran ahora **2 h** para la subida, con su test.
+
+**Consecuencia aceptada, escrita entera y no disimulada:** un enlace de subida filtrado permite
+**escribir durante 2 h en UNA ruta concreta que eligio el servidor**, dentro del prefijo de la
+empresa, y el bucket sigue rechazando lo que no sea PDF de menos de 20 MB. **No permite leer nada
+ajeno** ni escribir en ninguna otra ruta.
+
+El registro de por que se paro y se pregunto se conserva abajo, porque es lo que sostiene la
+enmienda.
 
 **Lo que dice el spec.** D3: «el enlace vive **15 minutos**». R10: «Cada enlace de subida DEBE
 caducar 15 minutos despues de su emision; el sistema **NO DEBE emitir enlaces sin caducidad**».
@@ -240,15 +276,42 @@ constante unica), **no una garantia del proveedor**, y el servicio puede seguir 
 firma despues de los quince minutos. El adaptador lo dice en su docblock en vez de fingir la
 garantia.
 
-**Por que no se eligio una salida aqui.** Las 18 decisiones cerradas son del humano, y cuando una
-resulta imposible el encargo es **parar y preguntar**, no sustituirla. Las salidas concebibles
-—aceptar el plazo que imponga el proveedor y corregir la redaccion de R10; mover el vencimiento a
-donde si sea exigible; o descartar la subida directa— **cambian el alcance o el significado de D3**,
-y ninguna es del implementer.
+**Por que se paro en vez de elegir.** Las decisiones cerradas son del humano, y cuando una resulta
+imposible el encargo es **parar y preguntar**, no sustituirla. Las salidas concebibles —aceptar el
+plazo que imponga el proveedor y corregir la redaccion de R10; mover el vencimiento a donde si sea
+exigible; o descartar la subida directa— **cambiaban el alcance o el significado de D3**, y ninguna
+era del implementer.
+
+**Que eligio el humano el 2026-09-16:** la primera. Aceptar las 2 h del proveedor y acotar los 15
+minutos a la lectura, que es lo que quedo escrito como **D19** y reescrito en **R10**.
 
 **Lo que esto NO invalida.** El resto de D3 y R10 se sostiene: el plazo vive en **una sola**
 definicion del modulo, toda la tanda caduca a la vez y nada se firma sin permiso. Lo unico que no
 se sostiene es que la caducidad de la **subida** sea algo que este sistema imponga.
+
+## CONFIRMADA POR EL HUMANO (2026-09-16) — la autorizacion gana a la validacion de entrada
+
+Se llevo a la puerta humana como **desviacion declarada** de la letra de `tasks.md` T9, caso (a)
+(«entrada invalida ⇒ el doble del caso de uso **no se llama**»). **Queda CONFIRMADA como decision
+humana**, no como deuda ni como desviacion pendiente: no hay nada que devolver ni que arreglar.
+
+**La tension era real y no reconciliable al pie de la letra.** El codigo del permiso vive **dentro
+del dominio y no sale por el contrato**, asi que el borde **no tiene forma de saber si el actor
+esta autorizado sin invocar el caso de uso**. Por tanto «rechazar la entrada sin llamar al caso de
+uso» y «el veredicto de autorizacion gana siempre» **no pueden ser ciertas a la vez** para un actor
+**sin** permiso.
+
+**Lo decidido:** gana la **autorizacion**. Pre-validar en el borde le contaria a quien **no puede
+operar** si su entrada estaba bien formada, y eso rompe el **falla cerrado** de R2 y R3. Las dos
+alternativas eran peores: pre-validar siempre (el fallo que se acaba de describir) o **sacar el
+codigo del permiso al contrato** para decidir en el borde, que seria una **segunda definicion de la
+autorizacion**, justo lo que el dominio prohibe por escrito.
+
+**Lo que la letra de T9(a) protegia si se cumple, y esta probado:** con entrada invalida **el
+almacenamiento no se toca ni una vez** y **no se firma ningun enlace**, afirmado metodo a metodo
+sobre **ocho** entradas invalidas distintas y contra un puerto cuyos tres metodos **revientan** si
+alguien los llama. Y la frontera sigue intacta: la accion **no comprueba ningun permiso** ni nombra
+ningun codigo de permiso — eso sigue siendo la primera linea del caso de uso (R5).
 
 ## Limites y deudas declaradas
 
