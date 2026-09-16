@@ -93,7 +93,7 @@
       `lib/composition` (lo verifica la guardia de arquitectura). Cubre el lado contrato de **R21,
       R28**.
 
-- [ ] **T5 — El caso de uso de la emisión de enlaces.** Depende de T1, T3 y T4.
+- [x] **T5 — El caso de uso de la emisión de enlaces.** Depende de T1, T3 y T4.
       Archivos: `lib/modules/documentos/domain/issue-upload-links.ts`,
       `tests/unit/documentos/issue-upload-links.test.ts`.
       Orden fijo e **irreversible**: permiso → zod → construcción de rutas con `actor.companyId` →
@@ -108,7 +108,7 @@
       (f) la salida **no** contiene ninguna URL completa de lectura.
       Cubre **R6, R7, R8, R9, R10, R12, R13, R14, R15, R16**.
 
-- [ ] **T6 — El caso de uso de la conversión.** Depende de T1, T2 y T4.
+- [x] **T6 — El caso de uso de la conversión.** Depende de T1, T2 y T4.
       Archivos: `lib/modules/documentos/domain/convert-pdf.ts`,
       `tests/unit/documentos/convert-pdf.test.ts`.
       Los cuatro pasos de `design.md > 7`, y el resultado por archivo como **discriminado**
@@ -124,7 +124,7 @@
 
 ## Tanda 3 — adaptadores driven (el único sitio que conoce a los terceros)
 
-- [ ] **T7 — Adaptador de Storage y su configuración perezosa.** Depende de T4.
+- [x] **T7 — Adaptador de Storage y su configuración perezosa.** Depende de T4.
       Archivos: `lib/modules/documentos/adapters/driven/config/document-storage-config-env.ts`,
       `.../adapters/driven/storage/document-storage-supabase.ts`, `.env.example` (bloque **nuevo al
       final**), `tests/unit/documentos/storage-config.test.ts`.
@@ -139,7 +139,7 @@
       barrido del árbol de producción.
       Cubre **R11 (lado bucket), R26, R32** y el lado adaptador de **R31**.
 
-- [ ] **T8 — Adaptador de conversión con `unpdf`.** Depende de **T0.1** y de T4.
+- [x] **T8 — Adaptador de conversión con `unpdf`.** Depende de **T0.1** y de T4.
       Archivos: `lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf.ts`, `package.json`
       y `pnpm-lock.yaml` (**solo** si T0.1 salió «sí»), `docs/dependencias.md` (dos filas nuevas, las
       escribe el leader en F1.4), `tests/unit/documentos/pdf-converter.test.ts`.
