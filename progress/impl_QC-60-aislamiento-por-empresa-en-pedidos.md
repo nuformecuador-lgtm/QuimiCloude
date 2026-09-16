@@ -160,3 +160,7 @@ Sin cambios de comportamiento: todo lo de esta ronda es comentario, un test nuev
 4. **m7** (`48f4db3`): la viñeta de `docs/architecture.md` repartida en líneas de 83/82/70 columnas, sin cambiar palabras.
 
 No tocado por decisión del leader: `presentation-prisma.ts:123` (deuda), T19, el test de R30 (nota para el PR) y `e2e/aislamiento-inventario.spec.ts` (deuda).
+
+## Ronda 5 — 2026-09-16
+
+- `c9de7a8`: `tests/integration/inventario/list-query-indexes.int.test.ts` tenía otra lista cerrada sin tensar (`PRE_EXISTING_INDEXES`). `orders_order_year_order_sequence_key` sale con su nota y un caso de relevo exige `orders_company_year_sequence_key` único, no parcial y con las columnas `(company_id, order_year, order_sequence)`, con el mismo patrón que `presentations_name_normalized_key`. Resultado del archivo: `Test Files 1 passed (1) · Tests 16 passed (16)`.
