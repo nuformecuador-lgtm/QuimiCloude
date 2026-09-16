@@ -465,9 +465,13 @@ enum OrderPriority {
 }
 
 /// Sin fecha de solicitud: es `createdAt`. El correlativo es un indice unico total, no parcial: un
-/// pedido dado de baja conserva su numero. `orderYear` es el ano de `createdAt` en UTC, y lo exige
-/// el CHECK `orders_order_year_matches_created_at`. `recipeId`, `createdBy` y `updatedBy` van sin
-/// `@relation` porque apuntan a otros modulos; sus FK y CHECK estan escritos a mano y son drift.
+/// pedido dado de baja conserva su numero, y desde QC-60 se mide DENTRO de la empresa --el unico
+/// pasa de `(ano, secuencia)` a `(empresa, ano, secuencia)`--. `orderYear` es el ano de `createdAt`
+/// en UTC, y lo exige el CHECK `orders_order_year_matches_created_at`. `recipeId`, `createdBy`,
+/// `updatedBy` y `companyId` van sin `@relation` porque apuntan a otros modulos; sus FK y CHECK
+/// estan escritos a mano y son drift: hay que borrar a mano su `DROP CONSTRAINT` de toda migracion
+/// generada, y eso incluye ahora `orders_company_id_fkey` (QC-60). `orders_id_company_id_key` es la
+/// clave candidata a la que apunta la FK COMPUESTA de `order_assignments`: quitarla la rompe.
 /// Los indices de listado son parciales y viven en la migracion `list_query_indexes`.
 /// @module pedidos
 model Order {
@@ -481,13 +485,15 @@ model Order {
   /// Sin longitud en la columna: el tope vive en la validacion de entrada. Que exista solo en un
   /// pedido cancelado lo exige el CHECK `orders_cancellation_reason_matches_status`.
   cancellationReason String?       @map("cancellation_reason")
+  companyId          String        @map("company_id") @db.Uuid
   createdBy          String?       @map("created_by") @db.Uuid
   updatedBy          String?       @map("updated_by") @db.Uuid
   createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt          DateTime?     @map("deleted_at") @db.Timestamptz(6)
 
-  @@unique([orderYear, orderSequence], map: "orders_order_year_order_sequence_key")
+  @@unique([companyId, orderYear, orderSequence], map: "orders_company_year_sequence_key")
+  @@unique([id, companyId], map: "orders_id_company_id_key")
   @@index([recipeId], map: "orders_recipe_id_idx")
   @@index([createdBy], map: "orders_created_by_idx")
   @@index([updatedBy], map: "orders_updated_by_idx")
