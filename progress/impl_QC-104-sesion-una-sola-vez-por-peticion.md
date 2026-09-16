@@ -55,18 +55,18 @@ subagente de T2 era **este** entorno a medias, no su codigo. Tras `prisma genera
 
 | Task | Estado | Commit |
 |---|---|---|
-| T1 — conteo en ejecucion, ANTES (R16) | **BLOQUEADA**, ver seccion 5 | — |
+| T1 — conteo en ejecucion, ANTES (R16) | hecha (base propia) | ver seccion 5 |
 | T2 — helper de ambito de peticion | hecha | `f23d312` |
 | T3 — cableado en la composicion | hecha | `f23d312` |
 | T4 — ambito explicito en los 8 `currentActor` | hecha | `f23d312` |
 | T5 — conteo por pantalla | hecha | `974bc9d` |
 | T6 — conteo por Server Action | hecha | `a9d7338` |
 | T7 — prueba de que el conteo muerde | hecha, ver seccion 8 | — (no deja codigo) |
-| T8 — conteo en ejecucion, DESPUES (R16) | **BLOQUEADA**, ver seccion 5 | — |
+| T8 — conteo en ejecucion, DESPUES (R16) | hecha (base propia) | ver seccion 5 |
 | T9 | retirada en la revision de F1.4 | — |
-| T10 — test del artefacto del conteo | **BLOQUEADA** (depende de T8) | — |
+| T10 — test del artefacto del conteo | hecha, 9/9 y muerde | pendiente de commit |
 | T11 — nota en la arquitectura | hecha | `f23d312` |
-| T12 — mapa de trazabilidad | pendiente | — |
+| T12 — mapa de trazabilidad | hecha, **19/19** | pendiente de commit |
 
 ### T2 — `lib/shared/request-scope.ts` (R4-R7, R9, R20)
 
@@ -228,10 +228,29 @@ R16 pide contar las consultas de sesion **en la aplicacion real** (`next build &
 contra la base local, antes y despues, en tres pantallas y un guardado. Eso exige **navegar como
 una persona con sesion iniciada**, y en este entorno:
 
-**ACTUALIZADO el 2026-09-16.** El humano autorizo despues las dos cosas que faltaban —Playwright
-**solo como navegador** y tocar la configuracion del Postgres local— y se reintento. **La parte del
-navegador dejo de ser el problema y el bloqueo se movio de sitio.** El detalle completo, con la
-evidencia, esta en **`progress/medicion_QC-104-sesion-una-sola-vez-por-peticion.md`**; resumen:
+**RESUELTO el 2026-09-16 con base propia.** Lo que sigue es el historial de como se desbloqueo;
+**la medicion esta hecha y R16 tiene cifras y test**. El detalle completo esta en
+**`progress/medicion_QC-104-sesion-una-sola-vez-por-peticion.md`**.
+
+### Resultado (ver el artefacto para el metodo y las trampas)
+
+Mismo metodo y **misma base aislada** (`QuimiCloude_QC104`, clon de la plantilla de la rama), con el
+control en reposo a **0** a los dos lados en las dos corridas:
+
+| Caso | Antes | Despues |
+|---|---|---|
+| `/configuracion/usuarios` | 7 | **1** |
+| `/pedidos` | 6 | **1** |
+| `/configuracion/unidades` | 7 | **1** |
+| guardado (alta de unidad) | 9 | **2** |
+
+**R1 y R2 se cumplen en la aplicacion real.** Y **el hallazgo H3 era correcto**: la semilla decia
+«tres lecturas por pagina» y eran **6-7**, porque los componentes de servidor invocan Server Actions
+al pintarse. El guardado baja de 9 a 2, y esas 2 son **la accion y el repintado** de la misma
+respuesta: el hallazgo H2 medido. **La Pregunta abierta 2 NO se cierra aqui**: el dato lo aporta
+esta medicion, la decision es del humano.
+
+### Como se llego (dos intentos fallidos antes)
 
 1. **La navegacion FUNCIONO.** `next build && next start -p 3217`, sesion real por el formulario de
    login con un fixture de rol `Administrador`, y las tres pantallas mas el guardado servidas con
@@ -251,9 +270,16 @@ evidencia, esta en **`progress/medicion_QC-104-sesion-una-sola-vez-por-peticion.
 una recarga en produccion son **14-17 peticiones**, no una, porque Next precarga el menu, y R1/R2
 hablan de **una peticion**; y `waitUntil: 'networkidle'` **no vale** con streaming de RSC.
 
-**Lo que haria falta para desbloquearlo, y es decision humana:** una base aislada para la corrida
-(o la certeza de que nadie mas toca `QuimiCloude` mientras dura), o que el entorno permita la via
-(b), que es la unica exacta por peticion.
+**Como se desbloqueo:** el leader decidio **montar base propia** —`QuimiCloude_QC104`, clon de la
+plantilla de la rama, que es el precedente del repo— y con eso la via (c) pasa a ser exacta **sin
+tocar ninguna configuracion y sin necesitar el permiso denegado**. El control en reposo, que sobre
+la base compartida daba 1-2, da **0**. La via (b) **sigue denegada y no se reintento**.
+
+**Falto un ajuste mas del instrumento, y estaba en mi lado:** con base propia las cifras aun salian
+en **0,75-0,80 lecturas por peticion**, que es imposible —una pantalla no se pinta con menos de una
+lectura—. La causa era el piso de 3 s: basta para una consulta suelta y **no para una rafaga de 20
+recargas**, porque la cola de publicacion de estadisticas se perdia. Con **piso de 12 s** las cifras
+caen en enteros exactos. Esta escrito en el artefacto para que no se vuelva a pagar.
 
 **Lo que si quedo resuelto, y ahorra trabajo a quien lo retome:**
 
@@ -318,13 +344,13 @@ huecos no se reutilizan**. Abreviaturas de los tres archivos nuevos:
 | R13 | ACCIONES | la cookie cambiando entre llamadas sin ambito, **mas** la prueba de fuente de que `login-action.ts` no contiene `runInRequestScope` |
 | R14 | RENDER | «servir la pantalla sin fallos no llama a `console.*`» en las tres pantallas |
 | R15 | RENDER + ACCIONES + **T7** | los dos tests de conteo son la comprobacion ejecutable del gate; que **muerden** esta probado con las dos mutaciones de la seccion 8 |
-| R16 | **SIN TEST — BLOQUEADO** | `tests/unit/identity/session-count-artifact.test.ts` no existe: depende de T8, y T1/T8 no se pudieron ejecutar (seccion 5). **Unico requisito sin cobertura.** |
+| R16 | `tests/unit/identity/session-count-artifact.test.ts` (T10) | 9 casos: existen las secciones `Metodo` y `Conteo en ejecucion`, hay fila por cada pantalla de R2 y por el guardado con «antes» y «despues» **numericos**, y no hay ninguna seccion de tiempos. Las cifras estan en `progress/medicion_QC-104-...md` |
 | R20 | `tests/guards/guard-dependencias-aprobadas.test.ts` (**existente**) + SCOPE | la guardia vigila que toda dependencia declarada este aprobada; la prueba de fuente afirma que `request-scope.ts` solo importa `react` y `node:async_hooks`. `package.json` no cambia |
 | R21 | `e2e/session.spec.ts` entero (**existente**) | sin E2E nuevo, decision cerrada 11. **Lo corre el leader** |
 | R22 | `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`, `tests/unit/navegacion/private-layout-menu.test.tsx`, `tests/unit/identity/require-page-permission.test.ts`, `tests/unit/private-layout.test.tsx` (**existentes**) | redireccion al login con la marca, 404 dentro del layout privado y menu filtrado por permisos |
 
-**Resumen: 18 de 19 requisitos con al menos un test. El unico descubierto es R16**, y su causa
-es el bloqueo de la seccion 5, no un olvido.
+**Resumen: 19 de 19 requisitos con al menos un test.** R16 se cerro el 2026-09-16 con la medicion
+sobre base propia (seccion 5) y su test de artefacto (T10).
 
 **Preguntas abiertas del spec, al cerrar la implementacion:**
 
@@ -342,15 +368,16 @@ es el bloqueo de la seccion 5, no un olvido.
   spec de QC-104 hasta que esta rama vuelva.
 - **Seccion 2** — el worktree necesito `pnpm install`, `prisma generate`, `next typegen` y
   `db:migrate`. No es parte de la feature, pero sin ello ningun veredicto de gate valia.
-- **Seccion 5** — T1, T8 y T10 quedan sin ejecutar, y con ellas R16 sin test. **Bloqueo real,
-  subido al leader; no se autoaprueba ni se rellena con supuestos.**
+- **Seccion 5** — T1, T8 y T10 estuvieron bloqueadas dos rondas y **se subieron sin resolver en vez
+  de rellenarlas con supuestos**. Se cerraron el 2026-09-16, cuando el leader autorizo **base
+  propia**: eso hizo exacta la via (c) sin tocar configuracion. La via (b) **sigue denegada por el
+  entorno y no se reintento**.
 - La **Pregunta abierta 2** sigue **abierta**: rige **R4 provisional** (accion y repintado son
   **dos** ambitos, hasta dos lecturas en esa respuesta). El helper esta escrito con esa semantica
   y `tests/unit/shared/request-scope.test.ts` la fija. **No se cerro aqui.**
-- **T12 NO se marca como hecha** en `tasks.md`, y es a proposito. Su criterio de «Hecho» es «los
-  19 requisitos con al menos un test», y **R16 no lo tiene** por el bloqueo de la seccion 5. El
-  mapa de la seccion 6 esta escrito y completo en todo lo demas, pero marcar la casilla seria
-  autoaprobarse un criterio que no se cumple. Lo decide el leader.
+- **T12 ya SI se marca**: su criterio de «Hecho» es «los 19 requisitos con al menos un test», y con
+  R16 cerrado el mapa llega a **19/19**. Mientras falto R16 se dejo sin marcar a proposito, que es
+  lo que evito autoaprobar un criterio incumplido.
 
 ## 8. T7 — prueba de que el conteo MUERDE (R15)
 

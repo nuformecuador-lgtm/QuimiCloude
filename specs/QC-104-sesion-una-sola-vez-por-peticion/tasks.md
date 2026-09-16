@@ -18,7 +18,7 @@
 
 ## Tanda 0 — contar ANTES de cambiar nada
 
-- [ ] **T1 — Conteo en ejecucion, ANTES (R16).** Sin dependencias. **Debe hacerse antes de T3 y T4
+- [x] **T1 — Conteo en ejecucion, ANTES (R16).** Sin dependencias. **Debe hacerse antes de T3 y T4
       sobre este arbol**, o sobre un checkout del merge-base con `dev`.
       Archivos: `progress/medicion_QC-104-sesion-una-sola-vez-por-peticion.md` (nuevo). **Ningun
       script.**
@@ -129,7 +129,7 @@
 
 ## Tanda 3 — contar DESPUES y cerrar
 
-- [ ] **T8 — Conteo en ejecucion, DESPUES (R16).** Depende de T3, T4 y T1.
+- [x] **T8 — Conteo en ejecucion, DESPUES (R16).** Depende de T3, T4 y T1.
       Archivos: `progress/medicion_QC-104-sesion-una-sola-vez-por-peticion.md`.
       El mismo metodo de T1, sobre la rama y con la misma via y el mismo marcador. Si algun numero
       «despues» es mayor que 1 en una pantalla que no sea respuesta a un POST, **se para y se sube
@@ -140,7 +140,7 @@
 - **T9 — RETIRADA en la revision de F1.4** (eran los tiempos antes y despues). El numero no se
   reutiliza.
 
-- [ ] **T10 [P] — Test del artefacto del conteo (R16).** Depende de T8.
+- [x] **T10 [P] — Test del artefacto del conteo (R16).** Depende de T8.
       Archivos: `tests/unit/identity/session-count-artifact.test.ts` (nuevo).
       Afirmaciones de `design.md > 5.6`:
       - las secciones `Metodo` y `Conteo en ejecucion` existen;
@@ -158,7 +158,7 @@
       **Hecho:** `tests/guards/guard-arquitectura-modulos.test.ts` (bloque 12 lee este documento) en
       verde; el parrafo no promete nada que no pruebe T5.
 
-- [ ] **T12 — Mapa de trazabilidad.** Depende de T5, T6, T7, T8 y T10.
+- [x] **T12 — Mapa de trazabilidad.** Depende de T5, T6, T7, T8 y T10.
       Archivos: `progress/impl_QC-104-sesion-una-sola-vez-por-peticion.md`.
       Mapa `R<n> → test` para **R1-R16 y R20-R22** (19 requisitos; R17-R19 retirados) segun
       `design.md > 9`, con el nombre exacto de cada caso.
