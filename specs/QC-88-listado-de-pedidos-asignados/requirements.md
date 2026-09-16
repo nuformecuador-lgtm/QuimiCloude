@@ -153,14 +153,17 @@
 
 ## Preguntas abiertas
 
-1. **¿Como se llama la ruta y su item de menu?** La decision cerrada 1 fija que hay **pantalla
+**Ninguna viva.** Las dos se cerraron en F1.4 el 2026-09-16 y estan en la tabla de abajo como
+`[PA1]` y `[PA2]`. Se conserva su enunciado original por trazabilidad:
+
+1. ~~**¿Como se llama la ruta y su item de menu?**~~ **CERRADA** (`[PA1]`). La decision 1 fija que hay **pantalla
    propia**, no cual es su direccion ni su etiqueta. `lib/shared/routes.ts` declara una constante por
    pantalla y `order-route-contract.test.ts` vigila que ninguna se redeclare, asi que la ruta nueva
    nace con su constante y su prueba. `spec_author` **propone** nombre de ruta y etiqueta en
    `design.md` y el humano los aprueba en F1.4; si no hay respuesta, no se inventa un nombre
    definitivo en el codigo.
 
-2. **¿Donde se compone la lista: ampliando `pedidos` o solo desde `asignaciones`?** Hacen falta dos
+2. ~~**¿Donde se compone la lista: ampliando `pedidos` o solo desde `asignaciones`?**~~ **CERRADA** (`[PA2]`). Hacen falta dos
    lecturas —los pedidos de la persona y los datos de esos pedidos— y hoy `pedidos` no sabe leer un
    conjunto de ids. `spec_author` decide en `design.md` entre anadir esa lectura al modulo `pedidos`
    o resolverlo desde `asignaciones`, **midiendo el numero de consultas por pagina** y respetando
@@ -170,6 +173,8 @@
 
 | Fecha | Pregunta | Decision |
 |---|---|---|
+| 2026-09-16 | `[PA1]` ¿Como se llama la ruta y su item de menu? | **Ruta `/asignacion`** y **etiqueta de menu `Asignacion`** (con tilde en el texto visible: `Asignación`). **No** se toma la propuesta `/mis-pedidos` de `design.md > 2.1`: la eligio el humano en F1.4. Verificado antes de fijarla: no colisiona con ninguna constante de `lib/shared/routes.ts` ni con ninguna carpeta de `app/(private)`, y no cae dentro del prefijo `ORDERS_ROUTE = '/pedidos'`. La constante sigue siendo **`ASSIGNED_ORDERS_ROUTE`** y la etiqueta **`ASSIGNED_ORDERS_LABEL`**: cambia el valor, no el nombre. El `testId` del item de menu deriva del valor aprobado (`nav-asignacion`), no del `nav-mis-pedidos` que `design.md:386` escribio sobre la propuesta |
+| 2026-09-16 | `[PA2]` ¿Donde se compone la lista? | **Opcion B de `design.md > 2.2`: desde `asignaciones`**, con `pedidos` aportando **solo una lectura de catalogo en lote por ids**. El caso de uso `listAssignedOrders` nace en `asignaciones` con `requirePermission(actor, 'asignaciones.consultar')` en su primera linea (R5). **4 consultas por pagina, constantes** (R14). Se descarta la opcion A porque la autorizacion no cabe en `pedidos`: exigir `asignaciones.consultar` ahi es hallazgo de la regla (e) del contrato del modulo, y `pedidos.consultar` el Operador no lo tiene |
 | 2026-09-15 | ¿Por donde entra el Operador a su lista de trabajo? | **Pantalla propia, ruta nueva**, con su item de menu y el permiso **`asignaciones.consultar`**, que el Operador ya tiene (`SEED_ROLE_PERMISSIONS`). **NO se reutiliza `/pedidos`**: exige `pedidos.consultar`, que el Operador no tiene, y darselo le abriria el listado completo de la empresa |
 | 2026-09-15 | Un pedido EN_CURSO, ¿que ve quien no lo abrio? | **Se ve, con el disparador de entrar DESHABILITADO y su motivo.** La regla de verdad —rechazar la ejecucion— la aplica **QC-63 en el servidor**: esta ficha no la duplica ni la adelanta |
 | 2026-09-15 | ¿Se guarda quien esta preparando el pedido? | **No.** Hoy no existe el dato y **no se anade**: nada de columna ni tabla nueva. La fila **muestra a sus responsables**, que ya se saben, y no afirma quien lo abrio. `updated_by` **no** se usa para esto: lo escribe cualquier edicion, incluida la de un Administrador |
