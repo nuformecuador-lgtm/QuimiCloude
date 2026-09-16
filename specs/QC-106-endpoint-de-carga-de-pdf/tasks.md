@@ -165,7 +165,7 @@
       con las rutas; (d) el archivo **no** se reexporta desde el barrel del módulo.
       Cubre **R16 (borde), R29**.
 
-- [ ] **T10 — Cableado en el punto de composición.** Depende de T5, T6, T7 y T8.
+- [x] **T10 — Cableado en el punto de composición.** Depende de T5, T6, T7 y T8.
       Archivos: `lib/composition/index.ts` (**bloque nuevo al final**; sus imports, al final del
       bloque de imports: no se reordena ni se reformatea nada de lo existente).
       Se atan los dos puertos a sus adaptadores y se exporta la fachada `documentos`. **Ninguna
