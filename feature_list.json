@@ -1566,7 +1566,7 @@
       "epic_name": "Plataforma",
       "name": "sesion-una-sola-vez-por-peticion",
       "description": "Hoy la sesion se resuelve VARIAS VECES dentro de una misma peticion, y cada vez es la consulta completa: users + role + SU LISTA DE PERMISOS + company + revoked_sessions (lib/modules/identity/adapters/driven/persistence/session-user-prisma.ts).\n\nMEDIDO EN DISCO EL 2026-09-15. Al abrir pantallas: el layout privado (app/(private)/layout.tsx:59) y el requirePagePermission de cada page.tsx; una TERCERA en /configuracion/usuarios (page.tsx:54), en /pedidos (order-list-section.tsx:122) y en /configuracion/unidades (dos cortes, page.tsx:59-60). Al guardar: 8 archivos de Server Actions piden getSessionUser y getSessionContext en paralelo, o sea DOS lecturas por clic. No existe ninguna memoizacion.\n\nLo que hay que hacer: que dentro de UNA MISMA peticion -sea una pantalla o una accion- esa lectura ocurra UNA SOLA VEZ. El objetivo es EVITAR LLAMADAS INNECESARIAS A LA BASE, no medir.\n\nCOMO SE DEMUESTRA: un test del gate que cuenta las lecturas de sesion por peticion y falla si pasa de una, y una comprobacion UNA vez en la app real que cuenta las consultas en la base local, antes y despues. NO se miden tiempos (decision humana del 2026-09-15).\n\nPOR QUE VA ANTES QUE QC-28: sin servicio externo, sin dependencia, sin modo de fallo nuevo en la autenticacion, y NO PUEDE QUEDARSE OBSOLETO: el resultado vive solo lo que dura la peticion. La garantia de que dar de baja surte efecto en el siguiente clic no se toca.\n\nLo que NO entra: la cache entre peticiones (Redis, QC-28), y medir tiempos de respuesta.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",

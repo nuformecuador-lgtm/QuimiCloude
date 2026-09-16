@@ -3619,3 +3619,41 @@ rojos**. Integración: 54 archivos, 709 verdes.
   integración. Y `merge-tree` entra en el flujo: que el tramo nuevo de `dev` no toque el área de la
   ficha **no basta** para saltarse la sincronización —el PR salió CONFLICTING por un test de
   contrato ajeno que la limpieza de comentarios había rozado—.
+
+## QC-104 — sesion-una-sola-vez-por-peticion (2026-09-16)
+
+`backend`, `medium`. PR **#76** mergeado en `dev` (merge `d02571b`). **19 requisitos** (R1–R16,
+R20–R22) y **11 tasks**, con `./init.sh` completo en verde antes del PR: **474 archivos, 6865
+pasados, 87 saltados, 0 rojos nuevos**.
+
+- **Qué entra**: dentro de una misma petición la sesión se resuelve **una sola vez**, en pantallas y
+  en Server Actions. `React.cache` para el render y `AsyncLocalStorage` (`node:async_hooks`, que no
+  es dependencia npm) para las acciones, con el helper en `lib/shared/request-scope.ts`. El dominio
+  y las dos proyecciones de QC-48 no cambian, y **`components/shared/data-table/` ni se toca**.
+- **Medido, no supuesto** (R16, sobre base propia `QuimiCloude_QC104`, control en reposo 0):
+  `/configuracion/usuarios` **7 → 1**, `/pedidos` **6 → 1**, `/configuracion/unidades` **7 → 1**,
+  guardado **9 → 2**. **La ficha subestimaba el problema**: hablaba de «tres lecturas por página».
+- **La acotación quitó lo que no se sostenía.** La ficha nació para «dejar la medición que QC-28 no
+  tiene»; al preguntarlo, el humano respondió que el objetivo es evitar llamadas innecesarias, **no
+  medir**, y salieron R17–R19, T9 y el script de tiempos. **Consecuencia que queda escrita: QC-28
+  sigue sin condición que la desbloquee.**
+- **El hallazgo del ciclo, en tres capas.** El `reviewer` encontró un **noveno `currentActor` sin
+  envolver** (`session-actions.ts`, de QC-101) que **entró con la propia sincronización de la rama**,
+  después de la auditoría. Al arreglarlo apareció que el test que debía cazarlo **contaba las filas
+  de su propia lista** y seguía verde con nueve en disco; se cambió para que recorriera el árbol. Y
+  ese recorrido **llevaba dentro otra lista de módulos escrita a mano** y no bajaba a subcarpetas.
+  Las tres capas cerradas, cada una probada por mutación.
+- **Cinco trampas del instrumento**, todas documentadas en `progress/medicion_QC-104-…md` porque cada
+  una había producido antes una tabla creíble y falsa: el contador publica con retraso (piso de 12 s),
+  `APIRequestContext` no manda la cookie `Secure` y servía el login con 200, el fixture nace muerto
+  sin `sessionsValidFrom` en el pasado, un `goto` repetido lo sirve el router sin tocar el servidor,
+  y `networkidle` no vale con streaming de RSC.
+
+### Lo que deja anotado y no tiene ficha todavía
+
+1. **La pregunta abierta 2 sigue viva**: una acción que revalida y el repintado que provoca cuentan
+   como **dos** ámbitos (R4 provisional), y los 2 del guardado son justo eso. Si se decide que sean
+   una sola petición, baja a 1.
+2. **La nota de T11 en `docs/architecture.md` no es exigible**: hacerlo pediría una guardia nueva.
+3. **El entorno denegó dos veces** la vía de conteo por configuración de Postgres (`ALTER SYSTEM`).
+   El subagente **no la rodeó** y se resolvió con base aislada; queda dicho por si vuelve a estorbar.
