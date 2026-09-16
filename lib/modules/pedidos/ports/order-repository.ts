@@ -26,27 +26,13 @@ import type { NewOrder, OrderRow } from '../domain/order-view';
  * en el `where`, «no existe» y «esta entregado» devolverian lo mismo y el usuario recibiria
  * `not_found` ante un pedido que esta viendo en pantalla.
  *
- * QC-60 (R18): **los SEIS metodos exigen `scope: OrderScope`**, la empresa en cuyo nombre se
- * consulta o se escribe, y va AL FINAL de cada firma para que ninguna llamada existente cambie
- * de orden de argumentos. Esta en la FIRMA y no escondido dentro del adaptador a proposito: el
- * ambito es parte del contrato, asi que una llamada que lo omita NO COMPILA, y no hay forma de
- * pedirle una fila a este puerto sin decir de quien es. Si en cambio viviera dentro del
- * adaptador -leido de un contexto global, de una variable de modulo o de un `$extends`-, el
- * archivo que escribe la consulta no diria por que filtra, y la consulta numero siete la
- * escribiria alguien que no sabe que tiene que filtrar.
+ * Los seis metodos exigen `scope: OrderScope` al final de la firma: una llamada que lo omita no
+ * compila. Una IMPLEMENTACION que lo omita si compila (TypeScript acepta una funcion de menor
+ * aridad), y eso lo vigila `tests/guards/guard-ambito-empresa-pedidos.test.ts`.
  *
- * Lo que la firma NO cierra: TypeScript admite asignar una funcion de MENOR aridad donde se
- * espera una de mayor, asi que una IMPLEMENTACION que se olvide del `scope` se cablea en
- * `lib/composition` sin que `tsc` proteste. Esa mitad la cierra la guardia estatica por funcion
- * `tests/guards/guard-ambito-empresa-pedidos.test.ts`, que comprueba que cada implementacion
- * declara el ambito y que ese valor llega hasta una envoltura de `./company-scope`
- * (`design.md > 4.2` y `> 8`; verificado por el reviewer de QC-49 contra el `tsc` de este repo).
- *
- * Los resultados discriminados **no crecen**: «de otra empresa» vuelve como `null` o como
- * `'not_found'`, o sea por el mismo camino que «no existe» (R20, R21). El dominio no necesita
- * distinguirlos porque no DEBE distinguirlos: hacerlo seria un oraculo de existencia sobre
- * datos ajenos. La empresa tampoco viaja en `NewOrder` ni en `createOrderSchema` (R22): lo que
- * no esta en el tipo no se puede escribir por accidente.
+ * «De otra empresa» vuelve como `null` o `'not_found'`, igual que «no existe»: distinguirlos
+ * seria un oraculo de existencia sobre datos ajenos. La empresa no viaja en `NewOrder`: lo que no
+ * esta en el tipo no se puede escribir por accidente.
  */
 export interface OrderRepository {
   /**
@@ -68,7 +54,7 @@ export interface OrderRepository {
   ): Promise<OrderRow | 'duplicate_number'>;
 
   /** `null` = no existe, ya esta borrado, o es de OTRA empresa: para el dominio son el mismo
-   *  caso (R33, R40, QC-60 R20). */
+   *  caso. */
   findAliveById(id: string, scope: OrderScope): Promise<OrderRow | null>;
 
   /**

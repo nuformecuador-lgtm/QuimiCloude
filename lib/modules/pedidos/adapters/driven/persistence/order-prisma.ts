@@ -128,57 +128,36 @@ type CreatedOrderRow = {
  *  `tests/helpers/test-database.ts`, asi que no pueden colisionar. */
 const ORDER_SEQUENCE_LOCK_NAMESPACE = 60;
 
-/** La EMPRESA y el ANO van en la clave del lock (`design.md > 3.2`): dos empresas —o dos anos— no
- *  se hacen cola entre si (R14). */
+/** La EMPRESA y el ANO van en la clave del lock: dos empresas —o dos anos— no se hacen cola entre
+ *  si. */
 const ORDER_SEQUENCE_LOCK_KEY_PREFIX = 'orders_sequence:';
 
-/** Tres intentos y ni uno mas (R15, `design.md > 3.3`). El lock hace que el choque sea casi
+/** Tres intentos y ni uno mas. El lock hace que el choque sea casi
  *  imposible; el indice unico es la garantia. Reintentar sin techo convertiria un duplicado real
  *  —por ejemplo el que insertara otra via— en un bucle infinito. */
 const CREATE_ORDER_MAX_ATTEMPTS = 3;
 
 /**
- * `create` de `OrderRepository` (R6, R8, R10, R11, R13; QC-60 R12, R14, R15, R22, R24).
+ * `create` de `OrderRepository`: SQL crudo en una transaccion, porque el maximo del correlativo
+ * tiene que evaluarse DENTRO del `INSERT`, sin ventana entre leerlo y escribirlo. Es la UNICA
+ * operacion del modulo que no usa la API tipada.
  *
- * DOS SENTENCIAS DENTRO DE UNA TRANSACCION, y van con SQL crudo —no con la API tipada— por un
- * motivo concreto (`design.md > 3.2`): el maximo del correlativo tiene que evaluarse DENTRO del
- * `INSERT`, para que no haya ninguna ventana entre leerlo y escribirlo. Es la UNICA operacion del
- * modulo que no usa la API tipada.
+ * El lock va en una sentencia APARTE y ANTERIOR: en `READ COMMITTED` cada sentencia toma su
+ * instantanea al empezar, asi que dentro del `INSERT` la sesion que espera leeria el mismo maximo
+ * que la que comitea. Es `xact` y se pide uno solo: se suelta al terminar y no puede interbloquear.
  *
- * **Por que el lock es una sentencia APARTE y ANTERIOR al `INSERT`.** Prisma trabaja en
- * `READ COMMITTED`, donde CADA SENTENCIA toma su propia instantanea al empezar. Si la sesion B
- * pidiera el lock DENTRO de la sentencia que calcula el maximo —que es como lo hacia la difunta
- * `next_order_sequence(integer)`—, su instantanea ya estaria tomada ANTES de que A comiteara: B
- * leeria el mismo maximo que A y propondria el mismo numero. Tomandolo en una sentencia anterior, B
- * ESPERA ahi; cuando A comitea y B sigue, la sentencia 2 arranca despues y su instantanea SI ve la
- * fila de A. El lock es `xact`: se suelta solo al comitear o abortar, y como se pide UNO SOLO no
- * hay orden de adquisicion ni interbloqueo posible.
+ * El maximo no filtra `deleted_at` ni el estado: un pedido borrado o cancelado conserva su numero,
+ * y los huecos existentes se conservan. La empresa del ambito va, parametrizada con `::uuid`, en la
+ * columna que se escribe y en el subselect del maximo.
  *
- * **El maximo NO filtra `deleted_at` ni el estado** (R12): un pedido borrado o cancelado conserva
- * su numero y no lo libera. Y la serie continua desde el MAXIMO, no desde el recuento, asi que los
- * huecos que ya existen se conservan intactos (R13).
+ * UN SOLO RELOJ: `created_at`, `updated_at` y el ANO salen del mismo `now`; con otro reloj, un alta
+ * en el cambio de ano violaria `orders_order_year_matches_created_at` con `23514`. `created_by` y
+ * `updated_by` llevan el mismo `actorId`, y el `status` va parametrizado porque lo decide el caso
+ * de uso.
  *
- * **La empresa sale del AMBITO y se usa en los DOS sitios de la misma sentencia** (R22, R24): la
- * columna que se escribe y el `WHERE` del subselect que calcula el maximo. Si fueran dos empresas
- * distintas, la serie de una la moverian los pedidos de otra. Va PARAMETRIZADA con `::uuid` por el
- * template tag, JAMAS interpolada como cadena.
- *
- * UN SOLO RELOJ (R10): `created_at`, `updated_at` y el ANO del correlativo salen del MISMO `now`
- * que fijo el caso de uso. Si el ano se calculara de otro reloj, un alta a las 23:59:59.999 UTC del
- * 31 de diciembre podria escribir un ano y una fecha de anos distintos y el `CHECK`
- * `orders_order_year_matches_created_at` (QC-33 R41) la rechazaria con `23514`.
- *
- * `created_by` Y `updated_by` se escriben con el MISMO `actorId` (R6). El `status` va PARAMETRIZADO
- * con `data.status` y no como literal: quien decide el estado de alta es el caso de uso (R9), y
- * `NewOrder.status` es `EditableOrderStatus`, que no puede EXPRESAR la cancelacion.
- *
- * **El reintento va FUERA de `prisma.$transaction`** (R15): una transaccion abortada por el `23505`
- * no admite ni una sentencia mas, asi que reintentar dentro seria reintentar sobre una transaccion
- * muerta. Cada intento es transaccion nueva, instantanea nueva y maximo nuevo. Agotados los tres,
- * `'duplicate_number'` —el resultado discriminado que el puerto YA declara: ni el puerto ni
- * `ERROR_CODES` crecen (`design.md > 9`)—.
- *
- * Ninguna salida de esta funcion lleva `companyId` (R23): el ambito entra, pero no vuelve.
+ * El reintento va FUERA de `prisma.$transaction`: una transaccion abortada por el `23505` no
+ * admite ni una sentencia mas. Agotados los intentos, `'duplicate_number'`. Ninguna salida lleva
+ * `companyId`.
  */
 export async function createOrder(
   data: NewOrder,
@@ -241,7 +220,7 @@ export async function createOrder(
         quantity: fromDecimal(toDecimalInput(data.quantity)),
         priority: data.priority,
         status: data.status,
-        // El motivo solo existe en un pedido cancelado, y cancelar es `cancelAlive` (R26, R30).
+        // El motivo solo existe en un pedido cancelado, y cancelar es `cancelAlive`.
         cancellationReason: null,
         createdAt: now,
         updatedAt: now,
@@ -257,11 +236,9 @@ export async function createOrder(
   }
 }
 
-/** `findAliveById` (R33, R40; QC-60 R20): `deleted_at IS NULL` Y EL AMBITO en el `where`, no en un
- *  `if` posterior sobre la fila ya leida —leer primero y decidir despues ya es haber leido lo
- *  ajeno—. Un pedido de otra empresa vuelve como `null`, o sea por el MISMO camino que «no existe»:
- *  distinguirlos seria un oraculo de existencia sobre datos ajenos. Un pedido CANCELADO si vuelve
- *  -tiene estado propio precisamente para no desaparecer-. */
+/** `findAliveById`: `deleted_at IS NULL` Y EL AMBITO en el `where`, no en un `if` posterior. Un
+ *  pedido de otra empresa vuelve como `null`, igual que uno que no existe. Un pedido CANCELADO si
+ *  vuelve -tiene estado propio precisamente para no desaparecer-. */
 export async function findAliveOrderById(
   id: string,
   scope: OrderScope,
@@ -499,9 +476,8 @@ export async function listAliveOrders(
 /**
  * `updateAlive` (R6, R20, R33, R40).
  *
- * QC-60 (R21): el AMBITO viaja EN EL `where`, junto a `deletedAt: null` y por el mismo motivo. Un
- * pedido de otra empresa no se actualiza y sale como `'not_found'`, sin que esta funcion llegue a
- * leer ni una columna suya.
+ * El AMBITO viaja EN EL `where`, junto a `deletedAt: null`: un pedido de otra empresa no se
+ * actualiza y sale como `'not_found'`.
  *
  * `updateMany` con `deletedAt: null` en el `where` y no `update`: si el pedido no existe o ya
  * esta borrado, `count` sale 0 y se devuelve `'not_found'` en vez de lanzar.
@@ -545,8 +521,8 @@ export async function updateAliveOrder(
  * El motivo llega YA recortado y con el tope de 500 aplicado por `cancelOrderSchema` (R27):
  * aqui no se recorta, no se trunca y no se vuelve a validar nada.
  *
- * QC-60 (R21): el AMBITO viaja EN EL `where`, junto a `deletedAt: null` y por el mismo motivo. Un
- * pedido de otra empresa no se cancela y sale como `'not_found'`.
+ * El AMBITO viaja EN EL `where`, junto a `deletedAt: null`: un pedido de otra empresa no se
+ * cancela y sale como `'not_found'`.
  */
 export async function cancelAliveOrder(
   id: string,
@@ -577,8 +553,7 @@ export async function cancelAliveOrder(
  * un resultado discriminado a proposito: significa que la comprobacion de aplicacion se
  * salto, y un error sin traducir es exactamente lo que hay que ver en ese caso.
  *
- * QC-60 (R21): el AMBITO viaja EN EL `where`. Un pedido de otra empresa no se borra y sale como
- * `'not_found'`.
+ * El AMBITO viaja EN EL `where`: un pedido de otra empresa no se borra y sale como `'not_found'`.
  */
 export async function softDeleteAliveOrder(
   id: string,

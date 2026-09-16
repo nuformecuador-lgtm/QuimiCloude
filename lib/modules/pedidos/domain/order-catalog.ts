@@ -30,23 +30,13 @@ export type OrderAssignmentTarget = {
 export interface OrderCatalog {
   /**
    * `null` = no existe, esta dado de baja, o NO ES DE ESA EMPRESA: para quien pregunta son el
-   * mismo caso (QC-34 R33, QC-60 R20, R27). Un pedido CANCELADO si vuelve -tiene estado propio
-   * precisamente para no desaparecer-, y quien lo consulta decide que hacer con el.
+   * mismo caso. Un pedido CANCELADO si vuelve -tiene estado propio precisamente para no
+   * desaparecer-, y quien lo consulta decide que hacer con el.
    *
-   * QC-60 (R18, R27): la empresa entra POR LA FIRMA, como en los seis metodos de
-   * `OrderRepository`, porque esto tambien es una consulta del modulo `pedidos` y el Alcance
-   * dice «toda consulta». Sin ella, asignar responsables a un pedido ajeno moriria contra la FK
-   * compuesta `order_assignments_order_id_company_id_fkey` con un `23503` sin traducir; con
-   * ella, el caso de uso de `asignaciones` lo rechaza en el service con su «ese pedido no
-   * existe» de siempre. Sus cuatro llamantes ya tienen `companyId` en su propio `Actor`
-   * (`asignaciones/domain/actor.ts`), asi que no necesitan fontaneria nueva.
-   *
-   * **Por que una `string` y no el `OrderScope`** (`design.md > 6`): `OrderScope` es el tipo
-   * INTERNO con el que `pedidos` habla con su propio adaptador driven. Obligar a `asignaciones`
-   * a construirlo seria acoplar los dos modulos por un dato que ya es una cadena en los dos
-   * lados, y por un tipo que no tiene nada que ver con lo que `asignaciones` hace. Es la misma
-   * asimetria que este catalogo ya practica: devuelve `OrderAssignmentTarget`, un tipo de
-   * FRONTERA, y no el `OrderRow` interno.
+   * Esta consulta SI se filtra por empresa, como las de `OrderRepository`. La empresa llega como
+   * `string` y no como `OrderScope` para no obligar a otros modulos a construir un tipo interno de
+   * `pedidos`; el adaptador la convierte. Sin este filtro, asignar un pedido ajeno moriria contra
+   * la FK compuesta de `order_assignments` con un `23503` sin traducir.
    */
   findAliveById(id: string, companyId: string): Promise<OrderAssignmentTarget | null>;
 }

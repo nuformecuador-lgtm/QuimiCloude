@@ -10,20 +10,13 @@ import { assertPermission, type PermissionCode } from '@/lib/modules/identity';
 import { UnauthorizedError } from './errors';
 
 /** Actor de entrada de cada uno de los seis casos de uso: id, EMPRESA y CONJUNTO DE PERMISOS,
- *  nada mas. Sin nombre de rol (QC-74 R18): en este modulo no se autoriza por rol. El
- *  dominio NO lee la sesion, ni una cookie, ni una cabecera: quien la resuelve es el
- *  adaptador driving con `identity.getSessionUser()` y `identity.getSessionContext()`.
+ *  nada mas. Sin nombre de rol: en este modulo no se autoriza por rol. El dominio NO lee la
+ *  sesion, ni una cookie, ni una cabecera: quien la resuelve es el adaptador driving con
+ *  `identity.getSessionUser()` y `identity.getSessionContext()`.
  *
- *  `companyId` (QC-60 R16, R17) es la empresa en cuyo nombre se opera, y va DENTRO del actor
- *  -y no como parametro suelto de cada caso de uso- porque asi viaja SIEMPRE junto a los
- *  permisos: como argumento separado, cada llamante nuevo podria olvidarse de pasarla o, peor,
- *  ELEGIRLA. La rellena el adaptador driving desde el contexto de sesion del servidor, jamas
- *  desde la entrada del llamante; sin contexto no hay actor, y sin actor no hay consulta.
- *
- *  **La empresa FILTRA y no autoriza por si sola** (R16,
- *  `docs/architecture.md > Acceso a datos y autorizacion`): el permiso se exige aparte y
- *  primero con `requirePermission`; solo despues la empresa se convierte en `OrderScope`
- *  (`./order-scope.ts`) y entra en la consulta. */
+ *  `companyId` va dentro del actor, y no como parametro suelto de cada caso de uso, para que
+ *  viaje siempre junto a los permisos y ningun llamante pueda olvidarla ni elegirla. Filtra y no
+ *  autoriza por si sola: el permiso se exige aparte y primero con `requirePermission`. */
 export type Actor = {
   readonly id: string;
   readonly companyId: string;

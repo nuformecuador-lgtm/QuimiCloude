@@ -39,12 +39,9 @@ export type { OrderAssignmentTarget, OrderCatalog } from './domain/order-catalog
 export { requirePermission } from './domain/actor';
 export type { Actor } from './domain/actor';
 
-/** QC-60 (T5, R16, R18): el AMBITO por empresa. Solo el TIPO -no hay valor que exportar-, asi
- *  que el barrel sigue siendo importable desde un componente de cliente. `lib/composition`
- *  necesita poder nombrarlo para tipar el repositorio, igual que con `OrderRow`.
- *
- *  `asignaciones` NO lo usa: `OrderCatalog.findAliveById` recibe una `string`
- *  (`design.md > 6`). */
+/** El AMBITO por empresa. Solo el TIPO -no hay valor que exportar-, asi que el barrel sigue
+ *  siendo importable desde un componente de cliente. `lib/composition` necesita nombrarlo para
+ *  tipar el repositorio, igual que con `OrderRow`. */
 export type { OrderScope } from './domain/order-scope';
 
 /** Los errores, con su `code` ESTABLE. El adaptador driving traduce por el `code`, nunca por

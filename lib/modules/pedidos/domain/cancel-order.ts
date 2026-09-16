@@ -45,10 +45,7 @@ export function createCancelOrder(
   ): Promise<void> {
     requirePermission(actor, 'pedidos.modificar');
 
-    // QC-60 (R16): la empresa sale del ACTOR y jamas de la entrada, para que nadie pueda
-    // consultar ni escribir en otra. Se construye aqui, DESPUES del permiso -que sigue siendo
-    // la primera linea (R28)- y antes de tocar el puerto. Esto no es una condicion SQL: el
-    // `where` lo escribe el UNICO punto de consulta del adaptador driven (`design.md > 5`).
+    // La empresa sale del ACTOR y jamas de la entrada: nadie puede elegir consultar otra.
     const scope: OrderScope = { companyId: actor.companyId };
 
     // R27: sin motivo, vacio, de solo espacios o de mas de 500 caracteres una vez recortado,

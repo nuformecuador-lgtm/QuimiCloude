@@ -25,13 +25,8 @@ import type { OrderAssignmentTarget } from '../../../domain/order-catalog';
  * `module-contract.test.ts` que compara valor a valor el enum del dominio con el de
  * `db/schema.prisma`.
  *
- * QC-60 (R18, R20, R27): esta consulta TAMBIEN se acota por empresa, y **no hay excepcion** —a
- * diferencia de `findProductRefs` de QC-49 R29, que quedo fuera porque `recetas` lo llama sin
- * sesion—. Aqui los cuatro llamantes son casos de uso de `asignaciones` cuyo `Actor` ya declara
- * `companyId`, asi que la empresa entra por la firma. La `string` se convierte al `OrderScope`
- * interno AQUI, en el adaptador: `OrderScope` es el tipo con el que `pedidos` habla con su propio
- * adaptador driven y obligar a `asignaciones` a construirlo seria acoplarlos por un dato que ya es
- * una cadena en los dos lados (`design.md > 6`).
+ * La empresa llega como cadena (ver `OrderCatalog` en `order-catalog.ts`) y se convierte aqui al
+ * `OrderScope` interno.
  */
 
 type OrderCatalogRow = {

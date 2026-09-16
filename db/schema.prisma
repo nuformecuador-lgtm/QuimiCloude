@@ -465,13 +465,13 @@ enum OrderPriority {
 }
 
 /// Sin fecha de solicitud: es `createdAt`. El correlativo es un indice unico total, no parcial: un
-/// pedido dado de baja conserva su numero, y desde QC-60 se mide DENTRO de la empresa --el unico
-/// pasa de `(ano, secuencia)` a `(empresa, ano, secuencia)`--. `orderYear` es el ano de `createdAt`
-/// en UTC, y lo exige el CHECK `orders_order_year_matches_created_at`. `recipeId`, `createdBy`,
-/// `updatedBy` y `companyId` van sin `@relation` porque apuntan a otros modulos; sus FK y CHECK
-/// estan escritos a mano y son drift: hay que borrar a mano su `DROP CONSTRAINT` de toda migracion
-/// generada, y eso incluye ahora `orders_company_id_fkey` (QC-60). `orders_id_company_id_key` es la
-/// clave candidata a la que apunta la FK COMPUESTA de `order_assignments`: quitarla la rompe.
+/// pedido dado de baja conserva su numero, y se mide DENTRO de la empresa: `(empresa, ano,
+/// secuencia)`. `orderYear` es el ano de `createdAt` en UTC, y lo exige el CHECK
+/// `orders_order_year_matches_created_at`. `recipeId`, `createdBy`, `updatedBy` y `companyId` van
+/// sin `@relation` porque apuntan a otros modulos; sus FK y CHECK estan escritos a mano y son drift:
+/// hay que borrar a mano su `DROP CONSTRAINT` de toda migracion generada.
+/// `orders_id_company_id_key` es la clave candidata a la que apunta la FK COMPUESTA de
+/// `order_assignments`: quitarla la rompe.
 /// Los indices de listado son parciales y viven en la migracion `list_query_indexes`.
 /// @module pedidos
 model Order {
@@ -503,8 +503,8 @@ model Order {
 /// Las tres FK y el CHECK van escritos a mano y sin `@relation`, porque los padres son de otros
 /// modulos, y son drift: hay que borrar a mano su `DROP CONSTRAINT` de toda migracion generada. Las
 /// TRES FK -pedido, persona y grupo- son compuestas con `company_id`: los tres son de la misma
-/// empresa por construccion. Desde QC-60 la del pedido es `order_assignments_order_id_company_id_fkey`
-/// contra `orders_id_company_id_key`, asi que una fila con pedido de otra empresa no puede existir.
+/// empresa por construccion: la del pedido va contra `orders_id_company_id_key`, asi que una fila
+/// con pedido de otra empresa no puede existir.
 /// La del grupo es `MATCH SIMPLE` a proposito, porque `MATCH FULL` impediria una
 /// asignacion sin grupo. `workGroupName` es una foto del nombre al asignar. Sin `deleted_at`: quitar
 /// a alguien borra la fila, y con filas muertas la PK dejaria de ser unica.

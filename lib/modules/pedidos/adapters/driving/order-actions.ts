@@ -111,17 +111,11 @@ const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
 const toErrorState = createErrorStateTranslator(PedidosError, observabilidad.readRequestIdHeader);
 
 /**
- * El actor que exige R5: se resuelve UNA vez por invocacion, nunca dentro del dominio.
+ * El actor: se resuelve UNA vez por invocacion, nunca dentro del dominio.
  *
- * QC-60 (R17): pide las DOS CARAS de la sesion —el usuario y el contexto de empresa— y en
- * PARALELO, exactamente como `unit-actions.ts`, `product-actions.ts` y
- * `order-assignment-actions.ts`. Si falta CUALQUIERA de las dos devuelve `null`, o sea que FALLA
- * CERRADO: con actor `null`, `requirePermission` rechaza en la primera linea del caso de uso, antes
- * de tocar ningun puerto. Sin contexto no hay actor, y sin actor no hay consulta.
- *
- * La empresa sale del CONTEXTO DE SESION del servidor y jamas de la entrada del llamante: si
- * viajara en el `FormData`, elegir de que empresa se consulta seria escribir otro uuid en el
- * formulario. Las SEIS firmas publicas de las actions no cambian (R34).
+ * Usuario y contexto de empresa salen de la sesion del servidor, en paralelo; si falta cualquiera
+ * de los dos devuelve `null` y el caso de uso rechaza antes de tocar ningun puerto. La empresa
+ * jamas sale de la entrada del llamante: si no, elegirla seria escribir otro uuid en el formulario.
  */
 async function currentActor(): Promise<Actor | null> {
   const [sessionUser, sessionContext] = await Promise.all([
