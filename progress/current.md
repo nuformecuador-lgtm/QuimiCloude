@@ -32,6 +32,11 @@ referirse a un producto de otra empresa» ahora que los productos tienen empresa
 unidades la tienen OPCIONAL (QC-76); que pasa con los pedidos que ya apuntan a recetas, que es el
 hueco que QC-60 dejo; y que «la base se siembra limpia» no es vaciar, como ya aclararon QC-49 y QC-60.
 
+**ACOTADA con `/afinar-feature` el 2026-09-16**: alcance, **16 decisiones cerradas** y **cero preguntas
+abiertas** en `.worktrees/QC-50-aislamiento-por-empresa-en-recetas/specs/QC-50-aislamiento-por-empresa-en-recetas/requirements.md`
+(sembrado dentro del worktree). No se copian aqui. La `description` del board se reescribio ANTES de sembrar:
+no decia que se cierra el hueco pedido → receta de QC-60. `zone`, `complexity` y `depends_on` siguen igual.
+
 ### QC-106 - acotada con `/afinar-feature` (2026-09-16)
 
 Alcance, **18 decisiones cerradas** —el leader escribio «17» por un error de conteo propio, que
