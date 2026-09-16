@@ -21,7 +21,9 @@
 
 ## Bloque 1 — La consulta que no existe (backend)
 
-### T1 · Metodo de puerto «los pedidos de esta persona» (R9) `[P]`
+### T1 · `[x]` Metodo de puerto «los pedidos de esta persona» (R9) `[P]`
+
+> Hecha en el commit `1b0b16d` (2026-09-16). Alcance ampliado: ver la nota al pie de T2.
 
 **Toca**
 - `lib/modules/asignaciones/ports/order-assignment-repository.ts` (metodo nuevo **al final** de la
@@ -33,7 +35,14 @@
 primer parametro**, y hay un caso que demuestra que una llamada que lo olvide **no compila** (mismo
 patron que el caso negativo ya vigilado en ese archivo).
 
-### T2 · Adaptador Prisma de esa lectura (R10, R37)
+### T2 · `[x]` Adaptador Prisma de esa lectura (R10, R37)
+
+> Hecha en el commit `1b0b16d` (2026-09-16). **Desviacion declarada:** anadir un metodo REQUERIDO a
+> `OrderAssignmentRepository` rompe a todos sus implementadores, y tres de ellos no los nombra
+> ninguna task — los dobles de `tests/unit/asignaciones/assign-responsibles.test.ts` (dos) y
+> `tests/unit/asignaciones/order-state.test.ts` (uno)—. El sistema de tipos obliga a cerrarlos en el
+> MISMO commit en que la interfaz crece, asi que T1+T2 entraron juntas con esos tres archivos. Es un
+> hueco de la descomposicion T1/T2, no una decision de diseno reabierta.
 
 **Toca**
 - `lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma.ts` (funcion nueva
@@ -102,7 +111,11 @@ y el `total` describe el conjunto **ya filtrado por estado** (R11).
 - reutiliza `compareResponsibles` y `toOrigin` de `./responsible-order` y **no** copia el comparador
   (R15), y **no** invoca `listResponsiblesForOrders` (`design.md > 0` H1).
 
-### T7 · Enmienda de la guardia del contrato del modulo (R36)
+### T7 · `[x]` Enmienda de la guardia del contrato del modulo (R36)
+
+> Hecha en el commit `1b0b16d` (2026-09-16). La puerta quedo **por igualdad exacta de archivo**
+> (`relPath === 'lib/modules/asignaciones/domain/list-assigned-orders.ts'`), mas estrecha que la de
+> QC-87 para `asignaciones.modificar`, que es por prefijo de carpeta.
 
 **Toca**
 - `tests/unit/asignaciones/module-contract.test.ts` (regla **(e)**: `isLegitimatePermissionConsumer`
