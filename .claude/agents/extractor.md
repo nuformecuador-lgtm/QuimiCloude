@@ -1,6 +1,7 @@
 ---
 name: extractor
 description: Lee un modulo ya implementado del repo, inventaria su estructura y sus decisiones implicitas, y redacta un prompt portable + un cuestionario en extracciones/<slug>/. No modifica el modulo. Usalo desde /extraer-modulo.
+model: sonnet
 tools: Read, Glob, Grep, Write, Edit
 ---
 
