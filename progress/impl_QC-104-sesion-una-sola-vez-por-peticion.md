@@ -462,6 +462,32 @@ constante `raices` dentro del mismo arreglo—. Lo unico que las tres veces dete
 **52/52**; guardias **41 archivos / 445 tests** en verde, incluido el bloque 12 que lee
 `docs/architecture.md`.
 
+## 11. Gate completo del leader y PR
+
+**`./init.sh` completo sobre HEAD `3d8b99a`** —lo corre el **leader**, no el implementer ni los
+subagentes (regla del gate, `AGENTS.md`)—:
+
+```
+== init OK ==   exit 0
+474 archivos · 6865 pasados · 87 saltados · 0 rojos nuevos
+```
+
+Log en `scratchpad/qc104-init-completo.log`. Los **8 del baseline son heredados** y el gate avisa
+ademas de que **ya pasan**, o sea que son candidatos a salir de `tests/baseline-rojos.json` en una
+limpieza futura (no en esta ficha: `docs/verification.md` pide retirarlos en el cambio que arregla
+su causa, y su causa no es de QC-104).
+
+El leader verifico tambien, por su cuenta: **arbol limpio**, **las dos sondas de mutacion
+borradas** y el invariante **9 archivos con las dos caras / 9 con ambito**, contado con `grep`
+recursivo.
+
+Con eso queda cubierto lo que los modos rapido y acotado **no** responden
+(`docs/verification.md > Lo que --rapido NO cubre`): que esta rama no haya roto nada lejano que
+ningun grafo de imports relacione con el cambio. Es la razon por la que el gate completo antes del
+PR no es opcional.
+
+**PR abierto hacia `dev`** tras ese verde, y **no se mergea aqui**: lo hace el humano.
+
 ## 8. T7 — prueba de que el conteo MUERDE (R15)
 
 `docs/verification.md > Probar que muerde, no que pasa`: un check probado solo con su caso verde
