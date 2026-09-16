@@ -3534,3 +3534,173 @@ rojos**. Integración: 54 archivos, 709 verdes.
 - **Una caída de la base se ve como un cierre de sesión** (§ 4.2): precio de que la revocación no se
   pueda saltar provocando un fallo.
 - **Los 8 rojos del baseline pasan todos** y nadie los ha limpiado. Material de QC-99.
+
+## QC-56 — migrar-listas-a-tabla-compartida (2026-09-15/16)
+
+`frontend`, `medium`. PR **#74** mergeado en `dev` (merge `dc73f14`). **R1–R33** y **19 tasks**, con
+`./init.sh` completo en verde antes del PR: **466 archivos, 6721 pasados, 78 saltados, 0 rojos nuevos**.
+
+- **Qué entra**: las listas de **recetas** y **proveedores** montan la tabla compartida de QC-55 y
+  **se igualan a productos**: orden por cabecera, búsqueda y filtro por rango de fecha de creación,
+  contra las listas blancas que QC-57 ya publicaba. Cada gesto navega y el servidor recalcula.
+  **Invierte** QC-26 R14 y QC-44 R11, como `749d850` invirtió QC-22 R13.
+- **La acotación encontró la ficha medio derogada**: productos **ya estaba migrado** desde `749d850`
+  (2026-09-07, fuera del flujo de fichas) y **dos documentos afirmaban que recetas también** —el
+  mensaje de ese commit y la enmienda de QC-44—, lo cual era falso. El alcance pasó a recetas +
+  proveedores, reabriendo la enmienda que dejaba la lista de proveedores como estaba.
+- **Cuatro decisiones del humano en F1.4**, contra lo que decía la semilla: vacío, error y esqueleto
+  **fuera** de la tabla (como productos, no como QC-55); una línea en el barrel para publicar
+  `SUPPLIER_QUERYABLE`; la **descripción de receta sale de la lista**; y un estado propio de «sin
+  resultados» con «limpiar». **D16, al aprobar**: «sin resultados» es la **única** excepción y lo
+  pinta la tabla con cero filas, porque la caja de búsqueda vive dentro de `<DataTable>` y no debe
+  desmontarse. **`components/shared/data-table/` no se tocó**, y hay test que lo afirma.
+- **La prueba en iPhone real salió a ficha propia: QC-114**, ahora desbloqueada. La T13 de QC-55
+  llevaba pendiente desde el 2026-09-04 y ya afectaba a siete pantallas, no solo a esta.
+- **Review**: RECHAZADA en la primera vuelta (3 mayores) y APROBADA en la segunda (0 mayores nuevos,
+  2 menores). **M2** era un test que se habría puesto rojo al cerrar la feature —sumaba el árbol de
+  trabajo y exigía que fuera de rutas y tests solo cambiara el barrel—; ahora mira solo el rango
+  commiteado y las raíces de producto. **M3** añadió el test automático de R25.
+- **M1 lo decidió el humano: NO bloquea.** La regla de comentarios que invocaba **no está en
+  `origin/dev`**, solo sin commitear en el árbol principal. Queda como deuda con m5, m6 y m7.
+- **F2.3 con QC-93 dentro**: `dev` avanzó 36 commits durante la review y el merge trajo 3 conflictos
+  (los dos E2E y `data-table-alcance`). Se resolvieron conservando ambos lados, y los E2E nuevos
+  pasaron a `loginAndLand`, porque QC-93 borró `login()` y su guardia lo prohíbe. **Ese merge curó
+  los rojos R6 y R52** del Operador.
+
+### Lo que deja anotado y no tiene ficha todavía
+
+1. **R51 sigue rojo, heredado de QC-80**: `choosePresentation` de `e2e/proveedores.spec.ts` —y el
+   mismo patrón en `e2e/inventario.spec.ts`— crea la presentación **sin unidad**, obligatoria desde
+   `af96771`, así que el panel no se cierra. Es la «ficha nueva» que ya proponía la bitácora de QC-93.
+2. **La receta de base vacía de `progress/current.md` estaba rota** desde QC-23: `db:seed` necesita
+   `users.sessions_valid_from`, de una migración posterior a la de QC-49, que nunca llega a aplicarse.
+   La que funciona es la plantilla de QC-77 (`pnpm run db:test template`), y `docs/worktrees.md` no
+   documenta nada de esto —ni `pnpm install`, ni `prisma generate`, ni `next typegen`—.
+3. **n1**: la guardia de R25 cubre *localizar* por copy, no *afirmar* sobre copy.
+
+## QC-81 — lote-y-fecha-de-compra · CERRADA el 2026-09-16 (PR #75, merge `6175700`)
+
+- Cada entrada de mercancía (`product_batches`) registra **lote** y **fecha de compra**, los dos
+  obligatorios. El lote es único por empresa —índice `(company_id, lot)` en la base, no una
+  comprobación en el código—, y si nadie lo escribe lo genera el backend continuando desde el más
+  alto de esa empresa. La fecha admite hoy o antes, nunca futura; ausente, queda hoy. Migración con
+  relleno por orden de creación, que se detiene entera si encuentra duplicados previos.
+- **Requisitos cubiertos: R1–R37**, verificados uno a uno por el reviewer. La pantalla **no entra**
+  (R28): es QC-103. Sin dependencias nuevas.
+- **La concurrencia, que era el corazón de la ficha**: el número sale de `max(lot)` dentro de la
+  misma transacción que inserta, con `pg_advisory_xact_lock` por empresa **como sentencia anterior**
+  al SELECT —en `READ COMMITTED`, pedirlo dentro del cálculo leería un máximo viejo—. El test de dos
+  altas simultáneas **da rojo si se quita el lock**, comprobado por el implementer y por el reviewer.
+- **Decisiones humanas**: `batch_duplicate_lot` como sexta enmienda al catálogo cerrado de errores;
+  excepción acotada a R29 para tocar **solo** la siembra de `e2e/aislamiento-inventario.spec.ts`;
+  **D13/R34–R36**, un lote tecleado de solo dígitos no llega a 60 caracteres para que el generado
+  quepa; y **D14/R37**, que arregla aquí una carrera **heredada de QC-90** —el borrado lógico de un
+  producto podía colarse entre la comprobación de «vivo» y el alta de su lote— con
+  `FOR NO KEY UPDATE` sobre la fila del producto antes del lock del correlativo.
+- **La regla nueva de comentarios de `docs/conventions.md` se aplicó entera**: 34 commits `chore`
+  limpian los comentarios de los 32 archivos de la rama sin tocar código (4.776 → 1.242 líneas de
+  comentario, 1.240 → 3 citas). Las tres que quedan son las que exigen sus tests, exceptuadas por el
+  humano. Tres vueltas de revisión: la segunda rechazó por esos comentarios y la tercera por R37
+  fuera del mapa de trazabilidad.
+- **Verificación, dicha como fue**: E2E verde en Chromium y WebKit; gate completo de **469 archivos
+  y 6718 tests verdes** con **un rojo ajeno** (`credential-setup.int.test.ts`, de QC-79, idéntico a
+  `dev` y **15/15 repetido solo**: falla por su propia guarda de concurrencia bajo carga). El PR se
+  mergeó con esa corrida, así que **T12 quedó sin marcar**.
+- **El gate que se lanzó tras la resincronización final no vale, y el error fue del leader**: seguía
+  corriendo cuando se ejecutó `wt.sh done`, que desregistró el worktree en mitad de la corrida. Sin
+  `.git`, toda la integración —que deriva de git el nombre de su base efímera— y algunas pruebas de
+  UI cayeron a la vez: **32 archivos en rojo que no son una regresión, sino una corrida invalidada**.
+  La lección es de secuencia, no de código: **no se desmonta un worktree con el gate en marcha**.
+- **Deuda que hereda QC-103**: pintar la fecha, mostrar el lote generado y un test de UI que afirme
+  el mensaje de R34 en el campo del lote.
+- **Deuda de arnés encontrada de paso**: la receta para montar una base propia
+  (`docs/verification.md`, `specs/QC-77-…/design.md > 3`) **no corre hoy** —`db:seed` muere con
+  `The column 'existe' does not exist`—; la base de esta ficha se montó copiando la plantilla de
+  integración. Y `merge-tree` entra en el flujo: que el tramo nuevo de `dev` no toque el área de la
+  ficha **no basta** para saltarse la sincronización —el PR salió CONFLICTING por un test de
+  contrato ajeno que la limpieza de comentarios había rozado—.
+
+## QC-104 — sesion-una-sola-vez-por-peticion (2026-09-16)
+
+`backend`, `medium`. PR **#76** mergeado en `dev` (merge `d02571b`). **19 requisitos** (R1–R16,
+R20–R22) y **11 tasks**, con `./init.sh` completo en verde antes del PR: **474 archivos, 6865
+pasados, 87 saltados, 0 rojos nuevos**.
+
+- **Qué entra**: dentro de una misma petición la sesión se resuelve **una sola vez**, en pantallas y
+  en Server Actions. `React.cache` para el render y `AsyncLocalStorage` (`node:async_hooks`, que no
+  es dependencia npm) para las acciones, con el helper en `lib/shared/request-scope.ts`. El dominio
+  y las dos proyecciones de QC-48 no cambian, y **`components/shared/data-table/` ni se toca**.
+- **Medido, no supuesto** (R16, sobre base propia `QuimiCloude_QC104`, control en reposo 0):
+  `/configuracion/usuarios` **7 → 1**, `/pedidos` **6 → 1**, `/configuracion/unidades` **7 → 1**,
+  guardado **9 → 2**. **La ficha subestimaba el problema**: hablaba de «tres lecturas por página».
+- **La acotación quitó lo que no se sostenía.** La ficha nació para «dejar la medición que QC-28 no
+  tiene»; al preguntarlo, el humano respondió que el objetivo es evitar llamadas innecesarias, **no
+  medir**, y salieron R17–R19, T9 y el script de tiempos. **Consecuencia que queda escrita: QC-28
+  sigue sin condición que la desbloquee.**
+- **El hallazgo del ciclo, en tres capas.** El `reviewer` encontró un **noveno `currentActor` sin
+  envolver** (`session-actions.ts`, de QC-101) que **entró con la propia sincronización de la rama**,
+  después de la auditoría. Al arreglarlo apareció que el test que debía cazarlo **contaba las filas
+  de su propia lista** y seguía verde con nueve en disco; se cambió para que recorriera el árbol. Y
+  ese recorrido **llevaba dentro otra lista de módulos escrita a mano** y no bajaba a subcarpetas.
+  Las tres capas cerradas, cada una probada por mutación.
+- **Cinco trampas del instrumento**, todas documentadas en `progress/medicion_QC-104-…md` porque cada
+  una había producido antes una tabla creíble y falsa: el contador publica con retraso (piso de 12 s),
+  `APIRequestContext` no manda la cookie `Secure` y servía el login con 200, el fixture nace muerto
+  sin `sessionsValidFrom` en el pasado, un `goto` repetido lo sirve el router sin tocar el servidor,
+  y `networkidle` no vale con streaming de RSC.
+
+### Lo que deja anotado y no tiene ficha todavía
+
+1. **La pregunta abierta 2 sigue viva**: una acción que revalida y el repintado que provoca cuentan
+   como **dos** ámbitos (R4 provisional), y los 2 del guardado son justo eso. Si se decide que sean
+   una sola petición, baja a 1.
+2. **La nota de T11 en `docs/architecture.md` no es exigible**: hacerlo pediría una guardia nueva.
+3. **El entorno denegó dos veces** la vía de conteo por configuración de Postgres (`ALTER SYSTEM`).
+   El subagente **no la rodeó** y se resolvió con base aislada; queda dicho por si vuelve a estorbar.
+
+## QC-60 — aislamiento-por-empresa-en-pedidos · CERRADA el 2026-09-16 (PR #77, merge `c93d916`)
+
+`backend`, `medium`. **R1–R35** y **20 tasks**, con `./init.sh` completo en verde antes del PR:
+**482/482 archivos, 7000 tests verdes, 87 saltados, 0 rojos**. Review **aprobada en segunda vuelta,
+sin mayores**.
+
+- **Qué entra**: `orders` gana `company_id` obligatorio; toda lectura y escritura de `pedidos` se
+  limita a la empresa de la sesión, en un único punto de consulta y validado en el service, y el
+  acceso a un pedido ajeno se rechaza **aunque se conozca el id**. El correlativo pasa a contarse
+  **por empresa** —lock de aviso por `(empresa, año)` como sentencia anterior, `max()+1` dentro del
+  `INSERT`, único `(company_id, order_year, order_sequence)`— y **no se renumera nada**: los 3
+  pedidos vivos conservan 37, 44 y 77 y el siguiente fue el 78. La FK de `order_assignments` hacia
+  el pedido pasa a ser **compuesta**. El `down.sql` aborta entero si revertir perdería datos. E2E en
+  Chromium y WebKit.
+- **La acotación corrigió la ficha**: decía «los pedidos **y sus líneas**» —no existe tabla de
+  líneas— y que un pedido referencia producto o unidad —referencia una **receta**—. La
+  `description` del board se reescribió antes de sembrar.
+- **R15 era un bug real, y un test en verde lo tapaba.** Con `INSERT` crudo, Prisma devuelve el
+  duplicado como `P2010` **sin el nombre del índice**, y el código lo buscaba por ese nombre: el
+  reintento era **código muerto** y el unit test pasaba porque fabricaba un error que sí lo traía.
+  Reproducido contra Postgres 16 antes de decidir. Ahora se reconoce **por SQLSTATE `23505`**, como
+  ya exigía el repo, y el test de integración nuevo **se comprobó rojo con el código anterior**.
+- **R22 chocaba con una decisión aprobada**: se copió de QC-49 («rechazar el campo desconocido») y
+  QC-35bis había fijado que el alta de pedidos **descarta**. Ganó QC-35bis por decisión humana; la
+  garantía que importa —la empresa de la entrada nunca se escribe— sigue con test.
+- **El reviewer rechazó una vez por comentarios, y el fallo de fondo fue del leader**: la regla de no
+  citar fichas en producción **no está escrita en `docs/`**, solo la describe QC-115, y el leader la
+  metió en los encargos como si lo estuviera. El humano la acotó a las líneas de esta rama; las citas
+  preexistentes esperan a QC-115.
+- **Tres cosas que el gate rápido no ve y el completo sí**: una lista cerrada de índices de QC-57
+  sin tensar, el conflicto semántico con **QC-104** mergeada en paralelo (`order-actions.ts` a
+  `runInRequestScope`) y, en la base compartida, el checksum de la migración desincronizado tras
+  editar sus comentarios —SQL ejecutable idéntico, `migrate status` al día—.
+- **Coste de máquina**: dos corridas del gate **murieron por falta de memoria** con otra sesión
+  corriendo su gate a la vez, y una tercera dio un rojo de saturación que pasa corrido solo. La
+  buena se lanzó esperando a que no hubiera procesos de test ajenos.
+
+### Lo que deja anotado
+
+- **Hasta QC-50** un pedido puede apuntar a una receta de otra empresa: las recetas aún no tienen
+  empresa. Declarado en el spec, sin fecha de cierre.
+- **Se acaban los huecos por transacción abortada** en la numeración, que QC-33 R42 / QC-34 D27
+  habían aceptado como coste.
+- En *Deudas* de `current.md`: el posible falso verde de `e2e/aislamiento-inventario.spec.ts`
+  (QC-49) y el barrido pendiente de adaptadores que reconozcan duplicados por nombre de índice, con
+  `presentation-prisma.ts:123` como primer sitio a mirar.

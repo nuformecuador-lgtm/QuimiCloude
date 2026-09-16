@@ -56,6 +56,15 @@ export function hallazgosDeVersionDeNext(
 // fallaria alli. Un `.spec.ts` nuevo se nombra aqui a mano.
 export const E2E_ESPERADOS = [
   'aislamiento-inventario.spec.ts',
+  // Alta por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su punto
+  // de extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo se nombra,
+  // uno a uno-. El recorrido que ejercita: con sesion en una empresa, el listado de pedidos no
+  // muestra ninguna fila de otra empresa, borrar un pedido ajeno conociendo su identificador se
+  // rechaza como inexistente y lo deja intacto, y el alta numera en la serie de su propia empresa.
+  // NO ejercita el cruce borde -> accion del
+  // identificador de peticion: el spec no lee ni afirma nada sobre el identificador ni sobre
+  // `reference`, asi que el diferimiento de ese E2E sigue INTACTO.
+  'aislamiento-pedidos.spec.ts',
   // QC-101 T10 / R17: la E2E del cierre de TODAS las sesiones de otra persona desde la pantalla.
   // Alta por el MISMO motivo y en el MISMO sitio que las de QC-49, QC-67, QC-79, QC-85 y QC-102:
   // esta lista es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO
@@ -143,6 +152,10 @@ export const MIGRACIONES_ESPERADAS = [
   '20260911130000_inventory_company_scope',
   '20260912103000_session_revocation',
   '20260913120000_product_batch_lot_and_purchase_date',
+  // Alta con el mismo patron que las anteriores: la migracion que da empresa a los pedidos no
+  // persiste el identificador de peticion ni lo menciona; se nombra aqui a mano y la lista sigue
+  // CERRADA para la siguiente.
+  '20260915120000_orders_company_scope',
 ] as const
 
 export function hallazgosDeMigraciones(

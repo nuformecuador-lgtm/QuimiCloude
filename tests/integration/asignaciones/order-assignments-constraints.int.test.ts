@@ -137,7 +137,9 @@ const CHECK_VIOLATION = '23514'
  * Las restricciones de esta tabla, por su nombre exacto: se afirma contra ellas, no contra
  * «algo fallo». Si alguien las renombra, las borra o las simplifica, estos tests se ponen rojos.
  */
-const FK_ORDEN = 'order_assignments_order_id_fkey'
+// QC-60 (R25): la FK del pedido dejo de ser simple. Ahora es COMPUESTA `(order_id, company_id)`
+// hacia `orders(id, company_id)`, y con ella cambio de nombre.
+const FK_ORDEN = 'order_assignments_order_id_company_id_fkey'
 const FK_PERSONA = 'order_assignments_user_id_fkey'
 const FK_GRUPO = 'order_assignments_work_group_id_fkey'
 const PK_ASIGNACION = 'order_assignments_pkey'
@@ -277,6 +279,9 @@ async function createOrder(fixture: Fixture): Promise<string> {
   nextSequence += 1
   const order = await fixture.tx.order.create({
     data: {
+      // QC-60: `orders.company_id` es NOT NULL y la FK de la asignacion ya es compuesta, asi que
+      // el pedido nace en la MISMA empresa que sus asignaciones.
+      companyId: fixture.companyA,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: nextSequence,
       recipeId: fixture.recipeId,
@@ -838,7 +843,8 @@ describe('las tres referencias de la asignacion', () => {
   })
 
   it('R2: rechaza la asignacion cuyo pedido no existe', async () => {
-    // La FK del pedido es SIMPLE (R14) y apunta a `orders(id)`: el uuid inventado no esta.
+    // La FK del pedido es COMPUESTA desde QC-60 y apunta a `orders(id, company_id)`: la pareja con
+    // el uuid inventado no esta.
     await inRolledBackTransaction(async (fixture) => {
       const { tx, companyA } = fixture
       const persona = await createUser(fixture, companyA)

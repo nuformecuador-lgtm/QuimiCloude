@@ -377,6 +377,13 @@ describe('alcance de QC-49 (aislamiento-por-empresa-en-inventario): tres tablas 
     { tabla: 'orders', modelo: 'Order', ficha: 'QC-60' },
   ] as const
 
+  /**
+   * Modelos de `TABLAS_FUERA_DE_ALCANCE` que ya ganaron empresa con su propia migracion. Siguen
+   * vetados en el UP y el DOWN de esta migracion; en el esquema se exige lo contrario, que SI la
+   * declaren. Se nombran uno a uno: un `companyId` en cualquier otro modelo de la lista sigue en rojo.
+   */
+  const MODELOS_YA_AISLADOS_POR_SU_MIGRACION: readonly string[] = ['Order']
+
   /** La carpeta de la migracion de esta ficha, localizada por su sufijo y no por su marca de tiempo. */
   function carpetaDeLaMigracion(): string {
     const raiz = join(repoRoot, 'db', 'migrations')
@@ -448,7 +455,16 @@ describe('alcance de QC-49 (aislamiento-por-empresa-en-inventario): tres tablas 
       )
     }
 
+    for (const modelo of MODELOS_YA_AISLADOS_POR_SU_MIGRACION) {
+      expect(
+        TABLAS_FUERA_DE_ALCANCE.some((fuera) => fuera.modelo === modelo),
+        `${modelo} no esta en TABLAS_FUERA_DE_ALCANCE: su alta aqui no exime a nadie`,
+      ).toBe(true)
+      expect(cuerpoDelModelo(modelo), `${modelo} ya deberia declarar companyId`).toContain('companyId')
+    }
+
     for (const { modelo, ficha } of TABLAS_FUERA_DE_ALCANCE) {
+      if (MODELOS_YA_AISLADOS_POR_SU_MIGRACION.includes(modelo)) continue
       const cuerpo = cuerpoDelModelo(modelo)
       expect(cuerpo, `${modelo} no gana empresa en QC-49: es ${ficha}`).not.toContain('companyId')
       expect(cuerpo, `${modelo} no gana empresa en QC-49: es ${ficha}`).not.toContain('company_id')

@@ -127,11 +127,12 @@ const recipe = parseModel('Recipe')
 const unit = parseModel('Unit')
 const user = parseModel('User')
 
-/** Los TRECE campos de `Order`, con la columna en ingles que le toca (R36). Fueron catorce en
+/** Los CATORCE campos de `Order`, con la columna en ingles que le toca (R36). Fueron catorce en
  *  QC-33 y quince con `cancellationReason` (QC-34 R48); el 2026-09-07 la decision humana quito
  *  `unit_id` y `unit_price` de la tabla
- *  (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`) y quedaron trece. La lista
- *  sigue siendo cerrada: anadir o quitar cualquier otra columna pone este test rojo. */
+ *  (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`) y quedaron trece. QC-60 (R1)
+ *  anade `company_id`, obligatoria, y vuelven a ser catorce. La lista sigue siendo cerrada:
+ *  anadir o quitar cualquier otra columna pone este test rojo. */
 const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
   ['orderYear', 'order_year'],
@@ -141,6 +142,7 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['priority', 'priority'],
   ['status', 'status'],
   ['cancellationReason', 'cancellation_reason'], // QC-34 R48, decision cerrada 4
+  ['companyId', 'company_id'], // QC-60 R1: la empresa del pedido, obligatoria
   ['createdBy', 'created_by'],
   ['updatedBy', 'updated_by'],
   ['createdAt', 'created_at'],
@@ -148,10 +150,14 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['deletedAt', 'deleted_at'],
 ]
 
-/** Las TRES referencias que cruzan de modulo y por eso NO llevan `@relation` (R33). Eran cuatro
- *  hasta el 2026-09-07: `unitId` se fue con la unidad, y con ella la frontera hacia `unidades`. */
+/** Las CUATRO referencias que cruzan de modulo y por eso NO llevan `@relation` (R33). Fueron cuatro
+ *  hasta el 2026-09-07, cuando `unitId` se fue con la unidad -y con ella la frontera hacia
+ *  `unidades`- y quedaron tres. QC-60 anade `companyId` (FK a `companies`, de `identity`),
+ *  OBLIGATORIA y tambien sin `@relation`: con ella, `pedidos` podria hacer
+ *  `include: { company: true }` (`design.md > 2.1`). */
 const CROSS_MODULE_SCALARS: ReadonlyArray<readonly [string, string, boolean]> = [
   ['recipeId', 'recipe_id', false],
+  ['companyId', 'company_id', false],
   ['createdBy', 'created_by', true],
   ['updatedBy', 'updated_by', true],
 ]
@@ -465,11 +471,20 @@ describe('db/schema.prisma — modelo de pedido', () => {
       )
       expect(candidate.attributes).not.toMatch(/autoincrement/)
     }
-    // La clave unica del correlativo, declarada y con su nombre, sin nada mas.
+    // La clave unica del correlativo, declarada y con su nombre. QC-60 (R10, R11): la unicidad
+    // pasa a medirse DENTRO de la empresa, con `companyId` DE CABEZA, y el unico global de QC-33
+    // desaparece -si siguiera declarado, dos empresas no podrian tener cada una su pedido 1-.
     expect(order.body).toMatch(
-      /@@unique\(\[orderYear,\s*orderSequence\],\s*map:\s*"orders_order_year_order_sequence_key"\)/,
+      /@@unique\(\[companyId,\s*orderYear,\s*orderSequence\],\s*map:\s*"orders_company_year_sequence_key"\)/,
     )
-    expect([...order.body.matchAll(/@@unique\(/g)]).toHaveLength(1)
+    expect(order.body).not.toMatch(/@@unique\(\[orderYear,\s*orderSequence\]/)
+    expect(order.body).not.toMatch(/orders_order_year_order_sequence_key/)
+    // Y la clave candidata `(id, company_id)` que hace posible la FK compuesta de
+    // `order_assignments` (QC-60 R25). Son DOS unicos y ninguno mas: la lista sigue cerrada.
+    expect(order.body).toMatch(
+      /@@unique\(\[id,\s*companyId\],\s*map:\s*"orders_id_company_id_key"\)/,
+    )
+    expect([...order.body.matchAll(/@@unique\(/g)]).toHaveLength(2)
   })
 
   it('Order no declara ninguna columna con el numero formateado', () => {
@@ -565,7 +580,7 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(owners.get('User')).toBe('identity')
   })
 
-  it('las tres referencias son escalares uuid SIN @relation y Recipe/Unit/User no tienen campos de vuelta', () => {
+  it('las cuatro referencias son escalares uuid SIN @relation y Recipe/Unit/User no tienen campos de vuelta', () => {
     // R33 y decision cerrada 17: las FK son REALES pero viven escritas a mano en el SQL. Sin
     // `@relation` en ninguno de los dos lados, NO hay `include` que atraviese de `pedidos` a
     // `recetas` ni a `identity` (`design.md > 8.1`). Eran cuatro hasta el 2026-09-07; `Unit`
@@ -632,6 +647,11 @@ describe('db/schema.prisma — modelo de pedido', () => {
       'orders_created_by_idx',
       'orders_updated_by_idx',
     ])
-    expect(order.body).toMatch(/map:\s*"orders_order_year_order_sequence_key"/)
+    // Los dos unicos, tambien en ingles y `snake_case` (QC-60 sustituye el de QC-33).
+    const uniqueMaps = [...order.body.matchAll(/@@unique\([^)]*map:\s*"([^"]+)"/g)].map(
+      (match) => match[1],
+    )
+    expect(uniqueMaps).toEqual(['orders_company_year_sequence_key', 'orders_id_company_id_key'])
+    for (const nombre of uniqueMaps) expect(nombre).toMatch(SNAKE_CASE)
   })
 })

@@ -13,6 +13,7 @@ import {
   type OrderView,
   type Page,
 } from '@/lib/modules/pedidos';
+import { runInRequestScope } from '@/lib/shared/request-scope';
 
 /**
  * Server Actions del pedido (T15, R5, R54, R56, `design.md > 9`). Copia en forma de
@@ -110,11 +111,24 @@ const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
  */
 const toErrorState = createErrorStateTranslator(PedidosError, observabilidad.readRequestIdHeader);
 
-/** El actor que exige R5: se resuelve UNA vez por invocacion, nunca dentro del dominio. */
+/**
+ * El actor: se resuelve UNA vez por invocacion, nunca dentro del dominio.
+ *
+ * Usuario y contexto de empresa salen de la sesion del servidor, en paralelo; si falta cualquiera
+ * de los dos devuelve `null` y el caso de uso rechaza antes de tocar ningun puerto. La empresa
+ * jamas sale de la entrada del llamante: si no, elegirla seria escribir otro uuid en el formulario.
+ */
 async function currentActor(): Promise<Actor | null> {
-  const sessionUser = await identity.getSessionUser();
-  if (sessionUser === null) return null;
-  return { id: sessionUser.id, permissions: sessionUser.permissions };
+  // El ambito envuelve solo este `Promise.all`: las dos caras comparten una lectura de sesion.
+  const [sessionUser, sessionContext] = await runInRequestScope(() =>
+    Promise.all([identity.getSessionUser(), identity.getSessionContext()]),
+  );
+  if (sessionUser === null || sessionContext === null) return null;
+  return {
+    id: sessionUser.id,
+    companyId: sessionContext.companyId,
+    permissions: sessionUser.permissions,
+  };
 }
 
 function readFormString(formData: FormData, name: string): string {

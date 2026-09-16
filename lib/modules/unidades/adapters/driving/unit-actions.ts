@@ -8,6 +8,7 @@ import {
   type Page,
   type UnitView,
 } from '@/lib/modules/unidades';
+import { runInRequestScope } from '@/lib/shared/request-scope';
 
 /**
  * Server Action de lectura del catalogo de unidades (`design.md > 9`, R40-R42). Es el
@@ -63,10 +64,11 @@ const toErrorState = createErrorStateTranslator(UnidadesError, observabilidad.re
  * repositorio. Sin contexto no hay actor, y sin actor no hay consulta.
  */
 async function currentActor(): Promise<Actor | null> {
-  const [sessionUser, sessionContext] = await Promise.all([
-    identity.getSessionUser(),
-    identity.getSessionContext(),
-  ]);
+  // QC-104 R3: el ambito envuelve EXACTAMENTE este `Promise.all`, para que las dos caras
+  // compartan UNA sola lectura de la ficha de sesion en esta invocacion (`design.md > 2.6`).
+  const [sessionUser, sessionContext] = await runInRequestScope(() =>
+    Promise.all([identity.getSessionUser(), identity.getSessionContext()]),
+  );
   if (sessionUser === null || sessionContext === null) return null;
   return {
     id: sessionUser.id,

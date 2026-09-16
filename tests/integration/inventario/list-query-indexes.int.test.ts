@@ -190,7 +190,13 @@ const PRE_EXISTING_INDEXES = [
   'orders_recipe_id_idx',
   // `orders_unit_id_idx` (indice de la FK que QC-33 creo) cayo el 2026-09-07 con la columna
   // `orders.unit_id`, en la misma migracion.
-  'orders_order_year_order_sequence_key',
+  // `orders_order_year_order_sequence_key` (unico GLOBAL sobre `(order_year, order_sequence)`)
+  // salio de esta lista el 2026-09-15 con QC-60. NO es un indice perdido por descuido, que es
+  // justo lo que este caso vigila: la numeracion de pedidos pasa a ser POR EMPRESA, porque con el
+  // global dos empresas no podrian llevar cada una su propia serie. Su sustituto es UN solo indice
+  // compuesto, `orders_company_year_sequence_key`, que se afirma abajo en su propio caso: si la
+  // migracion se hubiera llevado el global SIN dejar el compuesto, la numeracion se quedaria sin
+  // ninguna garantia de unicidad y este archivo seguiria siendo quien lo dijera.
 ] as const
 
 /**
@@ -302,6 +308,23 @@ describe('QC-57 — la migracion en la base (R21, R23)', () => {
     expect(compuesto).not.toContain('WHERE')
 
     expect(indexes.has('presentations_name_normalized_key')).toBe(false)
+  })
+
+  it('el unico del numero de pedido es POR EMPRESA, y el global ya no esta (QC-60)', async () => {
+    // El RELEVO de `orders_order_year_order_sequence_key`, que sale de `PRE_EXISTING_INDEXES`
+    // arriba. Los dos no pueden convivir: con el global en pie, dos empresas seguirian sin poder
+    // llevar cada una su propia serie de numeracion.
+    const indexes = await readIndexes()
+    const compuesto = indexes.get('orders_company_year_sequence_key')
+    expect(compuesto, 'falta orders_company_year_sequence_key').toBeDefined()
+    expect(compuesto).toContain('UNIQUE')
+    // `company_id` va DE CABEZA: asi el mismo indice sirve para filtrar por empresa y para la
+    // verificacion del RESTRICT de la FK de empresa, sin un indice propio de empresa.
+    expect(compuesto).toMatch(/\(company_id, order_year, order_sequence\)/u)
+    // Y NO es parcial: un pedido borrado o cancelado conserva su numero.
+    expect(compuesto).not.toContain('WHERE')
+
+    expect(indexes.has('orders_order_year_order_sequence_key')).toBe(false)
   })
 
   it('el indice de la unidad de la presentacion existe y va sobre unit_id (QC-80 R3)', async () => {

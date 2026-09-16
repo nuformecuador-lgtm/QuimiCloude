@@ -3,6 +3,7 @@
 import { identity, inventario, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import { InventarioError, type Actor, type Page, type ProductView } from '@/lib/modules/inventario';
+import { runInRequestScope } from '@/lib/shared/request-scope';
 
 // Aqui no se repite `requirePermission`: es la primera linea de cada caso de uso.
 
@@ -65,10 +66,11 @@ const toErrorState = createErrorStateTranslator(InventarioError, observabilidad.
  * el caso de uso rechaza antes de tocar el repositorio.
  */
 async function currentActor(): Promise<Actor | null> {
-  const [sessionUser, sessionContext] = await Promise.all([
-    identity.getSessionUser(),
-    identity.getSessionContext(),
-  ]);
+  // QC-104 R3: el ambito envuelve EXACTAMENTE este `Promise.all`, para que las dos caras
+  // compartan UNA sola lectura de la ficha de sesion en esta invocacion (`design.md > 2.6`).
+  const [sessionUser, sessionContext] = await runInRequestScope(() =>
+    Promise.all([identity.getSessionUser(), identity.getSessionContext()]),
+  );
   if (sessionUser === null || sessionContext === null) return null;
   return {
     id: sessionUser.id,

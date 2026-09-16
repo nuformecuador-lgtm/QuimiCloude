@@ -31,9 +31,8 @@ consecuencias de arquitectura que no son opinables:
      son las del sistema, y son una lista corta y cerrada: `users`, `roles`,
      `document_types`. Anadir una tabla de operacion sin empresa es BLOQUEANTE.
    - **Lo ya construido todavia no lo esta**, y esa es la deuda que salda la epica QC-46:
-     recetas (QC-50), unidades (QC-51), proveedores (QC-59) y pedidos
-     (QC-60). La guardia que lo hace cumplir es QC-61. Mientras una tabla siga en esa
-     lista es deuda registrada, no
+     recetas (QC-50), unidades (QC-51) y proveedores (QC-59). La guardia que lo hace
+     cumplir es QC-61. Mientras una tabla siga en esa lista es deuda registrada, no
      incumplimiento; cuando la lista quede vacia, esta vineta se borra.
    - **Lo que la regla vieja protegia sigue en pie.** No se prepara infraestructura «por
      si acaso». Lo que cambio es que multiplicar empresas dejo de ser hipotetico y paso a
@@ -412,6 +411,19 @@ sustituye ni lo relaja: el layout de la zona privada vuelve a leer la sesion en 
 redirige si no la hay. Ademas **filtra el menu** con los permisos de esa misma lectura, en el
 servidor: un item para el que no hay permiso no viaja en el HTML. El middleware ahorra render y da
 la vuelta rapida; no es la unica puerta.
+
+**Esa lectura es una sola por peticion** (QC-104): el layout, el corte por permiso de la pagina y
+las Server Actions que esos componentes invocan mientras se pintan comparten **la misma** lectura de
+sesion en vez de repetirla cada uno por su cuenta, y lo compartido muere con la peticion —**nunca**
+se reutiliza entre peticiones, porque una sesion revocada no puede sobrevivir a la peticion en que
+se leyo—. Lo que esta probado es el **conteo**: sendos **tests del gate** —en `tests/unit/`, no en
+`tests/guards/`: los selecciona el grafo de imports, no el barrido de guardias— fallan si una
+pantalla, o una Server Action de las que resuelven a la vez el usuario y la empresa, supera **una**
+lectura de sesion. La lista de esas acciones **no se escribe a mano**: el test **lee el disco** —los
+modulos salen de `readdirSync` de `lib/modules/`, y de cada uno recorre `adapters/driving/` **en
+profundidad**— y se pone rojo si aparece una accion con las dos caras de la sesion fuera de la lista
+o sin ambito. Asi se detecta la que llegue en el proximo merge, aunque venga en un **modulo nuevo**
+o en una **subcarpeta**.
 
 **Ni el borde ni la pagina son la frontera de autorizacion.** `## Acceso a datos y autorizacion`
 sigue mandando: la **autorizacion se valida en el service**, antes de tocar el repositorio. El rol

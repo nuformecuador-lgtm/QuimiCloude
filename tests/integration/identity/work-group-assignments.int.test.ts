@@ -81,10 +81,13 @@ async function createRecipe(): Promise<string> {
   return recipe.id;
 }
 
-async function createOrder(recipeId: string): Promise<string> {
+async function createOrder(recipeId: string, companyId: string): Promise<string> {
   nextSequence += 1;
   const order = await prisma.order.create({
     data: {
+      // QC-60: `orders.company_id` es NOT NULL y la FK de la asignacion ya es compuesta, asi que
+      // el pedido nace en la MISMA empresa que sus asignaciones.
+      companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: nextSequence,
       recipeId,
@@ -124,6 +127,9 @@ async function seedUser(companyId: string, lastNames: string): Promise<string> {
  */
 async function dropCompany(companyId: string): Promise<void> {
   await prisma.orderAssignment.deleteMany({ where: { companyId } });
+  // QC-60: `orders.company_id` tiene FK `ON DELETE RESTRICT`, asi que los pedidos de la empresa
+  // caen ANTES que ella. Los borra tambien `dropRecipes`, pero eso pasa despues y llega tarde.
+  await prisma.order.deleteMany({ where: { companyId } });
   await prisma.workGroupMember.deleteMany({ where: { companyId } });
   await prisma.workGroup.deleteMany({ where: { companyId } });
   await prisma.user.updateMany({ where: { companyId }, data: { accountStatusChangedBy: null } });
@@ -180,7 +186,7 @@ async function montarPedidoConGrupoAplicado(): Promise<Escenario> {
     responsables.push(userId);
   }
 
-  const orderId = await createOrder(await createRecipe());
+  const orderId = await createOrder(await createRecipe(), companyId);
   for (const userId of responsables) {
     await prisma.orderAssignment.create({
       data: {
