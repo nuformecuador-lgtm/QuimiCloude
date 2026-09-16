@@ -62,6 +62,7 @@ import {
   updateAliveInCompany,
 } from '@/lib/modules/identity/adapters/driven/persistence/user-admin-prisma';
 import { PERMISSIONS } from '@/lib/modules/identity/domain/permissions';
+import { clearedLockState } from '@/lib/modules/identity/domain/effective-account-status';
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -393,6 +394,7 @@ describe('R13 + R49 — el alta persiste la empresa del argumento, el rol, `pend
         now: new Date(),
         accountStatus: 'active',
         changedBy: actorId,
+        lockState: clearedLockState(),
       });
 
       expect(outcome).toBe('ok');
@@ -968,6 +970,7 @@ describe('R33 — todo esta acotado a la empresa: un identificador ajeno respond
         now: new Date(),
         accountStatus: 'blocked',
         changedBy: actorA,
+        lockState: null,
       });
 
       expect(outcome).toBe('not_found');
@@ -1067,6 +1070,7 @@ describe('R34 + R37 — el borrado es LOGICO: la fila se conserva entera y las o
           now: new Date(),
           accountStatus: 'active',
           changedBy: actorId,
+          lockState: clearedLockState(),
         }),
       ).toBe('not_found');
 

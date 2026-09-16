@@ -70,7 +70,7 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 // Todo como VALOR y por el barrel del modulo —nunca por ruta profunda, nunca un literal a mano—:
 // `normalizeCompanyName` es la UNICA definicion de «mismo nombre de empresa» (QC-47 R3),
@@ -84,7 +84,10 @@ import {
 } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { prisma } from '@/lib/shared/db/prisma';
-import { INVENTORY_ROUTE, LOGIN_ROUTE, DASHBOARD_ROUTE, USERS_ROUTE } from '@/lib/shared/routes';
+import { USERS_ROUTE } from '@/lib/shared/routes';
+
+// QC-93: la entrada y su aterrizaje, derivado de los permisos del usuario en la base.
+import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc67_e2e_';
@@ -225,21 +228,6 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
 }
 
 /**
- * Entra por el formulario real y aterriza donde le corresponde a ese usuario.
- *
- * **El destino se pasa como parametro desde QC-75 (R11)**: el login lleva al PRIMER item del menu
- * que esa persona puede ver. El Administrador aterriza en `DASHBOARD_ROUTE`; el Operador, que no
- * tiene `dashboard.consultar`, en `INVENTORY_ROUTE`.
- */
-async function login(page: Page, user: Credentials, landing: string): Promise<void> {
-  await page.goto(LOGIN_ROUTE);
-  await page.getByTestId('login-username').fill(user.username);
-  await page.getByTestId('login-password').fill(user.password);
-  await page.getByTestId('login-submit').click();
-  await page.waitForURL((url) => url.pathname === landing, { timeout: 60_000 });
-}
-
-/**
  * URL de la lista, SIEMPRE derivada de `USERS_ROUTE` (R1), con el termino de busqueda ya puesto.
  *
  * **La busqueda va en la URL desde el primer `goto`**, y no se teclea en la caja, por dos motivos:
@@ -317,7 +305,7 @@ test.describe('pantalla de usuarios', () => {
   test('el Administrador entra por la URL, da de alta un usuario y lo ve en la lista con estado pending (R42)', async ({
     page,
   }) => {
-    await login(page, adminUser, DASHBOARD_ROUTE);
+    await loginAndLand(page, adminUser);
 
     // --- 1. La pantalla se sirve a quien tiene `usuarios.consultar` (R4, la mitad que deja pasar).
     // Se llega POR URL derivada de la constante; el item `nav-usuarios` existe (T2) pero aqui no se
@@ -428,10 +416,10 @@ test.describe('pantalla de usuarios', () => {
   test('una sesion valida sin `usuarios.consultar` recibe 404 dentro del layout privado y no ve la tabla (R4, R42)', async ({
     page,
   }) => {
-    // El Operador del seed lleva `inventario.consultar` y SOLO ese (QC-74 R9), asi que aterriza en
-    // inventario (QC-75 R11) y la pantalla de usuarios —que exige `usuarios.consultar`— le esta
-    // cerrada.
-    await login(page, operatorUser, INVENTORY_ROUTE);
+    // El Operador del seed no tiene `usuarios.consultar` (QC-74 R9), asi que la pantalla de usuarios
+    // le esta cerrada. Donde aterriza lo deriva `loginAndLand` de sus permisos
+    // (`e2e/helpers/landing.ts`).
+    await loginAndLand(page, operatorUser);
 
     // Sesion valida, permiso ausente: **404, sin redireccion**. La respuesta es indistinguible de la
     // de una ruta que no existe, que es justo lo que evita delatar que el modulo esta ahi. No es

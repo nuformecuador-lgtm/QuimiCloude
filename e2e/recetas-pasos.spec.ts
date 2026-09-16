@@ -39,13 +39,10 @@ import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { normalizeProductName } from '@/lib/modules/inventario/domain/product-name';
 import { prisma } from '@/lib/shared/db/prisma';
-import {
-  DASHBOARD_ROUTE,
-  FORMULAS_ROUTE,
-  LOGIN_ROUTE,
-  NEW_RECIPE_ROUTE,
-  recipeEditRoute,
-} from '@/lib/shared/routes';
+import { FORMULAS_ROUTE, NEW_RECIPE_ROUTE, recipeEditRoute } from '@/lib/shared/routes';
+
+// QC-93 (R8): el aterrizaje tras el login se deriva de los permisos del usuario en el helper unico.
+import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc64_e2e_';
@@ -120,15 +117,6 @@ async function createAdmin(user: Credentials): Promise<string> {
   return created.id;
 }
 
-/** Entra por el formulario real y aterriza en el dashboard. */
-async function login(page: Page, user: Credentials): Promise<void> {
-  await page.goto(LOGIN_ROUTE);
-  await page.getByTestId('login-username').fill(user.username);
-  await page.getByTestId('login-password').fill(user.password);
-  await page.getByTestId('login-submit').click();
-  await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 60_000 });
-}
-
 /**
  * Elige en el desplegable de producto la opcion cuyo nombre es EXACTAMENTE `name`. Mismo helper
  * que `e2e/recetas.spec.ts`: desde el 2026-09-07 el selector busca en el servidor y pagina al
@@ -190,13 +178,15 @@ async function fillControlled(locator: Locator, value: string): Promise<void> {
 }
 
 /**
- * Recorre las paginas de la lista hasta encontrar la FILA de la receta pedida. Hace falta porque la
- * pantalla no ofrece busqueda y el orden es fijo por nombre: una receta recien creada cae en
- * cualquier pagina. Nunca se mira «la primera fila» ni el total, que otro proyecto puede mover.
+ * Recorre las paginas de la lista hasta encontrar la FILA de la receta pedida: sin buscar, una
+ * receta recien creada cae en cualquier pagina. Nunca se mira «la primera fila» ni el total, que
+ * otro proyecto puede mover.
  */
 async function findRecipeRow(page: Page, name: string): Promise<Locator> {
-  const row = page.getByTestId('recipe-row').filter({ hasText: name });
-  const next = page.getByTestId('recipe-page-next');
+  const row = page
+    .locator('[data-testid^="data-table-row-"]')
+    .filter({ has: page.getByTestId('data-table-cell-name').filter({ hasText: name }) });
+  const next = page.getByTestId('data-table-next');
 
   for (;;) {
     if ((await row.count()) > 0) return row;
@@ -209,7 +199,7 @@ async function findRecipeRow(page: Page, name: string): Promise<Locator> {
       before,
       { timeout: 60_000 },
     );
-    await expect(page.getByTestId('recipe-list')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('data-table')).toBeVisible({ timeout: 60_000 });
   }
 }
 
@@ -317,7 +307,7 @@ test.describe('editor y lectura de pasos', () => {
   test('el Administrador redacta un paso con negrilla y lista de verificacion, lo guarda, lo reabre igual y recorre la vista previa hasta Finalizar (R28)', async ({
     page,
   }) => {
-    await login(page, adminUser);
+    await loginAndLand(page, adminUser);
 
     // --- 1. Nueva receta.
     await page.goto(NEW_RECIPE_ROUTE);

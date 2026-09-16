@@ -114,6 +114,27 @@ válidos y presentar la lista, y NO DEBE fallar ni mostrar un error.
 >   barrel, como ya hacía `pedidos` con la suya: la pantalla comprueba contra el contrato en vez de
 >   contra una copia escrita a mano.
 
+> **ENMIENDA DEL 2026-09-15 (QC-56, decisión humana), para la lista de PROVEEDORES.** **Reabre la
+> línea 106** de la enmienda anterior («La lista de PROVEEDORES no cambia»), que se deja escrita
+> tal cual pero deja de valer: la lista de proveedores **también monta la tabla compartida**, en
+> lugar de su tabla y su barra de paginación propias. La enmienda anterior daba además por hecho
+> que recetas ya usaba esa tabla (l.96); medido en disco el 2026-09-15, **era falso**, y QC-56
+> migra las dos. Con ella:
+>
+> - **R11 se INVIERTE también para la lista de proveedores**: ofrece orden por cabecera sobre
+>   `name`, `createdAt` y `updatedAt`, búsqueda y filtro por rango de `createdAt`, exactamente lo
+>   que declara `SUPPLIER_QUERYABLE` (QC-57). Teléfono, correo electrónico y acciones no ordenan.
+>   Para el catálogo no cambia nada respecto a la enmienda anterior.
+> - **Lo que R11 protegía sigue en pie y afirmado**: nada se ordena, filtra, busca ni recorta en el
+>   navegador sobre la página ya descargada; cada gesto **navega** y la lista se vuelve a pedir al
+>   servidor, que la recalcula.
+> - **Cambia de dueño** para la lista de proveedores: el orden es **QC-56 R6** (y R7 para las
+>   columnas que no ordenan), la búsqueda **QC-56 R8**, el filtro de fecha **QC-56 R9**, y la
+>   protección de no calcular en el navegador **QC-56 R10**. R8 y R9 se conservan en QC-56 R22 y
+>   R23, y R10 se amplía al contrato de lista completo en QC-56 R13.
+> - El módulo `proveedores` **publica `SUPPLIER_QUERYABLE`** por su barrel, sin cambiar su
+>   contenido, y la lista la consume desde ahí (QC-56 R31).
+
 **R12** — Ninguna de las dos listas DEBE mostrar el identificador ni el nombre de quien creó o
 modificó un proveedor o una línea de catálogo.
 

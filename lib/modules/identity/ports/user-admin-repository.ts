@@ -29,6 +29,7 @@
  * `@/lib/modules/identity`, que crearia un ciclo del modulo consigo mismo-.
  */
 
+import type { AccountLockState } from '../domain/account-lock';
 import type { UserAccountStatus } from '../domain/account-status';
 import type { ListQuery } from '../domain/list-query';
 import type { Page } from '../domain/page';
@@ -51,8 +52,9 @@ export type UserAdminDetail = UserDetail;
  * **Lo que NO esta aqui es el requisito**: ni `companyId` (R14: viaja como argumento propio de
  * `create`, tomado del actor), ni el hash de la credencial (R15: argumento propio y obligatorio),
  * ni `accountStatus` / `accountStatusChangedAt` / `accountStatusChangedBy` (R20: la edicion no los
- * toca; moverlos es otra operacion), ni `mustChangeCredential`, ni los tres contadores de QC-19
- * (R45).
+ * toca; moverlos es otra operacion), ni `mustChangeCredential`, ni los tres contadores de QC-19.
+ * La EDICION no los lleva: limpiarlos al salir de `blocked` lo hace `applyGuardedChange`
+ * (variante `account_status`) — QC-95, que enmienda R45 de QC-66.
  */
 export type NewUser = {
   readonly firstNames: string;
@@ -126,6 +128,13 @@ export type GuardedChange =
        * cuenta (R49), y por eso `create` no tiene este campo.
        */
       readonly changedBy: string;
+      /**
+       * QC-95 R1, R3 (enmienda R45 de QC-66): los tres contadores de bloqueo de QC-19, ya limpios,
+       * que se escriben AQUI, en la MISMA escritura que mueve el estado. `null` = el destino
+       * es `blocked` y no se toca ningun contador (R2). `clearedLockState()` es la
+       * UNICA fuente de «cero, cero, null» y la decide el caso de uso por el destino (R4, R6).
+       */
+      readonly lockState: AccountLockState | null;
     })
   | (GuardedTarget & { readonly kind: 'delete' });
 

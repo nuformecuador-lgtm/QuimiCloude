@@ -110,4 +110,38 @@ describe('contrato de la ruta de proveedores', () => {
       );
     }
   });
+
+  it('R30: la lista no conserva tabla ni barra propias y si su vacio, su error y su esqueleto', () => {
+    // Solo la ruta de LISTA: el catalogo del proveedor vive en `[id]/components/` y tiene su
+    // propio esqueleto sobre la tabla primitiva, que no es de esta lista.
+    const nombres = readdirSync(join(RAIZ, COMPONENTES_PATH));
+    const esqueleto = join(COMPONENTES_PATH, 'supplier-table-skeleton.tsx');
+    const tabla = join(COMPONENTES_PATH, 'supplier-table.tsx');
+
+    for (const borrado of ['supplier-list-toolbar.tsx', 'supplier-columns.ts']) {
+      expect(nombres, `${COMPONENTES_PATH} no deberia tener ${borrado}`).not.toContain(borrado);
+    }
+    expect(
+      nombres.filter((nombre) => /toolbar|pagination/i.test(nombre)),
+      'la barra y la paginacion las pinta la tabla compartida',
+    ).toEqual([]);
+
+    const importaTablaPrimitiva = /from\s*['"]@\/components\/ui\/table['"]/;
+    expect(
+      archivosDeLaLista().filter(
+        (archivo) => archivo !== esqueleto && importaTablaPrimitiva.test(leer(archivo)),
+      ),
+      'solo el esqueleto puede seguir montando la tabla primitiva',
+    ).toEqual([]);
+
+    for (const conservado of [
+      join(COMPONENTES_PATH, 'supplier-list-empty.tsx'),
+      join(COMPONENTES_PATH, 'supplier-list-error.tsx'),
+      esqueleto,
+    ]) {
+      expect(existsSync(join(RAIZ, conservado)), `falta ${conservado}`).toBe(true);
+    }
+
+    expect(leer(tabla)).toMatch(/from\s*['"]@\/components\/shared\/data-table['"]/);
+  });
 });

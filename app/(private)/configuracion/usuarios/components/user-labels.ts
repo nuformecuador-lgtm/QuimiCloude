@@ -72,6 +72,40 @@ export function changeUserStatusLabel(displayName: string): string {
 }
 
 /**
+ * Los textos del cierre de todas las sesiones de OTRA persona (QC-101 R7, R9, R13, R19;
+ * `design.md > 2`). Viven aqui y no en el dialogo porque dos de ellos los consume tambien el panel
+ * (el nombre accesible del disparador) y porque los tests los toman de estas funciones, nunca de un
+ * literal copiado.
+ *
+ * **Todos NOMBRAN a la persona**: la accion expulsa a alguien que puede estar trabajando, y el nombre
+ * dentro es lo que convierte un «¿seguro?» en una comprobacion real (decision cerrada 4).
+ *
+ * **Ninguno promete numero** (R19), y por eso ninguna funcion recibe mas que el nombre: el caso de
+ * uso devuelve `void` (`end-all-sessions.ts:64`) y el sistema **no sabe cuantas sesiones cerro**. El
+ * mensaje de exito es verdad tanto con cinco sesiones como con ninguna.
+ */
+
+/** Nombre accesible del disparador en el panel de detalle (R7). */
+export function endUserSessionsLabel(displayName: string): string {
+  return `Cerrar todas las sesiones de ${displayName}`;
+}
+
+/** Titulo del dialogo de confirmacion, en forma de pregunta y con el nombre dentro (R9). */
+export function endUserSessionsTitle(displayName: string): string {
+  return `¿Cerrar todas las sesiones de ${displayName}?`;
+}
+
+/** Descripcion del dialogo: nombra a la persona y advierte que tendra que volver a entrar (R9). */
+export function endUserSessionsMessage(displayName: string): string {
+  return `Se cerrarán todas las sesiones de ${displayName}. Tendrá que volver a entrar.`;
+}
+
+/** Aviso de exito por el `<Toaster />` del layout privado: confirma sin prometer numero (R13, R19). */
+export function endUserSessionsSuccess(displayName: string): string {
+  return `Se cerraron las sesiones de ${displayName}.`;
+}
+
+/**
  * Un `Date` a `YYYY-MM-DD`, que es lo que `<input type="date">` emite y lo que `z.iso.date()`
  * espera (R26).
  *

@@ -1,74 +1,54 @@
+import type { DataTableParams } from '@/components/shared/data-table';
 import { listSuppliersAction } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
-import { SUPPLIERS_ROUTE } from '@/lib/shared/routes';
 
+import {
+  FIRST_PAGE,
+  clearSearchAndFilters,
+  hasActiveSearchOrFilter,
+  supplierListHref,
+} from './supplier-list-params';
 import { SupplierListEmpty } from './supplier-list-empty';
 import { SupplierListError } from './supplier-list-error';
-import { buildSupplierListQuery, type SupplierPageSize } from './supplier-list-params';
-import { SupplierListToolbar } from './supplier-list-toolbar';
 import { SupplierSheet } from './supplier-sheet';
 import { SupplierTable } from './supplier-table';
 
-/** La primera pagina, a la que vuelve el estado vacio cuando la pedida se quedo atras. */
-const FIRST_PAGE = 1;
-
 type SupplierListSectionProps = {
-  readonly page: number;
-  readonly pageSize: SupplierPageSize;
+  readonly params: DataTableParams;
 };
 
-/**
- * Seccion de lista: pide los datos y despacha a uno de los tres estados (R14, R16, R17, R18,
- * `design.md > 5.2`).
- *
- * **Server Component `async`**: los datos se piden en el servidor y bajan al cliente ya
- * renderizados. Es la parte que la pagina envuelve en `<Suspense>`, de modo que el esqueleto de
- * R17 aparece solo mientras esta consulta esta en vuelo —sin un estado de carga escrito a mano y
- * sin carreras entre peticiones—.
- *
- * **Una sola llamada a `listSuppliersAction`** (`design.md > 5.2`): nunca `getSupplierAction`
- * por fila. Toda lectura pasa por la Server Action del modulo; ningun `fetch` a rutas propias
- * (R43).
- *
- * **R7**: aqui no se decide nada sobre permisos. No se lee la sesion, no se repite `requireAdmin`
- * y no se ocultan columnas por rol: la autorizacion la aportan los nueve casos de uso de
- * `proveedores`, y si la operacion responde `unauthorized` se pinta el estado de error **sin un
- * solo dato**.
- *
- * **Una lista vacia NO se pinta como tabla sin filas** (R16, R18): son tres situaciones
- * distintas —fallo, lista realmente vacia y pagina que se quedo atras tras una baja— y cada una
- * dice lo suyo. El destino de «volver a la primera» se deriva de `SUPPLIERS_ROUTE` y de
- * `buildSupplierListQuery`, nunca de un literal (R2).
- */
-export async function SupplierListSection({ page, pageSize }: SupplierListSectionProps) {
-  const result = await listSuppliersAction({ page, pageSize });
+export async function SupplierListSection({ params }: SupplierListSectionProps) {
+  const result = await listSuppliersAction(params);
 
   if (result.status === 'error') {
     return <SupplierListError error={result} />;
   }
 
   const { items, page: currentPage, totalPages } = result.data;
+  const firstPageHref =
+    currentPage > FIRST_PAGE ? supplierListHref({ ...params, page: FIRST_PAGE }) : undefined;
 
-  if (items.length === 0) {
-    // El slot de «crear el primer proveedor» (R16) lo llena `<SupplierSheet />` (T8): es la
-    // unica accion util cuando no hay ni un proveedor, y desde aqui baja como `children` para
-    // que el estado vacio no tenga que conocer el panel lateral.
+  if (items.length === 0 && !hasActiveSearchOrFilter(params)) {
     return (
-      <SupplierListEmpty
-        firstPageHref={
-          currentPage > FIRST_PAGE
-            ? `${SUPPLIERS_ROUTE}?${buildSupplierListQuery({ page: FIRST_PAGE, pageSize })}`
-            : undefined
-        }
-      >
+      <SupplierListEmpty firstPageHref={firstPageHref}>
         <SupplierSheet />
       </SupplierListEmpty>
     );
   }
 
+  // Mismo árbol con filas y sin resultados: si cambiara, React remontaría la tabla y la búsqueda
+  // perdería el foco al volver la navegación.
   return (
     <div className="flex flex-col gap-4" data-testid="supplier-list">
-      <SupplierTable suppliers={items} />
-      <SupplierListToolbar page={currentPage} pageSize={pageSize} totalPages={totalPages} />
+      <SupplierTable
+        suppliers={items}
+        params={{ ...params, page: currentPage }}
+        totalPages={totalPages}
+        noResults={
+          items.length === 0
+            ? { clearHref: supplierListHref(clearSearchAndFilters(params)), firstPageHref }
+            : undefined
+        }
+      />
     </div>
   );
 }

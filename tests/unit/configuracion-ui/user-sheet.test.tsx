@@ -16,9 +16,15 @@ import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  END_USER_SESSIONS_CONFIRM_TESTID,
+  END_USER_SESSIONS_DIALOG_TESTID,
+  END_USER_SESSIONS_DISMISS_TESTID,
+  END_USER_SESSIONS_ID_FIELD,
+  END_USER_SESSIONS_MESSAGE_TESTID,
   USER_ERROR_TESTIDS,
   USER_FIELD_TESTIDS,
   USER_FORM_CANCEL_TESTID,
+  USER_FORM_END_SESSIONS_TESTID,
   USER_FORM_SUBMIT_TESTID,
   USER_FORM_TESTID,
   USER_ROLE_FIELD,
@@ -28,10 +34,17 @@ import {
   USER_SHEET_LOADING_TESTID,
   USER_SHEET_TESTID,
   UserSheet,
+  endUserSessionsLabel,
   toDateInputValue,
 } from '@/app/(private)/configuracion/usuarios/components';
 import type { ErrorState } from '@/lib/modules/errores';
-import type { RoleOption, UserDetail, UserRow } from '@/lib/modules/identity';
+import {
+  USER_ACCOUNT_STATUSES,
+  type RoleOption,
+  type UserDetail,
+  type UserRow,
+} from '@/lib/modules/identity';
+import type { EndSessionsFormState } from '@/lib/modules/identity/adapters/driving/session-actions';
 import type {
   CreateUserFormState,
   UserDetailResult,
@@ -39,7 +52,13 @@ import type {
 } from '@/lib/modules/identity/adapters/driving/user-actions';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
-const { routerMock, createUserActionMock, updateUserActionMock, getUserActionMock } = vi.hoisted(
+const {
+  routerMock,
+  createUserActionMock,
+  updateUserActionMock,
+  getUserActionMock,
+  endAllSessionsActionMock,
+} = vi.hoisted(
   () => ({
     routerMock: {
       push: vi.fn<(href: string) => void>(),
@@ -56,8 +75,16 @@ const { routerMock, createUserActionMock, updateUserActionMock, getUserActionMoc
         (id: string, prev: UserMutationFormState, data: FormData) => Promise<UserMutationFormState>
       >(),
     getUserActionMock: vi.fn<(id: string) => Promise<UserDetailResult>>(),
+    endAllSessionsActionMock:
+      vi.fn<(prev: EndSessionsFormState, data: FormData) => Promise<EndSessionsFormState>>(),
   }),
 );
+
+// QC-101: el cierre de sesiones, por su RUTA EXACTA. Es el punto de observacion de R9 y R10 desde
+// el panel: abrir la confirmacion no la invoca, y confirmar la invoca UNA vez.
+vi.mock('@/lib/modules/identity/adapters/driving/session-actions', () => ({
+  endAllSessionsAction: endAllSessionsActionMock,
+}));
 
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
@@ -135,16 +162,25 @@ afterEach(() => {
 /** Monta el panel con estado propio, que es como lo monta la tabla: una instancia controlada. */
 function PanelDePrueba({
   user = null,
+  currentUserId = null,
   roles = ROLES,
   rolesError = null,
 }: {
   readonly user?: UserRow | null;
+  readonly currentUserId?: string | null;
   readonly roles?: readonly RoleOption[];
   readonly rolesError?: ErrorState | null;
 }) {
   const [open, setOpen] = useState(true);
   return open ? (
-    <UserSheet user={user} roles={roles} rolesError={rolesError} open onOpenChange={setOpen} />
+    <UserSheet
+      user={user}
+      currentUserId={currentUserId}
+      roles={roles}
+      rolesError={rolesError}
+      open
+      onOpenChange={setOpen}
+    />
   ) : null;
 }
 
@@ -394,5 +430,188 @@ describe('en la zona privada hay EXACTAMENTE UNA region de avisos (R29)', () => 
     );
     expect(montajes).toHaveLength(1);
     expect(montajes[0]).toBe(join(raiz, 'layout.tsx'));
+  });
+});
+
+// QC-101 T9 — El cierre de TODAS las sesiones de otra persona, desde el panel de detalle:
+// R7, R9, R10, R11, R12, R13, R14 y R16.
+//
+// Aqui vive la DECISION de si el control se emite —cuenta activa y no es uno mismo—, que la toma el
+// panel con datos bajados por props. El dialogo aislado se prueba en
+// `end-user-sessions-dialog.test.tsx`; el contrato del disparador, en `user-form.test.tsx`.
+describe('el panel ofrece el cierre de sesiones solo sobre OTRA persona ACTIVA (QC-101)', () => {
+  /** El actor de la sesion. Distinto de la fila salvo en el caso de R12. */
+  const ACTOR_ID = 'u-actor';
+
+  beforeEach(() => {
+    endAllSessionsActionMock.mockResolvedValue({ status: 'success' });
+  });
+
+  /** Monta la edicion y espera a que el formulario este pintado. */
+  async function abrirEdicion(user: UserRow, currentUserId: string | null = ACTOR_ID) {
+    const montado = render(<PanelDePrueba user={user} currentUserId={currentUserId} />);
+    await screen.findByTestId(USER_FORM_TESTID);
+    return montado;
+  }
+
+  it('R7 — sobre otra persona activa se ofrece dentro del panel, con su nombre en el nombre accesible', async () => {
+    await abrirEdicion(FILA);
+
+    const disparador = screen.getByRole('button', { name: endUserSessionsLabel(FILA.displayName) });
+    expect(disparador).toBe(screen.getByTestId(USER_FORM_END_SESSIONS_TESTID));
+    expect(screen.getByTestId(USER_SHEET_TESTID).contains(disparador)).toBe(true);
+  });
+
+  const NO_ACTIVOS = USER_ACCOUNT_STATUSES.filter((estado) => estado !== 'active');
+
+  it('R11 — ancla: hay estados no activos que comprobar', () => {
+    // Sin esto, el bucle de abajo podria no generar ningun caso y pasar en verde sin mirar nada.
+    expect(NO_ACTIVOS.length).toBeGreaterThan(0);
+    expect(USER_ACCOUNT_STATUSES).toContain('active');
+  });
+
+  for (const estado of NO_ACTIVOS) {
+    it(`R11 — con la cuenta \`${estado}\` el control NO existe en el DOM`, async () => {
+      await abrirEdicion({ ...FILA, accountStatus: estado });
+
+      expect(screen.queryAllByTestId(USER_FORM_END_SESSIONS_TESTID)).toHaveLength(0);
+      expect(
+        screen.queryByRole('button', { name: endUserSessionsLabel(FILA.displayName) }),
+      ).toBeNull();
+    });
+  }
+
+  it('R11 — en el alta, que no tiene sujeto, el control tampoco existe', async () => {
+    render(<PanelDePrueba currentUserId={ACTOR_ID} />);
+    await screen.findByTestId(USER_FORM_TESTID);
+
+    expect(screen.queryAllByTestId(USER_FORM_END_SESSIONS_TESTID)).toHaveLength(0);
+  });
+
+  it('R12 — si la persona del panel es el propio actor, el control NO existe en el DOM', async () => {
+    await abrirEdicion(FILA, FILA.id);
+
+    expect(screen.queryAllByTestId(USER_FORM_END_SESSIONS_TESTID)).toHaveLength(0);
+    expect(
+      screen.queryByRole('button', { name: endUserSessionsLabel(FILA.displayName) }),
+    ).toBeNull();
+  });
+
+  it('R9 — pulsar el disparador abre la confirmacion con el nombre y NO invoca la action', async () => {
+    const user = setupUser();
+    await abrirEdicion(FILA);
+
+    await user.click(screen.getByTestId(USER_FORM_END_SESSIONS_TESTID));
+
+    const dialogo = await screen.findByTestId(END_USER_SESSIONS_DIALOG_TESTID);
+    expect(dialogo).toBeInTheDocument();
+    expect(screen.getByTestId(END_USER_SESSIONS_MESSAGE_TESTID)).toHaveTextContent(
+      FILA.displayName,
+    );
+    expect(endAllSessionsActionMock).not.toHaveBeenCalled();
+    // Y el dialogo NO vive dentro del `<form>` de edicion.
+    expect(screen.getByTestId(USER_FORM_TESTID).contains(dialogo)).toBe(false);
+  });
+
+  it('R9 — volver cierra la confirmacion sin invocar nada y el panel sigue abierto', async () => {
+    const user = setupUser();
+    await abrirEdicion(FILA);
+
+    await user.click(screen.getByTestId(USER_FORM_END_SESSIONS_TESTID));
+    await user.click(await screen.findByTestId(END_USER_SESSIONS_DISMISS_TESTID));
+
+    await waitFor(() => expect(screen.queryByTestId(END_USER_SESSIONS_DIALOG_TESTID)).toBeNull());
+    expect(endAllSessionsActionMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId(USER_FORM_TESTID)).toBeInTheDocument();
+  });
+
+  it('R10 — confirmar invoca la action EXACTAMENTE una vez con el id, y NINGUNA escritura de edicion', async () => {
+    const user = setupUser();
+    await abrirEdicion(FILA);
+
+    await user.click(screen.getByTestId(USER_FORM_END_SESSIONS_TESTID));
+    // El disparador por si solo no envio el formulario de edicion.
+    expect(updateUserActionMock).not.toHaveBeenCalled();
+
+    await user.click(await screen.findByTestId(END_USER_SESSIONS_CONFIRM_TESTID));
+
+    await waitFor(() => expect(endAllSessionsActionMock).toHaveBeenCalledTimes(1));
+    const enviado = endAllSessionsActionMock.mock.calls[0]![1];
+    expect(enviado.get(END_USER_SESSIONS_ID_FIELD)).toBe(FILA.id);
+    await waitFor(() => expect(routerMock.refresh).toHaveBeenCalledTimes(1));
+    expect(endAllSessionsActionMock).toHaveBeenCalledTimes(1);
+    expect(updateUserActionMock).not.toHaveBeenCalled();
+    expect(createUserActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R13 — con exito se cierra la confirmacion, se avisa una vez y se refresca sin navegar', async () => {
+    const user = setupUser();
+    await abrirEdicion(FILA);
+
+    await user.click(screen.getByTestId(USER_FORM_END_SESSIONS_TESTID));
+    await user.click(await screen.findByTestId(END_USER_SESSIONS_CONFIRM_TESTID));
+
+    await waitFor(() => expect(screen.queryByTestId(END_USER_SESSIONS_DIALOG_TESTID)).toBeNull());
+    await waitFor(() => expect(routerMock.refresh).toHaveBeenCalledTimes(1));
+    expect(toastExito).toHaveBeenCalledTimes(1);
+    expect(routerMock.push).not.toHaveBeenCalled();
+    expect(routerMock.replace).not.toHaveBeenCalled();
+  });
+
+  it('R14 — un rechazo se pinta dentro de la confirmacion, que sigue abierta, sin aviso de exito', async () => {
+    const user = setupUser();
+    endAllSessionsActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No tienes permiso.',
+    });
+    await abrirEdicion(FILA);
+
+    await user.click(screen.getByTestId(USER_FORM_END_SESSIONS_TESTID));
+    await user.click(await screen.findByTestId(END_USER_SESSIONS_CONFIRM_TESTID));
+
+    const dialogo = await screen.findByTestId(END_USER_SESSIONS_DIALOG_TESTID);
+    await waitFor(() =>
+      expect(dialogo.querySelector('[data-code="unauthorized"]')).not.toBeNull(),
+    );
+    expect(screen.getByTestId(USER_FORM_TESTID)).toBeInTheDocument();
+    expect(toastExito).not.toHaveBeenCalled();
+    expect(routerMock.refresh).not.toHaveBeenCalled();
+  });
+
+  it('R16 — el control lo gobiernan SOLO las props: cambiar `currentUserId` lo quita y lo devuelve', async () => {
+    const { rerender } = await abrirEdicion(FILA, ACTOR_ID);
+    expect(screen.getAllByTestId(USER_FORM_END_SESSIONS_TESTID)).toHaveLength(1);
+
+    rerender(<PanelDePrueba user={FILA} currentUserId={FILA.id} />);
+    await waitFor(() =>
+      expect(screen.queryAllByTestId(USER_FORM_END_SESSIONS_TESTID)).toHaveLength(0),
+    );
+
+    rerender(<PanelDePrueba user={FILA} currentUserId={ACTOR_ID} />);
+    expect(await screen.findAllByTestId(USER_FORM_END_SESSIONS_TESTID)).toHaveLength(1);
+  });
+
+  it('R16 — ni el panel, ni el formulario, ni el dialogo leen la sesion o la composicion', () => {
+    const carpeta = join(process.cwd(), 'app', '(private)', 'configuracion', 'usuarios', 'components');
+    const sinComentarios = (codigo: string) =>
+      codigo.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+    for (const archivo of ['user-sheet.tsx', 'user-form.tsx', 'end-user-sessions-dialog.tsx']) {
+      const codigo = sinComentarios(readFileSync(join(carpeta, archivo), 'utf8'));
+      // Anti-vacuidad: el archivo existe, es de cliente y tiene codigo.
+      expect(codigo, archivo).toMatch(/^\s*['"]use client['"]/);
+      for (const prohibido of [
+        '@/lib/composition',
+        'getSessionUser',
+        'getSessionContext',
+        'next/headers',
+        'cookies(',
+        '@/lib/shared/db',
+        '@prisma/client',
+      ]) {
+        expect(codigo, `${archivo} no debe usar ${prohibido}`).not.toContain(prohibido);
+      }
+    }
   });
 });

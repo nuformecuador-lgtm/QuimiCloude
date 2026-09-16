@@ -52,6 +52,11 @@ export type UserListSectionProps = {
   readonly params: DataTableParams;
   /** Si la sesion trae `usuarios.modificar` (R6). Llega por props desde la pagina (R8). */
   readonly canModify: boolean;
+  /**
+   * El identificador del actor de la sesion, o `null` (QC-101 R12, R16). Lo resolvio la pagina de
+   * la MISMA lectura que `canModify`; aqui solo se transporta hasta el panel de detalle.
+   */
+  readonly currentUserId: string | null;
 };
 
 /** `true` si hay termino de busqueda o algun filtro activo: las dos cosas que el vacio limpia. */
@@ -59,7 +64,7 @@ function hasActiveQuery(params: DataTableParams): boolean {
   return params.search.trim() !== '' || Object.keys(params.filters).length > 0;
 }
 
-export async function UserListSection({ params, canModify }: UserListSectionProps) {
+export async function UserListSection({ params, canModify, currentUserId }: UserListSectionProps) {
   const [pageResult, rolesResult] = await Promise.all([listUsersAction(params), listRolesAction()]);
 
   if (pageResult.status === 'error') {
@@ -103,6 +108,7 @@ export async function UserListSection({ params, canModify }: UserListSectionProp
         params={params}
         totalPages={totalPages}
         canModify={canModify}
+        currentUserId={currentUserId}
         roles={roles}
         rolesError={rolesError}
       />
