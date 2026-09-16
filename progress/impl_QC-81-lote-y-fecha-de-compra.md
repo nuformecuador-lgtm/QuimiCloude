@@ -1191,6 +1191,66 @@ lo habia corrido ademas en 5 corridas instrumentadas y con toda la carpeta
 **Adenda al mapa R -> test: R37.** Lo cubren los dos unitarios y los dos casos de integracion de
 arriba. Con ellos, el mapa queda **R1..R37 sin requisitos huerfanos**.
 
+### Menores de la tercera revision: n4 y n5 · `backend_dev` · 2026-09-15
+
+La tercera revision cerro B1 y valido T16 y R37. Rechazo por **B2** —arreglado arriba, en el mapa— y
+señalo tres menores, que el humano aprobo arreglar. n3 quedo anotado en la bitacora; n4 y n5 son estos.
+
+**n4a. El comentario del orden de locks afirmaba mas de lo que su archivo puede sostener.**
+- **Donde:** `product-prisma.ts`, en `addBatchToAlive`, tras tomar la fila.
+- **Que decia:** que el orden fila → lock de aviso no puede formar un ciclo con el borrado, «que solo
+  toma la fila». Es cierto hoy, pero es una conclusion sobre **todo el sistema** escrita en un archivo:
+  el dia que otra transaccion pida el aviso y despues una fila, el comentario seguiria ahi diciendo que
+  no hay ciclo.
+- **Que dice ahora:** solo lo que la funcion controla —un alta que no va a escribir no pide el lock de
+  aviso, y esta funcion pide siempre los dos locks en el orden fila y luego aviso—. La regla completa
+  de adquisicion vive en el diseño, que es donde puede mantenerse.
+- Commit `chore`, solo comentario.
+
+**n4b. El limite de los 60 nueves pasaba de 110 caracteres.**
+- **Donde:** `migration.sql`, el arreglo de n1.
+- Se parte en dos lineas, sin perder la condicion completa: solo aborta si la empresa tiene un lote de
+  60 nueves **y ademas** filas sin lote que rellenar.
+- Comprobado: la linea de comentario mas larga del archivo queda en **105** caracteres.
+- Commit `chore`, solo comentario.
+
+**n5. El caso 2 de la carrera afirmaba un orden que el lock no garantiza.**
+- **Donde:** `product-batch-lot.int.test.ts`, el caso 2 del bloque de R37.
+- **Que se quita:** `expect(orden).toEqual(['alta', 'borrado'])`. Medir en que orden se asientan dos
+  promesas de dos conexiones distintas no lo garantiza el lock: era el flake latente que ya estaba
+  anotado como riesgo teorico.
+- **Que se queda, y es lo que prueba el requisito:** la espera sobre `pg_stat_activity` que demuestra
+  que el borrado se queda bloqueado mientras el alta tiene la fila, mas el desenlace (el lote queda
+  escrito, el borrado devuelve `true`, el producto queda borrado).
+- **El nombre del `it` deja de prometer lo que ya no afirma:** ahora es «R37: con el alta llegando
+  antes, el borrado espera a que el alta confirme y el lote queda escrito».
+- **Sigue muriendo sin el lock.** Con la mutacion, el caso 2 cae por «el borrado no espero al alta»,
+  que es justo la asercion conservada: quitar el orden **no** debilito la prueba.
+- **Resto conocido:** el array local `orden` sigue existiendo porque `vigilar()` lo recibe como
+  parametro y esa funcion la usa tambien el caso 1, que no entraba en el encargo. Se escribe y ya no se
+  lee en el caso 2. Limpiarlo exige tocar el caso 1; queda anotado, no hecho.
+- Commit `test`, porque es cambio de codigo de test.
+
+**Verificacion de esta ronda** (una cosa cada vez, por la memoria de la maquina):
+```
+$ pnpm run typecheck   -> exit=0
+$ pnpm run lint        -> exit=0
+$ pnpm exec vitest run guard
+ Test Files  39 passed (39)
+      Tests  407 passed | 9 skipped (416)
+$ pnpm exec vitest run --project integration tests/integration/inventario/product-batch-lot.int.test.ts
+test-db: la corrida de integracion va contra qct_qc81_75ea7fee_mu3buqj3_950 (copia de qct_tpl_7d0d301d89fb).
+ Test Files  1 passed (1)
+      Tests  19 passed (19)
+$ pnpm exec vitest related --run --project node --project ui product-prisma.ts product-batch-lot.int.test.ts
+ Test Files  121 passed (121)
+      Tests  1867 passed | 1 skipped (1868)
+```
+
+**Trazabilidad, reproducida tras el arreglo de B2.** Con las dos expresiones del script oficial y sin su
+salto de feature, sobre `requirements.md` y esta bitacora: **37 declarados, 37 mapeados, ninguno
+pendiente**, y la fila del mapa cuenta.
+
 ## Estado final de F2.1
 
 | Task | Estado |
