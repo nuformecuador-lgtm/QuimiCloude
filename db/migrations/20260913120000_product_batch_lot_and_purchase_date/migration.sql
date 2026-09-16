@@ -60,7 +60,8 @@ BEGIN
 
   -- El maximo se lee con `numeric` sobre `'^[0-9]+$'`, sin techo de digitos: con `bigint` un lote
   -- de 19 digitos quedaria fuera del maximo y el correlativo repetiria un valor existente.
-  -- Limite conocido: solo aborta si una empresa tiene un lote de 60 nueves y ademas filas sin lote que rellenar.
+  -- Limite conocido: solo aborta si una empresa tiene un lote de 60 nueves y ademas
+  -- filas sin lote que rellenar.
   -- El `id` desempata: con el mismo `created_at` el orden seria indefinido y el relleno no reproducible.
   SELECT count(*) INTO pending_rows
     FROM "product_batches"
