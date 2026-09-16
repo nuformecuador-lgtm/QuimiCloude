@@ -177,7 +177,7 @@
 
 ## Tanda 5 — límites de la ficha y cierre
 
-- [ ] **T11 [P] — La guardia de alcance de esta ficha.** Depende de nada.
+- [x] **T11 [P] — La guardia de alcance de esta ficha.** Depende de nada.
       Archivos: `tests/unit/documentos/qc106-alcance.test.ts` (nuevo; patrón de
       `tests/unit/inventario/qc81-alcance.test.ts`).
       Afirma contra el **diff de la rama** frente al merge-base con `origin/dev`: cero archivos bajo
