@@ -195,7 +195,7 @@
       **Hecho:** el test en verde y rojo si alguien cuelga un adaptador del barrel. Cubre **R27,
       R28**.
 
-- [ ] **T13 — Trazabilidad y gate.** Depende de **todas**.
+- [x] **T13 — Trazabilidad y gate.** Depende de **todas**.
       Archivos: `progress/impl_QC-106-endpoint-de-carga-de-pdf.md`.
       El mapa `R1..R34 → test` completo, sin ningún requisito huérfano. Se escriben además: las dos
       respuestas de T0; la enmienda a `docs/dependencias.md:32` tal como quedó; la nota del **E2E
