@@ -20,8 +20,8 @@
     "inventario/inventario-constraints.int.test.ts",
     "inventario/presentation-uniqueness.int.test.ts",
     "inventario/product-batch-write.int.test.ts",
+    "pedidos/company-scope.int.test.ts",
     "pedidos/order-crud.int.test.ts",
-    "pedidos/order-sequence.int.test.ts",
     "pedidos/pedidos-constraints.int.test.ts",
     "proveedores/catalog-line.int.test.ts",
     "proveedores/proveedores-constraints.int.test.ts",
@@ -133,14 +133,34 @@
       "desde": "2026-09-12"
     },
     {
+      "archivo": "pedidos/company-scope-queries.int.test.ts",
+      "motivo": "Nacido con QC-77 ya en pie (QC-60 T13): siembra pedidos de CUATRO empresas efimeras a la vez y llama a los adaptadores driven de 'pedidos' ('order-prisma.ts' y 'order-catalog-prisma.ts') directamente, para demostrar que el WHERE del SQL -y el 'count' del total- acota por empresa, que el alta numera en la serie de su empresa y que quitar FORCE ROW LEVEL SECURITY no cambia nada. Esos adaptadores usan el cliente Prisma GLOBAL y 'createOrder' abre SU PROPIA 'prisma.$transaction' con el lock de aviso dentro, asi que una transaccion del test no los envolveria. Committea y borra lo suyo en el afterAll por 'company_id' en el orden de las FK (asignaciones -> pedidos -> usuario, rol, tipo de documento -> empresa -> receta). El caso R30 relaja FORCE en 'orders' y lo restaura en un 'finally', comprobandolo despues contra pg_class. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-16"
+    },
+    {
       "archivo": "pedidos/list-query-orders.int.test.ts",
       "motivo": "Nacido antes de QC-77 (QC-57 T20): siembra mas filas que una pagina y afirma sobre el orden que decide el MOTOR -el enum de prioridad por su orden de declaracion y el par (order_year, order_sequence) detras de 'orderNumber'-. El adaptador usa el cliente global; committea y borra lo suyo en el afterAll.",
       "desde": "2026-09-12"
     },
     {
+      "archivo": "pedidos/order-duplicate-number.int.test.ts",
+      "motivo": "Nacido con QC-77 ya en pie (QC-60, decision humana del 2026-09-16): provoca un 23505 AUTENTICO sobre 'orders_company_year_sequence_key' a traves del adaptador real 'createOrder', que usa el cliente Prisma GLOBAL y abre SU PROPIA 'prisma.$transaction' por intento, asi que una transaccion del test no lo envolveria. Para que choquen los tres intentos crea, desde un 'pg.Client' aparte, una funcion y un trigger BEFORE INSERT con nombre unico y acotados por WHEN a la empresa efimera del caso, que reescriben 'order_sequence' a un numero ya ocupado. En un 'finally' borra el trigger y la funcion y despues el fixture (pedidos -> usuario -> rol y tipo de documento -> empresa); la receta se borra en el afterAll. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-16"
+    },
+    {
       "archivo": "pedidos/order-repository.int.test.ts",
       "motivo": "Nacido antes de QC-77 (QC-34). Existe justamente como contrapunto de 'order-crud.int.test.ts', que si se aisla por transaccion pero ejecutando su PROPIA copia de las sentencias: aqui se llaman las funciones REALES del adaptador que cablea lib/composition, y esas hablan con el cliente Prisma global. Committea y limpia lo suyo.",
       "desde": "2026-09-12"
+    },
+    {
+      "archivo": "pedidos/order-sequence-race.int.test.ts",
+      "motivo": "Nacido con QC-77 ya en pie (QC-60 T14): la carrera del correlativo por empresa (R14, R15) con el patron medido de QC-81. 'createOrder' usa el cliente Prisma GLOBAL y abre SU PROPIA 'prisma.$transaction' por intento con el 'pg_advisory_xact_lock' dentro, asi que envolverlo en una transaccion del test seria un aislamiento de mentira; ademas cada alta tiene que CONFIRMAR para que la siguiente vea su fila, y el caso de empresas distintas sujeta el lock desde un 'pg.Client' aparte. Cada caso fabrica su empresa efimera con randomUUID, escribe solo en ella y la borra en un 'finally' (pedidos -> usuario -> rol y tipo de documento -> empresa) despues de asentar todas las altas pendientes; la receta se borra en el afterAll. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-16"
+    },
+    {
+      "archivo": "pedidos/order-sequence.int.test.ts",
+      "motivo": "Paso de 'transaccion' a 'commit' con QC-60 (2026-09-16). Hasta entonces probaba 'next_order_sequence(integer)' con su propia copia del INSERT dentro de una transaccion con ROLLBACK; QC-60 T3 dejo caer esa funcion y el correlativo lo calcula ahora 'createOrder' (lock de aviso por empresa y ano + max()+1). El archivo se reescribio para llamar al adaptador REAL en vez de a otra copia de su SQL, y ese adaptador usa el cliente Prisma GLOBAL y abre SU PROPIA transaccion, asi que una transaccion del test no lo envolveria. Cada caso fabrica su empresa efimera, da de alta en anos 287x y la borra en un 'finally' (pedidos -> usuario -> rol y tipo de documento -> empresa); la receta se borra en el afterAll. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-16"
     },
     {
       "archivo": "proveedores/list-query-catalog-lines.int.test.ts",

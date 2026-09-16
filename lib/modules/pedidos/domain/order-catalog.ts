@@ -28,8 +28,15 @@ export type OrderAssignmentTarget = {
 };
 
 export interface OrderCatalog {
-  /** `null` = no existe o esta dado de baja: para quien pregunta son el mismo caso (QC-34
-   *  R33). Un pedido CANCELADO si vuelve -tiene estado propio precisamente para no
-   *  desaparecer-, y quien lo consulta decide que hacer con el. */
-  findAliveById(id: string): Promise<OrderAssignmentTarget | null>;
+  /**
+   * `null` = no existe, esta dado de baja, o NO ES DE ESA EMPRESA: para quien pregunta son el
+   * mismo caso. Un pedido CANCELADO si vuelve -tiene estado propio precisamente para no
+   * desaparecer-, y quien lo consulta decide que hacer con el.
+   *
+   * Esta consulta SI se filtra por empresa, como las de `OrderRepository`. La empresa llega como
+   * `string` y no como `OrderScope` para no obligar a otros modulos a construir un tipo interno de
+   * `pedidos`; el adaptador la convierte. Sin este filtro, asignar un pedido ajeno moriria contra
+   * la FK compuesta de `order_assignments` con un `23503` sin traducir.
+   */
+  findAliveById(id: string, companyId: string): Promise<OrderAssignmentTarget | null>;
 }

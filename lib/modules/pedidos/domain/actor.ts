@@ -9,12 +9,17 @@ import { assertPermission, type PermissionCode } from '@/lib/modules/identity';
 
 import { UnauthorizedError } from './errors';
 
-/** Actor de entrada de cada uno de los seis casos de uso: id y CONJUNTO DE PERMISOS, nada
- *  mas. Sin nombre de rol (QC-74 R18): en este modulo no se autoriza por rol. El
- *  dominio NO lee la sesion, ni una cookie, ni una cabecera: quien la resuelve es el
- *  adaptador driving con `identity.getSessionUser()`. */
+/** Actor de entrada de cada uno de los seis casos de uso: id, EMPRESA y CONJUNTO DE PERMISOS,
+ *  nada mas. Sin nombre de rol: en este modulo no se autoriza por rol. El dominio NO lee la
+ *  sesion, ni una cookie, ni una cabecera: quien la resuelve es el adaptador driving con
+ *  `identity.getSessionUser()` y `identity.getSessionContext()`.
+ *
+ *  `companyId` va dentro del actor, y no como parametro suelto de cada caso de uso, para que
+ *  viaje siempre junto a los permisos y ningun llamante pueda olvidarla ni elegirla. Filtra y no
+ *  autoriza por si sola: el permiso se exige aparte y primero con `requirePermission`. */
 export type Actor = {
   readonly id: string;
+  readonly companyId: string;
   readonly permissions: readonly string[];
 };
 

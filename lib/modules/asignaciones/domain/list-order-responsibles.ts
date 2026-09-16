@@ -84,7 +84,7 @@ export function createListOrderResponsibles(
     requirePermission(actor, 'pedidos.consultar');
 
     // El pedido tiene que existir y estar vivo (R8). Su `status` NO se mira: R13.
-    const order = await deps.orders.findAliveById(orderId);
+    const order = await deps.orders.findAliveById(orderId, actor.companyId);
     if (order === null) throw new OrderNotFoundError(orderId);
 
     // La empresa sale del ACTOR (R5) y acota la lectura (R7): una asignacion de otra empresa no

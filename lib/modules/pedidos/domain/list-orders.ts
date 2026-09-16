@@ -4,6 +4,7 @@ import { toOrderView } from './get-order';
 import { createListQuerySchema, sanitizeListQuery } from './list-query';
 import { ORDER_PRIORITY_VALUES, ORDER_STATUS_VALUES } from './order-classification';
 import { ORDER_QUERYABLE } from './order-queryable';
+import type { OrderScope } from './order-scope';
 
 import type { ListFilterValue, ListQuery } from './list-query';
 import type { OrderSummary } from './order-view';
@@ -126,6 +127,9 @@ export function createListOrders(
   ): Promise<Page<OrderSummary>> {
     requirePermission(actor, 'pedidos.consultar');
 
+    // La empresa sale del ACTOR y jamas de la entrada: nadie puede elegir consultar otra.
+    const scope: OrderScope = { companyId: actor.companyId };
+
     const parsed = listQuerySchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
 
@@ -133,7 +137,7 @@ export function createListOrders(
     const podada = pruneClosedSelects(saneada.query);
     deps.log.ignoredFields(LIST_NAME, [...saneada.ignored, ...podada.ignored]);
 
-    const page = await deps.orders.listAlive(podada.query);
+    const page = await deps.orders.listAlive(podada.query, scope);
 
     // R45: los ids se DEDUPLICAN antes de preguntar. Diez pedidos de la misma receta son UNA
     // sola entrada, y el numero de consultas no crece con el numero de filas.

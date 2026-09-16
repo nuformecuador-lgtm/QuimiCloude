@@ -32,7 +32,7 @@ import {
 import { prisma } from '@/lib/shared/db/prisma'
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination'
 
-import type { ListQuery, NewOrder, OrderRow } from '@/lib/modules/pedidos'
+import type { ListQuery, NewOrder, OrderRow, OrderScope } from '@/lib/modules/pedidos'
 
 /** Un ano por archivo, distinto de los 288x de `order-repository.int.test.ts` y de los 287x de
  *  `order-sequence.int.test.ts`, para que ninguno pueda pisarle la secuencia a otro. */
@@ -51,6 +51,13 @@ let companyId: string
 
 const creados: string[] = []
 
+/** QC-60 (R18): el adaptador exige el AMBITO en la firma. Es la empresa efimera del propio
+ *  fixture, asi que el archivo sigue viendo exactamente los pedidos que siembra. Se lee como
+ *  funcion y no como constante porque `companyId` no existe hasta el `beforeAll`. */
+function scope(): OrderScope {
+  return { companyId }
+}
+
 function instantIn(day: number, ms = 0): Date {
   return new Date(Date.UTC(YEAR, 0, day, 12, 0, 0, ms))
 }
@@ -67,7 +74,7 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
 
 /** Alta por el adaptador REAL. Registra el id para que el `afterAll` la borre. */
 async function alta(now: Date, overrides: Partial<NewOrder> = {}): Promise<OrderRow> {
-  const resultado = await createOrder(baseOrder(overrides), YEAR, actorId, now)
+  const resultado = await createOrder(baseOrder(overrides), YEAR, actorId, now, scope())
   expect(resultado).not.toBe('duplicate_number')
   const fila = resultado as OrderRow
   creados.push(fila.id)
@@ -198,14 +205,15 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
 
     // Orden de HOY: `priority DESC, created_at ASC, ...`. Todas comparten prioridad, asi que el
     // ultimo sembrado -el `created_at` mas alto- cae en la pagina 3 con paginas de cinco.
-    const pagina3 = await listAliveOrders(consulta({ page: 3, pageSize: 5 }))
+    const pagina3 = await listAliveOrders(consulta({ page: 3, pageSize: 5 }), scope())
     expect(pagina3.items.map((o) => o.id)).toContain(ultimo)
-    const pagina1 = await listAliveOrders(consulta({ page: 1, pageSize: 5 }))
+    const pagina1 = await listAliveOrders(consulta({ page: 1, pageSize: 5 }), scope())
     expect(pagina1.items.map((o) => o.id)).not.toContain(ultimo)
 
     // Pidiendo el orden inverso por el correlativo, la MISMA fila sale en la pagina 1.
     const desc = await listAliveOrders(
       consulta({ page: 1, pageSize: 5, sort: { columnId: 'orderNumber', direction: 'desc' } }),
+      scope(),
     )
     expect(desc.items[0]?.id).toBe(ultimo)
   })
@@ -218,6 +226,7 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
         pageSize: 5,
         filters: conFiltros({ quantity: { kind: 'numberRange', min: 12, max: 12 } }),
       }),
+      scope(),
     )
 
     expect(pagina.items.map((o) => o.id)).toEqual([sembrados[sembrados.length - 1]?.id])
@@ -227,7 +236,7 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
 
   it('pedir 100 por pagina se ACOTA a 25, no se rechaza (R29)', async () => {
     // R29 — acotar, no rechazar. El `pageSize` que sale es el efectivo, nunca el pedido.
-    const pagina = await listAliveOrders(consulta({ page: 1, pageSize: 100 }))
+    const pagina = await listAliveOrders(consulta({ page: 1, pageSize: 100 }), scope())
 
     expect(pagina.pageSize).toBe(MAX_PAGE_SIZE)
     expect(pagina.items.length).toBeLessThanOrEqual(MAX_PAGE_SIZE)
@@ -237,8 +246,8 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
     // R17 — el adaptador no tiene capa de busqueda y no puede tenerla: `orders` no tiene
     // columna `name`. Aunque el `search` llegara con texto -no llega: el caso de uso lo poda-,
     // la lista vuelve igual.
-    const conTexto = await listAliveOrders(consulta({ pageSize: 25, search: 'acido' }))
-    const sinTexto = await listAliveOrders(consulta({ pageSize: 25 }))
+    const conTexto = await listAliveOrders(consulta({ pageSize: 25, search: 'acido' }), scope())
+    const sinTexto = await listAliveOrders(consulta({ pageSize: 25 }), scope())
 
     expect(conTexto.total).toBe(sinTexto.total)
     expect(conTexto.items.map((o) => o.id)).toEqual(sinTexto.items.map((o) => o.id))
@@ -269,6 +278,7 @@ describe('`priority` ordena por el ORDEN DEL ENUM, no por el alfabetico', () => 
           },
         }),
       }),
+      scope(),
     )
 
     expect(pagina.items.map((o) => o.priority)).toEqual(['CRITICA', 'ALTA', 'MEDIA', 'BAJA'])
@@ -289,6 +299,7 @@ describe('`priority` ordena por el ORDEN DEL ENUM, no por el alfabetico', () => 
           },
         }),
       }),
+      scope(),
     )
 
     expect(pagina.items.map((o) => o.priority)).toEqual(['CRITICA', 'ALTA', 'MEDIA', 'BAJA'])
@@ -303,6 +314,7 @@ describe('`orderNumber` ordena por el par (ano, correlativo) y no alfabeticament
     // correlativos van del 1 en adelante y cruzan el 9 -> 10.
     const pagina = await listAliveOrders(
       consulta({ pageSize: 25, sort: { columnId: 'orderNumber', direction: 'asc' } }),
+      scope(),
     )
 
     const secuencias = pagina.items.map((o) => o.number.sequence)
@@ -336,6 +348,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
         pageSize: 25,
         filters: soloElDia9({ status: { kind: 'select', values: ['EN_CURSO'] } }),
       }),
+      scope(),
     )
     expect(porEstado.total).toBe(2)
     expect(porEstado.items.every((o) => o.status === 'EN_CURSO')).toBe(true)
@@ -345,6 +358,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
         pageSize: 25,
         filters: soloElDia9({ priority: { kind: 'select', values: ['ALTA'] } }),
       }),
+      scope(),
     )
     expect(porPrioridad.total).toBe(2)
 
@@ -357,6 +371,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
           priority: { kind: 'select', values: ['ALTA'] },
         }),
       }),
+      scope(),
     )
     expect(ambos.total).toBe(1)
     expect(ambos.items[0]?.status).toBe('EN_CURSO')
@@ -371,6 +386,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
           status: { kind: 'select', values: ['EN_CURSO', 'PENDIENTE'] },
         }),
       }),
+      scope(),
     )
 
     expect(pagina.total).toBe(3)
@@ -403,7 +419,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
     })
 
     // Sin filtro de estado: el cancelado SALE y el borrado NO, aunque los dos son del dia 14.
-    const todos = await listAliveOrders(consulta({ pageSize: 25, filters: soloElDia14() }))
+    const todos = await listAliveOrders(consulta({ pageSize: 25, filters: soloElDia14() }), scope())
     expect(todos.items.map((o) => o.id)).toEqual([cancelado.id])
     expect(todos.total).toBe(1)
 
@@ -413,6 +429,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
         pageSize: 25,
         filters: soloElDia14({ status: { kind: 'select', values: ['CANCELADO'] } }),
       }),
+      scope(),
     )
     expect(pagina.items.map((o) => o.id)).toEqual([cancelado.id])
     expect(pagina.items[0]?.cancellationReason).toBe('el cliente anulo el pedido')
@@ -444,6 +461,7 @@ describe('los decimales se comparan como Decimal, no como coma flotante', () => 
           quantity: { kind: 'numberRange', min: null, max: 19.99 },
         },
       }),
+      scope(),
     )
 
     expect(pagina.items.map((o) => o.id).sort()).toEqual([justo.id, menos.id].sort())
@@ -473,6 +491,7 @@ describe('el rango de fechas se compara en UTC, con los dos extremos inclusivos'
           },
         },
       }),
+      scope(),
     )
 
     expect(pagina.items.map((o) => o.id).sort()).toEqual([inicial.id, final.id].sort())
@@ -507,6 +526,7 @@ describe('desempate estable por identificador (R10)', () => {
           sort: { columnId: 'status', direction: 'asc' },
           filters: soloElDia28,
         }),
+        scope(),
       )
       vistos.push(...pagina.items.map((o) => o.id))
     }
