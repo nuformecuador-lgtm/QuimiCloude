@@ -9,9 +9,9 @@
 
 ## Estado: 19 de 20 tasks cerradas (T0–T18). Queda T19, del leader.
 
-**Hay dos hallazgos abiertos que el reviewer tiene que ver** (sección *Abiertos*): R15 no se cumple
-contra Postgres real y R22 se cumple solo a medias. No se arreglaron porque hacerlo se aparta del
-`design.md > 3.3` o de un test cerrado de otra ficha (QC-35bis): lo decide el leader o el humano.
+Los dos abiertos de la ronda 1 (R15 y R22) **quedaron cerrados en la ronda 2** por decisión humana
+del 2026-09-16: ver *Ronda 2* al final. La sección *Abiertos* se conserva como registro de lo que se
+encontró.
 
 ## Commits
 
@@ -89,14 +89,14 @@ Integración: `tests/integration/pedidos/{order-sequence,order-crud,order-reposi
 | R12 | `tests/integration/pedidos/company-scope-queries.int.test.ts` (primera = 1; borrado y cancelado no liberan) + `tests/integration/pedidos/order-sequence.int.test.ts` | integración |
 | R13 | `company-scope.int.test.ts` (backfill conserva 37/44/77) + `company-scope-queries.int.test.ts` (siguiente = 78) | integración |
 | R14 | `tests/integration/pedidos/order-sequence-race.int.test.ts` (3×8 altas simultáneas, distintas y consecutivas, cero reintentos; empresas distintas no se esperan; muerde sin el lock) | integración |
-| R15 | `order-sequence-race.int.test.ts` + `tests/unit/pedidos/order-prisma-errors.test.ts` — **ver Abierto 1** | integración + unit |
+| R15 | `tests/integration/pedidos/order-duplicate-number.int.test.ts` (23505 auténtico → `duplicate_number`, 3 transacciones, sin error de Prisma; **rojo antes del arreglo**) + `order-sequence-race.int.test.ts` + `tests/unit/pedidos/order-prisma-errors.test.ts` (forma real `P2010`/`meta.code`) | integración + unit |
 | R16 | `tests/unit/pedidos/company-isolation-service.test.ts` | unit |
 | R17 | `tests/unit/pedidos/order-actions.test.ts` (sin contexto o sin usuario → `unauthorized` sin tocar puertos) | unit |
 | R18 | `tests/guards/guard-ambito-empresa-pedidos.test.ts` (por función, sin excepciones; 4 mutaciones probadas) + `tests/unit/pedidos/company-scope.test.ts` + `company-scope-queries.int.test.ts` | guardia + unit + integración |
 | R19 | `company-scope-queries.int.test.ts` (listado y `total`, filtros y orden) + `e2e/aislamiento-pedidos.spec.ts` | integración + E2E |
 | R20 | `company-isolation-service.test.ts` (ficha ajena = inexistente, nunca `unauthorized`) + E2E | unit + E2E |
 | R21 | `company-isolation-service.test.ts` + `company-scope-queries.int.test.ts` (fila ajena intacta) + E2E (borrado cruzado) | unit + integración + E2E |
-| R22 | `company-isolation-service.test.ts` + `company-scope-queries.int.test.ts` — **ver Abierto 2** | unit + integración |
+| R22 (enmendado 2026-09-16) | `company-isolation-service.test.ts` (entrada con empresa B y actor de A: el alta resuelve, el puerto recibe `{ companyId: A }` y datos sin empresa) + `company-scope-queries.int.test.ts` (la fila se escribe con la empresa del ámbito) | unit + integración |
 | R23 | `tests/unit/pedidos/company-scope.test.ts` + `company-scope-queries.int.test.ts` | unit + integración |
 | R24 | `company-scope-queries.int.test.ts` (B recibe 7, no 79) + guardia (subselect desde `companyScopeColumns`) | integración + guardia |
 | R25 | `tests/integration/pedidos/company-scope.int.test.ts` (`23503` en `order_assignments_order_id_company_id_fkey`) | integración |
@@ -111,7 +111,7 @@ Integración: `tests/integration/pedidos/{order-sequence,order-crud,order-reposi
 | R34 | `tests/unit/pedidos/order-actions.test.ts` (6 actions, misma aridad) + `tests/unit/pedidos/list-orders.test.ts` | unit |
 | R35 | `tests/guards/guard-dependencias-aprobadas.test.ts` (`package.json` sin tocar) | guardia |
 
-35 de 35 con test. R15 y R22 tienen test pero **no cumplimiento completo** (Abiertos 1 y 2).
+35 de 35 con test y cumplidos (R15 y R22 al día tras la ronda 2).
 
 ## Salida real de lo que se corrió (por subagente, nunca la suite)
 
@@ -126,3 +126,26 @@ Integración: `tests/integration/pedidos/{order-sequence,order-crud,order-reposi
 - **T17:** `[chromium] 2 passed (20.3s)` y `[webkit] 2 passed (28.1s)` (`aislamiento-pedidos.spec.ts` + `pedidos-responsables.spec.ts`). `pnpm typecheck` y `pnpm lint` verdes.
 
 No se corrió `pnpm test`, `./init.sh` ni la suite E2E completa: el gate es del leader.
+
+## Ronda 2 — 2026-09-16
+
+Cinco correcciones pedidas por el leader; R15 y R22 decididas por el humano.
+
+1. **R15, reconocimiento por código** (`3f9b340`). `isDuplicateOrderNumber` es ahora `sqlStateOf(error) === '23505'`, sin leer ningún texto; su comentario explica que es seguro solo porque está acotado al `INSERT` del alta, que no escribe `id`. Desaparece `ORDER_NUMBER_UNIQUE_INDEX`. `sqlStateOf` se redujo a leer `meta.code` de `PrismaClientKnownRequestError`: se quitó la rama que sacaba el código del mensaje de un `PrismaClientUnknownRequestError` con una regex (era leer texto); un error por esa vía ahora se relanza sin traducir, algo que no se ha visto en ninguna medición.
+   - **Test nuevo** `tests/integration/pedidos/order-duplicate-number.int.test.ts` (declarado `commit` en `aislamiento.json`, con motivo): tras un alta que ocupa el 1, un trigger `BEFORE INSERT` temporal, limitado a la empresa efímera, fuerza `order_sequence = 1`; el test comprueba primero con `pg` que el trigger produce un `23505` real sobre `orders_company_year_sequence_key`, y luego que `createOrder` devuelve `'duplicate_number'`, abre exactamente 3 transacciones y deja 1 sola fila. Limpieza en `finally`.
+   - **Comprobado rojo con el código anterior:** `× con el correlativo ocupado en los tres intentos devuelve duplicate_number, sin lanzar, tras 3 transacciones` → `PrismaClientKnownRequestError … Raw query failed. Code: 23505. Message: Ya existe la llave (company_id, order_year, order_sequence)=(…, 2026, 1).` (`Tests 1 failed (1)`). Tras el arreglo: `Tests 1 passed (1)`.
+   - `tests/unit/pedidos/order-prisma-errors.test.ts` reescrito con la forma real medida (`P2010`, `meta.code`, mensaje sin nombre de índice): se reconoce; `23503`, `23514`, `P2002` sin `meta.code`, un `Unknown` con el código solo en el texto y lo que no es error de Prisma, no. Se retiró el caso «23505 de `orders_pkey` no se reconoce»: la garantía la da el acotamiento al `INSERT`, no el código.
+   - `design.md > 3.3` con **enmienda fechada** (`5b882ef`).
+   - Corridas: `order-prisma-errors` + `guard-ambito-empresa-pedidos` + `guard-aislamiento-integracion` → `3 passed, 35 tests`; `order-sequence-race.int.test.ts` → `2 passed`.
+2. **R22 enmendado** (`5b882ef`, `2cdbdb7`). `requirements.md` sin la cláusula de rechazo y con nota de enmienda; `tasks.md > T16` al día. `company-isolation-service.test.ts`: entrada del alta con `companyId`/`company_id` de B y actor de A → resuelve, `create` recibe `{ companyId: A }`, los datos no llevan empresa, B no aparece en ningún argumento. La edición con empresa en la entrada también resuelve. El **listado** con `filters.companyId` sí da `ValidationError` hoy (no es un filtro ofrecido) y el test lo admite solo para el listado.
+3. **Listas cerradas** (`c` commit `test(QC-60): alta de la migracion y del E2E en cuatro listas cerradas`). Cinco rojos, no dos:
+   - `tests/guards/guard-identificador-de-request.test.ts`: `aislamiento-pedidos.spec.ts` en `E2E_ESPERADOS` y `20260915120000_orders_company_scope` en `MIGRACIONES_ESPERADAS`, patrón de `1012f97`.
+   - `tests/unit/shared/data-table-alcance.test.ts`: el E2E usa `data-table-row-<id>`; centinela de doce a trece.
+   - `tests/unit/recetas-ui/recipe-route-contract.test.ts`: `MIGRACION_QC60` en `DB_PERMITIDAS`, como QC-49 y QC-81.
+   - `tests/unit/inventario/scope.test.ts`: `Order` ya declara `companyId`; nueva lista cerrada `MODELOS_YA_AISLADOS_POR_SU_MIGRACION = ['Order']` que exige presencia para esos y ausencia para el resto.
+   - Miradas que no aplican: `qc81-alcance.test.ts` (solo mide en la rama de QC-81), `E2E_DE_AISLAMIENTO` de inventario (su patrón no casa), `aviso-base-atrasada.test.ts`, `EXPECTED_FAILING_MIGRATION` y los tests de migración de inventario (miran la suya).
+   - Corrida de los 5 archivos: `Test Files 5 passed (5) · Tests 91 passed | 2 skipped (93)` (antes, 5 fallos).
+4. **Erratas** (`5b882ef`): «seis `CHECK`» → cinco en `design.md` §0.3, §1 y §7 (con nota de errata) y en `tasks.md > T11`; la fila R15 de `tasks.md` apunta a `order-prisma-errors.test.ts` y al test de integración nuevo.
+5. `pnpm typecheck` y `pnpm lint` limpios sobre HEAD.
+
+**Avisos, sin tocar:** `docs/conventions.md` de este worktree no tiene sección «Comentarios» (la regla se aplicó tal como la dio el leader; puede estar solo en `dev`). `lib/modules/inventario/adapters/driven/persistence/presentation-prisma.ts:123` cita que `isDuplicateOrderNumber` reconoce «con el nombre de su indice», ya falso; fuera del módulo, no se tocó. El posible fallo latente de `e2e/aislamiento-inventario.spec.ts` lo anota el leader en *Deudas*.
