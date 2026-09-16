@@ -19,6 +19,10 @@
 
 ## Evaluaciones
 
+### QC-88 - acotada con `/afinar-feature` (2026-09-15)
+
+Alcance, **14 decisiones cerradas** y **2 preguntas abiertas** -nombre de la ruta y donde se compone la lista- en `specs/QC-88-listado-de-pedidos-asignados/requirements.md`. **El board se actualizo ANTES de sembrar**: `description` reescrita y `complexity:high` (nacio sin ella). **Lo que la acotacion midio en disco y decide el tamano**: la consulta «los pedidos de esta persona» **no existe** -el puerto de `asignaciones` solo va al reves- y el listado de `pedidos` **no filtra por un conjunto de ids**, con el JOIN prohibido por QC-33 R53. **Tres decisiones humanas**: pantalla propia con `asignaciones.consultar` -reutilizar `/pedidos` exigiria darle al Operador un permiso que le abre todo el listado-, la lista **deshabilita** el pedido ya tomado y la regla de servidor queda en QC-63, y **no se guarda quien abrio el pedido**: se muestran los responsables en vez de afirmar algo que el sistema no sabe. Ninguna ficha nueva y ninguna cancelada. Sigue `pending` en Backlog.
+
 ### QC-60 - seleccionada en F1.0 (2026-09-15)
 
 `arranca 60` del humano. Ficha del **2026-09-04**, nunca acotada: se corre `/afinar-feature`
@@ -35,6 +39,14 @@ el codigo del rechazo» de *Deudas*, cuya causa escrita es justo que `orders` no
 **Advertencia de estado**: esta sesion corrio F0 **en paralelo con otra sesion** que hizo lo
 mismo a la misma hora. Los dos `feature_list.json` coinciden —105 fichas, QC-113 a QC-117
 dentro, `in_progress` solo QC-81— y el validador pasa. La otra sesion tiene **QC-104**.
+
+**ACOTADA con `/afinar-feature` el 2026-09-15**: alcance, **13 decisiones cerradas** y **dos
+preguntas abiertas, las dos informativas**, en
+`.worktrees/QC-60-aislamiento-por-empresa-en-pedidos/specs/QC-60-aislamiento-por-empresa-en-pedidos/requirements.md`
+(sembrado DENTRO del worktree, para que no haya que copiarlo como en QC-93). No se copian aqui. El
+board se corrigio ANTES de sembrar: la `description` afirmaba «y sus lineas» —no existe tabla de
+lineas— y que un pedido referencia producto o unidad —referencia una RECETA—. `zone`, `complexity`
+y `depends_on` siguen igual; no nace ni se cancela ninguna ficha.
 
 
 ### F0 rehecho y `feature_list.json` reimportado (2026-09-15)

@@ -3534,3 +3534,46 @@ rojos**. Integración: 54 archivos, 709 verdes.
 - **Una caída de la base se ve como un cierre de sesión** (§ 4.2): precio de que la revocación no se
   pueda saltar provocando un fallo.
 - **Los 8 rojos del baseline pasan todos** y nadie los ha limpiado. Material de QC-99.
+
+## QC-56 — migrar-listas-a-tabla-compartida (2026-09-15/16)
+
+`frontend`, `medium`. PR **#74** mergeado en `dev` (merge `dc73f14`). **R1–R33** y **19 tasks**, con
+`./init.sh` completo en verde antes del PR: **466 archivos, 6721 pasados, 78 saltados, 0 rojos nuevos**.
+
+- **Qué entra**: las listas de **recetas** y **proveedores** montan la tabla compartida de QC-55 y
+  **se igualan a productos**: orden por cabecera, búsqueda y filtro por rango de fecha de creación,
+  contra las listas blancas que QC-57 ya publicaba. Cada gesto navega y el servidor recalcula.
+  **Invierte** QC-26 R14 y QC-44 R11, como `749d850` invirtió QC-22 R13.
+- **La acotación encontró la ficha medio derogada**: productos **ya estaba migrado** desde `749d850`
+  (2026-09-07, fuera del flujo de fichas) y **dos documentos afirmaban que recetas también** —el
+  mensaje de ese commit y la enmienda de QC-44—, lo cual era falso. El alcance pasó a recetas +
+  proveedores, reabriendo la enmienda que dejaba la lista de proveedores como estaba.
+- **Cuatro decisiones del humano en F1.4**, contra lo que decía la semilla: vacío, error y esqueleto
+  **fuera** de la tabla (como productos, no como QC-55); una línea en el barrel para publicar
+  `SUPPLIER_QUERYABLE`; la **descripción de receta sale de la lista**; y un estado propio de «sin
+  resultados» con «limpiar». **D16, al aprobar**: «sin resultados» es la **única** excepción y lo
+  pinta la tabla con cero filas, porque la caja de búsqueda vive dentro de `<DataTable>` y no debe
+  desmontarse. **`components/shared/data-table/` no se tocó**, y hay test que lo afirma.
+- **La prueba en iPhone real salió a ficha propia: QC-114**, ahora desbloqueada. La T13 de QC-55
+  llevaba pendiente desde el 2026-09-04 y ya afectaba a siete pantallas, no solo a esta.
+- **Review**: RECHAZADA en la primera vuelta (3 mayores) y APROBADA en la segunda (0 mayores nuevos,
+  2 menores). **M2** era un test que se habría puesto rojo al cerrar la feature —sumaba el árbol de
+  trabajo y exigía que fuera de rutas y tests solo cambiara el barrel—; ahora mira solo el rango
+  commiteado y las raíces de producto. **M3** añadió el test automático de R25.
+- **M1 lo decidió el humano: NO bloquea.** La regla de comentarios que invocaba **no está en
+  `origin/dev`**, solo sin commitear en el árbol principal. Queda como deuda con m5, m6 y m7.
+- **F2.3 con QC-93 dentro**: `dev` avanzó 36 commits durante la review y el merge trajo 3 conflictos
+  (los dos E2E y `data-table-alcance`). Se resolvieron conservando ambos lados, y los E2E nuevos
+  pasaron a `loginAndLand`, porque QC-93 borró `login()` y su guardia lo prohíbe. **Ese merge curó
+  los rojos R6 y R52** del Operador.
+
+### Lo que deja anotado y no tiene ficha todavía
+
+1. **R51 sigue rojo, heredado de QC-80**: `choosePresentation` de `e2e/proveedores.spec.ts` —y el
+   mismo patrón en `e2e/inventario.spec.ts`— crea la presentación **sin unidad**, obligatoria desde
+   `af96771`, así que el panel no se cierra. Es la «ficha nueva» que ya proponía la bitácora de QC-93.
+2. **La receta de base vacía de `progress/current.md` estaba rota** desde QC-23: `db:seed` necesita
+   `users.sessions_valid_from`, de una migración posterior a la de QC-49, que nunca llega a aplicarse.
+   La que funciona es la plantilla de QC-77 (`pnpm run db:test template`), y `docs/worktrees.md` no
+   documenta nada de esto —ni `pnpm install`, ni `prisma generate`, ni `next typegen`—.
+3. **n1**: la guardia de R25 cubre *localizar* por copy, no *afirmar* sobre copy.
