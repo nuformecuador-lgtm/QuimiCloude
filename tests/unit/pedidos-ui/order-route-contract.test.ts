@@ -150,30 +150,54 @@ describe('la pantalla vive donde dice la constante (R1, R40)', () => {
 // BARREL; la pagina no los importa por ruta profunda.
 //
 // El caso de «la pagina importa desde el barrel» ya esta arriba (R40 de QC-35, que es el mismo
-// requisito de arquitectura). Lo que falta y se anade aqui es lo especifico de QC-102: que los DOS
+// requisito de arquitectura). Lo que falta y se anade aqui es lo especifico de QC-102: que los
 // archivos nuevos existan donde deben, que el barrel los reexporte y que **ellos** declaren su
 // `'use client'` —nunca el `index.ts`, que convertirlo en frontera cliente/servidor arrastraria la
 // pagina entera al navegador—.
+//
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// **ENMIENDA QC-88 T17 (2026-09-16) — `responsible-avatars.tsx` ya NO es un componente de esta
+// ruta.** Que nadie lea esto manana como un aflojamiento silencioso:
+//
+//   - QC-88 (`listado-de-pedidos-asignados`) es el **SEGUNDO consumidor** de `ResponsibleAvatars`,
+//     y lo necesita **con la misma API** (`specs/QC-88-listado-de-pedidos-asignados/design.md >
+//     8.3`, hallazgo **H6**).
+//   - `docs/architecture.md > Componentes > Regla: sin sobre-ingenieria` **obliga** a promover a
+//     `components/shared/` en ese caso exacto. Lo contrario seria duplicar el avatar —dos
+//     definiciones que divergen en silencio— o hacer que la pantalla de QC-88 importara por ruta
+//     profunda las tripas de `/pedidos`, que es justo lo que este `describe` prohibe.
+//   - Decision humana del 2026-09-16, mismo patron con el que se invirtieron R14 de QC-26 y R11
+//     de QC-44 en QC-56.
+//
+// Por eso —y SOLO por eso— el componente sale de la lista de archivos de la ruta. **Cambia su
+// ubicacion declarada, no la exigencia**: lo que se le pedia aqui se le sigue pidiendo en su casa
+// nueva, en el `describe` que va justo debajo (directiva de cliente propia + reexportado por el
+// barrel de la ruta desde la ubicacion compartida, nunca por ruta relativa). Y para todo lo que
+// SIGUE siendo de `/pedidos` las tres condiciones quedan intactas: dentro de `components/`,
+// reexportado por el barrel y con su `'use client'`.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
 describe('los componentes de responsables viven en components/ y salen por el barrel (R36)', () => {
   const CARPETA = `app/(private)${ORDERS_ROUTE}/components`;
-  const NUEVOS = ['responsible-avatars.tsx', 'order-responsibles.tsx'] as const;
+  /** Los que SIGUEN siendo de esta ruta. `responsible-avatars.tsx` salio por la enmienda QC-88. */
+  const DE_LA_RUTA = ['order-responsibles.tsx'] as const;
 
-  it('los dos archivos nuevos estan dentro de `components/`, no sueltos junto a `page.tsx`', () => {
-    for (const archivo of NUEVOS) {
+  it('los archivos de la ruta estan dentro de `components/`, no sueltos junto a `page.tsx`', () => {
+    for (const archivo of DE_LA_RUTA) {
       expect(existsSync(`${CARPETA}/${archivo}`), `falta ${archivo}`).toBe(true);
       expect(existsSync(`app/(private)${ORDERS_ROUTE}/${archivo}`)).toBe(false);
     }
   });
 
-  it('el barrel reexporta los dos, y por su ruta relativa', () => {
+  it('el barrel reexporta los de la ruta, y por su ruta relativa', () => {
     const barrel = fuenteSinComentarios(`${CARPETA}/index.ts`);
 
-    expect(barrel).toContain("from './responsible-avatars'");
-    expect(barrel).toContain("from './order-responsibles'");
+    for (const archivo of DE_LA_RUTA) {
+      expect(barrel).toContain(`from './${archivo.replace(/\.tsx$/, '')}'`);
+    }
   });
 
-  it('cada componente declara su `use client`; el barrel sigue sin declararlo', () => {
-    for (const archivo of NUEVOS) {
+  it('cada componente de la ruta declara su `use client`; el barrel sigue sin declararlo', () => {
+    for (const archivo of DE_LA_RUTA) {
       expect(readFileSync(`${CARPETA}/${archivo}`, 'utf8').startsWith("'use client'")).toBe(true);
     }
     expect(fuenteSinComentarios(`${CARPETA}/index.ts`)).not.toContain('use client');
@@ -191,6 +215,14 @@ describe('los componentes de responsables viven en components/ y salen por el ba
     }
   });
 
+  it('la ruta NO conserva una copia propia del avatar promovido (una sola definicion)', () => {
+    // El otro lado de la enmienda: promover y dejar el archivo viejo en la ruta serian DOS
+    // definiciones del mismo avatar divergiendo en silencio, que es justo lo que la promocion
+    // evita (`design.md > 8.3`, riesgo 4 de `> 14`).
+    expect(existsSync(`${CARPETA}/responsible-avatars.tsx`)).toBe(false);
+    expect(existsSync(`app/(private)${ORDERS_ROUTE}/responsible-avatars.tsx`)).toBe(false);
+  });
+
   it('consumen las acciones de QC-87 por su RUTA EXACTA, nunca por el barrel del modulo (R40)', () => {
     const codigo = fuenteSinComentarios(`${CARPETA}/order-responsibles.tsx`);
 
@@ -201,5 +233,40 @@ describe('los componentes de responsables viven en components/ y salen por el ba
     expect(codigo).not.toMatch(
       /import\s+\{[^}]*Action[^}]*\}\s+from\s+'@\/lib\/modules\/asignaciones'/,
     );
+  });
+});
+
+// QC-88 T17 (2026-09-16) — El componente promovido, vigilado en su casa nueva.
+//
+// La enmienda de arriba saca `responsible-avatars.tsx` de la lista de archivos de la ruta; este
+// `describe` es lo que impide que eso sea un agujero. Lo que QC-102 exigia sigue exigiendose, solo
+// que sobre `components/shared/`: que el archivo exista alli, que declare SU directiva de cliente
+// —promoverlo no lo convierte en Server Component— y que la ruta de pedidos lo siga consumiendo
+// por su barrel, reexportado desde la ubicacion compartida y no por una ruta relativa que ya no
+// existe. Motivo de la promocion: `design.md > 8.3` / H6 de QC-88 y
+// `docs/architecture.md > Componentes > Regla: sin sobre-ingenieria` (dos consumidores, misma API).
+describe('`ResponsibleAvatars` vive en components/shared y la ruta lo consume desde ahi (R36)', () => {
+  const COMPARTIDO = 'components/shared/responsible-avatars.tsx';
+  const BARREL = `app/(private)${ORDERS_ROUTE}/components/index.ts`;
+
+  it('el archivo esta en `components/shared/`, que es donde la promocion lo puso', () => {
+    expect(existsSync(COMPARTIDO), `falta ${COMPARTIDO}`).toBe(true);
+  });
+
+  it('sigue declarando su `use client`: promoverlo no lo hizo Server Component', () => {
+    expect(readFileSync(COMPARTIDO, 'utf8').startsWith("'use client'")).toBe(true);
+  });
+
+  it('el barrel de la ruta lo reexporta desde la ubicacion COMPARTIDA, no por ruta relativa', () => {
+    const barrel = fuenteSinComentarios(BARREL);
+
+    expect(barrel).toContain("from '@/components/shared/responsible-avatars'");
+    // Si volviera a exportarse `from './responsible-avatars'`, el archivo habria vuelto a la ruta
+    // —o el barrel apuntaria a un modulo inexistente— y la promocion se habria deshecho a medias.
+    expect(barrel).not.toContain("from './responsible-avatars'");
+  });
+
+  it('el barrel sigue nombrando el simbolo: los consumidores de la ruta no cambian (R36)', () => {
+    expect(fuenteSinComentarios(BARREL)).toContain('ResponsibleAvatars');
   });
 });

@@ -145,6 +145,11 @@ export {
   type ResponsiblePersonOption,
   type ResponsibleWorkGroupOption,
 } from './order-responsibles';
+// QC-88 T17 (2026-09-16) — `ResponsibleAvatars` se PROMOVIO a `components/shared/`: QC-88 es el
+// segundo consumidor con la misma API y `docs/architecture.md > Componentes > Regla: sin
+// sobre-ingenieria` lo manda (`specs/QC-88-listado-de-pedidos-asignados/design.md > 8.3`, H6).
+// Se sigue reexportando desde aqui para que la ruta de pedidos lo consuma por su barrel de
+// siempre: ningun consumidor de esta ruta cambia.
 export {
   MISSING_RESPONSIBLES_MARK,
   RESPONSIBLE_AVATARS_LIMIT,
@@ -156,7 +161,7 @@ export {
   ResponsibleAvatars,
   responsiblesOverflowLabel,
   type ResponsibleAvatarsProps,
-} from './responsible-avatars';
+} from '@/components/shared/responsible-avatars';
 export {
   RECIPE_FIELD,
   RECIPE_PICKER_TESTID,

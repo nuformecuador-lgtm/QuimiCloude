@@ -241,7 +241,16 @@ marcador **y no el uuid** (R17), que el nombre del grupo es el **congelado** (R1
 sale entre los avatares (R20) y que `EN_CURSO` deshabilita el disparador **con su motivo accesible**
 (R21)— y un test que ata el numero de columnas del esqueleto al de la tabla.
 
-### T17 · Los avatares: promocion o componente propio (R18, R19)
+### T17 · `[x]` Los avatares: promocion o componente propio (R18, R19)
+
+> Hecha en la tanda 3 (2026-09-16), por la via de **promocion**: QC-102 esta mergeado en `dev`, asi
+> que el plan B no aplica y **no hay deuda de duplicacion que anotar**. Requirio enmendar
+> `tests/unit/pedidos-ui/order-route-contract.test.ts` (R36 de QC-102), que fijaba el componente
+> dentro de la ruta — **decision humana del 2026-09-16**, no del implementer. La guardia se **tenso**
+> (dos casos nuevos y un `describe` nuevo de 4) y se probo con **4 mutaciones**.
+>
+> **Correccion al desglose:** `order-columns.tsx` y `order-responsibles.tsx` **NO importan** el
+> componente; el unico import de producto era `order-sheet.tsx:23`.
 
 **Toca**, **opcion promocion** (si QC-102 esta mergeado en `dev`; lo confirma el leader en F2.0):
 - `components/shared/responsible-avatars.tsx` (**movido** desde

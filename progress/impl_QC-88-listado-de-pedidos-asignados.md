@@ -8,12 +8,13 @@
 > 12 de las 18 tasks estan bloqueadas (ver `> Bloqueadas`). Lo que hay aqui es lo ejecutado, con su
 > evidencia real; lo que falta esta nombrado como falta, no omitido.
 
-## Estado: 4 de 18 tasks cerradas
+## Estado: 5 de 18 tasks cerradas
 
 | Tanda | Tasks | Commit |
 |---|---|---|
 | 1 | T1, T2, T7 | `1b0b16d` |
-| 2 | T3 | la tanda de este commit |
+| 2 | T3 | `95afb58` |
+| 3 | T17 | la tanda de este commit |
 
 ### Tanda 2 — T3 (2 archivos)
 
@@ -24,6 +25,21 @@
 
 Ejercita **el adaptador directamente** —`createOrderAssignmentRepository(fixture.tx)` ->
 `listOrderIdsByUserInCompany`—, no un caso de uso: T6 no existe todavia.
+
+### Tanda 3 — T17 (5 archivos: 2 movidos, 3 modificados)
+
+| Archivo | Que le pasa |
+|---|---|
+| `components/shared/responsible-avatars.tsx` | **movido** desde `app/(private)/pedidos/components/` con `git mv`. Git lo registra como **`R` puro (rename 100%)**: ni una linea de API tocada |
+| `tests/unit/shared-ui/responsible-avatars.test.tsx` | **movido** desde `tests/unit/pedidos-ui/` (`RM`: rename + imports). Ningun caso de prueba alterado. Precedente de ubicacion: `unexpected-error-notice.test.tsx`, el otro componente de presentacion de `components/shared/` |
+| `app/(private)/pedidos/components/index.ts` | reexporta los **mismos 10 simbolos** desde la ubicacion compartida |
+| `app/(private)/pedidos/components/order-sheet.tsx` | el **unico** import de producto (`:23`) |
+| `tests/unit/pedidos-ui/order-route-contract.test.ts` | la enmienda (ver `> T17` abajo) |
+
+**El import del test quedo mixto y comentado**: el componente y su `data-testid` vienen de
+`@/components/shared/responsible-avatars`, pero `MISSING_RESPONSIBLES_MARK` y `MISSING_VALUE_MARK`
+**siguen viniendo del barrel de la ruta**, porque lo que ata el marcador a `order-columns.tsx` es esa
+comparacion y `MISSING_VALUE_MARK` solo existe alli.
 
 ## Preparacion del worktree
 
@@ -66,6 +82,14 @@ el arnes, y una base `QuimiCloude_QC88` suelta solo habria sido basura que el ba
 | R15 (parcial) | ids desnudos y orden estable entre dos lecturas | mismo archivo — «devuelve identificadores DESNUDOS, ordenados, y dos lecturas seguidas dan lo mismo». El orden **de la lista que ve el usuario** lo pone `pedidos` y queda sin cubrir (T5/T6, bloqueadas) |
 | R1-R6, R11-R35, R38-R40 | — | **SIN CUBRIR**: sus tasks estan bloqueadas |
 
+**T17 no cierra ningun `R<n>` de QC-88, y conviene no confundirlo.** Promover `ResponsibleAvatars`
+**habilita** R18 y R19 —hace que el componente se pueda consumir desde la pantalla nueva sin
+importar por ruta profunda ni duplicarlo—, pero R18 y R19 hablan de **lo que muestra cada fila de
+esta pantalla**, y esa pantalla es T12/T14, bloqueadas. Apuntar R18/R19 como cubiertos por T17 seria
+un verde falso: lo que hoy esta probado es el componente **en su sitio nuevo** y el contrato de ruta
+de QC-102, no la fila de QC-88. R26 («no se toca `components/shared/data-table/`») si se sostiene, y
+T17 lo respeto.
+
 ## Salida real de lo que se corrio
 
 ```
@@ -107,6 +131,25 @@ test-db: borrada la base de la corrida: qct_qc88_6c532eac_mu49iqnn_cbw.
 
 La corrida **creo y borro su propia base efimera**, que es la confirmacion en ejecucion de por que
 no hacia falta montar `QuimiCloude_QC88` a mano.
+
+Tanda 3 (T17), verificada por el implementer despues de la entrega del subagente:
+
+```
+pnpm typecheck -> VERDE (sin salida)
+pnpm lint      -> VERDE (sin salida)
+
+pnpm exec vitest run tests/unit/pedidos-ui/order-route-contract.test.ts
+                     tests/unit/shared-ui/responsible-avatars.test.tsx
+                     tests/unit/pedidos-ui/a11y-tactil.test.tsx
+                     tests/unit/pedidos-ui/order-sheet-responsibles.test.tsx
+ Test Files  4 passed (4)
+      Tests  54 passed (54)
+   Duration  10.72s
+```
+
+`a11y-tactil.test.tsx` y `order-sheet-responsibles.test.tsx` **no cambiaron ni un import** y siguen
+verdes: entran por el barrel de la ruta, que sigue reexportando. Es la comprobacion de que la
+promocion no rompio a los consumidores existentes.
 
 La mutacion de T7 es la evidencia de que la guardia **muerde**: ensanchar la puerta de igualdad
 exacta a prefijo de carpeta pone en rojo el caso `:764` de QC-87, el caso nuevo de QC-88 y la
@@ -169,7 +212,7 @@ El corte es **mas profundo que «parar antes de T5»**, y es el hallazgo princip
 
 Bloqueadas por QC-60: **T4, T5, T6, T8, T9, T10, T11, T12, T13, T14, T15, T16**.
 
-### T17 — bloqueada por un contrato de QC-102, NO por QC-60
+### T17 — estuvo bloqueada por un contrato de QC-102; **RESUELTA** por decision humana del 2026-09-16
 
 `tests/unit/pedidos-ui/order-route-contract.test.ts:157-192` (R36 de QC-102, **verde hoy: 17/17**)
 afirma sobre **rutas de disco** que `responsible-avatars.tsx` vive **dentro** de
@@ -179,12 +222,47 @@ componente a `components/shared/` pone esos tres casos en **rojo**, y **ese arch
 lista «Toca» de T17** (que solo nombra los `tests/unit/pedidos-ui/*` que **importen** esos simbolos;
 este no importa ningun simbolo, afirma sobre disco).
 
-**No se toco nada** y se devuelve al leader: enmendar el contrato de otra feature aprobada es
-decision de spec, y hacerlo por cuenta propia seria exactamente el «aflojar una guardia ajena» que
-T7 prohibe como principio. La enmienda minima propuesta —y **no** aplicada— seria sacar
-`responsible-avatars.tsx` de la lista NUEVOS de ese describe y apuntar el reexport esperado del
-barrel a la ubicacion compartida, conservando lo que R36 protege de verdad (nada suelto junto a
-`page.tsx`, todo por el barrel, y el barrel sin directiva de cliente).
+En su momento **no se toco nada** y se devolvio al leader: enmendar el contrato de otra feature
+aprobada es decision de spec, y hacerlo por cuenta propia seria exactamente el «aflojar una guardia
+ajena» que T7 prohibe como principio.
+
+**Resolucion (decision humana del 2026-09-16): se PROMUEVE y se enmienda el test.** El motivo es la
+regla de los dos consumidores de `docs/architecture.md > Componentes`: QC-88 es el **segundo**
+consumidor con la misma API, y la alternativa era duplicar el avatar o importar por ruta profunda
+las tripas de `/pedidos` —que es justo lo que ese `describe` prohibe—. Mismo patron con el que QC-56
+invirtio R14 de QC-26 y R11 de QC-44.
+
+**La enmienda TENSA, no afloja.** Lo unico que cambia es **la ubicacion declarada de este
+componente**: la lista del `describe` pasa de `NUEVOS = ['responsible-avatars.tsx',
+'order-responsibles.tsx']` a `DE_LA_RUTA = ['order-responsibles.tsx']`, y sus tres exigencias
+—dentro de `components/`, reexportado por el barrel, directiva de cliente propia— **siguen corriendo
+intactas** sobre lo que sigue siendo de la ruta. El caso del barrel se generalizo para **derivar** el
+`from './<nombre>'` de la lista en vez de escribir literales. Nota fechada en bloque destacado sobre
+el `describe`, citando `design.md > 8.3`/H6, la regla de arquitectura, la decision humana y el
+precedente QC-56, y dejando escrito: **«cambia su ubicacion declarada, no la exigencia»**.
+
+**Y ademas se anadio vigilancia** (por eso tensa): un caso nuevo que exige que **la ruta no conserve
+una copia propia** del avatar promovido —impide que la promocion quede a medias con dos definiciones
+divergiendo— y un `describe` nuevo de 4 casos para la nueva casa: el archivo existe en
+`components/shared/`, **sigue empezando por la directiva de cliente** (promoverlo no lo convierte en
+Server Component), el barrel lo reexporta **desde la ubicacion compartida** y **en negativo** no por
+ruta relativa, y el barrel sigue nombrando el simbolo. El componente promovido **no quedo sin
+vigilancia**.
+
+**Prueba por mutacion — 4 mutaciones, todas restauradas byte-exacto:**
+
+| Mutacion | Resultado |
+|---|---|
+| A) `order-responsibles.tsx` pierde su directiva de cliente | **ROJO** — 1 failed \| 21 passed |
+| B) el barrel vuelve a exportar por ruta relativa (promocion deshecha a medias) | **ROJO** — 1 failed \| 21 passed |
+| C) la ruta se queda una copia propia del avatar | **ROJO** — 1 failed \| 21 passed |
+| D) `order-responsibles.tsx` sale de `components/` y queda suelto junto a `page.tsx` | **ROJO** — 3 failed \| 19 passed |
+| (restaurado) | **VERDE** — 22 passed (22) |
+
+**Nota metodologica que merece quedar escrita:** el primer intento de mutacion fue un **no-op
+silencioso** —el `perl` no matcheo porque los archivos tienen **CRLF**, el test siguio verde y eso
+**no era evidencia de nada**—. Se detecto y se repitio con `\r?\n`. Una mutacion que no muta es
+exactamente el falso verde que esta tecnica existe para evitar.
 
 **Dato util para quien lo retome:** los tres tests de componente
 (`responsible-avatars.test.tsx`, `a11y-tactil.test.tsx`, `order-sheet-responsibles.test.tsx`) ya

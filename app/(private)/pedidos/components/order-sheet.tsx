@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
+import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
@@ -20,7 +21,6 @@ import {
 } from './order-responsibles';
 import { OrderRowActions } from './order-row-actions';
 import type { RecipePickerPage } from './recipe-picker';
-import { ResponsibleAvatars } from './responsible-avatars';
 
 /**
  * Panel lateral de alta y edicion de pedido (R25, R35, R36, `design.md > 8`).
@@ -250,8 +250,9 @@ export type OrderRowResponsiblesProps = {
  * responsables: la segunda puerta al dato que R35 exige, la que no depende de `:hover` ni de que
  * el tooltip llegue a abrir en tactil (`design.md > 0` H5).
  *
- * **Vive en ESTE archivo, junto a `OrderRowSheetActions`, y no en `responsible-avatars.tsx`** por
- * una razon concreta: `responsible-avatars.tsx` es la pieza de presentacion pura —no conoce
+ * **Vive en ESTE archivo, junto a `OrderRowSheetActions`, y no en `ResponsibleAvatars`** por
+ * una razon concreta: `components/shared/responsible-avatars.tsx` es la pieza de presentacion
+ * pura —promovida a `shared/` por QC-88 T17 (2026-09-16), `design.md > 8.3`—; no conoce
  * paneles y no debe conocerlos—, y quien sabe abrir el panel de un pedido es este modulo. Asi la
  * columna de avatares y la de acciones abren **el mismo** `OrderSheet` (R23), no dos.
  *
