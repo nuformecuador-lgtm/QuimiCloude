@@ -39,7 +39,7 @@
 
 ## Tanda 1 — el mecanismo
 
-- [ ] **T2 [P] — Helper de ambito de peticion (R4-R7, R9, R20).** Sin dependencias de codigo.
+- [x] **T2 [P] — Helper de ambito de peticion (R4-R7, R9, R20).** Sin dependencias de codigo.
       Archivos:
       - `lib/shared/request-scope.ts` (nuevo);
       - `tests/unit/shared/request-scope.test.ts` (nuevo).
@@ -52,7 +52,7 @@
       - `tests/guards/guard-arquitectura-modulos.test.ts` en verde (`lib/shared` sigue siendo hoja);
       - `package.json` sin cambios.
 
-- [ ] **T3 — Cableado en la composicion (R1, R11, R12).** Depende de T2.
+- [x] **T3 — Cableado en la composicion (R1, R11, R12).** Depende de T2.
       Archivos: `lib/composition/index.ts`, **solo** una linea de import y `:297-344`
       (`design.md > 2.5`).
       `const resolveSessionOncePerRequest = requestScoped(() => resolveSession());` detras de `:301`.
@@ -62,7 +62,7 @@
         en verde sin tocarlos;
       - `git diff` del archivo con ~8 lineas, en esos dos bloques y en ninguno mas.
 
-- [ ] **T4 [P] — Ambito explicito en los 8 `currentActor` (R3).** Depende de T2. Paralela a T3.
+- [x] **T4 [P] — Ambito explicito en los 8 `currentActor` (R3).** Depende de T2. Paralela a T3.
       Archivos:
       - `lib/modules/unidades/adapters/driving/unit-actions.ts`
       - `lib/modules/inventario/adapters/driving/product-actions.ts` (**conflicto QC-81**, ver cabecera)
@@ -104,7 +104,7 @@
       - camino feliz sin `console.*`;
       - el archivo pasa solo y con `vitest related`.
 
-- [ ] **T6 [P] — Conteo por Server Action (R3, R5, R7, R11, R13, R15).** Depende de T3 y T4.
+- [x] **T6 [P] — Conteo por Server Action (R3, R5, R7, R11, R13, R15).** Depende de T3 y T4.
       Paralela a T5.
       Archivos: `tests/unit/identity/session-once-per-request-actions.test.ts` (nuevo).
       Casos de `design.md > 5.3`:
@@ -150,7 +150,7 @@
       **Hecho:** en verde contra el archivo real, y rojo con dos mutaciones sobre una copia (quitar
       `Metodo`; vaciar una celda «despues»), probadas y restauradas.
 
-- [ ] **T11 [P] — Nota en la arquitectura.** Depende de T3.
+- [x] **T11 [P] — Nota en la arquitectura.** Depende de T3.
       Archivos: `docs/architecture.md`, solo `## Permisos y autenticacion`, parrafo «El layout
       privado sigue siendo la ultima linea de defensa».
       Una o dos frases: la sesion se resuelve una vez por peticion (QC-104). Layout, pagina y las
