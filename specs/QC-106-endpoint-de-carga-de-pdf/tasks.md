@@ -40,7 +40,7 @@
 
 ## Tanda 1 — el esqueleto del módulo y sus piezas puras
 
-- [ ] **T1 — El módulo `documentos` nace: contrato, actor y errores.** Depende de **T0.2**.
+- [x] **T1 — El módulo `documentos` nace: contrato, actor y errores.** Depende de **T0.2**.
       Archivos: `lib/modules/documentos/index.ts`, `.../domain/actor.ts`, `.../domain/errors.ts`,
       `tests/unit/documentos/authorization.test.ts`,
       `tests/unit/documentos/module-contract.test.ts`.
@@ -58,7 +58,7 @@
       `guard-rol-administrador-unico.test.ts` en verde.
       Cubre **R1, R2, R3, R4, R5, R27, R33**.
 
-- [ ] **T2 [P] — Las constantes únicas, la firma del PDF y la ruta de empresa.** Depende de T1.
+- [x] **T2 [P] — Las constantes únicas, la firma del PDF y la ruta de empresa.** Depende de T1.
       Archivos: `lib/modules/documentos/domain/limits.ts`, `.../domain/pdf-content.ts`,
       `.../domain/document-path.ts`, `tests/unit/documentos/limits-and-path.test.ts`.
       `MAX_FILES_PER_BATCH`, `MAX_PDF_PAGES`, `PAGE_RENDER_DPI`, `UPLOAD_LINK_TTL_SECONDS` y
@@ -72,7 +72,7 @@
       valores aparecen **una sola vez** en el módulo (búsqueda en el árbol del módulo).
       Cubre **R12 (mitad pura), R17, R20**.
 
-- [ ] **T3 [P] — El esquema de entrada de la tanda.** Depende de T1 y T2.
+- [x] **T3 [P] — El esquema de entrada de la tanda.** Depende de T1 y T2.
       Archivos: `lib/modules/documentos/domain/upload-input.ts`,
       `tests/unit/documentos/upload-input.test.ts`.
       `strictObject` con `files` de 1 a `MAX_FILES_PER_BATCH`, `fileName` recortado y acotado, y
@@ -83,7 +83,7 @@
 
 ## Tanda 2 — puertos y casos de uso
 
-- [ ] **T4 — Los dos puertos.** Depende de T2.
+- [x] **T4 — Los dos puertos.** Depende de T2.
       Archivos: `lib/modules/documentos/ports/document-storage.ts`, `.../ports/pdf-converter.ts`.
       Las firmas de `design.md > 3.1` y `> 3.2`. **Sin operación de borrado** en
       `DocumentStorage`: el borrado del PDF temporal es de QC-111 y no debe ser expresable desde
