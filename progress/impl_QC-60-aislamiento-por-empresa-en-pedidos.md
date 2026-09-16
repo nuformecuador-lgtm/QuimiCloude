@@ -165,3 +165,18 @@ No tocado por decisión del leader: `presentation-prisma.ts:123` (deuda), T19, e
 
 - `c9de7a8`: `tests/integration/inventario/list-query-indexes.int.test.ts` tenía otra lista cerrada sin tensar (`PRE_EXISTING_INDEXES`). `orders_order_year_order_sequence_key` sale con su nota y un caso de relevo exige `orders_company_year_sequence_key` único, no parcial y con las columnas `(company_id, order_year, order_sequence)`, con el mismo patrón que `presentations_name_normalized_key`. Resultado del archivo: `Test Files 1 passed (1) · Tests 16 passed (16)`.
 - **Ronda 6 — 2026-09-16** (`6795012`): conflicto semántico con QC-104 tras sincronizar con `dev`. `order-actions.ts` resuelve las dos caras de la sesión dentro de `runInRequestScope` (molde `product-actions.ts`) y entra en `ACCIONES` de `tests/unit/identity/session-once-per-request-actions.test.ts`, sin cambiar comportamiento. `session-once-per-request-actions` + `order-actions` + `company-isolation-service` → `Test Files 3 passed (3) · Tests 61 passed (61)`; `typecheck` y `lint` limpios.
+
+## T19 — Gate completo (leader, 2026-09-16)
+
+`./init.sh` sin flags sobre `facb670` (rama sincronizada con `origin/dev` tras el merge de QC-104):
+**`== init OK ==`**, **482/482 archivos, 7000 tests verdes, 87 saltados, 0 rojos** —ninguno fuera
+del baseline—. El baseline avisa de 8 archivos que ya pasan; no son de esta ficha.
+
+Tres corridas anteriores no cuentan y se dejan escritas para que no se lean como verdes:
+
+- **Dos murieron por falta de memoria** del sistema a mitad de la suite unitaria, sin rojos hasta ese
+  punto, con otra sesión corriendo su propio gate en la misma máquina. La corrida buena se lanzó
+  esperando a que no hubiera procesos de test ajenos.
+- **Una terminó con 2 rojos**: `list-query-indexes.int.test.ts` era de esta ficha —lista cerrada de
+  índices sin tensar, arreglado en la ronda 5— y `ciclo-de-vida-de-la-base.int.test.ts` era
+  saturación —pasó 5/5 corrido solo y pasa en la corrida buena—.

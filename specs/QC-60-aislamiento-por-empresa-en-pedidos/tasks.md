@@ -245,7 +245,7 @@
   Hecho cuando: la viñeta ya no nombra pedidos y el mapa de trazabilidad está escrito.
   Cubre: el checkpoint de trazabilidad de `CHECKPOINTS.md`.
 
-- [ ] **T19 — Gate completo.**
+- [x] **T19 — Gate completo.**
   `./init.sh` en verde (no `--rapido`: es lo que exige cerrar la feature y todo PR).
   Depende de: T18.
   Hecho cuando: typecheck, lint, unit, integración, guardias y E2E pasan; en particular
