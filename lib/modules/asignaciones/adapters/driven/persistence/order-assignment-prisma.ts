@@ -161,5 +161,34 @@ export function createOrderAssignmentRepository(db: PrismaLike = prisma): OrderA
       });
       return count;
     },
+
+    /**
+     * QC-88 T2 — «los pedidos que ESTA persona tiene asignados en ESTA empresa» (R9, R10, R37).
+     *
+     * UN SOLO `findMany`, **sin `include` y sin join** (R37): esta lectura solo necesita la columna
+     * que la pantalla usa despues para preguntar por los pedidos, y traerse la fila entera —o peor,
+     * navegar a `orders`— seria justo lo que `guard-lote-sin-join.test.ts` marca como hallazgo. Los
+     * pedidos se leen luego por sus identificadores, en el modulo que es dueno de `orders`.
+     *
+     * **Sin `distinct`**: la PK de `order_assignments` es `(order_id, user_id)` —QC-86—, asi que
+     * fijado el `user_id` no puede haber dos filas del mismo pedido. La deduplicacion que promete el
+     * puerto la da la clave primaria, no una clausula que costaria y no quitaria nada.
+     *
+     * **El `orderBy` NO es el orden de la lista**: es determinismo barato ANTES de paginar, para que
+     * dos lecturas iguales devuelvan la misma secuencia. El orden que ve quien mira lo pone
+     * `pedidos` al leer los pedidos por estos identificadores (`design.md > 5.3`); confundir uno con
+     * otro llevaria a ordenar la pantalla por un uuid.
+     */
+    async listOrderIdsByUserInCompany(
+      companyId: string,
+      userId: string,
+    ): Promise<readonly string[]> {
+      const filas = await db.orderAssignment.findMany({
+        where: { userId, companyId },
+        select: { orderId: true },
+        orderBy: { orderId: 'asc' },
+      });
+      return filas.map((fila) => fila.orderId);
+    },
   };
 }
