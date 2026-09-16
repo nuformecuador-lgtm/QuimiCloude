@@ -502,8 +502,10 @@ model Order {
 
 /// Las tres FK y el CHECK van escritos a mano y sin `@relation`, porque los padres son de otros
 /// modulos, y son drift: hay que borrar a mano su `DROP CONSTRAINT` de toda migracion generada. Las
-/// FK a persona y grupo son compuestas con `company_id`: ambos son de la misma empresa por
-/// construccion. La del grupo es `MATCH SIMPLE` a proposito, porque `MATCH FULL` impediria una
+/// TRES FK -pedido, persona y grupo- son compuestas con `company_id`: los tres son de la misma
+/// empresa por construccion. Desde QC-60 la del pedido es `order_assignments_order_id_company_id_fkey`
+/// contra `orders_id_company_id_key`, asi que una fila con pedido de otra empresa no puede existir.
+/// La del grupo es `MATCH SIMPLE` a proposito, porque `MATCH FULL` impediria una
 /// asignacion sin grupo. `workGroupName` es una foto del nombre al asignar. Sin `deleted_at`: quitar
 /// a alguien borra la fila, y con filas muertas la PK dejaria de ser unica.
 /// @module asignaciones
