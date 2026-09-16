@@ -46,6 +46,7 @@ import {
   type IssuedUploadBatch,
 } from '@/lib/modules/documentos';
 import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
+import { runInRequestScope } from '@/lib/shared/request-scope';
 
 /**
  * Lo que la accion devuelve: la tanda de enlaces, o el estado de error serializable.
@@ -67,10 +68,11 @@ const toErrorState = createErrorStateTranslator(
  * autorizar por rol no es como se decide aqui.
  */
 async function currentActor(): Promise<Actor | null> {
-  const [sessionUser, sessionContext] = await Promise.all([
-    identity.getSessionUser(),
-    identity.getSessionContext(),
-  ]);
+  // R3: el ambito envuelve EXACTAMENTE este `Promise.all`, para que las dos caras compartan UNA
+  // sola lectura de la ficha de sesion en esta invocacion.
+  const [sessionUser, sessionContext] = await runInRequestScope(() =>
+    Promise.all([identity.getSessionUser(), identity.getSessionContext()]),
+  );
   if (sessionUser === null || sessionContext === null) return null;
   return {
     id: sessionUser.id,
