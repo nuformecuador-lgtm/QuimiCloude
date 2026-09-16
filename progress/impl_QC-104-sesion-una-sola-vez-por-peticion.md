@@ -283,8 +283,9 @@ caen en enteros exactos. Esta escrito en el artefacto para que no se vuelva a pa
 
 **Lo que si quedo resuelto, y ahorra trabajo a quien lo retome:**
 
-- **Via de conteo: la (b) de `design.md > 6.1`.** Medido contra la base local (PostgreSQL 16.1
-  en `localhost`, instalacion nativa, no Docker):
+- **Sobre las vias de conteo** *(historial del intento bloqueado; la via que se acabo usando es la
+  **(c)**, `pg_stat_user_tables` — ver `progress/medicion_QC-104-...md > Metodo`, apartado 4)*.
+  Medido contra la base local (PostgreSQL 16.1 en `localhost`, instalacion nativa, no Docker):
 
   | Comprobacion | Resultado |
   |---|---|
@@ -331,7 +332,7 @@ huecos no se reutilizan**. Abreviaturas de los tres archivos nuevos:
 |---|---|---|
 | R1 | RENDER | los tres casos de «lee la ficha de sesion exactamente 1 vez», que incluyen layout, cortes por permiso y las Server Actions que la pantalla invoca al pintarse |
 | R2 | RENDER | «/configuracion/usuarios», «/configuracion/unidades» y «/pedidos lee la ficha de sesion exactamente 1 vez» |
-| R3 | ACCIONES | `describe.each` de las 8 acciones: 1 lectura por invocacion |
+| R3 | ACCIONES | `describe.each` de las **9** acciones: 1 lectura por invocacion. Ademas, un caso que recorre **el arbol** y falla si algun archivo de `driving/` con las dos caras no abre ambito |
 | R4 | SCOPE | «al terminar el ambito de la accion, un ambito de PINTADO posterior lee de nuevo» (R4 **provisional**, ver seccion 7) |
 | R5 | SCOPE + RENDER + ACCIONES | «dos ambitos SEGUIDOS no comparten»; «dos peticiones simuladas seguidas leen la ficha DOS veces»; «2 con dos invocaciones seguidas» |
 | R6 | SCOPE | «dos ambitos SIMULTANEOS no comparten, y cada uno recibe lo suyo» |
@@ -343,7 +344,7 @@ huecos no se reutilizan**. Abreviaturas de los tres archivos nuevos:
 | R12 | RENDER | «el id del usuario y el del contexto coinciden con una sola lectura» |
 | R13 | ACCIONES | la cookie cambiando entre llamadas sin ambito, **mas** la prueba de fuente de que `login-action.ts` no contiene `runInRequestScope` |
 | R14 | RENDER | «servir la pantalla sin fallos no llama a `console.*`» en las tres pantallas |
-| R15 | RENDER + ACCIONES + **T7** | los dos tests de conteo son la comprobacion ejecutable del gate; que **muerden** esta probado con las dos mutaciones de la seccion 8 |
+| R15 | RENDER + ACCIONES + **T7** | los dos tests de conteo son la comprobacion ejecutable del gate; que **muerden** esta probado con las dos mutaciones de la seccion 8. ACCIONES cubre las **9** acciones y, ademas, **recorre el arbol**: falla si aparece un archivo de `driving/` con las dos caras fuera de la lista o sin ambito (seccion 10) |
 | R16 | `tests/unit/identity/session-count-artifact.test.ts` (T10) | 9 casos: existen las secciones `Metodo` y `Conteo en ejecucion`, hay fila por cada pantalla de R2 y por el guardado con «antes» y «despues» **numericos**, y no hay ninguna seccion de tiempos. Las cifras estan en `progress/medicion_QC-104-...md` |
 | R20 | `tests/guards/guard-dependencias-aprobadas.test.ts` (**existente**) + SCOPE | la guardia vigila que toda dependencia declarada este aprobada; la prueba de fuente afirma que `request-scope.ts` solo importa `react` y `node:async_hooks`. `package.json` no cambia |
 | R21 | `e2e/session.spec.ts` entero (**existente**) | sin E2E nuevo, decision cerrada 11. **Lo corre el leader** |
@@ -378,6 +379,61 @@ sobre base propia (seccion 5) y su test de artefacto (T10).
 - **T12 ya SI se marca**: su criterio de «Hecho» es «los 19 requisitos con al menos un test», y con
   R16 cerrado el mapa llega a **19/19**. Mientras falto R16 se dejo sin marcar a proposito, que es
   lo que evito autoaprobar un criterio incumplido.
+
+## 10. Correccion tras la revision (F2.2)
+
+El `reviewer` **RECHAZO** la ficha: 1 mayor y 5 menores
+(`progress/review_QC-104-sesion-una-sola-vez-por-peticion.md`, commiteado sin editar).
+
+### MAYOR 1 — el noveno `currentActor`, cerrado
+
+`lib/modules/identity/adapters/driving/session-actions.ts` (`endAllSessionsAction`, de QC-101)
+hacia el `Promise.all` de las dos proyecciones **sin ambito**: dos lecturas por invocacion, y se
+invoca desde el navegador (`end-user-sessions-dialog.tsx:83`). Incumplia **R3** y **R15**.
+
+**Por que se colo, sin adornos: es un fallo mio.** El hallazgo H4 grepeo el 2026-09-15 y conto
+ocho. `session-actions.ts` **no existe en el merge-base** y **si en `origin/dev`**, o sea que entro
+con **mi propia sincronizacion `0d0e164`**, antes de T4. La auditoria previa que T4 exigia se hizo
+contra **la lista de ocho del `design.md`** en vez de volver a recorrer el arbol **ya mergeado**.
+Delegue esa auditoria dando la lista por buena, que es precisamente lo que no habia que dar por
+bueno despues de un merge.
+
+**Y el caso que debia detectarlo no podia:** congelaba `expect(...size).toBe(8)` contando **las
+filas de su propia lista**, no los `currentActor` del arbol. Con nueve en disco seguia verde. Un
+numero escrito a mano no vigila nada.
+
+**Arreglado:**
+
+1. El noveno `currentActor` envuelto en `runInRequestScope`, identico a los otros ocho.
+2. Su fila anadida a `ACCIONES` (`endAllSessionsAction` con un `FormData` con `id`).
+3. **El numero congelado sustituido por DOS comprobaciones sobre el ARBOL**, que es lo que cierra
+   el agujero de verdad. `archivosConLasDosCaras()` recorre `lib/modules/*/adapters/driving/*.ts`
+   y recoge los que usan `identity.getSessionUser()` **y** `identity.getSessionContext()`:
+   - *todo archivo con las dos caras esta en la lista* (R15), y
+   - *todo archivo con las dos caras abre ambito* (R3).
+   Los dos mensajes de fallo **nombran el archivo** y dicen que hacer.
+
+**Probado por mutacion**, que es lo unico que demuestra que muerde: se creo un **decimo
+sintetico** (`lib/modules/unidades/adapters/driving/qc104-sintetico.ts`, con las dos caras y sin
+ambito) y **los dos casos se pusieron rojos** nombrandolo; borrado el sintetico, **24/24 en verde**.
+La version anterior de ese caso habria seguido verde con el decimo en disco.
+
+**R16 no se rehizo**, y el reviewer coincide: el guardado medido (alta de unidad) no pasa por esta
+accion y sus cifras siguen valiendo.
+
+### Los cinco menores
+
+| # | Estado |
+|---|---|
+| 1 — `docs/architecture.md` llamaba «guardia del gate» a tests de `tests/unit/` | **CERRADO**: ahora dice «tests del gate» y precisa que los selecciona el grafo de imports, **no** el barrido de guardias. Ademas se corrigio la frase sobre «una accion», que el MAYOR 1 hacia falsa, y se dice que la lista **no se escribe a mano** |
+| 2 — la nota de T11 envejece en silencio si alguien retira los tests de conteo | **ANOTADO, no cerrado.** Hacerla exigible pediria una guardia nueva que compruebe la frase, y eso es alcance de otra ficha. Queda dicho aqui en vez de fingir que no existe |
+| 3 — la bitacora decia «via de conteo: la (b)» | **CERRADO**: marcado como historial del intento bloqueado y remitido a la via **(c)**, que es la del artefacto |
+| 4 — el ambito envuelve solo el `Promise.all`, no la invocacion | **Riesgo aceptado ya en `design.md > 2.6` y `> 8`** (alternativa 6 descartada con razones). El MAYOR 1 demuestra que la red que lo cubre no se mantiene sola: por eso ahora la mantiene **el arbol**, no una lista |
+| 5 — el metodo de R16 es repetible como prosa, no como herramienta | **Aceptado por el propio reviewer** y por la decision de F1.4 (sin script en el repo). Las trampas del artefacto son lo que hace repetible el metodo |
+
+**Verificacion de la correccion:** `typecheck` y `lint` exit 0; los 4 archivos de QC-104
+**52/52**; guardias **41 archivos / 445 tests** en verde, incluido el bloque 12 que lee
+`docs/architecture.md`.
 
 ## 8. T7 — prueba de que el conteo MUERDE (R15)
 

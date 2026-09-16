@@ -14,11 +14,11 @@
 // `AsyncLocalStorage` de `runInRequestScope` y nadie mas.
 //
 // Se ejercita el cableado REAL de `lib/composition` —una instancia de `resolveSession`, la
-// memoizacion de T3 y los ocho `currentActor` de T4—: los unicos dobles son los adaptadores
+// memoizacion de T3 y los `currentActor` de T4—: los unicos dobles son los adaptadores
 // driven de sesion, el cliente de base de datos y lo que `next/*` necesita para que los modulos
 // de las actions carguen.
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import type { SessionClaims } from '@/lib/modules/identity/domain/session-claims';
@@ -60,7 +60,7 @@ vi.mock('@/lib/modules/identity/adapters/driven/persistence/session-user-prisma'
 
 // EL AMBITO, SIN PINTADO. Se sustituye el modulo por el `createRequestScope` REAL con un
 // `renderStore` que devuelve un `Map` nuevo en cada llamada. La instancia es UNA sola y de ella
-// salen las dos claves, asi que `lib/composition` (que importa `requestScoped`) y los ocho
+// salen las dos claves, asi que `lib/composition` (que importa `requestScoped`) y los
 // `currentActor` (que importan `runInRequestScope`) comparten el MISMO almacen: si fueran dos
 // instancias, este archivo contaria siempre 2 y el conteo no probaria nada.
 vi.mock('@/lib/shared/request-scope', async (importOriginal) => {
@@ -142,9 +142,10 @@ beforeEach(() => {
 });
 
 /**
- * LOS OCHO ARCHIVOS CON `currentActor` (`design.md > 0`, H4), uno por fila, con una accion cuya
- * entrada llega hasta `currentActor()`. Si manana aparece un noveno `Promise.all` de las dos
- * caras, su fila va aqui: esta lista es lo que R15 promete cubrir.
+ * LOS ARCHIVOS CON `currentActor`, uno por fila, con una accion cuya entrada llega hasta
+ * `currentActor()`. Esta lista es lo que R15 promete cubrir, y **ya no se fia de un numero
+ * escrito a mano**: los dos casos de abajo la comparan contra el arbol, porque el noveno
+ * (`session-actions.ts`, de QC-101) llego por un merge y se colo justo por ahi.
  *
  * `setCredentialWithLinkAction` NO esta y no es un olvido: es la accion PUBLICA que a proposito
  * no resuelve actor (QC-79 R18), asi que no lee la sesion ninguna vez.
@@ -216,13 +217,76 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
     invocar: async () =>
       (await import('@/lib/modules/identity/adapters/driving/role-actions')).listRolesAction(),
   },
+  {
+    // El NOVENO. Entro con la sincronizacion con `dev` (QC-101) DESPUES del grep de H4, que conto
+    // ocho, asi que se quedo fuera de T4 y lo encontro el reviewer. Se invoca desde el navegador
+    // (`end-user-sessions-dialog.tsx`), que es el supuesto exacto de R3.
+    archivo: 'lib/modules/identity/adapters/driving/session-actions.ts',
+    nombre: 'endAllSessionsAction',
+    invocar: async () => {
+      const formData = new FormData();
+      formData.set('id', OTRO_SUB);
+      return (
+        await import('@/lib/modules/identity/adapters/driving/session-actions')
+      ).endAllSessionsAction({ status: 'idle' }, formData);
+    },
+  },
 ];
 
+/**
+ * Los archivos de `adapters/driving/` que resuelven LAS DOS CARAS de la sesion, leidos DEL ARBOL.
+ *
+ * Esto sustituye a un `expect(...size).toBe(8)` que contaba las filas de `ACCIONES`: como contaba
+ * su propia lista, un noveno `currentActor` en disco lo dejaba verde, que es exactamente lo que
+ * paso con `session-actions.ts`. Un numero escrito a mano no vigila el arbol; el arbol si.
+ */
+function archivosConLasDosCaras(): string[] {
+  const raices = ['asignaciones', 'identity', 'inventario', 'pedidos', 'proveedores', 'recetas', 'unidades'];
+  const encontrados: string[] = [];
+
+  for (const modulo of raices) {
+    const carpeta = resolve(process.cwd(), `lib/modules/${modulo}/adapters/driving`);
+    if (!existsSync(carpeta)) continue;
+
+    for (const archivo of readdirSync(carpeta)) {
+      if (!archivo.endsWith('.ts')) continue;
+      const ruta = `lib/modules/${modulo}/adapters/driving/${archivo}`;
+      const fuente = readFileSync(resolve(process.cwd(), ruta), 'utf8');
+      // Las dos proyecciones juntas: es la firma de `currentActor`, y lo que R3 acota.
+      if (fuente.includes('identity.getSessionUser()') && fuente.includes('identity.getSessionContext()')) {
+        encontrados.push(ruta);
+      }
+    }
+  }
+
+  return encontrados.sort();
+}
+
 describe('QC-104 · una lectura de sesion por invocacion de Server Action', () => {
-  it('la lista cubre los OCHO archivos con `currentActor` (H4)', () => {
-    // Si alguien anade un noveno `currentActor` y no lo suma aqui, R15 dejaria de cubrirlo en
-    // silencio. Esta linea no lo impide, pero deja el numero escrito donde se ve.
-    expect(new Set(ACCIONES.map((accion) => accion.archivo)).size).toBe(8);
+  // R15 exige el conteo en CADA Server Action que resuelve a la vez el usuario y la empresa. Estos
+  // dos casos son lo que impide que esa promesa se quede atras del arbol: no hay ningun numero
+  // congelado, la lista se compara contra lo que hay en disco.
+  it('TODO archivo de driving/ con las dos caras esta en la lista (R15)', () => {
+    const enLaLista = new Set(ACCIONES.map((accion) => accion.archivo));
+    const sinCubrir = archivosConLasDosCaras().filter((ruta) => !enLaLista.has(ruta));
+
+    expect(
+      sinCubrir,
+      `hay ${sinCubrir.length} archivo(s) con las dos caras de la sesion fuera del conteo de R15: ` +
+        `${sinCubrir.join(', ')}. Anade su fila a ACCIONES.`,
+    ).toEqual([]);
+  });
+
+  it('TODO archivo de driving/ con las dos caras abre ambito con `runInRequestScope` (R3)', () => {
+    const sinAmbito = archivosConLasDosCaras().filter(
+      (ruta) => !readFileSync(resolve(process.cwd(), ruta), 'utf8').includes('runInRequestScope'),
+    );
+
+    expect(
+      sinAmbito,
+      `hay ${sinAmbito.length} archivo(s) que resuelven las dos caras SIN ambito de peticion: ` +
+        `${sinAmbito.join(', ')}. Envuelve su \`Promise.all\` en \`runInRequestScope\`.`,
+    ).toEqual([]);
   });
 
   describe.each(ACCIONES)('$nombre ($archivo)', ({ invocar }) => {

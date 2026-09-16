@@ -417,8 +417,12 @@ la vuelta rapida; no es la unica puerta.
 las Server Actions que esos componentes invocan mientras se pintan comparten **la misma** lectura de
 sesion en vez de repetirla cada uno por su cuenta, y lo compartido muere con la peticion —**nunca**
 se reutiliza entre peticiones, porque una sesion revocada no puede sobrevivir a la peticion en que
-se leyo—. Lo que esta probado es el **conteo**: una guardia del gate falla si una pantalla o una
-accion supera **una** lectura de sesion por peticion.
+se leyo—. Lo que esta probado es el **conteo**: sendos **tests del gate** —en `tests/unit/`, no en
+`tests/guards/`: los selecciona el grafo de imports, no el barrido de guardias— fallan si una
+pantalla, o una Server Action de las que resuelven a la vez el usuario y la empresa, supera **una**
+lectura de sesion. La lista de esas acciones **no se escribe a mano**: el test recorre
+`lib/modules/**/adapters/driving/**` y se pone rojo si aparece una sin ambito, que es como se
+detecta la que llegue en el proximo merge.
 
 **Ni el borde ni la pagina son la frontera de autorizacion.** `## Acceso a datos y autorizacion`
 sigue mandando: la **autorizacion se valida en el service**, antes de tocar el repositorio. El rol
