@@ -47,3 +47,22 @@ export { buildDocumentPath, isPathInCompany } from './domain/document-path';
 // El esquema del borde y su tipo inferido: una sola definicion de la entrada, no dos que puedan
 // diverger.
 export { issueUploadLinksSchema, type IssueUploadLinksInput } from './domain/upload-input';
+
+// Las dos capacidades del modulo, publicadas como FABRICAS: quien las usa recibe el caso de uso ya
+// construido y no conoce a sus dependencias. Ata puerto -> adaptador un solo sitio, que es
+// `lib/composition`; aqui solo se dice QUE hay y con que forma.
+export {
+  createIssueUploadLinks,
+  type IssueUploadLinksDeps,
+  type IssuedUploadBatch,
+} from './domain/issue-upload-links';
+
+export {
+  createConvertPdfs,
+  type ConversionFailure,
+  type ConversionResult,
+  type ConversionSuccess,
+  type ConvertPdfDeps,
+  type PdfOutput,
+  type PdfToConvert,
+} from './domain/convert-pdf';
