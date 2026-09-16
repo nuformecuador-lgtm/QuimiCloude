@@ -198,7 +198,7 @@
   Hecho cuando: pasa, y **muerde**: quitar el `pg_advisory_xact_lock` lo pone rojo con la causa real.
   Cubre: R14, R15.
 
-- [ ] **T15 — Guardia estática por función.** `[P]`
+- [x] **T15 — Guardia estática por función.** `[P]`
   Archivos: `tests/guards/guard-ambito-empresa-pedidos.test.ts` (nuevo), calcado de
   `guard-ambito-empresa-inventario.test.ts`.
   Contenido: **método a método** de `OrderRepository` y de `OrderCatalog`, y función a función de
@@ -208,7 +208,7 @@
   Depende de: T8, T9.
   Cubre: R18.
 
-- [ ] **T16 — Service: el rechazo cruzado, con dobles.** `[P]`
+- [x] **T16 — Service: el rechazo cruzado, con dobles.** `[P]`
   Archivos: `tests/unit/pedidos/company-isolation-service.test.ts` (nuevo);
   `tests/unit/pedidos/authorization.test.ts` y `.../order-actions.test.ts` (se amplían);
   `tests/unit/pedidos/company-scope.test.ts` (nuevo: las dos envolturas, la forma de la salida

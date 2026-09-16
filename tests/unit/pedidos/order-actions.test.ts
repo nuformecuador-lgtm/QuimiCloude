@@ -39,6 +39,16 @@ import {
   type CreateOrderFormState,
   type OrderMutationFormState,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions'
+import * as orderActions from '@/lib/modules/pedidos/adapters/driving/order-actions'
+import { createCancelOrder } from '@/lib/modules/pedidos/domain/cancel-order'
+import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order'
+import { createDeleteOrder } from '@/lib/modules/pedidos/domain/delete-order'
+import { createGetOrder } from '@/lib/modules/pedidos/domain/get-order'
+import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
+import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
+
+import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { RecipeCatalog } from '@/lib/modules/recetas'
 
 const {
   createOrderMock,
@@ -519,5 +529,204 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     expect(traducciones.length).toBe(catches.length)
     expect(catches.length).toBe(6)
     expect(source, 'hay un catch vacio').not.toMatch(/catch\s*\([^)]*\)\s*\{\s*\}/)
+  })
+})
+
+// ---------------------------------------------------------------------------------------
+// QC-60 (R17, R34, T16). La empresa sale del CONTEXTO de sesion del servidor. Sin ese contexto
+// -o sin el usuario- no hay actor, y sin actor no hay consulta.
+//
+// Lo que se afirma, y con que precision. La action NO repite `requirePermission` (R5, primer caso
+// de este archivo): con la sesion incompleta baja `null` al caso de uso, y es el caso de uso quien
+// rechaza en su primera linea, antes de tocar ningun puerto. Por eso aqui se prueban DOS cosas:
+//   1. que las seis actions bajan `null` -nunca un actor a medias, con `companyId: undefined` o
+//      con una empresa inventada- cuando falta CUALQUIERA de las dos caras;
+//   2. la CADENA REAL: action -> caso de uso de verdad -> puertos que EXPLOTAN. Sin contexto, el
+//      estado es `unauthorized` y ningun puerto se toco. Eso es R17 entero -«rechazar la operacion
+//      sin consultar el repositorio»- y no depende de que el doble del caso de uso se porte bien.
+// ---------------------------------------------------------------------------------------
+
+describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta', () => {
+  /** Las seis actions con la posicion del argumento `actor` en la llamada al caso de uso. */
+  const SEIS = [
+    [
+      'createOrderAction',
+      createOrderMock,
+      1,
+      () => createOrderAction(CREATE_INITIAL, formDataOf(VALID_CREATE_FIELDS)),
+    ],
+    [
+      'updateOrderAction',
+      updateOrderMock,
+      2,
+      () => updateOrderAction(ORDER_ID, MUTATION_INITIAL, formDataOf(VALID_UPDATE_FIELDS)),
+    ],
+    [
+      'cancelOrderAction',
+      cancelOrderMock,
+      2,
+      () => cancelOrderAction(MUTATION_INITIAL, formDataOf({ id: ORDER_ID, reason: 'Sin stock' })),
+    ],
+    [
+      'deleteOrderAction',
+      deleteOrderMock,
+      1,
+      () => deleteOrderAction(MUTATION_INITIAL, formDataOf({ id: ORDER_ID })),
+    ],
+    ['getOrderAction', getOrderMock, 1, () => getOrderAction(ORDER_ID)],
+    ['listOrdersAction', listOrdersMock, 1, () => listOrdersAction({ page: 1 })],
+  ] as const
+
+  const SESIONES_INCOMPLETAS = [
+    ['sin contexto de sesion', ADMIN_SESSION_USER, null],
+    ['sin usuario de sesion', null, SESSION_CONTEXT],
+    ['sin ninguna de las dos', null, null],
+  ] as const
+
+  for (const [sesion, usuario, contexto] of SESIONES_INCOMPLETAS) {
+    it(`${sesion}: las seis actions bajan actor null, nunca uno a medias`, async () => {
+      getSessionUserMock.mockResolvedValue(usuario)
+      getSessionContextMock.mockResolvedValue(contexto)
+
+      for (const [nombre, mock, posicion, invocar] of SEIS) {
+        mock.mockRejectedValueOnce(new UnauthorizedError())
+        const estado = await invocar()
+        expect(mock.mock.calls.at(-1)?.[posicion], `${nombre}: el actor tiene que ser null`).toBeNull()
+        expect(estado, nombre).toMatchObject({ status: 'error', code: 'unauthorized' })
+      }
+      // Las dos caras se pidieron en CADA invocacion: una action que solo mirara el usuario
+      // habria construido un actor sin empresa.
+      expect(getSessionContextMock).toHaveBeenCalledTimes(SEIS.length)
+      expect(getSessionUserMock).toHaveBeenCalledTimes(SEIS.length)
+    })
+  }
+
+  it('con la sesion completa, la empresa del actor es la del CONTEXTO y no la del formulario', async () => {
+    createOrderMock.mockResolvedValue({
+      id: ORDER_ID,
+      number: { year: 2026, sequence: 1 },
+      numberText: '2026-0000001',
+    })
+    const OTRA = '44444444-4444-4444-8444-444444444444'
+    await createOrderAction(
+      CREATE_INITIAL,
+      formDataOf({ ...VALID_CREATE_FIELDS, companyId: OTRA, company_id: OTRA }),
+    )
+    expect(createOrderMock.mock.calls[0]?.[1]).toEqual({
+      id: ADMIN_SESSION_USER.id,
+      companyId: SESSION_CONTEXT.companyId,
+      permissions: ADMIN_SESSION_USER.permissions,
+    })
+    // Y el candidato que baja al caso de uso ni siquiera la trae.
+    expect(JSON.stringify(createOrderMock.mock.calls[0]?.[0])).not.toContain(OTRA)
+  })
+
+  it('CADENA REAL sin contexto de sesion: las seis devuelven unauthorized y NINGUN puerto se toca', async () => {
+    const explota = (nombre: string) =>
+      vi.fn(() => {
+        throw new Error(`el puerto ${nombre} no debe llamarse sin contexto de sesion`)
+      })
+    const orders = {
+      create: explota('create'),
+      findAliveById: explota('findAliveById'),
+      listAlive: explota('listAlive'),
+      updateAlive: explota('updateAlive'),
+      cancelAlive: explota('cancelAlive'),
+      softDeleteAlive: explota('softDeleteAlive'),
+    }
+    const recipes = { findRefsIncludingDeleted: explota('findRefsIncludingDeleted') }
+    const log = { ignoredFields: explota('ignoredFields') }
+    const deps = {
+      orders: orders as unknown as OrderRepository,
+      recipes: recipes as unknown as RecipeCatalog,
+      log,
+    }
+
+    // Los casos de uso DE VERDAD detras de la composicion simulada.
+    createOrderMock.mockImplementation(createCreateOrder(deps))
+    getOrderMock.mockImplementation(createGetOrder(deps))
+    listOrdersMock.mockImplementation(createListOrders(deps))
+    updateOrderMock.mockImplementation(createUpdateOrder(deps))
+    cancelOrderMock.mockImplementation(createCancelOrder(deps))
+    deleteOrderMock.mockImplementation(createDeleteOrder(deps))
+
+    getSessionUserMock.mockResolvedValue(ADMIN_SESSION_USER)
+    getSessionContextMock.mockResolvedValue(null)
+
+    for (const [nombre, , , invocar] of SEIS) {
+      expect(await invocar(), nombre).toEqual({
+        status: 'error',
+        code: 'unauthorized',
+        message: errorMessage('unauthorized'),
+      })
+    }
+    for (const espia of [...Object.values(orders), ...Object.values(recipes), log.ignoredFields]) {
+      expect(espia).not.toHaveBeenCalled()
+    }
+
+    // CONTROL POSITIVO de la misma cadena: con el contexto presente la barrera se cruza y el
+    // primer puerto SI se alcanza (y explota). Sin esto, unos casos de uso que rechazaran todo
+    // pondrian verde el bucle de arriba.
+    getSessionContextMock.mockResolvedValue(SESSION_CONTEXT)
+    const conContexto = await getOrderAction(ORDER_ID)
+    expect(conContexto).toMatchObject({ status: 'error', code: UNEXPECTED_ERROR_CODE })
+    expect(orders.findAliveById).toHaveBeenCalledWith(ORDER_ID, {
+      companyId: SESSION_CONTEXT.companyId,
+    })
+
+    // Los `mockImplementation` no los limpia `clearAllMocks` del `beforeEach`: se retiran aqui
+    // para no arrastrar los casos de uso reales a otro test.
+    for (const mock of [
+      createOrderMock,
+      getOrderMock,
+      listOrdersMock,
+      updateOrderMock,
+      cancelOrderMock,
+      deleteOrderMock,
+    ]) {
+      mock.mockReset()
+    }
+  })
+})
+
+describe('QC-60 R34 — las seis firmas publicas de las Server Actions no cambian', () => {
+  it('el modulo exporta exactamente las seis actions, con su aridad de siempre', () => {
+    const exportadas = Object.entries(orderActions)
+      .filter(([, valor]) => typeof valor === 'function')
+      .map(([nombre, valor]) => [nombre, (valor as (...args: never[]) => unknown).length] as const)
+      .sort(([a], [b]) => a.localeCompare(b))
+
+    expect(exportadas).toEqual([
+      ['cancelOrderAction', 2],
+      ['createOrderAction', 2],
+      ['deleteOrderAction', 2],
+      ['getOrderAction', 1],
+      ['listOrdersAction', 1],
+      ['updateOrderAction', 3],
+    ])
+  })
+
+  it('ninguna firma recibe la empresa, ni el actor, ni la sesion', () => {
+    const source = readActionsSource()
+    const FIRMAS = {
+      createOrderAction: 'prevState: CreateOrderFormState, formData: FormData',
+      updateOrderAction: 'id: string, prevState: OrderMutationFormState, formData: FormData',
+      cancelOrderAction: 'prevState: OrderMutationFormState, formData: FormData',
+      deleteOrderAction: 'prevState: OrderMutationFormState, formData: FormData',
+      getOrderAction: 'id: string',
+      listOrdersAction: 'query: unknown',
+    }
+    for (const [nombre, parametros] of Object.entries(FIRMAS)) {
+      const desde = source.indexOf(`export async function ${nombre}(`)
+      expect(desde, `falta ${nombre}`).toBeGreaterThan(-1)
+      const abre = source.indexOf('(', desde)
+      const firma = source
+        .slice(abre + 1, source.indexOf(')', abre))
+        .replace(/\s+/g, ' ')
+        .replace(/,\s*$/, '')
+        .trim()
+      expect(firma, nombre).toBe(parametros)
+      expect(firma, `${nombre} recibe la empresa`).not.toMatch(/company|actor|session/i)
+    }
   })
 })
