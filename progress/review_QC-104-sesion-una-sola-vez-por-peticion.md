@@ -262,3 +262,136 @@ para quien lo retome.
 | Permisos (validacion en el service) | OK: el cambio no mueve ninguna frontera de autorizacion |
 | Configuracion | OK |
 | `./init.sh` verde, `review_` con veredicto OK, `history.md`, worktree | pendiente del leader; **este informe NO es OK** |
+
+---
+
+# Segunda vuelta — 2026-09-16, HEAD `7fb0abe`
+
+> La primera vuelta queda arriba **sin tocar**. Esto se anade debajo.
+> Verificacion propia de esta vuelta: corri los 4 archivos de la ficha y **monte yo mismo tres
+> mutaciones** contra el caso nuevo (un decimo sintetico en un modulo cubierto, otro en un modulo
+> nuevo y otro en una subcarpeta). El arbol quedo limpio: `git status --porcelain` vacio.
+
+## Veredicto de la segunda vuelta
+
+**APROBADO** — **0 mayores nuevos**, **2 menores nuevos** (6 y 7). El **MAYOR 1 queda CERRADO**.
+
+## 1. El mayor: cerrado
+
+`lib/modules/identity/adapters/driving/session-actions.ts:79-92` envuelve ahora el `Promise.all`
+en `runInRequestScope`, **identico** a los otros ocho (un import y dos lineas; el comentario dice
+ademas por que se colo). Sin efectos raros en esa accion:
+
+- el ambito cubre **exactamente** el `Promise.all`, no el cuerpo de `endAllSessionsAction`, asi que
+  la mutacion (`identity.endAllSessions`) queda **fuera** del ambito;
+- este archivo **no emite ni borra la cookie de sesion** (no llama a `startSession` ni a
+  `clearSession`), que es la unica condicion que `design.md > 2.7` pone para no abrir ambito;
+- su fila esta en `ACCIONES` (`session-once-per-request-actions.test.ts:220-233`) con un `FormData`
+  con `id`, y sus dos casos —1 lectura por invocacion, 2 con dos invocaciones— pasan.
+
+**9 archivos con las dos caras / 9 con ambito**, contados por mi sobre el arbol: los unicos
+`adapters/driving/` que usan las dos proyecciones son los 8 de T4 mas este.
+
+## 2. El caso del arbol: **mira el disco de verdad**
+
+`session-once-per-request-actions.test.ts:243-290`. `archivosConLasDosCaras()` hace
+`readdirSync` mas `readFileSync` sobre `lib/modules/<modulo>/adapters/driving/` y recoge los
+archivos cuya fuente contiene **las dos** proyecciones; los dos casos comparan ese resultado contra
+`ACCIONES` (R15) y contra la presencia de `runInRequestScope` (R3). **No queda ningun numero
+congelado**: no hay `toBe(9)` ni equivalente, asi que anadir una accion no obliga a tocar ningun
+contador, y omitirla no pasa desapercibido.
+
+**Lo verifique por mutacion, no por lectura.** Cree un **decimo sintetico** en un modulo cubierto,
+`lib/modules/unidades/adapters/driving/qc104-rev-sintetico.ts`, con las dos caras y sin ambito:
+
+```
+AssertionError: hay 1 archivo(s) con las dos caras de la sesion fuera del conteo de R15:
+  lib/modules/unidades/adapters/driving/qc104-rev-sintetico.ts. Anade su fila a ACCIONES.
+AssertionError: hay 1 archivo(s) que resuelven las dos caras SIN ambito de peticion:
+  lib/modules/unidades/adapters/driving/qc104-rev-sintetico.ts. Envuelve su Promise.all en runInRequestScope.
+      Tests  2 failed | 22 skipped (24)
+```
+
+Los **dos** casos rojos, **nombrando el archivo** y diciendo que hacer. Borrado el sintetico,
+`Tests 24 passed (24)`. Confirmado lo que dice la bitacora, y confirmado que la version anterior
+(`toBe(8)`) habria seguido verde con ese archivo en disco.
+
+## 3. Trazabilidad: 19/19
+
+R3 y R15 vuelven a estar cubiertos, y ahora con mas red que antes de mi hallazgo: R3 suma el caso
+del arbol (todo archivo con las dos caras abre ambito) y R15 el de la lista. El mapa de
+`progress/impl_QC-104-...md` seccion 6 esta actualizado a las **9** acciones y remite a la seccion
+10. Los 4 archivos de la ficha: **52 tests en verde**, corridos por mi.
+
+## 4. Los menores de la primera vuelta
+
+- **menor 1 — CERRADO.** `docs/architecture.md:420-425` ya no dice guardia: dice **tests del
+  gate**, precisa que viven en `tests/unit/` y que **los selecciona el grafo de imports, no el
+  barrido de guardias**, y corrige la frase sobre una accion que el mayor hacia falsa. Ademas ahora
+  dice que la lista **no se escribe a mano**, que es lo que de verdad cambio.
+- **menor 3 — CERRADO.** `progress/impl_QC-104-...md:286` marca ese bloque como historial del
+  intento bloqueado y remite a la via **(c)**, la del artefacto.
+- **menor 2 — me vale como ANOTADO sin cerrar.** Exigir esa frase pediria una guardia que lea
+  `docs/architecture.md` y compruebe que los tests que promete existen; eso es una guardia nueva y
+  es alcance de otra ficha, no de QC-104. Queda escrito en la bitacora (seccion 10), que es lo que
+  pedia: que no desaparezca en silencio.
+- **menor 4 y menor 5 — sin cambio, y correcto.** El 4 es riesgo ya aceptado en `design.md > 2.6`;
+  lo que pedia mi nota era que la red no dependiera de una lista a mano, y eso es justo lo que
+  arregla el caso del arbol. El 5 lo di por aceptable ya en la primera vuelta.
+
+## 5. R16 no se rehizo — **confirmado**
+
+Coincido y lo sostengo: el guardado medido es **un alta de unidad**, que pasa por
+`unit-actions.ts`, no por `session-actions.ts`. Ninguna de las cuatro cifras del artefacto
+(7/6/7 y 9 antes; 1/1/1 y 2 despues) se ve afectada por envolver `endAllSessionsAction`. El
+artefacto y su test siguen valiendo tal cual.
+
+## 6. Hallazgos nuevos
+
+### menor 6 — El recorrido del arbol conserva una lista de modulos escrita a mano, y no baja a subcarpetas
+
+**Archivo:** `tests/unit/identity/session-once-per-request-actions.test.ts:244` (la constante
+`raices`) y `:251` (`readdirSync` de un solo nivel).
+
+Las dos mutaciones que monte para probar el limite:
+
+- un archivo con las dos caras y sin ambito en un modulo **nuevo**,
+  `lib/modules/qc104probe/adapters/driving/probe-actions.ts` da `Tests 2 passed`: **invisible**;
+- lo mismo en una **subcarpeta**, `lib/modules/unidades/adapters/driving/sub/deep-actions.ts`, da
+  `Tests 2 passed`: **invisible**.
+
+**Por que NO es bloqueante:** hoy no hay ningun requisito incumplido. Los modulos con
+`adapters/driving/` son exactamente los **7** de la lista —`errores` y `observabilidad` no tienen
+esa carpeta— y no existe ninguna subcarpeta dentro de ningun `driving/`. Ademas el vector que de
+verdad mordio en esta ficha era **un archivo nuevo en un modulo existente**, y ese si queda
+cubierto: es lo que demuestra la mutacion A.
+
+**Por que lo dejo escrito igualmente:** la leccion del MAYOR 1 fue que una lista escrita a mano no
+vigila el arbol, y aqui sobrevive una lista escrita a mano —la de modulos—. El dia que nazca un
+modulo nuevo, el conteo lo ignorara sin decir nada. Arreglo barato para quien lo retome: derivar
+`raices` de un `readdirSync` sobre `lib/modules` y recorrer `driving/` en profundidad. Tambien
+valdria afirmar que `raices` coincide con los modulos que tienen esa carpeta, para que un modulo
+nuevo ponga el caso en rojo y obligue a mirarlo.
+
+### menor 7 — La nota de `docs/architecture.md` promete mas recorrido del que hace el test
+
+**Archivo:** `docs/architecture.md:424`.
+
+Dice que el test recorre `lib/modules/**/adapters/driving/**`. Los dos comodines prometen **todos**
+los modulos y **subcarpetas incluidas**; el codigo recorre 7 raices fijas y un solo nivel
+(menor 6). La diferencia es pequena y hoy no cambia nada, pero es el mismo tipo de frase que el
+menor 1 vino a corregir: el documento afirmando un poco mas de lo que el test sostiene. Con el
+arreglo del menor 6, la frase pasaria a ser cierta tal cual esta escrita.
+
+## 7. Checkpoints revisados en esta vuelta
+
+| Bloque | Estado |
+|---|---|
+| Trazabilidad (requisito a test) | **OK, 19/19**: R3 y R15 cubiertos, con el caso del arbol como red |
+| Calidad de codigo (los 4 archivos de la ficha) | OK: 52 tests en verde, corridos por mi |
+| Modulos hexagonales / capas | OK: el noveno adaptador driving importa `lib/shared/**`, que es lo permitido |
+| Datos, seguridad, dependencias, UI | Sin cambios desde la primera vuelta; el diff de esta vuelta solo toca un adaptador, un test y dos documentos |
+| `./init.sh` completo, `history.md`, worktree | del leader |
+
+**Veredicto final de la ficha: APROBADO** (con los menores 2, 5, 6 y 7 anotados, ninguno
+bloqueante).
