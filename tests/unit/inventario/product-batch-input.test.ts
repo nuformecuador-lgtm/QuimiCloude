@@ -1,15 +1,10 @@
 import { createProductWithFirstBatchSchema } from '@/lib/modules/inventario';
 
 /**
- * Esquema de entrada del alta CON su primer lote (QC-90, T3; `design.md > 4`). Cubre **R2,
- * R4, R5, R8, R10, R11, R12, R14 y R24**.
- *
- * Se importa por el CONTRATO PUBLICO del modulo, no por la ruta profunda: el formulario de
- * cliente lo consume por ahi (R24, R27), y si el barrel dejara de exportarlo este archivo no
- * compilaria.
+ * Se importa por el CONTRATO PUBLICO del modulo y no por la ruta profunda: si el barrel dejara de
+ * exportar el esquema, este archivo no compilaria.
  */
 
-/** Alta valida minima: producto completo, presentacion y un solo costo. */
 const VALIDA = {
   name: 'Cloro Granulado',
   stock: 10,
@@ -18,7 +13,6 @@ const VALIDA = {
   unitCost: '12.5000',
 } as const;
 
-/** Los `path` de los issues de un rechazo, como cadenas, para comparar sin ceremonia. */
 function camposRechazados(input: unknown): readonly string[] {
   const result = createProductWithFirstBatchSchema.safeParse(input);
   expect(result.success, 'se esperaba un rechazo y el esquema acepto la entrada').toBe(false);
@@ -28,7 +22,6 @@ function camposRechazados(input: unknown): readonly string[] {
 
 describe('createProductWithFirstBatchSchema', () => {
   it('acepta el alta con los campos del producto, la presentacion y un solo costo', () => {
-    // R2, R4, R12: lote y fecha de expiracion son opcionales y su ausencia no rechaza nada.
     const parsed = createProductWithFirstBatchSchema.parse({ ...VALIDA });
 
     expect(parsed.name).toBe('Cloro Granulado');
@@ -37,7 +30,6 @@ describe('createProductWithFirstBatchSchema', () => {
   });
 
   it('acepta el lote y la fecha de expiracion cuando vienen, y tambien cuando vienen en nulo', () => {
-    // R12, R13
     const conDatos = createProductWithFirstBatchSchema.parse({
       ...VALIDA,
       lot: 'L-2026-01',
@@ -56,7 +48,7 @@ describe('createProductWithFirstBatchSchema', () => {
   });
 
   it('acepta el importe con la forma de decimal(14,4) y rechaza cualquier otra', () => {
-    // R4: hasta 10 enteros y 4 decimales, sin signo, sin notacion cientifica y sin coma.
+    // Hasta 10 enteros y 4 decimales, sin signo, sin notacion cientifica y sin coma.
     for (const valido of ['1', '0.0001', '12.5', '9999999999.9999']) {
       expect(
         createProductWithFirstBatchSchema.safeParse({ ...VALIDA, unitCost: valido }).success,
@@ -70,7 +62,7 @@ describe('createProductWithFirstBatchSchema', () => {
   });
 
   it('rechaza el importe de todos ceros senalando el campo del importe recibido', () => {
-    // R5: '0', '0.0' y '0.0000' se descartan LEXICAMENTE, no convirtiendo a numero.
+    // '0', '0.0' y '0.0000' se descartan LEXICAMENTE, no convirtiendo a numero.
     for (const cero of ['0', '0.0', '0.0000']) {
       expect(camposRechazados({ ...VALIDA, unitCost: cero })).toEqual(['unitCost']);
       expect(
@@ -80,10 +72,8 @@ describe('createProductWithFirstBatchSchema', () => {
   });
 
   it('rechaza un campo desconocido en vez de ignorarlo en silencio', () => {
-    // R24: `strictObject`. Quien manda un campo de mas cree haber guardado algo que no se
-    // guardo; ignorarlo es peor que rechazarlo.
-    // El issue de `strictObject` no cuelga de un campo: lleva `code: 'unrecognized_keys'` y
-    // la lista de claves sobrantes, que es donde hay que mirar.
+    // Quien manda un campo de mas cree haber guardado algo que no se guardo. El issue de
+    // `strictObject` no cuelga de un campo: lleva `code: 'unrecognized_keys'` y la lista de claves.
     for (const desconocido of ['cost', 'batchId', 'unitCostNumber']) {
       const result = createProductWithFirstBatchSchema.safeParse({
         ...VALIDA,
@@ -99,7 +89,6 @@ describe('createProductWithFirstBatchSchema', () => {
   });
 
   it('recorta el lote y rechaza el que pasa de 60 caracteres una vez recortado', () => {
-    // R14
     const parsed = createProductWithFirstBatchSchema.parse({ ...VALIDA, lot: '  L-2026-01  ' });
     expect(parsed.lot).toBe('L-2026-01');
 
@@ -113,8 +102,7 @@ describe('createProductWithFirstBatchSchema', () => {
   });
 
   it('rechaza la presentacion ausente o sin forma de uuid senalando presentationId', () => {
-    // R2: la presentacion es obligatoria en el alta, y solo se valida su FORMA -que exista lo
-    // garantiza la clave foranea, no zod-.
+    // Solo se valida la FORMA: que exista lo garantiza la clave foranea, no zod.
     expect(camposRechazados({ ...VALIDA, presentationId: undefined })).toEqual(['presentationId']);
     expect(camposRechazados({ ...VALIDA, presentationId: 'no-es-un-uuid' })).toEqual([
       'presentationId',
@@ -122,7 +110,6 @@ describe('createProductWithFirstBatchSchema', () => {
   });
 
   it('rechaza la fecha de expiracion que no es una fecha civil YYYY-MM-DD', () => {
-    // R13: viaja como fecha civil, no como instante. Un `2026-12-31T00:00:00Z` no entra.
     expect(camposRechazados({ ...VALIDA, expiryDate: '31/12/2026' })).toEqual(['expiryDate']);
     expect(camposRechazados({ ...VALIDA, expiryDate: '2026-12-31T00:00:00Z' })).toEqual([
       'expiryDate',
@@ -130,7 +117,6 @@ describe('createProductWithFirstBatchSchema', () => {
   });
 
   it('rechaza el alta sin ninguno de los dos costos senalando LOS DOS campos', () => {
-    // R11
     expect(camposRechazados({ ...VALIDA, unitCost: undefined })).toEqual(['unitCost', 'totalCost']);
     expect(camposRechazados({ ...VALIDA, unitCost: null, totalCost: null })).toEqual([
       'unitCost',
@@ -139,8 +125,8 @@ describe('createProductWithFirstBatchSchema', () => {
   });
 
   it('rechaza el alta con solo costo total y existencia 0 senalando el campo de la existencia', () => {
-    // R8: no hay costo unitario posible y la columna es NOT NULL, asi que el rechazo se pinta
-    // en EXISTENCIA -no en el costo-, que es el dato que hay que corregir.
+    // No hay costo unitario posible y la columna es NOT NULL, asi que el rechazo se pinta en
+    // EXISTENCIA -no en el costo-, que es el dato que hay que corregir.
     const result = createProductWithFirstBatchSchema.safeParse({
       ...VALIDA,
       unitCost: undefined,
@@ -156,7 +142,7 @@ describe('createProductWithFirstBatchSchema', () => {
   });
 
   it('rechaza el alta con solo costo total cuyo unitario derivado redondea a cero, en totalCost', () => {
-    // R9: 0.0001 / 5 = 0.0000 en cuatro decimales, y la columna exige `> 0`.
+    // 0.0001 / 5 = 0.0000 en cuatro decimales, y la columna exige `> 0`.
     const rechazados = camposRechazados({
       ...VALIDA,
       unitCost: undefined,
@@ -167,8 +153,7 @@ describe('createProductWithFirstBatchSchema', () => {
   });
 
   it('acepta el alta con solo costo total cuando el derivado es guardable', () => {
-    // R7, R8: con existencia de 1 o mas y un derivado mayor que cero no hay rechazo. Derivar
-    // no es del esquema, es del caso de uso: aqui solo se comprueba que deja pasar.
+    // Derivar no es del esquema, es del caso de uso: aqui solo se comprueba que deja pasar.
     const parsed = createProductWithFirstBatchSchema.parse({
       ...VALIDA,
       unitCost: undefined,
@@ -180,9 +165,8 @@ describe('createProductWithFirstBatchSchema', () => {
   });
 
   it('acepta el alta con LOS DOS costos y no los compara entre si', () => {
-    // R10: prevalece el unitario y el total se ignora, sin comprobar que uno concuerde con el
-    // otro -una discrepancia de un centimo por redondeo seria un rechazo incorregible-. Quien
-    // ignora el total es el caso de uso, no este esquema.
+    // Una discrepancia de un centimo por redondeo seria un rechazo incorregible. Quien ignora el
+    // total es el caso de uso, no este esquema.
     const parsed = createProductWithFirstBatchSchema.parse({
       ...VALIDA,
       unitCost: '2.0000',
@@ -194,9 +178,155 @@ describe('createProductWithFirstBatchSchema', () => {
     expect(parsed.totalCost).toBe('999');
   });
 
+  describe('QC-81 — purchaseDate', () => {
+    it('acepta una fecha civil YYYY-MM-DD existente y la entrega como la misma cadena', () => {
+      // Sale TEXTO, no `Date`. Incluye un 29 de febrero de año bisiesto, que existe.
+      for (const valida of ['2026-09-10', '2024-02-29', '2026-12-31', '2026-01-01']) {
+        const result = createProductWithFirstBatchSchema.safeParse({ ...VALIDA, purchaseDate: valida });
+        expect(result.success, `${valida} deberia aceptarse`).toBe(true);
+        if (result.success) expect(result.data.purchaseDate).toBe(valida);
+      }
+    });
+
+    it('rechaza la fecha sin forma YYYY-MM-DD con un solo issue en purchaseDate', () => {
+      // Un solo issue: el corte del patron evita que la comprobacion de calendario sume otro.
+      for (const invalida of [
+        '10/09/2026',
+        '2026-9-1',
+        '2026-09-10T00:00:00Z',
+        '20260910',
+        '',
+        ' 2026-09-10',
+      ]) {
+        expect(camposRechazados({ ...VALIDA, purchaseDate: invalida }), invalida).toEqual([
+          'purchaseDate',
+        ]);
+      }
+      expect(camposRechazados({ ...VALIDA, purchaseDate: 20260910 })).toEqual(['purchaseDate']);
+    });
+
+    it('rechaza la fecha con forma correcta que no existe en el calendario', () => {
+      // El patron solo no distingue estas. `2025-02-29` es un 29 de febrero de año NO bisiesto.
+      for (const inexistente of ['2026-02-30', '2025-02-29', '2026-04-31', '2026-13-01', '2026-00-10', '2026-09-00']) {
+        expect(camposRechazados({ ...VALIDA, purchaseDate: inexistente }), inexistente).toEqual([
+          'purchaseDate',
+        ]);
+      }
+    });
+
+    it('acepta el alta sin purchaseDate, ausente o en null (ausente = hoy, lo resuelve el caso de uso)', () => {
+      // `nullish()` mantiene funcionando la pantalla de hoy, que no manda el campo: el esquema deja
+      // pasar y «hoy» lo pone `create-product.ts`.
+      const ausente = createProductWithFirstBatchSchema.parse({ ...VALIDA });
+      expect(ausente.purchaseDate).toBeUndefined();
+
+      const enNulo = createProductWithFirstBatchSchema.parse({ ...VALIDA, purchaseDate: null });
+      expect(enNulo.purchaseDate).toBeNull();
+    });
+
+    it('no rechaza una fecha futura: la no-futuridad es del caso de uso, que tiene el reloj', () => {
+      // zod no conoce el `now()` inyectado. Este caso fija el limite para que nadie meta un
+      // `new Date()` en el esquema creyendo que falta.
+      expect(
+        createProductWithFirstBatchSchema.safeParse({ ...VALIDA, purchaseDate: '2999-01-01' }).success,
+      ).toBe(true);
+    });
+
+    it('sigue rechazando un campo desconocido parecido a la fecha de compra (strictObject)', () => {
+      for (const desconocido of ['purchasedAt', 'purchase_date', 'fechaCompra']) {
+        const result = createProductWithFirstBatchSchema.safeParse({
+          ...VALIDA,
+          [desconocido]: '2026-09-10',
+        });
+
+        expect(result.success, `${desconocido} deberia rechazarse`).toBe(false);
+        if (result.success) continue;
+        const rechazo = result.error.issues.find((issue) => issue.code === 'unrecognized_keys');
+        expect(rechazo && 'keys' in rechazo ? rechazo.keys : []).toContain(desconocido);
+      }
+    });
+
+    it('lot sigue siendo opcional en la ENTRADA: ausente pide generarlo, no es un rechazo', () => {
+      // Lo obligatorio es la FILA, no el campo.
+      const parsed = createProductWithFirstBatchSchema.parse({ ...VALIDA });
+      expect(parsed.lot ?? null).toBeNull();
+      // Pero el de solo espacios sigue rechazandose: no se confunde con «generalo».
+      expect(camposRechazados({ ...VALIDA, lot: '   ' })).toEqual(['lot']);
+    });
+  });
+
+  describe('QC-81 D13 — el lote tecleado de solo digitos no llega a 60 caracteres', () => {
+    const MENSAJE = 'Un lote de solo números puede tener hasta 59 caracteres.';
+
+    /** Los issues ENTEROS y no solo sus rutas: aqui importan cuantos son, su codigo y su texto. */
+    function issuesDe(input: unknown) {
+      const result = createProductWithFirstBatchSchema.safeParse(input);
+      expect(result.success, 'se esperaba un rechazo y el esquema acepto la entrada').toBe(false);
+      return result.success ? [] : result.error.issues;
+    }
+
+    it('R34: 60 digitos se rechazan con UN solo issue en lot, de codigo custom y con su mensaje', () => {
+      const issues = issuesDe({ ...VALIDA, lot: '9'.repeat(60) });
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0]?.path).toEqual(['lot']);
+      expect(issues[0]?.code).toBe('custom');
+      expect(issues[0]?.message).toBe(MENSAJE);
+    });
+
+    it('R34: 60 digitos con ceros a la izquierda se rechazan igual (cuenta caracteres, no magnitud)', () => {
+      const lote = `${'0'.repeat(59)}1`;
+      expect(lote).toHaveLength(60);
+
+      const issues = issuesDe({ ...VALIDA, lot: lote });
+      expect(issues).toHaveLength(1);
+      expect(issues[0]?.path).toEqual(['lot']);
+      expect(issues[0]?.code).toBe('custom');
+    });
+
+    it('R34: 60 digitos rodeados de espacios se rechazan, porque cuenta el valor recortado', () => {
+      const issues = issuesDe({ ...VALIDA, lot: `  ${'1'.repeat(60)}  ` });
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0]?.path).toEqual(['lot']);
+      expect(issues[0]?.code).toBe('custom');
+      expect(issues[0]?.message).toBe(MENSAJE);
+    });
+
+    it('R34: 61 digitos cobran UN solo issue, el del largo, y no tambien el de solo digitos', () => {
+      const issues = issuesDe({ ...VALIDA, lot: '9'.repeat(61) });
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0]?.path).toEqual(['lot']);
+      expect(issues[0]?.code).toBe('too_big');
+      expect(issues[0]?.message).not.toBe(MENSAJE);
+    });
+
+    it('R35: 59 digitos se aceptan y llegan tal cual', () => {
+      const lote = '9'.repeat(59);
+      const result = createProductWithFirstBatchSchema.safeParse({ ...VALIDA, lot: lote });
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.lot).toBe(lote);
+    });
+
+    it('R35: 60 caracteres con una letra o un guion se aceptan y llegan tal cual', () => {
+      for (const lote of [`${'9'.repeat(59)}A`, `${'9'.repeat(30)}-${'9'.repeat(29)}`, `L${'0'.repeat(59)}`]) {
+        expect(lote).toHaveLength(60);
+        const result = createProductWithFirstBatchSchema.safeParse({ ...VALIDA, lot: lote });
+        expect(result.success, `${lote} deberia aceptarse`).toBe(true);
+        if (result.success) expect(result.data.lot).toBe(lote);
+      }
+    });
+
+    it('R8: el lote ausente o en null sigue siendo valido (sin regresion por la regla nueva)', () => {
+      expect(createProductWithFirstBatchSchema.safeParse({ ...VALIDA }).success).toBe(true);
+      expect(createProductWithFirstBatchSchema.safeParse({ ...VALIDA, lot: null }).success).toBe(true);
+    });
+  });
+
   it('acepta la existencia 0 mientras venga el costo unitario', () => {
-    // R3: una existencia de 0 no es motivo de rechazo por si sola; solo lo es cuando hay que
-    // dividir el total entre ella (R8).
+    // Una existencia de 0 solo es motivo de rechazo cuando hay que dividir el total entre ella.
     expect(
       createProductWithFirstBatchSchema.safeParse({ ...VALIDA, stock: 0 }).success,
     ).toBe(true);
