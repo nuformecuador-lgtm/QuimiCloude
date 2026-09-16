@@ -276,3 +276,277 @@ describe('documentos — contrato del modulo y frontera', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+// El contrato CONGELADO. Bloque NUEVO al final del archivo: no reordena ni reescribe nada de lo de
+// arriba, que vigila la FORMA del modulo. Lo que se congela aqui es la LISTA: que el barril exporte
+// exactamente lo previsto —ni un simbolo de mas, ni uno de menos— y que su cierre transitivo de
+// imports siga sin arrastrar servidor.
+//
+// «Ni uno de menos» importa tanto como «ni uno de mas»: si alguien retira una constante del
+// contrato, quien la consumia se la reescribe en su casa y el modulo pasa a tener dos definiciones
+// del mismo numero. «Ni uno de mas» es lo que impide que un puerto o un adaptador se cuelen por la
+// puerta grande.
+//
+// Cada regla se escribe como una FUNCION PURA y se prueba por sus DOS lados: sobre el arbol REAL
+// —que tiene que estar limpio— y sobre una lista FABRICADA que la infringe —que tiene que dar
+// hallazgo—. Un `toEqual([])` sobre el repo, solo, no demuestra que la regla muerda.
+// ---------------------------------------------------------------------------------------------
+
+/** Lo que el contrato publica EN EJECUCION: funciones, clases de error, constantes y el esquema. */
+const EXPORTACIONES_DE_EJECUCION = [
+  'requirePermission',
+  'DocumentosError',
+  'UnauthorizedError',
+  'ValidationError',
+  'MAX_FILES_PER_BATCH',
+  'MAX_PDF_BYTES',
+  'MAX_PDF_PAGES',
+  'PAGE_RENDER_DPI',
+  'UPLOAD_LINK_TTL_SECONDS',
+  'isPdfContent',
+  'buildDocumentPath',
+  'isPathInCompany',
+  'issueUploadLinksSchema',
+  'createIssueUploadLinks',
+  'createConvertPdfs',
+] as const;
+
+/** Y lo que publica SOLO COMO TIPO: se borra al compilar, asi que no se ve en el objeto importado y
+ *  hay que leerlo del fuente del barril. */
+const EXPORTACIONES_DE_TIPO = [
+  'Actor',
+  'IssueUploadLinksDeps',
+  'IssuedUploadBatch',
+  'IssueUploadLinksInput',
+  'ConversionFailure',
+  'ConversionResult',
+  'ConversionSuccess',
+  'ConvertPdfDeps',
+  'PdfOutput',
+  'PdfToConvert',
+] as const;
+
+/** Nombres exportados SOLO como tipo por un barril, leidos del fuente: `export { type X } from ...`
+ *  y `export type { X } from ...`. Se mira el codigo sin comentarios, no la prosa. */
+export function extractTypeOnlyExportNames(source: string): readonly string[] {
+  const nombres = new Set<string>();
+  const sinComentarios = stripComments(source);
+  for (const bloque of sinComentarios.matchAll(/export\s+(type\s+)?\{([^}]*)\}\s*from/g)) {
+    const bloqueEsDeTipos = bloque[1] !== undefined;
+    for (const entrada of (bloque[2] as string).split(',')) {
+      const texto = entrada.trim();
+      if (texto.length === 0) continue;
+      const entradaEsDeTipo = bloqueEsDeTipos || texto.startsWith('type ');
+      if (!entradaEsDeTipo) continue;
+      const nombre = texto.replace(/^type\s+/, '').split(/\s+as\s+/)[0] as string;
+      nombres.add(nombre.trim());
+    }
+  }
+  return [...nombres];
+}
+
+/** Sobra / falta contra la lista congelada. */
+export function findFrozenListFindings(
+  etiqueta: string,
+  actuales: readonly string[],
+  esperados: readonly string[],
+): readonly string[] {
+  const hallazgos: string[] = [];
+  for (const nombre of actuales) {
+    if (!esperados.includes(nombre)) hallazgos.push(`${etiqueta}: '${nombre}' NO estaba previsto`);
+  }
+  for (const nombre of esperados) {
+    if (!actuales.includes(nombre)) hallazgos.push(`${etiqueta}: falta '${nombre}'`);
+  }
+  return hallazgos.sort();
+}
+
+/**
+ * Paquetes que el contrato no puede arrastrar en NINGUN punto de su cierre: el framework, el cliente
+ * de la base, el SDK del almacenamiento y la libreria de conversion. Los tres ultimos viven —y solo
+ * pueden vivir— en los adaptadores driven.
+ */
+const PAQUETES_DE_SERVIDOR = /^(next(\/.*)?|react(-dom)?(\/.*)?|@prisma\/client|@supabase\/.*|unpdf|@napi-rs\/.*)$/;
+
+/**
+ * Los dos paquetes que los casos de abajo necesitan ESCRIBIR dentro de fuentes fabricados, para
+ * demostrar que la regla muerde.
+ *
+ * Van en una constante y se interpolan, en vez de escribirse dentro del `import` de ejemplo, porque
+ * otro barrido del modulo exige que cada uno de esos paquetes lo importe un UNICO archivo y recorre
+ * tambien `tests/`: un `from '<paquete>'` escrito aqui, aunque sea dentro de una cadena, contaria
+ * como un segundo importador y pondria en rojo una regla ajena a este archivo.
+ */
+const SDK_DE_ALMACENAMIENTO = '@supabase/storage-js';
+const LIBRERIA_DE_CONVERSION = 'unpdf';
+
+/**
+ * Cierre transitivo de imports con el LECTOR INYECTADO: es lo que permite pasar la misma regla por
+ * el arbol real y por un arbol fabricado. La version de arriba lee del disco a secas y por eso no
+ * sirve para el caso que tiene que dar rojo.
+ */
+export function collectClosureWith(
+  entryRelPath: string,
+  entryContent: string,
+  leer: (relBase: string) => { relPath: string; content: string } | null,
+): { internos: ReadonlyMap<string, string>; externos: ReadonlySet<string> } {
+  const internos = new Map<string, string>();
+  const externos = new Set<string>();
+  const vistos = new Set<string>([entryRelPath]);
+  const pendientes = [{ relPath: entryRelPath, content: entryContent }];
+  while (pendientes.length > 0) {
+    const actual = pendientes.pop() as { relPath: string; content: string };
+    for (const specifier of extractImportSpecifiers(actual.content)) {
+      const target = resolveSpecifier(actual.relPath, specifier);
+      if (target === null) {
+        externos.add(specifier);
+        continue;
+      }
+      const resuelto = leer(target);
+      if (resuelto === null || vistos.has(resuelto.relPath)) continue;
+      vistos.add(resuelto.relPath);
+      internos.set(resuelto.relPath, resuelto.content);
+      pendientes.push(resuelto);
+    }
+  }
+  return { internos, externos };
+}
+
+/** Todo lo que el contrato NO puede arrastrar: servidor, SDKs y cualquier archivo de `adapters/`. */
+export function findContractClosureFindings(
+  entryRelPath: string,
+  entryContent: string,
+  leer: (relBase: string) => { relPath: string; content: string } | null,
+): readonly string[] {
+  const hallazgos: string[] = [];
+  if (hasUseServerDirective(entryContent)) hallazgos.push(`${entryRelPath} declara 'use server'`);
+  const { internos, externos } = collectClosureWith(entryRelPath, entryContent, leer);
+  for (const paquete of externos) {
+    if (PAQUETES_DE_SERVIDOR.test(paquete)) hallazgos.push(`el contrato arrastra '${paquete}'`);
+  }
+  for (const [relPath, content] of internos) {
+    if (hasUseServerDirective(content)) {
+      hallazgos.push(`el contrato arrastra '${relPath}', que declara 'use server'`);
+    }
+    if (relPath.startsWith(`${MODULO}/adapters/`)) {
+      hallazgos.push(`el contrato arrastra el adaptador '${relPath}'`);
+    }
+  }
+  return hallazgos.sort();
+}
+
+/** Lector real del disco: el MISMO que ya usa el cierre de arriba, no una segunda resolucion de
+ *  extensiones que pudiera diverger de aquella. */
+const lectorDelDisco = leerDelDisco;
+
+describe('documentos — el contrato, congelado (R27, R28)', () => {
+  describe('la lista de lo que publica (R27)', () => {
+    it('R27 — el barril exporta EXACTAMENTE los simbolos de ejecucion previstos, ni uno mas ni uno menos', async () => {
+      const contrato = await import('@/lib/modules/documentos');
+      expect(
+        findFrozenListFindings('ejecucion', Object.keys(contrato), EXPORTACIONES_DE_EJECUCION),
+      ).toEqual([]);
+    });
+
+    it('R27 — y EXACTAMENTE los tipos previstos, leidos del fuente del barril', () => {
+      expect(
+        findFrozenListFindings('tipos', extractTypeOnlyExportNames(barril), EXPORTACIONES_DE_TIPO),
+      ).toEqual([]);
+      // El lector de tipos ve de verdad algo: si el patron dejara de casar, la comparacion de arriba
+      // seguiria en verde solo si ademas la lista esperada estuviera vacia, y no lo esta.
+      expect(extractTypeOnlyExportNames(barril).length).toBe(EXPORTACIONES_DE_TIPO.length);
+    });
+
+    it('R27 — la regla MUERDE: una lista fabricada con un puerto de mas y una constante de menos da hallazgo', () => {
+      const fabricada = [
+        ...EXPORTACIONES_DE_EJECUCION.filter((nombre) => nombre !== 'MAX_PDF_PAGES'),
+        'DocumentStorage',
+        'uploadRecipeImage',
+      ];
+      expect(findFrozenListFindings('ejecucion', fabricada, EXPORTACIONES_DE_EJECUCION)).toEqual([
+        "ejecucion: 'DocumentStorage' NO estaba previsto",
+        "ejecucion: 'uploadRecipeImage' NO estaba previsto",
+        "ejecucion: falta 'MAX_PDF_PAGES'",
+      ]);
+      // Y el caso simetrico: la lista correcta no genera ningun hallazgo.
+      expect(
+        findFrozenListFindings('ejecucion', [...EXPORTACIONES_DE_EJECUCION], EXPORTACIONES_DE_EJECUCION),
+      ).toEqual([]);
+    });
+  });
+
+  describe('el cierre de imports del contrato (R28)', () => {
+    it("R28 — el cierre real no arrastra 'use server', Prisma, next/*, el SDK del almacenamiento, la libreria de conversion ni ningun adaptador", () => {
+      expect(findContractClosureFindings(BARRIL, barril, lectorDelDisco)).toEqual([]);
+      // El cierre alcanza de verdad al dominio: sin esto, un barril que no resolviera nada pasaria
+      // en verde sin haber mirado un solo archivo.
+      const { internos } = collectClosureWith(BARRIL, barril, lectorDelDisco);
+      expect([...internos.keys()]).toContain(`${MODULO}/domain/issue-upload-links.ts`);
+      expect([...internos.keys()]).toContain(`${MODULO}/domain/convert-pdf.ts`);
+    });
+
+    it('R28 — la Server Action y los adaptadores driven existen en el arbol y NO son alcanzables desde el contrato', () => {
+      // Lo que se afirma no es que no existan —existen, y son el trabajo de la ficha— sino que el
+      // contrato no llega a ellos.
+      const { internos } = collectClosureWith(BARRIL, barril, lectorDelDisco);
+      expect(fuentes.some((ruta) => ruta.startsWith(`${MODULO}/adapters/`))).toBe(true);
+      expect([...internos.keys()].filter((ruta) => ruta.startsWith(`${MODULO}/adapters/`))).toEqual([]);
+    });
+
+    it('R28 — la regla MUERDE: un arbol fabricado que cuelga un adaptador del barril da hallazgo', () => {
+      // El barril fabricado esta impecable a simple vista: reexporta un solo simbolo. La fuga esta
+      // un salto mas alla, que es la forma que toma de verdad.
+      const arbol = new Map<string, string>([
+        [BARRIL, "export { issueUploadLinksAction } from './adapters/driving/document-upload-actions';"],
+        [
+          `${MODULO}/adapters/driving/document-upload-actions.ts`,
+          [
+            "'use server';",
+            `import { createClient } from '${SDK_DE_ALMACENAMIENTO}';`,
+            "import { cookies } from 'next/headers';",
+            'export async function issueUploadLinksAction() { return createClient(cookies()); }',
+          ].join('\n'),
+        ],
+      ]);
+      const leer = (relBase: string): { relPath: string; content: string } | null => {
+        for (const candidato of [relBase, `${relBase}.ts`, `${relBase}/index.ts`]) {
+          const content = arbol.get(candidato);
+          if (content !== undefined) return { relPath: candidato, content };
+        }
+        return null;
+      };
+
+      const hallazgos = findContractClosureFindings(BARRIL, arbol.get(BARRIL) as string, leer);
+
+      expect(hallazgos).toContainEqual(
+        `el contrato arrastra el adaptador '${MODULO}/adapters/driving/document-upload-actions.ts'`,
+      );
+      expect(hallazgos).toContainEqual(
+        `el contrato arrastra '${MODULO}/adapters/driving/document-upload-actions.ts', que declara 'use server'`,
+      );
+      expect(hallazgos).toContainEqual(`el contrato arrastra '${SDK_DE_ALMACENAMIENTO}'`);
+      expect(hallazgos).toContainEqual("el contrato arrastra 'next/headers'");
+    });
+
+    it("R28 — y muerde tambien con un 'use server' en el propio barril, o con `unpdf` un salto mas alla", () => {
+      expect(
+        findContractClosureFindings(BARRIL, `'use server';\n${barril}`, lectorDelDisco),
+      ).toContainEqual(`${BARRIL} declara 'use server'`);
+
+      // Mutacion sobre el arbol REAL: un solo archivo de dominio sustituido, el barril intacto.
+      const objetivo = `${MODULO}/domain/convert-pdf.ts`;
+      const lectorMutado = (relBase: string): { relPath: string; content: string } | null => {
+        const leido = lectorDelDisco(relBase);
+        if (leido === null || leido.relPath !== objetivo) return leido;
+        return {
+          relPath: leido.relPath,
+          content: `import { extractText } from '${LIBRERIA_DE_CONVERSION}';\n${leido.content}`,
+        };
+      };
+      expect(findContractClosureFindings(BARRIL, barril, lectorMutado)).toContainEqual(
+        `el contrato arrastra '${LIBRERIA_DE_CONVERSION}'`,
+      );
+    });
+  });
+});

@@ -153,7 +153,7 @@
 
 ## Tanda 4 — borde y cableado
 
-- [ ] **T9 [P] — La Server Action.** Depende de T5.
+- [x] **T9 [P] — La Server Action.** Depende de T5.
       Archivos: `lib/modules/documentos/adapters/driving/document-upload-actions.ts`,
       `tests/unit/documentos/document-upload-actions.test.ts`.
       `'use server'`, el actor construido con las dos caras de la sesión de
@@ -187,7 +187,7 @@
       **Hecho:** el test en verde y **rojo si alguien toca la pantalla, la base, los errores o los
       permisos**. Cubre **R14, R29, R30, R33, R34**.
 
-- [ ] **T12 [P] — El contrato del módulo, congelado.** Depende de T1..T6.
+- [x] **T12 [P] — El contrato del módulo, congelado.** Depende de T1..T6.
       Archivos: `tests/unit/documentos/module-contract.test.ts` (se amplía el de T1).
       El barrel exporta exactamente lo previsto —tipos, errores, constantes, esquemas y las dos
       factories— y **nada** de `ports/` ni de `adapters/`; su cierre transitivo de imports no
