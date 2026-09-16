@@ -75,9 +75,20 @@ saliendo únicamente por Prisma. `[D2]`
 **R9.** SI la tanda no trae ningún archivo, ENTONCES el sistema DEBE rechazarla con `invalid_input`
 y NO DEBE llamar al almacenamiento.
 
-**R10.** Cada enlace de subida DEBE caducar **15 minutos** después de su emisión; el sistema NO DEBE
-emitir enlaces sin caducidad, y ese plazo DEBE estar escrito en **una sola** definición del módulo,
-no repetido en cada sitio que lo use. `[D3]`
+**R10.** El sistema DEBE hacer caducar **15 minutos** después de su emisión cada enlace de
+**lectura** que firme, y ese plazo DEBE estar escrito en **una sola** definición del módulo, no
+repetido en cada sitio que lo use. En los enlaces de **subida** el plazo lo impone **el proveedor**
+—**2 horas**, fijas—: el sistema NO lo elige, NO lo puede cambiar y por tanto **NO DEBE prometer
+otro**; DEBE declarar ese plazo en una sola definición y DEBE informar la caducidad real del enlace
+que emite. El sistema NO DEBE emitir enlaces sin caducidad. `[D3]` `[D19]`
+
+> **Enmendado el 2026-09-16 (D19).** La redacción original exigía 15 minutos **también** en la
+> subida, y eso **no es implementable** con la librería aprobada: verificado en las declaraciones
+> de tipos del paquete instalado (`@supabase/storage-js@2.115.0`,
+> `node_modules/@supabase/storage-js/dist/index.d.cts`), `createSignedUploadUrl(path, options?:
+> { upsert: boolean })` **no admite plazo**, mientras que `createSignedUrl(path, expiresIn:
+> number, ...)` sí. Prometer quince minutos en la subida habría sido escribir en el código una
+> garantía que el servicio no da.
 
 **R11.** El sistema DEBE emitir los enlaces contra un bucket **privado y propio de estos PDFs**,
 distinto del bucket de la imagen de receta; y NO DEBE modificar, leer ni escribir el bucket público
@@ -210,6 +221,7 @@ requisito que la hace testeable. Ninguna queda sin `R<n>`.
 | D16 | **Ningún** código de error nuevo: `unauthorized` e `invalid_input` | R2, R33 |
 | D17 | **E2E diferido** a QC-107, con motivo | R34 |
 | D18 | Capas, borde e identificadores: zod en el borde, identificadores en inglés, dominio sin Supabase ni `next/*`, cableado solo en `lib/composition` | R1, R16, R28, R29, R30 |
+| D19 | **Enmienda a D3**: 15 minutos en los enlaces de **lectura**; en los de **subida**, las **2 horas** que impone el proveedor, que el módulo no elige y no promete | R10 |
 
 Requisitos que **no** salen de una fila de la tabla, y de dónde salen: **R8** y **R9** del bloque de
 Alcance («hasta 10 PDFs por tanda»), que fija el tamaño de la tanda y por tanto lo que se rechaza
@@ -264,3 +276,4 @@ No se rellenan con supuestos (regla 6 de `CLAUDE.md`). **Ninguna de las tres blo
 | 2026-09-16 | ¿Códigos de error nuevos? | **Ninguno.** Se reutilizan `unauthorized` e `invalid_input`; **el catálogo cerrado de QC-70 no se enmienda**, y por tanto no hay sexta/octava familia ni enmienda que aprobar |
 | 2026-09-16 | ¿Hace falta E2E? | **Diferido a QC-107, con motivo**: esta ficha no añade ninguna pantalla ni ruta navegable, así que no hay recorrido que visitar. Es **deuda con destinatario, no exención** de `CHECKPOINTS.md > Calidad de codigo`. Mismo criterio que **QC-25 D23** y **QC-20 D4** |
 | 2026-09-16 | Capas, borde e identificadores | Validación de entrada con **zod** en el borde (`docs/conventions.md`). Identificadores de la base en **inglés** (**QC-4**). El dominio no conoce Supabase ni `next/*`; el cableado puerto → adaptador vive **solo** en `lib/composition` |
+| 2026-09-16 | ¿Cuánto vive el enlace, de verdad? (**ENMIENDA A LA DECISIÓN 3**) | **Los 15 minutos se acotan a los enlaces de LECTURA**, que es donde este módulo sí los impone con `createSignedUrl(path, expiresIn)`. **En la SUBIDA se aceptan las 2 horas que fija el proveedor.** Motivo, verificado en las declaraciones de tipos del paquete **instalado** y no de memoria: `createSignedUploadUrl(path, options?: { upsert: boolean })` **no admite plazo** —la documentación de Supabase lo confirma: los enlaces de subida firmados «are valid for 2 hours», fijas—. La decisión 3 pedía quince minutos para la subida y **eso no es implementable**: el módulo no elige ese plazo, así que **no lo promete**; lo declara en una sola definición y **informa la caducidad real**. **Consecuencia aceptada, dicha entera**: un enlace de subida filtrado permite **escribir durante 2 h en UNA ruta concreta que eligió el servidor**, dentro del prefijo de la empresa, y el bucket sigue rechazando lo que no sea PDF de menos de 20 MB; **no permite leer nada ajeno** ni escribir en ninguna otra ruta. El resto de la decisión 3 sigue en pie: nada se firma sin permiso y toda la tanda caduca a la vez |
