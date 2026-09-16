@@ -27,7 +27,7 @@ import type { OrderScope } from '../../../domain/order-scope';
  *   QC-34 R40.
  * - **El ALTA escribe `companyId` desde `companyScopeColumns`** (R22). La empresa NO viaja en
  *   `NewOrder` ni en `createOrderSchema`: lo que no esta en el tipo no se puede escribir por
- *   accidente, y lo que el esquema no declara se rechaza por campo desconocido.
+ *   accidente, y lo que el esquema no declara se descarta al validar el alta.
  * - **EL CASO RARO: el alta va en SQL crudo** y no puede recibir un `Prisma.OrderWhereInput`. Recibe
  *   `companyScopeColumns(scope).companyId` como PARAMETRO TIPADO del template tag (`::uuid`), jamas
  *   interpolado como cadena; y lo usa en los DOS sitios de la misma sentencia: la columna que

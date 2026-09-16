@@ -231,9 +231,8 @@ DROP INDEX "orders_order_year_order_sequence_key";
 --
 -- Al no ser parcial ni funcional, Prisma SI sabe modelarlo: se declara como
 -- `@@unique([companyId, orderYear, orderSequence], map: "orders_company_year_sequence_key")` en
--- `model Order` y en ese punto NO queda drift. El adaptador reconoce el `23505` por el NOMBRE del
--- indice --el alta va en `$queryRaw` y el conector no entrega `meta.target`--, asi que la
--- constante `ORDER_NUMBER_UNIQUE_INDEX` cambia con el.
+-- `model Order` y en ese punto NO queda drift. El adaptador reconoce el duplicado por el SQLSTATE
+-- `23505`, no por el nombre del indice: renombrarlo no toca el adaptador.
 --
 -- LOS CUATRO INDICES PARCIALES DE QC-57 NO SE RECOMPONEN (`orders_status_idx`,
 -- `orders_priority_idx`, `orders_created_at_idx`, `orders_quantity_idx`). Lo correcto a largo
