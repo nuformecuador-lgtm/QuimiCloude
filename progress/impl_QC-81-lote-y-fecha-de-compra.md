@@ -1251,6 +1251,52 @@ $ pnpm exec vitest related --run --project node --project ui product-prisma.ts p
 salto de feature, sobre `requirements.md` y esta bitacora: **37 declarados, 37 mapeados, ninguno
 pendiente**, y la fila del mapa cuenta.
 
+### F2.3 — sincronizacion con `origin/dev` · 2026-09-15
+
+**Merge `1813910`**, con `origin/dev` 55 commits por delante y la rama 58 por delante. Trae, entre
+otros, el arreglo de QC-95 (PR #72) y QC-93 (PR #73).
+
+**Un solo conflicto, trivial: `e2e/aislamiento-inventario.spec.ts`.**
+- **Que choco.** QC-93 sustituyo el `login` local de las catorce suites por el helper compartido
+  `loginAndLand` (`e2e/helpers/landing.ts`). Por nuestro lado, ese tramo solo habia cambiado al limpiar
+  comentarios, asi que git lo vio tocado en los dos lados.
+- **Como se resolvio.** Se conserva la version de `dev` en las dos regiones: desaparece el `login`
+  local y queda la llamada a `loginAndLand`. Comprobado despues: cero marcadores, ningun uso suelto de
+  `login(`, el import del helper ya venia del merge y el tipo `Page` deja de importarse porque ya no se
+  usa.
+- **La excepcion de R29 sigue intacta:** el unico cambio de la rama en ese archivo son las dos lineas
+  del fixture (`lot` y `purchaseDate`), que se auto-mergearon y siguen ahi.
+- Todo lo demas se auto-mergeo, incluidos `feature_list.json` y `progress/current.md`.
+  `tests/baseline-rojos.json` no se toco.
+
+**Ninguna migracion entra en el tramo:** la ultima en disco sigue siendo la de esta ficha. No hubo nada
+que aplicar.
+
+**El rojo ajeno de QC-95 esta MUERTO.** `tests/unit/identity/usuarios/scope.test.ts` pasa a verde
+(19 pasan, 5 saltados): `fdea487` añade a la guardia R45 la excepcion anclada. Ya no queda ningun rojo
+conocido que no sea del gate completo del leader.
+
+**Base de datos:** este worktree ya no usa la compartida. Su `.env` apunta a `QuimiCloude_QC81`, y la
+integracion sigue corriendo sobre una copia efimera de la plantilla, que se borra al terminar.
+
+**Verificacion tras el merge**, de una en una por la memoria de la maquina:
+```
+$ pnpm run typecheck -> exit=0      $ pnpm run lint -> exit=0
+$ pnpm exec vitest run guard
+ Test Files  41 passed (41)
+      Tests  445 passed | 9 skipped (454)
+$ pnpm exec vitest run tests/unit/identity/usuarios/scope.test.ts
+ Test Files  1 passed (1)
+      Tests  19 passed | 5 skipped (24)
+$ pnpm exec vitest run --project integration tests/integration/inventario/product-batch-lot.int.test.ts
+test-db: la corrida de integracion va contra qct_qc81_75ea7fee_mu3ggqhb_9yg (copia de qct_tpl_7d0d301d89fb).
+ Test Files  1 passed (1)
+      Tests  19 passed (19)
+$ pnpm exec vitest related --run --project node --project ui <los 11 archivos de produccion del merge>
+ Test Files  223 passed (223)
+      Tests  3399 passed | 5 skipped (3404)
+```
+
 ## Estado final de F2.1
 
 | Task | Estado |
