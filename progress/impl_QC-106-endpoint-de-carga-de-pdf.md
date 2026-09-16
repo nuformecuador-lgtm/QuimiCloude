@@ -72,6 +72,45 @@ Decision humana cerrada. Verificada en disco antes de implementar, en
 
 (Se completa al cerrar cada tanda.)
 
+## DIVERGENCIA QUE REQUIERE DECISION HUMANA — el plazo del enlace de SUBIDA
+
+**No se resuelve por cuenta propia y no se ha cambiado nada por decidirlo.** Se escribe aqui
+porque afecta a una decision cerrada (**D3**) y a un requisito (**R10**).
+
+**Lo que dice el spec.** D3: «el enlace vive **15 minutos**». R10: «Cada enlace de subida DEBE
+caducar 15 minutos despues de su emision; el sistema **NO DEBE emitir enlaces sin caducidad**».
+`design.md > 3.1` modelo el puerto como `createSignedUpload(path, expiresInSeconds)`, dando por
+supuesto que el plazo se le pasa al proveedor.
+
+**Lo que hace de verdad la libreria aprobada.** Verificado en las declaraciones de tipos del
+paquete **instalado** (`@supabase/storage-js@2.115.0`,
+`node_modules/@supabase/storage-js/dist/index.d.cts`), no de memoria:
+
+```ts
+// linea 1076 — la de SUBIDA: NO admite plazo
+createSignedUploadUrl(path: string, options?: { upsert: boolean }): Promise<...>
+
+// linea 1302 — la de LECTURA: SI admite plazo
+createSignedUrl(path: string, expiresIn: number, options?: {...}): Promise<...>
+```
+
+**La consecuencia, dicha sin adornos.** El plazo de los enlaces de **lectura** si lo fija este
+modulo y R10 se cumple ahi. El de **subida** **no lo fija nuestro codigo**: la API no lo acepta.
+El `expiresAt` que devuelve la emision es **el instante que declara el modulo** (emision + la
+constante unica), **no una garantia del proveedor**, y el servicio puede seguir aceptando esa
+firma despues de los quince minutos. El adaptador lo dice en su docblock en vez de fingir la
+garantia.
+
+**Por que no se eligio una salida aqui.** Las 18 decisiones cerradas son del humano, y cuando una
+resulta imposible el encargo es **parar y preguntar**, no sustituirla. Las salidas concebibles
+—aceptar el plazo que imponga el proveedor y corregir la redaccion de R10; mover el vencimiento a
+donde si sea exigible; o descartar la subida directa— **cambian el alcance o el significado de D3**,
+y ninguna es del implementer.
+
+**Lo que esto NO invalida.** El resto de D3 y R10 se sostiene: el plazo vive en **una sola**
+definicion del modulo, toda la tanda caduca a la vez y nada se firma sin permiso. Lo unico que no
+se sostiene es que la caducidad de la **subida** sea algo que este sistema imponga.
+
 ## Limites y deudas declaradas
 
 - **El E2E se difiere a QC-107**, con motivo: esta ficha no anade ninguna pantalla, pagina ni
