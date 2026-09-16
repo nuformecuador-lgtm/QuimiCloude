@@ -539,8 +539,8 @@ export async function addBatchToAlive(
     const alive = rows[0];
     if (alive === undefined) return null;
 
-    // Despues de la fila: un alta que no va a escribir no pide lock, y el orden fila -> lock de
-    // aviso no puede formar un ciclo con el borrado, que solo toma la fila.
+    // Despues de la fila: un alta que no va a escribir no pide el lock de aviso. Y con la fila ya
+    // tomada arriba, esta funcion pide siempre los dos locks en ese orden: fila y luego aviso.
     const lot = await resolveBatchLot();
 
     const createdBatch = await tx.productBatch.create({
