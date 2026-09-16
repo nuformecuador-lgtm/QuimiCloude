@@ -355,6 +355,26 @@ porque es validacion de entrada y no una regla nueva de dominio.
 
 ## Deudas y cosas abiertas
 
+### Posible fallo latente en `e2e/aislamiento-inventario.spec.ts` (2026-09-16)
+
+Lo encontro el `implementer` de QC-60 al escribir el E2E hermano de pedidos. Cambiar el
+identificador del recurso **solo por DOM** no llegaba al servidor: el dialogo se vuelve a
+renderizar y **restaura el identificador original** antes del envio, asi que la peticion viajaba
+con el id propio y el test afirmaba un rechazo que nunca se habia intentado. En pedidos hubo que
+reponer el id justo antes de enviar. **El de inventario (QC-49) usa la misma tecnica y puede estar
+en verde sin probar el acceso cruzado.** No verificado todavia y **no entra en QC-60**: es de QC-49,
+ya mergeada, y merece que alguien lo compruebe haciendo que el test falle a proposito.
+
+### El reconocimiento del duplicado por nombre de indice se cayo en QC-60 (2026-09-16)
+
+Medido, no supuesto: con un `INSERT` crudo, Prisma devuelve el `23505` como `P2010` y `meta.message`
+trae solo la linea DETAIL (`Ya existe la llave (...)`), **sin el nombre del indice**. QC-60 lo
+reconocia por ese nombre, asi que su reintento era codigo muerto y el unit test daba verde porque
+fabricaba un error que si lo traia. **Se corrige dentro de QC-60** por el SQLSTATE, como ya exige el
+repo en `credential-setup-link-prisma.ts:25`. Lo que queda abierto es **si otro adaptador del repo
+hace lo mismo**: QC-81 no (usa el cliente tipado y `P2002` con `meta.target`), pero no se ha
+barrido el resto.
+
 ### El worktree de QC-81 quedó a medio borrar, y su base sigue viva (2026-09-16)
 
 Tercera vez, tras QC-23 y QC-102. Al cerrar (F2.5), `./scripts/wt.sh done QC-81-lote-y-fecha-de-compra`
