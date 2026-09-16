@@ -59,9 +59,9 @@ subagente de T2 era **este** entorno a medias, no su codigo. Tras `prisma genera
 | T2 — helper de ambito de peticion | hecha | `f23d312` |
 | T3 — cableado en la composicion | hecha | `f23d312` |
 | T4 — ambito explicito en los 8 `currentActor` | hecha | `f23d312` |
-| T5 — conteo por pantalla | en curso | — |
-| T6 — conteo por Server Action | hecha | pendiente de commit |
-| T7 — prueba de que el conteo muerde | pendiente de T5 | — |
+| T5 — conteo por pantalla | hecha | `974bc9d` |
+| T6 — conteo por Server Action | hecha | `a9d7338` |
+| T7 — prueba de que el conteo muerde | hecha, ver seccion 8 | — (no deja codigo) |
 | T8 — conteo en ejecucion, DESPUES (R16) | **BLOQUEADA**, ver seccion 5 | — |
 | T9 | retirada en la revision de F1.4 | — |
 | T10 — test del artefacto del conteo | **BLOQUEADA** (depende de T8) | — |
@@ -276,10 +276,49 @@ una persona con sesion iniciada**, y en este entorno:
 **Consecuencia en la trazabilidad:** **R16 se queda sin test** hasta que T8 y T10 se ejecuten.
 Los otros 18 requisitos si quedan cubiertos (seccion 6).
 
-## 6. Mapa de trazabilidad R(n) -> test
+## 6. Mapa de trazabilidad R(n) -> test (T12)
 
-_Pendiente de T12: se completa cuando cierren T5 y T7. R16 quedara marcado como descubierto
-mientras el bloqueo de la seccion 5 siga abierto._
+**19 requisitos: R1-R16 y R20-R22.** R17, R18 y R19 se retiraron en la revision de F1.4 y **sus
+huecos no se reutilizan**. Abreviaturas de los tres archivos nuevos:
+
+- **RENDER** = `tests/unit/identity/session-once-per-request-render.test.tsx` (7 casos, T5)
+- **ACCIONES** = `tests/unit/identity/session-once-per-request-actions.test.ts` (21 casos, T6)
+- **SCOPE** = `tests/unit/shared/request-scope.test.ts` (12 casos, T2)
+
+| R | Test que lo cubre | Caso |
+|---|---|---|
+| R1 | RENDER | los tres casos de «lee la ficha de sesion exactamente 1 vez», que incluyen layout, cortes por permiso y las Server Actions que la pantalla invoca al pintarse |
+| R2 | RENDER | «/configuracion/usuarios», «/configuracion/unidades» y «/pedidos lee la ficha de sesion exactamente 1 vez» |
+| R3 | ACCIONES | `describe.each` de las 8 acciones: 1 lectura por invocacion |
+| R4 | SCOPE | «al terminar el ambito de la accion, un ambito de PINTADO posterior lee de nuevo» (R4 **provisional**, ver seccion 7) |
+| R5 | SCOPE + RENDER + ACCIONES | «dos ambitos SEGUIDOS no comparten»; «dos peticiones simuladas seguidas leen la ficha DOS veces»; «2 con dos invocaciones seguidas» |
+| R6 | SCOPE | «dos ambitos SIMULTANEOS no comparten, y cada uno recibe lo suyo» |
+| R7 | SCOPE + ACCIONES | «no memoiza: `compute` se evalua en cada llamada» y «tampoco memoiza DESPUES de que un ambito explicito haya terminado»; y sin ambito, con la cookie cambiando entre llamadas, la segunda ve la nueva |
+| R8 | `e2e/session.spec.ts:352` (**existente**) | «una sesion abierta cuya ficha se da de baja tampoco rebota: sale al login en una sola redireccion». **Lo corre el leader**, no el subagente |
+| R9 | RENDER + SCOPE | «layout y pagina resuelven sin sesion sin reintentar la consulta»; «comparte la promesa RECHAZADA y no reintenta `compute` dentro del ambito» |
+| R10 | RENDER | el mismo caso de fallo: **UNA sola** linea `[session-check]` para toda la peticion |
+| R11 | ACCIONES + `tests/unit/composition/identity-facade.test.ts` (**existente**) | `getSessionUser.length === 0` y `getSessionContext.length === 0`; y la paridad de `null` de las dos proyecciones |
+| R12 | RENDER | «el id del usuario y el del contexto coinciden con una sola lectura» |
+| R13 | ACCIONES | la cookie cambiando entre llamadas sin ambito, **mas** la prueba de fuente de que `login-action.ts` no contiene `runInRequestScope` |
+| R14 | RENDER | «servir la pantalla sin fallos no llama a `console.*`» en las tres pantallas |
+| R15 | RENDER + ACCIONES + **T7** | los dos tests de conteo son la comprobacion ejecutable del gate; que **muerden** esta probado con las dos mutaciones de la seccion 8 |
+| R16 | **SIN TEST — BLOQUEADO** | `tests/unit/identity/session-count-artifact.test.ts` no existe: depende de T8, y T1/T8 no se pudieron ejecutar (seccion 5). **Unico requisito sin cobertura.** |
+| R20 | `tests/guards/guard-dependencias-aprobadas.test.ts` (**existente**) + SCOPE | la guardia vigila que toda dependencia declarada este aprobada; la prueba de fuente afirma que `request-scope.ts` solo importa `react` y `node:async_hooks`. `package.json` no cambia |
+| R21 | `e2e/session.spec.ts` entero (**existente**) | sin E2E nuevo, decision cerrada 11. **Lo corre el leader** |
+| R22 | `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`, `tests/unit/navegacion/private-layout-menu.test.tsx`, `tests/unit/identity/require-page-permission.test.ts`, `tests/unit/private-layout.test.tsx` (**existentes**) | redireccion al login con la marca, 404 dentro del layout privado y menu filtrado por permisos |
+
+**Resumen: 18 de 19 requisitos con al menos un test. El unico descubierto es R16**, y su causa
+es el bloqueo de la seccion 5, no un olvido.
+
+**Preguntas abiertas del spec, al cerrar la implementacion:**
+
+- **Pregunta abierta 1** (contra que Supabase se miden los tiempos): **cerrada sin objeto** por el
+  humano el 2026-09-15 al quitar los tiempos en F1.4. La implementacion no la reabre: no se midio
+  ningun tiempo y no se toco ningun Supabase real.
+- **Pregunta abierta 2** (que es «una peticion» cuando una accion revalida): **sigue ABIERTA**.
+  Rige **R4 provisional**, opcion (a): la accion y el repintado que provoca son **dos** ambitos, y
+  esa respuesta HTTP cuesta hasta **dos** lecturas. El helper esta escrito con esa semantica y el
+  caso de SCOPE citado en R4 la fija. **No se cerro aqui**: la decide el humano.
 
 ## 7. Desviaciones
 
@@ -292,3 +331,114 @@ mientras el bloqueo de la seccion 5 siga abierto._
 - La **Pregunta abierta 2** sigue **abierta**: rige **R4 provisional** (accion y repintado son
   **dos** ambitos, hasta dos lecturas en esa respuesta). El helper esta escrito con esa semantica
   y `tests/unit/shared/request-scope.test.ts` la fija. **No se cerro aqui.**
+- **T12 NO se marca como hecha** en `tasks.md`, y es a proposito. Su criterio de «Hecho» es «los
+  19 requisitos con al menos un test», y **R16 no lo tiene** por el bloqueo de la seccion 5. El
+  mapa de la seccion 6 esta escrito y completo en todo lo demas, pero marcar la casilla seria
+  autoaprobarse un criterio que no se cumple. Lo decide el leader.
+
+## 8. T7 — prueba de que el conteo MUERDE (R15)
+
+`docs/verification.md > Probar que muerde, no que pasa`: un check probado solo con su caso verde
+no esta probado. Se rompio el codigo de produccion **a mano**, se comprobo el rojo y se restauro
+**desde copia con `cp`**, nunca con `git checkout`. Los tests **no se tocaron**: las mutaciones
+van en produccion.
+
+**Base de partida:** `Test Files 2 passed (2)` · `Tests 28 passed (28)`.
+
+### Mutacion A — quitar `requestScoped` del cableado (T3)
+
+Las dos proyecciones de `lib/composition/index.ts` vuelven a llamar a `resolveSession()` directo.
+
+```
+Test Files  2 failed (2)
+     Tests  22 failed | 6 passed (28)
+```
+
+Pantallas, con los conteos reales frente al 1 exigido:
+
+```
+FAIL  /configuracion/usuarios lee la ficha de sesion exactamente 1 vez
+FAIL  /configuracion/unidades lee la ficha de sesion exactamente 1 vez
+      AssertionError: expected "vi.fn()" to be called 1 times, but got 7 times
+FAIL  /pedidos lee la ficha de sesion exactamente 1 vez
+      AssertionError: expected "vi.fn()" to be called 1 times, but got 12 times
+FAIL  dos peticiones simuladas seguidas leen la ficha DOS veces
+      AssertionError: expected "vi.fn()" to be called 2 times, but got 14 times
+FAIL  el id del usuario y el del contexto coinciden con una sola lectura
+      AssertionError: expected "vi.fn()" to be called 1 times, but got 3 times
+FAIL  layout y pagina resuelven «sin sesion» sin reintentar la consulta
+      AssertionError: expected "vi.fn()" to be called 1 times, but got 2 times
+```
+
+Acciones: **los 8 `currentActor` caidos en sus 2 casos** (16 fallos), todos con
+`expected 1 times, but got 2 times` (R3) y `expected 2 times, but got 4 times` (R5).
+
+**Restaurado desde la copia -> VERDE:** `Tests 28 passed (28)`, y `git diff -- lib/` vacio.
+
+### Mutacion B — quitar `runInRequestScope` de UN solo `currentActor` (T4)
+
+Solo `lib/modules/unidades/adapters/driving/unit-actions.ts`, con el `Promise.all` desnudo.
+
+```
+× 'listUnitsAction' > lee la ficha de sesion EXACTAMENTE una vez por invocacion (R3)
+   -> expected "vi.fn()" to be called 1 times, but got 2 times
+× 'listUnitsAction' > dos invocaciones seguidas leen DOS veces (R5)
+   -> expected "vi.fn()" to be called 2 times, but got 4 times
+✓ listProductsAction, listPresentationsAction, resendCredentialSetupLinkAction,
+  listOrderResponsiblesAction, listWorkGroupsAction, listUsersAction, listRolesAction
+✓ la lista cubre los OCHO archivos con `currentActor` (H4)
+✓ fuera de todo ambito (R7, R13) · login-action sin runInRequestScope (R13)
+✓ las dos proyecciones conservan su firma (R11)
+
+Test Files  1 failed (1)
+     Tests  2 failed | 19 passed (21)
+```
+
+**Esto es lo que demuestra que el conteo senala al culpable:** se rompio un solo adaptador y cayo
+ese y **solo** ese; los otros 7 siguieron verdes.
+
+**Restaurado desde la copia -> VERDE:** `Tests 21 passed (21)`.
+
+### Prueba de que la restauracion fue exacta
+
+```
+=== git diff -- lib/ ===
+=== fin diff ===        <- COMPLETAMENTE VACIO
+```
+
+La produccion quedo **identica** al commit `f23d312`, sin una linea de diferencia, asi que el
+`git diff` de T3 y T4 es el mismo que quedo commiteado. Las copias `.bak` se borraron.
+
+**Veredicto de R15:** ningun test paso por casualidad. El conteo del gate falla cuando alguna
+pantalla o alguna accion supera UNA lectura, y lo hace senalando cual.
+
+## 9. Verificacion final consolidada (sobre el arbol ya restaurado)
+
+Corrida por el `implementer` al cerrar, con la produccion identica a `f23d312`. **No es el gate
+completo**: `./init.sh` y los E2E los corre el **leader** (regla del gate, `AGENTS.md`).
+
+```
+pnpm typecheck                         exit=0   (sin errores)
+pnpm lint                              exit=0   (sin hallazgos)
+
+pnpm exec vitest run \
+  tests/unit/shared/request-scope.test.ts \
+  tests/unit/identity/session-once-per-request-actions.test.ts \
+  tests/unit/identity/session-once-per-request-render.test.tsx
+  Test Files  3 passed (3)
+       Tests  40 passed (40)
+
+pnpm exec vitest run guard
+  Test Files  41 passed (41)
+       Tests  445 passed | 9 skipped (454)
+```
+
+Las **guardias enteras en verde** importan aqui por dos razones concretas: ningun grafo de
+imports las seleccionaria (`docs/verification.md`), y esta ficha toca justo lo que dos de ellas
+vigilan — `guard-arquitectura-modulos` (bloque 9: `lib/shared` sigue siendo **hoja**; bloque 12:
+lee `docs/architecture.md`, que T11 modifico) y `guard-dependencias-aprobadas` (R20: `package.json`
+no cambia).
+
+**Lo que esta corrida NO responde**, y por eso el gate completo no es opcional: si esta rama
+rompio algo lejano que ningun test de los de arriba importa. Eso es `./init.sh` contra
+`tests/baseline-rojos.json`, y es del leader.

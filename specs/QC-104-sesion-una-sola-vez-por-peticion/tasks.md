@@ -116,7 +116,7 @@
 
       **Hecho:** `findActiveById` exactamente 1 por invocacion en los 8, y los demas casos en verde.
 
-- [ ] **T7 — Prueba de que el conteo muerde (R15).** Depende de T5 y T6.
+- [x] **T7 — Prueba de que el conteo muerde (R15).** Depende de T5 y T6.
       Archivos: `progress/impl_QC-104-sesion-una-sola-vez-por-peticion.md` (nuevo o ampliado). El
       codigo de produccion **se restaura** al terminar.
       - Quitar a mano `requestScoped` del cableado de T3 → T5 y T6 rojos.
