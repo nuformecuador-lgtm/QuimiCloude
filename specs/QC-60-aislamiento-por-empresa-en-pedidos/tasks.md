@@ -221,7 +221,7 @@
   Depende de: T7, T10.
   Cubre: R16, R17, R18, R20, R21, R22, R23, R28.
 
-- [ ] **T17 — E2E de aislamiento.** **(E2E — Playwright)**
+- [x] **T17 — E2E de aislamiento.** **(E2E — Playwright)**
   Archivos: `e2e/aislamiento-pedidos.spec.ts` (nuevo), con el patrón de
   `e2e/aislamiento-inventario.spec.ts` y `e2e/permisos.spec.ts`: fixture propio, prefijo por worker,
   limpieza defensiva, **una sola sesión real** (la de A) y los datos de B sembrados con Prisma.
