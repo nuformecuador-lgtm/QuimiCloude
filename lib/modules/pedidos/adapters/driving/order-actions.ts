@@ -13,6 +13,7 @@ import {
   type OrderView,
   type Page,
 } from '@/lib/modules/pedidos';
+import { runInRequestScope } from '@/lib/shared/request-scope';
 
 /**
  * Server Actions del pedido (T15, R5, R54, R56, `design.md > 9`). Copia en forma de
@@ -118,10 +119,10 @@ const toErrorState = createErrorStateTranslator(PedidosError, observabilidad.rea
  * jamas sale de la entrada del llamante: si no, elegirla seria escribir otro uuid en el formulario.
  */
 async function currentActor(): Promise<Actor | null> {
-  const [sessionUser, sessionContext] = await Promise.all([
-    identity.getSessionUser(),
-    identity.getSessionContext(),
-  ]);
+  // El ambito envuelve solo este `Promise.all`: las dos caras comparten una lectura de sesion.
+  const [sessionUser, sessionContext] = await runInRequestScope(() =>
+    Promise.all([identity.getSessionUser(), identity.getSessionContext()]),
+  );
   if (sessionUser === null || sessionContext === null) return null;
   return {
     id: sessionUser.id,

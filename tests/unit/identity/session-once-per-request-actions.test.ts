@@ -231,6 +231,14 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       ).endAllSessionsAction({ status: 'idle' }, formData);
     },
   },
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'listOrdersAction',
+    invocar: async () =>
+      (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).listOrdersAction({
+        page: 1,
+      }),
+  },
 ];
 
 /**
