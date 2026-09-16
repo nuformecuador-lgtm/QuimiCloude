@@ -358,6 +358,12 @@ const MIGRACION_QC81 = [
   'db/migrations/20260913120000_product_batch_lot_and_purchase_date/down.sql',
 ];
 
+// La migracion que da empresa a los pedidos: no toca ninguna tabla de recetas.
+const MIGRACION_QC60 = [
+  'db/migrations/20260915120000_orders_company_scope/migration.sql',
+  'db/migrations/20260915120000_orders_company_scope/down.sql',
+];
+
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
   ...AUTORIZACION_POR_PERMISO_QC74,
@@ -375,6 +381,7 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC49,
   ...MIGRACION_QC23,
   ...MIGRACION_QC81,
+  ...MIGRACION_QC60,
 ];
 
 /** Espera rutas con separadores POSIX, como las devuelve `git diff --name-only`. */
