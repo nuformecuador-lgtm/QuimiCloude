@@ -54,7 +54,12 @@ patron que el caso negativo ya vigilado en ese archivo).
 `select: { orderId: true }` y `orderBy: { orderId: 'asc' }`; **no hay ningun `include`**; y
 `pnpm exec vitest related --run tests/guards/guard-lote-sin-join.test.ts` sigue verde.
 
-### T3 · Integracion contra base real de la lectura nueva (R7, R8) `[P]`
+### T3 · `[x]` Integracion contra base real de la lectura nueva (R7, R8) `[P]`
+
+> Hecha en la tanda 2 (2026-09-16). Ejercita el **adaptador** directamente: el caso de uso (T6) esta
+> bloqueado por QC-60. **Desviacion:** «un `user_id` con filas en dos empresas» es inseedable — la FK
+> `order_assignments_user_id_fkey` es compuesta `(user_id, company_id)`, asi que la base lo rechaza;
+> R7 se cubre por el lado que si existe y se anade un caso que demuestra la imposibilidad.
 
 **Toca**
 - `tests/integration/asignaciones/assigned-orders.int.test.ts` (**archivo nuevo**)

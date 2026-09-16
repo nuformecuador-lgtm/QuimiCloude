@@ -13,7 +13,17 @@
 | Tanda | Tasks | Commit |
 |---|---|---|
 | 1 | T1, T2, T7 | `1b0b16d` |
-| 2 | T3 | (en vuelo al escribir esto) |
+| 2 | T3 | la tanda de este commit |
+
+### Tanda 2 — T3 (2 archivos)
+
+| Archivo | Task |
+|---|---|
+| `tests/integration/asignaciones/assigned-orders.int.test.ts` (**nuevo**, 6 casos) | T3 |
+| `tests/integration/aislamiento.json` (fila nueva en `transaccion`, en orden alfabetico) | T3 |
+
+Ejercita **el adaptador directamente** —`createOrderAssignmentRepository(fixture.tx)` ->
+`listOrderIdsByUserInCompany`—, no un caso de uso: T6 no existe todavia.
 
 ## Preparacion del worktree
 
@@ -51,7 +61,9 @@ el arnes, y una base `QuimiCloude_QC88` suelta solo habria sido basura que el ba
 | **R10** | una sola sentencia, sin `include`, sin navegar relacion | mismo archivo — «es UNA sola consulta…» y «el orderBy es orderId ascendente…» |
 | **R36** | el codigo de consulta legitimo **solo** en el caso de uso nuevo; sigue dando hallazgo en `app/**`, `components/**`, `lib/shared/**`, adaptador driving y otro modulo | `tests/unit/asignaciones/module-contract.test.ts` — regla (e), caso `:764` (tres portazos de QC-87) + caso nuevo de QC-88 con sus tres portazos |
 | **R37** | nadie fuera de `adapters/driven/**` consulta `prisma.orderAssignment`; ninguna consulta nueva usa `include` | mismo archivo («el select trae SOLO orderId, y no hay ningun include») + `tests/guards/guard-lote-sin-join.test.ts` |
-| **R7, R8** | aislamiento por empresa y rechazo cruzado indistinguible de inexistente | **T3, en vuelo** — `tests/integration/asignaciones/assigned-orders.int.test.ts` |
+| **R8** | una asignacion de otra empresa no vuelve **ni se distingue de una inexistente** | `tests/integration/asignaciones/assigned-orders.int.test.ts` — «R8: la asignacion de OTRA empresa no vuelve, y no se distingue de una que no existe». La asignacion ajena se siembra **de verdad** (pedido real + persona real de `companyB`, dada de alta por el caso de uso real de QC-87) y el caso **lee `order_assignments` al margen del adaptador** antes de afirmar que no vuelve: lo demostrado es que el `where` la filtra, no que no hubiera datos |
+| **R7** | toda lectura acotada a la empresa del actor | mismo archivo — «el mismo `user_id` preguntado por la OTRA empresa devuelve vacio, teniendo filas» (es el caso que mata la mutacion: quitar `companyId` del `where` lo pone rojo), «solo los pedidos de ESA persona, no los de su companera de empresa», y «la BASE impide que un mismo `user_id` tenga filas en dos empresas (FK compuesta)» |
+| R15 (parcial) | ids desnudos y orden estable entre dos lecturas | mismo archivo — «devuelve identificadores DESNUDOS, ordenados, y dos lecturas seguidas dan lo mismo». El orden **de la lista que ve el usuario** lo pone `pedidos` y queda sin cubrir (T5/T6, bloqueadas) |
 | R1-R6, R11-R35, R38-R40 | — | **SIN CUBRIR**: sus tasks estan bloqueadas |
 
 ## Salida real de lo que se corrio
@@ -77,6 +89,25 @@ T7: mutacion deliberada de la regla (e) -> 3 failed (caen los tres casos a la ve
     restaurada -> 24 passed (24)
 ```
 
+Tanda 2 (T3), verificada por el implementer despues de la entrega del subagente:
+
+```
+pnpm typecheck -> VERDE (sin salida)
+pnpm lint      -> VERDE (sin salida)
+
+pnpm exec vitest run tests/integration/asignaciones/assigned-orders.int.test.ts
+                     tests/guards/guard-aislamiento-integracion.test.ts
+test-db: plantilla reutilizada: qct_tpl_5a5346ed8f4d (las migraciones no han cambiado)
+test-db: la corrida de integracion va contra qct_qc88_6c532eac_mu49iqnn_cbw (copia de qct_tpl_5a5346ed8f4d).
+ Test Files  2 passed (2)
+      Tests  12 passed (12)
+   Duration  4.30s
+test-db: borrada la base de la corrida: qct_qc88_6c532eac_mu49iqnn_cbw.
+```
+
+La corrida **creo y borro su propia base efimera**, que es la confirmacion en ejecucion de por que
+no hacia falta montar `QuimiCloude_QC88` a mano.
+
 La mutacion de T7 es la evidencia de que la guardia **muerde**: ensanchar la puerta de igualdad
 exacta a prefijo de carpeta pone en rojo el caso `:764` de QC-87, el caso nuevo de QC-88 y la
 mutacion (e2) sobre el fuente real. No se puede aflojar en silencio.
@@ -93,7 +124,22 @@ mutacion (e2) sobre el fuente real. No se puede aflojar en silencio.
    El resto de dobles del repo no rompio porque castean via `as unknown as OrderAssignmentRepository`.
 2. **T4 se escribio y se revirtio.** Ver `> Bloqueadas`.
 3. **Base propia no montada.** Ver `> Preparacion del worktree`.
-4. **El riesgo 4 de `design.md > 14` (dos definiciones del avatar) NO aplica y no hay deuda que
+4. **R7 no se pudo demostrar con «un `user_id` con filas en dos empresas»: el esquema lo impide.**
+   `db/migrations/20260911120000_order_assignments/migration.sql:168` declara
+   `order_assignments_user_id_fkey` como FK **compuesta** `(user_id, company_id) -> users(id, company_id)`,
+   y `users.company_id` es una sola: la base rechaza la fila. R7 se cubrio por el lado que si existe
+   —el mismo `user_id` preguntado por la otra empresa devuelve vacio **teniendo filas**, que ademas es
+   el caso que mata la mutacion— y se anadio un caso que **demuestra la imposibilidad** con
+   `withSavepoint` en vez de darla por sabida. Ese caso vale por si solo: el OJO 2 de
+   `db/schema.prisma` deja escrito que si alguien simplifica esa FK a `(user_id) -> users(id)` todo
+   sigue verde y la coherencia de empresa **desaparece en silencio**; ahora no.
+5. **Prisma no sabe el nombre de esa FK.** La primera version del test afirmaba sobre
+   `order_assignments_user_id_fkey` y salio roja: Prisma reporta
+   `Foreign key constraint violated on the (not available)`, **sin nombre**, porque la FK compuesta va
+   escrita a mano en el `migration.sql` y Prisma no la modela. La asercion se corrigio a la **clase**
+   de error, con el motivo escrito en el test: pedir el nombre seria afirmar sobre una limitacion del
+   cliente, no sobre la base. El comportamiento nunca fallo, solo la asercion.
+6. **El riesgo 4 de `design.md > 14` (dos definiciones del avatar) NO aplica y no hay deuda que
    anotar**: QC-102 esta mergeado en `dev` —`app/(private)/pedidos/components/responsible-avatars.tsx`
    y su test estan en `dev` y en el HEAD de esta rama—, asi que T17 iba por **promocion**, no por el
    plan B. Pero T17 quedo bloqueada por otro motivo (ver abajo).

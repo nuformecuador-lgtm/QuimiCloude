@@ -2,6 +2,7 @@
   "_nota": "Censo de aislamiento de los archivos de tests/integration/** (QC-77, R18). Cada archivo *.int.test.ts declara COMO se aisla: 'transaccion' (transaccion interactiva que termina en ROLLBACK, con SAVEPOINT para lo que se espera que falle: el patron heredado de QC-4 y ampliado en QC-47) o 'commit' (escribe de verdad y se limpia el solo, o no escribe nada). Toda entrada de 'commit' necesita motivo y desde; sin eso el censo se vuelve el sitio donde se mete lo que estorba, que es la leccion escrita de tests/baseline-rojos.json. Rutas relativas a tests/integration/ y SIEMPRE con '/', para que el archivo sea identico en Windows y en Linux. Lo vigila tests/guards/guard-aislamiento-integracion.test.ts. Ver specs/QC-77-aislamiento-de-la-base-en-tests-de-integracion/design.md > 8.",
   "transaccion": [
     "asignaciones/active-members-only.int.test.ts",
+    "asignaciones/assigned-orders.int.test.ts",
     "asignaciones/atomicity.int.test.ts",
     "asignaciones/batch-company-scope.int.test.ts",
     "asignaciones/batch-states.int.test.ts",
