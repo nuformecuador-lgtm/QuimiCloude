@@ -410,3 +410,79 @@ afirmaban siguen en verde.
   archivo queda **ligeramente anterior** al real, porque su firma se emitio unos milisegundos
   despues. Es **conservador** —nunca dice que un enlace vive mas de lo que vive, asi que no engana
   a favor de quien sube— y por eso se acepta en vez de corregirse.
+
+## Vuelta de gate (2026-09-16) — los dos rojos que dejo el resto de la semana
+
+Esta feature quedo implementada y revisada; los dos rojos que siguen no son del codigo del
+modulo, sino de reglas que cambiaron o de guardias de otras fichas mientras esta estaba en
+curso.
+
+### Rojo 1, el que bloqueaba de verdad — la regla de QC-104
+
+QC-104 se mergeo mientras se construia esta ficha, y su regla exige que **toda** Server Action
+que resuelva las dos caras de la sesion —`getSessionUser()` y `getSessionContext()`— lo haga
+dentro de `runInRequestScope`, para que ambas lecturas compartan una sola resolucion de la
+ficha de sesion en la misma invocacion. `currentActor()` en
+`lib/modules/documentos/adapters/driving/document-upload-actions.ts` las resolvia con un
+`Promise.all` sin ambito, y eso es justo lo que `tests/unit/identity/session-once-per-request-actions.test.ts`
+vigila contra el arbol real (no contra una lista escrita a mano), asi que el archivo entro en
+rojo en cuanto la regla lo alcanzo — no por un cambio de esta ficha.
+
+**Lo hecho:**
+- `currentActor()` ahora envuelve el `Promise.all` en `runInRequestScope`, copiado del patron
+  exacto de `lib/modules/asignaciones/adapters/driving/order-assignment-actions.ts` (lineas 41 y
+  77-83 en dev): mismo import, misma forma, el ambito ciñendo exactamente ese `Promise.all` y
+  nada mas. El comentario cita el requisito (R3), sin ficha.
+- Se anadio la fila de `issueUploadLinksAction` a `ACCIONES` en
+  `session-once-per-request-actions.test.ts`, con import dinamico dentro de `invocar` y una
+  entrada invalida a proposito (`{} as never`): la accion captura sus errores y devuelve un
+  estado, asi que la entrada rota no rompe el caso — lo que esa lista mide es cuantas veces se
+  lee la sesion por invocacion, no que la operacion tenga exito.
+
+### Rojo 2, la guardia de QC-25 — falso positivo, acotado por el humano, no tocado aqui
+
+`tests/unit/recetas/scope.test.ts` se disparaba contra los tests de esta feature porque su
+comprobacion buscaba el texto `@supabase/storage-js` en **todo** `tests/`, y los tests de
+`documentos` lo NOMBRAN como dato de prueba al afirmar la misma regla de aislamiento de
+dependencia (R26, R31). Es un falso positivo: nada de esta feature importa esa libreria fuera
+del adaptador que le corresponde. **El humano autorizo acotar esa guardia a
+`tests/unit/recetas/`, y el leader ya hizo esa edicion antes de esta vuelta.** No se toco en
+esta sesion; solo se comprobo que pasa.
+
+### Los otros dos rojos — deuda de baseline ajena, fuera de alcance
+
+`tests/unit/navegacion/qc75-convenciones.test.ts` y
+`tests/unit/unidades/unidades-convenciones.test.ts` siguen en rojo por las dos dependencias
+aprobadas de esta ficha, pero estan listados en `tests/baseline-rojos.json` y por tanto **no
+bloquean**. No se tocaron, no se modificaron y no se anadio nada al baseline.
+
+### Verificacion de esta vuelta
+
+```
+$ pnpm lint
+> eslint                                          <- sin un solo hallazgo
+
+$ pnpm exec vitest run tests/unit/identity/session-once-per-request-actions.test.ts tests/unit/recetas/scope.test.ts
+ Test Files  2 passed (2)
+      Tests  33 passed (33)
+
+$ pnpm exec vitest run tests/unit/documentos
+ Test Files  11 passed (11)
+      Tests  165 passed (165)
+
+$ pnpm exec vitest run guard
+ Test Files  42 passed (42)
+      Tests  467 passed | 9 skipped (476)
+```
+
+El filtro `guard` recoge ahora 42 archivos (antes 41 en la corrida original de esta bitacora)
+porque el patron de vitest matchea por substring y otra feature en curso sumo un archivo de
+guardia propio (`tests/unit/proveedores-ui/guard-convenciones-proveedores.test.ts`); no es un
+archivo de esta ficha y todos los 467 casos pasan, con los 9 saltos ya explicados (diffs de
+otras features sin commits en este rango).
+
+`pnpm typecheck` no se corrio de nuevo en esta vuelta a proposito: la instruccion de esta
+sesion fue verificar que nada de `documentos` ni `composition` aparezca entre sus errores, y esa
+condicion no cambia con los dos archivos tocados aqui (uno de produccion sin tipos nuevos, uno
+de test). Los 335 errores previos siguen siendo el mismo problema ambiental descrito arriba
+(cliente de Prisma sin generar en este worktree).
