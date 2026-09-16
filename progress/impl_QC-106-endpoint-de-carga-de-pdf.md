@@ -86,7 +86,8 @@ lib/modules/documentos/adapters/driving/document-upload-actions.ts
 `.env.example` (bloque nuevo al final, +18), `package.json` y `pnpm-lock.yaml` (las dos
 dependencias aprobadas).
 
-**Tests, nuevos (10 archivos, 145 casos):**
+**Tests, nuevos (11 archivos, 165 casos).** Nacieron **10 con 145 casos**; la enmienda **D19** sumo
+**4** y el cierre de **B1** trajo el archivo **numero 11** con **16** mas:
 
 ```
 tests/unit/documentos/authorization.test.ts
@@ -99,6 +100,7 @@ tests/unit/documentos/storage-config.test.ts
 tests/unit/documentos/pdf-converter.test.ts
 tests/unit/documentos/document-upload-actions.test.ts
 tests/unit/documentos/qc106-alcance.test.ts
+tests/unit/documentos/read-document.test.ts     <- el 11, lo trajo el cierre de B1
 ```
 
 **Lo que toco despues la enmienda D19** (5 de produccion + 5 de test, ninguno nuevo):
@@ -140,7 +142,7 @@ en vez de disimularlo.
 | R9 | `upload-input.test.ts`, `issue-upload-links.test.ts` | «R9 — una tanda sin ningun archivo se rechaza»; «una tanda vacia se rechaza con `invalid_input` y no llama al almacenamiento» |
 | R10 | `issue-upload-links.test.ts`, `limits-and-path.test.ts` | **Subida (plazo del proveedor):** «R10 — la caducidad es la emision mas las DOS HORAS del proveedor, con el reloj inyectado»; «R10 — la SUBIDA no promete los quince minutos: ese plazo es el de LECTURA y aqui no se usa»; «R10 — al puerto NO se le pasa ningun plazo: quien lo impone es el proveedor»; «R10 — toda la tanda caduca a la vez aunque el reloj avance entre firma y firma». **Lectura (plazo nuestro):** «R10 — el plazo de LECTURA lo fija este modulo: quince minutos, y el puerto SI los pide»; «R10 — el plazo de SUBIDA lo impone el PROVEEDOR: dos horas, y el puerto NO las pide»; «R10 — el docblock del plazo de subida dice que el modulo NO lo elige y NO lo promete». **Reescrito por la enmienda D19; ya no queda limite abierto** |
 | R11 | `storage-config.test.ts` | «R11, R32 — con las tres presentes resuelve el bucket PROPIO de los documentos, no el de las imagenes»; «R11, R32 — la direccion y la credencial se REUTILIZAN: no nace ninguna variable duplicada» |
-| R12 | `limits-and-path.test.ts`, `issue-upload-links.test.ts` | «R12 — `empresa-A2/x.pdf` NO pasa como ruta de `empresa-A`»; «R12 — la travesia de directorios y la carpeta sola tampoco pasan»; «cada ruta cae bajo el prefijo de LA EMPRESA DEL ACTOR»; «dos actores de empresas distintas con la MISMA entrada caen en prefijos distintos» |
+| R12 | `limits-and-path.test.ts`, `issue-upload-links.test.ts`, **`read-document.test.ts`** | **Funcion pura:** «R12 — `empresa-A2/x.pdf` NO pasa como ruta de `empresa-A`»; «R12 — la travesia de directorios y la carpeta sola tampoco pasan». **Mitad de SUBIDA:** «cada ruta cae bajo el prefijo de LA EMPRESA DEL ACTOR»; «dos actores de empresas distintas con la MISMA entrada caen en prefijos distintos». **Mitad de LECTURA (la que cerro B1), por el CASO DE USO y para las DOS operaciones:** rechazo cruzado con `unauthorized` y **cero** llamadas a los tres metodos del puerto; el rechazo es **identico exista o no el archivo** —mismo `code` y mismo `message`; el doble responde a cualquier ruta, asi que **sin la guardia el caso daria verde con una URL en la mano**—; las trampas (`empresa-A2/…`, `../empresa-B/…`, `empresa-A/../empresa-B/…`, ruta absoluta, `otra/empresa-A/…`, carpeta sola, vacia); falla cerrado sin actor y sin empresa; ruta propia ⇒ **si llega al puerto** |
 | R13 | `issue-upload-links.test.ts` | «la salida son rutas y enlaces: ninguna URL de lectura y ninguna conversion» |
 | R14 | `issue-upload-links.test.ts`, `qc106-alcance.test.ts` | «no se escribe ni se lee ninguna fila: el caso de uso no tiene por donde»; «R14: el diff de la rama no trae ningun archivo bajo `db/`» |
 | R15 | `issue-upload-links.test.ts` | «la salida son rutas y enlaces: ninguna URL de lectura y ninguna conversion» |
@@ -159,7 +161,7 @@ en vez de disimularlo.
 | R28 | `module-contract.test.ts` | «R28 — el cierre real no arrastra `'use server'`, Prisma, `next/*`, el SDK del almacenamiento, la libreria de conversion ni ningun adaptador»; «R28 — la Server Action y los adaptadores driven existen en el arbol y NO son alcanzables desde el contrato»; «R28 — la regla MUERDE» |
 | R29 | `document-upload-actions.test.ts`, `qc106-alcance.test.ts` | «R29 — el archivo declara `'use server'` y no se reexporta desde el contrato del modulo»; «R29 — la emision de enlaces no estrena ningun Route Handler»; «R29: el diff de la rama no trae ningun archivo bajo `app/api/`» |
 | R30 | `qc106-alcance.test.ts` | «R30: `permissions.ts` es identico al de dev»; «R30: y por lo tanto no introduce ningun identificador de base —tabla, columna o indice—» |
-| R31 | `storage-config.test.ts` + las 10 suites del modulo | «R32, R31 — importar el adaptador con las tres variables vacias no lanza». Los **145 casos corren sin red, sin bucket y sin variables de entorno**. **LIMITE: `tests/unit/composition` no es ejecutable en esta maquina — ver abajo** |
+| R31 | `storage-config.test.ts` + las 11 suites del modulo | «R32, R31 — importar el adaptador con las tres variables vacias no lanza». Los **165 casos corren sin red, sin bucket y sin variables de entorno**. **LIMITE: `tests/unit/composition` no es ejecutable en esta maquina — ver abajo** |
 | R32 | `storage-config.test.ts` | «R32 — invocar sin configuracion lanza nombrando las tres variables, sin ningun valor»; «R32 — con una sola presente, el mensaje nombra solo las que faltan»; «R32 — una variable vacia o solo espacios cuenta como ausente»; «R32 — `SUPABASE_DOCUMENTS_BUCKET` esta declarada, VACIA y con su documentacion»; «R32 — el archivo no contiene ningun secreto» |
 | R33 | `module-contract.test.ts`, `qc106-alcance.test.ts` | «R27, R33 — el barril expone el actor, los dos errores, los limites, la ruta y el esquema» (los dos unicos codigos: `unauthorized`, `invalid_input`); «R33: `error-codes.ts` es identico al de dev» |
 | R34 | `qc106-alcance.test.ts` | «R34: el diff de la rama no trae ningun archivo bajo `app/`, `components/` ni `e2e/`»; «R34 — el detector muerde». E2E **diferido a QC-107**, con motivo |
@@ -179,9 +181,9 @@ $ pnpm lint
                                    <- sin un solo hallazgo
 
 $ pnpm exec vitest run tests/unit/documentos
- Test Files  10 passed (10)
-      Tests  149 passed (149)
-   Duration  2.45s
+ Test Files  11 passed (11)
+      Tests  165 passed (165)
+   Duration  2.04s
 
 $ pnpm exec vitest run guard
  Test Files  41 passed (41)
@@ -193,8 +195,16 @@ $ pnpm typecheck
 0 que mencionen `modules/documentos` o `composition/index`
 ```
 
-**Las guardias quedan 41 de 41.** Los 149 casos del modulo son los 145 originales mas los **cuatro
-nuevos** que trajo la enmienda D19, que afirman de quien es cada plazo.
+**Las guardias quedan 41 de 41.** Los **165** casos del modulo son los **145** originales, mas los
+**4** que trajo la enmienda D19 —que afirman de quien es cada plazo— y los **16** del cierre de
+**B1**, que prueban el rechazo cruzado de la lectura y la descarga.
+
+**Verificado por el leader sobre el estado final** (2026-09-16), y no solo relatado: `tests/unit/documentos`
+**11 de 11 archivos y 165 de 165 casos**, y `guard` **41 de 41, 445 pasados y 9 saltados**. El
+implementer **murio a mitad de escribir esta bitacora** —limite semanal de la API, no un fallo del
+trabajo—, asi que el codigo y sus tests quedaron commiteados y estas ultimas lineas las cerro el
+leader. Una primera corrida del leader dio 2 archivos y 1 guardia en rojo: fue **transitoria**, por
+leer el arbol mientras el proceso agonizaba a media escritura, y no se reprodujo.
 
 ### El rojo bloqueante, CERRADO por decision humana (2026-09-16)
 
@@ -312,6 +322,63 @@ almacenamiento no se toca ni una vez** y **no se firma ningun enlace**, afirmado
 sobre **ocho** entradas invalidas distintas y contra un puerto cuyos tres metodos **revientan** si
 alguien los llama. Y la frontera sigue intacta: la accion **no comprueba ningun permiso** ni nombra
 ningun codigo de permiso — eso sigue siendo la primera linea del caso de uso (R5).
+
+## Vuelta de review (2026-09-16) — B1 cerrado y los cuatro menores
+
+La review salio **RECHAZADA** con un bloqueante y cuatro menores
+(`progress/review_QC-106-endpoint-de-carga-de-pdf.md`). Esto es lo que se hizo.
+
+### B1 (bloqueante) — la mitad de LECTURA de R12, implementada
+
+**Era real, y se comprobo antes de tocar nada:** `isPathInCompany` tenia **cero llamantes en
+produccion** —solo su definicion y el reexport del barril; todo lo demas eran tests—, no habia
+ningun caso de uso de lectura donde la comprobacion pudiera ocurrir, y sin embargo la composicion
+**ya cableaba** `createSignedReadUrl` y `download`. R12 dice «de subida **o de lectura**», asi que
+no era interpretable. En una ficha **sin tabla**, donde el aislamiento entre empresas **es la
+ruta**, eso es exactamente el agujero que el aislamiento existe para impedir: QC-111 habria podido
+firmar o descargar **cualquier** ruta.
+
+**Se eligio implementarlo** (opcion 1 del review) y **no** reescribir R12: el requisito se cumple
+tal como esta aprobado, asi que no habia nada que enmendar ni que llevar a la puerta humana.
+Archivos nuevos: `domain/read-document.ts` y `tests/unit/documentos/read-document.test.ts`.
+
+**Por que QC-111 no puede saltarselo:** lo que sale por el contrato y por la fachada cableada son
+**los casos de uso** (`issueReadLink`, `downloadDocument`), **nunca** las funciones del puerto. El
+puerto y los adaptadores driven solo los ve `lib/composition`, y la guardia de arquitectura impide
+que cualquier otro archivo de produccion los importe. El plazo de lectura tampoco lo elige quien
+llama: sale de la constante del modulo. El rechazo es `unauthorized` **antes** de tocar el puerto y
+**sin diagnostico**, de modo que «no es de tu empresa» y «no existe» son indistinguibles — no por
+promesa, sino porque nunca se llega a preguntar.
+
+**Cero permisos nuevos y cero codigos de error nuevos.** La lectura exige **solo** empresa: R2 y R5
+hablan del permiso de *la emision de enlaces*, y exigir un permiso de **escritura** para una
+**lectura** habria sido inventar un requisito que nadie aprobo.
+
+### Agujero de travesia encontrado y cerrado, de propina
+
+Al implementarlo aparecio que `isPathInCompany` dejaba pasar `empresa-A/../empresa-B/x.pdf`: el
+primer segmento coincide, asi que la comprobacion vieja decia que si, y esa ruta **normalizada
+apunta fuera de la empresa**. Se cierra exigiendo que ningun segmento sea `..`, en el **unico
+dueno del formato de ruta**, que es donde no puede divergir. **No es requisito nuevo**: es
+literalmente lo que R12 pide —«una ruta que no este bajo ese prefijo»—, y los casos que ya se
+afirmaban siguen en verde.
+
+### Los menores
+
+- **m1 — queda DISUELTO, no pendiente.** El hallazgo era que de las tres operaciones del puerto
+  solo `createSignedUpload` tenia consumidor. Con B1 implementado, **las tres lo tienen**:
+  `createSignedReadUrl` y `download` los consumen ahora los dos casos de uso de lectura. Ya no hay
+  cableado sin consumidor que declarar.
+- **m3 — hecho.** El efecto secundario de unificar la caducidad de la tanda queda dicho en el
+  docblock del caso de uso y abajo, en los limites declarados.
+- **m4 — hecho.** El factor de milisegundos queda en **una sola** definicion. No se publica por el
+  barril, porque no es un limite de negocio, y el barrido de duplicados sigue en verde.
+- **m2 — no es del implementer.** El estado del leader (`feature_list.json`, `progress/current.md`,
+  y la entrada de `progress/history.md`) lo escribe el leader tras sincronizar con `dev`.
+- **Nota que no es hallazgo pero conviene no perder:** `progress/review_QC-106-*.md` esta **sin
+  seguimiento** en git. Tal cual, no viaja con el PR, y `CHECKPOINTS.md > Verificacion final` lo
+  pide presente. Es artefacto del reviewer, no del implementer, asi que se anota en vez de
+  commitearlo por cuenta propia.
 
 ## Limites y deudas declaradas
 
