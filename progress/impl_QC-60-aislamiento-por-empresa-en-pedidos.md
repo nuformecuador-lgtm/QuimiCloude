@@ -138,7 +138,7 @@ Cinco correcciones pedidas por el leader; R15 y R22 decididas por el humano.
    - `design.md > 3.3` con **enmienda fechada** (`5b882ef`).
    - Corridas: `order-prisma-errors` + `guard-ambito-empresa-pedidos` + `guard-aislamiento-integracion` → `3 passed, 35 tests`; `order-sequence-race.int.test.ts` → `2 passed`.
 2. **R22 enmendado** (`5b882ef`, `2cdbdb7`). `requirements.md` sin la cláusula de rechazo y con nota de enmienda; `tasks.md > T16` al día. `company-isolation-service.test.ts`: entrada del alta con `companyId`/`company_id` de B y actor de A → resuelve, `create` recibe `{ companyId: A }`, los datos no llevan empresa, B no aparece en ningún argumento. La edición con empresa en la entrada también resuelve. El **listado** con `filters.companyId` sí da `ValidationError` hoy (no es un filtro ofrecido) y el test lo admite solo para el listado.
-3. **Listas cerradas** (`c` commit `test(QC-60): alta de la migracion y del E2E en cuatro listas cerradas`). Cinco rojos, no dos:
+3. **Listas cerradas** (`7a44560`). Cinco rojos, no dos:
    - `tests/guards/guard-identificador-de-request.test.ts`: `aislamiento-pedidos.spec.ts` en `E2E_ESPERADOS` y `20260915120000_orders_company_scope` en `MIGRACIONES_ESPERADAS`, patrón de `1012f97`.
    - `tests/unit/shared/data-table-alcance.test.ts`: el E2E usa `data-table-row-<id>`; centinela de doce a trece.
    - `tests/unit/recetas-ui/recipe-route-contract.test.ts`: `MIGRACION_QC60` en `DB_PERMITIDAS`, como QC-49 y QC-81.
