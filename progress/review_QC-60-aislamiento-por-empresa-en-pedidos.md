@@ -118,3 +118,70 @@ nombre del caso sí vale).
 - **m6** — `tasks.md > T19` sigue `[ ]` (gate completo, del leader). Hay que cerrarlo antes del PR.
 - **m7** — `docs/architecture.md:34`: la viñeta editada deja una línea de ~110 columnas, más ancha que el resto del párrafo. Cosmético.
 - **m8** — R27 cambia algo observable en `asignaciones`: desasignar desde otra empresa pasa de `order_assignment_not_found` a `order_not_found`. Es lo correcto y tiene test; conviene decirlo en el PR para quien consuma ese código desde la UI de QC-102.
+
+---
+
+## Segunda vuelta — HEAD `ff89f7a` (2026-09-16)
+
+### Alcance decidido por el humano
+La sección *Comentarios* no existe en `docs/conventions.md` en ninguna rama (solo la describe
+QC-115). Para esta ficha: corregir los dos comentarios falsos y aplicar la regla **solo a las
+líneas de comentario que añadió esta rama** en `lib/` y `db/`. Las citas que ya estaban en
+`origin/dev` y los textos de `RAISE EXCEPTION` quedan fuera y no son hallazgo.
+
+### Veredicto: **OK**
+0 bloqueantes. B1 cerrado. Quedan 3 menores abiertos, ninguno bloqueante.
+
+### Lo que comprobé
+- **Citas en líneas añadidas**: `git diff origin/dev...HEAD -- lib db`, filtrando las líneas `+`
+  de comentario (`//`, `--`, `*`, `/*`) por `QC-<n>|R<n>|design.md|decisión cerrada` → **cero**.
+- **Los dos comentarios falsos** (`04f6f9c`): `migration.sql` ahora dice que el duplicado se reconoce
+  por SQLSTATE `23505` y no por el nombre del índice; `company-scope.ts` ya no dice que las claves
+  desconocidas se rechazan. Un grep de `ORDER_NUMBER_UNIQUE_INDEX` y «campo desconocido» en los
+  archivos del diff no encuentra nada.
+- **No se perdió información útil.** Leí de nuevo todos los comentarios de los dos SQL, de
+  `schema.prisma`, `order-prisma.ts`, `company-scope.ts`, `order-scope.ts`, `order-catalog.ts`,
+  `order-repository.ts`, `actor.ts` y `order-actions.ts`:
+  - **FK escritas a mano y drift**: `schema.prisma` (`Order`) conserva «hay que borrar a mano su
+    `DROP CONSTRAINT` de toda migración generada» con `companyId` en la lista, y que quitar
+    `orders_id_company_id_key` rompe la FK compuesta. `OrderAssignment` dice que las tres FK son
+    compuestas y por qué la del grupo es `MATCH SIMPLE`. `migration.sql` dice por qué está escrita a
+    mano, que hay un único `DROP CONSTRAINT`, que no hay `MATCH FULL` y por qué, y por qué
+    `companyId` va sin `@relation`.
+  - **Lock del correlativo**: `createOrder` explica que el lock va en una sentencia anterior por la
+    instantánea de `READ COMMITTED`, que es `xact` y único (sin interbloqueo), el reintento fuera de
+    la transacción, el reloj único y la empresa en columna y subselect. Siguen también el espacio de
+    claves de dos enteros y el techo de 3 intentos.
+  - **Guardias del `down`**: la cabecera enumera las tres pérdidas silenciosas que evitan, y cada
+    guardia (1.1–1.4) conserva su porqué: `JOIN` y no `LEFT JOIN`, y correcta aunque la FK esté `NOT VALID`.
+    Siguen el paréntesis `NO FORCE` y su motivo, el orden FK compuesta → clave candidata, y el
+    `setval` con `is_called`.
+  - **Ámbito**: `company-scope.ts` conserva las tres reglas de uso (`AND` y no fundido con un
+    `OR`, ámbito en el `where` de las escrituras, parámetro `::uuid` en columna y subselect).
+    `order-repository.ts` conserva por qué una implementación de menor aridad compila y qué guardia
+    lo vigila.
+- **SQL ejecutable**: el leader lo comparó idéntico; lo confirman
+  `tests/integration/pedidos/company-scope.int.test.ts`, `tests/unit/pedidos/schema` y la guardia de
+  ámbito sobre HEAD: `Test Files 5 passed · Tests 116 passed`.
+- **Guardia 3 del `down`** (`cbe16fb`): el caso nuevo suelta la FK compuesta dentro de una
+  transacción con ROLLBACK, fabrica una asignación cruzada y deja las guardias 1 y 2 sin nada que
+  hacer. Afirma que aborta con `P0001` en el primer `DO`, con el mensaje de la guardia 3 y no el de
+  las otras, sin cambiar el esquema ni el número de filas. Es un test que detecta el fallo de verdad.
+
+### Estado de los menores de la primera vuelta
+- **m1** (contradicción sobre si `OrderCatalog` es excepción) — **cerrado**: ningún comentario habla ya de excepción, y `order-catalog.ts` explica por qué recibe `string`.
+- **m2** (`presentation-prisma.ts:123`, «con el nombre de su indice») — **abierto**. Está fuera del diff; anotarlo como deuda.
+- **m3** (guardia 3 sin integración) — **cerrado** con `cbe16fb`.
+- **m4** (R30 no puede ponerse rojo en local) — del leader para el PR; no cuenta.
+- **m5** (regla ausente de `conventions.md`) — **cerrado** por la decisión humana (QC-115).
+- **m6** (T19) — del leader; no cuenta.
+- **m7** (ancho de la viñeta en `architecture.md`) — **cerrado** con `48f4db3` (líneas ≤ 89 columnas).
+- **m8** (`order_assignment_not_found` → `order_not_found` en `asignaciones`) — informativo; va como nota del PR.
+
+### Menores nuevos
+- **n1** — `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts:119-120`: el docblock de
+  `CreatedOrderRow` dice «el correlativo que acaba de entregar la secuencia». Ya no hay secuencia: el
+  número sale de `max()+1`. El texto viene de `origin/dev`, pero lo volvió falso esta rama. Cambio de una línea.
+- **n2** — `db/migrations/20260915120000_orders_company_scope/migration.sql:12-13`: «el de
+  `order_assignments_order_id_fkey`, que sustituye la FK compuesta del paso 6» dice lo contrario de
+  lo que pasa: es la FK compuesta la que sustituye a la simple. Solo cambia la redacción; el SQL es correcto.
