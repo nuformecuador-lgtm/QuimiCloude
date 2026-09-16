@@ -228,16 +228,32 @@ R16 pide contar las consultas de sesion **en la aplicacion real** (`next build &
 contra la base local, antes y despues, en tres pantallas y un guardado. Eso exige **navegar como
 una persona con sesion iniciada**, y en este entorno:
 
-1. **No hay navegador.** Playwright esta en el repo, pero su `webServer`
-   (`playwright.config.ts:40-46`) levanta `pnpm run dev`, o sea **`next dev`**, no
-   `next build && next start`, que es justo lo que `design.md > 6.1` exige para confirmar en
-   produccion lo que el apartado 2.2 solo leyo en las compilaciones de desarrollo.
-2. **Automatizarlo contradiria el spec.** La revision de F1.4 **quito** el script de medicion a
-   proposito (`design.md > 7`, alternativa 8; cabecera de `tasks.md`: «Ningun script»), y decidio
-   que el conteo se hace **a mano**. Escribir un arnes de Playwright para esto seria reabrir una
-   decision humana, no implementarla.
-3. **Los usuarios de E2E no sirven tal cual:** cada spec crea sus propias credenciales sinteticas
-   por corrida; no hay un usuario fijo con los permisos de las tres pantallas.
+**ACTUALIZADO el 2026-09-16.** El humano autorizo despues las dos cosas que faltaban —Playwright
+**solo como navegador** y tocar la configuracion del Postgres local— y se reintento. **La parte del
+navegador dejo de ser el problema y el bloqueo se movio de sitio.** El detalle completo, con la
+evidencia, esta en **`progress/medicion_QC-104-sesion-una-sola-vez-por-peticion.md`**; resumen:
+
+1. **La navegacion FUNCIONO.** `next build && next start -p 3217`, sesion real por el formulario de
+   login con un fixture de rol `Administrador`, y las tres pantallas mas el guardado servidas con
+   HTTP 200. Sin dejar huerfanas y sin script en el repo (vivio en el scratchpad).
+2. **La via (b) sigue sin ejecutarse: el ENTORNO la deniega.** `ALTER SYSTEM SET log_statement`
+   cae en el permiso «Modify Shared Resources». **No se rodeo** —ni por `postgresql.conf` ni por
+   ningun otro camino—, y **no se le pidio a otro agente que lo ejecutara**. `log_statement` nunca
+   cambio: sigue en `none`, asi que **no hubo nada que revertir**.
+3. **La via (c), `pg_stat_user_tables`, resulto INSERVIBLE sobre la base compartida.** El contador
+   es exacto en aislamiento (validado: 1 -> 1, 3 -> 3, reposo -> 0), pero en la base de desarrollo
+   **una ventana en reposo, con el navegador cerrado, sigue sumando 1-2**. Con ese suelo,
+   `/configuracion/usuarios` salia **0** en tres rondas seguidas —imposible si de verdad hace una
+   lectura—: las lecturas se atribuyen a la ventana vecina. **No se publico ninguna cifra.**
+
+**Tres hallazgos que valen para quien lo retome**, todos en el artefacto: el contador **publica con
+1,5-2 s de retraso** (leer una sola vez tras una espera corta da 0 en todo y «prueba» algo falso);
+una recarga en produccion son **14-17 peticiones**, no una, porque Next precarga el menu, y R1/R2
+hablan de **una peticion**; y `waitUntil: 'networkidle'` **no vale** con streaming de RSC.
+
+**Lo que haria falta para desbloquearlo, y es decision humana:** una base aislada para la corrida
+(o la certeza de que nadie mas toca `QuimiCloude` mientras dura), o que el entorno permita la via
+(b), que es la unica exacta por peticion.
 
 **Lo que si quedo resuelto, y ahorra trabajo a quien lo retome:**
 
