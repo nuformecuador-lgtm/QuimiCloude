@@ -1,38 +1,11 @@
 /**
- * T13 (QC-49, aislamiento-por-empresa-en-inventario) — Los LISTADOS y las ESCRITURAS del
- * modulo ven SOLO su empresa, contra Postgres REAL.
+ * Contra Postgres real: un doble diria que llego el ambito aunque el adaptador lo compusiera al
+ * nivel del `OR` de la busqueda. El adaptador usa el cliente Prisma global, asi que no hay rollback
+ * que lo aisle: las filas se borran por id en `afterAll`. Las dos empresas nacen aqui, y por eso
+ * `total` se afirma como igualdad.
  *
- * QUE SE PRUEBA AQUI Y POR QUE NO BASTA UN UNITARIO. `company-isolation-service.test.ts`
- * (T12) demuestra, con dobles, que el caso de uso pasa el ambito del ACTOR al puerto. Eso deja
- * sin probar lo unico que puede filtrar de verdad: el SQL. Un doble diria «llego el ambito»
- * aunque el adaptador lo compusiera al mismo nivel que el `OR` de la busqueda -el fallo exacto
- * contra el que avisa QC-76- y las filas ajenas siguieran saliendo. Solo Postgres puede decir
- * si el `WHERE` acota. Por eso este archivo llama a los ADAPTADORES DRIVEN directamente, con
- * filas reales de DOS empresas sembradas a la vez.
- *
- * `company-scope.int.test.ts` (T11) es el otro archivo de integracion de la ficha y prueba otra
- * cosa: lo que la BASE rechaza (columnas NOT NULL, FK, disparadores de coherencia). Aqui no se
- * prueba ninguna restriccion: se prueba QUE SE VE y QUE SE ESCRIBE.
- *
- * AISLAMIENTO. Los adaptadores llaman al cliente Prisma GLOBAL, no a un `tx` inyectado, asi que
- * una transaccion que se deshace NO los envuelve. Se crean filas REALES y se borran en el
- * `afterAll` POR SU IDENTIFICADOR EXACTO, nunca por rango ni por nombre. Mismo patron que
- * `list-query-products.int.test.ts`.
- *
- * NINGUNA AFIRMACION GLOBAL sobre el catalogo. Las dos empresas del archivo son EFIMERAS y
- * nacen aqui, asi que «todas las filas de la empresa A» es exactamente «las que sembro este
- * archivo»: ninguna otra sesion ni ningun residuo de la base puede entrar en un recuento. Eso
- * es lo que permite afirmar el `total` como IGUALDAD y no como «al menos».
- *
- * LA FILA AJENA SE RELEE SIEMPRE. Un rechazo que devuelve `false` o `'not_found'` no prueba
- * que no se escribio: podria haber escrito y despues haber devuelto el codigo equivocado. Cada
- * caso cruzado toma una foto JSON de la fila ajena ANTES y la compara DESPUES (R16).
- *
- * CONTROL POSITIVO EN CADA ESCRITURA CRUZADA. Junto al caso ajeno va el MISMO metodo con el
- * ambito CORRECTO. Sin el, un adaptador roto que devolviera siempre «no existe» dejaria este
- * archivo entero en verde: probaria que no escribe nada, no que aisla.
- *
- * Cubre R13, R14, R16, R17, R19, R25 y R26.
+ * Un `false` o `'not_found'` no prueba que no se escribiera: la fila ajena se relee, y cada
+ * escritura cruzada lleva su control positivo para que un adaptador que nunca escribe no pase.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -62,25 +35,16 @@ import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-s
 import type { ListQuery } from '@/lib/modules/inventario/domain/list-query';
 import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-batch';
 
-// ---------------------------------------------------------------------------------------
-// Marcadores y utilidades
-// ---------------------------------------------------------------------------------------
-
 function token(): string {
   return randomUUID().replace(/-/gu, '');
 }
 
 /**
- * Marcador irrepetible de ESTE ARCHIVO, alfanumerico y en minusculas para que sobreviva intacto
- * a `normalizeProductName` y a `normalizePresentationName`. Va en el nombre de TODA fila
- * sembrada aqui, de las DOS empresas, y por eso sirve para el caso que mas importa: una
- * busqueda por el marcador casa con las siete filas, asi que si el ambito no acotara, la
- * busqueda desde A devolveria tambien las de B.
+ * Alfanumerico en minusculas para sobrevivir a la normalizacion. Lo llevan las filas de las dos
+ * empresas: si el ambito no acotara, buscarlo desde A traeria tambien las de B.
  */
 const MARCA = `m${token().slice(0, 12)}`;
 
-/** Marcador que SOLO llevan las filas de la empresa B. Es el termino con el que se comprueba
- *  que una busqueda desde A no las alcanza (R14). */
 const SOLO_B = `b${token().slice(0, 12)}`;
 
 function normalizeForTest(name: string): string {
@@ -94,25 +58,19 @@ function normalizeForTest(name: string): string {
 
 const AHORA = new Date('2026-09-11T10:00:00.000Z');
 
-// ---------------------------------------------------------------------------------------
-// Fixture: DOS empresas completas, sembradas a la vez
-// ---------------------------------------------------------------------------------------
-
 type Empresa = {
   readonly companyId: string;
   readonly userId: string;
   readonly roleId: string;
   readonly documentTypeCode: string;
-  /** Productos vivos sembrados, en el orden en que se crearon. */
+  /** En orden de creacion: los casos los toman por indice. */
   readonly productos: string[];
-  /** Presentaciones sembradas, en el orden en que se crearon. */
   readonly presentaciones: string[];
   readonly lotes: string[];
 };
 
-/** La unidad de apoyo: DE SISTEMA (`company_id IS NULL`), asi que el disparador
- *  `presentations_check_unit_scope` la acepta en las dos empresas. Se siembra aqui en vez de
- *  reutilizar la del catalogo arrancador para no depender de lo que haya en la base. */
+/** De sistema, para que `presentations_check_unit_scope` la acepte en las dos empresas. Se crea
+ *  aqui para no depender de lo que haya en la base. */
 let unidadDeSistema: string;
 
 let A: Empresa;
@@ -137,8 +95,7 @@ async function sembrarEmpresa(etiqueta: string): Promise<Empresa> {
     data: { name: `rol-${marker}`, description: 'Rol de prueba' },
     select: { id: true },
   });
-  // Usuario REAL: `product_batches.created_by` es FK a `users`, aunque el esquema Prisma la
-  // declare como escalar. No vale inventar un uuid.
+  // `product_batches.created_by` es FK real a `users`, aunque el esquema Prisma la declare escalar.
   const user = await prisma.user.create({
     data: {
       firstNames: 'Ana Maria',
@@ -210,10 +167,11 @@ async function sembrarLote(
       presentationId,
       stock: 7,
       unitCost: '3.0000',
+      lot: `L-${randomUUID()}`,
+      purchaseDate: new Date('2026-09-01T00:00:00Z'),
       createdBy: empresa.userId,
       updatedBy: empresa.userId,
-      // R2/R22: el lote declara SU empresa y el disparador exige que coincida con la de su
-      // producto y la de su presentacion.
+      // El disparador exige que coincida con la empresa de su producto y su presentacion.
       companyId: empresa.companyId,
     },
     select: { id: true },
@@ -228,6 +186,7 @@ function loteNuevo(empresa: Empresa, presentationId: string): NewProductBatch {
     stock: 2,
     unitCost: '1.5000',
     lot: null,
+    purchaseDate: '2026-09-01',
     expiryDate: null,
     createdBy: empresa.userId,
   };
@@ -244,9 +203,7 @@ beforeAll(async () => {
   A = await sembrarEmpresa('A');
   B = await sembrarEmpresa('B');
 
-  // TRES productos vivos en A y CUATRO en B: los recuentos de las dos son distintos a
-  // proposito, de modo que un `total` que contara filas ajenas no pudiera coincidir por
-  // casualidad con el correcto.
+  // Recuentos distintos en A y B para que un `total` con filas ajenas no coincida por casualidad.
   await sembrarProducto(A, `${MARCA} Producto A uno`, { stock: 10, qtyAlert: 1 });
   await sembrarProducto(A, `${MARCA} Producto A dos`, { stock: 20, qtyAlert: 2 });
   await sembrarProducto(A, `${MARCA} Producto A tres`, { stock: 30, qtyAlert: 3 });
@@ -255,28 +212,24 @@ beforeAll(async () => {
   await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B tres`, { stock: 930, qtyAlert: 93 });
   await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B cuatro`, { stock: 940, qtyAlert: 94 });
 
-  // Un producto BORRADO logicamente en A, para que el ambito no se lleve por delante lo que
-  // `deleted_at IS NULL` ya garantizaba: siguen siendo dos condiciones, no una.
+  // Un borrado en A, para comprobar que el ambito no sustituye a `deleted_at IS NULL`.
   const borrado = await sembrarProducto(A, `${MARCA} Producto A borrado`);
   await prisma.product.update({ where: { id: borrado }, data: { deletedAt: AHORA } });
 
-  // DOS presentaciones en A y TRES en B. La primera de cada una comparte NOMBRE NORMALIZADO:
-  // desde QC-49 (R20) la unicidad es por empresa, asi que las dos pueden existir — y sirve para
-  // comprobar que el listado de A no ve la homonima de B.
+  // La primera de cada empresa comparte nombre normalizado, que la unicidad por empresa permite,
+  // para comprobar que el listado de A no ve la homonima de B.
   await sembrarPresentacion(A, `${MARCA} Bidon compartido`);
   await sembrarPresentacion(A, `${MARCA} Bidon A dos`);
   await sembrarPresentacion(B, `${MARCA} Bidon compartido`);
   await sembrarPresentacion(B, `${MARCA} ${SOLO_B} Bidon B dos`);
   await sembrarPresentacion(B, `${MARCA} ${SOLO_B} Bidon B tres`);
 
-  // Un lote en cada empresa, colgando de su primer producto y su primera presentacion.
   await sembrarLote(A, A.productos[0] ?? '', A.presentaciones[0] ?? '');
   await sembrarLote(B, B.productos[0] ?? '', B.presentaciones[0] ?? '');
 });
 
 afterAll(async () => {
-  // Por `id` EXACTO y en el orden que exigen las FK (todas ON DELETE RESTRICT):
-  // lotes -> productos -> presentaciones -> unidad -> usuario -> rol -> tipo doc -> empresa.
+  // En el orden que exigen las FK.
   const empresas = [A, B].filter((empresa): empresa is Empresa => empresa !== undefined);
   for (const empresa of empresas) {
     await prisma.productBatch.deleteMany({ where: { companyId: empresa.companyId } });
@@ -293,12 +246,7 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-// ---------------------------------------------------------------------------------------
-// Lecturas crudas: lo que la COLUMNA guardo, sin pasar por el contrato de salida
-// ---------------------------------------------------------------------------------------
-
-/** Foto JSON de la fila de producto, TODAS sus columnas. Es lo que se compara antes y despues
- *  de una escritura cruzada: comparar solo el nombre dejaria pasar un `updated_at` movido. */
+/** Todas las columnas: comparar solo el nombre dejaria pasar un `updated_at` movido. */
 async function fotoProducto(id: string): Promise<string> {
   const fila = await prisma.product.findUniqueOrThrow({ where: { id } });
   return JSON.stringify(fila);
@@ -309,8 +257,7 @@ async function fotoPresentacion(id: string): Promise<string> {
   return JSON.stringify(fila);
 }
 
-/** La empresa que quedo ESCRITA en la fila. Se lee de la columna, no del contrato de salida:
- *  el contrato no la publica (R19) y ese es justamente otro de los casos. */
+/** De la columna, porque el contrato de salida no publica la empresa. */
 async function empresaDelProducto(id: string): Promise<string> {
   const fila = await prisma.product.findUniqueOrThrow({
     where: { id },
@@ -323,30 +270,22 @@ function consulta(partial: Partial<ListQuery> = {}): ListQuery {
   return { page: 1, pageSize: 25, sort: null, filters: {}, search: MARCA, ...partial };
 }
 
-// ---------------------------------------------------------------------------------------
-// R13, R14 — los dos listados, y el `total` con ellos
-// ---------------------------------------------------------------------------------------
-
 describe('R14 — el listado devuelve EXACTAMENTE las filas de su empresa, y el total tambien', () => {
   it('productos: A ve sus tres y ninguna de las cuatro de B', async () => {
     const pagina = await listAliveProducts(consulta(), ambitoDe(A));
 
-    // Las tres vivas de A, ni una mas. Igualdad de CONJUNTO, no «contiene».
     expect([...pagina.items.map((p) => p.id)].sort()).toEqual([...A.productos.slice(0, 3)].sort());
-    // El recuento describe lo visible PARA A (R14). Si el `count` usara otro `where` que el
-    // `findMany`, aqui saldrian 7 —o 8 con el borrado— con tres elementos en la pagina.
+    // Si el `count` usara otro `where` que el `findMany`, aqui saldrian 7 u 8 con tres elementos.
     expect(pagina.total).toBe(3);
     expect(pagina.totalPages).toBe(1);
 
-    // Explicito y en negativo, por si el conjunto cambiara de forma manana: ningun id de B.
     for (const ajeno of B.productos) {
       expect(pagina.items.map((p) => p.id)).not.toContain(ajeno);
     }
   });
 
   it('productos: B ve sus cuatro y ninguna de las de A', async () => {
-    // El caso simetrico no es adorno: un adaptador que devolviera SIEMPRE las filas de la
-    // primera empresa sembrada pasaria el caso de arriba y caeria aqui.
+    // Atrapa un adaptador que devolviera siempre las filas de la primera empresa sembrada.
     const pagina = await listAliveProducts(consulta(), ambitoDe(B));
 
     expect([...pagina.items.map((p) => p.id)].sort()).toEqual([...B.productos].sort());
@@ -365,8 +304,6 @@ describe('R14 — el listado devuelve EXACTAMENTE las filas de su empresa, y el 
       expect(pagina.items.map((p) => p.id)).not.toContain(ajeno);
     }
 
-    // La homonima existe en las DOS empresas con el mismo nombre normalizado (R20) y cada una
-    // ve SOLO la suya: el nombre no es lo que las distingue, la empresa si.
     const normalizado = normalizePresentationName(`${MARCA} Bidon compartido`);
     const enA = pagina.items.filter((p) => p.nameNormalized === normalizado);
     expect(enA).toHaveLength(1);
@@ -381,8 +318,6 @@ describe('R14 — el listado devuelve EXACTAMENTE las filas de su empresa, y el 
   });
 
   it('el producto con borrado logico de A no aparece: el ambito no sustituye a deleted_at', async () => {
-    // A sembro CUATRO productos y uno esta borrado. El listado devuelve tres: las dos
-    // condiciones siguen vivas y componen, no se pisan.
     const pagina = await listAliveProducts(consulta(), ambitoDe(A));
     expect(A.productos).toHaveLength(4);
     expect(pagina.items.map((p) => p.id)).not.toContain(A.productos[3]);
@@ -390,9 +325,8 @@ describe('R14 — el listado devuelve EXACTAMENTE las filas de su empresa, y el 
   });
 
   it('R19: ni la vista de producto ni la de presentacion publican la empresa', async () => {
-    // La empresa entra en la CONSULTA y no sale hacia el navegador. Se afirma sobre las claves
-    // del objeto, no sobre su serializacion: un `companyId: undefined` no viajaria en el JSON
-    // pero si estaria en el contrato.
+    // Sobre las claves y no sobre el JSON: un `companyId: undefined` no viajaria serializado pero
+    // estaria en el contrato.
     const productos = await listAliveProducts(consulta(), ambitoDe(A));
     const presentaciones = await listPresentations(consulta(), ambitoDe(A));
 
@@ -411,22 +345,16 @@ describe('R14 — el listado devuelve EXACTAMENTE las filas de su empresa, y el 
   });
 });
 
-// ---------------------------------------------------------------------------------------
-// R14 — la busqueda y los filtros acotan DENTRO del ambito, nunca lo ensanchan
-// ---------------------------------------------------------------------------------------
-
 describe('R14 — la busqueda y los filtros NO ensanchan lo visible', () => {
   it('productos: buscar el marcador que SOLO llevan las filas de B, desde A, no devuelve nada', async () => {
-    // ESTE es el caso que atrapa el bug de componer el ambito al mismo nivel que un `OR`: si
-    // `companyId` y la busqueda fueran hermanos dentro de un `OR`, la fila de B entraria por
-    // cumplir la busqueda. Con el ambito como capa de FUERA, la busqueda solo puede QUITAR.
+    // Si `companyId` y la busqueda fueran hermanos dentro de un `OR`, la fila de B entraria por
+    // cumplir la busqueda.
     const pagina = await listAliveProducts(consulta({ search: SOLO_B }), ambitoDe(A));
 
     expect(pagina.items).toEqual([]);
     expect(pagina.total).toBe(0);
 
-    // Control positivo: el mismo termino, desde B, SI encuentra las cuatro. Sin esto, una
-    // busqueda rota devolveria cero siempre y el caso de arriba no probaria nada.
+    // Sin este control, una busqueda rota que devolviera siempre cero dejaria verde lo de arriba.
     const desdeB = await listAliveProducts(consulta({ search: SOLO_B }), ambitoDe(B));
     expect(desdeB.total).toBe(4);
   });
@@ -441,7 +369,7 @@ describe('R14 — la busqueda y los filtros NO ensanchan lo visible', () => {
   });
 
   it('productos: un filtro numerico que solo casa con filas de B devuelve cero desde A', async () => {
-    // Los `stock` de B (910..940) no se solapan con los de A (10..30) a proposito.
+    // Los `stock` de B (910..940) no se solapan con los de A (10..30).
     const desdeA = await listAliveProducts(
       consulta({ filters: { stock: { kind: 'numberRange', min: 900, max: 999 } } }),
       ambitoDe(A),
@@ -472,8 +400,7 @@ describe('R14 — la busqueda y los filtros NO ensanchan lo visible', () => {
   });
 
   it('el orden inverso tampoco cuela filas ajenas: ordenar no es ensanchar', async () => {
-    // Ordenar `desc` cambia QUE fila cae en la pagina 1. Si el ambito se aplicara despues de
-    // paginar, aqui apareceria la primera fila de B, que es la que gana el orden global.
+    // Si el ambito se aplicara despues de paginar, aqui entraria la fila de B que gana el orden.
     const pagina = await listAliveProducts(
       consulta({ pageSize: 2, sort: { columnId: 'stock', direction: 'desc' } }),
       ambitoDe(A),
@@ -487,22 +414,16 @@ describe('R14 — la busqueda y los filtros NO ensanchan lo visible', () => {
   });
 
   it('findAliveIdByName no resuelve el homonimo de otra empresa (R18 por el lado del SQL)', async () => {
-    // El nombre existe, vivo, en B. Desde A no hay nada que resolver: `null`. Es lo que hace
-    // que el alta cree un producto NUEVO en vez de colgarle el lote al de la otra empresa.
+    // Por eso el alta desde A crea un producto nuevo en vez de colgar el lote al de B.
     const nombreDeB = `${MARCA} ${SOLO_B} Producto B uno`;
     expect(await findAliveIdByName(nombreDeB, ambitoDe(A))).toBeNull();
     expect(await findAliveIdByName(nombreDeB, ambitoDe(B))).toBe(B.productos[0]);
   });
 });
 
-// ---------------------------------------------------------------------------------------
-// R16 — escribir sobre lo ajeno: «no existe», y la fila ajena INTACTA
-// ---------------------------------------------------------------------------------------
-
 describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', () => {
   it('la ficha de un producto de B, pedida desde A, es `null`', async () => {
     expect(await findAliveProductById(B.productos[1] ?? '', ambitoDe(A))).toBeNull();
-    // Control positivo: la misma fila, desde su empresa, SI existe.
     const propia = await findAliveProductById(B.productos[1] ?? '', ambitoDe(B));
     expect(propia?.id).toBe(B.productos[1]);
   });
@@ -519,12 +440,11 @@ describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', (
     );
 
     expect(resultado).toBe(false);
-    // Releida de la base: ni el nombre, ni el stock, ni `updated_at` se movieron.
     expect(await fotoProducto(ajeno)).toBe(antes);
   });
 
   it('control positivo: el mismo updateAlive, desde B, SI escribe', async () => {
-    // Sin este caso, un `updateMany` que no actualizara nunca dejaria el anterior en verde.
+    // Sin este caso, un `updateMany` que nunca actualizara dejaria verde el anterior.
     const propio = B.productos[1] ?? '';
     const antes = await fotoProducto(propio);
     const nuevoNombre = `${MARCA} ${SOLO_B} Producto B dos editado`;
@@ -540,7 +460,6 @@ describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', (
     expect(await fotoProducto(propio)).not.toBe(antes);
     const fila = await prisma.product.findUniqueOrThrow({ where: { id: propio } });
     expect(fila.name).toBe(nuevoNombre);
-    // La empresa NO se reescribe con una edicion: un producto no cambia de dueno.
     expect(fila.companyId).toBe(B.companyId);
   });
 
@@ -555,7 +474,6 @@ describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', (
     const fila = await prisma.product.findUniqueOrThrow({ where: { id: ajeno } });
     expect(fila.deletedAt).toBeNull();
 
-    // Y sigue saliendo en el listado de SU empresa: el intento fallido no la escondio.
     const desdeB = await listAliveProducts(consulta(), ambitoDe(B));
     expect(desdeB.items.map((p) => p.id)).toContain(ajeno);
   });
@@ -620,8 +538,7 @@ describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', (
   });
 
   it('deleteById de una presentacion de B desde A devuelve not_found y la fila SIGUE AHI', async () => {
-    // La presentacion elegida NO tiene lotes, asi que un `'not_found'` no puede confundirse con
-    // el `'in_use'` de la FK: lo unico que puede haberlo producido es el ambito.
+    // Sin lotes, para que `'not_found'` no se confunda con el `'in_use'` de la FK.
     const ajena = B.presentaciones[2] ?? '';
     expect(await prisma.productBatch.count({ where: { presentationId: ajena } })).toBe(0);
     const antes = await fotoPresentacion(ajena);
@@ -644,20 +561,15 @@ describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', (
   });
 });
 
-// ---------------------------------------------------------------------------------------
-// R17 — el alta escribe la empresa DEL AMBITO
-// ---------------------------------------------------------------------------------------
-
 describe('R17 — el alta escribe la empresa del AMBITO, no la de la entrada', () => {
   it('createProduct escribe la empresa del ambito en la columna', async () => {
-    // `NewProduct` no declara empresa: no hay forma de que la entrada la elija. Lo que se
-    // comprueba aqui es la otra mitad —que la CORRECTA si se escribe—, leyendo la columna.
+    // `NewProduct` no declara empresa, asi que la entrada no puede elegirla: falta ver que se
+    // escribe la correcta.
     const name = `${MARCA} Alta en A ${token().slice(0, 8)}`;
     const creado = await createProduct({ name, stock: 1, qtyAlert: 1 }, AHORA, ambitoDe(A));
     A.productos.push(creado.id);
 
     expect(await empresaDelProducto(creado.id)).toBe(A.companyId);
-    // Y aparece en el listado de A, no en el de B.
     const desdeA = await listAliveProducts(consulta({ search: name }), ambitoDe(A));
     expect(desdeA.items.map((p) => p.id)).toEqual([creado.id]);
     const desdeB = await listAliveProducts(consulta({ search: name }), ambitoDe(B));
@@ -704,9 +616,7 @@ describe('R17 — el alta escribe la empresa del AMBITO, no la de la entrada', (
   });
 
   it('createPresentation escribe la empresa del ambito, y el mismo nombre cabe en las dos', async () => {
-    // El nombre normalizado es IDENTICO en las dos altas. Con la unicidad global de antes de
-    // QC-49 la segunda habria salido `'duplicate'`; con la unicidad por empresa (R20) las dos
-    // entran, cada una en su empresa.
+    // Mismo nombre normalizado en las dos: con unicidad global la segunda seria `'duplicate'`.
     const name = `${MARCA} Bidon doble ${token().slice(0, 8)}`;
     const normalizado = normalizePresentationName(name);
 
@@ -724,7 +634,6 @@ describe('R17 — el alta escribe la empresa del AMBITO, no la de la entrada', (
     expect(filaA.companyId).toBe(A.companyId);
     expect(filaB.companyId).toBe(B.companyId);
 
-    // Y cada una ve SOLO la suya al buscarla por el nombre compartido.
     const vistaA = await listPresentations(consulta({ search: name }), ambitoDe(A));
     expect(vistaA.items.map((p) => p.id)).toEqual([enA.id]);
     const vistaB = await listPresentations(consulta({ search: name }), ambitoDe(B));
@@ -732,11 +641,6 @@ describe('R17 — el alta escribe la empresa del AMBITO, no la de la entrada', (
   });
 });
 
-// ---------------------------------------------------------------------------------------
-// R26 — la RLS es defensa en profundidad, NO la frontera
-// ---------------------------------------------------------------------------------------
-
-/** Retrato del estado visible para una empresa: lo que se compara con y sin `FORCE`. */
 async function retrato(empresa: Empresa): Promise<string> {
   const productos = await listAliveProducts(consulta(), ambitoDe(empresa));
   const presentaciones = await listPresentations(consulta(), ambitoDe(empresa));
@@ -781,12 +685,8 @@ async function forceDeCadaTabla(): Promise<Record<string, boolean>> {
 
 describe('R26 — quitar FORCE ROW LEVEL SECURITY no cambia NINGUN resultado', () => {
   it('el retrato de A y el de B son identicos con FORCE y sin FORCE', async () => {
-    // QUE DEMUESTRA ESTE CASO, y que no. No demuestra que la RLS proteja: con Prisma no podria
-    // (`docs/verification.md`, `docs/architecture.md > Acceso a datos y autorizacion`).
-    // Demuestra lo CONTRARIO, que es lo que R26 pide: que el aislamiento del modulo NO DEPENDE
-    // de la RLS. Si al quitarla algun resultado cambiara, significaria que la frontera real
-    // estaba en la base y no en el modulo, y el aislamiento se caeria en cuanto alguien se
-    // conectara con otro rol. La RLS queda como defensa en profundidad, y por eso se RESTAURA.
+    // No prueba que la RLS proteja (Prisma se conecta como dueno de las tablas): prueba que el
+    // aislamiento no depende de ella. Si quitarla cambiara algo, la frontera estaria en la base.
     const conForceA = await retrato(A);
     const conForceB = await retrato(B);
     expect(await forceDeCadaTabla()).toEqual({
@@ -799,8 +699,7 @@ describe('R26 — quitar FORCE ROW LEVEL SECURITY no cambia NINGUN resultado', (
     let sinForceB = '';
     try {
       await forzarRls(false);
-      // Se comprueba que el cambio ENTRO: si el `ALTER` no hubiera hecho nada, comparar dos
-      // retratos identicos no probaria absolutamente nada.
+      // Si el `ALTER` no hubiera entrado, dos retratos iguales no probarian nada.
       expect(await forceDeCadaTabla()).toEqual({
         products: false,
         presentations: false,
@@ -809,15 +708,14 @@ describe('R26 — quitar FORCE ROW LEVEL SECURITY no cambia NINGUN resultado', (
       sinForceA = await retrato(A);
       sinForceB = await retrato(B);
     } finally {
-      // El `finally` no es cortesia: sin el, un fallo dentro del bloque dejaria la base con la
-      // RLS relajada y `guard-rls-force` en rojo para todo el mundo.
+      // Sin el `finally`, un fallo dejaria la base compartida con la RLS relajada.
       await forzarRls(true);
     }
 
     expect(sinForceA).toBe(conForceA);
     expect(sinForceB).toBe(conForceB);
 
-    // Restaurado, y afirmado leyendo el catalogo de Postgres, no confiando en el `finally`.
+    // Del catalogo, sin fiarse del `finally`.
     expect(await forceDeCadaTabla()).toEqual({
       products: true,
       presentations: true,
@@ -825,10 +723,6 @@ describe('R26 — quitar FORCE ROW LEVEL SECURITY no cambia NINGUN resultado', (
     });
   });
 });
-
-// ---------------------------------------------------------------------------------------
-// R25 — una empresa marcada como borrada conserva su inventario intacto
-// ---------------------------------------------------------------------------------------
 
 describe('R25 — marcar la empresa como borrada no toca su inventario', () => {
   it('el inventario de B sobrevive entero a su propio borrado logico', async () => {
@@ -854,12 +748,11 @@ describe('R25 — marcar la empresa como borrada no toca su inventario', () => {
         where: { id: B.companyId },
         data: { deletedAt: new Date('2026-09-11T12:00:00.000Z') },
       });
-      // La empresa QUEDO marcada: si el `update` no hubiera escrito, lo de abajo no diria nada.
+      // Si el `update` no hubiera escrito, lo de abajo no diria nada.
       const empresa = await prisma.company.findUniqueOrThrow({ where: { id: B.companyId } });
       expect(empresa.deletedAt).not.toBeNull();
 
-      // Ni una fila menos, ni una columna distinta, en las TRES tablas. Se comparan las filas
-      // enteras, no los conteos: un borrado que vaciara `stock` conservaria el conteo.
+      // Filas enteras y no conteos: un borrado que vaciara `stock` conservaria el conteo.
       expect(
         JSON.stringify(
           await prisma.product.findMany({ where: { companyId: B.companyId }, orderBy: { id: 'asc' } }),
@@ -882,14 +775,12 @@ describe('R25 — marcar la empresa como borrada no toca su inventario', () => {
         ),
       ).toBe(JSON.stringify(lotesAntes));
 
-      // Y el modulo sigue devolviendo lo mismo: el ambito mira la EMPRESA, no si esta viva.
-      // Que una empresa de baja pueda o no operar es una decision de `identity`, no un filtro
-      // escondido en el inventario.
+      // El ambito mira la empresa, no si esta viva: si una empresa de baja opera lo decide
+      // `identity`, no un filtro escondido en el inventario.
       const listadoDespues = await listAliveProducts(consulta(), ambitoDe(B));
       expect(listadoDespues.items.map((p) => p.id)).toEqual(listadoAntes.items.map((p) => p.id));
       expect(listadoDespues.total).toBe(listadoAntes.total);
 
-      // El inventario de A tampoco se entera de nada.
       const desdeA = await listAliveProducts(consulta(), ambitoDe(A));
       expect(desdeA.items.map((p) => p.id)).not.toContain(B.productos[0]);
     } finally {
