@@ -3657,3 +3657,50 @@ pasados, 87 saltados, 0 rojos nuevos**.
 2. **La nota de T11 en `docs/architecture.md` no es exigible**: hacerlo pediría una guardia nueva.
 3. **El entorno denegó dos veces** la vía de conteo por configuración de Postgres (`ALTER SYSTEM`).
    El subagente **no la rodeó** y se resolvió con base aislada; queda dicho por si vuelve a estorbar.
+
+## QC-60 — aislamiento-por-empresa-en-pedidos · CERRADA el 2026-09-16 (PR #77, merge `c93d916`)
+
+`backend`, `medium`. **R1–R35** y **20 tasks**, con `./init.sh` completo en verde antes del PR:
+**482/482 archivos, 7000 tests verdes, 87 saltados, 0 rojos**. Review **aprobada en segunda vuelta,
+sin mayores**.
+
+- **Qué entra**: `orders` gana `company_id` obligatorio; toda lectura y escritura de `pedidos` se
+  limita a la empresa de la sesión, en un único punto de consulta y validado en el service, y el
+  acceso a un pedido ajeno se rechaza **aunque se conozca el id**. El correlativo pasa a contarse
+  **por empresa** —lock de aviso por `(empresa, año)` como sentencia anterior, `max()+1` dentro del
+  `INSERT`, único `(company_id, order_year, order_sequence)`— y **no se renumera nada**: los 3
+  pedidos vivos conservan 37, 44 y 77 y el siguiente fue el 78. La FK de `order_assignments` hacia
+  el pedido pasa a ser **compuesta**. El `down.sql` aborta entero si revertir perdería datos. E2E en
+  Chromium y WebKit.
+- **La acotación corrigió la ficha**: decía «los pedidos **y sus líneas**» —no existe tabla de
+  líneas— y que un pedido referencia producto o unidad —referencia una **receta**—. La
+  `description` del board se reescribió antes de sembrar.
+- **R15 era un bug real, y un test en verde lo tapaba.** Con `INSERT` crudo, Prisma devuelve el
+  duplicado como `P2010` **sin el nombre del índice**, y el código lo buscaba por ese nombre: el
+  reintento era **código muerto** y el unit test pasaba porque fabricaba un error que sí lo traía.
+  Reproducido contra Postgres 16 antes de decidir. Ahora se reconoce **por SQLSTATE `23505`**, como
+  ya exigía el repo, y el test de integración nuevo **se comprobó rojo con el código anterior**.
+- **R22 chocaba con una decisión aprobada**: se copió de QC-49 («rechazar el campo desconocido») y
+  QC-35bis había fijado que el alta de pedidos **descarta**. Ganó QC-35bis por decisión humana; la
+  garantía que importa —la empresa de la entrada nunca se escribe— sigue con test.
+- **El reviewer rechazó una vez por comentarios, y el fallo de fondo fue del leader**: la regla de no
+  citar fichas en producción **no está escrita en `docs/`**, solo la describe QC-115, y el leader la
+  metió en los encargos como si lo estuviera. El humano la acotó a las líneas de esta rama; las citas
+  preexistentes esperan a QC-115.
+- **Tres cosas que el gate rápido no ve y el completo sí**: una lista cerrada de índices de QC-57
+  sin tensar, el conflicto semántico con **QC-104** mergeada en paralelo (`order-actions.ts` a
+  `runInRequestScope`) y, en la base compartida, el checksum de la migración desincronizado tras
+  editar sus comentarios —SQL ejecutable idéntico, `migrate status` al día—.
+- **Coste de máquina**: dos corridas del gate **murieron por falta de memoria** con otra sesión
+  corriendo su gate a la vez, y una tercera dio un rojo de saturación que pasa corrido solo. La
+  buena se lanzó esperando a que no hubiera procesos de test ajenos.
+
+### Lo que deja anotado
+
+- **Hasta QC-50** un pedido puede apuntar a una receta de otra empresa: las recetas aún no tienen
+  empresa. Declarado en el spec, sin fecha de cierre.
+- **Se acaban los huecos por transacción abortada** en la numeración, que QC-33 R42 / QC-34 D27
+  habían aceptado como coste.
+- En *Deudas* de `current.md`: el posible falso verde de `e2e/aislamiento-inventario.spec.ts`
+  (QC-49) y el barrido pendiente de adaptadores que reconozcan duplicados por nombre de índice, con
+  `presentation-prisma.ts:123` como primer sitio a mirar.
