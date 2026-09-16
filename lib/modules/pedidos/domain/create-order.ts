@@ -3,6 +3,7 @@ import { DuplicateOrderNumberError, RecipeNotFoundError, ValidationError } from 
 import { DEFAULT_ORDER_STATUS } from './order-classification';
 import { createOrderSchema, type EditableOrderStatus } from './order-input';
 import { formatOrderNumber, type OrderNumber } from './order-number';
+import type { OrderScope } from './order-scope';
 
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 
@@ -73,6 +74,12 @@ export function createCreateOrder(
   ): Promise<CreatedOrder> {
     requirePermission(actor, 'pedidos.modificar');
 
+    // QC-60 (R16): la empresa sale del ACTOR y jamas de la entrada, para que nadie pueda
+    // consultar ni escribir en otra. Se construye aqui, DESPUES del permiso -que sigue siendo
+    // la primera linea (R28)- y antes de tocar el puerto. Esto no es una condicion SQL: el
+    // `where` lo escribe el UNICO punto de consulta del adaptador driven (`design.md > 5`).
+    const scope: OrderScope = { companyId: actor.companyId };
+
     const parsed = createOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
     const data = parsed.data;
@@ -94,6 +101,7 @@ export function createCreateOrder(
       instant.getUTCFullYear(),
       actor.id,
       instant,
+      scope,
     );
 
     // El `23505` del indice unico del correlativo llega como resultado DISCRIMINADO -lo

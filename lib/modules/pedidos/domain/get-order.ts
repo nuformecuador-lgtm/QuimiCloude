@@ -1,6 +1,7 @@
 import { requirePermission, type Actor } from './actor';
 import { OrderNotFoundError } from './errors';
 import { formatOrderNumber } from './order-number';
+import type { OrderScope } from './order-scope';
 import type { OrderRow, OrderView } from './order-view';
 
 import type { RecipeCatalog } from '@/lib/modules/recetas';
@@ -72,9 +73,15 @@ export function createGetOrder(
   ): Promise<OrderView> {
     requirePermission(actor, 'pedidos.consultar');
 
+    // QC-60 (R16): la empresa sale del ACTOR y jamas de la entrada, para que nadie pueda
+    // consultar ni escribir en otra. Se construye aqui, DESPUES del permiso -que sigue siendo
+    // la primera linea (R28)- y antes de tocar el puerto. Esto no es una condicion SQL: el
+    // `where` lo escribe el UNICO punto de consulta del adaptador driven (`design.md > 5`).
+    const scope: OrderScope = { companyId: actor.companyId };
+
     // null = no existe o ya esta borrado: para el dominio son el mismo caso (R33), y el
     // filtro `deleted_at IS NULL` es del puerto, no de un `if` de aqui (R40).
-    const row = await deps.orders.findAliveById(id);
+    const row = await deps.orders.findAliveById(id, scope);
     if (row === null) throw new OrderNotFoundError();
 
     const recipes = await deps.recipes.findRefsIncludingDeleted([row.recipeId]);

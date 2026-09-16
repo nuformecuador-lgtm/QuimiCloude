@@ -1,5 +1,6 @@
 import type { ListQuery } from '../domain/list-query';
 import type { Page } from '../domain/page';
+import type { OrderScope } from '../domain/order-scope';
 import type { NewOrder, OrderRow } from '../domain/order-view';
 
 /**
@@ -24,6 +25,28 @@ import type { NewOrder, OrderRow } from '../domain/order-view';
  * sino en el caso de uso, sobre el `OrderRow` que acaba de leer con `findAliveById`: si viviera
  * en el `where`, «no existe» y «esta entregado» devolverian lo mismo y el usuario recibiria
  * `not_found` ante un pedido que esta viendo en pantalla.
+ *
+ * QC-60 (R18): **los SEIS metodos exigen `scope: OrderScope`**, la empresa en cuyo nombre se
+ * consulta o se escribe, y va AL FINAL de cada firma para que ninguna llamada existente cambie
+ * de orden de argumentos. Esta en la FIRMA y no escondido dentro del adaptador a proposito: el
+ * ambito es parte del contrato, asi que una llamada que lo omita NO COMPILA, y no hay forma de
+ * pedirle una fila a este puerto sin decir de quien es. Si en cambio viviera dentro del
+ * adaptador -leido de un contexto global, de una variable de modulo o de un `$extends`-, el
+ * archivo que escribe la consulta no diria por que filtra, y la consulta numero siete la
+ * escribiria alguien que no sabe que tiene que filtrar.
+ *
+ * Lo que la firma NO cierra: TypeScript admite asignar una funcion de MENOR aridad donde se
+ * espera una de mayor, asi que una IMPLEMENTACION que se olvide del `scope` se cablea en
+ * `lib/composition` sin que `tsc` proteste. Esa mitad la cierra la guardia estatica por funcion
+ * `tests/guards/guard-ambito-empresa-pedidos.test.ts`, que comprueba que cada implementacion
+ * declara el ambito y que ese valor llega hasta una envoltura de `./company-scope`
+ * (`design.md > 4.2` y `> 8`; verificado por el reviewer de QC-49 contra el `tsc` de este repo).
+ *
+ * Los resultados discriminados **no crecen**: «de otra empresa» vuelve como `null` o como
+ * `'not_found'`, o sea por el mismo camino que «no existe» (R20, R21). El dominio no necesita
+ * distinguirlos porque no DEBE distinguirlos: hacerlo seria un oraculo de existencia sobre
+ * datos ajenos. La empresa tampoco viaja en `NewOrder` ni en `createOrderSchema` (R22): lo que
+ * no esta en el tipo no se puede escribir por accidente.
  */
 export interface OrderRepository {
   /**
@@ -41,10 +64,12 @@ export interface OrderRepository {
     year: number,
     actorId: string,
     now: Date,
+    scope: OrderScope,
   ): Promise<OrderRow | 'duplicate_number'>;
 
-  /** `null` = no existe o ya esta borrado: para el dominio son el mismo caso (R33, R40). */
-  findAliveById(id: string): Promise<OrderRow | null>;
+  /** `null` = no existe, ya esta borrado, o es de OTRA empresa: para el dominio son el mismo
+   *  caso (R33, R40, QC-60 R20). */
+  findAliveById(id: string, scope: OrderScope): Promise<OrderRow | null>;
 
   /**
    * Listado paginado (R34, R38, R41) con el CONTRATO GENERICO de consulta (QC-57 R13, R25).
@@ -69,14 +94,31 @@ export interface OrderRepository {
    * (Firma corregida el 2026-09-04, aprobada por el leader; ver la nota al final de
    * `design.md > 7.4`. QC-57 le quita el primer parametro.)
    */
-  listAlive(query: ListQuery): Promise<Page<OrderRow>>;
+  listAlive(query: ListQuery, scope: OrderScope): Promise<Page<OrderRow>>;
 
   /** Edicion como REEMPLAZO COMPLETO (R20). No puede escribir `CANCELADO` ni motivo. */
-  updateAlive(id: string, data: NewOrder, actorId: string, now: Date): Promise<'ok' | 'not_found'>;
+  updateAlive(
+    id: string,
+    data: NewOrder,
+    actorId: string,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<'ok' | 'not_found'>;
 
   /** UNICO camino hacia `CANCELADO` y hacia el motivo (R26, R28, R29). */
-  cancelAlive(id: string, reason: string, actorId: string, now: Date): Promise<'ok' | 'not_found'>;
+  cancelAlive(
+    id: string,
+    reason: string,
+    actorId: string,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<'ok' | 'not_found'>;
 
   /** Borrado LOGICO (R31): marca `deleted_at`, jamas borra la fila ni libera el correlativo. */
-  softDeleteAlive(id: string, actorId: string, now: Date): Promise<'ok' | 'not_found'>;
+  softDeleteAlive(
+    id: string,
+    actorId: string,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<'ok' | 'not_found'>;
 }

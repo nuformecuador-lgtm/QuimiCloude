@@ -7,7 +7,7 @@
 
 ## Bloque 0 — Base de datos
 
-- [ ] **T0 — Migración: columna, FK, índices y unicidad por empresa.**
+- [x] **T0 — Migración: columna, FK, índices y unicidad por empresa.**
   Archivos: `db/migrations/<ts>_orders_company_scope/migration.sql` (nuevo),
   `db/schema.prisma` (`model Order`).
   Contenido: paréntesis `NO FORCE` / `FORCE` de RLS (pasos 0 y 8 de `design.md > 7.1`);
@@ -22,7 +22,7 @@
   `pnpm run typecheck` señala exactamente los sitios que T5–T9 van a tocar.
   Cubre: R1, R4, R8, R9, R10, R11.
 
-- [ ] **T1 — Backfill de los tres pedidos a «QuimiCloud», sin renumerar.**
+- [x] **T1 — Backfill de los tres pedidos a «QuimiCloud», sin renumerar.**
   Archivos: el mismo `migration.sql` de T0 (paso 2).
   Contenido: resolución por `name_normalized = 'quimicloud'` con el único fallback de «hay
   exactamente una empresa»; `RAISE EXCEPTION` en cualquier otro caso; `ROW_COUNT` contra el total de
@@ -33,7 +33,7 @@
   77 de 2026; `companies` sigue con 48 filas y `order_assignments` con 0.
   Cubre: R2, R3, R13.
 
-- [ ] **T2 — Clave candidata y FK compuesta de `order_assignments`.**
+- [x] **T2 — Clave candidata y FK compuesta de `order_assignments`.**
   Archivos: el mismo `migration.sql` (paso 6), `db/schema.prisma` (`model Order`:
   `@@unique([id, companyId], map: "orders_id_company_id_key")`).
   Contenido: `orders_id_company_id_key` **antes** que la FK; `DROP CONSTRAINT
@@ -47,7 +47,7 @@
   `psql`, y el `migration.sql` no contiene ningún `DROP CONSTRAINT` salvo el de la FK simple.
   Cubre: R25, R26.
 
-- [ ] **T3 — Muerte de `next_order_sequence(integer)`.**
+- [x] **T3 — Muerte de `next_order_sequence(integer)`.**
   Archivos: el mismo `migration.sql` (paso 7).
   Contenido: `DROP FUNCTION "next_order_sequence"(integer)`. **No se borra ninguna secuencia
   `orders_sequence_<año>`** (`design.md > 3.2`, riesgo 2).
@@ -56,7 +56,7 @@
   `last_value`.
   Cubre: R5 (su mitad del UP).
 
-- [ ] **T4 — `down.sql` con las tres guardias y el `setval`.**
+- [x] **T4 — `down.sql` con las tres guardias y el `setval`.**
   Archivos: `db/migrations/<ts>_orders_company_scope/down.sql` (nuevo).
   Contenido, en este orden: paréntesis `NO FORCE` de RLS → **guardia 1** (dos empresas comparten
   `(año, secuencia)` → `RAISE EXCEPTION` con el recuento y qué hacer) → **guardia 2** (fila con
@@ -73,7 +73,7 @@
 
 ## Bloque 1 — Dominio y puertos
 
-- [ ] **T5 — `OrderScope` y el actor con empresa.** `[P]` con T0
+- [x] **T5 — `OrderScope` y el actor con empresa.** `[P]` con T0
   Archivos: `lib/modules/pedidos/domain/order-scope.ts` (nuevo),
   `lib/modules/pedidos/domain/actor.ts`, `lib/modules/pedidos/index.ts` (reexportar el tipo).
   Depende de: —.
@@ -82,7 +82,7 @@
   `module-contract.test.ts` en verde).
   Cubre: R16 (parte), R18 (parte).
 
-- [ ] **T6 — El puerto y el catálogo exigen el ámbito.**
+- [x] **T6 — El puerto y el catálogo exigen el ámbito.**
   Archivos: `lib/modules/pedidos/ports/order-repository.ts`,
   `lib/modules/pedidos/domain/order-catalog.ts`.
   Contenido: `scope: OrderScope` **al final** de los seis métodos de `OrderRepository`;
@@ -95,7 +95,7 @@
   queda verde al terminar T7–T10.
   Cubre: R18.
 
-- [ ] **T7 — Los seis casos de uso pasan el ámbito.**
+- [x] **T7 — Los seis casos de uso pasan el ámbito.**
   Archivos: `lib/modules/pedidos/domain/{create,get,list,update,cancel,delete}-order.ts`.
   Contenido: tras `requirePermission` (que sigue siendo la primera línea), construir
   `{ companyId: actor.companyId }` y pasarlo al puerto. Ninguna condición SQL aquí. Ningún cambio en

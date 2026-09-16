@@ -2,6 +2,7 @@ import { requirePermission, type Actor } from './actor';
 import { NotCancellableError, OrderNotFoundError, ValidationError } from './errors';
 import { cancelOrderSchema } from './order-input';
 import type { OrderStatus } from './order-classification';
+import type { OrderScope } from './order-scope';
 
 import type { OrderRepository } from '../ports/order-repository';
 
@@ -44,6 +45,12 @@ export function createCancelOrder(
   ): Promise<void> {
     requirePermission(actor, 'pedidos.modificar');
 
+    // QC-60 (R16): la empresa sale del ACTOR y jamas de la entrada, para que nadie pueda
+    // consultar ni escribir en otra. Se construye aqui, DESPUES del permiso -que sigue siendo
+    // la primera linea (R28)- y antes de tocar el puerto. Esto no es una condicion SQL: el
+    // `where` lo escribe el UNICO punto de consulta del adaptador driven (`design.md > 5`).
+    const scope: OrderScope = { companyId: actor.companyId };
+
     // R27: sin motivo, vacio, de solo espacios o de mas de 500 caracteres una vez recortado,
     // se rechaza AQUI, en la validacion de aplicacion, y no modifica ninguna fila. El tope
     // vive en el esquema y no en el tipo de la columna (decision cerrada 4).
@@ -51,7 +58,7 @@ export function createCancelOrder(
     if (!parsed.success) throw new ValidationError();
     const { reason } = parsed.data;
 
-    const row = await deps.orders.findAliveById(id);
+    const row = await deps.orders.findAliveById(id, scope);
     if (row === null) throw new OrderNotFoundError();
 
     // R28, con `code` PROPIO: `not_cancellable` no es `invalid_transition` ni `not_deletable`,
@@ -59,7 +66,7 @@ export function createCancelOrder(
     if (!CANCELABLES.includes(row.status)) throw new NotCancellableError();
 
     // R6: el actor queda como autor de la ultima modificacion, sin tocar el de creacion.
-    const result = await deps.orders.cancelAlive(id, reason, actor.id, now());
+    const result = await deps.orders.cancelAlive(id, reason, actor.id, now(), scope);
     if (result === 'not_found') throw new OrderNotFoundError();
   };
 }
