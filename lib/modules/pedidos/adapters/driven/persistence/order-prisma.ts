@@ -96,62 +96,24 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
 }
 
 /**
- * SQLSTATE de un error de Postgres, leido del campo ESTRUCTURADO del conector y jamas del
- * texto humano del mensaje: en esta maquina Postgres responde en espanol (`design.md > 12`,
- * primer aviso al implementer). Mismo criterio -y misma tecnica- que `sqlStateOf` de
- * `lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts`.
- *
- * Un `$queryRaw` que viola una restriccion llega como `PrismaClientKnownRequestError` con
- * `code: 'P2010'` y el SQLSTATE en `meta.code`; algunas rutas del conector lo entregan como
- * `PrismaClientUnknownRequestError`, y entonces el codigo sigue estando incrustado y
- * estructurado en el mensaje del conector (`code: "23505"`), que no es texto traducible.
+ * SQLSTATE de un error de Postgres, leido del campo ESTRUCTURADO del conector y jamas del texto
+ * del mensaje: en esta maquina Postgres responde en espanol y el detalle del choque ni siquiera
+ * nombra la restriccion. Un `$queryRaw` que viola una restriccion llega como
+ * `PrismaClientKnownRequestError` con `code: 'P2010'` y el SQLSTATE en `meta.code`.
  */
 function sqlStateOf(error: unknown): string | null {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    const meta: unknown = error.meta;
-    if (typeof meta === 'object' && meta !== null && 'code' in meta) {
-      const code: unknown = (meta as { code: unknown }).code;
-      if (typeof code === 'string') return code;
-    }
-    return error.code;
-  }
-  if (error instanceof Prisma.PrismaClientUnknownRequestError) {
-    const match = /\bcode:\s*"(\d{5})"/.exec(error.message);
-    if (match !== null) return match[1] as string;
-  }
-  return null;
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return null;
+  const meta: unknown = error.meta;
+  if (typeof meta !== 'object' || meta === null || !('code' in meta)) return null;
+  const code: unknown = (meta as { code: unknown }).code;
+  return typeof code === 'string' ? code : null;
 }
 
-/** El indice unico del correlativo, declarado en `db/schema.prisma` con ese `map`. Es el UNICO
- *  `23505` que esta feature sabe traducir.
- *
- *  QC-60 (R11, R15): la unicidad dejo de medirse en todo el mundo y pasa a medirse DENTRO de la
- *  empresa, asi que el indice cambio de nombre —`orders_order_year_order_sequence_key` murio en
- *  `db/migrations/20260915120000_orders_company_scope`—. Dejar aqui el nombre viejo no habria roto
- *  ninguna compilacion: habria hecho que el `23505` del correlativo dejara de reconocerse y
- *  saliera crudo a la pantalla. */
-const ORDER_NUMBER_UNIQUE_INDEX = 'orders_company_year_sequence_key';
-
-/**
- * ¿Es este error el `23505` del indice unico del correlativo (`design.md > 4.2`)?
- *
- * Dos condiciones, y hacen falta las dos: el SQLSTATE -campo estructurado- tiene que ser
- * `23505`, y el NOMBRE DEL INDICE tiene que aparecer en la carga del error. Buscar el nombre
- * NO es decidir por el texto del mensaje: un nombre de restriccion es un identificador de la
- * base, Postgres nunca lo traduce, y es lo unico que distingue este unico de cualquier otro
- * que `orders` llegue a tener. Si el SQLSTATE es `23505` pero no se puede identificar el
- * indice, NO se asume: se relanza crudo, que es mejor que traducirlo mal (mismo criterio
- * conservador que `recipe-prisma.ts` y `supplier-prisma.ts`).
- */
+/** Duplicado del correlativo: SQLSTATE `23505`, sin leer texto. Es seguro solo porque se usa acotado
+ *  al `INSERT` de `createOrder`, que no escribe `id` (lo genera `gen_random_uuid()`): de los unicos
+ *  de `orders` solo puede chocar `orders_company_year_sequence_key`. */
 export function isDuplicateOrderNumber(error: unknown): boolean {
-  if (sqlStateOf(error) !== '23505') return false;
-  const meta: unknown = error instanceof Prisma.PrismaClientKnownRequestError ? error.meta : null;
-  const detalle =
-    typeof meta === 'object' && meta !== null && 'message' in meta
-      ? String((meta as { message: unknown }).message)
-      : '';
-  const bruto = error instanceof Error ? error.message : '';
-  return `${detalle}\n${bruto}`.includes(ORDER_NUMBER_UNIQUE_INDEX);
+  return sqlStateOf(error) === '23505';
 }
 
 /** Lo que devuelve el `RETURNING` del alta: el identificador y el correlativo que acaba de

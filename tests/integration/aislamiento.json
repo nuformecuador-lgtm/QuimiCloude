@@ -143,6 +143,11 @@
       "desde": "2026-09-12"
     },
     {
+      "archivo": "pedidos/order-duplicate-number.int.test.ts",
+      "motivo": "Nacido con QC-77 ya en pie (QC-60, decision humana del 2026-09-16): provoca un 23505 AUTENTICO sobre 'orders_company_year_sequence_key' a traves del adaptador real 'createOrder', que usa el cliente Prisma GLOBAL y abre SU PROPIA 'prisma.$transaction' por intento, asi que una transaccion del test no lo envolveria. Para que choquen los tres intentos crea, desde un 'pg.Client' aparte, una funcion y un trigger BEFORE INSERT con nombre unico y acotados por WHEN a la empresa efimera del caso, que reescriben 'order_sequence' a un numero ya ocupado. En un 'finally' borra el trigger y la funcion y despues el fixture (pedidos -> usuario -> rol y tipo de documento -> empresa); la receta se borra en el afterAll. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-16"
+    },
+    {
       "archivo": "pedidos/order-repository.int.test.ts",
       "motivo": "Nacido antes de QC-77 (QC-34). Existe justamente como contrapunto de 'order-crud.int.test.ts', que si se aisla por transaccion pero ejecutando su PROPIA copia de las sentencias: aqui se llaman las funciones REALES del adaptador que cablea lib/composition, y esas hablan con el cliente Prisma global. Committea y limpia lo suyo.",
       "desde": "2026-09-12"
