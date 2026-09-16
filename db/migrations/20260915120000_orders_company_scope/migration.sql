@@ -9,8 +9,8 @@
 -- `prisma migrate dev`. Se aplica con `pnpm run db:migrate` (`prisma migrate deploy`), que no mira
 -- drift.
 --
--- El unico `DROP CONSTRAINT` es el de `order_assignments_order_id_fkey`, que sustituye la FK
--- compuesta del paso 6. Ninguna FK lleva `MATCH FULL`: en la del grupo impediria las asignaciones
+-- El unico `DROP CONSTRAINT` es el de `order_assignments_order_id_fkey`, la FK simple a la que
+-- sustituye la FK compuesta `(order_id, company_id)` del paso 6. Ninguna FK lleva `MATCH FULL`: en la del grupo impediria las asignaciones
 -- con `work_group_id IS NULL`. No hay `INSERT` ni `DELETE`, y `order_year`/`order_sequence` no se
 -- tocan: los pedidos existentes conservan su numero.
 --

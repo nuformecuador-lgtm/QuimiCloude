@@ -117,7 +117,8 @@ export function isDuplicateOrderNumber(error: unknown): boolean {
 }
 
 /** Lo que devuelve el `RETURNING` del alta: el identificador y el correlativo que acaba de
- *  entregar la secuencia. Nada mas viaja de vuelta, porque nada mas lo decide la base. */
+ *  calcular el propio `INSERT`, `max(order_sequence) + 1` de esa empresa y ese ano bajo el lock
+ *  de aviso. Nada mas viaja de vuelta, porque nada mas lo decide la base. */
 type CreatedOrderRow = {
   readonly id: string;
   readonly order_year: number;
