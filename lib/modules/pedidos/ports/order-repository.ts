@@ -1,5 +1,6 @@
 import type { ListQuery } from '../domain/list-query';
 import type { Page } from '../domain/page';
+import type { OrderScope } from '../domain/order-scope';
 import type { NewOrder, OrderRow } from '../domain/order-view';
 
 /**
@@ -24,6 +25,14 @@ import type { NewOrder, OrderRow } from '../domain/order-view';
  * sino en el caso de uso, sobre el `OrderRow` que acaba de leer con `findAliveById`: si viviera
  * en el `where`, «no existe» y «esta entregado» devolverian lo mismo y el usuario recibiria
  * `not_found` ante un pedido que esta viendo en pantalla.
+ *
+ * Los seis metodos exigen `scope: OrderScope` al final de la firma: una llamada que lo omita no
+ * compila. Una IMPLEMENTACION que lo omita si compila (TypeScript acepta una funcion de menor
+ * aridad), y eso lo vigila `tests/guards/guard-ambito-empresa-pedidos.test.ts`.
+ *
+ * «De otra empresa» vuelve como `null` o `'not_found'`, igual que «no existe»: distinguirlos
+ * seria un oraculo de existencia sobre datos ajenos. La empresa no viaja en `NewOrder`: lo que no
+ * esta en el tipo no se puede escribir por accidente.
  */
 export interface OrderRepository {
   /**
@@ -41,10 +50,12 @@ export interface OrderRepository {
     year: number,
     actorId: string,
     now: Date,
+    scope: OrderScope,
   ): Promise<OrderRow | 'duplicate_number'>;
 
-  /** `null` = no existe o ya esta borrado: para el dominio son el mismo caso (R33, R40). */
-  findAliveById(id: string): Promise<OrderRow | null>;
+  /** `null` = no existe, ya esta borrado, o es de OTRA empresa: para el dominio son el mismo
+   *  caso. */
+  findAliveById(id: string, scope: OrderScope): Promise<OrderRow | null>;
 
   /**
    * Listado paginado (R34, R38, R41) con el CONTRATO GENERICO de consulta (QC-57 R13, R25).
@@ -69,14 +80,31 @@ export interface OrderRepository {
    * (Firma corregida el 2026-09-04, aprobada por el leader; ver la nota al final de
    * `design.md > 7.4`. QC-57 le quita el primer parametro.)
    */
-  listAlive(query: ListQuery): Promise<Page<OrderRow>>;
+  listAlive(query: ListQuery, scope: OrderScope): Promise<Page<OrderRow>>;
 
   /** Edicion como REEMPLAZO COMPLETO (R20). No puede escribir `CANCELADO` ni motivo. */
-  updateAlive(id: string, data: NewOrder, actorId: string, now: Date): Promise<'ok' | 'not_found'>;
+  updateAlive(
+    id: string,
+    data: NewOrder,
+    actorId: string,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<'ok' | 'not_found'>;
 
   /** UNICO camino hacia `CANCELADO` y hacia el motivo (R26, R28, R29). */
-  cancelAlive(id: string, reason: string, actorId: string, now: Date): Promise<'ok' | 'not_found'>;
+  cancelAlive(
+    id: string,
+    reason: string,
+    actorId: string,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<'ok' | 'not_found'>;
 
   /** Borrado LOGICO (R31): marca `deleted_at`, jamas borra la fila ni libera el correlativo. */
-  softDeleteAlive(id: string, actorId: string, now: Date): Promise<'ok' | 'not_found'>;
+  softDeleteAlive(
+    id: string,
+    actorId: string,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<'ok' | 'not_found'>;
 }

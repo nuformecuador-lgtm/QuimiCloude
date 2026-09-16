@@ -408,7 +408,13 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   //
   // 2026-09-15: entran los dos E2E de recetas, que ya localizan la tabla compartida.
   // `e2e/errores.spec.ts` sigue fuera: solo mira el error de la pagina de edicion.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos doce', () => {
+  //
+  // 2026-09-16: entra `e2e/aislamiento-pedidos.spec.ts`, que no estrena pantalla: recorre la de
+  // pedidos, ya en esta lista, y localiza `data-table-row-<id>` y la celda del numero de pedido
+  // porque lo que afirma son las filas servidas con sesion en una empresa. Se anade la fila y se
+  // TENSA el centinela de doce a trece; un spec mas que referencie `data-table` vuelve a ponerlo
+  // en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos trece', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -418,13 +424,15 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos doce E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos trece E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
       // ya consumen la tabla compartida -inventario y presentaciones- y localiza
       // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
       // B con sesion en la A, ni siquiera al borrar conociendo el identificador. No estrena
       // pantalla: mide las que ya estaban.
       'e2e/aislamiento-inventario.spec.ts',
+      // Las filas servidas de la lista de pedidos con sesion en una empresa: ver la nota de arriba.
+      'e2e/aislamiento-pedidos.spec.ts',
       // La OCTAVA la trae QC-85 el 2026-09-12 (R42): ver la nota de arriba.
       'e2e/grupos-de-trabajo.spec.ts',
       'e2e/inventario.spec.ts',

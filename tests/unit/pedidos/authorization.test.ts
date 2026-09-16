@@ -22,7 +22,7 @@
 // `tests/guards/guard-autorizacion-por-permiso.test.ts` (QC-74 R20, T16). Una copia por modulo
 // de la misma regla es exactamente lo que la decision cerrada 7 del spec quiere evitar.
 
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -153,8 +153,9 @@ async function ejecutar(
   return { error, llamadas }
 }
 
+// QC-60 (R16): el `Actor` de `pedidos` lleva la EMPRESA desde esta ficha.
 function actorCon(...permissions: readonly string[]): Actor {
-  return { id: 'u-1', permissions }
+  return { id: 'u-1', companyId: '33333333-3333-4333-8333-333333333333', permissions }
 }
 
 /** Afirma el rechazo COMPLETO: error del modulo, `code` estable y CERO puertos tocados. */
@@ -255,7 +256,7 @@ describe('QC-74 — falla cerrado (R14)', () => {
   const AUSENTES: readonly (readonly [string, Actor | null | undefined])[] = [
     ['sin actor (null)', null],
     ['sin actor (undefined)', undefined],
-    ['conjunto de permisos vacio', { id: 'u-vacio', permissions: [] }],
+    ['conjunto de permisos vacio', { id: 'u-vacio', companyId: '33333333-3333-4333-8333-333333333333', permissions: [] }],
   ]
 
   for (const [quien, actor] of AUSENTES) {
@@ -379,4 +380,93 @@ describe('QC-74 — el Actor de pedidos no lleva nombre de rol (R18)', () => {
     // tipo de ESTE modulo, que es lo que R18 pide nombre por nombre.
     expect(fuente).not.toMatch(/roleName/)
   })
+})
+
+// ---------------------------------------------------------------------------------------
+// QC-60 (R28, T16). El ambito por empresa NO cambia la autorizacion: siguen siendo los dos
+// permisos de siempre, se exigen en el service y se exigen ANTES de validar la entrada y de
+// tocar ningun puerto. Lo que esta ficha anade es que el actor ya lleva EMPRESA, y eso abre dos
+// tentaciones que este bloque cierra: crear un permiso «por empresa», y dejar que un actor
+// rechazado se distinga segun de que empresa venga.
+// ---------------------------------------------------------------------------------------
+
+describe('QC-60 R28 — ningun permiso nuevo: siguen siendo pedidos.consultar y pedidos.modificar', () => {
+  const moduloDir = join(domainDir, '..')
+
+  /** Todos los `.ts` de `lib/modules/pedidos/**`, leidos del disco. */
+  function fuentesDelModulo(dir: string): readonly string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entrada) => {
+      const ruta = join(dir, entrada.name)
+      if (entrada.isDirectory()) return fuentesDelModulo(ruta)
+      return entrada.name.endsWith('.ts') ? [ruta] : []
+    })
+  }
+
+  it('los seis casos de uso exigen exactamente esos dos codigos, y ningun otro', () => {
+    const exigidos = new Set<string>()
+    for (const [archivo] of SEIS_ARCHIVOS) {
+      const codigo = soloCodigo(readFileSync(join(domainDir, archivo), 'utf8'))
+      for (const match of codigo.matchAll(/requirePermission\(\s*actor\s*,\s*'([^']+)'\s*\)/g)) {
+        exigidos.add(match[1] ?? '')
+      }
+    }
+    expect([...exigidos].sort()).toEqual([CONSULTAR, MODIFICAR])
+  })
+
+  it('ningun archivo del modulo escribe un codigo de permiso de pedidos distinto de esos dos', () => {
+    const fuentes = fuentesDelModulo(moduloDir)
+    // Anti-placebo: el barrido LEE el modulo (dominio, puertos y adaptadores).
+    expect(fuentes.length).toBeGreaterThan(10)
+
+    const codigos = new Set<string>()
+    for (const ruta of fuentes) {
+      const codigo = soloCodigo(readFileSync(ruta, 'utf8'))
+      for (const match of codigo.matchAll(/['"`](pedidos\.[a-zA-Z_.-]+)['"`]/g)) {
+        codigos.add(match[1] ?? '')
+      }
+    }
+    expect(codigos.size, 'el barrido no encontro ni los dos codigos existentes').toBeGreaterThan(0)
+    for (const codigo of codigos) {
+      expect([CONSULTAR, MODIFICAR], `permiso nuevo en pedidos: ${codigo}`).toContain(codigo)
+    }
+  })
+})
+
+describe('QC-60 R28 — rechazo POR IGUAL de las cuatro formas de no estar autorizado, antes de la entrada y de los puertos', () => {
+  const OTRA_EMPRESA = '44444444-4444-4444-8444-444444444444'
+
+  /** Las cuatro formas que enumera R28, todas con una empresa distinta de la del pedido: la
+   *  empresa no puede cambiar ni el error ni el momento del rechazo. */
+  const NO_AUTORIZADOS: readonly (readonly [string, Actor | null | undefined])[] = [
+    ['actor ausente (null)', null],
+    ['actor ausente (undefined)', undefined],
+    [
+      'actor sin conjunto de permisos',
+      { id: 'u-sin', companyId: OTRA_EMPRESA } as unknown as Actor,
+    ],
+    ['actor con el conjunto vacio', { id: 'u-vacio', companyId: OTRA_EMPRESA, permissions: [] }],
+    [
+      'actor sin el codigo exacto',
+      {
+        id: 'u-casi',
+        companyId: OTRA_EMPRESA,
+        permissions: ['pedidos', 'pedidos.consultar.extra', 'PEDIDOS.MODIFICAR', 'inventario.modificar'],
+      },
+    ],
+  ]
+
+  for (const [nombre, , invocacion] of SEIS) {
+    it(`${nombre}: las cuatro formas dan el MISMO error, con entrada invalida y sin tocar ningun puerto`, async () => {
+      const firmas: string[] = []
+      for (const [quien, actor] of NO_AUTORIZADOS) {
+        // Entrada INVALIDA en las que la tienen: si zod corriera antes, saldria `invalid_input`.
+        const { error, llamadas } = await ejecutar(invocacion, actor, ENTRADA_INVALIDA)
+        esperaRechazo(error, llamadas, `${nombre} / ${quien}`)
+        const e = error as UnauthorizedError
+        firmas.push(`${e.constructor.name}|${e.code}|${e.message}`)
+      }
+      // Indistinguibles entre si: ni la forma del actor ni su empresa se filtran por el error.
+      expect(new Set(firmas).size, `${nombre}: el rechazo varia segun el actor`).toBe(1)
+    })
+  }
 })

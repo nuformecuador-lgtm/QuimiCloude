@@ -148,6 +148,8 @@ function currentUtcYear(): number {
 }
 
 interface Fixtures {
+  /** QC-60: `orders.company_id` es NOT NULL, asi que el pedido nace en la empresa del fixture. */
+  readonly companyId: string
   readonly unitId: string
   readonly recipeId: string
   readonly userId: string
@@ -208,12 +210,13 @@ async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
     },
     select: { id: true },
   })
-  return { unitId: unit.id, recipeId: recipe.id, userId: user.id }
+  return { companyId: company.id, unitId: unit.id, recipeId: recipe.id, userId: user.id }
 }
 
 /** Columnas que un alta cruda puede escribir en `orders`. */
 type WritableColumn =
   | 'id'
+  | 'company_id'
   | 'order_year'
   | 'order_sequence'
   | 'recipe_id'
@@ -279,6 +282,7 @@ function asStatus(value: string): Prisma.Sql {
  *  sobreescribe la que quiere poner a prueba, y asi solo una restriccion puede dispararse. */
 function baseColumns(f: Fixtures, sequence: number): Partial<Record<WritableColumn, Prisma.Sql>> {
   return {
+    company_id: asUuid(f.companyId),
     order_year: Prisma.sql`${currentUtcYear()}`,
     order_sequence: Prisma.sql`${sequence}`,
     recipe_id: asUuid(f.recipeId),
@@ -305,6 +309,7 @@ async function createOrder(
 ): Promise<string> {
   const order = await tx.order.create({
     data: {
+      companyId: f.companyId,
       orderYear: currentUtcYear(),
       orderSequence: seed.sequence ?? freshSequence(),
       recipeId: f.recipeId,
@@ -378,22 +383,35 @@ describe('el alta contra la base (R8, R10)', () => {
     // funcion del adaptador, porque el adaptador habla con el cliente Prisma GLOBAL: llamarla
     // "dentro" de esta transaccion correria en OTRA conexion del pool y haria COMMIT, dejando
     // filas en una base compartida. Lo que este caso demuestra es lo unico que un doble no
-    // puede demostrar: que la base acepta el alta, que el numero lo entrega
-    // `next_order_sequence` DENTRO del INSERT y que el `RETURNING` trae id y correlativo.
+    // puede demostrar: que la base acepta el alta, que el numero lo calcula el
+    // `max()+1` DENTRO del INSERT y que el `RETURNING` trae id y correlativo.
+    //
+    // ACTUALIZADO POR QC-60 (T3, T9): `next_order_sequence(integer)` ya no existe. El alta son dos
+    // sentencias en una transaccion —el lock de aviso por (empresa, ano) y el INSERT con el maximo
+    // de ESA empresa— y la empresa se escribe en la columna Y en el subselect. Aqui la transaccion
+    // es la del propio caso. La carrera y el reparto por empresa se prueban contra el adaptador
+    // real en `order-sequence-race.int.test.ts` y `company-scope-queries.int.test.ts`.
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
       const now = new Date()
       const year = now.getUTCFullYear()
 
+      await tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(60::int, hashtext(${`orders_sequence:${f.companyId}:${String(year)}`}::text))`
+
       const filas = await tx.$queryRaw<
         { id: string; order_year: number; order_sequence: number }[]
       >`
         INSERT INTO "orders" (
-          "order_year", "order_sequence", "recipe_id", "quantity",
+          "company_id", "order_year", "order_sequence", "recipe_id", "quantity",
           "priority", "status", "created_by", "updated_by", "created_at", "updated_at"
         ) VALUES (
+          ${f.companyId}::uuid,
           ${year}::integer,
-          next_order_sequence(${year}::integer),
+          (SELECT COALESCE(max("order_sequence"), 0) + 1
+             FROM "orders"
+            WHERE "company_id" = ${f.companyId}::uuid
+              AND "order_year" = ${year}::integer),
           ${f.recipeId}::uuid,
           ${'12.5000'}::numeric,
           ${'ALTA'}::"OrderPriority",
@@ -410,10 +428,12 @@ describe('el alta contra la base (R8, R10)', () => {
       if (devuelta === undefined) throw new Error('el INSERT no devolvio ninguna fila')
       expect(devuelta.id).toMatch(UUID_SHAPE)
       expect(Number(devuelta.order_year)).toBe(year)
-      expect(Number(devuelta.order_sequence)).toBeGreaterThanOrEqual(1)
+      // La empresa del fixture nace en este caso sin pedidos: su serie arranca en 1.
+      expect(Number(devuelta.order_sequence)).toBe(1)
 
       // Y lo devuelto es lo persistido: se relee la fila por su id.
       const stored = await tx.order.findUniqueOrThrow({ where: { id: devuelta.id } })
+      expect(stored.companyId).toBe(f.companyId)
       expect(stored.orderYear).toBe(Number(devuelta.order_year))
       expect(stored.orderSequence).toBe(Number(devuelta.order_sequence))
       expect(stored.recipeId).toBe(f.recipeId)

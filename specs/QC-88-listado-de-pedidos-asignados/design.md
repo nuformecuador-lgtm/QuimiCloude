@@ -279,9 +279,10 @@ createListAssignedOrders(deps): (actor, input: unknown) => Promise<Page<Assigned
    **salen del actor**, nunca de la entrada (R7).
 4. **Corte seco:** si no hay ni un id, se devuelve la pagina vacia **sin tocar ningun otro puerto**
    (mismo criterio que `list-responsibles-for-orders.ts:109`).
-5. `orders.listAliveSummariesByIds(ids, ['PENDIENTE','EN_CURSO'], page, pageSize)` — el filtro de
-   estado y la paginacion ocurren **en SQL, sobre el conjunto completo y antes de paginar** (R11), de
-   modo que `total` describe lo que se muestra.
+5. `orders.listAliveSummariesByIds(actor.companyId, ids, ['PENDIENTE','EN_CURSO'], page, pageSize)`
+   — la empresa **sale del actor**, como en el paso 3 (sincronizacion del 2026-09-16, `> 6`); el
+   filtro de estado y la paginacion ocurren **en SQL, sobre el conjunto completo y antes de
+   paginar** (R11), de modo que `total` describe lo que se muestra.
 6. Nombres de receta: ids **deduplicados** y **una** llamada a `recipes.findRefsIncludingDeleted`
    (igual que `list-orders.ts:140-147`): una receta dada de baja sigue apareciendo con su nombre.
 7. Responsables: **una** llamada a `assignments.listByOrdersInCompany(actor.companyId, idsDeLaPagina)`
@@ -335,6 +336,9 @@ export type AssignedOrderSummary = {
 };
 
 listAliveSummariesByIds(
+  companyId: string,   // AÑADIDO en la sincronizacion del 2026-09-16: QC-60 ya le dio `company_id` a
+                       // `orders`. Primero, como en `findAliveById` y en `listOrderIdsByUserInCompany`:
+                       // una llamada que lo olvide no compila.
   ids: readonly string[],
   statuses: readonly OrderStatus[],
   page: number,
@@ -346,10 +350,12 @@ listAliveSummariesByIds(
   en `lib/shared/pagination`, que `domain/` no puede importar, asi que **pagina el adaptador**
   (mismo reparto que `ports/order-repository.ts:56-62`).
 - **Implementacion** en `adapters/driven/persistence/order-catalog-prisma.ts` (funcion nueva al
-  final): un `count` + un `findMany` con `where: { id: { in }, status: { in }, deletedAt: null }`.
-  Son **dos sentencias** para **una** lectura logica, como cualquier listado paginado del repo; R14
-  cuenta consultas **por pagina**, no sentencias por lectura, y el numero sigue sin depender del
-  tamano de la pagina. Se declara aqui para que nadie lo lea como una lectura extra.
+  final): un `count` + un `findMany` con
+  `where: { AND: [orderCompanyScope({ companyId }), { id: { in }, status: { in }, deletedAt: null }] }`
+  (mismo patron que `findAliveOrderTargetById`, `./company-scope`). Son **dos sentencias** para
+  **una** lectura logica, como cualquier listado paginado del repo; R14 cuenta consultas **por
+  pagina**, no sentencias por lectura, y el numero sigue sin depender del tamano de la pagina. Se
+  declara aqui para que nadie lo lea como una lectura extra.
 - **`ids` vacio no llega**: el caso de uso corta en el paso 4.
 - **No se toca `OrderRepository`, ni `listAlive`, ni `ORDER_QUERYABLE`, ni `list-query.ts`.** Es la
   mitad del diseno que mantiene la superficie de conflicto con QC-60 pequena (`> 13`).
@@ -573,6 +579,27 @@ tocar `ORDER_QUERYABLE`, `list-query.ts` o `OrderRepository`.
    las FK y los CHECK de `orders` y `order_assignments` son **drift para Prisma** y toda migracion que
    los toque emite `DROP CONSTRAINT` que hay que borrar a mano (`db/schema.prisma:1133-1137`). Eso es
    carga de QC-60, no de esta ficha.
+
+### Nota del merge de sincronizacion, 2026-09-16
+
+QC-60 ya esta en `dev` y se fusiono en esta rama sin conflicto de texto en
+`order-catalog-prisma.ts` (git lo resolvio solo: el metodo nuevo de esta ficha, T5, todavia no
+existia cuando se fusiono). Lo que SI cambio, medido en disco tras el merge:
+
+- `orders` **ya tiene `company_id`** (migracion `20260915120000_orders_company_scope`) y
+  `findAliveOrderTargetById` (el UNICO metodo de `OrderCatalog` que existe hoy) ya filtra por
+  `orderCompanyScope({ companyId })` (`order-catalog-prisma.ts:44`, `company-scope.ts`). El punto 2
+  de arriba se cumplio: QC-60 SI le anadio el filtro a lo que ya existia.
+- **`listAliveSummariesByIds` (T4/T5, `> 6`) sigue sin escribirse.** Cuando T5 la implemente, su
+  `where` DEBE llevar `orderCompanyScope({ companyId })` en `AND` junto a `id: { in }`,
+  `status: { in }` y `deletedAt: null` —el mismo patron que `findAliveOrderTargetById`, reutilizando
+  `orderCompanyScope` de `./company-scope` en vez de escribir `{ companyId }` a mano—. El caso de uso
+  (T6) ya tiene `actor.companyId` disponible (paso 3 de `> 5.1`), asi que **T4 anade `companyId` como
+  parametro de `listAliveSummariesByIds`** igual que hizo T1 con `listOrderIdsByUserInCompany`: una
+  llamada que lo olvide no compila. Esto TENSA el "Hecho cuando" de T5 (`tasks.md`), que se anota ahi
+  con fecha.
+- Ningun otro archivo de la superficie declarada en la tabla de arriba cambio su forma: sigue siendo
+  un merge de una funcion nueva al final del archivo cuando T5 llegue.
 
 ---
 

@@ -83,6 +83,13 @@ no se distingue de una inexistente (R8)— sobre base real, y el archivo declara
 arrastrar `@prisma/client`/`next/*`/`'use server'` en su cierre de imports (R12), y el metodo devuelve
 `Page<AssignedOrderSummary>` (la paginacion la hace el adaptador, no el dominio).
 
+**Sincronizacion del 2026-09-16 (QC-60 ya fusionado):** `orders` ya tiene `company_id`, asi que la
+firma nace con `companyId` como **parametro**, en el mismo lugar que `findAliveById(id, companyId)`
+ya lo tiene: `listAliveSummariesByIds(companyId: string, ids: readonly string[], statuses:
+readonly OrderStatus[], page: number, pageSize?: number): Promise<Page<AssignedOrderSummary>>`. No
+se escribe la version sin empresa y se enmienda despues: nace ya acotada (ver `design.md > 13`,
+nota del merge, y T5 mas abajo).
+
 ### T5 · `[PA2]` Adaptador de esa lectura (R11)
 
 **Toca**
@@ -91,11 +98,15 @@ arrastrar `@prisma/client`/`next/*`/`'use server'` en su cierre de imports (R12)
 - `tests/unit/pedidos/order-catalog.test.ts` (o el archivo existente equivalente)
 
 **Depende de:** T4.
-**Hecho cuando:** el `where` lleva `id: { in }`, `status: { in }` y **`deletedAt: null`**; la
+**Hecho cuando:** el `where` lleva `id: { in }`, `status: { in }`, **`deletedAt: null`** y
+**`orderCompanyScope({ companyId })`** (`./company-scope`, en `AND`, no fundido con el resto); la
 paginacion sale de `toOffsetLimit`/`buildPage` de `lib/shared/pagination` y **no se reimplementa**;
-y el `total` describe el conjunto **ya filtrado por estado** (R11).
-**AVISO DE CONFLICTO:** este es **uno de los dos archivos que QC-60 va a tocar**
-(`design.md > 13`). El leader lo valida antes de F2.0.
+y el `total` describe el conjunto **ya filtrado por estado y por empresa** (R11).
+**AVISO DE CONFLICTO — resuelto en la sincronizacion del 2026-09-16:** QC-60 ya esta en `dev` y
+fusionado en esta rama; `order-catalog-prisma.ts` y `db/schema.prisma` no dieron conflicto de texto
+porque esta funcion **todavia no existia**. Lo que cambia: `orders` **ya tiene `company_id`**, asi
+que el filtro de empresa entra **en el mismo commit de T5**, no despues (`design.md > 13`, nota del
+merge). `companyId` es parametro nuevo de `listAliveSummariesByIds` (T4).
 
 ### T6 · `[PA2]` El caso de uso, con su autorizacion (R5, R6, R7, R11, R14, R15, R20)
 

@@ -355,7 +355,7 @@ describe('QC-34 — limite de alcance de la feature', () => {
     ])
   })
 
-  it('los specs E2E de pedidos son estos DOS -QC-35 y QC-102-, y la lista sigue cerrada (R57)', () => {
+  it('los specs E2E de pedidos son estos TRES -QC-35, QC-102 y QC-60-, y la lista sigue cerrada (R57)', () => {
     // CENTINELA INVERTIDO el 2026-09-07 (QC-35). El E2E estaba diferido a esa ficha y el
     // humano lo aprobo el 2026-09-06 (R48, R49). La lista es CERRADA: un spec de pedidos sin
     // ficha que lo respalde vuelve a poner esto en rojo.
@@ -367,9 +367,24 @@ describe('QC-34 — limite de alcance de la feature', () => {
     // edicion del pedido- porque lo que ejercita es otra cosa: los responsables. La lista se AMPLIA
     // y se TENSA -el ancla pasa de una entrada a dos-, nunca se afloja: sigue CERRADA y un TERCER
     // spec de pedidos sin ficha que lo respalde vuelve a ponerla en rojo.
+    //
+    // AMPLIADA el 2026-09-16 (QC-60, aislamiento-por-empresa-en-pedidos, T17, R31): entra la
+    // TERCERA entrada, el spec e2e/aislamiento-pedidos.spec.ts. Con sesion en la empresa A comprueba
+    // que la lista no trae pedidos de B, que borrar un pedido de B conociendo su identificador se
+    // rechaza como inexistente y lo deja intacto, y que el alta de A numera en su propia serie
+    // (R19, R20, R21, R11). No sustituye al de QC-35 -alta y edicion del pedido- ni al de QC-102
+    // -responsables- porque lo que ejercita es otra cosa: la frontera entre empresas. La lista se
+    // AMPLIA y se TENSA -el ancla pasa de dos entradas a tres-, nunca se afloja: sigue CERRADA y un
+    // CUARTO spec de pedidos sin ficha que lo respalde vuelve a ponerla en rojo. El orden es el de
+    // `filesIn` (orden alfabetico de ruta), no el de llegada.
     expect(rutasE2e.length).toBeGreaterThan(0)
-    expect(specsE2eDePedidos(rutasE2e)).toEqual(['e2e/pedidos-responsables.spec.ts', 'e2e/pedidos.spec.ts'])
+    expect(specsE2eDePedidos(rutasE2e)).toEqual([
+      'e2e/aislamiento-pedidos.spec.ts',
+      'e2e/pedidos-responsables.spec.ts',
+      'e2e/pedidos.spec.ts',
+    ])
     expect(specsE2eDePedidos([...rutasE2e, 'e2e/orders-extra.spec.ts'])).toEqual([
+      'e2e/aislamiento-pedidos.spec.ts',
       'e2e/pedidos-responsables.spec.ts',
       'e2e/pedidos.spec.ts',
       'e2e/orders-extra.spec.ts',

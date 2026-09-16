@@ -1,6 +1,7 @@
 import { requirePermission, type Actor } from './actor';
 import { NotDeletableError, OrderNotFoundError } from './errors';
 import type { OrderStatus } from './order-classification';
+import type { OrderScope } from './order-scope';
 
 import type { OrderRepository } from '../ports/order-repository';
 
@@ -37,9 +38,12 @@ export function createDeleteOrder(
   ): Promise<void> {
     requirePermission(actor, 'pedidos.modificar');
 
+    // La empresa sale del ACTOR y jamas de la entrada: nadie puede elegir consultar otra.
+    const scope: OrderScope = { companyId: actor.companyId };
+
     // R33: no existe y ya esta borrado son el mismo caso, y el filtro `deleted_at IS NULL`
     // es del puerto (R40).
-    const row = await deps.orders.findAliveById(id);
+    const row = await deps.orders.findAliveById(id, scope);
     if (row === null) throw new OrderNotFoundError();
 
     // R32, con `code` PROPIO (`not_deletable`), distinto del de la edicion rechazada. Se lee
@@ -48,7 +52,7 @@ export function createDeleteOrder(
     if (NO_BORRABLES.includes(row.status)) throw new NotDeletableError();
 
     // R6: el borrado tambien registra al actor como autor de la ultima modificacion.
-    const result = await deps.orders.softDeleteAlive(id, actor.id, now());
+    const result = await deps.orders.softDeleteAlive(id, actor.id, now(), scope);
     if (result === 'not_found') throw new OrderNotFoundError();
   };
 }

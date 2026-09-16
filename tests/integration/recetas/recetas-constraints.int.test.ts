@@ -1,57 +1,8 @@
 /**
- * Tests de integracion de QC-24 (modelo-recetas) contra una base Postgres REAL, con la
- * migracion `20260902163256_recipes_and_recipe_lines` aplicada.
- *
- * AISLAMIENTO — cada `it` corre dentro de `prisma.$transaction` interactiva y termina
- * lanzando `RollbackSignal`, lo que hace que Prisma emita `ROLLBACK`: ninguna fila
- * escrita por un test sobrevive. Se usa la transaccion interactiva de Prisma (y no un
- * cliente `pg` aparte) porque asi se ejercita EXACTAMENTE el camino de datos de la app
- * (Prisma es el unico camino) y porque `$executeRaw` dentro de la misma transaccion
- * reutiliza la conexion, asi que el SQL crudo comparte el aislamiento.
- *
- * NINGUNA AFIRMACION GLOBAL — no se afirma «la tabla esta vacia» ni «hay N filas en
- * total»: cada test mira solo las filas que el mismo sembro, localizadas por su `id` o
- * por un marcador irrepetible. Una base con catalogo cargado, o un test futuro que
- * siembre datos, no puede volverlos rojos.
- *
- * CADA CASO SIEMBRA SUS PROPIAS FK — las tres referencias que cruzan de modulo
- * (`recipe_lines.product_id` -> `products`, `recipes.created_by` / `updated_by` ->
- * `users`) son FK REALES aunque el esquema Prisma las declare como escalares sin
- * `@relation` (`design.md` seccion 4.1, R19). Por eso cada caso crea dentro de su propia
- * transaccion el tipo de documento, el rol, el usuario, la presentacion y el producto que
- * necesita: no se depende del seed ni del orden de los archivos.
- *
- * SAVEPOINTS — un error de constraint aborta la transaccion de Postgres entera, y varios
- * requisitos exigen comprobar el estado DESPUES del rechazo («no crear ninguna fila»:
- * R2, R14, R16). Por eso toda operacion que se espera que falle se envuelve en un
- * `SAVEPOINT` y se deshace con `ROLLBACK TO SAVEPOINT`, que deja la transaccion viva y
- * permite seguir consultando.
- *
- * SQL CRUDO — TODA operacion que se espera que la base rechace se hace con `$executeRaw`,
- * por dos motivos: (1) omitir una columna obligatoria no se puede expresar con la API
- * tipada de Prisma (no compilaria), y (2) solo el raw propaga el SQLSTATE de Postgres en
- * `meta.code`. La API tipada lo traduce a su propio codigo (`P2002`, `P2003`, `P2011`…) y
- * el SQLSTATE se pierde: un test escrito contra ella no podria afirmar sobre `23505` sin
- * caer en el texto del mensaje, que en esta maquina esta en espanol. Se afirma sobre el
- * SQLSTATE y NUNCA sobre el texto. Los caminos felices y las lecturas si van con la API
- * tipada, que es el camino real de la app.
- *
- * CANTIDAD — `quantity` se maneja siempre como `Prisma.Decimal` y se compara con
- * `.toString()` / `.equals()`, o contra `quantity::text` de la propia base. Convertirla a
- * `number` reintroduciria justo la coma flotante binaria que `docs/architecture.md >
- * Dominio` n.o 4 prohibe, y el test dejaria de demostrar R13.
- *
- * NOMBRE NORMALIZADO — `name_normalized` se escribe LITERAL en cada caso, sin llamar a
- * `normalizeRecipeName`. Lo que aqui se prueba es el indice unico parcial de la base
- * (R7, R9); el algoritmo lo prueba `tests/unit/recetas/domain/recipe-name.test.ts`. Si
- * este archivo importara la funcion, un fallo del algoritmo podria dejarlo verde.
- *
- * SIN TESTS DE RLS — un test de RLS escrito con Prisma sale verde pase lo que pase,
- * porque Prisma se conecta como dueno de las tablas (`design.md` seccion 10). R29 se
- * cierra con la guardia estatica sobre el SQL, no aqui.
- *
- * Requisitos cubiertos: R1, R2, R3, R4, R5, R6, R7, R9, R10, R11, R12, R13, R14, R15,
- * R16, R19, R21, R22, R23, R24, R25, R26, R27 y R33.
+ * La base es compartida: ningun caso afirma conteos globales y cada uno siembra sus propias filas
+ * con marcadores irrepetibles.
+ * `quantity` nunca pasa a `number`: la coma flotante binaria es justo lo que la columna evita.
+ * Sin tests de RLS: Prisma conecta como dueno de las tablas y saldrian verdes siempre.
  */
 import { randomUUID } from 'node:crypto'
 
@@ -61,10 +12,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { prisma } from '@/lib/shared/db/prisma'
 
-// ---------------------------------------------------------------------------
-// Utilidades de aislamiento
-// ---------------------------------------------------------------------------
-
 /** Senal de rollback: no es un fallo, es como se deshace la transaccion del test. */
 class RollbackSignal extends Error {
   constructor() {
@@ -73,7 +20,7 @@ class RollbackSignal extends Error {
   }
 }
 
-/** Ejecuta el cuerpo del test en una transaccion que SIEMPRE termina en ROLLBACK. */
+/** `$executeRaw` dentro de la transaccion reutiliza su conexion: el SQL crudo tambien se deshace. */
 async function inRolledBackTransaction(
   body: (tx: Prisma.TransactionClient) => Promise<void>,
 ): Promise<void> {
@@ -92,18 +39,15 @@ async function inRolledBackTransaction(
 
 let savepointSeq = 0
 
-/** SQLSTATE de Postgres relevantes aqui. Son estables y NO dependen del idioma. */
 const NOT_NULL_VIOLATION = '23502'
 const FOREIGN_KEY_VIOLATION = '23503'
 const UNIQUE_VIOLATION = '23505'
 const CHECK_VIOLATION = '23514'
 
 /**
- * SQLSTATE del error. Se lee de `meta.code` y no del texto: el mensaje de Postgres esta
- * traducido al idioma del servidor (en esta maquina, espanol). Por eso NINGUN test afirma
- * sobre el nombre de la restriccion: se afirma sobre el SQLSTATE y sobre el efecto, y
- * cada caso se construye para que solo una restriccion pueda dispararlo. Los nombres de
- * los CHECK, de los indices y de las FK los vigilan los tests estaticos sobre el SQL.
+ * Solo el SQL crudo deja el SQLSTATE en `meta.code`; la API tipada lo traduce a `P20xx`. No se
+ * mira el texto porque sale en el idioma del servidor, asi que cada caso se monta para que solo
+ * una restriccion pueda dar ese SQLSTATE.
  */
 function sqlStateOf(error: unknown): string {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -118,8 +62,8 @@ function sqlStateOf(error: unknown): string {
 }
 
 /**
- * Corre `run` esperando que la base lo rechace. Devuelve el SQLSTATE para que el test
- * afirme sobre el tipo exacto de violacion, y deja la transaccion utilizable.
+ * Va dentro de un SAVEPOINT porque un error de constraint aborta la transaccion entera, y los
+ * casos necesitan seguir consultando despues del rechazo.
  */
 async function expectRejectedByDatabase(
   tx: Prisma.TransactionClient,
@@ -139,10 +83,6 @@ async function expectRejectedByDatabase(
   throw new Error(`se esperaba que la base rechazara la operacion, pero la acepto: ${what}`)
 }
 
-// ---------------------------------------------------------------------------
-// Datos de apoyo — las FK son reales, asi que cada caso siembra las suyas
-// ---------------------------------------------------------------------------
-
 const UUID_SHAPE = /^[0-9a-f-]{36}$/u
 
 /** Marcador irrepetible de solo letras y digitos: sobrevive a cualquier normalizacion. */
@@ -151,9 +91,8 @@ function token(): string {
 }
 
 /**
- * Crea un usuario completo con su tipo de documento y su rol propios. Los nombres y
- * codigos se aleatorizan porque `roles.name` es unico global y `users` tiene indices
- * unicos parciales sobre correo, nombre de usuario y documento (QC-4).
+ * Nombres y codigos aleatorios: `roles.name` es unico global y `users` tiene indices unicos
+ * sobre correo, nombre de usuario y documento.
  */
 async function createUser(tx: Prisma.TransactionClient): Promise<string> {
   const marker = token()
@@ -165,12 +104,7 @@ async function createUser(tx: Prisma.TransactionClient): Promise<string> {
     data: { name: `rol-${marker}`, description: 'Rol de prueba' },
     select: { id: true },
   })
-  // Empresa efimera propia de este fixture: QC-47 R9 hizo `users.company_id` obligatoria, asi
-  // que ningun usuario se puede crear ya sin una. NUNCA la empresa de instalacion: el indice
-  // `companies_name_unique` es GLOBAL y el nombre chocaria con el de la empresa que siembra
-  // `db:seed`. `name_normalized` sale de `normalizeCompanyName` -la UNICA definicion de «mismo
-  // nombre de empresa» (R3), importada del contrato publico de `identity`-, nunca de una copia
-  // escrita a mano aqui.
+  // Empresa efimera y no la de instalacion: el nombre chocaria con la que siembra `db:seed`.
   const companyName = `Empresa ${marker}`
   const company = await tx.company.create({
     data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
@@ -195,10 +129,8 @@ async function createUser(tx: Prisma.TransactionClient): Promise<string> {
   return user.id
 }
 
-/** Copia local de `normalizeProductName` (QC-57). NO se importa el original a proposito: lo
- *  que aqui se prueba es otra cosa, y si el algoritmo real se rompiera este archivo no debe
- *  quedar verde por arrastre. El algoritmo lo prueba
- *  `tests/unit/inventario/product-name.test.ts`. */
+/** Copia local de `normalizeProductName` a proposito: si el algoritmo real se rompiera, este
+ *  archivo no debe quedar verde por arrastre. */
 function normalizeProductNameForTest(name: string): string {
   return name
     .trim()
@@ -209,18 +141,8 @@ function normalizeProductNameForTest(name: string): string {
 }
 
 /**
- * Empresa efimera del ANDAMIAJE de inventario (QC-49 R1, R2, R22).
- *
- * Las tres tablas de inventario ganaron `company_id` NOT NULL en
- * `<ts>_inventory_company_scope`, y el disparador `product_batches_check_company` exige ademas
- * que la empresa del lote coincida con la de SU producto Y con la de SU presentacion. Por eso
- * el producto, la presentacion y el lote de un mismo caso tienen que compartir empresa, y por
- * eso esta se cachea POR TRANSACCION en vez de crear una nueva en cada llamada.
- *
- * Aqui la empresa es ANDAMIAJE y nada mas: este archivo no prueba el aislamiento por empresa
- * -eso es `tests/integration/inventario/company-scope.int.test.ts`-, solo necesita una para
- * poder seguir sembrando lo que si prueba. NUNCA la empresa de instalacion:
- * `companies_name_unique` es GLOBAL y el nombre chocaria con el que siembra `db:seed`.
+ * Una empresa por transaccion: `product_batches_check_company` exige que el lote, su producto y
+ * su presentacion compartan empresa. Ningun aserto de este archivo depende de cual sea.
  */
 const empresasDeInventario = new WeakMap<object, Promise<string>>()
 
@@ -239,19 +161,11 @@ function inventoryCompanyOf(tx: Prisma.TransactionClient): Promise<string> {
   return creando
 }
 
-/** Crea un producto con su presentacion propia. `products.name` no es unico (QC-14). */
+/** `products.name` no es unico: el nombre por defecto se puede repetir en una transaccion. */
 async function createProduct(
   tx: Prisma.TransactionClient,
   name = 'Acido citrico monohidratado',
 ): Promise<string> {
-  // QC-20 anadio `presentations.name_normalized` NOT NULL con INDICE UNICO (su R17, R20).
-  // Dos consecuencias para este helper, las dos de andamiaje y ninguna de significado:
-  //   1. hay que escribir `nameNormalized` junto a `name`, porque la columna es NOT NULL;
-  //   2. el nombre FIJO 'Bidon 20 L' ya no vale: este helper se llama VARIAS VECES en la
-  //      misma transaccion (p. ej. tres seguidas en «una receta con tres lineas»), y la
-  //      segunda chocaria contra el indice unico. Se marca con `token()`, que es
-  //      irrepetible y de solo letras y digitos, asi que sobrevive a la normalizacion.
-  // Sin presentacion desde el 2026-09-09: la presentacion se mudo a `product_batches`.
   const product = await tx.product.create({
     data: {
       name,
@@ -270,8 +184,8 @@ interface RecipeSeed {
 }
 
 /**
- * Crea una receta viva. `nameNormalized` se pasa siempre a mano (ver cabecera): aqui se
- * prueba el indice de la base, no el algoritmo de normalizacion.
+ * `nameNormalized` va literal, sin `normalizeRecipeName`, para que un fallo del algoritmo no
+ * deje verde este archivo.
  */
 async function createRecipe(tx: Prisma.TransactionClient, seed: RecipeSeed): Promise<string> {
   const recipe = await tx.recipe.create({
@@ -286,13 +200,8 @@ async function createRecipe(tx: Prisma.TransactionClient, seed: RecipeSeed): Pro
 }
 
 /**
- * Crea una unidad REAL dentro de la transaccion del test y devuelve su identificador.
- *
- * 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Donde estos tests
- * escribian el texto 'kg' ahora hay una FK de verdad (`recipe_lines_unit_id_fkey`), asi que
- * un uuid inventado lo rechazaria la base con 23503: la unidad hay que crearla. El nombre
- * lleva `token()` porque `units.name_normalized` tiene indice unico y la base local ya trae
- * las unidades del seed arrancador.
+ * Nombre y simbolo llevan marcador: sin empresa la unidad es de sistema, donde ya estan las del
+ * arrancador, y los dos son unicos dentro del ambito.
  */
 async function createUnit(
   tx: Prisma.TransactionClient,
@@ -300,12 +209,6 @@ async function createUnit(
 ): Promise<string> {
   const marca = token()
   const unit = await tx.unit.create({
-    // ACTUALIZADO EL 2026-09-08 POR QC-76 (R15, decision cerrada 28): el simbolo pasa a ser
-    // UNICO dentro del ambito cuando existe, y estas unidades se siembran SIN empresa —o sea DE
-    // SISTEMA—. El defecto era el literal `'kg'`, que choca con `23505` contra el `kilogramo`
-    // del catalogo arrancador Y contra si mismo en cuanto el helper se llama dos veces en el
-    // mismo caso. Ahora DERIVA DEL MARCADOR, que ya es irrepetible; quien pase un simbolo
-    // explicito —incluido `null`— sigue mandando. Ningun aserto lee el valor del simbolo.
     data: {
       name: `unidad ${marca}`,
       nameNormalized: `unidad${marca}`,
@@ -316,12 +219,7 @@ async function createUnit(
   return unit.id
 }
 
-/** Crea una linea con la API tipada. Devuelve el id para poder releerla por el.
- *
- *  2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. El quinto parametro era
- *  el TEXTO de la unidad con `'kg'` por defecto; ahora es el ID de una unidad del catalogo, y
- *  si no se pasa se crea una para esa linea. La unidad SIGUE SIENDO OBLIGATORIA en toda linea
- *  (QC-32 R11): por eso el helper nunca puede dejarla sin poner. */
+/** Si no se pasa unidad se crea una: la linea no puede quedarse sin ella. */
 async function createLine(
   tx: Prisma.TransactionClient,
   recipeId: string,
@@ -341,7 +239,6 @@ async function createLine(
   return line.id
 }
 
-/** Columnas que un alta cruda puede escribir en una de las dos tablas de la feature. */
 type WritableColumn =
   | 'name'
   | 'name_normalized'
@@ -353,15 +250,12 @@ type WritableColumn =
   | 'recipe_id'
   | 'product_id'
   | 'quantity'
-  // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La columna `unit`
-  // (TEXT) ya no existe; su sitio lo ocupa `unit_id` (UUID con FK hacia `units`).
   | 'unit_id'
 
 /**
- * `INSERT` crudo. `columns` decide que se escribe: omitir una entrada es exactamente el
- * caso «falta un dato obligatorio», que la API tipada de Prisma no deja ni compilar.
- * `updated_at` se da siempre porque es NOT NULL sin DEFAULT (lo rellena el cliente Prisma
- * via `@updatedAt`, no la base).
+ * Omitir una entrada de `columns` es el caso «falta un dato obligatorio», que la API tipada no
+ * deja ni compilar. `updated_at` va siempre: es NOT NULL sin DEFAULT porque la rellena Prisma con
+ * `@updatedAt`, no la base.
  */
 function rawInsert(
   tx: Prisma.TransactionClient,
@@ -411,16 +305,11 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-// ---------------------------------------------------------------------------
-
 beforeAll(async () => {
   const tables = await prisma.$queryRaw<{ tablename: string }[]>`
     SELECT tablename FROM pg_tables
     WHERE schemaname = 'public' AND tablename IN ('recipes', 'recipe_lines', 'units')`
   if (tables.length !== 3) {
-    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva la
-    // comprobacion previa -sin la migracion de QC-24 estos tests no pueden correr- y se le
-    // suma `units`, sin la cual ninguna linea de receta se puede escribir.
     throw new Error(
       'la base de pruebas no tiene aplicadas las migraciones de QC-24 (recipes y ' +
         'recipe_lines) y QC-32 (units). Corre `pnpm run db:migrate` antes de estos tests.',
@@ -431,8 +320,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await prisma.$disconnect()
 })
-
-// ---------------------------------------------------------------------------
 
 describe('estructura de la receta', () => {
   it('crea una receta con todos sus datos y los relee sin perdida', async () => {
@@ -454,7 +341,6 @@ describe('estructura de la receta', () => {
         select: { id: true },
       })
 
-      // R1: identificador propio, estable y no derivado de los datos de negocio.
       expect(created.id).toMatch(UUID_SHAPE)
 
       const recipe = await tx.recipe.findUniqueOrThrow({ where: { id: created.id } })
@@ -467,8 +353,7 @@ describe('estructura de la receta', () => {
       expect(recipe.updatedBy).toBe(authorId)
       expect(recipe.deletedAt).toBeNull()
 
-      // «No derivado de sus datos de negocio»: renombrarla no cambia el identificador, y
-      // la fila se sigue encontrando por el mismo id despues del renombrado.
+      // Si el identificador saliera de los datos de negocio, renombrarla lo cambiaria.
       const renamed = await tx.recipe.update({
         where: { id: created.id },
         data: { name: `Otro nombre ${marker}`, nameNormalized: `otronombre${marker}` },
@@ -488,9 +373,7 @@ describe('estructura de la receta', () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
 
-      // SQL crudo a proposito: `tx.recipe.create({ data: { nameNormalized } })` no
-      // compilaria. La unica columna obligatoria que falta es `name`, asi que el 23502
-      // solo puede venir de ella.
+      // La unica columna obligatoria que falta es `name`: el 23502 solo puede venir de ella.
       const sqlState = await expectRejectedByDatabase(
         tx,
         () => rawInsert(tx, 'recipes', { name_normalized: Prisma.sql`${marker}` }),
@@ -498,7 +381,6 @@ describe('estructura de la receta', () => {
       )
       expect(sqlState).toBe(NOT_NULL_VIOLATION)
 
-      // «No crear ninguna fila»: se busca lo que ese intento habria escrito, no el total.
       const survivors = await tx.recipe.findMany({
         where: { nameNormalized: marker },
         select: { id: true },
@@ -519,13 +401,12 @@ describe('estructura de la receta', () => {
         select: { id: true },
       })
 
-      // R3: el limite de 120/500 es validacion de aplicacion (QC-25), no de la columna.
+      // El limite de longitud es validacion de aplicacion, no de la columna.
       const recipe = await tx.recipe.findUniqueOrThrow({ where: { id } })
       expect(recipe.name).toBe(name)
       expect(recipe.description).toBe(description)
       expect(recipe.description).toHaveLength(5000)
 
-      // Y la razon por la que entra: las dos columnas son TEXT sin longitud declarada.
       const columns = await columnInfo(tx, 'recipes', ['name', 'description'])
       expect(columns.map((column) => [column.column_name, column.data_type])).toEqual([
         ['description', 'text'],
@@ -547,8 +428,7 @@ describe('estructura de la receta', () => {
       const recipe = await tx.recipe.findUniqueOrThrow({ where: { id } })
       expect(recipe.steps).toEqual(steps)
 
-      // El orden es el de la lista y lo conserva la propia base: jsonb reordena las
-      // CLAVES de un objeto, no los elementos de un array (`design.md` seccion 2.1).
+      // jsonb reordena las claves de un objeto, no los elementos de un array.
       const positions = await tx.$queryRaw<{ primero: string; tercero: string }[]>`
         SELECT "steps"->>0 AS primero, "steps"->>2 AS tercero
         FROM "recipes" WHERE "id" = ${asUuid(id)}`
@@ -556,8 +436,6 @@ describe('estructura de la receta', () => {
       expect(positions[0]?.primero).toBe('1. Pesar')
       expect(positions[0]?.tercero).toBe('3. Reposar 24 h')
 
-      // R4 en positivo: la base NO juzga la forma del documento (decision cerrada 10).
-      // Un objeto que no es una lista de textos tambien se guarda tal cual.
       const raro = { nota: 'esto no es una lista', repeticiones: 3, anidado: { a: [1, 2] } }
       const { id: rareId } = await tx.recipe.create({
         data: { name: `Raro ${marker}`, nameNormalized: `raro${marker}`, steps: raro },
@@ -566,7 +444,6 @@ describe('estructura de la receta', () => {
       const rareRecipe = await tx.recipe.findUniqueOrThrow({ where: { id: rareId } })
       expect(rareRecipe.steps).toEqual(raro)
 
-      // Y no existe ninguna tabla separada de «paso» con la que juntarlos.
       const stepTables = await tx.$queryRaw<{ tablename: string }[]>`
         SELECT tablename FROM pg_tables
         WHERE schemaname = 'public' AND tablename LIKE '%step%'`
@@ -583,13 +460,11 @@ describe('estructura de la receta', () => {
       expect(recipe.steps).toEqual([])
       expect(recipe.steps).not.toBeNull()
 
-      // Lo que hay en la base es un array vacio, no un NULL disfrazado.
       const shape = await tx.$queryRaw<{ tipo: string; nulo: boolean }[]>`
         SELECT jsonb_typeof("steps") AS tipo, ("steps" IS NULL) AS nulo
         FROM "recipes" WHERE "id" = ${asUuid(id)}`
       expect(shape).toEqual([{ tipo: 'array', nulo: false }])
 
-      // Y la ausencia de valor no se puede escribir ni a proposito: la columna es NOT NULL.
       const sqlState = await expectRejectedByDatabase(
         tx,
         () => tx.$executeRaw`UPDATE "recipes" SET "steps" = NULL WHERE "id" = ${asUuid(id)}`,
@@ -621,8 +496,6 @@ describe('estructura de la receta', () => {
         (await tx.recipe.findUniqueOrThrow({ where: { id: conImagen } })).imagePath,
       ).toBe('https://storage.example.test/recetas/foto%20final.jpg')
 
-      // R6: UNA sola columna de texto opcional, y ninguna otra columna de imagen. El
-      // contenido del archivo no vive aqui.
       const imageColumns = await tx.$queryRaw<{ column_name: string; data_type: string }[]>`
         SELECT column_name, data_type FROM information_schema.columns
         WHERE table_schema = 'public' AND table_name = 'recipes'
@@ -643,8 +516,7 @@ describe('unicidad del nombre de la receta', () => {
         nameNormalized: normalized,
       })
 
-      // El nombre original es distinto («desengrasante-5%-…» frente a «Desengrasante 5 %
-      // …»); lo que choca es la clave normalizada, que es justo lo que R7 exige.
+      // El nombre original es distinto: lo que choca es la clave normalizada.
       const sqlState = await expectRejectedByDatabase(
         tx,
         () =>
@@ -656,7 +528,6 @@ describe('unicidad del nombre de la receta', () => {
       )
       expect(sqlState).toBe(UNIQUE_VIOLATION)
 
-      // «No crear ni modificar ninguna fila»: solo sobrevive la primera.
       const rows = await tx.recipe.findMany({
         where: { nameNormalized: normalized },
         select: { id: true },
@@ -689,7 +560,6 @@ describe('unicidad del nombre de la receta', () => {
       expect(rows).toHaveLength(2)
       expect(rows.filter((row) => row.deletedAt === null).map((row) => row.id)).toEqual([secondId])
 
-      // Y la garantia sigue viva para la que quedo: una tercera choca contra la segunda.
       const sqlState = await expectRejectedByDatabase(
         tx,
         () =>
@@ -710,14 +580,10 @@ describe('estructura de la linea de receta', () => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
       const productId = await createProduct(tx)
-      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La linea sigue
-      // teniendo unidad PROPIA -es lo que R10 vigila-; hoy esa unidad es una referencia.
       const unitId = await createUnit(tx)
 
       const lineId = await createLine(tx, recipeId, productId, '2.5000', unitId)
 
-      // R10: la pareja receta-producto es ENTIDAD PROPIA — tiene id propio, cantidad y
-      // unidad propias y sus marcas de tiempo. No es una tabla de union sin datos.
       const line = await tx.recipeLine.findUniqueOrThrow({ where: { id: lineId } })
       expect(line.id).toMatch(UUID_SHAPE)
       expect(line.recipeId).toBe(recipeId)
@@ -736,9 +602,7 @@ describe('estructura de la linea de receta', () => {
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
       const productId = await createProduct(tx)
 
-      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Dos unidades
-      // DISTINTAS, igual que antes eran dos textos distintos ('kg' y 'L'): lo que este caso
-      // demuestra es que el `@@unique(recipe_id, product_id)` no depende de la unidad.
+      // Unidades distintas: el unico `(recipe_id, product_id)` no depende de la unidad.
       const unitId = await createUnit(tx)
       const otraUnidad = await createUnit(tx, 'L')
       const firstLine = await createLine(tx, recipeId, productId, '1.0000', unitId)
@@ -756,7 +620,6 @@ describe('estructura de la linea de receta', () => {
       )
       expect(sqlState).toBe(UNIQUE_VIOLATION)
 
-      // «No crear ninguna fila»: la receta se queda con la linea que ya tenia.
       const lines = await tx.recipeLine.findMany({
         where: { recipeId },
         select: { id: true, unitId: true },
@@ -775,14 +638,11 @@ describe('estructura de la linea de receta', () => {
       const product2 = await createProduct(tx, 'Hidroxido de sodio')
       const product3 = await createProduct(tx, 'Colorante azul')
 
-      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Este caso no habla
-      // de la unidad: cada linea toma la suya del catalogo por el helper.
       await createLine(tx, recipeA, product1, '10.0000')
       await createLine(tx, recipeA, product2, '0.5000')
       await createLine(tx, recipeA, product3, '0.0100')
       await createLine(tx, recipeB, product1, '4.0000')
 
-      // Sin limite de lineas por receta: se cuentan SOLO las de esta receta.
       const linesOfA = await tx.recipeLine.findMany({
         where: { recipeId: recipeA },
         select: { productId: true },
@@ -791,7 +651,6 @@ describe('estructura de la linea de receta', () => {
         [product1, product2, product3].sort(),
       )
 
-      // Y el mismo producto aparece en las dos recetas sin estorbarse.
       const usesOfProduct1 = await tx.recipeLine.findMany({
         where: { productId: product1 },
         select: { recipeId: true },
@@ -819,8 +678,7 @@ describe('estructura de la linea de receta', () => {
       expect(byId.get(grande)?.toString()).toBe('1234567890.1234')
       expect(byId.get(minimo)?.toString()).toBe('0.0001')
 
-      // La misma comprobacion contra el texto que devuelve Postgres, sin pasar por el
-      // cliente: si la columna fuera de coma flotante, aqui se veria la deriva.
+      // Sin pasar por el cliente: si la columna fuera de coma flotante, aqui se veria la deriva.
       const asText = await tx.$queryRaw<{ id: string; cantidad: string }[]>`
         SELECT "id"::text AS id, "quantity"::text AS cantidad
         FROM "recipe_lines" WHERE "id" IN (${asUuid(grande)}, ${asUuid(minimo)})
@@ -840,9 +698,7 @@ describe('estructura de la linea de receta', () => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
       const productId = await createProduct(tx)
-      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La unidad se pone
-      // en los tres intentos, igual que antes se ponia 'kg', para que la UNICA razon posible
-      // del rechazo sea la cantidad y no una unidad que falta.
+      // Unidad valida en los tres intentos: la unica razon posible del rechazo es la cantidad.
       const unitId = await createUnit(tx)
 
       const cero = await expectRejectedByDatabase(
@@ -871,8 +727,7 @@ describe('estructura de la linea de receta', () => {
       )
       expect(negativa).toBe(CHECK_VIOLATION)
 
-      // Ausente: la columna es NOT NULL, asi que esto lo rechaza el NOT NULL (23502), no
-      // el CHECK. Solo se puede expresar con SQL crudo.
+      // Ausente la rechaza el NOT NULL, no el CHECK.
       const ausente = await expectRejectedByDatabase(
         tx,
         () =>
@@ -885,32 +740,20 @@ describe('estructura de la linea de receta', () => {
       )
       expect(ausente).toBe(NOT_NULL_VIOLATION)
 
-      // «No crear ni modificar ninguna fila»: la receta se queda sin ninguna linea.
       const lines = await tx.recipeLine.findMany({ where: { recipeId }, select: { id: true } })
       expect(lines).toEqual([])
     })
   })
 
   it('acepta cualquier unidad del catalogo, sin restriccion por producto, y rechaza la linea sin unidad', async () => {
-    // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Este caso cubria R15
-    // de QC-24, que decia «texto libre» porque el catalogo no existia. Esa mitad caduca. Lo
-    // que R15 vigilaba y SIGUE VIGENTE se conserva entero aqui:
-    //   - la unidad de la linea es OBLIGATORIA (QC-32 R11): sin ella, 23502;
-    //   - es ANOTATIVA (QC-32 R14): la base acepta CUALQUIER unidad del catalogo en
-    //     cualquier linea, no la deduce de la unidad del producto y no exige que coincidan
-    //     -por eso cada producto se crea con una unidad distinta de la de su linea-;
-    //   - y no hay ningun `enum` de Postgres del que tomarla: el catalogo es una tabla, que
-    //     se puede ampliar sin desplegar (QC-32 `design.md > 8.5`).
+    // Cada producto recibe una unidad distinta de la de su linea: la base no deduce una de la
+    // otra. Y el catalogo es una tabla, no un `enum`, para poder ampliarlo sin desplegar.
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
 
-      // Las cuatro formas de texto que este caso quiere cubrir —una corta, dos con espacios,
-      // una con barra y mayusculas— mas la ausencia. Desde QC-76 R15 el simbolo es unico dentro
-      // del ambito, y `'kg'` a secas chocaria con el `kilogramo` del arrancador, asi que cada
-      // una lleva el marcador del caso. Las FORMAS se conservan enteras, que es lo que se mide;
-      // `null` sigue tal cual porque el indice es parcial y varias unidades sin simbolo en el
-      // mismo ambito siguen siendo legales.
+      // Cada simbolo lleva marcador porque es unico dentro del ambito y `kg` ya esta en el
+      // arrancador. `null` puede repetirse: el indice es parcial.
       const symbols = [
         `kg ${marker}`,
         `gotas por litro ${marker}`,
@@ -920,15 +763,8 @@ describe('estructura de la linea de receta', () => {
       ]
       for (const symbol of symbols) {
         const unidadDeLaLinea = await createUnit(tx, symbol)
-        // Sin simbolo explicito: el helper lo deriva, asi que las cinco unidades de producto
-        // que crea este bucle ya no comparten `'kg'` entre ellas. Lo que el caso necesita
-        // sigue siendo lo mismo: que sea una unidad DISTINTA de la de la linea.
         const unidadDelProducto = await createUnit(tx)
-        // TRASLADADO EL 2026-09-11 POR QC-80 (R7, R22): el producto ya no declara unidad -la
-        // columna `products.unit_id` no existe-, la DERIVA de la presentacion de su lote mas
-        // reciente. Asi que la unidad distinta se le da por donde hoy se le da: una presentacion
-        // con esa unidad y un lote que la use. Lo que el caso vigila no cambia una coma: nada
-        // relaciona la unidad de la linea con la del producto.
+        // El producto no declara unidad: la toma de la presentacion de su lote mas reciente.
         const productId = await createProduct(tx, `Insumo ${symbol ?? 'sin simbolo'}`)
         const marcaPresentacion = token()
         const presentation = await tx.presentation.create({
@@ -946,6 +782,9 @@ describe('estructura de la linea de receta', () => {
             presentationId: presentation.id,
             stock: 1,
             unitCost: new Prisma.Decimal('1.0000'),
+            // `lot` es unico por empresa.
+            lot: `L-${randomUUID()}`,
+            purchaseDate: new Date('2026-09-01T00:00:00Z'),
             companyId: await inventoryCompanyOf(tx),
           },
           select: { id: true },
@@ -959,10 +798,6 @@ describe('estructura de la linea de receta', () => {
         expect(line.unitId).not.toBe(unidadDelProducto)
       }
 
-      // Pero es OBLIGATORIA. Lo era ya frente a la del producto (QC-32 R10, columna opcional);
-      // desde QC-80 el producto no declara unidad en absoluto (R21) y la de la presentacion es
-      // tambien obligatoria (R1), asi que la comparacion que daba sentido a esta frase se fue.
-      // Lo que la linea exige no cambia: sin unidad, 23502.
       const productoSinUnidad = await createProduct(tx, 'Insumo sin unidad de linea')
       const sqlState = await expectRejectedByDatabase(
         tx,
@@ -982,21 +817,8 @@ describe('estructura de la linea de receta', () => {
       })
       expect(survivors).toEqual([])
 
-      // Y el catalogo es una TABLA: no hay ningun tipo `enum` de Postgres de unidades.
-      //
-      // ACOTADO EL 2026-09-03 POR QC-33 (`specs/QC-33-modelo-pedidos/`). Antes se traian
-      // TODOS los tipos enum de `public` y se exigia `toEqual([])`: cero enums en la base
-      // entera. Esa mitad CADUCA — no habia ninguno el dia que se escribio, pero lo que esta
-      // afirmacion vigila es que EL CATALOGO DE UNIDADES sea una tabla ampliable sin
-      // desplegar (QC-32 `design.md > 8.5`), no que la base carezca de enums. QC-33 crea
-      // `OrderStatus` y `OrderPriority` por decision cerrada 4 del humano.
-      //
-      // Lo que SIGUE VIGENTE se conserva entero, y con el mismo `toEqual([])`: lo que se
-      // filtra es el SUJETO —los enums de unidades—, no la asercion. Muere igual que antes
-      // ante un `CREATE TYPE "Unit" AS ENUM (...)`, ante cualquier nombre con pinta de
-      // unidad, y ante un enum de otro nombre cuyas etiquetas sean unidades del catalogo.
-      // NO se filtra por los nombres de QC-33: eso ataria `recetas` a `pedidos`. Y las
-      // unidades no se escriben a mano, se leen de la tabla `units`.
+      // Otros modulos si tienen enums: se filtran los que parecen de unidades, por nombre o por
+      // etiquetas, y no por los nombres de los ajenos, que ataria este archivo a ellos.
       const enumTypes = await tx.$queryRaw<{ typname: string; labels: string[] }[]>`
         SELECT t.typname,
                array_remove(array_agg(e.enumlabel::text ORDER BY e.enumsortorder), NULL) AS labels
@@ -1025,10 +847,7 @@ describe('estructura de la linea de receta', () => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
       const productId = await createProduct(tx)
-      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. `trace` era un
-      // TEXTO de unidad inventado que servia de MARCA para reconocer despues las filas que
-      // los cuatro intentos habrian escrito. La marca sigue siendo la unidad -misma idea-,
-      // pero ahora es el id de una unidad creada para este test, porque `unit_id` tiene FK.
+      // La unidad propia del caso marca las filas que los cuatro intentos habrian escrito.
       const trace = await createUnit(tx)
 
       const sinReceta = await expectRejectedByDatabase(
@@ -1081,7 +900,6 @@ describe('estructura de la linea de receta', () => {
       )
       expect(productoInexistente).toBe(FOREIGN_KEY_VIOLATION)
 
-      // «No crear ninguna fila»: ninguno de los cuatro intentos dejo rastro.
       const survivors = await tx.recipeLine.findMany({
         where: { unitId: trace },
         select: { id: true },
@@ -1096,9 +914,8 @@ describe('frontera con inventario e identity: FK reales sin relacion de Prisma',
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
-      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. La unidad es
-      // VALIDA a proposito, igual que antes se ponia 'kg': asi la unica FK que puede
-      // dispararse es la del producto, que es lo que este caso demuestra.
+      // Unidad valida a proposito: en la linea, la unica FK que puede dispararse es la del
+      // producto.
       const unitId = await createUnit(tx)
 
       const productoFantasma = await expectRejectedByDatabase(
@@ -1126,21 +943,10 @@ describe('frontera con inventario e identity: FK reales sin relacion de Prisma',
       )
       expect(autorFantasma).toBe(FOREIGN_KEY_VIOLATION)
 
-      // El porque: las FK existen en la base aunque el esquema Prisma declare `product_id`,
-      // `unit_id`, `created_by` y `updated_by` como escalares sin `@relation`. La integridad
-      // la da Postgres; el ORM no puede atravesar la frontera con un `include`.
-      //
-      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Eran cuatro FK y
-      // son cinco. Se conserva entero lo que este caso vigila -la lista es CERRADA, asi que
-      // si una migracion futura se lleva una FK por drift, o alguien anade una relacion a
-      // escondidas, el test cae-, y la nueva `recipe_lines_unit_id_fkey` entra bajo el mismo
-      // criterio: escalar sin `@relation` en Prisma, FK de verdad en Postgres (QC-32 R18).
-      // El JOIN con `pg_namespace` acota la consulta al esquema `public` y NO es adorno:
-      // `pg_constraint` es global a la BASE, no al esquema. La base de pruebas es
-      // compartida y llego a tener un esquema espejo (`public_shadow_qc52`) con las
-      // mismas tablas; sin este filtro cada FK aparecia DOS veces. No sirve confiar en
-      // el `search_path` ni en `::regclass`, que solo cualifica cuando la tabla NO esta
-      // en el path: por eso el sintoma era tan confuso.
+      // Prisma declara estas columnas sin `@relation`: la integridad la da Postgres. Lista
+      // cerrada, para que una FK perdida por drift o anadida a escondidas ponga rojo el caso.
+      // `pg_constraint` abarca toda la base, no un esquema: sin acotar `public`, un esquema
+      // espejo con las mismas tablas duplicaria cada FK. `search_path` y `::regclass` no bastan.
       const foreignKeys = await tx.$queryRaw<{ conname: string; referencia: string }[]>`
         SELECT c.conname, ft.relname AS referencia
         FROM pg_constraint c
@@ -1187,7 +993,6 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       expect(recipe.createdBy).toBe(autor)
       expect(recipe.updatedBy).toBe(editor)
 
-      // «SI se intenta registrar como autor un usuario inexistente, DEBE rechazar».
       const altaConAutorInventado = await expectRejectedByDatabase(
         tx,
         () =>
@@ -1208,7 +1013,6 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       )
       expect(edicionConEditorInventado).toBe(FOREIGN_KEY_VIOLATION)
 
-      // Y la fila conserva la autoria buena despues de los dos rechazos.
       const afterRejects = await tx.recipe.findUniqueOrThrow({
         where: { id },
         select: { createdBy: true, updatedBy: true },
@@ -1222,21 +1026,19 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       const marker = token()
       const id = await createRecipe(tx, { name: `Importada ${marker}`, nameNormalized: marker })
 
-      // R33: `NULL` significa «no la creo una persona» (una importacion, un seed).
+      // `NULL` significa que no la creo una persona: una importacion, un seed.
       const recipe = await tx.recipe.findUniqueOrThrow({ where: { id } })
       expect(recipe.createdBy).toBeNull()
       expect(recipe.updatedBy).toBeNull()
       expect(recipe.createdBy).not.toBe('')
       expect(recipe.updatedBy).not.toBe('')
 
-      // Ausencia de verdad en la propia base, no una cadena vacia ni un uuid de relleno.
       const shape = await tx.$queryRaw<{ sin_autor: boolean; sin_editor: boolean }[]>`
         SELECT ("created_by" IS NULL) AS sin_autor, ("updated_by" IS NULL) AS sin_editor
         FROM "recipes" WHERE "id" = ${asUuid(id)}`
       expect(shape).toEqual([{ sin_autor: true, sin_editor: true }])
 
-      // Que sea anulable NO afloja la integridad: una FK solo verifica las filas CON
-      // valor, asi que un autor presente sigue teniendo que existir.
+      // Que sea anulable no afloja la integridad: la FK verifica toda fila con valor.
       const sqlState = await expectRejectedByDatabase(
         tx,
         () =>
@@ -1272,7 +1074,6 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       const recipe = await tx.recipe.findUniqueOrThrow({ where: { id } })
       expect(recipe.deletedAt).toBeInstanceOf(Date)
       expect(recipe.deletedAt?.getTime()).toBeGreaterThanOrEqual(antes.getTime() - 1000)
-      // Ningun dato se destruye: la fila sigue entera.
       expect(recipe.name).toBe(`Receta a borrar ${marker}`)
       expect(recipe.nameNormalized).toBe(marker)
       expect(recipe.description).toBe('Descripcion que no se puede perder')
@@ -1338,16 +1139,13 @@ describe('auditoria, borrado y marcas de tiempo', () => {
 
       await tx.recipeLine.delete({ where: { id: lineaQueSale } })
 
-      // R24: borrado FISICO de la linea, no una marca.
       expect(await tx.recipeLine.findUnique({ where: { id: lineaQueSale } })).toBeNull()
       const lines = await tx.recipeLine.findMany({ where: { recipeId }, select: { id: true } })
       expect(lines).toEqual([{ id: lineaQueQueda }])
 
-      // La receta y el producto siguen ahi: lo que se quito fue la linea.
       expect(await tx.recipe.findUnique({ where: { id: recipeId } })).not.toBeNull()
       expect(await tx.product.findUnique({ where: { id: productoQueSale } })).not.toBeNull()
 
-      // Y no hay ninguna marca de borrado logico de lineas donde esconderla.
       const softDeleteColumns = await tx.$queryRaw<{ column_name: string }[]>`
         SELECT column_name FROM information_schema.columns
         WHERE table_schema = 'public' AND table_name = 'recipe_lines'
@@ -1366,9 +1164,8 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       const line1 = await createLine(tx, recipeId, product1, '1.0000')
       const line2 = await createLine(tx, recipeId, product2, '2.0000')
 
-      // Borrado FISICO (una purga, un script, el `down.sql`): aqui si se dispara el
-      // CASCADE. En operacion normal el borrado es logico y ninguna FK reacciona a un
-      // UPDATE (`design.md` seccion 4.2).
+      // Solo un borrado fisico (una purga, un script) dispara el CASCADE: el normal es logico y
+      // ninguna FK reacciona a un UPDATE.
       await tx.recipe.delete({ where: { id: recipeId } })
 
       const survivors = await tx.recipeLine.findMany({
@@ -1387,9 +1184,7 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       const product1 = await createProduct(tx, 'Insumo 1')
       const product2 = await createProduct(tx, 'Insumo 2')
 
-      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Dos unidades
-      // distintas, como antes eran 'kg' y 'L'; el orden por unidad se mantiene solo para que
-      // las dos lecturas se comparen fila a fila, y hoy ordena por `unit_id`.
+      // Ordenar por `unit_id` solo sirve para comparar las dos lecturas fila a fila.
       const line1 = await createLine(tx, recipeId, product1, '10.5000', await createUnit(tx))
       const line2 = await createLine(tx, recipeId, product2, '0.2500', await createUnit(tx, 'L'))
       const antes = await tx.recipeLine.findMany({
@@ -1399,7 +1194,6 @@ describe('auditoria, borrado y marcas de tiempo', () => {
 
       await tx.recipe.update({ where: { id: recipeId }, data: { deletedAt: new Date() } })
 
-      // R26: las lineas siguen existiendo, sin modificar y asociadas a su receta.
       const despues = await tx.recipeLine.findMany({
         where: { recipeId },
         orderBy: { unitId: 'asc' },
@@ -1423,19 +1217,15 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       const unitId = await createUnit(tx)
       const lineId = await createLine(tx, recipeId, productId, '3.0000', unitId)
 
-      // El borrado de producto es LOGICO (QC-20 D5): un UPDATE, no un DELETE.
+      // El borrado de producto es logico: un UPDATE, no un DELETE.
       await tx.product.update({ where: { id: productId }, data: { deletedAt: new Date() } })
 
       const line = await tx.recipeLine.findUniqueOrThrow({ where: { id: lineId } })
       expect(line.productId).toBe(productId)
       expect(line.quantity.toString()).toBe('3')
-      // 2026-09-03, QC-32 decision cerrada 13: la unidad pasa a catalogo. Se conserva lo que
-      // el caso vigila -borrar logicamente el producto no toca NINGUN dato de la linea, su
-      // unidad incluida-, ahora sobre `unit_id`.
       expect(line.unitId).toBe(unitId)
 
-      // Y la fila del producto sigue existiendo, que es lo que hace que la linea no
-      // apunte al vacio (decision cerrada 13).
+      // Que la fila del producto siga existiendo es lo que evita que la linea apunte al vacio.
       const product = await tx.product.findUniqueOrThrow({ where: { id: productId } })
       expect(product.deletedAt).toBeInstanceOf(Date)
     })
@@ -1448,8 +1238,8 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       const productId = await createProduct(tx, 'Insumo en uso')
       const lineId = await createLine(tx, recipeId, productId, '1.0000')
 
-      // ON DELETE RESTRICT: existe para que un borrado fisico por consola o por script no
-      // deje lineas apuntando al vacio.
+      // El RESTRICT existe para que un borrado fisico por consola o script no deje lineas
+      // apuntando al vacio.
       const sqlState = await expectRejectedByDatabase(
         tx,
         () => tx.$executeRaw`DELETE FROM "products" WHERE "id" = ${asUuid(productId)}`,
@@ -1457,7 +1247,6 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       )
       expect(sqlState).toBe(FOREIGN_KEY_VIOLATION)
 
-      // Nada se movio: ni el producto ni la linea.
       expect(await tx.product.findUnique({ where: { id: productId } })).not.toBeNull()
       const line = await tx.recipeLine.findUniqueOrThrow({ where: { id: lineId } })
       expect(line.productId).toBe(productId)

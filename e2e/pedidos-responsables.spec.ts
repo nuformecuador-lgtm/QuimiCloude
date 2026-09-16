@@ -438,6 +438,9 @@ test.beforeAll(async () => {
       quantity: ORDER_QUANTITY,
       status: 'PENDIENTE',
       createdBy: adminUserId,
+      // QC-60: `orders.company_id` es obligatoria. La empresa de la sesion del recorrido, o el
+      // listado de ese administrador no traeria el pedido.
+      companyId,
     },
     select: { id: true, orderYear: true, orderSequence: true },
   });

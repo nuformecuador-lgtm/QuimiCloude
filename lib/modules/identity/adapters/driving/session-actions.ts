@@ -3,6 +3,7 @@
 import { identity, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
 import { IdentityError, type Actor } from '@/lib/modules/identity';
+import { runInRequestScope } from '@/lib/shared/request-scope';
 
 /**
  * QC-101 T1 — La Server Action del CIERRE DE SESIONES (`design.md > 1`; R1, R2, R5, R6).
@@ -76,10 +77,16 @@ const toErrorState = createErrorStateTranslator(IdentityError, observabilidad.re
  * deja de ser mecanica.
  */
 async function currentActor(): Promise<Actor | null> {
-  const [sessionUser, sessionContext] = await Promise.all([
-    identity.getSessionUser(),
-    identity.getSessionContext(),
-  ]);
+  // QC-104 R3: el ambito envuelve EXACTAMENTE este `Promise.all`, para que las dos caras
+  // compartan UNA sola lectura de la ficha de sesion en esta invocacion (`design.md > 2.6`).
+  //
+  // Este archivo es el NOVENO `currentActor`, y se quedo fuera de T4 porque entro con la
+  // sincronizacion con `dev` (QC-101) DESPUES del grep del hallazgo H4, que conto ocho. Lo
+  // encontro el reviewer. Por eso el caso que lo vigila ya no cuenta una lista escrita a mano:
+  // recorre el arbol (`session-once-per-request-actions.test.ts`).
+  const [sessionUser, sessionContext] = await runInRequestScope(() =>
+    Promise.all([identity.getSessionUser(), identity.getSessionContext()]),
+  );
   if (sessionUser === null || sessionContext === null) return null;
   return {
     id: sessionUser.id,

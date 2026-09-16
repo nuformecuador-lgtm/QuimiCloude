@@ -271,6 +271,85 @@ un import. El unico import de producto que habria que reescribir es `order-sheet
 `order-columns.tsx` y `order-responsibles.tsx` **no importan el componente**, al contrario de lo que
 suponia el desglose.
 
+## Sincronizacion con `dev`, 2026-09-16 (FASE 1, antes de retomar T4+)
+
+Retomado desde arbol limpio en HEAD `4a08623` (T1, T2, T3, T7, T17 ya cerradas). Se fusiono
+`origin/dev` -137 commits: QC-60 `aislamiento-por-empresa-en-pedidos`, QC-104 `sesion-una-sola-vez-
+por-peticion`, QC-81 `lote-y-fecha-de-compra`, QC-56- para poder retomar T4 en adelante contra la
+base real.
+
+**Merge:** `git fetch origin dev && git merge origin/dev`. **Un solo conflicto de texto**, `add/add`
+en `specs/QC-88-listado-de-pedidos-asignados/requirements.md`: `dev` traia el placeholder sembrado
+`_Pendiente: los escribe spec_author (F1.2)._` (de antes de que el spec se escribiera) y esta rama
+trae los 40 requisitos ya aprobados por el humano. **Resuelto quedandome con los de esta rama**: no
+es ambiguo, el placeholder es literalmente anterior al trabajo ya aprobado.
+
+**`db/schema.prisma` y `order-catalog-prisma.ts` NO dieron conflicto de texto**, al reves de lo que
+`design.md > 13` anticipaba. Motivo medido: la superficie de choque prevista era el metodo nuevo que
+T5 iba a escribir (`listAliveSummariesByIds`), y T5 **todavia no existe** en este HEAD (esta
+bloqueada por QC-60 desde la tanda anterior). Git fusiono limpio porque no habia nada mio que
+tocara esos archivos todavia.
+
+**Lo que SI cambio, medido tras el merge:**
+- `orders` **ya tiene `company_id`** (migracion `20260915120000_orders_company_scope`).
+- `findAliveOrderTargetById` -el UNICO metodo de `OrderCatalog` que existe hoy- **ya filtra por
+  empresa**: `orderCompanyScope({ companyId })` en `AND` (`order-catalog-prisma.ts:44`,
+  `./company-scope.ts`, nuevo). Su firma crecio a `(id, companyId)` y `OrderCatalog.findAliveById`
+  en el dominio la sigue.
+- **Filtro de empresa en la lectura de catalogo en lote (punto 4 del encargo):** `T4/T5
+  (listAliveSummariesByIds`, seccion `design.md > 6`) **siguen sin escribirse**, asi que no hay nada
+  que migrar todavia -no hubo "reescribir el metodo con el filtro que faltaba", porque el metodo no
+  existia-. Lo que se anoto, en `design.md > 6` y `> 13` y en `tasks.md > T4/T5`, con fecha: cuando
+  T4/T5 se escriban, **nacen ya acotadas por empresa** (`companyId` como primer parametro de
+  `listAliveSummariesByIds`, igual que `listOrderIdsByUserInCompany`, y `orderCompanyScope({
+  companyId })` en el `where` del adaptador junto a `id: { in }`, `status: { in }` y `deletedAt:
+  null`). El caso de uso (T6) ya tenia `actor.companyId` disponible en el paso 3 de `design.md >
+  5.1`; el paso 5 se actualizo para pasarlo tambien al catalogo.
+
+**Regresion de merge encontrada y corregida (no era un conflicto de texto, era semantica):**
+`tests/integration/asignaciones/assigned-orders.int.test.ts` (T3, ya cerrada) tenia un caso, «R8: la
+asignacion de OTRA empresa no vuelve…», que sembraba el pedido «ajeno» con `createOrder(fixture)`
+-companyId por defecto = `companyA`- y lo asignaba con un actor de `companyB`. Antes del merge
+`orders` no tenia `company_id` y esto daba igual; con QC-60 fusionado, `assignResponsibles` llama
+`orders.findAliveById(orderId, companyId)`, que ahora filtra por empresa, y el pedido "ajeno" no
+aparecia para la empresa B: `OrderNotFoundError` en vez del comportamiento esperado. **Fix**: el
+pedido ajeno nace con `{ companyId: fixture.companyB }` (la fixture ya tenia ese parametro,
+`OrderOptions.companyId`, para exactamente este caso). Se actualizo tambien la cabecera del archivo,
+que documentaba -correcto en su momento- que `orders` no tenia empresa. No se toco ningun otro
+`createOrder` del archivo: los demas ya usaban `companyA` para pedido y asignacion por igual.
+
+**Verificacion de la fase 1:**
+```
+pnpm exec prisma migrate deploy   -> "No pending migrations to apply." (las dos entraron con el merge)
+pnpm exec prisma migrate status   -> "Database schema is up to date!"
+pnpm exec prisma generate         -> OK (Prisma Client v6.19.3)
+
+pnpm typecheck -> VERDE (tsc --noEmit, sin salida)
+pnpm lint      -> VERDE (eslint, sin salida)
+
+pnpm exec vitest run tests/unit/pedidos tests/unit/asignaciones
+                     tests/guards/guard-ambito-empresa-pedidos.test.ts
+                     tests/guards/guard-identificador-de-request.test.ts
+ Test Files  58 passed (58)
+      Tests  988 passed | 3 skipped (991)
+
+pnpm exec vitest run tests/integration/pedidos tests/integration/asignaciones   (antes del fix)
+ Test Files  1 failed | 21 passed (22)
+      Tests  1 failed | 185 passed (186)      <- assigned-orders.int.test.ts, caso R8
+
+pnpm exec vitest run tests/integration/pedidos tests/integration/asignaciones   (despues del fix)
+ Test Files  22 passed (22)
+      Tests  186 passed (186)
+
+pnpm exec vitest run tests/guards
+ Test Files  36 passed (36)
+      Tests  403 passed | 5 skipped (408)
+```
+
+**No quedan tasks de esta feature abiertas por este merge.** T1-T3, T7 y T17 siguen cerradas y
+verdes contra la base sincronizada; T4 en adelante sigue bloqueada solo por lo que ya estaba
+bloqueada (nada nuevo lo bloquea). El leader corre el gate completo antes de dar paso a la fase 2.
+
 ## Nota de coordinacion, para que no se repita
 
 Dos subagentes escribiendo **en el mismo worktree a la vez** se pisaron: el de T4 reaplico sus

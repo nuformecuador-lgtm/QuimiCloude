@@ -21,9 +21,13 @@
  * Sin eso, «no vuelve» seria indistinguible de «no habia nada que devolver», que es justo la
  * confusion que R8 prohibe.
  *
- * LA EMPRESA ENTRA POR LA ASIGNACION, NO POR EL PEDIDO (hallazgo H4 de `design.md > 0`): `orders`
- * no tiene `company_id` —es la deuda de QC-60—, asi que `createOrder` no recibe empresa y no puede.
- * Lo que acota es `(user_id, company_id)` de `order_assignments`.
+ * LA EMPRESA ENTRA POR LA ASIGNACION, NO POR EL PEDIDO (hallazgo H4 de `design.md > 0`, escrito
+ * cuando `orders` todavia no tenia `company_id` -era la deuda de QC-60-). Lo que acota
+ * `listOrderIdsByUserInCompany` sigue siendo `(user_id, company_id)` de `order_assignments`, y esta
+ * ficha no cambia eso: R7/R8 se cumplen con o sin `orders.company_id` (design.md > 13). Ahora que
+ * QC-60 ya aterrizo, `createOrder` SI recibe empresa (`OrderOptions.companyId`), y hay que dar al
+ * pedido ajeno la de la asignacion ajena: `assign` resuelve el pedido con
+ * `findAliveById(id, companyId)`, que desde QC-60 tambien filtra por empresa.
  *
  * DESVIACION DECLARADA, y es del ESQUEMA, no del spec. «El mismo `user_id` con filas en DOS
  * empresas» **no se puede sembrar**: `order_assignments_user_id_fkey` es COMPUESTA
@@ -76,7 +80,11 @@ describe('asignaciones · los pedidos de una persona en su empresa (integracion)
       const repo = createOrderAssignmentRepository(fixture.tx);
 
       const pedidoPropio = await createOrder(fixture);
-      const pedidoAjeno = await createOrder(fixture);
+      // Tras QC-60 `orders` tambien lleva `company_id`: el pedido ajeno tiene que nacer en la
+      // empresa B para que la asignacion (tambien de B) sea coherente con su FK compuesta. Antes
+      // de QC-60 esto no hacia falta -de ahi la nota de la cabecera-; ahora `assign` resuelve el
+      // pedido con `findAliveById(id, companyId)` y lo rechazaria como inexistente si no coincide.
+      const pedidoAjeno = await createOrder(fixture, { companyId: fixture.companyB });
 
       const propia = await createPerson(fixture, fixture.companyA);
       const ajena = await createPerson(fixture, fixture.companyB);

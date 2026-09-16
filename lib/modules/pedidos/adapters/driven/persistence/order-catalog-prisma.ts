@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { orderCompanyScope } from './company-scope';
+
 import type { OrderStatus } from '../../../domain/order-classification';
 import type { OrderAssignmentTarget } from '../../../domain/order-catalog';
 
@@ -22,6 +24,9 @@ import type { OrderAssignmentTarget } from '../../../domain/order-catalog';
  * cruce -a mano y en un solo sitio- que hace `order-prisma.ts`, y lo vigila el caso de
  * `module-contract.test.ts` que compara valor a valor el enum del dominio con el de
  * `db/schema.prisma`.
+ *
+ * La empresa llega como cadena (ver `OrderCatalog` en `order-catalog.ts`) y se convierte aqui al
+ * `OrderScope` interno.
  */
 
 type OrderCatalogRow = {
@@ -36,9 +41,10 @@ export function toOrderAssignmentTarget(row: OrderCatalogRow): OrderAssignmentTa
 
 export async function findAliveOrderTargetById(
   id: string,
+  companyId: string,
 ): Promise<OrderAssignmentTarget | null> {
   const row = await prisma.order.findFirst({
-    where: { id, deletedAt: null },
+    where: { AND: [orderCompanyScope({ companyId }), { id, deletedAt: null }] },
     select: { id: true, status: true },
   });
 

@@ -69,6 +69,9 @@ const adaptadorFuente = read(
 // dominio, no un `string`. Antes eran objetos literales sin tipo y por eso el estado
 // inventado `'EN_PROCESO'` -que NO esta en `ORDER_STATUS_VALUES`- compilaba sin queja. Atado
 // asi, un estado que no exista en el enum pone el typecheck en rojo.
+/** QC-60: el catalogo se acota por empresa, asi que el doble recibe una y el `where` la lleva. */
+const EMPRESA = 'c-1'
+
 const PEDIDO_VIVO: OrderAssignmentTarget = { id: 'o-viva', status: 'PENDIENTE' }
 const PEDIDO_DE_BAJA: OrderAssignmentTarget = { id: 'o-baja', status: 'EN_CURSO' }
 
@@ -83,9 +86,15 @@ function baseConUnPedidoVivoYUnoDeBaja(): void {
       { fila: PEDIDO_VIVO, borrado: null as Date | null },
       { fila: PEDIDO_DE_BAJA, borrado: new Date('2026-03-03') },
     ]
-    const encontrada = filas.find((candidata) => candidata.fila.id === args.where.id)
+    // QC-60: el ambito entra como termino propio de un `AND`, nunca fundido con lo demas, asi
+    // que el doble aplana los terminos antes de decidir -igual que hace Postgres-.
+    const terminos = Array.isArray(args.where.AND)
+      ? (args.where.AND as readonly Record<string, unknown>[])
+      : [args.where]
+    const where: Record<string, unknown> = Object.assign({}, ...terminos)
+    const encontrada = filas.find((candidata) => candidata.fila.id === where.id)
     if (encontrada === undefined) return null
-    const filtraBorrados = 'deletedAt' in args.where && args.where.deletedAt === null
+    const filtraBorrados = 'deletedAt' in where && where.deletedAt === null
     if (filtraBorrados && encontrada.borrado !== null) return null
     return encontrada.fila
   })
@@ -101,7 +110,7 @@ describe('contrato OrderCatalog', () => {
     // `OrderAssignmentTarget` son SOLO TIPOS y desaparecen al compilar.
     expect(catalogoFuente).toMatch(/export interface OrderCatalog \{/)
     expect(catalogoFuente).toMatch(
-      /findAliveById\(id: string\): Promise<OrderAssignmentTarget \| null>/,
+      /findAliveById\(id: string, companyId: string\): Promise<OrderAssignmentTarget \| null>/,
     )
     expect(catalogoFuente).toMatch(/export type OrderAssignmentTarget = \{/)
     // El estado es el enum de QC-34 IMPORTADO, no una segunda lista copiada.
@@ -151,7 +160,7 @@ describe('findAliveOrderTargetById', () => {
   it('un pedido vivo vuelve como {id, status}', async () => {
     baseConUnPedidoVivoYUnoDeBaja()
 
-    await expect(findAliveOrderTargetById('o-viva')).resolves.toEqual({
+    await expect(findAliveOrderTargetById('o-viva', EMPRESA)).resolves.toEqual({
       id: 'o-viva',
       status: 'PENDIENTE',
     })
@@ -162,17 +171,19 @@ describe('findAliveOrderTargetById', () => {
 
     // MUTACION: si el adaptador quitara `deletedAt: null` del `where`, el doble devolveria la
     // fila de baja y esta asercion se pondria roja.
-    await expect(findAliveOrderTargetById('o-baja')).resolves.toBeNull()
-    await expect(findAliveOrderTargetById('o-fantasma')).resolves.toBeNull()
+    await expect(findAliveOrderTargetById('o-baja', EMPRESA)).resolves.toBeNull()
+    await expect(findAliveOrderTargetById('o-fantasma', EMPRESA)).resolves.toBeNull()
   })
 
   it('el filtro de vida va en el WHERE, no en un if posterior (R40)', async () => {
     baseConUnPedidoVivoYUnoDeBaja()
 
-    await findAliveOrderTargetById('o-viva')
+    await findAliveOrderTargetById('o-viva', EMPRESA)
 
     const args = findFirst.mock.calls[0]?.[0]
-    expect(args.where).toEqual({ id: 'o-viva', deletedAt: null })
+    expect(args.where).toEqual({
+      AND: [{ companyId: EMPRESA }, { id: 'o-viva', deletedAt: null }],
+    })
     // Y el `select` pide DOS columnas: el tipo publico no lleva ninguna mas.
     expect(args.select).toEqual({ id: true, status: true })
   })
@@ -180,7 +191,7 @@ describe('findAliveOrderTargetById', () => {
   it('hace UNA sola consulta', async () => {
     baseConUnPedidoVivoYUnoDeBaja()
 
-    await findAliveOrderTargetById('o-viva')
+    await findAliveOrderTargetById('o-viva', EMPRESA)
 
     expect(findFirst).toHaveBeenCalledTimes(1)
   })

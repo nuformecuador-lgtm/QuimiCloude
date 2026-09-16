@@ -10,10 +10,12 @@ import {
   type OrderStatus,
 } from '../../../domain/order-classification';
 
+import { companyScopeColumns, orderCompanyScope } from './company-scope';
 import { dateRangeCondition, numberRangeCondition, selectCondition } from './list-query-sql';
 
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
+import type { OrderScope } from '../../../domain/order-scope';
 import type { NewOrder, OrderRow } from '../../../domain/order-view';
 
 /**
@@ -94,158 +96,156 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
 }
 
 /**
- * SQLSTATE de un error de Postgres, leido del campo ESTRUCTURADO del conector y jamas del
- * texto humano del mensaje: en esta maquina Postgres responde en espanol (`design.md > 12`,
- * primer aviso al implementer). Mismo criterio -y misma tecnica- que `sqlStateOf` de
- * `lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts`.
- *
- * Un `$queryRaw` que viola una restriccion llega como `PrismaClientKnownRequestError` con
- * `code: 'P2010'` y el SQLSTATE en `meta.code`; algunas rutas del conector lo entregan como
- * `PrismaClientUnknownRequestError`, y entonces el codigo sigue estando incrustado y
- * estructurado en el mensaje del conector (`code: "23505"`), que no es texto traducible.
+ * SQLSTATE de un error de Postgres, leido del campo ESTRUCTURADO del conector y jamas del texto
+ * del mensaje: en esta maquina Postgres responde en espanol y el detalle del choque ni siquiera
+ * nombra la restriccion. Un `$queryRaw` que viola una restriccion llega como
+ * `PrismaClientKnownRequestError` con `code: 'P2010'` y el SQLSTATE en `meta.code`.
  */
 function sqlStateOf(error: unknown): string | null {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    const meta: unknown = error.meta;
-    if (typeof meta === 'object' && meta !== null && 'code' in meta) {
-      const code: unknown = (meta as { code: unknown }).code;
-      if (typeof code === 'string') return code;
-    }
-    return error.code;
-  }
-  if (error instanceof Prisma.PrismaClientUnknownRequestError) {
-    const match = /\bcode:\s*"(\d{5})"/.exec(error.message);
-    if (match !== null) return match[1] as string;
-  }
-  return null;
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return null;
+  const meta: unknown = error.meta;
+  if (typeof meta !== 'object' || meta === null || !('code' in meta)) return null;
+  const code: unknown = (meta as { code: unknown }).code;
+  return typeof code === 'string' ? code : null;
 }
 
-/** El indice unico del correlativo (QC-33 R21), declarado en `db/schema.prisma` con ese
- *  `map`. Es el UNICO `23505` que esta feature sabe traducir. */
-const ORDER_NUMBER_UNIQUE_INDEX = 'orders_order_year_order_sequence_key';
-
-/**
- * ¿Es este error el `23505` del indice unico del correlativo (`design.md > 4.2`)?
- *
- * Dos condiciones, y hacen falta las dos: el SQLSTATE -campo estructurado- tiene que ser
- * `23505`, y el NOMBRE DEL INDICE tiene que aparecer en la carga del error. Buscar el nombre
- * NO es decidir por el texto del mensaje: un nombre de restriccion es un identificador de la
- * base, Postgres nunca lo traduce, y es lo unico que distingue este unico de cualquier otro
- * que `orders` llegue a tener. Si el SQLSTATE es `23505` pero no se puede identificar el
- * indice, NO se asume: se relanza crudo, que es mejor que traducirlo mal (mismo criterio
- * conservador que `recipe-prisma.ts` y `supplier-prisma.ts`).
- */
+/** Duplicado del correlativo: SQLSTATE `23505`, sin leer texto. Es seguro solo porque se usa acotado
+ *  al `INSERT` de `createOrder`, que no escribe `id` (lo genera `gen_random_uuid()`): de los unicos
+ *  de `orders` solo puede chocar `orders_company_year_sequence_key`. */
 export function isDuplicateOrderNumber(error: unknown): boolean {
-  if (sqlStateOf(error) !== '23505') return false;
-  const meta: unknown = error instanceof Prisma.PrismaClientKnownRequestError ? error.meta : null;
-  const detalle =
-    typeof meta === 'object' && meta !== null && 'message' in meta
-      ? String((meta as { message: unknown }).message)
-      : '';
-  const bruto = error instanceof Error ? error.message : '';
-  return `${detalle}\n${bruto}`.includes(ORDER_NUMBER_UNIQUE_INDEX);
+  return sqlStateOf(error) === '23505';
 }
 
 /** Lo que devuelve el `RETURNING` del alta: el identificador y el correlativo que acaba de
- *  entregar la secuencia. Nada mas viaja de vuelta, porque nada mas lo decide la base. */
+ *  calcular el propio `INSERT`, `max(order_sequence) + 1` de esa empresa y ese ano bajo el lock
+ *  de aviso. Nada mas viaja de vuelta, porque nada mas lo decide la base. */
 type CreatedOrderRow = {
   readonly id: string;
   readonly order_year: number;
   readonly order_sequence: number;
 };
 
+/** Lock de DOS enteros: es otro espacio de claves que el `pg_advisory_lock(bigint)` de
+ *  `tests/helpers/test-database.ts`, asi que no pueden colisionar. */
+const ORDER_SEQUENCE_LOCK_NAMESPACE = 60;
+
+/** La EMPRESA y el ANO van en la clave del lock: dos empresas —o dos anos— no se hacen cola entre
+ *  si. */
+const ORDER_SEQUENCE_LOCK_KEY_PREFIX = 'orders_sequence:';
+
+/** Tres intentos y ni uno mas. El lock hace que el choque sea casi
+ *  imposible; el indice unico es la garantia. Reintentar sin techo convertiria un duplicado real
+ *  —por ejemplo el que insertara otra via— en un bucle infinito. */
+const CREATE_ORDER_MAX_ATTEMPTS = 3;
+
 /**
- * `create` de `OrderRepository` (R6, R8, R10, R11, R13).
+ * `create` de `OrderRepository`: SQL crudo en una transaccion, porque el maximo del correlativo
+ * tiene que evaluarse DENTRO del `INSERT`, sin ventana entre leerlo y escribirlo. Es la UNICA
+ * operacion del modulo que no usa la API tipada.
  *
- * UNA SOLA SENTENCIA, y va con `$queryRaw` -no con la API tipada- por un motivo concreto
- * (`design.md > 4.2`): `next_order_sequence($year)` tiene que evaluarse DENTRO del `INSERT`.
- * Leerla antes, en otro viaje, seria el mismo numero con dos idas y venidas y sin ganar nada.
- * Es la UNICA operacion del modulo que no usa la API tipada.
+ * El lock va en una sentencia APARTE y ANTERIOR: en `READ COMMITTED` cada sentencia toma su
+ * instantanea al empezar, asi que dentro del `INSERT` la sesion que espera leeria el mismo maximo
+ * que la que comitea. Es `xact` y se pide uno solo: se suelta al terminar y no puede interbloquear.
  *
- * UN SOLO RELOJ (R10): `created_at`, `updated_at` y el ANO del correlativo salen del MISMO
- * `now` que fijo el caso de uso. Si el ano se calculara de otro reloj -o se dejara el
- * `DEFAULT CURRENT_TIMESTAMP` de la columna-, un alta a las 23:59:59.999 UTC del 31 de
- * diciembre podria escribir un ano y una fecha de anos distintos y el `CHECK`
- * `orders_order_year_matches_created_at` (QC-33 R41) la rechazaria con `23514`. Es la trampa
- * que QC-33 dejo avisada por escrito.
+ * El maximo no filtra `deleted_at` ni el estado: un pedido borrado o cancelado conserva su numero,
+ * y los huecos existentes se conservan. La empresa del ambito va, parametrizada con `::uuid`, en la
+ * columna que se escribe y en el subselect del maximo.
  *
- * `created_by` Y `updated_by` se escriben con el MISMO `actorId` (R6): al nacer, el autor de
- * la creacion y el de la ultima modificacion son la misma persona. Ninguno de los dos sale de
- * la entrada.
+ * UN SOLO RELOJ: `created_at`, `updated_at` y el ANO salen del mismo `now`; con otro reloj, un alta
+ * en el cambio de ano violaria `orders_order_year_matches_created_at` con `23514`. `created_by` y
+ * `updated_by` llevan el mismo `actorId`, y el `status` va parametrizado porque lo decide el caso
+ * de uso.
  *
- * El `status` va PARAMETRIZADO con `data.status` y no como literal: quien decide el estado de
- * alta es el caso de uso (R9, `create-order.ts`), y `NewOrder.status` es
- * `EditableOrderStatus`, que no puede EXPRESAR la cancelacion (`design.md > 8`, capa 1). Un
- * literal aqui haria que este adaptador ignorara en silencio lo que el puerto recibe.
- *
- * Los parametros llevan CAST EXPLICITO porque en un `$queryRaw` no hay mapeo de Prisma que
- * los tipe: `::uuid`, `::numeric`, `::timestamptz` y los dos enums. Interpolacion de cadenas,
- * JAMAS: el template tag parametriza.
+ * El reintento va FUERA de `prisma.$transaction`: una transaccion abortada por el `23505` no
+ * admite ni una sentencia mas. Agotados los intentos, `'duplicate_number'`. Ninguna salida lleva
+ * `companyId`.
  */
 export async function createOrder(
   data: NewOrder,
   year: number,
   actorId: string,
   now: Date,
+  scope: OrderScope,
 ): Promise<OrderRow | 'duplicate_number'> {
-  try {
-    const filas = await prisma.$queryRaw<readonly CreatedOrderRow[]>`
-      INSERT INTO "orders" (
-        "order_year", "order_sequence", "recipe_id", "quantity",
-        "priority", "status", "created_by", "updated_by", "created_at", "updated_at"
-      ) VALUES (
-        ${year}::integer,
-        next_order_sequence(${year}::integer),
-        ${data.recipeId}::uuid,
-        ${data.quantity}::numeric,
-        ${data.priority}::"OrderPriority",
-        ${data.status}::"OrderStatus",
-        ${actorId}::uuid,
-        ${actorId}::uuid,
-        ${now}::timestamptz,
-        ${now}::timestamptz
-      )
-      RETURNING "id", "order_year", "order_sequence"
-    `;
+  const { companyId } = companyScopeColumns(scope);
+  const lockKey = `${ORDER_SEQUENCE_LOCK_KEY_PREFIX}${companyId}:${String(year)}`;
 
-    const fila = filas[0];
-    if (fila === undefined) {
-      // Un `INSERT ... RETURNING` que no devuelve fila no tiene lectura posible: no se
-      // inventa un pedido con id vacio, se propaga con contexto (`docs/conventions.md`).
-      throw new Error('El INSERT de pedido no devolvio ninguna fila.');
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const fila = await prisma.$transaction(async (tx) => {
+        // `$executeRaw` y no `$queryRaw`: `pg_advisory_xact_lock` devuelve `void`, y el cliente no
+        // sabe deserializar una columna de ese tipo.
+        await tx.$executeRaw(
+          Prisma.sql`SELECT pg_advisory_xact_lock(${ORDER_SEQUENCE_LOCK_NAMESPACE}::int, hashtext(${lockKey}::text))`,
+        );
+
+        const filas = await tx.$queryRaw<readonly CreatedOrderRow[]>(Prisma.sql`
+          INSERT INTO "orders" (
+            "company_id", "order_year", "order_sequence", "recipe_id", "quantity",
+            "priority", "status", "created_by", "updated_by", "created_at", "updated_at"
+          ) VALUES (
+            ${companyId}::uuid,
+            ${year}::integer,
+            (SELECT COALESCE(max("order_sequence"), 0) + 1
+               FROM "orders"
+              WHERE "company_id" = ${companyId}::uuid
+                AND "order_year" = ${year}::integer),
+            ${data.recipeId}::uuid,
+            ${data.quantity}::numeric,
+            ${data.priority}::"OrderPriority",
+            ${data.status}::"OrderStatus",
+            ${actorId}::uuid,
+            ${actorId}::uuid,
+            ${now}::timestamptz,
+            ${now}::timestamptz
+          )
+          RETURNING "id", "order_year", "order_sequence"
+        `);
+
+        const row = filas[0];
+        if (row === undefined) {
+          // Un `INSERT ... RETURNING` que no devuelve fila no tiene lectura posible: no se
+          // inventa un pedido con id vacio, se propaga con contexto (`docs/conventions.md`).
+          throw new Error('El INSERT de pedido no devolvio ninguna fila.');
+        }
+        return row;
+      });
+
+      // El resto de la fila es exactamente lo que se acaba de escribir, asi que no hace falta
+      // un segundo viaje para leerlo. Los importes se normalizan con la MISMA funcion que usa
+      // la lectura, para que el alta y la consulta no devuelvan dos formatos del mismo numero.
+      return {
+        id: fila.id,
+        number: { year: Number(fila.order_year), sequence: Number(fila.order_sequence) },
+        recipeId: data.recipeId,
+        quantity: fromDecimal(toDecimalInput(data.quantity)),
+        priority: data.priority,
+        status: data.status,
+        // El motivo solo existe en un pedido cancelado, y cancelar es `cancelAlive`.
+        cancellationReason: null,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: actorId,
+        updatedBy: actorId,
+      };
+    } catch (error) {
+      // Lo que no se sabe traducir se RELANZA: el dominio recibe un resultado DISCRIMINADO, jamas
+      // un SQLSTATE, y aqui no hay ni un `catch` vacio.
+      if (!isDuplicateOrderNumber(error)) throw error;
+      if (attempt >= CREATE_ORDER_MAX_ATTEMPTS) return 'duplicate_number';
     }
-
-    // El resto de la fila es exactamente lo que se acaba de escribir, asi que no hace falta
-    // un segundo viaje para leerlo. Los importes se normalizan con la MISMA funcion que usa
-    // la lectura, para que el alta y la consulta no devuelvan dos formatos del mismo numero.
-    return {
-      id: fila.id,
-      number: { year: Number(fila.order_year), sequence: Number(fila.order_sequence) },
-      recipeId: data.recipeId,
-      quantity: fromDecimal(toDecimalInput(data.quantity)),
-      priority: data.priority,
-      status: data.status,
-      // El motivo solo existe en un pedido cancelado, y cancelar es `cancelAlive` (R26, R30).
-      cancellationReason: null,
-      createdAt: now,
-      updatedAt: now,
-      createdBy: actorId,
-      updatedBy: actorId,
-    };
-  } catch (error) {
-    // R13, `design.md > 4.2`: en operacion normal la secuencia impide la colision; el indice
-    // es lo que impide el duplicado si alguien inserta por otra via. El dominio recibe un
-    // resultado DISCRIMINADO, jamas un SQLSTATE.
-    if (isDuplicateOrderNumber(error)) return 'duplicate_number';
-    throw error;
   }
 }
 
-/** `findAliveById` (R33, R40): `deleted_at IS NULL` en el `where`, no en un `if` posterior.
- *  Un pedido CANCELADO si vuelve -tiene estado propio precisamente para no desaparecer-. */
-export async function findAliveOrderById(id: string): Promise<OrderRow | null> {
+/** `findAliveById`: `deleted_at IS NULL` Y EL AMBITO en el `where`, no en un `if` posterior. Un
+ *  pedido de otra empresa vuelve como `null`, igual que uno que no existe. Un pedido CANCELADO si
+ *  vuelve -tiene estado propio precisamente para no desaparecer-. */
+export async function findAliveOrderById(
+  id: string,
+  scope: OrderScope,
+): Promise<OrderRow | null> {
   const row = await prisma.order.findFirst({
-    where: { id, deletedAt: null },
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
     select: ORDER_SELECT,
   });
   return row === null ? null : toOrderRow(row);
@@ -423,14 +423,16 @@ function orderFilterWhere(field: string, value: ListFilterValue): Prisma.OrderWh
  * NO hay capa de busqueda, y es el requisito: `orders` no tiene columna `name` (R17), asi que
  * la busqueda se omite y se registra en el caso de uso y aqui no llega nada que aplicar.
  */
-export function buildOrderWhere(query: ListQuery): Prisma.OrderWhereInput {
+export function buildOrderWhere(query: ListQuery, scope: OrderScope): Prisma.OrderWhereInput {
   const filters = Object.entries(query.filters)
     .map(([field, value]) => orderFilterWhere(field, value))
     .filter((condition): condition is Prisma.OrderWhereInput => condition !== null);
 
+  // El AMBITO va PRIMERO y en su propio termino del `AND`, al lado de `deletedAt: null` y ANTES de
+  // los filtros. NUNCA fundido con ellos ni al mismo nivel que un `OR`: un `OR` y el `companyId` en
+  // el mismo objeto dejarian que un filtro AMPLIE lo visible en vez de acotarlo.
   return {
-    deletedAt: null,
-    ...(filters.length === 0 ? {} : { AND: filters }),
+    AND: [orderCompanyScope(scope), { deletedAt: null }, ...filters],
   };
 }
 
@@ -451,9 +453,12 @@ export function buildOrderWhere(query: ListQuery): Prisma.OrderWhereInput {
  * `total` sale de un `count` con el MISMO `where` que el `findMany` (R14) -literalmente la
  * misma constante, no dos copias parecidas-.
  */
-export async function listAliveOrders(query: ListQuery): Promise<Page<OrderRow>> {
+export async function listAliveOrders(
+  query: ListQuery,
+  scope: OrderScope,
+): Promise<Page<OrderRow>> {
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
-  const where = buildOrderWhere(query);
+  const where = buildOrderWhere(query, scope);
 
   const [rows, total] = await Promise.all([
     prisma.order.findMany({
@@ -472,6 +477,9 @@ export async function listAliveOrders(query: ListQuery): Promise<Page<OrderRow>>
 /**
  * `updateAlive` (R6, R20, R33, R40).
  *
+ * El AMBITO viaja EN EL `where`, junto a `deletedAt: null`: un pedido de otra empresa no se
+ * actualiza y sale como `'not_found'`.
+ *
  * `updateMany` con `deletedAt: null` en el `where` y no `update`: si el pedido no existe o ya
  * esta borrado, `count` sale 0 y se devuelve `'not_found'` en vez de lanzar.
  *
@@ -488,9 +496,10 @@ export async function updateAliveOrder(
   data: NewOrder,
   actorId: string,
   now: Date,
+  scope: OrderScope,
 ): Promise<'ok' | 'not_found'> {
   const { count } = await prisma.order.updateMany({
-    where: { id, deletedAt: null },
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
     data: {
       recipeId: data.recipeId,
       quantity: toDecimalInput(data.quantity),
@@ -512,15 +521,19 @@ export async function updateAliveOrder(
  *
  * El motivo llega YA recortado y con el tope de 500 aplicado por `cancelOrderSchema` (R27):
  * aqui no se recorta, no se trunca y no se vuelve a validar nada.
+ *
+ * El AMBITO viaja EN EL `where`, junto a `deletedAt: null`: un pedido de otra empresa no se
+ * cancela y sale como `'not_found'`.
  */
 export async function cancelAliveOrder(
   id: string,
   reason: string,
   actorId: string,
   now: Date,
+  scope: OrderScope,
 ): Promise<'ok' | 'not_found'> {
   const { count } = await prisma.order.updateMany({
-    where: { id, deletedAt: null },
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
     data: {
       status: 'CANCELADO',
       cancellationReason: reason,
@@ -540,14 +553,17 @@ export async function cancelAliveOrder(
  * lo impide el `CHECK orders_delivered_not_deleted` en la base. Ese `23514` NO se traduce a
  * un resultado discriminado a proposito: significa que la comprobacion de aplicacion se
  * salto, y un error sin traducir es exactamente lo que hay que ver en ese caso.
+ *
+ * El AMBITO viaja EN EL `where`: un pedido de otra empresa no se borra y sale como `'not_found'`.
  */
 export async function softDeleteAliveOrder(
   id: string,
   actorId: string,
   now: Date,
+  scope: OrderScope,
 ): Promise<'ok' | 'not_found'> {
   const { count } = await prisma.order.updateMany({
-    where: { id, deletedAt: null },
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
     data: { deletedAt: now, updatedAt: now, updatedBy: actorId },
   });
   return count === 1 ? 'ok' : 'not_found';

@@ -11,6 +11,7 @@ import {
   type Actor,
   type CredentialRule,
 } from '@/lib/modules/identity';
+import { runInRequestScope } from '@/lib/shared/request-scope';
 // La ruta de la pagina publica de R17, para revalidarla despues de establecer la contrasena. Ya no
 // es una constante local: T19 la publico en `lib/shared/routes.ts` junto con la pagina, y es el
 // mismo literal del que cuelgan los dos transportes de correo al armar la URL del enlace.
@@ -125,10 +126,11 @@ const toErrorState = createErrorStateTranslator(IdentityError, observabilidad.re
  * **Esta funcion NO la usa la action publica**, y esa ausencia es R18.
  */
 async function currentActor(): Promise<Actor | null> {
-  const [sessionUser, sessionContext] = await Promise.all([
-    identity.getSessionUser(),
-    identity.getSessionContext(),
-  ]);
+  // QC-104 R3: el ambito envuelve EXACTAMENTE este `Promise.all`, para que las dos caras
+  // compartan UNA sola lectura de la ficha de sesion en esta invocacion (`design.md > 2.6`).
+  const [sessionUser, sessionContext] = await runInRequestScope(() =>
+    Promise.all([identity.getSessionUser(), identity.getSessionContext()]),
+  );
   if (sessionUser === null || sessionContext === null) return null;
   return {
     id: sessionUser.id,
