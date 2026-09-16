@@ -251,22 +251,36 @@ describe('QC-60 R16 — los seis casos de uso pasan al puerto el ambito DEL ACTO
     }
   })
 
-  it('la empresa que llega en la ENTRADA no cambia el ambito ni viaja al puerto (alta, edicion, listado)', async () => {
-    // R16/R22, la mitad «NO DEBE escribirla, NO DEBE tenerla en cuenta». La entrada trae la
-    // empresa B por todos los sitios por los que podria colarse; el actor es de A. Lo que llega
-    // al puerto no puede contener B en NINGUN argumento.
-    //
-    // La otra mitad de R22 -«DEBE rechazar la entrada por campo desconocido»- NO la cumple hoy
-    // `createOrderSchema`, que es `z.object` y DESCARTA la clave en silencio (lo fija
-    // `order-input.test.ts`). Esta pendiente de decision y va en el informe de T16; este caso se
-    // escribe para seguir en verde tanto si se decide descartar como si se decide rechazar: lo
-    // que NO admite es que B llegue al puerto.
+  it('el alta con la empresa de OTRA en la entrada resuelve, escribe en la empresa del actor y no pasa la empresa de la entrada al puerto', async () => {
+    // La empresa que se escribe es la del actor. La que traiga la entrada se descarta como
+    // cualquier clave desconocida del alta: ni se escribe, ni se tiene en cuenta, ni provoca un
+    // rechazo.
+    const a = almacen()
+    const c = casosDeUso(a)
+
+    await expect(
+      c.createOrder({ ...ENTRADA_ALTA, companyId: EMPRESA_B, company_id: EMPRESA_B }, ACTOR_A),
+    ).resolves.toBeDefined()
+
+    expect(a.espias.create).toHaveBeenCalledTimes(1)
+    const args = a.espias.create.mock.calls[0] as unknown as readonly unknown[]
+    expect(args[args.length - 1], 'ambito que llega a create').toStrictEqual({ companyId: EMPRESA_A })
+
+    const datos = args[0]
+    expect(typeof datos === 'object' && datos !== null, 'los datos del alta son un objeto').toBe(true)
+    expect(datos, 'los datos del alta no llevan companyId').not.toHaveProperty('companyId')
+    expect(datos, 'los datos del alta no llevan company_id').not.toHaveProperty('company_id')
+    expect(JSON.stringify(args), 'la empresa de la entrada llego al puerto').not.toContain(EMPRESA_B)
+
+    expect(a.altas, 'la fila dada de alta es de la empresa del actor').toEqual([{ companyId: EMPRESA_A }])
+  })
+
+  it('la empresa que llega en la entrada de la edicion o del listado no cambia el ambito ni viaja al puerto', async () => {
     const a = almacen()
     const c = casosDeUso(a)
 
     const conEmpresa = { companyId: EMPRESA_B, company_id: EMPRESA_B }
     const resultados = await Promise.all([
-      capturar(c.createOrder({ ...ENTRADA_ALTA, ...conEmpresa }, ACTOR_A)),
       capturar(c.updateOrder(PEDIDO_DE_A, { ...ENTRADA_EDICION, ...conEmpresa }, ACTOR_A)),
       capturar(
         c.listOrders(
@@ -276,18 +290,17 @@ describe('QC-60 R16 — los seis casos de uso pasan al puerto el ambito DEL ACTO
       ),
     ])
 
-    for (const error of resultados) {
-      // O se acepto (y entonces el ambito es A) o se rechazo POR ENTRADA. Nunca otra cosa.
-      if (error !== null) expect(error).toBeInstanceOf(ValidationError)
-    }
+    const [errorDeEdicion, errorDeListado] = resultados
+    expect(errorDeEdicion, 'la edicion resuelve').toBeNull()
+    // El listado rechaza un filtro por una columna que no ofrece; si lo acepta, el ambito sigue
+    // siendo el del actor.
+    if (errorDeListado !== null) expect(errorDeListado).toBeInstanceOf(ValidationError)
     expect(JSON.stringify(llamadasAlPuerto(a)), 'la empresa de la entrada llego al puerto').not.toContain(
       EMPRESA_B,
     )
     for (const [metodo, args] of llamadasAlPuerto(a)) {
       expect(args[args.length - 1], metodo).toStrictEqual({ companyId: EMPRESA_A })
     }
-    // Y el alta, si se hizo, se escribio en A.
-    for (const alta of a.altas) expect(alta).toEqual({ companyId: EMPRESA_A })
   })
 })
 
