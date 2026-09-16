@@ -478,9 +478,8 @@ describe('contrato de la ruta de recetas', () => {
   });
 
   it('R2, R3: la lista no puede pintar quien creo o modifico una receta ni su descripcion', () => {
-    // R9 — test **en negativo** sobre la fuente: lo prohibido es LEERLO o DECLARARLO como
-    // columna, no nombrarlo -la declaracion de columnas nombra los dos campos justamente para
-    // EXCLUIRLOS del tipo, y una prohibicion ciega borraria esa defensa al primer cambio-.
+    // Lo prohibido es leer o declarar esos campos como columna, no nombrarlos: la declaracion de
+    // columnas los nombra justo para excluirlos del tipo.
     ningunArchivoContiene([
       '.createdBy',
       '.updatedBy',
