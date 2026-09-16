@@ -463,6 +463,9 @@ describe('el pedido como fila completa', () => {
       // que esa ficha puede anadir a `orders`. Aparece la PRIMERA porque el `sort()` es
       // lexicografico y 'ca' < 'cr'. Sigue sin haber total, subtotal, impuesto ni cliente.
       'cancellation_reason',
+      // `company_id` la anade QC-60 (R1): la empresa del pedido. No es un total, un impuesto ni un
+      // cliente. Va entre las dos por el mismo `sort()` lexicografico ('ca' < 'co' < 'cr').
+      'company_id',
       'created_at',
       'created_by',
       'deleted_at',

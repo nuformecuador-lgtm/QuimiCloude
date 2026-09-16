@@ -173,7 +173,7 @@
   Depende de: T4.
   Cubre: R1, R2, R6, R7, R11, R13, R25.
 
-- [ ] **T13 — Integración: listado, escrituras y correlativo por empresa.** `[P]`
+- [x] **T13 — Integración: listado, escrituras y correlativo por empresa.** `[P]`
   Archivos: `tests/integration/pedidos/company-scope-queries.int.test.ts` (nuevo, declarado en
   `aislamiento.json`).
   Contenido: con pedidos de dos empresas sembrados, el listado devuelve solo los suyos **y el `total`
@@ -186,7 +186,7 @@
   Depende de: T9.
   Cubre: R12, R19, R21, R22, R23, R24, R29, R30, R34.
 
-- [ ] **T14 — Integración: la carrera del correlativo.** `[P]`
+- [x] **T14 — Integración: la carrera del correlativo.** `[P]`
   Archivos: el mismo `company-scope-queries.int.test.ts` (bloque propio) o
   `tests/integration/pedidos/order-sequence-race.int.test.ts`, declarado en `aislamiento.json`.
   Contenido: el patrón medido de QC-81 §8 — varias rondas de altas simultáneas de la **misma**
