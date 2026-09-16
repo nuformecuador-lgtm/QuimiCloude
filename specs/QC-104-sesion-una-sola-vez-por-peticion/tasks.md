@@ -87,7 +87,7 @@
 
 ## Tanda 2 — el conteo del gate
 
-- [ ] **T5 — Conteo por pantalla (R1, R2, R9, R10, R12, R14, R15).** Depende de T3 y T4.
+- [x] **T5 — Conteo por pantalla (R1, R2, R9, R10, R12, R14, R15).** Depende de T3 y T4.
       Archivos: `tests/unit/identity/session-once-per-request-render.test.tsx` (nuevo).
       Montaje y casos de `design.md > 5.2`:
       - composicion real importada una vez en `beforeAll` con plazo propio;
