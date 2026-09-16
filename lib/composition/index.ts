@@ -270,6 +270,7 @@ import { findAliveOrderTargetById } from '@/lib/modules/pedidos/adapters/driven/
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity';
+import { requestScoped } from '@/lib/shared/request-scope';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
 // QC-19: una sola instancia de la politica, la misma que se expone en la fachada y la que
@@ -299,6 +300,11 @@ const resolveSession = createResolveSession({
   users: sessionUserReader,
   log: sessionCheckLog,
 });
+// QC-104 T3 (R1, R12, `design.md > 2.5`): la sesion se resuelve UNA sola vez por peticion, y las
+// DOS proyecciones de abajo salen de esa MISMA lectura —asi el identificador del usuario y el de
+// su contexto no pueden discrepar (R12)—. Fuera de una peticion NO se memoiza nada y cada llamada
+// lee, que es lo que protege al inicio de sesion (R7, `design.md > 2.7`).
+const resolveSessionOncePerRequest = requestScoped(() => resolveSession());
 // ---------------------------------------------------------------------------------------
 // QC-23 T17 (`design.md > 8`) — el cableado de la revocacion de sesiones. Bloque NUEVO: no
 // reordena ni reformatea ninguna de las lineas de arriba. `resolveSession` se sigue
@@ -325,9 +331,9 @@ const sessionEraser: SessionEraser = { clear: clearSession };
 const sessionRevocations: SessionRevocationRepository = { revokeSession, stampAll };
 
 const sessionProvider: SessionProvider = {
-  getSessionUser: async () => (await resolveSession())?.user ?? null,
+  getSessionUser: async () => (await resolveSessionOncePerRequest())?.user ?? null,
   // R19: `null` en exactamente los mismos casos que `getSessionUser`, por construccion.
-  getSessionContext: async () => (await resolveSession())?.context ?? null,
+  getSessionContext: async () => (await resolveSessionOncePerRequest())?.context ?? null,
   // QC-23 T17 (R20-R24, `design.md > 5.1`): `endSession` DEJA DE SER un cableado directo a
   // `clearSession` y pasa a ser el CASO DE USO, que lee el `sid` en curso, registra su cierre
   // -y purga de paso las caducadas de esa persona- y despues retira la cookie, siempre.

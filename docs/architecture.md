@@ -412,6 +412,19 @@ redirige si no la hay. Ademas **filtra el menu** con los permisos de esa misma l
 servidor: un item para el que no hay permiso no viaja en el HTML. El middleware ahorra render y da
 la vuelta rapida; no es la unica puerta.
 
+**Esa lectura es una sola por peticion** (QC-104): el layout, el corte por permiso de la pagina y
+las Server Actions que esos componentes invocan mientras se pintan comparten **la misma** lectura de
+sesion en vez de repetirla cada uno por su cuenta, y lo compartido muere con la peticion —**nunca**
+se reutiliza entre peticiones, porque una sesion revocada no puede sobrevivir a la peticion en que
+se leyo—. Lo que esta probado es el **conteo**: sendos **tests del gate** —en `tests/unit/`, no en
+`tests/guards/`: los selecciona el grafo de imports, no el barrido de guardias— fallan si una
+pantalla, o una Server Action de las que resuelven a la vez el usuario y la empresa, supera **una**
+lectura de sesion. La lista de esas acciones **no se escribe a mano**: el test **lee el disco** —los
+modulos salen de `readdirSync` de `lib/modules/`, y de cada uno recorre `adapters/driving/` **en
+profundidad**— y se pone rojo si aparece una accion con las dos caras de la sesion fuera de la lista
+o sin ambito. Asi se detecta la que llegue en el proximo merge, aunque venga en un **modulo nuevo**
+o en una **subcarpeta**.
+
 **Ni el borde ni la pagina son la frontera de autorizacion.** `## Acceso a datos y autorizacion`
 sigue mandando: la **autorizacion se valida en el service**, antes de tocar el repositorio. El rol
 que viaja firmado en la cookie **no autoriza** nada; es un dato de presentacion (el nombre que

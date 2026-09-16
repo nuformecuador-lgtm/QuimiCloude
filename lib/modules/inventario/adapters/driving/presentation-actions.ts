@@ -8,6 +8,7 @@ import {
   type Page,
   type PresentationView,
 } from '@/lib/modules/inventario';
+import { runInRequestScope } from '@/lib/shared/request-scope';
 
 /**
  * Server Actions del catalogo de presentacion (T12, R29). Mismo patron que
@@ -64,10 +65,11 @@ const toErrorState = createErrorStateTranslator(InventarioError, observabilidad.
  * nunca sale del `FormData`. El razonamiento completo esta en `product-actions.ts`.
  */
 async function currentActor(): Promise<Actor | null> {
-  const [sessionUser, sessionContext] = await Promise.all([
-    identity.getSessionUser(),
-    identity.getSessionContext(),
-  ]);
+  // QC-104 R3: el ambito envuelve EXACTAMENTE este `Promise.all`, para que las dos caras
+  // compartan UNA sola lectura de la ficha de sesion en esta invocacion (`design.md > 2.6`).
+  const [sessionUser, sessionContext] = await runInRequestScope(() =>
+    Promise.all([identity.getSessionUser(), identity.getSessionContext()]),
+  );
   if (sessionUser === null || sessionContext === null) return null;
   return {
     id: sessionUser.id,
