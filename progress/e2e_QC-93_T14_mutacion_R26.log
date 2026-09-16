@@ -1,0 +1,118 @@
+2026-09-15T11:21:50-05:00
+e40203bcd113d17eee507d035a4fe21d8b78689f
+T14 (f): mutacion -> el rol efimero recibe inventario.consultar en su role.create; solo el caso R4 (-g), chromium + webkit
+mutacion aplicada: 1
+-      name: noPermissionsRoleName,
++      name: noPermissionsRoleName, permissions: { create: [{ permissionCode: 'inventario.consultar' }] },
+[WebServer] ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+[WebServer] 
+[WebServer]   To migrate automatically, run:
+[WebServer]   npx @next/codemod@canary middleware-to-proxy .
+[WebServer] 
+[WebServer]   Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+Running 2 tests using 2 workers
+
+  ✘  1 [chromium] › e2e\inventario.spec.ts:606:7 › catalogo de productos › un usuario sin inventario.consultar recibe 404 dentro del layout privado y no ve el catalogo (R4) (278ms)
+  ✘  2 [webkit] › e2e\inventario.spec.ts:606:7 › catalogo de productos › un usuario sin inventario.consultar recibe 404 dentro del layout privado y no ve el catalogo (R4) (569ms)
+
+
+  1) [chromium] › e2e\inventario.spec.ts:606:7 › catalogo de productos › un usuario sin inventario.consultar recibe 404 dentro del layout privado y no ve el catalogo (R4) 
+
+    Error: la premisa del caso: si el usuario tuviera inventario.consultar, este caso no comprobaria su titulo
+
+    expect(received).not.toContain(expected) // indexOf
+
+    Expected value: not "inventario.consultar"
+    Received array:     ["inventario.consultar"]
+
+      612 |       await permissionsForUsername(noInventoryUser.username),
+      613 |       'la premisa del caso: si el usuario tuviera inventario.consultar, este caso no comprobaria su titulo',
+    > 614 |     ).not.toContain('inventario.consultar');
+          |           ^
+      615 |
+      616 |     // El aterrizaje NO se escribe aqui: lo deriva el helper de sus permisos reales (QC-93 R11).
+      617 |     const landing = await loginAndLand(page, noInventoryUser);
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:614:11
+
+    PrismaClientKnownRequestError: 
+    Invalid `prisma.role.deleteMany()` invocation in
+    C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:400:23
+
+      397   }),
+      398 // El rol efimero, DESPUES de los usuarios (`users.role_id` es `onDelete: Restrict`) y ANTES de
+      399 // la empresa. Por su nombre EXACTO, nunca por el prefijo (QC-93 R27).
+    → 400 () => prisma.role.deleteMany(
+    Foreign key constraint violated on the (not available)
+
+      398 |     // El rol efimero, DESPUES de los usuarios (`users.role_id` es `onDelete: Restrict`) y ANTES de
+      399 |     // la empresa. Por su nombre EXACTO, nunca por el prefijo (QC-93 R27).
+    > 400 |     () => prisma.role.deleteMany({ where: { name: noPermissionsRoleName } }),
+          |                       ^
+      401 |     // La empresa, DESPUES de los usuarios: `users.company_id` es `onDelete: Restrict`
+      402 |     // (QC-47 R11). Por el nombre EXACTO de ESTE worker, nunca por el prefijo.
+      403 |     () => prisma.company.deleteMany({ where: { name: companyName } }),
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:400:23
+        at ei.handleRequestError (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:228:13)
+        at ei.handleAndLogRequestError (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:174:12)
+        at ei.request (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:143:12)
+        at a (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:833:24)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:410:7
+
+    Error Context: test-results\inventario-catalogo-de-pro-9d646-ado-y-no-ve-el-catalogo-R4--chromium\error-context.md
+
+    Error Context: test-results\inventario-catalogo-de-pro-9d646-ado-y-no-ve-el-catalogo-R4--chromium\error-context.md
+
+  2) [webkit] › e2e\inventario.spec.ts:606:7 › catalogo de productos › un usuario sin inventario.consultar recibe 404 dentro del layout privado y no ve el catalogo (R4) 
+
+    Error: la premisa del caso: si el usuario tuviera inventario.consultar, este caso no comprobaria su titulo
+
+    expect(received).not.toContain(expected) // indexOf
+
+    Expected value: not "inventario.consultar"
+    Received array:     ["inventario.consultar"]
+
+      612 |       await permissionsForUsername(noInventoryUser.username),
+      613 |       'la premisa del caso: si el usuario tuviera inventario.consultar, este caso no comprobaria su titulo',
+    > 614 |     ).not.toContain('inventario.consultar');
+          |           ^
+      615 |
+      616 |     // El aterrizaje NO se escribe aqui: lo deriva el helper de sus permisos reales (QC-93 R11).
+      617 |     const landing = await loginAndLand(page, noInventoryUser);
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:614:11
+
+    PrismaClientKnownRequestError: 
+    Invalid `prisma.role.deleteMany()` invocation in
+    C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:400:23
+
+      397   }),
+      398 // El rol efimero, DESPUES de los usuarios (`users.role_id` es `onDelete: Restrict`) y ANTES de
+      399 // la empresa. Por su nombre EXACTO, nunca por el prefijo (QC-93 R27).
+    → 400 () => prisma.role.deleteMany(
+    Foreign key constraint violated on the (not available)
+
+      398 |     // El rol efimero, DESPUES de los usuarios (`users.role_id` es `onDelete: Restrict`) y ANTES de
+      399 |     // la empresa. Por su nombre EXACTO, nunca por el prefijo (QC-93 R27).
+    > 400 |     () => prisma.role.deleteMany({ where: { name: noPermissionsRoleName } }),
+          |                       ^
+      401 |     // La empresa, DESPUES de los usuarios: `users.company_id` es `onDelete: Restrict`
+      402 |     // (QC-47 R11). Por el nombre EXACTO de ESTE worker, nunca por el prefijo.
+      403 |     () => prisma.company.deleteMany({ where: { name: companyName } }),
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:400:23
+        at ei.handleRequestError (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:228:13)
+        at ei.handleAndLogRequestError (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:174:12)
+        at ei.request (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\RequestHandler.ts:143:12)
+        at a (C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\node_modules\.pnpm\@prisma+client@6.19.3_prism_1d040ab5215f59f0e27ddee7f0cf082e\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:833:24)
+        at C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-93-aterrizaje-sin-permiso-de-modulo\e2e\inventario.spec.ts:410:7
+
+    Error Context: test-results\inventario-catalogo-de-pro-9d646-ado-y-no-ve-el-catalogo-R4--webkit\error-context.md
+
+    Error Context: test-results\inventario-catalogo-de-pro-9d646-ado-y-no-ve-el-catalogo-R4--webkit\error-context.md
+
+  2 failed
+    [chromium] › e2e\inventario.spec.ts:606:7 › catalogo de productos › un usuario sin inventario.consultar recibe 404 dentro del layout privado y no ve el catalogo (R4) 
+    [webkit] › e2e\inventario.spec.ts:606:7 › catalogo de productos › un usuario sin inventario.consultar recibe 404 dentro del layout privado y no ve el catalogo (R4) 
+EXIT=1
+restaurado con cp
+git diff --stat -- e2e/inventario.spec.ts (debe estar vacio): []
+2026-09-15T11:22:01-05:00

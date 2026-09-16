@@ -123,6 +123,11 @@
       "desde": "2026-09-12"
     },
     {
+      "archivo": "inventario/product-batch-lot.int.test.ts",
+      "motivo": "Nacido con QC-77 ya en pie (QC-81 T8): ejercita 'createWithFirstBatch' y 'addBatchToAlive' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL y abren SU PROPIA 'prisma.$transaction' por intento -con el 'pg_advisory_xact_lock' del correlativo dentro-, asi que envolverlos en una transaccion del test seria un aislamiento de mentira: correrian en otra conexion del pool. La carrera (R14) necesita ademas que cada alta CONFIRME para que la siguiente vea su lote. Cada caso fabrica su empresa efimera con randomUUID, escribe solo en ella y la limpia en un 'finally' en orden de FK (lotes -> productos -> presentacion -> usuario -> rol y tipo de documento -> empresa). Los casos de la migracion no tocan 'public.product_batches': trabajan en un esquema de usar y tirar que borran con DROP SCHEMA CASCADE. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-15"
+    },
+    {
       "archivo": "inventario/product-crud.int.test.ts",
       "motivo": "Nacido antes de QC-77 (QC-20): su cabecera dice que el adaptador 'product-prisma.ts' llama al cliente Prisma GLOBAL y que por eso cada caso crea sus datos y los borra en un finally por su id exacto. AVISO APARTE: este archivo esta hoy en tests/baseline-rojos.json por un flake de saturacion documentado en QC-58; eso es otra cosa distinta del aislamiento y se sigue alli.",
       "desde": "2026-09-12"

@@ -27,6 +27,7 @@ export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
 // ordenar y filtrar. Se publica la lista blanca -como ya hacia `pedidos` con la suya- para que la
 // pantalla la compruebe contra el contrato en vez de contra una copia escrita a mano.
 export { SUPPLIER_CATALOG_LINE_QUERYABLE } from './domain/supplier-catalog-line-queryable';
+export { SUPPLIER_QUERYABLE } from './domain/supplier-queryable';
 export { normalizeSupplierName } from './domain/supplier-name';
 export {
   createSupplierSchema,

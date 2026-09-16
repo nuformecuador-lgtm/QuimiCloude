@@ -145,6 +145,18 @@ vi.mock('@/lib/modules/identity/adapters/driving/role-actions', () => ({
   listRolesAction: listRolesActionMock,
 }));
 
+// QC-101 T7 — La Server Action del CIERRE DE SESIONES, doble que FALLA si se la llama.
+//
+// Mismo motivo que el bloque de grupos: el panel de detalle monta ahora el dialogo del cierre de
+// sesiones, y `session-actions.ts` lee `observabilidad` de `@/lib/composition` al cargarse —y el
+// doble de composicion de este archivo declara solo `identity`—. Pintar la pantalla no cierra la
+// sesion de nadie: si alguien la llamara, el caso se pondria rojo.
+vi.mock('@/lib/modules/identity/adapters/driving/session-actions', () => ({
+  endAllSessionsAction: vi.fn(() => {
+    throw new Error('endAllSessionsAction no debe invocarse al pintar la pantalla');
+  }),
+}));
+
 // QC-85 T7 — Las SIETE Server Actions de GRUPOS, dobles que FALLAN si se les llama.
 //
 // **No es un cambio de guion de este archivo**: no toca ni un `test(...)`, ni un selector, ni una

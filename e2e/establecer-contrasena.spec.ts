@@ -61,7 +61,10 @@ import { errorMessage } from '@/lib/modules/errores';
 // codigo de documento del conjunto cerrado de QC-4. Ninguno se escribe a mano.
 import { DOCUMENT_TYPE_CC, normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
-import { CREDENTIAL_SETUP_ROUTE, DASHBOARD_ROUTE } from '@/lib/shared/routes';
+import { CREDENTIAL_SETUP_ROUTE } from '@/lib/shared/routes';
+
+// QC-93 (R8): el aterrizaje tras el login se deriva de los permisos del usuario en el helper unico.
+import { loginAndLand } from './helpers/landing';
 
 /** Ruta publica del login (QC-10), como en `login.spec.ts`: no hay constante para ella. */
 const LOGIN_PATH = '/login';
@@ -271,13 +274,10 @@ test.describe('establecer la contrasena desde el enlace del correo', () => {
     await page.getByTestId('set-credential-login-link').click();
     await page.waitForURL((url) => url.pathname === LOGIN_PATH, { timeout: 120_000 });
 
-    await page.getByTestId('login-username').fill(username);
-    await page.getByTestId('login-password').fill(NEW_CREDENTIAL);
-    await page.getByTestId('login-submit').click();
-
-    // Se espera por la RUTA, como en `login.spec.ts`: lo que se afirma es el destino, no lo que se
-    // pinte en el.
-    await page.waitForURL((url) => url.pathname === DASHBOARD_ROUTE, { timeout: 120_000 });
+    // La entrada y la espera del destino las hace el helper unico (QC-93 R8): el destino se DERIVA
+    // de los permisos que el usuario tiene en la base, no se escribe aqui. Lo que se afirma sigue
+    // siendo la ruta, no lo que se pinte en ella.
+    await loginAndLand(page, { username, password: NEW_CREDENTIAL });
 
     // --- 6. EL MISMO ENLACE YA NO SIRVE (R12). Se reabre tal cual, con la sesion recien abierta
     // encima —que no cambia el resultado (R18)— y con una contrasena que SI cumple la politica,
