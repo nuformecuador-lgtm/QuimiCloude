@@ -195,7 +195,16 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
  * Total absoluto del repositorio y no de un cambio: una dependencia aprobada de cualquier otra
  * feature lo rompe y obliga a subirlo. Lo que vigila de verdad es `FRAGMENTOS_PROHIBIDOS`.
  */
-export const DEPENDENCIAS_ESPERADAS = 31
+// El manifiesto declara hoy 33 dependencias. Fueron 31 hasta el 2026-09-16, cuando entraron
+// `unpdf` y `@napi-rs/canvas` -las dos con los cuatro checks, aprobacion humana y su fila en
+// `docs/dependencias.md`-, y el numero se subio con esa aprobacion.
+//
+// Que este conteo sea un absoluto es fragil y conviene saberlo: no distingue «alguien colo una
+// libreria» de «entro una aprobada», asi que lo rompe cualquier feature posterior que anada una
+// legitima. La pregunta «toda dependencia declarada esta aprobada» ya la responde
+// `guard-dependencias-aprobadas.test.ts`, que compara contra el registro. Lo robusto aqui seria
+// comparar contra el merge-base de la propia rama en vez de contar absolutos.
+export const DEPENDENCIAS_ESPERADAS = 33
 export const DEV_DEPENDENCIAS_ESPERADAS = 20
 
 /** `crypto.randomUUID()` es un global: una libreria de identificadores o de criptografia sobra. */
