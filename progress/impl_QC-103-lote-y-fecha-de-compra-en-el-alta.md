@@ -6,7 +6,8 @@
 > sobre helpers preexistentes (`566d122`, `ebdb21a`, detalle en §4). **Primera review RECHAZADA**
 > (2 bloqueantes, 2 menores) el 2026-09-17; los 4 hallazgos ya están cerrados, ver §8. T12 (gate
 > completo `./init.sh`) encontró 2 rojos propios de esta rama tras la review, ambos cerrados
-> (§9). T12 lo vuelve a cerrar el leader.
+> (§9). **Consolidación final de `formatDateLocalISO`/`parseDateLocalISO` en
+> `lib/shared/ui/date-civil.ts`** (§10), decisión del humano. T12 lo cierra el leader.
 
 ## 1. Lo que se construyó
 
@@ -272,3 +273,45 @@ fenómeno de contención, no una regresión de esta ficha.
 - `pnpm exec playwright test e2e/inventario.spec.ts -g "R14, R17" --project=chromium`: 1 passed.
 
 Commit: `4285b23`, con `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`.
+
+## 10. Consolidación final — una sola definición en `lib/shared/ui/` (decisión del humano, 2026-09-17)
+
+El arreglo del Rojo 1 (§9) evitó tocar el barrel de `data-table`, pero dejó **dos copias** de
+`formatDateLocalISO`/`parseDateLocalISO` (`data-table-filter-date.tsx` y
+`product-batch-date-field.tsx`) — un riesgo real: si la fórmula cambia algún día -zona horaria,
+formato-, una copia puede quedarse vieja en silencio. El humano decidió consolidarlas en **una
+sola definición**.
+
+**Por qué el destino es `lib/shared/ui/` y no cualquier otro sitio de `lib/shared/`**: no es
+estético, es lo único que no rompe la guardia de arquitectura. `docs/architecture.md > La regla de
+dependencias` restringe qué puede importar `components/**`, `hooks/**` y los archivos `'use
+client'`: solo `lib/shared/ui/**`, `lib/shared/routes` y `@/lib/utils` — NO `lib/shared/**` en
+general. Un archivo en cualquier otro sitio de `lib/shared/` habría dejado la guardia en rojo otra
+vez. `lib/shared/ui/` ya es el vecindario de utilidades de este tipo: `initials.ts`,
+`sidebar-state.ts`, `theme-state.ts`.
+
+**Qué se movió**: `lib/shared/ui/date-civil.ts` (archivo nuevo) exporta ambas funciones con su
+JSDoc consolidado. `data-table-filter-date.tsx` y `product-batch-date-field.tsx` pasan a
+importarlas de ahí; los dos siguen reexportando `formatDateLocalISO` porque sus propios
+consumidores externos ya la importaban así -dos tests de `data-table` por ruta profunda directa, y
+`product-form.tsx` desde `product-batch-date-field.tsx`- y no se tocó ese contrato ni el barrel de
+`data-table`.
+
+### Verificación
+- `pnpm typecheck`: limpio.
+- `pnpm exec eslint` sobre los tres archivos (el nuevo y los dos modificados): limpio.
+- `pnpm exec vitest related --run` sobre los tres archivos: los archivos relacionados con la
+  lógica de fecha en sí (`data-table-filter-date.test.tsx`, `data-table-viewport.test.tsx`,
+  `data-table-filters.test.tsx`, `product-field.test.tsx`) pasaron limpios, 99 tests. Aparecieron
+  timeouts en `product-page.test.tsx` y en archivos totalmente ajenos a esta rama
+  (`identity/session-once-per-request-render.test.tsx`,
+  `configuracion-ui/user-status-dialog.test.tsx`, `pedidos-ui/order-sheet.test.tsx`) con
+  duraciones muy por encima de lo normal (627s totales, `import: 2945s`) — coherente con el aviso
+  del leader de que la máquina estaba saturada en ese momento. No se persiguieron ni se
+  reintentaron: son timeouts genéricos (costo, decimales, existencia — ninguno sobre
+  `purchaseDate`), no fallos de aserción ni regresiones de esta consolidación.
+- `pnpm exec vitest run guard`: **43 archivos, 480 passed, 9 skipped, 0 failed** — verde, es la
+  guardia que vigila justo este import.
+- No se corrió `./init.sh` (instrucción explícita del leader; la máquina estaba saturada).
+
+Commit: `cab1fa8`, con `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`.
