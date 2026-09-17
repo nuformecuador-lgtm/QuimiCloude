@@ -755,7 +755,93 @@ Tanda 5 (drift de la Postgres compartida). No se marca como cerrado con un verde
   `db/schema.prisma` de esta rama y la Postgres local compartida antes de que `./init.sh`
   completo pueda correr Playwright sobre esta feature (y sobre cualquier otra que siembre una
   receta).
-- **`package.json` desincronizado con `origin/dev`** (ver `> T18`, verificacion final): dos
-  dependencias de mas (`@napi-rs/canvas`, `unpdf`) que esta rama no instalo. Ajeno a QC-88, no
-  tocado.
+- **`package.json` desincronizado con `origin/dev`**: **RESUELTO** por la sincronizacion del
+  2026-09-17 (ver seccion siguiente). El diagnostico original del implementer estaba invertido
+  -crei que sobraban dos dependencias; el leader corrigio: **faltaban**, de QC-106 (PR #78,
+  mergeado por otra sesion mientras se trabajaba esta tanda)-.
 - Nada mas queda abierto: T1-T18 cerradas, cada `R<n>` mapeado.
+
+---
+
+## Sincronizacion con `dev` (QC-106), 2026-09-17
+
+Encargo del leader: antes del `reviewer`, sincronizar con `origin/dev` -35 commits por detras,
+26 por delante-. **Motivo real, corregido por el leader sobre mi propio diagnostico**: el rojo
+de `unidades-convenciones.test.ts` («dependencies difiere de origin/dev») no era que esta rama
+tuviera dependencias de mas, sino que **`origin/dev` tiene dos que esta rama no tenia todavia**
+-`@napi-rs/canvas` y `unpdf`, de QC-106 (`endpoint-de-carga-de-pdf`), cuyo PR #78 mergeo otra
+sesion mientras se trabajaba la Tanda 5 de esta ficha-.
+
+**Merge, no rebase**: `git fetch origin dev && git merge origin/dev --no-edit`. **Un solo
+conflicto de texto**, `progress/current.md` -que el leader mantiene en exclusiva, nunca esta
+bitacora-: resuelto tomando la version de `origin/dev` entera (`git checkout --theirs`), sin
+tocar su contenido linea a linea. Ningun otro archivo dio conflicto: `lib/composition/index.ts`
+se auto-fusiono limpio -confirmado a mano que conserva **las dos** fachadas, `asignaciones`
+(con `listAssignedOrders`) y la `documentos` nueva de QC-106-.
+
+**Post-merge, antes de verificar nada**:
+- `pnpm install --frozen-lockfile` -> instalo `@napi-rs/canvas` y `unpdf` (el lockfile ya traia
+  su resolucion, fusionado sin conflicto).
+- `pnpm exec prisma generate` -> regenerado (los build scripts venian ignorados).
+- `pnpm exec prisma migrate status` -> **sin cambios de db/**: QC-106 no toca `db/schema.prisma`
+  ni migraciones (su propia bitacora lo dice: «sin tabla, sin migracion»). Confirmado por
+  `git diff ORIG_HEAD..MERGE_HEAD --stat -- db/` vacio.
+- **El drift de la Postgres local compartida (`recipes_company_scope`) SIGUE IGUAL tras el
+  merge**: `_prisma_migrations` real sigue en 31 filas, `db/migrations/` de esta rama sigue en
+  30. No se toco, tal como se pidio -no es de esta ficha y el leader solo pidio confirmar si
+  seguia igual-.
+
+**QC-104 (sesion-una-sola-vez-por-peticion) y el T9 de esta ficha**: revisado
+`tests/unit/identity/session-once-per-request-actions.test.ts` -la lista `ACCIONES` es **por
+archivo**, no por accion, y `order-assignment-actions.ts` ya estaba en ella desde antes (por
+`listOrderResponsiblesAction`)-. `listAssignedOrdersAction` (T9) reutiliza el MISMO
+`currentActor()` local del archivo, que ya envuelve su `Promise.all` en `runInRequestScope`
+-nada que anadir: la funcion nueva hereda la garantia de R3/R5 de QC-104 sin tocar la lista-.
+
+**Descubrimiento operativo, declarado**: el primer intento de verificar termino en un fallo real
+de `pedidos-convenciones.test.ts` («la feature toca `lib/modules/documentos/**` y
+`package.json`») porque **el merge se habia resuelto pero no commiteado todavia** -`HEAD` seguia
+apuntando al ultimo commit de esta rama antes del merge, asi que `git diff origin/dev..HEAD`
+comparaba TODO lo que trae `dev`-. Se corrigio haciendo `git commit --no-edit` para cerrar el
+merge (commit `c28133f`), y el mismo test paso a verde sin tocar una linea de codigo: era un
+fallo de secuencia propio, no del arbol.
+
+**Verificacion, con `--maxWorkers=2` por la advertencia de memoria de la maquina**:
+```
+pnpm typecheck -> VERDE (sin salida)
+pnpm lint      -> VERDE (sin salida)
+
+pnpm exec vitest run --maxWorkers=2 tests/guards
+ Test Files  37 passed (37)
+      Tests  417 passed | 5 skipped (422)
+
+pnpm exec vitest run --maxWorkers=2 tests/unit/unidades/unidades-convenciones.test.ts
+ Test Files  1 passed (1)
+      Tests  18 passed | 3 skipped (21)     <- el rojo de dependencias se resolvio con el merge
+
+pnpm exec vitest run --maxWorkers=2 tests/unit/asignaciones tests/unit/asignaciones-ui
+ Test Files  19 passed (19)
+      Tests  370 passed (370)
+
+pnpm exec vitest run --maxWorkers=2 tests/unit/pedidos tests/unit/pedidos-ui tests/unit/composition
+ Test Files  46 passed (46)
+      Tests  670 passed (670)
+
+pnpm exec vitest run --maxWorkers=2 tests/unit/recetas tests/unit/shared tests/unit/navegacion
+ Test Files  54 passed (54)
+      Tests  718 passed | 4 skipped (722)
+
+pnpm exec vitest run --maxWorkers=2 tests/unit/documentos
+ Test Files  11 passed (11)
+      Tests  157 passed | 8 skipped (165)
+
+pnpm exec vitest run --maxWorkers=2 tests/unit/identity
+ Test Files  91 passed (91)
+      Tests  1641 passed | 31 skipped (1672)
+```
+
+**No se corrio la suite entera ni Playwright** (instruccion explicita del leader por la memoria
+de la maquina); el gate completo lo corre el leader por partes.
+
+**Estado tras la sincronizacion**: `git status --branch` -> `ahead 27` de `origin/dev`, **0
+behind**. Commit de merge: `c28133f`.
