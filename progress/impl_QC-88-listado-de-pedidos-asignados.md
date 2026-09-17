@@ -653,6 +653,49 @@ tropiece con lo mismo.
 
 ## T18 — Trazabilidad y cierre
 
+### Verificacion final de cierre: seis guardias de OTRAS fichas, invisibles a `vitest related` (commit `8c014f7`)
+
+Antes de dar la Tanda 5 por terminada, el implementer corrio `tests/unit` y `tests/guards`
+**completos** (no solo lo relacionado), siguiendo el aviso del leader de que `vitest related` no
+ensena las guardias que una tanda rompe. Aparecieron **seis fallos reales**, todos en listas
+CERRADAS de otras fichas (QC-34, QC-35, QC-55, QC-64, QC-86/87) que enumeran exhaustivamente sus
+consumidores legitimos y que la Tanda 5 hizo crecer por primera vez desde fuera:
+
+1. `tests/unit/pedidos-ui/order-route-contract.test.ts` (QC-35): `assignedOrderRoute` coincidia
+   con el patron `/order/i` por el nombre.
+2. `tests/unit/pedidos/scope.test.ts` y `tests/unit/pedidos/module-contract.test.ts` (QC-34
+   R57): `app/(private)/asignacion/` consume el contrato publico de `pedidos`
+   (`OrderPriority`) y su E2E se llama `pedidos-asignados.spec.ts` (nombre que exige `tasks.md`
+   de QC-88, coincide con el patron "specs de pedidos" sin serlo).
+3. `tests/unit/recetas-ui/recipe-route-contract.test.ts` (QC-64 R12): lista exacta de exports de
+   `lib/shared/routes.ts`.
+4. `tests/unit/shared/data-table-alcance.test.ts` (QC-55 R34, R36): octava pantalla autorizada a
+   consumir la tabla compartida (ya decidido en `design.md > 8.1`, R26) y catorceavo E2E que la
+   referencia.
+5. `tests/unit/asignaciones/module-contract.test.ts` (QC-86 R29, enmendado por QC-87 y T7 de
+   QC-88): `page.tsx` (`requirePagePermission`) y `private-nav.ts` (el item de menu) son los DOS
+   puntos de consumo GENERICOS de `asignaciones.consultar` que R3/R4 de esta ficha exigen -la
+   misma puerta que usa cualquier otro codigo del catalogo-, no una reimplementacion.
+
+Las seis se tensaron (se anadio la entrada nueva, nombrada y fechada) sin relajar ningun
+criterio general; las mutaciones de `asignaciones/module-contract.test.ts` siguen detectando una
+infraccion real tras el cambio (24/24 tests, incluidas las mutaciones). Verificado:
+`pnpm typecheck`, `pnpm lint`, `tests/unit/{pedidos,pedidos-ui,recetas-ui,shared,
+asignaciones-ui,asignaciones,navegacion}` (97 archivos, 1535 tests) y `tests/guards` (36
+archivos, 404 tests), todo en verde.
+
+**Fallo NO relacionado con QC-88, dejado sin tocar:**
+`tests/unit/unidades/unidades-convenciones.test.ts` («las dependencias y devDependencies son
+EXACTAMENTE las de origin/dev») compara `package.json` de este worktree contra `origin/dev` y
+encuentra dos paquetes de mas (`@napi-rs/canvas`, `unpdf`). Verificado que `package.json` no
+aparece en el historial de ningun commit de esta rama desde antes de que esta feature empezara
+(el ultimo commit que lo toca es `ae6e881`, de QC-77). Es un problema de sincronizacion con
+`origin/dev` -probablemente un fetch desactualizado en este worktree, o dependencias que otra
+feature instalo en `dev` despues de que esta rama se creara-, ajeno a QC-88 y a los archivos que
+esta feature toca. Se deja anotado para el leader; no se toca `package.json` (regla 7 de
+`AGENTS.md`: ninguna dependencia se instala o desinstala sin aprobacion humana explicita, y este
+caso ademas no es ni siquiera una instalacion de esta ficha).
+
 ### Mapa `R1`…`R40` -> test, COMPLETO
 
 | R | Que exige | Test |
@@ -712,4 +755,7 @@ Tanda 5 (drift de la Postgres compartida). No se marca como cerrado con un verde
   `db/schema.prisma` de esta rama y la Postgres local compartida antes de que `./init.sh`
   completo pueda correr Playwright sobre esta feature (y sobre cualquier otra que siembre una
   receta).
+- **`package.json` desincronizado con `origin/dev`** (ver `> T18`, verificacion final): dos
+  dependencias de mas (`@napi-rs/canvas`, `unpdf`) que esta rama no instalo. Ajeno a QC-88, no
+  tocado.
 - Nada mas queda abierto: T1-T18 cerradas, cada `R<n>` mapeado.
