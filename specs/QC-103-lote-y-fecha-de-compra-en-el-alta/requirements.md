@@ -20,7 +20,77 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+**R1.** MIENTRAS el panel de alta de producto esté abierto, el sistema DEBE mostrar un campo
+**fecha de compra** para el primer lote, distinto del campo de fecha de vencimiento existente.
+
+**R2.** CUANDO se abre el panel de alta de producto, el sistema DEBE mostrar el campo fecha de
+compra con la fecha de hoy ya seleccionada `[D3]`.
+
+**R3.** El sistema DEBE ofrecer la fecha de compra como un campo obligatorio: CUANDO se envía el
+alta sin fecha de compra escrita, el sistema DEBE rechazar el envío y señalar el campo.
+
+**R4.** El sistema DEBE escribir y leer la fecha de compra con el calendario de `react-day-picker`
+`[D2]`.
+
+**R5.** SI la persona intenta seleccionar en el calendario de fecha de compra un día posterior a
+hoy, ENTONCES el sistema DEBE impedir esa selección sin necesidad de enviar el formulario `[D2]`.
+
+**R6.** DONDE el lote se deja vacío en el alta, el campo lote DEBE mostrar una ayuda que explique
+que, si se deja vacío, el sistema le asigna el lote `[D6]`.
+
+**R7.** El sistema DEBE seguir aceptando que la persona escriba el lote a mano en el campo de
+texto del alta, sin cambiar su tipo ni su comportamiento de envío `[D6]`.
+
+**R8.** El sistema DEBE tomar los mensajes de rechazo del lote y de la fecha de compra del mismo
+esquema de validación que revalida el alta en el servidor, sin duplicar en el formulario ninguna
+regla de forma del lote `[D7]`.
+
+**R9.** El campo lote y el campo fecha de compra DEBEN aparecer únicamente en el panel de ALTA de
+producto: la edición de producto no DEBE mostrarlos ni enviarlos `[D8]`.
+
+**R10.** CUANDO el alta de producto autoriza la operación, el sistema DEBE validar el permiso
+`inventario.modificar` en el servicio antes de crear el producto o el lote `[D9]`.
+
+**R11.** El sistema DEBE hacer viajar la fecha de compra, de cliente a servidor, como fecha civil
+en formato `YYYY-MM-DD`, y DEBE ser el adaptador quien la convierta a un tipo de fecha `[D9]`.
+
+**R12.** CUANDO el alta de producto crea el producto y su primer lote, el sistema DEBE devolver el
+**valor del lote** que quedó escrito en ese primer lote -el texto que lo identifica, sea el que
+generó el sistema o el que tecleó la persona, no el identificador interno de la fila-, junto con
+el identificador del producto, reutilizando el dato que la transacción ya calcula sin sumar
+ninguna regla ni tabla nueva `[D1] [D4]`.
+
+**R13.** CUANDO el alta de producto agrega un lote a un producto homónimo ya existente, el sistema
+DEBE devolver también el **valor del lote** que quedó escrito en ese lote, con el mismo criterio
+de R12 `[D1]`.
+
+**R14.** CUANDO el alta de producto termina con éxito, el sistema DEBE mostrar un aviso que nombre
+el valor del lote del producto que se acaba de dar de alta, en el mismo aviso que ya se muestra al
+crear `[D5]`.
+
+**R15.** SI la persona escribió el lote a mano en el alta, ENTONCES el aviso de éxito DEBE nombrar
+el lote tal como se escribió, sin sugerir que el sistema lo generó `[D5]`.
+
+**R16.** El sistema NO DEBE introducir ninguna superficie nueva -pantalla, diálogo o región- para
+mostrar el lote asignado, más allá del aviso que el panel de alta ya muestra al crear `[D5]`.
+
+**R17.** El sistema DEBE contar con una prueba de extremo a extremo que dé de alta un producto con
+fecha de compra por defecto, guarde con éxito y compruebe que el aviso final nombra el lote
+asignado `[D9]`.
+
+## Mapa de decisiones a requisitos
+
+| Decisión (tabla, en orden) | Requisito(s) |
+| --- | --- |
+| [D1] Backend devuelve el lote asignado | R12, R13 |
+| [D2] Fecha de compra con calendario `react-day-picker` | R4, R5 |
+| [D3] Valor por defecto: hoy | R2 |
+| [D4] Complejidad sigue `medium` | R12 (el requisito solo pide devolver un dato ya calculado, sin migración ni regla nueva) |
+| [D5] El lote asignado se enseña en el aviso ya existente | R14, R15, R16 |
+| [D6] Se puede seguir tecleando el lote a mano | R6, R7 |
+| [D7] El formulario no duplica la regla de solo dígitos | R8 |
+| [D8] Solo aparece en el alta | R9 |
+| [D9] Autorización, forma de la fecha y verificación heredadas | R10, R11, R17 |
 
 ## Preguntas abiertas
 
