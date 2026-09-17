@@ -8,16 +8,22 @@
 // `unit-prisma.ts`- en vez de escribir un segundo `OR`. La garantia real de existencia y de
 // aislamiento contra Postgres es de los tests de integracion de `recetas` (T14).
 
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import {
   findUnitRefs,
   toUnitRef,
 } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
-import { companyScopeWhere } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
+import {
+  companyScopeWhere,
+  findUnitRefsSharingBaseInCompany,
+} from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 
 /**
- * Doble del cliente Prisma, SOLO para el bloque QC-50 R24 de mas abajo: cuenta invocaciones y
- * deja inspeccionar el `where` que de verdad viaja a `findMany` -misma tecnica que
- * `tests/unit/inventario/product-catalog.test.ts` y `tests/unit/recetas/recipe-catalog.test.ts`-.
+ * Doble del cliente Prisma, para el bloque QC-50 R24 y para `findRefsSharingBaseInCompany`:
+ * cuenta invocaciones y deja inspeccionar el `where` que de verdad viaja a `findMany` -misma
+ * tecnica que `tests/unit/inventario/product-catalog.test.ts` y
+ * `tests/unit/recetas/recipe-catalog.test.ts`-.
  */
 const { findMany } = vi.hoisted(() => ({ findMany: vi.fn() }));
 vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { unit: { findMany } } }));
@@ -116,5 +122,119 @@ describe('QC-50 R24 — findRefs reutiliza companyScopeWhere, el punto unico del
     const refs = await findUnitRefs(['u-de-otra-empresa'], 'empresa-1');
 
     expect(refs).toEqual([]);
+  });
+});
+
+describe('findRefsSharingBaseInCompany', () => {
+  const EMPRESA = 'c-1';
+
+  const LITRO = { id: 'u-litro', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, companyId: null };
+  const MILILITRO = {
+    id: 'u-ml',
+    name: 'Mililitro',
+    symbol: 'mL',
+    baseUnitId: 'u-litro',
+    factor: { toString: () => '0.0010' },
+    companyId: null,
+  };
+  const GRAMO = { id: 'u-gramo', name: 'Gramo', symbol: 'g', baseUnitId: null, factor: null, companyId: null };
+  const KILOGRAMO = {
+    id: 'u-kg',
+    name: 'Kilogramo',
+    symbol: 'kg',
+    baseUnitId: 'u-gramo',
+    factor: { toString: () => '1000.0000' },
+    companyId: null,
+  };
+  const LITRO_AJENA = {
+    id: 'u-litro-ajena',
+    name: 'Litro ajena',
+    symbol: 'L',
+    baseUnitId: 'u-litro',
+    factor: { toString: () => '1.0000' },
+    companyId: 'c-2',
+  };
+
+  const UNIDADES = [LITRO, MILILITRO, GRAMO, KILOGRAMO, LITRO_AJENA];
+
+  /** Doble que se comporta como la base: aplica el `where` que le llega, tanto en la consulta
+   *  que lee la base efectiva como en la que trae las hermanas. */
+  function baseConCincoUnidades(): void {
+    findMany.mockImplementation(async (args: { where: Record<string, unknown>; select: Record<string, unknown> }) => {
+      const esConsultaDeBase = !('name' in args.select);
+      const [ambito, filtro] = args.where.AND as [
+        { OR: readonly { companyId: string | null }[] },
+        {
+          id?: { in: readonly string[] };
+          OR?: readonly [{ id: { in: readonly string[] } }, { baseUnitId: { in: readonly string[] } }];
+        },
+      ];
+      const visiblePorEmpresa = (unidad: (typeof UNIDADES)[number]): boolean =>
+        ambito.OR.some((cond) => cond.companyId === unidad.companyId);
+
+      if (esConsultaDeBase) {
+        const ids = (filtro.id as { in: readonly string[] }).in;
+        return UNIDADES.filter((unidad) => visiblePorEmpresa(unidad) && ids.includes(unidad.id)).map(
+          (unidad) => ({ id: unidad.id, baseUnitId: unidad.baseUnitId }),
+        );
+      }
+
+      const basesPedidas = (filtro.OR as readonly [{ id: { in: readonly string[] } }, unknown])[0].id.in;
+
+      return UNIDADES.filter((unidad) => {
+        const mismaBase = basesPedidas.includes(unidad.id) || basesPedidas.includes(unidad.baseUnitId ?? '');
+        return visiblePorEmpresa(unidad) && mismaBase;
+      });
+    });
+  }
+
+  beforeEach(() => {
+    findMany.mockReset();
+  });
+
+  it('T3(a) - pidiendo litro devuelve litro y mililitro', async () => {
+    baseConCincoUnidades();
+
+    const refs = await findUnitRefsSharingBaseInCompany(EMPRESA, ['u-litro']);
+
+    expect(refs.map((ref) => ref.id).sort()).toEqual(['u-litro', 'u-ml']);
+  });
+
+  it('T3(b) - pidiendo litro NO devuelve un kilogramo', async () => {
+    baseConCincoUnidades();
+
+    const refs = await findUnitRefsSharingBaseInCompany(EMPRESA, ['u-litro']);
+
+    expect(refs.map((ref) => ref.id)).not.toContain('u-kg');
+  });
+
+  it('T3(c) - NO devuelve una unidad de otra empresa, pero SI una de sistema', async () => {
+    baseConCincoUnidades();
+
+    const refs = await findUnitRefsSharingBaseInCompany(EMPRESA, ['u-litro']);
+
+    expect(refs.map((ref) => ref.id)).not.toContain('u-litro-ajena');
+    expect(refs.map((ref) => ref.id)).toContain('u-ml');
+  });
+
+  it('MENOR-2 - la consulta que lee la base efectiva TAMBIEN lleva companyScopeWhere', async () => {
+    findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    await findUnitRefsSharingBaseInCompany(EMPRESA, ['u-litro']);
+
+    const primeraLlamada = findMany.mock.calls[0]?.[0] as { where: Record<string, unknown> };
+    // Igualdad ESTRUCTURAL con `companyScopeWhere`, la MISMA definicion que compone la segunda
+    // consulta: si esta primera lectura escribiera su propio `OR` de sistema/empresa -o
+    // ninguno-, esta igualdad lo notaria.
+    expect(primeraLlamada.where).toEqual({
+      AND: [companyScopeWhere({ companyId: EMPRESA }), { id: { in: ['u-litro'] } }],
+    });
+  });
+
+  it('con una lista vacia de ids no consulta la base y devuelve una lista vacia', async () => {
+    const refs = await findUnitRefsSharingBaseInCompany(EMPRESA, []);
+
+    expect(refs).toEqual([]);
+    expect(findMany).not.toHaveBeenCalled();
   });
 });

@@ -20,10 +20,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 /** Doble del cliente Prisma. Cuenta invocaciones: es lo unico que hace testeable «una sola
  *  consulta para N ids» —comprobar solo el resultado pasaria verde con un bucle de N—. */
 const findMany = vi.fn()
-vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { recipe: { findMany } } }))
+const findFirst = vi.fn()
+vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { recipe: { findMany, findFirst } } }))
 
 const {
+  findRecipeExecutionContentById,
   findRecipeRefsIncludingDeleted,
+  toRecipeExecutionContent,
   toRecipeRef,
 } = await import('@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma')
 
@@ -66,6 +69,7 @@ const adaptadorFuente = read(
 
 beforeEach(() => {
   findMany.mockReset()
+  findFirst.mockReset()
 })
 
 describe('contrato RecipeCatalog', () => {
@@ -181,6 +185,98 @@ describe('findRecipeRefsIncludingDeleted', () => {
 
     expect(refs).toEqual([])
     expect(findMany).not.toHaveBeenCalled()
+  })
+})
+
+const LINEA_CLORO = { productId: 'p-cloro', quantity: { toFixed: () => '10.0000' }, unitId: 'u-litro' }
+const PASO_VALIDO = { blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }] }] }
+
+describe('findRecipeExecutionContentById', () => {
+  it('T2(a) - receta viva: devuelve pasos y lineas, con isDeleted false', async () => {
+    findFirst.mockResolvedValue({
+      id: 'r-viva',
+      name: 'Cloro 5%',
+      deletedAt: null,
+      steps: [PASO_VALIDO],
+      lines: [LINEA_CLORO],
+    })
+
+    const receta = await findRecipeExecutionContentById('r-viva', EMPRESA)
+
+    expect(receta).toEqual({
+      id: 'r-viva',
+      name: 'Cloro 5%',
+      isDeleted: false,
+      steps: [PASO_VALIDO],
+      lines: [{ productId: 'p-cloro', productName: null, quantity: '10.0000', unitId: 'u-litro' }],
+    })
+  })
+
+  it('T2(b) - receta de baja: vuelve igual, con isDeleted true', async () => {
+    findFirst.mockResolvedValue({
+      id: 'r-baja',
+      name: 'Detergente viejo',
+      deletedAt: new Date('2026-02-02'),
+      steps: [],
+      lines: [],
+    })
+
+    const receta = await findRecipeExecutionContentById('r-baja', EMPRESA)
+
+    expect(receta?.isDeleted).toBe(true)
+    expect(receta?.name).toBe('Detergente viejo')
+  })
+
+  it('T2(c) - un id inexistente devuelve null', async () => {
+    findFirst.mockResolvedValue(null)
+
+    await expect(findRecipeExecutionContentById('r-fantasma', EMPRESA)).resolves.toBeNull()
+  })
+
+  it('no filtra por deletedAt: una receta de baja sigue pudiendo ejecutarse', async () => {
+    findFirst.mockResolvedValue({ id: 'r-1', name: 'X', deletedAt: null, steps: [], lines: [] })
+
+    await findRecipeExecutionContentById('r-1', EMPRESA)
+
+    const args = findFirst.mock.calls[0]?.[0]
+    expect(args.where).toEqual({ AND: [{ companyId: EMPRESA }, { id: 'r-1' }] })
+    expect(JSON.stringify(args.where)).not.toContain('deletedAt')
+  })
+
+  it('QC-50 R14 - una receta de otra empresa devuelve null, igual que un id inexistente', async () => {
+    findFirst.mockResolvedValue(null)
+
+    const receta = await findRecipeExecutionContentById('r-de-otra-empresa', EMPRESA)
+
+    expect(receta).toBeNull()
+    const args = findFirst.mock.calls[0]?.[0]
+    expect(args.where).toEqual({ AND: [{ companyId: EMPRESA }, { id: 'r-de-otra-empresa' }] })
+  })
+})
+
+describe('toRecipeExecutionContent', () => {
+  it('descarta el paso invalido y conserva el orden de los validos', () => {
+    const contenido = toRecipeExecutionContent({
+      id: 'r-1',
+      name: 'X',
+      deletedAt: null,
+      steps: [{ id: 'invalido' }, PASO_VALIDO],
+      lines: [],
+    })
+
+    expect(contenido.steps).toEqual([PASO_VALIDO])
+  })
+
+  it('productName sale siempre null: recetas no conoce el nombre de un producto', () => {
+    const contenido = toRecipeExecutionContent({
+      id: 'r-1',
+      name: 'X',
+      deletedAt: null,
+      steps: [],
+      lines: [LINEA_CLORO],
+    })
+
+    expect(contenido.lines[0]?.productName).toBeNull()
   })
 })
 

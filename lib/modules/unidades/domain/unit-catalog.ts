@@ -36,4 +36,15 @@ export interface UnitCatalog {
    *  dos lados. Que el ambito viva en la firma es lo que hace que una llamada que lo omita
    *  no compile. */
   findRefs(ids: readonly UnitId[], companyId: string): Promise<readonly UnitRef[]>;
+
+  /**
+   * Las unidades VISIBLES para esa empresa -propias o de sistema- cuya base efectiva
+   * (`baseUnitId ?? id`) coincide con la de alguna de `unitIds`. Sirve para poblar un selector
+   * de unidades hermanas: quien lo llama agrupa en memoria y descarta la propia unidad de cada
+   * linea.
+   */
+  findRefsSharingBaseInCompany(
+    companyId: string,
+    unitIds: readonly UnitId[],
+  ): Promise<readonly UnitRef[]>;
 }

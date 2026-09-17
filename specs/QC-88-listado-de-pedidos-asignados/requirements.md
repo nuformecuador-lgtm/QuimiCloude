@@ -189,3 +189,9 @@
 | 2026-09-15 | ¿Hace falta E2E? | **Si**: el recorrido del Operador que entra, ve solo sus pedidos ejecutables y encuentra uno EN_CURSO que no puede abrir. `CHECKPOINTS.md` lo pide para permisos, y esta pantalla **es** la puerta del Operador. Se corre en **Chromium y WebKit** |
 | 2026-09-15 | ¿Dependencia nueva? | **Ninguna.** La tabla, los avatares y el contrato de lista ya estan montados |
 | 2026-09-15 | ¿Zona y complejidad? | **`fullstack` / `high`.** Estrena pantalla, ruta, item de menu y **una consulta que no existe**, con su puerto y su adaptador |
+
+---
+
+> **2026-09-17 — enmendado por QC-63 R27/R28** (decision cerrada 16 de QC-63): R21 pasa de bloqueo
+> a aviso y R23 queda **cerrada sin rechazo**, porque la reentrada a un pedido `EN_CURSO` se
+> permite.

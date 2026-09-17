@@ -38,10 +38,12 @@ describe('objetivos tactiles de 44x44 en todo lo que esta feature monta (R32)', 
     expect(esObjetivoTactil(screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID))).toBe(true);
   });
 
-  it('el disparador «entrar» deshabilitado (EN_CURSO)', () => {
+  it('el disparador «entrar» en curso (EN_CURSO)', () => {
     render(<AssignedOrderEnterTrigger order={{ id: 'order-2', status: 'EN_CURSO' }} />);
 
-    expect(esObjetivoTactil(screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID))).toBe(true);
+    const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
+    expect(esObjetivoTactil(trigger)).toBe(true);
+    expect(trigger).not.toBeDisabled();
   });
 
   it('el enlace de «volver a la primera pagina» del estado vacio', () => {

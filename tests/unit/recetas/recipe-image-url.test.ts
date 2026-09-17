@@ -59,7 +59,10 @@ function montarCatalogo(): ProductCatalog {
 }
 
 function montarCatalogoUnidades(): UnitCatalog {
-  return { findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []) };
+  return {
+    findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []),
+    findRefsSharingBaseInCompany: vi.fn<UnitCatalog['findRefsSharingBaseInCompany']>(async () => []),
+  };
 }
 
 const JPEG_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0, 0, 0]);
