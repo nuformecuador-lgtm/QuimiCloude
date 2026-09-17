@@ -74,6 +74,13 @@ ALTER TABLE "product_batches" NO FORCE ROW LEVEL SECURITY;
 -- con el unico fallback de que haya exactamente una empresa-- y NUNCA por identificador. Si
 -- no se puede resolver, la reversion se detiene tambien: sin saber cual escribio el UP no hay
 -- forma de distinguir el dato propio del ajeno.
+--
+-- SALIDA TEMPRANA SOBRE UNA BASE VACIA (mismo arreglo que el UP): con las tres tablas de
+-- inventario en cero no hay ningun reparto que proteger --ni inventario ajeno que descartar
+-- ni nombre de presentacion que colisionar--, asi que la resolucion de la empresa ni siquiera
+-- se plantea. Mismo idioma que `db/migrations/20260904180600_companies_and_user_company`. En
+-- cuanto hay una sola fila en cualquiera de las tres, el `RETURN` no se dispara y las tres
+-- guardias siguen abortando igual.
 -- ---------------------------------------------------------------------------------------
 DO $$
 DECLARE
@@ -82,7 +89,14 @@ DECLARE
   all_company_rows    BIGINT;
   filas_ajenas        BIGINT;
   nombres_repetidos   BIGINT;
+  existing_rows       BIGINT;
 BEGIN
+  SELECT (SELECT count(*) FROM "products")
+       + (SELECT count(*) FROM "presentations")
+       + (SELECT count(*) FROM "product_batches")
+    INTO existing_rows;
+  IF existing_rows = 0 THEN RETURN; END IF;
+
   SELECT count(*) INTO named_company_rows
     FROM "companies" WHERE "name_normalized" = 'quimicloud';
 

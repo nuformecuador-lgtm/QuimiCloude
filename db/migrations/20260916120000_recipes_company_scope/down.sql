@@ -12,6 +12,12 @@
 --      indistinguible; y
 --   3. si dos recetas vivas de empresas distintas comparten nombre, el indice unico GLOBAL no
 --      se puede recrear, y renombrar o borrar la que estorba descartaria dato de un cliente.
+--
+-- SALIDA TEMPRANA SOBRE UNA BASE VACIA (mismo arreglo que el UP): con `recipes` en cero no hay
+-- ninguna receta que proteger --ni receta ajena, ni nombre repetido entre empresas--, asi que
+-- las tres guardias ni se plantean. Mismo idioma que
+-- `db/migrations/20260904180600_companies_and_user_company`. En cuanto hay una sola receta, el
+-- `RETURN` no se dispara y las tres guardias siguen abortando igual.
 
 -- ---------------------------------------------------------------------------------------
 -- 0. `NO FORCE` temporal, por lo mismo que en el UP: con RLS forzada y sin policies, las
@@ -33,7 +39,11 @@ DECLARE
   foreign_recipe_rows BIGINT;
   duplicated_names   BIGINT;
   duplicated_rows    BIGINT;
+  existing_rows      BIGINT;
 BEGIN
+  SELECT count(*) INTO existing_rows FROM "recipes";
+  IF existing_rows = 0 THEN RETURN; END IF;
+
   -- 1.1. GUARDIA 1 — identificar la empresa que escribio el UP, igual que en el UP (por
   -- `name_normalized`, con el unico fallback de una sola empresa) y nunca por identificador.
   SELECT count(*) INTO named_company_rows
