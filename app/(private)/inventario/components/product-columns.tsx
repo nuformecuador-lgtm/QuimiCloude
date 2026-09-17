@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import type { DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import type { ProductView } from '@/lib/modules/inventario';
+import type { UnitRef } from '@/lib/modules/unidades';
 
 /**
  * Declaracion de las columnas de la tabla de productos (R6, R7, R8, `design.md > 7`).
@@ -97,21 +98,40 @@ function formatOptionalInt(value: number | null): string {
 }
 
 /**
- * La existencia esta en alarma cuando la alerta de cantidad la SUPERA: queda menos de lo que el
- * producto declara como minimo aceptable.
- *
- * **Solo cuando los dos son numeros.** Un producto anterior a la decision del 2026-09-03 puede
- * tener cualquiera de los dos a NULL en la base, y `null` no se compara: sin los dos valores no
- * se sabe si hay alarma, y pintar de rojo una incognita seria inventarse el dato.
+ * Etiqueta de una unidad a partir de su id: simbolo, nombre, o el marcador si el catalogo no la
+ * trae. Sin catalogo (`units` indefinido), devuelve `null` y quien llama pinta la cantidad sola.
+ */
+function unitLabel(unitId: UnitRef['id'], units: readonly UnitRef[] | undefined): string | null {
+  if (units === undefined) return null;
+  const unit = units.find((candidate) => candidate.id === unitId);
+  return unit?.symbol ?? unit?.name ?? EMPTY_CELL;
+}
+
+/**
+ * La existencia esta en alarma cuando la alerta de cantidad SUPERA la del lote mas reciente del
+ * producto; las existencias en otras unidades no cuentan. Sin lotes, esa existencia es 0.
  *
  * El nombre no es casual: `inventario-schema.test.ts` prohibe `isBelowAlert` y sus hermanos
  * COMO CAMPO DEL ESQUEMA -no puede existir una columna derivada de bajo de existencias-. Aqui es
  * una funcion de presentacion en un archivo de UI, que es justo lo que esa prohibicion deja vivo.
  */
 function isBelowAlert(product: ProductView): boolean {
-  if (typeof product.stock !== 'number') return false;
   if (typeof product.qtyAlert !== 'number') return false;
-  return product.qtyAlert > product.stock;
+  const existence =
+    product.stockByUnit.find((entry) => entry.unitId === product.latestBatchUnitId)?.quantity ?? 0;
+  return product.qtyAlert > existence;
+}
+
+/** Cantidad por unidad, unida con « · », o `0` cuando el producto no tiene ningun lote. */
+function existenceLabel(product: ProductView, units: readonly UnitRef[] | undefined): string {
+  if (product.stockByUnit.length === 0) return '0';
+
+  return product.stockByUnit
+    .map((entry) => {
+      const label = unitLabel(entry.unitId, units);
+      return label === null ? String(entry.quantity) : `${entry.quantity} ${label}`;
+    })
+    .join(' · ');
 }
 
 /**
@@ -121,7 +141,7 @@ function isBelowAlert(product: ProductView): boolean {
  * acompana a la clase para que la condicion sea afirmable sin depender del nombre de una utilidad
  * de Tailwind.
  */
-function stockCell(product: ProductView): ReactNode {
+function stockCell(product: ProductView, units: readonly UnitRef[] | undefined): ReactNode {
   const alerted = isBelowAlert(product);
 
   return (
@@ -130,7 +150,7 @@ function stockCell(product: ProductView): ReactNode {
       data-alert={alerted ? 'true' : undefined}
       className={alerted ? 'font-semibold text-destructive' : undefined}
     >
-      {formatOptionalInt(product.stock)}
+      {existenceLabel(product, units)}
     </span>
   );
 }
@@ -141,9 +161,14 @@ export type ProductColumnsDeps = {
    * importa el panel lateral ni el dialogo, los enchufa quien monta la tabla.
    */
   readonly rowActions: (product: ProductView) => ReactNode;
+  /**
+   * Catalogo de unidades para resolver el simbolo de la existencia. Sin el (lectura fallida en la
+   * pagina), la celda sigue pintando la cantidad, sin etiqueta.
+   */
+  readonly units?: readonly UnitRef[];
 };
 
-export function buildProductColumns({ rowActions }: ProductColumnsDeps): readonly ProductColumn[] {
+export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): readonly ProductColumn[] {
   return [
     {
       id: IMAGE_COLUMN_ID,
@@ -169,7 +194,7 @@ export function buildProductColumns({ rowActions }: ProductColumnsDeps): readonl
       align: 'end',
       sortable: true,
       filter: { kind: 'numberRange' },
-      cell: stockCell,
+      cell: (product) => stockCell(product, units),
     },
     {
       id: 'qtyAlert',

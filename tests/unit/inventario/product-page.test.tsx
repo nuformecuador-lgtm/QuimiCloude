@@ -627,16 +627,29 @@ describe('pantalla de productos — lista', () => {
     }
   });
 
-  it('la existencia se pinta en rojo cuando la alerta de cantidad la supera', async () => {
-    // Decision del humano, 2026-09-03. Es PRESENTACION y solo presentacion: no hay columna
-    // derivada en la base ni campo calculado en `ProductView` -R11 y la decision cerrada 10 de
-    // QC-14 lo prohiben-. La comparacion se hace al pintar, con dos valores que ya venian.
+  it('R16 — la existencia se pinta en rojo cuando la alerta de cantidad supera la del lote mas reciente', async () => {
+    const UNIDAD_A = crypto.randomUUID();
     listProductsActionMock.mockResolvedValue(
       paginaDeProductos([
-        producto({ id: crypto.randomUUID(), stock: 2, qtyAlert: 5 }),
-        producto({ id: crypto.randomUUID(), stock: 5, qtyAlert: 5 }),
-        producto({ id: crypto.randomUUID(), stock: 9, qtyAlert: 5 }),
-        producto({ id: crypto.randomUUID(), stock: null, qtyAlert: 5 }),
+        producto({
+          id: crypto.randomUUID(),
+          stockByUnit: [{ unitId: UNIDAD_A, quantity: 2 }],
+          latestBatchUnitId: UNIDAD_A,
+          qtyAlert: 5,
+        }),
+        producto({
+          id: crypto.randomUUID(),
+          stockByUnit: [{ unitId: UNIDAD_A, quantity: 5 }],
+          latestBatchUnitId: UNIDAD_A,
+          qtyAlert: 5,
+        }),
+        producto({
+          id: crypto.randomUUID(),
+          stockByUnit: [{ unitId: UNIDAD_A, quantity: 9 }],
+          latestBatchUnitId: UNIDAD_A,
+          qtyAlert: 5,
+        }),
+        producto({ id: crypto.randomUUID(), stockByUnit: [], latestBatchUnitId: null, qtyAlert: 5 }),
       ]),
     );
 
@@ -648,14 +661,98 @@ describe('pantalla de productos — lista', () => {
     // Justo en la alerta y por encima: no. La alarma salta cuando la SUPERA, no al igualarla.
     expect(celdas[1]).not.toHaveAttribute('data-alert');
     expect(celdas[2]).not.toHaveAttribute('data-alert');
-    // Sin existencia no se sabe si hay alarma: pintar de rojo una incognita seria inventarsela.
-    expect(celdas[3]).not.toHaveAttribute('data-alert');
+    // R17 — sin lotes la existencia es 0, y 0 es menor que cualquier alerta configurada.
+    expect(celdas[3]).toHaveAttribute('data-alert', 'true');
 
     // La alerta nunca se tine a si misma: la que esta en alarma es la existencia.
     for (const celda of screen.getAllByTestId('data-table-cell-qtyAlert')) {
       expect(celda).not.toHaveAttribute('data-alert');
       expect(within(celda).queryByTestId('product-stock')).toBeNull();
     }
+  });
+
+  it('R18 — sin cantidad de alerta configurada, la existencia no se marca, tenga o no lotes', async () => {
+    const UNIDAD_A = crypto.randomUUID();
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([
+        producto({
+          id: crypto.randomUUID(),
+          stockByUnit: [{ unitId: UNIDAD_A, quantity: 0 }],
+          latestBatchUnitId: UNIDAD_A,
+          qtyAlert: null,
+        }),
+        producto({ id: crypto.randomUUID(), stockByUnit: [], latestBatchUnitId: null, qtyAlert: null }),
+      ]),
+    );
+
+    await renderPantalla();
+
+    for (const celda of screen.getAllByTestId('product-stock')) {
+      expect(celda).not.toHaveAttribute('data-alert');
+    }
+  });
+
+  it('R16 — la alerta ignora la existencia de otras unidades', async () => {
+    const UNIDAD_DEL_LOTE_MAS_RECIENTE = crypto.randomUUID();
+    const OTRA_UNIDAD = crypto.randomUUID();
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([
+        producto({
+          id: crypto.randomUUID(),
+          // Existencia sobrada en OTRA unidad; en la del lote mas reciente no hay nada (0).
+          stockByUnit: [{ unitId: OTRA_UNIDAD, quantity: 100 }],
+          latestBatchUnitId: UNIDAD_DEL_LOTE_MAS_RECIENTE,
+          qtyAlert: 5,
+        }),
+      ]),
+    );
+
+    await renderPantalla();
+
+    expect(screen.getByTestId('product-stock')).toHaveAttribute('data-alert', 'true');
+  });
+
+  it('R6 — la celda muestra una existencia por unidad, separadas por «·»', async () => {
+    const UNIDAD_KG = { ...UNIDAD, id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
+    const UNIDAD_L = { ...UNIDAD, id: crypto.randomUUID(), name: 'Litro', symbol: 'L' };
+    listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD_KG, UNIDAD_L] });
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([
+        producto({
+          stockByUnit: [
+            { unitId: UNIDAD_KG.id, quantity: 10 },
+            { unitId: UNIDAD_L.id, quantity: 20 },
+          ],
+        }),
+      ]),
+    );
+
+    await renderPantalla();
+
+    expect(screen.getByTestId('product-stock')).toHaveTextContent('10 kg · 20 L');
+  });
+
+  it('R7 — un producto sin lotes muestra su existencia como 0', async () => {
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ stockByUnit: [], latestBatchUnitId: null })]),
+    );
+
+    await renderPantalla();
+
+    expect(screen.getByTestId('product-stock')).toHaveTextContent('0');
+  });
+
+  it('sin catalogo de unidades, la celda pinta la cantidad sin etiqueta', async () => {
+    listUnitsActionMock.mockResolvedValue(errorInesperado());
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([
+        producto({ stockByUnit: [{ unitId: crypto.randomUUID(), quantity: 10 }] }),
+      ]),
+    );
+
+    await renderPantalla();
+
+    expect(screen.getByTestId('product-stock')).toHaveTextContent('10');
   });
 
   it('el desbordamiento horizontal lo absorbe el envoltorio de la tabla y ningun ancestro', async () => {
