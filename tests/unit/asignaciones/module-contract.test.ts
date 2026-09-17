@@ -427,9 +427,26 @@ type ConsumoLegitimo =
 
 const CASO_DE_USO_QC88 = `${ASIGNACIONES}/domain/list-assigned-orders.ts`
 
+/**
+ * SEGUNDA ENMIENDA de QC-88 (2026-09-16, tanda de UI T10-T12), sobre la MISMA regla que T7
+ * (arriba) ya habia estrechado. No es una tercera puerta al dominio: son los DOS puntos de
+ * consumo GENERICOS que R3/R4 de esta ficha exigen -el corte por permiso de la pantalla y la
+ * declaracion del item de menu-, exactamente el mismo mecanismo que usa CUALQUIER otro codigo del
+ * catalogo (`requirePagePermission(...)` en cada `page.tsx`, `permission: '<codigo>'` en cada
+ * `NavLink`). `CODIGOS_NUEVOS` solo vigila `asignaciones.*` porque QC-86 los estreno sin
+ * consumidor; ahora que QC-88 ES ese consumidor, escribir el codigo en estos DOS sitios exactos
+ * no es «reimplementar la autorizacion» (eso seria una SEGUNDA comparacion manual del permiso, que
+ * sigue prohibida en TODAS partes): es invocar la UNICA puerta que ya existia. Se nombran los DOS
+ * archivos exactos, nunca una carpeta ni el modulo entero.
+ */
+const PAGINA_QC88 = 'app/(private)/asignacion/page.tsx'
+const NAV_PRIVADO = 'lib/shared/navigation/private-nav.ts'
+
 const CONSUMO_LEGITIMO: ReadonlyArray<ConsumoLegitimo> = [
   { tipo: 'carpeta', prefijo: `${ASIGNACIONES}/domain/`, codigo: 'asignaciones.modificar' },
   { tipo: 'archivo', archivo: CASO_DE_USO_QC88, codigo: 'asignaciones.consultar' },
+  { tipo: 'archivo', archivo: PAGINA_QC88, codigo: 'asignaciones.consultar' },
+  { tipo: 'archivo', archivo: NAV_PRIVADO, codigo: 'asignaciones.consultar' },
 ]
 
 /** ¿Ese archivo puede exigir ESE codigo, por las enmiendas de QC-87 y QC-88? */

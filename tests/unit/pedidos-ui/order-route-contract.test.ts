@@ -37,10 +37,20 @@ describe('la ruta de pedidos se declara una sola vez (R2)', () => {
   it('no se declara un helper de ruta de detalle: no hay pagina de detalle (R1, R2)', async () => {
     const rutas: Record<string, unknown> = await import('@/lib/shared/routes');
 
+    // TENSADO 2026-09-16 (QC-88): `assignedOrderRoute` es el helper de detalle de
+    // `ASSIGNED_ORDERS_ROUTE` (`/asignacion`, otra pantalla), no de `ORDERS_ROUTE`. Coincide con
+    // el patron `/order/i` solo porque su nombre habla de UN pedido asignado, no porque `/pedidos`
+    // haya ganado una pagina de detalle -sigue sin tenerla, R1-. Se nombra explicitamente y NO se
+    // afloja el patron: cualquier OTRA funcion nueva que hable de un pedido sigue cazandose.
+    const EXCEPCIONES = new Set(['assignedOrderRoute']);
+
     // Ni `orderDetailRoute` ni ninguna otra funcion cuyo nombre hable de un pedido.
     const funcionesDePedido = Object.entries(rutas).filter(
       ([nombre, valor]) =>
-        typeof valor === 'function' && /order|pedido/i.test(nombre) && nombre !== 'ORDERS_ROUTE',
+        typeof valor === 'function' &&
+        /order|pedido/i.test(nombre) &&
+        nombre !== 'ORDERS_ROUTE' &&
+        !EXCEPCIONES.has(nombre),
     );
     expect(funcionesDePedido.map(([nombre]) => nombre)).toEqual([]);
   });
