@@ -84,6 +84,15 @@ finalizar) y el módulo ya tiene un archivo por caso de uso.
 **Dependencias del caso de uso de lectura** (`GetAssignedOrderExecutionDeps`): `assignments`,
 `orders`, `recipes`, `units` y **`products`**.
 
+> **De dónde salen `numberText` y `orderQuantity` — escrito el 2026-09-17, al implementar.**
+> El paso 4 usa `findAliveById`, que devuelve `OrderAssignmentTarget`, y **eso solo trae
+> `{ id, status }`**: un test de `pedidos` afirma que esa proyección **no** lleva número ni cantidad,
+> así que no se puede ampliar sin romperlo. Los dos datos se obtienen **componiendo** con
+> `deps.orders.listAliveSummariesByIds(companyId, [orderId], [status], 1, 1)`, método **ya existente
+> del mismo puerto**, y **solo después** de que `findAliveById` haya confirmado pertenencia y
+> empresa — el orden importa: la composición nunca precede a la comprobación de acceso.
+> **No se amplía `OrderCatalog`** por un dato de presentación ni se le pide nada nuevo a `pedidos`.
+
 > **Corregido el 2026-09-17.** La lista original omitía `products`, y era falsa contra el disco:
 > `recetas` no puede resolver el nombre de un producto —ese dato es de `inventario`— así que
 > `RecipeExecutionContent.lines[].productName` sale **siempre `null`** de `findExecutionContentById`.

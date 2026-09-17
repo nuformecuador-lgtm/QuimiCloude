@@ -147,6 +147,11 @@ beforeEach(() => {
  * escrito a mano**: los dos casos de abajo la comparan contra el arbol, porque el noveno
  * (`session-actions.ts`, de QC-101) llego por un merge y se colo justo por ahi.
  *
+ * **Crecida el 2026-09-17 por QC-63**, que estrena la pantalla de ejecucion de recetas:
+ * `order-execution-actions.ts` resuelve las dos caras de la sesion y entra en el censo por su
+ * nombre exacto. El censo CRECE, nunca se afloja: sigue comparandose contra el arbol, asi que un
+ * archivo futuro que nadie declare aqui pone estos casos en rojo.
+ *
  * `setCredentialWithLinkAction` NO esta y no es un olvido: es la accion PUBLICA que a proposito
  * no resuelve actor (QC-79 R18), asi que no lee la sesion ninguna vez.
  *
@@ -238,6 +243,17 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).listOrdersAction({
         page: 1,
       }),
+  },
+  {
+    // Anadido el 2026-09-17 por QC-63, que estrena la pantalla de ejecucion: su archivo de
+    // `driving/` resuelve las dos caras de la sesion, asi que el censo tiene que cubrirlo o R15
+    // dejaria de ser cierta. Se nombra el ARCHIVO EXACTO, como las otras once filas.
+    archivo: 'lib/modules/asignaciones/adapters/driving/order-execution-actions.ts',
+    nombre: 'startAssignedOrderAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/asignaciones/adapters/driving/order-execution-actions')
+      ).startAssignedOrderAction('no-es-un-uuid'),
   },
   {
     // La accion captura los errores y devuelve un estado, asi que una entrada invalida no rompe

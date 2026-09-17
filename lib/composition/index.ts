@@ -1055,7 +1055,7 @@ export const asignaciones = {
     people: peopleDirectory,
     now: () => new Date(),
   }),
-  // QC-63 — la pantalla de ejecucion. MISMO `orderCatalog`, `recipeCatalog` y
+  // La pantalla de ejecucion. MISMO `orderCatalog`, `recipeCatalog` y
   // `orderAssignmentRepository` que el resto del modulo; `productCatalog` es el mismo que usa
   // `recetas` mas arriba, y `unitCatalog` el mismo que usa `recetas` para sus dos escrituras.
   getAssignedOrderExecution: createGetAssignedOrderExecution({

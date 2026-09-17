@@ -280,8 +280,68 @@ esos campos. Se resolvió **componiendo** con `listAliveSummariesByIds`, método
 mismo puerto, **después** de que `findAliveById` confirma pertenencia y empresa. No se amplió
 `OrderCatalog` ni se pidió nada nuevo a `pedidos`.
 
-### Pendiente de entorno, no de código
-`tests/integration/asignaciones` **no se pudo correr**: el `global-setup` aborta con
-`test-db: falta DATABASE_URL`. No hay `.env` en este worktree. Ningún archivo de integración se
-tocó salvo un stub de tipo en `use-case-fixture.ts` para que compile. **Queda por confirmar donde
-haya base de test.**
+### Entorno — resuelto
+`tests/integration/asignaciones` no corría por falta de `.env` en el worktree. **El humano copió el
+`.env` del árbol principal el 2026-09-17** y la integración volvió a correr. Cerrado.
+
+---
+
+## Tanda 2b — los dos censos que la ejecución hace crecer (2026-09-17)
+
+El `./init.sh --rapido` del leader salió rojo con **2 archivos fallando de 175**, y los dos eran
+**censos congelados de otras fichas**, no fallos del código nuevo:
+
+```
+Test Files  2 failed | 173 passed (175)
+     Tests  2 failed | 2588 passed | 1 skipped (2591)
+```
+
+Se arreglaron **TENSÁNDOLOS**, mismo procedimiento que `module-contract`: el censo **crece por
+nombre exacto**, nunca por patrón, prefijo de carpeta ni `toContain` laxo.
+
+### `tests/unit/composition/asignaciones-facade.test.ts`
+De **SEIS** operaciones a **NUEVE** (no siete: la ficha añade **tres** casos de uso). Las nueve van
+nombradas una a una y comparadas con `toEqual` por igualdad exacta, así que **una operación futura
+que nadie declare aquí pone el caso en rojo**. Nota fechada `2026-09-17` en el `describe`.
+Además **gana tres casos nuevos**: cada una de las tres operaciones rechaza con `unauthorized` sin
+llegar a la base. El archivo tiene **más** `expect` que antes, ninguno menos.
+
+### `tests/unit/identity/session-once-per-request-actions.test.ts`
+`order-execution-actions.ts` entra en `ACCIONES` **por su ruta exacta**, como las otras once filas.
+El censo sigue comparándose **contra el árbol**, que es lo que hace que un archivo futuro no
+declarado lo ponga rojo. Nota fechada `2026-09-17` en la cabecera de la lista.
+
+### Prueba por mutación — salida real
+
+Quitadas las entradas nuevas de los dos archivos, **los dos se ponen rojos**:
+
+```
+FAIL tests/unit/composition/asignaciones-facade.test.ts
+AssertionError: expected [ 'assignResponsibles', …(8) ] to deeply equal [ 'assignResponsibles', …(5) ]
+
+FAIL tests/unit/identity/session-once-per-request-actions.test.ts
+AssertionError: hay 1 archivo(s) con las dos caras de la sesion fuera del conteo de R15:
+lib/modules/asignaciones/adapters/driving/order-execution-actions.ts. Anade su fila a ACCIONES.
+
+Test Files  2 failed (2)
+     Tests  2 failed | 34 passed (36)
+```
+
+Restaurados, vuelven a verde:
+
+```
+Test Files  2 passed (2)
+     Tests  38 passed (38)
+```
+
+**Ninguno de los dos afirmaba de menos**: la mutación los destapó a los dos, con el mensaje exacto.
+
+### Limpieza de comentarios
+`lib/composition/index.ts` citaba `QC-63` en un comentario de producción, en una línea que esta rama
+introduce. Eliminado (`docs/conventions.md > Comentarios`).
+
+### `design.md` — desvío narrado
+La sección **3** gana, con fecha, de dónde salen `numberText` y `orderQuantity`: `findAliveById`
+devuelve solo `{ id, status }` y un test lo afirma, así que se **compone** con
+`listAliveSummariesByIds` —del mismo puerto, ya existente— **después** de confirmar pertenencia y
+empresa. No se amplía `OrderCatalog` por un dato de presentación.
