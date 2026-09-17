@@ -1044,6 +1044,14 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'ASSIGNED_ORDERS_ROUTE',
         'CREDENTIAL_SETUP_ROUTE',
         'DASHBOARD_ROUTE',
+        // Alta el 2026-09-17: la trae el aviso de entrega de QC-63. NO es una ruta ni una funcion
+        // de ruta: es el NOMBRE DE UN PARAMETRO DE CONSULTA de la lista de pedidos asignados
+        // (`?entregado=<numero>`), que la pantalla de ejecucion pone al volver y la lista lee para
+        // pintar la confirmacion. Verificado antes de darla de alta: no estrena ninguna ruta del
+        // asistente de lectura -no la marca el patron de arriba ni apunta a ninguna URL-, asi que
+        // R12 de QC-64 sigue INTACTA. La lista sigue siendo CERRADA y por igualdad exacta: una
+        // constante mas vuelve a ponerla en rojo.
+        'DELIVERED_ORDER_PARAM',
         'FORGOT_PASSWORD_ROUTE',
         'FORMULAS_ROUTE',
         'INVENTORY_ROUTE',

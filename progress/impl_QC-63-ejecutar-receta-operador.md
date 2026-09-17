@@ -1111,3 +1111,61 @@ pnpm exec vitest run tests/unit/asignaciones-ui tests/unit/asignaciones tests/un
 Test Files  86 passed (86)
      Tests  1194 passed | 11 skipped (1205)
 ```
+
+---
+
+## Octavo censo — `routes.ts` gana el parámetro del aviso (2026-09-17)
+
+El gate completo tras cerrar el rechazo dejó **un solo rojo nuestro**:
+
+```
+× tests/unit/recetas-ui/recipe-route-contract.test.ts
+  QC-64 R12 — «lib/shared/routes.ts no gana ninguna constante para el asistente
+  y publica exactamente las de hoy»
+  expected [ 'ASSIGNED_ORDERS_ROUTE', …(20) ] to deeply equal [ …(19) ]
+```
+
+Es **consecuencia directa del arreglo aprobado**: `DELIVERED_ORDER_PARAM` entra en `routes.ts` y esa
+lista es **cerrada y por igualdad exacta**.
+
+### Verificación previa — la que decidía si era censo o estrenar ruta
+Comprobado **antes** de dar el alta, con las dos reglas del propio archivo:
+- La constante es `export const DELIVERED_ORDER_PARAM = 'entregado'`: el **nombre de un parámetro de
+  consulta**, no una ruta ni una función de ruta. No apunta a ninguna URL.
+- El patrón que caza rutas del asistente
+  (`/asistente|lectura|leer|ejecucion|ejecutar|reader|read|run|execute|paso|step|guia|wizard/i`)
+  **no la marca** — comprobado ejecutando el propio regex contra el nombre.
+
+**R12 de QC-64 sigue INTACTA**: lo que prohíbe es que el asistente de lectura tenga **ruta propia**,
+y esto no la estrena.
+
+### Alta por nombre exacto
+`'DELIVERED_ORDER_PARAM'` en la lista, con nota fechada que dice qué es, quién la trae y por qué no
+viola R12. **La lista sigue cerrada**: una constante más vuelve a ponerla en rojo.
+
+### Prueba por mutación — salida real
+Quitada la entrada nueva:
+```
+AssertionError: expected [ 'ASSIGNED_ORDERS_ROUTE', …(20) ] to deeply equal [ 'ASSIGNED_ORDERS_ROUTE', …(19) ]
+ Test Files  1 failed (1)
+     Tests  1 failed | 25 passed (26)
+```
+Restaurada:
+```
+ Test Files  1 passed (1)
+     Tests  26 passed (26)
+```
+
+### Los otros dos rojos del gate NO son de esta rama
+`tests/integration/infra/ciclo-de-vida-de-la-base.int.test.ts` (2 casos): **flake por saturación de
+la máquina**, descartado por el humano sobre el diff —la rama no toca ese archivo—, timeouts de
+~15 s bajo carga paralela, y **repetidos en aislamiento pasan los cinco en 14,19 s**. Es la deuda de
+máquina ya registrada en `current.md`. **No van al baseline**; el humano lo anota en el PR.
+
+### Salida real
+```
+pnpm typecheck → 0 errores
+vitest guard + recetas-ui + asignaciones-ui --maxWorkers=2
+Test Files  64 passed (64)
+     Tests  817 passed | 9 skipped (826)
+```
