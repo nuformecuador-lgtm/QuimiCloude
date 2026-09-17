@@ -34,7 +34,12 @@ const LINEA_NUEVA = { productId: PRODUCTO_NUEVO, quantity: '2.0000', unitId: UNI
 // `null` es «no declara existencia», que es lo que el fixture decia ya por omision: el valor
 // no cambia el comportamiento de ningun caso, solo satisface el tipo.
 // QC-80 (R21): `ProductRef` ya no lleva unidad -nadie la consumia-, asi que el doble tampoco.
-const REF_NUEVO: ProductRef = { id: PRODUCTO_NUEVO, name: 'Sosa caustica', stock: null };
+const REF_NUEVO: ProductRef = {
+  id: PRODUCTO_NUEVO,
+  name: 'Sosa caustica',
+  stock: null,
+  stockByUnit: [],
+};
 
 /** Doble de `UnitCatalog` (R50): por defecto resuelve como existentes TODOS los `unitId`
  *  pedidos -este archivo prueba R45/R46 sobre `productId`, no R50, asi que el doble no
@@ -158,7 +163,7 @@ describe('R46 — anadir una linea nueva cuyo producto no existe o esta de baja 
     const products: ProductCatalog = {
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
         REF_NUEVO,
-        { id: PRODUCTO_VIEJO, name: 'Acido sulfurico', unitId: null, stock: null },
+        { id: PRODUCTO_VIEJO, name: 'Acido sulfurico', stock: null, stockByUnit: [] },
       ]),
     };
     const images = montarAlmacenamiento();
