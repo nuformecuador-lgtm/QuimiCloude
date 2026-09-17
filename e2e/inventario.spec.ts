@@ -261,7 +261,7 @@ async function abrirPanelDeAlta(page: Page): Promise<void> {
 async function crearPresentacionEnLinea(page: Page, nombre: string): Promise<void> {
   await page.getByTestId('presentation-create-open').click();
   await page.getByTestId('presentation-create-name').fill(nombre);
-  // El alta rapida exige unidad desde QC-80 (R11, R17): sin elegirla el envio se rechaza.
+  // El alta rapida exige unidad antes de enviar (R11, R17): sin elegirla el envio se rechaza.
   await page.getByTestId('presentation-unit-select').click();
   await page.getByTestId('presentation-unit-option').first().click();
   await page.getByTestId('presentation-create-submit').click();
@@ -464,7 +464,7 @@ test.describe('catalogo de productos', () => {
     // --- 4. La presentacion se crea desde el propio selector y queda SELECCIONADA (R24).
     await page.getByTestId('presentation-create-open').click();
     await page.getByTestId('presentation-create-name').fill(presentationName);
-    // El alta rapida exige unidad desde QC-80 (R11, R17): sin elegirla el envio se rechaza.
+    // El alta rapida exige unidad antes de enviar (R11, R17): sin elegirla el envio se rechaza.
     await page.getByTestId('presentation-unit-select').click();
     await page.getByTestId('presentation-unit-option').first().click();
     await page.getByTestId('presentation-create-submit').click();
@@ -625,7 +625,7 @@ test.describe('catalogo de productos', () => {
     page,
   }) => {
     // `lote-y-fecha-de-compra-en-el-alta`: el correlativo lo genera el servidor DENTRO de la
-    // misma transaccion que inserta la fila (QC-81), asi que no hay ventana intermedia que mirar
+    // misma transaccion que inserta la fila, asi que no hay ventana intermedia que mirar
     // -de "pedir" a "tener" el aviso ya lo nombra-. Este es el UNICO caso de este archivo que
     // mira el TEXTO del toast: el resto solo afirma que hay un aviso (R21, R22), pero R14 pide
     // justo que ese texto nombre el lote, y eso no se puede afirmar sin leerlo.

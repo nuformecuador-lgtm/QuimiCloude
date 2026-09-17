@@ -185,7 +185,7 @@ async function choosePresentation(page: Page): Promise<string> {
   if (reusablePresentationName === null) {
     await page.getByTestId('presentation-create-open').click();
     await page.getByTestId('presentation-create-name').fill(presentationName);
-    // El alta rapida exige unidad desde QC-80 (R11, R17): sin elegirla el envio se rechaza.
+    // El alta rapida exige unidad antes de enviar (R11, R17): sin elegirla el envio se rechaza.
     await page.getByTestId('presentation-unit-select').click();
     await page.getByTestId('presentation-unit-option').first().click();
     await page.getByTestId('presentation-create-submit').click();

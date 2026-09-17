@@ -128,7 +128,7 @@ type FieldValues = Record<ProductFieldName, string>;
  * `{ status: 'idle' }` -QC-20 explica por que no exporta ninguna constante inicial- y su estado
  * de error se recoge ENTERO.
  *
- * **QC-71 (R17): `serverError` guarda el `ErrorState` completo, no `code` y `message` sueltos.**
+ * **`serverError` guarda el `ErrorState` completo, no `code` y `message` sueltos (R17).**
  * La copia campo a campo que habia aqui perdia el `reference` del error inesperado -el unico dato
  * con el que quien reporta el fallo puede decir cual buscar en los registros-. Y un
  * `reference?: string` en este tipo local reabriria el mismo agujero por el otro lado: un
@@ -155,7 +155,7 @@ const INITIAL_STATE: ProductFormState = { status: 'idle' };
  * El mensaje de al lado NO sale del catalogo y se queda como esta (R31, `design.md > 6 bis`): es
  * el texto de una comprobacion PROPIA del formulario, no de un error que emita el back.
  *
- * QC-71 (R16, R18): `satisfies` en vez de anotacion. Sigue comprobando que el codigo pertenece al
+ * `satisfies` en vez de anotacion (R16, R18). Sigue comprobando que el codigo pertenece al
  * catalogo, pero deja el tipo en el literal, que es lo que permite construir con el la rama
  * CATALOGADA de `ErrorState` -la que no lleva identificador ni puede llevarlo-. Con `: ErrorCode`
  * el tipo incluiria tambien el codigo generico, y entonces este literal no compilaria sin un
@@ -385,7 +385,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
         // `invalid_input`, `product_not_found` y `unauthorized` NO identifican campo: van a la
         // region de error del formulario, que es lo que R20 pide para ese caso.
         //
-        // QC-71 (R17): el estado de la operacion se guarda ENTERO. Antes se copiaban `code` y
+        // El estado de la operacion se guarda ENTERO (R17). Antes se copiaban `code` y
         // `message` a mano, y esa copia tiraba el `reference` del error inesperado por el camino.
         return { status: 'error', serverError: result, fieldErrors: {}, values };
       }
@@ -427,7 +427,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
   // de error del formulario queda para los rechazos que NO senalan campo.
   //
   // Es el ERROR, no un booleano: asi el render puede estrechar por `code` y pedirle el
-  // identificador al inesperado sin ningun `as` (QC-71 R17, R18).
+  // identificador al inesperado sin ningun `as` (R17, R18).
   const formError =
     state.status === 'error' && Object.keys(fieldErrors).length === 0
       ? state.serverError
@@ -467,7 +467,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
       {formError === undefined ? null : (
         // Region de error del formulario (R20): aqui van los rechazos que no senalan un campo.
         //
-        // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
+        // El error INESPERADO lo pinta el componente compartido, que anade el
         // identificador de la peticion. El error DEL CATALOGO se pinta exactamente como siempre
         // -mismos `data-testid`, mismo marcado- y sin identificador ninguno.
         <div
