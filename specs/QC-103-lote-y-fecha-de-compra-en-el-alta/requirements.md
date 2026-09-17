@@ -26,8 +26,23 @@
 **R2.** CUANDO se abre el panel de alta de producto, el sistema DEBE mostrar el campo fecha de
 compra con la fecha de hoy ya seleccionada `[D3]`.
 
-**R3.** El sistema DEBE ofrecer la fecha de compra como un campo obligatorio: CUANDO se envía el
-alta sin fecha de compra escrita, el sistema DEBE rechazar el envío y señalar el campo.
+**R3.** DONDE la fecha de compra se edita en el panel de alta, el sistema DEBE impedir que el
+campo quede vacío antes de enviar el formulario, de forma que la interfaz nunca permita un envío
+sin fecha escrita. SI la fecha de compra no llega a la Server Action -por una llamada que no pase
+por este panel-, ENTONCES el sistema DEBE sustituirla por la fecha de hoy, como ya fija `[D9]`
+(heredado de QC-81, no se reabre); esto NO es un rechazo del envío. `[D10]`
+
+> **Enmendado el 2026-09-17.** La redacción original exigía que el sistema RECHAZARA un envío sin
+> fecha de compra. Verificado en disco durante la implementación: `purchaseDateSchema` es
+> `.nullish()` y `resolverFechaDeCompra` sustituye la ausencia por "hoy" en vez de rechazarla -
+> comportamiento heredado de QC-81, que `design.md` marca "no se reabre" (D9). El sistema, en su
+> frontera real -la Server Action, una superficie de red-, nunca rechaza una fecha de compra
+> ausente: solo el widget de la UI lo hace imposible desde el panel de alta. Reabrir el esquema de
+> QC-81 habría requerido una autorización explícita nueva, fuera de lo que esta ficha decidió
+> pedir; en su lugar se enmienda R3 para exigir lo que el sistema sí garantiza: que el panel de
+> alta nunca permite un envío vacío, y que si la fecha no llega, el servidor la sustituye por hoy.
+> **Se acepta explícitamente** que una llamada directa a la Server Action -sin pasar por este
+> panel- puede omitir la fecha de compra sin ser rechazada.
 
 **R4.** El sistema DEBE escribir y leer la fecha de compra con el calendario de `react-day-picker`
 `[D2]`.
@@ -91,6 +106,7 @@ asignado `[D9]`.
 | [D7] El formulario no duplica la regla de solo dígitos | R8 |
 | [D8] Solo aparece en el alta | R9 |
 | [D9] Autorización, forma de la fecha y verificación heredadas | R10, R11, R17 |
+| [D10] **Enmienda a R3** (2026-09-17): la obligatoriedad se cumple en el panel de alta -nunca envía vacío-; si la fecha no llega, el servidor sigue sustituyéndola por hoy, heredado de D9 | R3 |
 
 ## Preguntas abiertas
 
@@ -118,3 +134,4 @@ que se sepa cuál fue cuál:
 | 2026-09-16 | ¿El formulario duplica la regla del lote de solo dígitos de QC-81? | **No.** Ese caso lo rechaza el **servicio** con su mensaje, y el formulario **ya toma sus mensajes del mismo esquema** que valida el alta: duplicar la regla sería tener dos sitios donde cambiarla y uno se quedaría viejo |
 | 2026-09-16 | ¿En qué pantallas aparece el campo? | **Solo en el ALTA.** La edición del producto **no conoce el lote** (**QC-90 R26**) y esta ficha no lo cambia |
 | 2026-09-16 | Autorización, forma de la fecha y verificación | **Heredados, no se reabren.** La autorización se valida **en el service** con `inventario.modificar` (**QC-20**, **QC-90**) y lleva su test. La fecha viaja como **fecha civil `YYYY-MM-DD`** y la convierte el adaptador (**QC-81**, **QC-90**). **El E2E entra AQUÍ**: QC-81 lo difirió expresamente porque no tenía recorrido que mirar, y `CHECKPOINTS.md` lo exige por tratarse de un **movimiento de inventario**. La UI cumple `docs/architecture.md > Componentes > multiplataforma`, que es obligación de toda pantalla nueva |
+| 2026-09-17 | ¿R3 lo cumple el sistema de verdad -rechazo en la Server Action-, o solo lo impide la UI? (**ENMIENDA A R3**, D10) | **Se enmienda R3, no el servidor.** Medido durante la implementación: `purchaseDateSchema` es `.nullish()` y `resolverFechaDeCompra` sustituye una fecha de compra ausente por **hoy**, en vez de rechazarla -comportamiento heredado de **QC-81**, que `design.md` marca explícitamente «no se reabre» (decisión 9 de esta misma tabla). Reabrir ese esquema para que la Server Action rechace de verdad exigiría una autorización nueva, fuera de lo que esta ficha pidió. En su lugar, **R3 pasa a exigir lo que el sistema sí garantiza**: que el panel de alta nunca deja enviar el formulario sin fecha de compra -el campo no admite quedar vacío-, y que si la fecha no llega a la Server Action, el servidor la sustituye por hoy, tal como ya hacía. **Se acepta explícitamente** que una llamada que no pase por este panel -una integración futura, una petición directa- puede omitir la fecha de compra sin que el sistema la rechace |
