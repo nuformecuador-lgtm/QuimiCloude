@@ -31,7 +31,7 @@ import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/secur
 import { formatOrderNumber } from '@/lib/modules/pedidos';
 import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
-import { ASSIGNED_ORDERS_ROUTE, assignedOrderRoute } from '@/lib/shared/routes';
+import { ASSIGNED_ORDERS_ROUTE, DELIVERED_ORDER_PARAM, assignedOrderRoute } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
 
@@ -111,6 +111,9 @@ const ENTER_TESTID = 'assigned-order-enter';
 
 const EXECUTION_TITLE_TESTID = 'order-execution-title';
 const EXECUTION_ERROR_TESTID = 'order-execution-error';
+
+/** El mismo `data-testid` que exporta `AssignedOrderDeliveredNotice`. */
+const DELIVERED_NOTICE_TESTID = 'assigned-order-delivered-notice';
 
 /** El item unico del primer bloque (`checklist`, indice 0) del primer paso. */
 const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-0-0';
@@ -367,12 +370,20 @@ test.describe('la ejecucion de la receta de un pedido asignado', () => {
     await page.getByTestId(STEP_NEXT_TESTID).click();
 
     // Paso 2 de 2, el ultimo: Finalizar envia el formulario que llama a
-    // `finishAssignedOrderAction`, que termina en el servidor con
-    // `redirect(ASSIGNED_ORDERS_ROUTE)`.
+    // `finishAssignedOrderAction`, que termina en el servidor con un `redirect` a la lista que
+    // lleva `DELIVERED_ORDER_PARAM` con el numero del pedido.
     await page.getByTestId(STEP_FINISH_TESTID).click();
-    await page.waitForURL((url) => url.pathname === ASSIGNED_ORDERS_ROUTE, { timeout: 60_000 });
+    await page.waitForURL(
+      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
+      { timeout: 60_000 },
+    );
 
     expect(await orderStatus(orderPendingId)).toBe('ENTREGADO');
+
+    // La confirmacion se pinta EN LA LISTA al volver, nunca en la pantalla de ejecucion.
+    const aviso = page.getByTestId(DELIVERED_NOTICE_TESTID);
+    await expect(aviso).toBeVisible({ timeout: 60_000 });
+    await expect(aviso).toContainText(orderPendingNumber);
   });
 
   test('R30 - quien no tiene asignaciones.consultar pide la direccion del pedido y recibe 404', async ({

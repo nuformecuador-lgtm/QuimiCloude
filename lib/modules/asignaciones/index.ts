@@ -122,7 +122,7 @@ export { createListAssignedOrders, type ListAssignedOrdersDeps } from './domain/
 export type { AssignedOrderView } from './domain/assigned-order-view';
 
 // ---------------------------------------------------------------------------------------
-// QC-63 T8 — La pantalla de ejecucion. Bloque NUEVO al final: no reordena ni reformatea nada
+// La pantalla de ejecucion. Bloque NUEVO al final: no reordena ni reformatea nada
 // de lo de arriba. Las Server Actions de `adapters/driving/order-execution-actions.ts` NO se
 // reexportan aqui, mismo motivo que las de asignacion.
 // ---------------------------------------------------------------------------------------

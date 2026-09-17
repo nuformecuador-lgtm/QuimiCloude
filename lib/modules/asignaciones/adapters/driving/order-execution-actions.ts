@@ -16,7 +16,7 @@ import { redirect } from 'next/navigation';
 import { asignaciones, identity, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
 import { AsignacionesError, type Actor, type AssignedOrderExecutionView } from '@/lib/modules/asignaciones';
-import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
+import { ASSIGNED_ORDERS_ROUTE, DELIVERED_ORDER_PARAM } from '@/lib/shared/routes';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
 const toErrorState = createErrorStateTranslator(
@@ -66,12 +66,13 @@ export async function finishAssignedOrderAction(
 ): Promise<FinishAssignedOrderResult> {
   const actor = await currentActor();
 
+  let numberText: string;
   try {
-    await asignaciones.finishAssignedOrder(actor, finishFromFormData(formData));
+    ({ numberText } = await asignaciones.finishAssignedOrder(actor, finishFromFormData(formData)));
   } catch (error) {
     return toErrorState(error);
   }
 
   revalidatePath(ASSIGNED_ORDERS_ROUTE);
-  redirect(ASSIGNED_ORDERS_ROUTE);
+  redirect(`${ASSIGNED_ORDERS_ROUTE}?${DELIVERED_ORDER_PARAM}=${encodeURIComponent(numberText)}`);
 }

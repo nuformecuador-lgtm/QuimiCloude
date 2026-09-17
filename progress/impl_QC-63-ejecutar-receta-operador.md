@@ -834,7 +834,7 @@ pnpm lint      → limpio
 
 | R | Test — archivo › caso | Fuerza |
 | --- | --- | --- |
-| **R1** | `order-execution-screen.test.tsx` › *R1 — ningun literal de ruta nuevo en la pagina* › «page.tsx no incrusta `/asignacion` como cadena» | Ejecutable |
+| **R1** | `order-execution-screen.test.tsx` › *R1 — ningun literal de ruta nuevo en la pagina* › «page.tsx no incrusta `/asignacion` como cadena». **Matizada el 2026-09-17**: `lib/shared/routes.ts` gana `DELIVERED_ORDER_PARAM`, que **no es una ruta ni una función de ruta** sino el nombre de un **parámetro de consulta de la lista** —lo necesitan la Server Action (`lib/`) y la lista (`app/`), y `lib/` no puede importar de `app/`—. La pantalla sigue **sin declarar ningún literal ni función de ruta propios** | Ejecutable + matiz declarado |
 | **R2** | `order-execution-page.test.tsx` › «con el permiso, entra y abre el pedido» + `guard-pantallas-exigen-permiso.test.ts` › «el barrido encuentra exactamente las trece pantallas privadas de hoy» | Ejecutable |
 | **R3** | `order-execution-page.test.tsx` › «con sesion pero sin `asignaciones.consultar` responde 404, nunca 403» | Ejecutable |
 | **R4** | `asignaciones/module-contract.test.ts` › «nadie los nombra fuera del catalogo…» + sus **dos casos de mutación**. La otra mitad es **ESTRUCTURAL**: `identity/domain/permissions.ts` **no está en el diff** | Ejecutable + **Estructural** |
@@ -848,7 +848,7 @@ pnpm lint      → limpio
 | **R12** | `start-assigned-order.test.ts` › «el archivo no declara ninguna lista de estados propia» + `pedidos/module-contract.test.ts` › la lista **exacta** de consumidores de `assertTransition` | Ejecutable |
 | **R13** | `guard-arquitectura-modulos.test.ts` › «ningun adaptador driven real accede a un modelo de otro modulo», con su caso de mutación | Ejecutable |
 | **R14** | `start-assigned-order.test.ts` y `finish-assigned-order.test.ts` › «ENTREGADO rechaza con `order_delivered_frozen` sin escribir» y «CANCELADO rechaza con `order_cancelled_not_assignable` sin escribir» | Ejecutable |
-| **R15** | `order-execution-screen.test.tsx` › «al finalizar muestra la confirmacion y navega a la lista» y «si la operacion falla, muestra el error y NO muestra la confirmacion» | Ejecutable |
+| **R15** | **REESCRITA el 2026-09-17 tras el rechazo del `reviewer`.** La forma anterior era **inalcanzable** (`redirect()` lanza ⇒ la acción nunca devuelve éxito) y su test **no podía fallar**. Hoy: `tests/unit/asignaciones/order-execution-actions.test.ts` › «redirige a /asignacion?entregado=<numero> con el numero que devuelve el caso de uso» —**sobre la acción real**— + `tests/unit/asignaciones-ui/assigned-orders-delivered-notice.test.tsx` › *R15* › «con el parametro presente, el aviso queda visible y nombra el pedido» y «sin el parametro, no pinta ningun aviso» —**renderizando la página real**— + E2E R29, que lo afirma en el aterrizaje. **Los dos probados por mutación** (salida real abajo) | Ejecutable |
 | **R16** | `finish-assigned-order.test.ts` › «la firma solo acepta el actor y el identificador del pedido: sin un tercer parametro» y «un `input` con datos de marcado… el esquema estricto los rechaza» | Ejecutable |
 | **R17** | **Parcial.** `order-execution-screen.test.tsx` › «no ofrece ningun campo de texto ni area de edicion». Que no exista **reabrir/deshacer** es **ESTRUCTURAL**: el módulo solo publica `start`/`finish`, y `order-transitions.ts` deja `ENTREGADO`/`CANCELADO` **vacías** | Ejecutable + **Estructural** |
 | **R18** | `order-execution-screen.test.tsx` › *R18* › «`components/shared/step-reader/**` no cambia respecto a la base de fusion» | Ejecutable |
@@ -864,7 +864,7 @@ pnpm lint      → limpio
 | **R28** | **Probada por mutación en los DOS archivos unitarios** (salida real más arriba). **El E2E NO se ha mutado**: la receta exacta está en «LA MUTACIÓN DEL E2E QUE EXIGE R28» | Ejecutable (2 de 3) · **1 pendiente del gate** |
 | **R29** | `e2e/ejecucion-receta.spec.ts` › «R29 - el Operador entra, ve su pedido asignado, lo abre, el pedido queda EN_CURSO en base…» | **Escrito, sin ejecutar** |
 | **R30** | `e2e/ejecucion-receta.spec.ts` › «R30 - quien no tiene asignaciones.consultar pide la direccion del pedido y recibe 404» | **Escrito, sin ejecutar** |
-| **R31** | **ESTRUCTURAL.** De la lista de QC-88 la rama solo toca los **dos** archivos que R27/R28 exigen; `asignacion/page.tsx` y `lib/shared/routes.ts` **no están en el diff**. El puente sale de `Order.recipeId` y no hay navegación por el catálogo — lo vigila además `recetas/scope.test.ts` | **Estructural** + guardia |
+| **R31** | **REESCRITA el 2026-09-17: ya NO se sostiene por «el archivo no está en el diff».** La decisión humana de mostrar el aviso en la lista mete `app/(private)/asignacion/page.tsx` y `lib/shared/routes.ts` en el diff. Es una **enmienda declarada**, misma figura que R27 con QC-88 R21, y **acotada**: la lista gana **solo** el aviso de entrega (un componente nuevo y su lectura del parámetro), no se reorganiza ni cambia nada más suyo —`assigned-orders-list-params.ts` sigue **intacto**—. Lo que **sí** sigue siendo estructural y cierto: el puente sale de `Order.recipeId` y **no hay navegación por el catálogo de recetas**, que es lo que vigila `recetas/scope.test.ts` | Enmienda declarada + guardia |
 
 **Ni un `R<n>` sin fila: 31 de 31.**
 
@@ -1014,3 +1014,100 @@ Test Files  517 passed (517)
 **Antes hubo un gate completo ROJO** por dos censos que el rápido no alcanza —`recetas/scope` y
 `data-table-alcance`—, tensados en `f080ffd`. Es la demostración de por qué el gate completo es
 condición antes del PR y no un trámite: con el rápido en verde, esos dos se habrían colado en `dev`.
+
+---
+
+# Cierre del RECHAZO del `reviewer` (2026-09-17)
+
+## BLOQ-1 — cita de ficha en producción, cerrada
+`lib/modules/asignaciones/index.ts`: fuera el `QC-63 T8 — ` del comentario, conservando el porqué.
+**Era la cuarta reincidencia y la única que sobrevivía.** Barrido posterior: las únicas citas que
+quedan en producción son **preexistentes** en `lib/composition/index.ts` (`QC-23`, `R12`…), que
+`docs/conventions.md > Comentarios` dice expresamente que **no se arrastran**: se limpian por módulo,
+en ficha propia.
+
+## BLOQ-2 — R15: la confirmación era código muerto
+
+**El diagnóstico del `reviewer` era correcto de punta a punta.** `finishAssignedOrderAction` termina
+**siempre** en `redirect()`, que **lanza**; la acción **nunca** devolvía `{status:'success'}`; la
+pantalla pintaba la confirmación **solo** con ese estado; y su test pasaba porque **doblaba la acción
+con un valor que la acción real no emite**. Un test que no podía fallar.
+
+### La forma nueva (decisión humana): el aviso se ve EN LA LISTA
+- `finishAssignedOrder` pasa de `Promise<void>` a devolver **`{ numberText }`**, compuesto con
+  `formatOrderNumber` y **leído ANTES de transicionar** —tras `ENTREGADO` el pedido ya no vuelve en
+  los estados de trabajo, así que leerlo después habría dado vacío—. **R5 intacto** (autorización
+  sigue en la primera línea) y **R16 intacto** (la firma no gana ningún parámetro de entrada: solo
+  cambia lo que devuelve).
+- La acción redirige a `` `${ASSIGNED_ORDERS_ROUTE}?${DELIVERED_ORDER_PARAM}=<numero>` ``, escapado.
+- `app/(private)/asignacion/page.tsx` pinta `AssignedOrderDeliveredNotice`: «Pedido 2026-0000007
+  entregado», **texto en el DOM** con `role="status"` y `ASSIGNED_ORDER_DELIVERED_TESTID`. Nunca un
+  `title`.
+
+### Código muerto retirado
+De `order-execution-screen.tsx`: la variable `confirmed`, el párrafo de confirmación,
+`CONFIRMATION_TEXT`, y el `useEffect`/`useRouter` que empujaba a la lista con un estado que jamás
+llega. `ORDER_EXECUTION_CONFIRMATION_TESTID` deja de existir y sale del barrel.
+**`IGNORED_PREV_STATE` se conserva** porque **no** existía para la confirmación: satisface la firma
+`finishAssignedOrderAction(prevState, formData)`. **R19 y el resto de la pantalla, intactos.**
+
+### Cómo se garantizó que la cobertura sale del CAMINO REAL
+Era el punto 2 del encargo y es donde estaba el vicio.
+- **Se eliminó el doble que emitía `{status:'success'}` para `finish`.** Barrido posterior en
+  `tests/unit/asignaciones-ui/`: los dos `status:'success'` que quedan son de **otras** acciones que
+  sí devuelven ese valor —`listAssignedOrdersAction` (QC-88) y `startAssignedOrderAction`, que **no**
+  redirige—, no del `finish`.
+- La cobertura de la acción se hace **sobre la acción real** con `redirect` doblado, afirmando la
+  **URL exacta**.
+- La cobertura del aviso **renderiza la página real** (`AsignacionPage`) con `searchParams`.
+
+### Prueba por mutación — salida real de los dos lados
+
+**La acción** (valor esperado cambiado a `2026-0000008`):
+```
+AssertionError: expected "vi.fn()" to be called with arguments: [ Array(1) ]
+-   "/asignacion?entregado=2026-0000008",
++   "/asignacion?entregado=2026-0000007",
+ Test Files  1 failed (1)
+     Tests  1 failed | 2 passed (3)
+```
+
+**El aviso de la lista** (comparado contra `2026-9999999`):
+```
+FAIL tests/unit/asignaciones-ui/assigned-orders-delivered-notice.test.tsx
+> R15: aviso de entrega al volver de finalizar > con el parametro presente, el aviso queda visible
+Error: expect(element).toHaveTextContent()
+Expected element to have text content: 2026-9999999
+Received: Pedido 2026-0000007 entregado
+ Test Files  1 failed (1)
+     Tests  1 failed | 1 passed (2)
+```
+Restaurados, los dos verdes. **Ahora sí pueden fallar.**
+
+### E2E de R29, escrito y pendiente del gate
+El caso de R29 espera a que la URL de vuelta lleve `DELIVERED_ORDER_PARAM` y **afirma que el aviso
+está visible con el número del pedido**, por su `data-testid`. **No se ha corrido**: Playwright no
+está en el reparto del implementer.
+
+## MENOR-2 — cerrado
+La **primera** consulta de `findUnitRefsSharingBaseInCompany` —la que lee la base efectiva— ya se
+acota con `companyScopeWhere`, la misma definición y sin un segundo `OR`. Caso nuevo que inspecciona
+el `where` que de verdad viaja a `findMany`.
+
+## MENORES 3 y 4 — DEUDA DECLARADA, no tocada (por decisión del humano)
+- **Menor-3**: el censo de Server Actions de QC-104 ejercita **una sola** de las dos acciones nuevas
+  (`startAssignedOrderAction`); `finishAssignedOrderAction` entra en la lista por archivo pero no se
+  invoca. La lista es **por archivo**, así que el censo cumple su contrato; medir las dos sería
+  tensarlo más. **No se toca aquí.**
+- **Menor-4**: un `(R44)` **preexistente** en `lib/composition/index.ts` entra en el diff al
+  reflowarse una línea vecina. `docs/conventions.md` dice que los comentarios preexistentes **no se
+  arrastran** a la limpieza. **No se toca aquí.**
+
+## Salida real tras cerrar el rechazo
+```
+pnpm typecheck → 0 errores
+pnpm lint      → limpio
+pnpm exec vitest run tests/unit/asignaciones-ui tests/unit/asignaciones tests/unit/unidades tests/guards --maxWorkers=2
+Test Files  86 passed (86)
+     Tests  1194 passed | 11 skipped (1205)
+```

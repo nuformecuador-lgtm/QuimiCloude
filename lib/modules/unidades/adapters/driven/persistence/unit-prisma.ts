@@ -208,9 +208,9 @@ export async function listUnitsPage(query: ListQuery, scope: UnitScope): Promise
 }
 
 /**
- * Implementa `UnitCatalog['findRefsSharingBaseInCompany']`. Dos consultas: la primera lee la
- * base efectiva (`baseUnitId ?? id`) de cada unidad pedida; la segunda trae, YA con
- * `companyScopeWhere`, toda unidad -propia o de sistema- cuya base efectiva coincida con
+ * Implementa `UnitCatalog['findRefsSharingBaseInCompany']`. Dos consultas, LAS DOS con
+ * `companyScopeWhere`: la primera lee la base efectiva (`baseUnitId ?? id`) de cada unidad
+ * pedida; la segunda trae toda unidad -propia o de sistema- cuya base efectiva coincida con
  * alguna de las leidas, sea porque ELLA es esa base o porque deriva de ella.
  */
 export async function findUnitRefsSharingBaseInCompany(
@@ -220,7 +220,7 @@ export async function findUnitRefsSharingBaseInCompany(
   if (unitIds.length === 0) return [];
 
   const requested = await prisma.unit.findMany({
-    where: { id: { in: [...unitIds] } },
+    where: { AND: [companyScopeWhere({ companyId }), { id: { in: [...unitIds] } }] },
     select: { id: true, baseUnitId: true },
   });
   if (requested.length === 0) return [];

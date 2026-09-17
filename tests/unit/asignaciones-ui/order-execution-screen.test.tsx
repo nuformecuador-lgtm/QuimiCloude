@@ -3,39 +3,25 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { setupUser } from '../../helpers/user-event';
 
 import {
-  ORDER_EXECUTION_CONFIRMATION_TESTID,
   ORDER_EXECUTION_RECIPE_NAME_TESTID,
   ORDER_EXECUTION_SCREEN_TESTID,
   OrderExecutionScreen,
 } from '@/app/(private)/asignacion/[id]/components';
 import type { AssignedOrderExecutionView } from '@/lib/modules/asignaciones';
-import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 
 /**
- * El recorrido completo: R15, R18, R19, R20, R21, R26.
+ * El recorrido completo: R18, R19, R20, R21, R26. La confirmacion visible de R15 vive en la
+ * lista de pedidos asignados, no en esta pantalla: ver `assigned-orders-states.test.tsx`.
  */
 
-const { routerMock, finishAssignedOrderActionMock } = vi.hoisted(() => ({
-  routerMock: {
-    push: vi.fn<(href: string) => void>(),
-    replace: vi.fn<(href: string) => void>(),
-    refresh: vi.fn<() => void>(),
-    back: vi.fn<() => void>(),
-    forward: vi.fn<() => void>(),
-    prefetch: vi.fn<(href: string) => void>(),
-  },
+const { finishAssignedOrderActionMock } = vi.hoisted(() => ({
   finishAssignedOrderActionMock: vi.fn(),
-}));
-
-vi.mock('next/navigation', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('next/navigation')>()),
-  useRouter: () => routerMock,
 }));
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-execution-actions', () => ({
@@ -117,20 +103,8 @@ describe('pantalla de ejecucion — R19: bloqueo sin escape con el motivo visibl
   });
 });
 
-describe('pantalla de ejecucion — R15: confirmacion visible y vuelta a la lista', () => {
-  it('al finalizar muestra la confirmacion y navega a la lista de pedidos asignados', async () => {
-    finishAssignedOrderActionMock.mockResolvedValue({ status: 'success' });
-    const user = setupUser();
-    render(<OrderExecutionScreen execution={EXECUTION} />);
-
-    await marcarTodo(user);
-    await user.click(screen.getByTestId('step-reader-finish'));
-
-    expect(await screen.findByTestId(ORDER_EXECUTION_CONFIRMATION_TESTID)).toBeVisible();
-    await waitFor(() => expect(routerMock.push).toHaveBeenCalledWith(ASSIGNED_ORDERS_ROUTE));
-  });
-
-  it('si la operacion falla, muestra el error y NO muestra la confirmacion', async () => {
+describe('pantalla de ejecucion — el error de la operacion se muestra sin bloquear la pantalla', () => {
+  it('si la operacion falla, muestra el error', async () => {
     finishAssignedOrderActionMock.mockResolvedValue({
       status: 'error',
       code: 'order_delivered_frozen',
@@ -143,8 +117,6 @@ describe('pantalla de ejecucion — R15: confirmacion visible y vuelta a la list
     await user.click(screen.getByTestId('step-reader-finish'));
 
     expect(await screen.findByTestId('order-execution-finish-error')).toBeVisible();
-    expect(screen.queryByTestId(ORDER_EXECUTION_CONFIRMATION_TESTID)).toBeNull();
-    expect(routerMock.push).not.toHaveBeenCalled();
   });
 });
 

@@ -161,24 +161,29 @@ describe('findRefsSharingBaseInCompany', () => {
    *  que lee la base efectiva como en la que trae las hermanas. */
   function baseConCincoUnidades(): void {
     findMany.mockImplementation(async (args: { where: Record<string, unknown>; select: Record<string, unknown> }) => {
-      if ('baseUnitId' in args.select && !('AND' in args.where)) {
-        const ids = (args.where.id as { in: readonly string[] }).in;
-        return UNIDADES.filter((unidad) => ids.includes(unidad.id)).map((unidad) => ({
-          id: unidad.id,
-          baseUnitId: unidad.baseUnitId,
-        }));
+      const esConsultaDeBase = !('name' in args.select);
+      const [ambito, filtro] = args.where.AND as [
+        { OR: readonly { companyId: string | null }[] },
+        {
+          id?: { in: readonly string[] };
+          OR?: readonly [{ id: { in: readonly string[] } }, { baseUnitId: { in: readonly string[] } }];
+        },
+      ];
+      const visiblePorEmpresa = (unidad: (typeof UNIDADES)[number]): boolean =>
+        ambito.OR.some((cond) => cond.companyId === unidad.companyId);
+
+      if (esConsultaDeBase) {
+        const ids = (filtro.id as { in: readonly string[] }).in;
+        return UNIDADES.filter((unidad) => visiblePorEmpresa(unidad) && ids.includes(unidad.id)).map(
+          (unidad) => ({ id: unidad.id, baseUnitId: unidad.baseUnitId }),
+        );
       }
 
-      const [ambito, coincideBase] = args.where.AND as [
-        { OR: readonly { companyId: string | null }[] },
-        { OR: readonly [{ id: { in: readonly string[] } }, { baseUnitId: { in: readonly string[] } }] },
-      ];
-      const basesPedidas = coincideBase.OR[0].id.in;
+      const basesPedidas = (filtro.OR as readonly [{ id: { in: readonly string[] } }, unknown])[0].id.in;
 
       return UNIDADES.filter((unidad) => {
-        const visiblePorEmpresa = ambito.OR.some((cond) => cond.companyId === unidad.companyId);
         const mismaBase = basesPedidas.includes(unidad.id) || basesPedidas.includes(unidad.baseUnitId ?? '');
-        return visiblePorEmpresa && mismaBase;
+        return visiblePorEmpresa(unidad) && mismaBase;
       });
     });
   }
@@ -210,6 +215,20 @@ describe('findRefsSharingBaseInCompany', () => {
 
     expect(refs.map((ref) => ref.id)).not.toContain('u-litro-ajena');
     expect(refs.map((ref) => ref.id)).toContain('u-ml');
+  });
+
+  it('MENOR-2 - la consulta que lee la base efectiva TAMBIEN lleva companyScopeWhere', async () => {
+    findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    await findUnitRefsSharingBaseInCompany(EMPRESA, ['u-litro']);
+
+    const primeraLlamada = findMany.mock.calls[0]?.[0] as { where: Record<string, unknown> };
+    // Igualdad ESTRUCTURAL con `companyScopeWhere`, la MISMA definicion que compone la segunda
+    // consulta: si esta primera lectura escribiera su propio `OR` de sistema/empresa -o
+    // ninguno-, esta igualdad lo notaria.
+    expect(primeraLlamada.where).toEqual({
+      AND: [companyScopeWhere({ companyId: EMPRESA }), { id: { in: ['u-litro'] } }],
+    });
   });
 
   it('con una lista vacia de ids no consulta la base y devuelve una lista vacia', async () => {

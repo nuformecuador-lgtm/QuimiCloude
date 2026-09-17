@@ -1,7 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useActionState, useRef } from 'react';
 
 import { StepReader } from '@/components/shared/step-reader';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
@@ -11,7 +10,6 @@ import {
   type FinishAssignedOrderResult,
 } from '@/lib/modules/asignaciones/adapters/driving/order-execution-actions';
 import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
-import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { OrderExecutionLines } from './order-execution-lines';
 import { OrderScaleBanner } from './order-scale-banner';
@@ -21,20 +19,18 @@ import { OrderScaleBanner } from './order-scale-banner';
  * Finalizar. No hay ningun control de edicion: la receta, sus pasos y sus
  * lineas se leen tal cual llegaron.
  *
- * `finishAssignedOrderAction` termina, en el servidor, con `redirect(ASSIGNED_ORDERS_ROUTE)`. La
- * navegacion de aqui es un refuerzo del lado del cliente para el caso en que la operacion
- * resuelve `{ status: 'success' }` sin haber saltado esa redireccion.
+ * `finishAssignedOrderAction` termina, en el servidor, con una redireccion a la lista de pedidos
+ * asignados: el camino feliz de esta pantalla nunca resuelve, la navegacion ocurre en el
+ * servidor.
  */
 
 export const ORDER_EXECUTION_SCREEN_TESTID = 'order-execution-screen';
-export const ORDER_EXECUTION_CONFIRMATION_TESTID = 'order-execution-confirmation';
 export const ORDER_EXECUTION_FINISH_ERROR_TESTID = 'order-execution-finish-error';
 export const ORDER_EXECUTION_FINISH_FORM_TESTID = 'order-execution-finish-form';
 export const ORDER_EXECUTION_ORDER_ID_FIELD = 'orderId';
 export const ORDER_EXECUTION_TITLE_TESTID = 'order-execution-title';
 export const ORDER_EXECUTION_RECIPE_NAME_TESTID = 'order-execution-recipe-name';
 
-const CONFIRMATION_TEXT = 'Pedido finalizado. Volviendo a la lista de pedidos asignados…';
 const RECIPE_MISSING_TEXT = 'Esta receta esta dada de baja.';
 
 type FinishFormState = { readonly status: 'idle' } | FinishAssignedOrderResult;
@@ -49,20 +45,13 @@ export type OrderExecutionScreenProps = {
 };
 
 export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
-  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction] = useActionState<FinishFormState, FormData>(
     (_previous, formData) => finishAssignedOrderAction(IGNORED_PREV_STATE, formData),
     INITIAL_STATE,
   );
 
-  useEffect(() => {
-    if (state.status !== 'success') return;
-    router.push(ASSIGNED_ORDERS_ROUTE);
-  }, [state, router]);
-
   const error = state.status === 'error' ? state : undefined;
-  const confirmed = state.status === 'success';
 
   return (
     <div className="flex min-h-dvh flex-col gap-4 p-4 md:p-6">
@@ -100,16 +89,6 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
           defaultValue={execution.orderId}
         />
       </form>
-
-      {confirmed ? (
-        <p
-          role="status"
-          data-testid={ORDER_EXECUTION_CONFIRMATION_TESTID}
-          className="text-base font-medium"
-        >
-          {CONFIRMATION_TEXT}
-        </p>
-      ) : null}
 
       {error !== undefined ? (
         <div

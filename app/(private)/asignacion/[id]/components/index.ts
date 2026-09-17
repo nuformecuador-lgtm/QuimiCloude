@@ -17,7 +17,6 @@ export {
   type OrderExecutionLinesProps,
 } from './order-execution-lines';
 export {
-  ORDER_EXECUTION_CONFIRMATION_TESTID,
   ORDER_EXECUTION_FINISH_ERROR_TESTID,
   ORDER_EXECUTION_FINISH_FORM_TESTID,
   ORDER_EXECUTION_ORDER_ID_FIELD,

@@ -1,6 +1,11 @@
 // Sin `'use client'` a proposito: la frontera se declara en cada componente, y asi `page.tsx`
 // sigue siendo Server Component aunque importe desde aqui.
 export {
+  ASSIGNED_ORDER_DELIVERED_TESTID,
+  AssignedOrderDeliveredNotice,
+  assignedOrderDeliveredNoticeText,
+} from './assigned-order-delivered-notice';
+export {
   ASSIGNED_ORDER_ENTER_REASON_TESTID,
   ASSIGNED_ORDER_ENTER_TESTID,
   AssignedOrderEnterTrigger,

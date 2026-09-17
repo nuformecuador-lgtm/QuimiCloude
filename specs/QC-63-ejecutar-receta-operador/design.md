@@ -315,7 +315,33 @@ sola; **hay que dejarla con su ámbito o se ponen rojos**.
 
 `finishAssignedOrderAction` termina con `redirect(ASSIGNED_ORDERS_ROUTE)` y `revalidatePath` de esa
 ruta (R15): la lista debe volver **sin** el pedido, porque QC-88 R11 solo trae `PENDIENTE` y
-`EN_CURSO` (R17). La confirmación visible se muestra **antes** de volver, en la propia pantalla.
+`EN_CURSO` (R17). ~~La confirmación visible se muestra **antes** de volver, en la propia pantalla.~~
+
+> ### CORREGIDO el 2026-09-17 — esa forma era INALCANZABLE, y lo destapó el `reviewer`
+>
+> **Por qué no podía funcionar:** `finishAssignedOrderAction` termina **siempre** en
+> `redirect(ASSIGNED_ORDERS_ROUTE)`, y **`redirect()` lanza**. La acción, por tanto, **nunca**
+> devuelve su estado de éxito, y la pantalla pintaba la confirmación **solo** con ese estado: era
+> **código muerto**. Su test pasaba porque **doblaba la acción con un valor que la acción real no
+> emite** — un test que no podía fallar.
+>
+> **Qué la sustituye (decisión humana del 2026-09-17):** la confirmación se muestra **EN LA LISTA al
+> volver**. `finishAssignedOrder` devuelve el `numberText` —leído **antes** de transicionar, porque
+> tras `ENTREGADO` el pedido ya no vuelve en los estados de trabajo—, la acción redirige a
+> `` `${ASSIGNED_ORDERS_ROUTE}?${DELIVERED_ORDER_PARAM}=<numero>` `` y
+> `app/(private)/asignacion/page.tsx` pinta «Pedido 2026-0000007 entregado» con
+> `ASSIGNED_ORDER_DELIVERED_TESTID` y `role="status"`.
+>
+> **Descartadas**: retener al Operador en la pantalla —cuesta un toque por pedido— y la vuelta
+> automática tras unos segundos —frágil de probar, y el aviso puede desaparecer sin que nadie lo lea—.
+>
+> **CONSECUENCIA DE ALCANCE, declarada y no silenciosa:** esto mete en el diff
+> `app/(private)/asignacion/page.tsx` —la lista, que es de **QC-88**— y `lib/shared/routes.ts`. Es
+> una **enmienda declarada**, la misma figura que R27 con QC-88 R21: **R31** deja de sostenerse por
+> «el archivo no está en el diff», y **R1** gana una constante que **no es una ruta ni una función de
+> ruta**, sino el **nombre de un parámetro de consulta de la lista**, necesario porque la Server
+> Action vive en `lib/` y la lista en `app/`, y `lib/` no puede importar de `app/`. Las filas de R1,
+> R15 y R31 de la tabla de trazabilidad quedan reescritas en consecuencia.
 
 ## 5. La enmienda a QC-88 (R27, R28)
 

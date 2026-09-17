@@ -26,10 +26,13 @@ const PEDIDO = uuid('7');
 
 const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] };
 
+const NUMERO_PEDIDO = { year: 2026, sequence: 7 };
+
 type Dobles = {
   readonly deps: FinishAssignedOrderDeps;
   readonly listOrderIdsByUserInCompany: ReturnType<typeof vi.fn>;
   readonly findAliveById: ReturnType<typeof vi.fn>;
+  readonly listAliveSummariesByIds: ReturnType<typeof vi.fn>;
   readonly transitionAliveById: ReturnType<typeof vi.fn>;
 };
 
@@ -43,6 +46,13 @@ function montar(options?: {
 
   const listOrderIdsByUserInCompany = vi.fn(async () => options?.ids ?? [PEDIDO]);
   const findAliveById = vi.fn(async () => ({ id: PEDIDO, status: estados.shift() ?? 'ENTREGADO' }));
+  const listAliveSummariesByIds = vi.fn(async () => ({
+    items: [{ id: PEDIDO, number: NUMERO_PEDIDO, recipeId: 'receta-1', quantity: '10.0000', priority: 'MEDIA', status: 'EN_CURSO' }],
+    total: 1,
+    page: 1,
+    pageSize: 1,
+    totalPages: 1,
+  }));
   const transitionAliveById = vi.fn(async () => resultados.shift() ?? 'ok');
 
   const deps: FinishAssignedOrderDeps = {
@@ -56,13 +66,13 @@ function montar(options?: {
     } as unknown as OrderAssignmentRepository,
     orders: {
       findAliveById,
-      listAliveSummariesByIds: vi.fn(),
+      listAliveSummariesByIds,
       transitionAliveById,
     } as unknown as OrderCatalog,
     now: () => new Date('2026-09-17T12:00:00.000Z'),
   };
 
-  return { deps, listOrderIdsByUserInCompany, findAliveById, transitionAliveById };
+  return { deps, listOrderIdsByUserInCompany, findAliveById, listAliveSummariesByIds, transitionAliveById };
 }
 
 describe('finishAssignedOrder — autorizacion', () => {
@@ -134,9 +144,35 @@ describe('finishAssignedOrder — `stale`: relee y reintenta contra el estado re
     });
     const finishAssignedOrder = createFinishAssignedOrder(deps);
 
-    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).resolves.toBeUndefined();
+    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
+      numberText: '2026-0000007',
+    });
     expect(findAliveById).toHaveBeenCalledTimes(2);
     expect(transitionAliveById).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('finishAssignedOrder — confirmacion: devuelve el numero, leido ANTES de transicionar', () => {
+  it('resuelve con el `numberText` formateado del pedido', async () => {
+    const { deps } = montar({ ordenDeEstados: ['EN_CURSO'] });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await expect(finishAssignedOrder(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
+      numberText: '2026-0000007',
+    });
+  });
+
+  it('lee el numero ANTES de transicionar: el pedido ya no aparece en los estados de trabajo despues de ENTREGADO', async () => {
+    const { deps, listAliveSummariesByIds, transitionAliveById } = montar({
+      ordenDeEstados: ['EN_CURSO'],
+    });
+    const finishAssignedOrder = createFinishAssignedOrder(deps);
+
+    await finishAssignedOrder(ACTOR, { orderId: PEDIDO });
+
+    const [ordenLectura] = listAliveSummariesByIds.mock.invocationCallOrder;
+    const [ordenTransicion] = transitionAliveById.mock.invocationCallOrder;
+    expect(ordenLectura).toBeLessThan(ordenTransicion as number);
   });
 });
 
