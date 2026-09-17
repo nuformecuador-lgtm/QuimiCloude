@@ -57,14 +57,14 @@ kilogramo; test que **no** devuelve una unidad de otra empresa pero **sí** una 
 
 ## Bloque B — El caso de uso, que es donde vive la seguridad
 
-### T4 — Proyección de salida
+### T4 [x] — Proyección de salida
 **Toca:** `lib/modules/asignaciones/domain/assigned-order-execution-view.ts`
 **Hacer:** `AssignedOrderExecutionView` y `ExecutionLineView` tal como los fija `design.md > 3.2`.
 Cerrados: sin autoría, sin marcas de tiempo, sin existencia de producto. Decimales como **texto**.
 **Hecho cuando:** `tsc --noEmit` verde y el tipo no incluye ninguna clave de más.
 **Depende de:** T1, T2, T3 (nombra sus tipos).
 
-### T5 — Lectura: `getAssignedOrderExecution`
+### T5 [x] — Lectura: `getAssignedOrderExecution`
 **Toca:** `lib/modules/asignaciones/domain/get-assigned-order-execution.ts`,
 `tests/unit/asignaciones/get-assigned-order-execution.test.ts`
 **Hacer:** el orden exacto de `design.md > 3`: `requirePermission(actor, 'asignaciones.consultar')`
@@ -81,7 +81,7 @@ propia.
 - `R22`: solo vuelven unidades de la misma base efectiva.
 **Depende de:** T4.
 
-### T6 — Transición de apertura: `startAssignedOrder`
+### T6 [x] — Transición de apertura: `startAssignedOrder`
 **Toca:** `lib/modules/asignaciones/domain/start-assigned-order.ts`,
 `tests/unit/asignaciones/start-assigned-order.test.ts`
 **Hacer:** mismo preámbulo que T5; después: `PENDIENTE` ⇒ `transitionAliveById(..., 'EN_CURSO')`;
@@ -92,7 +92,7 @@ propia.
 archivo **no contiene ninguna lista de estados propia** (la decisión la toma `pedidos`).
 **Depende de:** T5.
 
-### T7 — Transición de cierre: `finishAssignedOrder`
+### T7 [x] — Transición de cierre: `finishAssignedOrder`
 **Toca:** `lib/modules/asignaciones/domain/finish-assigned-order.ts`,
 `tests/unit/asignaciones/finish-assigned-order.test.ts`
 **Hacer:** `EN_CURSO → ENTREGADO` vía `transitionAliveById`; `ENTREGADO`/`CANCELADO` ⇒ error de
@@ -101,7 +101,7 @@ archivo **no contiene ninguna lista de estados propia** (la decisión la toma `p
 que la operación **no recibe ni acepta** ningún dato de marcado (la firma no lo admite: no compila).
 **Depende de:** T5.
 
-### T8 — Contrato público del módulo
+### T8 [x] — Contrato público del módulo
 **Toca:** `lib/modules/asignaciones/index.ts`, `tests/unit/asignaciones/module-contract.test.ts`
 **Hacer:** **bloque nuevo al final**, sin reordenar ni reformatear nada de lo de arriba: las tres
 factories, sus `*Deps` y la vista. **No** las Server Actions.
@@ -109,14 +109,14 @@ factories, sus `*Deps` y la vista. **No** las Server Actions.
 barril no trae `'use server'`, `@prisma/client` ni `next/*`.
 **Depende de:** T6, T7.
 
-### T9 — Cableado
+### T9 [x] — Cableado
 **Toca:** `lib/composition/index.ts`
 **Hacer:** instanciar las tres factories con los adaptadores driven de T1, T2, T3.
 **Hecho cuando:** `guard-arquitectura-modulos` verde y `tsc --noEmit` verde.
 **Aviso:** archivo caliente; commit pequeño y solo esto, para que un conflicto se resuelva a ojo.
 **Depende de:** T8.
 
-### T10 — Server Actions
+### T10 [x] — Server Actions
 **Toca:** `lib/modules/asignaciones/adapters/driving/order-execution-actions.ts`
 **Hacer:** `startAssignedOrderAction` y `finishAssignedOrderAction` copiando la estructura de
 `order-assignment-actions.ts`: actor de las **dos caras** de la sesión dentro de `runInRequestScope`,

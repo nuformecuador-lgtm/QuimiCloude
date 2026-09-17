@@ -120,3 +120,25 @@ export { canModifyAssignments } from './domain/actor';
 // imports volveria este contrato inimportable desde un componente de cliente.
 export { createListAssignedOrders, type ListAssignedOrdersDeps } from './domain/list-assigned-orders';
 export type { AssignedOrderView } from './domain/assigned-order-view';
+
+// ---------------------------------------------------------------------------------------
+// QC-63 T8 — La pantalla de ejecucion. Bloque NUEVO al final: no reordena ni reformatea nada
+// de lo de arriba. Las Server Actions de `adapters/driving/order-execution-actions.ts` NO se
+// reexportan aqui, mismo motivo que las de asignacion.
+// ---------------------------------------------------------------------------------------
+export {
+  createGetAssignedOrderExecution,
+  type GetAssignedOrderExecutionDeps,
+} from './domain/get-assigned-order-execution';
+export {
+  createStartAssignedOrder,
+  type StartAssignedOrderDeps,
+} from './domain/start-assigned-order';
+export {
+  createFinishAssignedOrder,
+  type FinishAssignedOrderDeps,
+} from './domain/finish-assigned-order';
+export type {
+  AssignedOrderExecutionView,
+  ExecutionLineView,
+} from './domain/assigned-order-execution-view';

@@ -81,6 +81,17 @@ finalizar) y el módulo ya tiene un archivo por caso de uso.
 4. `deps.orders.findAliveById(orderId, actor.companyId)` → `null` ⇒ `OrderNotFoundError` (R7).
 5. Según la operación: pintar, o transicionar.
 
+**Dependencias del caso de uso de lectura** (`GetAssignedOrderExecutionDeps`): `assignments`,
+`orders`, `recipes`, `units` y **`products`**.
+
+> **Corregido el 2026-09-17.** La lista original omitía `products`, y era falsa contra el disco:
+> `recetas` no puede resolver el nombre de un producto —ese dato es de `inventario`— así que
+> `RecipeExecutionContent.lines[].productName` sale **siempre `null`** de `findExecutionContentById`.
+> El caso de uso lo completa con `deps.products.findRefs(...)`, exactamente como ya hace
+> `lib/modules/recetas/domain/get-recipe.ts`. Decidido por el humano: la rama degradada dejaría al
+> operario leyendo un identificador en vez del nombre del producto que tiene que cargar, y eso es la
+> pantalla entera, no un adorno como el factor.
+
 ### 3.1 Las dos transiciones (R8, R11, R12, R13, R14)
 
 ```
@@ -164,7 +175,7 @@ export type AssignedOrderExecutionView = {
 };
 
 export type ExecutionLineView = {
-  readonly productName: string | null;
+  readonly productName: string | null;   // lo resuelve el caso de uso con `deps.products.findRefs`
   readonly quantity: string;            // TAL CUAL está escrita, sin escalar (R21)
   readonly unit: UnitRef;               // la unidad de la línea
   readonly alternativeUnits: readonly UnitRef[];  // misma base efectiva, sin la propia (R22)
@@ -384,6 +395,15 @@ dice que es un **error**, no un resultado raro.
 > teórico sería `RecipeLineView.productStock`, que sale de `ProductCatalog.findRefs` — y esta ficha
 > **no lo usa ni lo toca**: su proyección de línea (`ExecutionLineView`, `## 3.2`) no lleva
 > existencia. Si QC-91 cambia la firma de `ProductCatalog`, esta ficha no se entera.
+>
+> **Corregido el 2026-09-17, sin borrar lo de arriba.** Esta ficha **SÍ usa `ProductCatalog`**, por
+> su contrato público y solo para leer `name` (ver `## 3`): lo **USA, no lo toca**. **Ningún archivo
+> de `lib/modules/inventario/**` entra en el diff de esta rama** — si alguna task se viera obligada a
+> **editar** uno, se **para** y se rehace este análisis, porque entonces sí habría solape.
+> **El solape se volvió a verificar contra el diff real de la rama viva de QC-91, no contra su spec:
+> QC-91 no toca `lib/composition/index.ts`.** Lo único que QC-91 cambia de ese contrato es
+> `stock: number | null` → `stockByUnit`; como aquí **solo se lee `name`** y no se depende de ningún
+> campo de existencia, el merge de QC-91 no roza a esta ficha. **Solape: sigue siendo ninguno.**
 
 **Nuevos**
 
