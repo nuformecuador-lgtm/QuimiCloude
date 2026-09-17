@@ -14,7 +14,9 @@
  * dos lineas de barril. Los seis casos de uso de QC-34 y `order-transitions.ts` quedan
  * intactos.
  */
-import type { OrderStatus } from './order-classification';
+import type { OrderPriority, OrderStatus } from './order-classification';
+import type { OrderNumber } from './order-number';
+import type { Page } from './page';
 
 /** Lo que otro modulo puede saber de un pedido: su identidad y su ESTADO, y nada mas. Ni el
  *  numero, ni la receta, ni las cantidades (mismo criterio que `MemberCandidate` de QC-84):
@@ -39,4 +41,46 @@ export interface OrderCatalog {
    * la FK compuesta de `order_assignments` con un `23503` sin traducir.
    */
   findAliveById(id: string, companyId: string): Promise<OrderAssignmentTarget | null>;
+
+  /**
+   * QC-88 (R11, R15) — los datos de un conjunto de pedidos por sus ids, acotados a los
+   * estados pedidos y paginados. Bloque nuevo AL FINAL de la interfaz: `findAliveById` de
+   * arriba no se toca.
+   *
+   * `companyId` es el PRIMER parametro, como `findAliveById(id, companyId)` ya lo tiene y
+   * como `listOrderIdsByUserInCompany` de `asignaciones`: una llamada que lo olvide no
+   * compila (sincronizacion del 2026-09-16, QC-60 ya le dio `company_id` a `orders`).
+   *
+   * Devuelve `Page<AssignedOrderSummary>` YA ARMADA: `toOffsetLimit`/`buildPage` viven en
+   * `lib/shared/pagination`, que `domain/` no puede importar, asi que quien pagina es el
+   * adaptador (mismo reparto que `OrderRepository.listAlive`).
+   *
+   * `ids` vacio no llega aqui: el caso de uso que la invoca corta antes, sin tocar ningun
+   * puerto.
+   */
+  listAliveSummariesByIds(
+    companyId: string,
+    ids: readonly string[],
+    statuses: readonly OrderStatus[],
+    page: number,
+    pageSize?: number,
+  ): Promise<Page<AssignedOrderSummary>>;
 }
+
+/**
+ * Lo que otro modulo puede saber de un pedido para LISTARLO (R11, R15 de QC-88). Sigue sin
+ * traer autoria, motivo de cancelacion ni marcas de tiempo (mismo criterio que
+ * `OrderAssignmentTarget`): lo que no esta en el tipo no se filtra por descuido.
+ *
+ * `number` es el par `(year, sequence)`; el texto visible lo compone `formatOrderNumber`, la
+ * UNICA definicion (R16 de QC-88). `quantity` es CADENA decimal, nunca `number`
+ * (`docs/architecture.md > Anti-patrones`).
+ */
+export type AssignedOrderSummary = {
+  readonly id: string;
+  readonly number: OrderNumber;
+  readonly recipeId: string;
+  readonly quantity: string;
+  readonly priority: OrderPriority;
+  readonly status: OrderStatus;
+};

@@ -113,11 +113,22 @@ describe('contrato OrderCatalog', () => {
       /findAliveById\(id: string, companyId: string\): Promise<OrderAssignmentTarget \| null>/,
     )
     expect(catalogoFuente).toMatch(/export type OrderAssignmentTarget = \{/)
-    // El estado es el enum de QC-34 IMPORTADO, no una segunda lista copiada.
-    expect(catalogoFuente).toMatch(/import type \{ OrderStatus \} from '\.\/order-classification'/)
+    // El estado es el enum de QC-34 IMPORTADO, no una segunda lista copiada. QC-88 (T4) suma
+    // `OrderPriority` a la MISMA linea de import -para `AssignedOrderSummary`-, asi que la
+    // asercion tolera cualquier orden de nombres en el mismo `import type { ... } from`.
+    expect(catalogoFuente).toMatch(
+      /import type \{ [^}]*\bOrderStatus\b[^}]* \} from '\.\/order-classification'/,
+    )
     // Ni el numero, ni la receta, ni las cantidades: lo que no esta en el tipo no se filtra.
+    // ACOTADO al bloque de `OrderAssignmentTarget` (QC-88 T4 anadio `AssignedOrderSummary` MAS
+    // ABAJO en el MISMO archivo, y ese tipo SI lleva `recipeId`/`quantity`/`priority` a proposito
+    // -R11, R15 de QC-88-, asi que buscar en el archivo entero daria un falso rojo).
+    const bloqueOrderAssignmentTarget = catalogoFuente.slice(
+      catalogoFuente.indexOf('export type OrderAssignmentTarget'),
+      catalogoFuente.indexOf('export interface OrderCatalog'),
+    )
     for (const campo of ['orderYear', 'orderSequence', 'recipeId', 'quantity', 'priority']) {
-      expect(catalogoFuente, `OrderAssignmentTarget expone ${campo}`).not.toMatch(
+      expect(bloqueOrderAssignmentTarget, `OrderAssignmentTarget expone ${campo}`).not.toMatch(
         new RegExp(`\\b${campo}\\b`),
       )
     }

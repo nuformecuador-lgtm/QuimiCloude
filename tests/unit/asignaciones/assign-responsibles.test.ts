@@ -648,7 +648,12 @@ function montarSobreBase(
 ): ReturnType<typeof createAssignResponsibles> {
   const deps: AssignResponsiblesDeps = {
     assignments: base.repo,
-    orders: { findAliveById: async () => ({ id: PEDIDO, status: 'PENDIENTE' as const }) },
+    orders: {
+      findAliveById: async () => ({ id: PEDIDO, status: 'PENDIENTE' as const }),
+      listAliveSummariesByIds: async () => {
+        throw new Error('QC-88: no lo usa `assignResponsibles`');
+      },
+    },
     people: {
       findAliveRefsInCompany: async (_companyId: string, ids: readonly string[]) =>
         ids.map((id) => persona(id)),

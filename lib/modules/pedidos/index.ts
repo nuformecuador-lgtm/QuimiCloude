@@ -20,8 +20,16 @@ export type { OrderContents } from './domain/order-contents';
 /** QC-87 (T2, R45): el servicio que `pedidos` ofrece a otros modulos para saber el ESTADO de
  *  un pedido sin tocar `prisma.order`. Solo el TIPO y la INTERFAZ: el adaptador que los
  *  implementa NO se exporta desde aqui -arrastraria `@prisma/client` al cierre de imports del
- *  barrel-, lo instancia `lib/composition` (R47), igual que con `RecipeCatalog`. */
-export type { OrderAssignmentTarget, OrderCatalog } from './domain/order-catalog';
+ *  barrel-, lo instancia `lib/composition` (R47), igual que con `RecipeCatalog`.
+ *
+ *  QC-88 (`design.md > 6`, R11, R12, R15) le suma `AssignedOrderSummary`: el tipo de salida del
+ *  metodo `listAliveSummariesByIds` que se anadio a la MISMA interfaz `OrderCatalog` de arriba
+ *  -no se publica una segunda interfaz-. */
+export type {
+  OrderAssignmentTarget,
+  OrderCatalog,
+  AssignedOrderSummary,
+} from './domain/order-catalog';
 
 // ---------------------------------------------------------------------------------------
 // QC-34 (T14). Lo que el modulo publica para poder ser USADO: el actor, los esquemas del
