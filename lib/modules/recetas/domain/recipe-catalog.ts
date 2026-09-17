@@ -38,8 +38,12 @@ export interface RecipeCatalog {
   ): Promise<readonly RecipeRef[]>;
 
   /** El contenido con el que se ejecuta una receta, INCLUIDA UNA DADA DE BAJA (viene con
-   *  `isDeleted: true`, nunca `null` por eso). `null` es solo «este id no existe». */
-  findExecutionContentById(id: RecipeId): Promise<RecipeExecutionContent | null>;
+   *  `isDeleted: true`, nunca `null` por eso). `null` es solo «este id no existe» -y una
+   *  receta de OTRA empresa cuenta como si no existiera-. */
+  findExecutionContentById(
+    id: RecipeId,
+    companyId: string,
+  ): Promise<RecipeExecutionContent | null>;
 }
 
 /** Linea de receta tal como la ve la ejecucion: sin `id` propio, sin autoria, sin marcas de

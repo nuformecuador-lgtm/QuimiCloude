@@ -34,6 +34,12 @@ otra empresa; (d) devuelve `'stale'` si `from` no coincide. `pnpm exec tsc --noE
 **Toca:** `lib/modules/recetas/domain/recipe-catalog.ts`,
 `lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts`,
 `lib/modules/recetas/index.ts`, `tests/unit/recetas/recipe-catalog.test.ts`
+> **CORREGIDO el 2026-09-17**: QC-50 se mergeó en `dev` y `recipes` **ya tiene `company_id`**, así
+> que el «sin `companyId`» de abajo **caducó**. La firma real es
+> **`findExecutionContentById(id, companyId)`**, con el ámbito llegando hasta `./company-scope`,
+> como exige `guard-ambito-empresa-recetas`. El texto original se deja porque era cierto al
+> escribirlo.
+
 **Hacer:** `findExecutionContentById(id)` → `RecipeExecutionContent | null` con pasos y líneas, y
 `isDeleted` en vez de ocultar la receta retirada (`design.md > 3.3`). **Sin `companyId` en la
 firma**, y el porqué —`recipes` no tiene la columna, deuda de QC-50— va escrito **en `design.md`**,

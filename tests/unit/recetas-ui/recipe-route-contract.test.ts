@@ -982,6 +982,16 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
   const UNICO_MONTADOR = enRutaDePosix(join(COMPONENTES_PATH, 'recipe-form.tsx'));
 
   /**
+   * SEGUNDO montador, anadido el 2026-09-17: la pantalla de ejecucion de un pedido asignado lo
+   * MONTA por props, que es lo que la cabecera del propio asistente dejo previsto -«podra montarlo
+   * pasandole otro `onFinish` sin tocar una linea de aqui»-. R12 sigue intacta: lo que prohibe es
+   * que el asistente tenga RUTA PROPIA, no que se monte desde otra pantalla. Se nombra el archivo
+   * EXACTO, nunca la carpeta.
+   */
+  const MONTADOR_DE_EJECUCION =
+    'app/(private)/asignacion/[id]/components/order-execution-screen.tsx';
+
+  /**
    * Por nombre y no por carpeta: un test nuevo que lo montase en otro sitio tiene que salir en la
    * lista. Este mismo archivo esta porque escribe el nombre para poder prohibirlo.
    */
@@ -989,6 +999,7 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     'tests/unit/recetas-ui/step-reader.test.tsx',
     'tests/unit/recetas-ui/recipe-route-contract.test.ts',
     'tests/guards/guard-editor-aislado.test.ts',
+    'tests/unit/asignaciones-ui/order-execution-screen.test.tsx',
   ] as const;
 
   it('ninguna page.tsx del repo monta el asistente', () => {
@@ -1070,7 +1081,7 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
       }
     }
 
-    expect(importadores.sort()).toEqual([UNICO_MONTADOR]);
+    expect(importadores.sort()).toEqual([MONTADOR_DE_EJECUCION, UNICO_MONTADOR].sort());
   });
 
   it('el listado del catalogo no enlaza ni menciona el asistente', () => {

@@ -20,8 +20,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 /** Doble del cliente Prisma. Cuenta invocaciones: es lo unico que hace testeable «una sola
  *  consulta para N ids» —comprobar solo el resultado pasaria verde con un bucle de N—. */
 const findMany = vi.fn()
-const findUnique = vi.fn()
-vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { recipe: { findMany, findUnique } } }))
+const findFirst = vi.fn()
+vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { recipe: { findMany, findFirst } } }))
 
 const {
   findRecipeExecutionContentById,
@@ -69,7 +69,7 @@ const adaptadorFuente = read(
 
 beforeEach(() => {
   findMany.mockReset()
-  findUnique.mockReset()
+  findFirst.mockReset()
 })
 
 describe('contrato RecipeCatalog', () => {
@@ -193,7 +193,7 @@ const PASO_VALIDO = { blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }]
 
 describe('findRecipeExecutionContentById', () => {
   it('T2(a) - receta viva: devuelve pasos y lineas, con isDeleted false', async () => {
-    findUnique.mockResolvedValue({
+    findFirst.mockResolvedValue({
       id: 'r-viva',
       name: 'Cloro 5%',
       deletedAt: null,
@@ -201,7 +201,7 @@ describe('findRecipeExecutionContentById', () => {
       lines: [LINEA_CLORO],
     })
 
-    const receta = await findRecipeExecutionContentById('r-viva')
+    const receta = await findRecipeExecutionContentById('r-viva', EMPRESA)
 
     expect(receta).toEqual({
       id: 'r-viva',
@@ -213,7 +213,7 @@ describe('findRecipeExecutionContentById', () => {
   })
 
   it('T2(b) - receta de baja: vuelve igual, con isDeleted true', async () => {
-    findUnique.mockResolvedValue({
+    findFirst.mockResolvedValue({
       id: 'r-baja',
       name: 'Detergente viejo',
       deletedAt: new Date('2026-02-02'),
@@ -221,26 +221,36 @@ describe('findRecipeExecutionContentById', () => {
       lines: [],
     })
 
-    const receta = await findRecipeExecutionContentById('r-baja')
+    const receta = await findRecipeExecutionContentById('r-baja', EMPRESA)
 
     expect(receta?.isDeleted).toBe(true)
     expect(receta?.name).toBe('Detergente viejo')
   })
 
   it('T2(c) - un id inexistente devuelve null', async () => {
-    findUnique.mockResolvedValue(null)
+    findFirst.mockResolvedValue(null)
 
-    await expect(findRecipeExecutionContentById('r-fantasma')).resolves.toBeNull()
+    await expect(findRecipeExecutionContentById('r-fantasma', EMPRESA)).resolves.toBeNull()
   })
 
   it('no filtra por deletedAt: una receta de baja sigue pudiendo ejecutarse', async () => {
-    findUnique.mockResolvedValue({ id: 'r-1', name: 'X', deletedAt: null, steps: [], lines: [] })
+    findFirst.mockResolvedValue({ id: 'r-1', name: 'X', deletedAt: null, steps: [], lines: [] })
 
-    await findRecipeExecutionContentById('r-1')
+    await findRecipeExecutionContentById('r-1', EMPRESA)
 
-    const args = findUnique.mock.calls[0]?.[0]
-    expect(args.where).toEqual({ id: 'r-1' })
-    expect(args.where).not.toHaveProperty('deletedAt')
+    const args = findFirst.mock.calls[0]?.[0]
+    expect(args.where).toEqual({ AND: [{ companyId: EMPRESA }, { id: 'r-1' }] })
+    expect(JSON.stringify(args.where)).not.toContain('deletedAt')
+  })
+
+  it('QC-50 R14 - una receta de otra empresa devuelve null, igual que un id inexistente', async () => {
+    findFirst.mockResolvedValue(null)
+
+    const receta = await findRecipeExecutionContentById('r-de-otra-empresa', EMPRESA)
+
+    expect(receta).toBeNull()
+    const args = findFirst.mock.calls[0]?.[0]
+    expect(args.where).toEqual({ AND: [{ companyId: EMPRESA }, { id: 'r-de-otra-empresa' }] })
   })
 })
 

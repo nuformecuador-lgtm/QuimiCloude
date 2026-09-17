@@ -63,7 +63,7 @@ export function createGetAssignedOrderExecution(
     const summary = summaryPage.items[0];
     if (summary === undefined) throw new OrderNotFoundError();
 
-    const content = await deps.recipes.findExecutionContentById(summary.recipeId);
+    const content = await deps.recipes.findExecutionContentById(summary.recipeId, actor.companyId);
     const recipeName = content !== null && !content.isDeleted ? content.name : null;
     const steps = content?.steps ?? [];
     const lines = content?.lines ?? [];

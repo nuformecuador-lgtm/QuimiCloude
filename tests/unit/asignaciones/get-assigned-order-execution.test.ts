@@ -242,7 +242,7 @@ describe('getAssignedOrderExecution — la vista', () => {
 
     const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
 
-    expect(productFindRefs).toHaveBeenCalledWith([PRODUCTO]);
+    expect(productFindRefs).toHaveBeenCalledWith([PRODUCTO], EMPRESA);
     expect(view.lines[0]?.productName).toBe('Sosa caustica');
   });
 });

@@ -424,6 +424,11 @@ const CASO_DE_USO_QC88 = `${ASIGNACIONES}/domain/list-assigned-orders.ts`
 const PAGINA_QC88 = 'app/(private)/asignacion/page.tsx'
 const NAV_PRIVADO = 'lib/shared/navigation/private-nav.ts'
 
+// La SEGUNDA pantalla de la zona, anadida el 2026-09-17: la de ejecucion consume el catalogo por
+// la misma puerta generica (`requirePagePermission`) y con el mismo codigo de consulta. Se nombra
+// el archivo EXACTO, como los otros dos: la carpeta sigue sin estar permitida.
+const PAGINA_EJECUCION = 'app/(private)/asignacion/[id]/page.tsx'
+
 const CASOS_DE_USO_QC63 = [
   `${ASIGNACIONES}/domain/get-assigned-order-execution.ts`,
   `${ASIGNACIONES}/domain/start-assigned-order.ts`,
@@ -434,6 +439,7 @@ const CONSUMO_LEGITIMO: ReadonlyArray<ConsumoLegitimo> = [
   { tipo: 'carpeta', prefijo: `${ASIGNACIONES}/domain/`, codigo: 'asignaciones.modificar' },
   { tipo: 'archivo', archivo: CASO_DE_USO_QC88, codigo: 'asignaciones.consultar' },
   { tipo: 'archivo', archivo: PAGINA_QC88, codigo: 'asignaciones.consultar' },
+  { tipo: 'archivo', archivo: PAGINA_EJECUCION, codigo: 'asignaciones.consultar' },
   { tipo: 'archivo', archivo: NAV_PRIVADO, codigo: 'asignaciones.consultar' },
   ...CASOS_DE_USO_QC63.map(
     (archivo): ConsumoLegitimo => ({ tipo: 'archivo', archivo, codigo: 'asignaciones.consultar' }),

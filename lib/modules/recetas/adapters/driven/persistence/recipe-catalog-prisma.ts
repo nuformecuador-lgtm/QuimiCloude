@@ -109,9 +109,11 @@ export function toRecipeExecutionContent(row: RecipeExecutionContentRow): Recipe
  */
 export async function findRecipeExecutionContentById(
   id: RecipeId,
+  companyId: string,
 ): Promise<RecipeExecutionContent | null> {
-  const row = await prisma.recipe.findUnique({
-    where: { id },
+  const scope: RecipeScope = { companyId };
+  const row = await prisma.recipe.findFirst({
+    where: { AND: [recipeCompanyScope(scope), { id }] },
     select: {
       id: true,
       name: true,

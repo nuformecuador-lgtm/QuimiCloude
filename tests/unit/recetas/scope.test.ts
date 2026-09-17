@@ -150,8 +150,14 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
 
     // Una SEGUNDA pantalla de recetas sigue prohibida: se mira el `page.tsx`/`layout.tsx` de
     // cualquier carpeta de `app/` fuera de la de formulas, por su ruta Y por su codigo.
+    // Anadida el 2026-09-17: la pantalla de ejecucion de un pedido asignado tiene RUTA PROPIA y
+    // llega a la receta por el `recipeId` de un pedido, nunca navegando el catalogo. Se nombra el
+    // archivo EXACTO, nunca la carpeta: cualquier OTRA segunda pantalla sigue prohibida.
+    const PANTALLA_DE_EJECUCION = join('app', '(private)', 'asignacion', '[id]', 'page.tsx')
+
     const segundasPantallas = filesIn(appDir, /^(page|layout)\.tsx$/)
       .filter((file) => relative(recipesRouteDir, file).startsWith(`..${sep}`))
+      .filter((file) => relative(repoRoot, file) !== PANTALLA_DE_EJECUCION)
       .filter(
         (file) =>
           screenPattern.test(file.slice(appDir.length)) || screenPattern.test(codeOf(file)),

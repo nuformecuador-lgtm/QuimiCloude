@@ -49,6 +49,16 @@ silencio.
   comprobación de «este pedido está asignado a quien pide» (R6) se hace con
   `OrderAssignmentRepository.listOrderIdsByUserInCompany(companyId, userId)`, que ya existe y ya
   lleva la empresa **como primer parámetro** (una llamada que la olvide no compila).
+> **CORREGIDO el 2026-09-17, y el texto viejo se deja a proposito.** Todo el punto siguiente
+> **dejo de ser cierto ese mismo dia**: **QC-50 se mergeo en `dev` y pago la deuda** que esta
+> seccion daba por abierta. `db/schema.prisma` declara hoy `Recipe.companyId`, la migracion
+> `20260916120000_recipes_company_scope` esta aplicada, `findRefsIncludingDeleted` exige
+> `companyId` y `tests/guards/guard-ambito-empresa-recetas.test.ts` obliga a que **cada** metodo
+> declare **y consuma** el ambito. **Consecuencia para esta ficha**:
+> `findExecutionContentById(id, companyId)` **si lleva ambito**, y lo lleva hasta el punto unico
+> `./company-scope`. Lo de abajo se conserva porque explica por que se decidio lo contrario
+> cuando era verdad, no porque siga valiendo.
+
 - **`recipes` y `recipe_lines` NO tienen `company_id`.** Verificado en `db/schema.prisma`: el modelo
   `Recipe` no declara la columna, y `docs/architecture.md > Dominio` lo registra como **deuda
   abierta de la épica QC-46** (recetas = QC-50, todavía en la lista). **Consecuencia para esta
@@ -227,8 +237,12 @@ export type RecipeExecutionContent = {
 };
 ```
 
-- **Sin `companyId` en la firma**, y el porqué está en `## 2.1`: `recipes` no tiene esa columna
-  todavía. Se documenta como deuda de QC-50 en vez de fingir un filtro que no existe.
+- ~~**Sin `companyId` en la firma**, y el porqué está en `## 2.1`: `recipes` no tiene esa columna
+  todavía. Se documenta como deuda de QC-50 en vez de fingir un filtro que no existe.~~
+  **CORREGIDO el 2026-09-17**: QC-50 se mergeó y `recipes` **ya tiene** la columna, así que la firma
+  real es **`findExecutionContentById(id, companyId)`**, con el ámbito llegando hasta
+  `./company-scope`. El llamante pasa `actor.companyId`, nunca un dato de la entrada. El texto
+  tachado se conserva porque era cierto al escribirlo.
 - **No devuelve `imageUrl`, ni autores, ni marcas de tiempo**: la pantalla no los pinta.
 - **Una receta dada de baja vuelve igual, con `isDeleted: true`**, mismo criterio que
   `findRefsIncludingDeleted`: un pedido viejo con receta retirada sigue teniendo que poder

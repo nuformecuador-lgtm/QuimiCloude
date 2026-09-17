@@ -502,6 +502,12 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
         )
     }
 
+    // Anadida el 2026-09-17: la pantalla de ejecucion de un pedido asignado tiene RUTA PROPIA y
+    // llega a la receta por el `recipeId` de un pedido, no navegando el catalogo. Se nombra el
+    // archivo EXACTO, nunca la carpeta, y NO queda exenta: se le sigue exigiendo que consuma
+    // `recetas` solo por su contrato publico, igual que a cualquier otro archivo de fuera.
+    const PANTALLAS_AUTORIZADAS = new Set(['app/(private)/asignacion/[id]/page.tsx'])
+
     const fueraDeSuCarpeta = sourcesIn(appDir).filter(
       (file) => relative(recipesRouteDir, file).startsWith(`..${sep}`),
     )
@@ -511,7 +517,11 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
       if (!RECIPE_MENTION.test(source)) continue
       const nombre = toPosix(relative(repoRoot, file))
       if (/^(page|layout)\.tsx$/.test(basename(file))) {
-        violaciones.push(`${nombre}: segunda pantalla de recetas fuera de su carpeta`)
+        if (!PANTALLAS_AUTORIZADAS.has(nombre)) {
+          violaciones.push(`${nombre}: segunda pantalla de recetas fuera de su carpeta`)
+        } else if (!consumesOnlyPublicContract(source)) {
+          violaciones.push(`${nombre}: consume recetas por dentro, no por su contrato publico`)
+        }
       } else if (screenRootOf(file) === null) {
         violaciones.push(`${nombre}: menciona recetas sin colgar de ninguna pantalla con ruta propia`)
       } else if (!consumesOnlyPublicContract(source)) {

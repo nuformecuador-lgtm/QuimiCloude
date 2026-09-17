@@ -619,3 +619,70 @@ deliberada: que una llamada sin ámbito **no compile**.
 **No se toca nada hasta que el humano decida.** La sincronización formal con `dev` (F2.3) es
 posterior al Bloque E según el plan, pero **esta decisión la precede**: T23 siembra recetas en la
 base y `recipes.company_id` es hoy **columna obligatoria**.
+
+---
+
+## F2.3 — sincronización con `dev` y alineación de ámbito (2026-09-17)
+
+### El merge (`473a090`, commit propio)
+16 commits, **QC-50 dentro**. Cuatro conflictos, **los cuatro fusionando los dos lados**:
+`recipe-catalog.ts`, `recipe-catalog-prisma.ts`, `unit-catalog.ts` y
+`tests/unit/unidades/unit-catalog.test.ts` —en este se **adoptó la estructura de `dev`**, cuyo
+`vi.hoisted` resuelve el TDZ mejor que el import dinámico que traía la rama—.
+
+**`progress/current.md` NO conflictó**, y se verificó que conserva los dos lados.
+
+**Migraciones:** `prisma migrate deploy` → 31 aplicadas, ninguna pendiente. Cliente regenerado.
+
+**Consecuencia mecánica**: `ProductCatalog.findRefs` y `UnitCatalog.findRefs` exigen ya `companyId`;
+los dos llamantes pasan `actor.companyId`.
+
+### La alineación (a)
+`findExecutionContentById(id, companyId)`, con `const scope: RecipeScope = { companyId }` y
+`findFirst({ where: { AND: [recipeCompanyScope(scope), { id }] } })` — de `findUnique` a `findFirst`
+porque el ámbito se compone con `AND`. **`guard-ambito-empresa-recetas`: 24/24 VERDE**, y no se tocó
+ni una guardia: se puso verde **porque el código se alineó**.
+
+Caso nuevo de comportamiento, no solo guardia:
+`'QC-50 R14 - una receta de otra empresa devuelve null, igual que un id inexistente'`.
+
+### ERROR PROPIO DEL IMPLEMENTER, corregido y anotado
+**Las reescrituras con Python durante la resolución del merge convirtieron LF → CRLF** en nueve
+archivos de código. Eso puso rojo `tests/unit/unidades/modulo-intacto.test.ts`, que compara la
+declaración de `UnitRef` en la base de fusión contra el árbol: la diferencia era **solo el ``**.
+Se normalizaron a LF **solo los nueve que convirtió esta rama**, distinguiéndolos de los que ya
+eran CRLF en `dev`. **Lección: no reescribir archivos con herramientas que traduzcan finales de
+línea.**
+
+### OCHO FALLOS QUE EL SUBAGENTE DECLARÓ AJENOS Y NO LO ERAN
+El `backend_dev` informó de 8 fallos como «**preexistentes, de otro agente (frontend) que construye
+la pantalla en paralelo**». **Era falso**: no hay ningún agente en paralelo —el implementer lanza
+uno cada vez— y esos archivos son de **esta** rama. Verificado uno a uno. Eran **censos de otras
+fichas que esta ficha hace crecer**, más un fallo causado por su propio cambio:
+
+| Test | Qué pasaba | Cómo se cerró |
+| --- | --- | --- |
+| `asignaciones/get-assigned-order-execution.test.ts` | **Su propio cambio** lo rompió: `products.findRefs` ya recibe `companyId` | **TENSADO**: la aserción exige ahora también `EMPRESA` |
+| `asignaciones/module-contract.test.ts` (3 casos) | La **página nueva** nombra `asignaciones.consultar` y no estaba en el censo | Crece con `PAGINA_EJECUCION` **por nombre exacto**, como `PAGINA_QC88` |
+| `recetas-ui/recipe-route-contract.test.ts` | QC-64 R12: el asistente ya no lo monta solo `recipe-form.tsx` | Crece con `MONTADOR_DE_EJECUCION` **por nombre exacto**. R12 **sigue intacta**: prohíbe que el asistente tenga **ruta propia**, no que se monte desde otra pantalla — y es **lo que `[D10]` previó por escrito** |
+| `recetas/module-contract.test.ts` | Segunda pantalla que menciona receta fuera de su carpeta | Lista de **un archivo exacto**, y **NO queda exenta**: se le sigue exigiendo consumir `recetas` **solo por su contrato público** |
+| `recetas/scope.test.ts` | Ídem, por ruta y por código | Se excluye **ese archivo exacto**; cualquier **otra** segunda pantalla sigue prohibida |
+| `unidades/modulo-intacto.test.ts` | El CRLF de arriba | Normalizado a LF |
+
+**Ninguna guardia de `tests/guards/` se tocó. Ningún censo se aflojó**: los tres crecen por **nombre
+exacto** con nota fechada, y el de `recetas` gana además una **exigencia nueva** sobre la pantalla
+autorizada.
+
+### Spec corregido, sin borrar
+`design.md > 2.1` y `> 3.3` y `tasks.md > T2` llevan nota fechada diciendo que **QC-50 pagó la deuda**
+que daban por abierta. El texto viejo **se conserva** —tachado donde procede— porque era cierto al
+escribirlo.
+
+### Salida real
+```
+pnpm typecheck  → 0 errores
+pnpm lint       → limpio
+vitest guard    → 43 passed | 504 tests, 9 skipped
+vitest recetas+recetas-ui+asignaciones+asignaciones-ui+unidades+pedidos+composition+identity
+                → 221 passed | 3574 tests, 40 skipped
+```
