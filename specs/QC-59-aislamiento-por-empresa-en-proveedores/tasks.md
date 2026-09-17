@@ -13,7 +13,7 @@
 
 ## Bloque 0 — Base de datos
 
-- [ ] **T0 — Migración: las dos columnas, el paréntesis de RLS y las dos FK a `companies`.**
+- [x] **T0 — Migración: las dos columnas, el paréntesis de RLS y las dos FK a `companies`.**
   Archivos: `db/migrations/<ts>_suppliers_company_scope/migration.sql` (nuevo),
   `db/schema.prisma` (`model Supplier`, `model SupplierCatalogLine`).
   Contenido: paréntesis `NO FORCE` / `FORCE` de RLS sobre `suppliers`, `supplier_catalog_lines`,
@@ -26,7 +26,7 @@
   y `pnpm run typecheck` señala exactamente los sitios que T6–T13 van a tocar.
   Cubre: R1, R2, R9, R12.
 
-- [ ] **T1 — Los dos backfills: proveedores a «QuimiCloud», líneas a la empresa de su proveedor.**
+- [x] **T1 — Los dos backfills: proveedores a «QuimiCloud», líneas a la empresa de su proveedor.**
   Archivos: el mismo `migration.sql` de T0 (pasos 2, 3 y 4).
   Contenido: `suppliers` se resuelve por `name_normalized = 'quimicloud'` con el único fallback de
   «hay exactamente una empresa», `RAISE EXCEPTION` en cualquier otro caso; `supplier_catalog_lines`
@@ -40,7 +40,7 @@
   `companies` y `presentations` conservan su recuento, y ninguna fila cambió más allá de la columna.
   Cubre: R7, R8.
 
-- [ ] **T2 — Las dos claves candidatas `(company_id, id)`.**
+- [x] **T2 — Las dos claves candidatas `(company_id, id)`.**
   Archivos: el mismo `migration.sql` (paso 6), `db/schema.prisma` (`model Supplier`,
   `model Presentation`).
   Contenido: `ALTER TABLE "suppliers" ADD CONSTRAINT "suppliers_company_id_id_key" UNIQUE
@@ -53,7 +53,7 @@
   (comprobado a mano una vez, para que la necesidad esté demostrada y no supuesta).
   Cubre: R3, R13.
 
-- [ ] **T3 — Las dos claves foráneas compuestas.**
+- [x] **T3 — Las dos claves foráneas compuestas.**
   Archivos: el mismo `migration.sql` (paso 6, después de T2).
   Contenido: `supplier_catalog_lines_company_id_supplier_id_fkey` `(company_id, supplier_id)` →
   `suppliers(company_id, id)` `ON DELETE CASCADE ON UPDATE CASCADE`, y
@@ -66,7 +66,7 @@
   legítima sigue insertándose.
   Cubre: R4, R5.
 
-- [ ] **T4 — Relevo del índice único de nombre: global → por empresa, y **sigue parcial**.**
+- [x] **T4 — Relevo del índice único de nombre: global → por empresa, y **sigue parcial**.**
   Archivos: el mismo `migration.sql` (paso 7), `db/schema.prisma`
   (`@@index([companyId, supplierId], map: "supplier_catalog_lines_company_id_supplier_id_idx")`).
   Contenido: guardia `RAISE EXCEPTION` si dos proveedores **vivos** de la misma empresa comparten
@@ -80,7 +80,7 @@
   de baja libera el nombre**.
   Cubre: R14, R15 (parte), R17 (por ausencia de cambio), R13.
 
-- [ ] **T5 — `down.sql` con sus tres guardias y su orden obligatorio.**
+- [x] **T5 — `down.sql` con sus tres guardias y su orden obligatorio.**
   Archivos: `db/migrations/<ts>_suppliers_company_scope/down.sql` (nuevo).
   Contenido, en este orden: paréntesis `NO FORCE` de RLS → **guardia 1** (empresa del UP ambigua) →
   **guardia 2** (fila de otra empresa en cualquiera de las dos tablas) → **guardia 3** (dos
