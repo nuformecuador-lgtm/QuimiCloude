@@ -5,7 +5,8 @@
 > **T1-T11 cerradas, con el E2E de R17 en verde** tras dos arreglos autorizados por el humano
 > sobre helpers preexistentes (`566d122`, `ebdb21a`, detalle en §4). **Primera review RECHAZADA**
 > (2 bloqueantes, 2 menores) el 2026-09-17; los 4 hallazgos ya están cerrados, ver §8. T12 (gate
-> completo `./init.sh`) lo cierra el leader.
+> completo `./init.sh`) encontró 2 rojos propios de esta rama tras la review, ambos cerrados
+> (§9). T12 lo vuelve a cerrar el leader.
 
 ## 1. Lo que se construyó
 
@@ -219,3 +220,55 @@ Queda para el leader, tal como el propio informe de review lo señala.
 Commits de este round, todos con `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`:
 `02b603d` (B1 backend), `d332705` (B1 E2E + m1), `9a83151` (test R3 por la enmienda),
 `0088fb3` (enmienda D10 en `requirements.md`).
+
+## 9. `./init.sh` completo del leader — 2 rojos propios, ambos cerrados (2026-09-17)
+
+Tras la primera review, el `./init.sh` completo del leader marcó 2 rojos, ninguno ambiental.
+
+### Rojo 1 — guardia de arquitectura: import por ruta profunda
+`product-batch-date-field.tsx` (y, por extensión, `product-form.tsx`, que tomaba la función de
+ahí) importaban `formatDateLocalISO` desde
+`@/components/shared/data-table/data-table-filter-date` -ruta profunda-, en vez de por el barrel
+`@/components/shared/data-table`. Medido en disco: el barrel de `data-table` **excluye
+`formatDateLocalISO` a propósito** -su propio docstring dice que es la ÚNICA superficie pública y
+que NO reexporta piezas internas-, así que ampliarlo habría sido una decisión sobre un módulo
+ajeno, no una corrección local. En vez de tocar ese barrel, se movió una copia de la función a
+`product-batch-date-field.tsx` -mismo patrón que el componente ya usaba con su inversa,
+`parseDateLocalISO`, copiada ahí desde el principio- y `product-form.tsx` pasó a importarla como
+sibling de este mismo módulo. Misma fórmula, mismo resultado, sin tocar el alcance de
+`data-table`. Confirmado con `tests/unit/shared/data-table-alcance.test.ts` (el guard de R1) en
+verde.
+
+### Rojo 2 — `product-page.test.tsx` colgado a 20s, diagnosticado como flake de saturación preexistente, NO de esta rama
+El caso `un guardado rechazado por un campo muestra el error en linea y no cierra el panel`
+colgaba con `Test timed out in 20000ms` al correr `./init.sh` completo. Diagnóstico por
+bisección real, no supuesto:
+- El test, y el archivo completo, pasan siempre en aislamiento -decenas de corridas-, incluso con
+  14 procesos de CPU saturando la máquina de fondo a propósito.
+- Corriendo el proyecto `ui` completo (111 archivos jsdom) con el componente real: 1 solo fallo
+  -este mismo caso- más un `Hook timed out` no relacionado en un archivo de `identity/` que no
+  toca fechas ni `Popover`.
+- Reemplazando temporalmente `ProductBatchDateField` por un `<div>` vacío (revertido, no quedó en
+  ningún commit) y repitiendo la corrida completa: **9 fallos en 6 archivos**, incluidos timeouts
+  de calendario en `supplier-page.test.tsx` y `recipe-page.test.tsx` que **no usan
+  `ProductBatchDateField`**. Quitar el componente sospechoso no arregló nada -empeoró y movió el
+  síntoma a archivos ajenos-, lo que descarta que sea un bug del `Popover` nuevo.
+
+Es la firma de los "flakes de saturación" que `docs/verification.md` ya documenta (y que el
+propio comentario de cabecera de `product-page.test.tsx` menciona, de una tanda anterior de
+arreglos de gate): al correr los 111 archivos jsdom del proyecto `ui` a la vez, el planificador no
+le da tiempo de CPU a `userEvent` dentro del plazo, y el archivo afectado varía de corrida en
+corrida. **No se tocó el test ni se subió ningún timeout** -no había nada que adaptar ni ningún
+bug de producción que arreglar en el componente-. Queda anotado para el leader: si `./init.sh`
+vuelve a marcar timeout en un archivo distinto del proyecto `ui`, es probablemente el mismo
+fenómeno de contención, no una regresión de esta ficha.
+
+### Verificación
+- `pnpm typecheck`: limpio.
+- `pnpm exec eslint` sobre los dos archivos tocados: limpio.
+- `pnpm exec vitest run tests/unit/inventario/product-page.test.tsx` (archivo completo, aislado):
+  53 archivo / 53 tests passed.
+- `pnpm exec vitest run guard`: 43 archivos, 480 passed, 9 skipped.
+- `pnpm exec playwright test e2e/inventario.spec.ts -g "R14, R17" --project=chromium`: 1 passed.
+
+Commit: `4285b23`, con `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`.
