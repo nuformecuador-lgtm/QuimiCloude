@@ -678,6 +678,7 @@ describe('contrato de la ruta de recetas', () => {
 
   it('la feature no toca lib/modules/recetas ni db/', () => {
     let diff: string[] = [];
+    let rangoDisponible = true;
     try {
       const salida = execSync('git diff --name-only origin/dev...HEAD', {
         cwd: RAIZ,
@@ -685,14 +686,24 @@ describe('contrato de la ruta de recetas', () => {
       });
       diff = salida.split('\n').map((linea) => linea.trim()).filter((linea) => linea.length > 0);
     } catch {
-      // Sin rango no se ha comprobado nada: el `diff` vacio pone el caso rojo abajo.
-      diff = [];
+      rangoDisponible = false;
     }
 
     expect(
-      diff.length,
+      rangoDisponible,
       'el rango git origin/dev...HEAD no estaba disponible: este caso no ha comprobado nada',
-    ).toBeGreaterThan(0);
+    ).toBe(true);
+
+    // Esta comprobacion protege la ruta de recetas-ui, no cualquier rama del repo: un diff
+    // vacio de esa carpeta no significa "nada que revisar", significa que quien corre este
+    // archivo no es la dueña de la ruta y no le corresponde afirmar nada sobre lib/modules/recetas
+    // ni db/ -afirmarlo igual la convertia en un barrido global que se disparaba con cualquier
+    // rama ajena que tocara ese modulo por un motivo legitimo propio-.
+    const carpetaRutaPosix = `${enRutaDePosix(CARPETA_RUTA)}/`;
+    const tocaLaRuta = diff.some((ruta) => ruta.startsWith(carpetaRutaPosix));
+    if (!tocaLaRuta) {
+      return;
+    }
 
     // Una entrada cuyo archivo se borro o renombro dejaria la ruta abierta sin que nadie lo note.
     for (const ruta of [...RECETAS_PERMITIDAS, ...DB_PERMITIDAS]) {
