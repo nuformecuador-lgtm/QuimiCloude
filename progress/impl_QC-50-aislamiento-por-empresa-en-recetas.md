@@ -450,3 +450,47 @@ siguen sin tocarse, sin `skip` y fuera de `tests/baseline-rojos.json`.
   título.
 
 **T28 (`./init.sh` completo, del leader) es lo único abierto.**
+
+## Tras el merge con `origin/dev` (`be79539`): el llamante nuevo de `asignaciones`
+
+QC-88 estrenó un llamante de `RecipeCatalog.findRefsIncludingDeleted` mientras QC-50 le añadía el
+ámbito de empresa. El merge **no dio conflicto textual** pero dejó `pnpm typecheck` rojo: el
+llamante nuevo pasaba un solo argumento. Dos choques semánticos, cerrados aquí:
+
+- **`lib/modules/asignaciones/domain/list-assigned-orders.ts:94`** — la llamada pasa a
+  `findRefsIncludingDeleted(recipeIds, actor.companyId)`. El ámbito no se eligió aquí: lo dicta el
+  propio caso de uso, cuyas otras tres llamadas (`listOrderIdsByUserInCompany`,
+  `listAliveSummariesByIds`, `listByOrdersInCompany`) ya sacan la empresa del actor. Sin acotar,
+  era el único hueco de la función y habría resuelto nombres de recetas de otras empresas.
+- **`e2e/pedidos-asignados.spec.ts`** — el `prisma.recipe.create` de la siembra recibe `companyId`,
+  ahora obligatorio. Se le da la **misma y única** empresa que siembra ese spec (la efímera del
+  worker, creada en su `beforeAll`); comprobado que el spec no usa una segunda.
+
+**No bastaba con que compilara**, porque este es justo el agujero que QC-50 existe para cerrar. La
+costura queda asertada en el test unitario que ya cubría el caso de uso —**no hizo falta crear uno
+nuevo**—: `tests/unit/asignaciones/list-assigned-orders.test.ts`, caso «deduplica los ids de receta
+antes de preguntar» del describe de **R15**, cuya aserción se tensó de
+`toHaveBeenCalledWith([RECETA])` a `toHaveBeenCalledWith([RECETA], ACTOR.companyId)`. Se compara
+contra la empresa del **actor** del test, no contra una constante suelta: lo que se prueba es que
+el ámbito llega hasta la costura. Mismo molde que la aserción ya tensada en
+`tests/unit/pedidos/order-service.test.ts`.
+
+Verificación de esta tanda (el gate completo sigue siendo del leader, **T28**):
+
+```
+$ pnpm typecheck
+> tsc --noEmit
+(sin salida — cero errores)
+
+$ pnpm lint
+> eslint
+(sin salida — cero errores)
+
+$ pnpm exec vitest run tests/unit/asignaciones/list-assigned-orders.test.ts
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+```
+
+Los E2E **no** se corrieron aquí (necesitan base de datos): la siembra arreglada la valida el gate
+completo. Aviso para quien siga: en este repo `vitest related --run <paths literales>` **no filtra**
+—arrastra la suite entera, integración incluida—; para una tanda hay que nombrar el archivo.
