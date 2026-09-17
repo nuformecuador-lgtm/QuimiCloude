@@ -43,20 +43,9 @@ export interface OrderCatalog {
   findAliveById(id: string, companyId: string): Promise<OrderAssignmentTarget | null>;
 
   /**
-   * QC-88 (R11, R15) — los datos de un conjunto de pedidos por sus ids, acotados a los
-   * estados pedidos y paginados. Bloque nuevo AL FINAL de la interfaz: `findAliveById` de
-   * arriba no se toca.
-   *
-   * `companyId` es el PRIMER parametro, como `findAliveById(id, companyId)` ya lo tiene y
-   * como `listOrderIdsByUserInCompany` de `asignaciones`: una llamada que lo olvide no
-   * compila (sincronizacion del 2026-09-16, QC-60 ya le dio `company_id` a `orders`).
-   *
-   * Devuelve `Page<AssignedOrderSummary>` YA ARMADA: `toOffsetLimit`/`buildPage` viven en
-   * `lib/shared/pagination`, que `domain/` no puede importar, asi que quien pagina es el
-   * adaptador (mismo reparto que `OrderRepository.listAlive`).
-   *
-   * `ids` vacio no llega aqui: el caso de uso que la invoca corta antes, sin tocar ningun
-   * puerto.
+   * Devuelve la `Page` ya armada porque `lib/shared/pagination` no puede importarse desde
+   * `domain/`: quien pagina es el adaptador. Con `ids` vacio no se llama, el caso de uso corta
+   * antes.
    */
   listAliveSummariesByIds(
     companyId: string,
@@ -68,12 +57,8 @@ export interface OrderCatalog {
 }
 
 /**
- * Lo que otro modulo puede saber de un pedido para LISTARLO (R11, R15 de QC-88). Sigue sin
- * traer autoria, motivo de cancelacion ni marcas de tiempo (mismo criterio que
- * `OrderAssignmentTarget`): lo que no esta en el tipo no se filtra por descuido.
- *
- * `number` es el par `(year, sequence)`; el texto visible lo compone `formatOrderNumber`, la
- * UNICA definicion (R16 de QC-88). `quantity` es CADENA decimal, nunca `number`
+ * Sin autoria, sin motivo de cancelacion y sin marcas de tiempo: lo que no esta en el tipo no se
+ * filtra por descuido. `quantity` es cadena decimal, nunca `number`
  * (`docs/architecture.md > Anti-patrones`).
  */
 export type AssignedOrderSummary = {

@@ -5,27 +5,10 @@ import type { AssignedOrderView } from '@/lib/modules/asignaciones';
 import { assignedOrderRoute } from '@/lib/shared/routes';
 import { cn } from '@/lib/utils';
 
-/**
- * El disparador de «entrar» de una fila (R21, R22, R23, `design.md > 7.3`, `> 8.4`, H5).
- *
- * **Server Component**: un `<Link>` sin mas interactividad no exige `'use client'` en este repo
- * (mismo precedente que `order-list-empty.tsx`).
- *
- * **`PENDIENTE`**: habilitado, navega a `assignedOrderRoute(id)` -derivada de `ASSIGNED_ORDERS_ROUTE`,
- * nunca un literal (R1)-. Hoy esa ruta responde 404 porque QC-63 todavia no existe (H5); eso no es
- * un error de esta pantalla, que **no** aplica ni replica la regla de «pedido ya tomado» (R23).
- *
- * **`EN_CURSO`**: deshabilitado, con su motivo **visible** (no solo `title`) y referenciado por
- * `aria-describedby` (R21, R32, precedente H5 de QC-102: un tooltip por `:hover` no llega en
- * tactil). El mismo `data-testid` en los dos casos, para que un test localice el disparador y
- * compruebe su estado sin dos selectores distintos.
- */
-
 export const ASSIGNED_ORDER_ENTER_TESTID = 'assigned-order-enter';
 export const ASSIGNED_ORDER_ENTER_REASON_TESTID = 'assigned-order-enter-reason';
 
-/** El motivo del deshabilitado, como funcion y no literal repetido (para que el test no compare
- *  un literal copiado). */
+/** Funcion y no literal, para que un test no pueda comparar contra una copia del texto. */
 export function assignedOrderEnterDisabledReason(): string {
   return 'Este pedido ya está en curso.';
 }
@@ -37,6 +20,8 @@ export function AssignedOrderEnterTrigger({
 }: {
   readonly order: Pick<AssignedOrderView, 'id' | 'status'>;
 }) {
+  // El motivo del deshabilitado va visible y no en `title`: un tooltip por `:hover` no llega en
+  // tactil.
   if (order.status === 'EN_CURSO') {
     const reasonId = `${ASSIGNED_ORDER_ENTER_REASON_TESTID}-${order.id}`;
 
@@ -62,6 +47,8 @@ export function AssignedOrderEnterTrigger({
     );
   }
 
+  // La pantalla de destino todavia no existe, asi que este enlace responde 404: no es un fallo de
+  // esta lista.
   return (
     <Link
       href={assignedOrderRoute(order.id)}

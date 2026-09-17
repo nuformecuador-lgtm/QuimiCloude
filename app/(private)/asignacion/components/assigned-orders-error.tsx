@@ -7,17 +7,12 @@ import { Button } from '@/components/ui/button';
 import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
 
 type AssignedOrdersErrorProps = {
-  /** El error de la consulta, ENTERO (QC-71 R17: no `message` y `code` sueltos). */
   readonly error: ErrorState;
 };
 
 /**
- * Estado de error de la lista de pedidos asignados (R28, `design.md > 8.1`).
- *
- * No se pinta una tabla vacia cuando la consulta falla: confundir «fallo» con «no hay nada» es
- * justo lo que R28 existe para impedir. Se pinta FUERA de `<DataTable>`, mismo patron que
- * `order-list-error.tsx`. Si la operacion responde `unauthorized` la pantalla no muestra ni un
- * dato: no decide nada por su cuenta, solo presenta el error.
+ * Se pinta en lugar de la tabla, nunca una tabla vacia: confundir «fallo» con «no hay nada» deja
+ * al Operador creyendo que no tiene trabajo.
  */
 export function AssignedOrdersError({ error }: AssignedOrdersErrorProps) {
   const router = useRouter();

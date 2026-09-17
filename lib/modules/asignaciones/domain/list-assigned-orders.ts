@@ -1,43 +1,8 @@
 // lib/modules/asignaciones/domain/list-assigned-orders.ts
 /**
- * QC-88 T6 — Caso de uso «los pedidos que YO tengo asignados» (`design.md > 5`; R5-R8, R11,
- * R14, R15, R20).
- *
- * Es el listado de trabajo del Operador: los pedidos `PENDIENTE`/`EN_CURSO` de la persona que
- * consulta, con sus demas responsables ya compuestos en lote (QC-102).
- *
- * El ORDEN de las operaciones es el requisito (`design.md > 5.1`), no un detalle de estilo:
- *
- *   1. `requirePermission(actor, 'asignaciones.consultar')` — PRIMERA linea, antes de `zod` y
- *      antes de tocar NINGUN puerto (R5, R6). Es la puerta que la enmienda de T7 abrio para
- *      este archivo y SOLO para el.
- *   2. `zod` sobre la entrada: solo `page` y `pageSize` (`design.md > 9.1`). Rechazo SIN tocar
- *      puerto.
- *   3. `assignments.listOrderIdsByUserInCompany(actor.companyId, actor.id)` — la empresa y la
- *      persona SALEN DEL ACTOR, nunca de la entrada (R7).
- *   4. Corte seco: sin ni un id, pagina vacia SIN tocar ningun otro puerto (mismo criterio que
- *      `list-responsibles-for-orders.ts:109`).
- *   5. `orders.listAliveSummariesByIds(actor.companyId, ids, ['PENDIENTE','EN_CURSO'], page,
- *      pageSize)` — la empresa sale del actor; el filtro de estado y la paginacion ocurren en
- *      SQL, sobre el conjunto completo y ANTES de paginar (R11), de modo que `total` describe
- *      lo que se muestra.
- *   6. Nombres de receta: ids DEDUPLICADOS y UNA llamada a `recipes.findRefsIncludingDeleted`
- *      (igual que `list-orders.ts:140-147`): una receta dada de baja sigue apareciendo con su
- *      nombre.
- *   7. Responsables: UNA llamada a `assignments.listByOrdersInCompany(actor.companyId,
- *      idsDeLaPagina)` —el metodo de QC-102, R14— y resolucion de nombres con `people`
- *      (mismo patron que `list-responsibles-for-orders.ts`), compuestos en memoria con
- *      `toOrigin` y `compareResponsibles` de `./responsible-order` —REUTILIZADOS, no
- *      copiados—.
- *   8. Se descarta al propio actor de los responsables de cada fila (R20), AL FINAL, para que
- *      el orden no dependa de quien mira.
- *
- * **NO invoca `listResponsiblesForOrders`** (`design.md > 0` hallazgo H1): ese caso de uso
- * exige `pedidos.consultar`, que el Operador no tiene, y llamarlo devolveria `unauthorized`
- * para todo Operador.
- *
- * Dominio PURO: `zod` y tipos del propio modulo o del contrato publico de otro. Sin `next/*`,
- * sin `@prisma/client`, sin adaptadores y sin `@/lib/shared/**`.
+ * Compone los responsables con el metodo del puerto y NO con `listResponsiblesForOrders`: ese caso
+ * de uso exige `pedidos.consultar`, que el Operador no tiene, y devolveria `unauthorized` para
+ * todo Operador.
  */
 import { z } from 'zod';
 
@@ -54,14 +19,9 @@ import type { PeopleDirectory } from '@/lib/modules/identity';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 
 /**
- * Defecto y tope del tamano de pagina, DUPLICADOS de `lib/shared/pagination.ts` a proposito: el
- * dominio de un modulo NO PUEDE importar `lib/shared/**` (`docs/architecture.md > La regla de
- * dependencias`). Es la MISMA duplicacion, con el MISMO motivo, que `MAX_ORDERS_PER_BATCH` de
- * `list-responsibles-for-orders.ts:57` y esta atada por un test que compara los dos numeros.
- *
- * Solo hacen falta para el CORTE SECO del paso 4: cuando no hay ni un id, este caso de uso
- * construye la pagina vacia el mismo, sin invocar `orders.listAliveSummariesByIds` -que es
- * quien normalmente aplica el defecto y el tope-.
+ * Duplicados de `lib/shared/pagination.ts` a proposito: el dominio no puede importar
+ * `lib/shared/**` (`docs/architecture.md > La regla de dependencias`). Un test ata los numeros.
+ * Solo se usan cuando no hay ni un id y la pagina vacia se construye aqui, sin tocar el puerto.
  */
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 25;
@@ -70,30 +30,23 @@ function effectivePageSize(pageSize: number | undefined): number {
   return Math.min(pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
 }
 
-/** El esquema del borde (`design.md > 9.1`): SOLO `page` y `pageSize`. `strict`: un campo de
- *  mas no se ignora, se rechaza -esta lista no ordena, no filtra y no busca-. */
 const listAssignedOrdersSchema = z.strictObject({
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).optional(),
 });
 
 export type ListAssignedOrdersDeps = {
-  /** El puerto propio: los ids de la persona (paso 3) y el lote de responsables (paso 7). */
   readonly assignments: OrderAssignmentRepository;
-  /** `pedidos`: los datos de esos ids, ya extendido con `listAliveSummariesByIds` (T4, T5). */
   readonly orders: OrderCatalog;
-  /** `recetas`: el nombre, con el mismo contrato y el mismo patron que `list-orders.ts:145`. */
   readonly recipes: RecipeCatalog;
-  /** `identity`: nombres mostrables de los responsables, incluidos los de baja. */
   readonly people: PeopleDirectory;
   readonly now?: () => Date;
 };
 
 const ESTADOS_DE_TRABAJO = ['PENDIENTE', 'EN_CURSO'] as const;
 
-/** Estrecha el `OrderStatus` completo a los dos literales que `AssignedOrderView.status` puede
- *  expresar. Seguro: `orders.listAliveSummariesByIds` se llama SIEMPRE con
- *  `ESTADOS_DE_TRABAJO` como filtro, asi que ninguna fila puede volver con otro estado. */
+/** El estrechamiento es seguro porque la consulta se llama SIEMPRE filtrando por
+ *  `ESTADOS_DE_TRABAJO`: ninguna fila puede volver con otro estado. */
 function toWorkingStatus(status: string): 'PENDIENTE' | 'EN_CURSO' {
   return status as 'PENDIENTE' | 'EN_CURSO';
 }
@@ -105,18 +58,17 @@ export function createListAssignedOrders(
     actor: Actor | null | undefined,
     input: unknown,
   ): Promise<Page<AssignedOrderView>> {
-    // 1. PRIMERA LINEA (R5, R6): antes de `zod` y antes de tocar ningun puerto.
+    // Autorizar va antes de validar la entrada y antes de tocar ningun puerto.
     requirePermission(actor, 'asignaciones.consultar');
 
-    // 2. El borde (`design.md > 9.1`). El rechazo ocurre SIN tocar ningun puerto.
     const parsed = listAssignedOrdersSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
     const { page, pageSize } = parsed.data;
 
-    // 3. La empresa Y LA PERSONA salen del ACTOR, nunca de la entrada (R7).
+    // La empresa y la persona salen del actor, nunca de la entrada.
     const ids = await deps.assignments.listOrderIdsByUserInCompany(actor.companyId, actor.id);
 
-    // 4. Corte seco: pagina vacia SIN tocar ningun otro puerto.
+    // Sin ni un id no se consulta nada mas: la pagina vacia se construye aqui.
     if (ids.length === 0) {
       return {
         items: [],
@@ -127,8 +79,8 @@ export function createListAssignedOrders(
       };
     }
 
-    // 5. UNA consulta para toda la pagina, acotada a los DOS estados de trabajo (R11). El
-    //    filtro y la paginacion ocurren en SQL, sobre el conjunto completo y ANTES de paginar.
+    // El filtro de estado y la paginacion van en SQL, sobre el conjunto completo: si no, `total`
+    // describiria algo distinto de lo que se muestra.
     const ordersPage = await deps.orders.listAliveSummariesByIds(
       actor.companyId,
       ids,
@@ -137,21 +89,18 @@ export function createListAssignedOrders(
       pageSize,
     );
 
-    // 6. Nombres de receta: ids DEDUPLICADOS y UNA llamada, tenga la pagina 1 fila o 25 (R14).
+    // Una sola llamada, tenga la pagina 1 fila o 25.
     const recipeIds = [...new Set(ordersPage.items.map((row) => row.recipeId))];
     const recipes = await deps.recipes.findRefsIncludingDeleted(recipeIds);
     const recipeNames = new Map(recipes.map((recipe) => [recipe.id, recipe.name]));
 
-    // 7. Responsables: UNA llamada al lote de QC-102, sobre los ids DE LA PAGINA -no de toda la
-    //    persona-, y composicion EN MEMORIA con `toOrigin` y `compareResponsibles`.
+    // Solo los ids DE LA PAGINA, no todos los de la persona.
     const pageOrderIds = ordersPage.items.map((row) => row.id);
     const assignmentRows = await deps.assignments.listByOrdersInCompany(
       actor.companyId,
       pageOrderIds,
     );
 
-    // Nombres de las personas responsables: UNA llamada, con los identificadores DEDUPLICADOS
-    // (mismo patron que `list-responsibles-for-orders.ts`).
     const userIds = [...new Set(assignmentRows.map((row) => row.userId))];
     const peopleRefs =
       userIds.length === 0
@@ -176,7 +125,7 @@ export function createListAssignedOrders(
       });
     }
 
-    // 8. Se compone la fila y se descarta al PROPIO ACTOR de sus responsables, AL FINAL (R20).
+    // Al actor se le descarta al final, para que el orden del resto no dependa de quien mira.
     const items: AssignedOrderView[] = ordersPage.items.map((row) => ({
       id: row.id,
       numberText: formatOrderNumber(row.number),

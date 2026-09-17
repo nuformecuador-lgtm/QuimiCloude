@@ -228,25 +228,13 @@ export async function listResponsiblesForOrdersAction(
   }
 }
 
-// ---------------------------------------------------------------------------------------------
-// QC-88 T9 - La lista de trabajo del Operador: argumento YA TIPADO, ningun `FormData` (R27 lado
-// servidor). Bloque NUEVO al final del archivo: no reordena ni reformatea ninguna de las cinco
-// funciones de arriba.
-// ---------------------------------------------------------------------------------------------
-
 export type AssignedOrdersListResult =
   | { status: 'success'; data: Page<AssignedOrderView> }
   | ErrorState;
 
 /**
- * Los pedidos que la persona que consulta tiene asignados (QC-88 R5, R27). No viene de un
- * `<form>`, asi que recibe la entrada ya tipada -`{ page, pageSize? }`- y no un `FormData`.
- *
- * Misma capa tonta que las otras cinco: resuelve el actor de las DOS caras de la sesion, llama
- * al caso de uso y traduce el error por su `code`. **Ningun permiso se comprueba aqui** -la
- * frontera es `requirePermission(actor, 'asignaciones.consultar')` en la primera linea del caso
- * de uso (R5)-, y esta funcion NO se reexporta desde el barrel del modulo: `app/**` la importa
- * por su RUTA EXACTA.
+ * Ningun permiso se comprueba aqui: la frontera es la primera linea del caso de uso. Esta funcion
+ * no se reexporta desde el barrel del modulo, `app/**` la importa por su ruta exacta.
  */
 export async function listAssignedOrdersAction(
   query: unknown,

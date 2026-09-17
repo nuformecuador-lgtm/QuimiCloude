@@ -116,14 +116,7 @@ export {
 // primera linea de los tres casos de uso de escritura de QC-87.
 export { canModifyAssignments } from './domain/actor';
 
-// ---------------------------------------------------------------------------------------
-// QC-88 T6 - La lista de trabajo del Operador (`design.md > 5`). Bloque NUEVO al final: no
-// reordena ni reformatea nada de lo de arriba, y sigue sin arrastrar `next/*`, `@prisma/client`
-// ni ningun `'use server'` en su cierre de imports.
-//
-// Se publica la FACTORY con su tipo `*Deps` -quien la cablea es `lib/composition`- y el tipo de
-// la SALIDA de cada fila. La Server Action de esta operacion NO se reexporta aqui (R46, mismo
-// criterio que las demas): `app/**` la importa por su RUTA EXACTA.
-// ---------------------------------------------------------------------------------------
+// La Server Action de esta operacion NO se reexporta aqui: un `'use server'` en el cierre de
+// imports volveria este contrato inimportable desde un componente de cliente.
 export { createListAssignedOrders, type ListAssignedOrdersDeps } from './domain/list-assigned-orders';
 export type { AssignedOrderView } from './domain/assigned-order-view';

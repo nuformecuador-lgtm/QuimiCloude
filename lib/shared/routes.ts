@@ -180,34 +180,17 @@ export function credentialSetupRoute(secret: string): string {
 export const FORGOT_PASSWORD_ROUTE = '/recuperar-contrasena';
 
 /**
- * Pantalla de pedidos asignados a la persona que ha iniciado sesion (QC-88, R1).
- *
  * Vive aqui y no en `navigation/private-nav.ts` porque el middleware y la regla ruta->rol de
- * `identity` la necesitan y **no pueden depender de la navegacion**, que arrastra etiquetas,
- * iconos y agrupacion de UI. `private-nav.ts` ya importa de este archivo, asi que la flecha no se
- * invierte ni aparece un ciclo. Como `SUPPLIERS_ROUTE` y `ORDERS_ROUTE`, esta constante **nace**
- * aqui —no se muda desde la navegacion—, asi que no necesita reexport de compatibilidad: nadie la
- * importaba antes.
- *
- * Es una pantalla propia del Operador: la lista de los pedidos donde figura como responsable
- * (`design.md > 7.1`). **No hay pagina de detalle de un pedido dentro de esta ruta**: el helper
- * `assignedOrderRoute` de abajo apunta a QC-63, que monta su propia ruta de detalle cuando exista.
+ * `identity` la necesitan y no pueden depender de la navegacion, que arrastra etiquetas, iconos y
+ * agrupacion de UI.
  */
 export const ASSIGNED_ORDERS_ROUTE = '/asignacion';
 
 /**
- * Ruta de detalle de un pedido asignado, derivada de `ASSIGNED_ORDERS_ROUTE` (QC-88, R21, R22).
+ * Hoy responde 404: la pantalla de detalle todavia no existe.
  *
- * Mismo patron que `recipeEditRoute` y `supplierDetailRoute`: ningun archivo de producto incrusta
- * esta URL como literal, se construye siempre aqui. **Hoy responde 404**: QC-63, la pantalla que
- * la serviria, no existe todavia — mismo estado que `FORMULAS_ROUTE` antes de QC-26, o
- * `FORGOT_PASSWORD_ROUTE` hoy.
- *
- * **No anade una fila nueva a `PRIVATE_ROUTE_PREFIXES`**: la guardia
- * `guard-rutas-privadas-cubiertas` y el middleware comparan por segmentos
- * (`route === prefix || route.startsWith(prefix + '/')`), asi que la fila de `ASSIGNED_ORDERS_ROUTE`
- * de mas abajo ya cubre `/asignacion/<id>`. Tampoco anade ninguna carpeta bajo `app/`: eso lo hace
- * QC-63 cuando llegue.
+ * No necesita fila propia en `PRIVATE_ROUTE_PREFIXES`: la guardia y el middleware comparan por
+ * segmentos, asi que la de `ASSIGNED_ORDERS_ROUTE` ya cubre `/asignacion/<id>`.
  */
 export function assignedOrderRoute(id: string): string {
   return `${ASSIGNED_ORDERS_ROUTE}/${id}`;
@@ -249,9 +232,7 @@ export const PRIVATE_ROUTE_PREFIXES = [
   // segmentos ya cubriria cualquier subcamino. Cubre SESION; el permiso `usuarios.consultar` lo
   // exige la propia pantalla (R4).
   USERS_ROUTE,
-  // QC-88 R2: la pantalla de pedidos asignados. Sin esta fila, `(private)` no aparece en la URL y
-  // `/asignacion` se serviria SIN sesion. Una sola entrada: no hay pagina de detalle dentro de esta
-  // ruta (el detalle lo monta QC-63 en su propia ruta), y la comparacion por segmentos ya cubriria
-  // cualquier subcamino si algun dia lo hubiera.
+  // Sin esta fila, `(private)` no aparece en la URL y `/asignacion` se serviria SIN sesion. Una
+  // sola entrada: la comparacion por segmentos ya cubre cualquier subcamino.
   ASSIGNED_ORDERS_ROUTE,
 ] as const;

@@ -1,12 +1,5 @@
-// Barrel de los componentes de la ruta de asignacion (R33,
-// `docs/architecture.md > Componentes > Regla: componentes de ruta en components/ con barrel index.ts`).
-//
-// Sin `'use client'`: la frontera cliente/servidor se declara en CADA archivo de componente,
-// nunca aqui. Asi `page.tsx` sigue siendo Server Component aunque importe desde el barrel, y
-// `assigned-orders-error.tsx` (cliente) convive con `assigned-orders-list-section.tsx`
-// (servidor).
-//
-// La pagina y los componentes de la ruta importan SIEMPRE desde aqui, nunca por ruta profunda.
+// Sin `'use client'` a proposito: la frontera se declara en cada componente, y asi `page.tsx`
+// sigue siendo Server Component aunque importe desde aqui.
 export {
   ASSIGNED_ORDER_ENTER_REASON_TESTID,
   ASSIGNED_ORDER_ENTER_TESTID,

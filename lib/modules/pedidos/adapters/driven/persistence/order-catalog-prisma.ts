@@ -54,13 +54,6 @@ export async function findAliveOrderTargetById(
   return row === null ? null : toOrderAssignmentTarget(row);
 }
 
-// ---------------------------------------------------------------------------------------
-// QC-88 (T5, R11, `design.md > 6`, `> 13` nota del merge 2026-09-16). Bloque nuevo al final:
-// `findAliveOrderTargetById` de arriba no se toca.
-// ---------------------------------------------------------------------------------------
-
-/** El `select` de esta lectura: solo lo que `AssignedOrderSummary` puede expresar. Ni autoria
- *  ni motivo de cancelacion, a diferencia de `ORDER_SELECT` de `order-prisma.ts`. */
 type AssignedOrderSummaryRow = {
   readonly id: string;
   readonly orderYear: number;
@@ -71,11 +64,8 @@ type AssignedOrderSummaryRow = {
   readonly status: string;
 };
 
-/** Fila de Prisma -> `AssignedOrderSummary`. Funcion pura, testeable sin base.
- *
- *  `quantity` llega como `Prisma.Decimal` -aqui SOLO tipado por su forma minima, sin importar
- *  `@prisma/client`- y se convierte con su propio `toFixed(4)`: la MISMA escala de la columna
- *  `Decimal(14,4)` que usa `fromDecimal` de `order-prisma.ts`, sin cruzar a ese archivo. */
+/** `quantity` llega como `Prisma.Decimal` -tipado aqui por su forma minima para no importar
+ *  `@prisma/client`- y se fija a 4 decimales, la escala de la columna `Decimal(14,4)`. */
 export function toAssignedOrderSummary(row: AssignedOrderSummaryRow): AssignedOrderSummary {
   return {
     id: row.id,
@@ -88,22 +78,11 @@ export function toAssignedOrderSummary(row: AssignedOrderSummaryRow): AssignedOr
 }
 
 /**
- * Implementa `OrderCatalog['listAliveSummariesByIds']` (QC-88 R11, R15): los datos de un
- * conjunto de pedidos por sus ids, acotados a los estados pedidos y a la empresa, y paginados.
+ * Dos sentencias -`count` y `findMany`- para una lectura logica: asi el `total` describe el
+ * conjunto ya filtrado por estado y por empresa, que es lo que se pagina.
  *
- * El `where` lleva `orderCompanyScope({ companyId })` (`./company-scope`) EN `AND`, junto a
- * `id: { in }`, `status: { in }` y `deletedAt: null` -mismo patron que `findAliveOrderTargetById`
- * y sincronizacion del 2026-09-16 tras el merge de QC-60-. `ids` vacio no llega: el caso de uso
- * que invoca esta funcion corta antes.
- *
- * PAGINACION: `toOffsetLimit`/`buildPage` de `lib/shared/pagination`, NUNCA reimplementada
- * (mismo reparto que `listAliveOrders` de `order-prisma.ts`). Son DOS sentencias -un `count` y
- * un `findMany`- para UNA lectura logica, como cualquier listado paginado del repo; el `total`
- * describe el conjunto YA FILTRADO por estado y por empresa.
- *
- * El orden es el MISMO que `OrderRepository.listAlive` sin `sort` (QC-88 R15, `design.md > 5.3`):
- * `priority DESC, created_at ASC, order_year ASC, order_sequence ASC`, con `id ASC` como
- * desempate final para que el orden sea total.
+ * El orden repite el de `OrderRepository.listAlive` sin `sort`, con `id ASC` de desempate para
+ * que sea total.
  */
 export async function listAliveOrderSummariesByIds(
   companyId: string,

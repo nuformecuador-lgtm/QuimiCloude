@@ -947,8 +947,6 @@ export const observabilidad = {
 /** `OrderCatalog` cableado con el adaptador driven DE PEDIDOS (`design.md > 2.1`): mismo patron
  *  que `RecipeCatalog` arriba. `asignaciones` solo conoce el TIPO, y por el solo puede saber si
  *  el pedido esta VIVO y en que ESTADO —ni el numero, ni la receta, ni las cantidades—. */
-/** QC-88 (T8, `design.md > 6`): `listAliveSummariesByIds` se cablea aqui, junto a
- *  `findAliveById`, en el MISMO objeto: es la MISMA interfaz `OrderCatalog`, no una segunda. */
 const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: listAliveOrderSummariesByIds,
@@ -1033,11 +1031,6 @@ export const asignaciones = {
     people: peopleDirectory,
     now: () => new Date(),
   }),
-  // QC-88 T8 - la SEXTA operacion: la lista de trabajo del Operador (`design.md > 5`, `> 6`).
-  // CUATRO dependencias, ninguna nueva: `orderAssignmentRepository` (los ids de la persona y el
-  // lote de responsables), `orderCatalog` (ya con `listAliveSummariesByIds`, arriba),
-  // `recipeCatalog` (el nombre de la receta, igual que `pedidos`) y `peopleDirectory` (los
-  // nombres mostrables de los responsables).
   listAssignedOrders: createListAssignedOrders({
     assignments: orderAssignmentRepository,
     orders: orderCatalog,

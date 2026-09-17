@@ -252,7 +252,7 @@ export type OrderRowResponsiblesProps = {
  *
  * **Vive en ESTE archivo, junto a `OrderRowSheetActions`, y no en `ResponsibleAvatars`** por
  * una razon concreta: `components/shared/responsible-avatars.tsx` es la pieza de presentacion
- * pura —promovida a `shared/` por QC-88 T17 (2026-09-16), `design.md > 8.3`—; no conoce
+ * pura —no conoce
  * paneles y no debe conocerlos—, y quien sabe abrir el panel de un pedido es este modulo. Asi la
  * columna de avatares y la de acciones abren **el mismo** `OrderSheet` (R23), no dos.
  *

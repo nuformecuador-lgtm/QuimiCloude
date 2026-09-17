@@ -4,22 +4,10 @@ import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 type AssignedOrdersEmptyProps = {
-  /**
-   * Destino a la primera pagina, presente **solo** cuando la pagina pedida se quedo sin elementos
-   * por ser mayor que el total (caso «la pagina se quedo atras»). Ausente cuando la persona no
-   * tiene ningun pedido asignado en absoluto.
-   */
+  /** Presente solo si la pagina pedida se paso del total; ausente si no hay ningun pedido. */
   readonly firstPageHref?: string;
 };
 
-/**
- * Estado vacio de la lista de pedidos asignados (R29, `design.md > 8.1`).
- *
- * Distinguible de un fallo de carga: una tabla con cero filas no comunica nada, y esta pantalla
- * es la lista de trabajo del Operador, sin accion de alta (asignar es QC-87, fuera de alcance).
- *
- * **Se pinta FUERA de `<DataTable>`**, mismo patron que `order-list-empty.tsx`.
- */
 export function AssignedOrdersEmpty({ firstPageHref }: AssignedOrdersEmptyProps) {
   return (
     <div

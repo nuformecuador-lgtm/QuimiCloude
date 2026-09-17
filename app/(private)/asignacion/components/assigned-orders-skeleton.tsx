@@ -8,21 +8,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-/**
- * Estado «cargando» de la lista de pedidos asignados (R30, `design.md > 8.1`).
- *
- * Se pinta como `fallback` del `<Suspense>` de la pagina, con `rows` = el tamano de pagina pedido
- * (R30). `role="status"` + `aria-busy`: quien usa lector de pantalla oye que algo se esta
- * cargando en lugar de encontrarse una tabla vacia.
- *
- * **Se pinta FUERA de `<DataTable>`**, igual que `order-list-skeleton.tsx` (alternativa Q,
- * descartada de `pedidos`): el «cargando» lo aporta el `<Suspense>` del servidor.
- */
-
-/**
- * Cuantas celdas por fila pinta el esqueleto: las SIETE columnas de `design.md > 8.2`. Un test
- * ata esta cifra a `buildAssignedOrdersColumns().length` (precedente: `order-list-skeleton.tsx`).
- */
+/** Copia a mano el numero de columnas de `buildAssignedOrdersColumns()`; un test ata las dos. */
 export const ASSIGNED_ORDERS_SKELETON_COLUMN_COUNT = 7;
 
 export function AssignedOrdersSkeleton({ rows }: { readonly rows: number }) {
