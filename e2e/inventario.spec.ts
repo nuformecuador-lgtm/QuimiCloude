@@ -171,6 +171,18 @@ const secondBatchUnitCost = '9.9999';
 const ignoredStockValue = '99';
 const ignoredQtyAlertValue = '77';
 
+/**
+ * Recorrido de `lote-y-fecha-de-compra-en-el-alta` (R14, R17): el lote se deja vacio a proposito,
+ * para que el servidor genere el correlativo, y la fecha de compra no se toca -queda "hoy" por
+ * defecto (R2)-. Los nombres cuelgan de `productName`/`presentationName` para que la limpieza por
+ * prefijo de `afterAll` los arrastre sin enumerarlos.
+ */
+const lotProductName = `${productName}_lote`;
+const lotPresentationName = `${presentationName}_l`;
+const lotStockValue = '5';
+const lotQtyAlertValue = '2';
+const lotUnitCostValue = '4.2500';
+
 async function createUserWithRole(user: Credentials, roleName: string): Promise<void> {
   if (!companyId) {
     throw new Error('la empresa del fixture no existe: fallo el beforeAll');
@@ -601,6 +613,55 @@ test.describe('catalogo de productos', () => {
       await prisma.productBatch.count({ where: { productId: antes[0]!.id } }),
       'la segunda alta solo debe agregar un lote',
     ).toBe(2);
+  });
+
+  test('el alta de producto muestra el lote asignado en el aviso de éxito (R14, R17)', async ({
+    page,
+  }) => {
+    // `lote-y-fecha-de-compra-en-el-alta`: el correlativo lo genera el servidor DENTRO de la
+    // misma transaccion que inserta la fila (QC-81), asi que no hay ventana intermedia que mirar
+    // -de "pedir" a "tener" el aviso ya lo nombra-. Este es el UNICO caso de este archivo que
+    // mira el TEXTO del toast: el resto solo afirma que hay un aviso (R21, R22), pero R14 pide
+    // justo que ese texto nombre el lote, y eso no se puede afirmar sin leerlo.
+    await loginAndLand(page, adminUser);
+
+    await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
+    await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
+
+    await abrirPanelDeAlta(page);
+
+    await page.getByTestId('product-field-name').fill(lotProductName);
+    await page.getByTestId('product-field-stock').fill(lotStockValue);
+    await page.getByTestId('product-field-qtyAlert').fill(lotQtyAlertValue);
+    await crearPresentacionEnLinea(page, lotPresentationName);
+    await page.getByTestId('product-field-unitCost').fill(lotUnitCostValue);
+
+    // NO se toca la fecha de compra (queda "hoy" por defecto, R2) ni el lote (queda vacio, para
+    // que el servidor genere el correlativo).
+
+    await guardarAlta(page);
+
+    // El toast contiene la palabra "Lote" seguida de un valor no vacio. Sin fijar el correlativo
+    // exacto: este spec corre en paralelo con otro proyecto que escribe en la misma serie (mismo
+    // criterio que `elegirPresentacionExistente`, que filtra por `RUN_ID` en vez de «la primera
+    // opcion»).
+    const toast = page.locator('[data-sonner-toast]').first();
+    await expect(toast).toBeVisible({ timeout: 60_000 });
+    await expect(toast).toContainText('Lote');
+
+    const texto = await toast.textContent();
+    const lote = /Lote\s+(\S+)/.exec(String(texto))?.[1];
+    expect(lote, 'el aviso debe nombrar un lote con un valor no vacio').toBeTruthy();
+
+    // Lo genero el backend de verdad, no solo lo pinto la pantalla.
+    const lotes = await prisma.$queryRaw<Array<{ lot: string | null }>>`
+      SELECT b.lot AS lot
+      FROM product_batches b
+      JOIN products p ON p.id = b.product_id
+      WHERE p.name = ${lotProductName} AND p.deleted_at IS NULL
+    `;
+    expect(lotes, 'el alta debe crear exactamente un lote').toHaveLength(1);
+    expect(lotes[0]?.lot, 'el lote debe quedar escrito en la base').toBe(lote);
   });
 
   test('un usuario sin inventario.consultar recibe 404 dentro del layout privado y no ve el catalogo (R4)', async ({

@@ -86,7 +86,7 @@ corre una sola vez al final, antes del PR (regla 5 de `CLAUDE.md`).
 
 ## Verificación de cierre
 
-- [ ] **T10. [P]** Ampliar `e2e/inventario.spec.ts` con el caso de `design.md > 7`: alta con fecha
+- [x] **T10. [P]** Ampliar `e2e/inventario.spec.ts` con el caso de `design.md > 7`: alta con fecha
       de compra por defecto y lote vacío (correlativo generado), aserto final sobre el texto del
       `toast`.
       **Hecho cuando**: `el alta de producto muestra el lote asignado en el aviso de éxito (R14,
