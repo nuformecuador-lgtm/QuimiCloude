@@ -845,3 +845,73 @@ de la maquina); el gate completo lo corre el leader por partes.
 
 **Estado tras la sincronizacion**: `git status --branch` -> `ahead 27` de `origin/dev`, **0
 behind**. Commit de merge: `c28133f`.
+
+---
+
+## Limpieza de comentarios (2026-09-17) — `docs/conventions.md > Comentarios`
+
+Encargo aparte del cambio funcional: aplicar la regla de comentarios (version acotada del
+2026-09-17) **solo a las lineas que anade esta rama** respecto de `origin/dev`. Ni una linea de
+logica tocada; ningun nombre de `it`/`describe` tocado (ahi `R<n>` es el enlace de trazabilidad).
+Los comentarios **preexistentes** se dejaron como estaban, aunque citen ficha.
+
+### Commits
+
+- `fee275f` — `chore(QC-88): limpia comentarios de produccion (app/ y lib/)`:
+  **24 archivos, 86 inserciones / 431 borrados** (todo lineas de comentario).
+- `646b6f9` — `chore(QC-88): limpia comentarios de tests y e2e`:
+  **31 archivos, 131 inserciones / 440 borrados** (todo lineas de comentario).
+
+Comprobado con `git diff -U0 | grep -vE '^[-+]\s*(//|\*|/\*|\*/)'`: **cero** lineas cambiadas que
+no sean comentario. Dos archivos de `app/(private)/pedidos/components/` estan en CRLF; se
+restauraron sus finales de linea tras una edicion automatizada, y `git diff --stat` lo confirma
+(4 y 7 lineas, no el archivo entero).
+
+### Porques conservados (reescritos, sin cita)
+
+Produccion:
+- `assigned-order-enter-trigger.tsx` — el motivo del deshabilitado va visible y no en `title`
+  porque un tooltip por `:hover` no llega en tactil; y el enlace responde 404 porque la pantalla
+  de destino todavia no existe.
+- `assigned-orders-columns.tsx` — el marcador de ausencia es **local al archivo**: misma glifo que
+  el de `/pedidos`, pero son rutas distintas y no se importa por ruta profunda.
+- `assigned-orders-list-params.ts` — se valida el TEXTO y no el resultado de `Number`; `sort`,
+  `filters` y `search` van fijos porque `<DataTable>` los exige; el esquema del dominio es
+  estricto y rechazaria una clave de mas.
+- `assigned-orders-table.tsx` — el «en vuelo» sale del `isPending` y no de una `key` en el
+  `<Suspense>`, que borraria el foco al remontar.
+- `assigned-orders-error.tsx` — se pinta en lugar de la tabla, nunca una tabla vacia.
+- `asignacion/page.tsx` — **la autorizacion va antes de resolver `searchParams`**.
+- `asignacion/components/index.ts` — el barrel no declara `'use client'` a proposito.
+- `list-assigned-orders.ts` — **se usa el metodo del puerto y no `listResponsiblesForOrders`**,
+  que exige `pedidos.consultar` y el Operador no lo tiene; los limites de pagina estan duplicados
+  porque el dominio no puede importar `lib/shared/**`; el estrechamiento de estado es seguro por
+  el filtro; al actor se le descarta al final para que el orden no dependa de quien mira.
+- `order-assignment-prisma.ts` — sin `distinct` porque la PK ya lo garantiza; el `orderBy` es
+  determinismo antes de paginar, no el orden que ve el usuario.
+- `order-catalog-prisma.ts` / `order-catalog.ts` — `count` + `findMany` para que `total` describa
+  el conjunto ya filtrado; la `Page` la arma el adaptador porque `domain/` no puede importar
+  `lib/shared/pagination`.
+- `routes.ts` / `private-nav.ts` — la ruta vive en `routes.ts` porque el middleware no puede
+  depender de la navegacion; sin su fila de prefijo `/asignacion` se serviria sin sesion; la
+  posicion en el menu decide el aterrizaje de quien no tiene `dashboard.consultar`.
+
+Tests y E2E (resumen): aislamiento por worker (prefijo + `RUN_ID`, empresa efimera porque
+`companies_name_unique` es global, limpieza por edad porque Chromium y WebKit corren a la vez,
+borrado final en el orden que imponen las FK RESTRICT), los CHECK de la base que obligan a sembrar
+`cancellationReason` y el ano del pedido, el rol `Operador` real del seed en vez de uno inventado,
+`useRouter` doblado porque jsdom no monta el App Router, y los porques de forma de consulta del
+adaptador (sin `include`, `where` estricto, `orderBy` por uuid).
+
+### Verificacion
+
+```
+pnpm run typecheck   -> OK (tsc --noEmit, sin salida)
+pnpm run lint        -> OK (eslint, sin salida)
+pnpm exec vitest run --maxWorkers=2 tests/unit/asignaciones tests/unit/asignaciones-ui \
+  tests/unit/pedidos tests/unit/pedidos-ui tests/guards
+  -> Test Files  100 passed (100)
+     Tests  1437 passed | 5 skipped (1442)
+```
+
+No se corrio la suite entera ni Playwright: el gate completo lo corre el leader.
