@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import PrivateLayout from '@/app/(private)/layout';
 import InventarioPage from '@/app/(private)/inventario/page';
 import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
+import { formatDateLocalISO } from '@/components/shared/data-table/data-table-filter-date';
 import {
   PRESENTATION_UNIT_ERROR_TESTID,
   PRESENTATION_UNIT_FIELD,
@@ -458,7 +459,7 @@ beforeEach(() => {
   listPresentationsActionMock.mockResolvedValue(
     paginaDePresentaciones([PRESENTACION_A, PRESENTACION_B]),
   );
-  createProductActionMock.mockResolvedValue({ status: 'success', id: crypto.randomUUID() });
+  createProductActionMock.mockResolvedValue({ status: 'success', id: crypto.randomUUID(), lot: '1' });
   updateProductActionMock.mockResolvedValue({ status: 'success' });
   deleteProductActionMock.mockResolvedValue({ status: 'success' });
   createPresentationActionMock.mockResolvedValue({ status: 'success', id: PRESENTACION_NUEVA.id });
@@ -1087,6 +1088,97 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(routerMock.refresh).toHaveBeenCalledTimes(1);
   });
 
+  it('tras un alta con éxito, ProductForm llama a onSaved con el lote devuelto por el servidor (R12)', async () => {
+    // T8 — `ProductForm.save()` guarda `result.lot` y se lo pasa a `onSaved`. El unico
+    // consumidor de `onSaved` es `ProductSheet.handleSaved`, asi que el efecto observable de que
+    // `onSaved` recibio el lote es que el aviso de exito lo nombra.
+    const user = setupUser();
+    const LOTE_DEVUELTO = 'LOTE-DEVUELTO-42';
+    createProductActionMock.mockResolvedValue({
+      status: 'success',
+      id: crypto.randomUUID(),
+      lot: LOTE_DEVUELTO,
+    });
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(toastExito).toHaveBeenCalledTimes(1));
+    expect(String(toastExito.mock.calls[0][0])).toContain(LOTE_DEVUELTO);
+  });
+
+  it('el aviso de alta nombra el lote asignado por el sistema (R14)', async () => {
+    // T9 — el lote vacio (correlativo generado por el servidor): el aviso lo nombra.
+    const user = setupUser();
+    const LOTE_ASIGNADO = '2026-00042';
+    createProductActionMock.mockResolvedValue({
+      status: 'success',
+      id: crypto.randomUUID(),
+      lot: LOTE_ASIGNADO,
+    });
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(toastExito).toHaveBeenCalledTimes(1));
+    const mensaje = String(toastExito.mock.calls[0][0]);
+    expect(mensaje).toContain('Lote');
+    expect(mensaje).toContain(LOTE_ASIGNADO);
+  });
+
+  it('el aviso de alta nombra el lote tecleado a mano sin decir que lo asignó el sistema (R15)', async () => {
+    // T9 — `resolveBatchLot()` devuelve el MISMO string que se tecleo, asi que el doble de la
+    // action simula esa devolucion con el valor que la persona escribio. El texto es neutro: no
+    // dice «asigno» ni «asignado» cuando el lote vino tecleado a mano.
+    const user = setupUser();
+    const LOTE_TECLEADO = 'PROV-7788';
+    createProductActionMock.mockResolvedValue({
+      status: 'success',
+      id: crypto.randomUUID(),
+      lot: LOTE_TECLEADO,
+    });
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user, { lot: LOTE_TECLEADO });
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(toastExito).toHaveBeenCalledTimes(1));
+    const mensaje = String(toastExito.mock.calls[0][0]);
+    expect(mensaje).toContain(LOTE_TECLEADO);
+    expect(mensaje.toLowerCase()).not.toContain('asigno');
+    expect(mensaje.toLowerCase()).not.toContain('asignó');
+    expect(mensaje.toLowerCase()).not.toContain('asignado');
+  });
+
+  it('el aviso de edición no cambia y no nombra ningún lote (R9)', async () => {
+    // T9 — la edicion no conoce el lote: el texto del aviso es el mismo de siempre, sin nombrar
+    // ningun valor de lote.
+    const user = setupUser();
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()]));
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await screen.findByTestId(testId.formulario);
+
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(updateProductActionMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toastExito).toHaveBeenCalledTimes(1));
+    expect(toastExito).toHaveBeenCalledWith('Producto actualizado.');
+    expect(String(toastExito.mock.calls[0][0])).not.toContain('Lote');
+  });
+
   it('elegir un producto existente autocompleta la alerta de cantidad, no la existencia', async () => {
     // Decision humana del 2026-09-09: en el alta el nombre es un autocomplete que busca productos
     // existentes; al elegir uno se autocompleta la alerta de cantidad. La existencia NO se copia:
@@ -1346,6 +1438,73 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.getByTestId('product-field-expiryDate')).toHaveValue('2027-03-15');
   });
 
+  it('el panel de alta nunca permite enviar sin fecha de compra escrita (R3)', async () => {
+    // El panel nunca permite un envio sin fecha de compra: el campo no admite quedar vacio. Si la
+    // fecha no llega a la Server Action, el servidor la sustituye por hoy, lo cual no es un
+    // rechazo.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    // Nada mas abrir el panel, sin tocar el calendario, el espejo oculto ya lleva una fecha civil
+    // completa (R2): no hay un estado "en blanco" intermedio que el usuario pueda enviar.
+    expect(screen.getByTestId('product-batch-date-value')).toHaveValue(
+      formatDateLocalISO(new Date()),
+    );
+
+    // El disparador es un BOTON que abre un calendario, no un campo de texto: no existe ningun
+    // control -ni "borrar", ni "limpiar"- capaz de dejarlo vacio. Abrir y cerrar el popover SIN
+    // elegir nada no cambia lo que hay listo para enviarse.
+    await user.click(screen.getByTestId('product-field-purchaseDate'));
+    await user.keyboard('{Escape}');
+    expect(screen.getByTestId('product-batch-date-value')).toHaveValue(
+      formatDateLocalISO(new Date()),
+    );
+
+    await rellenarFormulario(user);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+    const enviado = createProductActionMock.mock.calls[0][1];
+    // Lo que de verdad se envio nunca fue una cadena vacia.
+    expect(enviado.get('purchaseDate')).not.toBe('');
+  });
+
+  it('el alta de producto envía la fecha de compra elegida como YYYY-MM-DD (R4)', async () => {
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user);
+
+    // R2: el disparador ya muestra "hoy" -es lo elegido- antes de tocar el calendario.
+    const elegida = screen.getByTestId('product-field-purchaseDate').textContent?.trim() ?? '';
+    expect(elegida).toBe(formatDateLocalISO(new Date()));
+
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+
+    const enviado = createProductActionMock.mock.calls[0][1];
+    expect(enviado.get('purchaseDate')).toBe(elegida);
+  });
+
+  it('la edición no muestra el campo de fecha de compra (R9)', async () => {
+    const user = setupUser();
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()]));
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await screen.findByTestId(testId.formulario);
+
+    expect(screen.queryByTestId('product-field-purchaseDate')).toBeNull();
+    expect(screen.queryByTestId('product-batch-date-value')).toBeNull();
+  });
+
   it('los campos con ayuda la ofrecen en la etiqueta y la muestran al pasar por encima', async () => {
     // El formulario perdio tres campos el 2026-09-03 y gano una ayuda por campo en su lugar.
     // Se vigilan las tres cosas que pueden romperse en silencio:
@@ -1373,6 +1532,33 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
     // Pedir ayuda no envia el formulario.
     expect(createProductActionMock).not.toHaveBeenCalled();
+  });
+
+  it('el campo lote explica que un valor vacío lo asigna el sistema (R6)', async () => {
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    const ayuda = screen.getByTestId('product-helper-lot');
+    await user.hover(ayuda);
+
+    const texto = await screen.findByTestId('product-helper-text-lot', {}, { timeout: 3_000 });
+    expect(texto).toHaveTextContent('Déjalo vacío para que el sistema lo asigne.');
+  });
+
+  it('el campo lote sigue siendo un input de texto opcional (R7)', async () => {
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    const campo = screen.getByTestId('product-field-lot');
+    expect(campo).toHaveAttribute('type', 'text');
+    expect(campo).not.toHaveAttribute('required');
+    expect(campo).toHaveValue('');
   });
 
   it('el formulario no captura la unidad, y el alta viaja sin ella (QC-80, R21)', async () => {

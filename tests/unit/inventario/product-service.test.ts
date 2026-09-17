@@ -83,9 +83,11 @@ function montarRepositorio(overrides: Partial<ProductRepository> = {}): ProductR
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
       id: 'producto-1',
       batchId: 'lote-1',
+      lot: '1',
     })),
     addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => ({
       batchId: 'lote-1',
+      lot: '1',
     })),
     ...overrides,
   };
@@ -98,7 +100,7 @@ describe('R5 — alta de producto', () => {
 
     const resultado = await createProduct(ALTA_VALIDA, ADMIN);
 
-    expect(resultado).toEqual({ id: 'producto-1' });
+    expect(resultado).toEqual({ id: 'producto-1', lot: '1' });
     // QC-90 (R1): el alta pasa por `createWithFirstBatch`, no por `create`. `create` sigue
     // en el puerto para otros usos, pero el alta ya no puede escribir un producto sin lote.
     expect(products.createWithFirstBatch).toHaveBeenCalledTimes(1);

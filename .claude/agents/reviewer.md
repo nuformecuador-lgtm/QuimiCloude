@@ -37,6 +37,17 @@ Verifica:
    Falta cualquiera de las dos: BLOQUEANTE (`docs/architecture.md > Dominio` n.º 1).
 
 
+9. **Comentarios** (`docs/conventions.md > Comentarios`): en las líneas que el diff añade o
+   modifica en archivos de producción, un comentario que cite `QC-<n>`, `R<n>`, `design.md` o
+   «decisión cerrada» es BLOQUEANTE. Los comentarios **preexistentes** que el diff no toca **no**
+   son hallazgo: se limpian por módulo, en fichas del board. Son `menor`:
+   - un comentario que repite lo que hace el código;
+   - un bloque largo;
+   - un motivo que no has podido verificar;
+   - una limpieza de comentarios mezclada con cambios de código en el mismo commit.
+
+   Hasta que exista la guardia (**QC-115**), esto solo lo ves tú.
+
 Escribe `progress/review_<feature>.md` con:
 - Checklist marcado (qué pasó, qué no).
 - Lista de hallazgos, cada uno etiquetado `BLOQUEANTE` o `menor`.

@@ -9,7 +9,7 @@ import { runInRequestScope } from '@/lib/shared/request-scope';
 
 export type CreateProductFormState =
   | { status: 'idle' }
-  | { status: 'success'; id: string }
+  | { status: 'success'; id: string; lot: string }
   | ErrorState;
 
 export type ProductMutationFormState =
@@ -133,9 +133,10 @@ export async function createProductAction(
   const actor = await currentActor();
 
   try {
-    // Si el nombre ya existia, `id` es el del producto que ya estaba.
-    const { id } = await inventario.createProduct(candidate, actor);
-    return { status: 'success', id };
+    // Si el nombre ya existia, `id` es el del producto que ya estaba. `lot` es el TEXTO que
+    // quedo escrito en el primer lote, generado o tecleado a mano.
+    const { id, lot } = await inventario.createProduct(candidate, actor);
+    return { status: 'success', id, lot };
   } catch (error) {
     return toErrorState(error);
   }

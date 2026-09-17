@@ -3704,3 +3704,73 @@ sin mayores**.
 - En *Deudas* de `current.md`: el posible falso verde de `e2e/aislamiento-inventario.spec.ts`
   (QC-49) y el barrido pendiente de adaptadores que reconozcan duplicados por nombre de índice, con
   `presentation-prisma.ts:123` como primer sitio a mirar.
+
+## QC-106 — endpoint-de-carga-de-pdf · CERRADA el 2026-09-16 (PR #78, merge `8033f7a`)
+
+`backend`, `high`. **R1–R34** y **14 tasks**, con `./init.sh` completo en verde antes del PR:
+**493 archivos, 7165 tests verdes, 87 saltados**; los 2 rojos restantes son del baseline y los
+causan las dos dependencias aprobadas. Review **rechazada en primera vuelta** con 1 bloqueante, y
+cerrada. Primera ficha de la épica **QC-105 «Documentos e IA»**: desbloquea QC-107, QC-108, QC-109
+y QC-111.
+
+- **Qué entra**: módulo **nuevo `documentos`** que emite enlaces de subida firmados para hasta 10
+  PDFs por tanda contra un **bucket privado propio**, y publica **detrás de un puerto** las dos
+  conversiones —PDF a PNG de sus páginas y PDF a texto—, que consumirá QC-111. **Sin tabla, sin
+  migración, sin `app/api/`, sin códigos de error nuevos y sin permisos nuevos.**
+- **La acotación evitó construir sobre una premisa falsa.** La ficha pedía un «bucket privado de
+  Supabase Storage» dando por hecho que se apoyaba en lo de QC-25 — y QC-25 había **descartado a
+  conciencia** el bucket privado con enlace firmado («era la recomendación técnica y el humano la
+  descartó») y montado uno **público**. Se preguntó en vez de suponerlo: nace bucket privado nuevo y
+  **QC-25 D5 no se toca**.
+- **«Endpoint» no existía como camino en este repo**: `app/api/` no existe, todo entra por Server
+  Actions, y el límite por defecto de éstas es **1 MB** con `next.config.ts` vacío. Diez PDFs no
+  caben. De ahí la subida **directa del navegador** con enlace firmado, que es la decisión que dio
+  forma a toda la ficha.
+- **Una decisión cerrada resultó IMPOSIBLE, y se enmendó con D19.** `createSignedUploadUrl` **no
+  acepta plazo**: Supabase emite esos enlaces con **2 horas fijas** —verificado en los tipos del
+  paquete instalado y en su documentación—. Los 15 minutos rigen en los de **lectura**. **R10 se
+  reescribió** para que el código no prometa lo que no puede cumplir, y el puerto **perdió el
+  parámetro** del plazo en la subida: un contrato que pide algo que nadie puede honrar es una
+  mentira en el tipo.
+- **El hallazgo que vale más que la feature: B1, que ningún test veía.** La mitad de **lectura** de
+  R12 no estaba implementada —la comprobación de empresa no tenía **ni un llamante en producción**
+  mientras `lib/composition` ya cableaba `createSignedReadUrl` y `download` a pelo—. Todo estaba en
+  verde porque **no hay caso de uso de lectura todavía**: la factura la habría pagado **QC-111**,
+  pudiendo descargar PDFs de cualquier empresa. Es exactamente el agujero que un gate verde no ve y
+  para lo que existe la fase de review.
+- **El aislamiento por empresa sin tabla**: la ruta empieza por la empresa y el servidor solo firma
+  dentro de ese prefijo; el rechazo es idéntico **exista o no** el archivo.
+- **Sin ampliar el catálogo cerrado de permisos**: se exige `proveedores.modificar`, que ya existe y
+  que en el sembrado solo tiene el Administrador, validado en el service. No se compara el nombre
+  del rol, prohibido desde QC-74.
+- **Dependencias**: `unpdf` (MIT, cero dependencias propias) más `@napi-rs/canvas` como par
+  **opcional**, con los cuatro checks verificados **el día de la aprobación** —no heredados, que es
+  lo que caducó en QC-28—. **`mupdf` descartada a sabiendas** por `AGPL-3.0`. Se **enmendó** la fila
+  de `@supabase/storage-js`, que afirmaba que la consume un solo archivo.
+- **El cupo se levantó por decisión humana** y el coste fue mayor del anunciado: con 3 `in_progress`
+  en `backend`, el validador **aborta el gate entero** antes de typecheck, lint y tests. Durante esa
+  ventana **nada se verificó con el gate** —se usó verificación dirigida— hasta que QC-60 y QC-104
+  mergearon y el cupo bajó solo.
+- **El límite semanal de Opus mató al `implementer` a media escritura de su bitácora.** El daño fue
+  casi nulo porque el código y sus tests ya estaban commiteados. Se relanzó **en Sonnet** —que
+  `AGENTS.md` permite «en la llamada concreta»— y cerró el trabajo pendiente en 65k tokens.
+- **Dos desviaciones del reparto de roles, las dos declaradas en su commit**: el leader resolvió el
+  conflicto del merge y acotó una guardia ajena, porque el implementer estaba caído.
+
+### Lo que deja anotado
+
+- **El bucket privado y sus límites se crean A MANO en la consola de Supabase**: no hay ni un script
+  ni una migración que cree buckets en el repo, así que el gate **no puede comprobarlos**. El de
+  QC-25 se creó igual.
+- **Si `@napi-rs/canvas` corre en el runtime de Vercel quedó como DESCONOCIDO**, no como sí: es un
+  binario nativo y no se pudo verificar. **No bloquea** —la conversión a texto no lo necesita— y lo
+  cierra quien lo consuma.
+- **E2E diferido a QC-107** y **render real a QC-111**, las dos con destinatario.
+- **`documentos` NO entró en `BUSINESS_MODULES`** de `guard-autorizacion-por-permiso.test.ts`, así
+  que esa guardia **no vigila** el módulo nuevo: hoy no cazaría una autorización por nombre de rol
+  ahí. Queda propuesto como ficha propia.
+- En *Deudas* de `current.md`, cinco cosas del arnés que esta ficha destapó: el validador que ciega
+  el gate, tres guardias que se rompen solo por instalar una dependencia aprobada, una guardia que
+  afirmaba algo global protegiendo un alcance local, la herencia de modelo que costó más de un
+  millón de tokens de Opus, y la regla de «no citar fichas en comentarios» que **no está escrita en
+  ningún documento** pero rechaza trabajo.
