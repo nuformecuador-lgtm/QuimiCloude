@@ -183,6 +183,18 @@ const lotStockValue = '5';
 const lotQtyAlertValue = '2';
 const lotUnitCostValue = '4.2500';
 
+/**
+ * Segundo lote sobre un producto ya existente, con la MISMA presentacion en los dos altas: al
+ * compartir unidad, la existencia del listado debe sumar ambos lotes en un solo valor.
+ */
+const twoBatchesProductName = `${productName}_2lotes`;
+const twoBatchesPresentationName = `${presentationName}_2`;
+const twoBatchesQtyAlertValue = '2';
+const firstBatchStockValue = '6';
+const secondBatchStockValue = '5';
+const firstBatchUnitCostForSum = '2.5000';
+const secondBatchUnitCostForSum = '3.1000';
+
 async function createUserWithRole(user: Credentials, roleName: string): Promise<void> {
   if (!companyId) {
     throw new Error('la empresa del fixture no existe: fallo el beforeAll');
@@ -618,6 +630,76 @@ test.describe('catalogo de productos', () => {
     expect(
       await prisma.productBatch.count({ where: { productId: antes[0]!.id } }),
       'la segunda alta solo debe agregar un lote',
+    ).toBe(2);
+  });
+
+  test('agregar un segundo lote a un producto existente suma su existencia en el listado, sin escribir el lote a mano (R22, R20)', async ({
+    page,
+  }) => {
+    await loginAndLand(page, adminUser);
+
+    await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
+    await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
+
+    // --- 1. El producto nace con su primer lote y su presentacion.
+    await abrirPanelDeAlta(page);
+    await page.getByTestId('product-field-name').fill(twoBatchesProductName);
+    await page.getByTestId('product-field-stock').fill(firstBatchStockValue);
+    await page.getByTestId('product-field-qtyAlert').fill(twoBatchesQtyAlertValue);
+    await crearPresentacionEnLinea(page, twoBatchesPresentationName);
+    await page.getByTestId('product-field-unitCost').fill(firstBatchUnitCostForSum);
+    await guardarAlta(page);
+
+    const presentation = await prisma.presentation.findFirst({
+      where: { name: twoBatchesPresentationName },
+      select: { unitId: true },
+    });
+    if (!presentation) {
+      throw new Error('la presentacion del primer lote no existe: fallo el alta');
+    }
+    const unit = await prisma.unit.findUnique({
+      where: { id: presentation.unitId },
+      select: { symbol: true, name: true },
+    });
+    const unitLabel = unit?.symbol ?? unit?.name;
+    if (!unitLabel) {
+      throw new Error('la unidad del primer lote no existe: fallo el alta');
+    }
+
+    const primeraCelda = await findProductCell(page, twoBatchesProductName);
+    const primeraFila = primeraCelda.first().locator('xpath=ancestor::tr[1]');
+    await expect(primeraFila.getByTestId('product-stock')).toHaveText(
+      `${firstBatchStockValue} ${unitLabel}`,
+      { timeout: 60_000 },
+    );
+
+    // --- 2. Segundo lote sobre el MISMO producto y la MISMA presentacion, ambos elegidos del
+    // desplegable: el campo de lote se deja vacio para que el correlativo lo genere el servidor.
+    await abrirPanelDeAlta(page);
+    await elegirProductoExistente(page, twoBatchesProductName);
+    await elegirPresentacionExistente(page, twoBatchesPresentationName);
+    await page.getByTestId('product-field-stock').fill(secondBatchStockValue);
+    await page.getByTestId('product-field-qtyAlert').fill(twoBatchesQtyAlertValue);
+    await page.getByTestId('product-field-unitCost').fill(secondBatchUnitCostForSum);
+    await expect(
+      page.getByTestId('product-field-lot'),
+      'el correlativo lo genera el servidor: este recorrido no lo escribe',
+    ).toHaveValue('');
+    await guardarAlta(page);
+
+    const existenciaSumada = Number(firstBatchStockValue) + Number(secondBatchStockValue);
+    const segundaCelda = await findProductCell(page, twoBatchesProductName);
+    const segundaFila = segundaCelda.first().locator('xpath=ancestor::tr[1]');
+    await expect(segundaFila.getByTestId('product-stock')).toHaveText(
+      `${existenciaSumada} ${unitLabel}`,
+      { timeout: 60_000 },
+    );
+
+    expect(
+      await prisma.productBatch.count({
+        where: { product: { name: twoBatchesProductName, deletedAt: null } },
+      }),
+      'el segundo lote se suma al mismo producto, no crea uno nuevo',
     ).toBe(2);
   });
 
