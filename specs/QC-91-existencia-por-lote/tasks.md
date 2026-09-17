@@ -12,7 +12,7 @@
 
 ## Bloque 1 — la pieza pura
 
-- [ ] **T1. `sumStockByUnit` y `ProductStockByUnit`.** Función pura del dominio que agrupa filas
+- [x] **T1. `sumStockByUnit` y `ProductStockByUnit`.** Función pura del dominio que agrupa filas
       `{ stock, unitId }` por unidad, suma enteros y ordena por cantidad descendente con `unitId`
       ascendente como desempate (R3, R5).
       - Archivos: `lib/modules/inventario/domain/product-stock.ts` (nuevo),
@@ -25,7 +25,7 @@
 
 ## Bloque 2 — el listado lee por unidad (aditivo)
 
-- [ ] **T2. `ProductView` gana `stockByUnit` (sin perder `stock`).**
+- [x] **T2. `ProductView` gana `stockByUnit` (sin perder `stock`).**
       - Archivos: `lib/modules/inventario/domain/product-view.ts`,
         `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`
         (`PRODUCT_SELECT` → `BATCH_STOCK_BY_UNIT`, `toProductView`).

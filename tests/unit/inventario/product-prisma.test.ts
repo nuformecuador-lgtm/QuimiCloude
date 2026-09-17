@@ -20,9 +20,9 @@ import {
   toProductView,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 
-/** Un lote tal como lo devuelve `LATEST_BATCH_UNIT`: solo la unidad de su presentacion. */
-function lote(unitId: string) {
-  return { presentation: { unitId } };
+/** Un lote tal como lo devuelve `BATCH_STOCK_BY_UNIT`: su existencia y la unidad de su presentacion. */
+function lote(unitId: string, stock = 1) {
+  return { stock, presentation: { unitId } };
 }
 
 describe('toProductView', () => {
@@ -84,10 +84,10 @@ describe('toProductView', () => {
     expect(Object.keys(vista)).not.toContain('unitId');
   });
 
-  it('con VARIOS lotes se queda con el primero, que es el mas reciente del `orderBy` (R22)', () => {
-    // R22 — ELEGIR ES TRABAJO DEL MOTOR. El `select` pide `take: 1` con `created_at DESC, id
-    // DESC`, asi que a este mapeo llega UN solo lote y es el que gana; si el mapeo se pusiera a
-    // ordenar aqui habria DOS definiciones de «mas reciente» y podrian discrepar.
+  it('con VARIOS lotes `latestBatchUnitId` toma la PRIMERA fila, que es la mas reciente del `orderBy` (R22)', () => {
+    // R22 — ELEGIR ES TRABAJO DEL MOTOR. El `select` trae todos los lotes con `created_at DESC,
+    // id DESC`; el mapeo no reordena, solo mira la primera fila. Si se pusiera a ordenar aqui
+    // habria DOS definiciones de «mas reciente» y podrian discrepar.
     //
     // Que el criterio del motor sea el correcto se afirma como DATO en el bloque de abajo
     // (`PRODUCT_SELECT`), y contra Postgres de verdad en el test de integracion.
@@ -102,27 +102,57 @@ describe('toProductView', () => {
     const vista = toProductView({ ...filaBase, batches: [] });
     expect(vista.latestBatchUnitId).toBeNull();
   });
+
+  it('sin ningun lote `stockByUnit` es un array vacio (R14)', () => {
+    const vista = toProductView({ ...filaBase, batches: [] });
+    expect(vista.stockByUnit).toEqual([]);
+  });
+
+  it('dos lotes de la misma unidad suman su existencia (R3)', () => {
+    const vista = toProductView({ ...filaBase, batches: [lote('u-1', 4), lote('u-1', 6)] });
+    expect(vista.stockByUnit).toEqual([{ unitId: 'u-1', quantity: 10 }]);
+  });
+
+  it('dos lotes de unidades distintas quedan separados', () => {
+    const vista = toProductView({ ...filaBase, batches: [lote('u-1', 4), lote('u-2', 6)] });
+    expect(vista.stockByUnit).toEqual([
+      { unitId: 'u-2', quantity: 6 },
+      { unitId: 'u-1', quantity: 4 },
+    ]);
+  });
+
+  it('`latestBatchUnitId` sigue saliendo de la primera fila aunque haya mas de una unidad en `stockByUnit`', () => {
+    const vista = toProductView({ ...filaBase, batches: [lote('u-nueva', 2), lote('u-vieja', 8)] });
+    expect(vista.latestBatchUnitId).toBe('u-nueva');
+    expect(vista.stockByUnit).toEqual([
+      { unitId: 'u-vieja', quantity: 8 },
+      { unitId: 'u-nueva', quantity: 2 },
+    ]);
+  });
 });
 
-describe('PRODUCT_SELECT: como se elige el lote mas reciente (R22)', () => {
+describe('PRODUCT_SELECT: como se traen TODOS los lotes del producto (R22)', () => {
   // Se afirma sobre el OBJETO que viaja a Prisma, no sobre el texto del archivo: una asercion
   // sobre el fuente pasaria igual con el criterio equivocado -y no se puede probar contra la
   // base en un test unitario-. Es la unica parte de la derivacion que no vive en `toProductView`.
 
-  it('pide UN solo lote, el de creacion mas reciente, desempatando por id descendente', () => {
-    expect(PRODUCT_SELECT.batches.take).toBe(1);
+  it('no acota a un solo lote: trae todos, ordenados por creacion mas reciente primero', () => {
+    expect(PRODUCT_SELECT.batches).not.toHaveProperty('take');
     // El desempate por `id` NO es adorno: no hay fecha de compra todavia (es QC-81) y el alta
     // con primer lote escribe producto y lote con un UNICO `now`, asi que dos lotes pueden
-    // compartir `created_at` al milisegundo. Sin segundo criterio, la misma consulta podria
-    // devolver una unidad distinta cada vez.
+    // compartir `created_at` al milisegundo. Sin segundo criterio, la primera fila -de la que
+    // sale `latestBatchUnitId`- no estaria definida.
     expect(PRODUCT_SELECT.batches.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
   });
 
-  it('del lote lee SOLO el `unitId` de su presentacion: no entra en `units`', () => {
+  it('de cada lote lee su existencia y SOLO el `unitId` de su presentacion: no entra en `units`', () => {
     // La travesia `ProductBatch -> Presentation` es INTERNA a `inventario` (los dos modelos son
     // suyos). `units` es de `unidades` y se resuelve por su contrato publico, nunca con un
     // `include` que ninguna guardia de imports detectaria.
-    expect(PRODUCT_SELECT.batches.select).toEqual({ presentation: { select: { unitId: true } } });
+    expect(PRODUCT_SELECT.batches.select).toEqual({
+      stock: true,
+      presentation: { select: { unitId: true } },
+    });
   });
 
   it('el producto ya no selecciona ninguna columna de unidad (R21)', () => {

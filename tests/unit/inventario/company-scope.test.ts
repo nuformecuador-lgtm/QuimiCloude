@@ -178,6 +178,7 @@ describe('QC-49 R19 — la empresa entra en la consulta y no sale hacia el naveg
       'name',
       'qtyAlert',
       'stock',
+      'stockByUnit',
       'updatedAt',
     ]);
   });

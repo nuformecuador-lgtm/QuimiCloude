@@ -1,5 +1,7 @@
 import type { UnitId } from '@/lib/modules/unidades';
 
+import type { ProductStockByUnit } from './product-stock';
+
 /**
  * Contratos de entrada y salida de producto (`design.md > 6.1`, `> 3`). Viven en
  * `domain/` -no en `ports/`- porque describen el QUE se dice, no el COMO se habla con el
@@ -44,6 +46,8 @@ export type ProductView = {
    */
   readonly imagePath: string | null;
   readonly stock: number | null;
+  /** Existencia agregada por unidad, sumando todos los lotes vivos del producto. */
+  readonly stockByUnit: readonly ProductStockByUnit[];
   readonly qtyAlert: number | null;
   /**
    * Unidad DERIVADA del producto: la de la presentacion de su lote MAS RECIENTE -creacion

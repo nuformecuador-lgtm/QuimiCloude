@@ -160,6 +160,7 @@ const PRODUCTO_EN_BASE = {
   name: 'Acido sulfurico',
   imagePath: null,
   stock: 0,
+  stockByUnit: [],
   qtyAlert: 0,
   // QC-80 (R21, R22): el producto ya no declara unidad; la derivada del lote mas reciente es
   // `latestBatchUnitId`, y este doble no tiene lotes.

@@ -5,6 +5,7 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 import { BatchDuplicateLotError, ValidationError } from '../../../domain/errors';
 import { normalizeProductName } from '../../../domain/product-name';
+import { sumStockByUnit } from '../../../domain/product-stock';
 
 import { companyScopeColumns, productCompanyScope } from './company-scope';
 import {
@@ -26,13 +27,13 @@ import type { NewProduct, ProductView } from '../../../domain/product-view';
 // (`null`/`false`): distinguirlas seria un oraculo de existencia sobre filas ajenas.
 
 /**
- * Unidad del lote mas reciente. El desempate por `id` hace falta: con `created_at` empatado el
- * ganador no estaria definido. De `Presentation` solo se lee `unitId`: `units` es de otro modulo.
+ * Todos los lotes del producto, con su existencia y su unidad. El desempate por `id` hace falta:
+ * con `created_at` empatado el ganador de `latestBatchUnitId` no estaria definido. De
+ * `Presentation` solo se lee `unitId`: `units` es de otro modulo.
  */
-const LATEST_BATCH_UNIT = {
-  select: { presentation: { select: { unitId: true } } },
+const BATCH_STOCK_BY_UNIT = {
+  select: { stock: true, presentation: { select: { unitId: true } } },
   orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-  take: 1,
   // `satisfies` y no `as const`: `orderBy` exige un array mutable.
 } satisfies Prisma.Product$batchesArgs;
 
@@ -44,7 +45,7 @@ export const PRODUCT_SELECT = {
   qtyAlert: true,
   createdAt: true,
   updatedAt: true,
-  batches: LATEST_BATCH_UNIT,
+  batches: BATCH_STOCK_BY_UNIT,
 } satisfies Prisma.ProductSelect;
 
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>;
@@ -55,6 +56,9 @@ export function toProductView(row: ProductRow): ProductView {
     name: row.name,
     imagePath: row.imagePath,
     stock: row.stock,
+    stockByUnit: sumStockByUnit(
+      row.batches.map((batch) => ({ stock: batch.stock, unitId: batch.presentation.unitId })),
+    ),
     qtyAlert: row.qtyAlert,
     latestBatchUnitId: row.batches[0]?.presentation.unitId ?? null,
     createdAt: row.createdAt,
