@@ -37,11 +37,8 @@ describe('la ruta de pedidos se declara una sola vez (R2)', () => {
   it('no se declara un helper de ruta de detalle: no hay pagina de detalle (R1, R2)', async () => {
     const rutas: Record<string, unknown> = await import('@/lib/shared/routes');
 
-    // TENSADO 2026-09-16 (QC-88): `assignedOrderRoute` es el helper de detalle de
-    // `ASSIGNED_ORDERS_ROUTE` (`/asignacion`, otra pantalla), no de `ORDERS_ROUTE`. Coincide con
-    // el patron `/order/i` solo porque su nombre habla de UN pedido asignado, no porque `/pedidos`
-    // haya ganado una pagina de detalle -sigue sin tenerla, R1-. Se nombra explicitamente y NO se
-    // afloja el patron: cualquier OTRA funcion nueva que hable de un pedido sigue cazandose.
+    // `assignedOrderRoute` es el detalle de `ASSIGNED_ORDERS_ROUTE`, otra pantalla: casa con el
+    // patron solo por su nombre. Se exceptua por nombre para no aflojar el patron.
     const EXCEPCIONES = new Set(['assignedOrderRoute']);
 
     // Ni `orderDetailRoute` ni ninguna otra funcion cuyo nombre hable de un pedido.
@@ -165,30 +162,13 @@ describe('la pantalla vive donde dice la constante (R1, R40)', () => {
 // `'use client'` —nunca el `index.ts`, que convertirlo en frontera cliente/servidor arrastraria la
 // pagina entera al navegador—.
 //
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// **ENMIENDA QC-88 T17 (2026-09-16) — `responsible-avatars.tsx` ya NO es un componente de esta
-// ruta.** Que nadie lea esto manana como un aflojamiento silencioso:
-//
-//   - QC-88 (`listado-de-pedidos-asignados`) es el **SEGUNDO consumidor** de `ResponsibleAvatars`,
-//     y lo necesita **con la misma API** (`specs/QC-88-listado-de-pedidos-asignados/design.md >
-//     8.3`, hallazgo **H6**).
-//   - `docs/architecture.md > Componentes > Regla: sin sobre-ingenieria` **obliga** a promover a
-//     `components/shared/` en ese caso exacto. Lo contrario seria duplicar el avatar —dos
-//     definiciones que divergen en silencio— o hacer que la pantalla de QC-88 importara por ruta
-//     profunda las tripas de `/pedidos`, que es justo lo que este `describe` prohibe.
-//   - Decision humana del 2026-09-16, mismo patron con el que se invirtieron R14 de QC-26 y R11
-//     de QC-44 en QC-56.
-//
-// Por eso —y SOLO por eso— el componente sale de la lista de archivos de la ruta. **Cambia su
-// ubicacion declarada, no la exigencia**: lo que se le pedia aqui se le sigue pidiendo en su casa
-// nueva, en el `describe` que va justo debajo (directiva de cliente propia + reexportado por el
-// barrel de la ruta desde la ubicacion compartida, nunca por ruta relativa). Y para todo lo que
-// SIGUE siendo de `/pedidos` las tres condiciones quedan intactas: dentro de `components/`,
-// reexportado por el barrel y con su `'use client'`.
-// ─────────────────────────────────────────────────────────────────────────────────────────────
+// `responsible-avatars.tsx` ya no es de esta ruta: al aparecer un segundo consumidor con la misma
+// API se promovio a `components/shared/`, porque la alternativa era duplicar el avatar o importar
+// por ruta profunda las tripas de `/pedidos`. Lo que se le exigia aqui se le sigue exigiendo en el
+// `describe` de mas abajo.
 describe('los componentes de responsables viven en components/ y salen por el barrel (R36)', () => {
   const CARPETA = `app/(private)${ORDERS_ROUTE}/components`;
-  /** Los que SIGUEN siendo de esta ruta. `responsible-avatars.tsx` salio por la enmienda QC-88. */
+  /** Los que siguen siendo de esta ruta; el avatar se promovio a `components/shared/`. */
   const DE_LA_RUTA = ['order-responsibles.tsx'] as const;
 
   it('los archivos de la ruta estan dentro de `components/`, no sueltos junto a `page.tsx`', () => {
@@ -226,9 +206,8 @@ describe('los componentes de responsables viven en components/ y salen por el ba
   });
 
   it('la ruta NO conserva una copia propia del avatar promovido (una sola definicion)', () => {
-    // El otro lado de la enmienda: promover y dejar el archivo viejo en la ruta serian DOS
-    // definiciones del mismo avatar divergiendo en silencio, que es justo lo que la promocion
-    // evita (`design.md > 8.3`, riesgo 4 de `> 14`).
+    // Promover y dejar ademas el archivo viejo en la ruta serian DOS definiciones del mismo
+    // avatar divergiendo en silencio, que es justo lo que la promocion evita.
     expect(existsSync(`${CARPETA}/responsible-avatars.tsx`)).toBe(false);
     expect(existsSync(`app/(private)${ORDERS_ROUTE}/responsible-avatars.tsx`)).toBe(false);
   });
@@ -246,15 +225,6 @@ describe('los componentes de responsables viven en components/ y salen por el ba
   });
 });
 
-// QC-88 T17 (2026-09-16) — El componente promovido, vigilado en su casa nueva.
-//
-// La enmienda de arriba saca `responsible-avatars.tsx` de la lista de archivos de la ruta; este
-// `describe` es lo que impide que eso sea un agujero. Lo que QC-102 exigia sigue exigiendose, solo
-// que sobre `components/shared/`: que el archivo exista alli, que declare SU directiva de cliente
-// —promoverlo no lo convierte en Server Component— y que la ruta de pedidos lo siga consumiendo
-// por su barrel, reexportado desde la ubicacion compartida y no por una ruta relativa que ya no
-// existe. Motivo de la promocion: `design.md > 8.3` / H6 de QC-88 y
-// `docs/architecture.md > Componentes > Regla: sin sobre-ingenieria` (dos consumidores, misma API).
 describe('`ResponsibleAvatars` vive en components/shared y la ruta lo consume desde ahi (R36)', () => {
   const COMPARTIDO = 'components/shared/responsible-avatars.tsx';
   const BARREL = `app/(private)${ORDERS_ROUTE}/components/index.ts`;

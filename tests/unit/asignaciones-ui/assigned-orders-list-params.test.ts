@@ -1,9 +1,3 @@
-// QC-88 T14 — Parser y serializador de los parametros de lista de pedidos asignados: R31.
-//
-// `assigned-orders-list-params.ts` es PURO a proposito (`design.md > 9.1`): sin DOM, sin React y
-// sin `next/*`. Esta lista NO ordena, NO filtra y NO busca, asi que solo hay dos parametros:
-// `page` y `pageSize`.
-
 import { describe, expect, it } from 'vitest';
 
 import {

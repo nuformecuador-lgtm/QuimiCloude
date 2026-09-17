@@ -88,9 +88,8 @@ const testId = {
   // Se conserva a proposito, para afirmar que sigue SIN existir.
   userTriggerRetirado: 'private-user-trigger',
   dashboard: 'nav-dashboard',
-  // QC-88 T11 (2026-09-16): item de nivel superior en «Operación», entre dashboard e inventario.
-  // Declara `asignaciones.consultar`, que ningun caso de este archivo asigna todavia al Operador
-  // de prueba (usa solo `inventario.consultar`), asi que sigue sin aparecer en esos casos.
+  // Declara `asignaciones.consultar`, que ningun caso de este archivo da al Operador de prueba
+  // (usa solo `inventario.consultar`): por eso no aparece en los casos de menu corto.
   asignacion: 'nav-asignacion',
   inventario: 'nav-inventario',
   pedidos: 'nav-pedidos',
@@ -220,7 +219,6 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     // TENSADO el 2026-09-08 (QC-39 T4, R9/R10/R47): de seis items a siete, con «Unidades». El
     // titulo deja de decir «diez permisos» porque el catalogo ya son once desde QC-38; el numero
     // no se escribe a mano en ningun sitio, sale de `PERMISSIONS`.
-    // TENSADO el 2026-09-16 (QC-88 T11): de siete items a ocho, con «Asignación».
     await renderLayout(TODOS_LOS_PERMISOS);
 
     for (const item of [
@@ -304,9 +302,6 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
 
     expect(testIds).toEqual([
       testId.dashboard,
-      // TENSADO el 2026-09-16 (QC-88 T11, R3/R35): sube de ocho a nueve con `nav-asignacion`, entre
-      // dashboard e inventario -no al final-: ese orden cambia el aterrizaje del Operador
-      // (`design.md > 7.2`, H3). Se tensa, no se afloja: sigue siendo la lista EXACTA y en orden.
       testId.asignacion,
       testId.inventario,
       testId.pedidos,

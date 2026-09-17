@@ -32,14 +32,6 @@ describe('QC-93 — landingRouteForPermissions deriva el destino con la regla de
     expect(landingRouteForPermissions(seedPermissionsOf(ROLE_ADMINISTRADOR))).toBe(DASHBOARD_ROUTE);
   });
 
-  // TENSADO 2026-09-16 (QC-88 T11, R34, H3 de `spec_author`): el Operador del seed gano
-  // `asignaciones.consultar` con QC-86 y esta ficha coloco «Asignación» ENTRE Dashboard e
-  // Inventario en `PRIVATE_NAV_ITEMS`, asi que el primer item visible de su menu filtrado ya no
-  // es `nav-inventario` sino `nav-asignacion`. El destino que se afirma sigue siendo CONCRETO
-  // -`ASSIGNED_ORDERS_ROUTE`, no «alguno valido»-: la garantia de R2 (aterrizar donde manda la
-  // composicion real, sin regla propia) no cambia, solo cambia CUAL es ese destino hoy. El
-  // Operador CONSERVA `inventario.consultar` -ese modulo sigue siendo consultable, solo deja de
-  // ser el primero-.
   it('lleva a asignacion a quien tiene los permisos sembrados del Operador (R2)', () => {
     expect(landingRouteForPermissions(seedPermissionsOf(ROLE_OPERADOR))).toBe(
       ASSIGNED_ORDERS_ROUTE,

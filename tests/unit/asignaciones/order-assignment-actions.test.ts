@@ -707,11 +707,6 @@ describe('QC-102 R13 - listResponsiblesForOrdersAction', () => {
   });
 });
 
-// ---------------------------------------------------------------------------------------------
-// QC-88 T9 (R27 lado servidor) - `listAssignedOrdersAction`: argumento YA TIPADO, ningun
-// `FormData`, ningun permiso comprobado aqui y error traducido por su `code`.
-// ---------------------------------------------------------------------------------------------
-
 describe('QC-88 T9 — listAssignedOrdersAction', () => {
   it('recibe la entrada YA TIPADA -aridad UNO- y la entrega CRUDA al caso de uso', async () => {
     listAssignedOrdersMock.mockResolvedValue({
@@ -751,7 +746,6 @@ describe('QC-88 T9 — listAssignedOrdersAction', () => {
     const resultado = await listAssignedOrdersAction({ page: 1 });
 
     expect(resultado).toEqual({ status: 'success', data: pagina });
-    // Serializable sin perder nada, como el resto de las consultas de este archivo.
     expect(JSON.parse(JSON.stringify(resultado))).toEqual({ status: 'success', data: pagina });
   });
 

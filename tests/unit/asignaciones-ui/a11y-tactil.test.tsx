@@ -1,18 +1,3 @@
-// QC-88 T14 (retomado) — La regla multiplataforma sobre lo que esta feature anade (R32).
-//
-// `docs/architecture.md > Componentes > Regla: multiplataforma` y `design.md > 8.4`. Se afirma
-// sobre el DOM, no sobre una promesa en un comentario:
-//
-//   1. objetivos tactiles de 44x44 en TODO control que esta feature monta: el disparador
-//      «entrar» (los dos estados), el enlace de «volver a la primera pagina» del vacio y el
-//      boton de «reintentar» del error;
-//   2. el motivo del disparador deshabilitado (R21) es alcanzable SIN pasar el puntero por
-//      nada: es texto en el DOM, referenciado por `aria-describedby`, nunca un `title`.
-//
-// **No se declara ninguna excepcion de escritorio** (`design.md > 8.4`), asi que no hay nada que
-// eximir aqui. Mismo patron y mismo helper que `tests/unit/pedidos-ui/a11y-tactil.test.tsx`
-// (QC-102 T7/T9).
-
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -24,10 +9,7 @@ import {
   AssignedOrdersError,
 } from '@/app/(private)/asignacion/components';
 
-// `AssignedOrdersError` es 'use client' y llama `useRouter()` (para `router.refresh()` del
-// reintento): jsdom no monta el App Router, asi que se dobla igual que
-// `tests/unit/pedidos-ui/a11y-tactil.test.tsx` no necesita porque no monta ese componente; aqui
-// SI hace falta el doble.
+// `AssignedOrdersError` llama `useRouter()` para el reintento y jsdom no monta el App Router.
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({

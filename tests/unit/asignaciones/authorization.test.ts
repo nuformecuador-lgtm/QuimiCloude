@@ -233,14 +233,6 @@ describe('QC-102 — `canModifyAssignments` (R28, R29, R50)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------------------
-// QC-88 (T6, R40) — `listAssignedOrders`: el CASO DE USO real, no `requirePermission` solo. R40
-// exige el test que llama a la OPERACION con un actor sin `asignaciones.consultar` y confirma que
-// **lanza sin llegar al repositorio**: un corte de ruta o una policy no cuentan como cumplimiento
-// de R5. La matriz completa (mas casos, mas combinaciones) vive en
-// `tests/unit/asignaciones/list-assigned-orders.test.ts`; este caso es el que ata R40 al MISMO
-// archivo que prueba la autorizacion del modulo.
-// ---------------------------------------------------------------------------------------
 describe('QC-88 — `listAssignedOrders` (R5, R40)', () => {
   function montarDeps(): { deps: ListAssignedOrdersDeps; todos: readonly ReturnType<typeof vi.fn>[] } {
     const listOrderIdsByUserInCompany = vi.fn(async () => []);
@@ -288,8 +280,7 @@ describe('QC-88 — `listAssignedOrders` (R5, R40)', () => {
     for (const [, actor] of ACTORES_DENEGADOS) {
       await expect(listAssignedOrders(actor, { page: 1 })).rejects.toThrow(UnauthorizedError);
     }
-    // Un actor con OTROS permisos -incluido `pedidos.consultar`, que R3 ya prohibe que sustituya-
-    // tampoco llega al repositorio.
+    // `pedidos.consultar` no sustituye al permiso del modulo: tampoco llega al repositorio.
     await expect(
       listAssignedOrders(conPermisos(PERMISO_CONSULTA), { page: 1 }),
     ).rejects.toThrow(UnauthorizedError);

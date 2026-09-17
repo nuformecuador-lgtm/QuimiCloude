@@ -1,55 +1,12 @@
 // tests/integration/asignaciones/assigned-orders.int.test.ts
 /**
- * QC-88 T3 — «los pedidos que ESTA persona tiene asignados en ESTA empresa»
- * (`listOrderIdsByUserInCompany`) contra Postgres real: el rechazo cruzado (R8) y el alcance de
- * empresa (R7).
+ * En unidad, «el `where` lleva `company_id`» seria una promesa del TEST: un adaptador que filtrara
+ * solo por `user_id` pasaria todos los unitarios. Aqui corre el SQL contra dos empresas reales.
  *
- * QUE SE EJERCITA AQUI, Y QUE NO. El **adaptador** (`order-assignment-prisma.ts`, T2) construido
- * sobre la `tx` del test, NO un caso de uso: el caso de uso de esta ficha es **T6** y todavia no
- * existe (esta bloqueado por QC-60). Cuando exista, este archivo sigue valiendo tal cual: lo que
- * mide es el `where` del SQL, que es suyo y no del dominio.
- *
- * POR QUE EN INTEGRACION Y NO EN UNIDAD. En unidad el doble del repositorio devuelve lo que se le
- * diga, asi que «el `where` lleva `company_id`» seria una promesa **del test**, no del codigo: un
- * adaptador que filtrara solo por `user_id` pasaria todos los unitarios del mundo. Aqui corre el
- * SQL de verdad contra dos empresas que existen, con personas, pedidos y asignaciones de verdad, y
- * es lo unico que puede demostrar que el filtro esta **en la consulta**. Es el mismo argumento que
- * la cabecera de `./batch-company-scope.int.test.ts` (QC-102 T2).
- *
- * LA ASIGNACION AJENA SE SIEMBRA DE VERDAD —pedido real, persona real de la empresa B, alta por el
- * caso de uso real de QC-87— y el caso **lo comprueba leyendo la tabla al margen del adaptador**.
- * Sin eso, «no vuelve» seria indistinguible de «no habia nada que devolver», que es justo la
- * confusion que R8 prohibe.
- *
- * LA EMPRESA ENTRA POR LA ASIGNACION, NO POR EL PEDIDO (hallazgo H4 de `design.md > 0`, escrito
- * cuando `orders` todavia no tenia `company_id` -era la deuda de QC-60-). Lo que acota
- * `listOrderIdsByUserInCompany` sigue siendo `(user_id, company_id)` de `order_assignments`, y esta
- * ficha no cambia eso: R7/R8 se cumplen con o sin `orders.company_id` (design.md > 13). Ahora que
- * QC-60 ya aterrizo, `createOrder` SI recibe empresa (`OrderOptions.companyId`), y hay que dar al
- * pedido ajeno la de la asignacion ajena: `assign` resuelve el pedido con
- * `findAliveById(id, companyId)`, que desde QC-60 tambien filtra por empresa.
- *
- * DESVIACION DECLARADA, y es del ESQUEMA, no del spec. «El mismo `user_id` con filas en DOS
- * empresas» **no se puede sembrar**: `order_assignments_user_id_fkey` es COMPUESTA
- * —`(user_id, company_id) -> users(id, company_id)`, migracion `20260911120000_order_assignments`
- * :168— y `users.company_id` es una sola. El ultimo caso de este archivo lo demuestra en vez de
- * darlo por sabido: la base RECHAZA la fila. Asi que R7 se prueba por el unico lado que existe, y
- * es el mismo lado que mata la mutacion: **el mismo `user_id` preguntado por la OTRA empresa
- * devuelve vacio**, teniendo filas.
- *
- * AISLAMIENTO: `transaccion` (ver la cabecera de `./use-case-fixture.ts` y el censo
- * `tests/integration/aislamiento.json`).
- *
- * CADA ASERCION CAE AL MUTAR:
- *   - quitar `companyId` del `where` de `listOrderIdsByUserInCompany` -> caen «la persona ajena no
- *     devuelve nada» (volveria su pedido) y «preguntada por la otra empresa devuelve vacio»
- *     (volverian sus dos pedidos);
- *   - quitar `userId` del `where` -> cae «solo los suyos»: volverian tambien los de la companera;
- *   - devolver las filas en vez de `fila.orderId` (quitar el `.map`) -> cae «ids DESNUDOS»;
- *   - quitar el `orderBy: { orderId: 'asc' }` -> cae el orden estable de R15, que es lo que hace
- *     que dos lecturas seguidas devuelvan la misma secuencia antes de paginar;
- *   - cambiar el `findMany` por algo que lance con cero filas -> cae «sin asignaciones devuelve
- *     lista vacia».
+ * El mismo `user_id` con filas en DOS empresas NO se puede sembrar: la FK de `order_assignments`
+ * es compuesta -`(user_id, company_id) -> users(id, company_id)`- y `users.company_id` es una
+ * sola. Por eso el alcance de empresa se prueba preguntando por la OTRA, y el ultimo caso del
+ * archivo demuestra que la base rechaza la fila en vez de darlo por sabido.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -80,10 +37,9 @@ describe('asignaciones · los pedidos de una persona en su empresa (integracion)
       const repo = createOrderAssignmentRepository(fixture.tx);
 
       const pedidoPropio = await createOrder(fixture);
-      // Tras QC-60 `orders` tambien lleva `company_id`: el pedido ajeno tiene que nacer en la
-      // empresa B para que la asignacion (tambien de B) sea coherente con su FK compuesta. Antes
-      // de QC-60 esto no hacia falta -de ahi la nota de la cabecera-; ahora `assign` resuelve el
-      // pedido con `findAliveById(id, companyId)` y lo rechazaria como inexistente si no coincide.
+      // El pedido ajeno tiene que nacer en la empresa B para que la asignacion (tambien de B) sea
+      // coherente con su FK compuesta: `assign` resuelve el pedido con `findAliveById(id,
+      // companyId)` y lo rechazaria como inexistente si las empresas no coinciden.
       const pedidoAjeno = await createOrder(fixture, { companyId: fixture.companyB });
 
       const propia = await createPerson(fixture, fixture.companyA);
@@ -112,7 +68,7 @@ describe('asignaciones · los pedidos de una persona en su empresa (integracion)
 
       // Y aun asi, desde la empresa A esa persona no tiene nada...
       expect(await repo.listOrderIdsByUserInCompany(fixture.companyA, ajena)).toEqual([]);
-      // ...exactamente lo mismo que una persona que NO EXISTE (R8: indistinguibles).
+      // ...exactamente lo mismo que una persona que NO EXISTE: indistinguibles.
       expect(await repo.listOrderIdsByUserInCompany(fixture.companyA, randomUUID())).toEqual([]);
 
       // El pedido ajeno tampoco se cuela en la lista de quien si es de la empresa A.
@@ -201,7 +157,7 @@ describe('asignaciones · los pedidos de una persona en su empresa (integracion)
       // JavaScript porque los guiones estan en posiciones fijas y los digitos hexadecimales van en
       // minuscula; es el mismo ancla que usa `order-assignment-prisma.int.test.ts`.
       expect(salida).toEqual([...pedidos].sort());
-      // Orden TOTAL y ESTABLE (R15): sin cambios en los datos, la misma secuencia.
+      // Orden TOTAL y ESTABLE: sin cambios en los datos, la misma secuencia.
       expect(await repo.listOrderIdsByUserInCompany(fixture.companyA, persona)).toEqual(salida);
     });
   });
@@ -216,11 +172,10 @@ describe('asignaciones · los pedidos de una persona en su empresa (integracion)
   });
 
   it('R7: la BASE impide que un mismo `user_id` tenga filas en dos empresas (FK compuesta)', async () => {
-    // Por que este caso existe: sin el, la cabecera se quedaria en una afirmacion sobre el esquema
-    // que nadie comprueba, y el dia que alguien simplifique la FK a `("user_id") REFERENCES
-    // users("id")` —el riesgo 1 que QC-86 dejo escrito en `db/schema.prisma`, OJO 2— todo seguiria
-    // verde y la coherencia de empresa desapareceria en silencio. Va con SAVEPOINT porque el error
-    // del motor aborta la transaccion entera.
+    // Sin este caso, la cabecera seria una afirmacion sobre el esquema que nadie comprueba: el dia
+    // que alguien simplifique la FK a `("user_id") REFERENCES users("id")` todo seguiria verde y
+    // la coherencia de empresa desapareceria en silencio. Va con SAVEPOINT porque el error del
+    // motor aborta la transaccion entera.
     await inRolledBackTransaction(async (fixture) => {
       const pedido = await createOrder(fixture);
       const persona = await createPerson(fixture, fixture.companyA);

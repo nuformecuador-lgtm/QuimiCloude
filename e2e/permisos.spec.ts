@@ -20,17 +20,14 @@
  *   cortan antes de renderizar nada y la zona privada no tiene `loading.tsx`—. Eso solo se puede
  *   medir sobre la respuesta que devuelve `page.goto`, no sobre el texto de la pagina.
  * - **Los permisos REALES del seed**. El dato bajo prueba es que el rol `Operador` sembrado por
- *   QC-6/QC-74/QC-86 tiene exactamente `inventario.consultar` y `asignaciones.consultar`: con un
- *   rol inventado se estaria probando el fixture, no el sistema.
+ *   el seed tiene exactamente `inventario.consultar` y `asignaciones.consultar`: con un rol
+ *   inventado se estaria probando el fixture, no el sistema.
  * - Corre en Chromium y en WebKit (el motor de iOS).
  *
  * POR QUE EL 404 ES EN `/pedidos` Y NO EN `/inventario` NI EN `/asignacion`: `SEED_ROLE_PERMISSIONS`
- * da al `Operador` exactamente `inventario.consultar` y `asignaciones.consultar` (QC-74 R9, QC-86
- * R26). Desde QC-88 el PRIMER item de su menu filtrado ya no es «Inventario» sino «Asignación»
- * —entre Dashboard e Inventario en `PRIVATE_NAV_ITEMS`—, asi que ahora aterriza en
- * `ASSIGNED_ORDERS_ROUTE` (R11) y NO en `/inventario`; ese modulo sigue siendo consultable y sigue
- * viendose en el menu, solo deja de ser el primero. El 404 sigue apuntando a `/pedidos`, un modulo
- * que ese rol no tiene en absoluto; `requirements.md > Preguntas abiertas 2` lo deja escrito.
+ * da al `Operador` exactamente `inventario.consultar` y `asignaciones.consultar`, asi que `/pedidos`
+ * es el unico modulo que no puede consultar. Y aterriza en `/asignacion` porque «Asignación» es el
+ * primer item de su menu ya filtrado, entre Dashboard e Inventario.
  *
  * DATOS: este spec SI depende del seed para el rol `Operador` y sus permisos. Lo efimero es el
  * USUARIO —creado con hash real y borrado al final— y su EMPRESA. El rol nunca se crea ni se borra
@@ -212,16 +209,12 @@ test.describe('la zona privada segun los permisos de quien entra', () => {
     await page.getByTestId('login-password').fill(password);
     await page.getByTestId('login-submit').click();
 
-    // --- 2. Aterriza en `/asignacion`: el PRIMER item de su menu ya filtrado (R11, QC-88). Ya no
-    // es `/inventario` —ese modulo paso al segundo lugar cuando QC-88 coloco «Asignación» entre
-    // Dashboard e Inventario—, y no es el dashboard, que es donde llevaba el login antes de QC-75 y
-    // donde este rol veria un 404.
+    // --- 2. Aterriza en el PRIMER item de su menu ya filtrado, no en el dashboard: ahi este rol
+    // veria un 404.
     await page.waitForURL((url) => url.pathname === ASSIGNED_ORDERS_ROUTE, { timeout: 60_000 });
     await expect(page.getByTestId('asignacion-title')).toBeVisible({ timeout: 60_000 });
 
-    // --- 3. El menu es corto: solo estan los DOS modulos que puede consultar (R2, R3). El
-    // Operador conserva `inventario.consultar`, asi que `nav-inventario` sigue visible aunque ya
-    // no sea el primer destino del aterrizaje.
+    // --- 3. El menu es corto: solo estan los modulos que puede consultar.
     await expect(page.getByTestId('nav-asignacion')).toBeVisible();
     await expect(page.getByTestId('nav-inventario')).toBeVisible();
     for (const testId of HIDDEN_NAV_TEST_IDS) {

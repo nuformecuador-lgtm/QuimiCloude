@@ -95,9 +95,6 @@ describe('guardia — los permisos declarados en el menu existen en el catalogo 
   // «Configuración», que declara `usuarios.consultar` —el mismo codigo que exige su pantalla—. El
   // ancla se **tensa**: sube el numero Y se nombra el enlace nuevo, porque darse de alta en la
   // lista exacta es el punto de extension por diseño de este caso (R39).
-  // AMPLIADA el 2026-09-16 (QC-88 T11): el noveno es «Asignación», item de NIVEL SUPERIOR en la
-  // seccion «Operación», entre Dashboard e Inventario, que declara `asignaciones.consultar`. El
-  // ancla se **tensa**: sube el numero Y se nombra el enlace nuevo (R35).
   it('ancla: el recorrido encuentra hoy los nueve enlaces reales del menu', () => {
     // Anti-vacuidad. Si el recorrido se rompiera —un grupo que deja de visitarse, un cambio de
     // forma en `PRIVATE_NAV_ITEMS`—, `findUndeclaredNavPermissions` devolveria [] sobre una lista

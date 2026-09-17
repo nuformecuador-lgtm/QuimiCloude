@@ -1,5 +1,3 @@
-// QC-88 T14 — Las SIETE columnas de la lista de pedidos asignados: R16, R17, R18, R20.
-
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 

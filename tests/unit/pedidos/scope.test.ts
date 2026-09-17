@@ -108,24 +108,15 @@ function entradasDe(files: readonly string[]): readonly Entrada[] {
 // ---------------------------------------------------------------------------------------
 
 /**
- * TENSADO 2026-09-16 (QC-88): `app/(private)/asignacion/` es la pantalla de OTRO modulo
- * (`asignaciones`, la lista de trabajo del Operador), no de `pedidos` -aunque varios de sus
- * archivos hablen de "pedidos asignados" y algunos nombres contengan la palabra "orders" por
- * eso mismo (`assigned-orders-columns.tsx`, `assigned-order-enter-trigger.tsx`...)-. Tiene su
- * PROPIO contrato de ruta y su propio limite de alcance no es responsabilidad de este archivo:
- * `tests/unit/asignaciones-ui/assigned-orders-route-contract.test.ts`.
- *
- * Se excluye por PREFIJO DE CARPETA, no por nombre de archivo suelto: cualquier pieza de
- * `pedidos` fuera de su propia carpeta Y fuera de `asignacion/` sigue cayendo exactamente igual
- * que antes (los dos casos sinteticos de mas abajo -`dashboard/pedidos-resumen.tsx` y
- * `components/orders/order-form.tsx`- no estan bajo `asignacion/` y no se ven afectados).
+ * La pantalla de OTRO modulo (`asignaciones`), no de `pedidos`, aunque varios de sus archivos
+ * lleven "orders" en el nombre por hablar de pedidos asignados. Tiene su propio contrato de ruta,
+ * y su limite de alcance no es responsabilidad de este archivo. Se excluye por PREFIJO DE CARPETA:
+ * cualquier pieza de `pedidos` fuera de su carpeta y fuera de esta sigue cayendo igual que antes.
  */
 const CARPETA_ASIGNACION = 'app/(private)/asignacion/'
 
-/** El spec E2E de QC-88 (T16, R38): coincide con `/pedidos|orders/i` por el nombre, pero
- *  ejercita la pantalla de `asignaciones`, no la de `pedidos` (`tasks.md` de QC-88 lo nombra asi
- *  literalmente). Nombrado, no un patron: un QUINTO spec de pedidos sin ficha que lo respalde
- *  sigue cayendo. */
+/** Coincide con `/pedidos|orders/i` por el nombre, pero ejercita la pantalla de `asignaciones`.
+ *  Nombrado, y no un patron: un spec de pedidos nuevo sigue cayendo. */
 const SPECS_E2E_AJENOS_QUE_COINCIDEN_POR_NOMBRE = new Set(['e2e/pedidos-asignados.spec.ts'])
 
 /**
@@ -175,10 +166,8 @@ export function consumidoresDeUiFueraDeSuCarpeta(
   return entradas
     .filter((entrada) => /@\/lib\/modules\/pedidos/.test(soloCodigo(entrada.fuente)))
     .filter((entrada) => !entrada.nombre.startsWith(`${carpetaDeLaPantalla}/`))
-    // TENSADO 2026-09-16 (QC-88): `asignacion/` es una SEGUNDA pantalla legitima que consume el
-    // contrato publico de `pedidos` (el tipo `OrderPriority`, para su mapa de etiquetas
-    // exhaustivo por tipo) -no una fuga por goteo de la pantalla de `pedidos`-. Excluida por
-    // PREFIJO DE CARPETA, ver `CARPETA_ASIGNACION` arriba.
+    // Segunda pantalla legitima que consume el contrato publico de `pedidos`, no una fuga por
+    // goteo de la pantalla de `pedidos` (ver `CARPETA_ASIGNACION` arriba).
     .filter((entrada) => !entrada.nombre.startsWith(CARPETA_ASIGNACION))
     .map((entrada) => entrada.nombre)
 }

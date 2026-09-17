@@ -395,49 +395,26 @@ export function isScopedForPermissionCodes(relPath: string): boolean {
  *   - `app/**` y `components/**` **siguen sin poder nombrar ninguno de los dos**, que es donde esta
  *     el valor de la regla: R29 de QC-86 y **R50** de QC-87 —la pantalla es de QC-102—.
  *
- * **ENMENDADO 2026-09-16 por QC-88 (su R36, su T7)**, que es la ficha que el parrafo de arriba
- * nombraba de antemano —«lo estrena QC-88»—: ya no es futuro, es esta. Su caso de uso nuevo,
- * `lib/modules/asignaciones/domain/list-assigned-orders.ts`, abre con
- * `requirePermission(actor, 'asignaciones.consultar')` como PRIMERA linea (QC-88 R5, y su
- * `design.md > 5.1`), asi que mantener «prohibido en todas partes» obligaria a elegir entre esta
- * guardia y el trabajo que QC-88 manda hacer.
- *
- * La enmienda **TENSA la regla, no la ensancha** (QC-88 R36 y el riesgo 2 de su `design.md > 14`),
- * y por eso se escribe con una forma MAS ESTRECHA que la de QC-87, no con la misma:
- *
- *   - `asignaciones.consultar` es legitimo en **UN SOLO ARCHIVO**, comparado por **igualdad exacta**
- *     y no por prefijo de carpeta. Ni siquiera el resto de `asignaciones/domain/` puede exigirlo:
- *     `list-order-responsibles.ts` —el vecino que mas cerca esta de la tentacion— sigue dando
- *     hallazgo, que es literalmente el riesgo 3 del `> 10` de QC-87.
- *   - Lo que NO cambia, y es lo que el caso `:764` protege: el mismo codigo en un adaptador
- *     `driving`, en `app/**`, en `components/**`, en `lib/shared/**` o en otro modulo sigue siendo
- *     un hallazgo (QC-88 R36). La puerta se abre para **un archivo y un codigo**, y ni un milimetro
- *     mas; ensancharla a la carpeta, al modulo o a los dos codigos destruye la garantia.
- *   - `asignaciones.modificar` no se toca: sigue siendo cosa de QC-87 y de `domain/`, y el caso
- *     `:764` lo sigue demostrando por sus dos lados.
- *
- * El archivo se nombra aunque TODAVIA no exista: T7 va **antes** que T6 a proposito (QC-88
- * `tasks.md`), igual que esta guardia ya nombra por ruta archivos que juzga sin abrirlos.
+ * **ENMENDADO despues**: el caso de uso `domain/list-assigned-orders.ts` exige
+ * `asignaciones.consultar` en su primera linea, asi que ese codigo deja de estar prohibido en
+ * todas partes. La puerta es de **un archivo y un codigo**, por igualdad exacta y no por prefijo:
+ * ni el resto de `domain/` puede exigirlo. Ensancharla a la carpeta, al modulo o a los dos codigos
+ * destruye la garantia.
  */
 type ConsumoLegitimo =
-  /** Toda una carpeta del dominio puede exigir el codigo (la forma que abrio QC-87). */
+  /** Toda una carpeta del dominio puede exigir el codigo. */
   | { readonly tipo: 'carpeta'; readonly prefijo: string; readonly codigo: string }
-  /** UN archivo exacto, y ninguno mas, puede exigir el codigo (la forma que abre QC-88). */
+  /** UN archivo exacto, y ninguno mas, puede exigir el codigo. */
   | { readonly tipo: 'archivo'; readonly archivo: string; readonly codigo: string }
 
 const CASO_DE_USO_QC88 = `${ASIGNACIONES}/domain/list-assigned-orders.ts`
 
 /**
- * SEGUNDA ENMIENDA de QC-88 (2026-09-16, tanda de UI T10-T12), sobre la MISMA regla que T7
- * (arriba) ya habia estrechado. No es una tercera puerta al dominio: son los DOS puntos de
- * consumo GENERICOS que R3/R4 de esta ficha exigen -el corte por permiso de la pantalla y la
- * declaracion del item de menu-, exactamente el mismo mecanismo que usa CUALQUIER otro codigo del
- * catalogo (`requirePagePermission(...)` en cada `page.tsx`, `permission: '<codigo>'` en cada
- * `NavLink`). `CODIGOS_NUEVOS` solo vigila `asignaciones.*` porque QC-86 los estreno sin
- * consumidor; ahora que QC-88 ES ese consumidor, escribir el codigo en estos DOS sitios exactos
- * no es «reimplementar la autorizacion» (eso seria una SEGUNDA comparacion manual del permiso, que
- * sigue prohibida en TODAS partes): es invocar la UNICA puerta que ya existia. Se nombran los DOS
- * archivos exactos, nunca una carpeta ni el modulo entero.
+ * La pantalla y el item de menu son los DOS puntos de consumo GENERICOS del catalogo
+ * (`requirePagePermission(...)` en cada `page.tsx`, `permission: '<codigo>'` en cada `NavLink`):
+ * escribir ahi el codigo no es «reimplementar la autorizacion» -eso seria una SEGUNDA comparacion
+ * manual del permiso, que sigue prohibida en TODAS partes-, es invocar la unica puerta que ya
+ * existia. Se nombran los DOS archivos exactos, nunca una carpeta ni el modulo entero.
  */
 const PAGINA_QC88 = 'app/(private)/asignacion/page.tsx'
 const NAV_PRIVADO = 'lib/shared/navigation/private-nav.ts'
@@ -449,7 +426,7 @@ const CONSUMO_LEGITIMO: ReadonlyArray<ConsumoLegitimo> = [
   { tipo: 'archivo', archivo: NAV_PRIVADO, codigo: 'asignaciones.consultar' },
 ]
 
-/** ¿Ese archivo puede exigir ESE codigo, por las enmiendas de QC-87 y QC-88? */
+/** ¿Ese archivo puede exigir ESE codigo? */
 export function isLegitimatePermissionConsumer(relPath: string, codigo: string): boolean {
   return CONSUMO_LEGITIMO.some((permitido) => {
     if (codigo !== permitido.codigo) return false
@@ -822,11 +799,8 @@ describe('lib/modules/asignaciones — contrato del modulo y frontera (QC-86 T11
           content: "requirePermission(actor, 'asignaciones.modificar');",
         },
         // (2) El OTRO codigo, en OTRO archivo del mismo `domain/`: sigue siendo hallazgo.
-        //     QC-88 lo estreno (ver el caso de abajo), pero SOLO en `list-assigned-orders.ts`;
-        //     exigirlo aqui, en la consulta de responsables, es el riesgo 3 de `design.md > 10` de
-        //     QC-87 —«que alguien lo exija porque se llama asi»— y dejaria sin avatares a quien si
-        //     puede ver el pedido. La puerta de QC-88 es por ARCHIVO, no por carpeta, justo para
-        //     que esta linea siga en rojo.
+        //     Exigirlo aqui, en la consulta de responsables, dejaria sin avatares a quien si puede
+        //     ver el pedido; por eso su puerta es por ARCHIVO y no por carpeta.
         {
           relPath: `${ASIGNACIONES}/domain/list-order-responsibles.ts`,
           content: "requirePermission(actor, 'asignaciones.consultar');",
@@ -858,28 +832,23 @@ describe('lib/modules/asignaciones — contrato del modulo y frontera (QC-86 T11
     })
 
     /**
-     * La puerta que QC-88 abre (su R36, su T7), y sus tres portazos. Misma forma que el caso de
-     * arriba y por la misma razon: este es el caso que cae si alguien «arregla» la enmienda
-     * ensanchandola a la carpeta, al modulo o a los dos codigos.
-     *
-     * El archivo legitimo TODAVIA NO EXISTE en el disco —lo escribe T6, despues de T7—, y eso no
-     * debilita nada: estas funciones son puras y juzgan rutas, asi que el caso afirma la regla
-     * igual, y el bloque de mutaciones de mas abajo sigue exigiendo rojo sobre los fuentes reales.
+     * La segunda puerta y sus tres portazos: este es el caso que cae si alguien «arregla» la
+     * enmienda ensanchandola a la carpeta, al modulo o a los dos codigos.
      */
     it('la enmienda de QC-88 abre UNA puerta: `asignaciones.consultar` en UN archivo de domain/ y nada mas (R29, R36)', () => {
       const findings = findPermissionUsageFindings([
-        // (1) LEGITIMO, y solo esto: la primera linea del caso de uso nuevo (QC-88 R5).
+        // (1) LEGITIMO, y solo esto: la primera linea del caso de uso nuevo.
         {
           relPath: CASO_DE_USO_QC88,
           content: "requirePermission(actor, 'asignaciones.consultar');",
         },
         // (2) PORTAZO: el mismo codigo en el adaptador `driving` del propio modulo. La autorizacion
-        //     no vive ahi (QC-87 R43, QC-88 T9: la Server Action NO comprueba permisos).
+        //     no vive ahi: la Server Action no comprueba permisos.
         {
           relPath: `${ASIGNACIONES}/adapters/driving/order-assignment-actions.ts`,
           content: "requirePermission(actor, 'asignaciones.consultar');",
         },
-        // (3) PORTAZO: el mismo codigo en la pantalla, que es donde R50 de QC-87 pone el limite.
+        // (3) PORTAZO: el mismo codigo en la pantalla, que es donde esta el limite.
         {
           relPath: 'app/(private)/mis-pedidos/page.tsx',
           content: "const puede = permisos.includes('asignaciones.consultar');",
@@ -898,8 +867,8 @@ describe('lib/modules/asignaciones — contrato del modulo y frontera (QC-86 T11
         "lib/modules/pedidos/domain/list-orders.ts nombra 'asignaciones.consultar' (R29)",
       ])
 
-      // `components/**` y `lib/shared/**` cierran la lista que R36 enumera. Se comprueban aparte
-      // para que el mensaje de un futuro rojo diga cual de las cinco raices se aflojo.
+      // `components/**` y `lib/shared/**` cierran la lista de raices vigiladas. Se comprueban
+      // aparte para que el mensaje de un futuro rojo diga cual de las cinco se aflojo.
       for (const relPath of ['components/orders/my-orders-table.tsx', 'lib/shared/navigation/menu.ts']) {
         expect(
           findPermissionUsageFindings([{ relPath, content: "const p = 'asignaciones.consultar';" }]),

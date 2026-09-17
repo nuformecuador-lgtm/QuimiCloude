@@ -998,11 +998,6 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
 
     // Igualdad exacta: una constante nueva que se llame de otra forma no pasaria el patron de
     // arriba, y asi tiene que pasar por aqui y por quien la revise.
-    //
-    // TENSADO 2026-09-16 (QC-88): `ASSIGNED_ORDERS_ROUTE` y su helper `assignedOrderRoute`
-    // -la pantalla de pedidos asignados y la ruta de detalle que apunta a QC-63- se anaden a la
-    // lista exacta. Ninguno «alude» al asistente de lectura (R12 de esta ficha sigue intacto: el
-    // patron de arriba ya los deja pasar porque no casan con `alude`).
     const exportadas = [...rutas.matchAll(/export\s+(?:const|function)\s+([A-Za-z_$][\w$]*)/g)].map(
       (encaje) => encaje[1],
     );

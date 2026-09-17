@@ -1,6 +1,3 @@
-// QC-88 T14 — El disparador de «entrar»: R21 (EN_CURSO deshabilitado con motivo accesible) y
-// R22 (PENDIENTE habilitado, href derivado de assignedOrderRoute).
-
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 

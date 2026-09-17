@@ -1,5 +1,3 @@
-// QC-88 T14 — Los tres estados fuera de la tabla: vacio (R29), error (R28) y esqueleto (R30).
-
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -12,8 +10,7 @@ import {
 } from '@/app/(private)/asignacion/components';
 import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
 
-// `AssignedOrdersError` es cliente y usa `useRouter` para reintentar (R28); en jsdom no hay
-// router montado, asi que se mockea igual que `order-list-error.test.tsx`.
+// `AssignedOrdersError` usa `useRouter` para reintentar y en jsdom no hay router montado.
 const { routerMock } = vi.hoisted(() => ({
   routerMock: {
     push: vi.fn<(href: string) => void>(),

@@ -9,11 +9,6 @@
 // Como `tests/unit/composition/identity-facade.test.ts`: se sustituye el cliente Prisma entero
 // —`lib/composition` arrastra todos los adaptadores del repo y no hace falta ni Postgres ni
 // `DATABASE_URL`— y se ejercita el cableado REAL.
-//
-// RETENSADO QC-88 (T8, R13). La fachada pasa de CINCO a SEIS operaciones: `listAssignedOrders`,
-// la lista de trabajo del Operador, cableada con las CUATRO dependencias de `design.md > 6`
-// (`orderAssignmentRepository`, `orderCatalog` YA con `listAliveSummariesByIds`, `recipeCatalog`
-// y `peopleDirectory`) y NINGUN adaptador nuevo.
 
 import { describe, expect, it, vi } from 'vitest';
 

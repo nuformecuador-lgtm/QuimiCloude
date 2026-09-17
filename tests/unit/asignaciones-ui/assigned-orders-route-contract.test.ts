@@ -1,13 +1,3 @@
-// QC-88 T13 — Contrato de la ruta de pedidos asignados: R33, calcado de
-// `tests/unit/pedidos-ui/order-route-contract.test.ts`.
-//
-// Lo que este archivo promete es invisible renderizando: que la URL viva en UNA sola constante de
-// `lib/shared/routes.ts`, que el helper de detalle exista y derive de ella (R21, R22 - al reves
-// que en `/pedidos`, aqui SI hay pagina de detalle, la monta QC-63), que el prefijo privado la
-// cubra exactamente una vez, que la pantalla viva donde dice la constante, que sus componentes
-// cuelguen de `components/` con su barrel sin `'use client'`, y que ningun archivo de la ruta
-// escriba la URL como literal.
-
 import { existsSync, readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
@@ -83,7 +73,6 @@ describe('el prefijo privado cubre la pantalla de asignacion (R2, R33)', () => {
   });
 });
 
-// La pantalla existe donde dice la constante (R1, R33).
 describe('la pantalla vive donde dice la constante (R33)', () => {
   const CARPETA_DE_LA_RUTA = `app/(private)${ASSIGNED_ORDERS_ROUTE}`;
 

@@ -730,11 +730,9 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       `falta ${etiqueta(carpetaDeLaPantalla)}/page.tsx: la pantalla de pedidos es QC-35`,
     ).toBe(true)
 
-    // TENSADO 2026-09-16 (QC-88): `app/(private)/asignacion/` es la pantalla de OTRO modulo
-    // (`asignaciones`) que legitimamente consume el contrato publico de `pedidos` (el tipo
-    // `OrderPriority`, para su mapa de etiquetas exhaustivo). Tiene su propio contrato de ruta
-    // (`tests/unit/asignaciones-ui/assigned-orders-route-contract.test.ts`); no es una fuga de
-    // la pantalla de `pedidos` por goteo. Excluida por PREFIJO DE CARPETA, no por archivo suelto.
+    // `app/(private)/asignacion/` es la pantalla de OTRO modulo, que consume el contrato publico
+    // de `pedidos` (el tipo `OrderPriority`) y tiene su propio contrato de ruta: no es una fuga
+    // por goteo de la pantalla de `pedidos`. Se excluye por PREFIJO DE CARPETA, no por archivo.
     const carpetaAsignacion = join(repoRoot, 'app', '(private)', 'asignacion')
 
     let consumidoresDeLaPantalla = 0

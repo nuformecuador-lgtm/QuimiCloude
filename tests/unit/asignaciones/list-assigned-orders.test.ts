@@ -1,14 +1,8 @@
 // tests/unit/asignaciones/list-assigned-orders.test.ts
 //
-// QC-88 T6 — El caso de uso `listAssignedOrders` con DOBLES de sus cuatro puertos
-// (R5, R6, R7, R11, R14, R15, R20, R40).
-//
-// Con dobles que CUENTAN INVOCACIONES: R14 no se puede demostrar mirando el resultado —una
-// pagina de 1 fila y una de 25 pueden salir igual de correctas con dos consultas que con veinte—
-// asi que lo que se afirma es cuantas veces se llamo a cada puerto.
-//
-// Cubre R5, R6, R7, R11, R14, R15, R20 y la mitad de R40 que le toca a este archivo (la otra
-// mitad, junto a la matriz completa de actores denegados, vive en `authorization.test.ts`).
+// Los dobles CUENTAN INVOCACIONES: «una consulta por puerto» no se puede demostrar mirando el
+// resultado —una pagina de 1 fila y una de 25 pueden salir igual de correctas con dos consultas
+// que con veinte—, asi que lo que se afirma es cuantas veces se llamo a cada puerto.
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -72,8 +66,8 @@ type Dobles = {
   readonly listAliveSummariesByIds: ReturnType<typeof vi.fn>;
   readonly findRefsIncludingDeleted: ReturnType<typeof vi.fn>;
   readonly findRefsIncludingDeletedInCompany: ReturnType<typeof vi.fn>;
-  /** TODOS los metodos de puerto del montaje: lo que hace verificable «sin tocar ningun puerto»
-   *  (R6, R40) y «el mismo numero con 1 fila que con 25» (R14). */
+  /** TODOS los metodos de puerto del montaje: lo que hace verificable «sin tocar ningun puerto» y
+   *  «el mismo numero de llamadas con 1 fila que con 25». */
   readonly todos: readonly ReturnType<typeof vi.fn>[];
 };
 

@@ -59,8 +59,6 @@ function montar(order: OrderAssignmentTarget | null): {
     listByOrdersInCompany: vi.fn(async () => []),
     deleteOne: vi.fn(async () => 'ok' as const),
     deleteByWorkGroup: vi.fn(async () => 0),
-    // QC-88 T1: el sexto metodo del puerto (los pedidos de una persona). El doble lo declara para
-    // seguir satisfaciendo la interfaz; ningun caso de uso de QC-87 lo invoca.
     listOrderIdsByUserInCompany: vi.fn(async () => []),
   };
   const people = {

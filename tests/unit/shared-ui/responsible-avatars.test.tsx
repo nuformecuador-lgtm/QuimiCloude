@@ -5,18 +5,10 @@
 // en vez de copiarse — si manana el texto cambia, el test sigue diciendo la verdad sobre la
 // estructura, que es lo que R17 y R35 exigen.
 //
-// **QC-88 T17 (2026-09-16) — el componente se PROMOVIO a `components/shared/`** y este test se
-// mudo con el (de `tests/unit/pedidos-ui/` a `tests/unit/shared-ui/`), sin cambiar ni un caso:
-// QC-88 es el segundo consumidor con la misma API y `docs/architecture.md > Componentes >
-// Regla: sin sobre-ingenieria` obliga a promover
-// (`specs/QC-88-listado-de-pedidos-asignados/design.md > 8.3`, hallazgo H6).
-//
-// **El import es MIXTO a proposito.** El componente y sus `data-testid` vienen ya de
-// `@/components/shared/responsible-avatars`, su ubicacion real. Pero `MISSING_RESPONSIBLES_MARK`
-// y `MISSING_VALUE_MARK` se siguen tomando del **barrel de la ruta de pedidos**: lo que ata el
-// marcador de esta celda al de `order-columns.tsx` es justo esa comparacion, y `MISSING_VALUE_MARK`
-// solo existe alli. De paso, tomar la marca por el barrel comprueba que la ruta sigue
-// reexportando el componente promovido.
+// **El import es MIXTO a proposito.** El componente y sus `data-testid` vienen de
+// `@/components/shared/responsible-avatars`, su ubicacion real. `MISSING_RESPONSIBLES_MARK` y
+// `MISSING_VALUE_MARK` se toman del barrel de la ruta de pedidos: `MISSING_VALUE_MARK` solo
+// existe alli, y es lo que ata el marcador de esta celda al de `order-columns.tsx`.
 
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';

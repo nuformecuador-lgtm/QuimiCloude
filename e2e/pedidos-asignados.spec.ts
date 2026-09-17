@@ -1,39 +1,19 @@
 /**
- * E2E del recorrido del Operador sobre la pantalla de pedidos asignados (QC-88, T16, R38).
+ * E2E del recorrido del Operador sobre la pantalla de pedidos asignados.
  *
- * QUE RECORRE, en un solo `test(...)`: el actor entra y aterriza en `/asignacion` (R11, R34), ve
- * SOLO sus propios pedidos en `PENDIENTE`/`EN_CURSO` (R26, R27), NO ve los suyos ya `ENTREGADO` ni
- * `CANCELADO` aunque esten asignados a el (R29), NO ve el pedido de otra persona de su misma
- * empresa (R26), y el pedido `EN_CURSO` llega con su disparador de «entrar» deshabilitado y su
- * motivo visible (R21, R32).
+ * Un solo `test`: todas las comprobaciones dependen del MISMO fixture sembrado y de la MISMA
+ * sesion, asi que partirlo obligaria a recrear ambos sin afirmar nada mas.
  *
- * POR QUE UN SOLO RECORRIDO: cada comprobacion depende del MISMO fixture sembrado (cuatro pedidos
- * asignados al actor mas uno asignado solo a otra persona) y de la MISMA sesion; partirlo en varios
- * `test()` obligaria a recrear la sesion y el fixture en cada uno sin afirmar nada mas.
+ * AISLAMIENTO: prefijo propio `qc88_e2e_` + `RUN_ID` por proceso de worker, empresa efimera
+ * —`companies_name_unique` es GLOBAL— y limpieza de huerfanos por prefijo Y POR EDAD, porque
+ * Chromium y WebKit corren a la vez sobre la misma base. `afterAll` borra por los identificadores
+ * de ESTE worker y en el orden que imponen las FK RESTRICT: asignaciones -> pedidos -> receta ->
+ * personas -> empresa.
  *
- * QUE APORTA SOBRE UNIT E INTEGRACION: la cadena entera en un navegador de verdad —cookie firmada,
- * middleware, la regla ruta->rol, el Server Component de la lista con su lectura real contra
- * Postgres via `listAssignedOrdersAction`— y Chromium + WebKit (el motor de iOS).
+ * El pedido `CANCELADO` se siembra con `cancellationReason` porque el CHECK
+ * `orders_cancellation_reason_matches_status` lo exige si y solo si el pedido esta cancelado.
  *
- * EL PEDIDO `CANCELADO` SE SIEMBRA CON `cancellationReason`: el CHECK
- * `orders_cancellation_reason_matches_status` de `db/schema.prisma` exige que solo un pedido
- * cancelado lo tenga, y que un pedido cancelado SIEMPRE lo tenga.
- *
- * ENTRADA POR `loginAndLand`, SIEMPRE (`e2e/helpers/landing.ts`): nunca una ruta escrita a mano ni
- * un `login()` local, o `tests/guards/guard-e2e-landing.test.ts` muerde.
- *
- * PREFIJO PROPIO: `qc88_e2e_` + `RUN_ID`, distinto de `qc102_e2e_` y `qc75_e2e_`, que comparten
- * base con este.
- *
- * DATOS Y AISLAMIENTO, mismo patron que `e2e/aislamiento-pedidos.spec.ts` y
- * `e2e/pedidos-responsables.spec.ts`:
- *  - limpieza defensiva de huerfanos por prefijo Y por edad, para no llevarse por delante lo que
- *    otra ejecucion viva (Chromium/WebKit u otro worktree) esta usando ahora mismo;
- *  - una empresa efimera del worker, NUNCA la de instalacion (`companies_name_unique` es global);
- *  - el rol `Operador` es el REAL del seed (`ROLE_OPERADOR`), no un fixture: sus permisos son el
- *    dato bajo prueba de `loginAndLand`;
- *  - `afterAll` borra SIEMPRE, por los identificadores de ESTE worker, respetando el orden que
- *    imponen las FK RESTRICT: asignaciones -> pedidos -> receta -> personas -> empresa.
+ * El rol `Operador` es el REAL del seed, nunca un fixture: sus permisos son el dato bajo prueba.
  *
  * VARIABLES DE ENTORNO: no se cargan a mano. `@prisma/client` lee el `.env` del proyecto al
  * importarse y `next dev` —que arranca el `webServer` de la config— carga el suyo.
@@ -68,7 +48,6 @@ const RECIPE_NAME = `${SHARED_TOKEN}_receta`;
 
 type Credentials = { readonly username: string; readonly password: string };
 
-/** El actor del recorrido: entra, aterriza y ve (o no ve) segun el fixture. */
 const actorUser: Credentials = {
   username: `${SHARED_TOKEN}_actor`,
   password: `Qc88-Actor-${RUN_ID.slice(0, 12)}`,
@@ -102,15 +81,12 @@ const SEQUENCE_PENDING = BASE_SEQUENCE;
 const SEQUENCE_IN_PROGRESS = BASE_SEQUENCE + 1;
 const SEQUENCE_DELIVERED = BASE_SEQUENCE + 2;
 const SEQUENCE_CANCELLED = BASE_SEQUENCE + 3;
-/** El quinto pedido: mismo fixture, asignado SOLO a la otra persona. */
 const SEQUENCE_OTHERS_ONLY = BASE_SEQUENCE + 4;
 
-/** `data-testid` de la pantalla y de la fila/columna compartidas (`assigned-orders-columns.tsx`). */
 const ASIGNACION_TITLE_TESTID = 'asignacion-title';
 const ORDER_NUMBER_CELL_TESTID = 'data-table-cell-orderNumber';
 const TABLE_ROW_TESTID_PREFIX = 'data-table-row-';
 
-/** `data-testid` del disparador de «entrar» de una fila (`assigned-order-enter-trigger.tsx`). */
 const ENTER_TESTID = 'assigned-order-enter';
 const ENTER_REASON_TESTID = 'assigned-order-enter-reason';
 
@@ -135,7 +111,6 @@ function exactText(value: string): RegExp {
   return new RegExp(`^\\s*${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`);
 }
 
-/** La fila de la tabla compartida cuyo correlativo es EXACTAMENTE `numberText`. */
 function rowByNumber(page: Page, numberText: string): Locator {
   return page
     .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
@@ -197,9 +172,7 @@ async function seedOrder(params: {
 }
 
 test.beforeAll(async () => {
-  // El rol es el `Operador` REAL del seed: sus permisos (`inventario.consultar` +
-  // `asignaciones.consultar`) son el dato bajo prueba de `loginAndLand`. Nunca se crea aqui:
-  // `roles.name` es unico y es un dato compartido con produccion/seed.
+  // El rol nunca se crea aqui: `roles.name` es unico y es un dato compartido con produccion/seed.
   const operatorRole = await prisma.role.findUnique({
     where: { name: ROLE_OPERADOR },
     select: { id: true },
@@ -285,8 +258,7 @@ test.beforeAll(async () => {
   orderOthersOnlyId = othersOnly.id;
   orderOthersOnlyNumber = othersOnly.numberText;
 
-  // Los CUATRO pedidos del actor (los dos ejecutables Y los dos finales, para demostrar que estos
-  // ultimos no aparecen aunque esten asignados). Asignacion DIRECTA: sin grupo.
+  // Asignacion DIRECTA: sin grupo.
   await prisma.orderAssignment.createMany({
     data: [orderPendingId, orderInProgressId, orderDeliveredId, orderCancelledId].map((orderId) => ({
       orderId,
@@ -295,7 +267,6 @@ test.beforeAll(async () => {
     })),
   });
 
-  // El quinto pedido, asignado SOLO a la otra persona.
   await prisma.orderAssignment.create({
     data: { orderId: orderOthersOnlyId, userId: otherUserId, companyId },
   });
@@ -359,33 +330,26 @@ test.describe('la lista de pedidos asignados del Operador (R38)', () => {
       return;
     }
 
-    // --- 1. Entra por el UNICO sitio permitido (`loginAndLand`, `e2e/helpers/landing.ts`): el
-    // destino ya lo deriva de los permisos reales del actor, y con solo
-    // `inventario.consultar` + `asignaciones.consultar` del rol Operador real deberia aterrizar
-    // en `ASSIGNED_ORDERS_ROUTE` (R11, R34).
+    // Nunca una ruta escrita a mano: `loginAndLand` deriva el destino de los permisos reales del
+    // actor, que es justo lo que se esta midiendo.
     await loginAndLand(page, actorUser);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    // --- 2. Ve SOLO sus pedidos ejecutables (R26, R27): el pendiente y el en curso.
     const pendingRow = rowByNumber(page, orderPendingNumber);
     const inProgressRow = rowByNumber(page, orderInProgressNumber);
     await expect(pendingRow).toHaveCount(1, { timeout: 60_000 });
     await expect(inProgressRow).toHaveCount(1, { timeout: 60_000 });
 
-    // --- 3. NO ve el ENTREGADO ni el CANCELADO sembrados a proposito, aunque esten asignados a
-    // el (R29).
+    // El ENTREGADO y el CANCELADO estan asignados al actor y aun asi no deben aparecer.
     await expect(rowByNumber(page, orderDeliveredNumber)).toHaveCount(0);
     await expect(rowByNumber(page, orderCancelledNumber)).toHaveCount(0);
 
-    // --- 4. NO ve el pedido asignado solo a la otra persona (R26).
     await expect(rowByNumber(page, orderOthersOnlyNumber)).toHaveCount(0);
 
-    // --- 5. El disparador del EN_CURSO esta deshabilitado y su motivo es visible (R21, R32).
     const enterInProgress = inProgressRow.getByTestId(ENTER_TESTID);
     await expect(enterInProgress).toBeDisabled();
     await expect(inProgressRow.getByTestId(ENTER_REASON_TESTID)).toBeVisible();
 
-    // --- 6. El disparador del PENDIENTE, en cambio, esta habilitado.
     const enterPending = pendingRow.getByTestId(ENTER_TESTID);
     await expect(enterPending).toBeEnabled();
   });

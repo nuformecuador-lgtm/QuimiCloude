@@ -200,9 +200,7 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     USERS_ROUTE,
     // 2026-09-15: la pantalla de recetas pasa a montarse sobre la tabla compartida.
     FORMULAS_ROUTE,
-    // 2026-09-16 (QC-88): la lista de pedidos asignados del Operador, OCTAVA pantalla y decision
-    // ya tomada en `design.md > 8.1` (R26: "la tabla compartida de QC-55, consumida por su
-    // barrel publico"). Se anade a la lista, no se afloja el criterio de autorizacion.
+    // 2026-09-16: la lista de pedidos asignados pasa a montarse sobre la tabla compartida.
     ASSIGNED_ORDERS_ROUTE,
   ].map(carpetaDeRuta)
 
@@ -231,7 +229,7 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     }
     // Sin esto, el bucle pasaria en verde por no haber encontrado ningun consumidor. El ancla se
     // TENSA con cada alta: hoy son OCHO pantallas autorizadas, asi que se exige al menos un
-    // consumidor por pantalla (2026-09-16, QC-88; antes eran siete).
+    // consumidor por pantalla (2026-09-16; antes eran siete).
     expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(7)
   })
 
@@ -420,12 +418,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // TENSA el centinela de doce a trece; un spec mas que referencie `data-table` vuelve a ponerlo
   // en rojo.
   //
-  // AMPLIADA UNA VEZ MAS el 2026-09-16 (QC-88, listado-de-pedidos-asignados, T16, R38): entra la
-  // CATORCEAVA entrada, `e2e/pedidos-asignados.spec.ts`. Esta SI estrena pantalla:
-  // `ASSIGNED_ORDERS_ROUTE` monta la tabla compartida (R26 de QC-88), y el E2E localiza sus filas
-  // por `data-table-row-<id>` para comprobar que el Operador solo ve sus propios pedidos en
-  // `PENDIENTE`/`EN_CURSO`. Se anade la fila y se TENSA el centinela de trece a catorce; un
-  // QUINCEAVO spec que referencie `data-table` vuelve a ponerla en rojo.
+  // 2026-09-16: entra `e2e/pedidos-asignados.spec.ts`, que estrena pantalla y localiza sus filas
+  // por `data-table-row-<id>`. Se TENSA el centinela de trece a catorce; un spec mas que
+  // referencie `data-table` vuelve a ponerlo en rojo.
   it('la lista de specs E2E que referencian data-table es cerrada, y son estos catorce', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
@@ -451,8 +446,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // La DECIMA la trae QC-93 el 2026-09-15 (R18): ver la nota de arriba. Es la sonda del usuario
       // sin permisos de modulo: afirma que `data-table` NO esta, no consume la tabla.
       'e2e/login.spec.ts',
-      // La CATORCEAVA la trae QC-88 el 2026-09-16 (T16, R38): ver la nota de arriba. Va antes que
-      // `pedidos-responsables` porque 'a' precede a 'r'.
+      // Ver la nota de arriba. Va antes que `pedidos-responsables` porque la lista esta ORDENADA.
       'e2e/pedidos-asignados.spec.ts',
       // La NOVENA la trae QC-102 el 2026-09-13 (T16, R37): ver la nota de arriba. Va antes que
       // `e2e/pedidos.spec.ts` porque la lista esta ORDENADA y '-' precede a '.'.

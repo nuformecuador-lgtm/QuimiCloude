@@ -103,8 +103,6 @@ function montar(opts: {
     listByOrdersInCompany: vi.fn(async () => []),
     deleteOne: vi.fn(async () => 'ok' as const),
     deleteByWorkGroup: vi.fn(async () => 0),
-    // QC-88 T1: el sexto metodo del puerto (los pedidos de una persona). Mismo motivo que el
-    // anterior: el doble lo declara para satisfacer la interfaz; QC-87 no lo invoca.
     listOrderIdsByUserInCompany: vi.fn(async () => []),
   };
 
@@ -618,8 +616,6 @@ function baseEnMemoria(): {
       borrados += 1;
       return 0;
     },
-    // QC-88 T1: el sexto metodo del puerto. Esta base de mentira no lo ejercita: la lectura de
-    // «los pedidos de esta persona» es de QC-88 y tiene sus propios tests.
     async listOrderIdsByUserInCompany(): Promise<readonly never[]> {
       return [];
     },

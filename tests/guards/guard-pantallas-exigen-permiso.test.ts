@@ -227,10 +227,6 @@ const RUTAS_ESPERADAS_HOY = [
   '/proveedores/[id]',
 ].sort();
 
-// TENSADO (QC-88, 2026-09-16): de once a DOCE pantallas, con `/asignacion` -la lista de trabajo
-// del Operador-, que llama a `requirePagePermission('asignaciones.consultar')` como primera linea
-// de su `page.tsx` (R4). Se sube el numero Y se nombra la ruta nueva; no se afloja a un «al menos
-// N».
 describe('guardia — toda pantalla bajo app/(private)/ exige un permiso del catalogo (R6, R20)', () => {
   it('el barrido encuentra exactamente las doce pantallas privadas de hoy', () => {
     const rutas = [...listPrivatePages(repoRoot).map((pantalla) => pantalla.route)].sort();
