@@ -16,10 +16,14 @@
 //
 // Cubre R1, R2, R3, R4 (la parte de T6).
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { canModifyAssignments, requirePermission, type Actor } from '@/lib/modules/asignaciones/domain/actor';
 import { AsignacionesError, UnauthorizedError } from '@/lib/modules/asignaciones/domain/errors';
+import {
+  createListAssignedOrders,
+  type ListAssignedOrdersDeps,
+} from '@/lib/modules/asignaciones/domain/list-assigned-orders';
 
 import type { PermissionCode } from '@/lib/modules/identity';
 
@@ -226,5 +230,70 @@ describe('QC-102 — `canModifyAssignments` (R28, R29, R50)', () => {
     expect(typeof contrato.canModifyAssignments).toBe('function');
     expect(contrato.canModifyAssignments(conPermisos(PERMISO_ESCRITURA))).toBe(true);
     expect(contrato.canModifyAssignments(conPermisos('pedidos.consultar'))).toBe(false);
+  });
+});
+
+describe('QC-88 — `listAssignedOrders` (R5, R40)', () => {
+  function montarDeps(): { deps: ListAssignedOrdersDeps; todos: readonly ReturnType<typeof vi.fn>[] } {
+    const listOrderIdsByUserInCompany = vi.fn(async () => []);
+    const listByOrdersInCompany = vi.fn(async () => []);
+    const listAliveSummariesByIds = vi.fn(async () => ({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 10,
+      totalPages: 1,
+    }));
+    const findRefsIncludingDeleted = vi.fn(async () => []);
+    const findRefsIncludingDeletedInCompany = vi.fn(async () => []);
+
+    const deps = {
+      assignments: {
+        insertMissing: vi.fn(),
+        listByOrderInCompany: vi.fn(),
+        listByOrdersInCompany,
+        deleteOne: vi.fn(),
+        deleteByWorkGroup: vi.fn(),
+        listOrderIdsByUserInCompany,
+      },
+      orders: { findAliveById: vi.fn(), listAliveSummariesByIds },
+      recipes: { findRefsIncludingDeleted },
+      people: { findAliveRefsInCompany: vi.fn(), findRefsIncludingDeletedInCompany },
+    } as unknown as ListAssignedOrdersDeps;
+
+    return {
+      deps,
+      todos: [
+        listOrderIdsByUserInCompany,
+        listByOrdersInCompany,
+        listAliveSummariesByIds,
+        findRefsIncludingDeleted,
+        findRefsIncludingDeletedInCompany,
+      ],
+    };
+  }
+
+  it('R40: un actor sin `asignaciones.consultar` lanza SIN llegar al repositorio', async () => {
+    const { deps, todos } = montarDeps();
+    const listAssignedOrders = createListAssignedOrders(deps);
+
+    for (const [, actor] of ACTORES_DENEGADOS) {
+      await expect(listAssignedOrders(actor, { page: 1 })).rejects.toThrow(UnauthorizedError);
+    }
+    // `pedidos.consultar` no sustituye al permiso del modulo: tampoco llega al repositorio.
+    await expect(
+      listAssignedOrders(conPermisos(PERMISO_CONSULTA), { page: 1 }),
+    ).rejects.toThrow(UnauthorizedError);
+
+    for (const doble of todos) expect(doble).not.toHaveBeenCalled();
+  });
+
+  it('con `asignaciones.consultar` SI llega al repositorio', async () => {
+    const { deps, todos } = montarDeps();
+    const listAssignedOrders = createListAssignedOrders(deps);
+
+    await listAssignedOrders(conPermisos('asignaciones.consultar'), { page: 1 });
+
+    expect(todos[0]).toHaveBeenCalledTimes(1);
   });
 });

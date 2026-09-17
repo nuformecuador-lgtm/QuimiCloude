@@ -88,6 +88,9 @@ const testId = {
   // Se conserva a proposito, para afirmar que sigue SIN existir.
   userTriggerRetirado: 'private-user-trigger',
   dashboard: 'nav-dashboard',
+  // Declara `asignaciones.consultar`, que ningun caso de este archivo da al Operador de prueba
+  // (usa solo `inventario.consultar`): por eso no aparece en los casos de menu corto.
+  asignacion: 'nav-asignacion',
   inventario: 'nav-inventario',
   pedidos: 'nav-pedidos',
   proveedores: 'nav-proveedores',
@@ -210,7 +213,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     expect(screen.getByTestId(testId.logoutForm)).toBeInTheDocument();
   });
 
-  it('con todos los permisos del catalogo estan los siete items del menu', async () => {
+  it('con todos los permisos del catalogo estan los ocho items del menu', async () => {
     // R4 — el filtrado quita items, nunca los inventa ni los pierde: con todo el catalogo, el
     // arbol es el de `PRIVATE_NAV_ITEMS` entero.
     // TENSADO el 2026-09-08 (QC-39 T4, R9/R10/R47): de seis items a siete, con «Unidades». El
@@ -220,6 +223,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
 
     for (const item of [
       testId.dashboard,
+      testId.asignacion,
       testId.inventario,
       testId.pedidos,
       testId.proveedores,
@@ -287,7 +291,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     expect(screen.queryByTestId(testId.unidades)).toBeNull();
   });
 
-  it('ancla: el menu real tiene los ocho items que este test vigila', async () => {
+  it('ancla: el menu real tiene los nueve items que este test vigila', async () => {
     // Anti-vacuidad: si alguien renombra un `testId` de `PRIVATE_NAV_ITEMS`, los
     // `queryByTestId(...) === null` de arriba pasarian por buenos sin comprobar nada.
     // TENSADO el 2026-09-08 (QC-39 T4, R9/R10/R47): el ancla sube de seis a siete con
@@ -298,6 +302,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
 
     expect(testIds).toEqual([
       testId.dashboard,
+      testId.asignacion,
       testId.inventario,
       testId.pedidos,
       testId.produccion,

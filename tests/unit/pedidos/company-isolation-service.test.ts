@@ -440,7 +440,13 @@ describe('QC-60 R27 — `OrderCatalog` consultado desde `asignaciones` se acota 
       const pedido = pedidos.get(id)
       return pedido !== undefined && pedido.companyId === companyId ? pedido.target : null
     })
-    return { orders: { findAliveById } as OrderCatalog, findAliveById }
+    const listAliveSummariesByIds = vi.fn(async () => {
+      throw new Error('QC-88: este caso no ejercita el listado en lote')
+    })
+    return {
+      orders: { findAliveById, listAliveSummariesByIds } as unknown as OrderCatalog,
+      findAliveById,
+    }
   }
 
   function explota(nombre: string) {

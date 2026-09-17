@@ -145,6 +145,8 @@ export {
   type ResponsiblePersonOption,
   type ResponsibleWorkGroupOption,
 } from './order-responsibles';
+// `ResponsibleAvatars` vive en `components/shared/` desde que tuvo un segundo consumidor. Se
+// sigue reexportando aqui para que la ruta de pedidos lo consuma por su barrel de siempre.
 export {
   MISSING_RESPONSIBLES_MARK,
   RESPONSIBLE_AVATARS_LIMIT,
@@ -156,7 +158,7 @@ export {
   ResponsibleAvatars,
   responsiblesOverflowLabel,
   type ResponsibleAvatarsProps,
-} from './responsible-avatars';
+} from '@/components/shared/responsible-avatars';
 export {
   RECIPE_FIELD,
   RECIPE_PICKER_TESTID,

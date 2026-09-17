@@ -76,4 +76,11 @@ export interface OrderAssignmentRepository {
   deleteOne(companyId: string, orderId: string, userId: string): Promise<'ok' | 'not_found'>;
   /** Borrado FISICO de las filas de ese pedido con ESE origen (R32). Devuelve cuantas (R34). */
   deleteByWorkGroup(companyId: string, orderId: string, workGroupId: string): Promise<number>;
+  /**
+   * Los pedidos que esa persona tiene asignados en esa empresa. Devuelve **solo identificadores**
+   * a proposito: con la fila entera se acabaria componiendo los responsables «de paso», que es el
+   * trabajo de `listByOrdersInCompany` y tiene su propio orden. Deduplicados y ordenados por el
+   * adaptador, por determinismo antes de paginar; no es el orden que ve quien mira.
+   */
+  listOrderIdsByUserInCompany(companyId: string, userId: string): Promise<readonly string[]>;
 }

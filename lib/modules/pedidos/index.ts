@@ -21,7 +21,11 @@ export type { OrderContents } from './domain/order-contents';
  *  un pedido sin tocar `prisma.order`. Solo el TIPO y la INTERFAZ: el adaptador que los
  *  implementa NO se exporta desde aqui -arrastraria `@prisma/client` al cierre de imports del
  *  barrel-, lo instancia `lib/composition` (R47), igual que con `RecipeCatalog`. */
-export type { OrderAssignmentTarget, OrderCatalog } from './domain/order-catalog';
+export type {
+  OrderAssignmentTarget,
+  OrderCatalog,
+  AssignedOrderSummary,
+} from './domain/order-catalog';
 
 // ---------------------------------------------------------------------------------------
 // QC-34 (T14). Lo que el modulo publica para poder ser USADO: el actor, los esquemas del
