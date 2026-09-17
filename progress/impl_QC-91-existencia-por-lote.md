@@ -163,3 +163,109 @@ eventualidad («la existencia por lote es QC-91»).
 guardia de otra ficha es decisión del humano. Queda declarado aquí y escalado al leader. Es el mismo
 patrón de **QC-99**, aunque por otra vía: esta guardia no mira el diff de rama, afirma sobre el código
 un estado que la ficha siguiente está autorizada a cambiar.
+
+## Tanda 3 — verificación (T10–T12)
+
+| Task | Commit | Qué entró |
+|---|---|---|
+| — | `67363de` | Retira el caso de alcance de QC-81 que la ficha deroga (decisión humana) |
+| T10 | `c9264f0` | `qc91-alcance.test.ts`: la existencia sale de los lotes |
+| T11 | `f5b4921` | E2E: el segundo lote sube la existencia del producto |
+| — | `3f100c2` | Cierra el hueco de R4: el lote vencido sigue sumando |
+
+### El caso derogado de QC-81
+
+El caso de alcance de QC-81 que exigía que la existencia se siguiera escribiendo en el producto se
+**borró**, no se invirtió, por decisión humana del 2026-09-17. Invertirlo habría creado a sabiendas
+la misma trampa que esta rama sufrió tres veces: una guardia que exige un estado que la ficha
+siguiente está autorizada a cambiar —y hay una ficha posterior autorizada a devolver la columna—.
+El resto del archivo quedó intacto: 15 casos a 14, de `1 failed | 11 passed | 3 skipped` a
+`11 passed | 3 skipped`, verde.
+
+### T10 se acotó a propósito, y se declara
+
+`tasks.md` describía T10 como «recorre `lib/` y `app/` y falla si reaparece `products.stock`». **Esa
+forma no se escribió**: es exactamente la trampa de arriba. En su lugar la guardia afirma el estado
+nuevo **en positivo**, sobre fuentes nombradas y sin una sola llamada a `git diff`: que la existencia
+se **deriva** de los lotes vía `sumStockByUnit`, que los contratos publican `stockByUnit`, y que
+ninguna fila de lote se borra ni se modifica. Cada detector trae su autoprueba por mutación, y un
+caso fabrica los contratos anteriores a T8 para demostrar que la guardia **se pondría roja si T8 se
+revirtiera**, sin revertir ningún commit. 22/22 verdes.
+
+Afirmaciones descartadas por conflictivas, para que consten: el censo de `products.stock` sobre
+`lib/` y `app/`, y «el modelo `Product` no declara `stock`». Las dos las tendría que pelear la ficha
+que devuelva la columna.
+
+### E2E (T11) — ejecutado, no declarado
+
+`pnpm exec playwright test e2e/inventario.spec.ts e2e/aislamiento-inventario.spec.ts` da
+**`14 passed (2.7m)`**, en chromium y webkit. El caso nuevo corre en los dos navegadores: da de alta
+un producto con su primer lote, vuelve a abrir el panel, elige el **mismo** producto y la **misma**
+presentación, deja el campo de lote **vacío** (lo afirma antes de guardar: el correlativo es del
+backend) y comprueba que la celda de existencia del listado muestra la **suma**, más que en base hay
+exactamente dos filas de lote. Es el flujo que QC-81 difirió.
+
+**No hubo flujos que reescribir**: T9 ya había hecho la limpieza mecánica y ningún spec abre el panel
+de edición, porque desde T7 el campo de existencia solo se pinta en el alta. El censo del `design.md`
+contaba 19 apariciones de existencia editable; al medirlo quedaban 0. Se declara por si el reviewer
+esperaba ver ese diff.
+
+### El hueco de R4, encontrado al construir el mapa
+
+**R4 no tenía ningún test.** Medido antes de escribirlo: `ProductBatch.expiryDate`
+(`db/schema.prisma:303`) **no se lee en ninguna ruta de lectura de existencia** —ni en el `where` ni
+en el `select` de `BATCH_STOCK_BY_UNIT`—, así que el código ya cumplía R4; lo que faltaba era la
+prueba. Se cubrió con integración y no con un unitario: la función pura ni siquiera recibe la fecha,
+así que solo la consulta real contra Postgres demuestra que nadie filtra por vencimiento.
+
+## T12 — Trazabilidad `R<n> -> test` · **23 declarados / 23 mapeados**
+
+| R | Qué exige | Test (archivo:línea) |
+|---|---|---|
+| R1 | La existencia se calcula al consultar, no se guarda | `tests/unit/inventario/qc91-alcance.test.ts:201`, `:208`, `:214`, `:223` |
+| R2 | La migración quita columna, CHECK e índice; el down los restaura vacíos | `tests/unit/inventario/schema/inventario-migration.test.ts:381`, `:394`; `tests/unit/inventario/schema/inventario-schema.test.ts:259` |
+| R3 | La existencia del lote es entera, en la unidad de su presentación | `tests/unit/inventario/product-prisma.test.ts:114`; `tests/unit/inventario/product-stock.test.ts:4` |
+| R4 | Un lote vencido suma igual | `tests/integration/inventario/list-query-products.int.test.ts:440` |
+| R5 | Agrupa por unidad, sin convertir | `tests/unit/inventario/product-stock.test.ts:4`, `:13`, `:29` |
+| R6 | El listado muestra una existencia por unidad, con su etiqueta | `tests/unit/inventario/product-page.test.tsx:723` |
+| R7 | Producto sin lotes: existencia 0 | `tests/unit/inventario/product-stock.test.ts:25`; `tests/unit/inventario/product-page.test.tsx:743` |
+| R8 | Ni orden ni filtro por existencia; si llegan, se ignoran sin fallar | `tests/unit/inventario/list-query.test.ts:178`; `tests/unit/inventario/list-use-cases.test.ts:172`; `tests/unit/inventario/product-list-params.test.ts:176` |
+| R9 | La edición no muestra la existencia y la rechaza si llega | `tests/unit/inventario/product-input.test.ts:243`; `tests/unit/inventario/product-actions.test.ts:462`; `tests/unit/inventario/product-field.test.tsx:77`; `tests/unit/inventario/product-page.test.tsx:1057` |
+| R10 | El alta escribe la existencia solo en el lote | `tests/unit/inventario/product-batch-input.test.ts:335`; `tests/unit/inventario/product-field.test.tsx:77` |
+| R11 | No queda lectura ni escritura de la existencia del producto; entrega en una unidad | `tests/unit/inventario/qc91-alcance.test.ts:261`, `:268`, `:274`, `:290`, `:297`, `:315`; `tests/unit/inventario/product-prisma.test.ts:73`; `tests/unit/inventario/product-catalog.test.ts:39` |
+| R12 | El restante resta sobre la existencia de la unidad de la línea | `tests/unit/recetas/recipe-service.test.ts:392`; `tests/unit/pedidos-ui/order-form.test.tsx:728` |
+| R13 | Con lotes pero ninguno en esa unidad: marcador en existencia y restante | `tests/unit/recetas/recipe-service.test.ts:403`; `tests/unit/pedidos-ui/order-form.test.tsx:743` |
+| R14 | Sin lotes: existencia 0, restante calculado y en rojo si es negativo | `tests/unit/recetas/recipe-service.test.ts:414`; `tests/unit/pedidos-ui/order-form.test.tsx:758`; `tests/unit/inventario/product-prisma.test.ts:109` |
+| R15 | El detalle de receta expone la existencia de la unidad de la línea | `tests/unit/recetas/recipe-service.test.ts:425` (con `:392`, `:403`, `:414`) |
+| R16 | La alerta compara contra la existencia del lote más reciente | `tests/unit/inventario/product-page.test.tsx:629`, `:703` |
+| R17 | Sin lotes y con alerta configurada: se marca | `tests/unit/inventario/product-page.test.tsx:670` |
+| R18 | Sin alerta configurada: no se marca | `tests/unit/inventario/product-page.test.tsx:682` |
+| R19 | Los dos permisos de consulta, validados en el service | `tests/unit/inventario/authorization.test.ts:485`; `tests/unit/recetas/recipe-service.test.ts:433` |
+| R20 | Se calcula sobre el esquema de lote de QC-81, con correlativo del backend | `e2e/inventario.spec.ts:636` |
+| R21 | No se borra ni modifica ninguna fila de lote | `tests/unit/inventario/qc91-alcance.test.ts:355`, `:361`, `:365`, `:369` |
+| R22 | Un segundo lote sube la existencia del listado, con E2E | `e2e/inventario.spec.ts:636` |
+| R23 | Ninguna dependencia nueva; el manifiesto sin cambios | `tests/guards/guard-dependencias-aprobadas.test.ts:63` |
+
+**R23, comprobado además sobre el diff de la rama**:
+`git diff --name-only origin/dev...HEAD -- package.json pnpm-lock.yaml` devuelve **vacío**. Ni el
+manifiesto ni el lock se tocaron.
+
+### Salida real de la verificación de la tanda 3
+
+- `qc91-alcance.test.ts` da `Test Files 1 passed (1)` y `Tests 22 passed (22)`.
+- `qc81-alcance.test.ts`, tras el borrado, da `Test Files 1 passed (1)` y `Tests 11 passed | 3 skipped (14)`.
+- E2E: `14 passed (2.7m)`, chromium y webkit.
+- R4: `Test Files 2 passed (2)` y `Tests 29 passed (29)`.
+- `pnpm typecheck` y `pnpm lint` limpios tras cada commit de la tanda.
+
+### Desviaciones de la tanda 3 (declaradas)
+
+11. **T10 no es el censo que describía `tasks.md`**, por la razón de arriba. Es la desviación más
+    grande de la ficha y va declarada, no ajustada en silencio.
+12. **T11 no reescribió ningún flujo**: al medirlo no quedaba ninguno editando existencia de producto.
+13. **R4 no tenía test** y se cubrió fuera de las tasks; el código ya lo cumplía.
+14. `qc91-alcance.test.ts` **copia** la función pura `stripComments` en vez de importarla del archivo
+    de alcance de la ficha anterior: importar ese módulo re-ejecutaba su suite entera dentro del
+    archivo nuevo (36 tests en vez de 22, medido). El original no se tocó.
+
+**T13, el gate completo, es del leader.** Esta bitácora no se autoaprueba: decide el reviewer.

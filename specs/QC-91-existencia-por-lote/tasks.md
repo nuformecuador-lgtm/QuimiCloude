@@ -147,7 +147,7 @@
 
 ## Bloque 5 — verificación
 
-- [ ] **T10. [P] Test de alcance de la ficha (R11).** Al estilo de
+- [x] **T10. [P] Test de alcance de la ficha (R11).** Al estilo de
       `tests/unit/inventario/qc81-alcance.test.ts`: recorre `lib/` y `app/` y falla si reaparece
       una lectura o escritura de `products.stock`, y comprueba que `product_batches.stock` sigue
       intacto donde debe (R21: ningún borrado ni modificación de lotes).
@@ -155,7 +155,7 @@
       - **Hecho**: rojo si se revierte T8, verde con T8 aplicada.
       - Depende de: T9. `[P]` con T11.
 
-- [ ] **T11. [P] E2E: segundo lote sube la existencia (R22, R20).** Playwright: producto ya
+- [x] **T11. [P] E2E: segundo lote sube la existencia (R22, R20).** Playwright: producto ya
       existente con un lote → alta que agrega un **segundo lote** al mismo producto, **sin escribir
       el lote a mano** (correlativo del backend, QC-81) → el listado muestra la existencia sumada.
       Además se reescriben los flujos de `e2e/inventario.spec.ts` que hoy editan la existencia del
@@ -164,7 +164,7 @@
       - **Hecho**: el E2E nuevo pasa y ninguno de los viejos queda editando existencia de producto.
       - Depende de: T9. `[P]` con T10.
 
-- [ ] **T12. Trazabilidad `R<n> -> test`.** El mapa de los 23 requisitos a tests concretos, más la
+- [x] **T12. Trazabilidad `R<n> -> test`.** El mapa de los 23 requisitos a tests concretos, más la
       nota de que `package.json` no se tocó (R23, lo afirma
       `tests/guards/guard-dependencias-aprobadas.test.ts`).
       - Archivos: `progress/impl_QC-91-existencia-por-lote.md`.
