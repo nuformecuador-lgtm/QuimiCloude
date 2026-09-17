@@ -952,3 +952,65 @@ Test Files  2 passed (2)
 pnpm typecheck → 0 errores
 vitest guard   → 43 passed | 504 tests, 9 skipped
 ```
+
+## EJECUTADO POR EL LEADER (2026-09-17): Playwright, la mutación de R28 y el gate completo
+
+### El E2E nuevo SÍ se ejecutó, y pasa
+
+A diferencia de QC-88 —cuyo E2E nunca llegó a correr por drift de la Postgres local—, aquí
+Playwright arrancó sin incidencias contra el worktree ya migrado:
+
+```
+pnpm exec playwright test e2e/ejecucion-receta.spec.ts --project=chromium
+  [1/3] R30 - quien no tiene asignaciones.consultar pide la direccion del pedido y recibe 404
+  [2/3] R29 - el Operador entra, ve su pedido asignado, lo abre, el pedido queda EN_CURSO en base,
+              recorre los pasos hasta Finalizar y el pedido queda ENTREGADO en base
+  [3/3] R9  - recargar la pantalla de un pedido ya EN_CURSO la vuelve a mostrar sin error
+  3 passed (40.3s)
+```
+
+**R29 y R30 dejan de sostenerse por lectura**: están verificados contra un navegador real, con los
+estados leídos de la base.
+
+### La mutación de R28, con un matiz que la receta no preveía
+
+Aplicada tal cual: el `<Link>` de la rama `EN_CURSO` sustituido por `<button disabled>`, sin tocar
+la otra rama (`4 insertions, 4 deletions`, un solo archivo).
+
+**Primera corrida** — muere `toBeEnabled()`:
+
+```
+Error: expect(locator).toBeEnabled() failed
+> 352 |     await expect(enterInProgress).toBeEnabled();
+1 failed
+```
+
+**El matiz**: Playwright **aborta el test en la primera aserción fallida**, así que la de la línea
+353 **no llegó a ejecutarse**. No estaba verde: estaba **inalcanzada**, que no es lo mismo y no
+permite afirmar que muerde. Para poder afirmarlo, se neutralizó temporalmente la 352 y se repitió:
+
+```
+Error: expect(locator).toHaveAttribute(expected) failed
+> 353 |     await expect(enterInProgress).toHaveAttribute('href', assignedOrderRoute(...));
+1 failed
+```
+
+**Las dos aserciones afirman de verdad, cada una por su cuenta.** La tercera —el aviso -
+`toBeVisible()`— no depende del bloqueo, que era justo lo que había que demostrar.
+
+**Restaurado** con `git checkout --` de los dos archivos, árbol limpio, y el E2E de QC-88 vuelve a
+verde (`1 passed (8.2s)`).
+
+### Gate completo
+
+```
+Test Files  517 passed (517)
+     Tests  7488 passed | 95 skipped (7583)
+✓ los tres proyectos corrieron (ui, node, integration)
+✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 8)
+== init OK ==
+```
+
+**Antes hubo un gate completo ROJO** por dos censos que el rápido no alcanza —`recetas/scope` y
+`data-table-alcance`—, tensados en `f080ffd`. Es la demostración de por qué el gate completo es
+condición antes del PR y no un trámite: con el rápido en verde, esos dos se habrían colado en `dev`.
