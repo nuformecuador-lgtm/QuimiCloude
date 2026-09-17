@@ -84,6 +84,15 @@ export const E2E_ESPERADOS = [
   'pedidos.spec.ts',
   'pedidos-responsables.spec.ts',
   'permisos.spec.ts',
+  // QC-88 T16 / R38: la E2E del recorrido del Operador sobre la lista de pedidos asignados. Alta
+  // por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su punto de
+  // extension por diseno es darse de alta en ella. El recorrido que ejercita: el Operador aterriza
+  // en `/asignacion`, ve solo sus pedidos en `PENDIENTE`/`EN_CURSO`, no ve los suyos ya
+  // `ENTREGADO`/`CANCELADO` ni los de otra persona, y el `EN_CURSO` llega con su disparador
+  // deshabilitado. NO ejercita el cruce borde -> accion del identificador de peticion: el spec no
+  // lee ni afirma nada sobre el identificador ni sobre `reference`, asi que el diferimiento de
+  // QC-71 R21 sigue INTACTO.
+  'pedidos-asignados.spec.ts',
   'presentaciones.spec.ts',
   'proveedores.spec.ts',
   'recetas-pasos.spec.ts',
