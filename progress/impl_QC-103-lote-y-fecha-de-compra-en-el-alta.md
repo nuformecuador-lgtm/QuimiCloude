@@ -315,3 +315,85 @@ consumidores externos ya la importaban así -dos tests de `data-table` por ruta 
 - No se corrió `./init.sh` (instrucción explícita del leader; la máquina estaba saturada).
 
 Commit: `cab1fa8`, con `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`.
+
+## 11. Segunda review — RECHAZADA (2026-09-17), B4 y B3 cerrados
+
+Encargo del leader: cerrar los dos bloqueantes de la segunda vuelta. No hay tasks nuevas.
+
+### B4 — un comentario de producción afirmaba lo contrario de lo aprobado
+
+`app/(private)/inventario/components/product-form.tsx:339-343`. El bloque decía que `safeParse`
+rechaza la fecha de compra ausente porque `undefined` «es lo que el campo requerido del esquema no
+admite».
+
+**Verificado en disco antes de tocar nada** (no se dio por bueno el encargo):
+`lib/modules/inventario/domain/product-batch-input.ts:108` declara
+`purchaseDate: purchaseDateSchema.nullish()` — y la línea de encima ya lo dice sin citar ficha:
+«Opcional aunque la columna sea NOT NULL: ausente significa hoy». `create-product.ts >
+resolverFechaDeCompra` sustituye la ausencia por hoy. El comentario era **falso**, y además
+contradecía la enmienda D10 a R3 (aprobada por el humano el 2026-09-17), que dice que la
+obligatoriedad se cumple **solo en la superficie del panel**.
+
+**Se borró entero. No se reescribió**: sin la cita seguía cayendo por longitud, y el porqué
+verdadero ya está escrito —fechado y firmado— en `requirements.md` bajo D10, que es su sitio.
+
+**Cero cambios de código**: el comportamiento es correcto y está aprobado. Lo único falso era el
+comentario. Commit `25f9e81` (`fix`, separado de la limpieza a propósito).
+
+### B3 — citas de requisito en comentarios de producción
+
+Regla aplicada: `docs/conventions.md > Comentarios` (2026-09-15, acotada el 2026-09-17), leída
+desde `dev` (`git show dev:docs/conventions.md`) porque **en este worktree esa sección no existe**.
+
+**Alcance respetado**: solo las líneas que esta rama añade o modifica. Los comentarios
+preexistentes NO se arrastran (`R24, R27`, `R31`, `design.md > 6 bis`, `QC-20` en `product-form.tsx`;
+`R17, R21, design.md > 5` en `product-sheet.tsx`; `QC-90 (R17, R18)` y `QC-49 (R16)` en el puerto)
+— se quedan como estaban, y se limpiarán por módulo en fichas del board.
+
+Confirmado sobre el diff (`git diff origin/dev...HEAD`), no sobre el número del informe.
+
+| Archivo | Commit | Qué se hizo |
+| --- | --- | --- |
+| `lib/modules/inventario/ports/product-repository.ts` | `a6396f4` | 2 párrafos reescritos sin `(R12)`/`(R13)`. Se conserva el porqué: `lot` es el TEXTO de la fila, no el `batchId`. |
+| `app/(private)/inventario/components/product-form.tsx` | `18cb00c` | 9 bloques reescritos + **2 borrados enteros**. |
+| `app/(private)/inventario/components/product-batch-date-field.tsx` y `product-sheet.tsx` | `970b795` | Docblock de cabecera de 20 líneas reducido a tres párrafos cortos; 5 docblocks/comentarios más sin cita. |
+| `tests/unit/inventario/product-page.test.tsx` | `4d42d51` | m4: el comentario pierde «(heredado de QC-81)» y conserva el sentido. |
+
+**Los dos comentarios borrados enteros** (en `product-form.tsx`), porque al quitarles la cita solo
+repetían la línea de al lado:
+- `// La EDICION no conoce el lote (R9): onSaved se llama sin argumento.` — encima de
+  `return { status: 'success' };`, que ya no lleva lote.
+- `// R12: en el ALTA se pasa el lote...` — encima de `onSaved(state.lot);`.
+
+**Los porqués que sobreviven** (dichos sin cita, porque el código no los muestra): por qué se
+separan las dos ramas del envío (estrechar por `isCreate` no estrecha el tipo de un `result` ya
+unificado), por qué `serverError` viaja entero (la copia campo a campo tiraba el `reference`), por
+qué aquí siempre se le pasa un valor al campo de fecha aunque el componente ya caiga en «hoy», por
+qué `type="hidden"` y no `sr-only`, y por qué el aviso del alta es neutro.
+
+### Conteo final de citas
+
+Barrido propio sobre las **líneas añadidas** del diff `origin/dev...HEAD`:
+
+- **Producción** (`app/`, `lib/`, `components/`, `hooks/`, `db/`, `middleware.ts`): **0** citas de
+  `QC-<n>`, `R<n>` o `design.md`. Antes: 30.
+- **`tests/` y `e2e/`**: **1** superviviente.
+
+**El único superviviente y por qué sobrevive**:
+`tests/unit/inventario/create-product.test.ts:180` — `describe('QC-103 — el lote asignado viaja de
+vuelta con el resultado del alta')`. Es un **nombre de test**, no un comentario, y la regla manda
+la trazabilidad justo a los nombres de los casos. Que una **ficha** (y no un `R<n>`) vaya ahí es
+discutible, no claro; se deja, como pidió el encargo, y queda dicho para que el reviewer decida.
+
+**No se perdió trazabilidad**: R1-R17 mapea por el nombre de los tests, y no se tocó ningún nombre
+de caso (el `(R3)` de `product-page.test.tsx:1441` sigue intacto). 17 declarados / 17 mapeados.
+
+### Verificación (acotada; `./init.sh` NO se corrió — es del leader, y ya lo dejó verde)
+
+- `pnpm typecheck` — **verde**, sin salida (`tsc --noEmit`).
+- `pnpm exec eslint` sobre los 5 archivos tocados — **verde**, sin salida.
+- `pnpm exec vitest related --run` sobre los 5 archivos tocados — **5 archivos, 104 passed, 0 failed**
+  (32,33 s).
+
+Se corrieron los tests **a pesar de ser casi todo comentarios**: `product-form.tsx` es producción
+real, y dar por hecho que «solo son comentarios» es el error que esta bitácora ya se anotó una vez.
