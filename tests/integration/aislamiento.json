@@ -27,6 +27,7 @@
     "proveedores/catalog-line.int.test.ts",
     "proveedores/proveedores-constraints.int.test.ts",
     "proveedores/supplier-crud.int.test.ts",
+    "recetas/company-scope.int.test.ts",
     "recetas/recetas-constraints.int.test.ts",
     "recetas/recipe-crud.int.test.ts",
     "recetas/recipe-lines.int.test.ts",
@@ -172,6 +173,11 @@
       "archivo": "proveedores/list-query-suppliers.int.test.ts",
       "motivo": "Nacido antes de QC-77 (QC-57 T17): su cabecera dice que 'listAliveSuppliers' llama al cliente Prisma GLOBAL y que por eso una transaccion que se deshace no lo envuelve. Crea filas reales y las borra por id exacto en el afterAll.",
       "desde": "2026-09-12"
+    },
+    {
+      "archivo": "recetas/company-scope-queries.int.test.ts",
+      "motivo": "Nacido con QC-77 ya en pie (QC-50 T23): siembra recetas y lineas de DOS empresas efimeras a la vez y llama directamente a los adaptadores driven de 'recetas' ('recipe-prisma.ts' y 'recipe-catalog-prisma.ts') y a las costuras de 'inventario' ('findProductRefs') y 'unidades' ('findUnitRefs'). Esos adaptadores usan el cliente Prisma GLOBAL, asi que una transaccion del test no los envolveria -correrian en otra conexion del pool y verian una base vacia-. Committea y limpia lo suyo en el afterAll, por el id exacto de cada empresa, en el orden que exigen las FK (recetas, cuyas lineas caen con ON DELETE CASCADE -> producto y unidad propios -> usuario -> rol y tipo de documento -> empresa; la unidad de sistema compartida se borra la ultima). Los sub-casos de R11 que necesitan el 'meta.target' REAL de un 23505 SI abren su propia 'prisma.$transaction' con SAVEPOINT alrededor de la escritura que se espera que falle, y no dejan ninguna fila. El caso de R30 relaja FORCE ROW LEVEL SECURITY sobre 'recipes' y 'recipe_lines' y lo restaura en un 'finally'.",
+      "desde": "2026-09-16"
     },
     {
       "archivo": "recetas/list-query-recipes.int.test.ts",

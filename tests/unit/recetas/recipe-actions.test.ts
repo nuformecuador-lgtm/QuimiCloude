@@ -28,6 +28,7 @@ const {
   updateRecipeMock,
   deleteRecipeMock,
   getSessionUserMock,
+  getSessionContextMock,
 } = vi.hoisted(() => ({
   createRecipeMock: vi.fn(),
   getRecipeMock: vi.fn(),
@@ -35,6 +36,7 @@ const {
   updateRecipeMock: vi.fn(),
   deleteRecipeMock: vi.fn(),
   getSessionUserMock: vi.fn(),
+  getSessionContextMock: vi.fn(),
 }));
 
 // QC-71 (T7, R7, R13): el adaptador driving pide a la composicion la LECTURA de la cabecera
@@ -47,7 +49,7 @@ const { REQUEST_ID_DE_PRUEBA, readRequestIdHeaderMock } = vi.hoisted(() => {
 
 vi.mock('@/lib/composition', () => ({
   observabilidad: { readRequestIdHeader: readRequestIdHeaderMock },
-  identity: { getSessionUser: getSessionUserMock },
+  identity: { getSessionUser: getSessionUserMock, getSessionContext: getSessionContextMock },
   recetas: {
     createRecipe: createRecipeMock,
     getRecipe: getRecipeMock,
@@ -63,6 +65,19 @@ const ADMIN_SESSION_USER = {
   displayName: 'Ana Perez',
   roleName: 'Administrador',
   // QC-74 (R11): la sesion trae el conjunto de permisos vigente; el actor se arma con EL.
+  permissions: ['recetas.consultar', 'recetas.modificar'],
+};
+
+/** QC-50 (R13): la empresa sale SOLO de aqui; `SessionUser` no la trae. */
+const ADMIN_SESSION_CONTEXT = {
+  userId: 'user-admin-1',
+  companyId: 'empresa-1',
+  roleName: 'Administrador',
+};
+
+const ADMIN_ACTOR = {
+  id: 'user-admin-1',
+  companyId: 'empresa-1',
   permissions: ['recetas.consultar', 'recetas.modificar'],
 };
 
@@ -85,6 +100,7 @@ const VALID_RECIPE_INPUT = {
 beforeEach(() => {
   vi.clearAllMocks();
   getSessionUserMock.mockResolvedValue(ADMIN_SESSION_USER);
+  getSessionContextMock.mockResolvedValue(ADMIN_SESSION_CONTEXT);
 });
 
 describe('createRecipeAction — R38', () => {
@@ -105,7 +121,7 @@ describe('createRecipeAction — R38', () => {
     expect(resultado).toEqual({ status: 'success', id: 'receta-1' });
     expect(createRecipeMock).toHaveBeenCalledWith(
       expect.objectContaining({ name: VALID_RECIPE_INPUT.name }),
-      { id: ADMIN_SESSION_USER.id, permissions: ADMIN_SESSION_USER.permissions },
+      ADMIN_ACTOR,
     );
   });
 
@@ -216,6 +232,92 @@ describe('deleteRecipeAction, getRecipeAction, listRecipesAction — traduccion 
     // No se traga: el error original llega al registro del servidor (R14).
     expect(errorSpy).toHaveBeenCalledTimes(1);
     errorSpy.mockRestore();
+  });
+});
+
+describe('QC-50 R13 — la empresa sale de getSessionContext y nunca de la entrada', () => {
+  const INVOCACIONES: ReadonlyArray<{
+    readonly nombre: string;
+    readonly mock: ReturnType<typeof vi.fn>;
+    readonly invocar: () => Promise<unknown>;
+  }> = [
+    {
+      nombre: 'createRecipeAction',
+      mock: createRecipeMock,
+      invocar: () => createRecipeAction(VALID_RECIPE_INPUT),
+    },
+    {
+      nombre: 'updateRecipeAction',
+      mock: updateRecipeMock,
+      invocar: () => updateRecipeAction('receta-1', VALID_RECIPE_INPUT),
+    },
+    {
+      nombre: 'deleteRecipeAction',
+      mock: deleteRecipeMock,
+      invocar: () => deleteRecipeAction('receta-1'),
+    },
+    {
+      nombre: 'getRecipeAction',
+      mock: getRecipeMock,
+      invocar: () => getRecipeAction('receta-1'),
+    },
+    {
+      nombre: 'listRecipesAction',
+      mock: listRecipesMock,
+      invocar: () => listRecipesAction({ page: 1, pageSize: 10 }),
+    },
+  ];
+
+  function actorRecibido(mock: ReturnType<typeof vi.fn>): unknown {
+    const llamada = mock.mock.calls.at(-1);
+    if (llamada === undefined) throw new Error('el caso de uso no fue llamado');
+    return llamada.at(-1);
+  }
+
+  it('las cinco actions piden LAS DOS caras de la sesion y componen el actor con la empresa', async () => {
+    for (const { nombre, mock, invocar } of INVOCACIONES) {
+      vi.clearAllMocks();
+      getSessionUserMock.mockResolvedValue(ADMIN_SESSION_USER);
+      getSessionContextMock.mockResolvedValue(ADMIN_SESSION_CONTEXT);
+      mock.mockResolvedValue({ id: 'x', items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 });
+
+      await invocar();
+
+      expect(getSessionUserMock, nombre).toHaveBeenCalledTimes(1);
+      expect(getSessionContextMock, nombre).toHaveBeenCalledTimes(1);
+      expect(actorRecibido(mock), nombre).toEqual(ADMIN_ACTOR);
+    }
+  });
+
+  it('sin contexto de sesion el actor es null ENTERO, no un actor a medias sin empresa', async () => {
+    // Lo que se impide es un actor a medias, con `companyId: undefined`: el ambito que
+    // llegaria a la consulta no seria de nadie. El caso de uso -aqui mockeado- sigue siendo
+    // quien rechaza (R12 de QC-74, `authorization.test.ts`): esta action nunca lee el
+    // repositorio por su cuenta, asi que lo unico que puede fijar aqui es que el actor que
+    // le entrega al caso de uso sea `null` entero, nunca uno con la empresa a medias.
+    const AUSENCIAS = [
+      { etiqueta: 'sin contexto de sesion', user: ADMIN_SESSION_USER, context: null },
+      { etiqueta: 'sin usuario de sesion', user: null, context: ADMIN_SESSION_CONTEXT },
+      { etiqueta: 'sin ninguna de las dos', user: null, context: null },
+    ];
+
+    for (const { etiqueta, user, context } of AUSENCIAS) {
+      for (const { nombre, mock, invocar } of INVOCACIONES) {
+        vi.clearAllMocks();
+        getSessionUserMock.mockResolvedValue(user);
+        getSessionContextMock.mockResolvedValue(context);
+        mock.mockRejectedValue(new UnauthorizedError());
+
+        const resultado = await invocar();
+
+        expect(actorRecibido(mock), `${nombre} ${etiqueta}`).toBeNull();
+        expect(resultado, `${nombre} ${etiqueta}`).toEqual({
+          status: 'error',
+          code: 'unauthorized',
+          message: expect.any(String),
+        });
+      }
+    }
   });
 });
 

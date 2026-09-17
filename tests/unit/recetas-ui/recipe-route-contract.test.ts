@@ -305,6 +305,22 @@ const RENOMBRADO_DE_COMENTARIOS_QC70 = [
   'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
 ];
 
+// QC-50 aisla recetas por empresa. Este contrato solo mira el DIFF contra `origin/dev`, asi que
+// con los cambios sin commitear el caso pasaba en verde igual -no muerde hasta que hay commit-.
+// Son tres archivos nuevos/modificados, ninguno mas:
+//   * `domain/recipe-scope.ts` (nuevo): el tipo del ambito del modulo -la empresa en cuyo
+//     nombre se consulta o se escribe-. Dominio puro: no autoriza, solo nombra el ambito.
+//   * `adapters/driven/persistence/company-scope.ts` (nuevo): el punto UNICO donde se escribe
+//     «de la empresa» al armar el filtro/los datos de Prisma, para que ninguna consulta ni
+//     escritura del modulo lo repita por su cuenta y diverja.
+//   * `ports/recipe-repository.ts` (modificado): los cinco metodos ganan el ambito en la FIRMA,
+//     que es lo que hace que una llamada que lo omita no compile.
+const AISLAMIENTO_POR_EMPRESA_QC50 = [
+  'lib/modules/recetas/domain/recipe-scope.ts',
+  'lib/modules/recetas/adapters/driven/persistence/company-scope.ts',
+  'lib/modules/recetas/ports/recipe-repository.ts',
+];
+
 const MIGRACION_QC34 = [
   'db/schema.prisma',
   'db/migrations/20260904135210_order_cancellation/migration.sql',
@@ -364,10 +380,20 @@ const MIGRACION_QC60 = [
   'db/migrations/20260915120000_orders_company_scope/down.sql',
 ];
 
+// La migracion que da empresa a las recetas (QC-50): `recipes` gana `company_id` NOT NULL y el
+// unico de nombre pasa de global a `(company_id, name_normalized)`. Este contrato mira el DIFF
+// contra `origin/dev`, asi que con los cambios sin commitear pasaba en verde igual -no muerde
+// hasta que hay commit-.
+const MIGRACION_QC50 = [
+  'db/migrations/20260916120000_recipes_company_scope/migration.sql',
+  'db/migrations/20260916120000_recipes_company_scope/down.sql',
+];
+
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
   ...AUTORIZACION_POR_PERMISO_QC74,
   ...RENOMBRADO_DE_COMENTARIOS_QC70,
+  ...AISLAMIENTO_POR_EMPRESA_QC50,
 ];
 
 export const DB_PERMITIDAS: readonly string[] = [
@@ -382,6 +408,7 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC23,
   ...MIGRACION_QC81,
   ...MIGRACION_QC60,
+  ...MIGRACION_QC50,
 ];
 
 /** Espera rutas con separadores POSIX, como las devuelve `git diff --name-only`. */

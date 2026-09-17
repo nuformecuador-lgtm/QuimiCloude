@@ -426,7 +426,11 @@ describe('updateOrder — edicion (R20, R21, R22, R24, R25, R33)', () => {
 
     await createUpdateOrder(d)(ORDER_ID, { ...EDICION, recipeId: OTRA_RECETA }, ADMIN)
 
-    expect(d.findRefsIncludingDeleted).toHaveBeenCalledWith([OTRA_RECETA])
+    // QC-50 (T11): `findRefsIncludingDeleted` gana la empresa del actor como
+    // segundo argumento, para que el catalogo de recetas nunca busque fuera del ambito de quien
+    // pide el cambio. Se compara contra `ADMIN.companyId`, la empresa del propio actor de este
+    // test, no una constante suelta: lo que se prueba es que el ambito llega hasta la costura.
+    expect(d.findRefsIncludingDeleted).toHaveBeenCalledWith([OTRA_RECETA], ADMIN.companyId)
     expect(d.updateAlive).toHaveBeenCalledTimes(1)
   })
 

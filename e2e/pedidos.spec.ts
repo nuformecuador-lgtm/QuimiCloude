@@ -264,14 +264,22 @@ test.beforeAll(async () => {
   adminUserId = await createUserWithRole(adminUser, ROLE_ADMINISTRADOR);
   await createUserWithRole(operatorUser, ROLE_OPERADOR);
 
+  // La empresa del worker, ya creada arriba. Se copia a una constante para que el tipo sea
+  // `string` y no `string | null`: `recipes.company_id` no admite nulo (QC-50).
+  const empresaDelWorker = companyId;
+  if (empresaDelWorker === null) throw new Error('el fixture no creo la empresa del worker');
+
   // Receta y unidad de FIXTURE (`design.md > 13`), con las MISMAS funciones de normalizacion del
-  // dominio que usa la app: `name_normalized` es NOT NULL en las dos tablas.
+  // dominio que usa la app: `name_normalized` es NOT NULL en las dos tablas. La receta es de la
+  // MISMA empresa en la que abre sesion el Administrador: si fuera otra, el aislamiento por
+  // empresa la ocultaria del pedido.
   recipeId = (
     await prisma.recipe.create({
       data: {
         name: recipeName,
         nameNormalized: normalizeRecipeName(recipeName),
         createdBy: adminUserId,
+        companyId: empresaDelWorker,
       },
       select: { id: true },
     })

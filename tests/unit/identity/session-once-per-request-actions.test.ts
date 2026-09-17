@@ -249,6 +249,14 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         await import('@/lib/modules/documentos/adapters/driving/document-upload-actions')
       ).issueUploadLinksAction({} as never),
   },
+  {
+    archivo: 'lib/modules/recetas/adapters/driving/recipe-actions.ts',
+    nombre: 'listRecipesAction',
+    invocar: async () =>
+      (await import('@/lib/modules/recetas/adapters/driving/recipe-actions')).listRecipesAction({
+        page: 1,
+      }),
+  },
 ];
 
 /**

@@ -16,6 +16,7 @@ import {
   type RecipeDetail,
   type RecipeSummary,
 } from '@/lib/modules/recetas';
+import { runInRequestScope } from '@/lib/shared/request-scope';
 
 /**
  * Server Actions del CRUD de recetas (T13, R38, R39, `design.md > 5`). Es el ADAPTADOR
@@ -88,11 +89,25 @@ const INVALID_INPUT_MESSAGE = errorMessage(INVALID_INPUT_CODE);
  */
 const toErrorState = createErrorStateTranslator(RecetasError, observabilidad.readRequestIdHeader);
 
-/** El actor que exige R1/D17: se resuelve UNA vez por invocacion, nunca dentro del dominio. */
+/**
+ * El actor que exige R1/D17: se resuelve UNA vez por invocacion, nunca dentro del dominio.
+ *
+ * Usuario y empresa salen de la sesion del servidor, leidos en paralelo dentro del mismo
+ * ambito de peticion para que ambos vengan de la misma lectura; si falta cualquiera de los
+ * dos se devuelve `null` y el caso de uso rechaza antes de tocar ningun puerto. La empresa
+ * jamas sale de lo que envia quien llama a la action.
+ */
 async function currentActor(): Promise<Actor | null> {
-  const sessionUser = await identity.getSessionUser();
-  if (sessionUser === null) return null;
-  return { id: sessionUser.id, permissions: sessionUser.permissions };
+  // El ambito envuelve solo este `Promise.all`: las dos caras comparten una lectura de sesion.
+  const [sessionUser, sessionContext] = await runInRequestScope(() =>
+    Promise.all([identity.getSessionUser(), identity.getSessionContext()]),
+  );
+  if (sessionUser === null || sessionContext === null) return null;
+  return {
+    id: sessionUser.id,
+    companyId: sessionContext.companyId,
+    permissions: sessionUser.permissions,
+  };
 }
 
 /**

@@ -197,7 +197,16 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
     // Finalizar-. O sea: NO es crecimiento por goteo, es una ficha con su requisito, y el spec
     // lo aprobo el humano en F1.4. El orden de los literales es el que devuelve `readdirSync`
     // (`matchingFiles` no ordena aqui), y por eso `recetas-pasos.spec.ts` va primero.
+    //
+    // AMPLIADA de nuevo (QC-50, aislamiento-por-empresa-en-recetas): la lista pasa de DOS a
+    // TRES literales, y sigue siendo CERRADA -mismo criterio de siempre: un cuarto spec de
+    // recetas sin ficha tiene que seguir poniendo esto en rojo-. El spec que entra es el E2E de
+    // aislamiento por empresa que pide R31 de `specs/QC-50-aislamiento-por-empresa-en-recetas/requirements.md`,
+    // aprobado por el humano en T20. Verificado con `readdirSync` sobre `e2e/`
+    // (no me fio de memoria): devuelve `aislamiento-recetas.spec.ts` PRIMERO -antes que
+    // `recetas-pasos.spec.ts`-, asi que va al frente de la lista.
     expect(e2eMatches, `spec E2E de recetas inesperado: ${e2eMatches.join(', ')}`).toEqual([
+      'aislamiento-recetas.spec.ts', // QC-50 / R31: E2E de aislamiento por empresa
       'recetas-pasos.spec.ts', // QC-64 / R28: E2E del camino completo del editor y el asistente
       'recetas.spec.ts', // QC-26: E2E del CRUD de la pantalla de recetas
     ])
@@ -276,7 +285,21 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
       const importsStorageJs = /from\s+['"]@supabase\/storage-js['"]|require\(\s*['"]@supabase\/storage-js['"]\s*\)/.test(
         source,
       )
-      const importsStorageAdapter = /recipe-image-supabase/.test(source)
+      // Mismo criterio que `importsStorageJs`: exige FORMA de import/require, no un
+      // substring pelado. Un test como R27 (`recipe-image-scope.test.ts`) lee el adaptador
+      // como TEXTO con `readFileSync` para afirmar cosas sobre su codigo fuente -sin
+      // importarlo-, y cita su nombre de archivo (p. ej. en un segmento de ruta) sin que eso
+      // cree ninguna dependencia real en la corrida. Esa mencion textual no es lo que R43
+      // prohibe; lo que R43 prohibe es que el adaptador SE EJECUTE dentro de un test de este
+      // modulo, y eso solo pasa si hay un `import`/`require` real. La comprobacion hermana de
+      // `@supabase/storage-js`, arriba, siempre exigio forma de import: esta se habia quedado
+      // como substring por descuido, no por diseno -misma correccion que el ACOTADO de mas
+      // abajo, en la otra mitad de este caso-. Un import real del adaptador se sigue cazando
+      // exactamente igual.
+      const importsStorageAdapter =
+        /from\s+['"][^'"]*recipe-image-supabase(?:\.[jt]sx?)?['"]|require\(\s*['"][^'"]*recipe-image-supabase(?:\.[jt]sx?)?['"]\s*\)/.test(
+          source,
+        )
       if (importsStorageJs) hallazgos.push(`${file}: importa @supabase/storage-js`)
       if (importsStorageAdapter) hallazgos.push(`${file}: importa el adaptador de Storage`)
     }
@@ -287,12 +310,13 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
     ).toEqual([])
   })
 
-  it('esta feature no anade ninguna columna, indice ni restriccion a recipes ni a recipe_lines', () => {
+  it('el conjunto de columnas, indices y restricciones de recipes y recipe_lines es exactamente el esperado', () => {
     // R41: el esquema de `recipes` y `recipe_lines` lo dejo QC-24 y esta ficha lo consume
-    // tal cual. Es una afirmacion DESCRIPTIVA sobre el archivo actual, ligada al CONJUNTO
-    // DE NOMBRES de columna de `Recipe`/`RecipeLine` (y a sus `@@unique`/`@@index`/`@@map`
-    // completos) -no un censo global del schema-: si alguien anade, quita o renombra una
-    // columna, un indice o una restriccion de estos DOS modelos, esta prueba cae.
+    // tal cual, salvo por `companyId` (QC-50, ver abajo). Es una afirmacion DESCRIPTIVA sobre
+    // el archivo actual, ligada al CONJUNTO DE NOMBRES de columna de `Recipe`/`RecipeLine`
+    // (y a sus `@@unique`/`@@index`/`@@map` completos) -no un censo global del schema-: si
+    // alguien anade, quita o renombra una columna, un indice o una restriccion de estos DOS
+    // modelos fuera de lo que las listas de abajo ya reflejan, esta prueba cae.
     //
     // Se compara solo el NOMBRE de cada campo de columna, no su declaracion entera (tipo,
     // atributos, `@map`, etc.): comparar la linea completa es fragil ante cambios legitimos
@@ -342,6 +366,10 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
       'description',
       'steps',
       'imagePath',
+      // QC-50: aislamiento por empresa de esta ficha. `companyId` entra ENTRE `imagePath` y
+      // `createdBy`, que es el lugar exacto donde `db/schema.prisma` lo coloco -no al final-,
+      // porque esta lista compara el ORDEN de los campos, no solo su presencia.
+      'companyId',
       'createdBy',
       'updatedBy',
       'createdAt',
@@ -353,6 +381,10 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
       '@@map("recipes")',
     ]
 
+    // QC-50: `RecipeLine` NO gana `companyId` propio -a proposito-. Su empresa es la de su
+    // receta (via `recipeId`), y darle una columna propia abriria la puerta a que una linea
+    // apuntara a una empresa distinta de la de su receta. Esta lista SIGUE IGUAL que antes de
+    // QC-50: si algun dia cambiara, seria la prueba de que ese aislamiento se rompio.
     const EXPECTED_RECIPE_LINE_FIELDS = [
       'id',
       'recipeId',
