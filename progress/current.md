@@ -20,6 +20,29 @@
 
 ## Evaluaciones
 
+### QC-63 - REACOTADA con `/afinar-feature` (2026-09-17)
+
+La semilla del 2026-09-08 **ya existia**, asi que no se sobrescribio: se le **anadieron cinco filas**
+a la tabla de decisiones, en
+`.worktrees/QC-63-ejecutar-receta-operador/specs/QC-63-ejecutar-receta-operador/requirements.md`.
+No se copian aqui.
+
+**Dos decisiones viejas NO se sostenian contra el disco, y por eso valia la pena reacotar**: (1) la
+semilla cortaba la pantalla con `asignaciones.consultar` **y** `asignaciones.modificar`, pero el
+Operador nace **sin** el segundo, asi que se habria quedado fuera de su propia pantalla; y el unico
+camino que mueve un pedido, `updateOrder`, exige **`pedidos.modificar`**, que tampoco tiene. Se cierra
+con un **caso de uso nuevo en `asignaciones`** que pregunta al contrato de `pedidos` si la transicion
+es legal. (2) **QC-88 R23 dejo aqui el rechazo real del «pedido ya tomado»** y su R21 deshabilita el
+disparador de todo `EN_CURSO`: como abrir la pantalla pone el pedido `EN_CURSO`, **el Operador que
+recargase se encontraba su propio trabajo bloqueado**. El humano decidio **permitir la reentrada a
+cualquier responsable asignado**, asi que esta ficha **enmienda la guardia de QC-88 tensandola**.
+
+**El board se corrigio ANTES de sembrar**: la `description` afirmaba que la transicion iba por el caso
+de uso de pedidos, y **`complexity` subio de `medium` a `high`** —caso de uso nuevo con autorizacion
+propia, contrato de dos modulos, estreno de la conversion de unidades de QC-76, enmienda de tests ya
+mergeados y E2E de permisos—. Ninguna ficha nueva y ninguna cancelada. Sigue `pending` en Backlog: la
+mueve el leader en F1.3.
+
 ### QC-68 - seleccionada en F1.0 con la prioridad del humano (2026-09-17)
 
 El humano fijo el orden **Inventario -> Pedidos -> Recetas**. En **Inventario no hay nada que
