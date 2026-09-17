@@ -429,7 +429,40 @@ Ninguna se aplico en caliente. Se anotan con lo que costaron, que es lo que las 
    mecanico**. Al relanzarlo **en Sonnet** —que el propio documento permite «en la llamada concreta»—
    cerro el trabajo pendiente sin gastar Opus. Decidir si eso pasa a ser el criterio por defecto.
 
-### La regla de «no citar fichas en comentarios» no existe en `docs/conventions.md` (2026-09-16)
+### `harnessConfig/` y la raiz llevan dias divergiendo, y nada avisa (2026-09-17)
+
+Descubierto al correr `/afinar-regla` sobre la regla de comentarios. **`harnessConfig/` no es una
+copia: es una version MAS AVANZADA del arnes**, con su propio `.git`, y la raiz se quedo atras. Lo
+que tiene de mas, comprobado:
+
+- **La seccion `## Comentarios` entera** de `docs/conventions.md` —la que rechazo trabajo tres
+  veces— y las lineas correspondientes en `reviewer.md`, `frontend_dev.md` y `backend_dev.md`. **Eso
+  se porto el 2026-09-17**; el resto NO.
+- **`docs/orquestacion.md`**, que en esa version se lleva el flujo F0-F2.6 entero fuera de
+  `AGENTS.md` con un motivo medido: `AGENTS.md` se reenvia 8-12 veces por feature y un
+  `frontend_dev` no necesita el contrato F0 de Jira —«~5.000 tokens por invocacion en instrucciones
+  que no usa»—. Ya estaba anotado como H7 al acotar QC-88.
+- **La regla «Si un subagente falla, el leader NO hace su trabajo»**, nacida de un incidente del
+  2026-09-14 en opencode donde el leader escribio el informe del `reviewer` cuando la delegacion
+  fallo. **Hoy la raiz no la tiene**, y esta sesion ha estado cerca de ese borde dos veces.
+- Todo el soporte de **opencode** (`opencode.json`, `.opencode/`, `docs/opencode.md`).
+
+**El patron es el que importa**: una regla escrita, con su medicion y su coste, que **nunca llego a
+la copia que leen los agentes**. Se aplica de memoria, rechaza trabajo, y quien escribe el codigo no
+puede leerla. No hay nada que avise de la divergencia —ni guardia, ni paso del gate, ni linea en
+`AGENTS.md` que diga quien sincroniza—. Decision del humano el 2026-09-17: **portar solo lo de
+comentarios** y dejar el resto anotado aqui, porque cambiar el arnes entero de golpe es como se
+cuelan reglas que nadie decidio. **Lo siguiente seria inventariar la divergencia completa.**
+
+### La regla de «no citar fichas en comentarios» no existe en `docs/conventions.md` — RESUELTA el 2026-09-17
+
+**Ya no aplica: la regla se porto a la raiz con `/afinar-regla`** y ademas se acoto. Se conserva la
+entrada porque explica lo que costo: **34 commits en QC-81**, la review de **QC-60 rechazada** y
+**7 lineas en QC-103**, todo por una regla que se aplicaba sin estar donde los agentes la leen. El
+diagnostico original de esta entrada era correcto en el sintoma y **equivocado en la causa**: no es
+que la regla no existiera, es que **existia solo en la plantilla**. Ver la entrada de arriba.
+
+Texto original de la entrada (2026-09-16):
 
 Verificado con `grep` en los dos arboles: **no esta escrita en ningun sitio**. Y sin embargo se
 aplica: a **QC-81** le costo **34 commits** de limpieza, y la review de **QC-60 fue RECHAZADA hoy**
