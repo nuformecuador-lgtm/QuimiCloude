@@ -9,6 +9,11 @@
 // Como `tests/unit/composition/identity-facade.test.ts`: se sustituye el cliente Prisma entero
 // —`lib/composition` arrastra todos los adaptadores del repo y no hace falta ni Postgres ni
 // `DATABASE_URL`— y se ejercita el cableado REAL.
+//
+// RETENSADO QC-88 (T8, R13). La fachada pasa de CINCO a SEIS operaciones: `listAssignedOrders`,
+// la lista de trabajo del Operador, cableada con las CUATRO dependencias de `design.md > 6`
+// (`orderAssignmentRepository`, `orderCatalog` YA con `listAliveSummariesByIds`, `recipeCatalog`
+// y `peopleDirectory`) y NINGUN adaptador nuevo.
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -16,10 +21,11 @@ vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
 
 import { asignaciones } from '@/lib/composition';
 
-describe('QC-102 T5 — la fachada de `asignaciones` lista sus cinco operaciones', () => {
-  it('expone las cuatro de QC-87 y la consulta EN LOTE, y ninguna mas', () => {
+describe('QC-88 T8 — la fachada de `asignaciones` lista sus SEIS operaciones', () => {
+  it('expone las cinco anteriores mas `listAssignedOrders`, y ninguna mas', () => {
     expect(Object.keys(asignaciones).sort()).toEqual([
       'assignResponsibles',
+      'listAssignedOrders',
       'listOrderResponsibles',
       'listResponsiblesForOrders',
       'removeWorkGroupFromOrder',
@@ -40,6 +46,21 @@ describe('QC-102 T5 — la fachada de `asignaciones` lista sus cinco operaciones
     // la vez —el cableado existe y el permiso corta ANTES de ningun puerto (R2)—.
     const error = await asignaciones
       .listResponsiblesForOrders({ id: 'u', companyId: 'c', permissions: [] }, [])
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('`listAssignedOrders` es una funcion de DOS argumentos: el actor y la entrada', () => {
+    expect(typeof asignaciones.listAssignedOrders).toBe('function');
+    expect(asignaciones.listAssignedOrders).toHaveLength(2);
+  });
+
+  it('`listAssignedOrders` rechaza sin `asignaciones.consultar` sin llegar a la base (R5, R13)', async () => {
+    // Mismo criterio que arriba: el cliente Prisma doblado es `{}`, asi que un `unauthorized`
+    // demuestra a la vez que el cableado existe y que el permiso corta ANTES de ningun puerto.
+    const error = await asignaciones
+      .listAssignedOrders({ id: 'u', companyId: 'c', permissions: [] }, { page: 1 })
       .catch((caught: unknown) => caught);
 
     expect((error as { code?: string }).code).toBe('unauthorized');
