@@ -75,11 +75,14 @@ const FUENTE_DE_ACCIONES = join(
 )
 
 /**
- * Las cinco Server Actions del modulo, NOMBRADAS una a una: las cuatro de QC-87 mas la del lote
- * que anade QC-102. Escritas a mano y no deducidas de un sufijo («si acaba en `Action`»), porque un
- * criterio asi se afloja sin que nadie lo note. El riesgo contrario -que la lista se quede vieja y
- * una accion nueva entre por el barrel en silencio- lo cubre el caso «la lista coincide con lo que
- * el fuente real exporta».
+ * Las SEIS Server Actions del modulo, NOMBRADAS una a una: las cuatro de QC-87 mas la del lote
+ * que anade QC-102 mas la de la lista de trabajo del Operador que anade QC-88 (T9,
+ * 2026-09-16: `listAssignedOrdersAction`, R27 lado servidor — no comprueba ningun permiso, la
+ * frontera es la primera linea de `listAssignedOrders`; misma razon de ser en esta lista que
+ * las otras cinco). Escritas a mano y no deducidas de un sufijo («si acaba en `Action`»), porque
+ * un criterio asi se afloja sin que nadie lo note. El riesgo contrario -que la lista se quede
+ * vieja y una accion nueva entre por el barrel en silencio- lo cubre el caso «la lista coincide
+ * con lo que el fuente real exporta».
  */
 const ACCIONES = [
   'assignResponsiblesAction',
@@ -87,6 +90,7 @@ const ACCIONES = [
   'removeWorkGroupFromOrderAction',
   'listOrderResponsiblesAction',
   'listResponsiblesForOrdersAction',
+  'listAssignedOrdersAction',
 ] as const
 
 export type Fuente = { readonly relPath: string; readonly content: string }

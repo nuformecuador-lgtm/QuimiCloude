@@ -184,8 +184,16 @@ que si existe (`list-orders.ts:127`) exige `pedidos.consultar`, que el Operador 
   es el caso de uso que lo invoca.
 - El nombre de la receta lo resuelve el caso de uso con `RecipeCatalog`, el mismo contrato y el mismo
   patron que `list-orders.ts:145`.
-- **Consultas por pagina: 4, constantes** (R14) — asignaciones de la persona · pedidos de esos ids ·
-  recetas de esos pedidos (ids deduplicados) · responsables en lote.
+- **Consultas por pagina: 5, constantes** (R14) — asignaciones de la persona · pedidos de esos ids ·
+  recetas de esos pedidos (ids deduplicados) · responsables en lote · **nombres de esos
+  responsables (ids deduplicados)**.
+  **Correccion del 2026-09-16 (T6, tanda de backend):** el conteo original de este parrafo se
+  quedo en 4 y omitio la lectura de `people.findRefsIncludingDeletedInCompany` —los nombres
+  mostrables de los responsables, la misma que resuelve `list-responsibles-for-orders.ts`—. R14
+  no exige que el numero sea 4: exige que sea **constante**, y la quinta lectura tambien lo es
+  —una sola llamada, con los ids de responsables deduplicados, sin importar cuantas filas o
+  cuantos responsables tenga la pagina—. El codigo de T6 (`list-assigned-orders.ts`) ya hacia las
+  cinco desde el principio; lo que estaba desactualizado era este parrafo, no el caso de uso.
 - **No crea ciclo**: la flecha `asignaciones → pedidos` **ya existe** (QC-87, `composition:919`), y
   no aparece ninguna en sentido contrario.
 - **Superficie de conflicto con QC-60**: `order-catalog-prisma.ts` y `db/schema.prisma` (ver `> 13`).
