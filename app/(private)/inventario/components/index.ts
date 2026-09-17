@@ -25,6 +25,10 @@ export { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
 export { ProductField } from './product-field';
 export { ProductForm } from './product-form';
 export {
+  PURCHASE_DATE_FIELD,
+  ProductBatchDateField,
+} from './product-batch-date-field';
+export {
   PRODUCT_NAME_FIELD,
   ProductNamePicker,
   type ProductNameOption,

@@ -67,9 +67,11 @@ function montarRepositorio(overrides: Partial<DobleDelPuerto> = {}): DobleDelPue
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
       id: 'producto-nuevo-1',
       batchId: 'lote-1',
+      lot: '1',
     })),
     addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => ({
       batchId: 'lote-1',
+      lot: '1',
     })),
     ...overrides,
   };
@@ -174,6 +176,50 @@ describe('R24 — la entrada invalida se rechaza sin tocar el puerto', () => {
   });
 });
 
+describe('QC-103 — el lote asignado viaja de vuelta con el resultado del alta', () => {
+  it('createProduct devuelve el lote asignado al crear un producto nuevo (R12)', async () => {
+    const products = montarRepositorio({
+      createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
+        id: 'producto-nuevo-1',
+        batchId: 'lote-1',
+        lot: '42',
+      })),
+    });
+    const createProduct = createCreateProduct({ products, now: () => AHORA });
+
+    const resultado = await createProduct(ALTA_VALIDA, ADMIN);
+
+    expect(resultado).toEqual({ id: 'producto-nuevo-1', lot: '42' });
+  });
+
+  it('createProduct devuelve el lote asignado al agregar batch a un producto existente (R13)', async () => {
+    const products = montarRepositorio({
+      findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => 'producto-9'),
+      addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => ({
+        batchId: 'lote-2',
+        lot: 'ACME-2026-07',
+      })),
+    });
+    const createProduct = createCreateProduct({ products, now: () => AHORA });
+
+    const resultado = await createProduct(ALTA_VALIDA, ADMIN);
+
+    expect(resultado).toEqual({ id: 'producto-9', lot: 'ACME-2026-07' });
+  });
+
+  it('createProduct rechaza sin el permiso inventario.modificar (R10)', async () => {
+    // El permiso REAL, no el nombre del rol: `SOLO_CONSULTA` tiene `inventario.consultar`
+    // pero no `inventario.modificar`, y eso basta para que se rechace antes de tocar el puerto.
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA });
+
+    await expect(createProduct(ALTA_VALIDA, SOLO_CONSULTA)).rejects.toBeInstanceOf(
+      UnauthorizedError,
+    );
+    afirmarPuertoIntacto(products);
+  });
+});
+
 describe('R15, R16, R21 — producto nuevo', () => {
   it('busca por el nombre ESCRITO y crea producto y lote en una sola operacion del puerto', async () => {
     // Normalizar el nombre y descartar los borrados es del adaptador: el caso de uso pasa el
@@ -186,7 +232,7 @@ describe('R15, R16, R21 — producto nuevo', () => {
     expect(products.findAliveIdByName).toHaveBeenCalledWith('Acido sulfurico', { companyId: EMPRESA });
     expect(products.createWithFirstBatch).toHaveBeenCalledTimes(1);
     expect(products.addBatchToAlive).not.toHaveBeenCalled();
-    expect(resultado).toEqual({ id: 'producto-nuevo-1' });
+    expect(resultado).toEqual({ id: 'producto-nuevo-1', lot: '1' });
     // UNA operacion del puerto para las dos filas: el dominio no tiene dos llamadas que
     // descoordinar, y la transaccion es del adaptador.
     expect(products.createWithFirstBatch.mock.calls[0][2]).toBe(AHORA);
@@ -361,7 +407,7 @@ describe('R17, R18 — el nombre corresponde a un producto que ya existe', () =>
     expect(products.addBatchToAlive).toHaveBeenCalledTimes(1);
     expect(products.createWithFirstBatch).not.toHaveBeenCalled();
     expect(products.create).not.toHaveBeenCalled();
-    expect(resultado).toEqual({ id: 'producto-9' });
+    expect(resultado).toEqual({ id: 'producto-9', lot: '1' });
   });
 
   it('R18 — el candidato del producto NO viaja al puerto', async () => {
@@ -395,7 +441,7 @@ describe('R17, R18 — el nombre corresponde a un producto que ya existe', () =>
     });
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
-    await expect(createProduct(ALTA_VALIDA, ADMIN)).resolves.toEqual({ id: 'el-mas-viejo' });
+    await expect(createProduct(ALTA_VALIDA, ADMIN)).resolves.toEqual({ id: 'el-mas-viejo', lot: '1' });
     expect(products.addBatchToAlive.mock.calls[0][0]).toBe('el-mas-viejo');
   });
 

@@ -70,5 +70,12 @@ app/(public)/login/
     resultado de los checks; la aprueba un humano y se anota en `docs/dependencias.md`. Una
     dependencia no listada ahi tiñe el gate de rojo. Detalle en `docs/architecture.md >
     Dependencias de terceros`.
+11. **Comentarios: solo el porque que el codigo no muestra, y corto.** Nunca cites `QC-<n>`,
+    `R<n>`, `design.md` ni "decision cerrada" en un comentario de produccion; en tests, `R<n>` va
+    en el nombre del caso. **No imites el estilo de alrededor**: limpia los comentarios de **las
+    lineas que tocas**; los preexistentes que no tocas NO se arrastran -se limpian por modulo, en
+    fichas del board-. Si la limpieza abulta, va en un commit aparte `chore(<key>): limpia
+    comentarios de <archivo>` que no cambie codigo. Si no has verificado el motivo, no lo
+    escribas. Detalle en `docs/conventions.md > Comentarios`; el reviewer lo rechaza.
 
 Al terminar, devuelve SOLO: archivos creados/modificados y un veredicto de una linea.

@@ -95,6 +95,19 @@ downs). Al crear una migracion con `pnpm run db:migrate:create` (que envuelve
 `prisma migrate dev --create-only`), ANTES de aplicar, escribe el `down.sql` que revierta
 exactamente lo que hace `migration.sql`.
 
+## Comentarios
+
+1. Solo el porque que el codigo no muestra, y corto. Nunca `QC-<n>`, `R<n>`, `design.md` ni
+   "decision cerrada" en un comentario de produccion (incluidos `db/schema.prisma` y las
+   migraciones; `/// @module` no cuenta). En tests, `R<n>` va en el nombre del caso.
+2. **No imites el estilo de alrededor.** Limpia los comentarios de **las lineas que tocas**; los
+   preexistentes que no tocas NO se arrastran -se limpian por modulo, en fichas del board-. Si la
+   limpieza abulta, va en un commit aparte `chore(<key>): limpia comentarios de <archivo>` que no
+   cambie codigo.
+3. Si no has verificado el motivo, no lo escribas.
+
+Detalle en `docs/conventions.md > Comentarios`; el reviewer lo rechaza.
+
 ## Supabase, RLS y donde vive la autorizacion
 
 **Lee `docs/architecture.md > Acceso a datos y autorizacion` antes de tocar permisos.**

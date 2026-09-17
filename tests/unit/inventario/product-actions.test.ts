@@ -152,11 +152,21 @@ describe('createProductAction', () => {
   });
 
   it('devuelve exito con el id creado cuando el caso de uso resuelve', async () => {
-    createProductMock.mockResolvedValue({ id: 'product-42' });
+    createProductMock.mockResolvedValue({ id: 'product-42', lot: '1' });
 
     const result = await createProductAction(CREATE_INITIAL, formDataOf(VALID_PRODUCT_FIELDS));
 
-    expect(result).toEqual({ status: 'success', id: 'product-42' });
+    expect(result).toEqual({ status: 'success', id: 'product-42', lot: '1' });
+  });
+
+  it('createProductAction devuelve el lote en el estado de exito (R12)', async () => {
+    // El texto exacto es el que el caso de uso devuelve, sea el correlativo generado o el
+    // que tecleo la persona: la action no lo reinterpreta.
+    createProductMock.mockResolvedValue({ id: 'product-42', lot: 'L-2026-001' });
+
+    const result = await createProductAction(CREATE_INITIAL, formDataOf(VALID_PRODUCT_FIELDS));
+
+    expect(result).toEqual({ status: 'success', id: 'product-42', lot: 'L-2026-001' });
   });
 
   it('traduce cada error de dominio a su code serializable sin filtrar la excepcion', async () => {

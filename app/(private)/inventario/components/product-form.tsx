@@ -26,6 +26,7 @@ import {
 
 import { PresentationSelect } from '@/components/shared/presentation-select';
 
+import { ProductBatchDateField, formatDateLocalISO } from './product-batch-date-field';
 import { ProductField } from './product-field';
 import { ProductNamePicker, type ProductNameOption } from './product-name-picker';
 
@@ -53,10 +54,21 @@ const INT_FIELDS = ['stock', 'qtyAlert'] as const;
  * leyera. Los dos huecos los cierra el MISMO objeto: `createProductWithFirstBatchSchema`, que
  * valida el cliente aqui y revalida el caso de uso en el servidor (R24, R27).
  *
- * **Solo en el ALTA** (R26): la edicion no pinta ninguno de los cinco, no los envia y valida
- * con `createProductSchema`, que ni los conoce.
+ * **Solo en el ALTA**: la edicion no pinta ninguno de los seis, no los envia y valida con
+ * `createProductSchema`, que ni los conoce.
+ *
+ * **`purchaseDate`** siempre viaja con un valor -nunca vacia, "hoy" por defecto-, a diferencia
+ * de los demas. Aun asi es campo del lote: solo existe en el alta y la revalida el mismo esquema
+ * compartido.
  */
-const BATCH_FIELDS = ['presentationId', 'unitCost', 'totalCost', 'lot', 'expiryDate'] as const;
+const BATCH_FIELDS = [
+  'presentationId',
+  'unitCost',
+  'totalCost',
+  'lot',
+  'expiryDate',
+  'purchaseDate',
+] as const;
 
 type ProductFieldName =
   | (typeof TEXT_FIELDS)[number]
@@ -85,6 +97,7 @@ const FIELD_MESSAGES: Record<ProductFieldName, string> = {
   totalCost: 'Debe ser un importe mayor que 0, con hasta 4 decimales.',
   lot: 'Escribe un lote de 1 a 60 caracteres.',
   expiryDate: 'Escribe una fecha válida.',
+  purchaseDate: 'Elige la fecha de compra.',
 };
 
 /** Falta el par de costos entero. Se pinta en LOS DOS campos: cualquiera de ellos resuelve. */
@@ -99,6 +112,7 @@ const FIELD_LABELS: Record<ProductFieldName, string> = {
   totalCost: 'Costo total',
   lot: 'Lote',
   expiryDate: 'Fecha de expiración',
+  purchaseDate: 'Fecha de compra',
 };
 
 type FieldErrors = Partial<Record<ProductFieldName, string>>;
@@ -112,7 +126,7 @@ type FieldValues = Record<ProductFieldName, string>;
  * `{ status: 'idle' }` -QC-20 explica por que no exporta ninguna constante inicial- y su estado
  * de error se recoge ENTERO.
  *
- * **QC-71 (R17): `serverError` guarda el `ErrorState` completo, no `code` y `message` sueltos.**
+ * **`serverError` guarda el `ErrorState` completo, no `code` y `message` sueltos.**
  * La copia campo a campo que habia aqui perdia el `reference` del error inesperado -el unico dato
  * con el que quien reporta el fallo puede decir cual buscar en los registros-. Y un
  * `reference?: string` en este tipo local reabriria el mismo agujero por el otro lado: un
@@ -121,7 +135,7 @@ type FieldValues = Record<ProductFieldName, string>;
  */
 type ProductFormState =
   | { status: 'idle' }
-  | { status: 'success' }
+  | { status: 'success'; lot?: string }
   | {
       status: 'error';
       /** El error TAL CUAL: el de la operacion, o el `invalid_input` que fabrica la validacion previa. */
@@ -139,7 +153,7 @@ const INITIAL_STATE: ProductFormState = { status: 'idle' };
  * El mensaje de al lado NO sale del catalogo y se queda como esta (R31, `design.md > 6 bis`): es
  * el texto de una comprobacion PROPIA del formulario, no de un error que emita el back.
  *
- * QC-71 (R16, R18): `satisfies` en vez de anotacion. Sigue comprobando que el codigo pertenece al
+ * `satisfies` en vez de anotacion. Sigue comprobando que el codigo pertenece al
  * catalogo, pero deja el tipo en el literal, que es lo que permite construir con el la rama
  * CATALOGADA de `ErrorState` -la que no lleva identificador ni puede llevarlo-. Con `: ErrorCode`
  * el tipo incluiria tambien el codigo generico, y entonces este literal no compilaria sin un
@@ -216,8 +230,13 @@ type ProductFormProps = {
    * nada. Sin el, el alta rapida no se ofrece y la presentacion se elige entre las existentes.
    */
   readonly units?: readonly UnitRef[];
-  /** Lo llama el panel cuando la operacion termina bien: cerrar, avisar y refrescar (R21). */
-  readonly onSaved: () => void;
+  /**
+   * Lo llama el panel cuando la operacion termina bien: cerrar, avisar y refrescar.
+   *
+   * El argumento es el lote que devolvio el servidor, para que el aviso pueda nombrarlo. La
+   * edicion no conoce ningun lote y llama sin argumento: por eso es opcional.
+   */
+  readonly onSaved: (lot?: string) => void;
 };
 
 /**
@@ -315,6 +334,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
           totalCost,
           lot: readOptionalText(values.lot),
           expiryDate: readOptionalText(values.expiryDate),
+          purchaseDate: readOptionalText(values.purchaseDate),
         })
       : createProductSchema.safeParse({
           name: values.name,
@@ -346,23 +366,31 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
       };
     }
 
-    const result =
-      product === undefined
-        ? await createProductAction({ status: 'idle' }, formData)
-        : await updateProductAction(product.id, { status: 'idle' }, formData);
+    // Dos ramas y no una con un `result` compartido: `createProductAction` y `updateProductAction`
+    // devuelven estados de exito DISTINTOS -solo el del alta trae `lot`- y estrechar por
+    // `isCreate` no estrecha el TIPO de un `result` ya unificado. Separar la rama es lo que deja
+    // leer `result.lot` sin un `as`.
+    if (isCreate) {
+      const result = await createProductAction({ status: 'idle' }, formData);
+
+      if (result.status === 'error') {
+        // `invalid_input`, `product_not_found` y `unauthorized` NO identifican campo: van a la
+        // region de error del formulario.
+        //
+        // El estado de la operacion se guarda ENTERO. Antes se copiaban `code` y `message` a
+        // mano, y esa copia tiraba el `reference` del error inesperado por el camino.
+        return { status: 'error', serverError: result, fieldErrors: {}, values };
+      }
+
+      // `status === 'idle'` no lo devuelve nunca la action en la practica, pero el tipo lo
+      // incluye: sin lote que guardar, se trata igual que la edicion.
+      return result.status === 'success' ? { status: 'success', lot: result.lot } : { status: 'success' };
+    }
+
+    const result = await updateProductAction(product.id, { status: 'idle' }, formData);
 
     if (result.status === 'error') {
-      // `invalid_input`, `product_not_found` y `unauthorized` NO identifican campo: van a la region de
-      // error del formulario, que es lo que R20 pide para ese caso.
-      //
-      // QC-71 (R17): el estado de la operacion se guarda ENTERO. Antes se copiaban `code` y
-      // `message` a mano, y esa copia tiraba el `reference` del error inesperado por el camino.
-      return {
-        status: 'error',
-        serverError: result,
-        fieldErrors: {},
-        values,
-      };
+      return { status: 'error', serverError: result, fieldErrors: {}, values };
     }
 
     return { status: 'success' };
@@ -372,7 +400,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
 
   useEffect(() => {
     if (state.status !== 'success') return;
-    onSaved();
+    onSaved(state.lot);
   }, [state, onSaved]);
 
   const fieldErrors = state.status === 'error' ? state.fieldErrors : {};
@@ -387,7 +415,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
   // de error del formulario queda para los rechazos que NO senalan campo.
   //
   // Es el ERROR, no un booleano: asi el render puede estrechar por `code` y pedirle el
-  // identificador al inesperado sin ningun `as` (QC-71 R17, R18).
+  // identificador al inesperado sin ningun `as`.
   const formError =
     state.status === 'error' && Object.keys(fieldErrors).length === 0
       ? state.serverError
@@ -427,7 +455,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
       {formError === undefined ? null : (
         // Region de error del formulario (R20): aqui van los rechazos que no senalan un campo.
         //
-        // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
+        // El error INESPERADO lo pinta el componente compartido, que anade el
         // identificador de la peticion. El error DEL CATALOGO se pinta exactamente como siempre
         // -mismos `data-testid`, mismo marcado- y sin identificador ninguno.
         <div
@@ -568,7 +596,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
             name="lot"
             label={FIELD_LABELS.lot}
             type="text"
-            helper="El identificador del lote que trae el proveedor, tal cual viene en el envase. Opcional: déjalo vacío si el envase no lo trae."
+            helper="El identificador del lote que trae el proveedor, tal cual viene en el envase. Déjalo vacío para que el sistema lo asigne."
             defaultValue={initialValue('lot', '')}
             error={fieldErrors.lot}
           />
@@ -580,6 +608,16 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
             helper="La fecha en la que este lote caduca. Opcional: hoy solo se guarda, todavía no dispara ningún aviso."
             defaultValue={initialValue('expiryDate', '')}
             error={fieldErrors.expiryDate}
+          />
+
+          {/*
+            El componente ya cae en "hoy" si no recibe valor, pero aqui SIEMPRE se le pasa uno -el
+            de un intento fallido, o el de hoy- para que la recuperacion tras un rechazo y el valor
+            por defecto compartan la misma via.
+          */}
+          <ProductBatchDateField
+            initialValue={initialValue('purchaseDate', formatDateLocalISO(new Date()))}
+            error={fieldErrors.purchaseDate}
           />
         </>
       )}

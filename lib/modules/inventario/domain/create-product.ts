@@ -71,13 +71,13 @@ function resolverFechaDeCompra(entrada: EntradaValidada, instante: Date): string
  */
 export function createCreateProduct(
   deps: CreateProductDeps,
-): (input: unknown, actor: Actor | null | undefined) => Promise<{ id: string }> {
+): (input: unknown, actor: Actor | null | undefined) => Promise<{ id: string; lot: string }> {
   const now = deps.now ?? (() => new Date());
 
   return async function createProduct(
     input: unknown,
     actor: Actor | null | undefined,
-  ): Promise<{ id: string }> {
+  ): Promise<{ id: string; lot: string }> {
     requirePermission(actor, 'inventario.modificar');
 
     // La empresa sale del actor y nunca de la entrada, para que nadie pueda escribir en otra.
@@ -116,7 +116,7 @@ export function createCreateProduct(
       // consulta dira `null` y el alta seguira el camino de creacion.
       if (agregado === null) throw new ProductNotFoundError(existente);
 
-      return { id: existente };
+      return { id: existente, lot: agregado.lot };
     }
 
     // Una sola operacion del puerto para producto y lote, para que el dominio no pueda dejar
@@ -128,6 +128,6 @@ export function createCreateProduct(
     };
 
     const creado = await deps.products.createWithFirstBatch(producto, batch, instante, scope);
-    return { id: creado.id };
+    return { id: creado.id, lot: creado.lot };
   };
 }

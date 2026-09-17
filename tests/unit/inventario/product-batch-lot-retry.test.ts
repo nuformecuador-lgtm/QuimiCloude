@@ -128,6 +128,24 @@ describe('isDuplicateBatchLot — P2002 Y la pareja de columnas (R13, R15)', () 
   });
 });
 
+describe('createWithFirstBatch devuelve el lote escrito cuando R12 lo pide', () => {
+  it('con el lote generado, devuelve el correlativo que quedo escrito en la fila', async () => {
+    await expect(createWithFirstBatch(PRODUCTO, LOTE_GENERADO, AHORA, AMBITO)).resolves.toEqual({
+      id: PRODUCTO_ID,
+      batchId: LOTE_ID,
+      lot: '42',
+    });
+  });
+
+  it('con el lote tecleado a mano, devuelve ese mismo texto, no un correlativo', async () => {
+    await expect(createWithFirstBatch(PRODUCTO, LOTE_A_MANO, AHORA, AMBITO)).resolves.toEqual({
+      id: PRODUCTO_ID,
+      batchId: LOTE_ID,
+      lot: 'ACME-2026-07',
+    });
+  });
+});
+
 describe('createWithFirstBatch — lote GENERADO que choca: reintento acotado (R15)', () => {
   it('reintenta en una transaccion nueva, con maximo nuevo, y a la segunda escribe', async () => {
     doble.queryRaw.mockResolvedValueOnce([{ top: '41' }]).mockResolvedValueOnce([{ top: '42' }]);
@@ -136,6 +154,7 @@ describe('createWithFirstBatch — lote GENERADO que choca: reintento acotado (R
     await expect(createWithFirstBatch(PRODUCTO, LOTE_GENERADO, AHORA, AMBITO)).resolves.toEqual({
       id: PRODUCTO_ID,
       batchId: LOTE_ID,
+      lot: '43',
     });
 
     expect(doble.transaction).toHaveBeenCalledTimes(2);
@@ -235,6 +254,26 @@ function doblarLecturas(producto: { id: string } | null, maximos: readonly strin
   });
 }
 
+describe('addBatchToAlive devuelve el lote escrito cuando R13 lo pide', () => {
+  beforeEach(() => {
+    doblarLecturas({ id: PRODUCTO_ID }, ['41']);
+  });
+
+  it('con el lote generado, devuelve el correlativo que quedo escrito en la fila', async () => {
+    await expect(addBatchToAlive(PRODUCTO_ID, LOTE_GENERADO, AHORA, AMBITO)).resolves.toEqual({
+      batchId: LOTE_ID,
+      lot: '42',
+    });
+  });
+
+  it('con el lote tecleado a mano, devuelve ese mismo texto, no un correlativo', async () => {
+    await expect(addBatchToAlive(PRODUCTO_ID, LOTE_A_MANO, AHORA, AMBITO)).resolves.toEqual({
+      batchId: LOTE_ID,
+      lot: 'ACME-2026-07',
+    });
+  });
+});
+
 describe('addBatchToAlive — el mismo reintento en el otro camino que escribe lote (R13, R15)', () => {
   beforeEach(() => {
     doblarLecturas({ id: PRODUCTO_ID }, ['41']);
@@ -246,6 +285,7 @@ describe('addBatchToAlive — el mismo reintento en el otro camino que escribe l
 
     await expect(addBatchToAlive(PRODUCTO_ID, LOTE_GENERADO, AHORA, AMBITO)).resolves.toEqual({
       batchId: LOTE_ID,
+      lot: '9',
     });
 
     expect(doble.transaction).toHaveBeenCalledTimes(2);
@@ -279,6 +319,7 @@ describe('addBatchToAlive — la fila del producto se bloquea antes que el corre
 
     await expect(addBatchToAlive(PRODUCTO_ID, LOTE_GENERADO, AHORA, AMBITO)).resolves.toEqual({
       batchId: LOTE_ID,
+      lot: '42',
     });
 
     const ordenDe = (mock: { mock: { invocationCallOrder: number[] } }): number[] =>
