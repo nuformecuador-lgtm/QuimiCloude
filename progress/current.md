@@ -20,6 +20,34 @@
 
 ## Evaluaciones
 
+### QC-59 - acotada con `/afinar-feature` (2026-09-17)
+
+Alcance, **18 decisiones cerradas** y **cero preguntas abiertas** en
+`.worktrees/QC-59-aislamiento-por-empresa-en-proveedores/specs/QC-59-aislamiento-por-empresa-en-proveedores/requirements.md`
+(sembrado DENTRO del worktree). No se copian aqui.
+
+**El board se corrigio ANTES de sembrar**: la `description` decia que una linea no puede apuntar a
+``un producto`` de otra empresa, y **desde QC-52 las lineas no conocen productos** —apuntan a una
+presentacion y, opcionalmente, a una unidad—. Se anadio **QC-49** a `depends_on` (`done`): la clave
+foranea compuesta contra `presentations(company_id, id)` no existiria sin ella. `zone` y
+`complexity` siguen igual. Ninguna ficha nueva y ninguna cancelada.
+
+**La decision de fondo, y se aparta de QC-50**: la linea de catalogo **SI gana columna de empresa**
+—la de receta no la tiene—, porque es lo que permite acotar la presentacion **en la base** con una
+clave foranea compuesta en vez de con una consulta. Asi **la decision 3 de QC-52 queda intacta**:
+no nace ningun puerto de `proveedores` hacia `inventario`. La **unidad** no se puede cerrar por ahi
+—una FK compuesta no sabe decir ``la de sistema o la mia``—, asi que esa si se valida en el service
+y **anade una consulta hacia `unidades`**, dicho explicitamente en el archivo.
+
+**Cuesta dos indices unicos nuevos** `(company_id, id)`, en `presentations` y en `suppliers`,
+redundantes por definicion y cuyo unico fin es ser destino de esas claves. **Uno toca una tabla de
+`inventario`**; verificado el 2026-09-17 que hoy no existe ninguno de los dos.
+
+**Trampa heredada, ya localizada**: `suppliers_name_unique` es **PARCIAL**, como el de recetas.
+Medido en la base: 51 proveedores vivos, 1 linea viva, 0 imagenes, ningun nombre repetido.
+
+Sigue `pending` en Backlog: la mueve el leader en F1.3.
+
 ### QC-63 - REACOTADA con `/afinar-feature` (2026-09-17)
 
 La semilla del 2026-09-08 **ya existia**, asi que no se sobrescribio: se le **anadieron cinco filas**
