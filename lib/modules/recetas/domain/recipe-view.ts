@@ -31,11 +31,13 @@ export type RecipeSummary = {
  * catalogo de `unidades` (R50): este modulo no resuelve nombre ni simbolo, solo pasa el
  * identificador tal cual.
  *
- * `productStock` sale del MISMO `ProductCatalog.findRefs` y es `null` en la misma situacion
- * que `productName` -producto dado de baja-: sin producto no hay existencia que traer. La
- * presentacion YA NO viaja aqui: se mudo de `products` a `product_batches` el 2026-09-09, y
- * una linea de receta referencia un PRODUCTO, no un lote, asi que no tiene presentacion que
- * mostrar.
+ * `productStock` sale del MISMO `ProductCatalog.findRefs`, leido en la unidad de ESTA linea
+ * (`unitId`), nunca convertido: `null` cuando el producto esta dado de baja, `0` cuando no
+ * tiene ningun lote, la cantidad sumada cuando tiene un lote en esa unidad, y `null` cuando
+ * tiene lotes pero ninguno en esa unidad -mismo marcador de dato ausente que `productName`,
+ * distinto motivo-. La presentacion YA NO viaja aqui: se mudo de `products` a
+ * `product_batches` el 2026-09-09, y una linea de receta referencia un PRODUCTO, no un lote,
+ * asi que no tiene presentacion que mostrar.
  */
 export type RecipeLineView = {
   readonly id: string;
@@ -43,7 +45,7 @@ export type RecipeLineView = {
   readonly productName: string | null;
   readonly quantity: string;
   readonly unitId: string;
-  /** Existencia del producto en unidades, `null` cuando no declara stock. */
+  /** Existencia del producto en la unidad de esta linea; ver el comentario del tipo. */
   readonly productStock: number | null;
 };
 
