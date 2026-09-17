@@ -1,6 +1,33 @@
 import { cleanup, render, screen } from '@testing-library/react';
 
-import { ProductField } from '@/app/(private)/inventario/components';
+import { ProductField, ProductForm } from '@/app/(private)/inventario/components';
+import { Sheet } from '@/components/ui/sheet';
+import type { ProductView } from '@/lib/modules/inventario';
+
+vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
+  createProductAction: vi.fn(),
+  updateProductAction: vi.fn(),
+}));
+
+vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
+  listPresentationsAction: vi.fn().mockResolvedValue({ status: 'success', data: [] }),
+  createPresentationAction: vi.fn(),
+}));
+
+function producto(overrides: Partial<ProductView> = {}): ProductView {
+  return {
+    id: crypto.randomUUID(),
+    name: 'Hidróxido de sodio',
+    imagePath: null,
+    stock: 42,
+    stockByUnit: [],
+    qtyAlert: 5,
+    latestBatchUnitId: null,
+    createdAt: new Date('2026-01-15T10:20:30.000Z'),
+    updatedAt: new Date('2026-02-20T08:00:00.000Z'),
+    ...overrides,
+  };
+}
 
 /**
  * Objetivo tactil del disparador de ayuda de `ProductField` (QC-90, correccion M1).
@@ -44,5 +71,24 @@ describe('ProductField · disparador de la ayuda', () => {
     render(<ProductField name="name" label="Nombre" type="text" defaultValue="" />);
 
     expect(screen.queryByTestId('product-helper-name')).toBeNull();
+  });
+});
+
+describe('ProductForm · campo de existencia', () => {
+  it('R9, R10 — el alta pide la existencia del lote y la edicion no la muestra', () => {
+    const { unmount } = render(
+      <Sheet open>
+        <ProductForm onSaved={() => {}} />
+      </Sheet>,
+    );
+    expect(screen.getByTestId('product-field-stock')).toBeInTheDocument();
+    unmount();
+
+    render(
+      <Sheet open>
+        <ProductForm product={producto()} onSaved={() => {}} />
+      </Sheet>,
+    );
+    expect(screen.queryByTestId('product-field-stock')).toBeNull();
   });
 });

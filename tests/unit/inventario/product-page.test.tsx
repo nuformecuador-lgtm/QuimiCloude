@@ -649,7 +649,6 @@ describe('pantalla de productos — lista', () => {
           latestBatchUnitId: UNIDAD_A,
           qtyAlert: 5,
         }),
-        producto({ id: crypto.randomUUID(), stockByUnit: [], latestBatchUnitId: null, qtyAlert: 5 }),
       ]),
     );
 
@@ -661,14 +660,24 @@ describe('pantalla de productos — lista', () => {
     // Justo en la alerta y por encima: no. La alarma salta cuando la SUPERA, no al igualarla.
     expect(celdas[1]).not.toHaveAttribute('data-alert');
     expect(celdas[2]).not.toHaveAttribute('data-alert');
-    // R17 — sin lotes la existencia es 0, y 0 es menor que cualquier alerta configurada.
-    expect(celdas[3]).toHaveAttribute('data-alert', 'true');
 
     // La alerta nunca se tine a si misma: la que esta en alarma es la existencia.
     for (const celda of screen.getAllByTestId('data-table-cell-qtyAlert')) {
       expect(celda).not.toHaveAttribute('data-alert');
       expect(within(celda).queryByTestId('product-stock')).toBeNull();
     }
+  });
+
+  it('R17 — un producto sin lotes y con alerta de cantidad configurada se marca en alerta', async () => {
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([
+        producto({ id: crypto.randomUUID(), stockByUnit: [], latestBatchUnitId: null, qtyAlert: 5 }),
+      ]),
+    );
+
+    await renderPantalla();
+
+    expect(screen.getByTestId('product-stock')).toHaveAttribute('data-alert', 'true');
   });
 
   it('R18 — sin cantidad de alerta configurada, la existencia no se marca, tenga o no lotes', async () => {
@@ -1046,8 +1055,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(listProductsActionMock).toHaveBeenCalledTimes(1);
   });
 
-  it('la edicion precarga los valores actuales y envia el reemplazo completo', async () => {
-    // R19
+  it('la edicion precarga los valores actuales y envia el reemplazo completo, sin la existencia (R9)', async () => {
     const user = setupUser();
     const elProducto = producto({ name: 'Sosa cáustica' });
     listProductsActionMock.mockResolvedValue(paginaDeProductos([elProducto]));
@@ -1058,13 +1066,13 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
     const precargado: Record<string, string> = {
       name: elProducto.name,
-      stock: String(elProducto.stock),
       qtyAlert: String(elProducto.qtyAlert),
     };
 
     // QC-52 R5: los tres que el formulario enviaba ocultos ya no existen en el producto. La
     // edicion no puede enviarlos POR NINGUNA VIA -ni campo visible, ni oculto, ni precargado-.
-    const FUERA_DEL_PRODUCTO = ['cost', 'minPurchase', 'deliveryTime'] as const;
+    // La existencia se les suma: es del lote, no del producto que se edita.
+    const FUERA_DEL_PRODUCTO = ['cost', 'minPurchase', 'deliveryTime', 'stock'] as const;
 
     for (const [campo, valor] of Object.entries(precargado)) {
       expect(screen.getByTestId(`product-field-${campo}`), campo).toHaveValue(
@@ -1072,7 +1080,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
       );
     }
 
-    // Ninguno de los tres tiene control, ni visible ni oculto.
+    // Ninguno de los cuatro tiene control, ni visible ni oculto.
     for (const campo of FUERA_DEL_PRODUCTO) {
       expect(screen.queryByTestId(`product-field-${campo}`), campo).toBeNull();
       expect(screen.queryByTestId(`product-hidden-${campo}`), campo).toBeNull();
@@ -1092,7 +1100,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
       if (campo === 'name') continue;
       expect(enviado.get(campo), `${campo} debe viajar en el reemplazo`).toBe(valor);
     }
-    // Y los tres que el producto perdio no viajan (R5).
+    // Y los cuatro que el producto no lleva no viajan (R5, R9).
     for (const campo of FUERA_DEL_PRODUCTO) {
       expect(enviado.get(campo), `${campo} no debe viajar en el reemplazo`).toBeNull();
     }
@@ -1626,7 +1634,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
     await user.hover(ayuda);
     const texto = await screen.findByTestId('product-helper-text-stock', {}, { timeout: 3_000 });
-    expect(texto).toHaveTextContent('Se guarda tal cual');
+    expect(texto).toHaveTextContent('este lote');
 
     // Pedir ayuda no envia el formulario.
     expect(createProductActionMock).not.toHaveBeenCalled();
