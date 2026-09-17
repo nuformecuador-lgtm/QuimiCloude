@@ -22,7 +22,7 @@
 
 ### QC-59 - acotada con `/afinar-feature` (2026-09-17)
 
-Alcance, **18 decisiones cerradas** y **cero preguntas abiertas** en
+Alcance, **19 decisiones cerradas** y **cero preguntas abiertas** en
 `.worktrees/QC-59-aislamiento-por-empresa-en-proveedores/specs/QC-59-aislamiento-por-empresa-en-proveedores/requirements.md`
 (sembrado DENTRO del worktree). No se copian aqui.
 
@@ -142,7 +142,7 @@ no decia que se cierra el hueco pedido → receta de QC-60. `zone`, `complexity`
 
 ### QC-106 - acotada con `/afinar-feature` (2026-09-16)
 
-Alcance, **18 decisiones cerradas** —el leader escribio «17» por un error de conteo propio, que
+Alcance, **19 decisiones cerradas** —el leader escribio «17» por un error de conteo propio, que
 detecto `spec_author` al citarlas: la fila 18 es «Capas, borde e identificadores». Corregido en el
 board y en disco; no cambia ninguna decision— y **3 preguntas abiertas** —ninguna bloquea— en
 `.worktrees/QC-106-endpoint-de-carga-de-pdf/specs/QC-106-endpoint-de-carga-de-pdf/requirements.md`
