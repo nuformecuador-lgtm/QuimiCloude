@@ -1769,6 +1769,21 @@
       "branch": "feature/QC-117-menores-de-la-re-review-de-qc-95",
       "depends_on": [],
       "spec_path": "specs/QC-117-menores-de-la-re-review-de-qc-95"
+    },
+    {
+      "key": "QC-120",
+      "id": 120,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "rendimiento-de-la-receta",
+      "description": "Una receta debe guardar PARA QUE CANTIDAD esta escrita: su rendimiento. Hoy no lo guarda -el modelo Recipe tiene nombre, descripcion, pasos, lineas e imagen, y nada de cantidad-, y sin ese dato no se puede decir a cuanto equivale la receta respecto de lo que pide un pedido. NACE EL 2026-09-17 al escribir el spec de QC-63, que tiene como decision cerrada mostrar el factor -\"Pedido 250 L, receta para 100 L, x2,5\"- y al bajar a diseno se verifico que la mitad del dato NO EXISTE. QC-63 sale igualmente con una rama degradada. EL DATO ES CANTIDAD MAS UNIDAD, del catalogo de unidades (QC-32, QC-76). QUEDA ABIERTO: si es obligatorio, si se puede editar despues y que pasa con los pedidos que ya apuntan a la receta, si se muestra en el listado, y que se hace con las recetas existentes en la migracion. LO QUE NO ENTRA: encender el factor en la pantalla de ejecucion es de QC-63, que ya deja el sitio hecho; escalar las cantidades sigue descartado por decision cerrada de QC-63.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-120-rendimiento-de-la-receta",
+      "depends_on": [],
+      "spec_path": "specs/QC-120-rendimiento-de-la-receta"
     }
   ]
 }
