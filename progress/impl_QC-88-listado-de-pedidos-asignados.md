@@ -21,6 +21,7 @@
 | 4 | T6 | `8f4b8bf` |
 | 4 | T8 | `e61fbee` |
 | 4 | T9 | `46bb213` |
+| — | correccion post-gate del leader (guardia QC-87 + design.md) | `a09be8d` |
 
 **Quedan 8 tasks abiertas: T10-T16, T18** (la tanda de UI, ruta, menu y E2E — fuera del
 alcance de esta tanda de backend).
@@ -464,3 +465,44 @@ pnpm lint      -> VERDE (repetido tras el arreglo)
 - `[PA1]` ya esta cerrada (`/asignacion`, `ASSIGNED_ORDERS_ROUTE`/`ASSIGNED_ORDERS_LABEL`,
   `testId` `nav-asignacion`): T10-T16 pueden entrar directamente con ese valor, sin nueva
   pregunta al humano.
+
+## Correccion post-gate del leader, 2026-09-16 (commit `a09be8d`)
+
+`./init.sh --rapido` corrido por el leader sobre la Tanda 4 dio **un rojo legitimo**, invisible
+para el implementer porque `vitest related` no relaciona esa guardia con los archivos de T9
+—solo el gate completo la corre—, mas una inexactitud documental que el implementer no habia
+detectado al revisar el diff del subagente.
+
+1. **`tests/guards/guard-qc87-no-reimplementado.test.ts` (a), rojo.** La lista `ACCIONES`
+   -escrita a mano, comparada conjunto a conjunto contra lo que exporta de verdad
+   `order-assignment-actions.ts`- no incluia `listAssignedOrdersAction` (T9). Enmendada por el
+   MISMO criterio que T7 uso para la guardia de `asignaciones.consultar`: se anade la accion
+   nueva con nota fechada, **sin relajar la comparacion de conjunto a conjunto** -su valor esta
+   justo en que sea exacta-. Verificado que el resto de la guardia sigue mordiendo: **12/12
+   verdes** despues de la enmienda, incluidos los casos (b)/(b bis) que vigilan que la pantalla
+   no reimplemente una regla de QC-87.
+
+2. **`design.md:187` desactualizado, no un hallazgo de codigo.** Decia «Consultas por pagina: 4,
+   constantes» y enumeraba cuatro; `list-assigned-orders.ts` (T6) siempre hizo CINCO -se omitio
+   del conteo original la lectura de `people.findRefsIncludingDeletedInCompany`, los nombres
+   mostrables de los responsables-. **R14 se cumple igual**: exige numero CONSTANTE, no que sean
+   cuatro, y la quinta lectura es una sola llamada con ids deduplicados, igual que las otras
+   cuatro. Se corrigio el parrafo con nota fechada; **no se toco codigo**, porque el caso de uso
+   nunca estuvo mal.
+
+**Autocritica:** en el handback anterior el implementer afirmo «no encontre ningun choque entre
+`design.md` y la realidad del codigo». La inexactitud del conteo de consultas SI era ese choque
+y no se detecto en la revision del diff -la revision confirmo que el ORDEN de las 8 operaciones
+de `design.md > 5.1` se seguia al pie de la letra, pero no conto cuantas lecturas de puerto
+hacia el caso de uso contra el parrafo de `> 2.2`-. Queda anotado para que la proxima revision
+de un diff contra `design.md` incluya un conteo explicito de llamadas a puerto cuando el diseno
+declare un numero.
+
+Verificacion tras la correccion:
+```
+pnpm typecheck -> VERDE (sin salida)
+pnpm lint      -> VERDE (sin salida)
+pnpm exec vitest run tests/guards/guard-qc87-no-reimplementado.test.ts
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+```
