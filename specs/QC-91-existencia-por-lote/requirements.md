@@ -29,10 +29,8 @@ _Pendiente: los escribe spec_author (F1.2)._
 
 ## Preguntas abiertas
 
-1. **Alerta de un producto sin lotes.** Su existencia es 0 (decisión «Existencia de un producto sin
-   lotes»), pero no tiene lote más reciente y por tanto no tiene unidad contra la que comparar
-   (decisión «¿Contra qué se compara la cantidad de alerta?»). ¿Se marca cuando la alerta es mayor
-   que 0? No se decidió al acotar.
+**Ninguna.** La única que traía la acotación del 2026-09-15 —si un producto sin lotes marca la
+alerta— se cerró el **2026-09-17** por decisión humana y está abajo, en la tabla.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -55,3 +53,4 @@ _Pendiente: los escribe spec_author (F1.2)._
 | 2026-09-15 | Identificadores y borrado | Identificadores **en inglés**; borrado del producto **lógico**. Heredado de la **feature 4** y **QC-14**. Esta ficha no borra lotes |
 | 2026-09-15 | ¿Hace falta E2E? | **Sí**: es movimiento de inventario (`CHECKPOINTS.md`, heredado de **QC-90**). Mínimo: **agregar un segundo lote a un producto existente y ver subir su existencia en el listado**, lo que invierte la consecuencia que QC-90 aceptó |
 | 2026-09-15 | ¿Librería? | **Ninguna nueva** |
+| 2026-09-17 | ¿Un producto **sin lotes** marca la alerta de cantidad? | **Sí.** Su existencia es **0**, y 0 es menor que cualquier cantidad de alerta configurada, así que **se marca**. **No hace falta unidad para esta comparación**: la decisión «¿Contra qué se compara la cantidad de alerta?» fija la unidad para elegir *qué* existencia mirar, pero un producto sin lotes tiene una sola —0— y no hay ambigüedad que resolver. Si el producto **no tiene cantidad de alerta configurada**, no hay nada contra qué comparar y **no se marca**. Motivo: un producto sin lotes está **agotado**, que es exactamente lo que la alerta existe para avisar; callarla dejaría el caso más grave sin señal |
