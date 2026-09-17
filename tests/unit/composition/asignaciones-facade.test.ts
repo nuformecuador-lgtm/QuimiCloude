@@ -16,16 +16,49 @@ vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
 
 import { asignaciones } from '@/lib/composition';
 
-describe('QC-88 T8 — la fachada de `asignaciones` lista sus SEIS operaciones', () => {
-  it('expone las cinco anteriores mas `listAssignedOrders`, y ninguna mas', () => {
+describe('QC-88 T8 (censo crecido por QC-63, 2026-09-17) — la fachada de `asignaciones` lista sus NUEVE operaciones', () => {
+  // El censo CRECE, no se afloja: QC-63 anade las tres operaciones de la pantalla de ejecucion
+  // -`getAssignedOrderExecution`, `startAssignedOrder`, `finishAssignedOrder`- a las seis que ya
+  // habia. Siguen nombradas UNA A UNA y comparadas por igualdad exacta: una operacion futura que
+  // nadie declare aqui pone el caso en rojo, que es justo lo que este censo promete.
+  it('expone las seis anteriores mas las TRES de la ejecucion, y ninguna mas', () => {
     expect(Object.keys(asignaciones).sort()).toEqual([
       'assignResponsibles',
+      'finishAssignedOrder',
+      'getAssignedOrderExecution',
       'listAssignedOrders',
       'listOrderResponsibles',
       'listResponsiblesForOrders',
       'removeWorkGroupFromOrder',
+      'startAssignedOrder',
       'unassignResponsible',
     ]);
+  });
+
+  it('`getAssignedOrderExecution` rechaza sin `asignaciones.consultar` sin llegar a la base', async () => {
+    // Mismo criterio que los de abajo: con el cliente Prisma doblado a `{}`, un `unauthorized`
+    // demuestra a la vez que el cableado existe y que el permiso corta ANTES de ningun puerto.
+    const error = await asignaciones
+      .getAssignedOrderExecution({ id: 'u', companyId: 'c', permissions: [] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('`startAssignedOrder` rechaza sin `asignaciones.consultar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .startAssignedOrder({ id: 'u', companyId: 'c', permissions: [] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('`finishAssignedOrder` rechaza sin `asignaciones.consultar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .finishAssignedOrder({ id: 'u', companyId: 'c', permissions: [] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
   });
 
   it('`listResponsiblesForOrders` es una funcion de DOS argumentos: el actor y los identificadores', () => {

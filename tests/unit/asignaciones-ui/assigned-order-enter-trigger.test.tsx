@@ -5,7 +5,7 @@ import {
   ASSIGNED_ORDER_ENTER_REASON_TESTID,
   ASSIGNED_ORDER_ENTER_TESTID,
   AssignedOrderEnterTrigger,
-  assignedOrderEnterDisabledReason,
+  assignedOrderEnterNoticeText,
 } from '@/app/(private)/asignacion/components';
 import { assignedOrderRoute } from '@/lib/shared/routes';
 
@@ -30,23 +30,26 @@ describe('R22 - PENDIENTE: el disparador esta habilitado', () => {
   });
 });
 
-describe('R21 - EN_CURSO: el disparador esta deshabilitado y con su motivo', () => {
-  it('el disparador esta deshabilitado', () => {
+describe('R27 (QC-63, 2026-09-17; enmienda QC-88 R21) - EN_CURSO: el disparador ENTRA y avisa', () => {
+  it('es un enlace habilitado cuyo href deriva de assignedOrderRoute, no un boton deshabilitado', () => {
     render(<AssignedOrderEnterTrigger order={{ id: 'order-2', status: 'EN_CURSO' }} />);
 
     const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
-    expect(trigger).toBeDisabled();
+    expect(trigger.tagName).toBe('A');
+    expect(trigger).toHaveAttribute('href', assignedOrderRoute('order-2'));
+    expect(trigger).not.toBeDisabled();
+    expect(trigger).not.toHaveAttribute('aria-disabled', 'true');
   });
 
-  it('el motivo es VISIBLE en pantalla, no solo un `title` (R32)', () => {
+  it('el aviso es VISIBLE en pantalla, no solo un `title` (R32)', () => {
     render(<AssignedOrderEnterTrigger order={{ id: 'order-2', status: 'EN_CURSO' }} />);
 
     const reason = screen.getByTestId(ASSIGNED_ORDER_ENTER_REASON_TESTID);
     expect(reason).toBeVisible();
-    expect(reason).toHaveTextContent(assignedOrderEnterDisabledReason());
+    expect(reason).toHaveTextContent(assignedOrderEnterNoticeText());
   });
 
-  it('el motivo tiene su propio nombre accesible via aria-describedby, no solo title', () => {
+  it('el aviso tiene su propio nombre accesible via aria-describedby, no solo title', () => {
     render(<AssignedOrderEnterTrigger order={{ id: 'order-2', status: 'EN_CURSO' }} />);
 
     const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
@@ -64,6 +67,8 @@ describe('R21 - EN_CURSO: el disparador esta deshabilitado y con su motivo', () 
     unmount();
 
     render(<AssignedOrderEnterTrigger order={{ id: 'order-3', status: 'EN_CURSO' }} />);
-    expect(screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID)).toBeInTheDocument();
+    const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
+    expect(trigger).toBeInTheDocument();
+    expect(trigger).toHaveAttribute('href', assignedOrderRoute('order-3'));
   });
 });

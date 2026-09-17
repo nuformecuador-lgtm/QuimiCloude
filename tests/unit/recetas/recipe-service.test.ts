@@ -100,6 +100,7 @@ function montarCatalogoUnidades(overrides: Partial<UnitCatalog> = {}): UnitCatal
         factor: null,
       })),
     ),
+    findRefsSharingBaseInCompany: vi.fn<UnitCatalog['findRefsSharingBaseInCompany']>(async () => []),
     ...overrides,
   };
 }

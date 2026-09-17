@@ -197,6 +197,13 @@ export function assignedOrderRoute(id: string): string {
 }
 
 /**
+ * Nombre del parametro de consulta con el que la lista de pedidos asignados anuncia que uno
+ * acaba de entregarse: la pantalla de ejecucion vuelve a `ASSIGNED_ORDERS_ROUTE` con
+ * `?entregado=<numero>` y la lista pinta la confirmacion al aterrizar.
+ */
+export const DELIVERED_ORDER_PARAM = 'entregado';
+
+/**
  * Prefijos de URL que cuelgan de `app/(private)/` y, por tanto, exigen sesion valida (R1).
  *
  * `(private)` es un route group: **no aparece en la URL**, asi que el middleware no puede

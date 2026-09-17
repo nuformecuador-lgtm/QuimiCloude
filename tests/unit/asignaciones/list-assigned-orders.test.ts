@@ -122,7 +122,7 @@ function montar(options?: {
       listOrderIdsByUserInCompany,
     },
     orders: { findAliveById, listAliveSummariesByIds } as unknown as OrderCatalog,
-    recipes: { findRefsIncludingDeleted } as RecipeCatalog,
+    recipes: { findRefsIncludingDeleted } as unknown as RecipeCatalog,
     people: { findAliveRefsInCompany, findRefsIncludingDeletedInCompany },
     now: () => new Date('2026-09-16T10:00:00.000Z'),
   } as unknown as ListAssignedOrdersDeps;

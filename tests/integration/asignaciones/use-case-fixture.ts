@@ -71,6 +71,9 @@ import type { OrderCatalog } from '@/lib/modules/pedidos';
 const orders: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: listAliveOrderSummariesByIds,
+  transitionAliveById: async () => {
+    throw new Error('QC-87: los casos de uso de asignacion no escriben el estado del pedido');
+  },
 };
 
 export type UseCases = {

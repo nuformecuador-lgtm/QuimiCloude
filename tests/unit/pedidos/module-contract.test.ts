@@ -605,10 +605,17 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     )
 
     // Quien la CONSUME, y nadie mas: cancelar no pasa por aqui -es `cancelOrder` y su propio
-    // `NotCancellableError` (R28)- y borrar tampoco (R32).
+    // `NotCancellableError` (R28)- y borrar tampoco (R32). `order-catalog-prisma.ts` se sumo
+    // como tercer consumidor, DECISION explicita y no descuido: es el unico adaptador con
+    // permiso para escribir `status` fuera de `update-order.ts`, y su escritura tambien pasa
+    // por la misma guardia antes de tocar la fila.
     expect(
       pedidosSources.filter((file) => CONSUME_LA_GUARDIA.test(read(file))).map(etiqueta),
-    ).toEqual([DUENO, 'lib/modules/pedidos/domain/update-order.ts'])
+    ).toEqual([
+      'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
+      DUENO,
+      'lib/modules/pedidos/domain/update-order.ts',
+    ])
 
     for (const file of pedidosSources) {
       if (etiqueta(file) === DUENO) continue

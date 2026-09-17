@@ -1,4 +1,6 @@
 // lib/modules/recetas/domain/recipe-catalog.ts
+import type { RecipeStepView } from './recipe-view';
+
 /** Identificador de una receta visto DESDE FUERA de `recetas`. Es lo unico que otro modulo
  *  guarda de una receta (p. ej. `orders.recipe_id`). Anadido por QC-33; el modelo de QC-24 NO
  *  se toca (R5). */
@@ -34,4 +36,33 @@ export interface RecipeCatalog {
     ids: readonly RecipeId[],
     companyId: string,
   ): Promise<readonly RecipeRef[]>;
+
+  /** El contenido con el que se ejecuta una receta, INCLUIDA UNA DADA DE BAJA (viene con
+   *  `isDeleted: true`, nunca `null` por eso). `null` es solo «este id no existe» -y una
+   *  receta de OTRA empresa cuenta como si no existiera-. */
+  findExecutionContentById(
+    id: RecipeId,
+    companyId: string,
+  ): Promise<RecipeExecutionContent | null>;
 }
+
+/** Linea de receta tal como la ve la ejecucion: sin `id` propio, sin autoria, sin marcas de
+ *  tiempo. `productName` no lo resuelve este catalogo -`recetas` no conoce el nombre de un
+ *  producto, ese dato es de `inventario`-, asi que sale siempre `null`; quien orqueste la
+ *  pantalla lo completa con su propio `ProductCatalog`. */
+export type RecipeExecutionLine = {
+  readonly productId: string;
+  readonly productName: string | null;
+  readonly quantity: string;
+  readonly unitId: string;
+};
+
+/** Lo que hace falta para EJECUTAR una receta: pasos y lineas, y nada de lo que la pantalla no
+ *  pinta (ni `imageUrl`, ni autoria, ni marcas de tiempo). */
+export type RecipeExecutionContent = {
+  readonly id: RecipeId;
+  readonly name: string;
+  readonly isDeleted: boolean;
+  readonly steps: readonly RecipeStepView[];
+  readonly lines: readonly RecipeExecutionLine[];
+};

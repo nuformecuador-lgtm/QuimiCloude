@@ -1,7 +1,10 @@
 import { prisma } from '@/lib/shared/db/prisma';
 
-import type { RecipeId, RecipeRef } from '../../../domain/recipe-catalog';
+import { recipeStepSchema } from '../../../domain/recipe-input';
+
+import type { RecipeExecutionContent, RecipeId, RecipeRef } from '../../../domain/recipe-catalog';
 import type { RecipeScope } from '../../../domain/recipe-scope';
+import type { RecipeStepView } from '../../../domain/recipe-view';
 
 import { recipeCompanyScope } from './company-scope';
 
@@ -53,4 +56,72 @@ export async function findRecipeRefsIncludingDeleted(
   });
 
   return rows.map(toRecipeRef);
+}
+
+/**
+ * Valida cada elemento crudo del `Json` de `steps` contra el esquema del dominio y descarta el
+ * que no pasa, conservando el orden -mismo criterio de tolerancia que `recipe-prisma.ts`, pero
+ * repetido aqui en vez de importado: este adaptador no toca el repositorio interno de receta.
+ */
+function toExecutionSteps(steps: unknown): readonly RecipeStepView[] {
+  if (!Array.isArray(steps)) return [];
+
+  const parsed: RecipeStepView[] = [];
+  for (const step of steps) {
+    const result = recipeStepSchema.safeParse(step);
+    if (result.success) parsed.push(result.data);
+  }
+  return parsed;
+}
+
+type RecipeExecutionContentRow = {
+  readonly id: string;
+  readonly name: string;
+  readonly deletedAt: Date | null;
+  readonly steps: unknown;
+  readonly lines: ReadonlyArray<{
+    readonly productId: string;
+    readonly quantity: { toFixed(digits: number): string };
+    readonly unitId: string;
+  }>;
+};
+
+/** Fila de Prisma -> `RecipeExecutionContent`. Funcion pura, testeable sin base. */
+export function toRecipeExecutionContent(row: RecipeExecutionContentRow): RecipeExecutionContent {
+  return {
+    id: row.id,
+    name: row.name,
+    isDeleted: row.deletedAt !== null,
+    steps: toExecutionSteps(row.steps),
+    lines: row.lines.map((line) => ({
+      productId: line.productId,
+      productName: null,
+      quantity: line.quantity.toFixed(4),
+      unitId: line.unitId,
+    })),
+  };
+}
+
+/**
+ * Implementa `RecipeCatalog['findExecutionContentById']`. SIN `deleted_at IS NULL` en el
+ * `where`, a proposito: una receta dada de baja tiene que poder seguir ejecutandose, y la baja
+ * viaja en `isDeleted` -no se deduce por ausencia, como en `findRecipeRefsIncludingDeleted`-.
+ */
+export async function findRecipeExecutionContentById(
+  id: RecipeId,
+  companyId: string,
+): Promise<RecipeExecutionContent | null> {
+  const scope: RecipeScope = { companyId };
+  const row = await prisma.recipe.findFirst({
+    where: { AND: [recipeCompanyScope(scope), { id }] },
+    select: {
+      id: true,
+      name: true,
+      deletedAt: true,
+      steps: true,
+      lines: { select: { productId: true, quantity: true, unitId: true } },
+    },
+  });
+
+  return row === null ? null : toRecipeExecutionContent(row);
 }
