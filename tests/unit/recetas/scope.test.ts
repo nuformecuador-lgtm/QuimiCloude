@@ -211,8 +211,20 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
     // aprobado por el humano en T20. Verificado con `readdirSync` sobre `e2e/`
     // (no me fio de memoria): devuelve `aislamiento-recetas.spec.ts` PRIMERO -antes que
     // `recetas-pasos.spec.ts`-, asi que va al frente de la lista.
+    //
+    // AMPLIADA de nuevo el 2026-09-17 (QC-63, ejecutar-receta-operador): la lista pasa de TRES a
+    // CUATRO literales, y sigue siendo CERRADA -mismo criterio de siempre: un quinto spec de
+    // recetas sin ficha tiene que seguir poniendo esto en rojo, y por eso NO se convierte en
+    // `toContain` ni en un glob-. El spec que entra lo piden R29 y R30 de
+    // `specs/QC-63-ejecutar-receta-operador/requirements.md`. VERIFICADO antes de darlo de alta,
+    // no supuesto: ese spec NO pinta ni ejercita la pantalla de recetas -no navega a
+    // `FORMULAS_ROUTE` ni a `recipeEditRoute`; sus unicas navegaciones son `assignedOrderRoute` y
+    // `ASSIGNED_ORDERS_ROUTE`-. Aparece aqui porque EJECUTA la receta de un pedido asignado, que
+    // es el alcance de esa ficha: llega por `Order.recipeId`, nunca navegando el catalogo. El
+    // orden es el que devuelve `readdirSync`, asi que va SEGUNDO.
     expect(e2eMatches, `spec E2E de recetas inesperado: ${e2eMatches.join(', ')}`).toEqual([
       'aislamiento-recetas.spec.ts', // QC-50 / R31: E2E de aislamiento por empresa
+      'ejecucion-receta.spec.ts', // QC-63 / R29, R30: E2E de la ejecucion desde un pedido asignado
       'recetas-pasos.spec.ts', // QC-64 / R28: E2E del camino completo del editor y el asistente
       'recetas.spec.ts', // QC-26: E2E del CRUD de la pantalla de recetas
     ])

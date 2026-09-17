@@ -888,3 +888,67 @@ archivo se nombra, uno a uno—». Alta con nota fechada, igual que el precedent
 **Verificado antes de darlo de alta, no supuesto:** el E2E nuevo **no menciona** `request-id`,
 `x-request`, `reference` ni el identificador de petición (`grep` sin resultados), así que **el
 diferimiento de QC-71 R21 sigue INTACTO**. Si lo hubiera ejercitado, habría que haber parado.
+
+---
+
+## Dos censos MÁS, que solo ve la suite completa (2026-09-17)
+
+El `./init.sh` **completo** del humano salió rojo por **dos archivos que el `--rapido` no podía
+ver**: el grafo de imports no los relaciona con el cambio, y solo la suite entera los ejercita.
+**Es exactamente para lo que existe el gate completo.**
+
+```
+Test Files  2 failed | 515 passed (517)
+     Tests  2 failed | 7486 passed | 95 skipped (7583)
+rojos NUEVOS: tests/unit/recetas/scope.test.ts
+              tests/unit/shared/data-table-alcance.test.ts
+```
+
+Los dos los provoca el E2E nuevo, y los dos son **censos cerrados** que esta ficha hace crecer.
+
+### Verificación previa, la que decidía si esto era un censo o un desvío de alcance
+Antes de dar de alta el de `recetas/scope` se comprobó —**no se supuso**— que
+`e2e/ejecucion-receta.spec.ts` **NO pinta ni ejercita la pantalla de recetas**: no hay ninguna
+referencia a `FORMULAS_ROUTE`, `recipeEditRoute` ni `produccion` fuera de un comentario sobre el
+seed de roles, y **sus únicas navegaciones son `assignedOrderRoute` y `ASSIGNED_ORDERS_ROUTE`**.
+Aparece en ese censo porque **EJECUTA** la receta de un pedido asignado —alcance de la ficha, por
+`Order.recipeId`—, no porque navegue el catálogo. Si lo hubiera tocado, había orden de **parar**.
+
+### Cómo se crecieron: por nombre exacto, nunca por patrón
+- `tests/unit/recetas/scope.test.ts`: de **TRES a CUATRO** literales, con nota fechada en el estilo
+  del propio archivo. Sigue **CERRADA**: no se convierte en `toContain` ni en glob, y **un quinto
+  spec de recetas sin ficha vuelve a ponerla en rojo**. Va **segundo**, que es el orden real de
+  `readdirSync`.
+- `tests/unit/shared/data-table-alcance.test.ts`: de **QUINCE a DIECISÉIS**. Se tensó el centinela
+  en el nombre del caso y en el mensaje. Entra **cuarto**, por orden alfabético. No estrena pantalla
+  de tabla: llega a `data-table` por la **lista de pedidos asignados**, que ya la consumía.
+
+### Prueba por mutación — salida real
+Quitada la entrada nueva de cada uno, **los dos se ponen rojos**:
+
+```
+AssertionError: spec E2E de recetas inesperado: aislamiento-recetas.spec.ts,
+ejecucion-receta.spec.ts, recetas-pasos.spec.ts, recetas.spec.ts:
+expected [ 'aislamiento-recetas.spec.ts', …(3) ] to deeply equal [ 'aislamiento-recetas.spec.ts', …(2) ]
+
+AssertionError: solo estos dieciseis E2E pueden referenciar la tabla compartida (R36):
+expected [ …(16) ] to deeply equal [ …(15) ]
+
+Test Files  2 failed (2)
+     Tests  2 failed | 17 passed | 2 skipped (21)
+```
+
+Restaurados:
+
+```
+Test Files  2 passed (2)
+     Tests  19 passed | 2 skipped (21)
+```
+
+**Los dos afirmaban de verdad.** Ninguno se aflojó.
+
+### Salida real tras el tensado
+```
+pnpm typecheck → 0 errores
+vitest guard   → 43 passed | 504 tests, 9 skipped
+```
