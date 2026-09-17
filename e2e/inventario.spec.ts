@@ -656,7 +656,7 @@ test.describe('catalogo de productos', () => {
     await expect(toast).toContainText('Lote');
 
     const texto = await toast.textContent();
-    const lote = /Lote\s+(\S+)/.exec(String(texto))?.[1];
+    const lote = /Lote\s+(\S+?)\.?$/.exec(String(texto).trim())?.[1];
     expect(lote, 'el aviso debe nombrar un lote con un valor no vacio').toBeTruthy();
 
     // Lo genero el backend de verdad, no solo lo pinto la pantalla.
