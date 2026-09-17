@@ -1438,15 +1438,10 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.getByTestId('product-field-expiryDate')).toHaveValue('2027-03-15');
   });
 
-  it('el alta rechaza el envío sin fecha de compra (R3)', async () => {
-    // MEDIDO EN DISCO antes de escribir este caso: `purchaseDateSchema` es `.nullish()` en
-    // `lib/modules/inventario/domain/product-batch-input.ts` y `resolverFechaDeCompra`
-    // (`create-product.ts`) devuelve "hoy" cuando no llega nada -comportamiento HEREDADO de
-    // QC-81 que `design.md` marca como "no se reabre"-. O sea: el esquema compartido (R8) NUNCA
-    // rechaza una fecha de compra ausente, la sustituye. Por eso R3 no se cumple con un mensaje
-    // de "obligatorio" que salga del `safeParse` -no existe-, sino por CONSTRUCCION: este panel
-    // no ofrece ninguna via para enviar el alta sin que el campo lleve ya un valor. Lo que se
-    // prueba aqui es esa garantia estructural, no un rechazo de esquema.
+  it('el panel de alta nunca permite enviar sin fecha de compra escrita (R3)', async () => {
+    // R3 exige que el panel nunca permita un envio sin fecha de compra -el campo no admite
+    // quedar vacio-; si la fecha no llega a la Server Action, el servidor la sustituye por hoy
+    // (heredado de QC-81), lo cual no es un rechazo.
     const user = setupUser();
 
     await renderPantalla();
