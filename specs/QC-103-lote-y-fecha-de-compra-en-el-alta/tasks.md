@@ -31,7 +31,7 @@ corre una sola vez al final, antes del PR (regla 5 de `CLAUDE.md`).
       exista o se confirme vigente: `createProduct rechaza sin el permiso inventario.modificar
       (R10)`.
 
-- [ ] **T4.** `lib/modules/inventario/adapters/driving/product-actions.ts`: ampliar
+- [x] **T4.** `lib/modules/inventario/adapters/driving/product-actions.ts`: ampliar
       `CreateProductFormState` con `lot: string` en la rama `success`, y `createProductAction`
       desestructura y devuelve `lot`.
       **Hecho cuando**: test unitario `createProductAction devuelve el lote en el estado de éxito
@@ -49,7 +49,7 @@ corre una sola vez al final, antes del PR (regla 5 de `CLAUDE.md`).
       la fecha de hoy seleccionada (R2)`, `el campo de fecha de compra no permite elegir un día
       futuro (R5)`— pasan con Testing Library.
 
-- [ ] **T6.** Depende de T5. En `product-form.tsx`: añadir `'purchaseDate'` a `BATCH_FIELDS`,
+- [x] **T6.** Depende de T5. En `product-form.tsx`: añadir `'purchaseDate'` a `BATCH_FIELDS`,
       `FIELD_MESSAGES.purchaseDate`, `FIELD_LABELS.purchaseDate`, montar
       `ProductBatchDateField` junto a los demás campos del lote (solo en el alta, R9), y añadir
       `purchaseDate: readOptionalText(values.purchaseDate)` al objeto que valida

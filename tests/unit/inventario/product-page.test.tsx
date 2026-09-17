@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import PrivateLayout from '@/app/(private)/layout';
 import InventarioPage from '@/app/(private)/inventario/page';
 import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
+import { formatDateLocalISO } from '@/components/shared/data-table/data-table-filter-date';
 import {
   PRESENTATION_UNIT_ERROR_TESTID,
   PRESENTATION_UNIT_FIELD,
@@ -458,7 +459,7 @@ beforeEach(() => {
   listPresentationsActionMock.mockResolvedValue(
     paginaDePresentaciones([PRESENTACION_A, PRESENTACION_B]),
   );
-  createProductActionMock.mockResolvedValue({ status: 'success', id: crypto.randomUUID() });
+  createProductActionMock.mockResolvedValue({ status: 'success', id: crypto.randomUUID(), lot: '1' });
   updateProductActionMock.mockResolvedValue({ status: 'success' });
   deleteProductActionMock.mockResolvedValue({ status: 'success' });
   createPresentationActionMock.mockResolvedValue({ status: 'success', id: PRESENTACION_NUEVA.id });
@@ -1346,6 +1347,78 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.getByTestId('product-field-expiryDate')).toHaveValue('2027-03-15');
   });
 
+  it('el alta rechaza el envío sin fecha de compra (R3)', async () => {
+    // MEDIDO EN DISCO antes de escribir este caso: `purchaseDateSchema` es `.nullish()` en
+    // `lib/modules/inventario/domain/product-batch-input.ts` y `resolverFechaDeCompra`
+    // (`create-product.ts`) devuelve "hoy" cuando no llega nada -comportamiento HEREDADO de
+    // QC-81 que `design.md` marca como "no se reabre"-. O sea: el esquema compartido (R8) NUNCA
+    // rechaza una fecha de compra ausente, la sustituye. Por eso R3 no se cumple con un mensaje
+    // de "obligatorio" que salga del `safeParse` -no existe-, sino por CONSTRUCCION: este panel
+    // no ofrece ninguna via para enviar el alta sin que el campo lleve ya un valor. Lo que se
+    // prueba aqui es esa garantia estructural, no un rechazo de esquema.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    // Nada mas abrir el panel, sin tocar el calendario, el espejo oculto ya lleva una fecha civil
+    // completa (R2): no hay un estado "en blanco" intermedio que el usuario pueda enviar.
+    expect(screen.getByTestId('product-batch-date-value')).toHaveValue(
+      formatDateLocalISO(new Date()),
+    );
+
+    // El disparador es un BOTON que abre un calendario, no un campo de texto: no existe ningun
+    // control -ni "borrar", ni "limpiar"- capaz de dejarlo vacio. Abrir y cerrar el popover SIN
+    // elegir nada no cambia lo que hay listo para enviarse.
+    await user.click(screen.getByTestId('product-field-purchaseDate'));
+    await user.keyboard('{Escape}');
+    expect(screen.getByTestId('product-batch-date-value')).toHaveValue(
+      formatDateLocalISO(new Date()),
+    );
+
+    await rellenarFormulario(user);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+    const enviado = createProductActionMock.mock.calls[0][1];
+    // Lo que de verdad se envio nunca fue una cadena vacia.
+    expect(enviado.get('purchaseDate')).not.toBe('');
+  });
+
+  it('el alta de producto envía la fecha de compra elegida como YYYY-MM-DD (R4)', async () => {
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user);
+
+    // R2: el disparador ya muestra "hoy" -es lo elegido- antes de tocar el calendario.
+    const elegida = screen.getByTestId('product-field-purchaseDate').textContent?.trim() ?? '';
+    expect(elegida).toBe(formatDateLocalISO(new Date()));
+
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+
+    const enviado = createProductActionMock.mock.calls[0][1];
+    expect(enviado.get('purchaseDate')).toBe(elegida);
+  });
+
+  it('la edición no muestra el campo de fecha de compra (R9)', async () => {
+    const user = setupUser();
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()]));
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await screen.findByTestId(testId.formulario);
+
+    expect(screen.queryByTestId('product-field-purchaseDate')).toBeNull();
+    expect(screen.queryByTestId('product-batch-date-value')).toBeNull();
+  });
+
   it('los campos con ayuda la ofrecen en la etiqueta y la muestran al pasar por encima', async () => {
     // El formulario perdio tres campos el 2026-09-03 y gano una ayuda por campo en su lugar.
     // Se vigilan las tres cosas que pueden romperse en silencio:
@@ -1373,6 +1446,33 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
     // Pedir ayuda no envia el formulario.
     expect(createProductActionMock).not.toHaveBeenCalled();
+  });
+
+  it('el campo lote explica que un valor vacío lo asigna el sistema (R6)', async () => {
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    const ayuda = screen.getByTestId('product-helper-lot');
+    await user.hover(ayuda);
+
+    const texto = await screen.findByTestId('product-helper-text-lot', {}, { timeout: 3_000 });
+    expect(texto).toHaveTextContent('Déjalo vacío para que el sistema lo asigne.');
+  });
+
+  it('el campo lote sigue siendo un input de texto opcional (R7)', async () => {
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    const campo = screen.getByTestId('product-field-lot');
+    expect(campo).toHaveAttribute('type', 'text');
+    expect(campo).not.toHaveAttribute('required');
+    expect(campo).toHaveValue('');
   });
 
   it('el formulario no captura la unidad, y el alta viaja sin ella (QC-80, R21)', async () => {
