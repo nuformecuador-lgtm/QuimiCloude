@@ -733,7 +733,7 @@ caso ademas no es ni siquiera una instalacion de esta ficha).
 | R31 | tamanos 10/25 de `lib/shared/pagination`, en la cadena de consulta | `assigned-orders-list-params.test.ts` |
 | R32 | tactil >=44x44, sin `:hover` unico, sin `100vh` | `a11y-tactil.test.tsx` |
 | R33 | contrato de ruta equivalente al de `/pedidos` | `assigned-orders-route-contract.test.ts` (calcado completo) |
-| R34 | aterrizaje del Operador actualizado, tests que lo afirman | `e2e/permisos.spec.ts` (paso 2) + `guard-e2e-landing.test.ts` |
+| R34 | aterrizaje del Operador actualizado, tests que lo afirman | `e2e/permisos.spec.ts` (paso 2) + `guard-e2e-landing.test.ts` + `tests/unit/app-sidebar.test.tsx` (censo de `PRIVATE_NAV_ITEMS`, ocho -> nueve, `nav-asignacion` nombrado) + `tests/unit/e2e-helpers/landing.test.ts` (`landingRouteForPermissions` del Operador: `INVENTORY_ROUTE` -> `ASSIGNED_ORDERS_ROUTE`) |
 | R35 | guardias de menu/permisos tensadas, no relajadas | `guard-nav-permisos-declarados.test.ts` + `private-layout-menu.test.tsx` (ambas subieron su numero Y nombraron el enlace) |
 | R36 | `asignaciones.consultar` legitimo SOLO en el caso de uso nuevo | `tests/unit/asignaciones/module-contract.test.ts` (regla e, caso QC-88 con sus tres portazos) |
 | R37 | nadie fuera de `adapters/driven/**` consulta `prisma.orderAssignment`; sin `include` | `order-assignment-repository.test.ts` + `guard-lote-sin-join.test.ts` |

@@ -461,7 +461,7 @@ describe('el borrado de items de relleno (QC-13)', () => {
     }
   });
 
-  it('PRIVATE_NAV_ITEMS tiene exactamente siete entradas de nivel superior en orden', () => {
+  it('PRIVATE_NAV_ITEMS tiene exactamente nueve entradas de nivel superior en orden', () => {
     // R5. AMPLIADO el 2026-09-04 (QC-44 T2, R4): la CUARTA entrada es la pantalla de proveedores,
     // item de nivel superior de la seccion «Cadena» -hermano del grupo de produccion, no hijo
     // suyo-. El centinela no se relaja: sigue exigiendo la lista exacta y su orden, asi que una
@@ -497,10 +497,20 @@ describe('el borrado de items de relleno (QC-13)', () => {
     // OCHO y sigue exigiendo la lista exacta y su orden, asi que una novena entrada sin ficha que
     // la respalde lo vuelve a poner en rojo. El destino, la etiqueta y el permiso del item nuevo
     // los afirma `tests/unit/configuracion-ui/private-nav-usuarios.test.ts` sobre `USERS_ROUTE` y
-    // `USERS_LABEL`, nunca sobre el literal del copy.
-    expect(PRIVATE_NAV_ITEMS).toHaveLength(8);
+    // TENSADO el 2026-09-16 (QC-88 T11, R3/R35): la entrada nueva es la pantalla de pedidos
+    // asignados («Asignación»), item de nivel superior de la seccion «Operación» colocado ENTRE
+    // Dashboard e Inventario -no al final-, porque ese orden es el requisito (`design.md > 7.2`,
+    // H3 de `spec_author`): cambia el aterrizaje de quien no tiene `dashboard.consultar` -el
+    // Operador del seed- sin tocar el del Administrador, que sigue aterrizando en `/dashboard`.
+    // El ancla se TENSA, nunca se afloja: sube de OCHO a NUEVE y sigue exigiendo la lista exacta
+    // y su orden, asi que una decima entrada sin ficha que la respalde lo vuelve a poner en rojo.
+    // El destino, la etiqueta y el permiso del item nuevo los afirma
+    // `tests/unit/asignaciones-ui/assigned-orders-route-contract.test.ts` sobre
+    // `ASSIGNED_ORDERS_ROUTE` y `ASSIGNED_ORDERS_LABEL`, nunca sobre el literal del copy.
+    expect(PRIVATE_NAV_ITEMS).toHaveLength(9);
     expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).toEqual([
       'nav-dashboard',
+      'nav-asignacion',
       'nav-inventario',
       'nav-pedidos',
       'nav-produccion',
