@@ -3,8 +3,9 @@
 > Spec aprobado por el humano el 2026-09-16 (F1.4). Rama
 > `feature/QC-103-lote-y-fecha-de-compra-en-el-alta`, worktree propio.
 > **T1-T11 cerradas, con el E2E de R17 en verde** tras dos arreglos autorizados por el humano
-> sobre helpers preexistentes (`566d122`, `ebdb21a`, detalle en §4). T12 (gate completo `./init.sh`)
-> lo cierra el leader.
+> sobre helpers preexistentes (`566d122`, `ebdb21a`, detalle en §4). **Primera review RECHAZADA**
+> (2 bloqueantes, 2 menores) el 2026-09-17; los 4 hallazgos ya están cerrados, ver §8. T12 (gate
+> completo `./init.sh`) lo cierra el leader.
 
 ## 1. Lo que se construyó
 
@@ -58,7 +59,7 @@ e2e/inventario.spec.ts                                    (T10: R14, R17)
 | --- | --- | --- |
 | R1 | Campo fecha de compra distinto de vencimiento | Cubierto por el conjunto de tests de `ProductBatchDateField` como componente propio, separado de `expiryDate` (no tocado) — `tests/unit/inventario/product-batch-date-field.test.tsx` |
 | R2 | Hoy por defecto | `el campo de fecha de compra abre con la fecha de hoy seleccionada (R2)` — `product-batch-date-field.test.tsx` |
-| R3 | Obligatorio, rechaza envío sin fecha | `el alta rechaza el envío sin fecha de compra (R3)` — `product-page.test.tsx`. Nota de diseño encontrada en implementación: el esquema compartido (`purchaseDateSchema`, `.nullish()`) nunca rechaza una fecha ausente, la sustituye por "hoy" en el servidor (heredado de QC-81, `design.md` lo marca "no se reabre"). R3 se cumple por construcción del widget: el disparador es un botón sin vía de "vaciar", así que la UI nunca permite enviar sin fecha; el test prueba esa garantía estructural, no un rechazo de `safeParse` |
+| R3 | **Enmendado el 2026-09-17 (D10, aprobado por el humano tras B2 de la review).** El panel de alta nunca permite un envío sin fecha de compra; si la fecha no llega a la Server Action, el servidor la sustituye por hoy — no es un rechazo | `el panel de alta nunca permite enviar sin fecha de compra escrita (R3)` — `product-page.test.tsx` (garantía de la UI: el campo no admite quedar vacío); heredado de QC-81 para la mitad de servidor: `pasa al puerto la fecha civil UTC del now inyectado, y el MISMO instante como now` en `create-product.test.ts` prueba que, sin `purchaseDate`, el dominio sustituye por hoy en vez de rechazar |
 | R4 | Escribe/lee con calendario, viaja como YYYY-MM-DD | `el alta de producto envía la fecha de compra elegida como YYYY-MM-DD (R4)` — `product-page.test.tsx` |
 | R5 | No permite seleccionar día futuro | `el campo de fecha de compra no permite elegir un día futuro (R5)` — `product-batch-date-field.test.tsx` |
 | R6 | Ayuda: vacío = lo asigna el sistema | `el campo lote explica que un valor vacío lo asigna el sistema (R6)` — `product-page.test.tsx` |
@@ -141,7 +142,9 @@ que se tocó. Queda como deuda preexistente sin resolver, tal como estaba docume
 - R3 se interpretó "por construcción" en vez de como un rechazo de `safeParse`, porque el esquema
   compartido nunca rechaza una fecha de compra ausente (la sustituye por "hoy", comportamiento
   heredado de QC-81 y explícitamente "no se reabre" en `design.md`). No se tocó el esquema.
-  Documentado en el propio test y en el mapa de arriba (R3).
+  **Superado por la enmienda formal del 2026-09-17 (§8): esta interpretación resultó correcta en
+  el diagnóstico pero era una decisión que no le tocaba al implementer; el humano la convirtió en
+  enmienda aprobada (D10) tras el rechazo de la review.**
 - Los mocks del puerto `ProductRepository` en tres archivos de test que no forman parte de las
   tasks (`product-service.test.ts`, `authorization.test.ts`, `company-isolation-service.test.ts`)
   se ampliaron con `lot` porque implementan el puerto completo con tipado estricto y el cambio de
@@ -166,3 +169,53 @@ antes de soltar el stash, sin pérdida (confirmado byte a byte contra el commit 
 un reset a `HEAD` no explicado revirtió brevemente trabajo sin commitear de ambos agentes; se
 recreó y se commiteó sin pérdida neta, pero el origen del reset no se identificó — queda señalado
 para el leader por si se repite en una tanda más larga.
+
+## 8. Primera review — RECHAZADA (2026-09-17), 4 hallazgos, todos cerrados
+
+`progress/review_QC-103-lote-y-fecha-de-compra-en-el-alta.md` rechazó la ficha con 2 bloqueantes
+(B1, B2) y 2 menores (m1, m2). Lo funcional se dio por bien construido y bien probado; el rechazo
+fue por dos motivos distintos, ya resueltos:
+
+### B2 — R3 no lo cumplía el sistema, solo la UI (bloqueante)
+La review encontró que la interpretación "por construcción del widget" (§5) era un diagnóstico
+correcto pero una decisión que no le tocaba al implementer: reinterpretaba un requisito aprobado
+sin que el humano lo hubiera decidido así. **El humano enmendó R3 el 2026-09-17** (commit
+`0088fb3`): añadida la fila D10 a la tabla de decisiones cerradas de `requirements.md`, con fecha,
+y una nota de enmienda bajo el propio R3, dejando explícito que la obligatoriedad se cumple en el
+panel de alta (nunca permite un envío vacío) y que la Server Action sigue sustituyendo por hoy si
+la fecha no llega — no es un rechazo. No se tocó `purchaseDateSchema` ni `resolverFechaDeCompra`.
+El test de R3 se renombró de `el alta rechaza el envío sin fecha de compra (R3)` a
+`el panel de alta nunca permite enviar sin fecha de compra escrita (R3)`, con su comentario de
+cabecera simplificado para afirmar la enmienda en vez de justificar una desviación (commit
+`9a83151`). Mapa actualizado en §3.
+
+### B1 — comentarios nuevos citaban la ficha (QC-nn) en código de producción y E2E (bloqueante)
+Cinco líneas nuevas de esta rama citaban `QC-103` o `QC-80`/`QC-81` en comentarios de bloque
+(no en nombres de test, donde sí vale `R<n>`): dos docblocks en
+`lib/modules/inventario/ports/product-repository.ts` (commit `02b603d`), y tres comentarios en
+`e2e/inventario.spec.ts`/`e2e/proveedores.spec.ts` (commit `d332705`). Reescritos para decir QUÉ
+exige la regla en vez de QUÉ ficha la trajo, conservando todos los `(R<n>)`.
+
+### m1 — comentario preexistente QC-71 en product-form.tsx, movido sin limpiar (menor)
+El archivo se tocó a fondo en esta rama (T6-T8), así que entró en la limpieza: las cinco
+apariciones de `QC-71` en `product-form.tsx` se reescribieron sin la cita a la ficha, conservando
+sus `(R<n>)` (commit `d332705`, misma tanda que B1).
+
+### m2 — deuda del arnés, no del implementer
+`docs/conventions.md` sigue sin una sección de Comentarios que respalde esta regla por escrito.
+Queda para el leader, tal como el propio informe de review lo señala.
+
+### Verificación tras los 4 arreglos
+- `pnpm typecheck`: limpio en las tres tandas de arreglo.
+- `pnpm exec eslint` sobre todos los archivos tocados: limpio.
+- `pnpm exec vitest related --run` sobre los archivos de producción y test tocados: verde
+  (8 archivos / 173 passed / 3 skipped en la tanda de backend; 5 archivos / 104 passed en la
+  tanda de frontend).
+- `pnpm exec vitest run guard`: 43 archivos, 480 passed, 9 skipped — verde, sin cambios.
+- **E2E vuelto a correr tras tocar los dos archivos de E2E** (no se dio por hecho que "solo son
+  comentarios"): `pnpm exec playwright test e2e/inventario.spec.ts -g "R14, R17" --project=chromium`
+  → `1 passed`. Sigue verde.
+
+Commits de este round, todos con `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`:
+`02b603d` (B1 backend), `d332705` (B1 E2E + m1), `9a83151` (test R3 por la enmienda),
+`0088fb3` (enmienda D10 en `requirements.md`).
