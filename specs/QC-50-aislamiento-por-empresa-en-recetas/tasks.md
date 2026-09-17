@@ -191,7 +191,7 @@
   Depende de: T0.
   Cubre: el gate; sin esto la guardia da rojo.
 
-- [ ] **T16 — `E2E_ESPERADOS` de la guardia de QC-71.** `[P]`
+- [x] **T16 — `E2E_ESPERADOS` de la guardia de QC-71.** `[P]`
   Archivos: `tests/guards/guard-identificador-de-request.test.ts` (`:57-94`).
   Contenido: añadir `'aislamiento-recetas.spec.ts'` con su comentario, con el mismo patrón que
   `aislamiento-pedidos.spec.ts` (`:59-67`), diciendo qué recorrido ejercita y que **no** ejercita el
@@ -207,7 +207,7 @@
   Depende de: T0.
   Cubre: R2 (por ausencia de cambio en las líneas).
 
-- [ ] **T18 — El censo de E2E de recetas, que es la lista que QC-60 no tuvo que mirar.** `[P]`
+- [x] **T18 — El censo de E2E de recetas, que es la lista que QC-60 no tuvo que mirar.** `[P]`
   Archivos: `tests/unit/recetas/scope.test.ts` (`:200-203`), y
   `tests/integration/aislamiento.json`.
   Contenido: (a) el `toEqual` cerrado de specs de recetas pasa de dos a **tres** literales —
@@ -228,16 +228,26 @@
 
 ## Bloque 4 — Pruebas
 
-- [ ] **T20 — E2E de aislamiento.** **(E2E — Playwright)**
+- [x] **T20 — E2E de aislamiento.** **(E2E — Playwright)**
   Archivos: `e2e/aislamiento-recetas.spec.ts` (nuevo), con el patrón de
   `e2e/aislamiento-inventario.spec.ts` y `e2e/aislamiento-pedidos.spec.ts`: fixture propio, prefijo por
   worker, limpieza defensiva, **una sola sesión real** (la de A) y los datos de B sembrados con Prisma;
   el aterrizaje del login sale del helper único de QC-93, nunca de una ruta escrita a mano.
   Contenido: login por la UI como usuario de A; la pantalla de recetas no contiene la receta de B
-  (aserción sobre el HTML servido); se abre el diálogo de borrado de una receta **propia** y se
-  sustituye por DOM el identificador por el de la receta **de B**, se confirma, se espera el mensaje de
-  error y se comprueba con Prisma que la receta de B sigue con `deleted_at` nulo; y un alta en A con el
-  **mismo nombre** que la receta de B se completa sin error.
+  (aserción sobre el HTML servido); **se navega a la URL del detalle de una receta de B**
+  (`/produccion/formulas/<id ajeno>`) y se afirma que no se ve —sale el estado `recipe-not-found`, el
+  formulario de edición no se pinta y el nombre de la receta de B no aparece en el HTML—, que el
+  resultado es **idéntico** al de un identificador inexistente, y se comprueba con Prisma que la
+  receta de B sigue con `deleted_at` nulo; y un alta en A con el **mismo nombre** que la receta de B
+  se completa sin error.
+
+  > **Enmienda — 2026-09-16, decisión humana.** Este paso decía «se abre el diálogo de borrado de una
+  > receta **propia** y se sustituye por DOM el identificador por el de la receta **de B**». Eso es
+  > **imposible** en esta UI y por eso se cambió: el diálogo de recetas pasa `recipe.id` desde el
+  > **cierre de React** (`delete-recipe-dialog.tsx:58`), no desde un **campo oculto** como los de
+  > QC-49 y QC-60 (`delete-product-dialog.tsx:106`, `delete-order-dialog.tsx:128`), así que no hay
+  > ningún nodo del DOM que reescribir. Añadírselo habría sido tocar un componente, que
+  > `design.md > 14` prohíbe. El detalle del porqué, en `design.md > 8.2`.
   Depende de: T8, T12.
   Hecho cuando: pasa en Chromium **y** en WebKit, y el fixture deja la base como la encontró.
   Cubre: R31, y ejercita R10, R15, R16, R17 de extremo a extremo.
@@ -310,7 +320,7 @@
 
 ## Bloque 5 — Cierre
 
-- [ ] **T27 — Documentación de la deuda saldada.**
+- [x] **T27 — Documentación de la deuda saldada.**
   Archivos: `docs/architecture.md > Dominio` (quitar `recetas` de la lista de deuda registrada, si
   figura, dejando el resto intacto); `db/schema.prisma` (`///` de `Recipe` y de `RecipeLine`: el índice
   único es por empresa, la FK nueva es drift, y la línea **no** lleva empresa a propósito);

@@ -6,41 +6,43 @@
 
 ## Estado
 
-**24 de las 29 tasks cerradas. T20 (E2E) BLOQUEADA** por una contradicción entre el
-`design.md` y la UI real — ver `## El bloqueo de T20`. En consecuencia quedan también
-abiertas **T16** y **T18** —su parte (b), el censo de `aislamiento.json`, sí está hecha; falta
-(a), el censo de specs—, el cierre documental de
-**T27** y el gate completo **T28**.
+**Las 29 tasks cerradas. Los 33 requisitos con test.**
 
-**32 de los 33 requisitos tienen test.** El único sin test es **R31**, que *es* el E2E.
+T20 estuvo bloqueada y se desbloqueó por **decisión humana del 2026-09-16**: el acceso cruzado se
+prueba **por la URL del detalle**, no por DOM. Ver `## T20: por qué el molde no servía`.
 
-## El bloqueo de T20 — para decisión del leader
+## T20: por qué el molde no servía, y qué se hace en su lugar
 
-`tasks.md` T20 y `design.md > 8.2` prescriben el recorrido: «se abre el diálogo de borrado de
-una receta **propia** y **se sustituye por DOM** el identificador por el de la receta de B».
-Ese gesto es **imposible en la UI actual de recetas**, y no por un descuido del E2E:
+`tasks.md` T20 y `design.md > 8.2` prescribían «se abre el diálogo de borrado de una receta
+**propia** y **se sustituye por DOM** el identificador por el de la receta de B». **Ese gesto no
+existe en esta UI**:
 
-- El molde funciona en inventario y pedidos porque **su diálogo lleva un campo oculto** con el
-  id, que viaja en el `FormData`:
-  `app/(private)/inventario/components/delete-product-dialog.tsx:106` y el equivalente de
-  pedidos (`delete-order-dialog.tsx:128`, `type="hidden"`).
-- `app/(private)/produccion/formulas/components/delete-recipe-dialog.tsx:58` hace
-  `await deleteRecipeAction(recipe.id)`: el id sale del **cierre de React**, no del DOM. **No
-  existe ningún nodo cuyo `value` reescribir** para que el cambio llegue al servidor.
+- QC-49 y QC-60 funcionan porque su diálogo lleva un **campo oculto** con el id, que viaja en el
+  `FormData` (`delete-product-dialog.tsx:106`, `delete-order-dialog.tsx:128`): reescribir ese nodo
+  cambia de verdad lo que recibe el servidor.
+- `delete-recipe-dialog.tsx:58` hace `await deleteRecipeAction(recipe.id)` con el id tomado del
+  **cierre de React**. **No hay ningún nodo del DOM que reescribir.** Añadírselo habría sido tocar
+  un componente, que `design.md > 14` prohíbe.
 
-Las salidas posibles, ninguna elegible por el implementer:
+**Lo que se hace en su lugar** (decisión humana, 2026-09-16): con sesión en A, **navegar a
+`/produccion/formulas/<id de una receta de B>`**. No es un apaño: pegar un enlace que alguien te
+pasó es un gesto real, y **cierra también la escritura**, porque `EditarRecetaPage` es el único
+sitio que monta `RecipeForm` en modo edición con datos precargados —si `getRecipeAction` no acotara
+por empresa, ahí se pintaría el formulario de B relleno y listo para enviar—.
 
-1. **Dar al diálogo de recetas el campo oculto** que ya tienen inventario y pedidos. Choca de
-   frente con `design.md > 14` («No se toca ningún componente (R32)»).
-2. **Invocar la Server Action con el id de B** desde el test. Cubre R31 al pie de la letra
-   («conociendo su identificador») y modela mejor la amenaza real, pero **deja de ser el gesto
-   sobre la UI** que el design pide.
-3. **Redefinir el recorrido** del paso 3 a algo fiel a esta UI y documentar por qué difiere del
-   molde.
+Se enmendaron, con fecha y motivo, `design.md > 8.2` y T20 de `tasks.md`. **Ningún punto del spec
+sigue afirmando que se sustituye el identificador por DOM.**
 
-No se eligió ninguna por cuenta propia: el `design.md` está aprobado y esto lo decide el leader
-o el humano. Los pasos 1, 2 y 4 del recorrido (listado que no muestra la receta de B; alta en A
-con el mismo nombre que una de B) **sí** son viables tal cual.
+### El id ajeno se comporta EXACTAMENTE igual que el inexistente
+
+Verificado primero en el código y después **empíricamente** en el E2E. `get-recipe.ts:35-36` hace
+`findAliveById(id, scope)` —ya acotado— y, si devuelve `null`, lanza `RecipeNotFoundError`: el
+mismo error, para el ajeno y para el inexistente. La página lo traduce a `recipe_not_found` y pinta
+el estado `recipe-not-found`, **sin** `notFound()` ni redirección. El E2E compara los dos casos y
+afirma que **el texto del mensaje y el `href` del enlace son literalmente iguales**.
+
+Eso es lo que prueba que **no hay oráculo de existencia**: sondear identificadores no le enseña a
+una empresa qué recetas tienen las demás. No hubo hallazgo que reportar.
 
 ## Archivos creados
 
@@ -62,6 +64,7 @@ con el mismo nombre que una de B) **sí** son viables tal cual.
 - `tests/unit/pedidos/update-order.test.ts`
 - `tests/integration/recetas/company-scope.int.test.ts`
 - `tests/integration/recetas/company-scope-queries.int.test.ts`
+- `e2e/aislamiento-recetas.spec.ts`
 
 ## Archivos modificados
 
@@ -122,6 +125,14 @@ borraron los tres párrafos que anunciaban la excepción (`product-catalog-prism
 `inventario/.../company-scope.ts`, `unidades/.../unit-prisma.ts`). **Ningún archivo del repo
 sigue diciendo que esa costura está sin ámbito.** Esta ficha **no crea ninguna excepción nueva.**
 
+Y se **borró la maquinaria entera**: la constante, la rama que la comprobaba y el párrafo que
+justificaba conservarla vacía. Con la lista vacía esa rama era **código muerto** —no se ejecutaba
+nunca— y `docs/architecture.md` es explícito: «**No se prepara infraestructura "por si acaso"**».
+Es **tensar, no relajar**: antes existía una puerta, aunque estuviera cerrada; ahora **no existe la
+puerta**, y ninguna función sin ámbito tiene por dónde escaparse. Comprobado en vivo quitando el
+`scope: InventoryScope` de una función real: la guardia se pone roja en sus dos describes, y `lib/`
+quedó intacto byte a byte tras deshacerlo.
+
 ## El punto que más vigilancia pedía
 
 El índice único del nombre es **PARCIAL** (`WHERE "deleted_at" IS NULL`), a diferencia del de
@@ -171,11 +182,11 @@ receta dejaría su nombre ocupado para siempre **y ningún test lo diría**. Est
 | R28 | `tests/unit/recetas/authorization.test.ts` + `company-isolation-service.test.ts` (dobles **explosivos**: el permiso se exige antes de tocar ningún puerto) | unit | verde |
 | R29 | `company-scope.int.test.ts` (empresa de baja conserva recetas y líneas) | integración | verde |
 | R30 | `company-scope-queries.int.test.ts` (sin `FORCE`, mismo retrato) | integración | verde |
-| **R31** | **`e2e/aislamiento-recetas.spec.ts`** | **E2E** | **PENDIENTE — T20 bloqueada** |
+| **R31** | **`e2e/aislamiento-recetas.spec.ts`** (listado sin la receta ajena; URL del detalle ajeno indistinguible del id inexistente; la receta de B intacta; alta con el mismo nombre en A sin error) | **E2E** | **verde en Chromium y WebKit** |
 | R32 | `recipes-company-scope-migration.test.ts` (la migración no toca otras tablas) + `recipe-actions.test.ts` y `list-recipes.test.ts` (firmas y forma de salida intactas) | unit | verde |
 | R33 | `tests/guards/guard-dependencias-aprobadas.test.ts` (`package.json` y `pnpm-lock.yaml` sin tocar) | guardia | verde |
 
-**32/33 con test.** R31 depende de T20.
+**33/33 con test.**
 
 ## Verificación ejecutada
 
@@ -207,8 +218,22 @@ test-db: la corrida de integracion va contra qct_qc50_823f45a6_mu4xf7gt_qqw
 test-db: borrada la base de la corrida: qct_qc50_823f45a6_mu4xf7gt_qqw.
 ```
 
-**E2E: no corrido.** `e2e/aislamiento-recetas.spec.ts` no existe todavía (T20 bloqueada); los
-demás specs quedaron **compilando** pero no se ejecutaron — los lanza el gate.
+**E2E de esta ficha, corrido en los dos navegadores** (los demás specs quedaron compilando pero no
+se ejecutaron — los lanza el gate):
+
+```
+$ npx playwright test e2e/aislamiento-recetas.spec.ts --project=chromium
+  ✓  1 [chromium] › e2eislamiento-recetas.spec.ts:203:7 › ... (R31) (50.0s)
+  1 passed (1.9m)
+
+$ npx playwright test e2e/aislamiento-recetas.spec.ts --project=webkit
+  ✓  1 [webkit] › e2eislamiento-recetas.spec.ts:203:7 › ... (R31) (30.0s)
+  1 passed (55.8s)
+```
+
+El fixture deja la base como la encontró: tras cada corrida, cero `recipes`/`companies`/`users`
+con el prefijo `qc50_e2e_`. La limpieza respeta el orden de las FK (`recipes_company_id_fkey` es
+**RESTRICT**: la receta cae antes que su empresa).
 
 ### La migración, comprobada contra la base real
 
@@ -223,7 +248,9 @@ reaplicación vuelve al estado final.
 ## Desviaciones y hallazgos, declarados
 
 1. **T20 bloqueada** — ver arriba. Es lo único que impide cerrar la ficha.
-2. **Falso positivo corregido en `scope.test.ts`** — el caso «ningún test importa
+2. **Falso positivo corregido en `scope.test.ts`** — **validado por el leader el 2026-09-16:**
+   *pasar de substring pelado a forma de import es **tensar, no relajar**, y se comprobó que sigue
+   cazando un import real.* — el caso «ningún test importa
    `@supabase/storage-js` ni el adaptador de Storage» comprobaba el adaptador con un **substring
    pelado**, mientras su comprobación hermana de `@supabase/storage-js` siempre exigió **forma de
    import**. El test de R27 lee el adaptador como **texto** (`readFileSync`) y cita su nombre de
@@ -253,15 +280,11 @@ reaplicación vuelve al estado final.
    adaptador ya satisfacen las interfaces nuevas. Se respeta el criterio de la task («no se
    reordena ni se reformatea nada»).
 
-## Pendiente al cerrar T20
+## Cierre
 
-- **T16** — `E2E_ESPERADOS` en `guard-identificador-de-request.test.ts`: dar de alta
-  `aislamiento-recetas.spec.ts` con su motivo y dejando escrito que **no** ejercita el cruce del
-  identificador de petición, para que el diferimiento de QC-71 R21 siga intacto.
-- **T18(a)** — el censo de specs de recetas en `tests/unit/recetas/scope.test.ts` pasa de **dos**
-  a **tres** literales. Ojo al orden: es el de `readdirSync`, y `aislamiento-recetas.spec.ts` va
-  **primero**.
-- **T27** — quitar `recetas (QC-50)` de la lista de deuda de `docs/architecture.md:34`, dejando
-  `unidades` y `proveedores`. No se hizo todavía para no declarar saldada una deuda cuyo E2E
-  falta.
-- **T28** — `./init.sh` completo, que corre el leader.
+- **T27** hecho: `recetas` sale de la lista de deuda de `docs/architecture.md` —quedan `unidades` y
+  `proveedores`—, y los `///` de `Recipe` y `RecipeLine` ya lo dicen desde el bloque 0.
+- **T16** y **T18** cerradas: `aislamiento-recetas.spec.ts` dado de alta en `E2E_ESPERADOS` (con la
+  frase que deja **intacto** el diferimiento de QC-71 R21) y en el censo de specs de recetas, que
+  pasa de dos a tres literales.
+- **T28** es del leader: `./init.sh` completo. Aquí no se corrió la suite.

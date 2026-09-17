@@ -31,9 +31,13 @@
 //      al que se le pasa-. Declararlo y no usarlo seria la misma fuga con mejor cara.
 //
 // No hay ninguna excepcion permitida: toda funcion del modulo que toque `prisma.` sin ambito
-// pone esto en rojo. `SIN_AMBITO_POR_DECISION_APROBADA` se deja declarado y VACIO -no borrado-
-// para que la guardia siga sabiendo comprobar, si algun dia se abre una excepcion nueva, que
-// esta sigue siendo lo que dice ser: sin ambito y escrita como tal en su propio archivo.
+// pone esto en rojo. QC-50 cerro la unica excepcion que existia (`findProductRefs`) y con eso
+// borro tambien `SIN_AMBITO_POR_DECISION_APROBADA` y la rama que la comprobaba: con la lista
+// vacia esa rama era codigo muerto -nunca se ejecutaba-, y `docs/architecture.md` es explicito:
+// "No se prepara infraestructura por si acaso". Guardar la maquinaria de una excepcion que hoy
+// no protege nada, para una hipotetica de manana, es exactamente eso. Si alguna ficha futura
+// necesita abrir una excepcion de ambito, la aprueba un humano en el spec y trae su propia
+// comprobacion: no se hereda de aqui.
 //
 // TECNICA: barrido de TEXTO sobre el disco, como el resto de `tests/guards/`. No se importa
 // ningun modulo ni se mira el grafo de imports: lo que se vigila es lo que esta ESCRITO, que es
@@ -62,14 +66,6 @@ function findRepoRoot(startDir: string): string {
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)))
 const MODULE_ROOT = join(repoRoot, 'lib', 'modules', 'inventario')
 const PERSISTENCE_ROOT = join(MODULE_ROOT, 'adapters', 'driven', 'persistence')
-
-/**
- * Lista CERRADA y hoy VACIA: `inventario` no tiene ninguna consulta sin ambito de empresa.
- * Anadir un nombre aqui no es «arreglar la guardia»: es declarar por escrito que una consulta
- * del modulo ve el inventario de todas las empresas, y eso lo aprueba un humano en el spec, no
- * quien escribe el adaptador.
- */
-const SIN_AMBITO_POR_DECISION_APROBADA = new Set<string>([])
 
 /** El parametro exacto que toda funcion de persistencia del modulo tiene que declarar. */
 const PARAMETRO_DE_AMBITO = /\bscope\s*:\s*InventoryScope\b/
@@ -320,7 +316,6 @@ describe('QC-49 R13/R29 — ninguna otra consulta del modulo se queda sin ambito
 
   for (const archivo of archivos) {
     it(`${archivo}: toda funcion que toca la base declara y consume el ambito`, () => {
-      const source = readFileSync(join(PERSISTENCE_ROOT, archivo), 'utf8')
       const analizado = analizar(archivo)
 
       // «Toca la base» = su cuerpo ejecuta una consulta, por el cliente (`prisma.`) o por el
@@ -330,19 +325,6 @@ describe('QC-49 R13/R29 — ninguna otra consulta del modulo se queda sin ambito
 
       for (const funcion of analizado.funciones) {
         if (!tocaLaBase(funcion.cuerpo)) continue
-        if (SIN_AMBITO_POR_DECISION_APROBADA.has(funcion.nombre)) {
-          // La excepcion tiene que seguir siendo lo que dice ser: sin ambito, y escrita como tal
-          // en el propio archivo con su destino.
-          expect(
-            PARAMETRO_DE_AMBITO.test(funcion.parametros),
-            `${funcion.nombre} esta en la lista de excepciones pero YA declara el ambito: quitalo de la lista (R29 se cerro en QC-50)`,
-          ).toBe(false)
-          expect(
-            source.includes('R29') && source.includes('QC-50'),
-            `${archivo} contiene la unica excepcion de ambito del modulo y debe decirlo por escrito, con su requisito (R29) y su destino (QC-50)`,
-          ).toBe(true)
-          continue
-        }
 
         expect(
           PARAMETRO_DE_AMBITO.test(funcion.parametros),

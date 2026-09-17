@@ -197,7 +197,16 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
     // Finalizar-. O sea: NO es crecimiento por goteo, es una ficha con su requisito, y el spec
     // lo aprobo el humano en F1.4. El orden de los literales es el que devuelve `readdirSync`
     // (`matchingFiles` no ordena aqui), y por eso `recetas-pasos.spec.ts` va primero.
+    //
+    // AMPLIADA de nuevo (QC-50, aislamiento-por-empresa-en-recetas): la lista pasa de DOS a
+    // TRES literales, y sigue siendo CERRADA -mismo criterio de siempre: un cuarto spec de
+    // recetas sin ficha tiene que seguir poniendo esto en rojo-. El spec que entra es el E2E de
+    // aislamiento por empresa que pide R31 de `specs/QC-50-aislamiento-por-empresa-en-recetas/requirements.md`,
+    // aprobado por el humano en T20. Verificado con `readdirSync` sobre `e2e/`
+    // (no me fio de memoria): devuelve `aislamiento-recetas.spec.ts` PRIMERO -antes que
+    // `recetas-pasos.spec.ts`-, asi que va al frente de la lista.
     expect(e2eMatches, `spec E2E de recetas inesperado: ${e2eMatches.join(', ')}`).toEqual([
+      'aislamiento-recetas.spec.ts', // QC-50 / R31: E2E de aislamiento por empresa
       'recetas-pasos.spec.ts', // QC-64 / R28: E2E del camino completo del editor y el asistente
       'recetas.spec.ts', // QC-26: E2E del CRUD de la pantalla de recetas
     ])

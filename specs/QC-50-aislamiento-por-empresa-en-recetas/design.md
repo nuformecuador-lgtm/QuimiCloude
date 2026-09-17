@@ -480,6 +480,27 @@ envoltura de `./company-scope`. **Sin lista de excepciones.** Comprueba además 
 4. **E2E** (R31, decisión 15), uno solo: `e2e/aislamiento-recetas.spec.ts`, con el patrón de
    `aislamiento-inventario.spec.ts` y `aislamiento-pedidos.spec.ts`.
 
+> **Enmienda — 2026-09-16, decisión humana.** El paso del **acceso cruzado** de ese E2E **ya no se
+> ejerce sustituyendo el identificador por DOM** en el diálogo de borrado, como decían esta sección
+> y T20: se ejerce **navegando a la URL del detalle** de una receta de otra empresa
+> (`/produccion/formulas/<id ajeno>`).
+>
+> **Por qué el patrón de QC-49/QC-60 no era aplicable aquí.** En aquellas dos fichas el diálogo de
+> borrado es un formulario con un **campo oculto** que lleva el id y viaja en el `FormData`
+> (`delete-product-dialog.tsx:106`, `delete-order-dialog.tsx:128`), así que reescribir ese nodo por
+> DOM cambia de verdad lo que recibe el servidor. En `recetas` no: `delete-recipe-dialog.tsx:58`
+> hace `await deleteRecipeAction(recipe.id)` con el id tomado del **cierre de React**, y **no existe
+> ningún nodo del DOM que reescribir**. Darle el campo oculto habría sido tocar un componente, que
+> §14 prohíbe expresamente.
+>
+> **Por qué el recorrido nuevo no es un apaño.** Pegar un enlace que alguien te pasó es un gesto
+> real, y **cierra además la escritura**: el formulario de edición de la receta ajena nunca llega a
+> pintarse. La página resuelve la receta en el servidor con `getRecipeAction(id)`, y un id **ajeno**
+> recorre exactamente el mismo camino que uno **inexistente** —`findAliveById` acotado devuelve
+> `null` y nace el mismo `RecipeNotFoundError`—, de modo que el E2E puede afirmar que **los dos
+> casos se ven idénticos**: eso es justamente lo que prueba que no hay **oráculo de existencia**.
+> Los pasos 1, 2 y 4 del recorrido no cambian.
+
 ### 8.3. Las listas cerradas, una por una
 
 Las cinco de §0.6, **cada una con su task explícita** (T14–T18 de `tasks.md`). No se dan por hechas

@@ -65,6 +65,17 @@ export const E2E_ESPERADOS = [
   // identificador de peticion: el spec no lee ni afirma nada sobre el identificador ni sobre
   // `reference`, asi que el diferimiento de ese E2E sigue INTACTO.
   'aislamiento-pedidos.spec.ts',
+  // Alta por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su
+  // punto de extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo
+  // se nombra, uno a uno-. El recorrido que ejercita: con sesion en una empresa, el listado de
+  // recetas no muestra ninguna receta de otra empresa; pegar el enlace al detalle de una receta
+  // ajena (`/produccion/formulas/<id>`) no la enseña -sale el estado «no encontrada», el
+  // formulario de edicion nunca se pinta y el resultado es IDENTICO al de un identificador
+  // inexistente- y la receta ajena queda intacta; y un alta con el MISMO nombre que una receta
+  // de otra empresa se completa sin error. NO ejercita el cruce borde -> accion del
+  // identificador de peticion: el spec no lee ni afirma nada sobre el identificador ni sobre
+  // `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
+  'aislamiento-recetas.spec.ts',
   // QC-101 T10 / R17: la E2E del cierre de TODAS las sesiones de otra persona desde la pantalla.
   // Alta por el MISMO motivo y en el MISMO sitio que las de QC-49, QC-67, QC-79, QC-85 y QC-102:
   // esta lista es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO

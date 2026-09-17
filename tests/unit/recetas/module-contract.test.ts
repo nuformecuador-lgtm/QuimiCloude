@@ -404,16 +404,32 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
       'lib/modules/recetas/domain/delete-recipe.ts',
       'lib/modules/recetas/adapters/driving/recipe-actions.ts',
     ]
+    // QC-50 aisla recetas por empresa. Este caso solo mira el DIFF contra `origin/dev`, asi
+    // que con los cambios sin commitear pasaba en verde igual -no muerde hasta que hay commit-.
+    // Son tres archivos nuevos/modificados, ninguno mas:
+    //   * `domain/recipe-scope.ts` (nuevo): el tipo del ambito del modulo -la empresa en cuyo
+    //     nombre se consulta o se escribe-. Dominio puro: no autoriza, solo nombra el ambito.
+    //   * `adapters/driven/persistence/company-scope.ts` (nuevo): el punto UNICO donde se
+    //     escribe «de la empresa» al armar el filtro/los datos de Prisma, para que ninguna
+    //     consulta ni escritura del modulo lo repita por su cuenta y diverja.
+    //   * `ports/recipe-repository.ts` (modificado): los cinco metodos ganan el ambito en la
+    //     FIRMA, que es lo que hace que una llamada que lo omita no compile.
+    const AISLAMIENTO_POR_EMPRESA_QC50 = [
+      'lib/modules/recetas/domain/recipe-scope.ts',
+      'lib/modules/recetas/adapters/driven/persistence/company-scope.ts',
+      'lib/modules/recetas/ports/recipe-repository.ts',
+    ]
     const AMPLIACIONES_APROBADAS = [
       ...AMPLIACION_QC34,
       ...CAMBIO_DE_FORMA_DEL_PASO_QC62,
       ...AUTORIZACION_POR_PERMISO_QC74,
+      ...AISLAMIENTO_POR_EMPRESA_QC50,
     ]
     expect(
       diff
         .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))
         .filter((ruta) => !AMPLIACIONES_APROBADAS.includes(ruta)),
-      'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 (T10) y del cambio de forma del paso de QC-62 (T1-T3) puede estar en el diff',
+      'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 (T10), del cambio de forma del paso de QC-62 (T1-T3) y del aislamiento por empresa de QC-50 puede estar en el diff',
     ).toEqual([])
 
     // Defensa redundante de ubicacion, desde el angulo del modulo: la carpeta permitida se
