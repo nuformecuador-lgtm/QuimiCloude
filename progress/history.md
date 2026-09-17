@@ -3814,3 +3814,43 @@ además **33 commits por detrás** del remoto. Se integró y se empujó (`551a33
 
 Menores declarados que no bloquearon: una cita de ficha en el nombre de un `describe` y una
 importación por ruta profunda superviviente en un test.
+
+## QC-88 — listado-de-pedidos-asignados (CERRADA el 2026-09-17, PR #79, merge `b342375`)
+
+**Qué entró**: la pantalla del Operador en `/asignacion`, compuesta desde `asignaciones`, con
+`pedidos` aportando solo una lectura de catálogo en lote. **5 consultas constantes por página**, sin
+JOIN y sin crecer con filas, responsables ni tamaño de página. `responsible-avatars.tsx` se promovió
+a `components/shared/`.
+
+**Resultado**: R1-R40, 18 tasks, trazabilidad **40/40** verificada caso a caso por el reviewer
+(veredicto OK, sin bloqueantes). `./init.sh` completo verde sobre el árbol final: **503 archivos,
+7289 passed, 0 rojos**. Sin dependencias nuevas, sin tabla, columna ni migración.
+
+**El hueco que más peligro tenía, y cómo se cerró**: reutilizar el caso de uso de responsables de
+QC-102 habría dejado la columna **vacía en silencio** para el Operador, porque ese caso de uso exige
+`pedidos.consultar` y el Operador no lo tiene. Se reutilizó **el método del puerto**, no el caso de
+uso. La autorización quedó como primera línea del cuerpo, antes de validar la entrada y antes de
+tocar ningún `deps`, con tests que lo afirman sobre los cinco dobles.
+
+**La ficha cambió el aterrizaje del Operador**, así que puso rojos a propósito varios censos
+congelados de otras fichas. Las seis guardias afectadas se **tensaron, nunca se aflojaron**: cada
+excepción es por nombre o archivo exacto, con una mutación que demuestra que sigue mordiendo.
+
+**Dos interrupciones que no fueron fallos técnicos**: se agotó la cuota semanal de Opus con trabajo
+sin commitear (lo rescató el leader), y la implementación estuvo **12 tasks bloqueada por QC-60**
+hasta su merge, que trajo 132 commits y dos migraciones por delante.
+
+**Lección del arnés, la misma que QC-103 y por fin cerrada de raíz**: la limpieza de comentarios
+(871 líneas borradas, 217 reescritas sin cita) **no se hizo cuando el reviewer la señaló**, porque
+se verificó que la regla no estaba en ninguna rama remota — y era cierto. El diagnóstico de fondo
+era el equivocado: la regla **existía, pero vivía solo en la plantilla**. Apareció en la rama al
+re-sincronizar con `dev` para resolver el conflicto del PR, y ahí se limpió, en commits solo de
+comentarios. Coste de haberlo sabido tarde: un gate completo de más.
+
+**Conflicto de `current.md`, tercera vez**: se resolvió **fusionando los dos lados**, no tomando
+uno. Cada lado traía estado que el otro no tenía. La decisión de fondo —que el estado vivo deje de
+ser un archivo único que todas las ramas tocan— sigue pendiente en *Deudas*.
+
+**Límite declarado, no escondido**: el E2E del recorrido del Operador existe, pasa typecheck/lint y
+sigue el patrón de los E2E verdes del repo, pero **nunca se ejecutó contra Playwright** por drift de
+la Postgres local, ajeno a esta rama.
