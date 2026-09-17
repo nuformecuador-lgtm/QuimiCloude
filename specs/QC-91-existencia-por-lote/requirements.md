@@ -25,7 +25,104 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+> Cada requisito cita entre corchetes la decisión de la tabla de abajo que lo origina, numeradas
+> `D1`…`D18` **por orden de fila**. La tabla tiene **18 filas** (la 18 es la del 2026-09-17), y
+> todas quedan citadas al menos una vez: una decisión sin `R<n>` nunca llega a tener test.
+
+### Cálculo de la existencia
+
+**R1.** El sistema DEBE calcular la existencia de un producto **al consultarla**, como la suma de
+las existencias de sus lotes, y NO DEBE guardarla ni cachearla en ninguna columna, campo derivado
+ni contrato de escritura del producto. [D1] [D6]
+
+**R2.** CUANDO se aplique la migración de esta feature, el sistema DEBE eliminar la columna
+`products.stock` junto con su restricción de no-negatividad y su índice, **sin leer, comprobar ni
+trasladar** sus valores a ninguna otra tabla; y su `down.sql` DEBE restaurar la columna, la
+restricción y el índice, vacíos de datos. [D1] [D11]
+
+**R3.** El sistema DEBE contar la existencia de un lote como una cantidad **entera** expresada en
+la **unidad de su presentación** (en «Bolsa 5 KG», 10 son 10 kg, no 10 bolsas). [D4]
+
+**R4.** SI un lote tiene fecha de expiración pasada, ENTONCES el sistema DEBE sumarlo igual a la
+existencia de su producto. [D5]
+
+**R5.** El sistema DEBE agrupar la existencia **por unidad**: los lotes cuya presentación comparte
+unidad se suman en un único valor aunque la presentación difiera, los de unidades distintas quedan
+como valores separados, y NO DEBE convertir ninguna cantidad entre unidades. [D7]
+
+**R6.** CUANDO el listado de productos muestre un producto con lotes, el sistema DEBE mostrar **una
+existencia por unidad**, cada una acompañada de su unidad («Hipoclorito · 10 kg · 20 L»). [D7]
+
+**R7.** SI un producto no tiene ningún lote, ENTONCES el sistema DEBE dar su existencia como
+**0**. [D8]
+
+### Lo que deja de existir
+
+**R8.** El listado de productos NO DEBE ofrecer ordenar ni filtrar por existencia; y CUANDO la
+consulta reciba un orden o un filtro por existencia, el sistema DEBE ignorarlo y responder la
+página sin fallar. [D2]
+
+**R9.** MIENTRAS se edita un producto, el sistema NO DEBE mostrar su existencia; y CUANDO la
+edición reciba una existencia, el sistema DEBE rechazar la entrada como inválida y no escribir
+nada. [D3]
+
+**R10.** CUANDO el alta de producto reciba una existencia, el sistema DEBE escribirla **únicamente
+en el lote** que crea, y NO DEBE escribir ninguna existencia en el producto. [D3]
+
+**R11.** El sistema NO DEBE conservar ninguna lectura ni escritura de `products.stock` en el
+árbol —esquema, migraciones vigentes, dominio, adaptadores ni pantallas—, y la feature DEBE
+entregarse como una sola unidad que deja el árbol compilando y el gate en verde. [D11] [D12]
+
+### Pedido y receta
+
+**R12.** El formulario de pedido DEBE calcular el «restante» de cada línea restando la cantidad
+requerida a la existencia del producto **en la unidad de la línea de receta** (10 kg − 5 kg =
+5 kg), sin conversiones. [D9]
+
+**R13.** SI el producto de una línea tiene lotes pero ninguno en la unidad de esa línea, ENTONCES
+el sistema DEBE mostrar el marcador de dato ausente en su existencia y en su restante. [D9]
+
+**R14.** SI el producto de una línea no tiene ningún lote, ENTONCES el sistema DEBE mostrar su
+existencia como 0, calcular el restante y destacarlo como faltante cuando resulte negativo.
+[D8] [D9]
+
+**R15.** El detalle de receta DEBE exponer, por línea, la existencia del producto **en la unidad de
+esa línea**, con las mismas tres respuestas que R12, R13 y R14. [D9]
+
+### Alerta de cantidad
+
+**R16.** El sistema DEBE comparar la cantidad de alerta de un producto contra su existencia **en la
+unidad de su lote más reciente**, y NO DEBE tener en cuenta las existencias en otras unidades.
+[D10]
+
+**R17.** SI un producto no tiene ningún lote y sí tiene cantidad de alerta configurada, ENTONCES el
+sistema DEBE marcarlo en alerta (su existencia es 0, menor que cualquier cantidad de alerta), sin
+necesitar unidad para esa comparación. [D18]
+
+**R18.** SI un producto no tiene cantidad de alerta configurada, ENTONCES el sistema NO DEBE
+marcarlo en alerta, tenga o no lotes. [D18]
+
+### Permisos, datos y verificación
+
+**R19.** El sistema DEBE exigir `inventario.consultar` para leer la existencia desde el listado de
+productos y `recetas.consultar` para leerla desde el detalle de receta, validándolo **en el
+service** antes de tocar el repositorio, y NO DEBE introducir ningún permiso nuevo. [D14]
+
+**R20.** El sistema DEBE calcular la existencia sobre el esquema de lote vigente tras QC-81 —lote
+obligatorio con correlativo del backend y fecha de compra obligatoria—; CUANDO se agregue un lote
+sin lote escrito a mano, el sistema DEBE generar su correlativo y sumar su existencia a la del
+producto igual que la de los demás. [D13]
+
+**R21.** El sistema NO DEBE borrar ni modificar ninguna fila de lotes al calcular, mostrar o dejar
+de escribir la existencia; el borrado del producto sigue siendo lógico y todo identificador nuevo
+DEBE escribirse en inglés. [D15]
+
+**R22.** CUANDO se agregue un segundo lote a un producto que ya existe, el listado de productos
+DEBE mostrar su existencia aumentada por la suma de los dos lotes; esto DEBE quedar cubierto por al
+menos una prueba de extremo a extremo (Playwright). [D16]
+
+**R23.** El sistema NO DEBE incorporar ninguna dependencia nueva para esta feature: `package.json`
+queda sin cambios. [D17]
 
 ## Preguntas abiertas
 
