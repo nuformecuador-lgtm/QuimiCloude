@@ -68,7 +68,7 @@ export function createUpdateOrder(
     // Si CAMBIA, se exige viva igual que en el alta (R15), asi que sigue siendo imposible
     // PONER una receta inexistente o dada de baja.
     if (data.recipeId !== row.recipeId) {
-      const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId]);
+      const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId], actor.companyId);
       if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
     }
 

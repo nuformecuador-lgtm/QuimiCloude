@@ -29,6 +29,7 @@ import { ValidationError } from '@/lib/modules/recetas/domain/errors';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { NewRecipe } from '@/lib/modules/recetas/ports/recipe-repository';
+import type { RecipeScope } from '@/lib/modules/recetas';
 
 // ---------------------------------------------------------------------------
 // Utilidades de aislamiento (estrategia 1: tx + ROLLBACK + SAVEPOINT).
@@ -149,9 +150,15 @@ async function deleteTestProduct(db: Db, productId: string): Promise<void> {
   await db.product.delete({ where: { id: productId } });
 }
 
+/** La MISMA empresa de andamiaje que `createTestProduct`: QC-50 hizo `recipes.company_id`
+ *  obligatoria, y ningun aserto de este archivo depende de cual sea. */
 async function createTestRecipe(db: Db, name = `Receta ${token()}`): Promise<string> {
   const recipe = await db.recipe.create({
-    data: { name, nameNormalized: name.toLowerCase().replace(/\s+/gu, '') },
+    data: {
+      name,
+      nameNormalized: name.toLowerCase().replace(/\s+/gu, ''),
+      companyId: await andamiajeCompanyId(db),
+    },
     select: { id: true },
   });
   return recipe.id;
@@ -234,10 +241,11 @@ describe('R14: el CHECK de cantidad positiva', () => {
       const input = baseRecipeInput({
         lines: [{ productId, quantity: '0.0000', unitId: sharedUnitId }],
       });
+      const scope: RecipeScope = { companyId: await andamiajeCompanyId(prisma) };
 
-      await expect(createRecipe(input, null as unknown as string, new Date())).rejects.toBeInstanceOf(
-        ValidationError,
-      );
+      await expect(
+        createRecipe(input, null as unknown as string, new Date(), scope),
+      ).rejects.toBeInstanceOf(ValidationError);
 
       // Y no quedo ninguna receta a medio crear: `create` con lineas anidadas es una sola
       // sentencia -si la linea falla, la receta tampoco se creo-.
@@ -286,14 +294,15 @@ describe('R18: la linea de un producto borrado logicamente se conserva', () => {
       const input = baseRecipeInput({
         lines: [{ productId, quantity: '3.0000', unitId: sharedUnitId }],
       });
-      const created = await createRecipe(input, null as unknown as string, new Date());
+      const scope: RecipeScope = { companyId: await andamiajeCompanyId(prisma) };
+      const created = await createRecipe(input, null as unknown as string, new Date(), scope);
       expect(created).not.toBe('duplicate');
       recipeId = (created as { id: string }).id;
 
       // Borrado LOGICO del producto (QC-20 D5): un UPDATE, no un DELETE.
       await prisma.product.update({ where: { id: productId }, data: { deletedAt: new Date() } });
 
-      const detail = await findAliveRecipeById(recipeId);
+      const detail = await findAliveRecipeById(recipeId, scope);
       expect(detail).not.toBeNull();
       expect(detail?.lines).toHaveLength(1);
       expect(detail?.lines[0]?.productId).toBe(productId);
@@ -324,7 +333,7 @@ describe('R17: findProductRefs solo devuelve productos vivos', () => {
     try {
       await prisma.product.update({ where: { id: borradoId }, data: { deletedAt: new Date() } });
 
-      const refs = await findProductRefs([vivoId, borradoId]);
+      const refs = await findProductRefs([vivoId, borradoId], await andamiajeCompanyId(prisma));
 
       expect(refs.map((ref) => ref.id)).toEqual([vivoId]);
       expect(refs.some((ref) => ref.id === borradoId)).toBe(false);

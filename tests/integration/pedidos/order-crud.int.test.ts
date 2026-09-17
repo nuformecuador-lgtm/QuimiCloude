@@ -171,10 +171,6 @@ async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
     data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `kg${marca}` },
     select: { id: true },
   })
-  const recipe = await tx.recipe.create({
-    data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}` },
-    select: { id: true },
-  })
   const documentType = await tx.documentType.create({
     data: { code: `DOC${marca.slice(0, 8)}`, name: 'Tipo de documento de prueba' },
     select: { code: true },
@@ -192,6 +188,11 @@ async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
   const companyName = `Empresa ${marca}`
   const company = await tx.company.create({
     data: { name: companyName, nameNormalized: normalizeCompanyName(companyName) },
+    select: { id: true },
+  })
+  // La receta es de la MISMA empresa que el pedido: QC-50 hizo `recipes.company_id` obligatoria.
+  const recipe = await tx.recipe.create({
+    data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}`, companyId: company.id },
     select: { id: true },
   })
   const user = await tx.user.create({

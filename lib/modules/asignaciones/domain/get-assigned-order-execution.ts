@@ -69,11 +69,11 @@ export function createGetAssignedOrderExecution(
     const lines = content?.lines ?? [];
 
     const productIds = [...new Set(lines.map((line) => line.productId))];
-    const productRefs = productIds.length > 0 ? await deps.products.findRefs(productIds) : [];
+    const productRefs = productIds.length > 0 ? await deps.products.findRefs(productIds, actor.companyId) : [];
     const productNames = new Map(productRefs.map((ref) => [ref.id, ref.name]));
 
     const unitIds = [...new Set(lines.map((line) => line.unitId))];
-    const ownUnits = unitIds.length > 0 ? await deps.units.findRefs(unitIds) : [];
+    const ownUnits = unitIds.length > 0 ? await deps.units.findRefs(unitIds, actor.companyId) : [];
     const ownUnitsById = new Map(ownUnits.map((unit) => [unit.id, unit]));
 
     const sisterUnits =

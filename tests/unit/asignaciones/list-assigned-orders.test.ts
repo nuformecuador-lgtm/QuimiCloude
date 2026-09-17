@@ -293,7 +293,7 @@ describe('QC-88 — listAssignedOrders: R15 recetas y responsables', () => {
 
     await listAssignedOrders(ACTOR, { page: 1 });
 
-    expect(findRefsIncludingDeleted).toHaveBeenCalledWith([RECETA]);
+    expect(findRefsIncludingDeleted).toHaveBeenCalledWith([RECETA], ACTOR.companyId);
   });
 
   it('una receta sin resolver pinta `null`, nunca el identificador', async () => {

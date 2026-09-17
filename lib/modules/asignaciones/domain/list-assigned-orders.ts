@@ -91,7 +91,7 @@ export function createListAssignedOrders(
 
     // Una sola llamada, tenga la pagina 1 fila o 25.
     const recipeIds = [...new Set(ordersPage.items.map((row) => row.recipeId))];
-    const recipes = await deps.recipes.findRefsIncludingDeleted(recipeIds);
+    const recipes = await deps.recipes.findRefsIncludingDeleted(recipeIds, actor.companyId);
     const recipeNames = new Map(recipes.map((recipe) => [recipe.id, recipe.name]));
 
     // Solo los ids DE LA PAGINA, no todos los de la persona.

@@ -31,7 +31,7 @@ const MODIFICAR = 'recetas.modificar';
 
 /** Un actor con exactamente los permisos que se le pasen, y ninguno mas. */
 function actorCon(...permisos: readonly string[]): Actor {
-  return { id: 'actor-1', permissions: permisos };
+  return { id: 'actor-1', companyId: 'empresa-1', permissions: permisos };
 }
 
 const AHORA = new Date('2026-09-07T10:00:00.000Z');

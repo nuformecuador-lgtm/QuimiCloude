@@ -20,15 +20,27 @@ import { createListRecipes } from '@/lib/modules/recetas/domain/list-recipes';
 
 import type { ListQuery } from '@/lib/modules/recetas/domain/list-query';
 import type { Page } from '@/lib/modules/recetas/domain/page';
+import type { RecipeScope } from '@/lib/modules/recetas/domain/recipe-scope';
 import type { ListQueryLog } from '@/lib/modules/recetas/ports/list-query-log';
 import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
 import type { RecipeRepository } from '@/lib/modules/recetas/ports/recipe-repository';
 
+/** La empresa desde la que se lista, siempre la del actor (QC-50). */
+const EMPRESA = 'empresa-1';
+
 // QC-74 (R16, R18): el actor ya no lleva nombre de rol, lleva el conjunto de permisos.
 // Los dos codigos de `recetas`, que es lo que exigen los cinco casos de uso.
-const ADMIN: Actor = { id: 'admin-1', permissions: ['recetas.consultar', 'recetas.modificar'] };
+const ADMIN: Actor = {
+  id: 'admin-1',
+  companyId: EMPRESA,
+  permissions: ['recetas.consultar', 'recetas.modificar'],
+};
 // QC-74 (R13): tiene `recetas.modificar` y NADA mas. Modificar NO concede consultar.
-const SIN_PERMISO_DE_CONSULTA: Actor = { id: 'sin-consulta-1', permissions: ['recetas.modificar'] };
+const SIN_PERMISO_DE_CONSULTA: Actor = {
+  id: 'sin-consulta-1',
+  companyId: EMPRESA,
+  permissions: ['recetas.modificar'],
+};
 
 function montar() {
   const listAlive = vi.fn<RecipeRepository['listAlive']>(async () => ({ rows: [], total: 0 }));
@@ -80,11 +92,20 @@ function montar() {
 
 /** La consulta que llego al puerto en la ultima llamada (tercer argumento de `listAlive`). */
 function consultaRecibida(
-  recibidas: readonly (readonly [number, number, ListQuery])[],
+  recibidas: readonly (readonly [number, number, ListQuery, RecipeScope])[],
 ): ListQuery {
   const ultima = recibidas.at(-1);
   if (ultima === undefined) throw new Error('el puerto no fue llamado');
   return ultima[2];
+}
+
+/** El scope de empresa que llego al puerto en la ultima llamada (cuarto argumento). */
+function scopeRecibido(
+  recibidas: readonly (readonly [number, number, ListQuery, RecipeScope])[],
+): RecipeScope {
+  const ultima = recibidas.at(-1);
+  if (ultima === undefined) throw new Error('el puerto no fue llamado');
+  return ultima[3];
 }
 
 describe('list-recipes: autorizacion antes que todo (R33, R34)', () => {
@@ -199,6 +220,8 @@ describe('list-recipes: lo que llega al repositorio (R11, R13, R15, R16, R20, R3
       filters: {},
       search: '',
     });
+    // QC-50: la empresa que llega al puerto es la del actor, nunca una elegida por la entrada.
+    expect(scopeRecibido(recipes.listAlive.mock.calls)).toEqual({ companyId: EMPRESA });
   });
 
   it('la busqueda del contrato llega intacta al repositorio (R16)', async () => {
@@ -259,8 +282,14 @@ describe('list-recipes: la aritmetica de paginacion SIGUE INYECTADA (R40 de QC-2
     const pagina = await listRecipes({ page: 2, pageSize: 5 }, ADMIN);
 
     expect(toOffsetLimit).toHaveBeenCalledWith(2, 5);
-    // El puerto recibe la ventana YA CALCULADA fuera del adaptador, mas la consulta saneada.
-    expect(recipes.listAlive).toHaveBeenCalledWith(5, 5, expect.objectContaining({ page: 2 }));
+    // El puerto recibe la ventana YA CALCULADA fuera del adaptador, mas la consulta saneada y
+    // el ambito de empresa del actor (QC-50).
+    expect(recipes.listAlive).toHaveBeenCalledWith(
+      5,
+      5,
+      expect.objectContaining({ page: 2 }),
+      { companyId: EMPRESA },
+    );
     // Y el `pageSize` de la salida es el que devolvio `toOffsetLimit`, no el que se pidio.
     expect(llamadasDeBuildPage).toEqual([{ items: 0, total: 0, page: 2, pageSize: 5 }]);
     expect(pagina.pageSize).toBe(5);

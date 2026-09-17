@@ -231,6 +231,7 @@ test.beforeAll(async () => {
         name: RECIPE_NAME,
         nameNormalized: normalizeRecipeName(RECIPE_NAME),
         createdBy: actorUserId,
+        companyId,
       },
       select: { id: true },
     })

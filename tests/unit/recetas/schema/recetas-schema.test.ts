@@ -208,6 +208,15 @@ const RECIPE_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['description', 'description'],
   ['steps', 'steps'],
   ['imagePath', 'image_path'],
+  // 2026-09-16, QC-50 (aislamiento-por-empresa-en-recetas): Recipe gana `companyId` por el
+  // mismo motivo que ya lo tienen `Product`/`Presentation`/`ProductBatch` desde QC-49 y
+  // `Order` desde QC-60: sin ella, filtrar recetas por empresa dependeria de un `join`
+  // implicito con otra tabla en vez de una columna propia. Es `String @map("company_id")
+  // @db.Uuid` SIN `@relation` -la FK esta escrita a mano en la migracion, es drift
+  // deliberado, igual que `createdBy`/`updatedBy` de esta misma tabla- y sin `@@unique` ni
+  // `@@index` propios en el modelo porque el unico indice de empresa es PARCIAL (filtra por
+  // `deleted_at IS NULL`) y por eso vive solo en el `migration.sql`, no en el esquema.
+  ['companyId', 'company_id'],
   ['createdBy', 'created_by'],
   ['updatedBy', 'updated_by'],
   ['createdAt', 'created_at'],

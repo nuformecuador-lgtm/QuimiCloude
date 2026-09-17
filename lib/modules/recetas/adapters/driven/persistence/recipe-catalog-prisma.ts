@@ -3,7 +3,10 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { recipeStepSchema } from '../../../domain/recipe-input';
 
 import type { RecipeExecutionContent, RecipeId, RecipeRef } from '../../../domain/recipe-catalog';
+import type { RecipeScope } from '../../../domain/recipe-scope';
 import type { RecipeStepView } from '../../../domain/recipe-view';
+
+import { recipeCompanyScope } from './company-scope';
 
 /**
  * Implementa `RecipeCatalog['findRefsIncludingDeleted']` (`domain/recipe-catalog.ts`,
@@ -20,6 +23,13 @@ import type { RecipeStepView } from '../../../domain/recipe-view';
  *
  * UNA sola consulta para los N ids: quien lee una pagina de pedidos pide todos sus ids de
  * receta de golpe (R45). Un id que no existe simplemente no vuelve; no se inventa una fila.
+ *
+ * El `companyId` que llega por la interfaz publica se envuelve en un `RecipeScope` y se
+ * compone con `recipeCompanyScope` -la MISMA definicion de ambito que usa el resto del
+ * modulo-, nunca escrito a mano en el `where`: una receta de otra empresa tiene que
+ * desaparecer exactamente igual que un id que no existe, y esa igualdad solo la garantiza
+ * pasar por el mismo camino. El ambito se compone con `AND` contra `id: { in: ids }` y no
+ * gana ningun filtro de vida: `isDeleted` sigue viajando en cada `Ref`.
  */
 
 type RecipeCatalogRow = {
@@ -35,11 +45,13 @@ export function toRecipeRef(row: RecipeCatalogRow): RecipeRef {
 
 export async function findRecipeRefsIncludingDeleted(
   ids: readonly RecipeId[],
+  companyId: string,
 ): Promise<readonly RecipeRef[]> {
   if (ids.length === 0) return [];
 
+  const scope: RecipeScope = { companyId };
   const rows = await prisma.recipe.findMany({
-    where: { id: { in: [...ids] } },
+    where: { AND: [recipeCompanyScope(scope), { id: { in: [...ids] } }] },
     select: { id: true, name: true, deletedAt: true },
   });
 

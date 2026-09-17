@@ -3,12 +3,17 @@ import { assertPermission, type PermissionCode } from '@/lib/modules/identity';
 import { UnauthorizedError } from './errors';
 
 /**
- * Actor de entrada de cada caso de uso: id y CONJUNTO DE PERMISOS, nada mas. QC-74 (R18)
- * retiro el nombre del rol: ningun caso de uso ni adaptador de este modulo lee, compara ni
- * recibe el nombre del rol —eso es display, y vive en `identity`—.
+ * Actor de entrada de cada caso de uso: id, EMPRESA y CONJUNTO DE PERMISOS, nada mas. QC-74
+ * (R18) retiro el nombre del rol: ningun caso de uso ni adaptador de este modulo lee,
+ * compara ni recibe el nombre del rol —eso es display, y vive en `identity`—.
+ *
+ * `companyId` viaja dentro del actor y no como parametro suelto de cada caso de uso, para
+ * que ningun llamante nuevo pueda olvidarlo ni, peor, elegirlo. Filtra y no autoriza por si
+ * solo: el permiso se sigue exigiendo aparte y primero, con `requirePermission`.
  */
 export type Actor = {
   readonly id: string;
+  readonly companyId: string;
   readonly permissions: readonly string[];
 };
 

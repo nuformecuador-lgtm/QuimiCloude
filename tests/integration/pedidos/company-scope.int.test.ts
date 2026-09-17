@@ -429,10 +429,10 @@ async function crearUsuario(tx: Prisma.TransactionClient, companyId: string): Pr
   return user.id
 }
 
-async function crearReceta(tx: Prisma.TransactionClient): Promise<string> {
+async function crearReceta(tx: Prisma.TransactionClient, companyId: string): Promise<string> {
   const marca = token()
   const recipe = await tx.recipe.create({
-    data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}` },
+    data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}`, companyId },
     select: { id: true },
   })
   return recipe.id
@@ -520,7 +520,8 @@ afterAll(async () => {
 describe('R1 — todo pedido lleva una empresa que existe', () => {
   it('rechaza con 23502 un pedido SIN empresa y no escribe la fila', async () => {
     await inRolledBackTransaction(async (tx) => {
-      const recipeId = await crearReceta(tx)
+      const quimicloud = await quimicloudId(tx)
+      const recipeId = await crearReceta(tx, quimicloud)
       const sequence = freshSequence()
       const rechazo = await expectRejectedByDatabase(
         tx,
@@ -541,7 +542,8 @@ describe('R1 — todo pedido lleva una empresa que existe', () => {
 
   it('rechaza con 23503 un pedido con una empresa INEXISTENTE y no escribe la fila', async () => {
     await inRolledBackTransaction(async (tx) => {
-      const recipeId = await crearReceta(tx)
+      const quimicloud = await quimicloudId(tx)
+      const recipeId = await crearReceta(tx, quimicloud)
       const inventada = randomUUID()
       const rechazo = await expectRejectedByDatabase(
         tx,
@@ -571,7 +573,7 @@ describe('R11 — (ano, secuencia) es unico por empresa, no global', () => {
       const marca = token()
       const empresaA = await crearEmpresa(tx, `a${marca}`)
       const empresaB = await crearEmpresa(tx, `b${marca}`)
-      const recipeId = await crearReceta(tx)
+      const recipeId = await crearReceta(tx, empresaA)
       const year = currentUtcYear()
       const sequence = freshSequence()
 
@@ -591,7 +593,7 @@ describe('R11 — (ano, secuencia) es unico por empresa, no global', () => {
   it('RECHAZA con 23505 la misma pareja dentro de la MISMA empresa, contra orders_company_year_sequence_key', async () => {
     await inRolledBackTransaction(async (tx) => {
       const empresa = await crearEmpresa(tx, token())
-      const recipeId = await crearReceta(tx)
+      const recipeId = await crearReceta(tx, empresa)
       const year = currentUtcYear()
       const sequence = freshSequence()
       const primero = await insertarPedido(tx, { companyId: empresa, recipeId, year, sequence })
@@ -626,7 +628,7 @@ describe('R25 — una asignacion no puede apuntar a un pedido de otra empresa', 
       const marca = token()
       const empresaA = await crearEmpresa(tx, `a${marca}`)
       const empresaB = await crearEmpresa(tx, `b${marca}`)
-      const recipeId = await crearReceta(tx)
+      const recipeId = await crearReceta(tx, empresaA)
       const pedidoDeA = await insertarPedido(tx, {
         companyId: empresaA,
         recipeId,
@@ -653,7 +655,7 @@ describe('R26 — la asignacion suelta (sin grupo) sigue aceptandose', () => {
   it('acepta work_group_id NULL con pedido y persona de la misma empresa, y ninguna FK es MATCH FULL', async () => {
     await inRolledBackTransaction(async (tx) => {
       const empresa = await crearEmpresa(tx, token())
-      const recipeId = await crearReceta(tx)
+      const recipeId = await crearReceta(tx, empresa)
       const pedido = await insertarPedido(tx, {
         companyId: empresa,
         recipeId,
@@ -700,7 +702,7 @@ describe('R2, R3, R13 — el UP asigna todos los pedidos a «QuimiCloud» sin re
       await runScript(tx, DOWN)
       expect(await fotoDelEsquema(tx)).toEqual({ ...ESQUEMA_PREVIO, rlsForzada: RLS_FORZADA })
 
-      const recipeId = await crearReceta(tx)
+      const recipeId = await crearReceta(tx, quimicloud)
       const p37 = await insertarPedidoPrevio(tx, { recipeId, sequence: 37 })
       const p44 = await insertarPedidoPrevio(tx, { recipeId, sequence: 44, status: 'CANCELADO' })
       const p77 = await insertarPedidoPrevio(tx, { recipeId, sequence: 77, deleted: true })
@@ -746,7 +748,7 @@ describe('R2, R3, R13 — el UP asigna todos los pedidos a «QuimiCloud» sin re
       await vaciarPedidos(tx)
       await runScript(tx, DOWN)
 
-      const recipeId = await crearReceta(tx)
+      const recipeId = await crearReceta(tx, quimicloud)
       const p37 = await insertarPedidoPrevio(tx, { recipeId, sequence: 37 })
 
       // Sin ninguna empresa llamada «quimicloud» y con al menos dos en la tabla: no hay candidata.
@@ -788,7 +790,7 @@ describe('R6 — el DOWN aborta entero si hay pedidos de otra empresa', () => {
       const quimicloud = await quimicloudId(tx)
       await vaciarPedidos(tx)
       const ajena = await crearEmpresa(tx, token())
-      const recipeId = await crearReceta(tx)
+      const recipeId = await crearReceta(tx, quimicloud)
       const year = currentUtcYear()
       const propio = await insertarPedido(tx, { companyId: quimicloud, recipeId, year, sequence: 5 })
       const deOtra = await insertarPedido(tx, { companyId: ajena, recipeId, year, sequence: 5 })
@@ -813,7 +815,7 @@ describe('R6 — el DOWN aborta entero si hay pedidos de otra empresa', () => {
       const quimicloud = await quimicloudId(tx)
       await vaciarPedidos(tx)
       const ajena = await crearEmpresa(tx, token())
-      const recipeId = await crearReceta(tx)
+      const recipeId = await crearReceta(tx, quimicloud)
       const year = currentUtcYear()
       await insertarPedido(tx, { companyId: quimicloud, recipeId, year, sequence: 5 })
       const deOtra = await insertarPedido(tx, { companyId: ajena, recipeId, year, sequence: 6 })
@@ -840,7 +842,7 @@ describe('R6 — el DOWN aborta entero si hay pedidos de otra empresa', () => {
       const quimicloud = await quimicloudId(tx)
       await vaciarPedidos(tx)
       const ajena = await crearEmpresa(tx, token())
-      const recipeId = await crearReceta(tx)
+      const recipeId = await crearReceta(tx, quimicloud)
       const year = currentUtcYear()
       // Todos los pedidos son de la empresa del UP y sin parejas repetidas: las guardias 1 y 2
       // no tienen nada que ver, asi que si el DOWN aborta solo puede hacerlo la 3.
@@ -922,7 +924,7 @@ describe('R5, R7 — el DOWN limpio restaura el esquema global y deja el contado
       const retrasada = await tx.$queryRaw<{ v: bigint }[]>`SELECT nextval('orders_sequence_2962') AS v`
       expect(Number(retrasada[0]?.v)).toBe(1)
 
-      const recipeId = await crearReceta(tx)
+      const recipeId = await crearReceta(tx, quimicloud)
       const ids = [
         await insertarPedido(tx, { companyId: quimicloud, recipeId, year: 2961, sequence: 5, createdAt: '2961-03-01T12:00:00Z' }),
         await insertarPedido(tx, { companyId: quimicloud, recipeId, year: 2961, sequence: 12, createdAt: '2961-03-02T12:00:00Z' }),

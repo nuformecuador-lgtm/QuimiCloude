@@ -18,7 +18,12 @@ import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
 // QC-74 (R16, R18): el actor ya no lleva nombre de rol, lleva el conjunto de permisos.
 // Los dos codigos de `recetas`, que es lo que exigen los cinco casos de uso.
-const ADMIN: Actor = { id: 'admin-1', permissions: ['recetas.consultar', 'recetas.modificar'] };
+const EMPRESA = 'empresa-1';
+const ADMIN: Actor = {
+  id: 'admin-1',
+  companyId: EMPRESA,
+  permissions: ['recetas.consultar', 'recetas.modificar'],
+};
 
 const AHORA = new Date('2026-09-03T10:00:00.000Z');
 
@@ -147,6 +152,7 @@ describe('R5, R6 — alta de receta', () => {
       expect.objectContaining({ name: RECETA_VALIDA.name }),
       ADMIN.id,
       AHORA,
+      { companyId: EMPRESA },
     );
 
     await updateRecipe('receta-1', RECETA_VALIDA, ADMIN);
@@ -155,10 +161,16 @@ describe('R5, R6 — alta de receta', () => {
       expect.objectContaining({ name: RECETA_VALIDA.name }),
       ADMIN.id,
       AHORA,
+      { companyId: EMPRESA },
     );
 
     await deleteRecipe('receta-1', ADMIN);
-    expect(recipes.softDeleteAlive).toHaveBeenCalledWith('receta-1', ADMIN.id, AHORA);
+    expect(recipes.softDeleteAlive).toHaveBeenCalledWith(
+      'receta-1',
+      ADMIN.id,
+      AHORA,
+      { companyId: EMPRESA },
+    );
     // El puerto `replaceAlive`/`softDeleteAlive` no expone `createdBy` en su firma (solo
     // `actorId`, que aqui es siempre el autor de la ULTIMA modificacion): la conservacion
     // real del autor de creacion a traves de un `UPDATE` la cierra el adaptador Prisma
@@ -206,6 +218,7 @@ describe('R11 — la edicion recibe la lista final completa', () => {
       expect.objectContaining({ lines: nuevaListaCompleta.lines }),
       ADMIN.id,
       AHORA,
+      { companyId: EMPRESA },
     );
     // No existe ningun metodo `addLine`/`removeLine` en el puerto: `RecipeRepository`
     // solo expone `create`/`findAliveById`/`listAlive`/`replaceAlive`/`softDeleteAlive`.
@@ -222,7 +235,7 @@ describe('R17 — producto inexistente', () => {
     const createRecipe = createCreateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
     await expect(createRecipe(RECETA_VALIDA, ADMIN)).rejects.toThrow();
-    expect(products.findRefs).toHaveBeenCalledWith([LINEA_VALIDA.productId]);
+    expect(products.findRefs).toHaveBeenCalledWith([LINEA_VALIDA.productId], EMPRESA);
     expect(recipes.create).not.toHaveBeenCalled();
   });
 });
@@ -238,7 +251,7 @@ describe('R50 — unidad inexistente', () => {
     const createRecipe = createCreateRecipe({ recipes, products, units, images, now: () => AHORA });
 
     await expect(createRecipe(RECETA_VALIDA, ADMIN)).rejects.toThrow();
-    expect(units.findRefs).toHaveBeenCalledWith([LINEA_VALIDA.unitId]);
+    expect(units.findRefs).toHaveBeenCalledWith([LINEA_VALIDA.unitId], EMPRESA);
     expect(recipes.create).not.toHaveBeenCalled();
   });
 
@@ -254,7 +267,7 @@ describe('R50 — unidad inexistente', () => {
     // La linea es la MISMA que ya trae `FILA_RECETA` (existing) -no es "nueva"- pero R50
     // no exime a las lineas preexistentes: se valida igual.
     await expect(updateRecipe('receta-1', RECETA_VALIDA, ADMIN)).rejects.toThrow();
-    expect(units.findRefs).toHaveBeenCalledWith([LINEA_VALIDA.unitId]);
+    expect(units.findRefs).toHaveBeenCalledWith([LINEA_VALIDA.unitId], EMPRESA);
     expect(recipes.replaceAlive).not.toHaveBeenCalled();
   });
 });
@@ -330,7 +343,12 @@ describe('R27 — borrar la receta conserva su imagen', () => {
 
     await deleteRecipe('receta-1', ADMIN);
 
-    expect(recipes.softDeleteAlive).toHaveBeenCalledWith('receta-1', ADMIN.id, AHORA);
+    expect(recipes.softDeleteAlive).toHaveBeenCalledWith(
+      'receta-1',
+      ADMIN.id,
+      AHORA,
+      { companyId: EMPRESA },
+    );
     // `createDeleteRecipe` ni siquiera recibe un `RecipeImageStorage` en sus deps: no hay
     // forma estructural de que este caso de uso toque el almacenamiento (R27).
   });
@@ -405,7 +423,7 @@ describe('R36 — excluye las recetas borradas', () => {
     const getRecipe = createGetRecipe({ recipes, products, images });
 
     await expect(getRecipe('borrada', ADMIN)).rejects.toBeInstanceOf(RecipeNotFoundError);
-    expect(recipes.findAliveById).toHaveBeenCalledWith('borrada');
+    expect(recipes.findAliveById).toHaveBeenCalledWith('borrada', { companyId: EMPRESA });
   });
 });
 

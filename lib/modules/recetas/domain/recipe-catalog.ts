@@ -23,10 +23,19 @@ export type RecipeRef = {
  *  una receta sin consultar su modelo ni importar `recetas` por ruta profunda. */
 export interface RecipeCatalog {
   /** Referencias de las recetas pedidas, INCLUIDAS LAS DADAS DE BAJA, que vienen con
-   *  `isDeleted: true`. Un id que no existe simplemente no vuelve. El nombre es explicito
-   *  para que nadie lo confunda con `ProductCatalog.findRefs`/`UnitCatalog.findRefs`, que
-   *  devuelven SOLO lo vivo. */
-  findRefsIncludingDeleted(ids: readonly RecipeId[]): Promise<readonly RecipeRef[]>;
+   *  `isDeleted: true`. Un id que no existe simplemente no vuelve -y una receta de OTRA
+   *  empresa tampoco: para quien pregunta son el mismo caso-. El nombre es explicito para
+   *  que nadie lo confunda con `ProductCatalog.findRefs`/`UnitCatalog.findRefs`, que
+   *  devuelven SOLO lo vivo.
+   *
+   *  Recibe `companyId` como cadena suelta y no como un tipo de ambito propio de `recetas`:
+   *  ese tipo es interno del modulo, y publicarlo por el barrel para que OTRO modulo lo
+   *  construya acoplaria dos modulos por un dato que ya es una cadena en los dos lados. La
+   *  firma exige el ambito para que una llamada que lo omita no compile. */
+  findRefsIncludingDeleted(
+    ids: readonly RecipeId[],
+    companyId: string,
+  ): Promise<readonly RecipeRef[]>;
 
   /** El contenido con el que se ejecuta una receta, INCLUIDA UNA DADA DE BAJA (viene con
    *  `isDeleted: true`, nunca `null` por eso). `null` es solo «este id no existe». */

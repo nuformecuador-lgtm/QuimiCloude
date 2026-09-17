@@ -185,7 +185,9 @@ interface RecipeSeed {
 
 /**
  * `nameNormalized` va literal, sin `normalizeRecipeName`, para que un fallo del algoritmo no
- * deje verde este archivo.
+ * deje verde este archivo. La empresa es la MISMA que usan los productos de este archivo
+ * (`inventoryCompanyOf`): QC-50 hizo `recipes.company_id` obligatoria, y ningun aserto de aqui
+ * depende de que sean empresas distintas.
  */
 async function createRecipe(tx: Prisma.TransactionClient, seed: RecipeSeed): Promise<string> {
   const recipe = await tx.recipe.create({
@@ -193,6 +195,7 @@ async function createRecipe(tx: Prisma.TransactionClient, seed: RecipeSeed): Pro
       name: seed.name,
       nameNormalized: seed.nameNormalized,
       createdBy: seed.createdBy ?? null,
+      companyId: await inventoryCompanyOf(tx),
     },
     select: { id: true },
   })
@@ -247,6 +250,7 @@ type WritableColumn =
   | 'image_path'
   | 'created_by'
   | 'updated_by'
+  | 'company_id'
   | 'recipe_id'
   | 'product_id'
   | 'quantity'
@@ -337,6 +341,7 @@ describe('estructura de la receta', () => {
           imagePath: 'recetas/desengrasante.png',
           createdBy: authorId,
           updatedBy: authorId,
+          companyId: await inventoryCompanyOf(tx),
         },
         select: { id: true },
       })
@@ -372,11 +377,16 @@ describe('estructura de la receta', () => {
   it('rechaza una receta sin nombre con SQLSTATE 23502', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
+      const companyId = await inventoryCompanyOf(tx)
 
       // La unica columna obligatoria que falta es `name`: el 23502 solo puede venir de ella.
       const sqlState = await expectRejectedByDatabase(
         tx,
-        () => rawInsert(tx, 'recipes', { name_normalized: Prisma.sql`${marker}` }),
+        () =>
+          rawInsert(tx, 'recipes', {
+            name_normalized: Prisma.sql`${marker}`,
+            company_id: asUuid(companyId),
+          }),
         'receta sin nombre',
       )
       expect(sqlState).toBe(NOT_NULL_VIOLATION)
@@ -397,7 +407,7 @@ describe('estructura de la receta', () => {
       expect(name).toHaveLength(500)
 
       const { id } = await tx.recipe.create({
-        data: { name, nameNormalized: name, description },
+        data: { name, nameNormalized: name, description, companyId: await inventoryCompanyOf(tx) },
         select: { id: true },
       })
 
@@ -421,7 +431,12 @@ describe('estructura de la receta', () => {
       const steps = ['1. Pesar', '2. Mezclar', '3. Reposar 24 h', '4. Envasar']
 
       const { id } = await tx.recipe.create({
-        data: { name: `Lista ${marker}`, nameNormalized: `lista${marker}`, steps },
+        data: {
+          name: `Lista ${marker}`,
+          nameNormalized: `lista${marker}`,
+          steps,
+          companyId: await inventoryCompanyOf(tx),
+        },
         select: { id: true },
       })
 
@@ -438,7 +453,12 @@ describe('estructura de la receta', () => {
 
       const raro = { nota: 'esto no es una lista', repeticiones: 3, anidado: { a: [1, 2] } }
       const { id: rareId } = await tx.recipe.create({
-        data: { name: `Raro ${marker}`, nameNormalized: `raro${marker}`, steps: raro },
+        data: {
+          name: `Raro ${marker}`,
+          nameNormalized: `raro${marker}`,
+          steps: raro,
+          companyId: await inventoryCompanyOf(tx),
+        },
         select: { id: true },
       })
       const rareRecipe = await tx.recipe.findUniqueOrThrow({ where: { id: rareId } })
@@ -487,6 +507,7 @@ describe('estructura de la receta', () => {
           name: `Con imagen ${marker}`,
           nameNormalized: `conimagen${marker}`,
           imagePath: 'https://storage.example.test/recetas/foto%20final.jpg',
+          companyId: await inventoryCompanyOf(tx),
         },
         select: { id: true },
       })
@@ -516,13 +537,16 @@ describe('unicidad del nombre de la receta', () => {
         nameNormalized: normalized,
       })
 
-      // El nombre original es distinto: lo que choca es la clave normalizada.
+      // El nombre original es distinto: lo que choca es la clave normalizada, DENTRO de la misma
+      // empresa (`inventoryCompanyOf` memoiza una sola por transaccion).
+      const companyId = await inventoryCompanyOf(tx)
       const sqlState = await expectRejectedByDatabase(
         tx,
         () =>
           rawInsert(tx, 'recipes', {
             name: Prisma.sql`${`desengrasante-5%-${marker}`}`,
             name_normalized: Prisma.sql`${normalized}`,
+            company_id: asUuid(companyId),
           }),
         'segunda receta con el mismo nombre normalizado',
       )
@@ -560,12 +584,14 @@ describe('unicidad del nombre de la receta', () => {
       expect(rows).toHaveLength(2)
       expect(rows.filter((row) => row.deletedAt === null).map((row) => row.id)).toEqual([secondId])
 
+      const companyId = await inventoryCompanyOf(tx)
       const sqlState = await expectRejectedByDatabase(
         tx,
         () =>
           rawInsert(tx, 'recipes', {
             name: Prisma.sql`${`Jabon liquido ${marker}`}`,
             name_normalized: Prisma.sql`${normalized}`,
+            company_id: asUuid(companyId),
           }),
         'tercera receta viva con el nombre ya reutilizado',
       )
@@ -931,6 +957,7 @@ describe('frontera con inventario e identity: FK reales sin relacion de Prisma',
       )
       expect(productoFantasma).toBe(FOREIGN_KEY_VIOLATION)
 
+      const companyId = await inventoryCompanyOf(tx)
       const autorFantasma = await expectRejectedByDatabase(
         tx,
         () =>
@@ -938,6 +965,7 @@ describe('frontera con inventario e identity: FK reales sin relacion de Prisma',
             name: Prisma.sql`${`Con autor fantasma ${marker}`}`,
             name_normalized: Prisma.sql`${`fantasma${marker}`}`,
             created_by: asUuid(randomUUID()),
+            company_id: asUuid(companyId),
           }),
         'receta con created_by inventado',
       )
@@ -960,6 +988,12 @@ describe('frontera con inventario e identity: FK reales sin relacion de Prisma',
         { conname: 'recipe_lines_product_id_fkey', referencia: 'products' },
         { conname: 'recipe_lines_recipe_id_fkey', referencia: 'recipes' },
         { conname: 'recipe_lines_unit_id_fkey', referencia: 'units' },
+        // `recipes.company_id` es del mismo tipo que `created_by`/`updated_by`: la FK esta
+        // escrita a mano en el `migration.sql` de QC-50 y sin `@relation` en el esquema de
+        // Prisma, a proposito. Con `@relation` el cliente generado dejaria hacer un `include`
+        // que cruzara desde `recetas` hasta `companies`, y ninguna guardia de imports lo veria
+        // pasar: la integridad referencial la sigue dando Postgres, no el cliente.
+        { conname: 'recipes_company_id_fkey', referencia: 'companies' },
         { conname: 'recipes_created_by_fkey', referencia: 'users' },
         { conname: 'recipes_updated_by_fkey', referencia: 'users' },
       ])
@@ -980,6 +1014,7 @@ describe('auditoria, borrado y marcas de tiempo', () => {
           nameNormalized: marker,
           createdBy: autor,
           updatedBy: autor,
+          companyId: await inventoryCompanyOf(tx),
         },
         select: { id: true },
       })
@@ -993,6 +1028,7 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       expect(recipe.createdBy).toBe(autor)
       expect(recipe.updatedBy).toBe(editor)
 
+      const companyId = await inventoryCompanyOf(tx)
       const altaConAutorInventado = await expectRejectedByDatabase(
         tx,
         () =>
@@ -1000,6 +1036,7 @@ describe('auditoria, borrado y marcas de tiempo', () => {
             name: Prisma.sql`${`Otra ${marker}`}`,
             name_normalized: Prisma.sql`${`otra${marker}`}`,
             created_by: asUuid(randomUUID()),
+            company_id: asUuid(companyId),
           }),
         'alta con autor inexistente',
       )
@@ -1064,6 +1101,7 @@ describe('auditoria, borrado y marcas de tiempo', () => {
           imagePath: 'recetas/borrada.png',
           createdBy: autor,
           updatedBy: autor,
+          companyId: await inventoryCompanyOf(tx),
         },
         select: { id: true },
       })

@@ -1,4 +1,5 @@
 import type { ListQuery } from '../domain/list-query';
+import type { RecipeScope } from '../domain/recipe-scope';
 import type { RecipeStepView } from '../domain/recipe-view';
 
 /**
@@ -11,6 +12,16 @@ import type { RecipeStepView } from '../domain/recipe-view';
  * `23505` -> `'duplicate'` y `23514` -> un error de validacion antes de que el dominio lo
  * vea (`design.md > 7.3`). **La unicidad de R10 la garantiza unicamente el indice unico
  * parcial**: no hay comprobacion previa por `nameNormalized`, que seria una carrera.
+ *
+ * Los cinco metodos exigen `scope: RecipeScope` al FINAL de la firma. Ponerlo en la firma
+ * -y no como un filtro que el adaptador decida aplicar o no- es lo que hace que una
+ * LLAMADA que lo olvide no compile: quien escriba un sexto llamante dentro de un año no
+ * puede enterarse en produccion de que le faltaba la empresa. Una implementacion que lo
+ * omita si compila (TypeScript acepta asignar una funcion de menor aridad donde se espera
+ * una de mayor), asi que esa mitad la vigila una guardia, no el compilador.
+ *
+ * «De otra empresa» sale por el mismo camino que «no existe» -`null` o `'not_found'`-:
+ * distinguirlos le daria a quien pregunta un oraculo sobre lo que otra empresa tiene.
  */
 
 /** Linea de producto, tal como el dominio la entrega al puerto o la recibe de vuelta. */
@@ -61,8 +72,13 @@ export type RecipeRow = {
 };
 
 export interface RecipeRepository {
-  create(data: NewRecipe, actorId: string, now: Date): Promise<{ id: string } | 'duplicate'>;
-  findAliveById(id: string): Promise<RecipeRow | null>;
+  create(
+    data: NewRecipe,
+    actorId: string,
+    now: Date,
+    scope: RecipeScope,
+  ): Promise<{ id: string } | 'duplicate'>;
+  findAliveById(id: string, scope: RecipeScope): Promise<RecipeRow | null>;
   /**
    * QC-57 (R13, R14): ademas de la ventana, recibe el CONTRATO GENERICO ya saneado por el caso
    * de uso -orden, filtros y busqueda-. `offset`/`limit` siguen llegando calculados desde el
@@ -73,12 +89,19 @@ export interface RecipeRepository {
     offset: number,
     limit: number,
     query: ListQuery,
+    scope: RecipeScope,
   ): Promise<{ rows: readonly RecipeRow[]; total: number }>;
   replaceAlive(
     id: string,
     data: NewRecipe,
     actorId: string,
     now: Date,
+    scope: RecipeScope,
   ): Promise<'ok' | 'not_found' | 'duplicate'>;
-  softDeleteAlive(id: string, actorId: string, now: Date): Promise<'ok' | 'not_found'>;
+  softDeleteAlive(
+    id: string,
+    actorId: string,
+    now: Date,
+    scope: RecipeScope,
+  ): Promise<'ok' | 'not_found'>;
 }
