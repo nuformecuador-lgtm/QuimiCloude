@@ -182,7 +182,9 @@ No se reexporta desde el barrel del modulo.
 
 ## Bloque 2 — Ruta, menu y aterrizaje
 
-### T10 · `[PA1]` Constante de ruta, helper de detalle y prefijo privado (R1, R2)
+### T10 · `[x]` Constante de ruta, helper de detalle y prefijo privado (R1, R2)
+
+> Hecha en el commit `0ede341` (2026-09-16), junto con T12.
 
 **Toca**
 - `lib/shared/routes.ts` (constante nueva + helper derivado del disparador de R22 + **una** fila en
@@ -194,7 +196,9 @@ prefijo—.
 **Hecho cuando:** la constante aparece **una sola vez** en los prefijos y ningun otro archivo de
 producto redeclara la URL.
 
-### T11 · `[PA1]` Item de menu y guardias del menu tensadas (R3, R35)
+### T11 · `[x]` Item de menu y guardias del menu tensadas (R3, R35)
+
+> Hecha en el commit `4243548` (2026-09-16).
 
 **Toca**
 - `lib/shared/navigation/private-nav.ts` (etiqueta nueva + entrada en `PRIVATE_NAV_ITEMS` **entre
@@ -212,7 +216,9 @@ intacta (esta ficha **no** anade permisos).
 
 ## Bloque 3 — La pantalla
 
-### T12 · `[PA1]` Pagina y componentes de la ruta (R4, R26-R32)
+### T12 · `[x]` Pagina y componentes de la ruta (R4, R26-R32)
+
+> Hecha en el commit `0ede341` (2026-09-16), junto con T10.
 
 **Toca** (todos **nuevos**)
 - `app/(private)<RUTA>/page.tsx`
@@ -236,7 +242,9 @@ intacta (esta ficha **no** anade permisos).
 - el barrel **no** declara `'use client'` y la pagina importa **solo** desde el barrel;
 - objetivos tactiles >= 44x44 y el motivo de R21 **visible**, no solo en `tooltip` (R32).
 
-### T13 · `[PA1]` Test de contrato de la ruta (R33)
+### T13 · `[x]` Test de contrato de la ruta (R33)
+
+> Hecha en el commit `0ede341` (2026-09-16), junto con T10/T12.
 
 **Toca**
 - `tests/unit/asignaciones-ui/assigned-orders-route-contract.test.ts` (**archivo nuevo**, calcado de
@@ -249,7 +257,9 @@ pantalla donde dice la constante, `components/index.ts` sin `'use client'`, la p
 del barrel, ningun archivo de la ruta con la URL a mano, y que el permiso de la pagina y el del item
 de menu son **el mismo codigo**, derivado del catalogo.
 
-### T14 · Tests de los componentes (R16-R22, R28-R30) `[P]`
+### T14 · `[x]` Tests de los componentes (R16-R22, R28-R30) `[P]`
+
+> Hecha en el commit `6b83eb8` (2026-09-16).
 
 **Toca**
 - `tests/unit/asignaciones-ui/assigned-orders-columns.test.tsx` (**nuevo**)
@@ -293,7 +303,9 @@ duplicacion queda anotada como **deuda con destinatario** en `progress/impl_QC-8
 
 ## Bloque 4 — Lo que esta feature rompe y tiene que arreglar
 
-### T15 · Actualizar el E2E de permisos por el cambio de aterrizaje (R34)
+### T15 · `[x]` Actualizar el E2E de permisos por el cambio de aterrizaje (R34)
+
+> Hecha en el commit `bda2a9a` (2026-09-16).
 
 **Toca**
 - `e2e/permisos.spec.ts` (el aterrizaje afirmado; `HIDDEN_NAV_TEST_IDS` **no** gana el item nuevo)
@@ -305,7 +317,12 @@ sigue visible; **el 404 sobre `ORDERS_ROUTE` se conserva tal cual** —es lo que
 `tests/guards/guard-e2e-landing.test.ts` para este spec **se conserva con su motivo** (no se anade
 ninguna excepcion nueva).
 
-### T16 · E2E del recorrido del Operador (R38)
+### T16 · `[x]` E2E del recorrido del Operador (R38)
+
+> Hecha en el commit `5981070` (2026-09-16). **Sin correr Playwright de verdad**: la base
+> Postgres local compartida tiene drift respecto a este branch (ver bitacora, seccion
+> "Bloqueo de entorno"). El leader debe resolverlo antes de que `./init.sh` (completo, que
+> corre E2E) pueda cerrar la feature.
 
 **Toca**
 - `e2e/pedidos-asignados.spec.ts` (**archivo nuevo**; no se toca `e2e/pedidos.spec.ts` ni
