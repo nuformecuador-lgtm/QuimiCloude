@@ -256,3 +256,215 @@ por modulo de `composition` la recoja.
    el requisito y se retiran el parrafo muerto y su test doblado.
 
 Nada mas. Con esas dos, esta ficha pasa.
+
+---
+
+# Segunda revision — 2026-09-17
+
+> Sobre el mismo worktree, rama `feature/QC-63-ejecutar-receta-operador`, HEAD `08f5612`, arbol
+> limpio y al dia con `origin/dev`. **Acotada a lo que cambio desde `955ff28`** (3 commits:
+> `3f75b9b`, `abc7873`, `08f5612`; 20 archivos). Lo que la primera vuelta dio por bueno y el diff
+> nuevo no toca **sigue dado por bueno**.
+>
+> **No** se repitio el gate completo ni Playwright: los corrio el leader (519 archivos, 7495 tests,
+> los cuatro E2E contra Chromium). Lo de aqui es focalizado con `--maxWorkers=2` y **cinco
+> mutaciones propias**, cada una restaurada y con el arbol limpio al terminar.
+
+## Veredicto
+
+**OK.** Los dos bloqueantes estan cerrados y verificados contra el fuente, no contra la bitacora.
+Quedan cuatro hallazgos `menor` nuevos, ninguno impide el merge.
+
+## Cierre de los bloqueantes
+
+### BLOQ-1 — CERRADO
+
+`lib/modules/asignaciones/index.ts:125` ya dice «La pantalla de ejecucion. Bloque NUEVO al final:
+...»: la cita `QC-63 T8` se fue y el resto del comentario, que describe el archivo, se quedo.
+
+**Y no entro ninguna otra.** Barrido de los cuatro patrones (QC-n, R-n, design.md, «decision
+cerrada») sobre **todo** el diff de produccion contra `origin/dev` (`app/`, `lib/`, `components/`):
+**una sola linea**, la `(R44)` de `lib/composition/index.ts`, que entra solo por el reflow del
+comentario. Es **preexistente**: `docs/conventions.md` dice que los comentarios que el diff no
+introduce no se arrastran, y asi la clasifique en la primera vuelta (menor 4). **No es hallazgo
+nuevo ni bloquea.**
+
+Los comentarios que el diff nuevo **si** anade —el del componente del aviso, el del helper de
+`page.tsx`, el de `DELIVERED_ORDER_PARAM` en `routes.ts` y la cabecera de
+`finish-assigned-order.ts`— explican **por que**, sin una sola cita de ficha.
+
+### BLOQ-2 (R15) — CERRADO
+
+Verificado **contra el fuente**, punto por punto de lo pedido:
+
+1. **Alcanzable en produccion.** La cadena completa existe y encaja:
+   - `lib/modules/asignaciones/domain/finish-assigned-order.ts` devuelve el numero
+     (tipo `FinishAssignedOrderResult`, campo `numberText`) en lugar de `void`;
+   - `order-execution-actions.ts` desestructura ese `numberText` y redirige a la lista anadiendo
+     `DELIVERED_ORDER_PARAM` con el numero pasado por `encodeURIComponent`;
+   - `app/(private)/asignacion/page.tsx` lee el parametro y monta `AssignedOrderDeliveredNotice`,
+     un parrafo con `role="status"` y `ASSIGNED_ORDER_DELIVERED_TESTID`.
+
+   El aviso vive **en la lista al volver**, que es literalmente la decision del humano del
+   2026-09-17. Ya no depende de ningun estado que la accion no pueda resolver.
+
+2. **El numero se lee ANTES de transicionar.** La llamada a `listAliveSummariesByIds` esta **fuera y
+   antes** del bucle de `transitionAliveById`, con el estado aun vivo, y va **con `actor.companyId`**:
+   el aislamiento por empresa no se afloja. **R5 y R16 intactos**: `requirePermission` sigue siendo
+   la primera sentencia del cuerpo, antes del `safeParse` y de cualquier `deps.`; no se persiste
+   nada nuevo, la lectura es un SELECT. **R14 y el reintento por `stale` intactos**:
+   `assertOrderAcceptsWrites` y el bucle no se tocan, y su test sigue afirmando dos vueltas.
+
+3. **El test puede fallar, y el doble mentiroso desaparecio.**
+   - En `tests/unit/asignaciones-ui/order-execution-screen.test.tsx` **ya no queda ningun
+     `mockResolvedValue` de exito para `finish`**: el unico que queda emite un estado de error con
+     `order_delivered_frozen` y se afirma el testid de error. El `describe` de R15, el `routerMock`
+     y el `ORDER_EXECUTION_CONFIRMATION_TESTID` se fueron del archivo.
+   - Los estados de exito que quedan en `tests/unit/asignaciones/order-execution-actions.test.ts`
+     son el **argumento `prevState` ignorado** de la Server Action, no un valor devuelto por un
+     doble. `order-execution-page.test.tsx:77` es de **`startAssignedOrderAction`**, otra accion,
+     que si resuelve. `order-assignment-actions.test.ts` es de QC-86. Ninguno es `finish`.
+   - El nuevo `order-execution-actions.test.ts` prueba **la accion REAL** con `redirect` doblado
+     —que lanza, como el de Next—, no un doble de la accion.
+
+   **Mutaciones propias, 3 de 3 rojas:**
+   - quite el bloque del aviso de `page.tsx` -> `assigned-orders-delivered-notice.test.tsx`,
+     **1 rojo** de 2;
+   - quite el parametro del `redirect` de la accion -> `order-execution-actions.test.ts`,
+     **2 rojos** de 3;
+   - move la lectura del numero a **despues** de `transitionAliveById` ->
+     `finish-assigned-order.test.ts`, **1 rojo**: el caso «lee el numero ANTES de transicionar»,
+     que compara `invocationCallOrder`. El hueco de la primera vuelta esta tapado.
+
+4. **Codigo muerto retirado de verdad.** En `order-execution-screen.tsx` se fueron el `useEffect`,
+   el `useRouter`, el import de `ASSIGNED_ORDERS_ROUTE`, el texto de confirmacion, la constante
+   `ORDER_EXECUTION_CONFIRMATION_TESTID` y el parrafo condicionado. El barrel de
+   `[id]/components` deja de exportar el testid. `grep` sobre el arbol: **cero** ocurrencias de
+   `ORDER_EXECUTION_CONFIRMATION_TESTID`.
+
+5. **Spec y trazabilidad corregidos con nota fechada y sin borrar lo viejo.** `design.md` **tacha**
+   la frase anterior en vez de borrarla y anade el bloque «CORREGIDO el 2026-09-17», que dice **por
+   que** no podia funcionar, que la sustituye, las alternativas descartadas y la **consecuencia de
+   alcance, declarada**. La fila R15 de la tabla de trazabilidad esta reescrita y nombra los tres
+   tests —accion real, pagina real y E2E R29—, marcada *Ejecutable*, y ahora lo es.
+
+6. **El E2E si lo afirma.** `e2e/ejecucion-receta.spec.ts:373-386` espera la URL **con**
+   `DELIVERED_ORDER_PARAM` y ademas el aviso visible por `data-testid`, conteniendo el numero del
+   pedido. Leido, no ejecutado: lo corrio el leader.
+
+## Lo demas que cambio
+
+### Octavo censo (`recipe-route-contract.test.ts`): no se afloja, y **QC-64 R12 sigue intacta**
+
+La lista de exportadas de `lib/shared/routes.ts` sigue **cerrada** y por **`toEqual` de nombres
+exactos**: crece de 19 a 20 con `DELIVERED_ORDER_PARAM` y una nota fechada que explica el alta.
+**Mutado**: borre la entrada -> `AssertionError: expected [...(20)] to deeply equal [...(19)]`.
+El resto del caso **no se toco**: sigue vivo el barrido por linea que prohibe que cualquier
+constante o funcion exportada de ese archivo se llame como el asistente de lectura o apunte a una
+URL suya. `DELIVERED_ORDER_PARAM = 'entregado'` **no marca ese patron ni es una URL**: es el nombre
+de un parametro de consulta. No se anadio ninguna exencion. **R12 intacta.**
+
+### Alcance ampliado: **acotado**, no me parece que se pasara
+
+Entran `app/(private)/asignacion/page.tsx` y `lib/shared/routes.ts`, y es lo minimo que la decision
+del humano obliga a tocar: la Server Action vive en `lib/` y la lista en `app/`, asi que el nombre
+del parametro tiene que estar donde las dos puedan importarlo. En `page.tsx` el cambio son **tres
+bloques**: el import, el helper de primer valor y el render condicional del aviso. **Ni la lista, ni
+sus columnas, ni su paginacion, ni `assigned-orders-list-params.ts` se tocan** —verificado en el
+diffstat y leyendo el archivo entero: sigue igual, y el aviso **no pasa por el**, de modo que el
+parametro extra no puede alterar la paginacion—. `requirePagePermission('asignaciones.consultar')`
+sigue siendo la **primera** sentencia, antes de resolver `searchParams`. La enmienda esta declarada
+en `design.md` y las filas de R1, R15 y R31 se reescribieron en consecuencia. **Conforme.**
+
+### MENOR-2: CERRADO, y ademas cubierto
+
+La primera consulta de `findUnitRefsSharingBaseInCompany` ya compone el ambito de empresa junto al
+filtro por `id`, y la cabecera del metodo se corrigio para decir «Dos consultas, LAS DOS con
+`companyScopeWhere`». **Mutado**: le quite el ambito -> **4 rojos** en `tests/unit/unidades`, el
+primero comparando el `where` desnudo contra el que lleva el `AND` con el `OR` de empresa. Ya no es
+solo defensa en profundidad: esta probado.
+
+### `requirements.md`: coherente
+
+214 lineas, **una** sola vez cada requisito (R1-R31), **una** sola seccion «Preguntas abiertas»
+—que dice «Ninguna» y remite a la fila del factor— y **una** tabla «Decisiones cerradas» con **18**
+filas: 12 del 2026-09-08 y 6 del 2026-09-17. La duplicacion y la pregunta contradictoria de menor 1
+desaparecieron. **menor 1 CERRADO.**
+
+### Tasks
+
+`tasks.md`: **24 de 24 en `[x]`**, ninguna sin marcar.
+
+### Tests que corri
+
+`tests/unit/asignaciones-ui`, `tests/unit/asignaciones`, `tests/unit/unidades` y
+`recipe-route-contract.test.ts` con `--maxWorkers=2`: **50 archivos, 780 pasados, 6 saltados, 0
+rojos**. El «connection terminated unexpectedly» que aparece en la salida es la traza que un caso de
+`order-assignment-actions.test.ts` **espera** y afirma; el caso pasa.
+
+### El descarte de los dos rojos de `ciclo-de-vida-de-la-base.int.test.ts`
+
+**Me convence.** La rama **no toca** `db/`, ni `prisma/`, ni `scripts/`, ni ese archivo —comprobado
+en el diffstat contra `origin/dev`—, y el unico adaptador de persistencia que cambia
+(`unit-prisma.ts`) tiene su propia cobertura verde y mutada. Fuera del baseline, correcto.
+
+## Hallazgos nuevos
+
+### menor 5 — la cabecera de `order-execution-screen.test.tsx` remite al archivo equivocado
+
+Dice «La confirmacion visible de R15 vive en la lista de pedidos asignados, no en esta pantalla: ver
+`assigned-orders-states.test.tsx`». Ese archivo existe, pero **no** es donde vive ese test: es
+`tests/unit/asignaciones-ui/assigned-orders-delivered-notice.test.tsx`. Una referencia cruzada que
+manda a quien la siga a un archivo que no prueba lo que promete. Una palabra.
+
+### menor 6 — `firstSearchParamValue` duplica `firstValue`, en la carpeta de al lado
+
+`app/(private)/asignacion/page.tsx` define su propio «primer valor del parametro repetido» cuando
+`./components/assigned-orders-list-params.ts` ya tiene `firstValue`, identico linea por linea. No es
+dependencia de terceros ni bloquea; es la misma regla de dos copias que divergen en silencio. Se
+resuelve exportando la que ya hay.
+
+### menor 7 — el aviso confia en un parametro que cualquiera puede escribir a mano
+
+Pedir la lista con el parametro puesto a mano pinta «Pedido <lo-que-sea> entregado» sin que se haya
+entregado nada. **No es un agujero**: React escapa el texto —no hay `dangerouslySetInnerHTML`—, el
+parametro no entra en ninguna consulta ni decision de negocio y no revela nada de otra empresa. Es
+un aviso cosmetico falsificable por quien ya tiene sesion, y solo se enganaria a si mismo. Se anota
+porque el dia que ese aviso quiera decir algo mas que «entregado», el numero tendra que venir
+firmado o releerse del pedido.
+
+### menor 8 — el caso de R5 no afirma el puerto nuevo
+
+`finish-assigned-order.test.ts`, caso «R5: exige `asignaciones.consultar` ANTES de tocar ningun
+puerto», sigue afirmando `not.toHaveBeenCalled()` sobre `listOrderIdsByUserInCompany`,
+`findAliveById` y `transitionAliveById`, pero **no** sobre el `listAliveSummariesByIds` que esta
+tanda estrena en el caso de uso. Hoy no puede llamarse —esta detras de las tres anteriores—, asi que
+la conducta esta cubierta de hecho; es la red la que quedo un puerto mas corta que el caso de uso.
+Una linea.
+
+## Que verifique A FONDO frente a que por lectura
+
+**A fondo, con mutacion propia, cada una restaurada y con el arbol limpio al terminar:**
+
+- el aviso en `page.tsx` (1 rojo);
+- el parametro en el `redirect` de la accion real (2 rojos);
+- el **orden** lectura-antes-de-transicion en el dominio (1 rojo);
+- el octavo censo de `routes.ts` (1 rojo, igualdad exacta, 20 contra 19);
+- el ambito de empresa de MENOR-2 (4 rojos).
+
+**A fondo por lectura linea a linea del fuente:** la cadena completa de R15 —dominio, accion,
+pagina, componente—; la retirada del codigo muerto y el `grep` de cero ocurrencias del testid; el
+barrido de los cuatro patrones de comentario sobre **todo** el diff de produccion contra
+`origin/dev`; el caso del censo entero, para confirmar que no se anadio exencion y que el patron de
+R12 no marca la constante nueva; `assigned-orders-list-params.ts` intacto; `requirements.md`
+completo —secciones, conteo de requisitos y de decisiones—; `design.md`, `tasks.md` y la fila R15 de
+la trazabilidad.
+
+**Por lectura, sin ejecutar:** el E2E, que corrio el leader contra Chromium; y el gate completo, que
+doy por el suyo.
+
+## Para el merge
+
+Nada bloquea. Los cuatro `menor` nuevos (5, 6, 7 y 8), mas los que quedaron de la primera vuelta
+(menor 3 y menor 4), se pueden recoger en una ficha de limpieza o en la siguiente tanda del modulo;
+ninguno pide otra vuelta de revision.
