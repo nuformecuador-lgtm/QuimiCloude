@@ -28,6 +28,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   OrderAssignmentNotFoundError,
   OrderDeliveredFrozenError,
+  UnauthorizedError,
   ValidationError,
   createAssignResponsibles,
   createListOrderResponsibles,
@@ -37,6 +38,7 @@ import {
 } from '@/lib/modules/asignaciones';
 import {
   assignResponsiblesAction,
+  listAssignedOrdersAction,
   listOrderResponsiblesAction,
   listResponsiblesForOrdersAction,
   removeWorkGroupFromOrderAction,
@@ -56,6 +58,7 @@ const {
   unassignResponsibleMock,
   listOrderResponsiblesMock,
   listResponsiblesForOrdersMock,
+  listAssignedOrdersMock,
 } = vi.hoisted(() => ({
   getSessionUserMock: vi.fn(),
   getSessionContextMock: vi.fn(),
@@ -64,6 +67,7 @@ const {
   unassignResponsibleMock: vi.fn(),
   listOrderResponsiblesMock: vi.fn(),
   listResponsiblesForOrdersMock: vi.fn(),
+  listAssignedOrdersMock: vi.fn(),
 }));
 
 // QC-71 (R7, R13): el adaptador driving pide a la composicion la LECTURA de la cabecera del
@@ -86,6 +90,7 @@ vi.mock('@/lib/composition', () => ({
     unassignResponsible: unassignResponsibleMock,
     listOrderResponsibles: listOrderResponsiblesMock,
     listResponsiblesForOrders: listResponsiblesForOrdersMock,
+    listAssignedOrders: listAssignedOrdersMock,
   },
 }));
 
@@ -699,5 +704,109 @@ describe('QC-102 R13 - listResponsiblesForOrdersAction', () => {
     });
     expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
     for (const metodo of puertos.metodos) expect(metodo).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-88 T9 — listAssignedOrdersAction', () => {
+  it('recibe la entrada YA TIPADA -aridad UNO- y la entrega CRUDA al caso de uso', async () => {
+    listAssignedOrdersMock.mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 10,
+      totalPages: 1,
+    });
+
+    await listAssignedOrdersAction({ page: 1, pageSize: 10 });
+
+    expect(listAssignedOrdersAction).toHaveLength(1);
+    expect(listAssignedOrdersMock).toHaveBeenCalledWith(ACTOR_ESPERADO, { page: 1, pageSize: 10 });
+  });
+
+  it('devuelve la pagina TAL CUAL bajo `data`', async () => {
+    const pagina = {
+      items: [
+        {
+          id: ORDER_ID,
+          numberText: '2026-0000001',
+          recipeName: 'Jabon liquido',
+          quantity: '10.0000',
+          priority: 'MEDIA',
+          status: 'PENDIENTE',
+          otherResponsibles: [],
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 10,
+      totalPages: 1,
+    };
+    listAssignedOrdersMock.mockResolvedValue(pagina);
+
+    const resultado = await listAssignedOrdersAction({ page: 1 });
+
+    expect(resultado).toEqual({ status: 'success', data: pagina });
+    expect(JSON.parse(JSON.stringify(resultado))).toEqual({ status: 'success', data: pagina });
+  });
+
+  it('traduce el error por su CODE aunque se mute el texto del mensaje', async () => {
+    const error = new ValidationError();
+    Object.defineProperty(error, 'message', { value: 'un texto que nadie debe mirar' });
+    listAssignedOrdersMock.mockRejectedValue(error);
+
+    const resultado = await listAssignedOrdersAction({ page: 0 });
+
+    expect(resultado).toMatchObject({ status: 'error', code: 'invalid_input' });
+    expect(JSON.stringify(resultado)).not.toContain('un texto que nadie debe mirar');
+  });
+
+  it('un error ajeno al dominio sale como unexpected, con referencia y sin filtrar su texto', async () => {
+    listAssignedOrdersMock.mockRejectedValue(new Error('connection terminated unexpectedly'));
+
+    const resultado = await listAssignedOrdersAction({ page: 1 });
+
+    expect(resultado).toMatchObject({
+      status: 'error',
+      code: 'unexpected',
+      reference: REQUEST_ID_DE_PRUEBA,
+    });
+    expect(JSON.stringify(resultado)).not.toContain('connection terminated');
+  });
+
+  it('NO comprueba ningun permiso: un actor sin permisos llega igual al caso de uso', async () => {
+    getSessionUserMock.mockResolvedValue({ ...SESSION_USER, permissions: [] });
+    listAssignedOrdersMock.mockRejectedValue(new UnauthorizedError());
+
+    const resultado = await listAssignedOrdersAction({ page: 1 });
+
+    expect(listAssignedOrdersMock.mock.calls[0]?.[0]).toEqual({ ...ACTOR_ESPERADO, permissions: [] });
+    expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
+  });
+
+  it('las DOS caras de la sesion se consultan una vez, y sin ninguna el actor es null', async () => {
+    listAssignedOrdersMock.mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 10,
+      totalPages: 1,
+    });
+
+    await listAssignedOrdersAction({ page: 1 });
+
+    expect(getSessionUserMock).toHaveBeenCalledTimes(1);
+    expect(getSessionContextMock).toHaveBeenCalledTimes(1);
+
+    getSessionUserMock.mockResolvedValue(null);
+    listAssignedOrdersMock.mockRejectedValue(new UnauthorizedError());
+
+    await listAssignedOrdersAction({ page: 1 });
+
+    expect(listAssignedOrdersMock.mock.calls[1]?.[0]).toBeNull();
+  });
+
+  it('no se reexporta desde el barrel del modulo: `app/**` la importa por su ruta exacta', async () => {
+    const contrato = await import('@/lib/modules/asignaciones');
+    expect((contrato as Record<string, unknown>).listAssignedOrdersAction).toBeUndefined();
   });
 });

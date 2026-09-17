@@ -1,4 +1,5 @@
 import {
+  ASSIGNED_ORDERS_ROUTE,
   DASHBOARD_ROUTE,
   FORMULAS_ROUTE,
   INVENTORY_ROUTE,
@@ -103,6 +104,9 @@ export const UNITS_LABEL = 'Unidades';
  * criterio que `SUPPLIERS_LABEL`, `ORDERS_LABEL`, `PRESENTATIONS_LABEL` y `UNITS_LABEL`.
  */
 export const USERS_LABEL = 'Usuarios';
+
+/** Lleva tilde a proposito: es el texto que se lee en pantalla, no el segmento de la URL. */
+export const ASSIGNED_ORDERS_LABEL = 'Asignación';
 
 /** Nombre accesible del landmark de navegacion de la barra lateral (R3). */
 export const PRIVATE_NAV_LABEL = 'Navegación principal';
@@ -235,6 +239,18 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     testId: 'nav-dashboard',
     permission: 'dashboard.consultar',
     icon: 'layout-dashboard',
+    section: NAV_SECTION_OPERATION,
+  },
+  // La posicion no es cosmetica: `firstVisibleNavHref` recorre el menu filtrado de arriba abajo,
+  // asi que quien no tiene `dashboard.consultar` aterriza en el primer item visible, que con este
+  // orden es este.
+  {
+    kind: 'link',
+    href: ASSIGNED_ORDERS_ROUTE,
+    label: ASSIGNED_ORDERS_LABEL,
+    testId: 'nav-asignacion',
+    permission: 'asignaciones.consultar',
+    icon: 'clipboard-list',
     section: NAV_SECTION_OPERATION,
   },
   {

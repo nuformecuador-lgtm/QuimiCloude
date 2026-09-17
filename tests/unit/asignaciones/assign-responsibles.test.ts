@@ -103,6 +103,7 @@ function montar(opts: {
     listByOrdersInCompany: vi.fn(async () => []),
     deleteOne: vi.fn(async () => 'ok' as const),
     deleteByWorkGroup: vi.fn(async () => 0),
+    listOrderIdsByUserInCompany: vi.fn(async () => []),
   };
 
   const people = {
@@ -615,6 +616,9 @@ function baseEnMemoria(): {
       borrados += 1;
       return 0;
     },
+    async listOrderIdsByUserInCompany(): Promise<readonly never[]> {
+      return [];
+    },
   };
 
   return {
@@ -640,7 +644,12 @@ function montarSobreBase(
 ): ReturnType<typeof createAssignResponsibles> {
   const deps: AssignResponsiblesDeps = {
     assignments: base.repo,
-    orders: { findAliveById: async () => ({ id: PEDIDO, status: 'PENDIENTE' as const }) },
+    orders: {
+      findAliveById: async () => ({ id: PEDIDO, status: 'PENDIENTE' as const }),
+      listAliveSummariesByIds: async () => {
+        throw new Error('QC-88: no lo usa `assignResponsibles`');
+      },
+    },
     people: {
       findAliveRefsInCompany: async (_companyId: string, ids: readonly string[]) =>
         ids.map((id) => persona(id)),

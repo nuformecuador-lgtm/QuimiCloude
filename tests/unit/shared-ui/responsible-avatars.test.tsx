@@ -5,15 +5,16 @@
 // en vez de copiarse — si manana el texto cambia, el test sigue diciendo la verdad sobre la
 // estructura, que es lo que R17 y R35 exigen.
 //
-// **Todo se importa del BARREL de la ruta** (`@/app/(private)/pedidos/components`), nunca por
-// ruta profunda (R36).
+// **El import es MIXTO a proposito.** El componente y sus `data-testid` vienen de
+// `@/components/shared/responsible-avatars`, su ubicacion real. `MISSING_RESPONSIBLES_MARK` y
+// `MISSING_VALUE_MARK` se toman del barrel de la ruta de pedidos: `MISSING_VALUE_MARK` solo
+// existe alli, y es lo que ata el marcador de esta celda al de `order-columns.tsx`.
 
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { MISSING_RESPONSIBLES_MARK, MISSING_VALUE_MARK } from '@/app/(private)/pedidos/components';
 import {
-  MISSING_RESPONSIBLES_MARK,
-  MISSING_VALUE_MARK,
   RESPONSIBLE_AVATARS_LIMIT,
   RESPONSIBLE_AVATARS_TESTID,
   RESPONSIBLE_AVATAR_TESTID,
@@ -22,7 +23,7 @@ import {
   RESPONSIBLE_OVERFLOW_TESTID,
   ResponsibleAvatars,
   responsiblesOverflowLabel,
-} from '@/app/(private)/pedidos/components';
+} from '@/components/shared/responsible-avatars';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import { getInitials } from '@/lib/shared/ui/initials';
 

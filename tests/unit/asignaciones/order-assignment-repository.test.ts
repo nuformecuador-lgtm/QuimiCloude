@@ -23,7 +23,9 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import type { PrismaClient } from '@prisma/client'
 
 import type {
   AssignmentRow,
@@ -31,6 +33,12 @@ import type {
   OrderAssignmentRepository,
   OrderAssignmentRowWithOrder,
 } from '@/lib/modules/asignaciones/ports/order-assignment-repository'
+
+// El cliente global se sustituye para que importar el adaptador NO instancie un `PrismaClient` de
+// verdad: lo que se ejercita abajo es el doble que se le pasa por argumento, no este.
+vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }))
+
+import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma'
 
 const COMPANY = '11111111-1111-4111-8111-111111111111'
 const ORDER = '22222222-2222-4222-8222-222222222222'
@@ -44,6 +52,7 @@ class RepositorioDoble implements OrderAssignmentRepository {
   readonly llamadas: string[] = []
   readonly filas: AssignmentRow[] = []
   readonly enLote: OrderAssignmentRowWithOrder[] = []
+  readonly idsDePedido: string[] = []
 
   insertMissing(rows: readonly NewAssignment[], now: Date): Promise<number> {
     this.llamadas.push(`insertMissing:${rows.length}:${now.toISOString()}`)
@@ -74,6 +83,11 @@ class RepositorioDoble implements OrderAssignmentRepository {
   deleteByWorkGroup(companyId: string, orderId: string, workGroupId: string): Promise<number> {
     this.llamadas.push(`deleteByWorkGroup:${companyId}:${orderId}:${workGroupId}`)
     return Promise.resolve(0)
+  }
+
+  listOrderIdsByUserInCompany(companyId: string, userId: string): Promise<readonly string[]> {
+    this.llamadas.push(`listOrderIdsByUserInCompany:${companyId}:${userId}`)
+    return Promise.resolve(this.idsDePedido)
   }
 }
 
@@ -123,6 +137,16 @@ describe('QC-87 T4 — `companyId` primero: el caso NEGATIVO de tipos (R7)', () 
     await expect(repo.listByOrdersInCompany(COMPANY, [ORDER])).resolves.toEqual([])
   })
 
+  it('QC-88 R9: `listOrderIdsByUserInCompany` SIN `companyId` tampoco compila', async () => {
+    const repo: OrderAssignmentRepository = new RepositorioDoble()
+
+    // @ts-expect-error olvidar la empresa devolveria los pedidos que esa persona tiene asignados
+    // en TODAS las empresas: aqui la empresa entra por la asignacion, no por el pedido.
+    await repo.listOrderIdsByUserInCompany(USER)
+
+    await expect(repo.listOrderIdsByUserInCompany(COMPANY, USER)).resolves.toEqual([])
+  })
+
   it('la empresa llega al repositorio en la primera posicion, no se pierde por el camino', async () => {
     const repo = new RepositorioDoble()
 
@@ -130,18 +154,20 @@ describe('QC-87 T4 — `companyId` primero: el caso NEGATIVO de tipos (R7)', () 
     await repo.listByOrdersInCompany(COMPANY, [ORDER])
     await repo.deleteOne(COMPANY, ORDER, USER)
     await repo.deleteByWorkGroup(COMPANY, ORDER, GROUP)
+    await repo.listOrderIdsByUserInCompany(COMPANY, USER)
 
     expect(repo.llamadas).toEqual([
       `listByOrderInCompany:${COMPANY}:${ORDER}`,
       `listByOrdersInCompany:${COMPANY}:${ORDER}`,
       `deleteOne:${COMPANY}:${ORDER}:${USER}`,
       `deleteByWorkGroup:${COMPANY}:${ORDER}:${GROUP}`,
+      `listOrderIdsByUserInCompany:${COMPANY}:${USER}`,
     ])
   })
 })
 
-describe('QC-87 T4 (+ QC-102 T1) — cinco metodos y ni uno mas', () => {
-  it('el doble que satisface la interfaz expone exactamente esos cinco nombres', () => {
+describe('QC-87 T4 (+ QC-102 T1, QC-88 T1) — seis metodos y ni uno mas', () => {
+  it('el doble que satisface la interfaz expone exactamente esos seis nombres', () => {
     const nombres = Object.getOwnPropertyNames(RepositorioDoble.prototype)
       .filter((n) => n !== 'constructor')
       .sort()
@@ -152,6 +178,7 @@ describe('QC-87 T4 (+ QC-102 T1) — cinco metodos y ni uno mas', () => {
       'insertMissing',
       'listByOrderInCompany',
       'listByOrdersInCompany',
+      'listOrderIdsByUserInCompany',
     ])
   })
 
@@ -167,6 +194,7 @@ describe('QC-87 T4 (+ QC-102 T1) — cinco metodos y ni uno mas', () => {
       'listByOrdersInCompany',
       'deleteOne',
       'deleteByWorkGroup',
+      'listOrderIdsByUserInCompany',
     ])
     // QC-86 R8/R9: la asignacion se crea o se borra, NUNCA se edita.
     expect(metodos.filter((m) => m.startsWith('update'))).toEqual([])
@@ -211,5 +239,92 @@ describe('QC-87 T4 — el puerto es dominio puro', () => {
 
     expect(suelto.workGroupName).toBeNull()
     expect(deGrupo.workGroupName).toBe('Laboratorio')
+  })
+})
+
+// Este bloque NO toca Postgres: el cliente Prisma esta sustituido por un doble que CAPTURA el
+// argumento, asi que lo que se prueba es la FORMA de la consulta, no lo que la base devuelve. Que
+// una asignacion de otra empresa no vuelva -y no se distinga de una inexistente- se prueba contra
+// base real en `tests/integration/asignaciones/assigned-orders.int.test.ts`.
+
+const findMany = vi.fn(async () => [] as { orderId: string }[])
+
+/** Cliente de mentira. El adaptador es una FABRICA justo para esto: recibe por argumento el cliente
+ *  con el que hablar -el global o el transaccional- y no distingue cual le dan. */
+const dbDoble = { orderAssignment: { findMany } } as unknown as PrismaClient
+
+function ultimaConsulta(): {
+  where?: Record<string, unknown>
+  select?: Record<string, unknown>
+  orderBy?: unknown
+  include?: unknown
+} {
+  const ultima = findMany.mock.calls.at(-1)
+  if (ultima === undefined) throw new Error('el doble de Prisma no fue invocado')
+  return (ultima as unknown as [Record<string, never>])[0]
+}
+
+describe('QC-88 T2 — `listOrderIdsByUserInCompany` en Prisma (R9, R10, R37)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('es UNA sola consulta, y lleva la persona Y la empresa en el `where`', async () => {
+    const repo = createOrderAssignmentRepository(dbDoble)
+
+    await repo.listOrderIdsByUserInCompany(COMPANY, USER)
+
+    // Una, no dos: ni un `count` previo ni una segunda lectura para resolver nada.
+    expect(findMany).toHaveBeenCalledTimes(1)
+    // Igualdad ESTRICTA: si alguien anadiera aqui un filtro de estado o de vida del pedido, este
+    // aserto cae. El estado lo filtra `pedidos`; `order_assignments` no sabe en que estado esta un
+    // pedido.
+    expect(ultimaConsulta().where).toEqual({ userId: USER, companyId: COMPANY })
+  })
+
+  it('el `select` trae SOLO `orderId`, y no hay ningun `include` (R37)', async () => {
+    const repo = createOrderAssignmentRepository(dbDoble)
+
+    await repo.listOrderIdsByUserInCompany(COMPANY, USER)
+    const consulta = ultimaConsulta()
+
+    expect(consulta.select).toEqual({ orderId: true })
+    // El modulo compone en memoria: un `include` aqui seria navegar una relacion que no existe
+    // entre `orders` y `order_assignments`, y `tests/guards/guard-lote-sin-join.test.ts` da
+    // hallazgo ante cualquier `include:` del modulo.
+    expect(consulta.include).toBeUndefined()
+    expect(JSON.stringify(consulta)).not.toContain('include')
+  })
+
+  it('el `orderBy` es `orderId` ascendente: determinismo ANTES de paginar, no el orden de la lista', async () => {
+    const repo = createOrderAssignmentRepository(dbDoble)
+
+    await repo.listOrderIdsByUserInCompany(COMPANY, USER)
+
+    // Este orden NO es el que ve quien mira -ordenar la pantalla por un uuid no le dice nada a
+    // nadie-: el orden de la lista lo pone `pedidos`. Esto solo garantiza que dos lecturas iguales
+    // devuelvan la misma secuencia antes de cortar la pagina.
+    expect(ultimaConsulta().orderBy).toEqual({ orderId: 'asc' })
+  })
+
+  it('devuelve los identificadores DESNUDOS, no las filas que leyo (R9)', async () => {
+    const OTRO_PEDIDO = '55555555-5555-4555-8555-555555555555'
+    findMany.mockResolvedValueOnce([{ orderId: ORDER }, { orderId: OTRO_PEDIDO }])
+    const repo = createOrderAssignmentRepository(dbDoble)
+
+    const ids = await repo.listOrderIdsByUserInCompany(COMPANY, USER)
+
+    // Cadenas, no objetos: quien pregunta no puede leer de aqui el grupo ni el nombre congelado y
+    // componer los responsables «de paso» -eso es `listByOrdersInCompany` y tiene su propio orden-.
+    expect(ids).toEqual([ORDER, OTRO_PEDIDO])
+    expect(ids.every((id) => typeof id === 'string')).toBe(true)
+  })
+
+  it('sin asignaciones devuelve la lista vacia, que no es un error', async () => {
+    const repo = createOrderAssignmentRepository(dbDoble)
+
+    // «esta persona no tiene nada asignado» y «esa asignacion es de otra empresa» se ven IGUAL
+    // desde aqui -una lista vacia-, y ninguna de las dos lanza.
+    await expect(repo.listOrderIdsByUserInCompany(COMPANY, USER)).resolves.toEqual([])
   })
 })
