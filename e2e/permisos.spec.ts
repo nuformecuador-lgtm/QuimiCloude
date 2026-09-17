@@ -20,14 +20,17 @@
  *   cortan antes de renderizar nada y la zona privada no tiene `loading.tsx`—. Eso solo se puede
  *   medir sobre la respuesta que devuelve `page.goto`, no sobre el texto de la pagina.
  * - **Los permisos REALES del seed**. El dato bajo prueba es que el rol `Operador` sembrado por
- *   QC-6/QC-74 tiene exactamente `inventario.consultar`: con un rol inventado se estaria probando
- *   el fixture, no el sistema.
+ *   QC-6/QC-74/QC-86 tiene exactamente `inventario.consultar` y `asignaciones.consultar`: con un
+ *   rol inventado se estaria probando el fixture, no el sistema.
  * - Corre en Chromium y en WebKit (el motor de iOS).
  *
- * POR QUE EL 404 ES EN `/pedidos` Y NO EN `/inventario`: `SEED_ROLE_PERMISSIONS` da al `Operador`
- * exactamente `inventario.consultar` (QC-74 R9), o sea que inventario es justamente el unico modulo
- * que **si** puede consultar —y por eso es donde aterriza el login (R11)—. El 404 apunta a un modulo
- * que ese rol no tiene; `requirements.md > Preguntas abiertas 2` lo deja escrito.
+ * POR QUE EL 404 ES EN `/pedidos` Y NO EN `/inventario` NI EN `/asignacion`: `SEED_ROLE_PERMISSIONS`
+ * da al `Operador` exactamente `inventario.consultar` y `asignaciones.consultar` (QC-74 R9, QC-86
+ * R26). Desde QC-88 el PRIMER item de su menu filtrado ya no es «Inventario» sino «Asignación»
+ * —entre Dashboard e Inventario en `PRIVATE_NAV_ITEMS`—, asi que ahora aterriza en
+ * `ASSIGNED_ORDERS_ROUTE` (R11) y NO en `/inventario`; ese modulo sigue siendo consultable y sigue
+ * viendose en el menu, solo deja de ser el primero. El 404 sigue apuntando a `/pedidos`, un modulo
+ * que ese rol no tiene en absoluto; `requirements.md > Preguntas abiertas 2` lo deja escrito.
  *
  * DATOS: este spec SI depende del seed para el rol `Operador` y sus permisos. Lo efimero es el
  * USUARIO —creado con hash real y borrado al final— y su EMPRESA. El rol nunca se crea ni se borra
@@ -53,7 +56,7 @@ import { expect, test } from '@playwright/test';
 import { normalizeCompanyName, ROLE_OPERADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { prisma } from '@/lib/shared/db/prisma';
-import { INVENTORY_ROUTE, ORDERS_ROUTE } from '@/lib/shared/routes';
+import { ASSIGNED_ORDERS_ROUTE, ORDERS_ROUTE } from '@/lib/shared/routes';
 
 /** Ruta publica del login (QC-10). No hay constante para ella en `lib/shared/routes.ts`. */
 const LOGIN_PATH = '/login';
@@ -198,7 +201,7 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('la zona privada segun los permisos de quien entra', () => {
-  test('el Operador entra, aterriza en inventario, ve un menu corto y recibe 404 en un modulo que no puede consultar, con el control de cerrar sesion presente', async ({
+  test('el Operador entra, aterriza en asignacion, ve un menu corto con dos modulos y recibe 404 en un modulo que no puede consultar, con el control de cerrar sesion presente', async ({
     page,
   }) => {
     const { username, password } = await createOperatorUser();
@@ -209,12 +212,17 @@ test.describe('la zona privada segun los permisos de quien entra', () => {
     await page.getByTestId('login-password').fill(password);
     await page.getByTestId('login-submit').click();
 
-    // --- 2. Aterriza en `/inventario`: el PRIMER item de su menu ya filtrado (R11). No es el
-    // dashboard, que es donde llevaba el login antes de esta ficha y donde este rol veria un 404.
-    await page.waitForURL((url) => url.pathname === INVENTORY_ROUTE, { timeout: 60_000 });
-    await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
+    // --- 2. Aterriza en `/asignacion`: el PRIMER item de su menu ya filtrado (R11, QC-88). Ya no
+    // es `/inventario` —ese modulo paso al segundo lugar cuando QC-88 coloco «Asignación» entre
+    // Dashboard e Inventario—, y no es el dashboard, que es donde llevaba el login antes de QC-75 y
+    // donde este rol veria un 404.
+    await page.waitForURL((url) => url.pathname === ASSIGNED_ORDERS_ROUTE, { timeout: 60_000 });
+    await expect(page.getByTestId('asignacion-title')).toBeVisible({ timeout: 60_000 });
 
-    // --- 3. El menu es corto: solo esta el modulo que puede consultar (R2, R3).
+    // --- 3. El menu es corto: solo estan los DOS modulos que puede consultar (R2, R3). El
+    // Operador conserva `inventario.consultar`, asi que `nav-inventario` sigue visible aunque ya
+    // no sea el primer destino del aterrizaje.
+    await expect(page.getByTestId('nav-asignacion')).toBeVisible();
     await expect(page.getByTestId('nav-inventario')).toBeVisible();
     for (const testId of HIDDEN_NAV_TEST_IDS) {
       // `toHaveCount(0)` sobre el `data-testid`, NUNCA sobre una clase CSS: lo que se demuestra es

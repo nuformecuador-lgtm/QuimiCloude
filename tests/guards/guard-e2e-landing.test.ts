@@ -65,9 +65,12 @@ const EXCEPCIONES: ReadonlyArray<{ archivo: string; motivo: string }> = [
   {
     archivo: 'e2e/permisos.spec.ts',
     motivo:
-      'es la suite que AFIRMA la regla de aterrizaje por permisos: su espera a `INVENTORY_ROUTE` ' +
-      '(`permisos.spec.ts:214`) es el aterrizaje ya derivado del menu del Operador, escrito como ' +
-      'sujeto de la prueba y no como premisa de otra. Queda tal cual por QC-93 R10.',
+      'es la suite que AFIRMA la regla de aterrizaje por permisos: su espera a ' +
+      '`ASSIGNED_ORDERS_ROUTE` (`permisos.spec.ts:219`, QC-88 R34 — antes `INVENTORY_ROUTE` en la ' +
+      'linea 214, hasta que QC-88 antepuso «Asignación» a «Inventario» en el menu del Operador) es ' +
+      'el aterrizaje ya derivado del menu del Operador, escrito como sujeto de la prueba y no como ' +
+      'premisa de otra. Es la MISMA excepcion de QC-93 R10, no una nueva: solo cambia que ruta se ' +
+      'afirma (`specs/QC-88-listado-de-pedidos-asignados/design.md > 7.2`).',
   },
 ]
 
