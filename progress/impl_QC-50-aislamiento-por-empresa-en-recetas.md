@@ -94,10 +94,10 @@ archivos de `tests/integration/**` y `e2e/**`, y 10 de `tests/unit/**`. Varios `
 borraban la empresa **antes** que la receta que ahora la referencia (`recipes_company_id_fkey`
 es `RESTRICT`): se reordenó la limpieza en 5 de ellos.
 
-## Las listas cerradas: el spec nombraba seis, eran **diez**
+## Las listas cerradas: el spec nombraba seis, eran **trece**
 
 `design.md > 0.6` avisa de cinco, más la de QC-104. Al correr la verificación aparecieron
-**cuatro más** que el spec no anticipó. Todas se **tensaron** —alta a mano, con motivo escrito—;
+**siete más** que el spec no anticipó. Todas se **tensaron** —alta a mano, con motivo escrito—;
 **ninguna se relajó**, no se convirtió ningún `toEqual` en `toContain` y no nació ninguna lista
 de excepciones.
 
@@ -113,9 +113,19 @@ de excepciones.
 | 8 | **modelos con `companyId` permitido** | `tests/unit/inventario/scope.test.ts` | `Recipe` (y `RecipeLine` **sigue vetada**, a propósito) |
 | 9 | **dueños de `@prisma/client` en `recetas`** | `tests/unit/recetas/module-contract.test.ts` | **RETENSADO**: de uno a dos archivos, nombrados uno a uno (`company-scope.ts` tipa `Prisma.RecipeWhereInput`). Precedente literal: QC-60 hizo lo mismo en `tests/unit/pedidos/module-contract.test.ts:467` |
 | 10 | aserción de la costura | `tests/unit/pedidos/order-service.test.ts` | exige **los dos** argumentos, el segundo `ADMIN.companyId`: más estricta, no menos |
+| 11 | **`AMPLIACIONES_APROBADAS`** (contrato por diff) | `tests/unit/recetas/module-contract.test.ts` | `recipe-scope.ts`, `company-scope.ts` y `recipe-repository.ts`, uno a uno |
+| 12 | **`RECETAS_PERMITIDAS`** (contrato por diff) | `tests/unit/recetas-ui/recipe-route-contract.test.ts` | los mismos tres |
+| 13 | **`DB_PERMITIDAS`** | `tests/unit/recetas-ui/recipe-route-contract.test.ts` | los dos archivos de la migración |
+
+**Las tres últimas (11, 12, 13) tienen una trampa propia: comparan el DIFF contra `origin/dev`, así
+que con los cambios sin commitear pasan en VERDE y solo muerden una vez hay commit.** Aparecieron
+justo después del primer commit de la ficha, no antes. Queda escrito en su comentario para quien
+venga detrás.
 
 **La lista 6 es la que más cerca estuvo de pasar desapercibida**: solo la vio la corrida de
-integración, y es exactamente del tipo que `design.md > 2.1` anuncia como drift deliberado.
+integración, y es exactamente del tipo que `design.md > 2.1` anuncia como drift deliberado. Las
+**11-13** habrían emboscado al gate completo por el mismo motivo que a QC-60: no se ven hasta que
+hay commit.
 
 ## La excepción que muere
 
