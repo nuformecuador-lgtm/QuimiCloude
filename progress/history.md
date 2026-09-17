@@ -3894,3 +3894,53 @@ que referencian `data-table`; la resolución correcta eran **quince**.
 corrido con la máquina en reposo. E2E verde en Chromium y WebKit. El `down.sql` **se ejecuta
 entero** en una transacción con ROLLBACK comparando dos retratos de esquema, en vez de afirmarse
 leyendo el archivo: era el eslabón más débil y lo cerró la review.
+
+## QC-63 — ejecutar-receta-operador (CERRADA el 2026-09-17, PR #82, merge `6754a46`)
+
+**Qué entró**: la pantalla con la que el Operador ejecuta la receta del pedido que tiene asignado,
+en `/asignacion/<id>`. Cierra la épica que QC-83…QC-88 venían construyendo. Tres casos de uso nuevos
+en `asignaciones`, primer consumidor de la conversión entre unidades de QC-76, y `StepReader` de
+QC-64 montado por props sin tocar una línea.
+
+**Resultado**: R1-R31, 24 tasks, `./init.sh` completo verde (519 archivos, **7495 passed**, 0 rojos
+nuevos) y **los cuatro E2E ejecutados contra Chromium real**, con los estados leídos de la base.
+Sin dependencias, tabla, columna ni migración.
+
+**El Operador no gana ningún permiso, y esa fue la decisión de fondo.** La semilla de 2026-09-08
+cortaba la pantalla con `asignaciones.consultar` **y** `asignaciones.modificar`, pero el Operador
+nace sin el segundo: tal cual estaba escrito, se habría quedado fuera de su propia pantalla. Y el
+único camino que movía un pedido exigía `pedidos.modificar`. Se cerró con un caso de uso propio que
+**pregunta al contrato de `pedidos`** si la transición es legal, en vez de reimplementar la matriz.
+
+**Lo que la reacotación salvó**: la ficha llevaba nueve días acotada y sus tres dependencias
+cerraron el mismo día que se retomó. Reacotarla contra el disco —en vez de sembrar encima— destapó
+esa contradicción del permiso y el bloqueo de «pedido ya tomado» que QC-88 había remitido aquí: como
+abrir la pantalla pone el pedido `EN_CURSO`, **el Operador que recargara se encontraba su propio
+trabajo bloqueado**. Se permitió la reentrada y la guardia de QC-88 se enmendó tensándola.
+
+**El hallazgo que justifica la fase de revisión entera**: la primera vuelta **rechazó** al descubrir
+que la confirmación de «pedido entregado» era **código muerto** —la acción termina siempre en
+`redirect()`, que lanza, así que nunca devolvía el estado de éxito— y que **su test solo pasaba
+porque doblaba la acción con un valor que la acción real no emite**. Era la única fila de la
+trazabilidad que camuflaba una ausencia como test positivo, y el E2E del leader pasaba por al lado.
+La segunda vuelta aprobó tras **cinco mutaciones propias, las cinco rojas**.
+
+**Dos decisiones humanas**: el factor de escala sale **degradado** —se verificó que la receta no
+guarda su rendimiento, y de ahí **nace QC-120**— y el aviso de entrega se muestra **en la lista al
+volver**, porque la forma que describía el diseño era inalcanzable.
+
+**Ocho censos cerrados de otras fichas crecieron, ninguno aflojado**: todos por nombre exacto, con
+nota fechada y probados por mutación. **Una guardia se retiró** —`guard-conversion-sin-consumidores`—
+porque su propia cabecera prescribía la retirada en la ficha que estrenara la conversión; commit
+propio, y su conducta sigue cubierta por otros dos tests.
+
+**Tres lecciones del arnés**: el `spec_author` corrió **sin Bash** y entregó el spec sin commitear,
+que tuvo que verificar y commitear el leader; el worktree se montó **sin `.env`**, lo que mató la
+integración con un error que no nombra su causa; y el leader **rompió el `requirements.md`** al
+cerrar una pregunta abierta —su corte enganchó un fragmento de texto en vez del encabezado y
+reinyectó los 31 requisitos—, reparado en `3f75b9b`.
+
+**Deuda declarada**: seis hallazgos menores, ninguno bloqueante —el más vivo, que el número del
+aviso no se relee del pedido, así que es falsificable escribiendo el parámetro a mano, sin XSS ni
+fuga entre empresas—. Y dos rojos de `ciclo-de-vida-de-la-base.int.test.ts` **descartados como flake
+de máquina y NO metidos al baseline**: la rama no toca ese archivo y en aislamiento pasan los cinco.
