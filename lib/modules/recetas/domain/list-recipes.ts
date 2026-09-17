@@ -2,6 +2,7 @@ import { requirePermission, type Actor } from './actor';
 import { ValidationError } from './errors';
 import { createListQuerySchema, sanitizeListQuery } from './list-query';
 import { RECIPE_QUERYABLE } from './recipe-queryable';
+import type { RecipeScope } from './recipe-scope';
 
 import type { Page } from './page';
 import type { RecipeSummary } from './recipe-view';
@@ -87,6 +88,9 @@ export function createListRecipes(
   ): Promise<Page<RecipeSummary>> {
     requirePermission(actor, 'recetas.consultar');
 
+    // La empresa sale del ACTOR y jamas de la entrada: nadie puede elegir listar otra.
+    const scope: RecipeScope = { companyId: actor.companyId };
+
     const parsed = listQuerySchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
 
@@ -94,7 +98,7 @@ export function createListRecipes(
     deps.log.ignoredFields(LIST_NAME, ignored);
 
     const { offset, limit } = deps.toOffsetLimit(query.page, query.pageSize);
-    const { rows, total } = await deps.recipes.listAlive(offset, limit, query);
+    const { rows, total } = await deps.recipes.listAlive(offset, limit, query, scope);
 
     return deps.buildPage(
       rows.map((row) => toSummary(row, deps.images)),

@@ -30,7 +30,14 @@ export type ProductRef = {
  *  Lo implementa un adaptador driven DE INVENTARIO —el unico que puede tocar
  *  `prisma.product`— y lo cablea `lib/composition`. */
 export interface ProductCatalog {
-  /** Referencias de los productos vivos entre los ids pedidos. Los ids que no existan o
-   *  esten borrados logicamente simplemente no vienen en la respuesta. */
-  findRefs(ids: readonly ProductId[]): Promise<readonly ProductRef[]>;
+  /** Referencias de los productos vivos entre los ids pedidos, ACOTADAS a una empresa. Los
+   *  ids que no existan, esten borrados logicamente o sean de OTRA empresa simplemente no
+   *  vienen en la respuesta: para quien llama son el mismo caso.
+   *
+   *  Recibe `companyId` como cadena suelta y no como un tipo de ambito propio de
+   *  `inventario`: ese tipo es interno del modulo, y publicarlo por el barrel para que el
+   *  llamante lo construya acoplaria dos modulos por un dato que ya es una cadena en los
+   *  dos lados. Que el ambito viva en la firma es lo que hace que una llamada que lo omita
+   *  no compile. */
+  findRefs(ids: readonly ProductId[], companyId: string): Promise<readonly ProductRef[]>;
 }

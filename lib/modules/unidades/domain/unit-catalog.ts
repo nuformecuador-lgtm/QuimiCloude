@@ -26,7 +26,14 @@ export type UnitRef = {
  *  `lib/composition`. Esta ficha NO lo implementa: lo consume `recetas` (`create-recipe.ts`,
  *  `update-recipe.ts`, via `deps.units.findRefs`, QC-25/R50). */
 export interface UnitCatalog {
-  /** Referencias de las unidades existentes entre los ids pedidos. Los ids que no existan
-   *  simplemente no vienen en la respuesta. */
-  findRefs(ids: readonly UnitId[]): Promise<readonly UnitRef[]>;
+  /** Referencias de las unidades existentes entre los ids pedidos, de la empresa dada O DE
+   *  SISTEMA -las de sistema valen para todas las empresas-. Los ids que no existan o sean
+   *  de OTRA empresa simplemente no vienen en la respuesta.
+   *
+   *  Recibe `companyId` como cadena suelta y no como un tipo de ambito propio de
+   *  `unidades`: ese tipo es interno del modulo, y publicarlo por el barrel para que el
+   *  llamante lo construya acoplaria dos modulos por un dato que ya es una cadena en los
+   *  dos lados. Que el ambito viva en la firma es lo que hace que una llamada que lo omita
+   *  no compile. */
+  findRefs(ids: readonly UnitId[], companyId: string): Promise<readonly UnitRef[]>;
 }

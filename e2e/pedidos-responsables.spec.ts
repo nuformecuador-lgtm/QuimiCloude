@@ -415,13 +415,15 @@ test.beforeAll(async () => {
   });
 
   // Receta de FIXTURE, con la MISMA funcion de normalizacion del dominio que usa la app:
-  // `name_normalized` es NOT NULL.
+  // `name_normalized` es NOT NULL. De la MISMA empresa en la que abre sesion el Administrador
+  // (QC-50): si fuera otra, el aislamiento por empresa la ocultaria del pedido.
   recipeId = (
     await prisma.recipe.create({
       data: {
         name: recipeName,
         nameNormalized: normalizeRecipeName(recipeName),
         createdBy: adminUserId,
+        companyId,
       },
       select: { id: true },
     })

@@ -141,12 +141,9 @@ export function unitOrderBy(sort: ListSort | null): Prisma.UnitOrderByWithRelati
  * quien anada una consulta nueva la reutiliza en vez de escribir un segundo `OR` que manana
  * puede divergir y ensenarle a una empresa lo que no es suyo.
  *
- * **Quien la va a reutilizar y por que no lo hace ya**: `findUnitRefs`
- * (`unit-catalog-prisma.ts`) se queda SIN ambito en esta ficha, por decision cerrada del humano
- * del 2026-09-07 (R36, decision cerrada 33). Es la unica excepcion explicita a R18 y tiene
- * destino nombrado: **QC-50**, la ficha que aisla `recetas` —su unico llamante— por empresa.
- * Cuando llegue, acota su consulta con ESTA funcion; hasta entonces el aislamiento del catalogo
- * completo vive donde esta escrito, en el listado.
+ * **Quien mas la reutiliza**: `findUnitRefs` (`unit-catalog-prisma.ts`), que resuelve
+ * identificadores de unidad para otro modulo -`recetas`- acotando su consulta con ESTA misma
+ * funcion, en vez de escribir un segundo `OR` que manana pueda divergir.
  */
 export function companyScopeWhere(scope: UnitScope): Prisma.UnitWhereInput {
   return { OR: [{ companyId: scope.companyId }, { companyId: null }] };

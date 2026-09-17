@@ -241,12 +241,16 @@ test.beforeAll(async () => {
     select: { id: true },
   });
 
+  // De la empresa A -la del Administrador que abre sesion (QC-50)-: los pedidos de B se siembran
+  // directo por Prisma y no por el servicio de `pedidos`, que es el unico que valida la empresa
+  // de la receta (R26); la empresa de la receta no bloquea a la base cruda.
   recipeId = (
     await prisma.recipe.create({
       data: {
         name: RECIPE_NAME,
         nameNormalized: normalizeRecipeName(RECIPE_NAME),
         createdBy: admin.id,
+        companyId: companyAId,
       },
       select: { id: true },
     })

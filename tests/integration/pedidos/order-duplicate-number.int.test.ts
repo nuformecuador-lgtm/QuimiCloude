@@ -14,7 +14,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { Client, DatabaseError } from 'pg';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { createOrder } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
@@ -89,6 +89,10 @@ async function dropFixture(fixture: Fixture): Promise<void> {
   await prisma.user.deleteMany({ where: { id: fixture.actorId } });
   await prisma.role.deleteMany({ where: { id: fixture.roleId } });
   await prisma.documentType.deleteMany({ where: { code: fixture.documentTypeCode } });
+  // La receta ANTES que la empresa: es la MISMA (QC-50), y `recipes.company_id` es RESTRICT.
+  // El `afterAll` de mas abajo tambien la borra por `recetaId`, pero eso corre DESPUES de este
+  // `finally`, cuando la empresa ya tendria que estar libre.
+  await prisma.recipe.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.company.deleteMany({ where: { id: fixture.companyId } });
 }
 
@@ -103,15 +107,6 @@ function altaDe(fixture: Fixture): Promise<OrderRow | 'duplicate_number'> {
   });
 }
 
-beforeAll(async () => {
-  const marca = token();
-  const receta = await prisma.recipe.create({
-    data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}` },
-    select: { id: true },
-  });
-  recetaId = receta.id;
-});
-
 afterAll(async () => {
   await prisma.recipe.deleteMany({ where: { id: recetaId } });
   await prisma.$disconnect();
@@ -120,6 +115,14 @@ afterAll(async () => {
 describe('un 23505 real del correlativo se traduce a duplicate_number', () => {
   it('con el correlativo ocupado en los tres intentos devuelve duplicate_number, sin lanzar, tras 3 transacciones', async () => {
     const fixture = await createFixture();
+    // La receta es de la MISMA empresa que la del fixture: QC-50 hizo `recipes.company_id`
+    // obligatoria.
+    const marca = token();
+    const receta = await prisma.recipe.create({
+      data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}`, companyId: fixture.companyId },
+      select: { id: true },
+    });
+    recetaId = receta.id;
     const sufijo = token();
     const funcion = `test_force_order_seq_${sufijo}`;
     const trigger = `test_force_order_seq_trg_${sufijo}`;

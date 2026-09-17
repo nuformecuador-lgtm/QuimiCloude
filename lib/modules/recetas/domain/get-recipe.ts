@@ -1,5 +1,6 @@
 import { requirePermission, type Actor } from './actor';
 import { RecipeNotFoundError } from './errors';
+import type { RecipeScope } from './recipe-scope';
 import type { RecipeDetail } from './recipe-view';
 
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
@@ -27,14 +28,18 @@ export function createGetRecipe(
   ): Promise<RecipeDetail> {
     requirePermission(actor, 'recetas.consultar');
 
-    const row = await deps.recipes.findAliveById(id);
+    // La empresa sale del ACTOR y jamas de la entrada: una receta de otra empresa se
+    // trata igual que una receta que no existe.
+    const scope: RecipeScope = { companyId: actor.companyId };
+
+    const row = await deps.recipes.findAliveById(id, scope);
     if (row === null) throw new RecipeNotFoundError();
 
     // R18: se pide `findRefs` sobre TODAS las lineas -incluida la de un producto de baja,
     // que sale con `productName: null`-. Es el uso que DECORA, distinto del que VALIDA en
     // el alta y en la edicion (`design.md > 6`).
     const productIds = row.lines.map((line) => line.productId);
-    const refs = productIds.length > 0 ? await deps.products.findRefs(productIds) : [];
+    const refs = productIds.length > 0 ? await deps.products.findRefs(productIds, actor.companyId) : [];
     const namesById = new Map(refs.map((ref) => [ref.id, ref.name]));
     const stocksById = new Map(refs.map((ref) => [ref.id, ref.stock]));
 

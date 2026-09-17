@@ -2,6 +2,7 @@ import { requirePermission, type Actor } from './actor';
 import { RecipeDuplicateNameError, RecipeNotFoundError, ValidationError } from './errors';
 import { validateRecipeImage } from './recipe-image';
 import { updateRecipeSchema } from './recipe-input';
+import type { RecipeScope } from './recipe-scope';
 
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
 import type { NewRecipe, RecipeRepository } from '../ports/recipe-repository';
@@ -69,11 +70,15 @@ export function createUpdateRecipe(
   ): Promise<UpdateRecipeResult> {
     requirePermission(actor, 'recetas.modificar');
 
+    // La empresa sale del ACTOR y jamas de la entrada: una receta de otra empresa se
+    // trata igual que una receta que no existe.
+    const scope: RecipeScope = { companyId: actor.companyId };
+
     const parsed = updateRecipeSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
     const data = parsed.data;
 
-    const existing = await deps.recipes.findAliveById(id);
+    const existing = await deps.recipes.findAliveById(id, scope);
     if (existing === null) throw new RecipeNotFoundError();
 
     // R45, R46 (`design.md > 6`): diferencia de conjuntos. Solo se valida contra el
@@ -84,7 +89,7 @@ export function createUpdateRecipe(
     const idsANuevoValidar = idsEnviados.filter((productId) => !idsYaEnLaReceta.has(productId));
 
     if (idsANuevoValidar.length > 0) {
-      const refs = await deps.products.findRefs(idsANuevoValidar);
+      const refs = await deps.products.findRefs(idsANuevoValidar, actor.companyId);
       const foundIds = new Set(refs.map((ref) => ref.id));
       const missing = idsANuevoValidar.some((productId) => !foundIds.has(productId));
       if (missing) throw new ValidationError();
@@ -96,7 +101,7 @@ export function createUpdateRecipe(
     // no la prevee-.
     const unitIdsEnviados = [...new Set(data.lines.map((line) => line.unitId))];
     if (unitIdsEnviados.length > 0) {
-      const unitRefs = await deps.units.findRefs(unitIdsEnviados);
+      const unitRefs = await deps.units.findRefs(unitIdsEnviados, actor.companyId);
       const foundUnitIds = new Set(unitRefs.map((ref) => ref.id));
       const missingUnit = unitIdsEnviados.some((unitId) => !foundUnitIds.has(unitId));
       if (missingUnit) throw new ValidationError();
@@ -136,7 +141,7 @@ export function createUpdateRecipe(
 
     // R11, R12, R13: la conciliacion de las lineas y la transaccion viven en el
     // adaptador (`design.md > 8`), no aqui.
-    const result = await deps.recipes.replaceAlive(id, newRecipe, actor.id, now());
+    const result = await deps.recipes.replaceAlive(id, newRecipe, actor.id, now(), scope);
     if (result === 'not_found') throw new RecipeNotFoundError();
     if (result === 'duplicate') throw new RecipeDuplicateNameError();
 

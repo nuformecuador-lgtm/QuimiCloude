@@ -1,5 +1,6 @@
 import { requirePermission, type Actor } from './actor';
 import { RecipeNotFoundError } from './errors';
+import type { RecipeScope } from './recipe-scope';
 
 import type { RecipeRepository } from '../ports/recipe-repository';
 
@@ -26,7 +27,11 @@ export function createDeleteRecipe(
   ): Promise<void> {
     requirePermission(actor, 'recetas.modificar');
 
-    const result = await deps.recipes.softDeleteAlive(id, actor.id, now());
+    // La empresa sale del ACTOR y jamas de la entrada: una receta de otra empresa se
+    // trata igual que una receta que no existe.
+    const scope: RecipeScope = { companyId: actor.companyId };
+
+    const result = await deps.recipes.softDeleteAlive(id, actor.id, now(), scope);
     if (result === 'not_found') throw new RecipeNotFoundError();
   };
 }

@@ -3854,3 +3854,43 @@ ser un archivo único que todas las ramas tocan— sigue pendiente en *Deudas*.
 **Límite declarado, no escondido**: el E2E del recorrido del Operador existe, pasa typecheck/lint y
 sigue el patrón de los E2E verdes del repo, pero **nunca se ejecutó contra Playwright** por drift de
 la Postgres local, ajeno a esta rama.
+
+## QC-50 — aislamiento-por-empresa-en-recetas (cerrada el 2026-09-17, PR #81, merge `63befce`)
+
+Cierra el hueco que QC-60 dejó declarado: un pedido podía apuntar a una receta de otra empresa.
+`recipes` gana `company_id` y los cinco casos de uso, los cinco métodos del puerto y los catálogos
+de productos y unidades pasan a leer y escribir acotados. `recipe_lines` **no** gana columna, a
+propósito: cae con su receta. **29/29 tasks, 33/33 requisitos con test, sin dependencias nuevas.**
+
+**El hallazgo que justificó la ronda de acotación**: el único índice de nombre de recetas es
+**PARCIAL** (`WHERE deleted_at IS NULL`) y el de presentaciones que QC-49 usó de molde era
+**TOTAL**. Copiarlo habría hecho que borrar una receta **no liberara su nombre**, sin un solo test
+en rojo. Queda afirmado en tres sitios independientes, los tres comprobados falsables.
+
+**El spec nombraba seis listas cerradas y eran trece.** Las siete que aparecieron al verificar se
+tensaron a mano; ninguna se relajó. Tres comparan el diff contra `origin/dev` y **solo muerden
+después del commit**, que es como emboscaron al gate de QC-60.
+
+**`SIN_AMBITO_POR_DECISION_APROBADA` murió**: no se dejó vacía, se borró la maquinaria entera por
+ser código muerto. Antes había una puerta cerrada; ahora no hay puerta.
+
+**Una enmienda al spec, aprobada por el humano**: R31 pedía probar por E2E un **borrado** cruzado,
+que no es ejercitable —el diálogo toma el id del cierre de React y no hay nodo del DOM que
+reescribir, a diferencia de QC-49 y QC-60—. Se sustituye por abrir la **URL del detalle** de una
+receta ajena, **indistinguible de un id inexistente**: mismo mensaje, mismo enlace. Eso es lo que
+prueba que no hay oráculo de existencia. El borrado cruzado queda cerrado en service e integración.
+La review la rechazó por esto y **fue su único bloqueante, documental**: la decisión se había
+escrito en `design.md` y `tasks.md` y se olvidó en `requirements.md`.
+
+**Lo que más enseña, y no estaba previsto**: al sincronizar con QC-88 el merge **no dio conflicto
+textual en producción pero dejó el código sin compilar**. QC-88 estrenó un llamante de
+`findRefsIncludingDeleted` mientras esta rama le añadía el ámbito; sin el cambio de firma habría
+entrado resolviendo nombres de recetas **sin acotar por empresa y sin un test en rojo**. El test que
+cubría esa llamada existía y **miraba solo el primer argumento**: se tensó para exigir los dos.
+Además, las dos ramas añadieron **cada una su decimocuarta entrada** a la lista cerrada de specs E2E
+que referencian `data-table`; la resolución correcta eran **quince**.
+
+**Verificación**: gate completo verde dos veces (la última, 512 archivos / 7418 tests / 0 rojos),
+corrido con la máquina en reposo. E2E verde en Chromium y WebKit. El `down.sql` **se ejecuta
+entero** en una transacción con ROLLBACK comparando dos retratos de esquema, en vez de afirmarse
+leyendo el archivo: era el eslabón más débil y lo cerró la review.
