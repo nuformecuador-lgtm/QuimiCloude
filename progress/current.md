@@ -403,6 +403,18 @@ lista: `tests/integration/inventario/product-crud.int.test.ts`,
 feature. Un baseline que miente se vuelve ruido que se ignora, que es como se cuela un rojo de
 verdad.
 
+### Worktrees a medio borrar — QUINTA vez, ahora QC-88 (2026-09-17)
+
+Al cerrar QC-88 (F2.5), `./scripts/wt.sh done QC-88-listado-de-pedidos-asignados` respondio
+`is not a working tree` y aviso de posible archivo en uso en Windows. Mismo cuadro exacto que las
+cuatro anteriores: git ya lo tiene **desregistrado** —no sale en `git worktree list`— y el
+**directorio se queda en disco**. No se forzo, como manda `AGENTS.md`. La rama esta mergeada en
+`origin/dev` (PR #79, `b342375`), asi que **ese directorio no guarda nada unico**.
+
+**Hoy quedan tres directorios huerfanos**: `QC-88`, `QC-103` y `QC-106`, los tres de fichas ya
+cerradas y mergeadas. Barrerlos es seguro y lo decide el humano, como la vez anterior. Lo que
+sigue sin existir es **quien barre por defecto**: candidato a `/afinar-regla`.
+
 ### El worktree de QC-106 quedo a medio borrar — CUARTA vez con el mismo fallo (2026-09-16)
 
 Tras QC-23, QC-102 y QC-81. Al cerrar (F2.5), `./scripts/wt.sh done QC-106-endpoint-de-carga-de-pdf`
