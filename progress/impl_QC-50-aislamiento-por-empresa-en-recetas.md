@@ -6,7 +6,8 @@
 
 ## Estado
 
-**Las 29 tasks cerradas. Los 33 requisitos con test.**
+**28 de las 29 tasks cerradas. Los 33 requisitos con test.** La que falta es **T28, el gate
+completo (`./init.sh`), que corre el leader**: aquí no se da por hecha porque no la he ejecutado.
 
 T20 estuvo bloqueada y se desbloqueó por **decisión humana del 2026-09-16**: el acceso cruzado se
 prueba **por la URL del detalle**, no por DOM. Ver `## T20: por qué el molde no servía`.
@@ -213,11 +214,11 @@ $ pnpm run lint
 > eslint
 (sin salida — cero errores)
 
-$ pnpm exec vitest run tests/guards tests/unit/recetas tests/unit/pedidos \
-    tests/unit/inventario tests/unit/unidades tests/unit/identity
- Test Files  268 passed (268)
-      Tests  4118 passed | 48 skipped (4166)
-   Duration  151.14s
+$ pnpm exec vitest run tests/guards tests/unit    # corrida final, arbol committeado
+ Test Files  3 failed | 435 passed (438)
+      Tests  5 failed | 6468 passed | 95 skipped (6568)
+#  ^ los 5 rojos son AJENOS y flaky: ver la seccion de arriba.
+#    Pasan en aislamiento: 139/139 sobre esos mismos tres archivos.
 
 $ pnpm exec vitest run --project=integration
 test-db: plantilla reutilizada: qct_tpl_ba111e8df7b5 (las migraciones no han cambiado)
@@ -233,11 +234,11 @@ se ejecutaron — los lanza el gate):
 
 ```
 $ npx playwright test e2e/aislamiento-recetas.spec.ts --project=chromium
-  ✓  1 [chromium] › e2eislamiento-recetas.spec.ts:203:7 › ... (R31) (50.0s)
+  ✓  1 [chromium] › e2e/aislamiento-recetas.spec.ts:203:7 › ... (R31) (50.0s)
   1 passed (1.9m)
 
 $ npx playwright test e2e/aislamiento-recetas.spec.ts --project=webkit
-  ✓  1 [webkit] › e2eislamiento-recetas.spec.ts:203:7 › ... (R31) (30.0s)
+  ✓  1 [webkit] › e2e/aislamiento-recetas.spec.ts:203:7 › ... (R31) (30.0s)
   1 passed (55.8s)
 ```
 
@@ -289,6 +290,31 @@ reaplicación vuelve al estado final.
 6. **T13 sin edición** — `lib/composition/index.ts` no necesitó cambios: las funciones del
    adaptador ya satisfacen las interfaces nuevas. Se respeta el criterio de la task («no se
    reordena ni se reformatea nada»).
+
+## Un rojo AJENO que NO metí al baseline ni apagué
+
+En la corrida completa de `tests/guards tests/unit` quedan **5 tests rojos en 3 archivos**:
+
+- `tests/unit/inventario/product-page.test.tsx` (3 casos de guardado del panel de alta/edición)
+- `tests/unit/proveedores-ui/supplier-page.test.tsx` — *«R9: elegir a mano en el calendario un día
+  de inicio y otro de fin navega con ese rango en YYYY-MM-DD»*
+- `tests/unit/recetas-ui/recipe-page.test.tsx` — el **mismo** caso R9 del calendario
+
+**No son de esta ficha, y hay tres razones para afirmarlo:**
+
+1. **Ninguno de los tres archivos está en el diff de QC-50** (`git diff --name-only origin/dev...HEAD`
+   no los devuelve). De `recetas-ui` esta ficha solo tocó `recipe-route-contract.test.ts`.
+2. **Los tres pasan en aislamiento**: `vitest run` sobre esos tres archivos da **139/139 verdes**.
+3. **El conjunto que falla cambia de corrida en corrida** con el mismo árbol committeado —se
+   observaron tandas de 4, 5, 6 y 8 fallos, y algunas con archivos que ni siquiera llegaban a
+   colectarse—, lo que apunta a **flakiness bajo carga/paralelismo**, no a un fallo determinista.
+   Dos de los cinco son casos de **calendario sensibles a la fecha**, y la fecha cambió de
+   2026-09-16 a 2026-09-17 en mitad de la sesión.
+
+**No se tocó ninguno de los tres, no se marcó nada como `skip` y no se añadió nada a
+`tests/baseline-rojos.json`.** Queda anotado aquí para que el leader lo verifique contra `dev` en el
+gate completo: si también falla allí, es anterior a esta ficha; si solo falla en tandas cargadas, es
+flakiness que merece su propia ficha. **No es mío darlo por bueno.**
 
 ## Cierre
 
