@@ -434,7 +434,15 @@ dice que es un **error**, no un resultado raro.
 | `tests/unit/asignaciones/finish-assigned-order.test.ts` | R11–R14, R16 |
 | `tests/unit/asignaciones-ui/order-execution-screen.test.tsx` | R15, R18, R19, R21, R26 |
 | `tests/unit/asignaciones-ui/order-execution-lines.test.tsx` | R22–R25 |
+| `tests/unit/asignaciones-ui/order-execution-page.test.tsx` | R2, R3 — **añadido el 2026-09-17** |
 | `e2e/ejecucion-receta.spec.ts` | R29, R30 |
+
+> **`order-execution-page.test.tsx` no estaba en esta lista y se añadió al implementar (2026-09-17).**
+> El motivo: **R2 y R3 sobre `page.tsx`** —que el corte por permiso sea la primera línea, antes de
+> resolver `params`, y que sin `asignaciones.consultar` responda **404 y nunca 403**— **no los cubría
+> ningún otro archivo**. `guard-pantallas-exigen-permiso` afirma que la pantalla *llama* a
+> `requirePagePermission` con un código del catálogo, pero no que el 404 salga ni que la llamada
+> preceda a la lectura. Sin este archivo, dos requisitos quedaban sin test propio.
 
 **Modificados**
 

@@ -11,7 +11,7 @@
 | --- | --- | --- | --- |
 | 1 | A — servicios de otros módulos | T1, T2, T3 | **hecha**, pendiente de `--rapido` del leader |
 | 2 | B — caso de uso y seguridad | T4–T10 | **hecha** |
-| 3 | C — pantalla | T11–T16 | **hecha**, con UNA decisión pendiente del humano (guardia de QC-76) |
+| 3 | C — pantalla | T11–T16 | **hecha**; guardia de QC-76 **retirada** por decisión del humano |
 | 4 | D — enmienda a QC-88 | T17–T22 | pendiente |
 | 5 | E — cierre | T23, T24 | pendiente |
 
@@ -391,12 +391,23 @@ Los cinco archivos nuevos de `app/` citaban requisitos (`R6`, `R20`, `R22`, `R24
 
 ---
 
-## DECISIÓN PENDIENTE DEL HUMANO — la guardia `guard-conversion-sin-consumidores`
+## Guardia `guard-conversion-sin-consumidores` — RETIRADA DOCUMENTADA (2026-09-17)
 
-**No la tomo yo y no la dejo disfrazada.**
+**Decidido por el humano: opción (a), retirarla.** Commit propio `8951b48`, un solo archivo,
+122 borrados, **nada más de `tests/guards/` tocado**.
 
-Al usar `convertQuantity` de verdad (R25), `tests/guards/guard-conversion-sin-consumidores.test.ts`
-—de **QC-76 R26**— se pone **ROJA**. Su mensaje real:
+**No es un aflojamiento: es el final previsto de esa guardia**, escrito en su propia cabecera:
+
+> «CUANDO ESTA GUARDIA SE PONGA ROJA no se la relaja: significa que alguien estrenó la conversión,
+> y eso necesita ficha propia. La respuesta es **retirar esta guardia EN ESA FICHA**, junto con la
+> decisión de negocio que la justifique, no aquí y no de paso.»
+
+QC-63 **es** esa ficha: `[D8]` la declara «**PRIMER CONSUMIDOR** de la conversión entre unidades de
+QC-76, que hasta hoy no usaba nadie», y `design.md > 3.4` y `> 7` lo repiten. R25 obliga además a
+calcular con `convertQuantity` **y con nada más**, así que conservarla exigía contradecir el
+requisito.
+
+**El mensaje real con el que se puso roja**, antes de retirarla:
 
 ```
 AssertionError: convertQuantity aparece fuera de lib/modules/unidades:
@@ -406,23 +417,44 @@ estrenarla, va en su propia ficha con su propia decision de negocio, y esa ficha
 guardia; no se relaja aqui.
 ```
 
-**La guardia prescribe su propia retirada**, en su cabecera (`origin/dev`, líneas 16-18):
+**Qué la sustituye, para que no se lea como cobertura perdida:**
 
-> «CUANDO ESTA GUARDIA SE PONGA ROJA no se la relaja: significa que alguien estrenó la conversión
-> [...] La respuesta es **retirar esta guardia EN ESA FICHA**, junto con la decisión de negocio que
-> la justifique, no aquí y no de paso.»
+| Lo que se pierde | Lo que queda |
+| --- | --- |
+| La afirmación **negativa** «nadie la usa todavía» — **hoy falsa por decisión de negocio** | — |
+| | El **comportamiento** de la conversión: `tests/unit/unidades/domain/convert-quantity.test.ts` |
+| | El **consumo** real: `tests/unit/asignaciones-ui/order-execution-lines.test.tsx` (R22–R25) |
 
-Y QC-63 **es** esa ficha: `[D8]` la declara «**PRIMER CONSUMIDOR** de la conversión entre unidades
-de QC-76», y `design.md > 3.4` y `> 7` lo repiten.
+**Intento previo, revertido y por qué.** El subagente la había «retirado» vaciándola y dejando un
+`it.skip` —no pudo borrarla, su sandbox bloqueó `rm`—. Eso es **lo peor de las dos opciones**:
+parece una guardia y no afirma nada. Se restauró **byte a byte** contra `dev` y se dejó **roja y
+honesta** hasta que el humano decidió. **Criterio que queda fijado para lo que venga: retirar una
+guardia cuya propia cabecera prescribe su retirada, citando la decisión que la justifica, es
+legítimo; aflojarla para que pase —patrón laxo, excepción por carpeta, `skip`— no lo es nunca.**
 
-**Qué hizo el subagente y por qué se revirtió.** Vació el archivo dejando un `it.skip` de 15 líneas
-—no pudo borrarlo, su sandbox bloqueó `rm`—. Eso es **lo peor de las dos opciones**: parece una
-guardia y no afirma nada. **Se restauró el archivo a su estado original**: hoy está **roja y
-honesta**, no verde y hueca.
+---
 
-**Las dos salidas, y decide el humano:**
-- **(a) retirarla de verdad** — `git rm` del archivo, en su propio commit, citando `[D8]`. Es lo que
-  su propia cabecera manda y lo que la decisión de negocio respalda.
-- **(b) conservarla** — habría que dejar de usar `convertQuantity`, lo que **contradice R25**.
+## DATO PARA LA GUARDIA QC-115 — reincidencia en citas de ficha/requisito en comentarios
 
-Mientras no se decida, **`./init.sh --rapido` saldrá rojo por este archivo y solo por él.**
+`docs/conventions.md > Comentarios` prohíbe citar `QC-<n>`, `R<n>`, `design.md` o «decisión cerrada»
+en comentarios de **producción**. Hoy eso **depende de que alguien lo vea**: la guardia que lo
+vigilaría es **QC-115** y todavía no existe. Esta ficha aporta tres reincidencias **en tres tandas
+seguidas**, todas de subagentes distintos y **todas con la regla escrita como regla dura en su
+prompt**:
+
+| Tanda | Archivo de producción | Citas | Quién |
+| --- | --- | --- | --- |
+| 2 | `lib/modules/asignaciones/adapters/driving/order-execution-actions.ts` | 1 (`R15`) | `backend_dev` |
+| 2 | `lib/composition/index.ts` | 1 (`QC-63`) | `backend_dev` |
+| 3 | `app/(private)/asignacion/[id]/page.tsx` | 4 (`R1`, `R2`, `R3`, `R8`) | `frontend_dev` |
+| 3 | `app/(private)/asignacion/[id]/components/order-execution-screen.tsx` | 4 (`R18`, `R11`, `R15`, `R20`) | `frontend_dev` |
+| 3 | `app/(private)/asignacion/[id]/components/order-execution-lines.tsx` | 4 (`R20`, `R22`, `R24`, `R25`) | `frontend_dev` |
+| 3 | `app/(private)/asignacion/[id]/components/order-execution-error.tsx` | 1 (`R6`) | `frontend_dev` |
+
+**Total: 15 citas en 6 archivos de producción, en 2 de las 3 tandas.** Las 15 las detectó y limpió
+el implementer con un `grep`, no un test. **Corrección al informe anterior:** eran **cuatro**
+archivos nuevos de `app/` con citas, no cinco — `components/index.ts` no tenía ninguna.
+
+**Lectura para QC-115:** el patrón no es descuido puntual, es **sistemático y resistente a la
+instrucción**. Un `grep` de seis patrones sobre el diff de la rama lo habría atrapado las tres
+veces en menos de un segundo. En QC-88 esto costó **un gate completo de más**.
