@@ -18,10 +18,9 @@ const CREATE_SUCCESS = 'Producto creado.';
 const UPDATE_SUCCESS = 'Producto actualizado.';
 
 /**
- * Aviso de alta cuando se conoce el lote (R14). Texto NEUTRO a proposito (R15, `design.md > 1`):
- * dice «Lote X», nunca «se asigno el lote X» — el lote puede venir tecleado a mano por la persona,
- * y decir que el sistema lo asigno mentiria en ese caso. `resolveBatchLot()` ya devuelve el mismo
- * string sea cual sea su origen, asi que este texto no distingue los dos casos: no hace falta.
+ * Texto NEUTRO a proposito: dice «Lote X», nunca «se asigno el lote X» — el lote puede venir
+ * tecleado a mano, y decir que lo asigno el sistema mentiria en ese caso. Por eso no distingue
+ * los dos origenes.
  */
 function createSuccessMessage(lot: string): string {
   return `${CREATE_SUCCESS} Lote ${lot}.`;
@@ -70,8 +69,8 @@ export function ProductSheet({
   const handleSaved = useCallback(
     (lot?: string) => {
       setOpen(false);
-      // R14-R16: el aviso de alta nombra el lote en el MISMO `toast` que ya existia -ninguna
-      // superficie nueva-. La edicion no conoce el lote (R9), asi que su texto no cambia.
+      // El aviso de alta nombra el lote en el MISMO `toast` que ya existia: ninguna superficie
+      // nueva. La edicion no conoce el lote, asi que su texto no cambia.
       const message = isEdit
         ? UPDATE_SUCCESS
         : lot === undefined
