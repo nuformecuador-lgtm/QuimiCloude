@@ -70,7 +70,10 @@ patron que el caso negativo ya vigilado en ese archivo).
 **Hecho cuando:** hay un caso de **rechazo cruzado** —una asignacion de otra empresa **no vuelve** y
 no se distingue de una inexistente (R8)— sobre base real, y el archivo declara su aislamiento.
 
-### T4 · `[PA2]` Lectura en lote de pedidos por ids en el contrato de `pedidos` (R11, R15)
+### T4 · `[x]` Lectura en lote de pedidos por ids en el contrato de `pedidos` (R11, R15)
+
+> Hecha en el commit `3668d10` (2026-09-16), junto con T5 (el problema de tipos del metodo
+> requerido obligaba a cerrarlas juntas; ver bitacora).
 
 **Toca**
 - `lib/modules/pedidos/domain/order-catalog.ts` (tipo `AssignedOrderSummary` + metodo nuevo en la
@@ -90,7 +93,9 @@ readonly OrderStatus[], page: number, pageSize?: number): Promise<Page<AssignedO
 se escribe la version sin empresa y se enmienda despues: nace ya acotada (ver `design.md > 13`,
 nota del merge, y T5 mas abajo).
 
-### T5 · `[PA2]` Adaptador de esa lectura (R11)
+### T5 · `[x]` Adaptador de esa lectura (R11)
+
+> Hecha en el commit `3668d10` (2026-09-16), junto con T4.
 
 **Toca**
 - `lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts` (funcion nueva **al
@@ -108,7 +113,9 @@ porque esta funcion **todavia no existia**. Lo que cambia: `orders` **ya tiene `
 que el filtro de empresa entra **en el mismo commit de T5**, no despues (`design.md > 13`, nota del
 merge). `companyId` es parametro nuevo de `listAliveSummariesByIds` (T4).
 
-### T6 · `[PA2]` El caso de uso, con su autorizacion (R5, R6, R7, R11, R14, R15, R20)
+### T6 · `[x]` El caso de uso, con su autorizacion (R5, R6, R7, R11, R14, R15, R20)
+
+> Hecha en el commit `8f4b8bf` (2026-09-16).
 
 **Toca**
 - `lib/modules/asignaciones/domain/list-assigned-orders.ts` (**archivo nuevo**)
@@ -144,7 +151,9 @@ los **tres portazos** del caso siguen dando hallazgo (el mismo codigo en un adap
 legitimo fuera de donde QC-87 lo abrio. **La guardia se tensa, no se ensancha** (`design.md > 14`,
 riesgo 2).
 
-### T8 · Cableado en el punto unico de composicion (R13)
+### T8 · `[x]` Cableado en el punto unico de composicion (R13)
+
+> Hecha en el commit `e61fbee` (2026-09-16).
 
 **Toca**
 - `lib/composition/index.ts` (la constante `orderCatalog` gana la funcion nueva; la fachada
@@ -155,7 +164,9 @@ riesgo 2).
 **Hecho cuando:** ningun archivo fuera de `lib/composition` importa el adaptador driven nuevo, y la
 fachada expone la operacion ya cableada con sus cuatro dependencias.
 
-### T9 · Server Action de la consulta (R27 lado servidor)
+### T9 · `[x]` Server Action de la consulta (R27 lado servidor)
+
+> Hecha en el commit `46bb213` (2026-09-16).
 
 **Toca**
 - `lib/modules/asignaciones/adapters/driving/order-assignment-actions.ts` (funcion nueva **al final**;

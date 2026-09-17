@@ -8,13 +8,22 @@
 > 12 de las 18 tasks estan bloqueadas (ver `> Bloqueadas`). Lo que hay aqui es lo ejecutado, con su
 > evidencia real; lo que falta esta nombrado como falta, no omitido.
 
-## Estado: 5 de 18 tasks cerradas
+## Estado: 10 de 18 tasks cerradas
 
 | Tanda | Tasks | Commit |
 |---|---|---|
 | 1 | T1, T2, T7 | `1b0b16d` |
 | 2 | T3 | `95afb58` |
-| 3 | T17 | la tanda de este commit |
+| 3 | T17 | `4a08623` |
+| — | sincronizacion con `dev` (QC-60/104/81/56) | `b875197` |
+| — | F1.4: el humano cierra `[PA1]` y `[PA2]` | `ecf929c` |
+| 4 | T4+T5 | `3668d10` |
+| 4 | T6 | `8f4b8bf` |
+| 4 | T8 | `e61fbee` |
+| 4 | T9 | `46bb213` |
+
+**Quedan 8 tasks abiertas: T10-T16, T18** (la tanda de UI, ruta, menu y E2E — fuera del
+alcance de esta tanda de backend).
 
 ### Tanda 2 — T3 (2 archivos)
 
@@ -357,3 +366,101 @@ cambios y una limpieza dirigida a las rutas de `pedidos` se los volvio a llevar.
 commiteado se perdio, pero se gastaron dos corridas. **Leccion: en un worktree, una tanda a la vez**,
 o tandas cuyos conjuntos de archivos sean disjuntos **y** ninguna de ellas necesite revertir a la
 otra para verse en verde.
+
+---
+
+## Tanda 4 (F2.1b) — T4, T5, T6, T8, T9. La tanda de backend, con [PA1]/[PA2] ya cerradas
+
+`[PA2]` cerrada (opcion B, `> Decisiones cerradas` de `requirements.md`): `listAssignedOrders`
+nace en `asignaciones`, `pedidos` solo aporta el catalogo en lote. Delegado en `backend_dev`
+en un unico encargo secuencial (T4 -> T5 -> T6 -> T8 -> T9), sin tocar nada de T10 en adelante
+([PA1] resuelto pero fuera de esta tanda, es la UI).
+
+**Incidente del subagente:** la primera invocacion de `backend_dev` se quedo estancada (sin
+progreso 600s, watchdog no recupero) y el harness la marco `failed`. **No se perdio trabajo**:
+el arbol quedo con T4, T5, T6 (sin commitear), T8 y T9 completos y consistentes -typecheck en
+verde-, solo faltaba el commit. El implementer revisó cada diff contra `design.md` antes de
+commitear (no se relanzo un segundo subagente sobre el mismo arbol, precisamente por la leccion
+de coordinacion de arriba), corrigio un test roto que el subagente no habia tocado (ver
+`> Desviacion` abajo) y cerro los cuatro commits el mismo.
+
+### Archivos por task
+
+| Task | Archivos | Commit |
+|---|---|---|
+| T4 | `lib/modules/pedidos/domain/order-catalog.ts` (tipo `AssignedOrderSummary` + metodo en `OrderCatalog`), `lib/modules/pedidos/index.ts` (2 exports de tipo) | `3668d10` |
+| T5 | `lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts` (`listAliveOrderSummariesByIds`, funcion nueva al final), `tests/unit/pedidos/order-catalog.test.ts` | `3668d10` |
+| — | Cierre de los tres implementadores que el metodo REQUERIDO rompio: `tests/integration/asignaciones/use-case-fixture.ts`, `tests/unit/asignaciones/assign-responsibles.test.ts`, `tests/unit/pedidos/company-isolation-service.test.ts` | `3668d10` |
+| T6 | `lib/modules/asignaciones/domain/list-assigned-orders.ts` (nuevo), `lib/modules/asignaciones/domain/assigned-order-view.ts` (nuevo), `lib/modules/asignaciones/index.ts` (bloque nuevo), `tests/unit/asignaciones/list-assigned-orders.test.ts` (nuevo), `tests/unit/asignaciones/authorization.test.ts` (caso R40) | `8f4b8bf` |
+| T8 | `lib/composition/index.ts` (`orderCatalog` + fachada `asignaciones.listAssignedOrders`), `tests/unit/composition/asignaciones-facade.test.ts` | `e61fbee` |
+| T9 | `lib/modules/asignaciones/adapters/driving/order-assignment-actions.ts` (`listAssignedOrdersAction`), `tests/unit/asignaciones/order-assignment-actions.test.ts` | `46bb213` |
+
+### Desviacion declarada: `tests/unit/pedidos/order-catalog.test.ts` roto por el merge T4/T5, no anotado por el subagente
+
+`vitest related` sobre el conjunto de archivos tocados dio **1 test roto** en
+`tests/unit/pedidos/order-catalog.test.ts`: la asercion `import type { OrderStatus } from
+'./order-classification'` esperaba que esa fuera la UNICA linea de import de ese archivo, y T4
+le sumo `OrderPriority` a la misma linea (para `AssignedOrderSummary`). Ademas, arreglada esa,
+aparecia una segunda: el bucle que comprueba que `OrderAssignmentTarget` NO expone
+`recipeId`/`quantity`/`priority` buscaba en el **archivo entero**, y `AssignedOrderSummary` -en
+el MISMO archivo, a proposito, por `design.md > 6`- SI lleva esos campos.
+
+**Arreglo, hecho por el implementer, no por el subagente:** la primera asercion se relajo a
+tolerar cualquier orden dentro del mismo `import type { ... } from` (sigue exigiendo que
+`OrderStatus` venga de `order-classification`, no de una lista copiada). La segunda se acoto al
+**bloque de texto** de `OrderAssignmentTarget` (`catalogoFuente.slice(...)` entre su declaracion
+y `export interface OrderCatalog`), en vez de al archivo completo, para que la comprobacion siga
+siendo real -que el tipo VIEJO no gano campos- sin dar un falso rojo por el tipo NUEVO que
+comparte archivo a proposito. Commiteado dentro de `3668d10`, junto con T4/T5.
+
+### Salida real de lo que se corrio
+
+```
+pnpm typecheck -> VERDE (tsc --noEmit, sin salida)
+pnpm lint      -> VERDE (eslint, sin salida)
+
+pnpm exec vitest related --run <14 archivos de produccion y test de T4/T5/T6/T8/T9>
+test-db: plantilla reutilizada: qct_tpl_d83b600eb00c (las migraciones no han cambiado)
+test-db: la corrida de integracion va contra qct_qc88_6c532eac_mu4ty0kz_cxg (copia).
+ Test Files  1 failed | 148 passed (149)
+      Tests  1 failed | 2323 passed | 1 skipped (2325)
+      <- el 1 failed es tests/unit/pedidos/order-catalog.test.ts, arreglado (ver arriba)
+test-db: borrada la base de la corrida.
+
+Tras el arreglo:
+pnpm exec vitest run tests/unit/pedidos/order-catalog.test.ts
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+
+pnpm typecheck -> VERDE (repetido tras el arreglo)
+pnpm lint      -> VERDE (repetido tras el arreglo)
+```
+
+### Mapa `R<n>` -> test, incremental (lo que esta tanda ANADE al parcial de arriba)
+
+| R | Que exige | Test |
+|---|---|---|
+| **R5** | `asignaciones.consultar` en la PRIMERA linea, antes de `zod` y de tocar puerto | `tests/unit/asignaciones/list-assigned-orders.test.ts` — «R5: exige…ANTES de tocar ningun puerto» + `tests/unit/asignaciones/authorization.test.ts` — «R40: un actor sin…» |
+| **R6** | los cuatro actores invalidos se rechazan igual, sin tocar puerto | `list-assigned-orders.test.ts` — «R6: los cuatro actores invalidos…» |
+| **R7** | empresa y persona SALEN DEL ACTOR, nunca de la entrada | `list-assigned-orders.test.ts` — «R7 la empresa y la persona salen del ACTOR» (dos casos: `listOrderIdsByUserInCompany` y `listAliveSummariesByIds`) |
+| **R11** | solo PENDIENTE/EN_CURSO, descartados ANTES de paginar, `total` describe lo mostrado | `order-catalog.test.ts` (adaptador: `deletedAt: null`, `orderCompanyScope`, paginacion con `toOffsetLimit`/`buildPage`) + `list-assigned-orders.test.ts` (caso de uso: llama con `['PENDIENTE','EN_CURSO']`) + tipo `AssignedOrderView.status` acotado a esos dos literales (error de compilacion, no de test) |
+| **R12** | el barrel no arrastra `next/*`/`@prisma/client`/`'use server'` | `tests/unit/pedidos/module-contract.test.ts` (ya existente, sigue verde: no se toco) + inspeccion manual del cierre de imports de `lib/modules/pedidos/index.ts` y `lib/modules/asignaciones/index.ts` |
+| **R13** | el cableado puerto -> implementacion vive SOLO en `lib/composition` | `tests/unit/composition/asignaciones-facade.test.ts` — «expone las cinco anteriores mas `listAssignedOrders`…» + «rechaza sin `asignaciones.consultar` sin llegar a la base» |
+| **R14** | numero de consultas CONSTANTE, no crece con filas ni con tamano de pagina | `list-assigned-orders.test.ts` — «las mismas CUATRO llamadas de puerto con 1 fila que con 25» |
+| **R15** | ids desnudos y orden estable (parcial ya cubierto en T3); aqui: dedupe de recetas, responsables por pagina, comparador reutilizado | `list-assigned-orders.test.ts` — «deduplica los ids de receta…», «llama al lote de responsables…con los ids DE LA PAGINA» |
+| **R16** | numero visible compuesto por `formatOrderNumber`, nunca a mano | `list-assigned-orders.test.ts` — «compone el numero visible con `formatOrderNumber`…» |
+| **R17** | receta sin resolver pinta `null`, nunca el id | `list-assigned-orders.test.ts` — «una receta sin resolver pinta `null`…» |
+| **R20** | el actor no aparece entre sus propios responsables | `list-assigned-orders.test.ts` — «descarta al actor de `otherResponsibles`…» |
+| **R27** (lado servidor) | los datos se piden en el servidor; ninguna Action comprueba permisos por su cuenta | `tests/unit/asignaciones/order-assignment-actions.test.ts` — describe `QC-88 T9`, 6 casos (aridad, `data` tal cual, error por `code`, NO comprueba permiso, dos caras de sesion, no reexportada del barrel) |
+| **R37** | nadie fuera de `adapters/driven/**` consulta `prisma.orderAssignment`; sin `include` | sigue cubierto por T2 (sin cambios); `listAliveOrderSummariesByIds` no toca `prisma.orderAssignment` |
+| **R40** | test que llama la OPERACION con actor sin permiso y confirma que NO llega al repositorio | `authorization.test.ts` — «R40: un actor sin…lanza SIN llegar al repositorio» (cuenta invocaciones de los 5 dobles) + `list-assigned-orders.test.ts` — «R40: un actor sin el permiso lanza SIN llegar al repositorio (contando invocaciones)» |
+
+**Sigue sin cubrir** (bloqueado por la tanda de UI, T10-T18): R1-R4, R18-R19, R21-R36, R38-R39.
+
+## Deudas y notas para quien retome T10 en adelante
+
+- El tope de ids del riesgo 1 de `design.md > 14` sigue sin decidirse: no se anadio, como
+  manda la regla 6 de no inventar.
+- `[PA1]` ya esta cerrada (`/asignacion`, `ASSIGNED_ORDERS_ROUTE`/`ASSIGNED_ORDERS_LABEL`,
+  `testId` `nav-asignacion`): T10-T16 pueden entrar directamente con ese valor, sin nueva
+  pregunta al humano.
