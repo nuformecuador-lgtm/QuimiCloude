@@ -60,7 +60,7 @@ corre una sola vez al final, antes del PR (regla 5 de `CLAUDE.md`).
       nuevo si ya existe; si no existe, se añade `la edición no muestra el campo de fecha de
       compra (R9)`).
 
-- [ ] **T7. [P]** En `product-form.tsx`: cambiar el `helper` del campo `lot` al texto de
+- [x] **T7. [P]** En `product-form.tsx`: cambiar el `helper` del campo `lot` al texto de
       `design.md > 3` («Déjalo vacío para que el sistema lo asigne»).
       **Hecho cuando**: test de componente `el campo lote explica que un valor vacío lo asigna el
       sistema (R6)` pasa, y test ya existente de que el lote sigue siendo un `<input type="text">`

@@ -25,7 +25,9 @@ import {
 } from '@/lib/modules/inventario/adapters/driving/product-actions';
 
 import { PresentationSelect } from '@/components/shared/presentation-select';
+import { formatDateLocalISO } from '@/components/shared/data-table/data-table-filter-date';
 
+import { ProductBatchDateField } from './product-batch-date-field';
 import { ProductField } from './product-field';
 import { ProductNamePicker, type ProductNameOption } from './product-name-picker';
 
@@ -53,10 +55,22 @@ const INT_FIELDS = ['stock', 'qtyAlert'] as const;
  * leyera. Los dos huecos los cierra el MISMO objeto: `createProductWithFirstBatchSchema`, que
  * valida el cliente aqui y revalida el caso de uso en el servidor (R24, R27).
  *
- * **Solo en el ALTA** (R26): la edicion no pinta ninguno de los cinco, no los envia y valida
+ * **Solo en el ALTA** (R26): la edicion no pinta ninguno de los seis, no los envia y valida
  * con `createProductSchema`, que ni los conoce.
+ *
+ * **`purchaseDate` se sumo (R1-R5)**: fecha de compra del lote, escrita con el calendario de
+ * `ProductBatchDateField`. A diferencia de los demas, siempre viaja con un valor -nunca vacio,
+ * "hoy" por defecto (R2)-, pero eso no la hace menos "campo del lote": tambien es SOLO del alta y
+ * tambien la revalida el mismo esquema compartido (R8).
  */
-const BATCH_FIELDS = ['presentationId', 'unitCost', 'totalCost', 'lot', 'expiryDate'] as const;
+const BATCH_FIELDS = [
+  'presentationId',
+  'unitCost',
+  'totalCost',
+  'lot',
+  'expiryDate',
+  'purchaseDate',
+] as const;
 
 type ProductFieldName =
   | (typeof TEXT_FIELDS)[number]
@@ -85,6 +99,7 @@ const FIELD_MESSAGES: Record<ProductFieldName, string> = {
   totalCost: 'Debe ser un importe mayor que 0, con hasta 4 decimales.',
   lot: 'Escribe un lote de 1 a 60 caracteres.',
   expiryDate: 'Escribe una fecha válida.',
+  purchaseDate: 'Elige la fecha de compra.',
 };
 
 /** Falta el par de costos entero. Se pinta en LOS DOS campos: cualquiera de ellos resuelve. */
@@ -99,6 +114,7 @@ const FIELD_LABELS: Record<ProductFieldName, string> = {
   totalCost: 'Costo total',
   lot: 'Lote',
   expiryDate: 'Fecha de expiración',
+  purchaseDate: 'Fecha de compra',
 };
 
 type FieldErrors = Partial<Record<ProductFieldName, string>>;
@@ -315,6 +331,12 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
           totalCost,
           lot: readOptionalText(values.lot),
           expiryDate: readOptionalText(values.expiryDate),
+          // `purchaseDate` ES obligatoria (R3), al reves que el resto de `readOptionalText`: pero
+          // esa regla NO se duplica aqui (R8). Se toma el string crudo -tal cual llego en el
+          // `FormData`- y es el mismo `safeParse` quien la rechaza si falta: una cadena vacia
+          // pasa por `readOptionalText` igual que un costo vacio, y se convierte en `undefined`,
+          // que es lo que el campo requerido del esquema no admite.
+          purchaseDate: readOptionalText(values.purchaseDate),
         })
       : createProductSchema.safeParse({
           name: values.name,
@@ -568,7 +590,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
             name="lot"
             label={FIELD_LABELS.lot}
             type="text"
-            helper="El identificador del lote que trae el proveedor, tal cual viene en el envase. Opcional: déjalo vacío si el envase no lo trae."
+            helper="El identificador del lote que trae el proveedor, tal cual viene en el envase. Déjalo vacío para que el sistema lo asigne."
             defaultValue={initialValue('lot', '')}
             error={fieldErrors.lot}
           />
@@ -580,6 +602,17 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
             helper="La fecha en la que este lote caduca. Opcional: hoy solo se guarda, todavía no dispara ningún aviso."
             defaultValue={initialValue('expiryDate', '')}
             error={fieldErrors.expiryDate}
+          />
+
+          {/*
+            Fecha de compra (R1-R5). Obligatoria y con "hoy" ya elegida (R2, R3): el propio
+            componente cae en "hoy" si no recibe valor, pero aqui SIEMPRE se le pasa uno -el de un
+            intento fallido, o el de hoy calculado en hora local- para que la recuperacion tras un
+            rechazo (R20) y el valor por defecto compartan la misma via.
+          */}
+          <ProductBatchDateField
+            initialValue={initialValue('purchaseDate', formatDateLocalISO(new Date()))}
+            error={fieldErrors.purchaseDate}
           />
         </>
       )}
