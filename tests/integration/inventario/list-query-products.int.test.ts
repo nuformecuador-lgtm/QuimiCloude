@@ -124,6 +124,7 @@ async function sembrarLote(
   presentationId: string,
   createdAt: Date,
   stock = 1,
+  expiryDate: Date | null = null,
 ): Promise<string> {
   const { id } = await prisma.productBatch.create({
     data: {
@@ -134,6 +135,7 @@ async function sembrarLote(
       // `lot` es unico por empresa.
       lot: `L-${randomUUID()}`,
       purchaseDate: new Date('2026-09-01T00:00:00Z'),
+      expiryDate,
       createdAt,
       // `product_batches_check_company` exige la misma empresa en lote, producto y presentacion.
       companyId: empresaDelArchivo,
@@ -431,5 +433,30 @@ describe('QC-91 — el listado agrega la existencia por unidad (R1, R2, R3)', ()
       ]),
     );
     expect(pagina.items[0]?.stockByUnit).toHaveLength(2);
+  });
+});
+
+describe('QC-91 — un lote vencido sigue sumando a la existencia (R4)', () => {
+  it('un producto con un lote vencido y otro vigente en la misma unidad muestra la suma de los dos', async () => {
+    const marca = `Lote vencido ${token()}`;
+    const [productId] = await sembrar([{ name: `${marca} con lotes` }]);
+    if (productId === undefined) throw new Error('el producto de apoyo no se sembro');
+
+    const unidad = await sembrarUnidad();
+    const presentacion = await sembrarPresentacion(unidad);
+
+    await sembrarLote(
+      productId,
+      presentacion,
+      new Date('2031-05-02T00:00:00.000Z'),
+      10,
+      new Date('2020-01-01T00:00:00.000Z'),
+    );
+    await sembrarLote(productId, presentacion, new Date('2031-05-01T00:00:00.000Z'), 5, null);
+
+    const pagina = await listAliveProducts(consulta({ pageSize: 25, search: marca }), ambito());
+
+    expect(pagina.items).toHaveLength(1);
+    expect(pagina.items[0]?.stockByUnit).toEqual([{ unitId: unidad, quantity: 15 }]);
   });
 });
