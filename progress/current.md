@@ -425,6 +425,28 @@ porque es validacion de entrada y no una regla nueva de dominio.
 
 ## Deudas y cosas abiertas
 
+### El worktree de QC-50 quedo a medio borrar — SEXTA vez, y ya no es un worktree (2026-09-17)
+
+`./scripts/wt.sh done QC-50-aislamiento-por-empresa-en-recetas` fallo con
+`fatal: ... is not a working tree`. **No se forzo nada**, como manda la regla.
+
+**El diagnostico es distinto a las veces anteriores y conviene escribirlo**: el directorio sigue en
+disco pero **`.worktrees/QC-50-.../.git` NO EXISTE**, asi que git ya no lo registra —`git worktree
+list` no lo menciona— y `wt.sh done` no tiene nada que desmontar. No es «archivo en uso en Windows»,
+que es lo que el script supone y lo que dice su aviso: es que el registro se perdio antes.
+
+**El trabajo esta a salvo**: la rama esta en `origin` y mergeada en `dev` (PR #81, `63befce`).
+Lo que queda es un directorio suelto con su `node_modules`.
+
+**Y no esta solo**: quedan igual `QC-88`, `QC-103` y `QC-106`, las tres cerradas y mergeadas. Son
+cuatro arboles muertos ocupando disco que ningun paso del flujo va a recoger, porque el paso que
+lo haria es justo el que falla.
+
+**Esto ya no es una anecdota por ficha: es el mismo fallo seis veces seguidas** y el aviso del
+script apunta a una causa equivocada. Para `/afinar-regla`: `wt.sh done` deberia distinguir «no
+esta registrado» de «esta en uso» y, en el primer caso, ofrecer borrar el directorio cuando la
+rama ya esta integrada.
+
 ### La fila de QC-106 resucito en un merge, y el cupo se cuenta de aqui (2026-09-17)
 
 La quito al sincronizar QC-50 con `dev`. **QC-106 esta `done`** (PR #78 mergeado) y su F2.6 ya la
