@@ -128,7 +128,7 @@
         `products.stock` en `lib/` ni en `app/`.
       - Depende de: T7.
 
-- [ ] **T9. Migración: se quita la columna.** `DROP INDEX products_stock_idx`, `DROP CONSTRAINT
+- [x] **T9. Migración: se quita la columna.** `DROP INDEX products_stock_idx`, `DROP CONSTRAINT
       products_stock_non_negative`, `DROP COLUMN stock`, con su `down.sql` que restaura los tres
       vacíos de datos (R2).
       - Archivos: `db/schema.prisma` (`Product.stock` fuera),
