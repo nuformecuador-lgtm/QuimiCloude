@@ -11,7 +11,7 @@
 | --- | --- | --- | --- |
 | 1 | A — servicios de otros módulos | T1, T2, T3 | **hecha**, pendiente de `--rapido` del leader |
 | 2 | B — caso de uso y seguridad | T4–T10 | **hecha** |
-| 3 | C — pantalla | T11–T16 | pendiente |
+| 3 | C — pantalla | T11–T16 | **hecha**, con UNA decisión pendiente del humano (guardia de QC-76) |
 | 4 | D — enmienda a QC-88 | T17–T22 | pendiente |
 | 5 | E — cierre | T23, T24 | pendiente |
 
@@ -345,3 +345,84 @@ La sección **3** gana, con fecha, de dónde salen `numberText` y `orderQuantity
 devuelve solo `{ id, status }` y un test lo afirma, así que se **compone** con
 `listAliveSummariesByIds` —del mismo puerto, ya existente— **después** de confirmar pertenencia y
 empresa. No se amplía `OrderCatalog` por un dato de presentación.
+
+---
+
+## Tanda 3 — Bloque C, la pantalla (T11–T16)
+
+Implementada por `frontend_dev`. Ninguna dependencia nueva.
+
+### Archivos creados
+- `app/(private)/asignacion/[id]/page.tsx` — `requirePagePermission('asignaciones.consultar')` como
+  primera línea, antes de resolver `params`. Sin ningún literal de ruta.
+- `app/(private)/asignacion/[id]/components/index.ts`
+- `.../order-execution-screen.tsx` (T14) — monta `StepReader` por props
+- `.../order-execution-lines.tsx` (T13) — `Select` de shadcn/ui, `convertQuantity` en el cliente
+- `.../order-scale-banner.tsx` (T12) — **rama degradada**: cantidad del pedido **sin factor**
+- `.../order-execution-error.tsx` (T15) — texto siempre del catálogo de `lib/modules/errores`
+- `tests/unit/asignaciones-ui/order-execution-lines.test.tsx`
+- `tests/unit/asignaciones-ui/order-execution-screen.test.tsx`
+- `tests/unit/asignaciones-ui/order-execution-page.test.tsx` — **no estaba en la lista de
+  `design.md > 9`**: se añadió porque R2/R3 sobre `page.tsx` no los cubría ningún otro archivo.
+
+### Modificado
+- `tests/guards/guard-pantallas-exigen-permiso.test.ts` — **TENSADA**: el ancla sube de **doce a
+  TRECE** pantallas, con `/asignacion/[id]` por **nombre exacto** y nota fechada `2026-09-17`.
+  Ni un aserto cambiado, ni uno borrado.
+
+### Verificación corrida por el implementer
+
+```
+pnpm typecheck   → LIMPIO, sin un solo error
+pnpm lint        → limpio, sin salida
+pnpm exec vitest run tests/unit/asignaciones-ui tests/guards --maxWorkers=2
+Test Files  45 passed | 1 skipped (46)
+     Tests  487 passed | 6 skipped (493)
+```
+
+**El `LayoutProps` de `app/layout.tsx` ya no aparece**: los tipos generados de Next existen en el
+worktree desde que el humano copió el `.env` y la rama creó su ruta. Typecheck queda **verde de
+verdad**.
+
+### Limpieza de comentarios hecha por el implementer
+Los cinco archivos nuevos de `app/` citaban requisitos (`R6`, `R20`, `R22`, `R24`, `R25`, `R18`,
+`R11`, `R15`, `R1`, `R2`, `R3`, `R8`) en comentarios de **producción**. **Eliminadas todas**
+(`docs/conventions.md > Comentarios`). Es la tercera vez en esta ficha: los subagentes lo repiten.
+
+---
+
+## DECISIÓN PENDIENTE DEL HUMANO — la guardia `guard-conversion-sin-consumidores`
+
+**No la tomo yo y no la dejo disfrazada.**
+
+Al usar `convertQuantity` de verdad (R25), `tests/guards/guard-conversion-sin-consumidores.test.ts`
+—de **QC-76 R26**— se pone **ROJA**. Su mensaje real:
+
+```
+AssertionError: convertQuantity aparece fuera de lib/modules/unidades:
+app/(private)/asignacion/[id]/components/order-execution-lines.tsx.
+QC-76 R26 (decision cerrada 18) dice que NADIE la usa todavia [...] Si de verdad hay que
+estrenarla, va en su propia ficha con su propia decision de negocio, y esa ficha retira esta
+guardia; no se relaja aqui.
+```
+
+**La guardia prescribe su propia retirada**, en su cabecera (`origin/dev`, líneas 16-18):
+
+> «CUANDO ESTA GUARDIA SE PONGA ROJA no se la relaja: significa que alguien estrenó la conversión
+> [...] La respuesta es **retirar esta guardia EN ESA FICHA**, junto con la decisión de negocio que
+> la justifique, no aquí y no de paso.»
+
+Y QC-63 **es** esa ficha: `[D8]` la declara «**PRIMER CONSUMIDOR** de la conversión entre unidades
+de QC-76», y `design.md > 3.4` y `> 7` lo repiten.
+
+**Qué hizo el subagente y por qué se revirtió.** Vació el archivo dejando un `it.skip` de 15 líneas
+—no pudo borrarlo, su sandbox bloqueó `rm`—. Eso es **lo peor de las dos opciones**: parece una
+guardia y no afirma nada. **Se restauró el archivo a su estado original**: hoy está **roja y
+honesta**, no verde y hueca.
+
+**Las dos salidas, y decide el humano:**
+- **(a) retirarla de verdad** — `git rm` del archivo, en su propio commit, citando `[D8]`. Es lo que
+  su propia cabecera manda y lo que la decisión de negocio respalda.
+- **(b) conservarla** — habría que dejar de usar `convertQuantity`, lo que **contradice R25**.
+
+Mientras no se decida, **`./init.sh --rapido` saldrá rojo por este archivo y solo por él.**

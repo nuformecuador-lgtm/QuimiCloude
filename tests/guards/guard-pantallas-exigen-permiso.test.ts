@@ -212,8 +212,14 @@ function describir(infracciones: readonly Infraccion[]): string {
 // QC-74 decidio que `modificar` NO implica `consultar`, asi que cortar por los dos dejaria fuera a
 // quien tiene exactamente el permiso que la lista exige. Darse de alta en esta lista es el punto de
 // extension por diseño de la guardia; el ancla se SUBE y ni un aserto cambia.
+// TENSADA el 2026-09-17 (QC-63 T11): de doce a TRECE, con `/asignacion/[id]`, la pantalla de
+// ejecucion de la receta de un pedido asignado. Llama a `requirePagePermission` UNA sola vez
+// -`asignaciones.consultar`, la misma que exige la lista- porque esta pantalla no anade ninguna
+// escritura propia de `asignaciones`: abrir y finalizar los hace el caso de uso, no un permiso
+// nuevo de pantalla.
 const RUTAS_ESPERADAS_HOY = [
   '/asignacion',
+  '/asignacion/[id]',
   '/configuracion/presentaciones',
   '/configuracion/unidades',
   '/configuracion/usuarios',
@@ -228,7 +234,7 @@ const RUTAS_ESPERADAS_HOY = [
 ].sort();
 
 describe('guardia — toda pantalla bajo app/(private)/ exige un permiso del catalogo (R6, R20)', () => {
-  it('el barrido encuentra exactamente las doce pantallas privadas de hoy', () => {
+  it('el barrido encuentra exactamente las trece pantallas privadas de hoy', () => {
     const rutas = [...listPrivatePages(repoRoot).map((pantalla) => pantalla.route)].sort();
 
     expect(rutas).toEqual(RUTAS_ESPERADAS_HOY);

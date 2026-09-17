@@ -130,7 +130,7 @@ traducción por `code` con `createErrorStateTranslator`, **cero decisiones**. `f
 
 ## Bloque C — La pantalla
 
-### T11 — Página y corte por permiso
+### T11 [x] — Página y corte por permiso
 **Toca:** `app/(private)/asignacion/[id]/page.tsx`,
 `app/(private)/asignacion/[id]/components/index.ts`
 **Hacer:** `await requirePagePermission('asignaciones.consultar')` **antes** de resolver `params`;
@@ -140,17 +140,17 @@ de R3 que afirma 404 sin el permiso; **no** hay literal `/asignacion/...` en el 
 `assignedOrderRoute` / `ASSIGNED_ORDERS_ROUTE`) — R1.
 **Depende de:** T10.
 
-### T12 — El factor, visible y fijo
+### T12 [x] — El factor, visible y fijo
 **Toca:** `app/(private)/asignacion/[id]/components/order-scale-banner.tsx`
 **Hacer:** «Pedido 250 L · receta para 100 L · ×2,5». **Ninguna cifra de línea ni de paso se toca.**
-**BLOQUEADA** por la pregunta abierta de `design.md > 3.2`: sin la cantidad base de la receta, el
-factor no se puede calcular. Con la respuesta pendiente, se implementa la rama `null` (solo la
-cantidad del pedido) y se **para**.
+**DESBLOQUEADA el 2026-09-17** (decision humana): el modelo `Recipe` no tiene columna de rendimiento, asi que el
+factor no se puede calcular. Se implementa la rama degradada `null` (solo la
+cantidad del pedido), y esa es la entrega definitiva de esta ficha. El dato es de QC-120.
 **Hecho cuando:** test de R21 que afirma que el factor está en el DOM **y** que la cantidad de cada
 línea coincide **carácter a carácter** con la de la receta.
 **Depende de:** T11.
 
-### T13 [P] — Líneas y selector de unidad
+### T13 [x] [P] — Líneas y selector de unidad
 **Toca:** `app/(private)/asignacion/[id]/components/order-execution-lines.tsx`,
 `tests/unit/asignaciones-ui/order-execution-lines.test.tsx`
 **Hacer:** `Select` de shadcn/ui con `min-h-11 min-w-11`, poblado **solo** con
@@ -161,7 +161,7 @@ aritmética de conversión propia; test de R23 que afirma que `IncompatibleUnits
 ni se sustituye por un guion**.
 **Depende de:** T11.
 
-### T14 [P] — Recorrido y Finalizar
+### T14 [x] [P] — Recorrido y Finalizar
 **Toca:** `app/(private)/asignacion/[id]/components/order-execution-screen.tsx`,
 `tests/unit/asignaciones-ui/order-execution-screen.test.tsx`
 **Hacer:** montar `StepReader` con `steps`, `title` y un `onFinish` propio. **Cero cambios en
@@ -171,13 +171,13 @@ diff de la rama**; test de R19 (bloqueo sin escape, motivo visible); test de R15
 DOM y navegación a `ASSIGNED_ORDERS_ROUTE`); test de R20 (no hay ningún control de edición).
 **Depende de:** T11.
 
-### T15 [P] — Estados de error
+### T15 [x] [P] — Estados de error
 **Toca:** `app/(private)/asignacion/[id]/components/order-execution-error.tsx`
 **Hacer:** una frase por `code`, tomada del catálogo de `lib/modules/errores`. Nunca texto propio.
 **Hecho cuando:** test que afirma que «no existe» y «no es tuyo» pintan **lo mismo** (R6).
 **Depende de:** T11.
 
-### T16 — Barrido multiplataforma
+### T16 [x] — Barrido multiplataforma
 **Toca:** los cinco archivos de `app/(private)/asignacion/[id]/components/`
 **Hacer:** 44×44 en todo control, nada tras `:hover`, `min-h-dvh` y nunca `100vh`, operable por
 teclado.
