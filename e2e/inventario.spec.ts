@@ -261,6 +261,9 @@ async function abrirPanelDeAlta(page: Page): Promise<void> {
 async function crearPresentacionEnLinea(page: Page, nombre: string): Promise<void> {
   await page.getByTestId('presentation-create-open').click();
   await page.getByTestId('presentation-create-name').fill(nombre);
+  // El alta rapida exige unidad desde QC-80 (R11, R17): sin elegirla el envio se rechaza.
+  await page.getByTestId('presentation-unit-select').click();
+  await page.getByTestId('presentation-unit-option').first().click();
   await page.getByTestId('presentation-create-submit').click();
 
   await expect(page.getByTestId('presentation-create')).toHaveCount(0, { timeout: 60_000 });
@@ -461,6 +464,9 @@ test.describe('catalogo de productos', () => {
     // --- 4. La presentacion se crea desde el propio selector y queda SELECCIONADA (R24).
     await page.getByTestId('presentation-create-open').click();
     await page.getByTestId('presentation-create-name').fill(presentationName);
+    // El alta rapida exige unidad desde QC-80 (R11, R17): sin elegirla el envio se rechaza.
+    await page.getByTestId('presentation-unit-select').click();
+    await page.getByTestId('presentation-unit-option').first().click();
     await page.getByTestId('presentation-create-submit').click();
 
     await expect(page.getByTestId('presentation-create')).toHaveCount(0, { timeout: 60_000 });
