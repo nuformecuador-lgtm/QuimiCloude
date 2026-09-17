@@ -1,6 +1,6 @@
 # QC-63 — ejecutar-receta-operador · requirements.md
 
-> **Zona** `fullstack` · **Complejidad** `medium` · **depends_on** QC-62, QC-64, **QC-88** ·
+> **Zona** `fullstack` · **Complejidad** `high` (subida el 2026-09-17, ver las filas de esa fecha) · **depends_on** QC-62, QC-64, **QC-88** ·
 > **Rama** `feature/QC-63-ejecutar-receta-operador`
 >
 > **Alcance.** La pantalla con la que un **Operador ejecuta la receta de un pedido que tiene
@@ -17,7 +17,11 @@
 > se reescribe. Registrar **quién marcó qué y cuándo** → sigue **fuera de alcance** y esta acotación
 > no le crea ficha.
 >
-> *Sembrado por `/afinar-feature` el 2026-09-08, y la ficha del board **reescrita entera** ese
+> *Sembrado por `/afinar-feature` el 2026-09-08 y **reacotado el 2026-09-17**, cuando sus tres
+> dependencias cerraron: las filas de esa fecha **corrigen** lo que el disco desmintio y la ficha del
+> board se actualizo ANTES de escribirlas. Sembrado original:*
+>
+> *el 2026-09-08, y la ficha del board **reescrita entera** ese
 > mismo día: su versión anterior daba por hecho que el Operador navegaría el catálogo de recetas.
 > El bloque de Alcance y la tabla de «Decisiones cerradas» los fijó el humano ANTES del spec.
 > `spec_author` los respeta, no los reabre y no los reescribe: su trabajo aquí es
@@ -47,3 +51,8 @@ Ninguna.
 | 2026-09-08 | ¿Qué se hereda montado y no se re-crea? | El asistente **`StepReader`** de **QC-64** (`components/shared/step-reader/`), que **recibe todo por props** y cuya propia cabecera dice que «QC-63 podrá montarlo pasándole otro `onFinish` sin tocar una línea de aquí» — no lee datos, no importa `lib/composition`, ni Server Actions, ni `next/navigation`, y un **test de fuente** lo afirma. Más el corte por permiso de pantalla de **QC-75** (`requirePagePermission`, **404 y no 403**) y la autorización **en el service** antes del repositorio |
 | 2026-09-08 | ¿Hace falta E2E? | **Sí.** `CHECKPOINTS.md` la exige para flujos de permisos y este lo es: **Operador entra, ve su pedido asignado, lo abre, el pedido queda `EN_CURSO`, recorre los pasos hasta Finalizar y el pedido queda `ENTREGADO`**. Y el camino negativo: quien no tiene `asignaciones.consultar` recibe **404** |
 | 2026-09-08 | ¿Multiplataforma? | **Sin excepción**, heredado de **QC-26 R19, R34, R50** y reafirmado en QC-64: objetivos táctiles de **44×44 px**, **nada detrás de `:hover`**, y la pantalla operable por teclado. Es la ficha donde más pesa: se usa en planta, en un móvil o una tablet, posiblemente con guantes |
+| 2026-09-17 | ¿Con que permiso entra y con cual ESCRIBE el Operador? | **Corrige la fila del 2026-09-08, que ya no se sostiene contra el disco.** La pantalla se corta con **`asignaciones.consultar` a secas**: verificado en `lib/modules/identity/domain/permissions.ts`, el Operador nace con `inventario.consultar` + `asignaciones.consultar` y **no tiene `asignaciones.modificar`**, asi que exigir los dos lo dejaria fuera de su propia pantalla. El cambio de estado lo hace un **caso de uso NUEVO del modulo de asignacion**, cortado por el mismo permiso y que exige ademas que **el pedido este asignado a quien lo pide**. **No** se le da `pedidos.modificar` -hoy es lo que corta `updateOrder`, y le abriria editar cualquier pedido- ni `asignaciones.modificar` -hoy corta asignar y desasignar responsables, y podria repartirse pedidos a si mismo-. Misma clase de agujero que **QC-88 H1** evito a conciencia |
+| 2026-09-17 | ¿Quien decide que transicion es legal? | **La tabla de `lib/modules/pedidos/domain/order-transitions.ts` (QC-34) sigue siendo la unica verdad.** El caso de uso nuevo **pregunta al contrato publico de `pedidos`** y no reimplementa la matriz ni escribe la columna por su cuenta. El motivo esta escrito en ese mismo archivo y en `order-state.ts` de QC-87: dos copias de la misma tabla **divergen en silencio** el dia que el catalogo de estados crezca |
+| 2026-09-17 | ¿Puede el Operador volver a entrar a un pedido que ya esta `EN_CURSO`? | **Si: cualquier responsable asignado entra**, aunque el pedido ya este `EN_CURSO`. Es el caso real de planta -se apaga la tablet, se recarga la pantalla- y la alternativa dejaba el trabajo bloqueado hasta que alguien de oficina lo devolviera a `PENDIENTE`. **Sin dato nuevo, sin columna y sin migracion**, coherente con que esta ficha no registra quien hizo que. **Coste asumido y escrito**: dos responsables del mismo pedido pueden estar dentro a la vez y el sistema no lo sabra |
+| 2026-09-17 | ¿Que pasa entonces con el disparador deshabilitado que dejo QC-88, ya mergeada? | **Pasa a ser un aviso de presentacion, y esta ficha lo enmienda.** QC-88 R21 deshabilita el disparador de entrar de todo pedido `EN_CURSO` y su **R23 remitia el rechazo real aqui**; con la fila anterior, ese rechazo **no existe**. La guardia y los tests de QC-88 se **enmiendan TENSANDOLOS, con nota fechada**, nunca aflojandolos, y probandolo por mutacion: el mismo procedimiento que QC-88 uso con la guardia de QC-102. **La linea de «Lo que NO entra» que mandaba este bloqueo a QC-88 queda corregida por esta fila** |
+| 2026-09-17 | ¿Que deja detras Finalizar? | **Verificado en disco, no supuesto**: al pasar a `ENTREGADO`, `lib/modules/asignaciones/domain/order-state.ts` **congela las tres escrituras de asignacion** (`order_delivered_frozen`) y la lista de QC-88 **deja de mostrarlo** (su R11 solo trae `PENDIENTE` y `EN_CURSO`). Es el final del recorrido: desde esta pantalla **no hay vuelta atras**, y reabrir un pedido entregado no es de esta ficha |
