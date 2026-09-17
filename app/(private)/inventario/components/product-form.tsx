@@ -25,9 +25,8 @@ import {
 } from '@/lib/modules/inventario/adapters/driving/product-actions';
 
 import { PresentationSelect } from '@/components/shared/presentation-select';
-import { formatDateLocalISO } from '@/components/shared/data-table/data-table-filter-date';
 
-import { ProductBatchDateField } from './product-batch-date-field';
+import { ProductBatchDateField, formatDateLocalISO } from './product-batch-date-field';
 import { ProductField } from './product-field';
 import { ProductNamePicker, type ProductNameOption } from './product-name-picker';
 
