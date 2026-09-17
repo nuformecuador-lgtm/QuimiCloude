@@ -1,4 +1,5 @@
 import {
+  ASSIGNED_ORDERS_ROUTE,
   DASHBOARD_ROUTE,
   FORMULAS_ROUTE,
   INVENTORY_ROUTE,
@@ -103,6 +104,17 @@ export const UNITS_LABEL = 'Unidades';
  * criterio que `SUPPLIERS_LABEL`, `ORDERS_LABEL`, `PRESENTATIONS_LABEL` y `UNITS_LABEL`.
  */
 export const USERS_LABEL = 'Usuarios';
+
+/**
+ * Etiqueta del sidebar para la pantalla de pedidos asignados (QC-88, R3).
+ *
+ * `ASSIGNED_ORDERS_ROUTE` **no se reexporta** desde aqui: nace en `lib/shared/routes.ts` y no hay
+ * codigo previo que la importara de este archivo, asi que no hay compatibilidad que sostener.
+ * Mismo criterio que `SUPPLIERS_LABEL`, `ORDERS_LABEL`, `PRESENTATIONS_LABEL`, `UNITS_LABEL` y
+ * `USERS_LABEL`. El valor lleva tilde a proposito: es el texto que ve la persona usuaria, no el
+ * segmento de la URL (que no la lleva).
+ */
+export const ASSIGNED_ORDERS_LABEL = 'Asignación';
 
 /** Nombre accesible del landmark de navegacion de la barra lateral (R3). */
 export const PRIVATE_NAV_LABEL = 'Navegación principal';
@@ -235,6 +247,23 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     testId: 'nav-dashboard',
     permission: 'dashboard.consultar',
     icon: 'layout-dashboard',
+    section: NAV_SECTION_OPERATION,
+  },
+  // QC-88 R3, R35 (nota fechada 2026-09-16): item de NIVEL SUPERIOR en la seccion «Operación»,
+  // colocado ENTRE Dashboard e Inventario y no al final. El orden no es cosmetico: cambia el
+  // aterrizaje de quien no tiene `dashboard.consultar` (`design.md > 7.2`, H3). El Operador del
+  // seed carece de ese permiso, asi que `firstVisibleNavHref` recorre el menu filtrado de arriba
+  // abajo y aterriza aqui, en «Asignación», en vez de en Inventario; el Administrador si tiene
+  // `dashboard.consultar` y sigue aterrizando en `/dashboard` sin ningun cambio. Ningun otro item
+  // se reordena. El icono `clipboard-list` ya existe en `NavIconName` y en `NAV_ICONS` —lo usa hoy
+  // `nav-pedidos`—: reutilizarlo es correcto (`design.md > 7.2`), no se anade ningun icono nuevo.
+  {
+    kind: 'link',
+    href: ASSIGNED_ORDERS_ROUTE,
+    label: ASSIGNED_ORDERS_LABEL,
+    testId: 'nav-asignacion',
+    permission: 'asignaciones.consultar',
+    icon: 'clipboard-list',
     section: NAV_SECTION_OPERATION,
   },
   {
