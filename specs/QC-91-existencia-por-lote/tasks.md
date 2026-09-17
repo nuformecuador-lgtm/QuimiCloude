@@ -36,7 +36,7 @@
       - **Hecho**: typecheck en verde, `stock` y `stockByUnit` conviven, los tests de QC-80 intactos.
       - Depende de: T1.
 
-- [ ] **T3. [P] Listado: existencia por unidad y alerta nueva.** La celda pinta una existencia por
+- [x] **T3. [P] Listado: existencia por unidad y alerta nueva.** La celda pinta una existencia por
       unidad con su etiqueta, resolviendo el símbolo con el catálogo que la página ya pide
       (R6); `isBelowAlert` compara contra la existencia de `latestBatchUnitId`, con 0 cuando no hay
       lotes, y no marca si no hay `qtyAlert` (R16, R17, R18).
@@ -53,7 +53,7 @@
 
 ## Bloque 3 — receta y pedido leen por unidad (aditivo)
 
-- [ ] **T4. [P] `ProductRef` gana `stockByUnit` (sin perder `stock`).**
+- [x] **T4. [P] `ProductRef` gana `stockByUnit` (sin perder `stock`).**
       - Archivos: `lib/modules/inventario/domain/product-catalog.ts`,
         `lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma.ts`.
       - **No se toca el ámbito de empresa**: `findProductRefs` sigue sin él, con su excepción
@@ -62,7 +62,7 @@
       - **Hecho**: typecheck en verde; el contrato público exporta el tipo nuevo.
       - Depende de: T1. `[P]` con T3.
 
-- [ ] **T5. Detalle de receta: la existencia de la unidad de la línea.** `get-recipe` elige del
+- [x] **T5. Detalle de receta: la existencia de la unidad de la línea.** `get-recipe` elige del
       agregado con las cuatro reglas de la tabla de `design.md > 3.3` (R12, R13, R14, R15).
       - Archivos: `lib/modules/recetas/domain/get-recipe.ts`,
         `lib/modules/recetas/domain/recipe-view.ts` (documentación de `productStock`).
@@ -72,7 +72,7 @@
       - **Hecho**: los cuatro casos en verde.
       - Depende de: T4.
 
-- [ ] **T6. Pedido: restante, marcador y faltante.** La tabla de ingredientes muestra «—» cuando la
+- [x] **T6. Pedido: restante, marcador y faltante.** La tabla de ingredientes muestra «—» cuando la
       existencia es `null` (R13), 0 y el restante negativo en rojo cuando no hay lotes (R14).
       - Archivos: `app/(private)/pedidos/components/order-ingredients-table.tsx`,
         `app/(private)/pedidos/components/order-form.tsx` (sólo el comentario de `:380`).
