@@ -256,7 +256,7 @@ pedido `EN_CURSO` se permite». **R21 y R23 no se reescriben**: el spec es histo
 
 ## Bloque E — Cierre
 
-### T23 — E2E de la feature
+### T23 [x] — E2E de la feature
 **Toca:** `e2e/ejecucion-receta.spec.ts`
 **Hacer:** (a) camino feliz de R29: el Operador entra, ve su pedido asignado, lo abre, **el pedido
 queda `EN_CURSO` en base**, recorre los pasos hasta Finalizar y **queda `ENTREGADO` en base**;
@@ -265,7 +265,7 @@ recargar la pantalla de un pedido ya `EN_CURSO` la vuelve a mostrar **sin error*
 **Hecho cuando:** los tres pasan, y los asertos de estado se leen **de la base**, no de la pantalla.
 **Depende de:** T16, T22.
 
-### T24 — Trazabilidad `R<n> → test`
+### T24 [x] — Trazabilidad `R<n> → test`
 **Toca:** `progress/impl_QC-63-ejecutar-receta-operador.md`
 **Hacer:** la tabla de los **31** requisitos, cada uno con **archivo y nombre del caso**.
 **Hecho cuando:** ni un `R<n>` sin fila. `CHECKPOINTS.md > Trazabilidad` lo exige y el reviewer lo

@@ -13,7 +13,7 @@
 | 2 | B — caso de uso y seguridad | T4–T10 | **hecha** |
 | 3 | C — pantalla | T11–T16 | **hecha**; guardia de QC-76 **retirada** por decisión del humano |
 | 4 | D — enmienda a QC-88 | T17–T22 | **hecha**, T21 verificada dos veces |
-| 5 | E — cierre | T23, T24 | **NO LANZADA**: QC-50 invalida la premisa de T2 (ver abajo) |
+| 5 | E — cierre | T23, T24 | **hecha** |
 
 ---
 
@@ -686,3 +686,205 @@ vitest guard    → 43 passed | 504 tests, 9 skipped
 vitest recetas+recetas-ui+asignaciones+asignaciones-ui+unidades+pedidos+composition+identity
                 → 221 passed | 3574 tests, 40 skipped
 ```
+
+---
+
+## DEUDA AJENA, declarada y NO corregida aquí — `product-catalog.ts`
+
+`lib/modules/inventario/domain/product-catalog.ts` tiene un comentario que **esta rama vuelve
+falso**. Texto exacto, tal como está hoy en disco:
+
+> `` *  `recetas` -el unico llamante de `findRefs`- lo pide para saber si el producto sigue vivo y ``
+
+**Ya no es «el único llamante»**: desde esta ficha, `asignaciones` también llama a
+`ProductCatalog.findRefs` —`get-assigned-order-execution.ts`, para resolver `productName`—.
+
+**Por qué NO se corrige aquí, decidido por el humano el 2026-09-17:** ese archivo es **uno de los
+que QC-91 está reescribiendo ahora mismo** (le cambia `stock` por `stockByUnit`). Editarlo por una
+línea de comentario **crearía el único choque real de archivos entre las dos fichas a cambio de
+nada**. Cuando QC-91 mergee, esa línea **la reescribe su ficha** o la recoge la **limpieza por
+módulo** que `docs/conventions.md > Comentarios` prevé.
+
+Queda anotado aquí para que no se pierda: es una afirmación falsa en un comentario de producción,
+y su corrección tiene dueño.
+
+---
+
+## LA MUTACIÓN DEL E2E QUE EXIGE R28 — para que el humano la ejecute sin interpretar
+
+R28 exige demostrar la enmienda **por mutación** en los **tres** archivos. Los **dos unitarios ya
+están probados** (ver «Tanda 4»); **el E2E no, porque Playwright no está en el reparto del
+implementer**. Esta es la receta exacta.
+
+### Paso 1 — mutar la producción (UN solo cambio, en un solo archivo)
+Archivo: `app/(private)/asignacion/components/assigned-order-enter-trigger.tsx`
+
+Dentro de la rama `if (order.status === 'EN_CURSO') { ... }`, **sustituir el elemento `<Link>` por un
+`<button disabled>`**, conservando `data-testid`, `aria-describedby` y `className`. Es decir, cambiar
+esto:
+
+```tsx
+        <Link
+          href={assignedOrderRoute(order.id)}
+          data-slot="button"
+          aria-describedby={noticeId}
+          data-testid={ASSIGNED_ORDER_ENTER_TESTID}
+          className={cn(buttonVariants({ variant: 'outline' }), TOUCH_TARGET)}
+        >
+          Entrar
+        </Link>
+```
+
+por esto:
+
+```tsx
+        <button
+          type="button"
+          disabled
+          aria-describedby={noticeId}
+          data-testid={ASSIGNED_ORDER_ENTER_TESTID}
+          className={cn(buttonVariants({ variant: 'outline' }), TOUCH_TARGET)}
+        >
+          Entrar
+        </button>
+```
+
+**No toques la otra rama** (la del `return` final, para los pedidos que no están `EN_CURSO`): esa ya
+era un `<Link>` antes de la enmienda y debe seguir siéndolo.
+
+### Paso 2 — correr SOLO el E2E de QC-88
+```
+pnpm exec playwright test e2e/pedidos-asignados.spec.ts
+```
+
+### Paso 3 — qué TIENE que ponerse rojo
+En `e2e/pedidos-asignados.spec.ts`, **líneas 351-354**, estas **dos** aserciones deben fallar:
+
+```ts
+    const enterInProgress = inProgressRow.getByTestId(ENTER_TESTID);
+    await expect(enterInProgress).toBeEnabled();                                    // <- ROJA
+    await expect(enterInProgress).toHaveAttribute('href', assignedOrderRoute(orderInProgressId));  // <- ROJA
+    await expect(inProgressRow.getByTestId(ENTER_REASON_TESTID)).toBeVisible();     // sigue verde
+```
+
+- `toBeEnabled()` falla porque el elemento pasa a estar `disabled`.
+- `toHaveAttribute('href', ...)` falla porque un `<button>` **no tiene `href`** (devuelve `null`).
+- **La tercera, la del aviso, debe seguir VERDE**: el párrafo no se toca, y eso confirma que el
+  aviso es independiente del bloqueo.
+
+**Si alguna de las dos primeras queda verde, esa aserción no afirma nada y hay que arreglarla antes
+de dar R28 por cumplida.**
+
+### Paso 4 — restaurar
+`git checkout -- "app/(private)/asignacion/components/assigned-order-enter-trigger.tsx"` y volver a
+correr el E2E: debe quedar **verde**.
+
+> **Precedente que avala el procedimiento**: la misma mutación, hecha sobre los dos archivos
+> unitarios, **destapó que `a11y-tactil.test.tsx` no afirmaba nada** sobre habilitado/deshabilitado.
+> Se arregló antes de seguir. La mutación no es un trámite: aquí ya encontró un test hueco.
+
+---
+
+## Tanda 5 — Bloque E (T23, T24)
+
+### T23 — `e2e/ejecucion-receta.spec.ts` (NUEVO, 421 líneas)
+Tres casos, con `R<n>` **en el nombre** y en ningún comentario:
+1. `R29 - el Operador entra, ve su pedido asignado, lo abre, el pedido queda EN_CURSO en base, recorre los pasos hasta Finalizar y el pedido queda ENTREGADO en base`
+2. `R30 - quien no tiene asignaciones.consultar pide la direccion del pedido y recibe 404`
+3. `R9 - recargar la pantalla de un pedido ya EN_CURSO la vuelve a mostrar sin error y sin mover el estado`
+
+**Escrito contra el mundo nuevo**: siembra `recipes.company_id`, obligatorio desde QC-50. Los
+asertos de estado se leen **de la base** (`prisma.order.findUniqueOrThrow`), no de la pantalla, y la
+dirección sale de `assignedOrderRoute`, sin un solo literal.
+
+**Para R30 ni el Administrador ni el Operador servían**: los dos roles del seed tienen
+`asignaciones.consultar`. Se crea un **rol efímero sin ninguna fila en `role_permissions`**, el
+mismo patrón que `e2e/inventario.spec.ts`.
+
+### NO SE HA EJECUTADO, y eso no se maquilla
+Playwright **no está en el reparto del implementer**. Lo verificado **por lectura**, con el archivo
+donde se confirmó: los `data-testid` de la lista (`assigned-order-enter`), de la pantalla
+(`order-execution-title`, `order-execution-error`) y del asistente
+(`step-reader-item-0-0`, `step-reader-next`, `step-reader-finish`, en
+`components/shared/step-reader/*`); que `finishAssignedOrderAction` acaba en
+`redirect(ASSIGNED_ORDERS_ROUTE)`; que el corte de permiso va en la primera línea de `page.tsx` y
+sale por `notFound()`; y los campos de `db/schema.prisma` del seed.
+
+**Lo que NO se pudo verificar**: que los tres casos pasan contra un navegador real; el
+comportamiento runtime de `useActionState` + `redirect()` con `requestSubmit()`; y que el rol
+efímero resuelve de verdad a «sin permiso» en sesión real. **Un E2E que no se ha corrido no es un
+E2E verificado.**
+
+### Salida real
+```
+pnpm typecheck → 0 errores
+pnpm lint      → limpio
+```
+
+---
+
+# T24 — Trazabilidad `R<n> → test`, los 31 requisitos
+
+**Columna «Fuerza», declarada y no camuflada:**
+- **Ejecutable** — hay un test que **falla si se rompe la conducta**.
+- **Estructural** — se sostiene por **ausencia**: algo que NO está en el árbol o en el diff. **No hay
+  conducta que mutar.** Se declara a propósito: el reviewer trata el hueco como bloqueante y
+  camuflarlo sale más caro que declararlo.
+- **Escrito, sin ejecutar** — el E2E existe pero Playwright no está en el reparto del implementer.
+
+| R | Test — archivo › caso | Fuerza |
+| --- | --- | --- |
+| **R1** | `order-execution-screen.test.tsx` › *R1 — ningun literal de ruta nuevo en la pagina* › «page.tsx no incrusta `/asignacion` como cadena» | Ejecutable |
+| **R2** | `order-execution-page.test.tsx` › «con el permiso, entra y abre el pedido» + `guard-pantallas-exigen-permiso.test.ts` › «el barrido encuentra exactamente las trece pantallas privadas de hoy» | Ejecutable |
+| **R3** | `order-execution-page.test.tsx` › «con sesion pero sin `asignaciones.consultar` responde 404, nunca 403» | Ejecutable |
+| **R4** | `asignaciones/module-contract.test.ts` › «nadie los nombra fuera del catalogo…» + sus **dos casos de mutación**. La otra mitad es **ESTRUCTURAL**: `identity/domain/permissions.ts` **no está en el diff** | Ejecutable + **Estructural** |
+| **R5** | `get-assigned-order-execution.test.ts`, `start-assigned-order.test.ts`, `finish-assigned-order.test.ts` › los tres con *R5: exige `asignaciones.consultar` ANTES de tocar ningun puerto* | Ejecutable |
+| **R6** | `get-assigned-order-execution.test.ts` › «pedido existente pero no asignado…»; `finish-assigned-order.test.ts` › «un pedido no asignado…»; `order-execution-page.test.tsx` › «presenta el estado de error… `order_not_found`» | Ejecutable |
+| **R7** | `get-assigned-order-execution.test.ts` › «pedido de otra empresa…» y «lee el pedido con la empresa del ACTOR, nunca de la entrada» | Ejecutable |
+| **R8** | `start-assigned-order.test.ts` › «transiciona PENDIENTE a EN_CURSO» + E2E R29 (lee la base) | Ejecutable |
+| **R9** | `start-assigned-order.test.ts` › «con el pedido ya EN_CURSO, `transitionAliveById` no se llama ni una vez» y «la reentrada no depende de quien entro primero» + E2E R9 | Ejecutable |
+| **R10** | **ESTRUCTURAL.** `db/schema.prisma` y `db/migrations/**` **no aparecen en el diff**; sin columna, tabla ni migración. Verificable con `git diff origin/dev --name-only -- db/` (vacío) | **Estructural** |
+| **R11** | `finish-assigned-order.test.ts` › «llama a `transitionAliveById` con el estado leido y `ENTREGADO`» + E2E R29 | Ejecutable |
+| **R12** | `start-assigned-order.test.ts` › «el archivo no declara ninguna lista de estados propia» + `pedidos/module-contract.test.ts` › la lista **exacta** de consumidores de `assertTransition` | Ejecutable |
+| **R13** | `guard-arquitectura-modulos.test.ts` › «ningun adaptador driven real accede a un modelo de otro modulo», con su caso de mutación | Ejecutable |
+| **R14** | `start-assigned-order.test.ts` y `finish-assigned-order.test.ts` › «ENTREGADO rechaza con `order_delivered_frozen` sin escribir» y «CANCELADO rechaza con `order_cancelled_not_assignable` sin escribir» | Ejecutable |
+| **R15** | `order-execution-screen.test.tsx` › «al finalizar muestra la confirmacion y navega a la lista» y «si la operacion falla, muestra el error y NO muestra la confirmacion» | Ejecutable |
+| **R16** | `finish-assigned-order.test.ts` › «la firma solo acepta el actor y el identificador del pedido: sin un tercer parametro» y «un `input` con datos de marcado… el esquema estricto los rechaza» | Ejecutable |
+| **R17** | **Parcial.** `order-execution-screen.test.tsx` › «no ofrece ningun campo de texto ni area de edicion». Que no exista **reabrir/deshacer** es **ESTRUCTURAL**: el módulo solo publica `start`/`finish`, y `order-transitions.ts` deja `ENTREGADO`/`CANCELADO` **vacías** | Ejecutable + **Estructural** |
+| **R18** | `order-execution-screen.test.tsx` › *R18* › «`components/shared/step-reader/**` no cambia respecto a la base de fusion» | Ejecutable |
+| **R19** | `order-execution-screen.test.tsx` › «no permite finalizar mientras queden items sin marcar, y no invoca la operacion» | Ejecutable |
+| **R20** | `order-execution-screen.test.tsx` › «no ofrece ningun campo de texto ni area de edicion» + `order-execution-lines.test.tsx` › «presenta el producto y la cantidad tal cual, sin ningun control de edicion» | Ejecutable |
+| **R21** | `order-execution-screen.test.tsx` › «muestra la cantidad del pedido y la cantidad de la linea CARACTER A CARACTER» y «sin cantidad base de receta no pinta ningun factor inventado». Cumplido en su **rama degradada**: el factor no se pinta porque el dato no existe (**QC-120**) | Ejecutable (rama degradada) |
+| **R22** | `get-assigned-order-execution.test.ts` › «solo vuelven unidades de la misma base efectiva, sin la propia» + `order-execution-lines.test.tsx` › «el selector ofrece SOLO la unidad propia y sus hermanas…» y «al elegir una unidad hermana muestra la cantidad CONVERTIDA» | Ejecutable |
+| **R23** | `order-execution-lines.test.tsx` › «elegir una unidad de otra base efectiva propaga `IncompatibleUnitsError` sin capturarla» | Ejecutable |
+| **R24** | `order-execution-lines.test.tsx` › «remontar la lista devuelve la cantidad y la unidad original» | Ejecutable |
+| **R25** | `order-execution-lines.test.tsx` › «el archivo de las lineas no calcula la conversion a mano: solo llama a `convertQuantity`» | Ejecutable |
+| **R26** | `order-execution-screen.test.tsx` › «todo boton y todo selector… cumple el objetivo tactil minimo» y «no usa `100vh`… usa `min-h-dvh`» + `a11y-tactil.test.tsx` | Ejecutable |
+| **R27** | `assigned-order-enter-trigger.test.tsx` › *R27 (QC-63, 2026-09-17; enmienda QC-88 R21)*, 4 casos + `a11y-tactil.test.tsx` › «el disparador «entrar» en curso (EN_CURSO)» + `e2e/pedidos-asignados.spec.ts` | Ejecutable |
+| **R28** | **Probada por mutación en los DOS archivos unitarios** (salida real más arriba). **El E2E NO se ha mutado**: la receta exacta está en «LA MUTACIÓN DEL E2E QUE EXIGE R28» | Ejecutable (2 de 3) · **1 pendiente del gate** |
+| **R29** | `e2e/ejecucion-receta.spec.ts` › «R29 - el Operador entra, ve su pedido asignado, lo abre, el pedido queda EN_CURSO en base…» | **Escrito, sin ejecutar** |
+| **R30** | `e2e/ejecucion-receta.spec.ts` › «R30 - quien no tiene asignaciones.consultar pide la direccion del pedido y recibe 404» | **Escrito, sin ejecutar** |
+| **R31** | **ESTRUCTURAL.** De la lista de QC-88 la rama solo toca los **dos** archivos que R27/R28 exigen; `asignacion/page.tsx` y `lib/shared/routes.ts` **no están en el diff**. El puente sale de `Order.recipeId` y no hay navegación por el catálogo — lo vigila además `recetas/scope.test.ts` | **Estructural** + guardia |
+
+**Ni un `R<n>` sin fila: 31 de 31.**
+
+### Los cinco huecos, dichos en voz alta
+1. **R10** y **R31** — **puramente estructurales**: se sostienen porque algo **no está** en el diff.
+2. **R4** y **R17** — **mixtos**: media conducta con test, media por ausencia.
+3. **R28** — **dos tercios por mutación**; el del E2E lo ejecuta el gate, con receta escrita.
+4. **R29** y **R30** — **escritos y no ejecutados**.
+5. **R21** — cumplido **en su rama degradada**, por decisión humana cerrada (**QC-120**).
+
+### Un censo más que el E2E hizo crecer — `guard-identificador-de-request`
+Al aparecer `e2e/ejecucion-receta.spec.ts`, la guardia de **QC-71** se puso roja: mantiene una
+**lista CERRADA** de los `.spec.ts` de `e2e/` porque QC-71 **difirió su propio E2E con motivo**
+(R21) y no quiere que alguien lo cuele de tapadillo.
+
+**Se creció por su punto de extensión declarado**, que el propio archivo escribe: «esta lista es
+CERRADA y su punto de extensión por diseño es darse de alta en ella. El ancla NO se relaja —el
+archivo se nombra, uno a uno—». Alta con nota fechada, igual que el precedente de
+`aislamiento-pedidos.spec.ts`.
+
+**Verificado antes de darlo de alta, no supuesto:** el E2E nuevo **no menciona** `request-id`,
+`x-request`, `reference` ni el identificador de petición (`grep` sin resultados), así que **el
+diferimiento de QC-71 R21 sigue INTACTO**. Si lo hubiera ejercitado, habría que haber parado.
