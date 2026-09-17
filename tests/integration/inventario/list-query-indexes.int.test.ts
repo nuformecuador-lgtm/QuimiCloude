@@ -174,7 +174,7 @@ const PRE_EXISTING_INDEXES = [
   // `recipes_name_unique` (unico GLOBAL sobre el nombre normalizado, de QC-24) salio de esta
   // lista el 2026-09-16 con QC-50. NO es un indice perdido por descuido, que es justo lo que
   // este caso vigila: la unicidad del nombre de receta pasa a medirse POR EMPRESA porque dos
-  // empresas pueden tener cada una su misma receta (R20, decision cerrada). Un unico global lo
+  // empresas pueden tener cada una su misma receta. Un unico global lo
   // impediria. Su sustituto es UN solo indice compuesto PARCIAL,
   // `recipes_company_name_unique`, que se afirma abajo en su propio caso: si la migracion se
   // hubiera llevado el global SIN dejar el compuesto, el catalogo de recetas se quedaria sin
@@ -317,7 +317,7 @@ describe('QC-57 — la migracion en la base (R21, R23)', () => {
     expect(indexes.has('presentations_name_normalized_key')).toBe(false)
   })
 
-  it('el unico de nombre de receta es POR EMPRESA y PARCIAL, y el global ya no esta (QC-50 R20)', async () => {
+  it('el unico de nombre de receta es POR EMPRESA y PARCIAL, y el global ya no esta (QC-50 R9, R10)', async () => {
     // El RELEVO de `recipes_name_unique`, que sale de `PRE_EXISTING_INDEXES` arriba. Los dos no
     // pueden convivir: con el global en pie, dos empresas seguirian sin poder tener cada una su
     // misma receta.
