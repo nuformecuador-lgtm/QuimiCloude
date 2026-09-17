@@ -336,11 +336,6 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
           totalCost,
           lot: readOptionalText(values.lot),
           expiryDate: readOptionalText(values.expiryDate),
-          // `purchaseDate` ES obligatoria (R3), al reves que el resto de `readOptionalText`: pero
-          // esa regla NO se duplica aqui (R8). Se toma el string crudo -tal cual llego en el
-          // `FormData`- y es el mismo `safeParse` quien la rechaza si falta: una cadena vacia
-          // pasa por `readOptionalText` igual que un costo vacio, y se convierte en `undefined`,
-          // que es lo que el campo requerido del esquema no admite.
           purchaseDate: readOptionalText(values.purchaseDate),
         })
       : createProductSchema.safeParse({
