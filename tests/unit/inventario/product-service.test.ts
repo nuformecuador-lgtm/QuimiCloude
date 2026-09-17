@@ -9,7 +9,7 @@ import { ProductNotFoundError, ValidationError } from '@/lib/modules/inventario/
 import { createGetProduct } from '@/lib/modules/inventario/domain/get-product';
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
 import { createUpdateProduct } from '@/lib/modules/inventario/domain/update-product';
-import type { NewProduct, ProductView } from '@/lib/modules/inventario/domain/product-view';
+import type { ProductView } from '@/lib/modules/inventario/domain/product-view';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 
@@ -28,20 +28,20 @@ const ADMIN: Actor = {
 /** Instante fijo, inyectado como dependencia (`now`): ver el comentario en `create-product.ts`. */
 const AHORA = new Date('2026-09-02T10:00:00.000Z');
 
-/** Entrada valida minima. `stock` y `qtyAlert` estan aqui desde que la decision del humano
- *  del 2026-09-03 los volvio obligatorios en `createProductSchema`. Sigue sirviendo tal
- *  cual a la EDICION, que no conoce el lote (QC-90 R26). */
+/** Entrada valida minima de la EDICION, que ya no conoce la existencia (R9). `qtyAlert`
+ *  sigue obligatorio desde la decision del humano del 2026-09-03. */
 const PRODUCTO_VALIDO = {
   name: 'Acido sulfurico',
-  stock: 0,
   qtyAlert: 0,
 };
 
 /** QC-90 (R1): el ALTA siempre crea su primer lote, asi que su entrada valida minima lleva
- *  ademas presentacion y uno de los dos costos. Los casos propios de QC-90 -derivacion,
- *  producto ya existente, autoria del lote- viven en `create-product.test.ts`. */
+ *  ademas la existencia del lote, presentacion y uno de los dos costos. Los casos propios
+ *  de QC-90 -derivacion, producto ya existente, autoria del lote- viven en
+ *  `create-product.test.ts`. */
 const ALTA_VALIDA = {
   ...PRODUCTO_VALIDO,
+  stock: 0,
   presentationId: '11111111-1111-4111-8111-111111111111',
   unitCost: '10.0000',
 };
@@ -129,17 +129,15 @@ describe('R12 — nombres duplicados', () => {
   });
 });
 
-describe('R13 — existencia recibida al editar', () => {
-  it('guarda la existencia recibida al editar, sin recalcularla', async () => {
+describe('R9 — la edicion rechaza la existencia', () => {
+  it('rechaza la edicion que trae stock, sin llamar al puerto', async () => {
     const products = montarRepositorio();
     const updateProduct = createUpdateProduct({ products, now: () => AHORA });
 
-    await updateProduct('producto-1', { ...PRODUCTO_VALIDO, stock: 37 }, ADMIN);
-
-    const [, datos]: [string, NewProduct, Date] = (
-      products.updateAlive as unknown as { mock: { calls: [string, NewProduct, Date][] } }
-    ).mock.calls[0];
-    expect(datos.stock).toBe(37);
+    await expect(
+      updateProduct('producto-1', { ...PRODUCTO_VALIDO, stock: 37 }, ADMIN),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(products.updateAlive).not.toHaveBeenCalled();
   });
 });
 

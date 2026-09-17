@@ -68,7 +68,7 @@ const ALTA_VALIDA = {
   unitCost: '10.0000',
 };
 
-const EDICION_VALIDA = { name: 'Acido sulfurico', stock: 10, qtyAlert: 2 };
+const EDICION_VALIDA = { name: 'Acido sulfurico', qtyAlert: 2 };
 const PRESENTACION_VALIDA = { name: 'Bidon 20 L', unitId: UNIDAD };
 
 const AHORA = new Date('2026-09-11T10:00:00.000Z');
