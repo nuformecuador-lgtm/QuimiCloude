@@ -725,6 +725,57 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     expect(restante.firstElementChild).toHaveClass('text-destructive');
   });
 
+  it('R12 — con existencia en la unidad de la linea, el restante resta normal', async () => {
+    const user = setupUser();
+    getRecipeActionMock.mockResolvedValue({
+      status: 'success',
+      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, productStock: 40 }] }),
+    });
+    renderFormulario();
+
+    await elegirCatalogos(user);
+
+    const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
+    expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent('40');
+    expect(within(tabla).getByTestId('order-ingredient-remaining')).toHaveTextContent('40');
+  });
+
+  it('R13 — con lotes pero ninguno en la unidad de la linea, existencia y restante muestran el marcador', async () => {
+    const user = setupUser();
+    getRecipeActionMock.mockResolvedValue({
+      status: 'success',
+      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, productStock: null }] }),
+    });
+    renderFormulario();
+
+    await elegirCatalogos(user);
+
+    const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
+    expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent('—');
+    expect(within(tabla).getByTestId('order-ingredient-remaining')).toHaveTextContent('—');
+  });
+
+  it('R14 — sin ningun lote, la existencia es 0 y el restante negativo se destaca como faltante', async () => {
+    const user = setupUser();
+    getRecipeActionMock.mockResolvedValue({
+      status: 'success',
+      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, productStock: 0 }] }),
+    });
+    renderFormulario();
+
+    await elegirCatalogos(user);
+
+    const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
+    expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent('0');
+
+    await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
+
+    const restante = within(tabla).getByTestId('order-ingredient-remaining');
+    // 0 − 0.201 = −0.201: sin ningun lote el pedido siempre pide mas de lo que hay.
+    await waitFor(() => expect(restante).toHaveTextContent('-0.201'));
+    expect(restante.firstElementChild).toHaveClass('text-destructive');
+  });
+
   it('si el detalle falla, la tabla se sustituye por el estado de error de los ingredientes', async () => {
     const user = setupUser();
     // QC-70 R17 — el codigo es `recipe_not_found`, no el `not_found` generico que la ficha

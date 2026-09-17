@@ -377,8 +377,8 @@ export function OrderForm({
   /*
     Los ingredientes de la receta elegida. Se piden al SERVIDOR al elegir receta -en el alta- o al
     montar el panel -en la edicion, donde la receta ya viene elegida-: el detalle de `recetas` hace
-    el JOIN con `products` (`ProductCatalog.findRefs`) y trae por linea el nombre, el stock y la
-    presentacion del producto, mas la cantidad y la unidad de la linea.
+    el JOIN con `products` (`ProductCatalog.findRefs`) y trae por linea el nombre y la existencia
+    del producto en la unidad de la linea, mas la cantidad y la unidad de la linea.
 
     `ingredientsRequestRef` descarta la respuesta de una receta ya superada: elegir A y luego B no
     debe dejar que la linea de A pise a la de B cuando llegue la respuesta mas lenta. Es el mismo
