@@ -12,7 +12,7 @@
 | 1 | A — servicios de otros módulos | T1, T2, T3 | **hecha**, pendiente de `--rapido` del leader |
 | 2 | B — caso de uso y seguridad | T4–T10 | **hecha** |
 | 3 | C — pantalla | T11–T16 | **hecha**; guardia de QC-76 **retirada** por decisión del humano |
-| 4 | D — enmienda a QC-88 | T17–T22 | pendiente |
+| 4 | D — enmienda a QC-88 | T17–T22 | **hecha**, T21 verificada dos veces |
 | 5 | E — cierre | T23, T24 | pendiente |
 
 ---
@@ -458,3 +458,100 @@ archivos nuevos de `app/` con citas, no cinco — `components/index.ts` no tení
 **Lectura para QC-115:** el patrón no es descuido puntual, es **sistemático y resistente a la
 instrucción**. Un `grep` de seis patrones sobre el diff de la rama lo habría atrapado las tres
 veces en menos de un segundo. En QC-88 esto costó **un gate completo de más**.
+
+---
+
+## Tanda 4 — Bloque D, la enmienda a QC-88 (T17–T22)
+
+Implementada por `frontend_dev`. **Ninguna guardia tocada** (verificado sobre el diff). Ninguna
+dependencia nueva.
+
+### Qué cambia la conducta (R27)
+El disparador «Entrar» de un pedido `EN_CURSO` pasa de **deshabilitado** a **enlace habilitado** a la
+pantalla de ejecución. El texto que explicaba el bloqueo se conserva como **aviso de presentación**,
+visible y asociado por `aria-describedby`, **nunca un `title`**.
+`assignedOrderEnterDisabledReason()` → `assignedOrderEnterNoticeText()`, **sigue siendo función y no
+literal**.
+
+### Archivos tocados
+- `app/(private)/asignacion/components/assigned-order-enter-trigger.tsx` (T17)
+- `app/(private)/asignacion/components/index.ts` (T17)
+- `tests/unit/asignaciones-ui/assigned-order-enter-trigger.test.tsx` (T18)
+- `tests/unit/asignaciones-ui/a11y-tactil.test.tsx` (T19)
+- `e2e/pedidos-asignados.spec.ts` (T20)
+- `specs/QC-88-listado-de-pedidos-asignados/requirements.md` (T22)
+
+`assigned-orders-columns.tsx` **no se tocó**: no arrastraba el nombre renombrado.
+
+### Se TENSA: conteo de `expect` verificado por el implementer, no estimado
+
+| Archivo | Antes (`origin/dev`) | Después | Δ |
+| --- | --- | --- | --- |
+| `assigned-order-enter-trigger.test.tsx` | **11** | **15** | **+4** |
+| `a11y-tactil.test.tsx` | **7** | **8** | **+1** |
+| `e2e/pedidos-asignados.spec.ts` (bloque) | 1 aserción | 2 | **+1** |
+
+**Las cuatro líneas `expect` retiradas se auditaron una a una, y ninguna es una aserción perdida:**
+
+| Retirada | Qué la sustituye |
+| --- | --- |
+| `expect(trigger).toBeDisabled()` | **La afirmación del bloqueo**, la única que podía morir. Sustituida por `not.toBeDisabled()` + `tagName === 'A'` + `href` + `not aria-disabled` |
+| `toHaveTextContent(assignedOrderEnterDisabledReason())` | `toHaveTextContent(assignedOrderEnterNoticeText())` — el renombre |
+| `expect(esObjetivoTactil(...)).toBe(true)` | **Conservada**, solo extraída a variable; y el caso **gana** `not.toBeDisabled()` |
+| `expect(...).toBeInTheDocument()` | **Conservada**, y el caso **gana** `toHaveAttribute('href', ...)` |
+
+El bloque «el motivo del disparador … se alcanza SIN el puntero» quedó **intacto, sin tocar una
+línea**. Nota fechada `2026-09-17` en los archivos enmendados.
+
+### T21 — PRUEBA POR MUTACIÓN (bloqueante). Corrida DOS veces.
+
+**Hallazgo real del subagente, y es el motivo por el que esta task existe.** En su primera
+mutación, `a11y-tactil.test.tsx` **quedó VERDE**: solo afirmaba tamaño táctil y ausencia de `title`,
+**nada sobre habilitado/deshabilitado**. Es decir, **no afirmaba la conducta que la enmienda cambia**.
+Se corrigió añadiendo `expect(trigger).not.toBeDisabled()` **antes** de seguir, y se repitió.
+
+**El implementer la repitió por su cuenta, sin fiarse del reporte.** Primer intento **inválido**: se
+insertó una segunda rama `if (order.status === 'EN_CURSO')` **después** de la que ya devuelve el
+`<Link>`, o sea **código muerto**, y los tests pasaron. **No era debilidad de los tests sino una
+mutación mal hecha**, y queda escrito para que nadie lo lea al revés. Mutación correcta: sustituir el
+`<Link>` de la rama `EN_CURSO` por `<button disabled>`. Salida real:
+
+```
+ × el disparador «entrar» en curso (EN_CURSO)
+ × es un enlace habilitado cuyo href deriva de assignedOrderRoute, no un boton deshabilitado
+ × el mismo data-testid en los dos estados: un test lo localiza sin dos selectores
+AssertionError: expected 'BUTTON' to be 'A'
+Received element is disabled
+ Test Files  2 failed (2)
+      Tests  3 failed | 8 passed (11)
+```
+
+Restaurado el archivo:
+
+```
+Test Files  9 passed (9)
+     Tests  71 passed (71)
+```
+
+**Los dos archivos unitarios se ponen ROJOS con la mutación.** T21 cumplida.
+
+**PENDIENTE DEL GATE:** `e2e/pedidos-asignados.spec.ts` **no se mutó** — Playwright no está en el
+reparto de verificación del implementer. Su bloque gana una aserción, pero **su mutación la tiene
+que hacer el gate**.
+
+### T22 — el spec de QC-88 es historia y no se maquilla
+`specs/QC-88-listado-de-pedidos-asignados/requirements.md`: **6 líneas añadidas, CERO borradas**
+(verificado con `git diff --numstat`). **R21 y R23 no cambiaron ni una letra.**
+
+### Verificación corrida por el implementer
+```
+pnpm typecheck  → limpio, sin un solo error
+pnpm lint       → limpio
+pnpm exec vitest run tests/unit/asignaciones-ui --maxWorkers=2
+Test Files  9 passed (9)
+     Tests  71 passed (71)
+```
+
+**Sin cuarta reincidencia de comentarios**: `assigned-order-enter-trigger.tsx` e `index.ts` están
+limpios de citas, y el comentario **falso** que decía «la pantalla de destino todavía no existe, así
+que este enlace responde 404» quedó eliminado — hoy la pantalla existe.

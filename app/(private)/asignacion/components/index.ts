@@ -4,7 +4,7 @@ export {
   ASSIGNED_ORDER_ENTER_REASON_TESTID,
   ASSIGNED_ORDER_ENTER_TESTID,
   AssignedOrderEnterTrigger,
-  assignedOrderEnterDisabledReason,
+  assignedOrderEnterNoticeText,
 } from './assigned-order-enter-trigger';
 export {
   ASSIGNED_ORDER_ENTER_COLUMN_ID,

@@ -192,7 +192,7 @@ teclado.
 > **Regla del bloque, sin excepción: ninguna guardia se afloja y ninguna aserción se borra.** Cada
 > archivo gana aserciones o se queda igual. Nota **fechada** `2026-09-17` en cada uno.
 
-### T17 — El disparador pasa de bloqueo a aviso
+### T17 [x] — El disparador pasa de bloqueo a aviso
 **Toca:** `app/(private)/asignacion/components/assigned-order-enter-trigger.tsx`,
 `app/(private)/asignacion/components/index.ts`,
 `app/(private)/asignacion/components/assigned-orders-columns.tsx` (solo si arrastra el nombre)
@@ -204,7 +204,7 @@ ficha**.
 **Hecho cuando:** `tsc --noEmit` verde y ningún consumidor quedó con el nombre viejo.
 **Depende de:** T14.
 
-### T18 — Tensar el test unitario del disparador
+### T18 [x] — Tensar el test unitario del disparador
 **Toca:** `tests/unit/asignaciones-ui/assigned-order-enter-trigger.test.tsx`
 **Hacer:** el `describe('R21 - EN_CURSO: el disparador esta deshabilitado y con su motivo')` pasa a
 `describe('R27 (QC-63, 2026-09-17; enmienda QC-88 R21) - EN_CURSO: el disparador ENTRA y avisa')`, y
@@ -214,7 +214,7 @@ ficha**.
 no sean la afirmación del bloqueo.
 **Depende de:** T17.
 
-### T19 [P] — Conservar el barrido táctil de QC-88
+### T19 [x] [P] — Conservar el barrido táctil de QC-88
 **Toca:** `tests/unit/asignaciones-ui/a11y-tactil.test.tsx`
 **Hacer:** renombrar el caso «el disparador «entrar» deshabilitado (EN_CURSO)» a «…en curso
 (EN_CURSO)». **El bloque «el motivo del disparador … se alcanza SIN el puntero» se conserva
@@ -222,14 +222,14 @@ entero**: el aviso sigue siendo texto en el DOM y nunca un `title`.
 **Hecho cuando:** mismo número de `expect` o más; ninguno borrado.
 **Depende de:** T17.
 
-### T20 [P] — Tensar el E2E de QC-88
+### T20 [x] [P] — Tensar el E2E de QC-88
 **Toca:** `e2e/pedidos-asignados.spec.ts` (bloque de líneas ~349-354)
 **Hacer:** `toBeDisabled()` → `toBeEnabled()`, **y además** `toHaveAttribute('href', ...)`, **y** el
 aviso sigue `toBeVisible()`.
 **Hecho cuando:** el bloque tiene una aserción **más** que antes.
 **Depende de:** T17.
 
-### T21 — Prueba por mutación (BLOQUEANTE)
+### T21 [x] — Prueba por mutación (BLOQUEANTE)
 **Toca:** nada permanente — es un procedimiento, y su resultado se anota en
 `progress/impl_QC-63-ejecutar-receta-operador.md`
 **Hacer:** revertir a mano la rama `disabled` en `assigned-order-enter-trigger.tsx` y correr T18,
@@ -238,7 +238,7 @@ T19 y T20. Restaurar después.
 afirmaba nada: se arregla **antes** de seguir. El resultado queda escrito con la fecha.
 **Depende de:** T18, T19, T20.
 
-### T22 — Nota fechada en el spec de QC-88
+### T22 [x] — Nota fechada en el spec de QC-88
 **Toca:** `specs/QC-88-*/requirements.md`
 **Hacer:** nota al pie: «**2026-09-17 — enmendado por QC-63 R27/R28** (decisión cerrada 16 de
 QC-63): R21 pasa de bloqueo a aviso y R23 queda **cerrada sin rechazo**, porque la reentrada a un
