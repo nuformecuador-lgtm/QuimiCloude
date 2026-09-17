@@ -97,7 +97,7 @@
       - **Hecho**: el alta sigue escribiendo la existencia en el lote; la edición la rechaza.
       - Depende de: T3, T6.
 
-- [ ] **T8. LA RETIRADA — `stock` sale de los contratos, del dominio y del listado. ATÓMICA.**
+- [x] **T8. LA RETIRADA — `stock` sale de los contratos, del dominio y del listado. ATÓMICA.**
       **Esta task no deja el árbol compilando a mitad y no se puede partir**: al quitar
       `NewProduct.stock` y `ProductView.stock` rompen a la vez el adaptador, el caso de uso de alta,
       el de edición, la columna del listado y el filtro de la URL. Se abre y se cierra de una vez
