@@ -257,10 +257,17 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
   })
 
   it('ningun test importa @supabase/storage-js ni el adaptador de Storage', () => {
-    // R43: la verificacion de esta feature corre sin red y sin bucket. Ningun archivo bajo
-    // `tests/` puede importar la libreria del cliente ni el adaptador driven que la usa
-    // -eso obligaria a un doble/mock explicito, que es justo lo que R43 exige en su lugar-.
-    const testsDir = join(repoRoot, 'tests')
+    // R43: la verificacion de esta feature corre sin red y sin bucket. Ningun test DE ESTE MODULO
+    // puede importar la libreria del cliente ni el adaptador driven que la usa -eso obligaria a un
+    // doble/mock explicito, que es justo lo que R43 exige en su lugar-.
+    //
+    // ACOTADO al directorio de este modulo (2026-09-16). Antes barria `tests/` ENTERO y afirmaba
+    // algo global mientras protegia un alcance local, asi que se disparaba con tests de otros
+    // modulos que hacen cumplir esta MISMA regla: basta con que el texto del archivo NOMBRE la
+    // libreria -aunque sea como dato de prueba o dentro de una cadena- para que la expresion
+    // regular muerda, porque mira el texto y no los imports reales. R43 habla de la verificacion de
+    // ESTE modulo; el aislamiento de los demas lo afirma cada uno en su propio alcance.
+    const testsDir = join(repoRoot, 'tests', 'unit', 'recetas')
     const selfPath = fileURLToPath(import.meta.url) // este mismo archivo cita los patrones a proposito
     const hallazgos: string[] = []
     for (const file of filesIn(testsDir, /\.tsx?$/)) {

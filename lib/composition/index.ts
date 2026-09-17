@@ -274,6 +274,27 @@ import {
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity';
+// `documentos` — las DOS factories salen del CONTRATO del modulo (solo dominio), los dos puertos de
+// `ports/` y las dos implementaciones de `adapters/driven/` por su ruta exacta. La Server Action del
+// modulo NO se importa desde aqui: la flecha va driving -> composicion.
+import {
+  createConvertPdfs,
+  createDownloadDocument,
+  createIssueReadLink,
+  createIssueUploadLinks,
+} from '@/lib/modules/documentos';
+import {
+  countPages,
+  extractPdfText,
+  renderPages,
+} from '@/lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf';
+import {
+  createDocumentSignedReadUrl,
+  createDocumentSignedUpload,
+  downloadDocument,
+} from '@/lib/modules/documentos/adapters/driven/storage/document-storage-supabase';
+import type { DocumentStorage } from '@/lib/modules/documentos/ports/document-storage';
+import type { PdfConverter } from '@/lib/modules/documentos/ports/pdf-converter';
 import { requestScoped } from '@/lib/shared/request-scope';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
@@ -1024,4 +1045,78 @@ export const asignaciones = {
     people: peopleDirectory,
     now: () => new Date(),
   }),
+} as const;
+
+// ---------------------------------------------------------------------------------------
+// `documentos`. Bloque NUEVO al final, mismo criterio que los anteriores: no reordena ni
+// reformatea NADA de lo de arriba. Sus imports viven al final del bloque de imports.
+//
+// Es el UNICO archivo que ata puerto -> implementacion para este modulo: ningun otro archivo de
+// produccion puede importar sus adaptadores driven, y lo vigila
+// `tests/guards/guard-arquitectura-modulos.test.ts`.
+//
+// Los adaptadores exportan sus funciones con nombres DISTINTOS de los metodos del puerto —el
+// almacenamiento, porque `download` o `createSignedUpload` a secas no dirian de que son en un
+// archivo con nueve modulos; la conversion, porque `extractText` es tambien el nombre de la
+// funcion de la libreria—, asi que las claves del objeto son las del PUERTO y el valor, la funcion
+// del adaptador.
+// ---------------------------------------------------------------------------------------
+
+/**
+ * `DocumentStorage` cableado con el adaptador del bucket PRIVADO de estos PDFs. Ninguna de sus tres
+ * funciones se INVOCA aqui —solo se referencian—, asi que construir esta fachada no lee ni una
+ * variable de entorno ni toca la red: el adaptador resuelve su configuracion en cada llamada real.
+ * Importar este archivo con las variables del Storage vacias sigue funcionando.
+ *
+ * Ninguna de las tres BORRA, porque el puerto no lo expresa: el borrado del PDF temporal es de otra
+ * ficha, y aqui no hay nada que elegir al respecto.
+ */
+const documentStorage: DocumentStorage = {
+  createSignedUpload: createDocumentSignedUpload,
+  createSignedReadUrl: createDocumentSignedReadUrl,
+  download: downloadDocument,
+};
+
+/**
+ * `PdfConverter` cableado con el adaptador que es el UNICO archivo del repositorio que importa la
+ * libreria de PDF. Tampoco se invoca nada aqui: el par nativo de rasterizado se carga dentro de
+ * `renderPages`, de modo que cablear esta fachada no carga ningun binario.
+ */
+const pdfConverter: PdfConverter = {
+  countPages,
+  extractText: extractPdfText,
+  renderPages,
+};
+
+/**
+ * Fachada del modulo `documentos` ya cableada. Es lo que consume su Server Action.
+ *
+ * El ACTOR NO se resuelve aqui, mismo criterio que el resto de modulos: cada caso de uso lo recibe
+ * por parametro, y quien lo obtiene de las dos caras de la sesion es el adaptador driving.
+ * `lib/composition` no conoce cookies ni sesion; solo ata puerto -> adaptador.
+ *
+ * El RELOJ de la emision se inyecta aqui, REAL y explicito: `IssueUploadLinksDeps` lo declara
+ * opcional con `() => new Date()` por defecto, y dejarlo sin cablear haria que el unico lector del
+ * reloj del modulo fuera un defecto silencioso dentro del dominio. Este es el unico sitio que puede
+ * darselo; el defecto queda para los tests que no lo inyectan.
+ *
+ * `convertPdfs` NO recibe actor ni reloj: la frontera de autorizacion es la emision de enlaces, y
+ * quien convierte es el trabajo que procesa una tanda ya admitida.
+ */
+export const documentos = {
+  issueUploadLinks: createIssueUploadLinks({
+    storage: documentStorage,
+    now: () => new Date(),
+  }),
+  convertPdfs: createConvertPdfs({ converter: pdfConverter }),
+  // Las DOS operaciones de LECTURA salen por aqui como CASOS DE USO, no como las funciones del
+  // puerto: reciben el actor, comprueban que la ruta cae bajo su empresa y solo entonces llaman al
+  // almacenamiento. Cablear el puerto a pelo dejaria leer y descargar por ruta sin esa comprobacion,
+  // que es justo lo que no puede existir cuando el aislamiento entre empresas ES la ruta.
+  //
+  // El plazo de la firma de lectura NO se cablea aqui: lo pone el caso de uso desde la definicion
+  // unica del modulo. Tampoco se invoca ninguna de las dos: construir esta fachada sigue sin leer
+  // una variable ni tocar la red.
+  issueReadLink: createIssueReadLink({ storage: documentStorage }),
+  downloadDocument: createDownloadDocument({ storage: documentStorage }),
 } as const;
