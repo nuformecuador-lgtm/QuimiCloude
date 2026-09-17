@@ -84,7 +84,7 @@
 
 ## Bloque 4 — la retirada
 
-- [ ] **T7. Alta y edición dejan de compartir la existencia.** `productFieldsShape` queda
+- [x] **T7. Alta y edición dejan de compartir la existencia.** `productFieldsShape` queda
       `{ name, qtyAlert }`; el esquema del alta declara `stock` propio; el formulario lo pinta sólo
       en el alta; la action lo lee sólo en el alta (R9, R10).
       - Archivos: `lib/modules/inventario/domain/product-input.ts`,

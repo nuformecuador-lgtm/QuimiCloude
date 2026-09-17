@@ -50,7 +50,6 @@ const VISTA_PRODUCTO: ProductView = {
   id: 'producto-1',
   name: 'Acido sulfurico',
   imagePath: null,
-  stock: 0,
   stockByUnit: [],
   qtyAlert: null,
   // QC-80 (R22): `unitId` dejo de ser un campo del producto; lo que la vista trae es la unidad

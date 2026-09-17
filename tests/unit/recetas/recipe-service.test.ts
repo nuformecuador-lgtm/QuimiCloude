@@ -62,7 +62,6 @@ const FILA_RECETA: RecipeRow = {
 const PRODUCTO_REF: ProductRef = {
   id: LINEA_VALIDA.productId,
   name: 'Acido sulfurico',
-  stock: null,
   stockByUnit: [{ unitId: '55555555-5555-4555-8555-555555555555', quantity: 3 }],
 };
 
@@ -394,7 +393,6 @@ describe('R12, R13, R14, R15 — existencia de la linea en su propia unidad', ()
     const getRecipe = montarConProducto({
       id: LINEA_VALIDA.productId,
       name: 'Acido sulfurico',
-      stock: null,
       stockByUnit: [{ unitId: UNIT_ID, quantity: 15 }],
     });
 
@@ -406,7 +404,6 @@ describe('R12, R13, R14, R15 — existencia de la linea en su propia unidad', ()
     const getRecipe = montarConProducto({
       id: LINEA_VALIDA.productId,
       name: 'Acido sulfurico',
-      stock: null,
       stockByUnit: [{ unitId: '55555555-5555-4555-8555-555555555555', quantity: 3 }],
     });
 
@@ -418,7 +415,6 @@ describe('R12, R13, R14, R15 — existencia de la linea en su propia unidad', ()
     const getRecipe = montarConProducto({
       id: LINEA_VALIDA.productId,
       name: 'Acido sulfurico',
-      stock: null,
       stockByUnit: [],
     });
 

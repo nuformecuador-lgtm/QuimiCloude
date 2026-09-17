@@ -21,8 +21,6 @@ export type ProductId = string;
 export type ProductRef = {
   readonly id: ProductId;
   readonly name: string;
-  /** Existencia del producto en unidades, `null` cuando no declara stock. */
-  readonly stock: number | null;
   /** Suma de lotes por unidad; array vacio cuando el producto no tiene ninguno. */
   readonly stockByUnit: readonly ProductStockByUnit[];
 };

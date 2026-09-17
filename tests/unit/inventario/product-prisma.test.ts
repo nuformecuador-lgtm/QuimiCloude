@@ -32,7 +32,6 @@ describe('toProductView', () => {
     // 2026-09-07: el producto expone su ruta de imagen. `null` en el fixture base porque hoy
     // nadie llena esa columna; el caso de abajo comprueba que la ruta se copia tal cual.
     imagePath: null,
-    stock: 10,
     qtyAlert: 5,
     // QC-80 (R22): la fila YA NO trae `unit_id` -esa columna desaparecio de `products`-. Trae
     // `batches`, que el `select` acota al lote MAS RECIENTE y, de el, a la unidad de su
@@ -51,12 +50,10 @@ describe('toProductView', () => {
     );
   });
 
-  it('mapea la existencia y la alerta de cantidad sin reinterpretarlas', () => {
+  it('mapea la alerta de cantidad sin reinterpretarla', () => {
     const vista = toProductView(filaBase);
-    expect(vista.stock).toBe(10);
     expect(vista.qtyAlert).toBe(5);
-    expect(toProductView({ ...filaBase, stock: null, qtyAlert: null }).stock).toBeNull();
-    expect(toProductView({ ...filaBase, stock: null, qtyAlert: null }).qtyAlert).toBeNull();
+    expect(toProductView({ ...filaBase, qtyAlert: null }).qtyAlert).toBeNull();
   });
 
   it('no devuelve costo, compra minima ni tiempo de entrega', () => {
@@ -71,6 +68,12 @@ describe('toProductView', () => {
     expect(Object.keys(vista)).not.toContain('presentationName');
     expect(Object.keys(vista)).not.toContain('createdBy');
     expect(Object.keys(vista)).not.toContain('updatedBy');
+  });
+
+  it('no devuelve `stock`: la existencia sale unicamente de `stockByUnit` (R11)', () => {
+    const vista = toProductView(filaBase);
+    expect(Object.keys(vista)).not.toContain('stock');
+    expect(Object.keys(PRODUCT_SELECT)).not.toContain('stock');
   });
 
   it('deriva la unidad de la presentacion del lote, sin resolver nombre ni simbolo (R22)', () => {

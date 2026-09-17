@@ -160,11 +160,25 @@ describe('list-products: el campo no declarado se omite, no rompe y se anota (R5
   });
 
   it('un filtro con la forma equivocada se omite y se anota, sin fallar (R8)', async () => {
-    // R8 — `stock` es `numberRange`; pedirlo como texto no puede romper la consulta.
+    // R8 — `qtyAlert` es `numberRange`; pedirlo como texto no puede romper la consulta.
     const { products, log, listProducts } = montarProductos();
 
-    await listProducts({ filters: { stock: { kind: 'text', value: '5' } } }, ADMIN);
+    await listProducts({ filters: { qtyAlert: { kind: 'text', value: '5' } } }, ADMIN);
 
+    expect(consultaRecibida(products.listAlive.mock.calls).filters).toEqual({});
+    expect(log.ignoredFields).toHaveBeenCalledWith('products', ['qtyAlert']);
+  });
+
+  it('ordenar o filtrar por existencia se omite y se anota, sin fallar (R8)', async () => {
+    // R8 — `products.stock` ya no existe: ni orden ni filtro por ella pueden llegar al puerto.
+    const { products, log, listProducts } = montarProductos();
+
+    await listProducts(
+      { sort: { columnId: 'stock', direction: 'desc' }, filters: { stock: { kind: 'numberRange', min: 0, max: 10 } } },
+      ADMIN,
+    );
+
+    expect(consultaRecibida(products.listAlive.mock.calls).sort).toBeNull();
     expect(consultaRecibida(products.listAlive.mock.calls).filters).toEqual({});
     expect(log.ignoredFields).toHaveBeenCalledWith('products', ['stock']);
   });
@@ -244,19 +258,19 @@ describe('list-products: lo que llega al repositorio (R11, R13, R15, R20, R24, R
     await listProducts(
       {
         filters: {
-          // Los dos filtros son de `PRODUCT_QUERYABLE`. El segundo era `unitId` hasta QC-80
-          // (R21): dejo de estar declarado -`products.unit_id` no existe-, asi que un caso de
-          // «llegan intactos» no puede apoyarse en el, o mediria la omision en vez del paso.
-          stock: { kind: 'numberRange', min: 5, max: null },
+          // Los dos filtros son de `PRODUCT_QUERYABLE`. Ninguno es `unitId` (QC-80, R21) ni
+          // `stock` (QC-91, R8): los dos dejaron de estar declarados, asi que un caso de
+          // «llegan intactos» no puede apoyarse en ellos, o mediria la omision en vez del paso.
           qtyAlert: { kind: 'numberRange', min: null, max: 3 },
+          createdAt: { kind: 'dateRange', from: '2026-01-01', to: null },
         },
       },
       ADMIN,
     );
 
     expect(consultaRecibida(products.listAlive.mock.calls).filters).toEqual({
-      stock: { kind: 'numberRange', min: 5, max: null },
       qtyAlert: { kind: 'numberRange', min: null, max: 3 },
+      createdAt: { kind: 'dateRange', from: '2026-01-01', to: null },
     });
   });
 

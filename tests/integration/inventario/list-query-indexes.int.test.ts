@@ -401,7 +401,7 @@ describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion 
       const nombreAlta = `Solución Buffer pH 7 ${token()}`
       const created = await createProduct(
         // QC-80 (R21): `NewProduct` ya no lleva unidad; el producto no la declara.
-        { name: nombreAlta, stock: 3, qtyAlert: 1 },
+        { name: nombreAlta, qtyAlert: 1 },
         new Date('2026-01-01T00:00:00Z'),
         ambito(),
       )
@@ -420,7 +420,7 @@ describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion 
       const nombreEdicion = `Hipoclorito de sodio 5% ${token()}`
       const ok = await updateAliveProduct(
         created.id,
-        { name: nombreEdicion, stock: 3, qtyAlert: 1 },
+        { name: nombreEdicion, qtyAlert: 1 },
         new Date('2026-01-02T00:00:00Z'),
         ambito(),
       )

@@ -114,7 +114,7 @@ describe('R15: el borrado logico conserva la fila', () => {
     let productId: string | null = null;
 
     try {
-      const input: NewProduct = { ...baseProductInput({ stock: 9 }) };
+      const input: NewProduct = { ...baseProductInput() };
       const created = await createProduct(input, new Date(), ambito());
       productId = created.id;
 

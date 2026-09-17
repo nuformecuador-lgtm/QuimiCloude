@@ -277,7 +277,6 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
     id: crypto.randomUUID(),
     name: 'Hidróxido de sodio',
     imagePath: null,
-    stock: 42,
     stockByUnit: [],
     qtyAlert: 5,
     latestBatchUnitId: UNIDAD_QUE_NO_DEBE_VERSE,
@@ -534,7 +533,7 @@ describe('pantalla de productos — lista', () => {
     expect(columnas.map((columna) => columna.id)).toEqual([
       'image',
       'name',
-      'stock',
+      'stockByUnit',
       'qtyAlert',
       'actions',
     ]);

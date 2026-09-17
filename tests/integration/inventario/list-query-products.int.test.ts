@@ -164,7 +164,11 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
 
   beforeAll(async () => {
     await sembrar(
-      NOMBRES.map((name, i) => ({ name, stock: i + 1, qtyAlert: (i + 1) % 2 === 0 ? i + 1 : null })),
+      NOMBRES.map((name, i) => ({
+        name,
+        qtyAlert: i + 1,
+        createdAt: new Date(`2031-01-${String(i + 1).padStart(2, '0')}T00:00:00.000Z`),
+      })),
     );
   });
 
@@ -189,7 +193,7 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
       consulta({
         page: 1,
         pageSize: 5,
-        filters: { stock: { kind: 'numberRange', min: 12, max: 12 } },
+        filters: { qtyAlert: { kind: 'numberRange', min: 12, max: 12 } },
       }),
       ambito(),
     );
@@ -200,22 +204,21 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
   });
 
   it('dos filtros a la vez: una fila sale solo si cumple LOS DOS (R15)', async () => {
-    // `stock` entre 5 y 12 son ocho filas y solo las de indice par tienen `qtyAlert`: quedan
-    // cuatro.
+    // `qtyAlert` entre 5 y 12 son ocho filas (indices 4..11) y `createdAt` desde el dia 9 al 12
+    // son solo cuatro (indices 8..11): la interseccion son esas cuatro.
     const pagina = await listAliveProducts(
       consulta({
         pageSize: 25,
         filters: {
-          stock: { kind: 'numberRange', min: 5, max: 12 },
           qtyAlert: { kind: 'numberRange', min: 5, max: 12 },
+          createdAt: { kind: 'dateRange', from: '2031-01-09', to: '2031-01-12' },
         },
       }),
       ambito(),
     );
 
     expect(pagina.total).toBe(4);
-    expect(pagina.items.every((p) => p.qtyAlert !== null)).toBe(true);
-    expect(pagina.items.every((p) => (p.stock ?? 0) >= 5)).toBe(true);
+    expect(pagina.items.every((p) => (p.qtyAlert ?? 0) >= 9)).toBe(true);
   });
 
   it('pedir 100 por pagina se ACOTA a 25, no se rechaza (R29)', async () => {
@@ -231,7 +234,7 @@ describe('desempate estable por identificador (R10)', () => {
     // Sin desempate por `id`, dos filas empatadas pueden intercambiarse entre consultas y una
     // saldria dos veces, o ninguna.
     const nombre = `Homonimo ${token()}`;
-    await sembrar([1, 2, 3, 4].map(() => ({ name: nombre, stock: 7 })));
+    await sembrar([1, 2, 3, 4].map(() => ({ name: nombre, qtyAlert: 7 })));
 
     const vistos: string[] = [];
     for (const page of [1, 2]) {
@@ -239,8 +242,8 @@ describe('desempate estable por identificador (R10)', () => {
         consulta({
           page,
           pageSize: 2,
-          sort: { columnId: 'stock', direction: 'asc' },
-          filters: { stock: { kind: 'numberRange', min: 7, max: 7 } },
+          sort: { columnId: 'qtyAlert', direction: 'asc' },
+          filters: { qtyAlert: { kind: 'numberRange', min: 7, max: 7 } },
         }),
         ambito(),
       );
@@ -249,7 +252,7 @@ describe('desempate estable por identificador (R10)', () => {
 
     expect(vistos).toHaveLength(4);
     expect(new Set(vistos).size).toBe(4);
-    // Todas empatan en `stock`: lo unico que puede ordenarlas es el desempate por `id`.
+    // Todas empatan en `qtyAlert`: lo unico que puede ordenarlas es el desempate por `id`.
     expect([...vistos].sort()).toEqual(vistos);
   });
 });
@@ -259,10 +262,10 @@ describe('los nulos van SIEMPRE al final, en las DOS direcciones (decision cerra
 
   beforeAll(async () => {
     await sembrar([
-      { name: `${CON_VALOR} a`, stock: 1 },
-      { name: `${CON_VALOR} b`, stock: 99 },
-      { name: `${CON_VALOR} c`, stock: null },
-      { name: `${CON_VALOR} d`, stock: null },
+      { name: `${CON_VALOR} a`, qtyAlert: 1 },
+      { name: `${CON_VALOR} b`, qtyAlert: 99 },
+      { name: `${CON_VALOR} c`, qtyAlert: null },
+      { name: `${CON_VALOR} d`, qtyAlert: null },
     ]);
   });
 
@@ -271,22 +274,22 @@ describe('los nulos van SIEMPRE al final, en las DOS direcciones (decision cerra
   const soloEstas = (): Record<string, ListFilterValue> => ({});
 
   for (const direction of ['asc', 'desc'] as const) {
-    it(`en ${direction}, las filas sin existencia registrada salen las ultimas`, async () => {
+    it(`en ${direction}, las filas sin alerta configurada salen las ultimas`, async () => {
       // Por defecto Postgres pone los nulos al final en `ASC` pero al principio en `DESC`.
       const pagina = await listAliveProducts(
         consulta({
           pageSize: 25,
-          sort: { columnId: 'stock', direction },
+          sort: { columnId: 'qtyAlert', direction },
           filters: soloEstas(),
           search: normalizeProductName(CON_VALOR),
         }),
         ambito(),
       );
 
-      const stocks = pagina.items.map((p) => p.stock);
-      expect(stocks).toHaveLength(4);
-      expect(stocks.slice(0, 2).every((s) => s !== null)).toBe(true);
-      expect(stocks.slice(2)).toEqual([null, null]);
+      const alertas = pagina.items.map((p) => p.qtyAlert);
+      expect(alertas).toHaveLength(4);
+      expect(alertas.slice(0, 2).every((s) => s !== null)).toBe(true);
+      expect(alertas.slice(2)).toEqual([null, null]);
     });
   }
 });
@@ -296,8 +299,8 @@ describe('la busqueda ignora acentos y mayusculas (R16, R18, R19)', () => {
     // El marcador va delante del nombre y del termino para acotar el caso a sus dos filas.
     const marca = token();
     await sembrar([
-      { name: `${marca} Solución Buffer pH 7`, stock: 1 },
-      { name: `${marca} Agua destilada`, stock: 1 },
+      { name: `${marca} Solución Buffer pH 7` },
+      { name: `${marca} Agua destilada` },
     ]);
 
     const pagina = await listAliveProducts(
@@ -313,7 +316,7 @@ describe('la busqueda ignora acentos y mayusculas (R16, R18, R19)', () => {
     // El marcador no puede ir delante del termino: seria un prefijo, y el caso prueba una
     // palabra del medio. Por eso el aserto es `toContain` y no una igualdad.
     const marca = token();
-    await sembrar([{ name: `${marca} Hipoclorito de sodio 5%`, stock: 1 }]);
+    await sembrar([{ name: `${marca} Hipoclorito de sodio 5%` }]);
 
     const pagina = await listAliveProducts(consulta({ pageSize: 25, search: 'de sodio 5' }), ambito());
 
@@ -325,14 +328,14 @@ describe('el borrado logico no sale del listado, filtre lo que filtre (R7)', () 
   it('una fila borrada que cumple el filtro sigue sin aparecer y no cuenta en el total', async () => {
     const marca = `Borrado ${token()}`;
     await sembrar([
-      { name: `${marca} viva`, stock: 42 },
-      { name: `${marca} muerta`, stock: 42, deletedAt: new Date() },
+      { name: `${marca} viva`, qtyAlert: 42 },
+      { name: `${marca} muerta`, qtyAlert: 42, deletedAt: new Date() },
     ]);
 
     const pagina = await listAliveProducts(
       consulta({
         pageSize: 25,
-        filters: { stock: { kind: 'numberRange', min: 42, max: 42 } },
+        filters: { qtyAlert: { kind: 'numberRange', min: 42, max: 42 } },
       }),
       ambito(),
     );
@@ -350,10 +353,10 @@ describe('el rango de fechas se compara en UTC, con los dos extremos inclusivos'
     // encima del ultimo milisegundo.
     const marca = `Fechas ${token()}`;
     await sembrar([
-      { name: `${marca} borde inicial`, stock: 1, createdAt: new Date(`${DIA}T00:00:00.000Z`) },
-      { name: `${marca} borde final`, stock: 1, createdAt: new Date(`${DIA}T23:59:59.999Z`) },
-      { name: `${marca} dia siguiente`, stock: 1, createdAt: new Date('2031-03-11T00:00:00.000Z') },
-      { name: `${marca} dia anterior`, stock: 1, createdAt: new Date('2031-03-09T23:59:59.999Z') },
+      { name: `${marca} borde inicial`, createdAt: new Date(`${DIA}T00:00:00.000Z`) },
+      { name: `${marca} borde final`, createdAt: new Date(`${DIA}T23:59:59.999Z`) },
+      { name: `${marca} dia siguiente`, createdAt: new Date('2031-03-11T00:00:00.000Z') },
+      { name: `${marca} dia anterior`, createdAt: new Date('2031-03-09T23:59:59.999Z') },
     ]);
 
     const pagina = await listAliveProducts(

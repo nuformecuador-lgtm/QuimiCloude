@@ -265,7 +265,7 @@ describe('R7 (lado base): el costo unitario derivado se guarda con sus 4 decimal
       if (derivado === null) throw new Error('la derivacion no puede ser nula en este caso');
 
       const creado = await createWithFirstBatch(
-        newProduct({ stock: 3 }),
+        newProduct(),
         newBatch(fixture, { stock: 3, unitCost: derivado }),
         new Date(),
         ambito(fixture),
@@ -410,7 +410,7 @@ describe('R21: producto y primer lote se escriben en una sola transaccion', () =
       // transaccion quedaria un producto sin lote.
       await expect(
         createWithFirstBatch(
-          { name: nombre, stock: 5 },
+          { name: nombre },
           newBatch(fixture, { presentationId: randomUUID() }),
           new Date(),
           ambito(fixture),
@@ -435,7 +435,7 @@ describe('R18: agregar un lote no toca el producto', () => {
 
     try {
       const primero = await createWithFirstBatch(
-        newProduct({ stock: 7, qtyAlert: 2 }),
+        newProduct({ qtyAlert: 2 }),
         newBatch(fixture, { stock: 7 }),
         new Date(),
           ambito(fixture),

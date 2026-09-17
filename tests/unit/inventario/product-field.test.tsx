@@ -19,7 +19,6 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
     id: crypto.randomUUID(),
     name: 'Hidróxido de sodio',
     imagePath: null,
-    stock: 42,
     stockByUnit: [],
     qtyAlert: 5,
     latestBatchUnitId: null,

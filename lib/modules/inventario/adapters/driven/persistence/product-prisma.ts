@@ -41,7 +41,6 @@ export const PRODUCT_SELECT = {
   id: true,
   name: true,
   imagePath: true,
-  stock: true,
   qtyAlert: true,
   createdAt: true,
   updatedAt: true,
@@ -55,7 +54,6 @@ export function toProductView(row: ProductRow): ProductView {
     id: row.id,
     name: row.name,
     imagePath: row.imagePath,
-    stock: row.stock,
     stockByUnit: sumStockByUnit(
       row.batches.map((batch) => ({ stock: batch.stock, unitId: batch.presentation.unitId })),
     ),
@@ -76,7 +74,6 @@ export async function createProduct(
     data: {
       name: data.name,
       nameNormalized: normalizeProductName(data.name),
-      stock: data.stock ?? null,
       qtyAlert: data.qtyAlert ?? null,
       ...companyScopeColumns(scope),
       createdAt: now,
@@ -110,7 +107,6 @@ export async function updateAliveProduct(
     data: {
       name: data.name,
       nameNormalized: normalizeProductName(data.name),
-      stock: data.stock ?? null,
       qtyAlert: data.qtyAlert ?? null,
       updatedAt: now,
     },
@@ -155,8 +151,6 @@ export function productOrderBy(
   switch (sort.columnId) {
     case 'name':
       return [{ name: dir }, TIE_BREAKER];
-    case 'stock':
-      return [{ stock: { sort: dir, nulls: 'last' } }, TIE_BREAKER];
     case 'qtyAlert':
       return [{ qtyAlert: { sort: dir, nulls: 'last' } }, TIE_BREAKER];
     case 'createdAt':
@@ -182,7 +176,6 @@ function productFilterWhere(
     case 'numberRange': {
       const condition = numberRangeCondition(value.min, value.max);
       if (condition === null) return null;
-      if (field === 'stock') return { stock: condition };
       if (field === 'qtyAlert') return { qtyAlert: condition };
       return null;
     }
@@ -497,7 +490,6 @@ export async function createWithFirstBatch(
       data: {
         name: product.name,
         nameNormalized: normalizeProductName(product.name),
-        stock: product.stock ?? null,
         qtyAlert: product.qtyAlert ?? null,
         ...companyScopeColumns(scope),
         createdAt: now,

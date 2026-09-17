@@ -189,11 +189,9 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       cell: (product) => product.name,
     },
     {
-      id: 'stock',
+      id: 'stockByUnit',
       label: 'Existencia',
       align: 'end',
-      sortable: true,
-      filter: { kind: 'numberRange' },
       cell: (product) => stockCell(product, units),
     },
     {

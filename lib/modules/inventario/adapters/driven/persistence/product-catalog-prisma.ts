@@ -37,7 +37,6 @@ import type { ProductStockByUnit } from '../../../domain/product-stock';
 type ProductCatalogRow = {
   readonly id: string;
   readonly name: string;
-  readonly stock: number | null;
   readonly stockByUnit: readonly ProductStockByUnit[];
 };
 
@@ -46,7 +45,6 @@ export function toProductRef(row: ProductCatalogRow): ProductRef {
   return {
     id: row.id,
     name: row.name,
-    stock: row.stock,
     stockByUnit: row.stockByUnit,
   };
 }
@@ -63,7 +61,6 @@ export async function findProductRefs(ids: readonly ProductId[]): Promise<readon
     select: {
       id: true,
       name: true,
-      stock: true,
       batches: {
         select: { stock: true, presentation: { select: { unitId: true } } },
       },
@@ -74,7 +71,6 @@ export async function findProductRefs(ids: readonly ProductId[]): Promise<readon
     toProductRef({
       id: row.id,
       name: row.name,
-      stock: row.stock,
       stockByUnit: sumStockByUnit(
         row.batches.map((batch) => ({ stock: batch.stock, unitId: batch.presentation.unitId })),
       ),

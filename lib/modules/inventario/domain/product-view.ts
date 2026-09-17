@@ -16,12 +16,12 @@ import type { ProductStockByUnit } from './product-stock';
  * QC-52 (R1, R2): sin `cost`, `minPurchase` ni `deliveryTime` -son del catalogo del
  * proveedor-. 2026-09-09: sin `presentationId` -la presentacion se mudo al lote
  * (`ProductBatch`)-. QC-80 (R21): sin `unitId` -la unidad la declara la PRESENTACION, y la
- * del producto se DERIVA del lote mas reciente; no hay nada que escribir aqui-. Lo que queda
- * es lo que la cosa ES (`name`) y lo que HAY de ella (`stock`, `qtyAlert`).
+ * del producto se DERIVA del lote mas reciente; no hay nada que escribir aqui-. La existencia
+ * se quito (QC-91, R10): se escribe unicamente en el lote que crea el alta. Lo que queda es lo
+ * que la cosa ES (`name`) y su alerta (`qtyAlert`).
  */
 export type NewProduct = {
   readonly name: string;
-  readonly stock?: number | null;
   readonly qtyAlert?: number | null;
 };
 
@@ -45,7 +45,6 @@ export type ProductView = {
    * Sigue SIN ordenarse ni filtrarse (`PRODUCT_QUERYABLE`): no se ordena por una ruta de archivo.
    */
   readonly imagePath: string | null;
-  readonly stock: number | null;
   /** Existencia agregada por unidad, sumando todos los lotes vivos del producto. */
   readonly stockByUnit: readonly ProductStockByUnit[];
   readonly qtyAlert: number | null;
