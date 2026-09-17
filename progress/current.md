@@ -429,6 +429,42 @@ Ninguna se aplico en caliente. Se anotan con lo que costaron, que es lo que las 
    mecanico**. Al relanzarlo **en Sonnet** —que el propio documento permite «en la llamada concreta»—
    cerro el trabajo pendiente sin gastar Opus. Decidir si eso pasa a ser el criterio por defecto.
 
+### Tres sesiones en paralelo saturan la maquina y el gate deja de significar nada (2026-09-17)
+
+**Medido, no intuido.** Al cerrar QC-103, dos corridas seguidas de `./init.sh` completo sobre el
+**mismo codigo** dieron rojos **distintos**:
+
+- Corrida 1: `product-page.test.tsx` (timeout 20 s) + una guardia de arquitectura **real**.
+- Corrida 2, con la guardia ya arreglada: **tres** archivos, y **dos ajenos a la ficha** —
+  `integration/infra/ciclo-de-vida-de-la-base` (timeouts de 15 s en R7, R8 y R9) y
+  `unit/identity/session-once-per-request-render`, que es de **QC-104**—.
+
+Cuando los rojos **cambian de sitio entre corridas sobre el mismo codigo**, el veredicto no informa.
+Estado de la maquina en ese momento: **41 procesos `node`** vivos y ~15 de `chrome.exe`; un
+`tasklist` tardo **mas de tres minutos** en responder. Con QC-50, QC-88 y QC-103 en curso en tres
+sesiones, cada una con su gate de ~11 minutos, sus bases de test y sus navegadores de Playwright,
+12 nucleos no dan.
+
+**Lo que ya esta escrito y no basta**: `docs/verification.md > Los flakes de saturacion` describe la
+firma —`Test timed out`, en un test de UI con `userEvent`—, dice que se distingue corriendo el
+archivo **solo**, y que **bajar los workers NO lo cura** (medido: de 12 a 2 workers multiplica por
+cinco el tiempo y el fallo sigue). Su remedio es «lanzar la corrida buena cuando no haya procesos de
+test ajenos». **Pero nada lo coordina**: no hay turno, ni aviso, ni forma de que una sesion sepa que
+otra esta moliendo. El propio doc avisa ademas de que, **desde QC-58, un timeout de 15 s es senal
+mas seria que antes** —«15 s no se agotan por contencion de CPU sin mas»—, y aqui se agotaron en un
+test de infraestructura de base de datos.
+
+**Dos cosas que NO se hicieron, a proposito**: no se metio ningun rojo al baseline —apagar rojos de
+saturacion los vuelve permanentes, y el baseline ya arrastra 8 archivos que hoy pasan— y no se
+persiguio ninguno de los dos rojos ajenos. Decision humana del 2026-09-17: mandar la correccion
+pendiente y **correr el gate cuando la maquina este tranquila**.
+
+**Candidato claro a `/afinar-regla`**, y probablemente mas rentable que varias fichas del board: hoy
+el coste lo pagan las tres sesiones a la vez, en corridas de once minutos que hay que repetir. Sin
+decidir: si el arnes debe serializar los gates, avisar de que otro esta corriendo, o algo mas simple.
+**Queda tambien por mirar** si esos ~15 `chrome.exe` son navegadores de Playwright sin cerrar: seria
+una fuga, no uso legitimo, pero **no se investigo** —el humano eligio no abrir ese frente ahora—.
+
 ### `harnessConfig/` y la raiz llevan dias divergiendo, y nada avisa (2026-09-17)
 
 Descubierto al correr `/afinar-regla` sobre la regla de comentarios. **`harnessConfig/` no es una
