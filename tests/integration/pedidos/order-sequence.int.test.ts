@@ -57,6 +57,7 @@ function instantIn(year: number): Date {
 }
 
 let recetaId: string;
+let recetaCompanyId: string;
 
 type Fixture = {
   readonly companyId: string;
@@ -160,8 +161,17 @@ function sqlStateOf(error: unknown): string {
 
 beforeAll(async () => {
   const marca = token();
+  // La receta es compartida por todos los fixtures de este archivo —cada caso siembra su propia
+  // empresa efimera para el pedido—, asi que se ancla a una empresa efimera propia: QC-50 hizo
+  // `recipes.company_id` obligatoria.
+  const nombre = `Empresa receta ${marca}`;
+  const company = await prisma.company.create({
+    data: { name: nombre, nameNormalized: normalizeCompanyName(nombre) },
+    select: { id: true },
+  });
+  recetaCompanyId = company.id;
   const receta = await prisma.recipe.create({
-    data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}` },
+    data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}`, companyId: company.id },
     select: { id: true },
   });
   recetaId = receta.id;
@@ -169,6 +179,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.recipe.deleteMany({ where: { id: recetaId } });
+  await prisma.company.deleteMany({ where: { id: recetaCompanyId } });
   await prisma.$disconnect();
 });
 

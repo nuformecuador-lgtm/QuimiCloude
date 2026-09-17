@@ -18,7 +18,12 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 
 // QC-74 (R16, R18): el actor ya no lleva nombre de rol, lleva el conjunto de permisos.
 // Los dos codigos de `recetas`, que es lo que exigen los cinco casos de uso.
-const ADMIN: Actor = { id: 'admin-1', permissions: ['recetas.consultar', 'recetas.modificar'] };
+const EMPRESA = 'empresa-1';
+const ADMIN: Actor = {
+  id: 'admin-1',
+  companyId: EMPRESA,
+  permissions: ['recetas.consultar', 'recetas.modificar'],
+};
 const AHORA = new Date('2026-09-03T10:00:00.000Z');
 
 const PRODUCTO_VIEJO = '11111111-1111-4111-8111-111111111111'; // ya en la receta, de baja
@@ -103,6 +108,7 @@ describe('R45 — la linea preexistente se admite sin preguntar al catalogo por 
       expect.objectContaining({ lines: [LINEA_VIEJA] }),
       ADMIN.id,
       AHORA,
+      { companyId: EMPRESA },
     );
   });
 
@@ -122,7 +128,7 @@ describe('R45 — la linea preexistente se admite sin preguntar al catalogo por 
 
     // Argumentos exactos: ni el id viejo se cuela, ni falta el nuevo.
     expect(products.findRefs).toHaveBeenCalledTimes(1);
-    expect(products.findRefs).toHaveBeenCalledWith([PRODUCTO_NUEVO]);
+    expect(products.findRefs).toHaveBeenCalledWith([PRODUCTO_NUEVO], EMPRESA);
   });
 });
 
@@ -149,7 +155,7 @@ describe('R46 — anadir una linea nueva cuyo producto no existe o esta de baja 
       ),
     ).rejects.toThrow();
 
-    expect(products.findRefs).toHaveBeenCalledWith([PRODUCTO_NUEVO_DE_BAJA]);
+    expect(products.findRefs).toHaveBeenCalledWith([PRODUCTO_NUEVO_DE_BAJA], EMPRESA);
     expect(recipes.replaceAlive).not.toHaveBeenCalled();
   });
 
@@ -169,7 +175,7 @@ describe('R46 — anadir una linea nueva cuyo producto no existe o esta de baja 
       ADMIN,
     );
 
-    expect(products.findRefs).toHaveBeenCalledWith([PRODUCTO_VIEJO, PRODUCTO_NUEVO]);
+    expect(products.findRefs).toHaveBeenCalledWith([PRODUCTO_VIEJO, PRODUCTO_NUEVO], EMPRESA);
   });
 });
 
@@ -185,7 +191,7 @@ describe('R18 — productName del detalle sigue pidiendose sobre TODAS las linea
 
     const detalle = await getRecipe('receta-1', ADMIN);
 
-    expect(products.findRefs).toHaveBeenCalledWith([PRODUCTO_VIEJO]);
+    expect(products.findRefs).toHaveBeenCalledWith([PRODUCTO_VIEJO], EMPRESA);
     expect(detalle.lines).toEqual([
       // El producto no vino de `findRefs`, asi que NO hay nada que decorar: `productName` y
       // `productStock` -el campo que dev anadio el 2026-09-09- salen los dos en `null`.

@@ -156,6 +156,10 @@ export const MIGRACIONES_ESPERADAS = [
   // persiste el identificador de peticion ni lo menciona; se nombra aqui a mano y la lista sigue
   // CERRADA para la siguiente.
   '20260915120000_orders_company_scope',
+  // Alta con el mismo patron que las anteriores: la migracion que da empresa a las recetas no
+  // persiste el identificador de peticion ni lo menciona; se nombra aqui a mano y la lista sigue
+  // CERRADA para la siguiente.
+  '20260916120000_recipes_company_scope',
 ] as const
 
 export function hallazgosDeMigraciones(

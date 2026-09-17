@@ -3,6 +3,7 @@
 // sin arrastrar servidor: nada de 'use server', @prisma/client ni next/* en su cierre de
 // imports.
 export { requirePermission, type Actor } from './domain/actor';
+export { type RecipeScope } from './domain/recipe-scope';
 export {
   RecetasError,
   UnauthorizedError,

@@ -381,8 +381,14 @@ describe('alcance de QC-49 (aislamiento-por-empresa-en-inventario): tres tablas 
    * Modelos de `TABLAS_FUERA_DE_ALCANCE` que ya ganaron empresa con su propia migracion. Siguen
    * vetados en el UP y el DOWN de esta migracion; en el esquema se exige lo contrario, que SI la
    * declaren. Se nombran uno a uno: un `companyId` en cualquier otro modelo de la lista sigue en rojo.
+   *
+   * 2026-09-16, QC-50 (aislamiento-por-empresa-en-recetas): entra `Recipe`, con la misma forma
+   * que QC-60 metio a `Order` -su propia migracion (`_recipes_company_scope`, no esta) le da el
+   * `companyId`, no la de QC-49-. `RecipeLine` NO entra: sigue sin empresa propia a proposito
+   * (se alcanza solo a traves de su receta, ver el comentario del modelo en `schema.prisma`), asi
+   * que sigue vetada por `TABLAS_FUERA_DE_ALCANCE` sin excepcion, igual que antes de esta ficha.
    */
-  const MODELOS_YA_AISLADOS_POR_SU_MIGRACION: readonly string[] = ['Order']
+  const MODELOS_YA_AISLADOS_POR_SU_MIGRACION: readonly string[] = ['Order', 'Recipe']
 
   /** La carpeta de la migracion de esta ficha, localizada por su sufijo y no por su marca de tiempo. */
   function carpetaDeLaMigracion(): string {

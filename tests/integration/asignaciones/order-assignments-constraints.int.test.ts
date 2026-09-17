@@ -114,7 +114,7 @@ async function inRolledBackTransaction(body: (fixture: Fixture) => Promise<void>
         const companyA = await createCompany(tx, 'empresa-a')
         const companyB = await createCompany(tx, 'empresa-b')
         const roleId = await createRole(tx)
-        const recipeId = await createRecipe(tx)
+        const recipeId = await createRecipe(tx, companyA)
         await body({ tx, companyA, companyB, roleId, recipeId })
         throw new RollbackSignal()
       },
@@ -216,11 +216,12 @@ async function createRole(tx: Prisma.TransactionClient): Promise<string> {
   return role.id
 }
 
-/** Receta efimera SIN lineas: es solo el otro lado de `orders_recipe_id_fkey`. */
-async function createRecipe(tx: Prisma.TransactionClient): Promise<string> {
+/** Receta efimera SIN lineas: es solo el otro lado de `orders_recipe_id_fkey`. Es de la misma
+ *  empresa que los pedidos que la usan (`companyA`): QC-50 hizo `recipes.company_id` obligatoria. */
+async function createRecipe(tx: Prisma.TransactionClient, companyId: string): Promise<string> {
   const marca = randomUUID().replaceAll('-', '')
   const recipe = await tx.recipe.create({
-    data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}` },
+    data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}`, companyId },
     select: { id: true },
   })
   return recipe.id

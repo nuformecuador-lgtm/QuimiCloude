@@ -42,6 +42,7 @@ import { MAX_PAGE_SIZE, toOffsetLimit } from '@/lib/shared/pagination';
 
 import type { ListQuery } from '@/lib/modules/recetas/domain/list-query';
 import type { NewRecipe } from '@/lib/modules/recetas/ports/recipe-repository';
+import type { RecipeScope } from '@/lib/modules/recetas';
 
 /**
  * QC-57: `listAliveRecipes` recibe ahora, ademas de la ventana, el CONTRATO GENERICO de
@@ -123,8 +124,10 @@ function token(): string {
   return randomUUID().replace(/-/gu, '');
 }
 
-/** Usuario REAL, necesario porque `recipes.created_by`/`updated_by` son FK reales. */
-async function createTestUser(db: Db): Promise<string> {
+/** Usuario REAL, necesario porque `recipes.created_by`/`updated_by` son FK reales. Devuelve
+ *  tambien su empresa: QC-50 hizo `recipes.company_id` obligatoria, y este archivo usa esa
+ *  MISMA empresa para las recetas que siembra, en vez de inventar una tercera. */
+async function createTestUser(db: Db): Promise<{ userId: string; companyId: string }> {
   const marker = token();
   const documentType = await db.documentType.create({
     data: { code: `DOC${marker.slice(0, 8)}`, name: 'Tipo de documento de prueba' },
@@ -161,7 +164,7 @@ async function createTestUser(db: Db): Promise<string> {
     },
     select: { id: true },
   });
-  return user.id;
+  return { userId: user.id, companyId: company.id };
 }
 
 async function deleteTestUser(db: Db, userId: string): Promise<void> {
@@ -246,10 +249,10 @@ function baseRecipeInput(overrides: Partial<NewRecipe> = {}): NewRecipe {
 async function collectAllRecipes(
   limit: number,
 ): Promise<{ id: string; name: string }[]> {
-  const first = await listAliveRecipes(0, limit, SIN_CONSULTA);
+  const first = await listAliveRecipes(0, limit, SIN_CONSULTA, sharedScope);
   const items = [...first.rows];
   for (let offset = limit; offset < first.total; offset += limit) {
-    const next = await listAliveRecipes(offset, limit, SIN_CONSULTA);
+    const next = await listAliveRecipes(offset, limit, SIN_CONSULTA, sharedScope);
     items.push(...next.rows);
   }
   return items.map((item) => ({ id: item.id, name: item.name }));
@@ -258,6 +261,8 @@ async function collectAllRecipes(
 // ---------------------------------------------------------------------------
 
 let sharedActorId: string;
+let sharedCompanyId: string;
+let sharedScope: RecipeScope;
 /** Unidad real, sembrada por la migracion `..._units_catalog` (QC-32, R25): `RecipeLine.unitId`
  *  es una FK real a `units`, asi que las lineas de estos tests necesitan un id existente. */
 let sharedUnitId: string;
@@ -273,7 +278,10 @@ beforeAll(async () => {
     );
   }
 
-  sharedActorId = await createTestUser(prisma);
+  const actor = await createTestUser(prisma);
+  sharedActorId = actor.userId;
+  sharedCompanyId = actor.companyId;
+  sharedScope = { companyId: sharedCompanyId };
   sharedUnitId = (await prisma.unit.findFirstOrThrow()).id;
 });
 
@@ -303,13 +311,13 @@ describe('R5: alta de una receta con sus lineas', () => {
         ],
       });
 
-      const result = await createRecipe(input, sharedActorId, new Date());
+      const result = await createRecipe(input, sharedActorId, new Date(), sharedScope);
       expect(result).not.toBe('duplicate');
       const created = result as { id: string };
       recipeId = created.id;
       expect(created.id).toMatch(/^[0-9a-f-]{36}$/u);
 
-      const detail = await findAliveRecipeById(created.id);
+      const detail = await findAliveRecipeById(created.id, sharedScope);
       expect(detail).not.toBeNull();
       expect(detail?.name).toBe(input.name);
       expect(detail?.description).toBe('Formula de prueba');
@@ -338,16 +346,18 @@ describe('R10: unicidad del nombre normalizado', () => {
       const marker = token();
       const normalized = `desengrasanteintegracion${marker}`;
 
+      // La MISMA empresa en las dos filas (`sharedCompanyId`): el indice unico ahora es
+      // `(company_id, name_normalized)`, asi que sin ella el choque no seria por nombre.
       const first = await tx.recipe.create({
-        data: { name: `Desengrasante ${marker}`, nameNormalized: normalized },
+        data: { name: `Desengrasante ${marker}`, nameNormalized: normalized, companyId: sharedCompanyId },
         select: { id: true },
       });
 
       const sqlState = await expectRejectedByDatabase(
         tx,
         () =>
-          tx.$executeRaw`INSERT INTO "recipes" ("name", "name_normalized", "updated_at")
-            VALUES (${`Desengrasante otra vez ${marker}`}, ${normalized}, CURRENT_TIMESTAMP)`,
+          tx.$executeRaw`INSERT INTO "recipes" ("name", "name_normalized", "company_id", "updated_at")
+            VALUES (${`Desengrasante otra vez ${marker}`}, ${normalized}, ${sharedCompanyId}::uuid, CURRENT_TIMESTAMP)`,
         'segunda receta viva con el mismo nombre normalizado',
       );
       expect(sqlState).toBe(UNIQUE_VIOLATION);
@@ -374,7 +384,7 @@ describe('R12/R13: conciliacion de lineas en la edicion', () => {
           { productId: productB, quantity: '2.0000', unitId: sharedUnitId },
         ],
       });
-      const created = await createRecipe(input, sharedActorId, new Date());
+      const created = await createRecipe(input, sharedActorId, new Date(), sharedScope);
       expect(created).not.toBe('duplicate');
       recipeId = (created as { id: string }).id;
 
@@ -383,10 +393,11 @@ describe('R12/R13: conciliacion de lineas en la edicion', () => {
         { ...input, lines: [{ productId: productA, quantity: '1.0000', unitId: sharedUnitId }] },
         sharedActorId,
         new Date(),
+        sharedScope,
       );
       expect(result).toBe('ok');
 
-      const detail = await findAliveRecipeById(recipeId);
+      const detail = await findAliveRecipeById(recipeId, sharedScope);
       expect(detail?.lines).toHaveLength(1);
       expect(detail?.lines[0]?.productId).toBe(productA);
 
@@ -412,7 +423,7 @@ describe('R12/R13: conciliacion de lineas en la edicion', () => {
         name: originalName,
         lines: [{ productId: productA, quantity: '1.0000', unitId: sharedUnitId }],
       });
-      const created = await createRecipe(input, sharedActorId, new Date());
+      const created = await createRecipe(input, sharedActorId, new Date(), sharedScope);
       expect(created).not.toBe('duplicate');
       recipeId = (created as { id: string }).id;
 
@@ -429,11 +440,12 @@ describe('R12/R13: conciliacion de lineas en la edicion', () => {
         },
         sharedActorId,
         new Date(),
+        sharedScope,
       );
       await expect(failing).rejects.toBeTruthy();
 
       // La receta y su unica linea original quedan EXACTAMENTE como estaban.
-      const detail = await findAliveRecipeById(recipeId);
+      const detail = await findAliveRecipeById(recipeId, sharedScope);
       expect(detail?.name).toBe(originalName);
       expect(detail?.lines).toHaveLength(1);
       expect(detail?.lines[0]?.productId).toBe(productA);
@@ -462,12 +474,13 @@ describe('R29/R30 (parte)/R32: paginacion', () => {
           baseRecipeInput({ name: `Pagina ${marker} ${i}` }),
           sharedActorId,
           new Date(),
+          sharedScope,
         );
         expect(created).not.toBe('duplicate');
         createdIds.push((created as { id: string }).id);
       }
 
-      const { rows, total } = await listAliveRecipes(0, 2, SIN_CONSULTA);
+      const { rows, total } = await listAliveRecipes(0, 2, SIN_CONSULTA, sharedScope);
       expect(rows.length).toBeLessThanOrEqual(2);
       // Al menos las tres que este caso acaba de sembrar estan vivas.
       expect(total).toBeGreaterThanOrEqual(3);
@@ -484,7 +497,7 @@ describe('R29/R30 (parte)/R32: paginacion', () => {
     const { offset, limit } = toOffsetLimit(1, 999_999);
     expect(limit).toBe(MAX_PAGE_SIZE);
 
-    const { rows } = await listAliveRecipes(offset, limit, SIN_CONSULTA);
+    const { rows } = await listAliveRecipes(offset, limit, SIN_CONSULTA, sharedScope);
     expect(rows.length).toBeLessThanOrEqual(MAX_PAGE_SIZE);
   });
 
@@ -501,6 +514,7 @@ describe('R29/R30 (parte)/R32: paginacion', () => {
           baseRecipeInput({ name: `zzzorden-${marker}-${suffix}` }),
           sharedActorId,
           new Date(),
+          sharedScope,
         );
         expect(created).not.toBe('duplicate');
         createdIds.push((created as { id: string }).id);
@@ -530,14 +544,14 @@ describe('R35/R36: borrado logico', () => {
     let recipeId: string | null = null;
     try {
       const input = baseRecipeInput({ description: 'No se debe perder' });
-      const created = await createRecipe(input, sharedActorId, new Date());
+      const created = await createRecipe(input, sharedActorId, new Date(), sharedScope);
       expect(created).not.toBe('duplicate');
       recipeId = (created as { id: string }).id;
 
       const before = await prisma.recipe.findUniqueOrThrow({ where: { id: recipeId } });
       expect(before.deletedAt).toBeNull();
 
-      const result = await softDeleteAliveRecipe(recipeId, sharedActorId, new Date());
+      const result = await softDeleteAliveRecipe(recipeId, sharedActorId, new Date(), sharedScope);
       expect(result).toBe('ok');
 
       // Se relee con Prisma DIRECTO, sin el filtro de "viva", para ver la fila borrada.
@@ -555,20 +569,20 @@ describe('R35/R36: borrado logico', () => {
   it('la lista y el detalle excluyen las recetas borradas', async () => {
     let recipeId: string | null = null;
     try {
-      const created = await createRecipe(baseRecipeInput(), sharedActorId, new Date());
+      const created = await createRecipe(baseRecipeInput(), sharedActorId, new Date(), sharedScope);
       expect(created).not.toBe('duplicate');
       recipeId = (created as { id: string }).id;
 
       // Viva: aparece en el detalle y en el listado.
-      expect(await findAliveRecipeById(recipeId)).not.toBeNull();
+      expect(await findAliveRecipeById(recipeId, sharedScope)).not.toBeNull();
       const aliveList = await collectAllRecipes(MAX_PAGE_SIZE);
       expect(aliveList.some((item) => item.id === recipeId)).toBe(true);
 
-      const result = await softDeleteAliveRecipe(recipeId, sharedActorId, new Date());
+      const result = await softDeleteAliveRecipe(recipeId, sharedActorId, new Date(), sharedScope);
       expect(result).toBe('ok');
 
       // Borrada: desaparece de las dos consultas, aunque la fila siga existiendo.
-      expect(await findAliveRecipeById(recipeId)).toBeNull();
+      expect(await findAliveRecipeById(recipeId, sharedScope)).toBeNull();
       const deletedList = await collectAllRecipes(MAX_PAGE_SIZE);
       expect(deletedList.some((item) => item.id === recipeId)).toBe(false);
 

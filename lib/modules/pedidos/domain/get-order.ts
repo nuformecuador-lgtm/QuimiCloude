@@ -81,7 +81,7 @@ export function createGetOrder(
     const row = await deps.orders.findAliveById(id, scope);
     if (row === null) throw new OrderNotFoundError();
 
-    const recipes = await deps.recipes.findRefsIncludingDeleted([row.recipeId]);
+    const recipes = await deps.recipes.findRefsIncludingDeleted([row.recipeId], actor.companyId);
 
     return toOrderView(row, new Map(recipes.map((recipe) => [recipe.id, recipe.name])));
   };

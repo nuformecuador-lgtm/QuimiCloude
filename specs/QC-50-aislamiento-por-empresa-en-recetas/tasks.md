@@ -11,7 +11,7 @@
 
 ## Bloque 0 — Base de datos
 
-- [ ] **T0 — Migración: columna, FK y paréntesis de RLS.**
+- [x] **T0 — Migración: columna, FK y paréntesis de RLS.**
   Archivos: `db/migrations/<ts>_recipes_company_scope/migration.sql` (nuevo),
   `db/schema.prisma` (`model Recipe`).
   Contenido: paréntesis `NO FORCE` / `FORCE` de RLS sobre `recipes` y `companies` (pasos 0 y 6 de
@@ -24,7 +24,7 @@
   `pnpm run typecheck` señala exactamente los sitios que T5–T11 van a tocar.
   Cubre: R1, R2 (por ausencia), R5, R8.
 
-- [ ] **T1 — Backfill de las 5 recetas a «QuimiCloud».**
+- [x] **T1 — Backfill de las 5 recetas a «QuimiCloud».**
   Archivos: el mismo `migration.sql` de T0 (paso 2).
   Contenido: resolución por `name_normalized = 'quimicloud'` con el único fallback de «hay exactamente
   una empresa»; `RAISE EXCEPTION` en cualquier otro caso; `ROW_COUNT` contra el total de la tabla;
@@ -34,7 +34,7 @@
   `companies` conserva su recuento.
   Cubre: R3, R4.
 
-- [ ] **T2 — Relevo del índice único de nombre: global → por empresa, y sigue parcial.**
+- [x] **T2 — Relevo del índice único de nombre: global → por empresa, y sigue parcial.**
   Archivos: el mismo `migration.sql` (paso 5).
   Contenido: guardia `RAISE EXCEPTION` si dos recetas **vivas** de la misma empresa comparten
   `name_normalized`; `DROP INDEX "recipes_name_unique"`; `CREATE UNIQUE INDEX
@@ -45,7 +45,7 @@
   `psql` dos empresas pueden tener el mismo nombre y una empresa no puede tenerlo dos veces.
   Cubre: R9, R10.
 
-- [ ] **T3 — `down.sql` con sus tres guardias.**
+- [x] **T3 — `down.sql` con sus tres guardias.**
   Archivos: `db/migrations/<ts>_recipes_company_scope/down.sql` (nuevo).
   Contenido, en este orden: paréntesis `NO FORCE` de RLS → **guardia 1** (empresa del UP ambigua) →
   **guardia 2** (fila de otra empresa) → **guardia 3** (dos recetas vivas de empresas distintas con el
@@ -59,7 +59,7 @@
 
 ## Bloque 1 — Dominio y puertos
 
-- [ ] **T4 — `RecipeScope` y el actor con empresa.** `[P]` con T0
+- [x] **T4 — `RecipeScope` y el actor con empresa.** `[P]` con T0
   Archivos: `lib/modules/recetas/domain/recipe-scope.ts` (nuevo),
   `lib/modules/recetas/domain/actor.ts`, `lib/modules/recetas/index.ts` (reexportar el tipo).
   Depende de: —.
@@ -67,7 +67,7 @@
   siendo importable desde un componente de cliente (`guard-arquitectura-modulos` en verde).
   Cubre: R12 (parte), R14 (parte).
 
-- [ ] **T5 — El puerto y las tres costuras exigen el ámbito en su firma.**
+- [x] **T5 — El puerto y las tres costuras exigen el ámbito en su firma.**
   Archivos: `lib/modules/recetas/ports/recipe-repository.ts`,
   `lib/modules/recetas/domain/recipe-catalog.ts`,
   `lib/modules/inventario/domain/product-catalog.ts`,
@@ -82,7 +82,7 @@
   olvido en la **llamada** no compila— y queda verde al terminar T6–T11.
   Cubre: R14.
 
-- [ ] **T6 — Los cinco casos de uso pasan el ámbito.**
+- [x] **T6 — Los cinco casos de uso pasan el ámbito.**
   Archivos: `lib/modules/recetas/domain/{create,get,list,update,delete}-recipe.ts`.
   Contenido: tras `requirePermission` (que sigue siendo la primera línea), construir
   `{ companyId: actor.companyId }` y pasarlo al repositorio; y `actor.companyId` a
@@ -94,7 +94,7 @@
 
 ## Bloque 2 — Persistencia y costuras
 
-- [ ] **T7 — El único punto de consulta.**
+- [x] **T7 — El único punto de consulta.**
   Archivos: `lib/modules/recetas/adapters/driven/persistence/company-scope.ts` (nuevo).
   Contenido: `companyScope` privada + `recipeCompanyScope` (`Prisma.RecipeWhereInput`) y
   `companyScopeColumns`; docblock con las reglas de uso de `design.md > 4`, incluida la de las líneas
@@ -103,7 +103,7 @@
   Hecho cuando: existe y su test afirma que las dos envolturas devuelven el mismo objeto.
   Cubre: R14.
 
-- [ ] **T8 — Adaptador driven de `recetas` acotado.**
+- [x] **T8 — Adaptador driven de `recetas` acotado.**
   Archivos: `lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts`.
   Contenido: el ámbito compuesto en `buildRecipeWhere` —al lado de `deletedAt: null` y **nunca**
   fundido con la búsqueda ni con los filtros— y en el `where` de `findAliveRecipeById`, del
@@ -118,7 +118,7 @@
   `meta.target` del índice compuesto.
   Cubre: R11, R14, R15, R16, R17, R18, R19, R20.
 
-- [ ] **T9 — Costura con `inventario`: `findProductRefs` gana ámbito y muere la excepción.**
+- [x] **T9 — Costura con `inventario`: `findProductRefs` gana ámbito y muere la excepción.**
   Archivos: `lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma.ts`;
   `lib/modules/inventario/adapters/driven/persistence/company-scope.ts` (borrar el párrafo de la
   excepción, `:28-33`); `tests/guards/guard-ambito-empresa-inventario.test.ts` (vaciar
@@ -130,7 +130,7 @@
   sigue anunciando que `findProductRefs` está sin ámbito.
   Cubre: R22.
 
-- [ ] **T10 — Costura con `unidades`: `findUnitRefs` gana ámbito «de la empresa o de sistema».**
+- [x] **T10 — Costura con `unidades`: `findUnitRefs` gana ámbito «de la empresa o de sistema».**
   Archivos: `lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma.ts`;
   `lib/modules/unidades/adapters/driven/persistence/unit-prisma.ts` (actualizar el docblock `:144-149`
   que anunciaba la excepción).
@@ -141,7 +141,7 @@
   resuelve y una de otra empresa **no vuelve**.
   Cubre: R23, R24.
 
-- [ ] **T11 — Costura con `pedidos`: el catálogo de recetas gana ámbito y se cierra el hueco de QC-60.**
+- [x] **T11 — Costura con `pedidos`: el catálogo de recetas gana ámbito y se cierra el hueco de QC-60.**
   Archivos: `lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts`;
   `lib/modules/pedidos/domain/{create-order,update-order,get-order,list-orders}.ts`.
   Contenido: la consulta compone `recipeCompanyScope` y **no** gana ningún filtro de vida —`isDeleted`
@@ -153,7 +153,7 @@
   sin cambiar de firma pública.
   Cubre: R25, R26.
 
-- [ ] **T12 — Server Actions con las dos caras de la sesión, dentro de `runInRequestScope`.**
+- [x] **T12 — Server Actions con las dos caras de la sesión, dentro de `runInRequestScope`.**
   Archivos: `lib/modules/recetas/adapters/driving/recipe-actions.ts`.
   Contenido: `currentActor()` pide `getSessionUser()` **y** `getSessionContext()` en un `Promise.all`
   envuelto en `runInRequestScope` —y **solo** ese `Promise.all`—, y devuelve `null` si falta
@@ -163,7 +163,7 @@
   las actions siguen verdes sin cambiar de firma pública.
   Cubre: R13, R32.
 
-- [ ] **T13 — Cableado.**
+- [x] **T13 — Cableado.**
   Archivos: `lib/composition/index.ts` (`productCatalog`, `unitCatalog`, `recipeRepository`,
   `recipeCatalog`).
   Contenido: solo los tipos de las funciones cambian; **no se reordena ni se reformatea nada** del
@@ -174,7 +174,7 @@
 
 ## Bloque 3 — Las listas cerradas (una task cada una, a propósito)
 
-- [ ] **T14 — `PRE_EXISTING_INDEXES` y el caso del relevo.** `[P]`
+- [x] **T14 — `PRE_EXISTING_INDEXES` y el caso del relevo.** `[P]`
   Archivos: `tests/integration/inventario/list-query-indexes.int.test.ts`.
   Contenido: sacar `'recipes_name_unique'` (`:174`) **dejando en su sitio el comentario de relevo**,
   con el mismo formato que los de QC-49 (`:156-164`) y QC-76 (`:165-173`); y añadir un caso que afirme
@@ -184,7 +184,7 @@
   Hecho cuando: el archivo pasa, y borrar el `WHERE` de la migración lo pone rojo.
   Cubre: R9, R10 (parte).
 
-- [ ] **T15 — `MIGRACIONES_ESPERADAS` de la guardia de QC-71.** `[P]`
+- [x] **T15 — `MIGRACIONES_ESPERADAS` de la guardia de QC-71.** `[P]`
   Archivos: `tests/guards/guard-identificador-de-request.test.ts` (`:151-158`).
   Contenido: añadir el nombre de la migración de esta ficha con su motivo, con el mismo patrón que
   `20260915120000_orders_company_scope`.
@@ -199,7 +199,7 @@
   Depende de: T20.
   Cubre: el gate.
 
-- [ ] **T17 — `EXPECTED_RECIPE_FIELDS` del alcance de recetas.** `[P]`
+- [x] **T17 — `EXPECTED_RECIPE_FIELDS` del alcance de recetas.** `[P]`
   Archivos: `tests/unit/recetas/scope.test.ts` (`:331-347`).
   Contenido: añadir `companyId` en la posición que ocupe en el modelo, con un comentario que explique
   que la columna entra por esta ficha. `EXPECTED_RECIPE_LINE_FIELDS` **no cambia**, y eso es una
@@ -218,7 +218,7 @@
   Hecho cuando: `guard-aislamiento-integracion` pasa y el censo de specs es exacto.
   Cubre: el gate.
 
-- [ ] **T19 — `ACCIONES` de QC-104.** `[P]`
+- [x] **T19 — `ACCIONES` de QC-104.** `[P]`
   Archivos: `tests/unit/identity/session-once-per-request-actions.test.ts` (`:156`).
   Contenido: añadir la fila de `lib/modules/recetas/adapters/driving/recipe-actions.ts` con una acción
   cuya entrada llegue hasta `currentActor()` (p. ej. `listRecipesAction({ page: 1 })`). Los dos casos
@@ -242,7 +242,7 @@
   Hecho cuando: pasa en Chromium **y** en WebKit, y el fixture deja la base como la encontró.
   Cubre: R31, y ejercita R10, R15, R16, R17 de extremo a extremo.
 
-- [ ] **T21 — Test de esquema y de texto de la migración.** `[P]`
+- [x] **T21 — Test de esquema y de texto de la migración.** `[P]`
   Archivos: `tests/unit/recetas/schema/recipes-company-scope-migration.test.ts` (nuevo).
   Contenido: el UP declara la columna, la FK, el paréntesis de RLS y el relevo del único **con su
   `WHERE`**; **no contiene ningún `DELETE` ni `INSERT`**, **ninguna sentencia sobre `recipe_lines`** y
@@ -253,7 +253,7 @@
   Depende de: T3.
   Cubre: R4 (parte), R5, R6, R8, R32 (parte).
 
-- [ ] **T22 — Integración: restricciones, unicidad, backfill y reversión.** `[P]`
+- [x] **T22 — Integración: restricciones, unicidad, backfill y reversión.** `[P]`
   Archivos: `tests/integration/recetas/company-scope.int.test.ts` (nuevo).
   Contenido: `INSERT` de receta sin empresa y con empresa inexistente → rechazo; dos recetas vivas de
   empresas **distintas** con el mismo nombre → se aceptan; dos de la **misma** → `23505`; borrar
@@ -264,7 +264,7 @@
   Depende de: T3.
   Cubre: R1, R2, R3, R4, R7, R10, R29.
 
-- [ ] **T23 — Integración: listado, escrituras y costuras.** `[P]`
+- [x] **T23 — Integración: listado, escrituras y costuras.** `[P]`
   Archivos: `tests/integration/recetas/company-scope-queries.int.test.ts` (nuevo).
   Contenido: con recetas de dos empresas sembradas, el listado devuelve solo las suyas **y el `total`
   también**; la búsqueda y los filtros **no ensanchan** lo visible; `findAliveById`, `replaceAlive` y
@@ -276,7 +276,7 @@
   Depende de: T8, T9, T10, T11.
   Cubre: R11, R15, R16, R17, R18, R20, R22, R24, R25, R30.
 
-- [ ] **T24 — Guardia estática por función.** `[P]`
+- [x] **T24 — Guardia estática por función.** `[P]`
   Archivos: `tests/guards/guard-ambito-empresa-recetas.test.ts` (nuevo), calcado de
   `guard-ambito-empresa-pedidos.test.ts`.
   Contenido: **método a método** de `RecipeRepository` y de `RecipeCatalog`, y función a función de todo
@@ -286,7 +286,7 @@
   Depende de: T7, T8.
   Cubre: R14.
 
-- [ ] **T25 — Service: el rechazo cruzado, con dobles.** `[P]`
+- [x] **T25 — Service: el rechazo cruzado, con dobles.** `[P]`
   Archivos: `tests/unit/recetas/company-isolation-service.test.ts` (nuevo);
   `tests/unit/recetas/company-scope.test.ts` (nuevo: las dos envolturas y la forma de la salida
   pública); `tests/unit/recetas/authorization.test.ts` y `.../recipe-actions.test.ts` (se amplían).
@@ -299,7 +299,7 @@
   Depende de: T6, T12.
   Cubre: R12, R13, R18, R19, R21, R23, R28.
 
-- [ ] **T26 — Que las fotos no se movieron.** `[P]`
+- [x] **T26 — Que las fotos no se movieron.** `[P]`
   Archivos: `tests/unit/recetas/recipe-image-scope.test.ts` (nuevo) o ampliación del test de imagen ya
   existente.
   Contenido: la ruta que compone el adaptador de almacenamiento **no** contiene el identificador de

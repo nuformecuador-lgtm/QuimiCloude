@@ -191,13 +191,23 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
     // recetas` en `db/schema.prisma`)-. Prohibirlo aqui por completo chocaria con ese
     // requisito de diseno; la guardia real de "solo un archivo lo importa" la vigila
     // `tests/guards/guard-arquitectura-modulos.test.ts` (bloque 10, propiedad de modelos).
+    //
+    // RETENSADO 2026-09-16 (QC-50, T8). `@prisma/client` pasa a importarlo un archivo mas, y
+    // solo por su TIPO: `company-scope.ts` publica el ambito como `Prisma.RecipeWhereInput`, que
+    // es justo lo que hace que componerlo sobre otra tabla no compile (`design.md`). El precedente
+    // es el mismo que QC-60 dejo escrito en `tests/unit/pedidos/module-contract.test.ts` cuando le
+    // nacio su propio `company-scope.ts`: la lista se RETENSA nombrando el archivo de mas, no se
+    // ensancha el patron. Sigue siendo una lista CERRADA y sigue sin haber nada de Prisma en el
+    // dominio ni en los puertos.
     const RECIPE_PRISMA_ADAPTER = 'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts'
+    const COMPANY_SCOPE_ADAPTER = 'lib/modules/recetas/adapters/driven/persistence/company-scope.ts'
+    const DUENOS_DE_PRISMA = [COMPANY_SCOPE_ADAPTER, RECIPE_PRISMA_ADAPTER]
     expect(recetasSources.length).toBeGreaterThan(0)
     for (const file of recetasSources) {
       const source = read(file)
       const etiqueta = toPosix(relative(repoRoot, file))
       expect(source, `${etiqueta} consulta la tabla de productos`).not.toMatch(/prisma\.product/i)
-      if (etiqueta !== RECIPE_PRISMA_ADAPTER) {
+      if (!DUENOS_DE_PRISMA.includes(etiqueta)) {
         expect(source, `${etiqueta} importa @prisma/client`).not.toMatch(/@prisma\/client/)
       }
       // Ninguna ruta profunda a otro modulo: solo el barrel.

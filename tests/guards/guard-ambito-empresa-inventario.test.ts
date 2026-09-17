@@ -30,8 +30,10 @@
 //      punto unico (`./company-scope`), directamente o a traves de un ayudante del mismo archivo
 //      al que se le pasa-. Declararlo y no usarlo seria la misma fuga con mejor cara.
 //
-// La UNICA excepcion permitida es `findProductRefs` (R29 -> QC-50), y esta escrita abajo como
-// tal, con su motivo: cualquier otra funcion que toque `prisma.` sin ambito pone esto en rojo.
+// No hay ninguna excepcion permitida: toda funcion del modulo que toque `prisma.` sin ambito
+// pone esto en rojo. `SIN_AMBITO_POR_DECISION_APROBADA` se deja declarado y VACIO -no borrado-
+// para que la guardia siga sabiendo comprobar, si algun dia se abre una excepcion nueva, que
+// esta sigue siendo lo que dice ser: sin ambito y escrita como tal en su propio archivo.
 //
 // TECNICA: barrido de TEXTO sobre el disco, como el resto de `tests/guards/`. No se importa
 // ningun modulo ni se mira el grafo de imports: lo que se vigila es lo que esta ESCRITO, que es
@@ -62,16 +64,12 @@ const MODULE_ROOT = join(repoRoot, 'lib', 'modules', 'inventario')
 const PERSISTENCE_ROOT = join(MODULE_ROOT, 'adapters', 'driven', 'persistence')
 
 /**
- * LA EXCEPCION, UNA Y ESCRITA. `findProductRefs` (`product-catalog-prisma.ts`) se queda sin
- * ambito por decision aprobada (R29): es la costura por la que `recetas` resuelve referencias de
- * producto con identificadores que ya tiene guardados, sin sesion de la que sacar la empresa, y
- * acotarla obligaria a tocar `recetas` -otro modulo, que R28 deja fuera-. Destino: **QC-50**.
- *
- * Esta lista es CERRADA. Anadir un nombre aqui no es «arreglar la guardia»: es declarar por
- * escrito que una consulta mas del modulo ve el inventario de todas las empresas, y eso lo
- * aprueba un humano en el spec, no quien escribe el adaptador.
+ * Lista CERRADA y hoy VACIA: `inventario` no tiene ninguna consulta sin ambito de empresa.
+ * Anadir un nombre aqui no es «arreglar la guardia»: es declarar por escrito que una consulta
+ * del modulo ve el inventario de todas las empresas, y eso lo aprueba un humano en el spec, no
+ * quien escribe el adaptador.
  */
-const SIN_AMBITO_POR_DECISION_APROBADA = new Set(['findProductRefs'])
+const SIN_AMBITO_POR_DECISION_APROBADA = new Set<string>([])
 
 /** El parametro exacto que toda funcion de persistencia del modulo tiene que declarar. */
 const PARAMETRO_DE_AMBITO = /\bscope\s*:\s*InventoryScope\b/
@@ -348,7 +346,7 @@ describe('QC-49 R13/R29 — ninguna otra consulta del modulo se queda sin ambito
 
         expect(
           PARAMETRO_DE_AMBITO.test(funcion.parametros),
-          `${archivo}:${funcion.nombre} consulta la base SIN declarar \`scope: InventoryScope\`. La unica excepcion aprobada del modulo es \`findProductRefs\` (R29 -> QC-50); cualquier otra hay que aprobarla en el spec, no aqui`,
+          `${archivo}:${funcion.nombre} consulta la base SIN declarar \`scope: InventoryScope\`. El modulo no tiene ninguna excepcion aprobada; una consulta sin ambito hay que aprobarla en el spec, no aqui`,
         ).toBe(true)
         expect(
           analizado.consumidoras.has(funcion.nombre),

@@ -138,10 +138,11 @@ async function createPresentation(
   return presentation.id
 }
 
-/** Receta viva, vacia. */
-async function createRecipe(marker: string): Promise<string> {
+/** Receta viva, vacia. De la MISMA empresa que el resto del caso: QC-50 hizo
+ *  `recipes.company_id` obligatoria. */
+async function createRecipe(marker: string, companyId: string): Promise<string> {
   const recipe = await prisma.recipe.create({
-    data: { name: `Receta ${marker}`, nameNormalized: `receta${marker}` },
+    data: { name: `Receta ${marker}`, nameNormalized: `receta${marker}`, companyId },
     select: { id: true },
   })
   return recipe.id
@@ -600,7 +601,7 @@ describe('updateUnit — R20: cambiar base y factor de una unidad ya en uso no t
       const presentationId = await createPresentation(`pres${marker}`, unitId, companyId)
       seeded.presentations = [presentationId]
 
-      const recipeId = await createRecipe(`rec${marker}`)
+      const recipeId = await createRecipe(`rec${marker}`, companyId)
       seeded.recipes = [recipeId]
       const { productId: productoDeLaLinea } = await createProduct(`linea${marker}`, companyId)
       seeded.products = [...(seeded.products ?? []), productoDeLaLinea]
@@ -718,7 +719,7 @@ describe('deleteUnit — R24: bloqueado por uso, con UnitInUseError y las filas 
 
       const { productId } = await createProduct(`prod${marker}`, companyId)
       seeded.products = [productId]
-      const recipeId = await createRecipe(`rec${marker}`)
+      const recipeId = await createRecipe(`rec${marker}`, companyId)
       seeded.recipes = [recipeId]
       const lineId = await createLine(recipeId, productId, unitId)
       seeded.recipeLines = [lineId]

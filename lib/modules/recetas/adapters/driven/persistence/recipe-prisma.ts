@@ -5,8 +5,10 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { recipeStepSchema } from '../../../domain/recipe-input';
 import { normalizeRecipeName } from '../../../domain/recipe-name';
 import { ValidationError } from '../../../domain/errors';
+import type { RecipeScope } from '../../../domain/recipe-scope';
 import type { RecipeStepView } from '../../../domain/recipe-view';
 
+import { companyScopeColumns, recipeCompanyScope } from './company-scope';
 import { dateRangeCondition, normalizedSearchCondition } from './list-query-sql';
 
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
@@ -124,11 +126,14 @@ function sqlStateOf(error: unknown): string | null {
  *  escrito a mano en `migration.sql`: Prisma no modela indices parciales, ver el
  *  comentario de `model Recipe` en `db/schema.prisma`). Verificado empiricamente contra
  *  Postgres real (T14): cuando el conector de Prisma traduce un `23505` a `P2002` para
- *  ESTE indice, `error.meta.target` es `['name_normalized']` -la(s) COLUMNA(S), nunca el
- *  nombre del indice-. Es la UNICA columna cuya violacion cuenta como "nombre duplicado"
- *  (R10); el otro unico de esta feature -`(recipe_id, product_id)` de `recipe_lines`
- *  (R16), verificado con el mismo metodo y cuyo `target` sale `['recipe_id',
- *  'product_id']`- es un dato distinto y jamas debe traducirse a `RecipeDuplicateNameError`. */
+ *  ESTE indice, `error.meta.target` incluye `name_normalized` -la(s) COLUMNA(S), nunca el
+ *  nombre del indice-. Desde que el indice se volvio compuesto por empresa, `target` trae
+ *  tambien `company_id`, pero eso no cambia nada aqui: se comprueba que la lista de
+ *  columnas INCLUYE `name_normalized`, no que sea exactamente esa. Es la UNICA columna
+ *  cuya violacion cuenta como "nombre duplicado"; el otro unico de esta feature
+ *  -`(recipe_id, product_id)` de `recipe_lines`, verificado con el mismo metodo y cuyo
+ *  `target` sale `['recipe_id', 'product_id']`- es un dato distinto y jamas debe
+ *  traducirse a `RecipeDuplicateNameError`. */
 const RECIPE_NAME_UNIQUE_COLUMN = 'name_normalized';
 
 /**
@@ -176,10 +181,12 @@ export async function createRecipe(
   data: NewRecipe,
   actorId: string,
   now: Date,
+  scope: RecipeScope,
 ): Promise<{ id: string } | 'duplicate'> {
   try {
     const created = await prisma.recipe.create({
       data: {
+        ...companyScopeColumns(scope),
         name: data.name,
         nameNormalized: normalizeRecipeName(data.name),
         description: data.description,
@@ -207,9 +214,9 @@ export async function createRecipe(
 }
 
 /** `findAliveById` de `RecipeRepository` (R18, R33, R36). */
-export async function findAliveRecipeById(id: string): Promise<RecipeRow | null> {
+export async function findAliveRecipeById(id: string, scope: RecipeScope): Promise<RecipeRow | null> {
   const row = await prisma.recipe.findFirst({
-    where: { id, deletedAt: null },
+    where: { id, deletedAt: null, ...recipeCompanyScope(scope) },
     include: RECIPE_INCLUDE,
   });
   return row === null ? null : toRecipeRow(row);
@@ -295,9 +302,10 @@ function recipeFilterWhere(field: string, value: ListFilterValue): Prisma.Recipe
  * `where` UNICO del listado de recetas: el mismo objeto para el `findMany` y para el `count`
  * (R14). Tres capas, y ninguna sobra:
  *
- *   1. **`deletedAt: null` SIEMPRE** (R7, R36 de QC-26). No es un filtro que el llamante pueda
- *      quitar: `deletedAt` no es consultable en ninguna lista blanca y `sanitizeListQuery` lo
- *      poda ademas por su cuenta.
+ *   1. **`deletedAt: null` y el ambito de empresa SIEMPRE**, al mismo nivel y NUNCA fundidos
+ *      con la busqueda ni con los filtros (R7, R36 de QC-26): un termino de busqueda no puede
+ *      ampliar lo visible mas alla de la propia empresa. `deletedAt` no es consultable en
+ *      ninguna lista blanca y `sanitizeListQuery` lo poda ademas por su cuenta.
  *   2. **La busqueda contra `name_normalized`** (R16, R18, R19), normalizando el termino con
  *      `normalizeRecipeName` -la MISMA funcion que escribio la columna y la MISMA con la que el
  *      modulo compara nombres para la unicidad: R19 prohibe una segunda definicion de "mismo
@@ -307,7 +315,7 @@ function recipeFilterWhere(field: string, value: ListFilterValue): Prisma.Recipe
  *   3. **Los filtros, TODOS a la vez** (R15): un `AND` explicito, de modo que una fila sale solo
  *      si los cumple todos.
  */
-export function buildRecipeWhere(query: ListQuery): Prisma.RecipeWhereInput {
+export function buildRecipeWhere(query: ListQuery, scope: RecipeScope): Prisma.RecipeWhereInput {
   const search = normalizedSearchCondition(query.search, normalizeRecipeName);
   const filters = Object.entries(query.filters)
     .map(([field, value]) => recipeFilterWhere(field, value))
@@ -315,6 +323,7 @@ export function buildRecipeWhere(query: ListQuery): Prisma.RecipeWhereInput {
 
   return {
     deletedAt: null,
+    ...recipeCompanyScope(scope),
     ...(search === null ? {} : { nameNormalized: search }),
     ...(filters.length === 0 ? {} : { AND: filters }),
   };
@@ -338,8 +347,9 @@ export async function listAliveRecipes(
   offset: number,
   limit: number,
   query: ListQuery,
+  scope: RecipeScope,
 ): Promise<{ rows: readonly RecipeRow[]; total: number }> {
-  const where = buildRecipeWhere(query);
+  const where = buildRecipeWhere(query, scope);
 
   const [rows, total] = await Promise.all([
     prisma.recipe.findMany({
@@ -379,11 +389,12 @@ export async function replaceAliveRecipe(
   data: NewRecipe,
   actorId: string,
   now: Date,
+  scope: RecipeScope,
 ): Promise<'ok' | 'not_found' | 'duplicate'> {
   try {
     return await prisma.$transaction(async (tx) => {
       const updated = await tx.recipe.updateMany({
-        where: { id, deletedAt: null },
+        where: { id, deletedAt: null, ...recipeCompanyScope(scope) },
         data: {
           name: data.name,
           nameNormalized: normalizeRecipeName(data.name),
@@ -435,9 +446,10 @@ export async function softDeleteAliveRecipe(
   id: string,
   actorId: string,
   now: Date,
+  scope: RecipeScope,
 ): Promise<'ok' | 'not_found'> {
   const result = await prisma.recipe.updateMany({
-    where: { id, deletedAt: null },
+    where: { id, deletedAt: null, ...recipeCompanyScope(scope) },
     data: { deletedAt: now, updatedAt: now, updatedBy: actorId },
   });
   return result.count === 0 ? 'not_found' : 'ok';

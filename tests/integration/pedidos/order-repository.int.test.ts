@@ -129,12 +129,6 @@ async function seedFixtures(): Promise<void> {
       select: { id: true },
     })
   ).id
-  recipeId = (
-    await prisma.recipe.create({
-      data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}` },
-      select: { id: true },
-    })
-  ).id
   documentTypeCode = (
     await prisma.documentType.create({
       data: { code: `DOC${marca.slice(0, 8)}`, name: 'Tipo de documento de prueba' },
@@ -157,6 +151,14 @@ async function seedFixtures(): Promise<void> {
         name: `Empresa ${marca}`,
         nameNormalized: normalizeCompanyName(`Empresa ${marca}`),
       },
+      select: { id: true },
+    })
+  ).id
+  // La receta es de la MISMA empresa que el resto del fixture: QC-50 hizo `recipes.company_id`
+  // obligatoria.
+  recipeId = (
+    await prisma.recipe.create({
+      data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}`, companyId },
       select: { id: true },
     })
   ).id
@@ -183,11 +185,13 @@ async function seedFixtures(): Promise<void> {
 /** Retira las cinco FK sembradas, en el orden que las FK permiten. */
 async function dropFixtures(): Promise<void> {
   await prisma.user.delete({ where: { id: actorId } })
-  // La empresa DESPUES del usuario: `users_company_id_fkey` es `ON DELETE RESTRICT` (QC-47 R11).
+  // La receta TAMBIEN antes que la empresa: QC-50 hizo `recipes.company_id` una FK RESTRICT.
+  await prisma.recipe.delete({ where: { id: recipeId } })
+  // La empresa DESPUES del usuario y de la receta: `users_company_id_fkey` y
+  // `recipes_company_id_fkey` son `ON DELETE RESTRICT` (QC-47 R11, QC-50).
   await prisma.company.delete({ where: { id: companyId } })
   await prisma.role.delete({ where: { id: roleId } })
   await prisma.documentType.delete({ where: { code: documentTypeCode } })
-  await prisma.recipe.delete({ where: { id: recipeId } })
   await prisma.unit.delete({ where: { id: unitId } })
 }
 

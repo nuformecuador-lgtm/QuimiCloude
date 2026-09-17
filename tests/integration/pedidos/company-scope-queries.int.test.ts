@@ -166,17 +166,20 @@ async function alta(empresa: Empresa): Promise<OrderRow> {
 }
 
 beforeAll(async () => {
-  const marcaReceta = token();
-  const receta = await prisma.recipe.create({
-    data: { name: `Receta ${marcaReceta}`, nameNormalized: `receta${marcaReceta}` },
-    select: { id: true },
-  });
-  recetaId = receta.id;
-
   A = await sembrarEmpresa('A');
   B = await sembrarEmpresa('B');
   C = await sembrarEmpresa('C');
   Q = await sembrarEmpresa('Q');
+
+  // Receta compartida por los cuatro escenarios de pedidos: lo que este archivo mide es el
+  // ambito por empresa de `orders`, no el de `recetas`, asi que se ancla a la primera empresa
+  // sembrada (A) igual que el resto del andamiaje comun de este archivo.
+  const marcaReceta = token();
+  const receta = await prisma.recipe.create({
+    data: { name: `Receta ${marcaReceta}`, nameNormalized: `receta${marcaReceta}`, companyId: A.companyId },
+    select: { id: true },
+  });
+  recetaId = receta.id;
 
   // A: tres vivos, el 4 BORRADO y el 5 CANCELADO. El maximo de su serie es 5.
   await sembrarPedido(A, { sequence: 1, quantity: '10.0000', priority: 'BAJA' });
@@ -213,18 +216,20 @@ beforeAll(async () => {
 
 afterAll(async () => {
   const empresas = [A, B, C, Q].filter((empresa): empresa is Empresa => empresa !== undefined);
-  // En el orden que exigen las FK: la del pedido desde la asignacion es `ON DELETE RESTRICT`.
+  // En el orden que exigen las FK: la del pedido desde la asignacion es `ON DELETE RESTRICT`, y
+  // la receta compartida (ancla a A, QC-50) tambien es RESTRICT hacia `companies` -asi que se
+  // borra ANTES que las empresas, no despues-.
   for (const empresa of empresas) {
     await prisma.orderAssignment.deleteMany({ where: { companyId: empresa.companyId } });
     await prisma.order.deleteMany({ where: { companyId: empresa.companyId } });
   }
+  if (recetaId !== undefined) await prisma.recipe.deleteMany({ where: { id: recetaId } });
   for (const empresa of empresas) {
     await prisma.user.deleteMany({ where: { id: empresa.userId } });
     await prisma.role.deleteMany({ where: { id: empresa.roleId } });
     await prisma.documentType.deleteMany({ where: { code: empresa.documentTypeCode } });
     await prisma.company.deleteMany({ where: { id: empresa.companyId } });
   }
-  if (recetaId !== undefined) await prisma.recipe.deleteMany({ where: { id: recetaId } });
   await prisma.$disconnect();
 });
 

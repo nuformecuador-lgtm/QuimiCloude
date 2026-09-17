@@ -29,10 +29,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { listAliveRecipes } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
 import { normalizeRecipeName } from '@/lib/modules/recetas';
+import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 import { MAX_PAGE_SIZE, toOffsetLimit } from '@/lib/shared/pagination';
 
 import type { ListQuery } from '@/lib/modules/recetas/domain/list-query';
+import type { RecipeScope } from '@/lib/modules/recetas';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -41,6 +43,11 @@ function token(): string {
 /** Marcador de TODO el archivo: va en el nombre de cada fila sembrada y es lo que borra el
  *  `afterAll`. Ninguna receta ajena lo lleva, asi que nada de fuera entra en estos casos. */
 const MARCA = token();
+
+/** Empresa unica del archivo: QC-50 hizo `recipes.company_id` obligatoria. Ningun caso de este
+ *  archivo compara empresas entre si, asi que todas las filas sembradas comparten esta. */
+let companyId: string;
+let scope: RecipeScope;
 
 function consulta(partial: Partial<ListQuery> = {}): ListQuery {
   return { page: 1, sort: null, filters: {}, search: MARCA, ...partial };
@@ -60,6 +67,7 @@ async function sembrar(semillas: readonly Semilla[]): Promise<void> {
         name: semilla.name,
         nameNormalized: normalizeRecipeName(semilla.name),
         deletedAt: semilla.deletedAt ?? null,
+        companyId,
         ...(semilla.createdAt === undefined ? {} : { createdAt: semilla.createdAt }),
         ...(semilla.updatedAt === undefined ? {} : { updatedAt: semilla.updatedAt }),
       },
@@ -73,12 +81,23 @@ async function listar(
   query: ListQuery,
 ): Promise<{ nombres: readonly string[]; ids: readonly string[]; total: number; limit: number }> {
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
-  const { rows, total } = await listAliveRecipes(offset, limit, query);
+  const { rows, total } = await listAliveRecipes(offset, limit, query, scope);
   return { nombres: rows.map((row) => row.name), ids: rows.map((row) => row.id), total, limit };
 }
 
+beforeAll(async () => {
+  const name = `Empresa list-query-recipes ${MARCA}`;
+  const company = await prisma.company.create({
+    data: { name, nameNormalized: normalizeCompanyName(name) },
+    select: { id: true },
+  });
+  companyId = company.id;
+  scope = { companyId };
+});
+
 afterAll(async () => {
   await prisma.recipe.deleteMany({ where: { nameNormalized: { contains: MARCA } } });
+  await prisma.company.deleteMany({ where: { id: companyId } });
   await prisma.$disconnect();
 });
 

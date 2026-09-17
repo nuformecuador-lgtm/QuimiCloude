@@ -75,8 +75,10 @@ describe('contrato RecipeCatalog', () => {
     // no hay nada que mirar (mismo criterio que `module-contract.test.ts` con
     // `ProductCatalog`).
     expect(catalogoFuente).toMatch(/export interface RecipeCatalog \{/)
+    // QC-50: gano un segundo parametro, `companyId: string` -sin el, `findRefsIncludingDeleted`
+    // no podria negarle a otro modulo el nombre de una receta de otra empresa.
     expect(catalogoFuente).toMatch(
-      /findRefsIncludingDeleted\(ids: readonly RecipeId\[\]\): Promise<readonly RecipeRef\[\]>/,
+      /findRefsIncludingDeleted\(\s*ids: readonly RecipeId\[\],\s*companyId: string,\s*\): Promise<readonly RecipeRef\[\]>/,
     )
     expect(catalogoFuente).toMatch(/export type RecipeRef = \{/)
     expect(catalogoFuente).toMatch(/readonly isDeleted: boolean/)
@@ -124,6 +126,8 @@ describe('toRecipeRef', () => {
   })
 })
 
+const EMPRESA = 'empresa-1'
+
 describe('findRecipeRefsIncludingDeleted', () => {
   it('devuelve la receta dada de baja con su nombre e isDeleted true, y la viva con false (R44)', async () => {
     findMany.mockResolvedValue([
@@ -131,7 +135,7 @@ describe('findRecipeRefsIncludingDeleted', () => {
       { id: 'r-baja', name: 'Detergente viejo', deletedAt: new Date('2026-02-02') },
     ])
 
-    const refs = await findRecipeRefsIncludingDeleted(['r-viva', 'r-baja'])
+    const refs = await findRecipeRefsIncludingDeleted(['r-viva', 'r-baja'], EMPRESA)
 
     expect(refs).toEqual([
       { id: 'r-viva', name: 'Cloro 5%', isDeleted: false },
@@ -139,14 +143,18 @@ describe('findRecipeRefsIncludingDeleted', () => {
     ])
   })
 
-  it('no filtra por deletedAt en el where: pide los ids y nada mas', async () => {
+  it('no filtra por deletedAt en el where: pide los ids y el ambito de empresa, nada mas', async () => {
     findMany.mockResolvedValue([])
 
-    await findRecipeRefsIncludingDeleted(['r-1', 'r-2'])
+    await findRecipeRefsIncludingDeleted(['r-1', 'r-2'], EMPRESA)
 
     const args = findMany.mock.calls[0]?.[0]
-    expect(args.where).toEqual({ id: { in: ['r-1', 'r-2'] } })
-    expect(args.where).not.toHaveProperty('deletedAt')
+    // QC-50: la empresa se compone con AND, junto al filtro de ids -nunca fundida con
+    // ellos ni como un `OR` que ampliara lo visible.
+    expect(args.where).toEqual({
+      AND: [{ companyId: EMPRESA }, { id: { in: ['r-1', 'r-2'] } }],
+    })
+    expect(JSON.stringify(args.where)).not.toContain('deletedAt')
     // Y `deletedAt` se PIDE en el select: es de donde sale `isDeleted`.
     expect(args.select).toEqual({ id: true, name: true, deletedAt: true })
   })
@@ -154,7 +162,7 @@ describe('findRecipeRefsIncludingDeleted', () => {
   it('un id que no existe simplemente no vuelve: no se inventa una fila', async () => {
     findMany.mockResolvedValue([{ id: 'r-1', name: 'Cloro', deletedAt: null }])
 
-    const refs = await findRecipeRefsIncludingDeleted(['r-1', 'r-fantasma'])
+    const refs = await findRecipeRefsIncludingDeleted(['r-1', 'r-fantasma'], EMPRESA)
 
     expect(refs).toHaveLength(1)
     expect(refs.map((ref) => ref.id)).toEqual(['r-1'])
@@ -163,13 +171,13 @@ describe('findRecipeRefsIncludingDeleted', () => {
   it('hace UNA sola consulta para N ids (R45)', async () => {
     findMany.mockResolvedValue([])
 
-    await findRecipeRefsIncludingDeleted(['r-1', 'r-2', 'r-3', 'r-4', 'r-5'])
+    await findRecipeRefsIncludingDeleted(['r-1', 'r-2', 'r-3', 'r-4', 'r-5'], EMPRESA)
 
     expect(findMany).toHaveBeenCalledTimes(1)
   })
 
   it('con una lista vacia de ids no consulta la base y devuelve una lista vacia', async () => {
-    const refs = await findRecipeRefsIncludingDeleted([])
+    const refs = await findRecipeRefsIncludingDeleted([], EMPRESA)
 
     expect(refs).toEqual([])
     expect(findMany).not.toHaveBeenCalled()

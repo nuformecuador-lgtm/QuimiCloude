@@ -70,11 +70,12 @@ async function createCompany(): Promise<string> {
   return company.id;
 }
 
-/** Receta efimera SIN lineas: es solo el otro lado de `orders_recipe_id_fkey`. */
-async function createRecipe(): Promise<string> {
+/** Receta efimera SIN lineas: es solo el otro lado de `orders_recipe_id_fkey`. Es de la misma
+ *  empresa que el pedido que la usa: QC-50 hizo `recipes.company_id` obligatoria. */
+async function createRecipe(companyId: string): Promise<string> {
   const marca = randomUUID().replaceAll('-', '');
   const recipe = await prisma.recipe.create({
-    data: { name: `Receta QC84 T16 ${marca}`, nameNormalized: `recetaqc84t16${marca}` },
+    data: { name: `Receta QC84 T16 ${marca}`, nameNormalized: `recetaqc84t16${marca}`, companyId },
     select: { id: true },
   });
   createdRecipeIds.add(recipe.id);
@@ -122,25 +123,31 @@ async function seedUser(companyId: string, lastNames: string): Promise<string> {
 }
 
 /**
- * Borra el escenario entero en el unico orden que respetan las FK: las asignaciones antes que los
- * pedidos y que las personas; las pertenencias antes que los grupos; y la empresa al final.
+ * Borra TODO lo que cuelga de la empresa salvo la fila de la empresa misma: las asignaciones
+ * antes que los pedidos y que las personas; las pertenencias antes que los grupos. La receta
+ * -QC-50, `recipes.company_id` es RESTRICT- y la empresa se borran DESPUES, en
+ * `withPedidoConGrupoAplicado`, porque los pedidos tienen que estar fuera antes de poder borrar
+ * la receta a la que apuntan.
  */
-async function dropCompany(companyId: string): Promise<void> {
+async function dropCompanyExceptCompanyRow(companyId: string): Promise<void> {
   await prisma.orderAssignment.deleteMany({ where: { companyId } });
   // QC-60: `orders.company_id` tiene FK `ON DELETE RESTRICT`, asi que los pedidos de la empresa
-  // caen ANTES que ella. Los borra tambien `dropRecipes`, pero eso pasa despues y llega tarde.
+  // caen ANTES que ella.
   await prisma.order.deleteMany({ where: { companyId } });
   await prisma.workGroupMember.deleteMany({ where: { companyId } });
   await prisma.workGroup.deleteMany({ where: { companyId } });
   await prisma.user.updateMany({ where: { companyId }, data: { accountStatusChangedBy: null } });
   await prisma.user.deleteMany({ where: { companyId } });
+}
+
+async function dropCompanyRow(companyId: string): Promise<void> {
   await prisma.company.delete({ where: { id: companyId } });
   createdCompanyIds.delete(companyId);
 }
 
+/** Los pedidos que apuntaban a la receta ya cayeron con `dropCompanyExceptCompanyRow`. */
 async function dropRecipes(): Promise<void> {
   for (const recipeId of createdRecipeIds) {
-    await prisma.order.deleteMany({ where: { recipeId } });
     await prisma.recipe.delete({ where: { id: recipeId } });
     createdRecipeIds.delete(recipeId);
   }
@@ -186,7 +193,7 @@ async function montarPedidoConGrupoAplicado(): Promise<Escenario> {
     responsables.push(userId);
   }
 
-  const orderId = await createOrder(await createRecipe(), companyId);
+  const orderId = await createOrder(await createRecipe(companyId), companyId);
   for (const userId of responsables) {
     await prisma.orderAssignment.create({
       data: {
@@ -214,8 +221,11 @@ async function withPedidoConGrupoAplicado(body: (e: Escenario) => Promise<void>)
   try {
     await body(escenario);
   } finally {
-    await dropCompany(escenario.companyId);
+    // Orden completo: asignaciones/pedidos/grupos/personas -> receta (QC-50, RESTRICT hacia
+    // `companies`) -> la fila de la empresa, que es la ultima que puede caer.
+    await dropCompanyExceptCompanyRow(escenario.companyId);
     await dropRecipes();
+    await dropCompanyRow(escenario.companyId);
   }
 }
 

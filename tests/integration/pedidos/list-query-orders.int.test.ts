@@ -120,12 +120,6 @@ beforeAll(async () => {
       select: { id: true },
     })
   ).id
-  recipeId = (
-    await prisma.recipe.create({
-      data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}` },
-      select: { id: true },
-    })
-  ).id
   documentTypeCode = (
     await prisma.documentType.create({
       data: { code: `DOC${marca.slice(0, 8)}`, name: 'Tipo de documento de prueba' },
@@ -149,6 +143,14 @@ beforeAll(async () => {
         name: `Empresa ${marca}`,
         nameNormalized: normalizeCompanyName(`Empresa ${marca}`),
       },
+      select: { id: true },
+    })
+  ).id
+  // La receta es de la MISMA empresa que el resto del andamiaje de este archivo: QC-50 hizo
+  // `recipes.company_id` obligatoria.
+  recipeId = (
+    await prisma.recipe.create({
+      data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}`, companyId },
       select: { id: true },
     })
   ).id
@@ -180,8 +182,9 @@ afterAll(async () => {
   await prisma.user.delete({ where: { id: actorId } })
   await prisma.role.delete({ where: { id: roleId } })
   await prisma.documentType.delete({ where: { code: documentTypeCode } })
-  await prisma.company.delete({ where: { id: companyId } })
+  // La receta ANTES que la empresa: QC-50 hizo `recipes.company_id` una FK RESTRICT.
   await prisma.recipe.delete({ where: { id: recipeId } })
+  await prisma.company.delete({ where: { id: companyId } })
   await prisma.unit.delete({ where: { id: unitId } })
   await prisma.$disconnect()
 })
