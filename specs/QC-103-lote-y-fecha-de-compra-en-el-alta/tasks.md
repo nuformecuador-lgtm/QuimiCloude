@@ -92,7 +92,7 @@ corre una sola vez al final, antes del PR (regla 5 de `CLAUDE.md`).
       **Hecho cuando**: `el alta de producto muestra el lote asignado en el aviso de éxito (R14,
       R17)` pasa con `pnpm run e2e` (o el runner de Playwright del repo) contra un entorno local.
 
-- [ ] **T11.** Depende de T1-T10. Completar `progress/impl_QC-103-lote-y-fecha-de-compra-en-el-alta.md`
+- [x] **T11.** Depende de T1-T10. Completar `progress/impl_QC-103-lote-y-fecha-de-compra-en-el-alta.md`
       con el mapa `R1..R17 -> test`, incluyendo los tests heredados que ya cubrían R8, R10, R11
       antes de esta ficha (citarlos, no reescribirlos).
       **Hecho cuando**: cada `R<n>` de `requirements.md` aparece con al menos un test concreto en
