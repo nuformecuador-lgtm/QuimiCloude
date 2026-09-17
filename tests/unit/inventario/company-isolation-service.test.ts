@@ -157,7 +157,7 @@ function montar() {
         const id = `product-nuevo-${productos.length}`;
         productos.push({ id, name: product.name, companyId: scope.companyId, alive: true });
         creados.push({ tipo: 'product+batch', companyId: scope.companyId, productId: id });
-        return { id, batchId: `batch-de-${id}` };
+        return { id, batchId: `batch-de-${id}`, lot: `lote-de-${id}` };
       },
     ),
     addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(
@@ -165,7 +165,7 @@ function montar() {
         const fila = productoVisible(productId, scope);
         if (fila === undefined) return null;
         creados.push({ tipo: 'batch', companyId: scope.companyId, productId });
-        return { batchId: `batch-de-${productId}` };
+        return { batchId: `batch-de-${productId}`, lot: `lote-de-${productId}` };
       },
     ),
   } satisfies ProductRepository;
@@ -586,7 +586,7 @@ describe('QC-49 R18 — el homonimo de otra empresa no existe para quien da de a
 
     const resultado = await m.createProduct(ALTA_VALIDA, ACTOR_A);
 
-    expect(resultado).toEqual({ id: PRODUCTO_DE_A });
+    expect(resultado).toEqual({ id: PRODUCTO_DE_A, lot: `lote-de-${PRODUCTO_DE_A}` });
     expect(m.products.addBatchToAlive).toHaveBeenCalledTimes(1);
     expect(m.products.createWithFirstBatch).not.toHaveBeenCalled();
     expect(m.creados).toEqual([

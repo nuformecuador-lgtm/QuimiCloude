@@ -81,13 +81,17 @@ export interface ProductRepository {
    * La existencia viaja DOS veces -en `product.stock` y en `batch.stock`- y no es un
    * descuido: es la decision cerrada del 2026-09-10, transitoria hasta QC-91, cuando la
    * existencia del producto pase a ser la suma de sus lotes.
+   *
+   * QC-103 (R12): tambien devuelve `lot`, el TEXTO que quedo escrito en la fila del lote -el
+   * que tecleo la persona o el que genero el correlativo-, no el `batchId`. Es el mismo dato
+   * que el adaptador ya calcula para escribir la fila; aqui solo se propaga hacia arriba.
    */
   createWithFirstBatch(
     product: NewProduct,
     batch: NewProductBatch,
     now: Date,
     scope: InventoryScope,
-  ): Promise<{ id: string; batchId: string }>;
+  ): Promise<{ id: string; batchId: string; lot: string }>;
 
   /**
    * QC-90 (R17, R18): agrega el lote a un producto que YA EXISTE.
@@ -103,11 +107,14 @@ export interface ProductRepository {
    * QC-49 (R16): tambien devuelve `null` cuando el producto es de OTRA empresa, por el mismo
    * camino y sin ningun resultado nuevo. El ambito va en el `where` de la lectura, no en un
    * `if` posterior sobre la fila leida.
+   *
+   * QC-103 (R13): con la misma vara de `createWithFirstBatch`, devuelve tambien `lot`, el
+   * texto que quedo escrito en el lote.
    */
   addBatchToAlive(
     productId: string,
     batch: NewProductBatch,
     now: Date,
     scope: InventoryScope,
-  ): Promise<{ batchId: string } | null>;
+  ): Promise<{ batchId: string; lot: string } | null>;
 }

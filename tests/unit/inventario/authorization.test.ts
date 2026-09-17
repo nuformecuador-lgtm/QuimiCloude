@@ -188,9 +188,11 @@ function montarReposPermisivos(): Repos {
       createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
         id: 'producto-1',
         batchId: 'lote-1',
+        lot: '1',
       })),
       addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => ({
         batchId: 'lote-1',
+        lot: '1',
       })),
     },
     presentations: {
@@ -558,6 +560,7 @@ describe('R1 / QC-74 R18 — el actor entra por parametro y no trae nombre de ro
 
     await expect(createProduct(PRODUCTO_VALIDO_CON_LOTE, actorCon(MODIFICAR))).resolves.toEqual({
       id: 'producto-1',
+      lot: '1',
     });
     await expect(
       createProduct(PRODUCTO_VALIDO_CON_LOTE, actorCon(CONSULTAR)),

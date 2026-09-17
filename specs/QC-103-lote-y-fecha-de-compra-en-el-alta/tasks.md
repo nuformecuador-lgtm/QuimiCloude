@@ -6,13 +6,13 @@ corre una sola vez al final, antes del PR (regla 5 de `CLAUDE.md`).
 
 ## Backend — el lote de vuelta (R12, R13, R4/D4)
 
-- [ ] **T1.** Ampliar `lib/modules/inventario/ports/product-repository.ts`: `createWithFirstBatch`
+- [x] **T1.** Ampliar `lib/modules/inventario/ports/product-repository.ts`: `createWithFirstBatch`
       devuelve `Promise<{ id: string; batchId: string; lot: string }>` y `addBatchToAlive` devuelve
       `Promise<{ batchId: string; lot: string } | null>`. Solo firma y comentario; sin lógica.
       **Hecho cuando**: el puerto compila con la nueva firma (el adaptador y el dominio aún no la
       cumplen, así que romperá typecheck hasta T2-T3; se hacen en el mismo commit).
 
-- [ ] **T2.** `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`: en
+- [x] **T2.** `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`: en
       `createWithFirstBatch` y `addBatchToAlive`, incluir `lot` (la variable local que
       `resolveBatchLot()` ya captura) en el objeto que cada función retorna.
       **Hecho cuando**: `pnpm run typecheck` no marca error en este archivo y un test unitario
@@ -21,7 +21,7 @@ corre una sola vez al final, antes del PR (regla 5 de `CLAUDE.md`).
       contra un doble de Prisma o la base de test, cubriendo tanto el lote generado (`lot: null`
       en la entrada) como el lote tecleado a mano.
 
-- [ ] **T3.** `lib/modules/inventario/domain/create-product.ts`: cambiar el tipo de retorno de
+- [x] **T3.** `lib/modules/inventario/domain/create-product.ts`: cambiar el tipo de retorno de
       `createCreateProduct` a `Promise<{ id: string; lot: string }>` y devolver `lot` en los dos
       caminos (`{ id: existente, lot: agregado.lot }` y `{ id: creado.id, lot: creado.lot }`).
       **Hecho cuando**: test unitario `createProduct devuelve el lote asignado al crear un
@@ -40,7 +40,7 @@ corre una sola vez al final, antes del PR (regla 5 de `CLAUDE.md`).
 
 ## Frontend — fecha de compra (R1-R5)
 
-- [ ] **T5. [P]** Crear `app/(private)/inventario/components/product-batch-date-field.tsx`:
+- [x] **T5. [P]** Crear `app/(private)/inventario/components/product-batch-date-field.tsx`:
       componente con `Popover` + `Calendar` en `mode="single"`, valor por defecto "hoy" en hora
       local, `disabled={{ after: hoy }}`, e `<input type="hidden" name="purchaseDate">` que
       sincroniza el valor elegido para viajar en el `FormData` del formulario no controlado.

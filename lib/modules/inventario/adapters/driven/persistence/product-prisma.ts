@@ -487,7 +487,7 @@ export async function createWithFirstBatch(
   batch: NewProductBatch,
   now: Date,
   scope: InventoryScope,
-): Promise<{ id: string; batchId: string }> {
+): Promise<{ id: string; batchId: string; lot: string }> {
   return writeBatchWithLotRetry(batch, scope, async (tx, resolveBatchLot) => {
     const created = await tx.product.create({
       data: {
@@ -509,7 +509,7 @@ export async function createWithFirstBatch(
       select: { id: true },
     });
 
-    return { id: created.id, batchId: createdBatch.id };
+    return { id: created.id, batchId: createdBatch.id, lot };
   });
 }
 
@@ -522,7 +522,7 @@ export async function addBatchToAlive(
   batch: NewProductBatch,
   now: Date,
   scope: InventoryScope,
-): Promise<{ batchId: string } | null> {
+): Promise<{ batchId: string; lot: string } | null> {
   const { companyId } = companyScopeColumns(scope);
 
   return writeBatchWithLotRetry(batch, scope, async (tx, resolveBatchLot) => {
@@ -548,6 +548,6 @@ export async function addBatchToAlive(
       select: { id: true },
     });
 
-    return { batchId: createdBatch.id };
+    return { batchId: createdBatch.id, lot };
   });
 }
