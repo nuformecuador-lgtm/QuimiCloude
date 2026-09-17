@@ -20,7 +20,10 @@
  * (`tests/unit/recetas/schema/recipes-company-scope-migration.test.ts`, T21). `down.sql` trae UN
  * solo bloque `DO $$` con sus TRES guardias en secuencia (empresa ambigua, fila de otra empresa,
  * nombre repetido entre empresas): se ejecuta leido del disco, nunca copiado a mano, para que un
- * cambio futuro en el archivo real se refleje aqui sin tocar este test.
+ * cambio futuro en el archivo real se refleje aqui sin tocar este test. Y el `down.sql` se
+ * ejecuta ademas ENTERO -troceado en sus sentencias, tambien del disco- para comparar el retrato
+ * del esquema de antes con el de despues contra `pg_indexes` e `information_schema`, en vez de
+ * afirmar sobre el texto del archivo.
  *
  * LA MINA DE R7: la guardia 2 (fila de otra empresa) y la guardia 3 (nombre repetido entre
  * empresas VIVAS) no son independientes en los datos: el `target_company_id` de la guardia es UNA
@@ -158,9 +161,13 @@ expect(scopeDirs, 'debe existir exactamente una migracion *_recipes_company_scop
 )
 const migrationDir = join(migrationsDir, scopeDirs[0] as string)
 
+function leerSql(archivo: string): string {
+  return readFileSync(join(migrationDir, archivo), 'utf8')
+}
+
 /** Todos los bloques `DO $$ ... $$;` de un archivo, en el orden en que aparecen. */
 function allDoBlocks(archivo: string): string[] {
-  const sql = readFileSync(join(migrationDir, archivo), 'utf8')
+  const sql = leerSql(archivo)
   const matches = [...sql.matchAll(/DO\s+\$\$[\s\S]*?\$\$;/g)]
   if (matches.length === 0) throw new Error(`${archivo} no tiene ningun bloque DO $$`)
   return matches.map((match) => match[0])
@@ -194,6 +201,158 @@ expect(
   GUARDIA_2_Y_3_DESACTIVADAS,
   'la mutacion de la guardia 3 no encontro su texto',
 ).not.toBe(GUARDIA_2_DESACTIVADA)
+
+// ---------------------------------------------------------------------------
+// El `down.sql` ENTERO, troceado en sentencias para ejecutarlo del disco
+// ---------------------------------------------------------------------------
+
+/**
+ * Trocea por los `;` de nivel superior. Los `;` que viven dentro de un bloque `$$ ... $$`, de
+ * una cadena o de un comentario `--` no separan nada; los comentarios se descartan porque la
+ * unica forma de que uno termine dentro de la sentencia siguiente seria tragarse su texto.
+ */
+function sentenciasSql(sql: string): string[] {
+  const sentencias: string[] = []
+  let actual = ''
+  let enDolar = false
+  let enComilla = false
+  let enComentario = false
+  let i = 0
+  while (i < sql.length) {
+    const caracter = sql[i] as string
+    const pareja = sql.slice(i, i + 2)
+    if (enComentario) {
+      if (caracter === '\n') {
+        enComentario = false
+        actual += caracter
+      }
+      i += 1
+    } else if (!enDolar && !enComilla && pareja === '--') {
+      enComentario = true
+      i += 2
+    } else if (!enDolar && caracter === "'") {
+      enComilla = !enComilla
+      actual += caracter
+      i += 1
+    } else if (!enComilla && pareja === '$$') {
+      enDolar = !enDolar
+      actual += pareja
+      i += 2
+    } else if (!enDolar && !enComilla && caracter === ';') {
+      sentencias.push(actual.trim())
+      actual = ''
+      i += 1
+    } else {
+      actual += caracter
+      i += 1
+    }
+  }
+  if (actual.trim() !== '') sentencias.push(actual.trim())
+  return sentencias.filter((sentencia) => sentencia !== '')
+}
+
+const DOWN_SQL = leerSql('down.sql')
+const SENTENCIAS_DEL_DOWN = sentenciasSql(DOWN_SQL)
+
+// El troceador tambien puede mentir: si se comiera una sentencia, ejecutar el DOWN «entero»
+// dejaria de significar nada y la comparacion de retratos pasaria por otro camino. Se afirma
+// que el bloque de guardias viaja intacto en UNA sola pieza y que los cuatro pasos que este
+// archivo comprueba estan cada uno en la suya.
+expect(SENTENCIAS_DEL_DOWN.filter((s) => s.startsWith('DO $$'))).toHaveLength(1)
+for (const esperada of [
+  'DROP INDEX "recipes_company_name_unique"',
+  'CREATE UNIQUE INDEX "recipes_name_unique" ON "recipes"("name_normalized") WHERE "deleted_at" IS NULL',
+  'ALTER TABLE "recipes" DROP CONSTRAINT "recipes_company_id_fkey"',
+  'ALTER TABLE "recipes" DROP COLUMN "company_id"',
+  'ALTER TABLE "recipes" ENABLE ROW LEVEL SECURITY',
+  'ALTER TABLE "recipes" FORCE ROW LEVEL SECURITY',
+]) {
+  expect(SENTENCIAS_DEL_DOWN, `el troceador perdio: ${esperada}`).toContain(esperada)
+}
+
+/** Mutacion en memoria -nunca del archivo-: el DOWN deja de restaurar el unico global. */
+const SIN_RESTAURAR_EL_GLOBAL = sentenciasSql(
+  DOWN_SQL.replace(
+    'CREATE UNIQUE INDEX "recipes_name_unique" ON "recipes"("name_normalized") WHERE "deleted_at" IS NULL;',
+    '',
+  ),
+)
+expect(
+  SIN_RESTAURAR_EL_GLOBAL.length,
+  'la mutacion del CREATE INDEX no encontro su texto',
+).toBe(SENTENCIAS_DEL_DOWN.length - 1)
+
+// ---------------------------------------------------------------------------
+// Los dos retratos del esquema
+// ---------------------------------------------------------------------------
+
+type Retrato = {
+  readonly columnas: readonly string[]
+  readonly indices: readonly string[]
+  readonly restricciones: readonly string[]
+  readonly rls: readonly string[]
+  readonly politicas: readonly string[]
+}
+
+type Lector = Pick<Prisma.TransactionClient, '$queryRaw'>
+
+/**
+ * Lo que el esquema dice de si mismo, leido de `information_schema` y del catalogo, nunca del
+ * SQL del disco: es el unico oraculo que no comparte origen con lo que se esta probando.
+ */
+async function retratoDeEsquema(db: Lector): Promise<Retrato> {
+  const columnas = await db.$queryRaw<{ linea: string }[]>`
+    SELECT column_name::text || ' | ' || data_type::text || ' | ' || is_nullable::text AS linea
+      FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'recipes'
+     ORDER BY ordinal_position`
+  const indices = await db.$queryRaw<{ linea: string }[]>`
+    SELECT indexname::text || ' | ' || indexdef::text AS linea
+      FROM pg_indexes
+     WHERE schemaname = 'public' AND tablename = 'recipes'
+     ORDER BY indexname`
+  const restricciones = await db.$queryRaw<{ linea: string }[]>`
+    SELECT conname::text || ' | ' || contype::text AS linea
+      FROM pg_constraint
+     WHERE conrelid = 'public.recipes'::regclass
+     ORDER BY conname`
+  const rls = await db.$queryRaw<{ linea: string }[]>`
+    SELECT relname::text || ' | ' || relrowsecurity::text || ' | ' || relforcerowsecurity::text AS linea
+      FROM pg_class
+     WHERE oid IN (
+             'public.recipes'::regclass,
+             'public.recipe_lines'::regclass,
+             'public.companies'::regclass
+           )
+     ORDER BY relname`
+  const politicas = await db.$queryRaw<{ linea: string }[]>`
+    SELECT tablename::text || ' | ' || policyname::text AS linea
+      FROM pg_policies
+     WHERE schemaname = 'public'
+       AND tablename IN ('recipes', 'recipe_lines', 'companies')
+     ORDER BY tablename, policyname`
+  const lineas = (filas: { linea: string }[]): string[] => filas.map((fila) => fila.linea)
+  return {
+    columnas: lineas(columnas),
+    indices: lineas(indices),
+    restricciones: lineas(restricciones),
+    rls: lineas(rls),
+    politicas: lineas(politicas),
+  }
+}
+
+async function ejecutarDown(
+  tx: Prisma.TransactionClient,
+  sentencias: readonly string[],
+): Promise<void> {
+  for (const sentencia of sentencias) {
+    await tx.$executeRawUnsafe(sentencia)
+  }
+}
+
+function nombresDeIndice(retrato: Retrato): string[] {
+  return retrato.indices.map((linea) => linea.split(' | ')[0] as string)
+}
 
 // ---------------------------------------------------------------------------
 // Datos de apoyo
@@ -650,6 +809,102 @@ describe('R7 — el DOWN aborta la reversion entera ante dato que no puede tirar
       // estaria abortando en el caso (b), no la 3, y ese caso no probaria lo que dice probar.
       await expect(tx.$executeRawUnsafe(GUARDIA_2_Y_3_DESACTIVADAS)).resolves.not.toThrow()
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// R6 — el DOWN ejecutado ENTERO deja el esquema exactamente como estaba
+// ---------------------------------------------------------------------------
+
+describe('R6 — ejecutar el down.sql entero devuelve el esquema al estado anterior al UP', () => {
+  it('el retrato de despues es el de antes sin la columna, con el unico GLOBAL y PARCIAL restaurado, sin la constraint y con RLS forzada en las dos tablas', async () => {
+    const capturado: { antes?: Retrato; despues?: Retrato } = {}
+
+    await inRolledBackTransaction(async (tx) => {
+      capturado.antes = await retratoDeEsquema(tx)
+      await ejecutarDown(tx, SENTENCIAS_DEL_DOWN)
+      capturado.despues = await retratoDeEsquema(tx)
+    })
+
+    const antes = capturado.antes
+    const despues = capturado.despues
+    expect(antes, 'no se capturo el retrato de antes').toBeDefined()
+    expect(despues, 'no se capturo el retrato de despues').toBeDefined()
+    if (antes === undefined || despues === undefined) return
+
+    // Punto de partida: el esquema de la corrida es el de DESPUES del UP. Si no lo fuera, todo
+    // lo de abajo compararia contra otra cosa.
+    expect(antes.columnas.filter((linea) => linea.startsWith('company_id | '))).toHaveLength(1)
+    expect(nombresDeIndice(antes)).toContain('recipes_company_name_unique')
+    expect(nombresDeIndice(antes)).not.toContain('recipes_name_unique')
+
+    // La columna se va, y NINGUNA otra se mueve ni cambia de tipo o de nulabilidad.
+    expect(despues.columnas.filter((linea) => linea.startsWith('company_id | '))).toHaveLength(0)
+    expect(despues.columnas).toEqual(
+      antes.columnas.filter((linea) => !linea.startsWith('company_id | ')),
+    )
+
+    // El unico GLOBAL vuelve, y vuelve PARCIAL: sin el `WHERE` el nombre de una receta borrada
+    // quedaria ocupado para siempre, y el esquema NO seria el que habia antes del UP.
+    const global = despues.indices.find((linea) => linea.startsWith('recipes_name_unique | '))
+    expect(global, 'el DOWN no restauro recipes_name_unique').toBeDefined()
+    expect(global).toContain('CREATE UNIQUE INDEX')
+    expect(global).toContain('(name_normalized)')
+    expect(global).toMatch(/WHERE \(deleted_at IS NULL\)/u)
+    expect(nombresDeIndice(despues)).not.toContain('recipes_company_name_unique')
+    // Y el resto de indices de la tabla queda intacto, definicion a definicion.
+    expect(
+      despues.indices.filter((linea) => !linea.startsWith('recipes_name_unique | ')),
+    ).toEqual(antes.indices.filter((linea) => !linea.startsWith('recipes_company_name_unique | ')))
+
+    // La FK se va, y ninguna otra restriccion de la tabla se toca.
+    expect(despues.restricciones).toEqual(
+      antes.restricciones.filter((linea) => !linea.startsWith('recipes_company_id_fkey | ')),
+    )
+    expect(despues.restricciones.some((linea) => linea.includes('company'))).toBe(false)
+
+    // RLS activada Y forzada en las tres tablas que el DOWN desforzo, y sin ninguna policy.
+    expect(despues.rls).toEqual([
+      'companies | true | true',
+      'recipe_lines | true | true',
+      'recipes | true | true',
+    ])
+    expect(despues.rls).toEqual(antes.rls)
+    expect(despues.politicas).toEqual([])
+    expect(antes.politicas).toEqual([])
+  })
+
+  it('el ROLLBACK devuelve la base a su estado real: el DDL de Postgres es transaccional', async () => {
+    const antesDeTodo = await retratoDeEsquema(prisma)
+
+    await inRolledBackTransaction(async (tx) => {
+      await ejecutarDown(tx, SENTENCIAS_DEL_DOWN)
+      // Dentro de la transaccion el esquema SI cambio: si no, el ROLLBACK no estaria
+      // deshaciendo nada y este caso pasaria con un DOWN que no hiciera absolutamente nada.
+      const dentro = await retratoDeEsquema(tx)
+      expect(dentro.columnas).not.toEqual(antesDeTodo.columnas)
+    })
+
+    expect(await retratoDeEsquema(prisma)).toEqual(antesDeTodo)
+  })
+
+  it('sin la linea que restaura el unico global, el DOWN deja el esquema DISTINTO: la comparacion de arriba no es un placebo', async () => {
+    const capturado: { despues?: Retrato } = {}
+
+    await inRolledBackTransaction(async (tx) => {
+      await ejecutarDown(tx, SIN_RESTAURAR_EL_GLOBAL)
+      capturado.despues = await retratoDeEsquema(tx)
+    })
+
+    const despues = capturado.despues
+    expect(despues, 'no se capturo el retrato de despues').toBeDefined()
+    if (despues === undefined) return
+
+    // Exactamente la asercion que el caso de arriba da por buena, del reves: con el DOWN mutado
+    // la tabla se queda SIN ninguna garantia de unicidad de nombre, y el caso de arriba se
+    // pondria rojo aqui.
+    expect(nombresDeIndice(despues)).not.toContain('recipes_name_unique')
+    expect(nombresDeIndice(despues)).not.toContain('recipes_company_name_unique')
   })
 })
 

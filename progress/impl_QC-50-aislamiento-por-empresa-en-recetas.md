@@ -324,3 +324,129 @@ flakiness que merece su propia ficha. **No es mío darlo por bueno.**
   frase que deja **intacto** el diferimiento de QC-71 R21) y en el censo de specs de recetas, que
   pasa de dos a tres literales.
 - **T28** es del leader: `./init.sh` completo. Aquí no se corrió la suite.
+
+## Cierre de la review F2.2 — menor-2 y menor-3 (2026-09-17)
+
+Alcance cerrado: **solo** los dos hallazgos menores del informe del reviewer. No se tocó
+producción (`lib/`, `db/`, `app/`) ni el `down.sql`; el diff son **dos archivos de test**.
+
+### menor-2 — la etiqueta de requisito, corregida
+
+Verificado contra `requirements.md` antes de tocar nada: **R9** es «dejar **indexada** la columna
+de empresa de `recipes`», **R10** es «el nombre normalizado es único **por empresa**, sobre recetas
+vivas», y **R20** es la **conciliación de líneas** al editar. La etiqueta estaba mal.
+
+En `tests/integration/inventario/list-query-indexes.int.test.ts`:
+
+- **Título del caso**: «...es POR EMPRESA y PARCIAL, y el global ya no esta **(QC-50 R9, R10)**».
+  Ahí `R<n>` **sí** va: `docs/conventions.md > Comentarios` lo exige como enlace de trazabilidad en
+  el nombre del caso.
+- **Comentario de `PRE_EXISTING_INDEXES`**: la cita se **borra**, no se corrige. La misma regla
+  prohíbe citar `QC-<n>`, `R<n>` o «decisión cerrada» en un comentario, también en `tests/`. La
+  frase queda diciendo el porqué («dos empresas pueden tener cada una su misma receta») sin la
+  etiqueta. Las otras citas de esa lista son **de QC-49 y QC-76, preexistentes**, y no se tocan:
+  la regla limpia las líneas que la rama toca, no las de alrededor.
+
+### menor-3 — R6 deja de afirmarse sobre el TEXTO: el `down.sql` se ejecuta ENTERO
+
+En `tests/integration/recetas/company-scope.int.test.ts`, describe nuevo
+**`R6 — ejecutar el down.sql entero devuelve el esquema al estado anterior al UP`**, con tres casos.
+Reutiliza el andamiaje que ya tenía el archivo (`leerSql` del disco + `inRolledBackTransaction`):
+lo único nuevo es el troceador de sentencias y las dos funciones de retrato.
+
+- **`sentenciasSql`** parte el archivo por los `;` de nivel superior, respetando los `$$ ... $$`,
+  las cadenas y los comentarios `--`. El troceador **también se afirma**: exactamente un bloque
+  `DO $$` en una sola pieza, y las seis sentencias que este archivo comprueba presentes una a una.
+  Si se comiera una, «ejecutar el DOWN entero» dejaría de significar nada.
+- **`retratoDeEsquema`** lee el esquema del catálogo, nunca del SQL: `information_schema.columns`
+  (nombre, tipo y nulabilidad, en orden ordinal), `pg_indexes` (`indexname` + `indexdef` completo),
+  `pg_constraint`, `pg_class.relrowsecurity`/`relforcerowsecurity` y `pg_policies`, sobre
+  `recipes`, `recipe_lines` y `companies`.
+
+**Caso 1 — los dos retratos.** Se toma el retrato, se ejecuta el `down.sql` entero dentro de la
+transacción, se toma el segundo y se comparan fuera de ella. Afirma, todo contra el catálogo:
+
+- **columna fuera**: no queda ninguna `company_id`, y el retrato de después es **exactamente** el
+  de antes menos esa línea — así ninguna otra columna puede cambiar de tipo, de nulabilidad ni de
+  posición sin que el caso lo diga;
+- **`recipes_name_unique` restaurado, global Y PARCIAL**: su `indexdef` trae `CREATE UNIQUE INDEX`,
+  `(name_normalized)` y `WHERE (deleted_at IS NULL)`; `recipes_company_name_unique` ya no está, y
+  **el resto de índices queda intacto definición a definición**;
+- **constraint fuera**: el retrato de restricciones es el de antes menos `recipes_company_id_fkey`,
+  y no queda ninguna que mencione la empresa;
+- **`ENABLE` + `FORCE` en las dos tablas** (más `companies`, que el DOWN desfuerza temporalmente):
+  `['companies | true | true', 'recipe_lines | true | true', 'recipes | true | true']`, idéntico al
+  de antes, y **cero policies** en los dos retratos.
+
+**Caso 2 — el DDL es transaccional y el ROLLBACK no deja basura.** Retrato con `prisma` **antes** de
+abrir la transacción, se ejecuta el DOWN dentro, se comprueba que **dentro** el esquema sí cambió
+—si no, el caso pasaría con un DOWN que no hiciera nada— y, tras el ROLLBACK, el retrato vuelve a
+leerse con `prisma` y se exige `toEqual` con el de partida. Si un `expect` fallara a mitad, el error
+sale de la transacción y ésta también revierte: no hay camino que deje esquema tocado.
+
+**Caso 3 — anti-placebo permanente.** Con el `CREATE UNIQUE INDEX` quitado del texto **en memoria**
+(nunca del archivo), el DOWN deja la tabla sin `recipes_name_unique` **y** sin
+`recipes_company_name_unique`: sin ninguna garantía de unicidad de nombre.
+
+#### La prueba de falsabilidad, ejecutada
+
+El caso 1 se mutó **dos veces** apuntándolo a un `down.sql` roto en memoria, y se puso **ROJO** las
+dos. Después se restauró el archivo y se volvió a correr en verde.
+
+```
+# mutacion A — el DOWN no restaura el indice global
+AssertionError: el DOWN no restauro recipes_name_unique: expected undefined to be defined
+ ❯ tests/integration/recetas/company-scope.int.test.ts:850
+      Tests  1 failed | 14 passed (15)
+
+# mutacion B — el DOWN no quita la columna
+AssertionError: expected [ 'company_id | uuid | NO' ] to have a length of +0 but got 1
+      Tests  1 failed | 14 passed (15)
+```
+
+### Verificación de esta tanda
+
+El gate completo sigue siendo del leader (**T28**, la única task abierta). Aquí, lo que la regla
+deja al implementer:
+
+```
+$ pnpm run typecheck
+> tsc --noEmit
+(sin salida — cero errores)
+
+$ pnpm run lint
+> eslint
+(sin salida — cero errores)
+
+$ pnpm exec vitest run --project=integration \
+    tests/integration/recetas/company-scope.int.test.ts \
+    tests/integration/inventario/list-query-indexes.int.test.ts
+ Test Files  2 passed (2)
+      Tests  32 passed (32)
+
+$ pnpm exec vitest related --run <los dos archivos>
+ Test Files  2 passed (2)
+      Tests  32 passed (32)
+
+$ pnpm exec vitest run tests/guards/guard-aislamiento-integracion.test.ts
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+```
+
+`company-scope.int.test.ts` pasa de 12 a **15 casos**; el censo de `tests/integration/aislamiento.json`
+no cambia: el archivo sigue siendo de aislamiento por **transacción**.
+
+**Los 5 rojos ajenos** de `product-page.test.tsx`, `supplier-page.test.tsx` y `recipe-page.test.tsx`
+siguen sin tocarse, sin `skip` y fuera de `tests/baseline-rojos.json`.
+
+### El mapa `R<n> -> test`, en las filas que cambian
+
+- **R6** — `recipes-company-scope-migration.test.ts` (texto del SQL) **+
+  `company-scope.int.test.ts`, describe «R6 — ejecutar el down.sql entero»**: el `down.sql`
+  ejecutado entero contra Postgres y los dos retratos comparados contra `pg_indexes` e
+  `information_schema`. El criterio de hecho de T3 («esquema idéntico verificado contra `pg_indexes`
+  e `information_schema`») pasa de cubrirlo una corrida **manual** a cubrirlo un **test**.
+- **R9, R10** — `list-query-indexes.int.test.ts`: el caso ya existía y mordía; ahora lo dice su
+  título.
+
+**T28 (`./init.sh` completo, del leader) es lo único abierto.**
