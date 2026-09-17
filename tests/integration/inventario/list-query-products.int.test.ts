@@ -70,7 +70,6 @@ function consulta(partial: Partial<ListQuery> = {}): ListQuery {
 
 type Semilla = {
   readonly name: string;
-  readonly stock?: number | null;
   readonly qtyAlert?: number | null;
   readonly createdAt?: Date;
   readonly deletedAt?: Date | null;
@@ -83,7 +82,6 @@ async function sembrar(semillas: readonly Semilla[]): Promise<readonly string[]>
       data: {
         name: semilla.name,
         nameNormalized: normalizeProductName(semilla.name),
-        stock: semilla.stock ?? null,
         qtyAlert: semilla.qtyAlert ?? null,
         deletedAt: semilla.deletedAt ?? null,
         companyId: empresaDelArchivo,
@@ -379,7 +377,7 @@ describe('QC-80 — el listado devuelve la unidad derivada del lote mas reciente
     // El lote viejo se inserta el ultimo: si el adaptador ordenara por insercion, o se olvidara
     // del `orderBy`, este caso lo diria.
     const marca = `Derivada ${token()}`;
-    const [productId] = await sembrar([{ name: `${marca} con lotes`, stock: 5 }]);
+    const [productId] = await sembrar([{ name: `${marca} con lotes` }]);
     if (productId === undefined) throw new Error('el producto de apoyo no se sembro');
 
     const unidadVieja = await sembrarUnidad();
@@ -400,7 +398,7 @@ describe('QC-80 — el listado devuelve la unidad derivada del lote mas reciente
 
   it('un producto SIN ningun lote devuelve null, y no desaparece del listado (R23)', async () => {
     const marca = `Sin lotes ${token()}`;
-    await sembrar([{ name: `${marca} recien dado de alta`, stock: null }]);
+    await sembrar([{ name: `${marca} recien dado de alta` }]);
 
     const pagina = await listAliveProducts(consulta({ pageSize: 25, search: marca }), ambito());
 
@@ -412,7 +410,7 @@ describe('QC-80 — el listado devuelve la unidad derivada del lote mas reciente
 describe('QC-91 — el listado agrega la existencia por unidad (R1, R2, R3)', () => {
   it('un producto con dos lotes en dos unidades devuelve las dos existencias', async () => {
     const marca = `Existencia por unidad ${token()}`;
-    const [productId] = await sembrar([{ name: `${marca} con lotes`, stock: null }]);
+    const [productId] = await sembrar([{ name: `${marca} con lotes` }]);
     if (productId === undefined) throw new Error('el producto de apoyo no se sembro');
 
     const unidadA = await sembrarUnidad();

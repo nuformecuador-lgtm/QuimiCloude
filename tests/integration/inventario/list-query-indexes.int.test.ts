@@ -100,11 +100,14 @@ const SEARCH_INDEXES = [
   'units_name_normalized_trgm_idx',
 ] as const
 
-/** Los de las cinco tablas con borrado logico: PARCIALES (R7). */
+/** Los de las cinco tablas con borrado logico: PARCIALES (R7).
+ *
+ * `products_stock_idx` estuvo aqui hasta el 2026-09-17: cayo con su columna en
+ * `db/migrations/20260917120000_drop_product_stock` (QC-91 R2), y con ella `stock` salio de
+ * `PRODUCT_QUERYABLE.sortable`/`.filterable`, asi que ya no hay orden ni filtro que servir. */
 const PARTIAL_INDEXES = [
   'products_name_normalized_trgm_idx',
   'products_name_idx',
-  'products_stock_idx',
   'products_qty_alert_idx',
   'products_created_at_idx',
   'products_updated_at_idx',
@@ -237,12 +240,18 @@ describe('QC-57 — la migracion en la base (R21, R23)', () => {
     expect(rows).toHaveLength(1)
   })
 
-  it('los 34 indices nuevos existen, cada uno con su nombre exacto', async () => {
+  it('los 33 indices nuevos existen, cada uno con su nombre exacto', async () => {
     const indexes = await readIndexes()
-    // 34 desde el 2026-09-07: eran 35 hasta que `orders_unit_price_idx` cayo con su columna.
-    expect(ALL_INDEXES).toHaveLength(34)
+    // 33 desde el 2026-09-17: eran 34 hasta que `products_stock_idx` cayo con su columna
+    // (QC-91 R2), y 35 hasta que `orders_unit_price_idx` cayo con la suya.
+    expect(ALL_INDEXES).toHaveLength(33)
     const faltan = ALL_INDEXES.filter((name) => !indexes.has(name))
     expect(faltan, `indices que la base no tiene: ${faltan.join(', ')}`).toEqual([])
+  })
+
+  it('R2: products_stock_idx ya no existe', async () => {
+    const indexes = await readIndexes()
+    expect(indexes.has('products_stock_idx')).toBe(false)
   })
 
   it('los seis de busqueda son GIN de trigramas sobre name_normalized', async () => {
@@ -447,7 +456,7 @@ describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion 
     let ids: string[] = []
     try {
       const nombre = `Sosa caustica ${token()}`
-      const data = { name: nombre, stock: null, qtyAlert: null, unitId: null }
+      const data = { name: nombre, qtyAlert: null }
 
       const primero = await createProduct(data, new Date('2026-01-01T00:00:00Z'), ambito())
       const segundo = await createProduct(

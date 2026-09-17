@@ -126,13 +126,12 @@ async function sembrarEmpresa(etiqueta: string): Promise<Empresa> {
 async function sembrarProducto(
   empresa: Empresa,
   name: string,
-  extras: { readonly stock?: number | null; readonly qtyAlert?: number | null } = {},
+  extras: { readonly qtyAlert?: number | null } = {},
 ): Promise<string> {
   const { id } = await prisma.product.create({
     data: {
       name,
       nameNormalized: normalizeProductName(name),
-      stock: extras.stock ?? null,
       qtyAlert: extras.qtyAlert ?? null,
       companyId: empresa.companyId,
     },
@@ -204,13 +203,13 @@ beforeAll(async () => {
   B = await sembrarEmpresa('B');
 
   // Recuentos distintos en A y B para que un `total` con filas ajenas no coincida por casualidad.
-  await sembrarProducto(A, `${MARCA} Producto A uno`, { stock: 10, qtyAlert: 1 });
-  await sembrarProducto(A, `${MARCA} Producto A dos`, { stock: 20, qtyAlert: 2 });
-  await sembrarProducto(A, `${MARCA} Producto A tres`, { stock: 30, qtyAlert: 3 });
-  await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B uno`, { stock: 910, qtyAlert: 91 });
-  await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B dos`, { stock: 920, qtyAlert: 92 });
-  await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B tres`, { stock: 930, qtyAlert: 93 });
-  await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B cuatro`, { stock: 940, qtyAlert: 94 });
+  await sembrarProducto(A, `${MARCA} Producto A uno`, { qtyAlert: 1 });
+  await sembrarProducto(A, `${MARCA} Producto A dos`, { qtyAlert: 2 });
+  await sembrarProducto(A, `${MARCA} Producto A tres`, { qtyAlert: 3 });
+  await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B uno`, { qtyAlert: 91 });
+  await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B dos`, { qtyAlert: 92 });
+  await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B tres`, { qtyAlert: 93 });
+  await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B cuatro`, { qtyAlert: 94 });
 
   // Un borrado en A, para comprobar que el ambito no sustituye a `deleted_at IS NULL`.
   const borrado = await sembrarProducto(A, `${MARCA} Producto A borrado`);

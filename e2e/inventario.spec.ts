@@ -586,7 +586,7 @@ test.describe('catalogo de productos', () => {
 
     const antes = await prisma.product.findMany({
       where: { name: repeatProductName, deletedAt: null },
-      select: { id: true, name: true, stock: true, qtyAlert: true },
+      select: { id: true, name: true, qtyAlert: true },
     });
     expect(antes, 'la primera alta deberia dejar un unico producto').toHaveLength(1);
 
@@ -605,7 +605,7 @@ test.describe('catalogo de productos', () => {
     // --- 3. Sigue habiendo UN solo producto con ese nombre, y es el mismo de antes (R17).
     const despues = await prisma.product.findMany({
       where: { name: repeatProductName, deletedAt: null },
-      select: { id: true, name: true, stock: true, qtyAlert: true },
+      select: { id: true, name: true, qtyAlert: true },
     });
 
     expect(despues, 'la segunda alta NO debe crear otro producto').toHaveLength(1);

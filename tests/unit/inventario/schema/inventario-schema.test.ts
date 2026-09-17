@@ -165,15 +165,14 @@ function expectUnitCatalogIsNotAnEnum(): void {
 /** Los datos de negocio del producto, con su columna en la base. */
 const PRODUCT_BUSINESS_FIELDS: ReadonlyArray<readonly [string, string]> = [
   ['name', 'name'],
-  ['stock', 'stock'],
   ['qtyAlert', 'qty_alert'],
   ['imagePath', 'image_path'],
 ]
 
-const INTEGER_FIELDS = ['stock', 'qtyAlert'] as const
+const INTEGER_FIELDS = ['qtyAlert'] as const
 
 /** Opcionales: la ausencia de valor no puede convertirse en cero ni en cadena vacia. */
-const OPTIONAL_FIELDS = ['stock', 'qtyAlert', 'imagePath'] as const
+const OPTIONAL_FIELDS = ['qtyAlert', 'imagePath'] as const
 
 describe('db/schema.prisma — modelo de producto y presentacion', () => {
   it('Presentation declara id uuid propio y name obligatorio', () => {
@@ -257,11 +256,17 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(schema).not.toMatch(/@@map\("(inventory|inventory_items|stock_items|items)"\)/)
   })
 
+  it('R2, R11: Product ya no declara stock', () => {
+    expect(has(product, 'stock'), 'Product.stock se quito con la migracion (R2, R11)').toBe(false)
+    expect(product.body).not.toMatch(/^\s*stock\s+Int/m)
+    expect(product.body).not.toMatch(/products_stock_idx|products_stock_non_negative/)
+  })
+
   it('R7: Product declara sus datos de negocio en una sola tabla, y ya no declara unidad', () => {
     for (const [name] of PRODUCT_BUSINESS_FIELDS) {
       expect(has(product, name), `falta el campo Product.${name}`).toBe(true)
     }
-    expect(PRODUCT_BUSINESS_FIELDS).toHaveLength(4)
+    expect(PRODUCT_BUSINESS_FIELDS).toHaveLength(3)
 
     // Son terminos comerciales del proveedor: se vetan aparte para que no vuelvan por descuido.
     for (const name of ['cost', 'minPurchase', 'deliveryTime']) {
@@ -374,7 +379,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(candidate.type).toBe('String')
   })
 
-  it('R7: stock, qtyAlert e imagePath son opcionales, y unitId ya no esta entre ellos', () => {
+  it('R7: qtyAlert e imagePath son opcionales, y unitId ya no esta entre ellos', () => {
     // Un `@default` convertiria la ausencia en un valor sin que nadie lo note.
     for (const name of OPTIONAL_FIELDS) {
       const candidate = field(product, name)
@@ -383,7 +388,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
         /@default\(/,
       )
     }
-    expect(OPTIONAL_FIELDS).toHaveLength(3)
+    expect(OPTIONAL_FIELDS).toHaveLength(2)
     // `unitId` se afirma aparte para que no vuelva como opcional sin discutirlo.
     expect(OPTIONAL_FIELDS as readonly string[]).not.toContain('unitId')
   })
@@ -399,7 +404,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(imagePath.attributes).not.toMatch(/@db\./)
   })
 
-  it('stock y qtyAlert son Int', () => {
+  it('qtyAlert es Int', () => {
     for (const name of INTEGER_FIELDS) {
       const candidate = field(product, name)
       expect(candidate.type, `Product.${name} debe ser Int`).toBe('Int')
@@ -407,7 +412,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
         /@db\.(Decimal|Money|Real|DoublePrecision)/,
       )
     }
-    expect(INTEGER_FIELDS).toHaveLength(2)
+    expect(INTEGER_FIELDS).toHaveLength(1)
   })
 
   it('en el esquema no hay ningun Float, y el producto ya no declara ningun importe', () => {

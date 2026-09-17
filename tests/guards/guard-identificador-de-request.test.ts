@@ -156,6 +156,8 @@ export const MIGRACIONES_ESPERADAS = [
   // persiste el identificador de peticion ni lo menciona; se nombra aqui a mano y la lista sigue
   // CERRADA para la siguiente.
   '20260915120000_orders_company_scope',
+  // Igual patron: quita una columna de negocio, no toca el identificador de peticion.
+  '20260917120000_drop_product_stock',
 ] as const
 
 export function hallazgosDeMigraciones(

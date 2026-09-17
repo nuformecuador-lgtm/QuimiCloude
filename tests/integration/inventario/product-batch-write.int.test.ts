@@ -429,7 +429,7 @@ describe('R21: producto y primer lote se escriben en una sola transaccion', () =
 });
 
 describe('R18: agregar un lote no toca el producto', () => {
-  it('deja name, stock, qty_alert y updated_at del producto intactos', async () => {
+  it('deja name, qty_alert y updated_at del producto intactos', async () => {
     const fixture = await createFixture();
     const productIds: string[] = [];
 
@@ -454,7 +454,6 @@ describe('R18: agregar un lote no toca el producto', () => {
 
       const despues = await prisma.product.findUniqueOrThrow({ where: { id: primero.id } });
       expect(despues.name).toBe(antes.name);
-      expect(despues.stock).toBe(antes.stock);
       expect(despues.qtyAlert).toBe(antes.qtyAlert);
       // La fila entera, para cubrir tambien las columnas que se anadan despues.
       expect(despues).toEqual(antes);
