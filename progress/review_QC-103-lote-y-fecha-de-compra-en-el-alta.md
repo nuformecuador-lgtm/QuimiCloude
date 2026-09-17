@@ -486,3 +486,127 @@ rama repite la version vieja de R3.
 
 **No hace falta volver a tocar nada de la logica**: backend, UI, aviso, E2E y trazabilidad estan
 bien, y los dos bloqueantes se cierran sin modificar una sola linea de codigo ejecutable.
+
+---
+
+# TERCERA VUELTA — 2026-09-17
+
+> Acotada: solo el cierre de B3 y B4, mas las dos reconsideraciones pedidas (m5, m3).
+> HEAD `f2b5306`, seis commits por encima del `6f536b1` que revise en la segunda vuelta.
+> **No repeti `./init.sh`**: el leader lo dejo verde sobre `f2b5306` (0 rojos, 252 s).
+
+## Veredicto: APROBADA
+
+Sin condiciones. Los dos bloqueantes estan cerrados, comprobados por mi sobre el diff y sobre el
+disco, no sobre la bitacora.
+
+## B3 — CERRADO
+
+Rehice la busqueda yo, con el mismo criterio que la abrio: lineas **anadidas** por la rama
+(`origin/dev...HEAD`) en `app/`, `lib/`, `components/`, `hooks/`, `db/` y `middleware.ts`,
+filtrando por cita de ficha, de requisito, de `design.md` o de «decision cerrada».
+
+**Resultado: 0 aciertos.** Eran 30. Comprobado archivo por archivo en
+`git diff 6f536b1..HEAD`:
+
+- `product-batch-date-field.tsx` — docblock de cabecera, `today()`, las dos props y el comentario
+  JSX del campo espejo: reescritos conservando el porque y sin una sola cita. El de `type="hidden"`
+  quedo mejor que antes: dice por que no es `sr-only` sin apoyarse en `[D9]`/R8.
+- `product-form.tsx` — las 19 lineas limpias, incluidas las cuatro que la rama habia reescrito a
+  medias en la primera vuelta (las que perdieron el `QC-71` pero se quedaron el `(R17)` y el
+  `(R16, R18)`). Cuatro comentarios desaparecieron enteros por no aportar nada sin la cita, que
+  es exactamente lo que la regla pide.
+- `product-sheet.tsx` — los dos comentarios reescritos; el de `createSuccessMessage` mantiene el
+  porque que importa (el texto es neutro porque el lote puede venir tecleado a mano).
+- `ports/product-repository.ts` — los dos parrafos reescritos.
+
+Las citas que **quedan** en esos archivos (`R24`, `R27`, `R31`, `design.md > 6 bis`, `QC-20`,
+`QC-90`, `QC-49`) estan todas en lineas de contexto que la rama no toca: preexistentes, se
+limpian por modulo en fichas del board, y la propia regla las excluye.
+
+Verificado ademas que la limpieza **no cambio codigo**: el diff `6f536b1..HEAD` sobre `app/`,
+`lib/` y `components/` es solo comentario, incluidos los dos bloques JSX. Y fue en commits
+`chore(...)` separados del cambio real, como la seccion pide.
+
+## B4 — CERRADO
+
+El comentario falso de `product-form.tsx` esta **borrado**, no reescrito (`25f9e81`), y la linea
+`purchaseDate: readOptionalText(values.purchaseDate)` se queda sola. Es la mejor de las dos
+salidas que propuse: no hay ningun comentario nuevo que pueda volver a envejecer mal, y el que
+manda sobre esa decision es `requirements.md` (R3 + D10), que es donde la enmienda vive.
+
+Comprobe ademas que **ningun otro comentario de la rama repite la version vieja de R3**: el de
+`product-page.test.tsx:1441`, reescrito en `4d42d51`, dice justo lo enmendado («si la fecha no
+llega a la Server Action, el servidor la sustituye por hoy, lo cual no es un rechazo») y ya sin
+la cita a QC-81, con lo que de paso cierra m4.
+
+## m7 — CERRADO
+
+`tasks.md` no tiene ninguna task sin marcar: T12 pasa a `[x]` con el gate verde. Cumple
+`CHECKPOINTS.md > Especificacion`.
+
+## Reconsideraciones
+
+### m5 — RETIRADO. Lo tenia mal.
+
+Lo medi otra vez y el coordinador tiene razon: los dos reexportes **no son codigo muerto**.
+`product-batch-date-field.tsx:36` lo consume `product-form.tsx:29`, y
+`data-table-filter-date.tsx:16` lo consumen `tests/unit/shared/data-table-filter-date.test.tsx:10`,
+`tests/unit/shared/data-table-viewport.test.tsx:10` y `tests/unit/inventario/product-page.test.tsx:9`
+— cuatro importadores reales, no cero. Borrarlos rompe compilacion.
+
+Lo que yo llamaba «puente sin funcion» era, en realidad, **pedir que se migraran esos cuatro
+importadores** a `@/lib/shared/ui/date-civil`. Eso es un refactor con criterio propio, no una
+limpieza, y no lo respalda ninguna regla de `docs/`: la de dependencias ya se cumple por las dos
+vias. Un reviewer no rechaza —ni deja anotado como deuda— un diseno legitimo solo porque el
+habria elegido otro. **Retirado, sin sustituto.**
+
+Lo unico que sobrevive de aquel hallazgo, y como nota sin accion: el docblock de
+`product-batch-date-field.tsx:32-35` sigue diciendo que el componente es «su dueño real» de
+`formatDateLocalISO`, cuando desde `cab1fa8` el dueno es `lib/shared/ui/date-civil.ts`. Es
+impreciso, no falso —es el dueno del reexport que `product-form.tsx` consume— y no justifica otra
+vuelta.
+
+### m3 — SE MANTIENE como menor, con su regla, y NO bloquea.
+
+`tests/unit/inventario/create-product.test.ts:180`: el `describe` nuevo se llama «QC-103 — el
+lote asignado viaja de vuelta con el resultado del alta». La regla existe y es doble:
+`tasks.md` de esta misma ficha abre diciendo «los nombres de test citan `R<n>`, nunca `QC-nn`
+(regla del harness)», y `docs/conventions.md > Comentarios` dice que en tests «`R<n>` **si** va en
+el nombre del caso, porque es el enlace de trazabilidad» — el enlace es el requisito, no la ficha.
+
+Es el unico bloque de tests nuevo de la rama que no nombra su requisito en el `describe` (sus dos
+`it` tampoco: «con el lote generado...», «con el lote tecleado a mano...»). La trazabilidad no se
+pierde —la bitacora y mi tabla lo atan a R12/R13 por linea— pero se apoya en un documento externo
+en vez de en el propio nombre.
+
+**No bloquea**: el repo tiene precedentes en ambos sentidos (`describe('QC-49 R18 — ...')` convive
+con `describe('R24 — ...')`), la guardia no existe todavia (QC-115) y la trazabilidad esta
+cubierta. Queda anotado para que quien lo lea sepa que fue visto y decidido, no pasado por alto:
+un `describe('R12, R13 — el lote asignado viaja de vuelta...')` lo cerraria en una linea si se
+toca ese archivo por otro motivo.
+
+### m6 — se mantiene como menor, no bloquea
+
+Sin cambios respecto a la segunda vuelta: `product-page.test.tsx:9` importa por ruta profunda de
+`data-table`. El guard excluye `tests/` a proposito y el gate esta verde.
+
+## Estado final del expediente
+
+| Hallazgo | Vuelta | Estado |
+| --- | --- | --- |
+| B1 (citas de ficha en produccion y E2E) | 1.a | CERRADO |
+| B2 (R3 sin decision humana) | 1.a | CERRADO por la enmienda D10, fechada y fiel al codigo |
+| m1 (QC-71 en `product-form.tsx`) | 1.a | CERRADO |
+| m2 (`docs/conventions.md` sin seccion de Comentarios) | 1.a | Fuera de esta ficha, cerrado en `dev` |
+| B3 (citas de requisito en produccion) | 2.a | CERRADO |
+| B4 (comentario falso sobre el esquema) | 2.a | CERRADO |
+| m3 (ficha en un `describe`) | 2.a | Se mantiene, menor, no bloquea |
+| m4 (cita a QC-81 en un comentario de test) | 2.a | CERRADO |
+| m5 (reexportes «sin funcion») | 2.a | **RETIRADO**: estaba mal medido |
+| m6 (ruta profunda a `data-table` en un test) | 2.a | Se mantiene, menor, no bloquea |
+| m7 (T12 sin marcar) | 2.a | CERRADO |
+
+**Bloqueantes abiertos: 0.** Trazabilidad 17/17 con `archivo:linea`, E2E que ata pantalla y base,
+ninguna dependencia nueva, ninguna migracion, permiso validado en el service, UI multiplataforma
+verificada, gate completo verde. **APROBADA.**

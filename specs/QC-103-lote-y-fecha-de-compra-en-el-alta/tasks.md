@@ -98,7 +98,7 @@ corre una sola vez al final, antes del PR (regla 5 de `CLAUDE.md`).
       **Hecho cuando**: cada `R<n>` de `requirements.md` aparece con al menos un test concreto en
       el mapa.
 
-- [ ] **T12.** Depende de T11. Correr `./init.sh` completo (no `--rapido`) antes de abrir el PR.
+- [x] **T12.** Depende de T11. Correr `./init.sh` completo (no `--rapido`) antes de abrir el PR.
       **Hecho cuando**: termina en verde, incluidas las guardias de arquitectura y de dependencias
       (que deben quedar en verde sin cambios en `docs/dependencias.md`, porque no entra ninguna
       dependencia nueva).
