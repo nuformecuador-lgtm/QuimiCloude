@@ -1439,9 +1439,9 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
   });
 
   it('el panel de alta nunca permite enviar sin fecha de compra escrita (R3)', async () => {
-    // R3 exige que el panel nunca permita un envio sin fecha de compra -el campo no admite
-    // quedar vacio-; si la fecha no llega a la Server Action, el servidor la sustituye por hoy
-    // (heredado de QC-81), lo cual no es un rechazo.
+    // El panel nunca permite un envio sin fecha de compra: el campo no admite quedar vacio. Si la
+    // fecha no llega a la Server Action, el servidor la sustituye por hoy, lo cual no es un
+    // rechazo.
     const user = setupUser();
 
     await renderPantalla();
