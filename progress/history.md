@@ -3774,3 +3774,43 @@ y QC-111.
   afirmaba algo global protegiendo un alcance local, la herencia de modelo que costó más de un
   millón de tokens de Opus, y la regla de «no citar fichas en comentarios» que **no está escrita en
   ningún documento** pero rechaza trabajo.
+
+## QC-103 — lote-y-fecha-de-compra-en-el-alta (cerrada el 2026-09-17)
+
+**PR #80**, merge `433bad2`. Zona `fullstack`, `complexity: medium`. Épica *Inventario*.
+
+La pantalla que **QC-81 dejó fuera a propósito** para no cruzar de zona: el alta de producto gana el
+campo de **fecha de compra** del primer lote y **nombra el lote asignado** en el aviso de éxito.
+Hereda el **E2E que QC-81 difirió expresamente** hasta aquí, que `CHECKPOINTS.md` exige por ser un
+movimiento de inventario.
+
+**Resultado**: R1-R17, 12 tasks, trazabilidad **17/17**. `./init.sh` completo verde sobre el árbol
+final (495 archivos, 7191 passed, 0 rojos). Sin dependencias nuevas y sin migración.
+
+**La ficha cambió de tamaño al acotarla**, y ese fue su acierto: nació `frontend` y salió
+`fullstack`, porque se verificó en disco que «mostrar el lote asignado» **no era alcanzable desde la
+pantalla** —`createProduct` devolvía solo `{ id }`—. Después, en F1.2, se atrapó en vuelo que el
+spec decía devolver el **identificador** del lote cuando lo que hay que mostrar es el **valor**:
+corregido antes de que `design.md` se escribiera encima.
+
+**Enmienda D10 a R3** (aprobada el 2026-09-17): la obligatoriedad de la fecha de compra se cumple
+**solo en la superficie del panel**, no en el esquema —`purchaseDate` es `.nullish()` y la ausencia
+se resuelve como «hoy» en el servidor—. Se aceptó a conciencia, por escrito, en vez de resolverse
+en silencio dentro de un test, que es como la primera review la encontró.
+
+**Tres vueltas de review, y lo que justifican**: la 2ª encontró **un comentario de producción que
+afirmaba lo contrario de lo que hace el código** —que el esquema rechaza la fecha ausente— y que
+sobre esa premisa falsa justificaba una decisión de diseño. Se borró. La 3ª aprobó, y el propio
+reviewer **retiró un hallazgo suyo** (m5) al comprobarse que los reexportes que daba por muertos
+tenían cuatro importadores reales.
+
+**Consolidación**: nace `lib/shared/ui/date-civil.ts` con la única definición de
+`formatDateLocalISO`/`parseDateLocalISO`, antes duplicadas. Vive ahí porque es lo único que la regla
+de dependencias deja importar desde `components/**`; **no toca el barrel de `data-table`**.
+
+**Lección del arnés, ya cerrada**: el bloqueante B3 lo fundó `docs/conventions.md > Comentarios`,
+que ese día vivía **solo en `dev` local sin pushear**. Al empujar `dev` se descubrió que estaba
+además **33 commits por detrás** del remoto. Se integró y se empujó (`551a33a`).
+
+Menores declarados que no bloquearon: una cita de ficha en el nombre de un `describe` y una
+importación por ruta profunda superviviente en un test.
