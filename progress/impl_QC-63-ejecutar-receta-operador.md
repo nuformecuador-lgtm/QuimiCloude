@@ -13,7 +13,7 @@
 | 2 | B — caso de uso y seguridad | T4–T10 | **hecha** |
 | 3 | C — pantalla | T11–T16 | **hecha**; guardia de QC-76 **retirada** por decisión del humano |
 | 4 | D — enmienda a QC-88 | T17–T22 | **hecha**, T21 verificada dos veces |
-| 5 | E — cierre | T23, T24 | pendiente |
+| 5 | E — cierre | T23, T24 | **NO LANZADA**: QC-50 invalida la premisa de T2 (ver abajo) |
 
 ---
 
@@ -555,3 +555,67 @@ Test Files  9 passed (9)
 **Sin cuarta reincidencia de comentarios**: `assigned-order-enter-trigger.tsx` e `index.ts` están
 limpios de citas, y el comentario **falso** que decía «la pantalla de destino todavía no existe, así
 que este enlace responde 404» quedó eliminado — hoy la pantalla existe.
+
+---
+
+## PARADA ANTES DEL BLOQUE E — QC-50 invalida la premisa de T2
+
+**Verificado contra `origin/dev` actualizado (16 commits por delante), no supuesto.** No se ha
+tocado ni una línea de código por esto, y **el Bloque E no se ha lanzado**: escribir el E2E de T23
+ahora sería escribirlo contra un mundo que ya no existe.
+
+### Lo que cambió bajo los pies
+**QC-50 está mergeada en `dev` y pagó la deuda que esta ficha daba por abierta.**
+
+| Lo que `design.md > 2.1` afirma (y era cierto al escribirlo) | Lo que dice `origin/dev` HOY |
+| --- | --- |
+| «`recipes` y `recipe_lines` **NO tienen `company_id`**» | `db/schema.prisma`, modelo `Recipe`: **`companyId String @map("company_id") @db.Uuid`** |
+| «deuda abierta de la épica QC-46 (recetas = QC-50, todavía en la lista)» | **QC-50 mergeada** (`63befce`), con migración `20260916120000_recipes_company_scope` y su `down.sql` |
+| `RecipeCatalog.findRefsIncludingDeleted(ids)` | **`findRefsIncludingDeleted(ids, companyId)`** |
+
+La cabecera nueva de `RecipeCatalog` en `dev` lo dice sin ambigüedad:
+
+> «La firma **exige el ámbito para que una llamada que lo omita no compile**.»
+
+### Qué queda en falso en esta rama
+`lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts`:
+
+```ts
+export async function findRecipeExecutionContentById(id: RecipeId) {
+  const row = await prisma.recipe.findUnique({ where: { id }, ... });
+```
+
+**Sin ámbito de empresa de ninguna clase.** Y `tasks.md > T2` lo pedía así **explícitamente**
+(«**Sin `companyId` en la firma**»), con el porqué escrito en `design.md > 2.1` — un porqué que
+**hoy es falso**.
+
+### Por qué esto NO es un parche de compilación
+`dev` trae `tests/guards/guard-ambito-empresa-recetas.test.ts` (**673 líneas, nueva**). No se
+conforma con que el archivo importe el ámbito: exige, por método, (1) que **declare** el ámbito
+(`scope: RecipeScope` en el repositorio, `companyId: string` en el catálogo) y (2) que ese valor
+**llegue de verdad** hasta una envoltura del punto único `./company-scope`. Su propia cabecera
+explica que una guardia por archivo «no muerde» justo por esto.
+
+`findRecipeExecutionContentById` **no declara ámbito y no lo hace llegar a ninguna envoltura**. Tras
+la sincronización con `dev`, esa guardia cae sobre este método.
+
+### Lo que NO es: no hay agujero explotable hoy
+La receta **no se pide por un identificador de la entrada**, sino por el `recipeId` de un pedido
+**ya leído y ya filtrado por la empresa del actor** (`design.md > 2.1`, y así está implementado en
+`get-assigned-order-execution.ts`). Llegar a una receta ajena por esta pantalla exigiría tener
+asignado un pedido de otra empresa, que es justo lo que R6/R7 impiden. **El problema es de doctrina
+y de defensa en profundidad, no una fuga en producción** — pero la doctrina de QC-50 es
+deliberada: que una llamada sin ámbito **no compile**.
+
+### Las salidas, y decide el humano
+- **(a) alinear con QC-50** — `findExecutionContentById(id, companyId)`, y el caso de uso le pasa
+  `actor.companyId`, que ya tiene a mano. Toca T2 (hecha), su adaptador, sus tests, el llamante en
+  T5, y **corregir `design.md > 2.1` y `> 3.3` y `tasks.md > T2`**, cuyo motivo caducó. Es coherente
+  con la doctrina nueva y con `findRefsIncludingDeleted(ids, companyId)`.
+- **(b) dejarlo sin ámbito** — hay que justificar por qué **este** método es la excepción de las
+  seis lecturas de receta del repo, y previsiblemente **enfrentarse a la guardia de QC-50** o
+  declararle una excepción, que es aflojarla.
+
+**No se toca nada hasta que el humano decida.** La sincronización formal con `dev` (F2.3) es
+posterior al Bloque E según el plan, pero **esta decisión la precede**: T23 siembra recetas en la
+base y `recipes.company_id` es hoy **columna obligatoria**.
