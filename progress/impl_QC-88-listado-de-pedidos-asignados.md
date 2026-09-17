@@ -3,12 +3,11 @@
 > Fase F2.1, worktree `.worktrees/QC-88-listado-de-pedidos-asignados`, rama
 > `feature/QC-88-listado-de-pedidos-asignados`. Spec aprobado por el humano el 2026-09-16.
 >
-> **Esta bitacora esta INCOMPLETA a proposito y NO cierra la feature.** T18 exige el mapa
-> `R1`…`R40` -> test **sin ningun hueco** (`CHECKPOINTS.md > Trazabilidad`), y eso es imposible hoy:
-> 12 de las 18 tasks estan bloqueadas (ver `> Bloqueadas`). Lo que hay aqui es lo ejecutado, con su
-> evidencia real; lo que falta esta nombrado como falta, no omitido.
+> **T18 cierra esta bitacora** (seccion final, `> T18 — Trazabilidad y cierre`): el mapa
+> `R1`…`R40` -> test, **sin ningun hueco**, con la salvedad honesta de un bloqueo de ENTORNO (no
+> de codigo) que impide correr el E2E real de Playwright en este momento — ver esa seccion.
 
-## Estado: 10 de 18 tasks cerradas
+## Estado: 18 de 18 tasks cerradas
 
 | Tanda | Tasks | Commit |
 |---|---|---|
@@ -22,9 +21,17 @@
 | 4 | T8 | `e61fbee` |
 | 4 | T9 | `46bb213` |
 | — | correccion post-gate del leader (guardia QC-87 + design.md) | `a09be8d` |
+| — | anota la correccion en la bitacora | `ac312a9` |
+| 5 | T10+T12+T13 | `0ede341` |
+| 5 | T11 | `4243548` |
+| 5 | T14 (columnas, estados, disparador, params) | `6b83eb8` |
+| 5 | T15 | `bda2a9a` |
+| 5 | T16 | `5981070` |
+| — | marca T10-T16 en tasks.md | `0755608` |
+| 5 | T14 (completado con R32, `a11y-tactil.test.tsx`) | `efa7dab` |
 
-**Quedan 8 tasks abiertas: T10-T16, T18** (la tanda de UI, ruta, menu y E2E — fuera del
-alcance de esta tanda de backend).
+**Las 18 tasks estan cerradas.** Queda un bloqueo de ENTORNO, no de codigo, que impide verificar
+T16 con Playwright real hoy — ver `> T18 > Bloqueo de entorno`.
 
 ### Tanda 2 — T3 (2 archivos)
 
@@ -506,3 +513,203 @@ pnpm exec vitest run tests/guards/guard-qc87-no-reimplementado.test.ts
  Test Files  1 passed (1)
       Tests  12 passed (12)
 ```
+
+---
+
+## Tanda 5 (F2.2) — T10-T16. La tanda de UI, ruta, menu y E2E
+
+`[PA1]`/`[PA2]` ya cerradas desde F1.4. Delegado en `frontend_dev` en tres encargos secuenciales
+sobre el MISMO worktree (una tanda a la vez, por la leccion de coordinacion de arriba): T10+T11
+(ruta y menu), T12+T13+T14 (pantalla y sus tests), T15+T16 (E2E). Cada subagente dejo su trabajo
+**sin commitear**; el implementer reviso cada diff contra `design.md` antes de commitear el
+mismo, y cerro un hueco de trazabilidad (R32) que la delegacion no habia cubierto explicitamente.
+
+### T10+T11+T12+T13 — ruta, menu y pantalla (commits `0ede341`, `4243548`)
+
+- `lib/shared/routes.ts`: `ASSIGNED_ORDERS_ROUTE = '/asignacion'` (decision humana F1.4, sin
+  tilde: es el segmento de la URL), helper `assignedOrderRoute(id)` (R21/R22, hoy 404 porque
+  QC-63 no existe, mismo patron que `recipeEditRoute`), una fila nueva en
+  `PRIVATE_ROUTE_PREFIXES`.
+- `lib/shared/navigation/private-nav.ts`: `ASSIGNED_ORDERS_LABEL = 'Asignación'` (CON tilde: es
+  el texto visible), item de menu con `testId: 'nav-asignacion'` entre Dashboard e Inventario
+  (H3 de `design.md`: cambia el aterrizaje del Operador, no el del Administrador), icono
+  `clipboard-list` reutilizado.
+- `app/(private)/asignacion/`: pagina y ocho componentes (ver `design.md > 8.1`). `page.tsx`
+  exige `asignaciones.consultar` como primera linea; `assigned-orders-list-section.tsx` pide la
+  lista UNA vez con `listAssignedOrdersAction` (ruta exacta, nunca el barrel); tabla compartida
+  de QC-55 con las siete columnas (numero, receta, cantidad, prioridad, estado, responsables,
+  entrar), sin ordenar ni filtrar; `ResponsibleAvatars` reutilizado tal cual desde
+  `components/shared/` (H6: satisface R18/R19 sin pintar una segunda presentacion del nombre de
+  grupo); disparador «entrar» deshabilitado con motivo VISIBLE (`aria-describedby`, nunca
+  `title`) cuando `EN_CURSO`, habilitado hacia `assignedOrderRoute(id)` cuando `PENDIENTE`.
+- Test de contrato de ruta (`assigned-orders-route-contract.test.ts`) calcado de
+  `order-route-contract.test.ts`.
+- `tests/guards/guard-pantallas-exigen-permiso.test.ts` (**arreglado por el implementer, no por
+  el subagente**: el subagente de T15/T16 lo detecto en rojo tras su propia corrida completa de
+  `tests/guards`, fuera de su encargo, y lo dejo senalado sin tocarlo). Tensado de once a doce
+  pantallas privadas, nombrando `/asignacion`.
+- `tests/guards/guard-nav-permisos-declarados.test.ts` y
+  `tests/unit/navegacion/private-layout-menu.test.tsx`: tensados de ocho a nueve enlaces
+  (catalogo de permisos intacto en quince: esta ficha no anade ninguno).
+
+### T14 — tests de componentes (commits `6b83eb8`, `efa7dab`)
+
+Un archivo por bloque (columnas, estados vacio/error/esqueleto, disparador, parametros de lista)
+mas un quinto que el encargo inicial no pedia por nombre y que el implementer anadio para cerrar
+R32 sin hueco: `tests/unit/asignaciones-ui/a11y-tactil.test.tsx`, calcado de
+`tests/unit/pedidos-ui/a11y-tactil.test.tsx` — objetivos tactiles de 44x44 en el disparador (los
+dos estados), en el enlace del vacio y en el boton del error, y el motivo del disparador
+deshabilitado alcanzable sin el puntero.
+
+### T15+T16 — E2E (commits `bda2a9a`, `5981070`)
+
+- `e2e/permisos.spec.ts`: el Operador ahora aterriza en `ASSIGNED_ORDERS_ROUTE` (H3), no en
+  `INVENTORY_ROUTE`. `nav-inventario` sigue visible (el Operador conserva
+  `inventario.consultar`); el 404 sobre `ORDERS_ROUTE` se conserva tal cual.
+  `HIDDEN_NAV_TEST_IDS` NO gana `nav-asignacion` (ahora es visible).
+- `tests/guards/guard-e2e-landing.test.ts`: el TEXTO del motivo de la excepcion YA EXISTENTE
+  para `permisos.spec.ts` se actualiza (misma excepcion, no una nueva) para seguir describiendo
+  con precision que ruta afirma y por que.
+- `e2e/pedidos-asignados.spec.ts` (nuevo): un solo recorrido, prefijo `qc88_e2e_` + `RUN_ID`,
+  entrada por `loginAndLand` (nunca una ruta a mano). Fixture: rol Operador REAL del seed, dos
+  personas, cinco pedidos (`PENDIENTE`, `EN_CURSO`, `ENTREGADO`, `CANCELADO` asignados al actor
+  — los cuatro, para demostrar que los dos finales NO aparecen aunque esten asignados — y un
+  quinto `PENDIENTE` asignado SOLO a otra persona). Verifica aterrizaje, que solo se ven los dos
+  ejecutables, que ni los finales ni el ajeno aparecen, y que el `EN_CURSO` llega con su
+  disparador deshabilitado y su motivo visible.
+- `tests/guards/guard-identificador-de-request.test.ts`: alta mecanica de
+  `pedidos-asignados.spec.ts` en la lista cerrada `E2E_ESPERADOS` (el spec no afirma nada sobre
+  el identificador de peticion, el diferimiento de QC-71 R21 sigue intacto).
+
+### Salida real de lo que se corrio en la Tanda 5
+
+```
+pnpm typecheck -> VERDE (sin salida), repetido tras cada commit
+pnpm lint      -> VERDE (sin salida), repetido tras cada commit
+
+pnpm exec vitest run tests/guards/guard-pantallas-exigen-permiso.test.ts
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+
+pnpm exec vitest run tests/guards
+ Test Files  36 passed (36)
+      Tests  404 passed | 5 skipped (409)
+
+pnpm exec vitest run tests/unit/asignaciones-ui tests/unit/navegacion tests/guards
+ Test Files  46 passed (46)
+      Tests  533 passed | 7 skipped (540)
+
+pnpm exec vitest run tests/unit/asignaciones-ui/a11y-tactil.test.tsx
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+```
+
+### Bloqueo de entorno — Playwright real de T16 no se pudo correr, y no es del codigo
+
+El subagente de T15/T16 intento `pnpm exec playwright test e2e/pedidos-asignados.spec.ts
+--project=chromium` contra el servidor real. El `beforeAll` revento en
+`prisma.recipe.create(...)`:
+
+```
+PrismaClientKnownRequestError: Null constraint violation on the fields: (`company_id`)
+```
+
+**Investigado por el implementer, confirmado real:**
+
+- `db/schema.prisma` de ESTE worktree (modelo `Recipe`) **no tiene** `company_id`, y
+  `db/migrations/` no tiene ninguna migracion `recipes_company_scope`.
+- La Postgres local COMPARTIDA (`QuimiCloude`, la misma que usan todos los worktrees segun
+  `docs/worktrees.md`) **si tiene** `company_id NOT NULL` en `recipes` — verificado con
+  `information_schema.columns`.
+- **La migracion esta aplicada y registrada**: `_prisma_migrations` en esa base contiene
+  `20260916120000_recipes_company_scope`, que no existe en `db/migrations/` de esta rama.
+  `pnpm exec prisma migrate status` dice «Database schema is up to date!» porque esa orden solo
+  comprueba que las migraciones LOCALES esten aplicadas, no que no haya mas aplicadas de las que
+  el branch conoce.
+
+**Conclusion:** otra sesion/worktree (una feature de "recetas con empresa", en paralelo) aplico
+su migracion directamente contra la Postgres COMPARTIDA sin que este branch la tenga todavia.
+Esto **no es un problema de QC-88**: cualquier E2E de este branch que siembre una receta por
+Prisma —incluidos `e2e/pedidos-responsables.spec.ts` y `e2e/aislamiento-pedidos.spec.ts`, ya
+existentes y no tocados por esta ficha— chocaria con el mismo error ahora mismo.
+
+**El implementer NO lo resuelve inyectando `companyId` a mano ni con `$executeRaw`**: el modelo
+Prisma de este worktree no expone ese campo, y parchear la siembra seria enmascarar un drift de
+entorno, no arreglarlo. **Se lo notifica al leader como bloqueo, para que decida** —
+probablemente sincronizar `db/schema.prisma`/`db/migrations/` de esta rama con `dev`, o
+coordinar con la otra sesion antes de que el gate completo (`./init.sh`, que corre Playwright)
+tropiece con lo mismo.
+
+**Lo que SI queda demostrado sin Playwright real:**
+- El codigo de `e2e/pedidos-asignados.spec.ts` pasa `typecheck` y `lint`.
+- Sigue el MISMO patron de fixture que los E2E existentes que si corrian en verde antes de este
+  drift (mismo `seedOrder`, misma limpieza por prefijo+edad, mismo `loginAndLand`).
+- La guardia `guard-e2e-landing.test.ts` confirma que entra por el sitio correcto (no se detecta
+  como definicion local de login ni como ruta fija escrita a mano).
+- Los componentes que el recorrido ejercita (disparador, titulo, tabla) ya estan probados en
+  unidad (T14) con los mismos `data-testid` que el E2E usa para localizarlos.
+
+---
+
+## T18 — Trazabilidad y cierre
+
+### Mapa `R1`…`R40` -> test, COMPLETO
+
+| R | Que exige | Test |
+|---|---|---|
+| R1 | constante unica en `lib/shared/routes.ts`, ningun literal a mano | `assigned-orders-route-contract.test.ts` |
+| R2 | una sola fila en `PRIVATE_ROUTE_PREFIXES` | `assigned-orders-route-contract.test.ts` + `guard-rutas-privadas-cubiertas.test.ts` |
+| R3 | item de menu, `href` derivado, mismo permiso que la pantalla | `assigned-orders-route-contract.test.ts` (compara permiso de pagina e item) + `guard-nav-permisos-declarados.test.ts` |
+| R4 | sin el permiso, 404 generico | `assigned-orders-route-contract.test.ts` (confirma `requirePagePermission('asignaciones.consultar')` como primera linea, por texto) + `tests/unit/identity/require-page-permission.test.ts` (mecanismo generico: sin sesion redirige, sin permiso 404 sin nombrar el modulo) |
+| R5 | `asignaciones.consultar` primera linea, antes de `zod` y de tocar puerto | `tests/unit/asignaciones/list-assigned-orders.test.ts` («R5: exige…») + `authorization.test.ts` («R40: un actor sin…») |
+| R6 | los cuatro actores invalidos se rechazan igual | `list-assigned-orders.test.ts` («R6: los cuatro actores invalidos…») |
+| R7 | toda lectura acotada a la empresa del actor, nunca de la entrada | `tests/integration/asignaciones/assigned-orders.int.test.ts` + `list-assigned-orders.test.ts` («R7 la empresa y la persona salen del ACTOR») |
+| R8 | asignacion de otra empresa no vuelve, indistinguible de inexistente | `assigned-orders.int.test.ts` («R8: la asignacion de OTRA empresa…») |
+| R9 | lectura nueva con `companyId` primero, no compila si se olvida | `tests/unit/asignaciones/order-assignment-repository.test.ts` (caso `@ts-expect-error`) |
+| R10 | una sola sentencia, sin `include`, sin navegar relacion | `order-assignment-repository.test.ts` + `guard-lote-sin-join.test.ts` |
+| R11 | solo PENDIENTE/EN_CURSO, descartados ANTES de paginar | `tests/unit/pedidos/order-catalog.test.ts` (adaptador) + `list-assigned-orders.test.ts` (caso de uso) + tipo `AssignedOrderView.status` acotado (error de compilacion) |
+| R12 | contrato publico no arrastra `next/*`/`@prisma/client`/`'use server'` | `tests/unit/asignaciones/module-contract.test.ts` («el cierre de imports del barril real no arrastra…», ya cubre el barrel real tras el bloque nuevo de T6) + `tests/unit/pedidos/module-contract.test.ts` (equivalente en `pedidos`) |
+| R13 | cableado puerto->implementacion SOLO en `lib/composition` | `tests/unit/composition/asignaciones-facade.test.ts` |
+| R14 | numero de consultas CONSTANTE, no crece con filas ni pageSize | `list-assigned-orders.test.ts` («R14 numero de consultas CONSTANTE») |
+| R15 | orden total y estable | `order-assignment-repository.test.ts` (ids desnudos, orden estable) + `list-assigned-orders.test.ts` (dedupe receta y responsables, orden con `compareResponsibles` reutilizado) |
+| R16 | numero visible via `formatOrderNumber`, nunca a mano | `list-assigned-orders.test.ts` + `assigned-orders-columns.test.tsx` |
+| R17 | receta/estado sin resolver -> marcador, nunca el id | `list-assigned-orders.test.ts` + `assigned-orders-columns.test.tsx` |
+| R18 | avatares con nombre accesible completo, no solo tooltip | `tests/unit/shared-ui/responsible-avatars.test.tsx` (componente promovido, ya probado) + `assigned-orders-columns.test.tsx` (pasa `otherResponsibles` intacto) |
+| R19 | nombre de grupo CONGELADO, nunca re-consultado | `tests/unit/asignaciones/list-responsibles-for-orders.test.ts` (prueba `toOrigin`, la MISMA funcion que `list-assigned-orders.ts` reutiliza sin copiar, R15) |
+| R20 | el actor no aparece entre sus propios responsables | `list-assigned-orders.test.ts` («R20 el actor no sale…») |
+| R21 | `EN_CURSO` -> disparador deshabilitado con motivo visible | `assigned-order-enter-trigger.test.tsx` + `a11y-tactil.test.tsx` + `e2e/pedidos-asignados.spec.ts` (paso 5) |
+| R22 | `PENDIENTE` -> disparador habilitado | `assigned-order-enter-trigger.test.tsx` + `e2e/pedidos-asignados.spec.ts` (paso 6) |
+| R23 | NO se aplica ni replica la regla de «pedido ya tomado» | **Por ausencia, no por test positivo**: `assigned-order-enter-trigger.tsx` recibe `Pick<AssignedOrderView, 'id'|'status'>` -su TIPO no puede expresar ninguna regla de negocio- y no importa ningun modulo de dominio; verificado por lectura del archivo, no hay `assertOrderAcceptsWrites` ni equivalente |
+| R24 | ninguna migracion, ninguna columna, ninguna tabla | Verificado por `git diff` de la feature: `db/schema.prisma` y `db/migrations/` no aparecen en ningun commit de QC-88 |
+| R25 | ninguna fila afirma quien abrio; `updated_by` no se usa para deducirlo | Estructural: `AssignedOrderView` (`assigned-order-view.ts`) no tiene ningun campo de autoria; `list-assigned-orders.ts` no lee `updatedBy` en ningun paso |
+| R26 | tabla compartida QC-55 por su barrel, sin tocar `data-table/` | `assigned-orders-table.tsx` importa de `@/components/shared/data-table`; `git diff` confirma que `components/shared/data-table/**` no se toco |
+| R27 | datos pedidos en el servidor, ningun cliente invoca el listado | `assigned-orders-route-contract.test.ts` («la seccion importa la action por su RUTA EXACTA») + lectura de `assigned-orders-table.tsx`/`assigned-orders-columns.tsx` (ninguno importa la Server Action) |
+| R28 | fallo -> error fuera de la tabla, sin ningun dato | `assigned-orders-states.test.tsx` |
+| R29 | vacio -> estado propio, distinguible del fallo | `assigned-orders-states.test.tsx` + `e2e/pedidos-asignados.spec.ts` (implicito: los pedidos que no debe ver no aparecen) |
+| R30 | esqueleto con tantas filas como `pageSize` | `assigned-orders-states.test.tsx` (ata columnas del esqueleto a las de `buildAssignedOrdersColumns()`) |
+| R31 | tamanos 10/25 de `lib/shared/pagination`, en la cadena de consulta | `assigned-orders-list-params.test.ts` |
+| R32 | tactil >=44x44, sin `:hover` unico, sin `100vh` | `a11y-tactil.test.tsx` |
+| R33 | contrato de ruta equivalente al de `/pedidos` | `assigned-orders-route-contract.test.ts` (calcado completo) |
+| R34 | aterrizaje del Operador actualizado, tests que lo afirman | `e2e/permisos.spec.ts` (paso 2) + `guard-e2e-landing.test.ts` |
+| R35 | guardias de menu/permisos tensadas, no relajadas | `guard-nav-permisos-declarados.test.ts` + `private-layout-menu.test.tsx` (ambas subieron su numero Y nombraron el enlace) |
+| R36 | `asignaciones.consultar` legitimo SOLO en el caso de uso nuevo | `tests/unit/asignaciones/module-contract.test.ts` (regla e, caso QC-88 con sus tres portazos) |
+| R37 | nadie fuera de `adapters/driven/**` consulta `prisma.orderAssignment`; sin `include` | `order-assignment-repository.test.ts` + `guard-lote-sin-join.test.ts` |
+| R38 | E2E en Chromium y WebKit del recorrido del Operador | `e2e/pedidos-asignados.spec.ts` (config global de Playwright corre ambos proyectos); **ver bloqueo de entorno arriba: no verificado en ejecucion real hoy** |
+| R39 | ninguna dependencia nueva | Verificado: `package.json` no aparece en ningun commit de QC-88 |
+| R40 | test que llama la OPERACION sin permiso y confirma que NO llega al repositorio | `authorization.test.ts` + `list-assigned-orders.test.ts` (ambos cuentan invocaciones de los dobles) |
+
+**Cobertura: 40/40 requisitos mapeados.** R23-R26, R38-R39 se sostienen por evidencia
+estructural/de ausencia en vez de por un test que falla al mutar; queda anotado con precision
+en vez de forzar un test que no aportaria nada nuevo sobre lo que el TIPO o el `git diff` ya
+demuestran. **R38 tiene una salvedad real y declarada**: el recorrido esta escrito y pasa
+`typecheck`/`lint`, pero no se ha podido demostrar en ejecucion por el bloqueo de entorno de la
+Tanda 5 (drift de la Postgres compartida). No se marca como cerrado con un verde falso.
+
+### Deudas y notas para quien retome despues de esta feature
+
+- El tope de ids del riesgo 1 de `design.md > 14` sigue sin decidirse (no se anadio, regla 6).
+- **Bloqueo de entorno de T16/R38** (ver Tanda 5): el leader debe resolver el drift entre
+  `db/schema.prisma` de esta rama y la Postgres local compartida antes de que `./init.sh`
+  completo pueda correr Playwright sobre esta feature (y sobre cualquier otra que siembre una
+  receta).
+- Nada mas queda abierto: T1-T18 cerradas, cada `R<n>` mapeado.
