@@ -518,6 +518,25 @@ lista: `tests/integration/inventario/product-crud.int.test.ts`,
 feature. Un baseline que miente se vuelve ruido que se ignora, que es como se cuela un rojo de
 verdad.
 
+### Worktrees a medio borrar — SEXTA vez, ahora QC-63 (2026-09-17)
+
+Mismo cuadro exacto al cerrar QC-63: `wt.sh done` responde `is not a working tree`, git ya lo tiene
+**desregistrado** y el **directorio se queda en disco**. No se forzo. La rama esta mergeada
+(PR #82, `6754a46`), asi que no guarda nada unico.
+
+**Recuento del 2026-09-17 al cerrar QC-63: CINCO directorios huerfanos**, los cinco de fichas ya
+cerradas y mergeadas y ninguno registrado en `git worktree list`:
+
+- `QC-50-aislamiento-por-empresa-en-recetas`
+- `QC-63-ejecutar-receta-operador`
+- `QC-88-listado-de-pedidos-asignados`
+- `QC-103-lote-y-fecha-de-compra-en-el-alta`
+- `QC-106-endpoint-de-carga-de-pdf`
+
+Barrerlos es seguro y lo decide el humano, como la vez anterior. Lo que sigue sin existir es
+**quien barre por defecto**, y ya son seis repeticiones: es el candidato mas maduro para
+`/afinar-regla`.
+
 ### Worktrees a medio borrar — QUINTA vez, ahora QC-88 (2026-09-17)
 
 Al cerrar QC-88 (F2.5), `./scripts/wt.sh done QC-88-listado-de-pedidos-asignados` respondio
