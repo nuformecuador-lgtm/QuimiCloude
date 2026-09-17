@@ -35,10 +35,13 @@ import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/error
 import {
   AsignacionesError,
   type Actor,
+  type AssignedOrderView,
   type OrderResponsible,
   type OrderResponsiblesEntry,
 } from '@/lib/modules/asignaciones';
 import { runInRequestScope } from '@/lib/shared/request-scope';
+
+import type { Page } from '@/lib/modules/pedidos';
 
 export type AssignResponsiblesFormState =
   | { status: 'idle' }
@@ -219,6 +222,27 @@ export async function listResponsiblesForOrdersAction(
 
   try {
     const data = await asignaciones.listResponsiblesForOrders(actor, orderIds);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export type AssignedOrdersListResult =
+  | { status: 'success'; data: Page<AssignedOrderView> }
+  | ErrorState;
+
+/**
+ * Ningun permiso se comprueba aqui: la frontera es la primera linea del caso de uso. Esta funcion
+ * no se reexporta desde el barrel del modulo, `app/**` la importa por su ruta exacta.
+ */
+export async function listAssignedOrdersAction(
+  query: unknown,
+): Promise<AssignedOrdersListResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await asignaciones.listAssignedOrders(actor, query);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

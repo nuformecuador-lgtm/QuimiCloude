@@ -45,7 +45,10 @@ import { createRemoveWorkGroupFromOrder } from '@/lib/modules/asignaciones/domai
 import { createUnassignResponsible } from '@/lib/modules/asignaciones/domain/unassign-responsible';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import { DOCUMENT_TYPE_CC, normalizeCompanyName, normalizeWorkGroupName } from '@/lib/modules/identity';
-import { findAliveOrderTargetById } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
+import {
+  findAliveOrderTargetById,
+  listAliveOrderSummariesByIds,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import { setCurrentTx } from './prisma-tx-holder';
@@ -65,7 +68,10 @@ import type { OrderCatalog } from '@/lib/modules/pedidos';
  * `lib/composition` todavia no cablea `asignaciones` (T11) y este archivo no lo adelanta: el dia
  * que T11 exista, esta es la unica linea que cambia.
  */
-const orders: OrderCatalog = { findAliveById: findAliveOrderTargetById };
+const orders: OrderCatalog = {
+  findAliveById: findAliveOrderTargetById,
+  listAliveSummariesByIds: listAliveOrderSummariesByIds,
+};
 
 export type UseCases = {
   readonly assign: (actor: Actor | null | undefined, input: unknown, now: Date) => Promise<AssignOutcome>;

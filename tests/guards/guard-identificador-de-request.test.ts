@@ -95,6 +95,7 @@ export const E2E_ESPERADOS = [
   'pedidos.spec.ts',
   'pedidos-responsables.spec.ts',
   'permisos.spec.ts',
+  'pedidos-asignados.spec.ts',
   'presentaciones.spec.ts',
   'proveedores.spec.ts',
   'recetas-pasos.spec.ts',

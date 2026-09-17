@@ -14,7 +14,9 @@
  * dos lineas de barril. Los seis casos de uso de QC-34 y `order-transitions.ts` quedan
  * intactos.
  */
-import type { OrderStatus } from './order-classification';
+import type { OrderPriority, OrderStatus } from './order-classification';
+import type { OrderNumber } from './order-number';
+import type { Page } from './page';
 
 /** Lo que otro modulo puede saber de un pedido: su identidad y su ESTADO, y nada mas. Ni el
  *  numero, ni la receta, ni las cantidades (mismo criterio que `MemberCandidate` de QC-84):
@@ -39,4 +41,31 @@ export interface OrderCatalog {
    * la FK compuesta de `order_assignments` con un `23503` sin traducir.
    */
   findAliveById(id: string, companyId: string): Promise<OrderAssignmentTarget | null>;
+
+  /**
+   * Devuelve la `Page` ya armada porque `lib/shared/pagination` no puede importarse desde
+   * `domain/`: quien pagina es el adaptador. Con `ids` vacio no se llama, el caso de uso corta
+   * antes.
+   */
+  listAliveSummariesByIds(
+    companyId: string,
+    ids: readonly string[],
+    statuses: readonly OrderStatus[],
+    page: number,
+    pageSize?: number,
+  ): Promise<Page<AssignedOrderSummary>>;
 }
+
+/**
+ * Sin autoria, sin motivo de cancelacion y sin marcas de tiempo: lo que no esta en el tipo no se
+ * filtra por descuido. `quantity` es cadena decimal, nunca `number`
+ * (`docs/architecture.md > Anti-patrones`).
+ */
+export type AssignedOrderSummary = {
+  readonly id: string;
+  readonly number: OrderNumber;
+  readonly recipeId: string;
+  readonly quantity: string;
+  readonly priority: OrderPriority;
+  readonly status: OrderStatus;
+};

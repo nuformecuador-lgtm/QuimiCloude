@@ -180,6 +180,23 @@ export function credentialSetupRoute(secret: string): string {
 export const FORGOT_PASSWORD_ROUTE = '/recuperar-contrasena';
 
 /**
+ * Vive aqui y no en `navigation/private-nav.ts` porque el middleware y la regla ruta->rol de
+ * `identity` la necesitan y no pueden depender de la navegacion, que arrastra etiquetas, iconos y
+ * agrupacion de UI.
+ */
+export const ASSIGNED_ORDERS_ROUTE = '/asignacion';
+
+/**
+ * Hoy responde 404: la pantalla de detalle todavia no existe.
+ *
+ * No necesita fila propia en `PRIVATE_ROUTE_PREFIXES`: la guardia y el middleware comparan por
+ * segmentos, asi que la de `ASSIGNED_ORDERS_ROUTE` ya cubre `/asignacion/<id>`.
+ */
+export function assignedOrderRoute(id: string): string {
+  return `${ASSIGNED_ORDERS_ROUTE}/${id}`;
+}
+
+/**
  * Prefijos de URL que cuelgan de `app/(private)/` y, por tanto, exigen sesion valida (R1).
  *
  * `(private)` es un route group: **no aparece en la URL**, asi que el middleware no puede
@@ -215,4 +232,7 @@ export const PRIVATE_ROUTE_PREFIXES = [
   // segmentos ya cubriria cualquier subcamino. Cubre SESION; el permiso `usuarios.consultar` lo
   // exige la propia pantalla (R4).
   USERS_ROUTE,
+  // Sin esta fila, `(private)` no aparece en la URL y `/asignacion` se serviria SIN sesion. Una
+  // sola entrada: la comparacion por segmentos ya cubre cualquier subcamino.
+  ASSIGNED_ORDERS_ROUTE,
 ] as const;

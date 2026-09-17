@@ -730,6 +730,11 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       `falta ${etiqueta(carpetaDeLaPantalla)}/page.tsx: la pantalla de pedidos es QC-35`,
     ).toBe(true)
 
+    // `app/(private)/asignacion/` es la pantalla de OTRO modulo, que consume el contrato publico
+    // de `pedidos` (el tipo `OrderPriority`) y tiene su propio contrato de ruta: no es una fuga
+    // por goteo de la pantalla de `pedidos`. Se excluye por PREFIJO DE CARPETA, no por archivo.
+    const carpetaAsignacion = join(repoRoot, 'app', '(private)', 'asignacion')
+
     let consumidoresDeLaPantalla = 0
     for (const file of [
       ...sourcesIn(join(repoRoot, 'app')),
@@ -740,6 +745,9 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
         (match) => match[1] as string,
       )
       if (especificadores.length === 0) continue
+
+      const dentroDeOtraPantallaAutorizada = !relative(carpetaAsignacion, file).startsWith(`..${sep}`)
+      if (dentroDeOtraPantallaAutorizada) continue
 
       const dentroDeLaPantalla = !relative(carpetaDeLaPantalla, file).startsWith(`..${sep}`)
       expect(

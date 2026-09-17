@@ -461,7 +461,7 @@ describe('el borrado de items de relleno (QC-13)', () => {
     }
   });
 
-  it('PRIVATE_NAV_ITEMS tiene exactamente siete entradas de nivel superior en orden', () => {
+  it('PRIVATE_NAV_ITEMS tiene exactamente nueve entradas de nivel superior en orden', () => {
     // R5. AMPLIADO el 2026-09-04 (QC-44 T2, R4): la CUARTA entrada es la pantalla de proveedores,
     // item de nivel superior de la seccion «Cadena» -hermano del grupo de produccion, no hijo
     // suyo-. El centinela no se relaja: sigue exigiendo la lista exacta y su orden, asi que una
@@ -498,9 +498,12 @@ describe('el borrado de items de relleno (QC-13)', () => {
     // la respalde lo vuelve a poner en rojo. El destino, la etiqueta y el permiso del item nuevo
     // los afirma `tests/unit/configuracion-ui/private-nav-usuarios.test.ts` sobre `USERS_ROUTE` y
     // `USERS_LABEL`, nunca sobre el literal del copy.
-    expect(PRIVATE_NAV_ITEMS).toHaveLength(8);
+    // «Asignación» va ENTRE Dashboard e Inventario, no al final: el aterrizaje de quien no tiene
+    // `dashboard.consultar` es el primer item visible de su menu, asi que ese orden lo decide.
+    expect(PRIVATE_NAV_ITEMS).toHaveLength(9);
     expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).toEqual([
       'nav-dashboard',
+      'nav-asignacion',
       'nav-inventario',
       'nav-pedidos',
       'nav-produccion',

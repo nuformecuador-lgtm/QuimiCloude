@@ -1030,6 +1030,7 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     );
     expect(exportadas.sort()).toEqual(
       [
+        'ASSIGNED_ORDERS_ROUTE',
         'CREDENTIAL_SETUP_ROUTE',
         'DASHBOARD_ROUTE',
         'FORGOT_PASSWORD_ROUTE',
@@ -1046,6 +1047,7 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'SESSION_ENDED_PARAM',
         'SUPPLIERS_ROUTE',
         'UNITS_ROUTE',
+        'assignedOrderRoute',
         'credentialSetupRoute',
         'USERS_ROUTE',
         'recipeEditRoute',

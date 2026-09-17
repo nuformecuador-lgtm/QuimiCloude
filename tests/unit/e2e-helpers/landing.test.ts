@@ -19,7 +19,7 @@ import {
   filterNavItemsByPermissions,
   firstVisibleNavHref,
 } from '@/lib/shared/navigation/private-nav';
-import { DASHBOARD_ROUTE, INVENTORY_ROUTE } from '@/lib/shared/routes';
+import { ASSIGNED_ORDERS_ROUTE, DASHBOARD_ROUTE, INVENTORY_ROUTE } from '@/lib/shared/routes';
 
 function seedPermissionsOf(role: string): readonly string[] {
   const permissions = SEED_ROLE_PERMISSIONS[role];
@@ -32,8 +32,10 @@ describe('QC-93 — landingRouteForPermissions deriva el destino con la regla de
     expect(landingRouteForPermissions(seedPermissionsOf(ROLE_ADMINISTRADOR))).toBe(DASHBOARD_ROUTE);
   });
 
-  it('lleva a inventario a quien tiene los permisos sembrados del Operador (R2)', () => {
-    expect(landingRouteForPermissions(seedPermissionsOf(ROLE_OPERADOR))).toBe(INVENTORY_ROUTE);
+  it('lleva a asignacion a quien tiene los permisos sembrados del Operador (R2)', () => {
+    expect(landingRouteForPermissions(seedPermissionsOf(ROLE_OPERADOR))).toBe(
+      ASSIGNED_ORDERS_ROUTE,
+    );
   });
 
   it('cae en el dashboard de respaldo cuando no hay ningun permiso (R3)', () => {

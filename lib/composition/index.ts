@@ -259,6 +259,7 @@ import type { WorkGroupRepository } from '@/lib/modules/identity/ports/work-grou
 // Actions de T12 NO se importan aqui (la flecha va driving -> composicion).
 import {
   createAssignResponsibles,
+  createListAssignedOrders,
   createListOrderResponsibles,
   createListResponsiblesForOrders,
   createRemoveWorkGroupFromOrder,
@@ -266,7 +267,10 @@ import {
 } from '@/lib/modules/asignaciones';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
-import { findAliveOrderTargetById } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
+import {
+  findAliveOrderTargetById,
+  listAliveOrderSummariesByIds,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity';
@@ -943,7 +947,10 @@ export const observabilidad = {
 /** `OrderCatalog` cableado con el adaptador driven DE PEDIDOS (`design.md > 2.1`): mismo patron
  *  que `RecipeCatalog` arriba. `asignaciones` solo conoce el TIPO, y por el solo puede saber si
  *  el pedido esta VIVO y en que ESTADO —ni el numero, ni la receta, ni las cantidades—. */
-const orderCatalog: OrderCatalog = { findAliveById: findAliveOrderTargetById };
+const orderCatalog: OrderCatalog = {
+  findAliveById: findAliveOrderTargetById,
+  listAliveSummariesByIds: listAliveOrderSummariesByIds,
+};
 
 /**
  * `PeopleDirectory` y `WorkGroupDirectory` cableados con el MISMO adaptador driven DE IDENTITY
@@ -1021,6 +1028,13 @@ export const asignaciones = {
   // aplicando el puerto con la del actor (R3).
   listResponsiblesForOrders: createListResponsiblesForOrders({
     assignments: orderAssignmentRepository,
+    people: peopleDirectory,
+    now: () => new Date(),
+  }),
+  listAssignedOrders: createListAssignedOrders({
+    assignments: orderAssignmentRepository,
+    orders: orderCatalog,
+    recipes: recipeCatalog,
     people: peopleDirectory,
     now: () => new Date(),
   }),
