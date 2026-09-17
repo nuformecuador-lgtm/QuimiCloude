@@ -7,9 +7,13 @@ import type { DateRange } from 'react-day-picker';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { formatDateLocalISO, parseDateLocalISO } from '@/lib/shared/ui/date-civil';
 import { cn } from '@/lib/utils';
 
 import type { DataTableFilterValue, DataTableTexts } from './data-table-types';
+
+/** Reexportada para los consumidores que ya importan por esta ruta (tests, viewport helpers). */
+export { formatDateLocalISO };
 
 /**
  * Filtro de rango de fechas con atajos (`design.md > 6.1`, T9, R18).
@@ -79,24 +83,6 @@ export function computeDateShortcutRange(
   }
 
   return { from: subtractMonthsClamped(to, kind === 'lastMonth' ? 1 : 12), to };
-}
-
-/**
- * Formatea una fecha como `YYYY-MM-DD` en hora LOCAL (`design.md > 3.1`): nunca
- * `toISOString()`, que desplaza por huso horario. Determinista: siempre `getFullYear`/
- * `getMonth`/`getDate` con `padStart`.
- */
-export function formatDateLocalISO(date: Date): string {
-  const year = String(date.getFullYear()).padStart(4, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/** Inverso de `formatDateLocalISO`: construye la fecha en hora local, nunca en UTC. */
-function parseDateLocalISO(value: string): Date {
-  const [year, month, day] = value.split('-').map(Number);
-  return new Date(year, month - 1, day);
 }
 
 /** `DataTableFilterValue` (`kind: 'dateRange'`) -> `DateRange` que entiende el calendario. */

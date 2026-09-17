@@ -5,6 +5,7 @@ import { useId, useState } from 'react';
 
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { formatDateLocalISO, parseDateLocalISO } from '@/lib/shared/ui/date-civil';
 
 /**
  * Campo de fecha de compra del primer lote, en el alta de producto (R1-R5, `design.md > 2`).
@@ -33,26 +34,11 @@ export const PURCHASE_DATE_FIELD = 'purchaseDate';
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /**
- * Formatea una fecha como `YYYY-MM-DD` en hora LOCAL, nunca `toISOString()` (que desplaza por
- * huso horario). Copia local y no import de `@/components/shared/data-table/data-table-filter-date`
- * a proposito: ese modulo NO reexporta `formatDateLocalISO` por su barrel -es una pieza interna
- * suya (`components/shared/data-table/index.ts`)-, asi que importarla por ruta profunda violaria
- * el alcance del modulo (QC-55, R1). Se exporta desde aqui para que `product-form.tsx`, que
- * necesita la misma fecha de "hoy" para el valor por defecto, la tome de este componente -su
- * dueño real en esta feature- en vez de la ruta profunda ajena.
+ * Reexportada para que `product-form.tsx`, que necesita la misma fecha de "hoy" para el valor
+ * por defecto, la tome de este componente -su dueño real en esta feature- en vez de importar
+ * `lib/shared/ui/date-civil` directamente.
  */
-export function formatDateLocalISO(date: Date): string {
-  const year = String(date.getFullYear()).padStart(4, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/** Inverso de `formatDateLocalISO`: construye la fecha en hora local, nunca en UTC. */
-function parseDateLocalISO(value: string): Date {
-  const [year, month, day] = value.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
+export { formatDateLocalISO };
 
 /** "Hoy" a medianoche local, sin arrastrar la hora (R2, R5). */
 function today(): Date {
