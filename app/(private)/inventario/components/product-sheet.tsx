@@ -18,6 +18,16 @@ const CREATE_SUCCESS = 'Producto creado.';
 const UPDATE_SUCCESS = 'Producto actualizado.';
 
 /**
+ * Aviso de alta cuando se conoce el lote (R14). Texto NEUTRO a proposito (R15, `design.md > 1`):
+ * dice «Lote X», nunca «se asigno el lote X» — el lote puede venir tecleado a mano por la persona,
+ * y decir que el sistema lo asigno mentiria en ese caso. `resolveBatchLot()` ya devuelve el mismo
+ * string sea cual sea su origen, asi que este texto no distingue los dos casos: no hace falta.
+ */
+function createSuccessMessage(lot: string): string {
+  return `${CREATE_SUCCESS} Lote ${lot}.`;
+}
+
+/**
  * Panel lateral de alta y edicion (R17, R21, `design.md > 5`).
  *
  * **Panel lateral y no dialogo centrado ni pagina aparte**: decision humana del 2026-09-03. Como
@@ -57,11 +67,21 @@ export function ProductSheet({
   const router = useRouter();
   const isEdit = product !== undefined;
 
-  const handleSaved = useCallback(() => {
-    setOpen(false);
-    toast.success(isEdit ? UPDATE_SUCCESS : CREATE_SUCCESS);
-    router.refresh();
-  }, [isEdit, router]);
+  const handleSaved = useCallback(
+    (lot?: string) => {
+      setOpen(false);
+      // R14-R16: el aviso de alta nombra el lote en el MISMO `toast` que ya existia -ninguna
+      // superficie nueva-. La edicion no conoce el lote (R9), asi que su texto no cambia.
+      const message = isEdit
+        ? UPDATE_SUCCESS
+        : lot === undefined
+          ? CREATE_SUCCESS
+          : createSuccessMessage(lot);
+      toast.success(message);
+      router.refresh();
+    },
+    [isEdit, router],
+  );
 
   return (
     <Sheet open={open} onOpenChange={(next) => setOpen(next)}>

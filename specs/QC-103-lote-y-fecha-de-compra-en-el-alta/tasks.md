@@ -68,14 +68,14 @@ corre una sola vez al final, antes del PR (regla 5 de `CLAUDE.md`).
 
 ## Frontend — aviso con el lote (R14-R16)
 
-- [ ] **T8.** Depende de T4, T6. En `product-form.tsx`: `save()` guarda `result.lot` cuando
+- [x] **T8.** Depende de T4, T6. En `product-form.tsx`: `save()` guarda `result.lot` cuando
       `result.status === 'success'` y `onSaved` pasa a aceptar `(lot?: string) => void`; se llama
       `onSaved(result.lot)` en el alta y `onSaved()` en la edición (sin cambio de comportamiento
       ahí).
       **Hecho cuando**: test de componente `tras un alta con éxito, ProductForm llama a onSaved
       con el lote devuelto por el servidor (R12)` pasa.
 
-- [ ] **T9.** Depende de T8. En `product-sheet.tsx`: `handleSaved` recibe `(lot?: string)`, y
+- [x] **T9.** Depende de T8. En `product-sheet.tsx`: `handleSaved` recibe `(lot?: string)`, y
       cuando `!isEdit` construye el texto del `toast.success` nombrando el lote (p. ej. `Producto
       creado. Lote ${lot}.`); en la edición el texto no cambia.
       **Hecho cuando**: test de componente —`el aviso de alta nombra el lote asignado por el

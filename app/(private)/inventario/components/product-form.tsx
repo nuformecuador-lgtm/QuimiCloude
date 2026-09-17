@@ -137,7 +137,7 @@ type FieldValues = Record<ProductFieldName, string>;
  */
 type ProductFormState =
   | { status: 'idle' }
-  | { status: 'success' }
+  | { status: 'success'; lot?: string }
   | {
       status: 'error';
       /** El error TAL CUAL: el de la operacion, o el `invalid_input` que fabrica la validacion previa. */
@@ -232,8 +232,14 @@ type ProductFormProps = {
    * nada. Sin el, el alta rapida no se ofrece y la presentacion se elige entre las existentes.
    */
   readonly units?: readonly UnitRef[];
-  /** Lo llama el panel cuando la operacion termina bien: cerrar, avisar y refrescar (R21). */
-  readonly onSaved: () => void;
+  /**
+   * Lo llama el panel cuando la operacion termina bien: cerrar, avisar y refrescar (R21).
+   *
+   * **R12**: en el ALTA se llama con el lote que devolvio el servidor, para que el aviso lo
+   * nombre (R14). En la EDICION se llama sin argumento -no hay lote que nombrar (R9)-, asi que
+   * el parametro es opcional.
+   */
+  readonly onSaved: (lot?: string) => void;
 };
 
 /**
@@ -368,25 +374,35 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
       };
     }
 
-    const result =
-      product === undefined
-        ? await createProductAction({ status: 'idle' }, formData)
-        : await updateProductAction(product.id, { status: 'idle' }, formData);
+    // Dos ramas y no una con un `result` compartido: `createProductAction` y `updateProductAction`
+    // devuelven estados de exito DISTINTOS -solo el del alta trae `lot` (R12)- y estrechar por
+    // `isCreate` no estrecha el TIPO de un `result` ya unificado. Separar la rama es lo que deja
+    // leer `result.lot` sin un `as`.
+    if (isCreate) {
+      const result = await createProductAction({ status: 'idle' }, formData);
 
-    if (result.status === 'error') {
-      // `invalid_input`, `product_not_found` y `unauthorized` NO identifican campo: van a la region de
-      // error del formulario, que es lo que R20 pide para ese caso.
-      //
-      // QC-71 (R17): el estado de la operacion se guarda ENTERO. Antes se copiaban `code` y
-      // `message` a mano, y esa copia tiraba el `reference` del error inesperado por el camino.
-      return {
-        status: 'error',
-        serverError: result,
-        fieldErrors: {},
-        values,
-      };
+      if (result.status === 'error') {
+        // `invalid_input`, `product_not_found` y `unauthorized` NO identifican campo: van a la
+        // region de error del formulario, que es lo que R20 pide para ese caso.
+        //
+        // QC-71 (R17): el estado de la operacion se guarda ENTERO. Antes se copiaban `code` y
+        // `message` a mano, y esa copia tiraba el `reference` del error inesperado por el camino.
+        return { status: 'error', serverError: result, fieldErrors: {}, values };
+      }
+
+      // R12: el lote que devolvio el servidor se guarda para pasarselo a `onSaved`. `status ===
+      // 'idle'` no lo devuelve nunca la action en la practica, pero el tipo lo incluye: sin lote
+      // que guardar, se trata igual que el resto de "sin cambios" (mismo camino que la EDICION).
+      return result.status === 'success' ? { status: 'success', lot: result.lot } : { status: 'success' };
     }
 
+    const result = await updateProductAction(product.id, { status: 'idle' }, formData);
+
+    if (result.status === 'error') {
+      return { status: 'error', serverError: result, fieldErrors: {}, values };
+    }
+
+    // La EDICION no conoce el lote (R9): `onSaved` se llama sin argumento.
     return { status: 'success' };
   }
 
@@ -394,7 +410,9 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
 
   useEffect(() => {
     if (state.status !== 'success') return;
-    onSaved();
+    // R12: en el ALTA se pasa el lote que devolvio el servidor; en la EDICION `state.lot` no
+    // existe y `onSaved` se llama sin argumento, sin cambiar su comportamiento (R9).
+    onSaved(state.lot);
   }, [state, onSaved]);
 
   const fieldErrors = state.status === 'error' ? state.fieldErrors : {};

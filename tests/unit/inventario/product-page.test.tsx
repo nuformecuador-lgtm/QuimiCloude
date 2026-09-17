@@ -1088,6 +1088,97 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(routerMock.refresh).toHaveBeenCalledTimes(1);
   });
 
+  it('tras un alta con éxito, ProductForm llama a onSaved con el lote devuelto por el servidor (R12)', async () => {
+    // T8 — `ProductForm.save()` guarda `result.lot` y se lo pasa a `onSaved`. El unico
+    // consumidor de `onSaved` es `ProductSheet.handleSaved`, asi que el efecto observable de que
+    // `onSaved` recibio el lote es que el aviso de exito lo nombra.
+    const user = setupUser();
+    const LOTE_DEVUELTO = 'LOTE-DEVUELTO-42';
+    createProductActionMock.mockResolvedValue({
+      status: 'success',
+      id: crypto.randomUUID(),
+      lot: LOTE_DEVUELTO,
+    });
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(toastExito).toHaveBeenCalledTimes(1));
+    expect(String(toastExito.mock.calls[0][0])).toContain(LOTE_DEVUELTO);
+  });
+
+  it('el aviso de alta nombra el lote asignado por el sistema (R14)', async () => {
+    // T9 — el lote vacio (correlativo generado por el servidor): el aviso lo nombra.
+    const user = setupUser();
+    const LOTE_ASIGNADO = '2026-00042';
+    createProductActionMock.mockResolvedValue({
+      status: 'success',
+      id: crypto.randomUUID(),
+      lot: LOTE_ASIGNADO,
+    });
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(toastExito).toHaveBeenCalledTimes(1));
+    const mensaje = String(toastExito.mock.calls[0][0]);
+    expect(mensaje).toContain('Lote');
+    expect(mensaje).toContain(LOTE_ASIGNADO);
+  });
+
+  it('el aviso de alta nombra el lote tecleado a mano sin decir que lo asignó el sistema (R15)', async () => {
+    // T9 — `resolveBatchLot()` devuelve el MISMO string que se tecleo, asi que el doble de la
+    // action simula esa devolucion con el valor que la persona escribio. El texto es neutro: no
+    // dice «asigno» ni «asignado» cuando el lote vino tecleado a mano.
+    const user = setupUser();
+    const LOTE_TECLEADO = 'PROV-7788';
+    createProductActionMock.mockResolvedValue({
+      status: 'success',
+      id: crypto.randomUUID(),
+      lot: LOTE_TECLEADO,
+    });
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await rellenarFormulario(user, { lot: LOTE_TECLEADO });
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(toastExito).toHaveBeenCalledTimes(1));
+    const mensaje = String(toastExito.mock.calls[0][0]);
+    expect(mensaje).toContain(LOTE_TECLEADO);
+    expect(mensaje.toLowerCase()).not.toContain('asigno');
+    expect(mensaje.toLowerCase()).not.toContain('asignó');
+    expect(mensaje.toLowerCase()).not.toContain('asignado');
+  });
+
+  it('el aviso de edición no cambia y no nombra ningún lote (R9)', async () => {
+    // T9 — la edicion no conoce el lote: el texto del aviso es el mismo de siempre, sin nombrar
+    // ningun valor de lote.
+    const user = setupUser();
+    listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()]));
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await screen.findByTestId(testId.formulario);
+
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(updateProductActionMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toastExito).toHaveBeenCalledTimes(1));
+    expect(toastExito).toHaveBeenCalledWith('Producto actualizado.');
+    expect(String(toastExito.mock.calls[0][0])).not.toContain('Lote');
+  });
+
   it('elegir un producto existente autocompleta la alerta de cantidad, no la existencia', async () => {
     // Decision humana del 2026-09-09: en el alta el nombre es un autocomplete que busca productos
     // existentes; al elegir uno se autocompleta la alerta de cantidad. La existencia NO se copia:
