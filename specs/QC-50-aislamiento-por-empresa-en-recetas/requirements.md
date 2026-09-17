@@ -212,10 +212,13 @@ resultado de ninguna consulta ni escritura del módulo.
 ### Prueba de extremo a extremo
 
 **R31.** El sistema DEBE cubrir con un test **E2E** sobre navegador real que, con una sesión abierta en
-la empresa A: la pantalla de recetas NO muestra ninguna receta de la empresa B; un intento de **borrar**
-una receta de la empresa B **conociendo su identificador** se rechaza con un mensaje de error a la
-vista; la receta de la empresa B sigue intacta después del intento; y un alta en la empresa A con el
-**mismo nombre** que una receta de la empresa B se completa sin error.
+la empresa A: la pantalla de recetas NO muestra ninguna receta de la empresa B; **abrir la URL del
+detalle de una receta de la empresa B conociendo su identificador es indistinguible de abrir la de un
+identificador inexistente —mismo mensaje y mismo enlace—** (enmendado el 2026-09-16 por decisión
+humana: el borrado cruzado no es ejercitable por E2E sin añadir un campo oculto al diálogo, que
+`design.md > 14` prohíbe, y su rechazo queda cerrado en service e integración); la receta de la empresa
+B sigue intacta después del intento; y un alta en la empresa A con el **mismo nombre** que una receta de
+la empresa B se completa sin error.
 
 ### Límites de alcance
 
@@ -250,7 +253,7 @@ que la hace testeable. Ninguna queda sin `R<n>`.
 | 12 | RLS `ENABLE` + `FORCE`, defensa en profundidad y no la frontera | R5, R6, R30 |
 | 13 | Las recetas de una empresa dada de baja no se tocan | R29 |
 | 14 | No nacen permisos nuevos | R28 |
-| 15 | Hace falta **E2E** del acceso cruzado conociendo el identificador | R31 (y R15, R16, R17, R10, que es lo que el E2E ejercita) |
+| 15 | Hace falta **E2E** del acceso cruzado conociendo el identificador | R31 (y R15, R16, R10, que es lo que el E2E ejercita) |
 | 16 | Identificadores, marcas de tiempo, borrado y migración con `down` que aborta | R6, R7, R8 |
 
 ## Preguntas abiertas
