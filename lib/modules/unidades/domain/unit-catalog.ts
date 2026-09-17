@@ -29,4 +29,15 @@ export interface UnitCatalog {
   /** Referencias de las unidades existentes entre los ids pedidos. Los ids que no existan
    *  simplemente no vienen en la respuesta. */
   findRefs(ids: readonly UnitId[]): Promise<readonly UnitRef[]>;
+
+  /**
+   * Las unidades VISIBLES para esa empresa -propias o de sistema- cuya base efectiva
+   * (`baseUnitId ?? id`) coincide con la de alguna de `unitIds`. Sirve para poblar un selector
+   * de unidades hermanas: quien lo llama agrupa en memoria y descarta la propia unidad de cada
+   * linea.
+   */
+  findRefsSharingBaseInCompany(
+    companyId: string,
+    unitIds: readonly UnitId[],
+  ): Promise<readonly UnitRef[]>;
 }

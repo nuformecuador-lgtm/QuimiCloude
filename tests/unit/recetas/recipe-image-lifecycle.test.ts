@@ -68,7 +68,10 @@ function montarCatalogo(): ProductCatalog {
 /** Doble simple de `UnitCatalog`: este archivo prueba el ciclo de vida de la imagen
  *  (R47-R49), no R50, y todas sus recetas van sin lineas -no hace falta variar el doble. */
 function montarCatalogoUnidades(): UnitCatalog {
-  return { findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []) };
+  return {
+    findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []),
+    findRefsSharingBaseInCompany: vi.fn<UnitCatalog['findRefsSharingBaseInCompany']>(async () => []),
+  };
 }
 
 describe('R47 — image omitido conserva la imagen sin tocar el almacenamiento', () => {

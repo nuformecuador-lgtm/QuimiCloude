@@ -17,7 +17,7 @@
 
 ## Bloque A — Servicios que los otros módulos tienen que ofrecer
 
-### T1 [P] — `pedidos` aprende a mover el estado por encargo
+### T1 [x] [P] — `pedidos` aprende a mover el estado por encargo
 **Toca:** `lib/modules/pedidos/domain/order-catalog.ts`,
 `lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts`,
 `tests/unit/pedidos/order-catalog.test.ts`
@@ -30,7 +30,7 @@
 otra empresa; (d) devuelve `'stale'` si `from` no coincide. `pnpm exec tsc --noEmit` verde.
 **Depende de:** nada.
 
-### T2 [P] — `recetas` publica el contenido que se ejecuta
+### T2 [x] [P] — `recetas` publica el contenido que se ejecuta
 **Toca:** `lib/modules/recetas/domain/recipe-catalog.ts`,
 `lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts`,
 `lib/modules/recetas/index.ts`, `tests/unit/recetas/recipe-catalog.test.ts`
@@ -42,7 +42,7 @@ no en un comentario del código.
 baja con `isDeleted: true`, y otro que devuelve `null` para un id inexistente.
 **Depende de:** nada.
 
-### T3 [P] — `unidades` sabe listar las hermanas de una unidad
+### T3 [x] [P] — `unidades` sabe listar las hermanas de una unidad
 **Toca:** `lib/modules/unidades/domain/unit-catalog.ts`,
 `lib/modules/unidades/adapters/driven/persistence/unit-prisma.ts`,
 `tests/unit/unidades/unit-catalog.test.ts`

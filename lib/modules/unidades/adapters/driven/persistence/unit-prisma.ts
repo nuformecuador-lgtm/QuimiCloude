@@ -6,9 +6,11 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 import { normalizeUnitName } from '../../../domain/unit-name';
 
 import { normalizedSearchCondition } from './list-query-sql';
+import { toUnitRef } from './unit-catalog-prisma';
 
 import type { ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
+import type { UnitId, UnitRef } from '../../../domain/unit-catalog';
 import type { UnitScope } from '../../../domain/unit-scope';
 import type { UnitView } from '../../../domain/unit-view';
 
@@ -206,4 +208,37 @@ export async function listUnitsPage(query: ListQuery, scope: UnitScope): Promise
   ]);
 
   return buildPage(rows.map(toUnitView), total, query.page, limit);
+}
+
+/**
+ * Implementa `UnitCatalog['findRefsSharingBaseInCompany']`. Dos consultas: la primera lee la
+ * base efectiva (`baseUnitId ?? id`) de cada unidad pedida; la segunda trae, YA con
+ * `companyScopeWhere`, toda unidad -propia o de sistema- cuya base efectiva coincida con
+ * alguna de las leidas, sea porque ELLA es esa base o porque deriva de ella.
+ */
+export async function findUnitRefsSharingBaseInCompany(
+  companyId: string,
+  unitIds: readonly UnitId[],
+): Promise<readonly UnitRef[]> {
+  if (unitIds.length === 0) return [];
+
+  const requested = await prisma.unit.findMany({
+    where: { id: { in: [...unitIds] } },
+    select: { id: true, baseUnitId: true },
+  });
+  if (requested.length === 0) return [];
+
+  const effectiveBases = [...new Set(requested.map((unit) => unit.baseUnitId ?? unit.id))];
+
+  const rows = await prisma.unit.findMany({
+    where: {
+      AND: [
+        companyScopeWhere({ companyId }),
+        { OR: [{ id: { in: effectiveBases } }, { baseUnitId: { in: effectiveBases } }] },
+      ],
+    },
+    select: { id: true, name: true, symbol: true, baseUnitId: true, factor: true },
+  });
+
+  return rows.map(toUnitRef);
 }

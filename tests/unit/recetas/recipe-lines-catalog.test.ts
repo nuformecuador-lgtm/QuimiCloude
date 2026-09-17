@@ -44,6 +44,7 @@ function montarCatalogoUnidades(): UnitCatalog {
     findRefs: vi.fn<UnitCatalog['findRefs']>(async (ids) =>
       ids.map((id) => ({ id, name: 'Unidad', symbol: null, baseUnitId: null, factor: null })),
     ),
+    findRefsSharingBaseInCompany: vi.fn<UnitCatalog['findRefsSharingBaseInCompany']>(async () => []),
   };
 }
 

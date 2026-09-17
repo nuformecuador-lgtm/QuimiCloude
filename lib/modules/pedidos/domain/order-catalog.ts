@@ -54,6 +54,26 @@ export interface OrderCatalog {
     page: number,
     pageSize?: number,
   ): Promise<Page<AssignedOrderSummary>>;
+
+  /**
+   * Mueve el estado de un pedido vivo de esa empresa, SOLO si `assertTransition(from, to)` lo
+   * permite: la comprobacion la hace `pedidos` con su propia matriz, dentro del metodo.
+   *
+   * `from` viaja para que el `UPDATE` filtre tambien por el, ademas de por `id`, `companyId`
+   * y `deletedAt: null`: dos lecturas simultaneas no pueden escribir dos veces sobre la misma
+   * transicion. `'not_found'` es el mismo caso que en `findAliveById` -no existe, esta de
+   * baja o es de otra empresa-; `'stale'` es un caso nuevo: el pedido sigue vivo y es de esa
+   * empresa, pero su estado ya no es `from` porque alguien lo movio entre la lectura y esta
+   * llamada.
+   */
+  transitionAliveById(
+    id: string,
+    companyId: string,
+    from: OrderStatus,
+    to: OrderStatus,
+    actorId: string,
+    now: Date,
+  ): Promise<'ok' | 'not_found' | 'stale'>;
 }
 
 /**
