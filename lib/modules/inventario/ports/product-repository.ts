@@ -82,9 +82,9 @@ export interface ProductRepository {
    * descuido: es la decision cerrada del 2026-09-10, transitoria hasta QC-91, cuando la
    * existencia del producto pase a ser la suma de sus lotes.
    *
-   * QC-103 (R12): tambien devuelve `lot`, el TEXTO que quedo escrito en la fila del lote -el
-   * que tecleo la persona o el que genero el correlativo-, no el `batchId`. Es el mismo dato
-   * que el adaptador ya calcula para escribir la fila; aqui solo se propaga hacia arriba.
+   * Tambien devuelve `lot` (R12), el TEXTO que quedo escrito en la fila del lote -el que
+   * tecleo la persona o el que genero el correlativo-, no el `batchId`. Es el mismo dato que
+   * el adaptador ya calcula para escribir la fila; aqui solo se propaga hacia arriba.
    */
   createWithFirstBatch(
     product: NewProduct,
@@ -108,8 +108,8 @@ export interface ProductRepository {
    * camino y sin ningun resultado nuevo. El ambito va en el `where` de la lectura, no en un
    * `if` posterior sobre la fila leida.
    *
-   * QC-103 (R13): con la misma vara de `createWithFirstBatch`, devuelve tambien `lot`, el
-   * texto que quedo escrito en el lote.
+   * Con la misma vara de `createWithFirstBatch`, tambien devuelve `lot` (R13), el texto que
+   * quedo escrito en el lote.
    */
   addBatchToAlive(
     productId: string,
