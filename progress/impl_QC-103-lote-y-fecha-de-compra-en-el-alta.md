@@ -2,7 +2,9 @@
 
 > Spec aprobado por el humano el 2026-09-16 (F1.4). Rama
 > `feature/QC-103-lote-y-fecha-de-compra-en-el-alta`, worktree propio.
-> **T1-T10 cerradas.** T11 (esta bitácora) y T12 (gate completo `./init.sh`) los cierra el leader.
+> **T1-T11 cerradas, con el E2E de R17 en verde** tras dos arreglos autorizados por el humano
+> sobre helpers preexistentes (`566d122`, `ebdb21a`, detalle en §4). T12 (gate completo `./init.sh`)
+> lo cierra el leader.
 
 ## 1. Lo que se construyó
 
@@ -67,10 +69,10 @@ e2e/inventario.spec.ts                                    (T10: R14, R17)
 | R11 | Fecha viaja como YYYY-MM-DD, el adaptador la convierte | Heredado de QC-81: `pasa tal cual una fecha de la semana pasada` y `pasa la fecha escrita identica tambien al agregar el lote a un producto existente` en `create-product.test.ts` prueban el string civil intacto hasta el puerto; la conversión a `Date` vive en `toBatchPurchaseDate` (`product-prisma.ts:282`), ejercitada por los fixtures de `product-batch-lot-retry.test.ts` y verificada de punta a punta contra Postgres real por la suite de integración |
 | R12 | Backend devuelve el valor del lote al crear | `createWithFirstBatch devuelve el lote escrito cuando R12 lo pide` (`product-batch-lot-retry.test.ts`), `createProduct devuelve el lote asignado al crear un producto nuevo (R12)` (`create-product.test.ts`), `createProductAction devuelve el lote en el estado de exito (R12)` (`product-actions.test.ts`), `tras un alta con éxito, ProductForm llama a onSaved con el lote devuelto por el servidor (R12)` (`product-page.test.tsx`) |
 | R13 | Backend devuelve el lote al agregar a producto homónimo | `addBatchToAlive devuelve el lote escrito cuando R13 lo pide` (`product-batch-lot-retry.test.ts`), `createProduct devuelve el lote asignado al agregar batch a un producto existente (R13)` (`create-product.test.ts`) |
-| R14 | Aviso de éxito nombra el lote | `el aviso de alta nombra el lote asignado por el sistema (R14)` — `product-page.test.tsx`; E2E `el alta de producto muestra el lote asignado en el aviso de éxito (R14, R17)` — `e2e/inventario.spec.ts` (escrito, no corrido en verde: ver §4) |
+| R14 | Aviso de éxito nombra el lote | `el aviso de alta nombra el lote asignado por el sistema (R14)` — `product-page.test.tsx`; E2E `el alta de producto muestra el lote asignado en el aviso de éxito (R14, R17)` — `e2e/inventario.spec.ts`, **verde** (ver §4) |
 | R15 | Lote tecleado a mano: el aviso no dice que lo asignó el sistema | `el aviso de alta nombra el lote tecleado a mano sin decir que lo asignó el sistema (R15)` — `product-page.test.tsx` |
 | R16 | Ninguna superficie nueva, solo el aviso existente | Verificado por lectura de diff (no test, según `tasks.md > T9`): el diff de `product-sheet.tsx` confirma que el único cambio es el string del `toast.success` ya existente, sin JSX/elemento nuevo |
-| R17 | E2E: alta con fecha por defecto, aviso nombra el lote | `el alta de producto muestra el lote asignado en el aviso de éxito (R14, R17)` — `e2e/inventario.spec.ts` (escrito, no corrido en verde: ver §4) |
+| R17 | E2E: alta con fecha por defecto, aviso nombra el lote | `el alta de producto muestra el lote asignado en el aviso de éxito (R14, R17)` — `e2e/inventario.spec.ts`, **verde** (ver §4) |
 
 ## 4. Verificación
 
@@ -92,17 +94,47 @@ e2e/inventario.spec.ts                                    (T10: R14, R17)
   53 passed (incluye los 4 nuevos de T8/T9). `vitest run guard`: 43 archivos, 480 passed,
   9 skipped.
 
-### E2E (R17) — escrito, NO corrido en verde
-`pnpm exec playwright test e2e/inventario.spec.ts -g "R14, R17" --project=chromium` se ejecutó
-contra el entorno local (DB sembrada, navegadores instalados, `next dev` levantado por
-`playwright.config.ts`) y falla, pero no por esta ficha: el helper compartido
-`crearPresentacionEnLinea` (preexistente, no tocado por QC-103) no selecciona ninguna unidad de
-presentación antes de enviar el alta rápida, y el selector la exige desde QC-80
-(mensaje `presentation-error-unit`). Confirmado que es un bug previo y no una regresión: un test
-que ya existía antes de esta ficha (asociado a QC-90) falla en aislamiento, en la misma línea del
-mismo helper, con el mismo síntoma. El caso de QC-103 (typecheck y lint en verde) queda escrito y
-a la espera de que el helper compartido se arregle —fuera del alcance de esta ficha— o de que el
-leader decida cómo tratarlo antes del PR.
+### E2E (R17) — VERDE, arreglado y verificado tras autorización humana
+
+**Estado final: `el alta de producto muestra el lote asignado en el aviso de éxito (R14, R17)`
+pasa.** Salida real:
+```
+Running 1 test using 1 worker
+
+  ✓  1 [chromium] › e2e\inventario.spec.ts:624:7 › catalogo de productos › el alta de producto
+     muestra el lote asignado en el aviso de éxito (R14, R17) (11.0s)
+
+  1 passed (39.4s)
+```
+
+Hicieron falta dos arreglos, ninguno de lógica de negocio de QC-103, los dos autorizados
+explícitamente por el humano tras el primer intento (que había quedado "escrito, no corrido en
+verde" por el motivo de abajo):
+
+1. **Helper compartido de selección de unidad (preexistente, ajeno a esta ficha, deuda documentada
+   en `progress/current.md` desde 2026-09-15).** `crearPresentacionEnLinea` (y su bloque inline
+   equivalente) en `e2e/inventario.spec.ts`, y `choosePresentation` en `e2e/proveedores.spec.ts`,
+   rellenaban el nombre y enviaban el alta rápida de presentación SIN elegir unidad, que el
+   selector exige desde QC-80. Arreglo: click en `presentation-unit-select` + click en la primera
+   `presentation-unit-option` antes del submit, mismo patrón que ya usa
+   `tests/unit/inventario/product-page.test.tsx`. Commit `566d122`, separado del resto de QC-103.
+2. **Bug propio de QC-103, en el test que T10 escribió.** Una vez el helper de unidad dejó de
+   bloquear, el test seguía fallando en la aserción final: el regex `/Lote\s+(\S+)/` capturaba
+   `"1."` (con el punto final de cierre de frase del toast `Producto creado. Lote 1.`) en vez de
+   `"1"`, que es lo que hay en base. Arreglo: `/Lote\s+(\S+?)\.?$/` sobre el texto `.trim()`-eado
+   (no codicioso, ancla al final con punto opcional; no corta lotes de texto libre con guiones,
+   p. ej. `ACME-2026-07`). Commit `ebdb21a`.
+
+`pnpm typecheck` y `pnpm exec eslint` limpios en ambos arreglos.
+
+**El rojo de `e2e/proveedores.spec.ts` (R51) NO se mató.** Con el mismo arreglo de unidad aplicado,
+`pnpm exec playwright test e2e/proveedores.spec.ts -g "R51" --project=chromium` sigue en rojo, pero
+por una causa DISTINTA y no tocada: la rama de "presentación reutilizable" de `choosePresentation`
+(la que NO pasa por el alta rápida que se arregló) no encuentra la presentación esperada en el
+selector —`la presentacion "..." no aparecio en el selector`—, un fallo que no pasa por el código
+que se tocó. Queda como deuda preexistente sin resolver, tal como estaba documentada en
+`progress/current.md`; no se investigó más allá del diagnóstico porque cae fuera de lo autorizado
+("si sigue rojo por otra causa, dilo y no lo toques más").
 
 ## 5. Decisiones tomadas durante la implementación (no reabren las 9 cerradas del spec)
 
