@@ -202,7 +202,7 @@
       `CHECKPOINTS.md > Calidad de codigo`.
       **Hecho:** la nota escrita y citada desde el mapa de trazabilidad. Cubre **R19**.
 
-- [ ] **T13 — Trazabilidad y gate.** Depende de **todas**.
+- [x] **T13 — Trazabilidad y gate.** Depende de **todas**.
       Archivos: `progress/impl_QC-108-lectura-de-pdf-con-gemini.md`.
       El mapa `R1..R27 → test` completo, sin ningún requisito huérfano. Se escriben además: las **tres**
       respuestas de T0 tal como salieron; **cuál de los dos caminos de R12** se ejecutó (enmienda o plan
