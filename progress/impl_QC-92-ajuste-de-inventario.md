@@ -171,3 +171,18 @@ El caso nuevo **fija el estado del árbol**: afirma que hoy existe un identifica
 Se acepta aquí por una razón concreta: **es la única forma de demostrar la Cara B contra el árbol real**, que es lo que se pidió, y el caso hermano que prueba los detectores con **fuentes fabricadas** —el que no fija estado— sigue vivo e intacto al lado. Queda escrito para que el reviewer lo juzgue a la vista y no lo descubra.
 
 **Aviso para T7:** la R21 de QC-91 **no** se hace así. Ahí la instrucción es explícita —no invertir la afirmación— y se acota con `cuerpoDeFuncion`.
+
+---
+
+## Inventario de familias de guardia de censo/alcance (para **QC-99**)
+
+Confirmado por el leader el 2026-09-17. **Cuatro familias distintas encontradas en dos fichas**, y hoy no están escritas en ningún otro sitio. Todas comparten la forma: **una lista o afirmación cerrada en `tests/` que se pone roja por algo que no habla de la ficha que la rompió.**
+
+| # | Familia | Dónde vive | Qué la dispara | A quién le tocó |
+|---|---|---|---|---|
+| 1 | **Conteo de lecturas de sesión** | guardia de QC-104 | Una Server Action nueva que resuelve usuario y empresa y no se anota en la lista | **T9** (avisado en `tasks.md`) |
+| 2 | **Censo de escrituras** | `tests/guards/guard-libro-de-inventario.test.ts` (nace en esta ficha) | Un camino de escritura de `product_batches` fuera del conjunto nombrado, o sin su asiento | **T14** |
+| 3 | **Censo de migraciones** | `tests/guards/guard-identificador-de-request.test.ts`, `MIGRACIONES_ESPERADAS` | **Cualquier** migración nueva, hasta que se la nombra a mano | **T1** (no estaba previsto) |
+| 4 | **Guardia de alcance de ficha** | `tests/unit/inventario/qc81-alcance.test.ts`, R31 | Le reserva el sitio a una ficha futura y **no se acota a su rama**: se pone roja **justo cuando llega la ficha para la que reservaba** | **Tanda 2** (no estaba previsto) |
+
+Las dos que **no** estaban previstas en el spec son la 3 y la 4, y las dos costaron una parada. La 4 además reveló una **asimetría dentro de su propio archivo**: R28, R29 y R30 se acotaban a su rama y R31 no.
