@@ -4153,3 +4153,27 @@ en QC-108.
 «demostrado por partes» debería contar como **pendiente** para el reviewer; (3) la bitácora de una
 ficha puede quedar **partida entre el árbol principal y su worktree**, y aquí chocó en tres merges
 seguidos.
+
+## QC-61 — guardia-empresa-en-esquema (cerrada el 2026-09-18, PR #90, merge `05a0615`)
+
+**Qué quedó**: `tests/guards/guard-empresa-en-esquema.test.ts` lee `db/schema.prisma` como texto y da
+rojo si un modelo no declara `company_id` y su tabla no está en la lista cerrada de **ocho exentas**
+(`document_types`, `roles`, `permissions`, `role_permissions`, `companies`, `credential_setup_tokens`,
+`revoked_sessions`, `recipe_lines`). Basta con que la columna exista. También da rojo si a la lista le
+**sobra** una entrada y si el bullet de `docs/architecture.md` no dice lo mismo. La lista vieja se
+corrigió en `architecture.md`, `CHECKPOINTS.md` y `.claude/agents/reviewer.md`.
+
+**La ficha llegó vieja** (escrita el 2026-09-04, antes del arco multiempresa): daba como exenta a
+`users`, que ya lleva empresa, y pedía una lista de «pendientes de aislar» que habría nacido vacía.
+Se midió en disco y se corrigió el board **antes** de sembrar. El leader contó «siete» modelos sin
+empresa donde había **ocho**: el mismo tipo de error de conteo que en QC-106, QC-91 y QC-59.
+
+**Verificación**: guardia 15/15, también sobre el `dev` ya mergeado; review aprobada con 0/0/5 y 19
+mutaciones que dieron rojo donde tocaba. El gate completo **no salió verde** y el PR lo declaró, por
+decisión humana: el validador por el spec de QC-92 (en otra máquina), 11 de integración por la base
+local en **Postgres 18.6** y un intermitente de `user-table.test.tsx` (ya tiene ficha: QC-126).
+
+**Lo que destapó, fuera de la ficha**: 24 archivos de UI en rojo por el `localStorage` nativo de
+Node 26, arreglado en el PR #89 (`--no-experimental-webstorage` en el proyecto `ui`), y la decisión
+humana de que **Postgres 17 es la versión objetivo**, escrita en `docs/verification.md`. Queda que
+el humano monte un Postgres 17 local.

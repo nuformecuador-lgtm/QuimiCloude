@@ -8,12 +8,14 @@ import { Prisma } from '@prisma/client';
 const doble = vi.hoisted(() => {
   const productCreate = vi.fn();
   const batchCreate = vi.fn();
+  const movementCreate = vi.fn();
   const executeRaw = vi.fn();
   const queryRaw = vi.fn();
   // Sin `product.findFirst`: si el alta volviera a leer el producto sin lock, fallaria aqui.
   const tx = {
     product: { create: productCreate },
     productBatch: { create: batchCreate },
+    inventoryMovement: { create: movementCreate },
     $executeRaw: executeRaw,
     $queryRaw: queryRaw,
   };
@@ -21,6 +23,7 @@ const doble = vi.hoisted(() => {
     tx,
     productCreate,
     batchCreate,
+    movementCreate,
     executeRaw,
     queryRaw,
     transaction: vi.fn(),
@@ -88,6 +91,7 @@ beforeEach(() => {
   );
   doble.productCreate.mockResolvedValue({ id: PRODUCTO_ID });
   doble.batchCreate.mockResolvedValue({ id: LOTE_ID });
+  doble.movementCreate.mockResolvedValue({ id: 'movimiento-1' });
   doble.executeRaw.mockResolvedValue(0);
   doble.queryRaw.mockResolvedValue([{ top: '41' }]);
 });

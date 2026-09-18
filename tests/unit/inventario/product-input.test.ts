@@ -148,6 +148,10 @@ describe('createProductSchema', () => {
       findAliveIdByName: vi.fn(),
       createWithFirstBatch: vi.fn(),
       addBatchToAlive: vi.fn(),
+      // QC-92: mismo criterio, ninguno debe llegar a llamarse en este caso.
+      adjustBatchStock: vi.fn(),
+      findBatchesOfAliveProduct: vi.fn(),
+      findBatchMovements: vi.fn(),
     };
     const createProduct = createCreateProduct({ products });
 

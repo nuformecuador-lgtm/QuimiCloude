@@ -89,6 +89,10 @@ function montarRepositorio(overrides: Partial<ProductRepository> = {}): ProductR
       batchId: 'lote-1',
       lot: '1',
     })),
+    // QC-92: sin caso en este archivo, dobles minimos.
+    adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(async () => null),
+    findBatchesOfAliveProduct: vi.fn<ProductRepository['findBatchesOfAliveProduct']>(async () => []),
+    findBatchMovements: vi.fn<ProductRepository['findBatchMovements']>(async () => null),
     ...overrides,
   };
 }
