@@ -167,7 +167,7 @@
       `@google/genai`—; el test es **rojo** si alguien cuelga un adaptador del barrel.
       Cubre **R1 (publicación de la capacidad)** y **R21**.
 
-- [ ] **T10 — Cableado en el punto de composición.** Depende de **T0.3**, T5, T8 y T9.
+- [x] **T10 — Cableado en el punto de composición.** Depende de **T0.3**, T5, T8 y T9.
       Archivos: `lib/composition/index.ts` (**bloque nuevo dentro del bloque `documentos` ya
       existente**, líneas 1083-1155; sus imports, al final del bloque de imports: **no se reordena ni
       se reformatea nada**).
