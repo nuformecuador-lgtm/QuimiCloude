@@ -51,6 +51,8 @@ export const ERROR_MESSAGE_KEY = {
   order_assignment_not_found: 'errors.order_assignment_not_found',
   user_not_assignable: 'errors.user_not_assignable',
   batch_duplicate_lot: 'errors.batch_duplicate_lot',
+  batch_not_found: 'errors.batch_not_found',
+  batch_stock_negative: 'errors.batch_stock_negative',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -124,4 +126,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.user_not_assignable': 'No se puede asignar a una persona cuya cuenta no esta activa.',
   // «En esta empresa» porque el lote es unico por empresa, no en toda la base.
   'errors.batch_duplicate_lot': 'Ya existe un lote con ese valor en esta empresa.',
+  // No distingue «no existe» de «es de otra empresa»: la respuesta es la misma para las dos.
+  'errors.batch_not_found': 'El lote solicitado no existe.',
+  'errors.batch_stock_negative': 'El ajuste dejaria la existencia del lote por debajo de cero.',
 } as const satisfies Record<ErrorMessageKey, string>;

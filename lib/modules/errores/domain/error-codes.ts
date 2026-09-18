@@ -5,6 +5,9 @@
  *
  * **Sexta enmienda, el 2026-09-15 (QC-81)**: `batch_duplicate_lot`.
  * Aprobada por el humano el 2026-09-15 en la puerta F1.4 de QC-81.
+ *
+ * **Septima enmienda, el 2026-09-17 (QC-92)**: `batch_not_found`, `batch_stock_negative`.
+ * Aprobada por el humano el 2026-09-17 en la puerta F1.4 de QC-92.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -56,6 +59,11 @@ export const ERROR_CODES = [
   // Distinto de `invalid_input`: la entrada tiene la forma correcta y choca con la unicidad
   // `(empresa, lote)` de la base.
   'batch_duplicate_lot',
+  // Distinto de `product_not_found`: el lote no existe o es de otra empresa, no el producto.
+  'batch_not_found',
+  // Distinto de `invalid_input`: la entrada tiene forma valida y lo que falla es el estado del
+  // lote tras aplicar el ajuste.
+  'batch_stock_negative',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
