@@ -26,7 +26,145 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+> Cada requisito cita entre corchetes la decisión de la tabla de abajo que lo origina, numeradas
+> `D1`…`D15` **por orden de fila**. La tabla tiene **15 filas** y todas quedan citadas al menos
+> una vez: una decisión sin `R<n>` nunca llega a tener test. La pregunta abierta 1 (unidad de la
+> línea de receta) **no se decide aquí**: R19 conserva lo que fijó QC-91 mientras siga abierta.
+
+### Unidad del producto
+
+**R1.** El sistema DEBE guardar en cada producto su propia unidad; y CUANDO el alta cree un
+producto, el sistema DEBE asignarle la unidad de la presentación de su primer lote, en la misma
+operación que escribe el producto y el lote. [D2]
+
+**R2.** El sistema NO DEBE cambiar la unidad de un producto ya creado por ningún camino de la
+aplicación: agregarle un lote no la toca, y CUANDO la edición del producto reciba una unidad, el
+sistema DEBE rechazar la entrada como `invalid_input` sin escribir nada. [D2]
+
+**R3.** SI se intenta escribir un lote cuya presentación está en una unidad distinta de la de su
+producto, o un lote sobre un producto sin unidad, ENTONCES la base de datos DEBE rechazar la
+escritura sin dejar el lote escrito, llegue por la aplicación o por SQL directo; y CUANDO el alta
+reciba ese rechazo, el sistema DEBE responder `invalid_input` sin dejar escrito ni el lote ni, si lo
+estaba creando, el producto. [D2]
+
+**R4.** El sistema DEBE leer la unidad de un producto de la que el producto tiene guardada —en el
+listado de inventario, en el selector de productos de la receta y en la alerta de cantidad— y NO
+DEBE derivarla del lote más reciente. [D2]
+
+### Alta por nombre y unidad
+
+**R5.** CUANDO el alta reciba un nombre y una presentación, el sistema DEBE buscar, entre los
+productos vivos de la empresa del actor, uno con el mismo nombre normalizado **y** la misma unidad
+que esa presentación; SI existe, ENTONCES DEBE agregarle el lote sin crear ningún producto y sin
+modificar su nombre, su cantidad de alerta ni su unidad. [D1]
+
+**R6.** SI no hay ningún producto vivo de la empresa con ese nombre en esa unidad —aunque lo haya
+con ese nombre en otra unidad, o sin unidad—, ENTONCES el sistema DEBE crear un producto nuevo con
+ese nombre, la unidad de la presentación y ese lote, sin rechazar el alta y sin mostrar ningún aviso
+ni pedir confirmación. [D1] [D8]
+
+**R7.** SI hay varios productos vivos de la empresa con el mismo nombre y la misma unidad, ENTONCES
+el sistema DEBE agregar el lote siempre al mismo: el más antiguo, desempatando por identificador
+ascendente. [D1]
+
+### Existencia guardada
+
+**R8.** El sistema DEBE guardar en cada producto su existencia como un entero no negativo igual a
+la suma de las existencias de todos sus lotes, vencidos incluidos (tres lotes de 5 dan 15); un
+producto sin lotes DEBE tener existencia 0. [D3]
+
+**R9.** CUANDO se escriba un lote —al crear un producto con su primer lote o al agregarlo a uno
+existente—, el sistema DEBE recalcular la existencia guardada del producto a partir de sus lotes en
+la misma transacción que escribe el lote; y SI el recálculo falla, ENTONCES NO DEBE quedar escrito
+ni el lote ni, en el alta de un producto nuevo, el producto. [D4]
+
+**R10.** CUANDO dos altas simultáneas agreguen lotes al mismo producto, la existencia guardada DEBE
+terminar igual a la suma de todos sus lotes, sin perder ninguno. [D4]
+
+**R11.** CUANDO se agregue un lote a un producto existente, el sistema NO DEBE modificar su nombre,
+su cantidad de alerta, su unidad ni su fecha de última modificación: solo su existencia guardada.
+[D4]
+
+**R12.** La base de datos NO DEBE mantener la existencia guardada por su cuenta —ni disparador ni
+columna generada que la recalcule—: mantenerla es responsabilidad de la aplicación. [D4]
+
+**R13.** El sistema DEBE conservar la agregación de existencias por unidad y DEBE calcular con ella
+la existencia guardada; para un producto esa agregación DEBE dar como máximo un valor, y SI diera
+más de uno, ENTONCES el sistema DEBE abortar la escritura del lote en vez de guardar una suma que
+mezcle unidades. [D9]
+
+**R14.** El sistema DEBE publicar hacia otros módulos la existencia de un producto como existencia
+por unidad con **un único valor** —en la unidad del producto e igual a su existencia guardada—, o
+vacía si el producto no tiene unidad. [D9]
+
+### Listado de inventario
+
+**R15.** El listado de productos DEBE permitir ordenar por la existencia guardada, ascendente y
+descendente, con desempate estable por identificador, y filtrar por un rango de existencia con
+mínimo y máximo opcionales, ambos aplicados antes de paginar y con el total contado sobre el mismo
+filtro, usando el mismo identificador de columna y los mismos parámetros de URL que tenían antes de
+que QC-91 los retirara. [D5]
+
+**R16.** El listado DEBE mostrar la existencia guardada de cada producto acompañada de la unidad del
+producto; SI el producto no tiene unidad, ENTONCES DEBE mostrar 0. [D3]
+
+**R17.** SI un producto tiene cantidad de alerta configurada y esta es mayor que su existencia
+guardada, ENTONCES el listado DEBE marcarlo en alerta —también cuando no tiene lotes y su existencia
+es 0—; y SI no tiene cantidad de alerta configurada, ENTONCES NO DEBE marcarlo. [D10]
+
+**R18.** DONDE el listado de inventario o el selector de productos de la receta muestren un
+producto, el sistema DEBE mostrarlo como «nombre · unidad», con el símbolo de la unidad o, si la
+unidad no tiene símbolo, su nombre; SI el producto no tiene unidad o el catálogo de unidades no se
+pudo leer, ENTONCES DEBE mostrar solo el nombre. [D8]
+
+### Receta y pedido
+
+**R19.** El detalle de receta DEBE seguir exponiendo, por línea, la existencia del producto en la
+unidad de la línea: 0 si el producto no tiene lotes, su existencia guardada si la unidad de la línea
+es la del producto, y ausencia de dato —«—» en la existencia y en el restante del pedido— si no lo
+es. [D9]
+
+### Presentación
+
+**R20.** SI la edición de una presentación que tiene al menos un lote cambia su unidad, ENTONCES el
+sistema DEBE rechazarla con un código de error propio, distinto de `invalid_input`, sin modificar
+ningún campo de la presentación; y la base de datos DEBE rechazar ese cambio aunque llegue por otro
+camino o en carrera con el alta de un lote sobre esa presentación. [D7]
+
+**R21.** CUANDO se edite una presentación con lotes sin cambiar su unidad, o una presentación sin
+lotes cambiando o no su unidad, el sistema DEBE aceptar la edición igual que antes de esta feature.
+[D7]
+
+**R22.** CUANDO el formulario de presentación reciba el rechazo de R20, DEBE mostrar el mensaje del
+catálogo para ese código junto al campo de unidad, conservar lo escrito y seguir abierto. [D7]
+
+### Datos existentes
+
+**R23.** CUANDO se aplique la migración de esta feature, el sistema DEBE dar a cada producto con
+lotes la unidad de la presentación de su lote más reciente y como existencia la suma de sus lotes, y
+a cada producto sin lotes existencia 0 y ninguna unidad; NO DEBE comprobar si los lotes de un
+producto mezclan unidades ni partir, crear o borrar ningún producto ni lote; y su `down.sql` DEBE
+retirar todo lo que añade, dejando el esquema como estaba tras QC-91. [D6]
+
+### Permisos, identificadores y entrega
+
+**R24.** El sistema DEBE exigir `inventario.modificar` para el alta de producto y la edición de
+presentaciones, e `inventario.consultar` para el listado, validándolo **en el service** antes de
+tocar el repositorio, y NO DEBE introducir ningún permiso nuevo. [D11]
+
+**R25.** Todo identificador nuevo —columnas, restricciones, índices, disparadores, funciones,
+códigos de error, tipos y campos— DEBE escribirse en inglés; el borrado del producto DEBE seguir
+siendo lógico, y ninguna operación de esta feature DEBE borrar físicamente productos ni lotes. [D12]
+
+**R26.** CUANDO se dé de alta «X» en una presentación en kg y después «X» en una presentación en L,
+el listado DEBE mostrar **dos filas** «X», cada una con su unidad y su propia existencia; esto DEBE
+quedar cubierto por al menos una prueba de extremo a extremo (Playwright). [D13]
+
+**R27.** La feature DEBE entregarse como una sola unidad `fullstack` que deja el árbol compilando y
+`./init.sh` completo en verde. [D14]
+
+**R28.** El sistema NO DEBE incorporar ninguna dependencia nueva para esta feature: `package.json`
+queda sin cambios. [D15]
 
 ## Preguntas abiertas
 
