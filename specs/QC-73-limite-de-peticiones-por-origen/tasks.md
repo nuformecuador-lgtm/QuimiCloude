@@ -94,7 +94,7 @@
   cambiar la cuota crea otra, y la traducción `success` → `allowed`. Si T1 encontró cómo inyectar un
   cliente Redis falso, se añade además la batería de contrato de T7 contra este adaptador.
 
-- [ ] **T9 — Cableado en `lib/composition/edge.ts`.**
+- [x] **T9 — Cableado en `lib/composition/edge.ts`.**
   Depende de: T2–T8, y de la respuesta a `design.md > 11`, punto 1.
   Archivos: `lib/composition/edge.ts`, `tests/unit/composition/rate-limit-edge-wiring.test.ts`.
   Hacer: fachada `rateLimitEdge` (`design.md > 6`): configuración leída en cada llamada, avisos de
@@ -105,7 +105,7 @@
   memoria; con las dos se usa el de Upstash (simulado); con una sola, en memoria; la rama de
   producción hace lo decidido; un valor inválido avisa una sola vez en dos llamadas seguidas.
 
-- [ ] **T10 — Enganche en el middleware.**
+- [x] **T10 — Enganche en el middleware.**
   Depende de: T9.
   Archivos: `lib/modules/identity/adapters/driving/route-guard-middleware.ts`,
   `tests/unit/identity/route-guard-rate-limit.test.ts`; y, solo si hace falta, los tests existentes
@@ -160,7 +160,7 @@
 
 ## Frontend
 
-- [ ] **T13 — Envoltorio de `useActionState`.**
+- [x] **T13 — Envoltorio de `useActionState`.**
   Depende de: T5.
   Archivos: `hooks/use-rate-limited-action-state.ts`, `tests/unit/hooks/use-rate-limited-action-state.test.tsx`
   (proyecto `ui` de Vitest: confirmar en `vitest.config.mts` qué nombre lo selecciona).
@@ -173,7 +173,7 @@
   acción que lanza otro `Error`, el error llega al boundary como hoy y **no** hay toast; con una que
   devuelve estado, el estado es el devuelto.
 
-- [ ] **T14 — Censo y migración de formularios.**
+- [x] **T14 — Censo y migración de formularios.**
   Depende de: T13.
   Archivos: `app/(public)/login/components/login-form.tsx` y **cada** archivo que el censo encuentre;
   los layouts de zona que no monten el `Toaster`.
@@ -198,7 +198,7 @@
 
 ## Verificación y cierre
 
-- [ ] **T16 [P] — Procedimiento de medida de latencia.**
+- [x] **T16 [P] — Procedimiento de medida de latencia.**
   Archivos: `scripts/measure-rate-limit-latency.ts`, `tests/unit/scripts/measure-rate-limit-latency.test.ts`.
   Hacer: script que lanza N peticiones secuenciales a una URL y escribe p50 y p95; función de
   percentil exportada. Usa una ruta de la cuota **general** y un N por debajo de ella (o sube la
@@ -218,7 +218,7 @@
   Hecho cuando: las cifras están en el `impl`. Sin cuenta de Upstash: la medición en memoria está, y
   la de Upstash queda escrita como pendiente con su motivo (`design.md > 11`, punto 6).
 
-- [ ] **T18 [P] — Documentación.**
+- [x] **T18 [P] — Documentación.**
   Archivos: `docs/architecture.md` (`> Stack > Integraciones externas` y `> Permisos y autenticación`),
   `.env.example` si existe.
   Hacer: `design.md > 12`. Las cinco variables de cuota y las dos de Upstash, sin valores reales.
