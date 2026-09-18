@@ -197,8 +197,9 @@ async function createFixture(): Promise<Fixture> {
   return { actorId: userId, presentationId, companyId };
 }
 
-/** En orden de FK: lotes, productos, presentacion, usuario. */
+/** En orden de FK: asientos, lotes, productos, presentacion, usuario. */
 async function dropFixture(fixture: Fixture, productIds: readonly string[]): Promise<void> {
+  await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.productBatch.deleteMany({ where: { productId: { in: [...productIds] } } });
   await prisma.product.deleteMany({ where: { id: { in: [...productIds] } } });
   await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });

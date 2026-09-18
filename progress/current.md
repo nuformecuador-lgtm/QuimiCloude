@@ -509,6 +509,33 @@ QC-108, para que ese PR no arrastrase seis commits de papeleo de otras dos ficha
 **Lo que queda dicho, porque volverá a pasar**: un worktree se monta desde `origin/dev`, no desde el
 `dev` local, así que todo lo que viva sin pushear es invisible para la siguiente feature.
 
+### `./init.sh --rapido` no puede ver una guardia de censo que vive en `tests/unit/` (2026-09-18, QC-92)
+
+**Medido, no supuesto.** `tests/unit/inventario/schema/inventario-schema.test.ts` estuvo **rojo
+desde la tanda 1 de QC-92** (commit `842d63d`, que anadio el modelo `InventoryMovement` y la
+back-relation `movements`) y **las tandas 1 y 3 se cerraron con el gate rapido en verde**. Tres de
+sus cuatro rojos llevaban tres tandas escondidos; el cuarto lo anadio T8.
+
+**Tres causas simultaneas, las tres sobre `scripts/test-rapido.mjs`:**
+1. `changedFiles()` filtra el diff a `.ts|.tsx|.js|.jsx|.mjs|.cjs`: **`.prisma` y `.sql` quedan
+   fuera**, asi que una migracion o un cambio de esquema no selecciona nada.
+2. Ese archivo **lee lo que vigila como TEXTO** —un regex sobre el contenido del barrel y una
+   lectura de `db/schema.prisma` desde disco—, no lo importa. **Ningun grafo de imports lo
+   relaciona jamas.**
+3. Vive en `tests/unit/` y no en `tests/guards/`, asi que tampoco entra por el patron `guard`, que
+   es lo unico que el modo rapido corre siempre.
+
+Es la **quinta familia** del inventario de guardias de censo/alcance de QC-92, y la primera cuyo
+defecto es **donde vive** en vez de que afirma. Es exactamente el riesgo que `design.md > 5.2` de
+QC-92 dejo escrito para su propia guardia: «en `tests/guards/` y **no** en `tests/unit/` porque no
+la selecciona ningun grafo de imports».
+
+**Decision del humano del 2026-09-18: se anota y QC-92 NO se para.** El agujero es del **modo
+`--rapido`**, no del gate: **`./init.sh` completo si los habria cazado**, y el cierre de la feature
+lo exige igualmente. Arreglar `scripts/test-rapido.mjs` —o mover el censo a `tests/guards/`— es
+cambiar el arnes, y eso va por `/afinar-regla` **en frio**: un parche a mitad de una feature en
+vuelo puede poner rojas las otras ramas vivas (QC-68, QC-59, QC-96). **No se toco nada de eso.**
+
 ### El worktree de QC-59 tampoco se desmonta — SEPTIMA vez, y el gate miente en su codigo de salida (2026-09-17)
 
 **Dos cosas distintas, las dos del arnes y ninguna de la ficha.**

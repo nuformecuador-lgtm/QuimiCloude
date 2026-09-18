@@ -57,23 +57,29 @@ import type { SessionEraser } from '@/lib/modules/identity/ports/session-eraser'
 import type { SessionRevocationRepository } from '@/lib/modules/identity/ports/session-revocation-repository';
 import type { UserCredentialsReader } from '@/lib/modules/identity/ports/user-credentials-reader';
 import {
+  createAdjustBatchStock,
   createCreatePresentation,
   createCreateProduct,
   createDeletePresentation,
   createDeleteProduct,
   createGetProduct,
+  createListBatchMovements,
   createListPresentations,
+  createListProductBatches,
   createListProducts,
   createUpdatePresentation,
   createUpdateProduct,
 } from '@/lib/modules/inventario';
 import { findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
+import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
   addBatchToAlive,
+  adjustBatchStock,
   createProduct,
   createWithFirstBatch,
   findAliveIdByName,
   findAliveProductById,
+  findBatchesOfAliveProduct,
   listAliveProducts,
   softDeleteAliveProduct,
   updateAliveProduct,
@@ -640,6 +646,9 @@ const productRepository: ProductRepository = {
   findAliveIdByName,
   createWithFirstBatch,
   addBatchToAlive,
+  adjustBatchStock,
+  findBatchesOfAliveProduct,
+  findBatchMovements,
 };
 
 const presentationRepository: PresentationRepository = {
@@ -671,6 +680,15 @@ export const inventario = {
   listPresentations: createListPresentations({
     presentations: presentationRepository,
     log: inventarioListQueryLog,
+  }),
+  // Claves nuevas al final: ninguna de las de arriba se toca.
+  adjustBatchStock: createAdjustBatchStock({ products: productRepository }),
+  listProductBatches: createListProductBatches({ products: productRepository }),
+  // Se nombra el adaptador importado y no la constante `peopleDirectory`, que apunta al mismo
+  // objeto pero se declara mas abajo: un `const` no existe antes de su linea.
+  listBatchMovements: createListBatchMovements({
+    products: productRepository,
+    people: assignmentDirectoryPrisma,
   }),
 } as const;
 

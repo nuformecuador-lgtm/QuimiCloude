@@ -236,13 +236,15 @@ const PUERTOS = [
     nombre: 'ProductRepository',
     port: 'product-repository.ts',
     constante: 'productRepository',
-    adaptador: 'product-prisma.ts',
+    // `findBatchMovements` vive en `batch-movement-prisma.ts`, no en `product-prisma.ts`: el
+    // puerto tiene mas de un archivo que lo implementa, y la guardia busca en los dos.
+    adaptadores: ['product-prisma.ts', 'batch-movement-prisma.ts'],
   },
   {
     nombre: 'PresentationRepository',
     port: 'presentation-repository.ts',
     constante: 'presentationRepository',
-    adaptador: 'presentation-prisma.ts',
+    adaptadores: ['presentation-prisma.ts'],
   },
 ] as const
 
@@ -250,7 +252,7 @@ describe('QC-49 R13 — cada metodo de los dos puertos declara Y consume el ambi
   for (const puerto of PUERTOS) {
     const metodos = metodosDelPuerto(puerto.port, puerto.nombre)
     const cableado = cableadoDe(puerto.constante, puerto.nombre)
-    const adaptador = analizar(puerto.adaptador)
+    const adaptadores = puerto.adaptadores.map((archivo) => analizar(archivo))
 
     it(`${puerto.nombre}: los ${metodos.length} metodos estan cableados y ninguno se queda fuera`, () => {
       // Sin esto, un metodo NUEVO del puerto podria no aparecer en el barrido de abajo y la
@@ -264,18 +266,22 @@ describe('QC-49 R13 — cada metodo de los dos puertos declara Y consume el ambi
         const implementacion = cableado.get(metodo)
         expect(implementacion, `${metodo} no esta cableado en lib/composition`).toBeTruthy()
 
-        const funcion = adaptador.funciones.find((f) => f.nombre === implementacion)
+        const hallazgo = adaptadores
+          .map((adaptador) => ({ adaptador, funcion: adaptador.funciones.find((f) => f.nombre === implementacion) }))
+          .find((par) => par.funcion !== undefined)
         expect(
-          funcion,
-          `${puerto.adaptador} no exporta la funcion ${implementacion ?? '?'} que cablea ${metodo}`,
+          hallazgo,
+          `ninguno de ${puerto.adaptadores.join(', ')} exporta la funcion ${implementacion ?? '?'} que cablea ${metodo}`,
         ).toBeTruthy()
+        if (hallazgo === undefined) return
+        const { adaptador, funcion } = hallazgo
         if (funcion === undefined) return
 
         // 1. LA DECLARA. El compilador NO lo exige: una implementacion de menor aridad satisface
         //    la firma del puerto. Esta linea es lo unico que lo impide.
         expect(
           PARAMETRO_DE_AMBITO.test(funcion.parametros),
-          `${puerto.adaptador}:${funcion.nombre} implementa ${puerto.nombre}.${metodo} SIN declarar \`scope: InventoryScope\`. TypeScript lo acepta -una funcion de menos parametros satisface la firma-, asi que la unica forma de que no se cuele es esta (R13)`,
+          `${adaptador.archivo}:${funcion.nombre} implementa ${puerto.nombre}.${metodo} SIN declarar \`scope: InventoryScope\`. TypeScript lo acepta -una funcion de menos parametros satisface la firma-, asi que la unica forma de que no se cuele es esta (R13)`,
         ).toBe(true)
 
         // 2. LO USA. Declararlo y no usarlo seria la misma fuga con mejor cara: la llamada
@@ -283,7 +289,7 @@ describe('QC-49 R13 — cada metodo de los dos puertos declara Y consume el ambi
         //    todas las empresas.
         expect(
           adaptador.consumidoras.has(funcion.nombre),
-          `${puerto.adaptador}:${funcion.nombre} declara el ambito pero NO lo lleva hasta \`./company-scope\`: el \`scope\` tiene que acabar en una de sus envolturas (${envolturasImportadas(readFileSync(join(PERSISTENCE_ROOT, puerto.adaptador), 'utf8')).join(', ')}), aqui o en un ayudante de este mismo archivo al que se le pase (R13)`,
+          `${adaptador.archivo}:${funcion.nombre} declara el ambito pero NO lo lleva hasta \`./company-scope\`: el \`scope\` tiene que acabar en una de sus envolturas (${envolturasImportadas(readFileSync(join(PERSISTENCE_ROOT, adaptador.archivo), 'utf8')).join(', ')}), aqui o en un ayudante de este mismo archivo al que se le pase (R13)`,
         ).toBe(true)
       })
     }

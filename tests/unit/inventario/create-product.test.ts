@@ -73,6 +73,10 @@ function montarRepositorio(overrides: Partial<DobleDelPuerto> = {}): DobleDelPue
       batchId: 'lote-1',
       lot: '1',
     })),
+    // QC-92: sin caso en este archivo -es del alta, no del ajuste-, dobles minimos.
+    adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(async () => null),
+    findBatchesOfAliveProduct: vi.fn<ProductRepository['findBatchesOfAliveProduct']>(async () => []),
+    findBatchMovements: vi.fn<ProductRepository['findBatchMovements']>(async () => null),
     ...overrides,
   };
 }
