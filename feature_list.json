@@ -854,7 +854,7 @@
       "description": "Hoy nada impide que una feature nueva cree una tabla de datos de operacion sin su columna de empresa: la regla existe escrita en `docs/architecture.md > Dominio` y solo la hace cumplir el criterio del reviewer. Hace falta una guardia ejecutable que corra en el gate y falle sola.\n\nLa guardia lee `db/schema.prisma` y da rojo si un modelo de negocio no lleva su columna de empresa. Es el mismo patron que la guardia que ya vigila el comentario `/// @module`. Dos listas explicitas y cortas la acotan: las tablas del sistema, que estan exentas a proposito (`users`, `roles`, `document_types`), y las tablas ya construidas que todavia estan pendientes de aislar, cada una anotada con la ficha que la salda. Esa segunda lista solo puede encoger, nunca crecer: anadir una entrada nueva es rojo. Cuando quede vacia se borra, y con ella la vineta correspondiente de `docs/architecture.md`.\n\nNace el 2026-09-04 junto con la reescritura del punto 1 del dominio, para que la regla quede verificada y no solo escrita (regla 5 de `CLAUDE.md`).",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
+      "complexity": "low",
       "zone": "backend",
       "branch": "feature/QC-61-guardia-empresa-en-esquema",
       "depends_on": [
