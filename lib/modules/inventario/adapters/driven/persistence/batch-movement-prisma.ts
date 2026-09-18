@@ -61,7 +61,7 @@ function toMovementView(row: MovementRow): InventoryMovementView {
 
 /**
  * El historial de un lote, del mas reciente al mas antiguo. `null` cuando el lote no existe o es
- * de otra empresa (R18); comprobarlo aparte evita que un lote sin asientos -anterior al libro- se
+ * de otra empresa; comprobarlo aparte evita que un lote sin asientos -anterior al libro- se
  * confunda con uno que no existe.
  */
 export async function findBatchMovements(

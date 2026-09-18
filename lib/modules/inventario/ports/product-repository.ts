@@ -121,12 +121,12 @@ export interface ProductRepository {
   ): Promise<{ batchId: string; lot: string } | null>;
 
   /**
-   * QC-92: mueve la existencia de un lote por `delta` (con signo) y deja su asiento en el libro,
+   * Mueve la existencia de un lote por `delta` (con signo) y deja su asiento en el libro,
    * las dos cosas en la MISMA transaccion. El total nuevo no lo calcula quien llama: lo calcula la
    * base con un `UPDATE` relativo, para que dos ajustes concurrentes no se pisen el uno al otro.
    *
    * Devuelve `null` cuando el lote no existe o es de OTRA empresa -las dos por el mismo camino,
-   * igual que el resto del puerto (R18)-. Un `stock` que quedaria negativo se rechaza antes de
+   * igual que el resto del puerto-. Un `stock` que quedaria negativo se rechaza antes de
    * escribir nada; el adaptador decide como lo comunica.
    *
    * La empresa no viaja en ningun tipo de entrada, igual que en `NewProduct` y `NewProductBatch`.
@@ -141,7 +141,7 @@ export interface ProductRepository {
   ): Promise<{ stock: number } | null>;
 
   /**
-   * QC-92: todos los lotes del producto, siempre que el producto siga VIVO -el filtro de vivos es
+   * Todos los lotes del producto, siempre que el producto siga VIVO -el filtro de vivos es
    * del adaptador, como en el resto del puerto-. Un `productId` que no existe, que esta borrado o
    * que es de otra empresa devuelve un array vacio, por el mismo camino que «no hay lotes».
    */
@@ -151,8 +151,8 @@ export interface ProductRepository {
   ): Promise<readonly ProductBatchView[]>;
 
   /**
-   * QC-92: el historial de asientos de un lote, del mas reciente al mas antiguo. `null` cuando el
-   * lote no existe o es de otra empresa (R18); un lote vivo sin ningun asiento -anterior al libro-
+   * El historial de asientos de un lote, del mas reciente al mas antiguo. `null` cuando el
+   * lote no existe o es de otra empresa; un lote vivo sin ningun asiento -anterior al libro-
    * devuelve un array vacio, que no es lo mismo que `null`.
    */
   findBatchMovements(
