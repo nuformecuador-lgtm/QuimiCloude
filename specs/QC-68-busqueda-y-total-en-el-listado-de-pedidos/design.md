@@ -204,6 +204,19 @@ nombres) y **4 con búsqueda**. Constante: no crece con las filas. El molde es
 pedir primero los identificadores a otro módulo y después la página— y cuyo test cuenta
 invocaciones en vez de mirar el resultado.
 
+> **Nota fechada 2026-09-17 (implementación): dos cifras ciertas que miden cosas distintas.**
+> El párrafo de arriba cuenta **consultas SQL** —3 sin búsqueda y 4 con ella—, y **no se corrige**:
+> es lo que llega a Postgres y es lo que R8 acota. Pero **T9 es un test unitario con dobles**, y un
+> doble del puerto no puede ver el `findMany` y el `count` por separado: los dos viven dentro de
+> **una sola** invocación de `listAlive`. Lo único que ese test puede afirmar de verdad es el
+> número de **invocaciones de puerto**, que es **2 sin búsqueda** (`orders.listAlive` +
+> `recipes.findRefsIncludingDeleted`) y **3 con búsqueda** (más `recipes.findIdsMatchingName`).
+> Por eso T9 se escribe contando invocaciones y con esas cifras. Es también lo que dice hoy el
+> encabezado de `list-orders.ts` («DOS consultas por página»), que mide lo mismo que el test.
+> Quien compare el test con este párrafo y crea que uno de los dos miente, que lea esta nota: la
+> propiedad que las dos defienden es la misma —**el número no crece con las filas**—, y quien la
+> demuestra contra la base real es el test de integración, no el unitario.
+
 **El caso «ninguna receta casa» NO se cortocircuita en el dominio.** Se pasa `recipeIds: []` al
 repositorio y el `where` sale con `recipeId: { in: [] }`, que devuelve cero filas y un `count` de
 cero. Es una consulta más barata que la lista completa y mantiene **una sola** aritmética de

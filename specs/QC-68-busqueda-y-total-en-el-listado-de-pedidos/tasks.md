@@ -90,9 +90,17 @@
 
 ### T9 [P] — Comprobar el recuento de consultas (depende de T7)
 - **Toca**: `tests/unit/pedidos/list-orders.test.ts`
-- Caso nuevo que **cuenta invocaciones** (no resultados): misma página con 1 fila y con 25 →
-  **3 consultas sin búsqueda y 4 con búsqueda** (**R8**). Y: con `search` vacío el catálogo de
-  búsqueda **no se llama**; con `null` del catálogo, `listAlive` recibe `null` (**R9**).
+- Caso nuevo que **cuenta invocaciones de puerto** (no resultados): misma página con 1 fila y con
+  25 → **2 invocaciones sin búsqueda** (`orders.listAlive` + `recipes.findRefsIncludingDeleted`) y
+  **3 con búsqueda** (más `recipes.findIdsMatchingName`) (**R8**). Y: con `search` vacío el
+  catálogo de búsqueda **no se llama**; con `null` del catálogo, `listAlive` recibe `null`
+  (**R9**).
+- **Corregido el 2026-09-17** (implementación, acordado con el leader): esta tarea decía «3
+  consultas sin búsqueda y 4 con búsqueda», que son las **consultas SQL** que cuenta
+  `design.md > 3` y que un doble **no puede ver** —el `findMany` y el `count` viven dentro de una
+  sola invocación de `listAlive`—. Las dos cifras son ciertas y miden cosas distintas; la nota
+  fechada que lo explica está en `design.md > 3`, donde el conteo de SQL **no se ha borrado**.
+  Quien demuestra el número de consultas SQL contra la base real es el test de integración.
 - **Hecho**: el caso se pone rojo si alguien mete la resolución de ids dentro de un bucle por fila.
 
 ---
