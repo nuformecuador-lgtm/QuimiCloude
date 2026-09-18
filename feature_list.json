@@ -1374,7 +1374,7 @@
       "description": "Corregir la existencia de un producto registrando un MOVIMIENTO de ajuste que suma o resta, en vez de sobrescribir un numero.\n\nNace el 2026-09-10 al acotar QC-90 con /afinar-feature. La pregunta que la destapo fue concreta: alguien carga 100 bidones por error y la existencia ya no vive en el producto sino en los lotes. El humano eligio el ajuste de inventario frente a las dos alternativas -editar el lote en una pantalla propia, o dejar que la edicion del producto tocara el ultimo lote-.\n\nPOR QUE VA DETRAS DE QC-91: mientras la existencia siga siendo un numero editable en el producto, el ajuste no tiene nada que resolver. Se vuelve necesario justo cuando la existencia pasa a ser la suma de los lotes.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO:\n\n* Si el ajuste se hace sobre un LOTE concreto o sobre el producto, y en ese segundo caso de que lote sale la diferencia.\n* Si el motivo del ajuste es obligatorio y si sale de una lista cerrada -merma, rotura, conteo fisico, error de carga- o es texto libre.\n* Que permiso lo corta: si basta `inventario.modificar` o el ajuste merece uno propio.\n* Si el movimiento es una tabla nueva de movimientos de inventario -que hoy NO existe- o solo una correccion registrada sobre el lote.\n* Si el ajuste puede dejar la existencia en negativo, y que pasa con los lotes ya consumidos.\n\n",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
+      "complexity": "high",
       "zone": "fullstack",
       "branch": "feature/QC-92-ajuste-de-inventario",
       "depends_on": [
