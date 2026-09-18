@@ -27,9 +27,15 @@ consecuencias de arquitectura que no son opinables:
      aislamiento implementado solo como policy **no cuenta como implementado**, igual que
      no cuenta un permiso. La empresa viaja firmada en la sesion (QC-48) y **eso tampoco
      autoriza por si solo**.
-   - **Toda tabla de negocio nueva nace con su columna de empresa.** Las unicas exentas
-     son las del sistema, y son una lista corta y cerrada: `users`, `roles`,
-     `document_types`. Anadir una tabla de operacion sin empresa es BLOQUEANTE.
+   - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la
+     columna `company_id` exista, obligatoria u opcional. Las exentas son una lista corta
+     y cerrada de ocho tablas: los catalogos compartidos por todas las empresas
+     (`document_types`, `roles`, `permissions`, `role_permissions`), la propia empresa
+     (`companies`), las que cuelgan de un usuario que ya tiene empresa
+     (`credential_setup_tokens`, `revoked_sessions`) y la que hereda la empresa de su
+     receta (`recipe_lines`). La tabla de usuarios no es exenta: lleva su empresa. La
+     lista la hace cumplir `tests/guards/guard-empresa-en-esquema.test.ts`, que la guarda
+     con el motivo de cada entrada. Anadir una tabla de operacion sin empresa es BLOQUEANTE.
    - **Lo que la regla vieja protegia sigue en pie.** No se prepara infraestructura «por
      si acaso». Lo que cambio es que multiplicar empresas dejo de ser hipotetico y paso a
      ser backlog; sigue siendo sobre-ingenieria —y el reviewer la rechaza— todo lo que no
