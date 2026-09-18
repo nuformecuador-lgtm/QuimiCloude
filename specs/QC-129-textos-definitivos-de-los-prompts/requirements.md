@@ -128,8 +128,12 @@ R17). `[D12]`
 
 **R21.** Esta ficha DEBE añadir una **nota fechada** a
 `specs/QC-109-procesamiento-de-pdf-por-estrategia/requirements.md` que diga **qué queda derogado**
-—su R4, su R6 y sus decisiones `[D6]` y `[D15]`— **por qué** y **qué lo sustituye**, sin borrar ni
-reescribir el texto original. `[D12]`
+—su R4, su R6 y sus decisiones **`[D6]` y `[D15]` DE QC-109**— **por qué** y **qué lo sustituye**,
+sin borrar ni reescribir el texto original. `[D12]`
+
+> **Nota de notación.** Las dos citas de la línea de arriba son las decisiones **de QC-109**, no las
+> de esta ficha, que tiene su propia `[D6]` —los PDFs de muestra los aporta el humano—. En todo el
+> resto del archivo, `[Dn]` sin más se refiere **siempre** a la tabla de decisiones de QC-129.
 
 ## Preguntas abiertas
 
