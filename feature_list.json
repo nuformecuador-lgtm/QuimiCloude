@@ -1202,13 +1202,15 @@
       "epic": "QC-27",
       "epic_name": "Recetas",
       "name": "registro-de-ejecucion-de-receta",
-      "description": "Queda constancia de cómo se ejecutó una receta en planta: cada vez que alguien arranca, avanza, retrocede, cancela o termina, se guarda una anotación con el momento, el pedido, quién lo hizo, en qué paso estaba, qué acción fue y, si la hubo, el motivo.\n\nLas acciones posibles son cinco y ninguna más: arrancar, avanzar, retroceder, cancelar y finalizar.\n\nCon esto se puede reconstruir después el recorrido completo de una ejecución: quién la llevó, cuánto tardó entre paso y paso, si hubo que volver atrás, y si se abandonó a medias y por qué.\n\nEs la pieza que QC-63 dejó fuera a propósito: su ficha dice literalmente que «registrar quién marcó qué y cuándo sigue fuera de alcance». Los controles que disparan estas acciones —Anterior, Siguiente, Finalizar— ya existen desde QC-62.\n\nDECISIONES YA CERRADAS CON EL HUMANO EL 2026-09-08:\n\n* Las acciones son cinco: arrancar, avanzar, retroceder, cancelar y finalizar.\n* El motivo admite vacío: la mayoría de las acciones no lo necesitan.\n* CANCELAR SIN MOTIVO NO SE PUEDE. Quien abandona una ejecución a medias tiene que explicar por qué; un registro de cancelaciones mudas no sirve para lo único que se le va a pedir después, que es entender qué pasó en planta.\n\nHAY PRECEDENTE PARA ESTA REGLA Y NO SE INVENTA OTRA FORMA: un pedido cancelado (QC-34) guarda su motivo en una columna anulable, y una regla en la propia base —no solo en la validación de entrada— garantiza que motivo y cancelación van juntos. Aquí vale lo mismo, con una diferencia que hay que resolver antes de copiarla: en pedidos la regla es «existe si y solo si está cancelado», y aquí sólo está cerrada la mitad —que al cancelar hace falta—. Si el motivo puede acompañar también a un retroceso, la regla no es «si y solo si» y la forma cambia.\n\nEsta ficha entrega el almacenamiento y la operación de escritura. Engancharla a la pantalla del operador es de QC-63, que hoy está pendiente; mientras tanto el registro queda construido y sin consumidor, igual que se hizo con la conversión de unidades en QC-76.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO:\n\n* Si el motivo sirve para algo más que cancelar. Podría acompañar a un retroceso —volver atrás porque algo salió mal es justo lo que interesaría saber después—, o quedar reservado a la cancelación. De esto depende si la regla es «si y solo si» o sólo «hace falta al cancelar».\n* Qué se guarda exactamente en el paso. ¿El documento entero del paso, que se duplica en cada clic y crece rápido? ¿O su posición, que es barata pero deja de significar lo mismo si luego se edita la receta? Es una decisión de negocio, no de implementación.\n* Qué es «el tiempo». ¿El instante del clic, o cuánto se estuvo en ese paso antes de moverse? Son dos columnas distintas y no dan la misma respuesta.\n* Si el pedido es obligatorio. QC-63 permite al operador abrir una receta por su propia dirección, que no tiene por qué venir de un pedido.\n* Cuánto se conserva. Si es un registro de auditoría que no se borra nunca, o si se purga.\n* Si se acota por empresa. `orders` tampoco tiene empresa todavía: eso es QC-60.\n\n",
+      "description": "Queda constancia de como se ejecuto cada pedido en planta: cada vez que alguien arranca, retoma, avanza, retrocede, cancela o finaliza, se guarda una anotacion con el instante, el pedido, quien lo hizo, la posicion del paso y, solo al cancelar, el motivo.\n\nCon esto se puede reconstruir despues el recorrido completo de una ejecucion: quien la llevo, cuanto tardo entre paso y paso, si hubo que volver atras, y si se abandono a medias y por que.\n\nREACOTADA EL 2026-09-18 con /afinar-feature. QC-63 CERRO SIN CONECTAR EL REGISTRO, asi que esta ficha lo CONECTA a la pantalla de ejecucion y pasa a fullstack:\n\n* Las acciones son SEIS y ninguna mas: arrancar, retomar, avanzar, retroceder, cancelar y finalizar. Abrir anota arrancar; reentrar en un pedido EN_CURSO anota RETOMAR y la pantalla VUELVE AL ULTIMO PASO ANOTADO; Siguiente y Anterior anotan avanzar y retroceder; Finalizar anota finalizar.\n* CANCELAR SIN MOTIVO NO SE PUEDE, y el motivo existe SOLO al cancelar (si y solo si, garantizado en la base, como el motivo de un pedido cancelado de QC-34).\n* Cancelar CANCELA EL PEDIDO: la pantalla gana un boton que pide el motivo, el pedido pasa a CANCELADO por el camino unico de cancelacion de QC-34, y el mismo texto queda como motivo de cancelacion del pedido. Lo puede hacer cualquier responsable asignado, con asignaciones.consultar, por un caso de uso nuevo de asignaciones; el seed de permisos no cambia.\n* Del paso se guarda su POSICION; del tiempo, el INSTANTE de la accion.\n* Si falla anotar, avanzar y retroceder NO se bloquean; arrancar, retomar, finalizar y cancelar van en la misma operacion que el cambio que hacen.\n* El registro lleva empresa (QC-60 ya se la dio a los pedidos) y el pedido es obligatorio (QC-63 solo ejecuta desde un pedido asignado).\n\nLO QUE NO ENTRA: purgar el registro (ficha nueva con cron y caducidad en .env); una pantalla para consultar el recorrido; guardar lo marcado dentro de cada paso.\n\n\\--- Acotada por `/afinar-feature` el 2026-09-08 y reacotada el 2026-09-18. Las decisiones las fijo el humano ANTES del spec y estan en `specs/QC-82-registro-de-ejecucion-de-receta/requirements.md`. ---",
       "status": "pending",
       "sdd": true,
-      "complexity": "medium",
-      "zone": "backend",
+      "complexity": "high",
+      "zone": "fullstack",
       "branch": "feature/QC-82-registro-de-ejecucion-de-receta",
-      "depends_on": [],
+      "depends_on": [
+        "QC-63"
+      ],
       "spec_path": "specs/QC-82-registro-de-ejecucion-de-receta"
     },
     {
@@ -1817,6 +1819,23 @@
       "branch": "feature/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio",
       "depends_on": [],
       "spec_path": "specs/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio"
+    },
+    {
+      "key": "QC-124",
+      "id": 124,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "purga-del-registro-de-ejecucion",
+      "description": "Nace el 2026-09-18 al reacotar QC-82, que construye el registro de ejecucion de receta y NO borra nada.\n\nEl registro de un pedido se conserva X dias despues de que el pedido TERMINA (entregado o cancelado), y pasado ese plazo se borra. Lo hace un CRON AUTOMATICO, y X viene de una variable de entorno (.env). Decidido por el humano el 2026-09-18.\n\nQUEDA POR ACOTAR con /afinar-feature antes del spec: con que mecanismo corre el cron; que pasa si la variable no esta definida o no es valida; si se borran solo las anotaciones o algo mas; y como se prueba.\n\nLO QUE NO ENTRA: construir el registro y conectarlo a la pantalla (QC-82).",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-124-purga-del-registro-de-ejecucion",
+      "depends_on": [
+        "QC-82"
+      ],
+      "spec_path": "specs/QC-124-purga-del-registro-de-ejecucion"
     }
   ]
 }
