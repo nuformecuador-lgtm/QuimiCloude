@@ -3,12 +3,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { setupUser } from '../../helpers/user-event';
-
 import {
+  ORDER_EXECUTION_ORDER_ID_FIELD,
   ORDER_EXECUTION_RECIPE_NAME_TESTID,
   ORDER_EXECUTION_SCREEN_TESTID,
   OrderExecutionScreen,
@@ -68,13 +67,27 @@ const EXECUTION: AssignedOrderExecutionView = {
   ],
 };
 
-async function marcarTodo(user: ReturnType<typeof setupUser>): Promise<void> {
+function marcarTodo(): void {
   for (const casilla of screen.queryAllByRole('checkbox')) {
     if (casilla.getAttribute('aria-checked') !== 'true') {
-      await user.click(casilla);
+      fireEvent.click(casilla);
     }
   }
 }
+
+// Un paso sin lista de verificacion: aisla la espera de tiempo del bloqueo por elementos.
+const EXECUTION_SIN_ELEMENTOS: AssignedOrderExecutionView = {
+  ...EXECUTION,
+  steps: [{ blocks: [{ kind: 'paragraph', spans: [{ text: 'Paso sin elementos pendientes' }] }] }],
+};
+
+const EXECUTION_DOS_PASOS: AssignedOrderExecutionView = {
+  ...EXECUTION,
+  steps: [
+    { blocks: [{ kind: 'paragraph', spans: [{ text: 'Paso uno sin elementos' }] }] },
+    { blocks: [{ kind: 'paragraph', spans: [{ text: 'Paso dos sin elementos' }] }] },
+  ],
+};
 
 describe('pantalla de ejecucion — R21: el factor y las cantidades tal cual estan escritas', () => {
   it('muestra la cantidad del pedido y la cantidad de la linea CARACTER A CARACTER', () => {
@@ -103,20 +116,118 @@ describe('pantalla de ejecucion — R19: bloqueo sin escape con el motivo visibl
   });
 });
 
+describe('pantalla de ejecucion — R4: la espera minima de 5 segundos por paso', () => {
+  it('a los 4999 ms el avance sigue impedido y a los 5000 ms deja de estarlo', async () => {
+    vi.useFakeTimers();
+    try {
+      render(<OrderExecutionScreen execution={EXECUTION_SIN_ELEMENTOS} />);
+      const finalizar = screen.getByTestId('step-reader-finish');
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4999);
+      });
+      expect(finalizar).toBeDisabled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(finalizar).toBeEnabled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('pantalla de ejecucion — R5: la cuenta del primer paso arranca sola', () => {
+  it('muestra la cuenta completa al montar sin ninguna accion del usuario y no ofrece ningun control "Comenzar"', () => {
+    render(<OrderExecutionScreen execution={EXECUTION} />);
+
+    expect(screen.getByTestId('countdown-timer')).toHaveTextContent('00:05');
+    expect(screen.queryByRole('button', { name: /comenzar/i })).toBeNull();
+    expect(screen.queryByText(/comenzar/i)).toBeNull();
+  });
+});
+
 describe('pantalla de ejecucion — el error de la operacion se muestra sin bloquear la pantalla', () => {
   it('si la operacion falla, muestra el error', async () => {
+    // Enmienda 2026-09-18 (QC-125): la pantalla ahora exige 5 s por paso, asi que el camino de
+    // error tiene que cumplirlos antes de pulsar Finalizar.
     finishAssignedOrderActionMock.mockResolvedValue({
       status: 'error',
       code: 'order_delivered_frozen',
       message: 'Un pedido entregado conserva sus responsables tal como estaban.',
     });
-    const user = setupUser();
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    vi.useFakeTimers();
+    try {
+      render(<OrderExecutionScreen execution={EXECUTION} />);
+      marcarTodo();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+    } finally {
+      // El reloj falso solo hacia falta para cumplir la espera; el resto de la aserción sigue
+      // con temporizadores reales, como el resto del archivo.
+      vi.useRealTimers();
+    }
 
-    await marcarTodo(user);
-    await user.click(screen.getByTestId('step-reader-finish'));
+    fireEvent.click(screen.getByTestId('step-reader-finish'));
 
     expect(await screen.findByTestId('order-execution-finish-error')).toBeVisible();
+  });
+});
+
+describe('pantalla de ejecucion — R13: el ultimo paso tambien espera', () => {
+  it('pulsar Finalizar antes de los 5 s no invoca finishAssignedOrderAction', async () => {
+    vi.useFakeTimers();
+    try {
+      render(<OrderExecutionScreen execution={EXECUTION_SIN_ELEMENTOS} />);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+      fireEvent.click(screen.getByTestId('step-reader-finish'));
+
+      expect(finishAssignedOrderActionMock).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('pantalla de ejecucion — R18: el envio no lleva la espera y remontar la reinicia', () => {
+  it('el FormData enviado tras cumplir la espera y finalizar solo lleva orderId; remontar reinicia la cuenta en el paso 1', async () => {
+    finishAssignedOrderActionMock.mockResolvedValue({ status: 'success' });
+    vi.useFakeTimers();
+    try {
+      const { unmount } = render(<OrderExecutionScreen execution={EXECUTION_DOS_PASOS} />);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      fireEvent.click(screen.getByTestId('step-reader-next'));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('step-reader-finish'));
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(finishAssignedOrderActionMock).toHaveBeenCalledTimes(1);
+      const [, formData] = finishAssignedOrderActionMock.mock.calls[0] as [unknown, FormData];
+      expect([...formData.keys()]).toEqual([ORDER_EXECUTION_ORDER_ID_FIELD]);
+      expect(formData.get(ORDER_EXECUTION_ORDER_ID_FIELD)).toBe(EXECUTION_DOS_PASOS.orderId);
+
+      unmount();
+      render(<OrderExecutionScreen execution={EXECUTION_DOS_PASOS} />);
+
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 2');
+      expect(screen.getByTestId('countdown-timer')).toHaveTextContent('00:05');
+      expect(screen.getByTestId('step-reader-next')).toBeDisabled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -183,9 +294,15 @@ describe('R1 — ningun literal de ruta nuevo en la pagina', () => {
   });
 });
 
-describe('R18 — el asistente heredado no aparece en el diff de esta rama', () => {
+// Tensado a lista cerrada el 2026-09-18 (QC-125, ratificado por el humano): esta ficha SI
+// necesita tocar `step-reader.tsx` (botones, motivo del bloqueo y cronometro son internos del
+// asistente), asi que la igualdad contra `[]` de QC-63 dejaba de poder cumplirse. Lo que sigue
+// prohibido es cualquier OTRO archivo de la carpeta.
+describe('R18 — el asistente heredado solo puede cambiar step-reader.tsx (lista cerrada)', () => {
   const HERE = dirname(fileURLToPath(import.meta.url));
   const REPO_ROOT = join(HERE, '..', '..', '..');
+
+  const PERMITIDOS = ['components/shared/step-reader/step-reader.tsx'];
 
   function git(args: readonly string[]): string {
     return execFileSync('git', [...args], { cwd: REPO_ROOT, encoding: 'utf8' });
@@ -199,7 +316,7 @@ describe('R18 — el asistente heredado no aparece en el diff de esta rama', () 
     }
   }
 
-  it('`components/shared/step-reader/**` no cambia respecto a la base de fusion', (ctx) => {
+  it('todo archivo cambiado de `components/shared/step-reader/**` esta en la lista permitida', (ctx) => {
     const base = mergeBaseConDev();
     if (base === null) {
       ctx.skip(
@@ -213,9 +330,11 @@ describe('R18 — el asistente heredado no aparece en el diff de esta rama', () 
       .map((linea) => linea.trim())
       .filter((linea) => linea !== '');
 
+    const fueraDeLaLista = cambiados.filter((archivo) => !PERMITIDOS.includes(archivo));
+
     expect(
-      cambiados,
-      `esta rama modifico el asistente heredado: ${cambiados.join(', ')}`,
+      fueraDeLaLista,
+      `esta rama modifico un archivo del asistente fuera de la lista cerrada: ${fueraDeLaLista.join(', ')}`,
     ).toEqual([]);
   });
 });
