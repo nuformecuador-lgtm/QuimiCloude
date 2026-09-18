@@ -216,3 +216,48 @@ contra el mismo diff **mutado** con un archivo bajo `app/(private)/produccion/fo
 3. Marcar **T13** `[x]` cuando el gate se vuelva a correr tras el arreglo.
 4. Volver a correr `./init.sh` completo -el arreglo toca `lib/`- y devolver al reviewer.
    No hace falta repetir el E2E: ya lo verifico el reviewer y el arreglo no toca `app/`.
+
+---
+
+# SEGUNDA VUELTA — 2026-09-17
+
+> Vuelta acotada al cierre del bloqueante. No se rehace la review: lo verificado en la primera
+> vuelta sigue en pie. Rama avanzada 3 commits desde `5116ade`: `6a8667d` (limpieza de
+> comentarios), `d0119a6` (T13 marcada) y `c940295` (el informe de la primera vuelta).
+
+## Veredicto final
+
+**APROBADA.** Sin condiciones. Cero bloqueantes.
+
+## Lo verificado en esta vuelta (contrastado, no dado por bueno)
+
+- **El bloqueante esta cerrado.** Se rebarrio **todo** el rango `origin/dev...HEAD` sobre
+  `app/`, `lib/`, `components/`, `hooks/` y `db/`, buscando `QC-<n>`, `R<n>`, `D<n>`,
+  `design.md` y «decision cerrada» en las lineas **añadidas**: **0 resultados** (eran 9). Las
+  nueve lineas se reescribieron conservando el porque —`strictObject` sigue explicando por que
+  no es `z.object`, la edicion sigue explicando que es reemplazo completo, `findProductRefs`
+  sigue explicando por que no hay `unit_id`—, y ninguna quedo vacia ni se borro entera. La
+  cita de `QC-80 (R21)` que queda en `product-view.ts` esta en una **linea de contexto**
+  preexistente que la rama no toca: no es hallazgo, es limpieza por modulo.
+- **Solo comentarios.** `git diff 5116ade..HEAD` sobre produccion, filtrando las lineas que no
+  empiezan por `*`, `//` o `/*`, devuelve **vacio**: ni una sola linea ejecutable cambio. Los
+  cinco archivos tocados son los cinco que señalo la primera vuelta.
+- **Trazabilidad intacta.** Ningun nombre de test ni ningun archivo de `tests/` o `e2e/` entra
+  en el rango: el mapa 23/23 verificado uno a uno sigue valido sin reverificarlo.
+- **Gate completo verde** sobre el arbol final (497 archivos, 7249 passed, 95 skipped, 0
+  rojos). No se repitio, por indicacion del leader. El E2E lo corrio el reviewer en la primera
+  vuelta (14 passed, chromium y webkit) y el arreglo no toca `app/`.
+
+## Estado final de los hallazgos
+
+| # | Hallazgo | Estado |
+|---|---|---|
+| BLOQUEANTE 1 | Citas de ficha/requisito en comentarios de produccion (9 lineas) | **Cerrado** en `6a8667d`. Barrido nuevo: 0 citas |
+| menor 1 | T13 sin marcar | **Cerrado** en `d0119a6`: 13 tasks `[x]`, 0 sin marcar |
+| menor 4 | «lotes vivos» era falso | **Cerrado**. El docblock dice ahora «Existencia agregada por unidad: suma el stock de todos los lotes del producto». **Confirmado que es verdad**: `ProductBatch` no declara `deletedAt` en `db/schema.prisma`, `BATCH_STOCK_BY_UNIT` no lleva `where` y `sumStockByUnit` recorre todas las filas sin filtrar. El texto nuevo describe exactamente lo que el codigo hace |
+| menor 2 | `hallazgosDeStockDeProducto`, detector sin sujeto | **Aceptado como esta.** De acuerdo: cero ganancia de comportamiento y volver a editar la guardia de otra ficha es el riesgo que ya se corrio una vez hoy. Queda para QC-121, que es quien probablemente lo necesita tal cual |
+| menor 3 | La guardia de recetas-ui, estrechada de mas | **Aceptado, con la anotacion en QC-99.** El argumento se sostiene y coincide con lo medido en la primera vuelta: la alternativa es el nombre de rama —fragil— o el barrido que muerde a las fichas posteriores. Se cambia un falso positivo que bloqueaba a **todas** las fichas por un falso negativo acotado a **una**, y esa una es la dueña de la ruta, que es quien mas ojos tiene encima |
+| menor 5 | Limpieza mezclada con codigo en T7/T8 | **Aceptado.** Ya commiteado; la regla se aplica de aqui en adelante, y `6a8667d` es el primer ejemplo de hacerlo bien: solo comentarios, en su propio commit |
+
+Ninguno de los tres menores que quedan abiertos es bloqueante, ni juntos ni por separado.
+Vía libre para el PR.
