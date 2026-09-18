@@ -15,6 +15,7 @@ import {
   useAsyncPaginatedOptions,
   type AsyncPageRequest,
 } from '@/hooks/use-async-paginated-options';
+import { withRateLimitNotice } from '@/hooks/use-rate-limited-action-state';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
@@ -98,7 +99,15 @@ export function ProductNamePicker({
   const pedirPagina = useCallback(async ({ query, page }: AsyncPageRequest) => {
     const search = query.trim();
     const filtro = search === '' ? {} : { search };
-    const result = await listProductsAction({ page, pageSize: MAX_PAGE_SIZE, ...filtro });
+    const result = await withRateLimitNotice(listProductsAction)({
+      page,
+      pageSize: MAX_PAGE_SIZE,
+      ...filtro,
+    });
+
+    if (result === undefined) {
+      return { items: [], hasMore: false };
+    }
 
     if (result.status === 'error') {
       throw new Error(result.message);

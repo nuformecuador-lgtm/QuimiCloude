@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useActionState, useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { useRateLimitedActionState } from '@/hooks/use-rate-limited-action-state';
 import { Textarea } from '@/components/ui/textarea';
 import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
 import { cancelOrderSchema, formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
@@ -118,7 +119,7 @@ export function CancelOrderDialog({ order, open, onOpenChange }: CancelOrderDial
   const router = useRouter();
   const [reason, setReason] = useState('');
 
-  const [state, formAction, isPending] = useActionState(
+  const [state, formAction, isPending] = useRateLimitedActionState(
     async (
       _previous: OrderMutationFormState,
       formData: FormData,

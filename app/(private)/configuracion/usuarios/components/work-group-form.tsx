@@ -1,9 +1,10 @@
 'use client';
 
-import { useActionState, useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { useRateLimitedActionState } from '@/hooks/use-rate-limited-action-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -196,7 +197,7 @@ export function WorkGroupForm({ group, onSaved }: WorkGroupFormProps) {
       : { status: 'success' };
   }
 
-  const [state, formAction] = useActionState(save, INITIAL_STATE);
+  const [state, formAction] = useRateLimitedActionState(save, INITIAL_STATE);
 
   useEffect(() => {
     if (state.status !== 'success') return;

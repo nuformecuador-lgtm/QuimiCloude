@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useRef } from 'react';
+import { useRef } from 'react';
 
 import { StepReader } from '@/components/shared/step-reader';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
@@ -10,6 +10,7 @@ import {
   type FinishAssignedOrderResult,
 } from '@/lib/modules/asignaciones/adapters/driving/order-execution-actions';
 import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
+import { useRateLimitedActionState } from '@/hooks/use-rate-limited-action-state';
 
 import { OrderExecutionLines } from './order-execution-lines';
 import { OrderScaleBanner } from './order-scale-banner';
@@ -47,7 +48,7 @@ export type OrderExecutionScreenProps = {
 
 export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
   const formRef = useRef<HTMLFormElement>(null);
-  const [state, formAction] = useActionState<FinishFormState, FormData>(
+  const [state, formAction] = useRateLimitedActionState<FinishFormState, FormData>(
     (_previous, formData) => finishAssignedOrderAction(IGNORED_PREV_STATE, formData),
     INITIAL_STATE,
   );

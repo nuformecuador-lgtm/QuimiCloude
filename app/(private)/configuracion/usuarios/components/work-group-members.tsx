@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { withRateLimitNotice } from '@/hooks/use-rate-limited-action-state';
 import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
 import type { Page, UserRow, WorkGroupMemberRow } from '@/lib/modules/identity';
 import { listUsersAction } from '@/lib/modules/identity/adapters/driving/user-actions';
@@ -166,18 +167,19 @@ export function WorkGroupMembers({ workGroupId }: WorkGroupMembersProps) {
     let cancelled = false;
 
     // Solo `page` y `pageSize`: las tres listas blancas de la consulta de miembros estan vacias.
-    void listWorkGroupMembersAction(workGroupId, { page, pageSize: DEFAULT_PAGE_SIZE }).then(
-      (result) => {
-        if (cancelled) return;
-        // El `ErrorState` viaja ENTERO, no aplanado a `string`: asi el inesperado conserva su
-        // identificador de peticion (QC-71 R17).
-        setMembers(
-          result.status === 'error'
-            ? { status: 'error', key, error: result }
-            : { status: 'ready', key, data: result.data },
-        );
-      },
-    );
+    void withRateLimitNotice(listWorkGroupMembersAction)(workGroupId, {
+      page,
+      pageSize: DEFAULT_PAGE_SIZE,
+    }).then((result) => {
+      if (cancelled || result === undefined) return;
+      // El `ErrorState` viaja ENTERO, no aplanado a `string`: asi el inesperado conserva su
+      // identificador de peticion (QC-71 R17).
+      setMembers(
+        result.status === 'error'
+          ? { status: 'error', key, error: result }
+          : { status: 'ready', key, data: result.data },
+      );
+    });
 
     return () => {
       cancelled = true;
@@ -193,14 +195,14 @@ export function WorkGroupMembers({ workGroupId }: WorkGroupMembersProps) {
     let cancelled = false;
     const timer = setTimeout(() => {
       // La consulta de personas de QC-66, tal cual la publica el modulo (R28).
-      void listUsersAction({
+      void withRateLimitNotice(listUsersAction)({
         page: 1,
         pageSize: DEFAULT_PAGE_SIZE,
         sort: null,
         filters: {},
         search: term,
       }).then((result) => {
-        if (cancelled) return;
+        if (cancelled || result === undefined) return;
         setCandidates(
           result.status === 'error'
             ? { status: 'error', term, error: result }
@@ -226,8 +228,10 @@ export function WorkGroupMembers({ workGroupId }: WorkGroupMembersProps) {
   async function addMember(userId: string): Promise<void> {
     setBusy(true);
     const idle: WorkGroupMutationFormState = { status: 'idle' };
-    const result = await addWorkGroupMemberAction(idle, memberFormData(userId));
+    const result = await withRateLimitNotice(addWorkGroupMemberAction)(idle, memberFormData(userId));
     setBusy(false);
+
+    if (result === undefined) return;
 
     if (result.status === 'error') {
       // R29: se distingue por su `code`; el panel sigue abierto y la lista no se toca.
@@ -244,8 +248,13 @@ export function WorkGroupMembers({ workGroupId }: WorkGroupMembersProps) {
   async function removeMember(userId: string): Promise<void> {
     setBusy(true);
     const idle: WorkGroupMutationFormState = { status: 'idle' };
-    const result = await removeWorkGroupMemberAction(idle, memberFormData(userId));
+    const result = await withRateLimitNotice(removeWorkGroupMemberAction)(
+      idle,
+      memberFormData(userId),
+    );
     setBusy(false);
+
+    if (result === undefined) return;
 
     if (result.status === 'error') {
       // R32: el error se pinta por su codigo DENTRO del panel y la persona NO se retira.

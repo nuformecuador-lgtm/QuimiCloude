@@ -401,3 +401,177 @@ segun la consigna recibida).
 y el middleware frena antes de la sesion con las dos formas de 429, sin tocar `middleware.ts` ni
 ningun archivo ajeno a esta tanda; typecheck y lint limpios (el unico aviso de lint es de un
 archivo de otro agente); las guardias y los tests existentes del middleware siguen en verde.
+
+## T13-T14 — envoltorio y censo
+
+### T13 — `hooks/use-rate-limited-action-state.ts`
+
+`useRateLimitedActionState(action, initialState, permalink?)` con las mismas dos sobrecargas que
+`useActionState` de React 19 (con y sin `Payload`), y `withRateLimitNotice(fn)` para las llamadas
+directas. Los dos atrapan el error DENTRO de la funcion que envuelven: si `isRateLimitedError(e)`
+(barril `@/lib/modules/rate-limit`) avisan con `toast.error(RATE_LIMITED_MESSAGE)` (sonner) y
+devuelven, respectivamente, el estado anterior o `undefined`; cualquier otro error se relanza tal
+cual.
+
+Test: `tests/unit/hooks/use-rate-limited-action-state.test.tsx` (proyecto `ui`, cae ahi solo por
+`*.test.tsx`). Tres casos, R11 y R12 en el nombre: freno → toast + estado anterior + sin boundary
+montado; otro error → sube al `Boundary` de prueba, sin toast; sin error → el estado pasa a ser el
+que la accion devuelve.
+
+### T14 — censo
+
+Censo de TODO `useActionState` y TODA llamada directa a una Server Action en `app/`, `components/`
+y `hooks/` (`grep -rn` sobre esas tres carpetas), con el archivo y la linea **de antes de migrar**.
+
+**`useActionState` (22 archivos, uno por archivo) — migrados a `useRateLimitedActionState`:**
+
+| Archivo | Linea |
+|---|---|
+| `app/(private)/asignacion/[id]/components/order-execution-screen.tsx` | 50 |
+| `app/(private)/configuracion/presentaciones/components/delete-presentation-dialog.tsx` | 99 |
+| `app/(private)/configuracion/presentaciones/components/presentation-form.tsx` | 296 |
+| `app/(private)/configuracion/unidades/components/delete-unit-dialog.tsx` | 94 |
+| `app/(private)/configuracion/unidades/components/unit-form.tsx` | 270 |
+| `app/(private)/configuracion/usuarios/components/delete-user-dialog.tsx` | 77 |
+| `app/(private)/configuracion/usuarios/components/delete-work-group-dialog.tsx` | 77 |
+| `app/(private)/configuracion/usuarios/components/end-user-sessions-dialog.tsx` | 83 |
+| `app/(private)/configuracion/usuarios/components/user-form.tsx` | 351 |
+| `app/(private)/configuracion/usuarios/components/user-status-dialog.tsx` | 95 |
+| `app/(private)/configuracion/usuarios/components/work-group-form.tsx` | 199 |
+| `app/(private)/inventario/components/delete-product-dialog.tsx` | 51 |
+| `app/(private)/inventario/components/product-form.tsx` | 397 |
+| `app/(private)/pedidos/components/cancel-order-dialog.tsx` | 121 |
+| `app/(private)/pedidos/components/delete-order-dialog.tsx` | 85 |
+| `app/(private)/pedidos/components/order-form.tsx` | 494 |
+| `app/(private)/proveedores/[id]/components/catalog-line-form.tsx` | 320 |
+| `app/(private)/proveedores/[id]/components/delete-catalog-line-dialog.tsx` | 56 |
+| `app/(private)/proveedores/components/delete-supplier-dialog.tsx` | 62 |
+| `app/(private)/proveedores/components/supplier-form.tsx` | 239 |
+| `app/(public)/establecer-contrasena/[token]/components/set-credential-form.tsx` | 61 |
+| `app/(public)/login/components/login-form.tsx` | 57 |
+
+`delete-recipe-dialog.tsx` y `recipe-form.tsx` (produccion/formulas) citan `useActionState` solo en
+comentario (explican por que NO lo usan, `design.md > 5`): no importan el hook de React y no
+entraban en esta lista, pero si en la de llamadas directas de abajo.
+
+**Llamadas directas a una Server Action fuera de `useActionState`, en manejador / `startTransition`
+/ `.then` (10 archivos, 19 sitios) — envueltas con `withRateLimitNotice`:**
+
+| Archivo | Linea | Accion |
+|---|---|---|
+| `app/(private)/configuracion/usuarios/components/user-sheet.tsx` | 113 | `getUserAction` |
+| `app/(private)/configuracion/usuarios/components/work-group-members.tsx` | 169 | `listWorkGroupMembersAction` |
+| `app/(private)/configuracion/usuarios/components/work-group-members.tsx` | 199 | `listUsersAction` |
+| `app/(private)/configuracion/usuarios/components/work-group-members.tsx` | 231 | `addWorkGroupMemberAction` |
+| `app/(private)/configuracion/usuarios/components/work-group-members.tsx` | 249 | `removeWorkGroupMemberAction` |
+| `app/(private)/inventario/components/product-name-picker.tsx` | 100 | `listProductsAction` |
+| `app/(private)/pedidos/components/order-form.tsx` | 427 | `getRecipeAction` |
+| `app/(private)/pedidos/components/recipe-picker.tsx` | 173 | `listRecipesAction` |
+| `app/(private)/pedidos/components/order-responsibles.tsx` | 341 | `assignResponsiblesAction` |
+| `app/(private)/pedidos/components/order-responsibles.tsx` | 357 | `unassignResponsibleAction` |
+| `app/(private)/pedidos/components/order-responsibles.tsx` | 369 | `removeWorkGroupFromOrderAction` |
+| `app/(private)/produccion/formulas/components/product-picker.tsx` | 169 | `listProductsAction` |
+| `app/(private)/produccion/formulas/components/recipe-form.tsx` | 221 | `updateRecipeAction` |
+| `app/(private)/produccion/formulas/components/recipe-form.tsx` | 222 | `createRecipeAction` |
+| `app/(private)/produccion/formulas/components/delete-recipe-dialog.tsx` | 58 | `deleteRecipeAction` |
+| `components/shared/presentation-select.tsx` | 225 | `listPresentationsAction` (resolver nombre por defecto) |
+| `components/shared/presentation-select.tsx` | 245 | `listPresentationsAction` (`pedirPagina`) |
+| `components/shared/presentation-select.tsx` | 319 | `createPresentationAction` (alta rapida) |
+
+**Conteo total: 41 usos migrados/envueltos** (22 `useActionState` + 19 llamadas directas).
+
+**No entraron en el censo** (verificado archivo por archivo, no solo por `grep`): todo `await
+Xxx­Action(...)` que aparece dentro de la funcion `save`/`submit` que ya se pasa como argumento a
+`useActionState` (p. ej. `product-form.tsx`, `unit-form.tsx`, `user-form.tsx`,
+`work-group-form.tsx`, `order-form.tsx` en su `submit`, `catalog-line-form.tsx`,
+`supplier-form.tsx`, `cancel-order-dialog.tsx`) — ya queda protegido por el envoltorio de T13, una
+segunda envoltura ahi seria redundante. Tampoco los `Xxx­Action(...)` que se leen en Server
+Components puros (`page.tsx`, `*-list-section.tsx`, `catalog-directories.ts`): se ejecutan en el
+servidor sin pasar por el canal de N6/N7 (`design.md > 1`), asi que un freno ahi no se ve como un
+`Error` de cliente.
+
+**Comportamiento al frenar en una llamada directa** (no cubierto explicitamente por `design.md`,
+decidido aqui de forma minima y sin UI nueva): el `toast` ya lo pone el envoltorio; el sitio de
+llamada solo evita tratar `undefined` como si fuera el resultado normal —`return` temprano, o un
+resultado vacio en los `fetchPage` de autocompletado (`{ items: [], hasMore: false }` /
+`{ items: [], page, totalPages: page }`, que dejan la lista sin resultados en vez de mostrar el
+error generico de carga)—. En `order-form.tsx` (`loadIngredients`) se apaga ademas el spinner de
+esa peticion para no dejarlo colgado.
+
+**`Toaster`:** ambas zonas con formulario ya lo montan (`app/(private)/layout.tsx` y
+`app/(public)/layout.tsx`); no hay una tercera zona con formularios (`app/page.tsx` es la pagina
+placeholder de `create-next-app`, sin formulario). No hizo falta tocar ningun layout.
+
+### Archivos
+
+**Nuevos**
+- `hooks/use-rate-limited-action-state.ts`
+- `tests/unit/hooks/use-rate-limited-action-state.test.tsx`
+
+**Modificados** (22 migraciones de `useActionState` + 10 con `withRateLimitNotice`, algunos en
+ambas listas): los 22 de la primera tabla, mas `user-sheet.tsx`, `work-group-members.tsx`,
+`product-name-picker.tsx`, `order-form.tsx`, `recipe-picker.tsx`, `order-responsibles.tsx`,
+`product-picker.tsx` (formulas), `recipe-form.tsx` (formulas), `delete-recipe-dialog.tsx`,
+`presentation-select.tsx`.
+
+Ademas, `tests/unit/recetas-ui/recipe-route-contract.test.ts`: el contrato de codigo comprobaba el
+texto literal `listProductsAction({ page` en `product-picker.tsx` (llamada directa sin envoltorio).
+Con `withRateLimitNotice(listProductsAction)({` esa cadena exacta ya no aparece; se actualizo el
+`toContain` a la forma envuelta, sin tocar lo que la aserción vigila (que no se filtre en cliente y
+que la pagina use `MAX_PAGE_SIZE`).
+
+### Comandos corridos (T13-T14)
+
+```
+$ pnpm exec vitest run tests/unit/hooks/use-rate-limited-action-state.test.tsx
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+
+$ pnpm run typecheck && pnpm run lint
+(las dos limpias, exit 0)
+
+$ pnpm exec vitest run tests/unit/pedidos-ui
+ Test Files  25 passed (25)
+      Tests  313 passed | 3 skipped (316)
+
+$ pnpm exec vitest run tests/unit/proveedores-ui tests/unit/recetas-ui tests/unit/identity-ui/set-credential-form.test.tsx tests/unit/shared/presentation-select-helper.test.tsx tests/ui/login-form-uncontrolled-warning.test.tsx tests/unit/login-form.test.tsx
+(primera corrida: 1 fallo en recipe-route-contract.test.ts, el del literal de arriba; corregido)
+
+$ pnpm exec vitest run tests/unit/recetas-ui/recipe-route-contract.test.ts
+ Test Files  1 passed (1)
+      Tests  26 passed (26)
+
+$ pnpm exec vitest related --run "hooks/use-rate-limited-action-state.ts" <14 archivos de
+  configuracion-ui/inventario/asignaciones>
+ Test Files  1 failed | 102 passed (103)   -- el fallo NO es mio, ver abajo
+
+$ pnpm exec vitest run tests/guards/guard-arquitectura-modulos.test.ts
+ Test Files  1 passed (1)
+      Tests  62 passed (62)
+
+$ pnpm exec vitest run tests/unit/hooks/use-rate-limited-action-state.test.tsx tests/unit/recetas-ui/recipe-route-contract.test.ts tests/guards
+ Test Files  1 failed | 40 passed (41)   -- el fallo NO es mio, ver abajo
+```
+
+**Rojos que NO son mios, anotados sin arreglar:**
+- `tests/unit/configuracion-ui/user-table.test.tsx` > *la accion de editar de una fila abre el
+  panel SOBRE ESE usuario (R26)* — fallo solo dentro de una tanda de 14 archivos en paralelo
+  (`findByTestId` sin encontrar el nodo); en solitario pasa (33 s, 27/27). Flake de saturacion
+  conocido (`docs/verification.md > Los flakes de saturacion`), no relacionado con `user-sheet.tsx`.
+- `tests/unit/inventario/product-page.test.tsx` > *un guardado rechazado por un campo...* — timeout
+  de 20 s solo dentro de una tanda de 16 archivos; en solitario pasa (70 s, 61/61). Mismo flake de
+  saturacion, no relacionado con `product-form.tsx`.
+- `tests/guards/guard-identificador-de-request.test.ts` > *package.json no gana ninguna
+  dependencia...* — cuenta 36 `dependencies` contra las 34 esperadas por QC-71. Es el efecto de que
+  T1 de esta misma ficha (otro agente) sumo `@upstash/ratelimit` y `@upstash/redis`, aprobadas en
+  `docs/dependencias.md`; esta guardia de QC-71 quedo desactualizada por esa alta y no por nada de
+  T13/T14. No se toco.
+
+No se corrio `./init.sh`, `./init.sh --rapido` ni `pnpm test` (fuera de alcance de esta tanda).
+
+**Veredicto T13-T14:** hecho — envoltorio con sus tres casos probados (R11, R12); censo completo de
+41 usos (22 `useActionState` + 19 llamadas directas) migrados sin dejar ningun `useActionState` de
+`react` fuera de `hooks/use-rate-limited-action-state.ts`; ningun formulario cambia de
+comportamiento salvo por el aviso neutro del freno; typecheck y lint limpios; los tests de UI de
+las rutas tocadas (pedidos, proveedores, recetas, identity publico, shared, login, configuracion,
+inventario) pasan en solitario. No se marca `tasks.md`.

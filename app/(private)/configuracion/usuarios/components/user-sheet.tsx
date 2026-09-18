@@ -13,6 +13,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { withRateLimitNotice } from '@/hooks/use-rate-limited-action-state';
 import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
 import type { RoleOption, UserDetail, UserRow } from '@/lib/modules/identity';
 import { getUserAction } from '@/lib/modules/identity/adapters/driving/user-actions';
@@ -110,8 +111,8 @@ export function UserSheet({
     if (!open || userId === undefined) return;
 
     let cancelled = false;
-    void getUserAction(userId).then((result) => {
-      if (cancelled) return;
+    void withRateLimitNotice(getUserAction)(userId).then((result) => {
+      if (cancelled || result === undefined) return;
       // El ErrorState viaja ENTERO, no aplanado a `string`: asi el inesperado conserva su
       // identificador de peticion (QC-71 R17).
       setDetail(

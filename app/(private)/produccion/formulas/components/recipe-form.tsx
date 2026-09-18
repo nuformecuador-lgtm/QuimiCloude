@@ -19,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { withRateLimitNotice } from '@/hooks/use-rate-limited-action-state';
 import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import { createRecipeSchema, updateRecipeSchema, type RecipeDetail } from '@/lib/modules/recetas';
 import {
@@ -218,8 +219,10 @@ export function RecipeForm(props: RecipeFormProps) {
     startTransition(async () => {
       const result =
         props.mode === 'edit'
-          ? await updateRecipeAction(props.recipe.id, parsed.data)
-          : await createRecipeAction(parsed.data);
+          ? await withRateLimitNotice(updateRecipeAction)(props.recipe.id, parsed.data)
+          : await withRateLimitNotice(createRecipeAction)(parsed.data);
+
+      if (result === undefined) return;
 
       if (result.status === 'error') {
         if (result.code === 'recipe_duplicate_name') {

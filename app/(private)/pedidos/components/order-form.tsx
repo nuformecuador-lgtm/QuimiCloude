@@ -1,9 +1,13 @@
 'use client';
 
-import { useActionState, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import {
+  useRateLimitedActionState,
+  withRateLimitNotice,
+} from '@/hooks/use-rate-limited-action-state';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -424,7 +428,14 @@ export function OrderForm({
   const loadIngredients = useCallback(
     (selectedId: string) => {
       const requestId = ++ingredientsRequestRef.current;
-      void getRecipeAction(selectedId).then((result) => applyIngredientsResult(requestId, result));
+      void withRateLimitNotice(getRecipeAction)(selectedId).then((result) => {
+        if (result === undefined) {
+          // El aviso ya lo puso el envoltorio: aqui solo se apaga el spinner de esta peticion.
+          if (requestId === ingredientsRequestRef.current) setIngredientsLoading(false);
+          return;
+        }
+        applyIngredientsResult(requestId, result);
+      });
     },
     [applyIngredientsResult],
   );
@@ -491,7 +502,7 @@ export function OrderForm({
     return { status: 'success' };
   }
 
-  const [state, formAction] = useActionState(save, INITIAL_STATE);
+  const [state, formAction] = useRateLimitedActionState(save, INITIAL_STATE);
 
   useEffect(() => {
     if (state.status !== 'success') return;

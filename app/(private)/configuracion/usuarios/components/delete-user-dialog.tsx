@@ -1,10 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useActionState, useEffect, useId } from 'react';
+import { useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { useRateLimitedActionState } from '@/hooks/use-rate-limited-action-state';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -74,7 +75,7 @@ export function DeleteUserDialog({ user, open, onOpenChange }: DeleteUserDialogP
   const fieldId = useId();
   const errorId = `${fieldId}-error`;
   const router = useRouter();
-  const [state, formAction, isPending] = useActionState(deleteUserAction, INITIAL_STATE);
+  const [state, formAction, isPending] = useRateLimitedActionState(deleteUserAction, INITIAL_STATE);
 
   useEffect(() => {
     if (state.status !== 'success') return;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useActionState, useEffect, useId } from 'react';
+import { useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { useRateLimitedActionState } from '@/hooks/use-rate-limited-action-state';
 import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
 import type { UnitView } from '@/lib/modules/unidades';
 import {
@@ -91,7 +92,7 @@ export function DeleteUnitDialog({ unit, open, onOpenChange }: DeleteUnitDialogP
   const fieldId = useId();
   const errorId = `${fieldId}-error`;
   const router = useRouter();
-  const [state, formAction, isPending] = useActionState(deleteUnitAction, INITIAL_STATE);
+  const [state, formAction, isPending] = useRateLimitedActionState(deleteUnitAction, INITIAL_STATE);
 
   useEffect(() => {
     if (state.status !== 'success') return;

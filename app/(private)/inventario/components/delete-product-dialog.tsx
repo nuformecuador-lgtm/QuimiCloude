@@ -2,7 +2,7 @@
 
 import { Trash2Icon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useActionState, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -17,6 +17,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { useRateLimitedActionState } from '@/hooks/use-rate-limited-action-state';
 import { Button } from '@/components/ui/button';
 import {
   deleteProductAction,
@@ -48,7 +49,7 @@ const INITIAL_STATE: ProductMutationFormState = { status: 'idle' };
 export function DeleteProductDialog({ product }: { readonly product: ProductView }) {
   const [requestedOpen, setRequestedOpen] = useState(false);
   const router = useRouter();
-  const [state, formAction] = useActionState(deleteProductAction, INITIAL_STATE);
+  const [state, formAction] = useRateLimitedActionState(deleteProductAction, INITIAL_STATE);
 
   /*
     El dialogo abierto se DERIVA de dos cosas: lo que pidio el usuario y el resultado de la
