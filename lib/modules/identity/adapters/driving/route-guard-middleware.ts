@@ -54,18 +54,48 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { identityEdge, observabilidadEdge } from '@/lib/composition/edge';
+import { identityEdge, observabilidadEdge, rateLimitEdge } from '@/lib/composition/edge';
 import {
   decideRouteAccess,
   isSessionExpired,
   type RouteAccessSession,
 } from '@/lib/modules/identity';
 import {
+  RATE_LIMITED_MESSAGE,
+  renderRateLimitedPage,
+  resolveRequestOrigin,
+  selectBucket,
+} from '@/lib/modules/rate-limit';
+import {
   DASHBOARD_ROUTE,
   LOGIN_ROUTE,
   PRIVATE_ROUTE_PREFIXES,
   SESSION_ENDED_PARAM,
 } from '@/lib/shared/routes';
+
+/** Una Server Action es un POST a la misma ruta: solo `next-action` la distingue de una navegacion. */
+function isServerActionRequest(request: NextRequest): boolean {
+  return request.method === 'POST' && request.headers.has('next-action');
+}
+
+/**
+ * Cuerpo y `content-type` EXACTOS: una Server Action frenada solo llega intacta al formulario si
+ * el `content-type` es `text/plain` sin `charset`, que no es lo que pondria un `Response` de texto
+ * por defecto.
+ */
+function rateLimitedResponse(request: NextRequest): NextResponse {
+  if (isServerActionRequest(request)) {
+    return new NextResponse(RATE_LIMITED_MESSAGE, {
+      status: 429,
+      headers: { 'content-type': 'text/plain', 'cache-control': 'no-store' },
+    });
+  }
+
+  return new NextResponse(renderRateLimitedPage(), {
+    status: 429,
+    headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+  });
+}
 
 /**
  * Lee la sesion del valor crudo de la cookie y la traduce al estado que espera el dominio.
@@ -112,6 +142,19 @@ async function readSession(rawValue: string | undefined, now: Date): Promise<Rou
  * `matcher`; ese archivo no contiene ninguna decision (R20, R22).
  */
 export async function middleware(request: NextRequest): Promise<NextResponse> {
+  const origin = resolveRequestOrigin(request.headers.get('x-forwarded-for'));
+  const bucket = selectBucket(request.nextUrl.pathname, rateLimitEdge.loginRoute);
+  const verdict = await rateLimitEdge.check({ origin, bucket });
+
+  if (verdict.outcome === 'block') {
+    return rateLimitedResponse(request);
+  }
+  if (verdict.outcome === 'degraded') {
+    console.warn(
+      `[rate-limit] contador no disponible, se deja pasar (cuota=${bucket}, motivo=${verdict.reason})`,
+    );
+  }
+
   const rawValue = request.cookies.get(identityEdge.sessionTokenVerifier.cookieName)?.value;
   const session = await readSession(rawValue, new Date());
 
