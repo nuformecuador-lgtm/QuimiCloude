@@ -228,6 +228,34 @@ describe('los tres estados son mutuamente excluyentes y se distinguen por data-t
     expect(screen.queryByTestId(WORK_GROUP_CREATE_OPEN_TESTID)).toBeNull();
   });
 
+  it('Y EN ERROR TAMBIEN: la lista fallo, pero el alta sigue ofreciendose', async () => {
+    // Aqui es aun mas caro dejarla fuera: los grupos nacen en cero, asi que un fallo de lectura en
+    // una instalacion nueva volveria a dejar el primer grupo sin ninguna via.
+    listWorkGroupsActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unexpected',
+      message: 'Ocurrio un error inesperado.',
+    });
+
+    await renderSeccion();
+
+    expect(screen.getByTestId(WORK_GROUP_LIST_ERROR_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(WORK_GROUP_CREATE_OPEN_TESTID)).toBeEnabled();
+  });
+
+  it('pero sin `usuarios.modificar` el error tampoco trae alta (R9)', async () => {
+    listWorkGroupsActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unexpected',
+      message: 'Ocurrio un error inesperado.',
+    });
+
+    await renderSeccion(parametros(), false);
+
+    expect(screen.getByTestId(WORK_GROUP_LIST_ERROR_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(WORK_GROUP_CREATE_OPEN_TESTID)).toBeNull();
+  });
+
   it('error: mensaje DEVUELTO, codigo estable y accion de reintentar (R19)', async () => {
     listWorkGroupsActionMock.mockResolvedValue({
       status: 'error',

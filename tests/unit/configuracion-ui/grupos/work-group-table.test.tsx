@@ -21,6 +21,7 @@ import {
   WORK_GROUP_ACTIONS_COLUMN_ID,
   WORK_GROUP_ACTION_DELETE_TESTID,
   WORK_GROUP_ACTION_EDIT_TESTID,
+  WORK_GROUP_CREATE_OPEN_TESTID,
   DELETE_WORK_GROUP_DIALOG_TESTID,
   DELETE_WORK_GROUP_DISMISS_TESTID,
   DELETE_WORK_GROUP_ID_TESTID,
@@ -392,7 +393,7 @@ describe('la tabla es la duena del estado de las escrituras (R9, `design.md > 5`
     // Vive en `work-group-create-action.tsx`, fuera de la tabla. Los grupos nacen en cero, asi que
     // tenerlo aqui dentro hacia el primer grupo imposible de crear. Si alguien lo devolviera, esta
     // afirmacion se pone roja.
-    expect(screen.queryByTestId('work-group-create-open')).toBeNull();
+    expect(screen.queryByTestId(WORK_GROUP_CREATE_OPEN_TESTID)).toBeNull();
   });
 
   it('la accion de abrir de una fila abre el panel SOBRE ESE grupo', async () => {

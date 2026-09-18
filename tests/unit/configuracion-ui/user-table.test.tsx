@@ -23,6 +23,7 @@ import {
   USER_ACTION_DELETE_TESTID,
   USER_ACTION_EDIT_TESTID,
   USER_ACTION_STATUS_TESTID,
+  USER_CREATE_OPEN_TESTID,
   USER_ROW_ACTIONS_TESTID,
   USER_SHEET_TESTID,
   USER_STATUS_DIALOG_TESTID,
@@ -456,7 +457,7 @@ describe('la tabla es la duena del estado de las escrituras (R6, `design.md > 8`
     // Vive en `user-create-action.tsx`, fuera de la tabla, para que se ofrezca tambien cuando la
     // lista viene vacia y esta tabla no llega a montarse. Si alguien lo devolviera aqui, esta
     // afirmacion se pone roja antes de que el vacio vuelva a quedarse sin salida.
-    expect(screen.queryByTestId('user-create-open')).toBeNull();
+    expect(screen.queryByTestId(USER_CREATE_OPEN_TESTID)).toBeNull();
   });
 
   it('la accion de editar de una fila abre el panel SOBRE ESE usuario (R26)', async () => {

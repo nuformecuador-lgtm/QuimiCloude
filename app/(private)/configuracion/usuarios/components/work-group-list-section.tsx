@@ -47,9 +47,17 @@ export async function WorkGroupListSection({ params, canModify }: WorkGroupListS
   const pageResult = await listWorkGroupsAction(params);
 
   // R11 y R19: con error NO se pinta tabla, ni fila, ni un dato. Ni siquiera una tabla vacia, que
-  // seria decir «no hay grupos» sin saberlo.
+  // seria decir «no hay grupos» sin saberlo. Pero el alta SI sigue ahi: no depende de la lista,
+  // tiene su propia autorizacion en el caso de uso, y aqui dejarla fuera seria especialmente caro
+  // —los grupos nacen en cero, asi que un fallo de lectura en una instalacion nueva volveria a
+  // dejar el primer grupo sin ninguna via—. La regla es «el alta esta siempre que `canModify`».
   if (pageResult.status === 'error') {
-    return <WorkGroupListError error={pageResult} />;
+    return (
+      <>
+        <WorkGroupCreateAction canModify={canModify} />
+        <WorkGroupListError error={pageResult} />
+      </>
+    );
   }
 
   const { items, page: currentPage, totalPages } = pageResult.data;

@@ -301,6 +301,35 @@ describe('los tres estados son mutuamente excluyentes y se distinguen por data-t
     expect(screen.queryByTestId(USER_LIST_EMPTY_TESTID)).toBeNull();
   });
 
+  it('Y EN ERROR TAMBIEN: la lista fallo, pero el alta sigue ofreciendose', async () => {
+    // El alta no depende de la lista: tiene su propia autorizacion en el caso de uso. Dejarla
+    // fuera de este estado reabriria el mismo callejon por otra puerta —un parpadeo de la base en
+    // una instalacion recien sembrada y no hay forma de crear a nadie—.
+    listUsersActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unexpected',
+      message: 'Ocurrio un error inesperado.',
+    });
+
+    await renderSeccion();
+
+    expect(screen.getByTestId(USER_LIST_ERROR_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(USER_CREATE_OPEN_TESTID)).toBeEnabled();
+  });
+
+  it('pero sin `usuarios.modificar` el error tampoco trae alta (R6)', async () => {
+    listUsersActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unexpected',
+      message: 'Ocurrio un error inesperado.',
+    });
+
+    await renderSeccion(parametros(), false);
+
+    expect(screen.getByTestId(USER_LIST_ERROR_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(USER_CREATE_OPEN_TESTID)).toBeNull();
+  });
+
   it('cargando: mientras la lista esta en vuelo, la pagina pinta el esqueleto (R19)', async () => {
     // Sin resolver el Server Component `async`, `<Suspense>` pinta su `fallback`.
     render(await UsuariosPage({ searchParams: Promise.resolve({ pageSize: '25' }) }));
