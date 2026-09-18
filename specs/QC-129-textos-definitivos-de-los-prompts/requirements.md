@@ -23,7 +23,113 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+> Cada requisito cita entre corchetes la decisión cerrada que lo origina. Las 13 decisiones
+> (`[D1]`…`[D13]`) quedan citadas al menos una vez.
+>
+> Los requisitos se parten en dos familias, y el motivo está en `[D5]`: los del **mecanismo**
+> (R1–R9, R18, R19) se comprueban con tests unitarios normales; los de la **calidad del texto**
+> (R10–R14) no se pueden comprobar sin llamar al proveedor, y por eso su verificación es una **fila
+> firmada del registro de revisión humana** (R15–R17). `design.md > 8` lo declara para que no se lea
+> como un hueco de trazabilidad.
+
+### El mecanismo: de dónde sale el texto
+
+**R1.** El sistema DEBE obtener el texto del prompt de cada estrategia de una **variable de entorno
+propia**: `CATALOG_PROMPT` para `catalogo` y `FORMULA_PROMPT` para `formula`. NO DEBE existir una
+sola variable que transporte los dos textos, ni una que sirva de repuesto de la otra. `[D7]` `[D8]`
+
+**R2.** El sistema DEBE leer esa variable **en el momento de procesar el PDF**, dentro de la
+invocación. CUANDO se importa cualquier archivo del módulo `documentos` o se construye la fachada de
+`lib/composition`, el sistema NO DEBE leer ninguna de las dos variables ni fallar por su ausencia.
+`[D10]`
+
+**R3.** El sistema DEBE tratar una variable **ausente, vacía o compuesta solo de espacios** como
+ausente, con el mismo criterio que ya aplica la configuración de la IA del módulo. `[D9]`
+
+**R4.** SI la variable de la estrategia en curso está ausente, ENTONCES el sistema DEBE terminar el
+procesamiento con un fallo cuyo motivo **nombra esa variable**, y NO DEBE llamar a la lectura con IA
+ni al proveedor. `[D8]` `[D9]`
+
+**R5.** El sistema NO DEBE aportar ningún texto de prompt por defecto, de repuesto, heredado de la
+otra estrategia ni escrito en el código: si no hay variable, no hay texto. `[D9]` `[D11]`
+
+**R6.** CUANDO el procesamiento falla por una variable ausente, el sistema DEBE entregar al registro
+el mismo resumen de una sola línea que entrega en cualquier otra ejecución —una vez, con la
+estrategia y la ruta—, sin incluir el texto del prompt. `[D9]` `[D13]`
+
+**R7.** El sistema NO DEBE incluir el texto del prompt —ni entero, ni recortado, ni resumido— en
+ningún mensaje de error, motivo de fallo o línea de registro. `[D13]`
+
+### La desaparición de los textos del repositorio
+
+**R8.** Los archivos `lib/modules/documentos/domain/prompts/catalogo.json`,
+`.../formula.json` y `.../index.ts` con su mapa `PROMPT_BY_STRATEGY` DEBEN **dejar de existir** en el
+repositorio, y ningún archivo DEBE importarlos ni nombrarlos. `[D11]`
+
+**R9.** Ningún archivo versionado del repositorio —código, test, documento o especificación— DEBE
+contener el texto de un prompt de estrategia, ni completo ni en fragmento reconocible. `[D11]`
+`[D13]`
+
+### Lo que los dos textos tienen que pedir
+
+**R10.** El prompt de `catalogo` DEBE pedir, para cada línea del catálogo, exactamente estos seis
+datos: **nombre, presentación, unidad, precio, compra mínima y tiempo de entrega**. NO DEBE pedir
+moneda, vigencia ni referencia del proveedor. `[D1]`
+
+**R11.** El prompt de `formula` DEBE pedir el **nombre** de la fórmula, su **descripción**, cada
+**materia prima con su cantidad y su unidad**, y los **pasos** de preparación **en su orden**.
+`[D2]`
+
+**R12.** Los dos prompts DEBEN exigir que la IA conteste en **JSON**, y DEBEN declarar la forma
+exacta de ese JSON **dentro del propio texto del prompt**. El módulo NO DEBE interpretar, validar ni
+transformar esa respuesta: sigue devolviéndola tal cual. `[D3]`
+
+**R13.** Los dos prompts DEBEN ordenar que un dato que el PDF **no trae** se devuelva **vacío
+(`null`)**, y DEBEN prohibir explícitamente inventarlo o deducirlo del contexto. `[D4]`
+
+**R14.** Los dos textos DEBEN escribirse **en el entorno de despliegue** (variables de Vercel) y no
+en el repositorio. Quién los pone en **preview** y con qué valores **no está decidido**: es la
+**pregunta abierta 1**, y hasta que se cierre este requisito solo está garantizado para producción.
+`[D7]` `[D9]`
+
+### Cómo se comprueba que un prompt es bueno
+
+**R15.** El sistema DEBE incluir en `docs/` un **registro de revisión de prompts** con una
+**plantilla fija**: una fila por **campo esperado** de cada estrategia y, por columna, el
+**veredicto** de esa pasada con exactamente tres valores posibles —**bien**, **mal**, **no
+estaba**—, más la fecha, la estrategia, el PDF de muestra y quién firma. `[D5]`
+
+**R16.** El registro NO DEBE copiar el texto del prompt revisado ni ninguna huella de él. El propio
+documento DEBE dejar escrita la consecuencia aceptada: un veredicto **no se puede volver a
+comprobar** contra el texto al que se refería. `[D13]`
+
+**R17.** La revisión DEBE hacerse sobre **PDFs reales aportados por el humano** —al menos un
+catálogo de proveedor y una fórmula—, en **una pasada** por estrategia, y DEBE quedar **firmada por
+una persona**. Ningún agente DEBE poder darla por hecha. `[D5]` `[D6]`
+
+**R18.** Ningún test automatizado DEBE llamar al proveedor de IA, exigir red ni exigir claves
+configuradas para pasar. Los tests de la estrategia DEBEN poder ejercitarse con el texto de prompt
+**inyectado por sus dependencias**; **cómo llega ese texto al desarrollo local y a la suite es la
+pregunta abierta 2** y este requisito no la cierra: solo fija que el gate sigue corriendo sin red y
+sin claves. `[D5]` `[D10]`
+
+### El contrato del módulo
+
+**R19.** El contrato público del módulo (`lib/modules/documentos/index.ts`) NO DEBE exportar ningún
+texto de prompt, ningún mapa de prompts ni el puerto por el que llegue: el prompt sigue siendo
+detalle interno de la estrategia y solo `lib/composition` ata su implementación. `[D10]` `[D11]`
+
+### La derogación de QC-109
+
+**R20.** Esta ficha DEBE actualizar `tests/unit/documentos/qc109-alcance.test.ts` —los casos de
+**R4**, de **R6** y las afirmaciones sobre `PROMPT_BY_STRATEGY`— de modo que la suite quede verde
+**sin desactivar** ninguna de las guardias de QC-109 que siguen vigentes (R11, R13, R14, R15, R16 y
+R17). `[D12]`
+
+**R21.** Esta ficha DEBE añadir una **nota fechada** a
+`specs/QC-109-procesamiento-de-pdf-por-estrategia/requirements.md` que diga **qué queda derogado**
+—su R4, su R6 y sus decisiones `[D6]` y `[D15]`— **por qué** y **qué lo sustituye**, sin borrar ni
+reescribir el texto original. `[D12]`
 
 ## Preguntas abiertas
 
