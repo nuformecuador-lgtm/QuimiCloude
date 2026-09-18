@@ -135,6 +135,7 @@
    **producción sin credenciales**: ¿se trata como «Upstash no responde» (dejar pasar y avisar) o
    el despliegue debe fallar? El contador en memoria **no** sirve en producción: cada instancia de
    Vercel llevaría su propia cuenta.
+   **→ CERRADA por el humano al aprobar el spec (F1.4, 2026-09-18): opción (a)**, ver la última fila de «Decisiones cerradas». Quién da de alta la cuenta y cuándo sigue abierto, y no bloquea T9.
 2. **El techo real del plan gratuito.** 500.000 comandos/mes y 256 MB no se pudieron confirmar en
    la fuente. Se verifica al dar de alta la cuenta; si el consumo medido se acerca al techo, se
    decide entre pasar a pago o dejar de contar la navegación.
@@ -158,3 +159,4 @@
 | 2026-09-18 | ¿Dependencia nueva? | **`@upstash/ratelimit` y `@upstash/redis`, APROBADAS por el humano, sujetas a repetir los cuatro checks de salud en F1.4** (los del 2026-09-07 están caducados). El leader escribe las dos filas de `docs/dependencias.md` al aprobar el spec. **Esto saca de suspenso `@upstash/redis`** solo para esta ficha: QC-28 sigue con su propia condición. |
 | 2026-09-18 | ¿Hace falta E2E? | **Sí, uno sobre el login**: superar la cuota de login desde el mismo origen y comprobar el mensaje neutro, **contra el contador en memoria**. `CHECKPOINTS.md` lo exige para autenticación. El resto se cubre con tests unitarios y de integración. |
 | 2026-09-18 | Lo que se hereda y no se decide otra vez | **El contador entra por un puerto**, con **adaptador en memoria** para tests y desarrollo local, y el de Upstash cableado solo donde hay credenciales (**QC-28**). Se cablea por **`lib/composition/edge.ts`** y se engancha en **`route-guard-middleware.ts`**, no en `middleware.ts`, que sigue siendo un cascarón (**QC-71 / QC-9 R20**). `guard-middleware-edge` **no se relaja**. Identificadores en inglés (**feature 4**). |
+| 2026-09-18 | (F1.4) ¿Qué hace producción sin credenciales de Upstash? | **Opción (a): se trata como «Upstash no responde» (D2): se deja pasar y se registra un aviso.** El despliegue NO falla. Producción = `VERCEL_ENV === 'production'` (propuesta de `design.md > 11`, aceptada al aprobar sin cambios). Coste aceptado: hasta que exista la cuenta, en producción no hay límite. Los puntos 2-9 de `design.md > 11` se aceptan tal como los propone el diseño. |
