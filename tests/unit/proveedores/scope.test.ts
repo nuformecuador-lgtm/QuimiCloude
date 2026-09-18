@@ -77,15 +77,48 @@ const moduloDir = join(repoRoot, 'lib', 'modules', 'proveedores')
  * Se buscan MARCAS, no la palabra suelta: un comentario que explique por que la linea ya no
  * conoce ningun articulo del inventario es informacion util y no puede poner el test rojo.
  * Lo que no puede aparecer es ninguna de estas, y cada una es un vinculo real.
+ *
+ * 2026-09-17 - la marca de `findRefs` se RETENSA, y se parte en dos. Estaba escrita como
+ * palabra suelta y con eso media mal en las dos direcciones. Por un lado se ponia roja por un
+ * vinculo que no existe: el alta y la edicion de una linea resuelven la UNIDAD, y el catalogo
+ * de unidades expone un metodo que se llama igual; esa costura es legitima y no tiene nada que
+ * ver con el inventario. Por otro lado dejaba la puerta abierta de par en par: cualquier
+ * resolucion contra el catalogo de articulos escrita con otro nombre pasaba sin que nadie la
+ * viese. Asi que ni se borra ni se le pone una excepcion, sino que salen dos comprobaciones
+ * mas estrictas que la que habia: aqui abajo queda la NEGATIVA, que ya no caza la palabra sino
+ * la forma real del vinculo (`products.findRefs` / `productCatalog.findRefs`), y en el propio
+ * caso entra una POSITIVA que recorre TODAS las apariciones de `findRefs` del modulo y exige
+ * que el receptor sea exactamente uno. El conjunto permitido deja de ser «todo lo que no se
+ * llame asi» y pasa a ser uno y con nombre.
  */
 const MARCAS_DE_INVENTARIO: readonly { readonly nombre: string; readonly pattern: RegExp }[] = [
   { nombre: 'tipo ProductCatalog / ProductRef / ProductId', pattern: /\bProduct(Catalog|Ref|Id)\b/ },
-  { nombre: 'llamada a findRefs', pattern: /\bfindRefs\b/ },
+  {
+    nombre: 'resolucion de referencias contra el catalogo de articulos',
+    pattern: /\b(products|productCatalog)\s*\.\s*findRefs\b/,
+  },
   { nombre: 'consulta del modelo Product por Prisma', pattern: /prisma\.product/i },
   { nombre: 'campo productId / productName', pattern: /\bproduct(Id|Name)\b/ },
   { nombre: 'columna product_id', pattern: /\bproduct_id\b/ },
   { nombre: 'error de producto no encontrado', pattern: /ProductNotFound|product_not_found/ },
 ]
+
+/**
+ * El UNICO receptor de `findRefs` que el modulo admite, nombrado literalmente.
+ *
+ * Comprobar la unidad contra el catalogo de unidades es toda la resolucion de referencias que
+ * el modulo tiene derecho a hacer. Se afirma en POSITIVO y no por ausencia: enumerar lo
+ * prohibido deja fuera lo que nadie penso -un `recipes.findRefs`, un `deps.catalog.findRefs` o
+ * un `findRefs` suelto pasarian-, mientras que exigir el receptor inmediato los caza todos.
+ */
+const RECEPTOR_DE_FIND_REFS = 'units'
+
+/**
+ * Cada aparicion de `findRefs` del archivo con su receptor inmediato en el grupo 1, o sin
+ * grupo si no lo tiene: una llamada suelta tampoco es admisible, porque ahi no se ve de quien
+ * es el metodo.
+ */
+const LLAMADAS_A_FIND_REFS = /(?:([A-Za-z_$][\w$]*)\s*\.\s*)?findRefs\b/g
 
 describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla, solo la de QC-44', () => {
   it('ningun archivo del modulo importa inventario ni conserva una sola marca suya (R18)', () => {
@@ -124,6 +157,16 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
 
       for (const { nombre, pattern } of MARCAS_DE_INVENTARIO) {
         if (pattern.test(fuente)) hallazgos.push(`${relativo}: ${nombre}`)
+      }
+
+      for (const llamada of fuente.matchAll(LLAMADAS_A_FIND_REFS)) {
+        const receptor = llamada[1]
+        if (receptor !== RECEPTOR_DE_FIND_REFS) {
+          hallazgos.push(
+            `${relativo}: findRefs con receptor '${receptor ?? '(ninguno)'}'; el unico ` +
+              `admitido es '${RECEPTOR_DE_FIND_REFS}'`,
+          )
+        }
       }
     }
 
@@ -342,8 +385,9 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
         .map((linea) => (linea.startsWith('@@') ? linea : (linea.split(' ')[0] as string)))
     }
 
-    // `Supplier` queda EXACTAMENTE como lo dejo QC-42: esta feature no le toca ni una
-    // columna (sus dos CHECK no son modelables por Prisma y viven en la migracion).
+    // `Supplier` queda EXACTAMENTE como lo dejo QC-42 salvo por las dos lineas del ambito de
+    // empresa que se nombran una a una mas abajo (sus dos CHECK no son modelables por Prisma
+    // y viven en la migracion).
     expect(
       camposDe('Supplier'),
       'model Supplier gano, perdio o renombro algo respecto al estado que dejo QC-42',
@@ -353,12 +397,19 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
       'nameNormalized',
       'phone',
       'email',
+      // La empresa duena del proveedor: sin ella no hay forma de acotar el listado ni de
+      // impedir que una linea de otra empresa cuelgue de este proveedor.
+      'companyId',
       'createdBy',
       'updatedBy',
       'createdAt',
       'updatedAt',
       'deletedAt',
       'catalogLines',
+      // Clave candidata TOTAL -Prisma si la modela-: es el destino de la clave foranea
+      // compuesta de la linea, que obliga a que las dos empresas coincidan. No es una clave
+      // de nombre, asi que no afloja nada de lo que este censo ya vigilaba.
+      '@@unique([companyId, id], map: "suppliers_company_id_id_key")',
       '@@index([createdBy], map: "suppliers_created_by_idx")',
       '@@index([updatedBy], map: "suppliers_updated_by_idx")',
       '@@map("suppliers")',
@@ -388,12 +439,19 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
       'cost',
       'minPurchase',
       'deliveryTime',
+      // La linea guarda su propia empresa en vez de heredarla por su proveedor: es lo que
+      // permite acotar cada consulta sin atravesar la relacion.
+      'companyId',
       'createdBy',
       'updatedBy',
       'createdAt',
       'updatedAt',
       'deletedAt',
       'supplier',
+      // Prefijo izquierdo de «lineas de esta empresa y de este proveedor», que es como se
+      // consultan siempre, y lado hijo de la clave foranea compuesta. Es un INDICE, no un
+      // unico: la unicidad de la linea sigue siendo el indice parcial de la migracion.
+      '@@index([companyId, supplierId], map: "supplier_catalog_lines_company_id_supplier_id_idx")',
       '@@index([presentationId], map: "supplier_catalog_lines_presentation_id_idx")',
       '@@index([unitId], map: "supplier_catalog_lines_unit_id_idx")',
       '@@index([createdBy], map: "supplier_catalog_lines_created_by_idx")',
@@ -405,10 +463,11 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
       'la unicidad de la linea es un indice PARCIAL escrito a mano, no un @@unique de Prisma',
     ).toBe(false)
 
-    // Y SOLO CUATRO migraciones del repo tocan estas dos tablas: la de QC-42 que las creo, la
-    // de QC-43 con sus tres cambios, la de QC-52 que separa las dos tablas y la de QC-57, que
-    // solo les anade INDICES. Una quinta seria alcance escapandose por una via que el censo de
-    // campos de arriba no ve (p. ej. un CHECK, que Prisma no modela).
+    // Y SOLO CINCO migraciones del repo tocan estas dos tablas: la de QC-42 que las creo, la
+    // de QC-43 con sus tres cambios, la de QC-52 que separa las dos tablas, la de QC-57, que
+    // solo les anade INDICES, y la del ambito de empresa. Una sexta seria alcance escapandose
+    // por una via que el censo de campos de arriba no ve (p. ej. un CHECK, que Prisma no
+    // modela).
     //
     // 2026-09-04, QC-57: la cuarta entra aqui a conciencia y no relaja nada. `list_query_indexes`
     // no anade ni quita ninguna columna de estas dos tablas -el censo de campos de arriba, que es
@@ -446,6 +505,12 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
       '20260903200343_supplier_contact_cost_and_line_audit',
       '20260904123854_split_product_and_supplier_catalog',
       '20260904160000_list_query_indexes',
+      // 2026-09-17: la quinta entra a conciencia y tampoco relaja nada. Es la que da la
+      // empresa a las dos tablas, y por eso el censo de campos de arriba crece a la vez y en
+      // igualdad exacta: las dos columnas, la clave candidata y el indice compuesto se
+      // nombran alli uno a uno. Se anade el nombre concreto y no un comodin: cualquier otra
+      // migracion que toque estas tablas sigue poniendo esto rojo.
+      '20260917120000_suppliers_company_scope',
     ])
   })
 

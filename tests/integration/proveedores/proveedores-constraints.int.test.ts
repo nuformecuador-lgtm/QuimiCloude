@@ -689,6 +689,40 @@ describe('estructura del proveedor', () => {
     })
   })
 
+  it('el proveedor tiene EXACTAMENTE estas columnas, empresa incluida (R1, R2)', async () => {
+    // Este archivo tenia censo cerrado de columnas de la LINEA pero no del PROVEEDOR: la
+    // columna de empresa habria entrado -o desaparecido- sin que nadie se enterase. Se cierra
+    // igual que el de la linea y por el mismo motivo, leyendo de `information_schema` y no del
+    // esquema Prisma, que es lo que una migracion puede dejar desincronizado.
+    await inRolledBackTransaction(async (tx) => {
+      const columnas = await tx.$queryRaw<{ column_name: string }[]>`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'suppliers'
+        ORDER BY column_name`
+      expect(columnas.map((c) => c.column_name)).toEqual([
+        // La empresa duena del proveedor: sin ella no hay forma de acotar el listado ni de
+        // impedir que una linea de otra empresa cuelgue de el.
+        'company_id',
+        'created_at',
+        'created_by',
+        'deleted_at',
+        'email',
+        'id',
+        'name',
+        'name_normalized',
+        'phone',
+        'updated_at',
+        'updated_by',
+      ])
+
+      // Con su forma real, por el mismo motivo que en la linea: `uuid` y NOT NULL.
+      const empresa = await columnInfo(tx, 'suppliers', ['company_id'])
+      expect(empresa.map((c) => [c.column_name, c.data_type, c.is_nullable])).toEqual([
+        ['company_id', 'uuid', 'NO'],
+      ])
+    })
+  })
+
   it('dos proveedores vivos comparten el mismo telefono y correo, y un correo sin forma se acepta (R6)', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
@@ -943,6 +977,11 @@ describe('estructura de la linea de catalogo', () => {
         WHERE table_schema = 'public' AND table_name = 'supplier_catalog_lines'
         ORDER BY column_name`
       expect(columnas.map((c) => c.column_name)).toEqual([
+        // La linea guarda su PROPIA empresa en vez de heredarla atravesando su proveedor: es
+        // lo que permite acotar cada consulta sin un JOIN y, sobre todo, lo que da origen a
+        // las dos claves foraneas compuestas que hacen imposible una linea cuya empresa
+        // discrepe de la de su proveedor o de la de su presentacion.
+        'company_id',
         'cost',
         'created_at',
         'created_by',
@@ -958,6 +997,14 @@ describe('estructura de la linea de catalogo', () => {
         'unit_id',
         'updated_at',
         'updated_by',
+      ])
+
+      // Y la columna de empresa con su forma REAL, no solo con su nombre: `uuid` y NOT NULL.
+      // Anulable no serviria de nada -una linea sin empresa seria una linea que todo el mundo
+      // ve-, y un `text` dejaria pasar un identificador que no es de ninguna empresa.
+      const empresa = await columnInfo(tx, 'supplier_catalog_lines', ['company_id'])
+      expect(empresa.map((c) => [c.column_name, c.data_type, c.is_nullable])).toEqual([
+        ['company_id', 'uuid', 'NO'],
       ])
     })
   })
@@ -1355,6 +1402,13 @@ describe('estructura de la linea de catalogo', () => {
         JOIN pg_class t ON t.oid = c.conrelid
         WHERE c.contype = 'c' AND t.relname = 'supplier_catalog_lines'
         ORDER BY c.conname`
+      //
+      // 2026-09-17 - el ambito de empresa NO anade ni quita ningun CHECK, y esta lista sigue
+      // teniendo exactamente tres. Se deja dicho aqui a proposito: la coherencia de empresa
+      // entre la linea, su proveedor y su presentacion se resuelve con dos claves foraneas
+      // COMPUESTAS -declarativas, imposibles de desincronizar-, no con una regla escrita a
+      // mano que hubiera que mantener. Si un dia aparece un cuarto CHECK en esta tabla, este
+      // censo cae, y eso es justo lo que se quiere.
       expect(checks.map((c) => c.conname)).toEqual([
         'supplier_catalog_lines_cost_positive',
         'supplier_catalog_lines_delivery_time_non_negative',
@@ -1451,6 +1505,28 @@ describe('frontera con otros modulos: FK reales sin relacion de Prisma (QC-52 R3
           AND t.relname IN ('suppliers', 'supplier_catalog_lines')
         ORDER BY c.conname`
       expect(foreignKeys).toEqual([
+        // `r` = RESTRICT hacia `companies`: una empresa con proveedores dados de alta no se
+        // puede borrar de la base por debajo, y la baja de una empresa es logica -conserva sus
+        // proveedores y sus lineas-.
+        { conname: 'supplier_catalog_lines_company_id_fkey', referencia: 'companies', regla: 'r' },
+        // COMPUESTA `(company_id, presentation_id)` -> `presentations(company_id, id)`. Es lo
+        // que hace IMPOSIBLE que una linea use una presentacion de otra empresa sin tener que
+        // preguntarselo al modulo del inventario. `r` = RESTRICT, igual que la FK simple de
+        // presentacion que sigue viva al lado: las dos se conservan, no se sustituyen.
+        {
+          conname: 'supplier_catalog_lines_company_id_presentation_id_fkey',
+          referencia: 'presentations',
+          regla: 'r',
+        },
+        // COMPUESTA `(company_id, supplier_id)` -> `suppliers(company_id, id)`. Es la que hace
+        // IMPOSIBLE que exista una linea cuya empresa discrepe de la de su proveedor, sin
+        // ninguna comprobacion en codigo que se pueda olvidar. `c` = CASCADE, el mismo trato
+        // que la FK simple de proveedor de mas abajo, por el mismo motivo que ella.
+        {
+          conname: 'supplier_catalog_lines_company_id_supplier_id_fkey',
+          referencia: 'suppliers',
+          regla: 'c',
+        },
         { conname: 'supplier_catalog_lines_created_by_fkey', referencia: 'users', regla: 'r' },
         // `r` = RESTRICT. `presentations` no tiene borrado logico -se borra de verdad
         // (QC-20 D6)-, asi que el RESTRICT es justo lo que impide que borrar una
@@ -1463,6 +1539,8 @@ describe('frontera con otros modulos: FK reales sin relacion de Prisma (QC-52 R3
         { conname: 'supplier_catalog_lines_supplier_id_fkey', referencia: 'suppliers', regla: 'c' },
         { conname: 'supplier_catalog_lines_unit_id_fkey', referencia: 'units', regla: 'r' },
         { conname: 'supplier_catalog_lines_updated_by_fkey', referencia: 'users', regla: 'r' },
+        // `r` = RESTRICT, mismo motivo que en la linea.
+        { conname: 'suppliers_company_id_fkey', referencia: 'companies', regla: 'r' },
         { conname: 'suppliers_created_by_fkey', referencia: 'users', regla: 'r' },
         { conname: 'suppliers_updated_by_fkey', referencia: 'users', regla: 'r' },
       ])
@@ -1475,9 +1553,56 @@ describe('frontera con otros modulos: FK reales sin relacion de Prisma (QC-52 R3
       // crea solo, y por ahi pasa la verificacion del RESTRICT.
       const indices = await tx.$queryRaw<{ indexname: string }[]>`
         SELECT indexname FROM pg_indexes
-        WHERE schemaname = 'public' AND tablename = 'supplier_catalog_lines'
+        WHERE schemaname = 'public'
+          AND tablename IN ('suppliers', 'supplier_catalog_lines')
         ORDER BY indexname`
       const nombres = indices.map((i) => i.indexname)
+
+      // CENSO CERRADO de los indices de las DOS tablas. Antes eran tres `toContain` y dos
+      // `not.toContain`, y con eso un indice nuevo -o uno que desapareciera- pasaba sin que
+      // nadie lo viese; que la ficha del ambito de empresa trajera tres objetos nuevos y
+      // retirase uno es justo el movimiento que aquello no habria detectado. Se cierra, y se
+      // cierra sobre las dos tablas porque las dos ganan indices aqui. Los `toContain` de
+      // abajo se conservan: no sobran, dicen POR QUE esos tres tienen que estar.
+      expect(nombres).toEqual([
+        // Prefijo izquierdo de «lineas de esta empresa y de este proveedor», que es como se
+        // consultan siempre, y lado hijo de la clave foranea compuesta hacia `suppliers`: sin
+        // el, cada borrado de proveedor recorreria la tabla entera para verificar el CASCADE.
+        'supplier_catalog_lines_company_id_supplier_id_idx',
+        'supplier_catalog_lines_cost_idx',
+        'supplier_catalog_lines_created_at_idx',
+        'supplier_catalog_lines_created_by_idx',
+        'supplier_catalog_lines_delivery_time_idx',
+        'supplier_catalog_lines_min_purchase_idx',
+        'supplier_catalog_lines_name_idx',
+        'supplier_catalog_lines_name_normalized_trgm_idx',
+        'supplier_catalog_lines_name_presentation_unique',
+        'supplier_catalog_lines_pkey',
+        'supplier_catalog_lines_presentation_id_idx',
+        'supplier_catalog_lines_unit_id_idx',
+        'supplier_catalog_lines_updated_at_idx',
+        'supplier_catalog_lines_updated_by_idx',
+        // Clave candidata TOTAL `(company_id, id)`: destino de la clave foranea compuesta de la
+        // linea. Total y no parcial a proposito, para que la verificacion del CASCADE tambien
+        // vea los proveedores dados de baja, cosa que el unico de nombre no puede por parcial.
+        'suppliers_company_id_id_key',
+        // El unico de nombre de proveedor, ahora POR EMPRESA y todavia PARCIAL. RELEVA al
+        // global `suppliers_name_unique`, que por eso NO aparece en esta lista: no es un indice
+        // perdido por descuido, es que dos empresas pueden tener cada una al mismo proveedor y
+        // con el global la segunda no podria darlo de alta. Que siga siendo parcial es lo que
+        // hace que dar de baja libere el nombre; el predicado exacto se afirma en
+        // `tests/integration/inventario/list-query-indexes.int.test.ts`, en su propio caso.
+        'suppliers_company_name_unique',
+        'suppliers_created_at_idx',
+        'suppliers_created_by_idx',
+        'suppliers_name_idx',
+        'suppliers_name_normalized_trgm_idx',
+        'suppliers_pkey',
+        'suppliers_updated_at_idx',
+        'suppliers_updated_by_idx',
+      ])
+      expect(nombres).not.toContain('suppliers_name_unique')
+
       expect(nombres).toContain('supplier_catalog_lines_presentation_id_idx')
       expect(nombres).toContain('supplier_catalog_lines_unit_id_idx')
       expect(nombres).toContain('supplier_catalog_lines_name_presentation_unique')

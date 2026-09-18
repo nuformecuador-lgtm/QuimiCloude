@@ -358,9 +358,13 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
 //
 // QC-49 aisla por empresa TRES tablas: `products`, `presentations` y `product_batches`. Ni una
 // mas. `recipes` y `recipe_lines` son QC-50, `suppliers` y `supplier_catalog_lines` son QC-59 y
-// `orders` es QC-60. La tentacion de «ya que estoy» es real y cara: una columna de empresa en
-// `recipes` sin el filtro del modulo `recetas` no aisla nada y ademas rompe la ficha que si iba
-// a hacerlo, porque le deja el esquema a medias y sin su backfill.
+// `orders` es QC-60 — y a estas alturas varias de ellas YA tienen su empresa, puesta cada una
+// por su propia migracion y no por esta: `suppliers` y `supplier_catalog_lines` desde el
+// 2026-09-17. Que ya la tengan no afloja nada de lo que se mide aqui, porque lo que se mide es
+// que ESTA migracion no las toca, y eso sigue siendo cierto. La tentacion de «ya que estoy» es
+// real y cara: una columna de empresa puesta desde aqui, sin el filtro del modulo que la
+// consulta, no aisla nada y ademas rompe la ficha que si iba a hacerlo, porque le deja el
+// esquema a medias y sin su backfill.
 //
 // Por eso este bloque mide el ALCANCE, y lo mide en los dos sitios donde se puede desbordar: el
 // texto de la migracion -que es lo que se aplica- y el esquema de Prisma -que es lo que el
@@ -368,7 +372,13 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
 //
 // Cubre R28.
 describe('alcance de QC-49 (aislamiento-por-empresa-en-inventario): tres tablas y ninguna mas', () => {
-  /** Las cinco que R28 deja EXPLICITAMENTE fuera, con la ficha a la que van. */
+  /**
+   * Las cinco que R28 deja EXPLICITAMENTE fuera, con la ficha que se ocupa de cada una. La
+   * ficha anotada NO significa «todavia sin empresa»: varias ya la tienen, puesta por su propia
+   * migracion. Lo que esta lista afirma es que ninguna de las cinco puede aparecer en el UP ni
+   * en el DOWN de la migracion de este modulo, y eso vale igual antes y despues de que su ficha
+   * cierre. Cuales ya la ganaron se lee abajo, en `MODELOS_YA_AISLADOS_POR_SU_MIGRACION`.
+   */
   const TABLAS_FUERA_DE_ALCANCE = [
     { tabla: 'recipes', modelo: 'Recipe', ficha: 'QC-50' },
     { tabla: 'recipe_lines', modelo: 'RecipeLine', ficha: 'QC-50' },
@@ -387,8 +397,22 @@ describe('alcance de QC-49 (aislamiento-por-empresa-en-inventario): tres tablas 
    * `companyId`, no la de QC-49-. `RecipeLine` NO entra: sigue sin empresa propia a proposito
    * (se alcanza solo a traves de su receta, ver el comentario del modelo en `schema.prisma`), asi
    * que sigue vetada por `TABLAS_FUERA_DE_ALCANCE` sin excepcion, igual que antes de esta ficha.
+   *
+   * 2026-09-17, aislamiento por empresa en proveedores: entran `Supplier` y
+   * `SupplierCatalogLine`, con la misma forma que las anteriores. Su propia migracion
+   * (`_suppliers_company_scope`, que no es esta) les da el `companyId`, asi que las dos siguen
+   * vetadas en el UP y en el DOWN de aqui y en el esquema se les exige lo contrario. Entran
+   * LAS DOS -y no solo la cabecera, como paso con las recetas- porque aqui la linea si lleva
+   * empresa propia: la hereda su clave foranea compuesta en vez de alcanzarse solo a traves de
+   * su proveedor. Se nombran una a una: cualquier otro modelo de la lista con `companyId` sigue
+   * cayendo.
    */
-  const MODELOS_YA_AISLADOS_POR_SU_MIGRACION: readonly string[] = ['Order', 'Recipe']
+  const MODELOS_YA_AISLADOS_POR_SU_MIGRACION: readonly string[] = [
+    'Order',
+    'Recipe',
+    'Supplier',
+    'SupplierCatalogLine',
+  ]
 
   /** La carpeta de la migracion de esta ficha, localizada por su sufijo y no por su marca de tiempo. */
   function carpetaDeLaMigracion(): string {

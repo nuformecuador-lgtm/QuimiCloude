@@ -321,3 +321,200 @@ contiene la marca que las dos guardias del diff filtran (T27 sigue viva).
   E2E `aislamiento-proveedores.spec.ts` (T31) y los tests que cierran formalmente el mapa
   `R<n> -> test` de los bloques 1 y 2.
 - El gate: lo corre el leader.
+
+---
+
+## Tanda 3 — Bloque 3: las listas cerradas (T14–T26)
+
+Fecha: 2026-09-17. Regla que gobernó la tanda entera, fijada por el humano: **cada lista se
+TENSA, nunca se afloja**. Cero `toEqual` degradados a `toContain`, cero listas de excepciones
+nuevas, cero censos sustituidos por una marca más laxa. Toda alta va a mano, nombrada una a una
+y con el motivo escrito; los motivos nuevos no citan `QC-<n>`, `R<n>` ni `design.md`
+(`docs/conventions.md > Comentarios`), y los `R<n>` siguen viviendo solo en los **nombres** de
+los tests.
+
+### Tasks cerradas
+
+`T14`, `T15`, `T19`, `T20`, `T21`, `T22`, `T23`, `T24`, `T26`. (`T16` ya venía cerrada de la
+tanda 1.) `T18` queda **parcial**: (b), (c) y (d) hechas; (a) abierta. `T17`, `T25`, `T27` y
+`T28` no se cierran — ver «Lo que no se pudo cerrar».
+
+### Los rojos que había al empezar, y en qué quedaron
+
+El leader contó **11**. Al medirlos uno a uno eran **13**: los dos que faltaban son
+`tests/unit/identity/session-once-per-request-actions.test.ts` (el caso «TODO archivo de
+`driving/` con las dos caras está en la lista», rojo desde T12 de la tanda 2 → **T24**) y
+`tests/integration/inventario/list-query-indexes.int.test.ts` (el caso «los índices que ya
+existían siguen todos ahí», rojo desde T4 porque `suppliers_name_unique` fue relevado → **T14**).
+Los **13 están en verde**.
+
+| Rojo | Task | Cómo quedó |
+| --- | --- | --- |
+| `proveedores-schema.test.ts` (4) | T20 | verde |
+| `scope.test.ts` censo de campos (1) | T18 b/c | verde |
+| `scope.test.ts` `MARCAS_DE_INVENTARIO` (1) | T19 | verde, y falsable |
+| `module-contract.test.ts` (3) | T23 | verde |
+| `proveedores-constraints.int.test.ts` (2) | T21 | verde (30/30) |
+| `session-once-per-request-actions.test.ts` (1) | T24 | verde (34/34) |
+| `list-query-indexes.int.test.ts` (1) | T14 | verde |
+
+### T19 — la retensada, y su falsabilidad EJECUTADA
+
+La marca de la palabra suelta `findRefs` se ponía roja por un vínculo que no existe: la costura
+legítima del módulo es hacia `unidades`. **No se borró y no se le puso excepción**: salió
+partida en dos comprobaciones **más estrictas** que la que había.
+
+1. **Negativa, afinada**: pasa a exigir la forma real del vínculo —el receptor `products` o
+   `productCatalog` seguido del método—, no la palabra suelta. La marca de tipo
+   `ProductCatalog` / `ProductRef` / `ProductId` no se tocó.
+2. **Positiva, nueva**: `RECEPTOR_DE_FIND_REFS = 'units'`. El caso recorre **todas** las
+   apariciones de `findRefs` de `lib/modules/proveedores/**` y exige que el receptor inmediato
+   sea exactamente `units`. Antes el conjunto permitido era «todo lo que no se llame así»; ahora
+   es **uno y con nombre**, y un `findRefs` sin receptor también cae.
+
+**Falsabilidad ejecutada, y salió ROJA**. Escribiendo a mano una llamada con receptor `products`
+en `lib/modules/proveedores/domain/create-catalog-line.ts`, el caso cayó con **dos** hallazgos a
+la vez: «resolucion de referencias contra el catalogo de articulos» (la mitad negativa) y
+«findRefs con receptor 'products'; el unico admitido es 'units'» (la mitad positiva).
+
+Prueba extra de que la positiva **no** es redundante: con un receptor `catalog`, que la marca
+negativa no conoce, el caso **sigue cayendo** por la mitad positiva. Con la costura real hacia
+`units`: **7/7 verde**. La sonda se revirtió con `git checkout --`; ni `lib/` ni `db/` aparecen
+en `git status`.
+
+### T14 — el relevo del único, y su falsabilidad
+
+`suppliers_name_unique` sale de `PRE_EXISTING_INDEXES` **dejando en su sitio el comentario de
+relevo**, con el mismo formato que los de presentaciones, unidades y recetas. Entra un caso
+nuevo calcado del de recetas: `suppliers_company_name_unique` existe, es `UNIQUE`, lleva
+`company_id` de cabeza y **es parcial exigiendo el predicado literal** `WHERE (deleted_at IS
+NULL)`, no un `WHERE` genérico. La falsabilidad queda **escrita dentro del test**: recorta el
+`WHERE` del `def` real en memoria y afirma que el recorte cambia el predicado y no las columnas,
+de modo que la aserción mide el predicado y no otra cosa.
+
+Nota honesta: la prueba «de verdad» —borrar el `WHERE` en `migration.sql`, correr y revertir— no
+se ejecutó porque el clasificador del entorno bloqueó la edición in-place del SQL. Se cubrió
+simulando el `def` que produciría la migración sin `WHERE`, que da rojo con el mensaje esperado.
+
+### T15 — CONTRADICCIÓN CON EL SPEC, resuelta hacia el lado que tensa
+
+`tasks.md` T15 pedía «la misma baja y la misma alta que T14, pero sobre el texto». **La baja
+habría aflojado la lista.** Esta `PRE_EXISTING_INDEXES` no dice que los índices existan: alimenta
+el caso «no recrea ni borra ningún índice que ya existía», que afirma que el **texto** del UP y
+del DOWN de la migración de QC-57 **no los nombra**. De `suppliers_name_unique` eso sigue siendo
+cierto, y es el precedente del propio archivo: `presentations_name_normalized_key`,
+`units_name_normalized_key`, `recipes_name_unique`, `products_unit_id_idx` y `orders_unit_id_idx`
+siguen en la lista con sus índices ya relevados.
+
+Lo hecho: `suppliers_name_unique` **se queda**, y **entran tres** altas nombradas una a una —
+`suppliers_company_name_unique`, `suppliers_company_id_id_key` y
+`supplier_catalog_lines_company_id_supplier_id_idx`—, que la migración de QC-57 tampoco puede
+nombrar. Docblock reescrito para que la lista diga lo que de verdad afirma; esa descripción
+equivocada es justo lo que indujo la instrucción del spec. **`tasks.md` queda anotado con la
+corrección.**
+
+### Los puntos de anclaje tocados: 22, y 7 que el spec no nombraba
+
+El spec anticipó catorce (`design.md > 0.10`). En esta tanda se tocaron **22** puntos de anclaje
+—18 listas propiamente dichas más cuatro aserciones y docblocks que la tanda habría dejado
+mintiendo—, de los cuales **siete no estaban previstos**. Ninguno se tapó ni entró de rondón:
+todos quedan cerrados y con motivo escrito.
+
+| # | Lista | Archivo | ¿La nombraba el spec? |
+| --- | --- | --- | --- |
+| 1 | `PRE_EXISTING_INDEXES` (integración) | `tests/integration/inventario/list-query-indexes.int.test.ts` | sí (1) |
+| 2 | `PRE_EXISTING_INDEXES` (unit) | `tests/unit/inventario/schema/list-query-indexes-migration.test.ts` | sí (2), con la letra corregida |
+| 3 | campos de `model Supplier` | `tests/unit/proveedores/scope.test.ts` | sí (6) |
+| 4 | campos de `model SupplierCatalogLine` | `tests/unit/proveedores/scope.test.ts` | sí (7) |
+| 5 | migraciones que tocan las dos tablas | `tests/unit/proveedores/scope.test.ts` | sí (8) |
+| 6 | `MARCAS_DE_INVENTARIO` | `tests/unit/proveedores/scope.test.ts` | sí (9) |
+| 7 | `SUPPLIER_COLUMNS` | `tests/unit/proveedores/schema/proveedores-schema.test.ts` | sí (10) |
+| 8 | `SUPPLIER_CATALOG_LINE_COLUMNS` | idem | sí (10) |
+| 9 | `CROSS_MODULE_SCALARS` | idem | sí (10) |
+| 10 | censo de columnas de la línea | `tests/integration/proveedores/proveedores-constraints.int.test.ts` | sí (11) |
+| 11 | censo de `CHECK` (no cambia, y se afirma) | idem | sí (11) |
+| 12 | censo de FK de las dos tablas | idem | sí (11) |
+| 13 | `MODELOS_YA_AISLADOS_POR_SU_MIGRACION` | `tests/unit/inventario/scope.test.ts` | sí (12) |
+| 14 | `ADAPTADORES_CON_ORM` | `tests/unit/proveedores/module-contract.test.ts` | sí (13) |
+| 15 | `ACCIONES` | `tests/unit/identity/session-once-per-request-actions.test.ts` | sí (14) |
+| **16** | aserción «`Supplier` no tiene ningún `@@unique`» | `tests/unit/proveedores/schema/proveedores-schema.test.ts:257` | **NO** |
+| **17** | censo `indexMaps` de las dos tablas | idem, `:616` | **NO** |
+| **18** | censo de `adapters/driven/` | `tests/unit/proveedores/module-contract.test.ts:274` | **NO** |
+| **19** | censo de campos de la línea por `Prisma.dmmf` | idem, `:578` | **NO** |
+| **20** | censo de columnas de `suppliers` | `proveedores-constraints.int.test.ts` | **NO** — *no existía*, se creó cerrado |
+| **21** | censo de índices de las dos tablas | idem | **NO** — *no existía como lista cerrada*, se cerró |
+| **22** | docblock de `PRE_EXISTING_INDEXES` (unit) | `list-query-indexes-migration.test.ts` | **NO** |
+
+Detalle de los que no estaban previstos:
+
+- **La aserción «`Supplier` no tiene ningún `@@unique`»** dejó de sostenerse al ganar el modelo
+  su clave candidata. **No se borró ni se relajó: se tensó** a un censo `toEqual` de los
+  `@@unique` del cuerpo —exactamente uno, la pareja `(companyId, id)`— más las dos aserciones
+  explícitas de que no hay `@unique` sobre `name` ni sobre `nameNormalized`, que era lo que el
+  caso protegía. La gemela de `SupplierCatalogLine` **quedó intacta**, y eso es la prueba en el
+  gate de que la unicidad de la línea sigue siendo el índice parcial.
+- **`indexMaps`**, **censo de `adapters/driven/`** y **censo por `Prisma.dmmf`** — altas a mano
+  con motivo, `toEqual` intacto.
+- **Censo de columnas de `suppliers`** — `proveedores-constraints.int.test.ts` **no tenía**
+  censo cerrado de esa tabla, solo un subconjunto de dos columnas. Se creó cerrado (11 columnas,
+  con `company_id` y su `uuid`/`NOT NULL`) en vez de dejar la columna nueva sin vigilancia.
+- **Censo de índices** — tampoco existía como lista cerrada: eran tres `toContain` y dos
+  `not.toContain` sobre una sola tabla. Se cerró a `toEqual` sobre las **dos** (23 nombres
+  verificados contra `pg_indexes`), con los tres nuevos comentados uno a uno y el comentario de
+  relevo de `suppliers_name_unique` explicando por qué no aparece. Los `toContain` viejos se
+  conservan: dicen *por qué* esos tres tienen que estar.
+
+### T26 — el barrido
+
+Corregidas (reescrita la frase, no borrado el comentario):
+`tests/unit/inventario/scope.test.ts` (bloque «AMPLIACION … EL ALCANCE DE LA MIGRACION» y el
+docblock de `TABLAS_FUERA_DE_ALCANCE`) y
+`tests/unit/inventario/schema/inventory-company-scope-migration.test.ts` (docblock de
+`touchesNoOtherModuleTable`). Las dos ahora dicen que la ficha anotada es una **frontera**, no un
+«todavía sin empresa», y que `suppliers`/`supplier_catalog_lines` ya la tienen desde su propia
+migración. Lo que esas listas **miden** —que la migración de inventario no toca esas tablas—
+sigue intacto y no se aflojó.
+
+**No editado, a propósito**: `db/migrations/20260911130000_inventory_company_scope/migration.sql:35`
+sigue anunciando esas dos tablas como trabajo de otra ficha. Es una **migración ya aplicada** y
+no se edita; se corrigió el test que la refleja y queda constancia aquí.
+Barrido ampliado al resto del repo (fuera de `specs/`, `progress/`, `node_modules/`): sin más
+hallazgos. `docs/architecture.md:34` **no se tocó** — es T28.
+
+### Lo que no se pudo cerrar, y por qué
+
+- **T17 (`E2E_ESPERADOS`)** y **T18 (a) (censo de E2E de `scope.test.ts`)**: las dos listas se
+  comparan **contra el disco**. Dar de alta `aislamiento-proveedores.spec.ts` antes de que el
+  archivo exista las pondría **rojas**. El archivo lo crea **T31 (bloque 4)**. El spec dice
+  «Depende de: T22» en las dos; es una **errata**: T22 es `MODELOS_YA_AISLADOS`, y la
+  dependencia real es T31.
+- **T25 (`tests/integration/aislamiento.json`)**: no hay todavía ningún archivo nuevo bajo
+  `tests/integration/proveedores/**` que declarar. Los crean **T29 y T30 (bloque 4)**.
+- **T27** y **T28**: fuera del encargo de esta tanda.
+
+### Salidas reales
+
+```
+pnpm run typecheck   -> VERDE, 0 errores
+pnpm run lint        -> VERDE, 0 errores
+
+npx vitest run tests/unit/proveedores/ tests/unit/inventario/
+               tests/unit/identity/session-once-per-request-actions.test.ts
+  -> Test Files 51 passed (51) | Tests 779 passed | 3 skipped (782)
+
+npx vitest run tests/integration/proveedores/ tests/integration/inventario/
+  -> Test Files 16 passed (16) | Tests 224 passed (224)
+
+pnpm run test:guardias
+  -> Test Files 44 passed (44) | Tests 504 passed | 9 skipped (513)
+```
+
+No se corrió la suite completa: el gate lo corre el leader.
+
+### Nada que contradiga una decisión cerrada
+
+La tabla de 19 decisiones no se tocó. No entró ninguna dependencia de terceros. Ningún archivo de
+producción se modificó en esta tanda (las dos sondas de falsabilidad se revirtieron). Ningún
+mensaje de commit de esta rama contiene la marca que las dos guardias del diff filtran, así que
+T27 sigue viva. La única contradicción con el spec es la de **T15**, resuelta hacia el lado que
+tensa y anotada en `tasks.md`.

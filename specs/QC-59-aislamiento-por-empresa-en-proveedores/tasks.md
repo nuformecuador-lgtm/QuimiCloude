@@ -195,7 +195,7 @@
 
 ## Bloque 3 — Las listas cerradas (una task cada una, a propósito)
 
-- [ ] **T14 — `PRE_EXISTING_INDEXES` de integración, y el caso del relevo.** `[P]`
+- [x] **T14 — `PRE_EXISTING_INDEXES` de integración, y el caso del relevo.** `[P]`
   Archivos: `tests/integration/inventario/list-query-indexes.int.test.ts` (`:155`, `:182`).
   Contenido: sacar `'suppliers_name_unique'` **dejando en su sitio el comentario de relevo**, con el
   mismo formato que los de QC-49, QC-76 y QC-50; añadir un caso que afirme que
@@ -205,9 +205,18 @@
   Hecho cuando: el archivo pasa, y borrar el `WHERE` de la migración lo pone rojo.
   Cubre: R13, R15 (ángulo 2).
 
-- [ ] **T15 — `PRE_EXISTING_INDEXES` de unit, la gemela que QC-50 no nombró.** `[P]`
+- [x] **T15 — `PRE_EXISTING_INDEXES` de unit, la gemela que QC-50 no nombró.** `[P]`
   Archivos: `tests/unit/inventario/schema/list-query-indexes-migration.test.ts` (`:129`, `:133`).
-  Contenido: la misma baja y la misma alta que T14, pero sobre el **texto** de la migración de QC-57.
+  Contenido: ~~la misma baja y la misma alta que T14~~, sobre el **texto** de la migración de QC-57.
+  **CORREGIDO EN LA IMPLEMENTACIÓN (2026-09-17): la baja NO procede y habría aflojado la lista.**
+  Esta lista no dice «estos índices existen en la base»: alimenta el caso «no recrea ni borra ningún
+  índice que ya existía», que afirma que el **texto** del UP y del DOWN de QC-57 **no los nombra**.
+  Eso sigue siendo cierto de `suppliers_name_unique` aunque el índice ya no exista, y es el
+  precedente del propio archivo (`presentations_name_normalized_key`, `units_name_normalized_key`,
+  `recipes_name_unique`, `products_unit_id_idx` y `orders_unit_id_idx` siguen ahí, ya relevados).
+  Lo hecho: `suppliers_name_unique` **se queda**, y **entran tres altas** —
+  `suppliers_company_name_unique`, `suppliers_company_id_id_key` y
+  `supplier_catalog_lines_company_id_supplier_id_idx`—, que QC-57 tampoco puede nombrar.
   Se hace **aparte**: es un archivo distinto y una lista distinta, y dar la segunda por hecha con la
   primera es exactamente cómo se escapan.
   Depende de: T4.
@@ -220,7 +229,7 @@
   Depende de: T0.
   Cubre: el gate.
 
-- [ ] **T17 — `E2E_ESPERADOS` de la guardia de QC-71.** `[P]`
+- [ ] **T17 — `E2E_ESPERADOS` de la guardia de QC-71.** `[P]` **BLOQUEADA: la lista se compara contra el disco, así que el alta solo se puede hacer cuando exista `e2e/aislamiento-proveedores.spec.ts` (T31, bloque 4). «Depende de: T22» es una errata del spec; la dependencia real es T31.**
   Archivos: `tests/guards/guard-identificador-de-request.test.ts` (`:57`).
   Contenido: añadir `'aislamiento-proveedores.spec.ts'` con su comentario, con el mismo patrón que
   `aislamiento-recetas.spec.ts` (`:68-78`), diciendo qué recorrido ejercita y que **no** ejercita el
@@ -228,7 +237,7 @@
   Depende de: T22.
   Cubre: el gate.
 
-- [ ] **T18 — Las cuatro listas de `tests/unit/proveedores/scope.test.ts`.** `[P]`
+- [ ] **T18 — Las cuatro listas de `tests/unit/proveedores/scope.test.ts`.** `[P]` **(b), (c) y (d) HECHAS 2026-09-17; (a), el censo de E2E, queda abierta: su segundo literal es `aislamiento-proveedores.spec.ts`, que lo crea T31 (bloque 4). Darla de alta antes pondría la lista roja.**
   Archivos: `tests/unit/proveedores/scope.test.ts`.
   Contenido, las cuatro **a mano y con motivo escrito**:
   (a) censo de E2E (`:232`): de `['proveedores.spec.ts']` a **dos** literales, en el orden que
@@ -244,7 +253,7 @@
   Hecho cuando: el archivo pasa y ninguna de las cuatro listas se convirtió en `toContain`.
   Cubre: R17 (por ausencia de cambio), el gate.
 
-- [ ] **T19 — `MARCAS_DE_INVENTARIO`: la colisión con `findRefs`, RETENSADA.** `[P]`
+- [x] **T19 — `MARCAS_DE_INVENTARIO`: la colisión con `findRefs`, RETENSADA.** `[P]`
   Archivos: `tests/unit/proveedores/scope.test.ts` (`:81-88`).
   Contenido: `design.md > 6.3`. La marca `/\bfindRefs\b/` se sustituye por
   `/\b(products|productCatalog)\s*\.\s*findRefs\b/`, y entra una marca **nueva y positiva**: el único
@@ -257,7 +266,7 @@
   ejecutada y anotada en la bitácora).
   Cubre: R20.
 
-- [ ] **T20 — Los tres censos de `proveedores-schema.test.ts`.** `[P]`
+- [x] **T20 — Los tres censos de `proveedores-schema.test.ts`.** `[P]`
   Archivos: `tests/unit/proveedores/schema/proveedores-schema.test.ts` (`:126`, `:151`, `:172`).
   Contenido: `companyId → company_id` entra en `SUPPLIER_COLUMNS` y en
   `SUPPLIER_CATALOG_LINE_COLUMNS`, y **las dos** columnas de empresa entran en `CROSS_MODULE_SCALARS`
@@ -265,7 +274,7 @@
   Depende de: T0.
   Cubre: R1, R2 (forma en el esquema), R12.
 
-- [ ] **T21 — Los censos de catálogo de `proveedores-constraints.int.test.ts`.** `[P]`
+- [x] **T21 — Los censos de catálogo de `proveedores-constraints.int.test.ts`.** `[P]`
   Archivos: `tests/integration/proveedores/proveedores-constraints.int.test.ts`
   (`:651`, `:906`, `:1319`, `:1414`, `:1441`).
   Contenido: columnas de las dos tablas, censo de `CHECK` (**no cambia**, y eso se afirma), censo de
@@ -277,7 +286,7 @@
   Hecho cuando: los `toEqual` siguen siendo exactos y ninguno pasó a `toContain`.
   Cubre: R1, R2, R3, R4, R5, R9.
 
-- [ ] **T22 — `MODELOS_YA_AISLADOS_POR_SU_MIGRACION` de `inventario`.** `[P]`
+- [x] **T22 — `MODELOS_YA_AISLADOS_POR_SU_MIGRACION` de `inventario`.** `[P]`
   Archivos: `tests/unit/inventario/scope.test.ts` (`:391`).
   Contenido: entran **`Supplier` y `SupplierCatalogLine`**, con la misma forma con que entraron
   `Order` y `Recipe`: su propia migración les da la empresa, no la de QC-49, así que siguen vetadas
@@ -286,14 +295,14 @@
   Depende de: T0.
   Cubre: el gate.
 
-- [ ] **T23 — `ADAPTADORES_CON_ORM`, retensado de dos a tres.** `[P]`
+- [x] **T23 — `ADAPTADORES_CON_ORM`, retensado de dos a tres.** `[P]`
   Archivos: `tests/unit/proveedores/module-contract.test.ts` (`:209`).
   Contenido: añadir `company-scope.ts` nombrado uno a uno —tipa `Prisma.SupplierWhereInput`—. La
   lista sigue siendo **exacta**: un cuarto archivo con Prisma sigue cayendo.
   Depende de: T9.
   Cubre: el gate.
 
-- [ ] **T24 — `ACCIONES` de QC-104.** `[P]`
+- [x] **T24 — `ACCIONES` de QC-104.** `[P]`
   Archivos: `tests/unit/identity/session-once-per-request-actions.test.ts`.
   Contenido: añadir la fila de **los dos** archivos de Server Actions del módulo, cada uno con una
   acción cuya entrada llegue hasta `currentActor()`. Los casos que leen el árbol lo exigen en cuanto
@@ -301,7 +310,7 @@
   Depende de: T12.
   Cubre: R22.
 
-- [ ] **T25 — Censo de aislamiento de integración.** `[P]`
+- [ ] **T25 — Censo de aislamiento de integración.** `[P]` **BLOQUEADA: no hay todavía ningún archivo nuevo bajo `tests/integration/proveedores/**` que declarar; los crean T29 y T30 (bloque 4).**
   Archivos: `tests/integration/aislamiento.json`.
   Contenido: declarar los archivos nuevos de `tests/integration/proveedores/**` con su forma de
   aislamiento; si alguno fuese `commit`, con **motivo y desde**, que es lo que el propio censo exige.
@@ -309,7 +318,7 @@
   Hecho cuando: `guard-aislamiento-integracion` pasa.
   Cubre: el gate.
 
-- [ ] **T26 — Barrido de anotaciones que esta ficha deja mintiendo.** `[P]`
+- [x] **T26 — Barrido de anotaciones que esta ficha deja mintiendo.** `[P]`
   Archivos: los que aparezcan; como mínimo
   `db/migrations/20260911130000_inventory_company_scope/migration.sql:35`,
   `tests/unit/inventario/scope.test.ts:360` y
