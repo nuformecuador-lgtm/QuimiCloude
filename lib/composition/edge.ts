@@ -14,8 +14,6 @@
 // compartido de base. `tests/guards/guard-middleware-edge.test.ts` lo hace cumplir recorriendo el
 // cierre de imports desde `middleware.ts`, asi que un import prohibido no se queda en la revision:
 // pone el gate en rojo.
-import { Redis } from '@upstash/redis';
-
 import {
   SESSION_COOKIE_NAME,
   readSessionSecret,
@@ -87,25 +85,28 @@ function getInMemoryLimiter(): RateLimiter {
 interface UpstashLimiters {
   readonly url: string;
   readonly token: string;
-  readonly byBucket: Record<RateLimitBucket, RateLimiter>;
+  readonly cache: Map<RateLimitBucket, RateLimiter>;
 }
 
 let upstashLimiters: UpstashLimiters | undefined;
 
-/** Un limitador por cuota, recreado solo si cambian las credenciales. */
+const UPSTASH_PREFIX_BY_BUCKET: Record<RateLimitBucket, string> = {
+  login: 'rate-limit:login',
+  general: 'rate-limit:general',
+};
+
+/** Un limitador por credenciales y cuota, recreado solo si cambian las credenciales. */
 function getUpstashLimiter(url: string, token: string, bucket: RateLimitBucket): RateLimiter {
   if (!upstashLimiters || upstashLimiters.url !== url || upstashLimiters.token !== token) {
-    const redis = new Redis({ url, token });
-    upstashLimiters = {
-      url,
-      token,
-      byBucket: {
-        login: createUpstashRateLimiter(redis, 'rate-limit:login'),
-        general: createUpstashRateLimiter(redis, 'rate-limit:general'),
-      },
-    };
+    upstashLimiters = { url, token, cache: new Map() };
   }
-  return upstashLimiters.byBucket[bucket];
+
+  let limiter = upstashLimiters.cache.get(bucket);
+  if (!limiter) {
+    limiter = createUpstashRateLimiter({ url, token }, UPSTASH_PREFIX_BY_BUCKET[bucket]);
+    upstashLimiters.cache.set(bucket, limiter);
+  }
+  return limiter;
 }
 
 /**
