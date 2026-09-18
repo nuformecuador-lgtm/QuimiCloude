@@ -907,3 +907,306 @@ migraciones, ni ninguna guardia ajena.
 
 **T13bis, T13, T14 y T15 marcadas `[x]`.** Quedan **T16** (E2E a mano, lo coordina el leader) y
 **T17** (trazabilidad + gate completo). **Parada aquí, como estaba mandado.**
+
+---
+
+## Tanda 7 — T16 (E2E) y T17 (trazabilidad + gate completo)
+
+**T16 cierra en verde. T17 queda `[ ]` con un bloqueante escalado**: el gate completo termina en
+rojo y **dos de los cuatro rojos son nuestros**, los dos de la misma especie y los dos fuera de lo
+que esta ficha puede decidir sola (la **octava** y la **novena** guardia de censo). El mapa de
+trazabilidad sí está completo, y va abajo.
+
+### Archivos
+
+**Creados**
+- `e2e/ajuste-de-inventario.spec.ts` (T16)
+- `tests/unit/inventario/schema/inventory-movements-migration.test.ts` — los cinco requisitos que
+  T17 encontró sin un solo test (ver «El hallazgo de T17»)
+- `progress/e2e_QC-92_template.log`, `progress/e2e_QC-92_chromium.log`, `progress/e2e_QC-92_webkit.log`
+
+**Modificados**
+- `progress/impl_QC-92-ajuste-de-inventario.md`, `specs/QC-92-ajuste-de-inventario/tasks.md`
+
+Ningún archivo de producción, ninguna migración, ninguna guardia y **ninguna dependencia**.
+
+### T16 — la base propia, y el aviso de QC-81 sirvió
+
+No se repitió la receta de `specs/QC-77-.../design.md > 3`, que está desfasada y cuyo `db:seed`
+muere con «The column 'existe' does not exist» (medido y registrado en
+`progress/e2e_QC-93_db-setup.log`). Se siguió la salida de QC-93: **copiar la plantilla ya migrada
+y sembrada** que mantiene el propio gate.
+
+```
+pnpm run db:test template
+  test-db: plantilla reutilizada: qct_tpl_5316b8e32d17 (las migraciones no han cambiado)
+  plantilla de esta rama: qct_tpl_5316b8e32d17 (34 migraciones)
+
+DROP DATABASE IF EXISTS "QuimiCloude_QC92" WITH (FORCE)
+CREATE DATABASE "QuimiCloude_QC92" TEMPLATE "qct_tpl_5316b8e32d17"
+```
+
+Estado de la base recién copiada, medido:
+
+```
+companies: 1 · users: 1 · roles: 2 · role_permissions: 17
+products: 0 · product_batches: 0 · inventory_movements: 0
+_prisma_migrations: 34
+```
+
+Las 34 incluyen `20260917130000_inventory_movements`: la base del E2E sale de la **misma receta
+mantenida** que usa el gate, no de una armada a mano. El `.env` del worktree se apuntó a esa base
+para la corrida y **se restauró** a `QuimiCloude` al terminar (`.env` está en `.gitignore`).
+
+### Salida real del E2E — chromium y webkit, los dos
+
+`progress/e2e_QC-92_chromium.log`:
+
+```
+Running 3 tests using 3 workers
+  ok quien solo tiene inventario.consultar ve el panel y el historial, pero el control de ajuste no existe en el DOM (20.5s)
+  ok un ajuste que dejaria la existencia bajo cero se rechaza y no deja rastro (21.2s)
+  ok un ajuste con motivo cambia la cantidad del lote y queda su asiento junto al de alta, en Postgres (22.6s)
+  3 passed (42.6s)
+```
+
+`progress/e2e_QC-92_webkit.log` (base **recreada desde la plantilla** antes de esta corrida):
+
+```
+Running 3 tests using 3 workers
+  ok quien solo tiene inventario.consultar ve el panel y el historial, pero el control de ajuste no existe en el DOM (16.8s)
+  ok un ajuste que dejaria la existencia bajo cero se rechaza y no deja rastro (19.2s)
+  ok un ajuste con motivo cambia la cantidad del lote y queda su asiento junto al de alta, en Postgres (21.0s)
+  3 passed (28.1s)
+```
+
+**6/6 en los dos motores.** WebKit es el motor de iOS y la regla multiplataforma pide ejercitarlo,
+no suponerlo.
+
+**R4 va extremo a extremo, que es lo que pedía la ficha**: el caso lee el `stock` y el conteo de
+asientos **antes** —no da por bueno el estado que dejó el caso anterior—, pide un ajuste que dejaría
+la existencia negativa, y afirma en pantalla `adjust-batch-error` con el `data-code` de
+`batch_stock_negative` y el diálogo todavía abierto; y **contra Postgres**, que ni el `stock` cambió
+ni se escribió asiento. El recorrido feliz afirma también contra Postgres: `stock` = inicial + delta
+y **exactamente dos** filas en `inventory_movements` para ese lote —la de alta intacta y la de
+ajuste con su clase, su cantidad con signo y el motivo elegido—.
+
+**Residuo: cero.** Medido tras las dos corridas sobre `QuimiCloude_QC92`:
+
+```
+companies|users|products|presentations|units con prefijo qc92_e2e_: 0
+product_batches: 0 · inventory_movements: 0
+roles: 2 · role_permissions: 17   <- los del seed, intactos
+```
+
+**El Operador del seed sirvió tal cual** y no hizo falta rol efímero: tiene `inventario.consultar`
+y no tiene `inventario.modificar` (comprobado en `permissions.ts` antes de escribir el caso, y la
+premisa se vuelve a verificar dentro del test con `permissionsForUsername`). Ningún rol del seed se
+crea, modifica ni borra.
+
+**Lo que este E2E NO acredita**, escrito para que nadie lo sobreestime: `init.sh` **no** corre
+Playwright (deuda conocida, `docs/verification.md`), así que el gate en verde no acredita este
+recorrido y este recorrido no acredita el gate. Son dos afirmaciones distintas y las dos hacen falta.
+
+### El hallazgo de T17 — cinco requisitos estaban SIN UN SOLO TEST
+
+Al cruzar los 34 requisitos contra el disco, **R11, R14, R15, R16 y R31 no tenían ningún test que
+los afirmara**. No es una impresión: un barrido de `inventory_movements` bajo
+`tests/unit/inventario/schema/` no devolvía **nada**. La tabla nueva era la única del módulo sin su
+test de migración, mientras sus tres hermanas (`inventario-migration`,
+`inventory-company-scope-migration`, `product-batch-lot-migration`) sí lo tienen. El reviewer
+rechazó QC-81 por exactamente esto, así que se cierra aquí y no se arrastra.
+
+`tests/unit/inventario/schema/inventory-movements-migration.test.ts`, 9 casos, todos con **prueba
+por mutación** de su detector y **autoprueba de vacuidad** (si el lector no encuentra lo que busca,
+rojo, no mudo):
+
+| Caso | Cubre |
+|---|---|
+| `R11: el censo de columnas es exactamente id, batch_id, kind, quantity, reason, company_id, created_by, created_at` | R11 |
+| `R14: ni migration.sql ni down.sql contienen un INSERT INTO real, aunque BEFORE INSERT si aparece` | R14 |
+| `R14: ninguna otra migracion del repo escribe filas en inventory_movements` | R14 |
+| `R15(a): el SQL no ofrece ninguna via de UPDATE ni DELETE, y la tabla nace sin updated_at ni deleted_at` | R15 |
+| `R15(b): las unicas operaciones sobre inventoryMovement bajo lib/ son exactamente create y findMany` | R15 |
+| `R16: todo identificador creado por la migracion es snake_case en ingles` | R16 |
+| `R16: la migracion no anade marca de borrado ni borra filas ni la tabla de product_batches` | R16 |
+| `R31: cada objeto creado por el up tiene su DROP correspondiente en el down, ni uno mas ni uno menos` | R31 |
+| `R31: el down cae en orden inverso -disparador y funcion primero, la tabla al final-` | R31 |
+
+R15(b) es **censo en positivo**, el mismo patrón que T14: la lista nombrada de operaciones
+(`create`, `findMany`), no la ausencia de un patrón. R31 deriva **las dos listas del texto** y las
+cruza por correspondencia; no se escriben a mano las dos, que sería copiar el error de un lado al
+otro. Un matiz queda escrito en el propio archivo y no disimulado: el detector de R16 valida
+**forma** (`snake_case`), no **vocabulario** — un identificador en castellano pero bien formado
+pasaría, y la mutación que lo demuestra lleva su comentario explicando por qué sigue verde.
+
+### Mapa R -> test — **34 declarados, 34 mapeados**
+
+Los dos números: **34 requisitos declarados** en `requirements.md` (R1..R34), **34 mapeados**.
+Ninguno sin test.
+
+| R | Test que lo afirma |
+|---|---|
+| R1 | `adjust-batch-stock` «R1: el total lo devuelve el puerto y el caso de uso lo propaga sin recalcular» · `adjust-batch-stock-prisma` «R2, R7: un delta positivo suma sobre lo que la base tenga…» (filtra por id + empresa: un solo lote) · `qc91-alcance` «R11: los tres escritores de producto no escriben products.stock» |
+| R2 | `adjust-batch-stock` «R2: un delta negativo llega al puerto tal cual, con su signo» · `adjust-batch-dialog` «un delta negativo conserva su signo: NUNCA el total nuevo del lote» |
+| R3 | `adjust-batch-stock` «R3: rechaza {cero, no entero, ausente} sin tocar el repositorio» · `inventory-movements-constraints` «rechaza quantity = 0 con SQLSTATE 23514 (R3)» · `adjust-batch-dialog` «la cantidad cero se rechaza en el cliente» |
+| R4 | `adjust-batch-stock-prisma` «R4: el 23514 de product_batches_stock_non_negative se traduce a BatchStockNegativeError» · `batch-actions` «traduce batch_stock_negative con el texto del catalogo» · **E2E** «un ajuste que dejaria la existencia bajo cero se rechaza y no deja rastro» |
+| R5 | `inventory-movements-constraints` «rechaza un stock negativo en product_batches por SQL crudo con SQLSTATE 23514 (R5)» · `inventario-schema` «R25, R28: la migracion de product_batches conserva sus dos CHECK y su RLS ENABLE+FORCE sin policies» · `inventory-movements-migration` «R16: la migracion no anade marca de borrado ni borra filas ni la tabla de product_batches» |
+| R6 | `adjust-batch-stock-prisma` «R6: si el asiento falla, el ajuste entero se rechaza» · `batch-movement-prisma` «writeMovement (R6, R12) — recibe la tx, no la abre» |
+| R7 | `adjust-batch-stock-prisma` «R2, R7: un delta positivo/negativo suma o resta sobre lo que la base tenga» · `qc91-alcance` «R1: product-prisma.ts arma stockByUnit desde los lotes con sumStockByUnit» |
+| R8 | `adjust-batch-stock` «R8: rechaza {motivo ausente, fuera del conjunto} sin tocar el repositorio» y «R8: los cuatro motivos del conjunto pasan y llegan tal cual al puerto» · `inventory-movements-constraints` «rechaza el ajuste sin motivo (R10)» · `adjust-batch-dialog` «sin motivo, muestra el mensaje y NO invoca la action» |
+| R9 | `movement-reason` «R9 — ninguna fuente bajo app/ ni lib/ enumera los motivos a mano: todo consumidor deriva de la constante», con sus dos casos de mutación |
+| R10 | `inventory-movements-constraints` «rechaza el alta CON motivo con SQLSTATE 23514 (R10)» · `adjust-batch-stock-prisma` «createWithFirstBatch escribe el lote y, despues, su asiento de apertura» |
+| R11 | **`inventory-movements-migration` «R11: el censo de columnas es exactamente…»** · `inventory-movements-constraints` (inserta con las ocho contra Postgres real) |
+| R12 | `adjust-batch-stock-prisma` «R12 — el alta deja su asiento de apertura en la misma transaccion» y «si el asiento falla, la transaccion entera se rechaza» |
+| R13 | `guard-libro-de-inventario` «el censo de caminos de escritura es exactamente { createWithFirstBatch, addBatchToAlive, adjustBatchStock }» — censo en positivo: un cuarto camino (consumo) lo pone rojo · `module-contract` «ningun export del contrato denota editar ni borrar lotes» |
+| R14 | **`inventory-movements-migration` «R14: ni migration.sql ni down.sql contienen un INSERT INTO real…» y «R14: ninguna otra migracion del repo escribe filas en inventory_movements»** |
+| R15 | **`inventory-movements-migration` «R15(a): el SQL no ofrece ninguna via de UPDATE ni DELETE…» y «R15(b): las unicas operaciones sobre inventoryMovement bajo lib/ son exactamente create y findMany»** |
+| R16 | **`inventory-movements-migration` «R16: todo identificador creado por la migracion es snake_case en ingles» y «R16: la migracion no anade marca de borrado…»** · `qc91-alcance` «R21: product-prisma.ts no borra, reemplaza en bloque ni multiplica filas de product_batches» |
+| R17 | `guard-rls-force` «toda tabla creada tiene RLS activado y forzado» (descubre las tablas del SQL, no de una lista fija) · `inventory-movements-migration` R11 (company_id NOT NULL) y R31 (las tres FK y los tres índices) · `inventory-movements-constraints` «rechaza un asiento cuya empresa no coincide… (R19)» |
+| R18 | `adjust-batch-stock` «R18: el puerto devuelve null y el caso de uso lanza BatchNotFoundError», «R18: cambiar de actor cambia la empresa que llega al puerto», «R18: el producto inexistente, borrado o ajeno vuelve como lista vacia», «R18: el lote inexistente o ajeno devuelve null…», «R18: el ambito de la lectura sale del actor» · `batch-movement-prisma` «findBatchMovements (R18)» · `batch-actions` «R18 — el actor sale de la sesion del servidor» y «R18 — una empresa colada en el FormData no cambia el actor» · `guard-ambito-empresa-inventario` (los métodos nuevos del puerto declaran y consumen el ámbito) |
+| R19 | `inventory-movements-constraints` «rechaza un asiento cuya empresa no coincide con la del lote, con el identificador del disparador (R19)» |
+| R20 | `adjust-batch-stock` «R20: rechaza sin permiso sin tocar el repositorio» y «R20: el permiso se mira ANTES de zod, incluso con entrada invalida» · `batch-actions` «R20 — el Operador, que solo consulta, recibe el error de autorizacion del ajuste» · `product-route-contract` «el caso de uso de ajuste exige el permiso ANTES de validar y ANTES de tocar el repositorio» |
+| R21 | `adjust-batch-stock` «R21: el Operador… SI puede listar los lotes» y «R21: un actor con solo inventario.modificar es rechazado» (x2) · `authorization` «R21 — canAdjustBatchStock» (4 casos, incluida la sesión caída) · `adjust-batch-dialog` «sin canAdjust el panel se ve pero el disparador del ajuste no existe en el DOM» · `product-batches-sheet` «canAdjust decide si el control de ajuste existe en el DOM» · **E2E** «quien solo tiene inventario.consultar ve el panel y el historial, pero el control de ajuste no existe en el DOM» |
+| R22 | `product-batches-panel` «pinta tres lotes con numero, cantidad con su unidad derivada (sin convertir) y fecha (R22)» · `product-batches-sheet` «la fila abre el panel de lotes DEL producto (R22)» · **E2E** (recorrido feliz) |
+| R23 | `batch-history` «R23 — con asientos, muestra motivo, autor y fecha en el orden en que llegan, alta incluida» · `adjust-batch-stock` «R23: el autor que vuelve del directorio sale con su nombre mostrable» y «R23: el resto del asiento no se toca al resolver el autor» · **E2E** (recorrido feliz) |
+| R24 | `batch-history` «R24 — sin ningun asiento, dice que el lote es anterior al libro y no parece un error ni una lista» · `adjust-batch-stock` «R24: el lote sin asientos devuelve lista vacia y NO pregunta al directorio» |
+| R25 | `product-batches-panel` «multiplataforma: el disparador de la ranura de acciones cumple el objetivo tactil minimo (R25)» · `adjust-batch-dialog` «multiplataforma (R25): el disparador y los campos llevan area tactil, y el campo de cantidad lleva text-base» |
+| R26 | `qc91-alcance` «R21: el alta y el agregado de lote siguen creando; el unico update vive en adjustBatchStock» — la guardia R21 de QC-91 **ajustada**, con su nota fechada 2026-09-18 |
+| R27 | `qc91-alcance` «llamaAUpdateFueraDe — el update de adjustBatchStock queda aislado del resto (R27)»: 5 casos sobre fuentes fabricadas —update dentro (verde), el MISMO update movido a otra función (rojo), sin update (sin hallazgo), tipo de retorno con llave propia, y delete/deleteMany/SQL crudo siguen dando hallazgo— |
+| R28 | `guard-libro-de-inventario`, 13 casos: el censo en positivo, el asiento en cada camino, y los detectores probados con un cuarto camino fabricado, un camino sin su asiento y el asiento movido a otra función |
+| R29 | `ledger-cuadre` «cuadre del libro: stock = suma de asientos, para lotes posteriores a LEDGER_START (R29)», 4 casos, incluido el descuadre por SQL crudo que el cuadre **detecta** |
+| R30 | `ledger-cuadre` «la excepcion permanente de los lotes anteriores a LEDGER_START (R30)»: el mismo lote sin asientos a los dos lados del corte —antes pasa, después lo caza— |
+| R31 | **`inventory-movements-migration` «R31: cada objeto creado por el up tiene su DROP correspondiente en el down» y «R31: el down cae en orden inverso»** · `init.sh` «todas las migraciones tienen down.sql» · ciclo migrate deploy -> db:rollback -> migrate deploy verificado a mano en la tanda 1 |
+| R32 | `catalogo` «QC-92 R32 — los dos codigos del lote de ajuste tienen codigo y texto propios», 3 casos: las 48 entradas, que se distinguen entre sí y de product_not_found / invalid_input, y que la cabecera redacta la séptima enmienda con su fecha y su aprobación |
+| R33 | `guard-dependencias-aprobadas` (toda dependencia tiene su fila en el registro) **más la medición directa**: el diff de `package.json`, `pnpm-lock.yaml` y `docs/dependencias.md` contra `origin/dev` sale **vacío** |
+| R34 | **`e2e/ajuste-de-inventario.spec.ts`**, 3 casos x 2 motores, corrido a mano y pegado arriba |
+
+### Salida real del gate completo — **ROJO**, con cuatro rojos y los cuatro medidos
+
+`./init.sh` (completo, **sin** `--rapido`), código de salida 1:
+
+```
+Test Files  4 failed | 541 passed (545)
+     Tests  4 failed | 7943 passed | 97 skipped (8044)
+  Duration  433.99s
+
+hay 4 archivo(s) de test en rojo que NO estan en el baseline:
+  tests/guards/guard-identificador-de-request.test.ts
+  tests/unit/configuracion-ui/user-table.test.tsx
+  tests/unit/inventario/scope.test.ts
+  tests/unit/pedidos-ui/order-form.test.tsx
+hay rojos NUEVOS respecto del baseline
+```
+
+`typecheck` y `lint`, **verdes**. Las 45 guardias corren; las dos rojas son **censos**, no defectos
+de comportamiento.
+
+**Se esperaba un rojo y salieron cuatro.** Los cuatro medidos, uno a uno, antes de etiquetarlos —en
+esta ficha un subagente etiquetó mal un rojo propio dos veces, y las dos lo causaba él—:
+
+**1. `tests/unit/pedidos-ui/order-form.test.tsx` — HEREDADO de `dev`, no nuestro.**
+«R14 — sin ningun lote, la existencia es 0 y el restante negativo se destaca como faltante»,
+`1 failed | 32 passed (33)`. Espera `-0.201` y recibe `-0.2`. Medición **repetida por mí**, no
+heredada de palabra: los cuatro archivos implicados son **byte a byte idénticos a `origin/dev`**
+(`git diff --quiet origin/dev -- <archivo>` sale 0 en `tests/unit/pedidos-ui/order-form.test.tsx`,
+`app/(private)/pedidos/components/order-decimal.ts`, `order-form.tsx` y
+`order-ingredients-table.tsx`), y el diff de rama contra `origin/dev` sobre `tests/unit/pedidos-ui/`,
+`app/(private)/pedidos/` y `lib/modules/pedidos/` sale **vacío**: esta rama no toca un solo archivo
+de pedidos. Causa: el PR #85 (redondeo a dos decimales) cruzado con el caso R14 de QC-91, que espera
+tres. **Es de `dev`. No se arregla aquí** —está fuera del alcance de esta ficha— y no se declara
+como nuestro.
+
+**2. `tests/unit/configuracion-ui/user-table.test.tsx` — FLAKE DE SATURACIÓN, no nuestro.**
+«la accion de editar de una fila abre el panel SOBRE ESE usuario (R26)», un `findByTestId` que
+expira. Medido, no supuesto, con las dos comprobaciones que pide `docs/verification.md`:
+- **aislado pasa**: `pnpm exec vitest run tests/unit/configuracion-ui/user-table.test.tsx` →
+  `Test Files 1 passed (1) · Tests 27 passed (27)`;
+- **la rama no lo toca**: el diff contra `origin/dev` sobre `tests/unit/configuracion-ui/`,
+  `app/(private)/configuracion/` y `lib/modules/identity/` sale **vacío**.
+Es la especie que documenta QC-58 y que `docs/verification.md` describe: 2–5 flakes por corrida que
+cambian de sitio. **No está en el baseline**, así que el comparador lo cuenta igual.
+
+**3 y 4. `guard-identificador-de-request.test.ts` y `tests/unit/inventario/scope.test.ts` —
+NUESTROS, los dos, y son la MISMA especie.** No se disimulan: los causa el archivo que T16 acaba de
+crear. Ver el bloqueante de abajo, con su prueba por mutación.
+
+### BLOQUEANTE de T17 — la **octava** y la **novena** guardia de censo. No se tocan; se escalan.
+
+Los dos rojos nuestros son **censos cerrados de archivos bajo `e2e/`** que se ponen rojos porque
+existe un spec nuevo. Ninguno de los dos habla del ajuste de inventario; los dos hablan de otra
+ficha:
+
+| Archivo | Lista | Mensaje |
+|---|---|---|
+| `tests/guards/guard-identificador-de-request.test.ts:576` | `E2E_ESPERADOS` (de QC-71) | `e2e/ajuste-de-inventario.spec.ts: archivo nuevo en e2e/. QC-71 difirio el E2E con motivo (R21)…` |
+| `tests/unit/inventario/scope.test.ts:337` | lista cerrada de specs de catálogo (de QC-20/QC-22) | `spec E2E de catalogo inesperado: aislamiento-inventario.spec.ts, ajuste-de-inventario.spec.ts, inventario.spec.ts` |
+
+**Prueba por mutación, hecha por mí, que deja fuera de duda de quién son y que no hay nada más
+detrás**:
+
+```
+# con el spec nuevo MOVIDO fuera del árbol, sin tocar nada más:
+pnpm exec vitest run tests/guards/guard-identificador-de-request.test.ts tests/unit/inventario/scope.test.ts
+  Test Files  2 passed (2) · Tests  27 passed (27)
+
+# con el spec nuevo restaurado, sin tocar nada más:
+  Test Files  2 failed (2) · Tests  2 failed | 25 passed (27)
+```
+
+Los causa **exclusivamente** la existencia del archivo. Son nuestros y se declaran nuestros.
+
+**Por qué paro aquí y no los doy de alta**: la instrucción de esta ficha es explícita — siete
+guardias heredadas ya tocadas, todas con aprobación humana, nota fechada y prueba por mutación, y
+**si aparece una octava, parar y reportarla con la medición**. Han aparecido la octava **y la
+novena**. No se renombra nada para esquivar, no se toca ningún detector y no se afloja ningún
+matcher.
+
+**Lo que haría falta, para que el leader decida con el dato delante**: las dos listas dicen en su
+propio comentario que **su punto de extensión por diseño es darse de alta en ellas**.
+`E2E_ESPERADOS` ya lo hicieron QC-49, QC-67, QC-79, QC-85, QC-101 y QC-102 —seis fichas, cada una
+con su nota fechada diciendo que su spec **no** ejercita el cruce borde→acción del identificador de
+petición—; y `scope.test.ts` lo escribe literalmente: «La guardia no se afloja; se le añade un
+renglón», con el razonamiento de por qué se enumera en vez de afinar el matcher por nombre. En los
+dos casos el trámite sería **un renglón con su nota fechada**, no relajar la regla. Pero es la
+octava y la novena, y **la decide el humano, no yo**.
+
+Para las dos, la nota sería del mismo tipo que las que ya están: `ajuste-de-inventario.spec.ts`
+**no** lee ni afirma nada sobre el identificador de petición ni sobre `reference` —así que el
+diferimiento de QC-71 R21 seguiría intacto—, y **no es una segunda pantalla del catálogo**: casa
+con el patrón por la palabra «inventario», igual que `aislamiento-inventario.spec.ts`, pero lo que
+ejercita es el **panel de lotes y el ajuste**, que es pantalla de esta ficha.
+
+**Dato para QC-99**: un solo archivo, `guard-identificador-de-request.test.ts`, lleva **dos** listas
+cerradas independientes —migraciones y specs de E2E— y **esta ficha las ha roto las dos**, en dos
+tandas distintas (T1 y T16) y por dos motivos que no tienen nada que ver entre sí ni con el
+identificador de petición. Es la tercera familia (censo) ya inventariada en esta bitácora, y aquí se
+ve que un mismo archivo puede cobrártela más de una vez.
+
+### CHECKPOINTS.md, recorrido entero
+
+- Trazabilidad: **34/34**, arriba. OK
+- `typecheck`, `lint`: verdes. OK
+- `pnpm test`: **rojo**, 4 archivos; los cuatro medidos y clasificados arriba. **BLOQUEANTE**
+- E2E de flujo crítico (movimiento de inventario): **existe y pasa**, chromium + webkit. OK
+- Multiplataforma (`dvh`, sin `:hover` como única vía, 44x44, 16 px): R25, con test. OK
+- Dependencias: **ninguna nueva**, medido contra `origin/dev`. OK
+- Empresa, RLS ENABLE+FORCE sin policies, permiso en el **service**: R17, R19, R20, con test. OK
+- Migración con `down.sql` y `db:rollback` coherente: R31, con test y con el ciclo verificado. OK
+- `./init.sh` en verde: **NO**. **BLOQUEANTE**
+
+### Desviaciones de la tanda 7
+
+1. **Se creó un archivo de test que T17 no listaba**, `inventory-movements-migration.test.ts`. T17
+   listaba solo la bitácora y `tasks.md`, pero su encargo es **cerrar la trazabilidad de las 34** y
+   cinco requisitos no tenían test. Escribirlos en el mapa sin test habría sido un mapa falso.
+2. **Las dos listas cerradas quedan rotas y sin arreglar**, a propósito (bloqueante de arriba). El
+   gate queda rojo por ello, y se declara en vez de esconderse.
+3. **El E2E se corrió contra una base propia** (`QuimiCloude_QC92`) y no contra la de desarrollo,
+   siguiendo lo que hizo QC-93. El `.env` se restauró al terminar.
+
+### Estado
+
+**T16 `[x]`.** **T17 `[ ]`**: el mapa de trazabilidad está completo (34/34) y el gate completo se
+corrió de verdad, pero **termina en rojo** y dos de los cuatro rojos son nuestros y están escalados.
+**Parada aquí. No se abre el PR.**

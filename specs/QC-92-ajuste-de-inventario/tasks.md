@@ -282,7 +282,7 @@
 
 ## Tanda 7 — cierre
 
-- [ ] **T16 — E2E del ajuste.** Depende de T13.
+- [x] **T16 — E2E del ajuste.** Depende de T13.
       Recorrido: entrar al inventario, abrir el panel de lotes de un producto, ajustar con motivo,
       ver la existencia nueva y el asiento en el historial; y el Operador que no encuentra el
       control.
@@ -300,6 +300,15 @@
       del gate (completo + E2E manual) escritas con su resultado. **Cubre R33 y cierra la
       trazabilidad de las 34.**
       **Archivos:** `progress/impl_QC-92-ajuste-de-inventario.md`, `specs/QC-92-ajuste-de-inventario/tasks.md`.
+      **ESTADO 2026-09-18:** el mapa está **completo, 34 declarados / 34 mapeados** —y para
+      lograrlo hubo que escribir `tests/unit/inventario/schema/inventory-movements-migration.test.ts`,
+      porque **R11, R14, R15, R16 y R31 no tenían ningún test**—; `package.json` **no cambió**,
+      medido; el E2E de T16 está corrido a mano y anotado. **Lo que falta es el gate completo en
+      verde**: `./init.sh` termina en rojo con 4 archivos, y **2 son nuestros** —`E2E_ESPERADOS` de
+      `guard-identificador-de-request.test.ts` y la lista cerrada de `tests/unit/inventario/scope.test.ts`,
+      los dos censos de `e2e/` que el spec nuevo rompe—. Son la **octava y la novena** guardia
+      heredada, así que **se escalan al humano y no se tocan**. Detalle, mediciones y prueba por
+      mutación en la bitácora.
 
 ---
 
