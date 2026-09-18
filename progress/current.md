@@ -21,7 +21,7 @@
 
 ### QC-109 - acotada con `/afinar-feature` (2026-09-18)
 
-Alcance, **14 decisiones cerradas** y **una pregunta abierta** en
+Alcance y **16 decisiones cerradas, con CERO preguntas abiertas**, en
 `.worktrees/QC-109-procesamiento-de-pdf-por-estrategia/specs/QC-109-procesamiento-de-pdf-por-estrategia/requirements.md`
 (sembrado DENTRO del worktree, como QC-68, QC-92 y QC-103). No se copian aqui.
 
@@ -43,9 +43,13 @@ las acepto: `[D4]` la cabecera de provisional, `[D13]` el enum validado con zod 
 QC-108, y `[D14]` el E2E diferido a QC-107 con motivo escrito —esta ficha no tiene pantalla ni
 recorrido que ejercitar—.
 
-**La pregunta que queda abierta es real**: cuanto se registra por consola. El texto de un catalogo
-entero puede ser enorme y un PDF de proveedor puede traer datos que no conviene volcar en los
-registros. No se rellena con un supuesto.
+**La pregunta abierta se CERRO el mismo dia, en F1.4**: se registra un **resumen sin el texto**
+—estrategia, modo, ruta, paginas y longitud—, porque un catalogo entero puede ser enorme y un PDF
+de proveedor puede traer datos de terceros. Es `[D16]`, y la firma del puerto **no admite el
+texto**, asi que lo hace cumplir el compilador. En la misma puerta se cerro `[D15]`: los prompts
+van en **`.json`** y no en `.ts` —el diseno proponia la opcion que el humano habia descartado—,
+lo que ademas **disuelve** el roce con `docs/conventions.md`: la marca de provisional deja de ser
+un comentario que cita una ficha y pasa a ser un campo de datos.
 
 **El cruce de archivos con QC-61 dejo de ser un problema**: mergeo hoy (PR #90), asi que `backend`
 queda a 0 `in_progress` y la validacion que no se pudo hacer ya no hace falta.
