@@ -291,9 +291,11 @@ import {
   createDownloadDocument,
   createIssueReadLink,
   createIssueUploadLinks,
+  createProcessPdfByStrategy,
   createReadPdfWithAi,
 } from '@/lib/modules/documentos';
 import { readWithGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
+import { createStrategyRunLogConsole } from '@/lib/modules/documentos/adapters/driven/observability/strategy-run-log-console';
 import {
   countPages,
   extractPdfText,
@@ -307,6 +309,7 @@ import {
 import type { AiReader } from '@/lib/modules/documentos/ports/ai-reader';
 import type { DocumentStorage } from '@/lib/modules/documentos/ports/document-storage';
 import type { PdfConverter } from '@/lib/modules/documentos/ports/pdf-converter';
+import type { StrategyRunLog } from '@/lib/modules/documentos/ports/strategy-run-log';
 import { requestScoped } from '@/lib/shared/request-scope';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
@@ -1136,6 +1139,15 @@ const pdfConverter: PdfConverter = {
 const aiReader: AiReader = { read: readWithGenai };
 
 /**
+ * La lectura con IA, construida UNA vez: la publica la fachada y la reutiliza el procesamiento por
+ * estrategia. Dos construcciones serian dos cableados que pueden divergir.
+ */
+const readPdfWithAi = createReadPdfWithAi({ ai: aiReader, converter: pdfConverter });
+
+/** `StrategyRunLog` cableado con la unica implementacion que hay: una linea en el registro. */
+const strategyRunLog: StrategyRunLog = createStrategyRunLogConsole();
+
+/**
  * Fachada del modulo `documentos` ya cableada. Es lo que consume su Server Action.
  *
  * El ACTOR NO se resuelve aqui, mismo criterio que el resto de modulos: cada caso de uso lo recibe
@@ -1166,5 +1178,13 @@ export const documentos = {
   // una variable ni tocar la red.
   issueReadLink: createIssueReadLink({ storage: documentStorage }),
   downloadDocument: createDownloadDocument({ storage: documentStorage }),
-  readPdfWithAi: createReadPdfWithAi({ ai: aiReader, converter: pdfConverter }),
+  readPdfWithAi,
+  // El procesamiento por estrategia recibe la LECTURA ya construida, no el puerto de IA: el plazo y
+  // el tope de paginas son de ella. `countPages` es solo para el resumen que se registra. Tampoco
+  // recibe actor, por el mismo motivo que `convertPdfs`.
+  processPdfByStrategy: createProcessPdfByStrategy({
+    readPdfWithAi,
+    countPages: pdfConverter.countPages,
+    log: strategyRunLog,
+  }),
 } as const;
