@@ -912,10 +912,15 @@ migraciones, ni ninguna guardia ajena.
 
 ## Tanda 7 — T16 (E2E) y T17 (trazabilidad + gate completo)
 
-**T16 cierra en verde. T17 queda `[ ]` con un bloqueante escalado**: el gate completo termina en
-rojo y **dos de los cuatro rojos son nuestros**, los dos de la misma especie y los dos fuera de lo
-que esta ficha puede decidir sola (la **octava** y la **novena** guardia de censo). El mapa de
-trazabilidad sí está completo, y va abajo.
+**T16 cierra en verde. T17 se paró con un bloqueante escalado y CIERRA después**: el gate completo
+terminó en rojo y **dos de los cuatro rojos eran nuestros**, los dos de la misma especie y los dos
+fuera de lo que esta ficha podía decidir sola. El mapa de trazabilidad sí está completo, y va abajo.
+
+> **Cómo terminó, y el encuadre correcto** (resolución del 2026-09-18, al final de esta tanda): los
+> dos rojos nuestros eran **altas de censo**, no enmiendas, y el humano aprobó darlas de alta. **El
+> contador de guardias enmendadas de esta ficha se queda en SIETE**, no sube a nueve. Detalle en
+> «RESUELTO — alta de los dos censos». Lo que sigue a continuación es el registro de cómo se midió
+> y por qué se paró; se conserva tal cual porque parar era lo correcto.
 
 ### Archivos
 
@@ -1131,7 +1136,12 @@ cambian de sitio. **No está en el baseline**, así que el comparador lo cuenta 
 NUESTROS, los dos, y son la MISMA especie.** No se disimulan: los causa el archivo que T16 acaba de
 crear. Ver el bloqueante de abajo, con su prueba por mutación.
 
-### BLOQUEANTE de T17 — la **octava** y la **novena** guardia de censo. No se tocan; se escalan.
+### BLOQUEANTE de T17 (parada del 2026-09-18) — dos censos rotos. No se tocan; se escalan.
+
+> **RESUELTO el mismo día**, ver la sección final. Y **el encuadre de esta sección era el
+> equivocado**: se leyeron como «la octava y la novena guardia» cuando **no lo son**. Se conserva
+> el texto tal cual, con la corrección marcada abajo, porque el error de encuadre es parte de lo
+> que hay que poder auditar.
 
 Los dos rojos nuestros son **censos cerrados de archivos bajo `e2e/`** que se ponen rojos porque
 existe un spec nuevo. Ninguno de los dos habla del ajuste de inventario; los dos hablan de otra
@@ -1158,9 +1168,14 @@ Los causa **exclusivamente** la existencia del archivo. Son nuestros y se declar
 
 **Por qué paro aquí y no los doy de alta**: la instrucción de esta ficha es explícita — siete
 guardias heredadas ya tocadas, todas con aprobación humana, nota fechada y prueba por mutación, y
-**si aparece una octava, parar y reportarla con la medición**. Han aparecido la octava **y la
-novena**. No se renombra nada para esquivar, no se toca ningún detector y no se afloja ningún
-matcher.
+**si aparece una octava, parar y reportarla con la medición**. No se renombra nada para esquivar,
+no se toca ningún detector y no se afloja ningún matcher.
+
+> **CORRECCIÓN del 2026-09-18** (leader, con el humano): parar estuvo bien, **pero contarlas como
+> «la octava y la novena» estuvo mal**. Las siete anteriores **cambiaban lo que la guardia afirma**,
+> y por eso cada una necesitó decisión humana. Estas dos **no cambian nada de lo que la guardia
+> afirma**: son el **trámite que la propia guardia pide** para registrar un archivo nuevo.
+> **El contador de guardias enmendadas de esta ficha se queda en SIETE.**
 
 **Lo que haría falta, para que el leader decida con el dato delante**: las dos listas dicen en su
 propio comentario que **su punto de extensión por diseño es darse de alta en ellas**.
@@ -1168,8 +1183,8 @@ propio comentario que **su punto de extensión por diseño es darse de alta en e
 con su nota fechada diciendo que su spec **no** ejercita el cruce borde→acción del identificador de
 petición—; y `scope.test.ts` lo escribe literalmente: «La guardia no se afloja; se le añade un
 renglón», con el razonamiento de por qué se enumera en vez de afinar el matcher por nombre. En los
-dos casos el trámite sería **un renglón con su nota fechada**, no relajar la regla. Pero es la
-octava y la novena, y **la decide el humano, no yo**.
+dos casos el trámite sería **un renglón con su nota fechada**, no relajar la regla. Pero es una
+guardia heredada que esta ficha no había tocado, y **la decide el humano, no yo**.
 
 Para las dos, la nota sería del mismo tipo que las que ya están: `ajuste-de-inventario.spec.ts`
 **no** lee ni afirma nada sobre el identificador de petición ni sobre `reference` —así que el
@@ -1210,3 +1225,134 @@ ve que un mismo archivo puede cobrártela más de una vez.
 **T16 `[x]`.** **T17 `[ ]`**: el mapa de trazabilidad está completo (34/34) y el gate completo se
 corrió de verdad, pero **termina en rojo** y dos de los cuatro rojos son nuestros y están escalados.
 **Parada aquí. No se abre el PR.**
+
+---
+
+## RESUELTO — alta de los dos censos, y **T17 CIERRA** (2026-09-18)
+
+**Aprobado por el humano el 2026-09-18**, con el leader verificando antes las dos afirmaciones de
+la parada: `E2E_ESPERADOS` dice en su propio comentario que «esta lista es CERRADA y su punto de
+extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo se nombra, uno a
+uno-», con **seis altas previas** (QC-49, QC-67, QC-79, QC-85, QC-101, QC-102); y el rojo de
+`scope.test.ts` es el de su lista cerrada de specs E2E de catálogo.
+
+### El encuadre, que es lo que hay que retener
+
+**NO son la octava y la novena enmienda de guardia.** La distinción es la que importa y va escrita
+para que no se pierda:
+
+- **Las siete anteriores cambiaban lo que la guardia AFIRMA.** Por eso cada una necesitó decisión
+  humana, nota fechada y prueba por mutación de las dos caras: después de tocarlas, la guardia
+  afirmaba algo distinto de lo que afirmaba antes.
+- **Estas dos no cambian NADA de lo que la guardia afirma.** Son el **trámite que la propia guardia
+  pide** para registrar un archivo nuevo. Registrar el spec es **usar la guardia como fue
+  diseñada**; **no** registrarlo dejaría el E2E **fuera del censo**, que es estrictamente peor.
+
+**Por eso el contador de esta ficha se queda en SIETE guardias enmendadas, no sube a nueve.** Estas
+dos van aparte, como **altas de censo**. Parar y preguntar fue lo correcto —la instrucción era
+esa—; contarlas como enmiendas, no.
+
+### Lo que se escribió
+
+Un renglón en cada lista, **con nota fechada 2026-09-18**, en el sitio y con la forma de las altas
+previas. El diff es **puramente aditivo: 21 inserciones, 0 borrados**. No se relajó ningún ancla, no
+se tocó ningún detector, no se amplió ningún patrón, no se renombró nada, y el bloque de «Defensa
+extra» de `scope.test.ts` —el que comprueba que `aislamiento-inventario.spec.ts` sigue llevando sus
+señales— **quedó intacto**.
+
+- `tests/guards/guard-identificador-de-request.test.ts` → `'ajuste-de-inventario.spec.ts'` en
+  `E2E_ESPERADOS`, con la nota que dice **qué recorrido ejercita** el spec y que **NO** ejercita el
+  cruce borde→acción del identificador de petición —no lee ni afirma nada sobre el identificador ni
+  sobre `reference`—, **así que el diferimiento de QC-71 R21 sigue declarado INTACTO**.
+- `tests/unit/inventario/scope.test.ts` → el tercer nombre en la lista cerrada, en el orden que
+  devuelve el matcher (alfabético), con la nota de por qué **no es una segunda pantalla del
+  catálogo**: casa con `screenPattern` por la palabra «inventario», igual que
+  `aislamiento-inventario.spec.ts`, pero lo que ejercita es el **panel de lotes y el ajuste**, que
+  es la pantalla que añade esta ficha; el alta del catálogo la sigue cubriendo `inventario.spec.ts`,
+  que no se toca.
+
+### Prueba por mutación — las dos listas, las dos caras
+
+`pnpm exec vitest run tests/guards/guard-identificador-de-request.test.ts tests/unit/inventario/scope.test.ts`
+
+**Con los dos renglones puestos** → verde: `Test Files 2 passed (2) · Tests 27 passed (27)`.
+
+**Quitando SOLO el renglón de `E2E_ESPERADOS`** → rojo:
+
+```
+× no hay ningun archivo nuevo en e2e/ y existe el test que lo sustituye (R21)
+AssertionError: expected [ Array(1) ] to deeply equal []
++ [
++   "e2e/ajuste-de-inventario.spec.ts: archivo nuevo en e2e/. QC-71 difirio el E2E con motivo (R21):
++    el cruce borde -> accion se prueba en tests/unit/identity/route-guard-request-id.test.ts.
++    Si de verdad hace falta un E2E, es otra ficha y otra decision.",
++ ]
+Test Files  1 failed | 1 passed (2) · Tests  1 failed | 26 passed (27)
+```
+
+**Quitando SOLO el renglón de `scope.test.ts`** → rojo:
+
+```
+× la pantalla del catalogo vive solo donde la declara QC-22, y en ningun otro sitio
+AssertionError: spec E2E de catalogo inesperado: aislamiento-inventario.spec.ts,
+ajuste-de-inventario.spec.ts, inventario.spec.ts: expected [ …(3) ] to deeply equal [ …(2) ]
+    "aislamiento-inventario.spec.ts",
++   "ajuste-de-inventario.spec.ts",
+    "inventario.spec.ts",
+```
+
+**Restaurados los dos** → verde otra vez: `Test Files 2 passed (2) · Tests 27 passed (27)`.
+
+Las dos listas **siguen mordiendo**: quitar el renglón las pone rojas. No se han apagado, se han
+completado.
+
+### Gate completo, re-corrido tras el alta — **UN SOLO ROJO, y es el heredado**
+
+`./init.sh` (completo, **sin** `--rapido`), código de salida 1:
+
+```
+Test Files  1 failed | 544 passed (545)
+     Tests  1 failed | 7946 passed | 97 skipped (8044)
+  Duration  277.85s
+
+hay 1 archivo(s) de test en rojo que NO estan en el baseline:
+  tests/unit/pedidos-ui/order-form.test.tsx
+```
+
+`typecheck` y `lint`, **verdes**. Las 45 guardias, verdes
+(`Test Files 45 passed (45) · Tests 557 passed | 9 skipped (566)`).
+
+**Es exactamente lo esperado y ni uno más.** Comparado con la corrida anterior (4 rojos):
+
+- **Los dos nuestros desaparecieron**: los dos censos, ya dados de alta, pasan. De 541 a **544**
+  archivos en verde.
+- **`configuracion-ui/user-table.test.tsx` NO volvió a salir.** Queda **confirmado por segunda vía**
+  lo que ya se había medido: era el **flake de saturación**, no una regresión. La primera medición
+  (pasa aislado 27/27 + diff de rama vacío sobre `configuracion-ui/`, `app/(private)/configuracion/`
+  y `lib/modules/identity/`) y esta segunda corrida dicen lo mismo. Es la especie de QC-58 que
+  `docs/verification.md` describe: 2–5 flakes por corrida que **cambian de sitio**, y por eso el
+  comparador va por archivo y no por conteo.
+- **Queda el único rojo heredado**: `tests/unit/pedidos-ui/order-form.test.tsx`, «R14 — sin ningun
+  lote, la existencia es 0 y el restante negativo se destaca como faltante». Espera `-0.201`,
+  recibe `-0.2`. **Es deuda de `dev`**: los cuatro archivos implicados son byte a byte idénticos a
+  `origin/dev` y esta rama no toca un solo archivo de pedidos (las dos mediciones, arriba). Causa:
+  el PR #85 (redondeo a dos decimales) cruzado con el caso R14 de QC-91, que espera tres.
+
+**`tests/baseline-rojos.json` NO se toca**, y es deliberado: la entrada le corresponde a quien
+arregle la deuda en `dev`, no a esta ficha. Se declara aquí y va al PR.
+
+**Ningún tercer rojo apareció**, así que no hubo nada que medir contra `origin/dev`.
+
+### Estado final
+
+**T16 `[x]` · T17 `[x]`.** Las **20 tasks** de la ficha —T0..T17 más T9bis y T13bis—, todas `[x]`.
+Contado sobre el archivo: 20 marcadas, **ninguna sin marcar**.
+
+- Trazabilidad **34/34**, con los cinco requisitos que no tenían test ya cubiertos.
+- E2E a mano, **6/6**, chromium y webkit, con su salida pegada.
+- Gate completo corrido: **un solo rojo, heredado de `dev` y medido**.
+- **Siete guardias enmendadas** en toda la ficha —ese contador no se movió— más **dos altas de
+  censo**, que es otra cosa.
+- Cero dependencias nuevas.
+
+**No se abre el PR**: lo coordina el leader tras el `reviewer`.

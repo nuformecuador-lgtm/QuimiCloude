@@ -87,6 +87,18 @@ export const E2E_ESPERADOS = [
   // identificador de peticion: el spec no lee ni afirma nada sobre el identificador ni sobre
   // `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
   'aislamiento-recetas.spec.ts',
+  // Alta el 2026-09-18 (QC-92) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se
+  // relaja -el archivo se nombra, uno a uno-. Lo que ejercita: el Administrador abre el panel de
+  // lotes de un producto desde el listado de inventario, despliega el historial del lote y ve su
+  // asiento de alta, ajusta la existencia con una cantidad con signo y un motivo del conjunto
+  // cerrado, y ve la cantidad nueva y el asiento nuevo; un ajuste que dejaria la existencia bajo
+  // cero se rechaza en pantalla y no deja rastro en la base; y quien solo tiene
+  // `inventario.consultar` ve el panel y el historial pero el control de ajuste no existe en el
+  // DOM. NO ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni
+  // afirma nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71
+  // R21 sigue INTACTO.
+  'ajuste-de-inventario.spec.ts',
   // QC-101 T10 / R17: la E2E del cierre de TODAS las sesiones de otra persona desde la pantalla.
   // Alta por el MISMO motivo y en el MISMO sitio que las de QC-49, QC-67, QC-79, QC-85 y QC-102:
   // esta lista es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO

@@ -292,7 +292,7 @@
       acredita.** **Cubre R34.**
       **Archivos:** `e2e/ajuste-de-inventario.spec.ts`.
 
-- [ ] **T17 — Trazabilidad y gate completo.** Depende de **todas**.
+- [x] **T17 — Trazabilidad y gate completo.** Depende de **todas**.
       Mapa `R1..R34 -> test` en `progress/impl_QC-92-ajuste-de-inventario.md`; comprobar que
       `package.json` **no cambió** (R33); `./init.sh` completo verde y el E2E de T16 corrido a mano
       y anotado.
@@ -306,9 +306,18 @@
       medido; el E2E de T16 está corrido a mano y anotado. **Lo que falta es el gate completo en
       verde**: `./init.sh` termina en rojo con 4 archivos, y **2 son nuestros** —`E2E_ESPERADOS` de
       `guard-identificador-de-request.test.ts` y la lista cerrada de `tests/unit/inventario/scope.test.ts`,
-      los dos censos de `e2e/` que el spec nuevo rompe—. Son la **octava y la novena** guardia
-      heredada, así que **se escalan al humano y no se tocan**. Detalle, mediciones y prueba por
-      mutación en la bitácora.
+      los dos censos de `e2e/` que el spec nuevo rompe—. Se escalaron al humano antes de tocarlas.
+      **RESUELTO el 2026-09-18 con aprobación humana:** son **altas de censo**, no enmiendas —no
+      cambian nada de lo que la guardia afirma; son el trámite que la propia guardia pide para
+      registrar un archivo nuevo—, así que se dio de alta **un renglón con nota fechada en cada
+      una**, sin relajar ningún ancla ni tocar ningún detector, con prueba por mutación en las dos.
+      **El contador de guardias enmendadas de esta ficha se queda en SIETE.** Detalle, mediciones y
+      salidas en la bitácora.
+      **CIERRA:** `./init.sh` completo re-corrido tras el alta → **un solo rojo, el heredado de
+      `dev`** (`tests/unit/pedidos-ui/order-form.test.tsx`, PR #85 cruzado con R14 de QC-91), con
+      `1 failed | 7946 passed | 97 skipped` y las 45 guardias verdes. El flake de saturación de
+      `configuracion-ui/user-table.test.tsx` **no reapareció**, lo que confirma por segunda vía lo
+      ya medido. `tests/baseline-rojos.json` **no se toca**: es deuda de `dev`.
 
 ---
 
