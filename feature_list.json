@@ -1849,6 +1849,21 @@
       "branch": "feature/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio",
       "depends_on": [],
       "spec_path": "specs/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio"
+    },
+    {
+      "key": "QC-125",
+      "id": 125,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "espera-minima-por-paso",
+      "description": "En la pantalla donde el Operador ejecuta la receta de un pedido asignado (QC-63), cada paso exige que pasen **5 segundos** antes de poder avanzar. Mientras no pasan, el boton de avanzar esta deshabilitado y la pantalla muestra una cuenta regresiva. Al avanzar, el cronometro se reinicia para el paso nuevo.\n\n**SOLO EN LA EJECUCION DEL OPERADOR.** El lector de pasos es un componente compartido que tambien usa la vista previa del formulario de recetas. Ahi NO hay espera. El comportamiento se activa desde la pantalla de ejecucion y no afecta a nadie mas.\n\n**DECISIONES CERRADAS CON EL HUMANO EL 2026-09-18:**\n\n* **Comenzar es abrir la pantalla.** No se anade ningun boton «Comenzar»: los 5 s del paso 1 empiezan a correr al abrir el pedido, que ya lo pone EN_CURSO.\n* **Siempre 5 s por paso.** Si el operario vuelve atras con Anterior y luego avanza otra vez, el paso le vuelve a exigir los 5 s.\n* **Finalizar tambien espera.** El ultimo paso se trata igual que los demas.\n* **La espera se suma al bloqueo que ya existe.** Hoy no se avanza sin marcar todos los elementos del paso (QC-64). Para avanzar tienen que cumplirse las dos cosas: los elementos marcados y los 5 s cumplidos.\n* **La cuenta regresiva usa el componente compartido CountdownTimer** (components/shared/countdown-timer.tsx), que ya esta construido en la rama feat/cronometro-shared y se incorpora a esta ficha.\n\n**LO QUE NO ENTRA:**\n\n* Validar la espera en el servidor. Hoy el servidor no conoce el paso actual: el avance es solo de cliente, y registrarlo es QC-82.\n* Configurar la duracion por receta o por paso. Son 5 s fijos.\n* Botones de pausa o reinicio del cronometro.",
+      "status": "in_progress",
+      "sdd": true,
+      "complexity": "low",
+      "zone": "frontend",
+      "branch": "feature/QC-125-espera-minima-por-paso",
+      "depends_on": [],
+      "spec_path": "specs/QC-125-espera-minima-por-paso"
     }
   ]
 }
