@@ -1,7 +1,7 @@
 /**
  * El caso de uso de PROCESAR un PDF por ESTRATEGIA: traduce la estrategia a un modo de lectura y a
  * un prompt, delega en la lectura con IA ya construida, registra un resumen y devuelve el texto tal
- * cual.
+ * cual. Toda llamada registra un resumen, incluida la que rechaza la estrategia.
  *
  * La dependencia es el CASO DE USO ya construido y no el puerto de la IA: el plazo, el tope de
  * paginas y el manejo de errores viven dentro de el, y reconstruirlos aqui los duplicaria. Por eso
@@ -77,8 +77,16 @@ export function createProcessPdfByStrategy(
   ): Promise<StrategyRunResult> {
     const parsed = pdfStrategySchema.safeParse(input.strategy);
     if (!parsed.success) {
-      // Nada se ejecuto —ni lectura, ni conteo— y el resumen exige un modo, asi que aqui no hay
-      // ninguna entrada que registrar.
+      // La estrategia puede llegar de la base, asi que el rechazo es un suceso de ejecucion y se
+      // registra: con el modo vacio —sale de la estrategia—, la estrategia tal como llego y sin
+      // contar paginas, que no llegaron a hacer falta.
+      deps.log.run({
+        strategy: input.strategy,
+        mode: null,
+        path: input.path,
+        pages: null,
+        textLength: 0,
+      });
       return {
         ok: false,
         strategy: input.strategy,

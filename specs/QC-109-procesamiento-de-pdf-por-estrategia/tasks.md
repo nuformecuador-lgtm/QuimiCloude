@@ -31,11 +31,26 @@
 
 ## T3 — El puerto del registro `[P]` · depende de T0
 
-- [x] `ports/strategy-run-log.ts`: `StrategyRunSummary` (`strategy`, `mode`, `path`,
-      `pages: number | null`, `textLength`) y `StrategyRunLog.run(summary)`, tal como los fija
-      `design.md > 3.4`.
+- [x] `ports/strategy-run-log.ts`: `StrategyRunSummary` (`strategy`, `mode: AiReadMode | null`,
+      `path`, `pages: number | null`, `textLength`) y `StrategyRunLog.run(summary)`, tal como los
+      fija `design.md > 3.4`.
 - **Hecho:** la firma **no admite el texto** en ningún campo, así que registrarlo por descuido no
   compila; la cabecera explica por qué es un puerto y no un `console.log` suelto. Cubre R8, R9.
+
+> **Enmienda fechada — 2026-09-18.** Esta tarea decía `mode` **no anulable** y fijaba los cinco
+> campos «exactamente» así. Pasa a `AiReadMode | null`, igual que `pages`.
+>
+> **Por qué.** Con el modo no anulable, el rechazo por **estrategia inválida** no se podía registrar
+> —el modo sale de la estrategia, y con una inválida no hay ninguno que poner sin inventarlo—, así
+> que ese caso salía **mudo** de los registros. Y ese caso **puede ocurrir de verdad**: **QC-111 va a
+> leer la estrategia de la BASE DE DATOS**, no de una constante del código, así que un valor podrido
+> no es solo un error de programación que TypeScript frena en el borde. Es justo lo que se querría
+> ver en el registro.
+>
+> **Qué arrastra.** El caso de uso de T4 registra también ese rechazo, con `mode: null`, `pages:
+> null`, `textLength: 0` y la estrategia tal como llegó, **antes** de devolver el fallo. Con eso
+> **R8 queda cumplido a la letra** y su redacción **no se toca**. Lo que NO cambia: la firma sigue
+> sin admitir el texto de la IA (R9). Detalle y motivo largo en `design.md > 3.4`.
 
 ## T4 — El caso de uso · depende de T1, T2, T3
 

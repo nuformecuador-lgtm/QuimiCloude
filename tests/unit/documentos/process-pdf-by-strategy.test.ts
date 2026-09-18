@@ -3,8 +3,8 @@
 //
 // Sin red, sin claves y sin PDF real: quien interpreta los bytes es el doble, asi que cualquier
 // `Uint8Array` no vacio sirve. Lo que se vigila es tanto lo que se hace —que modo y prompt salen de
-// la estrategia, que el texto vuelve intacto, que se registra una vez— como lo que NO se hace: con
-// una estrategia desconocida no se lee nada y no se registra nada.
+// la estrategia, que el texto vuelve intacto, que se registra una vez en toda ejecucion, incluida la
+// que rechaza la estrategia— como lo que NO se hace: con una estrategia desconocida no se lee nada.
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -86,7 +86,7 @@ function valoresHondos(valor: unknown): unknown[] {
 }
 
 describe('documentos — procesar un PDF por estrategia', () => {
-  it('R1 — una estrategia desconocida se rechaza con invalid_input, sin leer y sin registrar', async () => {
+  it('R1 — una estrategia desconocida se rechaza con invalid_input y modo vacio, sin llamar a la lectura con IA', async () => {
     const readPdfWithAi = lecturaQueDevuelve('no deberia llegar aqui');
     const countPages = dobleDeConteo();
     const espia = espiaDeRegistro();
@@ -109,11 +109,41 @@ describe('documentos — procesar un PDF por estrategia', () => {
       'R1: con una estrategia desconocida no se llama a la lectura con IA; llamarla gastaria una ' +
         'peticion al proveedor por una entrada que ya se sabe invalida.',
     ).not.toHaveBeenCalled();
+    expect(countPages, 'R1: tampoco se cuentan las paginas de un PDF que no se va a leer.').not.toHaveBeenCalled();
+    expect(espia.run).toHaveBeenCalledTimes(1);
+  });
+
+  it('R8 — el rechazo por estrategia invalida se registra una vez, con el modo vacio y la estrategia tal como llego', async () => {
+    const readPdfWithAi = lecturaQueDevuelve('no deberia llegar aqui');
+    const espia = espiaDeRegistro();
+    const procesar = createProcessPdfByStrategy({
+      readPdfWithAi,
+      countPages: dobleDeConteo(),
+      log: espia.log,
+    });
+
+    const resultado = await procesar({
+      strategy: 'panfleto' as PdfStrategy,
+      path: PATH,
+      bytes: pdfBytes(),
+    });
+
     expect(
       espia.run,
-      'R1: el resumen exige un modo y la estrategia invalida no tiene ninguno, asi que el retorno ' +
-        'temprano ocurre ANTES de registrar.',
-    ).not.toHaveBeenCalled();
+      'R8: la estrategia puede llegar de la base, asi que su rechazo es una ejecucion mas y tambien ' +
+        'registra UNA entrada. Comprobar solo el retorno pasaria verde aunque nadie registrara nada.',
+    ).toHaveBeenCalledTimes(1);
+    expect(espia.run.mock.calls[0]?.[0]).toEqual({
+      strategy: 'panfleto',
+      mode: null,
+      path: PATH,
+      pages: null,
+      textLength: 0,
+    });
+    expect(resultado.ok).toBe(false);
+    expect(falloDe(resultado).code, 'R8: registrar el rechazo no cambia el fallo que se devuelve.').toBe(
+      'invalid_input',
+    );
   });
 
   it('R2 — catalogo pide la lectura en modo images', async () => {
@@ -432,6 +462,20 @@ describe('documentos — el adaptador de consola del registro por estrategia', (
     expect(
       linea.includes('paginas=null') || linea.includes('paginas=0'),
       `R8: un PDF que no se pudo contar no tiene cero paginas. Escrito: ${linea}`,
+    ).toBe(false);
+  });
+
+  it('R8 — con mode null escribe su hueco en vez de volcar el nulo', () => {
+    const escrito: string[] = [];
+    createStrategyRunLogConsole((linea) => escrito.push(linea)).run(
+      resumen({ mode: null, pages: null, textLength: 0 }),
+    );
+
+    const linea = escrito[0] ?? '';
+    expect(linea).toContain('modo=sin-modo');
+    expect(
+      linea.includes('modo=null') || linea.includes('modo=undefined'),
+      `R8: el rechazo por estrategia invalida se registra, y su modo vacio se lee como hueco. Escrito: ${linea}`,
     ).toBe(false);
   });
 });

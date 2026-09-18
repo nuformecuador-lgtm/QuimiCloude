@@ -14,14 +14,18 @@ const PREFIJO = 'process-pdf-by-strategy';
 /** El hueco cuando el PDF no se pudo contar. */
 const SIN_PAGINAS = 'sin-paginas';
 
+/** El hueco cuando la estrategia era invalida y por tanto no hubo modo que registrar. */
+const SIN_MODO = 'sin-modo';
+
 export function createStrategyRunLogConsole(
   escribir: (linea: string) => void = (linea) => console.log(linea),
 ): StrategyRunLog {
   return {
     run(summary: StrategyRunSummary): void {
       const paginas = summary.pages === null ? SIN_PAGINAS : String(summary.pages);
+      const modo = summary.mode ?? SIN_MODO;
       escribir(
-        `[${PREFIJO}] estrategia=${summary.strategy} modo=${summary.mode} ruta='${summary.path}' paginas=${paginas} longitud=${summary.textLength}`,
+        `[${PREFIJO}] estrategia=${summary.strategy} modo=${modo} ruta='${summary.path}' paginas=${paginas} longitud=${summary.textLength}`,
       );
     },
   };

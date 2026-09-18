@@ -3,6 +3,9 @@
 > Fase F2.1. Worktree `.worktrees/QC-109-procesamiento-de-pdf-por-estrategia`, rama
 > `feature/QC-109-procesamiento-de-pdf-por-estrategia`. Spec aprobado por el humano.
 > Tasks `[x]`: **T0–T10**. Sin marcar: **T11** (el gate completo lo corre el leader, no el implementer).
+>
+> **Incluye la enmienda fechada del 2026-09-18** decidida por el humano —la entrada inválida SÍ se
+> registra, con el modo vacío—, que **cambia T3**. Motivo y alcance en `## 5.1`.
 
 ## 1. Archivos
 
@@ -14,7 +17,7 @@
 | `domain/prompts/catalogo.json` | T2 | `{ "provisional": true, "loDefine": "QC-129", "prompt": "..." }`. Texto que **funciona**, no relleno. |
 | `domain/prompts/formula.json` | T2 | Idem, con el texto de la otra estrategia. |
 | `domain/prompts/index.ts` | T2 | Import por defecto de los dos `.json` y `PROMPT_BY_STRATEGY: Record<PdfStrategy, string>`. Unica fuente del prompt. Sin `fs`, `path` ni `process.cwd()`. |
-| `ports/strategy-run-log.ts` | T3 | `StrategyRunSummary` (`strategy`, `mode`, `path`, `pages` anulable, `textLength`) y `StrategyRunLog.run(summary)`. **La firma no admite el texto**: R9 la hace cumplir el compilador. |
+| `ports/strategy-run-log.ts` | T3 | `StrategyRunSummary` (`strategy`, `mode` **anulable** por la enmienda de `## 5.1`, `path`, `pages` anulable, `textLength`) y `StrategyRunLog.run(summary)`. **La firma no admite el texto**: R9 la hace cumplir el compilador. |
 | `domain/process-pdf-by-strategy.ts` | T4 | `createProcessPdfByStrategy`. No importa `limits.ts`, ni `AiReader`, ni ningun adaptador, ni nombra al proveedor. Sin actor. |
 | `adapters/driven/observability/strategy-run-log-console.ts` | T5 | Implementacion unica. Escritura por parametro con `console.log` por defecto; un test la espia sin parchear la consola global. |
 
@@ -53,14 +56,14 @@ nuevos importan `zod`, codigo del propio modulo y el tipo `ErrorCode` de `@/lib/
 
 | R | Archivo | Nombre exacto del caso |
 |---|---|---|
-| R1 | P | `R1 — una estrategia desconocida se rechaza con invalid_input, sin leer y sin registrar` |
+| R1 | P | `R1 — una estrategia desconocida se rechaza con invalid_input y modo vacio, sin llamar a la lectura con IA` |
 | R2 | P | `R2 — catalogo pide la lectura en modo images` |
 | R3 | P | `R3 — formula pide la lectura en modo pdf` |
 | R4 | A | `R4: el prompt de cada estrategia sale del .json importado como modulo, sin tocar disco ni red` |
 | R5 | P | `R5 — la entrada que construye cada estrategia trae un prompt que pasa aiReadInputSchema, sin que el llamante aporte texto` |
 | R6 | A | `R6: los dos .json traen provisional true, loDefine QC-129 y un prompt no vacio` |
 | R7 | P | `R7 — devuelve el texto de la IA byte a byte, con su estrategia` |
-| R8 | P | `R8 — registra exactamente una vez por ejecucion, en exito y en fallo, con los cinco campos` |
+| R8 | P | `R8 — registra exactamente una vez por ejecucion, en exito y en fallo, con los cinco campos` + (enmienda) `R8 — el rechazo por estrategia invalida se registra una vez, con el modo vacio y la estrategia tal como llego` |
 | R9 | P | `R9 — el resumen registrado no contiene el texto por ningun lado, y textLength coincide con su longitud` |
 | R10 | P | `R10 — un fallo de la lectura vuelve con su mismo code y reason, sin lanzar y sin inventar texto` |
 | R11 | A | `R11: ningun archivo nuevo escribe a mano un literal de limite ni importa domain/limits.ts` |
@@ -76,8 +79,9 @@ Casos de refuerzo, no de requisito:
 - `design 3.4 — si countPages LANZA, el resumen va con pages null y la ejecucion sigue igual`
   (compara el resultado **entero** contra una corrida con conteo sano, con `toEqual`).
 - `R8 — pages sale del countPages inyectado y no de ningun otro sitio`.
-- Adaptador: `R9 — la linea que escribe lleva la longitud y nunca el texto de la IA` y
-  `R8 — con pages null escribe su hueco en vez de un numero inventado`.
+- Adaptador: `R9 — la linea que escribe lleva la longitud y nunca el texto de la IA`,
+  `R8 — con pages null escribe su hueco en vez de un numero inventado` y
+  `R8 — con mode null escribe su hueco en vez de volcar el nulo`.
 - Cada detector de `A` tiene su caso de «muerde» con una entrada infractora inventada, y cada caso
   de diff su ancla anti-vacuidad (`specs/QC-109-.../` en el rango; los 7 archivos nuevos leidos no
   vacios; mas de cero archivos escaneados bajo `app/` y `adapters/driving/`).
@@ -118,6 +122,28 @@ Los **8 saltados** son los casos de diff de `qc108-alcance.test.ts`: se saltan r
 estamos en la rama de QC-109 y no en la suya. Es el comportamiento que esa guardia declara, no un
 agujero. Los 33 casos propios de QC-109 pasan, ninguno saltado.
 
+### Tras la enmienda del 2026-09-18 (`## 5.1`), vuelta a correr
+
+`pnpm typecheck` y `pnpm lint` siguen sin errores ni hallazgos. La corrida, ahora con **3 casos mas**
+—el nuevo de R8 para el rechazo registrado, el del hueco `sin-modo` del adaptador, y el R1
+reescrito—:
+
+```
+$ pnpm exec vitest run tests/unit/documentos/process-pdf-by-strategy.test.ts \
+    tests/unit/documentos/qc109-alcance.test.ts \
+    tests/unit/documentos/module-contract.test.ts \
+    tests/unit/composition/documentos-facade.test.ts \
+    tests/unit/documentos/read-pdf-with-ai.test.ts
+
+ Test Files  5 passed (5)
+      Tests  69 passed (69)
+   Duration  4.54s
+```
+
+`qc109-alcance.test.ts` **no hizo falta tocarlo**: sus listas son de **nombres** de exports y de
+campos, no de tipos, así que el cambio de firma no las desfasa. El hueco `SIN_MODO` del adaptador se
+dejó **sin exportar** justamente para no alterar la lista de exports que vigila R15.
+
 ### Lo que encontro la corrida intermedia (y ya esta arreglado)
 
 `pnpm exec vitest related --run` sobre los nueve archivos tocados arrastro 147 archivos
@@ -140,27 +166,62 @@ y en verde.
   Se cumplio el espiritu —los 17 requisitos tienen caso y los archivos relacionados estan verdes—
   pero la suite entera la cierra T11, que queda para el leader.
 
-## 5. Choques entre spec y codigo — **para el leader, no resueltos en silencio**
+## 5. El choque que se escalo, y como lo cerro el humano
 
-### 5.1 El `mode` en el fallo por estrategia invalida (desviacion real de `design.md > 3.3`)
+### 5.1 El `mode` con estrategia invalida — **ENMIENDA APLICADA (2026-09-18)**
 
-`design.md > 3.3` fija `mode: AiReadMode` en **las dos** ramas de `StrategyRunResult`. Pero **el modo
-sale de la estrategia**: con una estrategia invalida no hay ningun modo que poner sin inventarlo.
+**Lo que se escalo.** `design.md > 3.3` fijaba `mode: AiReadMode` en **las dos** ramas de
+`StrategyRunResult`, pero **el modo sale de la estrategia**: con una estrategia invalida no hay
+ninguno que poner sin inventarlo. Se anulo el modo en la rama de fallo —se descarto poner `'pdf'` o
+`'images'` a dedo, que seria una mentira que QC-111 leeria como verdad— y, como
+`StrategyRunSummary.mode` NO era anulable, **ese rechazo salia mudo del registro**, lo que rozaba la
+letra de R8. No se resolvio por cuenta propia: se paro y se subio.
 
-Resuelto asi, y es la **unica** desviacion respecto del design:
+**Lo que decidio el humano.** **La entrada invalida SI se registra, con el modo vacio.** Es una
+enmienda fechada al spec aprobado, no un arreglo del implementer.
 
-- La rama de fallo declara el modo como anulable. La rama de exito queda intacta, con `AiReadMode`.
-  El `null` solo aparece en el caso de estrategia invalida; un fallo de lectura trae el modo real.
-- Se descarto poner `'pdf'` o `'images'` a dedo: seria una mentira en el resultado que QC-111
-  leeria como verdad.
+**El motivo, que es lo que importa:** **QC-111 va a leer la estrategia de la BASE DE DATOS**, no de
+una constante del codigo. Un valor invalido **puede llegar de verdad en ejecucion** — no es solo un
+error de programacion que TypeScript ya frena en el borde. Y ese es **exactamente** el caso que se
+querria ver en los registros, justo el que la firma anterior dejaba mudo.
 
-**Consecuencia, y es la parte que conviene mirar:** `StrategyRunSummary.mode` NO es anulable —T3 lo
-fija «exactamente» asi y no se toco—, asi que **la estrategia invalida no se registra**. Es coherente
-con el flujo escrito en `design.md > 3.3`, donde el retorno temprano por estrategia invalida ocurre
-**antes** de `log.run`. Pero roza la letra de **R8** («exactamente una vez por ejecucion, tanto en
-exito como en fallo»): aqui «ejecucion» se ha entendido como «se intento leer». Si la lectura que
-quieres de R8 es «tambien en entrada invalida», hay que anular el modo **tambien en el puerto**, y
-eso es cambiar T3. **No se ha hecho por cuenta propia.**
+**Que se cambio, en disco:**
+
+1. `ports/strategy-run-log.ts` — `StrategyRunSummary.mode` pasa a `AiReadMode | null`, igual que ya
+   hacia `pages`, con doc de campo que dice **cuando** esta vacio. **Esto es cambiar T3**, que fijaba
+   los cinco campos «exactamente» asi.
+2. `domain/process-pdf-by-strategy.ts` — la rama de estrategia invalida **registra antes de
+   devolver**: `mode: null`, `pages: null` (no se llama a `countPages` ahi), `textLength: 0`, `path`,
+   y la estrategia **tal como llego**. El valor de retorno de esa rama **no cambia**.
+3. `specs/.../design.md > 3.4` y `specs/.../tasks.md > T3` — **nota fechada 2026-09-18 con el POR
+   QUE**, no solo el valor nuevo. De paso se corrigieron en `design.md` cuatro sitios que la enmienda
+   dejaba desmentidos: el flujo de `## 3.3`, el «**Dos** consecuencias no obvias» que pasaban a ser
+   tres, las filas de R1 y R8 de la tabla de `## 6`, y el bloque de codigo de `## 3.3`, cuya rama de
+   fallo seguia mostrando el modo no anulable que el humano ya habia dado por bueno como anulable.
+
+**R8 queda cumplido a la letra** —«exactamente una vez por ejecucion, tanto en exito como en
+fallo»— y **su redaccion NO se toco**.
+
+**Lo que NO cambio:** la firma del puerto **sigue sin admitir el texto** de la IA (R9). Lo que se
+anulo es el modo, no la prohibicion.
+
+### 5.2 Prosa que la enmienda dejo desmentida, y se reescribio
+
+Misma trampa que ya se cazo en el test de la fachada: prosa vieja que el cambio nuevo convierte en
+mentira. Se reviso y se reescribio en cuatro sitios ademas de los del design:
+
+- `domain/process-pdf-by-strategy.ts`, comentario de la rama invalida: decia «Nada se ejecuto —ni
+  lectura, ni conteo— y el resumen exige un modo, asi que aqui no hay ninguna entrada que
+  registrar.» Era **falso** tras la enmienda.
+- `domain/process-pdf-by-strategy.ts`, cabecera: ahora dice que **toda** llamada registra un
+  resumen, incluida la que rechaza la estrategia.
+- `process-pdf-by-strategy.test.ts`, cabecera: decia «con una estrategia desconocida no se lee nada
+  y no se registra nada».
+- El mensaje de asercion del caso R1, que explicaba que el retorno temprano ocurria ANTES de
+  registrar.
+
+La cabecera del puerto se releyo entera y **no** quedaba desmentida: solo afirma por que es un
+puerto y que la firma no admite el texto, las dos cosas siguen siendo ciertas.
 
 ### 5.2 Nada mas choco
 
@@ -178,8 +239,9 @@ no entro ningun loader.
   ciertos **por este archivo** y no por confianza en el doble o en el adaptador. No reimplementa
   plazo ni topes.
 - Linea del adaptador: prefijo fijo `[process-pdf-by-strategy]` con estrategia, modo, ruta, paginas y
-  longitud, y `sin-paginas` cuando no se pudo contar (mismo patron de hueco que
-  `session-check-log-console.ts`).
+  longitud, y huecos legibles en vez de volcar nulos: `sin-paginas` cuando no se pudo contar y
+  `sin-modo` cuando la estrategia era invalida (mismo patron que `session-check-log-console.ts`).
+  Las dos constantes de hueco se quedan **sin exportar**.
 - Textos de prompt en espanol —es el idioma del negocio y del documento—; todos los
   **identificadores** en ingles salvo los dos literales del enum, que son nombres del negocio
   fijados en `[D1]`.
@@ -191,7 +253,8 @@ no entro ningun loader.
 1. **T11 — `./init.sh` completo**, que corre el leader antes del PR. Recordatorio del contexto: el
    gate del repo esta **rojo por deuda ajena** (QC-82 y QC-121 en vuelo sin spec en disco); eso no es
    de esta ficha.
-2. **La decision de 5.1**, si el leader quiere que la estrategia invalida tambien se registre.
+2. ~~La decision de 5.1~~ — **cerrada por el humano el 2026-09-18 y ya aplicada** (`## 5.1`). No
+   queda nada pendiente ahi.
 3. **E2E: no hace falta en esta ficha**, y asi lo dicen `[D14]` y R17 —no hay pantalla ni recorrido
    de usuario que ejercitar, la capacidad no la invoca nadie todavia—. El E2E de la cadena lo aporta
    **QC-107**.

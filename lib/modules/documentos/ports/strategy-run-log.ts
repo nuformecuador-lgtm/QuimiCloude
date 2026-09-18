@@ -14,7 +14,11 @@ import type { AiReadMode } from '../domain/read-pdf-with-ai';
 
 export type StrategyRunSummary = {
   readonly strategy: PdfStrategy;
-  readonly mode: AiReadMode;
+  /**
+   * `null` cuando lo invalido es la propia estrategia: el modo SALE de ella, asi que no hay ninguno
+   * que decir sin inventarselo, y esa entrada se registra igual.
+   */
+  readonly mode: AiReadMode | null;
   readonly path: string;
   /** `null` cuando el archivo no se pudo contar; contar paginas es para el registro, no para el resultado. */
   readonly pages: number | null;

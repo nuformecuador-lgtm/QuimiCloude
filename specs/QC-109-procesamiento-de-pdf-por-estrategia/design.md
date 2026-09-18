@@ -122,7 +122,8 @@ export type StrategyRunResult =
   | { readonly ok: true;  readonly strategy: PdfStrategy; readonly path: string;
       readonly mode: AiReadMode; readonly text: string }
   | { readonly ok: false; readonly strategy: PdfStrategy; readonly path: string;
-      readonly mode: AiReadMode; readonly code: ErrorCode; readonly reason: string };
+      // `null` SOLO cuando lo invalido es la estrategia: el modo sale de ella. Ver 3.4.
+      readonly mode: AiReadMode | null; readonly code: ErrorCode; readonly reason: string };
 
 export type ProcessPdfByStrategyDeps = {
   readonly readPdfWithAi: (input: AiReadRequestInput) => Promise<AiReadResult>;
@@ -142,7 +143,10 @@ Cuatro decisiones de forma, y el porqué de cada una:
    resultado, y esta ficha es la raíz de la cadena.
 2. **`StrategyRunResult` es `AiReadResult` + `strategy`**, con los mismos nombres de campo y el mismo
    `ok` discriminante. Quien ya sabe leer un `AiReadResult` sabe leer este. No se reetiquetan campos
-   ni se traduce el `code`: el catálogo de `ErrorCode` es el mismo (R10).
+   ni se traduce el `code`: el catálogo de `ErrorCode` es el mismo (R10). **Con una diferencia, y es
+   la única:** el `mode` de la rama de fallo es anulable aquí y no en `AiReadResult`, porque esta
+   capa tiene un fallo que aquella no puede tener —la estrategia inválida, anterior a que exista
+   modo alguno—. Ver la enmienda de `## 3.4`.
 3. **La dependencia es el CASO DE USO ya construido, no el puerto `AiReader`.** Es una función, no
    una interfaz, porque eso es lo que `createReadPdfWithAi` devuelve y lo que `lib/composition` ya
    tiene cableado en `documentos.readPdfWithAi`. Reconstruirlo aquí a partir de `AiReader` +
@@ -155,7 +159,8 @@ Cuatro decisiones de forma, y el porqué de cada una:
 Flujo, entero:
 
 ```
-strategy -> (zod)            si falla: resultado ok:false con code 'invalid_input', SIN llamar a IA
+strategy -> (zod)            si falla: se REGISTRA el rechazo (mode y pages nulos, ver enmienda de
+                             3.4) y se devuelve ok:false con code 'invalid_input', SIN llamar a IA
          -> modo + prompt    desde el Record y el mapa de prompts
          -> countPages       solo para el resumen; si revienta, `pages: null` (ver 3.4)
          -> readPdfWithAi({ path, bytes, prompt, mode })
@@ -180,7 +185,7 @@ La firma sale directa de `[D16]` — **un resumen, sin el texto**:
 ```ts
 export type StrategyRunSummary = {
   readonly strategy: PdfStrategy;
-  readonly mode: AiReadMode;
+  readonly mode: AiReadMode | null;
   readonly path: string;
   readonly pages: number | null;
   readonly textLength: number;
@@ -191,12 +196,33 @@ export interface StrategyRunLog {
 }
 ```
 
+> **Enmienda fechada — 2026-09-18. `mode` pasa de `AiReadMode` a `AiReadMode | null`.**
+>
+> **Qué decía antes.** `mode: AiReadMode`, no anulable, y con ello el rechazo por estrategia inválida
+> **no se registraba**: el modo SALE de la estrategia, así que con una estrategia inválida no había
+> ninguno que poner sin inventarlo, y el flujo de `## 3.3` devolvía el fallo antes de `log.run`.
+>
+> **Por qué cambia, que es lo que importa.** Porque ese caso **puede ocurrir de verdad en ejecución**.
+> **QC-111 va a leer la estrategia de la BASE DE DATOS**, no de una constante del código: un valor
+> inválido no es solo un error de programación que TypeScript ya frena en el borde, es un dato que
+> puede llegar podrido en producción. Y ese es **exactamente** el caso que se querría ver en los
+> registros — justo el que la firma anterior dejaba mudo.
+>
+> **Qué implica.** El caso de uso registra también el rechazo, antes de devolver el fallo, con
+> `mode: null`, `pages: null`, `textLength: 0` y la estrategia **tal como llegó**. Con esto **R8 queda
+> cumplido a la letra** («exactamente una vez por ejecución, tanto en éxito como en fallo») y su
+> redacción NO se toca. Cambia **T3**, que fijaba estos campos «exactamente» así.
+>
+> **Lo que NO cambia.** La firma **sigue sin admitir el texto** de la IA (R9): lo que se anula es el
+> modo, no la prohibición. Y `StrategyRunResult` mantiene el modo anulado solo en su rama de fallo.
+
 **La firma no admite el texto, así que registrarlo por descuido no es posible** (R9) — el mismo
 truco que usa `ListQueryLog` para que no se pueda registrar el valor de un filtro. El texto puede ser
 enorme y puede traer datos de terceros; quien lo necesite lo tiene en el valor de retorno, que es lo
 que `[D5]` fija.
 
-Dos consecuencias no obvias de `[D16]`, dichas aquí para que nadie las descubra implementando:
+Tres consecuencias no obvias de `[D16]`, dichas aquí para que nadie las descubra implementando —la
+tercera la añade la enmienda del 2026-09-18—:
 
 1. **De dónde sale `pages`.** `AiReadResult` **no** trae el número de páginas, así que el resumen no
    se puede componer solo con lo que devuelve la lectura. Por eso `ProcessPdfByStrategyDeps` recibe
@@ -210,6 +236,9 @@ Dos consecuencias no obvias de `[D16]`, dichas aquí para que nadie las descubra
    conteo no puede convertirse en un fallo de lectura que no ocurrió. Si la lectura falla,
    `textLength` es `0`, porque no hubo texto. En los dos casos se registra igual: R8 exige **una**
    entrada por ejecución, también en fallo.
+3. **Y también se registra el rechazo por estrategia inválida** (enmienda del 2026-09-18, arriba),
+   con `mode: null` y `pages: null` porque en esa rama no se resolvió modo ni se contó nada. Es el
+   único caso en el que se registra sin haber llamado a la lectura.
 
 La implementación única vive en `adapters/driven/observability/strategy-run-log-console.ts` y acepta
 la función de escritura por parámetro con `console.log` por defecto, igual que
@@ -272,14 +301,14 @@ Mapa `R<n> -> test` previsto (lo cierra el implementer en `progress/impl_QC-109.
 
 | R | Test |
 |---|---|
-| R1 | rechaza una estrategia desconocida sin llamar a la lectura |
+| R1 | rechaza una estrategia desconocida sin llamar a la lectura (sí la registra: enmienda de `## 3.4`) |
 | R2 | `catalogo` pide la lectura en modo `images` |
 | R3 | `formula` pide la lectura en modo `pdf` |
 | R4 | los prompts se importan como módulo; su cierre no contiene `fs`, `path` ni `process.cwd` |
 | R5 | el prompt de cada estrategia pasa `aiReadInputSchema` |
 | R6 | cada `.json` de prompt trae `provisional: true` y `loDefine: 'QC-129'` |
 | R7 | devuelve el texto de la IA sin alterar, con su estrategia |
-| R8 | registra exactamente una vez por ejecución, en éxito y en fallo, con los cinco campos |
+| R8 | registra exactamente una vez por ejecución, en éxito y en fallo, con los cinco campos — y, por la enmienda de `## 3.4`, también en el rechazo por estrategia inválida, contando **invocaciones** |
 | R9 | el resumen registrado no contiene el texto; `textLength` coincide con su longitud |
 | R10 | un fallo de la lectura vuelve como `ok:false` con su `code`, sin lanzar |
 | R11 | ningún archivo nuevo contiene los literales de los límites |
