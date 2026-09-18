@@ -23,7 +23,7 @@ Produccion:
 - `app/(private)/asignacion/[id]/components/order-execution-screen.tsx` — `const MIN_STEP_SECONDS = 5` de modulo y la prop en el `StepReader`.
 
 Tests:
-- `tests/unit/recetas-ui/step-reader.test.tsx` — 20 casos nuevos; los 23 existentes sin editar (solo se ampliaron los imports con `act` y `fireEvent`).
+- `tests/unit/recetas-ui/step-reader.test.tsx` — 21 casos nuevos (uno añadido tras la review, H1); los 23 existentes sin editar (solo se ampliaron los imports con `act` y `fireEvent`).
 - `tests/unit/asignaciones-ui/order-execution-screen.test.tsx` — casos nuevos R4, R5, R13, R18; enmiendas con nota fechada 2026-09-18: «si la operacion falla, muestra el error» (reloj falso, avanza 5000 ms antes de Finalizar, sin aflojar la afirmacion) y el test R18 heredado de QC-63, tensado a lista cerrada cuyo unico permitido es `components/shared/step-reader/step-reader.tsx` (conserva el skip cuando no hay merge-base).
 - `tests/unit/recetas-ui/recipe-form.test.tsx` — el caso existente de la vista previa pasa a llamarse «R3, R11: ...» y afirma que el modal no contiene `countdown-timer` ni `step-reader-wait-reason`.
 
@@ -44,7 +44,7 @@ SR = `tests/unit/recetas-ui/step-reader.test.tsx`; OES = `tests/unit/asignacione
 | R5 | OES «pantalla de ejecucion — R5 › muestra la cuenta completa al montar sin ninguna accion del usuario y no ofrece ningun control Comenzar» |
 | R6 | SR «R6: muestra una cuenta regresiva visible mientras la espera no se ha cumplido» |
 | R7 | SR «R7: al avanzar con Siguiente, la cuenta se reinicia a la duracion completa en el paso nuevo» |
-| R8 | SR «R8: ninguna llegada hereda el tiempo cumplido en una llegada anterior, ni al mismo paso ni a otro» y «R8: la activacion programatica sobre el boton deshabilitado tampoco hereda el tiempo cumplido» |
+| R8 | SR «R8: retroceder con Anterior mientras corre la cuenta del paso 2 vuelve a exigir la duracion completa en el paso 1» (el que mata el mutante del escalar, ver H1), «R8: ninguna llegada hereda el tiempo cumplido en una llegada anterior, ni al mismo paso ni a otro» y «R8: la activacion programatica sobre el boton deshabilitado tampoco hereda el tiempo cumplido» |
 | R9 | SR «R9: Anterior sigue disponible mientras la cuenta corre, en un paso que no es el primero» |
 | R10 | SR «R10: la fuente del asistente importa el CountdownTimer compartido y no implementa ningun temporizador propio» |
 | R11 | SR «R11: con la espera activa, los unicos botones son Anterior y Siguiente ademas de los elementos» |
@@ -92,6 +92,24 @@ Nota: React no invoca `onClick` en un `button` deshabilitado, ni con `fireEvent.
 `vitest related` sobre los dos archivos de produccion (subagente de T2/T4, antes de T5): `tests/unit/recetas-ui/recipe-page.test.tsx` con 46 rojos por `TypeError: Cannot read properties of undefined (reading 'clear')` en `window.localStorage.clear()` — ajeno a la rama (Node 26), no se toco. El error de `companyId` en `supplier-crud.int.test.ts` no aparecio (el cliente de Prisma se regenero al montar el entorno).
 
 No se corrio la suite completa ni `./init.sh`: lo corre el leader.
+
+## Correcciones tras la review rechazada (2026-09-18, `progress/review_QC-125-espera-minima-por-paso.md`)
+
+- **H1 (bloqueante).** Caso nuevo en SR: «R8: retroceder con Anterior mientras corre la cuenta del paso 2 vuelve a exigir la duracion completa en el paso 1». Recorrido: cumplir el paso 1 (5000 ms), Siguiente, 1000 ms sin cumplir el paso 2, Anterior. Afirma paso 1 de 3, Siguiente deshabilitado, motivo de tiempo visible, cuenta en 00:05, y que sigue deshabilitado a los 4999 ms y se habilita a los 5000 ms.
+  - Codigo de la rama: **VERDE**, 45/45 en SR.
+  - Mutante «cumplido = indice en un escalar» (`waiting = waitEnabled && waitedArrival !== currentIndex`, `onEnd={() => setWaitedArrival(currentIndex)}`, `key={currentIndex}`, sin el estado `arrival`): **ROJO**, 1 failed / 44 passed; cae solo el caso nuevo, en `expect(siguiente).toBeDisabled()` («Received element is not disabled: <button data-testid="step-reader-next">», `step-reader.test.tsx:625`). OES con el mutante: 13/13 verdes, no lo detecta, como dice la review. Mutante revertido; el diff de `step-reader.tsx` quedo vacio. Commit `2ec1e6b7`.
+- **T3 / design.** El «Hecho cuando» de T3 en `tasks.md` nombra ahora el mutante del escalar, con enmienda fechada; `design.md > 4` lleva una nota del 2026-09-18: el recorrido que describia no puede ocurrir (Siguiente esta bloqueado mientras espera el paso 1) y la trampa real es retroceder durante la cuenta. Commit `d254384d`.
+- **H5.** En OES, «si la operacion falla, muestra el error» envuelve el tramo con reloj falso en `try { ... } finally { vi.useRealTimers() }`, sin aflojar ninguna afirmacion y conservando la nota fechada. Commit `17f3375c`.
+- H2, H3, H4, H6 y H7 no se tocan, por indicacion del leader.
+
+Verificacion tras las correcciones (implementer):
+
+    $ pnpm run typecheck   -> exit 0
+    $ pnpm run lint        -> exit 0
+    $ pnpm exec vitest run (los mismos 6 archivos de arriba)
+     Test Files  6 passed (6)
+          Tests  136 passed (136)
+    (el subagente corrio SR + OES 3 veces: 58/58 verdes las tres)
 
 ## Bloqueos
 
