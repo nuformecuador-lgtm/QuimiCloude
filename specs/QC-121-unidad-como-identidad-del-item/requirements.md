@@ -30,6 +30,8 @@
 > `D1`…`D15` **por orden de fila**. La tabla tiene **15 filas** y todas quedan citadas al menos
 > una vez: una decisión sin `R<n>` nunca llega a tener test. La pregunta abierta 1 (unidad de la
 > línea de receta) **no se decide aquí**: R19 conserva lo que fijó QC-91 mientras siga abierta.
+> R29–R34 (enmienda del 2026-09-18) citan además `[E1]`, la decisión del humano de que esta ficha
+> cubra el recálculo en el camino del ajuste de QC-92; ver la nota bajo la tabla.
 
 ### Unidad del producto
 
@@ -166,12 +168,57 @@ quedar cubierto por al menos una prueba de extremo a extremo (Playwright). [D13]
 **R28.** El sistema NO DEBE incorporar ninguna dependencia nueva para esta feature: `package.json`
 queda sin cambios. [D15]
 
+### Enmienda del 2026-09-18 — el ajuste de lote (QC-92, ya mergeada)
+
+> QC-92 entró **antes** que esta ficha (PR #91), no después como suponía D4. El humano decidió el
+> 2026-09-18: «Sí, QC-121 cubre el ajuste». Estos requisitos citan `[E1]` por esa decisión (ver la
+> nota bajo la tabla de decisiones) y `[D4]` porque el cómo sigue siendo el de D4: lo hace la
+> aplicación, en la misma transacción, sin disparador (R12 sigue en pie). Se numeran a
+> continuación sin renumerar R1–R28.
+
+**R29.** CUANDO se ajuste la existencia de un lote, el sistema DEBE recalcular la existencia
+guardada de su producto a partir de todos sus lotes —con la misma agregación y el mismo aborto por
+mezcla de unidades de R13— en la misma transacción que escribe el ajuste y su asiento del libro de
+movimientos; y SI el recálculo falla, ENTONCES NO DEBE quedar escrito ni el ajuste ni su asiento.
+[E1] [D4]
+
+**R30.** SI un ajuste se rechaza —porque el lote no existe, es de otra empresa o quedaría con
+existencia negativa—, ENTONCES la existencia guardada del producto NO DEBE cambiar. [E1] [D4]
+
+**R31.** CUANDO dos ajustes simultáneos sobre lotes del mismo producto, o un ajuste y un alta de
+lote simultáneos sobre el mismo producto, confirmen, la existencia guardada DEBE terminar igual a la
+suma de todos sus lotes, sin perder ninguno de los dos cambios. [E1] [D4]
+
+**R32.** CUANDO se ajuste un lote, el sistema NO DEBE modificar el nombre, la cantidad de alerta, la
+unidad ni la fecha de última modificación de su producto: solo su existencia guardada. [E1] [D4]
+_(Pendiente de confirmar en F1.4: extiende al ajuste lo que R11 fija para el alta; ver
+`design.md > 15`.)_
+
+**R33.** El `down.sql` de la migración de esta feature DEBE dejar intactos la tabla del libro de
+movimientos, su tipo enumerado y sus restricciones; y la migración DEBE aplicarse después de las
+dos migraciones del libro, de modo que su relleno sume la existencia de los lotes ya ajustada.
+[E1] [D6]
+
+**R34.** CUANDO un ajuste de lote confirme desde el panel de lotes del listado de inventario, el
+listado DEBE mostrar la existencia guardada nueva del producto sin recargar la página a mano; esto
+DEBE quedar cubierto por una prueba de extremo a extremo (Playwright). [E1] [D3] [D13]
+
 ## Preguntas abiertas
 
 1. **La unidad de la línea de receta.** Hoy la línea de receta elige producto y unidad por
    separado. Con la unidad fija en el producto, ¿la línea debe tomar la del producto? Mientras no
    se decida se mantiene lo que fijó QC-91: si la unidad de la línea no es la del producto, el
    «restante» del pedido muestra «—». No se decidió al acotar.
+2. **El título del panel de lotes (añadida el 2026-09-18, con la enmienda).** QC-92 trajo un panel
+   lateral de lotes que se abre desde cada fila del listado y titula con `product.name` a secas
+   (también su `aria-label`, «Lotes de X»). Con dos productos «X» en kg y en L, los dos paneles se
+   titulan igual. D8 nombra «el listado de inventario y el selector de productos de la receta»;
+   **no dice** si el panel que cuelga del listado cuenta. ¿Se titula «nombre · unidad»? No se
+   decide aquí: sin respuesta, el panel queda como está y ningún requisito lo cubre.
+3. **El ajuste de un lote de un producto dado de baja (añadida el 2026-09-18).** Hoy (QC-92) el
+   ajuste no mira si el producto está vivo. Esta enmienda **conserva** ese comportamiento: el
+   recálculo actualiza la existencia de un producto borrado igual que la de uno vivo. Si el humano
+   quiere que el ajuste de un producto borrado se rechace, es otra decisión, no de esta ficha.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -192,3 +239,13 @@ queda sin cambios. [D15]
 | 2026-09-18 | ¿Hace falta E2E? | **Sí**: es movimiento de inventario (`CHECKPOINTS.md`). Mínimo: dar de alta «X» en kg, darla de alta otra vez en L, y ver **dos filas** en el listado, cada una con su existencia |
 | 2026-09-18 | ¿Una ficha o se parte en backend y pantalla? | **Una sola `fullstack`**: la columna nueva y la unidad del producto rompen al compilar el listado y los selectores. Mismo motivo que QC-91 y QC-93 |
 | 2026-09-18 | ¿Librería? | **Ninguna nueva** |
+
+> **Nota de `spec_author` bajo la tabla, no una fila (2026-09-18).** La tabla la fijó el humano y no
+> se reescribe. En la fila de D4 («¿Quién mantiene `products.stock` al día?»), la frase **«QC-92
+> hereda la obligación»** quedó **sustituida** por la decisión del humano del 2026-09-18 («Sí,
+> QC-121 cubre el ajuste»), porque QC-92 entró antes que esta ficha (PR #91). Lo mismo vale para la
+> segunda frase de la viñeta «Ajuste de inventario → QC-92» de «Lo que NO entra»: el ajuste en sí
+> sigue siendo de QC-92, pero **el recálculo de `products.stock` en el camino del ajuste lo hace
+> esta ficha**. El resto de D4 no cambia: lo hace la aplicación, en la misma transacción, sin
+> disparador. Los requisitos citan esa decisión como `[E1]` (R29–R34). **La fila formal la añade
+> el leader si el humano lo pide.**

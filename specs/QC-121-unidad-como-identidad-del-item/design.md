@@ -4,6 +4,13 @@
 > `.worktrees/QC-121-unidad-como-identidad-del-item`), que ya contiene QC-91 mergeada. Rutas y
 > números de línea **medidos en ese árbol**, no de memoria. Lo que no se pudo medir desde aquí
 > (sin shell: el historial de git y la base local) está marcado como tal.
+>
+> **Enmienda del 2026-09-18.** La rama se sincronizó con `origin/dev` en `3d66790e`, que trae
+> **QC-92 (ajuste de inventario) mergeada** (PR #91), y también QC-108 y QC-68. Los números de
+> línea de este documento se **volvieron a medir** sobre ese árbol donde QC-92 los movió; lo que
+> QC-92 añade está en §1.4 y lo que cambia del plan, en §15. Sin shell ni búsqueda por contenido
+> en esta sesión (`rg` no está instalado): los archivos se leyeron uno a uno por ruta; lo que no se
+> pudo localizar así queda marcado «a medir».
 
 ## 1. Censo: dónde vive hoy la unidad y la existencia del producto
 
@@ -25,17 +32,18 @@ Importa separar lo que cambia de lo que se queda intacto.
 | 8 | `lib/modules/inventario/domain/errors.ts` | 7 clases | **CAMBIA**: gana `PresentationUnitLockedError` (§8) |
 | 9 | `lib/modules/inventario/domain/product-input.ts:29` | comentario sobre `latestBatchUnitId` | **CAMBIA**: sólo el comentario (se limpia, sin citar fichas) |
 | 10 | `lib/modules/inventario/index.ts:50-51` | reexporta `ProductView`, `ProductStockByUnit`, `sumStockByUnit` | **CAMBIA**: añade `singleUnitStock`, `productDisplayName`, `PresentationUnitLockedError` |
-| 11 | `lib/modules/inventario/ports/product-repository.ts:73` (`findAliveIdByName`), `:88-93`, `:113-118` | puerto del alta | **CAMBIA**: `findAliveIdByName` se sustituye por `findAliveIdByNameInPresentationUnit` (§4); las otras dos firmas no cambian |
+| 11 | `lib/modules/inventario/ports/product-repository.ts:76` (`findAliveIdByName`), `:84-85` (comentario «el producto no tiene columna propia»), `:91-96`, `:116-121`; `:123-141` (`adjustBatchStock`, QC-92) | puerto del alta y del ajuste | **CAMBIA**: `findAliveIdByName` se sustituye por `findAliveIdByNameInPresentationUnit` (§4); el comentario de `:84-85` deja de ser cierto y se reescribe; el de `adjustBatchStock` gana el recálculo (§5.1). Ninguna otra firma cambia |
 | 12 | `lib/modules/inventario/ports/presentation-repository.ts:77-81` (`replace`) | unión `'ok' \| 'not_found' \| 'duplicate' \| 'invalid_unit'` | **CAMBIA**: gana `'unit_locked'` |
-| 13 | `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts:34-48` (`BATCH_STOCK_BY_UNIT`, `PRODUCT_SELECT`), `:52-65` (`toProductView`) | lee todos los lotes de cada producto de la página | **CAMBIA**: `PRODUCT_SELECT` lee `stock` y `unitId` de la fila y **deja de traer lotes** |
-| 14 | `…/product-prisma.ts:145-163` (`productOrderBy`), `:165-196` (`productFilterWhere`) | sin `stock` | **CAMBIA**: `case 'stock'` en los dos (D5) |
-| 15 | `…/product-prisma.ts:249-264` (`findAliveIdByName`) | filtra por `nameNormalized` | **SE SUSTITUYE** (§4) |
-| 16 | `…/product-prisma.ts:387-414` (traducción de errores del lote) | `23514` de empresa → `ValidationError` | **CAMBIA**: añade el `23514` de unidad (§4.3) |
-| 17 | `…/product-prisma.ts:482-510` (`createWithFirstBatch`), `:516-549` (`addBatchToAlive`) | escriben producto/lote | **CAMBIAN**: unidad del producto desde la presentación, y recálculo de `stock` en la misma transacción (§4, §5) |
+| 13 | `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts:37-41` (`BATCH_STOCK_BY_UNIT`), `:43-51` (`PRODUCT_SELECT`), `:55-68` (`toProductView`) | lee todos los lotes de cada producto de la página | **CAMBIA**: `PRODUCT_SELECT` lee `stock` y `unitId` de la fila y **deja de traer lotes** |
+| 14 | `…/product-prisma.ts:148-166` (`productOrderBy`), `:168-199` (`productFilterWhere`) | sin `stock` | **CAMBIA**: `case 'stock'` en los dos (D5) |
+| 15 | `…/product-prisma.ts:252-267` (`findAliveIdByName`) | filtra por `nameNormalized` | **SE SUSTITUYE** (§4) |
+| 16 | `…/product-prisma.ts:402-430` (traducción de errores del lote: `isBatchCompanyScopeViolation` `:411-414`, `isBatchStockNegativeViolation` `:416-422` de QC-92, `translateBatchWriteError` `:426-430`) | `23514` de empresa → `ValidationError` | **CAMBIA**: añade el `23514` de unidad (§4.3) |
+| 17 | `…/product-prisma.ts:498-533` (`createWithFirstBatch`, lote en `:519`, asiento en `:524-529`), `:539-579` (`addBatchToAlive`, bloqueo en `:550-557`, lote en `:565`, asiento en `:570-575`) | escriben producto/lote/asiento | **CAMBIAN**: unidad del producto desde la presentación, y recálculo de `stock` en la misma transacción (§4, §5) |
+| 17b | `…/product-prisma.ts:638-665` (`adjustBatchStock`, QC-92) | `tx.productBatch.update` relativo + `writeMovement`, sin tocar `products` | **CAMBIA (enmienda)**: toma el bloqueo de fila del producto y recalcula `stock` en la misma transacción (§5.1) |
 | 18 | `…/product-catalog-prisma.ts:25-45`, `:52-91` (`findProductRefs`) | suma lotes con `sumStockByUnit` | **CAMBIA**: lee `stock` y `unitId` de la fila; ya no trae lotes (§3.2) |
 | 19 | `…/presentation-prisma.ts:217-242` (`replacePresentation`) | traduce `P2002`/`P2003`/`23514` de empresa | **CAMBIA**: traduce el `23514` del disparador nuevo a `'unit_locked'` (§6) |
-| 20 | `lib/modules/errores/domain/error-codes.ts:9-59`, `error-catalog.ts` | 46 códigos | **CAMBIA**: `presentation_unit_locked` (séptima enmienda, §8) |
-| 21 | `lib/composition/index.ts:627-639` (`productRepository`) | cablea `findAliveIdByName` | **CAMBIA**: cablea el método renombrado |
+| 20 | `lib/modules/errores/domain/error-codes.ts:14-72`, `error-catalog.ts` | **49** códigos (QC-92 y QC-108 sumaron tres) | **CAMBIA**: `presentation_unit_locked` (**novena** enmienda, §8) |
+| 21 | `lib/composition/index.ts:637-652` (`productRepository`, `findAliveIdByName` en `:646`) | cablea `findAliveIdByName` | **CAMBIA**: cablea el método renombrado |
 | 22 | `lib/modules/recetas/domain/get-recipe.ts:17-23`, `:74` (`stockInLineUnit`) | elige la existencia de la unidad de la línea | **INTACTO**: con `stockByUnit` de un solo valor sigue dando 0 / cantidad / `null` (R19) |
 
 ### 1.2 `app/`
@@ -52,6 +60,9 @@ Importa separar lo que cambia de lo que se queda intacto.
 | 30 | `app/(private)/produccion/formulas/components/unit-group.ts:70-75` | comentario sobre el origen de la unidad | **CAMBIA**: sólo el comentario; la lógica (`unitsOfGroup`, `resolveLineUnitId`) **no se toca** |
 | 31 | `app/(private)/configuracion/presentaciones/components/presentation-form.tsx:146-148` (`CODE_TO_FIELD`) | sólo `presentation_duplicate_name` | **CAMBIA**: `presentation_unit_locked → unitId` (R22) |
 | 32 | `app/(private)/pedidos/components/order-ingredients-table.tsx` | resta sobre `productStock` | **INTACTO**: el contrato `RecipeLineView.productStock` no cambia |
+| 33 | `app/(private)/inventario/components/product-batches-panel.tsx:8` (importa `EMPTY_CELL` de `product-columns`), `:37-47` (unidad de cada lote desde `ProductBatchView.unitId`) — QC-92 | cantidad del lote con la unidad de su presentación | **INTACTO**: con el disparador de §4.2 la unidad de la presentación de cada lote **es** la del producto, así que lo que pinta no cambia. T6 **no debe quitar** `EMPTY_CELL` de `product-columns.tsx`: lo consume este panel |
+| 34 | `app/(private)/inventario/components/product-table.tsx:51-113` (`ProductBatchesSheet`, título `:81` y `aria-label` `:72` con `product.name`) — QC-92 | panel lateral de lotes | **INTACTO** salvo que el humano responda la pregunta abierta 2 (`requirements.md`); ver T15 |
+| 35 | `app/(private)/inventario/components/adjust-batch-dialog.tsx:104-109` — QC-92 | tras un ajuste, `router.refresh()` | **INTACTO**: ese `refresh` vuelve a pedir el listado, que ya leerá `products.stock` recalculado (R34). No hace falta tocar la pantalla del ajuste |
 
 ### 1.3 Base de datos
 
@@ -61,20 +72,52 @@ Importa separar lo que cambia de lo que se queda intacto.
 | `db/schema.prisma:295-323` (`model ProductBatch`) | sin unidad propia | **INTACTO**, a propósito: ver §9, alternativa 1 |
 | `db/migrations/20260911130000_inventory_company_scope/migration.sql:279-316` | disparador `product_batches_check_company` | **INTACTO**; es el precedente de forma de los dos disparadores nuevos |
 | `db/migrations/20260917120000_drop_product_stock/*` | quitó `products.stock`, su CHECK y su índice | histórico; la migración nueva vuelve a crear **los mismos nombres** |
+| `db/migrations/20260917130000_inventory_movements/migration.sql:6-69` — QC-92 | tabla `inventory_movements`, FK a `product_batches` `RESTRICT`, CHECK `quantity <> 0` y `reason_matches_kind`, RLS, disparador `inventory_movements_check_company` (`BEFORE INSERT`) | **INTACTO**. La migración nueva va **después** y su `down.sql` no la toca (R33) |
+| `db/migrations/20260918120000_inventory_movement_kind_enum_and_reason_catalog/migration.sql:7-20` — QC-92 | enum `InventoryMovementKind`, CHECK `inventory_movements_reason_in_catalog` | **INTACTO**. **Ocupa el timestamp `20260918120000` que el plan original daba a la migración de esta ficha**: ver §11 |
+
+### 1.4 Censo de QC-92 (enmienda del 2026-09-18)
+
+Todo lo que QC-92 añadió o cambió y que escribe `product_batches.stock`, crea lotes o lee lo que
+esta ficha cambia. Medido en el árbol de `3d66790e`.
+
+**Caminos de escritura de `product_batches`** — son **tres** y los fija en positivo
+`tests/guards/guard-libro-de-inventario.test.ts:18` (`CAMINOS_ESPERADOS`):
+
+| # | `archivo:línea` | Qué escribe | Recalcula hoy `products.stock` | Qué le hace esta ficha |
+|---|---|---|---|---|
+| C1 | `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts:498-533` `createWithFirstBatch` | producto + lote (`:519`) + asiento `opening` (`:524-529`) | no (la columna no existe) | unidad + recálculo (T4) |
+| C2 | `…/product-prisma.ts:539-579` `addBatchToAlive` | lote (`:565`) + asiento `opening` (`:570-575`), con la fila del producto bloqueada (`:550-557`) | no | recálculo (T4) |
+| C3 | `…/product-prisma.ts:638-665` `adjustBatchStock` | `tx.productBatch.update({ stock: { increment: delta } })` (`:650-654`) + asiento `adjustment` (`:656`); traduce `P2025` a `null` y el CHECK de negativo a `BatchStockNegativeError` (`:660-663`) | no | **bloqueo de fila del producto + recálculo (T14, R29–R32)** |
+
+**Lo que rodea a esos caminos y NO escribe lotes** (se lee para no romperlo):
+
+| `archivo:línea` | Qué es | Destino |
+|---|---|---|
+| `lib/modules/inventario/domain/adjust-batch-stock.ts:42-73` | caso de uso del ajuste: permiso, zod (`delta` entero ≠ 0, `reason` del catálogo), puerto | **INTACTO**: el recálculo es del adaptador, como en el alta |
+| `lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma.ts:16-33` (`writeMovement`), `:67-84` (`findBatchMovements`) | escritor del asiento con la `tx` de fuera; lectura del historial | **INTACTO**. El asiento no lleva unidad: su unidad es la de la presentación del lote, que tras §4.2 es la del producto. **No hace falta requisito de unidad sobre el libro** |
+| `lib/modules/inventario/domain/inventory-movement.ts:3-19` | `InventoryMovementView`, `NewInventoryMovement` (`kind`, `quantity` con signo, `reason`) | **INTACTO** |
+| `lib/modules/inventario/domain/movement-ledger.ts:2` | `LEDGER_START = '20260917130000'` | **INTACTO**; no depende del timestamp de la migración de esta ficha |
+| `lib/modules/inventario/domain/product-batch-view.ts` y `…/product-prisma.ts:581-623` (`BATCH_VIEW_SELECT`, `toBatchView`, `findBatchesOfAliveProduct`) | lotes del panel, con `unitId` de la presentación | **INTACTO** (ver fila 33 de §1.2) |
+| `lib/modules/inventario/adapters/driven/persistence/company-scope.ts` | QC-92 reintrodujo `batchCompanyScope` y creó `movementCompanyScope` | **Se usa**: la lectura de lotes de `recalculateProductStock` lleva `batchCompanyScope(scope)` (§5) |
+| `lib/modules/inventario/adapters/driving/batch-actions.ts:80-105` | `adjustBatchStockAction` | **INTACTO** |
+| `lib/composition/index.ts:649-651`, `:685-689` | cableado de `adjustBatchStock`, `findBatchesOfAliveProduct`, `findBatchMovements` y de sus casos de uso | **INTACTO** |
 
 ## 2. Lo que se comprobó en disco antes de apoyarse en ello
 
 - **No hay índice único sobre el nombre del producto** (`db/schema.prisma:265`,
   `list_query_indexes/migration.sql:65`, `:82`): la mitad «el nombre se repite» de D1 no exige
   trabajo, como dice la propia decisión.
-- **`create-product` es la única alta** (`create-product.ts:65-71`) y los **dos únicos escritores
-  de lotes** son `createWithFirstBatch` y `addBatchToAlive` (`product-prisma.ts:503`, `:542`). El
-  método de puerto `create` (`product-prisma.ts:68-85`, cableado en `composition/index.ts:628`) crea
+- **`create-product` es la única alta** (`create-product.ts:65-71`). Los escritores de lotes
+  eran dos cuando se escribió el spec; **desde QC-92 son tres**: `createWithFirstBatch` y
+  `addBatchToAlive` crean (`product-prisma.ts:519`, `:565`) y `adjustBatchStock` actualiza
+  (`:650`). Los tres los fija `guard-libro-de-inventario.test.ts:18` (§1.4). El
+  método de puerto `create` (`product-prisma.ts:71-88`, cableado en `composition/index.ts:638`) crea
   un producto **sin lote**, y ningún caso de uso lo llama: esta ficha no lo toca (queda un producto
   sin unidad y con existencia 0, que es coherente con R8 y R23).
 - **`addBatchToAlive` ya toma el bloqueo de la fila del producto** (`FOR NO KEY UPDATE`,
-  `product-prisma.ts:527-534`) antes de escribir el lote. El recálculo concurrente (R10) se apoya en
-  ese mismo bloqueo; no hace falta uno nuevo.
+  `product-prisma.ts:550-557`) antes de escribir el lote. El recálculo concurrente (R10) se apoya en
+  ese mismo bloqueo; no hace falta uno nuevo. **`adjustBatchStock` (QC-92) no lo toma**: bloquea
+  sólo la fila del lote (la del `UPDATE`). Para R31 tiene que tomarlo (§5.1).
 - **La presentación no expone ningún método de búsqueda** (`presentation-repository.ts:29-35`, a
   propósito). Por eso la unidad de la presentación la resuelve el adaptador de producto, no el
   dominio pidiéndola a otro puerto (§4).
@@ -204,7 +247,8 @@ END; $fn$ LANGUAGE plpgsql;
   `unit_id` ni `name` ni `qty_alert` (R2, R11).
 - `translateBatchWriteError`: añade `product_batches_unit_differs_from_product` como `23514`
   reconocible → `ValidationError` (R3). Se identifica por SQLSTATE **y** nombre, con el mismo
-  patrón que `isBatchCompanyScopeViolation` (`:396-406`): un `23514` sin nombre conocido se relanza.
+  patrón que `isBatchCompanyScopeViolation` (`:411-414`) y que `isBatchStockNegativeViolation` de
+  QC-92 (`:416-422`): un `23514` sin nombre conocido se relanza.
 - Cuándo puede llegar ese rechazo por la aplicación: sólo en carrera —la presentación (aún sin
   lotes) cambia de unidad entre la búsqueda de §4.1 y la escritura—. Reintentar el alta lo resuelve
   por el camino correcto.
@@ -219,9 +263,12 @@ deleted_at IS NULL`: **los mismos nombres y la misma forma** que retiró QC-91, 
 - **`DEFAULT 0`** hace que los ~21 archivos de test que insertan productos a mano sin lotes sigan
   válidos (R8: sin lotes, 0). No se usa como atajo de la aplicación: el alta siempre recalcula.
 - **Recálculo** — ayudante `recalculateProductStock(tx, productId, scope)` en `product-prisma.ts`,
-  llamado por los **dos** escritores de lotes después de `tx.productBatch.create`:
+  llamado por los **tres** caminos de escritura de lotes (§1.4): los dos del alta, después de
+  `tx.productBatch.create` y de su `writeMovement`, y el ajuste (§5.1). **No es exportado** y **no
+  escribe `product_batches`**: así no entra en el censo de `guard-libro-de-inventario` (que cuenta
+  llamadas `productBatch.create/update/…` por función exportada) ni necesita asiento propio.
   1. lee `stock` y `presentation.unitId` de **todos** los lotes del producto (con el ámbito de
-     empresa llevado a una envoltura de `./company-scope`: lo exige
+     empresa por `batchCompanyScope(scope)`, que QC-92 reintrodujo en `./company-scope`: lo exige
      `guard-ambito-empresa-inventario`);
   2. `singleUnitStock(rows)` (dominio puro, §3.3; R13);
   3. escribe con `tx.$executeRaw` `UPDATE "products" SET "stock" = $n WHERE "id" = $id AND
@@ -234,10 +281,51 @@ deleted_at IS NULL`: **los mismos nombres y la misma forma** que retiró QC-91, 
   más ve hasta el commit.
 - **Atomicidad (R9)**: todo va dentro del mismo `prisma.$transaction` de `writeBatchWithLotRetry`;
   si el recálculo lanza, no queda ni lote ni producto.
-- **Riesgo aceptado (D4)**: un tercer escritor de lotes que no llame al ayudante deja `stock`
+- **Riesgo aceptado (D4)**: un cuarto escritor de lotes que no llame al ayudante deja `stock`
   desfasado sin que la base lo impida. Mitigación barata, no garantía: un test de alcance (T10)
-  exige que **toda** función de `product-prisma.ts` que llama a `tx.productBatch.create` llame
-  también a `recalculateProductStock`. QC-92 hereda la obligación y ese test la hará visible.
+  exige que **toda** función exportada de `lib/` que escriba `product_batches` —con el **mismo
+  patrón** que usa `guard-libro-de-inventario.test.ts:182-186` (`create`, `createMany`, `update`,
+  `updateMany`, `upsert`)— llame también a `recalculateProductStock`. ~~QC-92 hereda la
+  obligación~~: **sustituido el 2026-09-18** — QC-92 entró antes y esta ficha cubre su camino
+  (`requirements.md`, nota bajo la tabla; R29–R32).
+
+### 5.1 El ajuste de QC-92 recalcula (enmienda del 2026-09-18; R29–R32)
+
+`adjustBatchStock` (`product-prisma.ts:638-665`) pasa a esta forma, **dentro del mismo
+`prisma.$transaction`** que ya abre:
+
+```
+1. SELECT p."id" FROM "products" p
+     JOIN "product_batches" b ON b."product_id" = p."id"
+    WHERE b."id" = $batchId AND b."company_id" = $companyId
+      FOR NO KEY UPDATE OF p                      -- 0 filas => null (lote ajeno o inexistente)
+2. tx.productBatch.update({ stock: { increment: delta }, updatedBy, updatedAt })   -- igual que hoy
+3. writeMovement(tx, { kind: 'adjustment', ... })                                   -- igual que hoy
+4. recalculateProductStock(tx, productId, scope)                                    -- NUEVO
+```
+
+- **Bloqueo del producto primero, lote después.** Es el mismo orden que ya sigue `addBatchToAlive`
+  (fila del producto → lock de aviso → `INSERT` del lote) y el que tendría cualquier camino futuro
+  que parta del producto. Con un orden único no hay abrazo mortal entre ajuste y alta. Dos ajustes
+  sobre lotes distintos del mismo producto se serializan en el paso 1; el segundo, al seguir, ve en
+  su paso 4 —sentencia nueva, instantánea nueva en READ COMMITTED— el lote del primero ya confirmado
+  (R31). Sin este paso, cada uno sumaría sin ver el cambio no confirmado del otro y el último en
+  confirmar dejaría `stock` desfasado. El `SELECT` crudo lleva la empresa por
+  `companyScopeColumns(scope)`, como el de `addBatchToAlive`.
+- **No filtra `deleted_at`**, a propósito: QC-92 no lo filtra hoy y esta ficha no cambia qué
+  ajustes se aceptan (pregunta abierta 3 de `requirements.md`).
+- **Paso 1 devuelve 0 filas → `null`** sin tocar nada: es el mismo resultado que hoy da el `P2025`
+  del paso 2, que se conserva por si el lote desapareciera entre 1 y 2 (no puede: la FK es
+  `RESTRICT` y no hay borrado de lotes, pero el adaptador no lo supone).
+- **Negativo (R30)**: el CHECK `product_batches_stock_non_negative` rechaza el paso 2, la
+  transacción entera se deshace —incluido el bloqueo— y `stock` no cambia. Traducción igual que hoy.
+- **R32**: el recálculo es el mismo `UPDATE "products" SET "stock"` crudo de §5; no toca
+  `updated_at` (tampoco lo tocaba el ajuste antes), ni `name`, `qty_alert` ni `unit_id`.
+- **R29, aborto por mezcla**: `singleUnitStock` lanza si los lotes del producto mezclan unidades; el
+  ajuste sale como `unexpected` y no queda ni el `UPDATE` del lote ni el asiento.
+- **Lo que no cambia**: el caso de uso (`adjust-batch-stock.ts`), el puerto (firma y resultado
+  `{ stock }` = existencia **del lote**), la action, el diálogo, `writeMovement` y el libro. El
+  `UPDATE` relativo con `increment:` sigue siendo el de QC-92: aquí no se reescribe.
 
 ## 6. Presentación con lotes: la unidad se bloquea (D7)
 
@@ -286,14 +374,21 @@ lo traduce a `'unit_locked'`, y el caso de uso a `PresentationUnitLockedError`
 `presentation_unit_locked` → `errors.presentation_unit_locked` → texto propuesto: «La presentacion
 ya tiene lotes y no puede cambiar de unidad.» (único en el catálogo; sin acentos como el resto).
 
-- `tests/unit/errores/catalogo.test.ts:44` pasa de **46 a 47** (conteo literal a propósito).
-- La cabecera de `error-codes.ts:6-7` recoge la **séptima enmienda**. El test `:183-186` exige que
-  la sexta siga escrita literalmente con «(QC-81)», así que se **añade** debajo, no se reemplaza.
-- **Choque con `docs/conventions.md > Comentarios`**: las enmiendas anteriores citan su ficha, y la
-  convención prohíbe citar fichas en producción. Propuesta: la séptima se escribe **sin clave**
-  («Séptima enmienda, el 2026-09-18: `presentation_unit_locked`. Aprobada por el humano en la puerta
-  de aprobación del spec.») y su test —en `tests/`, donde sí se puede— es quien la ata a esta ficha.
-  **Lo decide el humano en F1.4.**
+- **Cifra corregida en la enmienda del 2026-09-18.** El spec aprobado decía «46 → 47» y «séptima
+  enmienda». Tras sincronizar, **la séptima la ocupó QC-92** (`batch_not_found`,
+  `batch_stock_negative`) y **la octava QC-108** (`ai_unavailable`): `ERROR_CODES` tiene hoy
+  **49** entradas (`error-codes.ts:14-72`). Esta ficha es la **novena enmienda**.
+- `tests/unit/errores/catalogo.test.ts:42-44` y `:54` pasan de **49 a 50** (conteo literal a
+  propósito, en el título de los dos casos y en `toHaveLength`).
+- La cabecera de `error-codes.ts:6-12` recoge la **novena enmienda**, debajo de la octava. Los
+  tests `:182-186` (sexta, QC-81), `:208-212` (séptima, QC-92) y `:233-237` (octava) exigen el
+  texto literal de las anteriores, así que se **añade** debajo, no se reemplaza nada.
+- **Choque con `docs/conventions.md > Comentarios`**: la sexta y la séptima citan su ficha, y la
+  convención prohíbe citar fichas en producción. **La octava ya se escribió sin clave**
+  («**Octava enmienda, el 2026-09-18**: `ai_unavailable`. Aprobada por el humano el 2026-09-18.»):
+  hay precedente. Propuesta: la novena igual, **sin clave** («**Novena enmienda, el 2026-09-18**:
+  `presentation_unit_locked`. Aprobada por el humano el 2026-09-18.»), y su test —en `tests/`,
+  donde sí se puede— es quien la ata a esta ficha. **Lo decide el humano en F1.4.**
 
 ## 9. Alternativas descartadas
 
@@ -309,8 +404,13 @@ ya tiene lotes y no puede cambiar de unidad.» (único en el catálogo; sin acen
 2. **Mantener `stock` con un disparador de la base.** Descartada por D4 literal.
 3. **Recalcular con `stock = stock + delta`** en vez de volver a sumar los lotes. Es más barato y
    concurrente sin bloqueo, pero no es «la suma de los lotes» (D3): un desfase se arrastra para
-   siempre en vez de corregirse en la siguiente escritura. Además
-   `qc81-alcance.test.ts > R31` rechaza `increment:`/`decrement:` en el módulo.
+   siempre en vez de corregirse en la siguiente escritura. _(El argumento «además
+   `qc81-alcance.test.ts > R31` rechaza `increment:`» ya no vale: ese caso está acotado a la rama
+   de QC-81 —`qc81-alcance.test.ts:444-467`— y QC-92 usa `increment:` en el lote. Lo que descarta
+   la alternativa es D3, no la guardia.)_
+   **Aplicado al ajuste (enmienda)**: sumar el mismo `delta` a `products.stock` en
+   `adjustBatchStock` sería la versión más barata de §5.1. Descartada por lo mismo: D3 dice «suma de
+   los lotes», y un `stock` que ya estuviera desfasado seguiría desfasado tras cada ajuste.
 4. **Conservar `ProductView.stockByUnit`** junto a `stock`/`unitId`. Descartada por redundante:
    tres campos para un dato que ya es uno. D9 se cumple con el tipo, con la agregación (que calcula
    la columna) y con `ProductRef`, que sí lo necesita tal cual.
@@ -321,6 +421,15 @@ ya tiene lotes y no puede cambiar de unidad.» (único en el catálogo; sin acen
    para cerrar la carrera de dos altas simultáneas del mismo nombre y unidad. No lo pide ninguna
    decisión, rechazaría altas que hoy entran y podría fallar sobre datos existentes. La carrera ya
    existía con el nombre solo (QC-90) y sigue igual.
+7. **(Enmienda) En el ajuste, actualizar el lote primero y bloquear el producto después** —añadir
+   sólo `SELECT … FOR NO KEY UPDATE` sobre el producto entre el `UPDATE` del lote y el recálculo—.
+   Es el cambio más pequeño sobre el código de QC-92 y también cumple R31. Descartada: deja dos
+   órdenes de bloqueo en el mismo archivo (el alta va producto → lote; el ajuste iría lote →
+   producto), y el primer camino que parta del producto y toque un lote existente abriría un abrazo
+   mortal con el ajuste. Un solo orden cuesta un `JOIN` y se razona una vez.
+8. **(Enmienda) Recalcular `products.stock` con un disparador sólo para el ajuste**, dejando el alta
+   en la aplicación. Descartada por D4 literal, que la enmienda no reabre, y porque tendríamos dos
+   mecanismos para la misma columna.
 
 ## 10. Permisos, empresa, RLS, multiplataforma y dependencias
 
@@ -341,7 +450,14 @@ ya tiene lotes y no puede cambiar de unidad.» (único en el catálogo; sin acen
 
 ## 11. Migración
 
-`db/migrations/20260918120000_product_unit_and_stored_stock/`, **escrita a mano** (como
+~~`db/migrations/20260918120000_product_unit_and_stored_stock/`~~ **→ cambia de timestamp
+(enmienda del 2026-09-18)**: `20260918120000` lo ocupa ya
+`20260918120000_inventory_movement_kind_enum_and_reason_catalog` (QC-92). La carpeta pasa a
+`db/migrations/<ts>_product_unit_and_stored_stock/` con `<ts>` **estrictamente mayor que el de la
+última carpeta de `db/migrations/`**, medido con `ls` por el implementer al empezar T3 (desde aquí
+no se pudo listar el directorio; QC-68 y QC-108 también migraron el 2026-09-18). Propuesta:
+`20260918130000` si nada lo supera. Ir **después** de las dos migraciones del libro es lo que pide
+R33: el relleno suma los lotes ya ajustados. **Escrita a mano** (como
 `drop_product_stock`: `migrate dev --create-only` no puede reproducir `inventory_company_scope`
 sobre una base sombra vacía). Orden del UP:
 
@@ -359,7 +475,10 @@ sobre una base sombra vacía). Orden del UP:
 6. `ENABLE` + `FORCE ROW LEVEL SECURITY` de nuevo en las tres.
 
 `down.sql`: quita los dos disparadores y sus funciones, los dos índices, la FK, el CHECK y las dos
-columnas. Deja el esquema como tras QC-91 (R23). Se prueba aplicar → `db:rollback` → aplicar.
+columnas. Deja el esquema como tras QC-91 (R23) **más lo que ya añadió QC-92**: `inventory_movements`,
+su enum `InventoryMovementKind`, sus CHECK y su disparador **no se tocan** (R33). Léase «como tras
+QC-91» de R23 como «como estaba justo antes de esta migración». Se prueba aplicar → `db:rollback`
+→ aplicar.
 
 **Consecuencia de D6, dicha para que nadie la descubra**: el disparador no revalida lo que ya
 existe, así que un producto que **ya** tuviera lotes en dos unidades **no** hace fallar la
@@ -371,6 +490,8 @@ leader: 1 producto, sin mezcla. D6 lo acepta («no se comprueba», «no se parte
 
 Lección de QC-50, QC-59 y QC-91: los que **no importan** lo que vigilan no los selecciona
 `--rapido` y sólo muerden en `./init.sh` completo o después del commit. Se listan aparte.
+Las filas marcadas **(Enmienda, QC-92)** y las cifras corregidas son de la enmienda del
+2026-09-18; lo que pide aprobación está en §15.
 
 ### 12.1 Los selecciona el grafo (`--rapido`)
 
@@ -380,23 +501,33 @@ Lección de QC-50, QC-59 y QC-91: los que **no importan** lo que vigilan no los 
 se invierte), `list-use-cases`, `product-list-params`, `presentation-actions`, `product-actions`;
 `tests/unit/recetas/`: `recipe-service`, `recipe-lines-catalog`; `tests/unit/recetas-ui/`:
 `recipe-form`, `recipe-line-unit-group`, `unit-group`; `tests/unit/configuracion-ui/` del formulario
-de presentación; `tests/unit/errores/catalogo.test.ts` (`:44`, 46 → 47).
+de presentación; `tests/unit/errores/catalogo.test.ts` (`:42-44`, `:54`: **49 → 50**, cifra
+corregida en la enmienda). **Enmienda**: los tests unitarios de `adjustBatchStock` del adaptador y
+de `adjust-batch-stock.ts` en `tests/unit/inventario/` (nombres exactos **a medir**: sin búsqueda
+por contenido en esta sesión) — si simulan la `tx` sólo con `productBatch.update` e
+`inventoryMovement.create`, se ponen rojos al añadir el `SELECT … FOR NO KEY UPDATE` y el recálculo
+de §5.1, y se amplían en T14.
 
 ### 12.2 NO los selecciona el grafo: se ponen rojos en el gate completo
 
 | Archivo:línea | Qué afirma hoy | Qué pasa |
 |---|---|---|
-| `tests/unit/inventario/qc91-alcance.test.ts:200-221` (R1), `:260-304` (R11) | `toProductView` y `findProductRefs` suman lotes con `sumStockByUnit`; `ProductView` expone `stockByUnit` y no `stock`; `PRODUCT_SELECT` trae `batches` y no `stock`; los escritores no escriben `stock` | **ROJO**: D3/D4 derogan esas decisiones. Se reescriben con el argumento escrito (la agregación pasa al recálculo; la lectura va a la columna), sin borrar los detectores de `R21` (`:354-392`), que siguen valiendo |
+| `tests/unit/inventario/qc91-alcance.test.ts:255-309` (R1), `:315-403` (R11) — líneas re-medidas tras QC-92 | `toProductView` y `findProductRefs` suman lotes con `sumStockByUnit`; `ProductView` expone `stockByUnit` y no `stock`; `PRODUCT_SELECT` trae `batches` y no `stock`; los escritores no escriben `stock` | **ROJO**: D3/D4 derogan esas decisiones. Se reescriben con el argumento escrito (la agregación pasa al recálculo; la lectura va a la columna), sin borrar los detectores de `R21` (`:409-511`, ya enmendados por QC-92 para admitir el `update` de `adjustBatchStock`), que **siguen verdes**: el recálculo escribe `products`, no `product_batches` |
 | `tests/unit/unidades/module-contract.test.ts:623-624` | `ProductView` declara `readonly latestBatchUnitId: UnitId \| null`; el archivo no contiene `readonly unitId` | **ROJO** las dos. Se actualizan con el argumento: el producto vuelve a declarar unidad, **por referencia** y como dato de lectura; `NewProduct` sigue sin ella. `:617` (`ProductRef` sin `unitId`) sigue verde |
-| `tests/unit/inventario/product-route-contract.test.ts:376-381` | `HiddenProductField` contiene `'latestBatchUnitId'` | **ROJO**: pasa a `'unitId'` |
-| `tests/unit/inventario/schema/inventario-schema.test.ts:259-262`, `:429-438`, `:598`, `:602-603` | `Product` sin `stock`, sin `unitId`, sin `unit_id`, índices exactamente `['products_company_id_idx']`, sin `products_unit_id_idx` | **ROJO** los cuatro. `:893-897` (lote sin unidad) **sigue verde**, y es el argumento de §9.1 |
-| `tests/integration/inventario/list-query-indexes.int.test.ts:105-112`, `:257-269` | 33 índices; `products_stock_idx` no existe | **ROJO**: vuelve a `PARTIAL_INDEXES` (34) y el caso «ya no existe» se invierte |
+| `tests/unit/inventario/product-route-contract.test.ts` — el caso que afirma que `HiddenProductField` contiene `'latestBatchUnitId'` (antes `:376-381`; **QC-92 movió el archivo**, localizar por contenido) | `HiddenProductField` contiene `'latestBatchUnitId'` | **ROJO**: pasa a `'unitId'` |
+| `tests/unit/inventario/schema/inventario-schema.test.ts:267-269`, `:437-449`, `:602-606`, `:610-612` — re-medidas tras QC-92 | `Product` sin `stock`, sin `unitId`, sin `unit_id`, índices exactamente `['products_company_id_idx']`, sin `products_unit_id_idx` | **ROJO** los cuatro. El caso «el lote no declara unidad» (antes `:893-897`; localizar por contenido) **sigue verde**, y es el argumento de §9.1 |
+| `tests/integration/inventario/list-query-indexes.int.test.ts:108-141` (`PARTIAL_INDEXES` y su nota), `:272-280`, `:282-285` — **cifra corregida** | **34** índices (QC-68 sumó `recipes_name_normalized_all_trgm_idx`); `products_stock_idx` no existe | **ROJO**: `products_stock_idx` vuelve a `PARTIAL_INDEXES` → **35** (no 34 como decía el spec aprobado), y el caso «R2: ya no existe» se invierte. La nota de `:213-219` sobre `products_unit_id_idx` se actualiza (el índice vuelve) |
 | `tests/integration/inventario/list-query-products.int.test.ts` | dos lotes en dos unidades sobre un producto | **ROJO**: el disparador lo prohíbe; se reescribe con dos productos |
 | `tests/integration/inventario/presentation-unit.int.test.ts` | cambiar la unidad de una presentación | **ROJO** si la presentación tiene lotes (R20) |
 | Integración con lotes insertados a mano: `inventario/{company-scope,company-scope-queries,inventario-constraints,product-batch-write,product-batch-lot,presentation-uniqueness}.int.test.ts`, `unidades/unidades-constraints.int.test.ts`, `recetas/recetas-constraints.int.test.ts`, `e2e/aislamiento-inventario.spec.ts` | crean producto sin unidad y le cuelgan un lote | **ROJO**: el disparador rechaza lote sobre producto sin unidad. Hay que darle `unit_id` al producto del fixture (la de la presentación) |
+| **(Enmienda, QC-92)** `tests/integration/inventario/inventory-movements-constraints.int.test.ts:111-121` (`createProduct` sin unidad) y su `createBatch` (`:137-…`) | producto sin unidad + lote a mano, para probar los CHECK y el disparador del libro | **ROJO**: mismo motivo. El producto del fixture gana la unidad de su presentación |
+| **(Enmienda, QC-92)** `tests/integration/inventario/ledger-cuadre.int.test.ts:299-331` (R30 de QC-92: `prisma.product.create` sin unidad + `createBatchDirectly`) | lote fabricado a mano sobre producto sin unidad | **ROJO** ese caso. Los cuatro de `:226-297` pasan por `createWithFirstBatch`/`addBatchToAlive`/`adjustBatchStock` y quedan verdes cuando T4 y T14 estén |
+| **(Enmienda, QC-92)** `e2e/ajuste-de-inventario.spec.ts:243-251` (producto sin unidad) y `:255-267` (lote a mano) | siembra del E2E del ajuste | **ROJO** al correrlo a mano (`init.sh` no corre Playwright): el producto sembrado gana `unitId` y `stock: 12` |
+| **(Enmienda, QC-92)** `tests/guards/guard-libro-de-inventario.test.ts:18`, `:233-266` | el censo de caminos de escritura de lotes es **exactamente** `{ createWithFirstBatch, addBatchToAlive, adjustBatchStock }` y cada uno llama a `writeMovement(` | Corre siempre. **Verde** si `recalculateProductStock` no escribe `product_batches` (§5). **Muerde** si alguien mueve el `productBatch.create/update` al ayudante o a otra función exportada. No se toca |
 | `tests/guards/guard-ambito-empresa-inventario.test.ts:249-340` | cada método del puerto está cableado con su nombre, y toda función que consulta declara y consume `scope` | Corre siempre. **Muerde** si el método renombrado no se cablea igual en `composition` o si `recalculateProductStock` o la lectura de la unidad de la presentación no llevan el ámbito |
 | `tests/guards/guard-catalogo-de-errores.test.ts` | cada código de `errors.ts` está en el catálogo | Corre siempre; verde si T2 va entera |
-| `tests/integration/aislamiento.json` | censo de archivos de integración | Todo archivo **nuevo** de integración se declara ahí o `guard-aislamiento-integracion` da rojo |
+| `tests/integration/aislamiento.json` | censo de archivos de integración | Todo archivo **nuevo** de integración se declara ahí o `guard-aislamiento-integracion` da rojo. **Enmienda**: `product-stock.int.test.ts` llama a los adaptadores reales, que abren su propia `prisma.$transaction` contra el cliente global (como `ledger-cuadre`, `:109-113`) y necesita confirmar para medir la concurrencia de R10/R31: va en **`commit`**, con `motivo` y `desde` |
+| `tests/unit/inventario/qc81-alcance.test.ts:444-467` (R31) y `:621-629` (puerto, R32) | sin suma, sin ajuste, sin operaciones de lote en el puerto | **Acotados a la rama de QC-81**: aquí se saltan. Los «Cuidado» de T4 que los citaban dejaron de morder; se conservan por prudencia pero no son guardia |
 
 Ninguno se «arregla» borrándolo: cada cambio va con su porqué en el propio test y en el mismo
 commit que lo provoca.
@@ -417,7 +548,9 @@ commit que lo provoca.
 5. **Mezcla previa silenciosa** (§11, D6).
 6. **Carrera de dos altas simultáneas del mismo nombre y unidad**: pueden nacer dos productos
    iguales, como ya podía pasar con el nombre solo (§9.6).
-7. **QC-92** hereda llamar a `recalculateProductStock` y tomar el mismo bloqueo de fila.
+7. ~~**QC-92** hereda llamar a `recalculateProductStock` y tomar el mismo bloqueo de fila.~~
+   **Sustituido el 2026-09-18**: QC-92 entró antes; lo hace esta ficha (§5.1, R29–R32, T14). Lo
+   que queda de este punto para aprobar está en §15.
 
 ## 14. Trazabilidad prevista (`R<n>` → test)
 
@@ -441,3 +574,62 @@ commit que lo provoca.
 | R26 | `e2e/inventario.spec.ts` |
 | R27 | `./init.sh` completo verde |
 | R28 | `tests/guards/guard-dependencias-aprobadas.test.ts` |
+| R29 | `product-stock.int.test.ts` (ajuste +6 y −9 sobre un producto de tres lotes → `stock` = suma) + test unitario del adaptador (`adjustBatchStock` llama a `recalculateProductStock`; si el recálculo lanza, ni `UPDATE` ni asiento) + `qc121-alcance.test.ts` (el cuerpo de `adjustBatchStock` llama al ayudante) + `ledger-cuadre.int.test.ts` sigue verde |
+| R30 | `product-stock.int.test.ts` (ajuste a negativo → `batch_stock_negative` y `stock` igual; lote de otra empresa → `null` y `stock` de los dos productos igual) |
+| R31 | `product-stock.int.test.ts` (dos ajustes simultáneos sobre dos lotes del mismo producto; un ajuste y un `addBatchToAlive` simultáneos → `stock` = suma) |
+| R32 | `product-stock.int.test.ts` (tras el ajuste, `name`, `qty_alert`, `unit_id` y `updated_at` del producto iguales) |
+| R33 | test unitario del SQL de la migración (el `down.sql` no nombra `inventory_movements` ni `InventoryMovementKind`; el `<ts>` de la carpeta es mayor que `20260918120000`) + aplicar → `db:rollback` → aplicar con el libro intacto |
+| R34 | `e2e/ajuste-de-inventario.spec.ts` (tras el ajuste feliz, la fila del producto en el listado muestra `INITIAL_STOCK + HAPPY_DELTA` con su unidad) |
+
+## 15. Enmienda del 2026-09-18: QC-121 cubre el ajuste de QC-92
+
+**Motivo.** El spec aprobado suponía que QC-92 entraría **después** y «heredaría la obligación de
+recalcular `products.stock`» (D4, §5, §13.7). QC-92 entró **antes** (PR #91). El humano decidió el
+2026-09-18: «Sí, QC-121 cubre el ajuste». La tabla de decisiones no se reescribe: la sustitución
+queda en una nota bajo la tabla de `requirements.md`; **la fila formal la añade el leader si el
+humano lo pide**.
+
+**Qué cambia del plan aprobado.**
+
+- Requisitos nuevos **R29–R34** (sin renumerar R1–R28); tasks nuevas **T14** (el ajuste recalcula)
+  y **T15** (condicional a la pregunta abierta 2); T2, T3, T4, T10, T11, T12 y T13 ajustadas.
+- Cifras corregidas: catálogo **49 → 50** (no 46 → 47) y **novena** enmienda (no séptima);
+  índices de listado **34 → 35** (no 33 → 34); caminos de escritura de lotes **tres** (no dos).
+- Migración: **cambia de timestamp** (colisión con QC-92 en `20260918120000`).
+
+**Requiere aprobación humana (F1.4 de la enmienda).**
+
+1. **R32 — el ajuste no toca `updated_at` del producto.** Extiende al ajuste lo que R11 fija para
+   el alta. Hoy (QC-92) el ajuste tampoco lo toca, así que es conservar el comportamiento, pero
+   ninguna decisión lo dice para el ajuste. Consecuencia: ajustar no mueve el producto en el orden
+   por «última modificación».
+2. **R34 — el E2E del ajuste pasa a afirmar la existencia del listado.** Se amplía
+   `e2e/ajuste-de-inventario.spec.ts` (de QC-92) en vez de crear otro archivo. D13 sólo exigía el
+   caso de las dos filas.
+3. **§5.1 — orden de bloqueo producto → lote en el ajuste**, que cambia el cuerpo de
+   `adjustBatchStock` más allá de añadir una llamada (alternativa 7 descartada).
+4. **Pregunta abierta 2** — si el panel de lotes se titula «nombre · unidad» (T15 sólo si sí).
+5. **Pregunta abierta 3** — el ajuste de un lote de producto dado de baja se sigue aceptando.
+6. **Redacción de la novena enmienda sin clave de ficha** (§8), con la octava como precedente.
+7. **Timestamp de la migración** (§11): el implementer lo mide; propuesta `20260918130000`.
+
+**Archivos que se AÑADEN respecto al spec aprobado** (a tocar; ninguno se crea salvo que se diga):
+
+| Archivo | Por qué | Task |
+|---|---|---|
+| `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts` → `adjustBatchStock` | bloqueo + recálculo (ya estaba el archivo; se añade la función) | T14 |
+| `lib/modules/inventario/ports/product-repository.ts:123-141` | comentario del ajuste | T14 |
+| tests unitarios de `adjustBatchStock` en `tests/unit/inventario/` (nombre a medir) | la `tx` simulada gana el `SELECT` y el recálculo | T14 |
+| `tests/integration/inventario/inventory-movements-constraints.int.test.ts` | fixture con unidad | T4 |
+| `tests/integration/inventario/ledger-cuadre.int.test.ts` | fixture del caso R30 de QC-92 con unidad | T4 |
+| `e2e/ajuste-de-inventario.spec.ts` | fixture con unidad (T4) y aserción de R34 (T11) | T4, T11 |
+| `tests/unit/errores/catalogo.test.ts` | 49 → 50 y caso de la novena | T2 (ya estaba; cambia la cifra) |
+| `tests/integration/inventario/list-query-indexes.int.test.ts` | 34 → 35 | T3 (ya estaba; cambia la cifra) |
+| `app/(private)/inventario/components/product-table.tsx` | sólo si se aprueba la pregunta abierta 2 | T15 |
+
+**Lo que se comprobó que NO hace falta tocar**: el caso de uso `adjust-batch-stock.ts`, la action
+`batch-actions.ts`, el diálogo de ajuste (ya hace `router.refresh()`), `batch-movement-prisma.ts`,
+`inventory-movement.ts`, `movement-ledger.ts`, las dos migraciones del libro,
+`product-batches-panel.tsx` y `guard-libro-de-inventario.test.ts`. El libro no gana unidad: la de
+cada asiento es la de la presentación de su lote, y el disparador de §4.2 la iguala a la del
+producto.
