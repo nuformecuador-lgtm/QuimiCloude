@@ -232,15 +232,15 @@ así que solo la consulta real contra Postgres demuestra que nadie filtra por ve
 | R8 | Ni orden ni filtro por existencia; si llegan, se ignoran sin fallar | `tests/unit/inventario/list-query.test.ts:178`; `tests/unit/inventario/list-use-cases.test.ts:172`; `tests/unit/inventario/product-list-params.test.ts:176` |
 | R9 | La edición no muestra la existencia y la rechaza si llega | `tests/unit/inventario/product-input.test.ts:243`; `tests/unit/inventario/product-actions.test.ts:462`; `tests/unit/inventario/product-field.test.tsx:77`; `tests/unit/inventario/product-page.test.tsx:1057` |
 | R10 | El alta escribe la existencia solo en el lote | `tests/unit/inventario/product-batch-input.test.ts:335`; `tests/unit/inventario/product-field.test.tsx:77` |
-| R11 | No queda lectura ni escritura de la existencia del producto; entrega en una unidad | `tests/unit/inventario/qc91-alcance.test.ts:261`, `:268`, `:274`, `:290`, `:297`, `:315`; `tests/unit/inventario/product-prisma.test.ts:73`; `tests/unit/inventario/product-catalog.test.ts:39` |
-| R12 | El restante resta sobre la existencia de la unidad de la línea | `tests/unit/recetas/recipe-service.test.ts:392`; `tests/unit/pedidos-ui/order-form.test.tsx:728` |
-| R13 | Con lotes pero ninguno en esa unidad: marcador en existencia y restante | `tests/unit/recetas/recipe-service.test.ts:403`; `tests/unit/pedidos-ui/order-form.test.tsx:743` |
-| R14 | Sin lotes: existencia 0, restante calculado y en rojo si es negativo | `tests/unit/recetas/recipe-service.test.ts:414`; `tests/unit/pedidos-ui/order-form.test.tsx:758`; `tests/unit/inventario/product-prisma.test.ts:109` |
-| R15 | El detalle de receta expone la existencia de la unidad de la línea | `tests/unit/recetas/recipe-service.test.ts:425` (con `:392`, `:403`, `:414`) |
+| R11 | No queda lectura ni escritura de la existencia del producto; entrega en una unidad | `tests/unit/inventario/qc91-alcance.test.ts:261`, `:268`, `:274`, `:290`, `:297`, `:315`; `tests/unit/inventario/product-prisma.test.ts:73`; `tests/unit/inventario/product-catalog.test.ts:46` |
+| R12 | El restante resta sobre la existencia de la unidad de la línea | `tests/unit/recetas/recipe-service.test.ts:411`; `tests/unit/pedidos-ui/order-form.test.tsx:728` |
+| R13 | Con lotes pero ninguno en esa unidad: marcador en existencia y restante | `tests/unit/recetas/recipe-service.test.ts:422`; `tests/unit/pedidos-ui/order-form.test.tsx:743` |
+| R14 | Sin lotes: existencia 0, restante calculado y en rojo si es negativo | `tests/unit/recetas/recipe-service.test.ts:433`; `tests/unit/pedidos-ui/order-form.test.tsx:758`; `tests/unit/inventario/product-prisma.test.ts:109` |
+| R15 | El detalle de receta expone la existencia de la unidad de la línea | `tests/unit/recetas/recipe-service.test.ts:444` (con `:411`, `:422`, `:433`) |
 | R16 | La alerta compara contra la existencia del lote más reciente | `tests/unit/inventario/product-page.test.tsx:629`, `:703` |
 | R17 | Sin lotes y con alerta configurada: se marca | `tests/unit/inventario/product-page.test.tsx:670` |
 | R18 | Sin alerta configurada: no se marca | `tests/unit/inventario/product-page.test.tsx:682` |
-| R19 | Los dos permisos de consulta, validados en el service | `tests/unit/inventario/authorization.test.ts:485`; `tests/unit/recetas/recipe-service.test.ts:433` |
+| R19 | Los dos permisos de consulta, validados en el service | `tests/unit/inventario/authorization.test.ts:485`; `tests/unit/recetas/recipe-service.test.ts:452` |
 | R20 | Se calcula sobre el esquema de lote de QC-81, con correlativo del backend | `e2e/inventario.spec.ts:636` |
 | R21 | No se borra ni modifica ninguna fila de lote | `tests/unit/inventario/qc91-alcance.test.ts:355`, `:361`, `:365`, `:369` |
 | R22 | Un segundo lote sube la existencia del listado, con E2E | `e2e/inventario.spec.ts:636` |
@@ -306,3 +306,45 @@ lotes del producto.»
 
 **T13 marcada**: el gate completo salió verde (497 archivos, 7249 passed, 0 rojos). Las 13 tasks
 quedan `[x]`.
+
+## F2.3 — sincronización con `dev`
+
+`39549c5` (merge) · `d982578` (arreglo de dobles). `dev` había avanzado **104 commits**, con
+**QC-50** y **QC-63** dentro y 10 archivos en común.
+
+**Dos conflictos, los dos resueltos sin ambigüedad:**
+
+1. `tests/guards/guard-identificador-de-request.test.ts` — unión de `MIGRACIONES_ESPERADAS`: quedan
+   las dos entradas en orden cronológico, la de `dev` y la nuestra, con sus comentarios.
+2. `lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma.ts` — **el ámbito de
+   empresa de `dev` se queda entero** y se le suma nuestro `sumStockByUnit`. **QC-50 cerró la
+   excepción de QC-49 que esta ficha dejó expresamente sin tocar**: `findProductRefs` ya recibe
+   `companyId`. No se deshizo nada de eso. De paso hubo que separar el tipo de la fila cruda de
+   Prisma (con `batches`) del que consume `toProductRef` (con `stockByUnit` ya sumado): venían
+   declarados como el mismo tipo y no compilaba.
+
+**Los cuatro sitios de lupa, verificados uno a uno:** `model Product` **no** recobró la columna
+`stock`; la acotación de la guardia de `recetas-ui` (`dfe1a9a`) **sobrevivió** al merge y `dev` no la
+había arreglado por su cuenta —trae además sus propias entradas de QC-50 en las listas permitidas—;
+`get-recipe.ts` conserva **los dos** cambios (`findRefs(ids, actor.companyId)` de QC-50 y la elección
+de la existencia por unidad de la línea de QC-91); y `ProductCatalog.findRefs` quedó con la firma de
+`dev` y nuestro `stockByUnit`.
+
+**Migraciones**: `pnpm run db:migrate` → `32 migrations found` · `No pending migrations to apply`, y
+`prisma migrate status` → `Database schema is up to date!`. La base de la feature ya las tenía.
+
+**Cuatro roturas que git NO marcó como conflicto** y salieron al verificar, todas mecánicas: dobles de
+`ProductRef` con la forma vieja (`stock`) en `tests/unit/asignaciones/` —módulo nuevo de `dev`— y en
+`product-catalog.test.ts`, y un `Actor` sin `companyId` en `recipe-service.test.ts`. Van en `d982578`,
+aparte del merge. Se declaran porque nacen del cruce de dos fichas, no de una sola.
+
+**Verificación tras el merge**: `pnpm typecheck` limpio · `pnpm lint` limpio ·
+`vitest related` sobre los archivos en común → **159 archivos, 2471 passed, 1 skipped, 0 fallos**.
+
+**Re-comprobado tras el merge, porque la base del diff cambió**: 0 citas de ficha o requisito en
+comentarios de producción, y `package.json`/`pnpm-lock.yaml` **sin tocar** (R23).
+
+**El mapa `R<n> -> test` se re-midió**: el merge desplazó líneas en dos archivos.
+`recipe-service.test.ts` pasó de `392/403/414/425/433` a **`411/422/433/444/452`** y
+`product-catalog.test.ts` de `39` a **`46`**. La tabla de T12 queda corregida; los demás
+`archivo:línea` no se movieron.
