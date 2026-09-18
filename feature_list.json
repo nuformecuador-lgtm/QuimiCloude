@@ -1636,7 +1636,7 @@
       "description": "Procesa un PDF segun una ESTRATEGIA elegida por un enum: catalogo | formula.\n\n* catalogo: procesa el PDF como IMAGEN.\n* formula: procesa el PDF como TEXTO.\n\nLas dos pasan por la lectura con IA (lectura-de-pdf-con-gemini).\n\nCAMBIO DEL 2026-09-14 (decidido por el humano): la estrategia SE EJECUTA DENTRO DEL TRABAJO DE LA COLA (procesamiento-de-pdf-en-cola), no por llamada directa.\n\nRETORNO, POR AHORA: solo un console.log con el resultado.\n\nPROMPTS: se crean los archivos de prompt de cada estrategia (catalogo y formula) con el CONTENIDO VACIO; el texto se escribe mas adelante. Decidido por el humano el 2026-09-14.\n\nLO QUE NO ENTRA: la cola que la ejecuta (procesamiento-de-pdf-en-cola), guardar o devolver el resultado de forma estructurada, y el recorte de imagenes (recorte-de-imagenes-del-pdf).",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
+      "complexity": "medium",
       "zone": "backend",
       "branch": "feature/QC-109-procesamiento-de-pdf-por-estrategia",
       "depends_on": [
