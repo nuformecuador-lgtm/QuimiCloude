@@ -219,6 +219,10 @@ export const MIGRACIONES_ESPERADAS = [
   // `inventory_movements.kind` en enum y acota `reason` a su catalogo no persiste el identificador
   // de peticion ni lo menciona; se nombra aqui a mano y la lista sigue CERRADA para la siguiente.
   '20260918120000_inventory_movement_kind_enum_and_reason_catalog',
+  // Alta con el mismo patron que las anteriores: la migracion que devuelve la unidad y la
+  // existencia guardada al producto no persiste el identificador de peticion ni lo menciona; se
+  // nombra aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260918130000_product_unit_and_stored_stock',
 ] as const
 
 export function hallazgosDeMigraciones(

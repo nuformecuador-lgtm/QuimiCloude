@@ -262,16 +262,21 @@ model Presentation {
   @@map("presentations")
 }
 
-/// `name` no es unico, a proposito: dos productos pueden llamarse igual. La unidad no se guarda: se
-/// deriva de la presentacion del lote mas reciente. `companyId` no lleva `@relation` porque
-/// `Company` es de otro modulo; su FK esta escrita a mano y es drift, y su indice no es parcial
-/// porque el RESTRICT tiene que ver tambien los productos dados de baja. Los indices de busqueda
-/// son parciales o GIN y viven en la migracion `list_query_indexes`.
+/// `name` no es unico, a proposito: dos productos pueden llamarse igual. La unidad se guarda en
+/// `unitId`, fija desde el primer lote, y ya no se deriva del lote mas reciente. `unitId` no lleva
+/// `@relation` porque `Unit` es de otro modulo; su FK esta escrita a mano y es drift, igual que su
+/// indice. `stock` la mantiene la aplicacion al escribir lotes, nunca un disparador.
+/// `companyId` no lleva `@relation` porque `Company` es de otro modulo; su FK esta escrita a mano
+/// y es drift, y su indice no es parcial porque el RESTRICT tiene que ver tambien los productos
+/// dados de baja. `products_stock_idx` es parcial y vive en la migracion, no aqui: Prisma no
+/// modela indices parciales.
 /// @module inventario
 model Product {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name           String
   nameNormalized String    @map("name_normalized")
+  unitId         String?   @map("unit_id") @db.Uuid
+  stock          Int       @default(0)
   qtyAlert       Int?      @map("qty_alert")
   imagePath      String?   @map("image_path")
   companyId      String    @map("company_id") @db.Uuid
@@ -282,6 +287,7 @@ model Product {
   batches ProductBatch[]
 
   @@index([companyId], map: "products_company_id_idx")
+  @@index([unitId], map: "products_unit_id_idx")
   @@map("products")
 }
 

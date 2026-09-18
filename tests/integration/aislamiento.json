@@ -22,6 +22,7 @@
     "inventario/inventory-movements-constraints.int.test.ts",
     "inventario/presentation-uniqueness.int.test.ts",
     "inventario/product-batch-write.int.test.ts",
+    "inventario/product-unit.int.test.ts",
     "pedidos/company-scope.int.test.ts",
     "pedidos/order-crud.int.test.ts",
     "pedidos/pedidos-constraints.int.test.ts",
