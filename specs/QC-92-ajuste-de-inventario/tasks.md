@@ -259,7 +259,7 @@
 
 ## Tanda 6 — que el libro y el `stock` no se separen
 
-- [ ] **T14 — Guardia del censo de escrituras.** Depende de T6.
+- [x] **T14 — Guardia del censo de escrituras.** Depende de T6.
       `tests/guards/`, no `tests/unit/`: ningún grafo de imports la relacionaría con un cambio.
       Afirma **en positivo** que los caminos de escritura de `product_batches` bajo `lib/` son
       exactamente `{ createWithFirstBatch, addBatchToAlive, adjustBatchStock }` y que **cada uno**
@@ -268,7 +268,7 @@
       asiento; verde sobre el árbol real. **Cubre R28.**
       **Archivos:** `tests/guards/guard-libro-de-inventario.test.ts`.
 
-- [ ] **T15 — El cuadre, con su excepción escrita.** Depende de T6 y T3.
+- [x] **T15 — El cuadre, con su excepción escrita.** Depende de T6 y T3.
       Test de integración: para todo lote con `created_at >= LEDGER_START`, `stock` = suma de sus
       asientos. Los anteriores quedan **exceptuados de forma permanente**, y la excepción va escrita
       **en el propio test** —con su razón y con la frase de que a esos los cubre T14, no este

@@ -106,6 +106,11 @@
       "desde": "2026-09-12"
     },
     {
+      "archivo": "inventario/ledger-cuadre.int.test.ts",
+      "motivo": "QC-92 T15: llama a 'createWithFirstBatch', 'addBatchToAlive' y 'adjustBatchStock' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL y abren cada uno SU PROPIA 'prisma.$transaction', asi que envolverlos en una transaccion del test seria aislamiento de mentira -correrian en otra conexion del pool y no verian las filas del fixture-. Cada caso fabrica su empresa efimera con randomUUID, escribe solo en ella y la limpia en un 'finally' en orden de FK (asientos -> lotes -> productos -> presentacion -> usuario). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-18"
+    },
+    {
       "archivo": "inventario/list-query-indexes.int.test.ts",
       "motivo": "Nacido antes de QC-77 (QC-57 T5/T6): afirma sobre el estado RESULTANTE de la migracion '20260904160000_list_query_indexes' -que pg_trgm existe, que los indices se aplicaron- y recorre TODAS las filas de products para comprobar el backfill de 'name_normalized'. Eso es una lectura del catalogo del motor y del contenido entero de una tabla, no algo que una transaccion del test pueda deshacer.",
       "desde": "2026-09-12"

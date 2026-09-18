@@ -806,3 +806,104 @@ pnpm exec vitest run tests/unit/inventario/
 ```
 
 `typecheck` y `lint` verdes. **Cero rojos.**
+
+---
+
+## Tanda 6 — T14 y T15: el libro y el `stock` no se separan. **Las dos, porque D12 exige las dos**
+
+Censo de **fuentes** y cuadre de **datos** son complementarios y ninguno solo responde a D12: la
+guardia no ve si el asiento lleva la `tx` y el delta correctos; el cuadre no ve un lote anterior al
+corte al que un camino futuro le olvide el asiento.
+
+### T14 — `tests/guards/guard-libro-de-inventario.test.ts`
+
+**En `tests/guards/` y no en `tests/unit/`, deliberadamente**, y el nombre empieza por `guard-`:
+barre `lib/` como **texto**, así que ningún grafo de imports la relaciona con un cambio y solo la ve
+el bloque de guardias, que el gate corre **siempre**. Es la lección que esta ficha ya pagó con
+`tests/unit/inventario/schema/inventario-schema.test.ts` —cuatro rojos invisibles durante tres
+tandas—; no se repite el patrón.
+
+Afirma **en positivo**: el censo de caminos de escritura de `product_batches` bajo `lib/` es
+**exactamente** `{ createWithFirstBatch, addBatchToAlive, adjustBatchStock }` —comparado con
+`toEqual`, no con `toContain`, y etiquetando cada hallazgo como `archivo::funcion`—, y el **cuerpo de
+cada uno** contiene `writeMovement(`. Autoprueba de vacuidad: si el recorrido no encuentra fuentes o
+el lector no encuentra un cuerpo, la guardia se pone **roja**, no muda. Detectores probados con
+fuentes fabricadas: un cuarto camino, un `update` fuera de toda función exportada, un camino sin su
+asiento, y el `writeMovement` **movido a otra función** —que no cuenta como asiento del camino
+pedido—.
+
+**La mordida, medida por mí sobre el árbol real** (no solo sobre fuentes fabricadas): quité a mano el
+`writeMovement` del alta de `createWithFirstBatch` en `product-prisma.ts`:
+
+```
+× el camino createWithFirstBatch de product-prisma.ts asienta con writeMovement(
+AssertionError: …product-prisma.ts :: createWithFirstBatch no contiene una llamada a writeMovement(
+  dentro de su cuerpo …: cambia la existencia de un lote sin dejar su asiento.
+Tests  1 failed | 12 passed (13)
+```
+
+Restaurado con `git checkout --`; `git status --porcelain` sin diff sobre ese archivo y los tres
+`writeMovement` de vuelta.
+
+En su cabecera queda escrito **lo que esta guardia NO puede ver**, para que nadie la sobreestime:
+que `writeMovement` se llame con la `tx` correcta y con el mismo delta que el `UPDATE`. Eso es del
+cuadre, no de ella.
+
+### T15 — `tests/integration/inventario/ledger-cuadre.int.test.ts`
+
+Para todo lote con `created_at >= LEDGER_START` —importado de `movement-ledger.ts`, **no reescrito a
+mano**—, `stock` = suma de sus asientos. Cinco casos: alta de producto nuevo, lote añadido a producto
+vivo, lote ajustado (suma y resta), **descuadre por SQL crudo sin asiento** —que el cuadre **detecta**,
+y es lo que demuestra que el test sirve y no solo mira datos que él mismo acaba de escribir bien— y
+la excepción.
+
+**La excepción, escrita en el propio test y no en un JSON:** los lotes anteriores a `LEDGER_START`
+quedan fuera **de forma permanente**, con su razón —el libro empieza ahí y no hay asientos
+retroactivos— y con la frase de que **a esos los cubre la guardia de T14, no este test**.
+
+**Y el corte es la FECHA, no «cero asientos»**, que es donde estaba el agujero: el último caso
+fabrica el **mismo** lote sin asientos a los dos lados del corte —antes: pasa; después: el cuadre lo
+caza—. Si la regla fuera «sin asientos, exceptuado», el segundo pasaría en silencio.
+
+**Aislamiento:** fila en la lista **`commit`** de `tests/integration/aislamiento.json`, con `motivo` y
+`desde` —esa categoría sí los admite; la de `transaccion` no, como midió la tanda 1—. La razón va
+escrita: los tres caminos usan el cliente Prisma **global** y abren cada uno **su propia**
+`prisma.$transaction`, así que envolverlos en la transacción del test sería aislamiento de mentira.
+Mismo patrón y misma lista que su vecino `product-batch-write.int.test.ts`. Cada caso fabrica su
+empresa efímera y limpia en `finally` en orden de FK.
+
+### Salida real del gate
+
+```
+./init.sh --rapido
+[test:rapido] tests relacionados con 56 archivo(s) del diff vs origin/dev
+  Test Files  353 passed (353)
+       Tests  5249 passed | 26 skipped (5275)
+[test:rapido] todas las guardias
+  Test Files  44 passed (44)        <- 43 + la guardia nueva de T14
+       Tests  528 passed | 9 skipped (537)
+✓ test:rapido paso · ✓ todas las migraciones tienen down.sql · == init OK ==
+```
+
+A mano, las dos cosas que el rápido podría no seleccionar:
+
+```
+pnpm exec vitest run tests/unit/inventario/
+  Test Files  47 passed (47) · Tests  725 passed | 5 skipped (730)
+
+pnpm exec vitest run tests/integration/inventario/ledger-cuadre.int.test.ts
+  Test Files  1 passed (1) · Tests  5 passed (5)
+```
+
+`typecheck` y `lint` verdes. **Cero rojos; ningún hallazgo:** el cuadre no encontró ningún descuadre
+real y el censo no encontró ningún cuarto camino de escritura.
+
+### Desviaciones de la tanda 6
+
+**Ninguna.** Las dos tasks se hicieron con los archivos que listaban, sin tocar producción, ni
+migraciones, ni ninguna guardia ajena.
+
+### Estado
+
+**T13bis, T13, T14 y T15 marcadas `[x]`.** Quedan **T16** (E2E a mano, lo coordina el leader) y
+**T17** (trazabilidad + gate completo). **Parada aquí, como estaba mandado.**
