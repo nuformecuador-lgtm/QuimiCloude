@@ -20,7 +20,7 @@
  *
  * QC-68 (2026-09-17): sumo su propio bloque de casos, con sus propias recetas efimeras, que
  * ejercitan la busqueda real contra Postgres (`findRecipeIdsMatchingName` + `listAliveOrders`
- * con el tercer argumento).
+ * con el argumento `recipeIds`).
  *
  * Cubre R7, R10, R11, R13, R14, R15, R17, R25 y R29.
  */
@@ -234,14 +234,15 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
 
     // Orden de HOY: `priority DESC, created_at ASC, ...`. Todas comparten prioridad, asi que el
     // ultimo sembrado -el `created_at` mas alto- cae en la pagina 3 con paginas de cinco.
-    const pagina3 = await listAliveOrders(consulta({ page: 3, pageSize: 5 }), scope())
+    const pagina3 = await listAliveOrders(consulta({ page: 3, pageSize: 5 }), null, scope())
     expect(pagina3.items.map((o) => o.id)).toContain(ultimo)
-    const pagina1 = await listAliveOrders(consulta({ page: 1, pageSize: 5 }), scope())
+    const pagina1 = await listAliveOrders(consulta({ page: 1, pageSize: 5 }), null, scope())
     expect(pagina1.items.map((o) => o.id)).not.toContain(ultimo)
 
     // Pidiendo el orden inverso por el correlativo, la MISMA fila sale en la pagina 1.
     const desc = await listAliveOrders(
       consulta({ page: 1, pageSize: 5, sort: { columnId: 'orderNumber', direction: 'desc' } }),
+      null,
       scope(),
     )
     expect(desc.items[0]?.id).toBe(ultimo)
@@ -255,6 +256,7 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
         pageSize: 5,
         filters: conFiltros({ quantity: { kind: 'numberRange', min: 12, max: 12 } }),
       }),
+      null,
       scope(),
     )
 
@@ -265,7 +267,7 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
 
   it('pedir 100 por pagina se ACOTA a 25, no se rechaza (R29)', async () => {
     // R29 — acotar, no rechazar. El `pageSize` que sale es el efectivo, nunca el pedido.
-    const pagina = await listAliveOrders(consulta({ page: 1, pageSize: 100 }), scope())
+    const pagina = await listAliveOrders(consulta({ page: 1, pageSize: 100 }), null, scope())
 
     expect(pagina.pageSize).toBe(MAX_PAGE_SIZE)
     expect(pagina.items.length).toBeLessThanOrEqual(MAX_PAGE_SIZE)
@@ -305,8 +307,8 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R10, R15)', () =
     const recipeIds = await findRecipeIdsMatchingName(search, companyId)
     return listAliveOrders(
       consulta({ pageSize, search, filters: soloElDia21 }),
-      scope(),
       recipeIds,
+      scope(),
     )
   }
 
@@ -404,17 +406,18 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R10, R15)', () =
 
     const conRecipeIdsNull = await listAliveOrders(
       consulta({ pageSize: 25, filters: soloElDia21 }),
-      scope(),
       recipeIds,
+      scope(),
     )
-    const sinTercerArgumento = await listAliveOrders(
+    const conNullExplicito = await listAliveOrders(
       consulta({ pageSize: 25, filters: soloElDia21 }),
+      null,
       scope(),
     )
 
-    expect(conRecipeIdsNull.total).toBe(sinTercerArgumento.total)
+    expect(conRecipeIdsNull.total).toBe(conNullExplicito.total)
     expect(conRecipeIdsNull.items.map((o) => o.id)).toEqual(
-      sinTercerArgumento.items.map((o) => o.id),
+      conNullExplicito.items.map((o) => o.id),
     )
   })
 })
@@ -443,6 +446,7 @@ describe('`priority` ordena por el ORDEN DEL ENUM, no por el alfabetico', () => 
           },
         }),
       }),
+      null,
       scope(),
     )
 
@@ -464,6 +468,7 @@ describe('`priority` ordena por el ORDEN DEL ENUM, no por el alfabetico', () => 
           },
         }),
       }),
+      null,
       scope(),
     )
 
@@ -479,6 +484,7 @@ describe('`orderNumber` ordena por el par (ano, correlativo) y no alfabeticament
     // correlativos van del 1 en adelante y cruzan el 9 -> 10.
     const pagina = await listAliveOrders(
       consulta({ pageSize: 25, sort: { columnId: 'orderNumber', direction: 'asc' } }),
+      null,
       scope(),
     )
 
@@ -513,6 +519,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
         pageSize: 25,
         filters: soloElDia9({ status: { kind: 'select', values: ['EN_CURSO'] } }),
       }),
+      null,
       scope(),
     )
     expect(porEstado.total).toBe(2)
@@ -523,6 +530,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
         pageSize: 25,
         filters: soloElDia9({ priority: { kind: 'select', values: ['ALTA'] } }),
       }),
+      null,
       scope(),
     )
     expect(porPrioridad.total).toBe(2)
@@ -536,6 +544,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
           priority: { kind: 'select', values: ['ALTA'] },
         }),
       }),
+      null,
       scope(),
     )
     expect(ambos.total).toBe(1)
@@ -551,6 +560,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
           status: { kind: 'select', values: ['EN_CURSO', 'PENDIENTE'] },
         }),
       }),
+      null,
       scope(),
     )
 
@@ -584,7 +594,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
     })
 
     // Sin filtro de estado: el cancelado SALE y el borrado NO, aunque los dos son del dia 14.
-    const todos = await listAliveOrders(consulta({ pageSize: 25, filters: soloElDia14() }), scope())
+    const todos = await listAliveOrders(consulta({ pageSize: 25, filters: soloElDia14() }), null, scope())
     expect(todos.items.map((o) => o.id)).toEqual([cancelado.id])
     expect(todos.total).toBe(1)
 
@@ -594,6 +604,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
         pageSize: 25,
         filters: soloElDia14({ status: { kind: 'select', values: ['CANCELADO'] } }),
       }),
+      null,
       scope(),
     )
     expect(pagina.items.map((o) => o.id)).toEqual([cancelado.id])
@@ -626,6 +637,7 @@ describe('los decimales se comparan como Decimal, no como coma flotante', () => 
           quantity: { kind: 'numberRange', min: null, max: 19.99 },
         },
       }),
+      null,
       scope(),
     )
 
@@ -656,6 +668,7 @@ describe('el rango de fechas se compara en UTC, con los dos extremos inclusivos'
           },
         },
       }),
+      null,
       scope(),
     )
 
@@ -691,6 +704,7 @@ describe('desempate estable por identificador (R10)', () => {
           sort: { columnId: 'status', direction: 'asc' },
           filters: soloElDia28,
         }),
+        null,
         scope(),
       )
       vistos.push(...pagina.items.map((o) => o.id))

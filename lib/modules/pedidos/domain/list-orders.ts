@@ -145,7 +145,7 @@ export function createListOrders(
         ? null
         : await deps.recipes.findIdsMatchingName(podada.query.search, actor.companyId);
 
-    const page = await deps.orders.listAlive(podada.query, scope, searchRecipeIds);
+    const page = await deps.orders.listAlive(podada.query, searchRecipeIds, scope);
 
     // R45: los ids se DEDUPLICAN antes de preguntar. Diez pedidos de la misma receta son UNA
     // sola entrada, y el numero de consultas no crece con el numero de filas.

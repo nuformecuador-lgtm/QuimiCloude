@@ -85,8 +85,8 @@ export interface OrderRepository {
    */
   listAlive(
     query: ListQuery,
-    scope: OrderScope,
     recipeIds: readonly string[] | null,
+    scope: OrderScope,
   ): Promise<Page<OrderRow>>;
 
   /** Edicion como REEMPLAZO COMPLETO (R20). No puede escribir `CANCELADO` ni motivo. */

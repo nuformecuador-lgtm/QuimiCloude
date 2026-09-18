@@ -256,8 +256,8 @@ async function limpiar(creados: readonly string[]): Promise<void> {
  */
 type FiltrosDePrueba = { readonly status?: OrderStatus; readonly priority?: OrderPriority }
 
-/** Los filtros de prueba + la pagina -> el CONTRATO GENERICO que el adaptador espera. Sin
- *  orden y sin busqueda: es exactamente la lista de siempre (R11, R17). */
+/** Los filtros de prueba + la pagina -> el CONTRATO GENERICO que el adaptador espera. Estas
+ *  llamadas no piden orden ni busqueda: es exactamente la lista de siempre (R11). */
 function consulta(
   filtros: FiltrosDePrueba = {},
   pagina: { readonly page?: number; readonly pageSize?: number } = {},
@@ -285,10 +285,10 @@ function consulta(
  * por este archivo, y cada caso filtra despues por SUS ids.
  */
 async function recorrerTodo(filtros: FiltrosDePrueba = {}): Promise<readonly OrderRow[]> {
-  const primera = await listAliveOrders(consulta(filtros, { pageSize: MAX_PAGE_SIZE }), scope())
+  const primera = await listAliveOrders(consulta(filtros, { pageSize: MAX_PAGE_SIZE }), null, scope())
   const items = [...primera.items]
   for (let page = 2; page <= primera.totalPages; page += 1) {
-    const siguiente = await listAliveOrders(consulta(filtros, { page, pageSize: MAX_PAGE_SIZE }), scope())
+    const siguiente = await listAliveOrders(consulta(filtros, { page, pageSize: MAX_PAGE_SIZE }), null, scope())
     items.push(...siguiente.items)
   }
   return items
@@ -390,7 +390,7 @@ describe('R35 — el tamano de pagina: defecto de 10 y tope de 25', () => {
       expect(creados).toHaveLength(cuantos)
 
       // (a) `pageSize` OMITIDO -> el defecto, en los elementos Y en la pagina.
-      const porDefecto = await listAliveOrders(consulta(), scope())
+      const porDefecto = await listAliveOrders(consulta(), null, scope())
       const totalVivos = await contarVivos()
       expect(porDefecto.items).toHaveLength(DEFAULT_PAGE_SIZE)
       expect(porDefecto.pageSize).toBe(DEFAULT_PAGE_SIZE)
@@ -404,7 +404,7 @@ describe('R35 — el tamano de pagina: defecto de 10 y tope de 25', () => {
       // el `query.pageSize`, que es el error contra el que avisa el propio adaptador —con el
       // pedido, `totalPages` mentiria aunque el `LIMIT` de SQL fuera correcto—.
       const pedida = 100
-      const acotada = await listAliveOrders(consulta({}, { pageSize: pedida }), scope())
+      const acotada = await listAliveOrders(consulta({}, { pageSize: pedida }), null, scope())
       expect(acotada.items).toHaveLength(MAX_PAGE_SIZE)
       expect(acotada.pageSize).toBe(MAX_PAGE_SIZE)
       expect(acotada.pageSize).not.toBe(pedida)
@@ -417,7 +417,7 @@ describe('R35 — el tamano de pagina: defecto de 10 y tope de 25', () => {
       expect(toOffsetLimit(1, undefined).limit).toBe(DEFAULT_PAGE_SIZE)
 
       // La consulta NUNCA sale sin limite superior: ni pidiendo un tamano absurdo.
-      const absurda = await listAliveOrders(consulta({}, { pageSize: 999_999 }), scope())
+      const absurda = await listAliveOrders(consulta({}, { pageSize: 999_999 }), null, scope())
       expect(absurda.items.length).toBeLessThanOrEqual(MAX_PAGE_SIZE)
       expect(absurda.pageSize).toBe(MAX_PAGE_SIZE)
     } finally {
@@ -568,14 +568,14 @@ describe('R34/R38 — el `total` es el de los filtros, no el de la pagina', () =
       })
 
       // R34: pagina de DOS sobre seis pedidos propios. El `total` no es 2.
-      const pagina = await listAliveOrders(consulta({}, { pageSize: 2 }), scope())
+      const pagina = await listAliveOrders(consulta({}, { pageSize: 2 }), null, scope())
       expect(pagina.items).toHaveLength(2)
       expect(pagina.total).toBe(await contarVivos())
       expect(pagina.total).toBeGreaterThanOrEqual(creados.length)
       expect(pagina.total).toBeGreaterThan(pagina.items.length)
 
       // R38, filtro suelto por estado.
-      const porEstado = await listAliveOrders(consulta({ status: 'EN_CURSO' }), scope())
+      const porEstado = await listAliveOrders(consulta({ status: 'EN_CURSO' }), null, scope())
       expect(porEstado.total).toBe(await contarVivos({ status: 'EN_CURSO' }))
       expect(porEstado.items.every((row) => row.status === 'EN_CURSO')).toBe(true)
       const mismosEstado = (await recorrerTodo({ status: 'EN_CURSO' })).filter((row) =>
@@ -584,7 +584,7 @@ describe('R34/R38 — el `total` es el de los filtros, no el de la pagina', () =
       expect(mismosEstado).toHaveLength(3)
 
       // R38, filtro suelto por prioridad.
-      const porPrioridad = await listAliveOrders(consulta({ priority: 'ALTA' }), scope())
+      const porPrioridad = await listAliveOrders(consulta({ priority: 'ALTA' }), null, scope())
       expect(porPrioridad.total).toBe(await contarVivos({ priority: 'ALTA' }))
       expect(porPrioridad.items.every((row) => row.priority === 'ALTA')).toBe(true)
       const mismosPrioridad = (await recorrerTodo({ priority: 'ALTA' })).filter((row) =>
@@ -594,7 +594,7 @@ describe('R34/R38 — el `total` es el de los filtros, no el de la pagina', () =
 
       // R38, los dos COMBINADOS: el `and`, no el `or`.
       const combinado = { status: 'EN_CURSO', priority: 'ALTA' } as const
-      const ambos = await listAliveOrders(consulta(combinado), scope())
+      const ambos = await listAliveOrders(consulta(combinado), null, scope())
       expect(ambos.total).toBe(await contarVivos(combinado))
       const mismosAmbos = (await recorrerTodo(combinado)).filter((row) => creados.includes(row.id))
       expect(mismosAmbos).toHaveLength(2)

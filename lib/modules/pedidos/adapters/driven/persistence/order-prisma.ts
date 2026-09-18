@@ -425,8 +425,8 @@ function orderFilterWhere(field: string, value: ListFilterValue): Prisma.OrderWh
  */
 export function buildOrderWhere(
   query: ListQuery,
-  scope: OrderScope,
   recipeIds: readonly string[] | null,
+  scope: OrderScope,
 ): Prisma.OrderWhereInput {
   const filters = Object.entries(query.filters)
     .map(([field, value]) => orderFilterWhere(field, value))
@@ -463,17 +463,16 @@ export function buildOrderWhere(
  * `total` sale de un `count` con el MISMO `where` que el `findMany` (R14) -literalmente la
  * misma constante, no dos copias parecidas-.
  *
- * `recipeIds` lleva `= null` por defecto: ese defecto significa «sin busqueda, no acotar
- * nada», que es el estado de las llamadas de los tests de integracion de pedidos que no
- * hablan de busqueda.
+ * `recipeIds` es obligatorio, sin valor por defecto: las llamadas que no hablan de busqueda
+ * pasan `null` explicito, que significa «sin busqueda, no acotar nada».
  */
 export async function listAliveOrders(
   query: ListQuery,
+  recipeIds: readonly string[] | null,
   scope: OrderScope,
-  recipeIds: readonly string[] | null = null,
 ): Promise<Page<OrderRow>> {
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
-  const where = buildOrderWhere(query, scope, recipeIds);
+  const where = buildOrderWhere(query, recipeIds, scope);
 
   const [rows, total] = await Promise.all([
     prisma.order.findMany({
