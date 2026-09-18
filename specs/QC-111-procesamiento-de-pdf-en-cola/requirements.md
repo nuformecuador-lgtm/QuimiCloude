@@ -24,7 +24,145 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+> **Qué es «el sistema» aquí.** El módulo `documentos` ampliado con **cuatro piezas**: (1) la
+> **operación de encolar** una tanda, que valida el permiso en el service y publica un mensaje por
+> archivo; (2) el **trabajo** que la cola entrega, con su **Route Handler** por delante; (3) la
+> **consulta** del estado de una tanda; y (4) las **filas** —tanda y archivo— donde esas tres
+> escriben y leen. Fuera de «el sistema» quedan, y no se re-especifican, las capacidades que
+> **QC-106**, **QC-108** y **QC-109** ya publicaron: la emisión de enlaces, la descarga del bucket,
+> la conversión, la lectura con IA y el procesamiento por estrategia. Esta ficha las **invoca**.
+>
+> Cada requisito cita entre corchetes la decisión cerrada que lo origina. Las 22 decisiones
+> (`[D1]`…`[D22]`) quedan citadas al menos una vez.
+
+**R1.** El sistema DEBE persistir, por cada tanda admitida, **una fila de tanda** con su empresa y su
+estrategia, y **una fila por PDF** con su empresa, su ruta dentro del bucket, su estado —en cola,
+procesando, listo o error— y, cuando el estado es error, el motivo. Ningún archivo de una tanda
+puede existir sin su fila, y ninguna fila de archivo puede pertenecer a una tanda de otra empresa.
+`[D1]` `[D4]`
+
+**R2.** El sistema DEBE tomar la estrategia **una sola vez por tanda** y aplicarla a todos sus
+archivos. NO DEBE existir ninguna entrada, columna ni parámetro por el que un archivo concreto de la
+tanda reciba una estrategia distinta de la de su tanda. `[D3]`
+
+**R3.** CUANDO se pide encolar una tanda, el sistema DEBE comprobar **en el service, y como primera
+acción**, que quien pide trae el **mismo permiso que exige la subida**, antes de validar la entrada y
+antes de tocar la cola, el almacenamiento o la base. SI el permiso falta, ENTONCES el sistema DEBE
+rechazar con el código de autorización del catálogo ya existente, **sin escribir ninguna fila y sin
+publicar ningún mensaje**. El sistema NO DEBE añadir ningún permiso nuevo al catálogo cerrado.
+`[D8]` `[D21]`
+
+**R4.** El sistema DEBE validar la entrada de la operación de encolar con **zod**: la estrategia debe
+ser uno de los dos valores del enum cerrado, las rutas deben ser **entre 1 y 10**, y **cada ruta debe
+caer bajo la empresa de quien pide**. SI cualquiera de las tres condiciones falla, ENTONCES el
+sistema DEBE rechazar la tanda **entera** con el código de entrada inválida, sin escribir ninguna
+fila y sin publicar ningún mensaje. `[D22]` `[D15]`
+
+**R5.** CUANDO una tanda supera la validación, el sistema DEBE **escribir primero** la fila de tanda
+y las filas de archivo en estado «en cola», y **solo después** publicar en la cola **un mensaje por
+archivo**. El sistema NO DEBE publicar ningún mensaje que apunte a una fila que todavía no existe.
+`[D4]`
+
+**R6.** SI la publicación de un mensaje falla, ENTONCES el sistema DEBE dejar esa fila en «en cola» y
+NO DEBE inventar ningún otro camino de recuperación: esa fila terminará en error **por caducidad**
+(R19). `[D11]`
+
+**R7.** El sistema DEBE exponer el trabajo como un **Route Handler** bajo `app/api/`, y DEBE
+**verificar la firma** del mensaje **antes** de interpretar el cuerpo y antes de producir cualquier
+efecto. SI la firma falta, no es válida o no corresponde al cuerpo recibido, ENTONCES el sistema DEBE
+responder **401** y NO DEBE leer ni escribir ninguna fila, descargar ningún archivo ni llamar a la
+IA. `[D9]`
+
+**R8.** El Route Handler NO DEBE comprobar permiso de usuario, leer la cookie de sesión ni resolver
+un actor de sesión: no hay usuario delante. El único control de entrada es la firma de R7. `[D9]`
+
+**R9.** El sistema DEBE validar con **zod** el cuerpo del mensaje entregado por la cola, ya con la
+firma verificada. SI el cuerpo no encaja con el esquema, ENTONCES el sistema DEBE responder con un
+resultado que la cola entienda como **definitivo** —un cuerpo roto no mejora reintentándolo— y NO
+DEBE procesar nada. `[D22]`
+
+**R10.** CUANDO la cola entrega **dos veces el mismo mensaje**, el sistema DEBE procesarlo **una sola
+vez**: la segunda entrega NO DEBE llamar a la IA, NO DEBE crear ninguna fila nueva y NO DEBE
+sobrescribir un resultado ya guardado ni un error ya registrado. El sistema DEBE responder a esa
+segunda entrega como éxito, para que la cola no la reintente. `[D10]`
+
+**R11.** MIENTRAS ejecuta un trabajo, el sistema DEBE resolver la empresa **de la fila del archivo**
+—nunca del cuerpo del mensaje— y DEBE descargar los bytes del bucket a través de la operación que ya
+comprueba que la ruta cae bajo esa empresa. SI la ruta del archivo no cae bajo la empresa de su fila,
+ENTONCES el sistema DEBE rechazarla sin descargar nada. `[D15]`
+
+**R12.** El trabajo DEBE ejecutar **exactamente** la conversión y la estrategia ya publicadas, y
+terminar. El sistema NO DEBE ejecutar, invocar ni preparar ningún paso de **recorte de imágenes**, y
+NO DEBE declarar ningún puerto, columna ni campo de salida para él. `[D7]`
+
+**R13.** CUANDO el procesamiento de un PDF termina bien, el sistema DEBE guardar en la fila de ese
+archivo el **texto que escribió la IA, tal cual y como texto plano** —sin recortarlo, resumirlo,
+reordenarlo ni convertirlo en ninguna estructura— y DEBE dejar la fila en estado «listo». `[D2]`
+
+**R14.** CUANDO un PDF termina **bien**, el sistema DEBE borrar ese archivo del bucket privado.
+MIENTRAS una fila esté en cualquier otro estado —en cola, procesando o **error**—, el sistema NO DEBE
+borrar su archivo. `[D6]`
+
+**R15.** SI el fallo de un trabajo proviene del **proveedor de IA o del almacenamiento** —caído,
+lento, sin cuota—, ENTONCES el sistema DEBE dejar la fila en un estado que admita otro intento y DEBE
+responder a la cola de forma que **la cola reintente** el mensaje, hasta un **tope que sale de
+configuración**. `[D5]` `[D17]`
+
+**R16.** SI el fallo de un trabajo proviene del **propio archivo** —cifrado, corrupto, por encima del
+tope de páginas o de tamaño— o de la estrategia guardada, ENTONCES el sistema DEBE dejar la fila en
+**error a la primera**, con su motivo, y DEBE responder a la cola de forma que **no la reintente**.
+`[D5]`
+
+**R17.** CUANDO se agota el tope de reintentos sin que el trabajo termine bien, el sistema DEBE dejar
+la fila en **error** con su motivo, y NO DEBE dejarla indefinidamente en «en cola» ni en
+«procesando». `[D5]` `[D11]`
+
+**R18.** El sistema DEBE ofrecer la **consulta del estado de una tanda**, que devuelve el estado de
+cada uno de sus archivos con su motivo de error cuando lo haya. Esa consulta DEBE exigir el permiso
+**en el service** y DEBE filtrar por la empresa de quien pide; NO DEBE cortar por quién subió la
+tanda. SI la tanda pedida pertenece a otra empresa, ENTONCES el sistema DEBE rechazarla **igual que
+si no existiera**, sin revelar la diferencia. `[D13]` `[D15]`
+
+**R19.** CUANDO se consulta el estado de una tanda, el sistema DEBE evaluar la **caducidad**: toda
+fila que lleve en «en cola» o «procesando» más del plazo configurado pasa a **error con el motivo de
+que se agotó el tiempo**, y así se devuelve y así queda guardada. El plazo DEBE salir de **variable
+de entorno**. El sistema NO DEBE montar ningún cron, tarea programada ni segundo Route Handler para
+esto. `[D11]` `[D12]`
+
+**R20.** El sistema DEBE **conservar** las filas de tanda y de archivo sin plazo. NO DEBE borrarlas,
+podarlas ni programar su borrado, y ninguna de sus operaciones DEBE ejecutar un borrado físico sobre
+ellas. `[D14]` `[D22]`
+
+**R21.** Las dos tablas nuevas DEBEN declarar su **columna de empresa**, tener **`RLS` activado y
+`FORCE ROW LEVEL SECURITY`**, y llegar en una **migración con su `down.sql`** que la revierte
+exactamente. Toda consulta del sistema sobre ellas DEBE filtrar por la empresa de quien pide, con
+**test del rechazo cruzado**. `[D15]`
+
+**R22.** El sistema NO DEBE añadir ningún código de error al catálogo cerrado: todo fallo que salga
+de él DEBE identificarse con un código **ya existente**, incluido el de proveedor de IA no
+disponible. `[D21]`
+
+**R23.** El sistema DEBE resolver por **variable de entorno** todo lo que cambie entre entornos
+—credenciales de la cola, su dirección de destino y el plazo de caducidad—, DEBE declararlas
+**vacías y documentadas** en `.env.example`, y NO DEBE incluir ningún secreto en el repositorio. Las
+variables DEBEN leerse **en el momento de la invocación**, nunca al importar el módulo. `[D17]`
+
+**R24.** Todo el código nuevo DEBE vivir en el módulo `documentos`, con **puertos nuevos y sus
+adaptadores driven**. `domain/` y `ports/` NO DEBEN importar el cliente de la cola, `next/*` ni
+`@prisma/client`, y el cableado puerto → adaptador DEBE vivir **solo** en `lib/composition`. `[D20]`
+
+**R25.** El sistema NO DEBE incorporar más dependencia nueva que **`@upstash/qstash`**, y esa no DEBE
+instalarse antes de su **aprobación humana** y de su fila en `docs/dependencias.md` con los cuatro
+checks. `[D16]`
+
+**R26.** La verificación DEBE incluir **tests de integración sobre la ruta** que cubran **firma
+inválida**, **firma válida** y **mensaje repetido**. Ningún test DEBE llamar a la red ni depender de
+que las variables de entorno tengan valor: la cola, el almacenamiento y la IA se sustituyen por
+**dobles**. `[D18]` `[D19]`
+
+**R27.** El sistema NO DEBE añadir ningún recorrido **E2E** en esta ficha, porque no aporta ninguna
+pantalla que un navegador pueda visitar; ese recorrido queda **diferido a QC-107**, con el motivo
+escrito. `[D18]`
 
 ## Preguntas abiertas
 
