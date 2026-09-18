@@ -35,7 +35,7 @@ type ProductListSectionProps = {
  * R15 aparece solo mientras esta consulta esta en vuelo -sin un estado de carga escrito a mano y
  * sin carreras entre peticiones-.
  *
- * **R5**: aqui no se decide autorizacion. La sesion se lee solo para preguntar a
+ * **Aqui no se decide autorizacion.** La sesion se lee solo para preguntar a
  * `canAdjustBatchStock` si se pinta el control de ajuste -presentacion, no permiso-; no se repite
  * `requireAdmin` ni se ocultan columnas por rol. La autorizacion sobre los datos la aporta el caso
  * de uso, y si responde `unauthorized` se pinta el estado de error **sin un solo dato del
