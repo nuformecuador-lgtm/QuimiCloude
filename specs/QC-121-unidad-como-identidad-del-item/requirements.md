@@ -209,16 +209,6 @@ DEBE quedar cubierto por una prueba de extremo a extremo (Playwright). [E1] [D3]
    separado. Con la unidad fija en el producto, ¿la línea debe tomar la del producto? Mientras no
    se decida se mantiene lo que fijó QC-91: si la unidad de la línea no es la del producto, el
    «restante» del pedido muestra «—». No se decidió al acotar.
-2. **El título del panel de lotes (añadida el 2026-09-18, con la enmienda).** QC-92 trajo un panel
-   lateral de lotes que se abre desde cada fila del listado y titula con `product.name` a secas
-   (también su `aria-label`, «Lotes de X»). Con dos productos «X» en kg y en L, los dos paneles se
-   titulan igual. D8 nombra «el listado de inventario y el selector de productos de la receta»;
-   **no dice** si el panel que cuelga del listado cuenta. ¿Se titula «nombre · unidad»? No se
-   decide aquí: sin respuesta, el panel queda como está y ningún requisito lo cubre.
-3. **El ajuste de un lote de un producto dado de baja (añadida el 2026-09-18).** Hoy (QC-92) el
-   ajuste no mira si el producto está vivo. Esta enmienda **conserva** ese comportamiento: el
-   recálculo actualiza la existencia de un producto borrado igual que la de uno vivo. Si el humano
-   quiere que el ajuste de un producto borrado se rechace, es otra decisión, no de esta ficha.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -239,6 +229,11 @@ DEBE quedar cubierto por una prueba de extremo a extremo (Playwright). [E1] [D3]
 | 2026-09-18 | ¿Hace falta E2E? | **Sí**: es movimiento de inventario (`CHECKPOINTS.md`). Mínimo: dar de alta «X» en kg, darla de alta otra vez en L, y ver **dos filas** en el listado, cada una con su existencia |
 | 2026-09-18 | ¿Una ficha o se parte en backend y pantalla? | **Una sola `fullstack`**: la columna nueva y la unidad del producto rompen al compilar el listado y los selectores. Mismo motivo que QC-91 y QC-93 |
 | 2026-09-18 | ¿Librería? | **Ninguna nueva** |
+| 2026-09-18 | QC-92 entró antes que esta ficha. ¿Quién recalcula `products.stock` en el ajuste de lote? | **Esta ficha** (decisión E1 de la enmienda): el ajuste recalcula en la **misma transacción**, como el alta. Sustituye «QC-92 hereda la obligación» de la fila de D4 |
+| 2026-09-18 | ¿El ajuste de un lote cambia el `updated_at` del producto? | **No**: solo el del lote, como hace hoy QC-92 |
+| 2026-09-18 | ¿El panel de lotes se titula «nombre · unidad»? | **Sí**, como el listado. Entra **T15** |
+| 2026-09-18 | ¿Se puede ajustar un lote de un producto dado de baja? | **Sí, como hoy** (QC-92): la existencia del producto se recalcula igual |
+| 2026-09-18 | Puntos técnicos de la enmienda (`design.md > 15`) | **Aprobados**: bloqueo producto→lote en el ajuste, se amplía el E2E de QC-92, el código de error nuevo sin citar la ficha, migración `20260918130000` |
 
 > **Nota de `spec_author` bajo la tabla, no una fila (2026-09-18).** La tabla la fijó el humano y no
 > se reescribe. En la fila de D4 («¿Quién mantiene `products.stock` al día?»), la frase **«QC-92

@@ -583,6 +583,8 @@ commit que lo provoca.
 
 ## 15. Enmienda del 2026-09-18: QC-121 cubre el ajuste de QC-92
 
+**APROBADA por el humano el 2026-09-18**, con todas las opciones recomendadas: las preguntas abiertas 2 y 3 pasan a la tabla de decisiones y T15 entra.
+
 **Motivo.** El spec aprobado suponía que QC-92 entraría **después** y «heredaría la obligación de
 recalcular `products.stock`» (D4, §5, §13.7). QC-92 entró **antes** (PR #91). El humano decidió el
 2026-09-18: «Sí, QC-121 cubre el ajuste». La tabla de decisiones no se reescribe: la sustitución

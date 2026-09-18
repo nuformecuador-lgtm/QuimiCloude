@@ -265,7 +265,7 @@
         `inventario/` entera en verde.
       - Depende de: T4. Bloquea: T10, T11. `[P]` con T5 **no** (los dos tocan `product-prisma.ts`).
 
-- [ ] **T15. [Condicional] Panel de lotes titulado «nombre · unidad».** **Sólo si el humano
+- [ ] **T15. [Aprobada el 2026-09-18] Panel de lotes titulado «nombre · unidad».** **Sólo si el humano
       responde «sí» a la pregunta abierta 2** de `requirements.md`; si responde «no» o no responde,
       se marca `[x]` con la nota «no aplica» y no se toca nada.
       - Archivos: `app/(private)/inventario/components/product-table.tsx:72` (`aria-label`) y `:81`
