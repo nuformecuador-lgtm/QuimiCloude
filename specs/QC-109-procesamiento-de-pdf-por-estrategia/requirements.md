@@ -19,8 +19,8 @@
 
 ## Requisitos (EARS)
 
-> Cada requisito cita entre corchetes la decisión cerrada que lo origina. Las 14 decisiones
-> (`[D1]`…`[D14]`) quedan citadas al menos una vez.
+> Cada requisito cita entre corchetes la decisión cerrada que lo origina. Las 16 decisiones
+> (`[D1]`…`[D16]`) quedan citadas al menos una vez.
 
 **R1.** El sistema DEBE aceptar como estrategia exactamente dos valores, `catalogo` y `formula`,
 validados en el borde con una unión de literales de zod. SI la estrategia recibida es cualquier
@@ -34,67 +34,68 @@ manda las **páginas rasterizadas** del PDF, que es el literal `images` de `AiRe
 manda el **PDF entero** para que la IA lo lea como texto, que es el literal `pdf` de `AiReadMode`.
 `[D1]`
 
-**R4.** El sistema DEBE tomar el texto del prompt de un archivo propio de cada estrategia, incluido
-en el paquete **en tiempo de compilación**. El sistema NO DEBE leer el sistema de archivos ni la red
-en tiempo de ejecución para obtener un prompt. `[D6]`
+**R4.** El sistema DEBE tomar el texto del prompt de un archivo **`.json`** propio de cada
+estrategia, importado como módulo y por tanto incluido en el paquete **en tiempo de compilación**.
+El sistema NO DEBE leer el sistema de archivos ni la red en tiempo de ejecución para obtener un
+prompt. `[D6]` `[D15]`
 
 **R5.** El sistema DEBE partir con un texto de prompt **no vacío** para cada una de las dos
 estrategias, de modo que la entrada construida por cada estrategia satisfaga
 `aiReadInputSchema` (`prompt: z.string().trim().min(1)`) sin que quien llama tenga que aportar
-texto alguno. `[D3]`
+texto alguno. `[D3]` `[D15]`
 
-**R6.** Cada archivo de prompt DEBE declarar en su cabecera que su texto es **provisional** y
-remitir a la ficha que escribirá el definitivo (QC-129). `[D4]`
+**R6.** Cada archivo de prompt DEBE declarar que su texto es **provisional**, y cuál es la ficha que
+escribirá el definitivo, **en campos de datos del propio `.json`** (`provisional` y `loDefine`), no
+en un comentario. `[D4]` `[D15]`
 
 **R7.** CUANDO la lectura con IA termina bien, el sistema DEBE devolver a quien llamó el texto que
 escribió la IA **tal cual**, sin recortarlo, reordenarlo, resumirlo ni convertirlo en ninguna
 estructura, junto con la estrategia usada. `[D5]` `[D10]`
 
-**R8.** El sistema DEBE entregar el resultado de cada ejecución al **registro**, exactamente una vez
-por ejecución, a través de una dependencia inyectable que un test pueda espiar.
-*El CONTENIDO exacto de esa entrada —texto íntegro, recortado o solo un resumen— está en
-`## Preguntas abiertas` y NO se resuelve por iniciativa de la implementación.* `[D5]`
+**R8.** El sistema DEBE entregar un **resumen** de cada ejecución al **registro**, exactamente una
+vez por ejecución —tanto en éxito como en fallo—, a través de una dependencia inyectable que un test
+pueda espiar. Ese resumen DEBE llevar la estrategia, el modo, la ruta del PDF, el número de páginas
+y la **longitud** del texto devuelto. `[D5]` `[D16]`
 
-**R9.** SI la lectura con IA falla —entrada inválida, tope de páginas superado, proveedor caído o
+**R9.** El sistema NO DEBE registrar el texto devuelto por la IA, ni entero ni recortado: al
+registro solo llega su longitud. Quien necesite el texto lo tiene en el valor de retorno. `[D16]`
+
+**R10.** SI la lectura con IA falla —entrada inválida, tope de páginas superado, proveedor caído o
 plazo agotado—, ENTONCES el sistema DEBE devolver ese fallo con su `code` y su `reason`, sin
 lanzar excepción y sin inventar un texto de resultado. `[D5]` `[D10]`
 
-**R10.** El sistema NO DEBE declarar ningún límite propio: el tope de páginas, el tope de tamaño, la
+**R11.** El sistema NO DEBE declarar ningún límite propio: el tope de páginas, el tope de tamaño, la
 resolución de rasterizado y el plazo de 60 s se importan de la definición única del módulo
 (`domain/limits.ts`). Ningún archivo nuevo de esta ficha DEBE contener esos valores escritos a mano.
 `[D9]`
 
-**R11.** El sistema NO DEBE exigir ningún permiso ni recibir un actor para procesar un PDF por
+**R12.** El sistema NO DEBE exigir ningún permiso ni recibir un actor para procesar un PDF por
 estrategia: la comprobación la hace quien encola. La firma pública de la capacidad NO DEBE incluir
 un actor. `[D7]`
 
-**R12.** El sistema DEBE publicar la capacidad en el contrato del módulo como **fábrica**, que
+**R13.** El sistema DEBE publicar la capacidad en el contrato del módulo como **fábrica**, que
 recibe sus dependencias por parámetro, del mismo modo que las capacidades que ya publica el módulo.
 Ningún archivo de `app/`, ni ningún adaptador driving, ni ningún cron DEBE invocarla en esta ficha:
 quien la dispara es la cola (QC-111). `[D2]` `[D8]`
 
-**R13.** El sistema DEBE resolver esta capacidad en el **dominio**, contra los puertos existentes, y
+**R14.** El sistema DEBE resolver esta capacidad en el **dominio**, contra los puertos existentes, y
 NO DEBE nombrar la librería de IA, el proveedor ni ningún adaptador driven en ningún archivo de
 `domain/` o `ports/`. `[D8]`
 
-**R14.** Todos los identificadores públicos que introduzca esta ficha —tipos, funciones, campos y
+**R15.** Todos los identificadores públicos que introduzca esta ficha —tipos, funciones, campos y
 los dos literales de la estrategia— DEBEN estar en **inglés**. `[D11]`
 
-**R15.** El sistema DEBE implementarse **sin añadir ninguna dependencia** a `package.json`: los
-archivos nuevos solo pueden importar `zod` y código del propio módulo. `[D12]`
+**R16.** El sistema DEBE implementarse **sin añadir ninguna dependencia** a `package.json`: los
+archivos nuevos solo pueden importar `zod` y código del propio módulo. `[D12]` `[D15]`
 
-**R16.** Esta ficha NO DEBE añadir ninguna especificación en `e2e/`: no hay pantalla ni recorrido de
-usuario que ejercitar, y el E2E de la cadena lo aporta QC-107. La cobertura de R1–R15 DEBE quedar
+**R17.** Esta ficha NO DEBE añadir ninguna especificación en `e2e/`: no hay pantalla ni recorrido de
+usuario que ejercitar, y el E2E de la cadena lo aporta QC-107. La cobertura de R1–R16 DEBE quedar
 en tests unitarios del dominio. `[D14]`
 
 ## Preguntas abiertas
 
-**Qué se registra exactamente, y con qué recorte.** `[D5]` cierra que la estrategia saca el
-resultado por consola mientras nada lo guarde, pero **no cuánto**. El texto de un catálogo entero
-puede ser muy largo, y un PDF de proveedor puede traer datos que no conviene volcar en los
-registros de la aplicación. Queda abierto si se registra completo, recortado a un tope, o solo un
-resumen (por ejemplo, la estrategia, el número de páginas y el tamaño del texto). **No se rellena
-con un supuesto.**
+**Ninguna.** La que quedaba —qué se registra y con qué recorte— la cerró el humano el 2026-09-18 y
+está en la tabla como `[D16]`.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -114,3 +115,5 @@ con un supuesto.**
 | 2026-09-18 | ¿Hace falta alguna librería nueva? | **Ninguna.** `@google/genai` ya entró con QC-108, con los cuatro checks, aprobación humana y su fila en `docs/dependencias.md`. Si el diseño propone una, es señal de que algo se torció. `[D12]` |
 | 2026-09-18 | ¿Cómo se valida el enum? | Unión de literales con zod, igual que el `mode` de QC-108. No es tabla ni enum de Prisma: aquí no se persiste nada. *Heredado de QC-108.* `[D13]` |
 | 2026-09-18 | ¿Hace falta E2E? | **Diferido, con motivo escrito**: no hay pantalla ni recorrido de usuario que ejercitar — esta ficha no la invoca nadie todavía. El E2E lo tendrá **QC-107**, que es quien pone la interfaz. `[D14]` |
+| 2026-09-18 | ¿En qué formato viven los archivos de prompt? | **Un `.json` por estrategia**, con la forma `{ "provisional": true, "loDefine": "QC-129", "prompt": "..." }`. Una constante en TypeScript se descartó al acotar: `[D6]` se eligió para que el texto se editara **como documento, sin tocar código**. Motivo de que el `.json` sea viable sin tocar el build: **`resolveJsonModule` ya está activo** (`tsconfig.json:12`), así que el archivo entra en el paquete de despliegue como un import más, sin loaders ni configuración nueva. Efecto secundario: la marca de provisional deja de ser un comentario que cita una ficha y pasa a ser un **campo de datos**, así que ya no roza `docs/conventions.md`. `[D15]` |
+| 2026-09-18 | ¿Qué se registra exactamente, y con qué recorte? | **Un resumen, SIN el texto**: estrategia, modo, ruta del PDF, número de páginas y **longitud** del texto devuelto. El texto completo no va al registro —puede ser enorme y puede traer datos de terceros—; quien lo necesite lo tiene en el valor de retorno, que es lo que `[D5]` ya fija. Cierra la única pregunta abierta que tenía la ficha. `[D16]` |
