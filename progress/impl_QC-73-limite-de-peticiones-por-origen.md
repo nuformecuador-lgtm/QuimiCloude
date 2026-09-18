@@ -262,3 +262,142 @@ las dos pasan sin cambios provocados por esta tanda.
 
 **Veredicto T16/T18:** hecho — script, test (7/7 verde) y documentacion actualizados; sin
 bloqueos.
+
+## T9-T10
+
+`backend_dev`, otra tanda. Cubre el cableado en `lib/composition/edge.ts` (T9) y el enganche en
+el middleware (T10).
+
+### T9 — fachada `rateLimitEdge` en `lib/composition/edge.ts`
+
+La configuracion se lee con `parseRateLimitConfig(process.env)` en CADA llamada a `check()`. La
+eleccion de contador:
+
+- **con `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`** → un `RateLimiter` de Upstash por
+  cuota (`login`/`general`), memoizado por la PAREJA de credenciales: si cambian, se recrean los
+  dos junto con el cliente `Redis`.
+- **falta alguna y NO es produccion** (`VERCEL_ENV !== 'production'`) → un contador en memoria,
+  uno solo por instancia (sirve las dos cuotas: la clave ya lleva el bucket).
+- **falta alguna y ES produccion** → decision del humano (F1.4, opcion a): veredicto `degraded`
+  directo, SIN tocar el contador en memoria y sin llamar a Upstash. El despliegue no falla.
+
+Los avisos de variable invalida (R19) se registran una sola vez por variable **y por valor**: la
+clave de deduplicacion incluye el valor crudo leido de `process.env` (nunca el mensaje que se
+imprime, que solo nombra la variable), asi que un segundo valor invalido de la misma variable
+vuelve a avisar.
+
+Tests en `tests/unit/composition/rate-limit-edge-wiring.test.ts` (8 casos): sin credenciales fuera
+de produccion cuenta en memoria; con las dos, en Upstash (`@upstash/ratelimit` y `@upstash/redis`
+simulados); con una sola, en memoria (los dos casos, solo URL y solo token); en produccion sin
+credenciales se degrada dos veces seguidas sin que el contador en memoria entre en juego (si
+entrara, la segunda llamada con cuota 1 daria `block`, no `degraded`); en produccion CON
+credenciales sigue usando Upstash; un valor invalido avisa una sola vez en dos llamadas seguidas
+sin filtrar el valor; y un segundo valor invalido distinto de la MISMA variable vuelve a avisar.
+
+### T10 — enganche en `route-guard-middleware.ts`
+
+El freno se decide ANTES de leer la cookie: `origin = resolveRequestOrigin(x-forwarded-for)`,
+`bucket = selectBucket(pathname, rateLimitEdge.loginRoute)`, `verdict = await rateLimitEdge.check(...)`.
+
+- `block` → responde 429 sin seguir: ni se lee la cookie, ni corre `decideRouteAccess`, ni se
+  genera identificador de peticion.
+- `degraded` → `console.warn('[rate-limit] contador no disponible, se deja pasar (cuota=<login|general>, motivo=<...>)')`
+  y sigue el camino de hoy (cookie, decision, `x-request-id`).
+- `allow` → sigue el camino de hoy sin marca alguna.
+
+La respuesta de 429 tiene dos formas, decididas por `request.method === 'POST' && request.headers.has('next-action')`:
+Server Action → `new NextResponse(RATE_LIMITED_MESSAGE, { status: 429, headers: { 'content-type': 'text/plain', 'cache-control': 'no-store' } })`
+(cabecera literal, sin `;charset`, que es la unica forma que el cliente de Next reconoce); navegacion
+→ igual pero con `renderRateLimitedPage()` y `content-type: text/html; charset=utf-8`. Ninguna de
+las dos lleva `retry-after` ni `x-ratelimit-*`.
+
+Se limpiaron los comentarios de las lineas tocadas (el bloque de imports y el arranque de
+`middleware`): no citan ficha ni requisito, solo el porque que el codigo no muestra.
+
+Tests en `tests/unit/identity/route-guard-rate-limit.test.ts` (11 casos), con `NextRequest`
+reales y un origen `x-forwarded-for` distinto por caso (RFC 5737) para no compartir cuota entre
+casos. `rateLimitEdge.check` se sustituye por un espia que, por defecto, LLAMA al de verdad —o
+sea que casi todos los casos corren contra el contador EN MEMORIA real—, y solo en el bloque de
+degradacion se le fuerza el veredicto una vez (`mockResolvedValueOnce`), porque un contador en
+memoria nunca produce `degraded` por si solo:
+
+- navegacion y Server Action al mismo origen comparten la cuota general; el login cuenta en la
+  suya propia; dos origenes no se pisan la cuota (R1-R4).
+- la peticion max+1 da 429, el verificador de la cookie sigue en 1 llamada y no hay
+  `x-request-id` reescrito (R8, R9).
+- las dos formas de 429, con la cabecera `content-type` exacta en cada una (R10, R11).
+- sin `retry-after` ni `x-ratelimit-*`, con `cache-control: no-store`, y la MISMA respuesta
+  (status, `content-type`, `cache-control`, cuerpo) en ruta privada y publica, con y sin cookie
+  valida (R13, R14, R16).
+- degradado por `timeout` y por `error:TypeError`: la peticion sigue el camino de hoy (sesion
+  verificada, `x-request-id` presente, o el redirect de siempre en `/login`), el aviso tiene el
+  formato exacto y no contiene el origen enviado (R21-R24).
+
+### Desviaciones del spec
+
+Ninguna.
+
+### Archivos
+
+**Nuevos**
+- `tests/unit/composition/rate-limit-edge-wiring.test.ts`
+- `tests/unit/identity/route-guard-rate-limit.test.ts`
+
+**Modificados**
+- `lib/composition/edge.ts` (fachada `rateLimitEdge`)
+- `lib/modules/identity/adapters/driving/route-guard-middleware.ts` (enganche del freno)
+
+### Mapa R<n> → test (lo que cubre T9-T10)
+
+| R | Test |
+|---|---|
+| R1, R2, R3 | `tests/unit/identity/route-guard-rate-limit.test.ts` |
+| R4 | `tests/unit/identity/route-guard-rate-limit.test.ts` |
+| R8, R9 | `tests/unit/identity/route-guard-rate-limit.test.ts` |
+| R10, R11 (lado servidor) | `tests/unit/identity/route-guard-rate-limit.test.ts` |
+| R13, R14, R16 | `tests/unit/identity/route-guard-rate-limit.test.ts` |
+| R17, R19 | `tests/unit/composition/rate-limit-edge-wiring.test.ts` |
+| R21, R22, R23, R24 | `tests/unit/identity/route-guard-rate-limit.test.ts` |
+| R25, R26 | `tests/unit/composition/rate-limit-edge-wiring.test.ts` |
+
+### Comandos corridos
+
+```
+$ pnpm run typecheck
+> tsc --noEmit
+(sin salida, exit 0)
+
+$ pnpm run lint
+> eslint
+1 aviso, 0 errores: `components/shared/presentation-select.tsx:26` (`withRateLimitNotice` sin
+usar). No es un archivo de esta tanda —lo toca otro agente en paralelo (T13/T14)— y no se corrigio
+aqui.
+
+$ pnpm exec vitest run tests/unit/composition/rate-limit-edge-wiring.test.ts
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+
+$ pnpm exec vitest run tests/unit/identity/route-guard-rate-limit.test.ts
+ Test Files  1 passed (1)
+      Tests  11 passed (11)
+
+$ pnpm exec vitest run tests/unit/identity/route-guard-request-id.test.ts tests/unit/middleware-root-contract.test.ts tests/guards/guard-middleware-edge.test.ts tests/guards/guard-arquitectura-modulos.test.ts tests/unit/identity/route-guard-middleware.test.ts tests/unit/identity/route-guard-rate-limit.test.ts tests/unit/composition/rate-limit-edge-wiring.test.ts
+ Test Files  7 passed (7)
+      Tests  132 passed (132)
+
+$ pnpm exec vitest related --run lib/composition/edge.ts lib/modules/identity/adapters/driving/route-guard-middleware.ts
+ Test Files  5 passed (5)
+      Tests  62 passed (62)
+
+$ pnpm exec vitest run tests/unit/identity
+ Test Files  92 passed (92)
+      Tests  1660 passed | 31 skipped (1691)
+```
+
+No se corrio `./init.sh`, `./init.sh --rapido` ni `pnpm test` (fuera de alcance de esta tanda,
+segun la consigna recibida).
+
+**Veredicto T9-T10:** hecho — `rateLimitEdge` cableada con las tres ramas de credenciales/entorno
+y el middleware frena antes de la sesion con las dos formas de 429, sin tocar `middleware.ts` ni
+ningun archivo ajeno a esta tanda; typecheck y lint limpios (el unico aviso de lint es de un
+archivo de otro agente); las guardias y los tests existentes del middleware siguen en verde.
