@@ -224,6 +224,49 @@ expect(SIN_GUARDIAS_2_Y_3, 'la mutacion de la guardia 3 no encontro su texto').n
   SIN_GUARDIA_2,
 );
 
+// Mutacion en memoria: quita la salida temprana del backfill de proveedores del UP, para el
+// control anti-placebo del caso de base vacia.
+const BACKFILL_PROVEEDORES_SIN_SALIDA_TEMPRANA = BACKFILL_PROVEEDORES.replace(
+  'IF existing_rows = 0 THEN RETURN; END IF;',
+  '',
+);
+expect(
+  BACKFILL_PROVEEDORES_SIN_SALIDA_TEMPRANA,
+  'la mutacion de la salida temprana del UP no encontro su texto',
+).not.toBe(BACKFILL_PROVEEDORES);
+
+// La misma mutacion, sobre el bloque de guardias del DOWN.
+const GUARDIA_DEL_DOWN_SIN_SALIDA_TEMPRANA = GUARDIA_DEL_DOWN.replace(
+  'IF existing_rows = 0 THEN RETURN; END IF;',
+  '',
+);
+expect(
+  GUARDIA_DEL_DOWN_SIN_SALIDA_TEMPRANA,
+  'la mutacion de la salida temprana del DOWN no encontro su texto',
+).not.toBe(GUARDIA_DEL_DOWN);
+
+// Mutacion en memoria: desactiva el `RAISE EXCEPTION` de la resolucion de empresa del backfill de
+// proveedores del UP -la rama de empresa no identificable-, para el control anti-placebo del caso
+// de una sola fila.
+const BACKFILL_PROVEEDORES_SIN_RESOLUCION = BACKFILL_PROVEEDORES.replace(
+  /RAISE EXCEPTION\s+'suppliers_company_scope: no se pudo identificar la empresa[\s\S]*?all_company_rows;/,
+  'NULL;',
+);
+expect(
+  BACKFILL_PROVEEDORES_SIN_RESOLUCION,
+  'la mutacion de la resolucion de empresa del UP no encontro su texto',
+).not.toBe(BACKFILL_PROVEEDORES);
+
+// La misma mutacion, sobre la guardia 1 del DOWN.
+const GUARDIA_DEL_DOWN_SIN_RESOLUCION = GUARDIA_DEL_DOWN.replace(
+  /RAISE EXCEPTION\s+'suppliers_company_scope down: no se pudo identificar la empresa que escribio el UP[\s\S]*?all_company_rows;/,
+  'NULL;',
+);
+expect(
+  GUARDIA_DEL_DOWN_SIN_RESOLUCION,
+  'la mutacion de la resolucion de empresa del DOWN no encontro su texto',
+).not.toBe(GUARDIA_DEL_DOWN);
+
 // ---------------------------------------------------------------------------
 // El `down.sql` ENTERO, troceado en sentencias para ejecutarlo del disco
 // ---------------------------------------------------------------------------
@@ -1353,6 +1396,178 @@ describe('R34 — marcar una empresa como borrada no vacia ni altera sus proveed
         select: { deletedAt: true },
       });
       expect(empresa.deletedAt).not.toBeNull();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R7, R11 — la salida temprana sobre la base vacia, y su firmeza en cuanto hay una fila
+// ---------------------------------------------------------------------------
+
+describe('R7, R11 — la salida temprana del UP y del DOWN manda sobre una base vacia, y sigue firme con una sola fila', () => {
+  /** Deja las dos tablas de proveedores en cero DENTRO de la transaccion, y lo afirma. El
+   *  `DELETE` es del test, no del SQL de la migracion -que no tiene ninguno-: el ROLLBACK de
+   *  `inRolledBackTransaction` lo deshace igual que deshace todo lo demas. */
+  async function vaciarProveedoresYLineas(tx: Prisma.TransactionClient): Promise<void> {
+    await tx.$executeRawUnsafe(`DELETE FROM "supplier_catalog_lines"`);
+    await tx.$executeRawUnsafe(`DELETE FROM "suppliers"`);
+    expect(await tx.supplier.count()).toBe(0);
+    expect(await tx.supplierCatalogLine.count()).toBe(0);
+  }
+
+  /** Pone la base en el estado de empresa IRRESOLUBLE: renombra «QuimiCloud» y garantiza que hay
+   *  mas de una empresa. Es justo el estado en el que la guardia de resolucion abortaria si
+   *  hubiera dato que repartir. */
+  async function haceEmpresaIrresoluble(tx: Prisma.TransactionClient, marcador: string): Promise<void> {
+    const quimicloud = await quimicloudId(tx);
+    await tx.$executeRaw`
+      UPDATE "companies" SET "name_normalized" = ${`renombrada${marcador}`}
+       WHERE "id" = CAST(${quimicloud} AS uuid)`;
+    await crearEmpresa(tx, marcador);
+  }
+
+  async function permitirCompanyIdNulo(tx: Prisma.TransactionClient): Promise<void> {
+    await tx.$executeRawUnsafe(`ALTER TABLE "suppliers" ALTER COLUMN "company_id" DROP NOT NULL`);
+    await tx.$executeRawUnsafe(
+      `ALTER TABLE "supplier_catalog_lines" ALTER COLUMN "company_id" DROP NOT NULL`,
+    );
+  }
+
+  async function insertarProveedorSolitario(
+    tx: Prisma.TransactionClient,
+    marcador: string,
+  ): Promise<string> {
+    const id = randomUUID();
+    await tx.$executeRawUnsafe(
+      `INSERT INTO "suppliers" ("id","name","name_normalized","phone","updated_at")
+       VALUES ($1::uuid, $2, $3, '+57 300 000 0000', CURRENT_TIMESTAMP)`,
+      id,
+      `Solitario ${marcador}`,
+      `solitario${marcador}`,
+    );
+    return id;
+  }
+
+  it('R7, R11: sobre una base vacia el backfill del UP y las guardias del DOWN no abortan — la salida temprana manda', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marcador = token();
+      await vaciarProveedoresYLineas(tx);
+      // Empresa irresoluble a proposito: sin filas que repartir, la resolucion de empresa ni se
+      // plantea y este estado no deberia importar.
+      await haceEmpresaIrresoluble(tx, marcador);
+      await permitirCompanyIdNulo(tx);
+
+      await expect(tx.$executeRawUnsafe(BACKFILL_PROVEEDORES)).resolves.not.toThrow();
+      await expect(tx.$executeRawUnsafe(BACKFILL_LINEAS)).resolves.not.toThrow();
+      await expect(tx.$executeRawUnsafe(GUARDIA_DEL_DOWN)).resolves.not.toThrow();
+    });
+  });
+
+  it('R7, R11 caso (a) no es un placebo: quitando la salida temprana en memoria, el mismo estado vacio SI aborta con el mensaje de «0 empresa(s)»', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marcador = token();
+      await vaciarProveedoresYLineas(tx);
+      await haceEmpresaIrresoluble(tx, marcador);
+      await permitirCompanyIdNulo(tx);
+
+      const rechazoUp = await expectRejectedByDatabase(
+        tx,
+        () => tx.$executeRawUnsafe(BACKFILL_PROVEEDORES_SIN_SALIDA_TEMPRANA),
+        'backfill del UP sin su salida temprana, sobre una base vacia',
+      );
+      expect(rechazoUp.texto).toContain('empresa(s) en la tabla');
+
+      const rechazoDown = await expectRejectedByDatabase(
+        tx,
+        () => tx.$executeRawUnsafe(GUARDIA_DEL_DOWN_SIN_SALIDA_TEMPRANA),
+        'guardias del DOWN sin su salida temprana, sobre una base vacia',
+      );
+      expect(rechazoDown.texto).toContain('empresa(s) en la tabla');
+    });
+  });
+
+  it('R7, R11 caso (b1): con una sola fila y la empresa NO resoluble, el backfill del UP y la guardia del DOWN abortan igual', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marcador = token();
+      await vaciarProveedoresYLineas(tx);
+      await haceEmpresaIrresoluble(tx, marcador);
+      await permitirCompanyIdNulo(tx);
+      // Exactamente una fila que repartir: el `RETURN` ya no se dispara y la resolucion de
+      // empresa se ejecuta de verdad.
+      await insertarProveedorSolitario(tx, marcador);
+
+      const rechazoUp = await expectRejectedByDatabase(
+        tx,
+        () => tx.$executeRawUnsafe(BACKFILL_PROVEEDORES),
+        'backfill del UP con una sola fila y la empresa no resoluble',
+      );
+      expect(rechazoUp.texto).toContain('no se pudo identificar la empresa');
+      expect(rechazoUp.texto).toContain('empresa(s) en la tabla');
+
+      // No se prueba literalmente «companies vacia»: dejar `companies` a cero es imposible en
+      // esta base -otras tablas la referencian con RESTRICT-, y de todos modos es la misma rama
+      // del SQL: `all_company_rows <> 1` con el mismo `RAISE EXCEPTION`.
+      const rechazoDown = await expectRejectedByDatabase(
+        tx,
+        () => tx.$executeRawUnsafe(GUARDIA_DEL_DOWN),
+        'guardia del DOWN con una sola fila y la empresa no resoluble',
+      );
+      expect(rechazoDown.texto).toContain('no se pudo identificar la empresa que escribio el UP');
+    });
+  });
+
+  it('R7, R11 caso (b2): con una sola fila y la empresa AMBIGUA, el backfill del UP y la guardia del DOWN abortan por ambiguedad', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marcador = token();
+      await vaciarProveedoresYLineas(tx);
+      // Dos empresas con `name_normalized = 'quimicloud'`: la ambiguedad exacta que la guardia 1
+      // no puede resolver. La sembrada por la corrida sigue tal cual; se le anade una segunda con
+      // el mismo nombre normalizado, dada de baja para no chocar con el unico PARCIAL de
+      // `companies` -que solo alcanza a las vivas- y que la guardia igualmente cuenta, porque su
+      // `SELECT count(*)` no filtra `deleted_at`.
+      await tx.company.create({
+        data: {
+          name: `QuimiCloud duplicada ${marcador}`,
+          nameNormalized: 'quimicloud',
+          deletedAt: new Date(),
+        },
+      });
+      await permitirCompanyIdNulo(tx);
+      await insertarProveedorSolitario(tx, marcador);
+
+      const rechazoUp = await expectRejectedByDatabase(
+        tx,
+        () => tx.$executeRawUnsafe(BACKFILL_PROVEEDORES),
+        'backfill del UP con una sola fila y la empresa ambigua',
+      );
+      expect(rechazoUp.texto).toContain('empresas con name_normalized');
+      expect(rechazoUp.texto).toContain('AMBIGUA');
+
+      const rechazoDown = await expectRejectedByDatabase(
+        tx,
+        () => tx.$executeRawUnsafe(GUARDIA_DEL_DOWN),
+        'guardia del DOWN con una sola fila y la empresa ambigua',
+      );
+      expect(rechazoDown.texto).toContain('suppliers_company_scope down');
+      expect(rechazoDown.texto).toContain('AMBIGUA');
+    });
+  });
+
+  it('R7, R11 caso (b) no es un placebo: quitando la resolucion de empresa en memoria, el mismo estado de una sola fila NO aborta', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      // Mismos datos que el caso (b1) -empresa irresoluble y exactamente una fila-: si el aborto
+      // de (b1) viniera de otra sentencia del bloque, o si el `RETURN` temprano se hubiera
+      // disparado igual con una fila presente, esto tambien abortaria.
+      const marcador = token();
+      await vaciarProveedoresYLineas(tx);
+      await haceEmpresaIrresoluble(tx, marcador);
+      await permitirCompanyIdNulo(tx);
+      await insertarProveedorSolitario(tx, marcador);
+
+      await expect(
+        tx.$executeRawUnsafe(BACKFILL_PROVEEDORES_SIN_RESOLUCION),
+      ).resolves.not.toThrow();
+      await expect(tx.$executeRawUnsafe(GUARDIA_DEL_DOWN_SIN_RESOLUCION)).resolves.not.toThrow();
     });
   });
 });

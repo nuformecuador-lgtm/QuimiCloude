@@ -1012,3 +1012,98 @@ pnpm run test:guardias
   Test Files  44 passed (44)
        Tests  540 passed | 9 skipped (549)
 ```
+
+## Tanda 7 — T38: el test de la salida temprana del UP y del DOWN · 2026-09-17
+
+**Archivo tocado:** `tests/integration/proveedores/company-scope.int.test.ts` (ampliado, sin
+archivo nuevo, así que `tests/integration/aislamiento.json` no cambia).
+
+**Qué se añadió:**
+
+1. Cuatro mutaciones en memoria, junto a las tres que ya había (`SIN_GUARDIA_DE_PROVEEDORES`,
+   `SIN_GUARDIA_2`, `SIN_GUARDIAS_2_Y_3`), cada una con su `expect(...).not.toBe(...)` anti-placebo
+   de que el `.replace` encontró su texto:
+   - `BACKFILL_PROVEEDORES_SIN_SALIDA_TEMPRANA` y `GUARDIA_DEL_DOWN_SIN_SALIDA_TEMPRANA`: quitan
+     literalmente `IF existing_rows = 0 THEN RETURN; END IF;` del UP y del DOWN.
+   - `BACKFILL_PROVEEDORES_SIN_RESOLUCION` y `GUARDIA_DEL_DOWN_SIN_RESOLUCION`: desactivan con una
+     expresión regular quirúrgica el `RAISE EXCEPTION` de «no se pudo identificar la empresa» (UP)
+     y su equivalente «... que escribió el UP» (DOWN), sustituyéndolo por `NULL;` — una sola
+     sentencia inocua que deja `target_company_id` en `NULL` y no interrumpe el bloque.
+2. Un `describe` nuevo al final del archivo, `R7, R11 — la salida temprana del UP y del DOWN manda
+   sobre una base vacía, y sigue firme con una sola fila`, con cinco `it`:
+   - `R7, R11: sobre una base vacia el backfill del UP y las guardias del DOWN no abortan — la
+     salida temprana manda`: vacía las dos tablas con `DELETE` dentro de la transacción, deja la
+     empresa «QuimiCloud» irresoluble (renombrada + una segunda empresa) a propósito —para probar
+     que ese estado no importa cuando no hay fila que repartir— y afirma que `BACKFILL_PROVEEDORES`,
+     `BACKFILL_LINEAS` y `GUARDIA_DEL_DOWN` resuelven sin lanzar.
+   - `R7, R11 caso (a) no es un placebo: quitando la salida temprana en memoria, el mismo estado
+     vacio SI aborta con el mensaje de «0 empresa(s)»`: mismos datos, con las dos mutaciones
+     `_SIN_SALIDA_TEMPRANA`; ambas abortan y el texto contiene `empresa(s) en la tabla`.
+   - `R7, R11 caso (b1): con una sola fila y la empresa NO resoluble, el backfill del UP y la
+     guardia del DOWN abortan igual`: una sola fila (proveedor sin línea), empresa irresoluble; el
+     `RETURN` no se dispara y ambos bloques abortan con el mensaje real. El comentario explica por
+     qué NO se prueba `companies` vacía —hay `RESTRICT` que lo hace imposible en esta base, y de
+     todos modos es la misma rama `all_company_rows <> 1`—.
+   - `R7, R11 caso (b2): con una sola fila y la empresa AMBIGUA, el backfill del UP y la guardia
+     del DOWN abortan por ambiguedad`: dos filas en `companies` con `name_normalized = 'quimicloud'`
+     —la segunda dada de baja, para no chocar con el índice único parcial `companies_name_unique`,
+     que solo alcanza a las vivas, pero que la guardia igual cuenta porque su `SELECT count(*)` no
+     filtra `deleted_at`—; ambos bloques abortan con `AMBIGUA`.
+   - `R7, R11 caso (b) no es un placebo: quitando la resolucion de empresa en memoria, el mismo
+     estado de una sola fila NO aborta`: mismos datos que (b1), con `_SIN_RESOLUCION`; ninguno de
+     los dos bloques lanza.
+
+**Hallazgo no anticipado por el encargo:** `companies` tiene un índice único real
+(`companies_name_unique`, parcial sobre `lower(name_normalized)` `WHERE deleted_at IS NULL`,
+`db/migrations/20260904180600_companies_and_user_company/migration.sql:77`), así que crear una
+segunda empresa VIVA con `name_normalized = 'quimicloud'` para el caso (b2) chocaba contra ese
+índice (`PrismaClientKnownRequestError` con `Unique constraint failed`). Se resolvió dando de baja
+la segunda empresa (`deletedAt: new Date()`), que el índice parcial no alcanza y que la guardia de
+la migración sigue contando porque cuenta filas sin filtrar `deleted_at` — exactamente el
+comportamiento real que hace ambigua la resolución, con un motivo distinto pero igual de válido al
+que describe el encargo («varias en `companies`»).
+
+**Falsabilidad ejecutada y anotada — dos ejercicios, cada uno revertido después:**
+
+1. En el `it` de caso (a) feliz, se cambió `BACKFILL_PROVEEDORES` por
+   `BACKFILL_PROVEEDORES_SIN_SALIDA_TEMPRANA` y se corrió solo, aislado con `-t`:
+   ```
+   FAIL … R7, R11: sobre una base vacia el backfill del UP y las guardias del DOWN no abortan — la salida temprana manda
+   AssertionError: promise rejected "PrismaClientKnownRequestError{ …(7) }" instead of resolving
+   Caused by: ERROR: suppliers_company_scope: no se pudo identificar la empresa «QuimiCloud» …
+     y hay 2 empresa(s) en la tabla …
+   ```
+   Confirma que quitar a mano el `RETURN` temprano del UP pone rojo el caso (a). Revertido.
+
+2. En el `it` de caso (b1), se cambió `BACKFILL_PROVEEDORES` por
+   `BACKFILL_PROVEEDORES_SIN_RESOLUCION` y se corrió solo, aislado con `-t`:
+   ```
+   FAIL … R7, R11 caso (b1): con una sola fila y la empresa NO resoluble, el backfill del UP y la guardia del DOWN abortan igual
+   Error: se esperaba que la base rechazara la operacion, pero la acepto: backfill del UP con una sola fila y la empresa no resoluble
+   ```
+   Confirma que quitar la resolución de empresa pone rojo el caso (b). Revertido.
+
+Después de cada ejercicio se restauró el bloque original y se volvió a correr el archivo entero en
+verde antes de seguir.
+
+**Verificación (salida real, solo el archivo, sin la suite completa — la corre el leader):**
+
+```
+pnpm run typecheck
+> tsc --noEmit
+(sin salida — verde)
+
+pnpm run lint -- tests/integration/proveedores/company-scope.int.test.ts
+> eslint "--" "tests/integration/proveedores/company-scope.int.test.ts"
+(sin salida — verde)
+
+pnpm vitest run tests/integration/proveedores/company-scope.int.test.ts
+ Test Files  1 passed (1)
+      Tests  29 passed (29)
+   Duration  12.50s
+```
+
+**Veredicto:** T38 hecha — la salida temprana del UP y del DOWN queda ejercitada en sus dos
+antecedentes (base vacía, una sola fila), con control anti-placebo para cada uno y falsabilidad
+comprobada dos veces; archivo entero en verde, typecheck y lint limpios. Falta que el leader
+relance `./init.sh` completo antes del PR.

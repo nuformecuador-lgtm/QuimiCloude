@@ -499,7 +499,12 @@
   Cubre: R38, R39 (por ausencia: `ERROR_CODES` no crece, ninguna empresa se borra, `package.json` no
   se toca).
 
-- [ ] **T38 — Test de la rama que la salida temprana estrena.**
+- [x] **T38 — Test de la rama que la salida temprana estrena.** **CERRADA 2026-09-17: se amplio
+  `company-scope.int.test.ts` con cinco casos (base vacia, (b1) empresa no resoluble, (b2) empresa
+  ambigua y los dos controles anti-placebo); el archivo pasa de 24 a 29 casos y `aislamiento.json`
+  no cambia porque no nacio ningun archivo nuevo. La ambiguedad de (b2) se siembra con una segunda
+  «QuimiCloud» DADA DE BAJA: `companies_name_unique` es parcial sobre las vivas, pero el
+  `count(*)` de la guardia no filtra `deleted_at`, asi que la ambiguedad es real.**
   Archivos: `tests/integration/proveedores/company-scope.int.test.ts` (se amplía) o un archivo de
   integración nuevo bajo `tests/integration/proveedores/**`; si es nuevo, entra además en
   `tests/integration/aislamiento.json` con su forma de aislamiento (mismo criterio que T25).
