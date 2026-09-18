@@ -78,7 +78,7 @@
 
 ## Tanda 3 — el repositorio (la única tanda que pasa por rojo)
 
-- [ ] **T5 — Ampliar el puerto.** Depende de T3.
+- [x] **T5 — Ampliar el puerto.** Depende de T3.
       `adjustBatchStock`, `findBatchesOfAliveProduct` y `findBatchMovements` en
       `ProductRepository`, con la nota de que la empresa no viaja en ningún tipo de entrada.
       **AVISO, dicho y no disimulado: esta task DEJA EL `typecheck` EN ROJO.** Declarar tres
@@ -88,7 +88,7 @@
       **Hecho:** el puerto declara los tres y su docblock; se pasa a T6 sin correr el gate.
       **Archivos:** `lib/modules/inventario/ports/product-repository.ts`.
 
-- [ ] **T6 — Implementar el libro y el ajuste en Prisma.** Depende de T5 (cierra su rojo).
+- [x] **T6 — Implementar el libro y el ajuste en Prisma.** Depende de T5 (cierra su rojo).
       1. `batch-movement-prisma.ts`: `writeMovement(tx, …)` —recibe la `tx`, no la abre— y las dos
          lecturas del historial.
       2. `company-scope.ts`: **reintroducir** `batchCompanyScope` y añadir `movementCompanyScope`,
@@ -110,7 +110,7 @@
       `tests/unit/inventario/adjust-batch-stock-prisma.test.ts`,
       `tests/unit/inventario/batch-movement-prisma.test.ts`.
 
-- [ ] **T7 — Ajustar la guardia R21 de QC-91, con nota fechada y prueba por mutación.**
+- [x] **T7 — Ajustar la guardia R21 de QC-91, con nota fechada y prueba por mutación.**
       Depende de T6 y **va en su misma tanda**: en cuanto T6 entra, la guardia se pone roja, y
       dejarla así aunque sea un commit es exactamente el «tocarla en silencio» que D13 prohíbe.
       Conserva íntegras las ramas de `delete`, `deleteMany`, `upsert`, `DELETE` crudo y `UPDATE`

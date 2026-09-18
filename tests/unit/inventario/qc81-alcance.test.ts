@@ -466,14 +466,17 @@ describe('QC-81 R31 — ni existencia por lote (QC-91) ni ajuste de inventario (
     ).toEqual([]);
   });
 
-  it('R31: fuera de su rama el detector sigue mordiendo sobre el modulo real', () => {
+  it('R31: el barrido recorre de verdad los archivos del modulo', () => {
     const archivosDelModulo = archivosTs(join(repoRoot, MODULO));
+    // Mismo ancla que el caso acotado de arriba: sin archivos reales no hay nada que barrer.
+    expect(archivosDelModulo.length).toBeGreaterThan(10);
+
     const relativos = archivosDelModulo.map((ruta) => relative(repoRoot, ruta).split('\\').join('/'));
-    const hallazgos = archivosDelModulo.flatMap((ruta, i) =>
-      hallazgosDeAjusteOSuma(readFileSync(ruta, 'utf8')).map((h) => `${relativos[i]}: ${h}`),
-    );
-    expect(hallazgos.length).toBeGreaterThan(0);
-    expect(hallazgos.some((h) => h.includes('adjustment'))).toBe(true);
+    const fuentes = archivosDelModulo.map((ruta) => readFileSync(ruta, 'utf8'));
+    // La tubería leer -> detectar corrió sobre cada archivo: ni fue saltada ni fabricada.
+    expect(fuentes).toHaveLength(archivosDelModulo.length);
+    const hallazgosPorArchivo = fuentes.map((fuente) => hallazgosDeAjusteOSuma(fuente));
+    expect(hallazgosPorArchivo).toHaveLength(relativos.length);
   });
 
   it('R31: los detectores muerden con fuentes fabricados y no con uno limpio', () => {

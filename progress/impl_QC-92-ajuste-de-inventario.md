@@ -186,3 +186,53 @@ Confirmado por el leader el 2026-09-17. **Cuatro familias distintas encontradas 
 | 4 | **Guardia de alcance de ficha** | `tests/unit/inventario/qc81-alcance.test.ts`, R31 | Le reserva el sitio a una ficha futura y **no se acota a su rama**: se pone roja **justo cuando llega la ficha para la que reservaba** | **Tanda 2** (no estaba previsto) |
 
 Las dos que **no** estaban previstas en el spec son la 3 y la 4, y las dos costaron una parada. La 4 además reveló una **asimetría dentro de su propio archivo**: R28, R29 y R30 se acotaban a su rama y R31 no.
+
+---
+
+## Tanda 3 — T5 → T6 → T7 (bloque cerrado, sin gate en medio)
+
+### Archivos
+**Creados**
+- `lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma.ts`
+- `tests/unit/inventario/adjust-batch-stock-prisma.test.ts`
+- `tests/unit/inventario/batch-movement-prisma.test.ts`
+
+**Modificados (producción)**
+- `lib/modules/inventario/ports/product-repository.ts` — los tres métodos nuevos
+- `lib/modules/inventario/adapters/driven/persistence/company-scope.ts` — `batchCompanyScope` reintroducida, `movementCompanyScope` nueva
+- `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts` — asiento de alta en las dos entradas, `findBatchesOfAliveProduct` y `adjustBatchStock`
+- `lib/composition/index.ts` — cableado de los tres
+
+**Modificados (tests)**
+- `tests/unit/inventario/qc91-alcance.test.ts` (T7)
+- `tests/guards/guard-ambito-empresa-inventario.test.ts`
+- Siete dobles de `ProductRepository` y cinco fixtures de integración (mecánico)
+
+### El paso por rojo, tal como estaba declarado
+`079a0c2` (T5) **no compila por sí solo** y el cuerpo del commit lo dice con esas palabras. `8c87ab5` (T6) lo cierra. No se corrió gate entre los dos.
+
+### La guardia R21, acotada sin invertir
+Las ramas de `delete`, `deleteMany`, `upsert`, `updateMany` y los dos SQL crudos **quedan intactas**. La de `update` pasa de «hallazgo del archivo» a «hallazgo **fuera** de `adjustBatchStock`», aislado con el `cuerpoDeFuncion` que ya existía. **No hay ninguna aserción que exija que `adjustBatchStock` DEBA tener un `update`**: eso fijaría un estado que otra ficha puede cambiar, que es lo que el reviewer de QC-91 evitó. Nota fechada sin citar fichas, y prueba por mutación con fuentes fabricadas.
+
+### Hallazgo: `cuerpoDeFuncion` venía funcionando por casualidad
+El helper buscaba la primera `{` tras el primer `)`. Con un tipo de retorno que trae sus propias llaves —`Promise<{ stock: number } | null>`— capturaba **la llave del TIPO, no la del cuerpo**. Nunca se había notado porque las aserciones que lo usaban no dependían de tener el cuerpo correcto. Corregido con control de profundidad de paréntesis y de `<>`/`{}`, y con su autoprueba para ese caso exacto. **Es un fallo preexistente que esta ficha destapó, no uno que introdujera.**
+
+### Desviaciones declaradas
+1. **`lib/composition/index.ts`, fuera de los archivos de la task.** Ampliar el puerto rompe el objeto que lo satisface en composición; sin cablear los tres métodos, «verde al final de T7» era imposible.
+2. **`tests/guards/guard-ambito-empresa-inventario.test.ts`, fuera de la task.** Esa guardia asumía **un** archivo adaptador por puerto. Como el diseño pide que `findBatchMovements` viva en `batch-movement-prisma.ts`, no lo encontraba. `adaptador: string` pasó a `adaptadores: readonly string[]`; la lógica de sus dos comprobaciones no cambió.
+3. **Cinco fixtures de integración necesitaron `inventoryMovement.deleteMany(...)` antes del `productBatch.deleteMany(...)`.** La FK es `RESTRICT` y hasta T6 nunca se escribía un asiento, así que nunca mordía. **Es una consecuencia directa y esperada del libro, no un parche.**
+4. **`authorName` sale hoy como el identificador crudo del actor, no como nombre mostrable.** Resolverlo en la persistencia exigiría que un driven de `inventario` leyera `users`, que es de otro módulo, y `docs/architecture.md > Anti-patrones` lo prohíbe. `identity` ya resolvió esto con el puerto `PeopleDirectory`, consumido **desde el caso de uso**. **PENDIENTE EXPLÍCITO PARA T8**: inyectar `PeopleDirectory` y resolver el nombre ahí. Mismo criterio que «un responsable que no vuelve del directorio sale con su identificador».
+5. **`adjustBatchStock` usa `tx.productBatch.update({ stock: { increment: delta } })`, no el `$queryRaw` del pseudocódigo de `design.md > 4.3`.** Sigue siendo el `SET stock = stock + $delta` **relativo** que el diseño exige, y es lo que la task pedía literalmente («la única función que llama a `tx.productBatch.update(...)`») y sobre lo que se construyó la guardia de T7. El SQL crudo habría disparado además la rama de «`UPDATE` crudo prohibido» de esa misma guardia.
+6. **La comprobación previa en la aplicación del stock negativo no se implementó.** El diseño decía que la aplicación «también» comprueba antes para dar un mensaje útil; hoy la única barrera es el `CHECK` de la base, traducido por nombre de restricción a `BatchStockNegativeError`. **La garantía dura, que es lo que exigen R4 y R5, está cumplida**; lo que falta es el mensaje anticipado. Se declara en vez de darlo por hecho.
+
+### Riesgo declarado
+**`where: { id: batchId, companyId }` en `update()` no está probado contra Postgres real.** Los tests de T6 usan Prisma mockeado, y un mock no demuestra que Prisma acepte esa combinación ni que lance `P2025` sin fila. Es válido —Prisma 6.19.3, filtro extendido en `where`— pero **quien lo demuestra de verdad es el test de integración de T15**. Si ahí falla, se cae el `null` de R18.
+
+### Salida real
+- `pnpm run typecheck` → verde · `pnpm run lint` → verde
+- `qc91-alcance` + `adjust-batch-stock-prisma` + `batch-movement-prisma` + `guard-ambito-empresa-inventario` → **4 archivos, 64 passed**
+- `vitest run guard` → 43 archivos, **515 passed, 9 skipped, 0 failed**
+- Un rojo **ajeno**: `tests/unit/configuracion-ui/user-table.test.tsx`, el flake conocido de jsdom («navigation to another Document»); corrido solo, sus 27 pasan.
+
+### Limpieza de comentarios (`934fe7c`, commit aparte)
+Seis líneas **nuevas** de producción citaban `QC-92` o `R18` —los tres docblocks del puerto y una línea de `batch-movement-prisma.ts`—. Limpiadas, sin tocar una línea de código. Los comentarios **preexistentes no se arrastran**. Comprobado sobre el diff de la rama: **la única cita que queda en producción es la cabecera de enmiendas de `error-codes.ts`**, que es un registro histórico y ya citaba las seis anteriores.
