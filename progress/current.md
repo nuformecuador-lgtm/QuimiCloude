@@ -509,6 +509,28 @@ porque es validacion de entrada y no una regla nueva de dominio.
 
 ## Deudas y cosas abiertas
 
+### El worktree de QC-59 tampoco se desmonta — SEPTIMA vez, y el gate miente en su codigo de salida (2026-09-17)
+
+**Dos cosas distintas, las dos del arnes y ninguna de la ficha.**
+
+**1. `wt.sh done QC-59-...` fallo con `fatal: ... is not a working tree`.** Mismo cuadro que QC-50:
+el directorio sigue en disco pero git ya no lo registra, asi que no hay nada que desmontar. El
+aviso del script culpa a «archivo en uso en Windows», que **es falso**: el registro se perdio
+antes. No se forzo nada. La rama esta mergeada (PR #84, `b8e3d5e`), asi que el trabajo esta a
+salvo y lo que queda es un arbol muerto con su `node_modules`.
+
+**2. Y esta es la seria: `./init.sh` SALE CON CODIGO 0 AUNQUE DECLARE ROJOS NUEVOS.** Medido hoy
+en la primera corrida del gate de QC-59: imprimio «hay rojos NUEVOS respecto del baseline» con un
+archivo en rojo, y el proceso termino en **0**. La pantalla dice rojo y el codigo dice verde.
+
+Hoy no engaño a nadie porque el leader lee la salida, pero **cualquier automatismo lo daria por
+bueno**: un hook, un CI, un `./init.sh && git push`. Es el tipo de fallo que no se nota hasta que
+mergea algo roto. Para `/afinar-regla`, y por delante de las demas deudas del gate.
+
+**Dato para esa ficha**: el rojo era real y de la propia rama —una lista cerrada cuyo valor
+correcto solo era conocible despues del merge—, asi que el caso no es hipotetico: es exactamente
+el escenario en el que el codigo de salida importa.
+
 ### Los censos que muerden POR EL DIFF no estan inventariados en ningun sitio (2026-09-17)
 
 Lo destapo QC-68: aparecieron **dos censos**, el 17 (`recipe-route-contract`, de QC-91) y el 18
