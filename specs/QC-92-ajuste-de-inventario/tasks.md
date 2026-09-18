@@ -14,7 +14,7 @@
 
 ## Tanda 0 — la puerta
 
-- [ ] **T0 — Aprobación de la séptima enmienda del catálogo de errores.**
+- [x] **T0 — Aprobación de la séptima enmienda del catálogo de errores.**
       **No es una task de código: es una pregunta al humano**, y se responde en la puerta F1.4
       junto con el spec. `design.md > 7` propone `batch_not_found` y `batch_stock_negative`, con su
       plan B por si no se aprueban.
