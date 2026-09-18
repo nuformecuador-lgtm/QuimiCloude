@@ -153,6 +153,36 @@
       `lib/composition/index.ts`, `tests/unit/inventario/batch-actions.test.ts`,
       el archivo de la lista de acciones de QC-104.
 
+- [ ] **T9bis — ENMIENDA AL SPEC del 2026-09-18: las cinco guardias heredadas.** Depende de T8 y T9.
+      **No estaba en el spec original.** T1 y T8 pusieron rojos **cinco** casos de guardia de otras
+      fichas. **Aprobada por el humano el 2026-09-18**, con dos familias y **trato distinto**, que no
+      se mezclan:
+
+      **Familia A — los dos del barrel: se DEROGAN.** `qc81-alcance.test.ts` (QC-81 R32, caso del
+      barrel) y `module-contract.test.ts` (QC-90 R30). Son prohibiciones de **política**, no censos
+      de estado, y su propia premisa dice «listar lotes **NO tiene ficha**: si hace falta, **se pide
+      una**». **QC-92 es esa ficha**: R22 y R23 no existen sin exponer esa lectura. Se retira la
+      prohibición **de listar**; editar y borrar lotes **siguen prohibidos**.
+      **NO se acota por rama**, y esto es lo que la distingue del precedente de R31/R32 (`be90661`,
+      `921e224`): aquello era un estado **transitorio de rama**; esto es permanente **tras el
+      merge**, así que acotar dejaría la guardia roja al mergear y escribiría una afirmación falsa.
+
+      **Familia B — los cuatro de `inventario-schema.test.ts`: se ACTUALIZAN.** Son censos de «qué
+      hay hoy» y lo que hay cambió legítimamente: `InventoryMovement` (T1), la back-relation
+      `movements` de `ProductBatch` (T1) y las tres factorías nuevas del barrel (T8).
+      **`movements` no se añade a `PRODUCT_BATCH_COLUMNS`**: una back-relation no es una columna.
+
+      **Límites, para las dos familias:** ningún detector se toca —`operacionesDeLoteProhibidas`,
+      `OPERACIONES_PROHIBIDAS`, `PALABRAS_DE_LOTE`, `metodosDePuerto`, `words`—; ningún caso de uso
+      ni export se renombra para esquivar una guardia; ninguna lista de excepciones que crezca sola;
+      **nota fechada 2026-09-18** en cada caso tocado y **prueba por mutación** de cada uno.
+      **Hecho:** los cinco casos verdes, cada uno con su mutación demostrando que **sigue
+      mordiendo**, y `./init.sh --rapido` verde. **Cubre R22 y R23 en su parte de alcance**; no
+      cambia ningún otro requisito.
+      **Archivos:** `tests/unit/inventario/qc81-alcance.test.ts`,
+      `tests/unit/inventario/module-contract.test.ts`,
+      `tests/unit/inventario/schema/inventario-schema.test.ts`.
+
 ---
 
 ## Tanda 5 — la pantalla
@@ -250,6 +280,9 @@ T1 ─► T2              │
                   └─► T15  (también depende de T3)
 ```
 
+- **T9bis cuelga de T9** y cierra la tanda 4: sin ella el gate no puede ponerse verde, porque los
+  cinco casos heredados están rojos desde T1 (tres) y T8 (dos). No bloquea a T10 en contenido, pero
+  **la tanda 4 no cierra sin ella**.
 - **T5 → T6 → T7 es un bloque**: no se corre el gate dentro de él.
 - **T10 y T11 son `[P]`** entre sí; tocan archivos distintos.
 - **T4 muere si T0 sale que no**, y el plan B de `design.md > 7` se aplica dentro de T8.

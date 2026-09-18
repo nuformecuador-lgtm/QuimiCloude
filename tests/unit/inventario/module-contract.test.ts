@@ -4,9 +4,10 @@
 // deliberadamente NO entran quedan aqui escritas como test, porque son ausencias y una
 // ausencia no la protege nadie salvo que alguien la afirme en positivo:
 //
-//   R30 — el contrato publico NO expone ninguna operacion de LISTAR, EDITAR ni BORRAR lotes.
-//         «Listar, editar y borrar lotes» no tiene ficha y no se crea aqui
-//         (`requirements.md > Alcance > Lo que NO entra`): nace el dia que alguien lo pida.
+//   R30 — el contrato publico NO expone ninguna operacion de EDITAR ni BORRAR lotes. Nacio
+//         prohibiendo tambien LISTAR porque «listar, editar y borrar lotes» no tenia ficha
+//         (`requirements.md > Alcance > Lo que NO entra`) y nacia el dia que alguien la pidiera:
+//         el 2026-09-18 la pidio QC-92 y esa parte queda derogada (ver la nota del describe).
 //
 //   R31 — el listado de productos NO devuelve presentacion, asi que al elegir un producto
 //         existente en el autocomplete el selector de presentacion queda VACIO. Es la
@@ -114,7 +115,45 @@ const OPERACIONES_PROHIBIDAS = new Set([
 /** Palabras que hacen que un export hable de LOTES y no de otra cosa. */
 const PALABRAS_DE_LOTE = new Set(['batch', 'batches', 'lot', 'lots', 'lote', 'lotes']);
 
-describe('QC-90 R30 — el contrato de inventario no ofrece listar, editar ni borrar lotes', () => {
+/**
+ * 2026-09-18 (QC-92, enmienda al spec aprobada por el humano): conjunto CERRADO de verbos de
+ * lectura cuya prohibicion queda DEROGADA. R30 decia que listar, editar y borrar lotes «NO tiene
+ * ficha: si hace falta, se pide una»; QC-92 es esa ficha, y sus R22 (panel de lotes) y R23
+ * (historial del lote) no existen sin publicar esa lectura en el contrato. No se acota por rama:
+ * tras el merge el barrel expone el listado de lotes para siempre. Editar y borrar siguen
+ * prohibidos, y `OPERACIONES_PROHIBIDAS` no se toca: cambia que se considera infraccion, no como
+ * se caza. No es una lista de excepciones que crezca: se escribe de una vez y con su fecha.
+ */
+const OPERACIONES_DE_LECTURA_DEROGADAS = new Set([
+  'list',
+  'listar',
+  'get',
+  'find',
+  'fetch',
+  'read',
+  'query',
+  'search',
+  'buscar',
+  'obtener',
+]);
+
+/** Un nombre infringe si junta una palabra de lote con una operacion prohibida NO derogada. */
+function operacionesDeLoteVigentes(nombres: readonly string[]): string[] {
+  return nombres
+    .filter((nombre) => {
+      const partes = words(nombre);
+      return (
+        partes.some((parte) => PALABRAS_DE_LOTE.has(parte)) &&
+        partes.some(
+          (parte) =>
+            OPERACIONES_PROHIBIDAS.has(parte) && !OPERACIONES_DE_LECTURA_DEROGADAS.has(parte),
+        )
+      );
+    })
+    .sort();
+}
+
+describe('QC-90 R30 — el contrato de inventario no ofrece editar ni borrar lotes', () => {
   // Se mira lo que el barrel EXPORTA DE VERDAD -las claves del modulo ya cargado-, no un regex
   // sobre su texto: un regex se engana con un comentario, con un reexport indirecto o con un
   // `export * from`. Aqui solo aparecen los exports de VALOR, que es exactamente lo que una
@@ -133,22 +172,40 @@ describe('QC-90 R30 — el contrato de inventario no ofrece listar, editar ni bo
     expect(claves).toContain('PRODUCT_BATCH_LOT_MAX_LENGTH');
   });
 
-  it('ningun export del contrato denota listar, editar ni borrar lotes', () => {
+  it('ningun export del contrato denota editar ni borrar lotes', () => {
     // La regla NO es una lista negra de nombres concretos -de esas hay que acordarse, y nadie
     // se acuerda-: es estructural. Cualquier export NUEVO cuyo nombre junte una palabra de lote
-    // con un verbo de listar/editar/borrar pone esto rojo, se llame `listProductBatches`,
-    // `deleteBatch`, `batchQuery` o `updateLote`.
-    const infractores = claves.filter((clave) => {
-      const partes = words(clave);
-      return (
-        partes.some((parte) => PALABRAS_DE_LOTE.has(parte)) &&
-        partes.some((parte) => OPERACIONES_PROHIBIDAS.has(parte))
-      );
-    });
+    // con un verbo de editar/borrar pone esto rojo, se llame `deleteBatch` o `updateLote`.
+    // 2026-09-18: los verbos de lectura ya no cuentan (ver la nota de OPERACIONES_DE_LECTURA_DEROGADAS).
+    const infractores = operacionesDeLoteVigentes(claves);
     expect(
       infractores,
       `el contrato publico de inventario expone operaciones de lote que R30 prohibe: ${infractores.join(', ')}. ` +
-        'Listar, editar y borrar lotes NO tiene ficha (requirements.md > Lo que NO entra): si hace falta, se pide una.',
+        'Editar y borrar lotes no tiene ficha (requirements.md > Lo que NO entra): si hace falta, se pide una, ' +
+        'como QC-92 pidio la de listar.',
+    ).toEqual([]);
+  });
+
+  // 2026-09-18: prueba por mutacion de la derogacion, sobre nombres FABRICADOS y no sobre el
+  // barrel real, para no fijar en el archivo el estado del arbol.
+  it('tras la derogacion la politica sigue mordiendo editar y borrar, y ya no listar', () => {
+    expect(
+      operacionesDeLoteVigentes([
+        'deleteBatch',
+        'updateLot',
+        'borrarLotes',
+        'editBatch',
+        'removeBatch',
+      ]),
+    ).toEqual(['borrarLotes', 'deleteBatch', 'editBatch', 'removeBatch', 'updateLot']);
+
+    expect(
+      operacionesDeLoteVigentes(['listProductBatches', 'findBatchMovements', 'getBatch']),
+    ).toEqual([]);
+
+    // El alta nunca estuvo prohibida, ni antes ni despues.
+    expect(
+      operacionesDeLoteVigentes(['createProductWithFirstBatchSchema', 'addBatchToAlive']),
     ).toEqual([]);
   });
 });

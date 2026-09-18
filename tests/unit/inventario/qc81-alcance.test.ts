@@ -548,20 +548,68 @@ describe('QC-81 R31 — ni existencia por lote (QC-91) ni ajuste de inventario (
 });
 
 // ---------------------------------------------------------------------------------------------
-// NI LISTAR, NI EDITAR, NI BORRAR LOTES
+// NI EDITAR NI BORRAR LOTES
 // ---------------------------------------------------------------------------------------------
 
-describe('QC-81 R32 — el contrato de inventario no expone listar, editar ni borrar lotes', () => {
-  it('R32: ningun export del contrato publico denota listar, editar ni borrar lotes', () => {
+// 2026-09-18 (QC-92, enmienda al spec aprobada por el humano): se DEROGA la parte de
+// LISTAR/LEER de esta prohibicion. El propio mensaje de QC-90 R30 decia que listar, editar
+// y borrar lotes «NO tiene ficha: si hace falta, se pide una»; QC-92 es esa ficha, y sus
+// R22 (panel de lotes) y R23 (historial del lote) no existen sin exponer esa lectura en el
+// contrato. No se acota por rama -como si se acotaron R31 y el puerto de R32- porque
+// aquello era un estado transitorio y esto no: tras el merge el barrel expone el listado de
+// lotes para siempre, y acotarlo dejaria la guardia roja al mergear. Sigue prohibido EDITAR
+// y BORRAR, y el detector no se toca: lo que cambia es que se considera infraccion.
+//
+// Conjunto CERRADO de verbos que la derogacion retira de `OPERACIONES_PROHIBIDAS`, escrito
+// de una vez: no es una lista de excepciones a la que se le anadan nombres.
+const OPERACIONES_DE_LECTURA_DEROGADAS = new Set([
+  'list', 'listar', 'get', 'find', 'fetch', 'read', 'query', 'search', 'buscar', 'obtener',
+]);
+
+/** Lo que el detector caza, menos los nombres cuya unica operacion prohibida esta derogada. */
+function operacionesDeLoteVigentes(nombres: readonly string[]): string[] {
+  return operacionesDeLoteProhibidas(nombres).filter((nombre) =>
+    palabras(nombre).some(
+      (p) => OPERACIONES_PROHIBIDAS.has(p) && !OPERACIONES_DE_LECTURA_DEROGADAS.has(p),
+    ),
+  );
+}
+
+describe('QC-81 R32 — el contrato de inventario no expone editar ni borrar lotes', () => {
+  it('R32: ningun export del contrato publico denota editar ni borrar lotes', () => {
     // Las claves del barrel YA CARGADO, no un regex sobre su texto: una operacion es un valor.
     const claves = Object.keys(inventario).sort();
     expect(claves.length, 'el barrel de inventario no expone exports de valor').toBeGreaterThan(10);
     expect(claves).toContain('createProductWithFirstBatchSchema');
 
-    const infractores = operacionesDeLoteProhibidas(claves);
+    const infractores = operacionesDeLoteVigentes(claves);
     expect(
       infractores,
-      `QC-81 R32 (se mantiene QC-90 R30): el contrato expone operaciones de lote prohibidas: ${infractores.join(', ')}`,
+      `QC-81 R32 (se mantiene QC-90 R30 salvo su parte de listar, derogada el 2026-09-18): el ` +
+        `contrato expone operaciones de lote prohibidas: ${infractores.join(', ')}`,
+    ).toEqual([]);
+  });
+
+  // 2026-09-18: prueba por mutacion de la derogacion, sobre nombres FABRICADOS y no sobre el
+  // barrel real, para no fijar en el archivo el estado del arbol.
+  it('R32: tras la derogacion la politica sigue mordiendo editar y borrar, y ya no listar', () => {
+    expect(
+      operacionesDeLoteVigentes([
+        'deleteBatch',
+        'updateLot',
+        'borrarLotes',
+        'editBatch',
+        'removeBatch',
+      ]),
+    ).toEqual(['borrarLotes', 'deleteBatch', 'editBatch', 'removeBatch', 'updateLot']);
+
+    expect(
+      operacionesDeLoteVigentes(['listProductBatches', 'findBatchMovements', 'getBatch']),
+    ).toEqual([]);
+
+    // El alta nunca estuvo prohibida, ni antes ni despues.
+    expect(
+      operacionesDeLoteVigentes(['createProductWithFirstBatchSchema', 'addBatchToAlive']),
     ).toEqual([]);
   });
 
