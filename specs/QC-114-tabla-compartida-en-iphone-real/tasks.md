@@ -23,7 +23,7 @@ esa respuesta.**
 
 ## Preparación — las hace un agente
 
-### [ ] T1 [AGENTE] — Crear la plantilla del registro de evidencia
+### [x] T1 [AGENTE] — Crear la plantilla del registro de evidencia
 - **Depende de**: nada.
 - **Qué**: crear `docs/verificacion-ios/QC-114.md` con la estructura de `design.md > 4`: cabecera
   (dispositivo, versión de iOS, navegador, URL del preview, fecha, verificador), la nota de Android
@@ -34,7 +34,7 @@ esa respuesta.**
   casillas A/B/C están **vacías** (la plantilla no inventa veredictos) y la cabecera tiene los
   campos en blanco a rellenar.
 
-### [ ] T2 [AGENTE] [P] — Escribir el mapa de trazabilidad dentro del registro
+### [x] T2 [AGENTE] [P] — Escribir el mapa de trazabilidad dentro del registro
 - **Depende de**: T1.
 - **Qué**: copiar la tabla `R<n> -> evidencia` de `design.md > 6` a la sección «Mapa» del registro,
   y dejar el mismo mapa en `progress/impl_QC-114-tabla-compartida-en-iphone-real.md`.
