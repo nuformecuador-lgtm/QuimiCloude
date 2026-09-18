@@ -554,7 +554,7 @@ describe('listOrders — el campo no declarado se omite, no rompe y se anota (QC
 // `recipes.findRefsIncludingDeleted`) y 3 con busqueda (mas `recipes.findIdsMatchingName`), y
 // que ninguno de los dos crece con el numero de filas. Nota fechada 2026-09-17 en
 // `design.md > 3` y correccion fechada en `tasks.md > T9`: las dos cifras son ciertas y miden
-// cosas distintas, y quien demuestra el numero de consultas SQL es el test de integracion.
+// cosas distintas. El numero de consultas SQL no esta probado por ningun test de este repo.
 describe('listOrders — invocaciones de puerto por pagina, con y sin busqueda (R8, R9)', () => {
   it('sin busqueda: DOS invocaciones de puerto, tenga la pagina 1 fila o 25 (R8)', async () => {
     for (const cuantas of [1, 25]) {

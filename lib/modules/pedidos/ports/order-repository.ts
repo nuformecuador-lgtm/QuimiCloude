@@ -60,10 +60,10 @@ export interface OrderRepository {
   /**
    * Listado paginado (R34, R38, R41) con el CONTRATO GENERICO de consulta (QC-57 R13, R25).
    *
-   * **Un solo parametro.** `OrderFilters` desaparecio con QC-57: el estado y la prioridad ya no
-   * son parametros propios del listado, son filtros `select` DENTRO de la consulta (R25), como
-   * en las otras seis listas. La consulta llega YA SANEADA -lo que no esta en `ORDER_QUERYABLE`
-   * no llega aqui (R5)- y con los valores de los dos `select` ya acotados a su conjunto cerrado.
+   * El estado y la prioridad no son parametros propios del listado: son filtros `select`
+   * DENTRO de la consulta (R25), como en las otras seis listas. `OrderFilters` desaparecio con
+   * QC-57. La consulta llega YA SANEADA -lo que no esta en `ORDER_QUERYABLE` no llega aqui
+   * (R5)- y con los valores de los dos `select` ya acotados a su conjunto cerrado.
    *
    * Devuelve una `Page` armada: `toOffsetLimit`/`buildPage` viven en `lib/shared/pagination`,
    * que `domain/` NO puede importar (`docs/architecture.md > La regla de dependencias`), asi

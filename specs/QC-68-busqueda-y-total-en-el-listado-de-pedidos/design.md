@@ -214,8 +214,12 @@ invocaciones en vez de mirar el resultado.
 > Por eso T9 se escribe contando invocaciones y con esas cifras. Es también lo que dice hoy el
 > encabezado de `list-orders.ts` («DOS consultas por página»), que mide lo mismo que el test.
 > Quien compare el test con este párrafo y crea que uno de los dos miente, que lea esta nota: la
-> propiedad que las dos defienden es la misma —**el número no crece con las filas**—, y quien la
-> demuestra contra la base real es el test de integración, no el unitario.
+> propiedad que las dos defienden es la misma —**el número no crece con las filas**—.
+>
+> **Recorte fechado 2026-09-18:** esta nota cerraba prometiendo que el número de consultas SQL
+> lo demuestra un test de integración. Ese test no existe y no se escribe para salvar la frase:
+> el número de consultas SQL no está probado por ningún test de este repo, solo razonado aquí a
+> partir de lo que hace `listAlive`.
 
 **El caso «ninguna receta casa» NO se cortocircuita en el dominio.** Se pasa `recipeIds: []` al
 repositorio y el `where` sale con `recipeId: { in: [] }`, que devuelve cero filas y un `count` de

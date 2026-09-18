@@ -121,7 +121,9 @@
   `design.md > 3` y que un doble **no puede ver** —el `findMany` y el `count` viven dentro de una
   sola invocación de `listAlive`—. Las dos cifras son ciertas y miden cosas distintas; la nota
   fechada que lo explica está en `design.md > 3`, donde el conteo de SQL **no se ha borrado**.
-  Quien demuestra el número de consultas SQL contra la base real es el test de integración.
+- **Recortado el 2026-09-18**: la corrección de arriba cerraba prometiendo que el número de
+  consultas SQL lo demuestra un test de integración. Ese test no existe y no se escribe para
+  salvar la frase; el número de consultas SQL no está probado por ningún test de este repo.
 - **Hecho**: el caso se pone rojo si alguien mete la resolución de ids dentro de un bucle por fila.
 
 ---
