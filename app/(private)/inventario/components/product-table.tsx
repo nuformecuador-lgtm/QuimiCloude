@@ -1,20 +1,116 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useMemo, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 
 import {
   DataTable,
   type DataTableParams,
   type DataTableTexts,
 } from '@/components/shared/data-table';
-import type { ProductView } from '@/lib/modules/inventario';
+import { Button } from '@/components/ui/button';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import { listProductBatchesAction } from '@/lib/modules/inventario/adapters/driving/batch-actions';
+import type { ErrorState } from '@/lib/modules/errores';
+import type { ProductBatchView, ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 
+import { AdjustBatchDialog } from './adjust-batch-dialog';
+import { BatchHistory } from './batch-history';
 import { DeleteProductDialog } from './delete-product-dialog';
 import { PRODUCT_DEFAULT_PINNED_COLUMNS, buildProductColumns } from './product-columns';
 import { productListHref } from './product-list-params';
+import { ProductBatchesPanel } from './product-batches-panel';
 import { ProductSheet } from './product-sheet';
+
+const TOUCH_TARGET = 'min-h-11 min-w-11';
+
+type BatchesLoadState =
+  | { readonly status: 'idle' }
+  | { readonly status: 'loading' }
+  | { readonly status: 'success'; readonly data: readonly ProductBatchView[] }
+  | ErrorState;
+
+type ProductBatchesSheetProps = {
+  readonly product: ProductView;
+  readonly units?: readonly UnitRef[];
+  /** Falla cerrado: el permiso baja por props, esta pantalla no lo resuelve. */
+  readonly canAdjust: boolean;
+};
+
+/**
+ * Panel lateral con los lotes de un producto. Pide los lotes al abrirse por primera vez y
+ * los vuelve a pedir tras un ajuste, para que la existencia nueva se vea.
+ */
+function ProductBatchesSheet({ product, units, canAdjust }: ProductBatchesSheetProps) {
+  const [state, setState] = useState<BatchesLoadState>({ status: 'idle' });
+
+  function fetchBatches() {
+    setState({ status: 'loading' });
+    void listProductBatchesAction(product.id).then((result) => {
+      setState(result.status === 'success' ? { status: 'success', data: result.data } : result);
+    });
+  }
+
+  function handleOpenChange(open: boolean) {
+    if (open && state.status === 'idle') fetchBatches();
+  }
+
+  return (
+    <Sheet onOpenChange={handleOpenChange}>
+      <SheetTrigger
+        render={
+          <Button
+            variant="ghost"
+            className={TOUCH_TARGET}
+            aria-label={`Lotes de ${product.name}`}
+            data-testid="product-batches-open"
+          />
+        }
+      >
+        Lotes
+      </SheetTrigger>
+      <SheetContent data-testid="product-batches-sheet">
+        <SheetHeader>
+          <SheetTitle>{product.name}</SheetTitle>
+        </SheetHeader>
+
+        {state.status === 'loading' ? (
+          <p data-testid="product-batches-loading">Cargando lotes…</p>
+        ) : null}
+
+        {state.status === 'error' ? (
+          <p role="alert" data-testid="product-batches-error">
+            {state.message}
+          </p>
+        ) : null}
+
+        {state.status === 'success' ? (
+          <ProductBatchesPanel
+            batches={state.data}
+            units={units}
+            renderBatchDetail={(batch) => (
+              <BatchHistory batchId={batch.id} batchLot={batch.lot} />
+            )}
+            renderBatchActions={(batch) => (
+              <AdjustBatchDialog
+                batch={batch}
+                canAdjust={canAdjust}
+                onAdjusted={fetchBatches}
+              />
+            )}
+          />
+        ) : null}
+      </SheetContent>
+    </Sheet>
+  );
+}
 
 /**
  * Tabla del catalogo (R6-R11, `design.md > 4.3`, `> 7`).
@@ -92,9 +188,20 @@ export type ProductTableProps = {
   readonly totalPages: number;
   /** Catalogo de unidades, para resolver el simbolo de la existencia en la columna. */
   readonly units?: readonly UnitRef[];
+  /**
+   * Permiso `inventario.modificar`, resuelto en el servidor y bajado por props. Defecto `false`:
+   * falla cerrado, como el resto de esta ruta.
+   */
+  readonly canAdjust?: boolean;
 };
 
-export function ProductTable({ products, params, totalPages, units }: ProductTableProps) {
+export function ProductTable({
+  products,
+  params,
+  totalPages,
+  units,
+  canAdjust = false,
+}: ProductTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -106,13 +213,14 @@ export function ProductTable({ products, params, totalPages, units }: ProductTab
       buildProductColumns({
         rowActions: (product) => (
           <>
+            <ProductBatchesSheet product={product} units={units} canAdjust={canAdjust} />
             <ProductSheet product={product} />
             <DeleteProductDialog product={product} />
           </>
         ),
         units,
       }),
-    [units],
+    [units, canAdjust],
   );
 
   /*

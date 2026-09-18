@@ -2,6 +2,7 @@
 
 import { useId, useState } from 'react';
 
+import { CountdownTimer } from '@/components/shared/countdown-timer';
 import { Button } from '@/components/ui/button';
 import type { RecipeStepDocument } from '@/lib/modules/recetas';
 
@@ -37,12 +38,17 @@ const TEXTS = {
   finish: 'Finalizar',
   position: (current: number, total: number) => `Paso ${current} de ${total}`,
   blocked: (pending: number) => `Marca los ${pending} elementos pendientes para continuar.`,
+  waitPrefix: 'Espera',
+  waitSuffix: 'para continuar.',
 } as const;
 
 export type StepReaderProps = {
   readonly steps: readonly RecipeStepDocument[];
   readonly onFinish: () => void;
   readonly title?: string;
+  /** Segundos que cada paso exige antes de permitir avanzar. Ausente, cero, negativo o no
+   *  finito: sin espera. */
+  readonly minStepSeconds?: number;
 };
 
 /** Clave de un item marcado. El paso entra en la clave: marcar en el paso 2 no marca en el 1. */
@@ -70,13 +76,19 @@ function countPendingItems(
   }, 0);
 }
 
-export function StepReader({ steps, onFinish, title }: StepReaderProps) {
+export function StepReader({ steps, onFinish, title, minStepSeconds }: StepReaderProps) {
   const baseId = useId();
   const [index, setIndex] = useState(0);
   const [checkedItems, setCheckedItems] = useState<ReadonlySet<string>>(() => new Set<string>());
+  const [arrival, setArrival] = useState(0);
+  const [waitedArrival, setWaitedArrival] = useState<number | null>(null);
+
+  const waitEnabled =
+    minStepSeconds !== undefined && Number.isFinite(minStepSeconds) && minStepSeconds > 0;
 
   const headingId = `${baseId}-title`;
   const reasonId = `${baseId}-reason`;
+  const waitReasonId = `${baseId}-wait-reason`;
 
   if (steps.length === 0) {
     // R21: estado vacio explicito y NINGUNA navegacion entre pasos.
@@ -103,7 +115,12 @@ export function StepReader({ steps, onFinish, title }: StepReaderProps) {
   const isLast = currentIndex === steps.length - 1;
   const isFirst = currentIndex === 0;
   const pending = countPendingItems(current, currentIndex, checkedItems);
-  const blocked = pending > 0;
+  const waiting = waitEnabled && waitedArrival !== arrival;
+  const blocked = pending > 0 || waiting;
+  const reasonIds = [pending > 0 ? reasonId : undefined, waiting ? waitReasonId : undefined]
+    .filter((id): id is string => id !== undefined)
+    .join(' ');
+  const describedBy = reasonIds === '' ? undefined : reasonIds;
 
   function toggleItem(blockIndex: number, itemIndex: number, checked: boolean) {
     setCheckedItems((previous) => {
@@ -119,14 +136,27 @@ export function StepReader({ steps, onFinish, title }: StepReaderProps) {
   }
 
   function goPrevious() {
-    // R15: en el primer paso, Anterior no retrocede. El boton ya va `disabled`; esto cierra
+    // En el primer paso, Anterior no retrocede. El boton ya va `disabled`; esto cierra
     // tambien la activacion por programa.
-    setIndex((previous) => Math.max(0, previous - 1));
+    const next = Math.max(0, currentIndex - 1);
+    if (next !== currentIndex) {
+      setArrival((previous) => previous + 1);
+    }
+    setIndex(next);
   }
 
   function goNext() {
     if (blocked) return;
-    setIndex((previous) => Math.min(steps.length - 1, previous + 1));
+    const next = Math.min(steps.length - 1, currentIndex + 1);
+    if (next !== currentIndex) {
+      setArrival((previous) => previous + 1);
+    }
+    setIndex(next);
+  }
+
+  function finish() {
+    if (blocked) return;
+    onFinish();
   }
 
   return (
@@ -157,9 +187,21 @@ export function StepReader({ steps, onFinish, title }: StepReaderProps) {
         onToggleItem={toggleItem}
       />
 
-      {blocked && (
+      {pending > 0 && (
         <p id={reasonId} data-testid="step-reader-blocked-reason" className="text-base">
           {TEXTS.blocked(pending)}
+        </p>
+      )}
+
+      {waiting && (
+        <p id={waitReasonId} data-testid="step-reader-wait-reason" className="text-base">
+          {TEXTS.waitPrefix}{' '}
+          <CountdownTimer
+            key={arrival}
+            seconds={minStepSeconds}
+            onEnd={() => setWaitedArrival(arrival)}
+          />{' '}
+          {TEXTS.waitSuffix}
         </p>
       )}
 
@@ -181,8 +223,8 @@ export function StepReader({ steps, onFinish, title }: StepReaderProps) {
             className={TOUCH_TARGET}
             data-testid="step-reader-finish"
             disabled={blocked}
-            aria-describedby={blocked ? reasonId : undefined}
-            onClick={onFinish}
+            aria-describedby={describedBy}
+            onClick={finish}
           >
             {TEXTS.finish}
           </Button>
@@ -192,7 +234,7 @@ export function StepReader({ steps, onFinish, title }: StepReaderProps) {
             className={TOUCH_TARGET}
             data-testid="step-reader-next"
             disabled={blocked}
-            aria-describedby={blocked ? reasonId : undefined}
+            aria-describedby={describedBy}
             onClick={goNext}
           >
             {TEXTS.next}

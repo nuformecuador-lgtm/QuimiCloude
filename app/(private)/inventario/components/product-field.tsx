@@ -1,7 +1,7 @@
 'use client';
 
 import { CircleAlertIcon } from 'lucide-react';
-import { useId, type ReactNode } from 'react';
+import { useId, type ChangeEventHandler, type ReactNode } from 'react';
 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,11 +27,16 @@ type ProductFieldProps = {
    * viene, no se pinta ningun icono: un campo que se explica solo no lleva adorno.
    */
   readonly helper?: ReactNode;
-  readonly defaultValue: string;
+  /** Valor inicial del campo sin controlar. No se pasa junto con `value`. */
+  readonly defaultValue?: string;
   /** Mensaje de error del campo (R20). Se pinta en linea y marca el input como invalido. */
   readonly error?: string;
   /** Solo para `text`: teclado decimal en movil sin usar `type="number"`. */
   readonly inputMode?: 'decimal';
+  /** Pasa el campo a controlado. Lo usan los dos importes del lote y nadie mas. */
+  readonly value?: string;
+  /** Acompana a `value`: sin el, el campo controlado seria de solo lectura. */
+  readonly onChange?: ChangeEventHandler<HTMLInputElement>;
 };
 
 /**
@@ -54,6 +59,10 @@ type ProductFieldProps = {
  * **`key={defaultValue}`** por la misma razon que en `login-form.tsx`: Base UI avisa cuando el
  * `defaultValue` de un campo no controlado cambia despues de montarse, y la clave fuerza un
  * remontaje justo en ese salto. El campo sigue sin estar controlado.
+ *
+ * **Salvo que se le pase `value`**: entonces el campo pasa a controlado y no lleva ni
+ * `defaultValue` ni `key`. Es una salida acotada para los dos importes del lote, que se filtran y
+ * se rellenan el uno al otro mientras se teclean; los otros siete campos siguen sin controlar.
  */
 export function ProductField({
   name,
@@ -64,12 +73,17 @@ export function ProductField({
   defaultValue,
   error,
   inputMode,
+  value,
+  onChange,
 }: ProductFieldProps) {
   const fieldId = useId();
   const inputId = `${fieldId}-${name}`;
   const errorId = `${inputId}-error`;
 
   const isNumber = type === 'number';
+  // Base UI elige entre controlado y sin controlar segun `value` sea `undefined`, asi que las dos
+  // ramas no pueden convivir. La `key` de remontaje sobra igual: sirve justo para lo contrario.
+  const isControlled = value !== undefined;
 
   return (
     <div className="flex flex-col gap-2">
@@ -102,7 +116,7 @@ export function ProductField({
       </div>
 
       <Input
-        key={defaultValue}
+        key={isControlled ? undefined : defaultValue}
         id={inputId}
         name={name}
         type={type}
@@ -110,7 +124,9 @@ export function ProductField({
         step={isNumber ? 1 : undefined}
         min={isNumber ? 0 : undefined}
         required={required}
-        defaultValue={defaultValue}
+        defaultValue={isControlled ? undefined : defaultValue}
+        value={value}
+        onChange={onChange}
         className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
         aria-invalid={error === undefined ? undefined : true}
         aria-describedby={error === undefined ? undefined : errorId}

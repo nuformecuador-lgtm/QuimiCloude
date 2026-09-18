@@ -18,12 +18,15 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { BatchDuplicateLotError, createCreateProduct, ValidationError } from '@/lib/modules/inventario';
+import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
   addBatchToAlive,
+  adjustBatchStock,
   createProduct,
   createWithFirstBatch,
   findAliveIdByName,
   findAliveProductById,
+  findBatchesOfAliveProduct,
   listAliveProducts,
   softDeleteAliveProduct,
   updateAliveProduct,
@@ -164,6 +167,7 @@ async function createFixture(): Promise<Fixture> {
  * con un nombre irrepetible.
  */
 async function dropFixture(fixture: Fixture): Promise<void> {
+  await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.productBatch.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.product.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
@@ -674,6 +678,9 @@ const repositorioReal: ProductRepository = {
   findAliveIdByName,
   createWithFirstBatch,
   addBatchToAlive,
+  adjustBatchStock,
+  findBatchesOfAliveProduct,
+  findBatchMovements,
 };
 
 describe('R3: la fecha de compra se guarda sin corrimiento de dia', () => {

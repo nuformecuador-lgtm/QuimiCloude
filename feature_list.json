@@ -49,8 +49,8 @@
       "zone": "backend",
       "branch": "feature/QC-6-seed-roles-y-usuario-inicial",
       "depends_on": [
-        "QC-5",
-        "QC-15"
+        "QC-15",
+        "QC-5"
       ],
       "spec_path": "specs/QC-6-seed-roles-y-usuario-inicial"
     },
@@ -67,8 +67,8 @@
       "zone": "backend",
       "branch": "feature/QC-7-login-usuario-y-contrasena",
       "depends_on": [
-        "QC-5",
-        "QC-15"
+        "QC-15",
+        "QC-5"
       ],
       "spec_path": "specs/QC-7-login-usuario-y-contrasena"
     },
@@ -85,8 +85,8 @@
       "zone": "backend",
       "branch": "feature/QC-8-sesion-actual-y-logout",
       "depends_on": [
-        "QC-7",
-        "QC-15"
+        "QC-15",
+        "QC-7"
       ],
       "spec_path": "specs/QC-8-sesion-actual-y-logout"
     },
@@ -103,8 +103,8 @@
       "zone": "backend",
       "branch": "feature/QC-9-proteccion-de-rutas-privadas",
       "depends_on": [
-        "QC-8",
-        "QC-15"
+        "QC-15",
+        "QC-8"
       ],
       "spec_path": "specs/QC-9-proteccion-de-rutas-privadas"
     },
@@ -169,11 +169,11 @@
       "zone": "frontend",
       "branch": "feature/QC-13-guardia-de-sesion-en-navegacion",
       "depends_on": [
-        "QC-9",
         "QC-10",
         "QC-12",
         "QC-15",
-        "QC-22"
+        "QC-22",
+        "QC-9"
       ],
       "spec_path": "specs/QC-13-guardia-de-sesion-en-navegacion"
     },
@@ -207,8 +207,8 @@
       "zone": "fullstack",
       "branch": "feature/QC-15-arquitectura-hexagonal-y-modulos",
       "depends_on": [
-        "QC-5",
-        "QC-11"
+        "QC-11",
+        "QC-5"
       ],
       "spec_path": "specs/QC-15-arquitectura-hexagonal-y-modulos"
     },
@@ -329,8 +329,8 @@
       "zone": "backend",
       "branch": "feature/QC-25-crud-de-recetas",
       "depends_on": [
-        "QC-24",
         "QC-20",
+        "QC-24",
         "QC-8"
       ],
       "spec_path": "specs/QC-25-crud-de-recetas"
@@ -365,9 +365,9 @@
       "zone": "backend",
       "branch": "feature/QC-28-cache-de-sesion-en-redis",
       "depends_on": [
-        "QC-8",
+        "QC-104",
         "QC-23",
-        "QC-104"
+        "QC-8"
       ],
       "spec_path": "specs/QC-28-cache-de-sesion-en-redis"
     },
@@ -433,8 +433,8 @@
       "zone": "backend",
       "branch": "feature/QC-33-modelo-pedidos",
       "depends_on": [
-        "QC-32",
-        "QC-24"
+        "QC-24",
+        "QC-32"
       ],
       "spec_path": "specs/QC-33-modelo-pedidos"
     },
@@ -504,8 +504,8 @@
       "branch": "feature/QC-38-crud-de-unidades",
       "depends_on": [
         "QC-32",
-        "QC-76",
-        "QC-74"
+        "QC-74",
+        "QC-76"
       ],
       "spec_path": "specs/QC-38-crud-de-unidades"
     },
@@ -656,8 +656,8 @@
       "zone": "backend",
       "branch": "feature/QC-49-aislamiento-por-empresa-en-inventario",
       "depends_on": [
-        "QC-48",
-        "QC-32"
+        "QC-32",
+        "QC-48"
       ],
       "spec_path": "specs/QC-49-aislamiento-por-empresa-en-inventario"
     },
@@ -674,8 +674,8 @@
       "zone": "backend",
       "branch": "feature/QC-50-aislamiento-por-empresa-en-recetas",
       "depends_on": [
-        "QC-48",
-        "QC-32"
+        "QC-32",
+        "QC-48"
       ],
       "spec_path": "specs/QC-50-aislamiento-por-empresa-en-recetas"
     },
@@ -692,8 +692,8 @@
       "zone": "backend",
       "branch": "feature/QC-51-aislamiento-por-empresa-en-unidades",
       "depends_on": [
-        "QC-48",
-        "QC-32"
+        "QC-32",
+        "QC-48"
       ],
       "spec_path": "specs/QC-51-aislamiento-por-empresa-en-unidades"
     },
@@ -774,8 +774,8 @@
       "zone": "frontend",
       "branch": "feature/QC-56-migrar-listas-a-tabla-compartida",
       "depends_on": [
-        "QC-55",
         "QC-52",
+        "QC-55",
         "QC-57"
       ],
       "spec_path": "specs/QC-56-migrar-listas-a-tabla-compartida"
@@ -851,10 +851,10 @@
       "epic": "QC-16",
       "epic_name": "Plataforma",
       "name": "guardia-empresa-en-esquema",
-      "description": "Hoy nada impide que una feature nueva cree una tabla de datos de operacion sin su columna de empresa: la regla existe escrita en `docs/architecture.md > Dominio` y solo la hace cumplir el criterio del reviewer. Hace falta una guardia ejecutable que corra en el gate y falle sola.\n\nLa guardia lee `db/schema.prisma` y da rojo si un modelo de negocio no lleva su columna de empresa. Es el mismo patron que la guardia que ya vigila el comentario `/// @module`. Dos listas explicitas y cortas la acotan: las tablas del sistema, que estan exentas a proposito (`users`, `roles`, `document_types`), y las tablas ya construidas que todavia estan pendientes de aislar, cada una anotada con la ficha que la salda. Esa segunda lista solo puede encoger, nunca crecer: anadir una entrada nueva es rojo. Cuando quede vacia se borra, y con ella la vineta correspondiente de `docs/architecture.md`.\n\nNace el 2026-09-04 junto con la reescritura del punto 1 del dominio, para que la regla quede verificada y no solo escrita (regla 5 de `CLAUDE.md`).",
-      "status": "pending",
+      "description": "Hoy nada impide que una feature nueva cree una tabla de datos de operacion sin su columna de empresa: la regla existe escrita en `docs/architecture.md > Dominio` y solo la hace cumplir el criterio del reviewer. Hace falta una guardia ejecutable que corra en el gate y falle sola.\n\nLa guardia lee `db/schema.prisma` y da rojo si un modelo no declara su columna de empresa y no esta en la LISTA CERRADA DE EXENTAS, escrita en la propia guardia con el motivo de cada entrada. Es el mismo patron que la guardia que ya vigila el comentario `/// @module`. BASTA CON QUE LA COLUMNA EXISTA, obligatoria u opcional (`units` la lleva opcional a proposito, QC-76).\n\nACOTADA EL 2026-09-18, medido en disco:\n\n* Las exentas son OCHO: `document_types`, `roles`, `permissions`, `role_permissions` (catalogos compartidos), `companies` (la propia empresa), `credential_setup_tokens` y `revoked_sessions` (cuelgan de un usuario, que ya tiene empresa) y `recipe_lines` (hereda la empresa de su receta, QC-50). `users` SALE de la lista: ya lleva empresa (QC-47) y la guardia se la exige.\n* La lista de «pendientes de aislar» NO SE CREA: el arco multiempresa ya cerro y naceria vacia.\n* La lista de exentas de `docs/architecture.md > Dominio` se corrige para que coincida con la guardia.\n\nLO QUE NO ENTRA: dar empresa a alguna tabla exenta; comprobar que las consultas filtran por empresa (ya lo hacen las guardias `guard-ambito-empresa-*`).\n\nNace el 2026-09-04 junto con la reescritura del punto 1 del dominio, para que la regla quede verificada y no solo escrita (regla 5 de `CLAUDE.md`).\n\n\\--- Acotada por `/afinar-feature` el 2026-09-18. Las decisiones las fijo el humano ANTES del spec y estan en `specs/QC-61-guardia-empresa-en-esquema/requirements.md`. ---",
+      "status": "done",
       "sdd": true,
-      "complexity": null,
+      "complexity": "low",
       "zone": "backend",
       "branch": "feature/QC-61-guardia-empresa-en-esquema",
       "depends_on": [
@@ -883,7 +883,7 @@
       "epic": "QC-27",
       "epic_name": "Recetas",
       "name": "ejecutar-receta-operador",
-      "description": "El Operador abre un pedido que tiene ASIGNADO y sigue su receta paso a paso desde su propia direccion, enlazable y recargable, sin pasar por el formulario de edicion y sin poder modificar nada. El componente que presenta la receta como formulario de un paso por pantalla -Anterior, Siguiente, Finalizar, y elementos que se marcan- ya existe: lo construyo QC-64 recibiendo todo por props, y esta ficha lo MONTA, no lo reescribe.\n\nREESCRITA EL 2026-09-08 al acotarla con /afinar-feature. La version anterior daba por hecho que el Operador navegaria el catalogo de recetas y que habia que abrirle el permiso de consultar recetas. Es al reves: el Operador no navega recetas, ve SUS PEDIDOS ASIGNADOS y ejecuta la receta de uno de ellos. El permiso no es de recetas sino del modulo nuevo de asignacion (QC-86). Darle consultar recetas le abriria tambien el listado y el formulario de edicion, que es justo lo que esta ficha dice que no debe pasar.\n\nEJECUTAR MUEVE EL ESTADO DEL PEDIDO. Abrirlo lo pone EN_CURSO y Finalizar lo pone ENTREGADO, a traves del caso de uso de transicion de pedidos (QC-34) y no escribiendo la columna por su cuenta. El operario que prepara la mezcla es quien mejor sabe cuando arranco y cuando esta lista.\n\nLAS CANTIDADES NO SE ESCALAN. La pantalla muestra el factor bien visible y fijo -\"Pedido 250 L, receta para 100 L, x2,5\"- y las lineas y los pasos TAL COMO ESTAN ESCRITOS. Escalar solo las lineas seria peor que no escalar: los pasos de QC-62 son texto libre, y si el autor escribio \"cargar el reactor con 90 L de agua\" dentro de un parrafo, ese numero no se puede escalar sin adivinar. La pantalla mostraria 225 L en la lista y 90 L en el paso que el operario esta leyendo. Ninguna cifra de esta pantalla se contradice con otra porque ninguna se toca.\n\nSE PUEDE CAMBIAR LA UNIDAD EN QUE SE VEN LAS CANTIDADES: ver la misma linea en litros o en mililitros, para no obligar a nadie a hacer la conversion de cabeza en planta. Cambia SOLO como se ve; no altera la receta ni el pedido. ESTA FICHA ES EL PRIMER CONSUMIDOR DE LA CONVERSION ENTRE UNIDADES que construyo QC-76 y que hasta hoy no usaba nadie: solo se ofrecen unidades que comparten base efectiva, asi que ofrecer una conversion imposible es un error y no un resultado raro.\n\nAL TERMINAR se muestra una confirmacion visible en pantalla y se vuelve al listado de pedidos asignados. No se guarda nada de lo marcado.\n\nEL BLOQUEO DE SIGUIENTE NO TIENE VIA DE ESCAPE: no se avanza hasta marcar todos los elementos del paso, tal como lo construyo QC-64. Esto cierra la pregunta abierta 1 de QC-64, que estaba escrita esperando a esta ficha.\n\nLo que NO entra: los grupos de trabajo (QC-83, QC-84, QC-85); la tabla de asignacion y asignar desde el pedido (QC-86, QC-87); el listado de pedidos asignados (QC-88), donde esta ficha empieza. Registrar quien marco que y cuando sigue FUERA DE ALCANCE y esta acotacion no le crea ficha.",
+      "description": "El Operador abre un pedido que tiene ASIGNADO y sigue su receta paso a paso desde su propia direccion, enlazable y recargable, sin pasar por el formulario de edicion y sin poder modificar nada. El componente que presenta la receta como formulario de un paso por pantalla -Anterior, Siguiente, Finalizar, y elementos que se marcan- ya existe: lo construyo QC-64 recibiendo todo por props, y esta ficha lo MONTA, no lo reescribe.\n\nREESCRITA EL 2026-09-08 al acotarla con /afinar-feature. La version anterior daba por hecho que el Operador navegaria el catalogo de recetas y que habia que abrirle el permiso de consultar recetas. Es al reves: el Operador no navega recetas, ve SUS PEDIDOS ASIGNADOS y ejecuta la receta de uno de ellos. El permiso no es de recetas sino del modulo nuevo de asignacion (QC-86). Darle consultar recetas le abriria tambien el listado y el formulario de edicion, que es justo lo que esta ficha dice que no debe pasar.\n\nEJECUTAR MUEVE EL ESTADO DEL PEDIDO. Abrirlo lo pone EN_CURSO y Finalizar lo pone ENTREGADO. El operario que prepara la mezcla es quien mejor sabe cuando arranco y cuando esta lista. REACOTADO EL 2026-09-17 contra el disco: la escritura NO pasa por el caso de uso de edicion de pedidos, porque ese exige pedidos.modificar y el Operador nace solo con inventario.consultar y asignaciones.consultar. La hace un caso de uso PROPIO del modulo de asignacion, cortado por asignaciones.consultar, que exige ademas que el pedido este asignado a quien lo pide, y que pregunta al contrato publico de pedidos si la transicion es legal en vez de reimplementar la matriz o escribir la columna por su cuenta. Al Operador NO se le da pedidos.modificar -le abriria editar cualquier pedido- ni asignaciones.modificar -hoy corta asignar y desasignar responsables-.\n\nSE PUEDE VOLVER A ENTRAR A UN PEDIDO YA EN_CURSO. Cualquier responsable asignado entra, aunque el pedido ya este EN_CURSO: si a alguien se le apaga la tablet o recarga la pantalla, vuelve a su trabajo. No se guarda quien lo tomo, no nace ningun dato nuevo y no hay migracion. Coste asumido y escrito: dos responsables del mismo pedido pueden estar dentro a la vez y el sistema no lo sabra.\n\nLAS CANTIDADES NO SE ESCALAN. La pantalla muestra el factor bien visible y fijo -\"Pedido 250 L, receta para 100 L, x2,5\"- y las lineas y los pasos TAL COMO ESTAN ESCRITOS. Escalar solo las lineas seria peor que no escalar: los pasos de QC-62 son texto libre, y si el autor escribio \"cargar el reactor con 90 L de agua\" dentro de un parrafo, ese numero no se puede escalar sin adivinar. La pantalla mostraria 225 L en la lista y 90 L en el paso que el operario esta leyendo. Ninguna cifra de esta pantalla se contradice con otra porque ninguna se toca.\n\nSE PUEDE CAMBIAR LA UNIDAD EN QUE SE VEN LAS CANTIDADES: ver la misma linea en litros o en mililitros, para no obligar a nadie a hacer la conversion de cabeza en planta. Cambia SOLO como se ve; no altera la receta ni el pedido. ESTA FICHA ES EL PRIMER CONSUMIDOR DE LA CONVERSION ENTRE UNIDADES que construyo QC-76 y que hasta hoy no usaba nadie: solo se ofrecen unidades que comparten base efectiva, asi que ofrecer una conversion imposible es un error y no un resultado raro.\n\nAL TERMINAR se muestra una confirmacion visible en pantalla y se vuelve al listado de pedidos asignados. No se guarda nada de lo marcado.\n\nEL BLOQUEO DE SIGUIENTE NO TIENE VIA DE ESCAPE: no se avanza hasta marcar todos los elementos del paso, tal como lo construyo QC-64. Esto cierra la pregunta abierta 1 de QC-64, que estaba escrita esperando a esta ficha.\n\nLo que NO entra: los grupos de trabajo (QC-83, QC-84, QC-85); la tabla de asignacion y asignar desde el pedido (QC-86, QC-87); el listado de pedidos asignados (QC-88), donde esta ficha empieza. Registrar quien marco que y cuando sigue FUERA DE ALCANCE y esta acotacion no le crea ficha. EL BLOQUEO DEL PEDIDO YA TOMADO NO ES DE QC-88: su disparador deshabilitado para los EN_CURSO queda como aviso de presentacion -su R23 ya remitia el rechazo real a esta ficha-, y esta ficha enmienda esa guardia tensandola y con nota fechada, el mismo procedimiento que QC-88 uso con la de QC-102.",
       "status": "done",
       "sdd": true,
       "complexity": "high",
@@ -971,8 +971,8 @@
       "epic": "QC-31",
       "epic_name": "Pedidos",
       "name": "busqueda-y-total-en-el-listado-de-pedidos",
-      "description": "El listado de pedidos es la unica de las siete listas del ERP que no busca. QC-57 lo dejo con searchable:false a proposito y lo escribio en ORDER_QUERYABLE: la tabla orders no tiene columna name, y el nombre de la receta no vive ahi -lo resuelve el caso de uso pidiendoselo al modulo de recetas, con una consulta por pagina-. Esta ficha le da a pedidos lo que le falta, y son dos cosas que caen en la misma consulta.\n\nBUSCAR POR NOMBRE DE RECETA. Escribir \"buffer\" devuelve los pedidos cuya receta se llama asi. Se aplica sobre el conjunto completo y nunca sobre la pagina ya traida, como manda el contrato generico de QC-57, e ignora acentos y mayusculas igual que las otras seis listas. Que la comparacion se resuelva cruzando tablas o denormalizando el nombre en orders es decision del diseno, no de esta descripcion.\n\nEL TOTAL DEL PEDIDO, CALCULADO EN EL SERVIDOR. Hoy la consulta devuelve cantidad y precio unitario por separado y nadie multiplica. QC-34 dejo esto escrito como su pregunta abierta 3 y lo remitio a la pantalla; al acotar QC-35 el 2026-09-06 se decidio que el total se muestra, pero que lo calcula el servidor y NO la pantalla: los dos importes son Decimal(14,4) y multiplicarlos con el tipo numerico de JavaScript pierde precision, mientras que en el servidor Prisma ya opera decimales. La consulta devuelve el total como cadena decimal, igual que los otros dos importes. Asi NO entra decimal.js ni ninguna otra dependencia nueva.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO: si el total tambien se puede ordenar y filtrar. Anadirlo a ORDER_QUERYABLE obliga a que exista como expresion en la base, no solo en la salida.\n\nLA MIGRACION LLEVA SU DOWN y los indices que la busqueda necesite, mismo criterio con el que QC-57 metio los suyos: ordenar o buscar por un campo sin indice es el anti-patron que el reviewer rechaza en cuanto las tablas crezcan.\n\nLos tests que hoy pasan tienen que seguir pasando.\n\nLA PANTALLA VA APARTE. QC-35 se especifico y se construye SIN busqueda y SIN total, por decision del humano del 2026-09-06, justamente para no quedar bloqueada por esta ficha ni nacer con una caja de busqueda y una columna que no hacen nada. Enchufar las dos cosas en la pantalla de pedidos es una ficha de frontend posterior, que se crea cuando esta este done.",
-      "status": "in_progress",
+      "description": "El listado de pedidos es la unica de las siete listas del ERP que no busca. QC-57 lo dejo con searchable:false a proposito y lo escribio en ORDER_QUERYABLE: la tabla orders no tiene columna name, y el nombre de la receta no vive ahi -lo resuelve el caso de uso pidiendoselo al modulo de recetas-. Esta ficha le da a pedidos lo que le falta.\n\nPARTIDA EL 2026-09-17, Y ESTE ES EL MOTIVO. La ficha llevaba tambien EL TOTAL DEL PEDIDO. Al escribir el spec se verifico en el esquema que su premisa estaba derogada: decia \"hoy la consulta devuelve cantidad y precio unitario por separado\", pero `orders` tiene UN SOLO decimal, `quantity`. El precio unitario y la unidad se borraron el 2026-09-07 en la migracion `orders_drop_unit_and_unit_price`, por decision del humano en QC-35bis: \"un pedido es receta + cantidad\". El total no tiene con que multiplicarse, y de donde sale el precio es una DECISION DE NEGOCIO sin tomar, no una tarea. Se saco a QC-123. Esta ficha se queda solo con la busqueda, que no depende de ello.\n\nBUSCAR POR NOMBRE DE RECETA. Escribir \"buffer\" devuelve los pedidos cuya receta se llama asi. Se aplica sobre el conjunto completo y nunca sobre la pagina ya traida, como manda el contrato generico de QC-57, e ignora acentos y mayusculas igual que las otras seis listas. Que la comparacion se resuelva cruzando tablas o denormalizando el nombre en orders es decision del diseno, no de esta descripcion.\n\nACOTADO EL 2026-09-17: LA BUSQUEDA ENCUENTRA TAMBIEN LOS PEDIDOS CUYA RECETA ESTA DE BAJA. Un pedido conserva su receta aunque la den de baja y la lista sigue mostrando ese nombre en pantalla, asi que si al buscarlo no saliera pareceria que el pedido se ha perdido. Es coherente con lo que ya hace la lista, que resuelve los nombres incluyendo las de baja. Ojo a que el indice de busqueda que metio QC-57 es PARCIAL -solo filas vivas- y por tanto no sirve para esto.\n\nLA MIGRACION LLEVA SU DOWN y los indices que la busqueda necesite, mismo criterio con el que QC-57 metio los suyos: buscar por un campo sin indice es el anti-patron que el reviewer rechaza en cuanto las tablas crezcan.\n\nDIECISEIS SITIOS AFIRMAN HOY QUE PEDIDOS NO BUSCA -seis censos con aserto y diez comentarios cuya razon escrita deja de ser cierta-. Todos estan localizados archivo por archivo en el tasks.md, y se TENSAN, nunca se aflojan.\n\nLos tests que hoy pasan tienen que seguir pasando.\n\nACOTADO EL 2026-09-17: EL E2E SE DIFIERE, CON MOTIVO. Esta ficha no tiene pantalla: sin caja de busqueda que manejar no hay recorrido que ejercitar en un navegador, y montar uno obligaria a inventar una interfaz que otra ficha va a construir. El E2E es de QC-122, que se creo el mismo dia para que la exigencia no quedara sin dueno. La cobertura de esta ficha es de integracion contra la base real.\n\nLA PANTALLA VA APARTE -> QC-122.",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
@@ -1202,13 +1202,15 @@
       "epic": "QC-27",
       "epic_name": "Recetas",
       "name": "registro-de-ejecucion-de-receta",
-      "description": "Queda constancia de cómo se ejecutó una receta en planta: cada vez que alguien arranca, avanza, retrocede, cancela o termina, se guarda una anotación con el momento, el pedido, quién lo hizo, en qué paso estaba, qué acción fue y, si la hubo, el motivo.\n\nLas acciones posibles son cinco y ninguna más: arrancar, avanzar, retroceder, cancelar y finalizar.\n\nCon esto se puede reconstruir después el recorrido completo de una ejecución: quién la llevó, cuánto tardó entre paso y paso, si hubo que volver atrás, y si se abandonó a medias y por qué.\n\nEs la pieza que QC-63 dejó fuera a propósito: su ficha dice literalmente que «registrar quién marcó qué y cuándo sigue fuera de alcance». Los controles que disparan estas acciones —Anterior, Siguiente, Finalizar— ya existen desde QC-62.\n\nDECISIONES YA CERRADAS CON EL HUMANO EL 2026-09-08:\n\n* Las acciones son cinco: arrancar, avanzar, retroceder, cancelar y finalizar.\n* El motivo admite vacío: la mayoría de las acciones no lo necesitan.\n* CANCELAR SIN MOTIVO NO SE PUEDE. Quien abandona una ejecución a medias tiene que explicar por qué; un registro de cancelaciones mudas no sirve para lo único que se le va a pedir después, que es entender qué pasó en planta.\n\nHAY PRECEDENTE PARA ESTA REGLA Y NO SE INVENTA OTRA FORMA: un pedido cancelado (QC-34) guarda su motivo en una columna anulable, y una regla en la propia base —no solo en la validación de entrada— garantiza que motivo y cancelación van juntos. Aquí vale lo mismo, con una diferencia que hay que resolver antes de copiarla: en pedidos la regla es «existe si y solo si está cancelado», y aquí sólo está cerrada la mitad —que al cancelar hace falta—. Si el motivo puede acompañar también a un retroceso, la regla no es «si y solo si» y la forma cambia.\n\nEsta ficha entrega el almacenamiento y la operación de escritura. Engancharla a la pantalla del operador es de QC-63, que hoy está pendiente; mientras tanto el registro queda construido y sin consumidor, igual que se hizo con la conversión de unidades en QC-76.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO:\n\n* Si el motivo sirve para algo más que cancelar. Podría acompañar a un retroceso —volver atrás porque algo salió mal es justo lo que interesaría saber después—, o quedar reservado a la cancelación. De esto depende si la regla es «si y solo si» o sólo «hace falta al cancelar».\n* Qué se guarda exactamente en el paso. ¿El documento entero del paso, que se duplica en cada clic y crece rápido? ¿O su posición, que es barata pero deja de significar lo mismo si luego se edita la receta? Es una decisión de negocio, no de implementación.\n* Qué es «el tiempo». ¿El instante del clic, o cuánto se estuvo en ese paso antes de moverse? Son dos columnas distintas y no dan la misma respuesta.\n* Si el pedido es obligatorio. QC-63 permite al operador abrir una receta por su propia dirección, que no tiene por qué venir de un pedido.\n* Cuánto se conserva. Si es un registro de auditoría que no se borra nunca, o si se purga.\n* Si se acota por empresa. `orders` tampoco tiene empresa todavía: eso es QC-60.\n\n",
-      "status": "pending",
+      "description": "Queda constancia de como se ejecuto cada pedido en planta: cada vez que alguien arranca, retoma, avanza, retrocede, cancela o finaliza, se guarda una anotacion con el instante, el pedido, quien lo hizo, la posicion del paso y, solo al cancelar, el motivo.\n\nCon esto se puede reconstruir despues el recorrido completo de una ejecucion: quien la llevo, cuanto tardo entre paso y paso, si hubo que volver atras, y si se abandono a medias y por que.\n\nREACOTADA EL 2026-09-18 con /afinar-feature. QC-63 CERRO SIN CONECTAR EL REGISTRO, asi que esta ficha lo CONECTA a la pantalla de ejecucion y pasa a fullstack:\n\n* Las acciones son SEIS y ninguna mas: arrancar, retomar, avanzar, retroceder, cancelar y finalizar. Abrir anota arrancar; reentrar en un pedido EN_CURSO anota RETOMAR y la pantalla VUELVE AL ULTIMO PASO ANOTADO; Siguiente y Anterior anotan avanzar y retroceder; Finalizar anota finalizar.\n* CANCELAR SIN MOTIVO NO SE PUEDE, y el motivo existe SOLO al cancelar (si y solo si, garantizado en la base, como el motivo de un pedido cancelado de QC-34).\n* Cancelar CANCELA EL PEDIDO: la pantalla gana un boton que pide el motivo, el pedido pasa a CANCELADO por el camino unico de cancelacion de QC-34, y el mismo texto queda como motivo de cancelacion del pedido. Lo puede hacer cualquier responsable asignado, con asignaciones.consultar, por un caso de uso nuevo de asignaciones; el seed de permisos no cambia.\n* Del paso se guarda su POSICION; del tiempo, el INSTANTE de la accion.\n* Si falla anotar, avanzar y retroceder NO se bloquean; arrancar, retomar, finalizar y cancelar van en la misma operacion que el cambio que hacen.\n* El registro lleva empresa (QC-60 ya se la dio a los pedidos) y el pedido es obligatorio (QC-63 solo ejecuta desde un pedido asignado).\n\nLO QUE NO ENTRA: purgar el registro (ficha nueva con cron y caducidad en .env); una pantalla para consultar el recorrido; guardar lo marcado dentro de cada paso.\n\n\\--- Acotada por `/afinar-feature` el 2026-09-08 y reacotada el 2026-09-18. Las decisiones las fijo el humano ANTES del spec y estan en `specs/QC-82-registro-de-ejecucion-de-receta/requirements.md`. ---",
+      "status": "spec_ready",
       "sdd": true,
-      "complexity": "medium",
-      "zone": "backend",
+      "complexity": "high",
+      "zone": "fullstack",
       "branch": "feature/QC-82-registro-de-ejecucion-de-receta",
-      "depends_on": [],
+      "depends_on": [
+        "QC-63"
+      ],
       "spec_path": "specs/QC-82-registro-de-ejecucion-de-receta"
     },
     {
@@ -1258,8 +1260,8 @@
       "zone": "frontend",
       "branch": "feature/QC-85-pantalla-de-grupos-de-trabajo",
       "depends_on": [
-        "QC-84",
-        "QC-67"
+        "QC-67",
+        "QC-84"
       ],
       "spec_path": "specs/QC-85-pantalla-de-grupos-de-trabajo"
     },
@@ -1293,8 +1295,8 @@
       "zone": "backend",
       "branch": "feature/QC-87-asignar-responsables-a-un-pedido",
       "depends_on": [
-        "QC-86",
-        "QC-84"
+        "QC-84",
+        "QC-86"
       ],
       "spec_path": "specs/QC-87-asignar-responsables-a-un-pedido"
     },
@@ -1304,7 +1306,7 @@
       "epic": "QC-31",
       "epic_name": "Pedidos",
       "name": "listado-de-pedidos-asignados",
-      "description": "La lista de trabajo del Operador: los pedidos que tiene asignados, para entrar a prepararlos. Es su pantalla de entrada, con su item de menu, cortada por asignaciones.consultar. PANTALLA PROPIA, ruta nueva (decision humana del 2026-09-15). No se reutiliza /pedidos: esa pantalla exige pedidos.consultar, que el Operador NO tiene, y darselo le abriria el listado completo de la empresa. SOLO LOS EJECUTABLES: PENDIENTE y EN_CURSO; los ENTREGADO y CANCELADO no aparecen (decidido al acotar QC-63 el 2026-09-08). Cada fila muestra el numero del pedido, el nombre de la receta, la cantidad, la prioridad, el estado, y los DEMAS responsables como grupo de avatares, con el nombre del grupo de trabajo cuando la asignacion vino de uno. UN PEDIDO YA EN CURSO NO SE PUEDE ABRIR: la lista lo muestra con el disparador de entrar DESHABILITADO y su motivo (decision humana del 2026-09-15); la regla de verdad, al ejecutar, la aplica QC-63 en el servidor. NO SE GUARDA QUIEN ABRIO EL PEDIDO (decision humana del 2026-09-15): hoy no existe ese dato -solo el estado y updated_by, que es quien lo toco por ultima vez- y no se anade; la fila ENSENA A SUS RESPONSABLES. MEDIDO EN DISCO EL 2026-09-15, y es lo que hace la ficha fullstack: la consulta «los pedidos de esta persona» NO EXISTE -el puerto de asignaciones solo va al reves (listByOrdersInCompany, QC-102) y borra-, hay indice order_assignments_user_id_idx asi que es barata, pero hay que crearla (puerto, adaptador y caso de uso); ademas el listado de pedidos no admite filtrar por un conjunto de ids (ORDER_QUERYABLE declara status, priority y createdAt, searchable: false) y QC-33 R53 prohibe el JOIN entre orders y order_assignments. Reutiliza la tabla compartida (QC-55) y la composicion en lote de responsables de QC-102. Lo que NO entra: ejecutar la receta paso a paso (QC-63), asignar responsables (QC-87) y guardar quien abrio el pedido. Nace el 2026-09-08 al acotar QC-63 con /afinar-feature. Acotada el 2026-09-15.",
+      "description": "La lista de trabajo del Operador: los pedidos que tiene asignados, para entrar a prepararlos. Es su pantalla de entrada, con su item de menu, cortada por asignaciones.consultar.\n\nPANTALLA PROPIA, ruta nueva (decision humana del 2026-09-15). No se reutiliza /pedidos: esa pantalla exige pedidos.consultar, que el Operador NO tiene, y darselo le abriria el listado completo de la empresa.\n\nSOLO LOS EJECUTABLES. Se muestran los pedidos en estado PENDIENTE y EN_CURSO. Los ENTREGADO y los CANCELADO no aparecen: es una lista de trabajo, no un historial. Decidido al acotar QC-63 el 2026-09-08.\n\nCada fila muestra el numero del pedido, el nombre de la receta, la cantidad, la prioridad, el estado, y los DEMAS responsables como grupo de avatares -con el nombre del grupo de trabajo cuando la asignacion vino de uno-.\n\nUN PEDIDO YA EN CURSO NO SE PUEDE ABRIR. La lista lo muestra con el disparador de entrar DESHABILITADO y su motivo (decision humana del 2026-09-15). La regla de verdad, al ejecutar, la aplica QC-63 en el servidor: esta ficha no la duplica.\n\nNO SE GUARDA QUIEN ABRIO EL PEDIDO (decision humana del 2026-09-15). Hoy no existe ese dato -solo el estado del pedido y updated_by, que es quien lo toco por ultima vez- y no se anade: la fila ENSENA A SUS RESPONSABLES en vez de afirmar quien lo esta preparando.\n\nMEDIDO EN DISCO EL 2026-09-15, y es lo que hace la ficha fullstack: la consulta «los pedidos de esta persona» NO EXISTE. El puerto de asignaciones solo sabe ir al reves -responsables de unos pedidos, listByOrdersInCompany, QC-102- y borrar; hay indice order_assignments_user_id_idx, asi que la consulta es barata, pero hay que crearla (puerto, adaptador y caso de uso). Ademas el listado de pedidos no admite filtrar por un conjunto de ids -ORDER_QUERYABLE solo declara status, priority y createdAt, y searchable: false- y QC-33 R53 prohibe el JOIN entre orders y order_assignments.\n\nReutiliza la tabla de datos compartida (QC-55, ya migrada en siete pantallas) y la composicion en lote de responsables de QC-102.\n\nLo que NO entra: ejecutar la receta paso a paso, que es QC-63 y empieza donde esta lista termina; asignar responsables, que es QC-87; y guardar quien abrio el pedido.\n\nNace el 2026-09-08 al acotar QC-63 con /afinar-feature. Acotada el 2026-09-15.",
       "status": "done",
       "sdd": true,
       "complexity": "high",
@@ -1353,15 +1355,15 @@
       "epic": "QC-18",
       "epic_name": "Inventario",
       "name": "existencia-por-lote",
-      "description": "La existencia deja de ser un numero escrito a mano en el producto y pasa a ser la SUMA de sus lotes, calculada al consultar y UNA POR UNIDAD.\n\nNace el 2026-09-10 al acotar QC-90 con /afinar-feature (decision textual del humano: «quita el stock de product, manda lote»). ACOTADA EL 2026-09-15 con /afinar-feature. Decisiones completas en `specs/QC-91-existencia-por-lote/requirements.md`.\n\nDECISIONES CERRADAS (2026-09-10 y 2026-09-15):\n\n* Manda el lote: `products.stock` se QUITA. El listado PIERDE, por ahora, el orden y el filtro por existencia. Corregir una existencia es QC-92, no la edicion del producto, que deja de mostrarla y escribirla.\n* La existencia de un lote es CANTIDAD EN LA UNIDAD de su presentacion: 10 en «Bolsa 5 KG» son 10 kg, no 10 bolsas. Sigue siendo entera.\n* Suman TODOS los lotes, vencidos incluidos. Se calcula al consultar y NO se guarda.\n* Lotes en unidades distintas: una existencia POR UNIDAD («10 kg · 20 L»), sin convertir. Lotes de la misma unidad se suman aunque la presentacion difiera.\n* Producto sin lotes: existencia 0.\n* El «restante» del pedido se calcula contra la existencia en la unidad de la linea de receta; con lotes pero ninguno en esa unidad, «—».\n* La alerta de cantidad se compara contra la existencia en la unidad del producto, la de su lote mas reciente (QC-80).\n* `products.stock` se quita SIN comprobar si hay productos con existencia y sin lotes (riesgo aceptado, como QC-81 P1).\n* Una sola ficha fullstack: quitar la columna rompe al compilar el formulario y el listado.\n* E2E obligatorio: agregar un segundo lote a un producto existente y ver subir su existencia.\n\nBLOQUEADA POR QC-81, que cambia el esquema de lotes (lote obligatorio, fecha de compra) y comparte con esta siete archivos.\n\nALCANCE MEDIDO EL 2026-09-15: `stock` aparece en 21 archivos de `lib/` y `app/` (inventario, recetas, pedidos) mas la base, no en diez.\n\nNO ENTRA: ajuste de inventario (QC-92), fecha y lote en el panel de alta (QC-103), conversion entre unidades (QC-63), recuperar orden y filtro por existencia, consumo por lote y aviso de vencimiento.\n\nCERRADA EL 2026-09-17: un producto SIN LOTES SI marca la alerta. Su existencia es 0 y 0 es menor que cualquier cantidad de alerta configurada; no hace falta unidad, porque no hay mas que una existencia que mirar. Sin alerta configurada, no se marca. QUEDAN CERO PREGUNTAS ABIERTAS.",
+      "description": "La existencia deja de ser un numero escrito a mano en el producto y pasa a ser la SUMA de sus lotes, calculada al consultar y UNA POR UNIDAD.\n\nNace el 2026-09-10 al acotar QC-90 con /afinar-feature (decision textual del humano: «quita el stock de product, manda lote»). ACOTADA EL 2026-09-15 con /afinar-feature. Decisiones completas en `specs/QC-91-existencia-por-lote/requirements.md`, en la rama `feature/QC-91-existencia-por-lote`.\n\nDECISIONES CERRADAS (2026-09-10, 2026-09-15 y 2026-09-17):\n\n* Manda el lote: `products.stock` se QUITA. El listado PIERDE, por ahora, el orden y el filtro por existencia. Corregir una existencia es QC-92, no la edicion del producto, que deja de mostrarla y escribirla.\n* La existencia de un lote es CANTIDAD EN LA UNIDAD de su presentacion: 10 en «Bolsa 5 KG» son 10 kg, no 10 bolsas. Sigue siendo entera.\n* Suman TODOS los lotes, vencidos incluidos. Se calcula al consultar y NO se guarda.\n* Lotes en unidades distintas: una existencia POR UNIDAD («10 kg · 20 L»), sin convertir. Lotes de la misma unidad se suman aunque la presentacion difiera.\n* Producto sin lotes: existencia 0.\n* El «restante» del pedido se calcula contra la existencia en la unidad de la linea de receta; con lotes pero ninguno en esa unidad, «—».\n* La alerta de cantidad se compara contra la existencia en la unidad del producto, la de su lote mas reciente (QC-80).\n* CERRADA EL 2026-09-17: un producto SIN LOTES SI marca la alerta. Su existencia es 0 y 0 es menor que cualquier cantidad de alerta configurada, asi que se marca; no hace falta unidad, porque no hay mas que una existencia que mirar. Si el producto no tiene cantidad de alerta configurada, no se marca. Motivo: un producto sin lotes esta agotado, que es justo lo que la alerta existe para avisar.\n* `products.stock` se quita SIN comprobar si hay productos con existencia y sin lotes (riesgo aceptado, como QC-81 P1).\n* Una sola ficha fullstack: quitar la columna rompe al compilar el formulario y el listado.\n* E2E obligatorio: agregar un segundo lote a un producto existente y ver subir su existencia.\n\nBLOQUEO LEVANTADO: QC-81 y QC-90 estan Finalizadas, y QC-103 tambien. El spec se escribe contra un `dev` que ya las contiene (433bad2).\n\nALCANCE MEDIDO EL 2026-09-15: `stock` aparece en 21 archivos de `lib/` y `app/` (inventario, recetas, pedidos) mas la base, no en diez.\n\nNO ENTRA: ajuste de inventario (QC-92), fecha y lote en el panel de alta (QC-103, ya cerrada), conversion entre unidades (QC-63), recuperar orden y filtro por existencia, consumo por lote y aviso de vencimiento.\n\nQUEDAN CERO PREGUNTAS ABIERTAS.",
       "status": "done",
       "sdd": true,
       "complexity": "high",
       "zone": "fullstack",
       "branch": "feature/QC-91-existencia-por-lote",
       "depends_on": [
-        "QC-90",
-        "QC-81"
+        "QC-81",
+        "QC-90"
       ],
       "spec_path": "specs/QC-91-existencia-por-lote"
     },
@@ -1371,7 +1373,7 @@
       "epic": "QC-18",
       "epic_name": "Inventario",
       "name": "ajuste-de-inventario",
-      "description": "Corregir la existencia de un producto registrando un MOVIMIENTO de ajuste que suma o resta, en vez de sobrescribir un numero.\n\nNace el 2026-09-10 al acotar QC-90 con /afinar-feature. La pregunta que la destapo fue concreta: alguien carga 100 bidones por error y la existencia ya no vive en el producto sino en los lotes. El humano eligio el ajuste de inventario frente a las dos alternativas -editar el lote en una pantalla propia, o dejar que la edicion del producto tocara el ultimo lote-.\n\nPOR QUE VA DETRAS DE QC-91: mientras la existencia siga siendo un numero editable en el producto, el ajuste no tiene nada que resolver. Se vuelve necesario justo cuando la existencia pasa a ser la suma de los lotes.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO:\n\n* Si el ajuste se hace sobre un LOTE concreto o sobre el producto, y en ese segundo caso de que lote sale la diferencia.\n* Si el motivo del ajuste es obligatorio y si sale de una lista cerrada -merma, rotura, conteo fisico, error de carga- o es texto libre.\n* Que permiso lo corta: si basta `inventario.modificar` o el ajuste merece uno propio.\n* Si el movimiento es una tabla nueva de movimientos de inventario -que hoy NO existe- o solo una correccion registrada sobre el lote.\n* Si el ajuste puede dejar la existencia en negativo, y que pasa con los lotes ya consumidos.\n\n",
+      "description": "Corregir la existencia de un LOTE registrando un MOVIMIENTO que suma o resta, en vez de sobrescribir un numero a ciegas. Nace una tabla de movimientos de inventario -que hoy NO existe- y el alta de lote pasa a asentar tambien en ella. El producto gana un panel que LISTA SUS LOTES -hoy no hay ninguna pantalla que los muestre- y que despliega el historial de cada uno.\n\nNace el 2026-09-10 al acotar QC-90 con /afinar-feature. La pregunta que la destapo fue concreta: alguien carga 100 bidones por error y la existencia ya no vive en el producto sino en los lotes. El humano eligio el ajuste de inventario frente a las dos alternativas -editar el lote en una pantalla propia, o dejar que la edicion del producto tocara el ultimo lote-.\n\nPOR QUE VA DETRAS DE QC-91: mientras la existencia siga siendo un numero editable en el producto, el ajuste no tiene nada que resolver. Se vuelve necesario justo cuando la existencia pasa a ser la suma de los lotes. QC-91 esta Finalizada (PR #83).\n\nACOTADA EL 2026-09-17 con /afinar-feature: 16 decisiones cerradas, CERO preguntas abiertas. Decisiones completas en `specs/QC-92-ajuste-de-inventario/requirements.md`, en la rama `feature/QC-92-ajuste-de-inventario`.\n\nLAS CINCO PREGUNTAS QUE ESTA FICHA TRAIA ABIERTAS, YA CERRADAS:\n\n* Se ajusta SOBRE UN LOTE CONCRETO, no sobre el producto. El error se cargo en un lote y se corrige ahi; evita inventar una regla de reparto entre lotes, que es la pregunta 2 del dominio y sigue abierta.\n* El motivo es OBLIGATORIO en los ajustes, de un conjunto cerrado que crece sin migrar lo ya guardado -merma, rotura, conteo fisico, error de carga-, con el mecanismo heredado del tipo de documento de la feature 4. El asiento de alta NO lleva motivo.\n* Basta `inventario.modificar`: SIN permiso nuevo. El Administrador lo tiene, el Operador no. Validado en el service, con test.\n* SI es tabla nueva, `inventory_movements`, y ademas nace como LIBRO COMPLETO: registra todo movimiento de inventario, incluida el alta de lote de QC-90. El consumo NO: no existe todavia y no se disena a ciegas.\n* NO puede dejar la existencia en negativo: el CHECK (stock >= 0) de `product_batches` es la garantia dura y no se toca. Los lotes ya consumidos NO EXISTEN, porque nada consume lotes todavia.\n\nOTRAS DECISIONES DEL 2026-09-17:\n\n* `product_batches.stock` SIGUE SIENDO EL NUMERO DE VERDAD; el movimiento es el historial que explica como llego ahi. La existencia se lee de un solo sitio.\n* El ajuste se hace desde el listado de inventario: el producto abre un panel con sus lotes y cada uno se corrige ahi. El lote despliega sus movimientos con motivo, autor y fecha.\n* Los lotes YA EXISTENTES no se rellenan: el libro empieza hoy. Consecuencia aceptada: la comprobacion de que libro y stock cuadran necesita una excepcion permanente para ellos, y hay que escribirla.\n* RIESGO DEL DISENO, declarado: el libro y el stock pueden divergir si un camino de escritura olvida su asiento. Se cierra con una guardia que lo vigile; es requisito, no deuda.\n* LA GUARDIA R21 DE QC-91 HAY QUE AJUSTARLA, y deliberadamente: hoy afirma que `product-prisma.ts` nunca hace `productBatch.update(...)`, y esta ficha lo necesita. No se toca en silencio.\n* E2E obligatorio por ser movimiento de inventario. Aviso: el gate NO corre Playwright, asi que se corre a mano.\n* Sin libreria nueva.\n\nNO ENTRA: consumo por lote -que lote sale al despachar- y aviso de lotes por vencer, las dos abiertas en `docs/architecture.md > Preguntas abiertas del dominio`, 2, sin ficha y a proposito; pantalla propia de ajustes con busqueda e historico global; conversion entre unidades (QC-63); la unidad como identidad del item (QC-121).",
       "status": "in_progress",
       "sdd": true,
       "complexity": "high",
@@ -1440,8 +1442,8 @@
       "zone": "fullstack",
       "branch": "feature/QC-96-recuperar-contrasena-olvidada",
       "depends_on": [
-        "QC-79",
-        "QC-23"
+        "QC-23",
+        "QC-79"
       ],
       "spec_path": "specs/QC-96-recuperar-contrasena-olvidada"
     },
@@ -1581,7 +1583,7 @@
       "epic": "QC-105",
       "epic_name": "Documentos e IA",
       "name": "endpoint-de-carga-de-pdf",
-      "description": "Recibe HASTA 10 PDFs POR TANDA y ofrece la conversion de cada uno a IMAGEN (sus paginas) o a TEXTO.\n\nLO QUE ENTRA: la subida de varios PDFs a la vez -cada uno con su subida TEMPORAL a un bucket PRIVADO Y NUEVO de Supabase Storage- y las dos conversiones, detras de un puerto, como capacidad del modulo NUEVO documentos.\n\nCAMBIO DEL 2026-09-14 (decidido por el humano): la conversion YA NO se devuelve en la respuesta de la subida. La ejecuta el trabajo de la cola (procesamiento-de-pdf-en-cola), que usa esta capacidad por dentro. Asi desaparece el problema de devolver hasta 50 PNG en una sola respuesta.\n\nACOTADA el 2026-09-16 con /afinar-feature: 18 decisiones cerradas, 3 preguntas abiertas.\n\nCOMO ENTRA EL ARCHIVO: el NAVEGADOR SUBE DIRECTO a Supabase con un ENLACE FIRMADO por archivo, valido 15 MINUTOS, que emite el servidor. Los bytes NO atraviesan la aplicacion. Motivo medido: hoy next.config.ts esta vacio y el limite por defecto de Server Actions es 1 MB, asi que 10 PDFs no caben por el camino actual. Es la primera vez que el navegador habla con Supabase, y se declara por escrito que esto es ALMACENAMIENTO y no datos de negocio: el unico camino de DATOS sigue siendo Prisma (docs/architecture.md > Acceso a datos y autorizacion).\n\nBUCKET PRIVADO Y NUEVO, solo para estos PDFs. NO deroga QC-25 D5: el bucket de la imagen de receta sigue siendo PUBLICO y no se toca. Mismo criterio que QC-110, que ya tiene decidido un bucket propio para sus recortes. La subida vive DETRAS DE UN PUERTO con doble en los tests, heredado de QC-25 D10.\n\nAISLAMIENTO POR EMPRESA: la ruta dentro del bucket EMPIEZA POR LA EMPRESA, y el servidor solo firma enlaces dentro del prefijo de la empresa de quien pide. Sin esto, un identificador filtrado daria acceso a un archivo ajeno.\n\nQUIEN PUEDE SUBIR: SOLO EL ADMINISTRADOR, validado en el SERVICE con su test. El catalogo cerrado de 15 permisos NO se amplia. Heredado de QC-20 D2 y QC-25 D1.\n\nNO DEJA NINGUNA FILA EN BASE DE DATOS. Devuelve la ruta del archivo subido. El estado por archivo -en cola, procesando, listo, error- y la tabla donde viva son alcance de procesamiento-de-pdf-en-cola, que ya lo tiene declarado abierto.\n\nDEPENDENCIA NUEVA, con los cuatro checks verificados el 2026-09-16: unpdf (MIT, 1.8.1 del 2026-08-13, 2.568.072 descargas/semana, CERO dependencias propias) mas @napi-rs/canvas como par OPCIONAL (MIT, 1.0.9 del 2026-09-09, 17.616.629 descargas/semana). Una sola libreria cubre las DOS conversiones: se verifico en el paquete publicado que exporta extractText y renderPageAsImage. DESCARTADA A SABIENDAS mupdf, que tecnicamente es la mejor: su licencia es AGPL-3.0-or-later y falla el check 4. No se instala nada sin aprobacion humana (regla 7). @supabase/storage-js NO es dependencia nueva: ya esta aprobada, y se verifico que su version instalada 2.115.0 expone createSignedUploadUrl, uploadToSignedUrl y createSignedUrl. Su fila del registro dice que la consume un solo archivo y hay que ACTUALIZARLA en F1.4.\n\nFORMATO DE LAS PAGINAS: PNG a 150 DPI. Sin perdida, porque lo que va a leer Gemini son tablas de precios y texto pequeno, y la compresion cuesta digitos mal leidos.\n\nLIMITES POR ARCHIVO: 20 MB y 50 PAGINAS por PDF. El TAMANO y el tipo application/pdf los hace cumplir EL PROPIO BUCKET (fileSizeLimit y allowedMimeTypes), no nuestro codigo, porque con subida directa el servidor nunca ve los bytes. Las PAGINAS solo se saben al abrir el PDF, asi que ese limite lo aplica la conversion.\n\nPDF ILEGIBLE: en la subida se rechaza lo comprobable; un PDF cifrado o corrupto falla como error de ESE archivo y NO tumba los otros nueve de la tanda.\n\nMODULO NUEVO documentos, con su index.ts, su domain, sus ports y sus adapters. No se cuelga de recetas, cuyo puerto de storage es especifico, ni de proveedores: toda la epica QC-105 va a colgar de aqui.\n\nCODIGOS DE ERROR: ninguno nuevo. Se reutilizan unauthorized e invalid_input; el catalogo cerrado de QC-70 no se enmienda.\n\nE2E DIFERIDO a componente-de-carga-de-archivos, con motivo: esta ficha no tiene pantalla, asi que no hay recorrido navegable que visitar. Mismo criterio que QC-25 D23 y QC-20 D4.\n\nLO QUE NO ENTRA: encolar y procesar, el estado por archivo y el borrado del PDF temporal (procesamiento-de-pdf-en-cola), la pantalla / componente de subida (componente-de-carga-de-archivos), la lectura con Gemini (lectura-de-pdf-con-gemini), la estrategia catalogo/formula (procesamiento-de-pdf-por-estrategia) y el recorte de imagenes (recorte-de-imagenes-del-pdf).\n\nPREGUNTAS ABIERTAS (3, ninguna bloquea): quien crea el bucket privado y sus limites -no hay NI UN script ni migracion que cree buckets en el repo, el de recetas se creo a mano en la consola-; las tres variables SUPABASE_STORAGE no estan en el .env de la maquina de desarrollo, asi que nada de esto se prueba ahi contra Supabase real; y si @napi-rs/canvas, que es un BINARIO NATIVO, corre en el runtime de Vercel, que lo verifica el design.md.",
+      "description": "Recibe HASTA 10 PDFs POR TANDA y ofrece la conversion de cada uno a IMAGEN (sus paginas) o a TEXTO.\n\nLO QUE ENTRA: la subida de varios PDFs a la vez -cada uno con su subida TEMPORAL a un bucket PRIVADO Y NUEVO de Supabase Storage- y las dos conversiones, detras de un puerto, como capacidad del modulo NUEVO documentos.\n\nCAMBIO DEL 2026-09-14 (decidido por el humano): la conversion YA NO se devuelve en la respuesta de la subida. La ejecuta el trabajo de la cola (procesamiento-de-pdf-en-cola), que usa esta capacidad por dentro. Asi desaparece el problema de devolver hasta 50 PNG en una sola respuesta.\n\nACOTADA el 2026-09-16 con /afinar-feature: 18 decisiones cerradas, 3 preguntas abiertas.\n\nCOMO ENTRA EL ARCHIVO: el NAVEGADOR SUBE DIRECTO a Supabase con un ENLACE FIRMADO por archivo, valido 15 MINUTOS, que emite el servidor. Los bytes NO atraviesan la aplicacion. Motivo medido: hoy next.config.ts esta vacio y el limite por defecto de Server Actions es 1 MB, asi que 10 PDFs no caben por el camino actual. Es la primera vez que el navegador habla con Supabase, y se declara por escrito que esto es ALMACENAMIENTO y no datos de negocio: el unico camino de DATOS sigue siendo Prisma (docs/architecture.md > Acceso a datos y autorizacion).\n\nBUCKET PRIVADO Y NUEVO, solo para estos PDFs. NO deroga QC-25 D5: el bucket de la imagen de receta sigue siendo PUBLICO y no se toca. Mismo criterio que QC-110, que ya tiene decidido un bucket propio para sus recortes. La subida vive DETRAS DE UN PUERTO con doble en los tests, heredado de QC-25 D10.\n\nAISLAMIENTO POR EMPRESA: la ruta dentro del bucket EMPIEZA POR LA EMPRESA, y el servidor solo firma enlaces dentro del prefijo de la empresa de quien pide. Sin esto, un identificador filtrado daria acceso a un archivo ajeno.\n\nQUIEN PUEDE SUBIR: SOLO EL ADMINISTRADOR, validado en el SERVICE con su test. El catalogo cerrado de 15 permisos NO se amplia. Heredado de QC-20 D2 y QC-25 D1. OJO, matizado por el spec (ver comentario de F1.3): como el repo prohibe autorizar por NOMBRE DE ROL desde QC-74, se exige un permiso YA EXISTENTE que en el seed solo tiene el Administrador; se propone proveedores.modificar y lo confirma el humano en F1.4.\n\nNO DEJA NINGUNA FILA EN BASE DE DATOS. Devuelve la ruta del archivo subido. El estado por archivo -en cola, procesando, listo, error- y la tabla donde viva son alcance de procesamiento-de-pdf-en-cola, que ya lo tiene declarado abierto.\n\nDEPENDENCIA NUEVA, con los cuatro checks verificados el 2026-09-16: unpdf (MIT, 1.8.1 del 2026-08-13, 2.568.072 descargas/semana, CERO dependencias propias) mas @napi-rs/canvas como par OPCIONAL (MIT, 1.0.9 del 2026-09-09, 17.616.629 descargas/semana). Una sola libreria cubre las DOS conversiones: se verifico en el paquete publicado que exporta extractText y renderPageAsImage. DESCARTADA A SABIENDAS mupdf, que tecnicamente es la mejor: su licencia es AGPL-3.0-or-later y falla el check 4. No se instala nada sin aprobacion humana (regla 7). @supabase/storage-js NO es dependencia nueva: ya esta aprobada, y se verifico que su version instalada 2.115.0 expone createSignedUploadUrl, uploadToSignedUrl y createSignedUrl. Su fila del registro dice que la consume un solo archivo y hay que ACTUALIZARLA en F1.4.\n\nFORMATO DE LAS PAGINAS: PNG a 150 DPI. Sin perdida, porque lo que va a leer Gemini son tablas de precios y texto pequeno, y la compresion cuesta digitos mal leidos.\n\nLIMITES POR ARCHIVO: 20 MB y 50 PAGINAS por PDF. El TAMANO y el tipo application/pdf los hace cumplir EL PROPIO BUCKET (fileSizeLimit y allowedMimeTypes), no nuestro codigo, porque con subida directa el servidor nunca ve los bytes. Las PAGINAS solo se saben al abrir el PDF, asi que ese limite lo aplica la conversion.\n\nPDF ILEGIBLE: en la subida se rechaza lo comprobable; un PDF cifrado o corrupto falla como error de ESE archivo y NO tumba los otros nueve de la tanda.\n\nMODULO NUEVO documentos, con su index.ts, su domain, sus ports y sus adapters. No se cuelga de recetas, cuyo puerto de storage es especifico, ni de proveedores: toda la epica QC-105 va a colgar de aqui.\n\nCODIGOS DE ERROR: ninguno nuevo. Se reutilizan unauthorized e invalid_input; el catalogo cerrado de QC-70 no se enmienda.\n\nE2E DIFERIDO a componente-de-carga-de-archivos, con motivo: esta ficha no tiene pantalla, asi que no hay recorrido navegable que visitar. Mismo criterio que QC-25 D23 y QC-20 D4.\n\nLO QUE NO ENTRA: encolar y procesar, el estado por archivo y el borrado del PDF temporal (procesamiento-de-pdf-en-cola), la pantalla / componente de subida (componente-de-carga-de-archivos), la lectura con Gemini (lectura-de-pdf-con-gemini), la estrategia catalogo/formula (procesamiento-de-pdf-por-estrategia) y el recorte de imagenes (recorte-de-imagenes-del-pdf).\n\nPREGUNTAS ABIERTAS (3, ninguna bloquea): quien crea el bucket privado y sus limites -no hay NI UN script ni migracion que cree buckets en el repo, el de recetas se creo a mano en la consola-; las tres variables SUPABASE_STORAGE no estan en el .env de la maquina de desarrollo, asi que nada de esto se prueba ahi contra Supabase real; y si @napi-rs/canvas, que es un BINARIO NATIVO, corre en el runtime de Vercel -el spec lo dejo como DESCONOCIDO, no como si, y no bloquea porque la conversion a texto no lo necesita-.",
       "status": "done",
       "sdd": true,
       "complexity": "high",
@@ -1614,10 +1616,10 @@
       "epic": "QC-105",
       "epic_name": "Documentos e IA",
       "name": "lectura-de-pdf-con-gemini",
-      "description": "Integracion con Google Gemini Flash, detras de un puerto, que lee un PDF y recibe PROMPTS PERSONALIZADOS.\n\nDOS MODOS DE LECTURA: el PDF tal cual, o convertido a imagen (reutiliza la conversion de endpoint-de-carga-de-pdf) para que la IA pueda identificar imagenes.\n\nDEPENDENCIA NUEVA: @google/genai. No se instala sin aprobacion humana ni sin los cuatro checks (regla 7).\n\nLO QUE NO ENTRA: la estrategia catalogo/formula (procesamiento-de-pdf-por-estrategia) y la deteccion de coordenadas, recorte y subida de imagenes (recorte-de-imagenes-del-pdf).\n\nABIERTO, se acota con /afinar-feature: que pasa si Gemini no responde o tarda, donde vive la clave, como se prueba sin red (el gate corre sin red).",
-      "status": "pending",
+      "description": "Integracion con Google Gemini Flash, detras de un puerto, que lee un PDF y recibe PROMPTS PERSONALIZADOS.\n\nDOS MODOS DE LECTURA: el PDF tal cual, o convertido a imagen (reutiliza la conversion de endpoint-de-carga-de-pdf) para que la IA pueda identificar imagenes.\n\nDEPENDENCIA NUEVA: @google/genai. No se instala sin aprobacion humana ni sin los cuatro checks (regla 7).\n\nLO QUE NO ENTRA: la estrategia catalogo/formula y sus archivos de prompt (procesamiento-de-pdf-por-estrategia); la deteccion de coordenadas, recorte y subida de imagenes (recorte-de-imagenes-del-pdf); la cola, el estado por archivo y los REINTENTOS (procesamiento-de-pdf-en-cola); la pantalla (componente-de-carga-de-archivos).\n\nACOTADA EL 2026-09-18 con /afinar-feature. SEIS DECISIONES CERRADAS:\n\n1. PLAZO: 60 s por lectura, escrito en UNA SOLA definicion del modulo. Al agotarse falla ESE archivo. CERO reintentos aqui: son de procesamiento-de-pdf-en-cola, que ya los tiene declarados abiertos. Dos capas reintentando multiplican el gasto en silencio.\n2. ERROR: codigo NUEVO ai_unavailable, OCTAVA enmienda al catalogo cerrado de QC-70, con plan B escrito (caer a unexpected). La aprueba el humano en F1.4. Distingue un corte del proveedor de un bug nuestro.\n3. RETORNO: TEXTO PLANO, tal cual lo escribio la IA. Interpretarlo es de quien lo pide; es lo que procesamiento-de-pdf-por-estrategia necesita hoy.\n4. CLAVE: UNA SOLA del despliegue, por variable de entorno, declarada VACIA en .env.example y leida en la invocacion, nunca al importar. Sin clave por empresa y sin tabla. Heredado de endpoint-de-carga-de-pdf.\n5. QUIEN INVOCA: capacidad INTERNA. Sin Server Action, sin ruta y sin pantalla; la ejecuta el trabajo de la cola por dentro. El permiso lo corta quien sube el PDF, donde endpoint-de-carga-de-pdf ya lo valida. E2E diferido con motivo: no anade recorrido navegable.\n6. MODELO: el nombre del modelo vive en una VARIABLE DE ENTORNO, obligatoria. Si falta, la lectura falla con error explicito y NO cae a un modelo escrito a mano en el codigo.\n\nHEREDADO y no se reabre: modulo documentos con puerto + adaptador driven y cableado solo en lib/composition; verificacion SIN RED con doble del puerto; CERO filas en base; zod en el borde e identificadores en ingles. La conversion a imagen NO se re-implementa: se reutiliza el PdfConverter que ya existe.\n\nLos cuatro checks de @google/genai, corridos el 2026-09-18 y los cuatro limpios: sin deprecated, 2.23.0 del 2026-09-16, licencia Apache-2.0, 22.1M descargas semanales. La fila en docs/dependencias.md y la instalacion esperan a F1.4.\n\nLO QUE SIGUE ABIERTO, y no se rellena con supuestos: como saca recorte-de-imagenes-del-pdf las coordenadas si el retorno es texto plano (se decide alli, que ya lo tiene abierto); que nadie valida si la IA alucina; y que el gasto no se mide ni tiene tope por empresa.",
+      "status": "done",
       "sdd": true,
-      "complexity": null,
+      "complexity": "high",
       "zone": "backend",
       "branch": "feature/QC-108-lectura-de-pdf-con-gemini",
       "depends_on": [
@@ -1732,7 +1734,7 @@
       "epic": null,
       "epic_name": null,
       "name": "guardia-de-comentarios-sobre-el-diff",
-      "description": "Una guardia en `tests/guards/` que haga cumplir la regla de `docs/conventions.md > Comentarios`. Hoy solo la verifica el `reviewer` a ojo.\n\n**Qué comprueba:** en cada archivo de producción que toca la rama (`app/`, `lib/`, `components/`, `hooks/`, `middleware.ts`, `db/`), solo en las LINEAS QUE LA RAMA ANADE O MODIFICA, ningún comentario cita `QC-<n>`, `R<n>`, `design.md` ni «decisión cerrada». ACOTADO EL 2026-09-17: antes decía «el archivo entero». Los comentarios preexistentes que el diff no toca NO son hallazgo; se limpian por módulo, en fichas del board. Y OJO: hasta el 2026-09-17 la regla vivía SOLO en la plantilla `harnessConfig/`, no en el `docs/conventions.md` que leen los agentes.\n\n**Qué no cuenta:** `/// @module <modulo>` en `db/schema.prisma` es obligatorio y no es una cita. `scripts/` queda fuera a propósito. En tests, `R<n>` va en el nombre del caso.\n\n**Por qué:** medido el 2026-09-15 sobre `dev`, en producción el 42 % de las líneas no vacías eran comentario y 6.549 citaban fichas o requisitos. Una regla que solo sostiene el reviewer depende de que lo vea.\n\n**A decidir al acotar:**\n\n* cómo se obtiene el diff de la rama sin romper en `dev`, con precondición de rama como las guardias de alcance;\n* cómo distingue un comentario de un string que contenga «R1»;\n* si detecta la limpieza mezclada con código en el mismo commit o eso se queda en el reviewer.\n\nSin acotar; sin `complexity`.",
+      "description": "Una guardia en `tests/guards/` que haga cumplir la regla de `docs/conventions.md > Comentarios`. Hoy solo la verifica el `reviewer` a ojo.\n\nCORREGIDA EL 2026-09-17, y conviene leer esto antes de acotarla. Dos cosas cambiaron:\n\n1. LA REGLA NO ESTABA DONDE ESTA FICHA DECIA. Se escribio el 2026-09-15, completa, pero solo en la PLANTILLA del arnes (`harnessConfig/`) y en una rama sin mergear: el `docs/conventions.md` que leen los agentes NO la tenia. Por eso el reviewer la aplicaba de memoria y quien escribia el codigo no podia verla: rechazo trabajo tres veces -QC-81 con 34 commits de limpieza, QC-60 y QC-103-. El 2026-09-17 se porto a la raiz y a los tres archivos de agente (`reviewer`, `frontend_dev`, `backend_dev`).\n2. EL ALCANCE DE LA LIMPIEZA SE ACOTO. Donde decia «el archivo ENTERO» ahora dice LAS LINEAS QUE LA RAMA ANADE O MODIFICA. Los comentarios preexistentes que el diff no toca NO son hallazgo: se limpian por modulo, en fichas del board. Motivo medido: `e2e/inventario.spec.ts` tiene 47 citas y `lib/composition/index.ts` tenia 410 lineas de comentario, asi que exigir el archivo entero convierte cualquier ficha que roce un archivo grande en una limpieza masiva. El humano lo habia acotado ya dos veces en la practica (QC-60 y QC-103).\n\nQUE COMPRUEBA: en los archivos de produccion que toca la rama (`app/`, `lib/`, `components/`, `hooks/`, `middleware.ts`, `db/`), que ninguna LINEA ANADIDA O MODIFICADA lleve un comentario que cite `QC-<n>`, `R<n>`, `design.md` ni «decision cerrada».\n\nQUE NO CUENTA: `/// @module <modulo>` en `db/schema.prisma` es obligatorio y no es una cita. `scripts/` queda fuera a proposito. En tests, `R<n>` va en el nombre del caso. Los comentarios preexistentes no tocados por el diff.\n\nPOR QUE: medido el 2026-09-15 sobre `dev`, en produccion el 42 % de las lineas no vacias eran comentario y 6.549 citaban fichas o requisitos. Una regla que solo sostiene el reviewer depende de que lo vea, y se ha visto que no siempre lo ve igual: la misma regla se aplico con tres varas distintas en tres fichas del mismo dia.\n\nA DECIDIR AL ACOTAR:\n\n* como se obtiene el diff de la rama sin romper en `dev`, con precondicion de rama como las guardias de alcance;\n* como distingue un comentario de un string que contenga «R1»;\n* si detecta la limpieza mezclada con codigo en el mismo commit o eso se queda en el reviewer.\n\nSin acotar; sin `complexity`.",
       "status": "pending",
       "sdd": true,
       "complexity": null,
@@ -1792,7 +1794,7 @@
       "epic": "QC-27",
       "epic_name": "Recetas",
       "name": "rendimiento-de-la-receta",
-      "description": "Una receta debe guardar PARA QUE CANTIDAD esta escrita: su rendimiento. Hoy no lo guarda -el modelo Recipe tiene nombre, descripcion, pasos, lineas e imagen, y nada de cantidad-, y sin ese dato no se puede decir a cuanto equivale la receta respecto de lo que pide un pedido. NACE EL 2026-09-17 al escribir el spec de QC-63, que tiene como decision cerrada mostrar el factor -\"Pedido 250 L, receta para 100 L, x2,5\"- y al bajar a diseno se verifico que la mitad del dato NO EXISTE. QC-63 sale igualmente con una rama degradada. EL DATO ES CANTIDAD MAS UNIDAD, del catalogo de unidades (QC-32, QC-76). QUEDA ABIERTO: si es obligatorio, si se puede editar despues y que pasa con los pedidos que ya apuntan a la receta, si se muestra en el listado, y que se hace con las recetas existentes en la migracion. LO QUE NO ENTRA: encender el factor en la pantalla de ejecucion es de QC-63, que ya deja el sitio hecho; escalar las cantidades sigue descartado por decision cerrada de QC-63.",
+      "description": "Una receta debe guardar PARA QUE CANTIDAD esta escrita: su rendimiento. Hoy no lo guarda -el modelo Recipe tiene nombre, descripcion, pasos, lineas e imagen, y nada de cantidad-, y sin ese dato no se puede decir a cuanto equivale la receta respecto de lo que pide un pedido.\n\nNACE EL 2026-09-17 al escribir el spec de QC-63. Esa ficha tiene como decision cerrada mostrarle al Operador el factor bien visible -\"Pedido 250 L, receta para 100 L, x2,5\"- y al bajar a diseno se verifico en el esquema que la mitad del dato NO EXISTE. QC-63 sale igualmente, con una rama degradada: muestra la cantidad del pedido sin factor, y sus dos campos ya estan tipados para admitir el dato el dia que exista, asi que encender el factor no obliga a rehacer la pantalla.\n\nEL DATO ES CANTIDAD MAS UNIDAD, no un numero suelto: \"100 L\" y no \"100\". La unidad sale del catalogo de unidades que ya existe (QC-32, QC-76), igual que en las lineas de la receta, porque el factor solo tiene sentido entre cantidades que comparten base efectiva.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO:\n\n* Si el rendimiento es OBLIGATORIO en toda receta o puede quedar vacio. Hay recetas ya cargadas sin el, asi que hacerlo obligatorio obliga a decidir que pasa con ellas.\n* Si se puede editar despues de creada la receta, y que pasa con los pedidos que ya apuntan a ella: el factor que vio un Operador ayer dejaria de coincidir con el de hoy.\n* Si la pantalla de recetas lo muestra en el listado o solo en el detalle.\n* Que se hace con las recetas existentes en la migracion: quedan nulas, o se les pone un valor.\n\nLO QUE NO ENTRA: encender el factor en la pantalla de ejecucion es de QC-63, que ya deja el sitio hecho. Escalar las cantidades sigue descartado por decision cerrada de QC-63: el factor se MUESTRA, no se aplica, porque los pasos son texto libre y escalar solo las lineas haria que la lista y el paso que el operario esta leyendo se contradigan.",
       "status": "pending",
       "sdd": true,
       "complexity": null,
@@ -1824,7 +1826,7 @@
       "epic": "QC-31",
       "epic_name": "Pedidos",
       "name": "busqueda-y-total-en-la-pantalla-de-pedidos",
-      "description": "Enchufar en la pantalla de pedidos la caja de busqueda por nombre de receta que QC-68 construye por debajo. NACE EL 2026-09-17 al acotar QC-68. CORREGIDA EL MISMO DIA: nacio llevando tambien la columna del total y ya no la lleva, porque `orders` no guarda precio unitario -lo borro QC-35bis- y de donde sale el precio es decision de negocio sin tomar, que vive en QC-123. EL E2E DE LA BUSQUEDA ES DE ESTA FICHA: QC-68 lo difirio aqui con motivo, porque sin caja que manejar no hay recorrido que ejercitar. NO reabre lo que QC-68 cerro. QUEDA ABIERTO: que ve el usuario mientras la busqueda esta en vuelo; que ve cuando no hay coincidencias -'no hay pedidos' y 'no hay pedidos que coincidan' no son lo mismo-; y si el termino se conserva al paginar y al volver de un detalle. NO ENTRA: la consulta, la migracion ni el indice (QC-68), ni el total (QC-123).",
+      "description": "Enchufar en la pantalla de pedidos la caja de busqueda por nombre de receta que QC-68 construye por debajo.\n\nNACE EL 2026-09-17 al acotar QC-68. La pantalla de pedidos (QC-35) se especifico y se construyo A PROPOSITO sin busqueda, por decision del humano del 2026-09-06, para no quedar bloqueada por QC-68 ni nacer con una caja que no hace nada. Esta ficha es la otra mitad.\n\nCORREGIDA EL MISMO DIA: NACIO LLEVANDO TAMBIEN LA COLUMNA DEL TOTAL Y YA NO LA LLEVA. Al escribir el spec de QC-68 se verifico que `orders` no guarda precio unitario -lo borro QC-35bis el 2026-09-07- asi que el total no tiene con que multiplicarse. De donde sale el precio es una decision de negocio sin tomar y vive en QC-123. Pintar el total sera de la ficha de pantalla que QC-123 genere cuando se decida; esta ficha se queda solo con la busqueda.\n\nEL E2E DE LA BUSQUEDA ES DE ESTA FICHA. QC-68 lo difirio aqui con motivo escrito: sin caja que manejar no hay recorrido que ejercitar en un navegador. El recorrido: escribir en la caja, ver la lista recortada, y que lo que se ve coincide con lo que la consulta devuelve.\n\nLO QUE YA ESTA DECIDIDO EN QC-68 y esta ficha NO reabre: se busca solo por nombre de receta, ignorando acentos y mayusculas, sobre el conjunto completo y nunca sobre la pagina; y la busqueda encuentra tambien los pedidos cuya receta esta de baja.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO:\n\n* Que ve el usuario mientras la busqueda esta en vuelo.\n* Que ve cuando no hay ninguna coincidencia: la lista ya tiene estado vacio, pero \"no hay pedidos\" y \"no hay pedidos que coincidan\" no son lo mismo, y el segundo tiene que ofrecer una salida.\n* Si el termino buscado se conserva al navegar entre paginas y al volver de un detalle.\n\nNO ENTRA: la consulta, la migracion ni el indice, que son de QC-68. El total del pedido, que es de QC-123.",
       "status": "pending",
       "sdd": true,
       "complexity": null,
@@ -1841,7 +1843,7 @@
       "epic": "QC-31",
       "epic_name": "Pedidos",
       "name": "el-total-del-pedido-decidir-donde-vive-el-precio",
-      "description": "Un pedido no sabe cuanto vale. Para poder mostrar un total hace falta antes decidir DE DONDE SALE EL PRECIO, y esa es una decision de negocio que hoy no esta tomada. NACE EL 2026-09-17 al escribir el spec de QC-68, que llevaba el total dentro: se verifico que `orders` tiene UN SOLO decimal, `quantity`, porque el precio unitario y la unidad los borro QC-35bis el 2026-09-07 por decision del humano -'un pedido es receta + cantidad'-. Ningun modelo guarda un precio de venta de receta. QUEDA ABIERTO: de donde sale el precio; que pasa con los pedidos ya hechos cuando el precio cambia -un pedido de marzo no deberia cambiar de importe porque en octubre suba la tarifa-; quien puede ver y editar el precio; si el total ademas se ordena y filtra -QC-68 lo cerro como 'solo se muestra', pero sobre un total calculado al vuelo-; y que se hace con los pedidos existentes en la migracion. YA DECIDIDO: el total se calcula en el servidor y viaja como cadena decimal, nunca multiplicado con el tipo numerico de JavaScript. NO ENTRA: la busqueda (QC-68) ni pintar el total en pantalla.",
+      "description": "Un pedido no sabe cuanto vale. Para poder mostrar un total hace falta antes decidir DE DONDE SALE EL PRECIO, y esa es una decision de negocio que hoy no esta tomada.\n\nNACE EL 2026-09-17 al escribir el spec de QC-68, que llevaba el total dentro. Al bajar a diseno se verifico en el esquema que la premisa de esa ficha estaba derogada: decia \"hoy la consulta devuelve cantidad y precio unitario por separado\", pero `orders` tiene UN SOLO decimal, `quantity`. El precio unitario y la unidad se borraron el 2026-09-07 en la migracion `orders_drop_unit_and_unit_price`, POR DECISION DEL HUMANO en QC-35bis: \"un pedido es receta + cantidad\". Ningun modelo del repo guarda un precio de venta de receta; lo que hay son costes de COMPRA en inventario (`product_batches.unit_cost`) y en proveedores (`supplier_catalog_lines.cost`), que son otra cosa.\n\nAsi que el total no es trabajo pendiente: es una decision sin tomar. QC-68 salio partida y se quedo solo con la busqueda, que no depende de esto.\n\nLO QUE HAY QUE DECIDIR, y ninguna se rellena con un supuesto:\n\n* De donde sale el precio: vuelve al pedido -como estaba antes de QC-35bis-, vive en la receta como precio de venta del catalogo, o en otro sitio.\n* Si el precio vive en la receta: que pasa con los pedidos YA HECHOS cuando el precio cambia. Un pedido de marzo no deberia cambiar de importe porque en octubre suba la tarifa, asi que o el pedido congela el precio que vio, o el total historico miente.\n* Quien puede ver y quien puede editar el precio. Hoy `pedidos.consultar` no distingue importes, y un Operador entra a la pantalla de ejecucion sin ver dinero.\n* Si el total se muestra solo, o ademas se puede ordenar y filtrar por el. QC-68 cerro que solo se muestra, pero esa decision se tomo sobre un total que iba a calcularse al vuelo; si el importe pasa a estar guardado, la pregunta se reabre con otro coste.\n* Que se hace con los pedidos existentes en la migracion que traiga el precio.\n\nLO QUE YA ESTA DECIDIDO y esta ficha no reabre: el total se calcula EN EL SERVIDOR y viaja como cadena decimal, nunca multiplicado con el tipo numerico de JavaScript, que pierde precision con dos Decimal(14,4). Eso viene de QC-35 y de QC-68 y sigue en pie sea cual sea el origen del precio.\n\nNO ENTRA: la busqueda por nombre de receta, que es de QC-68. Pintar el total en la pantalla, que sera de la ficha de pantalla correspondiente cuando esta cierre.",
       "status": "pending",
       "sdd": true,
       "complexity": null,
@@ -1849,6 +1851,83 @@
       "branch": "feature/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio",
       "depends_on": [],
       "spec_path": "specs/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio"
+    },
+    {
+      "key": "QC-124",
+      "id": 124,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "purga-del-registro-de-ejecucion",
+      "description": "Nace el 2026-09-18 al reacotar QC-82, que construye el registro de ejecucion de receta y NO borra nada.\n\nEl registro de un pedido se conserva X dias despues de que el pedido TERMINA (entregado o cancelado), y pasado ese plazo se borra. Lo hace un CRON AUTOMATICO, y X viene de una variable de entorno (.env). Decidido por el humano el 2026-09-18.\n\nQUEDA POR ACOTAR con /afinar-feature antes del spec: con que mecanismo corre el cron; que pasa si la variable no esta definida o no es valida; si se borran solo las anotaciones o algo mas; y como se prueba.\n\nLO QUE NO ENTRA: construir el registro y conectarlo a la pantalla (QC-82).",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-124-purga-del-registro-de-ejecucion",
+      "depends_on": [
+        "QC-82"
+      ],
+      "spec_path": "specs/QC-124-purga-del-registro-de-ejecucion"
+    },
+    {
+      "key": "QC-125",
+      "id": 125,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "espera-minima-por-paso",
+      "description": "En la pantalla donde el Operador ejecuta la receta de un pedido asignado (QC-63), cada paso exige que pasen **5 segundos** antes de poder avanzar. Mientras no pasan, el boton de avanzar esta deshabilitado y la pantalla muestra una cuenta regresiva. Al avanzar, el cronometro se reinicia para el paso nuevo.\n\n**SOLO EN LA EJECUCION DEL OPERADOR.** El lector de pasos es un componente compartido que tambien usa la vista previa del formulario de recetas. Ahi NO hay espera. El comportamiento se activa desde la pantalla de ejecucion y no afecta a nadie mas.\n\n**DECISIONES CERRADAS CON EL HUMANO EL 2026-09-18:**\n\n* **Comenzar es abrir la pantalla.** No se anade ningun boton «Comenzar»: los 5 s del paso 1 empiezan a correr al abrir el pedido, que ya lo pone EN_CURSO.\n* **Siempre 5 s por paso.** Si el operario vuelve atras con Anterior y luego avanza otra vez, el paso le vuelve a exigir los 5 s.\n* **Finalizar tambien espera.** El ultimo paso se trata igual que los demas.\n* **La espera se suma al bloqueo que ya existe.** Hoy no se avanza sin marcar todos los elementos del paso (QC-64). Para avanzar tienen que cumplirse las dos cosas: los elementos marcados y los 5 s cumplidos.\n* **La cuenta regresiva usa el componente compartido CountdownTimer** (components/shared/countdown-timer.tsx), que ya esta construido en la rama feat/cronometro-shared y se incorpora a esta ficha.\n\n**LO QUE NO ENTRA:**\n\n* Validar la espera en el servidor. Hoy el servidor no conoce el paso actual: el avance es solo de cliente, y registrarlo es QC-82.\n* Configurar la duracion por receta o por paso. Son 5 s fijos.\n* Botones de pausa o reinicio del cronometro.\n\n",
+      "status": "in_progress",
+      "sdd": true,
+      "complexity": "low",
+      "zone": "frontend",
+      "branch": "feature/QC-125-espera-minima-por-paso",
+      "depends_on": [],
+      "spec_path": "specs/QC-125-espera-minima-por-paso"
+    },
+    {
+      "key": "QC-126",
+      "id": 126,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "flake-tabla-de-usuarios-navegacion-jsdom",
+      "description": "Cuando la suite completa corre entera, el caso «la accion de editar de una fila abre el panel SOBRE ESE usuario» de `tests/unit/configuracion-ui/user-table.test.tsx` (linea 471) se pone rojo: el panel no aparece en el documento. El mismo archivo, corrido AISLADO, pasa sus 27 casos.\n\nEl error que emite jsdom es `Not implemented: navigation to another Document`. Eso no es una expiracion por lentitud: es jsdom encontrandose una navegacion REAL del navegador —un submit o un enlace que nadie intercepta— y negandose a seguirla. Por eso el panel nunca llega a montarse y el `findByTestId` no encuentra nada.\n\n**Esto importa porque puede no ser un flake.** Si bajo la suite completa la accion de editar dispara una navegacion de verdad en vez de abrir el panel, el defecto esta en la pantalla y no en el test, y ahi el test estaria haciendo su trabajo. La hipotesis contraria —que solo sea el timing bajo carga— es la comoda, y es la que hay que descartar ANTES de tocar el test.\n\n**QUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO**: cual de las dos es. Sale de responder que elemento concreto provoca la navegacion y por que solo aparece bajo carga.\n\n**No es la misma especie que QC-58**, aunque se le parezca por fuera. QC-58 era expiracion por saturacion y se atajo subiendo `testTimeout` a 15 s en los tres proyectos. Aqui no expira nada: jsdom rechaza una navegacion. Subir el margen de tiempo no puede arreglar esto.\n\n**Decision humana del 2026-09-18: NO se da de alta en** `tests/baseline-rojos.json`. El coste de listarlo ahi esta medido y es alto: el comparador apaga el archivo ENTERO, o sea que los 27 casos de la tabla de usuarios dejarian de vigilar nada via gate. Se prefiere una ficha propia y que el rojo siga a la vista.\n\n**Mientras esta ficha siga abierta,** `./init.sh` completo termina en error con este unico rojo, y las fichas que abran PR lo declaran en la descripcion en vez de silenciarlo. Lo hizo asi QC-68 el 2026-09-18.\n\nMedido en la rama de QC-68 (2026-09-18): suite completa `1 failed | 530 passed` (531 archivos), `7799` tests en verde; aislado, `27/27`.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": null,
+      "branch": "feature/QC-126-flake-tabla-de-usuarios-navegacion-jsdom",
+      "depends_on": [],
+      "spec_path": "specs/QC-126-flake-tabla-de-usuarios-navegacion-jsdom"
+    },
+    {
+      "key": "QC-127",
+      "id": 127,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "decimales-caso-r14-sin-actualizar",
+      "description": "`dev` esta en rojo desde el merge del PR #85 (`682d3e3`, «la pantalla redondea a dos y no pinta ceros de relleno»). Cae un caso: «R14 — sin ningun lote, la existencia es 0 y el restante negativo se destaca como faltante», en `tests/unit/pedidos-ui/order-form.test.tsx:791`.\n\n**No es un flake y no hay que diagnosticarlo**: falla AISLADO, 1 de 33, de forma determinista. El caso espera `toHaveTextContent('-0.201')` y la pantalla ahora pinta `-0.2`, que es exactamente lo que el PR quiso.\n\n**Lo que paso es un olvido, y esta a la vista en el propio diff**: ese commit actualizo a dos decimales los casos VECINOS del mismo archivo —les puso `textContent` a dos decimales mas un `title` con el valor exacto— y no toco este. El patron a aplicar ya esta escrito por sus hermanos:\n\n```\nawait waitFor(() => expect(restante.textContent).toBe('-0.2'));\nexpect(restante).toHaveAttribute('title', '-0.201');\nexpect(restante.firstElementChild).toHaveClass('text-destructive');\n```\n\n**ANTES DE TOCAR EL TEST, COMPROBAR QUE LA PANTALLA ACIERTA.** El valor es negativo y pequeño, y redondear a dos decimales puede volver visible un caso que el PR no penso: su propio caso vecino documenta que `-0.001` se pinta «0», o sea SIN signo y sin resalte numerico. Aqui el resalte en rojo lo sigue dando la clase `text-destructive`, no el texto; pero merece decidirse a proposito y no por inercia si un faltante que se pinta «0» comunica lo que debe. Si la respuesta es que no, el arreglo es de la pantalla y no del test.\n\n**QUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO**: si algun otro caso del repo quedo en la misma situacion. El PR toco siete pantallas y cuatro archivos de test; nadie ha censado si los tres restantes tienen casos con mas de dos decimales sin actualizar. La suite completa solo delata este porque los demas pasan, pero pasar no es lo mismo que afirmar lo correcto.\n\n**No se da de alta en** `tests/baseline-rojos.json`, por decision humana del 2026-09-18 y por el mismo motivo que QC-126: listarlo ahi apagaria el archivo ENTERO para el comparador —33 casos del formulario de pedidos— y ademas este rojo NO es deuda dormida sino una contradiccion viva entre la pantalla y su test.\n\nDetectado por el gate completo de QC-68 el 2026-09-18, que lo declara en su PR como rojo ajeno. Medido: suite completa `1 failed | 532 passed` (533 archivos), `7833` tests en verde.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": null,
+      "branch": "feature/QC-127-decimales-caso-r14-sin-actualizar",
+      "depends_on": [],
+      "spec_path": "specs/QC-127-decimales-caso-r14-sin-actualizar"
+    },
+    {
+      "key": "QC-128",
+      "id": 128,
+      "epic": "QC-16",
+      "epic_name": "Plataforma",
+      "name": "wt-borra-antes-de-desregistrar",
+      "description": "Nacida el 2026-09-18 al cerrar QC-108, que fue el OCTAVO worktree que quedo «a medio borrar». Los ocho se anotaron en `progress/current.md` como «archivo en uso en Windows», que es el aviso que imprime el script: describe el sintoma y esconde la causa. Ninguno se ha recuperado solo, y ese detalle es el que da la causa.\n\nLA CAUSA, medida el 2026-09-18. `scripts/wt.sh done` hace dos cosas EN ESTE ORDEN: (1) quita el registro del worktree en git, (2) borra el directorio. En Windows el paso 2 falla con facilidad -basta con que cualquier proceso tenga abierto algo bajo `node_modules`-, y entonces queda el PEOR de los dos estados posibles:\n\n* git ya NO conoce el worktree: no sale en `git worktree list` y `git worktree prune` no lo ve.\n* el directorio SIGUE en disco, a medias, con `node_modules` y parte del arbol.\n\nY lo que lo hace permanente: al no estar registrado, NINGUNA corrida futura de `wt.sh` lo va a reintentar. Por eso van ocho y ninguno se recupera solo. No es mala suerte repetida ocho veces: el orden de las dos operaciones convierte un fallo transitorio en basura definitiva.\n\nCOMO SE RECONOCE, en un vistazo: el directorio existe bajo `.worktrees/`, NO aparece en `git worktree list`, y dentro NO hay `.git`.\n\nLO QUE ENTRA: invertir el orden en `scripts/wt.sh done` -borrar primero y desregistrar SOLO si el borrado tuvo exito-, de modo que un fallo deje el worktree ENTERO Y REGISTRADO, que es un estado del que `wt.sh` si sabe salir reintentando. Y un caso de test que lo pruebe: hoy `wt.sh` no tiene ninguno.\n\nLO QUE NO ENTRA: las cuatro guardas de `wt.sh done` (worktree principal, bloqueado, arbol sucio, rama sin integrar), que funcionan y no se tocan. Tampoco la regla de oro «ante la duda, NO borra», que se mantiene.\n\nCUIDADO AL IMPLEMENTAR, y es el riesgo real de esta ficha: se toca el unico script que borra directorios del repositorio. Un fallo aqui borra trabajo, no lo estorba. Cualquier cambio necesita probarse contra un worktree de mentira antes que contra uno real, y la regla de oro manda sobre cualquier simplificacion.\n\nLIMPIEZA APARTE: los huerfanos que YA existen en disco no los borra esta ficha. Estan anotados en `progress/current.md > Deudas y cosas abiertas` y los borra el humano cuando quiera, comprobando antes que la rama figura en `git branch --merged dev`.\n\nEl diagnostico completo quedo escrito el 2026-09-18 en `docs/worktrees.md`.\n\nABIERTO, se acota con /afinar-regla: si el desregistro se reintenta solo en la siguiente corrida de `wt.sh` o hace falta un comando aparte; si `wt.sh list` debe detectar y nombrar los huerfanos que ya hay; y si el script debe negarse a desregistrar cuando el directorio sigue en pie.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-128-wt-borra-antes-de-desregistrar",
+      "depends_on": [],
+      "spec_path": "specs/QC-128-wt-borra-antes-de-desregistrar"
     }
   ]
 }

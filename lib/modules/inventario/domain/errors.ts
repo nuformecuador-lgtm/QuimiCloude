@@ -70,6 +70,24 @@ export class BatchDuplicateLotError extends InventarioError {
   }
 }
 
+/** El lote no existe o es de otra empresa: las dos se responden igual. */
+export class BatchNotFoundError extends InventarioError {
+  readonly code = 'batch_not_found';
+
+  constructor(diagnostic?: string) {
+    super('batch_not_found', diagnostic);
+  }
+}
+
+/** El ajuste dejaria la existencia del lote por debajo de cero. */
+export class BatchStockNegativeError extends InventarioError {
+  readonly code = 'batch_stock_negative';
+
+  constructor(diagnostic?: string) {
+    super('batch_stock_negative', diagnostic);
+  }
+}
+
 export class ValidationError extends InventarioError {
   readonly code = 'invalid_input';
 

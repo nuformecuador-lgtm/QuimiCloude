@@ -259,13 +259,13 @@ function consulta(partial: Partial<ListQuery> = {}): ListQuery {
 }
 
 async function idsVisibles(empresa: Empresa): Promise<string[]> {
-  const pagina = await listAliveOrders(consulta(), ambitoDe(empresa));
+  const pagina = await listAliveOrders(consulta(), null, ambitoDe(empresa));
   return pagina.items.map((item) => item.id);
 }
 
 describe('R19 — el listado devuelve EXACTAMENTE los pedidos de su empresa, y el total tambien', () => {
   it('A ve sus cuatro vivos —el cancelado incluido— y ninguno de los seis de B', async () => {
-    const pagina = await listAliveOrders(consulta(), ambitoDe(A));
+    const pagina = await listAliveOrders(consulta(), null, ambitoDe(A));
 
     const vivosDeA = [A.pedidos[0], A.pedidos[1], A.pedidos[2], A.pedidos[4]];
     expect([...pagina.items.map((o) => o.id)].sort()).toEqual([...vivosDeA].sort());
@@ -280,7 +280,7 @@ describe('R19 — el listado devuelve EXACTAMENTE los pedidos de su empresa, y e
 
   it('B ve sus seis y ninguno de los de A', async () => {
     // Atrapa un adaptador que devolviera siempre las filas de la primera empresa sembrada.
-    const pagina = await listAliveOrders(consulta(), ambitoDe(B));
+    const pagina = await listAliveOrders(consulta(), null, ambitoDe(B));
 
     expect([...pagina.items.map((o) => o.id)].sort()).toEqual([...B.pedidos].sort());
     expect(pagina.total).toBe(6);
@@ -290,13 +290,13 @@ describe('R19 — el listado devuelve EXACTAMENTE los pedidos de su empresa, y e
   });
 
   it('el pedido con borrado logico de A no aparece: el ambito no sustituye a deleted_at', async () => {
-    const pagina = await listAliveOrders(consulta(), ambitoDe(A));
+    const pagina = await listAliveOrders(consulta(), null, ambitoDe(A));
     expect(pagina.items.map((o) => o.id)).not.toContain(A.pedidos[3]);
     expect(pagina.total).toBe(4);
   });
 
   it('una empresa sin pedidos ve la lista vacia, no la de al lado', async () => {
-    const pagina = await listAliveOrders(consulta(), ambitoDe(C));
+    const pagina = await listAliveOrders(consulta(), null, ambitoDe(C));
     expect(pagina.items).toEqual([]);
     expect(pagina.total).toBe(0);
   });
@@ -304,7 +304,7 @@ describe('R19 — el listado devuelve EXACTAMENTE los pedidos de su empresa, y e
   it('R23: ni el resumen de la lista, ni la ficha, ni el catalogo publican la empresa', async () => {
     // Sobre las CLAVES y no sobre el JSON: un `companyId: undefined` no viajaria serializado pero
     // estaria en el contrato.
-    const pagina = await listAliveOrders(consulta(), ambitoDe(A));
+    const pagina = await listAliveOrders(consulta(), null, ambitoDe(A));
     expect(pagina.items.length).toBeGreaterThan(0);
     for (const item of pagina.items) {
       expect(Object.keys(item)).not.toContain('companyId');
@@ -325,29 +325,29 @@ describe('R19 — los filtros, el orden y la paginacion NO ensanchan lo visible'
     // Si `companyId` y el filtro fueran hermanos dentro de un `OR`, las seis de B entrarian por
     // cumplir el filtro.
     const filters = { priority: { kind: 'select' as const, values: ['CRITICA'] } };
-    const desdeA = await listAliveOrders(consulta({ filters }), ambitoDe(A));
+    const desdeA = await listAliveOrders(consulta({ filters }), null, ambitoDe(A));
     expect(desdeA.items).toEqual([]);
     expect(desdeA.total).toBe(0);
 
     // Sin este control, un filtro roto que devolviera siempre cero dejaria verde lo de arriba.
-    const desdeB = await listAliveOrders(consulta({ filters }), ambitoDe(B));
+    const desdeB = await listAliveOrders(consulta({ filters }), null, ambitoDe(B));
     expect(desdeB.total).toBe(6);
   });
 
   it('un rango de cantidad que solo casa con filas de B devuelve cero desde A', async () => {
     const filters = { quantity: { kind: 'numberRange' as const, min: 900, max: 999 } };
-    const desdeA = await listAliveOrders(consulta({ filters }), ambitoDe(A));
+    const desdeA = await listAliveOrders(consulta({ filters }), null, ambitoDe(A));
     expect(desdeA.items).toEqual([]);
     expect(desdeA.total).toBe(0);
 
-    const desdeB = await listAliveOrders(consulta({ filters }), ambitoDe(B));
+    const desdeB = await listAliveOrders(consulta({ filters }), null, ambitoDe(B));
     expect(desdeB.total).toBe(6);
   });
 
   it('un filtro de estado que casa en las dos empresas solo trae los de la propia', async () => {
     // PENDIENTE casa con dos de A y con los seis de B: el total tiene que ser 2, no 8.
     const filters = { status: { kind: 'select' as const, values: ['PENDIENTE'] } };
-    const desdeA = await listAliveOrders(consulta({ filters }), ambitoDe(A));
+    const desdeA = await listAliveOrders(consulta({ filters }), null, ambitoDe(A));
     expect([...desdeA.items.map((o) => o.id)].sort()).toEqual([A.pedidos[0], A.pedidos[2]].sort());
     expect(desdeA.total).toBe(2);
   });
@@ -356,6 +356,7 @@ describe('R19 — los filtros, el orden y la paginacion NO ensanchan lo visible'
     // Si el ambito se aplicara DESPUES de paginar, aqui entrarian las de B, que ganan el orden.
     const pagina = await listAliveOrders(
       consulta({ pageSize: 2, sort: { columnId: 'quantity', direction: 'desc' } }),
+      null,
       ambitoDe(A),
     );
 
@@ -372,6 +373,7 @@ describe('R19 — los filtros, el orden y la paginacion NO ensanchan lo visible'
     // por el numero es la forma mas facil de que se intercalen.
     const pagina = await listAliveOrders(
       consulta({ sort: { columnId: 'orderNumber', direction: 'asc' } }),
+      null,
       ambitoDe(A),
     );
     expect(pagina.items.map((o) => o.number.sequence)).toEqual([1, 2, 3, 5]);
@@ -487,13 +489,13 @@ describe('R21 — findAliveById / updateAlive / cancelAlive / softDeleteAlive co
     expect(resultado).toBe('ok');
     const fila = await prisma.order.findUniqueOrThrow({ where: { id: propio } });
     expect(fila.deletedAt).not.toBeNull();
-    const desdeB = await listAliveOrders(consulta(), ambitoDe(B));
+    const desdeB = await listAliveOrders(consulta(), null, ambitoDe(B));
     expect(desdeB.items.map((o) => o.id)).not.toContain(propio);
     expect(desdeB.total).toBe(5);
   });
 
   it('ninguna de las escrituras cruzadas creo, movio ni borro nada del lado de A', async () => {
-    const pagina = await listAliveOrders(consulta(), ambitoDe(A));
+    const pagina = await listAliveOrders(consulta(), null, ambitoDe(A));
     expect(pagina.total).toBe(4);
     expect(await correlativosDe(A)).toEqual([1, 2, 3, 4, 5]);
   });
@@ -555,7 +557,7 @@ describe('R22, R24, R12, R13 — el alta escribe la empresa del AMBITO y numera 
 
 /** Todo lo que el modulo sabe contestar sobre una empresa, en una cadena comparable. */
 async function retrato(empresa: Empresa, ajena: Empresa): Promise<string> {
-  const listado = await listAliveOrders(consulta(), ambitoDe(empresa));
+  const listado = await listAliveOrders(consulta(), null, ambitoDe(empresa));
   const fichaAjena = await findAliveOrderById(ajena.pedidos[0] ?? '', ambitoDe(empresa));
   const catalogoAjeno = await findAliveOrderTargetById(ajena.pedidos[0] ?? '', empresa.companyId);
   const escrituraAjena = await updateAliveOrder(

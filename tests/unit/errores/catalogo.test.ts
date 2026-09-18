@@ -39,10 +39,9 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 45 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 49 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
-      expect(ERROR_CODES).toHaveLength(46)
-      expect(new Set(ERROR_CODES).size).toBe(ERROR_CODES.length)
+      expect(ERROR_CODES).toHaveLength(49)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -52,7 +51,7 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       expect(Object.keys(ERROR_MESSAGES_ES).sort()).toEqual([...claves].sort())
     })
 
-    it('errorMessage devuelve el texto del catalogo para los 46 codigos', () => {
+    it('errorMessage devuelve el texto del catalogo para los 49 codigos', () => {
       for (const code of ERROR_CODES) {
         expect(errorMessage(code)).toBe(ERROR_MESSAGES_ES[ERROR_MESSAGE_KEY[code]])
         expect(errorMessage(code).trim().length).toBeGreaterThan(0)
@@ -184,6 +183,57 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
       expect(source).toContain('**Sexta enmienda, el 2026-09-15 (QC-81)**')
       expect(source).toContain('Aprobada por el humano el 2026-09-15 en la puerta F1.4 de QC-81')
+    })
+  })
+
+  describe('QC-92 R32 — los dos codigos del lote de ajuste tienen codigo y texto propios', () => {
+    it('batch_not_found y batch_stock_negative estan en el catalogo con su clave y su texto exacto', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('batch_not_found')
+      expect(codigos).toContain('batch_stock_negative')
+      expect(ERROR_MESSAGE_KEY.batch_not_found).toBe('errors.batch_not_found')
+      expect(ERROR_MESSAGE_KEY.batch_stock_negative).toBe('errors.batch_stock_negative')
+      expect(errorMessage('batch_not_found')).toBe('El lote solicitado no existe.')
+      expect(errorMessage('batch_stock_negative')).toBe(
+        'El ajuste dejaria la existencia del lote por debajo de cero.',
+      )
+    })
+
+    it('se distinguen entre si y de product_not_found e invalid_input', () => {
+      expect(errorMessage('batch_not_found')).not.toBe(errorMessage('product_not_found'))
+      expect(errorMessage('batch_stock_negative')).not.toBe(errorMessage('invalid_input'))
+      expect(errorMessage('batch_not_found')).not.toBe(errorMessage('batch_stock_negative'))
+    })
+
+    it('la cabecera de error-codes.ts redacta la septima enmienda con su fecha y su aprobacion', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toContain('**Septima enmienda, el 2026-09-17 (QC-92)**')
+      expect(source).toContain('Aprobada por el humano el 2026-09-17 en la puerta F1.4 de QC-92')
+    })
+  })
+
+  describe('QC-108 R10, R11 — ai_unavailable es la octava enmienda al catalogo cerrado', () => {
+    it('ai_unavailable esta en el catalogo con su clave y su texto propio', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('ai_unavailable')
+      expect(ERROR_MESSAGE_KEY.ai_unavailable).toBe('errors.ai_unavailable')
+      expect(errorMessage('ai_unavailable')).toBe(
+        'La lectura automatica no esta disponible en este momento. Intentalo mas tarde.',
+      )
+    })
+
+    it('R12 — el codigo emitido para el corte del proveedor esta en el catalogo cerrado', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('ai_unavailable')
+      const texto = errorMessage('ai_unavailable')
+      expect(texto).not.toBe(errorMessage('invalid_input'))
+      expect(texto).not.toBe(errorMessage('unexpected'))
+    })
+
+    it('la cabecera de error-codes.ts redacta la octava enmienda con su fecha y su aprobacion', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toContain('**Octava enmienda, el 2026-09-18**')
+      expect(source).toContain('Aprobada por el humano el 2026-09-18')
     })
   })
 

@@ -110,13 +110,52 @@ export function cuerpoDeConst(fuente: string, nombre: string): string | null {
   return bloqueTrasEncabezado(stripComments(fuente), `export const ${nombre} = {`);
 }
 
+/**
+ * La llave que abre el CUERPO de la funcion, saltando el tipo de retorno: uno como
+ * `Promise<{ stock: number } | null>` trae sus propias llaves y angulos, y la primera `{` tras el
+ * cierre de parametros puede ser una de esas, no la del cuerpo.
+ */
+function llaveDeCuerpoTrasParametros(codigo: string, cierreParametros: number): number {
+  let profundidadAngulos = 0;
+  let profundidadLlavesDeTipo = 0;
+  for (let i = cierreParametros + 1; i < codigo.length; i += 1) {
+    const caracter = codigo[i];
+    if (caracter === '<') {
+      profundidadAngulos += 1;
+    } else if (caracter === '>') {
+      profundidadAngulos = Math.max(0, profundidadAngulos - 1);
+    } else if (caracter === '{') {
+      if (profundidadAngulos === 0 && profundidadLlavesDeTipo === 0) return i;
+      profundidadLlavesDeTipo += 1;
+    } else if (caracter === '}') {
+      profundidadLlavesDeTipo = Math.max(0, profundidadLlavesDeTipo - 1);
+    }
+  }
+  return -1;
+}
+
+/** El indice del `)` que CIERRA la lista de parametros que abre en `aperturaParametros`. */
+function cierreDeParametros(codigo: string, aperturaParametros: number): number {
+  let profundidad = 0;
+  for (let i = aperturaParametros; i < codigo.length; i += 1) {
+    if (codigo[i] === '(') profundidad += 1;
+    if (codigo[i] === ')') {
+      profundidad -= 1;
+      if (profundidad === 0) return i;
+    }
+  }
+  return -1;
+}
+
 /** El cuerpo de `export [async] function <nombre>(...) { ... }` completo, con balance de llaves. */
 export function cuerpoDeFuncion(fuente: string, nombre: string): string | null {
   const codigo = stripComments(fuente);
   for (const prefijo of ['export async function ', 'export function ']) {
     const inicio = codigo.indexOf(`${prefijo}${nombre}(`);
     if (inicio === -1) continue;
-    const llave = codigo.indexOf('{', codigo.indexOf(')', inicio));
+    const cierreParametros = cierreDeParametros(codigo, codigo.indexOf('(', inicio));
+    if (cierreParametros === -1) return null;
+    const llave = llaveDeCuerpoTrasParametros(codigo, cierreParametros);
     if (llave === -1) return null;
     let profundidad = 0;
     for (let i = llave; i < codigo.length; i += 1) {
@@ -177,11 +216,15 @@ export function sumaPropia(cuerpo: string): string[] {
   return hallazgos;
 }
 
-/** Escrituras que borran o modifican filas de `product_batches`, tipadas o en SQL crudo. */
+/**
+ * Escrituras que borran, reemplazan en bloque o multiplican filas de `product_batches`, tipadas o
+ * en SQL crudo. `update` simple NO esta aqui: tiene su propio detector, `llamaAUpdateFueraDe`, que
+ * lo permite en un unico sitio nombrado.
+ */
 export function escrituraDestructivaDeLotes(fuente: string): string[] {
   const codigo = stripComments(fuente);
   const hallazgos: string[] = [];
-  if (/\.productBatch\.(?:delete|deleteMany|update|updateMany|upsert)\s*\(/.test(codigo)) {
+  if (/\.productBatch\.(?:delete|deleteMany|updateMany|upsert)\s*\(/.test(codigo)) {
     hallazgos.push('llama a un metodo de escritura destructiva sobre productBatch');
   }
   if (/DELETE\s+FROM\s+"?product_batches"?/i.test(codigo)) {
@@ -191,6 +234,18 @@ export function escrituraDestructivaDeLotes(fuente: string): string[] {
     hallazgos.push('UPDATE crudo sobre product_batches');
   }
   return hallazgos;
+}
+
+/**
+ * `true` si `.productBatch.update(` aparece en algun lugar del archivo QUE NO sea el cuerpo de
+ * `nombreFuncionPermitida`. Aisla ese cuerpo con `cuerpoDeFuncion` y busca en el resto, para que
+ * un `update` movido a otra funcion -o uno nuevo, en cualquier sitio distinto- siga dando rojo.
+ */
+export function llamaAUpdateFueraDe(fuente: string, nombreFuncionPermitida: string): boolean {
+  const codigo = stripComments(fuente);
+  const cuerpoPermitido = cuerpoDeFuncion(fuente, nombreFuncionPermitida);
+  const resto = cuerpoPermitido === null ? codigo : codigo.replace(stripComments(cuerpoPermitido), '');
+  return /\.productBatch\.update\s*\(/.test(resto);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -351,6 +406,13 @@ describe('QC-91 R11 — ProductView y ProductRef exponen stockByUnit; NewProduct
 // R21 — EL CALCULO NO BORRA NI MODIFICA NINGUNA FILA DE LOTE
 // ---------------------------------------------------------------------------------------------
 
+// Nota (2026-09-17): esta guardia dejo de exigir CERO llamadas a `productBatch.update` en todo
+// `product-prisma.ts`. Ahora permite exactamente UNA, dentro del cuerpo de `adjustBatchStock`, y
+// sigue prohibiendo: cualquier `update` en cualquier OTRA funcion; `delete`, `deleteMany` y
+// `upsert` sobre `productBatch` en cualquier funcion, incluida `adjustBatchStock`; y cualquier
+// `DELETE`/`UPDATE` crudo sobre la tabla. No se afirma en positivo que `adjustBatchStock` DEBA
+// tener un `update` -esta guardia no fija ese estado-, solo que si hay uno en el archivo, no
+// puede estar en ningun otro sitio.
 describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ninguna fila de lote', () => {
   it('R21: product_batches.stock sigue intacto en el esquema', () => {
     const cuerpo = cuerpoDeModelo(leer(SCHEMA), 'ProductBatch');
@@ -358,25 +420,29 @@ describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ningu
     expect(cuerpo).toMatch(/\bstock\s+Int\b/);
   });
 
-  it('R21: product-prisma.ts no borra ni modifica filas de product_batches', () => {
+  it('R21: product-prisma.ts no borra, reemplaza en bloque ni multiplica filas de product_batches', () => {
     expect(escrituraDestructivaDeLotes(leer(PRODUCT_PRISMA))).toEqual([]);
   });
 
   it('R21: product-catalog-prisma.ts no borra ni modifica filas de product_batches', () => {
     expect(escrituraDestructivaDeLotes(leer(PRODUCT_CATALOG_PRISMA))).toEqual([]);
+    expect(llamaAUpdateFueraDe(leer(PRODUCT_CATALOG_PRISMA), 'adjustBatchStock')).toBe(false);
   });
 
-  it('R21: el alta y el agregado de lote siguen creando, nunca actualizando ni borrando', () => {
+  it('R21: el alta y el agregado de lote siguen creando; el unico update vive en adjustBatchStock', () => {
     const fuente = leer(PRODUCT_PRISMA);
     expect(fuente).toMatch(/tx\.productBatch\.create\s*\(/);
-    expect(fuente).not.toMatch(/tx\.productBatch\.(?:update|updateMany|delete|deleteMany|upsert)\s*\(/);
+    expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(false);
   });
 
-  it('R21: el detector muerde con fuentes fabricadas y no con una limpia', () => {
-    expect(escrituraDestructivaDeLotes('await tx.productBatch.update({ where, data: { stock: 0 } });')).toEqual([
+  it('R21: el detector de escrituras destructivas muerde con fuentes fabricadas y no con una limpia', () => {
+    expect(escrituraDestructivaDeLotes('await tx.productBatch.delete({ where });')).toEqual([
       'llama a un metodo de escritura destructiva sobre productBatch',
     ]);
-    expect(escrituraDestructivaDeLotes('await tx.productBatch.delete({ where });')).toEqual([
+    expect(escrituraDestructivaDeLotes('await tx.productBatch.deleteMany({ where });')).toEqual([
+      'llama a un metodo de escritura destructiva sobre productBatch',
+    ]);
+    expect(escrituraDestructivaDeLotes('await tx.productBatch.upsert({ where, create, update });')).toEqual([
       'llama a un metodo de escritura destructiva sobre productBatch',
     ]);
     expect(
@@ -386,8 +452,61 @@ describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ningu
       escrituraDestructivaDeLotes('await tx.$executeRaw`UPDATE "product_batches" SET stock = 0`;'),
     ).toEqual(['UPDATE crudo sobre product_batches']);
     expect(escrituraDestructivaDeLotes('await tx.productBatch.create({ data: {} });')).toEqual([]);
+    // `update` simple ya NO es hallazgo de este detector: lo cubre `llamaAUpdateFueraDe`.
+    expect(escrituraDestructivaDeLotes('await tx.productBatch.update({ where, data: {} });')).toEqual([]);
     // Un comentario que mencione borrar un lote no es codigo que borre un lote.
     expect(escrituraDestructivaDeLotes('// aqui NO se llama a tx.productBatch.delete(...)')).toEqual([]);
+  });
+
+  describe('llamaAUpdateFueraDe — el update de adjustBatchStock queda aislado del resto (R27)', () => {
+    it('R27: un update DENTRO de adjustBatchStock no cuenta como hallazgo', () => {
+      const fuente = [
+        'export function otraCosa() {',
+        '  return 1;',
+        '}',
+        'export async function adjustBatchStock(batchId) {',
+        '  return tx.productBatch.update({ where: { id: batchId } });',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(false);
+    });
+
+    it('R27: el MISMO update movido a OTRA funcion si cuenta como hallazgo', () => {
+      const fuente = [
+        'export async function adjustBatchStock(batchId) {',
+        '  return 1;',
+        '}',
+        'export function otraFuncion() {',
+        '  return tx.productBatch.update({ where: { id: 1 } });',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(true);
+    });
+
+    it('R27: sin ningun update en el archivo, no hay hallazgo', () => {
+      const fuente = 'export async function adjustBatchStock() { return 1; }';
+      expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(false);
+    });
+
+    it('R27: un tipo de retorno con su propia llave -Promise<{ stock: number } | null>- no confunde al cuerpo', () => {
+      const fuente = [
+        'export async function adjustBatchStock(batchId: string): Promise<{ stock: number } | null> {',
+        '  return tx.productBatch.update({ where: { id: batchId } });',
+        '}',
+        'export function otraFuncion(): void {',
+        '  return undefined;',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(false);
+    });
+
+    it('R27: delete, deleteMany y el SQL crudo siguen dando hallazgo pase lo que pase con update', () => {
+      expect(escrituraDestructivaDeLotes('await tx.productBatch.delete({ where });')).not.toEqual([]);
+      expect(escrituraDestructivaDeLotes('await tx.productBatch.deleteMany({ where });')).not.toEqual([]);
+      expect(
+        escrituraDestructivaDeLotes('await tx.$executeRaw`DELETE FROM "product_batches" WHERE id = ${id}`;'),
+      ).not.toEqual([]);
+    });
   });
 });
 

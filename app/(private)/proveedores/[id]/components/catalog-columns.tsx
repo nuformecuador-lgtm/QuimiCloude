@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import type { DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import type { CatalogLineView } from '@/lib/modules/proveedores';
+import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 import {
   resolvePresentationName,
@@ -36,6 +37,18 @@ import {
  * **Que columna ordena y que columna filtra sale de `SUPPLIER_CATALOG_LINE_QUERYABLE`**, la lista
  * blanca del modulo, no de una decision de esta pantalla: declarar `sortable` en una cabecera que
  * el backend ignora seria pintar un control que miente.
+ *
+ * **El costo y el minimo de compra se PINTAN con dos decimales** (enmienda del 2026-09-17 a R41,
+ * decision humana). Llegan con la escala de la columna -«12.5000»- y cuatro decimales de relleno
+ * no informan de nada: compiten por la atencion con los que si. Las dos celdas los pasan por
+ * `formatDecimalDisplay`, y llevan el valor exacto en su `title` cuando el redondeo cambia lo que
+ * se ve, asi que la cifra completa no desaparece.
+ *
+ * Lo que R41 protege de fondo sigue vigilado y sin excepcion: NI `Intl.NumberFormat`, NI
+ * `toFixed`, NI `parseFloat`, NI coma flotante, NI aritmetica de `number`. `formatDecimalDisplay`
+ * redondea con enteros `BigInt` sobre el texto, que es exacto. Y es PRESENTACION: estas celdas no
+ * alimentan ningun envio, la linea guardada conserva sus cuatro decimales y el formulario la
+ * precarga con `trimDecimal`, que no redondea. Mismo criterio que la tabla de pedidos.
  */
 
 /** Marca de «sin dato» de las columnas opcionales. Constante para que ningun test dependa del glifo. */
@@ -180,16 +193,24 @@ export function buildCatalogColumns({
       align: 'end',
       sortable: true,
       filter: { kind: 'numberRange' },
-      // R41: la cadena decimal, TAL CUAL la entrega la consulta. Ni `Intl`, ni `toFixed`, ni
-      // conversion a coma flotante, ni aritmetica.
-      cell: (line) => line.cost,
+      // Dos decimales para leer, exacto por dentro: ver el bloque de R41 de arriba.
+      cell: (line) => (
+        <span title={exactDecimalTitle(line.cost)}>{formatDecimalDisplay(line.cost)}</span>
+      ),
     },
     {
       id: 'minPurchase',
       label: 'Mínimo de compra',
       align: 'end',
       sortable: true,
-      cell: (line) => line.minPurchase ?? EMPTY_CELL,
+      cell: (line) =>
+        line.minPurchase === null ? (
+          EMPTY_CELL
+        ) : (
+          <span title={exactDecimalTitle(line.minPurchase)}>
+            {formatDecimalDisplay(line.minPurchase)}
+          </span>
+        ),
     },
     {
       id: 'deliveryTime',

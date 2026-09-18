@@ -13,12 +13,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { normalizePresentationName, normalizeProductName } from '@/lib/modules/inventario';
+import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
   addBatchToAlive,
+  adjustBatchStock,
   createProduct,
   createWithFirstBatch,
   findAliveIdByName,
   findAliveProductById,
+  findBatchesOfAliveProduct,
   listAliveProducts,
   softDeleteAliveProduct,
   updateAliveProduct,
@@ -231,6 +234,7 @@ afterAll(async () => {
   // En el orden que exigen las FK.
   const empresas = [A, B].filter((empresa): empresa is Empresa => empresa !== undefined);
   for (const empresa of empresas) {
+    await prisma.inventoryMovement.deleteMany({ where: { companyId: empresa.companyId } });
     await prisma.productBatch.deleteMany({ where: { companyId: empresa.companyId } });
     await prisma.product.deleteMany({ where: { companyId: empresa.companyId } });
     await prisma.presentation.deleteMany({ where: { companyId: empresa.companyId } });
@@ -637,6 +641,89 @@ describe('R17 — el alta escribe la empresa del AMBITO, no la de la entrada', (
     expect(vistaA.items.map((p) => p.id)).toEqual([enA.id]);
     const vistaB = await listPresentations(consulta({ search: name }), ambitoDe(B));
     expect(vistaB.items.map((p) => p.id)).toEqual([enB.id]);
+  });
+});
+
+describe('R18 — adjustBatchStock / findBatchesOfAliveProduct / findBatchMovements con un id AJENO', () => {
+  /** Todas las columnas del lote: comparar solo `stock` dejaria pasar un `updated_by`/`updated_at`
+   *  movido sin que ningun campo del contrato lo delatara. */
+  async function fotoLote(id: string): Promise<string> {
+    const fila = await prisma.productBatch.findUniqueOrThrow({ where: { id } });
+    return JSON.stringify(fila);
+  }
+
+  it('adjustBatchStock sobre el lote de B desde A devuelve null y NO toca la fila ni escribe asiento', async () => {
+    const ajeno = B.lotes[0] ?? '';
+    const antes = await fotoLote(ajeno);
+    const asientosAntes = await prisma.inventoryMovement.count({ where: { batchId: ajeno } });
+
+    const resultado = await adjustBatchStock(ajeno, 1, 'conteo_fisico', A.userId, new Date(), ambitoDe(A));
+
+    expect(resultado).toBeNull();
+    expect(await fotoLote(ajeno)).toBe(antes);
+    expect(await prisma.inventoryMovement.count({ where: { batchId: ajeno } })).toBe(asientosAntes);
+  });
+
+  it('control positivo: el mismo adjustBatchStock, desde B, SI escribe el stock y deja un asiento', async () => {
+    // Sin este caso, un `update` que nunca actualizara -y nunca escribiera asiento- dejaria verde
+    // el cruzado de arriba por vacuidad.
+    const propio = B.lotes[0] ?? '';
+    const antes = await fotoLote(propio);
+    const asientosAntes = await prisma.inventoryMovement.count({ where: { batchId: propio } });
+    const delta = 1;
+
+    const resultado = await adjustBatchStock(propio, delta, 'conteo_fisico', B.userId, new Date(), ambitoDe(B));
+
+    expect(resultado).toEqual({ stock: 7 + delta });
+    expect(await fotoLote(propio)).not.toBe(antes);
+    const fila = await prisma.productBatch.findUniqueOrThrow({ where: { id: propio } });
+    expect(fila.stock).toBe(7 + delta);
+    expect(fila.companyId).toBe(B.companyId);
+
+    const asientosDespues = await prisma.inventoryMovement.findMany({
+      where: { batchId: propio },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(asientosDespues).toHaveLength(asientosAntes + 1);
+    const asiento = asientosDespues[0];
+    expect(asiento?.kind).toBe('adjustment');
+    expect(asiento?.quantity).toBe(delta);
+    expect(asiento?.reason).toBe('conteo_fisico');
+    expect(asiento?.companyId).toBe(B.companyId);
+  });
+
+  it('findBatchesOfAliveProduct del producto de B pedido desde A trae la lista vacia', async () => {
+    const propio = B.productos[0] ?? '';
+
+    const resultado = await findBatchesOfAliveProduct(propio, ambitoDe(A));
+
+    expect(resultado).toEqual([]);
+  });
+
+  it('control positivo: el mismo producto, pedido desde B, trae su lote', async () => {
+    // Sin este caso, un `findMany` que devolviera siempre `[]` dejaria verde el cruzado de arriba.
+    const propio = B.productos[0] ?? '';
+
+    const resultado = await findBatchesOfAliveProduct(propio, ambitoDe(B));
+
+    expect(resultado.map((lote) => lote.id)).toContain(B.lotes[0]);
+  });
+
+  it('findBatchMovements del lote de B pedido desde A es `null`', async () => {
+    const ajeno = B.lotes[0] ?? '';
+
+    expect(await findBatchMovements(ajeno, ambitoDe(A))).toBeNull();
+  });
+
+  it('control positivo: el mismo lote, pedido desde B, no es null y trae el asiento ya escrito', async () => {
+    // Depende a proposito de que el control positivo de `adjustBatchStock`, arriba en este mismo
+    // describe, ya haya dejado un asiento de tipo 'adjustment' para este lote.
+    const propio = B.lotes[0] ?? '';
+
+    const resultado = await findBatchMovements(propio, ambitoDe(B));
+
+    expect(resultado).not.toBeNull();
+    expect(resultado?.some((asiento) => asiento.kind === 'adjustment')).toBe(true);
   });
 });
 

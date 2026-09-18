@@ -298,8 +298,13 @@ Feature con `depends_on` no arranca hasta que su dependencia este `done`.
     - Si el PR se mergeo con **squash**, GitHub reescribe los commits y la rama nunca
       figura como ancestro de `dev`: ahi va `./scripts/wt.sh done <key>-<slug>
       --assume-merged`, que salta solo esa guarda y mantiene las otras tres.
-12. (F2.6) Añade un resumen a `progress/history.md` (append-only) y limpia la
-    feature de `progress/current.md`.
+12. (F2.6) Añade un resumen a `progress/history.md` (append-only), limpia la
+    feature de `progress/current.md` **y poda el baseline de rojos**: el gate completo
+    termina avisando de las entradas de `tests/baseline-rojos.json` que **ya pasan**, y ese
+    aviso hay que atenderlo aquí —se borra la entrada, o se escribe por qué se queda—. Un
+    baseline que no se poda deja el gate **ciego** sobre esos archivos, que es exactamente
+    lo que su propia nota advierte que no debe pasar. El porqué y el estado, en
+    `docs/verification.md > Rojos heredados`.
 
 ## Regla del gate: quien corre que (2026-08-03)
 

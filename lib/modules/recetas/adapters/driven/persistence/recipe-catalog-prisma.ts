@@ -1,12 +1,14 @@
 import { prisma } from '@/lib/shared/db/prisma';
 
 import { recipeStepSchema } from '../../../domain/recipe-input';
+import { normalizeRecipeName } from '../../../domain/recipe-name';
 
 import type { RecipeExecutionContent, RecipeId, RecipeRef } from '../../../domain/recipe-catalog';
 import type { RecipeScope } from '../../../domain/recipe-scope';
 import type { RecipeStepView } from '../../../domain/recipe-view';
 
 import { recipeCompanyScope } from './company-scope';
+import { normalizedSearchCondition } from './list-query-sql';
 
 /**
  * Implementa `RecipeCatalog['findRefsIncludingDeleted']` (`domain/recipe-catalog.ts`,
@@ -56,6 +58,28 @@ export async function findRecipeRefsIncludingDeleted(
   });
 
   return rows.map(toRecipeRef);
+}
+
+/**
+ * Ids de recetas de esa empresa cuyo nombre casa con `search`, INCLUIDAS LAS DADAS DE BAJA:
+ * un pedido conserva su receta aunque la den de baja, y buscar ese nombre tiene que seguir
+ * encontrandolo. `null` cuando el termino no normaliza a nada -no es una busqueda, no hay
+ * nada que filtrar-, distinto de `[]` -ninguna receta casa-.
+ */
+export async function findRecipeIdsMatchingName(
+  search: string,
+  companyId: string,
+): Promise<readonly RecipeId[] | null> {
+  const condition = normalizedSearchCondition(search, normalizeRecipeName);
+  if (condition === null) return null;
+
+  const scope: RecipeScope = { companyId };
+  const rows = await prisma.recipe.findMany({
+    where: { AND: [recipeCompanyScope(scope), { nameNormalized: condition }] },
+    select: { id: true },
+  });
+
+  return rows.map((row) => row.id);
 }
 
 /**

@@ -44,6 +44,13 @@ export interface RecipeCatalog {
     id: RecipeId,
     companyId: string,
   ): Promise<RecipeExecutionContent | null>;
+
+  /** Ids (no `Ref`s: quien busca no necesita nombres ni fechas) de las recetas de esa empresa
+   *  cuyo nombre casa con `search`, INCLUIDAS LAS DADAS DE BAJA -una receta de baja tiene que
+   *  seguir siendo encontrable por su nombre-. `null` significa que `search` no es una
+   *  busqueda -no queda nada al normalizarlo-, y por tanto no filtra nada; `[]` significa que
+   *  ninguna receta casa. Los dos casos son distintos y no deben fundirse. */
+  findIdsMatchingName(search: string, companyId: string): Promise<readonly RecipeId[] | null>;
 }
 
 /** Linea de receta tal como la ve la ejecucion: sin `id` propio, sin autoria, sin marcas de
