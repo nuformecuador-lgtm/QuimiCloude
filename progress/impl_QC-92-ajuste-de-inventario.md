@@ -313,3 +313,150 @@ Es exactamente lo que advierte `AGENTS.md > Regla del gate`: *«el subagente no 
 Hoy `R32: ningun export del contrato publico denota listar, editar ni borrar lotes` está **verde**, y por eso **no se toca ahora**. Pero mira las claves del barrel de `inventario`, y T8 va a exportar los casos de uso `listProductBatches` y `listBatchMovements`. `operacionesDeLoteProhibidas` parte el nombre en palabras: `listProductBatches` → `list` (operación prohibida) + `batches` (palabra de lote) ⇒ **infractor**.
 
 **Se anota ahora, con la predicción hecha antes de que ocurra, para que en T8 no se lea como una sorpresa** ni se «arregle» renombrando un caso de uso para esquivar una guardia. Es el mismo defecto de familia 4 en su tercer caso del mismo archivo.
+
+---
+
+## Tanda 4 — T8, T9 (código hecho y commiteado; la tanda **NO** cierra: el gate está rojo)
+
+Commits: `9b58bc8` (T8) y `1ef5f2a` (T9). **Ninguna de las dos tasks se marca `[x]`**: el «Hecho»
+de T9 es `./init.sh --rapido` verde, y no lo está.
+
+### Archivos
+
+**Creados**
+- `lib/modules/inventario/domain/adjust-batch-stock.ts`
+- `lib/modules/inventario/domain/list-product-batches.ts`
+- `lib/modules/inventario/domain/list-batch-movements.ts`
+- `lib/modules/inventario/adapters/driving/batch-actions.ts`
+- `tests/unit/inventario/adjust-batch-stock.test.ts`
+- `tests/unit/inventario/batch-actions.test.ts`
+
+**Modificados**
+- `lib/modules/inventario/index.ts` — las tres fábricas, sus tipos de deps, `ProductBatchView`,
+  `InventoryMovementView`, `NewInventoryMovement`, `MOVEMENT_REASONS`/`MovementReason` y las dos
+  clases de error nuevas.
+- `lib/composition/index.ts` — las tres claves nuevas de la fachada, **al final y sin reordenar nada**.
+- `tests/unit/inventario/authorization.test.ts` — de nueve a **doce** casos de uso.
+- `tests/unit/identity/session-once-per-request-actions.test.ts` — la fila del censo de QC-104.
+
+### La desviación 4 queda **CERRADA**: R23 ya tiene autor y no UUID
+
+`list-batch-movements.ts` recibe el puerto `PeopleDirectory` de `identity` —**solo el tipo, por el
+contrato público**— y resuelve el nombre en el caso de uso, con
+`findRefsIncludingDeletedInCompany`: un autor no desaparece del historial porque su cuenta se
+desactive. El que no vuelve del directorio **sigue saliendo con su identificador**; no hay `filter`.
+La persistencia no se tocó: un driven de `inventario` leyendo `users` es el anti-patrón que esto
+evita. Mismo patrón que `list-order-responsibles.ts`.
+
+### La trampa de QC-104, cerrada como estaba previsto
+
+Las tres acciones resuelven las dos caras de la sesión, así que el archivo entra en `ACCIONES` con
+su fila. `archivosConLasDosCaras()` y las dos comprobaciones contra el árbol quedan **intactas**:
+el censo crece, no se afloja. Los dos casos de conteo pasan para la fila nueva.
+
+### La trampa de orden de la composición (no estaba en el spec, se declara)
+
+`peopleDirectory` se declara en `lib/composition/index.ts:987`, **después** de la fachada de
+`inventario` (~664): usarla ahí sería una referencia a un `const` en zona muerta y habría reventado
+en tiempo de ejecución, no en `typecheck`. Se nombra el import de valor `assignmentDirectoryPrisma`
+(`:286`), que se iza y es el **mismo objeto**, y no se movió ninguna declaración existente.
+Comprobado que el módulo **carga**, no solo que compila (`tests/unit/composition`: 2 archivos, 23
+casos verdes).
+
+### Salida real del gate
+
+`./init.sh --rapido` → **ROJO**. `347 archivos, 3 failed | 5177 passed | 26 skipped (5206)`.
+Los tres rojos, **medidos uno a uno contra `origin/dev`, ninguno aceptado de oídas**:
+
+| Rojo | Causa | ¿Nuestro? |
+|---|---|---|
+| `module-contract.test.ts:152` (QC-90 R30) | los exports `createListProductBatches` / `createListBatchMovements` del barrel | **Sí, T8** |
+| `qc81-alcance.test.ts:565` (QC-81 R32) | los mismos dos exports, mismo detector | **Sí, T8** |
+| `configuracion-ui/user-table.test.tsx` | el flake conocido de jsdom | **No**: el archivo es idéntico a `origin/dev` y corrido solo da **27 passed** |
+
+Guardias, corridas aparte porque `test:rapido` **no llega a ellas cuando la selección relacionada
+falla** (el `if (status === 0)` del final de `scripts/test-rapido.mjs`): `vitest run guard` → **43
+archivos, 515 passed, 9 skipped, 0 rojos**.
+
+`pnpm run typecheck` y `pnpm run lint` → verdes.
+
+### BLOQUEANTE 1 — los dos casos del **barrel**: la predicción se cumplió, y son DOS, no uno
+
+La bitácora predijo el caso del barrel de R32 antes de que ocurriera. Se cumplió, **y tiene un
+gemelo que no estaba predicho**: `tests/unit/inventario/module-contract.test.ts:152`, el caso
+«QC-90 R30 — ningún export del contrato denota listar, editar ni borrar lotes». Corre el **mismo
+detector** (palabra de lote + operación prohibida) sobre las **mismas claves del barrel**, así que
+la causa es una sola y la decisión tiene que cubrir **dos archivos**.
+
+**Medición, no veredicto:** en `origin/dev` el barrel solo publica `BatchDuplicateLotError`,
+`PRODUCT_BATCH_LOT_MAX_LENGTH`, `createProductWithFirstBatchSchema`,
+`CreateProductWithFirstBatchInput` y `NewProductBatch` — ninguno infractor. `HEAD` antes de esta
+tanda era **idéntico** a `origin/dev` en ese archivo. Los dos infractores son exactamente los dos
+exports que entra T8.
+
+**Lo que dice el precedente de esta misma rama.** `921e224` acotó el caso *del puerto* de R32 y dejó
+escrito, con todas las letras, que el del barrel «sigue limpio, y **es lo que R32 protege de
+verdad**». Ya no sigue limpio. Y el mensaje de error de QC-90 R30 dice: «Listar, editar y borrar
+lotes **NO tiene ficha** (`requirements.md > Lo que NO entra`): si hace falta, **se pide una**».
+**QC-92 es esa ficha**: R22 exige el panel que lista los lotes y R23 el historial. La premisa de las
+dos guardias está superada por una ficha aprobada, no esquivada.
+
+**No se ha tocado nada.** Ni los detectores, ni `OPERACIONES_PROHIBIDAS`, ni `PALABRAS_DE_LOTE`, ni
+se renombró ningún caso de uso para esquivar la guardia. **La decisión es del leader.**
+
+### BLOQUEANTE 2 — `inventario-schema.test.ts`: **cuatro rojos que llevan tres tandas escondidos**
+
+`tests/unit/inventario/schema/inventario-schema.test.ts` tiene **4 casos rojos** y el gate rápido
+**no los ve**. Medidos:
+
+| Caso | Qué afirma | Causa |
+|---|---|---|
+| `:246` | el esquema declara **exactamente** `Presentation`, `Product`, `ProductBatch` | `InventoryMovement`, de **T1** |
+| `:631` | los **tres** modelos declaran `/// @module inventario` | `InventoryMovement`, de **T1** |
+| `:823` | `ProductBatch` conserva **exactamente** sus columnas | la back-relation `movements`, de **T1** |
+| `:685` | la lista cerrada de factorías del barrel | las tres fábricas de **T8** |
+
+**Tres de los cuatro son de T1**, commiteada en `842d63d`. `db/schema.prisma` no se ha tocado desde
+entonces (`git diff HEAD -- db/schema.prisma` vacío), así que **esos tres están rojos desde la tanda
+1**, que se cerró con el gate en verde. Y la tanda 3 también.
+
+**Por qué el gate no los vio, medido sobre `scripts/test-rapido.mjs`:**
+1. `changedFiles()` filtra a `.ts|.tsx|.js|.jsx|.mjs|.cjs`. **`.prisma` y `.sql` quedan fuera**, así
+   que una migración o un cambio de esquema no selecciona nada.
+2. Este archivo **lee el barrel como TEXTO** —un regex sobre el contenido, no un import— y lee
+   `db/schema.prisma` del disco. **No importa nada de lo que vigila**, así que ningún grafo de
+   imports lo relaciona jamás.
+3. Vive en `tests/unit/`, no en `tests/guards/`, así que tampoco entra por el patrón `guard`.
+
+Es **una guardia de censo en la carpeta equivocada**, y es exactamente el riesgo que
+`design.md > 5.2` de esta ficha dejó escrito para T14: «en `tests/guards/` y **no** en `tests/unit/`
+porque no la selecciona ningún grafo de imports». Aquí está el caso real de lo que ese párrafo
+predice.
+
+**Quinta familia** sobre las cuatro ya inventariadas, y la primera cuyo defecto es **dónde vive**:
+
+| # | Familia | Dónde vive | Qué la dispara | A quién le tocó |
+|---|---|---|---|---|
+| 5 | **Censo de esquema fuera de `tests/guards/`** | `tests/unit/inventario/schema/inventario-schema.test.ts` | Un modelo, una columna o una factoría nueva; **invisible al gate rápido** por partida triple | **T1** (3 casos, desde `842d63d`) y **T8** (1 caso) |
+
+**No se ha tocado.** Actualizar esas cuatro listas cerradas es el mismo trámite mecánico que T1 ya
+hizo con `MIGRACIONES_ESPERADAS`, pero es una guardia de otra ficha y **la decisión es del leader**.
+
+### Desviaciones declaradas de la tanda 4
+
+1. **`authorName` transporta el identificador entre el puerto y el caso de uso.** El adaptador lo
+   rellena con `created_by` y `list-batch-movements.ts` lo sustituye por el nombre mostrable. Lo
+   limpio habría sido un `authorId` aparte en `InventoryMovementView`, pero eso obliga a tocar
+   `inventory-movement.ts` y `batch-movement-prisma.ts`, que son de **T6** y no de T8. Se respetó la
+   lista de archivos de la task y queda **escrito en el docblock** del caso de uso. **A la vista del
+   reviewer, no descubierto por él.**
+2. **`AdjustBatchStockInput` se exporta por el barrel** (el `z.infer` del esquema) aunque la task no
+   lo pedía: lo va a necesitar el diálogo de T12 para tipar el formulario. No es infractor de
+   ninguno de los dos detectores del barrel (comprobado).
+
+### Lección de proceso, tercera vez y esta vez **no** falló
+
+Los dos subagentes de esta tanda reportaron sus rojos **con la medición contra `origin/dev` hecha
+por ellos**, y el de T9 encontró y escaló por su cuenta los cuatro rojos de `inventario-schema` que
+no estaban en su lista de rojos conocidos. Aun así **los tres se volvieron a medir aquí antes de
+commitear**, que es la regla. Ninguno resultó mal diagnosticado.
