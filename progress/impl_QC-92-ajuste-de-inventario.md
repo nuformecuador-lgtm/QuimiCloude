@@ -271,3 +271,45 @@ AssertionError: expected [ 'findBatchMovements', 'findBatchesOfAliveProduct' ] t
 **No la he tocado.** La decisión del leader sobre R31 fue para R31; no la extiendo por mi cuenta a otra guardia.
 
 **Lección de proceso, y es la segunda vez:** un subagente etiquetó como «ajeno y preexistente» un rojo que había causado él mismo. Es exactamente lo que `AGENTS.md > Regla del gate` advierte —el subagente no tiene contexto para juzgar un rojo— y la razón por la que el implementer verifica antes de commitear.
+
+---
+
+## Dos desviaciones, cerradas — no arrastradas
+
+### Desviación 6 → **CAMBIO DE DISEÑO DECLARADO**, no deuda
+
+`design.md > 4.3` decía: «La aplicación **también** lo comprueba antes, para dar un mensaje útil; la garantía dura sigue siendo la base». **Esa comprobación previa no se implementó, y no se va a implementar.** La razón, medida:
+
+1. **El mensaje útil ya se da.** El `23514` de `product_batches_stock_non_negative` se traduce **por el nombre de la restricción** a `BatchStockNegativeError`, cuyo texto es «El ajuste dejaria la existencia del lote por debajo de cero». Es exactamente el mensaje accionable que la comprobación previa buscaba. **No se pierde nada de lo que el design quería.**
+2. **La comprobación previa reintroduciría el bug que esta ficha existe para quitar.** Leer el `stock`, decidir en la aplicación y después escribir es **leer-y-escribir no atómico**: entre la lectura y el `UPDATE` cabe otro ajuste. Es el mismo argumento con el que `design.md > 4.1` prohíbe que el dominio calcule el total y lo escriba, y con el que `> 6` descarta la alternativa 5. Una comprobación previa **no vinculante** daría además falsos negativos bajo concurrencia: aprobaría un ajuste que la base rechazará igual.
+3. **R4 y R5 no dependen de ella.** R4 exige rechazar y no dejar escrito **ni el asiento ni la existencia**: eso lo da el `CHECK` dentro de la transacción, que revierte las dos escrituras. R5 exige que el `CHECK` siga intacto y que la base rechace por su cuenta **por cualquier vía**: una comprobación en la aplicación no ayudaría a eso, y de hecho invita a confiar en ella.
+
+**Dónde quedan mapeados R4 y R5, con test real y no con una nota:**
+- **R5** — `tests/integration/inventario/inventory-movements-constraints.int.test.ts`: caso de `stock` negativo escrito **por SQL crudo**, rechazado por `product_batches_stock_non_negative`. Es la vía que ninguna comprobación de aplicación cubre.
+- **R4** — `tests/unit/inventario/adjust-batch-stock-prisma.test.ts`: el `23514` con ese nombre de restricción se traduce a `BatchStockNegativeError` y **no queda escrito ni el asiento ni el cambio**.
+- **R4 extremo a extremo** — `e2e/ajuste-de-inventario.spec.ts` (**T16**).
+
+### Desviación 4 → **PENDIENTE DE T8**, y no está hecha
+
+`authorName` sale **hoy** como el identificador crudo del actor. **R23 pide autor, y un UUID en pantalla no es un autor.** Aprobado por el leader el plan: **en T8**, inyectar el puerto `PeopleDirectory` de `identity` en el caso de uso y resolver ahí el nombre — **nunca en la persistencia**, porque un driven de `inventario` leyendo `users` es lo que prohíben los anti-patrones. Es el patrón que `identity` ya usa en `list-order-responsibles.ts`.
+
+**Hasta que T8 lo cierre, R23 NO está cumplido.** Queda escrito así para que no se dé por hecho.
+
+---
+
+## Lección de proceso — **dos veces en una ficha**
+
+**Un subagente etiquetó como «ajeno y preexistente» un rojo que había causado él mismo.** Dos casos medidos en esta ficha:
+
+1. La lista cerrada de migraciones de `guard-identificador-de-request.test.ts`, que el subagente sí anotó pero clasificó como trampa de QC-104 cuando era un censo de QC-99.
+2. **R32 de QC-81**, reportado literalmente como «preexistente y no relacionado con mi cambio». Medido: en `origin/dev` el puerto declara **0** `findBatch*`; en la rama, **2**. **Lo causó su propia T5.**
+
+Es exactamente lo que advierte `AGENTS.md > Regla del gate`: *«el subagente no tiene el contexto para juzgar un rojo ajeno… Un rojo mal diagnosticado por un subagente cuesta más que la corrida que se ahorró»*. Los dos se cazaron **verificando antes de commitear**, no confiando en el reporte. **El implementer no debe commitear un veredicto de subagente sin medirlo.**
+
+---
+
+## Predicción anotada: el caso del **barrel** de R32 se pondrá rojo en **T8**
+
+Hoy `R32: ningun export del contrato publico denota listar, editar ni borrar lotes` está **verde**, y por eso **no se toca ahora**. Pero mira las claves del barrel de `inventario`, y T8 va a exportar los casos de uso `listProductBatches` y `listBatchMovements`. `operacionesDeLoteProhibidas` parte el nombre en palabras: `listProductBatches` → `list` (operación prohibida) + `batches` (palabra de lote) ⇒ **infractor**.
+
+**Se anota ahora, con la predicción hecha antes de que ocurra, para que en T8 no se lea como una sorpresa** ni se «arregle» renombrando un caso de uso para esquivar una guardia. Es el mismo defecto de familia 4 en su tercer caso del mismo archivo.
