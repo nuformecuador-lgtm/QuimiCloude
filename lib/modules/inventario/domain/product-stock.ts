@@ -19,3 +19,14 @@ export function sumStockByUnit(
     return a.unitId < b.unitId ? -1 : a.unitId > b.unitId ? 1 : 0;
   });
 }
+
+export function singleUnitStock(
+  rows: readonly { readonly stock: number; readonly unitId: UnitId }[],
+): number {
+  const totals = sumStockByUnit(rows);
+
+  if (totals.length === 0) return 0;
+  if (totals.length === 1) return totals[0].quantity;
+
+  throw new Error(`singleUnitStock: los lotes mezclan ${totals.length} unidades`);
+}
