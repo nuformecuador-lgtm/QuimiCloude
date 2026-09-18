@@ -204,3 +204,61 @@ T1–T8 completas: dominio, puerto, caso de uso con espera maxima y los dos adap
 contador, con 47 tests en verde y typecheck/lint limpios. T9 en adelante (cableado en
 `lib/composition/edge.ts`, enganche en el middleware, guardias, frontend, E2E y cierre) quedan
 pendientes de otra tanda.
+
+## T16 y T18
+
+**Archivos.**
+
+- `scripts/measure-rate-limit-latency.ts` (nuevo): lanza N peticiones GET secuenciales a una
+  URL y escribe `p50`/`p95` en ms. Exporta `percentile(values, p)` (rango mas cercano,
+  nearest-rank) y `summarizeLatencies(durationsMs)`, las dos puras y sin red. La ejecucion de
+  `main()` esta guardada por `import.meta.url === pathToFileURL(process.argv[1]).href`: al
+  importar el modulo desde el test no dispara ninguna peticion.
+- `tests/unit/scripts/measure-rate-limit-latency.test.ts` (nuevo): 7 casos con `R34` en el
+  nombre — par, impar, un solo valor, `p95` sobre diez valores, no-mutacion del arreglo de
+  entrada, arreglo vacio lanza, y `summarizeLatencies` sobre un caso conocido.
+- `docs/architecture.md`: `> Stack > Integraciones externas` ya no dice «ninguna definida
+  todavia»; nombra Upstash Redis (REST) y su unico archivo consumidor. `> Permisos y
+  autenticacion` suma que el middleware hace una E/S (el contador) antes de leer la cookie,
+  acotada por una espera maxima, y que si falla se deja pasar con aviso.
+- `.env.example`: bloque nuevo con las cinco variables de cuota comentadas (con su valor por
+  defecto: `30`/`600`/`600`/`60`/`500`) y `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`
+  sin valor.
+
+**Como se usa el script.**
+
+```bash
+tsx scripts/measure-rate-limit-latency.ts <url> [n]
+# ej.: tsx scripts/measure-rate-limit-latency.ts http://localhost:3117/ 200
+# para N por encima de RATE_LIMIT_GENERAL_MAX (600 por defecto), subirlo en el
+# entorno del SERVIDOR medido antes de arrancarlo:
+#   RATE_LIMIT_GENERAL_MAX=5000 pnpm start
+```
+
+**Salida real.**
+
+```
+$ pnpm exec vitest run tests/unit/scripts/measure-rate-limit-latency.test.ts
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+
+$ pnpm run typecheck
+> tsc --noEmit
+(sin salida, exit 0)
+
+$ pnpm run lint
+> eslint
+(sin salida, exit 0)
+
+$ pnpm exec vitest run tests/guards/guard-arquitectura-modulos.test.ts tests/guards/guard-empresa-en-esquema.test.ts tests/guards/guard-dependencias-aprobadas.test.ts
+ Test Files  3 passed (3)
+      Tests  79 passed (79)
+```
+
+No se corrio `./init.sh` ni `./init.sh --rapido` ni la suite completa (fuera de alcance de esta
+tanda). Las guardias de arriba se corrieron sueltas porque leen `docs/architecture.md` de disco;
+las dos pasan sin cambios provocados por esta tanda.
+
+**Veredicto T16/T18:** hecho — script, test (7/7 verde) y documentacion actualizados; sin
+bloqueos.
