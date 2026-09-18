@@ -189,7 +189,15 @@ nombres) y 4 con ella. Un test unitario con **dobles** no puede ver eso: el `fin
 viven dentro de **una sola** invocacion de `listAlive`. T9 contara **invocaciones de puerto**: **2
 sin busqueda y 3 con ella**. Las dos cifras son ciertas y miden cosas distintas; **el conteo de SQL
 no se ha borrado** y lleva su nota fechada al lado, y `tasks.md > T9` lleva la correccion con su
-fecha. Quien demuestra el numero real de consultas contra la base es el test de integracion.
+fecha.
+
+> **Recorte fechado 2026-09-18 (review).** Esta nota cerraba con «quien demuestra el numero real
+> de consultas contra la base es el test de integracion». **Ese test no existe**: ningun test del
+> repo cuenta consultas SQL. La frase se quita en vez de inventar el test para salvarla, aqui y en
+> los otros tres sitios donde estaba. Lo que **si** esta probado es que el numero de invocaciones
+> de puerto **no crece con las filas** (T9), y que dentro de `listAlive` el par `findMany`+`count`
+> es constante **por construccion**. El numero de consultas SQL **no esta probado por nadie**, y
+> decirlo es mas util que prometer un test que nadie escribio.
 
 ## Pruebas por mutacion (salida real)
 
@@ -600,3 +608,109 @@ era el caso que junta las dos condiciones a la vez, que es justo lo que el enunc
 `R<n> -> test` no deberia admitir una celda con tres tests que cubren **trozos** del requisito sin
 que nadie ejercite el enunciado entero: conviene que el reviewer lo trate como **pendiente** y no
 como cubierto.
+
+---
+
+# Menores de la review (2026-09-18, F2.2)
+
+> Review **APROBADA**, 0 bloqueantes, 9 menores (`progress/review_QC-68-...md`, `ee2f8bc`). El
+> leader encargo **cuatro**; los otros cinco quedan anotados ahi y **no se tocan**: el de
+> R6-conjuncion (el reviewer verifico por mutacion que el ambito del lado de pedidos **si** esta
+> cubierto, con 13 rojos en `company-scope-queries.int`), el de R3, T21 sin marcar, el rojo ajeno
+> del gate y el bloque de comentario de seis lineas.
+
+## 1 y 2 — los dos obligatorios son EL MISMO defecto que esta ficha persigue
+
+Los dos primeros menores son **una razon escrita que dejo de ser cierta**, cometida **dentro de la
+ficha que nacio para cazarlas**. Van juntos porque son la misma leccion.
+
+### 1. El docblock de `listAlive` decia «Un solo parametro» y la firma tiene tres
+
+`lib/modules/pedidos/ports/order-repository.ts`. La rama **le anadio cuatro lineas** a ese mismo
+docblock —el parrafo de `recipeIds`— y **dejo la cabecera en pie**, en el archivo que T6 tenia el
+encargo de poner al dia. Reescrita: lo que el parrafo defendia de verdad —que el estado y la
+prioridad **no son parametros propios** sino filtros dentro de la consulta ya saneada— **se
+conserva**; lo que se cae es el recuento. Solo prosa, sin tocar codigo.
+
+### 2. Una frase prometia un test de conteo de SQL que NO EXISTE
+
+«Quien demuestra el numero de consultas SQL es el test de integracion» estaba en **cuatro** sitios:
+`tests/unit/pedidos/list-orders.test.ts`, `design.md > 3`, `tasks.md > T9` y **este mismo archivo**.
+El reviewer barrio `$on('query')`, `$extends` y variantes por `tests/` y **no existe**: ningun test
+del repo cuenta consultas SQL.
+
+**No se ha escrito el test para salvar la frase.** Se ha quitado la frase de los cuatro sitios y se
+dice lo que de verdad pasa: **R8 esta cubierto contando invocaciones de puerto** —2 y 3, y no crecen
+con las filas— y dentro de `listAlive` el par `findMany`+`count` es constante **por construccion**;
+**el numero de consultas SQL no esta probado por nadie**. En `design.md` y `tasks.md` la nota
+fechada del 2026-09-17 **no se borra** —la discrepancia de cifras es real y sigue haciendo falta
+explicarla—: se **recorta**, con marca fechada 2026-09-18 que dice por que. El conteo de SQL de
+`design.md > 3` tampoco se borra: describe lo que llega a Postgres y es correcto.
+
+## 3 y 5 — dos tests que no probaban lo que su nombre decia
+
+### 3. «R2: ignora acentos» no tenia UN SOLO ACENTO
+
+El fixture sembraba `Acido Citrico <marca>` y buscaba `'ACIDO citrico'`: **ni un caracter acentuado
+en ninguno de los dos**, asi que el caso solo ejercitaba mayusculas mientras su nombre prometia
+acentos. Ahora la receta se siembra **`Ácido Cítrico`** y el caso busca **en las dos direcciones**:
+sin acentos encuentra la que los tiene, y con acentos y en mayusculas tambien.
+
+**El caso paso en verde a la primera**, asi que la parada condicional que el encargo preveia —«si
+sale rojo, para: la normalizacion no hace lo que creemos»— **no se activo**. La normalizacion hace
+lo que se esperaba.
+
+Comprobado ademas que cambiar ese nombre **no afloja a sus vecinos**: R1 busca `Bicarbonato` y no
+depende de el, y R3 —que busca el correlativo y espera cero— sigue a salvo porque `marca` es
+`tokenLetters()` y **los acentos no anaden digitos**.
+
+### 5. La segunda mitad de R15 comparaba `null` contra `null`
+
+El caso afirmaba `recipeIds === null` y **despues** comparaba `listAliveOrders(..., recipeIds, ...)`
+con `listAliveOrders(..., null, ...)`: dos llamadas con argumentos **identicos**, una comparacion
+que **no podia fallar nunca**. Partido en dos, sin borrar nada:
+
+- el primero conserva la afirmacion que si valia (`''` -> `null`);
+- el segundo **gana sustancia**: afirma el **total** del dia sembrado (6) y el **orden por defecto**
+  (`priority DESC, created_at ASC`; los seis comparten prioridad, asi que manda el alta).
+
+El 6 no es un numero inventado: son los tres del `beforeAll` mas los tres de R5, y los dos casos de
+R6 crean y borran los suyos **despues**, que es el orden en que Vitest los define.
+
+## Salida real
+
+```
+$ pnpm run typecheck        -> tsc --noEmit, sin errores
+$ pnpm run lint             -> eslint, sin errores
+
+$ pnpm exec vitest run tests/unit/pedidos/ \
+    tests/integration/pedidos/list-query-orders.int.test.ts --maxWorkers=2
+test-db: la corrida va contra qct_qc68_92789bc4_mu70snh4_br4 (copia de qct_tpl_49d5621c32fb).
+ Test Files  22 passed (22)
+      Tests  380 passed (380)
+test-db: borrada la base de la corrida.
+```
+
+El archivo de integracion pasa de **21 a 22 casos** —uno mas por partir R15 en dos—, **ninguno
+perdido ni aflojado**.
+
+**Prueba por mutacion del caso de R2**, cambiando el nombre sembrado por uno que no casa:
+
+```
+ tests/integration/pedidos/list-query-orders.int.test.ts (22 tests | 1 failed)
+   x R2: ignora acentos y mayusculas, en las dos direcciones
+AssertionError: expected [] to deeply equal [ Array(1) ]
+```
+
+Restaurado: `Test Files 1 passed (1)` · `Tests 22 passed (22)`.
+
+## Deuda del arnes, la septima
+
+**La ficha que persigue un defecto no esta vacunada contra el.** QC-68 existe para cazar razones
+escritas que dejaron de ser ciertas, y cometio **dos** dentro de si misma: una cabecera de docblock
+que quedo desmentida por las cuatro lineas que la propia rama le anadio debajo, y una frase que
+prometia un test que nadie escribio. Las dos sobrevivieron a la implementacion y a la verificacion,
+y las caza el **reviewer**. La leccion no es «revisar mejor»: es que **anadir prosa a un bloque
+existente obliga a releer el bloque entero**, porque lo que se anade puede desmentir lo que ya
+estaba. Y que **una nota que promete un test debe nombrarlo con su archivo y su caso** — si no se
+puede nombrar, no existe.
