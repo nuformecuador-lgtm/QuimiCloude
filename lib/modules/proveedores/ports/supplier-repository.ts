@@ -1,5 +1,6 @@
 import type { ListQuery } from '../domain/list-query';
 import type { Page } from '../domain/page';
+import type { SupplierScope } from '../domain/supplier-scope';
 import type { NewSupplier, SupplierView } from '../domain/supplier-view';
 
 /**
@@ -17,44 +18,56 @@ import type { NewSupplier, SupplierView } from '../domain/supplier-view';
  *
  * Los resultados son discriminados, nunca excepciones de Prisma: el dominio no ve jamas un
  * SQLSTATE. Traducirlos es del adaptador driven.
+ *
+ * Los cinco metodos exigen `scope: SupplierScope` al FINAL de la firma. Ponerlo en la firma
+ * -y no como campo opcional ni con valor por defecto- es lo que hace que una llamada que lo
+ * omita no compile: es el compilador, no un test, quien atrapa al llamante nuevo que se
+ * olvide de acotar por empresa.
  */
 export interface SupplierRepository {
   /** `'duplicate'` = el indice unico parcial rechazo el nombre normalizado (R15, R17). */
-  create(data: NewSupplier, actorId: string, now: Date): Promise<{ id: string } | 'duplicate'>;
+  create(
+    data: NewSupplier,
+    actorId: string,
+    now: Date,
+    scope: SupplierScope,
+  ): Promise<{ id: string } | 'duplicate'>;
 
-  /** `null` = no existe o esta dado de baja: para el dominio son el mismo caso (R24). */
-  findAliveById(id: string): Promise<SupplierView | null>;
+  /** `null` = no existe, esta dado de baja o es de otra empresa: para el dominio son el
+   *  mismo caso (R24). */
+  findAliveById(id: string, scope: SupplierScope): Promise<SupplierView | null>;
 
   updateAlive(
     id: string,
     data: NewSupplier,
     actorId: string,
     now: Date,
+    scope: SupplierScope,
   ): Promise<'ok' | 'not_found' | 'duplicate'>;
 
   /**
    * Baja LOGICA del proveedor: marca `deleted_at`, jamas borra la fila. `false` = no habia
-   * ningun proveedor vivo con ese id (R23).
+   * ningun proveedor vivo con ese id **dentro de esa empresa** (R23).
    *
    * QC-52 le anade una obligacion que la firma no puede expresar y por eso se escribe aqui
    * (R20, decision cerrada 5): la baja arrastra TODAS las lineas vivas del catalogo de ese
    * proveedor, en la MISMA operacion atomica y con la MISMA marca de tiempo. Dos `now()`
    * distintos harian imposible saber despues que lineas cayeron con que baja. Y si no hay
-   * proveedor vivo que dar de baja, la transaccion NO escribe nada: ni en `suppliers` ni en
-   * `supplier_catalog_lines`.
+   * proveedor vivo que dar de baja -ni siquiera de otra empresa-, la transaccion NO escribe
+   * nada: ni en `suppliers` ni en `supplier_catalog_lines`.
    */
-  softDeleteAlive(id: string, actorId: string, now: Date): Promise<boolean>;
+  softDeleteAlive(id: string, actorId: string, now: Date, scope: SupplierScope): Promise<boolean>;
 
   /**
-   * Listado paginado de los proveedores VIVOS con el CONTRATO GENERICO de consulta
-   * (QC-57 R13). Recibe la consulta YA SANEADA por el caso de uso -lo que no esta en
+   * Listado paginado de los proveedores VIVOS de esa empresa, con el CONTRATO GENERICO de
+   * consulta (QC-57 R13). Recibe la consulta YA SANEADA por el caso de uso -lo que no esta en
    * `SUPPLIER_QUERYABLE` no llega aqui (R5)- y devuelve una `Page` ya armada:
    * `toOffsetLimit`/`buildPage` viven en `lib/shared/pagination`, que `domain/` NO puede
    * importar, asi que quien pagina es el adaptador driven.
    *
-   * El orden, el filtro y la busqueda los aplica el MOTOR sobre el conjunto completo y antes
-   * de paginar (R13), nunca sobre la pagina ya traida; el `total` describe el conjunto ya
-   * filtrado (R14).
+   * El orden, el filtro y la busqueda los aplica el MOTOR sobre el conjunto ya acotado a la
+   * empresa y antes de paginar (R13), nunca sobre la pagina ya traida; el `total`
+   * describe ese conjunto ya filtrado (R14).
    */
-  listAlive(query: ListQuery): Promise<Page<SupplierView>>;
+  listAlive(query: ListQuery, scope: SupplierScope): Promise<Page<SupplierView>>;
 }

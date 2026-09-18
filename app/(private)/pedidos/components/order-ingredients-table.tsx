@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/table';
 import type { RecipeLineView } from '@/lib/modules/recetas';
 import type { UnitView } from '@/lib/modules/unidades';
+import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 import { multiplyDecimal, subtractDecimal } from './order-decimal';
 
@@ -48,6 +49,17 @@ import { multiplyDecimal, subtractDecimal } from './order-decimal';
  * queda NEGATIVO y se resalta en rojo (`text-destructive` sobre un fondo suave), para que el
  * faltante se vea de un vistazo. Sin stock (`productStock: null`) se muestra el marcador, igual
  * que en la columna de stock: no hay resta que calcular.
+ *
+ * **Las cuatro columnas numericas se PINTAN con dos decimales** (2026-09-17): la cantidad y el
+ * stock llegan con la escala de la columna («0.1000»), y la requerida y la restante salen de un
+ * producto de decimales que suma escalas y puede dar ocho cifras («0.20100»). Ninguna de esas
+ * cifras de mas ayuda a leer la tabla, asi que la celda las pasa por `formatDecimalDisplay`.
+ *
+ * El redondeo es SOLO del pixel: `requiredOf` y `remainingOf` siguen devolviendo el valor
+ * EXACTO, y `isShort` mira ese exacto y no el redondeado —un faltante de 0.001 redondea a «0» y
+ * perderia el signo, dejando sin resaltar justo la fila que avisa de que no alcanza—. Y cuando
+ * el redondeo cambia lo que se ve, la celda lleva el valor exacto en su `title`
+ * (`exactDecimalTitle`): la cifra completa queda a un hover, no desaparece.
  */
 
 /** Prefijo de los `data-testid` de la tabla (R44). Ningun test depende del copy. */
@@ -136,25 +148,48 @@ export function OrderIngredientsTable({
           </TableHeader>
           <TableBody>
             {lines.map((line, index) => {
+              const required = requiredOf(line);
               const remaining = remainingOf(line);
               return (
                 <TableRow key={line.id} data-testid={`order-ingredient-${index}`}>
                   <TableCell data-testid="order-ingredient-product">
                     {line.productName ?? MISSING_PRODUCT_LABEL}
                   </TableCell>
-                  <TableCell className="text-right" data-testid="order-ingredient-quantity">
-                    {line.quantity}
+                  <TableCell
+                    className="text-right"
+                    title={exactDecimalTitle(line.quantity)}
+                    data-testid="order-ingredient-quantity"
+                  >
+                    {formatDecimalDisplay(line.quantity)}
                   </TableCell>
                   <TableCell data-testid="order-ingredient-unit">
                     {unitLabel(line.unitId, units)}
                   </TableCell>
-                  <TableCell className="text-right" data-testid="order-ingredient-stock">
-                    {line.productStock ?? MISSING_VALUE_MARK}
+                  <TableCell
+                    className="text-right"
+                    title={
+                      line.productStock === null
+                        ? undefined
+                        : exactDecimalTitle(line.productStock.toString())
+                    }
+                    data-testid="order-ingredient-stock"
+                  >
+                    {line.productStock === null
+                      ? MISSING_VALUE_MARK
+                      : formatDecimalDisplay(line.productStock.toString())}
                   </TableCell>
-                  <TableCell className="text-right" data-testid="order-ingredient-required">
-                    {requiredOf(line)}
+                  <TableCell
+                    className="text-right"
+                    title={exactDecimalTitle(required)}
+                    data-testid="order-ingredient-required"
+                  >
+                    {formatDecimalDisplay(required)}
                   </TableCell>
-                  <TableCell className="text-right" data-testid="order-ingredient-remaining">
+                  <TableCell
+                    className="text-right"
+                    title={remaining === null ? undefined : exactDecimalTitle(remaining)}
+                    data-testid="order-ingredient-remaining"
+                  >
                     {remaining === null ? (
                       MISSING_VALUE_MARK
                     ) : (
@@ -165,7 +200,7 @@ export function OrderIngredientsTable({
                             : undefined
                         }
                       >
-                        {remaining}
+                        {formatDecimalDisplay(remaining)}
                       </span>
                     )}
                   </TableCell>

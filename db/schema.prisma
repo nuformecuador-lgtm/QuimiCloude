@@ -242,6 +242,8 @@ model RevokedSession {
 /// porque apuntan a otros modulos y un `include` cruzaria la frontera sin que ninguna guardia lo vea;
 /// sus FK estan escritas a mano y son drift. El disparador `presentations_check_unit_scope` y los
 /// indices de busqueda y orden solo existen en las migraciones.
+/// `presentations_company_id_id_key` es la clave candidata a la que apunta la FK COMPUESTA de
+/// `supplier_catalog_lines` hacia la presentacion: quitarla la rompe.
 /// @module inventario
 model Presentation {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -255,6 +257,7 @@ model Presentation {
   batches ProductBatch[]
 
   @@unique([companyId, nameNormalized], map: "presentations_company_name_unique")
+  @@unique([companyId, id], map: "presentations_company_id_id_key")
   @@index([unitId], map: "presentations_unit_id_idx")
   @@map("presentations")
 }
@@ -399,8 +402,15 @@ model RecipeLine {
 
 /// `createdBy` y `updatedBy` no llevan `@relation`: un `include` cruzaria a `users` sin que la
 /// guardia de modulos lo vea. Sus FK estan escritas a mano. `phone` y `email` parecen opcionales
-/// pero el CHECK `suppliers_contact_required` exige al menos uno. `suppliers_name_unique` y los
-/// indices de busqueda son parciales o GIN y viven en las migraciones.
+/// pero el CHECK `suppliers_contact_required` exige al menos uno. `companyId` tampoco lleva
+/// `@relation`, por el mismo motivo pero hacia `companies`: su FK (`suppliers_company_id_fkey`)
+/// esta escrita a mano en la migracion y es drift a proposito. `suppliers_company_name_unique`
+/// (empresa, nombre) es PARCIAL por `deleted_at IS NULL` y por eso no se declara `@@unique`
+/// aqui: Prisma no modela indices parciales. `suppliers_company_id_id_key` SI se declara -es
+/// TOTAL- y es la clave candidata a la que apunta la FK COMPUESTA de `supplier_catalog_lines`
+/// hacia el proveedor: quitarla la rompe. Esa misma clave, con `companyId` de cabeza, hace de
+/// indice de la columna de empresa, asi que no hay un `@@index([companyId])` propio. Los indices
+/// de busqueda siguen siendo parciales o GIN y viven en las migraciones.
 /// @module proveedores
 model Supplier {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -408,6 +418,7 @@ model Supplier {
   nameNormalized String    @map("name_normalized")
   phone          String?
   email          String?
+  companyId      String    @map("company_id") @db.Uuid
   createdBy      String?   @map("created_by") @db.Uuid
   updatedBy      String?   @map("updated_by") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -416,6 +427,7 @@ model Supplier {
 
   catalogLines SupplierCatalogLine[]
 
+  @@unique([companyId, id], map: "suppliers_company_id_id_key")
   @@index([createdBy], map: "suppliers_created_by_idx")
   @@index([updatedBy], map: "suppliers_updated_by_idx")
   @@map("suppliers")
@@ -423,10 +435,15 @@ model Supplier {
 
 /// No hay vinculo con `products`, a proposito: el catalogo de un proveedor puede incluir cosas que
 /// no estan dadas de alta. La identidad `(supplier_id, name_normalized, presentation_id)` sobre las
-/// vivas es un indice unico parcial escrito a mano. Las FK a otros modulos van sin `@relation` y
-/// son drift. El `Cascade` hacia `suppliers` solo actua en un borrado fisico: la baja del proveedor
-/// es logica y marca sus lineas en la misma transaccion. Los CHECK de costo, minimo y plazo, y los
-/// indices de busqueda, estan escritos a mano en las migraciones.
+/// vivas es un indice unico parcial escrito a mano, y no cambia con `companyId`. Las FK a otros
+/// modulos van sin `@relation` y son drift. El `Cascade` hacia `suppliers` solo actua en un
+/// borrado fisico: la baja del proveedor es logica y marca sus lineas en la misma transaccion.
+/// Los CHECK de costo, minimo y plazo, y los indices de busqueda, estan escritos a mano en las
+/// migraciones. `companyId` es columna propia de la linea -no se deriva de su proveedor-: es el
+/// origen de las dos FK COMPUESTAS escritas a mano, `supplier_catalog_lines_company_id_supplier_id_fkey`
+/// (hacia el proveedor) y `supplier_catalog_lines_company_id_presentation_id_fkey` (hacia la
+/// presentacion), que hacen imposible que la empresa de la linea contradiga la de cualquiera de
+/// las dos. Sin `@@unique` nuevo, a proposito.
 /// @module proveedores
 model SupplierCatalogLine {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -439,6 +456,7 @@ model SupplierCatalogLine {
   cost           Decimal   @db.Decimal(14, 4)
   minPurchase    Decimal?  @map("min_purchase") @db.Decimal(14, 4)
   deliveryTime   Int?      @map("delivery_time")
+  companyId      String    @map("company_id") @db.Uuid
   createdBy      String?   @map("created_by") @db.Uuid
   updatedBy      String?   @map("updated_by") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -447,6 +465,7 @@ model SupplierCatalogLine {
 
   supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
+  @@index([companyId, supplierId], map: "supplier_catalog_lines_company_id_supplier_id_idx")
   @@index([presentationId], map: "supplier_catalog_lines_presentation_id_idx")
   @@index([unitId], map: "supplier_catalog_lines_unit_id_idx")
   @@index([createdBy], map: "supplier_catalog_lines_created_by_idx")

@@ -182,7 +182,14 @@ const PRE_EXISTING_INDEXES = [
   // `recipes_company_name_unique`, que se afirma abajo en su propio caso: si la migracion se
   // hubiera llevado el global SIN dejar el compuesto, el catalogo de recetas se quedaria sin
   // ninguna garantia de unicidad y este archivo seguiria siendo quien lo dijera.
-  'suppliers_name_unique',
+  // `suppliers_name_unique` (unico GLOBAL y PARCIAL sobre el nombre normalizado, de QC-42) salio
+  // de esta lista el 2026-09-17. NO es un indice perdido por descuido, que es justo lo que este
+  // caso vigila: la unicidad del nombre de proveedor pasa a medirse POR EMPRESA porque dos
+  // empresas pueden tener cada una su mismo proveedor -se surten del mismo sitio- y con el
+  // global la segunda no podria darlo de alta. Su sustituto es UN solo indice compuesto y
+  // TAMBIEN PARCIAL, `suppliers_company_name_unique`, que se afirma abajo en su propio caso: si
+  // la migracion se hubiera llevado el global SIN dejar el compuesto, el listado de proveedores
+  // se quedaria sin ninguna garantia de unicidad y este archivo seguiria siendo quien lo dijera.
   'supplier_catalog_lines_name_presentation_unique',
   // `products_presentation_id_idx` cayo el 2026-09-09 con la columna `products.presentation_id`,
   // en la misma migracion que creo `product_batches`: la presentacion se mudo al lote, y el
@@ -348,6 +355,45 @@ describe('QC-57 — la migracion en la base (R21, R23)', () => {
     expect(compuesto, `${compuesto ?? ''} deberia ser parcial`).toMatch(/WHERE \(deleted_at IS NULL\)/u)
 
     expect(indexes.has('recipes_name_unique')).toBe(false)
+  })
+
+  it('el unico de nombre de proveedor es POR EMPRESA y PARCIAL, y el global ya no esta (R13, R14, R15)', async () => {
+    // El RELEVO de `suppliers_name_unique`, que sale de `PRE_EXISTING_INDEXES` arriba. Los dos
+    // no pueden convivir: con el global en pie, dos empresas seguirian sin poder tener cada una
+    // al mismo proveedor dado de alta.
+    //
+    // Mismo molde que el de recetas, y por el mismo motivo: `suppliers` tiene `deleted_at` (ver
+    // `PARTIAL_INDEXES`), asi que sin el `WHERE deleted_at IS NULL` dar de baja un proveedor
+    // dejaria su nombre ocupado PARA SIEMPRE dentro de la empresa y ninguna alta podria
+    // reusarlo. Por eso el predicado se exige LITERAL y no basta con que haya un `WHERE`
+    // cualquiera: un `WHERE deleted_at IS NOT NULL` tambien traeria la palabra y significaria lo
+    // contrario.
+    const indexes = await readIndexes()
+    const compuesto = indexes.get('suppliers_company_name_unique')
+    expect(compuesto, 'falta suppliers_company_name_unique').toBeDefined()
+    expect(compuesto).toContain('UNIQUE')
+    // `company_id` va DE CABEZA: asi el mismo indice sirve para filtrar el listado por empresa,
+    // sin que la tabla necesite un indice propio de la columna.
+    expect(compuesto).toMatch(/\(company_id, name_normalized\)/u)
+    expect(compuesto, `${compuesto ?? ''} deberia ser parcial`).toMatch(
+      /WHERE \(deleted_at IS NULL\)/u,
+    )
+
+    // FALSABILIDAD, y en memoria para no tocar la base: el mismo `def` que acaba de pasar, con
+    // su `WHERE` recortado, tiene que FALLAR la asercion de arriba. Sin esto, un dia en que
+    // `pg_indexes` devolviera la definicion en otro formato el caso pasaria en verde sin medir
+    // nada, que es exactamente el falso verde que la parcialidad no se puede permitir.
+    const sinWhere = (compuesto ?? '').replace(/\s*WHERE \(deleted_at IS NULL\)/u, '')
+    expect(sinWhere, 'el recorte no quito el WHERE: la falsabilidad no prueba nada').not.toBe(
+      compuesto,
+    )
+    expect(sinWhere).not.toMatch(/WHERE \(deleted_at IS NULL\)/u)
+    // Y lo que NO cambia al recortarlo: sigue siendo UNIQUE y sigue llevando las dos columnas en
+    // orden. Es la prueba de que la asercion del predicado mide el predicado y no otra cosa.
+    expect(sinWhere).toContain('UNIQUE')
+    expect(sinWhere).toMatch(/\(company_id, name_normalized\)/u)
+
+    expect(indexes.has('suppliers_name_unique')).toBe(false)
   })
 
   it('el unico del numero de pedido es POR EMPRESA, y el global ya no esta (QC-60)', async () => {

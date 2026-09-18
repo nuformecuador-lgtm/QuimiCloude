@@ -1,5 +1,6 @@
 import { requirePermission, type Actor } from './actor';
 import { SupplierNotFoundError } from './errors';
+import type { SupplierScope } from './supplier-scope';
 
 import type { SupplierRepository } from '../ports/supplier-repository';
 
@@ -26,8 +27,10 @@ export function createDeleteSupplier(
   ): Promise<void> {
     requirePermission(actor, 'proveedores.modificar');
 
-    // false = no existe o ya estaba dado de baja: mismo caso (R24).
-    const deleted = await deps.suppliers.softDeleteAlive(id, actor.id, now());
+    const scope: SupplierScope = { companyId: actor.companyId };
+
+    // false = no existe, ya estaba dado de baja o es de otra empresa: mismo caso (R24).
+    const deleted = await deps.suppliers.softDeleteAlive(id, actor.id, now(), scope);
     if (!deleted) throw new SupplierNotFoundError();
   };
 }

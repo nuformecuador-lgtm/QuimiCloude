@@ -626,16 +626,38 @@ describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
     expect(listPresentationsActionMock).toHaveBeenCalledTimes(1);
   });
 
-  it('el costo y el minimo de compra se pintan TAL CUAL la cadena de la consulta', async () => {
-    // R41 — sin `Intl.NumberFormat`, sin `toFixed`, sin coma flotante y sin aritmetica.
+  it('el costo y el minimo de compra se pintan REDONDEADOS A DOS DECIMALES', async () => {
+    // Enmienda del 2026-09-17 a R41 (decision humana): la cadena llega con la escala de la
+    // columna y cuatro decimales de relleno no informan de nada. Lo que R41 protege de fondo
+    // sigue en pie -sin `Intl.NumberFormat`, sin `toFixed`, sin `parseFloat` y sin coma
+    // flotante-: el redondeo es aritmetica exacta de enteros sobre el texto.
     const laLinea = linea({ cost: '1234.5678', minPurchase: '0.1005' });
     listCatalogLinesActionMock.mockResolvedValue(paginaDeLineas([laLinea]));
 
     await renderPantalla();
 
-    // La celda contiene EXACTAMENTE la cadena, ni redondeada ni reformateada.
-    expect(screen.getByTestId('data-table-cell-cost').textContent).toBe(laLinea.cost);
-    expect(screen.getByTestId('data-table-cell-minPurchase').textContent).toBe(laLinea.minPurchase);
+    expect(screen.getByTestId('data-table-cell-cost').textContent).toBe('1234.57');
+    expect(screen.getByTestId('data-table-cell-minPurchase').textContent).toBe('0.1');
+  });
+
+  it('el redondeo de la celda no esconde la cifra: el valor exacto viaja en el `title`', async () => {
+    // El redondeo es del PIXEL, no del dato. Cuando cambia lo que se ve, la celda lleva el valor
+    // exacto a un hover de distancia; cuando no lo cambia, no ensucia el DOM con un `title` que
+    // repite lo que ya se lee.
+    listCatalogLinesActionMock.mockResolvedValue(
+      paginaDeLineas([linea({ cost: '1234.5678', minPurchase: '25.0000' })]),
+    );
+
+    await renderPantalla();
+
+    expect(
+      screen.getByTestId('data-table-cell-cost').querySelector('span'),
+    ).toHaveAttribute('title', '1234.5678');
+    // «25.0000» se pinta «25» y eso es el mismo numero: no hay nada que guardar en un `title`.
+    expect(screen.getByTestId('data-table-cell-minPurchase').textContent).toBe('25');
+    expect(
+      screen.getByTestId('data-table-cell-minPurchase').querySelector('span'),
+    ).not.toHaveAttribute('title');
   });
 
   it('un minimo y un tiempo de entrega ausentes pintan la marca de «sin dato»', async () => {

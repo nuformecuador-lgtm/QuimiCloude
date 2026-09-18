@@ -51,6 +51,7 @@ import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { ListQuery } from '@/lib/modules/proveedores/domain/list-query';
+import type { SupplierScope } from '@/lib/modules/proveedores/domain/supplier-scope';
 
 // ---------------------------------------------------------------------------
 // Utilidades de aislamiento (estrategia 1)
@@ -291,6 +292,7 @@ async function createTestSupplier(db: Db, deletedAt: Date | null = null): Promis
       nameNormalized: normalizeSupplierName(name),
       phone: '+57 300 000 0000',
       deletedAt,
+      companyId,
     },
     select: { id: true },
   });
@@ -304,7 +306,7 @@ async function createTestSupplier(db: Db, deletedAt: Date | null = null): Promis
  * las dos se escribieran siempre con el mismo valor, quitar una de las dos FK dejaria el
  * test verde -lo rechazaria la otra- y la mitad de la regla quedaria sin vigilar.
  */
-function rawInsertLine(
+async function rawInsertLine(
   tx: Prisma.TransactionClient,
   supplierId: string,
   presentationId: string,
@@ -314,12 +316,20 @@ function rawInsertLine(
   updatedBy: string | null = createdBy,
   deletedAt: Date | null = null,
 ): Promise<number> {
+  // La empresa de la linea sale de la del PROVEEDOR que se le paso: con la FK compuesta
+  // nueva, cualquier otro valor rechazaria el INSERT antes de llegar a lo que el caso
+  // quiere probar.
+  const { companyId: lineCompanyId } = await tx.supplier.findUniqueOrThrow({
+    where: { id: supplierId },
+    select: { companyId: true },
+  });
   return tx.$executeRaw`
     INSERT INTO "supplier_catalog_lines"
-      ("supplier_id", "name", "name_normalized", "presentation_id", "cost",
+      ("supplier_id", "company_id", "name", "name_normalized", "presentation_id", "cost",
        "created_by", "updated_by", "updated_at", "deleted_at")
     VALUES (
       CAST(${supplierId} AS uuid),
+      CAST(${lineCompanyId} AS uuid),
       ${name},
       ${normalizeSupplierName(name)},
       CAST(${presentationId} AS uuid),
@@ -357,6 +367,10 @@ function fields(
 // ---------------------------------------------------------------------------
 
 let sharedActorId: string;
+/** Empresa unica del archivo: proveedor y linea comparten `SupplierScope`. Ningun caso de
+ *  este archivo compara empresas entre si. */
+let companyId: string;
+let scope: SupplierScope;
 
 beforeAll(async () => {
   // Falla claro si la migracion de QC-52 no esta aplicada: sin las columnas nuevas y sin el
@@ -378,6 +392,8 @@ beforeAll(async () => {
   }
 
   sharedActorId = await createTestUser(prisma);
+  companyId = await andamiajeCompanyId(prisma);
+  scope = { companyId };
 });
 
 afterAll(async () => {
@@ -517,8 +533,8 @@ describe('R10, R30: la presentacion, la unidad y el costo los cierra la base', (
         tx,
         () => tx.$executeRaw`
           INSERT INTO "supplier_catalog_lines"
-            ("supplier_id", "name", "name_normalized", "presentation_id", "unit_id", "cost", "updated_at")
-          VALUES (CAST(${supplierId} AS uuid), 'Sosa', 'sosa', CAST(${presentationId} AS uuid),
+            ("supplier_id", "company_id", "name", "name_normalized", "presentation_id", "unit_id", "cost", "updated_at")
+          VALUES (CAST(${supplierId} AS uuid), CAST(${companyId} AS uuid), 'Sosa', 'sosa', CAST(${presentationId} AS uuid),
                   CAST(${randomUUID()} AS uuid), 10.0000, CURRENT_TIMESTAMP)`,
         'alta de linea con una unidad inexistente',
       );
@@ -528,8 +544,8 @@ describe('R10, R30: la presentacion, la unidad y el costo los cierra la base', (
       await rawInsertLine(tx, supplierId, presentationId, 'Sin unidad', '10.0000');
       await tx.$executeRaw`
         INSERT INTO "supplier_catalog_lines"
-          ("supplier_id", "name", "name_normalized", "presentation_id", "unit_id", "cost", "updated_at")
-        VALUES (CAST(${supplierId} AS uuid), 'Con unidad', 'conunidad', CAST(${presentationId} AS uuid),
+          ("supplier_id", "company_id", "name", "name_normalized", "presentation_id", "unit_id", "cost", "updated_at")
+        VALUES (CAST(${supplierId} AS uuid), CAST(${companyId} AS uuid), 'Con unidad', 'conunidad', CAST(${presentationId} AS uuid),
                 CAST(${unitId} AS uuid), 10.0000, CURRENT_TIMESTAMP)`;
       const filas = await tx.supplierCatalogLine.findMany({
         where: { supplierId },
@@ -572,9 +588,10 @@ describe('R10, R30: la presentacion, la unidad y el costo los cierra la base', (
           () =>
             tx.$executeRawUnsafe(
               `INSERT INTO "supplier_catalog_lines"
-                 ("supplier_id", "name", "name_normalized", "presentation_id", "cost", "${columna}", "updated_at")
-               VALUES ($1::uuid, $2, $2, $3::uuid, 10.0000, ${valor}, CURRENT_TIMESTAMP)`,
+                 ("supplier_id", "company_id", "name", "name_normalized", "presentation_id", "cost", "${columna}", "updated_at")
+               VALUES ($1::uuid, $2::uuid, $3, $3, $4::uuid, 10.0000, ${valor}, CURRENT_TIMESTAMP)`,
               supplierId,
+              companyId,
               `linea ${columna}`,
               presentationId,
             ),
@@ -655,6 +672,7 @@ describe('R10, R13: alta de la linea del catalogo por el adaptador', () => {
         },
         sharedActorId,
         new Date('2026-01-01T00:00:00Z'),
+        scope,
       );
       expect(typeof created).not.toBe('string');
       if (typeof created === 'string') return;
@@ -673,7 +691,7 @@ describe('R10, R13: alta de la linea del catalogo por el adaptador', () => {
       expect(fila.createdBy).toBe(sharedActorId);
       expect(fila.updatedBy).toBe(sharedActorId);
 
-      const page = await listCatalogLinesBySupplierAlive(supplierId, consulta({ pageSize: 10 }));
+      const page = await listCatalogLinesBySupplierAlive(supplierId, consulta({ pageSize: 10 }), scope);
       if (page === 'supplier_not_found') throw new Error('el proveedor de apoyo esta dado de baja');
       expect(page.items).toHaveLength(1);
       expect(page.items[0]).toMatchObject({
@@ -731,6 +749,7 @@ describe('R10, R13: alta de la linea del catalogo por el adaptador', () => {
           { supplierId, ...campos },
           sharedActorId,
           new Date('2026-01-01T00:00:00Z'),
+        scope,
         ).catch((error: unknown) => error);
         expect(fallo, etiqueta).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
         expect((fallo as Prisma.PrismaClientKnownRequestError).code, etiqueta).toBe('P2003');
@@ -742,6 +761,7 @@ describe('R10, R13: alta de la linea del catalogo por el adaptador', () => {
         { supplierId, ...fields('Autor fantasma', presentationId) },
         randomUUID(),
         new Date('2026-01-01T00:00:00Z'),
+        scope,
       ).catch((error: unknown) => error);
       expect(porAutor).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
       expect((porAutor as Prisma.PrismaClientKnownRequestError).code).toBe('P2003');
@@ -769,6 +789,7 @@ describe('R24: la edicion reemplaza los siete campos y respeta la identidad de l
         { supplierId, ...fields('Acido citrico', bidon) },
         autorA,
         new Date('2026-01-01T00:00:00Z'),
+        scope,
       );
       if (typeof created === 'string') throw new Error(`el alta de apoyo fallo: ${created}`);
 
@@ -790,6 +811,7 @@ describe('R24: la edicion reemplaza los siete campos y respeta la identidad de l
         }),
         autorB,
         new Date('2026-02-02T00:00:00Z'),
+        scope,
       );
       expect(editada).toBe('ok');
 
@@ -848,11 +870,13 @@ describe('R24: la edicion reemplaza los siete campos y respeta la identidad de l
         { supplierId, ...fields('Acido citrico', presentationId) },
         sharedActorId,
         new Date('2026-01-01T00:00:00Z'),
+        scope,
       );
       const segunda = await createCatalogLine(
         { supplierId, ...fields('Sosa caustica', presentationId, { cost: '20.0000' }) },
         sharedActorId,
         new Date('2026-01-01T00:00:01Z'),
+        scope,
       );
       if (typeof primera === 'string' || typeof segunda === 'string') {
         throw new Error('el alta de apoyo fallo');
@@ -864,6 +888,7 @@ describe('R24: la edicion reemplaza los siete campos y respeta la identidad de l
           fields('ACIDO CITRICO', presentationId, { cost: '20.0000' }),
           sharedActorId,
           new Date('2026-02-02T00:00:00Z'),
+        scope,
         ),
       ).toBe('duplicate');
 
@@ -882,6 +907,7 @@ describe('R24: la edicion reemplaza los siete campos y respeta la identidad de l
           fields('Hipoclorito', presentationId, { cost: '20.0000' }),
           sharedActorId,
           new Date('2026-02-02T00:00:00Z'),
+        scope,
         ),
       ).toBe('ok');
     } finally {
@@ -902,10 +928,11 @@ describe('R21, R22: la baja de la linea es logica y ninguna consulta la devuelve
         { supplierId, ...fields('Acido citrico', presentationId) },
         sharedActorId,
         new Date('2026-01-01T00:00:00Z'),
+        scope,
       );
       if (typeof created === 'string') throw new Error(`el alta de apoyo fallo: ${created}`);
 
-      expect(await softDeleteAliveCatalogLine(created.id, sharedActorId, baja)).toBe(true);
+      expect(await softDeleteAliveCatalogLine(created.id, sharedActorId, baja, scope)).toBe(true);
 
       // R21: la fila SIGUE EXISTIENDO, entera, con la marca puesta. Se comprueba contra la
       // TABLA, no contra el listado -que la ocultaria igual si el borrado fuera fisico-.
@@ -922,20 +949,21 @@ describe('R21, R22: la baja de la linea es logica y ninguna consulta la devuelve
       expect(fila?.createdBy).toBe(sharedActorId);
 
       // R22: ninguna consulta del catalogo la devuelve.
-      const page = await listCatalogLinesBySupplierAlive(supplierId, consulta({ pageSize: 10 }));
+      const page = await listCatalogLinesBySupplierAlive(supplierId, consulta({ pageSize: 10 }), scope);
       if (page === 'supplier_not_found') throw new Error('el proveedor de apoyo esta dado de baja');
       expect(page.items).toEqual([]);
       expect(page.total).toBe(0);
 
       // R23: la segunda baja de lo que ya esta dado de baja es «no encontrado», y la edicion
       // de una linea dada de baja tambien. Los tres casos son el mismo.
-      expect(await softDeleteAliveCatalogLine(created.id, sharedActorId, baja)).toBe(false);
+      expect(await softDeleteAliveCatalogLine(created.id, sharedActorId, baja, scope)).toBe(false);
       expect(
         await replaceAliveCatalogLine(
           created.id,
           fields('Acido citrico', presentationId),
           sharedActorId,
           new Date('2026-03-03T00:00:00Z'),
+        scope,
         ),
       ).toBe('not_found');
 
@@ -969,15 +997,17 @@ describe('R20, R22, R23: la baja del proveedor arrastra su catalogo, y R48 de QC
         { supplierId, ...fields('Acido citrico', presentationId) },
         sharedActorId,
         new Date('2026-01-01T00:00:00Z'),
+        scope,
       );
       const b = await createCatalogLine(
         { supplierId, ...fields('Sosa caustica', presentationId, { cost: '20.0000' }) },
         sharedActorId,
         new Date('2026-01-01T00:00:01Z'),
+        scope,
       );
       if (typeof a === 'string' || typeof b === 'string') throw new Error('el alta de apoyo fallo');
 
-      expect(await softDeleteAliveSupplier(supplierId, sharedActorId, baja)).toBe(true);
+      expect(await softDeleteAliveSupplier(supplierId, sharedActorId, baja, scope)).toBe(true);
 
       const proveedor = await prisma.supplier.findUniqueOrThrow({
         where: { id: supplierId },
@@ -1003,7 +1033,7 @@ describe('R20, R22, R23: la baja del proveedor arrastra su catalogo, y R48 de QC
       expect(lineas.every((l) => l.updatedBy === sharedActorId)).toBe(true);
 
       // R22: ninguna consulta las devuelve, ni por el proveedor ni por la linea.
-      expect(await listCatalogLinesBySupplierAlive(supplierId, consulta({ pageSize: 10 }))).toBe(
+      expect(await listCatalogLinesBySupplierAlive(supplierId, consulta({ pageSize: 10 }), scope)).toBe(
         'supplier_not_found',
       );
 
@@ -1012,13 +1042,14 @@ describe('R20, R22, R23: la baja del proveedor arrastra su catalogo, y R48 de QC
       // el borrado como excepcion, con el argumento de que si no esas filas quedarian
       // «atrapadas sin ninguna operacion capaz de eliminarlas»; desde R20 ya estan dadas de
       // baja y no hay nada que atrapar.
-      expect(await softDeleteAliveCatalogLine(a.id, sharedActorId, new Date())).toBe(false);
+      expect(await softDeleteAliveCatalogLine(a.id, sharedActorId, new Date(), scope)).toBe(false);
       expect(
         await replaceAliveCatalogLine(
           a.id,
           fields('Otro nombre', presentationId),
           sharedActorId,
           new Date(),
+        scope,
         ),
       ).toBe('not_found');
       expect(
@@ -1026,6 +1057,7 @@ describe('R20, R22, R23: la baja del proveedor arrastra su catalogo, y R48 de QC
           { supplierId, ...fields('Linea nueva', presentationId) },
           sharedActorId,
           new Date(),
+        scope,
         ),
       ).toBe('supplier_not_found');
 
@@ -1056,6 +1088,7 @@ describe('R20, R22, R23: la baja del proveedor arrastra su catalogo, y R48 de QC
         { supplierId, ...fields('Acido citrico', presentationId) },
         sharedActorId,
         new Date('2026-01-01T00:00:00Z'),
+        scope,
       );
       if (typeof created === 'string') throw new Error(`el alta de apoyo fallo: ${created}`);
 
@@ -1066,7 +1099,7 @@ describe('R20, R22, R23: la baja del proveedor arrastra su catalogo, y R48 de QC
         data: { deletedAt: new Date('2026-02-02T00:00:00Z') },
       });
 
-      expect(await softDeleteAliveSupplier(supplierId, sharedActorId, new Date())).toBe(false);
+      expect(await softDeleteAliveSupplier(supplierId, sharedActorId, new Date(), scope)).toBe(false);
 
       const linea = await prisma.supplierCatalogLine.findUniqueOrThrow({
         where: { id: created.id },
@@ -1097,6 +1130,7 @@ describe('R19: las dos tablas son independientes', () => {
         { supplierId, ...fields('Acido citrico', presentationId, { cost: '42.0000' }) },
         sharedActorId,
         new Date('2026-01-01T00:00:00Z'),
+        scope,
       );
       if (typeof created === 'string') throw new Error(`el alta de apoyo fallo: ${created}`);
 
@@ -1121,7 +1155,7 @@ describe('R19: las dos tablas son independientes', () => {
       );
 
       // (3) Y la linea sigue viva y visible en el catalogo de su proveedor.
-      const page = await listCatalogLinesBySupplierAlive(supplierId, consulta({ pageSize: 10 }));
+      const page = await listCatalogLinesBySupplierAlive(supplierId, consulta({ pageSize: 10 }), scope);
       if (page === 'supplier_not_found') throw new Error('el proveedor de apoyo esta dado de baja');
       expect(page.items.map((l) => l.id)).toEqual([created.id]);
       expect(page.items[0]?.cost).toBe('42.0000');

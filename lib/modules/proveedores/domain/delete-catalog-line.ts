@@ -1,5 +1,6 @@
 import { requirePermission, type Actor } from './actor';
 import { CatalogLineNotFoundError } from './errors';
+import type { SupplierScope } from './supplier-scope';
 
 import type { SupplierCatalogRepository } from '../ports/supplier-catalog-repository';
 
@@ -35,7 +36,9 @@ export function createDeleteCatalogLine(
   ): Promise<void> {
     requirePermission(actor, 'proveedores.modificar');
 
-    const dadaDeBaja = await deps.catalog.softDeleteAlive(id, actor.id, now());
+    const scope: SupplierScope = { companyId: actor.companyId };
+
+    const dadaDeBaja = await deps.catalog.softDeleteAlive(id, actor.id, now(), scope);
     if (!dadaDeBaja) throw new CatalogLineNotFoundError();
   };
 }

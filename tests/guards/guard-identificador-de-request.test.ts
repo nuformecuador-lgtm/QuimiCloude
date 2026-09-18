@@ -68,6 +68,17 @@ export const E2E_ESPERADOS = [
   // Alta por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su
   // punto de extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo
   // se nombra, uno a uno-. El recorrido que ejercita: con sesion en una empresa, el listado de
+  // proveedores filtrado por un termino que comparten las dos empresas no trae ni una fila de
+  // la otra; el detalle de un proveedor ajeno responde EXACTAMENTE igual que un identificador
+  // que no existe en ninguna empresa; darlo de baja conociendo su identificador se rechaza y lo
+  // deja intacto con su linea de catalogo; y el nombre de un proveedor de la otra empresa se
+  // puede usar para dar uno de alta en la propia. NO ejercita el cruce borde -> accion del
+  // identificador de peticion: el spec no lee ni afirma nada sobre el identificador ni sobre
+  // `reference`, asi que el diferimiento de ese E2E sigue INTACTO.
+  'aislamiento-proveedores.spec.ts',
+  // Alta por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su
+  // punto de extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo
+  // se nombra, uno a uno-. El recorrido que ejercita: con sesion en una empresa, el listado de
   // recetas no muestra ninguna receta de otra empresa; pegar el enlace al detalle de una receta
   // ajena (`/produccion/formulas/<id>`) no la enseña -sale el estado «no encontrada», el
   // formulario de edicion nunca se pinta y el resultado es IDENTICO al de un identificador
@@ -183,6 +194,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20260916120000_recipes_company_scope',
   // Igual patron: quita una columna de negocio, no toca el identificador de peticion.
   '20260917120000_drop_product_stock',
+  // Misma alta, esta vez para la migracion que da empresa a proveedores y a su catalogo.
+  '20260917120000_suppliers_company_scope',
   // Igual patron: tabla nueva de movimientos de inventario, no toca el identificador de peticion.
   '20260917130000_inventory_movements',
 ] as const

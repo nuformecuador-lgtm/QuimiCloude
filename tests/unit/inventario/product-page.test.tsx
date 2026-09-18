@@ -422,7 +422,9 @@ const ALTA_VALIDA: Readonly<Record<string, string>> = {
  * en su selector, no se teclea, y el lote y la caducidad son opcionales.
  */
 const LOTE_VALIDO: Readonly<Record<string, string>> = {
-  unitCost: '12.5000',
+  // Dos decimales, no cuatro: el campo no deja teclear mas. Escribir `'12.5000'` seguiria
+  // «pasando» -quedaria en `'12.50'`- pero el helper mentiria sobre lo que hay en pantalla.
+  unitCost: '12.50',
 };
 
 /** Elige la primera presentacion del catalogo en el selector del alta. */
@@ -1420,32 +1422,98 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
   });
 
-  it('el alta rechaza en su campo un importe con mas de 4 decimales o escrito con coma', async () => {
-    // QC-90 R4 — la forma admitida es la EXACTA de `decimal(14,4)`: hasta 4 decimales y con
-    // punto. La coma es el error mas comun de un teclado en castellano, y no se "arregla" en
-    // silencio: se rechaza, en el campo que la trae.
+  it('los dos importes no dejan escribir texto, ni un tercer decimal, ni una coma suelta', async () => {
+    // Lo que antes se rechazaba AL GUARDAR -mas de 4 decimales, o coma- ahora ni llega a entrar,
+    // asi que lo que se mide es lo que queda escrito. El esquema no se toco: sigue admitiendo
+    // hasta 4 decimales para el resto de llamantes.
+    //
+    // La coma se convierte en punto en vez de descartarse: tirarla dejaria `150,00` en `15000`.
     const user = setupUser();
 
     await renderPantalla();
     await user.click(screen.getByTestId(testId.abrirAlta));
     await screen.findByTestId(testId.formulario);
 
-    await rellenarFormulario(user, { unitCost: '12.34567' });
+    await rellenarFormulario(user);
+
+    const unitario = screen.getByTestId('product-field-unitCost') as HTMLInputElement;
+    const total = screen.getByTestId('product-field-totalCost') as HTMLInputElement;
+
+    await user.clear(unitario);
+    await user.type(unitario, '12.34567');
+    expect(unitario.value, 'el tercer decimal y los siguientes no entran').toBe('12.34');
+
+    await user.clear(unitario);
+    await user.type(unitario, 'abc12x.5y0z');
+    expect(unitario.value, 'las letras no entran').toBe('12.50');
+
+    await user.clear(total);
+    await user.type(total, '150,00');
+    expect(total.value, 'la coma entra como punto decimal').toBe('150.00');
+
+    // Y con importes que el campo si admite, el alta sale adelante: el filtro no bloquea nada
+    // legitimo.
     await user.click(screen.getByTestId(testId.enviar));
+    await waitFor(() => expect(createProductActionMock).toHaveBeenCalledTimes(1));
+  });
 
-    await waitFor(() => expect(screen.getByTestId('product-error-unitCost')).toBeInTheDocument());
-    expect(screen.queryByTestId('product-error-totalCost')).toBeNull();
+  it('escribir el costo unitario rellena el total, y escribir el total rellena el unitario', async () => {
+    // total = unitario x existencia, unitario = total / existencia redondeado a 2 decimales mitad
+    // arriba. La aritmetica va con `BigInt` sobre la cadena, nunca con coma flotante.
+    const user = setupUser();
 
-    // Ahora el otro importe, y con coma: el rechazo se muda al campo que la trae.
-    await user.clear(screen.getByTestId('product-field-unitCost'));
-    await user.type(screen.getByTestId('product-field-totalCost'), '150,00');
-    await user.click(screen.getByTestId(testId.enviar));
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
 
-    await waitFor(() => expect(screen.getByTestId('product-error-totalCost')).toBeInTheDocument());
-    expect(screen.queryByTestId('product-error-unitCost')).toBeNull();
+    const existencia = screen.getByTestId('product-field-stock');
+    const unitario = screen.getByTestId('product-field-unitCost') as HTMLInputElement;
+    const total = screen.getByTestId('product-field-totalCost') as HTMLInputElement;
 
-    expect(createProductActionMock).not.toHaveBeenCalled();
-    expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
+    await user.clear(existencia);
+    await user.type(existencia, '7');
+
+    await user.type(unitario, '3.50');
+    // El derivado se escribe sin ceros de relleno: «24.50» se rellena «24.5». Lo tecleado no se
+    // toca -el unitario sigue leyendose «3.50», tal cual se escribio-, porque reescribir el campo
+    // bajo el cursor moveria el punto de insercion.
+    expect(total.value, '3.50 x 7').toBe('24.5');
+    expect(unitario.value, 'lo tecleado no se reescribe').toBe('3.50');
+
+    // Y al reves. La division no cae redonda a proposito: 150 / 7 es 21.428571..., que a dos
+    // decimales y mitad arriba es 21.43.
+    await user.clear(total);
+    await user.type(total, '150');
+    expect(unitario.value, '150 / 7 redondeado a 2 decimales').toBe('21.43');
+
+    // Vaciar un importe NO borra el otro: es el camino de «escribi el unitario» a «escribo solo
+    // el total», y borrarlo ahi haria perder lo ya escrito.
+    await user.clear(unitario);
+    expect(total.value, 'el total sobrevive a vaciar el unitario').toBe('150');
+  });
+
+  it('sin existencia utilizable el importe derivado se queda vacio, no obsoleto', async () => {
+    // El derivado se vacia cuando no se puede calcular -existencia en blanco, o 0-. Un total
+    // obsoleto engana mas que uno en blanco, y ademas el esquema entiende «vacio» como campo
+    // omitido, que es exactamente lo que ese estado significa.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    const existencia = screen.getByTestId('product-field-stock');
+    const unitario = screen.getByTestId('product-field-unitCost') as HTMLInputElement;
+    const total = screen.getByTestId('product-field-totalCost') as HTMLInputElement;
+
+    await user.clear(existencia);
+    await user.type(unitario, '9.99');
+    expect(total.value, 'sin existencia no hay total que escribir').toBe('');
+
+    await user.type(existencia, '0');
+    await user.clear(total);
+    await user.type(total, '150.00');
+    expect(unitario.value, 'con existencia 0 no hay unitario que escribir').toBe('');
   });
 
   it('con solo costo total y existencia 0 el rechazo se pinta en el campo de la EXISTENCIA', async () => {
@@ -1501,8 +1569,13 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(enviado.get('unitCost')).toBe(LOTE_VALIDO.unitCost);
     expect(enviado.get('lot')).toBe('LT-4471');
     expect(enviado.get('expiryDate')).toBe('2027-03-15');
-    // El costo total no se escribio: viaja vacio, que es "campo omitido", no un cero.
-    expect(enviado.get('totalCost')).toBe('');
+    // El costo total NO se escribio, y aun asi viaja escrito: el panel lo rellena al teclear el
+    // unitario (`12.50 x 12`). Antes viajaba vacio -"campo omitido"-, y esa premisa cayo: hoy solo
+    // viaja vacio si se dejan los dos importes en blanco, que es un rechazo.
+    //
+    // Viaja SIN ceros de relleno («150», no «150.00»): es el mismo importe y el esquema lo acepta
+    // igual -sus decimales son opcionales-, porque el campo manda lo que el panel rellena.
+    expect(enviado.get('totalCost')).toBe('150');
   });
 
   it('la edicion no envia ningun campo del lote', async () => {
@@ -1542,7 +1615,11 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     await user.click(screen.getByTestId(testId.abrirAlta));
     await screen.findByTestId(testId.formulario);
 
-    await rellenarFormulario(user, { totalCost: '150.0000', lot: 'LT-4471' });
+    // Da igual el valor que se escriba: el helper teclea el unitario DESPUES y eso recalcula el
+    // total. Se escribe el mismo numero al que se llega para que el caso siga hablando de lo que
+    // mide -que un rechazo no borra lo escrito- y no del recalculo. El
+    // recalculado se escribe sin relleno («150»), que es lo que queda en el campo.
+    await rellenarFormulario(user, { totalCost: '150.00', lot: 'LT-4471' });
     await user.type(screen.getByTestId('product-field-expiryDate'), '2027-03-15');
     await user.click(screen.getByTestId(testId.enviar));
 
@@ -1552,7 +1629,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
     expect(screen.getByTestId('presentation-value')).toHaveValue(PRESENTACION_A.id);
     expect(screen.getByTestId('product-field-unitCost')).toHaveValue(LOTE_VALIDO.unitCost);
-    expect(screen.getByTestId('product-field-totalCost')).toHaveValue('150.0000');
+    expect(screen.getByTestId('product-field-totalCost')).toHaveValue('150');
     expect(screen.getByTestId('product-field-lot')).toHaveValue('LT-4471');
     expect(screen.getByTestId('product-field-expiryDate')).toHaveValue('2027-03-15');
   });
