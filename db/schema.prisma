@@ -582,3 +582,63 @@ model OrderAssignment {
   @@index([workGroupId], map: "order_assignments_work_group_id_idx")
   @@map("order_assignments")
 }
+
+enum DocumentStrategy {
+  catalogo
+  formula
+}
+
+enum DocumentFileStatus {
+  queued
+  processing
+  done
+  error
+}
+
+/// La TANDA: quien sube elige la estrategia UNA vez y sus hasta diez archivos la heredan. Sin
+/// `deleted_at`: nada de esta ficha borra estas filas, y una columna que nadie escribe es
+/// infraestructura por si acaso.
+/// Las FK a `companies` y `users` van escritas a mano en la migracion y son drift: hay que borrar su
+/// `DROP CONSTRAINT` de toda migracion generada, como en `orders` y `order_assignments`.
+/// `document_batches_id_company_id_key` es la clave candidata a la que apunta la FK COMPUESTA de
+/// `document_files`: quitarla la rompe.
+/// @module documentos
+model DocumentBatch {
+  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String           @map("company_id") @db.Uuid
+  strategy  DocumentStrategy
+  createdBy String?          @map("created_by") @db.Uuid
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([id, companyId], map: "document_batches_id_company_id_key")
+  @@index([companyId], map: "document_batches_company_id_idx")
+  @@index([createdBy], map: "document_batches_created_by_idx")
+  @@map("document_batches")
+}
+
+/// Un PDF de una tanda, con su estado. `extracted_text` guarda lo que escribio la IA TAL CUAL, como
+/// texto plano y sin longitud declarada: un catalogo de 40 paginas no cabe en un `varchar`.
+/// La FK a la tanda es COMPUESTA con `company_id` contra `document_batches_id_company_id_key`: una
+/// fila cuya tanda sea de otra empresa no puede existir.
+/// `updated_at` es el reloj de la caducidad: se mueve al reclamar y al terminar.
+/// @module documentos
+model DocumentFile {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batchId        String             @map("batch_id") @db.Uuid
+  companyId      String             @map("company_id") @db.Uuid
+  path           String
+  status         DocumentFileStatus @default(queued)
+  extractedText  String?            @map("extracted_text")
+  errorCode      String?            @map("error_code")
+  errorReason    String?            @map("error_reason")
+  queueMessageId String?            @map("queue_message_id")
+  attempts       Int                @default(0)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([companyId, path], map: "document_files_company_path_key")
+  @@index([batchId], map: "document_files_batch_id_idx")
+  @@index([companyId], map: "document_files_company_id_idx")
+  @@map("document_files")
+}
