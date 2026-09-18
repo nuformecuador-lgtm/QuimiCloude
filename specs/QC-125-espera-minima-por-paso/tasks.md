@@ -72,7 +72,7 @@
   - Hecho cuando: verde, y por mutación, pasar `minStepSeconds={5}` en `recipe-form.tsx` (sin
     commitearlo) lo pone rojo.
 
-- [ ] **T7 [P] — E2E existente sigue verde.**
+- [x] **T7 [P] — E2E existente sigue verde.**
   - Depende de: T4.
   - Archivo: `e2e/ejecucion-receta.spec.ts` — **sólo si** falla con la espera; la única enmienda
     permitida es esperar `toBeEnabled` con plazo mayor que 5 s antes de cada `click` (`design.md > 9`).

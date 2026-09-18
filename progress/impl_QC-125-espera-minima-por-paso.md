@@ -13,7 +13,7 @@ Fecha: 2026-09-18. Sin merge con `dev`, sin push, sin PR (lo decide el leader tr
 | T3 tests del componente | [x] | `dcc16101` |
 | T5 tests de la pantalla + enmiendas | [x] | `530a48e6` |
 | T6 la vista previa no espera | [x] | `bc64e0fd` |
-| T7 E2E existente sigue verde | **[ ] BLOQUEADA**: no se pudo ejecutar (ver Bloqueos) | — |
+| T7 E2E existente sigue verde | [x] corrido por el leader el 2026-09-18 tras instalar los navegadores: **8/8 verdes** (Chromium y WebKit), sin tocar el spec E2E | — |
 | T8 trazabilidad y gate de cierre | [ ] este archivo; el `./init.sh` completo lo corre el leader | — |
 
 ## Archivos tocados
@@ -58,7 +58,7 @@ SR = `tests/unit/recetas-ui/step-reader.test.tsx`; OES = `tests/unit/asignacione
 | R19 | SR «R19: el unico import nuevo del asistente es el CountdownTimer compartido, y sigue sin lo que R19/R20 prohiben» + tests de fuente existentes de SR; `tests/guards/guard-editor-aislado.test.ts` verde |
 | R20 | SR «R20: tras cumplirse la espera, se puede avanzar solo con teclado»; OES R26 existente (44x44) sin editar |
 | R21 | OES «R18 — el asistente heredado solo puede cambiar step-reader.tsx (lista cerrada) › todo archivo cambiado de components/shared/step-reader/** esta en la lista permitida» (enmienda fechada); casos existentes R19, R20, R21, R26 y R1 de OES y los 23 de SR, verdes sin edicion |
-| R22 | `e2e/ejecucion-receta.spec.ts` «R29 - el Operador entra, ... recorre los pasos hasta Finalizar y el pedido queda ENTREGADO en base» — **NO EJECUTADO** (ver Bloqueos) |
+| R22 | `e2e/ejecucion-receta.spec.ts` «R29 - el Operador entra, ... recorre los pasos hasta Finalizar y el pedido queda ENTREGADO en base» — **VERDE** en Chromium y WebKit (2026-09-18) |
 
 ## Mutaciones (hechas por los subagentes y revertidas; el diff de produccion quedo intacto)
 
@@ -113,7 +113,7 @@ Verificacion tras las correcciones (implementer):
 
 ## Bloqueos
 
-1. **T7 / R22 sin verificar.** Los navegadores de Playwright no estan instalados en esta maquina (`pnpm exec playwright install` los descargaria). No se instalaron: es una descarga al entorno fuera del encargo. Ningun test E2E llego a arrancar, asi que no hay evidencia ni a favor ni en contra. `e2e/ejecucion-receta.spec.ts` no se modifico.
+1. **[RESUELTO 2026-09-18]** El humano autorizo instalar Chromium y WebKit de Playwright; el leader corrio `e2e/ejecucion-receta.spec.ts` y `e2e/recetas-pasos.spec.ts`: **8 passed (6.5m)**. Texto original: **T7 / R22 sin verificar.** Los navegadores de Playwright no estan instalados en esta maquina (`pnpm exec playwright install` los descargaria). No se instalaron: es una descarga al entorno fuera del encargo. Ningun test E2E llego a arrancar, asi que no hay evidencia ni a favor ni en contra. `e2e/ejecucion-receta.spec.ts` no se modifico.
 2. Entorno del worktree: hubo que correr `pnpm install --frozen-lockfile`, `pnpm exec prisma generate` y `pnpm exec next typegen` para que `typecheck` funcionara (sin cambios de codigo).
 
 ## Nota tecnica para futuros tests con reloj falso en esta cascada
