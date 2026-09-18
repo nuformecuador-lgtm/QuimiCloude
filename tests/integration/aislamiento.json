@@ -19,6 +19,7 @@
     "identity/work-groups-constraints.int.test.ts",
     "inventario/company-scope.int.test.ts",
     "inventario/inventario-constraints.int.test.ts",
+    "inventario/inventory-movements-constraints.int.test.ts",
     "inventario/presentation-uniqueness.int.test.ts",
     "inventario/product-batch-write.int.test.ts",
     "pedidos/company-scope.int.test.ts",
