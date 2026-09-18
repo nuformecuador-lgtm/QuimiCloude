@@ -126,6 +126,20 @@ del dominio.
    **Queda un fleco abierto**: si algun dia hay que exportar esos datos a un contable externo
    no se evaluo, y esta anotado como pregunta abierta en
    `specs/QC-33-modelo-pedidos/requirements.md`.
+   **CORREGIDA el 2026-09-18 (QC-123), y hay que leer este punto con la enmienda delante: las
+   frases de arriba sobre el precio ya NO describen el sistema.** No existe ningun **precio de
+   venta**, ni en el pedido ni en la receta. El precio unitario y la unidad del pedido los
+   **borro QC-35bis el 2026-09-07** (`orders_drop_unit_and_unit_price`), por decision del humano
+   —«un pedido es receta + cantidad»—, y entre esa fecha y el 2026-09-18 este punto siguio
+   diciendo «el precio de venta del pedido nace aqui» sobre columnas que ya no estaban. Lo que
+   **si** existe desde QC-123 es un importe de otra naturaleza: el **coste de los ingredientes**
+   que la receta del pedido consume, leido de los **lotes de inventario con existencia**,
+   promediado por lote usado. Y **se guarda**, al reves de lo que dice la frase original: sus
+   factores —que lotes habia y a que costo— cambian cada dia, asi que calcularlo al leer haria
+   que el importe de un pedido de marzo cambiara solo. Se recalcula **en cada edicion del
+   pedido** y en ningun otro momento. Lo que **sigue en pie**: el ERP no factura ni liquida
+   impuestos, y el dinero va en `decimal(14,4)` y nunca `float`. Detalle en
+   `specs/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio/requirements.md`.
 5. **Moneda por empresa.** QC-14 y QC-42 cerraron que la moneda del costo es **implicita y
    no se guarda**, y la razon escrita fue «el ERP es de un solo tenant». Esa premisa ya no
    vale. Si dos empresas pueden operar en monedas distintas, es columna nueva y conversion
