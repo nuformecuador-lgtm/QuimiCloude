@@ -20,6 +20,12 @@
 
 ## Evaluaciones
 
+### QC-121 - acotada con `/afinar-feature` (2026-09-18)
+
+Alcance, **15 decisiones cerradas** y **1 pregunta abierta** (la unidad de la linea de receta) en
+`.worktrees/QC-121-unidad-como-identidad-del-item/specs/QC-121-unidad-como-identidad-del-item/requirements.md`
+(sembrado DENTRO del worktree). No se copian aqui. **El board se corrigio ANTES de sembrar**: la `description` pedia **rechazar** el lote en otra unidad y el humano decidio **crear otro producto**. Ninguna ficha nueva ni cancelada. **Deroga tres decisiones de QC-91** (D6 «se calcula, no se guarda», D2 «orden y filtro se pierden», D7 «sin rechazar ni crear en el alta»). Sigue `pending`: la mueve el leader en F1.3.
+
 ### QC-68 - acotada con `/afinar-feature` (2026-09-17)
 
 Alcance, **8 decisiones cerradas** y **cero preguntas abiertas** en
