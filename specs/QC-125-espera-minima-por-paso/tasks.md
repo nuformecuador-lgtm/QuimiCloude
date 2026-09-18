@@ -26,7 +26,7 @@
   - Hecho cuando: `pnpm run typecheck` y `pnpm run lint` verdes, y `tests/unit/recetas-ui/step-reader.test.tsx`
     **sin tocar** sigue verde (prueba de R2).
 
-- [ ] **T3 [P] — Tests del componente.**
+- [x] **T3 [P] — Tests del componente.**
   - Depende de: T2.
   - Archivo: `tests/unit/recetas-ui/step-reader.test.tsx` (sólo casos nuevos; los existentes no se
     editan).
@@ -47,7 +47,7 @@
     `StepReader` (`design.md > 6`). Nada más.
   - Hecho cuando: typecheck y lint verdes.
 
-- [ ] **T5 — Tests de la pantalla de ejecución.**
+- [x] **T5 — Tests de la pantalla de ejecución.**
   - Depende de: T1, T4.
   - Archivo: `tests/unit/asignaciones-ui/order-execution-screen.test.tsx`.
   - Casos nuevos: R4 (impedido a 4999 ms, liberado a 5000 ms), R5 (cuenta visible al montar, ningún
@@ -59,7 +59,7 @@
   - Hecho cuando: el archivo entero verde; los casos R19, R20, R21, R26 y R1 existentes siguen verdes
     sin edición; y por mutación, poner `MIN_STEP_SECONDS = 4` pone rojo R4.
 
-- [ ] **T6 [P] — La vista previa no espera.**
+- [x] **T6 [P] — La vista previa no espera.**
   - Depende de: T2.
   - Archivo: `tests/unit/recetas-ui/recipe-form.test.tsx`.
   - Qué: en el caso existente que abre la vista previa, afirmar que el modal no contiene
