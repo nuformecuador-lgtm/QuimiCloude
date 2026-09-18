@@ -518,6 +518,19 @@ lista: `tests/integration/inventario/product-crud.int.test.ts`,
 feature. Un baseline que miente se vuelve ruido que se ignora, que es como se cuela un rojo de
 verdad.
 
+### Worktrees huerfanos BARRIDOS por decision humana (2026-09-17)
+
+El humano ordeno borrarlos. Se borraron los **cinco** —QC-50, QC-63, QC-88, QC-103 y QC-106—,
+todos de fichas cerradas y mergeadas. **Verificado antes de borrar, no supuesto**: las cinco ramas
+son ancestro de `origin/dev`, ninguna estaba registrada en `git worktree list`, y el unico archivo
+mas nuevo que su ultimo commit era `progress/current.md`, **identico al commiteado**.
+
+`git worktree list` y `.worktrees/` vuelven a **coincidir exactamente**: el principal mas QC-36,
+QC-59, QC-68, QC-91, QC-96 y `tmp-dev-product-page`.
+
+Sigue sin existir **quien barre por defecto**, y van seis repeticiones del mismo fallo de `wt.sh`
+en Windows: el candidato mas maduro para `/afinar-regla`.
+
 ### Worktrees a medio borrar — SEXTA vez, ahora QC-63 (2026-09-17)
 
 Mismo cuadro exacto al cerrar QC-63: `wt.sh done` responde `is not a working tree`, git ya lo tiene
