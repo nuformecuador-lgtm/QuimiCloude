@@ -88,6 +88,20 @@ los dos literales de la estrategia— DEBEN estar en **inglés**. `[D11]`
 **R16.** El sistema DEBE implementarse **sin añadir ninguna dependencia** a `package.json`: los
 archivos nuevos solo pueden importar `zod` y código del propio módulo. `[D12]` `[D15]`
 
+> **Nota fechada — 2026-09-18.** «Código del propio módulo» incluye el **contrato público de otro
+> módulo de este mismo repositorio**, y en concreto `@/lib/modules/errores`, del que sale el tipo
+> `ErrorCode`. Un import así **no es una dependencia de terceros**: no añade una línea a
+> `package.json`, no pasa por los cuatro checks de salud y no necesita fila en
+> `docs/dependencias.md` — que es de lo que habla `[D12]` y lo que esta regla existe para impedir.
+> Es además el **precedente ya establecido** del módulo: `domain/read-pdf-with-ai.ts:18` importa
+> exactamente ese mismo tipo desde el mismo sitio.
+>
+> Se escribe porque la letra de R16 no lo contemplaba y el test de forma sí lo admite —correctamente—:
+> la nota alinea el enunciado con lo que la regla siempre quiso decir. **La sustancia de R16 no se
+> relaja**: los archivos nuevos siguen sin poder importar nada de fuera del repositorio, y lo que
+> se importa de otro módulo es **solo su contrato público**, nunca su `domain/`, sus `ports/` ni sus
+> adaptadores.
+
 **R17.** Esta ficha NO DEBE añadir ninguna especificación en `e2e/`: no hay pantalla ni recorrido de
 usuario que ejercitar, y el E2E de la cadena lo aporta QC-107. La cobertura de R1–R16 DEBE quedar
 en tests unitarios del dominio. `[D14]`

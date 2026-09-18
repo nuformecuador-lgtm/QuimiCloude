@@ -9,6 +9,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { aiReadInputSchema } from '@/lib/modules/documentos/domain/ai-read-input';
+import { UnexpectedError } from '@/lib/modules/documentos/domain/errors';
 import {
   createProcessPdfByStrategy,
   type StrategyRunResult,
@@ -415,6 +416,60 @@ describe('documentos — procesar un PDF por estrategia', () => {
       'design.md > 3.4 (1): un fallo de conteo no puede convertirse en un fallo de lectura que no ' +
         'ocurrio, asi que el resultado es identico al de una ejecucion que conto bien.',
     ).toEqual(esperado);
+  });
+
+  it('design 3.4 — la red de seguridad del catch: si readPdfWithAi LANZA, la excepcion no se propaga y vuelve como ok:false con el code de UnexpectedError, registrando igual', async () => {
+    const MENSAJE = 'el SDK del proveedor reviento en vez de devolver ok:false';
+    const readPdfWithAi = vi.fn(async (): Promise<AiReadResult> => {
+      throw new Error(MENSAJE);
+    });
+    const espia = espiaDeRegistro();
+    const procesar = createProcessPdfByStrategy({
+      readPdfWithAi,
+      countPages: dobleDeConteo(),
+      log: espia.log,
+    });
+
+    // Se captura a mano en vez de con `.resolves`: asi el caso solo pasa si de verdad hay un
+    // resultado. Sin el `catch` de produccion, `resuelto` se quedaria en null y esto seria rojo.
+    let resuelto: StrategyRunResult | null = null;
+    let propagado: unknown = null;
+    try {
+      resuelto = await procesar({ strategy: 'catalogo', path: PATH, bytes: pdfBytes() });
+    } catch (error) {
+      propagado = error;
+    }
+
+    expect(
+      propagado,
+      'design.md > 3.4: el contrato dice que esta capa NO lanza. Si la lectura inyectada deja de ' +
+        'cumplir el suyo, el `catch` es lo unico que sostiene el nuestro.',
+    ).toBeNull();
+    expect(resuelto, 'design.md > 3.4: tiene que haber un resultado, no una promesa rechazada.').not.toBeNull();
+
+    const resultado = resuelto as StrategyRunResult;
+    expect(resultado.ok).toBe(false);
+    expect(
+      falloDe(resultado).code,
+      'design.md > 3.4: un lanzamiento no es un corte del proveedor ni una entrada invalida; es lo ' +
+        'inesperado, y su codigo sale del propio error del dominio.',
+    ).toBe(new UnexpectedError().code);
+    expect(
+      falloDe(resultado).reason,
+      'design.md > 3.4: la causa del lanzamiento viaja en el reason, o el diagnostico se pierde.',
+    ).toContain(MENSAJE);
+    expect(
+      resultado.strategy,
+      'design.md > 3.4: aqui la estrategia SI era valida, asi que estrategia y modo no quedan vacios.',
+    ).toBe('catalogo');
+    expect(resultado.ok ? null : resultado.mode).toBe('images');
+
+    expect(
+      espia.run,
+      'design.md > 3.4: un lanzamiento no se traga la entrada del registro: sigue habiendo UNA por ' +
+        'ejecucion.',
+    ).toHaveBeenCalledTimes(1);
+    expect((espia.run.mock.calls[0]?.[0] as StrategyRunSummary).textLength).toBe(0);
   });
 });
 

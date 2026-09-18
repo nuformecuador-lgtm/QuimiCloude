@@ -279,6 +279,17 @@ que es la condición que el propio `index.ts` declara.
 
 **Ninguna nueva** (`[D12]`, R16). Los archivos nuevos importan `zod` —ya aprobada— y código del
 propio módulo. `package.json` no se toca, y
+
+> **Nota fechada — 2026-09-18.** Hay **un** import que no es ni `zod` ni del propio módulo: el tipo
+> `ErrorCode`, que `domain/process-pdf-by-strategy.ts` trae de `@/lib/modules/errores`. **No es una
+> dependencia de terceros** y por tanto no toca nada de esta sección: es el contrato público de otro
+> módulo del mismo repositorio, no añade una línea a `package.json`, no pasa por los cuatro checks
+> de salud y no necesita fila en `docs/dependencias.md`. Es el mismo precedente que
+> `domain/read-pdf-with-ai.ts:18`, y viene impuesto por el propio diseño: `## 3.3` decide que el
+> `code` **no se traduce** porque el catálogo de `ErrorCode` es el mismo, y para no traducirlo hay
+> que nombrar ese tipo. Se anota porque la letra de R16 no lo contemplaba; la sustancia —cero
+> dependencias nuevas— se cumple entera.
+
 `tests/guards/guard-dependencias-aprobadas.test.ts` sigue verde sin cambios en
 `docs/dependencias.md`. Si durante la implementación aparece la necesidad de una librería, eso es
 señal de que algo se torció: se **para** y se sube la propuesta al humano.

@@ -47,7 +47,8 @@
 **Nada mas se toco.** `git diff --stat` contra la merge-base **no** incluye `package.json`,
 `pnpm-lock.yaml`, `tsconfig.json` ni `next.config` (T9). Cero dependencias nuevas: los archivos
 nuevos importan `zod`, codigo del propio modulo y el tipo `ErrorCode` de `@/lib/modules/errores`
-(mismo precedente que `read-pdf-with-ai.ts`).
+(mismo precedente que `read-pdf-with-ai.ts:18`; por que eso **no** es una dependencia de terceros,
+en la nota fechada de R16 y de `design.md > 5`, y el porque del hallazgo en `## 5.4`).
 
 ## 2. Mapa `R<n> -> test` (17/17, sin huecos)
 
@@ -78,6 +79,9 @@ Casos de refuerzo, no de requisito:
 
 - `design 3.4 — si countPages LANZA, el resumen va con pages null y la ejecucion sigue igual`
   (compara el resultado **entero** contra una corrida con conteo sano, con `toEqual`).
+- `design 3.4 — la red de seguridad del catch: si readPdfWithAi LANZA, la excepcion no se propaga y
+  vuelve como ok:false con el code de UnexpectedError, registrando igual` — anadido por el menor 3 de
+  la review; ver `## 5.5`.
 - `R8 — pages sale del countPages inyectado y no de ningun otro sitio`.
 - Adaptador: `R9 — la linea que escribe lleva la longitud y nunca el texto de la IA`,
   `R8 — con pages null escribe su hueco en vez de un numero inventado` y
@@ -143,6 +147,27 @@ $ pnpm exec vitest run tests/unit/documentos/process-pdf-by-strategy.test.ts \
 `qc109-alcance.test.ts` **no hizo falta tocarlo**: sus listas son de **nombres** de exports y de
 campos, no de tipos, así que el cambio de firma no las desfasa. El hueco `SIN_MODO` del adaptador se
 dejó **sin exportar** justamente para no alterar la lista de exports que vigila R15.
+
+### Tras los menores de la review (`## 5.4`), vuelta a correr
+
+`pnpm typecheck` y `pnpm lint` siguen sin errores ni hallazgos. Con el caso de la rama `catch`
+(`## 5.5`), uno más:
+
+```
+$ pnpm exec vitest run tests/unit/documentos/process-pdf-by-strategy.test.ts \
+    tests/unit/documentos/qc109-alcance.test.ts \
+    tests/unit/documentos/module-contract.test.ts \
+    tests/unit/composition/documentos-facade.test.ts \
+    tests/unit/documentos/read-pdf-with-ai.test.ts
+
+ Test Files  5 passed (5)
+      Tests  70 passed (70)
+   Duration  4.09s
+```
+
+De los tres menores, **solo uno tocó `tests/`** y **ninguno tocó producción**: `git diff` sobre
+`lib/` sale vacío en esta tanda. Los otros dos fueron notas fechadas en el spec y una renumeración
+de epígrafes en esta bitácora.
 
 ### Lo que encontro la corrida intermedia (y ya esta arreglado)
 
@@ -223,12 +248,84 @@ mentira. Se reviso y se reescribio en cuatro sitios ademas de los del design:
 La cabecera del puerto se releyo entera y **no** quedaba desmentida: solo afirma por que es un
 puerto y que la firma no admite el texto, las dos cosas siguen siendo ciertas.
 
-### 5.2 Nada mas choco
+### 5.3 Nada mas choco
 
 El mapeo `catalogo -> 'images'` / `formula -> 'pdf'` se verifico contra `read-pdf-with-ai.ts:173-174`
 antes de escribir nada, y `extractText` del `PdfConverter` **no se usa** —la trampa estaba avisada—.
 `resolveJsonModule` ya estaba activo: no se toco `tsconfig.json`, `next.config` ni `vitest.config`, y
 no entro ningun loader.
+
+### 5.4 Menores de la review, atendidos (2026-09-18)
+
+La review salio **APROBADA: 0 bloqueantes, 6 menores**
+(`progress/review_QC-109-procesamiento-de-pdf-por-estrategia.md`, commit `55654be`). De los seis, al
+implementer le tocaron **tres**:
+
+- **menor 2 — R16 y `@/lib/modules/errores`.** El test de forma admite ese import por el tipo
+  `ErrorCode` y la **letra** de R16 no lo contemplaba. **El codigo no cambia y el test tampoco**: hoy
+  afirma lo correcto, y relajarlo seria empeorarlo. Lo que faltaba era la linea que lo recoge, y se
+  ha escrito con **nota fechada 2026-09-18** en dos sitios: el enunciado de **R16** en
+  `requirements.md` y la seccion 5 de `design.md`. Dice lo mismo en los dos: un import del contrato
+  publico de otro modulo **del propio repositorio** no es una dependencia de terceros —no toca
+  `package.json`, no pasa los cuatro checks, no necesita fila en `docs/dependencias.md`—, que es de
+  lo que habla `[D12]`. Mismo precedente que `read-pdf-with-ai.ts:18`, y ademas **impuesto por el
+  propio diseño**: `design.md > 3.3` decide que el `code` no se traduce, y para no traducirlo hay que
+  nombrar ese tipo. **La sustancia de R16 no se relaja.**
+- **menor 3 — la rama `catch` sin test.** Ver `## 5.5`. Resumen: **la rama es alcanzable**, es una red
+  de seguridad legitima y no codigo muerto, asi que se ha escrito el caso en vez de quitar el
+  `catch`.
+- **menor 6 — dos epigrafes numerados 5.2** en esta bitacora. Renumerado: el segundo es ahora `5.3`.
+  Comprobado que ninguna referencia cruzada apuntaba al numero viejo.
+
+Los otros tres no son del implementer y **no se han tocado**: T11 es del leader; el menor de
+`current.md` («14 decisiones» y «una pregunta abierta» cuando son 16 y cero) lo corrigio el leader en
+`6ba4b82`; y las cabeceras de 8-11 lineas frente a las ~5 de `conventions.md` **se quedan**, porque
+replican el formato ya aprobado en QC-108 y cambiarlas aqui dejaria el modulo hablando dos idiomas
+—es una ficha de limpieza por modulo, no un parche en esta—.
+
+#### Nota sobre la verificacion de la review
+
+El reviewer no se fio de que los tests pasaran: los probo con **tres mutaciones propias** —invertir
+el mapa estrategia -> modo, meter un `trim()` al texto devuelto y suprimir el registro del rechazo
+invalido— y dieron **3, 3 y 2 rojos**. Los tests muerden.
+
+### 5.5 La rama `catch`: alcanzable, y ahora con caso que la ejercita
+
+**La pregunta que habia que contestar antes de escribir nada** era si esa rama es **codigo muerto** o
+una **red de seguridad legitima**, porque la respuesta cambia lo que hay que hacer: si nadie puede
+provocarla, se quita; si alguien puede, se prueba. Fabricar un test artificial para tapar una rama
+inalcanzable habria sido lo peor de los dos mundos.
+
+**Es alcanzable, y de la forma mas simple posible:** `readPdfWithAi` entra **por parametro**
+(`ProcessPdfByStrategyDeps`), asi que un doble puede lanzar sin ningun truco. Que hoy la
+implementacion real devuelva `ok:false` en vez de lanzar es una propiedad del **contrato** de esa
+dependencia, no del tipo: nada en la firma impide que una implementacion futura —o un adaptador mal
+portado— lance. El `catch` es lo que sostiene que **esta** capa no lance y que **el resumen se
+registre igual** si eso pasara, que es justo lo que R8 y R10 prometen. Se queda, y ahora esta
+probado.
+
+Caso nuevo:
+
+```
+design 3.4 — la red de seguridad del catch: si readPdfWithAi LANZA, la excepcion no se propaga y
+vuelve como ok:false con el code de UnexpectedError, registrando igual
+```
+
+Sin `R<n>` en el nombre, a proposito: es consecuencia de diseño, no requisito, y sigue el estilo del
+`design 3.4 —` que ya existia para el `countPages` que revienta.
+
+Afirma las cuatro cosas juntas: que la excepcion **no se propaga** —con `try/catch` manual y
+comprobando **que hay resultado**, porque un `.resolves` a secas pasaria verde aunque no lo hubiera—;
+que el `code` es el de `UnexpectedError` **leido del propio error**, no un literal `'unexpected'`
+escrito a mano; que el `reason` contiene el mensaje de lo que lanzo; que `strategy` y `mode` **no**
+quedan vacios, porque aqui la estrategia si era valida; y que se registra **exactamente una vez** con
+`textLength: 0`.
+
+**Comprobado por mutacion, no supuesto.** Con `throw error;` como primera linea del `catch`
+—equivalente a que el `catch` no exista—, el caso nuevo es **el unico** que se pone rojo
+(`1 failed | 15 passed`). Eso prueba dos cosas: que muerde, y que **ningun otro caso cubria ya esa
+rama**. La mutacion se revirtio y `git diff` sobre el archivo de produccion sale **vacio**:
+verificado por mi, no solo reportado.
 
 ## 6. Decisiones de forma donde el design dejaba margen
 
