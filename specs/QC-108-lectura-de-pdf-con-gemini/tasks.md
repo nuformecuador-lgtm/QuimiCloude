@@ -138,7 +138,7 @@
       secreto.
       Cubre **R13, R14, R15, R16**.
 
-- [ ] **T8 — Adaptador `@google/genai`.** Depende de **T0.2**, de T3 y de T7.
+- [x] **T8 — Adaptador `@google/genai`.** Depende de **T0.2**, de T3 y de T7.
       Archivos: `lib/modules/documentos/adapters/driven/ai/ai-reader-genai.ts`, `package.json` y
       `pnpm-lock.yaml` (**solo** si T0.2 salió «sí»), `docs/dependencias.md` (una fila nueva, **la
       escribe el leader** en F1.4 con el texto ya redactado en `design.md > 8.2`),
@@ -157,7 +157,7 @@
 
 ## Tanda 4 — contrato y cableado
 
-- [ ] **T9 [P] — El barrel del módulo.** Depende de T5.
+- [x] **T9 [P] — El barrel del módulo.** Depende de T5.
       Archivos: `lib/modules/documentos/index.ts` (**se amplía al final**),
       `tests/unit/documentos/module-contract.test.ts` (**se amplía** el de QC-106).
       Se exportan la **factory** `createReadPdfWithAi`, su `ReadPdfWithAiDeps`, el tipo de salida y la
