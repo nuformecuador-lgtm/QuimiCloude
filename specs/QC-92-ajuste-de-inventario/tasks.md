@@ -319,6 +319,54 @@
       `configuracion-ui/user-table.test.tsx` **no reapareció**, lo que confirma por segunda vía lo
       ya medido. `tests/baseline-rojos.json` **no se toca**: es deuda de `dev`.
 
+## Tanda 8 — ENMIENDA AL SPEC del 2026-09-18: el enum de `kind` y el CHECK del motivo
+
+> Aprobada por el humano el 2026-09-18 sobre la ficha ya implementada, revisada y con PR abierto.
+> Entra en el mismo PR. Sale de `requirements.md > Enmienda del 2026-09-18`, que **enmienda D5** y
+> añade **D17**, **D18** y los requisitos **R35**, **R36** y **R37**.
+
+- [x] **T18 — Migración: `kind` a enum y CHECK del catálogo de motivos.** Depende de T1.
+      Enum `InventoryMovementKind` con **exactamente** `opening` y `adjustment` en minúscula, nota
+      `///` sobre el orden de declaración (sin citar ficha), y CHECK
+      `inventory_movements_reason_in_catalog`. **Orden obligatorio en el up**: `DROP CONSTRAINT
+      inventory_movements_reason_matches_kind` → `ALTER COLUMN ... TYPE ... USING` → `ADD
+      CONSTRAINT` de nuevo. `down.sql` obligatorio y probado `migrate` → `rollback` → `migrate`
+      contra base real. **La carpeta NO puede terminar en `_inventory_movements`**: el censo de
+      `tests/unit/inventario/schema/inventory-movements-migration.test.ts:31` exige exactamente una.
+      **El dominio NO importa tipos de Prisma.** **Cubre R35 y R36.**
+      **Archivos:** `db/schema.prisma`, `db/migrations/20260918120000_inventory_movement_kind_enum_and_reason_catalog/`,
+      `tests/integration/inventario/inventory-movements-constraints.int.test.ts`,
+      `tests/guards/guard-identificador-de-request.test.ts` (cuarta alta de `MIGRACIONES_ESPERADAS`),
+      y los censos de esquema que toque, a la verdad nueva y con nota fechada.
+
+- [x] **T19 — Guardia: la lista de motivos no puede divergir entre el dominio y la base.**
+      Depende de T18.
+      Lee la lista del CHECK **de la migración en disco** y afirma **igualdad exacta** —no
+      inclusión— con `MOVEMENT_REASONS`. **Prueba por mutación de las dos caras** (motivo de más en
+      la constante ⇒ rojo; motivo de menos en el CHECK ⇒ rojo) y **autoprueba de vacuidad**: dos
+      listas vacías compararían iguales, así que hay que anclar que el extractor leyó algo.
+      **En `tests/guards/`, NO en `tests/unit/`**: esta ficha ya midió que el gate rápido no ve un
+      censo que vive en `tests/unit/` y lee `.prisma`/`.sql` como texto (quinta familia, ver la
+      bitácora). **Cubre R37.**
+      **Archivos:** `tests/guards/guard-motivos-de-ajuste.test.ts`.
+
+- [x] **T20 — Trazabilidad de la enmienda y gate.** Depende de T18 y T19.
+      Ampliar el mapa `R<n> -> test` a **R35, R36 y R37**, dejar escrita la enmienda a D5 en la
+      bitácora y correr el gate. **AVISO 2026-09-18:** `./init.sh` completo cae **antes de los
+      tests** por `feature_list.json` heredado de `dev` (faltan specs de QC-82 y QC-121); eso **no
+      es de esta ficha**. Si sigue roto, se corre `./init.sh --rapido` y a mano
+      `tests/unit/inventario/`, `tests/guards/` y los de integración del módulo, y se declara qué
+      se pudo correr y qué no.
+      **Archivos:** `progress/impl_QC-92-ajuste-de-inventario.md`, `specs/QC-92-ajuste-de-inventario/tasks.md`.
+      **ESTADO 2026-09-18:** mapa ampliado, **37 declarados / 37 mapeados**. El gate completo
+      **NO se pudo correr**: `./init.sh` y `./init.sh --rapido` caen los dos en la validación
+      del board, **antes** de los tests, por `QC-82` sin specs. **Medido ajeno**: el validador
+      falla igual con el `feature_list.json` de `origin/dev`. Corrido a mano en su lugar:
+      typecheck, lint, `test:rapido` (368 archivos / 5524 passed) + las 47 guardias
+      (588 passed), `tests/unit/inventario/` (750), `tests/integration/inventario/` (165) y la
+      etapa de `down.sql`. **Cero rojos.** Falta la suite completa, que **le toca al leader**.
+
+
 ---
 
 ## Notas de dependencia, en una vista

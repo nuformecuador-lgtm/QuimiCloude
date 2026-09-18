@@ -29,9 +29,14 @@
 
 > **Cómo leer las citas.** Cada requisito cita entre corchetes la fila de `## Decisiones cerradas`
 > que lo origina, numeradas **por orden de la tabla**: `[D1]` es «¿Sobre qué se ajusta?» y `[D16]`
-> «¿Librería?». Son **16 filas**, contadas sobre la tabla de abajo. Las decisiones que no nacen de
-> una fila —aislamiento por empresa, migración reversible, catálogo de errores— citan el documento
-> del arnés que las impone.
+> «¿Librería?». Son **18 filas** desde la enmienda del 2026-09-18, contadas sobre la tabla de
+> abajo: `[D17]` («¿`kind` es texto o enum?») y `[D18]` («¿El motivo lo vigila la base?») las añade
+> esa enmienda. Las decisiones que no nacen de una fila —aislamiento por empresa, migración
+> reversible, catálogo de errores— citan el documento del arnés que las impone.
+>
+> **Aviso sobre D5.** La **enmienda del 2026-09-18 modifica D5** y con ella el texto de **R9**. Si
+> vas a añadir un motivo al catálogo, lee esa enmienda antes que D5: ya **no** se hace tocando una
+> sola línea.
 
 ### El ajuste: qué corrige y sobre qué
 
@@ -67,9 +72,11 @@ derivar, calcular ni corregir ninguna existencia sumando `inventory_movements` `
 —merma, rotura, conteo físico, error de carga—; SI el motivo falta o no pertenece al conjunto,
 ENTONCES DEBE rechazar la operación sin escribir nada `[D5]`.
 
-**R9.** El sistema DEBE declarar ese conjunto en **una sola definición**, y añadirle un valor NO
-DEBE requerir migración alguna ni modificar ninguna fila ya persistida: los asientos escritos con
-los motivos anteriores DEBEN seguir leyéndose y agrupándose igual `[D5]`.
+**R9.** *(Texto modificado por la enmienda del 2026-09-18; ver esa sección.)* El sistema DEBE
+declarar ese conjunto en **una sola definición** en el dominio, y añadirle un valor NO DEBE
+modificar ninguna fila ya persistida: los asientos escritos con los motivos anteriores DEBEN seguir
+leyéndose y agrupándose igual. Añadir un valor **SÍ requiere migración** desde el 2026-09-18, porque
+la base vigila el catálogo con un CHECK `[D5]` `[D18]`.
 
 **R10.** El sistema NO DEBE exigir ni escribir motivo en el asiento del **alta de lote**; MIENTRAS
 el asiento sea de alta, su motivo DEBE quedar ausente `[D4]` `[D5]`.
@@ -185,6 +192,66 @@ panel de lotes, ajustar con motivo, ver el asiento en el historial—; y como `i
 Playwright, el spec y las tasks DEBEN dejar escrito que ese E2E **se corre a mano** y que el gate en
 verde no lo acredita `[D15]`.
 
+### Enmienda del 2026-09-18: `kind` es un enum de Postgres y el motivo lo vigila un CHECK
+
+> **Aprobada por el humano el 2026-09-18**, sobre el spec ya aprobado, implementado y revisado.
+> Entra en esta misma ficha y en el mismo PR. Nacen **D17** y **D18**, y los requisitos **R35**,
+> **R36** y **R37**. Ningún otro requisito cambia de número.
+>
+> #### ESTO ENMIENDA D5. No es compatible con D5: la sustituye en un punto concreto.
+>
+> **Lo que D5 decidió, el 2026-09-17:** motivo obligatorio en los ajustes, de un conjunto cerrado
+> **que crece sin migrar** lo ya persistido, con el mecanismo heredado del tipo de documento de la
+> feature 4. La forma elegida para conseguirlo fue **constante de dominio + validación zod +
+> columna `TEXT`**, precisamente para que el catálogo de motivos pudiera crecer **sin tocar la
+> base**.
+>
+> **Lo que cambia el 2026-09-18:** la columna `reason` sigue siendo `TEXT`, pero gana un **CHECK
+> con la lista escrita**. En consecuencia, **añadir un motivo pasa a costar una migración**. Eso es
+> exactamente lo que D5 quería evitar, y el humano lo decidió **con ese coste delante**.
+>
+> **Lo que NO cambia de D5:** el motivo sigue siendo obligatorio en el ajuste y ausente en el alta
+> (R8, R10); los asientos ya escritos no se reescriben ni se releen distinto; la definición sigue
+> siendo **una sola** en el dominio, y ninguna pantalla enumera motivos a mano.
+>
+> **Por qué se escribe así de largo.** Para que dentro de tres fichas nadie lea D5, vea «crece sin
+> migrar» y crea que puede añadir un motivo tocando una línea. Con el CHECK puesto, hacerlo así
+> deja la base rechazando en producción con un `23514` que nadie predijo. Mismo trato que se dio a
+> D13 y D14 en las dos enmiendas de QC-81.
+>
+> **El riesgo que abre la enmienda, y que R37 cierra:** la lista de motivos pasa a vivir en **dos
+> sitios** —`MOVEMENT_REASONS` en el dominio y el CHECK en la base— y **pueden divergir en
+> silencio**.
+>
+> **Sobre `kind` (D17), y por qué NO se añaden más valores:** el enum tiene **exactamente**
+> `opening` y `adjustment`. El **consumo por lote** es pregunta abierta del dominio **sin ficha**
+> —así está declarado en `## Lo que NO entra` y en las specs de QC-81—, y declarar un valor que
+> nada puede producir daría la falsa impresión de que está resuelto. La **minúscula** no es estilo:
+> los datos ya están escritos así, y por eso la conversión es un `USING` directo que no reescribe
+> ni una fila.
+
+**R35.** La columna `inventory_movements.kind` DEBE ser un **tipo enumerado de Postgres**
+(`InventoryMovementKind`) con **exactamente** los valores `opening` y `adjustment`, en minúscula;
+la conversión desde `TEXT` NO DEBE reescribir ninguna fila existente, y el **orden de declaración
+NO DEBE reordenarse** —Postgres ordena un enum por declaración y reordenar obliga a recrear el
+tipo—. El **dominio NO DEBE importar tipos de Prisma**: `inventory-movement.ts` conserva su unión
+`'opening' | 'adjustment'` y convertir es del **adaptador driven**
+(`docs/architecture.md > Dominio`). `[D17]`
+
+**R36.** La columna `inventory_movements.reason` DEBE seguir siendo **`TEXT`** y anulable, y la
+base DEBE **rechazar por su cuenta**, con SQLSTATE `23514`, todo motivo que no pertenezca al
+catálogo, por **cualquier vía de escritura** —incluida el SQL crudo—. El CHECK NO DEBE impedir el
+`NULL` del asiento de alta. `[D18]` `[D5]`
+
+**R37.** DEBE existir una **guardia en `tests/guards/`** —y no en `tests/unit/`— que lea la lista
+del **CHECK de la migración en disco** y afirme que es **exactamente igual** a `MOVEMENT_REASONS`
+(**igualdad, no inclusión**). DEBE traer **prueba por mutación de las dos caras** —un motivo de más
+en la constante da rojo; un motivo de menos en el CHECK da rojo— y **autoprueba de vacuidad**: si
+el extractor no leyera nada, la comparación de dos listas vacías pasaría, así que la guardia DEBE
+anclar que leyó algo. Vive en `tests/guards/` porque `./init.sh --rapido` **no la vería** en
+`tests/unit/`: filtra el diff a fuentes JS/TS y ningún grafo de imports relaciona un archivo que
+lee `.prisma`/`.sql` como texto. `[D18]`
+
 ## Preguntas abiertas
 
 **Ninguna.** Las cinco que la ficha traía escritas —sobre qué se ajusta, el motivo, el permiso, si
@@ -210,3 +277,5 @@ era tabla nueva, y el negativo con los lotes consumidos— se cerraron el 2026-0
 | 2026-09-17 | Enteros, borrado, idioma | Heredados: existencia **entera** (QC-14); **borrado lógico** e **identificadores en inglés** (feature 4). **Esta ficha no borra lotes** |
 | 2026-09-17 | ¿Hace falta E2E? | **Sí**: es movimiento de inventario (`CHECKPOINTS.md`). **Aviso: `init.sh` NO corre Playwright** —deuda conocida, `docs/verification.md`—, así que el E2E se corre **a mano** y no basta con el gate en verde |
 | 2026-09-17 | ¿Librería? | **Ninguna nueva** |
+| 2026-09-18 | ¿`kind` es texto o enum? | **Enum de Postgres `InventoryMovementKind`**, con **exactamente** `opening` y `adjustment` en minúscula. No se añade `consumption` ni `transfer`: el consumo por lote es pregunta abierta del dominio **sin ficha**, y un valor que nada puede producir fingiría que está resuelto. La minúscula es porque los datos ya están escritos así: la conversión es un `USING` directo, sin reescribir una fila. El orden de declaración no se reordena por estética. **El dominio no importa tipos de Prisma**: convertir es del adaptador driven. *Añadida en la enmienda del 2026-09-18, aprobada por el humano ese día* |
+| 2026-09-18 | ¿El motivo lo vigila la base? | **Sí: CHECK con la lista, y `reason` sigue siendo `TEXT`** (no enum). **ENMIENDA D5**: con el CHECK, añadir un motivo **pasa a costar una migración**, que es justo lo que D5 quería evitar. El humano lo decidió **con ese coste delante** el 2026-09-18. Abre el riesgo de que la lista **diverja en silencio** entre `MOVEMENT_REASONS` y la base, y por eso R37 exige una guardia de igualdad exacta en `tests/guards/`. *Añadida en la enmienda del 2026-09-18, aprobada por el humano ese día* |

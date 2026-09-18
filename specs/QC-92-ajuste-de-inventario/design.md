@@ -92,7 +92,12 @@ inventory_movements
   transaccionales; aquí el libro directamente no ofrece la vía.
 - **`quantity` es `INTEGER`**, no decimal: la existencia es entera desde QC-14 y
   `product_batches.stock` es `Int`. Un asiento decimal no podría cuadrar con la columna que explica.
-- **`kind` y `reason` son `TEXT`, no `enum` de Postgres.** Ver §2.2.
+- **`kind` y `reason` nacieron `TEXT`, no `enum` de Postgres.** Ver §2.2.
+  **ENMENDADO EL 2026-09-18** (`requirements.md > Enmienda del 2026-09-18`, R35/R36): `kind`
+  **pasa a enum de Postgres** (`InventoryMovementKind`, con `opening` y `adjustment` y nada
+  más) y `reason` **sigue siendo `TEXT`** pero gana el CHECK
+  `inventory_movements_reason_in_catalog` con la lista escrita. Lo hace una **migración
+  aparte**: el `migration.sql` de arriba no se toca.
 - **`created_by` anulable** por el mismo criterio que `product_batches.created_by`: NULL significa
   «no lo hizo una persona». En esta ficha siempre viene relleno, porque no hay proceso automático.
 - **Índices**: `inventory_movements_batch_id_idx` (el historial de un lote y la verificación del
@@ -122,6 +127,16 @@ no el código de la aplicación. `OrderAssignment` (`db/schema.prisma:519-532`) 
 tabla nueva nacida con su `company_id`.
 
 ### 2.2 El motivo: conjunto cerrado que crece sin migrar (R8, R9, D5)
+
+> **ENMENDADO EL 2026-09-18 — léelo antes que el resto de esta sección.**
+> `requirements.md > Enmienda del 2026-09-18` **enmienda D5** y reescribe R9. La columna sigue
+> siendo `TEXT` y la definición sigue siendo **una sola en el dominio**, pero la base gana un
+> **CHECK con la lista**, así que **añadir un motivo ya NO es «una línea»: cuesta una migración**.
+> El humano lo decidió con ese coste delante. El párrafo de abajo que dice «Añadir un motivo es
+> **una línea**: ninguna migración» **dejó de ser cierto ese día** y se conserva para que se vea
+> qué se cambió y por qué.
+> La contrapartida es que la lista vive en **dos sitios** —`MOVEMENT_REASONS` y el CHECK—, y eso lo
+> cierra la guardia de igualdad exacta que exige **R37** (`tests/guards/`, no `tests/unit/`).
 
 El conjunto vive en **una sola definición del dominio**:
 

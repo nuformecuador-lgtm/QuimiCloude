@@ -1,5 +1,6 @@
 /**
- * Contra Postgres real, con la migracion `20260917130000_inventory_movements` aplicada.
+ * Contra Postgres real, con las migraciones `20260917130000_inventory_movements` y
+ * `20260918120000_inventory_movement_kind_enum_and_reason_catalog` aplicadas.
  *
  * AISLAMIENTO -- cada caso corre dentro de `prisma.$transaction` interactiva y termina
  * lanzando `RollbackSignal`, asi que ninguna fila escrita sobrevive. Un error de constraint
@@ -11,6 +12,7 @@ import { randomUUID } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { MOVEMENT_REASONS } from '@/lib/modules/inventario/domain/movement-reason'
 import { prisma } from '@/lib/shared/db/prisma'
 
 class RollbackSignal extends Error {
@@ -39,6 +41,9 @@ async function inRolledBackTransaction(
 let savepointSeq = 0
 
 const CHECK_VIOLATION = '23514'
+const INVALID_TEXT_REPRESENTATION = '22P02'
+
+const MOTIVO_FUERA_DEL_CATALOGO = 'inventado'
 
 function sqlStateOf(error: unknown): string {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -157,6 +162,11 @@ async function createBatch(
  * `INSERT INTO inventory_movements` crudo: la API tipada traduciria el SQLSTATE a su propio
  * codigo (`P2010`/`P2002`, sin `meta.code`), asi que los casos que esperan un CHECK o un
  * disparador rechazados van por aqui para poder afirmar sobre el SQLSTATE real.
+ *
+ * El `CAST(... AS "InventoryMovementKind")` no es adorno: desde que `kind` es un enum, el
+ * parametro llega como texto y Postgres rechaza el INSERT con 42804 -medido- antes de poder
+ * llegar al CHECK o al disparador que el caso quiere ejercitar. Con el cast, un valor que no
+ * es del enum cae donde tiene que caer: en 22P02.
  */
 async function rawInsertMovement(
   tx: Prisma.TransactionClient,
@@ -165,7 +175,8 @@ async function rawInsertMovement(
   return tx.$executeRaw`
     INSERT INTO "inventory_movements" ("batch_id", "kind", "quantity", "reason", "company_id")
     VALUES (
-      CAST(${columns.batchId} AS uuid), ${columns.kind}, ${columns.quantity}, ${columns.reason},
+      CAST(${columns.batchId} AS uuid), CAST(${columns.kind} AS "InventoryMovementKind"),
+      ${columns.quantity}, ${columns.reason},
       CAST(${columns.companyId} AS uuid)
     )`
 }
@@ -252,6 +263,77 @@ describe('inventory_movements — restricciones', () => {
       )
       expect(rejection.sqlState).toBe(CHECK_VIOLATION)
       expect(rejection.message).toContain('inventory_movements_company_differs_from_batch')
+
+      expect(await tx.inventoryMovement.findMany({ where: { batchId }, select: { id: true } })).toEqual([])
+    })
+  })
+
+  it('acepta todos los motivos del catalogo en un ajuste (R36)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const companyId = await createCompany(tx, marker)
+      const batchId = await createBatch(tx, marker, companyId)
+
+      // Sin esto, un catalogo vacio dejaria el bucle sin insertar nada y el caso pasaria en verde.
+      expect(MOVEMENT_REASONS.length).toBeGreaterThan(0)
+
+      for (const reason of MOVEMENT_REASONS) {
+        await rawInsertMovement(tx, { batchId, kind: 'adjustment', quantity: -1, reason, companyId })
+      }
+
+      const escritos = await tx.inventoryMovement.findMany({
+        where: { batchId },
+        select: { reason: true },
+        orderBy: { reason: 'asc' },
+      })
+      expect(escritos.map((movimiento) => movimiento.reason)).toEqual([...MOVEMENT_REASONS].sort())
+    })
+  })
+
+  it('rechaza un motivo que no esta en el catalogo con SQLSTATE 23514 e inventory_movements_reason_in_catalog (R36)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const companyId = await createCompany(tx, marker)
+      const batchId = await createBatch(tx, marker, companyId)
+
+      const catalogo: readonly string[] = MOVEMENT_REASONS
+      expect(catalogo).not.toContain(MOTIVO_FUERA_DEL_CATALOGO)
+
+      const rejection = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertMovement(tx, {
+            batchId,
+            kind: 'adjustment',
+            quantity: -1,
+            reason: MOTIVO_FUERA_DEL_CATALOGO,
+            companyId,
+          }),
+        'ajuste con un motivo fuera del catalogo',
+      )
+      expect(rejection.sqlState).toBe(CHECK_VIOLATION)
+      expect(rejection.message).toContain('inventory_movements_reason_in_catalog')
+
+      expect(await tx.inventoryMovement.findMany({ where: { batchId }, select: { id: true } })).toEqual([])
+    })
+  })
+
+  it('rechaza una clase que no es del enum con SQLSTATE 22P02 (R35)', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const marker = token()
+      const companyId = await createCompany(tx, marker)
+      const batchId = await createBatch(tx, marker, companyId)
+
+      const rejection = await expectRejectedByDatabase(
+        tx,
+        () => rawInsertMovement(tx, { batchId, kind: 'consumption', quantity: -1, reason: 'merma', companyId }),
+        'asiento con una clase que el enum no declara',
+      )
+      expect(rejection.sqlState).toBe(INVALID_TEXT_REPRESENTATION)
+      // Por el nombre del tipo y el valor rechazado, no por el texto: el mensaje de Postgres esta
+      // traducido y decir «invalid input value for enum» ata el caso al idioma del servidor.
+      expect(rejection.message).toContain('InventoryMovementKind')
+      expect(rejection.message).toContain('consumption')
 
       expect(await tx.inventoryMovement.findMany({ where: { batchId }, select: { id: true } })).toEqual([])
     })

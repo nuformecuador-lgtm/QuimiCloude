@@ -1529,3 +1529,316 @@ del PR**: o se arregla en `dev`, o alguien añade la fila con su motivo y su fec
 - **Menores 1 y 8** (la contradicción entre R26 y `conventions` §31, y el carve-out de la cabecera de
   enmiendas): los cierra `/afinar-regla` **en frío**, no esta ficha.
 - **El PR no se abre.**
+
+---
+
+## Tanda A (enmienda del 2026-09-18) — T18: `kind` a enum y CHECK del catálogo de motivos
+
+Delta sobre la ficha ya implementada y revisada. **Solo T18**: T19 (guardia de divergencia de
+motivos, R37) y T20 (trazabilidad + gate) **no entraban en el encargo de esta tanda**.
+
+### Archivos
+**Creados**
+- `db/migrations/20260918120000_inventory_movement_kind_enum_and_reason_catalog/migration.sql`
+- `db/migrations/20260918120000_inventory_movement_kind_enum_and_reason_catalog/down.sql`
+
+**Modificados**
+- `db/schema.prisma` — `enum InventoryMovementKind { opening, adjustment }` declarado justo antes de
+  `model InventoryMovement`; `kind String` → `kind InventoryMovementKind`. El comentario del modelo
+  decía «`kind` y `reason` son `TEXT`» y ya no era verdad; se corrigió. `prisma format` realineó de
+  paso el bloque de relaciones de `ProductBatch` (solo espacios).
+- `tests/guards/guard-identificador-de-request.test.ts` — cuarta alta en `MIGRACIONES_ESPERADAS`.
+- `tests/integration/inventario/inventory-movements-constraints.int.test.ts` — tres casos nuevos y
+  el cast del helper de `$executeRaw`.
+
+### La carpeta no puede terminar en `_inventory_movements`
+`tests/unit/inventario/schema/inventory-movements-migration.test.ts:31` exige **exactamente una**
+carpeta con ese sufijo. Por eso la migración se llama
+`20260918120000_inventory_movement_kind_enum_and_reason_catalog`.
+
+### Ciclo de la migración, verificado de verdad
+Base `QuimiCloude_QC92E`, copiada con `CREATE DATABASE ... TEMPLATE "qct_tpl_5316b8e32d17"` (receta
+de T16) y **sembrada a mano con dos asientos reales** (`opening`/NULL y `adjustment`/`merma`) antes
+de migrar, para que la conversión se midiera sobre datos y no sobre una tabla vacía.
+
+`migrate deploy` → `kind` = `InventoryMovementKind`, labels `opening`(1) / `adjustment`(2), tres
+CHECK, las **dos filas intactas**, 36 en `_prisma_migrations` · `pnpm run db:rollback` → `kind` =
+`text`, el tipo ya no existe, dos CHECK, **las dos filas intactas**, 35 filas · `migrate deploy` →
+vuelve a quedar en enum, tres CHECK, filas intactas, 36 filas y `rolled_back_at` nulo.
+La base temporal se borró al terminar.
+
+### Censos
+- `tests/guards/guard-identificador-de-request.test.ts` — **alta obligatoria**, lista cerrada.
+- `tests/unit/inventario/schema/inventario-schema.test.ts` — **no hizo falta tocarlo**: el censo de
+  modelos y el veto de «ningún enum suplanta el catálogo de unidades» siguen verdes con el enum
+  nuevo. Medido, no supuesto.
+- `tests/unit/pedidos/schema/pedidos-schema.test.ts`, `tests/unit/identity/schema/identity-schema.test.ts`
+  y `tests/integration/recetas/recetas-constraints.int.test.ts` — verdes sin tocar.
+- Ningún test afirmaba que `kind` fuera `String`/`TEXT` fuera del comentario del esquema.
+
+### La trampa del helper de `$executeRaw`, medida
+Con la columna ya enum, el parámetro de texto hacía que Postgres rechazara el INSERT con **42804**
+antes de llegar al CHECK o al disparador: cuatro de los cinco casos existentes se pusieron rojos.
+Se resolvió con `CAST(${kind} AS "InventoryMovementKind")` en el helper.
+
+Segundo hallazgo: el mensaje de Postgres está **traducido** («la sintaxis de entrada no es válida
+para el enum»), así que el caso del enum afirma sobre el **nombre del tipo** y el **valor
+rechazado**, no sobre el texto. El SQLSTATE sí es 22P02.
+
+### Mapa `R<n> -> test` de la enmienda
+| Requisito | Test |
+|---|---|
+| R35 | `tests/integration/inventario/inventory-movements-constraints.int.test.ts` — «rechaza una clase que no es del enum con SQLSTATE 22P02 (R35)»; y el ciclo migrate→rollback→migrate con filas sembradas, arriba |
+| R36 | mismo archivo — «acepta los cuatro motivos del catalogo en un ajuste (R36)» y «rechaza un motivo que no esta en el catalogo … (R36)» |
+| R37 | **pendiente**: es T19, fuera del encargo de esta tanda |
+
+### Salida real
+- `pnpm run typecheck` → verde, sin salida. El dominio **no** cambió: `inventory-movement.ts`
+  conserva su unión `'opening' | 'adjustment'` y Prisma genera el enum como unión de literales, así
+  que el adaptador sigue compilando sin importar tipos de Prisma en el dominio.
+- `pnpm run lint` → verde, sin salida.
+- `pnpm exec vitest run tests/integration/inventario/inventory-movements-constraints.int.test.ts` → **8 passed (8)**.
+- `pnpm exec vitest run tests/integration/inventario/` → **13 archivos, 165 passed**.
+- `pnpm exec vitest run tests/unit/inventario/` → **49 archivos, 750 passed, 5 skipped**.
+- `pnpm exec vitest run guard` → **46 archivos, 573 passed, 9 skipped**.
+- `pnpm exec vitest related --run db/schema.prisma …/batch-movement-prisma.ts` → **161 archivos, 2481 passed, 1 skipped**.
+
+Ninguna guardia heredada se puso roja. Ninguna dependencia nueva.
+
+---
+
+## La enmienda del 2026-09-18, escrita en el spec como tal — **ENMIENDA A D5**
+
+Aprobada por el humano el 2026-09-18 sobre la ficha ya implementada, revisada y con PR abierto.
+La escribió el implementer en el spec, no solo aquí: una enmienda aprobada se escribe en
+`requirements.md`, que es el precedente de las dos enmiendas de QC-81 (D13 y D14).
+
+### Qué se tocó del spec
+- `specs/QC-92-ajuste-de-inventario/requirements.md` — sección nueva
+  **«Enmienda del 2026-09-18: `kind` es un enum de Postgres y el motivo lo vigila un CHECK»**, con
+  los requisitos **R35**, **R36** y **R37**; dos filas nuevas en «Decisiones cerradas» (**D17** y
+  **D18**, la tabla pasa de 16 a 18 filas); y el bloque «Cómo leer las citas» actualizado con el
+  aviso sobre D5.
+- **R9 cambia de TEXTO** (no de número). Decía que añadir un motivo «NO DEBE requerir migración
+  alguna». Con el CHECK puesto eso es **falso**, así que se reescribió y se marcó como modificado
+  por la enmienda. Ningún otro requisito cambia de número ni de texto.
+- `specs/QC-92-ajuste-de-inventario/design.md` — aviso de enmienda en §2.2 y en la viñeta de §2.1
+  que decía «`kind` y `reason` son `TEXT`». El párrafo «añadir un motivo es **una línea**» se
+  **conserva** con la corrección encima, para que se vea qué se cambió y por qué.
+- `specs/QC-92-ajuste-de-inventario/tasks.md` — **Tanda 8** con T18, T19 y T20.
+
+### Lo que NO se disimuló, y es el punto
+**D5 eligió constante de dominio + zod + `TEXT` precisamente para que el catálogo de motivos
+creciera SIN migrar.** Con el CHECK, **añadir un motivo pasa a costar una migración**. Eso es
+exactamente lo que D5 quería evitar. El humano lo decidió **con ese coste delante** el 2026-09-18.
+
+Se escribió como **enmienda fechada que dice qué cambia y por qué**, y **no** como algo compatible
+con D5, para que dentro de tres fichas nadie lea D5, vea «crece sin migrar» y crea que puede añadir
+un motivo tocando una línea. Si lo hiciera, la base rechazaría en producción con un `23514` que
+nadie predijo.
+
+### Los dos valores del enum, y por qué no hay un tercero
+`opening` y `adjustment`, **y nada más**. El **consumo por lote** es pregunta abierta del dominio
+**sin ficha** —declarado así en `requirements.md > Lo que NO entra` y en las specs de QC-81 y
+QC-92—, y un valor que **nada puede producir** daría la falsa impresión de que está resuelto.
+La minúscula tampoco es estilo: **los datos ya están escritos así**, y por eso la conversión es un
+`USING kind::"InventoryMovementKind"` directo que no reescribe ni una fila (medido sobre dos filas
+sembradas a mano, arriba).
+
+### El orden de declaración no se reordena
+Queda escrito en el `///` del enum en `db/schema.prisma`, sin citar ninguna ficha: Postgres ordena
+un enum **por declaración**, así que reordenarlo obliga a **recrear el tipo**. Es la misma lección
+que ya estaba escrita en `OrderStatus` («va el último: reordenar obligaría a recrear el tipo en vez
+de añadir un valor») y en `OrderPriority`.
+
+### El dominio no importa tipos de Prisma
+`lib/modules/inventario/domain/inventory-movement.ts` **conserva** su unión
+`'opening' | 'adjustment'`. **Medido por el implementer, no aceptado de oídas:**
+`git diff -- lib/ app/` sale **vacío** en toda esta tanda — no hubo que tocar ni una línea de
+producción fuera del esquema. Convertir es del **adaptador driven**, como ya decía el comentario de
+ese archivo. Es arquitectura hexagonal (`docs/architecture.md > Dominio`), no estilo.
+
+
+---
+
+## Tanda B (enmienda del 2026-09-18) — T19: la guardia de divergencia de motivos
+
+### Archivo
+**Creado:** `tests/guards/guard-motivos-de-ajuste.test.ts` — **15 casos**.
+
+### Qué vigila
+El CHECK `inventory_movements_reason_in_catalog` **de la migración en disco** y la constante
+`MOVEMENT_REASONS` tienen que nombrar **exactamente** los mismos motivos. **Igualdad, no
+inclusión.** `MOVEMENT_REASONS` se **importa** del dominio; la lista del SQL se **extrae del
+archivo**, no se copia.
+
+Piezas, todas con autoprueba: `motivosDelCheck(sql)` —anclado al **nombre** de la restricción y con
+paréntesis balanceados, así que no lo confunde `inventory_movements_reason_matches_kind`, que
+también nombra `reason` y lleva literales entrecomillados—, `migracionesQueDeclaranElCheck()` —barre
+`db/migrations/` y **no ata el nombre de la carpeta a mano**; solo lee `migration.sql`, por eso el
+`DROP CONSTRAINT` del `down.sql` no la confunde— y la función **pura** `hallazgosDeMotivos`.
+
+### Por qué en `tests/guards/` y no en `tests/unit/`
+Escrito en la cabecera del archivo, en prosa y **sin citar ficha ni requisito**. Es la lección que
+esta misma ficha pagó y que está arriba como **quinta familia**: el selector rápido filtra el diff a
+fuentes JS/TS y relaciona por grafo de imports, así que un archivo que vigila un `.sql` **sin
+importarlo** no lo relaciona nadie. En `tests/unit/` no correría al cambiar la migración, que es
+justo el cambio que tiene que morder.
+
+**Y quedó demostrado en la corrida de esta tanda, no solo razonado:** el archivo es *untracked*, así
+que **no aparece** en la lista de 61 archivos del diff que selecciona `test:rapido`. Corrió igual,
+en la etapa «todas las guardias». En `tests/unit/` no habría corrido ninguna de las dos veces.
+
+### El orden no se compara, los duplicados sí
+Se comparan **conjuntos ordenados**, porque el orden de un `IN (...)` de SQL no significa nada. Por
+eso mismo los **duplicados se denuncian aparte**: al pasar por el conjunto se perderían, y un
+duplicado podría comerse una diferencia al ordenar. Hay caso para cada lado.
+
+### Anclas de vacuidad — el punto que más importa
+Si el extractor no leyera nada, el `toEqual` compararía **dos vacíos y pasaría en verde** sin haber
+comprobado nada. Cuatro anclas: exactamente **una** migración declara el CHECK; la lista extraída
+**no** está vacía; `MOVEMENT_REASONS` **no** está vacía; y el extractor devuelve vacío sobre SQL
+fabricado sin el CHECK.
+
+### Prueba por mutación de las dos caras, contra el ÁRBOL REAL
+Medido por el subagente **y vuelto a medir por el implementer**, que es la regla de esta ficha:
+
+- **Cara A — motivo de más en la constante** (`devolucion_a_proveedor`): rojo, con el motivo
+  nombrado y el `23514` anunciado.
+- **Cara B — motivo de menos en el CHECK** (quitado `error_de_carga` de la migración): rojo, con el
+  motivo que falta nombrado.
+
+**Medición propia del implementer, que cubre las dos guardias de un tiro** —vaciar
+`MOVEMENT_REASONS`—:
+
+```
+pnpm exec vitest run tests/guards/guard-motivos-de-ajuste.test.ts
+  Tests  2 failed | 13 passed (15)
+  - «ni la lista del SQL ni MOVEMENT_REASONS estan vacias»  -> rojo (el ancla de vacuidad)
+  - «la lista del CHECK y MOVEMENT_REASONS son iguales»     -> rojo, los cuatro motivos nombrados
+
+pnpm exec vitest run tests/integration/inventario/inventory-movements-constraints.int.test.ts
+  Tests  1 failed | 7 passed (8)
+  - expect(MOVEMENT_REASONS.length).toBeGreaterThan(0)      -> rojo
+```
+
+**El ancla de vacuidad distingue**: no se limita a fallar la igualdad, falla *por separado* diciendo
+que la comparación se habría hecho sobre vacío. Mutación revertida con `git checkout --`;
+`git diff -- lib/ app/` vuelve a salir **vacío**.
+
+### Riesgo declarado de esta guardia
+`toHaveLength(1)` sobre las migraciones que declaran el CHECK es una **lista cerrada de hecho**: si
+una ficha futura vuelve a declarar ese CHECK en otra migración —por ejemplo para cambiar la lista—,
+la guardia se pone roja. **Es deliberado** (con dos listas vivas la guardia no sabría cuál manda) y
+el mensaje de error lo dice con esas palabras, pero queda escrito aquí para que el reviewer lo
+juzgue a la vista y no lo descubra. Es de la **familia 3**, censo, y nace **ya** en `tests/guards/`,
+que es donde le toca.
+
+### Lo que esta guardia NO puede ver, escrito en su cabecera
+Si el CHECK está **realmente aplicado en la base** —lee la migración en disco, no
+`information_schema`—, ni si el esquema de zod usa de verdad `MOVEMENT_REASONS` en vez de su propia
+copia. Lo primero lo cubren los casos de integración de T18; lo segundo, la guardia de R9.
+
+---
+
+## Tanda C — la tercera copia de la lista, cazada por el implementer
+
+Al medir la tanda A apareció que el archivo de integración había nacido con **una tercera copia a
+mano** de la lista, con un comentario que prometía una sincronía que **nada comprobaba**, y justo en
+el archivo que debería probar que la base respeta el catálogo: con un quinto motivo en el dominio y
+en el CHECK, el caso habría seguido probando cuatro y diciendo verde. **Toda esta enmienda existe
+porque la lista pasó a vivir en dos sitios; añadir un tercero iba en contra de lo que estábamos
+haciendo.**
+
+Corregido: import real de `@/lib/modules/inventario/domain/movement-reason` (directo al dominio,
+**no por el barrel**, para no mover censos de contrato); el caso recorre `MOVEMENT_REASONS`; se
+renombró a «acepta **todos** los motivos del catalogo» —decía «los cuatro» y eso pasa a ser mentira
+en cuanto entre un quinto—; **ancla de vacuidad**; y el motivo inválido **comprueba** su
+no-pertenencia en vez de darla por hecha.
+
+**Es el mismo patrón que esta ficha ya lleva anotado tres veces:** una afirmación escrita en
+presente que nadie vuelve a medir. Aquí se cazó **antes** de commitear, midiendo el trabajo del
+subagente en vez de aceptarlo.
+
+---
+
+## Verificación de la enmienda — qué se pudo correr y qué NO
+
+### El gate completo NO se pudo correr. La causa es AJENA y está medida.
+
+```
+./init.sh
+  ✗ feature_list.json invalido:
+    faltan specs para features sdd en vuelo: QC-82
+```
+
+`./init.sh --rapido` **cae en el mismo punto**: la validación del board va **antes** de los tests en
+los dos modos, así que ninguno llegó a ejecutar nada.
+
+**No es nuestro, y no se dice de oídas:**
+
+- `QC-82` está `spec_ready` con `sdd: true` y **no tiene specs en disco**, ni aquí ni en `dev`:
+  `git ls-tree -d origin/dev --name-only specs/` no trae ni `QC-82` ni `QC-121`.
+- **Prueba directa:** se corrió el validador **con el `feature_list.json` de `origin/dev`** y falla
+  con el **mismo mensaje y el mismo código de salida**:
+  ```
+  git show origin/dev:feature_list.json > feature_list.json
+  node scripts/validate-features.mjs
+    faltan specs para features sdd en vuelo: QC-82
+    exit=1
+  ```
+  Restaurado acto seguido; `git status -- feature_list.json` sale **vacío**.
+- **`feature_list.json` NO se tocó.** La única diferencia con `origin/dev` es que `dev` avanzó **un
+  commit de bookkeeping** después de nuestro último merge (`6333f88`, QC-61 a `done`). **Se
+  comprobó expresamente que NO es la regresión de merge del bloqueante B3**: la rama simplemente va
+  un commit por detrás, y el `in_progress` de QC-61 que tenemos es el valor viejo de `dev`, no uno
+  que hayamos escrito.
+
+### Las etapas del gate, corridas a mano una por una
+
+| Etapa del gate | Resultado |
+|---|---|
+| `pnpm run typecheck` | **verde**, sin salida |
+| `pnpm run lint` | **verde**, sin salida |
+| `pnpm run test:rapido` (selección relacionada, 61 archivos del diff) | **368 archivos, 5524 passed, 26 skipped, 0 rojos** |
+| `pnpm run test:rapido` (todas las guardias) | **47 archivos, 588 passed, 9 skipped, 0 rojos** |
+| toda migración tiene `down.sql` (etapa 7) | **OK**, ninguna sin él |
+
+Y, a mano, lo que el encargo pedía explícitamente:
+
+```
+pnpm exec vitest run tests/unit/inventario/        -> 49 archivos, 750 passed |  5 skipped
+pnpm exec vitest run tests/integration/inventario/ -> 13 archivos, 165 passed
+pnpm exec vitest run guard                         -> 47 archivos, 588 passed |  9 skipped
+```
+
+**Las guardias pasan de 46 a 47: la que sube es la nuestra.** Ninguna guardia heredada se puso roja,
+así que **el contador de guardias enmendadas de esta ficha NO sube**: sigue en **ocho**. Esta tanda
+añade **un alta de censo** (`MIGRACIONES_ESPERADAS`, la cuarta de la ficha) y **crea** una guardia
+nueva; un alta no es una enmienda.
+
+**El flake de jsdom apareció y no mordió:** «Not implemented: navigation to another Document» salió
+dos veces en la corrida relacionada y los 368 archivos pasaron igual.
+
+### Lo que NO se corrió, y por qué
+
+- **`pnpm test` (la suite entera): NO.** Ni los subagentes ni el implementer corren la suite
+  completa (`AGENTS.md > Regla del gate: quién corre qué`). **Le toca al leader**, y aquí hace falta
+  de verdad, porque `./init.sh` completo no llegó a los tests.
+- **El E2E: NO.** `init.sh` no corre Playwright. **Esta enmienda no toca la pantalla** —no hay ni un
+  cambio bajo `app/`—, así que `e2e/ajuste-de-inventario.spec.ts` no cambia de sujeto; pero **toca
+  la base sobre la que corre**, así que conviene re-correrlo a mano antes del PR.
+- **El rojo heredado de `dev`** (`tests/unit/pedidos-ui/order-form.test.tsx`, PR #85 cruzado con R14
+  de QC-91) **no apareció** en ninguna corrida de esta tanda porque no entra en la selección
+  relacionada. **Sigue vivo y sigue esperando decisión del leader** (menor 7 del reviewer).
+  `tests/baseline-rojos.json` **no se ha tocado**.
+
+### Mapa `R<n> -> test` de la enmienda — las tres, mapeadas
+
+| Requisito | Test que lo prueba |
+|---|---|
+| **R35** — `kind` es enum, dos valores, la conversión no reescribe filas y el dominio no importa Prisma | `tests/integration/inventario/inventory-movements-constraints.int.test.ts` → «rechaza una clase que no es del enum con SQLSTATE 22P02 (R35)»; el ciclo `migrate`→`rollback`→`migrate` con **dos filas sembradas a mano**, intactas en las tres vueltas; y `git diff -- lib/ app/` **vacío**, que es la prueba de que el dominio no cambió |
+| **R36** — `reason` sigue `TEXT`, la base rechaza lo que no es del catálogo y el `NULL` del alta sigue pasando | mismo archivo → «acepta todos los motivos del catalogo en un ajuste (R36)» y «rechaza un motivo que no esta en el catalogo con SQLSTATE 23514 e `inventory_movements_reason_in_catalog` (R36)»; el `NULL` del alta lo siguen cubriendo los dos casos de `reason_matches_kind`, que siguen verdes |
+| **R37** — guardia de igualdad exacta, dos caras y vacuidad, en `tests/guards/` | `tests/guards/guard-motivos-de-ajuste.test.ts`, 15 casos, con las dos mutaciones contra el árbol real pegadas arriba |
+
+**34 requisitos + 3 de la enmienda = 37 declarados, 37 mapeados.**
