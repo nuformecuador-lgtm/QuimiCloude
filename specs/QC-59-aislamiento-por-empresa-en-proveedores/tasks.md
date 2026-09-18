@@ -347,7 +347,7 @@
   Hecho cuando: las seis pasan **con el árbol committeado**, no con el árbol sucio.
   Cubre: el gate.
 
-- [ ] **T28 — La deuda que queda vacía se borra entera.**
+- [x] **T28 — La deuda que queda vacía se borra entera.**
   Archivos: `docs/architecture.md` (la viñeta «Lo ya construido todavía no lo está», `:33-36`).
   Contenido: sacar `proveedores` de la lista. Si al hacerlo la lista **queda vacía** —`unidades` la
   cerró QC-76—, **borrar la viñeta entera**, con su frase y su referencia, que es lo que ella misma
@@ -456,7 +456,7 @@
 
 ## Bloque 5 — Cierre
 
-- [ ] **T36 — Documentación de la deuda saldada y bitácora.**
+- [x] **T36 — Documentación de la deuda saldada y bitácora.**
   Archivos: `db/schema.prisma` (`///` de `Supplier`, `SupplierCatalogLine` y `Presentation`: la
   empresa, las claves candidatas, las FK compuestas, el único por empresa y el drift);
   `progress/impl_QC-59-aislamiento-por-empresa-en-proveedores.md` con el mapa `R<n> -> test`.

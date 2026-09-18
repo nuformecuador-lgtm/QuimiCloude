@@ -797,3 +797,126 @@ entero es T37 y lo corre el leader. No apareció ningún `Test timed out`.
 
 Ningún mensaje de commit de esta rama contiene la cadena que las dos guardias del diff filtran, así
 que T27 sigue viva. La tabla de 19 decisiones no se tocó ni se reabrió.
+
+---
+
+## Tanda 5 — Bloque 5: cierre (T28, T36) más T27 · 2026-09-17
+
+**Encargo**: el bloque 5 y las dos tasks que se desbloquearon. **T37 (gate completo) NO es de esta
+tanda**: lo corre el leader inmediatamente después, y por eso aquí no se corrió la suite entera.
+
+### T28 — la viñeta de deuda se borró ENTERA, no se dejó vacía
+
+`docs/architecture.md`, viñeta «**Lo ya construido todavia no lo esta**» (`:33-36`). Decía que la
+deuda que salda la épica QC-46 son «unidades (QC-51) y proveedores (QC-59)», que la guardia que lo
+hace cumplir es QC-61, y que **cuando la lista quede vacía, esa viñeta se borra**.
+
+**Se comprobó contra el código que de verdad queda vacía antes de borrarla**, en vez de dar por
+bueno el texto:
+
+| Módulo de la lista | ¿Tiene ya su empresa? | Evidencia leída |
+| --- | --- | --- |
+| unidades | **sí** | `model Unit` declara `companyId` (anulable: las de sistema no tienen empresa) e `units_company_id_idx`. El propio `docs/architecture.md:94` dice que **QC-76 añadió el ámbito por empresa de unidades y canceló QC-51** — la ficha que la viñeta nombraba ya no existe |
+| proveedores | **sí, por esta ficha** | `model Supplier` y `model SupplierCatalogLine` con `companyId` `NOT NULL`, sus FK a `companies`, las dos claves candidatas y las dos FK compuestas |
+
+Con esas dos, la lista queda **vacía**, así que la viñeta se borra entera —frase, lista y
+referencia— tal como ella misma manda y como exige la viñeta que la sigue, que prohíbe preparar
+infraestructura «por si acaso». Lo que la sustituye ya tiene nombre, **QC-61**, y **esta ficha no la
+implementa** (R38).
+
+Las otras dos viñetas del bloque —«Toda tabla de negocio nueva nace con su columna de empresa» y
+«Lo que la regla vieja protegia sigue en pie»— **no se tocaron**: son las que siguen mandando.
+
+Comprobaciones hechas antes de borrar:
+
+- **Ningún test lee esa viñeta.** `guard-doc-permisos.test.ts` es el único que abre
+  `docs/architecture.md`, y mide la sección «Permisos y autenticacion», no ésta.
+- **Ningún otro archivo vivo del repo declara `proveedores` como pendiente de ámbito** (barrido
+  sobre `docs/*.md` por «pendiente / deuda / todavia / sin empresa / sin ambito»: vacío). Lo que T26
+  dejó dicho sigue en pie.
+- **La anotación que R36 mandaba cerrar ya no existe**: un barrido de la cadena «hasta QC-50» sobre
+  `.ts`, `.tsx`, `.sql`, `.prisma` y `.md` (fuera de `specs/` y `node_modules/`) no devuelve nada.
+
+### T36 — los `///` del esquema y la bitácora
+
+**Los `///` de `Supplier`, `SupplierCatalogLine` y `Presentation` ya describían el estado real** —los
+reescribió la tanda 1 junto con la migración— y se releyeron uno a uno contra lo que T36 exige: la
+empresa y su FK como drift a propósito, las dos claves candidatas y a qué FK compuesta sirve cada
+una, las dos FK compuestas nombradas, el único por empresa **parcial** y por qué por eso no se
+declara `@@unique`, la clave candidata haciendo de índice de la columna de empresa, y el `@@unique`
+ausente en la línea a propósito. **No hizo falta tocar `db/schema.prisma` en esta tanda**, y no se
+tocó: reescribirlos por reescribirlos habría sido ruido en el diff.
+
+### Mapa `R<n> -> test` COMPLETO, R1 a R39
+
+Los 39 requisitos, cada uno con el test que lo cierra. **Se verificó que los 21 archivos nombrados
+existen en el árbol**, uno a uno.
+
+| R | Test que lo cierra | Nivel |
+| --- | --- | --- |
+| R1 | `integration/proveedores/company-scope.int.test.ts` + `proveedores-constraints.int.test.ts` (censo cerrado de columnas y de FK de las dos tablas) | integración |
+| R2 | idem + `unit/proveedores/schema/proveedores-schema.test.ts` (`SUPPLIER_COLUMNS`, `SUPPLIER_CATALOG_LINE_COLUMNS`, `CROSS_MODULE_SCALARS`) | integración + unit |
+| R3 | `company-scope.int.test.ts` + `proveedores-constraints.int.test.ts` (las dos claves candidatas) + `suppliers-company-scope-migration.test.ts` | integración + unit |
+| R4 | `company-scope.int.test.ts` — el `INSERT` **y los dos `UPDATE`**, nombrando `supplier_catalog_lines_company_id_supplier_id_fkey` | integración |
+| R5 | `company-scope.int.test.ts` — presentación ajena rechazada nombrando `..._company_id_presentation_id_fkey`, propia aceptada como control positivo | integración |
+| R6 | `company-scope.int.test.ts` (ninguna fila escrita) + `unit/proveedores/catalog-line-fk.test.ts` (ningún código de error nuevo) | integración + unit |
+| R7 | `company-scope.int.test.ts` — los dos backfills leídos del disco, incluidas las filas con `deleted_at` | integración |
+| R8 | `company-scope.int.test.ts` (recuentos antes/después de las cuatro tablas) + `suppliers-company-scope-migration.test.ts` (ni `DELETE` ni `INSERT`) | integración + unit |
+| R9 | `guards/guard-rls-force.test.ts` + `suppliers-company-scope-migration.test.ts` + `proveedores-constraints.int.test.ts` | guardia + unit + integración |
+| R10 | `suppliers-company-scope-migration.test.ts` (orden del `down`) + `company-scope.int.test.ts` (el `down.sql` **entero** y los dos retratos de esquema) | unit + integración |
+| R11 | `company-scope.int.test.ts` — cada causa de aborto por separado **más dos controles anti-placebo** | integración |
+| R12 | `suppliers-company-scope-migration.test.ts` (identificadores en inglés) + `proveedores-schema.test.ts` | unit |
+| R13 | `integration/inventario/list-query-indexes.int.test.ts` (`company_id` de cabeza) + `proveedores-constraints.int.test.ts` (censo de índices) | integración |
+| R14 | `company-scope.int.test.ts` (dos empresas sí, la misma dos veces no, la baja **libera**) + `list-query-indexes.int.test.ts` + el E2E (paso 4) | integración + E2E |
+| **R15** | **tres ángulos independientes y falsables**: texto → `suppliers-company-scope-migration.test.ts`; predicado de `pg_indexes` → `list-query-indexes.int.test.ts`; comportamiento → `company-scope.int.test.ts` | unit + integración |
+| R16 | `company-scope-queries.int.test.ts` — el `meta.target` real del `23505` **medido**, no deducido | integración |
+| R17 | `unit/proveedores/scope.test.ts` (la línea sigue sin ningún `@@unique`) + `proveedores-constraints.int.test.ts` (el índice parcial de la línea, intacto) | unit + integración |
+| R18 | `unit/proveedores/company-isolation-service.test.ts` (unidad de sistema sí, propia sí, ajena no, ausente sí) | unit |
+| R19 | `company-scope-queries.int.test.ts` (`findUnitRefs` acotada) + `unit/unidades/unit-catalog.test.ts` (sigue reutilizando el ámbito, un solo `OR`) | integración + unit |
+| R20 | `unit/proveedores/scope.test.ts` (`MARCAS_DE_INVENTARIO` **retensada**: la negativa afinada al receptor real y una positiva nueva con `units` como único receptor admitido) + `module-contract.test.ts` | unit |
+| R21 | `company-isolation-service.test.ts` + `unit/proveedores/authorization.test.ts` | unit |
+| R22 | `unit/proveedores/supplier-actions.test.ts` + `unit/identity/session-once-per-request-actions.test.ts` | unit |
+| R23 | `guards/guard-ambito-empresa-proveedores.test.ts` (método a método y función a función) + `unit/proveedores/company-scope.test.ts` + `company-scope-queries.int.test.ts` | guardia + unit + integración |
+| R24 | `guard-ambito-empresa-proveedores.test.ts` (**y el caso que afirma que no existe ninguna lista de excepciones**) + `company-scope.test.ts` | guardia + unit |
+| R25 | `company-scope-queries.int.test.ts` (los dos listados y su `total`; búsqueda y filtros no ensanchan) + el E2E (paso 1) | integración + E2E |
+| R26 | `company-scope-queries.int.test.ts` (catálogo de proveedor ajeno → `'supplier_not_found'`, idéntico al de un id inexistente) | integración |
+| R27 | `company-isolation-service.test.ts` + `company-scope-queries.int.test.ts` + el E2E (paso 2) | unit + integración + E2E |
+| R28 | `company-isolation-service.test.ts` + `company-scope-queries.int.test.ts` + el E2E (paso 3) | unit + integración + E2E |
+| R29 | `company-scope-queries.int.test.ts` (baja ajena: ninguna línea tocada; baja propia: mismo `deleted_at`) | integración |
+| R30 | `company-isolation-service.test.ts` + `company-scope-queries.int.test.ts` | unit + integración |
+| R31 | `unit/proveedores/company-scope.test.ts` (los dos `select` y los dos mapeadores: ninguna salida pública lleva la empresa) | unit |
+| R32 | `unit/proveedores/catalog-line-image-scope.test.ts` | unit |
+| R33 | `unit/proveedores/authorization.test.ts` (dobles explosivos) + `company-isolation-service.test.ts` | unit |
+| R34 | `company-scope.int.test.ts` (empresa marcada de baja conserva proveedores y líneas) | integración |
+| R35 | `company-scope-queries.int.test.ts` (sin `FORCE ROW LEVEL SECURITY`, mismo retrato) | integración |
+| R36 | `unit/proveedores/module-contract.test.ts` — el cableado vive **solo** en `lib/composition` y una sola vez, y ni `Product` ni `User` ganan relación de vuelta. **Ver la salvedad de abajo** | unit |
+| **R37** | **`e2e/aislamiento-proveedores.spec.ts`**, verde en Chromium y en WebKit | **E2E** |
+| R38 | `suppliers-company-scope-migration.test.ts` (la migración no toca ninguna otra tabla) + `supplier-actions.test.ts` y `list-use-cases.test.ts` (firmas públicas y forma de salida intactas) + T28 (QC-61 no se implementa aquí) | unit |
+| R39 | `guards/guard-dependencias-aprobadas.test.ts` | guardia |
+
+**39 de 39 mapeados.** Con **una salvedad honesta**, dicha en vez de taparse con un test inventado:
+
+> **R36 tiene dos mitades y solo una es ejecutable.** La estructural —ningún módulo distinto de
+> `proveedores` lee esas dos tablas fuera del cableado— la cierra `module-contract.test.ts`. La
+> segunda —«NO DEBE quedar ninguna anotación en el repositorio que siga afirmando que existe el
+> hueco»— **no tiene ningún test que la vigile**: se verificó por barrido en T26 y otra vez en esta
+> tanda (la cadena «hasta QC-50» no aparece en ningún archivo vivo), pero nada impide que mañana
+> alguien la reescriba sin que ninguna suite se ponga roja. **No se inventó un test para taparlo** y
+> no se relajó el requisito: queda dicho para que el reviewer decida si exige una guardia.
+
+### T27 — las seis listas del diff contra `origin/dev`
+
+Corrida **después** del commit de T28/T36, que es la única forma de que mida algo: con el árbol
+sucio estas seis comparan contra un diff vacío y pasan en verde sin haber mirado nada. Es el agujero
+por el que el trabajo se coló en los gates de dos fichas anteriores.
+
+**Higiene verificada antes de correrlas**: ningún mensaje de commit de esta rama contiene la cadena
+que los dos guards del diff filtran; si la contuviera, se atribuirían el árbol de trabajo entero y
+el verde sería falso. Comprobado sobre **todos** los commits de la rama, no solo los de esta tanda.
+
+<!-- RESULTADO-T27 -->
+
+### Lo que NO se hizo
+
+- **T37 (gate completo)**: no es de esta tanda y **no se corrió la suite entera**. Lo corre el
+  leader inmediatamente después de este commit. Es la única task de `tasks.md` que queda sin marcar.
