@@ -4240,3 +4240,77 @@ en guardias que recorren el arbol, verdes a solas y en la segunda corrida: flaki
 OneDrive, y conviene recordarlo antes de creerle a un `--rapido` rojo. La segunda: `29145768` pasa
 QC-59 a `done` **dentro de la rama de QC-61**. Es estado del arnes, no de la feature; va en commit
 propio y estaba justificado, pero es la costura por la que `feature_list.json` choca en cada merge.
+
+## QC-92 — ajuste-de-inventario (cerrada el 2026-09-18, PR #91, merge `f91ea75`)
+
+Corregir la existencia de un **lote** registrando un **movimiento** que suma o resta, en vez de
+sobrescribir un numero a ciegas. Nace `inventory_movements`, el alta de lote pasa a asentar tambien,
+y el producto gana un panel que lista sus lotes con el historial de cada uno. **20 tasks**, R1-R37,
+trazabilidad **34/34**, E2E **6/6** en Chromium y WebKit.
+
+**EL CENSO ACHICO LA FICHA ANTES DE EMPEZAR**: en produccion habia **exactamente DOS** escrituras de
+`product_batches`, las dos `create` y las dos en `product-prisma.ts`. Ni un `update` ni SQL crudo.
+Por eso fueron 18 tasks y no cuarenta.
+
+**El review RECHAZO en la primera vuelta, y su bloqueante era real**: faltaba el **rechazo cruzado
+por empresa contra Postgres** para los tres metodos nuevos. El camino de **escritura**
+`update({ where: { id, companyId } })` no tenia prueba contra la base: si ese filtro no estuviera, un
+ajuste habria escrito en el lote de otra empresa. Se cerro con **seis casos A/B** con control
+positivo, y el reviewer los valido **mutando la produccion**, no el test.
+
+**LA LECCION QUE HAY QUE LLEVARSE, y esta medida**: la ficha **habia predicho ese agujero y no lo
+persiguio**. La bitacora de la tanda 3 escribio que «quien lo demuestra de verdad es el test de
+integracion de T15», y T15 cuadra el libro **con una sola empresa**. Nadie volvio sobre ello, y el
+mapa de trazabilidad presentaba cinco casos de unidad **como si zanjaran R18** —con Prisma mockeado,
+que prueba que el codigo pasa la empresa, no que Postgres la honre—. Por eso el agujero sobrevivio a
+T17. **Una prediccion correcta que no se persigue vale lo mismo que no haberla hecho.**
+
+**OCHO archivos de guardia heredados tocados**, cada uno con aprobacion humana, nota fechada y prueba
+por mutacion; el reviewer los revisó **como bloque** y verifico que **ningun detector se toco**:
+
+- La prohibicion de listar lotes (**QC-81 R32** y **QC-90 R30**) se **DEROGA**, no se acota por rama:
+  R30 decia en su propio mensaje que listar lotes «NO tiene ficha: si hace falta, se pide una», y
+  QC-92 es esa ficha. Acotar por rama habria dejado la guardia roja otra vez al mergear y habria
+  escrito una afirmacion falsa en el archivo. **Editar y borrar siguen prohibidos**, probado por
+  mutacion.
+- La guardia de la ruta (**QC-22**) se **RETENSA**: la premisa seguia en pie —la pantalla no debe
+  decidir autorizacion— pero **preguntar si se pinta un control no es decidir autorizacion**, y el
+  repo ya lo habia distinguido en `order-list-section.tsx`. Ademas **gana marca positiva**: borrar el
+  `requirePermission` de la primera linea del caso de uso **la pone roja**; antes no. El repo queda
+  mejor protegido que `dev`.
+- Aparte, **dos altas de censo** (`E2E_ESPERADOS` y la lista de specs de catalogo), que **NO son
+  enmiendas**: solo registran el E2E nuevo en listas cuyo punto de extension documentado es darse de
+  alta. Diff puramente aditivo.
+
+**ENMIENDA A D5, pedida por el humano ya con el PR abierto**: `kind` pasa a
+`enum InventoryMovementKind { opening, adjustment }` y `reason` gana un **CHECK** con los cuatro
+motivos. **No es compatible con D5 y se escribio como enmienda**: D5 eligio constante + zod + `TEXT`
+para que el catalogo creciera **sin migrar**, y con el CHECK anadir un motivo **cuesta migracion**.
+**R9 se reescribio**, porque afirmaba «NO DEBE requerir migracion alguna». El enum lleva **solo** los
+dos valores que existen: `consumption` habria dado la falsa impresion de que el consumo por lote esta
+resuelto, y sigue siendo **pregunta abierta del dominio sin ficha**.
+
+**La lista de motivos quedo en DOS sitios, asi que se cerro con guardia**:
+`guard-motivos-de-ajuste.test.ts` exige **igualdad exacta** entre el CHECK de la migracion en disco y
+`MOVEMENT_REASONS`. Va en `tests/guards/` **a proposito** —se demostro que ahi corre y en
+`tests/unit/` no habria corrido—. De paso se caza **una tercera copia a mano** de la lista en el test
+de integracion, con un comentario que **prometia** sincronia y nada que la comprobara: con un quinto
+motivo habria seguido probando cuatro y diciendo verde.
+
+**Verificacion**: suite completa **558 archivos, 8126 passed, 0 fallos**; E2E re-corrido contra la
+base ya migrada, **3/3 Chromium y 3/3 WebKit**, con la base recreada entre motores. **`./init.sh`
+NO llego a correr los tests**: cae antes en `validate-features` por `QC-82`, que esta `spec_ready`
+**sin spec en disco tambien en `dev`** —medido corriendo el validador con el `feature_list.json` de
+`dev`—. No es de esta rama.
+
+**Tres deudas quedan vivas y con ficha**: **QC-127** (el rojo de `dev` por el PR #85 cruzado con R14
+de QC-91, que aparecio al sincronizar), **QC-126** (el flake de jsdom, medido tres veces) y **QC-99**
+(la familia de censos, que mordio a esta ficha ocho veces). **Sin ficha todavia**: que
+`./init.sh --rapido` **no pueda ver** un censo que vive en `tests/unit/` y lee `.prisma` como texto
+—tres tandas cerraron «en verde» con rojo dentro—, y la **contradiccion R26 ↔ `conventions`**: uno
+exige que la nota diga que ficha cambio la guardia, el otro prohibe citar la ficha.
+
+**Para el que venga**: `guard-identificador-de-request.test.ts` lleva **dos listas cerradas
+independientes** y esta ficha **las rompio las dos**, en momentos distintos y por motivos que no
+tienen nada que ver entre si ni con el identificador de peticion. Choco **cuatro veces** al mergear.
+Es el mejor ejemplar vivo de lo que QC-99 persigue.
