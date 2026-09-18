@@ -171,7 +171,7 @@
       - **Hecho**: los 23 requisitos tienen al menos un test nombrado; ninguno dice «pendiente».
       - Depende de: T10, T11.
 
-- [ ] **T13. Gate completo y cierre.** `./init.sh` entero en verde antes del PR, sin excepción.
+- [x] **T13. Gate completo y cierre.** `./init.sh` entero en verde antes del PR, sin excepción.
       - Archivos: ninguno de producción.
       - **Hecho**: `./init.sh` verde y todas las tasks de arriba marcadas `[x]`.
       - Depende de: T12.

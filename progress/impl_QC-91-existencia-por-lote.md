@@ -269,3 +269,40 @@ manifiesto ni el lock se tocaron.
     archivo nuevo (36 tests en vez de 22, medido). El original no se tocó.
 
 **T13, el gate completo, es del leader.** Esta bitácora no se autoaprueba: decide el reviewer.
+
+## Ronda de review — el bloqueante de comentarios
+
+`6a8667d` · `chore(QC-91): limpia comentarios de dominio y adaptador de inventario`
+
+La review rechazó la ficha por **9 comentarios de producción que citaban ficha o requisito**, todos
+en líneas que esta rama añade. Es el mismo bloqueante que costó dos rechazos en QC-103. Las nueve se
+reescribieron **conservando el porqué y quitando la cita**; ninguna quedó vacía al hacerlo, así que
+no hubo que borrar ninguna entera. Cinco archivos, **19+/19−, solo comentarios**:
+`product-view.ts`, `product-input.ts`, `update-product.ts`, `product-queryable.ts`,
+`product-catalog-prisma.ts`.
+
+**Conteo final, literal:**
+
+```
+git diff origin/dev...HEAD -- lib/ app/ components/ hooks/ db/ middleware.ts \
+  | grep "^+" | grep -v "^+++" | grep -E "QC-[0-9]+|\bR[0-9]+\b|design\.md|decision cerrada|§"
+```
+
+Salida **vacía** (exit 1, sin coincidencias): **0 citas en producción**.
+
+### El comentario con el motivo equivocado
+
+`product-view.ts:48` decía «sumando todos los lotes **vivos** del producto». Medido en disco: el
+modelo `ProductBatch` **no tiene `deletedAt`** —no hay borrado lógico de lotes— y `sumStockByUnit`
+suma sin ningún filtro. Era un motivo no verificado, justo lo que la regla prohíbe y lo que explotó
+en QC-103 con el `.nullish()`. Quedó: «Existencia agregada por unidad: suma el stock de todos los
+lotes del producto.»
+
+### Verificación de la ronda
+
+- `pnpm typecheck` limpio · `pnpm exec eslint` sobre los cinco archivos, sin salida.
+- `pnpm exec vitest related --run` sobre los cinco → `Test Files 150 passed (150)` ·
+  `Tests 2453 passed | 4 skipped (2457)`.
+
+**T13 marcada**: el gate completo salió verde (497 archivos, 7249 passed, 0 rojos). Las 13 tasks
+quedan `[x]`.
