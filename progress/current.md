@@ -62,6 +62,20 @@ le pide a la IA en cada estrategia, como se mide que el prompt es bueno, y si lo
 versionan- son decisiones de negocio del humano, y F1.2 manda ofrecer la acotacion antes de pagar
 la ronda de spec dos veces.
 
+**ACOTADA con `/afinar-feature` el 2026-09-18**: alcance, **13 decisiones cerradas** y **dos
+preguntas abiertas** en
+`.worktrees/QC-129-textos-definitivos-de-los-prompts/specs/QC-129-textos-definitivos-de-los-prompts/requirements.md`.
+No se copian aqui. **La acotacion cambio el alcance y el board se corrigio ANTES de sembrar**:
+`description` reescrita y **`complexity` de `medium` a `high`**. El motivo es que la ficha **deroga
+`[D6]`, `[D15]` y R4 de QC-109, que esta `done`**: los textos salen del repositorio y llegan por
+`CATALOG_PROMPT` y `FORMULA_PROMPT`, asi que los dos `.json` desaparecen y esta ficha **reescribe
+tests ajenos** (`tests/unit/documentos/qc109-alcance.test.ts`, R4, R6 y `PROMPT_BY_STRATEGY`), con
+nota fechada en el `requirements.md` de QC-109. Precedente: la T3 de QC-81. **Ninguna ficha nueva y
+ninguna cancelada.** **El texto definitivo deja de ser un entregable del repositorio** -lo pone una
+persona en Vercel-, y **no queda rastro en git de cual es el vigente**: el registro de revision de
+`docs/` lleva fecha y veredicto por campo pero **no copia el prompt**, asi que un veredicto no se
+puede volver a comprobar. Consecuencia aceptada y escrita por el humano.
+
 ### QC-114 - seleccionada en F1.0, y la ejecuta una persona (2026-09-18)
 
 El humano la eligio por numero con el cupo `frontend` a **0 de 2**. `depends_on: QC-56` esta
