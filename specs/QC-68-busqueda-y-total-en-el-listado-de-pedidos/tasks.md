@@ -24,7 +24,7 @@
 - **Hecho**: `pnpm typecheck` falla a propósito en `lib/composition/index.ts` (el objeto ya no
   satisface la interfaz) — esa rojez es la prueba de que el contrato manda; la cierra T3.
 
-### T2 — La implementación, con ámbito de empresa
+### T2 [x] — La implementación, con ámbito de empresa
 - **Toca**: `lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts`
 - `findRecipeIdsMatchingName(search, companyId)` según `design.md > 2.2`: normaliza con
   `normalizedSearchCondition(search, normalizeRecipeName)`, devuelve `null` si el término no
@@ -41,7 +41,7 @@
 - ⚠ **Archivo compartido**: es el único del PR con riesgo de colisión con QC-59/QC-91. Commit
   pequeño y aislado.
 
-### T4 [P] — Tests del método nuevo (depende de T2)
+### T4 [x] — Tests del método nuevo (depende de T2)
 - **Toca**: `tests/unit/recetas/recipe-catalog.test.ts`
 - Casos, con `R<n>` en el nombre: casa por subcadena; ignora acentos y mayúsculas (**R2**); una
   receta **dada de baja sí vuelve** (**R4**); una receta de **otra empresa no vuelve** (**R6**);
@@ -99,7 +99,7 @@
 
 ## Bloque C — La migración
 
-### T10 — Índice de búsqueda que ve las recetas de baja
+### T10 [x] — Índice de búsqueda que ve las recetas de baja
 - **Toca**: `db/migrations/<ts>_recipes_search_index_including_deleted/migration.sql` y `down.sql`
 - `CREATE INDEX "recipes_name_normalized_all_trgm_idx" ON "recipes" USING gin ("name_normalized" gin_trgm_ops);`
   (**sin** `WHERE`, **R14**). `down.sql` con su `DROP INDEX IF EXISTS` y **sin** `DROP EXTENSION`
