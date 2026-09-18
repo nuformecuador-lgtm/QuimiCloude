@@ -22,7 +22,7 @@
 
 ## Tanda 0 — las tres puertas que no se pueden saltar
 
-- [ ] **T0 — Cerrar la puerta F1.4. BLOQUEANTE de T4, T8 y T10.**
+- [x] **T0 — Cerrar la puerta F1.4. BLOQUEANTE de T4, T8 y T10.**
       Archivos: ninguno todavía; la respuesta se escribe en
       `progress/impl_QC-108-lectura-de-pdf-con-gemini.md`.
       **Tres respuestas humanas, las tres en la aprobación del spec:**
@@ -41,7 +41,7 @@
 
 ## Tanda 1 — las piezas puras (nada aquí conoce al tercero)
 
-- [ ] **T1 [P] — La constante única del plazo.** Depende de T0 (solo para arrancar la tanda).
+- [x] **T1 [P] — La constante única del plazo.** Depende de T0 (solo para arrancar la tanda).
       Archivos: `lib/modules/documentos/domain/limits.ts` (**se amplía**, no se reescribe),
       `tests/unit/documentos/ai-limits.test.ts`.
       `AI_READ_TIMEOUT_SECONDS = 60`, en segundos como el resto de plazos del módulo, con docblock que
@@ -52,7 +52,7 @@
       `PAGE_RENDER_DPI` siguen declarados una sola vez y **sin duplicar** en los archivos nuevos.
       Cubre **R7** y el lado «no se duplican los límites» de **R5**.
 
-- [ ] **T2 [P] — El esquema del borde de la lectura.** Depende de T0.
+- [x] **T2 [P] — El esquema del borde de la lectura.** Depende de T0.
       Archivos: `lib/modules/documentos/domain/ai-read-input.ts`,
       `tests/unit/documentos/ai-read-input.test.ts`.
       `strictObject` (zod): `prompt` recortado y **no vacío**, `mode` literal `'pdf' | 'images'`,
@@ -62,7 +62,7 @@
       ausente, campo desconocido y `bytes` vacío ⇒ todos rechazados. Cubre el lado entrada de **R2**,
       **R3** y **R23**.
 
-- [ ] **T3 [P] — El puerto `AiReader`.** Depende de T0.
+- [x] **T3 [P] — El puerto `AiReader`.** Depende de T0.
       Archivos: `lib/modules/documentos/ports/ai-reader.ts`.
       Las firmas de `design.md > 3.1`: `AiDocumentPart` discriminado (`pdf` | `image`), `AiReadRequest`
       con `prompt`, `parts` y `timeoutMs`, y **un solo método** `read`. Docblock que diga que el puerto
@@ -72,7 +72,7 @@
       `next/*`, ni `@prisma/client`, ni `lib/shared/**`, ni `lib/composition`—, verificado por
       `tests/guards/guard-arquitectura-modulos.test.ts`. Cubre el lado contrato de **R1** y **R21**.
 
-- [ ] **T4 — La OCTAVA enmienda y la clase de error.** Depende de **T0.1**.
+- [x] **T4 — La OCTAVA enmienda y la clase de error.** Depende de **T0.1**.
       Archivos: `lib/modules/errores/domain/error-codes.ts`,
       `lib/modules/errores/domain/error-catalog.ts`, `tests/unit/errores/catalogo.test.ts`,
       `lib/modules/documentos/domain/errors.ts` (**se amplía**),
@@ -183,7 +183,7 @@
 
 ## Tanda 5 — límites de la ficha y cierre
 
-- [ ] **T11 [P] — La guardia de alcance de esta ficha.** Depende de nada.
+- [x] **T11 [P] — La guardia de alcance de esta ficha.** Depende de nada.
       Archivos: `tests/unit/documentos/qc108-alcance.test.ts` (nuevo; patrón de
       `tests/unit/documentos/qc106-alcance.test.ts`).
       Afirma contra el **diff de la rama** frente al merge-base con `origin/dev`: cero archivos bajo
@@ -195,7 +195,7 @@
       **Hecho:** el test en verde, y **rojo si alguien toca la pantalla, la base, los permisos o el
       puerto de conversión**. Cubre **R4 (lado «no se toca»), R17, R18, R19, R20, R24**.
 
-- [ ] **T12 [P] — El E2E diferido, escrito como deuda.** Depende de T11.
+- [x] **T12 [P] — El E2E diferido, escrito como deuda.** Depende de T11.
       Archivos: `progress/impl_QC-108-lectura-de-pdf-con-gemini.md`.
       Se escribe, con esas palabras, que **no hay E2E** porque la ficha no añade recorrido navegable, y
       que el destinatario es **QC-107**. Es **deuda con destinatario, no exención** de

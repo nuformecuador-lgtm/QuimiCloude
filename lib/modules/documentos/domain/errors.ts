@@ -6,9 +6,9 @@
  * `instanceof DocumentosError` y decida por el `code` y NUNCA por el texto: el mensaje puede
  * cambiar de idioma sin romper a quien lo muestra.
  *
- * **Dos clases y CERO codigos nuevos.** `unauthorized` e `invalid_input` ya existen y significan
- * aqui exactamente lo mismo que donde ya viven: mismo caso, mismo codigo, misma frase. Este modulo
- * no enmienda el catalogo.
+ * `unauthorized` e `invalid_input` ya existen y significan aqui exactamente lo mismo que donde ya
+ * viven: mismo caso, mismo codigo, misma frase. `ai_unavailable` es el unico codigo que este
+ * modulo aporta al catalogo.
  *
  * El `code` es un `ErrorCode` —uno mal escrito no compila— y el MENSAJE SALE DEL CATALOGO, no del
  * sitio que lanza. Por eso ninguna clase admite un `message` por parametro.
@@ -57,5 +57,18 @@ export class ValidationError extends DocumentosError {
 
   constructor(diagnostic?: string) {
     super('invalid_input', diagnostic);
+  }
+}
+
+/**
+ * La entrada era correcta y no hay bug en este modulo: lo que fallo es que el proveedor de IA no
+ * respondio, no estaba disponible o agoto el plazo. Con `unexpected` la pantalla invitaria a
+ * reportar un bug, y el registro no podria distinguir un corte del proveedor de un fallo propio.
+ */
+export class AiUnavailableError extends DocumentosError {
+  readonly code = 'ai_unavailable';
+
+  constructor(diagnostic?: string) {
+    super('ai_unavailable', diagnostic);
   }
 }
