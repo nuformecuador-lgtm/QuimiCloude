@@ -301,14 +301,14 @@ design, secciones 1, 4 y 6. Ninguno afirma nada falso salvo el del BLOQUEANTE 1.
 
 ---
 
-## Recuento
+## Recuento de la primera vuelta
 
 | Severidad | N.o |
 |---|---|
 | **BLOQUEANTE** | **2** |
 | menor | 5 |
 
-## Veredicto
+## Veredicto de la primera vuelta
 
 **RECHAZADO.**
 
@@ -329,3 +329,183 @@ Vuelve al implementer con dos encargos concretos:
    ficha del comentario de produccion.
 
 Los cinco menores no bloquean; m1 y m4 merecen quedar anotados aunque no se arreglen aqui.
+
+---
+
+# SEGUNDA VUELTA — 2026-09-18
+
+> Tip **`4da3642`**, arbol limpio. Arreglos en `9f15b12`; `c561e10` es bitacora; `4da3642` es del
+> leader y solo amplia `tests/baseline-rojos.json`.
+> **No se rehace la revision.** Lo que la primera vuelta dio por bueno sigue en pie: ningun arreglo
+> movio las citas al `.d.ts`, el plazo sin dormir, el cierre transitivo de capas, el «13 0» de
+> `lib/composition/index.ts` ni el intocable de QC-68. El diff de la segunda vuelta toca tres
+> archivos de produccion y cuatro de test, y nada mas.
+>
+> Verificacion propia: `typecheck` y `lint` verdes; 61 archivos de test, **757 casos** (tres mas
+> que en la primera vuelta), 0 rojos. Y **seis mutaciones aplicadas a mano** sobre el codigo de
+> produccion, corridas y deshechas, para no fiarme de que los tests nuevos muerdan.
+
+## B1 — CERRADO, y arreglado en la causa
+
+El arreglo no parchea el sintoma: `conDiagnostico` pasa de envolver todo en un `Error` plano a
+recibir **el constructor del error que le corresponde a cada operacion**, asi que el `code` se
+decide donde se sabe cual es la operacion, no en un `else` final que adivina. `UnexpectedError`
+reutiliza el codigo `unexpected`, que ya estaba en el catalogo.
+
+**Verificado que no queda ningun camino cruzado.** Lo compruebo rompiendo el codigo, no leyendolo:
+
+| Mutacion aplicada a `read-pdf-with-ai.ts` | Que paso |
+|---|---|
+| `countPages` vuelve a senalar `AiUnavailableError` | **Rojo**: cae «R8, R10 — si countPages lanza, el code es unexpected y NO ai_unavailable» |
+| `renderPages` vuelve a senalar `AiUnavailableError` | **Rojo**: cae «R8, R10 — si renderPages lanza, el code es unexpected y NO ai_unavailable» |
+| El `read` deja de senalar `AiUnavailableError` | **Rojo, y cuadruple**: caen los tres casos de `ai-timeout.test.ts` (plazo vencido al instante, `TimeoutRunner` real y puerto que lanza) mas «R9, R10 — si el puerto de IA lanza, el code SI es ai_unavailable» |
+
+**Los tres casos nuevos muerden de verdad**, y el del corte del proveedor esta ademas sostenido por
+los tres del plazo. El reparto declarado se cumple en el codigo: `countPages`/`renderPages` dan
+`unexpected`; el tope da `invalid_input` via `ValidationError`; `read` y el plazo agotado dan
+`ai_unavailable`; el `else` de `fallo()` da `unexpected`. **R10 queda servido**: la pantalla de
+QC-107 y el registro ya pueden distinguir un corte del proveedor de un bug nuestro, que es lo que
+el bloqueante pedia.
+
+Un matiz que no es hallazgo pero conviene que este escrito: `conDiagnostico` relanza **tal cual**
+cualquier `DocumentosError`, asi que si algun dia un adaptador del puerto `AiReader` lanzara un
+`DocumentosError` propio, un corte del proveedor podria salir con otro `code`. Hoy no ocurre
+—`readWithGenai` lanza `Error` plano— y el puerto documenta «Lanza si no puede», sin prometer
+clase. Queda dicho para quien escriba el segundo adaptador.
+
+**No se colo ningun codigo nuevo.** El diff completo contra el merge-base anade a `ERROR_CODES`
+**una sola** entrada, la de `ai_unavailable`. El codigo `unexpected` ya existia en la base
+(`error-codes.ts:12` en `b8e3d5e`). La octava enmienda queda tal como se aprobo y no se amplia.
+
+**`UnexpectedError` fuera del barril: decision correcta, no esconde nada.** El barril publica
+`DocumentosError`, `UnauthorizedError`, `ValidationError` y `AiUnavailableError`, y la asimetria
+tiene un porque real: esas se lanzan desde casos de uso que **propagan** hacia su Server Action, y
+quien las recibe las reconoce por su clase. `UnexpectedError` solo vive dentro de `readPdfWithAi`,
+que **nunca lanza**: convierte todo en el discriminado `AiReadResult`, donde el consumidor
+discrimina por `code`, no por clase. Publicarla no daria a nadie nada que no tenga ya, y ensanchar
+la lista curada que `module-contract.test.ts` congela por un simbolo que nadie puede usar seria
+ruido. Ademas el `code` que emite **si** es publico y **si** esta en el catalogo cerrado, asi que
+no hay nada oculto para la pantalla ni para el log.
+
+## B2 — CERRADO, y la limpieza es completa sin vaciar el test
+
+- Las dos lineas quedan sin clave de ficha y sin puerta: «**Octava enmienda, el 2026-09-18**:
+  `ai_unavailable`. / Aprobada por el humano el 2026-09-18.» El porque —que es una enmienda, cuando
+  y que la aprobo un humano— sobrevive; la historia de la ficha se va a `specs/` y a git, que es
+  donde `docs/conventions.md` la manda.
+- **Barrido de todo el diff contra el merge-base** sobre `lib/`, `app/`, `components/`, `hooks/`,
+  `db/` y `middleware.ts` buscando `QC-<n>`, `R<n>`, `design.md` y «decision cerrada» en lineas
+  anadidas: **ninguna**. La limpieza no dejo un resto en otro archivo.
+- **Siguen mordiendo.** Borre de `error-codes.ts` las dos lineas de la octava enmienda y
+  `catalogo.test.ts` cayo en «la cabecera de error-codes.ts redacta la octava enmienda con su fecha
+  y su aprobacion». No se cambio una infraccion por un test vacio.
+- **La linea preexistente de la sexta con «(QC-81)» esta intacta**, con su texto original. Correcto:
+  el diff no la toca y esa limpieza es de una ficha de modulo, no de esta.
+
+## Los menores
+
+| # | Estado | Juicio |
+|---|---|---|
+| m2 | **ARREGLADO** | Reverificado por mi contra el `.d.ts`: :12352, :8173, :2928 y :12351 son **exactos**, y la bitacora ahora distingue el docblock de la declaracion en vez de fundirlos |
+| m3 | **ARREGLADO** | Fuera «QC-108 T10» de `documentos-facade.test.ts:1` y la cita de ficha de la cabecera de bloque de `module-contract.test.ts`. Los nombres de los casos conservan `R<n>`, que es lo que la regla si permite y lo que sostiene la trazabilidad |
+| m4 | **ARREGLADO, y mejor de lo que pedi** | El titulo ya no promete lo que no hace y el caso **pasa un prompt con espacios al borde**, asi que ahora **muerde**: si alguien quitara el recorte del esquema, el caso caeria. Antes el titulo mentia y el caso no probaba nada de eso |
+| m1 | **RECHAZADO por el leader** | Ver abajo |
+| m5 | **A MEDIAS** | Ver abajo |
+
+### m1 — el rechazo fue correcto, y no invalida la cobertura de R24
+
+Preguntas si fue mala decision. **No lo fue.** Renombrar `diagnostico`, `causaDe`, `conDiagnostico`
+y `fallo` solo en el archivo nuevo dejaria a `documentos` con dos helpers homonimos en dos idiomas
+—`convert-pdf.ts:81-111` ya los tiene en espanol y esta mergeado en `dev`—, y eso es peor que la
+inconsistencia que arregla: quien lea el modulo tendria que preguntarse si `causaDe` y un
+`causeOf` hacen lo mismo. La regla que se estaria sirviendo es de nombres; el precio, legibilidad
+real.
+
+**La cobertura de R24 no se invalida** porque la parte del requisito que puede romper algo esta
+limpia y probada: no entra ningun identificador de base de datos (guardia con ancla), y **todo lo
+publico** —nombres de archivo, la factory, el puerto, los tipos, las constantes— esta en ingles.
+Lo que queda en espanol son **cuatro funciones privadas** que no cruzan el barril. R24 no queda
+limpio, y sigue escrito como tal en este informe; **pero es deuda de modulo, con dueno claro: la
+ficha que limpie `documentos` renombra los ocho a la vez.** El error seria dejar de anotarlo, no
+dejar de arreglarlo hoy.
+
+### m5 — se acepta a medias, y sigue abierto como deuda
+
+El arreglo bueno es el que se hizo: la lista numerada de `read-pdf-with-ai.ts` **contaba el orden
+que el codigo ya dice**, que es justo lo que `docs/conventions.md` prohibe, y ya no esta — la
+cabecera pasa de 22 lineas a 13.
+
+Las tres que se conservan **siguen sin pasar la regla de longitud**: `ai-reader-genai.ts` tiene un
+docblock de 16 lineas, `ai-config-env.ts` 11, y `limits.ts` dedica 14 lineas de docblock a una
+constante. La regla dice «un bloque de mas de ~5 lineas es senal de que ese porque pertenece al
+`design.md`» — y en el caso de `ai-reader-genai.ts` **ya esta ahi**, en `design.md > 12`, y tambien
+en la bitacora.
+
+**No lo bloqueo, y digo por que para que no se lea como que cedo**: los tres explican porques
+**ciertos y verificados** (abortar no cancela el cobro; la configuracion se lee por invocacion), y
+eso es de otra especie que el comentario falso del bloqueante 1. Ademas la regla lleva una tilde de
+aproximacion y no un limite duro. **Queda abierto como deuda de estilo**, no resuelto, para la
+ficha de limpieza del modulo.
+
+## Hallazgos nuevos de la segunda vuelta
+
+Los dos salen de mutaciones que corri yo; ninguno cambia el comportamiento de hoy, que es correcto.
+
+### m6 (menor) — el `code` del tope de paginas no lo fija ningun test, y es la misma clase de punto ciego que dejo entrar B1
+
+Cambie el `ValidationError` del tope de paginas por un `AiUnavailableError` y **los 19 archivos de
+`tests/unit/documentos/` siguieron verdes**: 231 casos, ninguno cayo. Es decir, el camino «PDF de
+51 paginas» podria pasar manana a decirle al usuario «la lectura automatica no esta disponible» sin
+que nada se entere.
+
+Hoy el codigo es **correcto** —sale `invalid_input`— y ningun requisito se incumple: R5 solo exige
+fallar sin renderizar y sin llamar al proveedor, y no fija el `code`. Por eso es menor y no
+bloqueante. Pero es **exactamente el punto ciego que dejo pasar el bloqueante 1**: un camino cuyo
+`code` nadie fija. El arreglo es una linea en el caso de las 51 paginas que ya existe: aserir que
+el `code` es `invalid_input`. Con eso los cuatro caminos del reparto quedan clavados y R10 deja de
+tener flancos.
+
+### m7 (menor) — el comentario nuevo de `conDiagnostico` nombra un caso que no pasa por ahi
+
+`read-pdf-with-ai.ts:64-70` dice: «Un `DocumentosError` que ya venia de mas adentro (**el tope de
+paginas**) se relanza TAL CUAL». El tope de paginas **no pasa por `conDiagnostico`**: su
+`ValidationError` se lanza en `buildImageParts`, **entre** las dos llamadas a `conDiagnostico`, no
+dentro de ninguna. Lo confirme borrando entera la linea que relanza el `DocumentosError`:
+**22 archivos de test siguieron verdes**, 257 casos, ninguno cayo — la rama es defensiva y hoy
+inalcanzable.
+
+Lo dejo en **menor y no repito el bloqueante**, y el criterio importa: en la primera vuelta el
+comentario falso describia **un comportamiento real y equivocado** que mandaba un fallo nuestro al
+usuario como corte del proveedor. Este solo se equivoca al **ejemplificar** que llega a una rama
+defensiva sin consecuencia en tiempo de ejecucion. Aun asi es un motivo no verificado escrito en
+produccion, que es lo que `docs/conventions.md` desaconseja: o se quita el parentesis, o se guarda
+la rama con el caso que de verdad la justifique.
+
+## Recuento de la segunda vuelta
+
+| Severidad | N.o |
+|---|---|
+| **BLOQUEANTE** | **0** |
+| menor nuevo | 2 (m6, m7) |
+| menor heredado sin cerrar | 2 (m1 por decision del leader, m5 a medias) |
+
+## VEREDICTO FINAL
+
+**OK — APROBADA.**
+
+Los dos bloqueantes estan cerrados, y cerrados donde tocaba: B1 en la causa —el `code` lo decide
+quien sabe que operacion fallo, no un `else` que adivina—, con tres casos nuevos que **compruebo
+que muerden**, y B2 sin vaciar el test que lo vigilaba. No se colo ningun codigo al catalogo, la
+octava enmienda queda como se aprobo, y `UnexpectedError` se queda fuera del barril por una razon
+que se sostiene: nunca sale del modulo.
+
+Quedan cuatro menores, ninguno bloquea y los cuatro tienen dueno escrito: **m6** —una linea, y es
+el flanco que dejo entrar el bloqueante 1, asi que es el que recomiendo cerrar antes del PR aunque
+no lo exija—, **m7**, y **m1** y **m5** como deuda de la ficha que limpie el modulo `documentos`.
+
+Fuera de alcance y no computa: el rojo de `qc75-convenciones.test.ts`, en
+`tests/baseline-rojos.json` desde el 2026-09-11 y tolerado por el gate completo. El intermitente
+`user-table.test.tsx` **no me aparecio** en ninguna de mis corridas; QC-108 no toca UI y no hay
+nada en su diff que pueda alcanzarlo.
+
+**El gate completo (`./init.sh`) lo corre el leader**, y con el la comprobacion final antes del PR.
