@@ -567,6 +567,30 @@ exactamente como QC-49, QC-60 y QC-50 — y por eso la plantilla siembra la empr
 migrar lo que queda. La migración de esta ficha es **posterior** a la de QC-49, así que se aplica con
 «QuimiCloud» ya sembrada.
 
+> **Enmienda ratificada por el humano el 2026-09-17 — salida temprana sobre base vacía.**
+> El párrafo anterior, tal y como estaba escrito, exigía que el paso 2 abortase **también** cuando
+> no hay ni una fila que repartir. El SQL ya no hace eso: antes de intentar resolver la empresa
+> cuenta las filas de las dos tablas y, si suman cero, sale (`IF existing_rows = 0 THEN RETURN;
+> END IF;`).
+>
+> **Motivo.** `dev` aplicó exactamente esa salida temprana a las **otras tres** migraciones de
+> empresa —inventario, pedidos y recetas— en el commit `38252c5` («las migraciones de empresa dejan
+> de abortar sobre una base vacía»). La de esta ficha nació en paralelo y se quedó fuera por
+> **accidente de calendario, no por criterio**. Sin ella, sobre una base vacía la migración abortaba
+> con «0 empresa(s)»: **ningún test de integración podía correr y un entorno nuevo no se podía
+> levantar**.
+>
+> **Lo que NO cambia: la guardia de empresa unívoca sigue intacta.** `existing_rows` suma
+> `suppliers` y `supplier_catalog_lines`; el `RETURN` solo dispara con las **dos a cero**. En cuanto
+> hay **una sola fila** que repartir, el `RETURN` no se dispara, la resolución por
+> `name_normalized = 'quimicloud'` con el único fallback de «hay exactamente una empresa» se ejecuta
+> igual, y el `RAISE EXCEPTION` **aborta igual** si la empresa es ambigua o no existe. Lo que este
+> diseño exige **cuando hay datos** queda exactamente como está descrito arriba y en §7.1: nada se
+> relaja sobre dato real.
+>
+> R7 y R11 se sostienen: sus antecedentes cuantifican sobre filas existentes y con cero filas son
+> vacuamente ciertos —no hay reparto que proteger ni dato que se pudiera confundir—.
+
 ### 7.3. DOWN — y por qué **tiene que abortar entero**
 
 Revierte en orden inverso y deja el esquema exacto anterior, **con el índice único global y parcial
@@ -592,6 +616,22 @@ suppliers_company_name_unique` → `CREATE UNIQUE INDEX suppliers_name_unique �
 NULL` → el `@@index` compuesto fuera → las dos columnas fuera → `ENABLE` + `FORCE`. **Ninguna fila se
 borra**: el archivo no tiene un solo `DELETE`. `pnpm run db:rollback` lo aplica y deja
 `_prisma_migrations` coherente.
+
+> **Enmienda ratificada por el humano el 2026-09-17 — la misma salida temprana en el DOWN.**
+> El bloque de guardias del `down.sql` abre también con `IF existing_rows = 0 THEN RETURN; END IF;`,
+> por el mismo motivo y con el mismo precedente que el UP (commit `38252c5` de `dev`, que lo aplicó
+> a las migraciones de empresa de inventario, pedidos y recetas; la de esta ficha se quedó fuera por
+> accidente de calendario, no por criterio). Sin ella, revertir sobre una base vacía abortaba en el
+> paso 1 —«identificar la empresa que escribió el UP»— con «0 empresa(s)», lo que impedía ejercitar
+> el `down.sql` en integración y levantar un entorno nuevo.
+>
+> **Las tres guardias siguen intactas en cuanto hay una fila.** Con cero filas en las dos tablas no
+> hay nada que revertir mal: no hay empresa que identificar, no hay fila de otra empresa que se
+> convierta en un montón indistinguible y no hay dos nombres vivos que impidan recrear el único
+> global. Con **una sola fila**, el `RETURN` no se dispara y las tres siguen abortando el DOWN
+> entero exactamente como se describe arriba —empresa del UP ambigua o inexistente incluidas—. **Lo
+> que este diseño exige cuando hay datos no cambia**, y en particular sigue sin haber ningún
+> `DELETE` ni ninguna reversión silenciosa.
 
 ## 8. Verificación
 

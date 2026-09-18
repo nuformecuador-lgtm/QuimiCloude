@@ -280,8 +280,20 @@
   Contenido: columnas de las dos tablas, censo de `CHECK` (**no cambia**, y eso se afirma), censo de
   FK —entran `suppliers_company_id_fkey`, `supplier_catalog_lines_company_id_fkey` y **las dos
   compuestas**, con su tabla de destino y su regla de borrado— y censo de índices —entran
-  `suppliers_company_id_id_key`, `suppliers_company_name_unique` y el `@@index` compuesto; sale
-  `suppliers_name_unique`—.
+  `suppliers_company_id_id_key`, `suppliers_company_name_unique` y el `@@index` compuesto; ~~sale
+  `suppliers_name_unique`~~—.
+  **ERRATA DEL SPEC, ANOTADA EN LA IMPLEMENTACIÓN (2026-09-17), mismo caso que T15.** Dos cosas:
+  (1) los **cinco punteros de línea** de arriba (`:651`, `:906`, `:1319`, `:1414`, `:1441`) están
+  **desplazados** y no señalan lo que el spec creía; valen como orientación, no como dirección.
+  (2) **`suppliers_name_unique` no podía «salir» de un censo de índices donde nunca estuvo**: ese
+  censo **no existía como lista cerrada** —eran tres `toContain` sueltos y dos `not.toContain` sobre
+  una sola tabla—. Lo hecho en la tanda 3, que **tensa** en vez de aflojar: se **creó cerrado** a
+  `toEqual` sobre las **dos** tablas (23 nombres verificados contra `pg_indexes`), con los tres
+  nombres nuevos comentados uno a uno y un comentario de relevo que explica por qué
+  `suppliers_name_unique` **no aparece** en la lista. Los `toContain` viejos se conservan: dicen
+  *por qué* esos tres tienen que estar. Lo mismo con el censo de columnas de `suppliers`, que
+  tampoco existía cerrado (solo un subconjunto de dos columnas) y se creó cerrado con sus 11.
+  La errata no cambia el alcance ni ninguna decisión cerrada.
   Depende de: T3, T4.
   Hecho cuando: los `toEqual` siguen siendo exactos y ninguno pasó a `toContain`.
   Cubre: R1, R2, R3, R4, R5, R9.
@@ -440,8 +452,19 @@
   error de «no existe» y **nunca** `UnauthorizedError`; el permiso se exige **antes** del ámbito
   (puertos **explosivos**: actor sin permiso → error de autorización sin tocar ningún puerto); unidad
   ajena → entrada inválida sin escribir nada, unidad de sistema y unidad propia → aceptadas, unidad
-  ausente → aceptada; una `companyId` en la entrada se descarta; falta el contexto de sesión → la
-  action no llama al caso de uso; ninguna salida pública lleva `companyId`.
+  ausente → aceptada; una `companyId` en la entrada se descarta; falta el contexto de sesión → ~~la
+  action no llama al caso de uso~~ **la action rechaza sin escribir nada**; ninguna salida pública
+  lleva `companyId`.
+  **REDACCIÓN CORREGIDA (2026-09-17), con precedente en QC-49 y QC-50.** La frase original pedía una
+  garantía que la producción **no** da y que nunca se pretendió: la action **sí** llama al caso de
+  uso, con actor `null`, y quien rechaza es `requirePermission` en su **primera línea** —el «falla
+  cerrado» que ya existía antes de esta ficha—. Lo que el requisito exige (R22) es **rechazar sin
+  escribir nada**, y eso es lo que el test afirma, con más detalle del que pedía la redacción vieja:
+  recorre las **nueve** actions por las **tres** formas de sesión incompleta, afirma que el actor
+  que baja es `null`, que el identificador de empresa de sesión **no viaja en ninguna posición del
+  argumento** y que el estado resultante es `unauthorized`; la mitad «sin tocar ningún puerto» se
+  prueba con **dobles explosivos** en `authorization.test.ts`. **No se toca el test ni el código**:
+  solo esta redacción.
   Depende de: T8, T12.
   Cubre: R18, R21, R22, R27, R28, R30, R31, R33.
 
@@ -464,15 +487,39 @@
   Hecho cuando: los `///` describen el estado real y el mapa de trazabilidad está escrito.
   Cubre: el checkpoint de trazabilidad de `CHECKPOINTS.md`.
 
-- [ ] **T37 — Gate completo.**
+- [x] **T37 — Gate completo.** **CERRADA 2026-09-17: lo corrió el leader y salió en verde.**
   `./init.sh` en verde (no `--rapido`: es lo que exige cerrar la feature y todo PR).
   Depende de: T36.
   Hecho cuando: typecheck, lint, unit, integración, guardias y E2E pasan; en particular
   `guard-rls-force`, `guard-arquitectura-modulos`, `guard-dependencias-aprobadas`,
   `guard-aislamiento-integracion`, `guard-identificador-de-request`, `guard-e2e-landing`, la guardia
   del catálogo de errores y las seis de T27, **con el árbol committeado**.
+  Resultado: **530 archivos, 7764 tests, 0 rojos**, sin rojos nuevos respecto del baseline y con la
+  máquina en reposo.
   Cubre: R38, R39 (por ausencia: `ERROR_CODES` no crece, ninguna empresa se borra, `package.json` no
   se toca).
+
+- [ ] **T38 — Test de la rama que la salida temprana estrena.**
+  Archivos: `tests/integration/proveedores/company-scope.int.test.ts` (se amplía) o un archivo de
+  integración nuevo bajo `tests/integration/proveedores/**`; si es nuevo, entra además en
+  `tests/integration/aislamiento.json` con su forma de aislamiento (mismo criterio que T25).
+  Contenido: la salida temprana `IF existing_rows = 0 THEN RETURN; END IF;` del UP y del `down.sql`
+  (`design.md > 7.2` y `> 7.3`, enmendados el 2026-09-17) **no la ejercita hoy ninguna suite**.
+  Dos afirmaciones, y las dos hacen falta:
+  (a) sobre una base **vacía** —cero filas en `suppliers` y cero en `supplier_catalog_lines`— la
+  migración **aplica sin abortar**, y el `down.sql` **revierte sin abortar**; en particular no
+  aparece el mensaje de «0 empresa(s)»;
+  (b) con **una sola fila** que repartir, la guardia **sigue abortando igual** si la empresa es
+  ambigua (varias en `companies`, ninguna con `name_normalized = 'quimicloud'`) o si no existe
+  (`companies` vacía) — es decir, el `RETURN` **no** se dispara y el `RAISE EXCEPTION` manda.
+  Con un **control anti-placebo**: que el caso (b) se ponga verde por el motivo correcto y no porque
+  el aborto venga de otra sentencia, nombrando el mensaje de la guardia.
+  Todo en transacciones que terminan en `ROLLBACK`; **ninguna migración ya aplicada se edita**.
+  Depende de: T29 (reutiliza su aparejo de aplicar el UP y el DOWN dentro de una transacción).
+  Hecho cuando: los dos casos pasan; quitar a mano el `RETURN` temprano del UP pone rojo el caso (a)
+  y quitar la resolución de empresa pone rojo el caso (b) (falsabilidad ejecutada y anotada en la
+  bitácora); `./init.sh` sigue en verde.
+  Cubre: R7, R11 (la rama de cero filas, donde sus antecedentes son vacuos), y el gate.
 
 ## Trazabilidad — `R<n> -> test`
 
