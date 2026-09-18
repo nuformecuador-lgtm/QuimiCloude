@@ -1,0 +1,5 @@
+{
+  "provisional": true,
+  "loDefine": "QC-129",
+  "prompt": "Este PDF es el catalogo de productos de un proveedor quimico. Transcribe cada producto que aparezca con su nombre, su referencia, su presentacion y su precio, tal como estan en el documento y sin anadir nada que no figure en el."
+}
