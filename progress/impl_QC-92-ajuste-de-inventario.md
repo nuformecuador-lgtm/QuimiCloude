@@ -236,3 +236,38 @@ El helper buscaba la primera `{` tras el primer `)`. Con un tipo de retorno que 
 
 ### Limpieza de comentarios (`934fe7c`, commit aparte)
 Seis líneas **nuevas** de producción citaban `QC-92` o `R18` —los tres docblocks del puerto y una línea de `batch-movement-prisma.ts`—. Limpiadas, sin tocar una línea de código. Los comentarios **preexistentes no se arrastran**. Comprobado sobre el diff de la rama: **la única cita que queda en producción es la cabecera de enmiendas de `error-codes.ts`**, que es un registro histórico y ya citaba las seis anteriores.
+
+### Medición pedida sobre la Cara B de R31 — **el leader tenía razón** (`55b00d1`)
+
+**Qué se midió.** Si el caso podía afirmar que *el barrido se ejecutó* en vez de *qué encontró*, sin dejar de distinguir un barrido roto.
+
+**Resultado: sí, y además la forma vieja no aportaba nada.** El caso hermano `R31: los detectores muerden con fuentes fabricados y no con uno limpio` ya prueba **las cuatro ramas** del detector —`_sum`, `SUM(...)`, `increment`/`decrement` y **la de identificadores** (`createAdjustInventory`, `consumirLote`)—. Debilitar el detector ya daba rojo ahí. La aserción sobre `adjustment` solo añadía el riesgo de falso rojo ante un renombrado legítimo.
+
+**Forma nueva:** más de diez archivos reales del módulo, contenido leído de verdad (no cadenas vacías) y el detector invocado sobre cada uno, **sin ninguna aserción sobre el contenido de los hallazgos**. Renombrado a `R31: el barrido recorre de verdad los archivos del modulo`, porque el nombre anterior habría pasado a ser mentira.
+
+**Probado por mutación, las dos:** lista de archivos vacía → rojo (`expected 0 to be greater than 10`); lectura fabricada en vez de real → rojo (`expected false to be true`). **Distingue.**
+
+**La desviación 1 de la tanda 2 queda retirada:** ya no se fija ningún estado del árbol. Y con ella se evita crear otra guardia de la familia 2 por nuestra propia mano.
+
+---
+
+## BLOQUEANTE NUEVO — **R32 de QC-81**, hermana de R31 y con el mismo defecto
+
+Lo reportó el subagente como «preexistente y no relacionado». **Lo medí y es falso: lo causa nuestra T5.**
+
+```
+FAIL tests/unit/inventario/qc81-alcance.test.ts
+  > QC-81 R32 — el contrato de inventario no expone listar, editar ni borrar lotes
+  > R32: y el puerto de producto tampoco declara ninguna
+AssertionError: expected [ 'findBatchMovements', 'findBatchesOfAliveProduct' ] to deeply equal []
+```
+
+**Medición.** En `origin/dev` el puerto **no declara ningún `findBatch*` ni `adjustBatch*`**, así que R32 estaba verde. `operacionesDeLoteProhibidas` marca todo nombre que junte una palabra de lote (`batch`) con una operación prohibida (`find`). **T5 añadió `findBatchesOfAliveProduct` y `findBatchMovements`, que es exactamente lo que `design.md > 4.2` manda declarar.**
+
+**Mismo defecto que R31:** `R32: y el puerto de producto tampoco declara ninguna` **no llama a `archivosOSalto(ctx)`**. Corre en cualquier rama. Es el **mismo archivo, la misma ficha y la misma familia 4**.
+
+**Y el mismo propósito cumplido:** el `describe` se titula «el contrato de inventario no expone listar, editar ni borrar lotes». QC-92 **es** la ficha que legítimamente expone la lectura de lotes: el panel del producto (R22) y el historial (R23) no existen sin ella.
+
+**No la he tocado.** La decisión del leader sobre R31 fue para R31; no la extiendo por mi cuenta a otra guardia.
+
+**Lección de proceso, y es la segunda vez:** un subagente etiquetó como «ajeno y preexistente» un rojo que había causado él mismo. Es exactamente lo que `AGENTS.md > Regla del gate` advierte —el subagente no tiene contexto para juzgar un rojo— y la razón por la que el implementer verifica antes de commitear.
