@@ -129,6 +129,8 @@ const SUPPLIER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['nameNormalized', 'name_normalized'],
   ['phone', 'phone'],
   ['email', 'email'],
+  // Cada proveedor pertenece a una empresa y todas las consultas se acotan por ella.
+  ['companyId', 'company_id'],
   ['createdBy', 'created_by'],
   ['updatedBy', 'updated_by'],
   ['createdAt', 'created_at'],
@@ -159,6 +161,9 @@ const SUPPLIER_CATALOG_LINE_COLUMNS: ReadonlyArray<readonly [string, string]> = 
   ['cost', 'cost'],
   ['minPurchase', 'min_purchase'],
   ['deliveryTime', 'delivery_time'],
+  // La linea lleva su propia empresa, no la toma prestada de su proveedor: es lo que
+  // permite que la clave foranea compuesta impida que las dos discrepen.
+  ['companyId', 'company_id'],
   // QC-43 (su decision cerrada 3): la linea gana autor propio.
   ['createdBy', 'created_by'],
   ['updatedBy', 'updated_by'],
@@ -168,11 +173,15 @@ const SUPPLIER_CATALOG_LINE_COLUMNS: ReadonlyArray<readonly [string, string]> = 
   ['deletedAt', 'deleted_at'],
 ]
 
-/** Los seis escalares que cruzan de modulo y por eso NO llevan `@relation` (R30). */
+/** Los ocho escalares que cruzan de modulo y por eso NO llevan `@relation` (R30). */
 const CROSS_MODULE_SCALARS: ReadonlyArray<readonly [PrismaModel, string, string]> = [
   // QC-52: las dos FK nuevas de la linea, hacia `inventario` y hacia `unidades`.
   [supplierCatalogLine, 'presentationId', 'presentation_id'],
   [supplierCatalogLine, 'unitId', 'unit_id'],
+  // La empresa vive en otro modulo: las dos tablas la referencian como escalar, sin objeto
+  // navegable, para que no haya `include` que se salte el ambito.
+  [supplier, 'companyId', 'company_id'],
+  [supplierCatalogLine, 'companyId', 'company_id'],
   [supplier, 'createdBy', 'created_by'],
   [supplier, 'updatedBy', 'updated_by'],
   [supplierCatalogLine, 'createdBy', 'created_by'],
@@ -254,7 +263,22 @@ describe('db/schema.prisma — modelo de proveedor y linea de catalogo', () => {
     // alcanzaria tambien a los proveedores borrados y R9 dejaria de cumplirse en silencio.
     expect(field(supplier, 'name').attributes).not.toMatch(/@unique/)
     expect(field(supplier, 'nameNormalized').attributes).not.toMatch(/@unique/)
-    expect(supplier.body).not.toMatch(/@@unique\(/)
+
+    // El modelo si declara UN `@@unique`, y solo uno: la clave candidata (empresa, id) a la
+    // que apunta la clave foranea compuesta de la linea, que es lo que impide que una linea
+    // acabe con una empresa distinta de la de su proveedor. Censo EXACTO, para que cualquier
+    // otro -y en particular uno de nombre, que alcanzaria tambien a los borrados- caiga aqui.
+    const supplierUniques = supplier.body
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith('@@unique('))
+    expect(supplierUniques).toEqual([
+      '@@unique([companyId, id], map: "suppliers_company_id_id_key")',
+    ])
+    // Y lo que este caso protege sigue dicho a las claras: ninguno de esos `@@unique` es de
+    // nombre, ni del original ni del normalizado.
+    expect(supplier.body).not.toMatch(/@@unique\([^\n]*\bname\b/)
+    expect(supplier.body).not.toMatch(/@@unique\([^\n]*\bnameNormalized\b/)
 
     // QC-52 (R15, R17): la linea TAMPOCO tiene ya ningun `@@unique`. El de QC-43 era TOTAL
     // -sobre la pareja del proveedor con el articulo del inventario- y se fue con esa
@@ -616,6 +640,9 @@ describe('db/schema.prisma — modelo de proveedor y linea de catalogo', () => {
     expect(indexMaps).toEqual([
       'suppliers_created_by_idx',
       'suppliers_updated_by_idx',
+      // La linea se lee siempre acotada por empresa y casi siempre por proveedor: este
+      // indice da ese prefijo izquierdo y sirve ademas de lado hijo de la FK compuesta.
+      'supplier_catalog_lines_company_id_supplier_id_idx',
       // QC-52 (R30): el lado hijo de cada FK nueva. Postgres no lo indexa solo, y por ahi
       // pasa la verificacion del RESTRICT al borrar una presentacion o una unidad.
       'supplier_catalog_lines_presentation_id_idx',

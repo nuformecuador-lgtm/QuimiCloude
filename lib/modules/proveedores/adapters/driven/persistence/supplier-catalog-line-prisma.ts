@@ -12,6 +12,7 @@ import type {
   CatalogLineView,
   NewCatalogLine,
 } from '../../../domain/catalog-line-view';
+import { catalogLineCompanyScope, companyScopeColumns, supplierCompanyScope } from './company-scope';
 import {
   dateRangeCondition,
   normalizedSearchCondition,
@@ -22,6 +23,7 @@ import {
 
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
+import type { SupplierScope } from '../../../domain/supplier-scope';
 
 /**
  * Implementa `SupplierCatalogRepository` (`design.md > 6`, `> 7`) con Prisma.
@@ -222,13 +224,15 @@ function throwIfInvalidCatalogReference(error: unknown): void {
 }
 
 /**
- * ¿Hay un proveedor VIVO con ese id? (R23). Es la misma consulta que abre
+ * ¿Hay un proveedor VIVO **de esa empresa** con ese id? (R23). Es la misma consulta que abre
  * `listBySupplierAlive`, extraida para que las operaciones que la necesitan compartan una
- * sola definicion de «proveedor vivo».
+ * sola definicion de «proveedor vivo». No es metodo de ningun puerto, y por eso es el punto
+ * que mas facil se escapa: sin el ambito, un proveedor de otra empresa seguiria pareciendo
+ * «vivo» aqui.
  */
-async function isSupplierAlive(supplierId: string): Promise<boolean> {
+async function isSupplierAlive(supplierId: string, scope: SupplierScope): Promise<boolean> {
   const row = await prisma.supplier.findFirst({
-    where: { id: supplierId, deletedAt: null },
+    where: { id: supplierId, deletedAt: null, ...supplierCompanyScope(scope) },
     select: { id: true },
   });
   return row !== null;
@@ -285,12 +289,14 @@ export async function createCatalogLine(
   data: NewCatalogLine,
   actorId: string,
   now: Date,
+  scope: SupplierScope,
 ): Promise<{ id: string } | 'duplicate' | 'supplier_not_found'> {
-  if (!(await isSupplierAlive(data.supplierId))) return 'supplier_not_found';
+  if (!(await isSupplierAlive(data.supplierId, scope))) return 'supplier_not_found';
 
   try {
     const created = await prisma.supplierCatalogLine.create({
       data: {
+        ...companyScopeColumns(scope),
         supplierId: data.supplierId,
         ...writableFields(data),
         createdAt: now,
@@ -328,10 +334,16 @@ export async function replaceAliveCatalogLine(
   data: CatalogLineFields,
   actorId: string,
   now: Date,
+  scope: SupplierScope,
 ): Promise<'ok' | 'not_found' | 'duplicate'> {
   try {
     const { count } = await prisma.supplierCatalogLine.updateMany({
-      where: { id, deletedAt: null, supplier: { deletedAt: null } },
+      where: {
+        id,
+        deletedAt: null,
+        ...catalogLineCompanyScope(scope),
+        supplier: { deletedAt: null, ...supplierCompanyScope(scope) },
+      },
       data: {
         ...writableFields(data),
         updatedAt: now,
@@ -362,9 +374,15 @@ export async function softDeleteAliveCatalogLine(
   id: string,
   actorId: string,
   now: Date,
+  scope: SupplierScope,
 ): Promise<boolean> {
   const { count } = await prisma.supplierCatalogLine.updateMany({
-    where: { id, deletedAt: null, supplier: { deletedAt: null } },
+    where: {
+      id,
+      deletedAt: null,
+      ...catalogLineCompanyScope(scope),
+      supplier: { deletedAt: null, ...supplierCompanyScope(scope) },
+    },
     data: { deletedAt: now, updatedAt: now, updatedBy: actorId },
   });
   return count === 1;
@@ -490,13 +508,13 @@ function catalogLineFilterWhere(
 
 /**
  * `where` UNICO del listado del catalogo: el mismo objeto para el `findMany` y para el `count`
- * (R14). Cuatro capas, y ninguna sobra:
+ * (R14). Cinco capas, y ninguna sobra:
  *
  *   1. **`supplierId`**: el catalogo es siempre el de UN proveedor.
- *   2. **`deletedAt: null` SIEMPRE** (R7, R22): la LINEA tiene que estar viva. La otra
- *      condicion de vida -que el PROVEEDOR lo este- la comprueba `listBySupplierAlive` antes
- *      de llegar aqui, y las dos juntas son las que ningun caso de uso puede olvidar porque no
- *      viven en un `if` del dominio.
+ *   2. **`deletedAt: null` y el ambito de empresa SIEMPRE** (R7, R22): la LINEA tiene que
+ *      estar viva y ser de la empresa del ambito. La otra condicion de vida -que el PROVEEDOR
+ *      lo este- la comprueba `listBySupplierAlive` antes de llegar aqui, y las tres juntas son
+ *      las que ningun caso de uso puede olvidar porque no viven en un `if` del dominio.
  *   3. **La busqueda contra `name_normalized`** (R16, R18, R19), normalizando el termino con
  *      `normalizeSupplierName` -la MISMA funcion que escribio la columna y que protege el
  *      indice unico parcial-: buscar y comparar no discrepan.
@@ -506,6 +524,7 @@ function catalogLineFilterWhere(
 export function buildCatalogLineWhere(
   supplierId: string,
   query: ListQuery,
+  scope: SupplierScope,
 ): Prisma.SupplierCatalogLineWhereInput {
   const search = normalizedSearchCondition(query.search, normalizeSupplierName);
   const filters = Object.entries(query.filters)
@@ -515,6 +534,7 @@ export function buildCatalogLineWhere(
   return {
     supplierId,
     deletedAt: null,
+    ...catalogLineCompanyScope(scope),
     ...(search === null ? {} : { nameNormalized: search }),
     ...(filters.length === 0 ? {} : { AND: filters }),
   };
@@ -536,11 +556,12 @@ export function buildCatalogLineWhere(
 export async function listCatalogLinesBySupplierAlive(
   supplierId: string,
   query: ListQuery,
+  scope: SupplierScope,
 ): Promise<Page<CatalogLineView> | 'supplier_not_found'> {
-  if (!(await isSupplierAlive(supplierId))) return 'supplier_not_found';
+  if (!(await isSupplierAlive(supplierId, scope))) return 'supplier_not_found';
 
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
-  const where = buildCatalogLineWhere(supplierId, query);
+  const where = buildCatalogLineWhere(supplierId, query, scope);
 
   const [rows, total] = await Promise.all([
     prisma.supplierCatalogLine.findMany({

@@ -5,10 +5,12 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 import { normalizeSupplierName } from '../../../domain/supplier-name';
 
+import { catalogLineCompanyScope, companyScopeColumns, supplierCompanyScope } from './company-scope';
 import { dateRangeCondition, normalizedSearchCondition, textCondition } from './list-query-sql';
 
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
+import type { SupplierScope } from '../../../domain/supplier-scope';
 import type { NewSupplier, SupplierView } from '../../../domain/supplier-view';
 
 /**
@@ -100,10 +102,12 @@ export async function createSupplier(
   data: NewSupplier,
   actorId: string,
   now: Date,
+  scope: SupplierScope,
 ): Promise<{ id: string } | 'duplicate'> {
   try {
     const created = await prisma.supplier.create({
       data: {
+        ...companyScopeColumns(scope),
         name: data.name,
         nameNormalized: data.nameNormalized,
         phone: data.phone,
@@ -124,10 +128,14 @@ export async function createSupplier(
   }
 }
 
-/** `findAliveById` (R22, R24): `deleted_at IS NULL` en el `where`, no en un `if` posterior. */
-export async function findAliveSupplierById(id: string): Promise<SupplierView | null> {
+/** `findAliveById` (R22, R24): `deleted_at IS NULL` y el ambito de empresa en el `where`, no
+ *  en un `if` posterior. */
+export async function findAliveSupplierById(
+  id: string,
+  scope: SupplierScope,
+): Promise<SupplierView | null> {
   const row = await prisma.supplier.findFirst({
-    where: { id, deletedAt: null },
+    where: { id, deletedAt: null, ...supplierCompanyScope(scope) },
     select: SUPPLIER_SELECT,
   });
   return row === null ? null : toSupplierView(row);
@@ -147,10 +155,11 @@ export async function updateAliveSupplier(
   data: NewSupplier,
   actorId: string,
   now: Date,
+  scope: SupplierScope,
 ): Promise<'ok' | 'not_found' | 'duplicate'> {
   try {
     const { count } = await prisma.supplier.updateMany({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, ...supplierCompanyScope(scope) },
       data: {
         name: data.name,
         nameNormalized: data.nameNormalized,
@@ -196,16 +205,17 @@ export async function softDeleteAliveSupplier(
   id: string,
   actorId: string,
   now: Date,
+  scope: SupplierScope,
 ): Promise<boolean> {
   return prisma.$transaction(async (tx) => {
     const { count } = await tx.supplier.updateMany({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, ...supplierCompanyScope(scope) },
       data: { deletedAt: now, updatedAt: now, updatedBy: actorId },
     });
     if (count !== 1) return false;
 
     await tx.supplierCatalogLine.updateMany({
-      where: { supplierId: id, deletedAt: null },
+      where: { supplierId: id, deletedAt: null, ...catalogLineCompanyScope(scope) },
       data: { deletedAt: now, updatedAt: now, updatedBy: actorId },
     });
     return true;
@@ -300,11 +310,12 @@ function supplierFilterWhere(
 
 /**
  * `where` UNICO del listado de proveedores: el mismo objeto para el `findMany` y para el
- * `count` (R14). Tres capas, y ninguna sobra:
+ * `count` (R14). Cuatro capas, y ninguna sobra:
  *
- *   1. **`deletedAt: null` SIEMPRE** (R7, R22). No es un filtro que el llamante pueda quitar:
- *      `deletedAt` no es consultable en ninguna lista blanca y `sanitizeListQuery` lo poda
- *      ademas por su cuenta.
+ *   1. **`deletedAt: null` y el ambito de empresa SIEMPRE**, al mismo nivel y NUNCA fundidos
+ *      con la busqueda ni con los filtros: un termino de busqueda no puede ampliar lo visible
+ *      mas alla de la propia empresa. `deletedAt` no es consultable en ninguna lista blanca y
+ *      `sanitizeListQuery` lo poda ademas por su cuenta.
  *   2. **La busqueda contra `name_normalized`** (R16, R18, R19), normalizando el termino con
  *      `normalizeSupplierName` -la MISMA funcion que escribio la columna y que decide si un
  *      nombre ya existe-. Es lo que hace que «quimicos» encuentre «Químicos del Pacífico».
@@ -313,7 +324,10 @@ function supplierFilterWhere(
  *   3. **Los filtros, TODOS a la vez** (R15): un `AND` explicito, de modo que una fila sale
  *      solo si los cumple todos.
  */
-export function buildSupplierWhere(query: ListQuery): Prisma.SupplierWhereInput {
+export function buildSupplierWhere(
+  query: ListQuery,
+  scope: SupplierScope,
+): Prisma.SupplierWhereInput {
   const search = normalizedSearchCondition(query.search, normalizeSupplierName);
   const filters = Object.entries(query.filters)
     .map(([field, value]) => supplierFilterWhere(field, value))
@@ -321,6 +335,7 @@ export function buildSupplierWhere(query: ListQuery): Prisma.SupplierWhereInput 
 
   return {
     deletedAt: null,
+    ...supplierCompanyScope(scope),
     ...(search === null ? {} : { nameNormalized: search }),
     ...(filters.length === 0 ? {} : { AND: filters }),
   };
@@ -342,9 +357,12 @@ export function buildSupplierWhere(query: ListQuery): Prisma.SupplierWhereInput 
  * `total` sale de un `count` con el MISMO `where` que el `findMany` (R14) -literalmente la
  * misma constante, no dos copias parecidas-.
  */
-export async function listAliveSuppliers(query: ListQuery): Promise<Page<SupplierView>> {
+export async function listAliveSuppliers(
+  query: ListQuery,
+  scope: SupplierScope,
+): Promise<Page<SupplierView>> {
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
-  const where = buildSupplierWhere(query);
+  const where = buildSupplierWhere(query, scope);
 
   const [rows, total] = await Promise.all([
     prisma.supplier.findMany({

@@ -11,12 +11,17 @@ import { assertPermission, type PermissionCode } from '@/lib/modules/identity';
 import { UnauthorizedError } from './errors';
 
 /**
- * Actor de entrada de cada uno de los nueve casos de uso: id y su conjunto de permisos,
- * nada mas. **Sin nombre de rol** (R18): este modulo no lo lee, no lo compara y no lo
- * recibe; quien decide es la pertenencia exacta del codigo al conjunto (R13).
+ * Actor de entrada de cada uno de los nueve casos de uso: id, EMPRESA y su conjunto de
+ * permisos, nada mas. **Sin nombre de rol** (R18): este modulo no lo lee, no lo compara y no
+ * lo recibe; quien decide es la pertenencia exacta del codigo al conjunto (R13).
+ *
+ * `companyId` viaja dentro del actor y no como parametro suelto de cada caso de uso, para
+ * que ningun llamante nuevo pueda olvidarlo ni, peor, elegirlo. Filtra y no autoriza por si
+ * solo: el permiso se sigue exigiendo aparte y primero, con `requirePermission`.
  */
 export type Actor = {
   readonly id: string;
+  readonly companyId: string;
   readonly permissions: readonly string[];
 };
 

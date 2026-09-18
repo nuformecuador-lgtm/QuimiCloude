@@ -307,6 +307,7 @@ test.beforeAll(async () => {
       select: { id: true },
     })
   ).id;
+  const fixtureCompanyId = companyId;
 
   await createUserWithRole(adminUser, ROLE_ADMINISTRADOR);
   await createUserWithRole(operatorUser, ROLE_OPERADOR);
@@ -327,6 +328,7 @@ test.beforeAll(async () => {
       name,
       nameNormalized: normalizeSupplierName(name),
       phone: supplierPhone,
+      companyId: fixtureCompanyId,
     })),
   });
 });

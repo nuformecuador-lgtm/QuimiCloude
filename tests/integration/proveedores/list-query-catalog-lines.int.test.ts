@@ -30,6 +30,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 import type { ListQuery } from '@/lib/modules/proveedores/domain/list-query';
+import type { SupplierScope } from '@/lib/modules/proveedores/domain/supplier-scope';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -40,6 +41,10 @@ let otroSupplierId: string;
 let presentationId: string;
 let otraPresentationId: string;
 let unitId: string;
+/** La empresa de las dos filas de apoyo (`suppliers`, `supplier_catalog_lines`) de este
+ *  archivo. Ningun caso compara empresas entre si: es lo que exigen las columnas NOT NULL. */
+let companyId: string;
+let scope: SupplierScope;
 
 /** Normalizacion de los datos de APOYO (presentacion, unidad), que tienen la suya propia. */
 function normalizeForTest(name: string): string {
@@ -68,6 +73,7 @@ async function sembrar(semillas: readonly Semilla[]): Promise<void> {
     await prisma.supplierCatalogLine.create({
       data: {
         supplierId: semilla.proveedor === 'otro' ? otroSupplierId : supplierId,
+        companyId,
         name: semilla.name,
         nameNormalized: normalizeSupplierName(semilla.name),
         presentationId: semilla.presentacion === 'otra' ? otraPresentationId : presentationId,
@@ -92,7 +98,7 @@ function consulta(partial: Partial<ListQuery> = {}): ListQuery {
 
 /** La pagina del proveedor sembrado. Nunca `'supplier_not_found'` salvo donde se prueba. */
 async function listar(query: ListQuery) {
-  const pagina = await listCatalogLinesBySupplierAlive(supplierId, query);
+  const pagina = await listCatalogLinesBySupplierAlive(supplierId, query, scope);
   if (pagina === 'supplier_not_found') throw new Error('el proveedor sembrado no esta vivo');
   return pagina;
 }
@@ -104,6 +110,7 @@ async function crearProveedor(): Promise<string> {
       name,
       nameNormalized: normalizeSupplierName(name),
       phone: '+57 300 000 0000',
+      companyId,
     },
     select: { id: true },
   });
@@ -146,6 +153,9 @@ async function andamiajeCompanyId(db: typeof prisma): Promise<string> {
 }
 
 beforeAll(async () => {
+  companyId = await andamiajeCompanyId(prisma);
+  scope = { companyId };
+
   supplierId = await crearProveedor();
   otroSupplierId = await crearProveedor();
 
@@ -510,6 +520,7 @@ describe('las DOS condiciones de vida siguen en el `where`, filtre lo que filtre
     const resultado = await listCatalogLinesBySupplierAlive(
       marcado,
       consulta({ sort: { columnId: 'cost', direction: 'desc' } }),
+      scope,
     );
 
     expect(resultado).toBe('supplier_not_found');

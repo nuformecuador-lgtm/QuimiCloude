@@ -30,10 +30,6 @@ consecuencias de arquitectura que no son opinables:
    - **Toda tabla de negocio nueva nace con su columna de empresa.** Las unicas exentas
      son las del sistema, y son una lista corta y cerrada: `users`, `roles`,
      `document_types`. Anadir una tabla de operacion sin empresa es BLOQUEANTE.
-   - **Lo ya construido todavia no lo esta**, y esa es la deuda que salda la epica QC-46:
-     unidades (QC-51) y proveedores (QC-59). La guardia que lo hace cumplir es
-     QC-61. Mientras una tabla siga en esa lista es deuda registrada, no
-     incumplimiento; cuando la lista quede vacia, esta vineta se borra.
    - **Lo que la regla vieja protegia sigue en pie.** No se prepara infraestructura «por
      si acaso». Lo que cambio es que multiplicar empresas dejo de ser hipotetico y paso a
      ser backlog; sigue siendo sobre-ingenieria —y el reviewer la rechaza— todo lo que no

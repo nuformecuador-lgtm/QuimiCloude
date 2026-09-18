@@ -480,9 +480,14 @@ export function staysOutOfOtherTickets(sql: string): boolean {
 /**
  * R28. ¿NINGUNA tabla de otro modulo gana columna de empresa aqui?
  *
- * `recipes`, `recipe_lines`, `suppliers`, `supplier_catalog_lines` y `orders` son QC-50, QC-59 y
- * QC-60. Se nombran una por una en vez de por «las que no son de inventario»: una lista
- * explicita se lee y se corrige; una regla implicita se olvida.
+ * `recipes`, `recipe_lines`, `suppliers`, `supplier_catalog_lines` y `orders` no son de este
+ * modulo y ESTA migracion no les hace DDL de ninguna clase. Cada una tiene su propia historia:
+ * `suppliers` y `supplier_catalog_lines` YA tienen empresa desde el 2026-09-17, y se la dio su
+ * propia migracion, no esta; `recipes` y `orders`, la suya. Que ya la tengan no cambia lo que
+ * este predicado afirma -sigue siendo que este archivo no las nombra-, pero si cambia como hay
+ * que leerlo: no es una lista de pendientes, es una lista de fronteras. Se nombran una por una
+ * en vez de por «las que no son de inventario»: una lista explicita se lee y se corrige; una
+ * regla implicita se olvida.
  */
 export function touchesNoOtherModuleTable(sql: string): boolean {
   const texto = stripSqlComments(sql)

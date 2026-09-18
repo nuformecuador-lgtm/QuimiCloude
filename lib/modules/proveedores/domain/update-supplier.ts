@@ -1,5 +1,6 @@
 import { requirePermission, type Actor } from './actor';
 import { SupplierDuplicateNameError, SupplierNotFoundError, ValidationError } from './errors';
+import type { SupplierScope } from './supplier-scope';
 import { updateSupplierSchema } from './supplier-input';
 import { normalizeSupplierName } from './supplier-name';
 
@@ -33,6 +34,8 @@ export function createUpdateSupplier(
   ): Promise<void> {
     requirePermission(actor, 'proveedores.modificar');
 
+    const scope: SupplierScope = { companyId: actor.companyId };
+
     const parsed = updateSupplierSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
 
@@ -41,6 +44,7 @@ export function createUpdateSupplier(
       { ...parsed.data, nameNormalized: normalizeSupplierName(parsed.data.name) },
       actor.id,
       now(),
+      scope,
     );
 
     // R24: no existe y ya esta dado de baja son el mismo caso; el filtro
