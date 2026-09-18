@@ -14,7 +14,7 @@
 
 ## Bloque 1 — La guardia
 
-- [ ] **T1 — Lector del esquema.**
+- [x] **T1 — Lector del esquema.**
   Archivos: `tests/guards/guard-empresa-en-esquema.test.ts` (nuevo).
   Contenido: `findRepoRoot`, `leerModelos(schemaSource)` según `design.md > 3` (normaliza `\r\n?`,
   quita `//`/`///` por línea, bloques `model`, tabla por `@@map` o nombre, columnas por `@map` o
@@ -25,7 +25,7 @@
   lo protege (normalizar CRLF / quitar comentarios) — comprobado a mano y anotado en `progress/`.
   Cubre: R1, R5, R11.
 
-- [ ] **T2 — `EXENTAS` y los dos juicios.**
+- [x] **T2 — `EXENTAS` y los dos juicios.**
   Archivos: el mismo de T1.
   Contenido: `EXENTAS` con las ocho tablas de [D1] y un motivo por entrada (catálogo compartido;
   la propia empresa; cuelga de un usuario que ya tiene empresa; hereda la empresa de su receta y
@@ -37,7 +37,7 @@
   `toEqual`, no con `toContain`) y su simétrico da `[]`.
   Cubre: R2, R3, R4, R6, R8, R9.
 
-- [ ] **T3 — El esquema real y la lista exacta.**
+- [x] **T3 — El esquema real y la lista exacta.**
   Archivos: el mismo de T1.
   Contenido: `it` sobre `db/schema.prisma` real: al menos un modelo (si no, rojo), cero hallazgos,
   `users` juzgada por su `company_id`; `it` que compara el conjunto de `EXENTAS` con las ocho
@@ -49,7 +49,7 @@
 
 ## Bloque 2 — Documentación
 
-- [ ] **T4 [P] — Corregir `docs/architecture.md > Dominio`.**
+- [x] **T4 [P] — Corregir `docs/architecture.md > Dominio`.**
   Archivos: `docs/architecture.md` (l. 30-32).
   Contenido: el bullet «Toda tabla de negocio nueva nace con su columna de empresa.» nombra las
   ocho tablas de [D1] con su motivo agrupado, dice que basta con que la columna exista [D3], nombra
@@ -60,7 +60,7 @@
   son exactamente las ocho.
   Cubre: R14 (texto).
 
-- [ ] **T5 — Test «doc = guardia».**
+- [x] **T5 — Test «doc = guardia».**
   Archivos: el mismo de T1.
   Contenido: localiza el bullet por su frase inicial, extrae identificadores `^[a-z][a-z_]*$` entre
   comillas invertidas, descuenta `company_id`, compara con `EXENTAS`. Rojo si no encuentra el
@@ -70,7 +70,7 @@
   Hecho cuando: verde sobre el doc real y rojo con los dos fixtures.
   Cubre: R14.
 
-- [ ] **T7 [P] — Corregir `CHECKPOINTS.md` y `.claude/agents/reviewer.md`.**
+- [x] **T7 [P] — Corregir `CHECKPOINTS.md` y `.claude/agents/reviewer.md`.**
   Archivos: `CHECKPOINTS.md` (l. 28-30), `.claude/agents/reviewer.md` (l. 33-35).
   Contenido: sustituir «las tres del sistema (`users`, `roles`, `document_types`)» por una remisión
   a la lista de `docs/architecture.md > Dominio` y a la guardia.
@@ -80,7 +80,7 @@
 
 ## Bloque 3 — Condicional
 
-- [ ] **T8 — Rojo por exenta que sobra.**
+- [x] **T8 — Rojo por exenta que sobra.**
   Archivos: el mismo de T1.
   Contenido: `hallazgosExentasQueSobran(modelos, exentas)`: entrada cuya tabla no existe en el
   esquema o que ya declara `company_id`. Fixtures de los dos casos y su simétrico; `it` sobre el
@@ -91,7 +91,7 @@
 
 ## Bloque 4 — Cierre
 
-- [ ] **T6 — Probar que muerde sobre el archivo real.**
+- [x] **T6 — Probar que muerde sobre el archivo real.**
   Archivos: ninguno queda modificado.
   Contenido: `cp db/schema.prisma` a una copia; (a) quitar la línea `companyId` de `model Product`;
   (b) añadir un `model Foo` sin `company_id`; en cada caso `pnpm run test:guardias` > archivo,
@@ -103,7 +103,7 @@
   en `docs/`.
   Cubre: R2, R10 (en el gate real).
 
-- [ ] **T9 — Gate y trazabilidad.**
+- [x] **T9 — Gate y trazabilidad.**
   Archivos: `progress/impl_QC-61-guardia-empresa-en-esquema.md`.
   Contenido: `./init.sh --rapido` y después `./init.sh` completo; `git diff origin/dev -- package.json`
   vacío; mapa `R<n> -> test` copiado de `§ Trazabilidad`. Un rojo del gate se compara contra la
