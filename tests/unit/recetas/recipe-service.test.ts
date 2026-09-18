@@ -455,7 +455,11 @@ describe('R19 — el detalle de receta sigue exigiendo recetas.consultar', () =>
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
     const getRecipe = createGetRecipe({ recipes, products, images });
-    const sinPermiso: Actor = { id: 'op-1', permissions: ['recetas.modificar'] };
+    const sinPermiso: Actor = {
+      id: 'op-1',
+      companyId: EMPRESA,
+      permissions: ['recetas.modificar'],
+    };
 
     await expect(getRecipe('receta-1', sinPermiso)).rejects.toThrow();
     expect(recipes.findAliveById).not.toHaveBeenCalled();
