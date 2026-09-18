@@ -207,8 +207,8 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
 
     it('la cabecera de error-codes.ts redacta la octava enmienda con su fecha y su aprobacion', () => {
       const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
-      expect(source).toContain('**Octava enmienda, el 2026-09-18 (QC-108)**')
-      expect(source).toContain('Aprobada por el humano el 2026-09-18 en la puerta F1.4 de QC-108')
+      expect(source).toContain('**Octava enmienda, el 2026-09-18**')
+      expect(source).toContain('Aprobada por el humano el 2026-09-18')
     })
   })
 

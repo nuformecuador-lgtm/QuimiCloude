@@ -72,3 +72,16 @@ export class AiUnavailableError extends DocumentosError {
     super('ai_unavailable', diagnostic);
   }
 }
+
+/**
+ * No es una entrada invalida ni un corte del proveedor: algo propio de este modulo reviento antes
+ * de llegar a hablar con la IA —el convertidor de PDF, por ejemplo—. Deliberadamente sin publicar
+ * por el barril: nada fuera de este modulo lo distingue por su clase, solo por el `code`.
+ */
+export class UnexpectedError extends DocumentosError {
+  readonly code = 'unexpected';
+
+  constructor(diagnostic?: string) {
+    super('unexpected', diagnostic);
+  }
+}

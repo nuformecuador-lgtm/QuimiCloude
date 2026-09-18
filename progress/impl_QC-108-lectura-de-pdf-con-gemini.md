@@ -38,16 +38,16 @@ de `node_modules/@google/genai/dist/genai.d.ts`, version **2.23.0**
 
 | Pregunta | Estado | Lo que dice la API real |
 |---|---|---|
-| Como se pide un **plazo maximo** | **CERRADO** | Dos vias, y **son distintas**. (a) `GenerateContentConfig.httpOptions?: HttpOptions` (`genai.d.ts:5899`), y `HttpOptions.timeout?: number` — *«Timeout for the request in milliseconds»* (`genai.d.ts:8172`). (b) `GenerateContentConfig.abortSignal?: AbortSignal` (`genai.d.ts:5906`) |
-| Como viaja un **PDF** | **CERRADO** | Como `Part.inlineData?: Blob` (`genai.d.ts:12351`), donde `Blob` es `{ data?: string, mimeType?: string, displayName?: string }` y `data` esta **codificado en base64** (`genai.d.ts:1378-1386`). Hay helper: `createPartFromBase64(data, mimeType)` (`genai.d.ts:2903`). `mimeType` = `application/pdf` |
-| Como viaja una **imagen** | **CERRADO** | **Por el mismo camino**: `inlineData` con `mimeType` = `image/png`. El `.d.ts` no ofrece ninguna forma distinta para imagen: el docblock de `Part.inlineData` dice literalmente *«can be used to include images, audio, or video»* (`genai.d.ts:12350`) |
+| Como se pide un **plazo maximo** | **CERRADO** | Dos vias, y **son distintas**. (a) `GenerateContentConfig.httpOptions?: HttpOptions` (`genai.d.ts:5899`), y `HttpOptions.timeout?: number` en `genai.d.ts:8173`, cuyo docblock de la linea justo anterior (`genai.d.ts:8172`) dice *«Timeout for the request in milliseconds»*. (b) `GenerateContentConfig.abortSignal?: AbortSignal` (`genai.d.ts:5906`) |
+| Como viaja un **PDF** | **CERRADO** | Como `Part.inlineData?: Blob` (`genai.d.ts:12352`), donde `Blob` es `{ data?: string, mimeType?: string, displayName?: string }` y `data` esta **codificado en base64** (`genai.d.ts:1378-1386`). Hay helper: `createPartFromBase64(data, mimeType)` (`genai.d.ts:2903`). `mimeType` = `application/pdf` |
+| Como viaja una **imagen** | **CERRADO** | **Por el mismo camino**: `inlineData` con `mimeType` = `image/png`. El `.d.ts` no ofrece ninguna forma distinta para imagen: el docblock de `Part.inlineData` dice literalmente *«can be used to include images, audio, or video»* (`genai.d.ts:12351`) |
 
 La forma completa de la llamada, tambien leida:
 `new GoogleGenAI({ apiKey })` (`genai.d.ts:7084`, opcion `apiKey` en `:7192`) →
 `ai.models.generateContent(params: GenerateContentParameters): Promise<GenerateContentResponse>`
 (`genai.d.ts:11445`), con `{ model: string, contents: ContentListUnion, config?: GenerateContentConfig }`
 (`genai.d.ts:6060-6069`) y el texto en el getter `GenerateContentResponse.text: string | undefined`
-(`genai.d.ts:6117`). `createPartFromText` (`genai.d.ts:2927`) y `createUserContent`
+(`genai.d.ts:6117`). `createPartFromText` (`genai.d.ts:2928`) y `createUserContent`
 (`genai.d.ts:3046`) arman el turno.
 
 ### Lo que este cierre **confirma**, y es un limite, no una buena noticia
@@ -241,3 +241,117 @@ verde**, incluidas `guard-dependencias-aprobadas`, `guard-catalogo-de-errores`,
 
 **El gate completo (`./init.sh`) lo corre el leader**, no el implementer (`AGENTS.md > Regla del
 gate`), y con el la decision sobre ese rojo.
+
+---
+
+# Segunda vuelta — los dos BLOQUEANTES del reviewer, arreglados
+
+Informe que los abrio: `progress/review_QC-108-lectura-de-pdf-con-gemini.md` (veredicto RECHAZADO,
+2 bloqueantes y 5 menores). El reviewer tenia razon en los dos.
+
+## BLOQUEANTE 1 — un fallo NUESTRO salia etiquetado como corte del proveedor
+
+**El defecto, confirmado leyendo el archivo:** `conDiagnostico()` relanzaba **cualquier** fallo como
+`Error` **plano**. Por eso un PDF corrupto o cifrado que reventara en `countPages` o `renderPages`
+caia por el `else` de `fallo()` y salia con el codigo `ai_unavailable`. Y el comentario de ese
+`else` —«lo que quedo fue el proveedor o el plazo»— **afirmaba algo falso**. Chocaba de frente con
+**R10**, que exige un codigo «distinto del de una entrada invalida **y distinto del de un bug
+nuestro**»: QC-107 habria dicho «la lectura automatica no esta disponible» ante un bug de nuestro
+convertidor, y el log habria apuntado a Google.
+
+**Arreglado de raiz, no tapando el comentario.** `conDiagnostico` ya no lanza `Error` plano: recibe
+el constructor del error que corresponde a **esa** operacion y envuelve con el. Un `DocumentosError`
+que venga de mas adentro se **relanza tal cual**, sin reenvolver.
+
+| Operacion | Codigo que emite ahora | Por que |
+|---|---|---|
+| `countPages` | **`unexpected`** | Es **nuestro** convertidor. `unexpected` ya existe en el catalogo para «lo que no es de dominio: fallo de base, bug» |
+| `renderPages` | **`unexpected`** | Lo mismo |
+| tope de paginas superado | `invalid_input` | **Sin cambios**: sigue siendo entrada invalida |
+| `read` (el puerto de IA) y plazo agotado | **`ai_unavailable`** | Lo unico que de verdad significa «el proveedor no respondio» |
+| el `else` de `fallo()` | **`unexpected`** | Antes era `ai_unavailable`. Ahora que `conDiagnostico` envuelve todo lo que puede reventar, llegar ahi es lo **verdaderamente imprevisto**, y eso es un bug nuestro |
+
+**No se invento ningun codigo nuevo**: la octava enmienda no se amplia. Lo que nacio es una
+**clase**, `UnexpectedError` en `domain/errors.ts` —la jerarquia unica del modulo—, con el codigo
+`unexpected`, sin `message` por parametro, igual que sus hermanas. **Deliberadamente NO se publica
+por el barril**: `module-contract.test.ts` congela una lista **curada** de exports y no exige que
+salga toda clase de `errors.ts`; fuera del modulo nadie la distingue por su clase, solo por su
+codigo. Asi el arreglo no amplia la superficie publica ni toca el contrato.
+
+**El test que dejo pasar esto tambien era nuestro, y tambien se arreglo.** El caso de R8 de ese
+camino comprobaba el `reason` y **no el codigo**, asi que pasaba con el bug puesto. Tres casos
+nuevos en `read-pdf-with-ai.test.ts`, que **muerden**:
+
+- «R8, R10 — si countPages lanza, el code es unexpected y NO ai_unavailable»
+- «R8, R10 — si renderPages lanza, el code es unexpected y NO ai_unavailable»
+- «R9, R10 — si el puerto de IA lanza, el code SI es ai_unavailable» (el simetrico, que fija el otro
+  camino para que el arreglo no se pase de frenada)
+
+**Se comprobo que muerden de verdad**, no por inspeccion: se reintrodujo el bug exacto —el `Error`
+plano y el `else` devolviendo `AiUnavailableError`— y los dos primeros dieron **rojo**, mientras
+`ai-timeout.test.ts` seguia **verde**, confirmando que el camino del proveedor no se rompe. Despues
+se restauro el arreglo y todo volvio a verde. Un requisito sin un test que falle cuando se rompe no
+esta cubierto (regla 4 de `CLAUDE.md`).
+
+## BLOQUEANTE 2 — citas a la ficha en produccion, clavadas por un test
+
+`docs/conventions.md > Comentarios`: **«Nunca se cita una ficha ni un requisito en un comentario de
+produccion… Sin excepciones.»** Dos lineas anadidas por esta rama en `error-codes.ts` citaban
+`QC-108` y `F1.4`, y —lo que lo convertia en algo peor que un descuido— dos `toContain` **nuevos**
+de `catalogo.test.ts` las **clavaban**, de modo que nadie podia limpiarlas sin ponerse en rojo.
+
+Las dos lineas quedan asi, sin la clave de la ficha ni la puerta:
+
+    **Octava enmienda, el 2026-09-18**: `ai_unavailable`.
+    Aprobada por el humano el 2026-09-18.
+
+La enmienda y su fecha se quedan —`tasks.md > T4` las pide y un test **preexistente** las exige— y
+«aprobada por el humano» tambien, porque es **el porque** y no una referencia al tablero. Los dos
+`toContain` ahora exigen **la enmienda y su fecha**, no la ficha, y siguen siendo **rojos** si
+alguien borra la enmienda de la cabecera.
+
+**La linea preexistente de la SEXTA enmienda con QC-81 NO se toco**, a proposito: los comentarios
+preexistentes no se arrastran a la limpieza, se limpian por modulo en fichas del board.
+
+**Comprobacion final**: el diff de lo **anadido** bajo `lib/` frente al merge-base no devuelve
+**ninguna** cita a `QC-`, `F1.4` ni `R<n>`. La rama ya no incumple la regla en produccion.
+
+### Nota sobre el origen de este bloqueante
+El encargo que recibi decia «con el mismo formato que la sexta (QC-81)», y esa linea preexistente
+**si** cita la ficha. La instruccion contradecia la regla, y **gana la regla**: `docs/conventions.md`
+dice ademas que **nunca se imita el estilo de alrededor**. Queda escrito para que no se repita.
+
+## Los cinco menores: tres arreglados, dos NO — con su motivo
+
+| # | Que decia | Que se hizo |
+|---|---|---|
+| **m1** | Cuatro helpers privados en espanol (`diagnostico`, `causaDe`, `conDiagnostico`, `fallo`), contra R24 | **NO se arregla, y es deliberado.** Son **copia exacta** de los helpers homonimos de `convert-pdf.ts`, que QC-106 ya dejo mergeados en `dev` **en este mismo modulo**: renombrarlos solo aqui dejaria el modulo hablando **dos idiomas**, que es peor que el defecto. Es **deuda de modulo, no invento de esta ficha**, y se limpia en la ficha que limpie `documentos`. **R24 no esta limpio y se dice, no se disimula** |
+| **m2** | Cuatro de las doce citas a `genai.d.ts` desplazadas una linea | **ARREGLADO**, y reverificado en el archivo: `Part.inlineData` es **:12352** (su docblock, :12351); `HttpOptions.timeout` es **:8173** (su docblock con la frase literal, :8172); `createPartFromText` es **:2928** (:2927 es el cierre del docblock); la frase «images, audio, or video» esta en **:12351**. Ninguna conclusion de `design.md > 8.3` cambia, pero **una cita que no dice lo que afirma es la misma especie de defecto que el bloqueante 1**, y por eso se corrige |
+| **m3** | Cabeceras de test que citan la ficha | **ARREGLADO** en `documentos-facade.test.ts` y `module-contract.test.ts`; los demas archivos nuevos ya estaban limpios. **Los nombres de it/describe NO se tocan**: ahi los `R<n>` son la excepcion expresa de la convencion y son el mapa del reviewer |
+| **m4** | El caso «el prompt llega EXACTAMENTE el que entro» no detectaba el recorte de zod | **ARREGLADO fijando el comportamiento**: el caso ahora usa un prompt **con espacios al borde** y afirma que llega **recortado**, que es lo que de verdad pasa. El titulo se ajusto para que sea cierto. **`ai-read-input.ts` no se toco**: el recorte se queda, R2 no prohibe normalizar. Lo que no podia quedarse era un titulo que prometia mas de lo que probaba |
+| **m5** | Bloques de comentario largos en los archivos nuevos | **ARREGLADO a medias, y digo cual mitad.** Se quito la **lista numerada del orden fijo** de la cabecera de `read-pdf-with-ai.ts`: repetia en prosa lo que el codigo ya dice y su porque ya vive en `design.md > 1`. **NO se tocan** las cabeceras de `ai-reader-genai.ts`, `limits.ts` ni `ai-config-env.ts`: lo que explican **no es evidente en el codigo** —por que abortar no deja de pagar, por que el plazo vive en una sola definicion, por que la lectura es perezosa— y es justo el tipo de porque verificado que la convencion pide conservar. Recortarlas seria borrar la evidencia que sostiene los limites de esta ficha |
+
+## Cambios en el mapa R -> test
+
+El mapa **no pierde nada**; se **amplia**:
+
+- **R8** suma «R8, R10 — si countPages lanza, el code es unexpected y NO ai_unavailable» y
+  «R8, R10 — si renderPages lanza, el code es unexpected y NO ai_unavailable». El caso preexistente
+  del `reason` queda intacto.
+- **R9** suma el simetrico «R9, R10 — si el puerto de IA lanza, el code SI es ai_unavailable».
+- **R10** pasa a estar cubierto **tambien en el dominio**, no solo en el catalogo: los tres casos
+  nuevos son los que demuestran que `ai_unavailable` es «distinto del de un bug nuestro», que es
+  literalmente lo que R10 pide y lo que antes **no se probaba**.
+- **R2** conserva su cobertura; su caso ahora prueba **lo que de verdad ocurre** en vez de una
+  afirmacion mas fuerte de la que probaba.
+
+**Siguen siendo 27 de 27, y ahora R8, R9 y R10 muerden donde antes no.**
+
+## El rojo de `qc75-convenciones.test.ts`, aclarado por el leader
+
+**No es de esta feature y ya estaba resuelto antes de que yo lo viera**: ese archivo esta en
+`tests/baseline-rojos.json` **desde el 2026-09-11**, puesto por QC-79 al instalar `resend` —el mismo
+caso exacto—, asi que **el gate COMPLETO lo tolera**. Lo que me confundio es real y esta documentado
+en QC-99: **`./init.sh --rapido` no consulta el baseline, solo el modo completo**. Por eso aparece
+rojo en la tanda y verde en el gate. La entrada del baseline y su motivo los mantiene el leader;
+**esta bitacora no toca `tests/baseline-rojos.json`**.

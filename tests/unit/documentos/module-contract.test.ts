@@ -566,9 +566,9 @@ describe('documentos — el contrato, congelado (R27, R28)', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// QC-108: la lectura de PDF con IA se publica por el MISMO contrato, sin arrastrar al tercero.
+// La lectura de PDF con IA se publica por el MISMO contrato, sin arrastrar al tercero.
 // Bloque NUEVO al final: no reordena ni reescribe nada de arriba, solo amplia lo que ya afirmaba
-// QC-106 con los simbolos y el paquete que estrena esta ficha.
+// el contrato con los simbolos y el paquete que estrena la lectura por IA.
 // ---------------------------------------------------------------------------------------------
 
 describe('documentos — la lectura con IA se publica sin arrastrar al tercero (QC-108)', () => {

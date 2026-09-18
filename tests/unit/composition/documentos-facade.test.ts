@@ -1,4 +1,4 @@
-// QC-108 T10 — La FACHADA ya cableada del modulo `documentos` con su lectura por IA.
+// La FACHADA ya cableada del modulo `documentos` con su lectura por IA.
 //
 // Lo que se afirma aqui es el CABLEADO, no el dominio: que `lib/composition` publica
 // `readPdfWithAi` junto a las cuatro claves que ya tenia, que construir la fachada NO lee las

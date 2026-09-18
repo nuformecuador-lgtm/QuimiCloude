@@ -109,15 +109,15 @@ describe('documentos — lectura de un PDF con IA', () => {
     expect(MAX_PDF_PAGES).toBe(50);
   });
 
-  it('R2 — el prompt que recibe la IA es EXACTAMENTE el que entro, sin prefijos ni sufijos', async () => {
+  it('R2 — el prompt que recibe la IA llega RECORTADO de espacios al borde, sin prefijos ni sufijos propios', async () => {
     const doble = dobleDeIa();
     const conversion = dobleDeConversion();
     const leer = createReadPdfWithAi({ ai: doble.ai, converter: conversion.converter });
-    const prompt = 'extrae el precio y el producto de cada fila';
+    const prompt = '  extrae el precio y el producto de cada fila  ';
 
     await leer({ path: PATH, bytes: pdfBytes(), prompt, mode: 'pdf' });
 
-    expect(doble.read.mock.calls[0]?.[0]?.prompt).toBe(prompt);
+    expect(doble.read.mock.calls[0]?.[0]?.prompt).toBe(prompt.trim());
   });
 
   it('R6 — el texto devuelto es IDENTICO al de la IA, saltos de linea y espacios incluidos', async () => {
@@ -176,5 +176,44 @@ describe('documentos — lectura de un PDF con IA', () => {
     expect(reason).toContain('countPages');
     expect(reason).toContain(PATH);
     expect(reason).toContain('corrupto');
+  });
+
+  it('R8, R10 — si countPages lanza, el code es unexpected y NO ai_unavailable', async () => {
+    const doble = dobleDeIa();
+    const conversion = dobleDeConversion();
+    conversion.countPages.mockImplementation(async () => {
+      throw new Error('el archivo esta corrupto');
+    });
+    const leer = createReadPdfWithAi({ ai: doble.ai, converter: conversion.converter });
+
+    const resultado = await leer({ path: PATH, bytes: pdfBytes(), prompt: 'lee esto', mode: 'images' });
+
+    expect(falloDe(resultado).code).toBe('unexpected');
+  });
+
+  it('R8, R10 — si renderPages lanza, el code es unexpected y NO ai_unavailable', async () => {
+    const doble = dobleDeIa();
+    const conversion = dobleDeConversion();
+    conversion.renderPages.mockImplementation(async () => {
+      throw new Error('el render fallo');
+    });
+    const leer = createReadPdfWithAi({ ai: doble.ai, converter: conversion.converter });
+
+    const resultado = await leer({ path: PATH, bytes: pdfBytes(), prompt: 'lee esto', mode: 'images' });
+
+    expect(falloDe(resultado).code).toBe('unexpected');
+  });
+
+  it('R9, R10 — si el puerto de IA lanza, el code SI es ai_unavailable', async () => {
+    const doble = dobleDeIa();
+    doble.read.mockImplementation(async () => {
+      throw new Error('el proveedor no respondio');
+    });
+    const conversion = dobleDeConversion();
+    const leer = createReadPdfWithAi({ ai: doble.ai, converter: conversion.converter });
+
+    const resultado = await leer({ path: PATH, bytes: pdfBytes(), prompt: 'lee esto', mode: 'pdf' });
+
+    expect(falloDe(resultado).code).toBe('ai_unavailable');
   });
 });

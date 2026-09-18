@@ -6,8 +6,8 @@
  * **Sexta enmienda, el 2026-09-15 (QC-81)**: `batch_duplicate_lot`.
  * Aprobada por el humano el 2026-09-15 en la puerta F1.4 de QC-81.
  *
- * **Octava enmienda, el 2026-09-18 (QC-108)**: `ai_unavailable`.
- * Aprobada por el humano el 2026-09-18 en la puerta F1.4 de QC-108.
+ * **Octava enmienda, el 2026-09-18**: `ai_unavailable`.
+ * Aprobada por el humano el 2026-09-18.
  */
 export const ERROR_CODES = [
   'unauthorized',
