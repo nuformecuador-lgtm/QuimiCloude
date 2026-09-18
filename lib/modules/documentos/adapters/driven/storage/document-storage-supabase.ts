@@ -20,9 +20,8 @@ import type { SignedUpload } from '../../../ports/document-storage';
  * El bucket que se lee aqui es el PROPIO de estos documentos, distinto del publico de imagenes: ni
  * una sola de estas operaciones puede alcanzarlo.
  *
- * **Ninguna operacion BORRA**, y no es olvido: el puerto no lo expresa, y el borrado del PDF
- * temporal es trabajo de quien procesa la tanda. Que la libreria ofrezca `remove` no lo convierte en
- * capacidad de este modulo.
+ * **`remove` borra de verdad**, y solo se llama tras terminar bien el procesamiento del archivo: en
+ * cualquier otro estado la fila conserva su PDF.
  *
  * Los errores del servicio se ENVUELVEN diciendo que operacion fallo y sobre que ruta. No se traga
  * ninguno: la libreria devuelve el fallo en `error` en vez de lanzarlo, asi que ignorarlo seria
@@ -101,4 +100,17 @@ export async function downloadDocument(path: string): Promise<Uint8Array> {
   }
 
   return new Uint8Array(await data.arrayBuffer());
+}
+
+/**
+ * `remove` del puerto: borra la ruta del bucket. La libreria acepta una lista de rutas; aqui se
+ * pasa siempre una sola, tal como declara el puerto.
+ */
+export async function removeDocument(path: string): Promise<void> {
+  const api = bucketApi();
+
+  const { error } = await api.remove([path]);
+  if (error) {
+    throw new Error(`fallo al borrar el documento en la ruta ${path}: ${error.message}`);
+  }
 }

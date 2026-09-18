@@ -311,6 +311,7 @@ import {
   createDocumentSignedReadUrl,
   createDocumentSignedUpload,
   downloadDocument,
+  removeDocument,
 } from '@/lib/modules/documentos/adapters/driven/storage/document-storage-supabase';
 import type { AiReader } from '@/lib/modules/documentos/ports/ai-reader';
 import type { DocumentStorage } from '@/lib/modules/documentos/ports/document-storage';
@@ -1122,18 +1123,16 @@ export const asignaciones = {
 // ---------------------------------------------------------------------------------------
 
 /**
- * `DocumentStorage` cableado con el adaptador del bucket PRIVADO de estos PDFs. Ninguna de sus tres
- * funciones se INVOCA aqui —solo se referencian—, asi que construir esta fachada no lee ni una
- * variable de entorno ni toca la red: el adaptador resuelve su configuracion en cada llamada real.
- * Importar este archivo con las variables del Storage vacias sigue funcionando.
- *
- * Ninguna de las tres BORRA, porque el puerto no lo expresa: el borrado del PDF temporal es de otra
- * ficha, y aqui no hay nada que elegir al respecto.
+ * `DocumentStorage` cableado con el adaptador del bucket PRIVADO de estos PDFs. Ninguna de sus
+ * cuatro funciones se INVOCA aqui —solo se referencian—, asi que construir esta fachada no lee ni
+ * una variable de entorno ni toca la red: el adaptador resuelve su configuracion en cada llamada
+ * real. Importar este archivo con las variables del Storage vacias sigue funcionando.
  */
 const documentStorage: DocumentStorage = {
   createSignedUpload: createDocumentSignedUpload,
   createSignedReadUrl: createDocumentSignedReadUrl,
   download: downloadDocument,
+  remove: removeDocument,
 };
 
 /**

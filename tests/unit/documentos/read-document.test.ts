@@ -62,8 +62,11 @@ function dobleDeAlmacenamiento() {
   const createSignedUpload = vi.fn(async (): Promise<never> => {
     throw new Error('la lectura no firma subidas');
   });
+  const remove = vi.fn(async (): Promise<void> => {
+    throw new Error('la lectura no borra nada');
+  });
 
-  const storage: DocumentStorage = { createSignedUpload, createSignedReadUrl, download };
+  const storage: DocumentStorage = { createSignedUpload, createSignedReadUrl, download, remove };
   return { storage, createSignedUpload, createSignedReadUrl, download, lecturas, descargas };
 }
 
