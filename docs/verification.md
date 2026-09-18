@@ -250,26 +250,36 @@ de test rojo que no estuviera ya en `tests/baseline-rojos.json`**.
 saber que la deuda es de `dev` y no tuya. Y síémbralo con pocas entradas: si nace con cincuenta,
 nadie lo va a limpiar nunca.
 
-> **Estado en QuimiCloude (2026-09-08):** el baseline tiene **dos** entradas. Eran cinco hasta
-> QC-58, que retiró las tres que estaban ahí por los flakes de saturación —`inventario/product-page`,
-> `proveedores-ui/catalog-line-sheet` y `proveedores-ui/supplier-page`— en el mismo cambio que
-> arregló la causa (ver la sección siguiente). Las dos que quedan son por el
-> mismo motivo estructural: `tests/unit/recetas-ui/recipe-route-contract.test.ts` y
-> `tests/unit/recetas/module-contract.test.ts` contienen guardias que se apoyan en
-> `git diff --name-only origin/dev...HEAD` y que, estando en `dev`, no tienen rango que mirar
-> y fallan a propósito en vez de pasar sin comprobar nada. El coste está anotado en cada
-> `motivo` y no es menor: al ser la comparación **por archivo**, esos dos archivos quedan
-> ignorados también en las ramas de feature donde sus guardias sí morderían. Lo correcto es
-> que el caso del diff se salte explícitamente cuando el rango no existe y que estas dos
-> entradas desaparezcan.
+> **Estado en QuimiCloude (2026-09-18):** el baseline tiene **ocho** entradas y **seis de ellas ya
+> pasan**. Eso es una regresión del propio baseline, no del código: la lista creció feature a
+> feature y nadie la podó. Hasta el 2026-09-08 tenía **dos** —eran cinco, y QC-58 retiró las tres
+> de los flakes de saturación **en el mismo cambio que arregló la causa**, que es lo que hace que
+> un arreglo cuente—. Las seis que sobran las señala el comparador en cada corrida completa
+> («aviso: N archivo(s) del baseline ya pasan; toca limpiarlos»), y **desde el 2026-09-18 atender
+> ese aviso es obligación del leader al cerrar cada feature** (`AGENTS.md`, paso F2.6): se borra lo
+> que ya pasa, o se dice por escrito por qué se queda.
+>
+> Las dos que sí siguen rojas son de la misma especie y **ninguna es deuda de código**: son
+> guardias que censan el diff de rama o el `package.json` contra `dev`, y por tanto las rompe
+> cualquier feature posterior con una dependencia legítima y aprobada —`resend` en QC-79,
+> `@google/genai` en QC-108—. El coste está anotado en cada `motivo` y no es menor: al ser la
+> comparación **por archivo**, esos archivos quedan ignorados **también en las ramas de feature
+> donde sus guardias sí morderían**. Arreglar la clase entera es **QC-99**.
 
 ### Los flakes de saturación: qué son, qué NO los cura, y cómo se curaron (2026-09-04, arreglado en QC-58 el 2026-09-08)
 
 Los «2–5 flakes de saturación» de arriba tienen una firma concreta, y merece la pena reconocerla
 antes de perder una tarde: **`Test timed out in <plazo>ms`, en un test de UI que escribe con
 `userEvent`**. Hasta QC-58 ese plazo era `5000` —el default de Vitest— y ese número era
-literalmente la firma; desde QC-58 son `15000`, así que si vuelves a verlo ahora es una señal
-mucho más seria que entonces: 15 s de espera no se agotan por contención de CPU sin más. El campo
+literalmente la firma; desde QC-58 son `15000`. Hasta el 2026-09-18 esta guía decía además que
+verlo con el plazo nuevo era «una señal mucho más seria», porque 15 s no se agotan por contención
+de CPU sin más. **Eso quedó desmentido ese día y se corrige aquí**: tres archivos distintos
+—`inventario/product-page` (que se pone 20 s por su cuenta), `pedidos-ui/order-form` y
+`integration/infra/ciclo-de-vida-de-la-base`— cayeron por plazo en corridas de **868 s, 489 s y
+401 s** frente a los ~300 s de una corrida sana, y **los tres pasaron en aislamiento**. Ninguno
+entró al baseline. La firma sigue siendo útil para reconocerlo; lo que ya no vale es tratarla como
+prueba de gravedad. **Desde el 2026-09-18 el plazo es `20000` en los tres proyectos**, y la
+comprobación barata de siempre —correr el archivo solo— sigue siendo la que decide. El campo
 controlado no llega a repintarse entre tecla y tecla cuando la máquina va cargada, y la prueba
 escribe más rápido de lo que el campo se actualiza. El síntoma clásico es que
 las letras salgan intercaladas —`xxxxxAxcxixdxox` donde debía salir `Acido citrico`—.

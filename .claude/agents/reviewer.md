@@ -55,3 +55,8 @@ Escribe `progress/review_<feature>.md` con:
 
 Si RECHAZADO, sé específico: qué requisito o checkpoint falla y qué falta para
 cumplirlo. No arregles el código tú; eso vuelve al implementer.
+
+**Un rojo del baseline no es un hallazgo.** `./init.sh --rapido` **NO** consulta
+`tests/baseline-rojos.json` —solo lo hace el modo completo—, asi que un archivo con deuda ajena
+ya listada sale rojo ahi igual. Antes de tratarlo como bloqueante, mira si el archivo esta en esa
+lista. El 2026-09-18 costo una vuelta entera y una decision que no existia.

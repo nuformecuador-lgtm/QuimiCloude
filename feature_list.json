@@ -1864,6 +1864,21 @@
       "branch": "feature/QC-125-espera-minima-por-paso",
       "depends_on": [],
       "spec_path": "specs/QC-125-espera-minima-por-paso"
+    },
+    {
+      "key": "QC-128",
+      "id": 128,
+      "epic": "QC-16",
+      "epic_name": "Plataforma",
+      "name": "wt-borra-antes-de-desregistrar",
+      "description": "Nacida el 2026-09-18 al cerrar QC-108, que fue el OCTAVO worktree que quedo «a medio borrar». Los ocho se anotaron en progress/current.md como «archivo en uso en Windows», que es el aviso que imprime el script: describe el sintoma y esconde la causa. Ninguno se ha recuperado solo, y ese detalle es el que da la causa.\n\nLA CAUSA, medida el 2026-09-18. scripts/wt.sh done hace dos cosas EN ESTE ORDEN: (1) quita el registro del worktree en git, (2) borra el directorio. En Windows el paso 2 falla con facilidad -basta con que cualquier proceso tenga abierto algo bajo node_modules-, y entonces queda el PEOR de los dos estados posibles: git ya NO conoce el worktree -no sale en git worktree list y git worktree prune no lo ve- y el directorio SIGUE en disco, a medias.\n\nY lo que lo hace permanente: al no estar registrado, NINGUNA corrida futura de wt.sh lo va a reintentar. Por eso van ocho y ninguno se recupera solo. No es mala suerte repetida ocho veces: el orden de las dos operaciones convierte un fallo transitorio en basura definitiva.\n\nCOMO SE RECONOCE: el directorio existe bajo .worktrees/, NO aparece en git worktree list, y dentro NO hay .git.\n\nLO QUE ENTRA: invertir el orden en wt.sh done -borrar primero y desregistrar SOLO si el borrado tuvo exito-, de modo que un fallo deje el worktree ENTERO Y REGISTRADO, que es un estado del que wt.sh si sabe salir reintentando. Y un caso de test que lo pruebe: hoy wt.sh no tiene ninguno.\n\nLO QUE NO ENTRA: las cuatro guardas de wt.sh done, que funcionan y no se tocan. Tampoco la regla de oro «ante la duda, NO borra».\n\nCUIDADO AL IMPLEMENTAR: se toca el unico script que borra directorios del repositorio. Un fallo aqui borra trabajo, no lo estorba. Cualquier cambio necesita probarse contra un worktree de mentira antes que contra uno real.\n\nLIMPIEZA APARTE: los huerfanos que YA existen en disco no los borra esta ficha. Estan anotados en progress/current.md y los borra el humano, comprobando antes que la rama figura en git branch --merged dev.\n\nEl diagnostico completo quedo escrito el 2026-09-18 en docs/worktrees.md.\n\nABIERTO, se acota con /afinar-regla: si el desregistro se reintenta solo en la siguiente corrida de wt.sh o hace falta un comando aparte; si wt.sh list debe detectar y nombrar los huerfanos que ya hay; y si el script debe negarse a desregistrar cuando el directorio sigue en pie.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-128-wt-borra-antes-de-desregistrar",
+      "depends_on": [],
+      "spec_path": "specs/QC-128-wt-borra-antes-de-desregistrar"
     }
   ]
 }

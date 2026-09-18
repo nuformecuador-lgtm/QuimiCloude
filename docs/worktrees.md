@@ -139,3 +139,33 @@ Pasó tres veces antes de arreglarse: dos en QC-74 —anotadas en `progress/curr
 
 La copia del board que manda **sigue siendo la de la rama**: es la que su PR va a mergear. Lo
 que cambia es dónde busca los specs, no a quién le cree.
+
+### `wt.sh done` desregistra ANTES de borrar, y por eso los huérfanos no se recuperan solos (2026-09-18)
+
+Van **ocho** worktrees que quedaron «a medio borrar», y hasta hoy los ocho se anotaron como
+«¿archivo en uso en Windows?», que es el aviso que imprime el script. Ese aviso describe el
+síntoma y esconde la causa, así que conviene escribirla.
+
+`wt.sh done` hace dos cosas: **quita el registro** del worktree en git y **borra el directorio**.
+En ese orden. En Windows el borrado falla con facilidad —basta con que cualquier proceso tenga
+abierto algo bajo `node_modules`—, y entonces el estado que queda es **el peor de los dos
+posibles**:
+
+- git ya **no** conoce el worktree: no sale en `git worktree list` y `git worktree prune` no lo ve;
+- el directorio **sigue en disco**, a medias, con `node_modules` y parte del árbol.
+
+Y lo que lo hace permanente: al no estar registrado, **ninguna corrida futura de `wt.sh` lo va a
+reintentar**. Por eso van ocho y ninguno se ha recuperado solo. No es mala suerte repetida ocho
+veces: es que el orden de las dos operaciones convierte un fallo transitorio en basura definitiva.
+
+**Cómo se reconoce**, en un vistazo: el directorio existe bajo `.worktrees/`, **no** aparece en
+`git worktree list`, y dentro **no hay `.git`**.
+
+**Qué hacer mientras no se arregle.** Comprueba que no hay nada que perder —la rama figura en
+`git branch --merged dev`, el PR está mergeado y el árbol estaba limpio— y sólo entonces borra a
+mano el directorio y la rama. **Ante la duda, no borres**: es la regla de oro del script y sigue
+en pie. Anótalo en `progress/current.md > Deudas y cosas abiertas` con lo comprobado.
+
+**La salida limpia** es invertir el orden —borrar primero y desregistrar sólo si el borrado tuvo
+éxito—, de modo que un fallo deje el worktree **entero y registrado**, que es un estado del que
+`wt.sh` sí sabe salir. Tiene ficha propia en el board.

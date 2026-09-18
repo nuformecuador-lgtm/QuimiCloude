@@ -39,11 +39,11 @@ export default defineConfig({
           name: 'ui',
           environment: 'jsdom',
           globals: true,
-          // Ver `docs/verification.md > Los flakes de saturacion`. 15 s, no los 5 s por
-          // defecto, y POR PROYECTO: `testTimeout` es opcion de proyecto y escribirlo una
-          // sola vez en la raiz seria una apuesta sobre la herencia que sale verde si
-          // pierdes. Lo vigila `tests/guards/guard-teclear-y-plazo.test.ts` (QC-58, R1).
-          testTimeout: 15_000,
+          // Ver `docs/verification.md > Los flakes de saturacion`. 20 s desde el 2026-09-18
+          // -eran 15 s, y tres archivos cayeron por plazo el mismo dia-, y POR PROYECTO:
+          // `testTimeout` es opcion de proyecto y escribirlo solo en la raiz seria una
+          // apuesta sobre la herencia. Lo vigila `tests/guards/guard-teclear-y-plazo.test.ts`.
+          testTimeout: 20_000,
           setupFiles: ['./tests/setup.ts'],
           include: ['tests/**/*.test.tsx', 'tests/ui/**/*.test.ts'],
           exclude,
@@ -59,7 +59,7 @@ export default defineConfig({
           // (`composition/identity-facade`, que no teclea nada, murio en
           // `await import('@/lib/composition')`). La causa es contencion de CPU y no
           // distingue de proyecto. Ver `docs/verification.md > Los flakes de saturacion`.
-          testTimeout: 15_000,
+          testTimeout: 20_000,
           include: ['tests/**/*.test.ts'],
           exclude: [...exclude, 'tests/ui/**', 'tests/integration/**'],
         },
@@ -72,7 +72,7 @@ export default defineConfig({
           globals: true,
           // Mismo plazo que los otros dos. Ver `docs/verification.md > Los flakes de
           // saturacion` (QC-58, R1).
-          testTimeout: 15_000,
+          testTimeout: 20_000,
           include: ['tests/integration/**/*.test.ts'],
           exclude,
           // QC-77: la base de esta corrida. `_global-setup.ts` corre una vez en el proceso
