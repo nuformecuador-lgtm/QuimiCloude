@@ -95,6 +95,10 @@ describe('documentos — lectura de un PDF con IA', () => {
     expect(doble.read).not.toHaveBeenCalled();
     expect(falloDe(resultado).reason).toContain('countPages');
     expect(falloDe(resultado).reason).toContain('51');
+    // Pasarse del tope es una entrada invalida, no un corte del proveedor: si este code se
+    // relajara, la pantalla diria que la IA no esta disponible por un PDF demasiado largo.
+    expect(falloDe(resultado).code).toBe('invalid_input');
+    expect(falloDe(resultado).code).not.toBe('ai_unavailable');
   });
 
   it('R5 — el tope es INCLUSIVO: con 50 paginas se lee', async () => {

@@ -375,3 +375,63 @@ aparecio. Esa corrida tardo **401 s frente a los 215 s** habituales, es decir, l
 cargada: tiene toda la pinta de ser un caso **sensible al tiempo bajo carga**, no un fallo real.
 **Queda anotado por si alguien lo vuelve a ver**; no se toco ese archivo ni se metio en el baseline,
 porque diagnosticar la intermitencia de un test de otra zona no es de esta ficha.
+
+---
+
+# Tercera vuelta — los dos menores de la aprobacion (m6 y m7)
+
+El reviewer **APROBO** en segunda vuelta, 0 bloqueantes, y no se fio de los tests: **muto el codigo
+el mismo** —`countPages`, `renderPages` y `read`, uno a uno— y comprobo que los tres casos nuevos
+caen. Estos dos menores se cierran antes del PR.
+
+## m6 — el `code` del tope de paginas no lo fijaba ningun test
+
+**Era el mismo punto ciego que dejo entrar el bloqueante 1**, y por eso se cierra aunque no
+bloqueara: el reviewer cambio el `ValidationError` del tope por `AiUnavailableError` y **los 19
+archivos de `tests/unit/documentos/` siguieron verdes** (231 casos). Un camino cuyo `code` nadie
+afirma es un camino que se puede cambiar sin que nada proteste — exactamente la forma del agujero
+de B1.
+
+Se anaden **dos afirmaciones** al caso de las 51 paginas que ya existia:
+
+    expect(falloDe(resultado).code).toBe('invalid_input');
+    expect(falloDe(resultado).code).not.toBe('ai_unavailable');
+
+**Comprobado que MUERDE**, con la misma mutacion que uso el reviewer: cambiando el constructor a
+`AiUnavailableError`, el caso da rojo con `expected 'ai_unavailable' to be 'invalid_input'`.
+Despues se restauro el archivo y todo volvio a verde.
+
+Por que `invalid_input` y no otro: pasarse del tope **es una entrada invalida**, no un corte del
+proveedor. Si ese `code` se relajara, la pantalla diria «la lectura automatica no esta disponible»
+ante un PDF simplemente demasiado largo, que es justo el matiz que la octava enmienda existe para
+dar.
+
+## m7 — el comentario de `conDiagnostico` ejemplificaba con un caso que no pasa por ahi
+
+Decia que por su rama defensiva pasa «(el tope de paginas)», y **no pasa**: ese `throw` esta
+**ENTRE** las dos llamadas a `conDiagnostico`, no dentro. El reviewer lo probo borrando entera la
+linea que relanza el `DocumentosError`: **22 archivos siguieron verdes**, o sea rama hoy
+**inalcanzable**.
+
+No tenia consecuencia en ejecucion —el comentario solo se equivocaba al ejemplificar—, pero
+venimos de arreglar un bloqueante que era **un comentario que afirmaba algo falso**, y dejar otro al
+lado seria raro.
+
+**Se corrige el comentario, NO el codigo.** La rama defensiva **se queda**: como anoto el reviewer,
+un futuro adaptador de `AiReader` que lanzara un `DocumentosError` propio **si** pasaria por ella, y
+envolverlo le borraria su `code`. El comentario ahora dice justo eso: que hoy ninguna de las tres
+operaciones lanza uno, que el del tope se lanza fuera, y para que dia existe la rama.
+
+## Lo que sigue SIN tocarse, y por que
+
+- **m1 sigue rechazado**, y el reviewer dio la razon a esa decision por escrito: renombrar solo los
+  cuatro helpers nuevos dejaria `documentos` con homonimos en **dos idiomas**, porque
+  `convert-pdf.ts:81-111` ya los tiene en espanol y esta en `dev`. **R24 no queda limpio y sigue
+  escrito como tal.**
+- **m5 se queda como esta.** El reviewer mantiene que las tres cabeceras conservadas no pasan la
+  regla de longitud, y no bloquea porque son porques ciertos y verificados. **Queda como deuda de
+  estilo anotada**, no se arregla aqui.
+
+## Estado de la verificacion
+
+`typecheck` y `lint` en verde. `tests/unit/documentos`: **19 archivos, 231 casos, 0 rojos**.

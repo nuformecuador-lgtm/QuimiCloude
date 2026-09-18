@@ -65,9 +65,12 @@ function causaDe(error: unknown): string {
  * Invoca una operacion y, si revienta, la vuelve a lanzar diciendo CUAL era. Sin esto, un fallo de
  * `countPages`, de `renderPages` o de la lectura misma se verian iguales desde fuera.
  *
- * Un `DocumentosError` que ya venia de mas adentro (el tope de paginas) se relanza TAL CUAL: ya
- * sabe su propio `code`. Cualquier otra cosa se envuelve con el `code` que le corresponde a ESTA
- * operacion, para que `countPages` o `renderPages` no terminen pareciendo un corte del proveedor.
+ * Un `DocumentosError` que venga de dentro de la operacion se relanza TAL CUAL: ya sabe su propio
+ * `code` y envolverlo lo perderia. Hoy ninguna de las tres operaciones lanza uno —el del tope de
+ * paginas se lanza FUERA de aqui, entre las dos llamadas—, asi que esa rama es defensiva: la
+ * sostiene el dia que una implementacion del puerto lance un error del modulo con su propio `code`.
+ * Cualquier otra cosa se envuelve con el `code` que le corresponde a ESTA operacion, para que
+ * `countPages` o `renderPages` no terminen pareciendo un corte del proveedor.
  */
 async function conDiagnostico<T>(
   operation: string,
