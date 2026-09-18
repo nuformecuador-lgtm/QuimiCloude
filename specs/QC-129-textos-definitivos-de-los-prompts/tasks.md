@@ -8,7 +8,7 @@
 
 ## T0 — Leer antes de escribir (bloquea todo)
 
-- [ ] Leer `adapters/driven/config/ai-config-env.ts` entero (es el precedente exacto),
+- [x] Leer `adapters/driven/config/ai-config-env.ts` entero (es el precedente exacto),
       `domain/process-pdf-by-strategy.ts`, `domain/pdf-strategy.ts`, `ports/strategy-run-log.ts`,
       el bloque `documentos` de `lib/composition/index.ts` (≈1110–1210) y
       `tests/unit/documentos/qc109-alcance.test.ts`.
@@ -18,7 +18,7 @@
 
 ## T1 — El puerto del prompt `[P]` · depende de T0
 
-- [ ] `ports/strategy-prompt.ts`: tipo `StrategyPrompt` con `promptFor(strategy): string`, tal como
+- [x] `ports/strategy-prompt.ts`: tipo `StrategyPrompt` con `promptFor(strategy): string`, tal como
       lo fija `design.md > 4.1`, con la cabecera que explica por qué **lanza** en vez de devolver
       `null`.
 - **Archivos:** `ports/strategy-prompt.ts` (nuevo).
@@ -27,7 +27,7 @@
 
 ## T2 — El adaptador de entorno `[P]` · depende de T0
 
-- [ ] `adapters/driven/config/strategy-prompt-env.ts`: `readStrategyPromptFromEnv(strategy)`, con el
+- [x] `adapters/driven/config/strategy-prompt-env.ts`: `readStrategyPromptFromEnv(strategy)`, con el
       `Record<PdfStrategy, string>` de nombres (`CATALOG_PROMPT`, `FORMULA_PROMPT`) como **única**
       aparición de esos dos nombres, lectura dentro de la función, vacío/solo-espacios = ausente,
       valor devuelto **sin recortar** y error que nombra la variable sin filtrar ningún valor.
@@ -37,7 +37,7 @@
 
 ## T3 — El caso de uso lee el prompt en la invocación · depende de T1
 
-- [ ] `domain/process-pdf-by-strategy.ts`: `prompt: StrategyPrompt` en `ProcessPdfByStrategyDeps`,
+- [x] `domain/process-pdf-by-strategy.ts`: `prompt: StrategyPrompt` en `ProcessPdfByStrategyDeps`,
       fuera el import de `./prompts`, y el bloque `try/catch` de `design.md > 4.3` **antes** de
       contar páginas y **antes** de llamar a `readPdfWithAi`.
 - **Archivos:** `domain/process-pdf-by-strategy.ts`.
@@ -47,9 +47,9 @@
 
 ## T4 — Borrar los prompts del repositorio · depende de T3
 
-- [ ] `git rm` de `domain/prompts/catalogo.json`, `domain/prompts/formula.json` y
+- [x] `git rm` de `domain/prompts/catalogo.json`, `domain/prompts/formula.json` y
       `domain/prompts/index.ts` (la carpeta queda vacía y desaparece).
-- [ ] Actualizar el comentario del último bloque de `index.ts` (el barril): el prompt ya no es «un
+- [x] Actualizar el comentario del último bloque de `index.ts` (el barril): el prompt ya no es «un
       detalle interno de la estrategia» que vive dentro, llega **por dependencia desde el entorno**.
       **No se añade ni se quita ninguna exportación.**
 - **Archivos:** los tres borrados + `index.ts`.
@@ -58,7 +58,7 @@
 
 ## T5 — Cablear en composición · depende de T2 y T4
 
-- [ ] `lib/composition/index.ts`: importar el adaptador por su ruta exacta, `const strategyPrompt:
+- [x] `lib/composition/index.ts`: importar el adaptador por su ruta exacta, `const strategyPrompt:
       StrategyPrompt = { promptFor: readStrategyPromptFromEnv }` junto a `strategyRunLog`, y pasar
       `prompt: strategyPrompt` a `createProcessPdfByStrategy`. Sin reordenar nada de lo que ya hay.
 - **Archivos:** `lib/composition/index.ts`.
@@ -68,7 +68,7 @@
 
 ## T6 — `.env.example` `[P]` · depende de T2
 
-- [ ] Bloque nuevo al final de `.env.example` con `CATALOG_PROMPT=` y `FORMULA_PROMPT=`, en la misma
+- [x] Bloque nuevo al final de `.env.example` con `CATALOG_PROMPT=` y `FORMULA_PROMPT=`, en la misma
       voz que los cuatro bloques anteriores: se leen en la invocación, si falta el procesamiento
       falla nombrándola, **sin valor de ejemplo**.
 - **Archivos:** `.env.example`.
@@ -79,21 +79,21 @@
 
 > Trabajo **declarado** de esta ficha por `[D12]`, no efecto colateral. Precedente: **T3 de QC-81**.
 
-- [ ] `tests/unit/documentos/qc109-alcance.test.ts`, punto por punto según `design.md > 8.3`:
+- [x] `tests/unit/documentos/qc109-alcance.test.ts`, punto por punto según `design.md > 8.3`:
       quitar los tres imports de prompts; rehacer `ARCHIVOS_NUEVOS` (fuera los tres `.json`/`index`,
-      dentro `ports/strategy-prompt.ts` y el adaptador; `toHaveLength(7)` → `8`); reescribir el
+      dentro `ports/strategy-prompt.ts` y el adaptador; `toHaveLength(7)` → `6`, corregido el 2026-09-18: 7 − 3 + 2 = 6); reescribir el
       `describe` de **R4** como «derogado por QC-129 `[D7]`», conservando la mitad viva (ni `fs`, ni
       `path`, ni `process.cwd`) y su caso de detector; **borrar** el `describe` de **R6** dejando en
       su lugar la nota de la derogación; actualizar la lista exacta de símbolos de **R15**; sumar
       `StrategyPrompt` a lo que **no** publica el barril en **R13**.
-- [ ] **No tocar** los casos de R11, R14, R16 ni R17: siguen mordiendo sobre la lista nueva.
+- [x] **No tocar** los casos de R11, R14, R16 ni R17: siguen mordiendo sobre la lista nueva.
 - **Archivos:** `tests/unit/documentos/qc109-alcance.test.ts`.
 - **Hecho:** el archivo entero en verde; sigue habiendo un caso de detector por cada detector; el
   texto de las derogaciones cita QC-129 y su decisión. Cubre **R8, R9, R19, R20**.
 
 ## T8 — La nota fechada en el spec de QC-109 · depende de T4
 
-- [ ] Añadir al final de `specs/QC-109-procesamiento-de-pdf-por-estrategia/requirements.md` una
+- [x] Añadir al final de `specs/QC-109-procesamiento-de-pdf-por-estrategia/requirements.md` una
       **nota fechada 2026-09-18** que diga: **R4 queda derogado en su primera mitad** (el texto ya no
       entra por import) y **vivo en la segunda** (sigue sin leerse disco ni red); **R6 queda derogado
       entero** (no hay `.json` que marcar); **`[D6]` y `[D15]` quedan derogados por `[D7]` y `[D11]`
@@ -107,13 +107,13 @@
 
 > **La plantilla la escribe el arnés; el contenido lo firma una persona (T11).**
 
-- [ ] `docs/revision-de-prompts.md` con la estructura exacta de `design.md > 4.8`: cabecera con el
+- [x] `docs/revision-de-prompts.md` con la estructura exacta de `design.md > 4.8`: cabecera con el
       porqué y con la **consecuencia aceptada de `[D13]`**; ficha de pasada (fecha, estrategia, PDF
       de muestra, firma); tabla de **seis** filas para `catalogo`; tabla de **cinco** filas para
       `formula`; **dos** filas de cierre (JSON con la forma declarada; lo ausente vuelve `null`); la
       definición literal de **bien / mal / no estaba**; y la regla de cierre (un prompt es bueno
       cuando no hay ningún **mal**; toda fila con **mal** lleva nota).
-- [ ] **Ninguna columna, fila ni ejemplo puede contener texto de prompt** ni una huella de él.
+- [x] **Ninguna columna, fila ni ejemplo puede contener texto de prompt** ni una huella de él.
 - **Archivos:** `docs/revision-de-prompts.md` (nuevo).
 - **Hecho:** las once filas de campo existen, los tres veredictos aparecen literales, y el documento
   dice con todas sus letras que un veredicto no se puede volver a comprobar contra su texto. Cubre
@@ -153,20 +153,20 @@
 
 ## T12 — Tests del mecanismo · depende de T3, T4, T5
 
-- [ ] `tests/unit/documentos/strategy-prompt-env.test.ts`: cada estrategia lee **su** variable;
+- [x] `tests/unit/documentos/strategy-prompt-env.test.ts`: cada estrategia lee **su** variable;
       ausente / `''` / `'   '` fallan igual y el mensaje nombra la variable; el valor se devuelve
       **sin recortar**; con una puesta y la otra vacía, la que falta **no hereda**; importar el
       adaptador con el entorno vacío no lanza. Restaura `process.env` en `afterEach`, como
       `ai-config.test.ts`.
-- [ ] Casos nuevos en `tests/unit/documentos/process-pdf-by-strategy.test.ts`, con un `promptFor`
+- [x] Casos nuevos en `tests/unit/documentos/process-pdf-by-strategy.test.ts`, con un `promptFor`
       falso: éxito con texto inyectado; **fallo por prompt ausente** con `readPdfWithAi` espía a
       **cero llamadas**, `code: 'unexpected'`, `reason` con el nombre de la variable y **una** línea
       de registro con `mode` y `pages: null`; y un caso que afirma que **ni el `reason` ni el
       resumen contienen el texto inyectado**.
-- [ ] Un caso de documento (donde viva la guardia de la ficha) que afirme la forma de
+- [x] Un caso de documento (donde viva la guardia de la ficha) que afirme la forma de
       `docs/revision-de-prompts.md`: las once filas de campo, los tres veredictos literales, la
       frase de la consecuencia aceptada y **ninguna** columna de texto de prompt.
-- [ ] Ningún caso nuevo hace red, ni exige `GEMINI_API_KEY`, ni exige las dos variables nuevas.
+- [x] Ningún caso nuevo hace red, ni exige `GEMINI_API_KEY`, ni exige las dos variables nuevas.
 - **Archivos:** `tests/unit/documentos/strategy-prompt-env.test.ts` (nuevo),
   `tests/unit/documentos/process-pdf-by-strategy.test.ts`.
 - **Hecho:** los nombres de los casos citan su `R<n>`; quitar el `return` temprano de T3 pone rojo el
@@ -174,11 +174,11 @@
 
 ## T13 — Trazabilidad · depende de T12
 
-- [ ] Escribir el mapa `R<n> → evidencia` en `progress/impl_QC-129.md`, los **21** sin huecos,
+- [x] Escribir el mapa `R<n> → evidencia` en `progress/impl_QC-129-textos-definitivos-de-los-prompts.md`, los **21** sin huecos,
       copiando `design.md > 8.2`. Las filas de **R10–R14 y R17** apuntan a la fila del registro
       humano y **se marcan como tales**, con el motivo (`[D5]`: ningún test llama a Gemini) escrito
       al lado. **R14 y R17 quedan pendientes hasta que T10 y T11 estén firmadas.**
-- **Archivos:** `progress/impl_QC-129.md` (nuevo).
+- **Archivos:** `progress/impl_QC-129-textos-definitivos-de-los-prompts.md` (nuevo).
 - **Hecho:** cada fila apunta a un caso que existe en la suite o a una fila que existe en
   `docs/revision-de-prompts.md`.
 

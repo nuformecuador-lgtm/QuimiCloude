@@ -11,12 +11,12 @@
  */
 import { UnexpectedError } from './errors';
 import { MODE_BY_STRATEGY, pdfStrategySchema } from './pdf-strategy';
-import { PROMPT_BY_STRATEGY } from './prompts';
 
 import type { PdfStrategy } from './pdf-strategy';
 import type { AiReadMode, AiReadRequestInput, AiReadResult } from './read-pdf-with-ai';
 import type { ErrorCode } from '@/lib/modules/errores';
 import type { PdfConverter } from '../ports/pdf-converter';
+import type { StrategyPrompt } from '../ports/strategy-prompt';
 import type { StrategyRunLog } from '../ports/strategy-run-log';
 
 export type ProcessPdfByStrategyInput = {
@@ -51,6 +51,7 @@ export type ProcessPdfByStrategyDeps = {
   /** Solo para el resumen del registro: el numero de paginas no sale de la lectura. */
   readonly countPages: PdfConverter['countPages'];
   readonly log: StrategyRunLog;
+  readonly prompt: StrategyPrompt;
 };
 
 function causaDe(error: unknown): string {
@@ -99,7 +100,19 @@ export function createProcessPdfByStrategy(
 
     const strategy = parsed.data;
     const mode = MODE_BY_STRATEGY[strategy];
-    const prompt = PROMPT_BY_STRATEGY[strategy];
+
+    let prompt: string;
+    try {
+      prompt = deps.prompt.promptFor(strategy);
+    } catch (error) {
+      deps.log.run({ strategy, mode, path: input.path, pages: null, textLength: 0 });
+      return {
+        ok: false, strategy, path: input.path, mode,
+        code: new UnexpectedError().code,
+        reason: `process-pdf-by-strategy: ${causaDe(error)}`,
+      };
+    }
+
     const pages = await contarPaginas(deps.countPages, input.bytes);
 
     // La lectura inyectada devuelve `ok:false` en vez de lanzar; el `catch` sostiene que esta capa

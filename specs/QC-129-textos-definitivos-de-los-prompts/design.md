@@ -306,7 +306,10 @@ los veredictos previstos), R18, R19, R20 y R21.
 - importa `catalogo.json`, `formula.json` y `PROMPT_BY_STRATEGY` (líneas 17–19) → **se quitan los
   tres imports**, que si no el archivo ni compila tras el borrado;
 - `ARCHIVOS_NUEVOS` lista los tres archivos de prompts → **salen de la lista** y entran
-  `ports/strategy-prompt.ts` y el adaptador de configuración; el `toHaveLength(7)` pasa a `8`;
+  `ports/strategy-prompt.ts` y el adaptador de configuración; el `toHaveLength(7)` pasa a `6`;
+  **corregido el 2026-09-18 por el leader, en F2.2**: este documento decía `8` y la aritmética no da
+  —7 entradas − 3 de prompts + 2 nuevas = **6**—. El implementer escribió el número real y lo
+  declaró en vez de inflar la lista para cuadrar con el diseño, que es lo correcto;
 - el `describe` de **R4** («los prompts entran por import») → se **reescribe** como «R4 derogado por
   QC-129 `[D7]`»: el texto ya no entra por import, y lo que se comprueba ahora es que los tres
   archivos **no existen** y que el dominio sigue sin importar `fs`, `path` ni usar `process.cwd`

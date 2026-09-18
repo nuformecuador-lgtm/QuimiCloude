@@ -14,9 +14,6 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import catalogoPrompt from '@/lib/modules/documentos/domain/prompts/catalogo.json';
-import formulaPrompt from '@/lib/modules/documentos/domain/prompts/formula.json';
-import { PROMPT_BY_STRATEGY } from '@/lib/modules/documentos/domain/prompts';
 import { pdfStrategySchema } from '@/lib/modules/documentos/domain/pdf-strategy';
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
@@ -156,15 +153,18 @@ function archivosOSalto(ctx: { skip: (nota?: string) => void }): readonly string
 
 const MODULO = 'lib/modules/documentos';
 
-/** Los siete archivos que introduce QC-109, tal como los enumera `design.md > 3`. */
+/**
+ * Los archivos que introduce QC-109, tal como los enumera `design.md > 3`, con los tres de
+ * `domain/prompts/` fuera y los dos del puerto y el adaptador de entorno de QC-129 dentro
+ * (`[D7]`, `[D11]`): QC-129 `design.md > 4.1` y `4.2`.
+ */
 export const ARCHIVOS_NUEVOS = [
   `${MODULO}/domain/pdf-strategy.ts`,
-  `${MODULO}/domain/prompts/index.ts`,
-  `${MODULO}/domain/prompts/catalogo.json`,
-  `${MODULO}/domain/prompts/formula.json`,
   `${MODULO}/domain/process-pdf-by-strategy.ts`,
   `${MODULO}/ports/strategy-run-log.ts`,
   `${MODULO}/adapters/driven/observability/strategy-run-log-console.ts`,
+  `${MODULO}/ports/strategy-prompt.ts`,
+  `${MODULO}/adapters/driven/config/strategy-prompt-env.ts`,
 ] as const;
 
 const BARREL = `${MODULO}/index.ts`;
@@ -188,7 +188,7 @@ function archivosNuevosLeidos(): readonly ArchivoLeido[] {
         'nada de verdad.',
     ).toBeGreaterThan(0);
   }
-  expect(leidos).toHaveLength(7);
+  expect(leidos).toHaveLength(6);
   return leidos;
 }
 
@@ -416,21 +416,35 @@ describe('QC-109 — la precondicion de rama', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// R4 — LOS PROMPTS SE IMPORTAN COMO MODULO, NO SE LEEN DEL DISCO
+// R4 — DEROGADO POR QC-129 [D7]
 // ---------------------------------------------------------------------------------------------
 
-describe('QC-109 R4 — los prompts entran por import, no por el sistema de archivos', () => {
-  it('R4: el prompt de cada estrategia sale del .json importado como modulo, sin tocar disco ni red', () => {
-    // Que el `import` de arriba haya resuelto ya es la mitad del requisito: el texto entra en el
-    // paquete por el mismo camino que el codigo.
-    expect(PROMPT_BY_STRATEGY.catalogo).toBe(catalogoPrompt.prompt);
-    expect(PROMPT_BY_STRATEGY.formula).toBe(formulaPrompt.prompt);
+/**
+ * QC-109 R4 decia que el texto del prompt entraba por `import`, como modulo, en tiempo de
+ * compilacion. QC-129 `[D7]` deroga esa mitad: el texto ahora llega por una variable de entorno,
+ * leida en la invocacion (`ports/strategy-prompt.ts`, `adapters/driven/config/strategy-prompt-env.ts`).
+ * La otra mitad de R4 SIGUE VIGENTE: una variable de entorno no es disco ni red, asi que el
+ * dominio y los archivos nuevos de la ficha siguen sin importar `fs`, sin importar `path` y sin
+ * usar `process.cwd`.
+ */
+describe('QC-109 R4 — derogado por QC-129 [D7]: el texto ya no entra por import, pero sigue sin ser disco ni red', () => {
+  it('R4 (mitad vigente): los tres archivos de prompts no existen y ningun archivo nuevo toca disco', () => {
+    for (const ruta of [
+      `${MODULO}/domain/prompts/index.ts`,
+      `${MODULO}/domain/prompts/catalogo.json`,
+      `${MODULO}/domain/prompts/formula.json`,
+    ]) {
+      expect(
+        () => enDisco(ruta),
+        `R4/R8: ${ruta} deberia haber desaparecido con QC-129 [D11] y sigue en disco.`,
+      ).toThrow();
+    }
 
     const infracciones = infraccionesDeDisco(archivosNuevosLeidos());
     expect(
       infracciones,
-      'R4: un `readFileSync` sobre `process.cwd()` funciona en local y devuelve ENOENT en Vercel, y ' +
-        `el fallo aparece la primera vez que alguien procesa un PDF de verdad:\n${infracciones.join('\n')}`,
+      'R4: una variable de entorno no es disco ni red, y los archivos nuevos de la ficha siguen sin ' +
+        `leer ninguno de los dos:\n${infracciones.join('\n')}`,
     ).toEqual([]);
   });
 
@@ -452,34 +466,14 @@ describe('QC-109 R4 — los prompts entran por import, no por el sistema de arch
 });
 
 // ---------------------------------------------------------------------------------------------
-// R6 — LA MARCA DE PROVISIONAL ES UN DATO, NO UN COMENTARIO
+// R6 — DEROGADO ENTERO POR QC-129 [D7] [D11]
 // ---------------------------------------------------------------------------------------------
 
-describe('QC-109 R6 — cada .json de prompt se declara provisional y remite a QC-129', () => {
-  it('R6: los dos .json traen provisional true, loDefine QC-129 y un prompt no vacio', () => {
-    const prompts = [
-      { ruta: 'catalogo.json', contenido: catalogoPrompt },
-      { ruta: 'formula.json', contenido: formulaPrompt },
-    ];
-    expect(prompts).toHaveLength(2);
-
-    for (const { ruta, contenido } of prompts) {
-      expect(
-        contenido.provisional,
-        `R6: ${ruta} no se declara provisional, asi que su texto de relleno pasaria por definitivo.`,
-      ).toBe(true);
-      expect(
-        contenido.loDefine,
-        `R6: ${ruta} no dice que ficha escribe el texto definitivo.`,
-      ).toBe('QC-129');
-      expect(typeof contenido.prompt).toBe('string');
-      expect(
-        contenido.prompt.trim().length,
-        `R6: el prompt de ${ruta} esta vacio o es puro espacio, y eso lo derogo [D3].`,
-      ).toBeGreaterThan(0);
-    }
-  });
-});
+// QC-109 R6 exigia que cada `.json` de prompt se declarara `provisional: true` y remitiera a
+// QC-129 como quien escribiria el texto definitivo. QC-129 borro los dos `.json` (`[D11]`): ya
+// no queda ningun archivo que marcar como provisional, asi que el requisito no tiene sobre que
+// comprobarse y este `describe` se borra entero, no se salta. La derogacion de R4 de mas arriba
+// cubre la comprobacion de forma que sustituye a esta seccion.
 
 // ---------------------------------------------------------------------------------------------
 // R11 — NINGUN LIMITE PROPIO
@@ -545,7 +539,13 @@ describe('QC-109 R13 — la capacidad se publica como fabrica y no la dispara na
 
     const publicados = [
       ...nombres.filter((nombre) =>
-        ['StrategyRunLog', 'StrategyRunSummary', 'MODE_BY_STRATEGY', 'PROMPT_BY_STRATEGY'].includes(nombre),
+        [
+          'StrategyRunLog',
+          'StrategyRunSummary',
+          'MODE_BY_STRATEGY',
+          'PROMPT_BY_STRATEGY',
+          'StrategyPrompt',
+        ].includes(nombre),
       ),
       ...rutas.filter((ruta) => /ports\/|prompts|adapters\/|\.json$/.test(ruta)),
     ].sort();
@@ -666,7 +666,7 @@ describe('QC-109 R15 — los identificadores publicos estan en ingles', () => {
     expect(exportados).toEqual(
       [
         'MODE_BY_STRATEGY',
-        'PROMPT_BY_STRATEGY',
+        'StrategyPrompt',
         'PdfStrategy',
         'ProcessPdfByStrategyDeps',
         'ProcessPdfByStrategyInput',
@@ -675,6 +675,7 @@ describe('QC-109 R15 — los identificadores publicos estan en ingles', () => {
         'StrategyRunSummary',
         'createProcessPdfByStrategy',
         'createStrategyRunLogConsole',
+        'readStrategyPromptFromEnv',
         'pdfStrategySchema',
       ].sort(),
     );
