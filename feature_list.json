@@ -1792,7 +1792,7 @@
       "epic": "QC-31",
       "epic_name": "Pedidos",
       "name": "busqueda-y-total-en-la-pantalla-de-pedidos",
-      "description": "Enchufar en la pantalla de pedidos las dos cosas que QC-68 construye por debajo: la caja de busqueda por nombre de receta y la columna del total. NACE EL 2026-09-17 al acotar QC-68; la pantalla (QC-35) se construyo a proposito sin las dos. EL E2E DE IMPORTES ES DE ESTA FICHA, y ese es el motivo por el que nace ahora: CHECKPOINTS.md lo exige y QC-68 no tiene pantalla que ejercitar. NO reabre lo que QC-68 cerro -busqueda solo por nombre de receta, incluyendo recetas de baja, y el total SOLO se muestra-. QUEDA ABIERTO: donde va la columna del total en una tabla ya cargada, si el total se muestra tambien en el panel de detalle, y que ve el usuario mientras la busqueda esta en vuelo y cuando no hay coincidencias. NO ENTRA: la consulta, la migracion ni el calculo, que son de QC-68.",
+      "description": "Enchufar en la pantalla de pedidos la caja de busqueda por nombre de receta que QC-68 construye por debajo. NACE EL 2026-09-17 al acotar QC-68. CORREGIDA EL MISMO DIA: nacio llevando tambien la columna del total y ya no la lleva, porque `orders` no guarda precio unitario -lo borro QC-35bis- y de donde sale el precio es decision de negocio sin tomar, que vive en QC-123. EL E2E DE LA BUSQUEDA ES DE ESTA FICHA: QC-68 lo difirio aqui con motivo, porque sin caja que manejar no hay recorrido que ejercitar. NO reabre lo que QC-68 cerro. QUEDA ABIERTO: que ve el usuario mientras la busqueda esta en vuelo; que ve cuando no hay coincidencias -'no hay pedidos' y 'no hay pedidos que coincidan' no son lo mismo-; y si el termino se conserva al paginar y al volver de un detalle. NO ENTRA: la consulta, la migracion ni el indice (QC-68), ni el total (QC-123).",
       "status": "pending",
       "sdd": true,
       "complexity": null,
@@ -1802,6 +1802,21 @@
         "QC-68"
       ],
       "spec_path": "specs/QC-122-busqueda-y-total-en-la-pantalla-de-pedidos"
+    },
+    {
+      "key": "QC-123",
+      "id": 123,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "el-total-del-pedido-decidir-donde-vive-el-precio",
+      "description": "Un pedido no sabe cuanto vale. Para poder mostrar un total hace falta antes decidir DE DONDE SALE EL PRECIO, y esa es una decision de negocio que hoy no esta tomada. NACE EL 2026-09-17 al escribir el spec de QC-68, que llevaba el total dentro: se verifico que `orders` tiene UN SOLO decimal, `quantity`, porque el precio unitario y la unidad los borro QC-35bis el 2026-09-07 por decision del humano -'un pedido es receta + cantidad'-. Ningun modelo guarda un precio de venta de receta. QUEDA ABIERTO: de donde sale el precio; que pasa con los pedidos ya hechos cuando el precio cambia -un pedido de marzo no deberia cambiar de importe porque en octubre suba la tarifa-; quien puede ver y editar el precio; si el total ademas se ordena y filtra -QC-68 lo cerro como 'solo se muestra', pero sobre un total calculado al vuelo-; y que se hace con los pedidos existentes en la migracion. YA DECIDIDO: el total se calcula en el servidor y viaja como cadena decimal, nunca multiplicado con el tipo numerico de JavaScript. NO ENTRA: la busqueda (QC-68) ni pintar el total en pantalla.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio",
+      "depends_on": [],
+      "spec_path": "specs/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio"
     }
   ]
 }
