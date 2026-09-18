@@ -4,7 +4,7 @@ Rama `feature/QC-125-espera-minima-por-paso`, comparada contra `origin/dev` (`b6
 Fecha: 2026-09-18. Reviewer: verificacion propia, sin editar codigo. Las mutaciones se hicieron
 en caliente y se revirtieron con `git checkout`; el arbol quedo limpio.
 
-## Veredicto: RECHAZADO
+## Veredicto de la primera vuelta: RECHAZADO (en la segunda: OK, ver «Segunda vuelta» al final)
 
 Un bloqueante: R8 tiene un hueco real que un mutante plausible atraviesa en verde (H1). Falta un
 test; el codigo de produccion no falla, porque la implementacion actual cumple R8.
@@ -137,3 +137,31 @@ anotado por la regla.
 - Los casos existentes de SR y OES no se editan, salvo los dos que el spec autoriza.
 - No hay reloj propio en el asistente (R10): la fuente no contiene `setTimeout`, `setInterval` ni
   `Date.now`.
+
+## Segunda vuelta (2026-09-18)
+
+Solo se revisan los commits `d254384d`, `2ec1e6b7`, `17f3375c` y `61106e47` (diff contra
+`20e4ba28`). No hay cambios de produccion: solo tests, spec y bitacora.
+
+### Veredicto: OK
+
+Sin bloqueantes. H1 queda resuelto; H5 tambien.
+
+### Comprobaciones hechas por el reviewer
+
+| Punto | Resultado |
+| --- | --- |
+| H1: caso nuevo «R8: retroceder con Anterior mientras corre la cuenta del paso 2 vuelve a exigir la duracion completa en el paso 1» | El recorrido es el que pedia la review: se cumple el paso 1, Siguiente, 1000 ms y Anterior. Afirma paso 1, Siguiente deshabilitado, motivo visible, cuenta en `00:05`, deshabilitado a 4999 ms y habilitado a 5000 ms |
+| Ese caso con el codigo de la rama | **Verde**: SR + OES 58/58 |
+| Ese caso con el mutante del escalar (`waitedArrival !== currentIndex`, `setWaitedArrival(currentIndex)`, `key={currentIndex}`) | **Rojo**: 1 fallo y 57 verdes, y el unico que cae es el caso nuevo. Mutante revertido; el arbol quedo limpio |
+| T3 y `design.md > 4` | El «Hecho cuando» nombra ahora el mutante del escalar, con enmienda fechada. La nota del diseño corrige el recorrido de la trampa sin borrar el texto original. Correcto |
+| H5 | `try/finally` alrededor del tramo con reloj falso; las afirmaciones no cambian |
+| Bitacora | El mapa de R8 incluye el caso nuevo; lo que declara coincide con lo que medi |
+| `pnpm run typecheck` / `pnpm run lint` | Verdes (los corri yo) |
+
+### Abiertos (conocidos por el leader, no bloquean esta vuelta)
+
+- **H3 — R22 / T7:** el E2E `e2e/ejecucion-receta.spec.ts` sigue **sin verificar** porque faltan los navegadores de Playwright. Hay que correrlo, junto con `e2e/recetas-pasos.spec.ts`, antes del PR.
+- **H4 — T8:** `./init.sh` sigue parado en `validate-features` por QC-68, que ya falla en `origin/dev`. T8 no se puede cerrar con el gate en verde hasta resolverlo.
+- Por esos dos, el checkpoint «todas las tasks en `[x]`» sigue sin cumplirse. La feature no pasa a `done` hasta cerrarlos.
+- Los menores H2, H6 y H7 siguen como estaban. Ninguno bloquea.
