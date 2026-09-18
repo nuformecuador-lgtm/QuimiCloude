@@ -78,9 +78,8 @@ export interface ProductRepository {
    * cualquiera de las dos falla, no queda ninguna, que es lo que hace imposible el producto
    * sin lote que R1 prohibe.
    *
-   * La existencia viaja DOS veces -en `product.stock` y en `batch.stock`- y no es un
-   * descuido: es la decision cerrada del 2026-09-10, transitoria hasta QC-91, cuando la
-   * existencia del producto pase a ser la suma de sus lotes.
+   * La existencia se escribe UNICAMENTE en `batch.stock`: el producto no tiene columna
+   * propia, es la suma de sus lotes.
    *
    * El `lot` devuelto es el TEXTO que quedo escrito en la fila -el que tecleo la persona o el
    * que genero el correlativo-, no el `batchId`. El adaptador ya lo calcula para escribir la
@@ -96,9 +95,9 @@ export interface ProductRepository {
   /**
    * QC-90 (R17, R18): agrega el lote a un producto que YA EXISTE.
    *
-   * Escribe UNICAMENTE la fila de `product_batches`: no toca `name`, `stock`, `qty_alert`
-   * ni `unit_id` del producto, ni siquiera su `updated_at` (`design.md > 2`). Por eso no
-   * recibe ningun `NewProduct`: lo que no viaja no se puede escribir por accidente.
+   * Escribe UNICAMENTE la fila de `product_batches`: no toca `name`, `qty_alert` ni
+   * `unit_id` del producto, ni siquiera su `updated_at`. Por eso no recibe ningun
+   * `NewProduct`: lo que no viaja no se puede escribir por accidente.
    *
    * Devuelve `null` cuando el producto ya NO esta vivo -se borro entre la consulta de
    * `findAliveIdByName` y esta escritura-. Es un resultado, no una excepcion, por la misma

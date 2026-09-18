@@ -1,7 +1,8 @@
 // T6 — Los cinco casos de uso de receta, con dobles de los cuatro puertos (`design.md > 3`,
 // `> 6`, `> 7`, `> 9`; `tasks.md > T6`). Sin base de datos ni bucket: lo que se prueba
 // aqui es la DECISION que vive en `domain/`, no la implementacion Prisma/Supabase (T9-T11).
-// Cierra R5, R6, R11, R17, R18, R21, R22, R26, R27, R33, R34, R36, R37, R50.
+// Cierra R5, R6, R11, R12, R13, R14, R15, R17, R18, R19, R21, R22, R26, R27, R33, R34, R36,
+// R37, R50.
 
 import type { Actor } from '@/lib/modules/recetas/domain/actor';
 import { createCreateRecipe } from '@/lib/modules/recetas/domain/create-recipe';
@@ -61,11 +62,13 @@ const FILA_RECETA: RecipeRow = {
   lines: [{ id: 'linea-1', productId: LINEA_VALIDA.productId, quantity: '10.5000', unitId: UNIT_ID }],
 };
 
-// dev anadio `stock` a `ProductRef` el 2026-09-09 (`419f01e`) y no actualizo estos dobles.
-// `null` es «no declara existencia», que es lo que el fixture decia ya por omision: el valor
-// no cambia el comportamiento de ningun caso, solo satisface el tipo.
-// QC-80 (R21): `ProductRef` ya no lleva unidad -nadie la consumia-, asi que el doble tampoco.
-const PRODUCTO_REF: ProductRef = { id: LINEA_VALIDA.productId, name: 'Acido sulfurico', stock: null };
+// `stockByUnit` trae un lote en una unidad DISTINTA a la de `LINEA_VALIDA`: el detalle debe
+// mostrar «—» para esa linea, no la cantidad de otra unidad.
+const PRODUCTO_REF: ProductRef = {
+  id: LINEA_VALIDA.productId,
+  name: 'Acido sulfurico',
+  stockByUnit: [{ unitId: '55555555-5555-4555-8555-555555555555', quantity: 3 }],
+};
 
 const UNIDAD_REF: UnitRef = { id: UNIT_ID, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null };
 
@@ -388,12 +391,78 @@ describe('R33 — la lista no trae lineas, el detalle si', () => {
         productName: PRODUCTO_REF.name,
         quantity: '10.5000',
         unitId: UNIT_ID,
-        // dev anadio `productStock` a `RecipeLineView` el 2026-09-09 (`419f01e`): el detalle lo
-        // decora junto al nombre, del mismo `ProductRef`. `toEqual` es exhaustivo, asi que el
-        // campo tiene que estar. Sale de `PRODUCTO_REF`, no escrito a mano.
-        productStock: PRODUCTO_REF.stock,
+        // `PRODUCTO_REF.stockByUnit` no trae la unidad de esta linea: marcador de dato ausente.
+        productStock: null,
       },
     ]);
+  });
+});
+
+describe('R12, R13, R14, R15 — existencia de la linea en su propia unidad', () => {
+  function montarConProducto(ref: ProductRef | undefined) {
+    const recipes = montarRepositorio();
+    const products = montarCatalogo({
+      findRefs: vi.fn<ProductCatalog['findRefs']>(async () => (ref === undefined ? [] : [ref])),
+    });
+    const images = montarAlmacenamiento();
+    return createGetRecipe({ recipes, products, images });
+  }
+
+  it('R12: con un lote en la unidad de la linea, la existencia es esa cantidad', async () => {
+    const getRecipe = montarConProducto({
+      id: LINEA_VALIDA.productId,
+      name: 'Acido sulfurico',
+      stockByUnit: [{ unitId: UNIT_ID, quantity: 15 }],
+    });
+
+    const detalle = await getRecipe('receta-1', ADMIN);
+    expect(detalle.lines[0].productStock).toBe(15);
+  });
+
+  it('R13: con lotes pero ninguno en la unidad de la linea, la existencia es null', async () => {
+    const getRecipe = montarConProducto({
+      id: LINEA_VALIDA.productId,
+      name: 'Acido sulfurico',
+      stockByUnit: [{ unitId: '55555555-5555-4555-8555-555555555555', quantity: 3 }],
+    });
+
+    const detalle = await getRecipe('receta-1', ADMIN);
+    expect(detalle.lines[0].productStock).toBeNull();
+  });
+
+  it('R14: sin ningun lote, la existencia es 0', async () => {
+    const getRecipe = montarConProducto({
+      id: LINEA_VALIDA.productId,
+      name: 'Acido sulfurico',
+      stockByUnit: [],
+    });
+
+    const detalle = await getRecipe('receta-1', ADMIN);
+    expect(detalle.lines[0].productStock).toBe(0);
+  });
+
+  it('R15: producto de baja, la existencia es null', async () => {
+    const getRecipe = montarConProducto(undefined);
+
+    const detalle = await getRecipe('receta-1', ADMIN);
+    expect(detalle.lines[0].productStock).toBeNull();
+  });
+});
+
+describe('R19 — el detalle de receta sigue exigiendo recetas.consultar', () => {
+  it('rechaza al actor sin recetas.consultar antes de tocar el repositorio', async () => {
+    const recipes = montarRepositorio();
+    const products = montarCatalogo();
+    const images = montarAlmacenamiento();
+    const getRecipe = createGetRecipe({ recipes, products, images });
+    const sinPermiso: Actor = {
+      id: 'op-1',
+      companyId: EMPRESA,
+      permissions: ['recetas.modificar'],
+    };
+
+    await expect(getRecipe('receta-1', sinPermiso)).rejects.toThrow();
+    expect(recipes.findAliveById).not.toHaveBeenCalled();
   });
 });
 

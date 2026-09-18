@@ -232,7 +232,6 @@ describe('updateProductAction', () => {
       'product-1',
       expect.objectContaining({
         name: 'Bidon 20 L',
-        stock: 10,
       }),
       ADMIN_ACTOR,
     );
@@ -453,12 +452,20 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
     // edicion ganara estos cinco campos, cada edicion moriria con `invalid_input`.
     expect(candidato).toEqual({
       name: 'Bidon 20 L',
-      stock: 10,
       qtyAlert: 2,
     });
     for (const campo of Object.keys(VALID_BATCH_FIELDS)) {
       expect(Object.keys(candidato)).not.toContain(campo);
     }
+  });
+
+  it('la edicion no lee la existencia del FormData aunque venga: R9', async () => {
+    updateProductMock.mockResolvedValue(undefined);
+
+    await updateProductAction('product-1', MUTATION_INITIAL, formDataOf(VALID_PRODUCT_FIELDS));
+
+    const [, candidato] = updateProductMock.mock.calls[0] as [string, Record<string, unknown>];
+    expect(Object.keys(candidato)).not.toContain('stock');
   });
 
   it('ni el alta ni la edicion leen `unitId` del FormData, aunque venga (QC-80, R21)', async () => {
@@ -585,7 +592,7 @@ describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () =>
     );
 
     const [, candidato] = updateProductMock.mock.calls[0] as [string, Record<string, unknown>];
-    expect(candidato).toEqual({ name: 'Bidon 20 L', stock: 10, qtyAlert: 2 });
+    expect(candidato).toEqual({ name: 'Bidon 20 L', qtyAlert: 2 });
     for (const campo of [...Object.keys(VALID_BATCH_FIELDS), 'purchaseDate']) {
       expect(Object.keys(candidato)).not.toContain(campo);
     }

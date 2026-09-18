@@ -1,5 +1,7 @@
 import type { UnitId } from '@/lib/modules/unidades';
 
+import type { ProductStockByUnit } from './product-stock';
+
 /**
  * Contratos de entrada y salida de producto (`design.md > 6.1`, `> 3`). Viven en
  * `domain/` -no en `ports/`- porque describen el QUE se dice, no el COMO se habla con el
@@ -14,12 +16,12 @@ import type { UnitId } from '@/lib/modules/unidades';
  * QC-52 (R1, R2): sin `cost`, `minPurchase` ni `deliveryTime` -son del catalogo del
  * proveedor-. 2026-09-09: sin `presentationId` -la presentacion se mudo al lote
  * (`ProductBatch`)-. QC-80 (R21): sin `unitId` -la unidad la declara la PRESENTACION, y la
- * del producto se DERIVA del lote mas reciente; no hay nada que escribir aqui-. Lo que queda
- * es lo que la cosa ES (`name`) y lo que HAY de ella (`stock`, `qtyAlert`).
+ * del producto se DERIVA del lote mas reciente; no hay nada que escribir aqui-. La existencia
+ * se quito: se escribe unicamente en el lote que crea el alta. Lo que queda es lo que la
+ * cosa ES (`name`) y su alerta (`qtyAlert`).
  */
 export type NewProduct = {
   readonly name: string;
-  readonly stock?: number | null;
   readonly qtyAlert?: number | null;
 };
 
@@ -43,7 +45,8 @@ export type ProductView = {
    * Sigue SIN ordenarse ni filtrarse (`PRODUCT_QUERYABLE`): no se ordena por una ruta de archivo.
    */
   readonly imagePath: string | null;
-  readonly stock: number | null;
+  /** Existencia agregada por unidad: suma el stock de todos los lotes del producto. */
+  readonly stockByUnit: readonly ProductStockByUnit[];
   readonly qtyAlert: number | null;
   /**
    * Unidad DERIVADA del producto: la de la presentacion de su lote MAS RECIENTE -creacion

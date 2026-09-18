@@ -459,15 +459,6 @@ describe('QC-81 R31 — ni existencia por lote (QC-91) ni ajuste de inventario (
     ).toEqual([]);
   });
 
-  it('R31: products.stock se sigue escribiendo como lo dejo QC-90', () => {
-    const hallazgos = hallazgosDeStockDeProducto(leer(ADAPTADOR_DE_PRODUCTO));
-    expect(
-      hallazgos,
-      `QC-81 R31: la escritura de products.stock cambio respecto de QC-90 en ${ADAPTADOR_DE_PRODUCTO}:\n` +
-        hallazgos.join('\n'),
-    ).toEqual([]);
-  });
-
   it('R31: los detectores muerden con fuentes fabricados y no con uno limpio', () => {
     expect(
       hallazgosDeAjusteOSuma('const t = await tx.productBatch.aggregate({ _sum: { stock: true } });'),

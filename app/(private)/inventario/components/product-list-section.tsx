@@ -16,9 +16,10 @@ type ProductListSectionProps = {
    */
   readonly params: DataTableParams;
   /**
-   * Catalogo de unidades, pedido **una sola vez** por la pagina (QC-80). Solo lo necesita el
-   * panel de ALTA del estado vacio, para el alta rapida de presentacion; sin el, ese alta rapida
-   * no se ofrece. Aqui no se consulta nada: baja por props (QC-44 R46).
+   * Catalogo de unidades, pedido **una sola vez** por la pagina. Lo necesita el panel de ALTA del
+   * estado vacio -para el alta rapida de presentacion- y la columna de existencia, que lo usa
+   * para resolver el simbolo de cada cantidad; sin el, ninguno de los dos se cae, se degradan.
+   * Aqui no se consulta nada: baja por props.
    */
   readonly units?: readonly UnitRef[];
 };
@@ -68,7 +69,12 @@ export async function ProductListSection({ params, units }: ProductListSectionPr
         La paginacion y el tamano de pagina los pinta la tabla compartida desde el 2026-09-07:
         `product-list-toolbar.tsx` desaparecio y con el la barra propia de esta ruta.
       */}
-      <ProductTable products={items} params={{ ...params, page: currentPage }} totalPages={totalPages} />
+      <ProductTable
+        products={items}
+        params={{ ...params, page: currentPage }}
+        totalPages={totalPages}
+        units={units}
+      />
     </div>
   );
 }

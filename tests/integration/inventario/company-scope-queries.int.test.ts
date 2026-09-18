@@ -126,13 +126,12 @@ async function sembrarEmpresa(etiqueta: string): Promise<Empresa> {
 async function sembrarProducto(
   empresa: Empresa,
   name: string,
-  extras: { readonly stock?: number | null; readonly qtyAlert?: number | null } = {},
+  extras: { readonly qtyAlert?: number | null } = {},
 ): Promise<string> {
   const { id } = await prisma.product.create({
     data: {
       name,
       nameNormalized: normalizeProductName(name),
-      stock: extras.stock ?? null,
       qtyAlert: extras.qtyAlert ?? null,
       companyId: empresa.companyId,
     },
@@ -204,13 +203,13 @@ beforeAll(async () => {
   B = await sembrarEmpresa('B');
 
   // Recuentos distintos en A y B para que un `total` con filas ajenas no coincida por casualidad.
-  await sembrarProducto(A, `${MARCA} Producto A uno`, { stock: 10, qtyAlert: 1 });
-  await sembrarProducto(A, `${MARCA} Producto A dos`, { stock: 20, qtyAlert: 2 });
-  await sembrarProducto(A, `${MARCA} Producto A tres`, { stock: 30, qtyAlert: 3 });
-  await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B uno`, { stock: 910, qtyAlert: 91 });
-  await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B dos`, { stock: 920, qtyAlert: 92 });
-  await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B tres`, { stock: 930, qtyAlert: 93 });
-  await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B cuatro`, { stock: 940, qtyAlert: 94 });
+  await sembrarProducto(A, `${MARCA} Producto A uno`, { qtyAlert: 1 });
+  await sembrarProducto(A, `${MARCA} Producto A dos`, { qtyAlert: 2 });
+  await sembrarProducto(A, `${MARCA} Producto A tres`, { qtyAlert: 3 });
+  await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B uno`, { qtyAlert: 91 });
+  await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B dos`, { qtyAlert: 92 });
+  await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B tres`, { qtyAlert: 93 });
+  await sembrarProducto(B, `${MARCA} ${SOLO_B} Producto B cuatro`, { qtyAlert: 94 });
 
   // Un borrado en A, para comprobar que el ambito no sustituye a `deleted_at IS NULL`.
   const borrado = await sembrarProducto(A, `${MARCA} Producto A borrado`);
@@ -369,16 +368,16 @@ describe('R14 — la busqueda y los filtros NO ensanchan lo visible', () => {
   });
 
   it('productos: un filtro numerico que solo casa con filas de B devuelve cero desde A', async () => {
-    // Los `stock` de B (910..940) no se solapan con los de A (10..30).
+    // Los `qtyAlert` de B (91..94) no se solapan con los de A (1..3).
     const desdeA = await listAliveProducts(
-      consulta({ filters: { stock: { kind: 'numberRange', min: 900, max: 999 } } }),
+      consulta({ filters: { qtyAlert: { kind: 'numberRange', min: 90, max: 99 } } }),
       ambitoDe(A),
     );
     expect(desdeA.items).toEqual([]);
     expect(desdeA.total).toBe(0);
 
     const desdeB = await listAliveProducts(
-      consulta({ filters: { stock: { kind: 'numberRange', min: 900, max: 999 } } }),
+      consulta({ filters: { qtyAlert: { kind: 'numberRange', min: 90, max: 99 } } }),
       ambitoDe(B),
     );
     expect(desdeB.total).toBe(4);
@@ -402,12 +401,12 @@ describe('R14 — la busqueda y los filtros NO ensanchan lo visible', () => {
   it('el orden inverso tampoco cuela filas ajenas: ordenar no es ensanchar', async () => {
     // Si el ambito se aplicara despues de paginar, aqui entraria la fila de B que gana el orden.
     const pagina = await listAliveProducts(
-      consulta({ pageSize: 2, sort: { columnId: 'stock', direction: 'desc' } }),
+      consulta({ pageSize: 2, sort: { columnId: 'qtyAlert', direction: 'desc' } }),
       ambitoDe(A),
     );
 
     expect(pagina.total).toBe(3);
-    expect(pagina.items.map((p) => p.stock)).toEqual([30, 20]);
+    expect(pagina.items.map((p) => p.qtyAlert)).toEqual([3, 2]);
     for (const ajeno of B.productos) {
       expect(pagina.items.map((p) => p.id)).not.toContain(ajeno);
     }
@@ -434,7 +433,7 @@ describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', (
 
     const resultado = await updateAliveProduct(
       ajeno,
-      { name: 'Nombre inyectado desde A', stock: 1, qtyAlert: 1 },
+      { name: 'Nombre inyectado desde A', qtyAlert: 1 },
       new Date(),
       ambitoDe(A),
     );
@@ -451,7 +450,7 @@ describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', (
 
     const resultado = await updateAliveProduct(
       propio,
-      { name: nuevoNombre, stock: 921, qtyAlert: 92 },
+      { name: nuevoNombre, qtyAlert: 92 },
       new Date(),
       ambitoDe(B),
     );
@@ -566,7 +565,7 @@ describe('R17 — el alta escribe la empresa del AMBITO, no la de la entrada', (
     // `NewProduct` no declara empresa, asi que la entrada no puede elegirla: falta ver que se
     // escribe la correcta.
     const name = `${MARCA} Alta en A ${token().slice(0, 8)}`;
-    const creado = await createProduct({ name, stock: 1, qtyAlert: 1 }, AHORA, ambitoDe(A));
+    const creado = await createProduct({ name, qtyAlert: 1 }, AHORA, ambitoDe(A));
     A.productos.push(creado.id);
 
     expect(await empresaDelProducto(creado.id)).toBe(A.companyId);
@@ -579,7 +578,7 @@ describe('R17 — el alta escribe la empresa del AMBITO, no la de la entrada', (
   it('createWithFirstBatch escribe la MISMA empresa en el producto y en su lote', async () => {
     const name = `${MARCA} Alta con lote en A ${token().slice(0, 8)}`;
     const creado = await createWithFirstBatch(
-      { name, stock: 5, qtyAlert: 1 },
+      { name, qtyAlert: 1 },
       loteNuevo(A, A.presentaciones[0] ?? ''),
       AHORA,
       ambitoDe(A),
@@ -648,7 +647,7 @@ async function retrato(empresa: Empresa): Promise<string> {
   const fichaAjena = await findAliveProductById(ajeno.productos[0] ?? '', ambitoDe(empresa));
   const escrituraAjena = await updateAliveProduct(
     ajeno.productos[0] ?? '',
-    { name: 'no deberia escribirse', stock: 0, qtyAlert: 0 },
+    { name: 'no deberia escribirse', qtyAlert: 0 },
     new Date(),
     ambitoDe(empresa),
   );

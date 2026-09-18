@@ -105,7 +105,7 @@ function montar(options?: {
       findRefs: vi.fn(async () => [unidad()]),
       findRefsSharingBaseInCompany: vi.fn(async () => []),
     } as UnitCatalog,
-    products: { findRefs: vi.fn(async () => [{ id: PRODUCTO, name: 'Sosa caustica', stock: null }]) } as ProductCatalog,
+    products: { findRefs: vi.fn(async () => [{ id: PRODUCTO, name: 'Sosa caustica', stockByUnit: [] }]) } as ProductCatalog,
     now: () => new Date('2026-09-17T10:00:00.000Z'),
   };
 

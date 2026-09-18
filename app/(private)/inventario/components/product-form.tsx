@@ -43,25 +43,19 @@ const TOUCH_TARGET = 'min-h-11 min-w-11';
  */
 const TEXT_FIELDS = ['name'] as const;
 
-/** Campos enteros. `FormData` solo entrega cadenas, asi que se convierten antes de validar. */
-const INT_FIELDS = ['stock', 'qtyAlert'] as const;
+/** Campo entero del producto. `FormData` solo entrega cadenas, asi que se convierte antes de validar. */
+const PRODUCT_INT_FIELDS = ['qtyAlert'] as const;
 
 /**
- * Campos del PRIMER LOTE del producto (`product_batches`), que el alta pide junto al producto.
+ * Campos del LOTE que el alta pide junto al producto (`product_batches`), incluida su existencia.
+ * Solo existen en el ALTA: la edicion no pinta ninguno, no los envia y valida con un esquema que
+ * ni los conoce.
  *
- * **QC-90 (R25): desde ahora VIAJAN.** Estan en el DOM del `<form>`, asi que ya iban en el
- * `FormData`; lo que faltaba era que la validacion previa los mirara y que la operacion los
- * leyera. Los dos huecos los cierra el MISMO objeto: `createProductWithFirstBatchSchema`, que
- * valida el cliente aqui y revalida el caso de uso en el servidor (R24, R27).
- *
- * **Solo en el ALTA**: la edicion no pinta ninguno de los seis, no los envia y valida con
- * `createProductSchema`, que ni los conoce.
- *
- * **`purchaseDate`** siempre viaja con un valor -nunca vacia, "hoy" por defecto-, a diferencia
- * de los demas. Aun asi es campo del lote: solo existe en el alta y la revalida el mismo esquema
- * compartido.
+ * `purchaseDate` siempre viaja con un valor -nunca vacia, "hoy" por defecto-, a diferencia de los
+ * demas; aun asi es campo del lote y solo existe en el alta.
  */
 const BATCH_FIELDS = [
+  'stock',
   'presentationId',
   'unitCost',
   'totalCost',
@@ -72,14 +66,17 @@ const BATCH_FIELDS = [
 
 type ProductFieldName =
   | (typeof TEXT_FIELDS)[number]
-  | (typeof INT_FIELDS)[number]
+  | (typeof PRODUCT_INT_FIELDS)[number]
   | (typeof BATCH_FIELDS)[number];
 
 const ALL_FIELDS: readonly ProductFieldName[] = [
   ...TEXT_FIELDS,
-  ...INT_FIELDS,
+  ...PRODUCT_INT_FIELDS,
   ...BATCH_FIELDS,
 ];
+
+/** Campos que se convierten a entero antes de validar: el del producto y la existencia del lote. */
+const NUMBER_FIELDS = [...PRODUCT_INT_FIELDS, 'stock'] as const;
 
 /**
  * Copy de los errores por campo. Se escribe aqui y no se toma de zod: los mensajes de zod estan
@@ -301,8 +298,8 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
     const values = readValues(formData);
     const fieldErrors: FieldErrors = {};
 
-    const numbers: Partial<Record<(typeof INT_FIELDS)[number], number>> = {};
-    for (const field of INT_FIELDS) {
+    const numbers: Partial<Record<(typeof NUMBER_FIELDS)[number], number>> = {};
+    for (const field of NUMBER_FIELDS) {
       const parsed = parseInteger(values[field]);
       if (parsed === 'invalid') {
         fieldErrors[field] = FIELD_MESSAGES[field];
@@ -523,15 +520,17 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
         />
       )}
 
-      <ProductField
-        name="stock"
-        label={FIELD_LABELS.stock}
-        type="number"
-        required
-        helper="Las unidades que hay ahora mismo. Se guarda tal cual, sin recalcularse a partir de ningún movimiento."
-        defaultValue={initialValue('stock', product?.stock?.toString() ?? '')}
-        error={fieldErrors.stock}
-      />
+      {isEdit ? null : (
+        <ProductField
+          name="stock"
+          label={FIELD_LABELS.stock}
+          type="number"
+          required
+          helper="La existencia con la que entra este lote al inventario."
+          defaultValue={initialValue('stock', '')}
+          error={fieldErrors.stock}
+        />
+      )}
 
       {/*
         AQUI IBA LA UNIDAD, y su ausencia es deliberada (decision humana del 2026-09-03).

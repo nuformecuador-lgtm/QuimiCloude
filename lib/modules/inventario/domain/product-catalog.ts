@@ -1,5 +1,7 @@
 // lib/modules/inventario/domain/product-catalog.ts
 
+import type { ProductStockByUnit } from './product-stock';
+
 /** Identificador de un producto visto DESDE FUERA de `inventario`. Es lo unico que otro
  *  modulo guarda de un producto (p. ej. `recipe_lines.product_id`). */
 export type ProductId = string;
@@ -15,14 +17,12 @@ export type ProductId = string;
  *  que es SUYA y no se toca. No se publica en su lugar la unidad derivada del lote
  *  (`ProductView.latestBatchUnitId`): un contrato publico no gana un campo que nadie pide, y
  *  quien lista productos ya lo recibe por `ProductView`.
- *
- *  `stock` es `null` cuando el producto no declara existencia (columna anulable, QC-14).
  */
 export type ProductRef = {
   readonly id: ProductId;
   readonly name: string;
-  /** Existencia del producto en unidades, `null` cuando no declara stock. */
-  readonly stock: number | null;
+  /** Suma de lotes por unidad; array vacio cuando el producto no tiene ninguno. */
+  readonly stockByUnit: readonly ProductStockByUnit[];
 };
 
 /** Servicio que `inventario` ofrece a los demas modulos (`docs/architecture.md > Dominio`
