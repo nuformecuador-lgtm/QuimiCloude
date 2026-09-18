@@ -19,6 +19,32 @@
 
 ## Evaluaciones
 
+### QC-68 - acotada con `/afinar-feature` (2026-09-17)
+
+Alcance, **8 decisiones cerradas** y **cero preguntas abiertas** en
+`.worktrees/QC-68-busqueda-y-total-en-el-listado-de-pedidos/specs/QC-68-busqueda-y-total-en-el-listado-de-pedidos/requirements.md`
+(sembrado DENTRO del worktree). No se copian aqui.
+
+**El worktree se sincronizo ANTES de acotar**, y no por rutina: se monto cuando `dev` iba 66 commits
+por detras, y la leccion de QC-63 es que acotar contra un mundo viejo produce premisas falsas. Tambien
+se le copio el `.env`, que `wt.sh` no puso —el mismo fallo que en QC-63 mato la integracion con un
+error que no nombra su causa—.
+
+**La pregunta que la ficha traia abierta se cerro**: el total **solo se muestra**, no entra en
+`ORDER_QUERYABLE`. **Una segunda la destapo el disco y no estaba en la ficha**: como `list-orders.ts`
+resuelve los nombres con `findRefsIncludingDeleted`, la lista **ya muestra el nombre de una receta dada
+de baja**, asi que la busqueda tambien la encuentra —si no, un pedido visible en pantalla no aparecerian
+al buscarlo por el nombre que el mismo muestra—.
+
+**El E2E se difiere A QC-122, con motivo escrito**: `CHECKPOINTS.md` lo exige para importes, pero esta
+ficha no tiene pantalla que ejercitar. **QC-122 nacio el mismo dia justamente para que esa exigencia no
+quedara sin dueno**: enchufar la busqueda y el total en la pantalla de pedidos, `zone:frontend`, epica
+Pedidos, «is blocked by» QC-68, y con el E2E de importes escrito dentro como suyo.
+
+**El board se corrigio ANTES de sembrar**: la `description` declaraba abierto lo del total y no decia
+nada de las recetas de baja ni del E2E. `zone`, `complexity` y `depends_on` siguen igual. Sigue
+`pending` en Backlog: la mueve el leader en F1.3.
+
 ### QC-59 - acotada con `/afinar-feature` (2026-09-17)
 
 Alcance, **18 decisiones cerradas** y **cero preguntas abiertas** en

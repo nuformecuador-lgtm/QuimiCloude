@@ -1785,6 +1785,23 @@
       "branch": "feature/QC-120-rendimiento-de-la-receta",
       "depends_on": [],
       "spec_path": "specs/QC-120-rendimiento-de-la-receta"
+    },
+    {
+      "key": "QC-122",
+      "id": 122,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "busqueda-y-total-en-la-pantalla-de-pedidos",
+      "description": "Enchufar en la pantalla de pedidos las dos cosas que QC-68 construye por debajo: la caja de busqueda por nombre de receta y la columna del total. NACE EL 2026-09-17 al acotar QC-68; la pantalla (QC-35) se construyo a proposito sin las dos. EL E2E DE IMPORTES ES DE ESTA FICHA, y ese es el motivo por el que nace ahora: CHECKPOINTS.md lo exige y QC-68 no tiene pantalla que ejercitar. NO reabre lo que QC-68 cerro -busqueda solo por nombre de receta, incluyendo recetas de baja, y el total SOLO se muestra-. QUEDA ABIERTO: donde va la columna del total en una tabla ya cargada, si el total se muestra tambien en el panel de detalle, y que ve el usuario mientras la busqueda esta en vuelo y cuando no hay coincidencias. NO ENTRA: la consulta, la migracion ni el calculo, que son de QC-68.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-122-busqueda-y-total-en-la-pantalla-de-pedidos",
+      "depends_on": [
+        "QC-68"
+      ],
+      "spec_path": "specs/QC-122-busqueda-y-total-en-la-pantalla-de-pedidos"
     }
   ]
 }
