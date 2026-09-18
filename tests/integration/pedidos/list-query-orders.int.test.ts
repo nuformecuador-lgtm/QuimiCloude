@@ -18,6 +18,10 @@
  * `order-sequence.int`- y sus propias secuencias se borran al final. Las consultas se acotan por
  * un filtro de fecha o por los ids sembrados; ninguna afirma nada global sobre la tabla.
  *
+ * QC-68 (2026-09-17): sumo su propio bloque de casos, con sus propias recetas efimeras, que
+ * ejercitan la busqueda real contra Postgres (`findRecipeIdsMatchingName` + `listAliveOrders`
+ * con el tercer argumento).
+ *
  * Cubre R7, R10, R11, R13, R14, R15, R17, R25 y R29.
  */
 import { randomUUID } from 'node:crypto'
@@ -25,6 +29,8 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { normalizeCompanyName } from '@/lib/modules/identity'
+import { findRecipeIdsMatchingName } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma'
+import { normalizeRecipeName } from '@/lib/modules/recetas'
 import {
   createOrder,
   listAliveOrders,
@@ -32,7 +38,7 @@ import {
 import { prisma } from '@/lib/shared/db/prisma'
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination'
 
-import type { ListQuery, NewOrder, OrderRow, OrderScope } from '@/lib/modules/pedidos'
+import type { ListQuery, NewOrder, OrderRow, OrderScope, Page } from '@/lib/modules/pedidos'
 
 /** Un ano por archivo, distinto de los 288x de `order-repository.int.test.ts` y de los 287x de
  *  `order-sequence.int.test.ts`, para que ninguno pueda pisarle la secuencia a otro. */
@@ -244,16 +250,151 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
     expect(pagina.pageSize).toBe(MAX_PAGE_SIZE)
     expect(pagina.items.length).toBeLessThanOrEqual(MAX_PAGE_SIZE)
   })
+})
 
-  it('la busqueda NO recorta nada: `orders` no busca (R17)', async () => {
-    // R17 — el adaptador no tiene capa de busqueda y no puede tenerla: `orders` no tiene
-    // columna `name`. Aunque el `search` llegara con texto -no llega: el caso de uso lo poda-,
-    // la lista vuelve igual.
-    const conTexto = await listAliveOrders(consulta({ pageSize: 25, search: 'acido' }), scope())
-    const sinTexto = await listAliveOrders(consulta({ pageSize: 25 }), scope())
+/**
+ * QC-68 (2026-09-17): este caso decia «la busqueda NO recorta nada: `orders` no busca», porque
+ * `orders` no tenia columna de nombre y el adaptador no tenia capa de busqueda. Esa afirmacion
+ * deja de ser cierta: `list-orders.ts` ahora resuelve los ids de receta que casan con el termino
+ * por `findRecipeIdsMatchingName` (contrato de `recetas`) y se los pasa a `listAliveOrders` como
+ * tercer argumento, que los acota con `recipeId: { in: [...] }`. El caso se tensa para demostrar
+ * la busqueda real contra Postgres, con sus propias recetas efimeras -tres nombres distintos, una
+ * dada de baja- para no interferir con el resto del archivo.
+ */
+describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R10, R15)', () => {
+  const DIA = 21
 
-    expect(conTexto.total).toBe(sinTexto.total)
-    expect(conTexto.items.map((o) => o.id)).toEqual(sinTexto.items.map((o) => o.id))
+  let recipeAlfaId: string
+  let recipeBetaId: string
+  let recipeBajaId: string
+  let ordenAlfa: OrderRow
+  let ordenBeta: OrderRow
+  let ordenBaja: OrderRow
+  const recetasComunes: string[] = []
+  const ordenesComunes: OrderRow[] = []
+
+  const soloElDia21: ListQuery['filters'] = {
+    createdAt: {
+      kind: 'dateRange',
+      from: `${String(YEAR)}-01-${String(DIA)}`,
+      to: `${String(YEAR)}-01-${String(DIA)}`,
+    },
+  }
+
+  async function buscar(search: string, pageSize = 25): Promise<Page<OrderRow>> {
+    const recipeIds = await findRecipeIdsMatchingName(search, companyId)
+    return listAliveOrders(
+      consulta({ pageSize, search, filters: soloElDia21 }),
+      scope(),
+      recipeIds,
+    )
+  }
+
+  beforeAll(async () => {
+    const marca = token()
+
+    async function recetaEfimera(nombre: string, overrides: { deletedAt?: Date } = {}) {
+      return (
+        await prisma.recipe.create({
+          data: {
+            name: nombre,
+            nameNormalized: normalizeRecipeName(nombre),
+            companyId,
+            ...overrides,
+          },
+          select: { id: true },
+        })
+      ).id
+    }
+
+    recipeAlfaId = await recetaEfimera(`Acido Citrico ${marca}`)
+    recipeBetaId = await recetaEfimera(`Bicarbonato ${marca}`)
+    recipeBajaId = await recetaEfimera(`Cloro de baja ${marca}`, { deletedAt: instantIn(DIA) })
+
+    ordenAlfa = await alta(instantIn(DIA, 1), { recipeId: recipeAlfaId })
+    ordenBeta = await alta(instantIn(DIA, 2), { recipeId: recipeBetaId })
+    ordenBaja = await alta(instantIn(DIA, 3), { recipeId: recipeBajaId })
+
+    // R5 — un termino que casa con MAS recetas que `pageSize`, para distinguir el total del
+    // conjunto buscado del tamano de la pagina.
+    for (let i = 0; i < 3; i += 1) {
+      const id = await recetaEfimera(`Comun Compartido ${i} ${marca}`)
+      recetasComunes.push(id)
+      ordenesComunes.push(await alta(instantIn(DIA, 10 + i), { recipeId: id }))
+    }
+  })
+
+  afterAll(async () => {
+    const recetas = [recipeAlfaId, recipeBetaId, recipeBajaId, ...recetasComunes]
+    // Los pedidos de estas recetas ANTES que las recetas: `recipes.company_id`/`orders.recipe_id`
+    // son FK RESTRICT y el `afterAll` del archivo, que borra `creados`, corre DESPUES de este.
+    await prisma.order.deleteMany({ where: { recipeId: { in: recetas } } })
+    for (const id of recetas) {
+      await prisma.recipe.delete({ where: { id } })
+    }
+  })
+
+  it('R1: el termino devuelve solo los pedidos de la receta que casa, y ninguno mas', async () => {
+    const pagina = await buscar('Bicarbonato')
+
+    expect(pagina.items.map((o) => o.id)).toEqual([ordenBeta.id])
+  })
+
+  it('R4: el pedido cuya receta esta de baja SI aparece al buscar su nombre', async () => {
+    const pagina = await buscar('Cloro de baja')
+
+    expect(pagina.items.map((o) => o.id)).toEqual([ordenBaja.id])
+  })
+
+  it('R2: ignora acentos y mayusculas', async () => {
+    const pagina = await buscar('ACIDO citrico')
+
+    expect(pagina.items.map((o) => o.id)).toEqual([ordenAlfa.id])
+  })
+
+  it('R5: el total describe el conjunto buscado y no la pagina', async () => {
+    const pagina = await buscar('Comun Compartido', 2)
+
+    expect(pagina.items).toHaveLength(2)
+    expect(pagina.total).toBe(3)
+    expect(pagina.totalPages).toBe(2)
+    expect(ordenesComunes).toHaveLength(3)
+  })
+
+  it('R10: un termino que no casa con ninguna receta devuelve pagina vacia, total 0 y sin error', async () => {
+    const pagina = await buscar('xilofono-que-no-existe')
+
+    expect(pagina.items).toEqual([])
+    expect(pagina.total).toBe(0)
+    // `buildPage` fija `totalPages` en 1 cuando `total` es 0 -nunca 0 paginas-, mismo criterio
+    // que el resto de listados del contrato generico.
+    expect(pagina.totalPages).toBe(1)
+  })
+
+  it('R3: buscar el numero de pedido no encuentra nada', async () => {
+    const pagina = await buscar(String(ordenAlfa.number.sequence))
+
+    expect(pagina.items).toEqual([])
+  })
+
+  it('R15: sin termino de busqueda, la lista vuelve exactamente igual que antes de esta feature', async () => {
+    const recipeIds = await findRecipeIdsMatchingName('', companyId)
+    expect(recipeIds).toBeNull()
+
+    const conRecipeIdsNull = await listAliveOrders(
+      consulta({ pageSize: 25, filters: soloElDia21 }),
+      scope(),
+      recipeIds,
+    )
+    const sinTercerArgumento = await listAliveOrders(
+      consulta({ pageSize: 25, filters: soloElDia21 }),
+      scope(),
+    )
+
+    expect(conRecipeIdsNull.total).toBe(sinTercerArgumento.total)
+    expect(conRecipeIdsNull.items.map((o) => o.id)).toEqual(
+      sinTercerArgumento.items.map((o) => o.id),
+    )
   })
 })
 
