@@ -489,10 +489,16 @@ por `/afinar-regla`.
 
 ### El gate completo NO corre el E2E (2026-09-17)
 
-Lo apuntó el `reviewer` de QC-91 de pasada: **`init.sh` no ejecuta Playwright**. Si se confirma,
-«gate verde» **nunca ha incluido los recorridos críticos** en ninguna ficha: los E2E se han corrido
-siempre a mano, y `CHECKPOINTS.md` los exige para movimientos de inventario. Es más grave que
-cualquier hallazgo de comentarios y **está sin verificar**: es lo primero que hay que comprobar.
+**VERIFICADO el 2026-09-17, y NO es un hallazgo nuevo**: `init.sh` no ejecuta Playwright, y ya
+estaba anotado como deuda en `docs/verification.md`; el propio `init.sh:45-47` lo dice, con el caso
+que lo destapó —**una suite E2E entera caída en `dev`** por un `Cannot find module 'resend'` que
+nadie vio, porque el gate no la corre—.
+
+Lo que sí conviene tener presente al leer cualquier bitácora: **«gate completo verde» no incluye los
+recorridos críticos**. Los E2E se corren a mano, y `CHECKPOINTS.md` los exige para movimientos de
+inventario. En QC-91 se corrieron (14 passed, chromium y webkit) y el reviewer los reejecutó, pero
+eso fue disciplina, no el gate. La deuda tiene dueño en `docs/verification.md` y no es de esta
+ficha.
 
 ### QC-121 no está en `feature_list.json` (2026-09-17)
 
