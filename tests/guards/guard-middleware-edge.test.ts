@@ -216,6 +216,13 @@ describe('guardia: el middleware carga en el borde', () => {
     // Y NO llega a la composicion Node, que es la que cablea Prisma.
     expect(files).not.toContain('lib/composition/index.ts')
   })
+
+  it('el cierre alcanza los archivos nuevos del limite de peticiones (R30)', () => {
+    const { files } = walkEdgeClosure(ENTRY_POINT, readRepoSource)
+
+    expect(files).toContain('lib/modules/rate-limit/domain/check-request-rate.ts')
+    expect(files).toContain('lib/modules/rate-limit/adapters/driven/upstash-rate-limiter.ts')
+  })
 })
 
 describe('guardia: casos sinteticos', () => {
