@@ -1938,8 +1938,8 @@
       "description": "Escribir los textos DEFINITIVOS de los dos prompts que QC-109 deja montados: el de la estrategia `catalogo` (que lee el PDF como imagen) y el de `formula` (que lo lee como texto). Nace el 2026-09-18 al acotar QC-109, porque un prompt vacio NO PUEDE FUNCIONAR: QC-108 rechaza un prompt en blanco sin llamar al proveedor. QC-109 crea los archivos con un texto provisional que si funciona; escribir los definitivos y quitar la cabecera de provisional queda aqui. QUEDA ABIERTO: que se le pide exactamente a la IA en cada caso, COMO SE COMPRUEBA QUE UN PROMPT ES BUENO -un prompt no se prueba como una funcion-, y si los textos se versionan.",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
-      "zone": null,
+      "complexity": "medium",
+      "zone": "backend",
       "branch": "feature/QC-129-textos-definitivos-de-los-prompts",
       "depends_on": [
         "QC-109"
