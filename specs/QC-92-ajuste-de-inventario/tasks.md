@@ -52,7 +52,7 @@
 
 ## Tanda 2 — el dominio, en piezas puras
 
-- [ ] **T3 [P] — Tipos y constantes del libro.** Depende de T1.
+- [x] **T3 [P] — Tipos y constantes del libro.** Depende de T1.
       `MOVEMENT_REASONS` + `MovementReason`; `LEDGER_START` con el timestamp de la migración de T1;
       `InventoryMovementView`, `NewInventoryMovement`, `ProductBatchView`.
       **Hecho:** `typecheck` y `lint` verdes; el test unitario afirma que añadir un motivo a la
@@ -63,7 +63,7 @@
       `lib/modules/inventario/domain/product-batch-view.ts`,
       `tests/unit/inventario/movement-reason.test.ts`.
 
-- [ ] **T4 [P] — Los dos códigos de error nuevos.** Depende de **T0** (aprobados) y no de T3.
+- [x] **T4 [P] — Los dos códigos de error nuevos.** Depende de **T0** (aprobados) y no de T3.
       Dos entradas en `ERROR_CODES` con su clave y su texto en `error-catalog.ts`, la **séptima
       enmienda escrita y fechada** en la cabecera de `error-codes.ts` —como la sexta— y las dos
       clases en `errors.ts` del módulo.

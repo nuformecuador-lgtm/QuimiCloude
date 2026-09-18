@@ -92,3 +92,61 @@ Las tres familias, para que se puedan contar:
 3. **Censo de migraciones** (QC-99) — `MIGRACIONES_ESPERADAS`. Le tocó a **T1**.
 
 Todas comparten la forma: una lista cerrada en `tests/guards/` que se pone roja por algo que **no habla de la ficha que la rompió**.
+
+---
+
+## Tanda 2 — T3, T4 (código hecho; la tanda **NO** cierra: hay un bloqueante)
+
+### Archivos
+**Creados**
+- `lib/modules/inventario/domain/movement-reason.ts` — `MOVEMENT_REASONS` + `MovementReason`
+- `lib/modules/inventario/domain/movement-ledger.ts` — `LEDGER_START = '20260917130000'`
+- `lib/modules/inventario/domain/inventory-movement.ts` — `InventoryMovementView`, `NewInventoryMovement`
+- `lib/modules/inventario/domain/product-batch-view.ts` — `ProductBatchView`
+- `tests/unit/inventario/movement-reason.test.ts`
+
+**Modificados**
+- `lib/modules/errores/domain/error-codes.ts` — `batch_not_found`, `batch_stock_negative` y la séptima enmienda fechada
+- `lib/modules/errores/domain/error-catalog.ts` — clave y texto de cada uno
+- `lib/modules/inventario/domain/errors.ts` — `BatchNotFoundError`, `BatchStockNegativeError`
+- `tests/unit/errores/catalogo.test.ts` — conteo 46 → 48 y cobertura de los dos códigos nuevos
+
+### La séptima enmienda, texto exacto
+```
+* **Septima enmienda, el 2026-09-17 (QC-92)**: `batch_not_found`, `batch_stock_negative`.
+* Aprobada por el humano el 2026-09-17 en la puerta F1.4 de QC-92.
+```
+
+### R9, cómo se probó de verdad
+El test **no** cuenta los motivos. Barre las fuentes de `app/` y `lib/` y se pone **rojo si algún archivo que no sea `movement-reason.ts` enumera los motivos a mano**, con caso rojo y caso verde sobre fuentes fabricadas. Contar `MOVEMENT_REASONS.length === 4` no habría probado nada de lo que R9 pide.
+
+### Salida real
+- `pnpm run typecheck` → verde · `pnpm run lint` → verde
+- `vitest run movement-reason.test.ts catalogo.test.ts guard-catalogo-de-errores.test.ts` → **3 archivos, 62 tests, verdes**
+- `vitest related --run <los 7 archivos + sus 2 tests>` → **336 de 337 archivos verdes (5016/5041)**. El único rojo es el bloqueante de abajo.
+
+---
+
+## BLOQUEANTE de la tanda 2 — la guardia R31 de **QC-81**, que el spec no previó
+
+`tests/unit/inventario/qc81-alcance.test.ts` se pone **rojo**. Medido por mí, no reportado de oídas:
+
+```
+FAIL tests/unit/inventario/qc81-alcance.test.ts
+  > QC-81 R31 — ni existencia por lote (QC-91) ni ajuste de inventario (QC-92)
+  > R31: ningun archivo del modulo inventario suma lotes, ajusta ni consume
+AssertionError: lib/modules/inventario/domain/inventory-movement.ts:
+  nombra un ajuste o consumo: adjustment
+Test Files 1 failed (1) · Tests 1 failed | 10 passed | 3 skipped (14)
+```
+
+**Por qué salta.** `hallazgosDeAjusteOSuma` (`:242-256`) marca cualquier identificador que contenga una palabra de `PALABRAS_DE_AJUSTE_O_CONSUMO`. `InventoryMovementView.kind` es `'opening' | 'adjustment'`, que es **literalmente lo que `design.md > 4.1` manda escribir**. No hay forma de cumplir el design sin ponerla roja.
+
+**El hallazgo de fondo, y es el que importa.** En ese mismo archivo, R28 (`:359`) y R29 (`:389`) se **acotan a la rama de QC-81** con el helper `archivosOSalto` (`:128-143`): fuera de su rama se saltan ruidosamente. **R31 no lo hace**: recorre `lib/modules/inventario` entero, incondicionalmente, en cualquier rama. Es una asimetría dentro del propio archivo.
+
+**Y su propósito ya se cumplió.** El `describe` se titula *«ni existencia por lote (QC-91) ni ajuste de inventario (QC-92)»*: existía para que **QC-81 no se adelantara** a estas dos fichas. QC-91 ya está en `dev`. **QC-92 es la ficha a la que la guardia le estaba guardando el sitio.**
+
+**No la he tocado.** Es la guardia de otra ficha y `D13` prohíbe tocar una guardia en silencio; además el spec solo previó ajustar la R21 de QC-91 (T7). Queda escalado al leader.
+
+**Cuarta familia de guardia de censo/alcance**, sobre las tres que ya llevábamos contadas arriba:
+4. **Guardia de alcance de ficha** (QC-81 R31) — le reserva el sitio a una ficha futura y **no se acota a su rama**, así que se pone roja justo cuando llega la ficha para la que reservaba.
