@@ -110,8 +110,27 @@
 
 ## T11 — Gate completo · depende de todo lo anterior
 
-- [ ] `./init.sh` completo antes del PR, sin excepción.
+- [x] `./init.sh` completo antes del PR, sin excepción.
 - **Hecho:** termina en verde, incluidas todas las guardias.
+- **CERRADA EL 2026-09-18 CON UNA SALVEDAD AUTORIZADA POR EL HUMANO, y se escribe en vez de
+  maquillarse.** El gate **NO llegó a mirar esta rama**: `scripts/validate-features.mjs` corta en su
+  bloque 0 con `faltan specs para features sdd en vuelo: QC-82`, que es **ANTES de typecheck**, así
+  que ni typecheck, ni lint, ni la suite, ni las guardias se ejecutaron. **No es deuda de esta rama**:
+  QC-82 figura en vuelo en el board sin spec en disco —trabajo de otra sesión sin empujar— y el diff
+  de esta rama no toca esa entrada del `feature_list.json`. Verificado también por el `reviewer`.
+- **Lo que SÍ se corrió a mano, que es lo que el gate no alcanzó** (2026-09-18, sobre la rama ya
+  sincronizada con `dev` y con las migraciones de QC-92 aplicadas):
+  - `pnpm typecheck` — limpio.
+  - `pnpm lint` — limpio.
+  - `pnpm exec prisma generate` — hizo falta: el cliente venía desactualizado tras las migraciones
+    de QC-92 y tumbaba `presentation-unit.int.test.ts` con `Cannot read properties of undefined`.
+    No era un rojo de la rama; el gate lo regenera solo, y correr a mano se lo salta.
+  - `pnpm exec vitest related --run <diff de la rama>` — **152 archivos, 2373 tests, 0 fallos**.
+- **La excepción es a la regla 5 de `CLAUDE.md`** («el gate completo antes de cada PR, sin
+  excepción») y la autorizó el humano expresamente, con las tres salidas a la vista: esperar a
+  QC-82, saltar el bloque de validación, o abrir el PR declarando el bloqueo. Eligió declararlo.
+  **El PR lo dice en su descripción.** Cuando QC-82 se resuelva, el gate vuelve a correr entero sin
+  que esta ficha tenga que hacer nada.
 
 ---
 
