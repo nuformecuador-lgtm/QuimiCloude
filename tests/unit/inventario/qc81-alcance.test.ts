@@ -441,15 +441,22 @@ describe('QC-81 R30 — package.json y pnpm-lock.yaml intactos', () => {
 // NI EXISTENCIA POR LOTE NI AJUSTE
 // ---------------------------------------------------------------------------------------------
 
+// 2026-09-17: este barrido completo del modulo solo tiene sentido mientras la ausencia
+// de ajuste o suma es una regla de la propia rama que introduce lote y fecha de compra.
+// Fuera de ella, cualquier trabajo legitimo que si nombre un ajuste (como el propio
+// ajuste de inventario) lo pondria en rojo sin haber tocado nada de esta ficha, igual
+// que ya se acota a sus tres vecinas de este archivo.
 describe('QC-81 R31 — ni existencia por lote (QC-91) ni ajuste de inventario (QC-92)', () => {
-  it('R31: ningun archivo del modulo inventario suma lotes, ajusta ni consume', () => {
-    const archivos = archivosTs(join(repoRoot, MODULO));
-    const relativos = archivos.map((ruta) => relative(repoRoot, ruta).split('\\').join('/'));
+  it('R31: ningun archivo del modulo inventario suma lotes, ajusta ni consume', (ctx) => {
+    const archivos = archivosOSalto(ctx);
+    if (archivos === null) return;
+    const archivosDelModulo = archivosTs(join(repoRoot, MODULO));
+    const relativos = archivosDelModulo.map((ruta) => relative(repoRoot, ruta).split('\\').join('/'));
     // Ancla: sin archivos, el `toEqual([])` de abajo seria verde sin mirar nada.
-    expect(archivos.length).toBeGreaterThan(10);
+    expect(archivosDelModulo.length).toBeGreaterThan(10);
     expect(relativos).toContain(ADAPTADOR_DE_PRODUCTO);
 
-    const hallazgos = archivos.flatMap((ruta, i) =>
+    const hallazgos = archivosDelModulo.flatMap((ruta, i) =>
       hallazgosDeAjusteOSuma(readFileSync(ruta, 'utf8')).map((h) => `${relativos[i]}: ${h}`),
     );
     expect(
@@ -457,6 +464,16 @@ describe('QC-81 R31 — ni existencia por lote (QC-91) ni ajuste de inventario (
       'QC-81 R31: la existencia por lote es QC-91 y el ajuste de inventario es QC-92. Hallazgos:\n' +
         hallazgos.join('\n'),
     ).toEqual([]);
+  });
+
+  it('R31: fuera de su rama el detector sigue mordiendo sobre el modulo real', () => {
+    const archivosDelModulo = archivosTs(join(repoRoot, MODULO));
+    const relativos = archivosDelModulo.map((ruta) => relative(repoRoot, ruta).split('\\').join('/'));
+    const hallazgos = archivosDelModulo.flatMap((ruta, i) =>
+      hallazgosDeAjusteOSuma(readFileSync(ruta, 'utf8')).map((h) => `${relativos[i]}: ${h}`),
+    );
+    expect(hallazgos.length).toBeGreaterThan(0);
+    expect(hallazgos.some((h) => h.includes('adjustment'))).toBe(true);
   });
 
   it('R31: los detectores muerden con fuentes fabricados y no con uno limpio', () => {
