@@ -558,3 +558,136 @@ tres causas simultáneas y como **quinta familia** del inventario de guardias.
 
 **T8, T9 y T9bis marcadas `[x]`.** La tanda 4 cierra. La desviación del `authorName` queda **como
 estaba, aceptada y a la vista del reviewer**: no se tocó.
+
+---
+
+## Tanda 5 — T10, T11, T12, T13 (la pantalla). Gate **VERDE**; T13 queda `[ ]` con un bloqueante escalado
+
+### Archivos
+
+**Creados**
+- `app/(private)/inventario/components/product-batches-panel.tsx` — `ProductBatchesPanel` (T10)
+- `app/(private)/inventario/components/batch-history.tsx` — `BatchHistory` + `movementReasonLabel` (T11)
+- `app/(private)/inventario/components/adjust-batch-dialog.tsx` — `AdjustBatchDialog` (T12)
+- `tests/unit/inventario/product-batches-panel.test.tsx`
+- `tests/unit/inventario/batch-history.test.tsx`
+- `tests/unit/inventario/adjust-batch-dialog.test.tsx`
+- `tests/unit/inventario/product-batches-sheet.test.tsx` — el enganche de T13 (**archivo no listado en la task**, ver desviación 3)
+
+**Modificados**
+- `app/(private)/inventario/components/index.ts` — los tres componentes salen por el barrel
+- `app/(private)/inventario/components/product-table.tsx` — `ProductBatchesSheet` (componente local, no exportado) en las acciones de fila, y `canAdjust` en `ProductTableProps`
+- `app/(private)/inventario/components/product-list-section.tsx` — transporta `canAdjust` hasta la tabla; **no lee la sesión** (ver bloqueante)
+- `tests/unit/inventario/product-page.test.tsx` — doble de `batch-actions` (ver desviación 2)
+
+### Cómo quedó compuesta la pantalla
+
+La fila del listado abre un panel lateral que pide `listProductBatchesAction(product.id)` al abrirse
+(estados: en vuelo, error con `role="alert"`, y el panel). El panel es **puramente presentacional**:
+recibe los lotes y las unidades por props y expone dos ranuras —`renderBatchDetail` y
+`renderBatchActions`—, el mismo patrón que `buildProductColumns({ rowActions })` ya usaba en esta
+ruta para que la declaración no importe diálogos. En esas ranuras entran el historial y el ajuste.
+Tras un ajuste con éxito el panel vuelve a pedir los lotes, así que la existencia nueva se ve.
+
+Las tres cosas de contenido que el encargo señalaba:
+- **Cantidad con su unidad, sin convertir**: se pinta `batch.stock` tal cual y la unidad sale de
+  `batch.unitId` resuelto contra el catálogo (`symbol ?? name ?? EMPTY_CELL`). Sin catálogo, la
+  cantidad va sola. Hay caso de test que afirma que **el número pintado es exactamente `stock`**.
+- **Lote sin asientos**: texto propio (`batch-history-before-ledger`) que dice que es anterior al
+  libro de movimientos. El test distingue **los tres** estados —lista, sin asientos, error— por
+  marcadores distintos y afirma que ninguno se confunde con otro.
+- **Sin `inventario.modificar` el control no existe en el DOM**: `AdjustBatchDialog` hace
+  `if (!canAdjust) return null;` como primera línea. El caso del test **nombra al Operador**, monta
+  el panel entero y afirma que el panel se ve y el disparador no existe (`queryBy… === null`), con
+  el contraste de que con el permiso sí aparece.
+
+### El motivo, y la trampa de R9 que casi se cobra una pieza
+
+Ni el historial ni el diálogo escriben un mapa de etiquetas por motivo: la etiqueta se **deriva del
+propio código** (`movementReasonLabel`: guion bajo → espacio, primera en mayúscula) y las opciones
+del selector se recorren desde `MOVEMENT_REASONS`. Dos motivos entrecomillados en un archivo de
+`app/` habrían puesto roja la guardia de R9 (`movement-reason.test.ts`), y —más importante— un mapa
+por motivo habría hecho falso lo que R9 promete: **añadir un motivo no obliga a tocar la UI**.
+**Coste declarado:** la etiqueta derivada sale **sin tilde** («Conteo fisico», «Error de carga»).
+Es copy visible, y se acepta a cambio de no tener una lista paralela que mantener.
+
+### BLOQUEANTE de la tanda 5 — de dónde sale `canAdjust`. **Medido, no supuesto.**
+
+El hilo está tendido: `ProductListSection → ProductTable → ProductBatchesSheet → AdjustBatchDialog`
+transportan `canAdjust?: boolean`, con defecto **`false`** (falla cerrado). **Lo que falta es quién
+lo pone a `true`**, y no se puede resolver dentro de la ruta:
+
+```
+$ # mutación: `const sessionUser = await identity.getSessionUser();` en product-list-section.tsx
+$ pnpm exec vitest run tests/unit/inventario/product-route-contract.test.ts
+  × la pantalla no repite requireAdmin ni decide autorizacion
+  AssertionError: app/(private)/inventario/components/product-list-section.tsx
+    no debe contener «getSessionUser»
+  Test Files  1 failed (1) · Tests  1 failed | 17 passed (18)
+```
+
+Revertida la mutación, el archivo vuelve a ser idéntico a `HEAD` y el test da 18/18. Es la **séptima
+guardia heredada** que esta ficha se encuentra, y **no se ha tocado**: es de QC-22 y la decisión es
+del leader. Las tres salidas posibles, con su coste medido:
+
+| Opción | Qué implica | Coste |
+|---|---|---|
+| **A. Acotar/enmendar el caso de QC-22** | Permitir la lectura de sesión en la ruta **solo para presentación**, con nota fechada y prueba por mutación. Es lo que ya hacen `usuarios` (QC-75 R6) y `pedidos` | Séptima guardia tocada. La prohibición se debilita para esta ruta |
+| **B. `hasPagePermission` en `identity/adapters/driving/`** | La ruta pregunta sin nombrar la sesión; la guardia de QC-22 queda **intacta** | Toca archivo/carpeta de otra ficha; `require-page-permission.ts` tiene test de fuente propio y deja escrito que devuelve `void` **a propósito** |
+| **C. Dejarlo en `false`** | Nada rojo, nada tocado | **La pantalla nunca ofrece el ajuste, ni al Administrador**, y el E2E de T16 no puede pasar |
+
+Hoy el árbol está en **C**, que es lo que mantiene el gate verde sin decidir nada. **T13 queda
+`[ ]`** por eso: su código está completo y verde, pero su propósito —que desde el listado se pueda
+ajustar— no se cumple hasta que el origen del booleano esté decidido. **No me autoapruebo esto.**
+
+### Desviaciones declaradas
+
+1. **`ProductBatchesSheet` vive DENTRO de `product-table.tsx`**, no en un archivo propio. La lista de
+   archivos de T13 no incluye ningún componente nuevo, y un archivo suelto en `components/` habría
+   exigido además su línea de barrel. Es un componente local de ~60 líneas, no exportado.
+2. **Se tocó `tests/unit/inventario/product-page.test.tsx`, que no estaba en la lista de T13.**
+   Medido por el subagente y **vuelto a medir aquí**: la página monta `product-table.tsx`, que ahora
+   arrastra `batch-actions.ts` (`'use server'`), y ese módulo importa `observabilidad` de
+   `@/lib/composition`, que el doble de ese archivo no declaraba → reventaba **al importar**. Con
+   `git show HEAD:` de los tres archivos de producción el test daba 59/59; restaurados, rojo. Se
+   añadió el **mismo patrón de doble** que el archivo ya usa para `product-actions` y
+   `unit-actions`. **Ningún caso existente se debilitó.**
+3. **`tests/unit/inventario/product-batches-sheet.test.tsx` es un archivo nuevo no listado en T13.**
+   T13 solo listaba el test de contrato de la ruta, que no observa DOM; sin este archivo, «el listado
+   abre el panel» no tendría ninguna prueba. El test de contrato **no se tocó**.
+4. **`movementReasonLabel` se exporta desde `batch-history.tsx`** y el diálogo lo importa de ahí. Es
+   un helper de presentación compartido por dos componentes de la misma ruta; no se creó un archivo
+   nuevo para él porque no estaba en ninguna lista de archivos.
+5. **Pulido posterior a las tres tasks**, en los mismos seis archivos: se quitó **una** cita de
+   requisitos que se había colado en un comentario de producción de `adjust-batch-dialog.tsx`
+   —`docs/conventions.md` lo prohíbe y esta ficha ya pagó eso en `934fe7c`—; se arregló un
+   `aria-describedby` que apuntaba a un `data-testid` y no a un `id` (no anunciaba nada); el motivo
+   pasó a exigirse **también en el cliente**; y los tres datos del lote y del asiento ganaron
+   **rótulo visible** («Lote», «Cantidad», «Fecha de compra» / «Motivo», «Autor», «Fecha»), que antes
+   eran valores sueltos sin decir qué eran.
+
+### Salida real del gate
+
+`./init.sh --rapido`:
+
+```
+[test:rapido] tests relacionados con 43 archivo(s) del diff vs origin/dev
+  Test Files  352 passed (352)
+       Tests  5235 passed | 26 skipped (5261)
+[test:rapido] todas las guardias
+  Test Files  43 passed (43)
+       Tests  515 passed | 9 skipped (524)
+✓ test:rapido paso · ✓ todas las migraciones tienen down.sql · ✓ .env presente · == init OK ==
+```
+
+**Y, sabiendo que la selección del modo rápido tiene agujeros** (deuda anotada en la tanda 4), la
+carpeta entera corrida **a mano**:
+
+```
+pnpm exec vitest run tests/unit/inventario/
+  Test Files  47 passed (47)
+       Tests  716 passed | 5 skipped (721)
+```
+
+`pnpm run typecheck` y `pnpm run lint`: verdes, sin salida. **Cero rojos; ninguno que declarar como
+ajeno.** `package.json` no cambió (R33).

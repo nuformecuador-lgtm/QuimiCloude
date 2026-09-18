@@ -187,7 +187,7 @@
 
 ## Tanda 5 — la pantalla
 
-- [ ] **T10 [P] — Panel de lotes del producto.** Depende de T9.
+- [x] **T10 [P] — Panel de lotes del producto.** Depende de T9.
       Lista los lotes con número, **cantidad con su unidad** —derivada de la presentación, sin
       convertir— y fecha de compra. Datos **por props** desde el Server Component.
       **Hecho:** test de componente que pinta tres lotes y su unidad; y el de multiplataforma
@@ -195,7 +195,7 @@
       **Archivos:** `app/(private)/inventario/components/product-batches-panel.tsx`,
       `tests/unit/inventario/product-batches-panel.test.tsx`.
 
-- [ ] **T11 [P] — Historial del lote.** Depende de T9.
+- [x] **T11 [P] — Historial del lote.** Depende de T9.
       Despliegue con motivo, autor y fecha, del más reciente al más antiguo; y el **texto propio**
       del lote sin asientos, que explica que es anterior al libro y no parece una lista vacía.
       **Hecho:** dos tests —con asientos y sin ninguno— y la distinción frente al estado de error.
@@ -203,7 +203,7 @@
       **Archivos:** `app/(private)/inventario/components/batch-history.tsx`,
       `tests/unit/inventario/batch-history.test.tsx`.
 
-- [ ] **T12 — Diálogo de ajuste.** Depende de T10.
+- [x] **T12 — Diálogo de ajuste.** Depende de T10.
       Cantidad **con signo** y motivo del conjunto cerrado, los dos obligatorios. El control **no
       existe en el DOM** sin `inventario.modificar` —ni visible, ni deshabilitado—.
       **Hecho:** test del envío, del rechazo de cantidad cero, y del Operador que ve el panel y no
