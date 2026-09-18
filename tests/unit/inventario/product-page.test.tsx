@@ -126,6 +126,9 @@ const {
   listPresentationsActionMock,
   createPresentationActionMock,
   listUnitsActionMock,
+  listProductBatchesActionMock,
+  listBatchMovementsActionMock,
+  adjustBatchStockActionMock,
 } = vi.hoisted(() => ({
   usePathnameMock: vi.fn<() => string>(),
   redirectMock: vi.fn<(ruta: string) => never>(),
@@ -161,6 +164,11 @@ const {
   // QC-80: la pagina pide el catalogo de unidades UNA vez, para el alta rapida de presentacion
   // que el selector lleva dentro (R11). Sin este doble la pagina intentaria abrir base de datos.
   listUnitsActionMock: vi.fn<() => Promise<UnitListResult>>(),
+  // La fila abre un panel con los lotes del producto: sin este doble, montar la tabla
+  // carga el modulo real y este intenta resolver la sesion.
+  listProductBatchesActionMock: vi.fn(),
+  listBatchMovementsActionMock: vi.fn(),
+  adjustBatchStockActionMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -194,6 +202,12 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
 
 vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
   listUnitsAction: listUnitsActionMock,
+}));
+
+vi.mock('@/lib/modules/inventario/adapters/driving/batch-actions', () => ({
+  listProductBatchesAction: listProductBatchesActionMock,
+  listBatchMovementsAction: listBatchMovementsActionMock,
+  adjustBatchStockAction: adjustBatchStockActionMock,
 }));
 
 const testId = {

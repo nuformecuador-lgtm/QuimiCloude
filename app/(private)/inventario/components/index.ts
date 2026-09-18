@@ -3,6 +3,8 @@
 //
 // Sin `'use client'`: la frontera cliente/servidor se declara en CADA archivo de componente,
 // nunca aqui. Asi `page.tsx` sigue siendo Server Component aunque importe desde el barrel.
+export { AdjustBatchDialog, type AdjustBatchDialogProps } from './adjust-batch-dialog';
+export { BatchHistory, movementReasonLabel } from './batch-history';
 export { DeleteProductDialog } from './delete-product-dialog';
 // `PresentationSelect` ya no es propio de esta ruta: QC-44 lo promovio a
 // `components/shared/` porque la pantalla de proveedores lo necesita con la MISMA API
@@ -28,6 +30,10 @@ export {
   PURCHASE_DATE_FIELD,
   ProductBatchDateField,
 } from './product-batch-date-field';
+export {
+  ProductBatchesPanel,
+  type ProductBatchesPanelProps,
+} from './product-batches-panel';
 export {
   PRODUCT_NAME_FIELD,
   ProductNamePicker,

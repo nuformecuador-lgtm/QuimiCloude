@@ -22,6 +22,11 @@ type ProductListSectionProps = {
    * Aqui no se consulta nada: baja por props.
    */
   readonly units?: readonly UnitRef[];
+  /**
+   * Permiso `inventario.modificar`, resuelto en el servidor y bajado por props. Defecto `false`:
+   * esta seccion no lo decide, solo lo transporta hasta la tabla.
+   */
+  readonly canAdjust?: boolean;
 };
 
 /**
@@ -40,7 +45,7 @@ type ProductListSectionProps = {
  * **Una lista vacia NO se pinta como tabla sin filas** (R14, R16): son tres situaciones distintas
  * -fallo, catalogo vacio y pagina que se quedo atras tras un borrado- y cada una dice lo suyo.
  */
-export async function ProductListSection({ params, units }: ProductListSectionProps) {
+export async function ProductListSection({ params, units, canAdjust }: ProductListSectionProps) {
   const result = await listProductsAction(params);
 
   if (result.status === 'error') {
@@ -74,6 +79,7 @@ export async function ProductListSection({ params, units }: ProductListSectionPr
         params={{ ...params, page: currentPage }}
         totalPages={totalPages}
         units={units}
+        canAdjust={canAdjust}
       />
     </div>
   );
