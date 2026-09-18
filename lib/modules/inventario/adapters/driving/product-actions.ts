@@ -80,16 +80,14 @@ async function currentActor(): Promise<Actor | null> {
 }
 
 function buildProductFields(formData: FormData): Record<string, unknown> | typeof INVALID_NUMBER {
-  const stock = readOptionalFormInt(formData, 'stock');
   const qtyAlert = readOptionalFormInt(formData, 'qtyAlert');
 
-  if (stock === INVALID_NUMBER || qtyAlert === INVALID_NUMBER) {
+  if (qtyAlert === INVALID_NUMBER) {
     return INVALID_NUMBER;
   }
 
   return {
     name: readFormString(formData, 'name'),
-    stock,
     qtyAlert,
   };
 }
@@ -98,14 +96,18 @@ function buildProductFields(formData: FormData): Record<string, unknown> | typeo
  * Alta y edicion no comparten constructor: el esquema de edicion es `strictObject` sin campos de
  * lote, y cualquiera de ellos haria fallar la edicion con `invalid_input`. Importes y fechas pasan
  * como la cadena escrita; vacios llegan `undefined`, porque el esquema los acepta ausentes y `''`
- * seria invalido.
+ * seria invalido. La existencia solo se lee aqui: va al lote, no al producto.
  */
 function buildCreateProductCandidate(formData: FormData): unknown | typeof INVALID_NUMBER {
   const fields = buildProductFields(formData);
   if (fields === INVALID_NUMBER) return INVALID_NUMBER;
 
+  const stock = readOptionalFormInt(formData, 'stock');
+  if (stock === INVALID_NUMBER) return INVALID_NUMBER;
+
   return {
     ...fields,
+    stock,
     presentationId: readOptionalFormString(formData, 'presentationId'),
     unitCost: readOptionalFormString(formData, 'unitCost'),
     totalCost: readOptionalFormString(formData, 'totalCost'),

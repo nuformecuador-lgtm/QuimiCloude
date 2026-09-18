@@ -111,12 +111,12 @@ describe('esquema del contrato de lista', () => {
 describe('sanitize contra la lista blanca', () => {
   it('deja intacta una consulta que solo pide campos declarados', () => {
     // R1, R3 — el nombre del campo de la base es el identificador, sin traduccion.
-    // El filtro de ejemplo era `unitId` hasta QC-80; ahora es `stock`, porque `unitId` dejo de
-    // estar declarado (R21) y un caso de «consulta valida» no puede apoyarse en un campo que la
-    // lista blanca ya no acepta.
+    // El filtro de ejemplo era `unitId` hasta QC-80, luego `stock`; ahora es `qtyAlert`, porque
+    // `stock` dejo de estar declarado (R8) y un caso de «consulta valida» no puede apoyarse en un
+    // campo que la lista blanca ya no acepta.
     const entrada = query({
       sort: { columnId: 'name', direction: 'asc' },
-      filters: { stock: { kind: 'numberRange', min: 0, max: 10 } },
+      filters: { qtyAlert: { kind: 'numberRange', min: 0, max: 10 } },
       search: 'sosa',
     });
 
@@ -143,13 +143,13 @@ describe('sanitize contra la lista blanca', () => {
       query({
         filters: {
           imagePath: { kind: 'text', value: '/x.png' },
-          stock: { kind: 'numberRange', min: 0, max: 10 },
+          qtyAlert: { kind: 'numberRange', min: 0, max: 10 },
         },
       }),
       PRODUCT_QUERYABLE,
     );
 
-    expect(resultado.query.filters).toEqual({ stock: { kind: 'numberRange', min: 0, max: 10 } });
+    expect(resultado.query.filters).toEqual({ qtyAlert: { kind: 'numberRange', min: 0, max: 10 } });
     expect(resultado.ignored).toEqual(['imagePath']);
   });
 
@@ -164,7 +164,7 @@ describe('sanitize contra la lista blanca', () => {
     // `?filters[unitId]=...` en un marcador tiene que seguir pintando la lista.
     expect(Object.keys(PRODUCT_QUERYABLE.filterable)).not.toContain('unitId');
     expect(PRODUCT_QUERYABLE.sortable).not.toContain('unitId');
-    expect(Object.keys(PRODUCT_QUERYABLE.filterable)).toEqual(['stock', 'qtyAlert', 'createdAt']);
+    expect(Object.keys(PRODUCT_QUERYABLE.filterable)).toEqual(['qtyAlert', 'createdAt']);
 
     const resultado = sanitizeListQuery(
       query({ filters: { unitId: { kind: 'select', values: ['u1'] } } }),
@@ -175,15 +175,36 @@ describe('sanitize contra la lista blanca', () => {
     expect(resultado.ignored).toEqual(['unitId']);
   });
 
+  it('el listado de productos YA NO ofrece ordenar ni filtrar por existencia (R8)', () => {
+    // R8 — `products.stock` dejo de existir; ordenar o filtrar por ella se ignora y la pagina
+    // responde sin fallar, igual que cualquier otro campo no declarado.
+    expect(PRODUCT_QUERYABLE.sortable).not.toContain('stock');
+    expect(Object.keys(PRODUCT_QUERYABLE.filterable)).not.toContain('stock');
+
+    const porOrden = sanitizeListQuery(
+      query({ sort: { columnId: 'stock', direction: 'desc' } }),
+      PRODUCT_QUERYABLE,
+    );
+    expect(porOrden.query.sort).toBeNull();
+    expect(porOrden.ignored).toEqual(['stock']);
+
+    const porFiltro = sanitizeListQuery(
+      query({ filters: { stock: { kind: 'numberRange', min: 0, max: 10 } } }),
+      PRODUCT_QUERYABLE,
+    );
+    expect(porFiltro.query.filters).toEqual({});
+    expect(porFiltro.ignored).toEqual(['stock']);
+  });
+
   it('omite un filtro cuya FORMA no es la que el campo declara', () => {
-    // R8 — `stock` es un rango numerico; un texto sobre `stock` se omite, no se traduce.
+    // R8 — `qtyAlert` es un rango numerico; un texto sobre `qtyAlert` se omite, no se traduce.
     const resultado = sanitizeListQuery(
-      query({ filters: { stock: { kind: 'text', value: '5' } } }),
+      query({ filters: { qtyAlert: { kind: 'text', value: '5' } } }),
       PRODUCT_QUERYABLE,
     );
 
     expect(resultado.query.filters).toEqual({});
-    expect(resultado.ignored).toEqual(['stock']);
+    expect(resultado.ignored).toEqual(['qtyAlert']);
   });
 
   it('un campo ordenable no se vuelve filtrable por estar en la otra lista', () => {

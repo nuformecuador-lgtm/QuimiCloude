@@ -25,39 +25,35 @@ const { findMany } = vi.hoisted(() => ({ findMany: vi.fn() }));
 vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { product: { findMany } } }));
 
 describe('toProductRef', () => {
-  it('mapea id, name y stock tal cual', () => {
+  it('mapea id, name y stockByUnit tal cual', () => {
     const ref = toProductRef({
       id: 'p-1',
       name: 'Acido sulfurico',
-      stock: 12,
+      stockByUnit: [{ unitId: 'kg', quantity: 12 }],
     });
     expect(ref).toEqual({
       id: 'p-1',
       name: 'Acido sulfurico',
-      stock: 12,
+      stockByUnit: [{ unitId: 'kg', quantity: 12 }],
     });
   });
 
-  it('conserva stock null cuando el producto no declara existencia', () => {
-    const ref = toProductRef({
-      id: 'p-1',
-      name: 'Acido sulfurico',
-      stock: null,
-    });
-    expect(ref.stock).toBeNull();
+  it('sin lotes, stockByUnit es un array vacio', () => {
+    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', stockByUnit: [] });
+    expect(ref.stockByUnit).toEqual([]);
   });
 
-  it('la referencia publica NO lleva unidad, ni la vieja ni la derivada (QC-80, R21)', () => {
+  it('la referencia publica NO lleva unidad propia, ni la vieja ni la derivada (QC-80, R21), ni existencia del producto (QC-91, R11)', () => {
     // R21 — `ProductRef` es lo que `inventario` publica a OTROS modulos, y `unitId` se retira
     // de ahi SIN SUSTITUTO: el unico llamante de `findRefs` es `recetas`, que lo pide para
     // saber si el producto sigue vivo y para su nombre y su existencia. La unidad de una linea
     // de receta es `recipe_lines.unit_id`, propia de `recetas` y ajena a esta ficha.
     //
-    // Se afirma sobre las CLAVES del objeto devuelto y no solo con el compilador: un `as` en el
-    // adaptador dejaria pasar el campo sin que el typecheck dijera nada. Y tampoco aparece
-    // `latestBatchUnitId`: el contrato publico no cambia de campo, pierde uno que nadie usaba.
-    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', stock: 0 });
-    expect(Object.keys(ref).sort()).toEqual(['id', 'name', 'stock']);
+    // R11 — `products.stock` ya no existe: la existencia sale UNICAMENTE de `stockByUnit`, que
+    // agrupa por unidad (R5) y no es lo mismo que el producto declarando SU unidad.
+    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', stockByUnit: [] });
+    expect(Object.keys(ref).sort()).toEqual(['id', 'name', 'stockByUnit']);
+    expect(Object.keys(ref)).not.toContain('stock');
     expect(Object.keys(ref)).not.toContain('unitId');
     expect(Object.keys(ref)).not.toContain('latestBatchUnitId');
   });
@@ -117,7 +113,7 @@ describe('QC-50 R22 — findRefs exige el ambito de empresa (la excepcion de R29
     // despues: devuelve tal cual lo que el `where` (ya acotado) dejo pasar. Si `findMany`
     // filtro por empresa, un producto ajeno simplemente no aparece en la fila -mismo camino que
     // un id que no existe, sin distincion posible para quien pregunta.
-    findMany.mockResolvedValue([{ id: 'p-propio', name: 'Acido sulfurico', stock: 5 }]);
+    findMany.mockResolvedValue([{ id: 'p-propio', name: 'Acido sulfurico', batches: [] }]);
 
     const refs = await findProductRefs(['p-propio', 'p-de-otra-empresa'], 'empresa-1');
 

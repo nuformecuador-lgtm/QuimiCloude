@@ -68,13 +68,20 @@ function listFiles(dir: string): readonly string[] {
   })
 }
 
-/** Los comentarios explican; no ejecutan. Se quitan antes de juzgar el codigo. */
+/**
+ * Los comentarios explican; no ejecutan. Se quitan antes de juzgar el codigo.
+ *
+ * Los de LINEA primero, los de BLOQUE despues, y CRLF normalizado antes de partir por
+ * lineas: un comentario `//` que sobreviva por el `\r` de Windows puede traer un `/*` que
+ * abra un bloque falso y se trague codigo real hasta el siguiente cierre.
+ */
 export function stripComments(source: string): string {
   return source
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\r\n?/g, '\n')
     .split('\n')
     .map((line) => line.replace(/\/\/.*$/, ''))
     .join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
 }
 
 /** Ruta comparable: separadores POSIX, para casar la allowlist venga la ruta como venga. */
@@ -285,6 +292,27 @@ describe('guardia — politica de contrasenas', () => {
 
     // Y un archivo que no produce ningun hash no exige nada.
     expect(findHashWithoutPolicy('scripts/otra-cosa.ts', 'export const x = 1')).toEqual([])
+  })
+
+  it('no se ciega con CRLF: un comentario de linea con `/*` no esconde el hash real que va debajo', () => {
+    // Con el orden viejo (bloque antes que linea) o sin normalizar el `\r` de Windows, el `/*` que
+    // vive dentro de esta nota abre un bloque que se cierra en el JSDoc de mas abajo y se traga la
+    // llamada real que hay en medio: la guardia pasaria en VERDE sin haberla visto.
+    const cegadoCrlf = [
+      '// esto se evalua como /* un bloque',
+      'const stored = await hasher.hash(candidate)',
+      '/** nota de cierre posterior que cerraria el bloque falso */',
+    ].join('\r\n')
+
+    expect(findHashWithoutPolicy('scripts/alta.ts', cegadoCrlf)).toEqual(['hasher.hash('])
+  })
+
+  it('un comentario con CRLF que solo MENCIONA la politica sigue sin contar como referencia', () => {
+    const soloComentarioCrlf = [
+      '// aqui habria que llamar a checkCredentialPolicy antes de hashear',
+      'const stored = await hasher.hash(candidate)',
+    ].join('\r\n')
+    expect(findHashWithoutPolicy('scripts/alta.ts', soloComentarioCrlf)).toEqual(['hasher.hash('])
   })
 
   it('la regla ve al que importa hash de bcryptjs y lo llama sin receptor', () => {

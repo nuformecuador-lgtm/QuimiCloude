@@ -150,16 +150,23 @@ export function isPlaintextPasswordIdentifier(identifier: string): boolean {
   return !NON_COLUMN_SUFFIXES.has(ultimo)
 }
 
+/**
+ * Los de LINEA primero, los de BLOQUE despues, y CRLF normalizado antes de partir por
+ * lineas: un comentario `--` que sobreviva por el `\r` de Windows puede traer un `/*` que
+ * abra un bloque falso y se trague codigo real hasta el siguiente cierre.
+ */
 function stripSqlComments(source: string): string {
   return source
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\r\n?/g, '\n')
     .split('\n')
     .map((line) => line.replace(/--.*$/, ''))
     .join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
 }
 
 function stripLineComments(source: string): string {
   return source
+    .replace(/\r\n?/g, '\n')
     .split('\n')
     .map((line) => line.replace(/\/\/.*$/, ''))
     .join('\n')
@@ -262,6 +269,30 @@ describe('guardia — contrasena nunca en claro', () => {
 
     const comentario = '-- la contrasena se guarda solo como hash\nCREATE TABLE "roles" ("id" UUID);'
     expect(findPlaintextPasswordDeclarations('migration.sql', comentario)).toEqual([])
+  })
+
+  it('un comentario SQL que solo menciona la contrasena, con CRLF, sigue sin ser una declaracion', () => {
+    // `core.autocrlf=true` deja cada linea terminada en `\r`. Sin normalizar antes de partir por
+    // lineas, `--.*$` no casa nunca en esa linea y el texto del comentario se lee como codigo.
+    const comentarioCrlf = '-- la contrasena se guarda solo como hash\r\nCREATE TABLE "roles" ("id" UUID);'
+    expect(findPlaintextPasswordDeclarations('migration.sql', comentarioCrlf)).toEqual([])
+  })
+
+  it('no se ciega con CRLF: una nota SQL con `/*` dentro de un comentario `--` no esconde la columna real', () => {
+    // Con el orden viejo (bloque antes que linea) o con el comentario `--` sin stripear por el
+    // `\r`, el `/*` que vive dentro de esta nota abre un bloque que se cierra en el JSDoc de mas
+    // abajo y se traga la columna real que hay en medio: la guardia pasaria en VERDE sin haberla
+    // visto.
+    const cegadoCrlf = [
+      '-- el formato de nota es como /* un bloque',
+      'CREATE TABLE "users" (',
+      '  "id" UUID NOT NULL,',
+      '  "plain_password" TEXT NOT NULL',
+      ');',
+      '/** nota de cierre posterior que cerraria el bloque falso */',
+    ].join('\r\n')
+
+    expect(findPlaintextPasswordDeclarations('migration.sql', cegadoCrlf)).toContain('plain_password')
   })
 
   it('la supresion de rutas, ids y errores es por FORMA del identificador, no por lista de nombres', () => {

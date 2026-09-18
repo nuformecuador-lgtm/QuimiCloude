@@ -6,13 +6,21 @@ import type { RecipeDetail } from './recipe-view';
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
 import type { RecipeRepository } from '../ports/recipe-repository';
 
-import type { ProductCatalog } from '@/lib/modules/inventario';
+import type { ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 
 export type GetRecipeDeps = {
   readonly recipes: RecipeRepository;
   readonly products: ProductCatalog;
   readonly images: RecipeImageStorage;
 };
+
+/** Existencia del producto en la unidad de la linea que lo pide: 0 sin lotes, `null` cuando
+ *  hay lotes pero ninguno en esa unidad. */
+function stockInLineUnit(ref: ProductRef, unitId: string): number | null {
+  if (ref.stockByUnit.length === 0) return 0;
+  const match = ref.stockByUnit.find((entry) => entry.unitId === unitId);
+  return match?.quantity ?? null;
+}
 
 /**
  * Detalle de una receta (R18, R24, R33, R34, R37). `requirePermission(actor,
@@ -41,7 +49,7 @@ export function createGetRecipe(
     const productIds = row.lines.map((line) => line.productId);
     const refs = productIds.length > 0 ? await deps.products.findRefs(productIds, actor.companyId) : [];
     const namesById = new Map(refs.map((ref) => [ref.id, ref.name]));
-    const stocksById = new Map(refs.map((ref) => [ref.id, ref.stock]));
+    const refsById = new Map(refs.map((ref) => [ref.id, ref]));
 
     return {
       id: row.id,
@@ -55,14 +63,17 @@ export function createGetRecipe(
       createdBy: row.createdBy,
       updatedBy: row.updatedBy,
       steps: row.steps,
-      lines: row.lines.map((line) => ({
-        id: line.id,
-        productId: line.productId,
-        productName: namesById.get(line.productId) ?? null,
-        quantity: line.quantity,
-        unitId: line.unitId,
-        productStock: stocksById.get(line.productId) ?? null,
-      })),
+      lines: row.lines.map((line) => {
+        const ref = refsById.get(line.productId);
+        return {
+          id: line.id,
+          productId: line.productId,
+          productName: namesById.get(line.productId) ?? null,
+          quantity: line.quantity,
+          unitId: line.unitId,
+          productStock: ref === undefined ? null : stockInLineUnit(ref, line.unitId),
+        };
+      }),
     };
   };
 }

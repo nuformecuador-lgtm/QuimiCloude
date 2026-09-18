@@ -1,6 +1,5 @@
 'use client';
 
-import { PlusIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 
@@ -9,7 +8,6 @@ import {
   type DataTableParams,
   type DataTableTexts,
 } from '@/components/shared/data-table';
-import { Button } from '@/components/ui/button';
 import type { ErrorState } from '@/lib/modules/errores';
 import type { RoleOption, UserRow } from '@/lib/modules/identity';
 
@@ -50,22 +48,25 @@ import { UserStatusDialog } from './user-status-dialog';
  * envuelve la tabla en un contenedor con `overflow-x-auto`, asi que con seis columnas el documento
  * no se desplaza y las acciones de fila siguen alcanzables con el scroll de la propia tabla.
  *
- * **Es la DUENA DEL ESTADO de las escrituras** (`design.md > 8` y `> 9`): monta **una** instancia
- * del panel y de cada dialogo para toda la pagina —no una por fila— y reparte los tres
- * disparadores a `createUserColumns`. Cada uno se monta **solo mientras esta abierto**, asi que
- * cada apertura arranca limpia y un rechazo anterior no reaparece.
+ * **Es la DUENA DEL ESTADO de las escrituras DE FILA** (`design.md > 8` y `> 9`): monta **una**
+ * instancia del panel de edicion y de cada dialogo para toda la pagina —no una por fila— y reparte
+ * los tres disparadores a `createUserColumns`. Cada uno se monta **solo mientras esta abierto**,
+ * asi que cada apertura arranca limpia y un rechazo anterior no reaparece.
  *
- * **R6, mitad cliente**: sin `usuarios.modificar` no se emite NINGUNA escritura —ni el disparador
- * del alta, ni las acciones de fila, ni el panel, ni los dialogos—. Ocultarlas es comodidad de la
- * interfaz y **no es el control**: quien autoriza es el caso de uso del modulo.
+ * **El ALTA no esta aqui, y es deliberado.** La monta `user-create-action.tsx`, hermana de esta
+ * tabla y no hija suya, porque esta tabla **solo existe cuando la consulta devuelve filas**: con la
+ * lista vacia no se renderiza, y con ella se iba el unico camino para crear a nadie. Como el
+ * listado excluye al actor (QC-66 R35), eso dejaba sin salida justo el caso de la instalacion —un
+ * solo usuario sembrado, que es quien mira la pantalla—.
+ *
+ * **R6, mitad cliente**: sin `usuarios.modificar` no se emite NINGUNA escritura —ni las acciones de
+ * fila, ni el panel, ni los dialogos—. Ocultarlas es comodidad de la interfaz y **no es el
+ * control**: quien autoriza es el caso de uso del modulo.
  *
  * **Todo llega por props** (R8): las filas, los parametros, el catalogo de roles y la decision de
  * R6. Aqui no se importa `lib/composition`, ni el cliente de base de datos, ni se lee la sesion, y
  * no se llama a ninguna Server Action: la lista la pidio el servidor.
  */
-
-/** `data-testid` del disparador del alta. Constante para que ningun test dependa del copy (R41). */
-export const USER_CREATE_OPEN_TESTID = 'user-create-open';
 
 /** Clave de persistencia del fijado de columnas. Una sola tabla en la pantalla, un solo id. */
 export const USER_TABLE_ID = 'usuarios';
@@ -78,11 +79,6 @@ export const USER_TABLE_TESTID = 'user-table';
  * no incrusta copy de ningun dominio. Ningun test afirma sobre estos literales (R41): los
  * controles se localizan por rol o por `data-testid`.
  */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
-/** El copy del disparador del alta. Ningun test afirma sobre el (R41). */
-const CREATE_LABEL = 'Nuevo usuario';
-
 export const USER_TABLE_TEXTS: DataTableTexts = {
   empty: 'No hay usuarios que mostrar.',
   loading: 'Cargando usuarios…',
@@ -109,15 +105,16 @@ export const USER_TABLE_TEXTS: DataTableTexts = {
  * Que escritura hay abierta. **Una sola por vez**, que es lo que permite montar una instancia de
  * cada panel para toda la pagina en vez de una por fila.
  *
- * `'create'` es el alta, y es el unico modo sin usuario seleccionado; los otros tres actuan
- * **sobre** la fila que dispara la accion.
+ * **Los tres modos actuan SOBRE una fila**, y por eso `user` no es opcional. El alta no esta aqui:
+ * vive en `user-create-action.tsx`, fuera de la tabla, para poder ofrecerse tambien cuando la
+ * consulta no devuelve ninguna fila y esta tabla no llega a montarse.
  */
-export type UserPanelMode = 'create' | 'edit' | 'delete' | 'status';
+export type UserPanelMode = 'edit' | 'delete' | 'status';
 
-/** La escritura abierta y sobre quien. `null` en `user` es el alta, que no tiene sujeto. */
+/** La escritura abierta y sobre quien. Siempre hay sujeto: los tres modos salen de una fila. */
 export type UserPanel = {
   readonly mode: UserPanelMode;
-  readonly user: UserRow | null;
+  readonly user: UserRow;
 };
 
 export type UserTableProps = {
@@ -185,29 +182,12 @@ export function UserTable({
   );
 
   // Se estrecha AQUI, no en el JSX: asi el compilador sabe que `panel` no es nulo al usarlo.
-  const sheetPanel =
-    panel !== null && (panel.mode === 'create' || panel.mode === 'edit') ? panel : null;
+  const editUser = panel !== null && panel.mode === 'edit' ? panel.user : null;
   const deleteUser = panel !== null && panel.mode === 'delete' ? panel.user : null;
   const statusUser = panel !== null && panel.mode === 'status' ? panel.user : null;
 
   return (
     <div className="flex flex-col gap-4" data-testid={USER_TABLE_TESTID}>
-      {/* El alta (R6): sin `usuarios.modificar` este disparador no existe en el arbol servido. */}
-      {canModify ? (
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="default"
-            className={TOUCH_TARGET}
-            data-testid={USER_CREATE_OPEN_TESTID}
-            onClick={() => setPanel({ mode: 'create', user: null })}
-          >
-            <PlusIcon aria-hidden="true" />
-            {CREATE_LABEL}
-          </Button>
-        </div>
-      ) : null}
-
       <DataTable
         tableId={USER_TABLE_ID}
         columns={columns}
@@ -221,13 +201,13 @@ export function UserTable({
       />
 
       {/*
-        UNA instancia del panel para toda la pagina, y solo mientras esta abierto: asi el alta
-        arranca en blanco y la edicion vuelve a pedir la ficha en cada apertura (R22, R26).
+        UNA instancia del panel de EDICION para toda la pagina, y solo mientras esta abierto: asi
+        vuelve a pedir la ficha en cada apertura (R26). El alta tiene el suyo, fuera de la tabla.
       */}
-      {sheetPanel === null ? null : (
+      {editUser === null ? null : (
         <UserSheet
-          key={`${sheetPanel.mode}:${sheetPanel.user?.id ?? ''}`}
-          user={sheetPanel.user}
+          key={editUser.id}
+          user={editUser}
           currentUserId={currentUserId}
           roles={roles}
           rolesError={rolesError}

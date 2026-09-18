@@ -238,14 +238,14 @@ describe('R15, R16, R21 — producto nuevo', () => {
     expect(products.createWithFirstBatch.mock.calls[0][2]).toBe(AHORA);
   });
 
-  it('escribe LA MISMA existencia en el producto y en el lote', async () => {
+  it('escribe la existencia UNICAMENTE en el lote, nunca en el producto (R10)', async () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
     await createProduct({ ...ALTA_VALIDA, stock: 7 }, ADMIN);
 
-    expect(productoCreado(products).stock).toBe(7);
     expect(loteCreado(products).stock).toBe(7);
+    expect(Object.keys(productoCreado(products))).not.toContain('stock');
   });
 
   it('R1 — ningun camino escribe un producto sin lote', async () => {

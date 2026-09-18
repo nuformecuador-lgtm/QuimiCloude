@@ -8,8 +8,15 @@ import { cn } from '@/lib/utils';
  *
  * **NO ofrece «crea el primero»**, mismo criterio que el vacio de personas (QC-67 R18): el
  * disparador del alta ya esta arriba, visible, cuando la sesion trae `usuarios.modificar`. Un
- * segundo camino al alta dentro del vacio duplicaria el disparador y encima aparecceria —o no—
+ * segundo camino al alta dentro del vacio duplicaria el disparador y encima apareceria —o no—
  * segun el estado de la lista, que es la peor forma de ofrecer una accion.
+ *
+ * **Esa premisa era falsa hasta el 2026-09-17 y el coste fue total.** El disparador NO estaba
+ * arriba: lo montaba `work-group-table.tsx`, que solo se renderiza cuando hay filas. Y como los
+ * grupos **no los siembra nadie**, toda instalacion empieza en cero, cae en este vacio y no tiene
+ * boton: el primer grupo era imposible de crear. Se arreglo la premisa —el alta subio a
+ * `work-group-create-action.tsx`, fuera de los tres estados— y no este archivo, que ya decia lo
+ * correcto.
  *
  * Las dos salidas que si son utiles, y **solo cuando aplican**:
  *

@@ -123,7 +123,6 @@ export function createCreateProduct(
     // escrita solo la mitad. El producto no lleva unidad: la declara la presentacion del lote.
     const producto: NewProduct = {
       name: entrada.name,
-      stock: entrada.stock,
       qtyAlert: entrada.qtyAlert,
     };
 

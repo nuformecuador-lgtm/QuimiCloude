@@ -5,6 +5,7 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 import { BatchDuplicateLotError, ValidationError } from '../../../domain/errors';
 import { normalizeProductName } from '../../../domain/product-name';
+import { sumStockByUnit } from '../../../domain/product-stock';
 
 import { companyScopeColumns, productCompanyScope } from './company-scope';
 import {
@@ -26,13 +27,13 @@ import type { NewProduct, ProductView } from '../../../domain/product-view';
 // (`null`/`false`): distinguirlas seria un oraculo de existencia sobre filas ajenas.
 
 /**
- * Unidad del lote mas reciente. El desempate por `id` hace falta: con `created_at` empatado el
- * ganador no estaria definido. De `Presentation` solo se lee `unitId`: `units` es de otro modulo.
+ * Todos los lotes del producto, con su existencia y su unidad. El desempate por `id` hace falta:
+ * con `created_at` empatado el ganador de `latestBatchUnitId` no estaria definido. De
+ * `Presentation` solo se lee `unitId`: `units` es de otro modulo.
  */
-const LATEST_BATCH_UNIT = {
-  select: { presentation: { select: { unitId: true } } },
+const BATCH_STOCK_BY_UNIT = {
+  select: { stock: true, presentation: { select: { unitId: true } } },
   orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-  take: 1,
   // `satisfies` y no `as const`: `orderBy` exige un array mutable.
 } satisfies Prisma.Product$batchesArgs;
 
@@ -40,11 +41,10 @@ export const PRODUCT_SELECT = {
   id: true,
   name: true,
   imagePath: true,
-  stock: true,
   qtyAlert: true,
   createdAt: true,
   updatedAt: true,
-  batches: LATEST_BATCH_UNIT,
+  batches: BATCH_STOCK_BY_UNIT,
 } satisfies Prisma.ProductSelect;
 
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>;
@@ -54,7 +54,9 @@ export function toProductView(row: ProductRow): ProductView {
     id: row.id,
     name: row.name,
     imagePath: row.imagePath,
-    stock: row.stock,
+    stockByUnit: sumStockByUnit(
+      row.batches.map((batch) => ({ stock: batch.stock, unitId: batch.presentation.unitId })),
+    ),
     qtyAlert: row.qtyAlert,
     latestBatchUnitId: row.batches[0]?.presentation.unitId ?? null,
     createdAt: row.createdAt,
@@ -72,7 +74,6 @@ export async function createProduct(
     data: {
       name: data.name,
       nameNormalized: normalizeProductName(data.name),
-      stock: data.stock ?? null,
       qtyAlert: data.qtyAlert ?? null,
       ...companyScopeColumns(scope),
       createdAt: now,
@@ -106,7 +107,6 @@ export async function updateAliveProduct(
     data: {
       name: data.name,
       nameNormalized: normalizeProductName(data.name),
-      stock: data.stock ?? null,
       qtyAlert: data.qtyAlert ?? null,
       updatedAt: now,
     },
@@ -151,8 +151,6 @@ export function productOrderBy(
   switch (sort.columnId) {
     case 'name':
       return [{ name: dir }, TIE_BREAKER];
-    case 'stock':
-      return [{ stock: { sort: dir, nulls: 'last' } }, TIE_BREAKER];
     case 'qtyAlert':
       return [{ qtyAlert: { sort: dir, nulls: 'last' } }, TIE_BREAKER];
     case 'createdAt':
@@ -178,7 +176,6 @@ function productFilterWhere(
     case 'numberRange': {
       const condition = numberRangeCondition(value.min, value.max);
       if (condition === null) return null;
-      if (field === 'stock') return { stock: condition };
       if (field === 'qtyAlert') return { qtyAlert: condition };
       return null;
     }
@@ -493,7 +490,6 @@ export async function createWithFirstBatch(
       data: {
         name: product.name,
         nameNormalized: normalizeProductName(product.name),
-        stock: product.stock ?? null,
         qtyAlert: product.qtyAlert ?? null,
         ...companyScopeColumns(scope),
         createdAt: now,

@@ -7,8 +7,6 @@ import {
   SEARCH_PARAM,
   SHARED_PAGE_SIZES,
   SORT_PARAM,
-  STOCK_MAX_PARAM,
-  STOCK_MIN_PARAM,
   buildProductListQuery,
   parseProductListParams,
 } from '@/app/(private)/inventario/components';
@@ -126,13 +124,12 @@ describe('parametros de lista de productos', () => {
       expect(parseProductListParams(Object.fromEntries(consulta))).toEqual(params);
     }
 
-    // Y con TODO puesto: orden, los dos rangos y la busqueda.
+    // Y con TODO puesto: orden, el rango que queda y la busqueda.
     const completos = {
       page: 2,
       pageSize: MAX_PAGE_SIZE,
       sort: { columnId: 'name', direction: 'asc' as const },
       filters: {
-        stock: { kind: 'numberRange' as const, min: 5, max: 40 },
         qtyAlert: { kind: 'numberRange' as const, min: null, max: 3 },
       },
       search: 'acido',
@@ -161,22 +158,30 @@ describe('orden, filtros y busqueda (2026-09-07: la pantalla estrena la tabla co
     }
   });
 
-  it('lee los dos rangos numericos, y un extremo roto no se lleva el filtro entero', () => {
+  it('lee el rango numerico de alerta, y un extremo roto no se lleva el filtro entero', () => {
     const params = parseProductListParams({
-      [STOCK_MIN_PARAM]: '5',
-      [STOCK_MAX_PARAM]: 'muchos',
       [QTY_ALERT_MIN_PARAM]: '',
       [QTY_ALERT_MAX_PARAM]: '3',
     });
 
-    expect(params.filters.stock).toEqual({ kind: 'numberRange', min: 5, max: null });
     expect(params.filters.qtyAlert).toEqual({ kind: 'numberRange', min: null, max: 3 });
   });
 
   it('sin ningun extremo, el filtro de rango NO existe', () => {
     // Un rango abierto por los dos lados no acota nada: seria ensuciar la consulta.
-    expect(parseProductListParams({ [STOCK_MIN_PARAM]: 'x' }).filters).toEqual({});
+    expect(parseProductListParams({ [QTY_ALERT_MIN_PARAM]: 'x' }).filters).toEqual({});
     expect(parseProductListParams({}).filters).toEqual({});
+  });
+
+  it('R8: un filtro o un orden por existencia que llega por la URL se ignora sin fallar', () => {
+    const params = parseProductListParams({
+      [SORT_PARAM]: 'stock:asc',
+      stockMin: '5',
+      stockMax: '40',
+    });
+
+    expect(params.sort).toBeNull();
+    expect(params.filters).toEqual({});
   });
 
   it('la busqueda se recorta, y la de solo espacios es AUSENCIA de busqueda', () => {
@@ -189,7 +194,7 @@ describe('orden, filtros y busqueda (2026-09-07: la pantalla estrena la tabla co
   });
 
   it('la consulta no escribe lo que esta vacio', () => {
-    // Una URL con `?q=&stockMin=` invita a creer que la lista esta filtrada cuando no lo esta.
+    // Una URL con `?q=&sort=` invita a creer que la lista esta filtrada cuando no lo esta.
     const consulta = buildProductListQuery({
       page: 1,
       pageSize: DEFAULT_PAGE_SIZE,
@@ -198,6 +203,5 @@ describe('orden, filtros y busqueda (2026-09-07: la pantalla estrena la tabla co
 
     expect(consulta).not.toContain(SEARCH_PARAM);
     expect(consulta).not.toContain(SORT_PARAM);
-    expect(consulta).not.toContain(STOCK_MIN_PARAM);
   });
 });

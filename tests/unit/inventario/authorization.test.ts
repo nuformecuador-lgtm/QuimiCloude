@@ -59,20 +59,20 @@ function actorCon(...permissions: readonly PermissionCode[]): Actor {
   };
 }
 
-/** Entrada valida minima. `stock` y `qtyAlert` estan aqui desde que la decision del humano
- *  del 2026-09-03 los volvio obligatorios en `createProductSchema`; `minPurchase` se fue
- *  con QC-52 (R1), y `presentationId` con la mudanza a `product_batches` (2026-09-09). */
+/** Entrada valida minima de la EDICION, que ya no conoce la existencia (R9): el esquema es
+ *  `strictObject` y `qtyAlert` sigue siendo obligatorio desde la decision del humano del
+ *  2026-09-03. `minPurchase` se fue con QC-52 (R1), y `presentationId` con la mudanza a
+ *  `product_batches` (2026-09-09). */
 const PRODUCTO_VALIDO = {
   name: 'Acido sulfurico',
-  stock: 0,
   qtyAlert: 0,
 };
 
 /** QC-90 (R1): el ALTA ya no acepta un producto pelado -siempre crea su primer lote-, asi
- *  que el fixture del alta lleva ademas presentacion y costo. `PRODUCTO_VALIDO` se queda
- *  como esta porque lo sigue usando la EDICION, que no conoce el lote (R26). */
+ *  que el fixture del alta lleva ademas la existencia del lote, presentacion y costo. */
 const PRODUCTO_VALIDO_CON_LOTE = {
   ...PRODUCTO_VALIDO,
+  stock: 0,
   presentationId: '11111111-1111-4111-8111-111111111111',
   unitCost: '10.0000',
 };
@@ -159,7 +159,7 @@ const PRODUCTO_EN_BASE = {
   id: 'producto-1',
   name: 'Acido sulfurico',
   imagePath: null,
-  stock: 0,
+  stockByUnit: [],
   qtyAlert: 0,
   // QC-80 (R21, R22): el producto ya no declara unidad; la derivada del lote mas reciente es
   // `latestBatchUnitId`, y este doble no tiene lotes.

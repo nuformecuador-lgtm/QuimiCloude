@@ -1,7 +1,9 @@
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { sumStockByUnit } from '../../../domain/product-stock';
 import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { ProductId, ProductRef } from '../../../domain/product-catalog';
+import type { ProductStockByUnit } from '../../../domain/product-stock';
 
 import { productCompanyScope } from './company-scope';
 
@@ -23,7 +25,7 @@ import { productCompanyScope } from './company-scope';
 type ProductCatalogRow = {
   readonly id: string;
   readonly name: string;
-  readonly stock: number | null;
+  readonly stockByUnit: readonly ProductStockByUnit[];
 };
 
 /** Fila de Prisma -> `ProductRef` del contrato publico. Funcion pura, testeable sin base. */
@@ -31,9 +33,16 @@ export function toProductRef(row: ProductCatalogRow): ProductRef {
   return {
     id: row.id,
     name: row.name,
-    stock: row.stock,
+    stockByUnit: row.stockByUnit,
   };
 }
+
+/** Fila cruda que devuelve la consulta: trae `batches`, no el `stockByUnit` ya sumado. */
+type ProductBatchRow = {
+  readonly id: string;
+  readonly name: string;
+  readonly batches: readonly { readonly stock: number; readonly presentation: { readonly unitId: string } }[];
+};
 
 /**
  * La consulta real. Vive aparte de `findProductRefs` para que declare el `scope` con el mismo
@@ -43,7 +52,7 @@ export function toProductRef(row: ProductCatalogRow): ProductRef {
 async function findAliveProducts(
   ids: readonly ProductId[],
   scope: InventoryScope,
-): Promise<readonly ProductCatalogRow[]> {
+): Promise<readonly ProductBatchRow[]> {
   // Sin JOIN desde el 2026-09-09: la presentacion se mudo a `product_batches`, asi que una
   // referencia de producto ya no la expone. Y sin `unit_id` desde QC-80 (R21): la columna
   // desaparecio de `products` y `ProductRef` no la sustituye por la unidad derivada del lote,
@@ -55,7 +64,9 @@ async function findAliveProducts(
     select: {
       id: true,
       name: true,
-      stock: true,
+      batches: {
+        select: { stock: true, presentation: { select: { unitId: true } } },
+      },
     },
   });
 }
@@ -72,7 +83,9 @@ export async function findProductRefs(
     toProductRef({
       id: row.id,
       name: row.name,
-      stock: row.stock,
+      stockByUnit: sumStockByUnit(
+        row.batches.map((batch) => ({ stock: batch.stock, unitId: batch.presentation.unitId })),
+      ),
     }),
   );
 }

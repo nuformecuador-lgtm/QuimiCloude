@@ -87,6 +87,11 @@ export {
   type UserColumnsDeps,
 } from './user-columns';
 export {
+  USER_CREATE_OPEN_TESTID,
+  UserCreateAction,
+  type UserCreateActionProps,
+} from './user-create-action';
+export {
   USER_LIST_CLEAR_SEARCH_TESTID,
   USER_LIST_EMPTY_MESSAGE_TESTID,
   USER_LIST_EMPTY_TESTID,
@@ -119,7 +124,6 @@ export {
   type UserRowActionsProps,
 } from './user-row-actions';
 export {
-  USER_CREATE_OPEN_TESTID,
   USER_TABLE_ID,
   USER_TABLE_TESTID,
   USER_TABLE_TEXTS,
@@ -310,6 +314,10 @@ export {
 } from './work-group-sheet';
 export {
   WORK_GROUP_CREATE_OPEN_TESTID,
+  WorkGroupCreateAction,
+  type WorkGroupCreateActionProps,
+} from './work-group-create-action';
+export {
   WORK_GROUP_TABLE_ID,
   WORK_GROUP_TABLE_TESTID,
   WORK_GROUP_TABLE_TEXTS,

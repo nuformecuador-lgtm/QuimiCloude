@@ -10,12 +10,12 @@ import {
 import { pageQuerySchema } from '@/lib/modules/inventario/domain/page';
 
 /**
- * Los dos campos que la decision del humano del 2026-09-03 volvio OBLIGATORIOS en la entrada
- * (`stock` y `qtyAlert`). Se anaden a cada caso que espera un producto VALIDO: sin ellos
- * cualquier `safeParse` correcto fallaria por un motivo que ese caso no esta midiendo.
+ * El campo que la decision del humano del 2026-09-03 volvio OBLIGATORIO en la entrada
+ * (`qtyAlert`). Se anade a cada caso que espera un producto VALIDO: sin el cualquier
+ * `safeParse` correcto fallaria por un motivo que ese caso no esta midiendo.
  * Su propia obligatoriedad tiene caso aparte, al final del describe.
  */
-const REQUERIDOS = { stock: 0, qtyAlert: 0 } as const;
+const REQUERIDOS = { qtyAlert: 0 } as const;
 
 /**
  * Unidad de fixture para las presentaciones (QC-80 R10): desde esta feature
@@ -210,8 +210,8 @@ describe('createProductSchema', () => {
     }
   });
 
-  it('exige stock y qtyAlert, y los sigue queriendo enteros de 0 o mas', () => {
-    // DECISION DEL HUMANO, 2026-09-03: acota a R5, que los declaraba opcionales. La COLUMNA sigue
+  it('exige qtyAlert, y lo sigue queriendo entero de 0 o mas', () => {
+    // DECISION DEL HUMANO, 2026-09-03: acota a R5, que lo declaraba opcional. La COLUMNA sigue
     // siendo nullable -eso lo afirma `inventario-schema.test.ts`-; lo que cambia es lo que la
     // aplicacion acepta. Ni ausente, ni nulo, ni negativo, ni con decimales.
     const soloObligatoriosDeAntes = {
@@ -220,33 +220,39 @@ describe('createProductSchema', () => {
 
     expect(createProductSchema.safeParse(soloObligatoriosDeAntes).success).toBe(false);
     expect(
-      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, stock: 0 }).success,
+      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, qtyAlert: null }).success,
     ).toBe(false);
     expect(
-      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, qtyAlert: 0 }).success,
+      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, qtyAlert: -1 }).success,
     ).toBe(false);
     expect(
-      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, stock: null, qtyAlert: null })
-        .success,
-    ).toBe(false);
-    expect(
-      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, stock: -1, qtyAlert: 0 }).success,
-    ).toBe(false);
-    expect(
-      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, stock: 1.5, qtyAlert: 0 })
-        .success,
+      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, qtyAlert: 1.5 }).success,
     ).toBe(false);
 
     const parsed = createProductSchema.parse({
       ...soloObligatoriosDeAntes,
-      stock: 7,
       qtyAlert: 3,
     });
-    expect(parsed.stock).toBe(7);
     expect(parsed.qtyAlert).toBe(3);
 
-    // QC-80 (R21): ya no queda ningun campo opcional en el producto. Los tres que hay -nombre,
-    // existencia y alerta- son obligatorios, y nada mas cruza el borde.
-    expect(Object.keys(parsed).sort()).toEqual(['name', 'qtyAlert', 'stock']);
+    // La existencia ya no cruza el borde del producto -ni en el alta ni en la edicion-, asi que
+    // solo quedan nombre y alerta.
+    expect(Object.keys(parsed).sort()).toEqual(['name', 'qtyAlert']);
+  });
+
+  it('la edicion rechaza la existencia como invalid_input: R9', () => {
+    const base = { name: 'Producto', ...REQUERIDOS };
+
+    expect(updateProductSchema.safeParse(base).success).toBe(true);
+
+    const conExistencia = updateProductSchema.safeParse({ ...base, stock: 5 });
+    expect(conExistencia.success).toBe(false);
+    if (!conExistencia.success) {
+      expect(
+        conExistencia.error.issues.some(
+          (issue) => issue.code === 'unrecognized_keys' && issue.keys.includes('stock'),
+        ),
+      ).toBe(true);
+    }
   });
 });
