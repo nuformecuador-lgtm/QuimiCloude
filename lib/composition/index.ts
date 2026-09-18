@@ -188,6 +188,7 @@ import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import {
   findRecipeExecutionContentById,
+  findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
@@ -902,6 +903,7 @@ export const unidades = {
 const recipeCatalog: RecipeCatalog = {
   findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
   findExecutionContentById: findRecipeExecutionContentById,
+  findIdsMatchingName: findRecipeIdsMatchingName,
 };
 
 /** QC-57 (T7, R6): misma implementacion, tipada con el puerto que declara `pedidos`. */

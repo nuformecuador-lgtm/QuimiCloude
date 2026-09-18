@@ -4099,3 +4099,57 @@ el baseline. Dos vueltas de reviewer: rechazo con 2 bloqueantes, aprobación en 
 **Deuda declarada, con dueño**: R24 no queda limpio —cuatro helpers privados en español copiados de
 `convert-pdf.ts`, ya en `dev`; renombrar solo aquí dejaría el módulo hablando dos idiomas—; el E2E
 va a QC-107; y tres cabeceras que el reviewer mantiene que no pasan la regla de longitud.
+
+## QC-68 — busqueda-y-total-en-el-listado-de-pedidos (cerrada el 2026-09-18, PR #86, merge `e68a66a`)
+
+El listado de pedidos busca por nombre de receta. `orders` no tiene columna de nombre, así que el
+término se traduce a ids de receta **antes** de tocar el repositorio y esa lista acota el `where`:
+sin JOIN y con consultas constantes —3 por página sin búsqueda, 4 con ella—, tenga la página 1 fila
+o 25. Se descartó denormalizar el nombre en `orders`. La búsqueda encuentra también los pedidos de
+recetas dadas de baja, porque la lista ya muestra ese nombre; de ahí el índice GIN de trigramas
+**sin `WHERE`** (el de QC-57 es parcial y no servía).
+
+**La ficha se partió al escribir el spec**: afirmaba que la consulta devuelve cantidad y precio por
+separado, y el `spec_author` verificó que `orders` tiene un solo decimal —el precio lo borró
+QC-35bis—. El total no tenía con qué multiplicarse. Por decisión del humano nació **QC-123** con el
+precio, **QC-122** con la caja de búsqueda en pantalla y su E2E de importes.
+
+**El hallazgo de la ficha: el censo diecinueve era una guardia de seguridad.** Los dieciocho
+anteriores eran comentarios y conteos que afirmaban que pedidos no busca. El diecinueve fue
+`tests/unit/pedidos/company-isolation-service.test.ts` (QC-60 R16), que exige `{ companyId }` como
+**último argumento** de los seis métodos del puerto y que el `recipeIds` nuevo desplazaba. Además
+`order-repository.ts` lo documenta por escrito y una segunda guardia lo vigila. Se cerró
+**reordenando la firma a `listAlive(query, recipeIds, scope)`** —enmienda fechada al spec, aprobada
+por el humano— en vez de tensar la guardia: las dos quedaron intactas. Se descartaron
+explícitamente «tensar el aserto» y «excepción acotada», por aflojar una guardia ajena.
+
+**Dos requisitos estaban mal dados por cubiertos, y esa es la lección transferible.** R6 se
+demostraba **«por partes»**: tres tests cubrían cada uno un trozo del enunciado, el mapa no dejaba
+ninguna casilla vacía y **nadie ejercitaba el requisito entero**. R13 se mapeaba a una comprobación
+a mano, que no es un test. Los dos ganaron casos propios. El caso de R6 sobre el pedido borrado deja
+la receta **viva a propósito**, que es lo que lo distingue de R4 y lo que hace que pruebe la
+conjunción; el del pedido ajeno comprueba que la fila **existe** antes de afirmar el cero.
+
+**El conteo de índices del spec estaba caducado**: pedía 34→35 y en disco eran 33→34, porque cayeron
+dos índices con QC-91 y QC-35bis. Se contó en disco en vez de copiar la cifra.
+
+**Dos menores de la review eran el mismo defecto que la ficha perseguía, cometido dentro de ella**:
+el docblock de `listAlive` seguía diciendo «un solo parámetro» —desmentido por las cuatro líneas que
+la propia rama le añadió debajo— y una frase repetida en cuatro sitios prometía que el test de
+integración demuestra el número de consultas SQL, cuando **ese test no existe**. Se quitó la frase
+en vez de inventar el test. De ahí la regla que quedó escrita: **añadir prosa a un bloque obliga a
+releer el bloque entero**, y una nota que promete un test debe nombrarlo con archivo y caso.
+
+**Verificación**: gate rápido verde al cierre (173 archivos, 2746 tests). El gate completo pasó por
+dos rojos ajenos, ninguno de la rama y los dos con ficha propia en vez de baseline —listarlos habría
+apagado 60 casos—: **QC-126** (intermitente de jsdom en la tabla de usuarios, `Not implemented:
+navigation to another Document`, que **no** es la especie de QC-58 y podría ser un defecto real) y
+**QC-127** (el caso que el PR #85 dejó sin actualizar), que **murió sola** al sincronizar, arreglada
+en QC-108.
+
+**Tres deudas del arnés, para `/afinar-regla`**: (1) la cautela sobre no correr integración estaba
+**generalizada de más** y frenó la ficha toda la jornada —lo inseguro en paralelo es
+`db:migrate:create`, no el runner, que corre contra una copia efímera en segundos—; (2)
+«demostrado por partes» debería contar como **pendiente** para el reviewer; (3) la bitácora de una
+ficha puede quedar **partida entre el árbol principal y su worktree**, y aquí chocó en tres merges
+seguidos.

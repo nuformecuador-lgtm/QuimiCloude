@@ -28,12 +28,24 @@ rama rompe a las otras features que corren en paralelo.
 
 ## Verificacion
 Al finalizar todas las tasks:
-1. Corre `pnpm run typecheck`, `pnpm run lint`, `pnpm test`.
-2. Si hay E2E, `pnpm run test:e2e`.
-3. Escribe o actualiza `progress/impl_<feature>.md` consolidando:
+1. Corre `pnpm run typecheck` y `pnpm run lint`.
+2. Corre **solo los tests que tu cambio toca**:
+   `pnpm exec vitest related --run <tus archivos>`. **NO corras `pnpm test`**: ningun
+   subagente corre la suite completa (`AGENTS.md > Regla del gate: quien corre que`).
+   No es una preferencia de estilo: en una sesion del 2026-08-02 cinco subagentes
+   murieron por cortes de stream, los cinco en la fase de verificacion larga, y en
+   cuanto se les dijo «corre solo tus archivos, el gate lo corro yo» dejaron de caerse.
+   Ademas no tienes el contexto para juzgar un rojo ajeno; el leader si.
+3. El E2E tampoco lo corres tu. Si la feature lo necesita, dilo en tu veredicto.
+4. Escribe o actualiza `progress/impl_<feature>.md` consolidando:
    - Archivos creados/modificados (de ambos subagentes)
    - Mapa `R<n> -> test`
    - Salida real de los tests
 
 No te autoapruebas: al terminar, devuelve solo la ruta de la bitacora y un
 veredicto de una linea. El reviewer decide si esta bien.
+
+**Un rojo del baseline no es un hallazgo.** `./init.sh --rapido` **NO** consulta
+`tests/baseline-rojos.json` —solo lo hace el modo completo—, asi que un archivo con deuda ajena
+ya listada sale rojo ahi igual. Antes de tratarlo como bloqueante, mira si el archivo esta en esa
+lista. El 2026-09-18 costo una vuelta entera y una decision que no existia.

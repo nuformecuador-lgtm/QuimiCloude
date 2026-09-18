@@ -30,11 +30,9 @@ import type { RecipePickerPage } from './recipe-picker';
  * **El destino sale de `orderListHref`** (R2): ningun archivo de la ruta escribe la URL como
  * literal.
  *
- * **`searchable={false}`** (R20, `design.md > 6.2`): la caja de busqueda **no se monta** —no se
- * pinta inerte ni deshabilitada: no existe en el DOM—. `ORDER_QUERYABLE.searchable` es `false`,
- * asi que una caja aqui mentiria: el termino se omitiria en silencio y la lista devolveria todo
- * como si no se hubiera buscado. `texts.search` se entrega igual porque el contrato de textos lo
- * exige obligatorio y esta ficha no lo toca.
+ * **`searchable={false}`**: la caja de busqueda **no se monta** —no se pinta inerte ni
+ * deshabilitada: no existe en el DOM—. Esta pantalla todavia no tiene caja de busqueda propia.
+ * `texts.search` se entrega igual porque el contrato de textos lo exige obligatorio.
  *
  * **`status` es SIEMPRE `'idle'`** (alternativa Q, descartada): el error y la lista vacia se
  * pintan fuera de `<DataTable>`, con copy y acciones propias. El «cargando» de R21 ya no viene de
@@ -60,7 +58,7 @@ export const ORDER_TABLE_TEXTS: DataTableTexts = {
   empty: 'No hay pedidos que mostrar.',
   loading: 'Cargando pedidos…',
   error: 'No se pudo cargar la lista de pedidos.',
-  // Obligatorio en el contrato de textos; con `searchable={false}` no se pinta en ningun sitio.
+  // Obligatorio en el contrato de textos; sin caja de busqueda montada no se pinta en ningun sitio.
   search: 'Buscar',
   filters: 'Filtros',
   columnMenu: 'opciones de la columna',

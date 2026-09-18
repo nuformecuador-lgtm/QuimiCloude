@@ -88,9 +88,17 @@ y el 2026-09-11 costaron cuatro paradas y una suite E2E entera caída sin que na
 | `Module '@prisma/client' has no exported member 'Prisma'` | versiones de Prisma peleadas | un `generate` que faltaba tras montar el worktree |
 | `Cannot find name 'LayoutProps'` | un problema de Next | los tipos de ruta sin generar |
 | `Cannot find module 'resend'` | **una dependencia metida sin aprobar** (regla 7) | estaba aprobada, documentada y en `package.json`; el `node_modules` del árbol principal se quedó corto tras el merge |
+| `TypeError: Cannot read properties of undefined (reading 'clear')` en `window.localStorage.clear()` (proyecto `ui`) | un mock de storage roto en ese test | Node 22+ expone su propio `localStorage`/`sessionStorage` global y pisa el de jsdom; en Node 26 viene activo por defecto. `vitest.config.mts` ya pasa `--no-experimental-webstorage` al worker del proyecto `ui`, así que nadie debería verlo — si vuelve, es que algo corre ese proyecto sin pasar por esta config |
+| `expected '23001' to be '23503'` en tests de `tests/integration/**` que borran una fila referenciada por FK con `RESTRICT` | el código de error cambió, o el test está mal | la base local corre en Postgres 18, y sobre 18.6 se reproduce que el `RESTRICT`/`NO ACTION` de una FK reporta `23001` (`restrict_violation`) donde 9 tests de esta rama esperan `23503` (`foreign_key_violation`); no se verificó aquí el changelog exacto de Postgres 18 que lo motiva, solo que 18.6 lo hace y 17 es el objetivo del proyecto (decisión humana, 2026-09-18: Supabase aún no está conectado y su canal estable es 17) |
+| Retrato de catálogo con una fila de más en `pg_constraint` tras correr `down.sql` (`company-scope.int.test.ts` de proveedores y de recetas, «9 vs 10») | el `down.sql` dejó una restricción sin borrar | en Postgres 18 las restricciones `NOT NULL` (p. ej. `suppliers_company_id_not_null`) pasan a tener su propia fila en `pg_constraint` (`contype = 'n'`), algo que no existe en 17; el retrato se escribió asumiendo 17 |
 
 El tercero es el que justifica la regla por sí solo: un síntoma de entorno **acusando a otra
 sesión de saltarse una regla del arnés**. De ahí a «arreglar» algo que no está roto hay un paso.
+
+**Versión objetivo de Postgres: 17**, no la que trae la instalación local. Ambas filas de arriba se
+reprodujeron el 2026-09-18 contra Postgres 18.6 (`SELECT version()`); ninguna toca código de
+producción ni de test para adaptarse a 18 — el remedio es correr la base local en 17, no mover la
+meta.
 
 **Coste medido el 2026-09-12**, no estimado: 12 s de `prisma generate` más 5 s de `next typegen`
 en régimen estable; **128 s la primera vez** tras cambiar el esquema. Sobre el gate completo
@@ -250,26 +258,36 @@ de test rojo que no estuviera ya en `tests/baseline-rojos.json`**.
 saber que la deuda es de `dev` y no tuya. Y síémbralo con pocas entradas: si nace con cincuenta,
 nadie lo va a limpiar nunca.
 
-> **Estado en QuimiCloude (2026-09-08):** el baseline tiene **dos** entradas. Eran cinco hasta
-> QC-58, que retiró las tres que estaban ahí por los flakes de saturación —`inventario/product-page`,
-> `proveedores-ui/catalog-line-sheet` y `proveedores-ui/supplier-page`— en el mismo cambio que
-> arregló la causa (ver la sección siguiente). Las dos que quedan son por el
-> mismo motivo estructural: `tests/unit/recetas-ui/recipe-route-contract.test.ts` y
-> `tests/unit/recetas/module-contract.test.ts` contienen guardias que se apoyan en
-> `git diff --name-only origin/dev...HEAD` y que, estando en `dev`, no tienen rango que mirar
-> y fallan a propósito en vez de pasar sin comprobar nada. El coste está anotado en cada
-> `motivo` y no es menor: al ser la comparación **por archivo**, esos dos archivos quedan
-> ignorados también en las ramas de feature donde sus guardias sí morderían. Lo correcto es
-> que el caso del diff se salte explícitamente cuando el rango no existe y que estas dos
-> entradas desaparezcan.
+> **Estado en QuimiCloude (2026-09-18):** el baseline tiene **ocho** entradas y **seis de ellas ya
+> pasan**. Eso es una regresión del propio baseline, no del código: la lista creció feature a
+> feature y nadie la podó. Hasta el 2026-09-08 tenía **dos** —eran cinco, y QC-58 retiró las tres
+> de los flakes de saturación **en el mismo cambio que arregló la causa**, que es lo que hace que
+> un arreglo cuente—. Las seis que sobran las señala el comparador en cada corrida completa
+> («aviso: N archivo(s) del baseline ya pasan; toca limpiarlos»), y **desde el 2026-09-18 atender
+> ese aviso es obligación del leader al cerrar cada feature** (`AGENTS.md`, paso F2.6): se borra lo
+> que ya pasa, o se dice por escrito por qué se queda.
+>
+> Las dos que sí siguen rojas son de la misma especie y **ninguna es deuda de código**: son
+> guardias que censan el diff de rama o el `package.json` contra `dev`, y por tanto las rompe
+> cualquier feature posterior con una dependencia legítima y aprobada —`resend` en QC-79,
+> `@google/genai` en QC-108—. El coste está anotado en cada `motivo` y no es menor: al ser la
+> comparación **por archivo**, esos archivos quedan ignorados **también en las ramas de feature
+> donde sus guardias sí morderían**. Arreglar la clase entera es **QC-99**.
 
 ### Los flakes de saturación: qué son, qué NO los cura, y cómo se curaron (2026-09-04, arreglado en QC-58 el 2026-09-08)
 
 Los «2–5 flakes de saturación» de arriba tienen una firma concreta, y merece la pena reconocerla
 antes de perder una tarde: **`Test timed out in <plazo>ms`, en un test de UI que escribe con
 `userEvent`**. Hasta QC-58 ese plazo era `5000` —el default de Vitest— y ese número era
-literalmente la firma; desde QC-58 son `15000`, así que si vuelves a verlo ahora es una señal
-mucho más seria que entonces: 15 s de espera no se agotan por contención de CPU sin más. El campo
+literalmente la firma; desde QC-58 son `15000`. Hasta el 2026-09-18 esta guía decía además que
+verlo con el plazo nuevo era «una señal mucho más seria», porque 15 s no se agotan por contención
+de CPU sin más. **Eso quedó desmentido ese día y se corrige aquí**: tres archivos distintos
+—`inventario/product-page` (que se pone 20 s por su cuenta), `pedidos-ui/order-form` y
+`integration/infra/ciclo-de-vida-de-la-base`— cayeron por plazo en corridas de **868 s, 489 s y
+401 s** frente a los ~300 s de una corrida sana, y **los tres pasaron en aislamiento**. Ninguno
+entró al baseline. La firma sigue siendo útil para reconocerlo; lo que ya no vale es tratarla como
+prueba de gravedad. **Desde el 2026-09-18 el plazo es `20000` en los tres proyectos**, y la
+comprobación barata de siempre —correr el archivo solo— sigue siendo la que decide. El campo
 controlado no llega a repintarse entre tecla y tecla cuando la máquina va cargada, y la prueba
 escribe más rápido de lo que el campo se actualiza. El síntoma clásico es que
 las letras salgan intercaladas —`xxxxxAxcxixdxox` donde debía salir `Acido citrico`—.

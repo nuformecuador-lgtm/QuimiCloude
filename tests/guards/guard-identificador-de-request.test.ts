@@ -210,6 +210,11 @@ export const MIGRACIONES_ESPERADAS = [
   '20260917120000_suppliers_company_scope',
   // Igual patron: tabla nueva de movimientos de inventario, no toca el identificador de peticion.
   '20260917130000_inventory_movements',
+  // Alta con el mismo patron que las anteriores: la migracion que crea el indice GIN de
+  // trigramas total sobre recipes.name_normalized, para que la busqueda del listado de
+  // pedidos vea tambien las recetas de baja, no persiste el identificador de peticion ni
+  // lo menciona; se nombra aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260917130000_recipes_search_index_including_deleted',
 ] as const
 
 export function hallazgosDeMigraciones(

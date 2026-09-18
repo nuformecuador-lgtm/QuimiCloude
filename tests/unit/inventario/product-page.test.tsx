@@ -80,20 +80,6 @@ import {
  * nada se ponga rojo.
  */
 
-// Timeout propio del archivo, no el de 5 s por defecto. Son 27 casos de `user-event` sobre jsdom
-// -que teclea caracter a caracter, con su espera entre pulsaciones- y el archivo entero tarda
-// ~25 s. Medido en aislamiento el 2026-09-04, los mas pesados van de 3,5 s a 4,4 s (el rechazo
-// por nombre largo teclea 121 caracteres; el alta de una presentacion en linea abre un segundo
-// formulario dentro del panel): a 5 s no les sobra nada, y con la suite completa saturando la
-// maquina se pasan del limite. El fallo que provocaban no era de logica -en aislamiento pasaban
-// enteros-, y ademas contaminaba al caso siguiente: al cortarse a mitad del tecleo, las pulsadas
-// que quedaban pendientes caian en el input del test posterior (`xxxxxÁxcxixdxox...`).
-//
-// Subirlo no afloja ningun assert: un `waitFor` que nunca se cumpla sigue fallando, solo que a los
-// 20 s en vez de a los 5. Va aqui, a nivel de archivo, y no en el proyecto `ui` de
-// `vitest.config.mts`, para no regalarle margen al resto de la UI: la lentitud es de este archivo.
-vi.setConfig({ testTimeout: 20_000 });
-
 type CookieStoreStub = {
   get: (name: string) => { name: string; value: string } | undefined;
 };
