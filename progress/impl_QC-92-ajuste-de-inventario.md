@@ -150,3 +150,24 @@ Test Files 1 failed (1) · Tests 1 failed | 10 passed | 3 skipped (14)
 
 **Cuarta familia de guardia de censo/alcance**, sobre las tres que ya llevábamos contadas arriba:
 4. **Guardia de alcance de ficha** (QC-81 R31) — le reserva el sitio a una ficha futura y **no se acota a su rama**, así que se pone roja justo cuando llega la ficha para la que reservaba.
+
+### BLOQUEANTE RESUELTO — R31 acotada a su rama (`be90661`)
+
+**Decisión humana del 2026-09-17: opción 1, acotar.** Descartadas expresamente la retirada de la guardia y la de parar QC-92 para hacer QC-99 antes.
+
+El caso `R31: ningun archivo del modulo inventario suma lotes, ajusta ni consume` ahora llama a `archivosOSalto(ctx)`, el **mismo helper y la misma forma** que sus tres vecinas R28/R29/R30 del mismo archivo. Dentro de la rama de QC-81 el comportamiento es **idéntico al de hoy**: mismo barrido del módulo entero, mismo `toEqual([])`. **Cambia cuándo se aplica, no qué caza.** `PALABRAS_DE_AJUSTE_O_CONSUMO` y `hallazgosDeAjusteOSuma` no tienen ni una línea tocada, y el caso que los prueba con fuentes fabricadas sigue corriendo siempre.
+
+Nota fechada encima del `describe`, **sin citar ninguna ficha** en el comentario.
+
+**Prueba por mutación, las dos caras:**
+- **Cara A — rama ajena se salta:** el caso sale `↓` con el motivo visible, igual que sus tres vecinas: *«la rama actual es 'feature/QC-92-ajuste-de-inventario' y no 'feature/QC-81-lote-y-fecha-de-compra' … Este caso NO ha comprobado nada.»*
+- **Cara B — el detector no está debilitado:** caso nuevo `R31: fuera de su rama el detector sigue mordiendo sobre el modulo real`, que **no se acota** y corre el barrido real sobre `lib/modules/inventario`, exigiendo hallazgos con `adjustment`. Hoy encuentra `lib/modules/inventario/domain/inventory-movement.ts: nombra un ajuste o consumo: adjustment`.
+
+Salida: `Test Files 1 passed (1) · Tests 11 passed | 4 skipped (15)`. `typecheck` y `lint` verdes.
+
+#### Riesgo del caso de la Cara B, declarado y no disimulado
+El caso nuevo **fija el estado del árbol**: afirma que hoy existe un identificador con `adjustment` en el módulo. Si una ficha futura renombrara ese literal —legítimamente—, el caso se pondría rojo. **Es el mismo patrón que `design.md > 5.1` descarta** para la R21 de QC-91 («invertir la afirmación fijaría un estado que otra ficha puede cambiar legítimamente», el error que el reviewer de QC-91 evitó).
+
+Se acepta aquí por una razón concreta: **es la única forma de demostrar la Cara B contra el árbol real**, que es lo que se pidió, y el caso hermano que prueba los detectores con **fuentes fabricadas** —el que no fija estado— sigue vivo e intacto al lado. Queda escrito para que el reviewer lo juzgue a la vista y no lo descubra.
+
+**Aviso para T7:** la R21 de QC-91 **no** se hace así. Ahí la instrucción es explícita —no invertir la afirmación— y se acota con `cuerpoDeFuncion`.
