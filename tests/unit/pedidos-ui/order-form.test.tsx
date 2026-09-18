@@ -71,6 +71,7 @@ import type {
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeDetail } from '@/lib/modules/recetas';
 import type { UnitView } from '@/lib/modules/unidades';
+import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 const {
   createOrderActionMock,
@@ -292,6 +293,12 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
       ['25.3', '25.3'],
       ['25.08', '25.08'],
       ['0.1005', '0.1'],
+      // 2026-09-17: estos tres reventaban. El redondeo propio del campo dejaba el punto suelto
+      // -«25.001» salia «25.»- y un `type="number"` sanea esa cadena a VACIA, con lo que el
+      // campo se quedaba EN BLANCO al tabular y el pedido se enviaba sin cantidad.
+      ['25.001', '25'],
+      ['25.995', '26'],
+      ['9.999', '10'],
     ] as const) {
       await user.clear(control);
       await user.type(control, escrito);
@@ -648,9 +655,12 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     expect(within(tabla).getByTestId('order-ingredient-product')).toHaveTextContent(
       LINEA_INGREDIENTE.productName,
     );
+    // 2026-09-17: la celda pinta la cantidad REDONDEADA a dos decimales, no la cadena cruda del
+    // contrato: «2.0000» se lee «2». El dato de la linea no cambia, solo lo que se pinta.
     expect(within(tabla).getByTestId('order-ingredient-quantity')).toHaveTextContent(
-      LINEA_INGREDIENTE.quantity,
+      formatDecimalDisplay(LINEA_INGREDIENTE.quantity),
     );
+    expect(within(tabla).getByTestId('order-ingredient-quantity').textContent).toBe('2');
     // La unidad llega como id y se resuelve con el catalogo de unidades bajado por props (R43).
     expect(within(tabla).getByTestId('order-ingredient-unit')).toHaveTextContent('L');
     expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent(
@@ -696,9 +706,12 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
 
     await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 
-    // 2.0000 × 0.1005 = 0.20100 -> «0.201»; restante = 40 − 0.201 = 39.799, sin resaltar.
-    await waitFor(() => expect(requerida).toHaveTextContent('0.201'));
-    expect(restante).toHaveTextContent('39.799');
+    // 2.0000 × 0.1005 = 0.20100 y 40 − 0.201 = 39.799. Se CALCULAN exactos y se PINTAN a dos
+    // decimales (2026-09-17): «0.2» y «39.8». El valor exacto no se pierde, viaja en el `title`.
+    await waitFor(() => expect(requerida.textContent).toBe('0.2'));
+    expect(requerida).toHaveAttribute('title', '0.201');
+    expect(restante.textContent).toBe('39.8');
+    expect(restante).toHaveAttribute('title', '39.799');
     expect(restante.firstChild).not.toHaveClass('text-destructive');
   });
 
@@ -720,8 +733,11 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
 
     await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 
-    // 0.2 − 0.201 = −0.001, resaltado.
-    await waitFor(() => expect(restante).toHaveTextContent('-0.001'));
+    // 0.2 − 0.201 = −0.001, resaltado. A dos decimales eso se pinta «0» (2026-09-17), y por eso
+    // el resalte NO puede decidirse con el valor pintado: `isShort` mira el exacto. Un cero en
+    // rojo sigue avisando de que no alcanza, y el `title` lleva la cifra entera.
+    await waitFor(() => expect(restante.textContent).toBe('0'));
+    expect(restante).toHaveAttribute('title', '-0.001');
     expect(restante.firstElementChild).toHaveClass('text-destructive');
   });
 

@@ -4,6 +4,7 @@ import type { DataTableColumn } from '@/components/shared/data-table';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import type { UnitView } from '@/lib/modules/unidades';
+import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 import {
   CREATED_AT_COLUMN_ID,
@@ -51,9 +52,17 @@ import {
  * el servidor en QC-68, y `createdBy`/`updatedBy` son identificadores, no nombres. El test de R8
  * lo comprueba recorriendo esta misma declaracion.
  *
- * **La cantidad se pinta TAL CUAL llega** (R39): es una cadena decimal del contrato. Ni
- * `Intl.NumberFormat`, ni `toFixed`, ni conversion a coma flotante, ni aritmetica —tampoco para
- * un total, que aqui no existe—.
+ * **La cantidad se pinta REDONDEADA A DOS DECIMALES** (enmienda del 2026-09-17 a R39,
+ * decision humana). Es una cadena decimal del contrato y llega con la escala de la columna
+ * -«12.5000»-, pero cuatro decimales de relleno no informan de nada y compiten por la atencion
+ * con los que si: la celda la pasa por `formatDecimalDisplay` y muestra «12.5».
+ *
+ * Lo que R39 protege de fondo sigue vigilado y sin una sola excepcion: NI `Intl.NumberFormat`,
+ * NI `toFixed`, NI coma flotante, NI aritmetica de `number` —tampoco para un total, que aqui no
+ * existe—. `formatDecimalDisplay` redondea con enteros `BigInt` sobre el texto, que es exacto.
+ * Y es PRESENTACION: esta celda no alimenta ningun envio, el pedido guardado conserva sus
+ * cuatro decimales y reabrirlo para editar no los pierde (el formulario precarga con
+ * `trimDecimal`, que no redondea).
  *
  * **QC-35bis (2026-09-07): no hay columna de unidad ni de precio unitario.** Salieron del pedido
  * entero -formulario, contrato del modulo y tabla `orders`-, asi que no queda dato que pintar.
@@ -184,8 +193,12 @@ export function buildOrderColumns({
       id: QUANTITY_COLUMN_ID,
       label: 'Cantidad',
       align: 'end',
-      // R39: la cadena decimal, tal cual la entrega la consulta.
-      cell: (order) => order.quantity,
+      // La cadena decimal de la consulta, redondeada a dos decimales SOLO PARA PINTARLA
+      // (`formatDecimalDisplay`). Lo que R39 protege sigue intacto: el redondeo es aritmetica
+      // exacta de enteros sobre el texto -ni `Intl`, ni `toFixed`, ni coma flotante- y esta
+      // celda no alimenta ningun envio. El pedido guardado conserva sus cuatro decimales; lo
+      // que se lee ya no arrastra el «.0000» que no dice nada.
+      cell: (order) => formatDecimalDisplay(order.quantity),
     },
     {
       id: CREATED_AT_COLUMN_ID,

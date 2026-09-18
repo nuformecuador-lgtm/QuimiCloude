@@ -630,8 +630,11 @@ describe('linea de catalogo — edicion (R31, R46)', () => {
     await abrirEdicion(user);
 
     expect(screen.getByTestId('catalog-field-name')).toHaveValue(laLinea.name);
-    expect(screen.getByTestId('catalog-field-cost')).toHaveValue(laLinea.cost);
-    expect(screen.getByTestId('catalog-field-minPurchase')).toHaveValue(laLinea.minPurchase);
+    // 2026-09-17: los dos importes se precargan SIN los ceros de relleno («99.5000» -> «99.5»).
+    // El campo es `type="text"` (R41), asi que `toHaveValue` compara la cadena y la diferencia
+    // se ve de verdad.
+    expect(screen.getByTestId('catalog-field-cost')).toHaveValue('99.5');
+    expect(screen.getByTestId('catalog-field-minPurchase')).toHaveValue('2.5');
     expect(screen.getByTestId('catalog-field-deliveryTime')).toHaveValue(laLinea.deliveryTime);
     expect(presentacionSeleccionada()).toBe(laLinea.presentationId);
     expect(screen.getByTestId(testId.selectorUnidad)).toHaveTextContent(UNIDAD.symbol);
@@ -652,10 +655,36 @@ describe('linea de catalogo — edicion (R31, R46)', () => {
     expect(enviado.get('name')).toBe('Ácido cítrico monohidrato');
     expect(enviado.get(PRESENTATION_FIELD)).toBe(laLinea.presentationId);
     expect(enviado.get('unitId')).toBe(laLinea.unitId);
-    expect(enviado.get('cost')).toBe(laLinea.cost);
-    expect(enviado.get('minPurchase')).toBe(laLinea.minPurchase);
+    // Viajan recortados, que es lo precargado. Es el MISMO numero -«99.5» y «99.5000» valen
+    // igual y el patron del esquema acepta los dos-, y por eso recortar es seguro sobre un campo
+    // que se vuelve a guardar. Redondear no lo seria, y el caso de abajo lo fija.
+    expect(enviado.get('cost')).toBe('99.5');
+    expect(enviado.get('minPurchase')).toBe('2.5');
     expect(enviado.get('deliveryTime')).toBe(String(laLinea.deliveryTime));
     expect(createCatalogLineActionMock).not.toHaveBeenCalled();
+  });
+
+  it('la precarga NO redondea: cuatro decimales se reenvian intactos', async () => {
+    // La otra mitad de la decision del 2026-09-17. El valor precargado es el que se vuelve a
+    // guardar, asi que la edicion solo puede quitarle ceros de relleno: si aqui se redondeara a
+    // dos decimales, abrir una linea y darle a guardar -sin tocar nada- convertiria este costo
+    // en 1234.57 y nadie lo habria pedido. La tabla SI redondea, porque ahi solo se pinta.
+    const user = setupUser();
+    const laLinea = linea({ cost: '1234.5678', minPurchase: '0.1005' });
+    listCatalogLinesActionMock.mockResolvedValue(paginaDeLineas([laLinea]));
+
+    await renderPantalla();
+    await abrirEdicion(user);
+
+    expect(screen.getByTestId('catalog-field-cost')).toHaveValue('1234.5678');
+    expect(screen.getByTestId('catalog-field-minPurchase')).toHaveValue('0.1005');
+
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(updateCatalogLineActionMock).toHaveBeenCalledTimes(1));
+    const [, , enviado] = updateCatalogLineActionMock.mock.calls[0];
+    expect(enviado.get('cost')).toBe('1234.5678');
+    expect(enviado.get('minPurchase')).toBe('0.1005');
   });
 
   it('no ofrece cambiar el proveedor de la linea', async () => {

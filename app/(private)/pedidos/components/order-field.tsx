@@ -4,6 +4,7 @@ import { useId } from 'react';
 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 /**
  * Un campo de texto del formulario de pedido: etiqueta, control y error en linea (R34, R45).
@@ -13,6 +14,14 @@ import { Label } from '@/components/ui/label';
  * pantalla lo muestra; lo que se ENVIA sigue siendo el `FormData`, con el valor ya colocado.
  * Quitar los ceros finales (y el punto cuando no queda nada) hace que «25.0» y «25.00» se
  * muestren como «25», y que «25.3» y «25.08» conserven sus decimales.
+ *
+ * **Quien redondea es `formatDecimalDisplay` de `lib/shared/ui/decimal-display`** (2026-09-17).
+ * Antes lo hacia un `roundDecimalText` propio de este archivo, y ese tenia DOS fallos que el
+ * campo mostraba: «25.00» volvia tal cual en vez de quedar en «25» -justo lo que el parrafo de
+ * arriba dice que hace-, y cualquier valor que redondeara a un entero salia con el punto suelto
+ * («25.001» -> «25.»). Un `type="number"` sanea «25.» a cadena VACIA, asi que el campo se
+ * quedaba en blanco al tabular. La regla de redondeo vive ahora en un solo sitio, con el mismo
+ * criterio que usan las tablas para pintar, y no hay dos que puedan separarse.
  *
  * **El `type` es de texto POR DEFECTO** (R39, `design.md > 10`): los importes de este modulo son
  * CADENA decimal de punta a punta, y el teclado adecuado en movil se ofrece con `inputMode`, que
@@ -50,33 +59,13 @@ const FIELD_TEXT = 'text-base md:text-base';
  * «25.08» a 2 decimales quedan «25», «25» y «25.08». La entrada invalida y la vacia vuelven tal
  * cual -el campo no es la frontera de validacion, el esquema del contrato lo es-, y un valor sin
  * decimales (o con menos de los pedidos) no se toca.
+ *
+ * Es el helper compartido con un `trim()` delante: el valor de un control puede traer espacios y
+ * `formatDecimalDisplay` no los quita a proposito -el resto de sus llamadores le pasan cadenas
+ * del contrato, que no los tienen-.
  */
-export function roundDecimalText(raw: string, decimals: number): string {
-  const text = raw.trim();
-  if (text === '' || text === '.') return text;
-
-  const dot = text.indexOf('.');
-  if (dot === -1) return text;
-
-  const intPart = text.slice(0, dot);
-  const fracPart = text.slice(dot + 1);
-  if (fracPart.length <= decimals) return text;
-
-  const whole = BigInt(intPart === '' ? '0' : intPart);
-  const keep = fracPart.slice(0, decimals).padEnd(decimals, '0');
-  const firstCut = fracPart[decimals] ?? '0';
-  const needsCarry = firstCut >= '5';
-
-  let scaled = whole * BigInt(10 ** decimals) + BigInt(keep);
-  if (needsCarry) scaled += BigInt(1);
-
-  let digits = scaled.toString().padStart(decimals + 1, '0');
-  const int = digits.slice(0, -decimals);
-  digits = digits.slice(-decimals);
-
-  let result = int === '' ? '' : int;
-  result += digits === '' ? '' : `.${digits.replace(/0+$/, '')}`;
-  return result === '' ? '0' : result;
+function roundDecimalText(raw: string, decimals: number): string {
+  return formatDecimalDisplay(raw.trim(), decimals);
 }
 
 export type OrderFieldProps = {

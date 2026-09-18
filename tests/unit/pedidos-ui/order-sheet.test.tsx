@@ -472,9 +472,13 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
     await screen.findByTestId(ORDER_FORM_TESTID);
     expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(elPedido.recipeId);
     // Cadena del DOM y no `toHaveValue`: sobre el control numerico ese matcher compara
-    // `valueAsNumber`, y `12.5000` y `12.5` son el mismo numero pero no la misma cadena (R39).
-    expect((screen.getByTestId('order-field-quantity') as HTMLInputElement).value).toBe(
-      elPedido.quantity,
+    // `valueAsNumber`, y «12.5000» y «12.5» son el mismo numero pero no la misma cadena (R39).
+    // Esa distincion es justo la que se afirma aqui: desde el 2026-09-17 el panel precarga la
+    // cantidad SIN los ceros de relleno («12.5000» -> «12.5»). Recortarlos no cambia el numero
+    // -y por eso es seguro sobre un campo que se vuelve a guardar-, pero si cambia la cadena.
+    expect((screen.getByTestId('order-field-quantity') as HTMLInputElement).value).toBe('12.5');
+    expect(elPedido.quantity, 'el dato del pedido NO se toca, solo lo que el campo muestra').toBe(
+      CANTIDAD,
     );
   });
 
