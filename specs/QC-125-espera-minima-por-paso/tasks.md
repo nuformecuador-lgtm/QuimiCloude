@@ -4,7 +4,11 @@
 > `[P]` = puede ir en paralelo con las otras `[P]` de su tanda (archivos disjuntos).
 > Gate por tanda: `./init.sh --rapido`. Cierre de feature: `./init.sh` completo.
 
-- [ ] **T1 — Respuesta del humano a la pregunta abierta 1** (enmienda del test de QC-63 R18).
+- [x] **T1 — Respuesta del humano a la pregunta abierta 1** (enmienda del test de QC-63 R18).
+  - **Respuesta (2026-09-18):** opcion (b), la del diseno. El humano aprobo el spec («aprobado») sin
+    elegir alternativa, asi que vale tal como esta escrito: el test R18 de QC-63 se tensa a lista
+    cerrada en la que solo puede cambiar `components/shared/step-reader/step-reader.tsx`. Sin cambio en
+    `design.md`. Tambien quedan como estan el color de `CountdownTimer` y el copy del motivo de tiempo.
   - Depende de: aprobación del spec.
   - Archivos: ninguno (la respuesta se anota en `progress/current.md` y, si cambia el diseño, en
     `design.md > 9`).
