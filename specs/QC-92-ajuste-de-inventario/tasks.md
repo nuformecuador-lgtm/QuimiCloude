@@ -211,7 +211,42 @@
       **Archivos:** `app/(private)/inventario/components/adjust-batch-dialog.tsx`,
       `tests/unit/inventario/adjust-batch-dialog.test.tsx`.
 
-- [ ] **T13 — Enganchar el panel al listado.** Depende de T10, T11, T12.
+- [x] **T13bis — ENMIENDA AL SPEC del 2026-09-18: el retensado de la guardia de QC-22.**
+      Depende de T12 y **bloquea a T13**. **No estaba en el spec original.** T12 exige que el control
+      de ajuste **no exista en el DOM** sin `inventario.modificar`, y eso obliga a la pantalla a
+      saber si el actor lo tiene. Resolver la sesión en cualquier archivo de la ruta pone **roja**
+      `tests/unit/inventario/product-route-contract.test.ts > la pantalla no repite requireAdmin ni
+      decide autorizacion` (medido: `product-list-section.tsx no debe contener «getSessionUser»`,
+      1 failed | 17 passed).
+      **Aprobada por el humano el 2026-09-18** (opción A de las tres escaladas), con este
+      razonamiento, que va **escrito en la nota de la guardia**: la premisa de QC-22 sigue en pie
+      —la pantalla no decide autorización— pero **preguntar si se pinta un control no es decidir
+      autorización**. La autorización dura la da el caso de uso y rechaza igual aunque la pantalla
+      se la saltara. La pantalla no es la regla: es su reflejo. El precedente está escrito en
+      `app/(private)/pedidos/components/order-list-section.tsx` («No es autorizacion, es
+      PRESENTACION») y **se cita, no se copia de tapadillo**.
+      **Sigue prohibido, intacto:** `requireAdmin`, `ADMIN_ROLE_NAME`, `decideRouteAccess`,
+      `redirect(` y `next/headers` —todo lo que sería **cortar el paso** desde la pantalla—.
+      **Se permite, acotado:** resolver la sesión **solo** para derivar booleanos de presentación y
+      **solo** delegando en un predicado del propio módulo que **no lanza** y que con la sesión
+      caída devuelve `false`, calcado de `canModifyAssignments`
+      (`lib/modules/asignaciones/domain/actor.ts:114`).
+      **Y la marca POSITIVA, que es la razón de ser de la enmienda:** el retensado deja el repo
+      **mejor protegido que antes**. La guardia pasa a afirmar además que (1) el literal
+      `'inventario.modificar'` **no aparece en ningún archivo de la ruta** —vive dentro del módulo—
+      y (2) el caso de uso **conserva** `requirePermission(actor, 'inventario.modificar')` en su
+      **primera línea**. Borrar esa línea mañana pone la guardia **roja**; hoy no se pondría.
+      **Límites:** no se toca `ningunArchivoContiene`, ni `FUENTES_DE_LA_RUTA`, ni ningún otro
+      mecanismo; nada se renombra para esquivar; **nota fechada 2026-09-18** y **prueba por mutación
+      de las dos caras**.
+      **Hecho:** los dos casos nuevos muerden sobre fuentes fabricadas y sobre el árbol real, el
+      caso retensado sigue rojo ante `requireAdmin` y compañía, y `./init.sh --rapido` verde.
+      **Cubre R21 en su parte de pantalla**; no cambia ningún otro requisito.
+      **Archivos:** `lib/modules/inventario/domain/actor.ts`, `lib/modules/inventario/index.ts`,
+      `tests/unit/inventario/product-route-contract.test.ts`,
+      `tests/unit/inventario/authorization.test.ts`.
+
+- [x] **T13 — Enganchar el panel al listado.** Depende de T10, T11, T12 **y T13bis**.
       Los tres componentes salen por el **barrel** de la ruta, y el listado abre el panel del
       producto. Nada se importa por ruta profunda.
       **Hecho:** `./init.sh --rapido` verde, incluido el test de contrato de la ruta. **Cubre R22.**

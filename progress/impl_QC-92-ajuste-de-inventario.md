@@ -691,3 +691,118 @@ pnpm exec vitest run tests/unit/inventario/
 
 `pnpm run typecheck` y `pnpm run lint`: verdes, sin salida. **Cero rojos; ninguno que declarar como
 ajeno.** `package.json` no cambió (R33).
+
+---
+
+## T13bis — ENMIENDA AL SPEC del 2026-09-18: el retensado de la guardia de QC-22, y **T13 cierra**
+
+**Aprobada por el humano el 2026-09-18** (opción A de las tres que escaló la tanda 5), escrita como
+task propia en `tasks.md` —una enmienda aprobada vive en el spec, no solo aquí; mismo trámite que
+T9bis—. **Séptima guardia heredada** que toca esta ficha.
+
+Antes de aprobar, el humano **verificó las tres afirmaciones** en las que se apoyaba la escalada:
+el precedente de `pedidos` (`order-list-section.tsx:122`), lo que dice la guardia
+(`product-route-contract.test.ts:316`) y el corte del caso de uso
+(`adjust-batch-stock.ts:51`, antes de zod). Las tres ciertas.
+
+### El razonamiento aprobado (y va escrito en la nota de la guardia)
+
+La premisa de QC-22 **sigue en pie** —la pantalla no decide autorización—, pero **preguntar si se
+pinta un control no es decidir autorización**. La autorización dura la da el caso de uso y rechaza
+igual aunque la pantalla se la saltara: **la pantalla no es la regla, es su reflejo**. Es la misma
+distinción que `app/(private)/pedidos/components/order-list-section.tsx` ya dejó escrita («No es
+autorizacion, es PRESENTACION»), y se **cita**, no se copia de tapadillo.
+
+### Qué cambió, exactamente
+
+**Sigue prohibido, intacto:** `requireAdmin`, `ADMIN_ROLE_NAME`, `decideRouteAccess`, `redirect(`,
+`next/headers`. Todo lo que sería **cortar el paso** desde la pantalla.
+
+**Se permite, acotado:** `getSessionUser` sale de la lista dura y pasa a ser condicional. Para
+**cada** archivo de la ruta que lo contenga, la guardia exige que (1) no sea de cliente, (2) importe
+y use `canAdjustBatchStock` de `@/lib/modules/inventario`, (3) **no hurgue por su cuenta** en el
+conjunto de permisos ni en el rol (`.permissions`, `roleName`), y (4) no traiga ningún prohibido
+duro. El predicado es `canAdjustBatchStock` (`lib/modules/inventario/domain/actor.ts`), **calcado de
+`canModifyAssignments`**: delega en `assertPermission` —la única implementación de la regla—, **no
+lanza** y devuelve `false` con la sesión caída.
+
+### La marca POSITIVA: el retensado deja el repo **mejor protegido que antes**
+
+Dos casos **nuevos**, que antes no existían:
+
+1. **`'inventario.modificar'` no vive en la ruta**, en ninguna de sus tres comillas. La respuesta
+   sale del módulo; la cadena, no.
+2. **El caso de uso conserva su corte en la PRIMERA línea.** Se extrae el cuerpo de la función
+   interna `adjustBatchStock` —con un extractor propio, porque el `cuerpoDeFuncion` de
+   `qc91-alcance.test.ts` exige `export` y esta función no lo es— y se mide **orden, no presencia**:
+   `requirePermission(actor, 'inventario.modificar')` tiene que ser la primera sentencia, antes de
+   `safeParse` y antes de cualquier `deps.products.`.
+
+**La mordida, medida por mí y no de oídas.** Borré a mano esa línea de
+`lib/modules/inventario/domain/adjust-batch-stock.ts` y corrí la guardia:
+
+```
+× el caso de uso de ajuste exige el permiso ANTES de validar y ANTES de tocar el repositorio
+AssertionError: expected false to be true
+Tests  1 failed | 22 passed (23)
+```
+
+Restaurada con `git checkout --`, `git status --porcelain` sin diff y la línea de vuelta en `:51`.
+**Antes de esta enmienda, borrar esa línea no ponía roja ninguna guardia de esta ruta.**
+
+**Prueba por mutación, las dos caras, con fuentes fabricadas** y **reusando los mismos detectores**
+que el caso real: lectura de sesión sin el predicado ⇒ rojo; con `requireAdmin` ⇒ rojo; con
+`redirect(` ⇒ rojo; en un archivo de cliente ⇒ rojo; delegando **y además** hurgando en
+`.permissions` ⇒ rojo; delegando de verdad ⇒ verde. Y el corte: en primera línea ⇒ verde; borrado
+⇒ rojo; movido tras el `safeParse` ⇒ rojo.
+
+**Límites respetados:** `ningunArchivoContiene`, `FUENTES_DE_LA_RUTA`, `FUENTES_VIGILADAS` y
+`fuenteSinComentarios` **sin una línea tocada**; ningún símbolo renombrado para esquivar; ningún
+otro caso del archivo debilitado.
+
+### T13 cierra: `canAdjust` ya tiene origen
+
+`product-list-section.tsx` (Server Component) resuelve
+`canAdjustBatchStock(await identity.getSessionUser())` y se lo pasa a `ProductTable`. **Se retiró el
+prop `canAdjust` de `ProductListSectionProps`**: nadie lo emitía —`page.tsx` nunca lo pasaba—, así
+que era letra muerta que garantizaba el `false`. La lectura **no añade consulta**:
+`identity.getSessionUser` está memoizada por petición (`requestScoped` en `lib/composition`), que es
+la misma vía por la que `requirePagePermission` ya la resolvió; no se montó ningún
+`runInRequestScope` nuevo. **T13 y T13bis marcadas `[x]`.**
+
+### Desviaciones de esta tanda
+
+1. **Se ajustó el JSDoc de R5 de `product-list-section.tsx`**, que decía «no se lee la sesion» y
+   había dejado de ser cierto. Un comentario con la razón equivocada es peor que ninguno.
+2. **`tests/unit/inventario/product-page.test.tsx` NO se tocó**, aunque estaba autorizado: se midió
+   que no lo necesitaba —`identity` ya estaba doblado ahí—.
+3. **Pulido posterior al primer intento**, en el propio archivo de la guardia: se quitaron las citas
+   de ficha que se habían colado en los comentarios nuevos (`docs/conventions.md:31` rige igual en
+   tests: el `R<n>` va en el nombre del caso, no en la prosa; **las citas preexistentes no se
+   arrastran**); se quitó un `expect(archivosConSesion).toBeGreaterThanOrEqual(0)` que era **siempre
+   cierto** y no afirmaba nada (`docs/verification.md > Qué NO cuenta`), sin sustituirlo por uno que
+   fijara el estado del árbol; y se cerró el hueco del detector, que daba verde a un archivo que
+   delegara en el predicado **y además** hurgara en `.permissions`.
+
+### Salida real del gate
+
+```
+./init.sh --rapido
+[test:rapido] tests relacionados con 54 archivo(s) del diff vs origin/dev
+  Test Files  352 passed (352)
+       Tests  5244 passed | 26 skipped (5270)
+[test:rapido] todas las guardias
+  Test Files  43 passed (43)
+       Tests  515 passed | 9 skipped (524)
+✓ test:rapido paso · ✓ todas las migraciones tienen down.sql · ✓ .env presente · == init OK ==
+```
+
+A mano, porque la selección del rápido tiene agujeros conocidos:
+
+```
+pnpm exec vitest run tests/unit/inventario/
+  Test Files  47 passed (47)
+       Tests  725 passed | 5 skipped (730)
+```
+
+`typecheck` y `lint` verdes. **Cero rojos.**

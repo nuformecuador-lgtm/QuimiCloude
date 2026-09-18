@@ -1,6 +1,6 @@
 // Contrato publico del modulo. Lo importa un componente de cliente, asi que no puede arrastrar
 // servidor.
-export { requirePermission, type Actor } from './domain/actor';
+export { requirePermission, canAdjustBatchStock, type Actor } from './domain/actor';
 // Lo piden las firmas de los puertos: quien escriba un adaptador o un doble de test lo toma de aqui.
 export type { InventoryScope } from './domain/inventory-scope';
 export {

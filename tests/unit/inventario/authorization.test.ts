@@ -18,6 +18,7 @@ import path from 'node:path';
 
 import { PERMISSIONS, type PeopleDirectory, type PermissionCode } from '@/lib/modules/identity';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
+import { canAdjustBatchStock } from '@/lib/modules/inventario/domain/actor';
 import { createAdjustBatchStock } from '@/lib/modules/inventario/domain/adjust-batch-stock';
 import { createCreatePresentation } from '@/lib/modules/inventario/domain/create-presentation';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
@@ -749,5 +750,35 @@ describe('QC-49 R24 — el permiso va antes que el ambito de empresa', () => {
         `${caso.nombre} deberia conceder a un actor con ${caso.permiso} de cualquier empresa`,
       );
     }
+  });
+});
+
+describe('R21 — canAdjustBatchStock, el predicado de presentacion', () => {
+  it('R21: con inventario.modificar devuelve true', () => {
+    expect(canAdjustBatchStock(actorCon(MODIFICAR))).toBe(true);
+  });
+
+  it('R21: el Operador, con solo inventario.consultar, devuelve false', () => {
+    expect(canAdjustBatchStock(actorCon(CONSULTAR))).toBe(false);
+  });
+
+  it('R21: falla cerrado sin lanzar ante sesion caida, permisos ausentes o vacios', () => {
+    const casos: ReadonlyArray<unknown> = [
+      null,
+      undefined,
+      { id: 'sin-campo-1', companyId: EMPRESA_DEL_ACTOR },
+      { id: 'sin-permisos-1', companyId: EMPRESA_DEL_ACTOR, permissions: [] },
+      { id: 'permisos-no-array', companyId: EMPRESA_DEL_ACTOR, permissions: 'inventario.modificar' },
+    ];
+
+    for (const actor of casos) {
+      expect(() => canAdjustBatchStock(actor as Actor | null | undefined)).not.toThrow();
+      expect(canAdjustBatchStock(actor as Actor | null | undefined)).toBe(false);
+    }
+  });
+
+  it('R21: no hay implicacion entre permisos', () => {
+    expect(canAdjustBatchStock(actorCon(CONSULTAR))).toBe(false);
+    expect(canAdjustBatchStock(actorCon(MODIFICAR))).toBe(true);
   });
 });
