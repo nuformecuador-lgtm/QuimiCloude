@@ -407,29 +407,35 @@ se copia a mano, asi que renombrar en el `up` y olvidar el `down` lo pone rojo�
 | R3 | `list-query-orders.int.test.ts` > `R3: buscar el numero de pedido no encuentra nada` | cubierto |
 | R4 | `list-query-orders.int.test.ts` > `R4: el pedido cuya receta esta de baja SI aparece al buscar su nombre` · `recipe-catalog.test.ts` > `una receta dada de baja SI vuelve (R4)` | cubierto |
 | R5 | `list-query-orders.int.test.ts` > `R5: el total describe el conjunto buscado y no la pagina` | cubierto |
-| R6 | `recipe-catalog.test.ts` > `una receta de otra empresa NO vuelve (R6)` (mitad de la empresa) · `list-orders.test.ts` > caso `(R1, R7)`, que afirma que el `companyId` que viaja es el del actor · `list-query-orders.int.test.ts` > `un pedido CANCELADO SI se consulta; uno BORRADO no sale nunca (R25, R7)` (mitad del borrado) · `buildOrderWhere` compone los tres en un `AND` explicito | cubierto **por partes**, ver la deuda de abajo |
+| R6 | `list-query-orders.int.test.ts` > `R6: el pedido BORRADO con el nombre exacto de su receta no aparece, y el total da cero` y `R6: un pedido de OTRA empresa con el nombre exacto de su receta no aparece, y el total da cero` · `recipe-catalog.test.ts` > `una receta de otra empresa NO vuelve (R6)` | cubierto **con casos propios** desde el 2026-09-18 |
 | R7 | `list-orders.test.ts` > `(R1, R7)` · `tests/guards/guard-arquitectura-modulos.test.ts` · `tests/unit/pedidos/scope.test.ts` (pedidos no consulta `prisma.recipe`) | cubierto |
 | R8 | `list-orders.test.ts` > `sin busqueda: DOS invocaciones de puerto, tenga la pagina 1 fila o 25 (R8)` y `con busqueda: TRES invocaciones de puerto, tenga la pagina 1 fila o 25 (R8)` | cubierto |
 | R9 | `recipe-catalog.test.ts` > `un termino que normaliza a vacio devuelve null, no [] (R9)` · `list-orders.test.ts` > `con null del catalogo (el termino no es una busqueda) la lista vuelve entera y listAlive recibe null (R9)` | cubierto |
 | R10 | `list-query-orders.int.test.ts` > `R10: un termino que no casa con ninguna receta devuelve pagina vacia, total 0 y sin error` · `recipe-catalog.test.ts` > `ningun nombre casa: devuelve [] (R10)` · `list-orders.test.ts` > `con [] del catalogo (ninguna receta casa) el repositorio se llama igual y devuelve pagina vacia (R10)` | cubierto |
 | R11 | `listas-blancas-listados.test.ts` > `ninguna de las siete apaga la busqueda (R11)` · `order-view.test.ts` > `los filtros del listado son solo estado, prioridad y fecha, y la busqueda ya se abrio (R11)` · `order-input.test.ts` > `la busqueda por texto SOBREVIVE a sanitizeListQuery (R11)` · `order-list-params.test.ts` > `el contrato de pedidos ya declara searchable: true (R11)` | cubierto |
-| R12 | `tests/unit/pedidos/authorization.test.ts` (el permiso es la primera accion y ningun puerto se toca sin el) · `company-isolation-service.test.ts` > `cada llamada al puerto de los seis lleva exactamente {companyId} como ultimo argumento` | cubierto — **pero ese segundo test esta HOY EN ROJO por el bloqueo de arriba** |
+| R12 | `tests/unit/pedidos/authorization.test.ts` (el permiso es la primera accion y ningun puerto se toca sin el) · `company-isolation-service.test.ts` > `cada llamada al puerto de los seis lleva exactamente {companyId} como ultimo argumento` | cubierto |
 | R13 | `recipes-search-index-migration.test.ts` > los cuatro casos `(R13)` | cubierto (**nuevo**: antes era manual) |
 | R14 | `list-query-indexes.int.test.ts` > `los siete de busqueda son GIN de trigramas sobre name_normalized`, que ademas comprueba que el nuevo **no** lleva `WHERE`; y `los 34 indices nuevos existen, cada uno con su nombre exacto` | cubierto |
 | R15 | `list-query-orders.int.test.ts` > `R15: sin termino de busqueda, la lista vuelve exactamente igual que antes de esta feature`; y el hecho de que **ningun test que hoy pasa se ha borrado ni aflojado** | cubierto |
 | R16 | `order-list-params.test.ts` > `un search en la URL se IGNORA: la consulta sale siempre con busqueda vacia (R16)` y `buildOrderListQuery NUNCA emite un parametro search, ni siquiera vacio (R16)` | cubierto |
 
-### Deuda de trazabilidad que el spec no vio, dicha en voz alta
+### La deuda de trazabilidad de R6, CERRADA el 2026-09-18
 
-**R6 no tiene un caso de integracion propio.** Dice dos cosas —buscar el nombre exacto de la receta
-de un pedido **de otra empresa**, o de un pedido **borrado**, devuelve cero— y hoy se demuestra
-**por partes**: la mitad de la empresa en el unitario del catalogo de recetas, la mitad del borrado
-en un caso de integracion que **no busca**, y la conjuncion **por construccion** en el `AND` de
-`buildOrderWhere`. Es defendible, pero es la casilla mas debil del mapa: **nadie ejercita hoy una
-busqueda cuyo termino case con un pedido ajeno o borrado**. Un caso de integracion en el `describe`
-de la busqueda lo cerraria. **No se ha escrito porque esta tanda no puede correr integracion**
-(el encargo lo prohibe y el gate lo corre el leader), y **un test que no se ha visto pasar no se
-entrega**. Queda como decision del leader.
+Al escribir el mapa se detecto que **R6 no tenia caso propio**: se demostraba **por partes** —la
+mitad de la empresa en el unitario del catalogo, la mitad del borrado en un caso de integracion que
+**no buscaba**, y la conjuncion «por construccion» en el `AND` de `buildOrderWhere`—. Nadie
+ejercitaba una busqueda contra una fila que deberia quedar fuera. **El leader lo trato como
+bloqueante de trazabilidad y se ha cerrado**, con dos casos en el `describe` de la busqueda:
+
+- **El pedido borrado**: su receta se deja **VIVA a proposito**, que es lo que lo distingue del caso
+  de R4; lo que se excluye es el **pedido**, no su receta.
+- **El pedido de otra empresa**: empresa efimera propia, con su receta y su pedido. Antes de afirmar
+  el cero, **comprueba que el pedido ajeno existe de verdad en la base**: sin eso el cero podria
+  venir de una fila que nunca llego a crearse, y el caso pasaria por casualidad — el mismo fallo
+  que ya se corrigio una vez dentro de esta ficha.
+
+Los dos limpian lo que crean en `finally`, en el orden que exigen las FK `RESTRICT` (pedido antes
+que receta, receta antes que empresa).
 
 ## Salida real de la verificacion
 
@@ -499,23 +505,98 @@ AssertionError: expected 'recipes_name_normalized_all_trgm_idx_wrong' to be 'rec
 
 Restaurado: `Test Files 1 passed (1)` · `Tests 4 passed (4)`, con `git diff -- db/` vacio.
 
+## Cierre del bloqueo (2026-09-18, misma jornada)
+
+El humano **aprobo** el arreglo de una linea y **rectifico la veda**: el doble de `listAlive` del
+almacen no es un espia. La autorizacion fue acotada a **la lista de parametros de ese doble y nada
+mas**; el aserto, `visible()`, el `Set` de los seis metodos y los nombres de los casos quedan
+intactos. El diff es literalmente eso:
+
+```diff
+-    listAlive: vi.fn(async (_query: unknown, scope: OrderScope) => {
++    // La aridad refleja la del puerto: el ambito se lee del ultimo argumento.
++    listAlive: vi.fn(async (_query: unknown, _recipeIds: readonly string[] | null, scope: OrderScope) => {
+```
+
+Dos inserciones, una supresion, **un solo archivo**. No es un aflojamiento: **restaura la aridad
+real del puerto**, que es lo que ese doble declaraba mal desde que la firma cambio.
+
+## Verificacion final, toda ella vista pasar
+
+```
+$ pnpm run typecheck        -> tsc --noEmit, sin errores
+$ pnpm run lint             -> eslint, sin errores
+
+$ pnpm exec vitest run tests/unit/pedidos/ tests/guards/guard-ambito-empresa-pedidos.test.ts --maxWorkers=2
+ Test Files  22 passed (22)
+      Tests  382 passed (382)
+
+$ pnpm exec vitest run tests/integration/pedidos/list-query-orders.int.test.ts
+test-db: plantilla reutilizada: qct_tpl_49d5621c32fb (las migraciones no han cambiado)
+test-db: la corrida va contra qct_qc68_92789bc4_mu6z4b49_1gg (copia de qct_tpl_49d5621c32fb).
+ Test Files  1 passed (1)
+      Tests  21 passed (21)
+test-db: borrada la base de la corrida.
+
+$ pnpm exec vitest run tests/integration/pedidos/order-repository.int.test.ts \
+    tests/integration/pedidos/company-scope-queries.int.test.ts \
+    tests/integration/inventario/list-query-indexes.int.test.ts
+ Test Files  3 passed (3)
+      Tests  52 passed (52)
+```
+
+**Los cuatro archivos de integracion tocados estan ahora vistos pasar**, no solo compilados: la
+reserva que esta bitacora dejo escrita hace unas horas **queda levantada**. Entre ellos el censo de
+indices, que confirma **contra la base real** el conteo de 34 y la definicion del indice nuevo.
+
+**No se corrio la suite completa ni Playwright**: el gate lo corre el leader.
+
+## Correccion a la deuda del arnes n.o 2: correr integracion SI es seguro aqui
+
+De la deuda n.o 2 \u2014«la Postgres local esta compartida entre sesiones»\u2014 se venia arrastrando la idea
+de que **correr tests de integracion** era arriesgado con features en paralelo, y por eso esta ficha
+estuvo entregando archivos de integracion sin verlos pasar. **Esa extension es falsa y conviene que
+deje de frenar a la proxima sesion.**
+
+Lo que no es seguro es `pnpm run db:migrate:create`, que trabaja sobre la base de desarrollo y pide
+reset destructivo. El **runner de integracion es otra cosa**: clona una plantilla y corre contra una
+**copia efimera** que borra al terminar. Lo dice su propia salida:
+
+```
+test-db: plantilla reutilizada: qct_tpl_49d5621c32fb (las migraciones no han cambiado)
+test-db: la corrida de integracion va contra qct_qc68_... (copia de qct_tpl_...).
+test-db: borrada la base de la corrida: qct_qc68_...
+```
+
+Cuatro archivos tardaron menos de seis segundos en total y **no tocaron la base compartida**. La
+distincion merece estar escrita en `docs/verification.md`: **`db:migrate:create` no es seguro en
+paralelo; correr integracion si lo es.**
+
 ## Lo que queda
 
-1. **BLOQUEANTE — el doble de `company-isolation-service.test.ts`.** Decision del humano: o se
-   ajusta la aridad declarada de ese doble (una linea, sin aflojar nada), o se elige otra salida.
-   **Hasta entonces la rama tiene 2 rojos** y no puede ir a PR.
-2. **El gate**: `./init.sh --rapido` para cerrar la tanda y **`./init.sh` completo antes del PR**,
-   que es lo unico que ejercita los cuatro archivos de integracion tocados contra la base real.
-3. **Opcional, recomendado**: el caso de integracion de **R6** descrito arriba.
+1. **El gate**: `./init.sh --rapido` y **`./init.sh` completo antes del PR**. Es lo unico que falta.
+2. **T21 sin marcar a proposito**: su mapa R1-R16 esta completo y sin ninguna casilla pendiente,
+   pero su criterio de hecho exige el gate en verde, y quien lo corre es el leader.
+
+**No queda ningun rojo conocido.** El bloqueo esta cerrado y R6 esta trazado con casos propios.
 
 ## Deuda del arnes, la quinta
 
 **Una decision humana puede apoyarse en una premisa falsa, y el encargo no tiene donde decirlo.**
-La decision de reordenar la firma era **correcta** —y se mantiene—, pero venia con una condicion
-que resulto imposible: «ese archivo vuelve a verde solo». Nadie habia leido que el doble de
-`listAlive` de ese archivo **no es un espia sino una implementacion**, y que por eso lee el ambito
-por posicion. El encargo ademas se contradecia: mandaba ajustar «los dobles que asuman la firma
-vieja» y a la vez vedaba el unico archivo que contiene uno. **Se paro y se pregunto en vez de
-elegir en silencio**, que es lo que manda la regla 6, pero costo una tanda entera descubrirlo.
-Un encargo que veda un archivo deberia decir **que se espera que pase con el**, no solo que no se
-toque.
+La decision de reordenar la firma era **correcta** \u2014y se mantiene\u2014, pero venia con una condicion
+imposible: «ese archivo vuelve a verde solo». Nadie habia leido que el doble de `listAlive` de ese
+archivo **no es un espia sino una implementacion**, y que por eso lee el ambito por posicion. El
+encargo ademas se contradecia: mandaba ajustar «los dobles que asuman la firma vieja» y a la vez
+vedaba el unico archivo que contiene uno. **Se paro y se pregunto en vez de elegir en silencio**, y
+el humano rectifico en la vuelta siguiente: el coste fue una consulta, no una guardia aflojada. Aun
+asi, **un encargo que veda un archivo deberia decir que se espera que pase con el**, no solo que no
+se toque.
+
+## Deuda del arnes, la sexta
+
+**«Demostrado por partes» se cuela en un mapa de trazabilidad si nadie lo mira de frente.** R6 tenia
+sus mitades cubiertas y ninguna casilla vacia, asi que el mapa **parecia completo**. Lo que faltaba
+era el caso que junta las dos condiciones a la vez, que es justo lo que el enunciado dice. Un mapa
+`R<n> -> test` no deberia admitir una celda con tres tests que cubren **trozos** del requisito sin
+que nadie ejercite el enunciado entero: conviene que el reviewer lo trate como **pendiente** y no
+como cubierto.
