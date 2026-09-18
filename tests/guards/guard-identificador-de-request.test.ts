@@ -183,6 +183,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20260916120000_recipes_company_scope',
   // Igual patron: quita una columna de negocio, no toca el identificador de peticion.
   '20260917120000_drop_product_stock',
+  // Igual patron: tabla nueva de movimientos de inventario, no toca el identificador de peticion.
+  '20260917130000_inventory_movements',
 ] as const
 
 export function hallazgosDeMigraciones(
