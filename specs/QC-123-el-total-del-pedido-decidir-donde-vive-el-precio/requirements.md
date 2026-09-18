@@ -21,7 +21,110 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe `spec_author` (F1.2)._
+> Cada requisito cita entre corchetes la decisión cerrada que lo origina. **Naturaleza del
+> importe.** Al importe se le llama aquí «importe del pedido»; su nombre técnico y su columna
+> los fija `design.md > 3`.
+
+**R1.** El sistema DEBE guardar en cada pedido un **importe** que es el **coste de los
+ingredientes** que su receta consume, leído de los lotes de inventario, y NO DEBE leer ni
+escribir en ningún momento un precio de venta, ni del pedido ni de la receta `[D1]`.
+
+**R2.** CUANDO el sistema calcula el importe de un pedido, DEBE tomar como cantidad necesaria de
+cada ingrediente el **producto de la cantidad de su línea de receta por la cantidad del pedido**
+`[D2]`.
+
+**R3.** CUANDO el sistema calcula el importe, para cada ingrediente DEBE considerar únicamente
+los lotes de ese producto **con existencia mayor que cero** y de la empresa del pedido,
+recorrerlos **de la fecha de compra más antigua a la más nueva**, **desempatando por el número de
+lote**, y acumular su existencia **hasta cubrir** la cantidad necesaria, deteniéndose en el primer
+lote con el que queda cubierta `[D3]`.
+
+**R4.** El sistema NO DEBE usar la **fecha de vencimiento** de un lote para ordenar ni para
+seleccionar los lotes del cálculo `[D3]`.
+
+**R5.** CUANDO el importe de un ingrediente se compone de varios lotes, el sistema DEBE usar el
+**promedio simple** de los costes unitarios de los lotes usados, de modo que dos lotes usados
+pesen igual aunque de uno salga más cantidad que del otro `[D4]`.
+
+**R6.** SI la unidad de la línea de receta y la unidad del lote son distintas pero **comparten
+unidad base**, ENTONCES el sistema DEBE convertir con la conversión publicada por `unidades`
+(`convertQuantity`, un solo nivel de derivación) antes de comparar existencias y antes de aplicar
+el coste unitario `[D6]`.
+
+**R7.** SI la unidad de la línea de receta y la unidad del lote **no comparten unidad base**,
+ENTONCES ese ingrediente **no tiene coste**, y el sistema NO DEBE modificar el esquema de la
+presentación para resolverlo `[D6]`.
+
+**R8.** SI se da cualquiera de estos cuatro casos —la existencia no alcanza a cubrir la cantidad
+necesaria de algún ingrediente, algún ingrediente no tiene coste por unidades no convertibles, la
+receta **no tiene ingredientes**, o el pedido es **anterior a la columna**—, ENTONCES el pedido
+DEBE quedar **sin importe**: el sistema NO DEBE devolver ni guardar un número parcial, y NO DEBE
+devolver ni guardar `0` `[D5]` `[D7]` `[D9]`.
+
+**R9.** MIENTRAS un pedido está sin importe, el sistema DEBE devolver **exactamente la misma
+salida** sea cual sea el caso de los cuatro que lo causó: ninguna salida, mensaje ni código
+distingue entre ellos `[D5]` `[D7]`.
+
+**R10.** CUANDO se **crea** un pedido, el sistema DEBE calcular el importe con los lotes vigentes
+en ese instante y **guardarlo en el pedido** `[D8]`.
+
+**R11.** CUANDO se **edita** un pedido, el sistema DEBE **recalcular** el importe con los lotes
+vigentes en el instante de la edición y sustituir el guardado, incluso si el resultado pasa a ser
+«sin importe» `[D8]`.
+
+**R12.** MIENTRAS un pedido no se edita, su importe DEBE permanecer **invariable**: ni un alta de
+lote, ni un ajuste de existencia, ni un cambio de coste unitario posteriores lo modifican, y
+**ninguna lectura** de pedido lo recalcula `[D8]`.
+
+**R13.** El sistema DEBE tratar el importe como **opcional** en el pedido: los pedidos existentes
+antes de la columna se quedan **sin importe**, y el sistema NO DEBE rellenarlos con `0` ni ofrecer
+vía alguna para teclearlo a mano `[D9]`.
+
+**R14.** CUANDO alguien con **`pedidos.consultar`** consulta un pedido —ficha o listado—, el
+sistema DEBE devolver su importe, y el importe de un pedido de otra empresa NO DEBE ser alcanzable
+por ninguna de esas consultas `[D10]`.
+
+**R15.** El sistema NO DEBE devolver el importe por la vía de **`asignaciones`** —ni en el listado
+de pedidos asignados ni en la pantalla de ejecución—, y NO DEBE añadir ningún permiso al catálogo
+cerrado de quince `[D10]`.
+
+**R16.** El sistema DEBE guardar y devolver el importe **sin moneda**: no nace columna de moneda
+ni campo de moneda en ninguna salida `[D11]`.
+
+**R17.** El sistema NO DEBE permitir **ordenar ni filtrar** por el importe: el campo no entra en
+la lista blanca de consulta del listado, y una consulta que lo pida se ignora igual que cualquier
+campo no declarado `[D12]`.
+
+**R18.** El sistema DEBE devolver el importe en el **contrato de salida** del pedido sin pintarlo
+en ninguna pantalla: ninguna vista de esta ficha muestra el importe `[D13]`.
+
+**R19.** El sistema DEBE calcular el importe **en el servidor**, guardarlo con precisión decimal
+explícita de cuatro decimales, hacerlo viajar como **cadena decimal**, y NO DEBE usar coma
+flotante ni incorporar ninguna dependencia nueva para operarlo `[D14]`.
+
+**R20.** El sistema DEBE añadir el importe como **columna opcional de `orders`**, con identificador
+de base en inglés y `snake_case`, sin crear tabla nueva y sin alterar el borrado lógico ni las
+marcas de tiempo de la tabla `[D16]`.
+
+**R21.** MIENTRAS calcula el importe, el sistema DEBE leer únicamente lotes de la **empresa del
+pedido**; un lote de otra empresa no participa del cálculo ni por identificador
+(`docs/architecture.md > Dominio` n.º 1, heredado de QC-60).
+
+**R22.** El cálculo del importe DEBE **solo leer** lotes: NO DEBE crear, modificar, descontar ni
+reservar existencia, ni escribir ningún asiento de movimiento de inventario (Alcance, «Lo que NO
+entra»).
+
+**R23.** El sistema DEBE calcular el importe **después** de exigir `pedidos.modificar` en el alta y
+en la edición: un actor sin ese permiso no dispara ninguna lectura de recetas, unidades ni lotes
+(`docs/architecture.md > Acceso a datos y autorizacion`).
+
+### Decisión sin requisito propio
+
+**`[D15]`** —«¿Hace falta E2E aquí?»— **no genera requisito**: no describe comportamiento del
+sistema, sino la **cobertura** con la que se prueba. Se cumple en la trazabilidad de `tasks.md`:
+ningún `R<n>` de esta ficha mapea a un test E2E, la cobertura es de unidad más integración contra
+la base real, y el E2E queda diferido a **QC-122**, con el motivo escrito —esta ficha no tiene
+pantalla—.
 
 ## Preguntas abiertas
 
