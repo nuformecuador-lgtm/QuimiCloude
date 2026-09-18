@@ -158,14 +158,17 @@ describe('pantalla de ejecucion — el error de la operacion se muestra sin bloq
       message: 'Un pedido entregado conserva sus responsables tal como estaban.',
     });
     vi.useFakeTimers();
-    render(<OrderExecutionScreen execution={EXECUTION} />);
-    marcarTodo();
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000);
-    });
-    // El reloj falso solo hacia falta para cumplir la espera; el resto de la aserción sigue
-    // con temporizadores reales, como el resto del archivo.
-    vi.useRealTimers();
+    try {
+      render(<OrderExecutionScreen execution={EXECUTION} />);
+      marcarTodo();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+    } finally {
+      // El reloj falso solo hacia falta para cumplir la espera; el resto de la aserción sigue
+      // con temporizadores reales, como el resto del archivo.
+      vi.useRealTimers();
+    }
 
     fireEvent.click(screen.getByTestId('step-reader-finish'));
 
