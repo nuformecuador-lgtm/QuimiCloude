@@ -1614,10 +1614,10 @@
       "epic": "QC-105",
       "epic_name": "Documentos e IA",
       "name": "lectura-de-pdf-con-gemini",
-      "description": "Integracion con Google Gemini Flash, detras de un puerto, que lee un PDF y recibe PROMPTS PERSONALIZADOS.\n\nDOS MODOS DE LECTURA: el PDF tal cual, o convertido a imagen (reutiliza la conversion de endpoint-de-carga-de-pdf) para que la IA pueda identificar imagenes.\n\nDEPENDENCIA NUEVA: @google/genai. No se instala sin aprobacion humana ni sin los cuatro checks (regla 7).\n\nLO QUE NO ENTRA: la estrategia catalogo/formula (procesamiento-de-pdf-por-estrategia) y la deteccion de coordenadas, recorte y subida de imagenes (recorte-de-imagenes-del-pdf).\n\nABIERTO, se acota con /afinar-feature: que pasa si Gemini no responde o tarda, donde vive la clave, como se prueba sin red (el gate corre sin red).",
-      "status": "pending",
+      "description": "Integracion con Google Gemini Flash, detras de un puerto, que lee un PDF y recibe PROMPTS PERSONALIZADOS.\n\nDOS MODOS DE LECTURA: el PDF tal cual, o convertido a imagen (reutiliza la conversion de endpoint-de-carga-de-pdf) para que la IA pueda identificar imagenes.\n\nDEPENDENCIA NUEVA: @google/genai. No se instala sin aprobacion humana ni sin los cuatro checks (regla 7).\n\nLO QUE NO ENTRA: la estrategia catalogo/formula y sus archivos de prompt (procesamiento-de-pdf-por-estrategia); la deteccion de coordenadas, recorte y subida de imagenes (recorte-de-imagenes-del-pdf); la cola, el estado por archivo y los REINTENTOS (procesamiento-de-pdf-en-cola); la pantalla (componente-de-carga-de-archivos).\n\nACOTADA EL 2026-09-18 con /afinar-feature. SEIS DECISIONES CERRADAS:\n\n1. PLAZO: 60 s por lectura, escrito en UNA SOLA definicion del modulo. Al agotarse falla ESE archivo. CERO reintentos aqui: son de procesamiento-de-pdf-en-cola, que ya los tiene declarados abiertos. Dos capas reintentando multiplican el gasto en silencio.\n2. ERROR: codigo NUEVO ai_unavailable, OCTAVA enmienda al catalogo cerrado de QC-70, con plan B escrito (caer a unexpected). La aprueba el humano en F1.4. Distingue un corte del proveedor de un bug nuestro.\n3. RETORNO: TEXTO PLANO, tal cual lo escribio la IA. Interpretarlo es de quien lo pide; es lo que procesamiento-de-pdf-por-estrategia necesita hoy.\n4. CLAVE: UNA SOLA del despliegue, por variable de entorno, declarada VACIA en .env.example y leida en la invocacion, nunca al importar. Sin clave por empresa y sin tabla. Heredado de endpoint-de-carga-de-pdf.\n5. QUIEN INVOCA: capacidad INTERNA. Sin Server Action, sin ruta y sin pantalla; la ejecuta el trabajo de la cola por dentro. El permiso lo corta quien sube el PDF, donde endpoint-de-carga-de-pdf ya lo valida. E2E diferido con motivo: no anade recorrido navegable.\n6. MODELO: el nombre del modelo vive en una VARIABLE DE ENTORNO, obligatoria. Si falta, la lectura falla con error explicito y NO cae a un modelo escrito a mano en el codigo.\n\nHEREDADO y no se reabre: modulo documentos con puerto + adaptador driven y cableado solo en lib/composition; verificacion SIN RED con doble del puerto; CERO filas en base; zod en el borde e identificadores en ingles. La conversion a imagen NO se re-implementa: se reutiliza el PdfConverter que ya existe.\n\nLos cuatro checks de @google/genai, corridos el 2026-09-18 y los cuatro limpios: sin deprecated, 2.23.0 del 2026-09-16, licencia Apache-2.0, 22.1M descargas semanales. La fila en docs/dependencias.md y la instalacion esperan a F1.4.\n\nLO QUE SIGUE ABIERTO, y no se rellena con supuestos: como saca recorte-de-imagenes-del-pdf las coordenadas si el retorno es texto plano (se decide alli, que ya lo tiene abierto); que nadie valida si la IA alucina; y que el gasto no se mide ni tiene tope por empresa.",
+      "status": "in_progress",
       "sdd": true,
-      "complexity": null,
+      "complexity": "high",
       "zone": "backend",
       "branch": "feature/QC-108-lectura-de-pdf-con-gemini",
       "depends_on": [
@@ -1772,6 +1772,21 @@
       "spec_path": "specs/QC-117-menores-de-la-re-review-de-qc-95"
     },
     {
+      "key": "QC-119",
+      "id": 119,
+      "epic": "QC-118",
+      "epic_name": "Canal WhatsApp",
+      "name": "webhook-whatsapp-recepcion",
+      "description": "Hace falta un endpoint POST que reciba los mensajes que Meta envia por el webhook de WhatsApp Business, para que el sistema se entere de lo que escriben los clientes y pueda procesarlos despues. Meta reintenta los envios, asi que un mismo mensaje puede llegar mas de una vez; y cualquiera puede llamar a la URL, asi que solo deben aceptarse los que realmente vienen de Meta. Responder al usuario (con el bot o manualmente) va aparte.",
+      "status": "cancelled",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-119-webhook-whatsapp-recepcion",
+      "depends_on": [],
+      "spec_path": "specs/QC-119-webhook-whatsapp-recepcion"
+    },
+    {
       "key": "QC-120",
       "id": 120,
       "epic": "QC-27",
@@ -1785,6 +1800,23 @@
       "branch": "feature/QC-120-rendimiento-de-la-receta",
       "depends_on": [],
       "spec_path": "specs/QC-120-rendimiento-de-la-receta"
+    },
+    {
+      "key": "QC-121",
+      "id": 121,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "unidad-como-identidad-del-item",
+      "description": "Nace el 2026-09-17, de una decision del humano durante la implementacion de QC-91 (que NO se reabre: cierra con lo aprobado).\n\nLA REGLA: el nombre de un producto SE PUEDE DUPLICAR, pero si las unidades no concuerdan se trata como un ITEM DIFERENTE. Dicho al reves: un producto tiene UNA sola unidad, y un lote en otra unidad no entra en el: es otro producto.\n\nCONSECUENCIA DIRECTA, y es el motivo de la ficha: si un producto solo puede tener una unidad, la existencia vuelve a ser UN SOLO NUMERO, y `products.stock` puede volver como columna calculada por el back (la suma de los lotes). El humano lo pidio con este ejemplo: 3 lotes de 5 -> stock 15.\n\nMEDIDO EN DISCO EL 2026-09-17, antes de escribir nada:\n\n* El nombre YA se puede duplicar: NO existe indice unico sobre `products.name` ni sobre `products.name_normalized`, solo indices de busqueda (`products_name_idx`, `products_name_normalized_trgm_idx`). A diferencia de presentaciones, que si tiene `presentations_name_normalized_key`. Esa mitad de la regla no exige trabajo.\n* El producto NO tiene unidad propia: la hereda de la presentacion de su lote mas reciente (`latestBatchUnitId`, QC-80). Hoy nada impide un lote en kg y otro en L sobre el mismo producto.\n* `products.stock` fue retirada por QC-91 (migracion `20260917120000_drop_product_stock`, con su `down.sql`).\n\nLO QUE ENTRA:\n\n* Rechazar en el alta de lote una unidad que no case con la del producto, con su codigo de error propio. Esto DEROGA la decision D7 de QC-91, que decia expresamente «sin rechazar nada en el alta».\n* Devolver `products.stock` como columna calculada por el back al cambiar los lotes. Queda por acotar si se recalcula al escribir o se deriva al leer, y que pasa con los productos que hoy ya tienen lotes en dos unidades.\n* Revisar que la existencia por unidad que QC-91 construyo (`sumStockByUnit`, `ProductStockByUnit`) degenere limpiamente a un solo valor. NO se tira: es correcta en los dos mundos, y por eso QC-91 cerro sin rehacerse.\n\nLO QUE NO ENTRA: ajuste de inventario (QC-92), conversion entre unidades (QC-63).\n\nQUEDA POR ACOTAR con /afinar-feature antes del spec: si `products.stock` se guarda o se deriva; que pasa con los productos ya existentes con lotes en dos unidades; si el rechazo es en el alta del lote, en el alta del producto o en ambos; y si duplicar el nombre necesita algun aviso en la pantalla, ahora que deja de ser accidental y pasa a ser la forma prevista de tener «el mismo producto en otra unidad».\n",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-121-unidad-como-identidad-del-item",
+      "depends_on": [
+        "QC-91"
+      ],
+      "spec_path": "specs/QC-121-unidad-como-identidad-del-item"
     },
     {
       "key": "QC-122",

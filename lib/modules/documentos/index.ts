@@ -77,3 +77,25 @@ export {
   type PdfOutput,
   type PdfToConvert,
 } from './domain/convert-pdf';
+
+// El plazo de la lectura con IA, en la misma seccion de arriba de los limites: quien decida cuanto
+// esperar antes de dar una lectura por fallida lo lee de aqui, no lo vuelve a escribir.
+export { AI_READ_TIMEOUT_SECONDS } from './domain/limits';
+
+// El esquema del borde de la lectura con IA y su tipo inferido, mismo criterio que el esquema de
+// subida de arriba: una sola definicion de la entrada.
+export { aiReadInputSchema, type AiReadInput } from './domain/ai-read-input';
+
+// El unico codigo nuevo que este modulo aporta al catalogo cerrado: el proveedor de IA no
+// respondio, no estaba disponible o agoto el plazo. Lo reconoce el mismo `instanceof
+// DocumentosError` de siempre.
+export { AiUnavailableError } from './domain/errors';
+
+// La lectura de un PDF con IA, publicada como FABRICA por el mismo motivo que las de arriba: quien
+// la usa recibe el caso de uso ya construido y nunca ve al puerto ni a su adaptador. Atar puerto ->
+// adaptador sigue siendo trabajo exclusivo de `lib/composition`.
+export {
+  createReadPdfWithAi,
+  type AiReadResult,
+  type ReadPdfWithAiDeps,
+} from './domain/read-pdf-with-ai';
