@@ -172,6 +172,8 @@ export const MIGRACIONES_ESPERADAS = [
   // persiste el identificador de peticion ni lo menciona; se nombra aqui a mano y la lista sigue
   // CERRADA para la siguiente.
   '20260916120000_recipes_company_scope',
+  // Misma alta, esta vez para la migracion que da empresa a proveedores y a su catalogo.
+  '20260917120000_suppliers_company_scope',
 ] as const
 
 export function hallazgosDeMigraciones(

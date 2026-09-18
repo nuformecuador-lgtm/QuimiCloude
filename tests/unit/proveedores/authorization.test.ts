@@ -38,6 +38,9 @@ import type { PermissionCode } from '@/lib/modules/identity'
 import type { Actor } from '@/lib/modules/proveedores/domain/actor'
 import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/supplier-catalog-repository'
 import type { SupplierRepository } from '@/lib/modules/proveedores/ports/supplier-repository'
+import type { UnitCatalog } from '@/lib/modules/unidades'
+
+const COMPANY_ID = '11111111-1111-4111-8111-111111111111'
 
 const moduloDir = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -108,11 +111,21 @@ function dobles() {
   // sanear, asi que un actor rechazado no llega ni a saber que su consulta traia campos raros.
   const log = { ignoredFields: explota('log.ignoredFields') }
 
+  // `units` tampoco puede sonar sin autorizacion: `createCatalogLine`/`updateCatalogLine`
+  // exigen el permiso antes de preguntarle nada al catalogo de unidades.
+  const units = { findRefs: explota('units.findRefs') }
+
   return {
     suppliers: suppliers as unknown as SupplierRepository,
     catalog: catalog as unknown as SupplierCatalogRepository,
     log,
-    espias: [...Object.values(suppliers), ...Object.values(catalog), ...Object.values(log)],
+    units: units as unknown as UnitCatalog,
+    espias: [
+      ...Object.values(suppliers),
+      ...Object.values(catalog),
+      ...Object.values(log),
+      ...Object.values(units),
+    ],
   }
 }
 
@@ -178,17 +191,19 @@ const CASOS_DE_USO: readonly Caso[] = [
     nombre: 'createCatalogLine',
     archivo: 'create-catalog-line.ts',
     permiso: MODIFICAR,
-    ejecutar: (d, actor) => createCreateCatalogLine({ catalog: d.catalog })(ENTRADA_LINEA, actor),
-    ejecutarConBasura: (d, actor) => createCreateCatalogLine({ catalog: d.catalog })(BASURA, actor),
+    ejecutar: (d, actor) =>
+      createCreateCatalogLine({ catalog: d.catalog, units: d.units })(ENTRADA_LINEA, actor),
+    ejecutarConBasura: (d, actor) =>
+      createCreateCatalogLine({ catalog: d.catalog, units: d.units })(BASURA, actor),
   },
   {
     nombre: 'updateCatalogLine',
     archivo: 'update-catalog-line.ts',
     permiso: MODIFICAR,
     ejecutar: (d, actor) =>
-      createUpdateCatalogLine({ catalog: d.catalog })('linea-1', CAMPOS_LINEA, actor),
+      createUpdateCatalogLine({ catalog: d.catalog, units: d.units })('linea-1', CAMPOS_LINEA, actor),
     ejecutarConBasura: (d, actor) =>
-      createUpdateCatalogLine({ catalog: d.catalog })('linea-1', BASURA, actor),
+      createUpdateCatalogLine({ catalog: d.catalog, units: d.units })('linea-1', BASURA, actor),
   },
   {
     nombre: 'deleteCatalogLine',
@@ -209,7 +224,7 @@ const CASOS_DE_USO: readonly Caso[] = [
 
 /** Actor con exactamente los permisos que se le den; sin nombre de rol (R18). */
 function actorCon(...permissions: readonly string[]): Actor {
-  return { id: 'u-1', permissions }
+  return { id: 'u-1', companyId: COMPANY_ID, permissions }
 }
 
 /** Todos los codigos del catalogo REAL menos uno: el conjunto que NO debe abrir el caso. */
@@ -450,7 +465,7 @@ describe('autorizacion por permiso de los nueve casos de uso de proveedores (QC-
     // rojo: devolver `roleName` en `actor.ts` «por si acaso».
     const actorTs = readFileSync(join(moduloDir, 'domain', 'actor.ts'), 'utf8')
     expect(actorTs).toMatch(
-      /export type Actor = \{\s*readonly id: string;\s*readonly permissions: readonly string\[\];\s*\}/,
+      /export type Actor = \{\s*readonly id: string;\s*readonly companyId: string;\s*readonly permissions: readonly string\[\];\s*\}/,
     )
 
     // Y el modulo entero: ni `roleName`, ni el literal de un rol, ni la comprobacion vieja. Es

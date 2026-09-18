@@ -57,6 +57,7 @@ function clavesDelTipoDeps(fuente: string): readonly string[] {
 // QC-74 (R18): el actor no lleva nombre de rol, lleva su conjunto de permisos.
 const ADMIN: Actor = {
   id: '11111111-1111-4111-8111-111111111111',
+  companyId: '99999999-9999-4999-8999-999999999999',
   permissions: ['proveedores.consultar', 'proveedores.modificar'],
 }
 const AHORA = new Date('2026-09-03T12:00:00.000Z')
@@ -140,10 +141,16 @@ describe('casos de uso del proveedor (QC-43 T8)', () => {
     const { repo, spies } = makeSuppliers()
 
     await createCreateSupplier({ suppliers: repo, now })(ENTRADA_VALIDA, ADMIN)
-    expect(spies.create).toHaveBeenCalledWith(expect.anything(), ADMIN.id, AHORA)
+    expect(spies.create).toHaveBeenCalledWith(expect.anything(), ADMIN.id, AHORA, expect.anything())
 
     await createUpdateSupplier({ suppliers: repo, now })('sup-1', ENTRADA_VALIDA, ADMIN)
-    expect(spies.updateAlive).toHaveBeenCalledWith('sup-1', expect.anything(), ADMIN.id, AHORA)
+    expect(spies.updateAlive).toHaveBeenCalledWith(
+      'sup-1',
+      expect.anything(),
+      ADMIN.id,
+      AHORA,
+      expect.anything(),
+    )
     expect(Object.keys(spies.updateAlive.mock.calls[0]?.[1] as object).sort()).toEqual([
       'email',
       'name',
@@ -152,7 +159,7 @@ describe('casos de uso del proveedor (QC-43 T8)', () => {
     ])
 
     await createDeleteSupplier({ suppliers: repo, now })('sup-1', ADMIN)
-    expect(spies.softDeleteAlive).toHaveBeenCalledWith('sup-1', ADMIN.id, AHORA)
+    expect(spies.softDeleteAlive).toHaveBeenCalledWith('sup-1', ADMIN.id, AHORA, expect.anything())
   })
 
   it('la edicion reemplaza nombre, telefono y correo y no expone ninguna operacion por campo suelto', async () => {

@@ -97,7 +97,7 @@
 
 ## Bloque 1 — Dominio y puertos
 
-- [ ] **T6 — `SupplierScope` y el actor con empresa.** `[P]` con T0
+- [x] **T6 — `SupplierScope` y el actor con empresa.** `[P]` con T0
   Archivos: `lib/modules/proveedores/domain/supplier-scope.ts` (nuevo),
   `lib/modules/proveedores/domain/actor.ts`, `lib/modules/proveedores/index.ts` (reexportar el tipo).
   Depende de: —.
@@ -105,7 +105,7 @@
   siendo importable desde un componente de cliente (`guard-arquitectura-modulos` en verde).
   Cubre: R21 (parte), R23 (parte).
 
-- [ ] **T7 — Los dos puertos exigen el ámbito en su firma, y es OBLIGATORIO.**
+- [x] **T7 — Los dos puertos exigen el ámbito en su firma, y es OBLIGATORIO.**
   Archivos: `lib/modules/proveedores/ports/supplier-repository.ts`,
   `lib/modules/proveedores/ports/supplier-catalog-repository.ts`.
   Contenido: `scope: SupplierScope` **al final** de los **nueve** métodos (`design.md > 3.2`).
@@ -117,7 +117,7 @@
   terminar T8–T13.
   Cubre: R23.
 
-- [ ] **T8 — Los nueve casos de uso pasan el ámbito; dos de ellos ganan el puerto de unidades.**
+- [x] **T8 — Los nueve casos de uso pasan el ámbito; dos de ellos ganan el puerto de unidades.**
   Archivos: `lib/modules/proveedores/domain/{create,update,delete,get}-supplier.ts`,
   `list-suppliers.ts`, `{create,update,delete}-catalog-line.ts`, `list-catalog-lines.ts`.
   Contenido: tras `requirePermission` (que sigue siendo la primera línea), construir
@@ -134,7 +134,7 @@
 
 ## Bloque 2 — Persistencia, costura y cableado
 
-- [ ] **T9 — El único punto de consulta.**
+- [x] **T9 — El único punto de consulta.**
   Archivos: `lib/modules/proveedores/adapters/driven/persistence/company-scope.ts` (nuevo).
   Contenido: `companyScope` privada + `supplierCompanyScope`, `catalogLineCompanyScope` y
   `companyScopeColumns`; docblock con las reglas de uso de `design.md > 4`, incluida la de
@@ -143,7 +143,7 @@
   Hecho cuando: existe y su test afirma que las tres envolturas devuelven el mismo objeto.
   Cubre: R23, R24.
 
-- [ ] **T10 — Adaptador driven del proveedor, acotado.**
+- [x] **T10 — Adaptador driven del proveedor, acotado.**
   Archivos: `lib/modules/proveedores/adapters/driven/persistence/supplier-prisma.ts`.
   Contenido: el ámbito compuesto en `buildSupplierWhere` —al lado de `deletedAt: null` y **nunca**
   fundido con la búsqueda ni con los filtros— y en el `where` de `findAliveSupplierById`, del
@@ -157,7 +157,7 @@
   `meta.target` del índice compuesto.
   Cubre: R14 (parte), R16, R25, R27, R28, R29, R30, R31.
 
-- [ ] **T11 — Adaptador driven del catálogo, acotado — incluida `isSupplierAlive`.**
+- [x] **T11 — Adaptador driven del catálogo, acotado — incluida `isSupplierAlive`.**
   Archivos: `lib/modules/proveedores/adapters/driven/persistence/supplier-catalog-line-prisma.ts`.
   Contenido: ámbito en `isSupplierAlive` (**el punto que más fácil se escapa**), en
   `buildCatalogLineWhere`, en el `create` —`companyId` desde `companyScopeColumns`— y en los
@@ -170,7 +170,7 @@
   catálogo de un proveedor ajeno responde «proveedor no encontrado».
   Cubre: R26, R28, R30, R31.
 
-- [ ] **T12 — Server Actions con las dos caras de la sesión, dentro de `runInRequestScope`.**
+- [x] **T12 — Server Actions con las dos caras de la sesión, dentro de `runInRequestScope`.**
   Archivos: `lib/modules/proveedores/adapters/driving/supplier-actions.ts` y
   `supplier-catalog-actions.ts`.
   Contenido: `currentActor()` pide `getSessionUser()` **y** `getSessionContext()` en un `Promise.all`
@@ -181,7 +181,7 @@
   actions siguen verdes sin cambiar de firma pública.
   Cubre: R22, R38.
 
-- [ ] **T13 — Cableado: el ámbito en los puertos y `unitCatalog` en las dos factories de línea.**
+- [x] **T13 — Cableado: el ámbito en los puertos y `unitCatalog` en las dos factories de línea.**
   Archivos: `lib/composition/index.ts` (`supplierRepository`, `supplierCatalogRepository`, la fachada
   `proveedores`).
   Contenido: `units: unitCatalog` —la constante que el archivo **ya construye**— en
@@ -213,7 +213,7 @@
   Depende de: T4.
   Cubre: el gate.
 
-- [ ] **T16 — `MIGRACIONES_ESPERADAS` de la guardia de QC-71.** `[P]`
+- [x] **T16 — `MIGRACIONES_ESPERADAS` de la guardia de QC-71.** `[P]`
   Archivos: `tests/guards/guard-identificador-de-request.test.ts` (`:137`).
   Contenido: añadir el nombre de la migración de esta ficha, con el mismo patrón que
   `20260916120000_recipes_company_scope`.

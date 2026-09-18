@@ -196,3 +196,128 @@ esa marca (`guard-convenciones-proveedores`, `guard-herencia-armazon-privado`) s
   `company-scope.int.test.ts`, `list-query-indexes.int.test.ts`— son T21, T22, T23 y T14. Lo de
   esta tanda los **anticipa**, no los sustituye.
 - El gate: lo corre el leader.
+
+## Tanda 2 — Bloques 1 y 2 completos, más T16 · 2026-09-17
+
+**Estado: T6, T7, T8, T9, T10, T11, T12, T13 y T16 cerradas.** Se para aquí por encargo: nada
+del resto del bloque 3, nada del 4, nada del 5.
+
+El criterio del corte era que el árbol volviera a compilar y las guardias volvieran a verde.
+**Los dos se cumplen**: `typecheck` verde, `lint` verde, y los 38 archivos de `tests/guards/`
+verdes (440 tests), incluido el censo `MIGRACIONES_ESPERADAS` que T16 cierra.
+
+### Archivos
+
+| Archivo | Task | Qué |
+| --- | --- | --- |
+| `lib/modules/proveedores/domain/supplier-scope.ts` | T6 | **nuevo** — el tipo del ámbito, dominio puro |
+| `lib/modules/proveedores/domain/actor.ts` | T6 | `Actor` gana `companyId`. Sin imports nuevos |
+| `lib/modules/proveedores/index.ts` | T6 | reexporta `SupplierScope` |
+| `lib/modules/proveedores/ports/supplier-repository.ts` | T7 | los **5** métodos exigen `scope` al final |
+| `lib/modules/proveedores/ports/supplier-catalog-repository.ts` | T7 | los **4** métodos exigen `scope` al final |
+| `lib/modules/proveedores/domain/*-supplier.ts` y `list-suppliers.ts` | T8 | construyen el ámbito tras `requirePermission` y lo pasan al puerto |
+| `lib/modules/proveedores/domain/create-catalog-line.ts`, `update-catalog-line.ts` | T8 | además: `units: UnitCatalog` en sus `*Deps` y la resolución de la unidad |
+| `lib/modules/proveedores/domain/delete-catalog-line.ts`, `list-catalog-lines.ts` | T8 | pasan el ámbito, sin dependencia nueva |
+| `.../driven/persistence/company-scope.ts` | T9 | **nuevo** — el único punto de consulta |
+| `.../driven/persistence/supplier-prisma.ts` | T10 | las cinco operaciones acotadas |
+| `.../driven/persistence/supplier-catalog-line-prisma.ts` | T11 | las seis acotadas, **incluida `isSupplierAlive`** |
+| `.../driving/supplier-actions.ts`, `supplier-catalog-actions.ts` | T12 | `currentActor()` con las dos caras de la sesión dentro de `runInRequestScope` |
+| `lib/composition/index.ts` | T13 | `units: unitCatalog` en las dos factories de línea |
+| `tests/guards/guard-identificador-de-request.test.ts` | T16 | la migración de esta ficha entra en `MIGRACIONES_ESPERADAS` |
+| cinco tests unitarios de `tests/unit/proveedores/` | — | reparación **mecánica** para que compilen |
+| cinco tests de `tests/integration/proveedores/` | — | reparación **mecánica** |
+| `e2e/proveedores.spec.ts` | — | `companyId` en el seed de Prisma |
+
+`lib/modules/unidades/**` **no se tocó**: `UnitCatalog.findRefs` ya llegaba acotada. Ningún
+componente de `app/` se tocó. Ningún archivo de `db/` se tocó en esta tanda.
+
+### Los cinco puntos que el encargo exigía dejar bien, y cómo quedaron
+
+1. **El ámbito es OBLIGATORIO en los nueve métodos.** Un barrido buscando el ámbito declarado
+   como opcional sobre los dos puertos no devuelve nada: ni opcional, ni con valor por defecto.
+   Va **al final** de la firma en los nueve, así que ninguna llamada existente cambió de orden
+   de argumentos. La red del compilador sigue en pie: una llamada que lo omita no compila.
+2. **`isSupplierAlive` está acotada**, que era el punto que más fácil se escapaba por no ser
+   método de ningún puerto: su `where` compone `supplierCompanyScope(scope)` junto a
+   `deletedAt: null`. Sus dos llamantes —el alta de línea y el listado del catálogo— le pasan
+   el ámbito.
+3. **La costura hacia `unidades` es la única nueva.** Un barrido por `findRefs` en
+   `lib/modules/proveedores/` devuelve exactamente dos líneas, en `create-catalog-line.ts` y
+   `update-catalog-line.ts`, las dos contra `deps.units` con `actor.companyId` y las dos
+   **solo cuando la entrada trae unidad**. La ausencia de unidad sigue siendo válida. La
+   semántica «de sistema o de la empresa» no se reescribe aquí: la pone `unidades`.
+4. **No nace ningún puerto ni import hacia `inventario`.** Un barrido por el prefijo de import
+   de `inventario` en `lib/modules/proveedores/` devuelve **vacío**. Tampoco hay ninguna
+   consulta. La presentación la sigue acotando la FK compuesta de la base.
+5. **El filtro vive en UN ÚNICO punto.** `company-scope.ts` tiene una función privada
+   `companyScope` y tres envolturas que **delegan todas en ella** —existen solo para tipar—.
+   Un barrido por `companyId` sobre los dos adaptadores driven no devuelve ni una ocurrencia
+   fuera de esas envolturas: ninguna consulta ni escritura escribe la condición a mano. **Sin
+   lista de excepciones**, y no se creó ninguna.
+
+### La convención de comentarios, corregida antes de commitear
+
+La primera pasada de los docblocks **amplió conjuntos de citas de requisito preexistentes** en
+siete archivos de producción: donde la cita nombraba un requisito, pasó a nombrar tres. Eso
+incumple `docs/conventions.md > Comentarios`, que prohíbe citarlos en el código que esta ficha
+escriba o modifique. Se revirtió cada conjunto a lo que decía antes de esta rama y el sentido
+nuevo quedó **expresado con palabras**. Las citas que ya existían y que esta ficha solo arrastró
+al reflujar un párrafo se conservan literalmente: `design.md > 13` dice expresamente que no se
+reescriben en masa. Los **dos archivos nuevos** no contienen ninguna cita.
+
+### Salidas reales
+
+```
+pnpm run typecheck   -> VERDE, sin una sola salida (venia de 23 errores + 31 mas que abrio T6-T8)
+pnpm run lint        -> VERDE, sin una sola salida
+pnpm test tests/guards/guard-identificador-de-request.test.ts
+                     -> Test Files 1 passed (1) | Tests 23 passed (23)
+pnpm test tests/guards/
+                     -> Test Files 38 passed (38) | Tests 440 passed | 5 skipped (445)
+pnpm test tests/unit/proveedores/
+                     -> Test Files 3 failed | 11 passed (14) | Tests 9 failed | 162 passed (171)
+pnpm test tests/integration/proveedores/
+                     -> Test Files 1 failed | 4 passed (5) | Tests 2 failed | 78 passed (80)
+```
+
+No se corrió la suite completa: el gate lo corre el leader.
+
+### Los 11 rojos que quedan, todos del bloque 3 y ninguno tapado
+
+Ninguno está en `tests/guards/`. Son **listas cerradas** de `design.md > 0.10`, cada una con su
+task explícita en el bloque 3, que esta tanda no debía tocar:
+
+| Rojo | Lista | Task | Desde cuándo |
+| --- | --- | --- | --- |
+| `proveedores-schema.test.ts` (4) | `SUPPLIER_COLUMNS`, `SUPPLIER_CATALOG_LINE_COLUMNS`, `CROSS_MODULE_SCALARS` | **T20** | bloque 0: `companyId` entró en los dos modelos |
+| `scope.test.ts` censo de campos (1) | campos de `model Supplier` y de `model SupplierCatalogLine` | **T18** | bloque 0, mismo motivo |
+| `scope.test.ts` marcas (1) | `MARCAS_DE_INVENTARIO` | **T19** | **esta tanda**, y estaba **previsto**: es el falso positivo que `design.md > 6.3` anticipó al detalle — la marca por la palabra suelta `findRefs` es genérica y se pone roja por la costura legítima hacia `unidades`. Se **retensa**, no se relaja |
+| `module-contract.test.ts` (3) | `ADAPTADORES_CON_ORM` | **T23** | **esta tanda**: `company-scope.ts` es el tercer archivo del módulo que tipa un `WhereInput` de Prisma. También previsto (`design.md > 0.10`, fila 13: «de dos a tres archivos») |
+| `proveedores-constraints.int.test.ts` (2) | censo de columnas y censo de FK de las dos tablas | **T21** | bloque 0: las columnas y las cuatro FK nuevas |
+
+Los cuatro rojos **nuevos** de esta tanda los predijo el spec nombre por nombre antes de
+escribirse una línea. No se ha relajado ninguna lista ni se ha añadido ninguna excepción: se dan
+de alta a mano en el bloque 3, que es donde el spec las pone.
+
+### Dos matices de los arreglos mecánicos de tests, para el reviewer
+
+1. **`rawInsert` de `proveedores-constraints.int.test.ts` inyecta la columna de empresa** cuando
+   la llamada no la trae, en vez de repetirla en unas catorce llamadas sueltas. Es una función
+   de apoyo del test, no de producción, y ningún caso de ese archivo ejercita la ausencia de esa
+   columna —eso vive en `company-scope.int.test.ts`, que es T29/T30 y no existe todavía—.
+2. **`rawInsertLine` de `catalog-line.int.test.ts` pasó a ser `async`**: resuelve la empresa de
+   la línea a partir del proveedor real en vez de asumir una empresa fija, para que la FK
+   compuesta nueva no rechace inserts que antes de esta ficha eran válidos.
+
+### Nada que contradiga el spec
+
+No hay ningún hallazgo que obligue a contradecir una decisión cerrada. La tabla de 19 decisiones
+no se tocó. No entró ninguna dependencia de terceros. Ningún mensaje de commit de esta rama
+contiene la marca que las dos guardias del diff filtran (T27 sigue viva).
+
+### Lo que NO se hizo
+
+- El resto del bloque 3 (T14, T15, T17-T25), el bloque 4 y el bloque 5 enteros. En particular el
+  E2E `aislamiento-proveedores.spec.ts` (T31) y los tests que cierran formalmente el mapa
+  `R<n> -> test` de los bloques 1 y 2.
+- El gate: lo corre el leader.

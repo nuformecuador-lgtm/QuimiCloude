@@ -293,6 +293,9 @@ interface SupplierSeed {
   readonly email?: string | null
   readonly createdBy?: string | null
   readonly updatedBy?: string | null
+  /** Por defecto, la empresa de andamiaje comun del archivo. Un caso que compare DOS
+   *  empresas -mismo nombre, empresas distintas- la pasa explicita. */
+  readonly companyId?: string
 }
 
 /**
@@ -309,6 +312,7 @@ async function createSupplier(tx: Prisma.TransactionClient, seed: SupplierSeed):
       email: seed.email ?? null,
       createdBy: seed.createdBy ?? null,
       updatedBy: seed.updatedBy ?? null,
+      companyId: seed.companyId ?? (await andamiajeCompanyId(tx)),
     },
     select: { id: true },
   })
@@ -341,6 +345,7 @@ async function createLine(
   const line = await tx.supplierCatalogLine.create({
     data: {
       supplierId,
+      companyId: await andamiajeCompanyId(tx),
       name,
       nameNormalized: name.toLowerCase().replace(/[^a-z0-9]/gu, ''),
       presentationId,
@@ -378,6 +383,7 @@ type WritableColumn =
   | 'name_normalized'
   | 'phone'
   | 'email'
+  | 'company_id'
   | 'created_by'
   | 'updated_by'
   | 'supplier_id'
@@ -403,6 +409,15 @@ function rawInsert(
   const entries = Object.entries(columns) as [WritableColumn, Prisma.Sql][]
   const names = entries.map(([name]) => Prisma.raw(`"${name}"`))
   const values = entries.map(([, value]) => value)
+
+  // `company_id` es NOT NULL en las dos tablas de esta feature y ningun caso de este
+  // archivo prueba SU ausencia -eso vive en `company-scope.int.test.ts`-, asi que se anade
+  // aqui, no en cada llamada: lo contrario obligaria a los treinta casos existentes a
+  // repetirlo.
+  if (!('company_id' in columns)) {
+    names.push(Prisma.raw('"company_id"'))
+    values.push(asUuid(companyId))
+  }
 
   names.push(Prisma.raw('"updated_at"'))
   values.push(Prisma.sql`CURRENT_TIMESTAMP`)
@@ -445,6 +460,10 @@ function sleep(ms: number): Promise<void> {
 
 // ---------------------------------------------------------------------------
 
+/** Empresa unica del archivo: `suppliers.company_id` y `supplier_catalog_lines.company_id`
+ *  son NOT NULL desde esta ficha. Ningun caso de este archivo compara empresas entre si. */
+let companyId: string
+
 beforeAll(async () => {
   const tables = await prisma.$queryRaw<{ tablename: string }[]>`
     SELECT tablename FROM pg_tables
@@ -455,6 +474,8 @@ beforeAll(async () => {
         'supplier_catalog_lines). Corre `pnpm run db:migrate` antes de estos tests.',
     )
   }
+
+  companyId = await andamiajeCompanyId(prisma)
 })
 
 afterAll(async () => {
@@ -474,6 +495,7 @@ describe('estructura del proveedor', () => {
           nameNormalized: `quimicosdelpacifico${marker}`,
           phone: '+57 300 111 2233',
           email: `contacto.${marker}@proveedor.test`,
+          companyId: await andamiajeCompanyId(tx),
         },
         select: { id: true },
       })
@@ -521,6 +543,7 @@ describe('estructura del proveedor', () => {
           nameNormalized: `solotelefono${marker}`,
           phone: '+57 300 222 3344',
           email: null,
+          companyId: await andamiajeCompanyId(tx),
         },
         select: { id: true },
       })
@@ -530,6 +553,7 @@ describe('estructura del proveedor', () => {
           nameNormalized: `solocorreo${marker}`,
           phone: null,
           email: `solo.${marker}@proveedor.test`,
+          companyId: await andamiajeCompanyId(tx),
         },
         select: { id: true },
       })
@@ -555,6 +579,7 @@ describe('estructura del proveedor', () => {
           nameNormalized: `contelefono${marker}`,
           phone: '+57 300 333 4455',
           email: null,
+          companyId: await andamiajeCompanyId(tx),
         },
         select: { id: true },
       })
@@ -567,6 +592,7 @@ describe('estructura del proveedor', () => {
           nameNormalized: `concorreo${marker}`,
           phone: null,
           email: `con.${marker}@proveedor.test`,
+          companyId: await andamiajeCompanyId(tx),
         },
         select: { id: true },
       })
@@ -579,6 +605,7 @@ describe('estructura del proveedor', () => {
           nameNormalized: `conlosdos${marker}`,
           phone: '+57 300 444 5566',
           email: `dos.${marker}@proveedor.test`,
+          companyId: await andamiajeCompanyId(tx),
         },
         select: { id: true },
       })
@@ -609,6 +636,7 @@ describe('estructura del proveedor', () => {
           nameNormalized: `paraactualizar${marker}`,
           phone: '+57 300 555 6677',
           email: null,
+          companyId: await andamiajeCompanyId(tx),
         },
         select: { id: true },
       })
@@ -639,7 +667,13 @@ describe('estructura del proveedor', () => {
       expect(email).toHaveLength(500)
 
       const { id } = await tx.supplier.create({
-        data: { name, nameNormalized: name, phone: '+57 300 666 7788', email },
+        data: {
+          name,
+          nameNormalized: name,
+          phone: '+57 300 666 7788',
+          email,
+          companyId: await andamiajeCompanyId(tx),
+        },
         select: { id: true },
       })
 
@@ -667,6 +701,7 @@ describe('estructura del proveedor', () => {
           nameNormalized: `primero${marker}`,
           phone: sharedPhone,
           email: sharedEmail,
+          companyId: await andamiajeCompanyId(tx),
         },
         select: { id: true },
       })
@@ -676,6 +711,7 @@ describe('estructura del proveedor', () => {
           nameNormalized: `segundo${marker}`,
           phone: sharedPhone,
           email: sharedEmail,
+          companyId: await andamiajeCompanyId(tx),
         },
         select: { id: true },
       })
@@ -688,6 +724,7 @@ describe('estructura del proveedor', () => {
           nameNormalized: `correoraro${marker}`,
           phone: null,
           email: `no-es-un-correo-${marker}`,
+          companyId: await andamiajeCompanyId(tx),
         },
         select: { id: true },
       })
@@ -775,6 +812,7 @@ describe('auditoria, baja y marcas de tiempo del proveedor', () => {
           email: `baja.${marker}@proveedor.test`,
           createdBy: autor,
           updatedBy: autor,
+          companyId: await andamiajeCompanyId(tx),
         },
         select: { id: true },
       })
@@ -847,6 +885,7 @@ describe('auditoria, baja y marcas de tiempo del proveedor', () => {
           phone: '+57 300 222 3300',
           createdBy: autor,
           updatedBy: autor,
+          companyId: await andamiajeCompanyId(tx),
         },
         select: { id: true },
       })

@@ -2,6 +2,7 @@ import { requirePermission, type Actor } from './actor';
 import { SupplierNotFoundError, ValidationError } from './errors';
 import { createListQuerySchema, sanitizeListQuery } from './list-query';
 import { SUPPLIER_CATALOG_LINE_QUERYABLE } from './supplier-catalog-line-queryable';
+import type { SupplierScope } from './supplier-scope';
 
 import type { CatalogLineView } from './catalog-line-view';
 import type { Page } from './page';
@@ -56,13 +57,15 @@ export function createListCatalogLines(
   ): Promise<Page<CatalogLineView>> {
     requirePermission(actor, 'proveedores.consultar');
 
+    const scope: SupplierScope = { companyId: actor.companyId };
+
     const parsed = listQuerySchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
 
     const { query, ignored } = sanitizeListQuery(parsed.data, SUPPLIER_CATALOG_LINE_QUERYABLE);
     deps.log.ignoredFields(LIST_NAME, ignored);
 
-    const page = await deps.catalog.listBySupplierAlive(supplierId, query);
+    const page = await deps.catalog.listBySupplierAlive(supplierId, query, scope);
     if (page === 'supplier_not_found') throw new SupplierNotFoundError();
 
     return page;

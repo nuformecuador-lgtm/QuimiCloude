@@ -54,6 +54,7 @@ const {
   deleteCatalogLineMock,
   listCatalogLinesMock,
   getSessionUserMock,
+  getSessionContextMock,
 } = vi.hoisted(() => ({
   createSupplierMock: vi.fn(),
   updateSupplierMock: vi.fn(),
@@ -65,6 +66,7 @@ const {
   deleteCatalogLineMock: vi.fn(),
   listCatalogLinesMock: vi.fn(),
   getSessionUserMock: vi.fn(),
+  getSessionContextMock: vi.fn(),
 }))
 
 // QC-71 (T7, R7, R13): el adaptador driving pide a la composicion la LECTURA de la cabecera
@@ -77,7 +79,7 @@ const { REQUEST_ID_DE_PRUEBA, readRequestIdHeaderMock } = vi.hoisted(() => {
 
 vi.mock('@/lib/composition', () => ({
   observabilidad: { readRequestIdHeader: readRequestIdHeaderMock },
-  identity: { getSessionUser: getSessionUserMock },
+  identity: { getSessionUser: getSessionUserMock, getSessionContext: getSessionContextMock },
   proveedores: {
     createSupplier: createSupplierMock,
     updateSupplier: updateSupplierMock,
@@ -100,6 +102,8 @@ const ADMIN_SESSION_USER = {
   roleName: 'Administrador',
   permissions: ['proveedores.consultar', 'proveedores.modificar'],
 }
+
+const ADMIN_SESSION_CONTEXT = { companyId: '22222222-2222-4222-8222-222222222222' }
 
 const SUPPLIER_ID = '33333333-3333-4333-8333-333333333333'
 const PRESENTATION_ID = '44444444-4444-4444-8444-444444444444'
@@ -156,6 +160,7 @@ const ACTION_FILES = ['supplier-actions.ts', 'supplier-catalog-actions.ts'] as c
 beforeEach(() => {
   vi.clearAllMocks()
   getSessionUserMock.mockResolvedValue(ADMIN_SESSION_USER)
+  getSessionContextMock.mockResolvedValue(ADMIN_SESSION_CONTEXT)
 })
 
 describe('Server Actions de proveedores — actor, forma de entrada y errores', () => {
@@ -175,6 +180,7 @@ describe('Server Actions de proveedores — actor, forma de entrada y errores', 
 
     const ESPERADO = {
       id: 'user-admin-1',
+      companyId: ADMIN_SESSION_CONTEXT.companyId,
       permissions: ['proveedores.consultar', 'proveedores.modificar'],
     }
 

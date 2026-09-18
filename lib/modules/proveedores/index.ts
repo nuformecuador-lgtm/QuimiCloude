@@ -8,6 +8,7 @@
 // caso de uso, que es lo que `lib/composition` necesita para cablearlas y lo que las
 // Server Actions necesitan para tipar su entrada y reconocer sus errores.
 export { requirePermission, type Actor } from './domain/actor';
+export { type SupplierScope } from './domain/supplier-scope';
 // QC-70 (R17, R18): `NotFoundError` se partio en `SupplierNotFoundError` y
 // `CatalogLineNotFoundError` -un codigo con un solo mensaje no podia decir a la vez «el
 // proveedor» y «la linea»- y `DuplicateNameError` paso a `SupplierDuplicateNameError`.

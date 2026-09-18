@@ -1,5 +1,6 @@
 import { requirePermission, type Actor } from './actor';
 import { SupplierDuplicateNameError, ValidationError } from './errors';
+import type { SupplierScope } from './supplier-scope';
 import { createSupplierSchema } from './supplier-input';
 import { normalizeSupplierName } from './supplier-name';
 
@@ -34,6 +35,10 @@ export function createCreateSupplier(
   ): Promise<{ id: string }> {
     requirePermission(actor, 'proveedores.modificar');
 
+    // La empresa sale del ACTOR y jamas de la entrada: nadie puede elegir dar de alta en
+    // nombre de otra.
+    const scope: SupplierScope = { companyId: actor.companyId };
+
     const parsed = createSupplierSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
 
@@ -47,6 +52,7 @@ export function createCreateSupplier(
       { ...parsed.data, nameNormalized: normalizeSupplierName(parsed.data.name) },
       actor.id,
       now(),
+      scope,
     );
 
     // R15: el duplicado llega como resultado discriminado del puerto -lo tradujo el

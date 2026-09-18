@@ -32,8 +32,13 @@ import type { SupplierRepository } from '@/lib/modules/proveedores/ports/supplie
 // autorizado tiene los dos codigos de `proveedores`; el Operador conserva su nombre porque su
 // conjunto es EXACTAMENTE el que le siembra el seed —solo `inventario.consultar`—, que no abre
 // nada de este modulo.
-const ADMIN: Actor = { id: 'admin-1', permissions: ['proveedores.consultar', 'proveedores.modificar'] };
-const OPERADOR: Actor = { id: 'operador-1', permissions: ['inventario.consultar'] };
+const COMPANY_ID = '99999999-9999-4999-8999-999999999999';
+const ADMIN: Actor = {
+  id: 'admin-1',
+  companyId: COMPANY_ID,
+  permissions: ['proveedores.consultar', 'proveedores.modificar'],
+};
+const OPERADOR: Actor = { id: 'operador-1', companyId: COMPANY_ID, permissions: ['inventario.consultar'] };
 const SUPPLIER_ID = '22222222-2222-4222-8222-222222222222';
 
 function paginaVacia<T>(): Page<T> {
@@ -70,7 +75,7 @@ function montarCatalogo(
 }
 
 /** La consulta que llego al puerto de proveedores en la ultima llamada. */
-function consultaRecibida(recibidas: readonly (readonly [ListQuery])[]): ListQuery {
+function consultaRecibida(recibidas: readonly (readonly [ListQuery, ...unknown[]])[]): ListQuery {
   const ultima = recibidas.at(-1);
   if (ultima === undefined) throw new Error('el puerto no fue llamado');
   return ultima[0];
@@ -78,7 +83,7 @@ function consultaRecibida(recibidas: readonly (readonly [ListQuery])[]): ListQue
 
 /** La consulta que llego al puerto del catalogo (segundo argumento). */
 function consultaDelCatalogo(
-  recibidas: readonly (readonly [string, ListQuery])[],
+  recibidas: readonly (readonly [string, ListQuery, ...unknown[]])[],
 ): ListQuery {
   const ultima = recibidas.at(-1);
   if (ultima === undefined) throw new Error('el puerto no fue llamado');

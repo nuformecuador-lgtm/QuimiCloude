@@ -801,8 +801,8 @@ export const proveedores = {
   // `productCatalog` NO se borra ni se toca: sigue arriba, cableado, porque `recetas` lo
   // usa en tres de sus casos de uso. Lo que desaparece son las dos lineas que se lo
   // pasaban a `proveedores`.
-  createCatalogLine: createCreateCatalogLine({ catalog: supplierCatalogRepository }),
-  updateCatalogLine: createUpdateCatalogLine({ catalog: supplierCatalogRepository }),
+  createCatalogLine: createCreateCatalogLine({ catalog: supplierCatalogRepository, units: unitCatalog }),
+  updateCatalogLine: createUpdateCatalogLine({ catalog: supplierCatalogRepository, units: unitCatalog }),
   deleteCatalogLine: createDeleteCatalogLine({ catalog: supplierCatalogRepository }),
   listCatalogLines: createListCatalogLines({
     catalog: supplierCatalogRepository,

@@ -1,11 +1,15 @@
 import { requirePermission, type Actor } from './actor';
 import { updateCatalogLineSchema } from './catalog-line-input';
 import { CatalogLineNotFoundError, DuplicateCatalogLineError, ValidationError } from './errors';
+import type { SupplierScope } from './supplier-scope';
 
 import type { SupplierCatalogRepository } from '../ports/supplier-catalog-repository';
 
+import type { UnitCatalog } from '@/lib/modules/unidades';
+
 export type UpdateCatalogLineDeps = {
   readonly catalog: SupplierCatalogRepository;
+  readonly units: UnitCatalog;
   /** Ver el comentario identico de `create-supplier.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
 };
@@ -24,9 +28,12 @@ export type UpdateCatalogLineDeps = {
  * Lo UNICO que nunca cambia es el proveedor, y no por un `if`: ni el esquema de entrada ni
  * el tipo del puerto (`CatalogLineFields`) pueden EXPRESARLO.
  *
- * Este caso de uso no consulta ningun catalogo de articulos, presentaciones ni unidades: la
- * existencia de la presentacion y la unidad la cierra la FK (`design.md > 6.2`). Y no toca
- * ningun dato del proveedor: no tiene repositorio con que hacerlo.
+ * Este caso de uso no consulta ningun catalogo de articulos ni de presentaciones: su
+ * existencia y su pertenencia a la empresa las cierra la FK compuesta de la base
+ * (`design.md > 6.2`). La unidad si se pregunta -SOLO cuando la entrada trae una-, por el
+ * mismo motivo que en `create-catalog-line.ts`: una FK compuesta no puede aceptar a la vez
+ * las unidades de sistema y las de la empresa. Y no toca ningun dato del proveedor: no tiene
+ * repositorio con que hacerlo.
  */
 export function createUpdateCatalogLine(
   deps: UpdateCatalogLineDeps,
@@ -40,8 +47,16 @@ export function createUpdateCatalogLine(
   ): Promise<void> {
     requirePermission(actor, 'proveedores.modificar');
 
+    const scope: SupplierScope = { companyId: actor.companyId };
+
     const parsed = updateCatalogLineSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
+
+    const unitId = parsed.data.unitId ?? null;
+    if (unitId !== null) {
+      const unitRefs = await deps.units.findRefs([unitId], actor.companyId);
+      if (unitRefs.length === 0) throw new ValidationError();
+    }
 
     // R10: «no indicado» se convierte en AUSENCIA explicita antes de salir del dominio. El
     // puerto recibe `null`, nunca `undefined`: la diferencia entre «no lo mandaron» y «lo
@@ -52,7 +67,7 @@ export function createUpdateCatalogLine(
       {
         name: parsed.data.name,
         presentationId: parsed.data.presentationId,
-        unitId: parsed.data.unitId ?? null,
+        unitId,
         imagePath: parsed.data.imagePath ?? null,
         cost: parsed.data.cost,
         minPurchase: parsed.data.minPurchase ?? null,
@@ -60,6 +75,7 @@ export function createUpdateCatalogLine(
       },
       actor.id,
       now(),
+      scope,
     );
 
     // R24, R15: renombrar hacia una combinacion que ya usa otra linea VIVA del mismo
