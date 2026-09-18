@@ -194,9 +194,9 @@ function rowByNumber(page: Page, numberText: string): Locator {
 
 /**
  * Recorre las paginas de la lista hasta encontrar la fila del correlativo pedido. Hace falta
- * porque la pantalla NO tiene busqueda (R20, `ORDER_QUERYABLE.searchable` es `false`) y la base
- * es compartida: aunque se pida por fecha descendente, otro worker puede haber empujado la fila
- * a la segunda pagina. De paso ejercita la paginacion de QC-55 en un navegador de verdad.
+ * porque la pantalla todavia no tiene caja de busqueda y la base es compartida: aunque se pida
+ * por fecha descendente, otro worker puede haber empujado la fila a la segunda pagina. De paso
+ * ejercita la paginacion de QC-55 en un navegador de verdad.
  */
 async function findOrderRow(page: Page, numberText: string): Promise<Locator> {
   const next = page.getByTestId('data-table-next');

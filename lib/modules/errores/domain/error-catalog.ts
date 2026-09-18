@@ -51,6 +51,7 @@ export const ERROR_MESSAGE_KEY = {
   order_assignment_not_found: 'errors.order_assignment_not_found',
   user_not_assignable: 'errors.user_not_assignable',
   batch_duplicate_lot: 'errors.batch_duplicate_lot',
+  ai_unavailable: 'errors.ai_unavailable',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -124,4 +125,6 @@ export const ERROR_MESSAGES_ES = {
   'errors.user_not_assignable': 'No se puede asignar a una persona cuya cuenta no esta activa.',
   // «En esta empresa» porque el lote es unico por empresa, no en toda la base.
   'errors.batch_duplicate_lot': 'Ya existe un lote con ese valor en esta empresa.',
+  'errors.ai_unavailable':
+    'La lectura automatica no esta disponible en este momento. Intentalo mas tarde.',
 } as const satisfies Record<ErrorMessageKey, string>;

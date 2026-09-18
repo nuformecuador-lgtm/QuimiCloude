@@ -88,9 +88,17 @@ y el 2026-09-11 costaron cuatro paradas y una suite E2E entera caída sin que na
 | `Module '@prisma/client' has no exported member 'Prisma'` | versiones de Prisma peleadas | un `generate` que faltaba tras montar el worktree |
 | `Cannot find name 'LayoutProps'` | un problema de Next | los tipos de ruta sin generar |
 | `Cannot find module 'resend'` | **una dependencia metida sin aprobar** (regla 7) | estaba aprobada, documentada y en `package.json`; el `node_modules` del árbol principal se quedó corto tras el merge |
+| `TypeError: Cannot read properties of undefined (reading 'clear')` en `window.localStorage.clear()` (proyecto `ui`) | un mock de storage roto en ese test | Node 22+ expone su propio `localStorage`/`sessionStorage` global y pisa el de jsdom; en Node 26 viene activo por defecto. `vitest.config.mts` ya pasa `--no-experimental-webstorage` al worker del proyecto `ui`, así que nadie debería verlo — si vuelve, es que algo corre ese proyecto sin pasar por esta config |
+| `expected '23001' to be '23503'` en tests de `tests/integration/**` que borran una fila referenciada por FK con `RESTRICT` | el código de error cambió, o el test está mal | la base local corre en Postgres 18, y sobre 18.6 se reproduce que el `RESTRICT`/`NO ACTION` de una FK reporta `23001` (`restrict_violation`) donde 9 tests de esta rama esperan `23503` (`foreign_key_violation`); no se verificó aquí el changelog exacto de Postgres 18 que lo motiva, solo que 18.6 lo hace y 17 es el objetivo del proyecto (decisión humana, 2026-09-18: Supabase aún no está conectado y su canal estable es 17) |
+| Retrato de catálogo con una fila de más en `pg_constraint` tras correr `down.sql` (`company-scope.int.test.ts` de proveedores y de recetas, «9 vs 10») | el `down.sql` dejó una restricción sin borrar | en Postgres 18 las restricciones `NOT NULL` (p. ej. `suppliers_company_id_not_null`) pasan a tener su propia fila en `pg_constraint` (`contype = 'n'`), algo que no existe en 17; el retrato se escribió asumiendo 17 |
 
 El tercero es el que justifica la regla por sí solo: un síntoma de entorno **acusando a otra
 sesión de saltarse una regla del arnés**. De ahí a «arreglar» algo que no está roto hay un paso.
+
+**Versión objetivo de Postgres: 17**, no la que trae la instalación local. Ambas filas de arriba se
+reprodujeron el 2026-09-18 contra Postgres 18.6 (`SELECT version()`); ninguna toca código de
+producción ni de test para adaptarse a 18 — el remedio es correr la base local en 17, no mover la
+meta.
 
 **Coste medido el 2026-09-12**, no estimado: 12 s de `prisma generate` más 5 s de `next typegen`
 en régimen estable; **128 s la primera vez** tras cambiar el esquema. Sobre el gate completo

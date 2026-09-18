@@ -32,6 +32,7 @@ export const ORDER_EXECUTION_TITLE_TESTID = 'order-execution-title';
 export const ORDER_EXECUTION_RECIPE_NAME_TESTID = 'order-execution-recipe-name';
 
 const RECIPE_MISSING_TEXT = 'Esta receta esta dada de baja.';
+const MIN_STEP_SECONDS = 5;
 
 type FinishFormState = { readonly status: 'idle' } | FinishAssignedOrderResult;
 
@@ -79,6 +80,7 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
           steps={execution.steps}
           title={execution.numberText}
           onFinish={() => formRef.current?.requestSubmit()}
+          minStepSeconds={MIN_STEP_SECONDS}
         />
       </div>
 

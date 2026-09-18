@@ -972,7 +972,7 @@
       "epic_name": "Pedidos",
       "name": "busqueda-y-total-en-el-listado-de-pedidos",
       "description": "El listado de pedidos es la unica de las siete listas del ERP que no busca. QC-57 lo dejo con searchable:false a proposito y lo escribio en ORDER_QUERYABLE: la tabla orders no tiene columna name, y el nombre de la receta no vive ahi -lo resuelve el caso de uso pidiendoselo al modulo de recetas, con una consulta por pagina-. Esta ficha le da a pedidos lo que le falta, y son dos cosas que caen en la misma consulta.\n\nBUSCAR POR NOMBRE DE RECETA. Escribir \"buffer\" devuelve los pedidos cuya receta se llama asi. Se aplica sobre el conjunto completo y nunca sobre la pagina ya traida, como manda el contrato generico de QC-57, e ignora acentos y mayusculas igual que las otras seis listas. Que la comparacion se resuelva cruzando tablas o denormalizando el nombre en orders es decision del diseno, no de esta descripcion.\n\nEL TOTAL DEL PEDIDO, CALCULADO EN EL SERVIDOR. Hoy la consulta devuelve cantidad y precio unitario por separado y nadie multiplica. QC-34 dejo esto escrito como su pregunta abierta 3 y lo remitio a la pantalla; al acotar QC-35 el 2026-09-06 se decidio que el total se muestra, pero que lo calcula el servidor y NO la pantalla: los dos importes son Decimal(14,4) y multiplicarlos con el tipo numerico de JavaScript pierde precision, mientras que en el servidor Prisma ya opera decimales. La consulta devuelve el total como cadena decimal, igual que los otros dos importes. Asi NO entra decimal.js ni ninguna otra dependencia nueva.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO: si el total tambien se puede ordenar y filtrar. Anadirlo a ORDER_QUERYABLE obliga a que exista como expresion en la base, no solo en la salida.\n\nLA MIGRACION LLEVA SU DOWN y los indices que la busqueda necesite, mismo criterio con el que QC-57 metio los suyos: ordenar o buscar por un campo sin indice es el anti-patron que el reviewer rechaza en cuanto las tablas crezcan.\n\nLos tests que hoy pasan tienen que seguir pasando.\n\nLA PANTALLA VA APARTE. QC-35 se especifico y se construye SIN busqueda y SIN total, por decision del humano del 2026-09-06, justamente para no quedar bloqueada por esta ficha ni nacer con una caja de busqueda y una columna que no hacen nada. Enchufar las dos cosas en la pantalla de pedidos es una ficha de frontend posterior, que se crea cuando esta este done.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
@@ -1371,8 +1371,8 @@
       "epic": "QC-18",
       "epic_name": "Inventario",
       "name": "ajuste-de-inventario",
-      "description": "Corregir la existencia de un producto registrando un MOVIMIENTO de ajuste que suma o resta, en vez de sobrescribir un numero.\n\nNace el 2026-09-10 al acotar QC-90 con /afinar-feature. La pregunta que la destapo fue concreta: alguien carga 100 bidones por error y la existencia ya no vive en el producto sino en los lotes. El humano eligio el ajuste de inventario frente a las dos alternativas -editar el lote en una pantalla propia, o dejar que la edicion del producto tocara el ultimo lote-.\n\nPOR QUE VA DETRAS DE QC-91: mientras la existencia siga siendo un numero editable en el producto, el ajuste no tiene nada que resolver. Se vuelve necesario justo cuando la existencia pasa a ser la suma de los lotes.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO:\n\n* Si el ajuste se hace sobre un LOTE concreto o sobre el producto, y en ese segundo caso de que lote sale la diferencia.\n* Si el motivo del ajuste es obligatorio y si sale de una lista cerrada -merma, rotura, conteo fisico, error de carga- o es texto libre.\n* Que permiso lo corta: si basta `inventario.modificar` o el ajuste merece uno propio.\n* Si el movimiento es una tabla nueva de movimientos de inventario -que hoy NO existe- o solo una correccion registrada sobre el lote.\n* Si el ajuste puede dejar la existencia en negativo, y que pasa con los lotes ya consumidos.\n\n",
-      "status": "pending",
+      "description": "Corregir la existencia de un LOTE registrando un MOVIMIENTO que suma o resta, en vez de sobrescribir un numero a ciegas. Nace una tabla de movimientos de inventario -que hoy NO existe- y el alta de lote pasa a asentar tambien en ella. El producto gana un panel que LISTA SUS LOTES y despliega el historial de cada uno. ACOTADA EL 2026-09-17 con /afinar-feature: 16 decisiones cerradas, CERO preguntas abiertas, en specs/QC-92-ajuste-de-inventario/requirements.md. Se ajusta sobre un LOTE concreto; motivo obligatorio de conjunto cerrado que crece sin migrar; basta `inventario.modificar`; `product_batches.stock` sigue siendo el numero de verdad y el movimiento es su historial; el libro empieza hoy, sin asientos retroactivos; no puede quedar en negativo. LA GUARDIA R21 DE QC-91 HAY QUE AJUSTARLA deliberadamente. RIESGO DECLARADO: el libro y el stock pueden divergir; se cierra con una guardia, que es requisito. E2E obligatorio y a mano: el gate no corre Playwright. NO ENTRA: consumo por lote y aviso de vencimiento (pregunta 2 del dominio, sin ficha); pantalla propia de ajustes; conversion de unidades (QC-63); la unidad como identidad (QC-121).",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "high",
       "zone": "fullstack",
@@ -1614,10 +1614,10 @@
       "epic": "QC-105",
       "epic_name": "Documentos e IA",
       "name": "lectura-de-pdf-con-gemini",
-      "description": "Integracion con Google Gemini Flash, detras de un puerto, que lee un PDF y recibe PROMPTS PERSONALIZADOS.\n\nDOS MODOS DE LECTURA: el PDF tal cual, o convertido a imagen (reutiliza la conversion de endpoint-de-carga-de-pdf) para que la IA pueda identificar imagenes.\n\nDEPENDENCIA NUEVA: @google/genai. No se instala sin aprobacion humana ni sin los cuatro checks (regla 7).\n\nLO QUE NO ENTRA: la estrategia catalogo/formula (procesamiento-de-pdf-por-estrategia) y la deteccion de coordenadas, recorte y subida de imagenes (recorte-de-imagenes-del-pdf).\n\nABIERTO, se acota con /afinar-feature: que pasa si Gemini no responde o tarda, donde vive la clave, como se prueba sin red (el gate corre sin red).",
-      "status": "pending",
+      "description": "Integracion con Google Gemini Flash, detras de un puerto, que lee un PDF y recibe PROMPTS PERSONALIZADOS.\n\nDOS MODOS DE LECTURA: el PDF tal cual, o convertido a imagen (reutiliza la conversion de endpoint-de-carga-de-pdf) para que la IA pueda identificar imagenes.\n\nDEPENDENCIA NUEVA: @google/genai. No se instala sin aprobacion humana ni sin los cuatro checks (regla 7).\n\nLO QUE NO ENTRA: la estrategia catalogo/formula y sus archivos de prompt (procesamiento-de-pdf-por-estrategia); la deteccion de coordenadas, recorte y subida de imagenes (recorte-de-imagenes-del-pdf); la cola, el estado por archivo y los REINTENTOS (procesamiento-de-pdf-en-cola); la pantalla (componente-de-carga-de-archivos).\n\nACOTADA EL 2026-09-18 con /afinar-feature. SEIS DECISIONES CERRADAS:\n\n1. PLAZO: 60 s por lectura, escrito en UNA SOLA definicion del modulo. Al agotarse falla ESE archivo. CERO reintentos aqui: son de procesamiento-de-pdf-en-cola, que ya los tiene declarados abiertos. Dos capas reintentando multiplican el gasto en silencio.\n2. ERROR: codigo NUEVO ai_unavailable, OCTAVA enmienda al catalogo cerrado de QC-70, con plan B escrito (caer a unexpected). La aprueba el humano en F1.4. Distingue un corte del proveedor de un bug nuestro.\n3. RETORNO: TEXTO PLANO, tal cual lo escribio la IA. Interpretarlo es de quien lo pide; es lo que procesamiento-de-pdf-por-estrategia necesita hoy.\n4. CLAVE: UNA SOLA del despliegue, por variable de entorno, declarada VACIA en .env.example y leida en la invocacion, nunca al importar. Sin clave por empresa y sin tabla. Heredado de endpoint-de-carga-de-pdf.\n5. QUIEN INVOCA: capacidad INTERNA. Sin Server Action, sin ruta y sin pantalla; la ejecuta el trabajo de la cola por dentro. El permiso lo corta quien sube el PDF, donde endpoint-de-carga-de-pdf ya lo valida. E2E diferido con motivo: no anade recorrido navegable.\n6. MODELO: el nombre del modelo vive en una VARIABLE DE ENTORNO, obligatoria. Si falta, la lectura falla con error explicito y NO cae a un modelo escrito a mano en el codigo.\n\nHEREDADO y no se reabre: modulo documentos con puerto + adaptador driven y cableado solo en lib/composition; verificacion SIN RED con doble del puerto; CERO filas en base; zod en el borde e identificadores en ingles. La conversion a imagen NO se re-implementa: se reutiliza el PdfConverter que ya existe.\n\nLos cuatro checks de @google/genai, corridos el 2026-09-18 y los cuatro limpios: sin deprecated, 2.23.0 del 2026-09-16, licencia Apache-2.0, 22.1M descargas semanales. La fila en docs/dependencias.md y la instalacion esperan a F1.4.\n\nLO QUE SIGUE ABIERTO, y no se rellena con supuestos: como saca recorte-de-imagenes-del-pdf las coordenadas si el retorno es texto plano (se decide alli, que ya lo tiene abierto); que nadie valida si la IA alucina; y que el gasto no se mide ni tiene tope por empresa.",
+      "status": "done",
       "sdd": true,
-      "complexity": null,
+      "complexity": "high",
       "zone": "backend",
       "branch": "feature/QC-108-lectura-de-pdf-con-gemini",
       "depends_on": [
@@ -1772,6 +1772,21 @@
       "spec_path": "specs/QC-117-menores-de-la-re-review-de-qc-95"
     },
     {
+      "key": "QC-119",
+      "id": 119,
+      "epic": "QC-118",
+      "epic_name": "Canal WhatsApp",
+      "name": "webhook-whatsapp-recepcion",
+      "description": "Hace falta un endpoint POST que reciba los mensajes que Meta envia por el webhook de WhatsApp Business, para que el sistema se entere de lo que escriben los clientes y pueda procesarlos despues. Meta reintenta los envios, asi que un mismo mensaje puede llegar mas de una vez; y cualquiera puede llamar a la URL, asi que solo deben aceptarse los que realmente vienen de Meta. Responder al usuario (con el bot o manualmente) va aparte.",
+      "status": "cancelled",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-119-webhook-whatsapp-recepcion",
+      "depends_on": [],
+      "spec_path": "specs/QC-119-webhook-whatsapp-recepcion"
+    },
+    {
       "key": "QC-120",
       "id": 120,
       "epic": "QC-27",
@@ -1785,6 +1800,23 @@
       "branch": "feature/QC-120-rendimiento-de-la-receta",
       "depends_on": [],
       "spec_path": "specs/QC-120-rendimiento-de-la-receta"
+    },
+    {
+      "key": "QC-121",
+      "id": 121,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "unidad-como-identidad-del-item",
+      "description": "Nace el 2026-09-17, de una decision del humano durante la implementacion de QC-91 (que NO se reabre: cierra con lo aprobado).\n\nLA REGLA: el nombre de un producto SE PUEDE DUPLICAR, pero si las unidades no concuerdan se trata como un ITEM DIFERENTE. Dicho al reves: un producto tiene UNA sola unidad, y un lote en otra unidad no entra en el: es otro producto.\n\nCONSECUENCIA DIRECTA, y es el motivo de la ficha: si un producto solo puede tener una unidad, la existencia vuelve a ser UN SOLO NUMERO, y `products.stock` puede volver como columna calculada por el back (la suma de los lotes). El humano lo pidio con este ejemplo: 3 lotes de 5 -> stock 15.\n\nMEDIDO EN DISCO EL 2026-09-17, antes de escribir nada:\n\n* El nombre YA se puede duplicar: NO existe indice unico sobre `products.name` ni sobre `products.name_normalized`, solo indices de busqueda (`products_name_idx`, `products_name_normalized_trgm_idx`). A diferencia de presentaciones, que si tiene `presentations_name_normalized_key`. Esa mitad de la regla no exige trabajo.\n* El producto NO tiene unidad propia: la hereda de la presentacion de su lote mas reciente (`latestBatchUnitId`, QC-80). Hoy nada impide un lote en kg y otro en L sobre el mismo producto.\n* `products.stock` fue retirada por QC-91 (migracion `20260917120000_drop_product_stock`, con su `down.sql`).\n\nLO QUE ENTRA:\n\n* Rechazar en el alta de lote una unidad que no case con la del producto, con su codigo de error propio. Esto DEROGA la decision D7 de QC-91, que decia expresamente «sin rechazar nada en el alta».\n* Devolver `products.stock` como columna calculada por el back al cambiar los lotes. Queda por acotar si se recalcula al escribir o se deriva al leer, y que pasa con los productos que hoy ya tienen lotes en dos unidades.\n* Revisar que la existencia por unidad que QC-91 construyo (`sumStockByUnit`, `ProductStockByUnit`) degenere limpiamente a un solo valor. NO se tira: es correcta en los dos mundos, y por eso QC-91 cerro sin rehacerse.\n\nLO QUE NO ENTRA: ajuste de inventario (QC-92), conversion entre unidades (QC-63).\n\nQUEDA POR ACOTAR con /afinar-feature antes del spec: si `products.stock` se guarda o se deriva; que pasa con los productos ya existentes con lotes en dos unidades; si el rechazo es en el alta del lote, en el alta del producto o en ambos; y si duplicar el nombre necesita algun aviso en la pantalla, ahora que deja de ser accidental y pasa a ser la forma prevista de tener «el mismo producto en otra unidad».\n",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-121-unidad-como-identidad-del-item",
+      "depends_on": [
+        "QC-91"
+      ],
+      "spec_path": "specs/QC-121-unidad-como-identidad-del-item"
     },
     {
       "key": "QC-122",
@@ -1817,6 +1849,21 @@
       "branch": "feature/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio",
       "depends_on": [],
       "spec_path": "specs/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio"
+    },
+    {
+      "key": "QC-125",
+      "id": 125,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "espera-minima-por-paso",
+      "description": "En la pantalla donde el Operador ejecuta la receta de un pedido asignado (QC-63), cada paso exige que pasen **5 segundos** antes de poder avanzar. Mientras no pasan, el boton de avanzar esta deshabilitado y la pantalla muestra una cuenta regresiva. Al avanzar, el cronometro se reinicia para el paso nuevo.\n\n**SOLO EN LA EJECUCION DEL OPERADOR.** El lector de pasos es un componente compartido que tambien usa la vista previa del formulario de recetas. Ahi NO hay espera. El comportamiento se activa desde la pantalla de ejecucion y no afecta a nadie mas.\n\n**DECISIONES CERRADAS CON EL HUMANO EL 2026-09-18:**\n\n* **Comenzar es abrir la pantalla.** No se anade ningun boton «Comenzar»: los 5 s del paso 1 empiezan a correr al abrir el pedido, que ya lo pone EN_CURSO.\n* **Siempre 5 s por paso.** Si el operario vuelve atras con Anterior y luego avanza otra vez, el paso le vuelve a exigir los 5 s.\n* **Finalizar tambien espera.** El ultimo paso se trata igual que los demas.\n* **La espera se suma al bloqueo que ya existe.** Hoy no se avanza sin marcar todos los elementos del paso (QC-64). Para avanzar tienen que cumplirse las dos cosas: los elementos marcados y los 5 s cumplidos.\n* **La cuenta regresiva usa el componente compartido CountdownTimer** (components/shared/countdown-timer.tsx), que ya esta construido en la rama feat/cronometro-shared y se incorpora a esta ficha.\n\n**LO QUE NO ENTRA:**\n\n* Validar la espera en el servidor. Hoy el servidor no conoce el paso actual: el avance es solo de cliente, y registrarlo es QC-82.\n* Configurar la duracion por receta o por paso. Son 5 s fijos.\n* Botones de pausa o reinicio del cronometro.",
+      "status": "in_progress",
+      "sdd": true,
+      "complexity": "low",
+      "zone": "frontend",
+      "branch": "feature/QC-125-espera-minima-por-paso",
+      "depends_on": [],
+      "spec_path": "specs/QC-125-espera-minima-por-paso"
     }
   ]
 }

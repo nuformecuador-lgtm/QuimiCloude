@@ -5,6 +5,9 @@
  *
  * **Sexta enmienda, el 2026-09-15 (QC-81)**: `batch_duplicate_lot`.
  * Aprobada por el humano el 2026-09-15 en la puerta F1.4 de QC-81.
+ *
+ * **Octava enmienda, el 2026-09-18**: `ai_unavailable`.
+ * Aprobada por el humano el 2026-09-18.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -56,6 +59,9 @@ export const ERROR_CODES = [
   // Distinto de `invalid_input`: la entrada tiene la forma correcta y choca con la unicidad
   // `(empresa, lote)` de la base.
   'batch_duplicate_lot',
+  // Distinto de `unexpected`: la entrada era correcta, lo que fallo es que el proveedor de IA no
+  // respondio o agoto el plazo.
+  'ai_unavailable',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

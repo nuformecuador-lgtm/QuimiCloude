@@ -122,7 +122,8 @@ function almacen() {
       const guardado = visible(id, scope)
       return guardado === null ? null : { ...guardado.row, status: guardado.status }
     }),
-    listAlive: vi.fn(async (_query: unknown, scope: OrderScope) => {
+    // La aridad refleja la del puerto: el ambito se lee del ultimo argumento.
+    listAlive: vi.fn(async (_query: unknown, _recipeIds: readonly string[] | null, scope: OrderScope) => {
       const items = [...filas.values()]
         .filter((g) => !g.deleted && g.companyId === scope.companyId)
         .map((g) => g.row)

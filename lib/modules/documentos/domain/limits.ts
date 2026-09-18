@@ -67,3 +67,19 @@ export const PROVIDER_UPLOAD_LINK_TTL_SECONDS = 2 * 60 * 60;
  * configurar el bucket; comprobarlo desde el codigo seria fingir una garantia que no existe.
  */
 export const MAX_PDF_BYTES = 20 * 1024 * 1024;
+
+/**
+ * Cuanto espera, como maximo, una lectura con IA antes de darse por fallida.
+ *
+ * En segundos, como el resto de plazos de este archivo (`READ_LINK_TTL_SECONDS`,
+ * `PROVIDER_UPLOAD_LINK_TTL_SECONDS`). Sesenta segundos es tiempo de sobra para que un modelo
+ * multimodal lea un PDF de hasta 20 MB o hasta 50 paginas rasterizadas, y corto para que un
+ * proveedor colgado no deje una lectura viva indefinidamente.
+ *
+ * Vive aqui, y no junto a quien la usa, por el mismo motivo que el resto de este archivo: un
+ * plazo repetido en dos sitios se desincroniza en silencio el dia que uno de los dos cambia.
+ *
+ * Este numero es solo el plazo de UNA llamada. Si esa llamada se repite o no ante un fallo lo
+ * decide quien orquesta el trabajo por lotes, no este modulo.
+ */
+export const AI_READ_TIMEOUT_SECONDS = 60;

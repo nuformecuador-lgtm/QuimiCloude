@@ -3981,3 +3981,175 @@ llegado de `dev` que nunca vio el cambio—. El mapa de trazabilidad se re-midi�
 `Transaction API error: Unable to start a transaction in the given time` —pool agotado, no
 aserción—; aislado pasó 3/3 y en la repetición del gate pasó. Saturación, con otras dos sesiones
 trabajando en la misma máquina.
+
+## QC-59 — aislamiento-por-empresa-en-proveedores (cerrada el 2026-09-17, PR #84, merge `b8e3d5e`)
+
+**Cierra el arco multiempresa**: proveedores era el último módulo sin acotar —inventario QC-49,
+unidades QC-76, pedidos QC-60, recetas QC-50— y con él **se desbloquea QC-61**. La viñeta de deuda
+de `docs/architecture.md` que los enumeraba **se borró entera**, no se dejó vacía.
+**38/38 tasks, 39/39 requisitos con test, sin dependencias nuevas.**
+
+**La decisión de fondo, y es la que la distingue de sus tres hermanas**: QC-52 había cortado a
+propósito el puerto de `proveedores` hacia `inventario`, así que la frontera de la presentación
+**la pone la base**, con dos claves foráneas compuestas —`(empresa, presentación)` y
+`(empresa, proveedor)`— en vez de una consulta. Cero acoplamiento nuevo, verificado por grep.
+Eso obliga a que **la línea gane columna de empresa**, apartándose de QC-50: lejos de traer el
+riesgo que allí se evitaba —dos datos que se contradicen—, la segunda clave **lo elimina**.
+Cuesta **dos índices únicos redundantes** `(company_id, id)`, uno en una tabla de `inventario`;
+sin ellos Postgres rechaza la FK con `42830`, comprobado quitándolos en una transacción.
+
+**La unidad no se puede cerrar por ahí** —una FK compuesta no sabe decir «la de sistema o la mía»—,
+así que se valida en el service consumiendo un catálogo que **ya llegó acotado** desde QC-50.
+
+**La trampa heredada volvió a estar ahí**: `suppliers_name_unique` es **PARCIAL**, como el de
+recetas. Afirmado desde tres ángulos independientes y los tres comprobados falsables.
+
+**Ninguna lista se aflojó en 23 anclajes.** El spec anticipaba catorce; siete no estaban previstos
+y **dos ni siquiera existían como listas cerradas** —eran `toContain` sueltos— y quedaron como
+censos `toEqual`. Una sola aserción eliminada en todo el diff, sustituida por otra más estricta.
+
+**Una enmienda al diseño, ratificada por el humano**: `dev` había dado a las otras tres migraciones
+de empresa una salida temprana sobre base vacía (`38252c5`) y esta se quedó fuera **por accidente
+de calendario**. Sin ella, sobre una base vacía la migración abortaba: **ningún test de integración
+corría y no se podía levantar un entorno nuevo**. Se añadió el mismo `RETURN` verbatim, se
+enmendaron `design.md > 7.2` y `> 7.3` con nota fechada, y **se escribió el test que faltaba** —el
+hueco que la review señaló—: la guardia de empresa unívoca sigue abortando en cuanto hay una fila.
+
+**Lo que más enseña, y no es del código**: el gate completo cazó una lista cerrada que **cinco
+tandas y 22 anclajes no vieron**, porque su valor correcto **solo era conocible después del merge**
+—el E2E no existía cuando se tensaron las listas, y `dev` movió el número por su cuenta—. Y dos
+subagentes se plantaron con razón: uno **se negó a seguir T15** porque habría aflojado una lista, y
+otro **revirtió sus propias citas de ficha** antes de commitear.
+
+**Verificación**: gate completo verde (530 archivos, 7769 tests, 0 rojos) con la máquina en reposo.
+E2E verde en Chromium y WebKit —el diálogo de borrado **sí** era ejercitable, y la sustitución del
+id se repite en la fase de **captura** del `submit`, porque React reescribe el `defaultValue` y sin
+eso el verde sería falso—. Review aprobada con **0 bloqueantes**.
+
+## QC-108 — lectura-de-pdf-con-gemini (cerrada el 2026-09-18, PR #87, merge `1a95e9a`)
+
+**Primera integración con una IA del repo**, y la que desbloquea la épica *Documentos e IA*: de
+QC-108 colgaban en cadena QC-109, QC-111, QC-110 y QC-107. Lee un PDF con Gemini Flash detrás de un
+puerto, con prompt personalizado y dos modos —el PDF tal cual o sus páginas ya convertidas a
+imagen—, **reutilizando el `PdfConverter` que QC-106 dejó montado**. Devuelve el texto tal cual lo
+escribió la IA. **14/14 tasks, 27/27 requisitos con test, una dependencia nueva aprobada.**
+
+**Es una capacidad interna a propósito**: sin pantalla, sin ruta y sin Server Action. La invocará
+por dentro el trabajo de la cola de QC-111. De ahí que el E2E quede diferido con motivo —no añade
+recorrido navegable— y que el permiso lo siga cortando quien sube el PDF, donde QC-106 ya lo valida.
+
+**Las seis decisiones se cerraron ANTES del spec** con `/afinar-feature`, y la ficha lo pedía por
+escrito: plazo de 60 s sin reintentos aquí —son de QC-111, y dos capas reintentando multiplican el
+gasto en silencio—; código nuevo `ai_unavailable`; retorno en texto plano; una sola clave del
+despliegue; capacidad interna; y **el nombre del modelo en una variable de entorno obligatoria, sin
+respaldo en el código**, porque un id escrito a mano deja de existir sin avisar.
+
+**El bloqueante que enseña, y lo encontró el reviewer**: un fallo de NUESTRO convertidor salía
+etiquetado como corte del proveedor. `conDiagnostico` relanzaba `Error` plano, así que un PDF
+corrupto acababa con `code: 'ai_unavailable'` —y un comentario de producción afirmaba lo contrario—.
+Tocaba **R10** de frente: la pantalla de QC-107 habría culpado a Google de un bug propio. Se arregló
+en la causa, repartiendo el `code` por operación, **sin añadir ningún código nuevo**. El reviewer no
+se fió de los tests: **mutó el código** y comprobó que los tres casos nuevos caen.
+
+**El segundo bloqueante lo causó el leader**, y queda escrito para que no se repita: su encargo
+mandaba escribir la enmienda «con el mismo formato que la sexta (QC-81)», y esa línea cita la ficha.
+`docs/conventions.md > Comentarios` prohíbe citar fichas en producción **y además** dice «nunca se
+imita el estilo de alrededor», que es exactamente la regla que evita este contagio. Peor: un test
+nuevo clavaba las citas con dos `toContain`, convirtiendo la infracción en obligación.
+
+**El punto ciego se cerró donde nació**: el reviewer encontró que el `code` del tope de páginas no
+lo fijaba ningún test —cambió su constructor y 19 archivos siguieron verdes—, la misma forma del
+agujero que dejó pasar el bloqueante 1. Se cerró con mutación de por medio antes del PR.
+
+**Límite confirmado leyendo la API real, no supuesto**: el docblock de `abortSignal`
+(`genai.d.ts:5900-5905`) dice que abortar es **solo-cliente**, no cancela en el servicio y **la
+llamada se cobra igual**. Por eso el plazo de 60 s lo impone el dominio con `Promise.race` y un
+`TimeoutRunner` inyectable, y el de la librería va **además**, no en lugar de. El `design.md` lo
+había declarado DESCONOCIDO por escrito —se escribió sin red y sin `node_modules`— y se cerró
+cuando el paquete estuvo en disco, con cita de archivo y línea.
+
+**Dependencia**: `@google/genai` 2.23.0, cuatro checks limpios, **aislada en un solo archivo** detrás
+del puerto `AiReader`. La guardia de dependencias es **bidireccional**: una fila sin paquete
+instalado es un fantasma que deja el gate rojo igual que un paquete sin fila, así que fila e
+instalación aterrizan juntas.
+
+**El conflicto con QC-68 se resolvió midiendo, no prometiendo.** `design.md > 7` solo ofrecía
+esperar, dejar el cableado fuera o mergear a mano, porque razonaba **sobre el archivo**. El leader
+cruzó los dos diffs: QC-68 mete 2 líneas en el bloque de `recetas` (`:182`, `:882`) y QC-108 escribe
+al final del bloque `documentos` (`:1083-1155`). **Sin solape de hunks**, así que se siguió entero.
+El resultado fue `13 0` en `git diff --numstat`: trece añadidas, cero borradas.
+
+**Tres rojos, tres especies distintas, y conviene no confundirlas.** `product-page` y
+`ciclo-de-vida-de-la-base` fueron **falsos, por carga** —868 s y 489 s frente a ~300 s, verdes en
+aislamiento— y **ninguno entró al baseline**. Los censos de dependencias de QC-75 y de unidades son
+**ajenos y conocidos**, ya en el baseline desde que `resend` los rompió en QC-79; se amplió el motivo
+de la entrada de QC-75 para nombrar el segundo caso. Y `order-form` era **real y ajeno, nacido ese
+mismo día**: el PR #85 cambió la pantalla a dos decimales, adaptó los casos vecinos y se dejó uno
+esperando `-0.201`. Se arregló aquí por decisión del humano, en commit propio y declarado en el PR,
+en vez de mandarlo al baseline —que habría apagado los 33 casos del archivo—.
+
+**Un conflicto de merge que no era de código**: GitHub marcó el PR `CONFLICTING` y el único archivo
+en disputa era `progress/current.md`, chocando **entero** porque un lado estaba en CRLF y el otro en
+LF. Se resolvió normalizando los tres lados y rehaciendo el merge a tres bandas; quedó un solo
+conflicto real, puramente aditivo, y se conservaron las dos filas.
+
+**Verificación**: gate completo verde (`== init OK ==`), **7880 tests pasan**, 2 rojos y los dos en
+el baseline. Dos vueltas de reviewer: rechazo con 2 bloqueantes, aprobación en la segunda.
+
+**Deuda declarada, con dueño**: R24 no queda limpio —cuatro helpers privados en español copiados de
+`convert-pdf.ts`, ya en `dev`; renombrar solo aquí dejaría el módulo hablando dos idiomas—; el E2E
+va a QC-107; y tres cabeceras que el reviewer mantiene que no pasan la regla de longitud.
+
+## QC-68 — busqueda-y-total-en-el-listado-de-pedidos (cerrada el 2026-09-18, PR #86, merge `e68a66a`)
+
+El listado de pedidos busca por nombre de receta. `orders` no tiene columna de nombre, así que el
+término se traduce a ids de receta **antes** de tocar el repositorio y esa lista acota el `where`:
+sin JOIN y con consultas constantes —3 por página sin búsqueda, 4 con ella—, tenga la página 1 fila
+o 25. Se descartó denormalizar el nombre en `orders`. La búsqueda encuentra también los pedidos de
+recetas dadas de baja, porque la lista ya muestra ese nombre; de ahí el índice GIN de trigramas
+**sin `WHERE`** (el de QC-57 es parcial y no servía).
+
+**La ficha se partió al escribir el spec**: afirmaba que la consulta devuelve cantidad y precio por
+separado, y el `spec_author` verificó que `orders` tiene un solo decimal —el precio lo borró
+QC-35bis—. El total no tenía con qué multiplicarse. Por decisión del humano nació **QC-123** con el
+precio, **QC-122** con la caja de búsqueda en pantalla y su E2E de importes.
+
+**El hallazgo de la ficha: el censo diecinueve era una guardia de seguridad.** Los dieciocho
+anteriores eran comentarios y conteos que afirmaban que pedidos no busca. El diecinueve fue
+`tests/unit/pedidos/company-isolation-service.test.ts` (QC-60 R16), que exige `{ companyId }` como
+**último argumento** de los seis métodos del puerto y que el `recipeIds` nuevo desplazaba. Además
+`order-repository.ts` lo documenta por escrito y una segunda guardia lo vigila. Se cerró
+**reordenando la firma a `listAlive(query, recipeIds, scope)`** —enmienda fechada al spec, aprobada
+por el humano— en vez de tensar la guardia: las dos quedaron intactas. Se descartaron
+explícitamente «tensar el aserto» y «excepción acotada», por aflojar una guardia ajena.
+
+**Dos requisitos estaban mal dados por cubiertos, y esa es la lección transferible.** R6 se
+demostraba **«por partes»**: tres tests cubrían cada uno un trozo del enunciado, el mapa no dejaba
+ninguna casilla vacía y **nadie ejercitaba el requisito entero**. R13 se mapeaba a una comprobación
+a mano, que no es un test. Los dos ganaron casos propios. El caso de R6 sobre el pedido borrado deja
+la receta **viva a propósito**, que es lo que lo distingue de R4 y lo que hace que pruebe la
+conjunción; el del pedido ajeno comprueba que la fila **existe** antes de afirmar el cero.
+
+**El conteo de índices del spec estaba caducado**: pedía 34→35 y en disco eran 33→34, porque cayeron
+dos índices con QC-91 y QC-35bis. Se contó en disco en vez de copiar la cifra.
+
+**Dos menores de la review eran el mismo defecto que la ficha perseguía, cometido dentro de ella**:
+el docblock de `listAlive` seguía diciendo «un solo parámetro» —desmentido por las cuatro líneas que
+la propia rama le añadió debajo— y una frase repetida en cuatro sitios prometía que el test de
+integración demuestra el número de consultas SQL, cuando **ese test no existe**. Se quitó la frase
+en vez de inventar el test. De ahí la regla que quedó escrita: **añadir prosa a un bloque obliga a
+releer el bloque entero**, y una nota que promete un test debe nombrarlo con archivo y caso.
+
+**Verificación**: gate rápido verde al cierre (173 archivos, 2746 tests). El gate completo pasó por
+dos rojos ajenos, ninguno de la rama y los dos con ficha propia en vez de baseline —listarlos habría
+apagado 60 casos—: **QC-126** (intermitente de jsdom en la tabla de usuarios, `Not implemented:
+navigation to another Document`, que **no** es la especie de QC-58 y podría ser un defecto real) y
+**QC-127** (el caso que el PR #85 dejó sin actualizar), que **murió sola** al sincronizar, arreglada
+en QC-108.
+
+**Tres deudas del arnés, para `/afinar-regla`**: (1) la cautela sobre no correr integración estaba
+**generalizada de más** y frenó la ficha toda la jornada —lo inseguro en paralelo es
+`db:migrate:create`, no el runner, que corre contra una copia efímera en segundos—; (2)
+«demostrado por partes» debería contar como **pendiente** para el reviewer; (3) la bitácora de una
+ficha puede quedar **partida entre el árbol principal y su worktree**, y aquí chocó en tres merges
+seguidos.

@@ -9,9 +9,10 @@
  * importar de otro modulo por una ruta profunda es justo lo que
  * `docs/architecture.md > La regla de dependencias` prohibe. Si cambia una, cambian las tres.
  *
- * `normalizedSearchCondition` se conserva aunque `orders` NO busque (R17,
- * `ORDER_QUERYABLE.searchable === false`): las tres copias son la misma, y podarla aqui las
- * haria divergir sin que nada avise. El adaptador de pedidos simplemente no la llama.
+ * `normalizedSearchCondition` se conserva sin que el adaptador de pedidos la llame: las tres
+ * copias son la misma, y podarla aqui las haria divergir sin que nada avise. `orders` no tiene
+ * columna de nombre propia -la busqueda de pedidos casa por el nombre de la receta, resuelto en
+ * otro modulo-, asi que aqui no hay nada sobre lo que aplicarla.
  *
  * Las funciones son PURAS y devuelven objetos planos; no tocan el cliente Prisma. Por eso se
  * pueden probar sin base, aunque quien demuestra que la traduccion dice lo que se cree es el

@@ -10,6 +10,17 @@ const alias = { '@': rootDir }
 
 const exclude = ['node_modules/**', '.next/**', '.worktrees/**', 'dist/**', 'e2e/**']
 
+// Desde Node 22 el proceso trae su propio `localStorage`/`sessionStorage` global
+// (Web Storage), y en Node 26 esta activo por defecto: pisa el que jsdom monta en
+// `window` para este proyecto, así que `window.localStorage.clear()` cae sobre un
+// objeto que no tiene los métodos de Storage. `--no-experimental-webstorage` se lo
+// pide al worker vía `execArgv` (nadie tiene que exportar NODE_OPTIONS a mano). Node
+// < 22 no reconoce el flag y aborta con "bad option": por eso se comprueba antes de
+// pasarlo.
+const workerExecArgv = process.allowedNodeEnvironmentFlags.has('--no-experimental-webstorage')
+  ? ['--no-experimental-webstorage']
+  : []
+
 // Tres entornos, una sola config (decision humana del 2026-08-06, ver
 // `progress/current.md > Conflictos pendientes`). Las features 1 y 7 corrieron en
 // paralelo y cada una monto Vitest por su cuenta: la 1 con `environment: 'node'`
@@ -44,6 +55,7 @@ export default defineConfig({
           // sola vez en la raiz seria una apuesta sobre la herencia que sale verde si
           // pierdes. Lo vigila `tests/guards/guard-teclear-y-plazo.test.ts` (QC-58, R1).
           testTimeout: 15_000,
+          execArgv: workerExecArgv,
           setupFiles: ['./tests/setup.ts'],
           include: ['tests/**/*.test.tsx', 'tests/ui/**/*.test.ts'],
           exclude,

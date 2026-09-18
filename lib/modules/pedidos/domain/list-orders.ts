@@ -99,9 +99,9 @@ function pruneClosedSelects(query: ListQuery): {
  *   6. Ids DEDUPLICADOS con `Set` y UNA llamada al catalogo de recetas, con todos los ids de la
  *      pagina a la vez (R45).
  *
- * DOS consultas por pagina -eran tres hasta el 2026-09-07, cuando la unidad salio del pedido y
- * con ella la consulta a `unidades`-, tenga la pagina 1 fila o 25. El test lo demuestra CONTANDO
- * invocaciones: comprobar solo el resultado pasaria verde con un bucle de diez consultas.
+ * DOS invocaciones de puerto por pagina sin busqueda (repositorio + catalogo de nombres) y TRES
+ * con busqueda (mas el catalogo de ids), tenga la pagina 1 fila o 25. El test lo demuestra
+ * CONTANDO invocaciones: comprobar solo el resultado pasaria verde con un bucle de diez consultas.
  *
  * QC-57 R25: **`status` y `priority` dejan de ser parametros propios** y entran como filtros
  * `select` del contrato, opcionales y combinables como siempre. Se conserva que un pedido
@@ -109,9 +109,9 @@ function pruneClosedSelects(query: ListQuery): {
  * los que no salen nunca son los BORRADOS, filtro que es del puerto (R40) y que no depende de
  * lo que traiga la consulta.
  *
- * QC-57 R17: **`orders` NO busca.** No tiene columna `name`, `ORDER_QUERYABLE.searchable` es
- * `false` y `sanitizeListQuery` omite la busqueda y la anota; la consulta devuelve la lista
- * como si no se hubiera buscado.
+ * `orders` no tiene columna de nombre propia, asi que la busqueda casa por el nombre de la
+ * receta del pedido: el termino se traduce a una lista de ids de receta con el catalogo de
+ * `recetas` ANTES de llamar al repositorio, y esa lista es la que acota el `where`.
  *
  * Este archivo NO calcula `offset`, `limit` ni `totalPages`, y no puede: `domain/` no importa
  * `lib/shared/**` y R37 prohibe reimplementar esa aritmetica dentro de `pedidos`. Quien la
@@ -137,7 +137,15 @@ export function createListOrders(
     const podada = pruneClosedSelects(saneada.query);
     deps.log.ignoredFields(LIST_NAME, [...saneada.ignored, ...podada.ignored]);
 
-    const page = await deps.orders.listAlive(podada.query, scope);
+    // El termino se resuelve a ids de receta ANTES de tocar el repositorio: `orders` no tiene
+    // columna de nombre y no puede buscar por si sola. `null` (sin busqueda) y `''` (sin
+    // termino) llegan igual a `listAlive`: ninguno de los dos filtra nada.
+    const searchRecipeIds =
+      podada.query.search === ''
+        ? null
+        : await deps.recipes.findIdsMatchingName(podada.query.search, actor.companyId);
+
+    const page = await deps.orders.listAlive(podada.query, searchRecipeIds, scope);
 
     // R45: los ids se DEDUPLICAN antes de preguntar. Diez pedidos de la misma receta son UNA
     // sola entrada, y el numero de consultas no crece con el numero de filas.

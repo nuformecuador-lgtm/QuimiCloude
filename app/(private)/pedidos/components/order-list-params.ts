@@ -28,10 +28,9 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
  * no declarado (QC-57 R5). Se acota igual por no depender de esa cortesia y para que la URL que
  * el usuario ve sea la que la consulta usa.
  *
- * **`search` no se lee ni se escribe NUNCA** (R20). `ORDER_QUERYABLE.searchable` es `false`, asi
- * que un termino de busqueda se omitiria en silencio y la lista devolveria todo como si no se
- * hubiera buscado. El campo existe en `DataTableParams` porque el contrato de lista lo tiene, y
- * esta pantalla lo emite **siempre** como cadena vacia, que es «sin busqueda».
+ * **`search` no se lee ni se escribe todavia**. Esta pantalla no tiene caja de busqueda: el campo
+ * existe en `DataTableParams` porque el contrato de lista lo tiene, y esta pantalla lo emite
+ * **siempre** como cadena vacia, que es «sin busqueda».
  */
 
 /**
