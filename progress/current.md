@@ -20,6 +20,12 @@
 
 ## Evaluaciones
 
+### QC-61 - acotada con `/afinar-feature` (2026-09-18)
+
+Alcance y **8 decisiones cerradas**, **cero abiertas**, en
+`.worktrees/QC-61-guardia-empresa-en-esquema/specs/QC-61-guardia-empresa-en-esquema/requirements.md`
+(sembrado DENTRO del worktree). No se copian aqui. **El board se corrigio ANTES de sembrar**: la `description` nombraba tres exentas (una, `users`, ya con empresa) y una lista de pendientes que naceria vacia. Quedan **ocho exentas** (incluida `recipe_lines`) y basta con que la columna exista. Ninguna ficha nueva ni cancelada. Sigue `pending`: la mueve el leader en F1.3.
+
 ### QC-68 - acotada con `/afinar-feature` (2026-09-17)
 
 Alcance, **8 decisiones cerradas** y **cero preguntas abiertas** en
