@@ -1718,7 +1718,7 @@
       "epic_name": "Plataforma",
       "name": "tabla-compartida-en-iphone-real",
       "description": "La T13 de QC-55 nunca se hizo: probar el componente en Safari de iOS REAL, con una tabla mas ancha que la pantalla y una columna fijada. QC-55 la paso a QC-56 y QC-56 la saca aqui (decision humana del 2026-09-15). La cobertura en jsdom y el E2E en WebKit de escritorio NO la sustituyen: docs/architecture.md > Regla: multiplataforma obliga a comprobar el scroll anidado en iOS, y el sticky dentro de un scroll anidado es el punto caliente del componente.\n\nQue se comprueba, en las nueve vistas que montan la tabla compartida -las ocho rutas que autoriza la guardia de alcance (pedidos, inventario, proveedores, presentaciones, unidades, usuarios, recetas, asignacion) mas la segunda pestana de usuarios, personas y grupos-: que la columna fijada se queda quieta, que el scroll es de la TABLA y no del body, y que el menu de cabecera se abre por toque. Se prueba contra el preview de Vercel del PR, en un iPhone con iOS 16 o superior, con datos sembrados hasta que la tabla desborde en horizontal y en vertical. La evidencia se escribe en docs/verificacion-ios/QC-114.md y viaja en el PR; capturas solo si algo falla. Si una vista falla, el arreglo NO entra aqui: nace como ficha nueva bloqueada por esta, y QC-114 cierra como \"probado, con hallazgos\".\n\nExige una PERSONA con un iPhone fisico: ningun agente puede hacerla. Si falla, lo que se revisa es el componente de QC-55, no la pantalla.\n\nVa despues de QC-56 para hacer una sola pasada sobre las nueve pantallas.",
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "complexity": "medium",
       "zone": "frontend",
