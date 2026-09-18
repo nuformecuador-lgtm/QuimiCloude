@@ -93,7 +93,7 @@
 
 ## Tanda 2 — el caso de uso
 
-- [ ] **T5 — La lectura: los dos modos y el texto tal cual.** Depende de T1, T2, T3 y T4.
+- [x] **T5 — La lectura: los dos modos y el texto tal cual.** Depende de T1, T2, T3 y T4.
       Archivos: `lib/modules/documentos/domain/read-pdf-with-ai.ts`,
       `tests/unit/documentos/read-pdf-with-ai.test.ts`.
       El orden **fijo** de `design.md > 1`: esquema → (si `images`) `countPages` y tope → `renderPages`
@@ -109,7 +109,7 @@
       **nombra la operación y la ruta**.
       Cubre **R2, R3, R4, R5, R6, R8 (lado forma del fallo), R23**.
 
-- [ ] **T6 — El plazo de 60 s y los CERO reintentos.** Depende de T5.
+- [x] **T6 — El plazo de 60 s y los CERO reintentos.** Depende de T5.
       Archivos: `lib/modules/documentos/domain/read-pdf-with-ai.ts` (el `TimeoutRunner` y su valor por
       defecto), `tests/unit/documentos/ai-timeout.test.ts`.
       El `Promise.race` por defecto del dominio, con limpieza del temporizador, y el `TimeoutRunner`
@@ -124,7 +124,7 @@
 
 ## Tanda 3 — los adaptadores driven (el único sitio que conoce al tercero)
 
-- [ ] **T7 [P] — Configuración perezosa y `.env.example`.** Depende de T3.
+- [x] **T7 [P] — Configuración perezosa y `.env.example`.** Depende de T3.
       Archivos: `lib/modules/documentos/adapters/driven/config/ai-config-env.ts`, `.env.example`
       (**bloque nuevo al final**), `tests/unit/documentos/ai-config.test.ts`.
       **Calcado** de `document-storage-config-env.ts`: los dos nombres viven **solo** como literales de

@@ -75,3 +75,38 @@ un test E2E pueda visitar — no hay pantalla, ni ruta, ni Server Action (R17, D
 capacidad interna que invocara por dentro el trabajo de la cola de QC-111. **El destinatario de la
 deuda es QC-107**, que es la ficha que trae la pantalla. Mismo criterio que QC-106 D17 y QC-25 D23.
 La verificacion de esta ficha es **unitaria** (R19), y se cita desde el mapa de trazabilidad.
+
+## Un SEGUNDO censo de dependencias en rojo, que NO he tocado — decision del leader
+
+Al cerrar la tanda 1 con `./init.sh --rapido`, la unica prueba roja de 349 archivos fue:
+
+    tests/unit/navegacion/qc75-convenciones.test.ts:425
+    "QC-75 R22 y decision cerrada «¿Libreria nueva? No»: dependencias nuevas en esta rama:
+     @google/genai"
+
+**Es el mismo fallo de diseno que el censo de QC-71, pero peor, y por eso no lo arreglo por mi
+cuenta.** El de QC-71 era un numero escrito a mano pensado para subirlo cuando una dependencia se
+aprueba, y el propio archivo tiene un comentario diciendo que es fragil: subirlo con su nota
+fechada **es** el procedimiento, y eso se hizo. El de QC-75 es distinto: compara `package.json`
+contra **el merge-base de la rama que se este ejecutando** y exige **cero** dependencias nuevas.
+Como la guardia no sabe en que rama corre, **afirma sobre QC-108 una decision cerrada de QC-75**
+(«¿Libreria nueva? No»), que es una decision que **nunca fue de esta ficha**. No hay numero que
+subir: cualquier rama posterior que anada una dependencia legitima, aprobada y con su fila, la
+pone en rojo.
+
+**Lo que NO hago, y por que:** no la silencio, no la salto y no la reescribo. Reescribirla es
+rediseñar la guardia de alcance de **otra** feature —acotarla a su propia rama, que es lo que
+deberia haber hecho desde el principio— y eso no cabe en el alcance de QC-108 ni en `tasks.md`.
+**Lo decide el leader.** Las tres salidas que veo, sin recomendar ninguna por mi cuenta:
+
+1. **Acotar la guardia a la rama de QC-75**, que es el arreglo correcto de raiz y el que evita
+   que la proxima dependencia aprobada vuelva a romperla. Es tocar una ficha ajena.
+2. **Anotarla en `tests/baseline-rojos.json`** con motivo y destinatario, si el arnes admite esa
+   salida para un rojo que no es de esta feature.
+3. **Ficha propia** para arreglar los dos censos a la vez —el de QC-71 y el de QC-75— porque son
+   la misma clase de error: un absoluto del repositorio escrito dentro de la guardia de alcance
+   de una feature concreta.
+
+La dependencia en si **esta limpia**: aprobada por el humano en F1.4, con los cuatro checks y con
+su fila en `docs/dependencias.md:36`. `tests/guards/guard-dependencias-aprobadas.test.ts` —que es
+la guardia que responde de verdad a «toda dependencia declarada esta aprobada»— **esta en verde**.
