@@ -575,3 +575,199 @@ No se corrio `./init.sh`, `./init.sh --rapido` ni `pnpm test` (fuera de alcance 
 comportamiento salvo por el aviso neutro del freno; typecheck y lint limpios; los tests de UI de
 las rutas tocadas (pedidos, proveedores, recetas, identity publico, shared, login, configuracion,
 inventario) pasan en solitario. No se marca `tasks.md`.
+
+## T12 y T17 — verificaciones de plataforma y latencia
+
+> Tareas manuales registradas (T12 puntos 1-3, T17). No se toco codigo de produccion ni tests.
+> Puerto usado: `3173` (libre, distinto de `3000`/`3117`). Sin credenciales de Upstash en esta
+> maquina: todo corre contra el contador EN MEMORIA. Servidores arrancados y matados uno por uno;
+> ningun proceso quedo vivo al terminar (verificado al final de cada punto).
+
+### T12, punto 1 — en `next dev`, el contador en memoria conserva la cuenta entre peticiones
+
+Arrancado con `RATE_LIMIT_LOGIN_MAX=3 pnpm exec next dev -p 3173` y esperado con un bucle de
+`curl` hasta `200`.
+
+Cuatro peticiones seguidas a `/login` con un origen de documentacion (RFC 5737)
+`x-forwarded-for: 198.51.100.10`:
+
+```
+$ curl -s -o /dev/null -w "status=%{http_code}\n" -H "x-forwarded-for: 198.51.100.10" http://localhost:3173/login
+status=200
+status=200
+status=200
+status=429
+```
+
+Cabeceras y cuerpo completos de la 4.a (la que da 429), sobre navegacion:
+
+```
+HTTP/1.1 429 Too Many Requests
+cache-control: no-store
+content-type: text/html; charset=utf-8
+Vary: Accept-Encoding
+```
+
+```
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Demasiados intentos. Prueba de nuevo más tarde</title>
+    ...
+```
+
+Sin `retry-after` ni `x-ratelimit-*` en esa respuesta (grep vacio sobre las cabeceras).
+
+POST con `next-action: x` a `/login` sobre el MISMO origen ya frenado (5.a peticion, sigue
+contando en la misma cuota de `login`):
+
+```
+$ curl -s -D - -o /tmp/qc73-429-action-body.txt -X POST -H "x-forwarded-for: 198.51.100.10" -H "next-action: x" http://localhost:3173/login
+HTTP/1.1 429 Too Many Requests
+cache-control: no-store
+content-type: text/plain
+```
+
+Cuerpo exacto: `Demasiados intentos. Prueba de nuevo más tarde`.
+
+`content-type` es literalmente `text/plain`, **sin** `; charset=utf-8` — la forma que N6 exige para
+que el cliente de Next reconozca el mensaje en vez de la pantalla de error generica.
+
+**Verificado.** El contador SI conserva la cuenta entre peticiones distintas del middleware dentro
+del mismo proceso de `next dev` (condicion de la que depende el E2E de T15, §8 del diseño).
+
+### T12, punto 2 — que `x-forwarded-for` ve el middleware, sin cabecera y con una del cliente
+
+Observado por EFECTO (no se toco codigo de produccion para loguear nada): dos orígenes explícitos
+distintos, con la misma cuota baja, se frenan cada uno en su propia cuenta; y varias peticiones SIN
+la cabecera comparten una cuenta comun.
+
+Origen B, IP distinta (`198.51.100.20`), cuota independiente de la del punto 1:
+
+```
+$ curl ... -H "x-forwarded-for: 198.51.100.20" http://localhost:3173/login   (x4)
+intento 1: status=200
+intento 2: status=200
+intento 3: status=200
+intento 4: status=429
+```
+
+Sin cabecera `x-forwarded-for` en absoluto (curl no la manda por defecto): la primera peticion sin
+cabecera del arranque del servidor ya habia consumido 1 de la cuota comun "desconocido"; las tres
+siguientes sin cabecera cierran la cuenta exactamente donde toca (3 = cuota):
+
+```
+$ curl -s -o /dev/null -w "..." http://localhost:3173/login   (x3, tras 1 peticion previa sin cabecera)
+intento sin-cabecera 1: status=200
+intento sin-cabecera 2: status=200
+intento sin-cabecera 3: status=429
+```
+
+Es decir: 1 (arranque) + 2 (200/200) = 3 consumidas, la 4.a peticion total sin cabecera (3.a de este
+bloque) da 429 — igual que las de origen explicito, confirmando que TODAS las peticiones sin
+cabecera caen en un contador COMUN, distinto del de cualquier IP explicita.
+
+**Verificado por efecto:** `next dev` deja pasar el valor de `x-forwarded-for` que manda el cliente
+tal cual (dos IPs explicitas = dos contadores separados); la ausencia de la cabecera cae en el
+origen comun "desconocido" (`design.md > 3`). Lo que NO se puede afirmar sin tocar codigo de
+produccion — y por tanto queda como **desconocido**, tal como pide la consigna — es si `next dev`
+en si AÑADE o reescribe algo sobre esa cabecera antes de que la vea el middleware; solo se observa
+el efecto de punta a punta (lo que curl envia vs. en que contador cae la peticion).
+
+### T12, punto 3 — `pnpm build` y `pnpm start`: el build del middleware carga con `@upstash/*`
+
+**BLOQUEO.** `pnpm run build` (`prisma migrate deploy && tsx scripts/seed.ts && next build`) llega
+hasta `next build` sin problema (migraciones y seed limpios) y falla ahi, ANTES de llegar a
+imprimir la tabla de rutas o el tamaño del middleware, por un error que **no tiene relacion con
+`@upstash/*`**:
+
+```
+Error: Turbopack build failed with 1 error:
+./node_modules/.pnpm/@napi-rs+canvas@1.0.9/node_modules/@napi-rs/canvas/js-binding.js
+Error: non-ecmascript placeable asset
+asset is not placeable in ESM chunks, so it doesn't have a module id
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@napi-rs+canvas@1.0.9/node_modules/@napi-rs/canvas/js-binding.js
+    ./node_modules/.pnpm/@napi-rs+canvas@1.0.9/node_modules/@napi-rs/canvas/index.js
+    ./lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf.ts
+    ./lib/composition/index.ts
+    ./app/(private)/configuracion/usuarios/page.tsx
+```
+
+Se repitio forzando webpack en vez de Turbopack (`pnpm exec next build --webpack`, sin tocar
+codigo) para descartar que fuera cosa del bundler por defecto: falla por la MISMA causa, el binario
+nativo de `@napi-rs/canvas` (esta vez el paquete de plataforma
+`@napi-rs/canvas-win32-x64-msvc/skia.win32-x64-msvc.node`) que ningun loader sabe empaquetar:
+
+```
+./node_modules/.pnpm/@napi-rs+canvas-win32-x64-msvc@1.0.9/node_modules/@napi-rs/canvas-win32-x64-msvc/skia.win32-x64-msvc.node
+Module parse failed: Unexpected character '�' (1:2)
+You may need an appropriate loader to handle this file type, currently no loaders are configured to process this file.
+
+Import trace for requested module:
+./node_modules/.pnpm/@napi-rs+canvas-win32-x64-msvc@1.0.9/node_modules/@napi-rs/canvas-win32-x64-msvc/skia.win32-x64-msvc.node
+./node_modules/.pnpm/@napi-rs+canvas@1.0.9/node_modules/@napi-rs/canvas/js-binding.js
+./node_modules/.pnpm/@napi-rs+canvas@1.0.9/node_modules/@napi-rs/canvas/index.js
+./lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf.ts
+./lib/composition/index.ts
+./lib/modules/inventario/adapters/driving/presentation-actions.ts
+```
+
+Ninguna de las dos trazas menciona `@upstash/*`, `uncrypto` ni `node:crypto`: el fallo es previo,
+en la conversion de PDF de QC-106 (`lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf.ts`,
+que arrastra `@napi-rs/canvas` via `lib/composition/index.ts`), no en el modulo de este ticket. Es
+pre-existente y ya estaba anotado como desconocido en
+`progress/impl_QC-106-endpoint-de-carga-de-pdf.md` («`@napi-rs/canvas` en el runtime de Vercel:
+DESCONOCIDO»), solo que alli nunca se habia corrido un `next build` completo para verlo materializarse
+localmente. No se intento arreglar (tocaria `next.config.ts` o el modulo de documentos, fuera del
+alcance y de las reglas de esta tanda).
+
+**Consecuencia:** no hay build de produccion utilizable en esta maquina, asi que **no se pudo
+generar** ni `pnpm start` ni la tabla de tamaños de rutas/middleware que este punto pedia. No se
+puede afirmar ni negar que el middleware cargue `@upstash/*` sin errores de `node:crypto`/`uncrypto`
+en un build real: queda **BLOQUEADO**, con el motivo de arriba, y arrastra a T17 (ver abajo).
+
+### T12, punto 4 — Vercel (pendiente, sin cuenta ni despliegue)
+
+**PENDIENTE**, tal como preveía `tasks.md`: sin cuenta de Upstash ni despliegue de preview en esta
+sesión, no se puede comprobar (a) si Vercel SOBRESCRIBE una `x-forwarded-for` falsa o la respeta;
+(b) si el `content-type` del 429 de Server Action llega en produccion exactamente `text/plain` sin
+que alguna capa de Vercel le añada `; charset=...`; (c) el nombre y valor real de `VERCEL_ENV` en
+runtime; (d) si cambiar una variable de entorno exige redeploy. Nada de esto se puede verificar sin
+red ni cuenta: se deja pendiente con motivo, sin darlo por verificado, y el leader lo lleva al PR
+(`design.md > 11`, puntos 1 y 5).
+
+### T17 — medir y anotar latencia
+
+**BLOQUEADO**, encadenado al punto 3: la tarea depende explícitamente de `pnpm start` (T12 punto
+3), y sin build de produccion no hay `pnpm start` que levantar en esta maquina. No se corrio el
+script de T16 contra un servidor de produccion.
+
+Se evaluo una alternativa para no dejar la tarea completamente vacia: correr el script contra
+`next dev` en su lugar. Se descarta explícitamente esa sustitucion porque `next dev` no representa
+la latencia real (recompilacion bajo demanda, sin las optimizaciones de `next build`) y la consigna
+pide la medida "real" del `pnpm start` del punto 3; unas cifras de `next dev` presentadas como
+medida de latencia serian enganosas, no una linea base valida. No se pegan cifras inventadas ni de
+`next dev` ni de Upstash.
+
+La medida contra Upstash sigue **pendiente** por el mismo motivo que ya preveía `design.md > 11`,
+punto 6: no hay cuenta de Upstash en esta sesion. El conteo de comandos de Upstash que consume una
+navegacion tipica (pregunta abierta 2) tampoco se pudo obtener: depende de tener el contador de
+Upstash en marcha.
+
+**Resumen para el PR:** T12 puntos 1 y 2 verificados con evidencia real arriba; punto 3 bloqueado
+por un fallo de build pre-existente y ajeno a `@upstash/*` (rastreado a QC-106); punto 4 pendiente
+por falta de cuenta/despliegue; T17 bloqueado en cascada por el punto 3, sin cifras de latencia de
+ningun tipo que anotar en esta tanda.
+
+### Procesos
+
+Todo arrancado y detenido en esta misma tanda: `next dev -p 3173` (arrancado con
+`RATE_LIMIT_LOGIN_MAX=3 pnpm exec next dev -p 3173`, matado con `taskkill //PID <pid-de-escucha-en-3173> //T //F`
+tras las pruebas del punto 1 y 2). `next build` y `next build --webpack` terminaron solos (con
+error) y no dejaron proceso de servidor arriba. Verificado al final: ningun proceso de `next`
+escuchando en `3173` (ni en `3000`/`3117`, que son de otros worktrees y no se tocaron).
