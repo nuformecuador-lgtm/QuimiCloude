@@ -21,7 +21,7 @@
 | `normalizeRecipeName` está en el **contrato público** de `recetas` | `lib/modules/recetas/index.ts:39` |
 | El índice de búsqueda de recetas es **PARCIAL**: `WHERE deleted_at IS NULL` | `db/migrations/20260904160000_list_query_indexes/migration.sql:67` |
 | `orders_recipe_id_idx` ya existe | `db/schema.prisma:505` |
-| **No hay precio unitario en ninguna parte**: `Order` tiene un solo decimal, `quantity` | `db/schema.prisma:485-509`; ver `requirements.md > P1` |
+| **No hay precio unitario en ninguna parte**: `Order` tiene un solo decimal, `quantity`. Es lo que sacó el total de esta ficha (`> 5`) | `db/schema.prisma:485-509` |
 
 ---
 
@@ -51,7 +51,7 @@ CREATE INDEX "recipes_name_normalized_all_trgm_idx"
 DROP INDEX IF EXISTS "recipes_name_normalized_all_trgm_idx";
 ```
 
-**Por qué hace falta un índice más y no vale el que hay** (R19, `[D8]`, `[D2]`). QC-57 creó
+**Por qué hace falta un índice más y no vale el que hay** (R14, `[D8]`, `[D2]`). QC-57 creó
 `recipes_name_normalized_trgm_idx` **parcial**, con `WHERE deleted_at IS NULL`, porque el listado
 de recetas nunca muestra las de baja. Esta búsqueda **sí tiene que verlas** (`[D2]`), así que su
 `where` no lleva `deleted_at IS NULL` y el planificador **no puede usar el índice parcial**: un
@@ -79,11 +79,9 @@ borrar a mano** antes de aplicarla, exactamente como ya pasa con los otros seis.
 
 ### 1.2 Lo que NO entra en la base
 
-- **Ninguna columna `total`.** `[D1]` y QC-33 (pregunta 4 del dominio, cerrada): los cálculos de
-  dinero son internos y derivados, no se guardan, para que no puedan contradecir a sus factores
-  (R15).
 - **Ninguna columna `recipe_name_normalized` en `orders`.** Es la alternativa descartada, `> 4`.
-- **Ningún índice sobre el total.** No se ordena ni se filtra por él (`[D1]`, R16).
+- **Nada del total**: ni columna, ni índice, ni expresión calculada. Salió a QC-123 el 2026-09-17
+  (`> 5`).
 
 ---
 
@@ -187,8 +185,8 @@ tiene importada en su `list-query-sql.ts` local.
 `lib/modules/pedidos/domain/list-orders.ts` conserva su orden y gana **un paso entre el 4 y el 5**:
 
 ```
-1. requirePermission(actor, 'pedidos.consultar')        ← sin cambios (R17, [D6])
-2. scope = { companyId: actor.companyId }               ← sin cambios (R17, [D6])
+1. requirePermission(actor, 'pedidos.consultar')        ← sin cambios (R12, [D6])
+2. scope = { companyId: actor.companyId }               ← sin cambios (R12, [D6])
 3. zod                                                   ← sin cambios
 4. sanitizeListQuery(parsed, ORDER_QUERYABLE)            ← ahora `search` SOBREVIVE (R11)
    + pruneClosedSelects + log                            ← sin cambios
@@ -257,8 +255,8 @@ return {
 ```
 
 El mismo objeto sirve al `findMany` y al `count` — literalmente la misma constante, como ya hace
-`listAliveOrders` (`order-prisma.ts:461-472`) —, así que el `total` describe el conjunto **ya
-buscado** (R5).
+`listAliveOrders` (`order-prisma.ts:461-472`) —, así que el **total de resultados** describe el
+conjunto **ya buscado** (R5).
 
 **El adaptador de pedidos sigue sin llamar a `normalizedSearchCondition`**: `orders` no tiene
 columna de nombre y no la gana. La copia de `list-query-sql.ts` se queda como está, por el motivo
@@ -297,7 +295,9 @@ lectura, y sin lista de identificadores que crezca.
 
 **Lo que se paga por descartarla**, dicho para que no se revierta sin datos: **una consulta más por
 página** cuando hay búsqueda, y una lista de identificadores en el `IN` acotada por el catálogo de
-recetas de la empresa (ver `requirements.md > P2`).
+recetas de la empresa. **Esa lista NO lleva tope** (decisión del humano, 2026-09-17): recortarla
+haría mentir al total de resultados (R5), y el catálogo de recetas de una empresa está acotado por
+su propio tamaño. Si alguna llega a tener miles, es ficha propia con su caso medido.
 
 ### 4.1 Segunda alternativa descartada: `include` / `join` de Prisma
 
@@ -309,35 +309,38 @@ encargo lo veta. No se evalúa más.
 
 ---
 
-## 5. El total
+## 5. El total del pedido — POR QUÉ NO ESTÁ AQUÍ (2026-09-17)
 
-**Bloqueado por `requirements.md > P1`**: no existe hoy el segundo factor. Lo que sí queda decidido,
-para cuando P1 se responda:
+Esta sección existía y describía el cálculo del total. **Se vació el 2026-09-17, por decisión del
+humano: la ficha se partió y el total salió a QC-123.** No se borra en silencio porque quien lea
+este diseño buscando el total tiene que encontrar la razón, no un hueco.
 
-- **Se calcula en el adaptador driven**, no en el dominio: multiplicar dos `Decimal(14,4)` exige
-  `Prisma.Decimal`, y `domain/` no puede importar `@prisma/client`
-  (`docs/architecture.md > La regla de dependencias`). El adaptador ya hace esta conversión en
-  los dos sentidos (`toDecimalRange`, `.toFixed(4)`).
-- **Viaja como cadena** con `.toFixed(4)`, igual que `quantity` (R13). `OrderRow` gana
-  `total: string` y `OrderView`/`OrderSummary` lo arrastran; `toOrderView` (`get-order.ts`) lo
-  copia. Así la ficha y el listado no pueden diverger, que es la razón por la que `OrderSummary`
-  es un alias y no una copia recortada (`order-view.ts:97-101`).
-- **Sin dependencia nueva** (R14): Prisma ya opera decimales. `decimal.js` **no entra**, y
-  `tests/unit/pedidos/scope.test.ts:284` (lista cerrada `zod` + `@prisma/client`) lo haría caer
-  solo si alguien lo intentara.
-- **Fuera de `ORDER_QUERYABLE`** (R16, `[D1]`): no se añade a `sortable` ni a `filterable`. Pedir
-  orden por `total` cae por el `default` de `orderOrderBy` como cualquier campo desconocido y se
-  anota en el log — el mismo camino por el que salió `unitPrice` en QC-35bis.
-- **No se persiste** (R15).
+**El motivo, en una línea**: **el total no tiene segundo factor**. `orders.unit_price` dejó de
+existir el 2026-09-07 con QC-35bis (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`)
+y en `db/schema.prisma` el modelo `Order` conserva **un solo decimal, `quantity`**. De dónde vuelve
+a salir ese importe —columna propia del pedido, precio de catálogo en la receta, u otra cosa— es
+una **decisión de negocio**, no de diseño, y por eso no se resuelve en un `design.md`: vive en
+**QC-123**, junto con el E2E de importes que QC-122 ya no lleva.
+
+Lo que QC-68 **sí** deja resuelto y QC-123 hereda, para que no se vuelva a discutir: el cálculo va
+en el **adaptador driven** (multiplicar dos `Decimal(14,4)` exige `Prisma.Decimal`, y `domain/` no
+puede importar `@prisma/client`), viaja como **cadena con `.toFixed(4)`** igual que `quantity`, y
+**no entra ninguna dependencia nueva** — `tests/unit/pedidos/scope.test.ts:284` mantiene la lista
+cerrada de `pedidos` en `zod` + `@prisma/client`, así que un `decimal.js` caería solo.
+
+**Consecuencia para esta ficha**: `OrderRow`, `OrderView`, `OrderSummary`, `toOrderView` y
+`ORDER_QUERYABLE.sortable`/`filterable` **no se tocan**. QC-68 cambia un solo campo de la lista
+blanca, `searchable`.
 
 ---
 
 ## 6. Dependencias de terceros
 
-**Ninguna.** La feature no propone ni una. Si al responder P1 alguien creyera necesitar una
-librería de decimales, la respuesta ya está escrita en `[D7]`: Prisma opera decimales y el cálculo
-vive en el adaptador. Los cuatro checks de `docs/architecture.md > Dependencias de terceros` no se
-aplican aquí porque no hay candidata.
+**Ninguna.** La feature no propone ni una: la búsqueda se resuelve con lo que ya hay
+(`normalizedSearchCondition`, `normalizeRecipeName`, `pg_trgm` ya instalada). Los cuatro checks de
+`docs/architecture.md > Dependencias de terceros` no se aplican aquí porque no hay candidata. La
+única que alguien podría llegar a proponer —una librería de decimales— se fue con el total a
+QC-123, y su respuesta ya está escrita en `[D7]`: Prisma opera decimales.
 
 ---
 
@@ -347,8 +350,9 @@ aplican aquí porque no hay candidata.
 (`ListQuery.search`, `''` = sin búsqueda) y ya viaja desde la Server Action; lo único que cambia es
 que **deja de podarse** (R11).
 
-**Salida**: `OrderSummary` gana `total: string` cuando P1 se responda (R12). Nada más. `recipeName`
-sigue siendo `string | null` con el mismo significado.
+**Salida**: **no cambia ni un campo.** `OrderSummary` se queda exactamente como está —`recipeName`
+sigue siendo `string | null` con el mismo significado— porque el `total` salió a QC-123 (`> 5`).
+Lo único que cambia es **qué filas** vuelven, no su forma.
 
 **Rutas y endpoints**: ninguno nuevo. La Server Action `listOrders`
 (`lib/modules/pedidos/adapters/driving/order-actions.ts`) no cambia de firma.
@@ -369,10 +373,8 @@ inventario/lotes).
 | `lib/modules/pedidos/domain/order-queryable.ts` | `searchable: true` + limpieza de comentarios de las líneas tocadas |
 | `lib/modules/pedidos/domain/list-orders.ts` | paso 5 (resolver ids) y llamada a `listAlive` |
 | `lib/modules/pedidos/ports/order-repository.ts` | firma de `listAlive` |
-| `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` | `buildOrderWhere` + `listAliveOrders` (+ total, bloqueado por P1) |
+| `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` | `buildOrderWhere` + `listAliveOrders` |
 | `lib/modules/pedidos/adapters/driven/persistence/list-query-sql.ts` | **solo comentario**: la razón escrita deja de ser cierta |
-| `lib/modules/pedidos/domain/order-view.ts` | `total` en `OrderRow`/`OrderView` — **bloqueado por P1** |
-| `lib/modules/pedidos/domain/get-order.ts` | `toOrderView` copia `total` — **bloqueado por P1** |
 | `lib/modules/recetas/domain/recipe-catalog.ts` | método `findIdsMatchingName` |
 | `lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts` | implementación con ámbito |
 | `lib/composition/index.ts` | cablear el método nuevo en `recipeCatalog` |
@@ -408,7 +410,8 @@ respalde la pondría en rojo. La cobertura es:
 - **Unitaria** para el flujo del caso de uso (conteo de invocaciones, no solo resultado) y para la
   lista blanca.
 - **Integración contra la base real** para lo que un doble no puede demostrar: que la búsqueda se
-  traduce a SQL, que el `total` describe el conjunto buscado, que una receta de baja entra, que el
+  traduce a SQL, que el total de resultados describe el conjunto buscado, que una receta de baja
+  entra, que el
   ámbito de empresa no se amplía, y que el índice nuevo existe con su definición exacta.
 - **Guardias**: `guard-ambito-empresa-recetas` y `guard-arquitectura-modulos` se tensan solas con
   el método nuevo; no se escribe ninguna guardia adicional.

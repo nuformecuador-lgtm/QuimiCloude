@@ -21,8 +21,13 @@
 
 ## Requisitos (EARS)
 
-> Cada requisito cita entre corchetes la decisión cerrada de la que nace (`[D1]`–`[D8]`, en el
-> orden de la tabla de abajo). Un requisito sin cita sería un requisito que nadie acordó.
+> Cada requisito cita entre corchetes la decisión cerrada de la que nace, en el orden de la tabla
+> de abajo. Un requisito sin cita sería un requisito que nadie acordó.
+>
+> **`[D1]` y `[D7]` no las cita ningún requisito, y es correcto desde el 2026-09-17**: las dos
+> hablan del **total del pedido**, que ese día salió de esta ficha a **QC-123** por decisión del
+> humano (ver el encabezado de `## Preguntas abiertas` y `design.md > 5`). Se quedan escritas en la
+> tabla porque una decisión cerrada no se borra; quien las convierta en requisitos es QC-123.
 
 ### La búsqueda por nombre de receta
 
@@ -43,8 +48,8 @@ apareciendo entre los resultados de una búsqueda por su nombre, igual que hoy s
 con ese nombre en la lista sin buscar. `[D2]`
 
 **R5** — El sistema DEBE aplicar la búsqueda **sobre el conjunto completo** de pedidos visibles y
-**antes de paginar**, de modo que el total devuelto describa el conjunto ya buscado y no la página
-ya traída. `[D5]`
+**antes de paginar**, de modo que el total **de resultados** devuelto describa el conjunto ya
+buscado y no la página ya traída. `[D5]`
 
 **R6** — MIENTRAS haya un término de búsqueda en curso, el sistema DEBE combinarlo **por
 conjunción** con el ámbito de empresa y con la exclusión de los borrados, de modo que una búsqueda
@@ -64,86 +69,53 @@ solo signos—, ENTONCES el sistema DEBE tratarlo como **ausencia de búsqueda**
 sin filtrar por texto. `[D5]`
 
 **R10** — SI ninguna receta de la empresa casa con el término, ENTONCES el sistema DEBE devolver
-una **página vacía con total cero**, y NO un error. `[D4]`
+una **página vacía con cero resultados**, y NO un error. `[D4]`
 
 **R11** — El sistema DEBE declarar el listado de pedidos como **buscable** en su lista blanca de
 consulta, de modo que el término deje de omitirse y de anotarse como campo no declarado. `[D5]`
 
-### El total del pedido
-
-**R12** — El listado de pedidos DEBE devolver, por cada fila, el **total del pedido calculado en el
-servidor**. `[D7]`
-
-**R13** — El total DEBE viajar como **cadena decimal de cuatro decimales**, en la misma forma en
-que ya viaja la cantidad, y NUNCA como número de coma flotante. `[D7]`
-
-**R14** — El sistema DEBE calcular el total multiplicando la cantidad del pedido por su importe
-unitario con **aritmética decimal exacta**, y NO DEBE incorporar ninguna dependencia nueva para
-hacerlo. `[D7]` *(de dónde sale hoy ese importe unitario es la pregunta abierta **P1**: la columna
-que la descripción de la ficha da por existente se eliminó el 2026-09-07. R12–R15 no se pueden
-implementar hasta que P1 tenga respuesta.)*
-
-**R15** — El sistema NO DEBE persistir el total: DEBE derivarlo de sus factores en cada consulta,
-de modo que no pueda contradecirlos. `[D7]`
-
-**R16** — El total NO DEBE aparecer en la lista blanca de consulta del listado: pedir orden o
-filtro por él DEBE **omitirse y anotarse** como cualquier campo no declarado, sin hacer fallar la
-consulta. `[D1]`
-
 ### Lo que no cambia
 
-**R17** — El sistema DEBE seguir exigiendo el permiso `pedidos.consultar` como **primera acción**
+**R12** — El sistema DEBE seguir exigiendo el permiso `pedidos.consultar` como **primera acción**
 del caso de uso —antes de validar la entrada y antes de tocar ningún puerto— y DEBE seguir tomando
 la empresa **del actor** y nunca de la entrada, también cuando hay búsqueda. `[D6]`
 
-**R18** — La migración DEBE incluir su `down.sql`, y ese `down.sql` DEBE revertir exactamente lo
+**R13** — La migración DEBE incluir su `down.sql`, y ese `down.sql` DEBE revertir exactamente lo
 que crea el `migration.sql`. `[D8]`
 
-**R19** — El sistema DEBE disponer de un **índice que sirva la búsqueda por nombre de receta
+**R14** — El sistema DEBE disponer de un **índice que sirva la búsqueda por nombre de receta
 incluyendo las dadas de baja**; el índice de búsqueda existente sobre ese nombre es parcial y
 excluye precisamente esas filas, así que no sirve para R4. `[D8]` `[D2]`
 
-**R20** — SIN término de búsqueda, el listado DEBE devolver **exactamente lo mismo que hoy**: el
-mismo orden por defecto, los mismos filtros, la misma paginación y el mismo total. `[D8]`
+**R15** — SIN término de búsqueda, el listado DEBE devolver **exactamente lo mismo que hoy**: el
+mismo orden por defecto, los mismos filtros, la misma paginación y el mismo total de resultados.
+`[D8]`
 
-**R21** — La pantalla de pedidos NO DEBE ganar en esta feature ni caja de búsqueda ni columna de
-total: DEBE seguir emitiendo la consulta con la búsqueda vacía y sin pintar ningún campo de
-búsqueda en el DOM. `[D3]`
+**R16** — La pantalla de pedidos NO DEBE ganar en esta feature caja de búsqueda: DEBE seguir
+emitiendo la consulta con la búsqueda vacía y sin pintar ningún campo de búsqueda en el DOM.
+`[D3]`
 
 ## Preguntas abiertas
 
 Ninguna.
 
-*Eso es lo que quedó al acotar, y no se reabre. Lo de abajo lo abre `spec_author` al verificar el
-código: es un hecho del disco que la descripción de la ficha no contempla y que la regla 6 de
-`CLAUDE.md` prohíbe rellenar con un supuesto.*
+*`spec_author` abrió dos preguntas al verificar el código el 2026-09-17. **Las dos están cerradas
+el mismo día**, así que la sección vuelve a «Ninguna». Se deja escrito **cómo** se cerraron, porque
+las dos cambiaron el alcance de la ficha:*
 
-**P1 — ¿De dónde sale el importe unitario con el que se multiplica la cantidad?** La descripción
-de QC-68 dice «hoy la consulta devuelve cantidad y precio unitario por separado y nadie
-multiplica». **Eso ya no es cierto.** El 2026-09-07, por decisión humana (QC-35bis), `unit_price`
-y `unit_id` **salieron de la tabla `orders`** —migración
-`db/migrations/20260907120000_orders_drop_unit_and_unit_price`, con pérdida de datos escrita en
-`specs/QC-35-pantalla-de-pedidos/requirements.md`— y con ellos salieron `unitPriceSchema` de
-`order-input.ts`, el campo de `order-view.ts`, `unitPrice` de `ORDER_QUERYABLE.sortable` y el
-índice `orders_unit_price_idx`. Verificado además en `db/schema.prisma`: el modelo `Order` tiene
-**un solo decimal, `quantity`**, y ningún otro modelo del repositorio guarda un precio de venta de
-receta (`recipes` no tiene importe; `product_batches.unit_cost` y `supplier_catalog_lines.cost`
-son costes de compra de otros módulos).
-
-Consecuencia: **el total del pedido no tiene hoy un segundo factor**, y esta ficha no puede
-inventárselo. Las tres salidas posibles —y la elige un humano, no el spec:
-
-1. **Devolver `unit_price` a `orders`**, con su migración, su `down`, su validación de borde y su
-   decisión sobre qué pasa con los pedidos ya creados (los datos viejos se perdieron). Es una
-   ficha de modelo, no un añadido a ésta.
-2. **Poner el importe en la receta** y pedirlo por `RecipeCatalog`. Cambia el significado del
-   total (pasa a ser «precio de catálogo × cantidad», que se mueve al editar la receta) y toca la
-   pregunta abierta 5 del dominio (moneda por empresa), que sigue sin cerrar.
-3. **Sacar el total de esta ficha** y dejarla como «búsqueda por nombre de receta», con el total
-   en la ficha que resuelva 1 o 2.
-
-Mientras P1 no se responda, **R12–R15 y las tareas T10–T13 quedan bloqueadas**; R1–R11 y R16–R21
-no dependen de ella y se pueden implementar enteros.
+- **P1 — de dónde sale el importe unitario del total. CERRADA PARTIENDO LA FICHA (humano,
+  2026-09-17).** La premisa de la descripción del board —«la consulta devuelve cantidad y precio
+  unitario por separado»— estaba **derogada**: el 2026-09-07 QC-35bis borró `unit_price` y
+  `unit_id` de `orders` (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`), y en
+  `db/schema.prisma` el modelo `Order` tiene **un solo decimal, `quantity`**. El total no tenía
+  segundo factor. **QC-68 se queda solo con la búsqueda y el total sale a QC-123**, que antes de
+  ser tarea tiene que decidir de dónde sale el precio —es decisión de negocio, no de diseño—.
+  Aquí ya no es pregunta abierta: es una ficha aparte.
+- **P2 — si se pone tope a la lista de identificadores de receta que casan. CERRADA: NO se pone
+  tope (humano, 2026-09-17).** Recortarla haría mentir al total de resultados (R5), y el conjunto
+  está acotado por el catálogo de recetas **de una empresa**. Si alguna llega a tener miles de
+  recetas, es ficha propia con su caso medido. El diseño se apoya en esta decisión
+  (`design.md > 4`).
 
 **P2 — ¿Hay un tope para la lista de identificadores de receta que casan?** El diseño elegido
 (`design.md > 3`) pasa a la consulta de pedidos los identificadores de las recetas que casan. Ese
@@ -164,3 +136,4 @@ medido. Se deja escrito por si el humano prefiere decidirlo ahora.
 | 2026-09-17 | ¿Con qué permiso y con qué ámbito? | **Heredado, sin cambios**: `pedidos.consultar` como primera línea del caso de uso y ámbito de empresa por `OrderScope`. Verificado en `list-orders.ts:91` y `:131`. Esta ficha **no toca la autorización** ni añade un permiso nuevo |
 | 2026-09-17 | ¿Cómo viaja el total? | **Como cadena decimal**, igual que la cantidad y el precio unitario, y **calculado en el servidor**. Multiplicar dos `Decimal(14,4)` con el tipo numérico de JavaScript pierde precisión. **NO entra `decimal.js` ni ninguna otra dependencia**: Prisma ya opera decimales |
 | 2026-09-17 | ¿Qué exige la migración? | **Su `down.sql`** y **los índices que la búsqueda necesite**, mismo criterio con el que QC-57 metió los suyos: buscar u ordenar por un campo sin índice es el anti-patrón que el reviewer rechaza en cuanto las tablas crezcan. **Los tests que hoy pasan tienen que seguir pasando** |
+| 2026-09-17 | Al bajar a diseño: el total no tiene con qué multiplicarse. ¿Qué se hace con la ficha? | **La ficha SE PARTE y se queda solo con la búsqueda.** Verificado en el esquema, no supuesto: `Order` tiene **un solo decimal**, `quantity`. El precio unitario y la unidad **los borró QC-35bis el 2026-09-07** (`20260907120000_orders_drop_unit_and_unit_price`), por decisión del humano —«un pedido es receta + cantidad»—, y **ningún modelo del repo guarda un precio de venta de receta**: los que hay son costes de **compra**, de otros módulos. De dónde sale el precio es una **decisión de negocio sin tomar, no una tarea**, así que meterla aquí la disfrazaría. **El total sale a `QC-123`**, que nace con las cinco preguntas que arrastra. **`[D1]` y `[D7]` se quedan escritas pero ya no las cita nadie**: son herencia de QC-123, y una decisión cerrada no se borra. `QC-122` deja de llevar la columna del total |

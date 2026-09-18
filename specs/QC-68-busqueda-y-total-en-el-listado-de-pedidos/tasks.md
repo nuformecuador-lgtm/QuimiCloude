@@ -9,8 +9,10 @@
 > limpian los comentarios de **las líneas que toca la rama**; en tests, `R<n>` va en el **nombre
 > del caso**.
 >
-> **T10–T13 están BLOQUEADAS por `requirements.md > P1`** (no existe hoy el importe unitario).
-> T1–T9 y T14–T24 no dependen de ella.
+> **El total salió de esta ficha el 2026-09-17** (decisión del humano: va a **QC-123**, ver
+> `design.md > 5`). Las cuatro tareas que lo construían se han retirado y el resto se ha renumerado
+> corrido, sin huecos. **Los censos del bloque E se quedan los dieciséis**: los provoca abrir la
+> búsqueda, no el total.
 
 ---
 
@@ -65,13 +67,13 @@
 - `listAlive(query, scope, recipeIds: readonly string[] | null)`. Actualiza la prosa de `listAlive`
   y del encabezado que hoy afirma que `orders` no busca, sin citar ficha ni requisito.
 - **Hecho**: `pnpm typecheck` señala `list-orders.ts` y el doble de `order-view.test.ts` — se
-  cierran en T7 y T16.
+  cierran en T7 y T12.
 
 ### T7 — El paso nuevo del caso de uso (depende de T6)
 - **Toca**: `lib/modules/pedidos/domain/list-orders.ts`
 - Entre el log y la llamada al repositorio: si `search !== ''`, pedir
   `deps.recipes.findIdsMatchingName(search, actor.companyId)`; si no, `null`. Pasar el resultado a
-  `listAlive`. **El permiso y el `scope` no se mueven de sitio** (**R17**). Reescribir el bloque
+  `listAlive`. **El permiso y el `scope` no se mueven de sitio** (**R12**). Reescribir el bloque
   «QC-57 R17: `orders` NO busca».
 - **Hecho**: `requirePermission` sigue siendo la primera sentencia del cuerpo; la empresa sigue
   saliendo del actor; el caso de uso no importa nada nuevo fuera del barrel de `recetas`.
@@ -95,57 +97,30 @@
 
 ---
 
-## Bloque C — El total (BLOQUEADO por P1)
+## Bloque C — La migración
 
-> No se empieza ninguna de estas cuatro hasta que el humano responda `requirements.md > P1`. Si la
-> respuesta es «el total sale de esta ficha», T10–T13 se reescriben con el factor ya decidido.
-
-### T10 — `total` en los tipos de salida
-- **Toca**: `lib/modules/pedidos/domain/order-view.ts`
-- `total: string` en `OrderRow` y en `OrderView` (y por tanto en `OrderSummary`, que es su alias).
-  Borrar el párrafo que dice «NO hay campo `total`».
-- **Hecho**: `pnpm typecheck` señala cada sitio que construye una fila.
-
-### T11 — El cálculo, en el adaptador (depende de T10)
-- **Toca**: `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts`
-- `toOrderRow` multiplica con `Prisma.Decimal` y devuelve `.toFixed(4)` (**R12**, **R13**,
-  **R14**). No se persiste nada (**R15**).
-- **Hecho**: ninguna aritmética de importes en `number`; `scope.test.ts` (lista cerrada de
-  dependencias del módulo) sigue verde sin `decimal.js`.
-
-### T12 — La ficha arrastra el mismo total (depende de T10)
-- **Toca**: `lib/modules/pedidos/domain/get-order.ts`
-- `toOrderView` copia `total`.
-- **Hecho**: ficha y listado devuelven el mismo valor para el mismo pedido.
-
-### T13 [P] — Tests del total (depende de T11)
-- **Toca**: `tests/unit/pedidos/order-view.test.ts`, `tests/integration/pedidos/list-query-orders.int.test.ts`
-- Cadena con cuatro decimales (**R13**); un caso con decimales que **pierde precisión en `number`**
-  y aquí no (**R14**); `total` **no** está en `ORDER_QUERYABLE` y pedir orden por él se **omite y
-  se anota** sin fallar (**R16**).
-
----
-
-## Bloque D — La migración
-
-### T14 — Índice de búsqueda que ve las recetas de baja
+### T10 — Índice de búsqueda que ve las recetas de baja
 - **Toca**: `db/migrations/<ts>_recipes_search_index_including_deleted/migration.sql` y `down.sql`
 - `CREATE INDEX "recipes_name_normalized_all_trgm_idx" ON "recipes" USING gin ("name_normalized" gin_trgm_ops);`
-  (**sin** `WHERE`, **R19**). `down.sql` con su `DROP INDEX IF EXISTS` y **sin** `DROP EXTENSION`
-  (**R18**). Crear con `pnpm run db:migrate:create`, escribir el `down` a mano, aplicar con
+  (**sin** `WHERE`, **R14**). `down.sql` con su `DROP INDEX IF EXISTS` y **sin** `DROP EXTENSION`
+  (**R13**). Crear con `pnpm run db:migrate:create`, escribir el `down` a mano, aplicar con
   `pnpm run db:migrate`.
 - **Hecho**: `pnpm run db:rollback` la deshace y `pnpm run db:migrate` la vuelve a aplicar, las dos
   sin error. El índice **no** se declara en `db/schema.prisma` (igual que sus seis hermanos).
 
 ---
 
-## Bloque E — Los censos que hay que tensar, archivo por archivo
+## Bloque D — Los censos que hay que tensar, archivo por archivo
 
 > Ninguno de estos se descubre solo al correr el gate en el orden equivocado: **son la lista que
 > QC-63 no tuvo**. Cada uno lleva su nota fechada explicando **por qué cambia la afirmación**, no
 > solo el valor.
+>
+> **Los dieciséis siguen en pie tras sacar el total a QC-123** (2026-09-17): todos los provoca
+> abrir la búsqueda —`ORDER_QUERYABLE.searchable` pasando a `true`, o el índice nuevo—, ninguno el
+> total. Revisados uno por uno.
 
-### T15 — `tests/unit/shared/listas-blancas-listados.test.ts` (censo de las SIETE listas)
+### T11 — `tests/unit/shared/listas-blancas-listados.test.ts` (censo de las SIETE listas)
 - Hoy: `it('pedidos es el UNICO listado que no busca')` con `expect(sinBusqueda).toEqual(['pedidos'])`
   (líneas 79-87).
 - **Se tensa**: la afirmación pasa a `expect(sinBusqueda).toEqual([])` — «**ninguna** de las siete
@@ -154,45 +129,45 @@
   `R11` en el nombre del caso.
 - **Hecho**: el caso sigue recorriendo las siete (no se convierte en un aserto sobre pedidos solo).
 
-### T16 — `tests/unit/pedidos/order-view.test.ts:125-126`
+### T12 — `tests/unit/pedidos/order-view.test.ts:125-126`
 - Hoy: `expect(ORDER_QUERYABLE.searchable).toBe(false)` con el comentario «Es la UNICA de las siete
   que no busca».
 - **Se tensa**: `toBe(true)`, comentario reescrito, `R11` en el nombre del caso. **No se borra** el
   resto del caso (filtrables exactos, sin `orderNumber`).
 
-### T17 — `tests/unit/pedidos/order-input.test.ts:282-288`
+### T13 — `tests/unit/pedidos/order-input.test.ts:282-288`
 - Hoy: «la busqueda por texto se OMITE y se anota: `orders` no tiene columna `name`».
 - **Se tensa**: la búsqueda **sobrevive** a `sanitizeListQuery` y **no** aparece en `ignored`
   (**R11**). Se **conserva** un caso hermano con un campo **no declarado** que sí se omite y se
   anota: sin él, esta parte del contrato dejaría de estar probada en pedidos.
 
-### T18 — `tests/unit/pedidos/list-orders.test.ts:313-316`
+### T14 — `tests/unit/pedidos/list-orders.test.ts:313-316`
 - Hoy: «la busqueda se OMITE y se registra, y la lista vuelve igual (R17, R39)».
 - **Se tensa**: el término **llega al catálogo de recetas** y los ids **llegan al repositorio**
   (**R1**, **R7**); con `null` del catálogo la lista vuelve entera (**R9**); con `[]` el
   repositorio se llama igualmente y devuelve página vacía (**R10**). El log **deja de anotar**
   `search`.
 
-### T19 — `tests/unit/pedidos-ui/order-list-params.test.ts:203-218`
+### T15 — `tests/unit/pedidos-ui/order-list-params.test.ts:203-218`
 - Hoy: `describe('la lista NO busca: search no se lee ni se escribe (R20)')` con
   `expect(ORDER_QUERYABLE.searchable).toBe(false)`.
 - **Se tensa, y aquí está la trampa**: el aserto sobre el contrato pasa a `true`, pero los otros
   dos casos —la pantalla **nunca** lee ni emite `search`— **se conservan y se refuerzan**, porque
   su motivo cambia: ya no es «el contrato no lo admite» sino «**la caja la construye QC-122**»
-  (`[D3]`, **R21**). Renombrar el `describe` a algo como «la pantalla todavía no busca, aunque el
+  (`[D3]`, **R16**). Renombrar el `describe` a algo como «la pantalla todavía no busca, aunque el
   contrato ya lo permita» y dejar la nota fechada. **Borrar estos casos sería aflojar**: dejarían
   de vigilar que esta ficha no se lleva por delante la pantalla.
 
-### T20 — `tests/integration/pedidos/list-query-orders.int.test.ts:248-255`
+### T16 — `tests/integration/pedidos/list-query-orders.int.test.ts:248-255`
 - Hoy: «la busqueda NO recorta nada: `orders` no busca (R17)», comparando con y sin texto.
 - **Se tensa**: pasa a ser **la prueba de integración de la búsqueda** contra la base real
   (`[D3]`): siembra pedidos de dos recetas con nombres distintos y una tercera **dada de baja**;
   comprueba que el término encuentra solo los suyos (**R1**), que encuentra el de la receta de baja
-  (**R4**), que ignora acentos y mayúsculas (**R2**), que `total` describe el conjunto buscado y no
-  la página (**R5**), que un término que no casa devuelve página vacía (**R10**) y que buscar el
-  número de pedido **no** encuentra nada (**R3**).
+  (**R4**), que ignora acentos y mayúsculas (**R2**), que el **total de resultados** describe el
+  conjunto buscado y no la página (**R5**), que un término que no casa devuelve página vacía
+  (**R10**) y que buscar el número de pedido **no** encuentra nada (**R3**).
 
-### T21 — `tests/integration/inventario/list-query-indexes.int.test.ts` (censo de índices, **tres a la vez**)
+### T17 — `tests/integration/inventario/list-query-indexes.int.test.ts` (censo de índices, **tres a la vez**)
 - Hoy: `SEARCH_INDEXES` con **seis** entradas (94-101), `PARTIAL_INDEXES`/`FULL_INDEXES` y
   `expect(ALL_INDEXES).toHaveLength(34)` (247-253).
 - **Se tensa**: `recipes_name_normalized_all_trgm_idx` entra en `SEARCH_INDEXES` (pasa a **siete**)
@@ -207,7 +182,7 @@
   35; y `recipes_name_normalized_trgm_idx` (el parcial) **sigue** en `PARTIAL_INDEXES`: los dos
   conviven (`design.md > 1.1`).
 
-### T22 [P] — Comentarios de producción cuya **razón escrita** deja de ser cierta
+### T18 [P] — Comentarios de producción cuya **razón escrita** deja de ser cierta
 - **Toca** (uno por uno, solo comentario):
   - `lib/modules/pedidos/adapters/driven/persistence/list-query-sql.ts:12-14` — dice que
     `normalizedSearchCondition` se conserva sin usar «porque `ORDER_QUERYABLE.searchable === false`».
@@ -218,16 +193,16 @@
   - `app/(private)/pedidos/components/order-table.tsx:33-37` y `:63` — ídem con `searchable={false}`.
 - **Hecho**: ninguno cita `QC-<n>`, `R<n>` ni `design.md`
   (`docs/conventions.md > Comentarios`), y ninguno afirma algo falso. **Ningún cambio de código**
-  en estos tres archivos: la pantalla sigue emitiendo búsqueda vacía (**R21**).
+  en estos tres archivos: la pantalla sigue emitiendo búsqueda vacía (**R16**).
 
-### T23 [P] — `e2e/pedidos.spec.ts:195-200`
+### T19 [P] — `e2e/pedidos.spec.ts:195-200`
 - **Solo el comentario** de `findOrderRow`: justifica recorrer páginas «porque la pantalla NO tiene
   búsqueda (R20, `ORDER_QUERYABLE.searchable` es `false`)». La mitad del paréntesis deja de ser
   cierta; el hecho (la pantalla no tiene caja) sigue siéndolo.
 - **No se añade ni un caso E2E** (`[D3]`): la lista de specs E2E de pedidos es un censo cerrado de
   tres en `tests/unit/pedidos/scope.test.ts:402-406` y un cuarto la pondría en rojo.
 
-### T24 — `tests/integration/pedidos/order-repository.int.test.ts:259-260`
+### T20 — `tests/integration/pedidos/order-repository.int.test.ts:259-260`
 - El comentario del ayudante `consulta()` dice «sin orden y sin búsqueda: es exactamente la lista
   de siempre (R11, R17)». Sigue siendo verdad **como estado**, pero su razón cambia: ya no es que
   `orders` no pueda buscar. Ajustar la prosa; las llamadas de dos argumentos **no cambian**
@@ -235,11 +210,11 @@
 
 ---
 
-## Bloque F — Cierre
+## Bloque E — Cierre
 
-### T25 — Trazabilidad y gate (depende de todo)
+### T21 — Trazabilidad y gate (depende de todo)
 - **Toca**: `progress/impl_QC-68-busqueda-y-total-en-el-listado-de-pedidos.md`
-- Mapa **`R<n> -> test concreto`** para R1–R21 (R12–R15 quedan como *bloqueados por P1* si P1 sigue
-  sin respuesta), como exige `CHECKPOINTS.md > Trazabilidad`.
+- Mapa **`R<n> -> test concreto`** para **R1–R16, los dieciséis**, sin ninguno pendiente: como
+  exige `CHECKPOINTS.md > Trazabilidad`.
 - **Hecho**: `./init.sh --rapido` verde al cerrar cada tanda y **`./init.sh` completo** verde antes
-  del PR, sin excepción. Ningún test que hoy pasa queda borrado ni aflojado (**R20**).
+  del PR, sin excepción. Ningún test que hoy pasa queda borrado ni aflojado (**R15**).
