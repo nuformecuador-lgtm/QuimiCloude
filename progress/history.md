@@ -4194,3 +4194,49 @@ figurar como verde.
 **Deuda del arnes que esto deja a la vista**: `validate-features` bloquea el gate de una rama por el
 estado de fichas ajenas en `dev`. Es la tercera vez que una feature paga el peaje de otra. Candidata
 a `/afinar-regla`.
+
+## QC-61 — guardia-empresa-en-esquema (cerrada el 2026-09-18, PR #90, merge `05a0615`)
+
+Una guardia que lee `db/schema.prisma` y se pone roja si una tabla de negocio nace sin columna de
+empresa. **R1–R16 y T1–T9**, cada requisito mapeado a un `it` concreto. Sin migracion, sin tabla
+nueva, sin E2E (no pedido, D7) y **sin una sola dependencia**: `git diff origin/dev -- package.json
+pnpm-lock.yaml` da 0 lineas.
+
+**La ficha estaba vieja y medirla fue la mitad del trabajo.** Daba por exentas `users`, `roles` y
+`document_types`, pero **`users` ya llevaba empresa** desde hacia fichas. En disco habia **ocho**
+modelos sin `companyId` —`document_types`, `roles`, `permissions`, `role_permissions`, `companies`,
+`credential_setup_tokens`, `revoked_sessions` y `recipe_lines`— y **ninguno pendiente de aislar**:
+`recipe_lines` **hereda** la empresa de su cabecera por decision de QC-50, y `units` la lleva
+anulable a proposito por QC-76. O sea que la lista de «pendientes, que solo encoge» que la ficha
+pedia **habria nacido vacia**, y faltaba una tercera clase que nadie habia nombrado: **las hijas que
+heredan**. Todo esto salio de contar en el esquema antes de escribir el spec, no de creerle a la
+description.
+
+**La lista vivia copiada en cuatro sitios y tres estaban desincronizados.** Al aprobar, el humano
+eligio A, B y C: corregir tambien `CHECKPOINTS.md` y `.claude/agents/reviewer.md` —que repetian la
+lista vieja—, **que la guardia tambien de rojo cuando a `EXENTAS` le SOBRA una entrada** (eso entro
+como **R16**, y es lo que impide que la lista se pudra en la direccion contraria), y atar el bullet
+de `docs/architecture.md` al gate para que R14 fuera testeable. Los dos documentos derivados ya no
+enumeran: **remiten a `architecture.md > Dominio` y a la guardia**. Una lista copiada en cuatro
+sitios se desincroniza; una copiada en uno y referida en tres, no.
+
+**Review aprobada a la primera: 0 bloqueantes, 0 mayores, 5 menores.** La guardia muerde en todas
+sus ramas —**11 mutaciones locales, 11 rojos**, restauradas—. De los cinco menores, dos son limites
+del lector declarados y no verdes falsos (`@map(name: "…")` de Prisma, que falla **hacia el rojo**;
+y un campo de relacion llamado literalmente `company_id`), uno es un **defecto del mapa, no del
+codigo** —el `it` de R12 no contiene el rojo que promete: lo ponen R1:187, R10 y R16— y el quinto es
+entorno.
+
+**Verificacion, con lo que no salio verde dicho por escrito**: `test:guardias` **45/45 archivos,
+555 passed / 9 skipped**, exit 0. El `./init.sh` completo **NO** paso, y el PR se abrio asi por
+decision humana, con las tres causas separadas y ninguna de la rama: `validate-features` cortando
+por el spec de QC-92 (otra maquina), **11 de integracion por Postgres 18.6 local** contra el 17 que
+se busca (lo arreglo el PR #89) y `user-table.test.tsx` intermitente, verde 3/3 a solas. El reviewer
+lo midio en vez de suponerlo: los 36 archivos rojos fuera del baseline son **identicos por diff** a
+los del padre sin los commits de la rama, que no toca ni un archivo de produccion.
+
+**Dos cosas para el que venga.** La primera corrida de `test:guardias` dio **tres rojos por timeout**
+en guardias que recorren el arbol, verdes a solas y en la segunda corrida: flakiness de E/S de
+OneDrive, y conviene recordarlo antes de creerle a un `--rapido` rojo. La segunda: `29145768` pasa
+QC-59 a `done` **dentro de la rama de QC-61**. Es estado del arnes, no de la feature; va en commit
+propio y estaba justificado, pero es la costura por la que `feature_list.json` choca en cada merge.
