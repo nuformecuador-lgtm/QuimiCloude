@@ -15,7 +15,7 @@
   - Hecho cuando: está escrita la opción elegida —(a) retirar, (b) lista cerrada u otra— con fecha.
     Sin esto no arranca T5.
 
-- [ ] **T2 — `StepReader` con espera opt-in.**
+- [x] **T2 — `StepReader` con espera opt-in.**
   - Depende de: aprobación del spec.
   - Archivo: `components/shared/step-reader/step-reader.tsx`.
   - Qué: prop `minStepSeconds?`; estados `arrival` y `waitedArrival`; `blocked` con las dos causas;
@@ -40,7 +40,7 @@
   - Hecho cuando: todos verdes con reloj falso y **por mutación**: quitar `|| waiting` de `blocked`
     pone rojos R1/R12; cambiar `key={arrival}` por `key={currentIndex}` pone rojo el caso de R8.
 
-- [ ] **T4 — La pantalla de ejecución activa la espera.**
+- [x] **T4 — La pantalla de ejecución activa la espera.**
   - Depende de: T2.
   - Archivo: `app/(private)/asignacion/[id]/components/order-execution-screen.tsx`.
   - Qué: `const MIN_STEP_SECONDS = 5` de módulo y `minStepSeconds={MIN_STEP_SECONDS}` en el
