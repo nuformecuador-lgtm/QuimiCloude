@@ -38,7 +38,12 @@
     los dos ids), R16, R17, R19 (tests de fuente existentes siguen verdes), R20 (tras la espera,
     avanzar con teclado).
   - Hecho cuando: todos verdes con reloj falso y **por mutación**: quitar `|| waiting` de `blocked`
-    pone rojos R1/R12; cambiar `key={arrival}` por `key={currentIndex}` pone rojo el caso de R8.
+    pone rojos R1/R12; y el mutante «cumplido = índice en un escalar» (`waiting` compara
+    `waitedArrival` con `currentIndex`, `onEnd` guarda `currentIndex` y `key={currentIndex}`) pone
+    rojo el caso de R8 que retrocede con Anterior mientras corre la cuenta del paso 2.
+    *Enmienda 2026-09-18 (review H1):* antes pedía cambiar sólo `key={arrival}` por
+    `key={currentIndex}`, un mutante equivalente que ningún test puede detectar (`arrival` sube
+    exactamente cuando cambia el índice).
 
 - [x] **T4 — La pantalla de ejecución activa la espera.**
   - Depende de: T2.

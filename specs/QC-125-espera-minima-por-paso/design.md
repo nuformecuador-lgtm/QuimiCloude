@@ -58,6 +58,13 @@ Derivado: `waiting = waitEnabled && waitedArrival !== arrival`; `blocked = pendi
   paso 1* volvería a presentar el paso 2 **como cumplido** sin esperar: `waitedIndex === 2` seguiría
   siendo cierto. El contador de llegadas hace imposible heredar tiempo entre llegadas (R8). Hay un
   test con exactamente ese recorrido.
+  - *Nota 2026-09-18 (review H1):* el recorrido de arriba **no puede ocurrir**: mientras el paso 1
+    espera, Siguiente está bloqueado, así que no se puede avanzar «antes de que acabe el paso 1».
+    La trampa real es la contraria: con «cumplido = índice» en un escalar, cumplir el paso 1 →
+    Siguiente → **Anterior mientras aún corre la cuenta del paso 2** devuelve al paso 1 como ya
+    cumplido (el escalar sigue valiendo 1), sin cuenta y con Siguiente habilitado. Eso incumple R8,
+    el contador de llegadas lo evita, y es ese recorrido el que fija el test de R8 que mata el
+    mutante del escalar.
 - `onEnd` vive en un ref dentro de `CountdownTimer`, que se actualiza en cada render, así que la
   closure siempre ve la `arrival` vigente; y un cronómetro de una llegada anterior ya está
   desmontado, así que no puede marcar como cumplida la actual.
