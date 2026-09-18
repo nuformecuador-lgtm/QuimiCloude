@@ -14,14 +14,15 @@
  *     seria un `where` anidado sobre ese lote: otra consulta, que nadie pidio. Quitarlo es un
  *     cambio de contrato del listado, y por eso lo vigilan `tests/unit/inventario/list-query.test.ts`
  *     y `tests/guards/guard-contrato-listados.test.ts`.
+ *   - `stock`: dejo de existir como columna de `products`; la existencia se calcula por
+ *     unidad y no se ordena ni se filtra.
  */
 
 import type { ListQueryable } from './list-query';
 
 export const PRODUCT_QUERYABLE: ListQueryable = {
-  sortable: ['name', 'stock', 'qtyAlert', 'createdAt', 'updatedAt'],
+  sortable: ['name', 'qtyAlert', 'createdAt', 'updatedAt'],
   filterable: {
-    stock: 'numberRange',
     qtyAlert: 'numberRange',
     createdAt: 'dateRange',
   },

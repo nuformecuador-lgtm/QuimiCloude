@@ -48,6 +48,7 @@ export {
 } from './domain/product-batch-input';
 export { type NewProductBatch } from './domain/product-batch';
 export { type NewProduct, type ProductView } from './domain/product-view';
+export { type ProductStockByUnit, sumStockByUnit } from './domain/product-stock';
 export { type PresentationView } from './domain/presentation-view';
 
 export { createCreateProduct, type CreateProductDeps } from './domain/create-product';

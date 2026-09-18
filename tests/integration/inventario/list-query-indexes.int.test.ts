@@ -100,11 +100,14 @@ const SEARCH_INDEXES = [
   'units_name_normalized_trgm_idx',
 ] as const
 
-/** Los de las cinco tablas con borrado logico: PARCIALES (R7). */
+/** Los de las cinco tablas con borrado logico: PARCIALES (R7).
+ *
+ * `products_stock_idx` estuvo aqui hasta el 2026-09-17: cayo con su columna en
+ * `db/migrations/20260917120000_drop_product_stock` (QC-91 R2), y con ella `stock` salio de
+ * `PRODUCT_QUERYABLE.sortable`/`.filterable`, asi que ya no hay orden ni filtro que servir. */
 const PARTIAL_INDEXES = [
   'products_name_normalized_trgm_idx',
   'products_name_idx',
-  'products_stock_idx',
   'products_qty_alert_idx',
   'products_created_at_idx',
   'products_updated_at_idx',
@@ -179,7 +182,14 @@ const PRE_EXISTING_INDEXES = [
   // `recipes_company_name_unique`, que se afirma abajo en su propio caso: si la migracion se
   // hubiera llevado el global SIN dejar el compuesto, el catalogo de recetas se quedaria sin
   // ninguna garantia de unicidad y este archivo seguiria siendo quien lo dijera.
-  'suppliers_name_unique',
+  // `suppliers_name_unique` (unico GLOBAL y PARCIAL sobre el nombre normalizado, de QC-42) salio
+  // de esta lista el 2026-09-17. NO es un indice perdido por descuido, que es justo lo que este
+  // caso vigila: la unicidad del nombre de proveedor pasa a medirse POR EMPRESA porque dos
+  // empresas pueden tener cada una su mismo proveedor -se surten del mismo sitio- y con el
+  // global la segunda no podria darlo de alta. Su sustituto es UN solo indice compuesto y
+  // TAMBIEN PARCIAL, `suppliers_company_name_unique`, que se afirma abajo en su propio caso: si
+  // la migracion se hubiera llevado el global SIN dejar el compuesto, el listado de proveedores
+  // se quedaria sin ninguna garantia de unicidad y este archivo seguiria siendo quien lo dijera.
   'supplier_catalog_lines_name_presentation_unique',
   // `products_presentation_id_idx` cayo el 2026-09-09 con la columna `products.presentation_id`,
   // en la misma migracion que creo `product_batches`: la presentacion se mudo al lote, y el
@@ -244,12 +254,18 @@ describe('QC-57 — la migracion en la base (R21, R23)', () => {
     expect(rows).toHaveLength(1)
   })
 
-  it('los 34 indices nuevos existen, cada uno con su nombre exacto', async () => {
+  it('los 33 indices nuevos existen, cada uno con su nombre exacto', async () => {
     const indexes = await readIndexes()
-    // 34 desde el 2026-09-07: eran 35 hasta que `orders_unit_price_idx` cayo con su columna.
-    expect(ALL_INDEXES).toHaveLength(34)
+    // 33 desde el 2026-09-17: eran 34 hasta que `products_stock_idx` cayo con su columna
+    // (QC-91 R2), y 35 hasta que `orders_unit_price_idx` cayo con la suya.
+    expect(ALL_INDEXES).toHaveLength(33)
     const faltan = ALL_INDEXES.filter((name) => !indexes.has(name))
     expect(faltan, `indices que la base no tiene: ${faltan.join(', ')}`).toEqual([])
+  })
+
+  it('R2: products_stock_idx ya no existe', async () => {
+    const indexes = await readIndexes()
+    expect(indexes.has('products_stock_idx')).toBe(false)
   })
 
   it('los seis de busqueda son GIN de trigramas sobre name_normalized', async () => {
@@ -339,6 +355,45 @@ describe('QC-57 — la migracion en la base (R21, R23)', () => {
     expect(compuesto, `${compuesto ?? ''} deberia ser parcial`).toMatch(/WHERE \(deleted_at IS NULL\)/u)
 
     expect(indexes.has('recipes_name_unique')).toBe(false)
+  })
+
+  it('el unico de nombre de proveedor es POR EMPRESA y PARCIAL, y el global ya no esta (R13, R14, R15)', async () => {
+    // El RELEVO de `suppliers_name_unique`, que sale de `PRE_EXISTING_INDEXES` arriba. Los dos
+    // no pueden convivir: con el global en pie, dos empresas seguirian sin poder tener cada una
+    // al mismo proveedor dado de alta.
+    //
+    // Mismo molde que el de recetas, y por el mismo motivo: `suppliers` tiene `deleted_at` (ver
+    // `PARTIAL_INDEXES`), asi que sin el `WHERE deleted_at IS NULL` dar de baja un proveedor
+    // dejaria su nombre ocupado PARA SIEMPRE dentro de la empresa y ninguna alta podria
+    // reusarlo. Por eso el predicado se exige LITERAL y no basta con que haya un `WHERE`
+    // cualquiera: un `WHERE deleted_at IS NOT NULL` tambien traeria la palabra y significaria lo
+    // contrario.
+    const indexes = await readIndexes()
+    const compuesto = indexes.get('suppliers_company_name_unique')
+    expect(compuesto, 'falta suppliers_company_name_unique').toBeDefined()
+    expect(compuesto).toContain('UNIQUE')
+    // `company_id` va DE CABEZA: asi el mismo indice sirve para filtrar el listado por empresa,
+    // sin que la tabla necesite un indice propio de la columna.
+    expect(compuesto).toMatch(/\(company_id, name_normalized\)/u)
+    expect(compuesto, `${compuesto ?? ''} deberia ser parcial`).toMatch(
+      /WHERE \(deleted_at IS NULL\)/u,
+    )
+
+    // FALSABILIDAD, y en memoria para no tocar la base: el mismo `def` que acaba de pasar, con
+    // su `WHERE` recortado, tiene que FALLAR la asercion de arriba. Sin esto, un dia en que
+    // `pg_indexes` devolviera la definicion en otro formato el caso pasaria en verde sin medir
+    // nada, que es exactamente el falso verde que la parcialidad no se puede permitir.
+    const sinWhere = (compuesto ?? '').replace(/\s*WHERE \(deleted_at IS NULL\)/u, '')
+    expect(sinWhere, 'el recorte no quito el WHERE: la falsabilidad no prueba nada').not.toBe(
+      compuesto,
+    )
+    expect(sinWhere).not.toMatch(/WHERE \(deleted_at IS NULL\)/u)
+    // Y lo que NO cambia al recortarlo: sigue siendo UNIQUE y sigue llevando las dos columnas en
+    // orden. Es la prueba de que la asercion del predicado mide el predicado y no otra cosa.
+    expect(sinWhere).toContain('UNIQUE')
+    expect(sinWhere).toMatch(/\(company_id, name_normalized\)/u)
+
+    expect(indexes.has('suppliers_name_unique')).toBe(false)
   })
 
   it('el unico del numero de pedido es POR EMPRESA, y el global ya no esta (QC-60)', async () => {
@@ -432,7 +487,7 @@ describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion 
       const nombreAlta = `Solución Buffer pH 7 ${token()}`
       const created = await createProduct(
         // QC-80 (R21): `NewProduct` ya no lleva unidad; el producto no la declara.
-        { name: nombreAlta, stock: 3, qtyAlert: 1 },
+        { name: nombreAlta, qtyAlert: 1 },
         new Date('2026-01-01T00:00:00Z'),
         ambito(),
       )
@@ -451,7 +506,7 @@ describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion 
       const nombreEdicion = `Hipoclorito de sodio 5% ${token()}`
       const ok = await updateAliveProduct(
         created.id,
-        { name: nombreEdicion, stock: 3, qtyAlert: 1 },
+        { name: nombreEdicion, qtyAlert: 1 },
         new Date('2026-01-02T00:00:00Z'),
         ambito(),
       )
@@ -478,7 +533,7 @@ describe('QC-57 — el adaptador escribe name_normalized en toda alta y edicion 
     let ids: string[] = []
     try {
       const nombre = `Sosa caustica ${token()}`
-      const data = { name: nombre, stock: null, qtyAlert: null, unitId: null }
+      const data = { name: nombre, qtyAlert: null }
 
       const primero = await createProduct(data, new Date('2026-01-01T00:00:00Z'), ambito())
       const segundo = await createProduct(

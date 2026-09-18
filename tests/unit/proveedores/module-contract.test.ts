@@ -209,6 +209,10 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
       const ADAPTADORES_CON_ORM = [
         'lib/modules/proveedores/adapters/driven/persistence/supplier-prisma.ts',
         'lib/modules/proveedores/adapters/driven/persistence/supplier-catalog-line-prisma.ts',
+        // Las envolturas del ambito de empresa se tipan con `Prisma.SupplierWhereInput` y
+        // `Prisma.SupplierCatalogLineWhereInput`, asi que necesitan el tipo del cliente. La
+        // lista sigue siendo EXACTA: un cuarto archivo con Prisma cae aqui igual.
+        'lib/modules/proveedores/adapters/driven/persistence/company-scope.ts',
       ]
       if (!ADAPTADORES_CON_ORM.includes(etiqueta)) {
         expect(source, `${etiqueta} importa @prisma/client`).not.toMatch(/@prisma\/client/)
@@ -272,6 +276,9 @@ describe('lib/modules/proveedores — forma del modulo y frontera de imports', (
       // gemela de `inventario`: importar de otro modulo por una ruta profunda es lo que la
       // regla de dependencias prohibe. La afirmacion sigue siendo la lista EXACTA.
     ).toEqual([
+      // Unico punto donde se escribe la condicion de empresa de las dos tablas: las tres
+      // envolturas salen de aqui y ningun adaptador arma la condicion por su cuenta.
+      'adapters/driven/persistence/company-scope.ts',
       'adapters/driven/persistence/list-query-sql.ts',
       'adapters/driven/persistence/supplier-catalog-line-prisma.ts',
       'adapters/driven/persistence/supplier-prisma.ts',
@@ -586,6 +593,9 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
       'cost',
       'minPurchase',
       'deliveryTime',
+      // La empresa de la linea, escalar y obligatoria: es lo que acota cada consulta y lo
+      // que la clave foranea compuesta obliga a coincidir con la de su proveedor.
+      'companyId',
       'createdBy',
       'updatedBy',
       'createdAt',

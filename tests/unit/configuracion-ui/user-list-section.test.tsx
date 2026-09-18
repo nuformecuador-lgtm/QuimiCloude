@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   USER_COLUMN_COUNT,
+  USER_CREATE_OPEN_TESTID,
   USER_LIST_EMPTY_TESTID,
   USER_LIST_ERROR_CODE_TESTID,
   USER_LIST_ERROR_MESSAGE_TESTID,
@@ -246,6 +247,36 @@ describe('los tres estados son mutuamente excluyentes y se distinguen por data-t
     expect(screen.queryByTestId(USER_LIST_ERROR_TESTID)).toBeNull();
   });
 
+  it('EL ALTA SOBREVIVE AL VACIO: con cero filas el disparador sigue ahi (2026-09-17)', async () => {
+    // La regresion que este caso existe para cerrar. El listado EXCLUYE al actor (R11), asi que una
+    // instalacion recien sembrada —un unico usuario, el que esta mirando la pantalla— ve la lista
+    // vacia con el catalogo lleno. Con el boton dentro de la tabla, ese vacio no tenia ninguna
+    // salida: no habia forma de crear al segundo usuario desde la interfaz.
+    listUsersActionMock.mockResolvedValue(paginaCon([]));
+
+    await renderSeccion();
+
+    expect(screen.getByTestId(USER_LIST_EMPTY_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(USER_CREATE_OPEN_TESTID)).toBeEnabled();
+  });
+
+  it('y con filas tambien: el alta no depende del estado de la lista', async () => {
+    await renderSeccion();
+
+    expect(screen.getByTestId(USER_LIST_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(USER_CREATE_OPEN_TESTID)).toBeEnabled();
+  });
+
+  it('sin `usuarios.modificar` no hay alta, ni con filas ni sin ellas (R6)', async () => {
+    await renderSeccion(parametros(), false);
+    expect(screen.queryByTestId(USER_CREATE_OPEN_TESTID)).toBeNull();
+
+    cleanup();
+    listUsersActionMock.mockResolvedValue(paginaCon([]));
+    await renderSeccion(parametros(), false);
+    expect(screen.queryByTestId(USER_CREATE_OPEN_TESTID)).toBeNull();
+  });
+
   it('error: mensaje DEVUELTO, codigo estable y accion de reintentar (R19)', async () => {
     listUsersActionMock.mockResolvedValue({
       status: 'error',
@@ -268,6 +299,35 @@ describe('los tres estados son mutuamente excluyentes y se distinguen por data-t
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.queryByTestId(USER_LIST_TESTID)).toBeNull();
     expect(screen.queryByTestId(USER_LIST_EMPTY_TESTID)).toBeNull();
+  });
+
+  it('Y EN ERROR TAMBIEN: la lista fallo, pero el alta sigue ofreciendose', async () => {
+    // El alta no depende de la lista: tiene su propia autorizacion en el caso de uso. Dejarla
+    // fuera de este estado reabriria el mismo callejon por otra puerta —un parpadeo de la base en
+    // una instalacion recien sembrada y no hay forma de crear a nadie—.
+    listUsersActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unexpected',
+      message: 'Ocurrio un error inesperado.',
+    });
+
+    await renderSeccion();
+
+    expect(screen.getByTestId(USER_LIST_ERROR_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(USER_CREATE_OPEN_TESTID)).toBeEnabled();
+  });
+
+  it('pero sin `usuarios.modificar` el error tampoco trae alta (R6)', async () => {
+    listUsersActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unexpected',
+      message: 'Ocurrio un error inesperado.',
+    });
+
+    await renderSeccion(parametros(), false);
+
+    expect(screen.getByTestId(USER_LIST_ERROR_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(USER_CREATE_OPEN_TESTID)).toBeNull();
   });
 
   it('cargando: mientras la lista esta en vuelo, la pagina pinta el esqueleto (R19)', async () => {

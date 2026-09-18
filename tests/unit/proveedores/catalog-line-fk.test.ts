@@ -107,6 +107,34 @@ describe('clasificacion de las violaciones de restriccion de la linea (QC-52 T13
     expect(classifyForeignKeyViolation('')).toBe('unknown')
   })
 
+  it('R6 — las DOS restricciones compuestas nuevas caen en su lado sin tocar la funcion', () => {
+    // El aislamiento por empresa anadio dos FK COMPUESTAS y dos FK simples a `companies`, y
+    // `classifyForeignKeyViolation` NO se modifico: los nombres nuevos encajan solos en su
+    // orden de comprobacion. Esto lo deja probado en vez de deducido.
+    //
+    // La compuesta del proveedor contiene `supplier_id`, asi que clasifica como el proveedor:
+    // que la linea contradiga la empresa de su proveedor es, para quien llama, el mismo
+    // desenlace que un proveedor que no existe.
+    expect(classifyForeignKeyViolation('supplier_catalog_lines_company_id_supplier_id_fkey')).toBe(
+      'supplier',
+    )
+    // La de la presentacion NO contiene `supplier_id` -y el orden de los `if` importa-, asi que
+    // clasifica como referencia de catalogo, igual que la FK simple de la presentacion.
+    expect(
+      classifyForeignKeyViolation('supplier_catalog_lines_company_id_presentation_id_fkey'),
+    ).toBe('catalog_reference')
+    expect(
+      classifyForeignKeyViolation('supplier_catalog_lines_company_id_presentation_id_fkey'),
+    ).not.toBe('supplier')
+
+    // Y las dos FK SIMPLES a `companies` no se traducen: la empresa la pone el ambito del
+    // servicio, nunca la entrada, asi que un `23503` contra ellas es un fallo del sistema y no
+    // un caso de negocio. Se relanza crudo, que es lo que `'unknown'` provoca.
+    expect(classifyForeignKeyViolation('supplier_catalog_lines_company_id_fkey')).toBe('unknown')
+    expect(classifyForeignKeyViolation('suppliers_company_id_fkey')).toBe('unknown')
+    expect(classifyForeignKeyViolation('company_id')).toBe('unknown')
+  })
+
   it('el reconocedor del proveedor solo dispara con un P2003 que nombre su columna', () => {
     // R23. Que hoy el conector no entregue el nombre significa que esta funcion devuelve
     // `false` en ejecucion; el camino de negocio no depende de ella, porque `create`

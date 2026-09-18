@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  WORK_GROUP_CREATE_OPEN_TESTID,
   WORK_GROUP_LIST_EMPTY_TESTID,
   WORK_GROUP_LIST_ERROR_CODE_TESTID,
   WORK_GROUP_LIST_ERROR_MESSAGE_TESTID,
@@ -196,6 +197,63 @@ describe('los tres estados son mutuamente excluyentes y se distinguen por data-t
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.queryByTestId(WORK_GROUP_LIST_TESTID)).toBeNull();
     expect(screen.queryByTestId(WORK_GROUP_LIST_ERROR_TESTID)).toBeNull();
+  });
+
+  it('EL ALTA SOBREVIVE AL VACIO: con cero grupos el disparador sigue ahi (2026-09-17)', async () => {
+    // La regresion que este caso existe para cerrar, y aqui era permanente: NADIE siembra grupos,
+    // asi que toda instalacion arranca en cero. Con el boton dentro de la tabla —que el vacio no
+    // monta— el primer grupo no se podia crear nunca desde la interfaz.
+    listWorkGroupsActionMock.mockResolvedValue(paginaCon([]));
+
+    await renderSeccion();
+
+    expect(screen.getByTestId(WORK_GROUP_LIST_EMPTY_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(WORK_GROUP_CREATE_OPEN_TESTID)).toBeEnabled();
+  });
+
+  it('y con filas tambien: el alta no depende del estado de la lista', async () => {
+    await renderSeccion();
+
+    expect(screen.getByTestId(WORK_GROUP_LIST_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(WORK_GROUP_CREATE_OPEN_TESTID)).toBeEnabled();
+  });
+
+  it('sin `usuarios.modificar` no hay alta, ni con filas ni sin ellas (R9)', async () => {
+    await renderSeccion(parametros(), false);
+    expect(screen.queryByTestId(WORK_GROUP_CREATE_OPEN_TESTID)).toBeNull();
+
+    cleanup();
+    listWorkGroupsActionMock.mockResolvedValue(paginaCon([]));
+    await renderSeccion(parametros(), false);
+    expect(screen.queryByTestId(WORK_GROUP_CREATE_OPEN_TESTID)).toBeNull();
+  });
+
+  it('Y EN ERROR TAMBIEN: la lista fallo, pero el alta sigue ofreciendose', async () => {
+    // Aqui es aun mas caro dejarla fuera: los grupos nacen en cero, asi que un fallo de lectura en
+    // una instalacion nueva volveria a dejar el primer grupo sin ninguna via.
+    listWorkGroupsActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unexpected',
+      message: 'Ocurrio un error inesperado.',
+    });
+
+    await renderSeccion();
+
+    expect(screen.getByTestId(WORK_GROUP_LIST_ERROR_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(WORK_GROUP_CREATE_OPEN_TESTID)).toBeEnabled();
+  });
+
+  it('pero sin `usuarios.modificar` el error tampoco trae alta (R9)', async () => {
+    listWorkGroupsActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unexpected',
+      message: 'Ocurrio un error inesperado.',
+    });
+
+    await renderSeccion(parametros(), false);
+
+    expect(screen.getByTestId(WORK_GROUP_LIST_ERROR_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(WORK_GROUP_CREATE_OPEN_TESTID)).toBeNull();
   });
 
   it('error: mensaje DEVUELTO, codigo estable y accion de reintentar (R19)', async () => {

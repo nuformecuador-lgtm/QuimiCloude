@@ -36,6 +36,7 @@ import type { Actor } from '@/lib/modules/proveedores/domain/actor'
 import type { CatalogLineView } from '@/lib/modules/proveedores/domain/catalog-line-view'
 import type { ListQueryLog } from '@/lib/modules/proveedores/ports/list-query-log'
 import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/supplier-catalog-repository'
+import type { UnitCatalog } from '@/lib/modules/unidades'
 
 const moduloDir = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -52,10 +53,29 @@ const read = (...partes: readonly string[]): string =>
 // QC-74 (R18): el actor no lleva nombre de rol, lleva su conjunto de permisos.
 const ADMIN: Actor = {
   id: '11111111-1111-4111-8111-111111111111',
+  companyId: '99999999-9999-4999-8999-999999999999',
   permissions: ['proveedores.consultar', 'proveedores.modificar'],
 }
 const AHORA = new Date('2026-09-04T12:00:00.000Z')
 const now = () => AHORA
+
+/** Doble del catalogo de unidades: resuelve cualquier id pedido, para que los casos que
+ *  traen unidad sigan aceptandola sin que este archivo tenga que probar `unidades`.
+ *
+ *  El puerto publica un segundo metodo que este modulo no usa. Se dobla LANZANDO y no
+ *  devolviendo vacio: si alguna llamada nueva lo alcanzara, es un acoplamiento que tiene que
+ *  salir en rojo aqui en vez de pasar en silencio. */
+const sinHermanasDeBase = () =>
+  vi.fn(async (): Promise<never> => {
+    throw new Error('proveedores no pide unidades hermanas de base')
+  })
+
+const units: UnitCatalog = {
+  findRefs: vi.fn(async (ids: readonly string[]) =>
+    ids.map((id) => ({ id, name: 'kg', symbol: 'kg', baseUnitId: null, factor: null })),
+  ),
+  findRefsSharingBaseInCompany: sinHermanasDeBase(),
+}
 
 const SUPPLIER_ID = '22222222-2222-4222-8222-222222222222'
 const PRESENTACION_A = '33333333-3333-4333-8333-333333333333'
@@ -129,6 +149,85 @@ function linea(id: string, name: string, presentationId: string): CatalogLineVie
   }
 }
 
+describe('el ambito de empresa de los cuatro casos de uso del catalogo (QC-59 T34)', () => {
+  it('R21, R30 — cada uno pasa `{ companyId: actor.companyId }` como ULTIMO argumento del puerto', async () => {
+    const { repo, spies } = makeCatalog()
+
+    await createCreateCatalogLine({ catalog: repo, units, now })(ALTA_VALIDA, ADMIN)
+    await createUpdateCatalogLine({ catalog: repo, units, now })('linea-1', CAMPOS_VALIDOS, ADMIN)
+    await createDeleteCatalogLine({ catalog: repo, now })('linea-1', ADMIN)
+    await createListCatalogLines({ catalog: repo, log: logMudo() })(SUPPLIER_ID, { page: 1 }, ADMIN)
+
+    const AMBITO = { companyId: ADMIN.companyId }
+    for (const [metodo, espia] of Object.entries(spies)) {
+      expect(espia, `${metodo} no se ejercito`).toHaveBeenCalledTimes(1)
+      const args = espia.mock.calls[0] as unknown as readonly unknown[]
+      expect(args[args.length - 1], `${metodo}: el ambito no es el del actor`).toStrictEqual(AMBITO)
+    }
+  })
+
+  it('R18 — la unidad se resuelve contra `unidades` con la empresa DEL ACTOR, y solo si la entrada la trae', async () => {
+    // La semantica «de sistema o de la empresa» no se reescribe aqui: la pone `unidades`. Lo
+    // que este modulo tiene que hacer bien es pasar la empresa en cuyo nombre pregunta.
+    const { repo } = makeCatalog()
+    const findRefs = vi.fn(async (ids: readonly string[]) =>
+      ids.map((id) => ({ id, name: 'kg', symbol: 'kg', baseUnitId: null, factor: null })),
+    )
+    const conUnidad: UnitCatalog = {
+      findRefs,
+      findRefsSharingBaseInCompany: sinHermanasDeBase(),
+    }
+
+    await createCreateCatalogLine({ catalog: repo, units: conUnidad, now })(
+      { ...ALTA_VALIDA, unitId: UNIDAD },
+      ADMIN,
+    )
+    expect(findRefs.mock.calls[0]).toEqual([[UNIDAD], ADMIN.companyId])
+
+    await createUpdateCatalogLine({ catalog: repo, units: conUnidad, now })(
+      'linea-1',
+      { ...CAMPOS_VALIDOS, unitId: UNIDAD },
+      ADMIN,
+    )
+    expect(findRefs.mock.calls[1]).toEqual([[UNIDAD], ADMIN.companyId])
+
+    // Sin unidad no se le pregunta nada: la ausencia sigue siendo un valor valido de la linea.
+    findRefs.mockClear()
+    await createCreateCatalogLine({ catalog: repo, units: conUnidad, now })(
+      { ...ALTA_VALIDA, unitId: null },
+      ADMIN,
+    )
+    expect(findRefs).not.toHaveBeenCalled()
+  })
+
+  it('R18 — una unidad que `unidades` no resuelve para esa empresa es entrada invalida, y no se escribe nada', async () => {
+    // El doble devuelve vacio, que es como `unidades` reporta «no existe o es de otra
+    // empresa»: los dos casos son el mismo desenlace y ninguno llega al repositorio.
+    const { repo, spies } = makeCatalog()
+    const ajena: UnitCatalog = {
+      findRefs: vi.fn(async () => []),
+      findRefsSharingBaseInCompany: sinHermanasDeBase(),
+    }
+
+    await expect(
+      createCreateCatalogLine({ catalog: repo, units: ajena, now })(
+        { ...ALTA_VALIDA, unitId: UNIDAD },
+        ADMIN,
+      ),
+    ).rejects.toBeInstanceOf(ValidationError)
+    await expect(
+      createUpdateCatalogLine({ catalog: repo, units: ajena, now })(
+        'linea-1',
+        { ...CAMPOS_VALIDOS, unitId: UNIDAD },
+        ADMIN,
+      ),
+    ).rejects.toBeInstanceOf(ValidationError)
+
+    expect(spies.create).not.toHaveBeenCalled()
+    expect(spies.replaceAlive).not.toHaveBeenCalled()
+  })
+})
+
 describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => {
   it('ninguno de los cuatro casos de uso depende del modulo inventario', () => {
     // R18, y es el corazon de la ficha. Se mide sobre el TIPO `*Deps` de cada caso de uso,
@@ -137,8 +236,18 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     //
     // Mutacion que lo pone rojo: devolver `readonly products: ProductCatalog` a cualquiera
     // de los dos casos de uso que lo tenian.
-    expect(clavesDelTipoDeps(read('domain', 'create-catalog-line.ts'))).toEqual(['catalog', 'now'])
-    expect(clavesDelTipoDeps(read('domain', 'update-catalog-line.ts'))).toEqual(['catalog', 'now'])
+    // `create`/`update` ganan `units` (R18, decision cerrada): es la unica costura nueva y es
+    // hacia `unidades`, no hacia `inventario`.
+    expect(clavesDelTipoDeps(read('domain', 'create-catalog-line.ts'))).toEqual([
+      'catalog',
+      'now',
+      'units',
+    ])
+    expect(clavesDelTipoDeps(read('domain', 'update-catalog-line.ts'))).toEqual([
+      'catalog',
+      'now',
+      'units',
+    ])
     expect(clavesDelTipoDeps(read('domain', 'delete-catalog-line.ts'))).toEqual(['catalog', 'now'])
     // QC-57 (R6) le anade el puerto del LOG de campos omitidos, y nada mas: sigue sin
     // conocer `inventario`, que es lo que este caso vigila.
@@ -166,12 +275,12 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     // siete campos, el proveedor y nada mas.
     const { repo, spies } = makeCatalog()
 
-    const creada = await createCreateCatalogLine({ catalog: repo, now })(
+    const creada = await createCreateCatalogLine({ catalog: repo, units, now })(
       { ...ALTA_VALIDA, unitId: UNIDAD, imagePath: 'catalogo/x.png', minPurchase: '2.5' },
       ADMIN,
     )
     expect(creada).toEqual({ id: 'linea-1' })
-    expect(spies.create).toHaveBeenCalledWith(expect.anything(), ADMIN.id, AHORA)
+    expect(spies.create).toHaveBeenCalledWith(expect.anything(), ADMIN.id, AHORA, expect.anything())
     expect(spies.create.mock.calls[0]?.[0]).toEqual({
       supplierId: SUPPLIER_ID,
       name: 'Acido citrico',
@@ -184,7 +293,7 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     })
 
     // R10: lo que no se indica llega como AUSENCIA explicita, nunca como `undefined`.
-    await createCreateCatalogLine({ catalog: repo, now })(
+    await createCreateCatalogLine({ catalog: repo, units, now })(
       { supplierId: SUPPLIER_ID, name: 'Sosa', presentationId: PRESENTACION_A, cost: '1.0000' },
       ADMIN,
     )
@@ -206,7 +315,7 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     // `strictObject` a `object`.
     const { repo, spies } = makeCatalog()
 
-    const fallo = await createCreateCatalogLine({ catalog: repo, now })(
+    const fallo = await createCreateCatalogLine({ catalog: repo, units, now })(
       { ...ALTA_VALIDA, productId: '66666666-6666-4666-8666-666666666666' },
       ADMIN,
     ).catch((error: unknown) => error)
@@ -223,7 +332,7 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     // no intenta ninguna segunda escritura.
     const alta = makeCatalog({ create: vi.fn(async () => 'duplicate' as const) })
 
-    const fallo = await createCreateCatalogLine({ catalog: alta.repo, now })(
+    const fallo = await createCreateCatalogLine({ catalog: alta.repo, units, now })(
       ALTA_VALIDA,
       ADMIN,
     ).catch((error: unknown) => error)
@@ -236,7 +345,7 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     // el mismo `code` (R24 remite a R15): no se introduce un codigo nuevo para un caso que
     // ya tiene uno (R32).
     const edicion = makeCatalog({ replaceAlive: vi.fn(async () => 'duplicate' as const) })
-    const falloEdicion = await createUpdateCatalogLine({ catalog: edicion.repo, now })(
+    const falloEdicion = await createUpdateCatalogLine({ catalog: edicion.repo, units, now })(
       'linea-1',
       CAMPOS_VALIDOS,
       ADMIN,
@@ -247,7 +356,7 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     // Y el proveedor inexistente o dado de baja es «no encontrado», no un duplicado (R23).
     const sinProveedor = makeCatalog({ create: vi.fn(async () => 'supplier_not_found' as const) })
     await expect(
-      createCreateCatalogLine({ catalog: sinProveedor.repo, now })(ALTA_VALIDA, ADMIN),
+      createCreateCatalogLine({ catalog: sinProveedor.repo, units, now })(ALTA_VALIDA, ADMIN),
     ).rejects.toBeInstanceOf(SupplierNotFoundError)
   })
 
@@ -258,7 +367,7 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     // edicion para que lo admita.
     const { repo, spies } = makeCatalog()
 
-    await createUpdateCatalogLine({ catalog: repo, now })(
+    await createUpdateCatalogLine({ catalog: repo, units, now })(
       'linea-1',
       {
         name: '  Sosa caustica  ',
@@ -271,7 +380,13 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
       },
       ADMIN,
     )
-    expect(spies.replaceAlive).toHaveBeenCalledWith('linea-1', expect.anything(), ADMIN.id, AHORA)
+    expect(spies.replaceAlive).toHaveBeenCalledWith(
+      'linea-1',
+      expect.anything(),
+      ADMIN.id,
+      AHORA,
+      expect.anything(),
+    )
     expect(spies.replaceAlive.mock.calls[0]?.[1]).toEqual({
       // El nombre llega ya RECORTADO: lo hizo el esquema, antes de salir del borde (R14).
       name: 'Sosa caustica',
@@ -284,7 +399,7 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     })
 
     // R10: lo que no se indica llega como AUSENCIA explicita, nunca como `undefined`.
-    await createUpdateCatalogLine({ catalog: repo, now })(
+    await createUpdateCatalogLine({ catalog: repo, units, now })(
       'linea-1',
       { name: 'Sosa', presentationId: PRESENTACION_A, cost: '9.0000' },
       ADMIN,
@@ -302,7 +417,7 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     // Intentar cambiar de proveedor es entrada INVALIDA, no un campo ignorado, y no llega
     // ninguna escritura al puerto.
     const conProveedor = makeCatalog()
-    const fallo = await createUpdateCatalogLine({ catalog: conProveedor.repo, now })(
+    const fallo = await createUpdateCatalogLine({ catalog: conProveedor.repo, units, now })(
       'linea-1',
       { ...CAMPOS_VALIDOS, supplierId: '77777777-7777-4777-8777-777777777777' },
       ADMIN,
@@ -315,7 +430,7 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     // encontrado»: los tres son el mismo caso para el dominio (R23).
     const vacio = makeCatalog({ replaceAlive: vi.fn(async () => 'not_found' as const) })
     await expect(
-      createUpdateCatalogLine({ catalog: vacio.repo, now })('linea-x', CAMPOS_VALIDOS, ADMIN),
+      createUpdateCatalogLine({ catalog: vacio.repo, units, now })('linea-x', CAMPOS_VALIDOS, ADMIN),
     ).rejects.toBeInstanceOf(CatalogLineNotFoundError)
   })
 
@@ -326,7 +441,12 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     // sellar.
     const { repo, spies } = makeCatalog()
     await createDeleteCatalogLine({ catalog: repo, now })('linea-1', ADMIN)
-    expect(spies.softDeleteAlive).toHaveBeenCalledWith('linea-1', ADMIN.id, AHORA)
+    expect(spies.softDeleteAlive).toHaveBeenCalledWith(
+      'linea-1',
+      ADMIN.id,
+      AHORA,
+      expect.anything(),
+    )
 
     // QC-43 R48 DEROGADA ENTERA (P5): la baja de una linea inexistente, de una ya dada de
     // baja o de una cuyo PROVEEDOR esta dado de baja responde «no encontrado», igual que las
@@ -363,12 +483,11 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
     // QC-57 (R13): al puerto llega el CONTRATO GENERICO ya saneado, no `{ page }` a secas. Sin
     // orden, sin filtros y sin busqueda es exactamente la lista de siempre (R11), asi que este
     // caso sigue midiendo lo mismo y no se relaja ningun aserto.
-    expect(spies.listBySupplierAlive).toHaveBeenCalledWith(SUPPLIER_ID, {
-      page: 1,
-      sort: null,
-      filters: {},
-      search: '',
-    })
+    expect(spies.listBySupplierAlive).toHaveBeenCalledWith(
+      SUPPLIER_ID,
+      { page: 1, sort: null, filters: {}, search: '' },
+      expect.anything(),
+    )
     expect(spies.listBySupplierAlive).toHaveBeenCalledTimes(1)
     expect(pagina.total).toBe(2)
     // R16 visto desde el dominio: dos lineas del MISMO nombre en presentaciones distintas

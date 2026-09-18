@@ -371,3 +371,37 @@ describe('down.sql — reversion exacta', () => {
     )
   })
 })
+
+describe('20260917120000_drop_product_stock — quita la columna, su CHECK y su indice', () => {
+  const dropMigrationDir = join(repoRoot, 'db', 'migrations', '20260917120000_drop_product_stock')
+  const dropDownSource = readFileSync(join(dropMigrationDir, 'down.sql'), 'utf8')
+  const dropUp = statements(readFileSync(join(dropMigrationDir, 'migration.sql'), 'utf8'))
+  const dropDown = statements(dropDownSource)
+
+  it('R2: migration.sql dropea el indice, el CHECK y la columna, en ese orden y sin leer datos', () => {
+    expect(dropUp).toHaveLength(3)
+    expect(dropUp[0]).toMatch(/^DROP INDEX IF EXISTS "products_stock_idx"$/i)
+    expect(dropUp[1]).toMatch(
+      /^ALTER TABLE "products" DROP CONSTRAINT IF EXISTS "products_stock_non_negative"$/i,
+    )
+    expect(dropUp[2]).toMatch(/^ALTER TABLE "products" DROP COLUMN "stock"$/i)
+    // Ningun SELECT, INSERT ni UPDATE: nada de esta migracion lee ni traslada valores.
+    for (const statement of dropUp) {
+      expect(statement).not.toMatch(/^(SELECT|INSERT|UPDATE)\b/i)
+    }
+  })
+
+  it('R2: down.sql restaura la columna, el CHECK y el indice vacios de datos', () => {
+    expect(dropDown).toHaveLength(3)
+    expect(dropDown[0]).toMatch(/^ALTER TABLE "products" ADD COLUMN "stock" INTEGER$/i)
+    expect(dropDown[1]).toMatch(
+      /^ALTER TABLE "products" ADD CONSTRAINT "products_stock_non_negative" CHECK \("stock" >= 0\)$/i,
+    )
+    expect(dropDown[2]).toMatch(
+      /^CREATE INDEX "products_stock_idx" ON "products" \("stock"\) WHERE "deleted_at" IS NULL$/i,
+    )
+    // Nada rellena la columna restaurada: vuelve a NULL para todas las filas (riesgo aceptado).
+    const dropDownEjecutable = stripSqlComments(dropDownSource)
+    expect(dropDownEjecutable).not.toMatch(/UPDATE\s+"products"/i)
+  })
+})

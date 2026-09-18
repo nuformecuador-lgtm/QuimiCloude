@@ -3944,3 +3944,40 @@ reinyectó los 31 requisitos—, reparado en `3f75b9b`.
 aviso no se relee del pedido, así que es falsificable escribiendo el parámetro a mano, sin XSS ni
 fuga entre empresas—. Y dos rojos de `ciclo-de-vida-de-la-base.int.test.ts` **descartados como flake
 de máquina y NO metidos al baseline**: la rama no toca ese archivo y en aislamiento pasan los cinco.
+
+## QC-91 — existencia-por-lote (cerrada el 2026-09-17)
+
+**PR #83**, merge `b579707`. Zona `fullstack`, `complexity: high`. Épica *Inventario*.
+
+`products.stock` desaparece: la existencia pasa a ser la **suma de los lotes**, calculada al
+consultar y **una por unidad** («10 kg · 20 L»), sin conversión. Toca inventario, recetas y pedidos.
+
+**Resultado**: R1-R23, 13 tasks, trazabilidad **23/23** verificada abriendo cada `archivo:línea`.
+`./init.sh` completo verde sobre la rama sincronizada (521 archivos, 7553 passed, 0 rojos). Trae el
+**E2E que QC-81 difirió expresamente** aquí: 14 passed en chromium y webkit. Sin dependencias nuevas.
+
+**La lección de la ficha son las guardias de censo.** Tropezó **tres veces** con el patrón que el
+board tiene fichado como **QC-99** —una guardia que afirma un estado que la ficha siguiente está
+autorizada a cambiar— y las tres se resolvieron sin propagarlo: la de `recetas-ui` se **acotó a su
+propia rama** (`dfe1a9a`, precedente `8bf3dd5`), probada por mutación y reproducida por el reviewer;
+de la de QC-81 se **borró el caso derogado** (`67363de`) en vez de invertirlo, porque invertirlo
+habría creado la misma trampa a QC-121; y **el censo que `tasks.md` pedía para T10 no se escribió**,
+por el mismo motivo. Esa última fue una desviación del spec, firmada por el implementer y validada
+por el reviewer midiendo que no dejaba agujero: lo que el censo habría cubierto de más ya lo cierra
+el typecheck.
+
+**Una decisión de producto nació a mitad y NO se metió aquí**: «el nombre se puede duplicar, pero si
+las unidades no concuerdan es otro ítem», que devolverá `products.stock` como columna calculada.
+Salió **QC-121**, bloqueada por esta. Se partió en dos en vez de reabrir tres decisiones con 9 de 13
+tasks hechas, y lo construido se reutiliza entero: cuando las unidades no puedan mezclarse,
+`sumStockByUnit` devolverá siempre un solo valor.
+
+**F2.3 fue el paso caro**: 104 commits de `dev` (QC-50 y QC-63). Dos conflictos, ninguno ambiguo, y
+**cuatro roturas que git no marcó** —dobles con la forma vieja de `ProductRef`, algunos en un módulo
+llegado de `dev` que nunca vio el cambio—. El mapa de trazabilidad se re-midió tras el merge: seis
+`archivo:línea` se habían desplazado y habrían mandado a la review a líneas equivocadas.
+
+**Un rojo de gate diagnosticado y descartado**: `product-batch-lot.int.test.ts` murió con
+`Transaction API error: Unable to start a transaction in the given time` —pool agotado, no
+aserción—; aislado pasó 3/3 y en la repetición del gate pasó. Saturación, con otras dos sesiones
+trabajando en la misma máquina.

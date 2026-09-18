@@ -122,9 +122,17 @@ const FULL_INDEXES = [
 const ALL_INDEXES = [...PARTIAL_INDEXES, ...FULL_INDEXES] as const
 
 /**
- * Los que YA existian antes de esta migracion. No se recrean y —sobre todo— el `down.sql` NO
- * puede nombrarlos: un `DROP INDEX` de mas aqui se llevaria por delante la unicidad de
- * recetas, proveedores, presentaciones, unidades o lineas de catalogo.
+ * Nombres de indice que el TEXTO de esta migracion no puede contener, ni en el UP ni en el
+ * `down.sql`. No es un censo de lo que existe en la base: es una afirmacion sobre este archivo
+ * y solo sobre el. No se recrean y —sobre todo— no se borran: un `DROP INDEX` de mas aqui se
+ * llevaria por delante la unicidad de recetas, proveedores, presentaciones, unidades o lineas
+ * de catalogo.
+ *
+ * Por eso los nombres de indices YA RELEVADOS se conservan en la lista aunque su indice ya no
+ * exista en la base: que otra ficha los haya sustituido no le da a esta migracion ningun
+ * derecho nuevo sobre ellos, ni para crearlos ni para borrarlos. Sacarlos seria aflojar la
+ * lista, no actualizarla. Y por el mismo motivo entran tambien los objetos NUEVOS que otras
+ * fichas crean sobre estas tablas: esta migracion tampoco puede nombrarlos.
  */
 const PRE_EXISTING_INDEXES = [
   'presentations_name_normalized_key',
@@ -139,6 +147,22 @@ const PRE_EXISTING_INDEXES = [
   'orders_recipe_id_idx',
   'orders_unit_id_idx',
   'orders_order_year_order_sequence_key',
+  // 2026-09-17 - los tres objetos con los que el ambito de empresa dota a `suppliers` y a
+  // `supplier_catalog_lines`. Nacen en su propia migracion, muy posterior a esta, asi que esta
+  // no los puede nombrar de ninguna forma; si un dia apareciera aqui un `CREATE` o un `DROP`
+  // con cualquiera de ellos, seria alcance de otra ficha metido en este archivo. Se nombran uno
+  // a uno, como todo lo demas de la lista, para que un cuarto objeto nuevo siga sin cobertura y
+  // haya que pensarlo.
+  //
+  // El unico compuesto y parcial del nombre de proveedor, que releva al global
+  // `suppliers_name_unique` -que sigue arriba, y sigue por el mismo motivo: relevado no es lo
+  // mismo que disponible-.
+  'suppliers_company_name_unique',
+  // La clave candidata `(company_id, id)` del proveedor: destino de la clave foranea compuesta
+  // que obliga a que la linea y su proveedor sean de la misma empresa.
+  'suppliers_company_id_id_key',
+  // El indice del lado hijo de esa misma clave foranea compuesta, con la empresa de cabeza.
+  'supplier_catalog_lines_company_id_supplier_id_idx',
 ] as const
 
 /** Restricciones escritas A MANO que Prisma no conoce (`design.md > 10.3`). */
@@ -339,5 +363,16 @@ describe('down.sql — revierte exactamente el up (R22)', () => {
     expect(dropColumns).toHaveLength(1)
     const alters = down.filter((s) => /^ALTER TABLE/iu.test(s))
     expect(alters).toHaveLength(1)
+  })
+})
+
+describe('R2: products_stock_idx, creado aqui, se dropea con el nombre exacto en la migracion que lo quita', () => {
+  it('el nombre que crea esta migracion es el mismo que dropea 20260917120000_drop_product_stock', () => {
+    const creado = up.find((s) => s.includes('"products_stock_idx"'))
+    expect(creado, 'esta migracion sigue creando products_stock_idx').toBeDefined()
+
+    const dropMigrationDir = join(repoRoot, 'db', 'migrations', '20260917120000_drop_product_stock')
+    const dropUpSource = readFileSync(join(dropMigrationDir, 'migration.sql'), 'utf8')
+    expect(stripSqlComments(dropUpSource)).toMatch(/DROP INDEX IF EXISTS "products_stock_idx"/iu)
   })
 })
