@@ -12,7 +12,7 @@
 
 ## Backend
 
-- [ ] **T1 — Instalar las dos dependencias y verificar su API publicada.**
+- [x] **T1 — Instalar las dos dependencias y verificar su API publicada.**
   Depende de: F1.4 (filas escritas).
   Archivos: `package.json`, `pnpm-lock.yaml`, `progress/impl_QC-73-limite-de-peticiones-por-origen.md`.
   Hacer: `pnpm add @upstash/ratelimit @upstash/redis`. Leer en `node_modules` —no de memoria— y
@@ -24,7 +24,7 @@
   Hecho cuando: `guard-dependencias-aprobadas` en verde y la nota existe con las seis respuestas. Si
   alguna contradice `design.md > 9`, **se para y se sube al leader**.
 
-- [ ] **T2 [P] — Dominio: origen de la petición.**
+- [x] **T2 [P] — Dominio: origen de la petición.**
   Archivos: `lib/modules/rate-limit/domain/request-origin.ts`, `lib/modules/rate-limit/index.ts`,
   `tests/unit/rate-limit/request-origin.test.ts`.
   Hacer: `resolveRequestOrigin(forwardedFor)` y `UNKNOWN_ORIGIN`, validando con los validadores de IP
@@ -33,7 +33,7 @@
   Hecho cuando: los casos IPv4, IPv6, lista con varias entradas, espacios, cabecera ausente, vacía y
   basura tienen test y pasan.
 
-- [ ] **T3 [P] — Dominio: configuración de cuotas.**
+- [x] **T3 [P] — Dominio: configuración de cuotas.**
   Archivos: `lib/modules/rate-limit/domain/rate-limit-config.ts`, `tests/unit/rate-limit/rate-limit-config.test.ts`.
   Hacer: `parseRateLimitConfig(env)` → `{ config, warnings }` con los cinco valores de
   `design.md > 7`; un aviso por variable inválida que la nombra (sin su valor).
@@ -42,14 +42,14 @@
   decimal y texto, y uno que afirma que con los valores por defecto login admite menos pet/s que
   general.
 
-- [ ] **T4 [P] — Dominio: qué cuota le toca a la petición.**
+- [x] **T4 [P] — Dominio: qué cuota le toca a la petición.**
   Archivos: `lib/modules/rate-limit/domain/rate-limit-bucket.ts`, `tests/unit/rate-limit/rate-limit-bucket.test.ts`.
   Hacer: `selectBucket(pathname, loginRoute)`; la ruta de login entra por parámetro.
   R: R2, R3.
   Hecho cuando: `/login` → `login`; `/login/…`, `/`, `/dashboard`, `/establecer-contrasena/x` →
   `general`, con test.
 
-- [ ] **T5 [P] — Dominio: la respuesta de freno.**
+- [x] **T5 [P] — Dominio: la respuesta de freno.**
   Archivos: `lib/modules/rate-limit/domain/rate-limited-response.ts`, `tests/unit/rate-limit/rate-limited-response.test.ts`.
   Hacer: `RATE_LIMITED_MESSAGE` (texto exacto de D4), `renderRateLimitedPage()` (HTML con
   `lang="es"`, `meta viewport` de ancho de dispositivo, texto ≥ 16 px, `min-height: 100dvh` y nunca
@@ -59,7 +59,7 @@
   de tiempo, la presencia del viewport y del tamaño, y que `isRateLimitedError` es cierto solo para
   un `Error` con ese mensaje exacto (falso para otro `Error`, para un texto parecido y para no-`Error`).
 
-- [ ] **T6 — Puerto y caso de uso con espera máxima.**
+- [x] **T6 — Puerto y caso de uso con espera máxima.**
   Depende de: T3, T4.
   Archivos: `lib/modules/rate-limit/ports/rate-limiter.ts`, `lib/modules/rate-limit/domain/check-request-rate.ts`,
   `tests/unit/rate-limit/check-request-rate.test.ts`.
@@ -71,7 +71,7 @@
   `timeoutMs` exactos y no después; uno que rechaza da `degraded/error` con el nombre del error; uno
   que dice `allowed:false` da `block`.
 
-- [ ] **T7 [P] — Adaptador en memoria.**
+- [x] **T7 [P] — Adaptador en memoria.**
   Depende de: T6 (puerto).
   Archivos: `lib/modules/rate-limit/adapters/driven/in-memory-rate-limiter.ts`,
   `tests/unit/rate-limit/in-memory-rate-limiter.test.ts`, `tests/unit/rate-limit/rate-limiter-contract.ts`
@@ -81,7 +81,7 @@
   Hecho cuando: la batería de contrato (max permitidas y la max+1 frenada; dos orígenes
   independientes; vuelve a pasar al cambiar de ventana) pasa contra este adaptador.
 
-- [ ] **T8 — Adaptador de Upstash.**
+- [x] **T8 — Adaptador de Upstash.**
   Depende de: T1, T6.
   Archivos: `lib/modules/rate-limit/adapters/driven/upstash-rate-limiter.ts`,
   `tests/unit/rate-limit/upstash-rate-limiter.test.ts`.
