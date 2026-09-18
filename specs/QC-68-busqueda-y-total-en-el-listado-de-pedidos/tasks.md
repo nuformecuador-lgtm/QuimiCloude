@@ -78,7 +78,7 @@
 - **Hecho**: `requirePermission` sigue siendo la primera sentencia del cuerpo; la empresa sigue
   saliendo del actor; el caso de uso no importa nada nuevo fuera del barrel de `recetas`.
 
-### T8 — El `where` del adaptador (depende de T6)
+### T8 [x] — El `where` del adaptador (depende de T6)
 - **Toca**: `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts`
 - `buildOrderWhere(query, scope, recipeIds)` con el término `recipeId: { in: [...] }` **como
   tercer elemento del `AND`**, junto al ámbito y a `deletedAt: null`, nunca fundido con los filtros
@@ -166,7 +166,7 @@
   contrato ya lo permita» y dejar la nota fechada. **Borrar estos casos sería aflojar**: dejarían
   de vigilar que esta ficha no se lleva por delante la pantalla.
 
-### T16 — `tests/integration/pedidos/list-query-orders.int.test.ts:248-255`
+### T16 [x] — `tests/integration/pedidos/list-query-orders.int.test.ts:248-255`
 - Hoy: «la busqueda NO recorta nada: `orders` no busca (R17)», comparando con y sin texto.
 - **Se tensa**: pasa a ser **la prueba de integración de la búsqueda** contra la base real
   (`[D3]`): siembra pedidos de dos recetas con nombres distintos y una tercera **dada de baja**;
@@ -215,6 +215,21 @@
   de siempre (R11, R17)». Sigue siendo verdad **como estado**, pero su razón cambia: ya no es que
   `orders` no pueda buscar. Ajustar la prosa; las llamadas de dos argumentos **no cambian**
   (`design.md > 3.1`).
+
+---
+
+### Censos 17 y 18 [x] — descubiertos al implementar, no estaban en esta lista (2026-09-17)
+
+> Los dos comparan `git diff ... origin/dev` contra una lista por **nombre exacto** y solo muerden
+> **despues** de commitear la migracion de T10, asi que no se ven al planificar. Los dos se han
+> **tensado con alta por nombre exacto y nota fechada**, nunca con un patron, y los dos llevan su
+> prueba por mutacion en la bitacora.
+>
+> - `tests/unit/recetas-ui/recipe-route-contract.test.ts` — bloque `MIGRACION_QC68` en
+>   `DB_PERMITIDAS` (commit `8404659`).
+> - `tests/guards/guard-identificador-de-request.test.ts` — alta en `MIGRACIONES_ESPERADAS`
+>   (commit `32f01c9`). **QC-59 tambien toca este archivo**: se espera un conflicto trivial de una
+>   linea al mergear.
 
 ---
 
