@@ -959,3 +959,56 @@ incluido, no solo el asunto.
 
 - **T37 (gate completo)**: no es de esta tanda y **no se corrió la suite entera**. Lo corre el
   leader inmediatamente después de este commit. Es la única task de `tasks.md` que queda sin marcar.
+
+---
+
+## Tanda 6 — el rojo del gate completo: la lista cerrada de E2E de la tabla compartida
+
+**Archivo tocado (uno solo):** `tests/unit/shared/data-table-alcance.test.ts`.
+
+**El rojo:** el caso «la lista de specs E2E que referencian data-table es cerrada» comparaba
+diecisiete rutas contra dieciséis: sobraba `e2e/aislamiento-proveedores.spec.ts`.
+
+**Por qué se escapó a los cinco bloques anteriores.** Esta lista **no** estaba entre las 22 que
+tensó el bloque 3, y no por descuido de aquel barrido: cuando el bloque 3 corrió, el E2E de
+aislamiento de proveedores **todavía no existía** —lo creó el bloque 4—. Ninguno de los bloques
+posteriores volvió a preguntarse qué centinelas de *otras* features cuentan ficheros de `e2e/`.
+Encima el centinela era un blanco móvil: `dev` lo había subido a dieciséis con el E2E de otra
+ficha mientras esta rama iba por su cuenta, así que el número correcto solo se pudo saber
+**después** del merge. Lección para la próxima: **crear un fichero en `e2e/` es, por sí solo,
+motivo para releer las listas cerradas que cuentan specs**, aunque el bloque de tensado ya haya
+pasado.
+
+**El arreglo — se tensa, no se afloja.** Alta de `e2e/aislamiento-proveedores.spec.ts` con su
+motivo escrito (recorre la pantalla de proveedores, que ya consumía la tabla compartida, y
+localiza `data-table-cell-name` y `data-table-row-<id>` porque lo que afirma son **las filas
+servidas** con sesión en una empresa), y el centinela pasa de **dieciséis a diecisiete** en los
+**dos** sitios donde vive el número: el nombre del caso y el mensaje del `expect`. Sigue siendo
+`toEqual` sobre la lista ordenada: ni `toContain` ni excepciones.
+
+**Otras listas del mismo archivo:** ninguna necesitaba el alta. El bloque de consumidores (R34)
+recorre también `e2e/`, pero busca la cadena `components/shared/data-table` (el import), no los
+`data-testid`, así que ningún spec de Playwright entra ahí.
+
+**El centinela sigue mordiendo — comprobado, no afirmado.** Dos mutaciones en memoria, ambas
+deshechas con `git checkout --` y con el árbol verificado limpio después:
+
+| Mutación | Resultado |
+| --- | --- |
+| Referencia a `data-table` añadida a `e2e/errores.spec.ts` | **ROJO**: `e2e/errores.spec.ts no referencia la tabla compartida: expected [ …(18) ] to not include 'e2e/errores.spec.ts'` |
+| Referencia a `data-table` añadida a `e2e/permisos.spec.ts` (spec fuera de la lista y sin guardia propia) | **ROJO**: `solo estos diecisiete E2E pueden referenciar la tabla compartida (R36): expected [ …(18) ] to deeply equal [ …(17) ]` |
+
+**Verificación (salida real, sin suite completa: el gate lo relanza el leader):**
+
+```
+pnpm vitest run tests/unit/shared/data-table-alcance.test.ts
+  Test Files  1 passed (1)
+       Tests  14 passed | 2 skipped (16)
+
+pnpm run typecheck   -> tsc --noEmit, sin salida (verde)
+pnpm run lint        -> eslint, sin salida (verde)
+
+pnpm run test:guardias
+  Test Files  44 passed (44)
+       Tests  540 passed | 9 skipped (549)
+```
