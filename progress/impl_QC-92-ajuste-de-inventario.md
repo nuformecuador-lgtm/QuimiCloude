@@ -460,3 +460,101 @@ Los dos subagentes de esta tanda reportaron sus rojos **con la medición contra 
 por ellos**, y el de T9 encontró y escaló por su cuenta los cuatro rojos de `inventario-schema` que
 no estaban en su lista de rojos conocidos. Aun así **los tres se volvieron a medir aquí antes de
 commitear**, que es la regla. Ninguno resultó mal diagnosticado.
+
+---
+
+## T9bis — ENMIENDA AL SPEC del 2026-09-18, y la tanda 4 **CIERRA EN VERDE**
+
+**Aprobada por el humano el 2026-09-18**, escrita como task propia en `tasks.md` —una enmienda
+aprobada se escribe en el spec, no solo aquí; es el precedente de las dos enmiendas de QC-81—.
+Commit `b8cd2b6`.
+
+Los rojos heredados eran **seis**, no cinco: los conté mal al escalar. Dos de política y cuatro de
+censo. **Dos familias, trato distinto, sin mezclarlas.**
+
+### Familia A — los dos del barrel: **DEROGADOS**, no acotados por rama
+
+`qc81-alcance.test.ts` (QC-81 R32, caso del barrel) y `module-contract.test.ts` (QC-90 R30). Son
+prohibiciones de **política**, no censos de estado, y su premisa está superada: el propio mensaje de
+R30 decía que listar lotes «**NO tiene ficha**: si hace falta, **se pide una**», y **QC-92 es esa
+ficha** (R22 el panel, R23 el historial).
+
+**Por qué NO se acotó por rama**, aunque sea el precedente de R31 y del caso del puerto de R32 en
+esta misma ficha (`be90661`, `921e224`): aquello era un estado **transitorio de rama**; esto es
+**permanente tras el merge**. Acotar habría dejado la guardia roja al mergear y —peor— habría dejado
+escrita en el archivo una afirmación falsa.
+
+**Cómo, sin tocar el mecanismo:** una constante local **cerrada** con los diez verbos de lectura que
+la derogación retira, y un envoltorio que **invoca el detector tal cual** y descarta los nombres cuya
+única operación prohibida está derogada. `operacionesDeLoteProhibidas`, `OPERACIONES_PROHIBIDAS`,
+`PALABRAS_DE_LOTE`, `palabras`, `words` y `metodosDePuerto` no tienen **ni una línea** tocada.
+**Editar y borrar siguen prohibidos.** Los `describe` y los `it` se renombraron: decían «listar,
+editar ni borrar» y eso habría pasado a ser mentira.
+
+**La señal de que el mecanismo no se debilitó:** el caso `R32: el detector muerde con listar, editar
+y borrar lotes, y no con el alta` **queda intacto**, sigue esperando `listProductBatches` entre sus
+infractores y **sigue verde**.
+
+### Familia B — los cuatro del censo de esquema: **ACTUALIZADOS** a la verdad nueva
+
+| Caso | Qué cambió |
+|---|---|
+| `:234` | el censo de modelos del módulo pasa de tres a **cuatro** (`InventoryMovement`), y el `it` se renombra: decía «exactamente dos modelos nuevos» y ya era mentira **antes** de esta ficha |
+| `:623` | mismo censo, más `owners.get('InventoryMovement')`; `it` renombrado a «los cuatro modelos» |
+| `:685` | la lista cerrada de factorías del barrel pasa de **nueve a doce**. La segunda mitad del caso —que ninguna pantalla importe factorías del barrel— **no se tocó y sigue mordiendo** |
+| `:836` | **`movements` NO entra en `PRODUCT_BATCH_COLUMNS`**: es una back-relation, no una columna, y en la base no existe. Se excluye **por tipo**, igual que ya se excluían `Product` y `Presentation`. El censo de columnas sigue siendo **igualdad exacta** |
+
+### Pruebas por mutación — las seis, y las dos caras donde hacía falta
+
+- **Familia A**, con nombres **fabricados** dentro del archivo (no sobre el barrel real, para no
+  fijar el estado del árbol): `deleteBatch`, `updateLot`, `borrarLotes`, `editBatch`, `removeBatch`
+  ⇒ **siguen rojos**; `listProductBatches`, `findBatchMovements`, `getBatch` ⇒ **ya no**; el alta ⇒
+  nunca estuvo prohibida. Y **sobre el árbol real**: un `export { … as createDeleteBatch }` en el
+  barrel pone **rojos los dos** archivos. Revertido.
+- **Familia B**, rompiendo el árbol y revirtiendo: un quinto modelo `/// @module inventario` ⇒ rojos
+  `:234` y `:623`; una factoría de más en el barrel ⇒ rojo `:685`, y un import de factoría en
+  `page.tsx` ⇒ roja la segunda mitad (probado con una factoría vieja **y** con una nueva); y en
+  `:836` **las dos caras**: una **columna** de más ⇒ rojo, la **back-relation** ⇒ ya no.
+  Todas revertidas; `git status` quedó limpio en producción.
+
+### Gate de la tanda 4 — **VERDE**
+
+```
+./init.sh --rapido
+  Test Files  348 passed (348)
+       Tests  5210 passed | 26 skipped (5236)
+  [test:rapido] todas las guardias
+  Test Files  43 passed (43)
+       Tests  515 passed | 9 skipped (524)
+  ✓ test:rapido paso · ✓ todas las migraciones tienen down.sql · == init OK ==
+```
+
+`typecheck` y `lint` verdes.
+
+**Y, sabiendo que el modo rápido puede no verlo todo, el censo de esquema corrido A MANO:**
+
+```
+pnpm exec vitest run tests/unit/inventario/schema/inventario-schema.test.ts
+  Test Files  1 passed (1)
+       Tests  28 passed (28)
+```
+
+Antes de T9bis ese mismo archivo daba **4 failed | 24 passed**.
+
+**El flake de `configuracion-ui/user-table.test.tsx` no reapareció** en esta corrida: pasó dentro de
+los 348. Es ajeno —el archivo es idéntico a `origin/dev`— y queda anotado, no arreglado.
+
+### La deuda del gate rápido, anotada y no parcheada
+
+Decisión del humano del 2026-09-18: **se anota y QC-92 no se para.** El agujero es del **modo
+`--rapido`**, no del gate: **`./init.sh` completo sí habría cazado esos cuatro rojos**, y el cierre
+de la feature lo exige de todas formas. Tocar `scripts/test-rapido.mjs` o mover el censo a
+`tests/guards/` es cambiar el arnés, y eso va por `/afinar-regla` **en frío**: un parche a mitad de
+una feature en vuelo puede poner rojas las otras ramas vivas (QC-68, QC-59, QC-96). **No se tocó
+ninguna de las dos cosas.** Queda escrito en `progress/current.md > Deudas y cosas abiertas` con las
+tres causas simultáneas y como **quinta familia** del inventario de guardias.
+
+### Estado
+
+**T8, T9 y T9bis marcadas `[x]`.** La tanda 4 cierra. La desviación del `authorName` queda **como
+estaba, aceptada y a la vista del reviewer**: no se tocó.

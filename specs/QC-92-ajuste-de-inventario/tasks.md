@@ -126,7 +126,7 @@
 
 ## Tanda 4 — casos de uso y cableado
 
-- [ ] **T8 — Los tres casos de uso.** Depende de T6 y T4.
+- [x] **T8 — Los tres casos de uso.** Depende de T6 y T4.
       `adjust-batch-stock.ts` con `requirePermission(actor, 'inventario.modificar')` **en la primera
       línea**, antes de zod y del puerto; `list-product-batches.ts` y `list-batch-movements.ts` con
       `inventario.consultar`. El ajuste **no** lee el stock para escribir el total: delega el
@@ -142,7 +142,7 @@
       `tests/unit/inventario/adjust-batch-stock.test.ts`,
       `tests/unit/inventario/authorization.test.ts`.
 
-- [ ] **T9 — Composición y Server Actions.** Depende de T8.
+- [x] **T9 — Composición y Server Actions.** Depende de T8.
       Cableado en `lib/composition/index.ts` y `batch-actions.ts` (`'use server'`), con el **mismo**
       `runInRequestScope(() => Promise.all([...]))` de `product-actions.ts:68-80`.
       **Trampa conocida:** las tres acciones resuelven **usuario y empresa**, así que caen bajo el
@@ -153,10 +153,10 @@
       `lib/composition/index.ts`, `tests/unit/inventario/batch-actions.test.ts`,
       el archivo de la lista de acciones de QC-104.
 
-- [ ] **T9bis — ENMIENDA AL SPEC del 2026-09-18: las cinco guardias heredadas.** Depende de T8 y T9.
-      **No estaba en el spec original.** T1 y T8 pusieron rojos **cinco** casos de guardia de otras
-      fichas. **Aprobada por el humano el 2026-09-18**, con dos familias y **trato distinto**, que no
-      se mezclan:
+- [x] **T9bis — ENMIENDA AL SPEC del 2026-09-18: las seis guardias heredadas.** Depende de T8 y T9.
+      **No estaba en el spec original.** T1 y T8 pusieron rojos **seis** casos de guardia de otras
+      fichas —dos de política y cuatro de censo—. **Aprobada por el humano el 2026-09-18**, con dos
+      familias y **trato distinto**, que no se mezclan:
 
       **Familia A — los dos del barrel: se DEROGAN.** `qc81-alcance.test.ts` (QC-81 R32, caso del
       barrel) y `module-contract.test.ts` (QC-90 R30). Son prohibiciones de **política**, no censos
@@ -176,7 +176,7 @@
       `OPERACIONES_PROHIBIDAS`, `PALABRAS_DE_LOTE`, `metodosDePuerto`, `words`—; ningún caso de uso
       ni export se renombra para esquivar una guardia; ninguna lista de excepciones que crezca sola;
       **nota fechada 2026-09-18** en cada caso tocado y **prueba por mutación** de cada uno.
-      **Hecho:** los cinco casos verdes, cada uno con su mutación demostrando que **sigue
+      **Hecho:** los seis casos verdes, cada uno con su mutación demostrando que **sigue
       mordiendo**, y `./init.sh --rapido` verde. **Cubre R22 y R23 en su parte de alcance**; no
       cambia ningún otro requisito.
       **Archivos:** `tests/unit/inventario/qc81-alcance.test.ts`,
@@ -281,8 +281,8 @@ T1 ─► T2              │
 ```
 
 - **T9bis cuelga de T9** y cierra la tanda 4: sin ella el gate no puede ponerse verde, porque los
-  cinco casos heredados están rojos desde T1 (tres) y T8 (dos). No bloquea a T10 en contenido, pero
-  **la tanda 4 no cierra sin ella**.
+  seis casos heredados estaban rojos desde T1 (tres) y T8 (tres). No bloquea a T10 en contenido,
+  pero **la tanda 4 no cerraba sin ella**.
 - **T5 → T6 → T7 es un bloque**: no se corre el gate dentro de él.
 - **T10 y T11 son `[P]`** entre sí; tocan archivos distintos.
 - **T4 muere si T0 sale que no**, y el plan B de `design.md > 7` se aplica dentro de T8.
