@@ -254,22 +254,14 @@ $ pnpm exec vitest run tests/guards/ tests/unit/recetas/ \
 Ningun test que hoy pasa quedo borrado ni aflojado (**R15**). No se corrio la suite completa ni
 Playwright: el gate lo corre el leader.
 
-## Lo que queda, en el orden en que hay que hacerlo
+## Lo que quedaba tras la tanda del 2026-09-17 (historico, ya cerrado)
 
-**Todo lo pendiente cuelga de `lib/composition/index.ts`**, que sigue en manos de QC-59.
+Todo lo de esta lista dependia de `lib/composition/index.ts`, en manos de QC-59. **QC-59 mergeo el
+2026-09-18 y se cerro entero**; el detalle de como esta al final de este archivo, en la seccion
+fechada de ese dia.
 
-1. **T1 + T3 + T5 + T6 + T7 juntos, en una sola tanda.** Es el **unico corte que deja el arbol
-   verde**: T1 (metodo en la interfaz `RecipeCatalog`) rompe el typecheck y
-   `guard-ambito-empresa-recetas` hasta que T3 cablea; T5 (`searchable: true`) sin T7 deja una
-   **busqueda silenciosamente ignorada**; T6 (puerto con el tercer parametro obligatorio) obliga a
-   que T7 pase el valor.
-2. **T9 y T14** — los unitarios del caso de uso, contando **invocaciones de puerto** (2 y 3).
-3. **T11, T12, T13, T15** — los censos que cambian al abrir la lista blanca.
-4. **T17** — el censo de indices (`tests/integration/inventario/list-query-indexes.int.test.ts`,
-   el segundo archivo bloqueado): `SEARCH_INDEXES` 6 -> 7, bucket nuevo `TOTAL_POR_DECISION` con
-   nota fechada, conteo 34 -> 35.
-5. **T18, T19, T20** — los comentarios cuya razon escrita deja de ser cierta.
-6. **T21** — cierre: mapa completo R1-R16 y gate.
+1. T1 + T3 + T5 + T6 + T7 en una sola tanda. 2. T9 y T14. 3. T11, T12, T13, T15. 4. T17.
+5. T18, T19, T20. 6. T21.
 
 ## Deuda del arnes detectada por esta ficha
 
@@ -295,3 +287,235 @@ Playwright: el gate lo corre el leader.
    corrigio partiendo el commit en dos (`8404659` y `30752fe`) y comprobando que el arbol final es
    **identico** al de antes del corte (`git diff` vacio contra la etiqueta de respaldo). La rama no
    estaba publicada, asi que reescribir ahi era seguro; con la rama ya publicada no lo habria sido.
+
+---
+
+# Tanda del 2026-09-18 — reanudada tras el merge de QC-59
+
+> Los dos archivos que QC-59 bloqueaba (`lib/composition/index.ts` y
+> `tests/integration/inventario/list-query-indexes.int.test.ts`) quedaron **libres** al mergear
+> QC-59 (PR #84). El worktree ya venia sincronizado con `origin/dev` (merge `07a8d17`) y con la
+> tanda **T1+T3+T5+T6+T7 commiteada pero SIN REGISTRAR**: `tasks.md` las tenia sin marcar y la
+> seccion «Lo que queda» de arriba las daba por pendientes. **Registradas ahora.**
+
+## El censo DIECINUEVE, y por que no es un censo mas
+
+`tests/unit/pedidos/company-isolation-service.test.ts` (QC-60 **R16**) exige que **los seis**
+metodos de `OrderRepository` reciban `{ companyId }` como **ultimo** argumento, leido con
+`args[args.length - 1]`. **T6 metio `recipeIds` DESPUES de `scope`**, asi que lo desplazaba.
+
+**No es un censo de comentario como los dieciocho anteriores: es la guardia del aislamiento por
+empresa.** Y ademas el propio `lib/modules/pedidos/ports/order-repository.ts` **tiene escrito** que
+«los seis metodos exigen `scope: OrderScope` al final de la firma», convencion que vigila una
+**segunda** guardia, `tests/guards/guard-ambito-empresa-pedidos.test.ts`. La firma que eligio T6
+**contradecia una convencion escrita del modulo**, no solo un aserto.
+
+**Decision del humano (2026-09-18): reordenar a `listAlive(query, recipeIds, scope)`.** Se
+descartaron «tensar la guardia» y «excepcion acotada a `listAlive`», las dos porque aflojan una
+guardia de seguridad **ajena a esta ficha** (**R15**). La enmienda esta escrita, con su fecha y su
+motivo, en `tasks.md > T6` y en `design.md > 3.1`.
+
+### PERO la premisa de esa decision resulto FALSA en un punto, y ahi esta el bloqueo
+
+La condicion era: **`company-isolation-service.test.ts` no se toca y vuelve a verde solo, por el
+reordenamiento**. **No vuelve.** El motivo esta en la linea 125 de ese archivo:
+
+```ts
+listAlive: vi.fn(async (_query: unknown, scope: OrderScope) => {
+  const items = [...filas.values()]
+    .filter((g) => !g.deleted && g.companyId === scope.companyId)
+```
+
+Ese doble **no es un espia: es un doble FUNCIONAL** que ejecuta el filtrado por empresa de verdad,
+y lee el ambito **por POSICION**, de su segundo parametro declarado. Con la firma vieja la posicion
+2 era el `scope` y funcionaba. Con la firma nueva la posicion 2 es `recipeIds` —`null` en ese
+flujo, porque la consulta no trae termino—, y `scope.companyId` revienta con
+`TypeError: Cannot read properties of null (reading 'companyId')`.
+
+El razonamiento del encargo —«con dos parametros declarados y tres pasados, `args[args.length-1]`
+ve los TRES argumentos reales»— **es cierto para el aserto**, que lee `mock.calls`. Lo que no
+cubria es que **ese mismo doble se usa ademas como implementacion** dentro de `almacen()`, y ahi la
+posicion declarada si importa. Por eso caen **dos** casos: uno porque la excepcion revienta antes
+de llegar al aserto de argumentos, y otro porque el filtrado por empresa deja de funcionar.
+
+**No se ha tocado el archivo.** La instruccion era parar y avisar, y es lo que se hace: **la
+decision de si se ajusta la aridad de ese doble es del humano.**
+
+**El arreglo minimo, si el humano lo aprueba**, es una linea: que el doble declare
+`(_query: unknown, _recipeIds: readonly string[] | null, scope: OrderScope)`. **No afloja nada**:
+el aserto `args[args.length - 1]` se queda intacto, la logica de filtrado se queda intacta, y lo
+unico que cambia es que el doble vuelve a declarar la aridad real del puerto — que es exactamente
+lo que el propio encargo pedia hacer con «los dobles de test que asuman la firma vieja». La
+tension del encargo es real: una clausula manda ajustar los dobles con la firma vieja, otra veda
+este archivo, y este archivo **contiene** un doble con la firma vieja.
+
+## Archivos tocados en esta tanda
+
+### Produccion
+| Archivo | Que |
+| --- | --- |
+| `lib/modules/pedidos/ports/order-repository.ts` | `listAlive(query, recipeIds, scope)` — ambito al final |
+| `lib/modules/pedidos/domain/list-orders.ts` | la llamada pasa a `(podada.query, searchRecipeIds, scope)` |
+| `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` | `listAliveOrders(query, recipeIds, scope)` y `buildOrderWhere(query, recipeIds, scope)`; **`recipeIds` pierde el `= null`** (un parametro en medio no puede tener defecto) y el docblock que justificaba ese defecto se corrige en vez de quedarse mintiendo |
+| `lib/modules/pedidos/adapters/driven/persistence/list-query-sql.ts` | **solo comentario** (T18): la razon escrita era «`ORDER_QUERYABLE.searchable === false`», que ya es falsa |
+| `app/(private)/pedidos/components/order-list-params.ts` | **solo comentario** (T18) |
+| `app/(private)/pedidos/components/order-table.tsx` | **solo comentario** (T18); `searchable={false}` del JSX **no se toca** |
+
+### Tests
+| Archivo | Que |
+| --- | --- |
+| `tests/unit/pedidos/list-orders.test.ts` | **T14** (tensado y partido en cuatro casos) y **T9** (bloque nuevo de invocaciones de puerto); `dobles()` gana `findIdsMatchingName` |
+| `tests/unit/shared/listas-blancas-listados.test.ts` | **T11**: `toEqual(['pedidos'])` pasa a `toEqual([])` |
+| `tests/unit/pedidos/order-view.test.ts` | **T12**: `searchable` a `true` |
+| `tests/unit/pedidos/order-input.test.ts` | **T13**: la busqueda SOBREVIVE; el caso de `orderNumber` se conserva, partido en dos |
+| `tests/unit/pedidos-ui/order-list-params.test.ts` | **T15**: contrato a `true`, **los dos casos de «la pantalla no busca» conservados** con motivo nuevo |
+| `tests/integration/inventario/list-query-indexes.int.test.ts` | **T17**: `SEARCH_INDEXES` 6 a 7, bucket `TOTAL_POR_DECISION`, conteo **33 a 34** |
+| `tests/unit/recetas/schema/recipes-search-index-migration.test.ts` | **NUEVO**: cierra **R13** con un test ejecutable |
+| `tests/integration/pedidos/order-repository.int.test.ts` | **T20** (comentario) + las llamadas pasan a `(consulta, null, scope)` |
+| `tests/integration/pedidos/list-query-orders.int.test.ts` | reorden de argumentos |
+| `tests/integration/pedidos/company-scope-queries.int.test.ts` | reorden de argumentos |
+| `e2e/pedidos.spec.ts` | **T19**: solo el comentario de `findOrderRow`. **Ni un caso E2E nuevo** |
+
+## El conteo de indices de T17 estaba caducado
+
+`tasks.md > T17` mandaba subir el censo de **34 a 35**. En disco valia **33**: `products_stock_idx`
+cayo con su columna en QC-91 y `orders_unit_price_idx` con la suya en QC-35bis, las dos **despues**
+de escribirse la tarea. Se **conto en disco** en vez de fiarse del spec (`PARTIAL_INDEXES` 24 +
+`FULL_INDEXES` 9 = 33; con el bucket nuevo `TOTAL_POR_DECISION`, **34**). Lo que la tarea pedia de
+verdad —**subir el censo en uno**— se cumple; el numero absoluto era el dato perecedero. La
+correccion, fechada, esta en `tasks.md > T17`, y la cronologia completa en el propio caso del test.
+**El cambio de QC-59 en ese archivo sigue intacto**: el unico global de nombre de proveedor sigue
+FUERA del censo y su sustituto por empresa sigue DENTRO, con su caso propio.
+
+## R13 dejaba de estar trazado, y ahora lo esta
+
+La tanda anterior mapeaba **R13** a «verificado a mano: `db:migrate` -> `db:rollback` ->
+`db:migrate`». **Una comprobacion manual no es un test**, y `CHECKPOINTS.md > Trazabilidad` exige
+un test concreto por requisito. Se cierra con
+`tests/unit/recetas/schema/recipes-search-index-migration.test.ts`, cuatro casos que leen el disco:
+la carpeta trae los dos ficheros; el `migration.sql` crea el GIN de trigramas **sin `WHERE`**; el
+`down.sql` tira **exactamente** el indice que crea el `up` —el nombre **se extrae** del `CREATE`, no
+se copia a mano, asi que renombrar en el `up` y olvidar el `down` lo pone rojo—; y el `down.sql`
+**no** hace `DROP EXTENSION`.
+
+## Mapa de trazabilidad R1-R16 (T21)
+
+| Req | Test concreto | Estado |
+| --- | --- | --- |
+| R1 | `list-query-orders.int.test.ts` > `R1: el termino devuelve solo los pedidos de la receta que casa, y ninguno mas` · `list-orders.test.ts` > `el termino de busqueda llega al catalogo de recetas y sus ids llegan al repositorio (R1, R7)` | cubierto |
+| R2 | `list-query-orders.int.test.ts` > `R2: ignora acentos y mayusculas` · `recipe-catalog.test.ts` > `ignora acentos y mayusculas al normalizar el termino (R2)` | cubierto |
+| R3 | `list-query-orders.int.test.ts` > `R3: buscar el numero de pedido no encuentra nada` | cubierto |
+| R4 | `list-query-orders.int.test.ts` > `R4: el pedido cuya receta esta de baja SI aparece al buscar su nombre` · `recipe-catalog.test.ts` > `una receta dada de baja SI vuelve (R4)` | cubierto |
+| R5 | `list-query-orders.int.test.ts` > `R5: el total describe el conjunto buscado y no la pagina` | cubierto |
+| R6 | `recipe-catalog.test.ts` > `una receta de otra empresa NO vuelve (R6)` (mitad de la empresa) · `list-orders.test.ts` > caso `(R1, R7)`, que afirma que el `companyId` que viaja es el del actor · `list-query-orders.int.test.ts` > `un pedido CANCELADO SI se consulta; uno BORRADO no sale nunca (R25, R7)` (mitad del borrado) · `buildOrderWhere` compone los tres en un `AND` explicito | cubierto **por partes**, ver la deuda de abajo |
+| R7 | `list-orders.test.ts` > `(R1, R7)` · `tests/guards/guard-arquitectura-modulos.test.ts` · `tests/unit/pedidos/scope.test.ts` (pedidos no consulta `prisma.recipe`) | cubierto |
+| R8 | `list-orders.test.ts` > `sin busqueda: DOS invocaciones de puerto, tenga la pagina 1 fila o 25 (R8)` y `con busqueda: TRES invocaciones de puerto, tenga la pagina 1 fila o 25 (R8)` | cubierto |
+| R9 | `recipe-catalog.test.ts` > `un termino que normaliza a vacio devuelve null, no [] (R9)` · `list-orders.test.ts` > `con null del catalogo (el termino no es una busqueda) la lista vuelve entera y listAlive recibe null (R9)` | cubierto |
+| R10 | `list-query-orders.int.test.ts` > `R10: un termino que no casa con ninguna receta devuelve pagina vacia, total 0 y sin error` · `recipe-catalog.test.ts` > `ningun nombre casa: devuelve [] (R10)` · `list-orders.test.ts` > `con [] del catalogo (ninguna receta casa) el repositorio se llama igual y devuelve pagina vacia (R10)` | cubierto |
+| R11 | `listas-blancas-listados.test.ts` > `ninguna de las siete apaga la busqueda (R11)` · `order-view.test.ts` > `los filtros del listado son solo estado, prioridad y fecha, y la busqueda ya se abrio (R11)` · `order-input.test.ts` > `la busqueda por texto SOBREVIVE a sanitizeListQuery (R11)` · `order-list-params.test.ts` > `el contrato de pedidos ya declara searchable: true (R11)` | cubierto |
+| R12 | `tests/unit/pedidos/authorization.test.ts` (el permiso es la primera accion y ningun puerto se toca sin el) · `company-isolation-service.test.ts` > `cada llamada al puerto de los seis lleva exactamente {companyId} como ultimo argumento` | cubierto — **pero ese segundo test esta HOY EN ROJO por el bloqueo de arriba** |
+| R13 | `recipes-search-index-migration.test.ts` > los cuatro casos `(R13)` | cubierto (**nuevo**: antes era manual) |
+| R14 | `list-query-indexes.int.test.ts` > `los siete de busqueda son GIN de trigramas sobre name_normalized`, que ademas comprueba que el nuevo **no** lleva `WHERE`; y `los 34 indices nuevos existen, cada uno con su nombre exacto` | cubierto |
+| R15 | `list-query-orders.int.test.ts` > `R15: sin termino de busqueda, la lista vuelve exactamente igual que antes de esta feature`; y el hecho de que **ningun test que hoy pasa se ha borrado ni aflojado** | cubierto |
+| R16 | `order-list-params.test.ts` > `un search en la URL se IGNORA: la consulta sale siempre con busqueda vacia (R16)` y `buildOrderListQuery NUNCA emite un parametro search, ni siquiera vacio (R16)` | cubierto |
+
+### Deuda de trazabilidad que el spec no vio, dicha en voz alta
+
+**R6 no tiene un caso de integracion propio.** Dice dos cosas —buscar el nombre exacto de la receta
+de un pedido **de otra empresa**, o de un pedido **borrado**, devuelve cero— y hoy se demuestra
+**por partes**: la mitad de la empresa en el unitario del catalogo de recetas, la mitad del borrado
+en un caso de integracion que **no busca**, y la conjuncion **por construccion** en el `AND` de
+`buildOrderWhere`. Es defendible, pero es la casilla mas debil del mapa: **nadie ejercita hoy una
+busqueda cuyo termino case con un pedido ajeno o borrado**. Un caso de integracion en el `describe`
+de la busqueda lo cerraria. **No se ha escrito porque esta tanda no puede correr integracion**
+(el encargo lo prohibe y el gate lo corre el leader), y **un test que no se ha visto pasar no se
+entrega**. Queda como decision del leader.
+
+## Salida real de la verificacion
+
+```
+$ pnpm run typecheck
+> tsc --noEmit
+(sin salida - verde)
+
+$ pnpm run lint
+> eslint
+(sin salida - verde)
+
+$ pnpm exec vitest run tests/unit/ tests/guards/ --maxWorkers=2
+ Test Files  1 failed | 461 passed (462)
+      Tests  2 failed | 6887 passed | 92 skipped (6981)
+   Duration  430.84s
+```
+
+Los **dos** rojos son los del bloqueo, los dos en `tests/unit/pedidos/company-isolation-service.test.ts`
+y los dos con la **misma** causa raiz:
+
+```
+FAIL tests/unit/pedidos/company-isolation-service.test.ts
+  > QC-60 R16 > cada llamada al puerto de los seis lleva exactamente { companyId } como ultimo argumento
+  > QC-60 R20, R21 > R19 (lado service): el listado de A no trae el pedido de B
+TypeError: Cannot read properties of null (reading 'companyId')
+ tests/unit/pedidos/company-isolation-service.test.ts:127:60
+   125|     listAlive: vi.fn(async (_query: unknown, scope: OrderScope) => {
+   126|       const items = [...filas.values()]
+   127|         .filter((g) => !g.deleted && g.companyId === scope.companyId)
+ Object.listOrders lib/modules/pedidos/domain/list-orders.ts:148:36
+```
+
+Barrido posterior con el archivo nuevo de R13 ya en disco, para comprobar que **ningun censo de los
+que muerden por el diff** se despierta con el:
+
+```
+$ pnpm exec vitest run tests/guards/ tests/unit/recetas/ tests/unit/recetas-ui/ tests/unit/documentos/ --maxWorkers=2
+ Test Files  85 passed (85)
+      Tests  1151 passed | 13 skipped (1164)
+```
+
+**No se corrio la suite completa ni Playwright ni integracion**: el gate lo corre el leader. Los
+cuatro archivos de integracion tocados (`list-query-indexes`, `list-query-orders`,
+`order-repository`, `company-scope-queries`) **no se han visto pasar en esta tanda** — solo los
+cubre el typecheck.
+
+## Pruebas por mutacion de esta tanda
+
+**T9** — duplicada la llamada a `findIdsMatchingName` en `list-orders.ts`:
+
+```
+ tests/unit/pedidos/list-orders.test.ts (28 tests | 2 failed)
+     x con busqueda: TRES invocaciones de puerto, tenga la pagina 1 fila o 25 (R8)
+     x con `null` del catalogo, `listAlive` recibe `null` (R9)
+AssertionError: expected "vi.fn()" to be called 1 times, but got 2 times
+```
+
+Restaurado: `Test Files 4 passed (4)` · `Tests 62 passed (62)`.
+
+**R13** — renombrado el indice en el `down.sql`:
+
+```
+ tests/unit/recetas/schema/recipes-search-index-migration.test.ts (4 tests | 2 failed)
+AssertionError: expected 'recipes_name_normalized_all_trgm_idx_wrong' to be 'recipes_name_normalized_all_trgm_idx'
+```
+
+Restaurado: `Test Files 1 passed (1)` · `Tests 4 passed (4)`, con `git diff -- db/` vacio.
+
+## Lo que queda
+
+1. **BLOQUEANTE — el doble de `company-isolation-service.test.ts`.** Decision del humano: o se
+   ajusta la aridad declarada de ese doble (una linea, sin aflojar nada), o se elige otra salida.
+   **Hasta entonces la rama tiene 2 rojos** y no puede ir a PR.
+2. **El gate**: `./init.sh --rapido` para cerrar la tanda y **`./init.sh` completo antes del PR**,
+   que es lo unico que ejercita los cuatro archivos de integracion tocados contra la base real.
+3. **Opcional, recomendado**: el caso de integracion de **R6** descrito arriba.
+
+## Deuda del arnes, la quinta
+
+**Una decision humana puede apoyarse en una premisa falsa, y el encargo no tiene donde decirlo.**
+La decision de reordenar la firma era **correcta** —y se mantiene—, pero venia con una condicion
+que resulto imposible: «ese archivo vuelve a verde solo». Nadie habia leido que el doble de
+`listAlive` de ese archivo **no es un espia sino una implementacion**, y que por eso lee el ambito
+por posicion. El encargo ademas se contradecia: mandaba ajustar «los dobles que asuman la firma
+vieja» y a la vez vedaba el unico archivo que contiene uno. **Se paro y se pregunto en vez de
+elegir en silencio**, que es lo que manda la regla 6, pero costo una tanda entera descubrirlo.
+Un encargo que veda un archivo deberia decir **que se espera que pase con el**, no solo que no se
+toque.

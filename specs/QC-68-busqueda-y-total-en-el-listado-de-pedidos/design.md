@@ -193,7 +193,7 @@ tiene importada en su `list-query-sql.ts` local.
 5. NUEVO: si `search !== ''`
         recipeIds = await deps.recipes.findIdsMatchingName(search, actor.companyId)
    si no  recipeIds = null
-6. await deps.orders.listAlive(query, scope, recipeIds)  ← firma con un parámetro más
+6. await deps.orders.listAlive(query, recipeIds, scope)  ← firma con un parámetro más
 7. await deps.recipes.findRefsIncludingDeleted(ids, ...)  ← sin cambios
 8. toOrderView por fila                                   ← sin cambios
 ```
@@ -232,10 +232,22 @@ puede importar. (`list-assigned-orders.ts` sí la construye a mano, y por eso ti
 ```ts
 listAlive(
   query: ListQuery,
-  scope: OrderScope,
   recipeIds: readonly string[] | null,
+  scope: OrderScope,
 ): Promise<Page<OrderRow>>;
 ```
+
+> **Nota fechada 2026-09-18 (decisión del humano): `recipeIds` va ANTES de `scope`.**
+> Este bloque decía `(query, scope, recipeIds)` y así se implementó primero. **El orden no es
+> estético: `scope` al final es una convención del módulo con dos guardias detrás.**
+> `tests/unit/pedidos/company-isolation-service.test.ts` (QC-60 **R16**) exige que **los seis**
+> métodos de `OrderRepository` reciban `{ companyId }` como **último** argumento —lo lee con
+> `args[args.length - 1]`—, y el encabezado de `order-repository.ts` lo tiene **escrito** («los
+> seis métodos exigen `scope: OrderScope` al final de la firma»), vigilado además por
+> `tests/guards/guard-ambito-empresa-pedidos.test.ts`. Con `recipeIds` detrás, el aserto leía el
+> parámetro equivocado y la frase del puerto pasaba a ser falsa. Las alternativas —tensar la
+> guardia o abrirle una excepción a `listAlive`— **aflojan una guardia de aislamiento por empresa
+> que esta ficha no ha escrito** (**R15**); reordenar devuelve las dos a verde **sin tocarlas**.
 
 `recipeIds` es **parámetro propio y no viaja dentro de `ListQuery`**: `ListQuery` es la forma
 *compartida* por los siete listados (`domain/list-query.ts:5-15`, duplicada a propósito en los
@@ -244,16 +256,24 @@ entiende obligaría a tocar las cinco copias y a que la guardia canónica lo ace
 genérico no cambia. **Nadie más llama a `listAlive`** por el puerto: el único consumidor es
 `list-orders.ts`.
 
-**El puerto lo exige; la función del adaptador lo declara con `= null` por defecto.** No es una
-concesión: `listAliveOrders` tiene **más de treinta llamadas directas** en los tres archivos de
+**El puerto lo exige; la función del adaptador lo declaraba con `= null` por defecto.** El motivo
+era no romper las **~45 llamadas directas** a `listAliveOrders` de los cuatro archivos de
 integración de pedidos (`order-repository.int.test.ts`, `list-query-orders.int.test.ts`,
-`company-scope-queries.int.test.ts`, todas con dos argumentos), y un tercer parámetro obligatorio
-las rompería todas sin que ninguna de ellas hable de búsqueda. Lo que **no** se relaja es el
-contrato: la interfaz `OrderRepository` lo declara **obligatorio**, así que el dominio no puede
-olvidarlo, y `null` significa exactamente «sin búsqueda», que es el estado de esas treinta
-llamadas.
+`company-scope-queries.int.test.ts`, `order-crud.int.test.ts`), todas con dos argumentos y ninguna
+hablando de búsqueda.
 
-`buildOrderWhere(query, scope, recipeIds)` gana **un tercer término del `AND`**, al mismo nivel que
+> **Nota fechada 2026-09-18: ese defecto ya no existe, y su justificación tampoco.** Al reordenar
+> la firma (nota de arriba), `recipeIds` queda **en medio**, y un parámetro en medio **no puede
+> llevar valor por defecto**. Así que `listAliveOrders(query, recipeIds, scope)` lo exige, y las
+> ~45 llamadas pasan a `(query, null, scope)`. **No es aflojar nada**: cada una sigue diciendo lo
+> mismo —«sin búsqueda»—, ahora de forma explícita en vez de implícita, que si acaso es más
+> estricto. Ahorrarse ese `null` no compensaba dejar en rojo la guardia de aislamiento.
+
+Lo que **nunca** se relajó es el contrato: la interfaz `OrderRepository` declara `recipeIds`
+**obligatorio**, así que el dominio no puede olvidarlo, y `null` significa exactamente «sin
+búsqueda».
+
+`buildOrderWhere(query, recipeIds, scope)` gana **un tercer término del `AND`**, al mismo nivel que
 el ámbito y el borrado, nunca fundido con los filtros ni con ningún `OR` (R6):
 
 ```ts
