@@ -18,6 +18,10 @@
  * `order-sequence.int`- y sus propias secuencias se borran al final. Las consultas se acotan por
  * un filtro de fecha o por los ids sembrados; ninguna afirma nada global sobre la tabla.
  *
+ * QC-68 (2026-09-17): sumo su propio bloque de casos, con sus propias recetas efimeras, que
+ * ejercitan la busqueda real contra Postgres (`findRecipeIdsMatchingName` + `listAliveOrders`
+ * con el argumento `recipeIds`).
+ *
  * Cubre R7, R10, R11, R13, R14, R15, R17, R25 y R29.
  */
 import { randomUUID } from 'node:crypto'
@@ -25,6 +29,8 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { normalizeCompanyName } from '@/lib/modules/identity'
+import { findRecipeIdsMatchingName } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma'
+import { normalizeRecipeName } from '@/lib/modules/recetas'
 import {
   createOrder,
   listAliveOrders,
@@ -32,7 +38,7 @@ import {
 import { prisma } from '@/lib/shared/db/prisma'
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination'
 
-import type { ListQuery, NewOrder, OrderRow, OrderScope } from '@/lib/modules/pedidos'
+import type { ListQuery, NewOrder, OrderRow, OrderScope, Page } from '@/lib/modules/pedidos'
 
 /** Un ano por archivo, distinto de los 288x de `order-repository.int.test.ts` y de los 287x de
  *  `order-sequence.int.test.ts`, para que ninguno pueda pisarle la secuencia a otro. */
@@ -40,6 +46,26 @@ const YEAR = 2891
 
 function token(): string {
   return randomUUID().replace(/-/gu, '')
+}
+
+const HEX_DIGIT_TO_LETTER: Readonly<Record<string, string>> = {
+  '0': 'g',
+  '1': 'h',
+  '2': 'i',
+  '3': 'j',
+  '4': 'k',
+  '5': 'l',
+  '6': 'm',
+  '7': 'n',
+  '8': 'o',
+  '9': 'p',
+}
+
+/** 2026-09-17: marcador SIN digitos -mapea cada digito hexadecimal a una letra distinta, uno a
+ *  uno- para que un nombre de receta que lo incluya nunca pueda casar por casualidad con el
+ *  correlativo de un pedido en una busqueda por texto. */
+function tokenLetters(): string {
+  return token().replace(/[0-9]/gu, (digit) => HEX_DIGIT_TO_LETTER[digit] ?? digit)
 }
 
 let recipeId: string
@@ -208,14 +234,15 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
 
     // Orden de HOY: `priority DESC, created_at ASC, ...`. Todas comparten prioridad, asi que el
     // ultimo sembrado -el `created_at` mas alto- cae en la pagina 3 con paginas de cinco.
-    const pagina3 = await listAliveOrders(consulta({ page: 3, pageSize: 5 }), scope())
+    const pagina3 = await listAliveOrders(consulta({ page: 3, pageSize: 5 }), null, scope())
     expect(pagina3.items.map((o) => o.id)).toContain(ultimo)
-    const pagina1 = await listAliveOrders(consulta({ page: 1, pageSize: 5 }), scope())
+    const pagina1 = await listAliveOrders(consulta({ page: 1, pageSize: 5 }), null, scope())
     expect(pagina1.items.map((o) => o.id)).not.toContain(ultimo)
 
     // Pidiendo el orden inverso por el correlativo, la MISMA fila sale en la pagina 1.
     const desc = await listAliveOrders(
       consulta({ page: 1, pageSize: 5, sort: { columnId: 'orderNumber', direction: 'desc' } }),
+      null,
       scope(),
     )
     expect(desc.items[0]?.id).toBe(ultimo)
@@ -229,6 +256,7 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
         pageSize: 5,
         filters: conFiltros({ quantity: { kind: 'numberRange', min: 12, max: 12 } }),
       }),
+      null,
       scope(),
     )
 
@@ -239,21 +267,259 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
 
   it('pedir 100 por pagina se ACOTA a 25, no se rechaza (R29)', async () => {
     // R29 — acotar, no rechazar. El `pageSize` que sale es el efectivo, nunca el pedido.
-    const pagina = await listAliveOrders(consulta({ page: 1, pageSize: 100 }), scope())
+    const pagina = await listAliveOrders(consulta({ page: 1, pageSize: 100 }), null, scope())
 
     expect(pagina.pageSize).toBe(MAX_PAGE_SIZE)
     expect(pagina.items.length).toBeLessThanOrEqual(MAX_PAGE_SIZE)
   })
+})
 
-  it('la busqueda NO recorta nada: `orders` no busca (R17)', async () => {
-    // R17 — el adaptador no tiene capa de busqueda y no puede tenerla: `orders` no tiene
-    // columna `name`. Aunque el `search` llegara con texto -no llega: el caso de uso lo poda-,
-    // la lista vuelve igual.
-    const conTexto = await listAliveOrders(consulta({ pageSize: 25, search: 'acido' }), scope())
-    const sinTexto = await listAliveOrders(consulta({ pageSize: 25 }), scope())
+/**
+ * QC-68 (2026-09-17): este caso decia «la busqueda NO recorta nada: `orders` no busca», porque
+ * `orders` no tenia columna de nombre y el adaptador no tenia capa de busqueda. Esa afirmacion
+ * deja de ser cierta: `list-orders.ts` ahora resuelve los ids de receta que casan con el termino
+ * por `findRecipeIdsMatchingName` (contrato de `recetas`) y se los pasa a `listAliveOrders` como
+ * tercer argumento, que los acota con `recipeId: { in: [...] }`. El caso se tensa para demostrar
+ * la busqueda real contra Postgres, con sus propias recetas efimeras -tres nombres distintos, una
+ * dada de baja- para no interferir con el resto del archivo.
+ */
+describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R6, R10, R15)', () => {
+  const DIA = 21
 
-    expect(conTexto.total).toBe(sinTexto.total)
-    expect(conTexto.items.map((o) => o.id)).toEqual(sinTexto.items.map((o) => o.id))
+  let recipeAlfaId: string
+  let recipeBetaId: string
+  let recipeBajaId: string
+  let ordenAlfa: OrderRow
+  let ordenBeta: OrderRow
+  let ordenBaja: OrderRow
+  const recetasComunes: string[] = []
+  const ordenesComunes: OrderRow[] = []
+
+  const soloElDia21: ListQuery['filters'] = {
+    createdAt: {
+      kind: 'dateRange',
+      from: `${String(YEAR)}-01-${String(DIA)}`,
+      to: `${String(YEAR)}-01-${String(DIA)}`,
+    },
+  }
+
+  async function buscar(search: string, pageSize = 25): Promise<Page<OrderRow>> {
+    const recipeIds = await findRecipeIdsMatchingName(search, companyId)
+    return listAliveOrders(
+      consulta({ pageSize, search, filters: soloElDia21 }),
+      recipeIds,
+      scope(),
+    )
+  }
+
+  beforeAll(async () => {
+    const marca = tokenLetters()
+
+    async function recetaEfimera(nombre: string, overrides: { deletedAt?: Date } = {}) {
+      return (
+        await prisma.recipe.create({
+          data: {
+            name: nombre,
+            nameNormalized: normalizeRecipeName(nombre),
+            companyId,
+            ...overrides,
+          },
+          select: { id: true },
+        })
+      ).id
+    }
+
+    recipeAlfaId = await recetaEfimera(`Ácido Cítrico ${marca}`)
+    recipeBetaId = await recetaEfimera(`Bicarbonato ${marca}`)
+    recipeBajaId = await recetaEfimera(`Cloro de baja ${marca}`, { deletedAt: instantIn(DIA) })
+
+    ordenAlfa = await alta(instantIn(DIA, 1), { recipeId: recipeAlfaId })
+    ordenBeta = await alta(instantIn(DIA, 2), { recipeId: recipeBetaId })
+    ordenBaja = await alta(instantIn(DIA, 3), { recipeId: recipeBajaId })
+
+    // R5 — un termino que casa con MAS recetas que `pageSize`, para distinguir el total del
+    // conjunto buscado del tamano de la pagina.
+    const NUMEROS_COMUNES = ['Uno', 'Dos', 'Tres'] as const
+    for (const [i, numero] of NUMEROS_COMUNES.entries()) {
+      const id = await recetaEfimera(`Comun Compartido ${numero} ${marca}`)
+      recetasComunes.push(id)
+      ordenesComunes.push(await alta(instantIn(DIA, 10 + i), { recipeId: id }))
+    }
+  })
+
+  afterAll(async () => {
+    const recetas = [recipeAlfaId, recipeBetaId, recipeBajaId, ...recetasComunes]
+    // Los pedidos de estas recetas ANTES que las recetas: `recipes.company_id`/`orders.recipe_id`
+    // son FK RESTRICT y el `afterAll` del archivo, que borra `creados`, corre DESPUES de este.
+    await prisma.order.deleteMany({ where: { recipeId: { in: recetas } } })
+    for (const id of recetas) {
+      await prisma.recipe.delete({ where: { id } })
+    }
+  })
+
+  it('R1: el termino devuelve solo los pedidos de la receta que casa, y ninguno mas', async () => {
+    const pagina = await buscar('Bicarbonato')
+
+    expect(pagina.items.map((o) => o.id)).toEqual([ordenBeta.id])
+  })
+
+  it('R4: el pedido cuya receta esta de baja SI aparece al buscar su nombre', async () => {
+    const pagina = await buscar('Cloro de baja')
+
+    expect(pagina.items.map((o) => o.id)).toEqual([ordenBaja.id])
+  })
+
+  it('R2: ignora acentos y mayusculas, en las dos direcciones', async () => {
+    // La receta se siembra CON acentos (`Ácido Cítrico`). Buscar SIN acentos la encuentra...
+    const sinAcentos = await buscar('acido citrico')
+    expect(sinAcentos.items.map((o) => o.id)).toEqual([ordenAlfa.id])
+
+    // ...y buscar CON acentos y en mayusculas tambien.
+    const conAcentosYMayusculas = await buscar('ÁCIDO CÍTRICO')
+    expect(conAcentosYMayusculas.items.map((o) => o.id)).toEqual([ordenAlfa.id])
+  })
+
+  it('R5: el total describe el conjunto buscado y no la pagina', async () => {
+    const pagina = await buscar('Comun Compartido', 2)
+
+    expect(pagina.items).toHaveLength(2)
+    expect(pagina.total).toBe(3)
+    expect(pagina.totalPages).toBe(2)
+    expect(ordenesComunes).toHaveLength(3)
+  })
+
+  it('R10: un termino que no casa con ninguna receta devuelve pagina vacia, total 0 y sin error', async () => {
+    const pagina = await buscar('xilofono-que-no-existe')
+
+    expect(pagina.items).toEqual([])
+    expect(pagina.total).toBe(0)
+    // `buildPage` fija `totalPages` en 1 cuando `total` es 0 -nunca 0 paginas-, mismo criterio
+    // que el resto de listados del contrato generico.
+    expect(pagina.totalPages).toBe(1)
+  })
+
+  it('R3: buscar el numero de pedido no encuentra nada', async () => {
+    const pagina = await buscar(String(ordenAlfa.number.sequence))
+
+    expect(pagina.items).toEqual([])
+  })
+
+  it('R15: sin termino de busqueda, `findRecipeIdsMatchingName` no acota nada', async () => {
+    const recipeIds = await findRecipeIdsMatchingName('', companyId)
+
+    expect(recipeIds).toBeNull()
+  })
+
+  it('R15: sin termino de busqueda, la lista trae TODO lo del dia en el orden por defecto', async () => {
+    // Este `describe` siembra, antes de esta `it`, exactamente seis pedidos vivos en el dia 21:
+    // los tres del `beforeAll` (alfa, beta, baja) y los tres «Comun Compartido» de R5. Los dos
+    // casos de R6 crean y borran los suyos DESPUES de esta `it` (estan definidos mas abajo), asi
+    // que no cuentan aqui.
+    const pagina = await listAliveOrders(
+      consulta({ pageSize: 25, filters: soloElDia21 }),
+      null,
+      scope(),
+    )
+
+    expect(pagina.total).toBe(6)
+    // Orden por defecto: `priority DESC, created_at ASC`. Los seis comparten prioridad `MEDIA`,
+    // asi que manda el `created_at`, que es el orden de alta.
+    expect(pagina.items.map((o) => o.id)).toEqual([
+      ordenAlfa.id,
+      ordenBeta.id,
+      ordenBaja.id,
+      ...ordenesComunes.map((o) => o.id),
+    ])
+  })
+
+  it('R6: el pedido BORRADO con el nombre exacto de su receta no aparece, y el total da cero', async () => {
+    const marca = tokenLetters()
+    const nombre = `Solo Borrado R6 ${marca}`
+    const recipeBorradaR6Id = (
+      await prisma.recipe.create({
+        data: { name: nombre, nameNormalized: normalizeRecipeName(nombre), companyId },
+        select: { id: true },
+      })
+    ).id
+    try {
+      const pedidoBorrado = await alta(instantIn(DIA, 30), { recipeId: recipeBorradaR6Id })
+      await prisma.order.update({
+        where: { id: pedidoBorrado.id },
+        data: { deletedAt: new Date() },
+      })
+
+      // La receta esta VIVA -distinto de R4-: lo que se excluye es el PEDIDO borrado, no su
+      // receta. `AND deleted_at IS NULL` va siempre en el `where`, y la busqueda no lo levanta.
+      const pagina = await buscar(nombre)
+
+      expect(pagina.items).toEqual([])
+      expect(pagina.total).toBe(0)
+    } finally {
+      // El pedido ANTES que su receta: `orders.recipe_id` es FK RESTRICT.
+      await prisma.order.deleteMany({ where: { recipeId: recipeBorradaR6Id } })
+      await prisma.recipe.delete({ where: { id: recipeBorradaR6Id } })
+    }
+  })
+
+  it('R6: un pedido de OTRA empresa con el nombre exacto de su receta no aparece, y el total da cero', async () => {
+    const marca = tokenLetters()
+    const otherCompanyId = (
+      await prisma.company.create({
+        data: {
+          name: `Empresa R6 ${marca}`,
+          nameNormalized: normalizeCompanyName(`Empresa R6 ${marca}`),
+        },
+        select: { id: true },
+      })
+    ).id
+    try {
+      const nombre = `Receta Ajena R6 ${marca}`
+      const otherRecipeId = (
+        await prisma.recipe.create({
+          data: {
+            name: nombre,
+            nameNormalized: normalizeRecipeName(nombre),
+            companyId: otherCompanyId,
+          },
+          select: { id: true },
+        })
+      ).id
+      try {
+        // Alta DIRECTA por Prisma, no por `alta()`: esa siembra siempre en la empresa del
+        // fixture (`scope()`), y este pedido tiene que ser de la OTRA empresa. `createdBy` y
+        // `updatedBy` quedan sin autor: son columnas opcionales y el actor del fixture es de
+        // la empresa contraria.
+        const otherOrder = await prisma.order.create({
+          data: {
+            companyId: otherCompanyId,
+            orderYear: YEAR,
+            orderSequence: 1,
+            recipeId: otherRecipeId,
+            quantity: '10.0000',
+            priority: 'MEDIA',
+            status: 'PENDIENTE',
+            createdAt: instantIn(DIA, 40),
+            updatedAt: instantIn(DIA, 40),
+          },
+          select: { id: true },
+        })
+
+        // El pedido ajeno EXISTE de verdad en la base: si esto fallara, el cero de abajo no
+        // demostraria ningun ambito, solo una fila que nunca llego a crearse.
+        const existeDeVerdad = await prisma.order.findFirst({ where: { id: otherOrder.id } })
+        expect(existeDeVerdad).not.toBeNull()
+
+        const pagina = await buscar(nombre)
+
+        expect(pagina.items).toEqual([])
+        expect(pagina.total).toBe(0)
+      } finally {
+        await prisma.order.deleteMany({ where: { recipeId: otherRecipeId } })
+        await prisma.recipe.delete({ where: { id: otherRecipeId } })
+      }
+    } finally {
+      await prisma.company.delete({ where: { id: otherCompanyId } })
+    }
   })
 })
 
@@ -281,6 +547,7 @@ describe('`priority` ordena por el ORDEN DEL ENUM, no por el alfabetico', () => 
           },
         }),
       }),
+      null,
       scope(),
     )
 
@@ -302,6 +569,7 @@ describe('`priority` ordena por el ORDEN DEL ENUM, no por el alfabetico', () => 
           },
         }),
       }),
+      null,
       scope(),
     )
 
@@ -317,6 +585,7 @@ describe('`orderNumber` ordena por el par (ano, correlativo) y no alfabeticament
     // correlativos van del 1 en adelante y cruzan el 9 -> 10.
     const pagina = await listAliveOrders(
       consulta({ pageSize: 25, sort: { columnId: 'orderNumber', direction: 'asc' } }),
+      null,
       scope(),
     )
 
@@ -351,6 +620,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
         pageSize: 25,
         filters: soloElDia9({ status: { kind: 'select', values: ['EN_CURSO'] } }),
       }),
+      null,
       scope(),
     )
     expect(porEstado.total).toBe(2)
@@ -361,6 +631,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
         pageSize: 25,
         filters: soloElDia9({ priority: { kind: 'select', values: ['ALTA'] } }),
       }),
+      null,
       scope(),
     )
     expect(porPrioridad.total).toBe(2)
@@ -374,6 +645,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
           priority: { kind: 'select', values: ['ALTA'] },
         }),
       }),
+      null,
       scope(),
     )
     expect(ambos.total).toBe(1)
@@ -389,6 +661,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
           status: { kind: 'select', values: ['EN_CURSO', 'PENDIENTE'] },
         }),
       }),
+      null,
       scope(),
     )
 
@@ -422,7 +695,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
     })
 
     // Sin filtro de estado: el cancelado SALE y el borrado NO, aunque los dos son del dia 14.
-    const todos = await listAliveOrders(consulta({ pageSize: 25, filters: soloElDia14() }), scope())
+    const todos = await listAliveOrders(consulta({ pageSize: 25, filters: soloElDia14() }), null, scope())
     expect(todos.items.map((o) => o.id)).toEqual([cancelado.id])
     expect(todos.total).toBe(1)
 
@@ -432,6 +705,7 @@ describe('estado y prioridad son filtros `select` del contrato (R25, R15)', () =
         pageSize: 25,
         filters: soloElDia14({ status: { kind: 'select', values: ['CANCELADO'] } }),
       }),
+      null,
       scope(),
     )
     expect(pagina.items.map((o) => o.id)).toEqual([cancelado.id])
@@ -464,6 +738,7 @@ describe('los decimales se comparan como Decimal, no como coma flotante', () => 
           quantity: { kind: 'numberRange', min: null, max: 19.99 },
         },
       }),
+      null,
       scope(),
     )
 
@@ -494,6 +769,7 @@ describe('el rango de fechas se compara en UTC, con los dos extremos inclusivos'
           },
         },
       }),
+      null,
       scope(),
     )
 
@@ -529,6 +805,7 @@ describe('desempate estable por identificador (R10)', () => {
           sort: { columnId: 'status', direction: 'asc' },
           filters: soloElDia28,
         }),
+        null,
         scope(),
       )
       vistos.push(...pagina.items.map((o) => o.id))

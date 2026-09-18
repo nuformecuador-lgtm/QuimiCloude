@@ -1,0 +1,456 @@
+# QC-68 — busqueda-y-total-en-el-listado-de-pedidos · design.md
+
+> Escrito el 2026-09-17 sobre el worktree de la rama, al día con `origin/dev` (trae QC-50, QC-63 y
+> el arreglo de migraciones). Todo lo que este documento afirma del código está verificado en
+> disco, con su archivo y su línea.
+
+---
+
+## 0. El punto de partida, verificado
+
+| Hecho | Dónde |
+| --- | --- |
+| `ORDER_QUERYABLE.searchable === false`, y el archivo se describe como «la UNICA de las siete con `searchable: false`» | `lib/modules/pedidos/domain/order-queryable.ts:6-7,37` |
+| El nombre de la receta lo resuelve el caso de uso con **una** llamada a `RecipeCatalog`, con los ids de la página deduplicados | `lib/modules/pedidos/domain/list-orders.ts:144-151` |
+| Los nombres se resuelven con `findRefsIncludingDeleted`, o sea **incluidas las recetas de baja** | `list-orders.ts:149` |
+| `pedidos` **no puede** tocar `prisma.recipe`; se comparte servicio vía interfaz | `docs/architecture.md > Dominio` n.º 2; `tests/guards/guard-arquitectura-modulos.test.ts`; `tests/unit/pedidos/scope.test.ts:521,541` |
+| Ninguna FK de `orders` lleva `@relation`: no hay relación que navegar con `include` | `db/schema.prisma:485-509`; QC-33 **R33** (el enunciado que el encargo llama «R53»; R53 es el de `scope.test.ts`, que prohíbe `prisma.recipe` en `pedidos` — los dos apuntan a lo mismo) |
+| `recipes` ya tiene `company_id` (QC-50) y `name_normalized` | `db/schema.prisma:335,339` |
+| Las otras seis listas normalizan el término con `normalizedSearchCondition(query.search, normalize<X>Name)` | `recipe-prisma.ts:319`, `unit-prisma.ts:155`, `supplier-prisma.ts:317`, `product-prisma.ts:207`, `presentation-prisma.ts:358`, `supplier-catalog-line-prisma.ts:510` |
+| `pedidos` **ya tiene su copia** de `normalizedSearchCondition`, sin usar | `lib/modules/pedidos/adapters/driven/persistence/list-query-sql.ts:118` |
+| `normalizeRecipeName` está en el **contrato público** de `recetas` | `lib/modules/recetas/index.ts:39` |
+| El índice de búsqueda de recetas es **PARCIAL**: `WHERE deleted_at IS NULL` | `db/migrations/20260904160000_list_query_indexes/migration.sql:67` |
+| `orders_recipe_id_idx` ya existe | `db/schema.prisma:505` |
+| **No hay precio unitario en ninguna parte**: `Order` tiene un solo decimal, `quantity`. Es lo que sacó el total de esta ficha (`> 5`) | `db/schema.prisma:485-509` |
+
+---
+
+## 1. Modelo de datos
+
+**Ninguna tabla cambia de forma.** No se añade columna, no se cambia ningún tipo, no se toca RLS ni
+el `/// @module` de ningún modelo. Lo único que entra en la base es **un índice**.
+
+### 1.1 La migración
+
+```
+db/migrations/<timestamp>_recipes_search_index_including_deleted/
+  migration.sql
+  down.sql
+```
+
+`migration.sql`:
+
+```sql
+CREATE INDEX "recipes_name_normalized_all_trgm_idx"
+  ON "recipes" USING gin ("name_normalized" gin_trgm_ops);
+```
+
+`down.sql`:
+
+```sql
+DROP INDEX IF EXISTS "recipes_name_normalized_all_trgm_idx";
+```
+
+**Por qué hace falta un índice más y no vale el que hay** (R14, `[D8]`, `[D2]`). QC-57 creó
+`recipes_name_normalized_trgm_idx` **parcial**, con `WHERE deleted_at IS NULL`, porque el listado
+de recetas nunca muestra las de baja. Esta búsqueda **sí tiene que verlas** (`[D2]`), así que su
+`where` no lleva `deleted_at IS NULL` y el planificador **no puede usar el índice parcial**: un
+índice parcial solo sirve a consultas cuyo predicado lo implique. Sin un índice total, la búsqueda
+cae en *seq scan* sobre `recipes` — el anti-patrón que `docs/architecture.md > Anti-patrones`
+rechaza y que `[D8]` manda evitar con el mismo criterio de QC-57.
+
+**Los dos conviven a propósito**: el parcial sigue sirviendo al listado de recetas (más pequeño y
+más barato de mantener), el total sirve a esta búsqueda. Quitar el parcial para dejar solo el total
+deoptimizaría una pantalla que ya funciona, y eso no lo pide nadie.
+
+**Sin `company_id` en el índice**, y es deliberado: un GIN compuesto de `(company_id, name_normalized gin_trgm_ops)`
+necesitaría la extensión `btree_gin`, o sea **una dependencia de infraestructura nueva** que nadie
+ha aprobado. El ámbito de empresa se aplica igual en el `where` (R6), y el trigrama recorta lo
+suficiente: el filtro por empresa se resuelve después sobre un conjunto ya pequeño.
+
+**`down.sql` NO hace `DROP EXTENSION pg_trgm`**, mismo criterio escrito en
+`db/migrations/20260904160000_list_query_indexes/down.sql:10`: una extensión es infraestructura
+compartida y otras seis tablas dependen de ella.
+
+**El índice NO se declara en `db/schema.prisma`**, igual que sus seis hermanos de QC-57: Prisma no
+expresa `gin_trgm_ops` sin activar un preview feature, y el repo ya vive con esa drift. Consecuencia
+conocida y heredada: toda migración generada después traerá un `DROP INDEX` de éste que **hay que
+borrar a mano** antes de aplicarla, exactamente como ya pasa con los otros seis.
+
+### 1.2 Lo que NO entra en la base
+
+- **Ninguna columna `recipe_name_normalized` en `orders`.** Es la alternativa descartada, `> 4`.
+- **Nada del total**: ni columna, ni índice, ni expresión calculada. Salió a QC-123 el 2026-09-17
+  (`> 5`).
+
+---
+
+## 2. La frontera entre módulos
+
+`pedidos` no puede leer `recipes`. La regla está en `docs/architecture.md > Dominio` n.º 2 («se
+comparten **servicios vía interfaz**, nunca repositorios ni tablas») y la hacen cumplir tres cosas
+distintas, todas verdes hoy:
+
+1. `tests/guards/guard-arquitectura-modulos.test.ts` — `prisma.<modelo>` solo en el módulo dueño.
+2. `tests/unit/pedidos/scope.test.ts:521` — «pedidos no consulta `prisma.recipe`».
+3. `db/schema.prisma` — `orders.recipe_id` es escalar **sin `@relation`**, así que ni siquiera hay
+   `include` que escribir (QC-33 R33).
+
+El mecanismo que ya existe para atravesar esa frontera es `RecipeCatalog`
+(`lib/modules/recetas/domain/recipe-catalog.ts:24`), implementado por un adaptador driven **de
+recetas** y cableado en `lib/composition`. Esta feature **lo amplía con un método**, que es
+exactamente el camino previsto.
+
+### 2.1 El método nuevo
+
+```ts
+// lib/modules/recetas/domain/recipe-catalog.ts (dentro de la interfaz RecipeCatalog)
+
+/** Identificadores de las recetas de esa empresa cuyo nombre casa con el término,
+ *  INCLUIDAS LAS DADAS DE BAJA. `null` = el término no es una búsqueda (no conserva
+ *  ningún carácter al normalizarlo): quien pregunta no debe filtrar nada. */
+findIdsMatchingName(search: string, companyId: string): Promise<readonly RecipeId[] | null>;
+```
+
+**Devuelve ids, no `Ref`s**, y es lo que impide que este método se convierta en un segundo listado
+de recetas por la puerta de atrás: quien pregunta no obtiene ni nombres ni fechas, solo la
+respuesta a «¿cuáles casan?». Los nombres siguen saliendo de `findRefsIncludingDeleted`, en su
+llamada de siempre.
+
+**`| null` y no `[]` para el término vacío** (R9). `[]` significa «ninguna receta casa» → cero
+pedidos (R10). `null` significa «esto no es una búsqueda» → la lista entera. Fundir los dos casos
+convertiría una búsqueda de solo signos en una lista vacía, que es justo lo contrario de lo que
+QC-57 R20 decidió. La distinción es la misma que ya hace `normalizedSearchCondition`, que devuelve
+`null` cuando el término se normaliza a vacío
+(`pedidos/adapters/driven/persistence/list-query-sql.ts:115-124`).
+
+### 2.2 La implementación, con ámbito de empresa
+
+En `lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts`, al lado de
+`findRecipeRefsIncludingDeleted` y con su mismo patrón:
+
+```ts
+export async function findRecipeIdsMatchingName(
+  search: string,
+  companyId: string,
+): Promise<readonly RecipeId[] | null> {
+  const condition = normalizedSearchCondition(search, normalizeRecipeName);
+  if (condition === null) return null;
+
+  const scope: RecipeScope = { companyId };
+  const rows = await prisma.recipe.findMany({
+    where: { AND: [recipeCompanyScope(scope), { nameNormalized: condition }] },
+    select: { id: true },
+  });
+
+  return rows.map((row) => row.id);
+}
+```
+
+**Nota de ámbito de empresa — lo que `guard-ambito-empresa-recetas.test.ts` exige y cómo se
+cumple.** La guardia (leída entera, `tests/guards/guard-ambito-empresa-recetas.test.ts:412-473`)
+no se conforma con la firma. De **cada** método de `RecipeCatalog` comprueba **cuatro** cosas:
+
+1. Que el método está **cableado con nombre** en `lib/composition/index.ts` y que el conjunto de
+   claves del objeto cableado es **exactamente igual** al de los métodos de la interfaz — así que
+   añadir el método a la interfaz **sin cablearlo pone la guardia en rojo sola**, sin que nadie
+   tenga que acordarse.
+2. Que la **interfaz** declara `companyId: string` en la firma.
+3. Que la **implementación** lo declara también. TypeScript no lo exige: una función de menor
+   aridad satisface la firma, y esa es la fuga que la guardia existe para cerrar.
+4. Que ese valor **llega** hasta una envoltura de `./company-scope`. El patrón admitido —y el que
+   se usa arriba— es el de `findRecipeRefsIncludingDeleted`: envolver `companyId` en un
+   `RecipeScope` local y pasárselo a `recipeCompanyScope(scope)`. La guardia sigue ese salto
+   (`lePasaElAmbito`, línea 191). Leer `scope.companyId` a mano está **prohibido** fuera del punto
+   único (`LECTURA_SUELTA`, línea 235).
+
+Es decir: **no hay que escribir ninguna guardia nueva**. La que existe se tensa sola con el método
+nuevo, que es la señal de que el diseño va por el camino previsto. Lo que sí hay que hacer es
+cablear (`T6`), o nada compila ni pasa.
+
+**Sin `deleted_at IS NULL` en el `where`**, igual que su hermana de al lado y por el mismo motivo
+escrito ahí (`recipe-catalog-prisma.ts:18-22`): un pedido conserva su receta aunque la den de baja
+y la lista ya enseña ese nombre. Si al buscar ese mismo nombre el pedido no saliera, parecería
+perdido — que es literalmente lo que dice `[D2]`.
+
+**La normalización se reutiliza, no se inventa** (R2): `normalizeRecipeName` es la misma función
+que escribió `recipes.name_normalized` y la misma con la que `recetas` mide «mismo nombre».
+`normalizedSearchCondition` es la misma función que usan las otras seis listas — y `recetas` ya la
+tiene importada en su `list-query-sql.ts` local.
+
+---
+
+## 3. El flujo del listado
+
+`lib/modules/pedidos/domain/list-orders.ts` conserva su orden y gana **un paso entre el 4 y el 5**:
+
+```
+1. requirePermission(actor, 'pedidos.consultar')        ← sin cambios (R12, [D6])
+2. scope = { companyId: actor.companyId }               ← sin cambios (R12, [D6])
+3. zod                                                   ← sin cambios
+4. sanitizeListQuery(parsed, ORDER_QUERYABLE)            ← ahora `search` SOBREVIVE (R11)
+   + pruneClosedSelects + log                            ← sin cambios
+5. NUEVO: si `search !== ''`
+        recipeIds = await deps.recipes.findIdsMatchingName(search, actor.companyId)
+   si no  recipeIds = null
+6. await deps.orders.listAlive(query, recipeIds, scope)  ← firma con un parámetro más
+7. await deps.recipes.findRefsIncludingDeleted(ids, ...)  ← sin cambios
+8. toOrderView por fila                                   ← sin cambios
+```
+
+**Número de consultas por página** (R8): **3 sin búsqueda** (`findMany` + `count` + catálogo de
+nombres) y **4 con búsqueda**. Constante: no crece con las filas. El molde es
+`lib/modules/asignaciones/domain/list-assigned-orders.ts:69-95`, que ya hace exactamente esto —
+pedir primero los identificadores a otro módulo y después la página— y cuyo test cuenta
+invocaciones en vez de mirar el resultado.
+
+> **Nota fechada 2026-09-17 (implementación): dos cifras ciertas que miden cosas distintas.**
+> El párrafo de arriba cuenta **consultas SQL** —3 sin búsqueda y 4 con ella—, y **no se corrige**:
+> es lo que llega a Postgres y es lo que R8 acota. Pero **T9 es un test unitario con dobles**, y un
+> doble del puerto no puede ver el `findMany` y el `count` por separado: los dos viven dentro de
+> **una sola** invocación de `listAlive`. Lo único que ese test puede afirmar de verdad es el
+> número de **invocaciones de puerto**, que es **2 sin búsqueda** (`orders.listAlive` +
+> `recipes.findRefsIncludingDeleted`) y **3 con búsqueda** (más `recipes.findIdsMatchingName`).
+> Por eso T9 se escribe contando invocaciones y con esas cifras. Es también lo que dice hoy el
+> encabezado de `list-orders.ts` («DOS consultas por página»), que mide lo mismo que el test.
+> Quien compare el test con este párrafo y crea que uno de los dos miente, que lea esta nota: la
+> propiedad que las dos defienden es la misma —**el número no crece con las filas**—.
+>
+> **Recorte fechado 2026-09-18:** esta nota cerraba prometiendo que el número de consultas SQL
+> lo demuestra un test de integración. Ese test no existe y no se escribe para salvar la frase:
+> el número de consultas SQL no está probado por ningún test de este repo, solo razonado aquí a
+> partir de lo que hace `listAlive`.
+
+**El caso «ninguna receta casa» NO se cortocircuita en el dominio.** Se pasa `recipeIds: []` al
+repositorio y el `where` sale con `recipeId: { in: [] }`, que devuelve cero filas y un `count` de
+cero. Es una consulta más barata que la lista completa y mantiene **una sola** aritmética de
+paginación: construir la página vacía a mano en el dominio sería reimplementar
+`toOffsetLimit`/`buildPage`, que QC-34 **R37** prohíbe explícitamente y que `domain/` ni siquiera
+puede importar. (`list-assigned-orders.ts` sí la construye a mano, y por eso tiene su propio
+`effectivePageSize`: aquí no hace falta pagar ese precio.)
+
+### 3.1 El puerto y el adaptador de pedidos
+
+`lib/modules/pedidos/ports/order-repository.ts`:
+
+```ts
+listAlive(
+  query: ListQuery,
+  recipeIds: readonly string[] | null,
+  scope: OrderScope,
+): Promise<Page<OrderRow>>;
+```
+
+> **Nota fechada 2026-09-18 (decisión del humano): `recipeIds` va ANTES de `scope`.**
+> Este bloque decía `(query, scope, recipeIds)` y así se implementó primero. **El orden no es
+> estético: `scope` al final es una convención del módulo con dos guardias detrás.**
+> `tests/unit/pedidos/company-isolation-service.test.ts` (QC-60 **R16**) exige que **los seis**
+> métodos de `OrderRepository` reciban `{ companyId }` como **último** argumento —lo lee con
+> `args[args.length - 1]`—, y el encabezado de `order-repository.ts` lo tiene **escrito** («los
+> seis métodos exigen `scope: OrderScope` al final de la firma»), vigilado además por
+> `tests/guards/guard-ambito-empresa-pedidos.test.ts`. Con `recipeIds` detrás, el aserto leía el
+> parámetro equivocado y la frase del puerto pasaba a ser falsa. Las alternativas —tensar la
+> guardia o abrirle una excepción a `listAlive`— **aflojan una guardia de aislamiento por empresa
+> que esta ficha no ha escrito** (**R15**); reordenar devuelve las dos a verde **sin tocarlas**.
+
+`recipeIds` es **parámetro propio y no viaja dentro de `ListQuery`**: `ListQuery` es la forma
+*compartida* por los siete listados (`domain/list-query.ts:5-15`, duplicada a propósito en los
+cinco módulos y vigilada por `guard-contrato-listados`), y meterle un campo que solo pedidos
+entiende obligaría a tocar las cinco copias y a que la guardia canónica lo aceptara. El contrato
+genérico no cambia. **Nadie más llama a `listAlive`** por el puerto: el único consumidor es
+`list-orders.ts`.
+
+**El puerto lo exige; la función del adaptador lo declaraba con `= null` por defecto.** El motivo
+era no romper las **~45 llamadas directas** a `listAliveOrders` de los cuatro archivos de
+integración de pedidos (`order-repository.int.test.ts`, `list-query-orders.int.test.ts`,
+`company-scope-queries.int.test.ts`, `order-crud.int.test.ts`), todas con dos argumentos y ninguna
+hablando de búsqueda.
+
+> **Nota fechada 2026-09-18: ese defecto ya no existe, y su justificación tampoco.** Al reordenar
+> la firma (nota de arriba), `recipeIds` queda **en medio**, y un parámetro en medio **no puede
+> llevar valor por defecto**. Así que `listAliveOrders(query, recipeIds, scope)` lo exige, y las
+> ~45 llamadas pasan a `(query, null, scope)`. **No es aflojar nada**: cada una sigue diciendo lo
+> mismo —«sin búsqueda»—, ahora de forma explícita en vez de implícita, que si acaso es más
+> estricto. Ahorrarse ese `null` no compensaba dejar en rojo la guardia de aislamiento.
+
+Lo que **nunca** se relajó es el contrato: la interfaz `OrderRepository` declara `recipeIds`
+**obligatorio**, así que el dominio no puede olvidarlo, y `null` significa exactamente «sin
+búsqueda».
+
+`buildOrderWhere(query, recipeIds, scope)` gana **un tercer término del `AND`**, al mismo nivel que
+el ámbito y el borrado, nunca fundido con los filtros ni con ningún `OR` (R6):
+
+```ts
+return {
+  AND: [
+    orderCompanyScope(scope),
+    { deletedAt: null },
+    ...(recipeIds === null ? [] : [{ recipeId: { in: [...recipeIds] } }]),
+    ...filters,
+  ],
+};
+```
+
+El mismo objeto sirve al `findMany` y al `count` — literalmente la misma constante, como ya hace
+`listAliveOrders` (`order-prisma.ts:461-472`) —, así que el **total de resultados** describe el
+conjunto **ya buscado** (R5).
+
+**El adaptador de pedidos sigue sin llamar a `normalizedSearchCondition`**: `orders` no tiene
+columna de nombre y no la gana. La copia de `list-query-sql.ts` se queda como está, por el motivo
+que su propia cabecera ya explica (las tres copias son la misma y podarla las haría divergir); lo
+que hay que corregir es la **razón escrita** en esa cabecera, que dice
+«`ORDER_QUERYABLE.searchable === false`» y deja de ser cierta (T15).
+
+---
+
+## 4. Alternativa descartada: denormalizar el nombre de la receta en `orders`
+
+**En qué consistía.** Añadir `orders.recipe_name_normalized`, escribirla en el alta y en la
+edición del pedido, poblarla con un backfill, indexarla con un GIN de trigramas y buscar con un
+`contains` sobre la propia tabla `orders`. Una sola consulta, sin cruzar módulos en tiempo de
+lectura, y sin lista de identificadores que crezca.
+
+**Por qué se descarta.**
+
+1. **Una copia que se queda vieja, y no hay quien la refresque sin romper la frontera.** Renombrar
+   una receta tendría que reescribir la columna de **todos** los pedidos de esa receta. Quien
+   renombra es `recetas`, y `recetas` **no puede escribir en `orders`**: sería exactamente el
+   `prisma.order` fuera de su módulo que `guard-arquitectura-modulos` rechaza. La alternativa sería
+   un evento o un job, y en este repo **no existe** ninguno de los dos: montarlo es una feature
+   propia, no un detalle de ésta.
+2. **La lista mentiría.** El listado ya muestra el nombre **vivo** de la receta, resuelto en cada
+   consulta (`list-orders.ts:149-151`). Con la columna desincronizada, buscar «buffer» no
+   encontraría un pedido cuya fila **dice** «buffer» en pantalla. `docs/architecture.md > Dominio`
+   n.º 3 («los datos son el producto») y el propio `[D2]` van justo en contra de eso.
+3. **Indexa la tabla que crece.** `orders` es transaccional y crece sin techo; `recipes` es un
+   catálogo. Poner el GIN de trigramas en la tabla grande —y mantenerlo en cada alta y cada
+   edición de pedido— cuesta más que consultar un catálogo pequeño que **ya** tiene su columna
+   normalizada desde QC-24 y su empresa desde QC-50.
+4. **Backfill con pérdida potencial.** La columna nacería `NOT NULL` sobre una tabla con datos, y
+   el nombre de una receta **borrada físicamente** no se podría recuperar. La opción elegida no
+   tiene ese problema: el `null` de `recipeName` ya está contemplado en `OrderView`.
+
+**Lo que se paga por descartarla**, dicho para que no se revierta sin datos: **una consulta más por
+página** cuando hay búsqueda, y una lista de identificadores en el `IN` acotada por el catálogo de
+recetas de la empresa. **Esa lista NO lleva tope** (decisión del humano, 2026-09-17): recortarla
+haría mentir al total de resultados (R5), y el catálogo de recetas de una empresa está acotado por
+su propio tamaño. Si alguna llega a tener miles, es ficha propia con su caso medido.
+
+### 4.1 Segunda alternativa descartada: `include` / `join` de Prisma
+
+Declarar `@relation` entre `Order` y `Recipe` y filtrar con `where: { recipe: { nameNormalized: ... } }`
+sería una línea. Está **prohibido de tres maneras a la vez**: QC-33 R33 exige que las referencias
+del pedido sean escalares sin relación precisamente para que el ORM no pueda atravesar,
+`guard-arquitectura-modulos` lo rechaza como acceso a un modelo de otro módulo, y el propio
+encargo lo veta. No se evalúa más.
+
+---
+
+## 5. El total del pedido — POR QUÉ NO ESTÁ AQUÍ (2026-09-17)
+
+Esta sección existía y describía el cálculo del total. **Se vació el 2026-09-17, por decisión del
+humano: la ficha se partió y el total salió a QC-123.** No se borra en silencio porque quien lea
+este diseño buscando el total tiene que encontrar la razón, no un hueco.
+
+**El motivo, en una línea**: **el total no tiene segundo factor**. `orders.unit_price` dejó de
+existir el 2026-09-07 con QC-35bis (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`)
+y en `db/schema.prisma` el modelo `Order` conserva **un solo decimal, `quantity`**. De dónde vuelve
+a salir ese importe —columna propia del pedido, precio de catálogo en la receta, u otra cosa— es
+una **decisión de negocio**, no de diseño, y por eso no se resuelve en un `design.md`: vive en
+**QC-123**, junto con el E2E de importes que QC-122 ya no lleva.
+
+Lo que QC-68 **sí** deja resuelto y QC-123 hereda, para que no se vuelva a discutir: el cálculo va
+en el **adaptador driven** (multiplicar dos `Decimal(14,4)` exige `Prisma.Decimal`, y `domain/` no
+puede importar `@prisma/client`), viaja como **cadena con `.toFixed(4)`** igual que `quantity`, y
+**no entra ninguna dependencia nueva** — `tests/unit/pedidos/scope.test.ts:284` mantiene la lista
+cerrada de `pedidos` en `zod` + `@prisma/client`, así que un `decimal.js` caería solo.
+
+**Consecuencia para esta ficha**: `OrderRow`, `OrderView`, `OrderSummary`, `toOrderView` y
+`ORDER_QUERYABLE.sortable`/`filterable` **no se tocan**. QC-68 cambia un solo campo de la lista
+blanca, `searchable`.
+
+---
+
+## 6. Dependencias de terceros
+
+**Ninguna.** La feature no propone ni una: la búsqueda se resuelve con lo que ya hay
+(`normalizedSearchCondition`, `normalizeRecipeName`, `pg_trgm` ya instalada). Los cuatro checks de
+`docs/architecture.md > Dependencias de terceros` no se aplican aquí porque no hay candidata. La
+única que alguien podría llegar a proponer —una librería de decimales— se fue con el total a
+QC-123, y su respuesta ya está escrita en `[D7]`: Prisma opera decimales.
+
+---
+
+## 7. Contratos de entrada y salida
+
+**Entrada**: no cambia ni una clave. `search` ya existe en el contrato genérico
+(`ListQuery.search`, `''` = sin búsqueda) y ya viaja desde la Server Action; lo único que cambia es
+que **deja de podarse** (R11).
+
+**Salida**: **no cambia ni un campo.** `OrderSummary` se queda exactamente como está —`recipeName`
+sigue siendo `string | null` con el mismo significado— porque el `total` salió a QC-123 (`> 5`).
+Lo único que cambia es **qué filas** vuelven, no su forma.
+
+**Rutas y endpoints**: ninguno nuevo. La Server Action `listOrders`
+(`lib/modules/pedidos/adapters/driving/order-actions.ts`) no cambia de firma.
+
+**Multiplataforma**: no aplica, no hay UI en esta feature (`[D3]`).
+
+---
+
+## 8. Archivos que la feature va a tocar
+
+Para el cruce de F1.4 con **QC-59** (`backend`, módulo `proveedores`) y **QC-91** (`fullstack`,
+inventario/lotes).
+
+### Producción
+
+| Archivo | Qué |
+| --- | --- |
+| `lib/modules/pedidos/domain/order-queryable.ts` | `searchable: true` + limpieza de comentarios de las líneas tocadas |
+| `lib/modules/pedidos/domain/list-orders.ts` | paso 5 (resolver ids) y llamada a `listAlive` |
+| `lib/modules/pedidos/ports/order-repository.ts` | firma de `listAlive` |
+| `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` | `buildOrderWhere` + `listAliveOrders` |
+| `lib/modules/pedidos/adapters/driven/persistence/list-query-sql.ts` | **solo comentario**: la razón escrita deja de ser cierta |
+| `lib/modules/recetas/domain/recipe-catalog.ts` | método `findIdsMatchingName` |
+| `lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts` | implementación con ámbito |
+| `lib/composition/index.ts` | cablear el método nuevo en `recipeCatalog` |
+| `db/migrations/<ts>_recipes_search_index_including_deleted/migration.sql` | índice nuevo |
+| `db/migrations/<ts>_recipes_search_index_including_deleted/down.sql` | su reverso |
+| `app/(private)/pedidos/components/order-list-params.ts` | **solo comentario**: la razón de emitir `search` vacío cambia |
+| `app/(private)/pedidos/components/order-table.tsx` | **solo comentario**: ídem |
+
+> **`lib/composition/index.ts` es el único archivo con riesgo real de colisión** con otra ficha en
+> curso: es el punto único de cableado y cualquier feature que añada un puerto lo toca. El resto
+> vive en `pedidos`, en `recetas` y en `db/migrations/`, y **no se solapa** con `proveedores`
+> (QC-59) ni con inventario/lotes (QC-91). Las dos migraciones nuevas que puedan coincidir en el
+> tiempo no chocan entre sí: son carpetas distintas.
+
+### Tests (censos y cobertura)
+
+`tests/unit/shared/listas-blancas-listados.test.ts`, `tests/unit/pedidos/order-view.test.ts`,
+`tests/unit/pedidos/order-input.test.ts`, `tests/unit/pedidos/list-orders.test.ts`,
+`tests/unit/pedidos-ui/order-list-params.test.ts`,
+`tests/integration/pedidos/list-query-orders.int.test.ts`,
+`tests/integration/inventario/list-query-indexes.int.test.ts`,
+`tests/unit/recetas/recipe-catalog.test.ts`, `e2e/pedidos.spec.ts` (**solo un comentario**).
+El detalle, archivo por archivo, en `tasks.md`.
+
+---
+
+## 9. Verificación
+
+`[D3]`: **no hay E2E en esta ficha** y no se añade ninguno — la lista de specs E2E de pedidos es un
+censo cerrado de tres (`tests/unit/pedidos/scope.test.ts:402-406`) y un cuarto sin ficha que lo
+respalde la pondría en rojo. La cobertura es:
+
+- **Unitaria** para el flujo del caso de uso (conteo de invocaciones, no solo resultado) y para la
+  lista blanca.
+- **Integración contra la base real** para lo que un doble no puede demostrar: que la búsqueda se
+  traduce a SQL, que el total de resultados describe el conjunto buscado, que una receta de baja
+  entra, que el
+  ámbito de empresa no se amplía, y que el índice nuevo existe con su definición exacta.
+- **Guardias**: `guard-ambito-empresa-recetas` y `guard-arquitectura-modulos` se tensan solas con
+  el método nuevo; no se escribe ninguna guardia adicional.
+
+Cierre de tanda con `./init.sh --rapido`; cierre de feature y PR con `./init.sh` completo.

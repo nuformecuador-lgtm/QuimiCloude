@@ -200,12 +200,16 @@ describe('la URL es la unica verdad del estado de lista: ida y vuelta (R15)', ()
   });
 });
 
-describe('la lista NO busca: `search` no se lee ni se escribe (R20)', () => {
-  it('el contrato de pedidos declara searchable: false, que es de donde sale R20', () => {
-    expect(ORDER_QUERYABLE.searchable).toBe(false);
+// Nota fechada 2026-09-18 (QC-68): `ORDER_QUERYABLE.searchable` paso a `true` (R11), asi que el
+// primer caso de este bloque cambia de valor. Los otros dos NO se borran: siguen vigilando que
+// esta pantalla, en concreto, no lea ni emita `search` -su motivo ya no es que el contrato lo
+// prohiba, sino que la caja de busqueda todavia no esta construida aqui (R16)-.
+describe('la pantalla todavia no busca, aunque el contrato ya lo permita (R16)', () => {
+  it('el contrato de pedidos ya declara searchable: true (R11)', () => {
+    expect(ORDER_QUERYABLE.searchable).toBe(true);
   });
 
-  it('un `search` en la URL se IGNORA: la consulta sale siempre con busqueda vacia', () => {
+  it('un `search` en la URL se IGNORA: la consulta sale siempre con busqueda vacia (R16)', () => {
     const params = parseOrderListParams({
       search: 'acido citrico',
       q: 'acido citrico',
@@ -217,7 +221,7 @@ describe('la lista NO busca: `search` no se lee ni se escribe (R20)', () => {
     expect(params.filters).toEqual({});
   });
 
-  it('buildOrderListQuery NUNCA emite un parametro `search`, ni siquiera vacio', () => {
+  it('buildOrderListQuery NUNCA emite un parametro `search`, ni siquiera vacio (R16)', () => {
     const conBusqueda: DataTableParams = {
       page: PRIMERA_PAGINA,
       pageSize: DEFAULT_PAGE_SIZE,
