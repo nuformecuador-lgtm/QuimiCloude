@@ -410,8 +410,8 @@ function orderFilterWhere(field: string, value: ListFilterValue): Prisma.OrderWh
 }
 
 /**
- * `where` UNICO del listado de pedidos: el mismo objeto para el `findMany` y para el `count`
- * (R14). Tres capas, y ninguna sobra:
+ * `where` UNICO del listado de pedidos: el mismo objeto para el `findMany` y para el `count`.
+ * Tres capas, y ninguna sobra:
  *
  *   1. **`deletedAt: null` SIEMPRE** (R7, R40). NO es un filtro opcional y por eso nunca estuvo
  *      en los parametros del listado: `deletedAt` no es consultable en ninguna lista blanca y
@@ -420,7 +420,7 @@ function orderFilterWhere(field: string, value: ListFilterValue): Prisma.OrderWh
  *   2. **`recipeIds`**, cuando la busqueda resolvio un termino: acota a los pedidos de esas
  *      recetas. `null` significa que no hay busqueda y no acota nada; `[]` significa que ninguna
  *      receta caso y el `IN` vacio deja la pagina sin filas.
- *   3. **Los filtros, TODOS a la vez** (R15): un `AND` explicito, de modo que una fila sale solo
+ *   3. **Los filtros, TODOS a la vez**: un `AND` explicito, de modo que una fila sale solo
  *      si los cumple todos. Estado y prioridad son dos de ellos (R25), ya no dos parametros.
  */
 export function buildOrderWhere(
@@ -463,9 +463,9 @@ export function buildOrderWhere(
  * `total` sale de un `count` con el MISMO `where` que el `findMany` (R14) -literalmente la
  * misma constante, no dos copias parecidas-.
  *
- * `recipeIds` lleva `= null` por defecto: el puerto lo declara obligatorio, pero las ~30
- * llamadas de dos argumentos de los tests de integracion de pedidos no hablan de busqueda y
- * `null` es exactamente su estado -«sin busqueda, no acotar nada»-.
+ * `recipeIds` lleva `= null` por defecto: ese defecto significa «sin busqueda, no acotar
+ * nada», que es el estado de las llamadas de los tests de integracion de pedidos que no
+ * hablan de busqueda.
  */
 export async function listAliveOrders(
   query: ListQuery,
