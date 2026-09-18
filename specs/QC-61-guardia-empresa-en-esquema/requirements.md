@@ -77,6 +77,9 @@ tabla; «lista de exentas» es la lista cerrada escrita en la propia guardia.
 - **R14** (ubicuo) — La lista de exentas de `docs/architecture.md > Dominio` DEBE nombrar exactamente
   las mismas tablas que la lista de exentas de la guardia. [D6]
 - **R15** (ubicuo) — La feature NO DEBE añadir ninguna dependencia a `package.json`. [D8]
+- **R16** (no deseado) — SI una tabla de la lista de exentas no existe en `db/schema.prisma` o ya
+  declara la columna de empresa, ENTONCES la guardia DEBE dar rojo nombrando la entrada que sobra.
+  _Aprobado por el humano en F1.4 el 2026-09-18 (`design.md > 9`, F1.4-B)._
 
 Cobertura de decisiones: D1 → R2, R4, R7, R10 · D2 → R4, R7 · D3 → R3, R5 · D4 → R2, R6, R10 ·
 D5 → R1, R6, R8, R9 · D6 → R14 · D7 → R1, R13 · D8 → R15.

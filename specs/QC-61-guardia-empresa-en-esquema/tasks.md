@@ -65,7 +65,7 @@
   Contenido: localiza el bullet por su frase inicial, extrae identificadores `^[a-z][a-z_]*$` entre
   comillas invertidas, descuenta `company_id`, compara con `EXENTAS`. Rojo si no encuentra el
   bullet. Fixture en memoria con una tabla de más y otra de menos.
-  Depende de: T2, T4. **Condicionada a F1.4-C** (`design.md > 9`): si el humano la rechaza, esta
+  Depende de: T2, T4. **Aprobada en F1.4-C el 2026-09-18** (`design.md > 9`): si el humano la rechaza, esta
   task se elimina y R14 queda a cargo de la revisión.
   Hecho cuando: verde sobre el doc real y rojo con los dos fixtures.
   Cubre: R14.
@@ -74,7 +74,7 @@
   Archivos: `CHECKPOINTS.md` (l. 28-30), `.claude/agents/reviewer.md` (l. 33-35).
   Contenido: sustituir «las tres del sistema (`users`, `roles`, `document_types`)» por una remisión
   a la lista de `docs/architecture.md > Dominio` y a la guardia.
-  Depende de: T4. **Condicionada a F1.4-A**: solo entra si el humano la aprueba.
+  Depende de: T4. **Aprobada en F1.4-A el 2026-09-18.**
   Hecho cuando: ninguno de los dos archivos nombra `users` como exenta.
   Cubre: — (coherencia; se verifica en la revisión).
 
@@ -85,9 +85,9 @@
   Contenido: `hallazgosExentasQueSobran(modelos, exentas)`: entrada cuya tabla no existe en el
   esquema o que ya declara `company_id`. Fixtures de los dos casos y su simétrico; `it` sobre el
   esquema real con `[]`.
-  Depende de: T3. **Condicionada a F1.4-B**: solo entra si el humano aprueba R16.
+  Depende de: T3. **Aprobada en F1.4-B el 2026-09-18.**
   Hecho cuando: los dos fixtures dan su hallazgo exacto y el esquema real da `[]`.
-  Cubre: R16 (si se aprueba).
+  Cubre: R16.
 
 ## Bloque 4 — Cierre
 
@@ -130,6 +130,6 @@
 | R11 | `R11 CRLF y LF dan los mismos hallazgos` | T1 |
 | R12 | `R12 un esquema sin modelos da rojo` | T3 |
 | R13 | `R13 la guardia vive en tests/guards y la selecciona el patron guard` | T3, T9 |
-| R14 | `R14 la lista de docs/architecture.md coincide con EXENTAS` (si F1.4-C la acepta) | T4, T5 |
+| R14 | `R14 la lista de docs/architecture.md coincide con EXENTAS`  | T4, T5 |
 | R15 | `tests/guards/guard-dependencias-aprobadas.test.ts` + diff de `package.json` vacío | T9 |
-| R16 | `R16 una exenta que sobra da rojo` (solo si F1.4-B la aprueba) | T8 |
+| R16 | `R16 una exenta que sobra da rojo`  | T8 |

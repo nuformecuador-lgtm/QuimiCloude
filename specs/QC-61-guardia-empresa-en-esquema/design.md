@@ -150,7 +150,10 @@ conjunto debe ser igual al de `EXENTAS`. Consecuencia para quien edite el bullet
 él, entre comillas invertidas, ninguna tabla que no sea exenta** (por ejemplo, `users` va sin
 ellas si se menciona). Si el bullet no se encuentra, la guardia da rojo: no pasa en vacío.
 
-## 9. Pendiente de F1.4 (no sale de la acotación; no se decide aquí)
+## 9. Resuelto en F1.4 (2026-09-18)
+
+**El humano aprobó el spec el 2026-09-18 con las tres opciones: A, B y C entran.** T5, T7 y T8 dejan
+de ser condicionales, y R16 entra en `requirements.md`. Lo que sigue es el razonamiento original.
 
 - **F1.4-A — ¿Se corrigen también `CHECKPOINTS.md` (l. 28-30) y `.claude/agents/reviewer.md`
   (l. 33-35)?** Repiten la lista vieja de tres. [D6] solo nombra `architecture.md`. Si no se
