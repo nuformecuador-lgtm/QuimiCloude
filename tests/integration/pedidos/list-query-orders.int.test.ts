@@ -48,6 +48,26 @@ function token(): string {
   return randomUUID().replace(/-/gu, '')
 }
 
+const HEX_DIGIT_TO_LETTER: Readonly<Record<string, string>> = {
+  '0': 'g',
+  '1': 'h',
+  '2': 'i',
+  '3': 'j',
+  '4': 'k',
+  '5': 'l',
+  '6': 'm',
+  '7': 'n',
+  '8': 'o',
+  '9': 'p',
+}
+
+/** 2026-09-17: marcador SIN digitos -mapea cada digito hexadecimal a una letra distinta, uno a
+ *  uno- para que un nombre de receta que lo incluya nunca pueda casar por casualidad con el
+ *  correlativo de un pedido en una busqueda por texto. */
+function tokenLetters(): string {
+  return token().replace(/[0-9]/gu, (digit) => HEX_DIGIT_TO_LETTER[digit] ?? digit)
+}
+
 let recipeId: string
 let unitId: string
 let actorId: string
@@ -291,7 +311,7 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R10, R15)', () =
   }
 
   beforeAll(async () => {
-    const marca = token()
+    const marca = tokenLetters()
 
     async function recetaEfimera(nombre: string, overrides: { deletedAt?: Date } = {}) {
       return (
@@ -317,8 +337,9 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R10, R15)', () =
 
     // R5 — un termino que casa con MAS recetas que `pageSize`, para distinguir el total del
     // conjunto buscado del tamano de la pagina.
-    for (let i = 0; i < 3; i += 1) {
-      const id = await recetaEfimera(`Comun Compartido ${i} ${marca}`)
+    const NUMEROS_COMUNES = ['Uno', 'Dos', 'Tres'] as const
+    for (const [i, numero] of NUMEROS_COMUNES.entries()) {
+      const id = await recetaEfimera(`Comun Compartido ${numero} ${marca}`)
       recetasComunes.push(id)
       ordenesComunes.push(await alta(instantIn(DIA, 10 + i), { recipeId: id }))
     }
