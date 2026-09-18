@@ -14,7 +14,7 @@
  *     seria un `where` anidado sobre ese lote: otra consulta, que nadie pidio. Quitarlo es un
  *     cambio de contrato del listado, y por eso lo vigilan `tests/unit/inventario/list-query.test.ts`
  *     y `tests/guards/guard-contrato-listados.test.ts`.
- *   - `stock` (R8): dejo de existir como columna de `products`; la existencia se calcula por
+ *   - `stock`: dejo de existir como columna de `products`; la existencia se calcula por
  *     unidad y no se ordena ni se filtra.
  */
 

@@ -11,11 +11,11 @@ export type UpdateProductDeps = {
 };
 
 /**
- * Edicion de producto (R9, R10, R11, R13, R14). Reemplazo completo de lo que
- * queda editable, y se guarda TAL CUAL, sin derivarlo ni recalcularlo (D3, R13). La
- * existencia no se lee ni se escribe aqui: es del lote. La autoria ya no se registra
- * aqui: se mudo al lote (`ProductBatch`) el 2026-09-09, asi que el actor solo sirve para
- * el permiso y para la EMPRESA en cuyo nombre se edita.
+ * Edicion de producto. Reemplazo completo de lo que queda editable, y se guarda TAL
+ * CUAL, sin derivarlo ni recalcularlo. La existencia no se lee ni se escribe aqui: es
+ * del lote. La autoria ya no se registra aqui: se mudo al lote (`ProductBatch`) el
+ * 2026-09-09, asi que el actor solo sirve para el permiso y para la EMPRESA en cuyo
+ * nombre se edita.
  *
  * QC-49 (R16): el ambito viaja al puerto y entra en el `where` del `UPDATE`, no en un `if`
  * posterior sobre una fila ya leida. Un `id` de otra empresa devuelve `false` -el mismo camino

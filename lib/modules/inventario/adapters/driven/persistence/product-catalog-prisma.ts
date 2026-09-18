@@ -53,9 +53,9 @@ export async function findProductRefs(ids: readonly ProductId[]): Promise<readon
   if (ids.length === 0) return [];
 
   // Sin JOIN de presentacion directo desde el 2026-09-09: se lee via `batches` para armar
-  // `stockByUnit`. Y sin `unit_id` propio desde QC-80 (R21): la columna desaparecio de
-  // `products` y `ProductRef` no la sustituye por la unidad derivada del lote, porque el
-  // unico llamante -`recetas`- nunca la consumio.
+  // `stockByUnit`. Y sin `unit_id` propio: la columna desaparecio de `products` y
+  // `ProductRef` no la sustituye por la unidad derivada del lote, porque el unico
+  // llamante -`recetas`- nunca la consumio.
   const rows = await prisma.product.findMany({
     where: { id: { in: [...ids] }, deletedAt: null },
     select: {

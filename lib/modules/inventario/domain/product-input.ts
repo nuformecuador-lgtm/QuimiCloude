@@ -34,15 +34,15 @@ const nonNegativeIntSchema = z.number().int().min(0);
 /**
  * `qtyAlert` es obligatorio en la entrada aunque la columna `qty_alert` sea NULLABLE en la
  * base: un producto anterior con ese campo en NULL no se puede guardar sin rellenarlo, porque
- * la edicion es reemplazo completo (R13/R19) y usa el mismo esquema que el alta.
+ * la edicion es reemplazo completo y usa el mismo esquema que el alta.
  *
- * `strictObject`, no `z.object` (QC-52, `design.md > 4`): un campo de mas se RECHAZA como
- * `invalid_input`, no se ignora en silencio.
+ * `strictObject`, no `z.object`: un campo de mas se RECHAZA como `invalid_input`, no se
+ * ignora en silencio.
  */
 /**
  * Los campos del producto, declarados UNA vez y compartidos por alta y edicion. La existencia
- * ya no esta aqui: es del lote, no del producto (R9, R10), y cada esquema que la necesita la
- * declara por su cuenta.
+ * ya no esta aqui: es del lote, no del producto, y cada esquema que la necesita la declara
+ * por su cuenta.
  */
 export const productFieldsShape = {
   name: productNameSchema,
@@ -52,8 +52,8 @@ export const productFieldsShape = {
 export const createProductSchema = z.strictObject({ ...productFieldsShape });
 
 /**
- * La edicion es REEMPLAZO COMPLETO, no `PATCH` por campos sueltos (§ 11.7, D3, R13). No
- * comparte la existencia con el alta: enviarla aqui es `invalid_input` por `strictObject`.
+ * La edicion es REEMPLAZO COMPLETO, no `PATCH` por campos sueltos. No comparte la
+ * existencia con el alta: enviarla aqui es `invalid_input` por `strictObject`.
  */
 export const updateProductSchema = createProductSchema;
 
