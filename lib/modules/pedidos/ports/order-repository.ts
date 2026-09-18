@@ -77,10 +77,17 @@ export interface OrderRepository {
    * aplican sobre el conjunto completo y ANTES de paginar (R13), y el `total` describe ese
    * conjunto ya filtrado (R14), no el catalogo entero.
    *
-   * (Firma corregida el 2026-09-04, aprobada por el leader; ver la nota al final de
-   * `design.md > 7.4`. QC-57 le quita el primer parametro.)
+   * `recipeIds` es la busqueda ya resuelta a identificadores por otro modulo: `orders` no tiene
+   * columna de nombre, asi que no puede traducir un termino de texto por si sola. `null` = sin
+   * busqueda, no filtra nada; una lista (incluida la vacia) se compone en el `where` junto al
+   * ambito y al borrado, nunca fundida con los filtros. Parametro obligatorio: el dominio no
+   * puede olvidarlo.
    */
-  listAlive(query: ListQuery, scope: OrderScope): Promise<Page<OrderRow>>;
+  listAlive(
+    query: ListQuery,
+    scope: OrderScope,
+    recipeIds: readonly string[] | null,
+  ): Promise<Page<OrderRow>>;
 
   /** Edicion como REEMPLAZO COMPLETO (R20). No puede escribir `CANCELADO` ni motivo. */
   updateAlive(
