@@ -355,3 +355,23 @@ caso exacto—, asi que **el gate COMPLETO lo tolera**. Lo que me confundio es r
 en QC-99: **`./init.sh --rapido` no consulta el baseline, solo el modo completo**. Por eso aparece
 rojo en la tanda y verde en el gate. La entrada del baseline y su motivo los mantiene el leader;
 **esta bitacora no toca `tests/baseline-rojos.json`**.
+
+## Cierre de la segunda vuelta — `./init.sh --rapido`
+
+    Test Files  1 failed | 353 passed (354)
+         Tests  1 failed | 5288 passed | 24 skipped (5313)
+      Duration  214.59s
+
+`typecheck` y `lint` en verde. **El unico rojo es `qc75-convenciones.test.ts`, el esperado**, que
+esta en el baseline desde el 2026-09-11 y que el gate **completo** tolera.
+
+### Un rojo intermitente que aparecio una vez, y lo digo en vez de callarlo
+
+En una corrida intermedia salieron **dos** rojos: el de QC-75 y
+`tests/unit/configuracion-ui/user-table.test.tsx > «la accion de editar de una fila abre el panel
+SOBRE ESE usuario (R26)»`. **No es de esta ficha** —QC-108 no toca ni un archivo de UI— y **no se
+reprodujo**: corrido solo pasa (27 de 27), y en la corrida siguiente del gate rapido tampoco
+aparecio. Esa corrida tardo **401 s frente a los 215 s** habituales, es decir, la maquina estaba
+cargada: tiene toda la pinta de ser un caso **sensible al tiempo bajo carga**, no un fallo real.
+**Queda anotado por si alguien lo vuelve a ver**; no se toco ese archivo ni se metio en el baseline,
+porque diagnosticar la intermitencia de un test de otra zona no es de esta ficha.
