@@ -19,6 +19,37 @@
 
 ## Evaluaciones
 
+### QC-92 — acotada con `/afinar-feature` (2026-09-17)
+
+Alcance, **16 decisiones cerradas** y **cero preguntas abiertas** en
+`.worktrees/QC-92-ajuste-de-inventario/specs/QC-92-ajuste-de-inventario/requirements.md`
+(sembrado DENTRO del worktree, como QC-91 y QC-103). No se copian aquí.
+
+**El board se corrigió ANTES de sembrar**: la `description` declaraba abiertas **las cinco**
+preguntas que esta acotación cerró y no decía que nace un libro de movimientos ni un panel de
+lotes. `zone`, `complexity` y `depends_on` ya estaban bien. Ninguna ficha nueva y ninguna cancelada:
+lo que queda fuera —el consumo por lote— es **pregunta abierta del dominio**, no trabajo sin ficha.
+
+**Dos de las cinco preguntas se respondieron en disco, no preguntando**: el negativo ya está
+prohibido por el `CHECK (stock >= 0)` de `product_batches`, y «los lotes ya consumidos» **no
+existen**, porque nada consume lotes todavía.
+
+**La decisión que más cuesta, tomada con el coste a la vista**: el libro nace **completo** —el alta
+de lote también asienta—, no solo con ajustes. Se le dijo al humano que eso toca el camino del alta
+de QC-90 y obliga a ajustar una guardia de QC-91, y lo eligió igual.
+
+**Dos cosas quedan ESCRITAS para que no se descubran tarde**, y las dos salen de mirar el código
+antes de preguntar: (1) **la guardia R21 de QC-91** afirma hoy que `product-prisma.ts` nunca hace
+`productBatch.update(...)`, y esta ficha lo necesita —se ajusta con nota fechada y prueba por
+mutación, no en silencio—; (2) **el libro y el `stock` pueden divergir** si un camino de escritura
+olvida su asiento, y cerrarlo con una guardia es **requisito**, no deuda. Es el tercer aviso de la
+familia de **QC-99** en dos fichas seguidas.
+
+**`complexity` se reevaluó y sigue `high`**, ahora con motivo firme: tabla nueva con migración,
+panel de lotes que no existe, historial visible y el camino del alta modificado.
+
+Sigue `pending` en Backlog: la mueve el leader en F1.3.
+
 ### QC-68 - acotada con `/afinar-feature` (2026-09-17)
 
 Alcance, **8 decisiones cerradas** y **cero preguntas abiertas** en
