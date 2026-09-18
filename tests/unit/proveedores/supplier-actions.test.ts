@@ -54,6 +54,7 @@ const {
   deleteCatalogLineMock,
   listCatalogLinesMock,
   getSessionUserMock,
+  getSessionContextMock,
 } = vi.hoisted(() => ({
   createSupplierMock: vi.fn(),
   updateSupplierMock: vi.fn(),
@@ -65,6 +66,7 @@ const {
   deleteCatalogLineMock: vi.fn(),
   listCatalogLinesMock: vi.fn(),
   getSessionUserMock: vi.fn(),
+  getSessionContextMock: vi.fn(),
 }))
 
 // QC-71 (T7, R7, R13): el adaptador driving pide a la composicion la LECTURA de la cabecera
@@ -77,7 +79,7 @@ const { REQUEST_ID_DE_PRUEBA, readRequestIdHeaderMock } = vi.hoisted(() => {
 
 vi.mock('@/lib/composition', () => ({
   observabilidad: { readRequestIdHeader: readRequestIdHeaderMock },
-  identity: { getSessionUser: getSessionUserMock },
+  identity: { getSessionUser: getSessionUserMock, getSessionContext: getSessionContextMock },
   proveedores: {
     createSupplier: createSupplierMock,
     updateSupplier: updateSupplierMock,
@@ -100,6 +102,8 @@ const ADMIN_SESSION_USER = {
   roleName: 'Administrador',
   permissions: ['proveedores.consultar', 'proveedores.modificar'],
 }
+
+const ADMIN_SESSION_CONTEXT = { companyId: '22222222-2222-4222-8222-222222222222' }
 
 const SUPPLIER_ID = '33333333-3333-4333-8333-333333333333'
 const PRESENTATION_ID = '44444444-4444-4444-8444-444444444444'
@@ -156,6 +160,7 @@ const ACTION_FILES = ['supplier-actions.ts', 'supplier-catalog-actions.ts'] as c
 beforeEach(() => {
   vi.clearAllMocks()
   getSessionUserMock.mockResolvedValue(ADMIN_SESSION_USER)
+  getSessionContextMock.mockResolvedValue(ADMIN_SESSION_CONTEXT)
 })
 
 describe('Server Actions de proveedores — actor, forma de entrada y errores', () => {
@@ -175,6 +180,7 @@ describe('Server Actions de proveedores — actor, forma de entrada y errores', 
 
     const ESPERADO = {
       id: 'user-admin-1',
+      companyId: ADMIN_SESSION_CONTEXT.companyId,
       permissions: ['proveedores.consultar', 'proveedores.modificar'],
     }
 
@@ -407,6 +413,52 @@ describe('Server Actions de proveedores — actor, forma de entrada y errores', 
       expect(existsSync(join(repoRoot, 'app', 'api', ruta)), `app/api/${ruta}`).toBe(false)
     }
     expect(fuentes, 'una action llama por fetch a una ruta propia').not.toMatch(/fetch\(/)
+  })
+
+  it('R22 (QC-59) — si falta CUALQUIERA de las dos caras de la sesion, el actor que baja es `null` y no se escribe nada', async () => {
+    // La empresa sale del contexto de sesion del servidor y nunca de la entrada del llamante.
+    // Si falta el usuario, o falta el contexto, o faltan los dos, la action NO inventa un
+    // actor a medias: baja `null`, y con `null` el caso de uso rechaza en su primera linea,
+    // antes de tocar ningun puerto -eso lo prueba `authorization.test.ts` con dobles que
+    // explotan-. El estado que ve el formulario es el `unauthorized` de siempre.
+    const SIN_SESION = [
+      { etiqueta: 'sin usuario de sesion', user: null, context: ADMIN_SESSION_CONTEXT },
+      { etiqueta: 'sin contexto de sesion', user: ADMIN_SESSION_USER, context: null },
+      { etiqueta: 'sin ninguna de las dos', user: null, context: null },
+    ] as const
+
+    const INVOCACIONES = [
+      ['createSupplier', createSupplierMock, () => createSupplierAction(CREATE_SUPPLIER_INITIAL, formDataOf(VALID_SUPPLIER_FIELDS)), 1],
+      ['updateSupplier', updateSupplierMock, () => updateSupplierAction(SUPPLIER_ID, SUPPLIER_MUTATION_INITIAL, formDataOf(VALID_SUPPLIER_FIELDS)), 2],
+      ['deleteSupplier', deleteSupplierMock, () => deleteSupplierAction(SUPPLIER_MUTATION_INITIAL, formDataOf({ id: SUPPLIER_ID })), 1],
+      ['getSupplier', getSupplierMock, () => getSupplierAction(SUPPLIER_ID), 1],
+      ['listSuppliers', listSuppliersMock, () => listSuppliersAction({ page: 1 }), 1],
+      ['createCatalogLine', createCatalogLineMock, () => createCatalogLineAction(CREATE_LINE_INITIAL, formDataOf(VALID_LINE_FIELDS)), 1],
+      ['updateCatalogLine', updateCatalogLineMock, () => updateCatalogLineAction(LINE_ID, LINE_MUTATION_INITIAL, formDataOf(VALID_LINE_FIELDS)), 2],
+      ['deleteCatalogLine', deleteCatalogLineMock, () => deleteCatalogLineAction(LINE_MUTATION_INITIAL, formDataOf({ id: LINE_ID })), 1],
+      ['listCatalogLines', listCatalogLinesMock, () => listCatalogLinesAction(SUPPLIER_ID, { page: 1 }), 2],
+    ] as const
+
+    for (const { etiqueta, user, context } of SIN_SESION) {
+      for (const [nombre, mock, invocar, posicionDelActor] of INVOCACIONES) {
+        vi.clearAllMocks()
+        getSessionUserMock.mockResolvedValue(user)
+        getSessionContextMock.mockResolvedValue(context)
+        mock.mockRejectedValue(new UnauthorizedError())
+
+        const estado = await invocar()
+
+        expect(mock.mock.calls[0]?.[posicionDelActor], `${nombre} ${etiqueta}`).toBeNull()
+        expect(JSON.stringify(mock.mock.calls[0]), `${nombre} ${etiqueta}: viajo una empresa`).not.toContain(
+          ADMIN_SESSION_CONTEXT.companyId,
+        )
+        expect(estado, `${nombre} ${etiqueta}`).toEqual({
+          status: 'error',
+          code: 'unauthorized',
+          message: expect.any(String),
+        })
+      }
+    }
   })
 
   it('traduce cada error de dominio a status error con el code estable de la clase, nunca con el texto', async () => {

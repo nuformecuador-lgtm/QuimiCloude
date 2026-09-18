@@ -2,6 +2,7 @@ import { requirePermission, type Actor } from './actor';
 import { ValidationError } from './errors';
 import { createListQuerySchema, sanitizeListQuery } from './list-query';
 import { SUPPLIER_QUERYABLE } from './supplier-queryable';
+import type { SupplierScope } from './supplier-scope';
 
 import type { Page } from './page';
 import type { SupplierView } from './supplier-view';
@@ -52,12 +53,14 @@ export function createListSuppliers(
   ): Promise<Page<SupplierView>> {
     requirePermission(actor, 'proveedores.consultar');
 
+    const scope: SupplierScope = { companyId: actor.companyId };
+
     const parsed = listQuerySchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
 
     const { query, ignored } = sanitizeListQuery(parsed.data, SUPPLIER_QUERYABLE);
     deps.log.ignoredFields(LIST_NAME, ignored);
 
-    return deps.suppliers.listAlive(query);
+    return deps.suppliers.listAlive(query, scope);
   };
 }

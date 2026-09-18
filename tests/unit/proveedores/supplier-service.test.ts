@@ -57,6 +57,7 @@ function clavesDelTipoDeps(fuente: string): readonly string[] {
 // QC-74 (R18): el actor no lleva nombre de rol, lleva su conjunto de permisos.
 const ADMIN: Actor = {
   id: '11111111-1111-4111-8111-111111111111',
+  companyId: '99999999-9999-4999-8999-999999999999',
   permissions: ['proveedores.consultar', 'proveedores.modificar'],
 }
 const AHORA = new Date('2026-09-03T12:00:00.000Z')
@@ -102,6 +103,69 @@ const VISTA: SupplierView = {
   updatedBy: ADMIN.id,
 }
 
+describe('el ambito de empresa de los cinco casos de uso del proveedor (QC-59 T34)', () => {
+  it('R21, R30 — cada uno pasa `{ companyId: actor.companyId }` como ULTIMO argumento del puerto', async () => {
+    // El ambito sale del ACTOR, no de la entrada, y viaja al final de la firma en los cinco
+    // metodos. Aqui se mide lo que RECIBE el puerto; que el `where` filtre de verdad es de la
+    // integracion, y que ninguna implementacion se olvide de declararlo es de
+    // `tests/guards/guard-ambito-empresa-proveedores.test.ts`.
+    const { repo, spies } = makeSuppliers({ findAliveById: vi.fn(async () => VISTA) })
+    const log = { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() }
+
+    await createCreateSupplier({ suppliers: repo, now })(ENTRADA_VALIDA, ADMIN)
+    await createUpdateSupplier({ suppliers: repo, now })('sup-1', ENTRADA_VALIDA, ADMIN)
+    await createDeleteSupplier({ suppliers: repo, now })('sup-1', ADMIN)
+    await createGetSupplier({ suppliers: repo })('sup-1', ADMIN)
+    await createListSuppliers({ suppliers: repo, log })({ page: 1 }, ADMIN)
+
+    const AMBITO = { companyId: ADMIN.companyId }
+    for (const [metodo, espia] of Object.entries(spies)) {
+      expect(espia, `${metodo} no se ejercito`).toHaveBeenCalledTimes(1)
+      const args = espia.mock.calls[0] as unknown as readonly unknown[]
+      expect(args[args.length - 1], `${metodo}: el ambito no es el del actor`).toStrictEqual(AMBITO)
+    }
+  })
+
+  it('R30 — una empresa en la ENTRADA del alta o de la edicion se descarta, y no llega al puerto', async () => {
+    // El esquema del proveedor es un `object` de zod: lo que no declara se elimina. Asi que la
+    // empresa de la entrada no se escribe y tampoco viaja dentro de los datos.
+    const AJENA = '12121212-1212-4121-8121-121212121212'
+    const { repo, spies } = makeSuppliers()
+
+    await createCreateSupplier({ suppliers: repo, now })(
+      { ...ENTRADA_VALIDA, companyId: AJENA, company_id: AJENA },
+      ADMIN,
+    )
+    await createUpdateSupplier({ suppliers: repo, now })(
+      'sup-1',
+      { ...ENTRADA_VALIDA, companyId: AJENA },
+      ADMIN,
+    )
+
+    for (const espia of [spies.create, spies.updateAlive]) {
+      const args = espia.mock.calls[0] as unknown as readonly unknown[]
+      expect(JSON.stringify(args)).not.toContain(AJENA)
+    }
+    const datosDelAlta = spies.create.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(Object.keys(datosDelAlta).sort()).toEqual(['email', 'name', 'nameNormalized', 'phone'])
+  })
+
+  it('R38 — las firmas publicas de los cinco casos de uso no cambiaron: el ambito NO es un parametro suyo', async () => {
+    // Quien llama sigue pasando (entrada, actor) o (id, entrada, actor). Si el ambito hubiera
+    // entrado como parametro del caso de uso, cada pantalla podria ELEGIR empresa, que es
+    // justo lo que se evita metiendolo en el actor.
+    const { repo } = makeSuppliers({ findAliveById: vi.fn(async () => VISTA) })
+    expect(createCreateSupplier({ suppliers: repo, now }).length).toBe(2)
+    expect(createUpdateSupplier({ suppliers: repo, now }).length).toBe(3)
+    expect(createDeleteSupplier({ suppliers: repo, now }).length).toBe(2)
+    expect(createGetSupplier({ suppliers: repo }).length).toBe(2)
+    expect(createListSuppliers({
+      suppliers: repo,
+      log: { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() },
+    }).length).toBe(2)
+  })
+})
+
 describe('casos de uso del proveedor (QC-43 T8)', () => {
   it('persiste el nombre normalizado junto al nombre en el alta y en la edicion', async () => {
     // R16 (y R7: el alta devuelve el identificador que dio el puerto). El emparejamiento
@@ -140,10 +204,16 @@ describe('casos de uso del proveedor (QC-43 T8)', () => {
     const { repo, spies } = makeSuppliers()
 
     await createCreateSupplier({ suppliers: repo, now })(ENTRADA_VALIDA, ADMIN)
-    expect(spies.create).toHaveBeenCalledWith(expect.anything(), ADMIN.id, AHORA)
+    expect(spies.create).toHaveBeenCalledWith(expect.anything(), ADMIN.id, AHORA, expect.anything())
 
     await createUpdateSupplier({ suppliers: repo, now })('sup-1', ENTRADA_VALIDA, ADMIN)
-    expect(spies.updateAlive).toHaveBeenCalledWith('sup-1', expect.anything(), ADMIN.id, AHORA)
+    expect(spies.updateAlive).toHaveBeenCalledWith(
+      'sup-1',
+      expect.anything(),
+      ADMIN.id,
+      AHORA,
+      expect.anything(),
+    )
     expect(Object.keys(spies.updateAlive.mock.calls[0]?.[1] as object).sort()).toEqual([
       'email',
       'name',
@@ -152,7 +222,7 @@ describe('casos de uso del proveedor (QC-43 T8)', () => {
     ])
 
     await createDeleteSupplier({ suppliers: repo, now })('sup-1', ADMIN)
-    expect(spies.softDeleteAlive).toHaveBeenCalledWith('sup-1', ADMIN.id, AHORA)
+    expect(spies.softDeleteAlive).toHaveBeenCalledWith('sup-1', ADMIN.id, AHORA, expect.anything())
   })
 
   it('la edicion reemplaza nombre, telefono y correo y no expone ninguna operacion por campo suelto', async () => {

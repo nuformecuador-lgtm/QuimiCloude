@@ -25,10 +25,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { listAliveSuppliers } from '@/lib/modules/proveedores/adapters/driven/persistence/supplier-prisma';
 import { normalizeSupplierName } from '@/lib/modules/proveedores/domain/supplier-name';
+import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 import type { ListFilterValue, ListQuery } from '@/lib/modules/proveedores/domain/list-query';
+import type { SupplierScope } from '@/lib/modules/proveedores/domain/supplier-scope';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -39,6 +41,11 @@ function token(): string {
 const MARCA = `zzq57${token().slice(0, 12)}`;
 
 const creados: string[] = [];
+
+/** Empresa unica del archivo: `suppliers.company_id` es obligatoria. Ningun caso de este
+ *  archivo compara empresas entre si, asi que todas las filas sembradas comparten esta. */
+let companyId: string;
+let scope: SupplierScope;
 
 type Semilla = {
   readonly name: string;
@@ -55,6 +62,7 @@ async function sembrar(semillas: readonly Semilla[]): Promise<void> {
         // El CHECK `suppliers_contact_required` exige un contacto util en los vivos.
         phone: '+57 300 000 0000',
         deletedAt: semilla.deletedAt ?? null,
+        companyId,
         ...(semilla.createdAt === undefined ? {} : { createdAt: semilla.createdAt }),
       },
       select: { id: true },
@@ -72,10 +80,21 @@ function soloLasMias(extra: Record<string, ListFilterValue> = {}): Record<string
   return { ...extra };
 }
 
+beforeAll(async () => {
+  const name = `Empresa list-query-suppliers ${MARCA}`;
+  const company = await prisma.company.create({
+    data: { name, nameNormalized: normalizeCompanyName(name) },
+    select: { id: true },
+  });
+  companyId = company.id;
+  scope = { companyId };
+});
+
 afterAll(async () => {
   if (creados.length > 0) {
     await prisma.supplier.deleteMany({ where: { id: { in: creados } } });
   }
+  await prisma.company.deleteMany({ where: { id: companyId } });
   await prisma.$disconnect();
 });
 
@@ -95,15 +114,16 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
     const nombreDeLaUltima = NOMBRES[NOMBRES.length - 1];
 
     // En el orden de HOY (`name ASC, id ASC`), con paginas de 5, la fila 12 cae en la pagina 3.
-    const porDefectoPagina3 = await listAliveSuppliers(consulta({ page: 3, pageSize: 5 }));
+    const porDefectoPagina3 = await listAliveSuppliers(consulta({ page: 3, pageSize: 5 }), scope);
     expect(porDefectoPagina3.items.map((s) => s.name)).toContain(nombreDeLaUltima);
-    const porDefectoPagina1 = await listAliveSuppliers(consulta({ page: 1, pageSize: 5 }));
+    const porDefectoPagina1 = await listAliveSuppliers(consulta({ page: 1, pageSize: 5 }), scope);
     expect(porDefectoPagina1.items.map((s) => s.name)).not.toContain(nombreDeLaUltima);
 
     // Pidiendo el orden inverso, la MISMA fila tiene que salir en la pagina 1: si el orden se
     // aplicara sobre la pagina ya traida, seguiria estando en la 3.
     const desc = await listAliveSuppliers(
       consulta({ page: 1, pageSize: 5, sort: { columnId: 'name', direction: 'desc' } }),
+      scope,
     );
     expect(desc.items[0]?.name).toBe(nombreDeLaUltima);
   });
@@ -111,7 +131,7 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
   it('el total describe el conjunto YA FILTRADO, no el catalogo entero (R14)', async () => {
     // R14 — `total` y `totalPages` son del conjunto filtrado por la busqueda, y el mismo
     // `where` sirve al `findMany` y al `count`.
-    const pagina = await listAliveSuppliers(consulta({ page: 1, pageSize: 5 }));
+    const pagina = await listAliveSuppliers(consulta({ page: 1, pageSize: 5 }), scope);
 
     const vivosConLaMarca = await prisma.supplier.count({
       where: { deletedAt: null, nameNormalized: { contains: MARCA } },
@@ -124,14 +144,14 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
 
   it('pedir 100 por pagina se ACOTA a 25, no se rechaza (R29)', async () => {
     // R29 — acotar, no rechazar. El `pageSize` que sale es el efectivo, nunca el pedido.
-    const pagina = await listAliveSuppliers(consulta({ page: 1, pageSize: 100 }));
+    const pagina = await listAliveSuppliers(consulta({ page: 1, pageSize: 100 }), scope);
 
     expect(pagina.pageSize).toBe(MAX_PAGE_SIZE);
     expect(pagina.items.length).toBeLessThanOrEqual(MAX_PAGE_SIZE);
   });
 
   it('sin orden explicito, el orden es el de HOY: name ASC (R11)', async () => {
-    const pagina = await listAliveSuppliers(consulta({ pageSize: 25 }));
+    const pagina = await listAliveSuppliers(consulta({ pageSize: 25 }), scope);
 
     const nombres = pagina.items.map((s) => s.name);
     expect([...nombres].sort()).toEqual(nombres);
@@ -163,6 +183,7 @@ describe('desempate estable por identificador (R10)', () => {
           sort: { columnId: 'createdAt', direction: 'asc' },
           search: marca,
         }),
+        scope,
       );
       vistos.push(...pagina.items.map((s) => s.id));
     }
@@ -186,6 +207,7 @@ describe('la busqueda ignora acentos y mayusculas (R16, R18, R19)', () => {
 
     const pagina = await listAliveSuppliers(
       consulta({ pageSize: 25, search: `quimicos del pacifico ${MARCA}` }),
+      scope,
     );
 
     expect(pagina.items.map((s) => s.name)).toEqual([`Químicos del Pacífico ${MARCA}`]);
@@ -196,7 +218,7 @@ describe('la busqueda ignora acentos y mayusculas (R16, R18, R19)', () => {
     // R16 + decision cerrada de `pg_trgm` (via A): bajar a prefijo habria roto esto en silencio.
     await sembrar([{ name: `Distribuidora Nacional de Reactivos ${MARCA}` }]);
 
-    const pagina = await listAliveSuppliers(consulta({ pageSize: 25, search: `nacionalde` }));
+    const pagina = await listAliveSuppliers(consulta({ pageSize: 25, search: `nacionalde` }), scope);
 
     expect(pagina.items.map((s) => s.name)).toContain(
       `Distribuidora Nacional de Reactivos ${MARCA}`,
@@ -213,7 +235,7 @@ describe('el borrado logico no sale del listado, filtre lo que filtre (R7)', () 
       { name: `Proveedor ${MARCA} ${marca} muerto`, deletedAt: new Date() },
     ]);
 
-    const pagina = await listAliveSuppliers(consulta({ pageSize: 25, search: marca }));
+    const pagina = await listAliveSuppliers(consulta({ pageSize: 25, search: marca }), scope);
 
     expect(pagina.items.map((s) => s.name)).toEqual([`Proveedor ${MARCA} ${marca} vivo`]);
     expect(pagina.total).toBe(1);
@@ -243,6 +265,7 @@ describe('el rango de fechas se compara en UTC, con los dos extremos inclusivos 
         search: marca,
         filters: soloLasMias({ createdAt: { kind: 'dateRange', from: DIA, to: DIA } }),
       }),
+      scope,
     );
 
     expect(pagina.items.map((s) => s.name).sort()).toEqual(

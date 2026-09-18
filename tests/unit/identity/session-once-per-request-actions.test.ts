@@ -273,6 +273,29 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         page: 1,
       }),
   },
+  {
+    // Los dos archivos de `driving/` de proveedores resuelven las dos caras de la sesion desde
+    // que el modulo acota sus consultas por empresa: el actor ya no basta con el usuario, hace
+    // falta tambien su empresa. Se elige en cada uno una accion de LISTADO porque su entrada
+    // llega hasta `currentActor()` sin depender de ninguna fila sembrada.
+    archivo: 'lib/modules/proveedores/adapters/driving/supplier-actions.ts',
+    nombre: 'listSuppliersAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/proveedores/adapters/driving/supplier-actions')
+      ).listSuppliersAction({ page: 1 }),
+  },
+  {
+    // El proveedor del que se pide el catalogo no tiene por que existir: la accion captura el
+    // error y devuelve un estado, y lo que esta lista mide es cuantas veces se lee la sesion
+    // por invocacion, no el desenlace.
+    archivo: 'lib/modules/proveedores/adapters/driving/supplier-catalog-actions.ts',
+    nombre: 'listCatalogLinesAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions')
+      ).listCatalogLinesAction('4c9d2f81-6b0a-4f3e-9d27-5a1e8c30b742', { page: 1 }),
+  },
 ];
 
 /**

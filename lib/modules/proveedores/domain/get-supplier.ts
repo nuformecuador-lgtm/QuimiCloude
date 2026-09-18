@@ -1,5 +1,6 @@
 import { requirePermission, type Actor } from './actor';
 import { SupplierNotFoundError } from './errors';
+import type { SupplierScope } from './supplier-scope';
 import type { SupplierView } from './supplier-view';
 
 import type { SupplierRepository } from '../ports/supplier-repository';
@@ -26,8 +27,11 @@ export function createGetSupplier(
   ): Promise<SupplierView> {
     requirePermission(actor, 'proveedores.consultar');
 
-    // null = no existe o esta dado de baja (R22, R24): el puerto ya filtro los muertos.
-    const supplier = await deps.suppliers.findAliveById(id);
+    const scope: SupplierScope = { companyId: actor.companyId };
+
+    // null = no existe, esta dado de baja o es de otra empresa (R22, R24): el puerto ya
+    // filtro los muertos y los ajenos, y los dos casos se responden igual.
+    const supplier = await deps.suppliers.findAliveById(id, scope);
     if (supplier === null) throw new SupplierNotFoundError();
     return supplier;
   };

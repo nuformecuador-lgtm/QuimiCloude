@@ -54,6 +54,7 @@ import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { ListQuery } from '@/lib/modules/proveedores/domain/list-query';
+import type { SupplierScope } from '@/lib/modules/proveedores/domain/supplier-scope';
 import type { NewSupplier, SupplierView } from '@/lib/modules/proveedores/domain/supplier-view';
 
 // ---------------------------------------------------------------------------
@@ -208,8 +209,8 @@ function rawInsertSupplier(
   email: string | null,
 ): Promise<number> {
   return tx.$executeRaw`
-    INSERT INTO "suppliers" ("name", "name_normalized", "phone", "email", "updated_at")
-    VALUES (${name}, ${normalizeSupplierName(name)}, ${phone}, ${email}, CURRENT_TIMESTAMP)`;
+    INSERT INTO "suppliers" ("name", "name_normalized", "phone", "email", "company_id", "updated_at")
+    VALUES (${name}, ${normalizeSupplierName(name)}, ${phone}, ${email}, CAST(${companyId} AS uuid), CURRENT_TIMESTAMP)`;
 }
 
 /**
@@ -229,6 +230,7 @@ async function seedSuppliers(cantidad: number, actorId: string): Promise<string[
         phone: '+57 300 000 0000',
         createdBy: actorId,
         updatedBy: actorId,
+        companyId,
       },
       select: { id: true },
     });
@@ -249,10 +251,10 @@ function consulta(partial: Partial<ListQuery> = {}): ListQuery {
 
 /** Recorre TODAS las paginas de `listAliveSuppliers` y devuelve la union de sus items. */
 async function collectAllPages(pageSize: number): Promise<SupplierView[]> {
-  const first = await listAliveSuppliers(consulta({ pageSize }));
+  const first = await listAliveSuppliers(consulta({ pageSize }), scope);
   const items = [...first.items];
   for (let page = 2; page <= first.totalPages; page += 1) {
-    const next = await listAliveSuppliers(consulta({ page, pageSize }));
+    const next = await listAliveSuppliers(consulta({ page, pageSize }), scope);
     items.push(...next.items);
   }
   return items;
@@ -262,6 +264,10 @@ async function collectAllPages(pageSize: number): Promise<SupplierView[]> {
 
 /** Actor compartido por los casos a los que no les importa QUIEN es el autor. */
 let sharedActorId: string;
+/** Empresa unica del archivo: las once operaciones de `supplier-prisma.ts` exigen un
+ *  `SupplierScope`. Ningun caso de este archivo compara empresas entre si. */
+let companyId: string;
+let scope: SupplierScope;
 
 beforeAll(async () => {
   // Falla claro si la migracion de esta ficha no esta aplicada: sin ella, media docena de
@@ -280,10 +286,19 @@ beforeAll(async () => {
   }
 
   sharedActorId = await createTestUser(prisma);
+
+  const name = `Empresa supplier-crud ${token()}`;
+  const company = await prisma.company.create({
+    data: { name, nameNormalized: normalizeCompanyName(name) },
+    select: { id: true },
+  });
+  companyId = company.id;
+  scope = { companyId };
 });
 
 afterAll(async () => {
   await deleteTestUser(prisma, sharedActorId);
+  await prisma.company.deleteMany({ where: { id: companyId } });
   await prisma.$disconnect();
 });
 
@@ -412,13 +427,18 @@ describe('R7: alta del proveedor', () => {
         phone: '+57 300 123 4567',
         email: 'ventas@proveedor.test',
       });
-      const created = await createSupplier(input, sharedActorId, new Date('2026-01-01T00:00:00Z'));
+      const created = await createSupplier(
+        input,
+        sharedActorId,
+        new Date('2026-01-01T00:00:00Z'),
+        scope,
+      );
       expect(created).not.toBe('duplicate');
       if (created === 'duplicate') return;
       supplierId = created.id;
       expect(created.id).toMatch(/^[0-9a-f-]{36}$/u);
 
-      const guardado = await findAliveSupplierById(created.id);
+      const guardado = await findAliveSupplierById(created.id, scope);
       expect(guardado).not.toBeNull();
       expect(guardado?.name).toBe(input.name);
       expect(guardado?.nameNormalized).toBe(input.nameNormalized);
@@ -442,11 +462,11 @@ describe('R8: el autor de la creacion no se pisa', () => {
 
     try {
       const input = supplierInput(`Proveedor auditado ${token()}`);
-      const created = await createSupplier(input, autorA, new Date('2026-01-01T00:00:00Z'));
+      const created = await createSupplier(input, autorA, new Date('2026-01-01T00:00:00Z'), scope);
       if (created === 'duplicate') throw new Error('el alta de apoyo no deberia duplicar');
       supplierId = created.id;
 
-      const recienCreado = await findAliveSupplierById(created.id);
+      const recienCreado = await findAliveSupplierById(created.id, scope);
       expect(recienCreado?.createdBy).toBe(autorA);
       expect(recienCreado?.updatedBy).toBe(autorA);
 
@@ -455,10 +475,11 @@ describe('R8: el autor de la creacion no se pisa', () => {
         supplierInput(`Proveedor auditado y editado ${token()}`, { email: 'nuevo@proveedor.test' }),
         autorB,
         new Date('2026-02-02T00:00:00Z'),
+        scope,
       );
       expect(editado).toBe('ok');
 
-      const trasEditar = await findAliveSupplierById(created.id);
+      const trasEditar = await findAliveSupplierById(created.id, scope);
       expect(trasEditar?.createdBy).toBe(autorA);
       expect(trasEditar?.updatedBy).toBe(autorB);
 
@@ -466,6 +487,7 @@ describe('R8: el autor de la creacion no se pisa', () => {
         created.id,
         autorB,
         new Date('2026-03-03T00:00:00Z'),
+        scope,
       );
       expect(dadoDeBaja).toBe(true);
 
@@ -493,6 +515,7 @@ describe('R15: el nombre solo es unico entre los vivos', () => {
         supplierInput(nombre),
         sharedActorId,
         new Date('2026-01-01T00:00:00Z'),
+        scope,
       );
       if (primero === 'duplicate') throw new Error('el alta de apoyo no deberia duplicar');
       ids.push(primero.id);
@@ -502,16 +525,23 @@ describe('R15: el nombre solo es unico entre los vivos', () => {
         supplierInput(nombre.toUpperCase()),
         sharedActorId,
         new Date('2026-01-01T00:00:00Z'),
+        scope,
       );
       expect(chocando).toBe('duplicate');
 
-      await softDeleteAliveSupplier(primero.id, sharedActorId, new Date('2026-02-02T00:00:00Z'));
+      await softDeleteAliveSupplier(
+        primero.id,
+        sharedActorId,
+        new Date('2026-02-02T00:00:00Z'),
+        scope,
+      );
 
       // Dado de baja el primero, el nombre queda libre: el indice unico es PARCIAL.
       const segundo = await createSupplier(
         supplierInput(nombre),
         sharedActorId,
         new Date('2026-03-03T00:00:00Z'),
+        scope,
       );
       expect(segundo).not.toBe('duplicate');
       if (segundo === 'duplicate') return;
@@ -539,19 +569,25 @@ describe('R22, R23: la baja es logica y saca al proveedor de toda consulta', () 
         supplierInput(`Proveedor que se va ${token()}`),
         sharedActorId,
         new Date('2026-01-01T00:00:00Z'),
+        scope,
       );
       if (created === 'duplicate') throw new Error('el alta de apoyo no deberia duplicar');
       supplierId = created.id;
 
       // Vivo: sale por la ficha y aparece en alguna pagina del listado.
-      expect(await findAliveSupplierById(created.id)).not.toBeNull();
+      expect(await findAliveSupplierById(created.id, scope)).not.toBeNull();
       const antes = await collectAllPages(25);
       expect(antes.map((s) => s.id)).toContain(created.id);
 
-      await softDeleteAliveSupplier(created.id, sharedActorId, new Date('2026-02-02T00:00:00Z'));
+      await softDeleteAliveSupplier(
+        created.id,
+        sharedActorId,
+        new Date('2026-02-02T00:00:00Z'),
+        scope,
+      );
 
       // Dado de baja: ni ficha, ni listado, ni edicion, ni segunda baja.
-      expect(await findAliveSupplierById(created.id)).toBeNull();
+      expect(await findAliveSupplierById(created.id, scope)).toBeNull();
       const despues = await collectAllPages(25);
       expect(despues.map((s) => s.id)).not.toContain(created.id);
       expect(
@@ -560,10 +596,16 @@ describe('R22, R23: la baja es logica y saca al proveedor de toda consulta', () 
           supplierInput(`Otro nombre ${token()}`),
           sharedActorId,
           new Date('2026-03-03T00:00:00Z'),
+          scope,
         ),
       ).toBe('not_found');
       expect(
-        await softDeleteAliveSupplier(created.id, sharedActorId, new Date('2026-03-03T00:00:00Z')),
+        await softDeleteAliveSupplier(
+          created.id,
+          sharedActorId,
+          new Date('2026-03-03T00:00:00Z'),
+          scope,
+        ),
       ).toBe(false);
     } finally {
       if (supplierId !== null) await prisma.supplier.delete({ where: { id: supplierId } });
@@ -577,12 +619,17 @@ describe('R22, R23: la baja es logica y saca al proveedor de toda consulta', () 
         phone: '+57 301 222 3344',
         email: 'contacto@proveedor.test',
       });
-      const created = await createSupplier(input, sharedActorId, new Date('2026-01-01T00:00:00Z'));
+      const created = await createSupplier(
+        input,
+        sharedActorId,
+        new Date('2026-01-01T00:00:00Z'),
+        scope,
+      );
       if (created === 'duplicate') throw new Error('el alta de apoyo no deberia duplicar');
       supplierId = created.id;
 
       const baja = new Date('2026-02-02T00:00:00Z');
-      expect(await softDeleteAliveSupplier(created.id, sharedActorId, baja)).toBe(true);
+      expect(await softDeleteAliveSupplier(created.id, sharedActorId, baja, scope)).toBe(true);
 
       // La fila NO se elimina fisicamente: sigue entera, con todos sus campos de negocio.
       const fila = await prisma.supplier.findUnique({
@@ -616,13 +663,14 @@ describe('R18, R19, R21: el listado paginado contra la base', () => {
     try {
       ids = await seedSuppliers(12, sharedActorId);
 
-      const page = await listAliveSuppliers(consulta({ pageSize: 7 }));
+      const page = await listAliveSuppliers(consulta({ pageSize: 7 }), scope);
       expect(page.items).toHaveLength(7);
       expect(page.pageSize).toBe(7);
 
-      // El `total` es el de los proveedores que cumplen la consulta -los vivos-, no el de
-      // la pagina. Se contrasta con un `count` calculado ahora, nunca con una constante.
-      const vivos = await prisma.supplier.count({ where: { deletedAt: null } });
+      // El `total` es el de los proveedores que cumplen la consulta -los vivos de ESTA
+      // empresa-, no el de la pagina. Se contrasta con un `count` calculado ahora, nunca
+      // con una constante.
+      const vivos = await prisma.supplier.count({ where: { deletedAt: null, companyId } });
       expect(page.total).toBe(vivos);
       expect(page.totalPages).toBe(Math.ceil(vivos / 7));
     } finally {
@@ -636,13 +684,15 @@ describe('R18, R19, R21: el listado paginado contra la base', () => {
       // Hacen falta mas de 25 filas vivas para que el tope sea OBSERVABLE: con 25 o menos,
       // una consulta sin limite superior devolveria lo mismo y el test no mordera nada.
       ids = await seedSuppliers(26, sharedActorId);
-      expect(await prisma.supplier.count({ where: { deletedAt: null } })).toBeGreaterThan(25);
+      expect(
+        await prisma.supplier.count({ where: { deletedAt: null, companyId } }),
+      ).toBeGreaterThan(25);
 
-      const porDefecto = await listAliveSuppliers(consulta());
+      const porDefecto = await listAliveSuppliers(consulta(), scope);
       expect(porDefecto.pageSize).toBe(10);
       expect(porDefecto.items).toHaveLength(10);
 
-      const pidiendoCien = await listAliveSuppliers(consulta({ pageSize: 100 }));
+      const pidiendoCien = await listAliveSuppliers(consulta({ pageSize: 100 }), scope);
       expect(pidiendoCien.pageSize).toBe(25);
       expect(pidiendoCien.items).toHaveLength(25);
     } finally {
