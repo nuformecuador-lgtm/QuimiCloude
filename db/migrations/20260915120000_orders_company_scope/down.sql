@@ -12,6 +12,12 @@
 --      pedido.
 --
 -- Solo se acepta descartar lo que escribio el propio UP: la empresa del backfill.
+--
+-- SALIDA TEMPRANA SOBRE UNA BASE VACIA (mismo arreglo que el UP): con `orders` en cero no hay
+-- ningun pedido que proteger --ni pareja repetida, ni pedido ajeno, ni asignacion cruzada--,
+-- asi que las tres guardias ni se plantean. Mismo idioma que
+-- `db/migrations/20260904180600_companies_and_user_company`. En cuanto hay un solo pedido, el
+-- `RETURN` no se dispara y las tres guardias siguen abortando igual.
 
 -- ---------------------------------------------------------------------------------------
 -- 0. `NO FORCE` temporal, por lo mismo que en el UP: con RLS forzada y sin policies, las
@@ -40,7 +46,11 @@ DECLARE
   duplicated_rows      BIGINT;
   foreign_order_rows   BIGINT;
   crossed_assignments  BIGINT;
+  existing_rows        BIGINT;
 BEGIN
+  SELECT count(*) INTO existing_rows FROM "orders";
+  IF existing_rows = 0 THEN RETURN; END IF;
+
   -- 1.1. GUARDIA 1 — dos empresas comparten `(ano, secuencia)`. Es la condicion EXACTA que hace
   -- imposible recrear `orders_order_year_order_sequence_key`, y decirla aqui es mejor que un
   -- `23505` suelto varias sentencias mas abajo. Cuenta TODAS las filas, tambien las canceladas y
