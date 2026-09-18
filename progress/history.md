@@ -4153,3 +4153,44 @@ en QC-108.
 «demostrado por partes» debería contar como **pendiente** para el reviewer; (3) la bitácora de una
 ficha puede quedar **partida entre el árbol principal y su worktree**, y aquí chocó en tres merges
 seguidos.
+
+## QC-125 — espera-minima-por-paso (cerrada el 2026-09-18, PR #88, merge `530fedf1`)
+
+Cada paso de la ejecucion de receta del operario exige **5 s** antes de dejar avanzar, con cuenta
+regresiva visible y el boton deshabilitado mientras corre. **R1–R22 y T1–T8**, todos mapeados.
+Solo en la pantalla de ejecucion: el lector de pasos es compartido con la vista previa del
+formulario de recetas, y ahi **no** hay espera.
+
+**No hubo `/afinar-feature`, y estuvo bien no haberlo**: el humano cerro por escrito las cuatro
+decisiones —comenzar es abrir la pantalla, siempre 5 s aunque se vuelva con Anterior, finalizar
+tambien espera, y la espera se **suma** al bloqueo de elementos marcados de QC-64— dentro de la
+propia `description` antes de crear la ficha. La acotacion existe para que no falte eso, no para
+repetirlo.
+
+**Absorbio trabajo que existia sin ficha**: `CountdownTimer` (`components/shared/countdown-timer.tsx`)
+estaba construido en `feat/cronometro-shared`, una rama sin tarjeta, y entro aqui cherry-pickeado
+(`42396946`). Es la forma barata de cerrar ese hueco: el codigo huerfano se adopta en la ficha que
+lo necesita en vez de quedarse esperando una propia.
+
+**El test de una ficha anterior se puso rojo por hacer justo lo que esta pedia.** El caso «R18 — el
+asistente heredado no aparece en el diff» de QC-63 prohibia tocar `components/shared/step-reader/**`
+entero. Se tenso a **lista cerrada** con solo `step-reader.tsx` (T1), ratificado por el humano al
+aprobar el spec. La leccion es de la especie de las guardias: una guardia escrita por glob ancho
+caduca en cuanto alguien tiene un motivo legitimo para entrar; la que nombra archivos sobrevive.
+
+**Una vuelta de reviewer RECHAZADA, y por el hallazgo correcto.** H1: a R8 le faltaba el caso de
+pulsar Anterior **mientras corre** la cuenta del paso 2, que es el unico que atrapa el mutante de
+guardar el indice cumplido en un **escalar** en vez de por paso. Se anadio en `2ec1e6b7` y el
+reviewer lo verifico rojo/verde. Segunda vuelta OK (`65b0f83b`).
+
+**Verificacion, con su agujero dicho por escrito**: E2E **8/8 verde** en Chromium y WebKit tras
+instalar los navegadores con autorizacion humana —cerro H3, que el reviewer habia dejado abierto
+justamente por no poder correrlo—. Pero **el PR se abrio con el gate completo en ROJO, por
+autorizacion expresa del humano**: `validate-features` cortaba por QC-68 y QC-92, `in_progress` en
+`dev` sin su `specs/`, ajenos a esta rama. Los pasos del gate corridos a mano por el reviewer salen
+verdes. **La suite completa no se corrio sobre esta rama**, y eso queda dicho aqui en vez de
+figurar como verde.
+
+**Deuda del arnes que esto deja a la vista**: `validate-features` bloquea el gate de una rama por el
+estado de fichas ajenas en `dev`. Es la tercera vez que una feature paga el peaje de otra. Candidata
+a `/afinar-regla`.
