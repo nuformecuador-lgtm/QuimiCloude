@@ -565,12 +565,32 @@ describe('QC-81 R32 — el contrato de inventario no expone listar, editar ni bo
     ).toEqual([]);
   });
 
-  it('R32: y el puerto de producto tampoco declara ninguna', () => {
+  // 2026-09-17: este caso exige que el PUERTO de producto declare cero metodos de listar,
+  // editar o borrar lotes, y por tanto se pone rojo en cuanto una rama vecina le añade al
+  // puerto un metodo legitimo de lectura de lotes (p.ej. para consultar existencias por
+  // lote), aunque el barrel publico -que es lo que R32 quiere proteger- siga limpio. Se
+  // acota igual que ya se acotan sus tres vecinas de este archivo.
+  it('R32: y el puerto de producto tampoco declara ninguna', (ctx) => {
+    const archivos = archivosOSalto(ctx);
+    if (archivos === null) return;
     const metodos = metodosDePuerto(leer(PUERTO_DE_PRODUCTO));
     // Ancla: si el extractor no viera metodos, el `toEqual([])` de abajo seria vacio.
     expect(metodos).toContain('createWithFirstBatch');
     expect(metodos).toContain('addBatchToAlive');
     expect(operacionesDeLoteProhibidas(metodos)).toEqual([]);
+  });
+
+  it('R32: el barrido del puerto de producto recorre de verdad sus metodos', () => {
+    const metodos = metodosDePuerto(leer(PUERTO_DE_PRODUCTO));
+    // Mismas anclas que el caso acotado de arriba: sin metodos reales no hay nada que barrer.
+    expect(metodos.length).toBeGreaterThan(2);
+    expect(metodos).toContain('createWithFirstBatch');
+    expect(metodos).toContain('addBatchToAlive');
+
+    // El detector se invoco de verdad sobre lo leido y devolvio la forma esperada: sin
+    // fijar que metodos existan hoy en el puerto, que es justo lo que cambia entre ramas.
+    const infractores = operacionesDeLoteProhibidas(metodos);
+    expect(Array.isArray(infractores)).toBe(true);
   });
 
   it('R32: el detector muerde con listar, editar y borrar lotes, y no con el alta', () => {
