@@ -4241,6 +4241,31 @@ OneDrive, y conviene recordarlo antes de creerle a un `--rapido` rojo. La segund
 QC-59 a `done` **dentro de la rama de QC-61**. Es estado del arnes, no de la feature; va en commit
 propio y estaba justificado, pero es la costura por la que `feature_list.json` choca en cada merge.
 
+
+### Segunda redaccion, de la otra sesion (conservada al reconciliar el 2026-09-18)
+
+> Las dos sesiones resumieron QC-61 por separado y **no dicen lo mismo**: esta aporta el nombre
+> del archivo de la guardia, el rastro de `localStorage` / `--no-experimental-webstorage` y la
+> relacion con QC-126 y QC-91, que la de arriba no trae. Se conservan las dos en vez de elegir.
+
+**Qué quedó**: `tests/guards/guard-empresa-en-esquema.test.ts` lee `db/schema.prisma` como texto y da
+rojo si un modelo no declara `company_id` y su tabla no está en la lista cerrada de **ocho exentas**
+(`document_types`, `roles`, `permissions`, `role_permissions`, `companies`, `credential_setup_tokens`,
+`revoked_sessions`, `recipe_lines`). Basta con que la columna exista. También da rojo si a la lista le
+**sobra** una entrada y si el bullet de `docs/architecture.md` no dice lo mismo. La lista vieja se
+corrigió en `architecture.md`, `CHECKPOINTS.md` y `.claude/agents/reviewer.md`.
+**La ficha llegó vieja** (escrita el 2026-09-04, antes del arco multiempresa): daba como exenta a
+`users`, que ya lleva empresa, y pedía una lista de «pendientes de aislar» que habría nacido vacía.
+Se midió en disco y se corrigió el board **antes** de sembrar. El leader contó «siete» modelos sin
+empresa donde había **ocho**: el mismo tipo de error de conteo que en QC-106, QC-91 y QC-59.
+**Verificación**: guardia 15/15, también sobre el `dev` ya mergeado; review aprobada con 0/0/5 y 19
+mutaciones que dieron rojo donde tocaba. El gate completo **no salió verde** y el PR lo declaró, por
+decisión humana: el validador por el spec de QC-92 (en otra máquina), 11 de integración por la base
+local en **Postgres 18.6** y un intermitente de `user-table.test.tsx` (ya tiene ficha: QC-126).
+**Lo que destapó, fuera de la ficha**: 24 archivos de UI en rojo por el `localStorage` nativo de
+Node 26, arreglado en el PR #89 (`--no-experimental-webstorage` en el proyecto `ui`), y la decisión
+humana de que **Postgres 17 es la versión objetivo**, escrita en `docs/verification.md`. Queda que
+el humano monte un Postgres 17 local.
 ## QC-92 — ajuste-de-inventario (cerrada el 2026-09-18, PR #91, merge `f91ea75`)
 
 Corregir la existencia de un **lote** registrando un **movimiento** que suma o resta, en vez de
@@ -4314,3 +4339,55 @@ exige que la nota diga que ficha cambio la guardia, el otro prohibe citar la fic
 independientes** y esta ficha **las rompio las dos**, en momentos distintos y por motivos que no
 tienen nada que ver entre si ni con el identificador de peticion. Choco **cuatro veces** al mergear.
 Es el mejor ejemplar vivo de lo que QC-99 persigue.
+
+## QC-109 — procesamiento-de-pdf-por-estrategia (cerrada el 2026-09-18, PR #92, merge `a2d6fa6`)
+
+Procesa un PDF según una estrategia de un enum cerrado: `catalogo` lo lee **como imagen**, `formula`
+**como texto**. Cada una aporta su prompt y las dos llaman a la lectura con IA que QC-108 dejó
+publicada; devuelve el texto tal cual y registra un resumen. **R1–R17 y T0–T11**, todos mapeados.
+
+**Es la raíz de una cadena, y por eso se eligió.** El humano pidió arrancar **QC-107** y estaba
+bloqueada: depende de QC-111, que depende de ésta. Se le ofrecieron tres salidas —solo Fase 1 de
+QC-107, atacar la raíz, o levantar la dependencia y recortar alcance— y eligió la raíz. Orden que
+queda: **QC-109 → QC-111 → QC-107**.
+
+**LA FICHA SE CONTRADECÍA CON EL CÓDIGO, y salió al acotar, antes de escribir una línea.** Mandaba
+crear los archivos de prompt «con el CONTENIDO VACIO», pero QC-108 había cerrado que un prompt en
+blanco se rechaza sin llamar al proveedor, y su `ai-read-input.ts:19` lo hace cumplir con
+`z.string().trim().min(1)`: **las dos estrategias nacían incapaces de ejecutarse**. Se resolvió con
+texto provisional que sí funciona, y los definitivos nacieron como **QC-129** — trabajo que hasta
+entonces no tenía dueño, porque «el texto se escribe más adelante» no era de nadie.
+
+**Los prompts van en `.json` y eso disuelve un roce en vez de excepcionarlo.** El diseño proponía
+`.ts`, que era la opción que el humano había descartado al acotar; el motivo técnico del
+`spec_author` era correcto —el repo no tiene `?raw` ni loader— pero no lo dijo, lo presentó como si
+cumpliera la decisión. La salida que nadie había mirado: `resolveJsonModule` ya estaba activo. Efecto
+secundario: la marca de provisional deja de ser un comentario que cita una ficha —prohibido por
+`docs/conventions.md`— y pasa a ser un **campo de datos**, así que la excepción sobra.
+
+**Una enmienda al spec, aprobada en F2.1**: la entrada con **estrategia inválida** pasa a registrarse,
+con el modo vacío. Antes se iba sin dejar rastro y no había ningún modo que poner sin inventarlo. El
+motivo pesa más que el caso: **QC-111 leerá la estrategia de la base de datos**, así que un valor
+inválido puede llegar de verdad en ejecución y no solo por un error que TypeScript frene en el borde.
+
+**Trampa evitada**: «leer como texto» **no** es `PdfConverter.extractText`. Ese método existe en el
+puerto pero `readPdfWithAi` no lo usa. El mapeo (`catalogo`→`images`, `formula`→`pdf`) se verificó en
+el código, no por el nombre.
+
+**Verificación**: review con **0 bloqueantes y 6 menores**, con la trazabilidad comprobada uno a uno
+y **tres mutaciones propias del reviewer** —invertir el mapa, meter `trim()` al texto, suprimir el
+registro del rechazo— que dieron 3, 3 y 2 rojos. Ningún requisito quedó «demostrado por partes», que
+era el encargo heredado de QC-68. Tres menores se cerraron **sin tocar una línea de producción** y
+uno era del leader.
+
+**T11 se cerró declarando una salvedad, no maquillándola**: `./init.sh` completo **no llegó a mirar
+la rama** porque `validate-features.mjs` corta en su bloque 0 con `faltan specs para features sdd en
+vuelo: QC-82` —deuda de otra sesión—, y eso ocurre **antes de typecheck**. Se corrió a mano lo que el
+gate no alcanzó: typecheck y lint limpios y **152 archivos / 2373 tests en verde**. Excepción a la
+regla 5 autorizada por el humano con las tres salidas a la vista, y declarada en el PR.
+
+**Deuda del arnés que dejó esta ficha**: el commit de F1.0 se quedó **sin empujar** en el árbol
+principal, así que la fila de la ficha no existía en su worktree y hubo que crearla allí; al cerrar,
+el árbol principal tenía **cinco commits locales sin empujar**, tres de ellos cierres de otras fichas.
+Y al reconciliar, `history.md` traía **dos redacciones distintas de QC-61** escritas por dos sesiones:
+**se conservaron las dos**, porque no decían lo mismo.

@@ -13,7 +13,6 @@
 |---|---|---|---|---|---|---|
 | QC-81 | lote-y-fecha-de-compra | Inventario | backend | done | feature/QC-81-lote-y-fecha-de-compra | **CERRADA el 2026-09-16** (PR #75, merge `6175700`): resumen en `progress/history.md`. Lo que sigue es historial y se borra en la proxima limpieza de este archivo. **REESCRITA EN EL WORKTREE el 2026-09-15**: las notas del leader vivian sin commitear en `progress/current.md` del **arbol principal**, y **se perdieron** cuando otra sesion hizo `checkout dev` ahi y mergeo. No estan en `stash@{0}` -comprobado: trae una fila vieja, sin gate, sin review y sin E2E- y **ese stash es ajeno, asi que no se toca**. Nada esencial se perdio: la bitacora y el informe estan **commiteados** (`3dc41be`, `6a111db`, `337cd87`) y las decisiones, en los comentarios del issue. **Desde ahora el estado se escribe en la copia del worktree, que viaja con el PR.** **F1.4 APROBADO el 2026-09-15**, con sus dos decisiones: T3 actualiza `inventario-schema.test.ts:1082` y **T0 = `batch_duplicate_lot`** (plan B descartado). **Implementacion**: T0-T14 y T16 hechas; **T15 NO APLICA** (P1 cerrada con D: no hay datos previos, «es nuevo todo»); **T12 sigue `[ ]`** hasta que el gate salga verde. **Dos enmiendas del spec, las dos aprobadas por el humano**: (1) **D13 con R34-R36**, un lote tecleado de solo digitos no llega a 60 caracteres, para que el siguiente generado quepa; (2) **D14 con R37**, la carrera entre el borrado logico de un producto y el alta de un lote sobre el, que se cierra con `FOR NO KEY UPDATE` sobre la fila del producto **antes** del lock del correlativo. **Excepcion acotada a R29** decidida por el humano: solo la siembra de `e2e/aislamiento-inventario.spec.ts`. **Tres vueltas de `reviewer`**: aprobo con 6 menores, rechazo por **B1** -comentarios citando fichas, contra la regla nueva de `docs/conventions.md`- y rechazo por **B2** -R37 fuera del mapa de trazabilidad-. **Los tres cerrados**: los 6 menores arreglados, **34 commits `chore`** que limpian los comentarios de los 32 archivos de la rama -solo quedan **3 citas exceptuadas** por el humano, que sus tests exigen- y el mapa en **37 declarados / 37 mapeados**. **Verificacion**: E2E **verde en Chromium y WebKit**; `--rapido` verde; **base propia `QuimiCloude_QC81`** montada -la receta de QC-77 **no corre hoy**, su seed muere con `The column 'existe' does not exist`, asi que se copio la plantilla ya migrada y sembrada-. **F2.3 hecha** (merge `1813910`, tip `337cd87` pusheado): un solo conflicto trivial en el E2E, **sin migraciones**, y **el rojo heredado de QC-95 MURIO** (`scope.test.ts` verde). **Gate completo corriendo** sobre la rama sincronizada; el anterior salio rojo **solo** por ese rojo ajeno, ya muerto, y por un timeout de maquina que repetido solo pasa 12/12. `origin/dev` avanzo otros 25 commits (QC-56, PR #74) que **no tocan el area de QC-81**: **no se re-sincroniza**. Acotada el 2026-09-13: **12 decisiones cerradas, cero abiertas**. La ficha estaba **derogada en su premisa**; el board se corrigio antes de sembrar y nacio **QC-103** con la pantalla. Cupo libre: cero `in_progress` en toda zona. `spec_author` entrego **R1-R33** y **13 tasks** (commit `be486b5`), **semilla verificada intacta por diff**, y cada decision citada como `[D1]-[D12]` en al menos un requisito. **La concurrencia se resuelve en la base**: `max(lot::bigint)+1` dentro de la misma transaccion que inserta, con `pg_advisory_xact_lock` por empresa **como sentencia anterior al SELECT** -en `READ COMMITTED` un lock pedido dentro del calculo leeria un maximo viejo-, e indice unico `(company_id, lot)` como garantia dura; choque en lote generado reintenta 3 veces, choque en lote tecleado **nunca** reintenta. **DOS COSAS ESPERAN DECISION HUMANA en F1.4**: (1) `tests/unit/inventario/schema/inventario-schema.test.ts:1082` **se pondra rojo por hacer justo lo que la ficha pide** -afirma que `lot` es opcional-, y T3 lo actualiza con el precedente del propio archivo; (2) `batch_duplicate_lot`, **sexta enmienda al catalogo cerrado de errores**, con plan B escrito. **Doce sitios asumen hoy `lot` nulo**, tabulados con `archivo:linea` en `design.md > 0`. Sin dependencias nuevas |
 | QC-82 | registro-de-ejecucion-de-receta | Recetas | backend | pending | feature/QC-82-registro-de-ejecucion-de-receta | **Nacida del chat el 2026-09-08** y creada en el board (QC-27), enlazada «relates to QC-63». `complexity: medium`, sin dependencias. **Pendiente F1.0 y F1.2**: ampliada el 2026-09-08 con `canceled` en el enum y un `reason` anulable; cerrado que cancelar sin motivo no se puede; quedan SEIS preguntas abiertas -entre ellas si el motivo vale fuera de la cancelacion, que se guarda en el paso y que significa «el tiempo»-, asi que toca `/afinar-feature` antes del `spec_author` |
-| QC-109 | procesamiento-de-pdf-por-estrategia | Documentos e IA | backend | pending | feature/QC-109-procesamiento-de-pdf-por-estrategia | **F1.0 y F1.1 hechos el 2026-09-18.** Elegida por el humano **como RAIZ de la cadena de Documentos e IA**: pidio arrancar QC-107 y **QC-107 esta bloqueada** —depende de QC-111, que depende de esta—, asi que se ataca la causa. Worktree montado desde `origin/dev` (`737e31c`) **con el `.env` copiado a mano**, que `wt.sh` no pone (la leccion de QC-63 y QC-68). **Dependencias CUMPLIDAS**: QC-106 y QC-108 estan las dos `done` —QC-108 cerro hoy, PR #87—. `zone:backend` venia del board; **`complexity:medium` la asigno el leader**: dos estrategias tras un enum, archivos de prompt, integracion con la lectura de QC-108 y varias capas, pero **ninguna integracion externa nueva** (Gemini ya entro con QC-108). **Cupo `backend`: 1 de 2** (QC-61), asi que cabe por numero. **PERO EL CRUCE DE ARCHIVOS NO SE PUDO VALIDAR, y se dice en vez de fingirlo**: QC-61 figura `in_progress` en el board y **no tiene ni `specs/` ni `progress/impl_` en disco** —ni en `dev` ni en ninguno de los worktrees montados—, asi que no hay de donde sacar su lista de archivos. Por el nombre (`guardia-empresa-en-esquema`) lo esperable es que toque `db/schema.prisma` y `tests/guards/`, y esta ficha vive en `lib/modules/documentos/`: **riesgo estimado bajo, pero es una ESTIMACION, no la validacion que pide el arnes**. Se revalida en F1.4 contra el `tasks.md`. **Siguiente paso: F1.2 con `/afinar-feature`**, y la ficha lo pide: el «RETORNO, POR AHORA: solo un `console.log`» choca con el logger del repo y con la regla de comentarios/produccion, y no esta dicho donde viven los archivos de prompt ni que forma tiene la estrategia que QC-111 va a invocar. **ACTUALIZADO el 2026-09-18 al cerrar QC-61**: el encargo de F1.4 **queda resuelto y sin objeto**. QC-61 se mergeo (PR #90, `05a0615`) y esta `done`, asi que el **cupo `backend` es 0 de 2** y la regla ya no exige cruzar con ella. Cruzado igual, ahora que sus `specs/` si estan en disco: QC-61 toca `tests/guards/guard-empresa-en-esquema.test.ts`, `docs/architecture.md`, `CHECKPOINTS.md` y `.claude/agents/reviewer.md`; esta ficha vive en `lib/modules/documentos/`. **Interseccion VACIA**, ya no estimada. |
 | QC-114 | tabla-compartida-en-iphone-real | Plataforma | frontend | in_progress | feature/QC-114-tabla-compartida-en-iphone-real | **F1.0 y F1.1 hechos el 2026-09-18** (`114` del humano, tercera feature de la tanda tras QC-92 y QC-109). Worktree montado desde `origin/dev` (`6333f88`) con `.env` copiado -el worktree nace sin el, ver *Deudas*-. `depends_on: QC-56`, **`done`**, que es la condicion que la ficha pone para hacer **una sola pasada** sobre las nueve pantallas. **Cupo `frontend`: 0 de 2**, asi que no hay conflicto de numero; la interseccion de archivos no se puede evaluar todavia (exige `tasks.md`) y queda de encargo para F1.4 -aunque el riesgo es bajo: las otras dos en curso son `fullstack` (QC-92) y `backend` (QC-109)-. **`complexity: medium` la asigno el leader**, y con una salvedad escrita: la pasada en si es una checklist sobre nueve pantallas, pero **el alcance real depende del resultado** -si algo falla, lo que se toca es el componente compartido de QC-55, que montan las nueve, y eso reevalua a `high`-. **LO QUE HAY QUE DECIR EN VOZ ALTA: NINGUN AGENTE PUEDE EJECUTAR ESTA FEATURE.** La ficha lo dice literal: exige una **persona con un iPhone fisico**. El arnes puede escribir el protocolo de prueba y el registro de evidencia; **la verificacion la hace el humano**. Ni jsdom ni el E2E en WebKit de escritorio la sustituyen -`docs/architecture.md > Regla: multiplataforma` y el hecho de que `position: fixed` + scroll anidado es el punto caliente del componente-. **F1.2 y F1.3 hechos el 2026-09-18; PARADA EN F1.4 esperando aprobacion humana.** `spec_author` entrego **R1-R18** y **9 tasks** (`3c925a8`), semilla intacta y las **nueve** decisiones `[D1]`-`[D9]` citadas, ninguna huerfana. **T5 y T6 son exclusivamente humanas** -la pasada en el iPhone y el registro-: ningun agente puede darlas por hechas. La trazabilidad `R<n>` apunta a una fila de `docs/verificacion-ios/QC-114.md`, no a un test de Vitest, y eso esta declarado en `design.md`. **DOS PREGUNTAS ABIERTAS NUEVAS, las dos bloqueantes**: (3) con que cuenta se entra al preview -la navegacion privada filtra por permiso y no consta una que vea las nueve vistas-, que bloquea **T5**; y (4) quien siembra y contra que base, que bloquea **T3**. Tarjeta movida a *En revision* y comentada. **F1.4 APROBADO el 2026-09-18** por el humano; tarjeta en *En curso* y ficha `in_progress`. **Cupo `frontend`: 1 de 2.** F2.1 arranca sabiendo que **T3 y T5 estan bloqueadas por las preguntas 3 y 4** -credenciales del preview y acceso a su base-: el implementer hace lo que no depende de eso y para ahi. **F2.1 PARCIAL el 2026-09-18** (`de35b88`): **T1 y T2 cerradas** -plantilla de `docs/verificacion-ios/QC-114.md` con las nueve filas y **27 casillas vacias a proposito**, mas el mapa `R1`-`R18`, ninguno huerfano-. `typecheck` y `lint` verdes; `vitest related` no procede porque la tanda solo toca Markdown. **LA FICHA PARA AQUI Y NO PUEDE AVANZAR SIN EL HUMANO**: T5 y T6 son la pasada en el iPhone y su registro; T3 espera la base del preview; T4 es el PR, que exige el gate completo -hoy rojo por QC-82, deuda ajena-. El implementer **no delego** en `frontend_dev` ni `backend_dev`: no habia UI ni backend que escribir, y lo dijo en vez de inventar delegacion. **HALLAZGO QUE PIDE DECISION HUMANA**: **R18 no admite `feature_list.json`** en su lista blanca y el archivo aparece en el diff desde `da78282`, que es un paso del propio arnes -toda feature lo toca por proceso-. O R18 lo admite, o el bookkeeping va por otra via. El implementer **no toco el spec**: lo devolvio. |
 
 ## Evaluaciones
@@ -58,26 +57,6 @@ reglas del arnes.
 **Cruce de archivos**: `frontend` esta a **0 `in_progress`**, asi que la regla no lo exige. Las
 otras dos en curso son de otra zona -QC-92 `fullstack`, QC-109 `backend`- y ninguna toca el
 componente de tabla compartida.
-
-### QC-109 - seleccionada en F1.0 como raiz de la cadena (2026-09-18)
-
-El humano pidio arrancar **QC-107** y **no se pudo**: depende de QC-106 (`done`) y de **QC-111**,
-que sigue `pending` y a su vez depende de **QC-109**. No es un tecnicismo del board — la propia
-ficha de QC-107 dice que el estado por archivo se lee «de la consulta que expone
-`procesamiento-de-pdf-en-cola`» y lista esa cola en su **LO QUE NO ENTRA ... que la bloquean**.
-Arrancarla habria sido construir un componente sin de donde leer la mitad de lo que enseña.
-
-Se le ofrecieron tres salidas —solo Fase 1 de QC-107, arrancar la raiz, o levantar la dependencia
-y recortar el alcance— y **eligio la raiz**. Orden que queda: **QC-109 -> QC-111 -> QC-107**.
-
-**Lo que NO se pudo comprobar, dicho por escrito**: la validacion de conflicto de archivos contra
-QC-61, la otra `backend` en vuelo. El board la da `in_progress` pero **no hay `specs/QC-61-*` ni
-`progress/impl_QC-61*` en ningun sitio del repo**, asi que no existe la lista de archivos que el
-arnes manda cruzar. Queda de encargo para F1.4.
-
-**Contexto heredado de QC-108**, que cerro hoy: `@google/genai` ya esta aprobada y con su fila en
-`docs/dependencias.md`, asi que esta ficha **no deberia necesitar dependencia nueva**. Si el spec
-propone una, es senal de que algo se torcio.
 
 ### QC-59 - acotada con `/afinar-feature` (2026-09-17)
 
@@ -501,7 +480,6 @@ La salida limpia sigue siendo la que sus propias notas describen desde el 2026-0
 de rango **se salte explicita y ruidosamente** cuando el rango no existe, en vez de fallar. Es la
 misma familia que persigue **QC-99**.
 
-
 ### El worktree de QC-108 quedó a medio borrar — OCTAVA vez, y el patrón ya no admite dudas (2026-09-18)
 
 `./scripts/wt.sh done QC-108-lectura-de-pdf-con-gemini` falló con
@@ -555,6 +533,33 @@ QC-108, para que ese PR no arrastrase seis commits de papeleo de otras dos ficha
 
 **Lo que queda dicho, porque volverá a pasar**: un worktree se monta desde `origin/dev`, no desde el
 `dev` local, así que todo lo que viva sin pushear es invisible para la siguiente feature.
+
+### `./init.sh --rapido` no puede ver una guardia de censo que vive en `tests/unit/` (2026-09-18, QC-92)
+
+**Medido, no supuesto.** `tests/unit/inventario/schema/inventario-schema.test.ts` estuvo **rojo
+desde la tanda 1 de QC-92** (commit `842d63d`, que anadio el modelo `InventoryMovement` y la
+back-relation `movements`) y **las tandas 1 y 3 se cerraron con el gate rapido en verde**. Tres de
+sus cuatro rojos llevaban tres tandas escondidos; el cuarto lo anadio T8.
+
+**Tres causas simultaneas, las tres sobre `scripts/test-rapido.mjs`:**
+1. `changedFiles()` filtra el diff a `.ts|.tsx|.js|.jsx|.mjs|.cjs`: **`.prisma` y `.sql` quedan
+   fuera**, asi que una migracion o un cambio de esquema no selecciona nada.
+2. Ese archivo **lee lo que vigila como TEXTO** —un regex sobre el contenido del barrel y una
+   lectura de `db/schema.prisma` desde disco—, no lo importa. **Ningun grafo de imports lo
+   relaciona jamas.**
+3. Vive en `tests/unit/` y no en `tests/guards/`, asi que tampoco entra por el patron `guard`, que
+   es lo unico que el modo rapido corre siempre.
+
+Es la **quinta familia** del inventario de guardias de censo/alcance de QC-92, y la primera cuyo
+defecto es **donde vive** en vez de que afirma. Es exactamente el riesgo que `design.md > 5.2` de
+QC-92 dejo escrito para su propia guardia: «en `tests/guards/` y **no** en `tests/unit/` porque no
+la selecciona ningun grafo de imports».
+
+**Decision del humano del 2026-09-18: se anota y QC-92 NO se para.** El agujero es del **modo
+`--rapido`**, no del gate: **`./init.sh` completo si los habria cazado**, y el cierre de la feature
+lo exige igualmente. Arreglar `scripts/test-rapido.mjs` —o mover el censo a `tests/guards/`— es
+cambiar el arnes, y eso va por `/afinar-regla` **en frio**: un parche a mitad de una feature en
+vuelo puede poner rojas las otras ramas vivas (QC-68, QC-59, QC-96). **No se toco nada de eso.**
 
 ### El worktree de QC-59 tampoco se desmonta — SEPTIMA vez, y el gate miente en su codigo de salida (2026-09-17)
 

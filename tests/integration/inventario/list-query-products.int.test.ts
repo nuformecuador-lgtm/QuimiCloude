@@ -148,6 +148,7 @@ async function sembrarLote(
 
 afterAll(async () => {
   // Por `id` exacto y en el orden que exigen las FK.
+  await prisma.inventoryMovement.deleteMany({ where: { batchId: { in: lotesSembrados } } });
   await prisma.productBatch.deleteMany({ where: { id: { in: lotesSembrados } } });
   await prisma.product.deleteMany({ where: { id: { in: productosSembrados } } });
   await prisma.presentation.deleteMany({ where: { id: { in: presentacionesSembradas } } });

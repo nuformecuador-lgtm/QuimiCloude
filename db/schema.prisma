@@ -310,8 +310,9 @@ model ProductBatch {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  presentation Presentation @relation(fields: [presentationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  product      Product             @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  presentation Presentation        @relation(fields: [presentationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  movements    InventoryMovement[]
 
   @@unique([companyId, lot], map: "product_batches_company_lot_unique")
   @@index([companyId], map: "product_batches_company_id_idx")
@@ -320,6 +321,38 @@ model ProductBatch {
   @@index([createdBy], map: "product_batches_created_by_idx")
   @@index([updatedBy], map: "product_batches_updated_by_idx")
   @@map("product_batches")
+}
+
+/// Los valores van en minuscula porque asi estan escritos los datos, y el orden de declaracion no
+/// se reordena por estetica: Postgres ordena un enum por declaracion y reordenarlo obliga a
+/// recrear el tipo.
+enum InventoryMovementKind {
+  opening
+  adjustment
+}
+
+/// Un asiento no se corrige: se corrige con otro. Sin `updatedAt` ni `deletedAt`, a proposito.
+/// `companyId` y `createdBy` no llevan `@relation`: `Company` y `User` son de otro modulo, sus
+/// FK estan escritas a mano y son drift. NULL en `createdBy` = no lo hizo una persona. `batchId`
+/// si lleva `@relation`: `ProductBatch` es del mismo modulo. `reason` sigue siendo `TEXT`, con un
+/// CHECK que enumera los motivos; el conjunto vive en una constante del dominio.
+/// @module inventario
+model InventoryMovement {
+  id        String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batchId   String                @map("batch_id") @db.Uuid
+  kind      InventoryMovementKind
+  quantity  Int
+  reason    String?
+  companyId String                @map("company_id") @db.Uuid
+  createdBy String?               @map("created_by") @db.Uuid
+  createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  batch ProductBatch @relation(fields: [batchId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([batchId], map: "inventory_movements_batch_id_idx")
+  @@index([companyId], map: "inventory_movements_company_id_idx")
+  @@index([createdBy], map: "inventory_movements_created_by_idx")
+  @@map("inventory_movements")
 }
 
 /// `createdBy` y `updatedBy` no llevan `@relation`: un `include` cruzaria a `users` sin que la

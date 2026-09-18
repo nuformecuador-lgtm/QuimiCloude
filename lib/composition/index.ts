@@ -57,23 +57,29 @@ import type { SessionEraser } from '@/lib/modules/identity/ports/session-eraser'
 import type { SessionRevocationRepository } from '@/lib/modules/identity/ports/session-revocation-repository';
 import type { UserCredentialsReader } from '@/lib/modules/identity/ports/user-credentials-reader';
 import {
+  createAdjustBatchStock,
   createCreatePresentation,
   createCreateProduct,
   createDeletePresentation,
   createDeleteProduct,
   createGetProduct,
+  createListBatchMovements,
   createListPresentations,
+  createListProductBatches,
   createListProducts,
   createUpdatePresentation,
   createUpdateProduct,
 } from '@/lib/modules/inventario';
 import { findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
+import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
   addBatchToAlive,
+  adjustBatchStock,
   createProduct,
   createWithFirstBatch,
   findAliveIdByName,
   findAliveProductById,
+  findBatchesOfAliveProduct,
   listAliveProducts,
   softDeleteAliveProduct,
   updateAliveProduct,
@@ -291,9 +297,11 @@ import {
   createDownloadDocument,
   createIssueReadLink,
   createIssueUploadLinks,
+  createProcessPdfByStrategy,
   createReadPdfWithAi,
 } from '@/lib/modules/documentos';
 import { readWithGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
+import { createStrategyRunLogConsole } from '@/lib/modules/documentos/adapters/driven/observability/strategy-run-log-console';
 import {
   countPages,
   extractPdfText,
@@ -307,6 +315,7 @@ import {
 import type { AiReader } from '@/lib/modules/documentos/ports/ai-reader';
 import type { DocumentStorage } from '@/lib/modules/documentos/ports/document-storage';
 import type { PdfConverter } from '@/lib/modules/documentos/ports/pdf-converter';
+import type { StrategyRunLog } from '@/lib/modules/documentos/ports/strategy-run-log';
 import { requestScoped } from '@/lib/shared/request-scope';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
@@ -640,6 +649,9 @@ const productRepository: ProductRepository = {
   findAliveIdByName,
   createWithFirstBatch,
   addBatchToAlive,
+  adjustBatchStock,
+  findBatchesOfAliveProduct,
+  findBatchMovements,
 };
 
 const presentationRepository: PresentationRepository = {
@@ -671,6 +683,15 @@ export const inventario = {
   listPresentations: createListPresentations({
     presentations: presentationRepository,
     log: inventarioListQueryLog,
+  }),
+  // Claves nuevas al final: ninguna de las de arriba se toca.
+  adjustBatchStock: createAdjustBatchStock({ products: productRepository }),
+  listProductBatches: createListProductBatches({ products: productRepository }),
+  // Se nombra el adaptador importado y no la constante `peopleDirectory`, que apunta al mismo
+  // objeto pero se declara mas abajo: un `const` no existe antes de su linea.
+  listBatchMovements: createListBatchMovements({
+    products: productRepository,
+    people: assignmentDirectoryPrisma,
   }),
 } as const;
 
@@ -1136,6 +1157,15 @@ const pdfConverter: PdfConverter = {
 const aiReader: AiReader = { read: readWithGenai };
 
 /**
+ * La lectura con IA, construida UNA vez: la publica la fachada y la reutiliza el procesamiento por
+ * estrategia. Dos construcciones serian dos cableados que pueden divergir.
+ */
+const readPdfWithAi = createReadPdfWithAi({ ai: aiReader, converter: pdfConverter });
+
+/** `StrategyRunLog` cableado con la unica implementacion que hay: una linea en el registro. */
+const strategyRunLog: StrategyRunLog = createStrategyRunLogConsole();
+
+/**
  * Fachada del modulo `documentos` ya cableada. Es lo que consume su Server Action.
  *
  * El ACTOR NO se resuelve aqui, mismo criterio que el resto de modulos: cada caso de uso lo recibe
@@ -1166,5 +1196,13 @@ export const documentos = {
   // una variable ni tocar la red.
   issueReadLink: createIssueReadLink({ storage: documentStorage }),
   downloadDocument: createDownloadDocument({ storage: documentStorage }),
-  readPdfWithAi: createReadPdfWithAi({ ai: aiReader, converter: pdfConverter }),
+  readPdfWithAi,
+  // El procesamiento por estrategia recibe la LECTURA ya construida, no el puerto de IA: el plazo y
+  // el tope de paginas son de ella. `countPages` es solo para el resumen que se registra. Tampoco
+  // recibe actor, por el mismo motivo que `convertPdfs`.
+  processPdfByStrategy: createProcessPdfByStrategy({
+    readPdfWithAi,
+    countPages: pdfConverter.countPages,
+    log: strategyRunLog,
+  }),
 } as const;

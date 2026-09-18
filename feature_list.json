@@ -1634,7 +1634,7 @@
       "epic_name": "Documentos e IA",
       "name": "procesamiento-de-pdf-por-estrategia",
       "description": "Procesa un PDF segun una ESTRATEGIA elegida por un enum: catalogo | formula.\n\n* catalogo: procesa el PDF como IMAGEN.\n* formula: procesa el PDF como TEXTO.\n\nLas dos pasan por la lectura con IA (lectura-de-pdf-con-gemini).\n\nCAMBIO DEL 2026-09-14 (decidido por el humano): la estrategia SE EJECUTA DENTRO DEL TRABAJO DE LA COLA (procesamiento-de-pdf-en-cola), no por llamada directa.\n\nRETORNO, POR AHORA: solo un console.log con el resultado.\n\nPROMPTS: se crean los archivos de prompt de cada estrategia (catalogo y formula) con el CONTENIDO VACIO; el texto se escribe mas adelante. Decidido por el humano el 2026-09-14.\n\nLO QUE NO ENTRA: la cola que la ejecuta (procesamiento-de-pdf-en-cola), guardar o devolver el resultado de forma estructurada, y el recorte de imagenes (recorte-de-imagenes-del-pdf).",
-      "status": "pending",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
@@ -1928,6 +1928,23 @@
       "branch": "feature/QC-128-wt-borra-antes-de-desregistrar",
       "depends_on": [],
       "spec_path": "specs/QC-128-wt-borra-antes-de-desregistrar"
+    },
+    {
+      "key": "QC-129",
+      "id": 129,
+      "epic": "QC-105",
+      "epic_name": "Documentos e IA",
+      "name": "textos-definitivos-de-los-prompts",
+      "description": "Escribir los textos DEFINITIVOS de los dos prompts que QC-109 deja montados: el de la estrategia `catalogo` (que lee el PDF como imagen) y el de `formula` (que lo lee como texto). Nace el 2026-09-18 al acotar QC-109, porque un prompt vacio NO PUEDE FUNCIONAR: QC-108 rechaza un prompt en blanco sin llamar al proveedor. QC-109 crea los archivos con un texto provisional que si funciona; escribir los definitivos y quitar la cabecera de provisional queda aqui. QUEDA ABIERTO: que se le pide exactamente a la IA en cada caso, COMO SE COMPRUEBA QUE UN PROMPT ES BUENO -un prompt no se prueba como una funcion-, y si los textos se versionan.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": null,
+      "branch": "feature/QC-129-textos-definitivos-de-los-prompts",
+      "depends_on": [
+        "QC-109"
+      ],
+      "spec_path": "specs/QC-129-textos-definitivos-de-los-prompts"
     }
   ]
 }

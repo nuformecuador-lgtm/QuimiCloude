@@ -269,6 +269,125 @@ function ningunArchivoContiene(prohibidos: readonly string[], fuentes = FUENTES_
   }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Enmienda 2026-09-18 — la sesion se puede leer PARA PREGUNTAR al modulo, nunca
+// para decidir aqui. Detectores compartidos entre el caso real y el caso de mutacion.
+// ---------------------------------------------------------------------------------------------
+
+/** El literal de permiso de escritura, en el UNICO sitio en que puede vivir: el modulo. */
+const INVENTARIO_MODIFICAR = 'inventario.modificar';
+
+const ADJUST_BATCH_STOCK_PATH = 'lib/modules/inventario/domain/adjust-batch-stock.ts';
+
+/** Prohibidos duros: son formas de CORTAR el paso desde la pantalla, no de preguntar. */
+const PROHIBIDOS_DUROS_DE_SESION = [
+  'requireAdmin',
+  'ADMIN_ROLE_NAME',
+  'decideRouteAccess',
+  'next/headers',
+  'redirect(',
+] as const;
+
+/**
+ * `true` si un archivo que lee la sesion lo hace para DELEGAR en el predicado del modulo y no
+ * para decidir el acceso el mismo: no es cliente, importa y usa `canAdjustBatchStock` de
+ * `@/lib/modules/inventario`, no hurga en `.permissions` ni en `roleName` de `SessionUser` por su
+ * cuenta -eso seria una segunda definicion de la regla-, y no contiene ninguno de los prohibidos
+ * duros.
+ */
+function delegaLaSesionEnElPredicado(codigo: string): boolean {
+  if (codigo.includes("'use client'")) return false;
+  if (!codigo.includes('canAdjustBatchStock')) return false;
+  if (!codigo.includes('@/lib/modules/inventario')) return false;
+  if (codigo.includes('.permissions') || codigo.includes('roleName')) return false;
+  return !PROHIBIDOS_DUROS_DE_SESION.some((prohibido) => codigo.includes(prohibido));
+}
+
+/**
+ * Igual que `fuenteSinComentarios`, pero sobre una cadena en memoria: para fuentes fabricadas y
+ * para archivos fuera de la ruta (`adjust-batch-stock.ts`, que `fuenteSinComentarios` no cubre
+ * porque lee del disco por ruta relativa dentro de la ruta vigilada).
+ */
+function sinLineasDeComentarioDeCadena(codigo: string): string {
+  return codigo
+    .split('\n')
+    .filter((linea) => {
+      const limpia = linea.trim();
+      return !(limpia.startsWith('//') || limpia.startsWith('*') || limpia.startsWith('/*'));
+    })
+    .join('\n');
+}
+
+/** Indice del `)` que cierra la lista de parametros que abre en `aperturaParametros`. */
+function indiceCierreDeParametros(codigo: string, aperturaParametros: number): number {
+  let profundidad = 0;
+  for (let i = aperturaParametros; i < codigo.length; i += 1) {
+    if (codigo[i] === '(') profundidad += 1;
+    if (codigo[i] === ')') {
+      profundidad -= 1;
+      if (profundidad === 0) return i;
+    }
+  }
+  return -1;
+}
+
+/** Indice de la `{` que abre el CUERPO de la funcion, saltando el tipo de retorno -que puede
+ *  traer sus propias llaves y angulos, como `Promise<{ stock: number }>`-. */
+function indiceLlaveDeCuerpo(codigo: string, cierreParametros: number): number {
+  let profundidadAngulos = 0;
+  let profundidadLlavesDeTipo = 0;
+  for (let i = cierreParametros + 1; i < codigo.length; i += 1) {
+    const caracter = codigo[i];
+    if (caracter === '<') {
+      profundidadAngulos += 1;
+    } else if (caracter === '>') {
+      profundidadAngulos = Math.max(0, profundidadAngulos - 1);
+    } else if (caracter === '{') {
+      if (profundidadAngulos === 0 && profundidadLlavesDeTipo === 0) return i;
+      profundidadLlavesDeTipo += 1;
+    } else if (caracter === '}') {
+      profundidadLlavesDeTipo = Math.max(0, profundidadLlavesDeTipo - 1);
+    }
+  }
+  return -1;
+}
+
+/**
+ * El cuerpo -SIN las llaves que lo envuelven- de `function <nombre>(...) { ... }`, con balance de
+ * llaves, buscada por su nombre este DONDE este -declarada, asignada o devuelta-. Equivalente
+ * local a `cuerpoDeFuncion` de `tests/unit/inventario/qc91-alcance.test.ts:151-171`, que exige
+ * `export` y por eso no sirve para `adjustBatchStock`, que es la funcion INTERNA que
+ * `createAdjustBatchStock` devuelve.
+ */
+function cuerpoDeFuncionAnidada(fuente: string, nombre: string): string | null {
+  const codigo = sinLineasDeComentarioDeCadena(fuente);
+  const inicio = codigo.indexOf(`function ${nombre}(`);
+  if (inicio === -1) return null;
+  const aperturaParametros = codigo.indexOf('(', inicio);
+  const cierreParametros = indiceCierreDeParametros(codigo, aperturaParametros);
+  if (cierreParametros === -1) return null;
+  const llave = indiceLlaveDeCuerpo(codigo, cierreParametros);
+  if (llave === -1) return null;
+  let profundidad = 0;
+  for (let i = llave; i < codigo.length; i += 1) {
+    if (codigo[i] === '{') profundidad += 1;
+    if (codigo[i] === '}') {
+      profundidad -= 1;
+      if (profundidad === 0) return codigo.slice(llave + 1, i);
+    }
+  }
+  return null;
+}
+
+/**
+ * `true` si, tras quitar el espacio en blanco inicial, el cuerpo empieza EXACTAMENTE por la
+ * llamada al corte de permiso -ni una validacion antes, ni una lectura del repositorio-. Mide
+ * ORDEN, no mera presencia: `requirePermission` en cualquier otra posicion da `false`.
+ */
+function primeraSentenciaEsRequirePermission(cuerpo: string): boolean {
+  return cuerpo.trimStart().startsWith(`requirePermission(actor, '${INVENTARIO_MODIFICAR}')`);
+}
+
 describe('contrato de la ruta de inventario', () => {
   it('la pantalla existe donde la ubica INVENTORY_ROUTE y sus componentes viven en su barrel', () => {
     // R2, R27 — la ruta esperada se DERIVA de la constante, no se escribe a mano.
@@ -317,14 +436,183 @@ describe('contrato de la ruta de inventario', () => {
     // R5 — la autorizacion sobre los datos la aportan los casos de uso; la pantalla solo exige el
     // permiso de consulta con `requirePagePermission` (el caso de abajo). Comparar roles o
     // resolver la sesion aqui seria una tercera regla que nadie mantiene sincronizada.
+    //
+    // NOTA 2026-09-18 (enmienda aprobada): la premisa sigue en pie -la pantalla no decide
+    // autorizacion-, pero preguntar si se pinta un control no es decidir autorizacion. La
+    // autorizacion dura la da el caso de uso (abajo) y rechaza igual aunque la pantalla se
+    // la saltara: la pantalla no es la regla, es su reflejo. Precedente de esta misma distincion en
+    // `app/(private)/pedidos/components/order-list-section.tsx` («No es autorizacion, es
+    // PRESENTACION»). Por eso `getSessionUser` deja de estar prohibido a secas: se admite SOLO si
+    // el archivo delega en el predicado del modulo.
     ningunArchivoContiene([
       'requireAdmin',
-      'getSessionUser',
       'ADMIN_ROLE_NAME',
       'decideRouteAccess',
       'next/headers',
       'redirect(',
     ]);
+
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      const codigo = fuenteSinComentarios(ruta);
+      if (!codigo.includes('getSessionUser')) continue;
+      expect(
+        delegaLaSesionEnElPredicado(codigo),
+        `${ruta} lee la sesion pero no delega en canAdjustBatchStock de @/lib/modules/inventario`,
+      ).toBe(true);
+    }
+
+    // El bucle de arriba puede quedarse legitimamente vacio: si ningun archivo de la ruta lee la
+    // sesion, no hay nada que vigilar y esa es la direccion segura. Las afirmaciones duras de este
+    // mismo caso (los prohibidos de `ningunArchivoContiene`) corren igual, vacio o no.
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // Enmienda 2026-09-18 — MARCA POSITIVA: el retensado deja el repo MEJOR
+  // protegido que antes, no solo igual de protegido con una excepcion nueva.
+  // ---------------------------------------------------------------------------------------------
+
+  it('el literal del permiso de escritura no vive en la ruta', () => {
+    // El literal es del modulo (`lib/modules/inventario/domain/actor.ts`); la ruta solo pregunta.
+    ningunArchivoContiene(
+      [`'${INVENTARIO_MODIFICAR}'`, `"${INVENTARIO_MODIFICAR}"`, `\`${INVENTARIO_MODIFICAR}`],
+      FUENTES_VIGILADAS,
+    );
+  });
+
+  it('el caso de uso de ajuste exige el permiso ANTES de validar y ANTES de tocar el repositorio', () => {
+    const fuente = sinLineasDeComentarioDeCadena(leer(ADJUST_BATCH_STOCK_PATH));
+    const cuerpo = cuerpoDeFuncionAnidada(fuente, 'adjustBatchStock');
+    expect(
+      cuerpo,
+      'adjustBatchStock no existe con esa forma: el sujeto de esta prueba cambio',
+    ).not.toBeNull();
+    expect(primeraSentenciaEsRequirePermission(cuerpo as string)).toBe(true);
+  });
+
+  describe('la marca positiva muerde de verdad, con fuentes fabricadas', () => {
+    it('la lectura de sesion sin el predicado, con requireAdmin, con redirect( o hurgando en .permissions/roleName no delega', () => {
+      const sinPredicado = [
+        "import { identity } from '@/lib/composition';",
+        '',
+        'export async function ProductListSection() {',
+        '  const sessionUser = await identity.getSessionUser();',
+        "  const canAdjust = sessionUser?.permissions?.includes('inventario.modificar') ?? false;",
+        '  return canAdjust;',
+        '}',
+      ].join('\n');
+      expect(delegaLaSesionEnElPredicado(sinPredicado)).toBe(false);
+
+      const conRequireAdmin = [
+        "import { requireAdmin } from '@/lib/composition';",
+        'export async function ProductListSection() {',
+        '  await requireAdmin();',
+        '  return true;',
+        '}',
+      ].join('\n');
+      expect(delegaLaSesionEnElPredicado(conRequireAdmin)).toBe(false);
+
+      const conRedirect = [
+        "import { redirect } from 'next/navigation';",
+        "import { canAdjustBatchStock } from '@/lib/modules/inventario';",
+        'export async function ProductListSection() {',
+        '  const sessionUser = await identity.getSessionUser();',
+        '  if (!canAdjustBatchStock(sessionUser)) redirect(\'/login\');',
+        '}',
+      ].join('\n');
+      expect(delegaLaSesionEnElPredicado(conRedirect)).toBe(false);
+
+      const clienteQueDelega = [
+        "'use client';",
+        "import { canAdjustBatchStock } from '@/lib/modules/inventario';",
+        'export function ProductListSection() {',
+        '  const sessionUser = getSessionUser();',
+        '  return canAdjustBatchStock(sessionUser);',
+        '}',
+      ].join('\n');
+      expect(delegaLaSesionEnElPredicado(clienteQueDelega)).toBe(false);
+
+      const queDelega = [
+        "import { identity } from '@/lib/composition';",
+        "import { canAdjustBatchStock } from '@/lib/modules/inventario';",
+        'export async function ProductListSection() {',
+        '  const sessionUser = await identity.getSessionUser();',
+        '  return canAdjustBatchStock(sessionUser);',
+        '}',
+      ].join('\n');
+      expect(delegaLaSesionEnElPredicado(queDelega)).toBe(true);
+
+      const queDelegaPeroTambienHurga = [
+        "import { identity } from '@/lib/composition';",
+        "import { canAdjustBatchStock } from '@/lib/modules/inventario';",
+        'export async function ProductListSection() {',
+        '  const sessionUser = await identity.getSessionUser();',
+        '  const puedeAdemas = sessionUser.permissions.includes(\'inventario.modificar\');',
+        '  return canAdjustBatchStock(sessionUser) && puedeAdemas;',
+        '}',
+      ].join('\n');
+      expect(delegaLaSesionEnElPredicado(queDelegaPeroTambienHurga)).toBe(false);
+    });
+
+    it('requirePermission borrado o movido despues del safeParse deja de ser la primera sentencia', () => {
+      const conElCorte = [
+        'export function createAdjustBatchStock(deps) {',
+        '  return async function adjustBatchStock(input, actor) {',
+        "    requirePermission(actor, 'inventario.modificar');",
+        '    const parsed = schema.safeParse(input);',
+        '    return deps.products.adjustBatchStock(parsed.data);',
+        '  };',
+        '}',
+      ].join('\n');
+      const cuerpoConElCorte = cuerpoDeFuncionAnidada(conElCorte, 'adjustBatchStock');
+      expect(cuerpoConElCorte).not.toBeNull();
+      expect(primeraSentenciaEsRequirePermission(cuerpoConElCorte as string)).toBe(true);
+
+      const sinElCorte = [
+        'export function createAdjustBatchStock(deps) {',
+        '  return async function adjustBatchStock(input, actor) {',
+        '    const parsed = schema.safeParse(input);',
+        '    return deps.products.adjustBatchStock(parsed.data);',
+        '  };',
+        '}',
+      ].join('\n');
+      const cuerpoSinElCorte = cuerpoDeFuncionAnidada(sinElCorte, 'adjustBatchStock');
+      expect(cuerpoSinElCorte).not.toBeNull();
+      expect(primeraSentenciaEsRequirePermission(cuerpoSinElCorte as string)).toBe(false);
+
+      const corteTardio = [
+        'export function createAdjustBatchStock(deps) {',
+        '  return async function adjustBatchStock(input, actor) {',
+        '    const parsed = schema.safeParse(input);',
+        "    requirePermission(actor, 'inventario.modificar');",
+        '    return deps.products.adjustBatchStock(parsed.data);',
+        '  };',
+        '}',
+      ].join('\n');
+      const cuerpoCorteTardio = cuerpoDeFuncionAnidada(corteTardio, 'adjustBatchStock');
+      expect(cuerpoCorteTardio).not.toBeNull();
+      expect(primeraSentenciaEsRequirePermission(cuerpoCorteTardio as string)).toBe(false);
+    });
+
+    it('el literal del permiso metido a mano en un archivo de ruta se detecta en sus tres comillas', () => {
+      const conComillaSimple = `const puede = '${INVENTARIO_MODIFICAR}' === permiso;`;
+      const conComillaDoble = `const puede = "${INVENTARIO_MODIFICAR}" === permiso;`;
+      const conAcentoGrave = `const puede = \`${INVENTARIO_MODIFICAR}\`;`;
+      const sinElLiteral = 'const puede = canAdjustBatchStock(actor);';
+
+      for (const conElLiteral of [conComillaSimple, conComillaDoble, conAcentoGrave]) {
+        const contiene = [
+          `'${INVENTARIO_MODIFICAR}'`,
+          `"${INVENTARIO_MODIFICAR}"`,
+          `\`${INVENTARIO_MODIFICAR}`,
+        ].some((literal) => conElLiteral.includes(literal));
+        expect(contiene, conElLiteral).toBe(true);
+      }
+      expect(
+        [`'${INVENTARIO_MODIFICAR}'`, `"${INVENTARIO_MODIFICAR}"`, `\`${INVENTARIO_MODIFICAR}`].some(
+          (literal) => sinElLiteral.includes(literal),
+        ),
+      ).toBe(false);
+    });
   });
 
   // QC-75 T12 — sustituye a la afirmacion «hay una fila {prefix, roles:[Administrador]} en la

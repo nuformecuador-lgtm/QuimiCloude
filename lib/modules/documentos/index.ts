@@ -99,3 +99,17 @@ export {
   type AiReadResult,
   type ReadPdfWithAiDeps,
 } from './domain/read-pdf-with-ai';
+
+// La estrategia de lectura, con su esquema y su tipo: es el borde de la capacidad de abajo, asi que
+// quien la invoque valida con el mismo esquema y no escribe los dos literales a mano.
+export { pdfStrategySchema, type PdfStrategy } from './domain/pdf-strategy';
+
+// El procesamiento por estrategia, tambien como FABRICA. Su puerto de registro y los textos de
+// prompt NO salen por aqui: el puerto lo ve solo `lib/composition`, y los prompts son detalle
+// interno de la estrategia —publicarlos invitaria a pasarlos por parametro desde fuera—.
+export {
+  createProcessPdfByStrategy,
+  type ProcessPdfByStrategyDeps,
+  type ProcessPdfByStrategyInput,
+  type StrategyRunResult,
+} from './domain/process-pdf-by-strategy';

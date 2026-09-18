@@ -1,8 +1,9 @@
 // La FACHADA ya cableada del modulo `documentos` con su lectura por IA.
 //
 // Lo que se afirma aqui es el CABLEADO, no el dominio: que `lib/composition` publica
-// `readPdfWithAi` junto a las cuatro claves que ya tenia, que construir la fachada NO lee las
-// variables de Gemini ni toca la red, y que el adaptador de IA no se invoca al importar.
+// `readPdfWithAi` y `processPdfByStrategy` junto a las cuatro claves que ya tenia, que construir la
+// fachada NO lee las variables de Gemini ni toca la red, y que el adaptador de IA no se invoca al
+// importar.
 //
 // Mismo criterio que `tests/unit/composition/asignaciones-facade.test.ts`: se sustituye el
 // cliente Prisma entero -`lib/composition` arrastra todos los adaptadores del repo- y no hace
@@ -26,9 +27,16 @@ vi.mock('@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai', () => ({
 import { documentos } from '@/lib/composition';
 
 describe('documentos — la fachada expone la lectura con IA (fachada cableada)', () => {
-  it('R21 — expone readPdfWithAi junto a las cuatro claves que ya tenia, y todas son funciones', () => {
+  it('R21 — expone readPdfWithAi y processPdfByStrategy junto a las cuatro claves que ya tenia, y todas son funciones', () => {
     expect(Object.keys(documentos).sort()).toEqual(
-      ['convertPdfs', 'downloadDocument', 'issueReadLink', 'issueUploadLinks', 'readPdfWithAi'].sort(),
+      [
+        'convertPdfs',
+        'downloadDocument',
+        'issueReadLink',
+        'issueUploadLinks',
+        'readPdfWithAi',
+        'processPdfByStrategy',
+      ].sort(),
     );
     for (const clave of Object.keys(documentos) as (keyof typeof documentos)[]) {
       expect(typeof documentos[clave]).toBe('function');
