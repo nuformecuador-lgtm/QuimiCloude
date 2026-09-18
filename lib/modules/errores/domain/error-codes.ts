@@ -8,6 +8,8 @@
  *
  * **Septima enmienda, el 2026-09-17 (QC-92)**: `batch_not_found`, `batch_stock_negative`.
  * Aprobada por el humano el 2026-09-17 en la puerta F1.4 de QC-92.
+ * **Octava enmienda, el 2026-09-18**: `ai_unavailable`.
+ * Aprobada por el humano el 2026-09-18.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -64,6 +66,9 @@ export const ERROR_CODES = [
   // Distinto de `invalid_input`: la entrada tiene forma valida y lo que falla es el estado del
   // lote tras aplicar el ajuste.
   'batch_stock_negative',
+  // Distinto de `unexpected`: la entrada era correcta, lo que fallo es que el proveedor de IA no
+  // respondio o agoto el plazo.
+  'ai_unavailable',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
