@@ -787,8 +787,9 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 
     const restante = within(tabla).getByTestId('order-ingredient-remaining');
-    // 0 − 0.201 = −0.201: sin ningun lote el pedido siempre pide mas de lo que hay.
-    await waitFor(() => expect(restante).toHaveTextContent('-0.201'));
+    // 0 − 0.201 = −0.201: sin ningun lote el pedido siempre pide mas de lo que hay. Se CALCULA
+    // exacto y se PINTA a dos decimales, «-0.2», igual que sus vecinos de este bloque.
+    await waitFor(() => expect(restante).toHaveTextContent('-0.2'));
     expect(restante.firstElementChild).toHaveClass('text-destructive');
   });
 

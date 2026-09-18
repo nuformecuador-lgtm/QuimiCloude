@@ -1,4 +1,8 @@
-import { assertPermission, type PermissionCode } from '@/lib/modules/identity';
+import {
+  assertPermission,
+  type PermissionBearer,
+  type PermissionCode,
+} from '@/lib/modules/identity';
 
 import { UnauthorizedError } from './errors';
 
@@ -43,4 +47,36 @@ export function requirePermission(
   permission: PermissionCode,
 ): asserts actor is Actor {
   assertPermission(actor, permission, () => new UnauthorizedError());
+}
+
+/**
+ * El codigo de escritura de este modulo, escrito UNA sola vez y dentro del dominio: lo que
+ * sale al exterior es la pregunta, no la cadena.
+ */
+const INVENTARIO_MODIFICAR: PermissionCode = 'inventario.modificar';
+
+/** Error centinela, privado: assertPermission exige una fabrica pero esto nunca lanza afuera. */
+const DENEGADO = new Error('inventario: permiso de escritura ausente');
+
+/**
+ * Puede este conjunto de permisos ajustar el stock de un lote? Devuelve boolean y NO LANZA:
+ * es una pregunta de presentacion, no una autorizacion.
+ *
+ * Anticipar no es autorizar: el corte real sigue siendo requirePermission en la primera
+ * linea del caso de uso de ajuste, y este predicado no lo sustituye, no lo relaja y no lo
+ * adelanta.
+ *
+ * Delega en assertPermission de identity, la UNICA implementacion de la pertenencia exacta:
+ * no se reimplementa con un includes que pueda divergir.
+ *
+ * Acepta cualquier portador de permisos, no solo el Actor de este modulo: quien pregunta es
+ * un Server Component con la sesion resuelta.
+ */
+export function canAdjustBatchStock(actor: PermissionBearer | null | undefined): boolean {
+  try {
+    assertPermission(actor, INVENTARIO_MODIFICAR, () => DENEGADO);
+    return true;
+  } catch {
+    return false;
+  }
 }

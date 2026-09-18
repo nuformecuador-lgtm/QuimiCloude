@@ -57,23 +57,29 @@ import type { SessionEraser } from '@/lib/modules/identity/ports/session-eraser'
 import type { SessionRevocationRepository } from '@/lib/modules/identity/ports/session-revocation-repository';
 import type { UserCredentialsReader } from '@/lib/modules/identity/ports/user-credentials-reader';
 import {
+  createAdjustBatchStock,
   createCreatePresentation,
   createCreateProduct,
   createDeletePresentation,
   createDeleteProduct,
   createGetProduct,
+  createListBatchMovements,
   createListPresentations,
+  createListProductBatches,
   createListProducts,
   createUpdatePresentation,
   createUpdateProduct,
 } from '@/lib/modules/inventario';
 import { findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
+import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
   addBatchToAlive,
+  adjustBatchStock,
   createProduct,
   createWithFirstBatch,
   findAliveIdByName,
   findAliveProductById,
+  findBatchesOfAliveProduct,
   listAliveProducts,
   softDeleteAliveProduct,
   updateAliveProduct,
@@ -182,6 +188,7 @@ import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import {
   findRecipeExecutionContentById,
+  findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
@@ -290,7 +297,9 @@ import {
   createDownloadDocument,
   createIssueReadLink,
   createIssueUploadLinks,
+  createReadPdfWithAi,
 } from '@/lib/modules/documentos';
+import { readWithGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
 import {
   countPages,
   extractPdfText,
@@ -301,6 +310,7 @@ import {
   createDocumentSignedUpload,
   downloadDocument,
 } from '@/lib/modules/documentos/adapters/driven/storage/document-storage-supabase';
+import type { AiReader } from '@/lib/modules/documentos/ports/ai-reader';
 import type { DocumentStorage } from '@/lib/modules/documentos/ports/document-storage';
 import type { PdfConverter } from '@/lib/modules/documentos/ports/pdf-converter';
 import { requestScoped } from '@/lib/shared/request-scope';
@@ -636,6 +646,9 @@ const productRepository: ProductRepository = {
   findAliveIdByName,
   createWithFirstBatch,
   addBatchToAlive,
+  adjustBatchStock,
+  findBatchesOfAliveProduct,
+  findBatchMovements,
 };
 
 const presentationRepository: PresentationRepository = {
@@ -667,6 +680,15 @@ export const inventario = {
   listPresentations: createListPresentations({
     presentations: presentationRepository,
     log: inventarioListQueryLog,
+  }),
+  // Claves nuevas al final: ninguna de las de arriba se toca.
+  adjustBatchStock: createAdjustBatchStock({ products: productRepository }),
+  listProductBatches: createListProductBatches({ products: productRepository }),
+  // Se nombra el adaptador importado y no la constante `peopleDirectory`, que apunta al mismo
+  // objeto pero se declara mas abajo: un `const` no existe antes de su linea.
+  listBatchMovements: createListBatchMovements({
+    products: productRepository,
+    people: assignmentDirectoryPrisma,
   }),
 } as const;
 
@@ -881,6 +903,7 @@ export const unidades = {
 const recipeCatalog: RecipeCatalog = {
   findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
   findExecutionContentById: findRecipeExecutionContentById,
+  findIdsMatchingName: findRecipeIdsMatchingName,
 };
 
 /** QC-57 (T7, R6): misma implementacion, tipada con el puerto que declara `pedidos`. */
@@ -1122,6 +1145,15 @@ const pdfConverter: PdfConverter = {
 };
 
 /**
+ * `AiReader` cableado con el adaptador de Gemini. La clave del objeto es la del PUERTO
+ * (`read`) y el valor, la funcion del adaptador (`readWithGenai`) —se llaman distinto a
+ * proposito, igual que `documentStorage` y `pdfConverter` arriba—. Aqui no se invoca nada,
+ * solo se referencia, asi que construir esta fachada no lee ninguna variable de entorno ni
+ * toca la red: la suite entera arranca sin claves de IA.
+ */
+const aiReader: AiReader = { read: readWithGenai };
+
+/**
  * Fachada del modulo `documentos` ya cableada. Es lo que consume su Server Action.
  *
  * El ACTOR NO se resuelve aqui, mismo criterio que el resto de modulos: cada caso de uso lo recibe
@@ -1152,4 +1184,5 @@ export const documentos = {
   // una variable ni tocar la red.
   issueReadLink: createIssueReadLink({ storage: documentStorage }),
   downloadDocument: createDownloadDocument({ storage: documentStorage }),
+  readPdfWithAi: createReadPdfWithAi({ ai: aiReader, converter: pdfConverter }),
 } as const;

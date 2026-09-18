@@ -389,6 +389,17 @@ const MIGRACION_QC50 = [
   'db/migrations/20260916120000_recipes_company_scope/down.sql',
 ];
 
+// QC-68 (2026-09-17): el listado de pedidos busca por nombre de receta, y esa busqueda tiene
+// que ver tambien las recetas dadas de baja -un pedido conserva la suya aunque la den de baja-.
+// El indice parcial de QC-57 lleva `WHERE deleted_at IS NULL` y el planificador no puede usarlo
+// para una consulta sin ese predicado, asi que hace falta un segundo indice GIN de trigramas
+// TOTAL, sin `WHERE`, sobre la misma columna `recipes.name_normalized`. Migracion legitima de
+// `db/`, ninguna otra tabla ni columna cambia.
+const MIGRACION_QC68 = [
+  'db/migrations/20260917130000_recipes_search_index_including_deleted/migration.sql',
+  'db/migrations/20260917130000_recipes_search_index_including_deleted/down.sql',
+];
+
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
   ...AUTORIZACION_POR_PERMISO_QC74,
@@ -409,6 +420,7 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC81,
   ...MIGRACION_QC60,
   ...MIGRACION_QC50,
+  ...MIGRACION_QC68,
 ];
 
 /** Espera rutas con separadores POSIX, como las devuelve `git diff --name-only`. */

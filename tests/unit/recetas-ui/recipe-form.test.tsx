@@ -1289,7 +1289,7 @@ describe('QC-64 R11, R13 y R22 — la vista previa lee lo que hay escrito y no g
     return await screen.findByTestId('recipe-form-preview');
   }
 
-  it('R11: abrir la vista previa no invoca ninguna operacion y monta el asistente sobre los pasos escritos EN ESE INSTANTE', async () => {
+  it('R3, R11: abrir la vista previa no invoca ninguna operacion, monta el asistente SIN espera y sobre los pasos escritos EN ESE INSTANTE', async () => {
     const user = setupUser();
     renderCreateForm();
 
@@ -1304,6 +1304,10 @@ describe('QC-64 R11, R13 y R22 — la vista previa lee lo que hay escrito y no g
     expect(within(modal).getByTestId('step-reader')).toBeInTheDocument();
     expect(within(modal).getByText('Calentar a fuego lento')).toBeInTheDocument();
     expect(within(modal).getByTestId('step-reader-position')).toHaveTextContent('1');
+
+    // R3: la vista previa no activa la espera minima por paso.
+    expect(within(modal).queryByTestId('countdown-timer')).toBeNull();
+    expect(within(modal).queryByTestId('step-reader-wait-reason')).toBeNull();
 
     // R11: ni guarda, ni invoca ninguna operacion del modulo, ni navega.
     esperarQueNoSeInvocoNingunaAccion();

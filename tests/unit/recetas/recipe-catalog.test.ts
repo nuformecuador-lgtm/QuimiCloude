@@ -25,6 +25,7 @@ vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { recipe: { findMany, findFir
 
 const {
   findRecipeExecutionContentById,
+  findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
   toRecipeExecutionContent,
   toRecipeRef,
@@ -251,6 +252,71 @@ describe('findRecipeExecutionContentById', () => {
     expect(receta).toBeNull()
     const args = findFirst.mock.calls[0]?.[0]
     expect(args.where).toEqual({ AND: [{ companyId: EMPRESA }, { id: 'r-de-otra-empresa' }] })
+  })
+})
+
+describe('findRecipeIdsMatchingName', () => {
+  it('casa por subcadena contra el nombre normalizado', async () => {
+    findMany.mockResolvedValue([{ id: 'r-1' }])
+
+    const ids = await findRecipeIdsMatchingName('cloro', EMPRESA)
+
+    expect(ids).toEqual(['r-1'])
+    const args = findMany.mock.calls[0]?.[0]
+    expect(args.where.AND[1]).toEqual({ nameNormalized: { contains: 'cloro' } })
+  })
+
+  it('ignora acentos y mayusculas al normalizar el termino (R2)', async () => {
+    findMany.mockResolvedValue([])
+
+    await findRecipeIdsMatchingName('CLÓRO', EMPRESA)
+
+    const args = findMany.mock.calls[0]?.[0]
+    expect(args.where.AND[1]).toEqual({ nameNormalized: { contains: 'cloro' } })
+  })
+
+  it('una receta dada de baja SI vuelve (R4)', async () => {
+    findMany.mockResolvedValue([{ id: 'r-baja' }])
+
+    const ids = await findRecipeIdsMatchingName('detergente', EMPRESA)
+
+    expect(ids).toEqual(['r-baja'])
+  })
+
+  it('una receta de otra empresa NO vuelve (R6)', async () => {
+    findMany.mockResolvedValue([])
+
+    const ids = await findRecipeIdsMatchingName('cloro', EMPRESA)
+
+    expect(ids).toEqual([])
+    const args = findMany.mock.calls[0]?.[0]
+    expect(args.where.AND[0]).toEqual({ companyId: EMPRESA })
+  })
+
+  it('un termino que normaliza a vacio devuelve null, no [] (R9)', async () => {
+    const ids = await findRecipeIdsMatchingName('%%%', EMPRESA)
+
+    expect(ids).toBeNull()
+    expect(findMany).not.toHaveBeenCalled()
+  })
+
+  it('ningun nombre casa: devuelve [] (R10)', async () => {
+    findMany.mockResolvedValue([])
+
+    const ids = await findRecipeIdsMatchingName('inexistente', EMPRESA)
+
+    expect(ids).toEqual([])
+  })
+
+  it('hace UNA sola consulta y deletedAt no aparece en el where', async () => {
+    findMany.mockResolvedValue([])
+
+    await findRecipeIdsMatchingName('cloro', EMPRESA)
+
+    expect(findMany).toHaveBeenCalledTimes(1)
+    const args = findMany.mock.calls[0]?.[0]
+    expect(JSON.stringify(args.where)).not.toContain('deletedAt')
+    expect(args.select).toEqual({ id: true })
   })
 })
 

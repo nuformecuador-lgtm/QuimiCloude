@@ -168,6 +168,10 @@ function montar() {
         return { batchId: `batch-de-${productId}`, lot: `lote-de-${productId}` };
       },
     ),
+    // QC-92: sin caso en este archivo -es de otro modulo de reglas-, asi que dobles minimos.
+    adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(async () => null),
+    findBatchesOfAliveProduct: vi.fn<ProductRepository['findBatchesOfAliveProduct']>(async () => []),
+    findBatchMovements: vi.fn<ProductRepository['findBatchMovements']>(async () => null),
   } satisfies ProductRepository;
 
   const presentations = {

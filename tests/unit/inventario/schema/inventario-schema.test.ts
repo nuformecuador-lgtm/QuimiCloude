@@ -231,7 +231,10 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(field(presentation, 'nameNormalized').attributes).not.toMatch(/@unique/)
   })
 
-  it('el esquema declara exactamente dos modelos nuevos: Presentation y Product', () => {
+  // 2026-09-18 (QC-92): el censo pasa de tres modelos a cuatro. `InventoryMovement` (R1) es
+  // el historial de ajustes del lote y nace con dueno `inventario`. El titulo anterior decia
+  // «exactamente dos modelos nuevos» y ya era mentira antes de esta ficha.
+  it('el esquema declara exactamente cuatro modelos del modulo inventario', () => {
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
       .map((match) => match[1])
       .filter((name): name is string => name !== undefined)
@@ -243,8 +246,13 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       .filter(([, moduleName]) => moduleName === 'inventario')
       .map(([, , modelName]) => modelName)
       .sort()
-    expect(inventarioModels).toEqual(['Presentation', 'Product', 'ProductBatch'])
-    expect(inventarioModels).toHaveLength(3)
+    expect(inventarioModels).toEqual([
+      'InventoryMovement',
+      'Presentation',
+      'Product',
+      'ProductBatch',
+    ])
+    expect(inventarioModels).toHaveLength(4)
 
     for (const owned of ['DocumentType', 'Role', 'User']) {
       expect(modelNames, `el modelo ${owned} no debe desaparecer`).toContain(owned)
@@ -612,7 +620,10 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     }
   })
 
-  it('los tres modelos declaran /// @module inventario', () => {
+  // 2026-09-18 (QC-92): son cuatro desde que `InventoryMovement` (R1) entro al modulo. Un
+  // modelo sin `/// @module` es un hallazgo de la guardia de arquitectura, asi que el nuevo
+  // se cita por nombre igual que sus tres hermanos.
+  it('los cuatro modelos declaran /// @module inventario', () => {
     // Texto crudo: `stripComments` se lleva justo lo que aqui hay que comprobar.
     const owners = new Map<string, string>()
     for (const match of rawSchema.matchAll(/\/\/\/\s*@module\s+(\S+)\s*\n\s*model\s+(\w+)\s*\{/g)) {
@@ -623,12 +634,18 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(owners.get('Presentation')).toBe('inventario')
     expect(owners.get('Product')).toBe('inventario')
     expect(owners.get('ProductBatch')).toBe('inventario')
+    expect(owners.get('InventoryMovement')).toBe('inventario')
 
     const inventarioModels = [...owners.entries()]
       .filter(([, moduleName]) => moduleName === 'inventario')
       .map(([modelName]) => modelName)
       .sort()
-    expect(inventarioModels).toEqual(['Presentation', 'Product', 'ProductBatch'])
+    expect(inventarioModels).toEqual([
+      'InventoryMovement',
+      'Presentation',
+      'Product',
+      'ProductBatch',
+    ])
     expect(owners.get('User')).toBe('identity')
     expect(owners.get('Role')).toBe('identity')
     expect(owners.get('DocumentType')).toBe('identity')
@@ -679,16 +696,22 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     }
     // Si el parseo deja de encontrar factorias, esta guardia no vigilaria nada. La lista se sube a
     // mano cuando se publique una nueva.
+    // 2026-09-18 (QC-92): entran las tres que publica esta ficha -`createAdjustBatchStock` (R1),
+    // `createListProductBatches` (R22) y `createListBatchMovements` (R23)-, y el barrel pasa de
+    // nueve a doce. Sigue siendo igualdad exacta: una factoria de mas o de menos lo pone rojo.
     expect(
       [...FACTORIAS_DE_CASO_DE_USO].sort(),
       'no se pudieron derivar las factorias de caso de uso del barrel: sin ellas esta guardia no mira nada',
     ).toEqual([
+      'createAdjustBatchStock',
       'createCreatePresentation',
       'createCreateProduct',
       'createDeletePresentation',
       'createDeleteProduct',
       'createGetProduct',
+      'createListBatchMovements',
       'createListPresentations',
+      'createListProductBatches',
       'createListProducts',
       'createUpdatePresentation',
       'createUpdateProduct',
@@ -813,8 +836,15 @@ describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batch
     expect(field(productBatch, 'expiryDate').attributes).toContain('@db.Date')
 
     // Igualdad exacta: una columna de mas es una migracion; si es a proposito, se anota arriba.
+    // 2026-09-18 (QC-92): `InventoryMovement` se excluye como ya se excluian `Product` y
+    // `Presentation`. `movements` es la back-relation del historial de ajustes (R1), no una
+    // columna: no entra en PRODUCT_BATCH_COLUMNS porque en la base no existe. El parser deja
+    // `type` sin los corchetes, asi que el tipo basta para descartarla.
     const escalares = productBatch.fields
-      .filter((candidate) => !['Product', 'Presentation'].includes(candidate.type))
+      .filter(
+        (candidate) =>
+          !['Product', 'Presentation', 'InventoryMovement'].includes(candidate.type),
+      )
       .map((candidate) => candidate.name)
       .sort()
     expect(
