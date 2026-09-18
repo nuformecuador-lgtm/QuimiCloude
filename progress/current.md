@@ -19,6 +19,40 @@
 
 ## Evaluaciones
 
+### QC-109 - acotada con `/afinar-feature` (2026-09-18)
+
+Alcance, **14 decisiones cerradas** y **una pregunta abierta** en
+`.worktrees/QC-109-procesamiento-de-pdf-por-estrategia/specs/QC-109-procesamiento-de-pdf-por-estrategia/requirements.md`
+(sembrado DENTRO del worktree, como QC-68, QC-92 y QC-103). No se copian aqui.
+
+**La acotacion destapo un choque que la ficha no veia, y estaba en el codigo**: mandaba crear los
+archivos de prompt «con el CONTENIDO VACIO», pero QC-108 cerro que un prompt ausente o en blanco se
+rechaza **sin llamar al proveedor**, y su `ai-read-input.ts:19` lo hace cumplir con
+`z.string().trim().min(1)`. Tal cual estaba escrito, **las dos estrategias nacian incapaces de
+ejecutarse**. Decision del humano: nacen con **texto provisional que SI funciona**, con la cabecera
+de cada archivo declarandolo.
+
+**El board se corrigio ANTES de sembrar**, en dos sitios: la `description` de QC-109 —dos parrafos
+derogados, reescritos **conservando la fecha y el rastro** de lo anterior en vez de borrarlo— y una
+**ficha nueva, QC-129**, para los textos definitivos, que hasta hoy no tenian dueno («el texto se
+escribe mas adelante» no era de nadie). Nace completa: epica QC-105, «is blocked by» QC-109, labels
+`sdd` y `slug:`, sin `complexity` —la asigna el leader en F1.0—, `pending` en Backlog y **sin sembrar**.
+
+**Tres decisiones las propuso el leader** como consecuencia de lo que el humano eligio, y el humano
+las acepto: `[D4]` la cabecera de provisional, `[D13]` el enum validado con zod como el `mode` de
+QC-108, y `[D14]` el E2E diferido a QC-107 con motivo escrito —esta ficha no tiene pantalla ni
+recorrido que ejercitar—.
+
+**La pregunta que queda abierta es real**: cuanto se registra por consola. El texto de un catalogo
+entero puede ser enorme y un PDF de proveedor puede traer datos que no conviene volcar en los
+registros. No se rellena con un supuesto.
+
+**El cruce de archivos con QC-61 dejo de ser un problema**: mergeo hoy (PR #90), asi que `backend`
+queda a 0 `in_progress` y la validacion que no se pudo hacer ya no hace falta.
+
+Sigue `pending` en Backlog: la mueve el leader en F1.3.
+
+
 ### QC-61 - acotada con `/afinar-feature` (2026-09-18)
 
 Alcance y **8 decisiones cerradas**, **cero abiertas**, en
