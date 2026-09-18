@@ -411,28 +411,38 @@ function orderFilterWhere(field: string, value: ListFilterValue): Prisma.OrderWh
 
 /**
  * `where` UNICO del listado de pedidos: el mismo objeto para el `findMany` y para el `count`
- * (R14). Dos capas, y ninguna sobra:
+ * (R14). Tres capas, y ninguna sobra:
  *
  *   1. **`deletedAt: null` SIEMPRE** (R7, R40). NO es un filtro opcional y por eso nunca estuvo
  *      en los parametros del listado: `deletedAt` no es consultable en ninguna lista blanca y
  *      `sanitizeListQuery` lo poda ademas por su cuenta. Los CANCELADOS si salen -tienen estado
  *      propio en vez de desaparecer (R25)-; los borrados no salen nunca.
- *   2. **Los filtros, TODOS a la vez** (R15): un `AND` explicito, de modo que una fila sale solo
+ *   2. **`recipeIds`**, cuando la busqueda resolvio un termino: acota a los pedidos de esas
+ *      recetas. `null` significa que no hay busqueda y no acota nada; `[]` significa que ninguna
+ *      receta caso y el `IN` vacio deja la pagina sin filas.
+ *   3. **Los filtros, TODOS a la vez** (R15): un `AND` explicito, de modo que una fila sale solo
  *      si los cumple todos. Estado y prioridad son dos de ellos (R25), ya no dos parametros.
- *
- * NO hay capa de busqueda, y es el requisito: `orders` no tiene columna `name` (R17), asi que
- * la busqueda se omite y se registra en el caso de uso y aqui no llega nada que aplicar.
  */
-export function buildOrderWhere(query: ListQuery, scope: OrderScope): Prisma.OrderWhereInput {
+export function buildOrderWhere(
+  query: ListQuery,
+  scope: OrderScope,
+  recipeIds: readonly string[] | null,
+): Prisma.OrderWhereInput {
   const filters = Object.entries(query.filters)
     .map(([field, value]) => orderFilterWhere(field, value))
     .filter((condition): condition is Prisma.OrderWhereInput => condition !== null);
 
   // El AMBITO va PRIMERO y en su propio termino del `AND`, al lado de `deletedAt: null` y ANTES de
   // los filtros. NUNCA fundido con ellos ni al mismo nivel que un `OR`: un `OR` y el `companyId` en
-  // el mismo objeto dejarian que un filtro AMPLIE lo visible en vez de acotarlo.
+  // el mismo objeto dejarian que un filtro AMPLIE lo visible en vez de acotarlo. `recipeIds` va en
+  // su PROPIO termino del `AND`, entre el borrado y los filtros, por el mismo motivo.
   return {
-    AND: [orderCompanyScope(scope), { deletedAt: null }, ...filters],
+    AND: [
+      orderCompanyScope(scope),
+      { deletedAt: null },
+      ...(recipeIds === null ? [] : [{ recipeId: { in: [...recipeIds] } }]),
+      ...filters,
+    ],
   };
 }
 
@@ -452,13 +462,18 @@ export function buildOrderWhere(query: ListQuery, scope: OrderScope): Prisma.Ord
  *
  * `total` sale de un `count` con el MISMO `where` que el `findMany` (R14) -literalmente la
  * misma constante, no dos copias parecidas-.
+ *
+ * `recipeIds` lleva `= null` por defecto: el puerto lo declara obligatorio, pero las ~30
+ * llamadas de dos argumentos de los tests de integracion de pedidos no hablan de busqueda y
+ * `null` es exactamente su estado -«sin busqueda, no acotar nada»-.
  */
 export async function listAliveOrders(
   query: ListQuery,
   scope: OrderScope,
+  recipeIds: readonly string[] | null = null,
 ): Promise<Page<OrderRow>> {
   const { offset, limit } = toOffsetLimit(query.page, query.pageSize);
-  const where = buildOrderWhere(query, scope);
+  const where = buildOrderWhere(query, scope, recipeIds);
 
   const [rows, total] = await Promise.all([
     prisma.order.findMany({
