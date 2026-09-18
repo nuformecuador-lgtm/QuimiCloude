@@ -607,6 +607,32 @@ describe('StepReader — espera minima por paso', () => {
     expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 3');
   });
 
+  it('R8: retroceder con Anterior mientras corre la cuenta del paso 2 vuelve a exigir la duracion completa en el paso 1', () => {
+    vi.useFakeTimers();
+    renderReaderConEspera();
+
+    // Paso 1 cumplido, avanza al paso 2.
+    avanzarReloj(5000);
+    fireEvent.click(screen.getByTestId('step-reader-next'));
+    expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 2 de 3');
+
+    // Retrocede sin dejar que se cumpla la cuenta del paso 2.
+    avanzarReloj(1000);
+    fireEvent.click(screen.getByTestId('step-reader-previous'));
+
+    expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 3');
+    const siguiente = screen.getByTestId('step-reader-next');
+    expect(siguiente).toBeDisabled();
+    expect(screen.getByTestId('step-reader-wait-reason')).toBeVisible();
+    expect(screen.getByTestId('countdown-timer')).toHaveTextContent('00:05');
+
+    avanzarReloj(4999);
+    expect(siguiente).toBeDisabled();
+
+    avanzarReloj(1);
+    expect(siguiente).toBeEnabled();
+  });
+
   it('R9: Anterior sigue disponible mientras la cuenta corre, en un paso que no es el primero', () => {
     vi.useFakeTimers();
     renderReaderConEspera();
