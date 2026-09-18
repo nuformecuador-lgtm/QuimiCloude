@@ -235,7 +235,9 @@ El helper buscaba la primera `{` tras el primer `)`. Con un tipo de retorno que 
 - Un rojo **ajeno**: `tests/unit/configuracion-ui/user-table.test.tsx`, el flake conocido de jsdom («navigation to another Document»); corrido solo, sus 27 pasan.
 
 ### Limpieza de comentarios (`934fe7c`, commit aparte)
-Seis líneas **nuevas** de producción citaban `QC-92` o `R18` —los tres docblocks del puerto y una línea de `batch-movement-prisma.ts`—. Limpiadas, sin tocar una línea de código. Los comentarios **preexistentes no se arrastran**. Comprobado sobre el diff de la rama: **la única cita que queda en producción es la cabecera de enmiendas de `error-codes.ts`**, que es un registro histórico y ya citaba las seis anteriores.
+Seis líneas **nuevas** de producción citaban `QC-92` o `R18` —los tres docblocks del puerto y una línea de `batch-movement-prisma.ts`—. Limpiadas, sin tocar una línea de código. Los comentarios **preexistentes no se arrastran**. Comprobado sobre el diff de la rama: **la única cita que quedaba en producción era la cabecera de enmiendas de `error-codes.ts`**, que es un registro histórico y ya citaba las seis anteriores.
+
+> **CORRECCIÓN del 2026-09-18 (vuelta de review).** Esa frase **dejó de ser cierta en T13bis**, que reescribió el docblock de `product-list-section.tsx` y lo dejó con un `**R5**` dentro. No se escribió en pasado por precisión: se escribió como si valiera para siempre, y nadie volvió a medirla. El reviewer la cazó. Limpiada en `451b8c9`, commit de **solo comentarios**, y vuelta a medir sobre el diff de producción de toda la rama: la única cita que queda hoy es la de `error-codes.ts`. **Tercera vez en esta ficha.**
 
 ### Medición pedida sobre la Cara B de R31 — **el leader tenía razón** (`55b00d1`)
 
@@ -1069,7 +1071,7 @@ Ninguno sin test.
 | R15 | **`inventory-movements-migration` «R15(a): el SQL no ofrece ninguna via de UPDATE ni DELETE…» y «R15(b): las unicas operaciones sobre inventoryMovement bajo lib/ son exactamente create y findMany»** |
 | R16 | **`inventory-movements-migration` «R16: todo identificador creado por la migracion es snake_case en ingles» y «R16: la migracion no anade marca de borrado…»** · `qc91-alcance` «R21: product-prisma.ts no borra, reemplaza en bloque ni multiplica filas de product_batches» |
 | R17 | `guard-rls-force` «toda tabla creada tiene RLS activado y forzado» (descubre las tablas del SQL, no de una lista fija) · `inventory-movements-migration` R11 (company_id NOT NULL) y R31 (las tres FK y los tres índices) · `inventory-movements-constraints` «rechaza un asiento cuya empresa no coincide… (R19)» |
-| R18 | `adjust-batch-stock` «R18: el puerto devuelve null y el caso de uso lanza BatchNotFoundError», «R18: cambiar de actor cambia la empresa que llega al puerto», «R18: el producto inexistente, borrado o ajeno vuelve como lista vacia», «R18: el lote inexistente o ajeno devuelve null…», «R18: el ambito de la lectura sale del actor» · `batch-movement-prisma` «findBatchMovements (R18)» · `batch-actions` «R18 — el actor sale de la sesion del servidor» y «R18 — una empresa colada en el FormData no cambia el actor» · `guard-ambito-empresa-inventario` (los métodos nuevos del puerto declaran y consumen el ámbito) |
+| R18 | **`company-scope-queries` (integracion, Postgres real, dos empresas A y B): «adjustBatchStock sobre el lote de B desde A devuelve null y NO toca la fila ni escribe asiento» + su control positivo, «findBatchesOfAliveProduct del producto de B pedido desde A trae la lista vacia» + su control positivo, y «findBatchMovements del lote de B pedido desde A es `null`» + su control positivo** — los seis, y son los que prueban R18 DE VERDAD: el camino de escritura `update({ where: { id, companyId } })` contra la base, no contra un mock · `adjust-batch-stock` «R18: el puerto devuelve null y el caso de uso lanza BatchNotFoundError», «R18: cambiar de actor cambia la empresa que llega al puerto», «R18: el producto inexistente, borrado o ajeno vuelve como lista vacia», «R18: el lote inexistente o ajeno devuelve null…», «R18: el ambito de la lectura sale del actor» (unidad, con Prisma mockeado: demuestran que el codigo PASA la empresa, no que Postgres la honre) · `batch-movement-prisma` «findBatchMovements (R18)» · `batch-actions` «R18 — el actor sale de la sesion del servidor» y «R18 — una empresa colada en el FormData no cambia el actor» · `guard-ambito-empresa-inventario` (los metodos nuevos del puerto declaran y consumen el ambito) |
 | R19 | `inventory-movements-constraints` «rechaza un asiento cuya empresa no coincide con la del lote, con el identificador del disparador (R19)» |
 | R20 | `adjust-batch-stock` «R20: rechaza sin permiso sin tocar el repositorio» y «R20: el permiso se mira ANTES de zod, incluso con entrada invalida» · `batch-actions` «R20 — el Operador, que solo consulta, recibe el error de autorizacion del ajuste» · `product-route-contract` «el caso de uso de ajuste exige el permiso ANTES de validar y ANTES de tocar el repositorio» |
 | R21 | `adjust-batch-stock` «R21: el Operador… SI puede listar los lotes» y «R21: un actor con solo inventario.modificar es rechazado» (x2) · `authorization` «R21 — canAdjustBatchStock» (4 casos, incluida la sesión caída) · `adjust-batch-dialog` «sin canAdjust el panel se ve pero el disparador del ajuste no existe en el DOM» · `product-batches-sheet` «canAdjust decide si el control de ajuste existe en el DOM» · **E2E** «quien solo tiene inventario.consultar ve el panel y el historial, pero el control de ajuste no existe en el DOM» |
@@ -1077,7 +1079,7 @@ Ninguno sin test.
 | R23 | `batch-history` «R23 — con asientos, muestra motivo, autor y fecha en el orden en que llegan, alta incluida» · `adjust-batch-stock` «R23: el autor que vuelve del directorio sale con su nombre mostrable» y «R23: el resto del asiento no se toca al resolver el autor» · **E2E** (recorrido feliz) |
 | R24 | `batch-history` «R24 — sin ningun asiento, dice que el lote es anterior al libro y no parece un error ni una lista» · `adjust-batch-stock` «R24: el lote sin asientos devuelve lista vacia y NO pregunta al directorio» |
 | R25 | `product-batches-panel` «multiplataforma: el disparador de la ranura de acciones cumple el objetivo tactil minimo (R25)» · `adjust-batch-dialog` «multiplataforma (R25): el disparador y los campos llevan area tactil, y el campo de cantidad lleva text-base» |
-| R26 | `qc91-alcance` «R21: el alta y el agregado de lote siguen creando; el unico update vive en adjustBatchStock» — la guardia R21 de QC-91 **ajustada**, con su nota fechada 2026-09-18 |
+| R26 | `qc91-alcance` «R21: el alta y el agregado de lote siguen creando; el unico update vive en adjustBatchStock» — la guardia R21 de QC-91 **ajustada**, con su nota fechada 2026-09-17 |
 | R27 | `qc91-alcance` «llamaAUpdateFueraDe — el update de adjustBatchStock queda aislado del resto (R27)»: 5 casos sobre fuentes fabricadas —update dentro (verde), el MISMO update movido a otra función (rojo), sin update (sin hallazgo), tipo de retorno con llave propia, y delete/deleteMany/SQL crudo siguen dando hallazgo— |
 | R28 | `guard-libro-de-inventario`, 13 casos: el censo en positivo, el asiento en cada camino, y los detectores probados con un cuarto camino fabricado, un camino sin su asiento y el asiento movido a otra función |
 | R29 | `ledger-cuadre` «cuadre del libro: stock = suma de asientos, para lotes posteriores a LEDGER_START (R29)», 4 casos, incluido el descuadre por SQL crudo que el cuadre **detecta** |
@@ -1356,3 +1358,174 @@ Contado sobre el archivo: 20 marcadas, **ninguna sin marcar**.
 - Cero dependencias nuevas.
 
 **No se abre el PR**: lo coordina el leader tras el `reviewer`.
+
+---
+
+## Vuelta de review (2026-09-18) — los TRES bloqueantes del reviewer, cerrados
+
+Informe: `progress/review_QC-92-ajuste-de-inventario.md`. Veredicto: **RECHAZADO**, tres
+bloqueantes, ninguno en el bloque de las guardias heredadas. Los tres eran **ciertos** y los tres
+se verificaron en disco antes de tocar nada. **Los ocho menores NO se tocan en esta vuelta**: los
+decide el leader.
+
+### B1 — faltaba el rechazo cruzado contra Postgres real. CERRADO (`88432f2`)
+
+**El bloqueante serio, y es de seguridad de datos.** `tests/integration/inventario/company-scope-queries.int.test.ts`
+es el archivo A/B que este repo usa exactamente para esto —dos empresas reales, cada escritura
+cruzada con **su control positivo**—, y la rama lo había tocado **solo** para añadir una línea de
+limpieza de FK. Medido: **cero casos** para `adjustBatchStock`, `findBatchesOfAliveProduct` y
+`findBatchMovements`. La única aparición de `adjustBatchStock` en integración era `ledger-cuadre`,
+**con una sola empresa**.
+
+Lo que quedaba sin probar era el camino de **ESCRITURA**: `tx.productBatch.update({ where: { id,
+companyId } })`. `companyId` **no es columna única**, así que que Prisma lo honre dentro del `where`
+de un `update` depende de su semántica, no de un `AND` que se lea en el SQL. Un mock demuestra que
+el código **pasa** la empresa, no que Postgres la **respete**. Sin ese filtro, **un ajuste
+escribiría en el lote de otra empresa**: `CHECKPOINTS.md > Datos y seguridad` y
+`docs/architecture.md > Dominio` n.º 1.
+
+**Seis casos nuevos**, con el patrón de sus vecinos de R16 —no uno inventado— y control positivo en
+cada uno:
+
+| Caso | Qué afirma contra la base |
+|---|---|
+| `adjustBatchStock` sobre el lote de B **desde A** | `null`, la fila de B releída **entera** (foto de todas las columnas, no solo `stock`: un `updated_at` movido no pasa) **sin cambiar**, y **cero** asientos nuevos en `inventory_movements` |
+| control positivo, **desde B** | `{ stock }` con el total esperado, la fila **sí** cambia y queda **exactamente un** asiento nuevo con su `kind` (`adjustment`), su `quantity` con signo, su `reason` y su `company_id` |
+| `findBatchesOfAliveProduct` del producto de B **desde A** | lista vacía |
+| control positivo, **desde B** | trae su lote |
+| `findBatchMovements` del lote de B **desde A** | `null` |
+| control positivo, **desde B** | no es `null` y trae el asiento que dejó el control positivo de arriba (dependencia de orden **declarada en el propio test**) |
+
+**Los tres cruzados distinguen, medido y no supuesto.** Cambiando en cada uno el ámbito cruzado por
+el propio, los tres se ponen rojos —y esta medición la repitió el implementer, no solo el subagente:
+
+```
+AssertionError: expected { stock: 8 } to be null
+AssertionError: expected [ { …(6) } ] to deeply equal []
+AssertionError: expected [ { …(6) } ] to be null
+```
+
+Mutaciones revertidas; el archivo vuelve a **34 passed (34)**.
+
+**Salida real**, contra base real —copia de la plantilla ya migrada con `CREATE DATABASE …
+TEMPLATE`, la receta de T16 y la que mantiene el propio gate, **no** la desfasada de QC-77—:
+
+```
+test-db: plantilla reutilizada: qct_tpl_5316b8e32d17 (las migraciones no han cambiado)
+test-db: la corrida de integracion va contra qct_qc92_d05e0ce0_mu75ux55_kk0 (copia de qct_tpl_5316b8e32d17).
+ Test Files  1 passed (1)
+      Tests  34 passed (34)
+```
+
+**R18 remapeado** en el mapa de trazabilidad a estos seis casos, que son los que lo prueban de
+verdad; los de unidad se quedan, pero **rotulados por lo que son**: con Prisma mockeado demuestran
+que el código pasa la empresa, no que la base la honre.
+
+#### La lección, y no es la del test que faltaba
+
+**Esta ficha había PREDICHO este agujero y lo perdió.** La bitácora de la tanda 3, en «Riesgo
+declarado», escribió que «`where: { id: batchId, companyId }` en `update()` no está probado contra
+Postgres real … **quien lo demuestra de verdad es el test de integración de T15**». Y **T15 no lo
+demuestra**, porque cuadra el libro con **una sola empresa**. Nadie volvió sobre ello: ni el cierre
+de la tanda 6 («desviaciones: ninguna») ni el mapa de T17 lo anotaron.
+
+Queda escrito aquí, con todas las letras: **una predicción correcta que no se persigue vale lo mismo
+que no haberla hecho.** El riesgo se declaró, se le asignó un dueño y el dueño no lo cubrió; declarar
+un riesgo no es mitigarlo, y una bitácora que lo declara y no lo cierra da una falsa sensación de
+cobertura que es **peor** que no haberlo escrito. Lo cazó el reviewer leyendo nuestra propia
+bitácora.
+
+### B2 — cita de requisito en producción. CERRADO (`451b8c9`)
+
+`app/(private)/inventario/components/product-list-section.tsx:38` conservaba `**R5**` en el JSDoc
+que **T13bis reescribió**. `docs/conventions.md > Comentarios` lo prohíbe sin excepciones y manda
+limpiar las líneas que la rama toca; la línea se tocó y salió con la cita puesta.
+
+Reescrito en prosa, **commit de solo comentarios: ni una línea de código**. Las citas
+**preexistentes** del mismo docblock (R14, R15, R16) **no se arrastran**.
+
+**Vuelto a medir sobre el diff de producción de toda la rama** (`git diff origin/dev...HEAD -- app
+lib db`): las únicas líneas añadidas que citan ficha o requisito son **las dos de la séptima
+enmienda de `error-codes.ts`**, que es el menor 8 del reviewer y que R32 exige con esas palabras. La
+afirmación de `934fe7c` vuelve a ser cierta, y arriba queda **corregida** en el sitio donde se
+escribió.
+
+**Es la tercera vez en esta ficha** (`934fe7c` limpió seis, la tanda 5 limpió una en
+`adjust-batch-dialog.tsx`). Tres veces es un patrón, no un descuido: el comentario se escribe
+citando el requisito porque el subagente tiene el requisito delante.
+
+### B3 — la rama no estaba sobre el `origin/dev` actual. CERRADO (`a92f40d`)
+
+`origin/dev` = `cbf0569`; `git merge-base HEAD origin/dev` daba `b625ca9`. Lo que `dev` ganó desde
+la base son **siete commits de solo bookkeeping** —`feature_list.json`, `progress/current.md` y
+`progress/history.md`—, **cero código** (`git diff --stat b625ca9 origin/dev`). Por eso el gate del
+reviewer seguía siendo válido para el código y el re-merge salía barato.
+
+**La trampa, que es lo que lo hacía bloqueante:** mergear sin cuidado **revierte en disco** el
+board. La rama no había tocado `feature_list.json` desde la base, así que un merge distraído lo deja
+en el estado **viejo**: QC-59 volvería de `done` a `in_progress` y QC-92 de `in_progress` a
+`pending`, **con la descripción anterior a `/afinar-feature`**. Es justo el archivo que
+`scripts/validate-features.mjs` valida en el gate, y contradice la regla 3 de `CLAUDE.md`.
+
+Resuelto así, y comprobado después sobre el archivo resultante:
+
+- **`feature_list.json` a favor de `dev`.** Verificado tras el merge: **QC-59 `done`** y **QC-92
+  `in_progress`** con su descripción **acotada el 2026-09-17** («16 decisiones cerradas, CERO
+  preguntas»). `git diff origin/dev -- feature_list.json` sale **vacío**.
+- **`progress/current.md`** (único conflicto): versión de `dev` y **reaplicado encima** el único
+  bloque nuestro —la deuda del gate rápido, 27 líneas—, sin pisar lo que escribieron las otras
+  sesiones. `git diff origin/dev -- progress/current.md` da **exactamente 27 inserciones y nada
+  más**.
+- **`progress/history.md`**: idéntico al de `dev`.
+
+### Gate COMPLETO sobre la rama ya re-mergeada — **un solo rojo, y es el heredado**
+
+`./init.sh` (completo, **sin** `--rapido`), sobre `88432f2`, con `origin/dev` ya dentro:
+
+```
+✓ las 108 fichas vienen del proyecto QC
+✓ regla max-2-por-zona respetada (in_progress=2)
+✓ specs presentes para features sdd en vuelo
+✓ base de desarrollo «QuimiCloude» al dia: 35 migracion(es) aplicada(s)
+✓ typecheck paso
+✓ lint paso
+
+ Test Files  1 failed | 544 passed (545)
+      Tests  1 failed | 7952 passed | 97 skipped (8050)
+   Duration  493.60s
+
+hay 1 archivo(s) de test en rojo que NO estan en el baseline:
+  tests/unit/pedidos-ui/order-form.test.tsx
+```
+
+**Es exactamente lo esperado y ni uno más.** Dos comprobaciones sobre esos números:
+
+- **8050 tests, contra los 8044 de la corrida del reviewer: +6 exactos**, que son los seis casos A/B
+  de B1. No entró ni se perdió nada por el camino.
+- **Ninguna guardia nueva se puso roja.** Un solo archivo en rojo en toda la suite, y no es de
+  `tests/guards/`. El contador de archivos de guardia tocados sigue en **ocho** —la corrección del
+  reviewer al siete de la bitácora— más las dos altas de censo. **No hay una novena.**
+
+**El rojo, medido y no aceptado de oídas:** `tests/unit/pedidos-ui/order-form.test.tsx`, «R14 — sin
+ningun lote, la existencia es 0 y el restante negativo se destaca como faltante»; espera `-0.201` y
+recibe `-0.2`. El archivo es **idéntico a `origin/dev`** (`git diff --quiet origin/dev` pasa) y el
+diff de rama sobre `tests/unit/pedidos-ui/`, `app/(private)/pedidos/` y `lib/modules/pedidos/` sale
+**vacío**. Causa: el **PR #85** (redondeo a dos decimales) cruzado con el caso R14 de QC-91. **No es
+de esta ficha.**
+
+**`tests/baseline-rojos.json` NO se ha tocado**, y sigue siendo deliberado: la fila le corresponde a
+quien arregle la deuda en `dev`. Es el **menor 7** del reviewer y **espera decisión del leader antes
+del PR**: o se arregla en `dev`, o alguien añade la fila con su motivo y su fecha. Dejar el PR rojo
+«porque ya sabemos por qué» es cómo un rojo deja de mirarse.
+
+### Lo que esta vuelta NO toca, y espera al leader
+
+- **Los ocho menores del informe**, íntegros. Excepción única y autorizada: el **menor 2**, un dato
+  falso en el mapa —fechaba la nota de `qc91-alcance.test.ts:409` el **18** cuando es del **17**—,
+  corregido arriba en la fila de R26. Un dato falso no es una opinión.
+- **Menor 4** (`authorName` transporta el identificador en la frontera del puerto): el reviewer pide
+  **ficha de seguimiento**, no solo una línea en la bitácora.
+- **Menor 7** (el baseline): decisión escrita antes de pasar la ficha a `done`.
+- **Menores 1 y 8** (la contradicción entre R26 y `conventions` §31, y el carve-out de la cabecera de
+  enmiendas): los cierra `/afinar-regla` **en frío**, no esta ficha.
+- **El PR no se abre.**
