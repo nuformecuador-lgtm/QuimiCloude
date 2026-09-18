@@ -31,8 +31,9 @@ Verifica:
    stack sin justificación en `design.md`, son BLOQUEANTES
    (`docs/architecture.md > Dependencias de terceros`).
 8. **Aislamiento por empresa:** si el diff añade un modelo a `db/schema.prisma`, debe llevar
-   su columna de empresa salvo que sea una de las tres del sistema (`users`, `roles`,
-   `document_types`). Y si toca consultas de datos de operación, cada una filtra por la
+   su columna de empresa salvo que su tabla este en la lista cerrada de exentas de
+   `docs/architecture.md > Dominio` (la hace cumplir `tests/guards/guard-empresa-en-esquema.test.ts`;
+   `users` no es exenta). Y si toca consultas de datos de operación, cada una filtra por la
    empresa de quien pide y existe un test que prueba que el acceso cruzado se rechaza.
    Falta cualquiera de las dos: BLOQUEANTE (`docs/architecture.md > Dominio` n.º 1).
 
