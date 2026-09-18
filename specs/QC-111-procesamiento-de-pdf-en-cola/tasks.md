@@ -10,7 +10,7 @@
 No es una task de escribir código: es la lista de lo que ya existe y que esta ficha **consume**. Si
 algo de aquí aparece reimplementado en el diff, es un rechazo.
 
-- [ ] Leer, y dar por consumido tal cual, lo que ya montaron **QC-106**, **QC-108** y **QC-109**:
+- [x] Leer, y dar por consumido tal cual, lo que ya montaron **QC-106**, **QC-108** y **QC-109**:
   - **Módulo `documentos` entero**: `index.ts` (barrel), `domain/`, `ports/`, `adapters/` y su bloque
     en `lib/composition/index.ts`. Esta ficha **añade** dentro; no reestructura.
   - **`domain/actor.ts`**: el tipo `Actor`, `requirePermission` y **`DOCUMENT_UPLOAD_PERMISSION`**. No
@@ -33,7 +33,7 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
   - **`lib/shared/request-scope.ts`** (`runInRequestScope`) y el traductor de errores de
     `@/lib/modules/errores`: los usa el driving, igual que `document-upload-actions.ts`.
   - **Las dos variables del bucket privado** ya declaradas en `.env.example`. No se duplican.
-- [ ] Abrir `progress/impl_QC-111.md` con esta lista, para que el reviewer pueda comprobar que
+- [x] Abrir `progress/impl_QC-111.md` con esta lista, para que el reviewer pueda comprobar que
       ninguno de esos archivos se reimplementó.
 - **Hecho:** el implementer ha leído los archivos de arriba y `progress/impl_QC-111.md` abre con esta
   lista, para que el reviewer pueda comprobar que ninguno se reimplementó.
