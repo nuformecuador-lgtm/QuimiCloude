@@ -128,7 +128,7 @@
   - `tests/unit/identity/route-guard-request-id.test.ts` y el resto de tests del middleware siguen
     en verde.
 
-- [ ] **T11 — Guardias.**
+- [x] **T11 — Guardias.**
   Depende de: T10, T13.
   Archivos: `tests/guards/guard-middleware-edge.test.ts` (solo añade), `tests/guards/guard-limite-de-peticiones.test.ts`.
   Hacer:
