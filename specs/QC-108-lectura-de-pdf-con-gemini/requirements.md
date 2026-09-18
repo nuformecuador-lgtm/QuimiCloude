@@ -20,7 +20,181 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+Notación EARS (`docs/specs.md`). **«El sistema»** aquí es el módulo **`documentos`** —que **ya
+existe** desde QC-106: su dominio, sus puertos y sus adaptadores driven— **más su cableado en
+`lib/composition`**. No hay modelo de datos que especificar: esta ficha **no toca `db/schema.prisma`**,
+no crea migración y no añade `down.sql` (D10).
+
+Las decisiones cerradas se citan como **`[D1]`…`[D12]`**, en el orden en que están escritas en
+`## Decisiones cerradas (no reabrir)`. **Son DOCE filas**, aunque el encargo hablara de once: se
+numeran por fila para que ninguna se quede sin requisito, igual que hizo QC-106 con su desajuste
+17/18. El desajuste se anota, no se resuelve por cuenta propia (regla 6 de `CLAUDE.md`), y la tabla
+no se toca.
+
+La **operación** a la que se refieren todos los requisitos es **una sola**: *leer un PDF con la IA,
+con un prompt dado y en uno de los dos modos*. Esta ficha no la invoca desde ninguna parte: la
+publica como capacidad y la consumirá **QC-111**.
+
+### La capacidad, su forma y sus dos modos
+
+**R1.** El sistema DEBE publicar la lectura de un PDF con la IA como capacidad del módulo
+`documentos` **detrás de un puerto**, implementado por un adaptador driven; el caso de uso y el
+dominio NO DEBEN conocer la librería concreta ni el nombre del proveedor. `[D8]`
+
+**R2.** El sistema DEBE recibir el **prompt** por parámetro en cada lectura, de quien la pide, y NO
+DEBE llevar ningún texto de prompt escrito en su código ni leerlo de ningún archivo de prompt —eso es
+**QC-109**—; SI el prompt llega ausente o en blanco, ENTONCES la lectura DEBE rechazarse **sin llamar
+al proveedor**.
+
+**R3.** CUANDO se pide una lectura, el sistema DEBE admitir **exactamente dos modos** —el PDF tal
+cual, o sus páginas ya convertidas a imagen— y NO DEBE ofrecer ningún tercer modo; SI llega un modo
+que no es uno de los dos, ENTONCES la lectura DEBE rechazarse **sin llamar al proveedor**. `[D11]`
+
+**R4.** CUANDO la lectura se pide en **modo imagen**, el sistema DEBE obtener las páginas invocando
+el **`PdfConverter` que QC-106 ya dejó montado** —contar páginas y renderizar a la resolución única
+del módulo—, y NO DEBE implementar ninguna conversión propia, NO DEBE añadir, renombrar ni cambiar
+ningún método de ese puerto y NO DEBE modificar su adaptador. `[D11]`
+
+**R5.** SI en modo imagen el PDF supera el **tope de páginas** ya declarado por el módulo, ENTONCES
+la lectura DEBE fallar **sin renderizar ninguna página y sin llamar al proveedor**; y el sistema NO
+DEBE volver a escribir ese tope, ni el de tamaño, ni la resolución: los **importa** de su definición
+única y no los duplica en ningún archivo nuevo. `[D11]`
+
+**R6.** CUANDO el proveedor responde, el sistema DEBE devolver **el texto tal cual lo escribió la
+IA** —sin recortarlo, reordenarlo, interpretarlo ni convertirlo en ninguna estructura— y NO DEBE
+devolver ningún dato derivado de ese texto. `[D3]`
+
+### El plazo, el fallo y los reintentos
+
+**R7.** El sistema DEBE imponer un **plazo máximo de 60 segundos** a cada lectura, y ese plazo DEBE
+estar escrito en **una sola definición** del módulo, no repetido en cada sitio que lo use. `[D1]`
+
+**R8.** SI el plazo se agota, o el proveedor no responde o falla, ENTONCES la lectura DEBE fallar
+**para ese archivo**, DEBE devolver el fallo a quien la pidió y NO DEBE afectar, revertir ni impedir
+la lectura de ningún otro archivo; el fallo NO DEBE descartarse en un `catch` vacío ni en silencio, y
+DEBE viajar diciendo qué operación falló y sobre qué ruta. `[D1]`
+
+**R9.** El sistema NO DEBE reintentar ninguna lectura: ante un fallo o un plazo agotado DEBE haber
+hecho **exactamente una** llamada al proveedor y devolver el fallo. Los reintentos son de **QC-111**.
+`[D1]`
+
+**R10.** CUANDO una lectura falla porque el proveedor no respondió, no estaba disponible o agotó el
+plazo, el sistema DEBE señalarlo con un **código de error estable propio**, distinto del de una
+entrada inválida y distinto del de un bug nuestro, de modo que la pantalla y el registro puedan
+distinguir un corte del proveedor; ese código es **`ai_unavailable`**. `[D2]`
+
+**R11.** SI se incorpora `ai_unavailable`, ENTONCES DEBE quedar declarado en **los dos archivos** del
+catálogo cerrado —la lista de códigos y el catálogo de mensajes—, con un texto propio **distinto del
+de todos los demás códigos**, y el sistema NO DEBE renombrar, retirar ni reordenar ningún código ya
+existente. `[D2]`
+
+**R12.** SI la enmienda de R11 **no se aprueba** en F1.4, ENTONCES el fallo de R10 DEBE señalarse con
+el código `unexpected` del catálogo vigente y DEBE quedar escrito que se pierde el matiz; en ningún
+caso el sistema DEBE emitir un código que no esté en el catálogo cerrado. `[D2]`
+
+### Configuración: la clave y el modelo
+
+**R13.** El sistema DEBE resolver la credencial del proveedor por **una sola variable de entorno del
+despliegue**, DEBE leerla **en el momento de la invocación** —nunca al importar el módulo, de modo que
+importar el adaptador sin invocarlo no falle—, DEBE declararla **vacía y documentada** en
+`.env.example` y NO DEBE incluir su valor escrito en el código ni en ningún archivo versionado.
+`[D4]`
+
+**R14.** El sistema NO DEBE admitir ninguna credencial **por empresa**: no crea tabla, ni columna de
+empresa, ni cifrado de credencial guardada, ni pantalla para cargarla. `[D4]`
+
+**R15.** El sistema DEBE resolver **el nombre del modelo** por variable de entorno, leída con el
+mismo criterio de R13, y NO DEBE llevarlo escrito en el código. `[D6]`
+
+**R16.** SI la variable del modelo falta o está vacía, ENTONCES la lectura DEBE fallar con un error
+**explícito que nombre la variable ausente**, NO DEBE caer a ningún modelo por defecto, NO DEBE
+continuar de forma degradada y NO DEBE incluir en el mensaje ningún valor de configuración. `[D6]`
+
+### Capacidad interna: ni ruta, ni permiso, ni pantalla
+
+**R17.** El sistema NO DEBE exponer esta capacidad como Server Action, Route Handler, ruta ni
+pantalla: esta ficha NO DEBE añadir ningún archivo bajo `app/**`, `components/**` ni `app/api/**`, ni
+ningún adaptador driving nuevo. La invoca por dentro el trabajo de la cola (**QC-111**). `[D5]`
+
+**R18.** El sistema NO DEBE comprobar ningún permiso en la lectura ni añadir ninguna entrada al
+catálogo cerrado de quince permisos de `identity`, y NO DEBE crear migración ni seed de permisos: el
+corte por permiso lo hizo la emisión de enlaces de subida de QC-106. `[D5]`
+
+**R19.** Esta feature NO DEBE aportar ningún recorrido navegable que un test E2E pueda visitar, por
+lo que su verificación DEBE ser **unitaria** y el E2E queda **diferido con motivo** a **QC-107**.
+`[D5]`
+
+**R20.** El sistema NO DEBE crear, leer ni escribir ninguna fila de base de datos, NO DEBE añadir
+ningún modelo a `db/schema.prisma`, ninguna migración y ningún `down.sql`. `[D10]`
+
+### Capas, borde, dependencia y aislamiento del tercero
+
+**R21.** El sistema DEBE atar el puerto nuevo a su adaptador **solo** en `lib/composition`; el
+`domain/` y los `ports/` de `documentos` NO DEBEN importar `@google/genai`, `next/*`,
+`@prisma/client`, `lib/shared/**` ni `lib/composition`. `[D8]` `[D12]`
+
+**R22.** El adaptador driven DEBE ser el **único** archivo de producción del repositorio que importa
+`@google/genai`; y construir la fachada del módulo en el punto de composición NO DEBE leer ninguna
+variable de entorno ni tocar la red. `[D7]` `[D8]`
+
+**R23.** El sistema DEBE validar con un **esquema** la entrada de la lectura —prompt y modo— antes de
+tocar ningún puerto, y NO DEBE dejar que ningún dato sin validar ni tipar cruce hacia el adaptador ni
+hacia el proveedor. `[D12]`
+
+**R24.** Los nombres de archivo y los símbolos que el sistema añada DEBEN estar en **inglés** y seguir
+las convenciones del repositorio; y NO DEBE introducir ningún identificador de base de datos, porque
+no crea ninguna tabla. `[D12]`
+
+**R25.** El sistema DEBE resolver la conversación con el proveedor con **`@google/genai`**, y NINGUNA
+dependencia nueva DEBE quedar instalada ni escrita en `package.json` **antes** de la aprobación
+humana y de su fila en `docs/dependencias.md`; NO DEBE incorporar ninguna dependencia con licencia
+fuera de MIT, Apache-2.0, BSD o ISC. `[D7]`
+
+### Verificación sin red
+
+**R26.** La verificación de esta feature DEBE poder ejecutarse **sin red y sin claves**: el puerto se
+sustituye por un doble, NINGÚN test DEBE llamar a Gemini ni a la red, y ningún test DEBE depender de
+que las variables de entorno del proveedor tengan valor. `[D9]`
+
+**R27.** El plazo de R7 DEBE poder ejercitarse en la suite **sin esperar 60 segundos reales**: el
+mecanismo que cuenta el tiempo DEBE ser sustituible desde el test, y NO DEBE existir ningún test que
+duerma el plazo de verdad. `[D1]` `[D9]`
+
+### Cobertura de las decisiones cerradas
+
+Cada fila de `## Decisiones cerradas (no reabrir)`, **en el orden en que está escrita**, con el
+requisito que la hace testeable. Ninguna queda sin `R<n>`.
+
+| # | Decisión cerrada | Requisito(s) |
+| --- | --- | --- |
+| D1 | **60 s** por lectura en una sola definición; falla ese archivo; **cero reintentos** aquí | R7, R8, R9, R27 |
+| D2 | Código **NUEVO `ai_unavailable`**, octava enmienda; plan B a `unexpected` si no se aprueba | R10, R11, R12 |
+| D3 | Devuelve **texto plano**, tal cual lo escribió la IA | R6 |
+| D4 | **UNA sola clave** del despliegue, por entorno, declarada vacía y leída en la invocación; **sin clave por empresa** | R13, R14 |
+| D5 | **Capacidad interna**: sin acción, ruta ni pantalla; el permiso lo corta QC-106; **E2E diferido con motivo** | R17, R18, R19 |
+| D6 | El **nombre del modelo** en variable de entorno, **obligatoria**, sin modelo por defecto | R15, R16 |
+| D7 | La librería es **`@google/genai`**; fila y aprobación en F1.4; nada se instala antes | R22, R25 |
+| D8 | Módulo **`documentos`**: puerto nuevo + adaptador driven; cableado solo en `lib/composition` | R1, R21, R22 |
+| D9 | **Se verifica sin red**, y es obligatorio: el puerto se sustituye por un doble | R26, R27 |
+| D10 | **Ninguna fila** en la base, sin modelo, sin migración y sin `down.sql` | R20 |
+| D11 | **No se re-implementa la conversión**: se reutiliza el `PdfConverter` de QC-106 con sus límites | R3, R4, R5 |
+| D12 | Capas, borde e identificadores: esquema en el borde, identificadores en inglés, cableado en `lib/composition` | R21, R23, R24 |
+
+Requisitos que **no** salen de una fila de la tabla, y de dónde salen:
+
+- **R2** del bloque de **Alcance** («recibiendo un **prompt personalizado** de quien llama»): la
+  tabla no dice de dónde viene el prompt, y sin este requisito nada impide que el texto acabe escrito
+  dentro del módulo, que es justo lo que pertenece a QC-109.
+- **R3** del bloque de **Alcance** («**Dos modos de lectura**») además de D11: D11 solo cierra que la
+  conversión no se re-implementa, no que los modos sean exactamente dos.
+- **R5** además de D11, de `CHECKPOINTS.md > Configuracion` y del anti-patrón de
+  `docs/architecture.md` sobre valores repetidos entre archivos: D11 fija los límites, pero no dice
+  que sigan viviendo en una sola definición cuando un archivo nuevo los use.
+- **R23** y **R24** se apoyan en D12 y en `docs/conventions.md` (validación en el borde, nombres);
+  D12 es una fila de una línea y la convención es la que da el detalle testeable.
+- **R26** y **R27** además de D9, de `docs/verification.md` —la suite corre **sin red**— y de
+  `CLAUDE.md > regla 5`: un plazo de 60 s probado durmiendo de verdad convertiría el gate en una sala
+  de espera, así que el mecanismo tiene que ser sustituible.
 
 ## Preguntas abiertas
 
