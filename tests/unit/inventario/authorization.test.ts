@@ -1,19 +1,24 @@
-// T9 -- El test de autorizacion de los NUEVE casos de uso de `inventario`, reescrito por
+// T9 -- El test de autorizacion de los DOCE casos de uso de `inventario`, reescrito por
 // QC-74 (requirements.md R12-R18; design.md > 5; tasks.md bloque E). Sustituye al barrido
 // por rol de QC-20/QC-54: ahora cada caso de uso exige un CODIGO del catalogo
 // (`inventario.consultar` / `inventario.modificar`), y este archivo es la unica red que
 // existe para R16/R17 -las guardias de texto no pueden ver si el codigo exigido es el
 // correcto (design.md > 6.2, ultimo parrafo)-.
 //
-// Sigue siendo un barrido de los nueve, con dobles de puerto que FALLAN si los llaman: un
+// AMPLIADO por QC-92 (T8): entran los tres casos de uso del libro de inventario
+// -`adjust-batch-stock`, `list-product-batches` y `list-batch-movements`-, y con ellos el puerto
+// de personas de `identity`, del que el historial saca el nombre del autor del asiento.
+//
+// Sigue siendo un barrido de los doce, con dobles de puerto que FALLAN si los llaman: un
 // service test de un solo caso de uso puede quedarse verde aunque la comprobacion
 // desaparezca de otro archivo (ya paso una vez en esta feature con `create-product.ts`).
 
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { PERMISSIONS, type PermissionCode } from '@/lib/modules/identity';
+import { PERMISSIONS, type PeopleDirectory, type PermissionCode } from '@/lib/modules/identity';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
+import { createAdjustBatchStock } from '@/lib/modules/inventario/domain/adjust-batch-stock';
 import { createCreatePresentation } from '@/lib/modules/inventario/domain/create-presentation';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
 import { createDeletePresentation } from '@/lib/modules/inventario/domain/delete-presentation';
@@ -25,6 +30,8 @@ import {
   UnauthorizedError,
 } from '@/lib/modules/inventario/domain/errors';
 import { createGetProduct } from '@/lib/modules/inventario/domain/get-product';
+import { createListBatchMovements } from '@/lib/modules/inventario/domain/list-batch-movements';
+import { createListProductBatches } from '@/lib/modules/inventario/domain/list-product-batches';
 import { createListPresentations } from '@/lib/modules/inventario/domain/list-presentations';
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
 import { createProductWithFirstBatchSchema } from '@/lib/modules/inventario/domain/product-batch-input';
@@ -83,6 +90,14 @@ const PRODUCTO_VALIDO_CON_LOTE = {
 const PRESENTACION_VALIDA = {
   name: 'Bidon 20 L',
   unitId: '11111111-1111-4111-8111-111111111111',
+};
+
+/** QC-92 (R3, R8): entrada valida minima del AJUSTE. Delta entero distinto de cero y motivo del
+ *  conjunto cerrado; el `batchId` es un uuid cualquiera porque aqui no hay base. */
+const AJUSTE_VALIDO = {
+  batchId: '22222222-2222-4222-8222-222222222222',
+  delta: 2,
+  reason: 'merma',
 };
 
 /** Entrada que zod rechaza sin dudarlo: es la que demuestra R12 -el permiso se mira ANTES
@@ -145,10 +160,28 @@ function logQueFalla(): ListQueryLog {
   };
 }
 
+/**
+ * QC-92 (T8): el historial del lote resuelve el nombre del autor contra el puerto de personas de
+ * `identity`. Mismo criterio que los repositorios: aqui EXPLOTA, porque sin permiso el caso de uso
+ * no puede haber llegado ni a preguntar por un nombre.
+ */
+function directorioQueFalla(): PeopleDirectory {
+  const explota = () => {
+    throw new Error('el directorio de personas no debe ser llamado');
+  };
+  return {
+    findAliveRefsInCompany: vi.fn<PeopleDirectory['findAliveRefsInCompany']>(explota),
+    findRefsIncludingDeletedInCompany: vi.fn<PeopleDirectory['findRefsIncludingDeletedInCompany']>(
+      explota,
+    ),
+  };
+}
+
 type Repos = {
   readonly products: ProductRepository;
   readonly presentations: PresentationRepository;
   readonly log: ListQueryLog;
+  readonly people: PeopleDirectory;
 };
 
 function montarReposQueFallan(): Repos {
@@ -156,6 +189,7 @@ function montarReposQueFallan(): Repos {
     products: repositorioProductoQueFalla(),
     presentations: repositorioPresentacionQueFalla(),
     log: logQueFalla(),
+    people: directorioQueFalla(),
   };
 }
 
@@ -209,6 +243,13 @@ function montarReposPermisivos(): Repos {
       list: vi.fn<PresentationRepository['list']>(async () => PAGINA_VACIA),
     },
     log: { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>(() => undefined) },
+    // Sin ningun nombre que devolver: el historial permisivo tampoco tiene asientos.
+    people: {
+      findAliveRefsInCompany: vi.fn<PeopleDirectory['findAliveRefsInCompany']>(async () => []),
+      findRefsIncludingDeletedInCompany: vi.fn<
+        PeopleDirectory['findRefsIncludingDeletedInCompany']
+      >(async () => []),
+    },
   };
 }
 
@@ -224,12 +265,20 @@ function todosLosMetodos(repos: Repos): ReadonlyArray<() => void> {
     () => expect(repos.products.findAliveIdByName).not.toHaveBeenCalled(),
     () => expect(repos.products.createWithFirstBatch).not.toHaveBeenCalled(),
     () => expect(repos.products.addBatchToAlive).not.toHaveBeenCalled(),
+    // QC-92 (T8): los tres del libro de inventario. Faltaban, y eran justo el hueco por el que un
+    // caso de uso nuevo se escaparia de esta red sin que nadie lo notara.
+    () => expect(repos.products.adjustBatchStock).not.toHaveBeenCalled(),
+    () => expect(repos.products.findBatchesOfAliveProduct).not.toHaveBeenCalled(),
+    () => expect(repos.products.findBatchMovements).not.toHaveBeenCalled(),
     () => expect(repos.presentations.create).not.toHaveBeenCalled(),
     () => expect(repos.presentations.replace).not.toHaveBeenCalled(),
     () => expect(repos.presentations.deleteById).not.toHaveBeenCalled(),
     () => expect(repos.presentations.list).not.toHaveBeenCalled(),
     // QC-57 R34 / QC-74 R12: sin permiso no se toca el repositorio NI se registra nada en el log.
     () => expect(repos.log.ignoredFields).not.toHaveBeenCalled(),
+    // QC-92: sin permiso tampoco se pregunta por el nombre del autor de ningun asiento.
+    () => expect(repos.people.findAliveRefsInCompany).not.toHaveBeenCalled(),
+    () => expect(repos.people.findRefsIncludingDeletedInCompany).not.toHaveBeenCalled(),
   ];
 }
 
@@ -240,11 +289,11 @@ function afirmarQueNingunMetodoFueLlamado(repos: Repos): void {
 type Invocacion = (repos: Repos, actor: Actor | null | undefined) => Promise<unknown>;
 
 /**
- * La tabla de R16 hecha codigo: los NUEVE casos de uso con el codigo EXACTO que cada uno
+ * La tabla de R16 hecha codigo: los DOCE casos de uso con el codigo EXACTO que cada uno
  * exige. Recorrerla en bucle es lo que hace que anadir un caso de uso manana sea trivial y
  * olvidarlo aqui, visible. `invocar` recibe el repositorio como parametro (no capturado por
  * closure), asi cada iteracion monta un repositorio NUEVO y el aislamiento es real.
- * `invocarConEntradaInvalida` es `null` en los tres casos que no reciben entrada validable
+ * `invocarConEntradaInvalida` es `null` en los casos que no reciben entrada validable
  * -solo un identificador-.
  */
 const CASOS_DE_USO: ReadonlyArray<{
@@ -332,6 +381,28 @@ const CASOS_DE_USO: ReadonlyArray<{
         actor,
       ),
   },
+  {
+    nombre: 'adjust-batch-stock',
+    permiso: MODIFICAR,
+    invocar: (repos, actor) =>
+      createAdjustBatchStock({ products: repos.products })(AJUSTE_VALIDO, actor),
+    invocarConEntradaInvalida: (repos, actor) =>
+      createAdjustBatchStock({ products: repos.products })(ENTRADA_INVALIDA, actor),
+  },
+  {
+    nombre: 'list-product-batches',
+    permiso: CONSULTAR,
+    invocar: (repos, actor) =>
+      createListProductBatches({ products: repos.products })('producto-1', actor),
+    invocarConEntradaInvalida: null,
+  },
+  {
+    nombre: 'list-batch-movements',
+    permiso: CONSULTAR,
+    invocar: (repos, actor) =>
+      createListBatchMovements({ products: repos.products, people: repos.people })('lote-1', actor),
+    invocarConEntradaInvalida: null,
+  },
 ];
 
 const CASOS_DE_LECTURA = CASOS_DE_USO.filter((caso) => caso.permiso === CONSULTAR);
@@ -378,8 +449,8 @@ async function esperarConcesion(
  * ser entrada valida-, todo lo de abajo seguiria en verde midiendo otra cosa.
  */
 describe('QC-74 R16 — la tabla que se barre es la tabla del requisito', () => {
-  it('cubre los nueve casos de uso: seis de modificacion y tres de consulta', () => {
-    expect(CASOS_DE_USO).toHaveLength(9);
+  it('cubre los doce casos de uso: siete de modificacion y cinco de consulta', () => {
+    expect(CASOS_DE_USO).toHaveLength(12);
     expect(CASOS_DE_ESCRITURA.map((caso) => caso.nombre)).toEqual([
       'create-product',
       'update-product',
@@ -387,11 +458,14 @@ describe('QC-74 R16 — la tabla que se barre es la tabla del requisito', () => 
       'create-presentation',
       'update-presentation',
       'delete-presentation',
+      'adjust-batch-stock',
     ]);
     expect(CASOS_DE_LECTURA.map((caso) => caso.nombre)).toEqual([
       'get-product',
       'list-products',
       'list-presentations',
+      'list-product-batches',
+      'list-batch-movements',
     ]);
   });
 
@@ -461,7 +535,7 @@ describe('QC-74 R12/R15 — rechazo sin el permiso exigido, sin efectos y con el
     // aqui saldria `ValidationError` -y un actor sin permiso habria averiguado algo del
     // sistema que no tenia derecho a preguntar-.
     const conEntrada = CASOS_DE_USO.filter((caso) => caso.invocarConEntradaInvalida !== null);
-    expect(conEntrada).toHaveLength(6);
+    expect(conEntrada).toHaveLength(7);
 
     for (const caso of conEntrada) {
       const invocar = caso.invocarConEntradaInvalida;
@@ -477,8 +551,8 @@ describe('QC-74 R12/R15 — rechazo sin el permiso exigido, sin efectos y con el
 });
 
 describe('QC-74 R13 — pertenencia exacta, sin jerarquia ni implicacion entre permisos', () => {
-  it('un actor con solo inventario.consultar es rechazado en los seis casos de escritura', async () => {
-    expect(CASOS_DE_ESCRITURA).toHaveLength(6);
+  it('un actor con solo inventario.consultar es rechazado en los siete casos de escritura', async () => {
+    expect(CASOS_DE_ESCRITURA).toHaveLength(7);
 
     for (const caso of CASOS_DE_ESCRITURA) {
       await esperarRechazoSinEfectos(
@@ -489,8 +563,8 @@ describe('QC-74 R13 — pertenencia exacta, sin jerarquia ni implicacion entre p
     }
   });
 
-  it('un actor con solo inventario.modificar es rechazado en los tres casos de lectura', async () => {
-    expect(CASOS_DE_LECTURA).toHaveLength(3);
+  it('un actor con solo inventario.modificar es rechazado en los cinco casos de lectura', async () => {
+    expect(CASOS_DE_LECTURA).toHaveLength(5);
 
     for (const caso of CASOS_DE_LECTURA) {
       await esperarRechazoSinEfectos(
@@ -544,7 +618,7 @@ describe('QC-74 R14 — falla cerrado', () => {
     },
   ];
 
-  it('un actor ausente, sin conjunto de permisos o con el conjunto vacio es rechazado en los nueve', async () => {
+  it('un actor ausente, sin conjunto de permisos o con el conjunto vacio es rechazado en los doce', async () => {
     for (const { etiqueta, actor } of actoresInvalidos) {
       for (const caso of CASOS_DE_USO) {
         await esperarRechazoSinEfectos(
@@ -626,7 +700,7 @@ describe('R1 / QC-74 R18 — el actor entra por parametro y no trae nombre de ro
 // derecho a hacer. El requisito lo fija al reves: permiso PRIMERO, en la primera linea, antes de
 // zod y antes de tocar el repositorio; la empresa FILTRA y no AUTORIZA.
 //
-// Se reusa la tabla de los nueve y `esperarRechazoSinEfectos`, que ya afirma que ningun metodo
+// Se reusa la tabla de los doce y `esperarRechazoSinEfectos`, que ya afirma que ningun metodo
 // del puerto se llamo: es justo lo que hace visible que el ambito NUNCA llego a la consulta.
 describe('QC-49 R24 — el permiso va antes que el ambito de empresa', () => {
   /** Sin permiso Y de otra empresa: los dos motivos de rechazo a la vez, para ver cual gana. */
