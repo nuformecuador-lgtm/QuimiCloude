@@ -510,6 +510,30 @@ porque es validacion de entrada y no una regla nueva de dominio.
 
 ## Deudas y cosas abiertas
 
+### El worktree de QC-108 quedó a medio borrar — OCTAVA vez, y el patrón ya no admite dudas (2026-09-18)
+
+`./scripts/wt.sh done QC-108-lectura-de-pdf-con-gemini` falló con
+`fatal: '...' is not a working tree` y el aviso `¿archivo en uso en Windows?`. Resultado: el
+worktree **queda desregistrado de git** —no sale en `git worktree list`— **pero el directorio sigue
+en disco**, con `progress/`, `specs/`, `tests/` y `node_modules` a medias. `lib/` sí se borró.
+
+**No hay nada que perder, y está comprobado**: no queda `.git`, la rama
+`feature/QC-108-lectura-de-pdf-con-gemini` **figura en `git branch --merged dev`**, el PR #87 está
+mergeado (`1a95e9a`) y el árbol estaba limpio en el último commit. El único archivo suelto es
+`_i.txt`, **un log de una corrida de QC-77 del 2026-09-12** que lleva arrastrándose entre worktrees.
+
+**No se borró a mano** porque la regla de oro de `wt.sh` es «ante la duda, NO borra» y un borrado no
+se deshace. Se borra con `rm -rf .worktrees/QC-108-lectura-de-pdf-con-gemini` y
+`git branch -d feature/QC-108-lectura-de-pdf-con-gemini` cuando el humano lo diga.
+
+**Lo que este octavo caso añade a los siete anteriores**: el fallo **no** es aleatorio ni es sólo
+«archivo en uso». `wt.sh` desregistra ANTES de borrar el directorio, así que cuando el borrado falla
+—y en Windows falla con `node_modules` abierto por cualquier proceso— el estado resultante es el
+peor de los dos: git ya no lo conoce, así que **ninguna corrida futura de `wt.sh` lo va a volver a
+intentar**, y el directorio se queda para siempre. Por eso van ocho y ninguno se ha recuperado solo.
+La salida limpia es invertir el orden —borrar primero, desregistrar después— o desregistrar sólo si
+el borrado tuvo éxito. Es material para `/afinar-regla`, junto con lo del baseline y los plazos.
+
 ### El gate completo da un rojo que NO es rojo: `product-page.test.tsx` se pasa de los 20s bajo carga (2026-09-18)
 
 `./init.sh` completo del 2026-09-18 salio con **1 fallo de 7864 tests** y lo declaro como rojo nuevo
