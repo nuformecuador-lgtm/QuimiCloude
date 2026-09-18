@@ -705,6 +705,7 @@ describe('contrato de la ruta de recetas', () => {
 
   it('la feature no toca lib/modules/recetas ni db/', () => {
     let diff: string[] = [];
+    let rangoDisponible = true;
     try {
       const salida = execSync('git diff --name-only origin/dev...HEAD', {
         cwd: RAIZ,
@@ -712,14 +713,24 @@ describe('contrato de la ruta de recetas', () => {
       });
       diff = salida.split('\n').map((linea) => linea.trim()).filter((linea) => linea.length > 0);
     } catch {
-      // Sin rango no se ha comprobado nada: el `diff` vacio pone el caso rojo abajo.
-      diff = [];
+      rangoDisponible = false;
     }
 
     expect(
-      diff.length,
+      rangoDisponible,
       'el rango git origin/dev...HEAD no estaba disponible: este caso no ha comprobado nada',
-    ).toBeGreaterThan(0);
+    ).toBe(true);
+
+    // Esta comprobacion protege la ruta de recetas-ui, no cualquier rama del repo: un diff
+    // vacio de esa carpeta no significa "nada que revisar", significa que quien corre este
+    // archivo no es la dueña de la ruta y no le corresponde afirmar nada sobre lib/modules/recetas
+    // ni db/ -afirmarlo igual la convertia en un barrido global que se disparaba con cualquier
+    // rama ajena que tocara ese modulo por un motivo legitimo propio-.
+    const carpetaRutaPosix = `${enRutaDePosix(CARPETA_RUTA)}/`;
+    const tocaLaRuta = diff.some((ruta) => ruta.startsWith(carpetaRutaPosix));
+    if (!tocaLaRuta) {
+      return;
+    }
 
     // Una entrada cuyo archivo se borro o renombro dejaria la ruta abierta sin que nadie lo note.
     for (const ruta of [...RECETAS_PERMITIDAS, ...DB_PERMITIDAS]) {
@@ -982,6 +993,16 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
   const UNICO_MONTADOR = enRutaDePosix(join(COMPONENTES_PATH, 'recipe-form.tsx'));
 
   /**
+   * SEGUNDO montador, anadido el 2026-09-17: la pantalla de ejecucion de un pedido asignado lo
+   * MONTA por props, que es lo que la cabecera del propio asistente dejo previsto -«podra montarlo
+   * pasandole otro `onFinish` sin tocar una linea de aqui»-. R12 sigue intacta: lo que prohibe es
+   * que el asistente tenga RUTA PROPIA, no que se monte desde otra pantalla. Se nombra el archivo
+   * EXACTO, nunca la carpeta.
+   */
+  const MONTADOR_DE_EJECUCION =
+    'app/(private)/asignacion/[id]/components/order-execution-screen.tsx';
+
+  /**
    * Por nombre y no por carpeta: un test nuevo que lo montase en otro sitio tiene que salir en la
    * lista. Este mismo archivo esta porque escribe el nombre para poder prohibirlo.
    */
@@ -989,6 +1010,7 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     'tests/unit/recetas-ui/step-reader.test.tsx',
     'tests/unit/recetas-ui/recipe-route-contract.test.ts',
     'tests/guards/guard-editor-aislado.test.ts',
+    'tests/unit/asignaciones-ui/order-execution-screen.test.tsx',
   ] as const;
 
   it('ninguna page.tsx del repo monta el asistente', () => {
@@ -1033,6 +1055,14 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'ASSIGNED_ORDERS_ROUTE',
         'CREDENTIAL_SETUP_ROUTE',
         'DASHBOARD_ROUTE',
+        // Alta el 2026-09-17: la trae el aviso de entrega de QC-63. NO es una ruta ni una funcion
+        // de ruta: es el NOMBRE DE UN PARAMETRO DE CONSULTA de la lista de pedidos asignados
+        // (`?entregado=<numero>`), que la pantalla de ejecucion pone al volver y la lista lee para
+        // pintar la confirmacion. Verificado antes de darla de alta: no estrena ninguna ruta del
+        // asistente de lectura -no la marca el patron de arriba ni apunta a ninguna URL-, asi que
+        // R12 de QC-64 sigue INTACTA. La lista sigue siendo CERRADA y por igualdad exacta: una
+        // constante mas vuelve a ponerla en rojo.
+        'DELIVERED_ORDER_PARAM',
         'FORGOT_PASSWORD_ROUTE',
         'FORMULAS_ROUTE',
         'INVENTORY_ROUTE',
@@ -1070,7 +1100,7 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
       }
     }
 
-    expect(importadores.sort()).toEqual([UNICO_MONTADOR]);
+    expect(importadores.sort()).toEqual([MONTADOR_DE_EJECUCION, UNICO_MONTADOR].sort());
   });
 
   it('el listado del catalogo no enlaza ni menciona el asistente', () => {

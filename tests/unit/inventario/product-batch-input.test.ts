@@ -331,4 +331,18 @@ describe('createProductWithFirstBatchSchema', () => {
       createProductWithFirstBatchSchema.safeParse({ ...VALIDA, stock: 0 }).success,
     ).toBe(true);
   });
+
+  it('R10: el alta sigue aceptando y exigiendo la existencia como entero de 0 o mas', () => {
+    expect(createProductWithFirstBatchSchema.safeParse({ ...VALIDA }).success).toBe(true);
+
+    const sinExistencia: Record<string, unknown> = { ...VALIDA };
+    delete sinExistencia.stock;
+    expect(createProductWithFirstBatchSchema.safeParse(sinExistencia).success).toBe(false);
+    expect(
+      createProductWithFirstBatchSchema.safeParse({ ...VALIDA, stock: -1 }).success,
+    ).toBe(false);
+    expect(
+      createProductWithFirstBatchSchema.safeParse({ ...VALIDA, stock: 1.5 }).success,
+    ).toBe(false);
+  });
 });

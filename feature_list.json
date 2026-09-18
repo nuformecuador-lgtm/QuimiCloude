@@ -884,7 +884,7 @@
       "epic_name": "Recetas",
       "name": "ejecutar-receta-operador",
       "description": "El Operador abre un pedido que tiene ASIGNADO y sigue su receta paso a paso desde su propia direccion, enlazable y recargable, sin pasar por el formulario de edicion y sin poder modificar nada. El componente que presenta la receta como formulario de un paso por pantalla -Anterior, Siguiente, Finalizar, y elementos que se marcan- ya existe: lo construyo QC-64 recibiendo todo por props, y esta ficha lo MONTA, no lo reescribe.\n\nREESCRITA EL 2026-09-08 al acotarla con /afinar-feature. La version anterior daba por hecho que el Operador navegaria el catalogo de recetas y que habia que abrirle el permiso de consultar recetas. Es al reves: el Operador no navega recetas, ve SUS PEDIDOS ASIGNADOS y ejecuta la receta de uno de ellos. El permiso no es de recetas sino del modulo nuevo de asignacion (QC-86). Darle consultar recetas le abriria tambien el listado y el formulario de edicion, que es justo lo que esta ficha dice que no debe pasar.\n\nEJECUTAR MUEVE EL ESTADO DEL PEDIDO. Abrirlo lo pone EN_CURSO y Finalizar lo pone ENTREGADO, a traves del caso de uso de transicion de pedidos (QC-34) y no escribiendo la columna por su cuenta. El operario que prepara la mezcla es quien mejor sabe cuando arranco y cuando esta lista.\n\nLAS CANTIDADES NO SE ESCALAN. La pantalla muestra el factor bien visible y fijo -\"Pedido 250 L, receta para 100 L, x2,5\"- y las lineas y los pasos TAL COMO ESTAN ESCRITOS. Escalar solo las lineas seria peor que no escalar: los pasos de QC-62 son texto libre, y si el autor escribio \"cargar el reactor con 90 L de agua\" dentro de un parrafo, ese numero no se puede escalar sin adivinar. La pantalla mostraria 225 L en la lista y 90 L en el paso que el operario esta leyendo. Ninguna cifra de esta pantalla se contradice con otra porque ninguna se toca.\n\nSE PUEDE CAMBIAR LA UNIDAD EN QUE SE VEN LAS CANTIDADES: ver la misma linea en litros o en mililitros, para no obligar a nadie a hacer la conversion de cabeza en planta. Cambia SOLO como se ve; no altera la receta ni el pedido. ESTA FICHA ES EL PRIMER CONSUMIDOR DE LA CONVERSION ENTRE UNIDADES que construyo QC-76 y que hasta hoy no usaba nadie: solo se ofrecen unidades que comparten base efectiva, asi que ofrecer una conversion imposible es un error y no un resultado raro.\n\nAL TERMINAR se muestra una confirmacion visible en pantalla y se vuelve al listado de pedidos asignados. No se guarda nada de lo marcado.\n\nEL BLOQUEO DE SIGUIENTE NO TIENE VIA DE ESCAPE: no se avanza hasta marcar todos los elementos del paso, tal como lo construyo QC-64. Esto cierra la pregunta abierta 1 de QC-64, que estaba escrita esperando a esta ficha.\n\nLo que NO entra: los grupos de trabajo (QC-83, QC-84, QC-85); la tabla de asignacion y asignar desde el pedido (QC-86, QC-87); el listado de pedidos asignados (QC-88), donde esta ficha empieza. Registrar quien marco que y cuando sigue FUERA DE ALCANCE y esta acotacion no le crea ficha.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "high",
       "zone": "fullstack",
@@ -972,7 +972,7 @@
       "epic_name": "Pedidos",
       "name": "busqueda-y-total-en-el-listado-de-pedidos",
       "description": "El listado de pedidos es la unica de las siete listas del ERP que no busca. QC-57 lo dejo con searchable:false a proposito y lo escribio en ORDER_QUERYABLE: la tabla orders no tiene columna name, y el nombre de la receta no vive ahi -lo resuelve el caso de uso pidiendoselo al modulo de recetas, con una consulta por pagina-. Esta ficha le da a pedidos lo que le falta, y son dos cosas que caen en la misma consulta.\n\nBUSCAR POR NOMBRE DE RECETA. Escribir \"buffer\" devuelve los pedidos cuya receta se llama asi. Se aplica sobre el conjunto completo y nunca sobre la pagina ya traida, como manda el contrato generico de QC-57, e ignora acentos y mayusculas igual que las otras seis listas. Que la comparacion se resuelva cruzando tablas o denormalizando el nombre en orders es decision del diseno, no de esta descripcion.\n\nEL TOTAL DEL PEDIDO, CALCULADO EN EL SERVIDOR. Hoy la consulta devuelve cantidad y precio unitario por separado y nadie multiplica. QC-34 dejo esto escrito como su pregunta abierta 3 y lo remitio a la pantalla; al acotar QC-35 el 2026-09-06 se decidio que el total se muestra, pero que lo calcula el servidor y NO la pantalla: los dos importes son Decimal(14,4) y multiplicarlos con el tipo numerico de JavaScript pierde precision, mientras que en el servidor Prisma ya opera decimales. La consulta devuelve el total como cadena decimal, igual que los otros dos importes. Asi NO entra decimal.js ni ninguna otra dependencia nueva.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO: si el total tambien se puede ordenar y filtrar. Anadirlo a ORDER_QUERYABLE obliga a que exista como expresion en la base, no solo en la salida.\n\nLA MIGRACION LLEVA SU DOWN y los indices que la busqueda necesite, mismo criterio con el que QC-57 metio los suyos: ordenar o buscar por un campo sin indice es el anti-patron que el reviewer rechaza en cuanto las tablas crezcan.\n\nLos tests que hoy pasan tienen que seguir pasando.\n\nLA PANTALLA VA APARTE. QC-35 se especifico y se construye SIN busqueda y SIN total, por decision del humano del 2026-09-06, justamente para no quedar bloqueada por esta ficha ni nacer con una caja de busqueda y una columna que no hacen nada. Enchufar las dos cosas en la pantalla de pedidos es una ficha de frontend posterior, que se crea cuando esta este done.",
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
@@ -1354,7 +1354,7 @@
       "epic_name": "Inventario",
       "name": "existencia-por-lote",
       "description": "La existencia deja de ser un numero escrito a mano en el producto y pasa a ser la SUMA de sus lotes, calculada al consultar y UNA POR UNIDAD.\n\nNace el 2026-09-10 al acotar QC-90 con /afinar-feature (decision textual del humano: «quita el stock de product, manda lote»). ACOTADA EL 2026-09-15 con /afinar-feature. Decisiones completas en `specs/QC-91-existencia-por-lote/requirements.md`.\n\nDECISIONES CERRADAS (2026-09-10 y 2026-09-15):\n\n* Manda el lote: `products.stock` se QUITA. El listado PIERDE, por ahora, el orden y el filtro por existencia. Corregir una existencia es QC-92, no la edicion del producto, que deja de mostrarla y escribirla.\n* La existencia de un lote es CANTIDAD EN LA UNIDAD de su presentacion: 10 en «Bolsa 5 KG» son 10 kg, no 10 bolsas. Sigue siendo entera.\n* Suman TODOS los lotes, vencidos incluidos. Se calcula al consultar y NO se guarda.\n* Lotes en unidades distintas: una existencia POR UNIDAD («10 kg · 20 L»), sin convertir. Lotes de la misma unidad se suman aunque la presentacion difiera.\n* Producto sin lotes: existencia 0.\n* El «restante» del pedido se calcula contra la existencia en la unidad de la linea de receta; con lotes pero ninguno en esa unidad, «—».\n* La alerta de cantidad se compara contra la existencia en la unidad del producto, la de su lote mas reciente (QC-80).\n* `products.stock` se quita SIN comprobar si hay productos con existencia y sin lotes (riesgo aceptado, como QC-81 P1).\n* Una sola ficha fullstack: quitar la columna rompe al compilar el formulario y el listado.\n* E2E obligatorio: agregar un segundo lote a un producto existente y ver subir su existencia.\n\nBLOQUEADA POR QC-81, que cambia el esquema de lotes (lote obligatorio, fecha de compra) y comparte con esta siete archivos.\n\nALCANCE MEDIDO EL 2026-09-15: `stock` aparece en 21 archivos de `lib/` y `app/` (inventario, recetas, pedidos) mas la base, no en diez.\n\nNO ENTRA: ajuste de inventario (QC-92), fecha y lote en el panel de alta (QC-103), conversion entre unidades (QC-63), recuperar orden y filtro por existencia, consumo por lote y aviso de vencimiento.\n\nCERRADA EL 2026-09-17: un producto SIN LOTES SI marca la alerta. Su existencia es 0 y 0 es menor que cualquier cantidad de alerta configurada; no hace falta unidad, porque no hay mas que una existencia que mirar. Sin alerta configurada, no se marca. QUEDAN CERO PREGUNTAS ABIERTAS.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "high",
       "zone": "fullstack",
@@ -1374,7 +1374,7 @@
       "description": "Corregir la existencia de un producto registrando un MOVIMIENTO de ajuste que suma o resta, en vez de sobrescribir un numero.\n\nNace el 2026-09-10 al acotar QC-90 con /afinar-feature. La pregunta que la destapo fue concreta: alguien carga 100 bidones por error y la existencia ya no vive en el producto sino en los lotes. El humano eligio el ajuste de inventario frente a las dos alternativas -editar el lote en una pantalla propia, o dejar que la edicion del producto tocara el ultimo lote-.\n\nPOR QUE VA DETRAS DE QC-91: mientras la existencia siga siendo un numero editable en el producto, el ajuste no tiene nada que resolver. Se vuelve necesario justo cuando la existencia pasa a ser la suma de los lotes.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO:\n\n* Si el ajuste se hace sobre un LOTE concreto o sobre el producto, y en ese segundo caso de que lote sale la diferencia.\n* Si el motivo del ajuste es obligatorio y si sale de una lista cerrada -merma, rotura, conteo fisico, error de carga- o es texto libre.\n* Que permiso lo corta: si basta `inventario.modificar` o el ajuste merece uno propio.\n* Si el movimiento es una tabla nueva de movimientos de inventario -que hoy NO existe- o solo una correccion registrada sobre el lote.\n* Si el ajuste puede dejar la existencia en negativo, y que pasa con los lotes ya consumidos.\n\n",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
+      "complexity": "high",
       "zone": "fullstack",
       "branch": "feature/QC-92-ajuste-de-inventario",
       "depends_on": [
@@ -1785,6 +1785,38 @@
       "branch": "feature/QC-120-rendimiento-de-la-receta",
       "depends_on": [],
       "spec_path": "specs/QC-120-rendimiento-de-la-receta"
+    },
+    {
+      "key": "QC-122",
+      "id": 122,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "busqueda-y-total-en-la-pantalla-de-pedidos",
+      "description": "Enchufar en la pantalla de pedidos la caja de busqueda por nombre de receta que QC-68 construye por debajo. NACE EL 2026-09-17 al acotar QC-68. CORREGIDA EL MISMO DIA: nacio llevando tambien la columna del total y ya no la lleva, porque `orders` no guarda precio unitario -lo borro QC-35bis- y de donde sale el precio es decision de negocio sin tomar, que vive en QC-123. EL E2E DE LA BUSQUEDA ES DE ESTA FICHA: QC-68 lo difirio aqui con motivo, porque sin caja que manejar no hay recorrido que ejercitar. NO reabre lo que QC-68 cerro. QUEDA ABIERTO: que ve el usuario mientras la busqueda esta en vuelo; que ve cuando no hay coincidencias -'no hay pedidos' y 'no hay pedidos que coincidan' no son lo mismo-; y si el termino se conserva al paginar y al volver de un detalle. NO ENTRA: la consulta, la migracion ni el indice (QC-68), ni el total (QC-123).",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-122-busqueda-y-total-en-la-pantalla-de-pedidos",
+      "depends_on": [
+        "QC-68"
+      ],
+      "spec_path": "specs/QC-122-busqueda-y-total-en-la-pantalla-de-pedidos"
+    },
+    {
+      "key": "QC-123",
+      "id": 123,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "el-total-del-pedido-decidir-donde-vive-el-precio",
+      "description": "Un pedido no sabe cuanto vale. Para poder mostrar un total hace falta antes decidir DE DONDE SALE EL PRECIO, y esa es una decision de negocio que hoy no esta tomada. NACE EL 2026-09-17 al escribir el spec de QC-68, que llevaba el total dentro: se verifico que `orders` tiene UN SOLO decimal, `quantity`, porque el precio unitario y la unidad los borro QC-35bis el 2026-09-07 por decision del humano -'un pedido es receta + cantidad'-. Ningun modelo guarda un precio de venta de receta. QUEDA ABIERTO: de donde sale el precio; que pasa con los pedidos ya hechos cuando el precio cambia -un pedido de marzo no deberia cambiar de importe porque en octubre suba la tarifa-; quien puede ver y editar el precio; si el total ademas se ordena y filtra -QC-68 lo cerro como 'solo se muestra', pero sobre un total calculado al vuelo-; y que se hace con los pedidos existentes en la migracion. YA DECIDIDO: el total se calcula en el servidor y viaja como cadena decimal, nunca multiplicado con el tipo numerico de JavaScript. NO ENTRA: la busqueda (QC-68) ni pintar el total en pantalla.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio",
+      "depends_on": [],
+      "spec_path": "specs/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio"
     }
   ]
 }

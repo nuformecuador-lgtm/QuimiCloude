@@ -649,6 +649,9 @@ function montarSobreBase(
       listAliveSummariesByIds: async () => {
         throw new Error('QC-88: no lo usa `assignResponsibles`');
       },
+      transitionAliveById: async () => {
+        throw new Error('QC-87: no lo usa `assignResponsibles`');
+      },
     },
     people: {
       findAliveRefsInCompany: async (_companyId: string, ids: readonly string[]) =>

@@ -9,6 +9,7 @@ import {
   type DataTableTexts,
 } from '@/components/shared/data-table';
 import type { ProductView } from '@/lib/modules/inventario';
+import type { UnitRef } from '@/lib/modules/unidades';
 
 import { DeleteProductDialog } from './delete-product-dialog';
 import { PRODUCT_DEFAULT_PINNED_COLUMNS, buildProductColumns } from './product-columns';
@@ -89,9 +90,11 @@ export type ProductTableProps = {
   /** Los parametros vigentes, los mismos con los que se pidio la lista. */
   readonly params: DataTableParams;
   readonly totalPages: number;
+  /** Catalogo de unidades, para resolver el simbolo de la existencia en la columna. */
+  readonly units?: readonly UnitRef[];
 };
 
-export function ProductTable({ products, params, totalPages }: ProductTableProps) {
+export function ProductTable({ products, params, totalPages, units }: ProductTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -107,8 +110,9 @@ export function ProductTable({ products, params, totalPages }: ProductTableProps
             <DeleteProductDialog product={product} />
           </>
         ),
+        units,
       }),
-    [],
+    [units],
   );
 
   /*

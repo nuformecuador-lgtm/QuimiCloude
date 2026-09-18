@@ -74,8 +74,11 @@ const BARREL_DE_LA_RUTA = `@/${CARPETA_DE_COMPONENTES}`;
  * |              | miembros, el panel que los junta y la confirmacion del borrado| 27 |
  * | QC-101 T5 | `end-user-sessions-dialog.tsx`: la confirmacion del cierre de todas las sesiones
  * |           | de otra persona, montada desde el panel de detalle | 28 |
+ * | 2026-09-17 | `user-create-action.tsx` y `work-group-create-action.tsx`: los dos disparadores
+ * |            | del alta, sacados de sus tablas para que se ofrezcan tambien con la lista
+ * |            | vacia —que es el estado en el que nace toda instalacion— | 30 |
  */
-const COMPONENTES_ESPERADOS = 28;
+const COMPONENTES_ESPERADOS = 30;
 
 /** Carpetas del repo que se barren buscando importes por ruta profunda (R38). */
 const CARPETAS_DEL_REPO = ['app', 'components', 'lib', 'tests'] as const;

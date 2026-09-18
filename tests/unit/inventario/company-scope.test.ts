@@ -157,7 +157,6 @@ describe('QC-49 R19 — la empresa entra en la consulta y no sale hacia el naveg
       id: 'product-1',
       name: 'Bidon 20 L',
       imagePath: null,
-      stock: 10,
       qtyAlert: 2,
       createdAt: new Date('2026-09-11T10:00:00.000Z'),
       updatedAt: new Date('2026-09-11T10:00:00.000Z'),
@@ -177,7 +176,7 @@ describe('QC-49 R19 — la empresa entra en la consulta y no sale hacia el naveg
       'latestBatchUnitId',
       'name',
       'qtyAlert',
-      'stock',
+      'stockByUnit',
       'updatedAt',
     ]);
   });

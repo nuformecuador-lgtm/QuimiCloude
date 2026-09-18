@@ -272,7 +272,6 @@ model Product {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name           String
   nameNormalized String    @map("name_normalized")
-  stock          Int?
   qtyAlert       Int?      @map("qty_alert")
   imagePath      String?   @map("image_path")
   companyId      String    @map("company_id") @db.Uuid

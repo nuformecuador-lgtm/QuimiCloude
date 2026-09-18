@@ -1,6 +1,5 @@
 'use client';
 
-import { PlusIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 
@@ -9,7 +8,6 @@ import {
   type DataTableParams,
   type DataTableTexts,
 } from '@/components/shared/data-table';
-import { Button } from '@/components/ui/button';
 import type { WorkGroupRow } from '@/lib/modules/identity';
 
 import { DeleteWorkGroupDialog } from './delete-work-group-dialog';
@@ -55,8 +53,11 @@ import { WorkGroupSheet } from './work-group-sheet';
  * reparte los dos disparadores a `createWorkGroupColumns`. Cada uno se monta **solo mientras esta
  * abierto**, asi que cada apertura arranca limpia y un rechazo anterior no reaparece.
  *
- * **R9, mitad cliente**: sin `usuarios.modificar` no se emite NINGUNA escritura —ni el disparador
- * del alta, ni las acciones de fila, ni el panel, ni el dialogo—. Ocultarlas es comodidad de la
+ * **El ALTA no esta aqui**: la monta `work-group-create-action.tsx`, hermana de esta tabla, porque
+ * esta tabla solo existe cuando hay filas y los grupos **nacen en cero** —no los siembra nadie—.
+ *
+ * **R9, mitad cliente**: sin `usuarios.modificar` no se emite NINGUNA escritura —ni las acciones de
+ * fila, ni el panel, ni el dialogo—. Ocultarlas es comodidad de la
  * interfaz y **no es el control**: quien autoriza es el caso de uso del modulo.
  *
  * **Todo llega por props** (R10): las filas, los parametros y la decision de R9. Aqui no se importa
@@ -64,20 +65,11 @@ import { WorkGroupSheet } from './work-group-sheet';
  * Server Action: la lista la pidio el servidor.
  */
 
-/** `data-testid` del disparador del alta. Constante para que ningun test dependa del copy (R41). */
-export const WORK_GROUP_CREATE_OPEN_TESTID = 'work-group-create-open';
-
 /** Clave de persistencia del fijado de columnas. Una sola tabla de grupos, un solo id. */
 export const WORK_GROUP_TABLE_ID = 'grupos-de-trabajo';
 
 /** `data-testid` del envoltorio de la tabla, para que ningun test dependa del copy (R41). */
 export const WORK_GROUP_TABLE_TESTID = 'work-group-table';
-
-/** Objetivo tactil minimo (44x44 px) de R40. */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
-/** El copy del disparador del alta. Ningun test afirma sobre el (R41). */
-const CREATE_LABEL = 'Nuevo grupo';
 
 /**
  * Textos del componente compartido. Viven aqui —y no en el componente— porque la tabla compartida
@@ -110,15 +102,16 @@ export const WORK_GROUP_TABLE_TEXTS: DataTableTexts = {
  * Que escritura hay abierta. **Una sola por vez**, que es lo que permite montar una instancia de
  * cada pieza para toda la pagina en vez de una por fila.
  *
- * `'create'` es el alta, y es el unico modo sin grupo seleccionado; los otros dos actuan **sobre**
- * la fila que dispara la accion.
+ * **Los dos modos actuan SOBRE una fila**, y por eso `group` no es opcional. El alta no esta aqui:
+ * vive en `work-group-create-action.tsx`, fuera de la tabla, porque los grupos no los siembra nadie
+ * y con cero filas esta tabla no llega a montarse.
  */
-export type WorkGroupPanelMode = 'create' | 'edit' | 'delete';
+export type WorkGroupPanelMode = 'edit' | 'delete';
 
-/** La escritura abierta y sobre quien. `null` en `group` es el alta, que no tiene sujeto. */
+/** La escritura abierta y sobre quien. Siempre hay sujeto: los dos modos salen de una fila. */
 export type WorkGroupPanel = {
   readonly mode: WorkGroupPanelMode;
-  readonly group: WorkGroupRow | null;
+  readonly group: WorkGroupRow;
 };
 
 export type WorkGroupTableProps = {
@@ -162,28 +155,11 @@ export function WorkGroupTable({ groups, params, totalPages, canModify }: WorkGr
   );
 
   // Se estrecha AQUI, no en el JSX: asi el compilador sabe que `panel` no es nulo al usarlo.
-  const sheetPanel =
-    panel !== null && (panel.mode === 'create' || panel.mode === 'edit') ? panel : null;
+  const editGroup = panel !== null && panel.mode === 'edit' ? panel.group : null;
   const deleteGroup = panel !== null && panel.mode === 'delete' ? panel.group : null;
 
   return (
     <div className="flex flex-col gap-4" data-testid={WORK_GROUP_TABLE_TESTID}>
-      {/* El alta (R9): sin `usuarios.modificar` este disparador no existe en el arbol servido. */}
-      {canModify ? (
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="default"
-            className={TOUCH_TARGET}
-            data-testid={WORK_GROUP_CREATE_OPEN_TESTID}
-            onClick={() => setPanel({ mode: 'create', group: null })}
-          >
-            <PlusIcon aria-hidden="true" />
-            {CREATE_LABEL}
-          </Button>
-        </div>
-      ) : null}
-
       <DataTable
         tableId={WORK_GROUP_TABLE_ID}
         columns={columns}
@@ -197,13 +173,13 @@ export function WorkGroupTable({ groups, params, totalPages, canModify }: WorkGr
       />
 
       {/*
-        UNA instancia del panel lateral para toda la pagina, y solo mientras esta abierto: asi el
-        alta arranca en blanco y la edicion llega precargada con el nombre de la fila (R20). El
-        contenido —el formulario del nombre y, en la edicion, la lista de miembros— lo pone
-        `work-group-sheet.tsx`; aqui solo se decide CUAL esta abierto y sobre quien.
+        UNA instancia del panel lateral de EDICION para toda la pagina, y solo mientras esta
+        abierto: asi llega precargada con el nombre de la fila en cada apertura (R20). El
+        contenido —el formulario del nombre y la lista de miembros— lo pone `work-group-sheet.tsx`;
+        aqui solo se decide sobre quien. El alta tiene el suyo, fuera de la tabla.
       */}
-      {sheetPanel === null ? null : (
-        <WorkGroupSheet group={sheetPanel.group} open onOpenChange={closePanel} />
+      {editGroup === null ? null : (
+        <WorkGroupSheet group={editGroup} open onOpenChange={closePanel} />
       )}
 
       {/* Y UNA del dialogo de borrado, tambien solo mientras esta abierto: un rechazo anterior no

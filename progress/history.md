@@ -3774,3 +3774,210 @@ y QC-111.
   afirmaba algo global protegiendo un alcance local, la herencia de modelo que costó más de un
   millón de tokens de Opus, y la regla de «no citar fichas en comentarios» que **no está escrita en
   ningún documento** pero rechaza trabajo.
+
+## QC-103 — lote-y-fecha-de-compra-en-el-alta (cerrada el 2026-09-17)
+
+**PR #80**, merge `433bad2`. Zona `fullstack`, `complexity: medium`. Épica *Inventario*.
+
+La pantalla que **QC-81 dejó fuera a propósito** para no cruzar de zona: el alta de producto gana el
+campo de **fecha de compra** del primer lote y **nombra el lote asignado** en el aviso de éxito.
+Hereda el **E2E que QC-81 difirió expresamente** hasta aquí, que `CHECKPOINTS.md` exige por ser un
+movimiento de inventario.
+
+**Resultado**: R1-R17, 12 tasks, trazabilidad **17/17**. `./init.sh` completo verde sobre el árbol
+final (495 archivos, 7191 passed, 0 rojos). Sin dependencias nuevas y sin migración.
+
+**La ficha cambió de tamaño al acotarla**, y ese fue su acierto: nació `frontend` y salió
+`fullstack`, porque se verificó en disco que «mostrar el lote asignado» **no era alcanzable desde la
+pantalla** —`createProduct` devolvía solo `{ id }`—. Después, en F1.2, se atrapó en vuelo que el
+spec decía devolver el **identificador** del lote cuando lo que hay que mostrar es el **valor**:
+corregido antes de que `design.md` se escribiera encima.
+
+**Enmienda D10 a R3** (aprobada el 2026-09-17): la obligatoriedad de la fecha de compra se cumple
+**solo en la superficie del panel**, no en el esquema —`purchaseDate` es `.nullish()` y la ausencia
+se resuelve como «hoy» en el servidor—. Se aceptó a conciencia, por escrito, en vez de resolverse
+en silencio dentro de un test, que es como la primera review la encontró.
+
+**Tres vueltas de review, y lo que justifican**: la 2ª encontró **un comentario de producción que
+afirmaba lo contrario de lo que hace el código** —que el esquema rechaza la fecha ausente— y que
+sobre esa premisa falsa justificaba una decisión de diseño. Se borró. La 3ª aprobó, y el propio
+reviewer **retiró un hallazgo suyo** (m5) al comprobarse que los reexportes que daba por muertos
+tenían cuatro importadores reales.
+
+**Consolidación**: nace `lib/shared/ui/date-civil.ts` con la única definición de
+`formatDateLocalISO`/`parseDateLocalISO`, antes duplicadas. Vive ahí porque es lo único que la regla
+de dependencias deja importar desde `components/**`; **no toca el barrel de `data-table`**.
+
+**Lección del arnés, ya cerrada**: el bloqueante B3 lo fundó `docs/conventions.md > Comentarios`,
+que ese día vivía **solo en `dev` local sin pushear**. Al empujar `dev` se descubrió que estaba
+además **33 commits por detrás** del remoto. Se integró y se empujó (`551a33a`).
+
+Menores declarados que no bloquearon: una cita de ficha en el nombre de un `describe` y una
+importación por ruta profunda superviviente en un test.
+
+## QC-88 — listado-de-pedidos-asignados (CERRADA el 2026-09-17, PR #79, merge `b342375`)
+
+**Qué entró**: la pantalla del Operador en `/asignacion`, compuesta desde `asignaciones`, con
+`pedidos` aportando solo una lectura de catálogo en lote. **5 consultas constantes por página**, sin
+JOIN y sin crecer con filas, responsables ni tamaño de página. `responsible-avatars.tsx` se promovió
+a `components/shared/`.
+
+**Resultado**: R1-R40, 18 tasks, trazabilidad **40/40** verificada caso a caso por el reviewer
+(veredicto OK, sin bloqueantes). `./init.sh` completo verde sobre el árbol final: **503 archivos,
+7289 passed, 0 rojos**. Sin dependencias nuevas, sin tabla, columna ni migración.
+
+**El hueco que más peligro tenía, y cómo se cerró**: reutilizar el caso de uso de responsables de
+QC-102 habría dejado la columna **vacía en silencio** para el Operador, porque ese caso de uso exige
+`pedidos.consultar` y el Operador no lo tiene. Se reutilizó **el método del puerto**, no el caso de
+uso. La autorización quedó como primera línea del cuerpo, antes de validar la entrada y antes de
+tocar ningún `deps`, con tests que lo afirman sobre los cinco dobles.
+
+**La ficha cambió el aterrizaje del Operador**, así que puso rojos a propósito varios censos
+congelados de otras fichas. Las seis guardias afectadas se **tensaron, nunca se aflojaron**: cada
+excepción es por nombre o archivo exacto, con una mutación que demuestra que sigue mordiendo.
+
+**Dos interrupciones que no fueron fallos técnicos**: se agotó la cuota semanal de Opus con trabajo
+sin commitear (lo rescató el leader), y la implementación estuvo **12 tasks bloqueada por QC-60**
+hasta su merge, que trajo 132 commits y dos migraciones por delante.
+
+**Lección del arnés, la misma que QC-103 y por fin cerrada de raíz**: la limpieza de comentarios
+(871 líneas borradas, 217 reescritas sin cita) **no se hizo cuando el reviewer la señaló**, porque
+se verificó que la regla no estaba en ninguna rama remota — y era cierto. El diagnóstico de fondo
+era el equivocado: la regla **existía, pero vivía solo en la plantilla**. Apareció en la rama al
+re-sincronizar con `dev` para resolver el conflicto del PR, y ahí se limpió, en commits solo de
+comentarios. Coste de haberlo sabido tarde: un gate completo de más.
+
+**Conflicto de `current.md`, tercera vez**: se resolvió **fusionando los dos lados**, no tomando
+uno. Cada lado traía estado que el otro no tenía. La decisión de fondo —que el estado vivo deje de
+ser un archivo único que todas las ramas tocan— sigue pendiente en *Deudas*.
+
+**Límite declarado, no escondido**: el E2E del recorrido del Operador existe, pasa typecheck/lint y
+sigue el patrón de los E2E verdes del repo, pero **nunca se ejecutó contra Playwright** por drift de
+la Postgres local, ajeno a esta rama.
+
+## QC-50 — aislamiento-por-empresa-en-recetas (cerrada el 2026-09-17, PR #81, merge `63befce`)
+
+Cierra el hueco que QC-60 dejó declarado: un pedido podía apuntar a una receta de otra empresa.
+`recipes` gana `company_id` y los cinco casos de uso, los cinco métodos del puerto y los catálogos
+de productos y unidades pasan a leer y escribir acotados. `recipe_lines` **no** gana columna, a
+propósito: cae con su receta. **29/29 tasks, 33/33 requisitos con test, sin dependencias nuevas.**
+
+**El hallazgo que justificó la ronda de acotación**: el único índice de nombre de recetas es
+**PARCIAL** (`WHERE deleted_at IS NULL`) y el de presentaciones que QC-49 usó de molde era
+**TOTAL**. Copiarlo habría hecho que borrar una receta **no liberara su nombre**, sin un solo test
+en rojo. Queda afirmado en tres sitios independientes, los tres comprobados falsables.
+
+**El spec nombraba seis listas cerradas y eran trece.** Las siete que aparecieron al verificar se
+tensaron a mano; ninguna se relajó. Tres comparan el diff contra `origin/dev` y **solo muerden
+después del commit**, que es como emboscaron al gate de QC-60.
+
+**`SIN_AMBITO_POR_DECISION_APROBADA` murió**: no se dejó vacía, se borró la maquinaria entera por
+ser código muerto. Antes había una puerta cerrada; ahora no hay puerta.
+
+**Una enmienda al spec, aprobada por el humano**: R31 pedía probar por E2E un **borrado** cruzado,
+que no es ejercitable —el diálogo toma el id del cierre de React y no hay nodo del DOM que
+reescribir, a diferencia de QC-49 y QC-60—. Se sustituye por abrir la **URL del detalle** de una
+receta ajena, **indistinguible de un id inexistente**: mismo mensaje, mismo enlace. Eso es lo que
+prueba que no hay oráculo de existencia. El borrado cruzado queda cerrado en service e integración.
+La review la rechazó por esto y **fue su único bloqueante, documental**: la decisión se había
+escrito en `design.md` y `tasks.md` y se olvidó en `requirements.md`.
+
+**Lo que más enseña, y no estaba previsto**: al sincronizar con QC-88 el merge **no dio conflicto
+textual en producción pero dejó el código sin compilar**. QC-88 estrenó un llamante de
+`findRefsIncludingDeleted` mientras esta rama le añadía el ámbito; sin el cambio de firma habría
+entrado resolviendo nombres de recetas **sin acotar por empresa y sin un test en rojo**. El test que
+cubría esa llamada existía y **miraba solo el primer argumento**: se tensó para exigir los dos.
+Además, las dos ramas añadieron **cada una su decimocuarta entrada** a la lista cerrada de specs E2E
+que referencian `data-table`; la resolución correcta eran **quince**.
+
+**Verificación**: gate completo verde dos veces (la última, 512 archivos / 7418 tests / 0 rojos),
+corrido con la máquina en reposo. E2E verde en Chromium y WebKit. El `down.sql` **se ejecuta
+entero** en una transacción con ROLLBACK comparando dos retratos de esquema, en vez de afirmarse
+leyendo el archivo: era el eslabón más débil y lo cerró la review.
+
+## QC-63 — ejecutar-receta-operador (CERRADA el 2026-09-17, PR #82, merge `6754a46`)
+
+**Qué entró**: la pantalla con la que el Operador ejecuta la receta del pedido que tiene asignado,
+en `/asignacion/<id>`. Cierra la épica que QC-83…QC-88 venían construyendo. Tres casos de uso nuevos
+en `asignaciones`, primer consumidor de la conversión entre unidades de QC-76, y `StepReader` de
+QC-64 montado por props sin tocar una línea.
+
+**Resultado**: R1-R31, 24 tasks, `./init.sh` completo verde (519 archivos, **7495 passed**, 0 rojos
+nuevos) y **los cuatro E2E ejecutados contra Chromium real**, con los estados leídos de la base.
+Sin dependencias, tabla, columna ni migración.
+
+**El Operador no gana ningún permiso, y esa fue la decisión de fondo.** La semilla de 2026-09-08
+cortaba la pantalla con `asignaciones.consultar` **y** `asignaciones.modificar`, pero el Operador
+nace sin el segundo: tal cual estaba escrito, se habría quedado fuera de su propia pantalla. Y el
+único camino que movía un pedido exigía `pedidos.modificar`. Se cerró con un caso de uso propio que
+**pregunta al contrato de `pedidos`** si la transición es legal, en vez de reimplementar la matriz.
+
+**Lo que la reacotación salvó**: la ficha llevaba nueve días acotada y sus tres dependencias
+cerraron el mismo día que se retomó. Reacotarla contra el disco —en vez de sembrar encima— destapó
+esa contradicción del permiso y el bloqueo de «pedido ya tomado» que QC-88 había remitido aquí: como
+abrir la pantalla pone el pedido `EN_CURSO`, **el Operador que recargara se encontraba su propio
+trabajo bloqueado**. Se permitió la reentrada y la guardia de QC-88 se enmendó tensándola.
+
+**El hallazgo que justifica la fase de revisión entera**: la primera vuelta **rechazó** al descubrir
+que la confirmación de «pedido entregado» era **código muerto** —la acción termina siempre en
+`redirect()`, que lanza, así que nunca devolvía el estado de éxito— y que **su test solo pasaba
+porque doblaba la acción con un valor que la acción real no emite**. Era la única fila de la
+trazabilidad que camuflaba una ausencia como test positivo, y el E2E del leader pasaba por al lado.
+La segunda vuelta aprobó tras **cinco mutaciones propias, las cinco rojas**.
+
+**Dos decisiones humanas**: el factor de escala sale **degradado** —se verificó que la receta no
+guarda su rendimiento, y de ahí **nace QC-120**— y el aviso de entrega se muestra **en la lista al
+volver**, porque la forma que describía el diseño era inalcanzable.
+
+**Ocho censos cerrados de otras fichas crecieron, ninguno aflojado**: todos por nombre exacto, con
+nota fechada y probados por mutación. **Una guardia se retiró** —`guard-conversion-sin-consumidores`—
+porque su propia cabecera prescribía la retirada en la ficha que estrenara la conversión; commit
+propio, y su conducta sigue cubierta por otros dos tests.
+
+**Tres lecciones del arnés**: el `spec_author` corrió **sin Bash** y entregó el spec sin commitear,
+que tuvo que verificar y commitear el leader; el worktree se montó **sin `.env`**, lo que mató la
+integración con un error que no nombra su causa; y el leader **rompió el `requirements.md`** al
+cerrar una pregunta abierta —su corte enganchó un fragmento de texto en vez del encabezado y
+reinyectó los 31 requisitos—, reparado en `3f75b9b`.
+
+**Deuda declarada**: seis hallazgos menores, ninguno bloqueante —el más vivo, que el número del
+aviso no se relee del pedido, así que es falsificable escribiendo el parámetro a mano, sin XSS ni
+fuga entre empresas—. Y dos rojos de `ciclo-de-vida-de-la-base.int.test.ts` **descartados como flake
+de máquina y NO metidos al baseline**: la rama no toca ese archivo y en aislamiento pasan los cinco.
+
+## QC-91 — existencia-por-lote (cerrada el 2026-09-17)
+
+**PR #83**, merge `b579707`. Zona `fullstack`, `complexity: high`. Épica *Inventario*.
+
+`products.stock` desaparece: la existencia pasa a ser la **suma de los lotes**, calculada al
+consultar y **una por unidad** («10 kg · 20 L»), sin conversión. Toca inventario, recetas y pedidos.
+
+**Resultado**: R1-R23, 13 tasks, trazabilidad **23/23** verificada abriendo cada `archivo:línea`.
+`./init.sh` completo verde sobre la rama sincronizada (521 archivos, 7553 passed, 0 rojos). Trae el
+**E2E que QC-81 difirió expresamente** aquí: 14 passed en chromium y webkit. Sin dependencias nuevas.
+
+**La lección de la ficha son las guardias de censo.** Tropezó **tres veces** con el patrón que el
+board tiene fichado como **QC-99** —una guardia que afirma un estado que la ficha siguiente está
+autorizada a cambiar— y las tres se resolvieron sin propagarlo: la de `recetas-ui` se **acotó a su
+propia rama** (`dfe1a9a`, precedente `8bf3dd5`), probada por mutación y reproducida por el reviewer;
+de la de QC-81 se **borró el caso derogado** (`67363de`) en vez de invertirlo, porque invertirlo
+habría creado la misma trampa a QC-121; y **el censo que `tasks.md` pedía para T10 no se escribió**,
+por el mismo motivo. Esa última fue una desviación del spec, firmada por el implementer y validada
+por el reviewer midiendo que no dejaba agujero: lo que el censo habría cubierto de más ya lo cierra
+el typecheck.
+
+**Una decisión de producto nació a mitad y NO se metió aquí**: «el nombre se puede duplicar, pero si
+las unidades no concuerdan es otro ítem», que devolverá `products.stock` como columna calculada.
+Salió **QC-121**, bloqueada por esta. Se partió en dos en vez de reabrir tres decisiones con 9 de 13
+tasks hechas, y lo construido se reutiliza entero: cuando las unidades no puedan mezclarse,
+`sumStockByUnit` devolverá siempre un solo valor.
+
+**F2.3 fue el paso caro**: 104 commits de `dev` (QC-50 y QC-63). Dos conflictos, ninguno ambiguo, y
+**cuatro roturas que git no marcó** —dobles con la forma vieja de `ProductRef`, algunos en un módulo
+llegado de `dev` que nunca vio el cambio—. El mapa de trazabilidad se re-midió tras el merge: seis
+`archivo:línea` se habían desplazado y habrían mandado a la review a líneas equivocadas.
+
+**Un rojo de gate diagnosticado y descartado**: `product-batch-lot.int.test.ts` murió con
+`Transaction API error: Unable to start a transaction in the given time` —pool agotado, no
+aserción—; aislado pasó 3/3 y en la repetición del gate pasó. Saturación, con otras dos sesiones
+trabajando en la misma máquina.

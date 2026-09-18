@@ -1032,6 +1032,10 @@ describe('R11 — el DOWN aborta la reversion entera ante dato que no puede tira
       const marcador = token();
       await crearEmpresa(tx, marcador);
       const quimicloud = await quimicloudId(tx);
+      // Una fila PROPIA, y no es decorado: el bloque sale temprano cuando las dos tablas estan
+      // en cero, asi que sin ella no habria reparto que proteger y la guardia 1 no llegaria a
+      // plantearse. Es de QuimiCloud para que la que aborte sea la 1 y no la 2.
+      await crearProveedor(tx, quimicloud, `propio${marcador}`);
 
       // Se renombra la empresa del UP: ya no hay ninguna con ese nombre normalizado y hay mas de
       // una empresa en la tabla, que es exactamente el caso que la guardia 1 no puede resolver.
@@ -1054,8 +1058,15 @@ describe('R11 — el DOWN aborta la reversion entera ante dato que no puede tira
 
   it('R11 causa (a) no es un placebo: con la empresa identificable y sin mas dato, el mismo bloque NO aborta', async () => {
     await inRolledBackTransaction(async (tx) => {
-      // Mismo bloque, mismos datos de la base, sin renombrar nada: si tambien abortara aqui, el
-      // caso de arriba no probaria que la causa fuera la guardia 1.
+      // Mismo bloque y MISMOS datos que el caso de arriba -incluida la fila propia, sin la cual
+      // el bloque saldria temprano y este caso pasaria sin recorrer ninguna guardia-, sin
+      // renombrar nada: si tambien abortara aqui, el caso de arriba no probaria que la causa
+      // fuera la guardia 1.
+      const marcador = token();
+      await crearEmpresa(tx, marcador);
+      const quimicloud = await quimicloudId(tx);
+      await crearProveedor(tx, quimicloud, `propio${marcador}`);
+
       await expect(tx.$executeRawUnsafe(GUARDIA_DEL_DOWN)).resolves.not.toThrow();
     });
   });

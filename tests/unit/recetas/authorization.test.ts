@@ -85,7 +85,10 @@ function catalogoUnidadesQueFalla(): UnitCatalog {
   const explota = () => {
     throw new Error('el catalogo de unidades no debe ser llamado');
   };
-  return { findRefs: vi.fn<UnitCatalog['findRefs']>(explota) };
+  return {
+    findRefs: vi.fn<UnitCatalog['findRefs']>(explota),
+    findRefsSharingBaseInCompany: vi.fn<UnitCatalog['findRefsSharingBaseInCompany']>(explota),
+  };
 }
 
 function almacenamientoQueFalla(): RecipeImageStorage {
@@ -139,7 +142,10 @@ function montarPuertosPermisivos(): Puertos {
       softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
     },
     products: { findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []) },
-    units: { findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []) },
+    units: {
+      findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []),
+      findRefsSharingBaseInCompany: vi.fn<UnitCatalog['findRefsSharingBaseInCompany']>(async () => []),
+    },
     images: {
       upload: vi.fn<RecipeImageStorage['upload']>(async () => 'recetas/x.jpg'),
       remove: vi.fn<RecipeImageStorage['remove']>(async () => undefined),

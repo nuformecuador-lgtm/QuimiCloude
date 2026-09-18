@@ -60,11 +60,21 @@ const AHORA = new Date('2026-09-04T12:00:00.000Z')
 const now = () => AHORA
 
 /** Doble del catalogo de unidades: resuelve cualquier id pedido, para que los casos que
- *  traen unidad sigan aceptandola sin que este archivo tenga que probar `unidades`. */
+ *  traen unidad sigan aceptandola sin que este archivo tenga que probar `unidades`.
+ *
+ *  El puerto publica un segundo metodo que este modulo no usa. Se dobla LANZANDO y no
+ *  devolviendo vacio: si alguna llamada nueva lo alcanzara, es un acoplamiento que tiene que
+ *  salir en rojo aqui en vez de pasar en silencio. */
+const sinHermanasDeBase = () =>
+  vi.fn(async (): Promise<never> => {
+    throw new Error('proveedores no pide unidades hermanas de base')
+  })
+
 const units: UnitCatalog = {
   findRefs: vi.fn(async (ids: readonly string[]) =>
     ids.map((id) => ({ id, name: 'kg', symbol: 'kg', baseUnitId: null, factor: null })),
   ),
+  findRefsSharingBaseInCompany: sinHermanasDeBase(),
 }
 
 const SUPPLIER_ID = '22222222-2222-4222-8222-222222222222'
@@ -163,7 +173,10 @@ describe('el ambito de empresa de los cuatro casos de uso del catalogo (QC-59 T3
     const findRefs = vi.fn(async (ids: readonly string[]) =>
       ids.map((id) => ({ id, name: 'kg', symbol: 'kg', baseUnitId: null, factor: null })),
     )
-    const conUnidad: UnitCatalog = { findRefs }
+    const conUnidad: UnitCatalog = {
+      findRefs,
+      findRefsSharingBaseInCompany: sinHermanasDeBase(),
+    }
 
     await createCreateCatalogLine({ catalog: repo, units: conUnidad, now })(
       { ...ALTA_VALIDA, unitId: UNIDAD },
@@ -191,7 +204,10 @@ describe('el ambito de empresa de los cuatro casos de uso del catalogo (QC-59 T3
     // El doble devuelve vacio, que es como `unidades` reporta «no existe o es de otra
     // empresa»: los dos casos son el mismo desenlace y ninguno llega al repositorio.
     const { repo, spies } = makeCatalog()
-    const ajena: UnitCatalog = { findRefs: vi.fn(async () => []) }
+    const ajena: UnitCatalog = {
+      findRefs: vi.fn(async () => []),
+      findRefsSharingBaseInCompany: sinHermanasDeBase(),
+    }
 
     await expect(
       createCreateCatalogLine({ catalog: repo, units: ajena, now })(

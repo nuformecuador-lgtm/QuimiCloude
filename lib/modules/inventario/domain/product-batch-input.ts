@@ -24,6 +24,9 @@ const amountSchema = z
 /** Que la presentacion exista lo garantiza la FK, no zod. */
 const presentationIdSchema = z.string().uuid();
 
+/** La existencia es del lote que se crea, no del producto: el alta la declara por su cuenta. */
+const stockSchema = z.number().int().min(0);
+
 export const PRODUCT_BATCH_LOT_MAX_LENGTH = 60;
 
 /**
@@ -99,6 +102,7 @@ const MESSAGE_TOTAL_INSUFICIENTE =
 export const createProductWithFirstBatchSchema = z
   .strictObject({
     ...productFieldsShape,
+    stock: stockSchema,
     presentationId: presentationIdSchema,
     unitCost: amountSchema.nullish(),
     totalCost: amountSchema.nullish(),

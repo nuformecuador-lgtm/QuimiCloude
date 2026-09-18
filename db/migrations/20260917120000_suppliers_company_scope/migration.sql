@@ -51,6 +51,14 @@ ALTER TABLE "supplier_catalog_lines" ADD COLUMN "company_id" UUID;
 --
 -- Afecta a todas las filas, incluidas las de borrado logico: la columna va a ser NOT NULL y un
 -- proveedor dado de baja sigue siendo una fila.
+--
+-- SALIDA TEMPRANA SOBRE UNA BASE VACIA (anadida para arreglar el arranque en una base nueva):
+-- con las dos tablas de proveedores en cero, el backfill es un no-op y no hay ningun reparto
+-- que proteger, asi que la resolucion de la empresa ni siquiera se plantea. Mismo idioma que
+-- `db/migrations/20260904180600_companies_and_user_company/migration.sql` (`IF usuarios = 0
+-- THEN RETURN; END IF;`). La guardia de mas abajo sigue intacta: en cuanto hay una sola fila
+-- que repartir, el `RETURN` no se dispara y `RAISE EXCEPTION` sigue abortando igual si la
+-- empresa es ambigua o no existe.
 -- ---------------------------------------------------------------------------------------
 DO $$
 DECLARE
@@ -59,7 +67,13 @@ DECLARE
   all_company_rows   BIGINT;
   updated_rows       BIGINT;
   total_rows         BIGINT;
+  existing_rows      BIGINT;
 BEGIN
+  SELECT (SELECT count(*) FROM "suppliers")
+       + (SELECT count(*) FROM "supplier_catalog_lines")
+    INTO existing_rows;
+  IF existing_rows = 0 THEN RETURN; END IF;
+
   SELECT count(*) INTO named_company_rows
     FROM "companies" WHERE "name_normalized" = 'quimicloud';
 

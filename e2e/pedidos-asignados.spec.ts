@@ -27,6 +27,7 @@ import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/secur
 import { formatOrderNumber } from '@/lib/modules/pedidos';
 import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
+import { assignedOrderRoute } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
 
@@ -312,7 +313,7 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('la lista de pedidos asignados del Operador (R38)', () => {
-  test('el Operador aterriza en asignacion, ve solo sus pedidos ejecutables, no ve los finales ni los de otra persona, y el en curso llega bloqueado', async ({
+  test('el Operador aterriza en asignacion, ve solo sus pedidos ejecutables, no ve los finales ni los de otra persona, y el en curso entra con aviso (R27)', async ({
     page,
   }) => {
     expect(orderPendingNumber, 'el fixture no existe: fallo el beforeAll').not.toBeNull();
@@ -348,7 +349,8 @@ test.describe('la lista de pedidos asignados del Operador (R38)', () => {
     await expect(rowByNumber(page, orderOthersOnlyNumber)).toHaveCount(0);
 
     const enterInProgress = inProgressRow.getByTestId(ENTER_TESTID);
-    await expect(enterInProgress).toBeDisabled();
+    await expect(enterInProgress).toBeEnabled();
+    await expect(enterInProgress).toHaveAttribute('href', assignedOrderRoute(orderInProgressId));
     await expect(inProgressRow.getByTestId(ENTER_REASON_TESTID)).toBeVisible();
 
     const enterPending = pendingRow.getByTestId(ENTER_TESTID);

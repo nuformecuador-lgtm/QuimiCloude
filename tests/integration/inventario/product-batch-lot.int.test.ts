@@ -182,7 +182,7 @@ function ambito(fixture: Fixture): InventoryScope {
 }
 
 function newProduct(overrides: Partial<NewProduct> = {}): NewProduct {
-  return { name: `Producto ${token()}`, stock: 3, ...overrides };
+  return { name: `Producto ${token()}`, ...overrides };
 }
 
 /** `lot: null` pide que el lote lo genere el adaptador. */

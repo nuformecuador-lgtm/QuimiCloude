@@ -1,0 +1,26 @@
+# Los finales de linea dejan de depender del `core.autocrlf` de cada maquina.
+#
+# El motivo no es cosmetico. Varias guardias de `tests/guards` despojan comentarios con
+# regex ancladas en `$` --`/\/\/.*$/`, `/--.*$/`--. Sobre una linea que acaba en `\r` esas
+# regex NO casan: `.` no consume `\r` porque es un terminador de linea para el motor, y `$`
+# sin la bandera `m` no ancla antes de el. Con `core.autocrlf=true` y sin este archivo, en
+# Windows los comentarios sobrevivian enteros al despojado, y eso daba cuatro falsos
+# positivos --se leia texto de comentarios como si fuera codigo-- y, en `middleware.ts`, un
+# falso negativo MUDO: el comodin `app/**` de su cabecera abria un bloque de comentario
+# FALSO que se cerraba en el siguiente JSDoc y se tragaba el `export ... from` real, con lo
+# que los bloques de la guardia de arquitectura que juzgan imports pasaban en verde sobre un
+# archivo vacio. En CI (Linux, LF) las cinco guardias pasaban, asi que el defecto era
+# invisible fuera de Windows.
+#
+# Las guardias ya normalizan `\r` por su cuenta --ahi esta el arreglo de fondo--; esto evita
+# que la misma clase de problema reaparezca por otra via.
+#
+# OJO: este archivo NO reescribe lo que ya esta en disco. Los archivos salen con LF en el
+# proximo checkout. Para pasar el arbol entero de una vez hace falta un
+# `git add --renormalize .` deliberado, que toca TODOS los archivos: hacerlo con features en
+# vuelo destroza los merges ajenos. Se hace con el arbol quieto y de comun acuerdo.
+* text=auto eol=lf
+
+# Binarios: nunca se convierten.
+*.png binary
+*.ico binary

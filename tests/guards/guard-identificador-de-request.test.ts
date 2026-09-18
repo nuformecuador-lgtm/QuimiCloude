@@ -98,6 +98,15 @@ export const E2E_ESPERADOS = [
   // identificador ni sobre `reference`, y entra por la misma puerta que las anteriores -«otra ficha
   // y otra decision»-, asi que el diferimiento de QC-71 R21 sigue INTACTO.
   'cierre-de-sesiones.spec.ts',
+  // Alta el 2026-09-17 por el MISMO motivo y en el MISMO sitio que las demas: la lista es CERRADA
+  // y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el archivo
+  // se nombra, uno a uno-. Lo que ejercita: un Operador abre la receta de un pedido que tiene
+  // asignado, el pedido pasa a EN_CURSO en base, recorre los pasos hasta Finalizar y queda
+  // ENTREGADO; quien no tiene el permiso recibe 404; y recargar un pedido ya EN_CURSO no mueve el
+  // estado. NO ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni
+  // afirma nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21
+  // sigue INTACTO.
+  'ejecucion-receta.spec.ts',
   'errores.spec.ts',
   'grupos-de-trabajo.spec.ts',
   'inventario.spec.ts',
@@ -183,6 +192,8 @@ export const MIGRACIONES_ESPERADAS = [
   // persiste el identificador de peticion ni lo menciona; se nombra aqui a mano y la lista sigue
   // CERRADA para la siguiente.
   '20260916120000_recipes_company_scope',
+  // Igual patron: quita una columna de negocio, no toca el identificador de peticion.
+  '20260917120000_drop_product_stock',
   // Misma alta, esta vez para la migracion que da empresa a proveedores y a su catalogo.
   '20260917120000_suppliers_company_scope',
 ] as const

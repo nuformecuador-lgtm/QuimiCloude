@@ -365,3 +365,14 @@ describe('down.sql — revierte exactamente el up (R22)', () => {
     expect(alters).toHaveLength(1)
   })
 })
+
+describe('R2: products_stock_idx, creado aqui, se dropea con el nombre exacto en la migracion que lo quita', () => {
+  it('el nombre que crea esta migracion es el mismo que dropea 20260917120000_drop_product_stock', () => {
+    const creado = up.find((s) => s.includes('"products_stock_idx"'))
+    expect(creado, 'esta migracion sigue creando products_stock_idx').toBeDefined()
+
+    const dropMigrationDir = join(repoRoot, 'db', 'migrations', '20260917120000_drop_product_stock')
+    const dropUpSource = readFileSync(join(dropMigrationDir, 'migration.sql'), 'utf8')
+    expect(stripSqlComments(dropUpSource)).toMatch(/DROP INDEX IF EXISTS "products_stock_idx"/iu)
+  })
+})

@@ -98,6 +98,14 @@ ALTER TABLE "product_batches" ADD COLUMN "company_id" UUID;
 -- que produce `normalizeCompanyName(INITIAL_COMPANY_NAME)`
 -- (`lib/modules/identity/domain/companies.ts`), y que las dos copias no diverjan lo vigila el
 -- test de esquema.
+--
+-- SALIDA TEMPRANA SOBRE UNA BASE VACIA (anadida para arreglar el arranque en una base nueva):
+-- con las tres tablas de inventario en cero, el backfill es un no-op y no hay ningun reparto
+-- que proteger, asi que la resolucion de la empresa ni siquiera se plantea. Mismo idioma que
+-- `db/migrations/20260904180600_companies_and_user_company/migration.sql` (`IF usuarios = 0
+-- THEN RETURN; END IF;`). La guardia de mas abajo sigue intacta: en cuanto hay una sola fila
+-- que repartir, el `RETURN` no se dispara y `RAISE EXCEPTION` sigue abortando igual si la
+-- empresa es ambigua o no existe.
 -- ---------------------------------------------------------------------------------------
 ALTER TABLE "companies"       NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE "products"        NO FORCE ROW LEVEL SECURITY;
@@ -111,7 +119,14 @@ DECLARE
   all_company_rows     BIGINT;
   updated_rows         BIGINT;
   total_rows           BIGINT;
+  existing_rows        BIGINT;
 BEGIN
+  SELECT (SELECT count(*) FROM "products")
+       + (SELECT count(*) FROM "presentations")
+       + (SELECT count(*) FROM "product_batches")
+    INTO existing_rows;
+  IF existing_rows = 0 THEN RETURN; END IF;
+
   -- 2.1. Resolucion de la empresa. UNIVOCA O NADA (R3): nunca «una cualquiera».
   SELECT count(*) INTO named_company_rows
     FROM "companies" WHERE "name_normalized" = 'quimicloud';

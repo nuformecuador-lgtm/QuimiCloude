@@ -45,6 +45,13 @@ ALTER TABLE "recipes" ADD COLUMN "company_id" UUID;
 --
 -- Afecta a todas las filas, incluidas las de borrado logico: la columna va a ser NOT NULL y
 -- una receta borrada sigue siendo una fila.
+--
+-- SALIDA TEMPRANA SOBRE UNA BASE VACIA (anadida para arreglar el arranque en una base nueva):
+-- con `recipes` en cero, el backfill es un no-op y no hay ninguna receta que repartir, asi que
+-- la resolucion de la empresa ni siquiera se plantea. Mismo idioma que
+-- `db/migrations/20260904180600_companies_and_user_company/migration.sql` (`IF usuarios = 0
+-- THEN RETURN; END IF;`). En cuanto hay una sola receta, el `RETURN` no se dispara y
+-- `RAISE EXCEPTION` sigue abortando igual si la empresa es ambigua o no existe.
 -- ---------------------------------------------------------------------------------------
 DO $$
 DECLARE
@@ -53,7 +60,11 @@ DECLARE
   all_company_rows   BIGINT;
   updated_rows       BIGINT;
   total_rows         BIGINT;
+  existing_rows      BIGINT;
 BEGIN
+  SELECT count(*) INTO existing_rows FROM "recipes";
+  IF existing_rows = 0 THEN RETURN; END IF;
+
   SELECT count(*) INTO named_company_rows
     FROM "companies" WHERE "name_normalized" = 'quimicloud';
 

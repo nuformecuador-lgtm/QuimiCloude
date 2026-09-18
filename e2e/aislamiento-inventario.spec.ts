@@ -129,7 +129,6 @@ async function seedCompanyInventory(input: {
     data: {
       name: input.productName,
       nameNormalized: normalizeProductName(input.productName),
-      stock: 10,
       qtyAlert: 2,
       companyId: company.id,
     },

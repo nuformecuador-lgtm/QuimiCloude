@@ -114,7 +114,7 @@ describe('R15: el borrado logico conserva la fila', () => {
     let productId: string | null = null;
 
     try {
-      const input: NewProduct = { ...baseProductInput({ stock: 9 }) };
+      const input: NewProduct = { ...baseProductInput() };
       const created = await createProduct(input, new Date(), ambito());
       productId = created.id;
 
@@ -129,7 +129,6 @@ describe('R15: el borrado logico conserva la fila', () => {
       const after = await prisma.product.findUniqueOrThrow({ where: { id: created.id } });
       expect(after.id).toBe(created.id);
       expect(after.name).toBe(before.name);
-      expect(after.stock).toBe(before.stock);
       expect(after.deletedAt).not.toBeNull();
       expect(after.deletedAt).toBeInstanceOf(Date);
       // ACTUALIZADO EL 2026-09-11 POR QC-80 (R7, R21). ANTES, las dos lineas que faltan aqui

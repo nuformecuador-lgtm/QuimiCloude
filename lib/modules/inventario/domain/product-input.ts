@@ -32,48 +32,28 @@ const nonNegativeIntSchema = z.number().int().min(0);
  */
 
 /**
- * DECISION DEL HUMANO, 2026-09-03: `stock` y `qtyAlert` pasan a ser OBLIGATORIOS en la entrada.
+ * `qtyAlert` es obligatorio en la entrada aunque la columna `qty_alert` sea NULLABLE en la
+ * base: un producto anterior con ese campo en NULL no se puede guardar sin rellenarlo, porque
+ * la edicion es reemplazo completo y usa el mismo esquema que el alta.
  *
- * Acota a R5, que los declaraba opcionales. Lo que R5 garantizaba SOBRE LA BASE no se toca -las
- * columnas `stock` y `qty_alert` siguen siendo NULLABLE, y el modelo lo sigue afirmando en
- * `tests/unit/inventario/schema/inventario-schema.test.ts`-: lo que cambia es lo que la
- * APLICACION acepta al dar de alta o editar. Son los dos unicos campos numericos que quedan en
- * el formulario, y dejarlos vacios ahi ya no significa nada util.
- *
- * CONSECUENCIA QUE HAY QUE CONOCER: la edicion es reemplazo completo (R13/R19) y usa este mismo
- * esquema, asi que un producto anterior con `stock` o `qty_alert` a NULL en la base NO se puede
- * guardar sin rellenar los dos. El formulario los marca `required`, de modo que quien edite uno
- * de esos productos vera el campo vacio y tendra que darle un valor.
- *
- * Desde QC-80 (R21) `unitId` ya no esta entre ellos: no es que sea opcional, es que el
- * producto no tiene unidad que declarar.
- *
- * `strictObject`, no `z.object` (QC-52 R1, `design.md > 4`): una entrada que traiga
- * `cost`, `minPurchase` o `deliveryTime` se RECHAZA como `invalid_input`, no se ignora en
- * silencio. Mismo criterio -y mismo motivo- que `createCatalogLineSchema` de QC-43:
- * ignorar el campo de mas es peor que rechazarlo, porque quien lo envia cree haber
- * guardado un costo que nunca se guardo.
+ * `strictObject`, no `z.object`: un campo de mas se RECHAZA como `invalid_input`, no se
+ * ignora en silencio.
  */
 /**
- * Los TRES campos del producto, declarados UNA vez (QC-90, T3; eran cuatro hasta QC-80). El alta con primer lote
- * (`product-batch-input.ts`) los reutiliza tal cual en vez de copiarlos: dos listas
- * paralelas divergen en cuanto alguien anade un campo a una sola de ellas. Es el mismo
- * precedente que `catalogLineFieldsShape` de `proveedores/domain/catalog-line-input.ts`.
- *
- * Extraer la constante NO cambia `createProductSchema`, que sigue siendo el esquema de la
- * EDICION y no conoce ningun campo de lote (QC-90 R26).
+ * Los campos del producto, declarados UNA vez y compartidos por alta y edicion. La existencia
+ * ya no esta aqui: es del lote, no del producto, y cada esquema que la necesita la declara
+ * por su cuenta.
  */
 export const productFieldsShape = {
   name: productNameSchema,
-  stock: nonNegativeIntSchema,
   qtyAlert: nonNegativeIntSchema,
 } as const;
 
 export const createProductSchema = z.strictObject({ ...productFieldsShape });
 
 /**
- * La edicion es REEMPLAZO COMPLETO, no `PATCH` por campos sueltos (§ 11.7, D3, R13): el
- * mismo esquema de alta, incluida la existencia (`stock`).
+ * La edicion es REEMPLAZO COMPLETO, no `PATCH` por campos sueltos. No comparte la
+ * existencia con el alta: enviarla aqui es `invalid_input` por `strictObject`.
  */
 export const updateProductSchema = createProductSchema;
 

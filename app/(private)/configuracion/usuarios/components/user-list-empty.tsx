@@ -6,14 +6,21 @@ import { cn } from '@/lib/utils';
 /**
  * Estado vacio de la lista de usuarios (R18, `design.md > 6`).
  *
- * **Es el vacio de «la busqueda no encontro nada»**, que es lo unico que puede significar aqui:
- * la pantalla la sirve una sesion valida, o sea que **siempre existe al menos un usuario** —el
- * actor—, y el actor no se ve a si mismo en su propio listado (R11). Llegar a este estado
- * significa por fuerza que el termino, el filtro o la pagina no encontraron nada; ofrecer «crea el
- * primero» seria decirle al usuario algo falso sobre el estado del catalogo.
+ * **Es el vacio de «no hay nada que mostrar aqui»**, y no ofrece «crea el primero» porque el
+ * disparador del alta ya esta **arriba, fuera de los tres estados** (`user-create-action.tsx`):
+ * ofrecerlo tambien aqui seria un segundo camino a la misma accion, que ademas apareceria o no
+ * segun el estado de la lista.
  *
- * **Y por la misma razon no se anuncia que falte nadie** (R11): la ausencia del actor no se
- * compensa, ni con una fila, ni con un aviso.
+ * **Este archivo decia antes otra cosa, y era falsa.** Argumentaba que llegar aqui solo podia
+ * significar «la busqueda no encontro nada», porque «siempre existe al menos un usuario, el actor».
+ * Existir existe, pero **el actor no se ve en su propio listado** (R11), asi que una instalacion
+ * recien sembrada —un unico usuario, el que esta mirando— aterriza en este vacio con el catalogo
+ * lleno al 100%%. Como el boton del alta vivia dentro de la tabla, y la tabla solo se monta con
+ * filas, ese vacio no tenia salida: no habia forma de crear al segundo usuario. Corregido el
+ * 2026-09-17 subiendo el alta fuera de los estados; el vacio no gano ninguna accion.
+ *
+ * **No se anuncia que falte nadie** (R11): la ausencia del actor no se compensa, ni con una fila,
+ * ni con un aviso.
  *
  * Las dos salidas que si son utiles, y solo cuando aplican:
  *

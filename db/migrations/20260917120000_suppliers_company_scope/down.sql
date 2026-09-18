@@ -13,6 +13,12 @@
 --   3. si dos proveedores vivos de empresas distintas comparten nombre, el indice unico GLOBAL
 --      no se puede recrear, y renombrar o borrar la fila que estorba descartaria dato de un
 --      cliente.
+--
+-- SALIDA TEMPRANA SOBRE UNA BASE VACIA (mismo arreglo que el UP): con las dos tablas en cero no
+-- hay nada que proteger --ni proveedor ajeno, ni linea ajena, ni nombre repetido entre
+-- empresas--, asi que las tres guardias ni se plantean. Mismo idioma que
+-- `db/migrations/20260904180600_companies_and_user_company`. En cuanto hay una sola fila, el
+-- `RETURN` no se dispara y las tres guardias siguen abortando igual.
 
 -- ---------------------------------------------------------------------------------------
 -- 0. `NO FORCE` temporal en las cuatro tablas, por lo mismo que en el UP: con RLS forzada y sin
@@ -37,7 +43,13 @@ DECLARE
   foreign_line_rows   BIGINT;
   duplicated_names    BIGINT;
   duplicated_rows     BIGINT;
+  existing_rows       BIGINT;
 BEGIN
+  SELECT (SELECT count(*) FROM "suppliers")
+       + (SELECT count(*) FROM "supplier_catalog_lines")
+    INTO existing_rows;
+  IF existing_rows = 0 THEN RETURN; END IF;
+
   -- 1.1. GUARDIA 1 — identificar la empresa que escribio el UP, igual que en el UP (por
   -- `name_normalized`, con el unico fallback de una sola empresa) y nunca por identificador.
   SELECT count(*) INTO named_company_rows

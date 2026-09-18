@@ -69,8 +69,14 @@ function fuentesDe(dir: string): readonly string[] {
   });
 }
 
+// El puerto de `unidades` publica dos metodos y este modulo solo usa el primero. El segundo
+// se dobla lanzando, no devolviendo vacio: si algun dia una llamada nueva lo alcanzara, es un
+// acoplamiento que tiene que salir en rojo aqui en vez de pasar en silencio.
 const units: UnitCatalog = {
   findRefs: vi.fn(async () => []),
+  findRefsSharingBaseInCompany: vi.fn(async () => {
+    throw new Error('proveedores no pide unidades hermanas de base');
+  }),
 };
 
 describe('R32 — `proveedores` sigue SIN puerto de almacenamiento, y esta ficha no le crea uno', () => {
