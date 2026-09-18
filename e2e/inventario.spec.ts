@@ -17,9 +17,9 @@
  *    no suponerlo.
  *
  * QC-90 (T13) lo amplia con el PRIMER LOTE, que el alta crea siempre en `product_batches`:
- *  - un alta con presentacion y **solo costo total**, donde el costo unitario del lote lo DERIVA
- *    el servidor (`total / existencia` a 4 decimales) — es el unico sitio del repo donde esa
- *    derivacion se ejercita de punta a punta, navegador -> Server Action -> Postgres (QC-90 R32);
+ *  - un alta donde se escribe **solo el costo total** y el unitario lo rellena la pantalla
+ *    (`total / existencia` a 2 decimales) — es el unico sitio del repo donde esa derivacion se
+ *    ejercita de punta a punta, navegador -> Server Action -> Postgres;
  *  - elegir un producto que YA EXISTE en el autocomplete: se le agrega otro lote y no nace un
  *    segundo producto (QC-90 R17, R18).
  * El importe se lee de vuelta de la base con `unit_cost::text`, NUNCA como `number`: es la unica
@@ -128,10 +128,11 @@ const qtyAlertValue = '3';
 /**
  * Costo unitario del recorrido de QC-22. Desde QC-90 el alta crea SIEMPRE un lote y exige uno de
  * los dos costos (R11): sin ninguno el panel rechaza y este recorrido -que afirma sobre el rol, el
- * panel y la lista, no sobre importes- se quedaria con el panel abierto para siempre. Se escribe
- * el unitario, que es el camino que NO deriva nada.
+ * panel y la lista, no sobre importes- se quedaria con el panel abierto para siempre. Dos
+ * decimales, que es lo que el campo deja teclear; escribirlo rellena tambien el costo total, cosa
+ * que este recorrido no afirma -la afirma el de mas abajo-.
  */
-const unitCostValue = '3.7500';
+const unitCostValue = '3.75';
 
 /**
  * Recorrido de QC-90 R32: presentacion y SOLO costo total. Los nombres cuelgan de `productName` y
@@ -147,15 +148,19 @@ const costProductName = `${productName}_costo`;
 const costPresentationName = `${presentationName}_c`;
 
 /**
- * Los numeros del alta con solo costo total. NO son divisibles de forma exacta ni trivial: la
- * division `8000.05 / 7` da `1142.86428571...`, cuyo quinto decimal es `8`. Asi el assert
- * distingue el redondeo correcto (`1142.8643`) de un truncado (`1142.8642`) y de cualquier
- * paseo por coma flotante; con un total divisible los tres darian lo mismo y el test no probaria
- * nada (QC-90 R7).
+ * Los numeros del alta que escribe SOLO el costo total. NO son divisibles de forma exacta ni
+ * trivial: la division `8000.05 / 7` da `1142.86428571...`. Asi el assert distingue el redondeo
+ * correcto de un truncado y de cualquier paseo por coma flotante; con un total divisible los tres
+ * darian lo mismo y el test no probaria nada.
+ *
+ * Quien deriva es el PANEL, no el servidor, y lo hace a 2 decimales: `1142.86428...` mitad arriba
+ * es `1142.86`, y eso viaja escrito en el campo del unitario. La columna es `decimal(14,4)`, asi
+ * que en la base se lee con sus cuatro (`1142.8600`).
  */
 const costStockValue = '7';
 const costTotalValue = '8000.05';
-const derivedUnitCost = '1142.8643';
+const derivedUnitCost = '1142.86';
+const derivedUnitCostStored = '1142.8600';
 
 /**
  * Recorrido de QC-90 R17/R18: el mismo producto se da de alta DOS veces. La segunda se elige del
@@ -166,8 +171,8 @@ const repeatProductName = `${productName}_repetido`;
 const repeatPresentationName = `${presentationName}_r`;
 const repeatStockValue = '4';
 const repeatQtyAlertValue = '2';
-const firstBatchUnitCost = '5.5000';
-const secondBatchUnitCost = '9.9999';
+const firstBatchUnitCost = '5.50';
+const secondBatchUnitCost = '9.99';
 const ignoredStockValue = '99';
 const ignoredQtyAlertValue = '77';
 
@@ -181,7 +186,7 @@ const lotProductName = `${productName}_lote`;
 const lotPresentationName = `${presentationName}_l`;
 const lotStockValue = '5';
 const lotQtyAlertValue = '2';
-const lotUnitCostValue = '4.2500';
+const lotUnitCostValue = '4.25';
 
 /**
  * Segundo lote sobre un producto ya existente, con la MISMA presentacion en los dos altas: al
@@ -527,8 +532,13 @@ test.describe('catalogo de productos', () => {
     // POR QUE EN E2E Y NO SOLO EN INTEGRACION: la derivacion ya tiene su test de dominio (T1) y su
     // test contra Postgres (T8), pero ninguno de los dos pasa por el navegador. QC-90 R32 pide
     // justo eso: que el importe salga del `<input>` como CADENA, cruce la Server Action sin
-    // convertirse en `number` y llegue a `decimal(14,4)` con sus cuatro decimales. Un `parseFloat`
-    // colado en el formulario dejaria los otros dos tests en verde y solo este en rojo.
+    // convertirse en `number` y llegue a `decimal(14,4)`. Un `parseFloat` colado en el formulario
+    // dejaria los otros dos tests en verde y solo este en rojo.
+    //
+    // Escribir el total rellena el campo del unitario en la propia pantalla, a 2 decimales, asi
+    // que lo que se ejercita ya no es `deriveUnitCost` -viva en el dominio para el resto de
+    // llamantes- sino la derivacion del panel. Lo que vigila es lo mismo: que el importe no toque
+    // la coma flotante entre el `<input>` y Postgres.
     await loginAndLand(page, adminUser);
 
     await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
@@ -543,12 +553,13 @@ test.describe('catalogo de productos', () => {
     // La presentacion es OBLIGATORIA en el alta (QC-90 R2) y se crea aqui mismo.
     await crearPresentacionEnLinea(page, costPresentationName);
 
-    // SOLO el costo total: el unitario se deja vacio a proposito, que es la premisa de R7.
+    // SOLO se ESCRIBE el costo total. El unitario no se teclea: lo rellena la pantalla al vuelo,
+    // dividiendo por la existencia.
     await page.getByTestId('product-field-totalCost').fill(costTotalValue);
     await expect(
       page.getByTestId('product-field-unitCost'),
-      'el recorrido pierde su sentido si el unitario viaja escrito',
-    ).toHaveValue('');
+      'escribir el total tiene que rellenar el unitario sin tocarlo',
+    ).toHaveValue(derivedUnitCost);
 
     await guardarAlta(page);
 
@@ -570,8 +581,8 @@ test.describe('catalogo de productos', () => {
     expect(lotes, 'el alta debe crear exactamente un lote').toHaveLength(1);
     expect(
       lotes[0]?.unit_cost,
-      `${costTotalValue} / ${costStockValue} redondeado a 4 decimales`,
-    ).toBe(derivedUnitCost);
+      `${costTotalValue} / ${costStockValue} redondeado a 2 decimales por el panel, guardado en decimal(14,4)`,
+    ).toBe(derivedUnitCostStored);
     expect(lotes[0]?.stock, 'la existencia escrita tambien va al lote').toBe(
       Number(costStockValue),
     );
