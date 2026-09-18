@@ -25,7 +25,7 @@
 
 ## Tanda 1 — la base
 
-- [ ] **T1 — Modelo y migración de `inventory_movements`.**
+- [x] **T1 — Modelo y migración de `inventory_movements`.**
       Modelo `InventoryMovement` en el esquema, con `/// @module inventario`, y migración escrita a
       mano con: tabla, las tres FK (`product_batches`, `companies`, `users`), los tres índices, los
       dos CHECK (`quantity <> 0`, `reason` coherente con `kind`), RLS `ENABLE` + `FORCE` sin
@@ -38,7 +38,7 @@
       `db/migrations/<timestamp>_inventory_movements/migration.sql`,
       `db/migrations/<timestamp>_inventory_movements/down.sql`.
 
-- [ ] **T2 — Integración: las restricciones muerden de verdad.** Depende de T1.
+- [x] **T2 — Integración: las restricciones muerden de verdad.** Depende de T1.
       Un caso por restricción: `quantity = 0` rechazado; `kind='adjustment'` sin motivo rechazado;
       `kind='opening'` con motivo rechazado; asiento con empresa distinta de la del lote rechazado
       con el identificador `inventory_movements_company_differs_from_batch`; `stock` negativo por
