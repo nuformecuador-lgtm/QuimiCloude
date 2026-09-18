@@ -10,6 +10,8 @@
  * Aprobada por el humano el 2026-09-17 en la puerta F1.4 de QC-92.
  * **Octava enmienda, el 2026-09-18**: `ai_unavailable`.
  * Aprobada por el humano el 2026-09-18.
+ * **Novena enmienda, el 2026-09-18**: `presentation_unit_locked`.
+ * Aprobada por el humano el 2026-09-18.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -69,6 +71,9 @@ export const ERROR_CODES = [
   // Distinto de `unexpected`: la entrada era correcta, lo que fallo es que el proveedor de IA no
   // respondio o agoto el plazo.
   'ai_unavailable',
+  // Distinto de `invalid_input`: la entrada tiene forma valida y lo que falla es que la
+  // presentacion ya tiene lotes en la unidad que se quiere reemplazar.
+  'presentation_unit_locked',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

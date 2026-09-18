@@ -10,6 +10,7 @@ export {
   PresentationNotFoundError,
   PresentationDuplicateNameError,
   PresentationInUseError,
+  PresentationUnitLockedError,
   ValidationError,
   BatchDuplicateLotError,
   BatchNotFoundError,
