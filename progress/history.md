@@ -3981,3 +3981,47 @@ llegado de `dev` que nunca vio el cambio—. El mapa de trazabilidad se re-midi�
 `Transaction API error: Unable to start a transaction in the given time` —pool agotado, no
 aserción—; aislado pasó 3/3 y en la repetición del gate pasó. Saturación, con otras dos sesiones
 trabajando en la misma máquina.
+
+## QC-59 — aislamiento-por-empresa-en-proveedores (cerrada el 2026-09-17, PR #84, merge `b8e3d5e`)
+
+**Cierra el arco multiempresa**: proveedores era el último módulo sin acotar —inventario QC-49,
+unidades QC-76, pedidos QC-60, recetas QC-50— y con él **se desbloquea QC-61**. La viñeta de deuda
+de `docs/architecture.md` que los enumeraba **se borró entera**, no se dejó vacía.
+**38/38 tasks, 39/39 requisitos con test, sin dependencias nuevas.**
+
+**La decisión de fondo, y es la que la distingue de sus tres hermanas**: QC-52 había cortado a
+propósito el puerto de `proveedores` hacia `inventario`, así que la frontera de la presentación
+**la pone la base**, con dos claves foráneas compuestas —`(empresa, presentación)` y
+`(empresa, proveedor)`— en vez de una consulta. Cero acoplamiento nuevo, verificado por grep.
+Eso obliga a que **la línea gane columna de empresa**, apartándose de QC-50: lejos de traer el
+riesgo que allí se evitaba —dos datos que se contradicen—, la segunda clave **lo elimina**.
+Cuesta **dos índices únicos redundantes** `(company_id, id)`, uno en una tabla de `inventario`;
+sin ellos Postgres rechaza la FK con `42830`, comprobado quitándolos en una transacción.
+
+**La unidad no se puede cerrar por ahí** —una FK compuesta no sabe decir «la de sistema o la mía»—,
+así que se valida en el service consumiendo un catálogo que **ya llegó acotado** desde QC-50.
+
+**La trampa heredada volvió a estar ahí**: `suppliers_name_unique` es **PARCIAL**, como el de
+recetas. Afirmado desde tres ángulos independientes y los tres comprobados falsables.
+
+**Ninguna lista se aflojó en 23 anclajes.** El spec anticipaba catorce; siete no estaban previstos
+y **dos ni siquiera existían como listas cerradas** —eran `toContain` sueltos— y quedaron como
+censos `toEqual`. Una sola aserción eliminada en todo el diff, sustituida por otra más estricta.
+
+**Una enmienda al diseño, ratificada por el humano**: `dev` había dado a las otras tres migraciones
+de empresa una salida temprana sobre base vacía (`38252c5`) y esta se quedó fuera **por accidente
+de calendario**. Sin ella, sobre una base vacía la migración abortaba: **ningún test de integración
+corría y no se podía levantar un entorno nuevo**. Se añadió el mismo `RETURN` verbatim, se
+enmendaron `design.md > 7.2` y `> 7.3` con nota fechada, y **se escribió el test que faltaba** —el
+hueco que la review señaló—: la guardia de empresa unívoca sigue abortando en cuanto hay una fila.
+
+**Lo que más enseña, y no es del código**: el gate completo cazó una lista cerrada que **cinco
+tandas y 22 anclajes no vieron**, porque su valor correcto **solo era conocible después del merge**
+—el E2E no existía cuando se tensaron las listas, y `dev` movió el número por su cuenta—. Y dos
+subagentes se plantaron con razón: uno **se negó a seguir T15** porque habría aflojado una lista, y
+otro **revirtió sus propias citas de ficha** antes de commitear.
+
+**Verificación**: gate completo verde (530 archivos, 7769 tests, 0 rojos) con la máquina en reposo.
+E2E verde en Chromium y WebKit —el diálogo de borrado **sí** era ejercitable, y la sustitución del
+id se repite en la fase de **captura** del `submit`, porque React reescribe el `defaultValue` y sin
+eso el verde sería falso—. Review aprobada con **0 bloqueantes**.
