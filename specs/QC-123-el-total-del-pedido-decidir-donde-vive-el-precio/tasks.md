@@ -44,13 +44,20 @@ Archivos: `lib/modules/pedidos/domain/order-cost.ts` (nuevo).
 - `calculateIngredientsCost(input): string | null` según `design.md > 4`.
 - Aritmética `BigInt` sobre enteros escalados, escala interna 12, redondeo `HALF_UP` a 4
   decimales **una sola vez al final**, en una constante con nombre.
-- Comparador de lotes: `purchase_date` ascendente, desempate por lote (`design.md > 5.2`).
-- Los cuatro caminos de «sin importe» devuelven `null` y son **indistinguibles**.
+- Comparador de lotes: `purchase_date` ascendente y desempate **numérico si los dos números de
+  lote son solo dígitos, como texto si alguno trae otros caracteres** (`[D18]`, `R25`,
+  `design.md > 5.2`).
+- Conversión de **cantidad Y coste unitario** a la unidad de la línea (`[D19]`, `R26`,
+  `design.md > 5.3`).
+- **Guarda de desbordamiento** (`[D17]`, `R24`): si el resultado redondeado no cabe en
+  `Decimal(14,4)`, devuelve `null`. Va **aquí**, en el dominio, no como `catch` del `22003` en el
+  adaptador.
+- Los **cinco** caminos de «sin importe» devuelven `null` y son **indistinguibles**.
 
 **Hecho cuando:** `tests/unit/pedidos/order-cost.test.ts` cubre cobertura justa, insuficiente por
-una milésima, dos lotes con misma fecha de compra, unidades convertibles, unidades sin base común,
-receta sin líneas, producto sin lotes, y promedio simple de dos lotes de coste distinto — **todo
-sin base de datos**.
+una milésima, dos lotes con misma fecha de compra (con lotes `'9'` y `'10'`), unidades
+convertibles, unidades sin base común, receta sin líneas, producto sin lotes, promedio simple de
+dos lotes de coste distinto y un resultado que desborda la columna — **todo sin base de datos**.
 
 ## T3 — `inventario` publica los lotes costeables `[P con T2]` `[depende de T0]`
 
@@ -142,8 +149,10 @@ Archivos: `tests/integration/pedidos/order-ingredients-cost.int.test.ts` (nuevo)
 - **Aislamiento**: un lote de otra empresa no entra en el cálculo.
 - **Solo lectura**: tras alta y edición, `product_batches` e `inventory_movements` quedan
   **byte a byte igual**.
+- **Desbordamiento** (`[D17]`, `R24`): un pedido cuyo importe no cabe en la columna **queda
+  creado**, con `ingredients_cost` en `NULL`, y la base **no** devuelve `22003`.
 
-**Hecho cuando:** el archivo pasa contra la base de test y demuestra los seis puntos.
+**Hecho cuando:** el archivo pasa contra la base de test y demuestra los siete puntos.
 
 ## T11 — Cierre `[depende de todas]`
 
@@ -185,3 +194,6 @@ E2E se difiere a **QC-122**.
 | R21 | `order-ingredients-cost.int.test.ts` — «(R14, R21)» de arriba, y «un lote de otra empresa no entra en el cálculo (R21)» |
 | R22 | `order-ingredients-cost.int.test.ts` — «tras el alta y la edición, los lotes y los asientos quedan intactos (R22)»; `tests/unit/inventario/product-catalog-costing.test.ts` — «el contrato de costeo no expone ninguna escritura (R22)» |
 | R23 | `tests/unit/pedidos/create-order.test.ts` y `.../update-order.test.ts` — «sin pedidos.modificar no se lee ni un lote ni una unidad (R23)», con dobles que fallan si se los llama |
+| R24 | `order-cost.test.ts` — «un importe que no cabe en decimal(14,4) sale sin número y no distinguible de los otros cuatro casos (R24)»; `tests/unit/pedidos/create-order.test.ts` — «el alta se completa aunque el importe desborde (R24)»; `order-ingredients-cost.int.test.ts` — «el pedido queda creado con el importe en blanco y la base no lanza 22003 (R24)» |
+| R25 | `order-cost.test.ts` — «con la misma fecha de compra el lote 9 se usa antes que el 10 (R25)» y «si un número de lote no es solo dígitos el desempate es por texto (R25)» |
+| R26 | `order-cost.test.ts` — «convierte también el coste unitario a la unidad de la línea: 20.000 por bidón de 20 L son 1.000 por litro (R26)» y «no promedia costes unitarios de unidades distintas (R26)» |

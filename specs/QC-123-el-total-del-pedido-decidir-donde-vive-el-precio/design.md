@@ -240,7 +240,9 @@ productos, y las unidades implicadas.
       último usado. Si al agotar los lotes **no se cubre** → `null` (`R8`, `[D5]`).
    5. `costeLínea = promedioSimple(costesUnitariosNormalizados de los lotes USADOS) × necesaria`
       (`R5`, `[D4]`).
-3. `importe = Σ costeLínea`, redondeado una sola vez a 4 decimales.
+3. `importe = Σ costeLínea`, redondeado una sola vez a 4 decimales. **Si el resultado redondeado
+   no cabe en `Decimal(14,4)` → `null`** (`R24`, `[D17]`, quinto caso): se comprueba **aquí**, en
+   el dominio, antes de que el valor llegue al puerto.
 4. En **cualquier** camino de fallo se devuelve `null`, sin dato de diagnóstico en la salida
    (`R9`). El motivo sí puede ir al **registro del servidor** como diagnóstico, nunca al
    navegador — mismo criterio que `convert-quantity.ts:196-201` y `docs/conventions.md > Manejo de
@@ -276,16 +278,23 @@ receta vista desde fuera».
 columna es `String` y el correlativo se genera **sin relleno de ceros**
 (`product-prisma.ts:298-321`), así que `'10' < '9'` en orden de texto.
 
-**Decisión de diseño:** el desempate lo hace el **dominio**, no el `ORDER BY` de SQL, y compara
-**numéricamente cuando los dos lotes son solo dígitos**; si alguno no lo es, compara como texto.
-Es determinista en los dos casos, respeta la intención de `[D3]` para la serie que el backend
-genera, y es **puro y testeable sin base**. Por eso `findCostingBatches` **no ordena** (`> 1.1`):
-el orden es criterio de negocio de quien costea.
+**Decisión cerrada `[D18]` (humano, 2026-09-18, al aprobar el spec): se adopta esta propuesta.** El
+desempate lo hace el **dominio**, no el `ORDER BY` de SQL, y compara **numéricamente cuando los dos
+números de lote son solo dígitos**; si alguno trae cualquier otro carácter, compara **como texto**
+(`R25`). Es determinista en los dos casos, respeta la intención de `[D3]` para la serie que el
+backend genera, y es **puro y testeable sin base**. Por eso `findCostingBatches` **no ordena**
+(`> 1.1`): el orden es criterio de negocio de quien costea.
 
-> **Esto es una lectura del diseño sobre `[D3]`, no una decisión cerrada.** Si el humano prefiere
-> orden de texto puro, cambia una función de comparación y su test, nada más. Está reportado.
+**No se toca la generación de lotes de QC-81 y no se migra nada**: el problema se resuelve en el
+comparador, no en los datos.
 
 ### 5.3 Unidades distintas por lote (hallazgo H2) y dirección de la conversión
+
+**Decisión cerrada `[D19]` (humano, 2026-09-18, al aprobar el spec).** Se convierte **la cantidad Y
+el coste unitario**, los dos, a la unidad de la línea de receta (`R26`). Un lote a **20.000 por
+bidón de 20 L son 1.000 por litro**. El porqué, escrito para que nadie lo «simplifique» después:
+**convertir la cantidad sin convertir el coste promedia números que miden cosas distintas, y el
+importe sale mal sin avisar** — no falla, no lanza, solo da un número equivocado.
 
 Todo se normaliza **a la unidad de la línea de receta**, que es la única común a todos los lotes
 de ese ingrediente:
@@ -302,8 +311,16 @@ propaga: un ingrediente incosteable no es un error de la edición, es un pedido 
 
 Las `UnitConversion` salen de `UnitCatalog.findRefs(ids, companyId)`
 (`unit-catalog.ts:38`), con **una sola llamada** para todas las unidades implicadas (las de las
-líneas más las de los lotes, deduplicadas). `pedidos` **recupera** la dependencia `units` que
-QC-35bis le quitó (`order-view.ts:13-17`), ahora con un motivo real.
+líneas más las de los lotes, deduplicadas).
+
+**Retroceso consciente sobre QC-35bis.** `pedidos` **recupera** la dependencia `units` que aquella
+ficha le quitó a propósito el 2026-09-07 —al salir la unidad del pedido «se cayó la única razón por
+la que `pedidos` hablaba con ese módulo» (`lib/modules/pedidos/domain/order-view.ts:13-17`)—. Se
+vuelve atrás con un motivo nuevo y real: `[D6]` exige convertir, y convertir exige saber de qué
+unidad deriva cada una y con qué factor, que es lo que `UnitCatalog` publica. **El humano lo dio
+por bueno al aprobar el spec (2026-09-18)**: es consecuencia directa de `[D6]`. Lo que NO vuelve es
+la unidad *del pedido*: `orders` no recupera ninguna columna de unidad y `NewOrder` sigue sin
+declararla.
 
 ---
 
@@ -407,18 +424,38 @@ propiedad (`findCostingBatches`), apuntando al adaptador driven nuevo de `invent
 
 ---
 
-## 10. Lo que este diseño deja abierto (decisión humana)
+## 10. Lo que este diseño dejó abierto, y cómo se cerró (F1.4, 2026-09-18)
 
-1. **Desbordamiento de `Decimal(14,4)`.** `quantity` del pedido y del ingrediente son `(14,4)`
-   cada una: su producto por un coste unitario **puede** superar `9 999 999 999,9999` y hacer que
-   Postgres rechace el `INSERT`/`UPDATE` con `22003`. **Posición por defecto propuesta** (no
-   decidida por el humano): el importe que no cabe en la columna se trata como **sin importe**
-   (`null`), con el diagnóstico al log del servidor; es la salida que el usuario ya entiende y no
-   convierte un alta legítima en un error sin traducir. Añadirlo significaría un **quinto caso**
-   de «sin importe», y `[D5]` dice «cuatro»: por eso no se cierra aquí.
-2. **El desempate por número de lote** (`> 5.2`): texto vs. numérico. Propuesta escrita, pendiente
-   de confirmación.
-3. Las **tres preguntas abiertas** de `requirements.md` siguen abiertas y este diseño no las
-   cierra: la moneda (`[D11]`), cuántos productos reales caen en el caso «bidón» (QC-130) y —la
-   única que sí era para el diseño— el cómo habla `pedidos` con `inventario`, que **queda resuelta
-   en `> 1`**.
+### 10.1 Desbordamiento de `Decimal(14,4)` — CERRADO `[D17]`
+
+`quantity` del pedido y `quantity` de la línea son `(14,4)` cada una: su producto por un coste
+unitario **puede** superar `9 999 999 999,9999`, y escribirlo haría que Postgres rechazara el
+`INSERT`/`UPDATE` con `22003`.
+
+**Decisión del humano (2026-09-18):** el importe que no cabe en la columna se trata como **sin
+importe** (`null`); **el pedido se crea o se edita igual** (`R24`). El diagnóstico —que fue
+desbordamiento y con qué factores— va **al registro del servidor**, nunca a la salida: hacia fuera
+es indistinguible de los otros cuatro casos (`R9`). El motivo, con sus palabras: **el pedido nunca
+se pierde por un importe demasiado grande**.
+
+**Esto ENMIENDA `[D5]`, de cuatro casos a CINCO**, y así queda escrito en la tabla de decisiones de
+`requirements.md` y en `R8`: la fila de `[D5]` **no se reescribe**, se anota. La comprobación es
+**del dominio, antes de escribir** —`calculateIngredientsCost` devuelve `null` si el resultado
+redondeado no cabe en `(14,4)`—, y no un `catch` del `22003` en el adaptador: así se prueba sin
+base y el puerto nunca recibe un valor que la columna no admita.
+
+### 10.2 Desempate por número de lote — CERRADO `[D18]`
+
+Se adopta la propuesta del diseño. Detalle y motivo en `> 5.2`, requisito `R25`.
+
+### 10.3 Unidades mezcladas — CERRADO `[D19]`
+
+Se convierte cantidad **y** coste unitario. Detalle y motivo en `> 5.3`, requisito `R26`.
+
+### 10.4 Lo que SIGUE abierto
+
+Las **preguntas abiertas 1 y 2** de `requirements.md` siguen abiertas y **esta ficha no las
+cierra**: la **moneda por empresa** (`[D11]`, punto 5 de `docs/architecture.md > Preguntas
+abiertas del dominio`) y **cuántos productos reales caen en el caso «bidón»** (la cierra QC-130).
+La pregunta abierta 3 —cómo habla `pedidos` con `inventario`— era la única que se dejó al diseño y
+**queda resuelta en `> 1`**.

@@ -59,11 +59,12 @@ presentación para resolverlo `[D6]`.
 necesaria de algún ingrediente, algún ingrediente no tiene coste por unidades no convertibles, la
 receta **no tiene ingredientes**, o el pedido es **anterior a la columna**—, ENTONCES el pedido
 DEBE quedar **sin importe**: el sistema NO DEBE devolver ni guardar un número parcial, y NO DEBE
-devolver ni guardar `0` `[D5]` `[D7]` `[D9]`.
+devolver ni guardar `0` `[D5]` `[D7]` `[D9]`. **Enmendado el 2026-09-18 `[D17]`: los casos pasan a
+ser CINCO, con el desbordamiento de R24 como quinto.**
 
 **R9.** MIENTRAS un pedido está sin importe, el sistema DEBE devolver **exactamente la misma
-salida** sea cual sea el caso de los cuatro que lo causó: ninguna salida, mensaje ni código
-distingue entre ellos `[D5]` `[D7]`.
+salida** sea cual sea el caso de los **cinco** que lo causó: ninguna salida, mensaje ni código
+distingue entre ellos `[D5]` `[D7]` `[D17]`.
 
 **R10.** CUANDO se **crea** un pedido, el sistema DEBE calcular el importe con los lotes vigentes
 en ese instante y **guardarlo en el pedido** `[D8]`.
@@ -118,6 +119,22 @@ entra»).
 en la edición: un actor sin ese permiso no dispara ninguna lectura de recetas, unidades ni lotes
 (`docs/architecture.md > Acceso a datos y autorizacion`).
 
+> **Requisitos añadidos el 2026-09-18 (F1.4).** El humano aprobó el spec y cerró las tres
+> preguntas que `design.md` dejaba abiertas. `R24`–`R26` salen de `[D17]`, `[D18]` y `[D19]`.
+
+**R24.** SI el importe calculado **no cabe** en la precisión decimal de la columna, ENTONCES el
+sistema DEBE **crear o editar el pedido igual** y dejar su importe **en blanco**, con la misma
+salida que los otros cuatro casos sin importe; el sistema NO DEBE rechazar el alta ni la edición
+por esa causa `[D17]`.
+
+**R25.** CUANDO dos lotes del mismo ingrediente empatan en fecha de compra, el sistema DEBE
+desempatar comparando sus números de lote **numéricamente si ambos son solo dígitos**, y **como
+texto** si alguno trae cualquier otro carácter `[D18]`.
+
+**R26.** CUANDO la unidad de un lote y la de la línea de receta son distintas pero comparten base,
+el sistema DEBE convertir a la unidad de la línea **tanto la existencia como el coste unitario**
+del lote, y NO DEBE promediar costes unitarios expresados en unidades distintas `[D19]`.
+
 ### Decisión sin requisito propio
 
 **`[D15]`** —«¿Hace falta E2E aquí?»— **no genera requisito**: no describe comportamiento del
@@ -151,7 +168,7 @@ pantalla—.
 | 2026-09-18 | ¿Qué lotes entran en el cálculo, y en qué orden? | Los que **tienen existencia**, ordenados por **fecha de compra** de la más antigua a la más nueva, acumulando hasta **cubrir** la cantidad necesaria. Desempata el **número de lote**, que es correlativo por empresa (QC-81). No se usa la fecha de vencimiento: es opcional y dejaría huecos en el orden `[D3]` |
 | 2026-09-18 | ¿Cómo se combinan los costes de varios lotes? | **Promedio simple** de los costes unitarios de los lotes usados. **No ponderado**: dos lotes usados pesan igual aunque de uno salga más cantidad que del otro. Decidido así explícitamente, con el caso ponderado sobre la mesa `[D4]` |
 | 2026-09-18 | ¿Y si la unidad de la receta y la del lote no son la misma? | Se convierte con **`convertQuantity`** (QC-76, un solo nivel de derivación) **si las dos unidades comparten base**. Si no la comparten —gramos contra bidones—, ese ingrediente **no tiene coste**. No se toca el esquema: la presentación **no** gana contenido aquí `[D6]` |
-| 2026-09-18 | ¿Cuándo NO hay importe? | Cuatro casos, **indistinguibles entre sí** y todos con el mismo resultado —**sin número**—: la existencia no alcanza a cubrir lo necesario, algún ingrediente no se puede convertir, la receta **no tiene ingredientes**, y los pedidos anteriores a la columna. **Nunca un número parcial y nunca 0**: un cero no se distingue de un pedido cuyos ingredientes salen gratis `[D5]` `[D7]` `[D9]` |
+| 2026-09-18 | ¿Cuándo NO hay importe? | Cuatro casos, **indistinguibles entre sí** y todos con el mismo resultado —**sin número**—: la existencia no alcanza a cubrir lo necesario, algún ingrediente no se puede convertir, la receta **no tiene ingredientes**, y los pedidos anteriores a la columna. **Nunca un número parcial y nunca 0**: un cero no se distingue de un pedido cuyos ingredientes salen gratis `[D5]` `[D7]` `[D9]` — **ENMENDADA el 2026-09-18 por `[D17]`: pasan a ser CINCO casos**, con el desbordamiento como quinto. Lo de arriba no se reescribe: sigue valiendo entero y solo cambia el recuento |
 | 2026-09-18 | ¿El importe se guarda o se calcula al leer? | **Se guarda en el pedido**, y **se recalcula en cada edición** con los lotes de ese día. Entre ediciones queda congelado: comprar un lote caro mañana **no toca** ningún pedido ya creado. **No se recalcula al leer** `[D8]` |
 | 2026-09-18 | ¿Qué pasa con los pedidos que ya existen? | La columna es **opcional** y se quedan **sin importe**. No se rellenan con 0 ni se teclean a mano `[D9]` |
 | 2026-09-18 | ¿Quién puede ver el importe? | Quien tenga **`pedidos.consultar`** —hoy solo el Administrador—. La vía de **`asignaciones`**, por la que el Operador llega a sus pedidos asignados, **no lleva importe**. **No nace permiso nuevo**: el catálogo cerrado de quince no se enmienda y se respeta su forma `<modulo>.consultar` / `<modulo>.modificar` `[D10]` |
@@ -161,3 +178,6 @@ pantalla—.
 | 2026-09-17 | ¿Cómo viaja el importe? | Como **cadena decimal**, **calculado en el servidor**, en `Decimal(14,4)` y nunca `float`. **No entra `decimal.js`** ni ninguna otra dependencia: Prisma ya opera decimales. *Heredado de QC-33 y QC-68, no se reabre* `[D14]` |
 | 2026-09-17 | ¿Hace falta E2E aquí? | **No: se difiere a QC-122, con el motivo escrito ahora.** `CHECKPOINTS.md` lo exige para flujos con importes, pero **esta ficha no tiene pantalla**: sin columna que leer no hay recorrido que ejercitar en un navegador. La cobertura de esta ficha es de **integración contra la base real**. *Mismo criterio y misma ficha destino que QC-68* `[D15]` |
 | 2026-09-01 | Forma de la tabla | Borrado **lógico**, `created_at` / `updated_at` / `deleted_at`, e **identificadores de base en inglés**. *Heredado de QC-4* `[D16]` |
+| 2026-09-18 | ¿Y si el importe calculado no cabe en la columna? | **El pedido se crea igual y su importe queda en blanco**, como los demás casos sin importe. **Esto ENMIENDA `[D5]` de CUATRO casos a CINCO**, y la enmienda se acepta sabiéndolo en vez de disimularla reinterpretando `[D5]`. El motivo: **el pedido nunca se pierde por un importe demasiado grande** — rechazar el alta convertiría un dato derivado en un bloqueo de la operación. *Cerrada por el humano al aprobar el spec (F1.4), sobre `design.md > 10.1`* `[D17]` |
+| 2026-09-18 | ¿Cómo se desempata por número de lote? | **Numéricamente si los dos números son solo dígitos; como texto si alguno trae otros caracteres.** Adopta la propuesta de `design.md > 5.2`, que nació del hallazgo de que `lot` es `String` y el correlativo del backend no lleva relleno de ceros, así que el orden de texto pondría `'10'` antes que `'9'`. **No se toca la generación de lotes de QC-81 y no se migra nada** `[D18]` |
+| 2026-09-18 | ¿Qué se convierte cuando el lote y la línea no usan la misma unidad? | **La cantidad Y el coste unitario**, los dos, a la unidad de la línea de receta: un lote a 20.000 por bidón de 20 L son **1.000 por litro**. El porqué queda escrito: convertir la cantidad sin convertir el coste **promedia números que miden cosas distintas** y el importe sale mal **sin avisar**. Confirma `design.md > 5.3` `[D19]` |
