@@ -283,7 +283,7 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
  * la busqueda real contra Postgres, con sus propias recetas efimeras -tres nombres distintos, una
  * dada de baja- para no interferir con el resto del archivo.
  */
-describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R10, R15)', () => {
+describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R6, R10, R15)', () => {
   const DIA = 21
 
   let recipeAlfaId: string
@@ -419,6 +419,96 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R10, R15)', () =
     expect(conRecipeIdsNull.items.map((o) => o.id)).toEqual(
       conNullExplicito.items.map((o) => o.id),
     )
+  })
+
+  it('R6: el pedido BORRADO con el nombre exacto de su receta no aparece, y el total da cero', async () => {
+    const marca = tokenLetters()
+    const nombre = `Solo Borrado R6 ${marca}`
+    const recipeBorradaR6Id = (
+      await prisma.recipe.create({
+        data: { name: nombre, nameNormalized: normalizeRecipeName(nombre), companyId },
+        select: { id: true },
+      })
+    ).id
+    try {
+      const pedidoBorrado = await alta(instantIn(DIA, 30), { recipeId: recipeBorradaR6Id })
+      await prisma.order.update({
+        where: { id: pedidoBorrado.id },
+        data: { deletedAt: new Date() },
+      })
+
+      // La receta esta VIVA -distinto de R4-: lo que se excluye es el PEDIDO borrado, no su
+      // receta. `AND deleted_at IS NULL` va siempre en el `where`, y la busqueda no lo levanta.
+      const pagina = await buscar(nombre)
+
+      expect(pagina.items).toEqual([])
+      expect(pagina.total).toBe(0)
+    } finally {
+      // El pedido ANTES que su receta: `orders.recipe_id` es FK RESTRICT.
+      await prisma.order.deleteMany({ where: { recipeId: recipeBorradaR6Id } })
+      await prisma.recipe.delete({ where: { id: recipeBorradaR6Id } })
+    }
+  })
+
+  it('R6: un pedido de OTRA empresa con el nombre exacto de su receta no aparece, y el total da cero', async () => {
+    const marca = tokenLetters()
+    const otherCompanyId = (
+      await prisma.company.create({
+        data: {
+          name: `Empresa R6 ${marca}`,
+          nameNormalized: normalizeCompanyName(`Empresa R6 ${marca}`),
+        },
+        select: { id: true },
+      })
+    ).id
+    try {
+      const nombre = `Receta Ajena R6 ${marca}`
+      const otherRecipeId = (
+        await prisma.recipe.create({
+          data: {
+            name: nombre,
+            nameNormalized: normalizeRecipeName(nombre),
+            companyId: otherCompanyId,
+          },
+          select: { id: true },
+        })
+      ).id
+      try {
+        // Alta DIRECTA por Prisma, no por `alta()`: esa siembra siempre en la empresa del
+        // fixture (`scope()`), y este pedido tiene que ser de la OTRA empresa. `createdBy` y
+        // `updatedBy` quedan sin autor: son columnas opcionales y el actor del fixture es de
+        // la empresa contraria.
+        const otherOrder = await prisma.order.create({
+          data: {
+            companyId: otherCompanyId,
+            orderYear: YEAR,
+            orderSequence: 1,
+            recipeId: otherRecipeId,
+            quantity: '10.0000',
+            priority: 'MEDIA',
+            status: 'PENDIENTE',
+            createdAt: instantIn(DIA, 40),
+            updatedAt: instantIn(DIA, 40),
+          },
+          select: { id: true },
+        })
+
+        // El pedido ajeno EXISTE de verdad en la base: si esto fallara, el cero de abajo no
+        // demostraria ningun ambito, solo una fila que nunca llego a crearse.
+        const existeDeVerdad = await prisma.order.findFirst({ where: { id: otherOrder.id } })
+        expect(existeDeVerdad).not.toBeNull()
+
+        const pagina = await buscar(nombre)
+
+        expect(pagina.items).toEqual([])
+        expect(pagina.total).toBe(0)
+      } finally {
+        await prisma.order.deleteMany({ where: { recipeId: otherRecipeId } })
+        await prisma.recipe.delete({ where: { id: otherRecipeId } })
+      }
+    } finally {
+      await prisma.company.delete({ where: { id: otherCompanyId } })
+    }
   })
 })
 
