@@ -470,13 +470,16 @@ describe('QC-81 R31 — ni existencia por lote (QC-91) ni ajuste de inventario (
     const archivosDelModulo = archivosTs(join(repoRoot, MODULO));
     // Mismo ancla que el caso acotado de arriba: sin archivos reales no hay nada que barrer.
     expect(archivosDelModulo.length).toBeGreaterThan(10);
-
     const relativos = archivosDelModulo.map((ruta) => relative(repoRoot, ruta).split('\\').join('/'));
-    const fuentes = archivosDelModulo.map((ruta) => readFileSync(ruta, 'utf8'));
-    // La tubería leer -> detectar corrió sobre cada archivo: ni fue saltada ni fabricada.
-    expect(fuentes).toHaveLength(archivosDelModulo.length);
-    const hallazgosPorArchivo = fuentes.map((fuente) => hallazgosDeAjusteOSuma(fuente));
-    expect(hallazgosPorArchivo).toHaveLength(relativos.length);
+    expect(relativos).toContain(ADAPTADOR_DE_PRODUCTO);
+
+    // Contenido leido de verdad, no cadenas vacias fabricadas.
+    const tamanos = archivosDelModulo.map((ruta) => readFileSync(ruta, 'utf8').length);
+    expect(tamanos.every((n) => n > 0)).toBe(true);
+
+    // El detector se invoco sobre cada archivo y devolvio la forma esperada: sin mirar que hallo.
+    const hallazgosPorArchivo = archivosDelModulo.map((ruta) => hallazgosDeAjusteOSuma(readFileSync(ruta, 'utf8')));
+    expect(hallazgosPorArchivo.every((h) => Array.isArray(h))).toBe(true);
   });
 
   it('R31: los detectores muerden con fuentes fabricados y no con uno limpio', () => {
