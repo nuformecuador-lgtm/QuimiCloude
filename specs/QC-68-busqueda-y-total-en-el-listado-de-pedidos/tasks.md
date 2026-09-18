@@ -265,9 +265,27 @@
 
 ## Bloque E — Cierre
 
-### T21 — Trazabilidad y gate (depende de todo)
+### T21 [x] — Trazabilidad y gate (depende de todo)
 - **Toca**: `progress/impl_QC-68-busqueda-y-total-en-el-listado-de-pedidos.md`
 - Mapa **`R<n> -> test concreto`** para **R1–R16, los dieciséis**, sin ninguno pendiente: como
   exige `CHECKPOINTS.md > Trazabilidad`.
 - **Hecho**: `./init.sh --rapido` verde al cerrar cada tanda y **`./init.sh` completo** verde antes
   del PR, sin excepción. Ningún test que hoy pasa queda borrado ni aflojado (**R15**).
+
+- **Cerrada el 2026-09-18, y la salvedad se escribe en vez de maquillarse.** El mapa R1–R16 está
+  completo y sin casilla pendiente, verificado por el `reviewer` caso por caso y con mutaciones
+  propias. Pero **`./init.sh` completo NO termina en verde**, así que el «sin excepción» de arriba
+  no se cumple al pie de la letra: quedan **dos rojos, los dos AJENOS y los dos con ficha propia**,
+  y ninguno lo toca esta rama.
+  - `tests/unit/configuracion-ui/user-table.test.tsx` (**QC-126**): intermitente — cayó en una
+    corrida completa y no en la siguiente, y aislado pasa 27/27. Error de jsdom
+    (`Not implemented: navigation to another Document`), **no** una expiración: no es la especie
+    de QC-58 y subir el margen de tiempo no puede arreglarlo.
+  - `tests/unit/pedidos-ui/order-form.test.tsx` (**QC-127**): **no es flake** —falla aislado, 1 de
+    33, determinista—. Llegó con el merge del PR #85, que cambió la pantalla a dos decimales,
+    actualizó los casos vecinos y olvidó éste. Verificado sobre `origin/dev` limpio.
+  - **Ninguno de los dos se dio de alta en `tests/baseline-rojos.json`**, por decisión humana del
+    2026-09-18: listarlos apagaría los dos archivos ENTEROS para el comparador (27 y 33 casos) y se
+    prefiere que el rojo siga a la vista con dueño. Los dos se declaran en el PR.
+  - Lo que sí quedó verde y es lo que esta rama controla: typecheck, lint, las **108** fichas del
+    board, las guardias, y `532 archivos / 7833 tests` en verde sobre 533.
