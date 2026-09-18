@@ -1,7 +1,10 @@
+import type { InventoryMovementView } from '../domain/inventory-movement';
 import type { InventoryScope } from '../domain/inventory-scope';
 import type { ListQuery } from '../domain/list-query';
+import type { MovementReason } from '../domain/movement-reason';
 import type { Page } from '../domain/page';
 import type { NewProductBatch } from '../domain/product-batch';
+import type { ProductBatchView } from '../domain/product-batch-view';
 import type { NewProduct, ProductView } from '../domain/product-view';
 
 /**
@@ -116,4 +119,44 @@ export interface ProductRepository {
     now: Date,
     scope: InventoryScope,
   ): Promise<{ batchId: string; lot: string } | null>;
+
+  /**
+   * QC-92: mueve la existencia de un lote por `delta` (con signo) y deja su asiento en el libro,
+   * las dos cosas en la MISMA transaccion. El total nuevo no lo calcula quien llama: lo calcula la
+   * base con un `UPDATE` relativo, para que dos ajustes concurrentes no se pisen el uno al otro.
+   *
+   * Devuelve `null` cuando el lote no existe o es de OTRA empresa -las dos por el mismo camino,
+   * igual que el resto del puerto (R18)-. Un `stock` que quedaria negativo se rechaza antes de
+   * escribir nada; el adaptador decide como lo comunica.
+   *
+   * La empresa no viaja en ningun tipo de entrada, igual que en `NewProduct` y `NewProductBatch`.
+   */
+  adjustBatchStock(
+    batchId: string,
+    delta: number,
+    reason: MovementReason,
+    actorId: string,
+    now: Date,
+    scope: InventoryScope,
+  ): Promise<{ stock: number } | null>;
+
+  /**
+   * QC-92: todos los lotes del producto, siempre que el producto siga VIVO -el filtro de vivos es
+   * del adaptador, como en el resto del puerto-. Un `productId` que no existe, que esta borrado o
+   * que es de otra empresa devuelve un array vacio, por el mismo camino que «no hay lotes».
+   */
+  findBatchesOfAliveProduct(
+    productId: string,
+    scope: InventoryScope,
+  ): Promise<readonly ProductBatchView[]>;
+
+  /**
+   * QC-92: el historial de asientos de un lote, del mas reciente al mas antiguo. `null` cuando el
+   * lote no existe o es de otra empresa (R18); un lote vivo sin ningun asiento -anterior al libro-
+   * devuelve un array vacio, que no es lo mismo que `null`.
+   */
+  findBatchMovements(
+    batchId: string,
+    scope: InventoryScope,
+  ): Promise<readonly InventoryMovementView[] | null>;
 }
