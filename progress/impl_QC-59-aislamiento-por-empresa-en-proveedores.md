@@ -914,7 +914,46 @@ por el que el trabajo se coló en los gates de dos fichas anteriores.
 que los dos guards del diff filtran; si la contuviera, se atribuirían el árbol de trabajo entero y
 el verde sería falso. Comprobado sobre **todos** los commits de la rama, no solo los de esta tanda.
 
-<!-- RESULTADO-T27 -->
+Corrida con el árbol **limpio** (`git status --porcelain` vacío, comprobado en el mismo comando,
+justo después de `ead8acf`):
+
+```
+npx vitest run tests/unit/proveedores-ui/guard-convenciones-proveedores.test.ts
+               tests/unit/proveedores-ui/guard-herencia-armazon-privado.test.ts
+               tests/unit/unidades/consumidores-catalogo.test.tsx
+               tests/guards/guard-qc95-alcance-del-pr-70.test.ts
+               tests/guards/guard-qc102-limites-de-la-ficha.test.ts
+               tests/guards/guard-pantalla-pedidos-se-amplia.test.ts
+
+ ✓ tests/guards/guard-qc102-limites-de-la-ficha.test.ts            (6 tests | 3 skipped)
+ ✓ tests/guards/guard-pantalla-pedidos-se-amplia.test.ts           (10 tests | 2 skipped)
+ ✓ tests/unit/proveedores-ui/guard-herencia-armazon-privado.test.ts (7 tests | 1 skipped)
+ ✓ tests/unit/proveedores-ui/guard-convenciones-proveedores.test.ts (7 tests | 3 skipped)
+ ✓ tests/guards/guard-qc95-alcance-del-pr-70.test.ts               (22 tests)
+ ✓ tests/unit/unidades/consumidores-catalogo.test.tsx              (6 tests | 1 skipped)
+
+ Test Files  6 passed (6)
+      Tests  48 passed | 10 skipped (58)
+```
+
+**Las seis en verde. Y los 10 `skipped` NO se dan por buenos**: se leyó por qué salta cada uno,
+porque un `skip` mudo aquí sería exactamente el agujero que esta task existe para tapar.
+
+| Archivo | Skips | Por qué saltan, leído en el código |
+| --- | --- | --- |
+| `guard-convenciones-proveedores` | 3 | Los tres casos que miran el **diff** derivan de `archivosTocadosPorLaFeature()`, que filtra `git log origin/dev..HEAD` **por la marca de su propia ficha**. Ningún commit de esta rama la lleva, así que devuelve `null` y los tres saltan con motivo escrito. **Eso es el resultado correcto, no una omisión**: esos tres casos vigilan el alcance de *aquella* ficha, y si nuestros commits llevaran su marca se atribuirían nuestro árbol —que sí toca `lib/modules/**` y `db/**`— y saldrían **rojos** por trabajo que no es suyo. Los otros 4 casos del archivo **sí midieron** el árbol entero y están verdes |
+| `guard-herencia-armazon-privado` | 1 | mismo mecanismo y misma marca |
+| `guard-qc102-limites-de-la-ficha` | 3 | precondición de **rama** declarada en su cabecera: solo miden estando en su propia rama; fuera hacen `ctx.skip` **ruidoso** diciendo que no han comprobado nada |
+| `guard-pantalla-pedidos-se-amplia` | 2 | idem, precondición de rama |
+| `consumidores-catalogo` | 1 | idem |
+
+Es decir: **ningún skip esconde una comprobación que debiera habernos medido a nosotros**, y el
+verde no viene de un diff vacío —`guard-qc95`, que sí resuelve su merge-base y lee 22 casos contra
+el árbol de un merge real, corrió entero sin saltarse nada—.
+
+**La regla de higiene sigue cumpliéndose y se verificó**: `git log --format='%H %s%n%b'
+origin/dev..HEAD | grep -c 'QC-44'` devuelve **0** sobre los **diez** commits de la rama, cuerpo
+incluido, no solo el asunto.
 
 ### Lo que NO se hizo
 

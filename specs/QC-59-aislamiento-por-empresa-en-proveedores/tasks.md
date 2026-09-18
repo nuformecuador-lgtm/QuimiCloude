@@ -333,7 +333,7 @@
   ámbito.
   Cubre: R36.
 
-- [ ] **T27 — Las listas que comparan el DIFF contra `origin/dev`: correr DESPUÉS del primer commit.**
+- [x] **T27 — Las listas que comparan el DIFF contra `origin/dev`: correr DESPUÉS del primer commit.**
   Archivos: ninguno, salvo que muerdan.
   Contenido: `design.md > 0.11`. Tras el **primer commit** de la rama, correr
   `tests/unit/proveedores-ui/guard-convenciones-proveedores.test.ts`,
