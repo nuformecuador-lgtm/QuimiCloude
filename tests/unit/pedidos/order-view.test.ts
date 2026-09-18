@@ -109,7 +109,7 @@ describe('pedidos — la salida de las consultas (R40, R46, R47)', () => {
     expect(enLaVista).toBe(true)
   })
 
-  it('los filtros del listado son solo estado, prioridad y fecha, y no hay busqueda', () => {
+  it('los filtros del listado son solo estado, prioridad y fecha, y la busqueda ya se abrio (R11)', () => {
     // R38/R39 heredados, dichos sobre la forma NUEVA. QC-57 (R25) borro `OrderFilters`: estado
     // y prioridad dejaron de ser parametros propios del listado y son filtros `select` del
     // contrato generico. Lo que aquel tipo garantizaba lo garantiza ahora la lista blanca, y se
@@ -122,8 +122,10 @@ describe('pedidos — la salida de las consultas (R40, R46, R47)', () => {
     expect(ORDER_QUERYABLE.filterable.status).toBe('select')
     expect(ORDER_QUERYABLE.filterable.priority).toBe('select')
 
-    // R17: `orders` no tiene columna `name`. Es la UNICA de las siete que no busca.
-    expect(ORDER_QUERYABLE.searchable).toBe(false)
+    // Nota fechada 2026-09-18: `orders` no tiene columna `name` propia, pero desde QC-68 la
+    // busqueda casa por el nombre de la receta del pedido, resuelta antes de llegar al puerto.
+    // Ya no es cierto que sea la unica de las siete que no busca.
+    expect(ORDER_QUERYABLE.searchable).toBe(true)
 
     // Y no hay filtro por el numero correlativo (R39): no esta declarado.
     expect(Object.keys(ORDER_QUERYABLE.filterable)).not.toContain('orderNumber')

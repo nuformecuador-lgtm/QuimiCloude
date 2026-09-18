@@ -279,16 +279,20 @@ describe('pedidos — la consulta del listado, ya con el contrato generico (QC-5
     }
   })
 
-  it('la busqueda por texto se OMITE y se anota: `orders` no tiene columna `name`', () => {
-    // R17 + R39 heredado. Antes la busqueda moria porque el esquema no la declaraba; ahora la
-    // declara el contrato -es una sola propiedad para las siete listas- y quien la omite es la
-    // lista blanca, con `searchable: false`. La consulta NO falla: devuelve la lista como si no
-    // se hubiera buscado, y el campo omitido queda anotado para el log (R5, R6).
+  it('la busqueda por texto SOBREVIVE a `sanitizeListQuery` (R11)', () => {
+    // Nota fechada 2026-09-18: hasta QC-68 este caso probaba que la busqueda moria aqui, porque
+    // `ORDER_QUERYABLE.searchable` era `false`. Ahora la lista blanca la declara `true` -el
+    // termino se resuelve a ids de receta en `list-orders.ts`, no en este esquema- y el contrato
+    // generico deja de podarla.
     const conBusqueda = saneada({ search: 'acido' })
-    expect(conBusqueda.query.search).toBe('')
-    expect(conBusqueda.ignored).toEqual(['search'])
+    expect(conBusqueda.query.search).toBe('acido')
+    expect(conBusqueda.ignored).not.toContain('search')
+  })
 
-    // Y un filtro por el numero correlativo tampoco existe: no esta declarado filtrable.
+  it('un filtro por el numero correlativo se OMITE y se anota: no esta declarado (R39)', () => {
+    // Caso hermano del anterior, conservado: `orderNumber` no es un campo declarado en
+    // `ORDER_QUERYABLE.filterable`, y eso si sigue omitiendose y anotandose. Sin este caso, esa
+    // mitad del contrato generico dejaria de estar probada en pedidos.
     const porNumero = saneada({
       filters: { orderNumber: { kind: 'text', value: '2026-0000001' } },
     })
