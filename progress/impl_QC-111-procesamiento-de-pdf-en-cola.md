@@ -35,7 +35,37 @@ Se va actualizando a medida que cierran. El detalle vive en `specs/QC-111-proces
 
 ## Lo que T8 verifico contra el paquete instalado
 
-(pendiente)
+`@upstash/qstash@2.11.3`, leido en
+`node_modules/.pnpm/@upstash+qstash@2.11.3/node_modules/@upstash/qstash/client-CsnfJpnA.d.ts`.
+No de memoria y no de la documentacion: del paquete, como hizo QC-108 con `@google/genai`.
+
+| Lo que `design.md > 8` dejaba abierto | Lo que dice el paquete | Veredicto |
+|---|---|---|
+| La firma real de `Receiver.verify` | `verify(request: VerifyRequest): Promise<boolean>`, con `VerifyRequest = { signature: string; body: string; url?: string; clockTolerance?: number; upstashRegion?: string }` | **coincide** |
+| Como se construye el `Receiver` | `new Receiver({ currentSigningKey?, nextSigningKey?, devMode? })` — las **dos** claves vivas a la vez, que es la rotacion que el diseno describe | **coincide** |
+| Nombre de la cabecera de la **firma** | **`upstash-signature`**, escrito en el propio tipo `VerifyRequest` | **cerrado** |
+| La opcion del tope de reintentos al publicar | `retries?: number` en `PublishRequest`; `publishJSON` devuelve `{ messageId, url }` | **coincide** |
+| Nombre de la cabecera del **identificador de mensaje** | **NO APARECE EN EL PAQUETE.** El SDK no lee esa cabecera en ningun punto: no esta en los tipos, ni en el bundle, ni en el README | **SIGUE ABIERTO** |
+
+**Un matiz que el diseno no preveia y que el adaptador absorbe.** `Receiver.verify` **lanza
+`SignatureError`** cuando la firma es invalida; **no devuelve `false`**. El puerto `QueueSignature`
+promete `Promise<boolean>` y «nunca lanza por una firma mala», asi que el adaptador captura y
+devuelve `false`. No es una desviacion del diseno: es exactamente el sitio donde el diseno dijo que
+se reconciliaria («quien conoce el nombre real es su adaptador»).
+
+**El DESCONOCIDO que NO se pudo cerrar, y se dice en vez de rellenarlo.** `design.md > 8` mandaba
+verificar el nombre de la cabecera del identificador de mensaje **contra el paquete instalado**. El
+paquete no lo contiene, porque el SDK nunca lee esa cabecera: la manda el servidor de QStash al
+webhook y el cliente no la modela. Este worktree no tiene acceso a la documentacion del proveedor,
+asi que **no se puede cerrar aqui**. Se implementa en una sola constante con el valor convencional
+`upstash-message-id`, `messageIdOf` la busca sin distinguir mayusculas y devuelve `null` si no
+viene. **Queda elevado al leader**, no dado por cerrado.
+
+**Alcance del fallo si el nombre fuera otro, medido y no supuesto:** `messageIdOf` devolveria
+`null` siempre; el `claim` sigue siendo atomico y la idempotencia sigue en pie, porque su candado es
+`status='queued'` y no el identificador. Lo unico que se perderia en silencio es la proteccion
+secundaria de `queue_message_id` —«un mensaje viejo sobre una fila re-encolada no la reclama»—.
+Es degradacion silenciosa, y por eso se eleva.
 
 ## Mapa R1..R27 -> test
 
