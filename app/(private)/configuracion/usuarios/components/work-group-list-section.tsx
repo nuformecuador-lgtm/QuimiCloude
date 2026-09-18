@@ -2,6 +2,7 @@ import type { DataTableParams } from '@/components/shared/data-table';
 import { listWorkGroupsAction } from '@/lib/modules/identity/adapters/driving/work-group-actions';
 
 import { FIRST_PAGE } from './user-list-params';
+import { WorkGroupCreateAction } from './work-group-create-action';
 import { WorkGroupListEmpty } from './work-group-list-empty';
 import { WorkGroupListError } from './work-group-list-error';
 import { workGroupListHref } from './work-group-list-params';
@@ -53,36 +54,43 @@ export async function WorkGroupListSection({ params, canModify }: WorkGroupListS
 
   const { items, page: currentPage, totalPages } = pageResult.data;
 
-  if (items.length === 0) {
-    // R18: las dos salidas, **cada una bajo su condicion**, y ningun «crea el primero».
-    return (
-      <WorkGroupListEmpty
-        clearSearchHref={
-          params.search.trim() !== ''
-            ? workGroupListHref({ ...params, search: '', page: FIRST_PAGE })
-            : undefined
-        }
-        firstPageHref={
-          currentPage > FIRST_PAGE ? workGroupListHref({ ...params, page: FIRST_PAGE }) : undefined
-        }
-      />
-    );
-  }
-
   return (
-    <div className="flex flex-col gap-4" data-testid={WORK_GROUP_LIST_TESTID}>
+    <>
       {/*
-        `work-group-table.tsx` es un modulo de CLIENTE —la columna de acciones declara una celda que
-        devuelve elementos—, asi que desde aqui solo bajan datos serializables: las filas, los
-        parametros vigentes, el total de paginas y la decision de R9. La tabla recibe
-        `status: 'idle'`: los tres estados se pintan FUERA de `<DataTable>`.
+        El alta, ANTES de elegir estado: se ofrece haya filas o no. Sin esto el primer grupo era
+        imposible de crear, porque los grupos nacen en cero y el boton vivia dentro de la tabla.
       */}
-      <WorkGroupTable
-        groups={items}
-        params={params}
-        totalPages={totalPages}
-        canModify={canModify}
-      />
-    </div>
+      <WorkGroupCreateAction canModify={canModify} />
+
+      {items.length === 0 ? (
+        // R18 INTACTO: las dos salidas, **cada una bajo su condicion**, y ningun «crea el primero».
+        // Quien ofrece el alta es la pantalla, arriba, no este estado.
+        <WorkGroupListEmpty
+          clearSearchHref={
+            params.search.trim() !== ''
+              ? workGroupListHref({ ...params, search: '', page: FIRST_PAGE })
+              : undefined
+          }
+          firstPageHref={
+            currentPage > FIRST_PAGE ? workGroupListHref({ ...params, page: FIRST_PAGE }) : undefined
+          }
+        />
+      ) : (
+        <div className="flex flex-col gap-4" data-testid={WORK_GROUP_LIST_TESTID}>
+          {/*
+            `work-group-table.tsx` es un modulo de CLIENTE —la columna de acciones declara una celda
+            que devuelve elementos—, asi que desde aqui solo bajan datos serializables: las filas,
+            los parametros vigentes, el total de paginas y la decision de R9. La tabla recibe
+            `status: 'idle'`: los tres estados se pintan FUERA de `<DataTable>`.
+          */}
+          <WorkGroupTable
+            groups={items}
+            params={params}
+            totalPages={totalPages}
+            canModify={canModify}
+          />
+        </div>
+      )}
+    </>
   );
 }

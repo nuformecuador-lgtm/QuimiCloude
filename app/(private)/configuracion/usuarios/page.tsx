@@ -147,7 +147,7 @@ export default async function UsuariosPage({
       </div>
       <UsuariosTabsSwitch tab={tab} />
       {tab === GROUPS_TAB ? (
-        <div data-testid={WORK_GROUP_SECTION_TESTID}>
+        <div data-testid={WORK_GROUP_SECTION_TESTID} className="flex flex-col gap-4">
           <Suspense
             key={buildWorkGroupListQuery(workGroupParams)}
             fallback={<WorkGroupListSkeleton rows={workGroupParams.pageSize} />}

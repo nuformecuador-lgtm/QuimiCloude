@@ -24,7 +24,6 @@ import {
   DELETE_WORK_GROUP_DIALOG_TESTID,
   DELETE_WORK_GROUP_DISMISS_TESTID,
   DELETE_WORK_GROUP_ID_TESTID,
-  WORK_GROUP_CREATE_OPEN_TESTID,
   WORK_GROUP_FORM_CANCEL_TESTID,
   WORK_GROUP_NAME_COLUMN_ID,
   WORK_GROUP_ROW_ACTIONS_TESTID,
@@ -387,16 +386,13 @@ describe('la tabla es la duena del estado de las escrituras (R9, `design.md > 5`
     expect(screen.getAllByTestId(WORK_GROUP_ROW_ACTIONS_TESTID)).toHaveLength(GRUPOS.length);
   });
 
-  it('el alta abre el panel SIN sujeto y sin navegar a ninguna otra URL (R20)', async () => {
-    const user = setupUser();
+  it('NO monta el alta: ese disparador ya no es suyo (2026-09-17)', () => {
     montar();
 
-    await user.click(screen.getByTestId(WORK_GROUP_CREATE_OPEN_TESTID));
-
-    const panel = await screen.findByTestId(WORK_GROUP_SHEET_TESTID);
-    expect(panel).toHaveAttribute('data-mode', 'create');
-    expect(panel).toHaveAttribute('data-work-group-id', '');
-    expect(routerMock.push).not.toHaveBeenCalled();
+    // Vive en `work-group-create-action.tsx`, fuera de la tabla. Los grupos nacen en cero, asi que
+    // tenerlo aqui dentro hacia el primer grupo imposible de crear. Si alguien lo devolviera, esta
+    // afirmacion se pone roja.
+    expect(screen.queryByTestId('work-group-create-open')).toBeNull();
   });
 
   it('la accion de abrir de una fila abre el panel SOBRE ESE grupo', async () => {
@@ -433,7 +429,10 @@ describe('la tabla es la duena del estado de las escrituras (R9, `design.md > 5`
     const user = setupUser();
     montar({ page: 2, search: 'lab' }, 3);
 
-    await user.click(screen.getByTestId(WORK_GROUP_CREATE_OPEN_TESTID));
+    // Se ejercita con la EDICION, que es la escritura que esta tabla sigue siendo duena de abrir:
+    // el alta se mudo a `work-group-create-action.tsx` y cierra en su propio archivo.
+    const fila = screen.getByTestId(`data-table-row-${GRUPOS[0]!.id}`);
+    await user.click(within(fila).getByTestId(WORK_GROUP_ACTION_EDIT_TESTID));
     await user.click(await screen.findByTestId(WORK_GROUP_FORM_CANCEL_TESTID));
 
     await waitFor(() => expect(screen.queryByTestId(WORK_GROUP_SHEET_TESTID)).toBeNull());
@@ -462,8 +461,7 @@ describe('la tabla es la duena del estado de las escrituras (R9, `design.md > 5`
     expect(screen.queryByTestId(WORK_GROUP_ROW_ACTIONS_TESTID)).toBeNull();
     expect(screen.queryByTestId(WORK_GROUP_ACTION_EDIT_TESTID)).toBeNull();
     expect(screen.queryByTestId(WORK_GROUP_ACTION_DELETE_TESTID)).toBeNull();
-    // Ni el disparador del alta, ni el panel, ni el dialogo.
-    expect(screen.queryByTestId(WORK_GROUP_CREATE_OPEN_TESTID)).toBeNull();
+    // Ni el panel, ni el dialogo. El alta se prueba en su propio archivo.
     expect(screen.queryByTestId(WORK_GROUP_SHEET_TESTID)).toBeNull();
     expect(screen.queryByTestId(DELETE_WORK_GROUP_DIALOG_TESTID)).toBeNull();
     // Y la lista SI se ve: quien solo consulta ve los grupos sin acciones de escritura.

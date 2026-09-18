@@ -23,8 +23,6 @@ import {
   USER_ACTION_DELETE_TESTID,
   USER_ACTION_EDIT_TESTID,
   USER_ACTION_STATUS_TESTID,
-  USER_CREATE_OPEN_TESTID,
-  USER_FORM_TESTID,
   USER_ROW_ACTIONS_TESTID,
   USER_SHEET_TESTID,
   USER_STATUS_DIALOG_TESTID,
@@ -452,15 +450,13 @@ describe('la tabla es la duena del estado de las escrituras (R6, `design.md > 8`
     expect(screen.getAllByTestId(USER_ROW_ACTIONS_TESTID)).toHaveLength(USUARIOS.length);
   });
 
-  it('el alta abre el panel lateral SIN sujeto: no precarga ninguna ficha (R22)', async () => {
-    const user = setupUser();
+  it('NO monta el alta: ese disparador ya no es suyo (2026-09-17)', () => {
     montar();
 
-    await user.click(screen.getByTestId(USER_CREATE_OPEN_TESTID));
-
-    expect(await screen.findByTestId(USER_FORM_TESTID)).toBeInTheDocument();
-    expect(getUserActionMock).not.toHaveBeenCalled();
-    expect(routerMock.push).not.toHaveBeenCalled();
+    // Vive en `user-create-action.tsx`, fuera de la tabla, para que se ofrezca tambien cuando la
+    // lista viene vacia y esta tabla no llega a montarse. Si alguien lo devolviera aqui, esta
+    // afirmacion se pone roja antes de que el vacio vuelva a quedarse sin salida.
+    expect(screen.queryByTestId('user-create-open')).toBeNull();
   });
 
   it('la accion de editar de una fila abre el panel SOBRE ESE usuario (R26)', async () => {
@@ -510,8 +506,7 @@ describe('la tabla es la duena del estado de las escrituras (R6, `design.md > 8`
 
     expect(screen.queryByTestId(USER_ROW_ACTIONS_TESTID)).toBeNull();
     expect(screen.queryByTestId(USER_ACTION_EDIT_TESTID)).toBeNull();
-    // Ni el disparador del alta, ni el panel, ni ninguno de los dos dialogos.
-    expect(screen.queryByTestId(USER_CREATE_OPEN_TESTID)).toBeNull();
+    // Ni el panel, ni ninguno de los dos dialogos. El alta se prueba en su propio archivo.
     expect(screen.queryByTestId(USER_SHEET_TESTID)).toBeNull();
     expect(screen.queryByTestId(DELETE_USER_DIALOG_TESTID)).toBeNull();
     expect(screen.queryByTestId(USER_STATUS_DIALOG_TESTID)).toBeNull();

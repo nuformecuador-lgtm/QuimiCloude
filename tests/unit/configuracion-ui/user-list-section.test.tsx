@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   USER_COLUMN_COUNT,
+  USER_CREATE_OPEN_TESTID,
   USER_LIST_EMPTY_TESTID,
   USER_LIST_ERROR_CODE_TESTID,
   USER_LIST_ERROR_MESSAGE_TESTID,
@@ -244,6 +245,36 @@ describe('los tres estados son mutuamente excluyentes y se distinguen por data-t
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.queryByTestId(USER_LIST_TESTID)).toBeNull();
     expect(screen.queryByTestId(USER_LIST_ERROR_TESTID)).toBeNull();
+  });
+
+  it('EL ALTA SOBREVIVE AL VACIO: con cero filas el disparador sigue ahi (2026-09-17)', async () => {
+    // La regresion que este caso existe para cerrar. El listado EXCLUYE al actor (R11), asi que una
+    // instalacion recien sembrada —un unico usuario, el que esta mirando la pantalla— ve la lista
+    // vacia con el catalogo lleno. Con el boton dentro de la tabla, ese vacio no tenia ninguna
+    // salida: no habia forma de crear al segundo usuario desde la interfaz.
+    listUsersActionMock.mockResolvedValue(paginaCon([]));
+
+    await renderSeccion();
+
+    expect(screen.getByTestId(USER_LIST_EMPTY_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(USER_CREATE_OPEN_TESTID)).toBeEnabled();
+  });
+
+  it('y con filas tambien: el alta no depende del estado de la lista', async () => {
+    await renderSeccion();
+
+    expect(screen.getByTestId(USER_LIST_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(USER_CREATE_OPEN_TESTID)).toBeEnabled();
+  });
+
+  it('sin `usuarios.modificar` no hay alta, ni con filas ni sin ellas (R6)', async () => {
+    await renderSeccion(parametros(), false);
+    expect(screen.queryByTestId(USER_CREATE_OPEN_TESTID)).toBeNull();
+
+    cleanup();
+    listUsersActionMock.mockResolvedValue(paginaCon([]));
+    await renderSeccion(parametros(), false);
+    expect(screen.queryByTestId(USER_CREATE_OPEN_TESTID)).toBeNull();
   });
 
   it('error: mensaje DEVUELTO, codigo estable y accion de reintentar (R19)', async () => {
