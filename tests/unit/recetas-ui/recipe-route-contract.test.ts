@@ -305,6 +305,22 @@ const RENOMBRADO_DE_COMENTARIOS_QC70 = [
   'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
 ];
 
+// QC-50 aisla recetas por empresa. Este contrato solo mira el DIFF contra `origin/dev`, asi que
+// con los cambios sin commitear el caso pasaba en verde igual -no muerde hasta que hay commit-.
+// Son tres archivos nuevos/modificados, ninguno mas:
+//   * `domain/recipe-scope.ts` (nuevo): el tipo del ambito del modulo -la empresa en cuyo
+//     nombre se consulta o se escribe-. Dominio puro: no autoriza, solo nombra el ambito.
+//   * `adapters/driven/persistence/company-scope.ts` (nuevo): el punto UNICO donde se escribe
+//     «de la empresa» al armar el filtro/los datos de Prisma, para que ninguna consulta ni
+//     escritura del modulo lo repita por su cuenta y diverja.
+//   * `ports/recipe-repository.ts` (modificado): los cinco metodos ganan el ambito en la FIRMA,
+//     que es lo que hace que una llamada que lo omita no compile.
+const AISLAMIENTO_POR_EMPRESA_QC50 = [
+  'lib/modules/recetas/domain/recipe-scope.ts',
+  'lib/modules/recetas/adapters/driven/persistence/company-scope.ts',
+  'lib/modules/recetas/ports/recipe-repository.ts',
+];
+
 const MIGRACION_QC34 = [
   'db/schema.prisma',
   'db/migrations/20260904135210_order_cancellation/migration.sql',
@@ -364,10 +380,20 @@ const MIGRACION_QC60 = [
   'db/migrations/20260915120000_orders_company_scope/down.sql',
 ];
 
+// La migracion que da empresa a las recetas (QC-50): `recipes` gana `company_id` NOT NULL y el
+// unico de nombre pasa de global a `(company_id, name_normalized)`. Este contrato mira el DIFF
+// contra `origin/dev`, asi que con los cambios sin commitear pasaba en verde igual -no muerde
+// hasta que hay commit-.
+const MIGRACION_QC50 = [
+  'db/migrations/20260916120000_recipes_company_scope/migration.sql',
+  'db/migrations/20260916120000_recipes_company_scope/down.sql',
+];
+
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
   ...AUTORIZACION_POR_PERMISO_QC74,
   ...RENOMBRADO_DE_COMENTARIOS_QC70,
+  ...AISLAMIENTO_POR_EMPRESA_QC50,
 ];
 
 export const DB_PERMITIDAS: readonly string[] = [
@@ -382,6 +408,7 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC23,
   ...MIGRACION_QC81,
   ...MIGRACION_QC60,
+  ...MIGRACION_QC50,
 ];
 
 /** Espera rutas con separadores POSIX, como las devuelve `git diff --name-only`. */
@@ -966,6 +993,16 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
   const UNICO_MONTADOR = enRutaDePosix(join(COMPONENTES_PATH, 'recipe-form.tsx'));
 
   /**
+   * SEGUNDO montador, anadido el 2026-09-17: la pantalla de ejecucion de un pedido asignado lo
+   * MONTA por props, que es lo que la cabecera del propio asistente dejo previsto -«podra montarlo
+   * pasandole otro `onFinish` sin tocar una linea de aqui»-. R12 sigue intacta: lo que prohibe es
+   * que el asistente tenga RUTA PROPIA, no que se monte desde otra pantalla. Se nombra el archivo
+   * EXACTO, nunca la carpeta.
+   */
+  const MONTADOR_DE_EJECUCION =
+    'app/(private)/asignacion/[id]/components/order-execution-screen.tsx';
+
+  /**
    * Por nombre y no por carpeta: un test nuevo que lo montase en otro sitio tiene que salir en la
    * lista. Este mismo archivo esta porque escribe el nombre para poder prohibirlo.
    */
@@ -973,6 +1010,7 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     'tests/unit/recetas-ui/step-reader.test.tsx',
     'tests/unit/recetas-ui/recipe-route-contract.test.ts',
     'tests/guards/guard-editor-aislado.test.ts',
+    'tests/unit/asignaciones-ui/order-execution-screen.test.tsx',
   ] as const;
 
   it('ninguna page.tsx del repo monta el asistente', () => {
@@ -1014,8 +1052,17 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     );
     expect(exportadas.sort()).toEqual(
       [
+        'ASSIGNED_ORDERS_ROUTE',
         'CREDENTIAL_SETUP_ROUTE',
         'DASHBOARD_ROUTE',
+        // Alta el 2026-09-17: la trae el aviso de entrega de QC-63. NO es una ruta ni una funcion
+        // de ruta: es el NOMBRE DE UN PARAMETRO DE CONSULTA de la lista de pedidos asignados
+        // (`?entregado=<numero>`), que la pantalla de ejecucion pone al volver y la lista lee para
+        // pintar la confirmacion. Verificado antes de darla de alta: no estrena ninguna ruta del
+        // asistente de lectura -no la marca el patron de arriba ni apunta a ninguna URL-, asi que
+        // R12 de QC-64 sigue INTACTA. La lista sigue siendo CERRADA y por igualdad exacta: una
+        // constante mas vuelve a ponerla en rojo.
+        'DELIVERED_ORDER_PARAM',
         'FORGOT_PASSWORD_ROUTE',
         'FORMULAS_ROUTE',
         'INVENTORY_ROUTE',
@@ -1030,6 +1077,7 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'SESSION_ENDED_PARAM',
         'SUPPLIERS_ROUTE',
         'UNITS_ROUTE',
+        'assignedOrderRoute',
         'credentialSetupRoute',
         'USERS_ROUTE',
         'recipeEditRoute',
@@ -1052,7 +1100,7 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
       }
     }
 
-    expect(importadores.sort()).toEqual([UNICO_MONTADOR]);
+    expect(importadores.sort()).toEqual([MONTADOR_DE_EJECUCION, UNICO_MONTADOR].sort());
   });
 
   it('el listado del catalogo no enlaza ni menciona el asistente', () => {

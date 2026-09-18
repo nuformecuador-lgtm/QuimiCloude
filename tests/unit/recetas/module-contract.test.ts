@@ -191,13 +191,23 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
     // recetas` en `db/schema.prisma`)-. Prohibirlo aqui por completo chocaria con ese
     // requisito de diseno; la guardia real de "solo un archivo lo importa" la vigila
     // `tests/guards/guard-arquitectura-modulos.test.ts` (bloque 10, propiedad de modelos).
+    //
+    // RETENSADO 2026-09-16 (QC-50, T8). `@prisma/client` pasa a importarlo un archivo mas, y
+    // solo por su TIPO: `company-scope.ts` publica el ambito como `Prisma.RecipeWhereInput`, que
+    // es justo lo que hace que componerlo sobre otra tabla no compile (`design.md`). El precedente
+    // es el mismo que QC-60 dejo escrito en `tests/unit/pedidos/module-contract.test.ts` cuando le
+    // nacio su propio `company-scope.ts`: la lista se RETENSA nombrando el archivo de mas, no se
+    // ensancha el patron. Sigue siendo una lista CERRADA y sigue sin haber nada de Prisma en el
+    // dominio ni en los puertos.
     const RECIPE_PRISMA_ADAPTER = 'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts'
+    const COMPANY_SCOPE_ADAPTER = 'lib/modules/recetas/adapters/driven/persistence/company-scope.ts'
+    const DUENOS_DE_PRISMA = [COMPANY_SCOPE_ADAPTER, RECIPE_PRISMA_ADAPTER]
     expect(recetasSources.length).toBeGreaterThan(0)
     for (const file of recetasSources) {
       const source = read(file)
       const etiqueta = toPosix(relative(repoRoot, file))
       expect(source, `${etiqueta} consulta la tabla de productos`).not.toMatch(/prisma\.product/i)
-      if (etiqueta !== RECIPE_PRISMA_ADAPTER) {
+      if (!DUENOS_DE_PRISMA.includes(etiqueta)) {
         expect(source, `${etiqueta} importa @prisma/client`).not.toMatch(/@prisma\/client/)
       }
       // Ninguna ruta profunda a otro modulo: solo el barrel.
@@ -394,16 +404,32 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
       'lib/modules/recetas/domain/delete-recipe.ts',
       'lib/modules/recetas/adapters/driving/recipe-actions.ts',
     ]
+    // QC-50 aisla recetas por empresa. Este caso solo mira el DIFF contra `origin/dev`, asi
+    // que con los cambios sin commitear pasaba en verde igual -no muerde hasta que hay commit-.
+    // Son tres archivos nuevos/modificados, ninguno mas:
+    //   * `domain/recipe-scope.ts` (nuevo): el tipo del ambito del modulo -la empresa en cuyo
+    //     nombre se consulta o se escribe-. Dominio puro: no autoriza, solo nombra el ambito.
+    //   * `adapters/driven/persistence/company-scope.ts` (nuevo): el punto UNICO donde se
+    //     escribe «de la empresa» al armar el filtro/los datos de Prisma, para que ninguna
+    //     consulta ni escritura del modulo lo repita por su cuenta y diverja.
+    //   * `ports/recipe-repository.ts` (modificado): los cinco metodos ganan el ambito en la
+    //     FIRMA, que es lo que hace que una llamada que lo omita no compile.
+    const AISLAMIENTO_POR_EMPRESA_QC50 = [
+      'lib/modules/recetas/domain/recipe-scope.ts',
+      'lib/modules/recetas/adapters/driven/persistence/company-scope.ts',
+      'lib/modules/recetas/ports/recipe-repository.ts',
+    ]
     const AMPLIACIONES_APROBADAS = [
       ...AMPLIACION_QC34,
       ...CAMBIO_DE_FORMA_DEL_PASO_QC62,
       ...AUTORIZACION_POR_PERMISO_QC74,
+      ...AISLAMIENTO_POR_EMPRESA_QC50,
     ]
     expect(
       diff
         .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))
         .filter((ruta) => !AMPLIACIONES_APROBADAS.includes(ruta)),
-      'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 (T10) y del cambio de forma del paso de QC-62 (T1-T3) puede estar en el diff',
+      'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 (T10), del cambio de forma del paso de QC-62 (T1-T3) y del aislamiento por empresa de QC-50 puede estar en el diff',
     ).toEqual([])
 
     // Defensa redundante de ubicacion, desde el angulo del modulo: la carpeta permitida se
@@ -476,6 +502,12 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
         )
     }
 
+    // Anadida el 2026-09-17: la pantalla de ejecucion de un pedido asignado tiene RUTA PROPIA y
+    // llega a la receta por el `recipeId` de un pedido, no navegando el catalogo. Se nombra el
+    // archivo EXACTO, nunca la carpeta, y NO queda exenta: se le sigue exigiendo que consuma
+    // `recetas` solo por su contrato publico, igual que a cualquier otro archivo de fuera.
+    const PANTALLAS_AUTORIZADAS = new Set(['app/(private)/asignacion/[id]/page.tsx'])
+
     const fueraDeSuCarpeta = sourcesIn(appDir).filter(
       (file) => relative(recipesRouteDir, file).startsWith(`..${sep}`),
     )
@@ -485,7 +517,11 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
       if (!RECIPE_MENTION.test(source)) continue
       const nombre = toPosix(relative(repoRoot, file))
       if (/^(page|layout)\.tsx$/.test(basename(file))) {
-        violaciones.push(`${nombre}: segunda pantalla de recetas fuera de su carpeta`)
+        if (!PANTALLAS_AUTORIZADAS.has(nombre)) {
+          violaciones.push(`${nombre}: segunda pantalla de recetas fuera de su carpeta`)
+        } else if (!consumesOnlyPublicContract(source)) {
+          violaciones.push(`${nombre}: consume recetas por dentro, no por su contrato publico`)
+        }
       } else if (screenRootOf(file) === null) {
         violaciones.push(`${nombre}: menciona recetas sin colgar de ninguna pantalla con ruta propia`)
       } else if (!consumesOnlyPublicContract(source)) {

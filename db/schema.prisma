@@ -321,7 +321,12 @@ model ProductBatch {
 
 /// `createdBy` y `updatedBy` no llevan `@relation`: un `include` cruzaria a `users` sin que la
 /// guardia de modulos lo vea. Sus FK estan escritas a mano. NULL = no la creo una persona.
-/// `recipes_name_unique` y los indices de busqueda son parciales o GIN y viven en las migraciones.
+/// `companyId` tampoco lleva `@relation`, por el mismo motivo pero hacia `companies`: su FK
+/// (`recipes_company_id_fkey`) esta escrita a mano en la migracion y es drift a proposito.
+/// `recipes_company_name_unique` (empresa, nombre) es PARCIAL por `deleted_at IS NULL` y por
+/// eso no se declara `@@unique` aqui: Prisma no modela indices parciales. Ese mismo indice
+/// hace de indice de `companyId`, asi que tampoco hay un `@@index([companyId])` propio. Los
+/// indices de busqueda siguen siendo parciales o GIN y viven en las migraciones.
 /// @module recetas
 model Recipe {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -330,6 +335,7 @@ model Recipe {
   description    String?
   steps          Json      @default("[]")
   imagePath      String?   @map("image_path")
+  companyId      String    @map("company_id") @db.Uuid
   createdBy      String?   @map("created_by") @db.Uuid
   updatedBy      String?   @map("updated_by") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -345,7 +351,9 @@ model Recipe {
 
 /// Sin `deletedAt`: la linea es parte de la receta, y corregir una formula es una edicion normal.
 /// `productId` y `unitId` no llevan `@relation` porque apuntan a otros modulos; sus FK estan
-/// escritas a mano y son drift. La unidad es anotativa: no hay conversion.
+/// escritas a mano y son drift. La unidad es anotativa: no hay conversion. Sin `companyId` a
+/// proposito: la linea no tiene empresa propia, solo se alcanza a traves de su receta y cae
+/// con ella por el `ON DELETE CASCADE` de `recipe_lines_recipe_id_fkey`.
 /// @module recetas
 model RecipeLine {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

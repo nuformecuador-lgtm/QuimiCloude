@@ -45,7 +45,10 @@ import { createRemoveWorkGroupFromOrder } from '@/lib/modules/asignaciones/domai
 import { createUnassignResponsible } from '@/lib/modules/asignaciones/domain/unassign-responsible';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import { DOCUMENT_TYPE_CC, normalizeCompanyName, normalizeWorkGroupName } from '@/lib/modules/identity';
-import { findAliveOrderTargetById } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
+import {
+  findAliveOrderTargetById,
+  listAliveOrderSummariesByIds,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import { setCurrentTx } from './prisma-tx-holder';
@@ -65,7 +68,13 @@ import type { OrderCatalog } from '@/lib/modules/pedidos';
  * `lib/composition` todavia no cablea `asignaciones` (T11) y este archivo no lo adelanta: el dia
  * que T11 exista, esta es la unica linea que cambia.
  */
-const orders: OrderCatalog = { findAliveById: findAliveOrderTargetById };
+const orders: OrderCatalog = {
+  findAliveById: findAliveOrderTargetById,
+  listAliveSummariesByIds: listAliveOrderSummariesByIds,
+  transitionAliveById: async () => {
+    throw new Error('QC-87: los casos de uso de asignacion no escriben el estado del pedido');
+  },
+};
 
 export type UseCases = {
   readonly assign: (actor: Actor | null | undefined, input: unknown, now: Date) => Promise<AssignOutcome>;
@@ -150,7 +159,7 @@ export async function inRolledBackTransaction(
         const companyA = await createCompany(tx, 'qc87-t14-a');
         const companyB = await createCompany(tx, 'qc87-t14-b');
         const roleId = await createRole(tx);
-        const recipeId = await createRecipe(tx);
+        const recipeId = await createRecipe(tx, companyA);
         await body({ tx, companyA, companyB, roleId, recipeId, useCases: wireUseCases(tx, now) });
         throw new RollbackSignal();
       },
@@ -222,11 +231,13 @@ async function createRole(tx: Prisma.TransactionClient): Promise<string> {
   return role.id;
 }
 
-/** Receta efimera SIN lineas: es solo el otro lado de `orders_recipe_id_fkey`. */
-async function createRecipe(tx: Prisma.TransactionClient): Promise<string> {
+/** Receta efimera SIN lineas: es solo el otro lado de `orders_recipe_id_fkey`. Es de la misma
+ *  empresa que los pedidos que la usan por defecto (`companyA`): QC-50 hizo `recipes.company_id`
+ *  obligatoria. */
+async function createRecipe(tx: Prisma.TransactionClient, companyId: string): Promise<string> {
   const marca = randomUUID().replaceAll('-', '');
   const recipe = await tx.recipe.create({
-    data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}` },
+    data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}`, companyId },
     select: { id: true },
   });
   return recipe.id;

@@ -161,5 +161,24 @@ export function createOrderAssignmentRepository(db: PrismaLike = prisma): OrderA
       });
       return count;
     },
+
+    /**
+     * Sin `distinct`: la PK de `order_assignments` es `(order_id, user_id)`, asi que fijado el
+     * `user_id` no puede repetirse un pedido y la clausula costaria sin quitar nada.
+     *
+     * El `orderBy` no es el orden de la lista —eso lo pone `pedidos`—, sino determinismo antes de
+     * paginar; ordenar la pantalla por un uuid seria el error de confundirlos.
+     */
+    async listOrderIdsByUserInCompany(
+      companyId: string,
+      userId: string,
+    ): Promise<readonly string[]> {
+      const filas = await db.orderAssignment.findMany({
+        where: { userId, companyId },
+        select: { orderId: true },
+        orderBy: { orderId: 'asc' },
+      });
+      return filas.map((fila) => fila.orderId);
+    },
   };
 }

@@ -86,7 +86,7 @@ export function createCreateOrder(
     // existe simplemente no vuelve del catalogo; uno dado de baja vuelve con
     // `isDeleted: true`, y las dos cosas se rechazan igual en el alta (en la EDICION no: ver
     // R25 en `update-order.ts`).
-    const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId]);
+    const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId], actor.companyId);
     if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
 
     const instant = now();

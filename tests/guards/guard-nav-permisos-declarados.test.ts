@@ -95,14 +95,15 @@ describe('guardia — los permisos declarados en el menu existen en el catalogo 
   // «Configuración», que declara `usuarios.consultar` —el mismo codigo que exige su pantalla—. El
   // ancla se **tensa**: sube el numero Y se nombra el enlace nuevo, porque darse de alta en la
   // lista exacta es el punto de extension por diseño de este caso (R39).
-  it('ancla: el recorrido encuentra hoy los ocho enlaces reales del menu', () => {
+  it('ancla: el recorrido encuentra hoy los nueve enlaces reales del menu', () => {
     // Anti-vacuidad. Si el recorrido se rompiera —un grupo que deja de visitarse, un cambio de
     // forma en `PRIVATE_NAV_ITEMS`—, `findUndeclaredNavPermissions` devolveria [] sobre una lista
     // vacia y la guardia pasaria en verde sin comprobar nada. Esto lo convierte en rojo.
     const enlaces = flattenNavLinks(PRIVATE_NAV_ITEMS);
 
-    expect(enlaces).toHaveLength(8);
+    expect(enlaces).toHaveLength(9);
     expect(enlaces.map((enlace) => enlace.testId).sort()).toEqual([
+      'nav-asignacion',
       'nav-dashboard',
       'nav-inventario',
       'nav-pedidos',

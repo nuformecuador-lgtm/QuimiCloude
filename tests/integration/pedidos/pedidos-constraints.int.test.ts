@@ -280,7 +280,7 @@ async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
   })
   const unitId = await createUnit(tx)
   const recipe = await tx.recipe.create({
-    data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}` },
+    data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}`, companyId: company.id },
     select: { id: true },
   })
   const userId = await createUser(tx)

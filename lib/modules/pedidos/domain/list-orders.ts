@@ -146,7 +146,7 @@ export function createListOrders(
     // R44: `findRefsIncludingDeleted` -y no una consulta de solo vivas- porque un pedido
     // conserva su receta aunque la den de baja y la fila tiene que seguir diciendo que se
     // pidio. La vigencia se exige al ESCRIBIR (R15, R25), no al leer.
-    const recipes = await deps.recipes.findRefsIncludingDeleted(recipeIds);
+    const recipes = await deps.recipes.findRefsIncludingDeleted(recipeIds, actor.companyId);
 
     const recipeNames = new Map(recipes.map((recipe) => [recipe.id, recipe.name]));
 

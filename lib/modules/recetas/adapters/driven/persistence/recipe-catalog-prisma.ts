@@ -1,6 +1,12 @@
 import { prisma } from '@/lib/shared/db/prisma';
 
-import type { RecipeId, RecipeRef } from '../../../domain/recipe-catalog';
+import { recipeStepSchema } from '../../../domain/recipe-input';
+
+import type { RecipeExecutionContent, RecipeId, RecipeRef } from '../../../domain/recipe-catalog';
+import type { RecipeScope } from '../../../domain/recipe-scope';
+import type { RecipeStepView } from '../../../domain/recipe-view';
+
+import { recipeCompanyScope } from './company-scope';
 
 /**
  * Implementa `RecipeCatalog['findRefsIncludingDeleted']` (`domain/recipe-catalog.ts`,
@@ -17,6 +23,13 @@ import type { RecipeId, RecipeRef } from '../../../domain/recipe-catalog';
  *
  * UNA sola consulta para los N ids: quien lee una pagina de pedidos pide todos sus ids de
  * receta de golpe (R45). Un id que no existe simplemente no vuelve; no se inventa una fila.
+ *
+ * El `companyId` que llega por la interfaz publica se envuelve en un `RecipeScope` y se
+ * compone con `recipeCompanyScope` -la MISMA definicion de ambito que usa el resto del
+ * modulo-, nunca escrito a mano en el `where`: una receta de otra empresa tiene que
+ * desaparecer exactamente igual que un id que no existe, y esa igualdad solo la garantiza
+ * pasar por el mismo camino. El ambito se compone con `AND` contra `id: { in: ids }` y no
+ * gana ningun filtro de vida: `isDeleted` sigue viajando en cada `Ref`.
  */
 
 type RecipeCatalogRow = {
@@ -32,13 +45,83 @@ export function toRecipeRef(row: RecipeCatalogRow): RecipeRef {
 
 export async function findRecipeRefsIncludingDeleted(
   ids: readonly RecipeId[],
+  companyId: string,
 ): Promise<readonly RecipeRef[]> {
   if (ids.length === 0) return [];
 
+  const scope: RecipeScope = { companyId };
   const rows = await prisma.recipe.findMany({
-    where: { id: { in: [...ids] } },
+    where: { AND: [recipeCompanyScope(scope), { id: { in: [...ids] } }] },
     select: { id: true, name: true, deletedAt: true },
   });
 
   return rows.map(toRecipeRef);
+}
+
+/**
+ * Valida cada elemento crudo del `Json` de `steps` contra el esquema del dominio y descarta el
+ * que no pasa, conservando el orden -mismo criterio de tolerancia que `recipe-prisma.ts`, pero
+ * repetido aqui en vez de importado: este adaptador no toca el repositorio interno de receta.
+ */
+function toExecutionSteps(steps: unknown): readonly RecipeStepView[] {
+  if (!Array.isArray(steps)) return [];
+
+  const parsed: RecipeStepView[] = [];
+  for (const step of steps) {
+    const result = recipeStepSchema.safeParse(step);
+    if (result.success) parsed.push(result.data);
+  }
+  return parsed;
+}
+
+type RecipeExecutionContentRow = {
+  readonly id: string;
+  readonly name: string;
+  readonly deletedAt: Date | null;
+  readonly steps: unknown;
+  readonly lines: ReadonlyArray<{
+    readonly productId: string;
+    readonly quantity: { toFixed(digits: number): string };
+    readonly unitId: string;
+  }>;
+};
+
+/** Fila de Prisma -> `RecipeExecutionContent`. Funcion pura, testeable sin base. */
+export function toRecipeExecutionContent(row: RecipeExecutionContentRow): RecipeExecutionContent {
+  return {
+    id: row.id,
+    name: row.name,
+    isDeleted: row.deletedAt !== null,
+    steps: toExecutionSteps(row.steps),
+    lines: row.lines.map((line) => ({
+      productId: line.productId,
+      productName: null,
+      quantity: line.quantity.toFixed(4),
+      unitId: line.unitId,
+    })),
+  };
+}
+
+/**
+ * Implementa `RecipeCatalog['findExecutionContentById']`. SIN `deleted_at IS NULL` en el
+ * `where`, a proposito: una receta dada de baja tiene que poder seguir ejecutandose, y la baja
+ * viaja en `isDeleted` -no se deduce por ausencia, como en `findRecipeRefsIncludingDeleted`-.
+ */
+export async function findRecipeExecutionContentById(
+  id: RecipeId,
+  companyId: string,
+): Promise<RecipeExecutionContent | null> {
+  const scope: RecipeScope = { companyId };
+  const row = await prisma.recipe.findFirst({
+    where: { AND: [recipeCompanyScope(scope), { id }] },
+    select: {
+      id: true,
+      name: true,
+      deletedAt: true,
+      steps: true,
+      lines: { select: { productId: true, quantity: true, unitId: true } },
+    },
+  });
+
+  return row === null ? null : toRecipeExecutionContent(row);
 }

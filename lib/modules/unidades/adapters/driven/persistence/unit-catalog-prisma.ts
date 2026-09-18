@@ -2,15 +2,22 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import type { UnitId, UnitRef } from '../../../domain/unit-catalog';
 
+import { companyScopeWhere } from './unit-prisma';
+
 /**
  * Implementa `UnitCatalog['findRefs']` (`domain/unit-catalog.ts`): el hueco que el
- * contrato publico de `unidades` dejaba abierto para que otro modulo -QC-25 es su
- * primer consumidor, R50- pueda saber si una unidad existe, SIN tocar la tabla ni el
- * repositorio de unidad. Mismo patron que
+ * contrato publico de `unidades` deja abierto para que otro modulo pueda saber si una
+ * unidad existe, SIN tocar la tabla ni el repositorio de unidad. Mismo patron que
  * `lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma.ts`.
  *
  * A diferencia de `ProductCatalog`, `Unit` NO tiene `deleted_at` (no hay borrado logico
  * de unidades): no hay ningun filtro de vida que aplicar en el `where`.
+ *
+ * El ambito se compone con `companyScopeWhere`, la UNICA definicion de «de la empresa o de
+ * sistema» del modulo, en un `AND` aparte del filtro por identificadores -nunca un segundo
+ * `OR` propio-: una unidad de sistema (`companyId` nulo) se resuelve para cualquier empresa,
+ * una de la empresa propia se resuelve, y una de otra empresa no vuelve, igual que si no
+ * existiera.
  */
 
 type UnitCatalogRow = {
@@ -36,11 +43,16 @@ export function toUnitRef(row: UnitCatalogRow): UnitRef {
   };
 }
 
-export async function findUnitRefs(ids: readonly UnitId[]): Promise<readonly UnitRef[]> {
+export async function findUnitRefs(
+  ids: readonly UnitId[],
+  companyId: string,
+): Promise<readonly UnitRef[]> {
   if (ids.length === 0) return [];
 
   const rows = await prisma.unit.findMany({
-    where: { id: { in: [...ids] } },
+    where: {
+      AND: [companyScopeWhere({ companyId }), { id: { in: [...ids] } }],
+    },
     select: { id: true, name: true, symbol: true, baseUnitId: true, factor: true },
   });
 

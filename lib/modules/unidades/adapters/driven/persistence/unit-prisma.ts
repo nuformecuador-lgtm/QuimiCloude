@@ -6,9 +6,11 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 import { normalizeUnitName } from '../../../domain/unit-name';
 
 import { normalizedSearchCondition } from './list-query-sql';
+import { toUnitRef } from './unit-catalog-prisma';
 
 import type { ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
+import type { UnitId, UnitRef } from '../../../domain/unit-catalog';
 import type { UnitScope } from '../../../domain/unit-scope';
 import type { UnitView } from '../../../domain/unit-view';
 
@@ -141,12 +143,9 @@ export function unitOrderBy(sort: ListSort | null): Prisma.UnitOrderByWithRelati
  * quien anada una consulta nueva la reutiliza en vez de escribir un segundo `OR` que manana
  * puede divergir y ensenarle a una empresa lo que no es suyo.
  *
- * **Quien la va a reutilizar y por que no lo hace ya**: `findUnitRefs`
- * (`unit-catalog-prisma.ts`) se queda SIN ambito en esta ficha, por decision cerrada del humano
- * del 2026-09-07 (R36, decision cerrada 33). Es la unica excepcion explicita a R18 y tiene
- * destino nombrado: **QC-50**, la ficha que aisla `recetas` —su unico llamante— por empresa.
- * Cuando llegue, acota su consulta con ESTA funcion; hasta entonces el aislamiento del catalogo
- * completo vive donde esta escrito, en el listado.
+ * **Quien mas la reutiliza**: `findUnitRefs` (`unit-catalog-prisma.ts`), que resuelve
+ * identificadores de unidad para otro modulo -`recetas`- acotando su consulta con ESTA misma
+ * funcion, en vez de escribir un segundo `OR` que manana pueda divergir.
  */
 export function companyScopeWhere(scope: UnitScope): Prisma.UnitWhereInput {
   return { OR: [{ companyId: scope.companyId }, { companyId: null }] };
@@ -206,4 +205,37 @@ export async function listUnitsPage(query: ListQuery, scope: UnitScope): Promise
   ]);
 
   return buildPage(rows.map(toUnitView), total, query.page, limit);
+}
+
+/**
+ * Implementa `UnitCatalog['findRefsSharingBaseInCompany']`. Dos consultas, LAS DOS con
+ * `companyScopeWhere`: la primera lee la base efectiva (`baseUnitId ?? id`) de cada unidad
+ * pedida; la segunda trae toda unidad -propia o de sistema- cuya base efectiva coincida con
+ * alguna de las leidas, sea porque ELLA es esa base o porque deriva de ella.
+ */
+export async function findUnitRefsSharingBaseInCompany(
+  companyId: string,
+  unitIds: readonly UnitId[],
+): Promise<readonly UnitRef[]> {
+  if (unitIds.length === 0) return [];
+
+  const requested = await prisma.unit.findMany({
+    where: { AND: [companyScopeWhere({ companyId }), { id: { in: [...unitIds] } }] },
+    select: { id: true, baseUnitId: true },
+  });
+  if (requested.length === 0) return [];
+
+  const effectiveBases = [...new Set(requested.map((unit) => unit.baseUnitId ?? unit.id))];
+
+  const rows = await prisma.unit.findMany({
+    where: {
+      AND: [
+        companyScopeWhere({ companyId }),
+        { OR: [{ id: { in: effectiveBases } }, { baseUnitId: { in: effectiveBases } }] },
+      ],
+    },
+    select: { id: true, name: true, symbol: true, baseUnitId: true, factor: true },
+  });
+
+  return rows.map(toUnitRef);
 }

@@ -22,13 +22,15 @@ import { fileURLToPath } from 'node:url'
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { InvalidTransitionError } from '@/lib/modules/pedidos'
 import type { OrderAssignmentTarget } from '@/lib/modules/pedidos'
 
 /** Doble del cliente Prisma. */
 const findFirst = vi.fn()
-vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { order: { findFirst } } }))
+const updateMany = vi.fn()
+vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { order: { findFirst, updateMany } } }))
 
-const { findAliveOrderTargetById, toOrderAssignmentTarget } = await import(
+const { findAliveOrderTargetById, toOrderAssignmentTarget, transitionAliveOrder } = await import(
   '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma'
 )
 
@@ -102,6 +104,7 @@ function baseConUnPedidoVivoYUnoDeBaja(): void {
 
 beforeEach(() => {
   findFirst.mockReset()
+  updateMany.mockReset()
 })
 
 describe('contrato OrderCatalog', () => {
@@ -113,11 +116,21 @@ describe('contrato OrderCatalog', () => {
       /findAliveById\(id: string, companyId: string\): Promise<OrderAssignmentTarget \| null>/,
     )
     expect(catalogoFuente).toMatch(/export type OrderAssignmentTarget = \{/)
-    // El estado es el enum de QC-34 IMPORTADO, no una segunda lista copiada.
-    expect(catalogoFuente).toMatch(/import type \{ OrderStatus \} from '\.\/order-classification'/)
+    // El estado es el enum de QC-34 IMPORTADO, no una segunda lista copiada. La asercion tolera
+    // cualquier orden de nombres dentro del mismo `import type { ... } from`.
+    expect(catalogoFuente).toMatch(
+      /import type \{ [^}]*\bOrderStatus\b[^}]* \} from '\.\/order-classification'/,
+    )
     // Ni el numero, ni la receta, ni las cantidades: lo que no esta en el tipo no se filtra.
+    // Acotado al bloque de `OrderAssignmentTarget`: `AssignedOrderSummary`, mas abajo en el MISMO
+    // archivo, SI lleva `recipeId`/`quantity`/`priority` a proposito, asi que buscar en el archivo
+    // entero daria un falso rojo.
+    const bloqueOrderAssignmentTarget = catalogoFuente.slice(
+      catalogoFuente.indexOf('export type OrderAssignmentTarget'),
+      catalogoFuente.indexOf('export interface OrderCatalog'),
+    )
     for (const campo of ['orderYear', 'orderSequence', 'recipeId', 'quantity', 'priority']) {
-      expect(catalogoFuente, `OrderAssignmentTarget expone ${campo}`).not.toMatch(
+      expect(bloqueOrderAssignmentTarget, `OrderAssignmentTarget expone ${campo}`).not.toMatch(
         new RegExp(`\\b${campo}\\b`),
       )
     }
@@ -220,5 +233,57 @@ describe('el cambio es ADITIVO: pedidos no gano ningun caso de uso ni perdio nad
 
   it('el catalogo no anade ninguna factory: es un tipo y una interfaz', () => {
     expect(catalogoFuente).not.toMatch(/export (async )?function|export const create/)
+  })
+})
+
+describe('transitionAliveOrder', () => {
+  const AHORA = new Date('2026-09-17T12:00:00Z')
+
+  it('T1(a) - mueve PENDIENTE->EN_CURSO y EN_CURSO->ENTREGADO', async () => {
+    updateMany.mockResolvedValue({ count: 1 })
+
+    await expect(
+      transitionAliveOrder('o-1', EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA),
+    ).resolves.toBe('ok')
+    await expect(
+      transitionAliveOrder('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA),
+    ).resolves.toBe('ok')
+
+    expect(updateMany).toHaveBeenCalledTimes(2)
+    const primeraLlamada = updateMany.mock.calls[0]?.[0]
+    expect(primeraLlamada.where).toEqual({
+      AND: [{ companyId: EMPRESA }, { id: 'o-1', deletedAt: null, status: 'PENDIENTE' }],
+    })
+    expect(primeraLlamada.data).toEqual({
+      status: 'EN_CURSO',
+      updatedAt: AHORA,
+      updatedBy: 'actor-1',
+    })
+  })
+
+  it('T1(b) - ENTREGADO->EN_CURSO lanza InvalidTransitionError SIN escribir', async () => {
+    await expect(
+      transitionAliveOrder('o-1', EMPRESA, 'ENTREGADO', 'EN_CURSO', 'actor-1', AHORA),
+    ).rejects.toBeInstanceOf(InvalidTransitionError)
+
+    expect(updateMany).not.toHaveBeenCalled()
+  })
+
+  it('T1(c) - devuelve not_found cuando el pedido es de otra empresa', async () => {
+    updateMany.mockResolvedValue({ count: 0 })
+    findFirst.mockResolvedValue(null)
+
+    await expect(
+      transitionAliveOrder('o-ajeno', EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA),
+    ).resolves.toBe('not_found')
+  })
+
+  it('T1(d) - devuelve stale si el from ya no coincide con el estado actual', async () => {
+    updateMany.mockResolvedValue({ count: 0 })
+    findFirst.mockResolvedValue({ id: 'o-1', status: 'EN_CURSO' })
+
+    await expect(
+      transitionAliveOrder('o-1', EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA),
+    ).resolves.toBe('stale')
   })
 })

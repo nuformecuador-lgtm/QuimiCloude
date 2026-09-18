@@ -605,10 +605,17 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     )
 
     // Quien la CONSUME, y nadie mas: cancelar no pasa por aqui -es `cancelOrder` y su propio
-    // `NotCancellableError` (R28)- y borrar tampoco (R32).
+    // `NotCancellableError` (R28)- y borrar tampoco (R32). `order-catalog-prisma.ts` se sumo
+    // como tercer consumidor, DECISION explicita y no descuido: es el unico adaptador con
+    // permiso para escribir `status` fuera de `update-order.ts`, y su escritura tambien pasa
+    // por la misma guardia antes de tocar la fila.
     expect(
       pedidosSources.filter((file) => CONSUME_LA_GUARDIA.test(read(file))).map(etiqueta),
-    ).toEqual([DUENO, 'lib/modules/pedidos/domain/update-order.ts'])
+    ).toEqual([
+      'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
+      DUENO,
+      'lib/modules/pedidos/domain/update-order.ts',
+    ])
 
     for (const file of pedidosSources) {
       if (etiqueta(file) === DUENO) continue
@@ -730,6 +737,11 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       `falta ${etiqueta(carpetaDeLaPantalla)}/page.tsx: la pantalla de pedidos es QC-35`,
     ).toBe(true)
 
+    // `app/(private)/asignacion/` es la pantalla de OTRO modulo, que consume el contrato publico
+    // de `pedidos` (el tipo `OrderPriority`) y tiene su propio contrato de ruta: no es una fuga
+    // por goteo de la pantalla de `pedidos`. Se excluye por PREFIJO DE CARPETA, no por archivo.
+    const carpetaAsignacion = join(repoRoot, 'app', '(private)', 'asignacion')
+
     let consumidoresDeLaPantalla = 0
     for (const file of [
       ...sourcesIn(join(repoRoot, 'app')),
@@ -740,6 +752,9 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
         (match) => match[1] as string,
       )
       if (especificadores.length === 0) continue
+
+      const dentroDeOtraPantallaAutorizada = !relative(carpetaAsignacion, file).startsWith(`..${sep}`)
+      if (dentroDeOtraPantallaAutorizada) continue
 
       const dentroDeLaPantalla = !relative(carpetaDeLaPantalla, file).startsWith(`..${sep}`)
       expect(

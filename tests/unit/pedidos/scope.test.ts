@@ -108,6 +108,18 @@ function entradasDe(files: readonly string[]): readonly Entrada[] {
 // ---------------------------------------------------------------------------------------
 
 /**
+ * La pantalla de OTRO modulo (`asignaciones`), no de `pedidos`, aunque varios de sus archivos
+ * lleven "orders" en el nombre por hablar de pedidos asignados. Tiene su propio contrato de ruta,
+ * y su limite de alcance no es responsabilidad de este archivo. Se excluye por PREFIJO DE CARPETA:
+ * cualquier pieza de `pedidos` fuera de su carpeta y fuera de esta sigue cayendo igual que antes.
+ */
+const CARPETA_ASIGNACION = 'app/(private)/asignacion/'
+
+/** Coincide con `/pedidos|orders/i` por el nombre, pero ejercita la pantalla de `asignaciones`.
+ *  Nombrado, y no un patron: un spec de pedidos nuevo sigue cayendo. */
+const SPECS_E2E_AJENOS_QUE_COINCIDEN_POR_NOMBRE = new Set(['e2e/pedidos-asignados.spec.ts'])
+
+/**
  * R57, INVERTIDO por QC-35: la pantalla de pedidos vive en `carpetaDeLaPantalla` -derivada de
  * `ORDERS_ROUTE`- y en NINGUN otro sitio de `app/` ni de `components/`.
  *
@@ -122,7 +134,8 @@ export function pantallasDePedidosFueraDeSuCarpeta(
   return rutas.filter(
     (ruta) =>
       /^(app|components)\/.*\b(pedidos|orders)\b/i.test(ruta) &&
-      !ruta.startsWith(`${carpetaDeLaPantalla}/`),
+      !ruta.startsWith(`${carpetaDeLaPantalla}/`) &&
+      !ruta.startsWith(CARPETA_ASIGNACION),
   )
 }
 
@@ -134,7 +147,12 @@ export function routeHandlersDePedidos(rutas: readonly string[]): readonly strin
 
 /** R57: los specs E2E de pedidos que hay. QC-35 trajo el suyo; la lista se afirma CERRADA. */
 export function specsE2eDePedidos(rutas: readonly string[]): readonly string[] {
-  return rutas.filter((ruta) => /^e2e\/.*\.spec\.tsx?$/.test(ruta) && /pedidos|orders/i.test(ruta))
+  return rutas.filter(
+    (ruta) =>
+      /^e2e\/.*\.spec\.tsx?$/.test(ruta) &&
+      /pedidos|orders/i.test(ruta) &&
+      !SPECS_E2E_AJENOS_QUE_COINCIDEN_POR_NOMBRE.has(ruta),
+  )
 }
 
 /**
@@ -148,6 +166,9 @@ export function consumidoresDeUiFueraDeSuCarpeta(
   return entradas
     .filter((entrada) => /@\/lib\/modules\/pedidos/.test(soloCodigo(entrada.fuente)))
     .filter((entrada) => !entrada.nombre.startsWith(`${carpetaDeLaPantalla}/`))
+    // Segunda pantalla legitima que consume el contrato publico de `pedidos`, no una fuga por
+    // goteo de la pantalla de `pedidos` (ver `CARPETA_ASIGNACION` arriba).
+    .filter((entrada) => !entrada.nombre.startsWith(CARPETA_ASIGNACION))
     .map((entrada) => entrada.nombre)
 }
 

@@ -174,7 +174,14 @@ const PRE_EXISTING_INDEXES = [
   // afirman abajo, en `UNIT_SCOPE_INDEXES`: si la migracion de QC-76 se llevara el global SIN
   // dejar los parciales, el catalogo se quedaria sin ninguna garantia de unicidad y este
   // archivo seguiria siendo quien lo dijera.
-  'recipes_name_unique',
+  // `recipes_name_unique` (unico GLOBAL sobre el nombre normalizado, de QC-24) salio de esta
+  // lista el 2026-09-16 con QC-50. NO es un indice perdido por descuido, que es justo lo que
+  // este caso vigila: la unicidad del nombre de receta pasa a medirse POR EMPRESA porque dos
+  // empresas pueden tener cada una su misma receta. Un unico global lo
+  // impediria. Su sustituto es UN solo indice compuesto PARCIAL,
+  // `recipes_company_name_unique`, que se afirma abajo en su propio caso: si la migracion se
+  // hubiera llevado el global SIN dejar el compuesto, el catalogo de recetas se quedaria sin
+  // ninguna garantia de unicidad y este archivo seguiria siendo quien lo dijera.
   'suppliers_name_unique',
   'supplier_catalog_lines_name_presentation_unique',
   // `products_presentation_id_idx` cayo el 2026-09-09 con la columna `products.presentation_id`,
@@ -317,6 +324,30 @@ describe('QC-57 — la migracion en la base (R21, R23)', () => {
     expect(compuesto).not.toContain('WHERE')
 
     expect(indexes.has('presentations_name_normalized_key')).toBe(false)
+  })
+
+  it('el unico de nombre de receta es POR EMPRESA y PARCIAL, y el global ya no esta (QC-50 R9, R10)', async () => {
+    // El RELEVO de `recipes_name_unique`, que sale de `PRE_EXISTING_INDEXES` arriba. Los dos no
+    // pueden convivir: con el global en pie, dos empresas seguirian sin poder tener cada una su
+    // misma receta.
+    //
+    // A DIFERENCIA del molde de presentaciones (arriba, `presentations_company_name_unique`),
+    // que es TOTAL porque `presentations` no tiene borrado logico, este indice es PARCIAL: la
+    // tabla `recipes` SI tiene `deleted_at` (ver `PARTIAL_INDEXES`), y sin el `WHERE deleted_at
+    // IS NULL` borrar una receta dejaria su nombre ocupado PARA SIEMPRE dentro de la empresa,
+    // sin que ninguna alta pudiera reusarlo. Si alguien quitara el `WHERE` de la migracion este
+    // caso se pone ROJO en su ultima asercion, aunque las columnas sigan siendo las correctas.
+    const indexes = await readIndexes()
+    const compuesto = indexes.get('recipes_company_name_unique')
+    expect(compuesto, 'falta recipes_company_name_unique').toBeDefined()
+    expect(compuesto).toContain('UNIQUE')
+    // `company_id` va DE CABEZA: mismo motivo que en presentaciones y pedidos.
+    expect(compuesto).toMatch(/\(company_id, name_normalized\)/u)
+    // Y ES parcial, con el mismo WHERE que el resto de indices de esta tabla con borrado
+    // logico: esta es la asercion que la falsabilidad del caso depende de que exista.
+    expect(compuesto, `${compuesto ?? ''} deberia ser parcial`).toMatch(/WHERE \(deleted_at IS NULL\)/u)
+
+    expect(indexes.has('recipes_name_unique')).toBe(false)
   })
 
   it('el unico del numero de pedido es POR EMPRESA, y el global ya no esta (QC-60)', async () => {

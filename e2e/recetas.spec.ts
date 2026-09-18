@@ -277,11 +277,14 @@ test.beforeAll(async () => {
   });
 
   // Con Prisma y no por la UI: el alta por pantalla ya la recorre el primer caso, y una receta
-  // existe sin lineas ni empresa.
+  // existe sin lineas. De la MISMA empresa en la que abre sesion el Administrador -QC-50 hizo
+  // `recipes.company_id` obligatoria-: si fuera de otra, el aislamiento por empresa las
+  // ocultaria de la lista y este spec dejaria de ver sus propias filas.
   await prisma.recipe.createMany({
     data: [orderRecipeAName, orderRecipeBName].map((name) => ({
       name,
       nameNormalized: normalizeRecipeName(name),
+      companyId: empresaDelWorker,
     })),
   });
 });

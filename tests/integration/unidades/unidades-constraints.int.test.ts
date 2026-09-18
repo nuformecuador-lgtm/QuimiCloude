@@ -217,9 +217,15 @@ async function createBatch(
   return batch.id
 }
 
+/** La MISMA empresa que el andamiaje de inventario de este archivo (`inventoryCompanyOf`): QC-50
+ *  hizo `recipes.company_id` obligatoria. */
 async function createRecipe(tx: Prisma.TransactionClient, marker: string): Promise<string> {
   const recipe = await tx.recipe.create({
-    data: { name: `Receta ${marker}`, nameNormalized: `receta${marker}` },
+    data: {
+      name: `Receta ${marker}`,
+      nameNormalized: `receta${marker}`,
+      companyId: await inventoryCompanyOf(tx),
+    },
     select: { id: true },
   })
   return recipe.id

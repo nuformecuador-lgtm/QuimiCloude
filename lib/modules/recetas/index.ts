@@ -3,6 +3,7 @@
 // sin arrastrar servidor: nada de 'use server', @prisma/client ni next/* en su cierre de
 // imports.
 export { requirePermission, type Actor } from './domain/actor';
+export { type RecipeScope } from './domain/recipe-scope';
 export {
   RecetasError,
   UnauthorizedError,
@@ -28,7 +29,13 @@ export {
 export { RECIPE_QUERYABLE } from './domain/recipe-queryable';
 // `RecipeCatalog` y `RecipeRef` los anade QC-34 (T10, R43/R44); `RecipeId` es de QC-33 y no
 // cambia. Son SOLO TIPOS: el barrel no gana nada de servidor por reexportarlos.
-export type { RecipeId, RecipeRef, RecipeCatalog } from './domain/recipe-catalog';
+export type {
+  RecipeId,
+  RecipeRef,
+  RecipeCatalog,
+  RecipeExecutionContent,
+  RecipeExecutionLine,
+} from './domain/recipe-catalog';
 export { normalizeRecipeName } from './domain/recipe-name';
 export {
   MAX_IMAGE_BYTES,

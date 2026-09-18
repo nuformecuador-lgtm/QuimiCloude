@@ -31,7 +31,7 @@ const MODIFICAR = 'recetas.modificar';
 
 /** Un actor con exactamente los permisos que se le pasen, y ninguno mas. */
 function actorCon(...permisos: readonly string[]): Actor {
-  return { id: 'actor-1', permissions: permisos };
+  return { id: 'actor-1', companyId: 'empresa-1', permissions: permisos };
 }
 
 const AHORA = new Date('2026-09-07T10:00:00.000Z');
@@ -85,7 +85,10 @@ function catalogoUnidadesQueFalla(): UnitCatalog {
   const explota = () => {
     throw new Error('el catalogo de unidades no debe ser llamado');
   };
-  return { findRefs: vi.fn<UnitCatalog['findRefs']>(explota) };
+  return {
+    findRefs: vi.fn<UnitCatalog['findRefs']>(explota),
+    findRefsSharingBaseInCompany: vi.fn<UnitCatalog['findRefsSharingBaseInCompany']>(explota),
+  };
 }
 
 function almacenamientoQueFalla(): RecipeImageStorage {
@@ -139,7 +142,10 @@ function montarPuertosPermisivos(): Puertos {
       softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
     },
     products: { findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []) },
-    units: { findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []) },
+    units: {
+      findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []),
+      findRefsSharingBaseInCompany: vi.fn<UnitCatalog['findRefsSharingBaseInCompany']>(async () => []),
+    },
     images: {
       upload: vi.fn<RecipeImageStorage['upload']>(async () => 'recetas/x.jpg'),
       remove: vi.fn<RecipeImageStorage['remove']>(async () => undefined),

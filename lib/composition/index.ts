@@ -91,6 +91,7 @@ import type { ProductCatalog } from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
 import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
+  findUnitRefsSharingBaseInCompany,
   listUnits,
   listUnitsPage,
 } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
@@ -179,7 +180,10 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
-import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
+import {
+  findRecipeExecutionContentById,
+  findRecipeRefsIncludingDeleted,
+} from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import { readRequestIdHeader } from '@/lib/modules/observabilidad/adapters/driven/request-id-headers';
 import type { RequestIdHeaderReader } from '@/lib/modules/errores';
@@ -259,14 +263,22 @@ import type { WorkGroupRepository } from '@/lib/modules/identity/ports/work-grou
 // Actions de T12 NO se importan aqui (la flecha va driving -> composicion).
 import {
   createAssignResponsibles,
+  createFinishAssignedOrder,
+  createGetAssignedOrderExecution,
+  createListAssignedOrders,
   createListOrderResponsibles,
   createListResponsiblesForOrders,
   createRemoveWorkGroupFromOrder,
+  createStartAssignedOrder,
   createUnassignResponsible,
 } from '@/lib/modules/asignaciones';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
-import { findAliveOrderTargetById } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
+import {
+  findAliveOrderTargetById,
+  listAliveOrderSummariesByIds,
+  transitionAliveOrder,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity';
@@ -675,8 +687,12 @@ export const inventario = {
 const productCatalog: ProductCatalog = { findRefs: findProductRefs };
 
 /** `UnitCatalog` cableado con el adaptador driven DE UNIDADES (R50): `recetas` solo
- *  conoce el TIPO `UnitCatalog`, nunca esta implementacion. */
-const unitCatalog: UnitCatalog = { findRefs: findUnitRefs };
+ *  conoce el TIPO `UnitCatalog`, nunca esta implementacion. `findRefsSharingBaseInCompany`
+ *  la estrena `asignaciones`, mas abajo. */
+const unitCatalog: UnitCatalog = {
+  findRefs: findUnitRefs,
+  findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
+};
 
 const recipeRepository: RecipeRepository = {
   create: createRecipe,
@@ -860,8 +876,12 @@ export const unidades = {
  *  llegue por los contratos publicos, que DEBEN publicarlo»- y que QC-34 llena.
  *
  *  `findRefsIncludingDeleted`, y no una consulta de solo vivas, porque un pedido conserva su
- *  receta aunque la den de baja y la fila tiene que seguir diciendo que se pidio (R44). */
-const recipeCatalog: RecipeCatalog = { findRefsIncludingDeleted: findRecipeRefsIncludingDeleted };
+ *  receta aunque la den de baja y la fila tiene que seguir diciendo que se pidio (R44).
+ *  `findExecutionContentById` la estrena `asignaciones`, mas abajo. */
+const recipeCatalog: RecipeCatalog = {
+  findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,
+  findExecutionContentById: findRecipeExecutionContentById,
+};
 
 /** QC-57 (T7, R6): misma implementacion, tipada con el puerto que declara `pedidos`. */
 const pedidosListQueryLog: PedidosListQueryLog = { ignoredFields: logIgnoredListQueryFields };
@@ -943,7 +963,11 @@ export const observabilidad = {
 /** `OrderCatalog` cableado con el adaptador driven DE PEDIDOS (`design.md > 2.1`): mismo patron
  *  que `RecipeCatalog` arriba. `asignaciones` solo conoce el TIPO, y por el solo puede saber si
  *  el pedido esta VIVO y en que ESTADO —ni el numero, ni la receta, ni las cantidades—. */
-const orderCatalog: OrderCatalog = { findAliveById: findAliveOrderTargetById };
+const orderCatalog: OrderCatalog = {
+  findAliveById: findAliveOrderTargetById,
+  listAliveSummariesByIds: listAliveOrderSummariesByIds,
+  transitionAliveById: transitionAliveOrder,
+};
 
 /**
  * `PeopleDirectory` y `WorkGroupDirectory` cableados con el MISMO adaptador driven DE IDENTITY
@@ -1022,6 +1046,36 @@ export const asignaciones = {
   listResponsiblesForOrders: createListResponsiblesForOrders({
     assignments: orderAssignmentRepository,
     people: peopleDirectory,
+    now: () => new Date(),
+  }),
+  listAssignedOrders: createListAssignedOrders({
+    assignments: orderAssignmentRepository,
+    orders: orderCatalog,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    now: () => new Date(),
+  }),
+  // La pantalla de ejecucion. MISMO `orderCatalog`, `recipeCatalog` y
+  // `orderAssignmentRepository` que el resto del modulo; `productCatalog` es el mismo que usa
+  // `recetas` mas arriba, y `unitCatalog` el mismo que usa `recetas` para sus dos escrituras.
+  getAssignedOrderExecution: createGetAssignedOrderExecution({
+    assignments: orderAssignmentRepository,
+    orders: orderCatalog,
+    recipes: recipeCatalog,
+    units: unitCatalog,
+    products: productCatalog,
+  }),
+  startAssignedOrder: createStartAssignedOrder({
+    assignments: orderAssignmentRepository,
+    orders: orderCatalog,
+    recipes: recipeCatalog,
+    units: unitCatalog,
+    products: productCatalog,
+    now: () => new Date(),
+  }),
+  finishAssignedOrder: createFinishAssignedOrder({
+    assignments: orderAssignmentRepository,
+    orders: orderCatalog,
     now: () => new Date(),
   }),
 } as const;

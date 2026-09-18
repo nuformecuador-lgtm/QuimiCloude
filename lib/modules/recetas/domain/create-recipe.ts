@@ -2,6 +2,7 @@ import { requirePermission, type Actor } from './actor';
 import { RecipeDuplicateNameError, ValidationError } from './errors';
 import { validateRecipeImage } from './recipe-image';
 import { createRecipeSchema } from './recipe-input';
+import type { RecipeScope } from './recipe-scope';
 
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
 import type { NewRecipe, RecipeRepository } from '../ports/recipe-repository';
@@ -39,6 +40,10 @@ export function createCreateRecipe(
   ): Promise<{ id: string }> {
     requirePermission(actor, 'recetas.modificar');
 
+    // La empresa sale del ACTOR y jamas de la entrada: nadie puede elegir dar de alta en
+    // nombre de otra.
+    const scope: RecipeScope = { companyId: actor.companyId };
+
     const parsed = createRecipeSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
     const data = parsed.data;
@@ -47,7 +52,7 @@ export function createCreateRecipe(
     // producto -no hay ninguna linea preexistente que eximir- (`design.md > 6`).
     const productIds = data.lines.map((line) => line.productId);
     if (productIds.length > 0) {
-      const refs = await deps.products.findRefs(productIds);
+      const refs = await deps.products.findRefs(productIds, actor.companyId);
       const foundIds = new Set(refs.map((ref) => ref.id));
       const missing = productIds.some((id) => !foundIds.has(id));
       if (missing) throw new ValidationError();
@@ -59,7 +64,7 @@ export function createCreateRecipe(
     // aqui (a diferencia de `productId`).
     const unitIds = [...new Set(data.lines.map((line) => line.unitId))];
     if (unitIds.length > 0) {
-      const unitRefs = await deps.units.findRefs(unitIds);
+      const unitRefs = await deps.units.findRefs(unitIds, actor.companyId);
       const foundUnitIds = new Set(unitRefs.map((ref) => ref.id));
       const missingUnit = unitIds.some((id) => !foundUnitIds.has(id));
       if (missingUnit) throw new ValidationError();
@@ -86,7 +91,7 @@ export function createCreateRecipe(
     };
 
     // R8: el puerto traduce el `23505` del indice unico parcial a `'duplicate'`.
-    const result = await deps.recipes.create(newRecipe, actor.id, now());
+    const result = await deps.recipes.create(newRecipe, actor.id, now(), scope);
     if (result === 'duplicate') throw new RecipeDuplicateNameError();
 
     return result;

@@ -14,7 +14,11 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 
 // QC-74 (R16, R18): el actor ya no lleva nombre de rol, lleva el conjunto de permisos.
 // Los dos codigos de `recetas`, que es lo que exigen los cinco casos de uso.
-const ADMIN: Actor = { id: 'admin-1', permissions: ['recetas.consultar', 'recetas.modificar'] };
+const ADMIN: Actor = {
+  id: 'admin-1',
+  companyId: 'empresa-1',
+  permissions: ['recetas.consultar', 'recetas.modificar'],
+};
 const AHORA = new Date('2026-09-03T10:00:00.000Z');
 
 const RECETA_VALIDA = {
@@ -68,7 +72,10 @@ function montarCatalogo(): ProductCatalog {
 /** Doble simple de `UnitCatalog`: este archivo prueba el ciclo de vida de la imagen
  *  (R47-R49), no R50, y todas sus recetas van sin lineas -no hace falta variar el doble. */
 function montarCatalogoUnidades(): UnitCatalog {
-  return { findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []) };
+  return {
+    findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []),
+    findRefsSharingBaseInCompany: vi.fn<UnitCatalog['findRefsSharingBaseInCompany']>(async () => []),
+  };
 }
 
 describe('R47 — image omitido conserva la imagen sin tocar el almacenamiento', () => {

@@ -25,13 +25,6 @@ import type { InventoryScope } from '../../../domain/inventory-scope';
  *   `NewProduct`, `NewProductBatch` ni `PresentationData`: lo que no esta en el tipo no se puede
  *   escribir por accidente ni ELEGIR desde la entrada del llamante.
  *
- * EXCEPCION, UNA Y EXPLICITA: `findProductRefs` (`product-catalog-prisma.ts`) se queda SIN
- * ambito (R29). Es la costura por la que `recetas` resuelve referencias de producto con
- * identificadores que ya conoce, y no tiene sesion de la que sacar la empresa. Esta aprobada por
- * escrito con su consecuencia: hasta entonces, una receta de la empresa A que guarde el
- * identificador de un producto de la B lo sigue resolviendo. **Destino: QC-50.** No es un
- * olvido, y ninguna otra consulta del modulo puede acogerse a ella.
- *
  * NO AUTORIZA NADA: es un criterio de FILTRADO. El permiso ya se comprobo en la primera linea
  * del caso de uso, antes de llegar hasta aqui.
  */

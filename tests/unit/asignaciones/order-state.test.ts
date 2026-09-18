@@ -59,6 +59,7 @@ function montar(order: OrderAssignmentTarget | null): {
     listByOrdersInCompany: vi.fn(async () => []),
     deleteOne: vi.fn(async () => 'ok' as const),
     deleteByWorkGroup: vi.fn(async () => 0),
+    listOrderIdsByUserInCompany: vi.fn(async () => []),
   };
   const people = {
     findAliveRefsInCompany: vi.fn(async (_c: string, ids: readonly string[]) =>
