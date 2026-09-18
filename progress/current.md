@@ -19,6 +19,10 @@
 
 ## Evaluaciones
 
+### QC-73 - acotada con `/afinar-feature` (2026-09-18)
+
+**9 decisiones cerradas y 3 preguntas abiertas** (ninguna bloquea el spec) en `specs/QC-73-limite-de-peticiones-por-origen/requirements.md`, sembrado dentro del worktree. El board se corrigio ANTES de sembrar: la `description` declaraba abiertas las tres preguntas que se cerraron. `zone`, `complexity` y `depends_on` no cambian. Dependencia Upstash **aprobada**, sujeta a repetir los checks en F1.4.
+
 ### QC-73 - seleccionada en F1.0 (2026-09-18)
 
 `arranca 73` del humano. **`complexity:high`**: integracion externa (Upstash por HTTP), dependencia nueva, primera E/S del middleware y decision de disponibilidad (fail-open / fail-closed). **`zone` se deja `fullstack`** tal como vino del board: la propia ficha dice que baja a `backend` si el freno es un 429 seco, asi que se reevalua **tras acotar** y no antes; si queda `fullstack`, se parte en F1.0.
