@@ -1,11 +1,13 @@
+import type { Prisma } from '@prisma/client';
+
 import { prisma } from '@/lib/shared/db/prisma';
 
 import { sumStockByUnit } from '../../../domain/product-stock';
 import type { InventoryScope } from '../../../domain/inventory-scope';
-import type { ProductId, ProductRef } from '../../../domain/product-catalog';
+import type { CostingBatch, ProductId, ProductRef } from '../../../domain/product-catalog';
 import type { ProductStockByUnit } from '../../../domain/product-stock';
 
-import { productCompanyScope } from './company-scope';
+import { batchCompanyScope, productCompanyScope } from './company-scope';
 
 /**
  * Implementa `ProductCatalog['findRefs']`: el hueco que el contrato publico de `inventario`
@@ -88,4 +90,58 @@ export async function findProductRefs(
       ),
     }),
   );
+}
+
+const COSTING_BATCH_SELECT = {
+  productId: true,
+  lot: true,
+  stock: true,
+  unitCost: true,
+  purchaseDate: true,
+  presentation: { select: { unitId: true } },
+} satisfies Prisma.ProductBatchSelect;
+
+type CostingBatchRow = Prisma.ProductBatchGetPayload<{ select: typeof COSTING_BATCH_SELECT }>;
+
+/** Fecha civil, sin hora: la columna es `@db.Date` y las tres cifras del ISO bastan. */
+function toCivilDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/** Fila de Prisma -> `CostingBatch` del contrato publico. Funcion pura, testeable sin base. */
+export function toCostingBatch(row: CostingBatchRow): CostingBatch {
+  return {
+    productId: row.productId,
+    lot: row.lot,
+    stock: row.stock,
+    unitCost: row.unitCost.toFixed(4),
+    unitId: row.presentation.unitId,
+    purchaseDate: toCivilDate(row.purchaseDate),
+  };
+}
+
+/**
+ * Implementa `ProductCatalog['findCostingBatches']`: los lotes CON EXISTENCIA de los
+ * productos pedidos, de esa empresa, para que `pedidos` calcule el importe. Una sola
+ * consulta para todos los `productId` (el numero de consultas no crece con el numero de
+ * ingredientes). NO ordena -el orden es criterio de negocio de quien costea- y NO escribe
+ * nada.
+ */
+export async function findCostingBatches(
+  ids: readonly ProductId[],
+  companyId: string,
+): Promise<readonly CostingBatch[]> {
+  if (ids.length === 0) return [];
+
+  const rows = await prisma.productBatch.findMany({
+    where: {
+      AND: [
+        batchCompanyScope({ companyId }),
+        { productId: { in: [...ids] }, stock: { gt: 0 }, product: { deletedAt: null } },
+      ],
+    },
+    select: COSTING_BATCH_SELECT,
+  });
+
+  return rows.map(toCostingBatch);
 }

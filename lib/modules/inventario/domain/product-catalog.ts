@@ -25,6 +25,18 @@ export type ProductRef = {
   readonly stockByUnit: readonly ProductStockByUnit[];
 };
 
+/** Un lote con existencia, visto desde fuera de `inventario` para costear. `stock` es `Int`
+ *  en la base; `unitCost` viaja como cadena decimal; `unitId` es el de la PRESENTACION del
+ *  lote; `purchaseDate` en `YYYY-MM-DD` (la columna es `@db.Date`, sin hora). */
+export type CostingBatch = {
+  readonly productId: ProductId;
+  readonly lot: string;
+  readonly stock: number;
+  readonly unitCost: string;
+  readonly unitId: string;
+  readonly purchaseDate: string;
+};
+
 /** Servicio que `inventario` ofrece a los demas modulos (`docs/architecture.md > Dominio`
  *  n.o 2: «se comparten servicios via interfaz, nunca repositorios ni tablas»).
  *  Lo implementa un adaptador driven DE INVENTARIO —el unico que puede tocar
@@ -40,4 +52,12 @@ export interface ProductCatalog {
    *  dos lados. Que el ambito viva en la firma es lo que hace que una llamada que lo omita
    *  no compile. */
   findRefs(ids: readonly ProductId[], companyId: string): Promise<readonly ProductRef[]>;
+
+  /** Lotes CON EXISTENCIA (`stock > 0`) de los productos pedidos, de productos vivos y de esa
+   *  empresa. Un producto sin lotes con existencia simplemente no aparece. NO ordena: el
+   *  orden del calculo es criterio de negocio de quien costea. */
+  findCostingBatches(
+    ids: readonly ProductId[],
+    companyId: string,
+  ): Promise<readonly CostingBatch[]>;
 }
