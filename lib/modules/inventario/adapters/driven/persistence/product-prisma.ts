@@ -3,11 +3,12 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
-import { BatchDuplicateLotError, ValidationError } from '../../../domain/errors';
+import { BatchDuplicateLotError, BatchStockNegativeError, ValidationError } from '../../../domain/errors';
 import { normalizeProductName } from '../../../domain/product-name';
 import { sumStockByUnit } from '../../../domain/product-stock';
 
-import { companyScopeColumns, productCompanyScope } from './company-scope';
+import { writeMovement } from './batch-movement-prisma';
+import { batchCompanyScope, companyScopeColumns, productCompanyScope } from './company-scope';
 import {
   dateRangeCondition,
   normalizedSearchCondition,
@@ -18,8 +19,10 @@ import {
 
 import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
+import type { MovementReason } from '../../../domain/movement-reason';
 import type { Page } from '../../../domain/page';
 import type { NewProductBatch } from '../../../domain/product-batch';
+import type { ProductBatchView } from '../../../domain/product-batch-view';
 import type { NewProduct, ProductView } from '../../../domain/product-view';
 
 // El ambito de empresa va como conjuncion aparte en un `AND` de primer nivel, para que ninguna otra
@@ -384,6 +387,18 @@ function sqlStateOf(error: unknown): string | null {
   return null;
 }
 
+/** El texto del error, incluido lo que trae `meta.message`, donde Postgres deja el nombre de la
+ *  restriccion violada. */
+function violationMessageOf(error: unknown): string {
+  const meta: unknown = error instanceof Prisma.PrismaClientKnownRequestError ? error.meta : null;
+  const detalle =
+    typeof meta === 'object' && meta !== null && 'message' in meta
+      ? String((meta as { message: unknown }).message)
+      : '';
+  const bruto = error instanceof Error ? error.message : '';
+  return `${detalle}\n${bruto}`;
+}
+
 /** Identificadores que escribe el propio `RAISE EXCEPTION` del disparador, no texto que Postgres
  *  traduzca: buscarlos no es decidir por el mensaje. */
 const BATCH_COMPANY_SCOPE_VIOLATIONS = [
@@ -395,14 +410,15 @@ const BATCH_COMPANY_SCOPE_VIOLATIONS = [
  *  SQLSTATE y no son entrada que no encaja. */
 function isBatchCompanyScopeViolation(error: unknown): boolean {
   if (sqlStateOf(error) !== '23514') return false;
-  const meta: unknown = error instanceof Prisma.PrismaClientKnownRequestError ? error.meta : null;
-  const detalle =
-    typeof meta === 'object' && meta !== null && 'message' in meta
-      ? String((meta as { message: unknown }).message)
-      : '';
-  const bruto = error instanceof Error ? error.message : '';
-  const carga = `${detalle}\n${bruto}`;
-  return BATCH_COMPANY_SCOPE_VIOLATIONS.some((nombre) => carga.includes(nombre));
+  return BATCH_COMPANY_SCOPE_VIOLATIONS.some((nombre) => violationMessageOf(error).includes(nombre));
+}
+
+const BATCH_STOCK_NON_NEGATIVE_CONSTRAINT = 'product_batches_stock_non_negative';
+
+/** Mismo criterio que `isBatchCompanyScopeViolation`: `23514` mas el nombre de la restriccion. */
+function isBatchStockNegativeViolation(error: unknown): boolean {
+  if (sqlStateOf(error) !== '23514') return false;
+  return violationMessageOf(error).includes(BATCH_STOCK_NON_NEGATIVE_CONSTRAINT);
 }
 
 /** Lo que no se sabe traducir se relanza: un CHECK violado o una caida de conexion no son entrada
@@ -505,6 +521,13 @@ export async function createWithFirstBatch(
       select: { id: true },
     });
 
+    await writeMovement(
+      tx,
+      { batchId: createdBatch.id, kind: 'opening', quantity: batch.stock, reason: null, createdBy: batch.createdBy },
+      now,
+      scope,
+    );
+
     return { id: created.id, batchId: createdBatch.id, lot };
   });
 }
@@ -544,6 +567,99 @@ export async function addBatchToAlive(
       select: { id: true },
     });
 
+    await writeMovement(
+      tx,
+      { batchId: createdBatch.id, kind: 'opening', quantity: batch.stock, reason: null, createdBy: batch.createdBy },
+      now,
+      scope,
+    );
+
     return { batchId: createdBatch.id, lot };
   });
+}
+
+const BATCH_VIEW_SELECT = {
+  id: true,
+  lot: true,
+  stock: true,
+  purchaseDate: true,
+  expiryDate: true,
+  presentation: { select: { unitId: true } },
+} satisfies Prisma.ProductBatchSelect;
+
+type BatchViewRow = Prisma.ProductBatchGetPayload<{ select: typeof BATCH_VIEW_SELECT }>;
+
+/** Fecha civil, sin hora: la columna es `@db.Date` y las tres cifras del ISO bastan. */
+function toCivilDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function toBatchView(row: BatchViewRow): ProductBatchView {
+  return {
+    id: row.id,
+    lot: row.lot,
+    stock: row.stock,
+    unitId: row.presentation.unitId,
+    purchaseDate: toCivilDate(row.purchaseDate),
+    expiryDate: row.expiryDate === null ? null : toCivilDate(row.expiryDate),
+  };
+}
+
+/** Todos los lotes del producto, siempre que el producto siga vivo: un producto borrado o ajeno
+ *  devuelve un array vacio, no una excepcion. */
+export async function findBatchesOfAliveProduct(
+  productId: string,
+  scope: InventoryScope,
+): Promise<readonly ProductBatchView[]> {
+  const rows = await prisma.productBatch.findMany({
+    where: {
+      AND: [batchCompanyScope(scope), { productId, product: { deletedAt: null } }],
+    },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    select: BATCH_VIEW_SELECT,
+  });
+
+  return rows.map(toBatchView);
+}
+
+/** `P2025`: el `where` unico mas el filtro de empresa no encontraron fila que actualizar. */
+function isBatchNotFound(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
+}
+
+/**
+ * `stock: { increment: delta } }` es un `UPDATE ... SET stock = stock + $delta` relativo: dos
+ * ajustes concurrentes suman sobre lo que la base tenga en ese instante, nunca sobre un total
+ * leido antes. `productBatch.update` es la UNICA funcion del repositorio que escribe sobre una
+ * fila de lote ya existente -el `where` combina el identificador unico con la empresa, y sin fila
+ * que lo cumpla Prisma lanza `P2025` en vez de tocar una fila ajena-. El asiento queda en la MISMA
+ * transaccion que el ajuste de stock.
+ */
+export async function adjustBatchStock(
+  batchId: string,
+  delta: number,
+  reason: MovementReason,
+  actorId: string,
+  now: Date,
+  scope: InventoryScope,
+): Promise<{ stock: number } | null> {
+  const { companyId } = companyScopeColumns(scope);
+
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const updated = await tx.productBatch.update({
+        where: { id: batchId, companyId },
+        data: { stock: { increment: delta }, updatedBy: actorId, updatedAt: now },
+        select: { stock: true },
+      });
+
+      await writeMovement(tx, { batchId, kind: 'adjustment', quantity: delta, reason, createdBy: actorId }, now, scope);
+
+      return { stock: updated.stock };
+    });
+  } catch (error) {
+    if (isBatchNotFound(error)) return null;
+    if (isBatchStockNegativeViolation(error)) throw new BatchStockNegativeError();
+    throw error;
+  }
 }

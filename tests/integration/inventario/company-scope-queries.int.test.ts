@@ -231,6 +231,7 @@ afterAll(async () => {
   // En el orden que exigen las FK.
   const empresas = [A, B].filter((empresa): empresa is Empresa => empresa !== undefined);
   for (const empresa of empresas) {
+    await prisma.inventoryMovement.deleteMany({ where: { companyId: empresa.companyId } });
     await prisma.productBatch.deleteMany({ where: { companyId: empresa.companyId } });
     await prisma.product.deleteMany({ where: { companyId: empresa.companyId } });
     await prisma.presentation.deleteMany({ where: { companyId: empresa.companyId } });

@@ -68,12 +68,15 @@ import {
   createUpdateProduct,
 } from '@/lib/modules/inventario';
 import { findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
+import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
   addBatchToAlive,
+  adjustBatchStock,
   createProduct,
   createWithFirstBatch,
   findAliveIdByName,
   findAliveProductById,
+  findBatchesOfAliveProduct,
   listAliveProducts,
   softDeleteAliveProduct,
   updateAliveProduct,
@@ -636,6 +639,9 @@ const productRepository: ProductRepository = {
   findAliveIdByName,
   createWithFirstBatch,
   addBatchToAlive,
+  adjustBatchStock,
+  findBatchesOfAliveProduct,
+  findBatchMovements,
 };
 
 const presentationRepository: PresentationRepository = {

@@ -112,6 +112,10 @@ function repositorioProductoQueFalla(): ProductRepository {
     findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(explota),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(explota),
     addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(explota),
+    // QC-92: los tres del libro de inventario tambien EXPLOTAN, por la misma razon.
+    adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(explota),
+    findBatchesOfAliveProduct: vi.fn<ProductRepository['findBatchesOfAliveProduct']>(explota),
+    findBatchMovements: vi.fn<ProductRepository['findBatchMovements']>(explota),
   };
 }
 
@@ -194,6 +198,9 @@ function montarReposPermisivos(): Repos {
         batchId: 'lote-1',
         lot: '1',
       })),
+      adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(async () => ({ stock: 1 })),
+      findBatchesOfAliveProduct: vi.fn<ProductRepository['findBatchesOfAliveProduct']>(async () => []),
+      findBatchMovements: vi.fn<ProductRepository['findBatchMovements']>(async () => []),
     },
     presentations: {
       create: vi.fn<PresentationRepository['create']>(async () => ({ id: 'presentacion-1' })),
