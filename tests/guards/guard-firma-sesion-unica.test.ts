@@ -104,6 +104,7 @@ function listSourceFiles(dir: string): readonly string[] {
  */
 function stripComments(source: string): string {
   return source
+    .replace(/\r\n?/g, '\n')
     .split('\n')
     .map((line) => line.replace(/\/\/.*$/, ''))
     .join('\n')
@@ -268,6 +269,22 @@ describe('guardia — un unico dueño de la firma de sesion (R5)', () => {
     // Y el mismo fuente sin la linea de comentario tiene que dar lo mismo: lo que se afirma es que
     // el comentario NO cambia el veredicto, no que el fuente case por casualidad.
     expect(mentionsSignatureAlgorithm(cegado.split('\n').slice(1).join('\n'))).toBe(true)
+  })
+
+  // Regresion CRLF: `core.autocrlf=true` deja cada linea terminada en `\r`, y sin normalizar antes
+  // de partir por lineas ni `.*$` ni `$` sin bandera `m` casan antes de el.
+  it('no se ciega con CRLF: el mismo cegado con `\\r\\n` NO esconde el createHmac que va debajo', () => {
+    const cegadoCrlf = [
+      '// se juzga con las mismas reglas que app/** (R19)',
+      "import { createHmac } from 'node:crypto';",
+      "export const firma = createHmac('sha256', secreto);",
+      '/** JSDoc posterior que cierra el bloque falso. */',
+      'export const otra = 1;',
+    ].join('\r\n')
+
+    expect(mentionsSignatureAlgorithm(cegadoCrlf)).toBe(true)
+    // Y un comentario que solo MENCIONA el algoritmo, con CRLF, sigue sin ser una implementacion.
+    expect(mentionsSignatureAlgorithm('// antes esto llamaba a createHmac(...) directamente\r\n')).toBe(false)
   })
 
   // QC-9 R19 — la raiz del repositorio tambien se barre.

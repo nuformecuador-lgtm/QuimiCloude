@@ -105,6 +105,7 @@ function tryReadReal(absPath: string): string | null {
  */
 function stripComments(source: string): string {
   return source
+    .replace(/\r\n?/g, '\n')
     .split('\n')
     .map((line) => line.replace(/\/\/.*$/, ''))
     .join('\n')
@@ -1856,6 +1857,24 @@ describe('guardia — arquitectura hexagonal por modulos', () => {
       // cegado, no la regla.
       expect(extractImportSpecifiers("// import { prisma } from '@/lib/shared/db/prisma'\n")).toEqual([])
       expect(extractImportSpecifiers("/* import { prisma } from '@/lib/shared/db/prisma' */")).toEqual([])
+    })
+
+    it('no se ciega con CRLF: el mismo cegado con `\\r\\n` tampoco esconde los imports que van debajo', () => {
+      // `core.autocrlf=true` deja cada linea terminada en `\r`. Sin normalizar antes de partir por
+      // lineas, `//.*$` no casa: `.` no consume `\r` y `$` sin bandera `m` no ancla antes de el, asi
+      // que el comentario de linea sobrevive junto a su apertura de bloque falsa.
+      const cegadoCrlf = [
+        '// se juzga con las mismas reglas que app/** (R19)',
+        "import { createHmac } from 'node:crypto';",
+        "export const firma = createHmac('sha256', secreto);",
+        '/** JSDoc posterior que cierra el bloque falso. */',
+        'export const otra = 1;',
+      ].join('\r\n')
+
+      expect(extractImportSpecifiers(cegadoCrlf)).toContain('node:crypto')
+
+      // Y el mismo matiz de mas arriba, en CRLF: un comentario que solo MENCIONA un import no cuenta.
+      expect(extractImportSpecifiers("// import { prisma } from '@/lib/shared/db/prisma'\r\n")).toEqual([])
     })
 
     it('el middleware.ts REAL sigue mostrando su reexport pese al comodin `app/` + dos asteriscos de su cabecera', () => {

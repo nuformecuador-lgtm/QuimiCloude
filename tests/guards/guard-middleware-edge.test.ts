@@ -72,6 +72,7 @@ function withoutExtension(relPath: string): string {
  */
 function stripComments(source: string): string {
   return source
+    .replace(/\r\n?/g, '\n')
     .split('\n')
     .map((line) => line.replace(/\/\/.*$/, ''))
     .join('\n')
@@ -272,5 +273,26 @@ describe('guardia: casos sinteticos', () => {
     const { findings } = walkEdgeClosure('middleware.ts', (relPath) => ciclo.get(relPath) ?? null)
 
     expect(findings).toHaveLength(1)
+  })
+})
+
+describe('guardia: no se ciega por comentarios', () => {
+  // Regresion CRLF: `core.autocrlf=true` deja cada linea terminada en `\r`, y sin normalizar antes
+  // de partir por lineas, un comentario de linea con un comodin `app/` + dos asteriscos sobrevive y
+  // abre un bloque falso que se traga el reexport real de debajo.
+  it('un comentario de linea con CRLF y un comodin `app/** ` NO esconde el reexport que va debajo', () => {
+    const cegadoCrlf = [
+      '// se juzga con las mismas reglas que app/** (R19)',
+      "export { middleware } from '@/lib/modules/identity/adapters/driving/route-guard-middleware'",
+      '/** JSDoc posterior que cerraria un bloque falso. */',
+      'export const config = { matcher: [] }',
+    ].join('\r\n')
+
+    expect(extractImportSpecifiers(cegadoCrlf)).toContain(
+      '@/lib/modules/identity/adapters/driving/route-guard-middleware',
+    )
+
+    // Un comentario que solo MENCIONA la ruta, con CRLF, sigue sin ser un import.
+    expect(extractImportSpecifiers("// export { middleware } from '@/lib/shared/db/prisma'\r\n")).toEqual([])
   })
 })
