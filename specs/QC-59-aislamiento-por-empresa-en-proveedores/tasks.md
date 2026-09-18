@@ -229,7 +229,7 @@
   Depende de: T0.
   Cubre: el gate.
 
-- [ ] **T17 — `E2E_ESPERADOS` de la guardia de QC-71.** `[P]` **BLOQUEADA: la lista se compara contra el disco, así que el alta solo se puede hacer cuando exista `e2e/aislamiento-proveedores.spec.ts` (T31, bloque 4). «Depende de: T22» es una errata del spec; la dependencia real es T31.**
+- [x] **T17 — `E2E_ESPERADOS` de la guardia de QC-71.** `[P]` **CERRADA 2026-09-17, en cuanto T31 creó `e2e/aislamiento-proveedores.spec.ts`. «Depende de: T22» era una errata del spec; la dependencia real era T31.**
   Archivos: `tests/guards/guard-identificador-de-request.test.ts` (`:57`).
   Contenido: añadir `'aislamiento-proveedores.spec.ts'` con su comentario, con el mismo patrón que
   `aislamiento-recetas.spec.ts` (`:68-78`), diciendo qué recorrido ejercita y que **no** ejercita el
@@ -237,7 +237,7 @@
   Depende de: T22.
   Cubre: el gate.
 
-- [ ] **T18 — Las cuatro listas de `tests/unit/proveedores/scope.test.ts`.** `[P]` **(b), (c) y (d) HECHAS 2026-09-17; (a), el censo de E2E, queda abierta: su segundo literal es `aislamiento-proveedores.spec.ts`, que lo crea T31 (bloque 4). Darla de alta antes pondría la lista roja.**
+- [x] **T18 — Las cuatro listas de `tests/unit/proveedores/scope.test.ts`.** `[P]` **(b), (c) y (d) HECHAS en la tanda del bloque 3; (a), el censo de E2E, CERRADA 2026-09-17 tras T31: la lista pasa a dos literales y sigue siendo `toEqual`.**
   Archivos: `tests/unit/proveedores/scope.test.ts`.
   Contenido, las cuatro **a mano y con motivo escrito**:
   (a) censo de E2E (`:232`): de `['proveedores.spec.ts']` a **dos** literales, en el orden que
@@ -310,7 +310,7 @@
   Depende de: T12.
   Cubre: R22.
 
-- [ ] **T25 — Censo de aislamiento de integración.** `[P]` **BLOQUEADA: no hay todavía ningún archivo nuevo bajo `tests/integration/proveedores/**` que declarar; los crean T29 y T30 (bloque 4).**
+- [x] **T25 — Censo de aislamiento de integración.** `[P]` **CERRADA 2026-09-17 tras T29 y T30: `company-scope.int.test.ts` entra como `transaccion` y `company-scope-queries.int.test.ts` como `commit`, con motivo y `desde`.**
   Archivos: `tests/integration/aislamiento.json`.
   Contenido: declarar los archivos nuevos de `tests/integration/proveedores/**` con su forma de
   aislamiento; si alguno fuese `commit`, con **motivo y desde**, que es lo que el propio censo exige.
@@ -360,7 +360,7 @@
 
 ## Bloque 4 — Pruebas
 
-- [ ] **T29 — Integración: restricciones, unicidad, backfill y reversión.** `[P]`
+- [x] **T29 — Integración: restricciones, unicidad, backfill y reversión.** `[P]`
   Archivos: `tests/integration/proveedores/company-scope.int.test.ts` (nuevo).
   Contenido: `INSERT` de proveedor y de línea sin empresa y con empresa inexistente → rechazo; línea
   con empresa distinta de la de su proveedor → rechazo por la **FK compuesta**, nombrándola; línea
@@ -375,7 +375,7 @@
   Depende de: T5.
   Cubre: R1, R2, R3, R4, R5, R7, R8, R10, R11, R14, R15, R34.
 
-- [ ] **T30 — Integración: listados, escrituras y la costura de unidades.** `[P]`
+- [x] **T30 — Integración: listados, escrituras y la costura de unidades.** `[P]`
   Archivos: `tests/integration/proveedores/company-scope-queries.int.test.ts` (nuevo).
   Contenido: con proveedores y líneas de dos empresas sembrados, los **dos** listados devuelven solo
   los suyos **y el `total` también**; la búsqueda y los filtros **no ensanchan** lo visible;
@@ -390,7 +390,7 @@
   Depende de: T10, T11, T13.
   Cubre: R16, R19, R25, R26, R27, R28, R29, R30, R31, R35.
 
-- [ ] **T31 — E2E de aislamiento.** **(E2E — Playwright)**
+- [x] **T31 — E2E de aislamiento.** **(E2E — Playwright)**
   Archivos: `e2e/aislamiento-proveedores.spec.ts` (nuevo), con el patrón de
   `e2e/aislamiento-inventario.spec.ts` y `e2e/aislamiento-pedidos.spec.ts`: fixture propio, prefijo
   por worker, limpieza defensiva en el orden que respetan las FK, **una sola sesión real** (la de A)
@@ -404,7 +404,7 @@
   Hecho cuando: pasa en Chromium **y** en WebKit, y el fixture deja la base como la encontró.
   Cubre: R37, y ejercita R14, R25, R27, R28 de extremo a extremo.
 
-- [ ] **T32 — Test de esquema y de texto de la migración.** `[P]`
+- [x] **T32 — Test de esquema y de texto de la migración.** `[P]`
   Archivos: `tests/unit/proveedores/schema/suppliers-company-scope-migration.test.ts` (nuevo).
   Contenido: el UP declara las dos columnas, las dos FK simples, las **dos claves candidatas**, las
   **dos FK compuestas**, el paréntesis de RLS y el relevo del único **con su `WHERE`** —evaluado
@@ -416,7 +416,7 @@
   Depende de: T5.
   Cubre: R8 (parte), R9, R10, R12, R15 (ángulo 1), R38 (parte).
 
-- [ ] **T33 — Guardia estática por función.** `[P]`
+- [x] **T33 — Guardia estática por función.** `[P]`
   Archivos: `tests/guards/guard-ambito-empresa-proveedores.test.ts` (nuevo), calcado de
   `guard-ambito-empresa-recetas.test.ts`.
   Contenido: **método a método** de los dos puertos, y **función a función** de todo
@@ -429,7 +429,7 @@
   ejecutada y anotada).
   Cubre: R23, R24.
 
-- [ ] **T34 — Service: el rechazo cruzado y la unidad, con dobles.** `[P]`
+- [x] **T34 — Service: el rechazo cruzado y la unidad, con dobles.** `[P]`
   Archivos: `tests/unit/proveedores/company-isolation-service.test.ts` (nuevo);
   `tests/unit/proveedores/company-scope.test.ts` (nuevo: las tres envolturas y la forma de la salida
   pública); `tests/unit/proveedores/authorization.test.ts`, `supplier-service.test.ts`,
@@ -445,7 +445,7 @@
   Depende de: T8, T12.
   Cubre: R18, R21, R22, R27, R28, R30, R31, R33.
 
-- [ ] **T35 — Que las imágenes no se movieron.** `[P]`
+- [x] **T35 — Que las imágenes no se movieron.** `[P]`
   Archivos: `tests/unit/proveedores/catalog-line-image-scope.test.ts` (nuevo) o ampliación del test
   de imagen existente.
   Contenido: la ruta que compone el adaptador de almacenamiento **no** contiene el identificador de

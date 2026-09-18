@@ -518,3 +518,282 @@ producción se modificó en esta tanda (las dos sondas de falsabilidad se revirt
 mensaje de commit de esta rama contiene la marca que las dos guardias del diff filtran, así que
 T27 sigue viva. La única contradicción con el spec es la de **T15**, resuelta hacia el lado que
 tensa y anotada en `tasks.md`.
+
+---
+
+## Tanda 4 — Bloque 4 completo (T29–T35) más las tres tasks que lo esperaban (T17, T18(a), T25) · 2026-09-17
+
+**Encargo**: el bloque 4 entero, incluido el E2E, y el cierre de las tres listas que la tanda 3
+dejó abiertas a propósito porque declaraban archivos que este bloque crea. Nada del bloque 5.
+
+**Ningún archivo de producción se tocó en esta tanda.** `git status` solo muestra `tests/`, `e2e/`
+y los dos `.md` del arnés. Ninguna dependencia de terceros entró: `package.json` y
+`pnpm-lock.yaml` quedan sin tocar.
+
+### La comprobación previa que el encargo exigía: el diálogo de borrado SÍ es ejercitable
+
+En QC-50 el intento de borrado cruzado resultó **no ejercitable**: el diálogo de recetas toma el id
+del cierre de React y no hay nodo del DOM que reescribir, y hubo que enmendar el requisito con
+aprobación humana. **Aquí no hace falta**: se leyó el código antes de escribir una sola línea de
+test y `app/(private)/proveedores/components/delete-supplier-dialog.tsx` lleva un
+`input type="hidden" name="id" defaultValue={supplier.id} data-testid="delete-supplier-id"`
+dentro de su `form action={formAction}`, igual que `delete-product-dialog.tsx` y
+`delete-order-dialog.tsx`. El gesto del paso 3 de `design.md > 8.3` es real y se hizo.
+**No se enmendó nada del spec y no se pidió excepción.**
+
+### T29 — `tests/integration/proveedores/company-scope.int.test.ts` (nuevo, 24 casos)
+
+Calcado de `tests/integration/recetas/company-scope.int.test.ts`. Cubre R1, R2, R3, R4, R5, R7, R8,
+R10, R11, R14, R15 (ángulo 3), R34.
+
+- R4 nombra `supplier_catalog_lines_company_id_supplier_id_fkey`, y no solo en el `INSERT`: también
+  en **los dos caminos por `UPDATE`** (cambiar la empresa de la línea y cambiar su proveedor), que
+  es lo que R4 exige al decir «no debe existir ningún camino».
+- R5 nombra `supplier_catalog_lines_company_id_presentation_id_fkey`, con la presentación propia
+  **aceptada** como control positivo.
+- **R15 ángulo 3 quedó aislado a propósito**: el caso «dar de baja libera el nombre» no lee
+  `pg_indexes` ni el texto del SQL, y lo dice en un comentario. Los otros dos ángulos siguen en
+  `list-query-indexes.int.test.ts` (predicado) y en el test de esquema (texto). Si uno se apoyara en
+  otro, la trampa del `WHERE` volvería a poder colarse sin un test en rojo.
+- R7/R8: los dos backfills se ejecutan **leídos del disco**. El de líneas se prueba con un proveedor
+  que **no** es «QuimiCloud»: si derivara la empresa por nombre en vez de del proveedor, la FK
+  compuesta lo cazaría. Recuentos de las cuatro tablas idénticos antes/después.
+- R11: la reversión aborta por **cada una** de sus causas (guardia 1; guardia 2 en sus dos mitades,
+  aisladas mutando la otra en memoria; guardia 3), **más dos controles anti-placebo**: el bloque real
+  no aborta sobre una base sin dato que estorbe, y con las guardias 2 y 3 desactivadas el mismo dato
+  pasa. Sin eso, un «abortó» podría ser un `RAISE` incondicional.
+- R10: el `down.sql` se ejecuta **entero**, con una comprobación de que el troceador no perdió
+  ninguna de las diez sentencias clave ni partió el bloque `DO`, y los dos retratos se comparan
+  contra `information_schema.columns`, `pg_indexes` (con el `indexdef` literal) y `pg_constraint`
+  (con `pg_get_constraintdef`).
+
+**Un punto donde no se pudo nombrar UNA restricción exacta**, y queda dicho en vez de disimulado:
+la línea con **empresa inexistente** incumple a la vez la FK simple a `companies` y las dos
+compuestas, y cuál de los tres salta primero lo decide el catálogo, no el test. Se dejó como
+conjunto **cerrado y explícito de tres nombres** —el rechazo tiene que venir de una de las tres
+restricciones de empresa de esa tabla y de ninguna otra— con el porqué escrito. No es una lista
+aflojada: no existía antes, y los dos casos deterministas (R4 y R5) sí nombran su FK exacta porque
+el dato está montado para que solo una sea violable.
+
+### T30 — `tests/integration/proveedores/company-scope-queries.int.test.ts` (nuevo, 28 casos)
+
+Cubre R16, R19, R25, R26, R27, R28, R29, R30, R31, R35. Los dos listados y sus `total`; búsqueda y
+filtros que no ensanchan, con control positivo desde la otra empresa; `findAliveById`, `updateAlive`
+y `softDeleteAlive` ajenos devuelven «no existe» con la fila ajena releída entera **con sus
+líneas**; `listBySupplierAlive` ajeno devuelve `'supplier_not_found'` **idéntico al de un id
+inexistente**; la baja arrastra **solo** las líneas de su empresa, con el **mismo `deleted_at`**
+comparado por `getTime()`; `findUnitRefs` acotada (sistema sí, propia sí, ajena no); y el retrato
+con y sin `FORCE ROW LEVEL SECURITY` sobre las dos tablas, restaurado en `finally`.
+
+**Dato medido que `design.md > 0.8` daba por deducción**: el `meta.target` real del `23505` del
+índice compuesto es `['company_id', 'name_normalized']`. El test lo afirma por los dos literales y
+además que `isUniqueNameViolation(error)` sigue devolviendo `true`. Ya no es una deducción.
+
+### T31 — `e2e/aislamiento-proveedores.spec.ts` (nuevo) · **EL REQUISITO, NO UN EXTRA**
+
+La decisión 16 lo exige porque un fallo aquí es una **fuga de datos entre clientes**. Un solo test
+encadenado con los cuatro pasos de `design.md > 8.3`, cada negativo con su control positivo —sin
+ellos, un aislamiento roto por exceso (una lista siempre vacía, un borrado que nunca funciona) daría
+verde—. Molde de `e2e/aislamiento-pedidos.spec.ts`: prefijo por worker, limpieza defensiva de
+huérfanos con una hora de antigüedad mínima, **una sola sesión real** (la de A, con hash bcrypt de
+verdad), los datos de B sembrados con Prisma, y el aterrizaje del login por el helper único
+`e2e/helpers/landing.ts`. **Ningún componente se tocó.**
+
+1. **Listado**: se filtra por un token que casa con las filas de A **y** de B, así que la ausencia no
+   puede venir del filtro. Se afirma contra el HTML servido y contra el DOM, con el proveedor de A
+   presente como control positivo.
+2. **Detalle**: se recoge el estado, el texto del alert, el enlace y el `data-code` para el id de B
+   y para un UUID que no existe en ninguna empresa, y se comparan con `toEqual`. **No hay ni un
+   literal de copy en el test**: la indistinguibilidad se prueba contra la pantalla real del
+   inexistente.
+3. **Baja cruzada**: se abre el diálogo de un proveedor **propio de A**, se afirma que el campo
+   oculto trae de serie el id de A, y se sustituye por DOM por el de B. La sustitución se **repite en
+   la fase de captura del `submit`** —React reescribe `defaultValue` en cada re-render, y sin eso el
+   `POST` sale con el id propio y el verde es falso— y se **espera la petición** comprobando que el
+   identificador ajeno viajó de verdad. Rechazo; y con Prisma, foto antes/después campo a campo: el
+   proveedor de B y su línea idénticos y con `deleted_at` nulo, y el de A tampoco dado de baja.
+   Control positivo: la misma sustitución con el id propio **sí** da de baja y arrastra su línea.
+4. **Alta con el nombre de B**: por la UI, sin error, y en base exactamente un proveedor vivo en A
+   con ese nombre y con id distinto del de B.
+
+**El fixture deja la base como la encontró.** El `afterAll` borra por el token de **este** worker
+—nunca por el prefijo pelado, que se llevaría filas de la ejecución viva del otro navegador— en el
+orden que exigen las FK, **que ahora incluye las dos compuestas nuevas**: líneas → proveedores →
+presentaciones → unidades → usuario → empresas; acumula el primer fallo y **afirma** que el recuento
+de sobrantes en las seis tablas es 0 antes de relanzarlo. Comprobado además desde fuera tras las dos
+ejecuciones: los seis recuentos a cero.
+
+### T32–T35
+
+- **T32** `tests/unit/proveedores/schema/suppliers-company-scope-migration.test.ts` (nuevo, 15
+  casos). **R15 ángulo 1 ejecutado**: el predicado se evalúa sobre el archivo real (**verdadero**) y
+  sobre una copia **en memoria** sin el `WHERE "deleted_at" IS NULL` (**falso**), con
+  `expect(mutado).not.toBe(original)` para que una mutación que no se aplicara no pasara por buena.
+  Mismo patrón para una veintena más de mutaciones (único no relevado, empresa en la cola, `DEFAULT`,
+  `CASCADE`, `ENABLE` sin `FORCE`, policy, identificador en castellano, `presentations` tocada de
+  más, `DELETE`/`INSERT`/`TRUNCATE`, candidatas antes o después de las FK).
+- **T33** `tests/guards/guard-ambito-empresa-proveedores.test.ts` (nuevo, 29 casos), calcada de la de
+  recetas: método a método de los dos puertos y **función a función** de todo
+  `adapters/driven/persistence/`, con caso explícito para `isSupplierAlive`, **sin lista de
+  excepciones** y con un caso que afirma que no existe ninguna (R24).
+- **T34** `company-isolation-service.test.ts` (nuevo, 52 casos) y `company-scope.test.ts` (nuevo, 10
+  casos), más la ampliación de seis archivos existentes (`authorization`, `supplier-service`,
+  `catalog-service`, `list-use-cases`, `supplier-actions`, `catalog-line-fk`). Solo altas: nada
+  removido, ningún `toEqual` degradado.
+- **T35** `catalog-line-image-scope.test.ts` (nuevo, 7 casos): la ruta no lleva la empresa, el enlace
+  sigue siendo público, y la ruta llega al puerto byte a byte igual a la que entró.
+
+### La falsabilidad de T33, EJECUTADA
+
+Se quitó a mano `scope: SupplierScope` y la composición con `supplierCompanyScope(scope)` de
+`findAliveSupplierById` en `supplier-prisma.ts`. La guardia cayó con **dos** fallos —el caso por
+método y el barrido por archivo—. **Sonda revertida** con `git checkout --` del archivo; `git status`
+no muestra nada bajo `lib/` y la guardia vuelve a 29/29 en verde.
+
+**La falsabilidad de T30 NO se pudo ejecutar**, y se dice en vez de darse por hecha: la sonda
+requería mutar `supplierCompanyScope` (producción) y el clasificador del entorno bloqueó la edición,
+igual que en la tanda 3 con el SQL. Lo que el archivo sí tiene por construcción es falsabilidad
+cruzada: «A ve sus tres y ninguno de B» y «B ve sus dos y ninguno de A» no pueden estar las dos
+verdes si el ámbito se ignorara —los dos listados darían cinco—, y lo mismo con cada par
+negativo/control positivo de las escrituras.
+
+### T17, T18(a) y T25 — las tres que esperaban a este bloque
+
+- **T17** `tests/guards/guard-identificador-de-request.test.ts`: alta de
+  `'aislamiento-proveedores.spec.ts'` en `E2E_ESPERADOS`, a mano y en su sitio alfabético, con
+  comentario propio: qué recorrido ejercita y que **no** ejercita el cruce borde → acción del
+  identificador de petición, de modo que ese diferimiento sigue intacto. La afirmación no es de
+  palabra: un `grep` de `request-id`, `requestId` y `reference` sobre el spec nuevo no devuelve nada.
+- **T18(a)** `tests/unit/proveedores/scope.test.ts:232`: el censo de E2E pasa de un literal a
+  **dos**, en el orden que devuelve el recorrido, y **sigue siendo `toEqual`**. (b), (c) y (d) no se
+  tocaron. La aserción «aquí no hay ningún `@@unique`» sigue en pie.
+- **T25** `tests/integration/aislamiento.json`: `proveedores/company-scope.int.test.ts` como
+  **`transaccion`** y `proveedores/company-scope-queries.int.test.ts` como **`commit`** con motivo y
+  `desde: "2026-09-17"`. La clasificación **se verificó leyendo los dos archivos**, no se dio por
+  buena: el primero corre cada caso en una transacción interactiva que termina en ROLLBACK y su
+  único `afterAll` es el `$disconnect`; el segundo importa los adaptadores driven por ruta profunda,
+  que usan el cliente Prisma **global** —una transacción del test sería un aislamiento de mentira,
+  correría en otra conexión del pool—, y limpia por id exacto afirmando con tres `count()` a cero.
+
+**Ninguna lista se aflojó en toda la tanda**: ningún `toContain` sustituyendo a un `toEqual`, ningún
+`skip`, ninguna alta al baseline de rojos. Los comentarios de las altas nuevas no citan `QC-<n>`,
+`R<n>` ni `design.md`, como en el bloque 3.
+
+### Salidas reales
+
+**El E2E, en los DOS navegadores** (`npx playwright test e2e/aislamiento-proveedores.spec.ts`):
+
+```
+--project=chromium --reporter=list
+Running 1 test using 1 worker
+
+  OK  1 [chromium] > e2e\aislamiento-proveedores.spec.ts:419:7 > aislamiento por empresa de
+      proveedores > con sesion en la empresa A: la lista no trae proveedores de B, el detalle de
+      uno de B es indistinguible de uno inexistente, darlo de baja conociendo su identificador se
+      rechaza y lo deja intacto con su linea, y el nombre de un proveedor de B se puede usar en A
+      (R37; R14, R25, R27, R28) (19.8s)
+
+  1 passed (30.6s)
+```
+
+```
+--project=webkit --reporter=list
+Running 1 test using 1 worker
+
+  OK  1 [webkit] > e2e\aislamiento-proveedores.spec.ts:419:7 > aislamiento por empresa de
+      proveedores > con sesion en la empresa A: la lista no trae proveedores de B, el detalle de
+      uno de B es indistinguible de uno inexistente, darlo de baja conociendo su identificador se
+      rechaza y lo deja intacto con su linea, y el nombre de un proveedor de B se puede usar en A
+      (R37; R14, R25, R27, R28) (19.7s)
+
+  1 passed (25.9s)
+```
+
+El resto, corrido por el implementer sobre el árbol final:
+
+```
+pnpm run typecheck   -> VERDE, sin una sola línea de salida
+pnpm run lint        -> VERDE, sin una sola línea de salida
+
+npx vitest run tests/unit/proveedores/ tests/unit/inventario/
+               tests/unit/identity/session-once-per-request-actions.test.ts
+  -> Test Files 55 passed (55) | Tests 874 passed | 3 skipped (877)
+
+npx vitest run tests/integration/proveedores/ tests/integration/inventario/
+  -> Test Files 18 passed (18) | Tests 276 passed (276)
+
+pnpm run test:guardias
+  -> Test Files 45 passed (45) | Tests 533 passed | 9 skipped (542)
+```
+
+Los 3 y 9 `skipped` son preexistentes y no se tocaron. **No se corrió la suite completa**: el gate
+entero es T37 y lo corre el leader. No apareció ningún `Test timed out`.
+
+### Mapa `R<n> -> test` que esta tanda deja cerrado
+
+| R | Test que lo cierra | Nivel |
+| --- | --- | --- |
+| R1, R2 | `proveedores/company-scope.int.test.ts` (+ los censos ya existentes) | integración |
+| R3 | `company-scope.int.test.ts` + `suppliers-company-scope-migration.test.ts` | int + unit |
+| R4 | `company-scope.int.test.ts` (`INSERT` y los **dos** `UPDATE`, nombrando la FK compuesta) | integración |
+| R5, R6 | `company-scope.int.test.ts` + `catalog-line-fk.test.ts` (ningún código nuevo) | int + unit |
+| R7, R8 | `company-scope.int.test.ts` (backfills y recuentos) + `suppliers-company-scope-migration.test.ts` | int + unit |
+| R9 | `suppliers-company-scope-migration.test.ts` + `guard-rls-force` + censos de integración | unit + guardia |
+| R10 | `suppliers-company-scope-migration.test.ts` + `company-scope.int.test.ts` (el `down` entero y los dos retratos) | unit + int |
+| R11 | `company-scope.int.test.ts` (cada causa + dos controles anti-placebo) | integración |
+| R12 | `suppliers-company-scope-migration.test.ts` + `proveedores-schema.test.ts` | unit |
+| R14 | `company-scope.int.test.ts` + `list-query-indexes.int.test.ts` + el E2E (paso 4) | int + E2E |
+| **R15** | **tres ángulos independientes**: texto (`suppliers-company-scope-migration.test.ts`), predicado (`list-query-indexes.int.test.ts`), comportamiento (`company-scope.int.test.ts`) | unit + int |
+| R16 | `company-scope-queries.int.test.ts` (`meta.target` real medido) | integración |
+| R18, R21, R33 | `company-isolation-service.test.ts` + `authorization.test.ts` | unit |
+| R19 | `company-scope-queries.int.test.ts` (`findUnitRefs` acotada) | integración |
+| R22 | `supplier-actions.test.ts` + `session-once-per-request-actions.test.ts` | unit |
+| R23, R24 | `guard-ambito-empresa-proveedores.test.ts` + `company-scope.test.ts` + `company-scope-queries.int.test.ts` | guardia + unit + int |
+| R25, R26, R29 | `company-scope-queries.int.test.ts` (+ el E2E, paso 1, para R25) | int + E2E |
+| R27, R28, R30 | `company-isolation-service.test.ts` + `company-scope-queries.int.test.ts` (+ el E2E, pasos 2 y 3) | unit + int + E2E |
+| R31 | `company-scope.test.ts` (los dos `SELECT` y los dos mapeadores) | unit |
+| R32 | `catalog-line-image-scope.test.ts` | unit |
+| R34 | `company-scope.int.test.ts` (empresa de baja) | integración |
+| R35 | `company-scope-queries.int.test.ts` (sin `FORCE`, mismo retrato) | integración |
+| **R37** | **`e2e/aislamiento-proveedores.spec.ts`, verde en Chromium y en WebKit** | **E2E** |
+| R38 (parte) | `suppliers-company-scope-migration.test.ts`, `supplier-actions.test.ts`, `list-use-cases.test.ts` | unit |
+
+### Lo que contradice o matiza el spec, y no se resolvió por cuenta propia
+
+1. **`tasks.md` T34 pide «falta el contexto de sesión, la action no llama al caso de uso». La
+   producción NO hace eso**: `currentActor()` devuelve `null` y la action **sí** invoca el caso de
+   uso con actor `null`; quien rechaza es `requirePermission` en su primera línea. Es el diseño
+   «falla cerrado» que ya estaba antes de esta ficha y que `supplier-actions.test.ts` documentaba
+   para `getSessionUser`. **No se cambió producción y no se aflojó el test**: el caso nuevo afirma lo
+   que de verdad pasa —actor `null`, la empresa de sesión no viaja, el estado es `unauthorized`— y la
+   mitad «sin tocar ningún puerto» queda probada con dobles explosivos. **Decide el reviewer** si
+   procede matizar la redacción de la task.
+2. **`design.md > 8.3` habla de «mismo `data-code` si lo hay». No lo hay.** Ni
+   `delete-supplier-error` ni `supplier-not-found` llevan `data-code` (a diferencia de
+   `delete-order-dialog`). Como no se puede tocar ningún componente ni asertar copy, la prueba de
+   «nunca `unauthorized`, siempre el no-existe» se hace comparando el desenlace del intento cruzado
+   contra el del UUID inexistente, más la ausencia del aviso de error **inesperado**. Es más fuerte
+   que un `data-code` literal —no depende de que alguien escriba el código correcto en el test— y el
+   `toEqual` incluye el atributo, así que si algún día aparece, la comparación lo cubre sola.
+3. **T34, R31: en `proveedores` los casos de uso devuelven la vista del puerto tal cual**, sin
+   re-mapear (a diferencia de `pedidos` y `recetas`). La frontera real es el `select` más el
+   mapeador del adaptador, así que `company-scope.test.ts` afirma **las dos cosas** y alimenta los
+   casos de uso con lo que el adaptador real produce. No es un defecto; queda escrito para el
+   reviewer.
+4. **T35: `proveedores` no tiene puerto de almacenamiento** (a diferencia de `recetas`): `imagePath`
+   es texto y se pinta con `components/shared/entity-image.tsx`. «Ninguna firma del puerto de
+   almacenamiento gana la empresa» se comprueba de la única forma comprobable: censo **cerrado** de
+   `ports/` (tres archivos, ninguno de imágenes), ninguna línea del módulo que junte `imagePath` con
+   `companyId`, y cero `createSignedUrl` en el módulo y en la pantalla.
+5. **T17 decía «Depende de: T22»; la dependencia real era T31**, como la tanda 3 ya había anotado.
+   Confirmado tras el hecho.
+
+### Lo que queda abierto, y por qué
+
+- **T27** (las listas que comparan el diff contra `origin/dev`) y **T28** (la deuda de
+  `docs/architecture.md`): fuera del encargo de esta tanda. T28 dependía de T31, que ya está hecha,
+  así que ya no está bloqueada.
+- **T36** y **T37**: bloque 5, fuera del encargo.
+
+Ningún mensaje de commit de esta rama contiene la cadena que las dos guardias del diff filtran, así
+que T27 sigue viva. La tabla de 19 decisiones no se tocó ni se reabrió.

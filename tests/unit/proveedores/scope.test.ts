@@ -273,6 +273,13 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
     // proveedores sin ficha pone esto en rojo, y si el de QC-44 desaparece, tambien.
     const enE2e = coincidenciasEn(join(repoRoot, 'e2e'))
     expect(enE2e, `spec E2E de proveedores inesperado: ${enE2e.join(', ')}`).toEqual([
+      // Entra el segundo, el del aislamiento por empresa: con sesion en una empresa recorre el
+      // listado, el detalle de un proveedor ajeno, su baja y el alta con un nombre que ya usa
+      // otra empresa. Es un spec de proveedores con ficha detras, asi que se nombra AQUI, uno a
+      // uno, que es el punto de extension de esta lista. La lista SIGUE SIENDO CERRADA y exacta:
+      // un tercer spec de proveedores sin ficha la pone roja igual que antes, y si desaparece
+      // cualquiera de estos dos, tambien.
+      'aislamiento-proveedores.spec.ts',
       'proveedores.spec.ts',
     ])
   })

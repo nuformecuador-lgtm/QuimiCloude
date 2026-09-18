@@ -139,6 +139,79 @@ function linea(id: string, name: string, presentationId: string): CatalogLineVie
   }
 }
 
+describe('el ambito de empresa de los cuatro casos de uso del catalogo (QC-59 T34)', () => {
+  it('R21, R30 — cada uno pasa `{ companyId: actor.companyId }` como ULTIMO argumento del puerto', async () => {
+    const { repo, spies } = makeCatalog()
+
+    await createCreateCatalogLine({ catalog: repo, units, now })(ALTA_VALIDA, ADMIN)
+    await createUpdateCatalogLine({ catalog: repo, units, now })('linea-1', CAMPOS_VALIDOS, ADMIN)
+    await createDeleteCatalogLine({ catalog: repo, now })('linea-1', ADMIN)
+    await createListCatalogLines({ catalog: repo, log: logMudo() })(SUPPLIER_ID, { page: 1 }, ADMIN)
+
+    const AMBITO = { companyId: ADMIN.companyId }
+    for (const [metodo, espia] of Object.entries(spies)) {
+      expect(espia, `${metodo} no se ejercito`).toHaveBeenCalledTimes(1)
+      const args = espia.mock.calls[0] as unknown as readonly unknown[]
+      expect(args[args.length - 1], `${metodo}: el ambito no es el del actor`).toStrictEqual(AMBITO)
+    }
+  })
+
+  it('R18 — la unidad se resuelve contra `unidades` con la empresa DEL ACTOR, y solo si la entrada la trae', async () => {
+    // La semantica «de sistema o de la empresa» no se reescribe aqui: la pone `unidades`. Lo
+    // que este modulo tiene que hacer bien es pasar la empresa en cuyo nombre pregunta.
+    const { repo } = makeCatalog()
+    const findRefs = vi.fn(async (ids: readonly string[]) =>
+      ids.map((id) => ({ id, name: 'kg', symbol: 'kg', baseUnitId: null, factor: null })),
+    )
+    const conUnidad: UnitCatalog = { findRefs }
+
+    await createCreateCatalogLine({ catalog: repo, units: conUnidad, now })(
+      { ...ALTA_VALIDA, unitId: UNIDAD },
+      ADMIN,
+    )
+    expect(findRefs.mock.calls[0]).toEqual([[UNIDAD], ADMIN.companyId])
+
+    await createUpdateCatalogLine({ catalog: repo, units: conUnidad, now })(
+      'linea-1',
+      { ...CAMPOS_VALIDOS, unitId: UNIDAD },
+      ADMIN,
+    )
+    expect(findRefs.mock.calls[1]).toEqual([[UNIDAD], ADMIN.companyId])
+
+    // Sin unidad no se le pregunta nada: la ausencia sigue siendo un valor valido de la linea.
+    findRefs.mockClear()
+    await createCreateCatalogLine({ catalog: repo, units: conUnidad, now })(
+      { ...ALTA_VALIDA, unitId: null },
+      ADMIN,
+    )
+    expect(findRefs).not.toHaveBeenCalled()
+  })
+
+  it('R18 — una unidad que `unidades` no resuelve para esa empresa es entrada invalida, y no se escribe nada', async () => {
+    // El doble devuelve vacio, que es como `unidades` reporta «no existe o es de otra
+    // empresa»: los dos casos son el mismo desenlace y ninguno llega al repositorio.
+    const { repo, spies } = makeCatalog()
+    const ajena: UnitCatalog = { findRefs: vi.fn(async () => []) }
+
+    await expect(
+      createCreateCatalogLine({ catalog: repo, units: ajena, now })(
+        { ...ALTA_VALIDA, unitId: UNIDAD },
+        ADMIN,
+      ),
+    ).rejects.toBeInstanceOf(ValidationError)
+    await expect(
+      createUpdateCatalogLine({ catalog: repo, units: ajena, now })(
+        'linea-1',
+        { ...CAMPOS_VALIDOS, unitId: UNIDAD },
+        ADMIN,
+      ),
+    ).rejects.toBeInstanceOf(ValidationError)
+
+    expect(spies.create).not.toHaveBeenCalled()
+    expect(spies.replaceAlive).not.toHaveBeenCalled()
+  })
+})
+
 describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => {
   it('ninguno de los cuatro casos de uso depende del modulo inventario', () => {
     // R18, y es el corazon de la ficha. Se mide sobre el TIPO `*Deps` de cada caso de uso,

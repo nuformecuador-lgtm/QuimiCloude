@@ -227,6 +227,12 @@ function actorCon(...permissions: readonly string[]): Actor {
   return { id: 'u-1', companyId: COMPANY_ID, permissions }
 }
 
+/** La misma forma, pero con la empresa elegida: el aislamiento por empresa la trajo al actor. */
+const OTRA_EMPRESA = '77777777-7777-4777-8777-777777777777'
+function actorDeEmpresa(companyId: string, ...permissions: readonly string[]): Actor {
+  return { id: 'u-1', companyId, permissions }
+}
+
 /** Todos los codigos del catalogo REAL menos uno: el conjunto que NO debe abrir el caso. */
 function todosMenos(permiso: PermissionCode): readonly string[] {
   return PERMISSIONS.map((p) => p.code).filter((code) => code !== permiso)
@@ -413,6 +419,33 @@ describe('autorizacion por permiso de los nueve casos de uso de proveedores (QC-
       for (const { etiqueta, actor } of NO_AUTORIZADOS) {
         await esperarRechazoSinTocarNada(caso, actor, etiqueta)
       }
+    }
+  })
+
+  it('R21, R33 (QC-59) — la empresa NO autoriza: sin el permiso no abre nada, y con el permiso abre aunque la empresa sea otra', async () => {
+    // El actor lleva empresa desde el aislamiento por empresa, y eso NO la convierte en una
+    // segunda credencial. Las dos mitades importan:
+    //
+    //   - ser de la empresa «de casa» sin el permiso no abre nada -ya lo cubre el conjunto
+    //     vacio de arriba, y aqui se repite con una empresa distinta para que no parezca que
+    //     el rechazo dependia de cual era-;
+    //   - tener el permiso SI abre, aunque la empresa sea otra: lo que hace que no vea nada
+    //     ajeno es el AMBITO del repositorio, que se evalua despues, no la autorizacion. Si
+    //     alguien «reforzara» el permiso comparando empresas aqui, el caso de abajo caeria y
+    //     el usuario recibiria `unauthorized` en vez de «no existe», que es el oraculo de
+    //     existencia que el diseno prohibe.
+    for (const caso of CASOS_DE_USO) {
+      await esperarRechazoSinTocarNada(
+        caso,
+        actorDeEmpresa(OTRA_EMPRESA, 'inventario.consultar'),
+        'otra empresa y sin el permiso',
+      )
+      await esperarRechazoSinTocarNada(
+        caso,
+        actorDeEmpresa(COMPANY_ID),
+        'la misma empresa y sin ningun permiso',
+      )
+      await esperarQueLlegueAlPuerto(caso, actorDeEmpresa(OTRA_EMPRESA, caso.permiso))
     }
   })
 

@@ -90,6 +90,46 @@ function consultaDelCatalogo(
   return ultima[1];
 }
 
+describe('los dos listados van acotados a la empresa DEL ACTOR (QC-59 T34)', () => {
+  it('R21, R25 — el ambito llega al puerto como ULTIMO argumento, y sale del actor y no de la consulta', async () => {
+    const { suppliers, listSuppliers } = montarProveedores();
+    const { catalog, listCatalogLines } = montarCatalogo();
+    const AJENA = '12121212-1212-4121-8121-121212121212';
+
+    // La consulta trae una empresa de contrabando, ademas de un filtro y una busqueda: nada de
+    // eso puede decidir DE QUE empresa se lista.
+    const FILTRO_DE_EMPRESA = { companyId: { kind: 'select', values: [AJENA] } } as const;
+    await listSuppliers({ page: 1, search: 'acido', filters: FILTRO_DE_EMPRESA }, ADMIN);
+    await listCatalogLines(SUPPLIER_ID, { page: 1, filters: FILTRO_DE_EMPRESA }, ADMIN);
+
+    const deProveedores = suppliers.listAlive.mock.calls[0] as unknown as readonly unknown[];
+    const deLineas = catalog.listBySupplierAlive.mock.calls[0] as unknown as readonly unknown[];
+
+    expect(deProveedores[deProveedores.length - 1]).toStrictEqual({ companyId: COMPANY_ID });
+    expect(deLineas[deLineas.length - 1]).toStrictEqual({ companyId: COMPANY_ID });
+
+    // Y la empresa de la consulta no llega al puerto por ningun camino: `companyId` no esta
+    // declarado como filtrable, asi que el saneado lo descarta antes.
+    expect(JSON.stringify([deProveedores, deLineas])).not.toContain(AJENA);
+  });
+
+  it('R38 — las firmas y la forma del resultado de los dos listados no cambiaron', async () => {
+    // Acotar por empresa no anade parametros ni campos: quien llama sigue pasando lo mismo y
+    // recibiendo la misma `Page`.
+    const { listSuppliers } = montarProveedores();
+    const { listCatalogLines } = montarCatalogo();
+
+    expect(listSuppliers.length).toBe(2);
+    expect(listCatalogLines.length).toBe(3);
+
+    const proveedores = await listSuppliers({ page: 1 }, ADMIN);
+    const lineas = await listCatalogLines(SUPPLIER_ID, { page: 1 }, ADMIN);
+    for (const pagina of [proveedores, lineas]) {
+      expect(Object.keys(pagina).sort()).toEqual(['items', 'page', 'pageSize', 'total', 'totalPages']);
+    }
+  });
+});
+
 describe('list-suppliers: autorizacion antes que todo (R33, R34)', () => {
   // R34 exige probarlo DOS veces: con una consulta valida y con una que traiga campos no
   // declarados. Si el permiso se comprobara despues de sanear, el segundo caso fallaria por
