@@ -329,7 +329,7 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R6, R10, R15)', 
       ).id
     }
 
-    recipeAlfaId = await recetaEfimera(`Acido Citrico ${marca}`)
+    recipeAlfaId = await recetaEfimera(`Ácido Cítrico ${marca}`)
     recipeBetaId = await recetaEfimera(`Bicarbonato ${marca}`)
     recipeBajaId = await recetaEfimera(`Cloro de baja ${marca}`, { deletedAt: instantIn(DIA) })
 
@@ -369,10 +369,14 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R6, R10, R15)', 
     expect(pagina.items.map((o) => o.id)).toEqual([ordenBaja.id])
   })
 
-  it('R2: ignora acentos y mayusculas', async () => {
-    const pagina = await buscar('ACIDO citrico')
+  it('R2: ignora acentos y mayusculas, en las dos direcciones', async () => {
+    // La receta se siembra CON acentos (`Ácido Cítrico`). Buscar SIN acentos la encuentra...
+    const sinAcentos = await buscar('acido citrico')
+    expect(sinAcentos.items.map((o) => o.id)).toEqual([ordenAlfa.id])
 
-    expect(pagina.items.map((o) => o.id)).toEqual([ordenAlfa.id])
+    // ...y buscar CON acentos y en mayusculas tambien.
+    const conAcentosYMayusculas = await buscar('ÁCIDO CÍTRICO')
+    expect(conAcentosYMayusculas.items.map((o) => o.id)).toEqual([ordenAlfa.id])
   })
 
   it('R5: el total describe el conjunto buscado y no la pagina', async () => {
@@ -400,25 +404,32 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R6, R10, R15)', 
     expect(pagina.items).toEqual([])
   })
 
-  it('R15: sin termino de busqueda, la lista vuelve exactamente igual que antes de esta feature', async () => {
+  it('R15: sin termino de busqueda, `findRecipeIdsMatchingName` no acota nada', async () => {
     const recipeIds = await findRecipeIdsMatchingName('', companyId)
-    expect(recipeIds).toBeNull()
 
-    const conRecipeIdsNull = await listAliveOrders(
-      consulta({ pageSize: 25, filters: soloElDia21 }),
-      recipeIds,
-      scope(),
-    )
-    const conNullExplicito = await listAliveOrders(
+    expect(recipeIds).toBeNull()
+  })
+
+  it('R15: sin termino de busqueda, la lista trae TODO lo del dia en el orden por defecto', async () => {
+    // Este `describe` siembra, antes de esta `it`, exactamente seis pedidos vivos en el dia 21:
+    // los tres del `beforeAll` (alfa, beta, baja) y los tres «Comun Compartido» de R5. Los dos
+    // casos de R6 crean y borran los suyos DESPUES de esta `it` (estan definidos mas abajo), asi
+    // que no cuentan aqui.
+    const pagina = await listAliveOrders(
       consulta({ pageSize: 25, filters: soloElDia21 }),
       null,
       scope(),
     )
 
-    expect(conRecipeIdsNull.total).toBe(conNullExplicito.total)
-    expect(conRecipeIdsNull.items.map((o) => o.id)).toEqual(
-      conNullExplicito.items.map((o) => o.id),
-    )
+    expect(pagina.total).toBe(6)
+    // Orden por defecto: `priority DESC, created_at ASC`. Los seis comparten prioridad `MEDIA`,
+    // asi que manda el `created_at`, que es el orden de alta.
+    expect(pagina.items.map((o) => o.id)).toEqual([
+      ordenAlfa.id,
+      ordenBeta.id,
+      ordenBaja.id,
+      ...ordenesComunes.map((o) => o.id),
+    ])
   })
 
   it('R6: el pedido BORRADO con el nombre exacto de su receta no aparece, y el total da cero', async () => {
