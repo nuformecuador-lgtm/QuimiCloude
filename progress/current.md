@@ -47,6 +47,12 @@ entra** por decision de la ficha, y la aprobacion en suspenso de **QC-28** no se
 
 **Sin override de modelo**: `spec_author` heredara el de la sesion, como manda `AGENTS.md > Modelos`.
 
+**ACOTADA el 2026-09-18 con `/afinar-feature`**: 22 decisiones cerradas y 4 preguntas abiertas en
+`specs/QC-111-procesamiento-de-pdf-en-cola/requirements.md`. La `description` del board se corrigio
+ANTES de sembrar -el recorte de imagenes sale del alcance del trabajo, porque QC-110 no existe y esta
+bloqueada por esta ficha-, y el disco refleja ese texto. No se creo ni se cancelo ninguna ficha.
+
+
 ### QC-114 - seleccionada en F1.0, y la ejecuta una persona (2026-09-18)
 
 El humano la eligio por numero con el cupo `frontend` a **0 de 2**. `depends_on: QC-56` esta
