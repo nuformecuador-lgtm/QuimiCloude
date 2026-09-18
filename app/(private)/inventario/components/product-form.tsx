@@ -27,6 +27,7 @@ import {
 import { PresentationSelect } from '@/components/shared/presentation-select';
 
 import { ProductBatchDateField, formatDateLocalISO } from './product-batch-date-field';
+import { ProductCostFields } from './product-cost-fields';
 import { ProductField } from './product-field';
 import { ProductNamePicker, type ProductNameOption } from './product-name-picker';
 
@@ -87,11 +88,11 @@ const FIELD_MESSAGES: Record<ProductFieldName, string> = {
   stock: 'Debe ser un número entero de 0 o más.',
   qtyAlert: 'Debe ser un número entero de 0 o más.',
   presentationId: 'Elige una presentación.',
-  // QC-90 (R27, R5): «mayor que 0», no «0 o mas». La columna `product_batches.unit_cost` lleva
-  // `CHECK (unit_cost > 0)` desde el 2026-09-09 y este panel aceptaba el `0`: era deuda declarada
-  // en `requirements.md`. El criterio del panel es ahora el mismo que el del servidor.
-  unitCost: 'Debe ser un importe mayor que 0, con hasta 4 decimales.',
-  totalCost: 'Debe ser un importe mayor que 0, con hasta 4 decimales.',
+  // «Mayor que 0» porque la columna lleva `CHECK (unit_cost > 0)`. Y dos decimales, no los cuatro
+  // del esquema: el campo ya no deja teclear mas, asi que prometer cuatro mandaria a escribir algo
+  // que el propio campo rechaza.
+  unitCost: 'Debe ser un importe mayor que 0, con hasta 2 decimales.',
+  totalCost: 'Debe ser un importe mayor que 0, con hasta 2 decimales.',
   lot: 'Escribe un lote de 1 a 60 caracteres.',
   expiryDate: 'Escribe una fecha válida.',
   purchaseDate: 'Elige la fecha de compra.',
@@ -567,28 +568,18 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
 
         Los dos costos son `type="text"` con teclado decimal, NO `type="number"`: un importe no
         pasa por el binario de coma flotante -es la misma razon por la que el dominio lo mueve
-        como cadena decimal-.
+        como cadena decimal-. Van juntos en `ProductCostFields` porque se rellenan el uno al otro
+        con la existencia y filtran lo tecleado: son un par, no dos campos sueltos.
       */}
       {isEdit ? null : (
         <>
-          <ProductField
-            name="unitCost"
-            label={FIELD_LABELS.unitCost}
-            type="text"
-            inputMode="decimal"
-            helper="Lo que cuesta UNA unidad de este lote. Escribe este o el costo total: con uno basta, y el otro se deduce con la existencia."
-            defaultValue={initialValue('unitCost', '')}
-            error={fieldErrors.unitCost}
-          />
-
-          <ProductField
-            name="totalCost"
-            label={FIELD_LABELS.totalCost}
-            type="text"
-            inputMode="decimal"
-            helper="Lo que costó el lote COMPLETO. Escribe este o el costo unitario: con uno basta, y el otro se deduce con la existencia."
-            defaultValue={initialValue('totalCost', '')}
-            error={fieldErrors.totalCost}
+          <ProductCostFields
+            unitCostLabel={FIELD_LABELS.unitCost}
+            totalCostLabel={FIELD_LABELS.totalCost}
+            initialUnitCost={initialValue('unitCost', '')}
+            initialTotalCost={initialValue('totalCost', '')}
+            unitCostError={fieldErrors.unitCost}
+            totalCostError={fieldErrors.totalCost}
           />
 
           <ProductField

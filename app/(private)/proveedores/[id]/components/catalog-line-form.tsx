@@ -28,6 +28,7 @@ import {
 } from '@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { SUPPLIERS_ROUTE } from '@/lib/shared/routes';
+import { trimDecimal } from '@/lib/shared/ui/decimal-display';
 
 import { NO_UNIT_VALUE, UNIT_FIELD, UnitSelect } from './unit-select';
 
@@ -213,6 +214,13 @@ type CatalogLineFormProps = {
  * `type="text"` e `inputMode="decimal"`, nunca con un control numerico del navegador, cuyo valor
  * pasa por el binario de coma flotante. Aqui no se convierte, no se redondea y no se opera con
  * ellos: se leen del `FormData` y se entregan tal cual.
+ *
+ * La PRECARGA de la edicion les quita los ceros de relleno desde el 2026-09-17 (`trimDecimal`):
+ * «12.5000» se precarga «12.5». Recortar ceros NO cambia el numero -y por eso es seguro sobre un
+ * campo cuyo valor se vuelve a guardar-, mientras que redondear si lo cambiaria: un costo de
+ * 0.1255 reabierto y guardado se convertiria en 0.13 sin que nadie lo pidiera, y la columna
+ * admite cuatro decimales justamente porque alguien los usa. Por eso la tabla redondea a dos y
+ * este formulario no: son dos trabajos distintos.
  *
  * **R32 - un rechazo no cierra el panel ni pierde lo escrito**: React 19 resetea los campos no
  * controlados al completarse la action, asi que el estado de fallo devuelve los valores escritos
@@ -466,7 +474,7 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
           // R41: cadena decimal de punta a punta. NUNCA `type="number"`.
           inputMode="decimal"
           pattern={DECIMAL_INPUT_PATTERN}
-          defaultValue={initialValue('cost', line?.cost ?? '')}
+          defaultValue={initialValue('cost', trimDecimal(line?.cost ?? ''))}
           error={fieldErrors.cost}
         />
 
@@ -475,7 +483,7 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
           label={FIELD_LABELS.minPurchase}
           inputMode="decimal"
           pattern={DECIMAL_INPUT_PATTERN}
-          defaultValue={initialValue('minPurchase', line?.minPurchase ?? '')}
+          defaultValue={initialValue('minPurchase', trimDecimal(line?.minPurchase ?? ''))}
           error={fieldErrors.minPurchase}
         />
 
