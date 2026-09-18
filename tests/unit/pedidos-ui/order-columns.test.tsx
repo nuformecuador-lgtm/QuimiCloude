@@ -262,15 +262,29 @@ describe('el motivo de cancelacion (R11)', () => {
   });
 });
 
-describe('la cantidad se pinta TAL CUAL llega (R39)', () => {
-  it('la cadena decimal no se reformatea, ni se redondea, ni pierde ceros', () => {
-    // El precio unitario acompanaba a la cantidad en este caso hasta el 2026-09-07. Lo que R39
-    // protege -que una cadena decimal del contrato no pase por `Intl`, `toFixed` ni coma
-    // flotante- sigue comprobandose sobre el unico decimal que le queda al pedido.
-    const order = pedido({ quantity: '12.5000' });
+describe('la cantidad se pinta REDONDEADA A DOS DECIMALES (enmienda del 2026-09-17 a R39)', () => {
+  // Decision humana del 2026-09-17: la cadena decimal del contrato llega con la escala de la
+  // columna -«12.5000»- y cuatro decimales de relleno no informan de nada. La celda la pasa por
+  // `formatDecimalDisplay`. El precio unitario acompanaba a la cantidad en este caso hasta el
+  // 2026-09-07; hoy la cantidad es el unico decimal que le queda al pedido.
 
-    const cantidad = pintarCelda(QUANTITY_COLUMN_ID, order);
-    expect(cantidad.container.textContent).toBe('12.5000');
+  it('los ceros de relleno no se pintan: «12.5000» se lee «12.5» y «15.0000» se lee «15»', () => {
+    expect(pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '12.5000' })).container.textContent)
+      .toBe('12.5');
+    expect(pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '15.0000' })).container.textContent)
+      .toBe('15');
+  });
+
+  it('mas de dos decimales se redondean al mas cercano', () => {
+    expect(pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '0.1255' })).container.textContent)
+      .toBe('0.13');
+  });
+
+  it('el redondeo es EXACTO: no pasa por coma flotante', () => {
+    // Lo que R39 protege de fondo sigue en pie. Con `number`, 1.005 no se representa exacto y
+    // `toFixed(2)` da «1.00»; la celda tiene que dar «1.01».
+    expect(pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '1.0050' })).container.textContent)
+      .toBe('1.01');
   });
 });
 

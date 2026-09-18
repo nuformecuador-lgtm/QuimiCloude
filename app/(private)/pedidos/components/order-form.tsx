@@ -37,6 +37,7 @@ import type { RecipeQueryResult } from '@/lib/modules/recetas/adapters/driving/r
 import type { RecipeLineView } from '@/lib/modules/recetas';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { UnitView } from '@/lib/modules/unidades';
+import { trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { OrderField } from './order-field';
 import { OrderIngredientsTable } from './order-ingredients-table';
 import { OrderRecipeImage } from './order-recipe-image';
@@ -365,7 +366,12 @@ export function OrderForm({
       ? null
       : { id: order.recipeId, name: order.recipeName ?? '', imageUrl: null },
   );
-  const [quantity, setQuantity] = useState(order?.quantity ?? '');
+  // La cantidad guardada llega con la escala de la columna («15.0000») y aqui se precarga SIN
+  // sus ceros de relleno: `trimDecimal` deja «15», no «15.00». NO redondea, y la diferencia
+  // importa porque este valor es el que se vuelve a guardar: recortar ceros no cambia el
+  // numero, redondearlo si -una cantidad de 0.1255 reabierta y guardada se convertiria en
+  // 0.13 sin que nadie lo pidiera-.
+  const [quantity, setQuantity] = useState(trimDecimal(order?.quantity ?? ''));
 
   const recipeName = recipe?.name ?? '';
   const recipeImageUrl = recipe?.imageUrl ?? null;
@@ -602,7 +608,7 @@ export function OrderForm({
               step="any"
               inputMode="decimal"
               roundDecimals={2}
-              defaultValue={initialValue('quantity', order?.quantity ?? '')}
+              defaultValue={initialValue('quantity', trimDecimal(order?.quantity ?? ''))}
               onValueChange={setQuantity}
               error={fieldErrors.quantity}
             />

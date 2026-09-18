@@ -27,6 +27,7 @@ import {
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { FORMULAS_ROUTE } from '@/lib/shared/routes';
+import { trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { cn } from '@/lib/utils';
 
 import type { ProductPickerOption } from './product-picker';
@@ -151,7 +152,13 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
         key: createLocalKey('line'),
         productId: line.productId,
         productName: line.productName,
-        quantity: line.quantity,
+        // La cantidad guardada llega con la escala de la columna («15.0000») y se precarga SIN
+        // sus ceros de relleno: `trimDecimal` deja «15». NO redondea, y eso es deliberado: este
+        // valor es el que se vuelve a guardar al aceptar el formulario, asi que recortar ceros
+        // -que no cambia el numero- es seguro, pero redondear no lo seria. Una linea de 0.1255
+        // reabierta y guardada se convertiria en 0.13 sin que nadie lo hubiera pedido, y la
+        // cantidad admite cuatro decimales justamente porque alguien los usa.
+        quantity: trimDecimal(line.quantity),
         unitId: line.unitId,
         // El detalle de la receta trae la unidad de la LINEA, no la del producto: aqui no se
         // sabe de que grupo es el ingrediente, y `null` es exactamente eso -no un olvido-.

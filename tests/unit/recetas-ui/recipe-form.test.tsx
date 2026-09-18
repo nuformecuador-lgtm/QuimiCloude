@@ -562,10 +562,12 @@ describe('R21 — precarga de la edición y receta inexistente', () => {
     expect(areaDePaso(0)).toHaveTextContent('Paso uno');
     expect(areaDePaso(1)).toHaveTextContent('Paso dos');
     // El campo es `type="number"` desde el 2026-09-08, y `toHaveValue` lee entonces
-    // `valueAsNumber`: `'3.2500'` se compara como `3.25`. Es una lectura del DOM, NO una
-    // conversion del dato -el `expect` del payload de mas abajo sigue exigiendo la cadena
-    // `'3.2500'` intacta, que es lo que R29 protege de verdad-.
+    // `valueAsNumber`: `'3.25'` se compara como `3.25`.
     expect(screen.getByTestId('recipe-line-quantity-0')).toHaveValue(3.25);
+    // 2026-09-17: el campo se PRECARGA sin los ceros de relleno («3.2500» -> «3.25»). El texto
+    // del control lo confirma; `toHaveValue` no distingue las dos cadenas porque las lee como
+    // numero, y aqui la diferencia es justo lo que se esta comprobando.
+    expect((screen.getByTestId('recipe-line-quantity-0') as HTMLInputElement).value).toBe('3.25');
     // Producto dado de baja (R53): la línea se conserva y se marca, no se descarta.
     expect(screen.getByTestId('recipe-line-unavailable-0')).toBeInTheDocument();
 
@@ -573,8 +575,45 @@ describe('R21 — precarga de la edición y receta inexistente', () => {
 
     await waitFor(() => expect(updateRecipeActionMock).toHaveBeenCalledTimes(1));
     const [, payload] = updateRecipeActionMock.mock.calls[0] as [string, { lines: unknown[] }];
+    // La cantidad viaja como CADENA y sin tocar el numero (R29), pero SIN los ceros de relleno
+    // con los que llego: «3.2500» sale «3.25». Es el mismo numero -la columna es `Decimal(14,4)`
+    // y lo guarda igual-, escrito sin las cifras que no aportan.
+    //
+    // Lo que R29 protege sigue en pie, y es lo que el caso de la linea de 4 decimales de mas
+    // abajo afirma: la precarga NO REDONDEA. Recortar ceros no puede cambiar un valor; redondear
+    // si, y por eso el formulario usa `trimDecimal` y no `formatDecimalDisplay`.
     expect(payload.lines).toEqual([
-      { productId: PRODUCT_1_ID, quantity: '3.2500', unitId: UNIT_LITRO_ID },
+      { productId: PRODUCT_1_ID, quantity: '3.25', unitId: UNIT_LITRO_ID },
+    ]);
+  });
+
+  it('la precarga NO redondea: una linea de cuatro decimales se reenvia intacta', async () => {
+    // 2026-09-17, la mitad que de verdad importa de la decision: el valor precargado es el que
+    // se vuelve a guardar, asi que la edicion solo puede quitarle ceros de relleno. Si aqui se
+    // redondeara a dos decimales, abrir una receta y darle a guardar -sin tocar nada- convertiria
+    // esta linea en 0.13 y nadie lo habria pedido.
+    const user = setupUser();
+    const recipe = recipeDetail({
+      lines: [
+        lineView({
+          id: 'line-precisa',
+          productId: PRODUCT_1_ID,
+          quantity: '0.1255',
+          unitId: UNIT_LITRO_ID,
+        }),
+      ],
+    });
+
+    renderEditForm(recipe);
+
+    expect((screen.getByTestId('recipe-line-quantity-0') as HTMLInputElement).value).toBe('0.1255');
+
+    await user.click(screen.getByTestId('recipe-form-submit'));
+
+    await waitFor(() => expect(updateRecipeActionMock).toHaveBeenCalledTimes(1));
+    const [, payload] = updateRecipeActionMock.mock.calls[0] as [string, { lines: unknown[] }];
+    expect(payload.lines).toEqual([
+      { productId: PRODUCT_1_ID, quantity: '0.1255', unitId: UNIT_LITRO_ID },
     ]);
   });
 
