@@ -19,6 +19,12 @@
 
 ## Evaluaciones
 
+### QC-108 - acotada con `/afinar-feature` (2026-09-18)
+
+**Seis decisiones cerradas y tres preguntas abiertas** en
+`specs/QC-108-lectura-de-pdf-con-gemini/requirements.md`. No se copian aqui: una es la fuente, esta
+linea enlaza. La `description` del board se actualizo **antes** de sembrar, como manda el paso 5.
+
 ### QC-108 - seleccionada en F1.0 por el humano (2026-09-18)
 
 Prioridad dada: **Inventario -> Pedidos -> IA**. En IA, QC-108 es la **unica desbloqueada** de las
