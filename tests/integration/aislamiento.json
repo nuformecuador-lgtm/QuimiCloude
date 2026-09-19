@@ -143,6 +143,11 @@
       "desde": "2026-09-12"
     },
     {
+      "archivo": "inventario/product-stock.int.test.ts",
+      "motivo": "QC-121 T4/T14: llama a 'createWithFirstBatch', 'addBatchToAlive' y 'adjustBatchStock' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL y abren cada uno SU PROPIA 'prisma.$transaction', igual que 'ledger-cuadre.int.test.ts' -envolverlos en una transaccion del test seria aislamiento de mentira, y ademas dos altas o dos ajustes concurrentes (R10, R31) necesitan que cada uno CONFIRME para que el otro vea su cambio-. Cada caso fabrica su empresa efimera con randomUUID, escribe solo en ella y la limpia en un 'finally' en orden de FK (asientos -> lotes -> productos -> presentacion -> usuario). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-18"
+    },
+    {
       "archivo": "pedidos/company-scope-queries.int.test.ts",
       "motivo": "Nacido con QC-77 ya en pie (QC-60 T13): siembra pedidos de CUATRO empresas efimeras a la vez y llama a los adaptadores driven de 'pedidos' ('order-prisma.ts' y 'order-catalog-prisma.ts') directamente, para demostrar que el WHERE del SQL -y el 'count' del total- acota por empresa, que el alta numera en la serie de su empresa y que quitar FORCE ROW LEVEL SECURITY no cambia nada. Esos adaptadores usan el cliente Prisma GLOBAL y 'createOrder' abre SU PROPIA 'prisma.$transaction' con el lock de aviso dentro, asi que una transaccion del test no los envolveria. Committea y borra lo suyo en el afterAll por 'company_id' en el orden de las FK (asignaciones -> pedidos -> usuario, rol, tipo de documento -> empresa -> receta). El caso R30 relaja FORCE en 'orders' y lo restaura en un 'finally', comprobandolo despues contra pg_class. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-16"

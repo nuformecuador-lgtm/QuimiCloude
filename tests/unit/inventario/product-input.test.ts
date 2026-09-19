@@ -145,7 +145,7 @@ describe('createProductSchema', () => {
       listAlive: vi.fn(),
       // QC-90 (T4): los tres metodos del alta con primer lote. Estan aqui porque el doble
       // tiene que cumplir el puerto ENTERO; ninguno debe llegar a llamarse en este caso.
-      findAliveIdByName: vi.fn(),
+      findAliveIdByNameInPresentationUnit: vi.fn(),
       createWithFirstBatch: vi.fn(),
       addBatchToAlive: vi.fn(),
       // QC-92: mismo criterio, ninguno debe llegar a llamarse en este caso.
@@ -170,7 +170,7 @@ describe('createProductSchema', () => {
     expect(products.create).not.toHaveBeenCalled();
     // QC-90: el alta ya no pasa por `create`, asi que «no toca el puerto» tambien tiene
     // que afirmarse sobre los metodos por los que ahora SI pasaria.
-    expect(products.findAliveIdByName).not.toHaveBeenCalled();
+    expect(products.findAliveIdByNameInPresentationUnit).not.toHaveBeenCalled();
     expect(products.createWithFirstBatch).not.toHaveBeenCalled();
     expect(products.addBatchToAlive).not.toHaveBeenCalled();
   });

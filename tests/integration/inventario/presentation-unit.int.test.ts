@@ -71,10 +71,15 @@ async function sembrarPresentacion(unitId: string): Promise<{ id: string; marca:
   return { id, marca };
 }
 
-async function sembrarProducto(): Promise<string> {
+async function sembrarProducto(unitId: string | null = null): Promise<string> {
   const marca = token();
   const { id } = await prisma.product.create({
-    data: { name: `Producto ${marca}`, nameNormalized: `producto${marca}`, companyId: empresaDelArchivo },
+    data: {
+      name: `Producto ${marca}`,
+      nameNormalized: `producto${marca}`,
+      unitId,
+      companyId: empresaDelArchivo,
+    },
     select: { id: true },
   });
   productosSembrados.push(id);
@@ -241,7 +246,9 @@ describe('R28 — ni el alta ni la edicion de una presentacion mueven ninguna ex
     const unidadVieja = await sembrarUnidad();
     const unidadNueva = await sembrarUnidad();
     const { id: presentationId, marca } = await sembrarPresentacion(unidadVieja);
-    const productId = await sembrarProducto();
+    // La unidad de la presentacion: sin ella, `product_batches_check_unit` rechazaria el lote
+    // de mas abajo.
+    const productId = await sembrarProducto(unidadVieja);
     const loteId = await sembrarLote(productId, presentationId);
 
     const loteAntes = await prisma.productBatch.findUniqueOrThrow({ where: { id: loteId } });
@@ -255,9 +262,12 @@ describe('R28 — ni el alta ni la edicion de una presentacion mueven ninguna ex
       actorAutorizado(),
     );
     anotarParaBorrar(creada.id);
+    // La MISMA unidad, no `unidadNueva`: la presentacion ya tiene el lote sembrado arriba, y
+    // eso bloquea el cambio de unidad de una presentacion con lotes. Editar el nombre sin
+    // tocar la unidad sigue aceptandose igual que antes.
     await inventario.updatePresentation(
       presentationId,
-      { name: `Presentacion editada ${marca}`, unitId: unidadNueva },
+      { name: `Presentacion editada ${marca}`, unitId: unidadVieja },
       actorAutorizado(),
     );
 
@@ -271,6 +281,8 @@ describe('R28 — ni el alta ni la edicion de una presentacion mueven ninguna ex
     expect(await prisma.order.count()).toBe(pedidosAntes);
 
     const producto = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
-    expect(Object.keys(producto)).not.toContain('unitId');
+    // La unidad del producto es la que se le dio al sembrar, y la edicion de la presentacion
+    // no la mueve -ni siquiera cuando toca el nombre-.
+    expect(producto.unitId).toBe(unidadVieja);
   });
 });

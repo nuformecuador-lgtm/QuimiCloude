@@ -24,7 +24,7 @@
 
 ## Bloque 1 — piezas puras y catálogo
 
-- [ ] **T1. [P] `singleUnitStock` y `productDisplayName`.** Funciones puras del dominio
+- [x] **T1. [P] `singleUnitStock` y `productDisplayName`.** Funciones puras del dominio
       (`design.md > 3.3`).
       - Archivos: `lib/modules/inventario/domain/product-stock.ts` (añade `singleUnitStock`, que
         delega en `sumStockByUnit`), `lib/modules/inventario/domain/product-display-name.ts`
@@ -36,7 +36,7 @@
         suma») sigue verde; el árbol compila y nadie usa todavía lo nuevo.
       - Depende de: nada. `[P]` con T2.
 
-- [ ] **T2. [P] Código de error `presentation_unit_locked`.** **Novena** enmienda del catálogo
+- [x] **T2. [P] Código de error `presentation_unit_locked`.** **Novena** enmienda del catálogo
       (`design.md > 8`; **(Enmienda)** la séptima y la octava ya las ocuparon QC-92 y QC-108), con
       la redacción que fije el humano en F1.4.
       - Archivos: `lib/modules/errores/domain/error-codes.ts`, `error-catalog.ts`,
@@ -50,7 +50,7 @@
 
 ## Bloque 2 — la base
 
-- [ ] **T3. Migración y esquema: `unit_id`, `stock`, sus restricciones y los dos disparadores.**
+- [x] **T3. Migración y esquema: `unit_id`, `stock`, sus restricciones y los dos disparadores.**
       (`design.md > 4.2`, `> 5`, `> 6`, `> 11`.)
       - Archivos: `db/schema.prisma` (`Product.unitId String?`, `Product.stock Int @default(0)`,
         `@@index([unitId], map: "products_unit_id_idx")`, comentario del modelo reescrito),

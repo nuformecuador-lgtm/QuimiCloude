@@ -5,10 +5,15 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 import { BatchDuplicateLotError, BatchStockNegativeError, ValidationError } from '../../../domain/errors';
 import { normalizeProductName } from '../../../domain/product-name';
-import { sumStockByUnit } from '../../../domain/product-stock';
+import { singleUnitStock, sumStockByUnit } from '../../../domain/product-stock';
 
 import { writeMovement } from './batch-movement-prisma';
-import { batchCompanyScope, companyScopeColumns, productCompanyScope } from './company-scope';
+import {
+  batchCompanyScope,
+  companyScopeColumns,
+  presentationCompanyScope,
+  productCompanyScope,
+} from './company-scope';
 import {
   dateRangeCondition,
   normalizedSearchCondition,
@@ -247,23 +252,71 @@ export async function listAliveProducts(
   return buildPage(rows.map(toProductView), total, query.page, limit);
 }
 
-/** Con `created_at` empatado decide el `id`: sin el, dos altas del mismo nombre podrian colgar su
- *  lote de productos distintos. */
-export async function findAliveIdByName(
+/**
+ * La unidad no llega de quien llama: se lee de la presentacion, con su propio ambito de
+ * empresa. Sin esa fila -no existe o es de otra empresa- no hay unidad que buscar y se
+ * devuelve `null` (el alta seguira por crear y fallara alli). Con `created_at` empatado decide
+ * el `id`: sin el, dos altas del mismo nombre y unidad podrian colgar su lote de productos
+ * distintos.
+ */
+export async function findAliveIdByNameInPresentationUnit(
   name: string,
+  presentationId: string,
   scope: InventoryScope,
 ): Promise<string | null> {
+  const presentation = await prisma.presentation.findFirst({
+    where: { AND: [presentationCompanyScope(scope), { id: presentationId }] },
+    select: { unitId: true },
+  });
+  if (presentation === null) return null;
+
   const row = await prisma.product.findFirst({
     where: {
       AND: [
         productCompanyScope(scope),
-        { nameNormalized: normalizeProductName(name), deletedAt: null },
+        {
+          nameNormalized: normalizeProductName(name),
+          unitId: presentation.unitId,
+          deletedAt: null,
+        },
       ],
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     select: { id: true },
   });
   return row === null ? null : row.id;
+}
+
+/**
+ * Suma los lotes vivos-de-empresa del producto y escribe `products.stock`. No exportada y sin
+ * tocar `product_batches`: quien la llama ya escribio el lote (o el ajuste) y su asiento antes
+ * de invocarla, en la MISMA transaccion.
+ *
+ * El `UPDATE` es SQL crudo -y no `updateMany`- para no disparar el `@updatedAt` de Prisma: el
+ * recalculo no debe mover `products.updated_at`.
+ */
+async function recalculateProductStock(
+  tx: Prisma.TransactionClient,
+  productId: string,
+  scope: InventoryScope,
+): Promise<void> {
+  const { companyId } = companyScopeColumns(scope);
+
+  const rows = await tx.productBatch.findMany({
+    where: { AND: [batchCompanyScope(scope), { productId }] },
+    select: { stock: true, presentation: { select: { unitId: true } } },
+  });
+
+  const stock = singleUnitStock(
+    rows.map((row) => ({ stock: row.stock, unitId: row.presentation.unitId })),
+  );
+
+  await tx.$executeRaw(Prisma.sql`
+    UPDATE "products"
+       SET "stock" = ${stock}
+     WHERE "id" = ${productId}::uuid
+       AND "company_id" = ${companyId}::uuid
+  `);
 }
 
 /** Del texto directo a `Prisma.Decimal`: pasar por un numero del lenguaje meteria el error de la
@@ -421,11 +474,21 @@ function isBatchStockNegativeViolation(error: unknown): boolean {
   return violationMessageOf(error).includes(BATCH_STOCK_NON_NEGATIVE_CONSTRAINT);
 }
 
+const BATCH_UNIT_MISMATCH_TRIGGER = 'product_batches_unit_differs_from_product';
+
+/** Disparador de `product_batches_check_unit`: mismo criterio, `23514` mas el nombre. Solo puede
+ *  llegar por la aplicacion en carrera con un cambio de unidad de la presentacion. */
+function isBatchUnitMismatchViolation(error: unknown): boolean {
+  if (sqlStateOf(error) !== '23514') return false;
+  return violationMessageOf(error).includes(BATCH_UNIT_MISMATCH_TRIGGER);
+}
+
 /** Lo que no se sabe traducir se relanza: un CHECK violado o una caida de conexion no son entrada
  *  invalida. */
 function translateBatchWriteError(error: unknown): never {
   if (isBatchForeignKeyViolation(error)) throw new ValidationError();
   if (isBatchCompanyScopeViolation(error)) throw new ValidationError();
+  if (isBatchUnitMismatchViolation(error)) throw new ValidationError();
   throw error;
 }
 
@@ -494,7 +557,11 @@ async function writeBatchWithLotRetry<T>(
   );
 }
 
-/** Producto y lote en la misma transaccion: si el lote falla, el producto tampoco queda. */
+/**
+ * Producto y lote en la misma transaccion: si el lote falla, el producto tampoco queda. El
+ * producto nace con la unidad de esta presentacion -sin fila viva de la empresa, se aborta con
+ * `ValidationError` antes de escribir nada- y su existencia queda recalculada al final.
+ */
 export async function createWithFirstBatch(
   product: NewProduct,
   batch: NewProductBatch,
@@ -502,10 +569,17 @@ export async function createWithFirstBatch(
   scope: InventoryScope,
 ): Promise<{ id: string; batchId: string; lot: string }> {
   return writeBatchWithLotRetry(batch, scope, async (tx, resolveBatchLot) => {
+    const presentation = await tx.presentation.findFirst({
+      where: { AND: [presentationCompanyScope(scope), { id: batch.presentationId }] },
+      select: { unitId: true },
+    });
+    if (presentation === null) throw new ValidationError();
+
     const created = await tx.product.create({
       data: {
         name: product.name,
         nameNormalized: normalizeProductName(product.name),
+        unitId: presentation.unitId,
         qtyAlert: product.qtyAlert ?? null,
         ...companyScopeColumns(scope),
         createdAt: now,
@@ -527,6 +601,8 @@ export async function createWithFirstBatch(
       now,
       scope,
     );
+
+    await recalculateProductStock(tx, created.id, scope);
 
     return { id: created.id, batchId: createdBatch.id, lot };
   });
@@ -573,6 +649,8 @@ export async function addBatchToAlive(
       now,
       scope,
     );
+
+    await recalculateProductStock(tx, alive.id, scope);
 
     return { batchId: createdBatch.id, lot };
   });
@@ -627,13 +705,20 @@ function isBatchNotFound(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
 }
 
+type AdjustProductRow = { readonly id: string };
+
 /**
  * `stock: { increment: delta } }` es un `UPDATE ... SET stock = stock + $delta` relativo: dos
  * ajustes concurrentes suman sobre lo que la base tenga en ese instante, nunca sobre un total
  * leido antes. `productBatch.update` es la UNICA funcion del repositorio que escribe sobre una
  * fila de lote ya existente -el `where` combina el identificador unico con la empresa, y sin fila
- * que lo cumpla Prisma lanza `P2025` en vez de tocar una fila ajena-. El asiento queda en la MISMA
- * transaccion que el ajuste de stock.
+ * que lo cumpla Prisma lanza `P2025` en vez de tocar una fila ajena-. El asiento y el recalculo
+ * de `products.stock` quedan en la MISMA transaccion que el ajuste.
+ *
+ * El bloqueo del PRODUCTO va primero -mismo orden que `addBatchToAlive`-, para que dos ajustes
+ * sobre lotes distintos del mismo producto se serialicen ahi en vez de abrazarse con un camino
+ * futuro que tambien parta del producto. Sin fila que bloquear -lote inexistente o de otra
+ * empresa- se devuelve `null` sin llegar a `productBatch.update`.
  */
 export async function adjustBatchStock(
   batchId: string,
@@ -647,6 +732,17 @@ export async function adjustBatchStock(
 
   try {
     return await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<ReadonlyArray<AdjustProductRow>>(Prisma.sql`
+        SELECT p."id"
+          FROM "products" p
+          JOIN "product_batches" b ON b."product_id" = p."id"
+         WHERE b."id" = ${batchId}::uuid
+           AND b."company_id" = ${companyId}::uuid
+         FOR NO KEY UPDATE OF p
+      `);
+      const product = rows[0];
+      if (product === undefined) return null;
+
       const updated = await tx.productBatch.update({
         where: { id: batchId, companyId },
         data: { stock: { increment: delta }, updatedBy: actorId, updatedAt: now },
@@ -654,6 +750,8 @@ export async function adjustBatchStock(
       });
 
       await writeMovement(tx, { batchId, kind: 'adjustment', quantity: delta, reason, createdBy: actorId }, now, scope);
+
+      await recalculateProductStock(tx, product.id, scope);
 
       return { stock: updated.stock };
     });

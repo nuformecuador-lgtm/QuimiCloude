@@ -6,14 +6,17 @@ import { Prisma } from '@prisma/client';
 
 const doble = vi.hoisted(() => {
   const productCreate = vi.fn();
+  const presentationFindFirst = vi.fn();
   const batchCreate = vi.fn();
+  const batchFindMany = vi.fn();
   const batchUpdate = vi.fn();
   const executeRaw = vi.fn();
   const queryRaw = vi.fn();
   const movementCreate = vi.fn();
   const tx = {
     product: { create: productCreate },
-    productBatch: { create: batchCreate, update: batchUpdate },
+    presentation: { findFirst: presentationFindFirst },
+    productBatch: { create: batchCreate, update: batchUpdate, findMany: batchFindMany },
     inventoryMovement: { create: movementCreate },
     $executeRaw: executeRaw,
     $queryRaw: queryRaw,
@@ -21,7 +24,9 @@ const doble = vi.hoisted(() => {
   return {
     tx,
     productCreate,
+    presentationFindFirst,
     batchCreate,
+    batchFindMany,
     batchUpdate,
     executeRaw,
     queryRaw,
@@ -62,15 +67,34 @@ const LOTE: NewProductBatch = {
   createdBy: ACTOR_ID,
 };
 
+/** El SQL de una llamada al doble de `$queryRaw`, que recibe un `Prisma.Sql`. */
+function sqlDe(llamada: unknown): string {
+  return (llamada as Prisma.Sql).sql;
+}
+
+/**
+ * Dos consultas crudas distintas comparten `$queryRaw`: el maximo del correlativo (`resolveLot`,
+ * usado por `createWithFirstBatch`) y el bloqueo del producto de `adjustBatchStock`. Se reparten
+ * por la tabla que leen, no por el orden.
+ */
+function doblarLecturaDelProducto(fila: { id: string } | null): void {
+  doble.queryRaw.mockImplementation(async (consulta: unknown) => {
+    if (sqlDe(consulta).includes('FROM "products"')) return fila === null ? [] : [fila];
+    return [{ top: '0' }];
+  });
+}
+
 beforeEach(() => {
   vi.resetAllMocks();
   doble.transaction.mockImplementation(
     async (run: (client: typeof doble.tx) => Promise<unknown>) => run(doble.tx),
   );
   doble.productCreate.mockResolvedValue({ id: PRODUCTO_ID });
+  doble.presentationFindFirst.mockResolvedValue({ unitId: '77777777-7777-4777-8777-777777777777' });
   doble.batchCreate.mockResolvedValue({ id: LOTE_ID });
+  doble.batchFindMany.mockResolvedValue([]);
   doble.executeRaw.mockResolvedValue(0);
-  doble.queryRaw.mockResolvedValue([{ top: '0' }]);
+  doblarLecturaDelProducto({ id: PRODUCTO_ID });
   doble.movementCreate.mockResolvedValue({ id: 'movimiento-1' });
 });
 
@@ -168,7 +192,20 @@ describe('adjustBatchStock (R1, R2, R4, R6, R7, R18) — increment relativo mas 
     );
   });
 
-  it('R18: un lote inexistente o de otra empresa no afecta ninguna fila y devuelve null sin asentar nada', async () => {
+  it('R18: sin fila que bloquear (lote inexistente o de otra empresa), devuelve null sin llamar a productBatch.update', async () => {
+    // El paso 1 -el SELECT con FOR NO KEY UPDATE- es quien detecta esto, antes de llegar
+    // siquiera al `update` del lote.
+    doblarLecturaDelProducto(null);
+
+    await expect(adjustBatchStock(LOTE_ID, 5, 'merma', ACTOR_ID, AHORA, AMBITO)).resolves.toBeNull();
+
+    expect(doble.batchUpdate).not.toHaveBeenCalled();
+    expect(doble.movementCreate).not.toHaveBeenCalled();
+  });
+
+  it('R18: si el lote desaparece entre el bloqueo y el update, el P2025 se traduce igual a null', async () => {
+    // Caso de resguardo: la FK es RESTRICT y no hay borrado de lotes, pero el adaptador no lo
+    // supone.
     doble.batchUpdate.mockRejectedValueOnce(registroNoEncontrado());
 
     await expect(adjustBatchStock(LOTE_ID, 5, 'merma', ACTOR_ID, AHORA, AMBITO)).resolves.toBeNull();
@@ -201,5 +238,57 @@ describe('adjustBatchStock (R1, R2, R4, R6, R7, R18) — increment relativo mas 
     await expect(adjustBatchStock(LOTE_ID, -100, 'merma', ACTOR_ID, AHORA, AMBITO)).rejects.toBe(
       otraViolacion,
     );
+  });
+});
+
+describe('adjustBatchStock — bloqueo del producto y recalculo de stock (QC-121, R29, R31, R32)', () => {
+  it('bloquea la fila del PRODUCTO -no la del lote- antes de tocar nada, con la empresa en el where', async () => {
+    doble.batchUpdate.mockResolvedValueOnce({ stock: 15 });
+
+    await adjustBatchStock(LOTE_ID, 5, 'conteo_fisico', ACTOR_ID, AHORA, AMBITO);
+
+    const [consulta] = doble.queryRaw.mock.calls[0] as [Prisma.Sql];
+    expect(consulta.sql).toContain('FOR NO KEY UPDATE OF p');
+    expect(consulta.sql).toContain('FROM "products"');
+    expect(consulta.values).toEqual([LOTE_ID, EMPRESA]);
+    // El bloqueo es la PRIMERA sentencia: antes del `update` del lote.
+    expect(doble.queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      doble.batchUpdate.mock.invocationCallOrder[0] as number,
+    );
+  });
+
+  it('recalcula DESPUES del asiento, y la unica columna que escribe en products es stock (R32)', async () => {
+    doble.batchUpdate.mockResolvedValueOnce({ stock: 15 });
+    doble.batchFindMany.mockResolvedValueOnce([
+      { stock: 15, presentation: { unitId: '77777777-7777-4777-8777-777777777777' } },
+    ]);
+
+    await adjustBatchStock(LOTE_ID, 5, 'conteo_fisico', ACTOR_ID, AHORA, AMBITO);
+
+    expect(doble.batchFindMany.mock.invocationCallOrder[0]).toBeGreaterThan(
+      doble.movementCreate.mock.invocationCallOrder[0] as number,
+    );
+    const llamadaUpdate = doble.executeRaw.mock.calls.find((llamada) =>
+      sqlDe(llamada[0]).includes('UPDATE "products"'),
+    );
+    if (llamadaUpdate === undefined) throw new Error('no se llamo al UPDATE de stock');
+    expect((llamadaUpdate[0] as Prisma.Sql).values).toEqual([15, PRODUCTO_ID, EMPRESA]);
+    expect(sqlDe(llamadaUpdate[0])).not.toContain('name');
+    expect(sqlDe(llamadaUpdate[0])).not.toContain('qty_alert');
+    expect(sqlDe(llamadaUpdate[0])).not.toContain('unit_id');
+    expect(sqlDe(llamadaUpdate[0])).not.toContain('updated_at');
+  });
+
+  it('si el recalculo lanza, el ajuste se rechaza en vez de darse por bueno (R29)', async () => {
+    doble.batchUpdate.mockResolvedValueOnce({ stock: 15 });
+    const fallo = new Error('mezcla de unidades');
+    doble.batchFindMany.mockRejectedValueOnce(fallo);
+
+    await expect(adjustBatchStock(LOTE_ID, 5, 'conteo_fisico', ACTOR_ID, AHORA, AMBITO)).rejects.toBe(
+      fallo,
+    );
+
+    expect(doble.batchUpdate).toHaveBeenCalledTimes(1);
+    expect(doble.movementCreate).toHaveBeenCalledTimes(1);
   });
 });

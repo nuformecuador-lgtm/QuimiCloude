@@ -130,12 +130,16 @@ async function seedCompanyInventory(input: {
       name: input.productName,
       nameNormalized: normalizeProductName(input.productName),
       qtyAlert: 2,
+      // La unidad de la presentacion de su lote: sin ella, `product_batches_check_unit`
+      // rechazaria el INSERT de mas abajo. La existencia guardada la fija esta siembra
+      // directa; en la aplicacion la recalcula el alta.
+      unitId: unit.id,
+      stock: 10,
       companyId: company.id,
     },
     select: { id: true },
   });
 
-  // Sin lote el producto no tiene de donde derivar su unidad y la fila de la lista saldria a medias.
   await prisma.productBatch.create({
     data: {
       productId: product.id,

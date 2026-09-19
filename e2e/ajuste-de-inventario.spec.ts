@@ -245,6 +245,11 @@ test.beforeAll(async () => {
       name: productName,
       nameNormalized: normalizeProductName(productName),
       qtyAlert: 2,
+      // La unidad de la presentacion de su lote, y su existencia guardada: sin la unidad,
+      // `product_batches_check_unit` rechazaria el INSERT del lote de mas abajo. En la
+      // aplicacion el alta las escribe; aqui la siembra las fija a mano.
+      unitId: unit.id,
+      stock: INITIAL_STOCK,
       companyId,
     },
     select: { id: true },

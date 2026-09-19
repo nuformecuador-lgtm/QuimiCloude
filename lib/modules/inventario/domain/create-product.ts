@@ -104,8 +104,13 @@ export function createCreateProduct(
       createdBy: actor.id,
     };
 
-    // Normalizar el nombre y filtrar los borrados es del adaptador.
-    const existente = await deps.products.findAliveIdByName(entrada.name, scope);
+    // Normalizar el nombre, filtrar los borrados y resolver la unidad de la presentacion es
+    // del adaptador: busca por nombre Y unidad, no por nombre solo.
+    const existente = await deps.products.findAliveIdByNameInPresentationUnit(
+      entrada.name,
+      entrada.presentationId,
+      scope,
+    );
 
     if (existente !== null) {
       // Solo viaja el lote: el nombre, la existencia y la alerta del panel se ignoran en este camino.

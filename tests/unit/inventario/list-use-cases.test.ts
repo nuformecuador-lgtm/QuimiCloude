@@ -52,7 +52,9 @@ function montarProductos() {
     softDeleteAlive: vi.fn<ProductRepository['softDeleteAlive']>(),
     // QC-90 (T4): el doble cumple el puerto ENTERO. El listado no los usa; estan para que
     // el compilador siga vigilando la forma completa de `ProductRepository`.
-    findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(),
+    findAliveIdByNameInPresentationUnit: vi.fn<
+      ProductRepository['findAliveIdByNameInPresentationUnit']
+    >(),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(),
     addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(),
     // QC-92: mismo criterio, el listado tampoco los usa.
