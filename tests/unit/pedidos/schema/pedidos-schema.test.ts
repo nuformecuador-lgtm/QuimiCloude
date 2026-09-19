@@ -127,12 +127,13 @@ const recipe = parseModel('Recipe')
 const unit = parseModel('Unit')
 const user = parseModel('User')
 
-/** Los CATORCE campos de `Order`, con la columna en ingles que le toca (R36). Fueron catorce en
+/** Los QUINCE campos de `Order`, con la columna en ingles que le toca (R36). Fueron catorce en
  *  QC-33 y quince con `cancellationReason` (QC-34 R48); el 2026-09-07 la decision humana quito
  *  `unit_id` y `unit_price` de la tabla
  *  (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`) y quedaron trece. QC-60 (R1)
- *  anade `company_id`, obligatoria, y vuelven a ser catorce. La lista sigue siendo cerrada:
- *  anadir o quitar cualquier otra columna pone este test rojo. */
+ *  anade `company_id`, obligatoria, y vuelven a ser catorce. `ingredientsCost` opcional las lleva
+ *  a quince. La lista sigue siendo cerrada: anadir o quitar cualquier otra columna pone este test
+ *  rojo. */
 const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
   ['orderYear', 'order_year'],
@@ -148,6 +149,7 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['createdAt', 'created_at'],
   ['updatedAt', 'updated_at'],
   ['deletedAt', 'deleted_at'],
+  ['ingredientsCost', 'ingredients_cost'],
 ]
 
 /** Las CUATRO referencias que cruzan de modulo y por eso NO llevan `@relation` (R33). Fueron cuatro
@@ -292,10 +294,10 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(has(order, 'unitPrice')).toBe(false)
     expect(order.body).not.toContain('unit_price')
 
-    // Y el UNICO decimal que le queda al modelo es la cantidad.
+    // Los DOS unicos decimales del modelo: la cantidad y el importe de ingredientes.
     expect(
       order.fields.filter((candidate) => candidate.type === 'Decimal').map((c) => c.name).sort(),
-    ).toEqual(['quantity'])
+    ).toEqual(['ingredientsCost', 'quantity'])
   })
 
   it('Order no declara total, subtotal ni ninguna columna derivada', () => {
@@ -653,5 +655,34 @@ describe('db/schema.prisma — modelo de pedido', () => {
     )
     expect(uniqueMaps).toEqual(['orders_company_year_sequence_key', 'orders_id_company_id_key'])
     for (const nombre of uniqueMaps) expect(nombre).toMatch(SNAKE_CASE)
+  })
+
+  it('orders gana una columna decimal(14,4) opcional en snake_case y ninguna tabla nueva (R20)', () => {
+    const ingredientsCost = field(order, 'ingredientsCost')
+    expect(ingredientsCost.type).toBe('Decimal')
+    expect(ingredientsCost.isOptional).toBe(true)
+    expect(ingredientsCost.attributes).toContain('@map("ingredients_cost")')
+    expect(ingredientsCost.attributes).toMatch(/@db\.Decimal\(\s*14\s*,\s*4\s*\)/)
+    expect(ingredientsCost.attributes).not.toMatch(/@default\(/)
+
+    // Sigue siendo un solo modelo, dueno de `pedidos`: ninguna tabla nueva nace con la feature.
+    const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
+      .map((match) => match[1])
+      .filter((name): name is string => name !== undefined)
+    const pedidosModels = [...rawSchema.matchAll(/\/\/\/\s*@module\s+(\S+)\s*\n\s*model\s+(\w+)\s*\{/g)]
+      .filter((match) => match[1] === 'pedidos')
+      .map((match) => match[2])
+      .filter((modelName): modelName is string => modelName !== undefined)
+    expect(pedidosModels).toEqual(['Order'])
+    expect(modelNames.filter((name) => /cost|price|import/i.test(name))).toEqual([])
+  })
+
+  it('no nace ninguna columna de moneda (R16)', () => {
+    const MONEDA = /currency|moneda|divisa|iso4217/i
+    expect(order.fields.filter((candidate) => MONEDA.test(candidate.name))).toEqual([])
+    expect(schema).not.toMatch(/currency|moneda|divisa/i)
+    for (const forbidden of ['currency', 'currencyCode', 'ingredientsCostCurrency']) {
+      expect(has(order, forbidden), `Order.${forbidden} no debe existir`).toBe(false)
+    }
   })
 })

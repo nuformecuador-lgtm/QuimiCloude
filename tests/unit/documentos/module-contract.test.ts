@@ -318,6 +318,8 @@ const EXPORTACIONES_DE_EJECUCION = [
   'aiReadInputSchema',
   'AiUnavailableError',
   'createReadPdfWithAi',
+  'pdfStrategySchema',
+  'createProcessPdfByStrategy',
 ] as const;
 
 /** Y lo que publica SOLO COMO TIPO: se borra al compilar, asi que no se ve en el objeto importado y
@@ -337,6 +339,10 @@ const EXPORTACIONES_DE_TIPO = [
   'AiReadInput',
   'AiReadResult',
   'ReadPdfWithAiDeps',
+  'PdfStrategy',
+  'ProcessPdfByStrategyDeps',
+  'ProcessPdfByStrategyInput',
+  'StrategyRunResult',
 ] as const;
 
 /** Nombres exportados SOLO como tipo por un barril, leidos del fuente: `export { type X } from ...`

@@ -441,15 +441,22 @@ describe('QC-81 R30 — package.json y pnpm-lock.yaml intactos', () => {
 // NI EXISTENCIA POR LOTE NI AJUSTE
 // ---------------------------------------------------------------------------------------------
 
+// 2026-09-17: este barrido completo del modulo solo tiene sentido mientras la ausencia
+// de ajuste o suma es una regla de la propia rama que introduce lote y fecha de compra.
+// Fuera de ella, cualquier trabajo legitimo que si nombre un ajuste (como el propio
+// ajuste de inventario) lo pondria en rojo sin haber tocado nada de esta ficha, igual
+// que ya se acota a sus tres vecinas de este archivo.
 describe('QC-81 R31 — ni existencia por lote (QC-91) ni ajuste de inventario (QC-92)', () => {
-  it('R31: ningun archivo del modulo inventario suma lotes, ajusta ni consume', () => {
-    const archivos = archivosTs(join(repoRoot, MODULO));
-    const relativos = archivos.map((ruta) => relative(repoRoot, ruta).split('\\').join('/'));
+  it('R31: ningun archivo del modulo inventario suma lotes, ajusta ni consume', (ctx) => {
+    const archivos = archivosOSalto(ctx);
+    if (archivos === null) return;
+    const archivosDelModulo = archivosTs(join(repoRoot, MODULO));
+    const relativos = archivosDelModulo.map((ruta) => relative(repoRoot, ruta).split('\\').join('/'));
     // Ancla: sin archivos, el `toEqual([])` de abajo seria verde sin mirar nada.
-    expect(archivos.length).toBeGreaterThan(10);
+    expect(archivosDelModulo.length).toBeGreaterThan(10);
     expect(relativos).toContain(ADAPTADOR_DE_PRODUCTO);
 
-    const hallazgos = archivos.flatMap((ruta, i) =>
+    const hallazgos = archivosDelModulo.flatMap((ruta, i) =>
       hallazgosDeAjusteOSuma(readFileSync(ruta, 'utf8')).map((h) => `${relativos[i]}: ${h}`),
     );
     expect(
@@ -457,6 +464,22 @@ describe('QC-81 R31 — ni existencia por lote (QC-91) ni ajuste de inventario (
       'QC-81 R31: la existencia por lote es QC-91 y el ajuste de inventario es QC-92. Hallazgos:\n' +
         hallazgos.join('\n'),
     ).toEqual([]);
+  });
+
+  it('R31: el barrido recorre de verdad los archivos del modulo', () => {
+    const archivosDelModulo = archivosTs(join(repoRoot, MODULO));
+    // Mismo ancla que el caso acotado de arriba: sin archivos reales no hay nada que barrer.
+    expect(archivosDelModulo.length).toBeGreaterThan(10);
+    const relativos = archivosDelModulo.map((ruta) => relative(repoRoot, ruta).split('\\').join('/'));
+    expect(relativos).toContain(ADAPTADOR_DE_PRODUCTO);
+
+    // Contenido leido de verdad, no cadenas vacias fabricadas.
+    const tamanos = archivosDelModulo.map((ruta) => readFileSync(ruta, 'utf8').length);
+    expect(tamanos.every((n) => n > 0)).toBe(true);
+
+    // El detector se invoco sobre cada archivo y devolvio la forma esperada: sin mirar que hallo.
+    const hallazgosPorArchivo = archivosDelModulo.map((ruta) => hallazgosDeAjusteOSuma(readFileSync(ruta, 'utf8')));
+    expect(hallazgosPorArchivo.every((h) => Array.isArray(h))).toBe(true);
   });
 
   it('R31: los detectores muerden con fuentes fabricados y no con uno limpio', () => {
@@ -525,29 +548,97 @@ describe('QC-81 R31 — ni existencia por lote (QC-91) ni ajuste de inventario (
 });
 
 // ---------------------------------------------------------------------------------------------
-// NI LISTAR, NI EDITAR, NI BORRAR LOTES
+// NI EDITAR NI BORRAR LOTES
 // ---------------------------------------------------------------------------------------------
 
-describe('QC-81 R32 — el contrato de inventario no expone listar, editar ni borrar lotes', () => {
-  it('R32: ningun export del contrato publico denota listar, editar ni borrar lotes', () => {
+// 2026-09-18 (QC-92, enmienda al spec aprobada por el humano): se DEROGA la parte de
+// LISTAR/LEER de esta prohibicion. El propio mensaje de QC-90 R30 decia que listar, editar
+// y borrar lotes «NO tiene ficha: si hace falta, se pide una»; QC-92 es esa ficha, y sus
+// R22 (panel de lotes) y R23 (historial del lote) no existen sin exponer esa lectura en el
+// contrato. No se acota por rama -como si se acotaron R31 y el puerto de R32- porque
+// aquello era un estado transitorio y esto no: tras el merge el barrel expone el listado de
+// lotes para siempre, y acotarlo dejaria la guardia roja al mergear. Sigue prohibido EDITAR
+// y BORRAR, y el detector no se toca: lo que cambia es que se considera infraccion.
+//
+// Conjunto CERRADO de verbos que la derogacion retira de `OPERACIONES_PROHIBIDAS`, escrito
+// de una vez: no es una lista de excepciones a la que se le anadan nombres.
+const OPERACIONES_DE_LECTURA_DEROGADAS = new Set([
+  'list', 'listar', 'get', 'find', 'fetch', 'read', 'query', 'search', 'buscar', 'obtener',
+]);
+
+/** Lo que el detector caza, menos los nombres cuya unica operacion prohibida esta derogada. */
+function operacionesDeLoteVigentes(nombres: readonly string[]): string[] {
+  return operacionesDeLoteProhibidas(nombres).filter((nombre) =>
+    palabras(nombre).some(
+      (p) => OPERACIONES_PROHIBIDAS.has(p) && !OPERACIONES_DE_LECTURA_DEROGADAS.has(p),
+    ),
+  );
+}
+
+describe('QC-81 R32 — el contrato de inventario no expone editar ni borrar lotes', () => {
+  it('R32: ningun export del contrato publico denota editar ni borrar lotes', () => {
     // Las claves del barrel YA CARGADO, no un regex sobre su texto: una operacion es un valor.
     const claves = Object.keys(inventario).sort();
     expect(claves.length, 'el barrel de inventario no expone exports de valor').toBeGreaterThan(10);
     expect(claves).toContain('createProductWithFirstBatchSchema');
 
-    const infractores = operacionesDeLoteProhibidas(claves);
+    const infractores = operacionesDeLoteVigentes(claves);
     expect(
       infractores,
-      `QC-81 R32 (se mantiene QC-90 R30): el contrato expone operaciones de lote prohibidas: ${infractores.join(', ')}`,
+      `QC-81 R32 (se mantiene QC-90 R30 salvo su parte de listar, derogada el 2026-09-18): el ` +
+        `contrato expone operaciones de lote prohibidas: ${infractores.join(', ')}`,
     ).toEqual([]);
   });
 
-  it('R32: y el puerto de producto tampoco declara ninguna', () => {
+  // 2026-09-18: prueba por mutacion de la derogacion, sobre nombres FABRICADOS y no sobre el
+  // barrel real, para no fijar en el archivo el estado del arbol.
+  it('R32: tras la derogacion la politica sigue mordiendo editar y borrar, y ya no listar', () => {
+    expect(
+      operacionesDeLoteVigentes([
+        'deleteBatch',
+        'updateLot',
+        'borrarLotes',
+        'editBatch',
+        'removeBatch',
+      ]),
+    ).toEqual(['borrarLotes', 'deleteBatch', 'editBatch', 'removeBatch', 'updateLot']);
+
+    expect(
+      operacionesDeLoteVigentes(['listProductBatches', 'findBatchMovements', 'getBatch']),
+    ).toEqual([]);
+
+    // El alta nunca estuvo prohibida, ni antes ni despues.
+    expect(
+      operacionesDeLoteVigentes(['createProductWithFirstBatchSchema', 'addBatchToAlive']),
+    ).toEqual([]);
+  });
+
+  // 2026-09-17: este caso exige que el PUERTO de producto declare cero metodos de listar,
+  // editar o borrar lotes, y por tanto se pone rojo en cuanto una rama vecina le añade al
+  // puerto un metodo legitimo de lectura de lotes (p.ej. para consultar existencias por
+  // lote), aunque el barrel publico -que es lo que R32 quiere proteger- siga limpio. Se
+  // acota igual que ya se acotan sus tres vecinas de este archivo.
+  it('R32: y el puerto de producto tampoco declara ninguna', (ctx) => {
+    const archivos = archivosOSalto(ctx);
+    if (archivos === null) return;
     const metodos = metodosDePuerto(leer(PUERTO_DE_PRODUCTO));
     // Ancla: si el extractor no viera metodos, el `toEqual([])` de abajo seria vacio.
     expect(metodos).toContain('createWithFirstBatch');
     expect(metodos).toContain('addBatchToAlive');
     expect(operacionesDeLoteProhibidas(metodos)).toEqual([]);
+  });
+
+  it('R32: el barrido del puerto de producto recorre de verdad sus metodos', () => {
+    const metodos = metodosDePuerto(leer(PUERTO_DE_PRODUCTO));
+    // Mismas anclas que el caso acotado de arriba: sin metodos reales no hay nada que barrer.
+    expect(metodos.length).toBeGreaterThan(2);
+    expect(metodos).toContain('createWithFirstBatch');
+    expect(metodos).toContain('addBatchToAlive');
+
+    // El detector se invoco de verdad sobre lo leido y devolvio la forma esperada: sin
+    // fijar que metodos existan hoy en el puerto, que es justo lo que cambia entre ramas.
+    const infractores = operacionesDeLoteProhibidas(metodos);
+    expect(Array.isArray(infractores)).toBe(true);
   });
 
   it('R32: el detector muerde con listar, editar y borrar lotes, y no con el alta', () => {

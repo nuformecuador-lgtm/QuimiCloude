@@ -78,7 +78,10 @@ function catalogoQueFalla(): ProductCatalog {
   const explota = () => {
     throw new Error('el catalogo de productos no debe ser llamado');
   };
-  return { findRefs: vi.fn<ProductCatalog['findRefs']>(explota) };
+  return {
+    findRefs: vi.fn<ProductCatalog['findRefs']>(explota),
+    findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(explota),
+  };
 }
 
 function catalogoUnidadesQueFalla(): UnitCatalog {
@@ -141,7 +144,12 @@ function montarPuertosPermisivos(): Puertos {
       replaceAlive: vi.fn<RecipeRepository['replaceAlive']>(async () => 'ok'),
       softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
     },
-    products: { findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []) },
+    products: {
+      findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []),
+      findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
+        throw new Error('recetas no debe costear nada');
+      }),
+    },
     units: {
       findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []),
       findRefsSharingBaseInCompany: vi.fn<UnitCatalog['findRefsSharingBaseInCompany']>(async () => []),

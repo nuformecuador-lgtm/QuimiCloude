@@ -57,23 +57,32 @@ import type { SessionEraser } from '@/lib/modules/identity/ports/session-eraser'
 import type { SessionRevocationRepository } from '@/lib/modules/identity/ports/session-revocation-repository';
 import type { UserCredentialsReader } from '@/lib/modules/identity/ports/user-credentials-reader';
 import {
+  createAdjustBatchStock,
   createCreatePresentation,
   createCreateProduct,
   createDeletePresentation,
   createDeleteProduct,
   createGetProduct,
+  createListBatchMovements,
   createListPresentations,
+  createListProductBatches,
   createListProducts,
   createUpdatePresentation,
   createUpdateProduct,
 } from '@/lib/modules/inventario';
-import { findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
+import {
+  findCostingBatches,
+  findProductRefs,
+} from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
+import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
   addBatchToAlive,
+  adjustBatchStock,
   createProduct,
   createWithFirstBatch,
   findAliveIdByName,
   findAliveProductById,
+  findBatchesOfAliveProduct,
   listAliveProducts,
   softDeleteAliveProduct,
   updateAliveProduct,
@@ -291,14 +300,17 @@ import {
   createDownloadDocument,
   createIssueReadLink,
   createIssueUploadLinks,
+  createProcessPdfByStrategy,
   createReadPdfWithAi,
 } from '@/lib/modules/documentos';
 import { readWithGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
+import { createStrategyRunLogConsole } from '@/lib/modules/documentos/adapters/driven/observability/strategy-run-log-console';
 import {
   countPages,
   extractPdfText,
   renderPages,
 } from '@/lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf';
+import { readStrategyPromptFromEnv } from '@/lib/modules/documentos/adapters/driven/config/strategy-prompt-env';
 import {
   createDocumentSignedReadUrl,
   createDocumentSignedUpload,
@@ -307,6 +319,8 @@ import {
 import type { AiReader } from '@/lib/modules/documentos/ports/ai-reader';
 import type { DocumentStorage } from '@/lib/modules/documentos/ports/document-storage';
 import type { PdfConverter } from '@/lib/modules/documentos/ports/pdf-converter';
+import type { StrategyPrompt } from '@/lib/modules/documentos/ports/strategy-prompt';
+import type { StrategyRunLog } from '@/lib/modules/documentos/ports/strategy-run-log';
 import { requestScoped } from '@/lib/shared/request-scope';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
@@ -640,6 +654,9 @@ const productRepository: ProductRepository = {
   findAliveIdByName,
   createWithFirstBatch,
   addBatchToAlive,
+  adjustBatchStock,
+  findBatchesOfAliveProduct,
+  findBatchMovements,
 };
 
 const presentationRepository: PresentationRepository = {
@@ -672,6 +689,15 @@ export const inventario = {
     presentations: presentationRepository,
     log: inventarioListQueryLog,
   }),
+  // Claves nuevas al final: ninguna de las de arriba se toca.
+  adjustBatchStock: createAdjustBatchStock({ products: productRepository }),
+  listProductBatches: createListProductBatches({ products: productRepository }),
+  // Se nombra el adaptador importado y no la constante `peopleDirectory`, que apunta al mismo
+  // objeto pero se declara mas abajo: un `const` no existe antes de su linea.
+  listBatchMovements: createListBatchMovements({
+    products: productRepository,
+    people: assignmentDirectoryPrisma,
+  }),
 } as const;
 
 // El modulo `unidades` (QC-32) siembra su catalogo con su propia migracion. `recetas`
@@ -688,7 +714,7 @@ export const inventario = {
 /** `ProductCatalog` cableado con el adaptador driven DE INVENTARIO (`design.md > 6`):
  *  es el hueco que QC-24 dejo abierto en el contrato publico de `inventario` y que T9
  *  llena. `recetas` solo conoce el TIPO `ProductCatalog`, nunca esta implementacion. */
-const productCatalog: ProductCatalog = { findRefs: findProductRefs };
+const productCatalog: ProductCatalog = { findRefs: findProductRefs, findCostingBatches };
 
 /** `UnitCatalog` cableado con el adaptador driven DE UNIDADES (R50): `recetas` solo
  *  conoce el TIPO `UnitCatalog`, nunca esta implementacion. `findRefsSharingBaseInCompany`
@@ -914,18 +940,30 @@ const orderRepository: OrderRepository = {
  * no necesita recibirla.
  *
  * `cancelOrder` y `deleteOrder` reciben SOLO el repositorio: ninguno de los dos toca la receta,
- * y darles catalogos que no usan seria cablear una dependencia falsa. Desde el 2026-09-07 los
- * otros cuatro reciben SOLO el catalogo de recetas, por el mismo motivo.
+ * y darles catalogos que no usan seria cablear una dependencia falsa. `getOrder` y `listOrders`
+ * reciben SOLO el catalogo de recetas, por el mismo motivo: no calculan ningun importe.
+ * `createOrder` y `updateOrder` son los dos que si costean, asi que son los dos que reciben
+ * tambien `products` y `units`.
  */
 export const pedidos = {
-  createOrder: createCreateOrder({ orders: orderRepository, recipes: recipeCatalog }),
+  createOrder: createCreateOrder({
+    orders: orderRepository,
+    recipes: recipeCatalog,
+    products: productCatalog,
+    units: unitCatalog,
+  }),
   getOrder: createGetOrder({ orders: orderRepository, recipes: recipeCatalog }),
   listOrders: createListOrders({
     orders: orderRepository,
     recipes: recipeCatalog,
     log: pedidosListQueryLog,
   }),
-  updateOrder: createUpdateOrder({ orders: orderRepository, recipes: recipeCatalog }),
+  updateOrder: createUpdateOrder({
+    orders: orderRepository,
+    recipes: recipeCatalog,
+    products: productCatalog,
+    units: unitCatalog,
+  }),
   cancelOrder: createCancelOrder({ orders: orderRepository }),
   deleteOrder: createDeleteOrder({ orders: orderRepository }),
 } as const;
@@ -1136,6 +1174,21 @@ const pdfConverter: PdfConverter = {
 const aiReader: AiReader = { read: readWithGenai };
 
 /**
+ * La lectura con IA, construida UNA vez: la publica la fachada y la reutiliza el procesamiento por
+ * estrategia. Dos construcciones serian dos cableados que pueden divergir.
+ */
+const readPdfWithAi = createReadPdfWithAi({ ai: aiReader, converter: pdfConverter });
+
+/** `StrategyRunLog` cableado con la unica implementacion que hay: una linea en el registro. */
+const strategyRunLog: StrategyRunLog = createStrategyRunLogConsole();
+
+/**
+ * `StrategyPrompt` cableado con el adaptador que lee el texto del entorno. Se REFERENCIA, no
+ * se invoca: construir esta fachada no lee ninguna variable.
+ */
+const strategyPrompt: StrategyPrompt = { promptFor: readStrategyPromptFromEnv };
+
+/**
  * Fachada del modulo `documentos` ya cableada. Es lo que consume su Server Action.
  *
  * El ACTOR NO se resuelve aqui, mismo criterio que el resto de modulos: cada caso de uso lo recibe
@@ -1166,5 +1219,14 @@ export const documentos = {
   // una variable ni tocar la red.
   issueReadLink: createIssueReadLink({ storage: documentStorage }),
   downloadDocument: createDownloadDocument({ storage: documentStorage }),
-  readPdfWithAi: createReadPdfWithAi({ ai: aiReader, converter: pdfConverter }),
+  readPdfWithAi,
+  // El procesamiento por estrategia recibe la LECTURA ya construida, no el puerto de IA: el plazo y
+  // el tope de paginas son de ella. `countPages` es solo para el resumen que se registra. Tampoco
+  // recibe actor, por el mismo motivo que `convertPdfs`.
+  processPdfByStrategy: createProcessPdfByStrategy({
+    readPdfWithAi,
+    countPages: pdfConverter.countPages,
+    log: strategyRunLog,
+    prompt: strategyPrompt,
+  }),
 } as const;

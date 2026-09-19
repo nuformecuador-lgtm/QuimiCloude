@@ -55,6 +55,10 @@ function montarProductos() {
     findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(),
     addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(),
+    // QC-92: mismo criterio, el listado tampoco los usa.
+    adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(),
+    findBatchesOfAliveProduct: vi.fn<ProductRepository['findBatchesOfAliveProduct']>(),
+    findBatchMovements: vi.fn<ProductRepository['findBatchMovements']>(),
     listAlive,
   } satisfies ProductRepository;
   const log: ListQueryLog = { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() };

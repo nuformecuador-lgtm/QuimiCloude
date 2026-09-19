@@ -112,7 +112,7 @@ function pedidoNuevo(): NewOrder {
  *  `CHECK orders_order_year_matches_created_at`. */
 function altaDe(fixture: Fixture): Promise<OrderRow | 'duplicate_number'> {
   const now = new Date();
-  return createOrder(pedidoNuevo(), now.getUTCFullYear(), fixture.actorId, now, ambito(fixture));
+  return createOrder(pedidoNuevo(), now.getUTCFullYear(), fixture.actorId, now, null, ambito(fixture));
 }
 
 /** Relanza el PRIMER rechazo antes de afirmar nada y antes de limpiar. Con `Promise.all` el

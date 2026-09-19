@@ -19,6 +19,7 @@
     "identity/work-groups-constraints.int.test.ts",
     "inventario/company-scope.int.test.ts",
     "inventario/inventario-constraints.int.test.ts",
+    "inventario/inventory-movements-constraints.int.test.ts",
     "inventario/presentation-uniqueness.int.test.ts",
     "inventario/product-batch-write.int.test.ts",
     "pedidos/company-scope.int.test.ts",
@@ -106,6 +107,11 @@
       "desde": "2026-09-12"
     },
     {
+      "archivo": "inventario/ledger-cuadre.int.test.ts",
+      "motivo": "QC-92 T15: llama a 'createWithFirstBatch', 'addBatchToAlive' y 'adjustBatchStock' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL y abren cada uno SU PROPIA 'prisma.$transaction', asi que envolverlos en una transaccion del test seria aislamiento de mentira -correrian en otra conexion del pool y no verian las filas del fixture-. Cada caso fabrica su empresa efimera con randomUUID, escribe solo en ella y la limpia en un 'finally' en orden de FK (asientos -> lotes -> productos -> presentacion -> usuario). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-18"
+    },
+    {
       "archivo": "inventario/list-query-indexes.int.test.ts",
       "motivo": "Nacido antes de QC-77 (QC-57 T5/T6): afirma sobre el estado RESULTANTE de la migracion '20260904160000_list_query_indexes' -que pg_trgm existe, que los indices se aplicaron- y recorre TODAS las filas de products para comprobar el backfill de 'name_normalized'. Eso es una lectura del catalogo del motor y del contenido entero de una tabla, no algo que una transaccion del test pueda deshacer.",
       "desde": "2026-09-12"
@@ -149,6 +155,11 @@
       "archivo": "pedidos/order-duplicate-number.int.test.ts",
       "motivo": "Nacido con QC-77 ya en pie (QC-60, decision humana del 2026-09-16): provoca un 23505 AUTENTICO sobre 'orders_company_year_sequence_key' a traves del adaptador real 'createOrder', que usa el cliente Prisma GLOBAL y abre SU PROPIA 'prisma.$transaction' por intento, asi que una transaccion del test no lo envolveria. Para que choquen los tres intentos crea, desde un 'pg.Client' aparte, una funcion y un trigger BEFORE INSERT con nombre unico y acotados por WHEN a la empresa efimera del caso, que reescriben 'order_sequence' a un numero ya ocupado. En un 'finally' borra el trigger y la funcion y despues el fixture (pedidos -> usuario -> rol y tipo de documento -> empresa); la receta se borra en el afterAll. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-16"
+    },
+    {
+      "archivo": "pedidos/order-ingredients-cost.int.test.ts",
+      "motivo": "QC-123 T10: ejercita el flujo REAL de alta y edicion ('createCreateOrder'/'createUpdateOrder') cableado a mano con los adaptadores driven REALES de 'pedidos', 'recetas', 'inventario' y 'unidades' -el mismo conjunto que 'lib/composition' ata-, y esos adaptadores hablan con el cliente Prisma GLOBAL, asi que una transaccion del test no los envolveria. Dos empresas efimeras (randomUUID) nacen en 'beforeAll' y mueren en 'afterAll'; cada caso siembra su propio producto/lote/receta/pedido y los borra en un 'finally' por su id exacto, en el orden que exigen las FK. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-18"
     },
     {
       "archivo": "pedidos/order-repository.int.test.ts",

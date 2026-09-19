@@ -3,15 +3,22 @@ import { OrderNotFoundError, RecipeNotFoundError, ValidationError } from './erro
 import { updateOrderSchema } from './order-input';
 import type { OrderScope } from './order-scope';
 import { assertTransition } from './order-transitions';
+import { resolveIngredientsCost } from './resolve-ingredients-cost';
 
+import type { ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
+import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import type { OrderRepository } from '../ports/order-repository';
 
-/** QC-35bis (2026-09-07): sin unidad en el pedido, `units` deja de ser dependencia. */
+/** Recupera `products` y `units` porque cada escritura recalcula el coste de los ingredientes:
+ *  hace falta leer los lotes disponibles y convertir entre la unidad de la receta y la del
+ *  lote. */
 export type UpdateOrderDeps = {
   readonly orders: OrderRepository;
   readonly recipes: RecipeCatalog;
+  readonly products: ProductCatalog;
+  readonly units: UnitCatalog;
   /** Ver el comentario identico de `create-order.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
 };
@@ -72,7 +79,19 @@ export function createUpdateOrder(
       if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
     }
 
-    const result = await deps.orders.updateAlive(id, data, actor.id, now(), scope);
+    // El coste se recalcula con la receta del DATO ENTRANTE, no con la de la fila vieja: una
+    // edicion que solo cambia la cantidad o la prioridad tambien reescribe el importe con los
+    // lotes de HOY.
+    const ingredientsCost = await resolveIngredientsCost(
+      deps.recipes,
+      deps.products,
+      deps.units,
+      data.recipeId,
+      data.quantity,
+      actor.companyId,
+    );
+
+    const result = await deps.orders.updateAlive(id, data, actor.id, now(), ingredientsCost, scope);
 
     // La fila pudo borrarse entre el `SELECT` y el `UPDATE`: el puerto vuelve a filtrar por
     // vivos y el caso de uso responde lo mismo que arriba (R33).

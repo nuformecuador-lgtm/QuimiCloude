@@ -51,6 +51,7 @@ export function toOrderView(
     // R29: el motivo se devuelve en la ficha Y en el listado mientras el pedido este
     // cancelado. Ningun caso de uso lo vacia ni lo sustituye.
     cancellationReason: row.cancellationReason,
+    ingredientsCost: row.ingredientsCost,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,

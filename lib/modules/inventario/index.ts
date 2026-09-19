@@ -1,6 +1,6 @@
 // Contrato publico del modulo. Lo importa un componente de cliente, asi que no puede arrastrar
 // servidor.
-export { requirePermission, type Actor } from './domain/actor';
+export { requirePermission, canAdjustBatchStock, type Actor } from './domain/actor';
 // Lo piden las firmas de los puertos: quien escriba un adaptador o un doble de test lo toma de aqui.
 export type { InventoryScope } from './domain/inventory-scope';
 export {
@@ -12,6 +12,8 @@ export {
   PresentationInUseError,
   ValidationError,
   BatchDuplicateLotError,
+  BatchNotFoundError,
+  BatchStockNegativeError,
 } from './domain/errors';
 export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
 export {
@@ -49,7 +51,11 @@ export {
 export { type NewProductBatch } from './domain/product-batch';
 export { type NewProduct, type ProductView } from './domain/product-view';
 export { type ProductStockByUnit, sumStockByUnit } from './domain/product-stock';
+export { type CostingBatch } from './domain/costing-batch';
 export { type PresentationView } from './domain/presentation-view';
+export { type ProductBatchView } from './domain/product-batch-view';
+export { type InventoryMovementView, type NewInventoryMovement } from './domain/inventory-movement';
+export { MOVEMENT_REASONS, type MovementReason } from './domain/movement-reason';
 
 export { createCreateProduct, type CreateProductDeps } from './domain/create-product';
 export { createUpdateProduct, type UpdateProductDeps } from './domain/update-product';
@@ -60,6 +66,19 @@ export { createCreatePresentation, type CreatePresentationDeps } from './domain/
 export { createUpdatePresentation, type UpdatePresentationDeps } from './domain/update-presentation';
 export { createDeletePresentation, type DeletePresentationDeps } from './domain/delete-presentation';
 export { createListPresentations, type ListPresentationsDeps } from './domain/list-presentations';
+export {
+  createAdjustBatchStock,
+  type AdjustBatchStockDeps,
+  type AdjustBatchStockInput,
+} from './domain/adjust-batch-stock';
+export {
+  createListProductBatches,
+  type ListProductBatchesDeps,
+} from './domain/list-product-batches';
+export {
+  createListBatchMovements,
+  type ListBatchMovementsDeps,
+} from './domain/list-batch-movements';
 
 // Solo tipos: por aqui otros modulos apuntan a un producto sin tocar la tabla ni Prisma. La
 // implementacion se cablea en `lib/composition`.

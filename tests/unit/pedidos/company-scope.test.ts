@@ -35,7 +35,9 @@ import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
+import type { UnitCatalog } from '@/lib/modules/unidades'
 
 const EMPRESA = '33333333-3333-4333-8333-333333333333'
 const OTRA_EMPRESA = '44444444-4444-4444-8444-444444444444'
@@ -69,6 +71,7 @@ function filaConEmpresa(): OrderRow {
     priority: 'BAJA',
     status: 'PENDIENTE',
     cancellationReason: null,
+    ingredientsCost: null,
     createdAt: new Date('2026-09-15T10:00:00.000Z'),
     updatedAt: new Date('2026-09-15T10:00:00.000Z'),
     createdBy: 'u-1',
@@ -139,6 +142,7 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
       priority: 'BAJA',
       status: 'PENDIENTE',
       cancellationReason: null,
+      ingredientsCost: null,
       createdAt: new Date('2026-09-15T10:00:00.000Z'),
       updatedAt: new Date('2026-09-15T10:00:00.000Z'),
       createdBy: 'u-1',
@@ -174,14 +178,29 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
       findRefsIncludingDeleted: vi.fn(async () => [
         { id: RECETA, name: 'Acido citrico 50%', isDeleted: false },
       ]),
+      findExecutionContentById: vi.fn(async () => ({
+        id: RECETA,
+        name: 'Acido citrico 50%',
+        isDeleted: false,
+        steps: [],
+        lines: [],
+      })),
     } as unknown as RecipeCatalog
+    const products = {
+      findRefs: vi.fn(async () => []),
+      findCostingBatches: vi.fn(async () => []),
+    } as unknown as ProductCatalog
+    const units = {
+      findRefs: vi.fn(async () => []),
+      findRefsSharingBaseInCompany: vi.fn(async () => []),
+    } as unknown as UnitCatalog
 
     const ficha = await createGetOrder({ orders, recipes })(PEDIDO, ACTOR)
     const lista = await createListOrders({ orders, recipes, log: { ignoredFields: vi.fn() } })(
       { page: 1 },
       ACTOR,
     )
-    const alta = await createCreateOrder({ orders, recipes })(
+    const alta = await createCreateOrder({ orders, recipes, products, units })(
       { recipeId: RECETA, quantity: '10.0000' },
       ACTOR,
     )

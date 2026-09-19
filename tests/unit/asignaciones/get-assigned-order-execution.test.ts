@@ -8,6 +8,7 @@ import {
 import { AsignacionesError, OrderNotFoundError, UnauthorizedError } from '@/lib/modules/asignaciones/domain/errors';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
+import type { AssignedOrderExecutionView } from '@/lib/modules/asignaciones/domain/assigned-order-execution-view';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
 import type { AssignedOrderSummary, OrderCatalog } from '@/lib/modules/pedidos';
 import type { RecipeCatalog, RecipeExecutionContent } from '@/lib/modules/recetas';
@@ -126,7 +127,12 @@ function montar(options?: {
     orders: { findAliveById, listAliveSummariesByIds, transitionAliveById } as unknown as OrderCatalog,
     recipes: { findRefsIncludingDeleted, findExecutionContentById } as unknown as RecipeCatalog,
     units: { findRefs, findRefsSharingBaseInCompany } as UnitCatalog,
-    products: { findRefs: productFindRefs } as ProductCatalog,
+    products: {
+      findRefs: productFindRefs,
+      findCostingBatches: vi.fn(async () => {
+        throw new Error('la ejecucion de un pedido asignado no costea nada');
+      }),
+    } as ProductCatalog,
   };
 
   return {
@@ -244,6 +250,55 @@ describe('getAssignedOrderExecution — la vista', () => {
 
     expect(productFindRefs).toHaveBeenCalledWith([PRODUCTO], EMPRESA);
     expect(view.lines[0]?.productName).toBe('Sosa caustica');
+  });
+});
+
+// QC-123 T8 (R15) — comprobacion de TIPO: un literal con `ingredientsCost` de mas sobre
+// `AssignedOrderExecutionView` tiene que dejar de compilar. Si la vista de ejecucion ganara el
+// campo, el `@ts-expect-error` se quedaria sin usar y `tsc` se pondria rojo aqui mismo.
+const _r15TipoSinImporte: AssignedOrderExecutionView = {
+  orderId: PEDIDO,
+  numberText: '2026-0000001',
+  status: 'PENDIENTE',
+  recipeName: null,
+  orderQuantity: '250.0000',
+  recipeBaseQuantity: null,
+  scaleFactorText: null,
+  steps: [],
+  lines: [],
+  // @ts-expect-error `AssignedOrderExecutionView` no declara `ingredientsCost` (R15): si esto
+  // compila, la pantalla de ejecucion gano el importe.
+  ingredientsCost: '10.0000',
+};
+void _r15TipoSinImporte;
+
+describe('QC-123 — la pantalla de ejecucion no lleva importe (R15)', () => {
+  it('la pantalla de ejecucion no lleva importe (R15)', async () => {
+    const { deps } = montar();
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    // La FORMA completa de la vista, no solo un campo: si ganara `ingredientsCost` (o
+    // cualquier otro campo nuevo), esta lista de claves dejaria de coincidir.
+    expect(Object.keys(view).sort()).toEqual(
+      [
+        'orderId',
+        'numberText',
+        'status',
+        'recipeName',
+        'orderQuantity',
+        'recipeBaseQuantity',
+        'scaleFactorText',
+        'steps',
+        'lines',
+      ].sort(),
+    );
+    for (const line of view.lines) {
+      expect(Object.keys(line).sort()).toEqual(
+        ['productName', 'quantity', 'unit', 'alternativeUnits'].sort(),
+      );
+    }
   });
 });
 

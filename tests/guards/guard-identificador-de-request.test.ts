@@ -87,6 +87,18 @@ export const E2E_ESPERADOS = [
   // identificador de peticion: el spec no lee ni afirma nada sobre el identificador ni sobre
   // `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
   'aislamiento-recetas.spec.ts',
+  // Alta el 2026-09-18 (QC-92) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se
+  // relaja -el archivo se nombra, uno a uno-. Lo que ejercita: el Administrador abre el panel de
+  // lotes de un producto desde el listado de inventario, despliega el historial del lote y ve su
+  // asiento de alta, ajusta la existencia con una cantidad con signo y un motivo del conjunto
+  // cerrado, y ve la cantidad nueva y el asiento nuevo; un ajuste que dejaria la existencia bajo
+  // cero se rechaza en pantalla y no deja rastro en la base; y quien solo tiene
+  // `inventario.consultar` ve el panel y el historial pero el control de ajuste no existe en el
+  // DOM. NO ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni
+  // afirma nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71
+  // R21 sigue INTACTO.
+  'ajuste-de-inventario.spec.ts',
   // QC-101 T10 / R17: la E2E del cierre de TODAS las sesiones de otra persona desde la pantalla.
   // Alta por el MISMO motivo y en el MISMO sitio que las de QC-49, QC-67, QC-79, QC-85 y QC-102:
   // esta lista es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO
@@ -204,11 +216,21 @@ export const MIGRACIONES_ESPERADAS = [
   '20260917120000_drop_product_stock',
   // Misma alta, esta vez para la migracion que da empresa a proveedores y a su catalogo.
   '20260917120000_suppliers_company_scope',
+  // Igual patron: tabla nueva de movimientos de inventario, no toca el identificador de peticion.
+  '20260917130000_inventory_movements',
   // Alta con el mismo patron que las anteriores: la migracion que crea el indice GIN de
   // trigramas total sobre recipes.name_normalized, para que la busqueda del listado de
   // pedidos vea tambien las recetas de baja, no persiste el identificador de peticion ni
   // lo menciona; se nombra aqui a mano y la lista sigue CERRADA para la siguiente.
   '20260917130000_recipes_search_index_including_deleted',
+  // Alta el 2026-09-18 con el mismo patron que las anteriores: la migracion que convierte
+  // `inventory_movements.kind` en enum y acota `reason` a su catalogo no persiste el identificador
+  // de peticion ni lo menciona; se nombra aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260918120000_inventory_movement_kind_enum_and_reason_catalog',
+  // Alta el 2026-09-18 (QC-123) con el mismo patron que las anteriores: la migracion que anade
+  // la columna `ingredients_cost` a `orders` no persiste el identificador de peticion ni lo
+  // menciona; se nombra aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260918130000_orders_add_ingredients_cost',
 ] as const
 
 export function hallazgosDeMigraciones(

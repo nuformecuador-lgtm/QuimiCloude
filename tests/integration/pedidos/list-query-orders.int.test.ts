@@ -100,7 +100,7 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
 
 /** Alta por el adaptador REAL. Registra el id para que el `afterAll` la borre. */
 async function alta(now: Date, overrides: Partial<NewOrder> = {}): Promise<OrderRow> {
-  const resultado = await createOrder(baseOrder(overrides), YEAR, actorId, now, scope())
+  const resultado = await createOrder(baseOrder(overrides), YEAR, actorId, now, null, scope())
   expect(resultado).not.toBe('duplicate_number')
   const fila = resultado as OrderRow
   creados.push(fila.id)
