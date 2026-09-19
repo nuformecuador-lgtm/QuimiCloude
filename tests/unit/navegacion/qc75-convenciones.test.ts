@@ -397,6 +397,22 @@ describe('QC-75 R22 — esta ficha no anade backend', () => {
   });
 
   it('package.json no gano dependencias respecto al merge-base con dev', (ctx) => {
+    // 2026-09-18: acotado a la rama de QC-75 con la MISMA precondicion conjuntiva que sus dos
+    // hermanos de arriba -no aplicaba solo a este caso-. Sin ella, cualquier otra rama que sume
+    // una dependencia propia y aprobada (QC-111 suma `@upstash/qstash`, aprobada junto con su
+    // Route Handler) hacia fallar este caso por una pregunta que no es la suya: la de si ESTA
+    // rama es la de QC-75. Fuera de esa rama, la pregunta complementaria -que toda dependencia
+    // declarada tenga su fila en `docs/dependencias.md`- ya la responde
+    // `tests/guards/guard-dependencias-aprobadas.test.ts`, que esta verde y no se toca. En la
+    // rama real de QC-75 este caso sigue midiendo exactamente igual.
+    if (!esLaRamaDeQC75) {
+      ctx.skip(
+        'el rango no trae a la vez el archivo central y la carpeta de spec de QC-75: esta NO es ' +
+          'su rama y R22 no le aplica.',
+      );
+      return;
+    }
+
     const base = mergeBaseConDev();
     const packageBase = base === null ? null : leerEnRevision(base, 'package.json');
     const packageHead = leerEnRevision('HEAD', 'package.json');

@@ -361,6 +361,22 @@ describe('R32 — esta ficha no toca db/schema.prisma ni anade ninguna migracion
 
 describe('R35 — ninguna dependencia nueva en package.json', () => {
   it('las dependencias y devDependencies son EXACTAMENTE las de origin/dev', (ctx) => {
+    // 2026-09-18: acotado a la rama de QC-38 con el MISMO patron que R32/R34 en este archivo -esta
+    // guardia es sobre el ALCANCE de ESTA ficha, no una prohibicion general de sumar una
+    // dependencia aprobada en otra rama-. Sin el salto, cualquier rama que sume una dependencia
+    // propia y aprobada (QC-111 suma `@upstash/qstash`, aprobada junto con su Route Handler) hacia
+    // fallar este caso por una pregunta que no es la suya. Fuera de la rama de QC-38, la pregunta
+    // complementaria -que toda dependencia declarada tenga su fila en `docs/dependencias.md`- ya
+    // la responde `tests/guards/guard-dependencias-aprobadas.test.ts`, que esta verde y no se toca.
+    // En la rama real de QC-38 este caso sigue midiendo exactamente igual.
+    if (!esLaRamaDeQC38) {
+      ctx.skip(
+        'el rango trae archivos pero ninguno es `' + ARCHIVO_CENTRAL + '`: esta NO es la rama de ' +
+          'QC-38, asi que R35 no le aplica y este caso NO ha comprobado nada.',
+      );
+      return;
+    }
+
     let enDevTexto: string;
     try {
       enDevTexto = git('git show origin/dev:package.json');
