@@ -400,6 +400,13 @@ const MIGRACION_QC68 = [
   'db/migrations/20260917130000_recipes_search_index_including_deleted/down.sql',
 ];
 
+// La migracion que da a producto su unidad de referencia y la existencia acumulada de sus lotes:
+// no toca ninguna tabla de recetas.
+const MIGRACION_QC121 = [
+  'db/migrations/20260918130000_product_unit_and_stored_stock/migration.sql',
+  'db/migrations/20260918130000_product_unit_and_stored_stock/down.sql',
+];
+
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
   ...AUTORIZACION_POR_PERMISO_QC74,
@@ -421,6 +428,7 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC60,
   ...MIGRACION_QC50,
   ...MIGRACION_QC68,
+  ...MIGRACION_QC121,
 ];
 
 /** Espera rutas con separadores POSIX, como las devuelve `git diff --name-only`. */
