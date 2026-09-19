@@ -219,6 +219,11 @@ export const MIGRACIONES_ESPERADAS = [
   // `inventory_movements.kind` en enum y acota `reason` a su catalogo no persiste el identificador
   // de peticion ni lo menciona; se nombra aqui a mano y la lista sigue CERRADA para la siguiente.
   '20260918120000_inventory_movement_kind_enum_and_reason_catalog',
+  // Alta el 2026-09-18 con el mismo patron que las anteriores: la migracion que crea las tablas
+  // `document_batches` y `document_files` no persiste el identificador de peticion ni lo
+  // menciona; se nombra aqui a mano y la lista sigue CERRADA para la siguiente. Si esta migracion
+  // es de otra ficha, esa ficha actualiza esta lista.
+  '20260918130000_document_batches_and_files',
 ] as const
 
 export function hallazgosDeMigraciones(
@@ -258,19 +263,22 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
  * Total absoluto del repositorio y no de un cambio: una dependencia aprobada de cualquier otra
  * feature lo rompe y obliga a subirlo. Lo que vigila de verdad es `FRAGMENTOS_PROHIBIDOS`.
  */
-// El manifiesto declara hoy 34 dependencias. Fueron 31 hasta el 2026-09-16, cuando entraron
+// El manifiesto declara hoy 35 dependencias. Fueron 31 hasta el 2026-09-16, cuando entraron
 // `unpdf` y `@napi-rs/canvas` -las dos con los cuatro checks, aprobacion humana y su fila en
 // `docs/dependencias.md`-, y el numero se subio con esa aprobacion. El 2026-09-18 entro
 // `@google/genai` -el cliente oficial para leer un PDF con Gemini-, tambien con los cuatro
 // checks, con aprobacion humana en la puerta F1.4 y con su fila en `docs/dependencias.md`: de
-// 33 a 34 con esa misma aprobacion.
+// 33 a 34 con esa misma aprobacion. El mismo 2026-09-18 entro `@upstash/qstash` -el cliente
+// oficial para publicar un trabajo por PDF en la cola y verificar la firma del webhook-, tambien
+// con los cuatro checks, con aprobacion humana en la puerta F1.4 y con su fila en
+// `docs/dependencias.md`: de 34 a 35 con esa misma aprobacion.
 //
 // Que este conteo sea un absoluto es fragil y conviene saberlo: no distingue «alguien colo una
 // libreria» de «entro una aprobada», asi que lo rompe cualquier feature posterior que anada una
 // legitima. La pregunta «toda dependencia declarada esta aprobada» ya la responde
 // `guard-dependencias-aprobadas.test.ts`, que compara contra el registro. Lo robusto aqui seria
 // comparar contra el merge-base de la propia rama en vez de contar absolutos.
-export const DEPENDENCIAS_ESPERADAS = 34
+export const DEPENDENCIAS_ESPERADAS = 35
 export const DEV_DEPENDENCIAS_ESPERADAS = 20
 
 /** `crypto.randomUUID()` es un global: una libreria de identificadores o de criptografia sobra. */

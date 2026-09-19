@@ -45,7 +45,7 @@ No de memoria y no de la documentacion: del paquete, como hizo QC-108 con `@goog
 | Como se construye el `Receiver` | `new Receiver({ currentSigningKey?, nextSigningKey?, devMode? })` — las **dos** claves vivas a la vez, que es la rotacion que el diseno describe | **coincide** |
 | Nombre de la cabecera de la **firma** | **`upstash-signature`**, escrito en el propio tipo `VerifyRequest` | **cerrado** |
 | La opcion del tope de reintentos al publicar | `retries?: number` en `PublishRequest`; `publishJSON` devuelve `{ messageId, url }` | **coincide** |
-| Nombre de la cabecera del **identificador de mensaje** | **NO APARECE EN EL PAQUETE.** El SDK no lee esa cabecera en ningun punto: no esta en los tipos, ni en el bundle, ni en el README | **SIGUE ABIERTO** |
+| Nombre de la cabecera del **identificador de mensaje** | **No aparece en el paquete**: el SDK no lee esa cabecera en ningun punto —ni en los tipos, ni en el bundle, ni en el README—. La cierra el leader contra la documentacion del proveedor (`upstash.com/docs/qstash/howto/receiving`, 2026-09-18): es **`Upstash-Message-Id`** | **cerrado** |
 
 **Un matiz que el diseno no preveia y que el adaptador absorbe.** `Receiver.verify` **lanza
 `SignatureError`** cuando la firma es invalida; **no devuelve `false`**. El puerto `QueueSignature`
@@ -53,19 +53,19 @@ promete `Promise<boolean>` y «nunca lanza por una firma mala», asi que el adap
 devuelve `false`. No es una desviacion del diseno: es exactamente el sitio donde el diseno dijo que
 se reconciliaria («quien conoce el nombre real es su adaptador»).
 
-**El DESCONOCIDO que NO se pudo cerrar, y se dice en vez de rellenarlo.** `design.md > 8` mandaba
-verificar el nombre de la cabecera del identificador de mensaje **contra el paquete instalado**. El
-paquete no lo contiene, porque el SDK nunca lee esa cabecera: la manda el servidor de QStash al
-webhook y el cliente no la modela. Este worktree no tiene acceso a la documentacion del proveedor,
-asi que **no se puede cerrar aqui**. Se implementa en una sola constante con el valor convencional
-`upstash-message-id`, `messageIdOf` la busca sin distinguir mayusculas y devuelve `null` si no
-viene. **Queda elevado al leader**, no dado por cerrado.
+**El DESCONOCIDO esta cerrado.** El paquete no podia cerrarlo —el SDK nunca lee esa cabecera—, asi
+que se elevo en vez de rellenarlo con un supuesto; el leader lo verifico contra la documentacion del
+proveedor el 2026-09-18 y el valor coincide con el que ya estaba implementado, `upstash-message-id`,
+buscado sin distinguir mayusculas. El codigo no cambia.
 
-**Alcance del fallo si el nombre fuera otro, medido y no supuesto:** `messageIdOf` devolveria
-`null` siempre; el `claim` sigue siendo atomico y la idempotencia sigue en pie, porque su candado es
-`status='queued'` y no el identificador. Lo unico que se perderia en silencio es la proteccion
-secundaria de `queue_message_id` —«un mensaje viejo sobre una fila re-encolada no la reclama»—.
-Es degradacion silenciosa, y por eso se eleva.
+**El analisis de degradacion se queda escrito, porque sigue siendo la razon de por que esto no era
+critico:** la idempotencia **no depende** de esa cabecera. Su candado es el `UPDATE ... WHERE
+status='queued' ... RETURNING`, que es atomico; `queue_message_id` solo aporta la proteccion
+secundaria de que un mensaje viejo no reclame una fila re-encolada.
+
+**Dato del proveedor anotado y no usado:** la entrega trae tambien `Upstash-Retried`, el numero de
+reintentos ya gastados. El diseno no la pide y no se consume; queda apuntada para quien diagnostique
+un archivo que agoto los reintentos.
 
 ## Mapa R1..R27 -> test
 

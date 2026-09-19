@@ -14,6 +14,7 @@
     "asignaciones/reapply-work-group.int.test.ts",
     "asignaciones/remove-work-group.int.test.ts",
     "asignaciones/unassign.int.test.ts",
+    "documentos/document-batches-and-files-constraints.int.test.ts",
     "identity/identity-constraints.int.test.ts",
     "identity/identity-seed.int.test.ts",
     "identity/work-groups-constraints.int.test.ts",
