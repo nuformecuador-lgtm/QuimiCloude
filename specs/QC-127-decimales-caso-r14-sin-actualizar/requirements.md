@@ -20,7 +20,91 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+> Cada requisito cita entre corchetes la decisión cerrada que lo origina. Las 10 decisiones
+> (`[D1]`…`[D10]`) quedan citadas al menos una vez.
+>
+> **Nota de lectura.** «El sistema» aquí incluye, además de la pantalla, el **cuerpo de prueba**:
+> buena parte de lo que esta ficha arregla **son los tests mismos**. Un requisito que habla de una
+> afirmación de test es igualmente testeable: se comprueba leyendo el archivo y, sobre todo,
+> **rompiendo a propósito lo afirmado y viendo el rojo** (ver `design.md > Cómo se demuestra que un
+> test corregido muerde`).
+
+**R1.** El caso **R14** de `tests/unit/pedidos-ui/order-form.test.tsx` DEBE afirmar el texto pintado
+de la celda «restante» por **igualdad exacta** del `textContent` con `'-0.2'`. NO DEBE afirmarlo con
+`toHaveTextContent`, que casa por **subcadena** y por tanto pasaría igual si el cálculo diera
+`-0.201`, `-0.2001` o `-0.25`. `[D1]`
+
+**R2.** El caso **R14** DEBE afirmar además que la celda «restante» lleva el atributo `title` con el
+valor **exacto** `'-0.201'`. Hoy ningún test afirma que el cálculo de ese caso da `-0.201`, y sin esa
+afirmación el valor exacto no está cubierto por nada. `[D1]` `[D8]`
+
+**R3.** El caso **R14** DEBE seguir afirmando que el valor pintado del «restante» lleva la clase de
+resalte `text-destructive`, de modo que el caso quede con el **patrón completo** de sus tres vecinos
+del mismo bloque: texto exacto, `title` exacto y clase de resalte. `[D1]`
+
+**R4.** El sistema DEBE decidir el resalte de faltante con el valor **exacto** del restante y nunca
+con el valor **pintado**. SI el restante exacto es negativo pero se pinta «0» por el redondeo a dos
+decimales, ENTONCES la celda DEBE seguir resaltada y DEBE llevar el valor exacto en su `title`.
+`[D2]` `[D4]`
+
+**R5.** El comportamiento actual de la pantalla queda **ratificado**: esta ficha NO DEBE modificar
+ningún archivo de `app/` ni de `lib/`. El redondeo a dos decimales de las celdas de solo lectura, el
+marcador de ausencia y la regla de resalte se quedan exactamente como están. `[D2]` `[D8]`
+
+**R6.** El sistema DEBE dejar constancia escrita, junto a los casos afectados, de que **en un
+teléfono o en un impreso no hay `title`** y de que allí el único aviso del faltante es el **color**,
+y de que la alternativa de pintar `<0.01` se evaluó y se descartó. La ficha acepta esa limitación **a
+sabiendas**; NO DEBE resolverse aquí. `[D3]`
+
+**R7.** El sistema DEBE censar, **archivo por archivo**, exactamente los **seis** archivos de test de
+pantalla que tocó el PR #85 —`tests/unit/pedidos-ui/order-columns.test.tsx`,
+`tests/unit/pedidos-ui/order-form.test.tsx`, `tests/unit/pedidos-ui/order-sheet.test.tsx`,
+`tests/unit/proveedores-ui/catalog-line-sheet.test.tsx`,
+`tests/unit/proveedores-ui/supplier-detail-page.test.tsx` y
+`tests/unit/recetas-ui/recipe-form.test.tsx`— buscando las **tres** formas del defecto: (a) una
+afirmación de **presentación** que exija más de dos decimales, (b) una afirmación de presentación
+hecha por **subcadena**, y (c) un valor **redondeado** que se pinta sin afirmar su `title` exacto.
+`tests/unit/shared-ui/decimal-display.test.ts` NO entra en el censo: es el test de la utilidad, no de
+una pantalla. `[D5]`
+
+**R8.** El censo NO DEBE tratar como hallazgo un valor **enviado** (por ejemplo
+`enviado.get('cost')`) ni el `value` de un `input`: esos valores **deben** ser exactos y llevar todos
+sus decimales, porque el dato vuelve a la base. Solo cuenta como hallazgo lo que se **pinta** en una
+celda de solo lectura. `[D5]` `[D8]`
+
+**R9.** El censo DEBE dejar **constancia por escrito, archivo por archivo**, de que se revisó y de
+qué resultó —hallazgo o nada—, en `progress/impl_QC-127-decimales-caso-r14-sin-actualizar.md`. Un
+archivo del censo sin su línea de constancia cuenta como no censado. `[D5]`
+
+**R10.** SI el censo encuentra un caso **del mismo tipo** que R14 —falta el `title` exacto, o se
+afirma la presentación por subcadena—, ENTONCES el sistema DEBE corregirlo **en esta ficha**, con el
+mismo patrón de R1–R3. `[D7]`
+
+**R11.** SI el censo encuentra **cualquier otra cosa** —un cálculo mal, una pantalla que redondea
+donde no debe, un valor enviado que sí se redondea—, ENTONCES el sistema NO DEBE arreglarlo aquí:
+DEBE dejarlo **tal cual**, anotar lo **medido** (archivo, línea, valor esperado y valor obtenido) y
+proponer **ficha propia**. `[D7]`
+
+**R12.** Esta ficha NO DEBE añadir ninguna guardia automática que intente impedir la reincidencia
+—ni totales del repositorio, ni listas cerradas de archivos, ni recorridos del diff de rama—. El
+motivo DEBE quedar escrito en `design.md` citando **QC-99**: guardias de censo de esa forma rompieron
+**tres** guardias ajenas al cerrar QC-79. `[D6]`
+
+**R13.** Esta ficha NO DEBE modificar `lib/shared/ui/decimal-display.ts` ni sus tests. La separación
+entre `trimDecimal` —precargar un campo editable, sin redondear— y `formatDecimalDisplay` —pintar una
+celda de solo lectura— se **respeta tal cual**. `[D8]`
+
+**R14.** Esta ficha NO DEBE añadir ninguna especificación en `e2e/`: no hay recorrido de usuario
+nuevo ni pantalla nueva, y la cobertura de R1–R13 DEBE quedar en **tests unitarios de UI** sobre
+casos que ya existen. `[D9]`
+
+**R15.** Esta ficha NO DEBE añadir `tests/unit/pedidos-ui/order-form.test.tsx` —ni ningún otro
+archivo— a `tests/baseline-rojos.json`: ya no hay rojo que listar, y listar ese archivo apagaría sus
+**33 casos** enteros para el comparador. `[D10]`
+
+**R16.** Esta ficha NO DEBE añadir ninguna dependencia a `package.json`: todo lo que necesita
+—`@testing-library/react`, `vitest` y `jest-dom`— ya está aprobado y en uso en los seis archivos del
+censo. `[D5]` `[D6]`
 
 ## Preguntas abiertas
 
