@@ -121,6 +121,26 @@ export function toCostingBatch(row: CostingBatchRow): CostingBatch {
 }
 
 /**
+ * La consulta real. Vive aparte de `findCostingBatches` por el mismo motivo que
+ * `findAliveProducts`: declara el `scope` como `InventoryScope` y lo lleva hasta
+ * `batchCompanyScope`.
+ */
+async function findAliveBatchesWithStock(
+  ids: readonly ProductId[],
+  scope: InventoryScope,
+): Promise<readonly CostingBatchRow[]> {
+  return prisma.productBatch.findMany({
+    where: {
+      AND: [
+        batchCompanyScope(scope),
+        { productId: { in: [...ids] }, stock: { gt: 0 }, product: { deletedAt: null } },
+      ],
+    },
+    select: COSTING_BATCH_SELECT,
+  });
+}
+
+/**
  * Implementa `ProductCatalog['findCostingBatches']`: los lotes CON EXISTENCIA de los
  * productos pedidos, de esa empresa, para que `pedidos` calcule el importe. Una sola
  * consulta para todos los `productId` (el numero de consultas no crece con el numero de
@@ -133,15 +153,7 @@ export async function findCostingBatches(
 ): Promise<readonly CostingBatch[]> {
   if (ids.length === 0) return [];
 
-  const rows = await prisma.productBatch.findMany({
-    where: {
-      AND: [
-        batchCompanyScope({ companyId }),
-        { productId: { in: [...ids] }, stock: { gt: 0 }, product: { deletedAt: null } },
-      ],
-    },
-    select: COSTING_BATCH_SELECT,
-  });
+  const rows = await findAliveBatchesWithStock(ids, { companyId });
 
   return rows.map(toCostingBatch);
 }
