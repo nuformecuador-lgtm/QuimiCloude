@@ -79,7 +79,12 @@ function imagenesMudas(): RecipeImageStorage {
 }
 
 function catalogoProductosVacio(): ProductCatalog {
-  return { findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []) };
+  return {
+    findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []),
+    findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
+      throw new Error('recetas no debe costear nada');
+    }),
+  };
 }
 
 describe('QC-50 R19 — ninguna salida publica del modulo lleva `companyId`', () => {

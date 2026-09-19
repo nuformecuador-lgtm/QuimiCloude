@@ -102,7 +102,7 @@ function pedidoNuevo(): NewOrder {
 
 function altaDe(fixture: Fixture): Promise<OrderRow | 'duplicate_number'> {
   const now = new Date();
-  return createOrder(pedidoNuevo(), now.getUTCFullYear(), fixture.actorId, now, {
+  return createOrder(pedidoNuevo(), now.getUTCFullYear(), fixture.actorId, now, null, {
     companyId: fixture.companyId,
   });
 }

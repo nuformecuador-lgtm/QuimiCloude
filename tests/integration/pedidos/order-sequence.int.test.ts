@@ -125,6 +125,7 @@ async function alta(fixture: Fixture, year: number, overrides: Partial<NewOrder>
     year,
     fixture.actorId,
     instantIn(year),
+    null,
     { companyId: fixture.companyId },
   );
   if (resultado === 'duplicate_number') throw new Error('el alta devolvio duplicate_number');

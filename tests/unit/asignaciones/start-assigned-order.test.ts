@@ -105,7 +105,12 @@ function montar(options?: {
       findRefs: vi.fn(async () => [unidad()]),
       findRefsSharingBaseInCompany: vi.fn(async () => []),
     } as UnitCatalog,
-    products: { findRefs: vi.fn(async () => [{ id: PRODUCTO, name: 'Sosa caustica', stockByUnit: [] }]) } as ProductCatalog,
+    products: {
+      findRefs: vi.fn(async () => [{ id: PRODUCTO, name: 'Sosa caustica', stockByUnit: [] }]),
+      findCostingBatches: vi.fn(async () => {
+        throw new Error('arrancar un pedido asignado no costea nada');
+      }),
+    } as ProductCatalog,
     now: () => new Date('2026-09-17T10:00:00.000Z'),
   };
 

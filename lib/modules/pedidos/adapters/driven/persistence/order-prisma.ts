@@ -58,6 +58,7 @@ const ORDER_SELECT = {
   priority: true,
   status: true,
   cancellationReason: true,
+  ingredientsCost: true,
   createdAt: true,
   updatedAt: true,
   createdBy: true,
@@ -88,6 +89,9 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     priority: row.priority,
     status: row.status,
     cancellationReason: row.cancellationReason,
+    // `null` sigue `null`: nunca se convierte en `'0.0000'`, `fromDecimal` solo se llama si hay
+    // valor.
+    ingredientsCost: row.ingredientsCost === null ? null : fromDecimal(row.ingredientsCost),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
@@ -165,6 +169,7 @@ export async function createOrder(
   year: number,
   actorId: string,
   now: Date,
+  ingredientsCost: string | null,
   scope: OrderScope,
 ): Promise<OrderRow | 'duplicate_number'> {
   const { companyId } = companyScopeColumns(scope);
@@ -182,7 +187,8 @@ export async function createOrder(
         const filas = await tx.$queryRaw<readonly CreatedOrderRow[]>(Prisma.sql`
           INSERT INTO "orders" (
             "company_id", "order_year", "order_sequence", "recipe_id", "quantity",
-            "priority", "status", "created_by", "updated_by", "created_at", "updated_at"
+            "priority", "status", "ingredients_cost", "created_by", "updated_by", "created_at",
+            "updated_at"
           ) VALUES (
             ${companyId}::uuid,
             ${year}::integer,
@@ -194,6 +200,7 @@ export async function createOrder(
             ${data.quantity}::numeric,
             ${data.priority}::"OrderPriority",
             ${data.status}::"OrderStatus",
+            ${ingredientsCost}::numeric,
             ${actorId}::uuid,
             ${actorId}::uuid,
             ${now}::timestamptz,
@@ -223,6 +230,9 @@ export async function createOrder(
         status: data.status,
         // El motivo solo existe en un pedido cancelado, y cancelar es `cancelAlive`.
         cancellationReason: null,
+        // Misma normalizacion que `quantity`: el alta y la consulta no pueden devolver dos
+        // formatos del mismo numero. `null` sigue `null`.
+        ingredientsCost: ingredientsCost === null ? null : fromDecimal(toDecimalInput(ingredientsCost)),
         createdAt: now,
         updatedAt: now,
         createdBy: actorId,
@@ -504,12 +514,16 @@ export async function listAliveOrders(
  *
  * `updatedAt` se escribe con el `now` INYECTADO y no con el `@updatedAt` de Prisma, para que
  * el reloj sea el mismo que fijo el caso de uso.
+ *
+ * `ingredientsCost` se SUSTITUYE entero, igual que el resto de `data`: la edicion recalcula, y
+ * el valor nuevo reemplaza al anterior aunque sea `null`.
  */
 export async function updateAliveOrder(
   id: string,
   data: NewOrder,
   actorId: string,
   now: Date,
+  ingredientsCost: string | null,
   scope: OrderScope,
 ): Promise<'ok' | 'not_found'> {
   const { count } = await prisma.order.updateMany({
@@ -519,6 +533,7 @@ export async function updateAliveOrder(
       quantity: toDecimalInput(data.quantity),
       priority: data.priority,
       status: data.status,
+      ingredientsCost: ingredientsCost === null ? null : toDecimalInput(ingredientsCost),
       updatedAt: now,
       updatedBy: actorId,
     },

@@ -187,6 +187,18 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('usuarios.modificar')
   })
 
+  // QC-123 (R15) — el importe del pedido se protege con `pedidos.consultar`, que ya existe:
+  // la ficha NO suma ningun permiso. Reutiliza `CODIGOS_DEL_REQUISITO` -el mismo catalogo de
+  // arriba, copiado del requisito- en vez de duplicar la verdad en una lista nueva.
+  it('el catalogo sigue teniendo quince permisos (R15)', () => {
+    expect(codigos).toEqual([...CODIGOS_DEL_REQUISITO])
+    expect(codigos).toHaveLength(15)
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([
+      'inventario.consultar',
+      'asignaciones.consultar',
+    ])
+  })
+
   it('R6: el seed asigna permisos SOLO a roles, sin ninguna clave de empresa', () => {
     expect(Object.keys(SEED_ROLE_PERMISSIONS).sort()).toEqual(
       [ROLE_ADMINISTRADOR, ROLE_OPERADOR].sort(),
