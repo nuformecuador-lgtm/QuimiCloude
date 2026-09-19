@@ -163,6 +163,9 @@ export function productOrderBy(
   switch (sort.columnId) {
     case 'name':
       return [{ name: dir }, TIE_BREAKER];
+    case 'stock':
+      // Sin `nulls`: `products.stock` es `NOT NULL DEFAULT 0`, nunca vacia.
+      return [{ stock: dir }, TIE_BREAKER];
     case 'qtyAlert':
       return [{ qtyAlert: { sort: dir, nulls: 'last' } }, TIE_BREAKER];
     case 'createdAt':
@@ -188,6 +191,7 @@ function productFilterWhere(
     case 'numberRange': {
       const condition = numberRangeCondition(value.min, value.max);
       if (condition === null) return null;
+      if (field === 'stock') return { stock: condition };
       if (field === 'qtyAlert') return { qtyAlert: condition };
       return null;
     }
