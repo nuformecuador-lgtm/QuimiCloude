@@ -962,3 +962,203 @@ Playwright los arranca y para el propio runner. Verificado al final: nada escuch
 | R35 | `e2e/rate-limit.spec.ts` › `login frenado por origen (chromium/webkit)` (contador en memoria, Upstash vacio en `webServer.env`) |
 | R10 (E2E) | mismo test, paso 4: `page.goto('/login')` → `429` y `RATE_LIMITED_MESSAGE` visible |
 | R11 (E2E) | mismo test, paso 3: envio del formulario → `RATE_LIMITED_MESSAGE` visible y `pathname` sigue en `/login` |
+
+## T15 y T19 — cierre tras sincronizar con dev
+
+> Implementer, 2026-09-19, sobre `0f41da0e` (merge de `origin/dev` = `63d15088`). **Estado: T15 `[ ]`
+> y T19 `[ ]`, las dos por causas ajenas a QC-73, con evidencia abajo.** Ningun rojo lleva el texto
+> de freno ni un `429`, y el spec nuevo pasa en los dos motores en todas las corridas.
+
+### Entorno de las corridas
+
+- **Base dedicada `QuimiCloude_qc73_e2e`** (localhost:5432), creada y borrada con `.tmp-createdb.cjs`
+  (guarda de nombre) y levantada con `db:migrate` + `db:seed` del repo, sin tropezar con el ciclo de
+  la memoria del arnes. Consulta de solo lectura tras el migrate: **37 migraciones, la ultima
+  `20260918130000_orders_add_ingredients_cost`, ninguna `product_unit`** = exactamente las 37 de
+  `db/migrations/` de la rama. Se recreo desde cero antes de cada corrida de abajo.
+- **La base compartida `QuimiCloude` no se toco.** La dedicada se apunto sobrescribiendo
+  `DATABASE_URL` y `DIRECT_URL` en el entorno de la corrida (el resto de variables, del `.env`). El
+  `.env` del worktree no se modifico. Playwright y `next dev` heredan la variable del entorno (Next no
+  pisa lo que ya esta en `process.env`).
+- `pnpm` con shim temporal fuera del repo (`exec pnpm.CMD "$@"`), como en «Gate de la tanda».
+
+### Primer rojo, propio del entorno: cliente de Prisma desfasado tras el merge
+
+La primera corrida de `pnpm run e2e` dio **38 failed / 2 skipped / 74 passed (16.5m)**. Seis eran
+`TypeError: Cannot read properties of undefined (reading 'deleteMany')` en
+`ajuste-de-inventario.spec.ts`: el cliente generado en `node_modules` no tenia `inventoryMovement`
+(`grep -c inventoryMovement …/.prisma/client/index.d.ts` = 0, fechado 08:54, antes del merge). Es el
+caso que `init.sh` paso 2 describe. Se corrio `pnpm exec prisma generate` y `pnpm exec next typegen`
+(ahora 29 coincidencias) y se repitio todo sobre base recreada. Esa primera corrida no cuenta.
+
+### Bateria completa (`pnpm run e2e`) — ROJA, 21 rojos ajenos
+
+```
+  21 failed
+  2 skipped
+  91 passed (6.2m)
+  ✓   41 [chromium] › e2e\rate-limit.spec.ts:56:9 › login frenado por origen (chromium) › agota la cuota de login: frena el formulario en la propia pantalla y la navegacion siguiente ve el 429 (R10, R11, R35)
+  ✓   99 [webkit] › e2e\rate-limit.spec.ts:56:9 › login frenado por origen (webkit) › agota la cuota de login: frena el formulario en la propia pantalla y la navegacion siguiente ve el 429 (R10, R11, R35)
+```
+
+(Los 2 skipped son los cruces de origen del propio spec: cada proyecto salta el `describe` del otro.)
+
+Rojos = 10 tests × 2 motores + 1 intermitente:
+
+| Test | Error |
+| --- | --- |
+| `inventario.spec.ts:529, 647, 766` | limpieza: `23001` al borrar `product_batches`, `RESTRICT` de `inventory_movements_batch_id_fkey` (QC-92) |
+| `session.spec.ts:241` | limpieza: `23001` al borrar `users`, `RESTRICT` de `revoked_sessions_user_id_fkey` |
+| `usuarios.spec.ts:305` | limpieza: `23001` al borrar `companies`, `RESTRICT` de `users_company_id_fkey` |
+| `presentaciones.spec.ts:280` | la hoja no se cierra tras el alta (`toHaveCount(0)`, recibido 1) |
+| `proveedores.spec.ts:380` | `Expected: "12.3456"`, `Received: "12.35"` |
+| `permisos.spec.ts:201` | un elemento esperado no aparece (`toBeVisible`) |
+| `cierre-de-sesiones.spec.ts:264` | un elemento esperado no aparece (`toBeVisible`) |
+| `errores.spec.ts:197` | `page.waitForURL` 60 s |
+| `grupos-de-trabajo.spec.ts:356` (solo Chromium) | tras `goto('/configuracion/usuarios')` se ve el login normal, sin texto de freno |
+
+**Prueba de que son ajenos: los mismos rojos en `origin/dev` sin QC-73.** Se monto un worktree
+temporal desanclado en `63d15088` fuera del repo (scratchpad de la sesion), con `pnpm install
+--frozen-lockfile`, `prisma generate` y `next typegen`, se recreo la base dedicada y se corrieron solo
+los 9 archivos con rojos. `origin/dev` y la rama tienen las mismas 37 migraciones
+(`git diff origin/dev...HEAD -- db/` vacio), asi que la base es la misma:
+
+```
+$ pnpm exec playwright test e2e/cierre-de-sesiones.spec.ts e2e/errores.spec.ts e2e/grupos-de-trabajo.spec.ts e2e/inventario.spec.ts e2e/permisos.spec.ts e2e/presentaciones.spec.ts e2e/proveedores.spec.ts e2e/session.spec.ts e2e/usuarios.spec.ts
+  20 failed
+  20 passed (4.3m)
+```
+
+Los 20 rojos de `origin/dev` son **exactamente** los 20 de la rama (mismo archivo:linea y proyecto,
+comparados con `diff`) y con los mismos errores (`23001` en las mismas FK, `12.35`, `waitForURL`). La
+unica diferencia es `grupos-de-trabajo.spec.ts:356` en Chromium, que en `dev` paso. En la rama es
+**intermitente**: paso en la primera corrida, en la de conteo de abajo, y en
+`pnpm exec playwright test e2e/grupos-de-trabajo.spec.ts --repeat-each=2` (`4 passed (39.2s)`). Su
+captura muestra el login normal, sin alerta ni texto de freno. El worktree temporal se quito despues
+(`git worktree list` ya no lo lista). Ademas: `grep -c Demasiados` en las tres salidas = 0,
+`grep -rl Demasiados test-results` vacio y ninguna linea ` 429 in` en el log del servidor.
+
+Los rojos son deuda de `dev`: fixtures de E2E que no conocen las FK `RESTRICT` nuevas (QC-92,
+revocacion de sesiones) y pantallas cambiadas por fichas ya mergeadas. **No se arreglaron** (fuera
+del alcance de QC-73). T15 sigue `[ ]`: su «Hecho cuando» pide `pnpm run e2e` verde **entero**.
+
+### N_e2e: recuento con los E2E nuevos de dev
+
+Mismo metodo que en «Conteo de logins de la bateria»: `stdout: 'pipe'` temporal en el `webServer`
+(revertido con `git checkout -- playwright.config.ts`, verificado sin diff), base recreada,
+`pnpm exec playwright test --grep-invert "login frenado"`:
+
+```
+    122 GET /login 200
+      4 GET /login?next=%2Fdashboard 200
+      2 GET /login?next=%2Fdashboard 307
+     10 GET /login?next=%2Finventario 200
+      2 GET /login?next=%2Finventario 307
+      4 GET /login?sesion=fin 200
+     92 POST /login 200
+      6 POST /login?next=%2Finventario 200
+total /login: 242        total peticiones registradas: 678        resultado: 20 failed, 90 passed (7.5m)
+```
+
+**242** frente a 227 antes del merge. N_e2e = 350 deja un ~45% de margen. Sigue valiendo el aviso
+de antes: un test que cae a mitad no hace los logins que le faltan. Aqui casi todos los rojos caen
+en la limpieza, **despues** de loguearse. **No se cambia N_e2e** y el spec nuevo no se quedo sin cuota
+antes de tiempo en ninguna corrida. Los comentarios de `playwright.config.ts` siguen citando 227
+(la medida de la seccion T15). No se tocan en esta tanda.
+
+### T19 — `./init.sh` completo: ROJO en el paso 3, antes de typecheck/lint/tests
+
+Corrido con `DATABASE_URL`/`DIRECT_URL` a la base dedicada y el shim de `pnpm`:
+
+```
+== Arnes SDD :: init (modo: completo) ==
+✓ node v26.7.0
+✓ dependencias presentes
+✓ cliente de Prisma al dia
+✓ tipos de ruta de Next al dia
+✗ feature_list.json invalido:
+faltan specs para features sdd en vuelo: QC-114
+```
+
+**Causa (ajena):** `feature_list.json` de `origin/dev` (y por el merge, el de la rama) tiene
+`QC-114` (`tabla-compartida-en-iphone-real`, zona frontend) en `in_progress` con
+`spec_path: specs/QC-114-tabla-compartida-en-iphone-real`. Ese directorio no existe ni en la rama,
+ni en la raiz, ni en ningun worktree hermano (`ls .worktrees/` no tiene ninguno de QC-114). La
+unica diferencia de la rama con `dev` en ese archivo es la ficha QC-73. `node
+scripts/validate-features.mjs` a solas da el mismo `rc=1`. Arreglarlo es cosa del leader (F0 / board
+o el worktree de QC-114), no de esta ficha.
+
+**Lo que NO se hizo, dicho:** el gate aborta antes de typecheck, lint y la suite, asi que **no hay
+salida de esos pasos en esta tanda**. Intente dos cosas y el clasificador de permisos las bloqueo por
+«CI bypass»: correr una copia de `init.sh` con solo ese `fail` bajado a `warn`, y correr a mano
+`typecheck` y `lint`. No se forzo. Queda para el leader: arreglar el estado de QC-114 y volver a
+correr `./init.sh` (la base dedicada sigue en pie para eso, ver «Base dedicada»). T19 sigue `[ ]`.
+
+**Diff vigilado (T19, R29 y R33):**
+
+```
+$ git diff origin/dev...HEAD -- middleware.ts db/ lib/modules/identity/domain/account-lock.ts | wc -c
+0
+$ git diff --quiet origin/dev...HEAD -- tests/unit/identity/account-lock.test.ts tests/unit/identity/verify-credentials.test.ts tests/unit/middleware-root-contract.test.ts tests/guards/guard-dependencias-aprobadas.test.ts && echo "sin cambios"
+sin cambios
+$ git diff origin/dev...HEAD -- package.json | grep '^[+-] '
++    "@upstash/ratelimit": "^2.1.0",
++    "@upstash/redis": "^1.38.4",
+```
+
+### Mapa R<n> → test, con el nombre real de cada caso (R1-R35)
+
+| R | Test (archivo › caso) |
+| --- | --- |
+| R1 | `tests/unit/identity/route-guard-rate-limit.test.ts` › «el freno cuenta cada forma de peticion contra el origen (R1, R2, R3)» › «una navegacion y una Server Action al mismo origen comparten la cuota GENERAL» y «el login cuenta en su PROPIA cuota, separada de la general del mismo origen» |
+| R2 | `tests/unit/rate-limit/rate-limit-bucket.test.ts` › «R2 cuenta la ruta exacta de login en la cuota de login»; mas el `describe` de R1 |
+| R3 | `rate-limit-bucket.test.ts` › «R3 cuenta una subruta de login en la cuota general», «R3 cuenta la raiz…», «R3 cuenta una ruta privada cualquiera…», «R3 cuenta el enlace de establecer contrasena…» |
+| R4 | `tests/unit/rate-limit/rate-limiter-contract.ts` (bateria que corre `in-memory-rate-limiter.test.ts`) › «R4 R27 permite hasta el maximo de peticiones y frena la peticion siguiente», «R4 R27 cuenta cada origen por separado…»; `route-guard-rate-limit.test.ts` › «dos origenes distintos no comparten cuota… (R4)» |
+| R5 | `rate-limiter-contract.ts` › «R5 R27 vuelve a dejar pasar cuando termina la ventana» |
+| R6 | `tests/unit/rate-limit/request-origin.test.ts` › «R6 toma la direccion IPv4…», «R6 toma la direccion IPv6…», «R6 toma la PRIMERA entrada…», «R6 recorta los espacios…» |
+| R7 | `request-origin.test.ts` › los cuatro «R7 devuelve el origen desconocido cuando…» (falta, vacia, IP invalida, entrada vacia entre comas) |
+| R8 | `tests/unit/rate-limit/check-request-rate.test.ts` › «R8 da block…», «R8 da allow…»; `route-guard-rate-limit.test.ts` › «la peticion que agota la cuota se frena antes de tocar la sesion (R8, R9)» › «la peticion max+1 da 429, no verifica la cookie y no lleva x-request-id reescrito» |
+| R9 | ese mismo caso de `route-guard-rate-limit.test.ts` |
+| R10 | `route-guard-rate-limit.test.ts` › «las dos formas de la respuesta de freno (R10, R11)» › «una navegacion frenada es una pantalla HTML con el mensaje neutro»; `tests/unit/rate-limit/rate-limited-response.test.ts` › «R10 muestra el texto neutro exacto», «R10 no trae JavaScript ni recursos externos»; `e2e/rate-limit.spec.ts` › «agota la cuota de login: … (R10, R11, R35)» |
+| R11 | `route-guard-rate-limit.test.ts` › «una Server Action frenada lleva content-type EXACTAMENTE text/plain y el cuerpo exacto»; `tests/unit/hooks/use-rate-limited-action-state.test.tsx` › «R11 — con el freno, avisa con el mensaje neutro y mantiene el estado anterior sin boundary»; `rate-limited-response.test.ts` › «R11 R12 es cierto para un Error con el mensaje exacto»; `tests/guards/guard-limite-de-peticiones.test.ts` › «ningun archivo de app/, components/ o hooks/ salvo el envoltorio importa useActionState de react (R11)», «R11 centinela: la version de next es la 16.3.0…» y sus tres casos sinteticos R11; `e2e/rate-limit.spec.ts` (mismo caso que R10) |
+| R12 | `use-rate-limited-action-state.test.tsx` › «R12 — cualquier otro error se relanza y llega al limite de error, sin aviso»; `rate-limited-response.test.ts` › los tres «R12 es falso para…» |
+| R13 | `rate-limited-response.test.ts` › «R13 R14 es el texto neutro exacto, sin cifras de tiempo», «R13 no revela cuanto falta ni cuanto queda»; `route-guard-rate-limit.test.ts` › «…(R13, R14, R16)» › «sin retry-after ni cabeceras x-ratelimit-*, y con cache-control: no-store» |
+| R14 | `rate-limited-response.test.ts` › «R13 R14 es el texto neutro exacto…»; `route-guard-rate-limit.test.ts` › «la respuesta es identica en una ruta privada y en una publica, con y sin cookie valida» |
+| R15 | `rate-limited-response.test.ts` › «R15 declara el viewport de ancho de dispositivo y un tamano de letra de al menos 16px», «R15 usa min-height en dvh y nunca 100vh» |
+| R16 | `route-guard-rate-limit.test.ts` › «sin retry-after ni cabeceras x-ratelimit-*, y con cache-control: no-store» |
+| R17 | `tests/unit/rate-limit/rate-limit-config.test.ts` › «R17 usa el valor valido de la variable de entorno en vez del por defecto»; `tests/unit/composition/rate-limit-edge-wiring.test.ts` › eleccion de contador (lee las cuotas del entorno) |
+| R18 | `rate-limit-config.test.ts` › «R18 usa los cinco valores por defecto cuando el entorno no define nada» |
+| R19 | `rate-limit-config.test.ts` › «R19 el aviso no incluye el valor invalido, solo el nombre de la variable»; `rate-limit-edge-wiring.test.ts` › «rateLimitEdge.check — avisos de configuracion invalida (R19)» › «un valor invalido avisa una sola vez en dos llamadas seguidas», «un segundo valor invalido DISTINTO de la misma variable vuelve a avisar» |
+| R20 | `rate-limit-config.test.ts` › «R20 con los valores por defecto el login admite menos peticiones por segundo que el general» |
+| R21 | `check-request-rate.test.ts` › «R21 da degraded/timeout exactamente a los timeoutMs cuando el contador no contesta»; `route-guard-rate-limit.test.ts` › «…degradado… (R21-R24)» › «un timeout deja pasar la peticion, con la sesion verificada y su x-request-id» |
+| R22 | `check-request-rate.test.ts` › «R22 da degraded/error con el nombre del error cuando el contador rechaza»; `route-guard-rate-limit.test.ts` › «un contador que falla tambien deja pasar, sin la IP en el aviso ni un mensaje de error» |
+| R23 | `route-guard-rate-limit.test.ts` › «un timeout deja pasar la peticion…» y «degradado en /login redirige igual que sin limite…» |
+| R24 | `route-guard-rate-limit.test.ts` › «un contador que falla tambien deja pasar, sin la IP en el aviso ni un mensaje de error» |
+| R25 | `rate-limit-edge-wiring.test.ts` › «con las dos credenciales cuenta en Upstash (simulado) (R25)»; `tests/unit/rate-limit/upstash-rate-limiter.test.ts` › «R25 R31 configura fixedWindow…», «R25 traduce success:false en allowed:false», «R25 traduce success:true en allowed:true» |
+| R26 | `rate-limit-edge-wiring.test.ts` › «sin credenciales y fuera de produccion cuenta en memoria (R26)» |
+| R27 | `rate-limiter-contract.ts` › los tres casos «R4/R5 R27…» contra el adaptador en memoria; `upstash-rate-limiter.test.ts` › «R27 reutiliza la MISMA instancia y el MISMO Map cuando la cuota no cambia», «R27 crea otra instancia con otro Map cuando cambia la cuota» |
+| R28 | `upstash-rate-limiter.test.ts` › «R25 R31 configura fixedWindow con la cuota, el prefijo, analytics apagado y cache en memoria» (afirma `ephemeralCache` instancia de `Map`) y «R27 reutiliza la MISMA instancia y el MISMO Map…» (la cache sobrevive entre llamadas). **Nota para el reviewer:** ningun caso lleva `R28` en el nombre |
+| R29 | `tests/unit/middleware-root-contract.test.ts` › «middleware.ts de la raiz» (6 casos; sus `R20/R21/R22` son la numeracion de QC-9), sin cambios; mas `git diff origin/dev...HEAD -- middleware.ts` vacio (arriba) |
+| R30 | `tests/guards/guard-middleware-edge.test.ts` › «el cierre alcanza los archivos nuevos del limite de peticiones (R30)» |
+| R31 | `guard-limite-de-peticiones.test.ts` › «ningun archivo fuera del adaptador de Upstash importa @upstash/* (R31)» y sus tres casos sinteticos «R31: …»; `upstash-rate-limiter.test.ts` › «R25 R31 configura fixedWindow…» |
+| R32 | `tests/guards/guard-dependencias-aprobadas.test.ts` › «toda dependencia de package.json tiene su fila en el registro», «el registro no lista paquetes que ya no estan instalados» (sin cambios); mas el diff de `package.json` de arriba: solo las dos `@upstash/*` |
+| R33 | `tests/unit/identity/account-lock.test.ts` › «bloqueo temporal de cuenta» › «el quinto fallo bloquea y reinicia el contador», «la escalada es 1, 5, 15 y 60 minutos y no pasa de 60», «con el bloqueo caducado vuelve a aceptar intentos», «fallo estando bloqueada devuelve el mismo estado», «un intento correcto deja contador, nivel y bloqueo a cero» (sin cambios); mas `git diff … lib/modules/identity/domain/account-lock.ts` vacio |
+| R34 | `tests/unit/scripts/measure-rate-limit-latency.test.ts` › los siete «R34 — …»; las cifras reales (T17) siguen pendientes |
+| R35 | `e2e/rate-limit.spec.ts` › «login frenado por origen (chromium)» y «(webkit)» › «agota la cuota de login: frena el formulario en la propia pantalla y la navegacion siguiente ve el 429 (R10, R11, R35)»: verde en los dos motores, en todas las corridas de esta tanda |
+
+### T12 (puntos 3 y 4) y T17
+
+No se hicieron, como estaba previsto: siguen `[ ]`. Motivo para el PR: `pnpm build` esta roto por
+`@napi-rs/canvas` (QC-106, modulo de documentos), asi que no hay `pnpm start` contra el que medir, y
+no hay cuenta de Upstash ni despliegue en Vercel. No se toco `next.config.ts` ni el modulo de documentos.
+
+### Base dedicada
+
+**Se deja en pie `QuimiCloude_qc73_e2e`** (37 migraciones + seed, recreada antes de la ultima
+corrida). Hace falta para volver a correr `./init.sh` y `pnpm run e2e` cuando se resuelva QC-114 y
+la deuda E2E de `dev`. Se borra con `DATABASE_URL=<…/QuimiCloude_qc73_e2e…> node .tmp-createdb.cjs drop`.
+
+### Procesos
+
+Los `next dev` de 3117 los arranco y paro Playwright en cada corrida; no se arranco ninguno a mano.
+No se mato ningun proceso ajeno.
