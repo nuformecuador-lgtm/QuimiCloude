@@ -130,13 +130,12 @@ export const E2E_ESPERADOS = [
   'pedidos-asignados.spec.ts',
   'presentaciones.spec.ts',
   'proveedores.spec.ts',
-  // QC-73 T15 / R35: el E2E del login frenado por origen (`specs/QC-73-…/design.md > 8`). Alta
-  // por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su punto de
-  // extension por diseno es darse de alta en ella. El recorrido que ejercita: agota la cuota de
-  // login de un origen propio, el envio del formulario muestra el mensaje neutro sobre `/login` y
-  // la navegacion siguiente recibe el 429. NO ejercita el cruce borde -> accion del identificador
-  // de peticion: el spec no lee ni afirma nada sobre el identificador ni sobre `reference`, asi que
-  // el diferimiento de QC-71 R21 sigue INTACTO.
+  // El E2E del login frenado por origen. Alta por el MISMO motivo y en el MISMO sitio que las
+  // demas: esta lista es CERRADA y su punto de extension por diseno es darse de alta en ella. El
+  // recorrido que ejercita: agota la cuota de login de un origen propio, el envio del formulario
+  // muestra el mensaje neutro sobre `/login` y la navegacion siguiente recibe el 429. NO ejercita
+  // el cruce borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
+  // identificador ni sobre `reference`.
   'rate-limit.spec.ts',
   'recetas-pasos.spec.ts',
   'recetas.spec.ts',
@@ -276,7 +275,7 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
 // `@google/genai` -el cliente oficial para leer un PDF con Gemini-, tambien con los cuatro
 // checks, con aprobacion humana en la puerta F1.4 y con su fila en `docs/dependencias.md`: de
 // 33 a 34 con esa misma aprobacion. De 34 a 36 entraron `@upstash/ratelimit` y `@upstash/redis`,
-// las dos aprobadas en F1.4 de QC-73 con su fila en `docs/dependencias.md`.
+// las dos aprobadas en F1.4 con su fila en `docs/dependencias.md`.
 //
 // Que este conteo sea un absoluto es fragil y conviene saberlo: no distingue «alguien colo una
 // libreria» de «entro una aprobada», asi que lo rompe cualquier feature posterior que anada una

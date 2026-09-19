@@ -14,31 +14,20 @@ const E2E_PORT = 3117
 const E2E_BASE_URL = `http://localhost:${E2E_PORT}`
 
 /**
- * Cuota de login del `next dev` que arranca este runner, solo para el E2E (QC-73,
- * `design.md > 8`). Sin subirla, el propio E2E se frenaria a si mismo: TODA la bateria existente
- * que toca `/login` sin mandar `x-forwarded-for` cae en el mismo origen comun "desconocido"
- * (`progress/impl_QC-73-limite-de-peticiones-por-origen.md > T12, punto 2`), y con el valor por
- * defecto (30) un solo archivo lo agotaria.
- *
- * Contado en `progress/impl_QC-73-limite-de-peticiones-por-origen.md > T15` (log de peticiones
- * de `next dev` durante la bateria completa sin este spec): 227 peticiones a `/login` sumando
- * Chromium y WebKit -que comparten ese origen comun-, ~113 por proyecto (navegaciones directas,
- * envios de formulario y redirecciones desde rutas privadas sin sesion). 350 deja un margen del
- * ~54% sobre esa cuenta. No mas alto: el propio spec de este ticket (`e2e/rate-limit.spec.ts`)
- * tiene que agotarlo con peticiones reales contra `next dev` -subirlo mas alarga el propio E2E
- * sin necesidad, tal como advierte `design.md > 11`, punto 4-.
+ * Cuota de login solo para este runner E2E. El resto de la bateria comparte el origen comun
+ * "desconocido" al no mandar `x-forwarded-for`, asi que con el valor por defecto (30) un solo
+ * archivo la agotaria. Medido en el log de `next dev`: 227 peticiones a `/login` en la bateria
+ * completa sin este spec (~113 por proyecto); 350 deja margen sin alargar mas de lo necesario el
+ * propio spec, que tiene que poder agotarla con peticiones reales.
  */
 export const E2E_RATE_LIMIT_LOGIN_MAX = 350
 
 /**
- * Cuota general del mismo `next dev`. El origen comun "desconocido" tambien la consume con cada
- * navegacion, peticion RSC y Server Action del RESTO de la bateria. El log de `next dev` registra
- * 373 peticiones fuera de `/login` en toda la bateria, pero es una cota INFERIOR: el middleware
- * puede contar lo que `next dev` no registra (p. ej. la conexion de recarga en caliente de cada
- * pagina, que el `matcher` no excluye), y no hay forma de medir el pico por ventana de 60 s.
- * Subirla es una precaucion, no una necesidad medida: evita que un freno general -que no es lo que
- * esta ficha prueba- tumbe un E2E ajeno. Ampliacion de `design.md > 8`, anotada como desviacion en
- * `progress/impl_QC-73-limite-de-peticiones-por-origen.md > T15`.
+ * Cuota general del mismo `next dev`: el origen comun "desconocido" tambien la gasta con cada
+ * navegacion, peticion RSC y Server Action del resto de la bateria. El log registra 373
+ * peticiones fuera de `/login`, pero es una cota inferior -el middleware cuenta trafico que
+ * `next dev` no registra, como la recarga en caliente-. Subirla es una precaucion sin medida
+ * exacta: evita que un freno general ajeno a este spec tumbe un E2E que no lo prueba.
  */
 export const E2E_RATE_LIMIT_GENERAL_MAX = 5000
 
@@ -75,9 +64,9 @@ export default defineConfig({
     env: {
       RATE_LIMIT_LOGIN_MAX: String(E2E_RATE_LIMIT_LOGIN_MAX),
       RATE_LIMIT_GENERAL_MAX: String(E2E_RATE_LIMIT_GENERAL_MAX),
-      // Vacias a proposito (QC-73, D8): sin credenciales de Upstash el contador vive en la
-      // memoria de este `next dev`, nunca en la cuenta real, aunque el entorno de quien corre el
-      // E2E tenga algo cargado en `.env`.
+      // Vacias a proposito: sin credenciales de Upstash el contador vive en la memoria de este
+      // `next dev`, nunca en la cuenta real, aunque el entorno de quien corre el E2E tenga algo
+      // cargado en `.env`.
       UPSTASH_REDIS_REST_URL: '',
       UPSTASH_REDIS_REST_TOKEN: '',
     },
