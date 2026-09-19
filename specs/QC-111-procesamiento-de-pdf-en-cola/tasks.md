@@ -44,7 +44,7 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
 
 ## T1 — Esquema Prisma: dos enums y dos modelos · depende de T0
 
-- [ ] Añadir al final de `db/schema.prisma`, **sin reordenar nada de lo de arriba**,
+- [x] Añadir al final de `db/schema.prisma`, **sin reordenar nada de lo de arriba**,
       `DocumentStrategy`, `DocumentFileStatus`, `DocumentBatch` y `DocumentFile` tal como los fija
       `design.md > 2.2` y `> 2.3`, cada modelo con su `/// @module documentos`.
 - **Hecho:** `pnpm run typecheck` verde; `tests/guards/guard-empresa-en-esquema.test.ts` verde sin
@@ -60,6 +60,10 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
       **`FORCE ROW LEVEL SECURITY`** en las dos tablas.
 - **Hecho:** `pnpm run db:migrate` aplica; `pnpm run db:rollback` revierte y deja `_prisma_migrations`
   coherente; volver a aplicar funciona.
+- **SIN MARCAR a proposito (2026-09-18).** Los dos archivos estan escritos con el contenido y el
+  orden exactos de `design.md > 2.5`, pero **el criterio no se ha comprobado**: este worktree no
+  tiene `.env` ni `DATABASE_URL`, asi que `db:migrate` y `db:rollback` no pudieron correr. No se
+  invento ninguna credencial. Lo cierra el leader al correr el gate con una base configurada.
 
 ## T3 — Tests de integración del esquema `[P]` · depende de T2
 
@@ -67,6 +71,10 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
       motivo; la FK compuesta rechaza un archivo cuya tanda es de otra empresa; el único
       `(company_id, path)` rechaza la ruta repetida.
 - **Hecho:** los cuatro casos pasan contra la base de test. Cubre R21 y parte de R1.
+- **SIN MARCAR a proposito (2026-09-18).** Los cuatro casos estan escritos, con el patron de
+  `tests/integration/inventario/inventory-movements-constraints.int.test.ts` y censados en
+  `tests/integration/aislamiento.json`, pero **no se han ejecutado**: sin `DATABASE_URL` el guardian
+  de `tests/integration/_setup.ts` aborta antes del primer caso. Lo cierra el leader con el gate.
 
 ---
 
@@ -74,7 +82,7 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
 
 ## T4 — `DocumentStorage` gana `remove` `[P]` · depende de T0
 
-- [ ] Añadir `remove(path): Promise<void>` a `ports/document-storage.ts` —actualizando la frase de su
+- [x] Añadir `remove(path): Promise<void>` a `ports/document-storage.ts` —actualizando la frase de su
       cabecera que dice que ninguna operación borra, porque **esta es la ficha** que la levanta— y su
       implementación en `document-storage-supabase.ts`.
 - **Hecho:** typecheck verde; test unitario del adaptador con el doble; `guard-arquitectura-modulos`
@@ -82,14 +90,14 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
 
 ## T5 — Los cuatro puertos nuevos `[P]` · depende de T0
 
-- [ ] `ports/document-batch-repository.ts`, `ports/processing-queue.ts`, `ports/queue-signature.ts`,
+- [x] `ports/document-batch-repository.ts`, `ports/processing-queue.ts`, `ports/queue-signature.ts`,
       `ports/processing-config.ts`, con las firmas de `design.md > 4`.
 - **Hecho:** typecheck verde; ninguno importa `@upstash/qstash`, `next/*` ni `@prisma/client` (R24), y
   ninguno sale por el barrel.
 
 ## T6 — Dominio: esquemas, clasificación y plazos `[P]` · depende de T5
 
-- [ ] `domain/enqueue-input.ts`, `domain/queue-message.ts`, `domain/batch-status.ts`,
+- [x] `domain/enqueue-input.ts`, `domain/queue-message.ts`, `domain/batch-status.ts`,
       `domain/failure-kind.ts` (la tabla de `design.md > 6.4`) y `domain/processing-timeouts.ts` (los
       valores por defecto **900** y **3** de `> 7`).
 - **Hecho:** tests unitarios: el esquema de encolar rechaza 0 y 11 rutas usando `MAX_FILES_PER_BATCH`
@@ -102,7 +110,7 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
 
 ## T7 — PARADA: propuesta de `@upstash/qstash` · depende de la aprobación del spec (F1.4)
 
-- [ ] Subir al humano la propuesta de `design.md > 8` con los cuatro checks y el plan B. **Aprobada**:
+- [x] Subir al humano la propuesta de `design.md > 8` con los cuatro checks y el plan B. **Aprobada**:
       se añade la fila a `docs/dependencias.md` (el texto ya está redactado en `> 8`) y **entonces** se
       instala. **No aprobada**: se para y se vuelve al leader con el plan B; no se implementan T8 ni T9
       tal como están.
@@ -111,7 +119,7 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
 
 ## T8 — Adaptador de firma + cierre del DESCONOCIDO · depende de T7
 
-- [ ] `adapters/driven/queue/queue-signature-qstash.ts` con `Receiver`. **Primera acción de la task:**
+- [x] `adapters/driven/queue/queue-signature-qstash.ts` con `Receiver`. **Primera acción de la task:**
       verificar contra el paquete instalado (1) la firma real de `Receiver.verify` y (2) **el nombre
       exacto de la cabecera del id de mensaje**, y anotarlo en `progress/impl_QC-111.md`. Es el
       desconocido que `design.md > 8` deja abierto a propósito.
@@ -120,16 +128,16 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
 
 ## T9 — Adaptador de publicación `[P]` · depende de T7
 
-- [ ] `adapters/driven/queue/processing-queue-qstash.ts` con `Client.publishJSON`, la URL de destino y
+- [x] `adapters/driven/queue/processing-queue-qstash.ts` con `Client.publishJSON`, la URL de destino y
       `retries` desde `ProcessingConfig`.
 - **Hecho:** typecheck verde; un test comprueba que el tope de reintentos que se manda es el de la
   configuración y no un literal.
 
 ## T10 — Adaptadores de configuración y de persistencia `[P]` · depende de T2, T5
 
-- [ ] `adapters/driven/config/processing-config-env.ts` —leyendo **en la invocación**, nunca al
+- [x] `adapters/driven/config/processing-config-env.ts` —leyendo **en la invocación**, nunca al
       importar, igual que `document-storage-config-env.ts`—.
-- [ ] `adapters/driven/persistence/document-batch-repository-prisma.ts` con las seis operaciones,
+- [x] `adapters/driven/persistence/document-batch-repository-prisma.ts` con las seis operaciones,
       incluido el `UPDATE ... WHERE status='queued' ... RETURNING` literal de `design.md > 6.3` y el
       `expireStale` acotado por tanda **y empresa**.
 - **Hecho:** typecheck verde; test que comprueba que si la variable falta, el adaptador **falla
@@ -141,14 +149,14 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
 
 ## T11 — `enqueueBatch` · depende de T5, T6
 
-- [ ] `domain/enqueue-batch.ts` con los cinco pasos **en el orden** de `design.md > 6.1`.
+- [x] `domain/enqueue-batch.ts` con los cinco pasos **en el orden** de `design.md > 6.1`.
 - **Hecho:** tests unitarios con dobles — sin permiso rechaza sin escribir fila **y sin publicar**; con
   permiso pero ruta de otra empresa rechaza la tanda entera; 11 rutas rechaza entera; el caso bueno
   escribe primero y publica después. Cubre R3, R4, R5.
 
 ## T12 — `runDocumentJob` · depende de T4, T5, T6
 
-- [ ] `domain/run-document-job.ts` con el flujo de `design.md > 6.2`, el ámbito de empresa de `> 6.5`
+- [x] `domain/run-document-job.ts` con el flujo de `design.md > 6.2`, el ámbito de empresa de `> 6.5`
       (con `permissions: []`) y la clasificación de T6.
 - **Hecho:** tests unitarios — éxito guarda el texto **tal cual** y llama a `remove`; fallo
   `ai_unavailable` deja la fila re-encolable y **no** llama a `remove`; fallo `unexpected` deja error a
@@ -156,7 +164,7 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
 
 ## T13 — `getBatchStatus` · depende de T5, T6
 
-- [ ] `domain/get-batch-status.ts` con los tres pasos de `design.md > 6.6`.
+- [x] `domain/get-batch-status.ts` con los tres pasos de `design.md > 6.6`.
 - **Hecho:** tests unitarios — sin permiso rechaza; tanda de otra empresa da **el mismo** rechazo que
   una inexistente; una fila en `queued` más vieja que el plazo vuelve como `error` con su motivo y
   **queda guardada**; una más joven no se toca. Cubre R18, R19.
