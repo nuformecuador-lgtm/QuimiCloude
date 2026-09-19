@@ -194,7 +194,7 @@
 
 ## Bloque 6 — verificación
 
-- [ ] **T10. [P] Test de alcance de la ficha.** `tests/unit/inventario/qc121-alcance.test.ts`
+- [x] **T10. [P] Test de alcance de la ficha.** `tests/unit/inventario/qc121-alcance.test.ts`
       (nuevo), al estilo de `qc91-alcance`, con cada detector probado sobre fuentes fabricadas:
       - **(Enmienda)** toda función exportada bajo `lib/` que escriba `product_batches` —mismo
         patrón que `guard-libro-de-inventario.test.ts:182-186`: `create`, `createMany`, `update`,

@@ -11,7 +11,11 @@
 | T7 | hecha, `[x]` | `20d11778` |
 | T8 | hecha, `[x]` | `93ec24e5` (back), `f2629e30` (front) |
 | T9 | hecha, `[x]` | `406e5ffd`, `7fc6136e` |
-| T10-T13, T15 | sin empezar | — |
+| T15 | hecha, `[x]` | `a40f6966` |
+| T10 | hecha, `[x]` | `d1e44f0c` |
+| T11 | escrita, **E2E sin ejecutar** (entorno, ver abajo); sin `[x]` | `424d8442` |
+| T12 | mapa escrito abajo; sin `[x]` hasta que corra el E2E de T11 (R26, R34) | `ec317702` (test de R20 que faltaba) |
+| T13 | del leader | — |
 
 ## Tanda T5-T9 (2026-09-19)
 
@@ -164,6 +168,107 @@ Los 25, clasificados:
 **Decision humana 2026-09-19**: los rojos de Postgres 18.6 se aceptan como ajenos para cerrar
 QC-121. Con eso, T4 y T14 se marcan `[x]`.
 
+## Tanda T15, T10, T11, T12 (2026-09-19)
+
+### Archivos
+
+- T15 (`a40f6966`, frontend_dev): `app/(private)/inventario/components/product-table.tsx`
+  (`ProductBatchesSheet`: `aria-label` del trigger y `SheetTitle` con
+  `productDisplayName(product.name, productUnitLabel(product, units))`), `product-columns.tsx`
+  (`productUnitLabel` pasa a exportada: la misma regla que la columna de nombre),
+  `components/index.ts`. Test: `tests/unit/inventario/product-batches-sheet.test.tsx` (3 casos
+  nuevos). Ningún E2E dependía del texto viejo (solo usan `data-testid`).
+- T10 (`d1e44f0c`, backend_dev): `tests/unit/inventario/qc121-alcance.test.ts` (nuevo, 29 casos).
+- T11 (`424d8442`, frontend_dev): `e2e/inventario.spec.ts` (test nuevo de R26;
+  `crearPresentacionEnLinea` gana un `unitId` opcional; usa las unidades de sistema `kilogramo` y
+  `litro` de `20260903121404_units_catalog`), `e2e/aislamiento-inventario.spec.ts` (la celda de
+  nombre pasa a `productDisplayName(PRODUCT_A_NAME, UNIT_A_NAME)`),
+  `e2e/ajuste-de-inventario.spec.ts` (R34: tras cerrar el panel, sin recargar, la celda
+  `product-stock` de la fila = `INITIAL_STOCK + HAPPY_DELTA` con su unidad, y `products.stock`
+  igual en Postgres). Ningún flujo E2E existente suponía lotes en dos unidades de un producto.
+- T12 (`ec317702`, backend_dev): `tests/integration/inventario/presentation-unit-race.int.test.ts`
+  (nuevo) y su entrada `commit` en `tests/integration/aislamiento.json`. Cubre la cláusula de
+  carrera de R20, que no tenía ningún test: dos `pg.Client` con `BEGIN`/`COMMIT` a mano y la espera
+  comprobada en `pg_stat_activity`, con el mismo patrón que `pedidos/order-sequence-race.int.test.ts`.
+  `pg` ya era dependencia.
+
+### Salida de tests (acotada por archivo)
+
+- typecheck y lint: exit 0 tras T15, T10, T11 y el test de R20.
+- T15: `product-batches-sheet` 7/7; `product-page` 62/62; `product-route-contract` 23/23;
+  `scope` 4/4.
+- T10: `qc121-alcance` 29/29 (repetido por el implementer: 29/29). Rojo comprobado a mano: sin la
+  llamada a `recalculateProductStock` en `addBatchToAlive` fallan 2 (`expected [ 'addBatchToAlive' ]
+  to deeply equal []`); revertido, con `git diff` vacío.
+- R20 en carrera: `presentation-unit-race.int` 2/2 (5 corridas del subagente y 1 del implementer);
+  `guard-aislamiento-integracion` 6/6.
+
+### E2E de T11: NO pasó; lo bloqueó el entorno
+
+Comando (a mano, solo, chromium, 1 worker; log en `$TEMP/qc121-e2e-t11.log`):
+
+```
+pnpm exec playwright test e2e/inventario.spec.ts e2e/aislamiento-inventario.spec.ts e2e/ajuste-de-inventario.spec.ts --project=chromium --workers=1 -g "mismo nombre en dos unidades son dos filas|sesion en la empresa A|ajuste con motivo cambia la cantidad del lote"
+```
+
+Resultado: «Running 3 tests using 1 worker» y **no terminó ninguno**. Dos causas del entorno:
+
+1. El `next dev` del worktree no compila: `Error: Module not found: Can't resolve '@google/genai'`
+   (`lib/modules/documentos/adapters/driven/ai/ai-reader-genai.ts:1`, importado desde
+   `lib/composition/index.ts` y `identity/adapters/driving/login-action.ts`). La dependencia está
+   en `package.json` y `pnpm-lock.yaml` (entró con QC-108, `fdb33c54`), pero **no está instalada
+   en el `node_modules` de este worktree** (`node_modules/@google` no existe). No es nueva ni de
+   esta rama (`git diff origin/dev...HEAD -- package.json` vacío). Hace falta un
+   `pnpm install --frozen-lockfile` en el worktree; no lo corrí sin orden.
+2. Claude Code mató el proceso por falta de memoria del sistema (≈2,9 GB libres al arrancar). El
+   `next dev` quedó huérfano en el puerto 3117 (PID 16652, de este worktree) y lo paré.
+
+Mientras no corra, R26 y R34 tienen test escrito pero **no pasado**, y T11 queda sin `[x]`.
+
 ## Mapa R<n> -> test
 
-Pendiente (T12).
+Rutas relativas al worktree. `int/` = `tests/integration/inventario/`; `unit/` =
+`tests/unit/inventario/`; `schema/` = `tests/unit/inventario/schema/`.
+
+| R | Test(s) |
+|---|---|
+| R1 | `int/product-stock.int.test.ts` > «R1, R8, R9 — el alta fija la unidad del producto…»; `unit/product-batch-lot-retry.test.ts` > «createWithFirstBatch — unidad del producto y recalculo» > «lee la unidad de la presentacion con el ambito de empresa y la escribe en el producto» |
+| R2 | `unit/product-input.test.ts` > «el alta NO acepta ninguna unidad: `unitId` es campo desconocido» (también afirma que `updateProductSchema` con `unitId` se rechaza); `unit/product-batch-lot-retry.test.ts` > «addBatchToAlive — no toca el producto salvo su stock recalculado»; `unit/qc121-alcance.test.ts` > «R2 — NewProduct no lleva unidad ni existencia» |
+| R3 | `int/product-unit.int.test.ts` > «rechaza con 23514 product_batches_unit_differs_from_product…», «rechaza un lote sobre un producto sin unidad, llegue por la aplicacion o por SQL directo»; `unit/create-product.test.ts` > «QC-121 R3 — el rechazo de la base por unidad llega al llamante como invalid_input» |
+| R4 | `unit/product-page.test.tsx` > «R18 — el nombre del producto se pinta junto a la unidad guardada», «R16 — …junto a la unidad del producto», «R17 — …existencia guardada»; `tests/unit/recetas-ui/recipe-line-unit-group.test.tsx` (`option.unitId` sale de `ProductView.unitId`); `unit/qc91-alcance.test.ts` > «R14: PRODUCT_SELECT trae products.stock y products.unit_id, sin catalogo de lotes» |
+| R5 | `int/product-stock.int.test.ts` > «R5, R6, R7 — el alta busca por nombre Y unidad»; `unit/create-product.test.ts` > «R17, R18 — el nombre corresponde a un producto que ya existe» |
+| R6 | `int/product-stock.int.test.ts` > «el mismo nombre en kg y en L crea DOS productos, cada uno con su propia existencia»; `unit/create-product.test.ts` > «QC-121 R6 — mismo nombre en otra unidad: nace otro producto, sin aviso» |
+| R7 | `int/product-batch-write.int.test.ts` > «R20: con homonimos vivos se elige siempre el mismo producto» > «elige el de creacion mas antigua y desempata por identificador ascendente» (ya con unidad); `unit/create-product.test.ts` > «QC-121 R7 — con varios homonimos en la misma unidad, usa el que el puerto elige» |
+| R8 | `int/product-stock.int.test.ts` > «tres lotes de 5 en la misma unidad dejan products.stock en 15», «un producto sin ningun lote tiene existencia 0»; `unit/product-stock.test.ts` > «singleUnitStock» > «R8: sin lotes devuelve 0», «R8: tres lotes de 5…dan 15» |
+| R9 | `unit/product-batch-lot-retry.test.ts` > «recalcula stock DESPUES del asiento del lote…», «si el recalculo lanza, no queda ni el producto ni el lote (R9)», y en `addBatchToAlive` «si el recalculo lanza, el resultado se rechaza…(R9)»; `int/product-stock.int.test.ts` > «R1, R8, R9» |
+| R10 | `int/product-stock.int.test.ts` > «R10» > «dos addBatchToAlive simultaneos sobre el mismo producto dejan stock = suma de los tres lotes» |
+| R11 | `unit/product-batch-lot-retry.test.ts` > «no llama a presentation.findFirst ni a ninguna escritura del producto: solo el lote y el recalculo»; `unit/qc91-alcance.test.ts` > «R11: los tres escritores de producto no escriben products.stock» |
+| R12 | `schema/product-unit-and-stored-stock-migration.test.ts` > «ninguna funcion de la migracion escribe products.stock»; `unit/qc121-alcance.test.ts` > «R12 — ninguna migracion mantiene products.stock con un disparador o columna generada» |
+| R13 | `unit/product-stock.test.ts` > «R13: lotes en dos unidades lanza»; `unit/qc91-alcance.test.ts` > «R1: recalculateProductStock arma la existencia desde los lotes con singleUnitStock»; el aborto al lanzar lo cubren los casos «si el recalculo lanza» de R9 |
+| R14 | `unit/product-catalog.test.ts` > «R14 — findRefs lee la existencia y la unidad de las columnas del producto» (un valor / vacío) |
+| R15 | `unit/list-query.test.ts` > «el listado de productos vuelve a ordenar y filtrar por existencia (R15)»; `unit/product-list-params.test.ts` > «R15: se puede ordenar y filtrar por la existencia guardada», «R15: un extremo de existencia roto no se lleva el filtro entero»; `int/list-query-products.int.test.ts` > «el listado vuelve a ordenar y a filtrar por existencia guardada (R15)» |
+| R16 | `unit/product-page.test.tsx` > «R16 — la celda muestra la existencia guardada junto a la unidad del producto», «R16 — un producto sin unidad muestra su existencia como 0» |
+| R17 | `unit/product-page.test.tsx` > «R17 — la existencia se pinta en rojo…», «R17 — un producto sin lotes y con alerta…», «R17 — sin cantidad de alerta configurada…» |
+| R18 | `unit/product-display-name.test.ts` (3 casos); `unit/product-page.test.tsx` > «R18 — el nombre del producto se pinta junto a la unidad guardada», «R18 — sin unidad guardada o sin catalogo de unidades, el nombre se pinta solo»; `tests/unit/recetas-ui/recipe-line-unit-group.test.tsx` (el selector se localiza por «nombre · unidad», y sin unidad solo por el nombre) |
+| R19 | `tests/unit/recetas/recipe-service.test.ts` > «R12, R13, R14, R15 — existencia de la linea en su propia unidad» (0 / cantidad / `null`) |
+| R20 | `int/product-unit.int.test.ts` > «rechaza con 23514 presentations_unit_locked_by_batches…»; `int/presentation-unit.int.test.ts` > «R20/R21» > «rechaza el cambio de unidad con PresentationUnitLockedError…», «el rechazo por unidad bloqueada es DISTINGUIBLE…»; `int/presentation-unit-race.int.test.ts` > «R20 (orden a…)», «R20 (orden b…)»; `unit/presentation-service.test.ts` > «traduce 'unit_locked' a PresentationUnitLockedError…» |
+| R21 | `int/product-unit.int.test.ts` > «acepta el cambio de unidad de una presentacion sin lotes», «acepta actualizar una presentacion con lotes cuando la unidad no cambia»; `int/presentation-unit.int.test.ts` > los dos «acepta…» de «R20/R21» |
+| R22 | `tests/unit/configuracion-ui/presentation-sheet.test.tsx` > «QC-121 — presentation_unit_locked» > «la edicion rechazada por unidad bloqueada (R20) se pinta junto al selector, sin cerrar ni perder lo escrito (R22)»; `unit/presentation-actions.test.ts` > «traduce PresentationUnitLockedError a su code estable…(R20, R22)» |
+| R23 | `schema/product-unit-and-stored-stock-migration.test.ts` > «R23: el relleno», «down.sql — revierte exactamente lo que crea el up» |
+| R24 | `unit/authorization.test.ts` > «un actor con solo inventario.consultar es rechazado en los siete casos de escritura», «un actor con solo inventario.modificar es rechazado en los cinco casos de lectura»; `unit/create-product.test.ts` > «R23 — el permiso se comprueba antes que nada»; `unit/presentation-service.test.ts` > «traduce 'unit_locked'…sin exigir mas permiso que inventario.modificar» |
+| R25 | `unit/qc121-alcance.test.ts` > «R25 — sin borrado fisico de productos ni de lotes», «R25 — los identificadores nuevos de la migracion son ingles ASCII»; `schema/inventario-schema.test.ts` |
+| R26 | `e2e/inventario.spec.ts` > «el mismo nombre en dos unidades son dos filas, cada una con su propia existencia (R26)»: **escrito, no ejecutado** (ver el E2E arriba). Respaldo en integración: `int/product-stock.int.test.ts` > «el mismo nombre en kg y en L crea DOS productos…» |
+| R27 | `./init.sh` completo (T13, del leader) |
+| R28 | `tests/guards/guard-dependencias-aprobadas.test.ts`; `git diff origin/dev...HEAD -- package.json pnpm-lock.yaml` vacío (medido el 2026-09-19) |
+| R29 | `int/product-stock.int.test.ts` > «tres lotes de 5 y un ajuste +6 y -9 dejan stock en 12…»; `unit/adjust-batch-stock-prisma.test.ts` > «si el recalculo lanza, el ajuste se rechaza en vez de darse por bueno (R29)»; `unit/qc121-alcance.test.ts` > «R29 — toda escritura exportada de product_batches recalcula products.stock»; `int/ledger-cuadre.int.test.ts` (verde en `--rapido`) |
+| R30 | `int/product-stock.int.test.ts` > «R30» > «un ajuste que dejaria el lote en negativo…stock no cambia», «un lote de otra empresa devuelve null y no cambia el stock de ninguno de los dos productos» |
+| R31 | `int/product-stock.int.test.ts` > «R31» > «dos ajustes simultaneos sobre dos lotes del mismo producto…», «un ajuste y una alta de lote simultaneos…» |
+| R32 | `int/product-stock.int.test.ts` > «…name/qty_alert/unit_id/updated_at intactos»; `unit/adjust-batch-stock-prisma.test.ts` > «recalcula DESPUES del asiento, y la unica columna que escribe en products es stock (R32)» |
+| R33 | `schema/product-unit-and-stored-stock-migration.test.ts` > «R33: el libro de movimientos queda intacto» |
+| R34 | `e2e/ajuste-de-inventario.spec.ts` > «un ajuste con motivo cambia la cantidad del lote y queda su asiento junto al de alta, en Postgres» (aserción de la celda `product-stock` y de `products.stock`): **escrito, no ejecutado** |
+
+T15 no tiene `R<n>` propio: la decisión del humano («¿El panel de lotes se titula «nombre ·
+unidad»? Sí») no se tradujo a requisito. Su test: `unit/product-batches-sheet.test.tsx` > «el
+panel se titula «nombre · unidad» (T15)».
+
+`package.json` no se tocó en toda la rama (R28).
