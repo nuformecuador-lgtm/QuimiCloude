@@ -1131,13 +1131,13 @@ $ git diff origin/dev...HEAD -- package.json | grep '^[+-] '
 | R19 | `rate-limit-config.test.ts` › «R19 el aviso no incluye el valor invalido, solo el nombre de la variable»; `rate-limit-edge-wiring.test.ts` › «rateLimitEdge.check — avisos de configuracion invalida (R19)» › «un valor invalido avisa una sola vez en dos llamadas seguidas», «un segundo valor invalido DISTINTO de la misma variable vuelve a avisar» |
 | R20 | `rate-limit-config.test.ts` › «R20 con los valores por defecto el login admite menos peticiones por segundo que el general» |
 | R21 | `check-request-rate.test.ts` › «R21 da degraded/timeout exactamente a los timeoutMs cuando el contador no contesta»; `route-guard-rate-limit.test.ts` › «…degradado… (R21-R24)» › «un timeout deja pasar la peticion, con la sesion verificada y su x-request-id» |
-| R22 | `check-request-rate.test.ts` › «R22 da degraded/error con el nombre del error cuando el contador rechaza»; `route-guard-rate-limit.test.ts` › «un contador que falla tambien deja pasar, sin la IP en el aviso ni un mensaje de error» |
+| R22 | `rate-limit-edge-wiring.test.ts` › «R22 R24 con UPSTASH_REDIS_REST_URL mal formada se degrada sin lanzar y el motivo no lleva URL ni token»; `tests/unit/composition/rate-limit-edge-upstash-failure-middleware.test.ts` › «R22 R24 la peticion pasa, sin excepcion, con un unico aviso sin URL ni token»; `check-request-rate.test.ts` › «R22 da degraded/error con el nombre del error cuando el contador rechaza»; `route-guard-rate-limit.test.ts` › «un contador que falla tambien deja pasar, sin la IP en el aviso ni un mensaje de error» |
 | R23 | `route-guard-rate-limit.test.ts` › «un timeout deja pasar la peticion…» y «degradado en /login redirige igual que sin limite…» |
-| R24 | `route-guard-rate-limit.test.ts` › «un contador que falla tambien deja pasar, sin la IP en el aviso ni un mensaje de error» |
+| R24 | los dos casos «R22 R24» de la URL mal formada (ver R22); `route-guard-rate-limit.test.ts` › «un contador que falla tambien deja pasar, sin la IP en el aviso ni un mensaje de error» |
 | R25 | `rate-limit-edge-wiring.test.ts` › «con las dos credenciales cuenta en Upstash (simulado) (R25)»; `tests/unit/rate-limit/upstash-rate-limiter.test.ts` › «R25 R31 configura fixedWindow…», «R25 traduce success:false en allowed:false», «R25 traduce success:true en allowed:true» |
 | R26 | `rate-limit-edge-wiring.test.ts` › «sin credenciales y fuera de produccion cuenta en memoria (R26)» |
 | R27 | `rate-limiter-contract.ts` › los tres casos «R4/R5 R27…» contra el adaptador en memoria; `upstash-rate-limiter.test.ts` › «R27 reutiliza la MISMA instancia y el MISMO Map cuando la cuota no cambia», «R27 crea otra instancia con otro Map cuando cambia la cuota» |
-| R28 | `upstash-rate-limiter.test.ts` › «R25 R31 configura fixedWindow con la cuota, el prefijo, analytics apagado y cache en memoria» (afirma `ephemeralCache` instancia de `Map`) y «R27 reutiliza la MISMA instancia y el MISMO Map…» (la cache sobrevive entre llamadas). **Nota para el reviewer:** ningun caso lleva `R28` en el nombre |
+| R28 | `upstash-rate-limiter.test.ts` › «R25 R28 R31 configura fixedWindow con la cuota, el prefijo, analytics apagado y cache en memoria» y «R27 R28 reutiliza la MISMA instancia y el MISMO Map cuando la cuota no cambia» (afirma la identidad del `Map` entre llamadas) |
 | R29 | `tests/unit/middleware-root-contract.test.ts` › «middleware.ts de la raiz» (6 casos; sus `R20/R21/R22` son la numeracion de QC-9), sin cambios; mas `git diff origin/dev...HEAD -- middleware.ts` vacio (arriba) |
 | R30 | `tests/guards/guard-middleware-edge.test.ts` › «el cierre alcanza los archivos nuevos del limite de peticiones (R30)» |
 | R31 | `guard-limite-de-peticiones.test.ts` › «ningun archivo fuera del adaptador de Upstash importa @upstash/* (R31)» y sus tres casos sinteticos «R31: …»; `upstash-rate-limiter.test.ts` › «R25 R31 configura fixedWindow…» |
@@ -1235,3 +1235,73 @@ vuelva a caer por saturacion.
 E2E pedido (`rate-limit.spec.ts` + `ajuste-de-inventario.spec.ts` contra `QuimiCloude_qc73_e2e`)
 **si aplica, pero no se corrio**: con la maquina sin memoria no se arranco `next dev` + dos motores.
 Pendiente para el leader, con la base dedicada (sigue en pie).
+
+## Correcciones tras la review
+
+Review: `progress/review_QC-73-limite-de-peticiones-por-origen.md` (`361a9fe4`), RECHAZADO con tres
+bloqueantes y siete menores. Commits: `7bc6d38f`, `ebfd7313`, `676da9cb` y `f0e8f544`.
+
+### Bloqueantes
+
+1. **URL de Upstash mal formada (D2, R22, R24).** Se arregla en la fachada
+   `lib/composition/edge.ts`, porque es la pieza de cableado (`design.md > 6`). El dominio y el
+   adaptador no cambian. `getUpstashLimiter` protege `createUpstashRateLimiter` con `try/catch`.
+   Si lanza, devuelve `{ failureReason: 'error:<error.name>' }`, sin el `message`, que en
+   `UrlError` lleva la URL entera. El fallo se guarda en la entrada de esas credenciales: mientras
+   `url` y `token` no cambien, `new Redis` no se vuelve a llamar ni a lanzar. `check` devuelve
+   `degraded` con ese motivo, y el aviso sigue saliendo UNA vez por peticion desde el middleware,
+   sin un segundo `console.warn`. Tests (tambien en el mapa, filas R22 y R24):
+   - `tests/unit/composition/rate-limit-edge-wiring.test.ts` › «rateLimitEdge.check — credenciales
+     de Upstash invalidas (R22 R24)» › «R22 R24 con UPSTASH_REDIS_REST_URL mal formada se degrada sin
+     lanzar y el motivo no lleva URL ni token». Tambien afirma que `new Redis` se llama una vez en
+     dos peticiones.
+   - `tests/unit/composition/rate-limit-edge-upstash-failure-middleware.test.ts` (nuevo, con la
+     fachada real y `@upstash/redis` simulado) › «R22 R24 la peticion pasa, sin excepcion, con un
+     unico aviso sin URL ni token».
+
+   **Rojo sin el arreglo** (con el `edge.ts` rechazado): los 2 casos fallan con
+   `UrlError: [Upstash Redis] The 'url' property is missing or invalid in your Redis config: redis://default:un-token-secreto@eu1.upstash.io:6379.`,
+   que sale de `getUpstashLimiter` por `Object.check` y `middleware`. Resultado:
+   `Tests 2 failed | 8 passed (10)`. **Verde con el arreglo:** `Test Files 2 passed (2) · Tests 10 passed (10)`.
+2. Se quita «(R31)» del docblock de `createUpstashRateLimiter` (`ebfd7313`).
+3. `work-group-members.tsx` queda asi: `// identificador de peticion.` (`ebfd7313`).
+
+### Menores
+
+| # | Estado |
+| --- | --- |
+| 4 | **Cerrado.** `R28` va en el nombre de los dos casos (fila R28 del mapa). El de R27 ahora afirma que el `ephemeralCache` es el mismo objeto entre llamadas. |
+| 5 | **Cerrado.** En `tests/unit/hooks/use-rate-limited-action-state.test.tsx` › `withRateLimitNotice` entran cuatro casos: «sin freno, devuelve el resultado de la accion y no hay aviso», «R11 — con el freno, devuelve undefined y avisa una vez con el mensaje neutro», «R12 — cualquier otro error se relanza tal cual, sin aviso» y «pasa los argumentos tal cual a la accion». |
+| 6 | **Se deja.** El contador en memoria no purga las claves vencidas de otros origenes. Es una **desviacion de T7**: pedia purgar al consultar y solo se reemplaza la clave consultada. Por eso la tanda T1-T8 no debia decir «Desviaciones: ninguna». Solo afecta a `next dev` y a preview sin credenciales: el `Map` crece con los origenes distintos mientras viva la instancia. Barrer en cada `consume` lo haria O(n) por peticion, y hacerlo bien pide un criterio (cada cuanto barrer) que el diseño no fija. Se deja para el leader, fuera de esta vuelta. |
+| 7 | **Cerrado.** Salen las citas de los comentarios que añadio la rama en `e2e/rate-limit.spec.ts`, `playwright.config.ts` (sus dos bloques bajan a 5 lineas y conservan las cifras y el porque), `tests/guards/guard-identificador-de-request.test.ts` (el alta y la nota de `DEPENDENCIAS_ESPERADAS`), `tests/unit/configuracion-ui/usuarios-convenciones.test.ts` y el docblock de `tests/unit/rate-limit/rate-limiter-contract.ts`. Los comentarios que ya estaban en `origin/dev` no se tocan: la cabecera de QC-71 en `edge.ts`, el docblock R36 de `usuarios-convenciones` y las altas previas de la guardia. Los nombres de caso conservan su `R<n>`. |
+| 8 | **Cerrado.** `recipe-route-contract.test.ts` afirma tambien `/withRateLimitNotice\(listProductsAction\)\(\{\s*page,/`. |
+| 9 | **Se deja.** Hay que actualizar la tabla de `design.md > 9`, que es un archivo del spec, del `spec_author` o del leader. Los checks y la aprobacion ya estan en `docs/dependencias.md` y en `requirements.md`. |
+| 10 | El reviewer lo acepta. Sin cambios. |
+
+### Archivos de esta vuelta
+
+`lib/composition/edge.ts`, `lib/modules/rate-limit/adapters/driven/upstash-rate-limiter.ts`,
+`app/(private)/configuracion/usuarios/components/work-group-members.tsx`,
+`tests/unit/composition/rate-limit-edge-wiring.test.ts`,
+`tests/unit/composition/rate-limit-edge-upstash-failure-middleware.test.ts` (nuevo),
+`tests/unit/rate-limit/upstash-rate-limiter.test.ts`, `tests/unit/rate-limit/rate-limiter-contract.ts`,
+`tests/unit/recetas-ui/recipe-route-contract.test.ts`, `tests/unit/hooks/use-rate-limited-action-state.test.tsx`,
+`e2e/rate-limit.spec.ts`, `playwright.config.ts`, `tests/guards/guard-identificador-de-request.test.ts`,
+`tests/unit/configuracion-ui/usuarios-convenciones.test.ts`.
+
+### Comandos corridos (sobre `f0e8f544`)
+
+```
+pnpm.cmd run typecheck   -> exit 0
+pnpm.cmd run lint        -> exit 0
+pnpm.cmd exec vitest run tests/unit/rate-limit tests/unit/composition/rate-limit-edge-wiring.test.ts \
+  tests/unit/composition/rate-limit-edge-upstash-failure-middleware.test.ts \
+  tests/unit/identity/route-guard-rate-limit.test.ts tests/unit/recetas-ui/recipe-route-contract.test.ts \
+  tests/unit/hooks/use-rate-limited-action-state.test.tsx tests/unit/configuracion-ui/usuarios-convenciones.test.ts \
+  tests/unit/scripts/measure-rate-limit-latency.test.ts tests/unit/middleware-root-contract.test.ts tests/guards
+ Test Files  57 passed (57)
+      Tests  668 passed | 9 skipped (677)
+```
+
+No se corrio la suite completa ni el E2E. `e2e/rate-limit.spec.ts` solo cambio en comentarios, pero
+el gate del leader sigue teniendo que correrlo.
