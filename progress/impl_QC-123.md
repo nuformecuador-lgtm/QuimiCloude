@@ -326,3 +326,24 @@ con archivos que la ficha no toca.
 **T11 marcada `[x]`**: el gate completo esta verde, el mapa `R<n> -> test` con los nombres reales
 esta arriba, y `package.json` y `pnpm-lock.yaml` no aparecen en el diff de la rama. Las once tasks
 quedan en `[x]`.
+
+## Sincronizacion con `dev` y gate definitivo (2026-09-19)
+
+`origin/dev` habia avanzado **13 commits** desde que nacio el worktree: QC-129 mergeada (PR #93) y
+el spec de QC-82 (PR #94). Se sincronizo **antes** del PR y no despues, porque el gate que vale es
+el de la rama que se va a mergear, no el de la rama aislada.
+
+- **`lib/composition/index.ts` lo tocan las dos ramas y se auto-mergeo limpio**: `dev` cablea
+  `documentos`, esta rama cablea `pedidos`.
+- **Unico conflicto: `feature_list.json`**, y de proceso: cada lado anadia una ficha distinta al
+  final. Se quedan **las dos**, QC-130 y QC-131. `scripts/validate-features.mjs` verde: 118 fichas,
+  sin duplicados, cupo por zona respetado.
+- Ningun conflicto en codigo de `pedidos`, `inventario` ni `recetas`, y ninguna migracion ajena
+  nueva.
+
+**`./init.sh` completo sobre la rama YA SINCRONIZADA (`eb5ea6bb`)**: **566/566** archivos, **8238**
+tests pasados, 104 skipped, **0 rojos**, los tres proyectos corridos y todas las migraciones con su
+`down.sql`. Es el gate que respalda el PR.
+
+Sigue en pie el aviso de los ocho archivos del baseline que ya pasan: **no es de esta ficha** y no
+se toca aqui.
