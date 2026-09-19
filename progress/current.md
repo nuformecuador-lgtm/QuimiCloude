@@ -515,6 +515,30 @@ porque es validacion de entrada y no una regla nueva de dominio.
 
 ## Deudas y cosas abiertas
 
+### El baseline pierde DOS entradas y conserva SEIS, y las dos decisiones van escritas (2026-09-19)
+
+El gate verde de QC-111 avisa de **ocho** archivos del baseline que «ya pasan». No se borran los
+ocho: se borran **los dos que esta rama arreglo de verdad**, y los otros seis se quedan con su
+motivo.
+
+**Borradas, porque su causa murio en esta rama:**
+
+| Entrada | Por que ya no aplica |
+|---|---|
+| `tests/unit/navegacion/qc75-convenciones.test.ts` | su motivo nombraba UN caso —«package.json no gano dependencias respecto al merge-base»— que se quedo fuera de la precondicion de rama que ya protegia a sus hermanos. Es exactamente el caso que QC-111 acoto, y la salida limpia que el propio motivo pedia: «llevar ese unico caso DENTRO de la misma precondicion de rama». Hecho |
+| `tests/unit/unidades/unidades-convenciones.test.ts` | su motivo, ampliado en QC-79, decia que el unico rojo vivo era «R35 — las dependencias son EXACTAMENTE las de origin/dev». Ese caso ahora salta fuera de la rama de QC-38, que es la salida limpia que el motivo pedia |
+
+**En `dev` seguiran verdes despues del merge**, que es la pregunta que importa antes de borrar una
+entrada: las dos acotaciones saltan el caso cuando el rango **no** es el de su ficha, y en `dev` no
+lo es. No se retira una red para que otro la pise.
+
+**Los otros seis se quedan**, y el motivo es el mismo que escribio QC-92: que hoy pasen no significa
+que su causa haya muerto. Las cinco estructurales pasan **segun la rama desde la que se mire** —son
+guardias que censan el diff, asi que su color depende de quien pase por ahi—, y
+`product-crud.int.test.ts` es un flake de saturacion cuya propia entrada fija la condicion de
+retirada: **tres corridas completas seguidas** con el archivo dentro. Esta es una. Borrarlas hoy es
+plantar el rojo en la rama siguiente.
+
 ### Queda al menos una guardia ciega con CRLF fuera de las cinco que ya se arreglaron (2026-09-19)
 
 **Medido en QC-111, no supuesto.** El gate completo del 2026-09-19 saco rojo

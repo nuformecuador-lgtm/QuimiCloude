@@ -245,9 +245,10 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
 
 ## T20 — Gate completo · depende de T19
 
-- [ ] `./init.sh` completo antes del PR, sin excepción.
-- **Hecho:** `./init.sh` termina en verde, incluidas **todas** las guardias, y no se añadió ningún
-  archivo bajo `e2e/` (R27).
+- [x] `./init.sh` completo antes del PR, sin excepción.
+- **Hecho:** `./init.sh` verde el 2026-09-19 — 574/574 archivos, 8273 tests, 0 rojos, `== init OK ==` —
+  incluidas **todas** las guardias, y no se añadió ningún archivo bajo `e2e/` (R27). Marcada solo
+  cuando el gate lo confirmó, no antes (menor 7 de la review).
 
 ---
 
