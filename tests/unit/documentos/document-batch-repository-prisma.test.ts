@@ -46,7 +46,7 @@ beforeEach(() => {
 });
 
 describe('createBatch — una transaccion con la tanda y sus archivos', () => {
-  it('inserta la tanda y un archivo por ruta, todo en la misma tx', async () => {
+  it('R1 — inserta la tanda y un archivo por ruta, todo en la misma tx', async () => {
     const batchCreate = vi.fn().mockResolvedValue({ id: TANDA });
     const fileCreate = vi
       .fn()
@@ -92,7 +92,7 @@ describe('attachMessageId', () => {
 });
 
 describe('claim — el UPDATE condicional', () => {
-  it('devuelve la fila reclamada cuando el UPDATE devuelve una', async () => {
+  it('R10 — devuelve la fila reclamada cuando el UPDATE devuelve una', async () => {
     doble.queryRaw.mockResolvedValue([
       { id: ARCHIVO, company_id: EMPRESA, batch_id: TANDA, path: 'empresa/a.pdf' },
     ]);
@@ -105,7 +105,7 @@ describe('claim — el UPDATE condicional', () => {
     });
   });
 
-  it('devuelve null cuando el UPDATE no reclamo ninguna fila', async () => {
+  it('R10 — devuelve null cuando el UPDATE no reclamo ninguna fila', async () => {
     doble.queryRaw.mockResolvedValue([]);
 
     await expect(claim(ARCHIVO, 'msg-1')).resolves.toBeNull();
@@ -113,7 +113,7 @@ describe('claim — el UPDATE condicional', () => {
 });
 
 describe('finish — los tres desenlaces', () => {
-  it('done: guarda el texto tal cual y limpia error', async () => {
+  it('R13 — done: guarda el texto tal cual y limpia error', async () => {
     doble.documentFileUpdate.mockResolvedValue({});
 
     await finish(ARCHIVO, { kind: 'done', text: 'texto extraido' });
@@ -135,7 +135,7 @@ describe('finish — los tres desenlaces', () => {
     });
   });
 
-  it('requeue: vuelve a queued LIMPIANDO code y reason', async () => {
+  it('R17 — requeue: vuelve a queued LIMPIANDO code y reason', async () => {
     doble.documentFileUpdate.mockResolvedValue({});
 
     await finish(ARCHIVO, { kind: 'requeue', code: 'ai_unavailable', reason: 'la IA no respondio' });
@@ -148,7 +148,7 @@ describe('finish — los tres desenlaces', () => {
 });
 
 describe('expireStale — acotado por tanda Y por empresa', () => {
-  it('pasa a error lo que lleva demasiado en queued/processing, con su motivo', async () => {
+  it('R17 — pasa a error lo que lleva demasiado en queued/processing, con su motivo', async () => {
     doble.documentFileUpdateMany.mockResolvedValue({ count: 2 });
     const limite = new Date('2026-09-18T00:00:00.000Z');
 
@@ -171,7 +171,7 @@ describe('expireStale — acotado por tanda Y por empresa', () => {
 });
 
 describe('readBatch — null si no existe o es de otra empresa', () => {
-  it('sin fila de tanda visible en la empresa, devuelve null sin leer los archivos', async () => {
+  it('R18 — sin fila de tanda visible en la empresa, devuelve null sin leer los archivos', async () => {
     doble.documentBatchFindFirst.mockResolvedValue(null);
 
     await expect(readBatch(TANDA, EMPRESA)).resolves.toBeNull();

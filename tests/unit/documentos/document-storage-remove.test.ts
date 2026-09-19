@@ -56,7 +56,7 @@ describe('documentos — DocumentStorage.remove (R14)', () => {
     await expect(removeDocument('empresa/archivo.pdf')).rejects.toThrow(/borrar.*empresa\/archivo\.pdf.*bucket caido/);
   });
 
-  it('R32 — el puerto expone `remove` y el adaptador la implementa como funcion', async () => {
+  it('R14 — el puerto expone `remove` y el adaptador la implementa como funcion', async () => {
     configurarEnv();
     const adaptador = await import(
       '@/lib/modules/documentos/adapters/driven/storage/document-storage-supabase'

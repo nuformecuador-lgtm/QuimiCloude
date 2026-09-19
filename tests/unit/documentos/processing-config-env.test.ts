@@ -36,14 +36,14 @@ describe('documentos — configuracion del procesamiento desde el entorno (R23)'
     Object.assign(process.env, originalEnv);
   });
 
-  it('si falta UNA variable de QStash, falla NOMBRANDOLA', () => {
+  it('R23 — si falta UNA variable de QStash, falla NOMBRANDOLA', () => {
     configurarEnv();
     delete process.env.QSTASH_CURRENT_SIGNING_KEY;
 
     expect(() => readQstashConfigFromEnv()).toThrow(/QSTASH_CURRENT_SIGNING_KEY/);
   });
 
-  it('si faltan VARIAS, las nombra todas juntas', () => {
+  it('R23 — si faltan VARIAS, las nombra todas juntas', () => {
     delete process.env.QSTASH_TOKEN;
     delete process.env.QSTASH_CURRENT_SIGNING_KEY;
     delete process.env.QSTASH_NEXT_SIGNING_KEY;
@@ -54,7 +54,7 @@ describe('documentos — configuracion del procesamiento desde el entorno (R23)'
     );
   });
 
-  it('el mensaje de fallo nunca incluye el VALOR de una variable', () => {
+  it('R23 — el mensaje de fallo nunca incluye el VALOR de una variable', () => {
     process.env.QSTASH_TOKEN = 'secreto-que-no-debe-filtrarse';
 
     let mensaje = '';
@@ -67,7 +67,7 @@ describe('documentos — configuracion del procesamiento desde el entorno (R23)'
     expect(mensaje).not.toContain('secreto-que-no-debe-filtrarse');
   });
 
-  it('con las cuatro variables presentes, devuelve la configuracion completa', () => {
+  it('R23 — con las cuatro variables presentes, devuelve la configuracion completa', () => {
     configurarEnv();
 
     expect(readQstashConfigFromEnv()).toEqual({
@@ -78,14 +78,14 @@ describe('documentos — configuracion del procesamiento desde el entorno (R23)'
     });
   });
 
-  it('los dos plazos son OPCIONALES: vacios, aplican su valor por defecto', () => {
+  it('R23 — los dos plazos son OPCIONALES: vacios, aplican su valor por defecto', () => {
     const config = readProcessingConfigFromEnv();
 
     expect(config.timeoutSeconds()).toBe(DEFAULT_PROCESSING_TIMEOUT_SECONDS);
     expect(config.maxRetries()).toBe(DEFAULT_PROCESSING_MAX_RETRIES);
   });
 
-  it('con los dos plazos configurados, los respeta', () => {
+  it('R23 — con los dos plazos configurados, los respeta', () => {
     process.env.DOCUMENT_PROCESSING_TIMEOUT_SECONDS = '120';
     process.env.DOCUMENT_PROCESSING_MAX_RETRIES = '5';
 
