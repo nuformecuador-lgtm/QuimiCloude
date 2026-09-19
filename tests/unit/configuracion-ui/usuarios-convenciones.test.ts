@@ -351,9 +351,16 @@ function estadoInicialImportado(fuente: string): string[] {
   return culpables;
 }
 
-/** R36 — Quien usa `useActionState` declara su propio `{ status: 'idle' }` en su propia fuente. */
+/**
+ * R36 — Quien usa `useActionState` declara su propio `{ status: 'idle' }` en su propia fuente.
+ *
+ * 2026-09-19: QC-73 T14 migro los formularios de `useActionState` a `useRateLimitedActionState`
+ * (`hooks/use-rate-limited-action-state.ts`), que envuelve al primero con el mismo contrato de
+ * tupla. El barrido reconoce los dos nombres para no perder cobertura sobre las pantallas ya
+ * migradas.
+ */
 function usaEstadoDeFormulario(fuente: string): boolean {
-  return /\buseActionState\s*\(/.test(sinComentarios(fuente));
+  return /\b(?:useActionState|useRateLimitedActionState)\s*\(/.test(sinComentarios(fuente));
 }
 
 function construyeElEstadoInicial(fuente: string): boolean {
@@ -726,6 +733,13 @@ describe('toda lectura y toda escritura pasan por las Server Actions del modulo 
     expect(fetchAPropia(`await fetch('/api/usuarios');`)).not.toEqual([]);
     expect(fetchAPropia('await fetch(`../usuarios`);')).not.toEqual([]);
     expect(fetchAPropia(`await fetch('https://ejemplo.test/x');`)).toEqual([]);
+
+    // El barrido reconoce las dos formas (QC-73 T14): la de React y la envuelta.
+    expect(usaEstadoDeFormulario(`const [state, action] = useActionState(a, s);`)).toBe(true);
+    expect(
+      usaEstadoDeFormulario(`const [state, action] = useRateLimitedActionState(a, s);`),
+    ).toBe(true);
+    expect(usaEstadoDeFormulario(`const [state, setState] = useState(s);`)).toBe(false);
   });
 });
 
