@@ -177,7 +177,7 @@
 
 ## Bloque 5 — la retirada
 
-- [ ] **T9. LA RETIRADA — fuera `latestBatchUnitId` y `ProductView.stockByUnit`. ATÓMICA.**
+- [x] **T9. LA RETIRADA — fuera `latestBatchUnitId` y `ProductView.stockByUnit`. ATÓMICA.**
       Quitar los dos campos rompe a la vez el adaptador, las columnas, el selector y las páginas de
       fórmulas; se abre y se cierra de una vez.
       - Archivos: `lib/modules/inventario/domain/product-view.ts`, `product-prisma.ts`

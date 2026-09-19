@@ -10,7 +10,7 @@
 | T6 | hecha, `[x]` | `156389a2` (back), `48c46ca0` (front) |
 | T7 | hecha, `[x]` | `20d11778` |
 | T8 | hecha, `[x]` | `93ec24e5` (back), `f2629e30` (front) |
-| T9 | commiteada; **sin `[x]`**: su «Hecho» exige `--rapido` verde y el gate murio por memoria | `406e5ffd` |
+| T9 | hecha, `[x]` | `406e5ffd`, `7fc6136e` |
 | T10-T13, T15 | sin empezar | — |
 
 ## Tanda T5-T9 (2026-09-19)
@@ -81,6 +81,14 @@ Typecheck y lint verdes; 24 rojos. 22 de Postgres 18.6 (aceptados como ajenos). 
   `tests/unit/identity/session-once-per-request-render.test.tsx` (hook `beforeAll` 60 s) → 7/7;
   `tests/unit/configuracion-ui/grupos/work-group-table.test.tsx` («UNKNOWN: unknown error, read»
   al importar) → 28/28; `tests/unit/inventario/product-page.test.tsx` (test de 20 s) → 62/62.
+
+### Gate rapido tras T9, corrida completa (2026-09-19)
+
+`./init.sh --rapido` (tras cerrar Spotify, Slack y WhatsApp; `$TEMP/qc121-rapido-t9d.log`): typecheck y
+lint verdes; `test:rapido` 373 archivos, 5594 pasados, **22 rojos**, todos de Postgres 18.6 aceptados por el
+humano (17 `23001` vs `23503`, 3 `unit-write` R24, 2 `company-scope` «9 vs 10»). Cero rojos propios.
+**T9 marcada `[x]`.**
+
 
 ### Nota de T6 (a confirmar por el reviewer)
 
