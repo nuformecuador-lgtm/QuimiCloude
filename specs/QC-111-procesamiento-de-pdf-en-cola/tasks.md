@@ -171,9 +171,9 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
 
 ## T14 — Barrel y composición · depende de T8, T9, T10, T11, T12, T13
 
-- [ ] `lib/modules/documentos/index.ts` publica **las tres fábricas** y los tipos, y **no** los
+- [x] `lib/modules/documentos/index.ts` publica **las tres fábricas** y los tipos, y **no** los
       puertos ni los adaptadores.
-- [ ] `lib/composition/index.ts` ata puerto → implementación dentro del bloque `documentos` que ya
+- [x] `lib/composition/index.ts` ata puerto → implementación dentro del bloque `documentos` que ya
       existe, **sin reordenar nada**.
 - **Hecho:** `guard-arquitectura-modulos` verde; el barrel sigue importable desde un componente de
   cliente (nada de `'use server'`, `@prisma/client` ni `next/*` en su cierre); test del contrato del
@@ -188,17 +188,17 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
 
 ## T15 — Server Actions · depende de T14
 
-- [ ] `adapters/driving/document-batch-actions.ts`: resuelve el actor con las dos caras de la sesión
+- [x] `adapters/driving/document-batch-actions.ts`: resuelve el actor con las dos caras de la sesión
       dentro de **un solo** `runInRequestScope`, valida con el mismo objeto de esquema del contrato y
       traduce el error por su `code`. Mismo patrón exacto que `document-upload-actions.ts`.
-- [ ] Añadir el archivo a la lista de `tests/unit/identity/session-once-per-request-actions.test.ts`.
+- [x] Añadir el archivo a la lista de `tests/unit/identity/session-once-per-request-actions.test.ts`.
 - **Hecho:** typecheck y lint verdes, y **el archivo queda añadido a la lista de
   `tests/unit/identity/session-once-per-request-actions.test.ts`**, que descubre por disco los
   `driving/` con las dos caras de la sesión y se pone rojo si una acción supera **una** lectura.
 
 ## T16 — El Route Handler · depende de T14
 
-- [ ] `adapters/driving/document-job-route.ts` con el `POST` y `runtime = 'nodejs'`, y
+- [x] `adapters/driving/document-job-route.ts` con el `POST` y `runtime = 'nodejs'`, y
       `app/api/documentos/trabajos/route.ts` con **solo** el reexport de `design.md > 5`. Los códigos
       de respuesta salen de la tabla de `> 5`.
 - **Hecho:** `guard-arquitectura-modulos` verde con el primer archivo de `app/api/` del repo; el
@@ -206,10 +206,15 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
 
 ## T17 — Tests de integración de la ruta · depende de T16
 
-- [ ] Los tres de `[D18]`: **firma inválida** → 401 y cero efectos; **firma válida** → procesa y 200;
+- [x] Los tres de `[D18]`: **firma inválida** → 401 y cero efectos; **firma válida** → procesa y 200;
       **mismo mensaje dos veces** → una sola llamada a la IA, un solo texto guardado, 200 las dos
       veces.
 - [ ] El de atomicidad del `claim` contra la base de test (`design.md > 9`).
+- **SIN MARCAR a proposito (2026-09-18).** Este es el unico de los cuatro que necesita la base: mide
+  la atomicidad real del `UPDATE ... WHERE status='queued'` bajo concurrencia, que un doble en
+  memoria no puede probar (`design.md > 9` ya lo avisaba). Sin `DATABASE_URL` no se puede correr, y
+  **no se escribe un test que no se puede correr**: seria afirmar algo que nadie ha comprobado. Los
+  otros tres de `[D18]` si estan, con dobles y en verde.
 - **Hecho:** los cuatro pasan **sin red** y sin que ninguna variable de entorno tenga valor. Cubre R26.
 
 ---
@@ -218,13 +223,13 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
 
 ## T18 — `.env.example` y documentación `[P]` · depende de T10
 
-- [ ] Las seis variables de `design.md > 7`, **vacías**, en un bloque nuevo al final con su
+- [x] Las seis variables de `design.md > 7`, **vacías**, en un bloque nuevo al final con su
       comentario, al estilo de los cuatro que ya hay.
 - **Hecho:** ningún secreto en el diff; `./init.sh --rapido` verde. Cubre R23.
 
 ## T19 — Trazabilidad · depende de todas
 
-- [ ] `progress/impl_QC-111.md` con el mapa **`R1..R27 -> test`** completo, la lista de T0 y lo que T8
+- [x] `progress/impl_QC-111.md` con el mapa **`R1..R27 -> test`** completo, la lista de T0 y lo que T8
       verificó del paquete.
 - **Hecho:** los 27 requisitos tienen test nombrado; ningún hueco (`CHECKPOINTS.md > Trazabilidad`).
 
