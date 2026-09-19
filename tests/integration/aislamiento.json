@@ -128,6 +128,11 @@
       "desde": "2026-09-12"
     },
     {
+      "archivo": "inventario/presentation-unit-race.int.test.ts",
+      "motivo": "QC-121 R20: la carrera entre el UPDATE de unidad de una presentacion y el INSERT de un lote sobre ella, en los dos ordenes. Usa DOS 'pg.Client' con BEGIN/COMMIT manuales -no el cliente Prisma global- porque necesita sostener una transaccion abierta mientras la otra se bloquea, y comprobar el bloqueo leyendo 'pg_stat_activity' por su 'pid' antes de soltarla; eso es incompatible por construccion con una transaccion del test que termina en ROLLBACK. Cada caso fabrica su propia empresa efimera con randomUUID, escribe solo en ella y la limpia en un 'finally' en orden de FK (lotes -> producto -> presentacion -> unidades). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-19"
+    },
+    {
       "archivo": "inventario/presentation-unit.int.test.ts",
       "motivo": "Nacido antes de QC-77 (QC-80 T13): ejercita los casos de uso de escritura de presentacion desde @/lib/composition -el camino real de una Server Action- y espera el rechazo REAL de 'presentations_unit_id_fkey'. El caso de uso abre su propia transaccion contra el cliente global. Committea y limpia lo suyo.",
       "desde": "2026-09-12"
