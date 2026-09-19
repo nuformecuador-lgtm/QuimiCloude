@@ -136,8 +136,11 @@ aparezca.
 
 **R17.** El caso «el costo y el minimo de compra se pintan REDONDEADOS A DOS DECIMALES» de
 `tests/unit/proveedores-ui/supplier-detail-page.test.tsx` DEBE afirmar, ademas del texto pintado,
-el atributo `title` con el valor **exacto** de las celdas cuyo valor pintado difiere del de origen:
-`'1234.5678'` para el costo y `'0.1005'` para el minimo de compra. Es la forma **(c)** del defecto
+el atributo `title` con el valor **exacto** del **minimo de compra**, `'0.1005'`, que es la unica de
+las dos celdas cuyo valor exacto **no afirmaba ningun caso**. (El `title` del costo, `'1234.5678'`,
+**ya lo cubria** el caso vecino «el redondeo de la celda no esconde la cifra»; se afirma tambien en
+este caso para dejarlo con el patron completo, pero **no es cobertura nueva** y R17 no se lo apunta.
+Precision anadida el 2026-09-18 al cerrar la revision.) Es la forma **(c)** del defecto
 (`design.md > 4`): el redondeo cambia lo que se ve —`0.1005` se pinta `0.1`— y hoy **ningun test
 del repositorio afirma que esa celda conserva `0.1005`**; el caso vecino no lo cubre, porque alli
 el minimo vale `'25.0000'` y lo que afirma es `.not.toHaveAttribute('title')`. La correccion es

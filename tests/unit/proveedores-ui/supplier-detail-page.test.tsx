@@ -638,9 +638,9 @@ describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
 
     expect(screen.getByTestId('data-table-cell-cost').textContent).toBe('1234.57');
     expect(screen.getByTestId('data-table-cell-minPurchase').textContent).toBe('0.1');
-    // 2026-09-18 (QC-127 R17): el texto redondeado por si solo no cubre el valor exacto -este
-    // caso ya lo cambia y nada mas lo comprobaba-, asi que el caso lleva el patron completo:
-    // texto exacto + `title` exacto, igual que el caso vecino de abajo.
+    // 2026-09-18: el minimo de compra se pinta redondeado y ningun otro caso afirmaba su valor
+    // exacto, asi que este queda con el patron completo: texto exacto + `title` exacto, igual
+    // que el caso vecino de abajo.
     expect(
       screen.getByTestId('data-table-cell-cost').querySelector('span'),
     ).toHaveAttribute('title', '1234.5678');
