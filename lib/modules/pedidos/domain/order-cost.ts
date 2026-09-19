@@ -183,8 +183,10 @@ function calculateLineCost(
   return multiplyInternal(averageUnitCostInternal, neededInternal)
 }
 
-/** `null` = sin importe, indistinguible entre los cinco casos: existencia insuficiente, unidad
- *  sin base comun, receta sin lineas, y el resultado desborda la precision de la columna. */
+/** `null` = sin importe, indistinguible entre los cuatro casos que puede producir esta funcion:
+ *  receta sin lineas, unidad sin base comun para convertir, existencia insuficiente para cubrir
+ *  la cantidad pedida, o resultado que desborda la precision de la columna. Quien llama recibe
+ *  el mismo `null` en los cuatro y no puede saber cual ocurrio. */
 export function calculateIngredientsCost(input: CostInput): string | null {
   if (input.lines.length === 0) {
     return null

@@ -137,7 +137,9 @@ export type CostInput = {
   readonly units: ReadonlyMap<string, UnitConversion>;
 };
 
-/** `null` = sin importe, indistinguible entre los cinco casos (R8, R9). */
+/** `null` = sin importe. Los CUATRO caminos que este calculo puede producir son
+ *  indistinguibles entre si (R8, R9); el quinto caso sin importe —el pedido anterior a la
+ *  columna— es un estado de la fila y no un camino de esta funcion. */
 export function calculateIngredientsCost(input: CostInput): string | null;
 ```
 

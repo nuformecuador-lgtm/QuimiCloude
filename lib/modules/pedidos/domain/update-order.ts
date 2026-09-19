@@ -11,8 +11,9 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import type { OrderRepository } from '../ports/order-repository';
 
-/** Recupera `products` y `units`, que la edicion necesita para recalcular el importe en cada
- *  escritura (QC-35bis, 2026-09-07, se los habia quitado al salir la unidad del pedido). */
+/** Recupera `products` y `units` porque cada escritura recalcula el coste de los ingredientes:
+ *  hace falta leer los lotes disponibles y convertir entre la unidad de la receta y la del
+ *  lote. */
 export type UpdateOrderDeps = {
   readonly orders: OrderRepository;
   readonly recipes: RecipeCatalog;

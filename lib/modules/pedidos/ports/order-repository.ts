@@ -98,7 +98,7 @@ export interface OrderRepository {
     scope: OrderScope,
   ): Promise<Page<OrderRow>>;
 
-  /** Edicion como REEMPLAZO COMPLETO (R20). No puede escribir `CANCELADO` ni motivo.
+  /** Edicion como REEMPLAZO COMPLETO. No puede escribir `CANCELADO` ni motivo.
    *
    *  `ingredientsCost`: mismo criterio que en `create` -parametro aparte, `null` distinto de
    *  `0`-. La edicion lo SUSTITUYE por completo, incluso a `null`: no hay fusion con el valor

@@ -179,7 +179,7 @@ E2E se difiere a **QC-122**.
 | R6 | `order-cost.test.ts` — «convierte la existencia y el coste cuando las unidades comparten base (R6)» |
 | R7 | `order-cost.test.ts` — «un ingrediente con unidad sin base común no tiene coste (R7)» |
 | R8 | `order-cost.test.ts` — «devuelve sin importe si la existencia no cubre (R8)», «… si un ingrediente no se puede convertir (R8)», «… si la receta no tiene líneas (R8)», «nunca devuelve cero ni un importe parcial (R8)»; `tests/integration/pedidos/order-ingredients-cost.int.test.ts` — «un pedido anterior a la columna sigue sin importe (R8, R13)» |
-| R9 | `order-cost.test.ts` — «los cinco casos sin importe devuelven exactamente la misma salida (R9)» |
+| R9 | `order-cost.test.ts` — «los cuatro caminos sin importe del calculo devuelven exactamente la misma salida (R9)», que son los que la funcion pura puede producir; `order-ingredients-cost.int.test.ts` — «un pedido anterior a la columna sigue sin importe (R8, R13)» cubre el quinto, que es un estado de la fila y no un camino del calculo |
 | R10 | `tests/unit/pedidos/create-order.test.ts` — «el alta calcula el importe y lo pasa al puerto (R10)»; `order-ingredients-cost.int.test.ts` — «el alta lo deja guardado en la fila (R10)» |
 | R11 | `tests/unit/pedidos/update-order.test.ts` — «la edición recalcula y sustituye el importe (R11)»; `order-ingredients-cost.int.test.ts` — «la edición lo reescribe, incluso a nulo (R11)» |
 | R12 | `tests/unit/pedidos/list-orders.test.ts` — «el listado no recibe catálogo de productos ni de unidades (R12)»; `order-ingredients-cost.int.test.ts` — «comprar un lote después no cambia el importe de un pedido ya creado (R12)» |

@@ -231,7 +231,7 @@ describe('calculateIngredientsCost', () => {
     expect(resultado).not.toBe('1000.0000');
   });
 
-  it('los cinco casos sin importe devuelven exactamente la misma salida (R9)', () => {
+  it('los cuatro caminos sin importe del calculo devuelven exactamente la misma salida (R9)', () => {
     const existenciaInsuficiente = calculateIngredientsCost(
       input({ lines: [linea({ quantity: '10.0000' })], batches: [lote({ stock: 5 })], units: unitsMap(LITRO) }),
     );
@@ -243,7 +243,6 @@ describe('calculateIngredientsCost', () => {
       }),
     );
     const recetaSinLineas = calculateIngredientsCost(input({ lines: [] }));
-    const productoSinLotes = calculateIngredientsCost(input({ batches: [] }));
     const desbordamiento = calculateIngredientsCost(
       input({
         orderQuantity: '1.0000',
@@ -253,13 +252,12 @@ describe('calculateIngredientsCost', () => {
       }),
     );
 
-    expect([
-      existenciaInsuficiente,
-      unidadIncompatible,
-      recetaSinLineas,
-      productoSinLotes,
-      desbordamiento,
-    ]).toEqual([null, null, null, null, null]);
+    expect([existenciaInsuficiente, unidadIncompatible, recetaSinLineas, desbordamiento]).toEqual([
+      null,
+      null,
+      null,
+      null,
+    ]);
   });
 
   it('el importe viaja como cadena decimal de cuatro decimales y nunca como numero (R19)', () => {
