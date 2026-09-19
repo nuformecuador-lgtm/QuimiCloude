@@ -65,6 +65,51 @@ mantenimiento que cada ficha paga, y las propias listas dicen que la actualiza l
 | `tests/unit/documentos/limits-and-path.test.ts` | el barrido «ningun archivo repite un valor de `limits.ts`» exime a `processing-timeouts.ts` **solo** para `READ_LINK_TTL_SECONDS`: el plazo por defecto de 900 s coincide en valor sin ser el mismo limite, y `design.md > 7` ya anotaba la coincidencia como no causal |
 | `tests/unit/documentos/storage-config.test.ts` | el caso que afirmaba «el puerto NO expresa borrado» —verdad de QC-106— pasa a comprobar que `remove` existe, que es la verdad de esta ficha |
 
+## Lo que T8 verifico contra el paquete instalado
+
+> **Restaurada el 2026-09-19** (menor 6 de la review). Esta seccion la escribio el commit
+> `27a7b525` y una reescritura posterior del archivo se la llevo por delante. Importa porque es el
+> unico DESCONOCIDO de la ficha que puede impedir que funcione en produccion sin que ningun test lo
+> note: todos doblan esa cabecera.
+
+`@upstash/qstash@2.11.3`, leido en
+`node_modules/.pnpm/@upstash+qstash@2.11.3/node_modules/@upstash/qstash/client-CsnfJpnA.d.ts`.
+No de memoria y no de la documentacion: del paquete, como hizo QC-108 con `@google/genai`.
+
+| Lo que `design.md > 8` dejaba abierto | Lo que dice el paquete | Veredicto |
+|---|---|---|
+| La firma real de `Receiver.verify` | `verify(request: VerifyRequest): Promise<boolean>`, con `VerifyRequest = { signature: string; body: string; url?: string; clockTolerance?: number; upstashRegion?: string }` | **coincide** |
+| Como se construye el `Receiver` | `new Receiver({ currentSigningKey?, nextSigningKey?, devMode? })` — las **dos** claves vivas a la vez, que es la rotacion que el diseno describe | **coincide** |
+| Nombre de la cabecera de la **firma** | **`upstash-signature`**, escrito en el propio tipo `VerifyRequest` | **cerrado** |
+| La opcion del tope de reintentos al publicar | `retries?: number` en `PublishRequest`; `publishJSON` devuelve `{ messageId, url }` | **coincide** |
+| Nombre de la cabecera del **identificador de mensaje** | **NO APARECE EN EL PAQUETE.** El SDK no lee esa cabecera en ningun punto: no esta en los tipos, ni en el bundle, ni en el README | **SIGUE ABIERTO** |
+
+**Un matiz que el diseno no preveia y que el adaptador absorbe.** `Receiver.verify` **lanza
+`SignatureError`** cuando la firma es invalida; **no devuelve `false`**. El puerto `QueueSignature`
+promete `Promise<boolean>` y «nunca lanza por una firma mala», asi que el adaptador captura y
+devuelve `false`. No es una desviacion del diseno: es exactamente el sitio donde el diseno dijo que
+se reconciliaria («quien conoce el nombre real es su adaptador»).
+
+**El DESCONOCIDO que NO se pudo cerrar, y se dice en vez de rellenarlo.** `design.md > 8` mandaba
+verificar el nombre de la cabecera del identificador de mensaje **contra el paquete instalado**. El
+paquete no lo contiene, porque el SDK nunca lee esa cabecera: la manda el servidor de QStash al
+webhook y el cliente no la modela. Este worktree no tiene acceso a la documentacion del proveedor,
+asi que **no se puede cerrar aqui**. Se implementa en una sola constante con el valor convencional
+`upstash-message-id`, `messageIdOf` la busca sin distinguir mayusculas y devuelve `null` si no
+viene. **Queda elevado al leader**, no dado por cerrado.
+
+**Alcance del fallo si el nombre fuera otro, medido y no supuesto:** `messageIdOf` devolveria
+`null` siempre; el `claim` sigue siendo atomico y la idempotencia sigue en pie, porque su candado es
+`status='queued'` y no el identificador. Lo unico que se perderia en silencio es la proteccion
+secundaria de `queue_message_id` —«un mensaje viejo sobre una fila re-encolada no la reclama»—.
+Es degradacion silenciosa, y por eso se eleva.
+
+**Correccion a ese alcance, medida el 2026-09-19 sobre el codigo de la ruta.** Es PEOR que lo que
+decia el parrafo de arriba: sin identificador de mensaje la ruta responde **400** —R9, sin id no hay
+candado que reclamar— asi que **ninguna entrega se procesaria**, no solo se perderia la proteccion
+secundaria. No es degradacion silenciosa parcial: es la ficha entera parada. Sigue sin cerrarse con
+un supuesto; se eleva como **pregunta abierta con dueno** junto a la de `@napi-rs/canvas`.
+
 ## Mapa R1..R27 -> test
 
 Los 27 tienen test nombrado. **Ninguno huerfano.** El `R<n>` va en el nombre del caso, que es el
@@ -229,3 +274,13 @@ sus columnas, que son las unicas con clave unica sobre ese par. El SQLSTATE sigu
    declarado asi en `tests/integration/aislamiento.json`, con limpieza en orden de FK.
 7. **Se acoto una guardia ajena** (`identity-schema.test.ts`). Esta arriba, en la tabla de censos,
    con su motivo y su precedente. Es el cambio que mas merece una mirada del reviewer.
+8. **Desviacion consciente del diseno al fallar la publicacion** (menor 4 de la review, anotada el
+   2026-09-19). `design.md > 6.1` dice que si revienta la publicacion del archivo 3 de 10 «los ocho
+   restantes se quedan en queued». El codigo **no aborta**: el try/catch es **por archivo** dentro
+   del bucle, asi que del 4 al 10 si se publican, y el test lo afirma. Cumple **R6** —«dejar ESA
+   fila en cola, sin inventar otro camino de recuperacion»— y es la conducta preferible: abortar
+   castigaria a siete archivos sanos por el fallo de uno. Se declara aqui como desviacion, igual
+   que se hizo con el orden de la migracion; **el texto del design no lo corrige el implementer**.
+9. **El nombre de la cabecera del identificador de mensaje vuelve a la bitacora** (menor 6), arriba,
+   en «Lo que T8 verifico contra el paquete instalado». Es el unico desconocido de la ficha que
+   puede dejarla **entera parada en produccion** sin que ningun test lo note.
