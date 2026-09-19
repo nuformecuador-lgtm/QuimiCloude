@@ -55,15 +55,17 @@ ALTER TABLE "document_batches" ADD CONSTRAINT "document_batches_company_id_fkey"
 ALTER TABLE "document_batches" ADD CONSTRAINT "document_batches_created_by_fkey"
   FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
+-- CreateIndex — tiene que existir ANTES de la FK compuesta de abajo: Postgres exige que la
+-- restriccion unica a la que apunta una clave foranea ya exista al declararla, y si no falla con
+-- 42830. Un indice unico sirve de destino; no hace falta un UNIQUE CONSTRAINT.
+CREATE UNIQUE INDEX "document_batches_id_company_id_key" ON "document_batches"("id", "company_id");
+
 -- AddForeignKey (A MANO, COMPUESTA) — archivo -> su tanda, con la empresa dentro. Apunta a
 -- `document_batches_id_company_id_key`, asi que la empresa del archivo tiene que coincidir con
 -- la de su propia tanda por construccion.
 ALTER TABLE "document_files" ADD CONSTRAINT "document_files_batch_id_company_id_fkey"
   FOREIGN KEY ("batch_id", "company_id") REFERENCES "document_batches"("id", "company_id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- CreateIndex
-CREATE UNIQUE INDEX "document_batches_id_company_id_key" ON "document_batches"("id", "company_id");
 
 -- CreateIndex
 CREATE INDEX "document_batches_company_id_idx" ON "document_batches"("company_id");
