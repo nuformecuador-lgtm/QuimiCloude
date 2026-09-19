@@ -284,3 +284,115 @@ sus columnas, que son las unicas con clave unica sobre ese par. El SQLSTATE sigu
 9. **El nombre de la cabecera del identificador de mensaje vuelve a la bitacora** (menor 6), arriba,
    en «Lo que T8 verifico contra el paquete instalado». Es el unico desconocido de la ficha que
    puede dejarla **entera parada en produccion** sin que ningun test lo note.
+
+---
+
+## F2.3 — sincronizacion con `dev` (2026-09-19)
+
+Punto de partida: `34673941`, arbol limpio, gate completo VERDE. `dev` iba **13 commits**
+por delante (`3caaebc8`). Merge hecho en `d6170815`.
+
+### Que traia `dev`
+
+QC-129 (PR #93) y el spec de QC-82 (PR #94). **Ninguna migracion**: `git diff HEAD...FETCH_HEAD
+-- prisma/` sale vacio, asi que no hubo `prisma migrate deploy` que aplicar.
+
+QC-129 **deroga por escrito las decisiones 6 y 15 y el R4 de QC-109**: los textos de prompt
+salen del modulo y del tiempo de compilacion y pasan a `CATALOG_PROMPT` y `FORMULA_PROMPT`;
+`lib/modules/documentos/domain/prompts/` desaparece. Es derogacion deliberada, no regresion:
+**en todo lo que toca al prompt gana `dev`**.
+
+### Los cinco archivos compartidos
+
+De los cinco, **tres dieron conflicto** y **dos automergearon**. Los dos automergeados se
+revisaron a mano igualmente, por ser los delicados.
+
+| Archivo | Conflicto | Que se decidio |
+| --- | --- | --- |
+| `.env.example` | Si (1 hunk) | **Union.** Los dos lados anadian un bloque tras `GEMINI_MODEL=`. Queda el de la cola (QC-111, seis variables) y debajo el de los prompts (QC-129, dos), cada uno con su propia cabecera. No se pierde ninguna variable. |
+| `feature_list.json` | Si (1 hunk) | **Gana `dev`** en la ficha de QC-129 (`description` reescrita + `status: done`). El resto del archivo automergeo como union. Validado con `node -e require(...)`: 117 fichas, QC-111 sigue `in_progress`, QC-82 `spec_ready`, QC-109 y QC-129 `done`. |
+| `lib/composition/index.ts` | Si (4 hunks) | Ver abajo. |
+| `lib/modules/documentos/index.ts` | No | Automerge correcto: se queda el comentario de `dev` sobre `createProcessPdfByStrategy` (habla del **puerto de prompt**, no de textos internos) y encima los exports de QC-111 intactos. |
+| `tests/unit/composition/documentos-facade.test.ts` | No | Automerge correcto y verificado clave por clave. Sobrevive el censo **CERRADO de 10 claves** de `a32b4da5` con la excepcion de `queueSignature` en el bucle de `typeof === 'function'`, y se le suman de `dev` los `delete` de `CATALOG_PROMPT`/`FORMULA_PROMPT` y las afirmaciones de R2. El censo coincide con lo que la fachada publica de verdad tras el merge: QC-129 **no anade ninguna clave**, solo una dependencia. |
+
+### `lib/composition/index.ts`, hunk por hunk
+
+1. **Imports de valor** — union. `readStrategyPromptFromEnv` se coloca junto al otro import
+   de `config/` (detras de `processing-config-env`), no donde lo dejo `dev`, para no romper
+   el orden alfabetico que vigila el lint.
+2. **Imports de tipo** — union; `StrategyPrompt` cae ya en su sitio alfabetico entre
+   `queue-signature` y `strategy-run-log`.
+3. **Cuerpo** — union con un reordenamiento obligado: QC-111 **izo** `processPdfByStrategy`
+   a una `const` (la necesitan la fachada y `runDocumentJob`), y QC-129 le anade la
+   dependencia `prompt`. Asi que `const strategyPrompt` se declara **antes** de esa `const`
+   y la construccion izada recibe `prompt: strategyPrompt`.
+4. **La fachada** — gana la **referencia izada** de QC-111 (`processPdfByStrategy,`); se
+   descarta la reconstruccion inline de `dev`, porque su unico aporte (`prompt`) ya quedo
+   en la construccion izada del punto 3. Cablear dos veces era justo lo que la `const` evita.
+
+Comprobado tras resolver: **el bloque de QC-111 no cita ficha ni requisito** en ningun
+comentario (`docs/conventions.md > Comentarios`). Las citas que quedan en el archivo son
+todas anteriores y de otros modulos.
+
+### CRLF
+
+`git ls-files --eol` sobre los cinco archivos y sobre todo lo que el merge toco: **todo
+`i/lf w/lf`**. Los ficheros con `w/crlf` que salen en el repo son deuda previa ya
+commiteada asi (`i/crlf` tambien) y el merge no los toco.
+
+### Verificacion
+
+`pnpm run typecheck` verde **antes** de commitear el merge. Despues, `./init.sh --rapido`:
+
+- `✓ regla max-2-por-zona respetada (in_progress=2)`, specs y fichas OK
+- `✓ typecheck paso`
+- `✓ lint paso`
+- `test:rapido` (50 archivos del diff vs `origin/dev`): **1 failed | 2636 passed | 11 skipped**
+
+### El unico rojo, y por que NO es de esta rama
+
+```
+FAIL tests/unit/composition/documentos-facade.test.ts
+  > R22, R26, R2 de QC-129 — construir la fachada con GEMINI_API_KEY, GEMINI_MODEL,
+    CATALOG_PROMPT y FORMULA_PROMPT ausentes no lanza
+AssertionError: expected '' to be undefined
+  66|     expect(process.env.GEMINI_API_KEY).toBeUndefined();
+  67|     expect(process.env.GEMINI_MODEL).toBeUndefined();
+  68|     expect(process.env.CATALOG_PROMPT).toBeUndefined();   <-- aqui
+```
+
+**Causa, medida y no supuesta.** El `.env` local de este worktree (sin seguimiento, mtime
+2026-09-18 21:45, es decir **posterior** al gate verde de QC-129) trae las lineas
+`CATALOG_PROMPT=` y `FORMULA_PROMPT=` **con valor vacio** —tal cual las pide el
+`.env.example` que QC-129 acaba de anadir—. Vitest carga `.env` en `process.env`, asi que la
+variable no esta *ausente*: esta *definida y vacia*, y `''` no es `undefined`.
+
+Experimento decisivo: se quitaron esas dos lineas del `.env`, se relanzo el archivo suelto y
+paso **3/3**; se restauro el `.env` y se comprobo con `cmp` que queda **byte a byte identico**
+al original. Tambien falla con el entorno de shell limpio (`env -u CATALOG_PROMPT ...`), lo
+que descarta que lo inyecte `init.sh`.
+
+**No es de QC-111:**
+
+- Las lineas 66-69 son **afirmaciones puras sobre `process.env`**, evaluadas antes de tocar
+  `documentos`; no dependen de una sola linea de codigo de esta rama.
+- Vienen **verbatim de `dev`** (son el R2 de QC-129), no las escribio QC-111.
+- Los otros dos casos del archivo pasan, incluido el **censo de 10 claves**: el cableado del
+  merge esta bien.
+- **No esta en `tests/baseline-rojos.json`** (que no se toco).
+
+**No se arreglo, y es deliberado.** Las dos salidas posibles son decisiones ajenas a esta
+tarea acotada: (a) quitar esas dos lineas del `.env` local, que es configuracion de la
+maquina del humano; o (b) reescribir la afirmacion de QC-129 —p. ej. con `vi.stubEnv`— para
+que no dependa de que la variable no exista, lo que toca la trazabilidad de **R2 de QC-129**,
+una ficha ya `done`. Elegir por mi cuenta seria adivinar.
+
+**Aviso para el gate completo previo al PR: este rojo volvera a salir en esta maquina, en
+cualquier rama, hasta que se resuelva (a) o (b).**
+
+### Estado
+
+- Merge `d6170815` **commiteado**, arbol limpio, 0 conflictos pendientes.
+- `./init.sh --rapido`: **rojo por ese unico test ajeno**; typecheck y lint verdes.
+- **NO se hizo `push`**, a proposito: el paso 5 iba detras de dejar el gate verde, y un
+  merge commit ya empujado es mas caro de rehacer si el leader prefiere otra salida.
