@@ -51,6 +51,7 @@ export {
 export { type NewProductBatch } from './domain/product-batch';
 export { type NewProduct, type ProductView } from './domain/product-view';
 export { type ProductStockByUnit, sumStockByUnit } from './domain/product-stock';
+export { type CostingBatch } from './domain/costing-batch';
 export { type PresentationView } from './domain/presentation-view';
 export { type ProductBatchView } from './domain/product-batch-view';
 export { type InventoryMovementView, type NewInventoryMovement } from './domain/inventory-movement';
@@ -81,4 +82,4 @@ export {
 
 // Solo tipos: por aqui otros modulos apuntan a un producto sin tocar la tabla ni Prisma. La
 // implementacion se cablea en `lib/composition`.
-export type { ProductCatalog, ProductId, ProductRef, CostingBatch } from './domain/product-catalog';
+export type { ProductCatalog, ProductId, ProductRef } from './domain/product-catalog';

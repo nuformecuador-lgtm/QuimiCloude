@@ -228,3 +228,65 @@ archivos y **3100** tests pasados (6 skipped) relacionados con los 58 archivos d
 
 **T11 sigue sin marcar a proposito**: se marca cuando el leader cierre con `./init.sh` completo y
 abra el PR. El gate completo **no lo ha corrido nadie todavia** sobre esta rama.
+
+7. **El rojo que solo salio en el gate completo: `CostingBatch` se muda a su propio archivo
+   (2026-09-19).** Con el `reviewer` ya en OK, `./init.sh` **completo** saco un rojo que
+   `--rapido` no habia sacado: `tests/unit/unidades/module-contract.test.ts:617`, caso «la unidad
+   del producto es la DERIVADA del lote y nunca un texto». La asercion que fallaba es
+
+       expect(catalogo, 'ProductRef recupero una unidad que nadie consume').not.toMatch(/unitId/)
+
+   **Es un rojo de esta rama, no deuda de `dev`**: no esta en `tests/baseline-rojos.json`. Lo
+   provoco `CostingBatch`, que esta rama habia declarado dentro de
+   `lib/modules/inventario/domain/product-catalog.ts` con un campo `unitId`.
+
+   **Diagnostico.** El SUJETO de esa guardia es `ProductRef` —lo dicen su comentario y el propio
+   mensaje de la asercion—, pero su IMPLEMENTACION es un regex sobre el texto entero del archivo,
+   mas grueso que su sujeto. `CostingBatch` no es `ProductRef`: es un tipo auxiliar, su `unitId`
+   **si lo consume alguien** (`order-cost.ts:146` lo necesita para convertir entre la unidad del
+   lote y la de la linea de receta) y **no es texto libre** sino una referencia al catalogo, que
+   es justo lo que el criterio de la guardia exige. La segunda asercion del caso
+   (`CAMPO_UNIT_TEXTO`) nunca fallo: busca `unit:` y `unitId:` no la activa.
+
+   **Por que se movio el tipo y NO se toco la guardia.** El criterio de la guardia es correcto y
+   sigue vigente; cambiarlo para acomodar un caso que no es su sujeto seria aflojar una
+   proteccion viva por comodidad, y ademas es una decision del humano, no del implementador. La
+   guardia quedo **intacta**. Nota para quien lea el diff: el `unitId` que queda en
+   `product-catalog.ts:15` esta dentro de un comentario y no cuenta — el ayudante `read()` de la
+   guardia (`leerFuente`) borra comentarios antes de aplicar el regex, que es tambien la razon de
+   que el archivo pasara la guardia antes de esta rama.
+
+   **El precedente en que se apoya.** El repo ya habia resuelto exactamente este caso en este
+   mismo modulo: `ProductStockByUnit` es tambien un tipo auxiliar alcanzable desde `ProductRef`
+   que lleva `readonly unitId: UnitId`, y vive en su propio archivo
+   `lib/modules/inventario/domain/product-stock.ts`, que la guardia no lee, reexportado por el
+   barrel. `CostingBatch` sigue ese patron y nada mas.
+
+   **Cambios.**
+   - Nuevo `lib/modules/inventario/domain/costing-batch.ts` con `CostingBatch` y su docblock.
+   - `unitId` pasa de `string` suelto a **`UnitId`** de `@/lib/modules/unidades`, como
+     `product-stock.ts` y `product-view.ts:65`. `UnitId` es alias de `string`, asi que **no
+     rompio a ningun consumidor**: `toCostingBatch` sigue asignando el `string` de Prisma sin
+     cast ninguno.
+   - `product-catalog.ts` solo importa el tipo; la firma de `findCostingBatches` **no cambia**.
+   - `product-catalog-prisma.ts` ajusta su import de ruta profunda al archivo nuevo (era lo unico
+     que no pasaba por el barrel; `tsc` lo saco con `TS2459`).
+   - El barrel sigue exportando `CostingBatch` con el mismo nombre y desde el mismo sitio
+     publico, ahora en su linea propia junto a `product-stock`: **`pedidos` no se entera**.
+   - `design.md` deja de declarar el tipo dentro de `product-catalog.ts` y dice donde vive.
+
+   **Ningun comportamiento cambia**: es una mudanza de tipo y un alias mas estrecho.
+
+## Verificacion de la mudanza de `CostingBatch` (2026-09-19)
+
+- `npx tsc --noEmit` — verde, sin salida.
+- `npx vitest run tests/unit/unidades/module-contract.test.ts` — **8/8 verdes**; el caso que
+  fallaba, en verde y con la guardia sin tocar.
+- `npx vitest run "tests/unit/pedidos/" "tests/unit/inventario/"` — **73 archivos, 1155 pasados,
+  5 skipped**.
+
+Ojo con el segundo comando si se repite sin la barra final: `tests/unit/pedidos` casa por PREFIJO
+y arrastra `tests/unit/pedidos-ui/`, cuya guardia de ficha ajena lee `git status --porcelain` sin
+filtrar y por eso ve un arbol sucio como archivos «tocados» por esa otra ficha. Con el arbol ya
+commiteado no aparece. **El gate completo no lo corre el implementador**: lo corre el leader al
+cerrar.

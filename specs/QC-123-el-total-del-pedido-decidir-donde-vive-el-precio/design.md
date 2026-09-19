@@ -83,8 +83,13 @@ módulos por un dato que uno de ellos ya no necesita»— sigue intacta.
 
 ### 1.1 El contrato nuevo
 
+`CostingBatch` vive en su propio archivo, `lib/modules/inventario/domain/costing-batch.ts`, y no
+en `product-catalog.ts`: es un tipo auxiliar con `unitId: UnitId`, igual que `ProductStockByUnit`
+en `product-stock.ts`, para que el archivo del contrato público de producto no lleve una unidad en
+su texto.
+
 ```ts
-// lib/modules/inventario/domain/product-catalog.ts  (AMPLIACIÓN)
+// lib/modules/inventario/domain/costing-batch.ts
 
 /** Un lote con existencia, visto desde fuera de `inventario` para costear. `stock` es `Int` en
  *  la base; `unitCost` viaja como cadena decimal; `unitId` es el de la PRESENTACIÓN del lote;
@@ -94,9 +99,13 @@ export type CostingBatch = {
   readonly lot: string;
   readonly stock: number;
   readonly unitCost: string;
-  readonly unitId: string;
+  readonly unitId: UnitId;
   readonly purchaseDate: string;
 };
+```
+
+```ts
+// lib/modules/inventario/domain/product-catalog.ts  (AMPLIACIÓN)
 
 export interface ProductCatalog {
   findRefs(ids: readonly ProductId[], companyId: string): Promise<readonly ProductRef[]>;

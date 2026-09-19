@@ -1,6 +1,7 @@
 // lib/modules/inventario/domain/product-catalog.ts
 
 import type { ProductStockByUnit } from './product-stock';
+import type { CostingBatch } from './costing-batch';
 
 /** Identificador de un producto visto DESDE FUERA de `inventario`. Es lo unico que otro
  *  modulo guarda de un producto (p. ej. `recipe_lines.product_id`). */
@@ -23,18 +24,6 @@ export type ProductRef = {
   readonly name: string;
   /** Suma de lotes por unidad; array vacio cuando el producto no tiene ninguno. */
   readonly stockByUnit: readonly ProductStockByUnit[];
-};
-
-/** Un lote con existencia, visto desde fuera de `inventario` para costear. `stock` es `Int`
- *  en la base; `unitCost` viaja como cadena decimal; `unitId` es el de la PRESENTACION del
- *  lote; `purchaseDate` en `YYYY-MM-DD` (la columna es `@db.Date`, sin hora). */
-export type CostingBatch = {
-  readonly productId: ProductId;
-  readonly lot: string;
-  readonly stock: number;
-  readonly unitCost: string;
-  readonly unitId: string;
-  readonly purchaseDate: string;
 };
 
 /** Servicio que `inventario` ofrece a los demas modulos (`docs/architecture.md > Dominio`

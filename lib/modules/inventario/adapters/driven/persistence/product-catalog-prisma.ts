@@ -4,7 +4,8 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import { sumStockByUnit } from '../../../domain/product-stock';
 import type { InventoryScope } from '../../../domain/inventory-scope';
-import type { CostingBatch, ProductId, ProductRef } from '../../../domain/product-catalog';
+import type { ProductId, ProductRef } from '../../../domain/product-catalog';
+import type { CostingBatch } from '../../../domain/costing-batch';
 import type { ProductStockByUnit } from '../../../domain/product-stock';
 
 import { batchCompanyScope, productCompanyScope } from './company-scope';
