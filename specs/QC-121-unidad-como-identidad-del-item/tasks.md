@@ -135,7 +135,7 @@
       - **Hecho**: typecheck verde; los campos viejos y nuevos conviven.
       - Depende de: T4, **T14** (Enmienda: los dos tocan `product-prisma.ts`; T14 va antes).
 
-- [ ] **T6. [P] Listado: nombre con unidad, existencia guardada, alerta, orden y filtro.**
+- [x] **T6. [P] Listado: nombre con unidad, existencia guardada, alerta, orden y filtro.**
       (`design.md > 7`; R4, R15, R16, R17, R18.)
       - Archivos: `lib/modules/inventario/domain/product-queryable.ts`, `product-prisma.ts`
         (`productOrderBy`, `productFilterWhere`), `app/(private)/inventario/components/`
@@ -151,7 +151,7 @@
       - **Hecho**: los casos en verde y el árbol compila.
       - Depende de: T1, T5. `[P]` con T7 y T8.
 
-- [ ] **T7. [P] Receta: el selector usa la unidad guardada y pinta «nombre · unidad».** (R4, R18.)
+- [x] **T7. [P] Receta: el selector usa la unidad guardada y pinta «nombre · unidad».** (R4, R18.)
       - Archivos: `app/(private)/produccion/formulas/components/product-picker.tsx`,
         `recipe-lines-field.tsx` (pasa `units`), `unit-group.ts` (sólo comentario),
         `nueva/page.tsx:76`, `[id]/page.tsx:120` (`unitId: item.unitId`).
@@ -162,7 +162,7 @@
       - **Hecho**: opciones «nombre · unidad»; un producto sin unidad sale sólo con nombre.
       - Depende de: T1, T5. `[P]` con T6 y T8.
 
-- [ ] **T8. [P] Presentación con lotes: la unidad no cambia.** (`design.md > 6`; R20, R21, R22.)
+- [x] **T8. [P] Presentación con lotes: la unidad no cambia.** (`design.md > 6`; R20, R21, R22.)
       - Archivos: `lib/modules/inventario/ports/presentation-repository.ts` (`'unit_locked'`),
         `…/presentation-prisma.ts` (`replacePresentation` traduce el `23514` por SQLSTATE y
         nombre), `lib/modules/inventario/domain/update-presentation.ts`,
