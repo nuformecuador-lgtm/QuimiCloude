@@ -27,20 +27,37 @@ vi.mock('@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai', () => ({
 import { documentos } from '@/lib/composition';
 
 describe('documentos — la fachada expone la lectura con IA (fachada cableada)', () => {
-  it('R21 — expone readPdfWithAi y processPdfByStrategy junto a las cuatro claves que ya tenia, y todas son funciones', () => {
+  it('R21 — expone exactamente las diez claves del censo, y cada una con la forma que promete', () => {
+    // 2026-09-18 (QC-111, `@upstash/qstash` y su Route Handler ya aprobados): el procesamiento en
+    // cola suma cuatro claves legitimas al censo -- `enqueueBatch`, `getBatchStatus`,
+    // `queueSignature` y `runDocumentJob` --. La lista sigue siendo un censo CERRADO comparado con
+    // `toEqual`, nunca `toContain`: cualquier clave nueva que no se declare aqui pone este caso en
+    // rojo.
     expect(Object.keys(documentos).sort()).toEqual(
       [
         'convertPdfs',
         'downloadDocument',
+        'enqueueBatch',
+        'getBatchStatus',
         'issueReadLink',
         'issueUploadLinks',
+        'queueSignature',
         'readPdfWithAi',
         'processPdfByStrategy',
+        'runDocumentJob',
       ].sort(),
     );
-    for (const clave of Object.keys(documentos) as (keyof typeof documentos)[]) {
+    // `queueSignature` es el objeto del puerto -verificar una firma no es un caso de uso, R8-, no
+    // una funcion: se comprueba aparte para no perder la afirmacion original sobre el resto.
+    const clavesFuncion = (Object.keys(documentos) as (keyof typeof documentos)[]).filter(
+      (clave) => clave !== 'queueSignature',
+    );
+    for (const clave of clavesFuncion) {
       expect(typeof documentos[clave]).toBe('function');
     }
+    expect(typeof documentos.queueSignature).toBe('object');
+    expect(typeof documentos.queueSignature.verify).toBe('function');
+    expect(typeof documentos.queueSignature.messageIdOf).toBe('function');
   });
 
   it('R22, R26 — construir la fachada con GEMINI_API_KEY y GEMINI_MODEL ausentes no lanza', () => {
