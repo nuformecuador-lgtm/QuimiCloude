@@ -62,6 +62,22 @@ function dobleDeConteo(pages: number | (() => never) = 3) {
   });
 }
 
+const PROMPT_INYECTADO = 'PROMPT DE PRUEBA — inyectado por el test, nunca el texto real';
+
+/** El doble del puerto de prompt: devuelve el texto inyectado, nunca uno real. */
+function dobleDePrompt(text: string = PROMPT_INYECTADO) {
+  return { promptFor: vi.fn((): string => text) };
+}
+
+/** El doble del puerto de prompt cuando la variable de entorno falta: lanza como el adaptador real. */
+function dobleDePromptQueFalta(nombreDeVariable: string) {
+  return {
+    promptFor: vi.fn((): string => {
+      throw new Error(`falta la variable de entorno ${nombreDeVariable}`);
+    }),
+  };
+}
+
 function espiaDeRegistro() {
   const run = vi.fn<(summary: StrategyRunSummary) => void>();
   return { log: { run }, run };
@@ -91,7 +107,12 @@ describe('documentos — procesar un PDF por estrategia', () => {
     const readPdfWithAi = lecturaQueDevuelve('no deberia llegar aqui');
     const countPages = dobleDeConteo();
     const espia = espiaDeRegistro();
-    const procesar = createProcessPdfByStrategy({ readPdfWithAi, countPages, log: espia.log });
+    const procesar = createProcessPdfByStrategy({
+      readPdfWithAi,
+      countPages,
+      log: espia.log,
+      prompt: dobleDePrompt(),
+    });
 
     // La entrada esta TIPADA como `PdfStrategy`, asi que el valor invalido solo puede entrar con un
     // cast: el caso simula al llamante que no valido antes de llamar, que es justo lo que R1
@@ -121,6 +142,7 @@ describe('documentos — procesar un PDF por estrategia', () => {
       readPdfWithAi,
       countPages: dobleDeConteo(),
       log: espia.log,
+      prompt: dobleDePrompt(),
     });
 
     const resultado = await procesar({
@@ -153,6 +175,7 @@ describe('documentos — procesar un PDF por estrategia', () => {
       readPdfWithAi,
       countPages: dobleDeConteo(),
       log: espiaDeRegistro().log,
+      prompt: dobleDePrompt(),
     });
 
     const resultado = await procesar({ strategy: 'catalogo', path: PATH, bytes: pdfBytes() });
@@ -172,6 +195,7 @@ describe('documentos — procesar un PDF por estrategia', () => {
       readPdfWithAi,
       countPages: dobleDeConteo(),
       log: espiaDeRegistro().log,
+      prompt: dobleDePrompt(),
     });
 
     const resultado = await procesar({ strategy: 'formula', path: PATH, bytes: pdfBytes() });
@@ -191,6 +215,7 @@ describe('documentos — procesar un PDF por estrategia', () => {
         readPdfWithAi,
         countPages: dobleDeConteo(),
         log: espiaDeRegistro().log,
+        prompt: dobleDePrompt(),
       });
 
       // La entrada del caso de uso NO lleva prompt: el texto lo pone la estrategia.
@@ -218,6 +243,7 @@ describe('documentos — procesar un PDF por estrategia', () => {
       readPdfWithAi,
       countPages: dobleDeConteo(),
       log: espiaDeRegistro().log,
+      prompt: dobleDePrompt(),
     });
 
     const resultado = await procesar({ strategy: 'formula', path: PATH, bytes: pdfBytes() });
@@ -240,6 +266,7 @@ describe('documentos — procesar un PDF por estrategia', () => {
       readPdfWithAi: lecturaQueDevuelve(TEXTO_DE_LA_IA),
       countPages: dobleDeConteo(7),
       log: enExito.log,
+      prompt: dobleDePrompt(),
     })({ strategy: 'catalogo', path: PATH, bytes: pdfBytes() });
 
     expect(enExito.run, 'R8: una ejecucion con exito registra UNA entrada.').toHaveBeenCalledTimes(1);
@@ -261,6 +288,7 @@ describe('documentos — procesar un PDF por estrategia', () => {
       readPdfWithAi: lecturaQueFalla('ai_unavailable', 'el proveedor no respondio'),
       countPages: dobleDeConteo(7),
       log: enFallo.log,
+      prompt: dobleDePrompt(),
     })({ strategy: 'formula', path: PATH, bytes: pdfBytes() });
 
     expect(
@@ -284,6 +312,7 @@ describe('documentos — procesar un PDF por estrategia', () => {
       readPdfWithAi: lecturaQueDevuelve(TEXTO_DE_LA_IA),
       countPages,
       log: espia.log,
+      prompt: dobleDePrompt(),
     })({ strategy: 'catalogo', path: PATH, bytes: pdfBytes() });
 
     expect(countPages).toHaveBeenCalledTimes(1);
@@ -300,6 +329,7 @@ describe('documentos — procesar un PDF por estrategia', () => {
       readPdfWithAi: lecturaQueDevuelve(TEXTO_DE_LA_IA),
       countPages: dobleDeConteo(),
       log: espia.log,
+      prompt: dobleDePrompt(),
     })({ strategy: 'catalogo', path: PATH, bytes: pdfBytes() });
 
     const resumen = espia.run.mock.calls[0]?.[0] as StrategyRunSummary;
@@ -334,6 +364,7 @@ describe('documentos — procesar un PDF por estrategia', () => {
         readPdfWithAi: lecturaQueFalla(fallo.code, fallo.reason),
         countPages: dobleDeConteo(),
         log: espia.log,
+        prompt: dobleDePrompt(),
       });
 
       const resultado = await procesar({ strategy: 'catalogo', path: PATH, bytes: pdfBytes() });
@@ -360,6 +391,7 @@ describe('documentos — procesar un PDF por estrategia', () => {
       readPdfWithAi,
       countPages: dobleDeConteo(),
       log: espia.log,
+      prompt: dobleDePrompt(),
     });
 
     // La comprobacion de verdad la hace el compilador: si algun dia la firma admitiera un actor,
@@ -394,6 +426,7 @@ describe('documentos — procesar un PDF por estrategia', () => {
       readPdfWithAi: lecturaQueDevuelve(TEXTO_DE_LA_IA),
       countPages: dobleDeConteo(reventar),
       log: espia.log,
+      prompt: dobleDePrompt(),
     });
 
     const resultado = await conConteoRoto({ strategy: 'catalogo', path: PATH, bytes: pdfBytes() });
@@ -409,6 +442,7 @@ describe('documentos — procesar un PDF por estrategia', () => {
       readPdfWithAi: lecturaQueDevuelve(TEXTO_DE_LA_IA),
       countPages: dobleDeConteo(3),
       log: conConteoSano.log,
+      prompt: dobleDePrompt(),
     })({ strategy: 'catalogo', path: PATH, bytes: pdfBytes() });
 
     expect(
@@ -428,6 +462,7 @@ describe('documentos — procesar un PDF por estrategia', () => {
       readPdfWithAi,
       countPages: dobleDeConteo(),
       log: espia.log,
+      prompt: dobleDePrompt(),
     });
 
     // Se captura a mano en vez de con `.resolves`: asi el caso solo pasa si de verdad hay un
@@ -470,6 +505,89 @@ describe('documentos — procesar un PDF por estrategia', () => {
         'ejecucion.',
     ).toHaveBeenCalledTimes(1);
     expect((espia.run.mock.calls[0]?.[0] as StrategyRunSummary).textLength).toBe(0);
+  });
+
+  it('R1 — con el prompt inyectado, la lectura recibe ese texto y el resultado lo devuelve tal cual', async () => {
+    const readPdfWithAi = lecturaQueDevuelve(TEXTO_DE_LA_IA);
+    const prompt = dobleDePrompt('PROMPT DE PRUEBA — caso de exito');
+    const procesar = createProcessPdfByStrategy({
+      readPdfWithAi,
+      countPages: dobleDeConteo(),
+      log: espiaDeRegistro().log,
+      prompt,
+    });
+
+    const resultado = await procesar({ strategy: 'catalogo', path: PATH, bytes: pdfBytes() });
+
+    expect(prompt.promptFor).toHaveBeenCalledWith('catalogo');
+    expect(readPdfWithAi.mock.calls[0]?.[0]?.prompt).toBe('PROMPT DE PRUEBA — caso de exito');
+    expect(textoDe(resultado)).toBe(TEXTO_DE_LA_IA);
+  });
+
+  it('R4 — si el prompt de la estrategia falta, el procesamiento falla sin llamar a la lectura con IA', async () => {
+    const readPdfWithAi = lecturaQueDevuelve('no deberia llegar aqui');
+    const espia = espiaDeRegistro();
+    const procesar = createProcessPdfByStrategy({
+      readPdfWithAi,
+      countPages: dobleDeConteo(),
+      log: espia.log,
+      prompt: dobleDePromptQueFalta('CATALOG_PROMPT'),
+    });
+
+    const resultado = await procesar({ strategy: 'catalogo', path: PATH, bytes: pdfBytes() });
+
+    expect(resultado.ok).toBe(false);
+    expect(falloDe(resultado).code).toBe(new UnexpectedError().code);
+    expect(falloDe(resultado).reason).toContain('CATALOG_PROMPT');
+    expect(
+      readPdfWithAi,
+      'R4: sin el prompt de la estrategia no se llama a la lectura con IA ni al proveedor.',
+    ).not.toHaveBeenCalled();
+    expect(espia.run).toHaveBeenCalledTimes(1);
+    expect(espia.run.mock.calls[0]?.[0]).toEqual({
+      strategy: 'catalogo',
+      mode: 'images',
+      path: PATH,
+      pages: null,
+      textLength: 0,
+    });
+  });
+
+  it('R6 — el fallo por prompt ausente registra una sola linea, con el modo de la estrategia y paginas nulas', async () => {
+    const espia = espiaDeRegistro();
+    const procesar = createProcessPdfByStrategy({
+      readPdfWithAi: lecturaQueDevuelve('no deberia llegar aqui'),
+      countPages: dobleDeConteo(),
+      log: espia.log,
+      prompt: dobleDePromptQueFalta('FORMULA_PROMPT'),
+    });
+
+    await procesar({ strategy: 'formula', path: PATH, bytes: pdfBytes() });
+
+    expect(espia.run).toHaveBeenCalledTimes(1);
+    const resumen = espia.run.mock.calls[0]?.[0] as StrategyRunSummary;
+    expect(resumen.mode).toBe('pdf');
+    expect(resumen.pages).toBeNull();
+  });
+
+  it('R7 — ni el reason de un fallo de lectura ni el resumen registrado contienen el texto del prompt inyectado', async () => {
+    const TEXTO_QUE_NUNCA_DEBE_APARECER = 'PROMPT DE PRUEBA — no debe fugarse a ningun sitio';
+    const espia = espiaDeRegistro();
+    const procesar = createProcessPdfByStrategy({
+      // La lectura falla DESPUES de recibir el prompt: si algo lo copiara al reason, este caso lo veria.
+      readPdfWithAi: lecturaQueFalla('ai_unavailable', 'el proveedor no respondio'),
+      countPages: dobleDeConteo(),
+      log: espia.log,
+      prompt: dobleDePrompt(TEXTO_QUE_NUNCA_DEBE_APARECER),
+    });
+
+    const resultado = await procesar({ strategy: 'catalogo', path: PATH, bytes: pdfBytes() });
+
+    expect(falloDe(resultado).reason.includes(TEXTO_QUE_NUNCA_DEBE_APARECER)).toBe(false);
+    for (const valor of valoresHondos(espia.run.mock.calls[0]?.[0])) {
+      const comoTexto = typeof valor === 'string' ? valor : String(valor);
+      expect(comoTexto.includes(TEXTO_QUE_NUNCA_DEBE_APARECER)).toBe(false);
+    }
   });
 });
 
