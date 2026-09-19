@@ -173,7 +173,7 @@ export function WorkGroupMembers({ workGroupId }: WorkGroupMembersProps) {
     }).then((result) => {
       if (cancelled || result === undefined) return;
       // El `ErrorState` viaja ENTERO, no aplanado a `string`: asi el inesperado conserva su
-      // identificador de peticion (QC-71 R17).
+      // identificador de peticion.
       setMembers(
         result.status === 'error'
           ? { status: 'error', key, error: result }

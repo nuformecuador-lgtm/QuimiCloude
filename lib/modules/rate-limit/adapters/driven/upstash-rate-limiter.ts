@@ -22,7 +22,7 @@ function sameQuota(a: RateLimitQuota, b: RateLimitQuota): boolean {
  * Un `Ratelimit` de ventana fija por `prefix`, recreado solo si cambia la cuota para
  * conservar la cache en memoria de orígenes ya bloqueados mientras dure la instancia. Las
  * credenciales llegan crudas y no un cliente ya armado: este es el unico archivo autorizado a
- * tocar `@upstash/*` (R31).
+ * tocar `@upstash/*`.
  */
 export function createUpstashRateLimiter(credentials: UpstashCredentials, prefix: string): RateLimiter {
   const redis = new Redis({ url: credentials.url, token: credentials.token });
