@@ -8,7 +8,7 @@
 
 ---
 
-## T0 — Lo que se HEREDA montado y NO se re-crea
+## [x] T0 — Lo que se HEREDA montado y NO se re-crea
 
 No es una task de escritura: es la lista de lo que ya existe y que el implementer **no** debe
 volver a construir. Criterio de hecho: leídas las seis piezas y confirmadas en la rama.
@@ -24,7 +24,7 @@ volver a construir. Criterio de hecho: leídas las seis piezas y confirmadas en 
 
 ---
 
-## T1 — Esquema y migración `[depende de T0]`
+## [x] T1 — Esquema y migración `[depende de T0]`
 
 Archivos: `db/schema.prisma` (modelo `Order`),
 `db/migrations/<ts>_orders_add_ingredients_cost/migration.sql` y `down.sql`.
@@ -37,7 +37,7 @@ Archivos: `db/schema.prisma` (modelo `Order`),
 `_prisma_migrations` coherente, y un test de esquema comprueba que la columna es **opcional**,
 `Decimal(14,4)`, y que no nació ninguna tabla ni ninguna columna de moneda.
 
-## T2 — El cálculo, dominio puro `[P con T3]` `[depende de T0]`
+## [x] T2 — El cálculo, dominio puro `[P con T3]` `[depende de T0]`
 
 Archivos: `lib/modules/pedidos/domain/order-cost.ts` (nuevo).
 
@@ -59,7 +59,7 @@ una milésima, dos lotes con misma fecha de compra (con lotes `'9'` y `'10'`), u
 convertibles, unidades sin base común, receta sin líneas, producto sin lotes, promedio simple de
 dos lotes de coste distinto y un resultado que desborda la columna — **todo sin base de datos**.
 
-## T3 — `inventario` publica los lotes costeables `[P con T2]` `[depende de T0]`
+## [x] T3 — `inventario` publica los lotes costeables `[P con T2]` `[depende de T0]`
 
 Archivos: `lib/modules/inventario/domain/product-catalog.ts` (amplía el tipo y el interface),
 `lib/modules/inventario/index.ts` (reexporta `CostingBatch`),
@@ -74,7 +74,7 @@ Archivos: `lib/modules/inventario/domain/product-catalog.ts` (amplía el tipo y 
 y la exclusión de `stock = 0`, y la guardia de módulos sigue verde (solo `inventario` toca
 `prisma.productBatch`).
 
-## T4 — El puerto de pedidos acepta el importe `[depende de T1]`
+## [x] T4 — El puerto de pedidos acepta el importe `[depende de T1]`
 
 Archivos: `lib/modules/pedidos/ports/order-repository.ts`,
 `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts`,
@@ -88,7 +88,7 @@ Archivos: `lib/modules/pedidos/ports/order-repository.ts`,
 `tests/unit/pedidos/order-view.test.ts` comprueba que la salida lleva el campo, que `null` no se
 vuelve `'0.0000'` y que no existe ningún campo de precio ni de moneda.
 
-## T5 — Alta y edición calculan `[depende de T2, T3, T4]`
+## [x] T5 — Alta y edición calculan `[depende de T2, T3, T4]`
 
 Archivos: `lib/modules/pedidos/domain/create-order.ts`, `.../update-order.ts`.
 
@@ -101,7 +101,7 @@ Archivos: `lib/modules/pedidos/domain/create-order.ts`, `.../update-order.ts`.
 dobles que **fallan si se los llama** sin permiso, y **cuentan invocaciones** de puerto (una a
 lotes y una a unidades por escritura, tenga la receta 1 o 20 líneas).
 
-## T6 — Composición `[depende de T5]`
+## [x] T6 — Composición `[depende de T5]`
 
 Archivos: `lib/composition/index.ts` (solo el bloque de `pedidos`, `:941-950`, y la constante
 `productCatalog` de `:712`).
@@ -111,7 +111,7 @@ Archivos: `lib/composition/index.ts` (solo el bloque de `pedidos`, `:941-950`, y
 
 **Hecho cuando:** `typecheck` y `lint` verdes y las guardias de arquitectura siguen verdes.
 
-## T7 — Las lecturas NO recalculan `[P con T8]` `[depende de T4]`
+## [x] T7 — Las lecturas NO recalculan `[P con T8]` `[depende de T4]`
 
 Archivos: ninguno de producción (verificación); `tests/unit/pedidos/list-orders.test.ts`,
 `tests/unit/pedidos/order-service.test.ts`.
@@ -120,7 +120,7 @@ Archivos: ninguno de producción (verificación); `tests/unit/pedidos/list-order
 `products` ni `units` y devuelven el importe **tal como está guardado**, y otro que demuestra que
 cambiar los lotes no altera el importe de un pedido ya creado.
 
-## T8 — La vía de `asignaciones` y el catálogo de permisos, intactos `[P con T7]`
+## [x] T8 — La vía de `asignaciones` y el catálogo de permisos, intactos `[P con T7]`
 
 Archivos: ninguno de producción. Tests:
 `tests/unit/asignaciones/list-assigned-orders.test.ts`,
@@ -131,7 +131,7 @@ Archivos: ninguno de producción. Tests:
 `OrderCatalog` ganan el importe, y el catálogo sigue teniendo **quince** permisos con el Operador
 en dos.
 
-## T9 — No ordenable ni filtrable, y sin pantalla `[P con T7, T8]`
+## [x] T9 — No ordenable ni filtrable, y sin pantalla `[P con T7, T8]`
 
 Archivos: ninguno de producción. Tests: `tests/unit/pedidos/list-orders.test.ts`,
 `tests/unit/pedidos-ui/order-columns.test.tsx`.
@@ -140,7 +140,7 @@ Archivos: ninguno de producción. Tests: `tests/unit/pedidos/list-orders.test.ts
 como orden o filtro se **poda y se anota** sin fallar la consulta; y otro comprueba que la tabla
 de pedidos **no** pinta ninguna columna de importe (lo hace QC-122).
 
-## T10 — Integración contra la base real `[depende de T6]`
+## [x] T10 — Integración contra la base real `[depende de T6]`
 
 Archivos: `tests/integration/pedidos/order-ingredients-cost.int.test.ts` (nuevo).
 
