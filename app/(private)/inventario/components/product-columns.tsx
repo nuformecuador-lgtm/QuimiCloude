@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
-import type { ProductView } from '@/lib/modules/inventario';
+import { productDisplayName, type ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 /**
@@ -36,26 +36,17 @@ import type { UnitRef } from '@/lib/modules/unidades';
 export const EMPTY_CELL = '—';
 
 /**
- * Campos de `ProductView` que la decision del 2026-09-03 (y la del 2026-09-09) deja FUERA de
- * la tabla: el identificador tecnico y el id de la unidad -un UUID que nadie resuelve a nombre-.
+ * Campos de `ProductView` que quedan FUERA de la tabla como columna propia: el identificador
+ * tecnico, la ruta de la imagen y el id de la unidad -un UUID que esta pantalla no resuelve a
+ * nombre por si solo-. La unidad no desaparece: se pinta junto al nombre (`nameCell`) y junto a
+ * la existencia (`existenceLabel`), resuelta contra el catalogo que recibe la columna.
  *
- * `latestBatchUnitId` esta aqui por una razon posterior, y bajo ese nombre desde QC-80: el merge
- * de QC-32 (`modelo-unidades`) convirtio la unidad en catalogo -asi que `ProductView` dejo de
- * traer el texto `unit` y paso a traer una clave foranea-, y QC-80 (R21, R22) le quito la columna
- * al producto y la dejo DERIVADA de la presentacion de su lote mas reciente. Cambio el nombre y
- * cambio el origen; lo que NO cambio es el motivo de ocultarla: sigue siendo un UUID que esta
- * pantalla no sabe resolver a nombre, y pintarlo seria peor que no mostrar nada.
- *
- * `imagePath` tambien esta fuera, y es el mismo criterio: la RUTA no se pinta como texto. La
- * imagen se ve -es la primera columna desde el 2026-09-07-, pero su columna se llama `image` y
- * pinta una miniatura, no la cadena.
- *
- * La presentacion y la autoria ya no estan en `ProductView` (se mudaron a `product_batches` el
- * 2026-09-09), asi que no hay que ocultarlas: no existen en el tipo.
+ * `imagePath` esta fuera por el mismo criterio: la RUTA no se pinta como texto. La imagen se ve
+ * -es la primera columna-, pero su columna se llama `image` y pinta una miniatura, no la cadena.
  */
 type HiddenProductField =
   | 'id'
-  | 'latestBatchUnitId'
+  | 'unitId'
   | 'imagePath';
 
 /** Id de la columna de la miniatura. No es un campo de `ProductView`: es marcado. */
@@ -108,30 +99,31 @@ function unitLabel(unitId: UnitRef['id'], units: readonly UnitRef[] | undefined)
 }
 
 /**
- * La existencia esta en alarma cuando la alerta de cantidad SUPERA la del lote mas reciente del
- * producto; las existencias en otras unidades no cuentan. Sin lotes, esa existencia es 0.
+ * La existencia esta en alarma cuando la alerta de cantidad SUPERA la existencia guardada del
+ * producto. Sin lotes, esa existencia es 0 y la alarma sigue funcionando igual.
  *
  * El nombre no es casual: `inventario-schema.test.ts` prohibe `isBelowAlert` y sus hermanos
  * COMO CAMPO DEL ESQUEMA -no puede existir una columna derivada de bajo de existencias-. Aqui es
  * una funcion de presentacion en un archivo de UI, que es justo lo que esa prohibicion deja vivo.
  */
 function isBelowAlert(product: ProductView): boolean {
-  if (typeof product.qtyAlert !== 'number') return false;
-  const existence =
-    product.stockByUnit.find((entry) => entry.unitId === product.latestBatchUnitId)?.quantity ?? 0;
-  return product.qtyAlert > existence;
+  return typeof product.qtyAlert === 'number' && product.qtyAlert > product.stock;
 }
 
-/** Cantidad por unidad, unida con « · », o `0` cuando el producto no tiene ningun lote. */
-function existenceLabel(product: ProductView, units: readonly UnitRef[] | undefined): string {
-  if (product.stockByUnit.length === 0) return '0';
+/** Etiqueta de la unidad del producto, o `null` sin unidad o sin catalogo. */
+function productUnitLabel(product: ProductView, units: readonly UnitRef[] | undefined): string | null {
+  return product.unitId === null ? null : unitLabel(product.unitId, units);
+}
 
-  return product.stockByUnit
-    .map((entry) => {
-      const label = unitLabel(entry.unitId, units);
-      return label === null ? String(entry.quantity) : `${entry.quantity} ${label}`;
-    })
-    .join(' · ');
+/** Existencia guardada junto a la unidad del producto, o solo el numero sin unidad ni catalogo. */
+function existenceLabel(product: ProductView, units: readonly UnitRef[] | undefined): string {
+  const label = productUnitLabel(product, units);
+  return label === null ? String(product.stock) : `${product.stock} ${label}`;
+}
+
+/** «nombre · unidad», o solo el nombre sin unidad o sin catalogo. */
+function nameCell(product: ProductView, units: readonly UnitRef[] | undefined): string {
+  return productDisplayName(product.name, productUnitLabel(product, units));
 }
 
 /**
@@ -186,12 +178,14 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       label: 'Nombre',
       align: 'start',
       sortable: true,
-      cell: (product) => product.name,
+      cell: (product) => nameCell(product, units),
     },
     {
-      id: 'stockByUnit',
+      id: 'stock',
       label: 'Existencia',
       align: 'end',
+      sortable: true,
+      filter: { kind: 'numberRange' },
       cell: (product) => stockCell(product, units),
     },
     {

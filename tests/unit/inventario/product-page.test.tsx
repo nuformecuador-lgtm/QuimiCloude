@@ -246,15 +246,9 @@ const PRESENTACION_B = { id: crypto.randomUUID(), name: 'Saco 25 kg' };
 const PRESENTACION_NUEVA = { id: crypto.randomUUID(), name: 'Garrafa 5 L' };
 
 /**
- * Id de unidad del fixture, **tambien inconfundible y tambien invisible**. Desde el merge de
- * QC-32 (`modelo-unidades`) la unidad es una clave foranea al catalogo y no un texto, y esta
- * pantalla no tiene forma de resolverla a un nombre.
- *
- * QC-80 (R21, R22) le cambio el NOMBRE y el ORIGEN -ya no es la columna `products.unit_id`, que
- * desaparecio, sino `ProductView.latestBatchUnitId`, derivada de la presentacion del lote mas
- * reciente-, pero **no le cambio el veredicto**: la unidad sigue fuera de la pantalla por la
- * decision humana del 2026-09-03, y este centinela vigila que no vuelva por la puerta de atras
- * pintando el UUID crudo, que seria peor que no mostrar nada.
+ * Id de unidad inconfundible que nunca deberia pintarse crudo: `ProductView.unitId` es una clave
+ * foranea al catalogo, y esta pantalla solo la resuelve a un nombre a traves de `units`. El caso
+ * dedicado compone un producto con esta unidad y comprueba que el UUID no aparece en el documento.
  */
 const UNIDAD_QUE_NO_DEBE_VERSE = 'UNIDAD-ID-NO-VISIBLE';
 
@@ -277,11 +271,13 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
     id: crypto.randomUUID(),
     name: 'Hidróxido de sodio',
     imagePath: null,
-    stockByUnit: [],
     stock: 0,
     unitId: null,
     qtyAlert: 5,
-    latestBatchUnitId: UNIDAD_QUE_NO_DEBE_VERSE,
+    // Campos heredados que la lectura de esta pantalla ya no usa (`stock`/`unitId` los
+    // sustituyen); siguen en `ProductView` hasta que se retiren.
+    stockByUnit: [],
+    latestBatchUnitId: null,
     createdAt: new Date('2026-01-15T10:20:30.000Z'),
     updatedAt: new Date('2026-02-20T08:00:00.000Z'),
     ...overrides,
@@ -537,23 +533,20 @@ describe('pantalla de productos — lista', () => {
     expect(columnas.map((columna) => columna.id)).toEqual([
       'image',
       'name',
-      'stockByUnit',
+      'stock',
       'qtyAlert',
       'actions',
     ]);
   });
 
-  it('la tabla no muestra el id de la unidad', async () => {
-    // Test **en negativo**: el id de unidad esta en los datos y no puede llegar a la pantalla.
-    //
-    // La unidad se vigila desde el 2026-09-03: no lo pide R7, lo pide la decision de sacarla de
-    // la pantalla tras el merge de QC-32. Mientras nadie sepa resolver ese id a un nombre, la
-    // unica forma de "mostrar la unidad" seria pintar el UUID, y eso no se hace.
-    //
-    // Desde QC-80 el campo se llama `latestBatchUnitId` y sale del lote mas reciente (R22). El
-    // centinela se renombra CON el campo, a proposito: si solo se hubiera vigilado el nombre
-    // viejo, la unidad podria haber vuelto a la tabla con el nombre nuevo sin que nadie se
-    // enterara.
+  it('la unidad no es su propia columna: se lee junto al nombre y junto a la existencia', async () => {
+    // Test **en negativo**: el id de unidad esta en los datos y no puede llegar a la pantalla
+    // crudo, ni como columna propia. La unidad se pinta resuelta a nombre o simbolo (R18), nunca
+    // como el UUID de `ProductView.unitId`.
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ unitId: UNIDAD_QUE_NO_DEBE_VERSE })]),
+    );
+
     await renderPantalla();
 
     expect(document.body.textContent).not.toContain(UNIDAD_QUE_NO_DEBE_VERSE);
@@ -561,7 +554,7 @@ describe('pantalla de productos — lista', () => {
     const columnas = buildProductColumns({ rowActions: () => null });
     // `imagePath` esta en la lista de prohibidos: la imagen SE VE, pero su columna se llama
     // `image` y pinta una miniatura. La RUTA no es una columna.
-    for (const prohibida of ['id', 'unitId', 'latestBatchUnitId', 'imagePath']) {
+    for (const prohibida of ['id', 'unitId', 'imagePath']) {
       expect(
         columnas.some((columna) => String(columna.id) === prohibida),
         `«${prohibida}» no puede ser columna`,
@@ -630,28 +623,13 @@ describe('pantalla de productos — lista', () => {
     }
   });
 
-  it('R16 — la existencia se pinta en rojo cuando la alerta de cantidad supera la del lote mas reciente', async () => {
+  it('R17 — la existencia se pinta en rojo cuando la alerta de cantidad supera la existencia guardada', async () => {
     const UNIDAD_A = crypto.randomUUID();
     listProductsActionMock.mockResolvedValue(
       paginaDeProductos([
-        producto({
-          id: crypto.randomUUID(),
-          stockByUnit: [{ unitId: UNIDAD_A, quantity: 2 }],
-          latestBatchUnitId: UNIDAD_A,
-          qtyAlert: 5,
-        }),
-        producto({
-          id: crypto.randomUUID(),
-          stockByUnit: [{ unitId: UNIDAD_A, quantity: 5 }],
-          latestBatchUnitId: UNIDAD_A,
-          qtyAlert: 5,
-        }),
-        producto({
-          id: crypto.randomUUID(),
-          stockByUnit: [{ unitId: UNIDAD_A, quantity: 9 }],
-          latestBatchUnitId: UNIDAD_A,
-          qtyAlert: 5,
-        }),
+        producto({ id: crypto.randomUUID(), stock: 2, unitId: UNIDAD_A, qtyAlert: 5 }),
+        producto({ id: crypto.randomUUID(), stock: 5, unitId: UNIDAD_A, qtyAlert: 5 }),
+        producto({ id: crypto.randomUUID(), stock: 9, unitId: UNIDAD_A, qtyAlert: 5 }),
       ]),
     );
 
@@ -673,9 +651,7 @@ describe('pantalla de productos — lista', () => {
 
   it('R17 — un producto sin lotes y con alerta de cantidad configurada se marca en alerta', async () => {
     listProductsActionMock.mockResolvedValue(
-      paginaDeProductos([
-        producto({ id: crypto.randomUUID(), stockByUnit: [], latestBatchUnitId: null, qtyAlert: 5 }),
-      ]),
+      paginaDeProductos([producto({ id: crypto.randomUUID(), stock: 0, unitId: null, qtyAlert: 5 })]),
     );
 
     await renderPantalla();
@@ -683,17 +659,12 @@ describe('pantalla de productos — lista', () => {
     expect(screen.getByTestId('product-stock')).toHaveAttribute('data-alert', 'true');
   });
 
-  it('R18 — sin cantidad de alerta configurada, la existencia no se marca, tenga o no lotes', async () => {
+  it('R17 — sin cantidad de alerta configurada, la existencia no se marca, tenga o no lotes', async () => {
     const UNIDAD_A = crypto.randomUUID();
     listProductsActionMock.mockResolvedValue(
       paginaDeProductos([
-        producto({
-          id: crypto.randomUUID(),
-          stockByUnit: [{ unitId: UNIDAD_A, quantity: 0 }],
-          latestBatchUnitId: UNIDAD_A,
-          qtyAlert: null,
-        }),
-        producto({ id: crypto.randomUUID(), stockByUnit: [], latestBatchUnitId: null, qtyAlert: null }),
+        producto({ id: crypto.randomUUID(), stock: 0, unitId: UNIDAD_A, qtyAlert: null }),
+        producto({ id: crypto.randomUUID(), stock: 0, unitId: null, qtyAlert: null }),
       ]),
     );
 
@@ -704,49 +675,49 @@ describe('pantalla de productos — lista', () => {
     }
   });
 
-  it('R16 — la alerta ignora la existencia de otras unidades', async () => {
-    const UNIDAD_DEL_LOTE_MAS_RECIENTE = crypto.randomUUID();
-    const OTRA_UNIDAD = crypto.randomUUID();
-    listProductsActionMock.mockResolvedValue(
-      paginaDeProductos([
-        producto({
-          id: crypto.randomUUID(),
-          // Existencia sobrada en OTRA unidad; en la del lote mas reciente no hay nada (0).
-          stockByUnit: [{ unitId: OTRA_UNIDAD, quantity: 100 }],
-          latestBatchUnitId: UNIDAD_DEL_LOTE_MAS_RECIENTE,
-          qtyAlert: 5,
-        }),
-      ]),
-    );
-
-    await renderPantalla();
-
-    expect(screen.getByTestId('product-stock')).toHaveAttribute('data-alert', 'true');
-  });
-
-  it('R6 — la celda muestra una existencia por unidad, separadas por «·»', async () => {
+  it('R18 — el nombre del producto se pinta junto a la unidad guardada', async () => {
     const UNIDAD_KG = { ...UNIDAD, id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
-    const UNIDAD_L = { ...UNIDAD, id: crypto.randomUUID(), name: 'Litro', symbol: 'L' };
-    listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD_KG, UNIDAD_L] });
+    listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD_KG] });
     listProductsActionMock.mockResolvedValue(
-      paginaDeProductos([
-        producto({
-          stockByUnit: [
-            { unitId: UNIDAD_KG.id, quantity: 10 },
-            { unitId: UNIDAD_L.id, quantity: 20 },
-          ],
-        }),
-      ]),
+      paginaDeProductos([producto({ name: 'Hipoclorito', unitId: UNIDAD_KG.id })]),
     );
 
     await renderPantalla();
 
-    expect(screen.getByTestId('product-stock')).toHaveTextContent('10 kg · 20 L');
+    expect(screen.getByTestId('data-table-cell-name')).toHaveTextContent('Hipoclorito · kg');
   });
 
-  it('R7 — un producto sin lotes muestra su existencia como 0', async () => {
+  it('R18 — sin unidad guardada o sin catalogo de unidades, el nombre se pinta solo', async () => {
     listProductsActionMock.mockResolvedValue(
-      paginaDeProductos([producto({ stockByUnit: [], latestBatchUnitId: null })]),
+      paginaDeProductos([producto({ name: 'Hipoclorito', unitId: null })]),
+    );
+    await renderPantalla();
+    expect(screen.getByTestId('data-table-cell-name')).toHaveTextContent('Hipoclorito');
+    cleanup();
+
+    listUnitsActionMock.mockResolvedValue(errorInesperado());
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ name: 'Hipoclorito', unitId: crypto.randomUUID() })]),
+    );
+    await renderPantalla();
+    expect(screen.getByTestId('data-table-cell-name')).toHaveTextContent('Hipoclorito');
+  });
+
+  it('R16 — la celda muestra la existencia guardada junto a la unidad del producto', async () => {
+    const UNIDAD_KG = { ...UNIDAD, id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
+    listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD_KG] });
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ stock: 15, unitId: UNIDAD_KG.id })]),
+    );
+
+    await renderPantalla();
+
+    expect(screen.getByTestId('product-stock')).toHaveTextContent('15 kg');
+  });
+
+  it('R16 — un producto sin unidad muestra su existencia como 0', async () => {
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ stock: 0, unitId: null })]),
     );
 
     await renderPantalla();
@@ -757,9 +728,7 @@ describe('pantalla de productos — lista', () => {
   it('sin catalogo de unidades, la celda pinta la cantidad sin etiqueta', async () => {
     listUnitsActionMock.mockResolvedValue(errorInesperado());
     listProductsActionMock.mockResolvedValue(
-      paginaDeProductos([
-        producto({ stockByUnit: [{ unitId: crypto.randomUUID(), quantity: 10 }] }),
-      ]),
+      paginaDeProductos([producto({ stock: 10, unitId: crypto.randomUUID() })]),
     );
 
     await renderPantalla();
