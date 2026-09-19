@@ -57,16 +57,23 @@ salvo su stock recalculado`).
 
 ## Gate rapido tras T4/T14 (2026-09-19, relanzado)
 
-Preflight, typecheck, lint y guardias **verdes**. : 369 archivos, 5514 pasados, **25 rojos**, 26 skipped (1125 s).
+Preflight, typecheck, lint y guardias **verdes**. `test:rapido`: 369 archivos, 5514 pasados, **25 rojos**, 26 skipped (1125 s).
 Los 25, clasificados:
 
-- **22 por Postgres local 18.6** (, filas de la tabla del gate), en modulos que esta rama **no toca** ( vacio sobre ellos):
-  - 17  (identity 6, asignaciones 3, work-groups 2, unidades-constraints 2, inventario-constraints, presentation-uniqueness, pedidos-constraints, recetas-constraints).
-  - 3  R24: el adaptador mapea ; con 18.6 la FK RESTRICT sale como  y Prisma no la traduce, llega . Misma causa.
-  - 2  (proveedores, recetas) «9 vs 10»: fila  en  propia de 18.
-- **3 **: esperados; el disparador de T3 prohibe lotes en dos unidades. Los reescribe **T6**.
+- **22 por Postgres local 18.6** (`docs/verification.md`, tabla del gate), en modulos que esta rama
+  **no toca** (`git diff origin/dev...HEAD` vacio sobre `lib/modules/unidades` y esos tests):
+  - 17 `expected '23001' to be '23503'` (identity 6, asignaciones 3, work-groups 2,
+    unidades-constraints 2, inventario-constraints, presentation-uniqueness, pedidos-constraints,
+    recetas-constraints).
+  - 3 `unit-write.int.test.ts` R24: el adaptador traduce `P2003`; con 18.6 la FK RESTRICT sale como
+    `23001`, Prisma no la traduce y llega `PrismaClientUnknownRequestError`. Misma causa.
+  - 2 `company-scope.int.test.ts` (proveedores, recetas) «9 vs 10»: la fila `NOT NULL` propia de
+    `pg_constraint` en 18.
+- **3 `list-query-products.int.test.ts`**: esperados; el disparador de T3 prohibe lotes en dos
+  unidades. Los reescribe **T6**.
 
-**Decision humana 2026-09-19**: los rojos de Postgres 18.6 se aceptan como ajenos para cerrar QC-121. Con eso, T4 y T14 se marcan .
+**Decision humana 2026-09-19**: los rojos de Postgres 18.6 se aceptan como ajenos para cerrar
+QC-121. Con eso, T4 y T14 se marcan `[x]`.
 
 ## Mapa R<n> -> test
 
