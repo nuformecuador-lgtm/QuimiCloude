@@ -771,3 +771,194 @@ Todo arrancado y detenido en esta misma tanda: `next dev -p 3173` (arrancado con
 tras las pruebas del punto 1 y 2). `next build` y `next build --webpack` terminaron solos (con
 error) y no dejaron proceso de servidor arriba. Verificado al final: ningun proceso de `next`
 escuchando en `3173` (ni en `3000`/`3117`, que son de otros worktrees y no se tocaron).
+
+## T15 — E2E del login frenado
+
+> Implementer, 2026-09-19. Retoma una tanda anterior que dejo `e2e/rate-limit.spec.ts` y el diff de
+> `playwright.config.ts` sin commitear, con comentarios que citaban esta seccion antes de que
+> existiera. Aqui estan el conteo real, las medidas y el resultado. **Estado: BLOQUEADA** — el spec
+> nuevo pasa en los dos motores, tambien dentro de la bateria completa, pero `pnpm run e2e` NO pasa
+> entero por causas ajenas a esta ficha (ver «Bateria completa»). T15 queda `[ ]`.
+
+### Conteo de logins de la bateria (N_e2e)
+
+**Metodo.** Se anadio temporalmente `stdout: 'pipe'` al `webServer` (retirado despues; no esta en
+el commit) y se corrio la bateria entera SIN el spec nuevo:
+`pnpm exec playwright test --grep-invert "login frenado"`. `next dev` registra cada peticion que
+renderiza (`GET /login 200 in …`), asi que se contaron sobre ese log todas las lineas de metodo +
+`/login` (con o sin query):
+
+```
+    114  GET /login 200
+      2  GET /login?next=%2Fdashboard 200
+      1  GET /login?next=%2Fdashboard 307
+     10  GET /login?next=%2Finventario 200
+      2  GET /login?next=%2Finventario 307
+      8  GET /login?sesion=fin 200
+     84  POST /login 200
+      6  POST /login?next=%2Finventario 200
+```
+
+**Total: 227** peticiones a `/login` (Chromium + WebKit, que comparten el origen comun
+"desconocido"), ~113 por proyecto. Hasta 2 de ellas son `curl` mias sin cabecera para ver si el
+servidor ya respondia, asi que la bateria real esta entre 225 y 227: se toma 227 como cota.
+
+**Limites del metodo, dichos:** (1) en esa corrida fallaron 28 tests (ver abajo), y un test que
+cae a mitad no hace los logins que le quedaban: con la bateria verde la cuenta puede ser algo mayor;
+(2) solo cuenta lo que `next dev` registra; una peticion a `/login` que el middleware cuente pero
+Next no registre no aparece. **N_e2e = 350** deja ~54% de margen sobre 227, que cubre ambas cosas
+con holgura razonable; no se sube mas porque el spec tiene que agotarlo (`design.md > 11`, punto 4).
+
+**Cuota general (desviacion de `design.md > 8`, que solo habla del login).** El mismo log registra
+600 peticiones en total, 373 fuera de `/login`. Es cota inferior (el `matcher` no excluye
+`/_next/webpack-hmr` ni otras rutas internas que Next no registra) y el pico por ventana de 60 s no
+se puede sacar de este log (no lleva hora). `E2E_RATE_LIMIT_GENERAL_MAX = 5000` es una
+**precaucion, no una necesidad medida**: que un freno general —que no es lo que esta ficha prueba—
+no tumbe un E2E ajeno. Queda para que el reviewer lo acepte o lo quite.
+
+### Que se corrigio del trabajo heredado
+
+1. **Las peticiones de gasto no cabian en el timeout.** El spec heredado gastaba la cuota con
+   `page.request.get('/login')` (HTML completo). Corrido solo (`pnpm exec playwright test
+   e2e/rate-limit.spec.ts`), los dos proyectos murieron por `Test timeout of 240000ms exceeded`
+   dentro del bucle de gasto. Medido contra un `next dev` propio en 3117 con curl: HTML
+   `GET /login` 367 ms/req en 20 en serie; 50 en paralelo, 14,1 s (~3,5 req/s). La cifra de «~7
+   peticiones/s» del comentario heredado no se reprodujo.
+2. **Se cambio a peticiones RSC sin seguir redirecciones.** Con `RSC: 1`, `next dev` contesta
+   `307 location: /login?_rsc` en ~15 ms (medido: 0,013-0,020 s por peticion, frente a 0,16-0,18 s
+   del HTML en la misma tanda) DESPUES de que el middleware la cuente. Verificado contra un
+   `next dev` con `RATE_LIMIT_LOGIN_MAX=10`, un origen distinto por serie:
+   ```
+   RSC serie:  307 307 307 307 307 307 307 307 307 307 429 429
+   GET serie:  200 200 200 200 200 200 200 200 200 200 429 429
+   ```
+   Cada RSC cuenta exactamente una. **Trampa encontrada al primer intento:** Playwright sigue el
+   307 por defecto y la peticion redirigida (`/login?_rsc`) vuelve a contar, asi que cada gasto
+   valia DOS y la cuota se agotaba a mitad del bucle — lo atrapo la asercion nueva de abajo
+   (`Expected: 200, Received: 429`). Por eso `maxRedirects: 0` es obligatorio y esta comentado.
+3. **Asercion nueva en el bucle:** ninguna peticion de gasto puede salir `429` (`not.toBe(429)`,
+   no `toBe(307)`, para no atar el test a un detalle interno de Next). Sin ella, un gasto que
+   contara doble pasaria desapercibido hasta el final.
+4. **Comentarios de `playwright.config.ts`** reescritos con las cifras de arriba (antes decian
+   «~111/~222» y «techo de ~7 peticiones/s», sin seccion que los respaldara).
+
+Lo que se mantuvo tal cual: un origen de documentacion RFC 5737 distinto por proyecto
+(`198.51.100.73` Chromium, `203.0.113.55` WebKit), `E2E_RATE_LIMIT_LOGIN_MAX` exportado desde
+`playwright.config.ts` e importado por el spec (un solo numero), Upstash vacio en `webServer.env`
+(D8), el texto exacto `RATE_LIMITED_MESSAGE` sobre `/login` tras el envio (R11) y el `429` + texto
+en la navegacion siguiente (R10).
+
+### Spec nuevo, solo
+
+```
+$ pnpm exec playwright test e2e/rate-limit.spec.ts
+Running 4 tests using 4 workers
+  -  2 [webkit] › … login frenado por origen (chromium) › …   (skip: origen de otro proyecto)
+  -  3 [chromium] › … login frenado por origen (webkit) › …   (skip: origen de otro proyecto)
+  ✓  1 [chromium] › e2e\rate-limit.spec.ts:56:9 › login frenado por origen (chromium) › agota la cuota de login: frena el formulario en la propia pantalla y la navegacion siguiente ve el 429 (R10, R11, R35) (36.9s)
+  ✓  4 [webkit] › e2e\rate-limit.spec.ts:56:9 › login frenado por origen (webkit) › agota la cuota de login: frena el formulario en la propia pantalla y la navegacion siguiente ve el 429 (R10, R11, R35) (44.2s)
+  2 skipped
+  2 passed (1.4m)
+```
+
+### Bateria completa (`pnpm run e2e`) — ROJA, por causa ajena
+
+```
+  26 failed
+  2 skipped
+  80 passed (16.0m)
+  ✓   38 [chromium] › e2e\rate-limit.spec.ts:56:9 › login frenado por origen (chromium) › …
+  ✓   93 [webkit] › e2e\rate-limit.spec.ts:56:9 › login frenado por origen (webkit) › …
+```
+
+El spec nuevo pasa tambien DENTRO de la bateria completa (con el resto compitiendo por el mismo
+`next dev`). Los 26 rojos son 13 tests × 2 motores, los mismos que en la corrida de conteo (que
+ademas tuvo 2 rojos solo en Chromium que no se repitieron: `login.spec.ts:386` y
+`pedidos-asignados.spec.ts:316`, intermitentes):
+
+| Test | Error |
+| --- | --- |
+| `aislamiento-inventario.spec.ts:270` | Postgres `23514 product_batches_unit_differs_from_product` en el `productBatch.create` del fixture |
+| `inventario.spec.ts:458, 529, 591, 647, 717` | el alta no cierra la hoja (`product-sheet` sigue en 1); en el log del servidor, 10 errores `23514 product_batches_unit_differs_from_product` (5 tests × 2 motores) |
+| `presentaciones.spec.ts:280` | la hoja `presentation-sheet` no se cierra tras el alta |
+| `proveedores.spec.ts:380` | `la presentacion "Bolsa 25" no aparecio en el selector` |
+| `session.spec.ts:241` | Postgres `23001` al borrar `users` en la limpieza: `violates RESTRICT setting of foreign key` |
+| `usuarios.spec.ts:305` | Postgres `23001` al borrar `companies` en la limpieza: `violates RESTRICT setting of foreign key` |
+| `cierre-de-sesiones.spec.ts:264` | la victima aterriza en «Asignación» y no en Inventario |
+| `permisos.spec.ts:201` | en la 404 privada no aparece `private-user-trigger` |
+| `errores.spec.ts:197` | `loginAndLand` no llega al destino derivado (`waitForURL` 60 s) |
+
+**Causa (con evidencia):** la base local `QuimiCloude` en `localhost:5432` es COMPARTIDA por todos
+los worktrees, y tiene aplicadas tres migraciones que NO estan en esta rama (esta rama tiene 34, la
+ultima `20260917130000_recipes_search_index_including_deleted`). Consulta de solo lectura a
+`_prisma_migrations`:
+
+```
+20260918130000_product_unit_and_stored_stock                   finished 2026-09-18T20:53:48Z
+20260918120000_inventory_movement_kind_enum_and_reason_catalog finished 2026-09-18T20:53:16Z
+20260917130000_inventory_movements                             finished 2026-09-18T20:53:16Z
+```
+
+Las tres viven en `.worktrees/QC-121-unidad-como-identidad-del-item/db/migrations/` (las dos
+primeras tambien en `QC-82`). `20260918130000_product_unit_and_stored_stock` define el trigger
+`product_batches_unit_differs_from_product` (rojos de inventario y aislamiento), e
+`inventory_movements` crea FKs `ON DELETE RESTRICT` a `users` y `companies` (rojos de limpieza de
+`session` y `usuarios`). `prisma migrate status` en esta rama dice «Database schema is up to date!»
+porque solo mira que las 34 propias esten aplicadas; no avisa de las de mas. Los tres ultimos de la
+tabla (y presentaciones/proveedores) no tienen un error de base propio en lo registrado; lo
+compatible con la evidencia —pero **no demostrado test a test**— es que hereden residuos de
+fixtures que no se pudieron borrar por esas mismas FKs. En NINGUNO de los 26 rojos aparece el texto
+de freno: `grep -rl "Demasiados" test-results` vacio y ninguna linea con `Demasiados` en la salida.
+
+**No se arreglo:** revertir migraciones de otra ficha en una base compartida esta fuera del alcance
+de QC-73 y romperia a QC-121/QC-82. Para cerrar T15 hace falta correr `pnpm run e2e` contra una base
+con exactamente las migraciones de esta rama (o sincronizar la rama cuando dev traiga esas
+migraciones). Decision del leader.
+
+### Guardia de QC-71: alta de `rate-limit.spec.ts`
+
+La primera corrida de `./init.sh --rapido` salio ROJA en
+`tests/guards/guard-identificador-de-request.test.ts` › «no hay ningun archivo nuevo en e2e/…
+(R21)»: `E2E_ESPERADOS` es una lista CERRADA y el archivo nuevo no estaba. Su punto de extension
+por diseno es darse de alta en ella, con comentario (asi lo hicieron QC-49, QC-67, QC-79, QC-85,
+QC-101, QC-102…). Se dio de alta `rate-limit.spec.ts` con el mismo formato. Afirmacion del
+comentario comprobada: `grep -n "reference\|request-id\|requestId\|x-request" e2e/rate-limit.spec.ts`
+vacio. Archivo fuera de la lista de T15 en `tasks.md`, pero consecuencia directa de crear el
+archivo que T15 manda.
+
+### Gate de la tanda
+
+**Aviso sobre el entorno:** en el Bash de esta sesion, `pnpm` (el shim de nvm) devuelve
+`error: CommandNotFound` y `pnpm.cmd` si funciona. `./init.sh --rapido` sin arreglarlo sale
+**VERDE FALSO**: imprime `! pnpm no disponible para correr script 'typecheck'` (y `lint`,
+`test:rapido`), se los salta y termina en `== init OK ==`. Se corrio con un shim temporal en el
+PATH (`exec pnpm.cmd "$@"`, en el scratchpad de la sesion, no en el repo).
+
+```
+✓ base de desarrollo «QuimiCloude» al dia: 37 migracion(es) aplicada(s)
+✓ typecheck paso
+✓ lint paso
+ Test Files  120 passed (120)
+      Tests  1828 passed | 1 skipped (1829)
+ Test Files  47 passed (47)
+      Tests  578 passed | 9 skipped (587)
+✓ test:rapido paso
+== init OK ==
+```
+
+(Las «37 migraciones» son las 34 de esta rama mas las 3 ajenas de arriba: el gate tampoco avisa
+de las de mas.)
+
+### Procesos
+
+`next dev --port 3117` arrancado a mano dos veces para medir (con `RATE_LIMIT_LOGIN_MAX=100000` y
+luego `=10`), matado cada vez con `taskkill //PID <pid de escucha en 3117> //T //F`; los de
+Playwright los arranca y para el propio runner. Verificado al final: nada escuchando en 3117.
+
+### Mapa R<n> → test (T15)
+
+| R | Test |
+| --- | --- |
+| R35 | `e2e/rate-limit.spec.ts` › `login frenado por origen (chromium/webkit)` (contador en memoria, Upstash vacio en `webServer.env`) |
+| R10 (E2E) | mismo test, paso 4: `page.goto('/login')` → `429` y `RATE_LIMITED_MESSAGE` visible |
+| R11 (E2E) | mismo test, paso 3: envio del formulario → `RATE_LIMITED_MESSAGE` visible y `pathname` sigue en `/login` |
