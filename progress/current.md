@@ -515,6 +515,41 @@ porque es validacion de entrada y no una regla nueva de dominio.
 
 ## Deudas y cosas abiertas
 
+### Las guardias de alcance escritas como absolutos muerden a quien viene detras (2026-09-18)
+
+**ENCARGO DEL HUMANO: abrir ficha en el board CUANDO CIERRE QC-111.** No antes, para no partir la
+atencion de la ficha en vuelo.
+
+**Lo medido, y no es una impresion.** QC-111 choco con **cinco** guardias de alcance de fichas **ya
+cerradas**, y **ninguna encontro un defecto**: las cinco afirman «el repo no tiene X» cuando QC-111
+tenia permiso explicito para anadir X —una dependencia que el humano aprobo en F1.4 y el primer
+Route Handler del repo, que su propio spec manda construir—.
+
+| Guardia | Que afirma de mas |
+|---|---|
+| `tests/unit/navegacion/qc75-convenciones.test.ts` | que QC-75 no anade dependencias... midiendo el repo entero |
+| `tests/unit/unidades/unidades-convenciones.test.ts` | `package.json` identico a `origin/dev` |
+| `tests/unit/pedidos-ui/pedidos-convenciones.test.ts` | ningun Route Handler en **todo** `app/` |
+| `tests/unit/composition/documentos-facade.test.ts` | censo cerrado de la fachada (este SI era de QC-111) |
+| `tests/unit/identity/schema/identity-schema.test.ts` | ningun enum cuyo NOMBRE case el patron del tipo de documento |
+
+**El repo ya se lo habia dicho a si mismo.** `tests/guards/guard-identificador-de-request.test.ts`
+lo lleva escrito en un comentario sobre su propio conteo: que ser un absoluto es fragil y conviene
+saberlo, porque no distingue una libreria colada de una aprobada, y que **lo robusto seria comparar
+contra el merge-base de la propia rama en vez de contar absolutos**.
+
+**Precedentes de que esto ya venia pasando**: QC-33 acoto `identity-schema` el 2026-09-03 por lo
+mismo, y QC-111 tuvo que acotarla otra vez el 2026-09-18. Dos fichas distintas, la misma guardia,
+por la misma causa.
+
+**Lo que la ficha tendria que decidir** (no se rellena aqui con un supuesto): si el criterio es
+comparar contra el **merge-base de la propia rama**; si las guardias de una ficha ya cerrada deben
+**congelarse** en vez de seguir midiendo el presente; y quien paga la reescritura de las cinco. El
+`reviewer` de QC-111 lo pidio por su cuenta «con ficha propia» y dijo que **el criterio cabe en una
+linea**.
+
+**Lo que NO es**: ninguna de las cinco esta mal escrita ni sobra. Lo que sobra es su **alcance**.
+
 ### El baseline de rojos NO se poda al cerrar QC-92, y el motivo va escrito (2026-09-18)
 
 F2.6 manda atender el aviso de entradas que «ya pasan»: se borran, **o se escribe por que se
