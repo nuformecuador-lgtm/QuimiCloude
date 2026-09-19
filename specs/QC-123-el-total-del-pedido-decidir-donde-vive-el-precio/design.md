@@ -137,7 +137,7 @@ export type CostInput = {
   readonly units: ReadonlyMap<string, UnitConversion>;
 };
 
-/** `null` = sin importe, indistinguible entre los cuatro casos (R8, R9). */
+/** `null` = sin importe, indistinguible entre los cinco casos (R8, R9). */
 export function calculateIngredientsCost(input: CostInput): string | null;
 ```
 

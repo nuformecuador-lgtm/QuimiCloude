@@ -72,7 +72,7 @@ tiene pantalla. La cobertura es **unidad + integracion contra la base real**.
 | R6 | `order-cost.test.ts` — «convierte la existencia y el coste cuando las unidades comparten base (R6)» |
 | R7 | `order-cost.test.ts` — «un ingrediente con unidad sin base comun no tiene coste (R7)» |
 | R8 | `order-cost.test.ts` — «devuelve sin importe si la existencia no cubre (R8)», «... si un ingrediente no se puede convertir (R8)», «... si la receta no tiene lineas (R8)», «nunca devuelve cero ni un importe parcial (R8)» · `order-ingredients-cost.int.test.ts` — «un pedido anterior a la columna sigue sin importe (R8, R13)» |
-| R9 | `order-cost.test.ts` — «los cuatro casos sin importe devuelven exactamente la misma salida (R9)» |
+| R9 | `order-cost.test.ts` — «los cinco casos sin importe devuelven exactamente la misma salida (R9)» |
 | R10 | `tests/unit/pedidos/create-order.test.ts` — «el alta calcula el importe y lo pasa al puerto (R10)» · `order-ingredients-cost.int.test.ts` — «el alta lo deja guardado en la fila (R10)» |
 | R11 | `tests/unit/pedidos/update-order.test.ts` — «la edicion recalcula y sustituye el importe (R11)» · `order-ingredients-cost.int.test.ts` — «la edicion lo reescribe, incluso a nulo (R11)» |
 | R12 | `tests/unit/pedidos/list-orders.test.ts` — «el listado no recibe catalogo de productos ni de unidades (R12)» · `order-ingredients-cost.int.test.ts` — «comprar un lote despues no cambia el importe de un pedido ya creado (R12)» |
@@ -172,7 +172,23 @@ de integracion cayeron en rojo y se revirtieron; `git diff` confirma que no qued
 4. **`resolveIngredientsCost` vive en su propio archivo**, fuera de las dos listas de archivos de
    T5. Nacio duplicada literalmente en los dos casos de uso y se extrajo: duplicaba el invariante
    de «una sola lectura de lotes y una sola de unidades», que es justo lo que los tests cuentan.
-5. **El nombre del caso de R9 dice «los cuatro casos»**, porque asi lo fija la tabla de
-   trazabilidad de `tasks.md`, que no se reescribio cuando `[D17]` subio el recuento a cinco. El
-   caso **si** prueba los cinco, desbordamiento incluido. Es un desfase de rotulo en el spec, no
-   de comportamiento, y se deja como esta porque el reviewer compara el nombre contra `tasks.md`.
+5. **El rotulo «cuatro casos» de R9 se corrigio a «cinco» (2026-09-18).** `[D17]` subio el
+   recuento y la fila de trazabilidad de `tasks.md` se habia quedado en cuatro. Se corrigieron
+   **los dos sitios a la vez** para que no se desincronicen —la fila de `tasks.md` y el nombre del
+   caso, que el reviewer compara palabra por palabra— mas el comentario de `design.md > 2`, que
+   decia lo mismo.
+
+   **Y no era solo un rotulo.** El caso comparaba **cuatro** salidas —existencia insuficiente,
+   unidad incompatible, receta sin lineas y producto sin lotes— y **no incluia el desbordamiento**,
+   asi que renombrarlo sin tocar el cuerpo habria dejado un nombre falso. Ahora compara **cinco**,
+   con el desbordamiento dentro. **Ningun comportamiento cambia**: esa quinta salida ya era `null`
+   —lo prueba el caso de R24 desde el primer commit—; lo que faltaba era afirmarlo tambien aqui.
+
+   Las filas de `[D5]` y `[D17]` **no se tocaron**. Donde el spec dice «los **otros** cuatro
+   casos» —R24 y su caso de test— sigue diciendolo: ahi cuatro es lo correcto, porque el
+   desbordamiento es el quinto y se compara contra los otros cuatro.
+
+   **El quinto caso cerrado —el pedido anterior a la columna— no es alcanzable desde esta funcion
+   pura**: es un estado de la fila, no un camino del calculo. Lo cubre
+   `order-ingredients-cost.int.test.ts` — «un pedido anterior a la columna sigue sin importe
+   (R8, R13)».
