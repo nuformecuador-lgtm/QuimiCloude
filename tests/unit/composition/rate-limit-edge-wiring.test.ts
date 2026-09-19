@@ -122,6 +122,35 @@ describe('rateLimitEdge.check — eleccion de contador', () => {
   });
 });
 
+describe('rateLimitEdge.check — credenciales de Upstash invalidas (R22 R24)', () => {
+  it('R22 R24 con UPSTASH_REDIS_REST_URL mal formada se degrada sin lanzar y el motivo no lleva URL ni token', async () => {
+    const urlMalFormada = 'redis://default:un-token-secreto@eu1.upstash.io:6379';
+    const tokenSecreto = 'un-token-secreto';
+    vi.stubEnv('UPSTASH_REDIS_REST_URL', urlMalFormada);
+    vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', tokenSecreto);
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    RedisMock.mockImplementationOnce(function throwsLikeUpstash() {
+      const error = new Error(
+        `[Upstash Redis] The 'url' property is missing or invalid in your Redis config: ${urlMalFormada}.`,
+      );
+      error.name = 'UrlError';
+      throw error;
+    });
+    const { rateLimitEdge } = await importEdge();
+
+    const primera = await rateLimitEdge.check({ origin: '203.0.113.20', bucket: 'general' });
+    const segunda = await rateLimitEdge.check({ origin: '203.0.113.20', bucket: 'general' });
+
+    expect(primera).toEqual({ outcome: 'degraded', reason: 'error:UrlError' });
+    expect(segunda).toEqual({ outcome: 'degraded', reason: 'error:UrlError' });
+    if (primera.outcome === 'degraded') {
+      expect(primera.reason).not.toContain(urlMalFormada);
+      expect(primera.reason).not.toContain(tokenSecreto);
+    }
+    expect(RedisMock).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('rateLimitEdge.check — avisos de configuracion invalida (R19)', () => {
   it('un valor invalido avisa una sola vez en dos llamadas seguidas', async () => {
     vi.stubEnv('UPSTASH_REDIS_REST_URL', undefined);

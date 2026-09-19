@@ -86,6 +86,8 @@ interface UpstashLimiters {
   readonly url: string;
   readonly token: string;
   readonly cache: Map<RateLimitBucket, RateLimiter>;
+  /** Puesto si `new Redis(...)` lanzo para esta pareja de credenciales; ver `getUpstashLimiter`. */
+  constructionFailureReason?: string;
 }
 
 let upstashLimiters: UpstashLimiters | undefined;
@@ -95,18 +97,45 @@ const UPSTASH_PREFIX_BY_BUCKET: Record<RateLimitBucket, string> = {
   general: 'rate-limit:general',
 };
 
-/** Un limitador por credenciales y cuota, recreado solo si cambian las credenciales. */
-function getUpstashLimiter(url: string, token: string, bucket: RateLimitBucket): RateLimiter {
+function errorName(error: unknown): string {
+  return error instanceof Error ? error.name : 'UnknownError';
+}
+
+type UpstashLimiterResult =
+  | { readonly limiter: RateLimiter }
+  | { readonly failureReason: string };
+
+/**
+ * Un limitador por credenciales y cuota, recreado solo si cambian las credenciales.
+ *
+ * `new Redis(...)` valida la URL de forma SINCRONA y lanza si no casa con `^https?://`: un valor
+ * mal pegado (la consola de Upstash tambien muestra una URL `redis://` junto a la REST) no puede
+ * escapar de aqui como excepcion, porque quien llama no espera que construir un contador lance.
+ * El fallo se recuerda por estas credenciales: mientras no cambien, no se vuelve a intentar ni a
+ * lanzar. El motivo que se guarda es solo el NOMBRE del error, nunca su mensaje (podria arrastrar
+ * la URL o la cabecera de autorizacion).
+ */
+function getUpstashLimiter(url: string, token: string, bucket: RateLimitBucket): UpstashLimiterResult {
   if (!upstashLimiters || upstashLimiters.url !== url || upstashLimiters.token !== token) {
     upstashLimiters = { url, token, cache: new Map() };
   }
 
+  if (upstashLimiters.constructionFailureReason !== undefined) {
+    return { failureReason: upstashLimiters.constructionFailureReason };
+  }
+
   let limiter = upstashLimiters.cache.get(bucket);
   if (!limiter) {
-    limiter = createUpstashRateLimiter({ url, token }, UPSTASH_PREFIX_BY_BUCKET[bucket]);
+    try {
+      limiter = createUpstashRateLimiter({ url, token }, UPSTASH_PREFIX_BY_BUCKET[bucket]);
+    } catch (error) {
+      const failureReason = `error:${errorName(error)}`;
+      upstashLimiters.constructionFailureReason = failureReason;
+      return { failureReason };
+    }
     upstashLimiters.cache.set(bucket, limiter);
   }
-  return limiter;
+  return { limiter };
 }
 
 /**
@@ -130,9 +159,13 @@ export const rateLimitEdge = {
     const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
     if (url && token) {
+      const upstash = getUpstashLimiter(url, token, input.bucket);
+      if ('failureReason' in upstash) {
+        return { outcome: 'degraded', reason: upstash.failureReason };
+      }
       return checkRequestRate(
         { origin: input.origin, bucket: input.bucket, quota },
-        { limiter: getUpstashLimiter(url, token, input.bucket), timeoutMs: config.timeoutMs },
+        { limiter: upstash.limiter, timeoutMs: config.timeoutMs },
       );
     }
 
