@@ -110,8 +110,16 @@ function isBelowAlert(product: ProductView): boolean {
   return typeof product.qtyAlert === 'number' && product.qtyAlert > product.stock;
 }
 
-/** Etiqueta de la unidad del producto, o `null` sin unidad o sin catalogo. */
-function productUnitLabel(product: ProductView, units: readonly UnitRef[] | undefined): string | null {
+/**
+ * Etiqueta de la unidad del producto, o `null` sin unidad o sin catalogo.
+ *
+ * Exportada para que otras pantallas de esta ruta -el panel de lotes, por ejemplo- compongan el
+ * mismo «nombre · unidad» que esta columna, sin duplicar la regla.
+ */
+export function productUnitLabel(
+  product: ProductView,
+  units: readonly UnitRef[] | undefined,
+): string | null {
   return product.unitId === null ? null : unitLabel(product.unitId, units);
 }
 

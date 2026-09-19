@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProductTable } from '@/app/(private)/inventario/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import type { ProductBatchView, ProductView } from '@/lib/modules/inventario';
+import type { UnitRef } from '@/lib/modules/unidades';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
 /**
@@ -177,5 +178,67 @@ describe('canAdjust decide si el control de ajuste existe en el DOM (R22, R21)',
     await abrirPanel();
 
     expect(await screen.findByTestId('adjust-batch-open')).toBeInTheDocument();
+  });
+});
+
+const UNIDAD_KG: UnitRef = {
+  id: 'unit-kg',
+  name: 'Kilogramo',
+  symbol: 'kg',
+  baseUnitId: null,
+  factor: null,
+};
+
+describe('el panel se titula "nombre · unidad" (T15)', () => {
+  it('con catalogo y unidad, el titulo y el aria-label del disparador llevan el simbolo', async () => {
+    render(
+      <ProductTable
+        products={[producto({ id: 'product-9', name: 'Acido citrico', unitId: 'unit-kg' })]}
+        params={PARAMS}
+        totalPages={1}
+        units={[UNIDAD_KG]}
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Lotes de Acido citrico · kg' }),
+    ).toBeInTheDocument();
+
+    await abrirPanel();
+
+    expect(await screen.findByRole('heading', { name: 'Acido citrico · kg' })).toBeInTheDocument();
+  });
+
+  it('sin catalogo de unidades, el titulo y el aria-label solo llevan el nombre', async () => {
+    render(
+      <ProductTable
+        products={[producto({ id: 'product-9', name: 'Acido citrico', unitId: 'unit-kg' })]}
+        params={PARAMS}
+        totalPages={1}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Lotes de Acido citrico' })).toBeInTheDocument();
+
+    await abrirPanel();
+
+    expect(await screen.findByRole('heading', { name: 'Acido citrico' })).toBeInTheDocument();
+  });
+
+  it('con catalogo pero sin unidad en el producto, el titulo y el aria-label solo llevan el nombre', async () => {
+    render(
+      <ProductTable
+        products={[producto({ id: 'product-9', name: 'Acido citrico', unitId: null })]}
+        params={PARAMS}
+        totalPages={1}
+        units={[UNIDAD_KG]}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Lotes de Acido citrico' })).toBeInTheDocument();
+
+    await abrirPanel();
+
+    expect(await screen.findByRole('heading', { name: 'Acido citrico' })).toBeInTheDocument();
   });
 });

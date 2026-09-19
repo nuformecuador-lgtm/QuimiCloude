@@ -18,13 +18,17 @@ import {
 } from '@/components/ui/sheet';
 import { listProductBatchesAction } from '@/lib/modules/inventario/adapters/driving/batch-actions';
 import type { ErrorState } from '@/lib/modules/errores';
-import type { ProductBatchView, ProductView } from '@/lib/modules/inventario';
+import { productDisplayName, type ProductBatchView, type ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 import { AdjustBatchDialog } from './adjust-batch-dialog';
 import { BatchHistory } from './batch-history';
 import { DeleteProductDialog } from './delete-product-dialog';
-import { PRODUCT_DEFAULT_PINNED_COLUMNS, buildProductColumns } from './product-columns';
+import {
+  PRODUCT_DEFAULT_PINNED_COLUMNS,
+  buildProductColumns,
+  productUnitLabel,
+} from './product-columns';
 import { productListHref } from './product-list-params';
 import { ProductBatchesPanel } from './product-batches-panel';
 import { ProductSheet } from './product-sheet';
@@ -50,6 +54,7 @@ type ProductBatchesSheetProps = {
  */
 function ProductBatchesSheet({ product, units, canAdjust }: ProductBatchesSheetProps) {
   const [state, setState] = useState<BatchesLoadState>({ status: 'idle' });
+  const displayName = productDisplayName(product.name, productUnitLabel(product, units));
 
   function fetchBatches() {
     setState({ status: 'loading' });
@@ -69,7 +74,7 @@ function ProductBatchesSheet({ product, units, canAdjust }: ProductBatchesSheetP
           <Button
             variant="ghost"
             className={TOUCH_TARGET}
-            aria-label={`Lotes de ${product.name}`}
+            aria-label={`Lotes de ${displayName}`}
             data-testid="product-batches-open"
           />
         }
@@ -78,7 +83,7 @@ function ProductBatchesSheet({ product, units, canAdjust }: ProductBatchesSheetP
       </SheetTrigger>
       <SheetContent data-testid="product-batches-sheet">
         <SheetHeader>
-          <SheetTitle>{product.name}</SheetTitle>
+          <SheetTitle>{displayName}</SheetTitle>
         </SheetHeader>
 
         {state.status === 'loading' ? (
