@@ -83,7 +83,7 @@
 
 ## Bloque 3 — el alta escribe unidad y existencia
 
-- [ ] **T4. Alta por nombre y unidad, y recálculo en la misma transacción.** (`design.md > 4`,
+- [x] **T4. Alta por nombre y unidad, y recálculo en la misma transacción.** (`design.md > 4`,
       `> 5`.)
       - Archivos: `lib/modules/inventario/ports/product-repository.ts`
         (`findAliveIdByName` → `findAliveIdByNameInPresentationUnit`),
@@ -238,7 +238,7 @@
 
 ## Bloque 7 — enmienda del 2026-09-18 (QC-92 ya mergeada)
 
-- [ ] **T14. El ajuste de lote recalcula `products.stock`.** (`design.md > 5.1`; R29, R30, R31,
+- [x] **T14. El ajuste de lote recalcula `products.stock`.** (`design.md > 5.1`; R29, R30, R31,
       R32.) **Se ejecuta justo después de T4**, en la misma tanda o la siguiente, antes de T5.
       - Archivos: `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`
         (`adjustBatchStock`, `:638-665`): paso 1 nuevo `SELECT p."id" … JOIN "product_batches" …

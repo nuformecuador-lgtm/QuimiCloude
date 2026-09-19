@@ -5,7 +5,7 @@
 | Task | Estado | Commit |
 |---|---|---|
 | T1, T2, T3 | hechas | `21c430a0`, `5c4ecf48`, `7a5ea4b7` |
-| T4 + T14 | implementadas y commiteadas, **sin marcar `[x]`**: falta `./init.sh --rapido` verde | `0cf25456` |
+| T4 + T14 | hechas; `[x]` tras `--rapido` del 2026-09-19 (ver abajo) | `0cf25456` |
 | T5-T13, T15 | sin empezar | — |
 
 T4 y T14 van en un solo commit: los dos tocan `product-prisma.ts` y `product-stock.int.test.ts`,
@@ -54,6 +54,19 @@ salvo su stock recalculado`).
     `recetas-constraints`, `unidades-constraints`: fallan igual en `origin/dev`; es el sintoma de
     Postgres 18.6 documentado en `docs/verification.md` (tabla del gate). No estan en
     `tests/baseline-rojos.json`. Ajenos a esta rama.
+
+## Gate rapido tras T4/T14 (2026-09-19, relanzado)
+
+Preflight, typecheck, lint y guardias **verdes**. : 369 archivos, 5514 pasados, **25 rojos**, 26 skipped (1125 s).
+Los 25, clasificados:
+
+- **22 por Postgres local 18.6** (, filas de la tabla del gate), en modulos que esta rama **no toca** ( vacio sobre ellos):
+  - 17  (identity 6, asignaciones 3, work-groups 2, unidades-constraints 2, inventario-constraints, presentation-uniqueness, pedidos-constraints, recetas-constraints).
+  - 3  R24: el adaptador mapea ; con 18.6 la FK RESTRICT sale como  y Prisma no la traduce, llega . Misma causa.
+  - 2  (proveedores, recetas) «9 vs 10»: fila  en  propia de 18.
+- **3 **: esperados; el disparador de T3 prohibe lotes en dos unidades. Los reescribe **T6**.
+
+**Decision humana 2026-09-19**: los rojos de Postgres 18.6 se aceptan como ajenos para cerrar QC-121. Con eso, T4 y T14 se marcan .
 
 ## Mapa R<n> -> test
 
