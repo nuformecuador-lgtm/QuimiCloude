@@ -53,28 +53,34 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
 
 ## T2 — Migración `up` + `down` · depende de T1
 
-- [ ] `pnpm run db:migrate:create` → `db/migrations/<ts>_document_batches_and_files/migration.sql`, y
+- [x] `pnpm run db:migrate:create` → `db/migrations/<ts>_document_batches_and_files/migration.sql`, y
       `down.sql` **a mano**. Contenido y orden exactos en `design.md > 2.5`: enums, tablas, FK a mano
       a `companies`/`users` (drift: borrar su `DROP CONSTRAINT` de lo generado), FK compuesta contra
       `document_batches_id_company_id_key`, índices, los dos `CHECK` de `> 2.4`, y `ENABLE` +
       **`FORCE ROW LEVEL SECURITY`** en las dos tablas.
 - **Hecho:** `pnpm run db:migrate` aplica; `pnpm run db:rollback` revierte y deja `_prisma_migrations`
   coherente; volver a aplicar funciona.
-- **SIN MARCAR a proposito (2026-09-18).** Los dos archivos estan escritos con el contenido y el
-  orden exactos de `design.md > 2.5`, pero **el criterio no se ha comprobado**: este worktree no
-  tiene `.env` ni `DATABASE_URL`, asi que `db:migrate` y `db:rollback` no pudieron correr. No se
-  invento ninguna credencial. Lo cierra el leader al correr el gate con una base configurada.
+- **CERRADA el 2026-09-18, con base ya disponible.** El `up` aplica: la plantilla de la rama se
+  construye entera (37 migraciones). El `down` se verifico sobre una **copia desechable** de la
+  plantilla —nunca sobre la base de desarrollo—: revierte las dos tablas y los dos enums, el `up`
+  vuelve a aplicar, y el ciclo aguanta dos vueltas.
+- **Correccion de una linea, y el orden lo mandaba mal el diseno.** `design.md > 2.5` ordena «FK
+  compuesta -> indices», y eso no aplica: Postgres exige que la restriccion unica exista ya cuando
+  se declara la FK que la apunta, asi que fallaba con **42830**. El `CREATE UNIQUE INDEX` de
+  `document_batches_id_company_id_key` pasa **antes** de la FK. **El design.md sigue diciendo el
+  orden imposible: corregirlo es del leader.**
 
 ## T3 — Tests de integración del esquema `[P]` · depende de T2
 
-- [ ] En `tests/integration/`: los dos `CHECK` rechazan una fila `done` sin texto y una `error` sin
+- [x] En `tests/integration/`: los dos `CHECK` rechazan una fila `done` sin texto y una `error` sin
       motivo; la FK compuesta rechaza un archivo cuya tanda es de otra empresa; el único
       `(company_id, path)` rechaza la ruta repetida.
 - **Hecho:** los cuatro casos pasan contra la base de test. Cubre R21 y parte de R1.
-- **SIN MARCAR a proposito (2026-09-18).** Los cuatro casos estan escritos, con el patron de
-  `tests/integration/inventario/inventory-movements-constraints.int.test.ts` y censados en
-  `tests/integration/aislamiento.json`, pero **no se han ejecutado**: sin `DATABASE_URL` el guardian
-  de `tests/integration/_setup.ts` aborta antes del primer caso. Lo cierra el leader con el gate.
+- **CERRADA el 2026-09-18.** Los cuatro pasan. En la primera corrida los cuatro salieron rojos, y
+  **no porque el esquema fallara** —las cuatro restricciones disparaban— sino porque el test leia el
+  codigo del sitio equivocado: insertaba con el cliente TIPADO, que traduce el SQLSTATE a `P2002`/
+  `P2003` y no expone `meta.code`. Ahora insertan con `$executeRaw`, como su hermano de inventario
+  ya documentaba que hay que hacer. Las aserciones de `23514`/`23503`/`23505` **no se relajaron**.
 
 ---
 
@@ -209,12 +215,16 @@ algo de aquí aparece reimplementado en el diff, es un rechazo.
 - [x] Los tres de `[D18]`: **firma inválida** → 401 y cero efectos; **firma válida** → procesa y 200;
       **mismo mensaje dos veces** → una sola llamada a la IA, un solo texto guardado, 200 las dos
       veces.
-- [ ] El de atomicidad del `claim` contra la base de test (`design.md > 9`).
-- **SIN MARCAR a proposito (2026-09-18).** Este es el unico de los cuatro que necesita la base: mide
-  la atomicidad real del `UPDATE ... WHERE status='queued'` bajo concurrencia, que un doble en
-  memoria no puede probar (`design.md > 9` ya lo avisaba). Sin `DATABASE_URL` no se puede correr, y
-  **no se escribe un test que no se puede correr**: seria afirmar algo que nadie ha comprobado. Los
-  otros tres de `[D18]` si estan, con dobles y en verde.
+- [x] El de atomicidad del `claim` contra la base de test (`design.md > 9`).
+- **CERRADA el 2026-09-18, con base ya disponible.**
+  `tests/integration/documentos/document-batch-claim-concurrency.int.test.ts`: dos `claim`
+  concurrentes sobre la misma fila y **solo uno** se lleva el `RETURNING`; el otro devuelve `null`,
+  la fila queda en `processing` con `attempts = 1`, y un tercer `claim` posterior tambien devuelve
+  `null`. Usa el repositorio **real**, no un SQL copiado a mano.
+- **Se aisla por `commit`, no por transaccion, y es a proposito:** `claim` va contra el cliente
+  global, asi que envolverlo en una sola transaccion no tendria dos conexiones compitiendo —seria
+  aislamiento de mentira sobre lo unico que este test existe para medir—. Declarado asi en
+  `tests/integration/aislamiento.json`, con limpieza en orden de FK.
 - **Hecho:** los cuatro pasan **sin red** y sin que ninguna variable de entorno tenga valor. Cubre R26.
 
 ---

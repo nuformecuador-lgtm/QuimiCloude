@@ -109,6 +109,34 @@ async function createBatch(
   return batch.id
 }
 
+/**
+ * `INSERT INTO document_files` crudo: la API tipada traduciria el SQLSTATE a su propio codigo
+ * (`P2003`/`P2002`, sin `meta.code`), asi que los casos que esperan un CHECK, una FK o un UNIQUE
+ * van por aqui para poder afirmar sobre el SQLSTATE real.
+ */
+async function rawInsertFile(
+  tx: Prisma.TransactionClient,
+  columns: {
+    batchId: string
+    companyId: string
+    path: string
+    status: string
+    extractedText?: string | null
+    errorCode?: string | null
+    errorReason?: string | null
+  },
+): Promise<number> {
+  return tx.$executeRaw`
+    INSERT INTO "document_files"
+      ("batch_id", "company_id", "path", "status", "extracted_text", "error_code", "error_reason", "updated_at")
+    VALUES (
+      CAST(${columns.batchId} AS uuid), CAST(${columns.companyId} AS uuid), ${columns.path},
+      CAST(${columns.status} AS "DocumentFileStatus"),
+      ${columns.extractedText ?? null}, ${columns.errorCode ?? null}, ${columns.errorReason ?? null},
+      CURRENT_TIMESTAMP
+    )`
+}
+
 beforeAll(async () => {
   const tables = await prisma.$queryRaw<{ tablename: string }[]>`
     SELECT tablename FROM pg_tables
@@ -135,13 +163,11 @@ describe('document_batches / document_files — restricciones', () => {
       const rejection = await expectRejectedByDatabase(
         tx,
         () =>
-          tx.documentFile.create({
-            data: {
-              batchId,
-              companyId,
-              path: `empresa/${marker}/archivo.pdf`,
-              status: 'done',
-            },
+          rawInsertFile(tx, {
+            batchId,
+            companyId,
+            path: `empresa/${marker}/archivo.pdf`,
+            status: 'done',
           }),
         'fila lista sin texto extraido',
       )
@@ -161,13 +187,11 @@ describe('document_batches / document_files — restricciones', () => {
       const rejection = await expectRejectedByDatabase(
         tx,
         () =>
-          tx.documentFile.create({
-            data: {
-              batchId,
-              companyId,
-              path: `empresa/${marker}/archivo.pdf`,
-              status: 'error',
-            },
+          rawInsertFile(tx, {
+            batchId,
+            companyId,
+            path: `empresa/${marker}/archivo.pdf`,
+            status: 'error',
           }),
         'fila en error sin codigo ni motivo',
       )
@@ -188,13 +212,11 @@ describe('document_batches / document_files — restricciones', () => {
       const rejection = await expectRejectedByDatabase(
         tx,
         () =>
-          tx.documentFile.create({
-            data: {
-              batchId: batchDeA,
-              companyId: companyB,
-              path: `empresa/${marker}/cruzado.pdf`,
-              status: 'queued',
-            },
+          rawInsertFile(tx, {
+            batchId: batchDeA,
+            companyId: companyB,
+            path: `empresa/${marker}/cruzado.pdf`,
+            status: 'queued',
           }),
         'archivo con la tanda de otra empresa',
       )
@@ -216,11 +238,15 @@ describe('document_batches / document_files — restricciones', () => {
 
       const rejection = await expectRejectedByDatabase(
         tx,
-        () => tx.documentFile.create({ data: { batchId, companyId, path, status: 'queued' } }),
+        () => rawInsertFile(tx, { batchId, companyId, path, status: 'queued' }),
         'la misma ruta dos veces en la misma empresa',
       )
       expect(rejection.sqlState).toBe(UNIQUE_VIOLATION)
-      expect(rejection.message).toContain('document_files_company_path_key')
+      // Para un error de UNIQUE en `$executeRaw`, Prisma reenvia el DETAIL de Postgres
+      // ("Ya existe la llave (company_id, path)=(...)"), no el mensaje primario con el
+      // nombre de la restriccion; el par de columnas identifica igual de bien a
+      // `document_files_company_path_key`, que es la unica clave sobre esas dos columnas.
+      expect(rejection.message).toContain('(company_id, path)')
 
       expect(await tx.documentFile.findMany({ where: { batchId }, select: { id: true } })).toHaveLength(1)
     })

@@ -126,26 +126,84 @@ $ pnpm exec vitest run tests/unit/documentos \
 Los 23 `skipped` son los `qcXXX-alcance.test.ts` de **otras** fichas, que se saltan fuera de su rama
 a proposito. El de esta, `qc111-alcance.test.ts`, **midio de verdad**: 35 casos, 35 en verde.
 
+**Con base de datos ya disponible** (el `.env` lo puso el leader; era deuda del arnes):
+
+```
+$ pnpm exec vitest run --project integration tests/integration/documentos
+ Test Files  2 passed (2)
+      Tests  6 passed (6)          <- los 4 de T3 y los 2 de la concurrencia de T17
+
+$ pnpm exec vitest run tests/guards tests/unit/documentos
+ Test Files  74 passed (74)
+      Tests  886 passed | 23 skipped (909)
+
+$ pnpm run db:test template
+ plantilla de esta rama: qct_tpl_b6f834eb0913 (37 migraciones)
+```
+
 **No se corrio `./init.sh` ni la suite completa**, por el reparto del gate de
 `AGENTS.md > Regla del gate`: eso es del leader.
 
-## Lo que NO se pudo comprobar aqui, y por que
+## La migracion no aplicaba, y el orden lo mandaba mal el diseno
 
-Este worktree **no tiene `.env` ni `DATABASE_URL`**, asi que el `globalSetup` del proyecto
-`integration` aborta antes del primer caso. Quedan **escritos pero sin ejecutar**:
+El gate la encontro: **42830**, «no hay restriccion unique que coincida con las columnas dadas en la
+tabla referida `document_batches`». La FK compuesta de `document_files` se declaraba **cinco lineas
+antes** de crear `document_batches_id_company_id_key`, y Postgres exige que la restriccion unica a la
+que apunta una FK ya exista al declararla.
 
-- `pnpm run db:migrate` y `pnpm run db:rollback` — el criterio de **T2**;
-- `tests/integration/documentos/document-batches-and-files-constraints.int.test.ts` — los cuatro
-  casos de **T3**, ya censados en `tests/integration/aislamiento.json`;
-- el cuarto test de **T17**, el de **atomicidad del `claim` bajo concurrencia** contra la base. Ese
-  **no esta escrito**: escribir un test que no se puede correr es afirmar algo que nadie ha
-  comprobado. Queda pendiente y dicho.
+**El `migration.sql` transcribia fielmente el diseno: el orden malo es del diseno.**
+`design.md > 2.5` dice, literal, «FK **compuesta** `document_files (batch_id, company_id)` →
+`document_batches (id, company_id)` → **indices**». Ese orden es imposible en Postgres.
+**El `design.md` sigue diciendolo y corregirlo no es del implementer.**
 
-**No se invento ninguna credencial y no se creo ningun `.env`.** Por eso T2, T3 y T20 quedan sin
-marcar: lo cierra el gate completo sobre una base configurada.
+Arreglado moviendo el `CREATE UNIQUE INDEX` **antes** de la FK. Un indice unico sirve de destino de
+una clave foranea; no hace falta convertirlo en `UNIQUE CONSTRAINT`.
+
+**Se reviso el resto del archivo buscando la misma especie y no hay mas.** Las otras dos FK apuntan
+a `companies("id")` y `users("id")`, claves primarias de tablas que ya existian; los dos `CHECK`
+solo miran columnas de su propia tabla; `ENABLE`/`FORCE ROW LEVEL SECURITY` no referencian nada.
+
+**El `down.sql` no tenia el problema por el otro lado**, porque no suelta indices ni FK uno a uno:
+`DROP TABLE` se los lleva. Lo que si estaba mal era **su comentario**, que anunciaba un orden
+—«los CHECK primero, luego los indices, luego las claves foraneas»— que el archivo no ejecuta. Un
+comentario con la razon equivocada es peor que ninguno (`docs/conventions.md`), asi que ahora dice lo
+que de verdad pasa, incluido **por que `document_files` va primero**: es quien guarda la FK, y al
+reves haria falta un `CASCADE` que borraria mas de lo que dice.
+
+### El ciclo up/down, verificado sin tocar la base de desarrollo
+
+`pnpm run db:rollback` apunta a `DATABASE_URL`, que es la base de **desarrollo**, asi que el ciclo se
+comprobo sobre una **copia desechable de la plantilla**, creada y borrada para esto:
+
+```
+1. copia de la plantilla:        {"batches":true, "files":true, "enum_strategy":true, "enum_status":true}
+2. despues de down.sql:          {"batches":false,"files":false,"enum_strategy":false,"enum_status":false}
+3. despues de reaplicar el up:   {"batches":true, "files":true, "enum_strategy":true, "enum_status":true}
+4. down otra vez:                {"batches":false,"files":false,"enum_strategy":false,"enum_status":false}
+base temporal borrada. La base de desarrollo NO se ha tocado.
+```
+
+## Los cuatro casos de T3 fallaban por donde entraba el INSERT, no por el esquema
+
+Primera corrida: los cuatro rojos. **Las cuatro restricciones disparaban de verdad** —el rechazo
+ocurria—, pero el test leia el codigo del sitio equivocado: insertaba con el cliente **tipado**, que
+traduce el SQLSTATE a su propio codigo (`P2002`, `P2003`) y no expone `meta.code`.
+
+Es un caso que el hermano del que se copio el patron ya tenia documentado
+(`tests/integration/inventario/inventory-movements-constraints.int.test.ts`): los casos que esperan
+un `CHECK` insertan con **`$executeRaw`**. Corregido asi. **Las aserciones de `23514`, `23503` y
+`23505` no se relajaron**; lo que cambio es por donde entra la fila.
+
+Un solo ajuste de contenido, y se dice: en el caso del unico `(company_id, path)`, Prisma reenvia el
+campo **DETAIL** de Postgres y no el mensaje primario, que es donde va el nombre de la restriccion.
+La asercion pasa a exigir `(company_id, path)` en vez del nombre: identifica la misma restriccion por
+sus columnas, que son las unicas con clave unica sobre ese par. El SQLSTATE sigue afirmado igual.
 
 ## Hallazgos que el leader tiene que ver
 
+0. **`design.md > 2.5` manda un orden de migracion imposible** y **sigue sin corregir**: «FK
+   compuesta -> indices». El SQL ya esta arreglado; el diseno no, porque no es del implementer.
+   Cualquiera que vuelva a transcribir esa seccion reproduce el fallo.
 1. **`@napi-rs/canvas` en el runtime de Vercel SIGUE SIENDO DESCONOCIDO** (pregunta abierta 2 y el
    aviso de T14). Lo unico medible aqui es que **carga en Node local** —v22.13.1, win32,
    `import('@napi-rs/canvas')` devuelve `LOADED`—. **Eso no responde la pregunta**, que es sobre
@@ -165,5 +223,9 @@ marcar: lo cierra el gate completo sobre una base configurada.
    No es un descuido: R27 y `[D18]` lo difieren a **QC-107** con el motivo escrito —un E2E real
    exigiria una URL publica y una cuenta, y el gate dejaria de correr sin red—. Lo decide el
    reviewer; la ficha lo declara en vez de callarlo.
-6. **Se acoto una guardia ajena** (`identity-schema.test.ts`). Esta arriba, en la tabla de censos,
+6. **Un test de integracion se aisla por `commit`, no por transaccion.** El de la concurrencia del
+   `claim` no puede envolverse en una transaccion con rollback: `claim` va contra el cliente global,
+   asi que una sola transaccion no tiene dos conexiones compitiendo y el test no mediria nada. Va
+   declarado asi en `tests/integration/aislamiento.json`, con limpieza en orden de FK.
+7. **Se acoto una guardia ajena** (`identity-schema.test.ts`). Esta arriba, en la tabla de censos,
    con su motivo y su precedente. Es el cambio que mas merece una mirada del reviewer.
