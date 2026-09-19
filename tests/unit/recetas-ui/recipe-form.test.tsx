@@ -193,9 +193,9 @@ function productView(overrides: Partial<ProductView> = {}): ProductView {
     name: PRODUCT_PAGE2_NAME,
     imagePath: null,
     stockByUnit: [],
+    stock: 0,
+    unitId: null,
     qtyAlert: null,
-    // QC-80 (R22, R23): la unidad del producto es DERIVADA de la presentacion de su lote mas
-    // reciente. `null` = todavia no tiene ningun lote.
     latestBatchUnitId: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),

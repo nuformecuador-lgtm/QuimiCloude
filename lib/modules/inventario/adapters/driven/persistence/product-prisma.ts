@@ -49,6 +49,8 @@ export const PRODUCT_SELECT = {
   id: true,
   name: true,
   imagePath: true,
+  stock: true,
+  unitId: true,
   qtyAlert: true,
   createdAt: true,
   updatedAt: true,
@@ -65,6 +67,8 @@ export function toProductView(row: ProductRow): ProductView {
     stockByUnit: sumStockByUnit(
       row.batches.map((batch) => ({ stock: batch.stock, unitId: batch.presentation.unitId })),
     ),
+    stock: row.stock,
+    unitId: row.unitId,
     qtyAlert: row.qtyAlert,
     latestBatchUnitId: row.batches[0]?.presentation.unitId ?? null,
     createdAt: row.createdAt,

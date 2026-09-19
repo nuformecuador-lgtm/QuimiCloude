@@ -123,7 +123,7 @@
 
 ## Bloque 4 — lectura (aditivo)
 
-- [ ] **T5. `ProductView` gana `stock` y `unitId`; `ProductRef` lee de columnas.** Sin quitar
+- [x] **T5. `ProductView` gana `stock` y `unitId`; `ProductRef` lee de columnas.** Sin quitar
       todavía `stockByUnit` ni `latestBatchUnitId` de `ProductView`.
       - Archivos: `lib/modules/inventario/domain/product-view.ts`, `product-prisma.ts`
         (`PRODUCT_SELECT` con `stock` y `unitId`; `toProductView`),

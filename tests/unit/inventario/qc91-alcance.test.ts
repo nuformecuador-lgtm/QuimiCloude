@@ -260,10 +260,12 @@ describe('QC-91 R1 — la existencia sale de sumar filas de lote, no de un numer
     expect(sumaPropia(cuerpo as string)).toEqual([]);
   });
 
-  it('R1: product-catalog-prisma.ts arma stockByUnit desde los lotes con sumStockByUnit', () => {
+  it('R14: product-catalog-prisma.ts arma stockByUnit desde la columna guardada, sin volver a sumar lotes', () => {
     const cuerpo = cuerpoDeFuncion(leer(PRODUCT_CATALOG_PRISMA), 'findProductRefs');
     expect(cuerpo, 'findProductRefs no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
-    expect(derivaDeLotesConSumStockByUnit(cuerpo as string)).toBe(true);
+    expect(cuerpo as string).not.toMatch(/sumStockByUnit\s*\(/);
+    expect(cuerpo as string).toMatch(/\bunitId\b/);
+    expect(cuerpo as string).toMatch(/\bstock\b/);
   });
 
   it('R1: los tres escritores de producto no suman por su cuenta', () => {
@@ -313,11 +315,11 @@ describe('QC-91 R1 — la existencia sale de sumar filas de lote, no de un numer
 // ---------------------------------------------------------------------------------------------
 
 describe('QC-91 R11 — ProductView y ProductRef exponen stockByUnit; NewProduct y el alta no llevan existencia', () => {
-  it('R11: ProductView expone stockByUnit y no un campo stock plano', () => {
+  it('R14: ProductView expone stockByUnit y tambien stock, la existencia guardada', () => {
     const cuerpo = cuerpoDeTipo(leer(PRODUCT_VIEW), 'ProductView');
     expect(cuerpo, 'ProductView no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
     expect(exponeStockPorUnidad(cuerpo as string)).toBe(true);
-    expect(declaraCampoStockPlano(cuerpo as string)).toBe(false);
+    expect(declaraCampoStockPlano(cuerpo as string)).toBe(true);
   });
 
   it('R11: NewProduct no lleva ninguna existencia -ni plana ni por unidad-', () => {
@@ -342,10 +344,10 @@ describe('QC-91 R11 — ProductView y ProductRef exponen stockByUnit; NewProduct
     expect(leer(PRODUCT_INPUT)).toMatch(/export const updateProductSchema = createProductSchema/);
   });
 
-  it('R11: PRODUCT_SELECT no trae products.stock -solo el catalogo de columnas y los lotes-', () => {
+  it('R14: PRODUCT_SELECT trae products.stock y products.unit_id, ademas del catalogo de lotes', () => {
     const cuerpo = cuerpoDeConst(leer(PRODUCT_PRISMA), 'PRODUCT_SELECT');
     expect(cuerpo, 'PRODUCT_SELECT no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
-    expect(declaraCampoStockPlano(cuerpo as string)).toBe(false);
+    expect(declaraCampoStockPlano(cuerpo as string)).toBe(true);
     expect(cuerpo).toMatch(/\bbatches\s*:/);
   });
 

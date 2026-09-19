@@ -59,6 +59,28 @@ describe('toProductRef', () => {
   });
 });
 
+describe('R14 — findRefs lee la existencia y la unidad de las columnas del producto', () => {
+  beforeEach(() => {
+    findMany.mockReset();
+  });
+
+  it('con unidad guardada, stockByUnit trae un unico valor en esa unidad', async () => {
+    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: 12, unitId: 'kg' }]);
+
+    const [ref] = await findProductRefs(['p-1'], 'empresa-1');
+
+    expect(ref?.stockByUnit).toEqual([{ unitId: 'kg', quantity: 12 }]);
+  });
+
+  it('sin unidad guardada, stockByUnit es un array vacio', async () => {
+    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: 0, unitId: null }]);
+
+    const [ref] = await findProductRefs(['p-1'], 'empresa-1');
+
+    expect(ref?.stockByUnit).toEqual([]);
+  });
+});
+
 describe('findRefs con lista vacia', () => {
   beforeEach(() => {
     findMany.mockReset();
@@ -113,7 +135,7 @@ describe('QC-50 R22 — findRefs exige el ambito de empresa (la excepcion de R29
     // despues: devuelve tal cual lo que el `where` (ya acotado) dejo pasar. Si `findMany`
     // filtro por empresa, un producto ajeno simplemente no aparece en la fila -mismo camino que
     // un id que no existe, sin distincion posible para quien pregunta.
-    findMany.mockResolvedValue([{ id: 'p-propio', name: 'Acido sulfurico', batches: [] }]);
+    findMany.mockResolvedValue([{ id: 'p-propio', name: 'Acido sulfurico', stock: 0, unitId: null }]);
 
     const refs = await findProductRefs(['p-propio', 'p-de-otra-empresa'], 'empresa-1');
 

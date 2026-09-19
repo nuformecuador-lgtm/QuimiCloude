@@ -29,13 +29,14 @@ describe('toProductView', () => {
   const filaBase = {
     id: 'p-1',
     name: 'Cloro',
-    // 2026-09-07: el producto expone su ruta de imagen. `null` en el fixture base porque hoy
-    // nadie llena esa columna; el caso de abajo comprueba que la ruta se copia tal cual.
+    // `null` en el fixture base porque hoy nadie llena esa columna; el caso de abajo comprueba
+    // que la ruta se copia tal cual.
     imagePath: null,
+    // Distintos de los de `batches` a proposito: prueban que `stock`/`unitId` salen de la
+    // columna propia del producto, no de una relectura de los lotes.
+    stock: 15,
+    unitId: 'u-9',
     qtyAlert: 5,
-    // QC-80 (R22): la fila YA NO trae `unit_id` -esa columna desaparecio de `products`-. Trae
-    // `batches`, que el `select` acota al lote MAS RECIENTE y, de el, a la unidad de su
-    // presentacion. El fixture base tiene un lote: el caso sin ninguno esta mas abajo.
     batches: [lote('u-1')],
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-02T00:00:00Z'),
@@ -70,10 +71,17 @@ describe('toProductView', () => {
     expect(Object.keys(vista)).not.toContain('updatedBy');
   });
 
-  it('no devuelve `stock`: la existencia sale unicamente de `stockByUnit` (R11)', () => {
+  it('mapea `stock` y `unitId` tal cual, directamente desde la columna de la fila', () => {
     const vista = toProductView(filaBase);
-    expect(Object.keys(vista)).not.toContain('stock');
-    expect(Object.keys(PRODUCT_SELECT)).not.toContain('stock');
+    expect(vista.stock).toBe(15);
+    expect(vista.unitId).toBe('u-9');
+    expect(Object.keys(PRODUCT_SELECT)).toContain('stock');
+    expect(Object.keys(PRODUCT_SELECT)).toContain('unitId');
+  });
+
+  it('`unitId` es null cuando la columna no tiene unidad guardada', () => {
+    const vista = toProductView({ ...filaBase, unitId: null });
+    expect(vista.unitId).toBeNull();
   });
 
   it('deriva la unidad de la presentacion del lote, sin resolver nombre ni simbolo (R22)', () => {
@@ -83,8 +91,9 @@ describe('toProductView', () => {
     // existe, a la presentacion del lote-, no que siga siendo una referencia.
     const vista = toProductView(filaBase);
     expect(vista.latestBatchUnitId).toBe('u-1');
-    // El nombre viejo no sobrevive con otro significado: se renombro a proposito.
-    expect(Object.keys(vista)).not.toContain('unitId');
+    // `unitId` conviene con `latestBatchUnitId`, pero es un campo aparte: sale de la columna
+    // guardada, no de este lote.
+    expect(vista.unitId).toBe(filaBase.unitId);
   });
 
   it('con VARIOS lotes `latestBatchUnitId` toma la PRIMERA fila, que es la mas reciente del `orderBy` (R22)', () => {
@@ -158,7 +167,7 @@ describe('PRODUCT_SELECT: como se traen TODOS los lotes del producto (R22)', () 
     });
   });
 
-  it('el producto ya no selecciona ninguna columna de unidad (R21)', () => {
-    expect(Object.keys(PRODUCT_SELECT)).not.toContain('unitId');
+  it('el producto selecciona su propia columna de unidad guardada, ademas de la del lote', () => {
+    expect(Object.keys(PRODUCT_SELECT)).toContain('unitId');
   });
 });

@@ -20,6 +20,8 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
     name: 'Hidróxido de sodio',
     imagePath: null,
     stockByUnit: [],
+    stock: 0,
+    unitId: null,
     qtyAlert: 5,
     latestBatchUnitId: null,
     createdAt: new Date('2026-01-15T10:20:30.000Z'),

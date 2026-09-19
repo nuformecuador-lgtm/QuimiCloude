@@ -51,9 +51,9 @@ const VISTA_PRODUCTO: ProductView = {
   name: 'Acido sulfurico',
   imagePath: null,
   stockByUnit: [],
+  stock: 0,
+  unitId: null,
   qtyAlert: null,
-  // QC-80 (R22): `unitId` dejo de ser un campo del producto; lo que la vista trae es la unidad
-  // DERIVADA del lote mas reciente, `null` mientras no haya ninguno.
   latestBatchUnitId: null,
   createdAt: AHORA,
   updatedAt: AHORA,

@@ -59,6 +59,8 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
     name: 'Acido citrico',
     imagePath: null,
     stockByUnit: [],
+    stock: 0,
+    unitId: null,
     qtyAlert: null,
     latestBatchUnitId: null,
     createdAt: new Date('2026-01-01'),

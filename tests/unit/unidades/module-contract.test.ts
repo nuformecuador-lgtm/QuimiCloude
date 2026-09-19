@@ -620,8 +620,10 @@ describe('lib/modules/unidades — forma del modulo, fronteras y limite de alcan
     // `ProductView` lleva la DERIVADA, tipada con `UnitId`; `NewProduct` -lo que se escribe- no
     // lleva ninguna: la unidad no se envia, se lee.
     const vista = read(join(inventarioDir, 'domain', 'product-view.ts'))
-    expect(vista).toMatch(/readonly latestBatchUnitId: UnitId \| null/) // ProductView
-    expect(vista, 'NewProduct volvio a declarar unidad').not.toMatch(/readonly unitId/)
+    expect(vista).toMatch(/readonly latestBatchUnitId: UnitId \| null/) // ProductView, derivada del lote
+    expect(vista).toMatch(/readonly unitId: UnitId \| null/) // ProductView, columna guardada
+    const nuevoProducto = vista.slice(vista.indexOf('export type NewProduct'), vista.indexOf('export type ProductView'))
+    expect(nuevoProducto, 'NewProduct volvio a declarar unidad').not.toMatch(/readonly unitId/)
     expect(vista, 'ProductView/NewProduct conservan un campo `unit`').not.toMatch(CAMPO_UNIT_TEXTO)
     expect(vista).toMatch(/from '@\/lib\/modules\/unidades'/)
 

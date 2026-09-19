@@ -47,6 +47,10 @@ export type ProductView = {
   readonly imagePath: string | null;
   /** Existencia agregada por unidad: suma el stock de todos los lotes del producto. */
   readonly stockByUnit: readonly ProductStockByUnit[];
+  /** Existencia guardada en `products.stock`: la suma de los lotes en la unidad del producto. */
+  readonly stock: number;
+  /** Unidad guardada en `products.unit_id`, o `null` si el producto todavia no tiene lotes. */
+  readonly unitId: UnitId | null;
   readonly qtyAlert: number | null;
   /**
    * Unidad DERIVADA del producto: la de la presentacion de su lote MAS RECIENTE -creacion

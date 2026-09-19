@@ -79,6 +79,8 @@ function vista(id: string, name: string): ProductView {
     name,
     imagePath: null,
     stockByUnit: [],
+    stock: 0,
+    unitId: null,
     qtyAlert: 2,
     latestBatchUnitId: null,
     createdAt: AHORA,
