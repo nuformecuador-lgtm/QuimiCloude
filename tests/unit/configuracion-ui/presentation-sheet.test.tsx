@@ -48,7 +48,11 @@ import {
   PresentationSheet,
   type PresentationSheetTarget,
 } from '@/app/(private)/configuracion/presentaciones/components';
-import { PresentationDuplicateNameError, ValidationError } from '@/lib/modules/inventario';
+import {
+  PresentationDuplicateNameError,
+  PresentationUnitLockedError,
+  ValidationError,
+} from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 import type {
   CreatePresentationFormState,
@@ -105,6 +109,7 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
  * catalogo lo volviera a mover, esta suite se entera sin tocarla.
  */
 const PRESENTATION_DUPLICATE_NAME_CODE = new PresentationDuplicateNameError().code;
+const PRESENTATION_UNIT_LOCKED_CODE = new PresentationUnitLockedError().code;
 const INVALID_INPUT_CODE = new ValidationError().code;
 
 const NOMBRE_ESCRITO = 'Bidón 20 L';
@@ -528,6 +533,42 @@ describe('QC-80 — la unidad de la presentacion (R15, R16, R17, R18)', () => {
       UNIDAD_LITRO.id,
     );
     expect(toastExito).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-121 — presentation_unit_locked', () => {
+  it('la edicion rechazada por unidad bloqueada (R20) se pinta junto al selector, sin cerrar ni perder lo escrito (R22)', async () => {
+    const user = setupUser();
+    updatePresentationActionMock.mockResolvedValue({
+      status: 'error',
+      code: PRESENTATION_UNIT_LOCKED_CODE,
+      message: 'La presentacion ya tiene lotes y no puede cambiar de unidad.',
+    });
+    render(<FilaConPanel presentation={PRESENTACION} />);
+    await user.click(screen.getByTestId(ROW_EDIT_TESTID));
+    await screen.findByTestId(PRESENTATION_FORM_TESTID);
+
+    const campo = screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID);
+    await user.clear(campo);
+    await user.type(campo, NOMBRE_ESCRITO);
+    await elegirUnidad(user, 0);
+    await user.click(screen.getByTestId(PRESENTATION_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(updatePresentationActionMock).toHaveBeenCalledTimes(1));
+    const errorDelCampo = await screen.findByTestId(PRESENTATION_UNIT_ERROR_TESTID);
+    expect(errorDelCampo).toHaveAttribute('role', 'alert');
+
+    const selector = screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID);
+    expect(selector).toHaveAttribute('aria-invalid', 'true');
+    expect(selector).toHaveAttribute('aria-describedby', errorDelCampo.id);
+    expect(screen.queryByTestId(PRESENTATION_FORM_ERROR_TESTID)).toBeNull();
+    expect(screen.queryByTestId(PRESENTATION_ERROR_NAME_TESTID)).toBeNull();
+
+    expect(screen.getByTestId(PRESENTATION_FORM_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(PRESENTATION_FIELD_NAME_TESTID)).toHaveValue(NOMBRE_ESCRITO);
+    expect(selector).toHaveTextContent(UNIDAD_KG.symbol!);
+    expect(toastExito).not.toHaveBeenCalled();
+    expect(routerMock.refresh).not.toHaveBeenCalled();
   });
 });
 
