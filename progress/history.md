@@ -4432,3 +4432,59 @@ de QC-111. (2) El gate avisa de **8 archivos del baseline de rojos que ya pasan*
 archivos** —«is not a working tree» y después el aviso de archivo en uso—: es la **novena** vez que ocurre el
 mismo patrón, y ya tiene ficha propia (**QC-128**, `wt-borra-antes-de-desregistrar`). Se limpió a mano y
 `git worktree prune` quedó en verde.
+
+## QC-127 — decimales-caso-r14-sin-actualizar (CERRADA el 2026-09-19, PR #95)
+
+**Qué entregó, y qué NO.** El diff de producción es **vacío**: la ficha entera vive en `tests/`. El caso
+**R14** de `tests/unit/pedidos-ui/order-form.test.tsx` recuperó el patrón completo de sus tres vecinos
+—igualdad **exacta** del texto pintado y el `title` con el valor **exacto** `'-0.201'`—. Hasta esta rama
+**ningún test del repositorio afirmaba que el cálculo de ese caso da `-0.201`**: la afirmación vieja
+(`toHaveTextContent('-0.2')`) casaba por **subcadena** y pasaba en verde también con `-0.204`.
+
+**Nació con la premisa derogada, y eso se descubrió antes de trabajar.** La ficha decía que `dev` estaba en
+rojo desde el PR #85; ya no: lo arregló `bd6e504e` **fuera del ciclo de la ficha**. El board se corrigió en
+`description` **y** en `summary` —que decía literalmente «y dev esta rojo»— antes de seguir. La ficha no se
+canceló porque quedaba trabajo real: el arreglo había aplicado **medio patrón** y el censo seguía sin hacerse.
+
+**La decisión de producto quedó ratificada, no heredada.** Un faltante de `-0.001` se pinta «0», **sin
+signo**, y el único resalte que queda es `text-destructive`. **La pantalla no se toca**, el resalte se decide
+con el valor **exacto** y nunca con el pintado, y la consecuencia se acepta a sabiendas: en teléfono o impreso
+no hay `title`, así que ahí el único aviso es el color. Se evaluó pintar `<0.01` y se descartó. **Corrección
+al propio leader**, que la acotación dejó por escrito: él había dicho que la decisión «entró por inercia» y
+**no era exacto** —el PR #85 la razonó en un comentario fechado dentro del test—; lo que faltaba era
+ratificarla.
+
+**El censo de las seis pantallas del PR #85**, archivo por archivo y con fila de constancia. Un hallazgo del
+mismo tipo, corregido aquí (**R17**, enmienda que añadió T12 y que el reviewer avaló): la celda de mínimo de
+compra pintaba `'0.1005'` como `'0.1'` y nada afirmaba que conserva el exacto. **Un hallazgo de otro tipo NO
+se arregló**, por diseño: `order-columns.tsx:201` pinta `0.1255` como `0.13` sin `title`, toca `app/` y R5 lo
+prohíbe aquí → **QC-133**.
+
+**Ninguna guardia automática, y el motivo tiene ficha.** R12 lo prohíbe citando **QC-99**: las guardias de
+censo rompieron **tres guardias ajenas** al cerrar QC-79. `tests/guards` cerró con **41** archivos, los mismos
+que `dev`. Tampoco `tests/baseline-rojos.json` (R15), ni `e2e/` (R14), ni `package.json` (R16).
+
+**La mordida está demostrada, no supuesta.** Con el cálculo roto a propósito, la afirmación **vieja pasaba en
+verde** y la **nueva cae**. El `reviewer` lo **reprodujo por su cuenta** y coincidió; rechazó con **2
+bloqueantes y 3 menores**, cerrados en `043ee12f` —uno de ellos, B2, se cerró **justificando por escrito** en
+el censo por qué una ocurrencia no cuenta (afirma la precondición, antes del `user.type`), que era una de las
+dos salidas que el reviewer admitía—.
+
+**Verificación.** `./init.sh` completo: **562 archivos, 8176 pasados, 107 saltados, cero rojos**. Sin E2E, con
+motivo escrito: no hay recorrido ni pantalla nueva. **Ninguna dependencia nueva.**
+
+**Lo que esta ficha destapó y no era suyo.** El primer gate completo cayó con **un rojo ajeno**,
+`tests/unit/composition/documentos-facade.test.ts` (de QC-129). La causa **se midió antes de tocar nada**, y
+las tres corridas importan porque «será el `.env`» es una hipótesis, no un diagnóstico: (1) reproduce
+**aislado**, así que no es contaminación de otro archivo del mismo worker; (2) con `CATALOG_PROMPT=SENTINELA`
+en el shell **sigue recibiendo cadena vacía**, o sea que el valor lo reinyecta **Vitest desde `.env`** después
+del `delete` previo al import; (3) **ningún código de producción asigna** esa variable. **El fallo es del
+test**, que afirma una precondición de entorno (`toBeUndefined()`) en vez de controlarla —su hermano
+`strategy-prompt-env.test.ts` la pone, la borra y la restaura, y por eso está verde—. **Al humano se le
+advirtió que rellenar las variables no pondría verde el caso** y decidió **quitar las dos líneas vacías del
+`.env`**; hecho con copia previa y `diff` comprobado. **No** se dio de alta en el baseline (R15 lo prohíbe
+aquí) ni se arregló el test ajeno dentro de esta rama → **QC-134**.
+
+**Deuda que deja.** El `.env` del **árbol principal sigue con las dos líneas**, así que ahí el rojo sigue vivo
+hasta que entre QC-134. Y el gate volvió a avisar de los **8 archivos del baseline que ya pasan** y siguen sin
+podar.
