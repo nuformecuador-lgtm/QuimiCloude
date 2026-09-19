@@ -676,6 +676,7 @@ describe('contrato de la ruta de recetas', () => {
     );
     expect(selector).not.toContain('.filter(');
     expect(selector).toContain('withRateLimitNotice(listProductsAction)({');
+    expect(selector).toMatch(/withRateLimitNotice\(listProductsAction\)\(\{\s*page,/);
     expect(selector).toContain('pageSize: MAX_PAGE_SIZE');
     expect(selector).not.toMatch(/pageSize:\s*25/);
 

@@ -2,7 +2,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { Component, type ReactNode } from 'react';
 
 import { RATE_LIMITED_MESSAGE } from '@/lib/modules/rate-limit';
-import { useRateLimitedActionState } from '@/hooks/use-rate-limited-action-state';
+import { useRateLimitedActionState, withRateLimitNotice } from '@/hooks/use-rate-limited-action-state';
 
 import { setupUser } from '../../helpers/user-event';
 
@@ -100,5 +100,46 @@ describe('useRateLimitedActionState', () => {
 
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('enviado'));
     expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('withRateLimitNotice', () => {
+  it('sin freno, devuelve el resultado de la accion y no hay aviso', async () => {
+    const action = vi.fn(async (a: number, b: string) => ({ a, b }));
+
+    const result = await withRateLimitNotice(action)(1, 'x');
+
+    expect(result).toEqual({ a: 1, b: 'x' });
+    expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('R11 — con el freno, devuelve undefined y avisa una vez con el mensaje neutro', async () => {
+    const action = vi.fn(async () => {
+      throw new Error(RATE_LIMITED_MESSAGE);
+    });
+
+    const result = await withRateLimitNotice(action)();
+
+    expect(result).toBeUndefined();
+    expect(toastErrorMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).toHaveBeenCalledWith(RATE_LIMITED_MESSAGE);
+  });
+
+  it('R12 — cualquier otro error se relanza tal cual, sin aviso', async () => {
+    const otherError = new Error('fallo distinto al freno');
+    const action = vi.fn(async () => {
+      throw otherError;
+    });
+
+    await expect(withRateLimitNotice(action)()).rejects.toBe(otherError);
+    expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('pasa los argumentos tal cual a la accion', async () => {
+    const action = vi.fn(async (...args: unknown[]) => args);
+
+    await withRateLimitNotice(action)(1, 'dos', { tres: 3 });
+
+    expect(action).toHaveBeenCalledWith(1, 'dos', { tres: 3 });
   });
 });

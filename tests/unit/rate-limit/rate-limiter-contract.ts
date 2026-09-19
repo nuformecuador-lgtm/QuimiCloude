@@ -11,7 +11,7 @@ export interface RateLimiterContractContext {
 
 /**
  * Bateria de contrato para cualquier adaptador de {@link RateLimiter}: mismas reglas de
- * cuota y ventana (R4, R5, R27), sin importar donde viva el contador.
+ * cuota y ventana, sin importar donde viva el contador.
  */
 export function runRateLimiterContract(
   name: string,

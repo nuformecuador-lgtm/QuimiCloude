@@ -42,7 +42,7 @@ beforeEach(() => {
 });
 
 describe('createUpstashRateLimiter', () => {
-  it('R25 R31 configura fixedWindow con la cuota, el prefijo, analytics apagado y cache en memoria', async () => {
+  it('R25 R28 R31 configura fixedWindow con la cuota, el prefijo, analytics apagado y cache en memoria', async () => {
     limitMock.mockResolvedValue({ success: true });
     const limiter = createUpstashRateLimiter(CREDENTIALS, 'rate-limit:login');
 
@@ -58,14 +58,18 @@ describe('createUpstashRateLimiter', () => {
     expect(config.ephemeralCache).toBeInstanceOf(Map);
   });
 
-  it('R27 reutiliza la MISMA instancia y el MISMO Map cuando la cuota no cambia', async () => {
+  it('R27 R28 reutiliza la MISMA instancia y el MISMO Map cuando la cuota no cambia', async () => {
     limitMock.mockResolvedValue({ success: true });
     const limiter = createUpstashRateLimiter(CREDENTIALS, 'rate-limit:general');
 
     await limiter.consume('general:a', GENERAL_QUOTA);
+    const cacheTrasLaPrimera = RatelimitMock.mock.calls[0][0].ephemeralCache;
     await limiter.consume('general:b', GENERAL_QUOTA);
+    const cacheTrasLaSegunda = RatelimitMock.mock.calls[0][0].ephemeralCache;
 
     expect(RatelimitMock).toHaveBeenCalledTimes(1);
+    expect(limitMock).toHaveBeenCalledTimes(2);
+    expect(cacheTrasLaSegunda).toBe(cacheTrasLaPrimera);
   });
 
   it('R27 crea otra instancia con otro Map cuando cambia la cuota', async () => {
