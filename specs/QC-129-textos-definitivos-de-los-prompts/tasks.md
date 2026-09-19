@@ -184,7 +184,7 @@
 
 ## T14 — Gate completo · depende de todo lo anterior
 
-- [ ] `./init.sh --rapido` al cerrar cada tanda; `./init.sh` completo antes del PR, sin excepción
+- [x] `./init.sh --rapido` al cerrar cada tanda; `./init.sh` completo antes del PR, sin excepción
       (regla 5 de `CLAUDE.md`).
 - **Archivos:** ninguno.
 - **Hecho:** termina en verde, guardias incluidas. **Si sigue cortando en
