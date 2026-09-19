@@ -1190,7 +1190,7 @@ const processPdfByStrategy = createProcessPdfByStrategy({
 // de lo de arriba: la firma, la cola y la persistencia de la tanda se atan aqui y solo aqui.
 //
 // El puerto `QueueSignature` NO envuelve ningun caso de uso: verificar una firma no comprueba
-// permiso ni empresa, es la unica autorizacion del Route Handler (R8), asi que se publica tal cual
+// permiso ni empresa, y es la unica autorizacion del webhook, asi que se publica tal cual
 // -- mismo criterio que `documentStorage` de arriba, un objeto que cumple el puerto y nada mas.
 // ---------------------------------------------------------------------------------------
 
@@ -1223,7 +1223,7 @@ const processingConfig: ProcessingConfig = {
  * `convertPdfs` NO recibe actor ni reloj: la frontera de autorizacion es la emision de enlaces, y
  * quien convierte es el trabajo que procesa una tanda ya admitida.
  *
- * `runDocumentJob` tampoco recibe actor: no hay usuario delante (R8), y su ambito de empresa sale
+ * `runDocumentJob` tampoco recibe actor: no hay usuario delante, y su ambito de empresa sale
  * del `claim` sobre la propia fila.
  */
 export const documentos = {
@@ -1249,8 +1249,8 @@ export const documentos = {
   processPdfByStrategy,
   // Las TRES capacidades nuevas del procesamiento en cola. `enqueueBatch` es la unica que recibe
   // actor -- lo construye el adaptador driving con las dos caras de la sesion --, y las otras dos
-  // ninguna: `runDocumentJob` por R8, `queueSignature` porque verificar una firma no es un caso de
-  // uso del dominio.
+  // ninguna: `runDocumentJob` porque no hay usuario delante, y `queueSignature` porque verificar
+  // una firma no es un caso de uso del dominio.
   enqueueBatch: createEnqueueBatch({ repository: documentBatchRepository, queue: processingQueue }),
   runDocumentJob: createRunDocumentJob({
     repository: documentBatchRepository,

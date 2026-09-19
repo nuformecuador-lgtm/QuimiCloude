@@ -20,7 +20,7 @@ export type RunDocumentJobMessage = {
   readonly messageId: string;
 };
 
-/** Lo que el driving necesita para elegir el codigo HTTP de la tabla de `design.md > 5`. */
+/** Lo que el driving necesita para elegir el codigo HTTP de la respuesta. */
 export type RunDocumentJobResult =
   | { readonly kind: 'skipped' }
   | { readonly kind: 'done' }
