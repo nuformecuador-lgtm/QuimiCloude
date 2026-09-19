@@ -366,9 +366,26 @@ test.describe('ajuste de existencia de un lote', () => {
 
     const adjustmentMovementId = movements[1]!.id;
 
-    // El panel se cierra y se vuelve a abrir: es lo que desmonta y remonta el historial, para
-    // pedirlo de nuevo y ver el asiento que se acaba de escribir (R23).
+    // El panel se cierra: la lista de detras ya se refresco -`AdjustBatchDialog` llama a
+    // `router.refresh()` al confirmar-, sin que este recorrido recargue la pagina a mano. La
+    // busqueda de `listUrl` deja un unico producto en la tabla, asi que la celda es unica.
     await closeBatchesPanel(page);
+    await expect(page.getByTestId('product-stock')).toHaveText(`${expectedStock} ${unitName}`, {
+      timeout: 60_000,
+    });
+
+    // Y en Postgres: `products.stock` del producto vale lo mismo que pinta la fila.
+    const productAfterAdjustment = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { stock: true },
+    });
+    expect(
+      productAfterAdjustment?.stock,
+      'products.stock debe reflejar el ajuste sin recargar la pagina',
+    ).toBe(expectedStock);
+
+    // El panel se vuelve a abrir: es lo que desmonta y remonta el historial, para pedirlo de
+    // nuevo y ver el asiento que se acaba de escribir.
     await openBatchesPanel(page);
     await expect(page.getByTestId('product-batch-quantity')).toContainText(String(expectedStock));
 

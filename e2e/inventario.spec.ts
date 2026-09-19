@@ -55,6 +55,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 // `companies.name_normalized` se calcula con esta y con ninguna otra.
 import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
+import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
@@ -110,6 +111,11 @@ const presentationName = `${FIXTURE_PREFIX}presentacion_${RUN_ID}`;
 const companyName = `${FIXTURE_PREFIX}empresa_${RUN_ID}`;
 
 let companyId: string | null = null;
+
+/** Unidad de sistema del recorrido de nombre repetido en otra unidad, resuelta en `beforeAll`: id y etiqueta. */
+type SystemUnitFixture = { readonly id: string; readonly label: string };
+let kilogramUnit: SystemUnitFixture | null = null;
+let literUnit: SystemUnitFixture | null = null;
 
 /**
  * Existencia que se escribe en el alta. Constante para que el assert de «crear la presentacion no
@@ -200,6 +206,24 @@ const secondBatchStockValue = '5';
 const firstBatchUnitCostForSum = '2.5000';
 const secondBatchUnitCostForSum = '3.1000';
 
+/**
+ * Fixture de un mismo nombre «X» dado de alta en dos unidades distintas: cada alta debe terminar
+ * en su propio producto y su propia fila, y un segundo lote en una de las unidades solo debe
+ * mover esa fila. Usa las unidades de SISTEMA (`kilogramo`/`litro`, `companyId` nulo, visibles
+ * para cualquier empresa) en vez de crear una propia: son estables entre ejecuciones y no hace
+ * falta limpiarlas.
+ */
+const sameNameProductName = `${productName}_igual`;
+const sameNameKgPresentationName = `${presentationName}_kg`;
+const sameNameLiterPresentationName = `${presentationName}_l`;
+const sameNameKgFirstStock = '10';
+const sameNameKgSecondStock = '4';
+const sameNameLiterStock = '6';
+const sameNameQtyAlert = '2';
+const sameNameKgUnitCost = '1.50';
+const sameNameLiterUnitCost = '2.25';
+const sameNameKgSecondUnitCost = '1.75';
+
 async function createUserWithRole(user: Credentials, roleName: string): Promise<void> {
   if (!companyId) {
     throw new Error('la empresa del fixture no existe: fallo el beforeAll');
@@ -274,13 +298,23 @@ async function abrirPanelDeAlta(page: Page): Promise<void> {
   await expect(page.getByTestId('product-sheet')).toBeVisible({ timeout: 60_000 });
 }
 
-/** Crea una presentacion desde el propio selector, sin salir del panel, y la deja elegida. */
-async function crearPresentacionEnLinea(page: Page, nombre: string): Promise<void> {
+/**
+ * Crea una presentacion desde el propio selector, sin salir del panel, y la deja elegida.
+ *
+ * `unitId`: cuando el recorrido necesita una unidad CONCRETA -no cualquiera- se localiza la
+ * opcion por su `data-value` (mismo criterio que `e2e/aislamiento-inventario.spec.ts`); sin el,
+ * se queda con la primera, como antes.
+ */
+async function crearPresentacionEnLinea(page: Page, nombre: string, unitId?: string): Promise<void> {
   await page.getByTestId('presentation-create-open').click();
   await page.getByTestId('presentation-create-name').fill(nombre);
   // El alta rapida exige unidad antes de enviar (R11, R17): sin elegirla el envio se rechaza.
   await page.getByTestId('presentation-unit-select').click();
-  await page.getByTestId('presentation-unit-option').first().click();
+  const unitOption =
+    unitId === undefined
+      ? page.getByTestId('presentation-unit-option').first()
+      : page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`);
+  await unitOption.click();
   await page.getByTestId('presentation-create-submit').click();
 
   await expect(page.getByTestId('presentation-create')).toHaveCount(0, { timeout: 60_000 });
@@ -401,6 +435,26 @@ test.beforeAll(async () => {
   // En la MISMA empresa que el Administrador que da de alta el catalogo: asi la cuenta cero del
   // caso R4 no puede salir en verde solo por mirar otra empresa.
   await createUserWithRole(noInventoryUser, noPermissionsRoleName);
+
+  // Las dos unidades de sistema de este recorrido. Medidas, no supuestas: nacen con la migracion
+  // `db/migrations/20260903121404_units_catalog`, con `companyId` nulo y visibles para cualquier
+  // empresa. Si faltan, la base no tiene esa migracion aplicada.
+  const kilogramRow = await prisma.unit.findFirst({
+    where: { companyId: null, nameNormalized: normalizeUnitName('kilogramo') },
+    select: { id: true, symbol: true, name: true },
+  });
+  const literRow = await prisma.unit.findFirst({
+    where: { companyId: null, nameNormalized: normalizeUnitName('litro') },
+    select: { id: true, symbol: true, name: true },
+  });
+  if (!kilogramRow || !literRow) {
+    throw new Error(
+      'faltan las unidades de sistema "kilogramo"/"litro": aplica la migracion de unidades ' +
+        '(`pnpm run db:migrate`) antes de correr `pnpm run e2e`.',
+    );
+  }
+  kilogramUnit = { id: kilogramRow.id, label: kilogramRow.symbol ?? kilogramRow.name };
+  literUnit = { id: literRow.id, label: literRow.symbol ?? literRow.name };
 });
 
 test.afterAll(async () => {
@@ -761,6 +815,133 @@ test.describe('catalogo de productos', () => {
     `;
     expect(lotes, 'el alta debe crear exactamente un lote').toHaveLength(1);
     expect(lotes[0]?.lot, 'el lote debe quedar escrito en la base').toBe(lote);
+  });
+
+  test('el mismo nombre en dos unidades son dos filas, cada una con su propia existencia (R26)', async ({
+    page,
+  }) => {
+    if (!kilogramUnit || !literUnit) {
+      throw new Error('las unidades de sistema del fixture no existen: fallo el beforeAll');
+    }
+    const kg = kilogramUnit;
+    const liter = literUnit;
+
+    await loginAndLand(page, adminUser);
+
+    await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
+    await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
+
+    // --- 1. Alta de "X" con una presentacion en kg: nace el primer producto.
+    await abrirPanelDeAlta(page);
+    await page.getByTestId('product-field-name').fill(sameNameProductName);
+    await page.getByTestId('product-field-stock').fill(sameNameKgFirstStock);
+    await page.getByTestId('product-field-qtyAlert').fill(sameNameQtyAlert);
+    await crearPresentacionEnLinea(page, sameNameKgPresentationName, kg.id);
+    await page.getByTestId('product-field-unitCost').fill(sameNameKgUnitCost);
+    await guardarAlta(page);
+
+    // --- 2. Alta de "X" OTRA VEZ, con una presentacion en L: el alta busca por nombre Y unidad,
+    // asi que esto NO agrega un lote al producto de kg -nace OTRO producto-.
+    await abrirPanelDeAlta(page);
+    await page.getByTestId('product-field-name').fill(sameNameProductName);
+    await page.getByTestId('product-field-stock').fill(sameNameLiterStock);
+    await page.getByTestId('product-field-qtyAlert').fill(sameNameQtyAlert);
+    await crearPresentacionEnLinea(page, sameNameLiterPresentationName, liter.id);
+    await page.getByTestId('product-field-unitCost').fill(sameNameLiterUnitCost);
+    await guardarAlta(page);
+
+    // --- 3. El listado muestra DOS filas «X · kg» y «X · <litro>», cada una con su propia
+    // existencia.
+    const kgRowName = `${sameNameProductName} · ${kg.label}`;
+    const literRowName = `${sameNameProductName} · ${liter.label}`;
+
+    const kgCell = await findProductCell(page, kgRowName);
+    const kgRow = kgCell.first().locator('xpath=ancestor::tr[1]');
+    await expect(kgRow.getByTestId('product-stock')).toHaveText(
+      `${sameNameKgFirstStock} ${kg.label}`,
+      { timeout: 60_000 },
+    );
+
+    const literCell = await findProductCell(page, literRowName);
+    const literRow = literCell.first().locator('xpath=ancestor::tr[1]');
+    await expect(literRow.getByTestId('product-stock')).toHaveText(
+      `${sameNameLiterStock} ${liter.label}`,
+      { timeout: 60_000 },
+    );
+
+    // Contra Postgres: dos productos vivos "X", con unidad distinta y la existencia que muestra
+    // cada fila.
+    const productosVivos = await prisma.product.findMany({
+      where: { name: sameNameProductName, deletedAt: null },
+      select: { id: true, unitId: true, stock: true },
+    });
+    expect(
+      productosVivos,
+      'el mismo nombre en dos unidades debe crear dos productos',
+    ).toHaveLength(2);
+    expect(
+      productosVivos[0]?.unitId,
+      'las dos filas deben ser productos con unidad distinta',
+    ).not.toBe(productosVivos[1]?.unitId);
+
+    const kgProduct = productosVivos.find((product) => product.unitId === kg.id);
+    const literProduct = productosVivos.find((product) => product.unitId === liter.id);
+    expect(
+      kgProduct?.stock,
+      'la existencia guardada del producto en kg debe ser la de su unico lote',
+    ).toBe(Number(sameNameKgFirstStock));
+    expect(
+      literProduct?.stock,
+      'la existencia guardada del producto en L debe ser la de su unico lote',
+    ).toBe(Number(sameNameLiterStock));
+
+    // --- 4. Un segundo lote en la MISMA unidad (kg): se elige el producto del desplegable -las
+    // dos opciones muestran el mismo nombre, cualquiera vale- y SU presentacion, que es lo que
+    // de verdad desambigua. Sube solo la fila kg; la de L queda igual.
+    await abrirPanelDeAlta(page);
+    await elegirProductoExistente(page, sameNameProductName);
+    await elegirPresentacionExistente(page, sameNameKgPresentationName);
+    await page.getByTestId('product-field-stock').fill(sameNameKgSecondStock);
+    await page.getByTestId('product-field-qtyAlert').fill(sameNameQtyAlert);
+    await page.getByTestId('product-field-unitCost').fill(sameNameKgSecondUnitCost);
+    await guardarAlta(page);
+
+    const kgStockAfter = Number(sameNameKgFirstStock) + Number(sameNameKgSecondStock);
+    const kgCellAfter = await findProductCell(page, kgRowName);
+    const kgRowAfter = kgCellAfter.first().locator('xpath=ancestor::tr[1]');
+    await expect(kgRowAfter.getByTestId('product-stock')).toHaveText(
+      `${kgStockAfter} ${kg.label}`,
+      { timeout: 60_000 },
+    );
+
+    const literCellAfter = await findProductCell(page, literRowName);
+    const literRowAfter = literCellAfter.first().locator('xpath=ancestor::tr[1]');
+    await expect(literRowAfter.getByTestId('product-stock')).toHaveText(
+      `${sameNameLiterStock} ${liter.label}`,
+      { timeout: 60_000 },
+    );
+
+    const productosTrasSegundoLote = await prisma.product.findMany({
+      where: { name: sameNameProductName, deletedAt: null },
+      select: { id: true, unitId: true, stock: true },
+    });
+    expect(
+      productosTrasSegundoLote,
+      'el segundo lote no debe crear un tercer producto',
+    ).toHaveLength(2);
+
+    const kgProductAfter = productosTrasSegundoLote.find((product) => product.unitId === kg.id);
+    const literProductAfter = productosTrasSegundoLote.find(
+      (product) => product.unitId === liter.id,
+    );
+    expect(
+      kgProductAfter?.stock,
+      'el segundo lote en kg debe sumarse a la existencia guardada del producto en kg',
+    ).toBe(kgStockAfter);
+    expect(
+      literProductAfter?.stock,
+      'el producto en L no cambia con un lote agregado al de kg',
+    ).toBe(Number(sameNameLiterStock));
   });
 
   test('un usuario sin inventario.consultar recibe 404 dentro del layout privado y no ve el catalogo (R4)', async ({
