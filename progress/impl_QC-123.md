@@ -347,3 +347,19 @@ tests pasados, 104 skipped, **0 rojos**, los tres proyectos corridos y todas las
 
 Sigue en pie el aviso de los ocho archivos del baseline que ya pasan: **no es de esta ficha** y no
 se toca aqui.
+
+## Segunda sincronizacion: QC-127 entra en `dev` con el PR ya abierto (2026-09-19)
+
+El PR #96 quedo marcado en conflicto poco despues de abrirse: **QC-127 se mergeo por el PR #95**
+mientras se cerraba esta ficha, y trajo 11 commits a `dev`.
+
+- **Auto-mergeados sin intervencion**: `feature_list.json` y
+  `tests/unit/pedidos-ui/order-form.test.tsx`. El segundo **lo tocan LAS DOS ramas** -QC-127 con su
+  arreglo del caso R14, y esta en `5c08edc2` al extender el puerto-, asi que el auto-merge limpio
+  no se dio por bueno: se verifico con el gate completo, no con la ausencia de marcadores.
+- **Unico conflicto: `progress/current.md`**, y de proceso: cada lado anadia su fila a la tabla y
+  su bloque de evaluaciones. Se quedan **las dos**, en una sola tabla y bajo un solo encabezado.
+  `validate-features.mjs` verde: 118 fichas, cupo por zona en pie.
+
+**`./init.sh` completo sobre el resultado del merge (`45e810c5`)**: **566/566** archivos, **8238**
+tests pasados, 104 skipped, **0 rojos**, los tres proyectos. Es el gate que respalda el PR #96.
