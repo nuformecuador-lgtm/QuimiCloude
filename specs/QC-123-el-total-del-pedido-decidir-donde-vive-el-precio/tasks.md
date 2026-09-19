@@ -154,7 +154,7 @@ Archivos: `tests/integration/pedidos/order-ingredients-cost.int.test.ts` (nuevo)
 
 **Hecho cuando:** el archivo pasa contra la base de test y demuestra los siete puntos.
 
-## T11 — Cierre `[depende de todas]`
+## [x] T11 — Cierre `[depende de todas]`
 
 Archivos: `progress/impl_QC-123-....md` (mapa `R<n> -> test`), `progress/current.md`.
 

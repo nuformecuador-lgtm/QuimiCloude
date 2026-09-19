@@ -290,3 +290,39 @@ y arrastra `tests/unit/pedidos-ui/`, cuya guardia de ficha ajena lee `git status
 filtrar y por eso ve un arbol sucio como archivos «tocados» por esa otra ficha. Con el arbol ya
 commiteado no aparece. **El gate completo no lo corre el implementador**: lo corre el leader al
 cerrar.
+
+## Cierre — `./init.sh` COMPLETO en verde (2026-09-19)
+
+Corrido por el leader sobre el tip `314e687e`, que es el que va al PR:
+
+- **564/564** archivos de test, **8222** pasados, **104** skipped, **0 rojos**.
+- Los **tres** proyectos corrieron (`ui`, `node`, `integration`), que es lo que el gate exige y lo
+  que el modo rapido no da.
+- Todas las migraciones tienen su `down.sql`.
+
+**La vuelta anterior del gate completo, sobre `c614fb29`, salio ROJA, y el rojo era de esta rama**:
+`tests/unit/unidades/module-contract.test.ts` — «la unidad del producto es la DERIVADA del lote y
+nunca un texto». Esta contado en el punto 7. Lo que importa dejar escrito aqui es **por que el gate
+rapido no podia verlo**: esa guardia vive en `tests/unit/unidades/`, asi que `vitest run guard` no
+la recoge; y lee el archivo con `fs` en vez de importarlo, asi que `vitest related` no la relaciona
+con el cambio. El rapido dio **47/47 guardias verdes y tenia razon**. Es exactamente el agujero que
+`CLAUDE.md` regla 5 describe cuando exige el gate completo antes de cada PR.
+
+**Aviso del gate que NO es de esta ficha**: ocho archivos del `baseline-rojos.json` ya pasan y
+tocaria limpiarlos. Ninguno es de `pedidos`, `inventario` ni `recetas`, y esta rama no los toca:
+
+    tests/integration/inventario/product-crud.int.test.ts
+    tests/unit/configuracion-ui/configuracion-convenciones.test.ts
+    tests/unit/configuracion-ui/unidades-convenciones.test.ts
+    tests/unit/navegacion/qc75-convenciones.test.ts
+    tests/unit/recetas-ui/recipe-route-contract.test.ts
+    tests/unit/recetas/module-contract.test.ts
+    tests/unit/unidades/modulo-intacto.test.ts
+    tests/unit/unidades/unidades-convenciones.test.ts
+
+Es deuda de limpieza del baseline y va en ficha propia: meterla aqui ensancharia el diff de QC-123
+con archivos que la ficha no toca.
+
+**T11 marcada `[x]`**: el gate completo esta verde, el mapa `R<n> -> test` con los nombres reales
+esta arriba, y `package.json` y `pnpm-lock.yaml` no aparecen en el diff de la rama. Las once tasks
+quedan en `[x]`.
