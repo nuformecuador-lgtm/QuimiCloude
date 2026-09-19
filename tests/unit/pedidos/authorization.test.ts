@@ -38,7 +38,9 @@ import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
+import type { UnitCatalog } from '@/lib/modules/unidades'
 
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222'
@@ -74,7 +76,21 @@ function dobles() {
 
   const recipes = {
     findRefsIncludingDeleted: explota('recipes.findRefsIncludingDeleted'),
+    findExecutionContentById: explota('recipes.findExecutionContentById'),
   } as unknown as RecipeCatalog
+
+  // El calculo del importe (R23) es otro puerto que no puede tocarse sin autorizacion: si
+  // alguno de los dos se llamara sin permiso, la operacion explota igual que con `orders` o
+  // `recipes`.
+  const products = {
+    findRefs: explota('products.findRefs'),
+    findCostingBatches: explota('products.findCostingBatches'),
+  } as unknown as ProductCatalog
+
+  const units = {
+    findRefs: explota('units.findRefs'),
+    findRefsSharingBaseInCompany: explota('units.findRefsSharingBaseInCompany'),
+  } as unknown as UnitCatalog
 
   // QC-57 (R34): el log del campo omitido tampoco puede sonar sin autorizacion.
   // `requirePermission` va antes de zod y antes de sanear, asi que un actor rechazado no llega
@@ -85,10 +101,12 @@ function dobles() {
     [
       ...Object.values(orders as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(recipes as unknown as Record<string, ReturnType<typeof vi.fn>>),
+      ...Object.values(products as unknown as Record<string, ReturnType<typeof vi.fn>>),
+      ...Object.values(units as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(log as unknown as Record<string, ReturnType<typeof vi.fn>>),
     ] as readonly ReturnType<typeof vi.fn>[]
 
-  return { orders, recipes, log, llamadas }
+  return { orders, recipes, products, units, log, llamadas }
 }
 
 /** Los dobles de la invocacion en curso. Se renuevan en CADA caso para que el contador de uno
@@ -99,6 +117,8 @@ function depsDeTurno() {
   return {
     orders: enCurso.orders,
     recipes: enCurso.recipes,
+    products: enCurso.products,
+    units: enCurso.units,
     log: enCurso.log,
   }
 }

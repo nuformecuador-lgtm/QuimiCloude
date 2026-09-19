@@ -49,7 +49,9 @@ import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
+import type { UnitCatalog } from '@/lib/modules/unidades'
 
 const EMPRESA_A = '33333333-3333-4333-8333-333333333333'
 const EMPRESA_B = '44444444-4444-4444-8444-444444444444'
@@ -156,6 +158,19 @@ function almacen() {
     findRefsIncludingDeleted: vi.fn(async (ids: readonly string[]) =>
       ids.map((id) => ({ id, name: 'Acido citrico 50%', isDeleted: false })),
     ),
+    // Receta SIN lineas: este archivo prueba el ambito, no el calculo del importe.
+    findExecutionContentById: vi.fn(async (id: string) => ({
+      id,
+      name: 'Acido citrico 50%',
+      isDeleted: false,
+      steps: [],
+      lines: [],
+    })),
+  }
+  const products = { findRefs: vi.fn(async () => []), findCostingBatches: vi.fn(async () => []) }
+  const units = {
+    findRefs: vi.fn(async () => []),
+    findRefsSharingBaseInCompany: vi.fn(async () => []),
   }
   const log = { ignoredFields: vi.fn() }
 
@@ -173,6 +188,8 @@ function almacen() {
     orders: orders as unknown as OrderRepository,
     espias: orders,
     recipes: recipes as unknown as RecipeCatalog,
+    products: products as unknown as ProductCatalog,
+    units: units as unknown as UnitCatalog,
     log,
     altas,
     foto,
@@ -185,10 +202,10 @@ type Almacen = ReturnType<typeof almacen>
 function casosDeUso(a: Almacen) {
   const now = () => new Date('2026-09-15T10:00:00.000Z')
   return {
-    createOrder: createCreateOrder({ orders: a.orders, recipes: a.recipes, now }),
+    createOrder: createCreateOrder({ orders: a.orders, recipes: a.recipes, products: a.products, units: a.units, now }),
     getOrder: createGetOrder({ orders: a.orders, recipes: a.recipes }),
     listOrders: createListOrders({ orders: a.orders, recipes: a.recipes, log: a.log }),
-    updateOrder: createUpdateOrder({ orders: a.orders, recipes: a.recipes, now }),
+    updateOrder: createUpdateOrder({ orders: a.orders, recipes: a.recipes, products: a.products, units: a.units, now }),
     cancelOrder: createCancelOrder({ orders: a.orders, now }),
     deleteOrder: createDeleteOrder({ orders: a.orders, now }),
   }
@@ -383,14 +400,36 @@ describe('QC-60 R16, R28 — el PERMISO se exige ANTES que el ambito', () => {
       cancelAlive: explota('cancelAlive'),
       softDeleteAlive: explota('softDeleteAlive'),
     }
-    const recipes = { findRefsIncludingDeleted: explota('findRefsIncludingDeleted') }
+    const recipes = {
+      findRefsIncludingDeleted: explota('findRefsIncludingDeleted'),
+      findExecutionContentById: explota('findExecutionContentById'),
+    }
+    const products = {
+      findRefs: explota('products.findRefs'),
+      findCostingBatches: explota('products.findCostingBatches'),
+    }
+    const units = {
+      findRefs: explota('units.findRefs'),
+      findRefsSharingBaseInCompany: explota('units.findRefsSharingBaseInCompany'),
+    }
     const log = { ignoredFields: explota('ignoredFields') }
     const deps = {
       orders: orders as unknown as OrderRepository,
       recipes: recipes as unknown as RecipeCatalog,
+      products: products as unknown as ProductCatalog,
+      units: units as unknown as UnitCatalog,
       log,
     }
-    return { deps, espias: [...Object.values(orders), ...Object.values(recipes), log.ignoredFields] }
+    return {
+      deps,
+      espias: [
+        ...Object.values(orders),
+        ...Object.values(recipes),
+        ...Object.values(products),
+        ...Object.values(units),
+        log.ignoredFields,
+      ],
+    }
   }
 
   const SEIS = [

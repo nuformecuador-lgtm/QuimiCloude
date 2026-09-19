@@ -1,17 +1,51 @@
 import { requirePermission, type Actor } from './actor';
 import { OrderNotFoundError, RecipeNotFoundError, ValidationError } from './errors';
+import { calculateIngredientsCost } from './order-cost';
 import { updateOrderSchema } from './order-input';
 import type { OrderScope } from './order-scope';
 import { assertTransition } from './order-transitions';
 
+import type { ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
+import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
 
 import type { OrderRepository } from '../ports/order-repository';
 
-/** QC-35bis (2026-09-07): sin unidad en el pedido, `units` deja de ser dependencia. */
+/**
+ * Coste de los ingredientes de una receta para una cantidad de pedido dada. Una sola llamada a
+ * cada catalogo: los `productId` de las lineas deduplicados para los lotes, y las unidades de
+ * las lineas mas las de los lotes leidos, deduplicadas, para las conversiones.
+ */
+async function resolveIngredientsCost(
+  recipes: RecipeCatalog,
+  products: ProductCatalog,
+  units: UnitCatalog,
+  recipeId: string,
+  orderQuantity: string,
+  companyId: string,
+): Promise<string | null> {
+  const content = await recipes.findExecutionContentById(recipeId, companyId);
+  const lines = content?.lines ?? [];
+
+  const productIds = [...new Set(lines.map((line) => line.productId))];
+  const batches = await products.findCostingBatches(productIds, companyId);
+
+  const unitIds = new Set<string>();
+  for (const line of lines) unitIds.add(line.unitId);
+  for (const batch of batches) unitIds.add(batch.unitId);
+  const unitRefs = await units.findRefs([...unitIds], companyId);
+  const unitConversions = new Map<string, UnitConversion>(unitRefs.map((ref) => [ref.id, ref]));
+
+  return calculateIngredientsCost({ orderQuantity, lines, batches, units: unitConversions });
+}
+
+/** Recupera `products` y `units`, que la edicion necesita para recalcular el importe en cada
+ *  escritura (QC-35bis, 2026-09-07, se los habia quitado al salir la unidad del pedido). */
 export type UpdateOrderDeps = {
   readonly orders: OrderRepository;
   readonly recipes: RecipeCatalog;
+  readonly products: ProductCatalog;
+  readonly units: UnitCatalog;
   /** Ver el comentario identico de `create-order.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
 };
@@ -72,10 +106,19 @@ export function createUpdateOrder(
       if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
     }
 
-    // TODO: recalcular el coste de ingredientes con los catalogos de productos y unidades
-    // antes de escribir; de momento se pasa `null` porque este caso de uso aun no tiene esas
-    // dependencias.
-    const result = await deps.orders.updateAlive(id, data, actor.id, now(), null, scope);
+    // El coste se recalcula con la receta del DATO ENTRANTE, no con la de la fila vieja: una
+    // edicion que solo cambia la cantidad o la prioridad tambien reescribe el importe con los
+    // lotes de HOY.
+    const ingredientsCost = await resolveIngredientsCost(
+      deps.recipes,
+      deps.products,
+      deps.units,
+      data.recipeId,
+      data.quantity,
+      actor.companyId,
+    );
+
+    const result = await deps.orders.updateAlive(id, data, actor.id, now(), ingredientsCost, scope);
 
     // La fila pudo borrarse entre el `SELECT` y el `UPDATE`: el puerto vuelve a filtrar por
     // vivos y el caso de uso responde lo mismo que arriba (R33).

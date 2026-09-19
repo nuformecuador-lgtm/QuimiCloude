@@ -27,7 +27,9 @@ import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
+import type { UnitCatalog } from '@/lib/modules/unidades'
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
 // porque este archivo ejercita lecturas y escrituras con el mismo fixture.
@@ -76,6 +78,8 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
 type Dobles = {
   readonly orders: OrderRepository
   readonly recipes: RecipeCatalog
+  readonly products: ProductCatalog
+  readonly units: UnitCatalog
   readonly now: () => Date
 }
 
@@ -94,6 +98,15 @@ function dobles(opciones: {
   const findAliveById = vi.fn(async () => opciones.fila ?? null)
   const updateAlive = vi.fn(async () => opciones.edicion ?? 'ok')
   const findRefsIncludingDeleted = vi.fn(async () => opciones.recetas ?? [RECETA_VIVA])
+  // Receta SIN lineas: este archivo no ejercita el calculo del importe, y sin lineas el
+  // resultado siempre es `null` sin necesidad de mas dobles.
+  const findExecutionContentById = vi.fn(async () => ({
+    id: RECIPE_ID,
+    name: 'Acido citrico 50%',
+    isDeleted: false,
+    steps: [],
+    lines: [],
+  }))
 
   const explota = (nombre: string) =>
     vi.fn(() => {
@@ -111,7 +124,12 @@ function dobles(opciones: {
 
   return {
     orders,
-    recipes: { findRefsIncludingDeleted } as unknown as RecipeCatalog,
+    recipes: { findRefsIncludingDeleted, findExecutionContentById } as unknown as RecipeCatalog,
+    products: { findRefs: vi.fn(async () => []), findCostingBatches: vi.fn(async () => []) } as unknown as ProductCatalog,
+    units: {
+      findRefs: vi.fn(async () => []),
+      findRefsSharingBaseInCompany: vi.fn(async () => []),
+    } as unknown as UnitCatalog,
     now: () => AHORA,
     create,
     findAliveById,

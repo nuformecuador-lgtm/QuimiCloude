@@ -48,7 +48,9 @@ import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
 import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
 
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
+import type { UnitCatalog } from '@/lib/modules/unidades'
 
 const {
   createOrderMock,
@@ -634,11 +636,24 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
       cancelAlive: explota('cancelAlive'),
       softDeleteAlive: explota('softDeleteAlive'),
     }
-    const recipes = { findRefsIncludingDeleted: explota('findRefsIncludingDeleted') }
+    const recipes = {
+      findRefsIncludingDeleted: explota('findRefsIncludingDeleted'),
+      findExecutionContentById: explota('findExecutionContentById'),
+    }
+    const products = {
+      findRefs: explota('products.findRefs'),
+      findCostingBatches: explota('products.findCostingBatches'),
+    }
+    const units = {
+      findRefs: explota('units.findRefs'),
+      findRefsSharingBaseInCompany: explota('units.findRefsSharingBaseInCompany'),
+    }
     const log = { ignoredFields: explota('ignoredFields') }
     const deps = {
       orders: orders as unknown as OrderRepository,
       recipes: recipes as unknown as RecipeCatalog,
+      products: products as unknown as ProductCatalog,
+      units: units as unknown as UnitCatalog,
       log,
     }
 

@@ -938,18 +938,30 @@ const orderRepository: OrderRepository = {
  * no necesita recibirla.
  *
  * `cancelOrder` y `deleteOrder` reciben SOLO el repositorio: ninguno de los dos toca la receta,
- * y darles catalogos que no usan seria cablear una dependencia falsa. Desde el 2026-09-07 los
- * otros cuatro reciben SOLO el catalogo de recetas, por el mismo motivo.
+ * y darles catalogos que no usan seria cablear una dependencia falsa. `getOrder` y `listOrders`
+ * reciben SOLO el catalogo de recetas, por el mismo motivo: no calculan ningun importe.
+ * `createOrder` y `updateOrder` son los dos que si costean, asi que son los dos que reciben
+ * tambien `products` y `units`.
  */
 export const pedidos = {
-  createOrder: createCreateOrder({ orders: orderRepository, recipes: recipeCatalog }),
+  createOrder: createCreateOrder({
+    orders: orderRepository,
+    recipes: recipeCatalog,
+    products: productCatalog,
+    units: unitCatalog,
+  }),
   getOrder: createGetOrder({ orders: orderRepository, recipes: recipeCatalog }),
   listOrders: createListOrders({
     orders: orderRepository,
     recipes: recipeCatalog,
     log: pedidosListQueryLog,
   }),
-  updateOrder: createUpdateOrder({ orders: orderRepository, recipes: recipeCatalog }),
+  updateOrder: createUpdateOrder({
+    orders: orderRepository,
+    recipes: recipeCatalog,
+    products: productCatalog,
+    units: unitCatalog,
+  }),
   cancelOrder: createCancelOrder({ orders: orderRepository }),
   deleteOrder: createDeleteOrder({ orders: orderRepository }),
 } as const;

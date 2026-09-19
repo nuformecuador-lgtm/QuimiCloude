@@ -1,13 +1,44 @@
 import { requirePermission, type Actor } from './actor';
 import { DuplicateOrderNumberError, RecipeNotFoundError, ValidationError } from './errors';
 import { DEFAULT_ORDER_STATUS } from './order-classification';
+import { calculateIngredientsCost } from './order-cost';
 import { createOrderSchema, type EditableOrderStatus } from './order-input';
 import { formatOrderNumber, type OrderNumber } from './order-number';
 import type { OrderScope } from './order-scope';
 
+import type { ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
+import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
 
 import type { OrderRepository } from '../ports/order-repository';
+
+/**
+ * Coste de los ingredientes de una receta para una cantidad de pedido dada. Una sola llamada a
+ * cada catalogo: los `productId` de las lineas deduplicados para los lotes, y las unidades de
+ * las lineas mas las de los lotes leidos, deduplicadas, para las conversiones.
+ */
+async function resolveIngredientsCost(
+  recipes: RecipeCatalog,
+  products: ProductCatalog,
+  units: UnitCatalog,
+  recipeId: string,
+  orderQuantity: string,
+  companyId: string,
+): Promise<string | null> {
+  const content = await recipes.findExecutionContentById(recipeId, companyId);
+  const lines = content?.lines ?? [];
+
+  const productIds = [...new Set(lines.map((line) => line.productId))];
+  const batches = await products.findCostingBatches(productIds, companyId);
+
+  const unitIds = new Set<string>();
+  for (const line of lines) unitIds.add(line.unitId);
+  for (const batch of batches) unitIds.add(batch.unitId);
+  const unitRefs = await units.findRefs([...unitIds], companyId);
+  const unitConversions = new Map<string, UnitConversion>(unitRefs.map((ref) => [ref.id, ref]));
+
+  return calculateIngredientsCost({ orderQuantity, lines, batches, units: unitConversions });
+}
 
 /**
  * El estado con el que nace un pedido (R9). `DEFAULT_ORDER_STATUS` esta tipado como
@@ -31,6 +62,10 @@ export type CreateOrderDeps = {
    *  QC-35bis (2026-09-07): era el primero de DOS catalogos. El de `unidades` se fue con la
    *  unidad del pedido, y con el la comprobacion de R16. */
   readonly recipes: RecipeCatalog;
+  /** Contrato PUBLICO de `inventario`: los lotes con existencia con los que se costea. */
+  readonly products: ProductCatalog;
+  /** Contrato PUBLICO de `unidades`: las conversiones con las que se normaliza cantidad y coste. */
+  readonly units: UnitCatalog;
   /**
    * El reloj entra INYECTADO -mismo patron que `recetas` y `proveedores`- para que el test
    * lo pueda fijar sin tocar el reloj global. Aqui NO se lee `next/headers` ni ninguna
@@ -89,19 +124,25 @@ export function createCreateOrder(
     const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId], actor.companyId);
     if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
 
+    const ingredientsCost = await resolveIngredientsCost(
+      deps.recipes,
+      deps.products,
+      deps.units,
+      data.recipeId,
+      data.quantity,
+      actor.companyId,
+    );
+
     const instant = now();
 
     // R9: el estado de alta es siempre `PENDIENTE` y lo pone este caso de uso, no la
     // entrada. La prioridad por defecto (`BAJA`) ya la aplico el esquema.
-    // TODO: calcular el coste de ingredientes con los catalogos de productos y unidades antes
-    // de escribir; de momento se pasa `null` porque este caso de uso aun no tiene esas
-    // dependencias.
     const created = await deps.orders.create(
       { ...data, status: STATUS_DE_ALTA },
       instant.getUTCFullYear(),
       actor.id,
       instant,
-      null,
+      ingredientsCost,
       scope,
     );
 
