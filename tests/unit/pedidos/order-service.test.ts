@@ -21,6 +21,7 @@ import {
   type PedidosError,
 } from '@/lib/modules/pedidos/domain/errors'
 import { createGetOrder } from '@/lib/modules/pedidos/domain/get-order'
+import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
 import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
@@ -311,6 +312,47 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       'order_not_found',
     )
     await expect(createGetOrder(d)(ORDER_ID, ADMIN)).rejects.toBeInstanceOf(OrderNotFoundError)
+  })
+})
+
+// QC-123 T7 — la ficha y el listado devuelven el importe TAL COMO ESTA GUARDADO (R14): ninguno
+// de los dos lo calcula, solo lo leen de la fila que ya trajo el puerto.
+describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R14)', () => {
+  it('la ficha y el listado devuelven el importe a quien tiene pedidos.consultar (R14)', async () => {
+    const CON_IMPORTE = fila({ ingredientsCost: '1234.5600' })
+
+    const dFicha = dobles({ fila: CON_IMPORTE })
+    const vista = await createGetOrder(dFicha)(ORDER_ID, ADMIN)
+    expect(vista.ingredientsCost).toBe('1234.5600')
+
+    // El listado se monta con dobles propios: `dobles()` de este archivo hace explotar
+    // `orders.listAlive` a proposito porque no es el caso de uso que ejercita este fichero.
+    const listAlive = vi.fn(async () => ({
+      items: [CON_IMPORTE],
+      total: 1,
+      page: 1,
+      pageSize: 10,
+      totalPages: 1,
+    }))
+    const orders = {
+      create: vi.fn(),
+      findAliveById: vi.fn(),
+      listAlive,
+      updateAlive: vi.fn(),
+      cancelAlive: vi.fn(),
+      softDeleteAlive: vi.fn(),
+    } as unknown as OrderRepository
+    const findRefsIncludingDeleted = vi.fn(async () => [RECETA_VIVA])
+    const findIdsMatchingName = vi.fn(async (): Promise<readonly string[] | null> => null)
+    const log = { ignoredFields: vi.fn() }
+
+    const pagina = await createListOrders({
+      orders,
+      recipes: { findRefsIncludingDeleted, findIdsMatchingName } as unknown as RecipeCatalog,
+      log,
+    })({ page: 1 }, ADMIN)
+
+    expect(pagina.items[0]?.ingredientsCost).toBe('1234.5600')
   })
 })
 

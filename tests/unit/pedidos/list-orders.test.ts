@@ -26,7 +26,9 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { ValidationError, type PedidosError } from '@/lib/modules/pedidos/domain/errors'
 import { UnauthorizedError } from '@/lib/modules/pedidos/domain/errors'
-import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
+import { type GetOrderDeps } from '@/lib/modules/pedidos/domain/get-order'
+import { createListOrders, type ListOrdersDeps } from '@/lib/modules/pedidos/domain/list-orders'
+import { ORDER_QUERYABLE } from '@/lib/modules/pedidos/domain/order-queryable'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { ListQuery } from '@/lib/modules/pedidos/domain/list-query'
@@ -602,5 +604,76 @@ describe('listOrders — invocaciones de puerto por pagina, con y sin busqueda (
 
     expect(d.findIdsMatchingName).toHaveBeenCalledTimes(1)
     expect(recipeIdsRecibidos(d.listAlive.mock.calls)).toBeNull()
+  })
+})
+
+// QC-123 T7 — las LECTURAS no recalculan (R12). No es solo comportamiento: es que el TIPO de
+// las dependencias no deja ni pedir `products` ni `units`. Las dos comprobaciones de abajo se
+// verifican por caminos distintos y ninguna sustituye a la otra:
+//  (a) TIPO — si `ListOrdersDeps` o `GetOrderDeps` alguna vez ganaran `products` o `units`, las
+//      cuatro constantes de mas abajo dejarian de aceptar `true` y `pnpm run typecheck` se
+//      pondria rojo EN ESTA LINEA, sin tocar el resto del archivo.
+//  (b) COMPORTAMIENTO — un doble que EXPLOTA si algo intenta LEER `products` o `units` de las
+//      deps demuestra que, ademas de no declararlos, el caso de uso nunca los toca en tiempo de
+//      ejecucion.
+describe('listOrders (y getOrder) — las lecturas no recalculan (R12)', () => {
+  it('el listado no recibe catalogo de productos ni de unidades (R12)', async () => {
+    const listadoSinProductos: 'products' extends keyof ListOrdersDeps ? false : true = true
+    const listadoSinUnidades: 'units' extends keyof ListOrdersDeps ? false : true = true
+    const fichaSinProductos: 'products' extends keyof GetOrderDeps ? false : true = true
+    const fichaSinUnidades: 'units' extends keyof GetOrderDeps ? false : true = true
+    expect([listadoSinProductos, listadoSinUnidades, fichaSinProductos, fichaSinUnidades]).toEqual(
+      [true, true, true, true],
+    )
+
+    const d = dobles({
+      pagina: pagina([fila({ id: 'o-1', ingredientsCost: '150.0000' })]),
+    })
+    // El doble real no tiene ni `products` ni `units`; el Proxy ademas hace explicito que
+    // LEERLOS -aunque alguien los colara con un cast- tira el caso de uso abajo.
+    const vigilado = new Proxy(d, {
+      get(target, prop, receiver) {
+        if (prop === 'products' || prop === 'units') {
+          throw new Error(`listOrders no deberia leer '${String(prop)}': las lecturas no recalculan (R12)`)
+        }
+        return Reflect.get(target, prop, receiver)
+      },
+    }) as typeof d
+
+    const salida = await createListOrders(vigilado)({ page: 1 }, ADMIN)
+
+    expect(salida.items[0]?.ingredientsCost).toBe('150.0000')
+  })
+})
+
+// QC-123 T9 — el importe no es ordenable ni filtrable (R17): `ORDER_QUERYABLE` no lo declara, y
+// pedirlo como `sort` o como filtro se PODA y se ANOTA sin que la consulta falle -mismo
+// mecanismo que `list-orders.ts:136-138` ya prueban los casos vecinos de `deletedAt` y de un
+// filtro con forma equivocada, aqui aplicado a `ingredientsCost`.
+describe('listOrders — el importe no es consultable (R17)', () => {
+  it('el importe no esta en la lista blanca y pedirlo como orden o filtro se poda y se anota (R17)', async () => {
+    expect(ORDER_QUERYABLE.sortable).not.toContain('ingredientsCost')
+    expect(Object.keys(ORDER_QUERYABLE.filterable)).not.toContain('ingredientsCost')
+
+    const porOrden = dobles({ pagina: pagina([]) })
+    const salidaOrden = await createListOrders(porOrden)(
+      { page: 1, sort: { columnId: 'ingredientsCost', direction: 'desc' } },
+      ADMIN,
+    )
+    // (a) la consulta NO falla
+    expect(salidaOrden.items).toEqual([])
+    // (b) el orden pedido se poda: el puerto recibe `sort: null`
+    expect(porOrden.listAlive).toHaveBeenCalledTimes(1)
+    expect(consultaRecibida(porOrden.listAlive.mock.calls).sort).toBeNull()
+    // (c) y se anota en el log de campos omitidos
+    expect(porOrden.log.ignoredFields).toHaveBeenCalledWith('orders', ['ingredientsCost'])
+
+    const porFiltro = dobles({ pagina: pagina([]) })
+    await createListOrders(porFiltro)(
+      { page: 1, filters: { ingredientsCost: { kind: 'numberRange', min: 100, max: 200 } } },
+      ADMIN,
+    )
+    expect(consultaRecibida(porFiltro.listAlive.mock.calls).filters).toEqual({})
+    expect(porFiltro.log.ignoredFields).toHaveBeenCalledWith('orders', ['ingredientsCost'])
   })
 })

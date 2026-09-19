@@ -315,6 +315,34 @@ describe('estado y prioridad se leen como etiqueta, no como valor crudo del enum
 // necesita el router. La declaracion no debe necesitar ninguno de los dos.
 // ---------------------------------------------------------------------------------------------
 
+// QC-123 T9 (R18) — el importe NO se pinta en esta ficha (lo pinta QC-122). En positivo, la
+// lista blanca de ids sigue sin ninguna columna de importe; en negativo, las celdas que SI se
+// pueden pintar sin montar el resto de la pantalla (router, dialogos) no dejan escapar el valor.
+describe('la tabla de pedidos no pinta el importe (R18)', () => {
+  it('la tabla de pedidos no pinta el importe (R18)', () => {
+    const ids = ORDER_COLUMNS.map((column) => column.id);
+    expect(ids).not.toContain('ingredientsCost');
+    expect(ids).not.toContain('importe');
+    expect(ids).toHaveLength(9);
+
+    const VALOR_DELATOR = '999999.9999';
+    const order = pedido({ ingredientsCost: VALOR_DELATOR });
+    const idsRenderizablesSinContexto = [
+      ORDER_NUMBER_COLUMN_ID,
+      STATUS_COLUMN_ID,
+      PRIORITY_COLUMN_ID,
+      RECIPE_NAME_COLUMN_ID,
+      QUANTITY_COLUMN_ID,
+      CREATED_AT_COLUMN_ID,
+      CANCELLATION_REASON_COLUMN_ID,
+    ];
+    for (const id of idsRenderizablesSinContexto) {
+      const { container } = pintarCelda(id, order);
+      expect(container.textContent).not.toContain(VALOR_DELATOR);
+    }
+  });
+});
+
 describe('QC-102 — la columna propia de responsables (R16)', () => {
   it('existe una columna `responsibles`, y va antes de las acciones', () => {
     const ids = ORDER_COLUMNS.map((column) => column.id);
