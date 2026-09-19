@@ -223,11 +223,11 @@
         depende de lotes en dos unidades.
       - Depende de: T9, **T14**. `[P]` con T10.
 
-- [ ] **T12. Trazabilidad `R<n> -> test`.** Mapa de los **34** requisitos **(Enmienda**: 28 + R29–R34**)**
+- [ ] **T12. Trazabilidad `R<n> -> test`.** Mapa de los **35** requisitos **(Enmienda**: 28 + R29–R35**)**
       a tests concretos (`design.md > 14` es el punto de partida), con la nota de que `package.json`
       no se tocó (R28).
       - Archivos: `progress/impl_QC-121-unidad-como-identidad-del-item.md`.
-      - **Hecho**: los 34 tienen al menos un test nombrado; ninguno «pendiente».
+      - **Hecho**: los 35 tienen al menos un test nombrado; ninguno «pendiente».
       - Depende de: T10, T11.
 
 - [ ] **T13. Gate completo y cierre.** `./init.sh` entero en verde antes del PR, sin excepción
@@ -265,13 +265,13 @@
         `inventario/` entera en verde.
       - Depende de: T4. Bloquea: T10, T11. `[P]` con T5 **no** (los dos tocan `product-prisma.ts`).
 
-- [x] **T15. [Aprobada el 2026-09-18] Panel de lotes titulado «nombre · unidad».** El humano
-      respondió «sí» a la pregunta abierta 2 de `requirements.md`.
+- [x] **T15. [Aprobada el 2026-09-18] Panel de lotes titulado «nombre · unidad».** (R35.) El
+      humano respondió «sí» a la pregunta abierta 2 de `requirements.md`.
       - Archivos: `app/(private)/inventario/components/product-table.tsx` (`aria-label` del
         disparador y `SheetTitle` con `productDisplayName` y `productUnitLabel`, exportada desde
         `product-columns.tsx` para no duplicar la regla).
       - Tests: `tests/unit/inventario/product-batches-sheet.test.tsx` — título «X · kg» y
         `aria-label` a juego con catálogo; sólo el nombre sin catálogo o sin unidad en el producto.
-        Ningún `R<n>` cubre esta task (no se inventa uno sin decisión).
+        Cubre R35 (añadido el 2026-09-19 por orden del humano).
       - **Hecho**: los tests de arriba en verde, `pnpm run typecheck` y `pnpm run lint` en verde.
       - Depende de: T1, T9. `[P]` con T10 y T11.

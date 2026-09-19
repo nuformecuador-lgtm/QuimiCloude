@@ -203,6 +203,14 @@ dos migraciones del libro, de modo que su relleno sume la existencia de los lote
 listado DEBE mostrar la existencia guardada nueva del producto sin recargar la página a mano; esto
 DEBE quedar cubierto por una prueba de extremo a extremo (Playwright). [E1] [D3] [D13]
 
+**R35.** DONDE el panel de lotes del listado de inventario muestre un producto, su título DEBE
+mostrarlo como «nombre · unidad», con la misma regla que el listado (R18): el símbolo de la unidad
+o, si la unidad no tiene símbolo, su nombre; y SI el producto no tiene unidad o el catálogo de
+unidades no se pudo leer, ENTONCES el título DEBE mostrar solo el nombre. [D8] [fila del
+2026-09-18 «¿El panel de lotes se titula «nombre · unidad»?» → «Sí, como el listado»]
+_(Añadido el 2026-09-19 por orden del humano: la decisión se aprobó el 2026-09-18 y entró como T15,
+pero no se había escrito como requisito.)_
+
 ## Preguntas abiertas
 
 1. **La unidad de la línea de receta.** Hoy la línea de receta elige producto y unidad por
