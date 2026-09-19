@@ -73,7 +73,7 @@ export default async function NuevaRecetaPage() {
           items: productsResult.data.items.map((item) => ({
             id: item.id,
             name: item.name,
-            unitId: item.latestBatchUnitId,
+            unitId: item.unitId,
           })),
           totalPages: productsResult.data.totalPages,
         }}

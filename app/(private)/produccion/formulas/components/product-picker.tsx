@@ -15,7 +15,9 @@ import {
   useAsyncPaginatedOptions,
   type AsyncPageRequest,
 } from '@/hooks/use-async-paginated-options';
+import { productDisplayName } from '@/lib/modules/inventario';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
+import type { UnitRef } from '@/lib/modules/unidades';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 /**
@@ -88,20 +90,16 @@ export type ProductPickerOption = {
   readonly id: string;
   readonly name: string;
   /**
-   * Unidad en la que se mide el producto, o `null` si todavia no se puede saber.
+   * Unidad guardada del producto, o `null` si todavia no tiene ninguna.
    *
-   * DE DONDE SALE, desde QC-80 (R22, R23): de `ProductView.latestBatchUnitId`, es decir, de la
-   * presentacion del LOTE MAS RECIENTE del producto. Antes era `products.unit_id`, una columna
-   * que el producto declaraba y que ya NO EXISTE. `null` significa «este producto todavia no
-   * tiene ningun lote», no «no tiene unidad»: con `null`, `unitsOfGroup` devuelve el catalogo
-   * entero y la linea se puede escribir igual (R23), que es lo que permite escribir una receta
-   * antes de comprar el ingrediente.
+   * DE DONDE SALE: de `ProductView.unitId`, la columna propia del producto -fija desde que se
+   * crea, ya no derivada del lote mas reciente-. `null` significa «este producto todavia no
+   * tiene unidad»: con `null`, `unitsOfGroup` devuelve el catalogo entero y la linea se puede
+   * escribir igual (R23), que es lo que permite escribir una receta antes de comprar el
+   * ingrediente.
    *
-   * El nombre del campo se queda en `unitId` porque aqui ya es «la unidad de este ingrediente»,
-   * sin mas: quien la consume es la linea de receta, y ninguna de sus reglas cambia.
-   *
-   * Este componente NO la usa para nada -no filtra, no ordena y no la pinta-, solo la entrega
-   * intacta en `onSelect`.
+   * Este componente la usa para pintar «nombre · unidad» en la opcion y en el valor elegido
+   * (R18), y ademas la entrega intacta en `onSelect`.
    */
   readonly unitId: string | null;
 };
@@ -116,6 +114,17 @@ const FIRST_PAGE = 1;
 const SEARCH_DEBOUNCE_MS = 400;
 /** Alto máximo del desplegable: siempre hay scroll cuando quedan páginas por traer. */
 const MAX_LIST_HEIGHT = 256;
+
+/** Etiqueta de una unidad por su id: símbolo o, si no tiene, su nombre; `null` si no está en el catálogo. */
+function unitLabel(unitId: string, units: readonly UnitRef[]): string | null {
+  const unit = units.find((candidate) => candidate.id === unitId);
+  return unit === undefined ? null : (unit.symbol ?? unit.name);
+}
+
+/** «nombre · unidad» de una opción, o solo el nombre sin unidad (R18). */
+function optionLabel(option: ProductPickerOption, units: readonly UnitRef[]): string {
+  return productDisplayName(option.name, option.unitId === null ? null : unitLabel(option.unitId, units));
+}
 
 export type ProductPickerProps = {
   /** Ingrediente ya elegido, o cadena vacía si ninguno. */
@@ -132,6 +141,8 @@ export type ProductPickerProps = {
   readonly initialPage: { readonly items: readonly ProductPickerOption[]; readonly totalPages: number };
   /** Ingredientes ya elegidos en OTRAS líneas: se apartan de la lista. */
   readonly excludedIds?: readonly string[];
+  /** Catálogo de unidades, para pintar «nombre · unidad» en cada opción (R18). */
+  readonly units: readonly UnitRef[];
 };
 
 export function ProductPicker({
@@ -143,6 +154,7 @@ export function ProductPicker({
   testId,
   initialPage,
   excludedIds = [],
+  units,
 }: ProductPickerProps) {
   const errorId = useId();
   const [open, setOpen] = useState(false);
@@ -178,10 +190,7 @@ export function ProductPicker({
         items: result.data.items.map((item) => ({
           id: item.id,
           name: item.name,
-          // QC-80 (R22): la unidad del ingrediente es la DERIVADA del lote mas reciente, no una
-          // columna del producto. El renombrado del contrato es lo que trajo el compilador hasta
-          // esta linea.
-          unitId: item.latestBatchUnitId,
+          unitId: item.unitId,
         })),
         page: result.data.page,
         totalPages: result.data.totalPages,
@@ -242,7 +251,7 @@ export function ProductPicker({
       <Autocomplete
         items={selectable}
         mode="none"
-        itemToStringValue={(option: ProductPickerOption) => option.name}
+        itemToStringValue={(option: ProductPickerOption) => optionLabel(option, units)}
         value={displayValue}
         onValueChange={handleValueChange}
         open={open}
@@ -279,7 +288,7 @@ export function ProductPicker({
                       data-testid={`${testId}-option`}
                       onClick={() => choose(option)}
                     >
-                      <span className="truncate">{option.name}</span>
+                      <span className="truncate">{optionLabel(option, units)}</span>
                     </AutocompleteItem>
                   )}
                 </AutocompleteList>
