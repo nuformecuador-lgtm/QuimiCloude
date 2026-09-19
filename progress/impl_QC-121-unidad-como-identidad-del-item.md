@@ -67,6 +67,21 @@ lo mato por falta de memoria del sistema tras el preflight (verde salvo el aviso
 «prisma generate fallo», que es el conocido de cliente bloqueado en Windows). No es un rojo del
 gate; no se relanzo sin orden. Por eso T9 queda sin `[x]`.
 
+### Gate rapido relanzado por el leader (`$TEMP/qc121-rapido-t9b.log`)
+
+Typecheck y lint verdes; 24 rojos. 22 de Postgres 18.6 (aceptados como ajenos). Los otros 4:
+
+- **Desviacion no prevista en `design.md > 12.2`**: `tests/unit/recetas-ui/recipe-route-contract.test.ts`
+  > «la feature no toca lib/modules/recetas ni db/». La rama toca la ruta de recetas (T7) y
+  añade la migracion de T3, que no estaba en `DB_PERMITIDAS`. Arreglado en `7fc6136e` con
+  `MIGRACION_QC121` (las dos rutas de `20260918130000_product_unit_and_stored_stock`), mismo patron
+  que las constantes hermanas, sin citar la ficha en el comentario; `db/schema.prisma` ya lo cubria
+  `MIGRACION_QC34`. Archivo aislado: 26/26 verde.
+- **Tiempos agotados por falta de RAM** (pasan solos, corridos uno a uno el 2026-09-19):
+  `tests/unit/identity/session-once-per-request-render.test.tsx` (hook `beforeAll` 60 s) → 7/7;
+  `tests/unit/configuracion-ui/grupos/work-group-table.test.tsx` («UNKNOWN: unknown error, read»
+  al importar) → 28/28; `tests/unit/inventario/product-page.test.tsx` (test de 20 s) → 62/62.
+
 ### Nota de T6 (a confirmar por el reviewer)
 
 De los 3 rojos de `list-query-products.int`, solo 2 tenian de verdad dos unidades en un producto y
