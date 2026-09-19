@@ -151,11 +151,11 @@ propuesta, y el código sigue **sin tocar**. O la línea explícita «no apareci
 El diff son archivos de `tests/`, `specs/` y `progress/`, y nada más. Cada uno de los seis
 requisitos negativos queda anotado como comprobado en el informe.
 
-### T15 — Cerrar la tanda con el gate rápido
+### [x] T15 — Cerrar la tanda con el gate rápido
 **Depende de:** T14.
 **Hecho cuando:** `./init.sh --rapido` termina en verde.
 
-### T16 — Cerrar la feature con el gate completo
+### [x] T16 — Cerrar la feature con el gate completo
 **Depende de:** T15.
 **Hecho cuando:** `./init.sh` completo termina en verde. Referencia de `dev` al 2026-09-18: 562
 archivos, 8176 pasados, cero rojos. **Un rojo nuevo es de este cambio**, no de la base. Sin este

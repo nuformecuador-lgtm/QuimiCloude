@@ -201,3 +201,56 @@ Lo que **no** se toco, por seguir en pie: `app/` y `lib/` (R5, R13), cero guardi
 como `dev`), el comentario de R6 en `order-form.test.tsx:792-795` —que el reviewer miro y **no es
 hallazgo**— y el hallazgo de R11 en `order-columns.tsx:201`, que **no se arregla y no se abre
 ficha**: lo lleva el leader al humano.
+
+## Cierre del gate (2026-09-19, leader)
+
+**T15 — `./init.sh --rapido`: VERDE.** typecheck y lint sin una linea de error, 2 archivos
+relacionados con el diff (62 pasados) y **las 47 guardias** (588 pasados, 9 saltados).
+
+**T16 — `./init.sh` completo: VERDE al segundo intento.** `562 archivos, 8176 pasados, 107
+saltados, cero rojos`. Los dos archivos de la ficha pasan dentro de la corrida completa:
+`order-form.test.tsx` 33/33 y `supplier-detail-page.test.tsx` 29/29.
+
+**El primer intento cayo con UN rojo, y no era de esta rama:**
+`tests/unit/composition/documentos-facade.test.ts`, de QC-129, que el diff **no toca**
+(`git diff origin/dev...HEAD` sobre el: 0 lineas). Antes de proponer nada se **midio la causa**,
+porque «sera el `.env`» es una hipotesis, no un diagnostico:
+
+| # | Medicion | Resultado | Que descarta |
+|---|---|---|---|
+| 1 | `vitest run` solo ese archivo | mismo rojo, `expected '' to be undefined` | no es contaminacion de otro archivo del mismo worker |
+| 2 | `CATALOG_PROMPT=SENTINELA vitest run` ese archivo | sigue recibiendo `''`, **no** `SENTINELA` | el valor **no** viene del entorno ambiente: lo reinyecta Vitest desde `.env` **despues** del `delete` previo al import |
+| 3 | `grep` de asignaciones en `lib/`, `app/`, `tests/` | ninguna; solo la **lee** `lib/modules/documentos/adapters/driven/config/strategy-prompt-env.ts:20` | no hay codigo que la ponga |
+
+**Conclusion: el fallo es del TEST, no del `.env`.** El caso borra las cuatro variables en un
+`vi.hoisted` y luego afirma `expect(process.env.CATALOG_PROMPT).toBeUndefined()`: afirma una
+**precondicion de entorno** en vez de **controlarla**. Una maquina de desarrollo tiene derecho a
+declarar esas variables —es lo que `.env.example` le pide desde QC-129—. Su hermano
+`tests/unit/documentos/strategy-prompt-env.test.ts` la pone, la borra y la restaura en `afterEach`,
+y por eso esta verde.
+
+**Decision humana del 2026-09-19.** Se le advirtio que **rellenar las variables no pondria verde el
+test** —`toBeUndefined()` falla igual con un prompt de verdad que con la cadena vacia— y eligio
+**quitar las dos lineas del `.env` y arreglar el test despues**. Ejecutado con copia previa en el
+scratchpad y `diff` comprobado: **solo** `CATALOG_PROMPT` y `FORMULA_PROMPT`, que ademas estaban
+**vacias**, asi que no se perdio capacidad local alguna (con la variable vacia, leer un PDF falla
+igual que sin ella: R3/R4 de QC-129). Confirmacion por el contrario: el archivo pasa **3/3**.
+
+**Lo que NO se hizo, y por que.** No se dio de alta el archivo en `tests/baseline-rojos.json`:
+**R15** lo prohibe expresamente en esta ficha (`[D10]`). Tampoco se arreglo el test ajeno dentro de
+esta rama: ampliaria el diff mas alla del spec aprobado.
+
+**Dos fichas nacidas en el board** (aun no en `feature_list.json`; entran en el F0 de la proxima
+sesion):
+
+- **QC-133** — el hallazgo de **R11**: `order-columns.tsx:201` pinta `0.1255` como `0.13` sin
+  `title`. Es de **otro tipo** y toca `app/`, que R5 prohibe aqui.
+- **QC-134** — el test de la fachada de documentos, con las tres mediciones de arriba.
+
+**Deuda que queda abierta:** el `.env` del **arbol principal sigue con las dos lineas**, asi que
+ahi el rojo sigue vivo hasta que entre QC-134.
+
+**Aviso del gate que esta ficha no atiende:** 8 archivos del baseline ya pasan y piden limpieza.
+Es trabajo ajeno y **R15** prohibe tocar ese archivo aqui: se anota y no se toca.
+
+**T15 y T16 quedan `[x]` en `tasks.md`: las 17 tasks marcadas.**
