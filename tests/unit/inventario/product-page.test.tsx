@@ -274,10 +274,6 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
     stock: 0,
     unitId: null,
     qtyAlert: 5,
-    // Campos heredados que la lectura de esta pantalla ya no usa (`stock`/`unitId` los
-    // sustituyen); siguen en `ProductView` hasta que se retiren.
-    stockByUnit: [],
-    latestBatchUnitId: null,
     createdAt: new Date('2026-01-15T10:20:30.000Z'),
     updatedAt: new Date('2026-02-20T08:00:00.000Z'),
     ...overrides,

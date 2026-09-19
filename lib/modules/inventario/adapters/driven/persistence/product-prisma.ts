@@ -5,7 +5,7 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 import { BatchDuplicateLotError, BatchStockNegativeError, ValidationError } from '../../../domain/errors';
 import { normalizeProductName } from '../../../domain/product-name';
-import { singleUnitStock, sumStockByUnit } from '../../../domain/product-stock';
+import { singleUnitStock } from '../../../domain/product-stock';
 
 import { writeMovement } from './batch-movement-prisma';
 import {
@@ -34,17 +34,6 @@ import type { NewProduct, ProductView } from '../../../domain/product-view';
 // condicion del `where` pueda relajarlo. Una fila de otra empresa sale igual que una que no existe
 // (`null`/`false`): distinguirlas seria un oraculo de existencia sobre filas ajenas.
 
-/**
- * Todos los lotes del producto, con su existencia y su unidad. El desempate por `id` hace falta:
- * con `created_at` empatado el ganador de `latestBatchUnitId` no estaria definido. De
- * `Presentation` solo se lee `unitId`: `units` es de otro modulo.
- */
-const BATCH_STOCK_BY_UNIT = {
-  select: { stock: true, presentation: { select: { unitId: true } } },
-  orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-  // `satisfies` y no `as const`: `orderBy` exige un array mutable.
-} satisfies Prisma.Product$batchesArgs;
-
 export const PRODUCT_SELECT = {
   id: true,
   name: true,
@@ -54,7 +43,6 @@ export const PRODUCT_SELECT = {
   qtyAlert: true,
   createdAt: true,
   updatedAt: true,
-  batches: BATCH_STOCK_BY_UNIT,
 } satisfies Prisma.ProductSelect;
 
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>;
@@ -64,13 +52,9 @@ export function toProductView(row: ProductRow): ProductView {
     id: row.id,
     name: row.name,
     imagePath: row.imagePath,
-    stockByUnit: sumStockByUnit(
-      row.batches.map((batch) => ({ stock: batch.stock, unitId: batch.presentation.unitId })),
-    ),
     stock: row.stock,
     unitId: row.unitId,
     qtyAlert: row.qtyAlert,
-    latestBatchUnitId: row.batches[0]?.presentation.unitId ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

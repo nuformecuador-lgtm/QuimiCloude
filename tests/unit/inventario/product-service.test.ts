@@ -50,11 +50,9 @@ const VISTA_PRODUCTO: ProductView = {
   id: 'producto-1',
   name: 'Acido sulfurico',
   imagePath: null,
-  stockByUnit: [],
   stock: 0,
   unitId: null,
   qtyAlert: null,
-  latestBatchUnitId: null,
   createdAt: AHORA,
   updatedAt: AHORA,
 };

@@ -147,10 +147,15 @@ function cierreDeParametros(codigo: string, aperturaParametros: number): number 
   return -1;
 }
 
-/** El cuerpo de `export [async] function <nombre>(...) { ... }` completo, con balance de llaves. */
+/**
+ * El cuerpo de `[export] [async] function <nombre>(...) { ... }` completo, con balance de
+ * llaves. Los prefijos exportados van primero para que una funcion exportada nunca se corte por
+ * un prefijo mas corto que tambien casa dentro de ella (`function foo(` dentro de `export
+ * function foo(`).
+ */
 export function cuerpoDeFuncion(fuente: string, nombre: string): string | null {
   const codigo = stripComments(fuente);
-  for (const prefijo of ['export async function ', 'export function ']) {
+  for (const prefijo of ['export async function ', 'export function ', 'async function ', 'function ']) {
     const inicio = codigo.indexOf(`${prefijo}${nombre}(`);
     if (inicio === -1) continue;
     const cierreParametros = cierreDeParametros(codigo, codigo.indexOf('(', inicio));
@@ -198,9 +203,16 @@ export function mencionaStock(cuerpo: string): boolean {
   return /\bstock/i.test(cuerpo);
 }
 
-/** La agregacion pasa por lotes con su unidad y por `sumStockByUnit`: es como se deriva del lote. */
+/**
+ * La agregacion pasa por lotes con su unidad y por `sumStockByUnit` o `singleUnitStock` -esta
+ * ultima delega en la primera-: es como se deriva del lote.
+ */
 export function derivaDeLotesConSumStockByUnit(cuerpo: string): boolean {
-  return /\bsumStockByUnit\s*\(/.test(cuerpo) && /\bbatches\b/.test(cuerpo) && /\bunitId\b/.test(cuerpo);
+  return (
+    /\b(?:sumStockByUnit|singleUnitStock)\s*\(/.test(cuerpo) &&
+    /\b(?:batches|productBatch)\b/.test(cuerpo) &&
+    /\bunitId\b/.test(cuerpo)
+  );
 }
 
 /**
@@ -253,10 +265,21 @@ export function llamaAUpdateFueraDe(fuente: string, nombreFuncionPermitida: stri
 // ---------------------------------------------------------------------------------------------
 
 describe('QC-91 R1 — la existencia sale de sumar filas de lote, no de un numero propio', () => {
-  it('R1: product-prisma.ts arma stockByUnit desde los lotes con sumStockByUnit', () => {
+  it('R1: recalculateProductStock arma la existencia desde los lotes con singleUnitStock', () => {
+    const cuerpo = cuerpoDeFuncion(leer(PRODUCT_PRISMA), 'recalculateProductStock');
+    expect(
+      cuerpo,
+      'recalculateProductStock no existe con esa forma: el sujeto de esta prueba cambio',
+    ).not.toBeNull();
+    expect(derivaDeLotesConSumStockByUnit(cuerpo as string)).toBe(true);
+    expect(sumaPropia(cuerpo as string)).toEqual([]);
+  });
+
+  it('R1: toProductView ya no deriva nada de los lotes: lee la columna guardada tal cual', () => {
     const cuerpo = cuerpoDeFuncion(leer(PRODUCT_PRISMA), 'toProductView');
     expect(cuerpo, 'toProductView no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
-    expect(derivaDeLotesConSumStockByUnit(cuerpo as string)).toBe(true);
+    expect(derivaDeLotesConSumStockByUnit(cuerpo as string)).toBe(false);
+    expect(cuerpo as string).not.toMatch(/\bbatches\b/);
     expect(sumaPropia(cuerpo as string)).toEqual([]);
   });
 
@@ -305,6 +328,11 @@ describe('QC-91 R1 — la existencia sale de sumar filas de lote, no de un numer
     expect(derivaDeLotesConSumStockByUnit('sumStockByUnit(row.batches.map((b) => ({ unitId: b.unitId })))')).toBe(
       true,
     );
+    expect(
+      derivaDeLotesConSumStockByUnit(
+        'singleUnitStock(rows.map((row) => ({ unitId: row.presentation.unitId })))\ntx.productBatch.findMany(',
+      ),
+    ).toBe(true);
     expect(derivaDeLotesConSumStockByUnit('const stock = product.stock ?? 0;')).toBe(false);
     expect(derivaDeLotesConSumStockByUnit('sumStockByUnit([])')).toBe(false);
   });
@@ -314,11 +342,11 @@ describe('QC-91 R1 — la existencia sale de sumar filas de lote, no de un numer
 // R11 — LOS CONTRATOS PUBLICAN LA EXISTENCIA POR UNIDAD, NO UN NUMERO PLANO
 // ---------------------------------------------------------------------------------------------
 
-describe('QC-91 R11 — ProductView y ProductRef exponen stockByUnit; NewProduct y el alta no llevan existencia', () => {
-  it('R14: ProductView expone stockByUnit y tambien stock, la existencia guardada', () => {
+describe('QC-91 R11 — ProductRef expone stockByUnit; ProductView expone la existencia guardada; NewProduct y el alta no llevan existencia', () => {
+  it('R14: ProductView expone stock, la existencia guardada, y no stockByUnit', () => {
     const cuerpo = cuerpoDeTipo(leer(PRODUCT_VIEW), 'ProductView');
     expect(cuerpo, 'ProductView no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
-    expect(exponeStockPorUnidad(cuerpo as string)).toBe(true);
+    expect(exponeStockPorUnidad(cuerpo as string)).toBe(false);
     expect(declaraCampoStockPlano(cuerpo as string)).toBe(true);
   });
 
@@ -344,11 +372,11 @@ describe('QC-91 R11 — ProductView y ProductRef exponen stockByUnit; NewProduct
     expect(leer(PRODUCT_INPUT)).toMatch(/export const updateProductSchema = createProductSchema/);
   });
 
-  it('R14: PRODUCT_SELECT trae products.stock y products.unit_id, ademas del catalogo de lotes', () => {
+  it('R14: PRODUCT_SELECT trae products.stock y products.unit_id, sin catalogo de lotes', () => {
     const cuerpo = cuerpoDeConst(leer(PRODUCT_PRISMA), 'PRODUCT_SELECT');
     expect(cuerpo, 'PRODUCT_SELECT no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
     expect(declaraCampoStockPlano(cuerpo as string)).toBe(true);
-    expect(cuerpo).toMatch(/\bbatches\s*:/);
+    expect(cuerpo).not.toMatch(/\bbatches\s*:/);
   });
 
   it('R11: los tres escritores de producto no escriben products.stock', () => {

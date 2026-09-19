@@ -443,8 +443,8 @@ describe('el mismo nombre en dos unidades distintas son dos productos, cada uno 
 
     expect(pagina.items).toHaveLength(2);
     const porUnidad = new Map(pagina.items.map((p) => [p.unitId, p]));
-    expect(porUnidad.get(unidadA)?.latestBatchUnitId).toBe(unidadA);
-    expect(porUnidad.get(unidadB)?.latestBatchUnitId).toBe(unidadB);
+    expect(porUnidad.get(unidadA)?.id).toBe(productoA);
+    expect(porUnidad.get(unidadB)?.id).toBe(productoB);
   });
 
   it('un producto SIN ningun lote devuelve null, y no desaparece del listado (R23)', async () => {
@@ -454,7 +454,6 @@ describe('el mismo nombre en dos unidades distintas son dos productos, cada uno 
     const pagina = await listAliveProducts(consulta({ pageSize: 25, search: marca }), ambito());
 
     expect(pagina.items).toHaveLength(1);
-    expect(pagina.items[0]?.latestBatchUnitId).toBeNull();
     expect(pagina.items[0]?.unitId).toBeNull();
     expect(pagina.items[0]?.stock).toBe(0);
   });
@@ -487,8 +486,6 @@ describe('la existencia guardada distingue dos unidades por dos productos (R15)'
     const porUnidad = new Map(pagina.items.map((p) => [p.unitId, p]));
     expect(porUnidad.get(unidadA)?.stock).toBe(10);
     expect(porUnidad.get(unidadB)?.stock).toBe(20);
-    expect(porUnidad.get(unidadA)?.stockByUnit).toEqual([{ unitId: unidadA, quantity: 10 }]);
-    expect(porUnidad.get(unidadB)?.stockByUnit).toEqual([{ unitId: unidadB, quantity: 20 }]);
   });
 });
 
@@ -514,6 +511,5 @@ describe('un lote vencido sigue sumando a la existencia guardada (R15)', () => {
 
     expect(pagina.items).toHaveLength(1);
     expect(pagina.items[0]?.stock).toBe(15);
-    expect(pagina.items[0]?.stockByUnit).toEqual([{ unitId: unidad, quantity: 15 }]);
   });
 });

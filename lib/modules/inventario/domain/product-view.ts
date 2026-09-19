@@ -1,7 +1,5 @@
 import type { UnitId } from '@/lib/modules/unidades';
 
-import type { ProductStockByUnit } from './product-stock';
-
 /**
  * Contratos de entrada y salida de producto (`design.md > 6.1`, `> 3`). Viven en
  * `domain/` -no en `ports/`- porque describen el QUE se dice, no el COMO se habla con el
@@ -45,28 +43,11 @@ export type ProductView = {
    * Sigue SIN ordenarse ni filtrarse (`PRODUCT_QUERYABLE`): no se ordena por una ruta de archivo.
    */
   readonly imagePath: string | null;
-  /** Existencia agregada por unidad: suma el stock de todos los lotes del producto. */
-  readonly stockByUnit: readonly ProductStockByUnit[];
   /** Existencia guardada en `products.stock`: la suma de los lotes en la unidad del producto. */
   readonly stock: number;
   /** Unidad guardada en `products.unit_id`, o `null` si el producto todavia no tiene lotes. */
   readonly unitId: UnitId | null;
   readonly qtyAlert: number | null;
-  /**
-   * Unidad DERIVADA del producto: la de la presentacion de su lote MAS RECIENTE -creacion
-   * descendente, desempatando por identificador descendente-, o `null` si el producto todavia
-   * no tiene ningun lote (QC-80, R22, R23).
-   *
-   * SE LLAMA ASI Y NO `unitId` A PROPOSITO. Hasta QC-80 este campo era la columna
-   * `products.unit_id`, que ya no existe; dejarle el nombre viejo con un significado nuevo
-   * habria sido un cambio invisible para el compilador y para quien lee. El nombre dice DE
-   * DONDE sale el dato, y el typecheck obliga a visitar cada consumidor.
-   *
-   * Es un dato de LECTURA: no se envia al dar de alta ni al editar (`NewProduct` no lo lleva),
-   * y no se ordena ni se filtra por el (`PRODUCT_QUERYABLE`), porque no es una columna de
-   * `products` sino el resultado de mirar otro lado.
-   */
-  readonly latestBatchUnitId: UnitId | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 };

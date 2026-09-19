@@ -200,11 +200,9 @@ const PRODUCTO_EN_BASE = {
   id: 'producto-1',
   name: 'Acido sulfurico',
   imagePath: null,
-  stockByUnit: [],
   stock: 0,
   unitId: null,
   qtyAlert: 0,
-  latestBatchUnitId: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 };

@@ -14,8 +14,8 @@ export type ProductId = string;
  *  QC-80 (R21): AQUI VIVIA `unitId`, y se retira SIN SUSTITUTO porque NADIE lo consumia.
  *  `recetas` -el unico llamante de `findRefs`- lo pide para saber si el producto sigue vivo y
  *  para su nombre y su existencia; la unidad de una linea de receta es `recipe_lines.unit_id`,
- *  que es SUYA y no se toca. No se publica en su lugar la unidad derivada del lote
- *  (`ProductView.latestBatchUnitId`): un contrato publico no gana un campo que nadie pide, y
+ *  que es SUYA y no se toca. No se publica en su lugar la unidad del producto
+ *  (`ProductView.unitId`): un contrato publico no gana un campo que nadie pide, y
  *  quien lista productos ya lo recibe por `ProductView`.
  */
 export type ProductRef = {
