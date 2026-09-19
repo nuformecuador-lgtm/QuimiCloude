@@ -66,7 +66,12 @@ function montarAlmacenamiento(overrides: Partial<RecipeImageStorage> = {}): Reci
 }
 
 function montarCatalogo(): ProductCatalog {
-  return { findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []) };
+  return {
+    findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []),
+    findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
+      throw new Error('recetas no debe costear nada');
+    }),
+  };
 }
 
 /** Doble simple de `UnitCatalog`: este archivo prueba el ciclo de vida de la imagen

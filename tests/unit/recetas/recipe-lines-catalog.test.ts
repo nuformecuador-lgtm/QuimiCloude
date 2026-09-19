@@ -92,7 +92,12 @@ function montarAlmacenamiento(): RecipeImageStorage {
 describe('R45 — la linea preexistente se admite sin preguntar al catalogo por ella', () => {
   it('reenviar la linea que ya tenia la receta, con su producto de baja, no la incluye en la consulta al catalogo', async () => {
     const recipes = montarRepositorio();
-    const products: ProductCatalog = { findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []) };
+    const products: ProductCatalog = {
+      findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []),
+      findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
+        throw new Error('recetas no debe costear nada');
+      }),
+    };
     const images = montarAlmacenamiento();
     const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
 
@@ -119,6 +124,9 @@ describe('R45 — la linea preexistente se admite sin preguntar al catalogo por 
     const recipes = montarRepositorio();
     const products: ProductCatalog = {
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [REF_NUEVO]),
+      findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
+        throw new Error('recetas no debe costear nada');
+      }),
     };
     const images = montarAlmacenamiento();
     const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
@@ -141,6 +149,9 @@ describe('R46 — anadir una linea nueva cuyo producto no existe o esta de baja 
     const products: ProductCatalog = {
       // El catalogo no devuelve nada para PRODUCTO_NUEVO_DE_BAJA: no existe o esta de baja.
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []),
+      findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
+        throw new Error('recetas no debe costear nada');
+      }),
     };
     const images = montarAlmacenamiento();
     const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
@@ -169,6 +180,9 @@ describe('R46 — anadir una linea nueva cuyo producto no existe o esta de baja 
         REF_NUEVO,
         { id: PRODUCTO_VIEJO, name: 'Acido sulfurico', stockByUnit: [] },
       ]),
+      findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
+        throw new Error('recetas no debe costear nada');
+      }),
     };
     const images = montarAlmacenamiento();
     const createRecipe = createCreateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
@@ -188,6 +202,9 @@ describe('R18 — productName del detalle sigue pidiendose sobre TODAS las linea
     const products: ProductCatalog = {
       // El detalle SI pregunta por la linea vieja (decora, no valida): no viene -> null.
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []),
+      findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
+        throw new Error('recetas no debe costear nada');
+      }),
     };
     const images = montarAlmacenamiento();
     const getRecipe = createGetRecipe({ recipes, products, images });

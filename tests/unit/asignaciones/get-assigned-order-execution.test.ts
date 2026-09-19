@@ -126,7 +126,12 @@ function montar(options?: {
     orders: { findAliveById, listAliveSummariesByIds, transitionAliveById } as unknown as OrderCatalog,
     recipes: { findRefsIncludingDeleted, findExecutionContentById } as unknown as RecipeCatalog,
     units: { findRefs, findRefsSharingBaseInCompany } as UnitCatalog,
-    products: { findRefs: productFindRefs } as ProductCatalog,
+    products: {
+      findRefs: productFindRefs,
+      findCostingBatches: vi.fn(async () => {
+        throw new Error('la ejecucion de un pedido asignado no costea nada');
+      }),
+    } as ProductCatalog,
   };
 
   return {

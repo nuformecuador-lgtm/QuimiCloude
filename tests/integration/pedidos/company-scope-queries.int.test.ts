@@ -159,7 +159,7 @@ function pedidoNuevo(overrides: Partial<NewOrder> = {}): NewOrder {
 
 /** Alta por el adaptador REAL: la transaccion, el lock y el `max()+1` son los de produccion. */
 async function alta(empresa: Empresa): Promise<OrderRow> {
-  const resultado = await createOrder(pedidoNuevo(), ANO, empresa.userId, new Date(), ambitoDe(empresa));
+  const resultado = await createOrder(pedidoNuevo(), ANO, empresa.userId, new Date(), null, ambitoDe(empresa));
   if (resultado === 'duplicate_number') throw new Error('el alta devolvio duplicate_number');
   empresa.pedidos.push(resultado.id);
   return resultado;
@@ -403,6 +403,7 @@ describe('R21 — findAliveById / updateAlive / cancelAlive / softDeleteAlive co
       pedidoNuevo({ quantity: '1.0000' }),
       A.userId,
       new Date(),
+      null,
       ambitoDe(A),
     );
 
@@ -420,6 +421,7 @@ describe('R21 — findAliveById / updateAlive / cancelAlive / softDeleteAlive co
       pedidoNuevo({ quantity: '921.0000', priority: 'CRITICA', status: 'EN_CURSO' }),
       B.userId,
       new Date(),
+      null,
       ambitoDe(B),
     );
 
@@ -565,6 +567,7 @@ async function retrato(empresa: Empresa, ajena: Empresa): Promise<string> {
     pedidoNuevo({ quantity: '2.0000' }),
     empresa.userId,
     new Date(),
+    null,
     ambitoDe(empresa),
   );
   const cancelacionAjena = await cancelAliveOrder(

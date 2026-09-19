@@ -70,7 +70,10 @@ import {
   createUpdatePresentation,
   createUpdateProduct,
 } from '@/lib/modules/inventario';
-import { findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
+import {
+  findCostingBatches,
+  findProductRefs,
+} from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
   addBatchToAlive,
@@ -709,7 +712,7 @@ export const inventario = {
 /** `ProductCatalog` cableado con el adaptador driven DE INVENTARIO (`design.md > 6`):
  *  es el hueco que QC-24 dejo abierto en el contrato publico de `inventario` y que T9
  *  llena. `recetas` solo conoce el TIPO `ProductCatalog`, nunca esta implementacion. */
-const productCatalog: ProductCatalog = { findRefs: findProductRefs };
+const productCatalog: ProductCatalog = { findRefs: findProductRefs, findCostingBatches };
 
 /** `UnitCatalog` cableado con el adaptador driven DE UNIDADES (R50): `recetas` solo
  *  conoce el TIPO `UnitCatalog`, nunca esta implementacion. `findRefsSharingBaseInCompany`

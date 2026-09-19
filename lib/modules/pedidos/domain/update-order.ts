@@ -72,7 +72,10 @@ export function createUpdateOrder(
       if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
     }
 
-    const result = await deps.orders.updateAlive(id, data, actor.id, now(), scope);
+    // TODO: recalcular el coste de ingredientes con los catalogos de productos y unidades
+    // antes de escribir; de momento se pasa `null` porque este caso de uso aun no tiene esas
+    // dependencias.
+    const result = await deps.orders.updateAlive(id, data, actor.id, now(), null, scope);
 
     // La fila pudo borrarse entre el `SELECT` y el `UPDATE`: el puerto vuelve a filtrar por
     // vivos y el caso de uso responde lo mismo que arriba (R33).

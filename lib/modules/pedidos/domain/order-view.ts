@@ -15,6 +15,10 @@ import type { OrderNumber } from './order-number';
  * columna se fue de `orders` y el tipo se fue de aqui a la vez. `unitName` tampoco existe -no
  * habia nada que resolver contra el catalogo de `unidades`-, y con el se cayo la unica razon
  * por la que `pedidos` hablaba con ese modulo.
+ *
+ * `OrderRow` y `OrderView` SI llevan `ingredientsCost`: el pedido guarda el coste de sus propios
+ * ingredientes, opcional, calculado al escribirlo. No es un precio de venta ni reabre lo que el
+ * parrafo anterior cerro.
  */
 
 /**
@@ -44,6 +48,9 @@ export type NewOrder = {
  *
  * `deletedAt` NO sale: ninguna consulta devuelve borrados (R40), asi que seria siempre `null`
  * y solo invitaria a filtrar en memoria lo que ya filtro el puerto.
+ *
+ * `ingredientsCost` es el coste de los ingredientes de la receta con los lotes del momento en
+ * que se escribio el pedido, o `null` si no se pudo calcular. No es un precio de venta.
  */
 export type OrderRow = {
   readonly id: string;
@@ -53,6 +60,7 @@ export type OrderRow = {
   readonly priority: OrderPriority;
   readonly status: OrderStatus;
   readonly cancellationReason: string | null;
+  readonly ingredientsCost: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly createdBy: string | null;
@@ -72,10 +80,10 @@ export type OrderRow = {
  * `createdBy`/`updatedBy` son IDENTIFICADORES, no nombres (R46): este modulo no consulta el
  * modelo `User`. Resolverlos es de QC-35.
  *
- * NO hay campo `total`: el total no se persiste (R47) y esta salida tampoco lo calcula. Es la
- * pregunta abierta 3 del spec, con su posicion por defecto escrita: devolverlo obligaria a
- * multiplicar dos decimales de 14 digitos, que no se puede hacer con `number` y hoy no tiene
- * aritmetica aprobada (`design.md > 13`).
+ * `ingredientsCost` **no es un precio de venta**: es el coste de los ingredientes de la receta,
+ * calculado con los lotes que habia en el momento de ESCRIBIR el pedido (alta o edicion), nunca
+ * al leerlo. Puede ser `null` cuando no se pudo calcular; `null` y `0` no significan lo mismo, y
+ * esta salida no tiene ningun otro campo de precio ni de moneda.
  */
 export type OrderView = {
   readonly id: string;
@@ -87,6 +95,7 @@ export type OrderView = {
   readonly priority: OrderPriority;
   readonly status: OrderStatus;
   readonly cancellationReason: string | null;
+  readonly ingredientsCost: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly createdBy: string | null;

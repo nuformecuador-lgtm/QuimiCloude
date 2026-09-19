@@ -81,6 +81,7 @@ function fila(id: string): OrderRow {
     priority: 'BAJA',
     status: 'PENDIENTE',
     cancellationReason: null,
+    ingredientsCost: null,
     createdAt: new Date('2026-01-02T03:04:05.000Z'),
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'u-0',
@@ -114,7 +115,7 @@ function almacen() {
   }
 
   const orders = {
-    create: vi.fn(async (_data: unknown, _year: number, _actorId: string, _now: Date, scope: OrderScope) => {
+    create: vi.fn(async (_data: unknown, _year: number, _actorId: string, _now: Date, _ingredientsCost: string | null, scope: OrderScope) => {
       altas.push({ companyId: scope.companyId })
       return fila('13131313-1313-4313-8313-131313131313')
     }),
@@ -129,7 +130,7 @@ function almacen() {
         .map((g) => g.row)
       return { items, total: items.length, page: 1, pageSize: 10, totalPages: 1 }
     }),
-    updateAlive: vi.fn(async (id: string, _data: unknown, actorId: string, _now: Date, scope: OrderScope) => {
+    updateAlive: vi.fn(async (id: string, _data: unknown, actorId: string, _now: Date, _ingredientsCost: string | null, scope: OrderScope) => {
       const guardado = visible(id, scope)
       if (guardado === null) return 'not_found' as const
       guardado.touchedBy = actorId

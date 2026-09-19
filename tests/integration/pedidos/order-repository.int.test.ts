@@ -232,7 +232,7 @@ async function altaReal(
   now: Date,
   overrides: Partial<NewOrder> = {},
 ): Promise<OrderRow> {
-  const resultado = await createOrder(baseOrder(overrides), year, actorId, now, scope())
+  const resultado = await createOrder(baseOrder(overrides), year, actorId, now, null, scope())
   // Un `'duplicate_number'` aqui no es el caso bajo prueba: seria una secuencia sucia de una
   // corrida anterior, y hay que verlo como fallo del test, no confundirlo con el pedido.
   expect(resultado).not.toBe('duplicate_number')
@@ -618,7 +618,7 @@ describe('R33/R40 — los discriminantes de las tres escrituras', () => {
 
       // VIVO -> 'ok', y la edicion escribe de verdad.
       const editado = baseOrder({ quantity: '99.0000', priority: 'CRITICA', status: 'EN_CURSO' })
-      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, scope())).toBe('ok')
+      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, null, scope())).toBe('ok')
       const relectura = await findAliveOrderById(pedido.id, scope())
       expect(relectura?.quantity).toBe('99.0000')
       expect(relectura?.priority).toBe('CRITICA')
@@ -629,13 +629,13 @@ describe('R33/R40 — los discriminantes de las tres escrituras', () => {
       expect(relectura?.updatedAt.toISOString()).toBe(despues.toISOString())
 
       // INEXISTENTE -> 'not_found' en las tres, sin lanzar.
-      expect(await updateAliveOrder(inexistente, editado, actorId, despues, scope())).toBe('not_found')
+      expect(await updateAliveOrder(inexistente, editado, actorId, despues, null, scope())).toBe('not_found')
       expect(await cancelAliveOrder(inexistente, 'da igual', actorId, despues, scope())).toBe('not_found')
       expect(await softDeleteAliveOrder(inexistente, actorId, despues, scope())).toBe('not_found')
 
       // YA BORRADO -> 'not_found' en las tres. El primer borrado si es 'ok'.
       expect(await softDeleteAliveOrder(pedido.id, actorId, despues, scope())).toBe('ok')
-      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, scope())).toBe('not_found')
+      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, null, scope())).toBe('not_found')
       expect(await cancelAliveOrder(pedido.id, 'da igual', actorId, despues, scope())).toBe('not_found')
       expect(await softDeleteAliveOrder(pedido.id, actorId, despues, scope())).toBe('not_found')
 

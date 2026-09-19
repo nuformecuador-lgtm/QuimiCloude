@@ -93,11 +93,15 @@ export function createCreateOrder(
 
     // R9: el estado de alta es siempre `PENDIENTE` y lo pone este caso de uso, no la
     // entrada. La prioridad por defecto (`BAJA`) ya la aplico el esquema.
+    // TODO: calcular el coste de ingredientes con los catalogos de productos y unidades antes
+    // de escribir; de momento se pasa `null` porque este caso de uso aun no tiene esas
+    // dependencias.
     const created = await deps.orders.create(
       { ...data, status: STATUS_DE_ALTA },
       instant.getUTCFullYear(),
       actor.id,
       instant,
+      null,
       scope,
     );
 

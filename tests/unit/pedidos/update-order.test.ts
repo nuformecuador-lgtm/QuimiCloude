@@ -43,6 +43,7 @@ function filaExistente(): OrderRow {
     priority: 'BAJA',
     status: 'PENDIENTE',
     cancellationReason: null,
+    ingredientsCost: null,
     createdAt: AHORA,
     updatedAt: AHORA,
     createdBy: 'admin-0',

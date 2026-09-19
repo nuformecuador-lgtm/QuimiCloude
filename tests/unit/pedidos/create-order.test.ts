@@ -48,6 +48,7 @@ function filaCreada(): OrderRow {
     priority: 'BAJA',
     status: 'PENDIENTE',
     cancellationReason: null,
+    ingredientsCost: null,
     createdAt: AHORA,
     updatedAt: AHORA,
     createdBy: ACTOR_A.id,
