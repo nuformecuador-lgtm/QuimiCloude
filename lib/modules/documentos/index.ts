@@ -104,9 +104,9 @@ export {
 // quien la invoque valida con el mismo esquema y no escribe los dos literales a mano.
 export { pdfStrategySchema, type PdfStrategy } from './domain/pdf-strategy';
 
-// El procesamiento por estrategia, tambien como FABRICA. Su puerto de registro y los textos de
-// prompt NO salen por aqui: el puerto lo ve solo `lib/composition`, y los prompts son detalle
-// interno de la estrategia —publicarlos invitaria a pasarlos por parametro desde fuera—.
+// El procesamiento por estrategia, tambien como FABRICA. Su puerto de registro y su puerto de
+// prompt NO salen por aqui: los ve solo `lib/composition`, que es quien ata cada uno a su
+// adaptador. El texto del prompt llega por dependencia, desde el entorno.
 export {
   createProcessPdfByStrategy,
   type ProcessPdfByStrategyDeps,

@@ -305,6 +305,7 @@ import {
 } from '@/lib/modules/documentos';
 import { readWithGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
 import { readProcessingConfigFromEnv } from '@/lib/modules/documentos/adapters/driven/config/processing-config-env';
+import { readStrategyPromptFromEnv } from '@/lib/modules/documentos/adapters/driven/config/strategy-prompt-env';
 import { createStrategyRunLogConsole } from '@/lib/modules/documentos/adapters/driven/observability/strategy-run-log-console';
 import {
   countPages,
@@ -327,6 +328,7 @@ import type { PdfConverter } from '@/lib/modules/documentos/ports/pdf-converter'
 import type { ProcessingConfig } from '@/lib/modules/documentos/ports/processing-config';
 import type { ProcessingQueue } from '@/lib/modules/documentos/ports/processing-queue';
 import type { QueueSignature } from '@/lib/modules/documentos/ports/queue-signature';
+import type { StrategyPrompt } from '@/lib/modules/documentos/ports/strategy-prompt';
 import type { StrategyRunLog } from '@/lib/modules/documentos/ports/strategy-run-log';
 import { requestScoped } from '@/lib/shared/request-scope';
 
@@ -1176,6 +1178,12 @@ const readPdfWithAi = createReadPdfWithAi({ ai: aiReader, converter: pdfConverte
 const strategyRunLog: StrategyRunLog = createStrategyRunLogConsole();
 
 /**
+ * `StrategyPrompt` cableado con el adaptador que lee el texto del entorno. Se REFERENCIA, no
+ * se invoca: construir esta fachada no lee ninguna variable.
+ */
+const strategyPrompt: StrategyPrompt = { promptFor: readStrategyPromptFromEnv };
+
+/**
  * El procesamiento por estrategia, construido UNA vez: lo usa la fachada de abajo y lo necesita
  * `runDocumentJob`. Dos construcciones serian dos cableados que pueden divergir.
  */
@@ -1183,6 +1191,7 @@ const processPdfByStrategy = createProcessPdfByStrategy({
   readPdfWithAi,
   countPages: pdfConverter.countPages,
   log: strategyRunLog,
+  prompt: strategyPrompt,
 });
 
 // ---------------------------------------------------------------------------------------

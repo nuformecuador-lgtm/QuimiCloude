@@ -4391,3 +4391,44 @@ principal, así que la fila de la ficha no existía en su worktree y hubo que cr
 el árbol principal tenía **cinco commits locales sin empujar**, tres de ellos cierres de otras fichas.
 Y al reconciliar, `history.md` traía **dos redacciones distintas de QC-61** escritas por dos sesiones:
 **se conservaron las dos**, porque no decían lo mismo.
+
+## QC-129 — textos-definitivos-de-los-prompts (CERRADA el 2026-09-18, PR #93)
+
+**Qué entregó.** Los textos de prompt **salen del repositorio**: puerto `documentos/ports/strategy-prompt.ts`
+y adaptador `adapters/driven/config/strategy-prompt-env.ts`, calcado de `ai-config-env.ts`, que lee
+`CATALOG_PROMPT` o `FORMULA_PROMPT` **dentro de la invocación** —nunca al importar, que es lo que permite
+que la suite entera siga corriendo sin variables configuradas—. Una variable por estrategia, **sin texto
+de repuesto ni valor por defecto**: si falta, el procesamiento falla nombrándola y no llama a Gemini. Los
+tres archivos de `domain/prompts/` se borraron con su `PROMPT_BY_STRATEGY`, y `.env.example` ganó las dos
+variables **vacías**.
+
+**Derogó parte de una ficha ya `done`, y con permiso.** `[D6]`, `[D15]` y R4 de **QC-109** decían que los
+textos viven dentro del módulo y entran en tiempo de compilación. Por eso esta ficha actualizó
+`tests/unit/documentos/qc109-alcance.test.ts` —R4 derogado en su primera mitad, R6 borrado, `ARCHIVOS_NUEVOS`
+de 7 a **6**— y añadió una **nota fechada** al `requirements.md` de QC-109 con **28 adiciones y 0 supresiones**.
+Las guardias vivas de QC-109 (R11, R13, R14, R15, R16, R17) quedaron intactas. Precedente: la T3 de QC-81.
+
+**Se cierra con 6 de sus 21 requisitos SIN verificar, y está escrito.** R10–R14 y R17 no se mapean a Vitest
+sino a una fila firmada del registro humano, porque `[D5]` prohíbe que un test llame a Gemini. Esa firma
+**hoy no se puede producir**: sus criterios de hecho exigen disparar una lectura real, y la pantalla (QC-107)
+y la cola (QC-111) no existen todavía. Por eso T10 y T11 salieron a **QC-131**, bloqueada por las dos.
+
+**El board cambió antes del spec.** `/afinar-feature` cerró **13 decisiones** y subió la ficha de `medium` a
+**`high`**: dejó de ser «escribir dos textos» al descubrirse que tocaba el contrato de otra ficha. Dos
+preguntas siguen **abiertas** y nadie las rellenó: quién pone las variables en *preview* —sin ellas ese
+entorno no procesa nada— y cómo llega el texto al desarrollo local y a la suite.
+
+**Verificación.** `./init.sh` completo: `== init OK ==`, 562 archivos, 8176 pasados, 107 saltados, cero rojos,
+sin rojos nuevos sobre el baseline. `reviewer`: aprobado, 0 mayores y 5 menores —los 3 reales cerrados; de
+los otros dos, uno lo exige el propio spec y el otro es deuda ajena—. **Ninguna dependencia nueva.**
+
+**Dos cosas que esta ficha destapó y no eran suyas.** (1) El gate llevaba días muriendo en el validador con
+«faltan specs para features sdd en vuelo: QC-82», y el diagnóstico no era el que decía la etiqueta: el spec
+de QC-82 **sí existe** en su rama; lo que faltaba era **su worktree**, que es donde el validador lo busca
+mientras la feature está en vuelo. Montarlo devolvió el gate a verde para todo el repo, incluida la sesión
+de QC-111. (2) El gate avisa de **8 archivos del baseline de rojos que ya pasan** y siguen sin podar.
+
+**Deuda del arnés que dejó esta ficha.** Al desmontar, `wt.sh done` **desregistró el worktree y no borró los
+archivos** —«is not a working tree» y después el aviso de archivo en uso—: es la **novena** vez que ocurre el
+mismo patrón, y ya tiene ficha propia (**QC-128**, `wt-borra-antes-de-desregistrar`). Se limpió a mano y
+`git worktree prune` quedó en verde.
