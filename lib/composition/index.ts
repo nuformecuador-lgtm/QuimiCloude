@@ -310,6 +310,7 @@ import {
   extractPdfText,
   renderPages,
 } from '@/lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf';
+import { readStrategyPromptFromEnv } from '@/lib/modules/documentos/adapters/driven/config/strategy-prompt-env';
 import {
   createDocumentSignedReadUrl,
   createDocumentSignedUpload,
@@ -318,6 +319,7 @@ import {
 import type { AiReader } from '@/lib/modules/documentos/ports/ai-reader';
 import type { DocumentStorage } from '@/lib/modules/documentos/ports/document-storage';
 import type { PdfConverter } from '@/lib/modules/documentos/ports/pdf-converter';
+import type { StrategyPrompt } from '@/lib/modules/documentos/ports/strategy-prompt';
 import type { StrategyRunLog } from '@/lib/modules/documentos/ports/strategy-run-log';
 import { requestScoped } from '@/lib/shared/request-scope';
 
@@ -1181,6 +1183,12 @@ const readPdfWithAi = createReadPdfWithAi({ ai: aiReader, converter: pdfConverte
 const strategyRunLog: StrategyRunLog = createStrategyRunLogConsole();
 
 /**
+ * `StrategyPrompt` cableado con el adaptador que lee el texto del entorno. Se REFERENCIA, no
+ * se invoca: construir esta fachada no lee ninguna variable.
+ */
+const strategyPrompt: StrategyPrompt = { promptFor: readStrategyPromptFromEnv };
+
+/**
  * Fachada del modulo `documentos` ya cableada. Es lo que consume su Server Action.
  *
  * El ACTOR NO se resuelve aqui, mismo criterio que el resto de modulos: cada caso de uso lo recibe
@@ -1219,5 +1227,6 @@ export const documentos = {
     readPdfWithAi,
     countPages: pdfConverter.countPages,
     log: strategyRunLog,
+    prompt: strategyPrompt,
   }),
 } as const;

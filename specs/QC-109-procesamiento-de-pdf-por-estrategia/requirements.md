@@ -131,3 +131,31 @@ está en la tabla como `[D16]`.
 | 2026-09-18 | ¿Hace falta E2E? | **Diferido, con motivo escrito**: no hay pantalla ni recorrido de usuario que ejercitar — esta ficha no la invoca nadie todavía. El E2E lo tendrá **QC-107**, que es quien pone la interfaz. `[D14]` |
 | 2026-09-18 | ¿En qué formato viven los archivos de prompt? | **Un `.json` por estrategia**, con la forma `{ "provisional": true, "loDefine": "QC-129", "prompt": "..." }`. Una constante en TypeScript se descartó al acotar: `[D6]` se eligió para que el texto se editara **como documento, sin tocar código**. Motivo de que el `.json` sea viable sin tocar el build: **`resolveJsonModule` ya está activo** (`tsconfig.json:12`), así que el archivo entra en el paquete de despliegue como un import más, sin loaders ni configuración nueva. Efecto secundario: la marca de provisional deja de ser un comentario que cita una ficha y pasa a ser un **campo de datos**, así que ya no roza `docs/conventions.md`. `[D15]` |
 | 2026-09-18 | ¿Qué se registra exactamente, y con qué recorte? | **Un resumen, SIN el texto**: estrategia, modo, ruta del PDF, número de páginas y **longitud** del texto devuelto. El texto completo no va al registro —puede ser enorme y puede traer datos de terceros—; quien lo necesite lo tiene en el valor de retorno, que es lo que `[D5]` ya fija. Cierra la única pregunta abierta que tenía la ficha. `[D16]` |
+
+## Nota fechada 2026-09-18 — derogación parcial por QC-129
+
+> Esta nota se añade sin borrar ni reescribir ninguna línea de lo anterior, según `[D12]` de
+> QC-129 y su R21.
+
+**R4 queda derogado en su primera mitad.** El texto del prompt ya NO entra al paquete de
+despliegue por `import` de un `.json` en tiempo de compilación. Esa mitad la deroga QC-129 `[D7]`.
+**La segunda mitad de R4 sigue vigente**: el texto sigue sin leerse de disco ni de red en tiempo de
+ejecución. QC-129 lo cumple con una variable de entorno, que no es ni lo uno ni lo otro.
+
+**R6 queda derogado entero.** Exigía que cada `.json` de prompt se declarase `provisional: true` y
+nombrara a QC-129 como la ficha que traería el texto definitivo. QC-129 borró los dos `.json`
+(`[D11]` de QC-129): ya no hay ningún archivo `.json` de prompt que marcar como provisional, así
+que el requisito no tiene sobre qué comprobarse.
+
+**`[D6]` y `[D15]` de QC-109 quedan derogadas.** `[D6]` fijaba que los textos vivían **dentro del
+módulo**, traídos en tiempo de compilación. `[D15]` fijaba el formato `.json` con el campo
+`provisional`. Las deroga QC-129 `[D7]` (dónde vive el texto ahora) y QC-129 `[D11]` (qué pasa con
+los `.json` provisionales).
+
+**Qué lo sustituye.** Dos variables de entorno, una por estrategia —`CATALOG_PROMPT` para
+`catalogo` y `FORMULA_PROMPT` para `formula`—, leídas dentro de la invocación de
+`processPdfByStrategy` por un adaptador driven de configuración
+(`lib/modules/documentos/adapters/driven/config/strategy-prompt-env.ts`) a través de un puerto
+(`lib/modules/documentos/ports/strategy-prompt.ts`). Si la variable de la estrategia en curso
+falta, el procesamiento falla nombrándola sin llegar a llamar al proveedor de IA. Detalle completo
+en `specs/QC-129-textos-definitivos-de-los-prompts/requirements.md` (R1–R9) y su `design.md`.
