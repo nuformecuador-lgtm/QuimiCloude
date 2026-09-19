@@ -176,11 +176,22 @@ vuelve de `error` a `queued` por un reintento tiene que **limpiar** el código y
 `db/migrations/<timestamp>_document_batches_and_files/` con su `migration.sql` y su `down.sql`
 (R21, `docs/architecture.md > Migraciones up/down`).
 
+> **Enmienda 2026-09-18 — el orden de esta sección estaba mal y no aplicaba.** La versión original
+> mandaba crear los índices *después* de la FK compuesta. Eso es imposible en Postgres: la FK
+> compuesta referencia `document_batches_id_company_id_key`, que es uno de esos índices, y Postgres
+> exige que la restricción única a la que apunta una clave foránea **ya exista** al declararla, así
+> que la migración moría con `42830` («no hay restricción unique que coincida con las columnas dadas
+> en la tabla referida»). El `migration.sql` había transcrito ese orden al pie de la letra. Lo
+> destapó la **ejecución real** de la migración al construir la plantilla de los tests de
+> integración, no una revisión de escritorio; el SQL quedó corregido en `d118e978`. El orden de
+> abajo es el bueno.
+
 `migration.sql`, en este orden: `CREATE TYPE` de los dos enums → `CREATE TABLE` de las dos tablas →
 FK **escritas a mano** a `companies` y `users` (son de otro módulo, no llevan `@relation`, y son
 drift: hay que borrar su `DROP CONSTRAINT` de toda migración generada después, como ya pasa con
-`orders`) → FK **compuesta** `document_files (batch_id, company_id)` → `document_batches (id,
-company_id)` → índices → los dos `CHECK` → y
+`orders`) → `CREATE UNIQUE INDEX "document_batches_id_company_id_key"` → FK **compuesta**
+`document_files (batch_id, company_id)` → `document_batches (id, company_id)` → el resto de los
+índices → los dos `CHECK` → y
 
 ```sql
 ALTER TABLE "document_batches" ENABLE ROW LEVEL SECURITY;
@@ -192,8 +203,16 @@ ALTER TABLE "document_files"   FORCE ROW LEVEL SECURITY;
 **Sin policies, deny-by-default**, igual que `inventory_movements`. Es defensa en profundidad: quien
 aísla de verdad es el service (`docs/architecture.md > Acceso a datos y autorizacion`).
 
-`down.sql` revierte exactamente y en orden inverso: `DROP` de los CHECK → de los índices → de las FK
-→ `DROP TABLE` de las dos → `DROP TYPE` de los dos enums.
+**El único compuesto va antes de la FK, y no es estética:** Postgres exige que la restricción única
+referenciada exista ya en el momento de declarar la clave foránea, y un **índice único basta** como
+destino —no hace falta convertirlo en `UNIQUE CONSTRAINT`—, así que alcanza con adelantar ese
+`CREATE UNIQUE INDEX`. Los demás índices, que no referencia nadie, siguen al final.
+
+`down.sql` revierte en orden inverso entre tablas: `DROP TABLE "document_files"` → `DROP TABLE
+"document_batches"` → `DROP TYPE` de los dos enums. No hace falta soltar CHECK, índices ni FK uno a
+uno: `DROP TABLE` se los lleva por delante. El orden **entre las dos tablas** sí importa y es ese:
+la tanda no se puede borrar mientras exista el archivo que la apunta con la FK compuesta; al revés
+haría falta un `CASCADE`, que borraría más de lo que dice.
 
 ## 3. Archivos nuevos
 
