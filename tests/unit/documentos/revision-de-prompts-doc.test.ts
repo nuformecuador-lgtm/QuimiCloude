@@ -49,8 +49,32 @@ describe('docs/revision-de-prompts.md — plantilla del registro de revision hum
     }
   });
 
-  it('R15 — son once filas de campo en total, seis de catalogo y cinco de formula', () => {
-    expect(CAMPOS_CATALOGO.length + CAMPOS_FORMULA.length).toBe(11);
+  it('R15 — el documento trae exactamente once filas de campo, ni una mas ni una menos', () => {
+    // Cuenta las filas de dato de las DOS tablas "Tabla de veredictos" (catalogo y formula),
+    // sin las cabeceras/separadores de tabla ni las filas de las "Filas de cierre" (R12/R13,
+    // que no son campos). Si una fila de campo se cuela de mas, este conteo debe bajar el R15.
+    const inicioCatalogo = documento.indexOf('### Tabla de veredictos — `catalogo`');
+    const inicioFormula = documento.indexOf('### Tabla de veredictos — `formula`');
+    const inicioCierre = documento.indexOf('### Filas de cierre');
+    expect(inicioCatalogo).toBeGreaterThan(-1);
+    expect(inicioFormula).toBeGreaterThan(inicioCatalogo);
+    expect(inicioCierre).toBeGreaterThan(inicioFormula);
+
+    function filasDeCampo(seccion: string): number {
+      const filas = seccion
+        .split('\n')
+        .filter((linea) => /^\|.+\|$/.test(linea.trim()))
+        // La cabecera ("| Campo | Veredicto | Nota |") y el separador ("|---|---|---|").
+        .filter((linea) => !/^\|\s*Campo\s*\|/i.test(linea.trim()))
+        .filter((linea) => !/^\|[\s|:-]+\|$/.test(linea.trim()));
+      return filas.length;
+    }
+
+    const seccionCatalogo = documento.slice(inicioCatalogo, inicioFormula);
+    const seccionFormula = documento.slice(inicioFormula, inicioCierre);
+
+    expect(filasDeCampo(seccionCatalogo)).toBe(6);
+    expect(filasDeCampo(seccionFormula)).toBe(5);
   });
 
   it('R15 — declara los tres veredictos literales: bien, mal, no estaba', () => {

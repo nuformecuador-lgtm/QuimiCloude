@@ -173,3 +173,90 @@ esta bitacora.
    deuda ajena ya presente en `origin/dev` -`feature_list.json invalido: faltan specs para features
    sdd en vuelo: QC-82`-. **No es de esta rama y no se arreglo desde aqui.** Si sigue cortando, se
    declara lo que se corrio a mano, como hizo la T11 de QC-109. **No se maquilla.**
+
+---
+
+## F2.3 — Cierre de menores del reviewer (2026-09-18)
+
+El reviewer aprobo la ficha con **0 mayores y 5 menores**
+(`progress/review_QC-129-textos-definitivos-de-los-prompts.md`, commit `c47d0cf5`; el trabajo de
+T0-T13 quedo en `708fa42d`). **Se cierran tres. Los otros dos no se tocan, por decision del leader**,
+y queda escrito aqui para que nadie los "arregle" mas adelante creyendo que se olvidaron.
+
+### Menor 1 (cerrado) — `documentos-facade.test.ts` no comprobaba lo que se citaba de el
+
+Se citaba como evidencia de **R2**, pero su `vi.hoisted(...)` solo borraba `GEMINI_API_KEY` y
+`GEMINI_MODEL`: no demostraba nada sobre las dos variables nuevas.
+
+- Ahora borra tambien `CATALOG_PROMPT` y `FORMULA_PROMPT`, **antes del import** de
+  `@/lib/composition`.
+- El caso pasa a llamarse `R22, R26, R2 de QC-129 - construir la fachada con GEMINI_API_KEY,
+  GEMINI_MODEL, CATALOG_PROMPT y FORMULA_PROMPT ausentes no lanza`, y afirma que las dos nuevas
+  estan `undefined` y que `documentos.processPdfByStrategy` sigue siendo una funcion.
+- Cabecera del archivo y comentario del `vi.hoisted` actualizados: eran dos variables, ahora son
+  cuatro.
+- Intactos el caso `R21` de las claves de la fachada y el `R26` del adaptador no invocado.
+
+**Por que importaba:** R2 es de las afirmaciones caras de la ficha. Si la lectura se escapara al
+momento de importar, la suite entera empezaria a exigir variables configuradas.
+
+### Menor 2 (cerrado) — el caso de las once filas era tautologico
+
+Era `expect(CAMPOS_CATALOGO.length + CAMPOS_FORMULA.length).toBe(11)`: sumaba sus propias
+constantes y **habria pasado en verde con cualquier numero**.
+
+Se eligio la **opcion (a): afirmar contra el documento de verdad**, y no quitarlo. Motivo:
+`design.md > 4.8` dice que las filas «son exactamente los campos que R10 y R11 exigen pedir, **ni
+uno mas**», y esa garantia solo la da leer el documento. El caso ahora recorta las dos secciones de
+«Tabla de veredictos», descuenta cabecera y separador, deja fuera las «Filas de cierre» (R12/R13,
+que no son campos) y exige **6 y 5**.
+
+**Prueba de que muerde, hecha dos veces** -por `backend_dev` y repetida por el implementer-: se
+anadio una fila de campo intrusa a la tabla de `catalogo` y el caso se puso **rojo** con
+`AssertionError: expected 7 to be 6`. El documento se revirtio y su `git diff` quedo **vacio**.
+
+### Menor 3 (cerrado) — `.env.example` llamaba «SECRETO» a lo que no lo es
+
+`design.md > 6` dice lo contrario con todas sus letras: «sin prefijo `NEXT_PUBLIC_` -no son
+publicas, y **aunque no son un secreto**, no tienen por que viajar al navegador-». El comentario de
+`CATALOG_PROMPT` decia «SECRETO de despliegue, no de codigo» y ahora dice que **no es un secreto,
+pero tampoco es publica**, y por que no lleva `NEXT_PUBLIC_`. El resto del bloque no se toco y las
+dos variables **siguen vacias** (lineas 145 y 149).
+
+### Los dos menores que NO se tocan, y por que
+
+- **Menor 4 — los comentarios de derogacion en `qc109-alcance.test.ts` que citan QC-129 y
+  `design.md`.** **Los exige el propio spec** (T7 y `design.md > 8.3`: el cambio «se deja escrito en
+  el propio test, no silenciado»). No son lineas de produccion. **Se quedan.**
+- **Menor 5 — los tests que se saltan solos en esta rama.** Preexistente, de la precondicion de rama
+  de QC-106/108/109. **No es de esta ficha y no se arregla desde aqui**; el leader lo anota como
+  limitacion.
+
+### Archivos tocados en esta tanda
+
+`.env.example`, `tests/unit/composition/documentos-facade.test.ts`,
+`tests/unit/documentos/revision-de-prompts-doc.test.ts`. **Y ningun otro.**
+`docs/revision-de-prompts.md` **no se edito**: sigue con la plantilla **vacia**, sin fecha, sin
+veredicto y sin firma. **T10 y T11 siguen sin ejecutar y sin marcar.**
+
+### Verificacion de esta tanda
+
+```
+$ pnpm typecheck   -> verde, sin salida
+$ pnpm lint        -> verde, sin salida
+$ pnpm exec vitest related --run [los dos archivos de test tocados]
+ Test Files  2 passed (2)
+      Tests  9 passed (9)
+   Duration  4.55s
+```
+
+Nadie corrio `pnpm test` ni `./init.sh`: el gate es del leader. Se repitio ademas el barrido de
+fuga de texto de prompt (R9) sobre los tres archivos tocados, con ventana de 8 palabras: **cero
+coincidencias**.
+
+### Efecto en el mapa de trazabilidad
+
+**R2 y R15 quedan mejor sostenidos que antes; ninguna fila del mapa cambia de evidencia.** R2 sigue
+apuntando a `strategy-prompt-env.test.ts` y a `documentos-facade.test.ts` -pero ahora el segundo
+comprueba de verdad lo que se decia de el-, y R15 sigue apuntando a `revision-de-prompts-doc.test.ts`
+-cuyo tercer caso ya no es incapaz de fallar-.
