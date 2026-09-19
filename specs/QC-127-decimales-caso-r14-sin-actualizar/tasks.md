@@ -11,7 +11,7 @@
 
 ## Tanda A — el caso R14
 
-### T1 — Endurecer el texto pintado a igualdad exacta (R1)
+### [x] T1 — Endurecer el texto pintado a igualdad exacta (R1)
 **Archivos:** `tests/unit/pedidos-ui/order-form.test.tsx` (caso «R14 — sin ningun lote…», ~línea 774).
 **Depende de:** nada.
 
@@ -23,7 +23,7 @@ Sustituir `await waitFor(() => expect(restante).toHaveTextContent('-0.2'))` por 
 no queda ningún `toHaveTextContent` sobre esa celda en ese caso, y `pnpm vitest run
 tests/unit/pedidos-ui/order-form.test.tsx` pasa.
 
-### T2 — Añadir la afirmación del `title` exacto (R2)
+### [x] T2 — Añadir la afirmación del `title` exacto (R2)
 **Archivos:** `tests/unit/pedidos-ui/order-form.test.tsx` (mismo caso).
 **Depende de:** T1.
 
@@ -34,7 +34,7 @@ describe `design.md > 2`: el `title` va en el **`<td>`** (`restante`), la clase 
 **Hecho cuando:** el caso afirma el `title` `'-0.201'` y el archivo pasa. Con esto, por primera vez
 un test afirma que el cálculo de ese caso da `-0.201`.
 
-### T3 — Dejar escrito lo que se ratifica y lo que se acepta (R3, R4, R6)
+### [x] T3 — Dejar escrito lo que se ratifica y lo que se acepta (R3, R4, R6)
 **Archivos:** `tests/unit/pedidos-ui/order-form.test.tsx` (comentario del caso).
 **Depende de:** T2.
 
@@ -52,7 +52,7 @@ exacto, clase) y el comentario fechado 2026-09-18 con los dos puntos anteriores.
 
 ## Tanda B — demostrar que muerde
 
-### T4 — Mutar, ver el rojo y revertir (R1, R2, R3, R4)
+### [x] T4 — Mutar, ver el rojo y revertir (R1, R2, R3, R4)
 **Archivos:** temporalmente `app/(private)/pedidos/components/order-ingredients-table.tsx` y el
 escenario del caso en `order-form.test.tsx`. **Ambos revertidos al terminar.**
 **Depende de:** T3. **No paralelizable.**
@@ -74,12 +74,12 @@ incluida, y `git status` sobre `app/` y `lib/` está **limpio**.
 > Las seis revisiones son independientes entre sí: **todas `[P]`**. Dependen de T3 solo para no
 > mezclar diffs; el orden entre ellas da igual.
 
-### T5 `[P]` — Censar `tests/unit/pedidos-ui/order-columns.test.tsx` (R7, R8, R9)
-### T6 `[P]` — Censar `tests/unit/pedidos-ui/order-form.test.tsx` (R7, R8, R9)
-### T7 `[P]` — Censar `tests/unit/pedidos-ui/order-sheet.test.tsx` (R7, R8, R9)
-### T8 `[P]` — Censar `tests/unit/proveedores-ui/catalog-line-sheet.test.tsx` (R7, R8, R9)
-### T9 `[P]` — Censar `tests/unit/proveedores-ui/supplier-detail-page.test.tsx` (R7, R8, R9)
-### T10 `[P]` — Censar `tests/unit/recetas-ui/recipe-form.test.tsx` (R7, R8, R9)
+### [x] T5 `[P]` — Censar `tests/unit/pedidos-ui/order-columns.test.tsx` (R7, R8, R9)
+### [x] T6 `[P]` — Censar `tests/unit/pedidos-ui/order-form.test.tsx` (R7, R8, R9)
+### [x] T7 `[P]` — Censar `tests/unit/pedidos-ui/order-sheet.test.tsx` (R7, R8, R9)
+### [x] T8 `[P]` — Censar `tests/unit/proveedores-ui/catalog-line-sheet.test.tsx` (R7, R8, R9)
+### [x] T9 `[P]` — Censar `tests/unit/proveedores-ui/supplier-detail-page.test.tsx` (R7, R8, R9)
+### [x] T10 `[P]` — Censar `tests/unit/recetas-ui/recipe-form.test.tsx` (R7, R8, R9)
 
 **Para cada una de T5–T10**, con el mismo procedimiento:
 
@@ -102,7 +102,7 @@ vacía o un «revisado, nada» sin líneas **no cuenta como hecho**.
 > **Fuera del censo, y se dice:** `tests/unit/shared-ui/decimal-display.test.ts`. Es el test de la
 > utilidad, no de una pantalla (`[D5]`).
 
-### T11 — Cerrar el censo (R7, R9)
+### [x] T11 — Cerrar el censo (R7, R9)
 **Archivos:** `progress/impl_QC-127-decimales-caso-r14-sin-actualizar.md`.
 **Depende de:** T5–T10.
 
@@ -113,7 +113,7 @@ cuántos hallazgos salieron de cada clase.
 
 ## Tanda D — qué se hace con lo que aparezca
 
-### T12 — Corregir los hallazgos **del mismo tipo** (R10)
+### [x] T12 — Corregir los hallazgos **del mismo tipo** (R10)
 **Archivos:** el archivo de test donde salió el hallazgo.
 **Depende de:** T11. **Se salta si el censo no encontró ninguno**, y eso se escribe.
 
@@ -125,7 +125,7 @@ reescribir ni reordenar nada de lo existente, para que la trazabilidad no quede 
 T4 equivalente (romper, ver el rojo, revertir) anotada. O, si no hubo ninguno, la línea explícita
 «el censo no encontró hallazgos del mismo tipo».
 
-### T13 — Reportar los hallazgos **de otro tipo**, sin arreglarlos (R11)
+### [x] T13 — Reportar los hallazgos **de otro tipo**, sin arreglarlos (R11)
 **Archivos:** `progress/impl_QC-127-decimales-caso-r14-sin-actualizar.md` únicamente.
 **Depende de:** T11.
 
@@ -141,7 +141,7 @@ propuesta, y el código sigue **sin tocar**. O la línea explícita «no apareci
 
 ## Tanda E — cierre
 
-### T14 `[P]` — Comprobar los requisitos negativos por diff (R5, R12, R13, R14, R15, R16)
+### [x] T14 `[P]` — Comprobar los requisitos negativos por diff (R5, R12, R13, R14, R15, R16)
 **Archivos:** ninguno; se inspecciona `git diff --stat` de la rama contra `dev`.
 **Depende de:** T12, T13.
 
@@ -161,7 +161,7 @@ requisitos negativos queda anotado como comprobado en el informe.
 archivos, 8176 pasados, cero rojos. **Un rojo nuevo es de este cambio**, no de la base. Sin este
 paso no hay PR (regla 5 de `CLAUDE.md`).
 
-### T17 — Mapa de trazabilidad completo
+### [x] T17 — Mapa de trazabilidad completo
 **Depende de:** T16.
 **Hecho cuando:** `progress/impl_QC-127-decimales-caso-r14-sin-actualizar.md` contiene el mapa
 `R1`–`R16` (más los `R<n>` que haya añadido T12) → test o comprobación concreta, en la forma de

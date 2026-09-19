@@ -126,3 +126,21 @@ aparezca.
 | 2026-09-18 | ¿Se toca la utilidad de presentación? | **No.** `decimal-display.ts` es del PR #85 y funciona. Su separación entre `trimDecimal` —precargar un campo editable, sin redondear— y `formatDecimalDisplay` —pintar una celda de solo lectura— **se respeta**: los valores **enviados** y los de `input` siguen exactos y no se redondean. `[D8]` |
 | 2026-09-18 | ¿Hace falta E2E? | **No, y el motivo va escrito**: no hay recorrido de usuario nuevo ni pantalla nueva. Es cobertura unitaria de UI sobre casos que ya existen. `[D9]` |
 | 2026-09-18 | ¿Entra en `tests/baseline-rojos.json`? | **No.** Ya no hay rojo que listar, y la razón original sigue valiendo por si reapareciera: listar ese archivo apagaría sus **33 casos** enteros para el comparador. *Heredado de la ficha y del criterio de QC-126.* `[D10]` |
+
+## Nota fechada — requisito anadido por el censo (2026-09-18)
+
+> Anadido por el `implementer` al cerrar el censo de `[D5]`, siguiendo `design.md > 5` y R10: un
+> hallazgo **del mismo tipo** se corrige en esta ficha y recibe su propio `R<n>` en una nota al
+> final, **sin reescribir ni reordenar nada de lo anterior**, para que la trazabilidad no quede
+> coja. Nada de arriba cambia.
+
+**R17.** El caso «el costo y el minimo de compra se pintan REDONDEADOS A DOS DECIMALES» de
+`tests/unit/proveedores-ui/supplier-detail-page.test.tsx` DEBE afirmar, ademas del texto pintado,
+el atributo `title` con el valor **exacto** de las celdas cuyo valor pintado difiere del de origen:
+`'1234.5678'` para el costo y `'0.1005'` para el minimo de compra. Es la forma **(c)** del defecto
+(`design.md > 4`): el redondeo cambia lo que se ve —`0.1005` se pinta `0.1`— y hoy **ningun test
+del repositorio afirma que esa celda conserva `0.1005`**; el caso vecino no lo cubre, porque alli
+el minimo vale `'25.0000'` y lo que afirma es `.not.toHaveAttribute('title')`. La correccion es
+**solo del test**: la pantalla ya renderiza ese `title`
+(`app/(private)/proveedores/[id]/components/catalog-columns.tsx:198,210`), asi que R5 y R13 siguen
+intactos. `[D5]` `[D7]`

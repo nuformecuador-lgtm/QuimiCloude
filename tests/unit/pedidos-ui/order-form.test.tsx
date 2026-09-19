@@ -789,7 +789,12 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     const restante = within(tabla).getByTestId('order-ingredient-remaining');
     // 0 − 0.201 = −0.201: sin ningun lote el pedido siempre pide mas de lo que hay. Se CALCULA
     // exacto y se PINTA a dos decimales, «-0.2», igual que sus vecinos de este bloque.
-    await waitFor(() => expect(restante).toHaveTextContent('-0.2'));
+    // 2026-09-18: el resalte de faltante (`isShort`) se decide con el restante EXACTO, nunca con
+    // el pintado. En telefono o impreso no hay `title`, y alli el color es el unico aviso; se
+    // acepta a sabiendas. Se evaluo pintar «<0.01» en vez de «0» y se DESCARTO: cambia la
+    // pantalla, que esta ficha ratifica, y mete un segundo idioma de presentacion en la columna.
+    await waitFor(() => expect(restante.textContent).toBe('-0.2'));
+    expect(restante).toHaveAttribute('title', '-0.201');
     expect(restante.firstElementChild).toHaveClass('text-destructive');
   });
 
