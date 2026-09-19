@@ -464,6 +464,30 @@ porque es validacion de entrada y no una regla nueva de dominio.
 
 ## Deudas y cosas abiertas
 
+### El worktree de QC-127 quedó a medio borrar — DÉCIMA vez, y el guion lo dice al revés (2026-09-19)
+
+`./scripts/wt.sh done QC-127-decimales-caso-r14-sin-actualizar` imprimió
+`fatal: '...' is not a working tree` y después el aviso de siempre, «¿archivo en uso en Windows?».
+**Y aun así terminó con código de salida 0**, que es la otra mitad del problema: el guion dice que
+no pudo desmontar y devuelve éxito.
+
+**Estado real, comprobado:** el directorio **existe** bajo `.worktrees/`, **no** aparece en
+`git worktree list` y dentro **no hay `.git`**. Es el patrón exacto que documenta **QC-128**: el
+desregistro corre antes del borrado, el borrado falla, y lo que queda es el peor de los dos estados
+—git ya no lo conoce, así que ninguna corrida futura de `wt.sh` va a reintentarlo—.
+
+**Nada se pierde.** Todo el trabajo está commiteado y en `dev`: el último commit de la rama
+(`cfe483aa`) es ancestro de `dev`, y `feature/QC-127-decimales-caso-r14-sin-actualizar` figura en
+`git branch --merged dev`.
+
+**No lo borra esta sesión**, por la misma regla con la que no lo borró QC-108: los huérfanos que ya
+están en disco los barre el humano, comprobando antes que la rama figura en `git branch --merged
+dev` —ya comprobado arriba—. Lo arregla de raíz **QC-128**.
+
+**Un detalle que este caso aporta y los nueve anteriores no:** dentro de ese directorio quedó un
+`.env` **sin** `CATALOG_PROMPT` ni `FORMULA_PROMPT`, que es el que desbloqueó su gate. Al barrerlo
+desaparece, y no hay nada que rescatar de él: el `.env` bueno es el del árbol principal.
+
 ### El `.env` del árbol principal deja el gate en rojo con un test que no es suyo (2026-09-19, QC-127)
 
 Lo destapó el gate completo de **QC-127**, que no toca nada de documentos.
