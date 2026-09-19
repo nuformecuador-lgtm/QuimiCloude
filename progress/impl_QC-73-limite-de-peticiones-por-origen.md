@@ -1162,3 +1162,76 @@ la deuda E2E de `dev`. Se borra con `DATABASE_URL=<…/QuimiCloude_qc73_e2e…> 
 
 Los `next dev` de 3117 los arranco y paro Playwright en cada corrida; no se arranco ninguno a mano.
 No se mato ningun proceso ajeno.
+
+## Rojos tras sincronizar con dev
+
+> Implementer, 2026-09-19, sobre `0f41da0e` + `ce1b5ed6` + `7407d293`. Partida: el `test:json` del
+> leader (17 archivos rojos fuera del baseline). **Estado: typecheck y lint VERDES; la suite completa
+> NO se pudo repetir** (ver «Paso 3 y 4»).
+
+### Clasificacion de cada rojo
+
+| Archivo | Clase | Que se hizo |
+| --- | --- | --- |
+| `tests/guards/guard-limite-de-peticiones.test.ts` (R11) | **QC-73** | `adjust-batch-dialog.tsx` (nuevo de QC-92) importaba `useActionState`. Migrado a `useRateLimitedActionState` (`ce1b5ed6`). |
+| (sin rojo, censo) `batch-history.tsx`, `product-table.tsx` | **QC-73** | Tambien nuevos de QC-92, con llamada directa `.then` a `listBatchMovementsAction` / `listProductBatchesAction`. Envueltos con `withRateLimitNotice`; si el freno corta (`undefined`) el estado vuelve a `idle` (no queda «Cargando…» colgado y la siguiente apertura reintenta). Censo de los 6 archivos de `app/ components/ hooks/` que trajo dev (`git diff 6333f885 63d15088`): no hay mas. |
+| `tests/unit/configuracion-ui/usuarios-convenciones.test.ts` | **QC-73** | El barrido `usaEstadoDeFormulario` buscaba solo `useActionState(`; T14 lo cambio por el envoltorio y la anti-vacuidad mordio (`expected 0 to be greater than 0`). Ahora busca los dos nombres, con nota fechada; anti-vacuidad intacta y tres casos sinteticos nuevos (true/true/false) en «y las guardias FALLAN…» (`7407d293`). |
+| 11 de `tests/integration/` (todos salvo `credential-setup`) | **deuda de dev / entorno** | Al baseline (`7407d293`). Ver «Prueba en origin/dev». |
+| `tests/integration/identity/credential-setup.int.test.ts` | **flake de saturacion** | R11 corrida 3 («las 2 emisiones no llegaron a encolarse» + P2028 de transaccion expirada a 10 s). Verde en la rama y en dev al correr los 12 de integracion juntos. **No** se añadio al baseline. |
+| `tests/unit/composition/documentos-facade.test.ts` | **deuda de dev (QC-129)** | Al baseline. Cae igual en dev; depende del `.env`: con las lineas `GEMINI_*`/`*_PROMPT` quitadas pasa (3 passed). |
+| `tests/unit/navegacion/qc75-convenciones.test.ts`, `tests/unit/unidades/unidades-convenciones.test.ts` | **ya en baseline** | Caen por `@upstash/*` (aprobadas 2026-09-18). El comparador ya no las contaba; se AMPLIO su motivo con la nota de QC-73, como hizo QC-108 con `@google/genai`. |
+| `data-table-alcance`, `session-once-per-request-render` | flake | Verdes al repetir (leader). |
+
+### Prueba en origin/dev
+
+Worktree temporal desanclado en `63d15088` (tip de `origin/dev` tras `git fetch` el 2026-09-19) en el
+scratchpad, fuera del repo; `pnpm install --frozen-lockfile`, `prisma generate`, mismo `.env`. Ya
+quitado (`git worktree list` no lo lista, directorio borrado).
+
+```
+# origin/dev: documentos-facade + los 12 de integracion
+ Test Files  12 failed | 1 passed (13)
+      Tests  23 failed | 260 passed (283)
+# rama QC-73: los mismos 12 de integracion
+ Test Files  11 failed | 1 passed (12)
+      Tests  22 failed | 258 passed (280)
+$ diff rama-fail.txt dev-fail.txt   (lineas FAIL de integracion, ordenadas)
+IGUALES
+```
+
+El que pasa en los dos es `credential-setup`. Los errores son dos: `expected '23001' to be '23503'`
+(34 lineas `23001` en cada log) en FK `ON DELETE RESTRICT` de identity, asignaciones, inventario,
+pedidos, recetas y unidades; y en los dos `company-scope` (down.sql) filas `… | n | NOT NULL …` de
+`pg_constraint` que el retrato no preve. La hipotesis de QC-92 **no se sostiene**: caen tablas que
+`inventory_movements` no toca. Causa probable, **no verificada**: el Postgres local es el 18
+(`C:/Program Files/PostgreSQL/18`), que cataloga los NOT NULL en `pg_constraint` y reporta RESTRICT
+con 23001. `git diff origin/dev...HEAD -- db/` sigue vacio.
+
+### Paso 1 y 2 — typecheck y lint (tras `7407d293`)
+
+```
+$ pnpm.cmd run typecheck   -> tsc --noEmit, exit 0
+$ pnpm.cmd run lint        -> eslint, exit 0
+```
+
+Tests de lo tocado (frontend_dev): `vitest run guard-limite-de-peticiones + usuarios-convenciones` →
+`Test Files 2 passed (2), Tests 29 passed | 4 skipped (33)`; `vitest related --run` sobre los tres
+`.tsx` → `Test Files 10 passed (10), Tests 153 passed (153)`.
+
+### Paso 3 y 4 — `test:json` + comparador: NO COMPLETADOS
+
+`pnpm.cmd run test:json` se lanzo tras los dos commits y **Claude Code lo mato por falta de memoria
+del sistema** (594 lineas de log, `EXIT test:json 1`, sin `.vitest-rojos.json`), asi que el
+comparador no tiene reporte. No se relanzo: la instruccion del sistema es no reintentarlo sin que se
+pida. La base efimera de esa corrida (`qct_qc73_606d68c4_mu8qih3a_aiw`) pudo quedar huerfana; el
+barrido R9 de `_global-setup.ts` la borra en la proxima corrida de integracion de este worktree.
+**Queda para el leader**: `pnpm.cmd run test:json` y `node scripts/comparar-baseline-rojos.mjs
+.vitest-rojos.json`. Lo esperado segun lo medido: sin rojos nuevos, salvo que `credential-setup`
+vuelva a caer por saturacion.
+
+### E2E
+
+`adjust-batch-dialog` cambia de hook y `e2e/ajuste-de-inventario.spec.ts` lo ejercita, asi que el
+E2E pedido (`rate-limit.spec.ts` + `ajuste-de-inventario.spec.ts` contra `QuimiCloude_qc73_e2e`)
+**si aplica, pero no se corrio**: con la maquina sin memoria no se arranco `next dev` + dos motores.
+Pendiente para el leader, con la base dedicada (sigue en pie).
