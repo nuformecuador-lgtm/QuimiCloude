@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { withRateLimitNotice } from '@/hooks/use-rate-limited-action-state';
 import { listBatchMovementsAction } from '@/lib/modules/inventario/adapters/driving/batch-actions';
 import type { ErrorState } from '@/lib/modules/errores';
 import type { InventoryMovementView, MovementReason } from '@/lib/modules/inventario';
@@ -63,7 +64,13 @@ export function BatchHistory({ batchId, batchLot }: BatchHistoryProps) {
     if (!nextOpen || state.status !== 'idle') return;
 
     setState({ status: 'loading' });
-    void listBatchMovementsAction(batchId).then((result) => {
+    void withRateLimitNotice(listBatchMovementsAction)(batchId).then((result) => {
+      // Frenado: el toast ya lo puso el envoltorio. Se vuelve a `idle` para no dejar el
+      // "Cargando…" colgado y que la proxima apertura reintente.
+      if (result === undefined) {
+        setState({ status: 'idle' });
+        return;
+      }
       setState(result.status === 'success' ? { status: 'success', data: result.data } : result);
     });
   }

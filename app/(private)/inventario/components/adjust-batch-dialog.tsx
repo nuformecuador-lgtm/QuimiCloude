@@ -1,10 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useActionState, useEffect, useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { useRateLimitedActionState } from '@/hooks/use-rate-limited-action-state';
 import {
   Dialog,
   DialogContent,
@@ -95,7 +96,10 @@ function AdjustBatchDialogContent({
   const [requestedOpen, setRequestedOpen] = useState(false);
   const [zeroError, setZeroError] = useState(false);
   const [reasonError, setReasonError] = useState(false);
-  const [state, formAction, isPending] = useActionState(adjustBatchStockAction, INITIAL_STATE);
+  const [state, formAction, isPending] = useRateLimitedActionState(
+    adjustBatchStockAction,
+    INITIAL_STATE,
+  );
 
   // El dialogo abierto se DERIVA del pedido del usuario y del resultado de la operacion, igual
   // que en `delete-product-dialog.tsx`: evita el `setState` sincrono dentro de un efecto.
