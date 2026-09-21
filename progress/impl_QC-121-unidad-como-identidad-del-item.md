@@ -15,7 +15,6 @@
 | T10 | hecha, `[x]` | `d1e44f0c` |
 | T11 | hecha, `[x]`: los 3 E2E verdes el 2026-09-21 | `424d8442`, `b1462880` (limpieza) |
 | T12 | hecha, `[x]`: mapa R1-R35 abajo | `ec317702` (test de R20 que faltaba) |
-| T13 | del leader | — |
 
 ## Tanda T5-T9 (2026-09-19)
 
@@ -116,6 +115,20 @@ y el trabajo venia mezclado de la sesion cortada.
 Code a mitad de `test:rapido` porque el sistema se quedo sin memoria (no es un fallo del gate).
 No se relanza sin orden. Nota: `test:rapido` selecciona por el diff **commiteado** contra
 `origin/dev`, por eso se commiteo antes de repetirlo.
+
+## T13 — gate completo (2026-09-21)
+
+`./init.sh` entero, dos corridas (`$TEMP/qc121-gate-completo.log` y `…2.log`, la segunda tras los
+arreglos del reviewer): preflight, typecheck, lint y guardias **verdes**; 564 archivos de test,
+**8190 pasados**, 105 skipped y **22 rojos**, que son exactamente los 22 de Postgres 18.6 que el humano
+aceptó como ajenos el 2026-09-19 (17 `23001` vs `23503`, 3 de `unit-write.int` R24, 2 «9 vs 10» de
+`company-scope`). El reviewer confirmó que **ninguno es de esta rama**. Cero rojos propios en las dos
+corridas.
+
+El gate los marca como «rojos NUEVOS respecto del baseline» y ofrece dos caminos: arreglarlos o
+declararlos en `tests/baseline-rojos.json`. **No se tocó el baseline**: cambiarlo afecta a todo el
+repo y es decisión del humano, que está pendiente. Queda dicho en el PR.
+
 
 ## Entorno
 

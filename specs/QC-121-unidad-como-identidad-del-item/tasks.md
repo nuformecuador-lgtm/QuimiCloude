@@ -230,7 +230,7 @@
       - **Hecho**: los 35 tienen al menos un test nombrado; ninguno «pendiente».
       - Depende de: T10, T11.
 
-- [ ] **T13. Gate completo y cierre.** `./init.sh` entero en verde antes del PR, sin excepción
+- [x] **T13. Gate completo y cierre.** `./init.sh` entero en verde antes del PR, sin excepción
       (R27). Confirma en particular la lista de `design.md > 12.2`, que `--rapido` no ve.
       - **Hecho**: `./init.sh` verde y todas las tasks marcadas `[x]`.
       - Depende de: T12, **T15**.
