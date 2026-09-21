@@ -101,6 +101,12 @@ se partieron en dos productos. El tercero («lote vencido sigue sumando») tenia
 caia porque el producto no tenia `unit_id`; se arreglo dando al producto la unidad de su
 presentacion, para no perder lo que prueba (vencido + vigente suman en el mismo producto).
 
+**CORRECCION del 2026-09-21 (vuelta del reviewer).** La frase de arriba **no era exacta** y queda
+derogada: al arreglar ese caso se sembro `stock: 15` directamente en la columna y los dos lotes se
+insertaron a mano, sin pasar por `recalculateProductStock`, asi que la asercion dejo de depender de
+los lotes y **si se perdio lo que probaba** — habria pasado igual con el vencido excluido o sin
+lotes. Reparado en la vuelta: ver «Vuelta del reviewer» al final.
+
 T4 y T14 van en un solo commit: los dos tocan `product-prisma.ts` y `product-stock.int.test.ts`,
 y el trabajo venia mezclado de la sesion cortada.
 
@@ -116,6 +122,12 @@ No se relanza sin orden. Nota: `test:rapido` selecciona por el diff **commiteado
 - En el Bash de esta maquina `pnpm` del PATH por defecto (shim de nvm) falla con
   `CommandNotFound`. Funciona anteponiendo `export PATH="$HOME/AppData/Local/pnpm/bin:$PATH"`.
 - Postgres local es **18.6** (`SELECT version()`); el objetivo es 17.
+
+## Archivos de T3 que faltaban aqui (anotado el 2026-09-21)
+
+`tests/guards/guard-identificador-de-request.test.ts` gana la entrada de la migracion nueva
+`20260918130000_product_unit_and_stored_stock` en su lista cerrada. Entro en el commit de T3
+(`7a5ea4b7`) y no se habia anotado entre los tests tocados.
 
 ## Archivos de T4/T14
 
@@ -273,7 +285,7 @@ Rutas relativas al worktree. `int/` = `tests/integration/inventario/`; `unit/` =
 | R5 | `int/product-stock.int.test.ts` > «R5, R6, R7 — el alta busca por nombre Y unidad»; `unit/create-product.test.ts` > «R17, R18 — el nombre corresponde a un producto que ya existe» |
 | R6 | `int/product-stock.int.test.ts` > «el mismo nombre en kg y en L crea DOS productos, cada uno con su propia existencia»; `unit/create-product.test.ts` > «QC-121 R6 — mismo nombre en otra unidad: nace otro producto, sin aviso» |
 | R7 | `int/product-batch-write.int.test.ts` > «R20: con homonimos vivos se elige siempre el mismo producto» > «elige el de creacion mas antigua y desempata por identificador ascendente» (ya con unidad); `unit/create-product.test.ts` > «QC-121 R7 — con varios homonimos en la misma unidad, usa el que el puerto elige» |
-| R8 | `int/product-stock.int.test.ts` > «tres lotes de 5 en la misma unidad dejan products.stock en 15», «un producto sin ningun lote tiene existencia 0»; `unit/product-stock.test.ts` > «singleUnitStock» > «R8: sin lotes devuelve 0», «R8: tres lotes de 5…dan 15» |
+| R8 | `int/product-stock.int.test.ts` > «tres lotes de 5 en la misma unidad dejan products.stock en 15», «**un lote vencido sigue sumando en products.stock (R8)**» (la cláusula «vencidos incluidos», añadida el 2026-09-21), «un producto sin ningun lote tiene existencia 0»; `unit/product-stock.test.ts` > «singleUnitStock» > «R8: sin lotes devuelve 0», «R8: tres lotes de 5…dan 15» |
 | R9 | `unit/product-batch-lot-retry.test.ts` > «recalcula stock DESPUES del asiento del lote…», «si el recalculo lanza, no queda ni el producto ni el lote (R9)», y en `addBatchToAlive` «si el recalculo lanza, el resultado se rechaza…(R9)»; `int/product-stock.int.test.ts` > «R1, R8, R9» |
 | R10 | `int/product-stock.int.test.ts` > «R10» > «dos addBatchToAlive simultaneos sobre el mismo producto dejan stock = suma de los tres lotes» |
 | R11 | `unit/product-batch-lot-retry.test.ts` > «no llama a presentation.findFirst ni a ninguna escritura del producto: solo el lote y el recalculo»; `unit/qc91-alcance.test.ts` > «R11: los tres escritores de producto no escriben products.stock» |
@@ -303,3 +315,110 @@ Rutas relativas al worktree. `int/` = `tests/integration/inventario/`; `unit/` =
 | R35 | `unit/product-batches-sheet.test.tsx` > «el panel se titula «nombre · unidad» (T15)» (con catálogo «X · kg» en título y `aria-label`; sin catálogo o sin unidad, solo el nombre). R35 lo añadió el leader en `5df569ee` |
 
 `package.json` no se tocó en toda la rama (R28).
+
+## Vuelta del reviewer (2026-09-21)
+
+Rechazo en `progress/review_QC-121-unidad-como-identidad-del-item.md`. Se arreglaron **solo** sus
+dos bloqueantes y los menores 2, 3, 5 y 7. El menor 1 se deja abierto a proposito (abajo).
+
+### BLOQUEANTE 1 — citas de requisito en comentarios de produccion
+
+Quitadas las 7 citas de las lineas que el diff anade o modifica, sin perder lo que el comentario
+explicaba (`docs/conventions.md > Comentarios`). Los comentarios **preexistentes** que el diff no
+toca se dejaron intactos, incluidos `product-picker.tsx:58` («QC-57 R16, R18, R19») y
+`unit-group.ts:64` («QC-80 R23»): son deuda de otras fichas, no de esta rama.
+
+| Archivo:linea | Como queda |
+|---|---|
+| `app/(private)/produccion/formulas/components/product-picker.tsx` (doc de `unitId`) | «…la linea se puede escribir igual, que es lo que permite escribir una receta antes de comprar el ingrediente» / «…en la opcion y en el valor elegido, y ademas la entrega intacta en `onSelect`» |
+| `.../product-picker.tsx` (`optionLabel`) | «"nombre · unidad" de una opción, o solo el nombre cuando no tiene unidad.» |
+| `.../product-picker.tsx` (prop `units`) | «Catálogo de unidades, para pintar "nombre · unidad" en cada opción.» |
+| `.../recipe-lines-field.tsx` | «…junto al nombre de cada opción ("nombre · unidad"), con el catálogo que este campo le pasa en `units`.» |
+| `.../recipe-lines-field.tsx` | «…**no se bloquea nunca** por ese motivo: el selector se habilita…» |
+| `.../unit-group.ts` | «…lo que ya hacia con `null` es exactamente lo que hace falta -catalogo entero, sin bloquear la linea ni impedir guardar la receta-.» |
+
+### BLOQUEANTE 2 — R8 recupera la clausula «vencidos incluidos»
+
+Caso **nuevo** en `tests/integration/inventario/product-stock.int.test.ts`, dentro de
+`describe('R1, R8, R9 …')`: **«un lote vencido sigue sumando en products.stock (R8)»**. Los dos
+lotes pasan por el camino real de escritura —`createWithFirstBatch` con `expiryDate: '2020-01-31'`
+y `stock: 7`, luego `addBatchToAlive` con `expiryDate: '2099-12-31'` y `stock: 4`—, asi que la
+columna la deja `recalculateProductStock` y no el fixture. El caso afirma ademas, releyendo
+`product_batches`, que el lote de 7 **tiene** `expiry_date` y que esa fecha ya paso: sin eso el
+caso podria volver a quedarse tautologico. Cierra con `products.stock === 11`.
+
+**Prueba de que detecta el fallo.** Se saboteo `recalculateProductStock`
+(`lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`) anadiendo a su `where`
+`{ OR: [{ expiryDate: null }, { expiryDate: { gte: new Date() } }] }`, es decir, excluyendo los
+vencidos. Resultado de `vitest run --project integration product-stock.int.test.ts`:
+
+```
+ ❯ tests/integration/inventario/product-stock.int.test.ts (10 tests | 1 failed)
+   × un lote vencido sigue sumando en products.stock (R8)
+AssertionError: expected +0 to be 7 // Object.is equality
+ Test Files  1 failed (1)
+      Tests  1 failed | 9 passed (10)
+```
+
+Falla **solo** el caso nuevo; los 9 restantes siguen verdes (sus lotes van sin caducidad). El
+sabotaje se revirtio y el archivo volvio a 10/10.
+
+Ademas, el caso de `list-query-products.int.test.ts` que quedo tautologico **no se borro ni se
+rehizo** —el listado ahi sirve la columna, no la recalcula—, pero se le corrigio el titulo para que
+diga lo que de verdad comprueba: «el listado sirve la existencia guardada tal cual, haya lotes
+vencidos o no (R15)», con un comentario que apunta al caso nuevo de `product-stock.int`.
+
+### Menores arreglados
+
+- **menor 2** — `lib/modules/inventario/domain/product-input.ts` y
+  `tests/unit/inventario/product-input.test.ts`: el comentario atribuia a «el propio disparador» la
+  escritura de `products.unit_id`. Corregido: la escribe `createWithFirstBatch` copiandola de la
+  presentacion; el disparador solo **rechaza** lo que no cuadra.
+- **menor 3** — `specs/.../tasks.md` T13: quitada la frase «T15 cuenta como hecha si el humano
+  respondió "no" a la pregunta abierta 2» (T15 esta hecha y tiene R35).
+- **menor 5** — `tests/unit/recetas-ui/recipe-form.test.tsx`: el comentario explicaba
+  `latestBatchUnitId`, campo que ya no existe. Ahora dice «`PRODUCT_1` todavia no tiene unidad
+  guardada: llega como `unitId: null`».
+- **menor 7** — documentada arriba la entrada de `guard-identificador-de-request.test.ts` de T3.
+
+### Hallazgo menor ACEPTADO, no arreglado (para que el reviewer lo confirme)
+
+**menor 1 — la clausula «si la unidad no tiene simbolo, su nombre» de R18/R35 sigue sin caso
+propio.** Todos los tests del listado, del panel y del selector usan unidades **con** simbolo, asi
+que la rama `?? unit.name` de `unitLabel` (`product-picker.tsx`) no la ejecuta nadie. Se deja tal
+cual **por orden del leader**: el nucleo de R18 si esta probado y la rama viene de codigo anterior.
+Queda anotado como deuda conocida, no como algo que se pasara por alto.
+
+### Menores del informe que NO eran accion (constan por completitud)
+
+- menor 4 (`aria-label` con «nombre · unidad»): el reviewer lo da por correcto, lo pide T15.
+- menor 6 (`pickerLabel` reimplementa `symbol ?? name` en `recipe-line-unit-group.test.tsx`): el
+  reviewer no lo pide; no se toco.
+
+### Verificacion de esta vuelta (acotada por archivo; el gate completo lo corre el leader)
+
+| Comando | Resultado |
+|---|---|
+| `pnpm run typecheck` | exit 0 |
+| `pnpm run lint` | exit 0 |
+| `vitest run --project integration tests/integration/inventario/product-stock.int.test.ts` | **10/10** (9 antes + el nuevo) |
+| `vitest run --project integration tests/integration/inventario/list-query-products.int.test.ts` | **17/17** |
+| `vitest run --project node tests/unit/inventario/product-input.test.ts` | **9/9** |
+| `vitest run --project node tests/unit/inventario/qc121-alcance.test.ts` | **29/29** |
+| `vitest run --project ui tests/unit/recetas-ui/recipe-form.test.tsx` | **32/32** |
+| `vitest run --project ui tests/unit/recetas-ui/recipe-line-unit-group.test.tsx` | **12/12** |
+
+Cero rojos propios. No se corrio `./init.sh` ni el E2E: los relanza el leader. **El E2E no hace
+falta rehacerlo por esta vuelta**: nada de lo tocado cambia comportamiento (seis comentarios, un
+titulo de test, un caso de integracion nuevo y dos lineas de `tasks.md`).
+
+### Archivos tocados en la vuelta
+
+Produccion: `app/(private)/produccion/formulas/components/product-picker.tsx`,
+`app/(private)/produccion/formulas/components/recipe-lines-field.tsx`,
+`app/(private)/produccion/formulas/components/unit-group.ts`,
+`lib/modules/inventario/domain/product-input.ts` — **solo comentarios, ni una linea de codigo**.
+Tests: `tests/integration/inventario/product-stock.int.test.ts` (caso nuevo),
+`tests/integration/inventario/list-query-products.int.test.ts` (titulo y comentario),
+`tests/unit/inventario/product-input.test.ts`, `tests/unit/recetas-ui/recipe-form.test.tsx`.
+Spec: `specs/QC-121-unidad-como-identidad-del-item/tasks.md`.
