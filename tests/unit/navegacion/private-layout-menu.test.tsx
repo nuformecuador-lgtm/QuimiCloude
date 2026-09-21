@@ -104,9 +104,9 @@ const testId = {
   // `unidades.consultar`, que ningun rol del seed tiene salvo el Administrador, asi que es el
   // contraste limpio con el Operador (R9, R10).
   unidades: 'nav-unidades',
-  // QC-67 T2 (2026-09-11): el TERCER item de la seccion «Configuración». Declara
-  // `usuarios.consultar` —el MISMO codigo que exige su pantalla—, que ningun rol del seed tiene
-  // salvo el Administrador, igual que unidades (R2, R3).
+  // QC-67 T2 (2026-09-11): nacio en la seccion «Configuración» y paso a «Operación» por decision
+  // humana del 2026-09-21. Declara `usuarios.consultar` —el MISMO codigo que exige su pantalla—,
+  // que ningun rol del seed tiene salvo el Administrador, igual que unidades (R2, R3).
   usuarios: 'nav-usuarios',
 } as const;
 
@@ -310,8 +310,9 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
       testId.presentaciones,
       testId.unidades,
       // TENSADO el 2026-09-11 (QC-67 T2, R2/R39): sube de siete a ocho con `nav-usuarios`, ULTIMO
-      // del array y tercer item de la seccion «Configuración». Se tensa, no se afloja: sigue
-      // siendo la lista EXACTA y en orden, nunca un «al menos N».
+      // del array. Se tensa, no se afloja: sigue siendo la lista EXACTA y en orden, nunca un «al
+      // menos N». Su `section` paso de «Configuración» a «Operación» el 2026-09-21 sin moverlo de
+      // sitio en el array, asi que esta lista no cambia.
       testId.usuarios,
     ]);
   });
