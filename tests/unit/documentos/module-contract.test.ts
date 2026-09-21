@@ -325,6 +325,7 @@ const EXPORTACIONES_DE_EJECUCION = [
   'createEnqueueBatch',
   'createRunDocumentJob',
   'createGetBatchStatus',
+  'createCropCatalogImages',
 ] as const;
 
 /** Y lo que publica SOLO COMO TIPO: se borra al compilar, asi que no se ve en el objeto importado y
@@ -356,6 +357,9 @@ const EXPORTACIONES_DE_TIPO = [
   'EnqueuedBatch',
   'RunDocumentJobMessage',
   'RunDocumentJobResult',
+  'CropCatalogImagesDeps',
+  'CropCatalogImagesInput',
+  'CropCatalogImagesResult',
 ] as const;
 
 /** Nombres exportados SOLO como tipo por un barril, leidos del fuente: `export { type X } from ...`
@@ -658,5 +662,54 @@ describe('documentos — la lectura con IA se publica sin arrastrar al tercero (
 
     expect(hallazgos).toContainEqual(`el contrato arrastra el adaptador '${RUTA_ADAPTADOR_IA}'`);
     expect(hallazgos).toContainEqual(`el contrato arrastra '${LIBRERIA_DE_IA}'`);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// El recorte de imagenes se publica por el MISMO contrato, sin arrastrar a `sharp` ni al SDK del
+// almacenamiento. Bloque NUEVO al final: no reordena ni reescribe nada de arriba.
+// ---------------------------------------------------------------------------------------------
+
+describe('documentos — el recorte de imagenes se publica sin arrastrar a sharp (QC-110)', () => {
+  it('R21 — el barril publica la factory del recorte', async () => {
+    const contrato = await import('@/lib/modules/documentos');
+    expect(typeof contrato.createCropCatalogImages).toBe('function');
+  });
+
+  it('R21 — el cierre real del barril no arrastra sharp ni el SDK del almacenamiento', () => {
+    expect(findContractClosureFindings(BARRIL, barril, lectorDelDisco)).toEqual([]);
+    const { externos } = collectClosureWith(BARRIL, barril, lectorDelDisco);
+    expect(externos.has('sharp')).toBe(false);
+    expect(externos.has(SDK_DE_ALMACENAMIENTO)).toBe(false);
+  });
+
+  it('R21 — el puerto ImageCropper, el puerto CropStorage y sus adaptadores NO salen por el contrato publico', async () => {
+    const contrato = await import('@/lib/modules/documentos');
+    expect('ImageCropper' in contrato).toBe(false);
+    expect('CropStorage' in contrato).toBe(false);
+    expect('cropImage' in contrato).toBe(false);
+    expect('uploadCrop' in contrato).toBe(false);
+  });
+
+  it('R21 — la regla MUERDE si alguien cuelga el adaptador de sharp del barril, aunque el archivo no exista todavia', () => {
+    const RUTA_ADAPTADOR_SHARP = `${MODULO}/adapters/driven/image/image-cropper-sharp.ts`;
+    const arbol = new Map<string, string>([
+      [BARRIL, "export { cropImage } from './adapters/driven/image/image-cropper-sharp';"],
+      [
+        RUTA_ADAPTADOR_SHARP,
+        ["import sharp from 'sharp';", 'export function cropImage() { return sharp(); }'].join('\n'),
+      ],
+    ]);
+    const leer = (relBase: string): { relPath: string; content: string } | null => {
+      for (const candidato of [relBase, `${relBase}.ts`, `${relBase}/index.ts`]) {
+        const content = arbol.get(candidato);
+        if (content !== undefined) return { relPath: candidato, content };
+      }
+      return null;
+    };
+
+    const hallazgos = findContractClosureFindings(BARRIL, arbol.get(BARRIL) as string, leer);
+
+    expect(hallazgos).toContainEqual(`el contrato arrastra el adaptador '${RUTA_ADAPTADOR_SHARP}'`);
   });
 });

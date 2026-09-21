@@ -297,6 +297,7 @@ import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity
 // modulo NO se importa desde aqui: la flecha va driving -> composicion.
 import {
   createConvertPdfs,
+  createCropCatalogImages,
   createDownloadDocument,
   createEnqueueBatch,
   createGetBatchStatus,
@@ -309,6 +310,7 @@ import {
 import { readWithGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
 import { readProcessingConfigFromEnv } from '@/lib/modules/documentos/adapters/driven/config/processing-config-env';
 import { readStrategyPromptFromEnv } from '@/lib/modules/documentos/adapters/driven/config/strategy-prompt-env';
+import { cropImage } from '@/lib/modules/documentos/adapters/driven/image/image-cropper-sharp';
 import { createStrategyRunLogConsole } from '@/lib/modules/documentos/adapters/driven/observability/strategy-run-log-console';
 import {
   countPages,
@@ -324,9 +326,12 @@ import {
   downloadDocument,
   removeDocument,
 } from '@/lib/modules/documentos/adapters/driven/storage/document-storage-supabase';
+import { uploadCrop } from '@/lib/modules/documentos/adapters/driven/storage/crop-storage-supabase';
 import type { AiReader } from '@/lib/modules/documentos/ports/ai-reader';
+import type { CropStorage } from '@/lib/modules/documentos/ports/crop-storage';
 import type { DocumentBatchRepository } from '@/lib/modules/documentos/ports/document-batch-repository';
 import type { DocumentStorage } from '@/lib/modules/documentos/ports/document-storage';
+import type { ImageCropper } from '@/lib/modules/documentos/ports/image-cropper';
 import type { PdfConverter } from '@/lib/modules/documentos/ports/pdf-converter';
 import type { ProcessingConfig } from '@/lib/modules/documentos/ports/processing-config';
 import type { ProcessingQueue } from '@/lib/modules/documentos/ports/processing-queue';
@@ -1222,6 +1227,37 @@ const documentBatchRepository: DocumentBatchRepository = documentBatchRepository
 const processingQueue: ProcessingQueue = processingQueueQstash;
 const queueSignature: QueueSignature = queueSignatureQstash;
 
+// ---------------------------------------------------------------------------------------
+// `documentos` — el recorte de las imagenes de un catalogo. Bloque nuevo dentro del mismo modulo,
+// no reordena nada de lo de arriba: los dos puertos nuevos se atan a su implementacion aqui y solo
+// aqui.
+// ---------------------------------------------------------------------------------------
+
+/**
+ * `ImageCropper` cableado con el adaptador que es el UNICO archivo del repositorio que importa la
+ * libreria de recorte de imagen. Se REFERENCIA, no se invoca: cablear esta fachada no toca ningun
+ * PNG.
+ */
+const imageCropper: ImageCropper = { crop: cropImage };
+
+/**
+ * `CropStorage` cableado con el adaptador del bucket PROPIO de estos recortes, distinto del de
+ * `documentStorage` de arriba. Tampoco se invoca aqui: el adaptador resuelve su configuracion en
+ * cada llamada, asi que construir esta fachada no lee ninguna variable de entorno.
+ */
+const cropStorage: CropStorage = { upload: uploadCrop };
+
+/**
+ * El recorte de catalogo, construido UNA vez: lo necesita `runDocumentJob` de la fachada de abajo.
+ * Reutiliza el MISMO `pdfConverter` y el MISMO `aiReader` que ya cablea el resto del modulo.
+ */
+const cropCatalogImages = createCropCatalogImages({
+  converter: pdfConverter,
+  ai: aiReader,
+  cropper: imageCropper,
+  storage: cropStorage,
+});
+
 /**
  * `ProcessingConfig` cableado con la lectura de entorno, pero DIFERIDA: cada metodo relee al
  * invocarse, nunca al construir esta fachada, para que importar `lib/composition` sin las
@@ -1280,6 +1316,7 @@ export const documentos = {
     repository: documentBatchRepository,
     storage: documentStorage,
     processPdfByStrategy,
+    cropCatalogImages,
   }),
   getBatchStatus: createGetBatchStatus({
     repository: documentBatchRepository,

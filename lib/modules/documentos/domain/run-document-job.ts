@@ -3,7 +3,10 @@
  * guardar el resultado. No recibe actor de sesion: su ambito es la empresa que salio del `claim`,
  * con permisos vacios, y esa es la unica autorizacion que necesita `downloadDocument`.
  *
- * Sin recorte de imagenes: ese paso no existe todavia y no hay hueco preparado para el.
+ * El recorte de imagenes corre DESPUES de que el procesamiento por estrategia termine bien, y
+ * SOLO para la estrategia `catalogo`: es la unica que rasteriza las paginas para mandarlas a la
+ * IA, asi que es la unica que puede pedirle donde estan sus imagenes. Corre ANTES de cerrar la
+ * fila para que un fallo suyo pueda dejarla en error con su motivo, y si falla el PDF NO se borra.
  */
 import { failureKind, STORAGE_FAILURE_KIND } from './failure-kind';
 import { createDownloadDocument } from './read-document';
@@ -11,6 +14,7 @@ import { createDownloadDocument } from './read-document';
 import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 
 import type { Actor } from './actor';
+import type { CropCatalogImagesInput, CropCatalogImagesResult } from './crop-catalog-images';
 import type { ProcessPdfByStrategyInput, StrategyRunResult } from './process-pdf-by-strategy';
 import type { DocumentBatchRepository } from '../ports/document-batch-repository';
 import type { DocumentStorage } from '../ports/document-storage';
@@ -31,6 +35,7 @@ export type RunDocumentJobDeps = {
   readonly repository: DocumentBatchRepository;
   readonly storage: DocumentStorage;
   readonly processPdfByStrategy: (input: ProcessPdfByStrategyInput) => Promise<StrategyRunResult>;
+  readonly cropCatalogImages: (input: CropCatalogImagesInput) => Promise<CropCatalogImagesResult>;
 };
 
 function causaDe(error: unknown): string {
@@ -92,6 +97,24 @@ export function createRunDocumentJob(
     });
 
     if (result.ok) {
+      if (batch.strategy === 'catalogo') {
+        const crop = await deps.cropCatalogImages({
+          documentFileId: claimed.id,
+          companyId: claimed.companyId,
+          path: claimed.path,
+          bytes,
+        });
+        if (!crop.ok) {
+          const outcome = {
+            kind: outcomeKindOf(failureKind(crop.code)),
+            code: crop.code,
+            reason: crop.reason,
+          } as const;
+          await deps.repository.finish(claimed.id, outcome);
+          return { kind: outcome.kind };
+        }
+      }
+
       await deps.repository.finish(claimed.id, { kind: 'done', text: result.text });
       await deps.storage.remove(claimed.path);
       return { kind: 'done' };

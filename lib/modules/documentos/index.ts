@@ -142,3 +142,14 @@ export {
   type RunDocumentJobResult,
 } from './domain/run-document-job';
 export { createGetBatchStatus } from './domain/get-batch-status';
+
+// El recorte de las imagenes de un catalogo, publicado como FABRICA por el mismo motivo que el
+// resto: quien lo usa recibe el caso de uso ya construido y nunca ve a `ImageCropper` ni a
+// `CropStorage`. Atar esos dos puertos a su implementacion sigue siendo trabajo exclusivo de
+// `lib/composition`.
+export {
+  createCropCatalogImages,
+  type CropCatalogImagesDeps,
+  type CropCatalogImagesInput,
+  type CropCatalogImagesResult,
+} from './domain/crop-catalog-images';
