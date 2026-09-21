@@ -10,20 +10,20 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
 
 ## Andamiaje del componente
 
-- [ ] **T1.** Crear `components/shared/document-upload/` con su `index.ts` y el esqueleto de
+- [x] **T1.** Crear `components/shared/document-upload/` con su `index.ts` y el esqueleto de
       `document-upload.tsx` (`'use client'`), con la prop `strategy: PdfStrategy` importada del
       barril del módulo y sin lógica todavía.
       **Hecho cuando**: `pnpm run typecheck` pasa y el test
       `el componente exige la estrategia de toda la tanda por prop (R3)` pasa en
       `tests/unit/documentos-ui/document-upload-strategy.test.tsx`.
 
-- [ ] **T2. [P]** `labels.ts`: los textos por estado de archivo (los cuatro de
+- [x] **T2. [P]** `labels.ts`: los textos por estado de archivo (los cuatro de
       `DocumentFileStatus`) y la elección del texto de error **por `code`**, con `errorMessage` del
       barril de `errores`. Sin ningún literal de mensaje escrito a mano.
       **Hecho cuando**: `el texto de un archivo en error se elige por su code y no por su mensaje
       (R12)` pasa en `tests/unit/documentos-ui/document-upload-errors.test.tsx`.
 
-- [ ] **T3.** Depende de T1. Selección de archivos: `<input type="file" multiple
+- [x] **T3.** Depende de T1. Selección de archivos: `<input type="file" multiple
       accept="application/pdf">` con su disparador accesible, tope importado
       (`MAX_FILES_PER_BATCH`) y rechazo **entero** por encima del tope.
       **Hecho cuando**: pasan `la selección admite hasta el tope de archivos que publica el módulo
@@ -33,12 +33,12 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
 
 ## El camino de subida
 
-- [ ] **T4.** Depende de T3. `upload-file.ts`: el `PUT` del navegador al `uploadUrl` firmado, con su
+- [x] **T4.** Depende de T3. `upload-file.ts`: el `PUT` del navegador al `uploadUrl` firmado, con su
       resultado por archivo. No conoce ninguna Server Action.
       **Hecho cuando**: `los bytes del PDF viajan al enlace firmado y no a ninguna Server Action
       (R5)` pasa en `tests/unit/documentos-ui/document-upload-flow.test.tsx`.
 
-- [ ] **T5.** Depende de T4. El flujo completo en `document-upload.tsx`: `issueUploadLinksAction`
+- [x] **T5.** Depende de T4. El flujo completo en `document-upload.tsx`: `issueUploadLinksAction`
       (ruta exacta) → subidas en paralelo → `enqueueBatchAction` (ruta exacta) con **las rutas que
       subieron bien** y la estrategia de la prop.
       **Hecho cuando**: pasan `pide los enlaces de subida con la acción del módulo importada por su
@@ -46,7 +46,7 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
       `un archivo cuya subida falla queda señalado y no se encola (R6)` y `si no sube ningún archivo
       no se encola nada (R6)` en `tests/unit/documentos-ui/document-upload-flow.test.tsx`.
 
-- [ ] **T6.** Depende de T5. `document-upload-row.tsx`: la fila con la **fase del navegador** antes
+- [x] **T6.** Depende de T5. `document-upload-row.tsx`: la fila con la **fase del navegador** antes
       de que la tanda exista y, después, **exclusivamente** uno de los cuatro estados del módulo.
       **Hecho cuando**: pasan `la fila pinta solo los cuatro estados que publica el módulo (R11)`,
       `mientras el archivo sube, la fila no muestra ningún estado del módulo (R6)` y `un archivo
@@ -55,7 +55,7 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
 
 ## El sondeo
 
-- [ ] **T7.** Depende de T5. `use-batch-status.ts`: sondeo de `getBatchStatusAction` cada 2000 ms
+- [x] **T7.** Depende de T5. `use-batch-status.ts`: sondeo de `getBatchStatusAction` cada 2000 ms
       (`design.md > 4.1`), primera consulta inmediata, una sola en vuelo, parada al terminar todos
       los archivos, parada al desmontar, parada con error reanudable. **Sin dependencia nueva.**
       **Hecho cuando**: pasan, con temporizadores falsos, `sondea el estado de la tanda hasta que
@@ -64,7 +64,7 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
       `deja de sondear al desmontarse (R8)` y `no declara ningún plazo propio para dar por fallido un
       archivo (R10)` en `tests/unit/documentos-ui/use-batch-status.test.tsx`.
 
-- [ ] **T8.** Depende de T7. El error de la consulta: se muestra por su `code` y el sondeo se
+- [x] **T8.** Depende de T7. El error de la consulta: se muestra por su `code` y el sondeo se
       detiene con un control para reanudar; `data: null` se trata como tanda desconocida y también
       detiene el sondeo.
       **Hecho cuando**: pasan `un error de la consulta detiene el sondeo y se muestra por su code
