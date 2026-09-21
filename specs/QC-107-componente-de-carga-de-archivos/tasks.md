@@ -117,7 +117,7 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
       **Hecho cuando**: la guardia pasa en verde **y** se comprueba que **muerde**, con un fixture
       por cada uno de los dos motivos de fallo (`docs/verification.md > Probar que muerde`).
 
-- [ ] **T15.** Depende de T13. `e2e/documentos.spec.ts`: login → detalle de proveedor → elegir tres
+- [x] **T15.** Depende de T13. `e2e/documentos.spec.ts`: login → detalle de proveedor → elegir tres
       PDFs → subir (con `page.route()` interceptando el `PUT` al enlace firmado) → ver tres filas →
       verlas llegar a «listo». Rutas desde `lib/shared/routes`, asertos sobre `data-testid` y roles,
       fixtures con prefijo propio y `afterAll` que limpia por nombre exacto.
@@ -158,7 +158,7 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
       estrategias**; y (c) **T15 pasa en Chromium y WebKit con las tres filas en «listo»**, que es
       exactamente lo que hoy no ocurre.
 
-- [ ] **T20. La ejecuta `backend_dev`.** Depende de T19 (el E2E solo llega hasta aquí con el búfer
+- [x] **T20. La ejecuta `backend_dev`.** Depende de T19 (el E2E solo llega hasta aquí con el búfer
       ya arreglado). Aplicar `design.md > 13`: declarar en `next.config.ts` el par nativo de
       rasterizado como **externo del servidor**, para que Next no lo empaquete y su binario se
       resuelva en ejecución. **No se toca `pdf-converter-unpdf.ts`**: `resolveRasterizer` y su

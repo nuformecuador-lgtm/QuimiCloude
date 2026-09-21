@@ -1,8 +1,9 @@
 # QC-107 — componente-de-carga-de-archivos · bitácora de implementación
 
 > Fase F2. Escrita por el `implementer`, que coordinó a `frontend_dev` (T1–T11) y a `backend_dev`
-> (T13–T14). **T12 sigue bloqueada; T15 está escrita y completa pero en ROJO por un defecto de
-> producción ajeno a esta ficha; T17 es del leader.** Nada aquí se autoaprueba:
+> (T13–T14). **Todas las tasks están cerradas salvo T17, que es del leader, y T12, que salió a
+> QC-142 con permiso propio.** El recorrido de extremo a extremo pasa en los dos navegadores.
+> Nada aquí se autoaprueba:
 > decide el reviewer.
 
 ## Estado de las tasks
@@ -14,10 +15,11 @@
 | T10–T11 — asertos por ausencia y multiplataforma | cerradas | `frontend_dev` |
 | T12 — montaje en fórmulas | **BLOQUEADA**, no se toca | — |
 | T13–T14 — dobles del E2E y su guardia | cerradas | `backend_dev` |
-| T15 — el E2E navegable | **escrita y completa**, pero **en rojo**: ver el hallazgo | `frontend_dev` |
+| T15 — el E2E navegable | **cerrada y en verde** en Chromium y WebKit | `frontend_dev` |
 | T16 — esta bitácora | cerrada | `implementer` |
 | T18 — R23, la tanda desconocida | cerrada | `frontend_dev` |
 | T19 — el búfer detachado (R24) | **cerrada y verificada** | `backend_dev` |
+| T20 — el par nativo bajo Next (R25) | cerrada | `backend_dev` |
 | T17 — gate completo antes del PR | **sin marcar**, es del leader | — |
 
 ## Archivos creados
@@ -88,11 +90,12 @@ Todos los caminos son relativos a `tests/unit/`, salvo la guardia.
 | R17 | `documentos-ui/supplier-detail-upload.test.tsx` | `la pantalla de detalle de proveedor monta el componente en modo catalogo (R17)` |
 | R18 | **BLOQUEADO** — cubierto **en negativo** en `documentos-ui/document-upload-convenciones.test.ts` | `ninguna pantalla de formulas monta el componente y no aparece ningun permiso nuevo (R18)` |
 | R19 | `documentos-ui/document-upload-convenciones.test.ts` | `no anade ninguna ruta, constante de ruta ni item de menu propios de documentos (R19)` |
-| R20 | `composition/documentos-facade.test.ts`, `tests/guards/guard-dobles-e2e.test.ts` y **`e2e/documentos.spec.ts`** | `sin la variable de entorno, la composicion elige los adaptadores reales (R20)` · `con la variable, la composicion elige los dobles (R20)` · los cinco casos de la guardia · `sube tres PDFs y ve cambiar el estado de cada uno hasta terminar (R20)`. **El caso E2E existe y recorre todo, pero termina en ROJO** por el defecto de producción del final. |
+| R20 | `composition/documentos-facade.test.ts`, `tests/guards/guard-dobles-e2e.test.ts` y **`e2e/documentos.spec.ts`** | `sin la variable de entorno, la composicion elige los adaptadores reales (R20)` · `con la variable, la composicion elige los dobles (R20)` · los cinco casos de la guardia · `sube tres PDFs y ve cambiar el estado de cada uno hasta terminar (R20)`, **en verde en Chromium y WebKit**. |
 | R21 | `documentos-ui/document-upload-a11y-tactil.test.tsx` | `la subida se puede activar sin hover y con objetivos tactiles de 44px (R21)` · `ninguna parte del componente mide la pantalla con 100vh (R21)` |
 | R22 | `documentos-ui/document-upload-convenciones.test.ts` | `el tope y los tipos se importan del contrato del modulo y no se reescriben (R22)` |
 | R23 | `documentos-ui/use-batch-status.test.tsx` y `documentos-ui/document-upload-errors.test.tsx` | `el hook deja de sondear cuando la consulta responde que no hay tanda (R23)` · `una tanda desconocida detiene el sondeo (R23)` · `el componente avisa de tanda desconocida sin distinguir si no existe o es de otra empresa (R23)` |
 | R24 | `documentos/pdf-converter.test.ts` y `documentos/process-pdf-by-strategy.test.ts` | `contar las paginas deja los bytes del PDF intactos (R24)` · `extraer el texto deja los bytes del PDF intactos (R24)` · `rasterizar deja los bytes del PDF intactos (R24)` · `la lectura con IA recibe los bytes completos despues de contar las paginas (R24)` (conversor **real**, en las dos estrategias) |
+| R25 | `documentos/next-config-externos.test.ts` y **`e2e/documentos.spec.ts`** | `la configuracion declara el par nativo de rasterizado como externo del servidor (R25)` · el recorrido es **el único test del repo que ejecuta esta cadena dentro del servidor de Next**, que es donde R25 exige observar la garantía |
 
 **R18, dicho entero.** Su montaje está bloqueado por la pregunta abierta 1 —subir exige
 `proveedores.modificar`, y quien trabaja recetas necesitaría ese permiso ajeno—. Hoy lo cubre el
@@ -181,53 +184,29 @@ Playwright, y elegir un doble sin consultarla.
    arreglo tal cual caen exactamente los cuatro casos nuevos del conversor y el del procesamiento,
    este último con el `invalid_input` que describe el spec.
 
-4. **T15 / R20 sigue en rojo, y la causa ya está identificada: el rasterizador nativo no carga
-   dentro del servidor de Next.** No es el búfer, no son los dobles y no es el E2E.
+4. **T15 / R20 — CERRADA. El recorrido pasa en los dos navegadores.** El segundo hallazgo del
+   mismo E2E era que el rasterizado no encontraba su binario nativo **dentro del servidor de
+   Next**: `renderPages` falla y, como `catalogo` se lee en modo imagen, los tres archivos morían
+   en `error` con `unexpected` y un motivo que nombraba la causa. Se leyó literal de
+   `document_files` durante una corrida, y se descartó «falta el paquete» ejecutando el mismo
+   tramo **fuera** de Next, donde devolvía el texto completo.
 
-   **Cómo se vio.** Se canalizó la salida del `webServer` de Playwright (`stdout`/`stderr` a
-   `pipe`). El registro por estrategia mostró, para los tres archivos:
+   Lo arregló **T20 (R25)**: `next.config.ts` declara el par nativo como **externo del servidor**,
+   así que Next deja de empaquetarlo y su binario se resuelve en ejecución. **No se tocó el
+   adaptador**: `resolveRasterizer` y su mensaje siguen siendo correctos el día que el par falte
+   de verdad.
 
-   ```
-   [process-pdf-by-strategy] estrategia=catalogo modo=images ruta='...' paginas=1 longitud=0
-   ```
-
-   `longitud` sale de `textLength: outcome.ok ? outcome.text.length : 0`, así que un cero ahí
-   significa que **la lectura falló**; esa línea, por diseño, no lleva el motivo. El motivo se leyó
-   de la base **mientras el recorrido corría**, antes de que su limpieza borrara las filas.
-
-   **`code` y `reason` literales, de `document_files`:**
+   Resultado real, tras el arreglo:
 
    ```
-   errorCode:   unexpected
-   errorReason: read-pdf-with-ai: 'renderPages' fallo sobre '<ruta>'
-                (no se puede convertir a imagen: el par nativo de rasterizado no esta disponible
-                en este entorno; la conversion a texto no depende de el y sigue disponible:
-                Cannot find native binding. npm has a bug related to optional dependencies ...)
+   ✓ 1 [chromium] › documentos › sube tres PDFs y ve cambiar el estado de cada uno hasta terminar (R20) (11.9s)
+   ✓ 2 [webkit]   › documentos › sube tres PDFs y ve cambiar el estado de cada uno hasta terminar (R20) (11.5s)
+     2 passed (21.8s)
    ```
 
-   **La causa, con archivo y línea.**
-   `lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf.ts:93` —
-   `renderPages` hace `await resolveRasterizer(() => import('@napi-rs/canvas'))`, y ese
-   `import()` **no resuelve su binario nativo dentro del servidor de Next**. `next.config.ts`
-   está **vacío**: no declara ese paquete como externo del servidor, así que Next intenta
-   empaquetarlo y el `.node` se queda fuera.
-
-   **Está descartado que sea «falta el paquete».** El mismo tramo —almacenamiento en memoria →
-   `processPdfByStrategy`, con los dobles encendidos— se ejecutó **fuera** de Next y devolvió
-   `ok:true` con `longitud=53` en **las dos** estrategias. El paquete y su binario están
-   instalados; lo que falla es el empaquetado del servidor.
-
-   **Alcance, y por eso no se arregla aquí.** `catalogo` se lee en modo `images`, así que pasa por
-   `renderPages` **siempre**; y `runDocumentJob` corre dentro de Next también en producción, por su
-   Route Handler. O sea que **esto rompe la lectura de catálogos en la aplicación real**, no sólo
-   en el recorrido: es un defecto de la misma familia que R24, destapado otra vez por el E2E. La
-   causa **no está en los dobles** —que son código nacido con esta ficha— sino en la configuración
-   de empaquetado y en el camino real del conversor. **Se para y se devuelve**, como R24.
-
-   **La canalización de la salida se queda.** Criterio: sin ella, un archivo que termina en `error`
-   sólo se distingue por el estado que pinta la pantalla, y el motivo —lo único que dice *qué*
-   falló— se pierde; con ella, este diagnóstico salió en **una** corrida en vez de tres. El coste
-   es ruido del servidor en la salida del E2E, que se paga.
+   Y las seis líneas del registro por estrategia —tres archivos por cada navegador— pasaron de
+   `longitud=0` a **`paginas=1 longitud=53`**: la lectura entrega el texto completo. **R20 queda
+   cerrado.**
 
 5. **T17 — el gate completo y el PR.** Son del leader. No se abrió ningún PR.
 
@@ -245,3 +224,27 @@ Playwright, y elegir un doble sin consultarla.
 - Entró un cuarto archivo no listado en T13, `adapters/driven/config/e2e-doubles-env.ts`, porque
   `lib/composition/index.ts` no lee `process.env` ni una sola vez en todo el repo y meter uno ahí
   habría roto esa convención.
+
+## Deuda que esta ficha NO cierra, y tiene destinatario
+
+**Si el par nativo de rasterizado sobrevive al runtime de Vercel sigue siendo DESCONOCIDO.**
+
+T20 resuelve el **empaquetado bajo Next**, que es lo que rompía aquí y ahora —en local y en el
+gate—: el paquete deja de empaquetarse y su binario se resuelve en ejecución. **Eso, y sólo eso.**
+Que además cargue en el runtime de Vercel **no está verificado**, no se puede verificar sin un
+despliegue real, y sin red el gate no puede afirmarlo. Por la regla 6 de `CLAUDE.md`, lo no
+verificado es un desconocido, no un sí.
+
+**No es un hallazgo nuevo: es la pregunta abierta 3 de QC-106, viva desde el 2026-09-16.** Su
+`design.md > 9` se titula literalmente «¿`@napi-rs/canvas` corre en el runtime de Vercel?», y
+`docs/dependencias.md` registró la respuesta como **DESCONOCIDO**, con el compromiso escrito de
+cerrarla **antes** de que QC-111 lo consumiera. QC-111 lo consumió. La pregunta siguió abierta.
+QC-111 la volvió a anotar como hallazgo no bloqueante y la difirió. **Cinco fichas después, la
+primera ejecución real la encontró** — y costó esta tarde entera de diagnóstico.
+
+Se anota aquí, entonces, con su destinatario y sin disfrazarla de resuelta: **sigue abierta, y ahora
+con un consumidor en producción**. Sólo un despliegue real puede responderla.
+
+**Qué pasa si el runtime de Vercel tampoco lo carga**, dicho para que no sea una sorpresa silenciosa:
+cae la estrategia `catalogo` **en ejecución**, con su fila en error y un motivo que nombra la causa,
+por el camino que QC-111 ya dejó montado. Es feo y es **visible**, que es lo que se pedía.
