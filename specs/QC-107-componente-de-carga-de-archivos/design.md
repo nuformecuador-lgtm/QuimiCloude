@@ -1,6 +1,7 @@
 # QC-107 — componente-de-carga-de-archivos · design.md
 
-> Diseño técnico de F1.2. Cubre `R1`–`R22` de `requirements.md`. Se apoya entero en lo que
+> Diseño técnico de F1.2. Cubre `R1`–`R25` de `requirements.md` —nació cubriendo `R1`–`R22`, y
+> `R23`, `R24` y `R25` entraron por enmienda durante la implementación (`## 12`, `## 13`)—. Se apoya entero en lo que
 > **QC-106**, **QC-109** y **QC-111** dejaron publicado y **no recrea nada de eso**: ni un límite,
 > ni un tipo, ni un código de error, ni una Server Action.
 
@@ -436,9 +437,10 @@ par nativo de rasterizado no está disponible** (`Cannot find native binding`).
 
 **La causa, con archivo y línea:**
 `lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf.ts:93` hace
-`await resolveRasterizer(() => import('@napi-rs/canvas'))`, y **`next.config.ts` está vacío** —trae
-el comentario de plantilla de `create-next-app` y nada más—. Next intenta empaquetar ese paquete
-para el servidor y su binario `.node` se queda fuera del bundle.
+`await resolveRasterizer(() => import('@napi-rs/canvas'))`, y **`next.config.ts` no declaraba ese
+paquete como externo del servidor** —cuando esto se escribió traía el comentario de plantilla de
+`create-next-app` y nada más—. Next intenta empaquetar el paquete para el servidor y su binario
+`.node` se queda fuera del bundle.
 
 **La evidencia, y es lo que descarta «el paquete no está instalado»:** el **mismo tramo ejecutado
 fuera de Next** da `ok: true` en las **dos** estrategias. El paquete está instalado y funciona; lo
@@ -449,12 +451,42 @@ que falla es el **empaquetado del servidor de Next**, y por eso el mensaje que e
 pasa por `renderPages` **siempre**, y `runDocumentJob` corre dentro de Next por su Route Handler.
 Sin esto, ningún PDF de catálogo puede terminar bien en el despliegue.
 
-### 13.1 El arreglo
+### 13.1 El arreglo, y quién lo mergeó primero
 
-`next.config.ts` declara el paquete nativo como **externo del servidor**, de modo que Next no
-intente empaquetarlo y lo resuelva en tiempo de ejecución con su binario. Es configuración del
-framework, no código del módulo: **el adaptador no cambia** y `resolveRasterizer` sigue exactamente
-igual —su mensaje sobre el par ausente sigue siendo el correcto el día que de verdad falte—.
+**Dicho sin maquillar: el arreglo no lo escribió esta ficha.** Mientras se implementaba, otra sesión
+mergeó **QC-136** (PR #101, commit `d3e13aaf`), nacida del **build roto** —el mismo defecto visto
+por su otra cara—, y su `next.config.ts` es el que sobrevive al merge con `dev`:
+
+```ts
+serverExternalPackages: ['@napi-rs/canvas'],
+```
+
+Su comentario es **mejor que el que habríamos escrito**, y por eso no se tocó: explica que
+`@napi-rs/canvas` no es JavaScript sino un envoltorio sobre un binario que su `js-binding.js` elige
+por plataforma **en ejecución**, que Turbopack no puede meter un `.node` en un chunk ESM —«no
+ecmascript placeable asset»—, que **el `await import()` del adaptador NO basta** porque un
+especificador literal sigue siendo analizable y el bundler lo mete en el grafo igual, y trae la
+medición: sin la línea `next build` sale con **exit 1**; con ella, **exit 0**.
+
+**Qué aporta entonces esta ficha, que no es poco:**
+
+1. **El hallazgo en ejecución.** El build roto y el PDF en error son el mismo defecto; QC-136 vio el
+   primero, el recorrido E2E de `[D4]` vio el segundo, que es el que le importa a quien usa la
+   aplicación.
+2. **`R25` como garantía.** QC-136 arregló la configuración; nadie había escrito **qué tiene que
+   seguir siendo cierto**. R25 lo dice en términos observables, así que el día que alguien cambie de
+   rasterizador o de bundler hay un requisito que consultar y no solo una línea heredada.
+3. **Un segundo test, y conviven a propósito.** El de QC-136
+   (`tests/unit/documentos/canvas-no-empaquetado.test.ts`) mira **ese paquete por su nombre**; el
+   nuestro (`tests/unit/documentos/next-config-externos.test.ts`) ancla el invariante a la
+   **propiedad**: todo paquete nativo que el servidor cargue tiene que estar declarado externo.
+   **Está medido, no razonado**: el implementer inyectó un segundo paquete nativo sin declarar, y el
+   test de QC-136 **siguió verde** —no lo ve— mientras el nuestro se puso **rojo**. Esa es la razón
+   de que sean dos y de que el de QC-136 no se haya tocado.
+
+En los dos casos el arreglo es **configuración del framework, no código del módulo**: **el adaptador
+no cambia** y `resolveRasterizer` sigue exactamente igual —su mensaje sobre el par ausente sigue
+siendo el correcto el día que de verdad falte—.
 
 ### 13.2 La pregunta que llevaba abierta desde el 2026-09-16, y lo que este arreglo NO cierra
 
@@ -466,8 +498,10 @@ no como «sí»**, con el compromiso escrito de **cerrarla antes de que QC-111 l
 lo consumió. La pregunta siguió abierta. QC-111 `design.md > 0` la volvió a anotar como hallazgo no
 bloqueante y la dejó para «T14». Cinco fichas después, la primera ejecución real la encontró.
 
-**Este arreglo NO cierra esa pregunta, y decir lo contrario sería el mismo error otra vez.** Lo que
-resuelve es el **empaquetado bajo Next**, que es lo que rompe aquí y ahora, en local y en el gate.
+**Este arreglo NO cierra esa pregunta, y decir lo contrario sería el mismo error otra vez. Que lo
+mergeara antes QC-136 no cambia nada de esto**: resuelve el mismo empaquetado y deja viva la misma
+deuda. Lo que se resuelve es el **empaquetado bajo Next**, que es lo que rompe aquí y ahora, en
+local y en el gate.
 **Si además el binario sobrevive al runtime de Vercel sigue siendo DESCONOCIDO**: no se puede
 verificar sin un despliegue real, y sin red el gate no puede afirmarlo. Queda como **deuda con
 destinatario** —la pregunta abierta 3 de QC-106, que sigue viva y ahora con un consumidor en
@@ -484,7 +518,8 @@ QC-111 `[D5]`/R16 ya dejó montado. Es feo y es visible, que es lo que se pedía
   es su aserto.
 - `tests/unit/documentos/next-config-externos.test.ts` — afirma sobre la **configuración resuelta**,
   no sobre el texto del archivo, con el mismo criterio que `guard-teclear-y-plazo.test.ts`: un valor
-  escrito en un comentario satisface a un regex y no cambia nada.
+  escrito en un comentario satisface a un regex y no cambia nada. Y afirma por **propiedad**, no por
+  nombre, que es lo que lo hace distinto del de QC-136 (`13.1`, punto 3).
 
 Ninguno de los dos afirma «el adaptador importa tal paquete»: si mañana se cambia de rasterizador,
 R25 sigue diciendo lo que hay que garantizar.
