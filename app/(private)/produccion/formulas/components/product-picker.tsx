@@ -15,6 +15,7 @@ import {
   useAsyncPaginatedOptions,
   type AsyncPageRequest,
 } from '@/hooks/use-async-paginated-options';
+import { withRateLimitNotice } from '@/hooks/use-rate-limited-action-state';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
@@ -166,7 +167,15 @@ export function ProductPicker({
       // La clave `search` se omite por claridad del sitio de llamada, NO porque el esquema fuera
       // a rechazarla: con el contrato de QC-57 una búsqueda vacía es AUSENCIA de búsqueda (R20).
       const filtro = search === '' ? {} : { search };
-      const result = await listProductsAction({ page, pageSize: MAX_PAGE_SIZE, ...filtro });
+      const result = await withRateLimitNotice(listProductsAction)({
+        page,
+        pageSize: MAX_PAGE_SIZE,
+        ...filtro,
+      });
+
+      if (result === undefined) {
+        return { items: [], page, totalPages: page };
+      }
 
       if (result.status === 'error') {
         // El mensaje del servidor viaja como `cause` del error que envuelve el hook, y es el que

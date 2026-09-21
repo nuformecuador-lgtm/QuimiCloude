@@ -15,6 +15,7 @@ import {
   useAsyncPaginatedOptions,
   type AsyncPageRequest,
 } from '@/hooks/use-async-paginated-options';
+import { withRateLimitNotice } from '@/hooks/use-rate-limited-action-state';
 import { listRecipesAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
@@ -170,7 +171,15 @@ export function RecipePicker({
       // Sin termino la clave se omite por claridad del sitio de llamada, no porque el esquema
       // fuera a rechazarla: con el contrato de QC-57 una busqueda vacia es AUSENCIA de busqueda.
       const termino = search === '' ? {} : { search };
-      const result = await listRecipesAction({ page, pageSize: MAX_PAGE_SIZE, ...termino });
+      const result = await withRateLimitNotice(listRecipesAction)({
+        page,
+        pageSize: MAX_PAGE_SIZE,
+        ...termino,
+      });
+
+      if (result === undefined) {
+        return { items: [], page, totalPages: page };
+      }
 
       if (result.status === 'error') {
         // El mensaje del servidor viaja como `cause` del error que envuelve el hook, y es el que

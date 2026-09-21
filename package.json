@@ -38,6 +38,8 @@
     "@tiptap/extension-text": "3.31.3",
     "@tiptap/pm": "3.31.3",
     "@tiptap/react": "3.31.3",
+    "@upstash/ratelimit": "^2.1.0",
+    "@upstash/redis": "^1.38.4",
     "@zxcvbn-ts/language-common": "^4.1.3",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",

@@ -1,10 +1,11 @@
 'use client';
 
 import { LogOutIcon } from 'lucide-react';
-import { useActionState, useEffect, useId } from 'react';
+import { useEffect, useId } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { useRateLimitedActionState } from '@/hooks/use-rate-limited-action-state';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -348,7 +349,7 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
     return { status: 'success' };
   }
 
-  const [state, formAction] = useActionState(save, INITIAL_STATE);
+  const [state, formAction] = useRateLimitedActionState(save, INITIAL_STATE);
 
   useEffect(() => {
     if (state.status !== 'success') return;

@@ -1,10 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useActionState, useEffect, useId } from 'react';
+import { useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { useRateLimitedActionState } from '@/hooks/use-rate-limited-action-state';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,7 +81,7 @@ export function EndUserSessionsDialog({ user, open, onOpenChange }: EndUserSessi
   const fieldId = useId();
   const errorId = `${fieldId}-error`;
   const router = useRouter();
-  const [state, formAction, isPending] = useActionState(endAllSessionsAction, INITIAL_STATE);
+  const [state, formAction, isPending] = useRateLimitedActionState(endAllSessionsAction, INITIAL_STATE);
   const { displayName } = user;
 
   useEffect(() => {

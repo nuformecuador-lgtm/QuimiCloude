@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
+import { withRateLimitNotice } from '@/hooks/use-rate-limited-action-state';
 import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
 import { deleteRecipeAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeSummary } from '@/lib/modules/recetas';
@@ -55,7 +56,8 @@ export function DeleteRecipeDialog({ recipe }: { readonly recipe: RecipeSummary 
 
   const handleConfirm = () => {
     startTransition(async () => {
-      const result = await deleteRecipeAction(recipe.id);
+      const result = await withRateLimitNotice(deleteRecipeAction)(recipe.id);
+      if (result === undefined) return;
       if (result.status === 'error') {
         setError(result);
         return;

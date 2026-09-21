@@ -1,9 +1,10 @@
 'use client';
 
-import { useActionState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 
 import { Input } from '@/components/ui/input';
+import { useRateLimitedActionState } from '@/hooks/use-rate-limited-action-state';
 import { Label } from '@/components/ui/label';
 import { RETURN_PARAM } from '@/lib/modules/identity';
 import { loginAction } from '@/lib/modules/identity/adapters/driving/login-action';
@@ -54,7 +55,7 @@ type LoginFormProps = {
  * sin tocar los campos no controlados, las claves de montaje, los toasts ni `SubmitButton`.
  */
 export function LoginForm({ next = '' }: LoginFormProps) {
-  const [state, formAction] = useActionState(loginAction, LOGIN_INITIAL_STATE);
+  const [state, formAction] = useRateLimitedActionState(loginAction, LOGIN_INITIAL_STATE);
 
   // Unico `useRef` del componente: memoriza que intento ya se notifico (R21).
   const lastToastedId = useRef<string | null>(null);

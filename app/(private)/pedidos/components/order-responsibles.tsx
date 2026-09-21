@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { withRateLimitNotice } from '@/hooks/use-rate-limited-action-state';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import {
   assignResponsiblesAction,
@@ -311,12 +312,13 @@ export function OrderResponsibles({
    * el servidor.
    */
   async function run(
-    operation: () => Promise<ResponsibleOperationResult>,
+    operation: () => Promise<ResponsibleOperationResult | undefined>,
     onSuccess: (result: { readonly added?: number; readonly removed?: number }) => void,
   ): Promise<void> {
     setBusy(true);
     try {
       const result = await operation();
+      if (result === undefined) return;
       if (result.status === 'error') {
         // R34: dentro del panel, por `code`, sin cerrar y sin perder lo marcado.
         setError(result);
@@ -340,7 +342,7 @@ export function OrderResponsibles({
     for (const groupId of pickedGroups) formData.append(RESPONSIBLE_WORK_GROUP_IDS_FIELD, groupId);
 
     await run(
-      () => assignResponsiblesAction({ status: 'idle' }, formData),
+      () => withRateLimitNotice(assignResponsiblesAction)({ status: 'idle' }, formData),
       (result) => {
         toast.success(assignResponsiblesSuccessMessage(result.added ?? 0));
         setPickedPeople(new Set());
@@ -356,7 +358,7 @@ export function OrderResponsibles({
     formData.set(RESPONSIBLE_USER_ID_FIELD, userId);
 
     await run(
-      () => unassignResponsibleAction({ status: 'idle' }, formData),
+      () => withRateLimitNotice(unassignResponsibleAction)({ status: 'idle' }, formData),
       () => toast.success(UNASSIGN_SUCCESS),
     );
   }
@@ -368,7 +370,7 @@ export function OrderResponsibles({
     formData.set(RESPONSIBLE_WORK_GROUP_ID_FIELD, workGroupId);
 
     await run(
-      () => removeWorkGroupFromOrderAction({ status: 'idle' }, formData),
+      () => withRateLimitNotice(removeWorkGroupFromOrderAction)({ status: 'idle' }, formData),
       (result) => toast.success(removeWorkGroupSuccessMessage(result.removed ?? 0)),
     );
   }

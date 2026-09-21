@@ -16,6 +16,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
+import { withRateLimitNotice } from '@/hooks/use-rate-limited-action-state';
 import { listProductBatchesAction } from '@/lib/modules/inventario/adapters/driving/batch-actions';
 import type { ErrorState } from '@/lib/modules/errores';
 import type { ProductBatchView, ProductView } from '@/lib/modules/inventario';
@@ -53,7 +54,13 @@ function ProductBatchesSheet({ product, units, canAdjust }: ProductBatchesSheetP
 
   function fetchBatches() {
     setState({ status: 'loading' });
-    void listProductBatchesAction(product.id).then((result) => {
+    void withRateLimitNotice(listProductBatchesAction)(product.id).then((result) => {
+      // Frenado: el toast ya lo puso el envoltorio. Se vuelve a `idle` para no dejar el
+      // "Cargando…" colgado y que la proxima apertura reintente.
+      if (result === undefined) {
+        setState({ status: 'idle' });
+        return;
+      }
       setState(result.status === 'success' ? { status: 'success', data: result.data } : result);
     });
   }

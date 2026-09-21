@@ -163,8 +163,11 @@ del dominio.
   dentro del mismo proyecto. No usar `fetch` a rutas API internas para mutaciones.
 - **API externa/webhooks:** Route handlers en `app/api/` con zod + firma/idempotencia.
 - **Deploy:** Vercel. Secretos en variables de entorno, nunca en repo.
-- **Integraciones externas:** ninguna definida todavia. Cuando entre la primera, se
-  documenta aqui con su cliente en `lib/modules/<modulo>/adapters/driven/`.
+- **Integraciones externas:** Upstash Redis, por su API REST (via `@upstash/redis` y
+  `@upstash/ratelimit`), como contador del limite de peticiones por origen. Cliente en
+  `lib/modules/rate-limit/adapters/driven/upstash-rate-limiter.ts`, el unico archivo que
+  la importa. Cuando entre otra, se documenta aqui con su cliente en
+  `lib/modules/<modulo>/adapters/driven/`.
 
 ## Dependencias de terceros
 
@@ -406,6 +409,10 @@ Supabase.
 - Las paginas (Server Components) exigen su permiso en el servidor, antes de leer o pintar datos.
 - `middleware.ts` intercepta las rutas privadas y **valida** la cookie de sesion: su **firma**, su
   **caducidad** y la **empresa** del contenido firmado. Que la cookie exista no es sesion.
+- Antes de eso, el middleware consulta el limite de peticiones por origen (contador en
+  Upstash o en memoria, segun credenciales) para decidir si frena con un 429. Es una E/S
+  del borde, acotada por una espera maxima configurable; si el contador no responde a
+  tiempo o falla, la peticion sigue su camino de hoy y queda un aviso por consola.
 - El middleware **no corta por rol**: no existe ninguna lista ruta→rol y ninguna decision del borde
   depende del rol que viaja en la cookie. El borde tampoco **consulta la base de datos** y no va a
   hacerlo: no conoce los permisos, y `tests/guards/guard-middleware-edge.test.ts` recorre su cierre

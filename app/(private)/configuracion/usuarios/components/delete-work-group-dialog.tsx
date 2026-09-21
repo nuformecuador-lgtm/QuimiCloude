@@ -1,10 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useActionState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { toast } from 'sonner';
 
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { useRateLimitedActionState } from '@/hooks/use-rate-limited-action-state';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -74,7 +75,7 @@ export type DeleteWorkGroupDialogProps = {
 
 export function DeleteWorkGroupDialog({ group, open, onOpenChange }: DeleteWorkGroupDialogProps) {
   const router = useRouter();
-  const [state, formAction, isPending] = useActionState(deleteWorkGroupAction, INITIAL_STATE);
+  const [state, formAction, isPending] = useRateLimitedActionState(deleteWorkGroupAction, INITIAL_STATE);
 
   useEffect(() => {
     if (state.status !== 'success') return;

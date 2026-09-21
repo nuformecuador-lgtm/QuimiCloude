@@ -1,10 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useActionState, useEffect, useId } from 'react';
+import { useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { useRateLimitedActionState } from '@/hooks/use-rate-limited-action-state';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -92,7 +93,7 @@ export function UserStatusDialog({ user, open, onOpenChange }: UserStatusDialogP
   const labelId = `${fieldId}-label`;
   const errorId = `${fieldId}-error`;
   const router = useRouter();
-  const [state, formAction, isPending] = useActionState(setUserAccountStatusAction, INITIAL_STATE);
+  const [state, formAction, isPending] = useRateLimitedActionState(setUserAccountStatusAction, INITIAL_STATE);
 
   useEffect(() => {
     if (state.status !== 'success') return;

@@ -25,9 +25,9 @@
 // `invalid_credential` NO es un `ErrorState` justamente por esto (`design.md > 11.3`).
 
 import Link from 'next/link';
-import { useActionState } from 'react';
 
 import { CREDENTIAL_RULE_LABELS } from '@/components/shared/credential-rule-labels';
+import { useRateLimitedActionState } from '@/hooks/use-rate-limited-action-state';
 import { buttonVariants } from '@/components/ui/button';
 import {
   setCredentialWithLinkAction,
@@ -58,7 +58,7 @@ type SetCredentialFormProps = {
 };
 
 export function SetCredentialForm({ secret, labels }: SetCredentialFormProps) {
-  const [state, formAction] = useActionState(setCredentialWithLinkAction, INITIAL_STATE);
+  const [state, formAction] = useRateLimitedActionState(setCredentialWithLinkAction, INITIAL_STATE);
   const texto: SetCredentialLabels = { ...SET_CREDENTIAL_LABELS, ...labels };
 
   if (state.status === 'success') {

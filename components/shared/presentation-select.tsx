@@ -23,6 +23,7 @@ import {
   useAsyncPaginatedOptions,
   type AsyncPageRequest,
 } from '@/hooks/use-async-paginated-options';
+import { withRateLimitNotice } from '@/hooks/use-rate-limited-action-state';
 import { createPresentationSchema } from '@/lib/modules/inventario';
 import {
   createPresentationAction,
@@ -222,11 +223,11 @@ export function PresentationSelect({
 
     let cancelled = false;
     void (async () => {
-      const result = await listPresentationsAction({
+      const result = await withRateLimitNotice(listPresentationsAction)({
         page: FIRST_PAGE,
         pageSize: MAX_PAGE_SIZE,
       });
-      if (cancelled || result.status === 'error') return;
+      if (cancelled || result === undefined || result.status === 'error') return;
       const encontrada = result.data.items.find((item) => item.id === defaultValue);
       if (encontrada !== undefined) setSelectedName(encontrada.name);
     })();
@@ -242,11 +243,15 @@ export function PresentationSelect({
     // Sin termino la clave se omite por claridad del sitio de llamada, no porque el esquema fuera
     // a rechazarla: con el contrato de QC-57 una busqueda vacia es AUSENCIA de busqueda.
     const filtro = search === '' ? {} : { search };
-    const result = await listPresentationsAction({
+    const result = await withRateLimitNotice(listPresentationsAction)({
       page,
       pageSize: MAX_PAGE_SIZE,
       ...filtro,
     });
+
+    if (result === undefined) {
+      return { items: [], page, totalPages: page };
+    }
 
     if (result.status === 'error') {
       // El mensaje del servidor viaja como `cause` del error que envuelve el hook, y es el que
@@ -316,8 +321,13 @@ export function PresentationSelect({
     formData.set(PRESENTATION_UNIT_FIELD, parsed.data.unitId);
 
     setCreatePending(true);
-    const result = await createPresentationAction({ status: 'idle' }, formData);
+    const result = await withRateLimitNotice(createPresentationAction)(
+      { status: 'idle' },
+      formData,
+    );
     setCreatePending(false);
+
+    if (result === undefined) return;
 
     if (result.status === 'error') {
       // `presentation_duplicate_name` SI identifica un campo, asi que se pinta junto al nombre y

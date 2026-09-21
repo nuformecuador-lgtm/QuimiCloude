@@ -675,7 +675,8 @@ describe('contrato de la ruta de recetas', () => {
       join(COMPONENTES_PATH, 'product-picker.tsx').split('\\').join('/'),
     );
     expect(selector).not.toContain('.filter(');
-    expect(selector).toContain('listProductsAction({ page');
+    expect(selector).toContain('withRateLimitNotice(listProductsAction)({');
+    expect(selector).toMatch(/withRateLimitNotice\(listProductsAction\)\(\{\s*page,/);
     expect(selector).toContain('pageSize: MAX_PAGE_SIZE');
     expect(selector).not.toMatch(/pageSize:\s*25/);
 
