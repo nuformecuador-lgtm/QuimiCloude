@@ -124,7 +124,7 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
       **Hecho cuando**: `sube tres PDFs y ve cambiar el estado de cada uno hasta terminar (R20)`
       pasa en **Chromium y WebKit**, con el servidor de Playwright y **sin red**.
 
-- [ ] **T16.** Depende de T1–T15 (salvo T12, bloqueada). Escribir
+- [x] **T16.** Depende de T1–T15 (salvo T12, bloqueada). Escribir
       `progress/impl_QC-107-componente-de-carga-de-archivos.md` con el mapa `R1..R22 → test`,
       dejando **R18 anotado como bloqueado** con su cobertura en negativo y la razón.
       **Hecho cuando**: cada `R<n>` aparece con al menos un test concreto, o —solo R18— con su
