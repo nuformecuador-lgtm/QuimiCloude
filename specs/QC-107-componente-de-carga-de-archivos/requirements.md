@@ -139,12 +139,18 @@ código que necesite —el tope de archivos, los tipos de estado de archivo y de
 estrategia—, y NO DEBE redeclarar ninguno de ellos en la capa de interfaz.
 *(heredada: el número de archivos se importa, no se reescribe, QC-106)*
 
+**R23.** SI la consulta de estado responde que **no hay tanda** —porque no existe o porque pertenece
+a otra empresa, dos casos que la consulta devuelve **exactamente igual** y que el sistema por tanto
+NO DEBE distinguir, nombrar ni insinuar en lo que muestra—, ENTONCES el sistema DEBE **detener el
+sondeo** de esa tanda y decir que no hay nada que seguir, sin volver a consultarla por su cuenta.
+`[D2]` *(heredada: una tanda de otra empresa se rechaza igual que si no existiera, QC-111 R18)*
+
 ### Mapa de decisiones a requisitos
 
 | Decisión (tabla, en orden) | Requisito(s) |
 | --- | --- |
 | `[D1]` Dos montajes, ninguna pantalla propia | R3, R17, R18, R19 |
-| `[D2]` Sondeo propio, con parada y sin dependencia nueva | R8, R9 |
+| `[D2]` Sondeo propio, con parada y sin dependencia nueva | R8, R9, R23 |
 | `[D5]` El tiempo real no entra: lo decide QC-137 | R15 |
 | `[D3]` Solo el estado; el texto extraído no se pinta | R13 |
 | `[D4]` E2E acotado a lo navegable, con cola e IA simuladas | R20 |

@@ -340,6 +340,7 @@ en `tests/` sí se cita—; **en el código de producción no se cita ninguna fi
 | R20 | `e2e/documentos.spec.ts` |
 | R21 | `tests/unit/documentos-ui/document-upload-a11y-tactil.test.tsx`, más los dos proyectos del E2E |
 | R22 | `tests/unit/documentos-ui/document-upload-convenciones.test.ts` (el tope y los tipos se importan; ningún literal) |
+| R23 | `tests/unit/documentos-ui/document-upload-errors.test.tsx` (`data: null` detiene el sondeo y el texto mostrado no distingue «no existe» de «es de otra empresa») |
 
 El mapa definitivo `R<n> → test` lo escribe el implementer en
 `progress/impl_QC-107-componente-de-carga-de-archivos.md` (`CHECKPOINTS.md > Trazabilidad`).

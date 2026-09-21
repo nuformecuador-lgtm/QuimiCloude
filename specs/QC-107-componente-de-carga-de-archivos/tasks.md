@@ -130,6 +130,17 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
       **Hecho cuando**: cada `R<n>` aparece con al menos un test concreto, o —solo R18— con su
       bloqueo escrito.
 
+- [ ] **T18.** Depende de T8. Cubrir **R23** con su propio caso en
+      `tests/unit/documentos-ui/document-upload-errors.test.tsx`: la consulta responde
+      `{ status: 'success', data: null }` y el componente **detiene el sondeo** y dice que no hay
+      tanda que seguir, **sin distinguir** «no existe» de «es de otra empresa». El comportamiento ya
+      está implementado (hoy etiquetado `(R8)`): esta task **no cambia código de producción**, añade
+      el caso y le pone su `R<n>` propio.
+      **Hecho cuando**: pasan `una tanda desconocida detiene el sondeo (R23)` y `el mensaje de tanda
+      desconocida no distingue si no existe o es de otra empresa (R23)`, el caso que hoy cita `(R8)`
+      para este escenario queda reetiquetado a `(R23)`, y el mapa de
+      `progress/impl_QC-107-componente-de-carga-de-archivos.md` (T16) recoge la fila `R23 → test`.
+
 - [ ] **T17.** Depende de T16. Correr `./init.sh` completo (no `--rapido`) antes de abrir el PR.
       **Hecho cuando**: termina en verde, incluidas las guardias de arquitectura y de dependencias,
       que deben pasar **sin ningún cambio en `docs/dependencias.md`** porque no entra ninguna
