@@ -113,3 +113,32 @@ export {
   type ProcessPdfByStrategyInput,
   type StrategyRunResult,
 } from './domain/process-pdf-by-strategy';
+
+// El esquema del borde de ENCOLAR una tanda y su tipo inferido: mismo criterio que los esquemas de
+// arriba, una sola definicion de la entrada.
+export { enqueueBatchSchema, type EnqueueBatchInput } from './domain/enqueue-input';
+
+// El estado de un archivo y el de una tanda, tal como los ve quien consulta: es lo que devuelve la
+// tercera capacidad de abajo y lo que pintara la pantalla.
+export {
+  type BatchStatus,
+  type DocumentFileStatus,
+  type DocumentFileStatusEntry,
+} from './domain/batch-status';
+
+// El cuerpo que entrega la cola, con su tipo: el Route Handler valida con el MISMO esquema, no con
+// una copia que pudiera diverger.
+export { queueMessageSchema, type QueueMessageBody } from './domain/queue-message';
+
+// Las TRES capacidades del procesamiento en cola, publicadas como FABRICAS por el mismo motivo que
+// las de arriba: quien las usa recibe el caso de uso ya construido y nunca ve a sus puertos.
+// `enqueueBatch` escribe la tanda y publica un mensaje por archivo; `runDocumentJob` es el trabajo
+// que ejecuta el Route Handler por cada mensaje; `getBatchStatus` consulta y caduca. Atar puerto ->
+// adaptador sigue siendo trabajo exclusivo de `lib/composition`.
+export { createEnqueueBatch, type EnqueuedBatch } from './domain/enqueue-batch';
+export {
+  createRunDocumentJob,
+  type RunDocumentJobMessage,
+  type RunDocumentJobResult,
+} from './domain/run-document-job';
+export { createGetBatchStatus } from './domain/get-batch-status';

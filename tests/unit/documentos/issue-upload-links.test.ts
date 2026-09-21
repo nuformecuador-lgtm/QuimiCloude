@@ -68,8 +68,11 @@ function dobleDeAlmacenamiento() {
   const download = vi.fn(async (): Promise<Uint8Array> => {
     throw new Error('la emision de enlaces no descarga nada');
   });
+  const remove = vi.fn(async (): Promise<void> => {
+    throw new Error('la emision de enlaces no borra nada');
+  });
 
-  const storage: DocumentStorage = { createSignedUpload, createSignedReadUrl, download };
+  const storage: DocumentStorage = { createSignedUpload, createSignedReadUrl, download, remove };
   return { storage, createSignedUpload, createSignedReadUrl, download, llamadas };
 }
 

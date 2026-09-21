@@ -178,11 +178,19 @@ describe('documentos — limites, firma del PDF y ruta de empresa', () => {
       const otros = fuentesDelModulo().filter((ruta) => ruta !== LIMITS);
       expect(otros.length).toBeGreaterThan(0);
 
+      // `processing-timeouts.ts` declara su propio valor por defecto de 900 (el plazo de
+      // caducidad de una fila, en segundos): coincide con READ_LINK_TTL_SECONDS sin ser el mismo
+      // limite, y por eso queda fuera de este barrido de duplicados.
+      const otrosParaTtlDeLectura = otros.filter(
+        (ruta) => relPosix(ruta) !== 'lib/modules/documentos/domain/processing-timeouts.ts',
+      );
+
       for (const [nombre, patron] of valores) {
         const codigoDeLimits = stripComments(readFileSync(LIMITS, 'utf8'));
         expect(patron.test(codigoDeLimits), `${nombre} no aparece en limits.ts`).toBe(true);
 
-        const intrusos = otros.filter((ruta) => patron.test(stripComments(readFileSync(ruta, 'utf8'))));
+        const candidatos = nombre === 'READ_LINK_TTL_SECONDS' ? otrosParaTtlDeLectura : otros;
+        const intrusos = candidatos.filter((ruta) => patron.test(stripComments(readFileSync(ruta, 'utf8'))));
         expect(intrusos.map(relPosix), `${nombre} repetido fuera de limits.ts`).toEqual([]);
       }
     });
