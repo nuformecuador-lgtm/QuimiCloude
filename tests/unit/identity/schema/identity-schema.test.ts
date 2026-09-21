@@ -139,13 +139,22 @@ const schemaEnums = parseEnums(schema)
  *
  * Los codigos NO se escriben aqui a mano: salen de `DOCUMENT_TYPE_CODES`, la contrapartida
  * en TypeScript de las filas que siembra `20260806122638_users_and_roles/migration.sql`.
+ *
+ * SEGUNDO ACOTAMIENTO, EL 2026-09-18 POR QC-111 (`specs/QC-111-procesamiento-de-pdf-en-cola/`).
+ *
+ * La comprobacion por NOMBRE mordia de mas: `/documen|tipodoc/i` cazaba tambien `DocumentStrategy`
+ * y `DocumentFileStatus`, los dos enums del modulo `documentos` que QC-111 declara, y que no son
+ * el tipo de documento de identidad. Se acota la comprobacion por nombre con una excepcion literal
+ * para esos dos nombres exactos, para que siga muriendo con `DocumentType`, `TipoDocumento` o
+ * `DocumentTypeCode`. La comprobacion por CONTENIDO —contra `DOCUMENT_TYPE_CODES`— es la
+ * proteccion real y NO se toca.
  */
 function expectDocumentTypeIsNotAnEnum(): void {
   for (const declared of schemaEnums) {
     expect(
       declared.name,
       `el enum ${declared.name} no puede ser el tipo de documento`,
-    ).not.toMatch(/documen|tipodoc/i)
+    ).not.toMatch(/documen(?!tstrategy|tfilestatus)|tipodoc/i)
     const upperValues = declared.values.map((value) => value.toUpperCase())
     for (const code of DOCUMENT_TYPE_CODES) {
       expect(
@@ -326,6 +335,19 @@ describe('db/schema.prisma — modelo de usuarios y roles', () => {
     expect(field(user, 'documentTypeCode').type).toBe('String')
     // Ni enum ni check: acotado por QC-33 a SU sujeto, ver `expectDocumentTypeIsNotAnEnum`.
     expectDocumentTypeIsNotAnEnum()
+  })
+
+  // QC-111: el acotamiento del 2026-09-18 no desarma la regla, solo la afina. Un enum llamado
+  // `DocumentType` -- que no es ninguno de los dos exceptuados-- sigue mordiendo por nombre.
+  it('la regla del tipo de documento sigue mordiendo un enum llamado DocumentType', () => {
+    const nombreDelTipoDeDocumento = /documen(?!tstrategy|tfilestatus)|tipodoc/i
+
+    expect('DocumentType').toMatch(nombreDelTipoDeDocumento)
+    expect('TipoDocumento').toMatch(nombreDelTipoDeDocumento)
+    expect('DocumentTypeCode').toMatch(nombreDelTipoDeDocumento)
+    // Los dos nombres exceptuados del modulo `documentos` no son el tipo de documento.
+    expect('DocumentStrategy').not.toMatch(nombreDelTipoDeDocumento)
+    expect('DocumentFileStatus').not.toMatch(nombreDelTipoDeDocumento)
   })
 
   it('passwordHash es String sin longitud declarada', () => {

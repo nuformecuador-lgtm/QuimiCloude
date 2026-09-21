@@ -4545,3 +4545,52 @@ podar.
   2026-09-19 y nadie cerró la ficha: `feature_list.json` siguió en `in_progress`, la tarjeta en
   *En curso* y el worktree montado. Se detectó al retomarla. El barrido de comprobación —93 PRs
   mergeados contra las 30 fichas no cerradas, por rama y por clave— confirmó que **era la única**.
+
+## 2026-09-21 — QC-111-procesamiento-de-pdf-en-cola
+
+- Cada tanda de PDFs (hasta 10) se encola en **Upstash QStash**, que entrega cada trabajo al
+  **primer Route Handler del repo** (`app/api/documentos/trabajos/route.ts`, `runtime = 'nodejs'`),
+  y ese trabajo ejecuta la conversión y la estrategia de QC-109. Cada archivo lleva su propio
+  estado —en cola, procesando, listo, error con su motivo— y la ficha expone su consulta, que
+  pintará QC-107.
+- Requisitos cubiertos: **R1–R27, 27 mapeados**, comprobados uno a uno abriendo cada test.
+  PR **#97**, merge `f97b594a`.
+- **Dos tablas nuevas**, `document_batches` y `document_files`, con `company_id`, **RLS activada y
+  forzada** en las dos, FK compuesta contra la empresa y su `down.sql`.
+- **Idempotencia por candado de fila**: un solo `UPDATE ... WHERE status='queued' ... RETURNING`
+  reclama el trabajo; dos entregas concurrentes se serializan en Postgres y la segunda no hace
+  nada. Test de integración real con dos conexiones (`attempts === 1`).
+- **La firma se valida antes de cualquier efecto**, y los fallos se clasifican reintentable /
+  definitivo con un `Record` tipado que no compila si un código del catálogo queda sin clasificar.
+  El código HTTP va invertido a propósito: un fallo **definitivo responde 200** para que la cola no
+  reintente, y solo el reintentable pide 5xx.
+- **Una dependencia nueva, `@upstash/qstash`**, con los cuatro checks de salud y su fila en
+  `docs/dependencias.md`. `@upstash/redis` no entra.
+- **Verificación**: `./init.sh` completo verde sobre la rama sincronizada — **576/576 archivos,
+  8289 tests, 0 rojos**. Sin E2E, deliberado: R27 lo difiere a QC-107 porque un E2E real exigiría
+  URL pública y cuenta, y el gate deja de correr sin red.
+- **Aflojó cinco guardias de alcance ajenas, y ninguna encontró un defecto**: las cinco afirmaban
+  «el repo no tiene X» cuando esta ficha tenía permiso explícito para añadir X —la dependencia
+  aprobada y el primer Route Handler—. En `pedidos-convenciones` se **borra** la afirmación
+  absoluta sobre todo `app/` y se conserva la acotada, con un caso nuevo que demuestra que el
+  detector sigue mordiendo. El baseline pierde dos entradas y conserva seis.
+- **Deuda declarada con encargo de ficha**: las guardias de alcance escritas como absolutos;
+  `tests/unit/pedidos/module-contract.test.ts` ciego con CRLF; y la guardia de QC-129, que afirma
+  que `CATALOG_PROMPT` no existe cuando `.env.example` la trae y el procedimiento de montar un
+  worktree es copiar ese archivo —el camino documentado produce el rojo—.
+- **Lo que quedó abierto al cerrar, y no es un defecto de la ficha sino un presupuesto que el spec
+  nunca puso.** Revisado al mergear: el trabajo corre **síncrono dentro de la petición** —el Route
+  Handler espera a `runDocumentJob` entero—, así que el techo lo pone `maxDuration` de Vercel,
+  **300 s por defecto**, y no QStash, que aguanta 15 min en el plan Free. El PR **no fija
+  `maxDuration` ni el `timeout` del publish**. Con `catalogo` y 50 páginas —el tope exacto de
+  `MAX_PDF_PAGES`— el paso caro es rasterizar a 150 DPI, y **el timeout de 60 s de la IA no lo
+  cubre**: `buildImageParts` corre *antes* del `runWithTimeout`. Si la función muere a mitad, la
+  fila se queda en `processing`, **los reintentos de QStash no sirven** —`claim` exige
+  `status='queued'`— y solo la cierra `expireStale` a los 900 s, que además no es un cron sino una
+  llamada perezosa desde `getBatchStatus`. Tres fichas propias: subir `maxDuration`, acotar la
+  rasterización y hacer re-reclamable la fila colgada.
+- **El nombre de la cabecera del message id sigue sin verificar**: el SDK nunca la lee —comprobado,
+  `message-id` no aparece en el paquete—, así que se implementó con `upstash-message-id` en una
+  sola constante, sin rellenar con un supuesto. Si fuera otro, la ruta responde 400 siempre y no se
+  procesa ni un PDF, sin que ningún test lo note. **El servidor dev local de QStash (`QSTASH_DEV=true`)
+  lo responde sin desplegar.**

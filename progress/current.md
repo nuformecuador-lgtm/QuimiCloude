@@ -464,6 +464,120 @@ porque es validacion de entrada y no una regla nueva de dominio.
 
 ## Deudas y cosas abiertas
 
+### El baseline pierde DOS entradas y conserva SEIS, y las dos decisiones van escritas (2026-09-19)
+
+El gate verde de QC-111 avisa de **ocho** archivos del baseline que «ya pasan». No se borran los
+ocho: se borran **los dos que esta rama arreglo de verdad**, y los otros seis se quedan con su
+motivo.
+
+**Borradas, porque su causa murio en esta rama:**
+
+| Entrada | Por que ya no aplica |
+|---|---|
+| `tests/unit/navegacion/qc75-convenciones.test.ts` | su motivo nombraba UN caso —«package.json no gano dependencias respecto al merge-base»— que se quedo fuera de la precondicion de rama que ya protegia a sus hermanos. Es exactamente el caso que QC-111 acoto, y la salida limpia que el propio motivo pedia: «llevar ese unico caso DENTRO de la misma precondicion de rama». Hecho |
+| `tests/unit/unidades/unidades-convenciones.test.ts` | su motivo, ampliado en QC-79, decia que el unico rojo vivo era «R35 — las dependencias son EXACTAMENTE las de origin/dev». Ese caso ahora salta fuera de la rama de QC-38, que es la salida limpia que el motivo pedia |
+
+**En `dev` seguiran verdes despues del merge**, que es la pregunta que importa antes de borrar una
+entrada: las dos acotaciones saltan el caso cuando el rango **no** es el de su ficha, y en `dev` no
+lo es. No se retira una red para que otro la pise.
+
+**Los otros seis se quedan**, y el motivo es el mismo que escribio QC-92: que hoy pasen no significa
+que su causa haya muerto. Las cinco estructurales pasan **segun la rama desde la que se mire** —son
+guardias que censan el diff, asi que su color depende de quien pase por ahi—, y
+`product-crud.int.test.ts` es un flake de saturacion cuya propia entrada fija la condicion de
+retirada: **tres corridas completas seguidas** con el archivo dentro. Esta es una. Borrarlas hoy es
+plantar el rojo en la rama siguiente.
+
+### La guardia de QC-129 afirma la ausencia de dos variables que el propio repo te manda tener (2026-09-19)
+
+**ENCARGO: ficha en el board, junto a la de las guardias de alcance.** Es la misma especie, en otro
+disfraz: una afirmacion absoluta sobre el entorno en vez de sobre el arbol.
+
+**Lo medido.** `tests/unit/composition/documentos-facade.test.ts` —en `dev`, nacido en QC-108 y
+ampliado por QC-129— afirma `expect(process.env.CATALOG_PROMPT).toBeUndefined()` y lo mismo para
+`FORMULA_PROMPT`. Vitest carga el `.env` en `process.env`, asi que basta con que la variable **este
+declarada**, aunque sea vacia, para que el caso caiga con `expected '' to be undefined`.
+
+**Y el repo te manda declararla**: `.env.example` trae `CATALOG_PROMPT=` y `FORMULA_PROMPT=` en sus
+lineas 175 y 179, y el procedimiento de montar un worktree es **copiar ese archivo**. O sea que el
+camino documentado produce el rojo. No es la maquina de nadie: le pasa a cualquiera que siga las
+instrucciones.
+
+**Lo vivio QC-111 en F2.3**: el merge con `dev` trajo el caso, el gate se puso rojo y el rojo **no
+era de la rama**. Se desbloqueo quitando las dos lineas del `.env` local **por decision del humano**
+—su valor era un par de comillas invertidas vacias, que QC-129 rechaza igual—, con copia de
+seguridad del archivo original.
+
+**Lo que NO vale hacer**: meter `documentos-facade.test.ts` en `tests/baseline-rojos.json`. Ese
+archivo es el censo de la fachada que QC-111 acaba de arreglar —fue el bloqueante 5 de su review— y
+listarlo apagaria el archivo ENTERO para el comparador, desarmando justo lo que se arreglo.
+
+**La salida limpia, y no la decide una ficha en vuelo**: que el caso no dependa de que la variable no
+exista —`vi.stubEnv`, o borrarla del entorno dentro del propio caso— para que siga afirmando lo que
+de verdad quiere afirmar: que **construir la fachada sin prompt no lanza**. Toca el **R2 de una ficha
+`done`**, con el precedente de la T3 de QC-81.
+
+### Queda al menos una guardia ciega con CRLF fuera de las cinco que ya se arreglaron (2026-09-19)
+
+**Medido en QC-111, no supuesto.** El gate completo del 2026-09-19 saco rojo
+`tests/unit/pedidos/module-contract.test.ts` afirmando que `lib/composition/index.ts` consulta
+`prisma.order`. **No lo consulta**: lo NOMBRA en un comentario de linea que explica quien NO puede
+escribirlo —el comentario existe desde QC-87—. El barrido lo leyo como codigo.
+
+**La causa es la que `progress/fix-guardias-crlf.md` ya tiene escrita**, y es exactamente el mismo
+defecto: `leerFuente` despoja comentarios con `/\/\/.*$/` **sin normalizar `\r\n` antes**. Sobre una
+linea acabada en `\r` esa regex no casa —`.` no consume `\r` y `$` sin la bandera `m` no ancla antes
+de el—, asi que el comentario **sobrevive entero** al despojado. Aquel arreglo cubrio **cinco**
+guardias de `tests/guards/`; los `module-contract` de `tests/unit/` **se quedaron fuera**, y este
+comparte el mismo ayudante.
+
+**Por que no se vio hasta hoy y por que no es rojo de la rama.** `.gitattributes` fija `eol=lf`, asi
+que un checkout limpio no reproduce nada: el indice guarda LF. Lo que hubo aqui fue una **copia de
+trabajo con CRLF** —archivos reescritos por herramienta durante la ficha—, y el gate corrio sobre
+ella. Normalizada la copia (`rm` + `git checkout` de los ocho archivos con `i/lf w/crlf`), el caso
+vuelve a verde sin tocar ni una linea de la guardia. **En el commit nunca hubo CRLF.**
+
+**La deuda que queda, y es real:** la guardia sigue siendo ciega, y solo la protege que nadie edite
+con CRLF. `.gitattributes` es una red, no el arreglo. Lo mismo que se hizo con las cinco —normalizar
+`\r\n?` a `\n` como PRIMER paso del despojado, con su test de regresion— hay que hacerlo con los
+`module-contract` que usen `leerFuente`. **Cabe en la misma ficha** que la deuda de arriba: las dos
+son «la guardia mide mal, no la regla esta mal».
+
+### Las guardias de alcance escritas como absolutos muerden a quien viene detras (2026-09-18)
+
+**ENCARGO DEL HUMANO: abrir ficha en el board CUANDO CIERRE QC-111.** No antes, para no partir la
+atencion de la ficha en vuelo.
+
+**Lo medido, y no es una impresion.** QC-111 choco con **cinco** guardias de alcance de fichas **ya
+cerradas**, y **ninguna encontro un defecto**: las cinco afirman «el repo no tiene X» cuando QC-111
+tenia permiso explicito para anadir X —una dependencia que el humano aprobo en F1.4 y el primer
+Route Handler del repo, que su propio spec manda construir—.
+
+| Guardia | Que afirma de mas |
+|---|---|
+| `tests/unit/navegacion/qc75-convenciones.test.ts` | que QC-75 no anade dependencias... midiendo el repo entero |
+| `tests/unit/unidades/unidades-convenciones.test.ts` | `package.json` identico a `origin/dev` |
+| `tests/unit/pedidos-ui/pedidos-convenciones.test.ts` | ningun Route Handler en **todo** `app/` |
+| `tests/unit/composition/documentos-facade.test.ts` | censo cerrado de la fachada (este SI era de QC-111) |
+| `tests/unit/identity/schema/identity-schema.test.ts` | ningun enum cuyo NOMBRE case el patron del tipo de documento |
+
+**El repo ya se lo habia dicho a si mismo.** `tests/guards/guard-identificador-de-request.test.ts`
+lo lleva escrito en un comentario sobre su propio conteo: que ser un absoluto es fragil y conviene
+saberlo, porque no distingue una libreria colada de una aprobada, y que **lo robusto seria comparar
+contra el merge-base de la propia rama en vez de contar absolutos**.
+
+**Precedentes de que esto ya venia pasando**: QC-33 acoto `identity-schema` el 2026-09-03 por lo
+mismo, y QC-111 tuvo que acotarla otra vez el 2026-09-18. Dos fichas distintas, la misma guardia,
+por la misma causa.
+
+**Lo que la ficha tendria que decidir** (no se rellena aqui con un supuesto): si el criterio es
+comparar contra el **merge-base de la propia rama**; si las guardias de una ficha ya cerrada deben
+**congelarse** en vez de seguir midiendo el presente; y quien paga la reescritura de las cinco. El
+`reviewer` de QC-111 lo pidio por su cuenta «con ficha propia» y dijo que **el criterio cabe en una
+linea**.
+
+**Lo que NO es**: ninguna de las cinco esta mal escrita ni sobra. Lo que sobra es su **alcance**.
+
 ### Los nombres de columna de `docs/jira.md` no son los del board (visto en F0, 2026-09-18)
 
 `docs/jira.md` documenta cinco columnas **Backlog / Spec en revision / En curso / Hecho /
@@ -543,6 +657,7 @@ de QC-127**, que además estaban **vacías**, con copia previa y `diff` comproba
 completo que se corra desde aquí sale con ese rojo hasta que entre **QC-134**, que es la ficha que lo arregla
 de raíz. Mientras tanto, quien se lo encuentre **no** debe darlo de alta en el baseline: apagaría los tres
 casos del archivo.
+
 
 ### El baseline de rojos NO se poda al cerrar QC-92, y el motivo va escrito (2026-09-18)
 

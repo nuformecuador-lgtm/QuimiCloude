@@ -310,6 +310,16 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         await import('@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions')
       ).listCatalogLinesAction('4c9d2f81-6b0a-4f3e-9d27-5a1e8c30b742', { page: 1 }),
   },
+  {
+    // Anadida por QC-111: su archivo de `driving/` resuelve las dos caras de la sesion, asi que el
+    // censo tiene que cubrirlo. Se invoca la consulta, que es la mas barata.
+    archivo: 'lib/modules/documentos/adapters/driving/document-batch-actions.ts',
+    nombre: 'getBatchStatusAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/documentos/adapters/driving/document-batch-actions')
+      ).getBatchStatusAction('4c9d2f81-6b0a-4f3e-9d27-5a1e8c30b742'),
+  },
 ];
 
 /**

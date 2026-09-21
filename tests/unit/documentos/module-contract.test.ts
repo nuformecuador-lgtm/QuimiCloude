@@ -320,6 +320,11 @@ const EXPORTACIONES_DE_EJECUCION = [
   'createReadPdfWithAi',
   'pdfStrategySchema',
   'createProcessPdfByStrategy',
+  'enqueueBatchSchema',
+  'queueMessageSchema',
+  'createEnqueueBatch',
+  'createRunDocumentJob',
+  'createGetBatchStatus',
 ] as const;
 
 /** Y lo que publica SOLO COMO TIPO: se borra al compilar, asi que no se ve en el objeto importado y
@@ -343,6 +348,14 @@ const EXPORTACIONES_DE_TIPO = [
   'ProcessPdfByStrategyDeps',
   'ProcessPdfByStrategyInput',
   'StrategyRunResult',
+  'EnqueueBatchInput',
+  'BatchStatus',
+  'DocumentFileStatus',
+  'DocumentFileStatusEntry',
+  'QueueMessageBody',
+  'EnqueuedBatch',
+  'RunDocumentJobMessage',
+  'RunDocumentJobResult',
 ] as const;
 
 /** Nombres exportados SOLO como tipo por un barril, leidos del fuente: `export { type X } from ...`

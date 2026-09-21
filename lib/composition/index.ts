@@ -298,27 +298,39 @@ import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity
 import {
   createConvertPdfs,
   createDownloadDocument,
+  createEnqueueBatch,
+  createGetBatchStatus,
   createIssueReadLink,
   createIssueUploadLinks,
   createProcessPdfByStrategy,
   createReadPdfWithAi,
+  createRunDocumentJob,
 } from '@/lib/modules/documentos';
 import { readWithGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
+import { readProcessingConfigFromEnv } from '@/lib/modules/documentos/adapters/driven/config/processing-config-env';
+import { readStrategyPromptFromEnv } from '@/lib/modules/documentos/adapters/driven/config/strategy-prompt-env';
 import { createStrategyRunLogConsole } from '@/lib/modules/documentos/adapters/driven/observability/strategy-run-log-console';
 import {
   countPages,
   extractPdfText,
   renderPages,
 } from '@/lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf';
-import { readStrategyPromptFromEnv } from '@/lib/modules/documentos/adapters/driven/config/strategy-prompt-env';
+import { documentBatchRepositoryPrisma } from '@/lib/modules/documentos/adapters/driven/persistence/document-batch-repository-prisma';
+import { processingQueueQstash } from '@/lib/modules/documentos/adapters/driven/queue/processing-queue-qstash';
+import { queueSignatureQstash } from '@/lib/modules/documentos/adapters/driven/queue/queue-signature-qstash';
 import {
   createDocumentSignedReadUrl,
   createDocumentSignedUpload,
   downloadDocument,
+  removeDocument,
 } from '@/lib/modules/documentos/adapters/driven/storage/document-storage-supabase';
 import type { AiReader } from '@/lib/modules/documentos/ports/ai-reader';
+import type { DocumentBatchRepository } from '@/lib/modules/documentos/ports/document-batch-repository';
 import type { DocumentStorage } from '@/lib/modules/documentos/ports/document-storage';
 import type { PdfConverter } from '@/lib/modules/documentos/ports/pdf-converter';
+import type { ProcessingConfig } from '@/lib/modules/documentos/ports/processing-config';
+import type { ProcessingQueue } from '@/lib/modules/documentos/ports/processing-queue';
+import type { QueueSignature } from '@/lib/modules/documentos/ports/queue-signature';
 import type { StrategyPrompt } from '@/lib/modules/documentos/ports/strategy-prompt';
 import type { StrategyRunLog } from '@/lib/modules/documentos/ports/strategy-run-log';
 import { requestScoped } from '@/lib/shared/request-scope';
@@ -1139,18 +1151,16 @@ export const asignaciones = {
 // ---------------------------------------------------------------------------------------
 
 /**
- * `DocumentStorage` cableado con el adaptador del bucket PRIVADO de estos PDFs. Ninguna de sus tres
- * funciones se INVOCA aqui —solo se referencian—, asi que construir esta fachada no lee ni una
- * variable de entorno ni toca la red: el adaptador resuelve su configuracion en cada llamada real.
- * Importar este archivo con las variables del Storage vacias sigue funcionando.
- *
- * Ninguna de las tres BORRA, porque el puerto no lo expresa: el borrado del PDF temporal es de otra
- * ficha, y aqui no hay nada que elegir al respecto.
+ * `DocumentStorage` cableado con el adaptador del bucket PRIVADO de estos PDFs. Ninguna de sus
+ * cuatro funciones se INVOCA aqui —solo se referencian—, asi que construir esta fachada no lee ni
+ * una variable de entorno ni toca la red: el adaptador resuelve su configuracion en cada llamada
+ * real. Importar este archivo con las variables del Storage vacias sigue funcionando.
  */
 const documentStorage: DocumentStorage = {
   createSignedUpload: createDocumentSignedUpload,
   createSignedReadUrl: createDocumentSignedReadUrl,
   download: downloadDocument,
+  remove: removeDocument,
 };
 
 /**
@@ -1189,6 +1199,40 @@ const strategyRunLog: StrategyRunLog = createStrategyRunLogConsole();
 const strategyPrompt: StrategyPrompt = { promptFor: readStrategyPromptFromEnv };
 
 /**
+ * El procesamiento por estrategia, construido UNA vez: lo usa la fachada de abajo y lo necesita
+ * `runDocumentJob`. Dos construcciones serian dos cableados que pueden divergir.
+ */
+const processPdfByStrategy = createProcessPdfByStrategy({
+  readPdfWithAi,
+  countPages: pdfConverter.countPages,
+  log: strategyRunLog,
+  prompt: strategyPrompt,
+});
+
+// ---------------------------------------------------------------------------------------
+// `documentos` — el procesamiento en cola. Bloque nuevo dentro del mismo modulo, no reordena nada
+// de lo de arriba: la firma, la cola y la persistencia de la tanda se atan aqui y solo aqui.
+//
+// El puerto `QueueSignature` NO envuelve ningun caso de uso: verificar una firma no comprueba
+// permiso ni empresa, y es la unica autorizacion del webhook, asi que se publica tal cual
+// -- mismo criterio que `documentStorage` de arriba, un objeto que cumple el puerto y nada mas.
+// ---------------------------------------------------------------------------------------
+
+const documentBatchRepository: DocumentBatchRepository = documentBatchRepositoryPrisma;
+const processingQueue: ProcessingQueue = processingQueueQstash;
+const queueSignature: QueueSignature = queueSignatureQstash;
+
+/**
+ * `ProcessingConfig` cableado con la lectura de entorno, pero DIFERIDA: cada metodo relee al
+ * invocarse, nunca al construir esta fachada, para que importar `lib/composition` sin las
+ * variables de la cola configuradas siga funcionando.
+ */
+const processingConfig: ProcessingConfig = {
+  timeoutSeconds: () => readProcessingConfigFromEnv().timeoutSeconds(),
+  maxRetries: () => readProcessingConfigFromEnv().maxRetries(),
+};
+
+/**
  * Fachada del modulo `documentos` ya cableada. Es lo que consume su Server Action.
  *
  * El ACTOR NO se resuelve aqui, mismo criterio que el resto de modulos: cada caso de uso lo recibe
@@ -1202,6 +1246,9 @@ const strategyPrompt: StrategyPrompt = { promptFor: readStrategyPromptFromEnv };
  *
  * `convertPdfs` NO recibe actor ni reloj: la frontera de autorizacion es la emision de enlaces, y
  * quien convierte es el trabajo que procesa una tanda ya admitida.
+ *
+ * `runDocumentJob` tampoco recibe actor: no hay usuario delante, y su ambito de empresa sale
+ * del `claim` sobre la propia fila.
  */
 export const documentos = {
   issueUploadLinks: createIssueUploadLinks({
@@ -1223,10 +1270,20 @@ export const documentos = {
   // El procesamiento por estrategia recibe la LECTURA ya construida, no el puerto de IA: el plazo y
   // el tope de paginas son de ella. `countPages` es solo para el resumen que se registra. Tampoco
   // recibe actor, por el mismo motivo que `convertPdfs`.
-  processPdfByStrategy: createProcessPdfByStrategy({
-    readPdfWithAi,
-    countPages: pdfConverter.countPages,
-    log: strategyRunLog,
-    prompt: strategyPrompt,
+  processPdfByStrategy,
+  // Las TRES capacidades nuevas del procesamiento en cola. `enqueueBatch` es la unica que recibe
+  // actor -- lo construye el adaptador driving con las dos caras de la sesion --, y las otras dos
+  // ninguna: `runDocumentJob` porque no hay usuario delante, y `queueSignature` porque verificar
+  // una firma no es un caso de uso del dominio.
+  enqueueBatch: createEnqueueBatch({ repository: documentBatchRepository, queue: processingQueue }),
+  runDocumentJob: createRunDocumentJob({
+    repository: documentBatchRepository,
+    storage: documentStorage,
+    processPdfByStrategy,
   }),
+  getBatchStatus: createGetBatchStatus({
+    repository: documentBatchRepository,
+    config: processingConfig,
+  }),
+  queueSignature,
 } as const;

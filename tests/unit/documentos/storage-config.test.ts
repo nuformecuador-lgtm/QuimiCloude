@@ -95,14 +95,7 @@ describe('documentos — configuracion del almacenamiento y aislamiento de su li
       expect(typeof adaptador.createDocumentSignedUpload).toBe('function');
       expect(typeof adaptador.createDocumentSignedReadUrl).toBe('function');
       expect(typeof adaptador.downloadDocument).toBe('function');
-    });
-
-    it('R32 — el puerto NO expresa ninguna operacion de borrado, ni el adaptador la implementa', async () => {
-      for (const name of REQUIRED_VARS) process.env[name] = '';
-
-      const adaptador = await import(ADAPTADOR);
-      const borrados = Object.keys(adaptador).filter((nombre) => /remove|delete|borrar/i.test(nombre));
-      expect(borrados, `el adaptador expone una operacion de borrado: ${borrados.join(', ')}`).toEqual([]);
+      expect(typeof adaptador.removeDocument).toBe('function');
     });
 
     it('R32 — invocar sin configuracion lanza nombrando las tres variables, sin ningun valor', async () => {
