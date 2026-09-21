@@ -34,9 +34,10 @@
  *  - la limpieza defensiva de huerfanos borra por prefijo **y por edad**, para no llevarse por
  *    delante lo que el otro proyecto acaba de crear;
  *  - `afterAll` borra siempre, aunque el test reviente;
- *  - desde QC-90 la limpieza empieza por `product_batches`: su FK a `products` es `RESTRICT`, asi
- *    que borrar los productos primero lo RECHAZA la base y el spec dejaria basura en una base
- *    compartida — que es exactamente lo que pone rojos los tests de integracion que cuentan filas.
+ *  - la limpieza empieza por `inventory_movements` y sigue por `product_batches`: sus FK hacia el
+ *    lote y hacia el producto son `RESTRICT`, asi que borrar en otro orden lo RECHAZA la base y el
+ *    spec dejaria basura en una base compartida — que es exactamente lo que pone rojos los tests
+ *    de integracion que cuentan filas.
  *
  * ROLES: el `Administrador` lo siembra `pnpm run db:seed` (`lib/modules/identity/domain/roles.ts`);
  * si falta, el `beforeAll` falla diciendo que hay que sembrar. Para el caso R4 la suite crea UN rol
@@ -368,9 +369,19 @@ test.beforeAll(async () => {
   // (`tests/integration/**`). Productos primero: `products.presentation_id` es `Restrict`.
   const orphanCutoff = new Date(Date.now() - ORPHAN_MIN_AGE_MS);
 
-  // Lotes primero (QC-90): `product_batches.product_id` es `Restrict`, asi que un producto con
-  // lotes NO se puede borrar. Se filtran por la edad DEL PRODUCTO, el mismo criterio que la linea
-  // siguiente, para no desparejar los dos borrados.
+  // Movimientos primero: `inventory_movements.batch_id` es `Restrict`, asi que un lote con
+  // asientos NO se puede borrar. Mismo filtro de edad que el paso de lotes, para no desparejar
+  // los tres borrados.
+  await prisma.inventoryMovement.deleteMany({
+    where: {
+      batch: {
+        product: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
+      },
+    },
+  });
+  // Lotes despues de sus movimientos: `product_batches.product_id` es `Restrict`, asi que un
+  // producto con lotes NO se puede borrar. Se filtran por la edad DEL PRODUCTO, el mismo criterio
+  // que la linea anterior, para no desparejar los tres borrados.
   await prisma.productBatch.deleteMany({
     where: {
       product: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
@@ -459,9 +470,9 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   // Borra SIEMPRE, aunque el `beforeAll` fallara a medias o un test reventara, y por el `RUN_ID`
-  // de ESTE worker. El orden lo imponen las FK: LOTES -> productos -> presentaciones, y los
-  // usuarios y su empresa al final. El borrado de producto es FISICO: el de la pantalla es logico
-  // (`deletedAt`) y dejaria la fila viva para el resto del repo.
+  // de ESTE worker. El orden lo imponen las FK: MOVIMIENTOS -> lotes -> productos ->
+  // presentaciones, y los usuarios y su empresa al final. El borrado de producto es FISICO: el
+  // de la pantalla es logico (`deletedAt`) y dejaria la fila viva para el resto del repo.
   //
   // Los pasos van en una lista y no en `try`/`finally` anidados (QC-90): con los lotes dentro ya
   // eran cinco niveles de sangria y el siguiente que se anadiera haria ilegible el orden de las
@@ -469,6 +480,12 @@ test.afterAll(async () => {
   // anterior; el primer fallo se guarda y se relanza al final, para que un borrado imposible no
   // se quede callado.
   const pasos: ReadonlyArray<() => Promise<unknown>> = [
+    // Los movimientos, ANTES que sus lotes: `inventory_movements.batch_id` es `Restrict` y al
+    // reves la base rechaza el borrado, dejando el lote vivo en una base compartida.
+    () =>
+      prisma.inventoryMovement.deleteMany({
+        where: { batch: { product: { name: { startsWith: productName } } } },
+      }),
     // Los lotes, ANTES que sus productos: `product_batches.product_id` es `Restrict` y al reves
     // la base rechaza el borrado, dejando producto Y lote vivos en una base compartida.
     () =>
