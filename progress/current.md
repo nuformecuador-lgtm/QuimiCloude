@@ -17,6 +17,18 @@
 
 ## Evaluaciones
 
+### QC-138 - ACOTADA con `/afinar-feature` (2026-09-21)
+
+Alcance, **16 decisiones cerradas** y **3 preguntas abiertas** en
+`specs/QC-138-estado-bloqueado-por-inventario-insuficiente/requirements.md`. No se copian aqui.
+
+**Dos cosas que conviene no perder.** (1) La acotacion **DEROGA** una decision cerrada de QC-123:
+el importe dejaba de cambiar por movimientos de inventario, y ahora un pedido que se desbloquea
+**recalcula su importe** con los lotes de ese dia. Aceptado a sabiendas por el humano. (2) Nacio
+**QC-141** (`reserva-de-material-del-pedido`) y **bloquea a QC-138**: sin reserva, dos pedidos
+creados el mismo dia cuentan con el mismo material y los dos se ven cubiertos. `complexity` sube a
+**`high`** y el board se corrigio antes de sembrar.
+
 ### QC-114 - seleccionada en F1.0, y la ejecuta una persona (2026-09-18)
 
 El humano la eligio por numero con el cupo `frontend` a **0 de 2**. `depends_on: QC-56` esta
