@@ -145,6 +145,21 @@ NO DEBE distinguir, nombrar ni insinuar en lo que muestra—, ENTONCES el sistem
 sondeo** de esa tanda y decir que no hay nada que seguir, sin volver a consultarla por su cuenta.
 `[D2]` *(heredada: una tanda de otra empresa se rechaza igual que si no existiera, QC-111 R18)*
 
+**R24.** CUANDO el sistema cuenta las páginas de un PDF, los bytes de ese PDF DEBEN quedar
+**intactos y utilizables** para toda operación posterior que se haga sobre el mismo arreglo. SI el
+procesamiento de un PDF cuenta sus páginas y **después** lo entrega a la lectura con IA, ENTONCES
+esa lectura DEBE recibir los bytes completos del archivo, y el sistema NO DEBE rechazarla por
+entrada inválida ni dar el archivo por fallido por esa causa. La garantía vale para **cualquier
+orden y cualquier combinación** de las operaciones que abren el PDF —contar, extraer texto,
+rasterizar— y para **las dos estrategias**, que comparten el conteo.
+
+> **Ninguna decisión cerrada origina este requisito.** No es una elección de alcance: es un
+> **defecto de producción** que el recorrido E2E de `[D4]` destapó y que nadie había visto porque
+> QC-109 y QC-111 doblan cada pieza por separado y nunca encadenan las dos sobre el mismo arreglo.
+> El humano decidió arreglarlo **dentro de esta ficha**, a sabiendas de que mete código de
+> `backend` en una ficha declarada `frontend`, a cambio de cerrarla en un solo PR. El detalle
+> técnico —quién detacha el búfer y dónde— está en `design.md > 12`.
+
 ### Mapa de decisiones a requisitos
 
 | Decisión (tabla, en orden) | Requisito(s) |

@@ -341,6 +341,76 @@ en `tests/` sí se cita—; **en el código de producción no se cita ninguna fi
 | R21 | `tests/unit/documentos-ui/document-upload-a11y-tactil.test.tsx`, más los dos proyectos del E2E |
 | R22 | `tests/unit/documentos-ui/document-upload-convenciones.test.ts` (el tope y los tipos se importan; ningún literal) |
 | R23 | `tests/unit/documentos-ui/document-upload-errors.test.tsx` (`data: null` detiene el sondeo y el texto mostrado no distingue «no existe» de «es de otra empresa») |
+| R24 | `tests/unit/documentos/pdf-converter.test.ts` (los bytes siguen enteros tras contar) y `tests/unit/documentos/process-pdf-by-strategy.test.ts` (contar y **después** leer con IA, sobre el mismo arreglo, en las dos estrategias); lo cierra en recorrido `e2e/documentos.spec.ts` |
 
 El mapa definitivo `R<n> → test` lo escribe el implementer en
 `progress/impl_QC-107-componente-de-carga-de-archivos.md` (`CHECKPOINTS.md > Trazabilidad`).
+
+## 12. El búfer detachado: por qué ningún PDF termina bien hoy (R24)
+
+**Añadido a esta ficha tras el hallazgo del E2E.** No es alcance que se amplía por gusto: el
+recorrido de `[D4]` llega entero —login, subida, encolado, sondeo— y los tres archivos acaban en
+`error` en vez de `done`. La causa es un defecto de producción, **medido y no deducido**: sobre un
+PDF mínimo, el arreglo pasa de `length` 186 a `length` 0 con `buffer.detached === true` después de
+llamar a `getDocumentProxy`.
+
+**La cadena, con su archivo y su línea:**
+
+1. `lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf.ts:56` — `countPages` entrega el
+   `Uint8Array` **tal cual** a `getDocumentProxy`, que se queda con el `ArrayBuffer` subyacente y lo
+   **detacha**.
+2. `lib/modules/documentos/domain/process-pdf-by-strategy.ts:116` — cuenta páginas con
+   `input.bytes` y, en la **122**, entrega **ese mismo arreglo** a `readPdfWithAi`.
+3. `lib/modules/documentos/domain/ai-read-input.ts:22` — el esquema del borde exige
+   `bytes.length > 0` y rechaza con `invalid_input`.
+
+**Afecta a las dos estrategias**, porque quien detacha es el conteo y el conteo es común, y **no
+tiene nada que ver con los dobles del E2E**: en producción `runDocumentJob` descarga una vez y pasa
+el mismo arreglo por la misma cadena. QC-109 y QC-111 cerraron verdes porque sus tests doblan cada
+pieza por separado y **nunca encadenan conteo y lectura sobre el mismo arreglo**, que es
+exactamente el hueco que un E2E existe para tapar.
+
+### 12.1 El arreglo
+
+**El adaptador entrega una copia a la librería, en sus tres funciones** —`countPages`,
+`extractPdfText` y `renderPages`—, no solo en la que hoy rompe el recorrido:
+
+```ts
+await getDocumentProxy(new Uint8Array(pdf));   // countPages, renderPages
+await extractText(new Uint8Array(pdf), { mergePages: true });  // extractPdfText
+```
+
+**Por qué las tres y no solo `countPages`.** Las otras dos detachan igual: `renderPages` llama a
+`getDocumentProxy` por su cuenta (línea 91) y `extractText` lo hace por dentro. Que hoy no rompan
+nada es circunstancia —nadie las encadena todavía—, no propiedad: el día que alguien extraiga texto
+y después lea con IA sobre el mismo arreglo, el mismo defecto reaparece con otro síntoma y otra
+tarde de diagnóstico. Arreglar una y dejar dos es dejar la trampa armada.
+
+**Por qué en el adaptador y no en el dominio.** Quien tiene la restricción externa es la librería, y
+el adaptador es el único sitio del repositorio que la conoce (lo dice su propia cabecera: es el
+único archivo que la importa). Copiar en `process-pdf-by-strategy` repartiría por el dominio una
+defensa contra un detalle de `unpdf`, y el día que se cambie de librería nadie sabría por qué esa
+copia estaba ahí. El puerto seguirá prometiendo lo mismo que promete hoy —bytes que entran, bytes
+que siguen sirviendo— y ahora lo cumplirá.
+
+**Coste aceptado y dicho:** una copia del PDF en memoria por operación, con el tope de
+`MAX_PDF_BYTES` (20 MB) como cota. Se paga sin discusión frente a la alternativa.
+
+**Alternativa descartada — que el dominio vuelva a descargar los bytes** (o los clone) antes de
+llamar a la IA. Se descarta por dos motivos: mete en `domain/` una compensación de un detalle de
+librería que el dominio no puede ni debe conocer, y en la variante de volver a descargar añade una
+segunda bajada del bucket por archivo, con su latencia y su ventana para que el archivo ya no esté.
+
+### 12.2 Cómo se prueba sin tratar la copia como el requisito
+
+R24 está escrito como **garantía observable**, así que el test afirma sobre el recorrido:
+
+- `tests/unit/documentos/pdf-converter.test.ts` — tras `countPages`, el arreglo que se pasó sigue
+  teniendo su longitud y su búfer **sin detachar**; lo mismo para `extractPdfText` y `renderPages`.
+- `tests/unit/documentos/process-pdf-by-strategy.test.ts` — con el conversor **real** y la IA
+  doblada, contar y después leer sobre el mismo arreglo entrega a la IA los bytes completos, y no
+  se produce `invalid_input`. En **las dos estrategias**.
+- `e2e/documentos.spec.ts` (T15) — el cierre de verdad: las tres filas llegan a `done`.
+
+Ninguno de los tres menciona la copia: si mañana la librería deja de detachar y la copia se quita,
+los tres siguen siendo correctos.

@@ -136,10 +136,27 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
       tanda que seguir, **sin distinguir** «no existe» de «es de otra empresa». El comportamiento ya
       está implementado (hoy etiquetado `(R8)`): esta task **no cambia código de producción**, añade
       el caso y le pone su `R<n>` propio.
-      **Hecho cuando**: pasan `una tanda desconocida detiene el sondeo (R23)` y `el mensaje de tanda
-      desconocida no distingue si no existe o es de otra empresa (R23)`, el caso que hoy cita `(R8)`
+      **Hecho cuando**: pasan `el hook deja de sondear cuando la consulta responde que no hay tanda
+      (R23)` en `use-batch-status.test.tsx` y `el componente avisa de tanda desconocida sin
+      distinguir si no existe o es de otra empresa (R23)` en `document-upload-errors.test.tsx`
+      —**dos nombres distintos, uno por capa**: el par idéntico que esta task pedía antes dejaba dos
+      casos indistinguibles en la salida del gate—, el caso que hoy cita `(R8)`
       para este escenario queda reetiquetado a `(R23)`, y el mapa de
       `progress/impl_QC-107-componente-de-carga-de-archivos.md` (T16) recoge la fila `R23 → test`.
+
+- [ ] **T19. La ejecuta `backend_dev`.** Depende de T15 (es su hallazgo). Arreglar el búfer
+      detachado de `design.md > 12`: en
+      `lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf.ts`, entregar **una copia** del
+      arreglo a la librería en las **tres** funciones —`countPages`, `extractPdfText` y
+      `renderPages`—, no solo en la que hoy rompe el recorrido. **No se toca `domain/` ni `ports/`**:
+      la restricción es de la librería y vive donde la librería se importa.
+      **Hecho cuando**: (a) pasan en `tests/unit/documentos/pdf-converter.test.ts` los casos `contar
+      las páginas deja los bytes del PDF intactos (R24)`, `extraer el texto deja los bytes del PDF
+      intactos (R24)` y `rasterizar deja los bytes del PDF intactos (R24)`; (b) pasa en
+      `tests/unit/documentos/process-pdf-by-strategy.test.ts` el caso `la lectura con IA recibe los
+      bytes completos después de contar las páginas (R24)`, **con el conversor real y en las dos
+      estrategias**; y (c) **T15 pasa en Chromium y WebKit con las tres filas en «listo»**, que es
+      exactamente lo que hoy no ocurre.
 
 - [ ] **T17.** Depende de T16. Correr `./init.sh` completo (no `--rapido`) antes de abrir el PR.
       **Hecho cuando**: termina en verde, incluidas las guardias de arquitectura y de dependencias,
