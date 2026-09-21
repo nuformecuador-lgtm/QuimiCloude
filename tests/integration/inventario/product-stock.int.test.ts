@@ -215,6 +215,52 @@ describe('R1, R8, R9 — el alta fija la unidad del producto y guarda la suma de
     }
   });
 
+  it('un lote vencido sigue sumando en products.stock (R8)', async () => {
+    const fixture = await createFixture();
+    const productIds: string[] = [];
+
+    try {
+      // Los dos lotes pasan por el camino real de escritura, que es quien recalcula la columna:
+      // el primero ya esta vencido, el segundo caduca dentro de anos.
+      const creado = await createWithFirstBatch(
+        newProduct(),
+        newBatch(fixture, fixture.kgPresentationId, {
+          stock: 7,
+          purchaseDate: '2019-06-01',
+          expiryDate: '2020-01-31',
+        }),
+        new Date(),
+        ambito(fixture),
+      );
+      productIds.push(creado.id);
+      expect(await stockOf(creado.id)).toBe(7);
+
+      const agregado = await addBatchToAlive(
+        creado.id,
+        newBatch(fixture, fixture.kgPresentationId, { stock: 4, expiryDate: '2099-12-31' }),
+        new Date(),
+        ambito(fixture),
+      );
+      expect(agregado).not.toBeNull();
+
+      // Que el lote vencido lo este de verdad: si no, el caso se volveria tautologico.
+      const lotes = await prisma.productBatch.findMany({
+        where: { productId: creado.id },
+        select: { stock: true, expiryDate: true },
+        orderBy: { stock: 'asc' },
+      });
+      expect(lotes.map((lote) => lote.stock)).toEqual([4, 7]);
+      const vencido = lotes.find((lote) => lote.stock === 7);
+      expect(vencido?.expiryDate).not.toBeNull();
+      expect(vencido?.expiryDate?.getTime()).toBeLessThan(Date.now());
+
+      // 11 = 7 vencido + 4 vigente. Un recalculo que excluyera los vencidos dejaria 4.
+      expect(await stockOf(creado.id)).toBe(11);
+    } finally {
+      await dropFixture(fixture, productIds);
+    }
+  });
+
   it('un producto sin ningun lote tiene existencia 0 (R8), aunque nadie la haya recalculado nunca', async () => {
     // Directo con Prisma, sin pasar por ningun camino de escritura: es el `DEFAULT 0` de la
     // columna, no un recalculo que corriera y diera 0.

@@ -489,8 +489,12 @@ describe('la existencia guardada distingue dos unidades por dos productos (R15)'
   });
 });
 
-describe('un lote vencido sigue sumando a la existencia guardada (R15)', () => {
-  it('un producto con un lote vencido y otro vigente en la misma unidad muestra la suma de los dos', async () => {
+// Que el vencido SUME es cosa del recalculo, y se prueba donde el recalculo corre:
+// `product-stock.int.test.ts` > «un lote vencido sigue sumando en products.stock (R8)». Aqui los
+// lotes se escriben a mano y la columna se siembra, asi que lo unico que se comprueba es que el
+// listado sirve la existencia guardada sin recalcular ni descontar nada.
+describe('el listado sirve la existencia guardada tal cual, haya lotes vencidos o no (R15)', () => {
+  it('un producto con un lote vencido y otro vigente en la misma unidad muestra su existencia guardada', async () => {
     const marca = `Lote vencido ${token()}`;
     const unidad = await sembrarUnidad();
     const presentacion = await sembrarPresentacion(unidad);
