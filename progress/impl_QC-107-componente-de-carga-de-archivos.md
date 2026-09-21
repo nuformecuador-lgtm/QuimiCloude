@@ -73,7 +73,7 @@ Todos los caminos son relativos a `tests/unit/`, salvo la guardia.
 | R5 | `documentos-ui/document-upload-flow.test.tsx` | `los bytes del PDF viajan al enlace firmado y no a ninguna Server Action (R5)` |
 | R6 | `documentos-ui/document-upload-flow.test.tsx` · `documentos-ui/document-upload-rows.test.tsx` | `un archivo cuya subida falla queda senalado y no se encola (R6)` · `si no sube ningun archivo no se encola nada (R6)` · `mientras el archivo sube, la fila no muestra ningun estado del modulo (R6)` |
 | R7 | `documentos-ui/document-upload-flow.test.tsx` | `encola la tanda con las rutas devueltas y la estrategia de la prop (R7)` |
-| R8 | `documentos-ui/use-batch-status.test.tsx` | `sondea el estado de la tanda hasta que todos los archivos terminan (R8)` · `deja de sondear en cuanto ningun archivo sigue en cola ni procesando (R8)` · `no lanza una consulta nueva mientras la anterior sigue en vuelo (R8)` · `deja de sondear al desmontarse (R8)` · `una tanda desconocida detiene el sondeo (R8)` |
+| R8 | `documentos-ui/use-batch-status.test.tsx` | `sondea el estado de la tanda hasta que todos los archivos terminan (R8)` · `deja de sondear en cuanto ningun archivo sigue en cola ni procesando (R8)` · `no lanza una consulta nueva mientras la anterior sigue en vuelo (R8)` · `deja de sondear al desmontarse (R8)` |
 | R9 | `documentos-ui/document-upload-convenciones.test.ts` | `no anade ninguna dependencia: el sondeo se resuelve con la plataforma (R9)` |
 | R10 | `documentos-ui/use-batch-status.test.tsx` | `no declara ningun plazo propio para dar por fallido un archivo (R10)` |
 | R11 | `documentos-ui/document-upload-rows.test.tsx` | `la fila pinta solo los cuatro estados que publica el modulo (R11)` |
@@ -88,6 +88,7 @@ Todos los caminos son relativos a `tests/unit/`, salvo la guardia.
 | R20 | **PARCIAL** — `composition/documentos-facade.test.ts` y `tests/guards/guard-dobles-e2e.test.ts` | `sin la variable de entorno, la composicion elige los adaptadores reales (R20)` · `con la variable, la composicion elige los dobles (R20)` · los cinco casos de la guardia. **Falta el recorrido navegable de T15.** |
 | R21 | `documentos-ui/document-upload-a11y-tactil.test.tsx` | `la subida se puede activar sin hover y con objetivos tactiles de 44px (R21)` · `ninguna parte del componente mide la pantalla con 100vh (R21)` |
 | R22 | `documentos-ui/document-upload-convenciones.test.ts` | `el tope y los tipos se importan del contrato del modulo y no se reescriben (R22)` |
+| R23 | `documentos-ui/document-upload-errors.test.tsx` y `documentos-ui/use-batch-status.test.tsx` | `una tanda desconocida detiene el sondeo (R23)` (uno en el componente, otro en el hook) · `el mensaje de tanda desconocida no distingue si no existe o es de otra empresa (R23)` |
 
 **R18, dicho entero.** Su montaje está bloqueado por la pregunta abierta 1 —subir exige
 `proveedores.modificar`, y quien trabaja recetas necesitaría ese permiso ajeno—. Hoy lo cubre el
@@ -170,10 +171,9 @@ Playwright, y elegir un doble sin consultarla.
   cita con tilde. El `R<n>`, que es lo que hace la trazabilidad, está intacto en todos.
 - Un error de fila sin código de error cae en `errorMessage(UNEXPECTED_ERROR_CODE)`. El tipo lo
   permite y el spec no lo fija; se eligió eso antes que escribir un literal de mensaje a mano.
-- El caso de la tanda desconocida se etiquetó `(R8)` y **no encaja limpio en ningún requisito**:
-  sale de `design.md > 7` y hereda de QC-111 R18, pero R8 sólo manda parar «cuando todos estén en
-  listo o error». Si se quiere trazabilidad exacta, eso pide una línea en el spec. **El spec no se
-  tocó.**
+- El caso de la tanda desconocida se etiquetó `(R8)` y no encajaba limpio en ningún requisito. El
+  spec se enmendó con **R23** y T18 lo reetiquetó: el caso del hook y los dos del componente citan
+  ya `(R23)`. **No cambió ninguna línea de producción.**
 - El disparador de selección es un `<label>` con `buttonVariants`, no un `<Button asChild>`: la
   primitiva de este repo es de Base UI y no acepta `asChild`.
 - Entró un cuarto archivo no listado en T13, `adapters/driven/config/e2e-doubles-env.ts`, porque

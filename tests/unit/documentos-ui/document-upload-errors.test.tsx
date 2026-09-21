@@ -28,8 +28,10 @@ import {
   BATCH_STATUS_POLL_INTERVAL_MS,
   DOCUMENT_UPLOAD_ERROR_TESTID,
   DOCUMENT_UPLOAD_INPUT_TESTID,
+  DOCUMENT_UPLOAD_MISSING_TESTID,
   DOCUMENT_UPLOAD_RESUME_TESTID,
   DOCUMENT_UPLOAD_SUBMIT_TESTID,
+  DOCUMENT_UPLOAD_TESTID,
   DOCUMENT_UPLOAD_TRIGGER_TESTID,
   DocumentUpload,
   DocumentUploadRow,
@@ -141,6 +143,45 @@ describe('los errores de la subida', () => {
 
     await waitFor(() => expect(getBatchStatusActionMock).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByTestId(DOCUMENT_UPLOAD_ERROR_TESTID)).toBeNull());
+  });
+
+  it('una tanda desconocida detiene el sondeo (R23)', async () => {
+    getBatchStatusActionMock.mockResolvedValue({ status: 'success', data: null });
+
+    render(<DocumentUpload strategy="catalogo" />);
+    await subirUnArchivo();
+
+    const aviso = await screen.findByTestId(DOCUMENT_UPLOAD_MISSING_TESTID);
+    expect(aviso).toHaveAttribute('role', 'status');
+    expect(aviso.textContent?.trim()).not.toBe('');
+    expect(getBatchStatusActionMock).toHaveBeenCalledTimes(1);
+
+    // Mas de un intervalo entero sin una sola consulta nueva: el sondeo esta detenido de verdad.
+    await new Promise((resolve) => setTimeout(resolve, BATCH_STATUS_POLL_INTERVAL_MS + 400));
+    expect(getBatchStatusActionMock).toHaveBeenCalledTimes(1);
+
+    // No es un error del que se pueda reanudar: no hay nada que volver a preguntar.
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_ERROR_TESTID)).toBeNull();
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_RESUME_TESTID)).toBeNull();
+  });
+
+  it('el mensaje de tanda desconocida no distingue si no existe o es de otra empresa (R23)', async () => {
+    const DELATORES =
+      /no existe|inexistente|no encontrad|otra empresa|ajena|pertenece|permiso|autoriza|acceso|prohib/i;
+
+    getBatchStatusActionMock.mockResolvedValue({ status: 'success', data: null });
+
+    render(<DocumentUpload strategy="catalogo" />);
+    await subirUnArchivo();
+
+    const aviso = await screen.findByTestId(DOCUMENT_UPLOAD_MISSING_TESTID);
+    expect(aviso.textContent).not.toMatch(DELATORES);
+
+    // Tampoco por el identificador: nada en pantalla senala a la tanda consultada.
+    const componente = screen.getByTestId(DOCUMENT_UPLOAD_TESTID);
+    expect(componente.textContent).not.toMatch(DELATORES);
+    expect(componente.textContent).not.toContain('batch-1');
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_ERROR_TESTID)).toBeNull();
   });
 
   it('el componente no comprueba ningun permiso y muestra el error de autorizacion como cualquier otro (R14)', async () => {

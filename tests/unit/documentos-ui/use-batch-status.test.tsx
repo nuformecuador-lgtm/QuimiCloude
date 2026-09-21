@@ -114,7 +114,7 @@ describe('el sondeo del estado de una tanda', () => {
     expect(getBatchStatusActionMock).toHaveBeenCalledTimes(1);
   });
 
-  it('una tanda desconocida detiene el sondeo (R8)', async () => {
+  it('una tanda desconocida detiene el sondeo (R23)', async () => {
     // `data: null` es «no existe o es de otra empresa, sin distinguirlo»: no hay estado que
     // esperar, asi que seguir preguntando solo repetiria la misma respuesta.
     getBatchStatusActionMock.mockResolvedValue({ status: 'success', data: null });

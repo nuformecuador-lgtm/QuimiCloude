@@ -130,7 +130,7 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
       **Hecho cuando**: cada `R<n>` aparece con al menos un test concreto, o —solo R18— con su
       bloqueo escrito.
 
-- [ ] **T18.** Depende de T8. Cubrir **R23** con su propio caso en
+- [x] **T18.** Depende de T8. Cubrir **R23** con su propio caso en
       `tests/unit/documentos-ui/document-upload-errors.test.tsx`: la consulta responde
       `{ status: 'success', data: null }` y el componente **detiene el sondeo** y dice que no hay
       tanda que seguir, **sin distinguir** «no existe» de «es de otra empresa». El comportamiento ya
