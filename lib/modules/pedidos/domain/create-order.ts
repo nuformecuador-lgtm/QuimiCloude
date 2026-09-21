@@ -3,9 +3,12 @@ import { DuplicateOrderNumberError, RecipeNotFoundError, ValidationError } from 
 import { DEFAULT_ORDER_STATUS } from './order-classification';
 import { createOrderSchema, type EditableOrderStatus } from './order-input';
 import { formatOrderNumber, type OrderNumber } from './order-number';
+import { resolveIngredientsCost } from './resolve-ingredients-cost';
 import type { OrderScope } from './order-scope';
 
+import type { ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
+import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import type { OrderRepository } from '../ports/order-repository';
 
@@ -31,6 +34,10 @@ export type CreateOrderDeps = {
    *  QC-35bis (2026-09-07): era el primero de DOS catalogos. El de `unidades` se fue con la
    *  unidad del pedido, y con el la comprobacion de R16. */
   readonly recipes: RecipeCatalog;
+  /** Contrato PUBLICO de `inventario`: los lotes con existencia con los que se costea. */
+  readonly products: ProductCatalog;
+  /** Contrato PUBLICO de `unidades`: las conversiones con las que se normaliza cantidad y coste. */
+  readonly units: UnitCatalog;
   /**
    * El reloj entra INYECTADO -mismo patron que `recetas` y `proveedores`- para que el test
    * lo pueda fijar sin tocar el reloj global. Aqui NO se lee `next/headers` ni ninguna
@@ -89,6 +96,15 @@ export function createCreateOrder(
     const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId], actor.companyId);
     if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
 
+    const ingredientsCost = await resolveIngredientsCost(
+      deps.recipes,
+      deps.products,
+      deps.units,
+      data.recipeId,
+      data.quantity,
+      actor.companyId,
+    );
+
     const instant = now();
 
     // R9: el estado de alta es siempre `PENDIENTE` y lo pone este caso de uso, no la
@@ -98,6 +114,7 @@ export function createCreateOrder(
       instant.getUTCFullYear(),
       actor.id,
       instant,
+      ingredientsCost,
       scope,
     );
 

@@ -132,6 +132,34 @@ describe('pedidos — la salida de las consultas (R40, R46, R47)', () => {
   })
 })
 
+describe('pedidos — el coste de ingredientes en la salida', () => {
+  it('la salida del pedido no declara ningun campo de precio de venta (R1)', () => {
+    const precio: Declara<OrderView, 'price'> = false
+    const precioUnitario: Declara<OrderView, 'unitPrice'> = false
+    const precioDeVenta: Declara<OrderView, 'salePrice'> = false
+    const total: Declara<OrderView, 'total'> = false
+    expect([precio, precioUnitario, precioDeVenta, total]).toEqual([false, false, false, false])
+  })
+
+  it('OrderRow y OrderView llevan ingredientsCost', () => {
+    const enLaFila: Declara<OrderRow, 'ingredientsCost'> = true
+    const enLaVista: Declara<OrderView, 'ingredientsCost'> = true
+    expect([enLaFila, enLaVista]).toEqual([true, true])
+  })
+
+  it('ingredientsCost en null no se vuelve "0.0000"', () => {
+    const sinCoste: OrderView['ingredientsCost'] = null
+    expect(sinCoste).toBeNull()
+    expect(sinCoste).not.toBe('0.0000')
+  })
+
+  it('la salida no tiene ningun campo de moneda', () => {
+    const moneda: Declara<OrderView, 'currency'> = false
+    const codigoDeMoneda: Declara<OrderView, 'currencyCode'> = false
+    expect([moneda, codigoDeMoneda]).toEqual([false, false])
+  })
+})
+
 describe('pedidos — el puerto declara los seis metodos de design.md > 7.4', () => {
   it('un doble que implementa la interfaz completa compila, y cancelAlive es el unico con reason', () => {
     // No se ejecuta ninguna operacion: lo que se comprueba es la FORMA del puerto. Si algun dia

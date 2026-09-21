@@ -1,6 +1,7 @@
 // lib/modules/inventario/domain/product-catalog.ts
 
 import type { ProductStockByUnit } from './product-stock';
+import type { CostingBatch } from './costing-batch';
 
 /** Identificador de un producto visto DESDE FUERA de `inventario`. Es lo unico que otro
  *  modulo guarda de un producto (p. ej. `recipe_lines.product_id`). */
@@ -40,4 +41,12 @@ export interface ProductCatalog {
    *  dos lados. Que el ambito viva en la firma es lo que hace que una llamada que lo omita
    *  no compile. */
   findRefs(ids: readonly ProductId[], companyId: string): Promise<readonly ProductRef[]>;
+
+  /** Lotes CON EXISTENCIA (`stock > 0`) de los productos pedidos, de productos vivos y de esa
+   *  empresa. Un producto sin lotes con existencia simplemente no aparece. NO ordena: el
+   *  orden del calculo es criterio de negocio de quien costea. */
+  findCostingBatches(
+    ids: readonly ProductId[],
+    companyId: string,
+  ): Promise<readonly CostingBatch[]>;
 }

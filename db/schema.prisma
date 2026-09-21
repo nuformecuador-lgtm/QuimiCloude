@@ -550,6 +550,9 @@ model Order {
   createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt          DateTime?     @map("deleted_at") @db.Timestamptz(6)
+  /// Coste de los ingredientes de la receta del pedido, con los lotes del momento en que se
+  /// escribio. NULL = no se pudo calcular; nunca 0.
+  ingredientsCost    Decimal?      @map("ingredients_cost") @db.Decimal(14, 4)
 
   @@unique([companyId, orderYear, orderSequence], map: "orders_company_year_sequence_key")
   @@unique([id, companyId], map: "orders_id_company_id_key")

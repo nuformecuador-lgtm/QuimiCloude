@@ -45,11 +45,20 @@ export interface OrderRepository {
    * En operacion normal no ocurre; existe para que un duplicado insertado por otra via no
    * llegue como excepcion sin traducir.
    */
+  /**
+   * `ingredientsCost`: coste calculado de los ingredientes de la receta, ya redondeado a la
+   * escala de la columna, o `null` cuando no se pudo costear. Viaja como PARAMETRO APARTE y
+   * no dentro de `NewOrder` porque no es un dato de entrada del usuario: lo calcula el caso de
+   * uso a partir de lecturas de otro modulo, y `NewOrder` solo debe poder expresar lo que se
+   * teclea. `null` no es `0`: cero seria un importe real, y aqui el significado es «no se pudo
+   * calcular», que es un caso distinto.
+   */
   create(
     data: NewOrder,
     year: number,
     actorId: string,
     now: Date,
+    ingredientsCost: string | null,
     scope: OrderScope,
   ): Promise<OrderRow | 'duplicate_number'>;
 
@@ -89,12 +98,17 @@ export interface OrderRepository {
     scope: OrderScope,
   ): Promise<Page<OrderRow>>;
 
-  /** Edicion como REEMPLAZO COMPLETO (R20). No puede escribir `CANCELADO` ni motivo. */
+  /** Edicion como REEMPLAZO COMPLETO. No puede escribir `CANCELADO` ni motivo.
+   *
+   *  `ingredientsCost`: mismo criterio que en `create` -parametro aparte, `null` distinto de
+   *  `0`-. La edicion lo SUSTITUYE por completo, incluso a `null`: no hay fusion con el valor
+   *  anterior. */
   updateAlive(
     id: string,
     data: NewOrder,
     actorId: string,
     now: Date,
+    ingredientsCost: string | null,
     scope: OrderScope,
   ): Promise<'ok' | 'not_found'>;
 

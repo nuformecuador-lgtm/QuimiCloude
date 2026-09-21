@@ -150,6 +150,18 @@ function montar(options?: {
   };
 }
 
+// QC-123 T8 (R15) — comprobacion de TIPO, ademas de la de comportamiento de mas abajo: un
+// literal con `ingredientsCost` de mas sobre `AssignedOrderSummary` tiene que dejar de compilar.
+// Si el contrato ganara el campo, el `@ts-expect-error` se quedaria SIN USAR y `tsc` se pondria
+// rojo aqui mismo -mismo mecanismo que `tests/unit/observabilidad/error-state-types.test-d.ts`-.
+const _r15TipoSinImporte: AssignedOrderSummary = {
+  ...resumen(pedidoId(0)),
+  // @ts-expect-error `AssignedOrderSummary` no declara `ingredientsCost` (R15): si esto
+  // compila, el pedido asignado gano el importe.
+  ingredientsCost: '10.0000',
+};
+void _r15TipoSinImporte;
+
 describe('QC-88 — listAssignedOrders: autorizacion (R5, R6, R40)', () => {
   it('R5: exige `asignaciones.consultar` ANTES de tocar ningun puerto', async () => {
     const { deps, todos } = montar();
@@ -351,5 +363,27 @@ describe('QC-88 — listAssignedOrders: la fila (R16, R17)', () => {
     const pagina = await listAssignedOrders(ACTOR, { page: 1 });
 
     expect(pagina.items[0]?.numberText).toBe('2026-0000007');
+  });
+});
+
+// QC-123 T8 — la via de `asignaciones` NO lleva el importe (R15). Se comprueba la FORMA del
+// contrato -la lista CERRADA de claves de la fila que el Operador recibe-, no solo un ejemplo:
+// si `AssignedOrderView` ganara `ingredientsCost`, el `toEqual` de abajo pasaria a comparar un
+// conjunto de claves distinto y este caso se pondria rojo.
+describe('QC-123 — el pedido asignado no lleva importe (R15)', () => {
+  it('el pedido asignado no lleva importe (R15)', async () => {
+    const ids = [pedidoId(1)];
+    const items = [resumen(pedidoId(1))];
+    const { deps } = montar({ ids, page: { items, total: 1 }, refs: [receta()] });
+    const listAssignedOrders = createListAssignedOrders(deps);
+
+    const pagina = await listAssignedOrders(ACTOR, { page: 1 });
+
+    const fila = pagina.items[0];
+    expect(fila).toBeDefined();
+    expect(Object.keys(fila ?? {}).sort()).toEqual(
+      ['id', 'numberText', 'recipeName', 'quantity', 'priority', 'status', 'otherResponsibles'].sort(),
+    );
+    expect(Object.keys(fila ?? {})).not.toContain('ingredientsCost');
   });
 });

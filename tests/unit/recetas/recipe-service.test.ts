@@ -86,6 +86,9 @@ function montarRepositorio(overrides: Partial<RecipeRepository> = {}): RecipeRep
 function montarCatalogo(overrides: Partial<ProductCatalog> = {}): ProductCatalog {
   return {
     findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [PRODUCTO_REF]),
+    findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
+      throw new Error('recetas no debe costear nada');
+    }),
     ...overrides,
   };
 }
