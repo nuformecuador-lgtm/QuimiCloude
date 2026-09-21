@@ -181,13 +181,24 @@ eso decide si la pantalla **se enseña**, y el caso de uso decide si se puede **
 <DocumentUpload strategy="catalogo" />
 ```
 
-### 6.2 Fórmulas — BLOQUEADO (R18)
+### 6.2 Fórmulas — fuera de alcance, lo hace QC-142 (R18)
 
-El montaje sería `<DocumentUpload strategy="formula" />` en la pantalla de fórmulas, y **no se
-implementa en esta ficha**: la pregunta abierta 1 decide si se acepta el préstamo de
-`proveedores.modificar` o si `documentos` necesita permiso propio —lo segundo es una enmienda al
-catálogo de QC-74, que esta ficha no decide—. **No se inventa ningún permiso nuevo y no se presta el
+El montaje es `<DocumentUpload strategy="formula" />` en la pantalla de fórmulas, y **no se
+implementa en esta ficha**. **La pregunta abierta 1 se cerró el 2026-09-21**, y salió el segundo de
+los dos caminos que estaban sobre la mesa: **`documentos` no toma prestado `proveedores.modificar`,
+tiene permiso propio**. Eso es la **cuarta enmienda al catálogo cerrado de QC-74**
+—`documentos.consultar` y `documentos.modificar`, por la convención de dos permisos por módulo— y
+exige **migración y seed**, porque QC-74 R5 no deja ninguna vía de aplicación que edite el catálogo.
+
+Por tanto el trabajo vive en **QC-142 — «Permiso propio de documentos y montaje de la subida en
+formulas»** (`zone: fullstack`, bloqueada por QC-107), **con el montaje dentro**: sin el permiso,
+esa pantalla no puede subir nada, así que separarlos daría una pantalla que ofrece una acción que
+siempre falla. Aquí no entra nada de eso: **no se añade ningún permiso al catálogo y no se presta el
 de proveedores por iniciativa del spec.**
+
+Lo que esta ficha sí deja resuelto es que el montaje sea **solo un montaje**: el modo `formula`
+existe en la prop de `## 3` desde el primer día, sin ningún cambio pendiente en el componente. Es lo
+que R18 exige hoy, y lo que hace que QC-142 sea una línea en una pantalla.
 
 ### 6.3 Ninguna pantalla propia (R19)
 

@@ -11,8 +11,9 @@
 >
 > **Lo que NO entra.** La subida y la conversión → **QC-106**. La cola, los reintentos y la
 > consulta de estado → **QC-111**. El tiempo real y los avisos → **QC-137**. Los prompts
-> definitivos y su revisión firmada → **QC-131**. **Guardar lo que la IA devuelve → sin dueño
-> hoy** (pregunta abierta 2).
+> definitivos y su revisión firmada → **QC-131**. **El permiso propio de `documentos` y el montaje
+> en fórmulas → QC-142** (pregunta abierta 1, cerrada el 2026-09-21). **Guardar lo que la IA
+> devuelve → sin dueño hoy** (pregunta abierta 2).
 >
 > Sembrado por `/afinar-feature` el 2026-09-21. El bloque de Alcance y la tabla de «Decisiones
 > cerradas» los fijó el humano ANTES del spec. `spec_author` los respeta, no los reabre y no los
@@ -115,11 +116,21 @@ archivo falla, más allá de lo que la propia pantalla muestra mientras está a 
 **R17.** El sistema DEBE montar el componente en la pantalla de **proveedores** donde vive el
 catálogo del proveedor, con la estrategia de **catálogo** fijada por la prop de R3. `[D1]`
 
-**R18.** DONDE se haya resuelto la pregunta abierta 1 —qué permiso exige subir desde fórmulas—, el
-sistema DEBE montar el mismo componente en la pantalla de **fórmulas** con la estrategia de
-**fórmula** fijada por la prop de R3. MIENTRAS esa pregunta siga abierta, el sistema NO DEBE montar
-el componente en fórmulas, NO DEBE añadir ningún permiso nuevo al catálogo cerrado y NO DEBE
-reutilizar el permiso de proveedores para esa pantalla. `[D1]`
+**R18.** El componente DEBE admitir el modo **fórmula** por la misma prop de R3, sin ningún cambio
+en su interfaz ni en su comportamiento, de modo que montarlo en la pantalla de fórmulas sea
+únicamente montarlo. El **montaje** en sí **NO entra en esta ficha**: lo hace **QC-142**, que trae
+el permiso propio de `documentos` sin el cual esa pantalla no puede subir nada. Por tanto, y
+mientras esta ficha sea la única entregada, el sistema NO DEBE montar el componente en fórmulas, NO
+DEBE añadir ningún permiso al catálogo cerrado y NO DEBE reutilizar el permiso de proveedores para
+esa pantalla. `[D1]`
+
+> **Alcance diferido con destinatario, no requisito vivo a medias** (2026-09-21). R18 nació
+> condicionado a la pregunta abierta 1; cerrada esa pregunta, el montaje **salió del alcance** y lo
+> que queda aquí es lo que esta ficha sí entrega y sí se puede verificar hoy: que el modo fórmula
+> **existe en la prop** y que **nada se monta ni se toca en el catálogo de permisos**. Se conserva
+> numerado a propósito —borrarlo o renumerar descuadraría la bitácora, el mapa `R<n> → test` y el
+> conteo del reviewer—, y lo cubre en positivo el test de la prop y en negativo el de convenciones.
+> Es el mismo trato que QC-106 `[D17]` dio a su E2E: deuda con destinatario, no exención.
 
 **R19.** El sistema NO DEBE añadir ninguna ruta, página ni área de navegación propia de documentos:
 el componente vive **dentro** de las pantallas de R17 y R18. `[D1]`
@@ -193,7 +204,19 @@ ejecutando el mismo tramo por fuera.
 
 ## Preguntas abiertas
 
-1. **El permiso, y bloquea uno de los dos montajes.** Subir exige `proveedores.modificar`, que es
+1. ~~**El permiso, y bloquea uno de los dos montajes.**~~ **CERRADA el 2026-09-21, y DERIVADA a
+   `QC-142`.** La decisión del humano: **`documentos` no toma prestado `proveedores.modificar`,
+   tiene permiso propio.** Eso es la **cuarta enmienda al catálogo cerrado de QC-74** —entran
+   `documentos.consultar` y `documentos.modificar`, por la convención de dos permisos por módulo,
+   de quince a diecisiete— y exige **migración y seed**, porque QC-74 R5 no deja ninguna vía de
+   aplicación que edite el catálogo. Eso no cabe en una ficha `frontend`, así que el trabajo salió
+   a **QC-142 — «Permiso propio de documentos y montaje de la subida en formulas»**, épica
+   *Identidad y acceso*, `zone: fullstack`, bloqueada por QC-107. **El montaje en fórmulas viaja
+   con ella**: sin el permiso, esa pantalla no puede subir nada. Aquí queda R18 como alcance
+   diferido con destinatario, y T12 sin hacer. El texto original de la pregunta, tal como se
+   escribió antes de decidirse, sigue debajo:
+
+   Subir exige `proveedores.modificar`, que es
    lo que el módulo ya declara en `lib/modules/documentos/domain/actor.ts:42`
    (`DOCUMENT_UPLOAD_PERMISSION`). Montado en **proveedores** encaja solo; montado en
    **fórmulas**, quien trabaja recetas necesitaría un permiso del módulo de proveedores para

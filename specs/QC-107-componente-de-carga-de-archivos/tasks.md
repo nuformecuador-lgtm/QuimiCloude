@@ -92,13 +92,17 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
       **Hecho cuando**: `la subida se puede activar sin hover y con objetivos táctiles de 44px (R21)`
       pasa.
 
-- [ ] **T12. BLOQUEADA — no se hace en esta ficha.** Montar
+- [ ] **T12. FUERA DE ALCANCE — la hace `QC-142`, no esta ficha.** Montar
       `<DocumentUpload strategy="formula" />` en la pantalla de fórmulas (R18).
-      **Bloqueada por la pregunta abierta 1** de `requirements.md`: quién puede subir desde
-      fórmulas. No se inventa un permiso nuevo ni se presta `proveedores.modificar`; lo decide el
-      humano en F1.4 o en una ficha posterior.
-      **Hecho cuando**: la pregunta 1 esté respondida por escrito **y** el montaje tenga su test
-      `la pantalla de fórmulas monta el componente en modo fórmula (R18)`.
+      La pregunta abierta 1 **se cerró el 2026-09-21**: `documentos` tiene **permiso propio**, lo
+      que es la cuarta enmienda al catálogo de QC-74 y exige migración y seed. Por eso el trabajo
+      salió a **QC-142 — «Permiso propio de documentos y montaje de la subida en formulas»**
+      (`zone: fullstack`, bloqueada por QC-107), y el montaje viaja con el permiso porque sin él esa
+      pantalla no puede subir nada. **Aquí no se hace, y no se marca**: no se añade ningún permiso
+      al catálogo y no se presta `proveedores.modificar`.
+      **Hecho cuando**: lo cierra QC-142 con su test `la pantalla de fórmulas monta el componente en
+      modo fórmula (R18)`. En esta ficha, R18 queda cubierto en positivo por el test de la prop
+      (T1) y en negativo por el de convenciones (T10).
 
 ## E2E y cierre
 
