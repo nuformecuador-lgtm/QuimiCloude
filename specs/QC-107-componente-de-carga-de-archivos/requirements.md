@@ -160,6 +160,19 @@ rasterizar— y para **las dos estrategias**, que comparten el conteo.
 > `backend` en una ficha declarada `frontend`, a cambio de cerrarla en un solo PR. El detalle
 > técnico —quién detacha el búfer y dónde— está en `design.md > 12`.
 
+**R25.** MIENTRAS el procesamiento de un PDF se ejecuta **dentro del servidor de la aplicación**, el
+sistema DEBE poder convertir ese PDF a imagen. SI un PDF se procesa con la estrategia de
+**catálogo** —que rasteriza siempre—, ENTONCES el sistema NO DEBE darlo por fallido por
+**indisponibilidad del rasterizado**, y la pantalla NO DEBE mostrar por esa causa un archivo en
+error. La garantía DEBE observarse **con el procesamiento corriendo dentro del servidor**, no
+ejecutando el mismo tramo por fuera.
+
+> **Tampoco lo origina ninguna decisión cerrada**, y sale del mismo sitio que R24: el recorrido E2E
+> de `[D4]`, que fue lo primero que ejecutó esta cadena **dentro de Next**. Y no es un hallazgo
+> nuevo, sino una **pregunta abierta que nadie cerró**: QC-106 dejó por escrito que
+> `@napi-rs/canvas` era **DESCONOCIDO** y que se cerraría antes de que QC-111 lo consumiera. No se
+> cerró. Detalle, evidencia y lo que este requisito **no** cierra: `design.md > 13`.
+
 ### Mapa de decisiones a requisitos
 
 | Decisión (tabla, en orden) | Requisito(s) |

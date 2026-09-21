@@ -342,6 +342,7 @@ en `tests/` sí se cita—; **en el código de producción no se cita ninguna fi
 | R22 | `tests/unit/documentos-ui/document-upload-convenciones.test.ts` (el tope y los tipos se importan; ningún literal) |
 | R23 | `tests/unit/documentos-ui/document-upload-errors.test.tsx` (`data: null` detiene el sondeo y el texto mostrado no distingue «no existe» de «es de otra empresa») |
 | R24 | `tests/unit/documentos/pdf-converter.test.ts` (los bytes siguen enteros tras contar) y `tests/unit/documentos/process-pdf-by-strategy.test.ts` (contar y **después** leer con IA, sobre el mismo arreglo, en las dos estrategias); lo cierra en recorrido `e2e/documentos.spec.ts` |
+| R25 | `e2e/documentos.spec.ts` (es el único que ejecuta la cadena **dentro** del servidor de Next, que es donde R25 exige observarla) y `tests/unit/documentos/next-config-externos.test.ts` (la configuración declara el paquete nativo como externo del servidor) |
 
 El mapa definitivo `R<n> → test` lo escribe el implementer en
 `progress/impl_QC-107-componente-de-carga-de-archivos.md` (`CHECKPOINTS.md > Trazabilidad`).
@@ -414,3 +415,65 @@ R24 está escrito como **garantía observable**, así que el test afirma sobre e
 
 Ninguno de los tres menciona la copia: si mañana la librería deja de detachar y la copia se quita,
 los tres siguen siendo correctos.
+
+## 13. El par nativo que Next no empaqueta (R25)
+
+**El segundo hallazgo del mismo recorrido.** Con el búfer ya arreglado, el E2E seguía rojo. La
+salida del servidor y la lectura en caliente de `document_files` dieron el motivo exacto: los tres
+archivos con `errorCode: unexpected` y un `errorReason` que dice que **`renderPages` falló porque el
+par nativo de rasterizado no está disponible** (`Cannot find native binding`).
+
+**La causa, con archivo y línea:**
+`lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf.ts:93` hace
+`await resolveRasterizer(() => import('@napi-rs/canvas'))`, y **`next.config.ts` está vacío** —trae
+el comentario de plantilla de `create-next-app` y nada más—. Next intenta empaquetar ese paquete
+para el servidor y su binario `.node` se queda fuera del bundle.
+
+**La evidencia, y es lo que descarta «el paquete no está instalado»:** el **mismo tramo ejecutado
+fuera de Next** da `ok: true` en las **dos** estrategias. El paquete está instalado y funciona; lo
+que falla es el **empaquetado del servidor de Next**, y por eso el mensaje que el módulo emite
+—escrito por `resolveRasterizer` para nombrar la causa— apunta al entorno y no al archivo.
+
+**Esto rompe producción, no solo el E2E.** La estrategia `catalogo` se lee en modo `images`, así que
+pasa por `renderPages` **siempre**, y `runDocumentJob` corre dentro de Next por su Route Handler.
+Sin esto, ningún PDF de catálogo puede terminar bien en el despliegue.
+
+### 13.1 El arreglo
+
+`next.config.ts` declara el paquete nativo como **externo del servidor**, de modo que Next no
+intente empaquetarlo y lo resuelva en tiempo de ejecución con su binario. Es configuración del
+framework, no código del módulo: **el adaptador no cambia** y `resolveRasterizer` sigue exactamente
+igual —su mensaje sobre el par ausente sigue siendo el correcto el día que de verdad falte—.
+
+### 13.2 La pregunta que llevaba abierta desde el 2026-09-16, y lo que este arreglo NO cierra
+
+Esto **no es un hallazgo nuevo**: es una pregunta abierta que nadie cerró, y conviene que quede
+escrito porque es la lección más cara de toda la cadena de Documentos.
+`specs/QC-106-endpoint-de-carga-de-pdf/design.md > 9` se titula literalmente «¿`@napi-rs/canvas`
+corre en el runtime de Vercel?», y `docs/dependencias.md` registró la respuesta como **DESCONOCIDO,
+no como «sí»**, con el compromiso escrito de **cerrarla antes de que QC-111 lo consumiera**. QC-111
+lo consumió. La pregunta siguió abierta. QC-111 `design.md > 0` la volvió a anotar como hallazgo no
+bloqueante y la dejó para «T14». Cinco fichas después, la primera ejecución real la encontró.
+
+**Este arreglo NO cierra esa pregunta, y decir lo contrario sería el mismo error otra vez.** Lo que
+resuelve es el **empaquetado bajo Next**, que es lo que rompe aquí y ahora, en local y en el gate.
+**Si además el binario sobrevive al runtime de Vercel sigue siendo DESCONOCIDO**: no se puede
+verificar sin un despliegue real, y sin red el gate no puede afirmarlo. Queda como **deuda con
+destinatario** —la pregunta abierta 3 de QC-106, que sigue viva y ahora con un consumidor en
+producción—, no como resuelto. Regla 6 de `CLAUDE.md`: lo no verificado es un desconocido, no un sí.
+
+**Qué pasa si el runtime de Vercel tampoco lo carga:** no hay sorpresa silenciosa. Cae la estrategia
+`catalogo` **en ejecución**, con su fila en error y el motivo que nombra la causa, por el camino que
+QC-111 `[D5]`/R16 ya dejó montado. Es feo y es visible, que es lo que se pedía.
+
+### 13.3 Cómo se prueba
+
+- `e2e/documentos.spec.ts` (T15) — **el único test del repo que ejecuta esta cadena dentro del
+  servidor de Next**, que es justo donde R25 exige observar la garantía. Las tres filas en «listo»
+  es su aserto.
+- `tests/unit/documentos/next-config-externos.test.ts` — afirma sobre la **configuración resuelta**,
+  no sobre el texto del archivo, con el mismo criterio que `guard-teclear-y-plazo.test.ts`: un valor
+  escrito en un comentario satisface a un regex y no cambia nada.
+
+Ninguno de los dos afirma «el adaptador importa tal paquete»: si mañana se cambia de rasterizador,
+R25 sigue diciendo lo que hay que garantizar.

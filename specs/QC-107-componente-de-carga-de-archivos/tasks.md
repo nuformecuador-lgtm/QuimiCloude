@@ -158,6 +158,19 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
       estrategias**; y (c) **T15 pasa en Chromium y WebKit con las tres filas en «listo»**, que es
       exactamente lo que hoy no ocurre.
 
+- [ ] **T20. La ejecuta `backend_dev`.** Depende de T19 (el E2E solo llega hasta aquí con el búfer
+      ya arreglado). Aplicar `design.md > 13`: declarar en `next.config.ts` el par nativo de
+      rasterizado como **externo del servidor**, para que Next no lo empaquete y su binario se
+      resuelva en ejecución. **No se toca `pdf-converter-unpdf.ts`**: `resolveRasterizer` y su
+      mensaje siguen siendo correctos el día que el par falte de verdad.
+      **Hecho cuando**: (a) pasa `la configuración declara el par nativo de rasterizado como externo
+      del servidor (R25)` en `tests/unit/documentos/next-config-externos.test.ts`, afirmando sobre
+      la **configuración resuelta** y no sobre el texto del archivo; (b) **T15 pasa en Chromium y
+      WebKit con las tres filas en «listo»**; y (c) queda anotada en
+      `progress/impl_QC-107-componente-de-carga-de-archivos.md` la **deuda que esto NO cierra**: si
+      el binario sobrevive al runtime de Vercel sigue siendo **DESCONOCIDO** —pregunta abierta 3 de
+      QC-106—, y solo un despliegue real puede responderlo.
+
 - [ ] **T17.** Depende de T16. Correr `./init.sh` completo (no `--rapido`) antes de abrir el PR.
       **Hecho cuando**: termina en verde, incluidas las guardias de arquitectura y de dependencias,
       que deben pasar **sin ningún cambio en `docs/dependencias.md`** porque no entra ninguna
