@@ -102,7 +102,7 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
 
 ## E2E y cierre
 
-- [ ] **T13.** Depende de T9. Los tres dobles de `design.md > 8`:
+- [x] **T13.** Depende de T9. Los tres dobles de `design.md > 8`:
       `document-storage-memory.ts`, `processing-queue-inline.ts` y `ai-reader-canned.ts` en
       `adapters/driven/**`, elegidos en `lib/composition` según `DOCUMENTS_E2E_DOUBLES` leída **en
       la invocación**, más su línea vacía y documentada en `.env.example` y
@@ -111,7 +111,7 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
       variable de entorno, la composición elige los adaptadores reales (R20)` y `con la variable, la
       composición elige los dobles (R20)`, y los dos pasan.
 
-- [ ] **T14.** Depende de T13. `tests/guards/guard-dobles-e2e.test.ts`: roja si algún archivo
+- [x] **T14.** Depende de T13. `tests/guards/guard-dobles-e2e.test.ts`: roja si algún archivo
       versionado distinto de `playwright.config.ts` activa la variable, o si `lib/composition` elige
       un doble sin consultarla.
       **Hecho cuando**: la guardia pasa en verde **y** se comprueba que **muerde**, con un fixture

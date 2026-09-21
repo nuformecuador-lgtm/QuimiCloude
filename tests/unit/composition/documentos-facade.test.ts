@@ -9,21 +9,41 @@
 // cliente Prisma entero -`lib/composition` arrastra todos los adaptadores del repo- y no hace
 // falta ni Postgres ni `DATABASE_URL`.
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { readWithGenaiMock } = vi.hoisted(() => {
+const { readWithGenaiMock, descargaRealMock, descargaDobleMock } = vi.hoisted(() => {
   // Borradas ANTES del `import` de mas abajo: si construir la fachada leyera alguna de las
   // cuatro, o el adaptador se invocara al cablearse, este archivo nunca llegaria a los `it`.
   delete process.env.GEMINI_API_KEY;
   delete process.env.GEMINI_MODEL;
   delete process.env.CATALOG_PROMPT;
   delete process.env.FORMULA_PROMPT;
-  return { readWithGenaiMock: vi.fn() };
+  return {
+    readWithGenaiMock: vi.fn(),
+    descargaRealMock: vi.fn(async () => new Uint8Array([1])),
+    descargaDobleMock: vi.fn(async () => new Uint8Array([2])),
+  };
 });
 
 vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
 vi.mock('@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai', () => ({
   readWithGenai: readWithGenaiMock,
+}));
+// Los DOS adaptadores del almacenamiento, doblados a la vez: la eleccion se observa mirando cual
+// de los dos recibio la llamada, que es la unica forma de afirmar sobre el cableado sin bucket.
+vi.mock('@/lib/modules/documentos/adapters/driven/storage/document-storage-supabase', () => ({
+  createDocumentSignedUpload: vi.fn(),
+  createDocumentSignedReadUrl: vi.fn(),
+  downloadDocument: descargaRealMock,
+  removeDocument: vi.fn(),
+}));
+vi.mock('@/lib/modules/documentos/adapters/driven/storage/document-storage-memory', () => ({
+  documentStorageMemory: {
+    createSignedUpload: vi.fn(),
+    createSignedReadUrl: vi.fn(),
+    download: descargaDobleMock,
+    remove: vi.fn(),
+  },
 }));
 
 import { documentos } from '@/lib/composition';
@@ -73,5 +93,43 @@ describe('documentos — la fachada expone la lectura con IA (fachada cableada)'
 
   it('R26 — el cableado no invoca el adaptador de IA al construirse', () => {
     expect(readWithGenaiMock).not.toHaveBeenCalled();
+  });
+});
+
+// La bifurcacion por entorno de `design.md > 8` de QC-107, observada por el puerto del
+// almacenamiento: los tres puertos se eligen con la MISMA consulta, asi que doblar uno basta para
+// afirmar cual de las dos ramas corre. `downloadDocument` es el camino mas corto hasta el puerto
+// —no exige ningun permiso, solo que la ruta caiga bajo la empresa del actor—.
+describe('documentos — la bifurcacion de los dobles de extremo a extremo', () => {
+  const VARIABLE = 'DOCUMENTS_E2E_DOUBLES';
+  const ACTOR = { id: 'quien-sea', companyId: 'empresa-a', permissions: [] };
+  const RUTA = 'empresa-a/00000000-0000-4000-8000-000000000000.pdf';
+
+  beforeEach(() => {
+    delete process.env[VARIABLE];
+    descargaRealMock.mockClear();
+    descargaDobleMock.mockClear();
+  });
+
+  afterEach(() => {
+    delete process.env[VARIABLE];
+  });
+
+  it('sin la variable de entorno, la composicion elige los adaptadores reales (R20)', async () => {
+    expect(process.env[VARIABLE]).toBeUndefined();
+
+    await documentos.downloadDocument(ACTOR, RUTA);
+
+    expect(descargaRealMock).toHaveBeenCalledWith(RUTA);
+    expect(descargaDobleMock).not.toHaveBeenCalled();
+  });
+
+  it('con la variable, la composicion elige los dobles (R20)', async () => {
+    process.env[VARIABLE] = '1';
+
+    await documentos.downloadDocument(ACTOR, RUTA);
+
+    expect(descargaDobleMock).toHaveBeenCalledWith(RUTA);
+    expect(descargaRealMock).not.toHaveBeenCalled();
   });
 });

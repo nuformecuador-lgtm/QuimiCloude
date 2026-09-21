@@ -43,5 +43,12 @@ export default defineConfig({
     url: E2E_BASE_URL,
     reuseExistingServer: false,
     timeout: 180_000,
+    // El UNICO sitio versionado que enciende los dobles del modulo `documentos`
+    // (almacenamiento en memoria, cola en linea e IA de guion). Sin esto el recorrido de
+    // documentos necesitaria bucket, URL publica y cuenta de IA, y el gate dejaria de
+    // correr sin red. Va en el entorno del SERVIDOR, que es donde se eligen los
+    // adaptadores; el navegador no la ve. `tests/guards/guard-dobles-e2e.test.ts` se pone
+    // roja si cualquier otro archivo versionado la activa.
+    env: { DOCUMENTS_E2E_DOUBLES: '1' },
   },
 })
