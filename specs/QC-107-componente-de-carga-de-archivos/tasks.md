@@ -175,7 +175,7 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
       el binario sobrevive al runtime de Vercel sigue siendo **DESCONOCIDO** —pregunta abierta 3 de
       QC-106—, y solo un despliegue real puede responderlo.
 
-- [ ] **T17.** Depende de T16. Correr `./init.sh` completo (no `--rapido`) antes de abrir el PR.
+- [x] **T17.** Depende de T16. Correr `./init.sh` completo (no `--rapido`) antes de abrir el PR.
       **Hecho cuando**: termina en verde, incluidas las guardias de arquitectura y de dependencias,
       que deben pasar **sin ningún cambio en `docs/dependencias.md`** porque no entra ninguna
       dependencia nueva.
