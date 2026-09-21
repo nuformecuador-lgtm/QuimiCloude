@@ -7,6 +7,13 @@
 
 ## Veredicto
 
+**VEREDICTO FINAL: OK** — segunda vuelta, HEAD `f7e2a8e0` (2026-09-21). Los dos bloqueantes estan
+cerrados y **verificados por el reviewer sobre el arbol**, no sobre el informe del implementer; el
+detalle esta en «Segunda vuelta» al final de este archivo. No queda ningun bloqueante. Lo unico
+pendiente no es del implementer: **T13** (`./init.sh` completo) verde y marcada antes del PR.
+
+### Primera vuelta, HEAD `2181d3a8` — RECHAZADO
+
 **RECHAZADO** — 2 bloqueantes. Los dos son de coste bajo y ninguno toca el diseno: uno es
 limpieza de comentarios en tres archivos de produccion, el otro es un caso de test que perdio lo
 que probaba. El resto de la feature esta bien construida y bien verificada.
@@ -224,3 +231,98 @@ los lotes). Es un caso, no un rediseno.
 3. Recomendado en la misma vuelta (menores 1, 2 y 3): la unidad sin simbolo, el comentario que
    atribuye al disparador lo que hace el adaptador, y la frase de T13.
 4. T13 verde y marcada, y `progress/current.md` con la deuda del punto 8.
+
+---
+
+## Segunda vuelta (2026-09-21) — verificacion de los arreglos
+
+Revisado el rango `2181d3a8..f7e2a8e0` (4 commits: `70f98907` del leader, `60844e8e`, `8f98d72e`,
+`f7e2a8e0`). Arbol limpio (`git status` vacio). **Veredicto: OK.**
+
+### BLOQUEANTE 1 — CERRADO
+
+- Re-ejecutado el mismo barrido que lo detecto, ahora sobre **toda** la rama:
+  `git diff origin/dev...HEAD -- app/ lib/ db/ components/ hooks/ | grep '^+' | grep -iE
+  'QC-[0-9]+|\bR[0-9]+\b|design\.md|decision cerrada'` → **cero coincidencias** (antes, 7).
+- Las 7 lineas quedaron reescritas conservando el porque sin el numero; ninguna se borro entera.
+- **Ni una linea de logica cambio**: el diff de produccion de esta vuelta son 4 archivos y todo lo
+  que cambia esta dentro de bloques de comentario (`product-picker.tsx`, `recipe-lines-field.tsx`,
+  `unit-group.ts`, `product-input.ts`).
+- Los preexistentes siguen intactos y **no los toca el diff de rama**: comprobado en
+  `product-picker.tsx:58` («QC-57 R16, R18, R19») y `unit-group.ts:64` («QC-80 R23»). Son deuda de
+  otras fichas y se limpian por modulo, no aqui.
+
+### BLOQUEANTE 2 — CERRADO
+
+- El caso nuevo esta en `tests/integration/inventario/product-stock.int.test.ts`, dentro de
+  `describe('R1, R8, R9 …')`: **«un lote vencido sigue sumando en products.stock (R8)»**.
+- Leido entero: los dos lotes entran por `createWithFirstBatch` (`stock: 7`,
+  `expiryDate: '2020-01-31'`) y `addBatchToAlive` (`stock: 4`, `expiryDate: '2099-12-31'`), o sea
+  por el camino que **recalcula**; despues relee `product_batches` y afirma que el lote de 7 tiene
+  `expiry_date` y que esa fecha ya paso —la guarda contra volver a la tautologia—, y cierra con
+  `products.stock === 11`. Un recalculo que excluyera los vencidos daria 4, y ademas ya fallaria en
+  el `expect(...).toBe(7)` intermedio (que es el `expected +0 to be 7` que reporta el implementer).
+- **Estado del adaptador verificado directamente, no por el informe**:
+  `git diff 2181d3a8..HEAD -- lib/modules/inventario/adapters/ db/` **vacio**, y leido el cuerpo
+  actual de `recalculateProductStock`, su `where` es
+  `{ AND: [batchCompanyScope(scope), { productId }] }` — sin rastro del filtro de caducidad del
+  sabotaje. El sabotaje esta revertido.
+- **Donde vive el caso: de acuerdo con el implementer.** `product-stock.int` es el archivo del
+  recalculo (llama a los adaptadores reales y ya cubre R8, R9, R10, R29-R32);
+  `list-query-products.int` prueba la consulta contra una fila sembrada. Poner ahi el caso habria
+  obligado a que ese archivo empezara a escribir por el camino de alta, que no es lo suyo.
+
+### Punto 3 — el retitulado de `list-query-products.int.test.ts`: ACEPTADO, no lo reviertas
+
+El titulo anterior afirmaba «un lote vencido sigue sumando a la existencia guardada» y el cuerpo,
+tras T6, solo comprobaba que el listado sirve una columna sembrada. Un titulo que promete mas de lo
+que el cuerpo prueba es peor que no tener el caso: es el mecanismo exacto por el que se perdio la
+cobertura de R8 sin que nadie lo notara. El titulo nuevo —«el listado sirve la existencia guardada
+tal cual, haya lotes vencidos o no (R15)»— dice justo lo que el cuerpo hace, la reatribucion a R15
+es correcta (es consulta, no recalculo) y el comentario que apunta al caso nuevo de
+`product-stock.int` deja el rastro para quien llegue despues. El cuerpo no se toco, asi que no hay
+riesgo de que el retitulado esconda un cambio de comportamiento.
+
+### Menores — 2, 3, 5 y 7 CERRADOS
+
+- **menor 2**: `product-input.ts:25-27` y su test ahora dicen que la escribe `createWithFirstBatch`
+  copiandola de la presentacion y que el disparador **solo rechaza**. Corresponde con el codigo.
+- **menor 3**: la frase de T13 sobre T15 ya no esta en `tasks.md`.
+- **menor 5**: el comentario de `recipe-form.test.tsx:853` ya no nombra `latestBatchUnitId`.
+- **menor 7**: la entrada de `guard-identificador-de-request.test.ts` queda documentada en la
+  bitacora.
+- **menor 4 y menor 6**: no eran accion; siguen como estaban, correctamente.
+
+### Menor 1 — ACEPTADO SIN ARREGLAR, y lo digo claro
+
+La clausula «si la unidad no tiene simbolo, su nombre» de R18/R35 **sigue sin caso propio**: la
+rama `?? unit.name` de `unitLabel` no la ejecuta ningun test. **Lo acepto asi para cerrar QC-121**,
+por lo mismo que no lo eleve a bloqueante en la primera vuelta: el nucleo de R18 esta probado (el
+separador, la unidad ausente y el catalogo ausente), la rama es un `??` heredado de codigo anterior
+igualmente sin cobertura, y una implementacion que ignorara el simbolo si rompe los tests actuales.
+Queda **anotado como deuda conocida** en la bitacora; si alguna ficha vuelve a tocar la etiqueta de
+unidad, el caso con `symbol: null` entra con ella.
+
+### Punto 6 — no relanzar el E2E: de acuerdo
+
+Medido en el diff, no supuesto: esta vuelta cambia **seis bloques de comentario** (sin una linea de
+codigo), **un titulo y un comentario** de test, **un caso de integracion nuevo** y **dos lineas** de
+`tasks.md`. Nada de eso puede mover un recorrido de Playwright: los E2E localizan por `data-testid`
+y por texto de pantalla, y ningun texto de pantalla cambio. Las tres corridas verdes del 2026-09-21
+siguen siendo validas para R26 y R34.
+
+### Verificacion ejecutable de esta vuelta (corrida por el reviewer)
+
+- `vitest --project node`: `product-input`, `qc121-alcance` → **38/38**.
+- `vitest --project ui`: `recipe-line-unit-group` (el que monta `ProductPicker`,
+  `RecipeLinesField` y `unit-group`, los tres archivos retocados) → **12/12**.
+- **No** se corrio integracion, ni `./init.sh`, ni Playwright: los relanza el leader. Por eso el
+  caso nuevo de R8 queda verificado **por lectura y por el estado del adaptador**, no por
+  ejecucion propia; el gate completo del leader es quien lo ejecuta.
+
+### Lo unico que queda para `done`
+
+1. `./init.sh` completo en verde (T13) y su casilla marcada en `tasks.md`.
+2. El resto de `CHECKPOINTS.md > Verificacion final`: entrada en `progress/history.md` y desmontar
+   el worktree (o anotar el HOLD). La deuda del sintoma del login ya esta en
+   `progress/current.md > Deudas y cosas abiertas` (`70f98907`), que era mi condicion del punto 8.
