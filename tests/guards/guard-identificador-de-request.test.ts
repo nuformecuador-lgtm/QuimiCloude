@@ -118,14 +118,8 @@ export const E2E_ESPERADOS = [
   // estado. NO ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni
   // afirma nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21
   // sigue INTACTO.
-  // Alta por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su punto
-  // de extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo se nombra,
-  // uno a uno-. El recorrido que ejercita: con sesion iniciada, la pantalla de detalle de un
-  // proveedor deja elegir tres PDFs, los sube desde el navegador al enlace firmado, encola la tanda
-  // y ve cambiar el estado de cada archivo hasta terminar, con el almacenamiento, la cola y la IA
-  // doblados para que corra sin red. NO ejercita el cruce borde -> accion del identificador de
-  // peticion: el spec no lee ni afirma nada sobre el identificador ni sobre `reference`, asi que
-  // el diferimiento de QC-71 R21 sigue INTACTO.
+  // Sube tres PDFs desde el detalle de un proveedor y ve cambiar el estado de cada uno, con el
+  // almacenamiento, la cola y la IA doblados. No afirma nada sobre el identificador de peticion.
   'documentos.spec.ts',
   'ejecucion-receta.spec.ts',
   'errores.spec.ts',

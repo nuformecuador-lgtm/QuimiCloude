@@ -1,8 +1,9 @@
-// QC-67 T2 — El item «Usuarios» en la seccion «Configuración» del menu privado (R2, R3).
+// QC-67 T2 — El item «Usuarios» del menu privado (R2, R3).
 //
-// La seccion la creo QC-45, QC-39 le anadio el segundo item y esta ficha **solo se da de alta en
-// ella**: no la crea, no la renombra y no toca los dos items que ya vivian dentro. Por eso el
-// archivo afirma tanto sobre el item nuevo como sobre lo que NO cambio.
+// Nacio dentro de la seccion «Configuración» (QC-67) y paso a «Operación» por decision humana del
+// 2026-09-21: usuarios es operacion de la organizacion, no configuracion del producto. El objeto
+// NO se movio de sitio en `PRIVATE_NAV_ITEMS` —solo cambio su `section`—, asi que sigue siendo el
+// ULTIMO del array.
 //
 // El ocultado es por PERMISO y se decide en el servidor (QC-75): el layout privado filtra
 // `PRIVATE_NAV_ITEMS` con los permisos de la sesion (`filterNavItemsByPermissions`). Aqui se
@@ -21,6 +22,7 @@ import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, SEED_ROLE_PERMISSIONS } from '@/lib/
 import { NAV_ICONS } from '@/lib/shared/navigation/nav-icons';
 import {
   NAV_SECTION_CONFIGURATION,
+  NAV_SECTION_OPERATION,
   PRESENTATIONS_LABEL,
   PRIVATE_NAV_ITEMS,
   UNITS_LABEL,
@@ -88,27 +90,37 @@ function paginaDe(href: string): string {
   return join(RAIZ, 'app', '(private)', ...href.split('/').filter(Boolean), 'page.tsx');
 }
 
-describe('la seccion Configuración sigue siendo una y ahora tiene TRES items (R2)', () => {
-  it('hay exactamente UNA seccion Configuración y lleva exactamente TRES items', () => {
-    // Ni se crea una segunda seccion ni se renombra la que existe: se anade un item a la que nacio
-    // en QC-45 con uno y crecio a dos en QC-39.
+describe('la seccion Configuración se queda con sus DOS items originales (R2, 2026-09-21)', () => {
+  it('hay exactamente UNA seccion Configuración y lleva exactamente DOS items', () => {
+    // Usuarios ya no vive aqui: paso a «Operación» por decision humana del 2026-09-21. La seccion
+    // vuelve a sus dos items originales, presentaciones y unidades.
     const secciones = groupNavItemsBySection(PRIVATE_NAV_ITEMS).filter(
       (seccion) => seccion.label === NAV_SECTION_CONFIGURATION,
     );
 
     expect(secciones).toHaveLength(1);
-    expect(secciones[0]?.items).toHaveLength(3);
+    expect(secciones[0]?.items).toHaveLength(2);
   });
 
-  it('el orden es presentaciones, unidades y usuarios: el nuevo entra el ULTIMO', () => {
-    // R2 prohibe alterar o reordenar los dos existentes: el item nuevo se anade DETRAS.
+  it('el orden de Configuración es presentaciones y unidades, sin usuarios', () => {
     const items = seccionConfiguracion() ?? [];
 
     expect(items.map((item) => (item.kind === 'link' ? item.href : item.label))).toEqual([
       PRESENTATIONS_ROUTE,
       UNITS_ROUTE,
-      USERS_ROUTE,
     ]);
+  });
+
+  it('usuarios es el ULTIMO item de la seccion Operación', () => {
+    // El objeto no se movio de sitio en el array (solo cambio su `section`), asi que sigue siendo
+    // el ultimo enlace declarado dentro de «Operación».
+    const operacion =
+      groupNavItemsBySection(PRIVATE_NAV_ITEMS).find(
+        (seccion) => seccion.label === NAV_SECTION_OPERATION,
+      )?.items ?? [];
+
+    const ultimo = operacion[operacion.length - 1];
+    expect(ultimo?.kind === 'link' ? ultimo.href : undefined).toBe(USERS_ROUTE);
   });
 
   it('los dos items que ya existian siguen intactos, campo por campo', () => {
@@ -130,11 +142,11 @@ describe('la seccion Configuración sigue siendo una y ahora tiene TRES items (R
     expect(ITEMS_DE_USUARIOS[0]?.label).toBe(USERS_LABEL);
     expect(ITEMS_DE_USUARIOS[0]?.testId).toBe('nav-usuarios');
     expect(ITEMS_DE_USUARIOS[0]?.permission).toBe('usuarios.consultar');
-    expect(ITEMS_DE_USUARIOS[0]?.section).toBe(NAV_SECTION_CONFIGURATION);
+    expect(ITEMS_DE_USUARIOS[0]?.section).toBe(NAV_SECTION_OPERATION);
     expect(ITEMS_DE_USUARIOS[0]?.icon).toBe('users');
   });
 
-  it('su icono tiene fila en NAV_ICONS y no colisiona con los otros dos de la seccion', () => {
+  it('su icono tiene fila en NAV_ICONS y no colisiona con los de Configuración', () => {
     // El nombre del icono es una CADENA porque cruza la frontera servidor->cliente: quien lo
     // resuelve es el mapa. Un nombre sin fila dibujaria un hueco, y el `Record` solo lo impide en
     // typecheck; aqui se comprueba el dato ya construido.
@@ -197,7 +209,7 @@ describe('el item se oculta a quien no tiene el permiso (R3)', () => {
     expect(PERMISOS_OPERADOR.length).toBeGreaterThan(0);
   });
 
-  it('con los permisos del Administrador se ven los TRES items y la seccion', () => {
+  it('con los permisos del Administrador se ven los TRES items, en Configuración y en Operación', () => {
     const visible = filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, PERMISOS_ADMINISTRADOR);
     const testIds = visible.map((item) => item.testId);
 
@@ -205,14 +217,18 @@ describe('el item se oculta a quien no tiene el permiso (R3)', () => {
     expect(testIds).toContain('nav-unidades');
     expect(testIds).toContain('nav-usuarios');
     expect(seccionesDe(visible)).toContain(NAV_SECTION_CONFIGURATION);
+    expect(seccionesDe(visible)).toContain(NAV_SECTION_OPERATION);
   });
 
-  it('con los del Operador no queda NINGUNO y la seccion desaparece entera', () => {
+  it('con los del Operador no aparece usuarios, pero Operación no desaparece', () => {
     const visible = filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, PERMISOS_OPERADOR);
     const testIds = visible.map((item) => item.testId);
 
     expect(testIds).not.toContain('nav-usuarios');
-    // Una seccion sin items no puede quedarse como un encabezado que anuncia algo que no esta.
+    // Usuarios vive en «Operación», que le sigue mostrando al Operador el resto de sus items: la
+    // seccion no desaparece por perder este uno.
+    expect(seccionesDe(visible)).toContain(NAV_SECTION_OPERATION);
+    // Configuración si desaparece entera: el Operador tampoco tiene presentaciones ni unidades.
     expect(seccionesDe(visible)).not.toContain(NAV_SECTION_CONFIGURATION);
     // Y el Operador sigue viendo lo suyo: el filtrado quita, no vacia el menu.
     expect(visible.length).toBeGreaterThan(0);

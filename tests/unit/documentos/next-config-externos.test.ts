@@ -11,18 +11,18 @@
 //      rasteriza: si manana se cambia de rasterizador, este test sigue exigiendo lo mismo -que lo
 //      que el adaptador carga en ejecucion este declarado externo- sin tener que editarlo.
 
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest';
 
-import configDeNext from '@/next.config'
+import configDeNext from '@/next.config';
 
 /** Raiz del repo: tres niveles por encima de `tests/unit/documentos/`. */
-const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
+const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
-const ADAPTADOR = 'lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf.ts'
+const ADAPTADOR = 'lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf.ts';
 
 /**
  * Los paquetes que el adaptador carga con `import()` diferido, que son exactamente los que
@@ -30,26 +30,26 @@ const ADAPTADOR = 'lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpd
  * propio repo y Next los empaqueta sin problema.
  */
 function paresNativosDelAdaptador(): string[] {
-  const fuente = readFileSync(join(RAIZ, ADAPTADOR), 'utf8')
+  const fuente = readFileSync(join(RAIZ, ADAPTADOR), 'utf8');
   const especificadores = [...fuente.matchAll(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g)].map(
     ([, especificador]) => especificador,
-  )
-  return especificadores.filter((especificador) => !especificador.startsWith('.'))
+  );
+  return especificadores.filter((especificador) => !especificador.startsWith('.'));
 }
 
 describe('next.config.ts', () => {
   it('la configuracion declara el par nativo de rasterizado como externo del servidor (R25)', () => {
-    const pares = paresNativosDelAdaptador()
+    const pares = paresNativosDelAdaptador();
 
     // Si el adaptador deja de cargar nada en diferido, la derivacion de arriba se quedaria
     // satisfecha mirando una lista vacia y este test pasaria sin comprobar nada.
-    expect(pares.length).toBeGreaterThan(0)
+    expect(pares.length).toBeGreaterThan(0);
 
-    const externos = (configDeNext as { serverExternalPackages?: unknown }).serverExternalPackages
-    expect(Array.isArray(externos)).toBe(true)
+    const externos = (configDeNext as { serverExternalPackages?: unknown }).serverExternalPackages;
+    expect(Array.isArray(externos)).toBe(true);
 
     for (const par of pares) {
-      expect(externos as string[]).toContain(par)
+      expect(externos as string[]).toContain(par);
     }
-  })
-})
+  });
+});

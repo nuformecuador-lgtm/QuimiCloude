@@ -8,13 +8,11 @@
  * interpretar el cuerpo con zod. Una firma que falla no produce ningun otro efecto -ni descarga, ni
  * IA, ni escritura-.
  *
- * `runtime = 'nodejs'`, no `edge`: el procesamiento usa un binario nativo para convertir el PDF, y
- * el runtime edge no lo carga.
+ * La configuracion de segmento -`runtime` y `maxDuration`- NO vive aqui sino en `route.ts`: Next
+ * la extrae del archivo de ruta analizandolo estaticamente y NO admite que se reexporte.
  */
 import { documentos } from '@/lib/composition';
 import { queueMessageSchema } from '@/lib/modules/documentos';
-
-export const runtime = 'nodejs';
 
 const SIGNATURE_HEADER = 'upstash-signature';
 

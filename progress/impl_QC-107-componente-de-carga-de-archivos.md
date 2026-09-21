@@ -88,26 +88,29 @@ Todos los caminos son relativos a `tests/unit/`, salvo la guardia.
 | R15 | `documentos-ui/document-upload-convenciones.test.ts` | `no abre ninguna suscripcion de tiempo real ni incorpora el cliente de Supabase (R15)` |
 | R16 | `documentos-ui/document-upload-convenciones.test.ts` | `no emite ningun aviso ni notificacion cuando una tanda termina (R16)` |
 | R17 | `documentos-ui/supplier-detail-upload.test.tsx` | `la pantalla de detalle de proveedor monta el componente en modo catalogo (R17)` |
-| R18 | **BLOQUEADO** — cubierto **en negativo** en `documentos-ui/document-upload-convenciones.test.ts` | `ninguna pantalla de formulas monta el componente y no aparece ningun permiso nuevo (R18)` |
+| R18 | `documentos-ui/document-upload-convenciones.test.ts` | `ninguna pantalla de formulas monta el componente y no aparece ningun permiso nuevo (R18)` |
 | R19 | `documentos-ui/document-upload-convenciones.test.ts` | `no anade ninguna ruta, constante de ruta ni item de menu propios de documentos (R19)` |
 | R20 | `composition/documentos-facade.test.ts`, `tests/guards/guard-dobles-e2e.test.ts` y **`e2e/documentos.spec.ts`** | `sin la variable de entorno, la composicion elige los adaptadores reales (R20)` · `con la variable, la composicion elige los dobles (R20)` · los cinco casos de la guardia · `sube tres PDFs y ve cambiar el estado de cada uno hasta terminar (R20)`, **en verde en Chromium y WebKit**. |
 | R21 | `documentos-ui/document-upload-a11y-tactil.test.tsx` | `la subida se puede activar sin hover y con objetivos tactiles de 44px (R21)` · `ninguna parte del componente mide la pantalla con 100vh (R21)` |
 | R22 | `documentos-ui/document-upload-convenciones.test.ts` | `el tope y los tipos se importan del contrato del modulo y no se reescriben (R22)` |
 | R23 | `documentos-ui/use-batch-status.test.tsx` y `documentos-ui/document-upload-errors.test.tsx` | `el hook deja de sondear cuando la consulta responde que no hay tanda (R23)` · `una tanda desconocida detiene el sondeo (R23)` · `el componente avisa de tanda desconocida sin distinguir si no existe o es de otra empresa (R23)` |
 | R24 | `documentos/pdf-converter.test.ts` y `documentos/process-pdf-by-strategy.test.ts` | `contar las paginas deja los bytes del PDF intactos (R24)` · `extraer el texto deja los bytes del PDF intactos (R24)` · `rasterizar deja los bytes del PDF intactos (R24)` · `la lectura con IA recibe los bytes completos despues de contar las paginas (R24)` (conversor **real**, en las dos estrategias) |
-| R25 | `documentos/next-config-externos.test.ts` y **`e2e/documentos.spec.ts`** | `la configuracion declara el par nativo de rasterizado como externo del servidor (R25)` · el recorrido es **el único test del repo que ejecuta esta cadena dentro del servidor de Next**, que es donde R25 exige observar la garantía |
+| R25 | `documentos/next-config-externos.test.ts`, `documentos/canvas-no-empaquetado.test.ts` (de QC-136) y **`e2e/documentos.spec.ts`** | `la configuracion declara el par nativo de rasterizado como externo del servidor (R25)` · el recorrido es **el único test del repo que ejecuta esta cadena dentro del servidor de Next**, que es donde R25 exige observar la garantía |
 
-**R18, dicho entero.** Su montaje está bloqueado por la pregunta abierta 1 —subir exige
-`proveedores.modificar`, y quien trabaja recetas necesitaría ese permiso ajeno—. Hoy lo cubre el
-caso **en negativo**, y se comprobó que **muerde** por sus dos vías: montar el componente en la
-pantalla de fórmulas lo pone rojo, y añadir un permiso al catálogo cerrado también. No se inventó
-ningún permiso, no se prestó el de proveedores y no se tocó la pantalla de fórmulas.
+**R18, dicho entero.** La pregunta abierta 1 **ya está cerrada**: el humano decidió que `documentos`
+tenga **permiso propio** —cuarta enmienda al catálogo cerrado de QC-74—, y eso es backend con
+migración, así que el montaje en fórmulas **salió de esta ficha a QC-142**. R18 se reescribió para
+exigir lo que esta ficha sí entrega y sí se puede verificar hoy. Lo cubre el caso **en negativo**, y
+se comprobó que **muerde** por sus dos vías: montar el componente en la pantalla de fórmulas lo pone
+rojo, y añadir un permiso al catálogo cerrado también. **No está bloqueado: está fuera de alcance**,
+con destinatario.
 
-**R20, dicho entero.** El recorrido navegable **ya existe** y ejercita login, pantalla, selección de
-tres PDFs, subida real desde el navegador al enlace firmado, encolado y sondeo vivo contra Postgres,
-en Chromium y en WebKit. **Termina en rojo en su último aserto** —el estado final es `error` y no
-`done`— por un defecto de producción que esta ficha no introdujo y que no le toca arreglar. **R20 no
-se puede dar por cerrado hasta que ese defecto se corrija.**
+**R20, dicho entero.** El recorrido navegable ejercita login, pantalla, selección de tres PDFs,
+subida real desde el navegador al enlace firmado, encolado y sondeo vivo contra Postgres, en
+Chromium y en WebKit, y **las tres filas llegan a «listo»**. Los dos defectos que lo tumbaron por el
+camino —el búfer detachado (R24) y el par nativo sin externalizar (R25)— están arreglados. **R20
+está cerrado**, medido tres veces: por el implementer, por el reviewer y de nuevo tras integrar
+`dev`.
 
 ## Salida real de los tests
 
@@ -161,7 +164,9 @@ Playwright, y elegir un doble sin consultarla.
 
 ## Lo que NO se cerró y por qué
 
-1. **T12 / R18 — montaje en fórmulas.** Bloqueada por la pregunta abierta 1. No se tocó.
+1. **T12 / R18 — montaje en fórmulas: FUERA DE ALCANCE, en QC-142.** La pregunta abierta 1 se
+   cerró con permiso propio para `documentos`, que es backend con migración. T12 queda sin marcar
+   a propósito y la pantalla de fórmulas no se tocó.
 
 2. **El hueco de `design.md > 8` que bloqueaba el E2E: RESUELTO.** Por decisión del humano,
    `CATALOG_PROMPT` y `FORMULA_PROMPT` se declaran con **texto ficticio** en el `webServer.env` de
@@ -248,3 +253,46 @@ con un consumidor en producción**. Sólo un despliegue real puede responderla.
 **Qué pasa si el runtime de Vercel tampoco lo carga**, dicho para que no sea una sorpresa silenciosa:
 cae la estrategia `catalogo` **en ejecución**, con su fila en error y un motivo que nombra la causa,
 por el camino que QC-111 ya dejó montado. Es feo y es **visible**, que es lo que se pedía.
+
+## F2.3 — integración con `dev`, y los dos tests de R25
+
+`dev` avanzó **15 commits** mientras esta ficha estaba en vuelo, y uno de ellos hace lo mismo que
+T20: **`d3e13aaf`, `fix(QC-136)`, mergeado por el PR #101 el 2026-09-21**, que ya declaraba el par
+nativo en `serverExternalPackages`. Nuestro arreglo es correcto y **llegó segundo**. Conviene
+decirlo sin adornos: el diagnóstico se pagó dos veces porque nadie miró `dev` antes de la tercera
+enmienda.
+
+**`next.config.ts`: gana `dev`, tal cual.** Su comentario es mejor que el nuestro y explica cosas
+que el nuestro no decía: que Turbopack no puede meter un `.node` en un chunk ESM —no tiene module
+id—, que `await import()` **no basta** porque un especificador literal sigue siendo analizable, y
+trae la medición (`next build` sale con exit 1 sin la línea, exit 0 con ella). No se mezcló ni se
+reescribió.
+
+**Los dos tests se quedan, y no es por cortesía: NO se solapan.** Comprobado ejecutando, no
+razonando: se inyectó en el adaptador un **segundo** paquete nativo con `import()` diferido y sin
+declarar como externo.
+
+| Test | Qué prueba | Con un segundo nativo sin declarar |
+| --- | --- | --- |
+| `canvas-no-empaquetado.test.ts` (QC-136) | que **ese** paquete, nombrado, está declarado externo — anclado al nombre, con la medición de `next build` detrás | **verde**: no lo ve |
+| `next-config-externos.test.ts` (esta ficha) | que **todo** paquete que el adaptador carga en diferido está declarado externo — lo **deriva** del adaptador y no lo nombra | **rojo**, que es lo correcto |
+
+El de QC-136 ancla el invariante al paquete que hoy rompe el build; el nuestro lo ancla a la
+**propiedad** —lo que se carga en ejecución tiene que estar fuera del empaquetado—, así que caza la
+regresión del día que entre otro nativo, que es exactamente la clase de fallo de la que nació
+QC-136. Borrar el de QC-136 no era opción: es trabajo ajeno.
+
+**`feature_list.json`** se reconcilió por unión: entran las **nueve** fichas que traía `dev`
+(QC-132…QC-136, QC-138…QC-141), se conserva **QC-142**, que sólo existía aquí, y la descripción de
+QC-107 se queda con la nuestra, que es la del afinado y ya dice que el montaje en fórmulas salió a
+QC-142. `scripts/validate-features.mjs` en verde con 129 fichas.
+
+**Otros dos conflictos, y ninguno trivial de más:** `tests/unit/composition/documentos-facade.test.ts`
+—`dev` quitó ahí las aserciones sobre las cuatro variables de entorno, que es el rojo que esta ficha
+había diagnosticado como de entorno; se conserva **su** explicación y **nuestros** dos dobles de la
+bifurcación— y `progress/current.md`, donde `dev` ya retiró las filas de QC-111 y QC-123 y sólo
+sobrevive la de QC-107. **Ninguna migración** que aplicar.
+
+Los dos renombrados de interfaz que venían en `dev` —«Producción» → «Fórmulas» y «Usuarios» a
+«Operación»— **no tocan nada de esta ficha**: se comprobó que ni el E2E ni los tests del componente
+nombran esas etiquetas, y la constante de ruta de fórmulas no cambió.

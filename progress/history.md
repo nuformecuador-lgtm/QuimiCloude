@@ -4488,3 +4488,136 @@ aquí) ni se arregló el test ajeno dentro de esta rama → **QC-134**.
 **Deuda que deja.** El `.env` del **árbol principal sigue con las dos líneas**, así que ahí el rojo sigue vivo
 hasta que entre QC-134. Y el gate volvió a avisar de los **8 archivos del baseline que ya pasan** y siguen sin
 podar.
+
+## 2026-09-19 — QC-123-el-total-del-pedido-decidir-donde-vive-el-precio
+
+- El pedido gana `orders.ingredients_cost DECIMAL(14,4)` NULL: el **coste de los ingredientes**
+  que consume su receta, leído de los lotes de inventario con existencia. **No es un precio de
+  venta** — no existe ninguno en el ERP. Se calcula en el servidor, viaja como cadena decimal, se
+  guarda en el pedido y se recalcula en cada edición con los lotes de ese día. La ficha solo
+  **lee** lotes: no descuenta ni reserva existencia.
+- Requisitos cubiertos: **R1–R23** del spec más **R24–R26** de la enmienda humana = **26
+  declarados / 26 mapeados**, cada uno a un test que existe y cuyo cuerpo prueba el requisito.
+  PR **#96**, merge `63d15088`.
+- **La premisa de la ficha cambió entera antes de escribir una línea.** Nació como «decidir dónde
+  vive el precio» con cinco preguntas abiertas; `/afinar-feature` las cerró y descubrió que no hay
+  precio de venta en ninguna parte. `complexity` subió de `medium` a `high`, el board se corrigió
+  antes de sembrar, y de ahí nacieron **QC-130** (una presentación no sabe que «bidón» son 20 L) y
+  la recuperación de la columna del importe en **QC-122**. **Deroga** el punto 4 de
+  `docs/architecture.md > Preguntas abiertas del dominio`, que describía columnas que QC-35bis
+  borró el 2026-09-07.
+- **Decisiones de diseño**: NO nace puerto `pedidos -> inventario` — `inventario` amplía su
+  contrato ya publicado con `findCostingBatches`. El cálculo vive en `pedidos/domain/order-cost.ts`,
+  **puro y probable sin base**, con enteros escalados y **sin dependencia nueva**. La migración no
+  lleva `UPDATE`: los pedidos anteriores se quedan sin importe y **nunca** se rellenan con 0, que
+  sería un dato falso indistinguible de un pedido gratis.
+- **Las tres decisiones que el spec dejó abiertas las cerró el humano ANTES del implementer**, y se
+  devolvieron al `spec_author` como enmienda en vez de dejar que las inventara el código: el
+  **desbordamiento** de `Decimal(14,4)` deja el importe en blanco —lo que enmienda `[D5]` de cuatro
+  casos a **cinco**—; el **desempate de lote** compara como número si ambos son sólo dígitos y como
+  texto si no, sin tocar QC-81; y se convierte **la cantidad y el coste unitario** a la unidad de la
+  línea de receta. `pedidos` **recupera la dependencia de `unidades`** que QC-35bis le quitó:
+  retroceso consciente, con motivo escrito en `[D6]`.
+- **Dos vueltas de `reviewer`.** La primera rechazó por **dos líneas de comentario** que citaban
+  ficha o requisito (`docs/conventions.md > Comentarios`), cerradas en `015593c6`. La segunda
+  aprobó sobre `015593c6` sin fiarse del barrido ajeno: repitió el suyo sobre todo lo añadido en
+  `lib/`, `app/`, `db/`, `components/` y `scripts/`, con patrón validado contra una línea de
+  control.
+- **Verificación**: `./init.sh` completo verde sobre la rama ya sincronizada con `dev` —
+  **566 archivos, 8238 tests, 0 rojos**. Ninguna dependencia nueva.
+- **Lo que este cierre destapó, y es la lección que conviene no perder.** El primer gate completo
+  salió **rojo con un rojo propio que el gate rápido no podía ver**:
+  `tests/unit/unidades/module-contract.test.ts` lee `product-catalog.ts` **con `fs`** y prohíbe que
+  aparezca `unitId`, y la ficha había metido ahí el tipo `CostingBatch`. `vitest run guard` no la
+  recoge (vive fuera de `tests/guards`) y `vitest related` no la relaciona (no importa el archivo,
+  lo lee). Es exactamente el agujero que la regla 5 describe al exigir el gate completo antes de
+  cada PR. Se arregló **sin tocar la guardia** (`314e687e`), con el precedente del propio módulo:
+  `CostingBatch` se mudó a `domain/costing-batch.ts`, como ya vivía `ProductStockByUnit`.
+  **Candidato a `/afinar-regla`.**
+- **Deuda que deja, y NO es de esta ficha.** (a) Ocho archivos de `tests/baseline-rojos.json` ya
+  pasan y siguen sin podar — ninguno de `pedidos`, `inventario` ni `recetas`; va en ficha propia
+  porque meterlo aquí ensancharía el diff. (b) Una guardia de `tests/unit/pedidos-ui/` lee
+  `git status --porcelain` **sin filtrar por ficha**, así que con el árbol sucio toma cambios ajenos
+  como propios y da un rojo falso — **segundo candidato a `/afinar-regla`**. (c) Menores del primer
+  informe, ninguno bloqueante: `INTERNAL_SCALE` duplica `CONVERSION_SCALE` sin que nada avise si
+  divergen; `design.md > 10.1` promete en indicativo un diagnóstico al log que el código no hace.
+- **El cierre en disco se hizo el 2026-09-21, dos días después del merge.** El PR #96 se mergeó el
+  2026-09-19 y nadie cerró la ficha: `feature_list.json` siguió en `in_progress`, la tarjeta en
+  *En curso* y el worktree montado. Se detectó al retomarla. El barrido de comprobación —93 PRs
+  mergeados contra las 30 fichas no cerradas, por rama y por clave— confirmó que **era la única**.
+
+## 2026-09-21 — QC-111-procesamiento-de-pdf-en-cola
+
+- Cada tanda de PDFs (hasta 10) se encola en **Upstash QStash**, que entrega cada trabajo al
+  **primer Route Handler del repo** (`app/api/documentos/trabajos/route.ts`, `runtime = 'nodejs'`),
+  y ese trabajo ejecuta la conversión y la estrategia de QC-109. Cada archivo lleva su propio
+  estado —en cola, procesando, listo, error con su motivo— y la ficha expone su consulta, que
+  pintará QC-107.
+- Requisitos cubiertos: **R1–R27, 27 mapeados**, comprobados uno a uno abriendo cada test.
+  PR **#97**, merge `f97b594a`.
+- **Dos tablas nuevas**, `document_batches` y `document_files`, con `company_id`, **RLS activada y
+  forzada** en las dos, FK compuesta contra la empresa y su `down.sql`.
+- **Idempotencia por candado de fila**: un solo `UPDATE ... WHERE status='queued' ... RETURNING`
+  reclama el trabajo; dos entregas concurrentes se serializan en Postgres y la segunda no hace
+  nada. Test de integración real con dos conexiones (`attempts === 1`).
+- **La firma se valida antes de cualquier efecto**, y los fallos se clasifican reintentable /
+  definitivo con un `Record` tipado que no compila si un código del catálogo queda sin clasificar.
+  El código HTTP va invertido a propósito: un fallo **definitivo responde 200** para que la cola no
+  reintente, y solo el reintentable pide 5xx.
+- **Una dependencia nueva, `@upstash/qstash`**, con los cuatro checks de salud y su fila en
+  `docs/dependencias.md`. `@upstash/redis` no entra.
+- **Verificación**: `./init.sh` completo verde sobre la rama sincronizada — **576/576 archivos,
+  8289 tests, 0 rojos**. Sin E2E, deliberado: R27 lo difiere a QC-107 porque un E2E real exigiría
+  URL pública y cuenta, y el gate deja de correr sin red.
+- **Aflojó cinco guardias de alcance ajenas, y ninguna encontró un defecto**: las cinco afirmaban
+  «el repo no tiene X» cuando esta ficha tenía permiso explícito para añadir X —la dependencia
+  aprobada y el primer Route Handler—. En `pedidos-convenciones` se **borra** la afirmación
+  absoluta sobre todo `app/` y se conserva la acotada, con un caso nuevo que demuestra que el
+  detector sigue mordiendo. El baseline pierde dos entradas y conserva seis.
+- **Deuda declarada con encargo de ficha**: las guardias de alcance escritas como absolutos;
+  `tests/unit/pedidos/module-contract.test.ts` ciego con CRLF; y la guardia de QC-129, que afirma
+  que `CATALOG_PROMPT` no existe cuando `.env.example` la trae y el procedimiento de montar un
+  worktree es copiar ese archivo —el camino documentado produce el rojo—.
+- **Lo que quedó abierto al cerrar, y no es un defecto de la ficha sino un presupuesto que el spec
+  nunca puso.** Revisado al mergear: el trabajo corre **síncrono dentro de la petición** —el Route
+  Handler espera a `runDocumentJob` entero—, así que el techo lo pone `maxDuration` de Vercel,
+  **300 s por defecto**, y no QStash, que aguanta 15 min en el plan Free. El PR **no fija
+  `maxDuration` ni el `timeout` del publish**. Con `catalogo` y 50 páginas —el tope exacto de
+  `MAX_PDF_PAGES`— el paso caro es rasterizar a 150 DPI, y **el timeout de 60 s de la IA no lo
+  cubre**: `buildImageParts` corre *antes* del `runWithTimeout`. Si la función muere a mitad, la
+  fila se queda en `processing`, **los reintentos de QStash no sirven** —`claim` exige
+  `status='queued'`— y solo la cierra `expireStale` a los 900 s, que además no es un cron sino una
+  llamada perezosa desde `getBatchStatus`. Tres fichas propias: subir `maxDuration`, acotar la
+  rasterización y hacer re-reclamable la fila colgada.
+- **El nombre de la cabecera del message id sigue sin verificar**: el SDK nunca la lee —comprobado,
+  `message-id` no aparece en el paquete—, así que se implementó con `upstash-message-id` en una
+  sola constante, sin rellenar con un supuesto. Si fuera otro, la ruta responde 400 siempre y no se
+  procesa ni un PDF, sin que ningún test lo note. **El servidor dev local de QStash (`QSTASH_DEV=true`)
+  lo responde sin desplegar.**
+
+## 2026-09-21 — QC-136-canvas-no-empaquetable-rompe-el-build
+
+- `next build` sobre `dev` salía con **exit 1** y la aplicación no se podía desplegar.
+  `serverExternalPackages: ['@napi-rs/canvas']` en `next.config.ts` lo deja en **exit 0**. Medido
+  el mismo día, mismo árbol y misma máquina, cambiando solo esa línea. PR **#101**.
+- **La causa era una línea de configuración que faltaba desde QC-106.** `next.config.ts` seguía
+  tal cual lo generó `create-next-app`, vacío. `@napi-rs/canvas` no es JavaScript: es un envoltorio
+  sobre un binario compilado que su `js-binding.js` elige por plataforma **en ejecución**.
+  Turbopack no puede darle un *module id* a un `.node`, así que el build ni terminaba.
+- **Lo que no bastaba, y conviene no perderlo:** el adaptador **ya** lo cargaba con
+  `await import()`. Un especificador literal sigue siendo analizable estáticamente, así que el
+  bundler lo mete en el grafo igual. La carga diferida ayuda en **ejecución**, no en
+  **compilación**.
+- **Guardia:** `tests/unit/documentos/canvas-no-empaquetado.test.ts`, 3 casos con control positivo,
+  sobre la **configuración** y no sobre el build —correr `next build` en un test de unidad lo
+  volvería de minutos—.
+- **Verificación:** `next build` exit 0 y `./init.sh` completo verde (582/582 archivos, 8354
+  tests). Ninguna dependencia nueva.
+- **Derogó** lo que QC-106 declaró como riesgo acotado: no era un fallo de ejecución capturable por
+  la rama de R16, es que no compilaba.
+- **Riesgo de QC-106 que además queda muy reducido:** el lockfile declara
+  `@napi-rs/canvas-linux-x64-gnu` y `-musl`, así que el entorno de Vercel tendrá su binario.
+- **El orden del merge dejó un cabo suelto y conviene recordarlo.** El PR #100 se mergeó contra la
+  rama del #99 cuando esa ya estaba en `dev`, así que su commit existía pero no llegaba. Se
+  detectó comprobando `dev` antes de arrancar otra ficha, y se rehizo como PR #101. **Encadenar un
+  PR sobre otro solo funciona si el padre se mergea antes de que el hijo esté listo.**
