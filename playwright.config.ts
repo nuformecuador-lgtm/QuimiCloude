@@ -49,6 +49,14 @@ export default defineConfig({
     // correr sin red. Va en el entorno del SERVIDOR, que es donde se eligen los
     // adaptadores; el navegador no la ve. `tests/guards/guard-dobles-e2e.test.ts` se pone
     // roja si cualquier otro archivo versionado la activa.
-    env: { DOCUMENTS_E2E_DOUBLES: '1' },
+    //
+    // Los dos textos de prompt son FICTICIOS: la lectura con IA esta doblada, asi que ese texto no
+    // se usa jamas; solo existe para que leer el prompt de la estrategia no lance antes de llegar
+    // al adaptador.
+    env: {
+      DOCUMENTS_E2E_DOUBLES: '1',
+      CATALOG_PROMPT: 'prompt ficticio de catalogo para el recorrido de extremo a extremo',
+      FORMULA_PROMPT: 'prompt ficticio de formula para el recorrido de extremo a extremo',
+    },
   },
 })

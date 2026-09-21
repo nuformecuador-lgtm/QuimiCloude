@@ -1,7 +1,8 @@
 # QC-107 — componente-de-carga-de-archivos · bitácora de implementación
 
 > Fase F2. Escrita por el `implementer`, que coordinó a `frontend_dev` (T1–T11) y a `backend_dev`
-> (T13–T14). **T12 y T15 quedan abiertas, y T17 es del leader.** Nada aquí se autoaprueba:
+> (T13–T14). **T12 sigue bloqueada; T15 está escrita y completa pero en ROJO por un defecto de
+> producción ajeno a esta ficha; T17 es del leader.** Nada aquí se autoaprueba:
 > decide el reviewer.
 
 ## Estado de las tasks
@@ -13,8 +14,9 @@
 | T10–T11 — asertos por ausencia y multiplataforma | cerradas | `frontend_dev` |
 | T12 — montaje en fórmulas | **BLOQUEADA**, no se toca | — |
 | T13–T14 — dobles del E2E y su guardia | cerradas | `backend_dev` |
-| T15 — el E2E navegable | **ABIERTA**, parada por un hueco de `design.md > 8` | — |
+| T15 — el E2E navegable | **escrita y completa**, pero **en rojo**: ver el hallazgo | `frontend_dev` |
 | T16 — esta bitácora | cerrada | `implementer` |
+| T18 — R23, la tanda desconocida | cerrada | `frontend_dev` |
 | T17 — gate completo antes del PR | **sin marcar**, es del leader | — |
 
 ## Archivos creados
@@ -85,7 +87,7 @@ Todos los caminos son relativos a `tests/unit/`, salvo la guardia.
 | R17 | `documentos-ui/supplier-detail-upload.test.tsx` | `la pantalla de detalle de proveedor monta el componente en modo catalogo (R17)` |
 | R18 | **BLOQUEADO** — cubierto **en negativo** en `documentos-ui/document-upload-convenciones.test.ts` | `ninguna pantalla de formulas monta el componente y no aparece ningun permiso nuevo (R18)` |
 | R19 | `documentos-ui/document-upload-convenciones.test.ts` | `no anade ninguna ruta, constante de ruta ni item de menu propios de documentos (R19)` |
-| R20 | **PARCIAL** — `composition/documentos-facade.test.ts` y `tests/guards/guard-dobles-e2e.test.ts` | `sin la variable de entorno, la composicion elige los adaptadores reales (R20)` · `con la variable, la composicion elige los dobles (R20)` · los cinco casos de la guardia. **Falta el recorrido navegable de T15.** |
+| R20 | `composition/documentos-facade.test.ts`, `tests/guards/guard-dobles-e2e.test.ts` y **`e2e/documentos.spec.ts`** | `sin la variable de entorno, la composicion elige los adaptadores reales (R20)` · `con la variable, la composicion elige los dobles (R20)` · los cinco casos de la guardia · `sube tres PDFs y ve cambiar el estado de cada uno hasta terminar (R20)`. **El caso E2E existe y recorre todo, pero termina en ROJO** por el defecto de producción del final. |
 | R21 | `documentos-ui/document-upload-a11y-tactil.test.tsx` | `la subida se puede activar sin hover y con objetivos tactiles de 44px (R21)` · `ninguna parte del componente mide la pantalla con 100vh (R21)` |
 | R22 | `documentos-ui/document-upload-convenciones.test.ts` | `el tope y los tipos se importan del contrato del modulo y no se reescriben (R22)` |
 | R23 | `documentos-ui/document-upload-errors.test.tsx` y `documentos-ui/use-batch-status.test.tsx` | `una tanda desconocida detiene el sondeo (R23)` (uno en el componente, otro en el hook) · `el mensaje de tanda desconocida no distingue si no existe o es de otra empresa (R23)` |
@@ -96,8 +98,11 @@ caso **en negativo**, y se comprobó que **muerde** por sus dos vías: montar el
 pantalla de fórmulas lo pone rojo, y añadir un permiso al catálogo cerrado también. No se inventó
 ningún permiso, no se prestó el de proveedores y no se tocó la pantalla de fórmulas.
 
-**R20, dicho entero.** La mitad de la composición está cubierta y verificada; el recorrido
-navegable **no existe todavía** porque T15 está parada. **R20 no está cerrado.**
+**R20, dicho entero.** El recorrido navegable **ya existe** y ejercita login, pantalla, selección de
+tres PDFs, subida real desde el navegador al enlace firmado, encolado y sondeo vivo contra Postgres,
+en Chromium y en WebKit. **Termina en rojo en su último aserto** —el estado final es `error` y no
+`done`— por un defecto de producción que esta ficha no introdujo y que no le toca arreglar. **R20 no
+se puede dar por cerrado hasta que ese defecto se corrija.**
 
 ## Salida real de los tests
 
@@ -153,17 +158,43 @@ Playwright, y elegir un doble sin consultarla.
 
 1. **T12 / R18 — montaje en fórmulas.** Bloqueada por la pregunta abierta 1. No se tocó.
 
-2. **T15 / R20 — el E2E. Parada, y pide decisión humana.** El motivo es un hueco de
-   `design.md > 8`: dobla tres puertos —almacenamiento, cola e IA— pero el recorrido de `catalogo`
-   pasa además por `readStrategyPromptFromEnv('catalogo')`, que **lanza** si falta su variable
-   (`lib/modules/documentos/adapters/driven/config/strategy-prompt-env.ts`, verificado contra el
-   código: «sin texto por defecto, de repuesto ni heredado de la otra estrategia»). Con el diseño
-   tal como está escrito, los tres archivos del E2E acabarían en `error` y nunca en «listo», que es
-   exactamente lo que R20 exige ver cambiar. **No se improvisó ninguna salida.** Opciones visibles,
-   sin elegir ninguna: añadir esa variable a `webServer.env` junto a la que ya está ahí; doblar
-   también el puerto del prompt como un cuarto adaptador; o enmendar `design.md > 8`.
+2. **T15 / R20 — el E2E está escrito y recorre todo, pero acaba en ROJO. No es suyo el fallo.**
+   El hueco de `design.md > 8` que lo bloqueaba se resolvió por decisión del humano: `CATALOG_PROMPT`
+   y `FORMULA_PROMPT` se declaran con **texto ficticio** en el `webServer.env` de
+   `playwright.config.ts`, con el motivo escrito allí —la IA está doblada, así que ese texto no se
+   usa jamás; sólo evita que leer el prompt lance antes de llegar al adaptador—. Se descartó doblar
+   el puerto del prompt y se descartó enmendar el diseño.
 
-3. **T17 — el gate completo y el PR.** Son del leader. No se abrió ningún PR.
+   Con eso, el recorrido llega entero hasta el último aserto **en los dos navegadores**: login,
+   detalle de proveedor por `supplierDetailRoute`, tres PDFs elegidos, tres filas con su nombre
+   exacto, los tres `PUT` al enlace firmado interceptados, encolado real y sondeo vivo leyendo de
+   Postgres. **Falla sólo el estado final**: `error` en vez de `done`.
+
+3. **El defecto que lo tumba, y es de PRODUCCIÓN.** `countPages` entrega el `Uint8Array` a pdf.js
+   sin copiarlo (`adapters/driven/pdf/pdf-converter-unpdf.ts`, `getDocumentProxy(pdf)`), y pdf.js
+   **transfiere el `ArrayBuffer`**, que queda *detached* y deja el arreglo del llamante en
+   `length === 0`. `domain/process-pdf-by-strategy.ts` cuenta las páginas sobre `input.bytes` y
+   **después** pasa **ese mismo** arreglo a la lectura con IA, cuyo esquema exige `bytes.length > 0`
+   (`domain/ai-read-input.ts`). Resultado: todo archivo acaba en `error` con `invalid_input`.
+
+   **Verificado leyendo el código, no sólo creído**: el conteo está en la línea 116 y la lectura en
+   la 122 del mismo archivo, sobre la misma variable, y ninguna de las tres funciones del adaptador
+   copia antes de entregar. Reproducido además fuera de Playwright: `antes: 346 detached? false` →
+   `despues de countPages: 0 detached? true`, y sobre una copia fresca las dos funciones responden
+   bien.
+
+   **Alcance: no depende de los dobles y no es cosa del E2E.** Afecta a las dos estrategias —quien
+   detacha es el conteo, que es común— y en producción `runDocumentJob` descarga una vez y pasa ese
+   mismo arreglo. El E2E no destapó un problema del E2E: destapó uno real, que es justo lo que un
+   recorrido de extremo a extremo aporta.
+
+   **No se arregla aquí.** Tocar `adapters/driven/pdf/` o `domain/` no lo autoriza ninguna task de
+   esta ficha, que además dice explícitamente que si algo parece necesitarlo **se para y se
+   pregunta**. Queda para el humano decidir quién lo corrige y en qué ficha. La salida más limpia
+   —dicha, no aplicada— es que el adaptador entregue una copia a pdf.js en sus tres funciones, de
+   modo que el puerto cumpla lo que el dominio ya supone: «no consumo lo que me das».
+
+4. **T17 — el gate completo y el PR.** Son del leader. No se abrió ningún PR.
 
 ## Decisiones que conviene que el reviewer mire
 
