@@ -1652,7 +1652,7 @@
       "epic_name": "Documentos e IA",
       "name": "recorte-de-imagenes-del-pdf",
       "description": "A partir de las paginas del PDF convertidas a imagen, Gemini identifica las imagenes que contienen y DEVUELVE SUS COORDENADAS; otra libreria las RECORTA y los recortes se SUBEN COMO ARCHIVOS a Supabase Storage.\n\nCAMBIO DEL 2026-09-14 (decidido por el humano): el recorte CORRE DENTRO DEL TRABAJO DE LA COLA (procesamiento-de-pdf-en-cola).\n\nSTORAGE: Supabase Storage, en un bucket NUEVO propio de estos recortes. Hereda el precedente de QC-25: @supabase/storage-js (ya aprobado) detras de un puerto. Decidido por el humano el 2026-09-14.\n\nDEPENDENCIA NUEVA: la libreria de recorte de imagenes. No se instala sin aprobacion humana ni sin los cuatro checks (regla 7).\n\nLO QUE NO ENTRA: la lectura generica con prompts (lectura-de-pdf-con-gemini) y la cola que lo ejecuta (procesamiento-de-pdf-en-cola), que la bloquean.\n\nABIERTO, se acota con /afinar-feature: formato de las coordenadas, nombre y ruta de los recortes, que pasa si la IA devuelve coordenadas fuera de la pagina.",
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",

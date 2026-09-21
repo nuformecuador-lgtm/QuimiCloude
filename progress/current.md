@@ -25,8 +25,18 @@ que dijo el leader al acotar estaba mal por uno; la tabla trae 18 filas.)
 
 **F1.2 y F1.3 hechos el 2026-09-21.** `spec_author` entrego **R1-R23** y **18 tasks** (T0-T17),
 **semilla verificada intacta por `git diff`** -el diff borra UNA linea, la del marcador- y las
-**18** decisiones citadas, ninguna huerfana. Tarjeta movida a *En revision*. **PARADA EN F1.4
-esperando aprobacion humana**, con **CUATRO HALLAZGOS** que el design declara en su §0.
+**18** decisiones citadas, ninguna huerfana. Tarjeta movida a *En revision*. **F1.4 APROBADO el 2026-09-21** por el humano, por chat; la tarjeta la
+movio el leader a *En curso* y se deja dicho quien la movio. **La aprobacion del spec INCLUYE la
+dependencia**: `sharp` ya tiene su fila en `docs/dependencias.md` con los cuatro checks del
+2026-09-21. **Cupo `backend`: 1 de 2.**
+
+**LOS CUATRO HALLAZGOS DEL DESIGN (§0) ENTRAN A F2 SIN CERRAR, y hay que decirlo**: (1) la ficha
+pondra en rojo `tests/unit/documentos/qc111-alcance.test.ts` -hoy verde, 33 casos, comprobado- y
+T13 la enmienda, que es tocar el test de OTRA ficha; (2) **se rasteriza DOS VECES por archivo de
+`catalogo`**, aceptado y declarado, y eso pesa mas de lo que parece porque rasterizar es el paso
+sin plazo propio y `maxDuration` esta en 300 s; (3) que `sharp` cargue en el runtime de Vercel es
+**DESCONOCIDO**, igual que quedo `@napi-rs/canvas`; (4) las tres preguntas abiertas siguen **sin
+mitigacion a proposito**, y la que mas pesa es que **no hay tope de recortes por PDF**.
 
 **La ficha declaraba TRES preguntas abiertas y salieron OCHO mas al mirar el codigo.** Las dos que
 cambiaban el alcance: el puerto `AiReader` devuelve TEXTO PLANO -QC-108 lo cerro asi-, y las
