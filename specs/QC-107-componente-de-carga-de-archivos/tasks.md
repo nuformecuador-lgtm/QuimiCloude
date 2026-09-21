@@ -1,0 +1,136 @@
+# QC-107 — componente-de-carga-de-archivos · tasks.md
+
+Convención: los nombres de test citan `R<n>`, nunca `QC-nn` (`docs/conventions.md > Comentarios`;
+en producción no se cita ni ficha ni requisito). «Hecho» en cada task exige typecheck + lint locales
+sobre los archivos tocados y `./init.sh --rapido` al cerrar la tanda; el gate completo (`./init.sh`)
+se corre una sola vez al final, antes del PR (regla 5 de `CLAUDE.md`).
+
+**Ninguna task de esta ficha toca `lib/modules/documentos/domain/`, `ports/` ni las dos Server
+Actions.** Si alguna parece necesitarlo, se para y se pregunta.
+
+## Andamiaje del componente
+
+- [ ] **T1.** Crear `components/shared/document-upload/` con su `index.ts` y el esqueleto de
+      `document-upload.tsx` (`'use client'`), con la prop `strategy: PdfStrategy` importada del
+      barril del módulo y sin lógica todavía.
+      **Hecho cuando**: `pnpm run typecheck` pasa y el test
+      `el componente exige la estrategia de toda la tanda por prop (R3)` pasa en
+      `tests/unit/documentos-ui/document-upload-strategy.test.tsx`.
+
+- [ ] **T2. [P]** `labels.ts`: los textos por estado de archivo (los cuatro de
+      `DocumentFileStatus`) y la elección del texto de error **por `code`**, con `errorMessage` del
+      barril de `errores`. Sin ningún literal de mensaje escrito a mano.
+      **Hecho cuando**: `el texto de un archivo en error se elige por su code y no por su mensaje
+      (R12)` pasa en `tests/unit/documentos-ui/document-upload-errors.test.tsx`.
+
+- [ ] **T3.** Depende de T1. Selección de archivos: `<input type="file" multiple
+      accept="application/pdf">` con su disparador accesible, tope importado
+      (`MAX_FILES_PER_BATCH`) y rechazo **entero** por encima del tope.
+      **Hecho cuando**: pasan `la selección admite hasta el tope de archivos que publica el módulo
+      (R1)`, `una selección por encima del tope se rechaza entera y no llama a ninguna acción (R1)`
+      y `la selección se restringe a PDF (R2)` en
+      `tests/unit/documentos-ui/document-upload-selection.test.tsx`.
+
+## El camino de subida
+
+- [ ] **T4.** Depende de T3. `upload-file.ts`: el `PUT` del navegador al `uploadUrl` firmado, con su
+      resultado por archivo. No conoce ninguna Server Action.
+      **Hecho cuando**: `los bytes del PDF viajan al enlace firmado y no a ninguna Server Action
+      (R5)` pasa en `tests/unit/documentos-ui/document-upload-flow.test.tsx`.
+
+- [ ] **T5.** Depende de T4. El flujo completo en `document-upload.tsx`: `issueUploadLinksAction`
+      (ruta exacta) → subidas en paralelo → `enqueueBatchAction` (ruta exacta) con **las rutas que
+      subieron bien** y la estrategia de la prop.
+      **Hecho cuando**: pasan `pide los enlaces de subida con la acción del módulo importada por su
+      ruta exacta (R4)`, `encola la tanda con las rutas devueltas y la estrategia de la prop (R7)`,
+      `un archivo cuya subida falla queda señalado y no se encola (R6)` y `si no sube ningún archivo
+      no se encola nada (R6)` en `tests/unit/documentos-ui/document-upload-flow.test.tsx`.
+
+- [ ] **T6.** Depende de T5. `document-upload-row.tsx`: la fila con la **fase del navegador** antes
+      de que la tanda exista y, después, **exclusivamente** uno de los cuatro estados del módulo.
+      **Hecho cuando**: pasan `la fila pinta solo los cuatro estados que publica el módulo (R11)`,
+      `mientras el archivo sube, la fila no muestra ningún estado del módulo (R6)` y `un archivo
+      listo no muestra el texto extraído (R13)` en
+      `tests/unit/documentos-ui/document-upload-rows.test.tsx`.
+
+## El sondeo
+
+- [ ] **T7.** Depende de T5. `use-batch-status.ts`: sondeo de `getBatchStatusAction` cada 2000 ms
+      (`design.md > 4.1`), primera consulta inmediata, una sola en vuelo, parada al terminar todos
+      los archivos, parada al desmontar, parada con error reanudable. **Sin dependencia nueva.**
+      **Hecho cuando**: pasan, con temporizadores falsos, `sondea el estado de la tanda hasta que
+      todos los archivos terminan (R8)`, `deja de sondear en cuanto ningún archivo sigue en cola ni
+      procesando (R8)`, `no lanza una consulta nueva mientras la anterior sigue en vuelo (R8)`,
+      `deja de sondear al desmontarse (R8)` y `no declara ningún plazo propio para dar por fallido un
+      archivo (R10)` en `tests/unit/documentos-ui/use-batch-status.test.tsx`.
+
+- [ ] **T8.** Depende de T7. El error de la consulta: se muestra por su `code` y el sondeo se
+      detiene con un control para reanudar; `data: null` se trata como tanda desconocida y también
+      detiene el sondeo.
+      **Hecho cuando**: pasan `un error de la consulta detiene el sondeo y se muestra por su code
+      (R12)` y `el componente no comprueba ningún permiso y muestra el error de autorización como
+      cualquier otro (R14)` en `tests/unit/documentos-ui/document-upload-errors.test.tsx`.
+
+## Montaje
+
+- [ ] **T9.** Depende de T6, T8. Montar `<DocumentUpload strategy="catalogo" />` en
+      `app/(private)/proveedores/[id]/page.tsx`, debajo de `CatalogListSection`, sin añadir ningún
+      corte de permiso nuevo.
+      **Hecho cuando**: `la pantalla de detalle de proveedor monta el componente en modo catálogo
+      (R17)` pasa en `tests/unit/documentos-ui/supplier-detail-upload.test.tsx`.
+
+- [ ] **T10. [P]** `tests/unit/documentos-ui/document-upload-convenciones.test.ts`: los asertos
+      «por ausencia», leyendo los archivos del componente y del repo —sin dependencia nueva (R9),
+      sin suscripción de tiempo real ni cliente de Supabase (R15), sin aviso ni notificación (R16),
+      sin ruta ni item de menú nuevos (R19), el tope y los tipos **importados** y no reescritos
+      (R22), y **ninguna pantalla de fórmulas montando el componente ni permiso nuevo** (R18).
+      **Hecho cuando**: los seis casos pasan citando su `R<n>`.
+
+- [ ] **T11. [P]** `tests/unit/documentos-ui/document-upload-a11y-tactil.test.tsx`: objetivos
+      táctiles de 44×44 px, `font-size` ≥ 16 px en el control de entrada, activación sin `:hover` y
+      ausencia de `100vh`, con el mismo patrón que `tests/unit/asignaciones-ui/a11y-tactil.test.tsx`.
+      **Hecho cuando**: `la subida se puede activar sin hover y con objetivos táctiles de 44px (R21)`
+      pasa.
+
+- [ ] **T12. BLOQUEADA — no se hace en esta ficha.** Montar
+      `<DocumentUpload strategy="formula" />` en la pantalla de fórmulas (R18).
+      **Bloqueada por la pregunta abierta 1** de `requirements.md`: quién puede subir desde
+      fórmulas. No se inventa un permiso nuevo ni se presta `proveedores.modificar`; lo decide el
+      humano en F1.4 o en una ficha posterior.
+      **Hecho cuando**: la pregunta 1 esté respondida por escrito **y** el montaje tenga su test
+      `la pantalla de fórmulas monta el componente en modo fórmula (R18)`.
+
+## E2E y cierre
+
+- [ ] **T13.** Depende de T9. Los tres dobles de `design.md > 8`:
+      `document-storage-memory.ts`, `processing-queue-inline.ts` y `ai-reader-canned.ts` en
+      `adapters/driven/**`, elegidos en `lib/composition` según `DOCUMENTS_E2E_DOUBLES` leída **en
+      la invocación**, más su línea vacía y documentada en `.env.example` y
+      `webServer.env` en `playwright.config.ts`.
+      **Hecho cuando**: `tests/unit/composition/documentos-facade.test.ts` se amplía con `sin la
+      variable de entorno, la composición elige los adaptadores reales (R20)` y `con la variable, la
+      composición elige los dobles (R20)`, y los dos pasan.
+
+- [ ] **T14.** Depende de T13. `tests/guards/guard-dobles-e2e.test.ts`: roja si algún archivo
+      versionado distinto de `playwright.config.ts` activa la variable, o si `lib/composition` elige
+      un doble sin consultarla.
+      **Hecho cuando**: la guardia pasa en verde **y** se comprueba que **muerde**, con un fixture
+      por cada uno de los dos motivos de fallo (`docs/verification.md > Probar que muerde`).
+
+- [ ] **T15.** Depende de T13. `e2e/documentos.spec.ts`: login → detalle de proveedor → elegir tres
+      PDFs → subir (con `page.route()` interceptando el `PUT` al enlace firmado) → ver tres filas →
+      verlas llegar a «listo». Rutas desde `lib/shared/routes`, asertos sobre `data-testid` y roles,
+      fixtures con prefijo propio y `afterAll` que limpia por nombre exacto.
+      **Hecho cuando**: `sube tres PDFs y ve cambiar el estado de cada uno hasta terminar (R20)`
+      pasa en **Chromium y WebKit**, con el servidor de Playwright y **sin red**.
+
+- [ ] **T16.** Depende de T1–T15 (salvo T12, bloqueada). Escribir
+      `progress/impl_QC-107-componente-de-carga-de-archivos.md` con el mapa `R1..R22 → test`,
+      dejando **R18 anotado como bloqueado** con su cobertura en negativo y la razón.
+      **Hecho cuando**: cada `R<n>` aparece con al menos un test concreto, o —solo R18— con su
+      bloqueo escrito.
+
+- [ ] **T17.** Depende de T16. Correr `./init.sh` completo (no `--rapido`) antes de abrir el PR.
+      **Hecho cuando**: termina en verde, incluidas las guardias de arquitectura y de dependencias,
+      que deben pasar **sin ningún cambio en `docs/dependencias.md`** porque no entra ninguna
+      dependencia nueva.
