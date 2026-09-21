@@ -296,3 +296,34 @@ sobrevive la de QC-107. **Ninguna migración** que aplicar.
 Los dos renombrados de interfaz que venían en `dev` —«Producción» → «Fórmulas» y «Usuarios» a
 «Operación»— **no tocan nada de esta ficha**: se comprobó que ni el E2E ni los tests del componente
 nombran esas etiquetas, y la constante de ruta de fórmulas no cambió.
+
+### Reverificación sobre el árbol ya integrado
+
+El gate que vale es el de la rama que se va a mergear, así que todo se repitió **después** del
+merge, no antes:
+
+```
+✓ typecheck paso
+✓ lint paso
+ Test Files  164 passed (164)
+      Tests  2428 passed | 1 skipped (2429)
+guardias: 48 passed
+== init OK ==
+```
+
+```
+✓  1 [chromium] › documentos › sube tres PDFs y ve cambiar el estado de cada uno hasta terminar (R20) (9.7s)
+✓  2 [webkit]   › documentos › sube tres PDFs y ve cambiar el estado de cada uno hasta terminar (R20) (10.7s)
+  2 passed (19.4s)
+```
+
+Las seis líneas del registro por estrategia —tres archivos por navegador— siguen dando
+`longitud=53`, así que la cadena entera funciona con el `next.config.ts` de QC-136, que es el que
+sobrevivió. Sin rojos, ni siquiera los dos flakes conocidos.
+
+**Menores del reviewer cerrados en este viaje**, además de los dos del mapa: el comentario del alta
+en el censo baja de ocho líneas a dos, los dos archivos de test que iban sin punto y coma se
+normalizaron con el propio ESLint, y `paraLaLibreria` —único identificador en castellano de un
+archivo en inglés— pasa a `copyForLibrary`. Los que tocan `design.md` los lleva el leader por otra
+vía. Los menores 7, 8, 9, 10 y 11 quedan como estaban: son ficha, decisión escrita o cierre del
+leader.
