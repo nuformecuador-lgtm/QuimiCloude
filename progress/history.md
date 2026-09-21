@@ -4488,3 +4488,60 @@ aquí) ni se arregló el test ajeno dentro de esta rama → **QC-134**.
 **Deuda que deja.** El `.env` del **árbol principal sigue con las dos líneas**, así que ahí el rojo sigue vivo
 hasta que entre QC-134. Y el gate volvió a avisar de los **8 archivos del baseline que ya pasan** y siguen sin
 podar.
+
+## 2026-09-19 — QC-123-el-total-del-pedido-decidir-donde-vive-el-precio
+
+- El pedido gana `orders.ingredients_cost DECIMAL(14,4)` NULL: el **coste de los ingredientes**
+  que consume su receta, leído de los lotes de inventario con existencia. **No es un precio de
+  venta** — no existe ninguno en el ERP. Se calcula en el servidor, viaja como cadena decimal, se
+  guarda en el pedido y se recalcula en cada edición con los lotes de ese día. La ficha solo
+  **lee** lotes: no descuenta ni reserva existencia.
+- Requisitos cubiertos: **R1–R23** del spec más **R24–R26** de la enmienda humana = **26
+  declarados / 26 mapeados**, cada uno a un test que existe y cuyo cuerpo prueba el requisito.
+  PR **#96**, merge `63d15088`.
+- **La premisa de la ficha cambió entera antes de escribir una línea.** Nació como «decidir dónde
+  vive el precio» con cinco preguntas abiertas; `/afinar-feature` las cerró y descubrió que no hay
+  precio de venta en ninguna parte. `complexity` subió de `medium` a `high`, el board se corrigió
+  antes de sembrar, y de ahí nacieron **QC-130** (una presentación no sabe que «bidón» son 20 L) y
+  la recuperación de la columna del importe en **QC-122**. **Deroga** el punto 4 de
+  `docs/architecture.md > Preguntas abiertas del dominio`, que describía columnas que QC-35bis
+  borró el 2026-09-07.
+- **Decisiones de diseño**: NO nace puerto `pedidos -> inventario` — `inventario` amplía su
+  contrato ya publicado con `findCostingBatches`. El cálculo vive en `pedidos/domain/order-cost.ts`,
+  **puro y probable sin base**, con enteros escalados y **sin dependencia nueva**. La migración no
+  lleva `UPDATE`: los pedidos anteriores se quedan sin importe y **nunca** se rellenan con 0, que
+  sería un dato falso indistinguible de un pedido gratis.
+- **Las tres decisiones que el spec dejó abiertas las cerró el humano ANTES del implementer**, y se
+  devolvieron al `spec_author` como enmienda en vez de dejar que las inventara el código: el
+  **desbordamiento** de `Decimal(14,4)` deja el importe en blanco —lo que enmienda `[D5]` de cuatro
+  casos a **cinco**—; el **desempate de lote** compara como número si ambos son sólo dígitos y como
+  texto si no, sin tocar QC-81; y se convierte **la cantidad y el coste unitario** a la unidad de la
+  línea de receta. `pedidos` **recupera la dependencia de `unidades`** que QC-35bis le quitó:
+  retroceso consciente, con motivo escrito en `[D6]`.
+- **Dos vueltas de `reviewer`.** La primera rechazó por **dos líneas de comentario** que citaban
+  ficha o requisito (`docs/conventions.md > Comentarios`), cerradas en `015593c6`. La segunda
+  aprobó sobre `015593c6` sin fiarse del barrido ajeno: repitió el suyo sobre todo lo añadido en
+  `lib/`, `app/`, `db/`, `components/` y `scripts/`, con patrón validado contra una línea de
+  control.
+- **Verificación**: `./init.sh` completo verde sobre la rama ya sincronizada con `dev` —
+  **566 archivos, 8238 tests, 0 rojos**. Ninguna dependencia nueva.
+- **Lo que este cierre destapó, y es la lección que conviene no perder.** El primer gate completo
+  salió **rojo con un rojo propio que el gate rápido no podía ver**:
+  `tests/unit/unidades/module-contract.test.ts` lee `product-catalog.ts` **con `fs`** y prohíbe que
+  aparezca `unitId`, y la ficha había metido ahí el tipo `CostingBatch`. `vitest run guard` no la
+  recoge (vive fuera de `tests/guards`) y `vitest related` no la relaciona (no importa el archivo,
+  lo lee). Es exactamente el agujero que la regla 5 describe al exigir el gate completo antes de
+  cada PR. Se arregló **sin tocar la guardia** (`314e687e`), con el precedente del propio módulo:
+  `CostingBatch` se mudó a `domain/costing-batch.ts`, como ya vivía `ProductStockByUnit`.
+  **Candidato a `/afinar-regla`.**
+- **Deuda que deja, y NO es de esta ficha.** (a) Ocho archivos de `tests/baseline-rojos.json` ya
+  pasan y siguen sin podar — ninguno de `pedidos`, `inventario` ni `recetas`; va en ficha propia
+  porque meterlo aquí ensancharía el diff. (b) Una guardia de `tests/unit/pedidos-ui/` lee
+  `git status --porcelain` **sin filtrar por ficha**, así que con el árbol sucio toma cambios ajenos
+  como propios y da un rojo falso — **segundo candidato a `/afinar-regla`**. (c) Menores del primer
+  informe, ninguno bloqueante: `INTERNAL_SCALE` duplica `CONVERSION_SCALE` sin que nada avise si
+  divergen; `design.md > 10.1` promete en indicativo un diagnóstico al log que el código no hace.
+- **El cierre en disco se hizo el 2026-09-21, dos días después del merge.** El PR #96 se mergeó el
+  2026-09-19 y nadie cerró la ficha: `feature_list.json` siguió en `in_progress`, la tarjeta en
+  *En curso* y el worktree montado. Se detectó al retomarla. El barrido de comprobación —93 PRs
+  mergeados contra las 30 fichas no cerradas, por rama y por clave— confirmó que **era la única**.
