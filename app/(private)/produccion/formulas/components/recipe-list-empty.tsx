@@ -55,7 +55,7 @@ export function RecipeListEmpty({ firstPageHref }: RecipeListEmptyProps) {
         data-testid="recipe-create-open"
         className={cn(buttonVariants({ variant: 'default' }), TOUCH_TARGET)}
       >
-        Nueva receta
+        Nueva fórmula
       </Link>
     </div>
   );

@@ -53,8 +53,8 @@ export { INVENTORY_ROUTE };
  */
 export { FORMULAS_ROUTE };
 
-/** Etiqueta del sidebar para la pantalla de recetas (QC-26, R3). */
-export const RECIPES_LABEL = 'Recetas';
+/** Etiqueta del sidebar para la pantalla de fórmulas (QC-26, R3). */
+export const RECIPES_LABEL = 'Fórmulas';
 
 /**
  * Etiqueta del sidebar para la pantalla de proveedores (QC-44, R4).

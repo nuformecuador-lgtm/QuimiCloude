@@ -12,8 +12,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const { readWithGenaiMock } = vi.hoisted(() => {
-  // Borradas ANTES del `import` de mas abajo: si construir la fachada leyera alguna de las
-  // cuatro, o el adaptador se invocara al cablearse, este archivo nunca llegaria a los `it`.
+  // Borradas ANTES del `import` de mas abajo. Desde 2026-09-21 estas cuatro ya no se
+  // verifican con `expect` (ver el caso de R22/R26/R2 de QC-129 mas abajo: Vitest recarga
+  // `.env` despues de este borrado, asi que la ausencia no se sostiene). El borrado se deja
+  // igual, como intencion declarada, y sigue vivo el mock `readWithGenaiMock`.
   delete process.env.GEMINI_API_KEY;
   delete process.env.GEMINI_MODEL;
   delete process.env.CATALOG_PROMPT;
@@ -62,11 +64,13 @@ describe('documentos — la fachada expone la lectura con IA (fachada cableada)'
     expect(typeof documentos.queueSignature.messageIdOf).toBe('function');
   });
 
-  it('R22, R26, R2 de QC-129 — construir la fachada con GEMINI_API_KEY, GEMINI_MODEL, CATALOG_PROMPT y FORMULA_PROMPT ausentes no lanza', () => {
-    expect(process.env.GEMINI_API_KEY).toBeUndefined();
-    expect(process.env.GEMINI_MODEL).toBeUndefined();
-    expect(process.env.CATALOG_PROMPT).toBeUndefined();
-    expect(process.env.FORMULA_PROMPT).toBeUndefined();
+  it('R22 de QC-129 — la fachada expone readPdfWithAi y processPdfByStrategy ya cableadas', () => {
+    // Retirado 2026-09-21 por decision humana: aqui habia cuatro `expect(process.env.X).toBeUndefined()`
+    // para GEMINI_API_KEY, GEMINI_MODEL, CATALOG_PROMPT y FORMULA_PROMPT. Vitest recarga `.env` en
+    // `process.env` despues del `delete` del bloque `vi.hoisted` de arriba, asi que esa precondicion
+    // era inalcanzable mientras exista `.env` y no probaba nada del codigo de produccion, solo que el
+    // borrado habia funcionado. R2 de QC-129 -"construir la fachada no lee las variables de Gemini"-
+    // queda SIN GUARDIA en este archivo a partir de ahora.
     expect(typeof documentos.readPdfWithAi).toBe('function');
     expect(typeof documentos.processPdfByStrategy).toBe('function');
   });

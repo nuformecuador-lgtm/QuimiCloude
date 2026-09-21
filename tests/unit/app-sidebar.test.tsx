@@ -380,10 +380,13 @@ describe('barra lateral privada', () => {
     }
   });
 
-  it('el item de recetas apunta a la constante FORMULAS_ROUTE, es el unico, y ya no dice Formulas (R5)', async () => {
+  it('el item de recetas apunta a la constante FORMULAS_ROUTE, es el unico, y el enlace muestra RECIPES_LABEL (R5)', async () => {
     // R5 — QC-26 T23. El item nace en el barrel `private-nav.ts` (T3) ya migrado; aqui se
     // afirma sobre el DOM real: un solo item apunta a `FORMULAS_ROUTE`, con el testId nuevo, y
     // el testId viejo (`nav-produccion-formulas`) ya no existe en ningun sitio del arbol.
+    // Decision humana del 2026-09-21: el literal 'Fórmulas' deja de ser el nombre placeholder
+    // que QC-13 desterro y pasa a ser el nombre definitivo de esta pantalla; la aserción del
+    // enlace compara contra RECIPES_LABEL, la unica fuente de verdad, no contra un literal.
     const user = setupUser();
 
     const itemsDeRecetas = PRIVATE_NAV_ITEMS.flatMap((item) =>
@@ -413,7 +416,7 @@ describe('barra lateral privada', () => {
 
     const enlace = screen.getByTestId('nav-produccion-recetas');
     expect(enlace).toHaveAttribute('href', FORMULAS_ROUTE);
-    expect(enlace.textContent).not.toContain('Fórmulas');
+    expect(enlace.textContent).toContain(RECIPES_LABEL);
 
     // El testId viejo ya no aparece en ningun sitio del arbol renderizado.
     expect(screen.queryByTestId('nav-produccion-formulas')).toBeNull();
