@@ -17,6 +17,48 @@
 
 ## Evaluaciones
 
+### QC-110 - ACOTADA con `/afinar-feature` (2026-09-21)
+
+Alcance, **17 decisiones cerradas** y **3 preguntas abiertas** en
+`specs/QC-110-recorte-de-imagenes-del-pdf/requirements.md`. No se copian aqui.
+
+**La ficha declaraba TRES preguntas abiertas y salieron OCHO mas al mirar el codigo.** Las dos que
+cambiaban el alcance: el puerto `AiReader` devuelve TEXTO PLANO -QC-108 lo cerro asi-, y las
+coordenadas son datos estructurados; y `DocumentStorage` esta atado a UN bucket y **no sabe subir
+bytes desde el servidor**, solo firmar subidas para el navegador. Se resolvieron sin tocar ninguno
+de los dos: el JSON viaja dentro del texto y lo interpreta esta ficha, y nace un puerto propio del
+recorte con una sola operacion.
+
+**DEPENDENCIA NUEVA APROBADA: `sharp`**, con los cuatro checks verificados el 2026-09-21
+(v0.35.4 del 2026-08-26, 72.211.349 descargas/sem, Apache-2.0, sin deprecated). El dato que
+decidio: **ya estaba instalada como `optionalDependency` de `next@16.3.0`**, asi que declararla no
+hace crecer el arbol. NO sustituye a `@napi-rs/canvas` -una rasteriza paginas, la otra recorta
+regiones- y entra en `serverExternalPackages` junto a ella. `complexity: medium`, con QC-106 como
+patron de medida.
+
+### QC-140 - ACOTADA con `/afinar-feature` (2026-09-21)
+
+Alcance, **13 decisiones cerradas** y **5 preguntas abiertas** en
+`specs/QC-140-catalogo-visual-de-proveedores/requirements.md`. No se copian aqui.
+
+**El alcance CRECIO al acotarla y el board se corrigio ANTES de sembrar.** Nacio como «otra vista»
+y quedo como **sustituta** de la lista de proveedores de QC-44: `/proveedores` pasa a ensenar cada
+proveedor con el carrusel de sus productos. El alta, la edicion y la baja se mudan a
+`/proveedores/<id>`, que QC-44 ya monta, asi que **QC-44 no queda huerfana y no se cancela** -esta
+`done` y su nivel 2 sigue vivo-; se le dejo un comentario en el issue diciendolo. QC-140 gano
+`complexity:high`.
+
+**Dos cosas que conviene no perder.** (1) La carga perezosa va **con libreria por decision humana**,
+y eso arrastra la regla 7: la candidata la propone `spec_author` y la aprueba el humano en **F1.4**,
+con los cuatro checks y su fila en `docs/dependencias.md`. Nadie instala nada antes. (2) La imagen
+**reutiliza** `EntityImage` y `MISSING_IMAGE_SRC`, verificado en codigo: ya cubre `null`, cadena
+vacia y ruta que no resuelve, asi que la ficha no modela ni migra nada de imagen.
+
+**Nacio tambien QC-139** (proveedores de lo que falta al ingresar un pedido), que aterriza en esta
+misma pantalla. Se importo a `feature_list.json` junto con QC-140 y **sigue sin acotar**: tiene 4
+preguntas abiertas. Se alineo con QC-138 el mismo dia -bloqueo «is blocked by» y su pregunta de
+«que cuenta como inventario insuficiente» cerrada citando lo que QC-138 ya fijo-.
+
 ### QC-138 - ACOTADA con `/afinar-feature` (2026-09-21)
 
 Alcance, **16 decisiones cerradas** y **3 preguntas abiertas** en
