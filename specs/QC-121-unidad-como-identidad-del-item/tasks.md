@@ -209,7 +209,7 @@
         cuarto camino fabricado sin recálculo; verde con el código de T4 y T14.
       - Depende de: T9, **T14**. `[P]` con T11.
 
-- [ ] **T11. [P] E2E: el mismo nombre en dos unidades son dos filas.** (R26.) En
+- [x] **T11. [P] E2E: el mismo nombre en dos unidades son dos filas.** (R26.) En
       `e2e/inventario.spec.ts`: alta «X» con presentación en kg → alta «X» con presentación en L →
       el listado muestra **dos filas** «X · kg» y «X · L», cada una con su existencia; y un segundo
       lote en kg sube sólo la fila en kg. Se revisan los flujos existentes que asuman existencia
@@ -223,7 +223,7 @@
         depende de lotes en dos unidades.
       - Depende de: T9, **T14**. `[P]` con T10.
 
-- [ ] **T12. Trazabilidad `R<n> -> test`.** Mapa de los **35** requisitos **(Enmienda**: 28 + R29–R35**)**
+- [x] **T12. Trazabilidad `R<n> -> test`.** Mapa de los **35** requisitos **(Enmienda**: 28 + R29–R35**)**
       a tests concretos (`design.md > 14` es el punto de partida), con la nota de que `package.json`
       no se tocó (R28).
       - Archivos: `progress/impl_QC-121-unidad-como-identidad-del-item.md`.

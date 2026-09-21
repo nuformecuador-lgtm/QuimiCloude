@@ -13,8 +13,8 @@
 | T9 | hecha, `[x]` | `406e5ffd`, `7fc6136e` |
 | T15 | hecha, `[x]` | `a40f6966` |
 | T10 | hecha, `[x]` | `d1e44f0c` |
-| T11 | escrita, **E2E sin ejecutar** (entorno, ver abajo); sin `[x]` | `424d8442` |
-| T12 | mapa escrito abajo; sin `[x]` hasta que corra el E2E de T11 (R26, R34) | `ec317702` (test de R20 que faltaba) |
+| T11 | hecha, `[x]`: los 3 E2E verdes el 2026-09-21 | `424d8442`, `b1462880` (limpieza) |
+| T12 | hecha, `[x]`: mapa R1-R35 abajo | `ec317702` (test de R20 que faltaba) |
 | T13 | del leader | — |
 
 ## Tanda T5-T9 (2026-09-19)
@@ -223,7 +223,41 @@ Resultado: «Running 3 tests using 1 worker» y **no terminó ninguno**. Dos cau
 2. Claude Code mató el proceso por falta de memoria del sistema (≈2,9 GB libres al arrancar). El
    `next dev` quedó huérfano en el puerto 3117 (PID 16652, de este worktree) y lo paré.
 
-Mientras no corra, R26 y R34 tienen test escrito pero **no pasado**, y T11 queda sin `[x]`.
+Mientras no corrió, R26 y R34 tuvieron test escrito pero no pasado. **Resuelto el 2026-09-21**: ver
+abajo.
+
+### E2E de T11: verde el 2026-09-21
+
+El leader instaló `@google/genai` en el worktree (`pnpm install --frozen-lockfile`), con lo que
+`next dev` ya compila. Después hizo falta un arreglo de limpieza, y entonces los tres pasaron.
+
+**El arreglo (`b1462880`), un hueco heredado de `origin/dev`.** El `afterAll` de
+`e2e/inventario.spec.ts` borraba los lotes sin borrar antes sus asientos, y Postgres lo rechazaba
+con `23001` sobre `inventory_movements_batch_id_fkey`: desde QC-92 cada alta de lote deja su
+asiento en `inventory_movements`, cuya FK al lote es `Restrict`. `origin/dev` tiene el mismo hueco
+(su versión del archivo no nombra `inventoryMovement`); aquí muerde porque el E2E nuevo de R26 da
+de alta tres lotes por la pantalla. Se añadió el paso de movimientos **antes** del de lotes, en el
+`afterAll` y en la purga de huérfanos del `beforeAll`, con el mismo patrón que
+`e2e/ajuste-de-inventario.spec.ts`. `e2e/aislamiento-inventario.spec.ts` **no** tiene el hueco:
+fabrica sus lotes con `prisma.productBatch.create`, sin pasar por la aplicación, así que no hay
+asientos que borrar.
+
+**Corridas** (log en `$TEMP/`; RAM libre entre 1,5 y 2,3 GB):
+
+| Corrida | Comando | Resultado |
+|---|---|---|
+| R26 solo (`qc121-e2e-r26b.log`) | `pnpm exec playwright test e2e/inventario.spec.ts --project=chromium --workers=1 -g "mismo nombre en dos unidades son dos filas"` | **1 passed** (16,2 s) |
+| los tres juntos (`qc121-e2e-t11c.log`) | `pnpm exec playwright test e2e/inventario.spec.ts e2e/aislamiento-inventario.spec.ts e2e/ajuste-de-inventario.spec.ts --project=chromium --workers=1 -g "mismo nombre en dos unidades son dos filas\|sesion en la empresa A\|ajuste con motivo cambia la cantidad del lote"` | **3 passed** (32,2 s): aislamiento 5,5 s, ajuste (R34) 4,3 s, R26 13,1 s |
+| R26 con `.next` borrado (`qc121-e2e-r26-frio.log`) | el mismo de R26 solo, tras `rm -rf .next` | **1 passed** (21,9 s) |
+
+**El síntoma de acabar en la pantalla de login no se reproduce.** Apareció una sola vez
+(`qc121-e2e-t11b.log`, corrida del leader del 2026-09-19): `page.goto(INVENTORY_ROUTE)` y luego
+`inventario-title` «element(s) not found» a los 60 s. En las tres corridas de arriba el mismo paso
+tarda entre 13 y 22 s, incluso con la caché de Next borrada a propósito para reproducir el arranque
+frío de aquella corrida (que venía justo después del `pnpm install`). No hay evidencia para
+atribuirle causa: el log de aquella corrida no trae traza del servidor y su `error-context.md` ya
+fue sobrescrito. **No se da por explicado**; si vuelve, hay que capturar el `trace` de Playwright
+(`--trace on`) para ver si la navegación acabó en `/login` o si la ruta no había compilado.
 
 ## Mapa R<n> -> test
 
@@ -257,7 +291,7 @@ Rutas relativas al worktree. `int/` = `tests/integration/inventario/`; `unit/` =
 | R23 | `schema/product-unit-and-stored-stock-migration.test.ts` > «R23: el relleno», «down.sql — revierte exactamente lo que crea el up» |
 | R24 | `unit/authorization.test.ts` > «un actor con solo inventario.consultar es rechazado en los siete casos de escritura», «un actor con solo inventario.modificar es rechazado en los cinco casos de lectura»; `unit/create-product.test.ts` > «R23 — el permiso se comprueba antes que nada»; `unit/presentation-service.test.ts` > «traduce 'unit_locked'…sin exigir mas permiso que inventario.modificar» |
 | R25 | `unit/qc121-alcance.test.ts` > «R25 — sin borrado fisico de productos ni de lotes», «R25 — los identificadores nuevos de la migracion son ingles ASCII»; `schema/inventario-schema.test.ts` |
-| R26 | `e2e/inventario.spec.ts` > «el mismo nombre en dos unidades son dos filas, cada una con su propia existencia (R26)»: **escrito, no ejecutado** (ver el E2E arriba). Respaldo en integración: `int/product-stock.int.test.ts` > «el mismo nombre en kg y en L crea DOS productos…» |
+| R26 | `e2e/inventario.spec.ts` > «el mismo nombre en dos unidades son dos filas, cada una con su propia existencia (R26)»: **verde el 2026-09-21** (ver el E2E arriba). Respaldo en integración: `int/product-stock.int.test.ts` > «el mismo nombre en kg y en L crea DOS productos…» |
 | R27 | `./init.sh` completo (T13, del leader) |
 | R28 | `tests/guards/guard-dependencias-aprobadas.test.ts`; `git diff origin/dev...HEAD -- package.json pnpm-lock.yaml` vacío (medido el 2026-09-19) |
 | R29 | `int/product-stock.int.test.ts` > «tres lotes de 5 y un ajuste +6 y -9 dejan stock en 12…»; `unit/adjust-batch-stock-prisma.test.ts` > «si el recalculo lanza, el ajuste se rechaza en vez de darse por bueno (R29)»; `unit/qc121-alcance.test.ts` > «R29 — toda escritura exportada de product_batches recalcula products.stock»; `int/ledger-cuadre.int.test.ts` (verde en `--rapido`) |
@@ -265,10 +299,7 @@ Rutas relativas al worktree. `int/` = `tests/integration/inventario/`; `unit/` =
 | R31 | `int/product-stock.int.test.ts` > «R31» > «dos ajustes simultaneos sobre dos lotes del mismo producto…», «un ajuste y una alta de lote simultaneos…» |
 | R32 | `int/product-stock.int.test.ts` > «…name/qty_alert/unit_id/updated_at intactos»; `unit/adjust-batch-stock-prisma.test.ts` > «recalcula DESPUES del asiento, y la unica columna que escribe en products es stock (R32)» |
 | R33 | `schema/product-unit-and-stored-stock-migration.test.ts` > «R33: el libro de movimientos queda intacto» |
-| R34 | `e2e/ajuste-de-inventario.spec.ts` > «un ajuste con motivo cambia la cantidad del lote y queda su asiento junto al de alta, en Postgres» (aserción de la celda `product-stock` y de `products.stock`): **escrito, no ejecutado** |
-
-T15 no tiene `R<n>` propio: la decisión del humano («¿El panel de lotes se titula «nombre ·
-unidad»? Sí») no se tradujo a requisito. Su test: `unit/product-batches-sheet.test.tsx` > «el
-panel se titula «nombre · unidad» (T15)».
+| R34 | `e2e/ajuste-de-inventario.spec.ts` > «un ajuste con motivo cambia la cantidad del lote y queda su asiento junto al de alta, en Postgres» (aserción de la celda `product-stock` y de `products.stock`): **verde el 2026-09-21** |
+| R35 | `unit/product-batches-sheet.test.tsx` > «el panel se titula «nombre · unidad» (T15)» (con catálogo «X · kg» en título y `aria-label`; sin catálogo o sin unidad, solo el nombre). R35 lo añadió el leader en `5df569ee` |
 
 `package.json` no se tocó en toda la rama (R28).
