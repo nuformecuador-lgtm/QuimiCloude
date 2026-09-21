@@ -462,6 +462,20 @@ porque es validacion de entrada y no una regla nueva de dominio.
 
 ## Deudas y cosas abiertas
 
+### Un E2E de inventario acabó en la pantalla de login, una vez y sin explicación (2026-09-19)
+
+En la primera corrida del E2E nuevo de QC-121 (`e2e/inventario.spec.ts`, «el mismo nombre en dos
+unidades son dos filas», R26), tras `loginAndLand` la navegación a la ruta de inventario acabó en la
+**pantalla de login**: `inventario-title` no apareció en 60 s y el `error-context` retrata el
+formulario de acceso. **No se reprodujo**: tres corridas posteriores verdes, ese paso tarda 13-22 s, y
+la hipótesis de la compilación fría se descartó **a propósito** borrando `.next` (pasó igual, 21,9 s).
+No queda evidencia: aquella corrida no trae traza del servidor y su `error-context.md` fue sobrescrito.
+Las dos causas posibles siguen vivas: la sesión se cae al navegar, o la ruta no había compilado.
+
+**Si vuelve a aparecer, captúralo con `--trace on`** y mira si la navegación terminó en `/login`.
+El reviewer de QC-121 lo aceptó como no bloqueante (R26 tiene respaldo determinista en integración)
+**con la condición de anotarlo aquí**, no solo en la bitácora de la feature.
+
 ### El worktree de QC-108 quedó a medio borrar — OCTAVA vez, y el patrón ya no admite dudas (2026-09-18)
 
 `./scripts/wt.sh done QC-108-lectura-de-pdf-con-gemini` falló con
