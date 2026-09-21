@@ -95,11 +95,10 @@ export type ProductPickerOption = {
    * DE DONDE SALE: de `ProductView.unitId`, la columna propia del producto -fija desde que se
    * crea, ya no derivada del lote mas reciente-. `null` significa «este producto todavia no
    * tiene unidad»: con `null`, `unitsOfGroup` devuelve el catalogo entero y la linea se puede
-   * escribir igual (R23), que es lo que permite escribir una receta antes de comprar el
-   * ingrediente.
+   * escribir igual, que es lo que permite escribir una receta antes de comprar el ingrediente.
    *
-   * Este componente la usa para pintar «nombre · unidad» en la opcion y en el valor elegido
-   * (R18), y ademas la entrega intacta en `onSelect`.
+   * Este componente la usa para pintar «nombre · unidad» en la opcion y en el valor elegido, y
+   * ademas la entrega intacta en `onSelect`.
    */
   readonly unitId: string | null;
 };
@@ -121,7 +120,7 @@ function unitLabel(unitId: string, units: readonly UnitRef[]): string | null {
   return unit === undefined ? null : (unit.symbol ?? unit.name);
 }
 
-/** «nombre · unidad» de una opción, o solo el nombre sin unidad (R18). */
+/** «nombre · unidad» de una opción, o solo el nombre cuando no tiene unidad. */
 function optionLabel(option: ProductPickerOption, units: readonly UnitRef[]): string {
   return productDisplayName(option.name, option.unitId === null ? null : unitLabel(option.unitId, units));
 }
@@ -141,7 +140,7 @@ export type ProductPickerProps = {
   readonly initialPage: { readonly items: readonly ProductPickerOption[]; readonly totalPages: number };
   /** Ingredientes ya elegidos en OTRAS líneas: se apartan de la lista. */
   readonly excludedIds?: readonly string[];
-  /** Catálogo de unidades, para pintar «nombre · unidad» en cada opción (R18). */
+  /** Catálogo de unidades, para pintar «nombre · unidad» en cada opción. */
   readonly units: readonly UnitRef[];
 };
 

@@ -232,8 +232,7 @@
 
 - [ ] **T13. Gate completo y cierre.** `./init.sh` entero en verde antes del PR, sin excepción
       (R27). Confirma en particular la lista de `design.md > 12.2`, que `--rapido` no ve.
-      - **Hecho**: `./init.sh` verde y todas las tasks marcadas `[x]` (T15 cuenta como hecha si el
-        humano respondió «no» a la pregunta abierta 2).
+      - **Hecho**: `./init.sh` verde y todas las tasks marcadas `[x]`.
       - Depende de: T12, **T15**.
 
 ## Bloque 7 — enmienda del 2026-09-18 (QC-92 ya mergeada)

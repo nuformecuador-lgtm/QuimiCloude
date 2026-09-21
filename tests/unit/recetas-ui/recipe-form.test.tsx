@@ -850,7 +850,7 @@ describe('QC-80 R23 — un ingrediente SIN NINGÚN LOTE no bloquea la línea ni 
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta de un ingrediente sin lotes');
-    // `PRODUCT_1` no tiene lotes: su `latestBatchUnitId` es `null` y llega como `unitId: null`.
+    // `PRODUCT_1` todavia no tiene unidad guardada: llega como `unitId: null`.
     await chooseProductForLine(user, 0, PRODUCT_1_NAME);
 
     // No se bloquea: sin lote no hay dato con el que acotar, pero se escriben recetas antes de

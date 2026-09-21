@@ -58,13 +58,13 @@ import {
  *
  * **De dónde sale esa unidad:** de `ProductView.unitId`, la unidad guardada y fija del producto
  * -ya no la del lote más reciente-. `ProductPicker` la pinta además junto al nombre de cada
- * opción («nombre · unidad», R18), con el catálogo que este campo le pasa en `units`.
+ * opción («nombre · unidad»), con el catálogo que este campo le pasa en `units`.
  * **Ninguna de las tres reglas de arriba cambió**, y `unit-group.ts` no se tocó.
  *
  * Cuando esa unidad es `null` -o la línea viene de la precarga de edición, que no trae la del
  * producto- el grupo es el **catálogo completo**: no se recorta una lista a partir de un dato
  * que no se tiene. `null` significa **«este producto todavía no tiene unidad»**, no «no se pudo
- * leer». Y por eso la línea **no se bloquea nunca** por ese motivo (R23): el selector se
+ * leer». Y por eso la línea **no se bloquea nunca** por ese motivo: el selector se
  * habilita en cuanto hay ingrediente elegido y la receta se puede guardar igual, porque se
  * escriben recetas antes de comprar el ingrediente.
  *

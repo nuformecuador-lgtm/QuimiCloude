@@ -22,8 +22,9 @@ const nonNegativeIntSchema = z.number().int().min(0);
 
 /**
  * El producto no declara unidad en el borde: la unidad la declara la PRESENTACION
- * (`presentations.unit_id`, NOT NULL), y `products.unit_id` la fija el propio disparador al
- * escribir el lote -un dato que se lee (`ProductView.unitId`), no uno que se envie-. Por eso
+ * (`presentations.unit_id`, NOT NULL), y `products.unit_id` la escribe `createWithFirstBatch`
+ * copiandola de esa presentacion -el disparador solo RECHAZA lo que no cuadra-, asi que es un
+ * dato que se lee (`ProductView.unitId`), no uno que se envie. Por eso
  * el alta y la edicion no aceptan `unitId` -y con `strictObject`, enviarlo es `invalid_input`,
  * no un campo ignorado en silencio-.
  */

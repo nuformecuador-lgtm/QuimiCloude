@@ -70,8 +70,8 @@ export function compareDecimalText(a: string, b: string): number {
  * **De donde viene ese `null`:** la unidad de un ingrediente sale de `ProductView.unitId`, la
  * unidad guardada y fija del producto. `null` quiere decir **«este producto todavia no tiene
  * unidad»**, y nunca «no se pudo leer». **Esta funcion no cambio ni una linea por eso**: lo que
- * ya hacia con `null` es exactamente lo que R23 pide -catalogo entero, sin bloquear la linea ni
- * impedir guardar la receta-.
+ * ya hacia con `null` es exactamente lo que hace falta -catalogo entero, sin bloquear la linea
+ * ni impedir guardar la receta-.
  */
 export function unitsOfGroup(
   units: readonly UnitRef[],

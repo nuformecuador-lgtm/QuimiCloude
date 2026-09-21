@@ -188,8 +188,9 @@ describe('createProductSchema', () => {
     //      (QC-52 R1) convierte el campo de mas en `invalid_input`: ignorarlo en silencio le
     //      haria creer a quien lo envia que guardo una unidad que nunca se guardo.
     //
-    // La unidad de un producto hoy se LEE, no se envia: la fija el disparador al escribir el
-    // lote (`ProductView.unitId`), y eso se prueba en `product-prisma.test.ts`.
+    // La unidad de un producto hoy se LEE, no se envia: la escribe `createWithFirstBatch`
+    // copiandola de la presentacion del lote -el disparador solo rechaza lo que no cuadra-, y
+    // eso se prueba en `product-prisma.test.ts`.
     const base = { name: 'Producto', ...REQUERIDOS };
 
     const parsed = createProductSchema.parse(base);
