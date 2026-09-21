@@ -19,8 +19,14 @@
 
 ### QC-110 - ACOTADA con `/afinar-feature` (2026-09-21)
 
-Alcance, **17 decisiones cerradas** y **3 preguntas abiertas** en
-`specs/QC-110-recorte-de-imagenes-del-pdf/requirements.md`. No se copian aqui.
+Alcance, **18 decisiones cerradas** y **3 preguntas abiertas** en
+`specs/QC-110-recorte-de-imagenes-del-pdf/requirements.md`. No se copian aqui. (El conteo de 17
+que dijo el leader al acotar estaba mal por uno; la tabla trae 18 filas.)
+
+**F1.2 y F1.3 hechos el 2026-09-21.** `spec_author` entrego **R1-R23** y **18 tasks** (T0-T17),
+**semilla verificada intacta por `git diff`** -el diff borra UNA linea, la del marcador- y las
+**18** decisiones citadas, ninguna huerfana. Tarjeta movida a *En revision*. **PARADA EN F1.4
+esperando aprobacion humana**, con **CUATRO HALLAZGOS** que el design declara en su §0.
 
 **La ficha declaraba TRES preguntas abiertas y salieron OCHO mas al mirar el codigo.** Las dos que
 cambiaban el alcance: el puerto `AiReader` devuelve TEXTO PLANO -QC-108 lo cerro asi-, y las
