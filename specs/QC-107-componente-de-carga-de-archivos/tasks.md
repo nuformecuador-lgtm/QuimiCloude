@@ -144,7 +144,7 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
       para este escenario queda reetiquetado a `(R23)`, y el mapa de
       `progress/impl_QC-107-componente-de-carga-de-archivos.md` (T16) recoge la fila `R23 → test`.
 
-- [ ] **T19. La ejecuta `backend_dev`.** Depende de T15 (es su hallazgo). Arreglar el búfer
+- [x] **T19. La ejecuta `backend_dev`.** Depende de T15 (es su hallazgo). Arreglar el búfer
       detachado de `design.md > 12`: en
       `lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf.ts`, entregar **una copia** del
       arreglo a la librería en las **tres** funciones —`countPages`, `extractPdfText` y

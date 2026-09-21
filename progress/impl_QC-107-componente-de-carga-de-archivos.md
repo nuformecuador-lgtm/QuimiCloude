@@ -17,6 +17,7 @@
 | T15 — el E2E navegable | **escrita y completa**, pero **en rojo**: ver el hallazgo | `frontend_dev` |
 | T16 — esta bitácora | cerrada | `implementer` |
 | T18 — R23, la tanda desconocida | cerrada | `frontend_dev` |
+| T19 — el búfer detachado (R24) | **cerrada y verificada** | `backend_dev` |
 | T17 — gate completo antes del PR | **sin marcar**, es del leader | — |
 
 ## Archivos creados
@@ -90,7 +91,8 @@ Todos los caminos son relativos a `tests/unit/`, salvo la guardia.
 | R20 | `composition/documentos-facade.test.ts`, `tests/guards/guard-dobles-e2e.test.ts` y **`e2e/documentos.spec.ts`** | `sin la variable de entorno, la composicion elige los adaptadores reales (R20)` · `con la variable, la composicion elige los dobles (R20)` · los cinco casos de la guardia · `sube tres PDFs y ve cambiar el estado de cada uno hasta terminar (R20)`. **El caso E2E existe y recorre todo, pero termina en ROJO** por el defecto de producción del final. |
 | R21 | `documentos-ui/document-upload-a11y-tactil.test.tsx` | `la subida se puede activar sin hover y con objetivos tactiles de 44px (R21)` · `ninguna parte del componente mide la pantalla con 100vh (R21)` |
 | R22 | `documentos-ui/document-upload-convenciones.test.ts` | `el tope y los tipos se importan del contrato del modulo y no se reescriben (R22)` |
-| R23 | `documentos-ui/document-upload-errors.test.tsx` y `documentos-ui/use-batch-status.test.tsx` | `una tanda desconocida detiene el sondeo (R23)` (uno en el componente, otro en el hook) · `el mensaje de tanda desconocida no distingue si no existe o es de otra empresa (R23)` |
+| R23 | `documentos-ui/use-batch-status.test.tsx` y `documentos-ui/document-upload-errors.test.tsx` | `el hook deja de sondear cuando la consulta responde que no hay tanda (R23)` · `una tanda desconocida detiene el sondeo (R23)` · `el componente avisa de tanda desconocida sin distinguir si no existe o es de otra empresa (R23)` |
+| R24 | `documentos/pdf-converter.test.ts` y `documentos/process-pdf-by-strategy.test.ts` | `contar las paginas deja los bytes del PDF intactos (R24)` · `extraer el texto deja los bytes del PDF intactos (R24)` · `rasterizar deja los bytes del PDF intactos (R24)` · `la lectura con IA recibe los bytes completos despues de contar las paginas (R24)` (conversor **real**, en las dos estrategias) |
 
 **R18, dicho entero.** Su montaje está bloqueado por la pregunta abierta 1 —subir exige
 `proveedores.modificar`, y quien trabaja recetas necesitaría ese permiso ajeno—. Hoy lo cubre el
@@ -158,43 +160,45 @@ Playwright, y elegir un doble sin consultarla.
 
 1. **T12 / R18 — montaje en fórmulas.** Bloqueada por la pregunta abierta 1. No se tocó.
 
-2. **T15 / R20 — el E2E está escrito y recorre todo, pero acaba en ROJO. No es suyo el fallo.**
-   El hueco de `design.md > 8` que lo bloqueaba se resolvió por decisión del humano: `CATALOG_PROMPT`
-   y `FORMULA_PROMPT` se declaran con **texto ficticio** en el `webServer.env` de
-   `playwright.config.ts`, con el motivo escrito allí —la IA está doblada, así que ese texto no se
-   usa jamás; sólo evita que leer el prompt lance antes de llegar al adaptador—. Se descartó doblar
-   el puerto del prompt y se descartó enmendar el diseño.
+2. **El hueco de `design.md > 8` que bloqueaba el E2E: RESUELTO.** Por decisión del humano,
+   `CATALOG_PROMPT` y `FORMULA_PROMPT` se declaran con **texto ficticio** en el `webServer.env` de
+   `playwright.config.ts`, con el motivo escrito allí: la IA está doblada, así que ese texto no se
+   usa jamás; sólo evita que leer el prompt lance antes de llegar al adaptador. Se descartó doblar
+   el puerto del prompt como cuarto adaptador y se descartó enmendar el diseño.
 
-   Con eso, el recorrido llega entero hasta el último aserto **en los dos navegadores**: login,
-   detalle de proveedor por `supplierDetailRoute`, tres PDFs elegidos, tres filas con su nombre
-   exacto, los tres `PUT` al enlace firmado interceptados, encolado real y sondeo vivo leyendo de
-   Postgres. **Falla sólo el estado final**: `error` en vez de `done`.
+3. **El defecto del búfer detachado: ARREGLADO (T19, R24).** `countPages` entregaba el
+   `Uint8Array` a pdf.js sin copiarlo y la librería **detachaba** el `ArrayBuffer`, dejando el
+   arreglo del llamante en `length === 0`; `process-pdf-by-strategy` contaba y **después** pasaba
+   ese mismo arreglo a la lectura con IA, cuyo esquema exige `bytes.length > 0`. El adaptador
+   entrega ahora una copia a la librería en **las tres** funciones —`countPages`, `extractPdfText`
+   y `renderPages`—, que es lo que fija `design.md > 12.1`: arreglar una y dejar dos habría dejado
+   la trampa armada. **Sólo se tocó `pdf-converter-unpdf.ts`**; ni `domain/`, ni `ports/`, ni el
+   esquema de entrada.
 
-3. **El defecto que lo tumba, y es de PRODUCCIÓN.** `countPages` entrega el `Uint8Array` a pdf.js
-   sin copiarlo (`adapters/driven/pdf/pdf-converter-unpdf.ts`, `getDocumentProxy(pdf)`), y pdf.js
-   **transfiere el `ArrayBuffer`**, que queda *detached* y deja el arreglo del llamante en
-   `length === 0`. `domain/process-pdf-by-strategy.ts` cuenta las páginas sobre `input.bytes` y
-   **después** pasa **ese mismo** arreglo a la lectura con IA, cuyo esquema exige `bytes.length > 0`
-   (`domain/ai-read-input.ts`). Resultado: todo archivo acaba en `error` con `invalid_input`.
+   Los tests afirman la **garantía observable**, no la copia: ninguno menciona `new Uint8Array` ni
+   el detach, así que si mañana la librería dejara de detachar y la copia se quitara, seguirían
+   siendo correctos. Se comprobó además que **muerden**: degradando el ayudante a devolver el
+   arreglo tal cual caen exactamente los cuatro casos nuevos del conversor y el del procesamiento,
+   este último con el `invalid_input` que describe el spec.
 
-   **Verificado leyendo el código, no sólo creído**: el conteo está en la línea 116 y la lectura en
-   la 122 del mismo archivo, sobre la misma variable, y ninguna de las tres funciones del adaptador
-   copia antes de entregar. Reproducido además fuera de Playwright: `antes: 346 detached? false` →
-   `despues de countPages: 0 detached? true`, y sobre una copia fresca las dos funciones responden
-   bien.
+4. **T15 / R20 SIGUE EN ROJO, y ya NO es por el búfer.** Corrido tras el arreglo:
+   `pnpm exec playwright test e2e/documentos.spec.ts` → **2 failed**, uno por proyecto, en el
+   mismo aserto final: la fila pasa por `queued` (4 sondeos) y termina en `error` en vez de `done`,
+   en Chromium y en WebKit.
 
-   **Alcance: no depende de los dobles y no es cosa del E2E.** Afecta a las dos estrategias —quien
-   detacha es el conteo, que es común— y en producción `runDocumentJob` descarga una vez y pasa ese
-   mismo arreglo. El E2E no destapó un problema del E2E: destapó uno real, que es justo lo que un
-   recorrido de extremo a extremo aporta.
+   **Lo que está probado que ya funciona:** la cadena conteo → lectura con IA sobre el mismo
+   arreglo, con el conversor **real** y en las **dos** estrategias, pasa en unit. Así que la causa
+   que queda es **otra**, y no está identificada: lo que falla ahora vive en el tramo servidor del
+   recorrido —el PDF que devuelve el almacenamiento en memoria, el adaptador de IA de guion o
+   `runDocumentJob`—, no en el detach.
 
-   **No se arregla aquí.** Tocar `adapters/driven/pdf/` o `domain/` no lo autoriza ninguna task de
-   esta ficha, que además dice explícitamente que si algo parece necesitarlo **se para y se
-   pregunta**. Queda para el humano decidir quién lo corrige y en qué ficha. La salida más limpia
-   —dicha, no aplicada— es que el adaptador entregue una copia a pdf.js en sus tres funciones, de
-   modo que el puerto cumpla lo que el dominio ya supone: «no consumo lo que me das».
+   **No se forzó ni se debilitó el caso**, y no se siguió hurgando: identificar esa causa exige
+   diagnóstico del lado servidor que puede volver a terminar en código de producción, y eso lo
+   decide el humano. Vía barata y concreta para el siguiente paso, dicha y no aplicada: el registro
+   de ejecución por estrategia ya imprime `code` y `reason` de cada archivo, pero hoy no se ve
+   porque `webServer` de Playwright no canaliza la salida del servidor.
 
-4. **T17 — el gate completo y el PR.** Son del leader. No se abrió ningún PR.
+5. **T17 — el gate completo y el PR.** Son del leader. No se abrió ningún PR.
 
 ## Decisiones que conviene que el reviewer mire
 

@@ -165,7 +165,7 @@ describe('los errores de la subida', () => {
     expect(screen.queryByTestId(DOCUMENT_UPLOAD_RESUME_TESTID)).toBeNull();
   });
 
-  it('el mensaje de tanda desconocida no distingue si no existe o es de otra empresa (R23)', async () => {
+  it('el componente avisa de tanda desconocida sin distinguir si no existe o es de otra empresa (R23)', async () => {
     const DELATORES =
       /no existe|inexistente|no encontrad|otra empresa|ajena|pertenece|permiso|autoriza|acceso|prohib/i;
 
