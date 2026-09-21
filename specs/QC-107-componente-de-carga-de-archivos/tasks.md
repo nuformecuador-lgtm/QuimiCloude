@@ -73,20 +73,20 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
 
 ## Montaje
 
-- [ ] **T9.** Depende de T6, T8. Montar `<DocumentUpload strategy="catalogo" />` en
+- [x] **T9.** Depende de T6, T8. Montar `<DocumentUpload strategy="catalogo" />` en
       `app/(private)/proveedores/[id]/page.tsx`, debajo de `CatalogListSection`, sin añadir ningún
       corte de permiso nuevo.
       **Hecho cuando**: `la pantalla de detalle de proveedor monta el componente en modo catálogo
       (R17)` pasa en `tests/unit/documentos-ui/supplier-detail-upload.test.tsx`.
 
-- [ ] **T10. [P]** `tests/unit/documentos-ui/document-upload-convenciones.test.ts`: los asertos
+- [x] **T10. [P]** `tests/unit/documentos-ui/document-upload-convenciones.test.ts`: los asertos
       «por ausencia», leyendo los archivos del componente y del repo —sin dependencia nueva (R9),
       sin suscripción de tiempo real ni cliente de Supabase (R15), sin aviso ni notificación (R16),
       sin ruta ni item de menú nuevos (R19), el tope y los tipos **importados** y no reescritos
       (R22), y **ninguna pantalla de fórmulas montando el componente ni permiso nuevo** (R18).
       **Hecho cuando**: los seis casos pasan citando su `R<n>`.
 
-- [ ] **T11. [P]** `tests/unit/documentos-ui/document-upload-a11y-tactil.test.tsx`: objetivos
+- [x] **T11. [P]** `tests/unit/documentos-ui/document-upload-a11y-tactil.test.tsx`: objetivos
       táctiles de 44×44 px, `font-size` ≥ 16 px en el control de entrada, activación sin `:hover` y
       ausencia de `100vh`, con el mismo patrón que `tests/unit/asignaciones-ui/a11y-tactil.test.tsx`.
       **Hecho cuando**: `la subida se puede activar sin hover y con objetivos táctiles de 44px (R21)`

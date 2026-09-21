@@ -114,6 +114,23 @@ describe('el sondeo del estado de una tanda', () => {
     expect(getBatchStatusActionMock).toHaveBeenCalledTimes(1);
   });
 
+  it('una tanda desconocida detiene el sondeo (R8)', async () => {
+    // `data: null` es «no existe o es de otra empresa, sin distinguirlo»: no hay estado que
+    // esperar, asi que seguir preguntando solo repetiria la misma respuesta.
+    getBatchStatusActionMock.mockResolvedValue({ status: 'success', data: null });
+
+    const { result } = renderHook(() => useBatchStatus('batch-1'));
+
+    await avanzar(0);
+    expect(getBatchStatusActionMock).toHaveBeenCalledTimes(1);
+    expect(result.current.missing).toBe(true);
+    expect(result.current.status).toBeNull();
+    expect(result.current.error).toBeNull();
+
+    await avanzar(INTERVALO * 10);
+    expect(getBatchStatusActionMock).toHaveBeenCalledTimes(1);
+  });
+
   it('no declara ningun plazo propio para dar por fallido un archivo (R10)', async () => {
     getBatchStatusActionMock.mockResolvedValue({
       status: 'success',

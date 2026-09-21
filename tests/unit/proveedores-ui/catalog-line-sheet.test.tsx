@@ -142,6 +142,18 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
   createPresentationAction: createPresentationActionMock,
 }));
 
+// La pagina de detalle monta la pieza de subida, que importa sus Server Actions por ruta exacta;
+// esas acciones resuelven sus puertos por `@/lib/composition`, doblado aqui solo con `identity`.
+// Sin estos dos dobles el archivo ni siquiera llega a montar la pantalla.
+vi.mock('@/lib/modules/documentos/adapters/driving/document-upload-actions', () => ({
+  issueUploadLinksAction: vi.fn(),
+}));
+
+vi.mock('@/lib/modules/documentos/adapters/driving/document-batch-actions', () => ({
+  enqueueBatchAction: vi.fn(),
+  getBatchStatusAction: vi.fn(),
+}));
+
 // Solo se sustituye el aviso de exito: `<Toaster />` lo monta el layout privado (R34) y esta
 // pantalla no lo re-monta, asi que sin este doble el toast no tendria donde pintarse.
 vi.mock('sonner', async (importOriginal) => ({
