@@ -4594,3 +4594,30 @@ podar.
   sola constante, sin rellenar con un supuesto. Si fuera otro, la ruta responde 400 siempre y no se
   procesa ni un PDF, sin que ningún test lo note. **El servidor dev local de QStash (`QSTASH_DEV=true`)
   lo responde sin desplegar.**
+
+## 2026-09-21 — QC-136-canvas-no-empaquetable-rompe-el-build
+
+- `next build` sobre `dev` salía con **exit 1** y la aplicación no se podía desplegar.
+  `serverExternalPackages: ['@napi-rs/canvas']` en `next.config.ts` lo deja en **exit 0**. Medido
+  el mismo día, mismo árbol y misma máquina, cambiando solo esa línea. PR **#101**.
+- **La causa era una línea de configuración que faltaba desde QC-106.** `next.config.ts` seguía
+  tal cual lo generó `create-next-app`, vacío. `@napi-rs/canvas` no es JavaScript: es un envoltorio
+  sobre un binario compilado que su `js-binding.js` elige por plataforma **en ejecución**.
+  Turbopack no puede darle un *module id* a un `.node`, así que el build ni terminaba.
+- **Lo que no bastaba, y conviene no perderlo:** el adaptador **ya** lo cargaba con
+  `await import()`. Un especificador literal sigue siendo analizable estáticamente, así que el
+  bundler lo mete en el grafo igual. La carga diferida ayuda en **ejecución**, no en
+  **compilación**.
+- **Guardia:** `tests/unit/documentos/canvas-no-empaquetado.test.ts`, 3 casos con control positivo,
+  sobre la **configuración** y no sobre el build —correr `next build` en un test de unidad lo
+  volvería de minutos—.
+- **Verificación:** `next build` exit 0 y `./init.sh` completo verde (582/582 archivos, 8354
+  tests). Ninguna dependencia nueva.
+- **Derogó** lo que QC-106 declaró como riesgo acotado: no era un fallo de ejecución capturable por
+  la rama de R16, es que no compilaba.
+- **Riesgo de QC-106 que además queda muy reducido:** el lockfile declara
+  `@napi-rs/canvas-linux-x64-gnu` y `-musl`, así que el entorno de Vercel tendrá su binario.
+- **El orden del merge dejó un cabo suelto y conviene recordarlo.** El PR #100 se mergeó contra la
+  rama del #99 cuando esa ya estaba en `dev`, así que su commit existía pero no llegaba. Se
+  detectó comprobando `dev` antes de arrancar otra ficha, y se rehizo como PR #101. **Encadenar un
+  PR sobre otro solo funciona si el padre se mergea antes de que el hijo esté listo.**
