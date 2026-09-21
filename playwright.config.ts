@@ -43,6 +43,12 @@ export default defineConfig({
     url: E2E_BASE_URL,
     reuseExistingServer: false,
     timeout: 180_000,
+    // La salida del servidor se ve. El procesamiento de cada archivo registra ahi su resultado
+    // -con su codigo y su motivo-, y sin canalizarla un archivo que termina en error solo se
+    // distingue de otro por el estado que pinta la pantalla: el motivo, que es lo unico que dice
+    // QUE fallo, se perdia.
+    stdout: 'pipe',
+    stderr: 'pipe',
     // El UNICO sitio versionado que enciende los dobles del modulo `documentos`
     // (almacenamiento en memoria, cola en linea e IA de guion). Sin esto el recorrido de
     // documentos necesitaria bucket, URL publica y cuenta de IA, y el gate dejaria de

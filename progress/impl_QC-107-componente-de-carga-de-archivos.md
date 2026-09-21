@@ -181,22 +181,53 @@ Playwright, y elegir un doble sin consultarla.
    arreglo tal cual caen exactamente los cuatro casos nuevos del conversor y el del procesamiento,
    este último con el `invalid_input` que describe el spec.
 
-4. **T15 / R20 SIGUE EN ROJO, y ya NO es por el búfer.** Corrido tras el arreglo:
-   `pnpm exec playwright test e2e/documentos.spec.ts` → **2 failed**, uno por proyecto, en el
-   mismo aserto final: la fila pasa por `queued` (4 sondeos) y termina en `error` en vez de `done`,
-   en Chromium y en WebKit.
+4. **T15 / R20 sigue en rojo, y la causa ya está identificada: el rasterizador nativo no carga
+   dentro del servidor de Next.** No es el búfer, no son los dobles y no es el E2E.
 
-   **Lo que está probado que ya funciona:** la cadena conteo → lectura con IA sobre el mismo
-   arreglo, con el conversor **real** y en las **dos** estrategias, pasa en unit. Así que la causa
-   que queda es **otra**, y no está identificada: lo que falla ahora vive en el tramo servidor del
-   recorrido —el PDF que devuelve el almacenamiento en memoria, el adaptador de IA de guion o
-   `runDocumentJob`—, no en el detach.
+   **Cómo se vio.** Se canalizó la salida del `webServer` de Playwright (`stdout`/`stderr` a
+   `pipe`). El registro por estrategia mostró, para los tres archivos:
 
-   **No se forzó ni se debilitó el caso**, y no se siguió hurgando: identificar esa causa exige
-   diagnóstico del lado servidor que puede volver a terminar en código de producción, y eso lo
-   decide el humano. Vía barata y concreta para el siguiente paso, dicha y no aplicada: el registro
-   de ejecución por estrategia ya imprime `code` y `reason` de cada archivo, pero hoy no se ve
-   porque `webServer` de Playwright no canaliza la salida del servidor.
+   ```
+   [process-pdf-by-strategy] estrategia=catalogo modo=images ruta='...' paginas=1 longitud=0
+   ```
+
+   `longitud` sale de `textLength: outcome.ok ? outcome.text.length : 0`, así que un cero ahí
+   significa que **la lectura falló**; esa línea, por diseño, no lleva el motivo. El motivo se leyó
+   de la base **mientras el recorrido corría**, antes de que su limpieza borrara las filas.
+
+   **`code` y `reason` literales, de `document_files`:**
+
+   ```
+   errorCode:   unexpected
+   errorReason: read-pdf-with-ai: 'renderPages' fallo sobre '<ruta>'
+                (no se puede convertir a imagen: el par nativo de rasterizado no esta disponible
+                en este entorno; la conversion a texto no depende de el y sigue disponible:
+                Cannot find native binding. npm has a bug related to optional dependencies ...)
+   ```
+
+   **La causa, con archivo y línea.**
+   `lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf.ts:93` —
+   `renderPages` hace `await resolveRasterizer(() => import('@napi-rs/canvas'))`, y ese
+   `import()` **no resuelve su binario nativo dentro del servidor de Next**. `next.config.ts`
+   está **vacío**: no declara ese paquete como externo del servidor, así que Next intenta
+   empaquetarlo y el `.node` se queda fuera.
+
+   **Está descartado que sea «falta el paquete».** El mismo tramo —almacenamiento en memoria →
+   `processPdfByStrategy`, con los dobles encendidos— se ejecutó **fuera** de Next y devolvió
+   `ok:true` con `longitud=53` en **las dos** estrategias. El paquete y su binario están
+   instalados; lo que falla es el empaquetado del servidor.
+
+   **Alcance, y por eso no se arregla aquí.** `catalogo` se lee en modo `images`, así que pasa por
+   `renderPages` **siempre**; y `runDocumentJob` corre dentro de Next también en producción, por su
+   Route Handler. O sea que **esto rompe la lectura de catálogos en la aplicación real**, no sólo
+   en el recorrido: es un defecto de la misma familia que R24, destapado otra vez por el E2E. La
+   causa **no está en los dobles** —que son código nacido con esta ficha— sino en la configuración
+   de empaquetado y en el camino real del conversor. **Se para y se devuelve**, como R24.
+
+   **La canalización de la salida se queda.** Criterio: sin ella, un archivo que termina en `error`
+   sólo se distingue por el estado que pinta la pantalla, y el motivo —lo único que dice *qué*
+   falló— se pierde; con ella, este diagnóstico salió en **una** corrida en vez de tres. El coste
+   es ruido del servidor en la salida del E2E, que se paga.
 
 5. **T17 — el gate completo y el PR.** Son del leader. No se abrió ningún PR.
 
