@@ -297,6 +297,7 @@ import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity
 // modulo NO se importa desde aqui: la flecha va driving -> composicion.
 import {
   createConvertPdfs,
+  createCropCatalogImages,
   createDownloadDocument,
   createEnqueueBatch,
   createGetBatchStatus,
@@ -311,7 +312,9 @@ import { readWithGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-re
 import { documentsE2EDoublesEnabled } from '@/lib/modules/documentos/adapters/driven/config/e2e-doubles-env';
 import { readProcessingConfigFromEnv } from '@/lib/modules/documentos/adapters/driven/config/processing-config-env';
 import { readStrategyPromptFromEnv } from '@/lib/modules/documentos/adapters/driven/config/strategy-prompt-env';
+import { cropImage } from '@/lib/modules/documentos/adapters/driven/image/image-cropper-sharp';
 import { createStrategyRunLogConsole } from '@/lib/modules/documentos/adapters/driven/observability/strategy-run-log-console';
+import { createCropRegionLogConsole } from '@/lib/modules/documentos/adapters/driven/observability/crop-region-log-console';
 import {
   countPages,
   extractPdfText,
@@ -328,15 +331,19 @@ import {
   downloadDocument,
   removeDocument,
 } from '@/lib/modules/documentos/adapters/driven/storage/document-storage-supabase';
+import { uploadCrop } from '@/lib/modules/documentos/adapters/driven/storage/crop-storage-supabase';
 import type { AiReader } from '@/lib/modules/documentos/ports/ai-reader';
+import type { CropStorage } from '@/lib/modules/documentos/ports/crop-storage';
 import type { DocumentBatchRepository } from '@/lib/modules/documentos/ports/document-batch-repository';
 import type { DocumentStorage } from '@/lib/modules/documentos/ports/document-storage';
+import type { ImageCropper } from '@/lib/modules/documentos/ports/image-cropper';
 import type { PdfConverter } from '@/lib/modules/documentos/ports/pdf-converter';
 import type { ProcessingConfig } from '@/lib/modules/documentos/ports/processing-config';
 import type { ProcessingQueue } from '@/lib/modules/documentos/ports/processing-queue';
 import type { QueueSignature } from '@/lib/modules/documentos/ports/queue-signature';
 import type { StrategyPrompt } from '@/lib/modules/documentos/ports/strategy-prompt';
 import type { StrategyRunLog } from '@/lib/modules/documentos/ports/strategy-run-log';
+import type { CropRegionLog } from '@/lib/modules/documentos/ports/crop-region-log';
 import { requestScoped } from '@/lib/shared/request-scope';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
@@ -1248,6 +1255,28 @@ const processPdfByStrategy = createProcessPdfByStrategy({
 const documentBatchRepository: DocumentBatchRepository = documentBatchRepositoryPrisma;
 const queueSignature: QueueSignature = queueSignatureQstash;
 
+// ---------------------------------------------------------------------------------------
+// `documentos` — el recorte de las imagenes de un catalogo.
+// ---------------------------------------------------------------------------------------
+
+/** Se REFERENCIA, no se invoca: cablear esta fachada no toca ningun PNG. */
+const imageCropper: ImageCropper = { crop: cropImage };
+
+/** Bucket PROPIO de estos recortes, distinto del de `documentStorage` de arriba. */
+const cropStorage: CropStorage = { upload: uploadCrop };
+
+/** `CropRegionLog` cableado con la unica implementacion que hay: una linea en el registro. */
+const cropRegionLog: CropRegionLog = createCropRegionLogConsole();
+
+/** Reutiliza el MISMO `pdfConverter` y el MISMO `aiReader` que ya cablea el resto del modulo. */
+const cropCatalogImages = createCropCatalogImages({
+  converter: pdfConverter,
+  ai: aiReader,
+  cropper: imageCropper,
+  storage: cropStorage,
+  log: cropRegionLog,
+});
+
 /**
  * El trabajo de la cola, construido UNA vez: lo publica la fachada y lo necesita la cola en linea,
  * que lo ejecuta en este mismo proceso en vez de publicar nada. Dos construcciones serian dos
@@ -1257,6 +1286,7 @@ const runDocumentJob = createRunDocumentJob({
   repository: documentBatchRepository,
   storage: documentStorage,
   processPdfByStrategy,
+  cropCatalogImages,
 });
 
 const processingQueue: ProcessingQueue = {

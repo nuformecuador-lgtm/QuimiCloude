@@ -99,6 +99,7 @@ function cablearRunDocumentJobReal() {
     repository,
     storage,
     processPdfByStrategy: procesar,
+    cropCatalogImages: vi.fn(async () => ({ ok: true as const, uploaded: 0, skipped: 0 })),
   });
 
   return { runDocumentJob, claim, finish, remove, procesar };

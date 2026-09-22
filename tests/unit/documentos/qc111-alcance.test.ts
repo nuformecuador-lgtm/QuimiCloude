@@ -299,8 +299,18 @@ describe('QC-111 R8 — el Route Handler no comprueba permiso ni resuelve actor 
 });
 
 // ---------------------------------------------------------------------------------------------
-// R12 — SIN RECORTE DE IMAGENES
+// R12 — SIN RECORTE DE IMAGENES (ENMENDADO por QC-110)
 // ---------------------------------------------------------------------------------------------
+//
+// La propia QC-111 dejo escrito `[D7]` que "QC-110 engancha su paso cuando exista". Ese dia
+// llego: bajo `lib/modules/documentos/ports/` existen `crop-storage.ts`, `image-cropper.ts` y
+// `crop-region-log.ts`, y
+// `run-document-job.ts` invoca el recorte cuando la estrategia es `catalogo`. Los dos casos que
+// afirmaban esa ausencia se han QUITADO porque dejaron de ser ciertos, no porque el recorte sea
+// aceptable en cualquier otro sitio: siguen sin serlo, y eso lo vigila ahora `qc110-alcance.test.ts`.
+// Lo que sigue vivo de R12 se conserva: `db/schema.prisma` sigue sin ninguna columna de salida
+// para el recorte, que es ademas R15 de QC-110. El detector `nombraRecorte` tampoco se retira:
+// cambia de signo, y el caso de abajo demuestra que sigue mordiendo sobre los nombres reales.
 
 export const PALABRAS_DE_RECORTE = ['recorte', 'crop', 'bounding-box', 'boundingbox', 'coordenadas'] as const;
 
@@ -309,30 +319,7 @@ export function nombraRecorte(texto: string): string[] {
   return PALABRAS_DE_RECORTE.filter((palabra) => enMinusculas.includes(palabra));
 }
 
-describe('QC-111 R12 — ningun archivo nuevo prepara el recorte de imagenes', () => {
-  it('R12: ningun nombre de archivo bajo ports/ del modulo nombra el recorte', () => {
-    const puertos = readdirSync(join(repoRoot, 'lib/modules/documentos/ports'));
-    const infractores = puertos.filter((nombre) => nombraRecorte(nombre).length > 0);
-    expect(
-      infractores,
-      `R12: no existe todavia ningun puerto de recorte —lo engancha QC-110 cuando exista—. ` +
-        `Nombres bajo ports/ que lo nombran:\n${infractores.join('\n')}`,
-    ).toEqual([]);
-  });
-
-  it('R12: run-document-job.ts no nombra el recorte de imagenes fuera de un comentario', () => {
-    // Sin comentarios: la cabecera del archivo YA documenta, a proposito, que no hace recorte
-    // -"Sin recorte de imagenes: ese paso no existe todavia..."-. Esa frase es la explicacion de la
-    // ausencia, no una preparacion del paso, y contarla como infraccion penalizaria la documentacion
-    // correcta. Lo que R12 prohibe es CODIGO que lo invoque o lo prepare.
-    const fuente = sinComentarios(enDisco('lib/modules/documentos/domain/run-document-job.ts'));
-    expect(
-      nombraRecorte(fuente),
-      'R12: el trabajo ejecuta exactamente la conversion y la estrategia, y termina; no invoca ' +
-        'ningun paso de recorte.',
-    ).toEqual([]);
-  });
-
+describe('QC-111 R12 — enmendado: el recorte de imagenes ya existe (QC-110)', () => {
   it('R12: db/schema.prisma no declara ninguna columna de salida para el recorte', () => {
     const esquema = enDisco('db/schema.prisma');
     expect(
@@ -345,6 +332,16 @@ describe('QC-111 R12 — ningun archivo nuevo prepara el recorte de imagenes', (
     expect(nombraRecorte('cropBoundingBox.ts')).toEqual(['crop', 'boundingbox']);
     expect(nombraRecorte('el RECORTE de la imagen trae sus COORDENADAS')).toEqual(['recorte', 'coordenadas']);
     expect(nombraRecorte('pdf-converter-unpdf.ts')).toEqual([]);
+  });
+
+  it('R12: el detector sigue mordiendo ahora que el recorte existe: los tres puertos nuevos lo nombran', () => {
+    const puertos = readdirSync(join(repoRoot, 'lib/modules/documentos/ports'));
+    const conRecorte = puertos.filter((nombre) => nombraRecorte(nombre).length > 0).sort();
+    expect(
+      conRecorte,
+      'R12 enmendado: el detector no se desactivo, cambio de signo. Ahora AFIRMA que los puertos ' +
+        `del recorte existen y se llaman como se espera. Nombres bajo ports/:\n${puertos.join('\n')}`,
+    ).toEqual(['crop-region-log.ts', 'crop-storage.ts', 'image-cropper.ts']);
   });
 });
 

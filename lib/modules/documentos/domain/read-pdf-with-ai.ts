@@ -91,7 +91,7 @@ async function conDiagnostico<T>(
  * corre por debajo puede seguir viva; si gana la lectura, el temporizador se limpia para no dejar
  * el proceso colgado.
  */
-const raceAgainstTimeout: TimeoutRunner = (promise, ms) =>
+export const raceAgainstTimeout: TimeoutRunner = (promise, ms) =>
   new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error(`el plazo de ${ms} ms se agoto`));

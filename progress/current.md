@@ -27,8 +27,24 @@ Alcance, **15 decisiones cerradas** y **1 pregunta abierta** (la unidad de la li
 
 ### QC-110 - ACOTADA con `/afinar-feature` (2026-09-21)
 
-Alcance, **17 decisiones cerradas** y **3 preguntas abiertas** en
-`specs/QC-110-recorte-de-imagenes-del-pdf/requirements.md`. No se copian aqui.
+Alcance, **18 decisiones cerradas** y **3 preguntas abiertas** en
+`specs/QC-110-recorte-de-imagenes-del-pdf/requirements.md`. No se copian aqui. (El conteo de 17
+que dijo el leader al acotar estaba mal por uno; la tabla trae 18 filas.)
+
+**F1.2 y F1.3 hechos el 2026-09-21.** `spec_author` entrego **R1-R23** y **18 tasks** (T0-T17),
+**semilla verificada intacta por `git diff`** -el diff borra UNA linea, la del marcador- y las
+**18** decisiones citadas, ninguna huerfana. Tarjeta movida a *En revision*. **F1.4 APROBADO el 2026-09-21** por el humano, por chat; la tarjeta la
+movio el leader a *En curso* y se deja dicho quien la movio. **La aprobacion del spec INCLUYE la
+dependencia**: `sharp` ya tiene su fila en `docs/dependencias.md` con los cuatro checks del
+2026-09-21. **Cupo `backend`: 1 de 2.**
+
+**LOS CUATRO HALLAZGOS DEL DESIGN (§0) ENTRAN A F2 SIN CERRAR, y hay que decirlo**: (1) la ficha
+pondra en rojo `tests/unit/documentos/qc111-alcance.test.ts` -hoy verde, 33 casos, comprobado- y
+T13 la enmienda, que es tocar el test de OTRA ficha; (2) **se rasteriza DOS VECES por archivo de
+`catalogo`**, aceptado y declarado, y eso pesa mas de lo que parece porque rasterizar es el paso
+sin plazo propio y `maxDuration` esta en 300 s; (3) que `sharp` cargue en el runtime de Vercel es
+**DESCONOCIDO**, igual que quedo `@napi-rs/canvas`; (4) las tres preguntas abiertas siguen **sin
+mitigacion a proposito**, y la que mas pesa es que **no hay tope de recortes por PDF**.
 
 **La ficha declaraba TRES preguntas abiertas y salieron OCHO mas al mirar el codigo.** Las dos que
 cambiaban el alcance: el puerto `AiReader` devuelve TEXTO PLANO -QC-108 lo cerro asi-, y las
@@ -1394,3 +1410,27 @@ meter alcance que nadie pidió.
 
 **No se ha creado la ficha todavía: espera decisión humana.** El patrón a copiar está identificado:
 el `recipe-picker` de QC-35, que **busca en servidor** en vez de filtrar lo ya traído.
+
+### QC-110 - F2 completa y PR #105 abierto (2026-09-22)
+
+**CUATRO vueltas de implementer y DOS de reviewer.** R1-R23 mapeados, 18 tasks cerradas, spec
+intacto salvo la tabla de `Deps` de `design.md > 4`, que se corrigio por decision humana porque
+se contradecia con su propio paso 6.
+
+**EL PR SE ABRIO SIN GATE VERDE, POR DECISION HUMANA Y CON LA EVIDENCIA ESCRITA.** La suite
+completa es INESTABLE BAJO CARGA: dos corridas consecutivas sobre el mismo arbol tumbaron DOS
+ARCHIVOS DISTINTOS -`user-table.test.tsx` (27/27 aislado, ficha QC-126) y
+`credential-setup.int.test.ts` (15/15 aislado, ficha NUEVA **QC-143**)-, ninguno tocado por esta
+rama. Que en la corrida donde uno pasa caiga el otro es lo que dice que no son el mismo problema.
+**Antes de sincronizar con `dev` el gate salio VERDE TRES VECES** (591 archivos, 8427/8428/8429
+tests), una de ellas corrida por el propio reviewer sin fiarse del informe.
+
+**LO QUE ESTO LE HACE A LA REGLA 5, y va en QC-143**: si la suite tumba un archivo distinto por
+corrida, «gate completo en verde antes de cada PR» **no se puede cumplir repitiendo**, porque no
+converge.
+
+**Ninguno de los dos se metio en el baseline**: enmascarar un flake apaga tambien sus casos sanos,
+que es lo que la review de QC-111 rechazo expresamente.
+
+**QC-143 esta en el board pero NO en `feature_list.json`**: nacio despues del ultimo F0 y la
+importa el proximo arranque de sesion.

@@ -282,13 +282,16 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
 // oficial para publicar un trabajo por PDF en la cola y verificar la firma del webhook-, tambien
 // con los cuatro checks, con aprobacion humana en la puerta F1.4 y con su fila en
 // `docs/dependencias.md`: de 34 a 35 con esa misma aprobacion.
+// El 2026-09-21 entro `sharp` -la libreria que recorta del PNG de una pagina la region que la IA
+// senala como imagen-, tambien con los cuatro checks, con aprobacion humana en la puerta F1.4 y con
+// su fila en `docs/dependencias.md`: de 35 a 36 con esa misma aprobacion.
 //
 // Que este conteo sea un absoluto es fragil y conviene saberlo: no distingue «alguien colo una
 // libreria» de «entro una aprobada», asi que lo rompe cualquier feature posterior que anada una
 // legitima. La pregunta «toda dependencia declarada esta aprobada» ya la responde
 // `guard-dependencias-aprobadas.test.ts`, que compara contra el registro. Lo robusto aqui seria
 // comparar contra el merge-base de la propia rama en vez de contar absolutos.
-export const DEPENDENCIAS_ESPERADAS = 35
+export const DEPENDENCIAS_ESPERADAS = 36
 export const DEV_DEPENDENCIAS_ESPERADAS = 20
 
 /** `crypto.randomUUID()` es un global: una libreria de identificadores o de criptografia sobra. */

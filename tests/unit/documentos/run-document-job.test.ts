@@ -1,5 +1,6 @@
 // El trabajo que entrega la cola, contra dobles del repositorio (con la SEMANTICA del `claim`,
-// no solo su forma), del almacenamiento y de `processPdfByStrategy` ya construido.
+// no solo su forma), del almacenamiento, de `processPdfByStrategy` ya construido y del recorte de
+// catalogo ya construido.
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -9,6 +10,7 @@ import type {
   BatchStatus,
   DocumentFileStatusEntry,
 } from '@/lib/modules/documentos/domain/batch-status';
+import type { CropCatalogImagesResult } from '@/lib/modules/documentos/domain/crop-catalog-images';
 import type { StrategyRunResult } from '@/lib/modules/documentos/domain/process-pdf-by-strategy';
 import type {
   ClaimedFile,
@@ -84,6 +86,13 @@ function dobleDeProcesamiento(resultado: StrategyRunResult) {
   return vi.fn(async () => resultado);
 }
 
+/** Doble del recorte de catalogo. Por defecto, cero recortes y exito. */
+function dobleDeRecorte(
+  resultado: CropCatalogImagesResult = { ok: true, uploaded: 0, skipped: 0 },
+) {
+  return vi.fn(async () => resultado);
+}
+
 describe('documentos — runDocumentJob', () => {
   it('R10 — un claim que devuelve null no llama a la IA ni a remove', async () => {
     const repo = dobleDeRepositorio();
@@ -96,16 +105,19 @@ describe('documentos — runDocumentJob', () => {
       mode: 'images',
       text: TEXTO_DE_LA_IA,
     });
+    const cropCatalogImages = dobleDeRecorte();
     const runDocumentJob = createRunDocumentJob({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
+      cropCatalogImages,
     });
 
     const resultado = await runDocumentJob({ documentFileId: ARCHIVO, messageId: MENSAJE });
 
     expect(resultado).toEqual({ kind: 'skipped' });
     expect(processPdfByStrategy).not.toHaveBeenCalled();
+    expect(cropCatalogImages).not.toHaveBeenCalled();
     expect(storage.remove).not.toHaveBeenCalled();
     expect(repo.finish).not.toHaveBeenCalled();
   });
@@ -120,10 +132,12 @@ describe('documentos — runDocumentJob', () => {
       mode: 'images',
       text: TEXTO_DE_LA_IA,
     });
+    const cropCatalogImages = dobleDeRecorte();
     const runDocumentJob = createRunDocumentJob({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
+      cropCatalogImages,
     });
 
     const primera = await runDocumentJob({ documentFileId: ARCHIVO, messageId: MENSAJE });
@@ -145,10 +159,12 @@ describe('documentos — runDocumentJob', () => {
       mode: 'images',
       text: TEXTO_DE_LA_IA,
     });
+    const cropCatalogImages = dobleDeRecorte();
     const runDocumentJob = createRunDocumentJob({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
+      cropCatalogImages,
     });
 
     const resultado = await runDocumentJob({ documentFileId: ARCHIVO, messageId: MENSAJE });
@@ -172,10 +188,12 @@ describe('documentos — runDocumentJob', () => {
       code: 'ai_unavailable',
       reason: 'el proveedor no respondio',
     });
+    const cropCatalogImages = dobleDeRecorte();
     const runDocumentJob = createRunDocumentJob({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
+      cropCatalogImages,
     });
 
     const resultado = await runDocumentJob({ documentFileId: ARCHIVO, messageId: MENSAJE });
@@ -187,6 +205,7 @@ describe('documentos — runDocumentJob', () => {
       reason: 'el proveedor no respondio',
     });
     expect(storage.remove).not.toHaveBeenCalled();
+    expect(cropCatalogImages).not.toHaveBeenCalled();
   });
 
   it('R16 — fallo unexpected deja error a la primera y NO llama a remove', async () => {
@@ -200,10 +219,12 @@ describe('documentos — runDocumentJob', () => {
       code: 'unexpected',
       reason: 'PDF corrupto',
     });
+    const cropCatalogImages = dobleDeRecorte();
     const runDocumentJob = createRunDocumentJob({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
+      cropCatalogImages,
     });
 
     const resultado = await runDocumentJob({ documentFileId: ARCHIVO, messageId: MENSAJE });
@@ -228,10 +249,12 @@ describe('documentos — runDocumentJob', () => {
       mode: 'images',
       text: TEXTO_DE_LA_IA,
     });
+    const cropCatalogImages = dobleDeRecorte();
     const runDocumentJob = createRunDocumentJob({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
+      cropCatalogImages,
     });
 
     const resultado = await runDocumentJob({ documentFileId: ARCHIVO, messageId: MENSAJE });
@@ -252,10 +275,12 @@ describe('documentos — runDocumentJob', () => {
       mode: 'images',
       text: TEXTO_DE_LA_IA,
     });
+    const cropCatalogImages = dobleDeRecorte();
     const runDocumentJob = createRunDocumentJob({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
+      cropCatalogImages,
     });
 
     await runDocumentJob({ documentFileId: ARCHIVO, messageId: MENSAJE });
@@ -276,10 +301,12 @@ describe('documentos — runDocumentJob', () => {
       mode: 'pdf',
       text: TEXTO_DE_LA_IA,
     });
+    const cropCatalogImages = dobleDeRecorte();
     const runDocumentJob = createRunDocumentJob({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
+      cropCatalogImages,
     });
 
     await runDocumentJob({ documentFileId: ARCHIVO, messageId: MENSAJE });
@@ -289,5 +316,136 @@ describe('documentos — runDocumentJob', () => {
       path: RUTA,
       bytes: expect.any(Uint8Array),
     });
+  });
+
+  it('R1 — con formula el doble del recorte NO se invoca; con catalogo SI', async () => {
+    const repoFormula = dobleDeRepositorio('formula');
+    const storageFormula = dobleDeAlmacenamiento();
+    const cropCatalogImagesFormula = dobleDeRecorte();
+    const runDocumentJobFormula = createRunDocumentJob({
+      repository: repoFormula.repository,
+      storage: storageFormula.storage,
+      processPdfByStrategy: dobleDeProcesamiento({
+        ok: true,
+        strategy: 'formula',
+        path: RUTA,
+        mode: 'pdf',
+        text: TEXTO_DE_LA_IA,
+      }),
+      cropCatalogImages: cropCatalogImagesFormula,
+    });
+
+    await runDocumentJobFormula({ documentFileId: ARCHIVO, messageId: MENSAJE });
+
+    expect(cropCatalogImagesFormula).not.toHaveBeenCalled();
+
+    const repoCatalogo = dobleDeRepositorio('catalogo');
+    const storageCatalogo = dobleDeAlmacenamiento();
+    const cropCatalogImagesCatalogo = dobleDeRecorte();
+    const runDocumentJobCatalogo = createRunDocumentJob({
+      repository: repoCatalogo.repository,
+      storage: storageCatalogo.storage,
+      processPdfByStrategy: dobleDeProcesamiento({
+        ok: true,
+        strategy: 'catalogo',
+        path: RUTA,
+        mode: 'images',
+        text: TEXTO_DE_LA_IA,
+      }),
+      cropCatalogImages: cropCatalogImagesCatalogo,
+    });
+
+    await runDocumentJobCatalogo({ documentFileId: ARCHIVO, messageId: MENSAJE });
+
+    expect(cropCatalogImagesCatalogo).toHaveBeenCalledTimes(1);
+    expect(cropCatalogImagesCatalogo).toHaveBeenCalledWith({
+      documentFileId: ARCHIVO,
+      companyId: EMPRESA,
+      path: RUTA,
+      bytes: expect.any(Uint8Array),
+    });
+  });
+
+  it('R16 — cero recortes deja la fila en listo y borra el PDF', async () => {
+    const repo = dobleDeRepositorio('catalogo');
+    const storage = dobleDeAlmacenamiento();
+    const processPdfByStrategy = dobleDeProcesamiento({
+      ok: true,
+      strategy: 'catalogo',
+      path: RUTA,
+      mode: 'images',
+      text: TEXTO_DE_LA_IA,
+    });
+    const cropCatalogImages = dobleDeRecorte({ ok: true, uploaded: 0, skipped: 0 });
+    const runDocumentJob = createRunDocumentJob({
+      repository: repo.repository,
+      storage: storage.storage,
+      processPdfByStrategy,
+      cropCatalogImages,
+    });
+
+    const resultado = await runDocumentJob({ documentFileId: ARCHIVO, messageId: MENSAJE });
+
+    expect(resultado).toEqual({ kind: 'done' });
+    expect(repo.finish).toHaveBeenCalledWith(ARCHIVO, { kind: 'done', text: TEXTO_DE_LA_IA });
+    expect(storage.remove).toHaveBeenCalledWith(RUTA);
+  });
+
+  it('R5 — un fallo del paso de recorte deja error/requeue y NO borra el PDF', async () => {
+    const repo = dobleDeRepositorio('catalogo');
+    const storage = dobleDeAlmacenamiento();
+    const processPdfByStrategy = dobleDeProcesamiento({
+      ok: true,
+      strategy: 'catalogo',
+      path: RUTA,
+      mode: 'images',
+      text: TEXTO_DE_LA_IA,
+    });
+    const cropCatalogImages = dobleDeRecorte({
+      ok: false,
+      code: 'invalid_input',
+      reason: 'el texto de la IA no traia un JSON interpretable',
+    });
+    const runDocumentJob = createRunDocumentJob({
+      repository: repo.repository,
+      storage: storage.storage,
+      processPdfByStrategy,
+      cropCatalogImages,
+    });
+
+    const resultado = await runDocumentJob({ documentFileId: ARCHIVO, messageId: MENSAJE });
+
+    expect(resultado).toEqual({ kind: 'error' });
+    expect(repo.finish).toHaveBeenCalledWith(ARCHIVO, {
+      kind: 'error',
+      code: 'invalid_input',
+      reason: 'el texto de la IA no traia un JSON interpretable',
+    });
+    expect(storage.remove).not.toHaveBeenCalled();
+  });
+
+  it('R17 — una region perdida (skipped > 0) igual deja la fila en listo y borra el PDF', async () => {
+    const repo = dobleDeRepositorio('catalogo');
+    const storage = dobleDeAlmacenamiento();
+    const processPdfByStrategy = dobleDeProcesamiento({
+      ok: true,
+      strategy: 'catalogo',
+      path: RUTA,
+      mode: 'images',
+      text: TEXTO_DE_LA_IA,
+    });
+    const cropCatalogImages = dobleDeRecorte({ ok: true, uploaded: 2, skipped: 1 });
+    const runDocumentJob = createRunDocumentJob({
+      repository: repo.repository,
+      storage: storage.storage,
+      processPdfByStrategy,
+      cropCatalogImages,
+    });
+
+    const resultado = await runDocumentJob({ documentFileId: ARCHIVO, messageId: MENSAJE });
+
+    expect(resultado).toEqual({ kind: 'done' });
+    expect(repo.finish).toHaveBeenCalledWith(ARCHIVO, { kind: 'done', text: TEXTO_DE_LA_IA });
+    expect(storage.remove).toHaveBeenCalledWith(RUTA);
   });
 });
