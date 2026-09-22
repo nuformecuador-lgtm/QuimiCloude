@@ -17,7 +17,9 @@ import path from 'node:path';
 
 const FEATURE_LIST = 'feature_list.json';
 const WT_DIR = '.worktrees';
-const MAX_POR_ZONA = 2;
+// Cupo de `in_progress` por zona (CLAUDE.md regla 1). `fullstack` sube a 3 el 2026-09-22.
+const MAX_POR_ZONA = { frontend: 2, backend: 2, fullstack: 3 };
+const cupoDe = (zone) => MAX_POR_ZONA[zone] ?? 2;
 const EN_VUELO = ['spec_ready', 'in_progress'];
 
 const errores = [];
@@ -211,9 +213,10 @@ for (const f of features) {
   }
 }
 
-// --- 3. Maximo 2 features in_progress por zona ----------------------------------------
+// --- 3. Cupo de features in_progress por zona -----------------------------------------
 // Coincide con CLAUDE.md regla 1 y AGENTS.md > Paralelismo. Las de `zone: null` se
-// ignoran (aun sin evaluar), y falla a partir de TRES: el limite es 2 inclusive.
+// ignoran (aun sin evaluar), y falla al pasar el cupo de la zona, que es inclusive: 2 en
+// `frontend` y `backend`, 3 en `fullstack` (desde el 2026-09-22; caso: QC-146).
 // Ojo: esto NO valida el conflicto de archivos entre features de la misma zona; eso sigue
 // siendo criterio del leader leyendo la seccion "Archivos esperados" de cada tasks.md.
 const enProgreso = features.filter((f) => f.status === 'in_progress');
@@ -223,11 +226,11 @@ for (const f of enProgreso) {
   porZona.set(f.zone, [...(porZona.get(f.zone) ?? []), ref(f)]);
 }
 for (const [zone, ids] of porZona) {
-  if (ids.length > MAX_POR_ZONA) {
-    errores.push(`zona ${zone}: ${ids.join(', ')} (${ids.length} in_progress, max ${MAX_POR_ZONA})`);
+  if (ids.length > cupoDe(zone)) {
+    errores.push(`zona ${zone}: ${ids.join(', ')} (${ids.length} in_progress, max ${cupoDe(zone)})`);
   }
 }
-notas.push(`regla max-${MAX_POR_ZONA}-por-zona respetada (in_progress=${enProgreso.length})`);
+notas.push(`regla de cupo por zona respetada (in_progress=${enProgreso.length})`);
 
 // --- 4. Specs presentes para features sdd en vuelo ------------------------------------
 // Se acota a "en vuelo" a proposito: las `done` pueden ser previas a la convencion y
