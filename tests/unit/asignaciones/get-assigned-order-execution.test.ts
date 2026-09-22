@@ -38,6 +38,7 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     quantity: '250.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
+    presentationId: null,
     ...overrides,
   };
 }

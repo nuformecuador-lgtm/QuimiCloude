@@ -29,6 +29,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { normalizeCompanyName } from '@/lib/modules/identity'
+import { normalizePresentationName } from '@/lib/modules/inventario'
 import { findRecipeIdsMatchingName } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma'
 import { normalizeRecipeName } from '@/lib/modules/recetas'
 import {
@@ -74,6 +75,8 @@ let actorId: string
 let roleId: string
 let documentTypeCode: string
 let companyId: string
+/** QC-146: presentacion de la MISMA empresa, obligatoria en `NewOrder`. */
+let presentationId: string
 
 const creados: string[] = []
 
@@ -94,6 +97,7 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
     quantity: '10.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
+    presentationId,
     ...overrides,
   }
 }
@@ -172,6 +176,18 @@ beforeAll(async () => {
       select: { id: true },
     })
   ).id
+  // QC-146: presentacion de la MISMA empresa, obligatoria en toda alta y edicion (`NewOrder`).
+  presentationId = (
+    await prisma.presentation.create({
+      data: {
+        name: `Bidon ${marca}`,
+        nameNormalized: normalizePresentationName(`Bidon ${marca}`),
+        unitId,
+        companyId,
+      },
+      select: { id: true },
+    })
+  ).id
   // La receta es de la MISMA empresa que el resto del andamiaje de este archivo: QC-50 hizo
   // `recipes.company_id` obligatoria.
   recipeId = (
@@ -210,6 +226,9 @@ afterAll(async () => {
   await prisma.documentType.delete({ where: { code: documentTypeCode } })
   // La receta ANTES que la empresa: QC-50 hizo `recipes.company_id` una FK RESTRICT.
   await prisma.recipe.delete({ where: { id: recipeId } })
+  // La presentacion TAMBIEN antes que la empresa, y despues de los pedidos que la usan (arriba):
+  // `orders_company_id_presentation_id_fkey` es RESTRICT (QC-146).
+  await prisma.presentation.delete({ where: { id: presentationId } })
   await prisma.company.delete({ where: { id: companyId } })
   await prisma.unit.delete({ where: { id: unitId } })
   await prisma.$disconnect()

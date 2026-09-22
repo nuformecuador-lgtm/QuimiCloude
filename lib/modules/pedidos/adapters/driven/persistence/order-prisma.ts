@@ -63,6 +63,7 @@ const ORDER_SELECT = {
   updatedAt: true,
   createdBy: true,
   updatedBy: true,
+  presentationId: true,
 } satisfies Prisma.OrderSelect;
 
 type OrderPrismaRow = Prisma.OrderGetPayload<{ select: typeof ORDER_SELECT }>;
@@ -96,6 +97,7 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
+    presentationId: row.presentationId,
   };
 }
 
@@ -188,7 +190,7 @@ export async function createOrder(
           INSERT INTO "orders" (
             "company_id", "order_year", "order_sequence", "recipe_id", "quantity",
             "priority", "status", "ingredients_cost", "created_by", "updated_by", "created_at",
-            "updated_at"
+            "updated_at", "presentation_id"
           ) VALUES (
             ${companyId}::uuid,
             ${year}::integer,
@@ -204,7 +206,8 @@ export async function createOrder(
             ${actorId}::uuid,
             ${actorId}::uuid,
             ${now}::timestamptz,
-            ${now}::timestamptz
+            ${now}::timestamptz,
+            ${data.presentationId}::uuid
           )
           RETURNING "id", "order_year", "order_sequence"
         `);
@@ -237,6 +240,7 @@ export async function createOrder(
         updatedAt: now,
         createdBy: actorId,
         updatedBy: actorId,
+        presentationId: data.presentationId,
       };
     } catch (error) {
       // Lo que no se sabe traducir se RELANZA: el dominio recibe un resultado DISCRIMINADO, jamas
@@ -536,6 +540,7 @@ export async function updateAliveOrder(
       ingredientsCost: ingredientsCost === null ? null : toDecimalInput(ingredientsCost),
       updatedAt: now,
       updatedBy: actorId,
+      presentationId: data.presentationId,
     },
   });
   return count === 1 ? 'ok' : 'not_found';

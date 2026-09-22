@@ -47,6 +47,7 @@
  */
 import { randomUUID } from 'node:crypto'
 
+import { Prisma } from '@prisma/client'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
@@ -57,7 +58,9 @@ import {
   softDeleteAliveOrder,
   updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
+import { listAliveOrderSummariesByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma'
 import { normalizeCompanyName } from '@/lib/modules/identity'
+import { normalizePresentationName } from '@/lib/modules/inventario'
 import { prisma } from '@/lib/shared/db/prisma'
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, toOffsetLimit } from '@/lib/shared/pagination'
 
@@ -82,6 +85,7 @@ const YEAR_ORDEN = 2883
 const YEAR_BORRADO = 2884
 const YEAR_FILTROS = 2885
 const YEAR_DISCRIMINANTES = 2886
+const YEAR_CATALOGO = 2887
 
 const TEST_YEARS = [
   YEAR_ALTA,
@@ -90,6 +94,7 @@ const TEST_YEARS = [
   YEAR_BORRADO,
   YEAR_FILTROS,
   YEAR_DISCRIMINANTES,
+  YEAR_CATALOGO,
 ] as const
 
 async function dropTestSequences(): Promise<void> {
@@ -115,6 +120,9 @@ let roleId: string
 let documentTypeCode: string
 /** Empresa efimera del fixture. QC-47 R9 hizo `users.company_id` obligatoria. */
 let companyId: string
+/** QC-146: presentacion de la MISMA empresa, para que `NewOrder.presentationId` (obligatorio)
+ *  tenga una referencia valida en toda alta y edicion de este archivo. */
+let presentationId: string
 
 async function seedFixtures(): Promise<void> {
   const marca = token()
@@ -154,6 +162,18 @@ async function seedFixtures(): Promise<void> {
       select: { id: true },
     })
   ).id
+  // QC-146: presentacion de la MISMA empresa, obligatoria en toda alta y edicion (`NewOrder`).
+  presentationId = (
+    await prisma.presentation.create({
+      data: {
+        name: `Bidon ${marca}`,
+        nameNormalized: normalizePresentationName(`Bidon ${marca}`),
+        unitId,
+        companyId,
+      },
+      select: { id: true },
+    })
+  ).id
   // La receta es de la MISMA empresa que el resto del fixture: QC-50 hizo `recipes.company_id`
   // obligatoria.
   recipeId = (
@@ -187,6 +207,10 @@ async function dropFixtures(): Promise<void> {
   await prisma.user.delete({ where: { id: actorId } })
   // La receta TAMBIEN antes que la empresa: QC-50 hizo `recipes.company_id` una FK RESTRICT.
   await prisma.recipe.delete({ where: { id: recipeId } })
+  // La presentacion TAMBIEN antes que la empresa, y despues de todo pedido que la use -cada
+  // caso ya borro los suyos en su `finally` (`limpiar`)-: `orders_company_id_presentation_id_fkey`
+  // es `ON DELETE RESTRICT` (QC-146).
+  await prisma.presentation.delete({ where: { id: presentationId } })
   // La empresa DESPUES del usuario y de la receta: `users_company_id_fkey` y
   // `recipes_company_id_fkey` son `ON DELETE RESTRICT` (QC-47 R11, QC-50).
   await prisma.company.delete({ where: { id: companyId } })
@@ -218,6 +242,7 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
     quantity: '10.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
+    presentationId,
     ...overrides,
   }
 }
@@ -644,6 +669,44 @@ describe('R33/R40 — los discriminantes de las tres escrituras', () => {
       const cruda = await prisma.order.findUnique({ where: { id: pedido.id } })
       expect(cruda?.status).toBe('EN_CURSO')
       expect(cruda?.cancellationReason).toBeNull()
+    } finally {
+      await limpiar(creados)
+    }
+  })
+})
+
+describe('R27 — listAliveOrderSummariesByIds devuelve la presentacion', () => {
+  it('el resumen que pedidos publica a asignaciones lleva presentationId, con y sin presentacion', async () => {
+    const creados: string[] = []
+    try {
+      const now = instantIn(YEAR_CATALOGO, 1, 10)
+      const conPresentacion = await altaReal(creados, YEAR_CATALOGO, now)
+      // Un pedido «viejo» sin presentacion: se inserta con Prisma directo, sin pasar por el
+      // adaptador -que ya la exige siempre- para simular una fila anterior a esta ficha (R2).
+      const filaSinPresentacion = await prisma.order.create({
+        data: {
+          companyId,
+          orderYear: YEAR_CATALOGO,
+          orderSequence: 999,
+          recipeId,
+          quantity: new Prisma.Decimal('10'),
+          createdAt: instantIn(YEAR_CATALOGO, 1, 11),
+        },
+        select: { id: true },
+      })
+      creados.push(filaSinPresentacion.id)
+
+      const pagina = await listAliveOrderSummariesByIds(
+        companyId,
+        [conPresentacion.id, filaSinPresentacion.id],
+        ['PENDIENTE'],
+        1,
+      )
+
+      const resumenConPresentacion = pagina.items.find((item) => item.id === conPresentacion.id)
+      const resumenSinPresentacion = pagina.items.find((item) => item.id === filaSinPresentacion.id)
+      expect(resumenConPresentacion?.presentationId).toBe(presentationId)
+      expect(resumenSinPresentacion?.presentationId).toBeNull()
     } finally {
       await limpiar(creados)
     }

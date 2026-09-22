@@ -28,7 +28,7 @@ import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
-import type { ProductCatalog } from '@/lib/modules/inventario'
+import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 
@@ -53,9 +53,12 @@ const RECETA_VIVA: RecipeRef = { id: RECIPE_ID, name: 'Acido citrico 50%', isDel
 const RECETA_DE_BAJA: RecipeRef = { id: RECIPE_ID, name: 'Formula retirada', isDeleted: true }
 const OTRA_VIVA: RecipeRef = { id: OTRA_RECETA, name: 'Detergente neutro', isDeleted: false }
 const OTRA_DE_BAJA: RecipeRef = { id: OTRA_RECETA, name: 'Formula vieja', isDeleted: true }
+const PRESENTATION_ID = '66666666-6666-4666-8666-666666666666'
+
 const ENTRADA_ALTA = {
   recipeId: RECIPE_ID,
   quantity: '10.0000',
+  presentationId: PRESENTATION_ID,
 }
 
 function fila(overrides: Partial<OrderRow> = {}): OrderRow {
@@ -72,6 +75,7 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
+    presentationId: PRESENTATION_ID,
     ...overrides,
   }
 }
@@ -81,6 +85,7 @@ type Dobles = {
   readonly recipes: RecipeCatalog
   readonly products: ProductCatalog
   readonly units: UnitCatalog
+  readonly presentations: PresentationCatalog
   readonly now: () => Date
 }
 
@@ -89,16 +94,23 @@ function dobles(opciones: {
   recetas?: readonly RecipeRef[]
   alta?: OrderRow | 'duplicate_number'
   edicion?: 'ok' | 'not_found'
+  presentaciones?: readonly { readonly id: string; readonly name: string }[]
 }): Dobles & {
   readonly create: ReturnType<typeof vi.fn>
   readonly findAliveById: ReturnType<typeof vi.fn>
   readonly updateAlive: ReturnType<typeof vi.fn>
   readonly findRefsIncludingDeleted: ReturnType<typeof vi.fn>
+  readonly findPresentationRefs: ReturnType<typeof vi.fn>
 } {
   const create = vi.fn(async () => opciones.alta ?? fila())
   const findAliveById = vi.fn(async () => opciones.fila ?? null)
   const updateAlive = vi.fn(async () => opciones.edicion ?? 'ok')
   const findRefsIncludingDeleted = vi.fn(async () => opciones.recetas ?? [RECETA_VIVA])
+  const findPresentationRefs = vi.fn(
+    async (ids: readonly string[]) =>
+      opciones.presentaciones ??
+      (ids.includes(PRESENTATION_ID) ? [{ id: PRESENTATION_ID, name: 'Bidon 20L' }] : []),
+  )
   // Receta SIN lineas: este archivo no ejercita el calculo del importe, y sin lineas el
   // resultado siempre es `null` sin necesidad de mas dobles.
   const findExecutionContentById = vi.fn(async () => ({
@@ -131,11 +143,13 @@ function dobles(opciones: {
       findRefs: vi.fn(async () => []),
       findRefsSharingBaseInCompany: vi.fn(async () => []),
     } as unknown as UnitCatalog,
+    presentations: { findRefs: findPresentationRefs } as unknown as PresentationCatalog,
     now: () => AHORA,
     create,
     findAliveById,
     updateAlive,
     findRefsIncludingDeleted,
+    findPresentationRefs,
   }
 }
 
@@ -172,6 +186,7 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
       quantity: '10.0000',
       priority: 'BAJA',
       status: 'PENDIENTE',
+      presentationId: PRESENTATION_ID,
     })
   })
 
@@ -209,7 +224,7 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
 
     const [data, , actorId] = d.create.mock.calls[0] as [Record<string, unknown>, number, string]
     expect(actorId).toBe(ADMIN.id)
-    expect(Object.keys(data).sort()).toEqual(['priority', 'quantity', 'recipeId', 'status'])
+    expect(Object.keys(data).sort()).toEqual(['presentationId', 'priority', 'quantity', 'recipeId', 'status'])
     expect(data.status).toBe('PENDIENTE')
   })
 
@@ -291,7 +306,20 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       // R46: los dos autores salen como IDENTIFICADORES; resolver sus nombres es de QC-35.
       createdBy: 'admin-0',
       updatedBy: 'admin-0',
+      // R23: la ficha devuelve id y nombre de la presentacion, resueltos por el contrato.
+      presentationId: PRESENTATION_ID,
+      presentationName: 'Bidon 20L',
     })
+  })
+
+  it('R23: un pedido sin presentacion devuelve su ausencia, sin consultar el catalogo', async () => {
+    const d = dobles({ fila: fila({ presentationId: null }) })
+
+    const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
+
+    expect(vista.presentationId).toBeNull()
+    expect(vista.presentationName).toBeNull()
+    expect(d.findPresentationRefs).not.toHaveBeenCalled()
   })
 
   it('devuelve el motivo de un pedido cancelado (R29, R40)', async () => {
@@ -349,6 +377,7 @@ describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R
     const pagina = await createListOrders({
       orders,
       recipes: { findRefsIncludingDeleted, findIdsMatchingName } as unknown as RecipeCatalog,
+      presentations: { findRefs: vi.fn(async () => []) } as unknown as PresentationCatalog,
       log,
     })({ page: 1 }, ADMIN)
 
@@ -377,6 +406,7 @@ describe('updateOrder — edicion (R20, R21, R22, R24, R25, R33)', () => {
       quantity: '10.0000',
       priority: 'ALTA',
       status: 'EN_CURSO',
+      presentationId: PRESENTATION_ID,
     })
     expect(actorId).toBe(ADMIN.id)
     expect(instante).toBe(AHORA)

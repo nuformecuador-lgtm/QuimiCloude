@@ -1,11 +1,16 @@
 import { requirePermission, type Actor } from './actor';
-import { OrderNotFoundError, RecipeNotFoundError, ValidationError } from './errors';
+import {
+  OrderNotFoundError,
+  PresentationNotFoundError,
+  RecipeNotFoundError,
+  ValidationError,
+} from './errors';
 import { updateOrderSchema } from './order-input';
 import type { OrderScope } from './order-scope';
 import { assertTransition } from './order-transitions';
 import { resolveIngredientsCost } from './resolve-ingredients-cost';
 
-import type { ProductCatalog } from '@/lib/modules/inventario';
+import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
@@ -19,6 +24,8 @@ export type UpdateOrderDeps = {
   readonly recipes: RecipeCatalog;
   readonly products: ProductCatalog;
   readonly units: UnitCatalog;
+  /** Ver el comentario identico de `create-order.ts` sobre por que no se le pasa al coste. */
+  readonly presentations: PresentationCatalog;
   /** Ver el comentario identico de `create-order.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
 };
@@ -69,6 +76,13 @@ export function createUpdateOrder(
     // ni siquiera la que solo cambia la prioridad. Va antes de preguntar a los catalogos:
     // una edicion rechazada no lee nada mas y no modifica ninguna fila.
     assertTransition(row.status, data.status);
+
+    // R7, R9: la presentacion se comprueba SIEMPRE, cambie o no -es una consulta de un id y
+    // evita una rama «si cambio» que habria que probar aparte. Con un pedido viejo sin
+    // presentacion, `row.presentationId` es `null` y la entrada trae una: la comprobacion es
+    // la misma.
+    const [presentation] = await deps.presentations.findRefs([data.presentationId], actor.companyId);
+    if (presentation === undefined) throw new PresentationNotFoundError();
 
     // R25 -la sutileza de esta ficha-. Si la receta NO cambia se acepta aunque este dada de
     // baja: corregir la cantidad de un pedido viejo no puede obligar a cambiarle la formula.

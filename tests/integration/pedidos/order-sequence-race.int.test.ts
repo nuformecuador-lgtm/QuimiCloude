@@ -23,6 +23,7 @@ import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
+import { normalizePresentationName } from '@/lib/modules/inventario';
 import { createOrder } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -43,12 +44,16 @@ function connectionString(): string {
 
 let recetaId: string;
 let recetaCompanyId: string;
+/** Unidad de SISTEMA compartida: `presentations.unit_id` es obligatoria. */
+let unitId: string;
 
 type Fixture = {
   readonly companyId: string;
   readonly actorId: string;
   readonly roleId: string;
   readonly documentTypeCode: string;
+  /** QC-146: presentacion de la MISMA empresa, obligatoria en `NewOrder`. */
+  readonly presentationId: string;
 };
 
 async function createFixture(): Promise<Fixture> {
@@ -83,17 +88,28 @@ async function createFixture(): Promise<Fixture> {
     },
     select: { id: true },
   });
+  const presentation = await prisma.presentation.create({
+    data: {
+      name: `Bidon ${marca}`,
+      nameNormalized: normalizePresentationName(`Bidon ${marca}`),
+      unitId,
+      companyId: company.id,
+    },
+    select: { id: true },
+  });
   return {
     companyId: company.id,
     actorId: user.id,
     roleId: role.id,
     documentTypeCode: documentType.code,
+    presentationId: presentation.id,
   };
 }
 
 /** En orden de FK. Borrar por `companyId` no alcanza filas ajenas: la empresa nacio en el caso. */
 async function dropFixture(fixture: Fixture): Promise<void> {
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
+  await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
   await prisma.user.deleteMany({ where: { id: fixture.actorId } });
   await prisma.role.deleteMany({ where: { id: fixture.roleId } });
   await prisma.documentType.deleteMany({ where: { code: fixture.documentTypeCode } });
@@ -104,15 +120,22 @@ function ambito(fixture: Fixture): OrderScope {
   return { companyId: fixture.companyId };
 }
 
-function pedidoNuevo(): NewOrder {
-  return { recipeId: recetaId, quantity: '3.0000', priority: 'BAJA', status: 'PENDIENTE' };
+function pedidoNuevo(presentationId: string): NewOrder {
+  return { recipeId: recetaId, quantity: '3.0000', priority: 'BAJA', status: 'PENDIENTE', presentationId };
 }
 
 /** El ano sale del MISMO `now` que se escribe en `created_at`, como en el caso de uso: lo exige el
  *  `CHECK orders_order_year_matches_created_at`. */
 function altaDe(fixture: Fixture): Promise<OrderRow | 'duplicate_number'> {
   const now = new Date();
-  return createOrder(pedidoNuevo(), now.getUTCFullYear(), fixture.actorId, now, null, ambito(fixture));
+  return createOrder(
+    pedidoNuevo(fixture.presentationId),
+    now.getUTCFullYear(),
+    fixture.actorId,
+    now,
+    null,
+    ambito(fixture),
+  );
 }
 
 /** Relanza el PRIMER rechazo antes de afirmar nada y antes de limpiar. Con `Promise.all` el
@@ -134,6 +157,12 @@ function cumplidasOLanza<T>(asentadas: readonly PromiseSettledResult<T>[]): T[] 
 
 beforeAll(async () => {
   const marca = token();
+  unitId = (
+    await prisma.unit.create({
+      data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `kg${marca}` },
+      select: { id: true },
+    })
+  ).id;
   // La receta es compartida por las tres rondas de la carrera —el fixture de la empresa nace
   // dentro del caso—, asi que se ancla a una empresa efimera propia: QC-50 hizo
   // `recipes.company_id` obligatoria.
@@ -153,6 +182,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await prisma.recipe.deleteMany({ where: { id: recetaId } });
   await prisma.company.deleteMany({ where: { id: recetaCompanyId } });
+  await prisma.unit.deleteMany({ where: { id: unitId } });
   await prisma.$disconnect();
 });
 

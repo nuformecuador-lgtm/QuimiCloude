@@ -45,6 +45,7 @@ import { Prisma } from '@prisma/client'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { normalizeCompanyName } from '@/lib/modules/identity'
+import { normalizePresentationName } from '@/lib/modules/inventario'
 import { prisma } from '@/lib/shared/db/prisma'
 
 // ---------------------------------------------------------------------------
@@ -153,6 +154,8 @@ interface Fixtures {
   readonly unitId: string
   readonly recipeId: string
   readonly userId: string
+  /** QC-146: presentacion de la MISMA empresa, lista para R5, R9 y R14. */
+  readonly presentationId: string
 }
 
 /**
@@ -211,7 +214,23 @@ async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
     },
     select: { id: true },
   })
-  return { companyId: company.id, unitId: unit.id, recipeId: recipe.id, userId: user.id }
+  const presentationName = `Bidon ${marca}`
+  const presentation = await tx.presentation.create({
+    data: {
+      name: presentationName,
+      nameNormalized: normalizePresentationName(presentationName),
+      unitId: unit.id,
+      companyId: company.id,
+    },
+    select: { id: true },
+  })
+  return {
+    companyId: company.id,
+    unitId: unit.id,
+    recipeId: recipe.id,
+    userId: user.id,
+    presentationId: presentation.id,
+  }
 }
 
 /** Columnas que un alta cruda puede escribir en `orders`. */
@@ -300,6 +319,7 @@ interface OrderSeed {
   readonly priority?: OrderPriorityValue
   readonly sequence?: number
   readonly createdAt?: Date
+  readonly presentationId?: string | null
 }
 
 /** Crea un pedido con la API tipada (camino feliz = camino real de la app) y devuelve su id. */
@@ -321,6 +341,7 @@ async function createOrder(
       createdAt: seed.createdAt,
       createdBy: f.userId,
       updatedBy: f.userId,
+      presentationId: seed.presentationId,
     },
     select: { id: true },
   })
@@ -825,6 +846,86 @@ describe('que devuelven las lecturas (R40)', () => {
       expect(listado).toEqual([
         { id, status: 'CANCELADO', cancellationReason: 'El cliente ya no lo necesita' },
       ])
+    })
+  })
+})
+
+describe('QC-146 — la presentacion del pedido, contra la base', () => {
+  it('R5: la baja logica conserva la presentacion', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      const id = await createOrder(tx, f, { presentationId: f.presentationId })
+
+      await tx.order.update({ where: { id }, data: { deletedAt: new Date() } })
+
+      const stored = await tx.order.findUniqueOrThrow({
+        where: { id },
+        select: { presentationId: true, deletedAt: true },
+      })
+      expect(stored.deletedAt).not.toBeNull()
+      expect(stored.presentationId).toBe(f.presentationId)
+    })
+  })
+
+  it('R9: editar sustituye la presentacion por otra de la misma empresa', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      const otraPresentacion = (
+        await tx.presentation.create({
+          data: {
+            name: `Tambor ${token()}`,
+            nameNormalized: normalizePresentationName(`Tambor ${token()}`),
+            unitId: f.unitId,
+            companyId: f.companyId,
+          },
+          select: { id: true },
+        })
+      ).id
+      const id = await createOrder(tx, f, { presentationId: f.presentationId })
+
+      await tx.order.update({ where: { id }, data: { presentationId: otraPresentacion } })
+
+      const stored = await tx.order.findUniqueOrThrow({ where: { id }, select: { presentationId: true } })
+      expect(stored.presentationId).toBe(otraPresentacion)
+      expect(stored.presentationId).not.toBe(f.presentationId)
+    })
+  })
+
+  it('R14: el alta y la edicion con presentacion no escriben movimientos ni cambian la existencia de los lotes', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      const product = await tx.product.create({
+        data: {
+          name: 'Acido citrico',
+          nameNormalized: 'acidocitrico',
+          companyId: f.companyId,
+          unitId: f.unitId,
+        },
+        select: { id: true },
+      })
+      const batch = await tx.productBatch.create({
+        data: {
+          productId: product.id,
+          presentationId: f.presentationId,
+          stock: 100,
+          unitCost: new Prisma.Decimal('5'),
+          lot: '1',
+          purchaseDate: new Date('2026-01-01'),
+          companyId: f.companyId,
+        },
+        select: { id: true, stock: true },
+      })
+
+      const id = await createOrder(tx, f, { presentationId: f.presentationId })
+      await tx.order.update({ where: { id }, data: { presentationId: f.presentationId, priority: 'ALTA' } })
+
+      const stockDespues = await tx.productBatch.findUniqueOrThrow({
+        where: { id: batch.id },
+        select: { stock: true },
+      })
+      expect(stockDespues.stock).toBe(batch.stock)
+      const movimientos = await tx.inventoryMovement.count({ where: { batchId: batch.id } })
+      expect(movimientos).toBe(0)
     })
   })
 })

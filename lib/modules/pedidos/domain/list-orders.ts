@@ -10,6 +10,7 @@ import type { ListFilterValue, ListQuery } from './list-query';
 import type { OrderSummary } from './order-view';
 import type { Page } from './page';
 
+import type { PresentationCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 
 import type { ListQueryLog } from '../ports/list-query-log';
@@ -19,6 +20,8 @@ import type { OrderRepository } from '../ports/order-repository';
 export type ListOrdersDeps = {
   readonly orders: OrderRepository;
   readonly recipes: RecipeCatalog;
+  /** Contrato PUBLICO de `inventario`: resuelve los nombres de presentacion de la pagina (R22). */
+  readonly presentations: PresentationCatalog;
   readonly log: ListQueryLog;
 };
 
@@ -158,8 +161,21 @@ export function createListOrders(
 
     const recipeNames = new Map(recipes.map((recipe) => [recipe.id, recipe.name]));
 
+    // R22: los ids NO NULOS de la pagina, deduplicados, con UNA sola llamada al catalogo de
+    // presentaciones -y ninguna si ningun pedido de la pagina tiene presentacion.
+    const presentationIds = [
+      ...new Set(
+        page.items
+          .map((row) => row.presentationId)
+          .filter((id): id is string => id !== null),
+      ),
+    ];
+    const presentations =
+      presentationIds.length === 0 ? [] : await deps.presentations.findRefs(presentationIds, actor.companyId);
+    const presentationNames = new Map(presentations.map((presentation) => [presentation.id, presentation.name]));
+
     return {
-      items: page.items.map((row) => toOrderView(row, recipeNames)),
+      items: page.items.map((row) => toOrderView(row, recipeNames, presentationNames)),
       total: page.total,
       page: page.page,
       pageSize: page.pageSize,

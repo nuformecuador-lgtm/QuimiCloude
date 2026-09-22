@@ -43,6 +43,7 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
     quantity: '10.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
+    presentationId: null,
     ...overrides,
   };
 }
