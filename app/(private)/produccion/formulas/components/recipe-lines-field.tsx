@@ -18,14 +18,14 @@ import {
 } from './recipe-form-state';
 
 /**
- * Campo de líneas de producto en porcentaje (T9, R1, R3, R10, R11, R12, R23-R25; `design.md > 8.1`).
+ * Campo de líneas de producto en porcentaje.
  *
- * **Sin unidad**: la línea ya no la lleva (R1), así que no hay ningún selector de unidad en esta
- * pantalla ni columna que lo pinte (R12). El ingrediente elegido se ve como «nombre · unidad»
+ * **Sin unidad**: la línea ya no la lleva, así que no hay ningún selector de unidad en esta
+ * pantalla ni columna que lo pinte. El ingrediente elegido se ve como «nombre · unidad»
  * -lo pinta `ProductPicker` a partir de `productUnitId`- cuando el insumo la tiene.
  *
  * **Añadir y quitar líneas, y una receta SIN ninguna se puede llegar a enviar** (aunque el
- * servidor y el propio formulario la rechacen por R3/R11, R23): el botón de quitar no tiene
+ * servidor y el propio formulario la rechacen): el botón de quitar no tiene
  * mínimo que respetar.
  *
  * **La fila en blanco de arranque es un FANTASMA, no una línea del estado**: cuando `lines` está
@@ -41,19 +41,19 @@ import {
  * quita esa línea -y si era la última, reaparece el fantasma, así que nunca se queda la pantalla
  * sin filas- y el `+` deja la fila donde está y añade otra vacía debajo.
  *
- * **El campo de porcentaje es `type="text"` con `inputMode="decimal"`** (R25, `design.md > 8.1`):
+ * **El campo de porcentaje es `type="text"` con `inputMode="decimal"`**:
  * un `type="number"` pinta el separador según la configuración regional del navegador y, en los
  * que usan punto, rechaza la coma -justo lo que impide garantizar «12,50»-. Se aceptan coma y
  * punto al escribir; el esquema del contrato valida lo que llega tras la sustitución que hace
  * `buildRecipePayload`. El valor sigue viajando como CADENA, tal cual lo escribió el usuario: ni
  * `parseFloat(`, ni `Number(`, ni `toFixed(` en ningún punto de este archivo.
  *
- * **El indicador de suma** (R10, R25) se calcula en CADA render con `sumPercentages` sobre las
+ * **El indicador de suma** se calcula en CADA render con `sumPercentages` sobre las
  * líneas reales -el fantasma no suma, porque no está en `lines`- y se pinta al pie del bloque,
  * `role="status"`, `aria-live="polite"`, con `data-complete` para que el test no dependa del
  * copy exacto además de comprobarlo.
  *
- * **Producto dado de baja (R24, decisión cerrada del 2026-09-03):** el ÚNICO discriminante es
+ * **Producto dado de baja:** el ÚNICO discriminante es
  * `line.productName === null`. Cuando lo es:
  * - la CELDA de producto de esa línea, y solo esa, lleva
  *   `data-testid="recipe-line-unavailable-<índice>"`;
@@ -92,7 +92,7 @@ function unitLabel(unitId: string, units: readonly UnitRef[]): string | null {
 /**
  * Texto del selector de ingrediente según el estado de la línea. Sin depender del copy en los
  * tests. Con ingrediente elegido y disponible, incluye su unidad -«nombre · unidad»- cuando el
- * insumo la tiene (R12); sin ella -sin lotes o dado de baja (R24)- se ve solo el nombre.
+ * insumo la tiene; sin ella -sin lotes o dado de baja- se ve solo el nombre.
  */
 function productPickerLabel(
   productName: string | null,
@@ -131,7 +131,7 @@ export function RecipeLinesField({
   // rojo, así que no puede sustituirse por un contador guardado en el estado.
   const unavailableCount = lines.filter((line) => line.productName === null).length;
 
-  // R10: la suma se calcula SOLO sobre las líneas reales -el fantasma nunca entra aquí, porque
+  // La suma se calcula SOLO sobre las líneas reales -el fantasma nunca entra aquí, porque
   // no está en `lines`-, y se recalcula en cada render con la misma función que valida el borde.
   // La MISMA sustitución de coma por punto que hace `buildRecipePayload` -nunca un paso por
   // `number`- porque `sumPercentages` opera sobre el formato del contrato, con punto.
@@ -305,8 +305,8 @@ export function RecipeLinesField({
       </div>
 
       {/*
-        Indicador de suma (R10, R25): SIEMPRE montado, incluso sin ninguna línea -"Suma: 0,00 % —
-        faltan 100,00 %" (R11, R23)-. `data-complete` deja al test comprobar el estado sin
+        Indicador de suma: SIEMPRE montado, incluso sin ninguna línea -"Suma: 0,00 % —
+        faltan 100,00 %"-. `data-complete` deja al test comprobar el estado sin
         depender del copy exacto, además del copy en sí.
       */}
       <p
@@ -342,7 +342,7 @@ export function RecipeLinesField({
 }
 
 /**
- * Texto exacto del indicador de suma (R10, R25), a partir del resultado de `sumPercentages`.
+ * Texto exacto del indicador de suma, a partir del resultado de `sumPercentages`.
  * Usa `formatPercentage` -la MISMA función que el resto de la receta- para el separador de coma,
  * nunca un `.replace(` propio que se desincronizaría del resto de la pantalla.
  */

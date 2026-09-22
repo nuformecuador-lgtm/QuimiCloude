@@ -56,7 +56,7 @@ export interface RecipeCatalog {
 /** Linea de receta tal como la ve la ejecucion: sin `id` propio, sin autoria, sin marcas de
  *  tiempo. `productName` no lo resuelve este catalogo -`recetas` no conoce el nombre de un
  *  producto, ese dato es de `inventario`-, asi que sale siempre `null`; quien orqueste la
- *  pantalla lo completa con su propio `ProductCatalog`. Sin unidad propia (R1): la unidad la
+ *  pantalla lo completa con su propio `ProductCatalog`. Sin unidad propia: la unidad la
  *  resuelve quien orquesta, a partir de `ProductRef.unitId`. */
 export type RecipeExecutionLine = {
   readonly productId: string;

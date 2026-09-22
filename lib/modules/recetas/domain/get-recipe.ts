@@ -14,7 +14,7 @@ export type GetRecipeDeps = {
   readonly images: RecipeImageStorage;
 };
 
-/** Existencia del producto en SU PROPIA unidad (R14, R24): 0 cuando no tiene lotes -y por
+/** Existencia del producto en SU PROPIA unidad: 0 cuando no tiene lotes -y por
  *  tanto ninguna unidad resoluble-, la cantidad de esa unidad en el resto de los casos. */
 function stockInProductUnit(ref: ProductRef): number {
   if (ref.unitId === null) return 0;

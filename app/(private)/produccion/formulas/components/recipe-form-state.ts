@@ -41,7 +41,7 @@ export type ImageFieldState =
  *   de estar marcada es automático: en cuanto el usuario elige otro producto por el selector,
  *   `productName` pasa a la cadena elegida y ya no es `null`.
  *
- * **Sin unidad propia** (R1, R12): la línea ya no lleva `unitId` ni un selector que lo pida. `percentage`
+ * **Sin unidad propia**: la línea ya no lleva `unitId` ni un selector que lo pida. `percentage`
  * es LO QUE EL USUARIO ESCRIBIO, con coma si la usó -`buildRecipePayload` es quien la sustituye por
  * un punto, sin pasar nunca por `number`-.
  */
@@ -52,8 +52,8 @@ export type RecipeLineFormValue = {
   readonly percentage: string;
   /**
    * Unidad del INGREDIENTE elegido (no de la línea, que ya no tiene una), o `null` si no se
-   * sabe -sin lotes o dado de baja (R24)-. Es de PRESENTACION pura, para mostrar «nombre ·
-   * unidad» junto al ingrediente elegido (R12); `buildRecipePayload` la descarta igual que `key`
+   * sabe -sin lotes o dado de baja-. Es de PRESENTACION pura, para mostrar «nombre ·
+   * unidad» junto al ingrediente elegido; `buildRecipePayload` la descarta igual que `key`
    * y `productName`, porque el contrato de receta no la declara.
    */
   readonly productUnitId: string | null;
@@ -85,7 +85,7 @@ export type RecipeFormState = {
   readonly image: ImageFieldState;
 };
 
-/** Línea tal como la espera el contrato (`recipeLineSchema`): sin `key` ni `productName`, sin unidad (R1). */
+/** Línea tal como la espera el contrato (`recipeLineSchema`): sin `key` ni `productName`, sin unidad. */
 export type RecipeLinePayload = {
   readonly productId: string;
   readonly percentage: string;
@@ -123,7 +123,7 @@ export type RecipePayload = {
  * prueba correcta de un test sobre esto es `'image' in payload`, nunca `payload.image ===
  * undefined` (`design.md > 8`, riesgo 6).
  *
- * **El porcentaje viaja como cadena, con una única sustitución de texto** (R1, R25): esta función
+ * **El porcentaje viaja como cadena, con una única sustitución de texto**: esta función
  * cambia la coma que el usuario pudo escribir por un punto (`replace(',', '.')`) y nada más -no
  * la parsea, no la redondea y no la convierte a número en ningún punto-. `grep` de la ruta
  * confirma que en ningún archivo de esta feature aparece `parseFloat(`, `Number(` ni `toFixed(`

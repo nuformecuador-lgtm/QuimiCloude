@@ -26,12 +26,12 @@ export type RecipeSummary = {
 /**
  * Linea de producto tal como sale en el DETALLE (R33). `productName` sale de
  * `ProductCatalog.findRefs` (`design.md > 6`), y es `null` cuando el producto esta
- * borrado logicamente (R18): la linea se conserva igual. `percentage` es cadena con 2
- * decimales, sin unidad propia (R1).
+ * borrado logicamente: la linea se conserva igual. `percentage` es cadena con 2
+ * decimales, sin unidad propia.
  *
  * `productUnitId` es la unidad del PRODUCTO, no de la linea: sale de
  * `ProductCatalog.findRefs` y es `null` cuando el insumo no tiene lotes o esta dado de
- * baja (R14, R24). `productStock` es la existencia en esa misma unidad: `null` cuando el
+ * baja. `productStock` es la existencia en esa misma unidad: `null` cuando el
  * producto esta dado de baja o cuando `productUnitId` es `null`, `0` cuando no tiene
  * ningun lote, y la cantidad sumada cuando tiene lotes en esa unidad.
  */

@@ -26,7 +26,7 @@ import type { NewRecipe, RecipeLineData, RecipeLineRow, RecipeRow } from '../../
  * escribe siempre junto al nombre, en la misma escritura.
  *
  * `percentage` viaja como CADENA por el puerto (el dominio no puede importar
- * `@prisma/client`, `design.md > 2`): `toDecimalInput`/`fromDecimalPercentage` son el UNICO
+ * `@prisma/client`): `toDecimalInput`/`fromDecimalPercentage` son el UNICO
  * sitio del modulo que convierte en los dos sentidos.
  */
 
@@ -163,7 +163,7 @@ function isUniqueNameViolation(error: unknown): boolean {
   return false;
 }
 
-/** `23514`: el `CHECK` de rango de `percentage` (`design.md > 2.1`, R6). Nunca `'duplicate'`. */
+/** `23514`: el `CHECK` de rango de `percentage`. Nunca `'duplicate'`. */
 function isPercentageCheckViolation(error: unknown): boolean {
   return sqlStateOf(error) === '23514';
 }

@@ -8,7 +8,7 @@ import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
  * Coste de los ingredientes de una receta para una cantidad de pedido dada. Una sola llamada a
  * cada catalogo salvo `products`, que hace dos: los lotes con existencia (`findCostingBatches`)
  * y la unidad de cada insumo (`findRefs`), ninguna crece con el numero de lineas de la receta.
- * La receta ya NO guarda unidad por linea (R14): la unidad de cada ingrediente es la que
+ * La receta ya NO guarda unidad por linea: la unidad de cada ingrediente es la que
  * `inventario` resuelve para ese producto en este momento, y llega `null` para uno sin lotes.
  */
 export async function resolveIngredientsCost(

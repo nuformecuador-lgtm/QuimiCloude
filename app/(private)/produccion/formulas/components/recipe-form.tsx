@@ -157,10 +157,10 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
         key: createLocalKey('line'),
         productId: line.productId,
         productName: line.productName,
-        // R25: el campo se precarga con la MISMA función que formatea en el resto de la
+        // El campo se precarga con la MISMA función que formatea en el resto de la
         // receta -«12.50» -> «12,50»-, nunca con el valor crudo del contrato.
         percentage: formatPercentage(line.percentage),
-        // La unidad del PRODUCTO (R12), no de la línea -que ya no tiene una-: el detalle de la
+        // La unidad del PRODUCTO, no de la línea -que ya no tiene una-: el detalle de la
         // receta la trae en `productUnitId` desde `RecipeLineView`.
         productUnitId: line.productUnitId,
       }),
@@ -188,8 +188,8 @@ export function RecipeForm(props: RecipeFormProps) {
 
   const isEdit = props.mode === 'edit';
 
-  // R10, R11: se recalcula en CADA render con la misma función que el indicador de suma y que el
-  // esquema del contrato -nunca una copia local de la regla-, también con cero líneas (R23). La
+  // Se recalcula en CADA render con la misma función que el indicador de suma y que el
+  // esquema del contrato -nunca una copia local de la regla-, también con cero líneas. La
   // coma se sustituye por un punto igual que en `buildRecipePayload`: `sumPercentages` opera
   // sobre el formato del contrato.
   const isComplete = sumPercentages(
@@ -199,7 +199,7 @@ export function RecipeForm(props: RecipeFormProps) {
   function handleSubmit() {
     setSaveError(null);
 
-    // R11: Enter en un campo no se salta la comprobación -`disabled` en el botón no basta,
+    // Enter en un campo no se salta la comprobación -`disabled` en el botón no basta,
     // porque el formulario también se envía por teclado-. Se repite la MISMA función que ya
     // deshabilita el botón, no una regla nueva.
     if (!isComplete) return;

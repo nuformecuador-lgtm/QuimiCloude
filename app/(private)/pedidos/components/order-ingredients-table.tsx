@@ -32,11 +32,11 @@ import { subtractDecimal } from './order-decimal';
  * lote, asi que no hay presentacion por ingrediente que mostrar.
  *
  * **La unidad es la del PRODUCTO, no de la linea** (`productUnitId`): la receta ya no guarda
- * unidad. Se traduce aqui con el catalogo que la seccion baja por props (R43): simbolo si lo
+ * unidad. Se traduce aqui con el catalogo que la seccion baja por props: simbolo si lo
  * hay, nombre si no, y el marcador cuando el insumo no tiene unidad resoluble —sin lotes o
  * dado de baja— o cuando el id no existe en el catalogo.
  *
- * **Una linea cuyo producto esta de baja llega con `productName: null`** (R18): la linea
+ * **Una linea cuyo producto esta de baja llega con `productName: null`**: la linea
  * se conserva y aqui se dice que el producto no esta disponible, en vez de dejar la celda
  * vacia o pintar el id tecnico.
  *
@@ -67,7 +67,7 @@ import { subtractDecimal } from './order-decimal';
  * (`exactDecimalTitle`): la cifra completa queda a un hover, no desaparece.
  */
 
-/** Prefijo de los `data-testid` de la tabla (R44). Ningun test depende del copy. */
+/** Prefijo de los `data-testid` de la tabla. Ningun test depende del copy. */
 export const ORDER_INGREDIENTS_TESTID = 'order-ingredients';
 export const ORDER_INGREDIENTS_TABLE_TESTID = 'order-ingredients-table';
 export const ORDER_INGREDIENTS_EMPTY_TESTID = 'order-ingredients-empty';
@@ -81,7 +81,7 @@ const MISSING_VALUE_MARK = '—';
 
 /**
  * Etiqueta visible de la unidad del insumo: simbolo, nombre, o el marcador cuando el insumo no
- * tiene unidad resoluble (`productUnitId === null`, R24) o el id no existe en el catalogo.
+ * tiene unidad resoluble (`productUnitId === null`) o el id no existe en el catalogo.
  */
 function unitLabel(productUnitId: string | null, units: readonly UnitView[]): string {
   if (productUnitId === null) return MISSING_VALUE_MARK;
@@ -92,7 +92,7 @@ function unitLabel(productUnitId: string | null, units: readonly UnitView[]): st
 export type OrderIngredientsTableProps = {
   /** Lineas de la receta elegida, tal cual las entrega el detalle de `recetas`. */
   readonly lines: readonly RecipeLineView[];
-  /** Catalogo de unidades, por props (R43): resuelve el `productUnitId` de cada linea. */
+  /** Catalogo de unidades, por props: resuelve el `productUnitId` de cada linea. */
   readonly units: readonly UnitView[];
   /** La cantidad escrita en el formulario: escalo con ella la «cantidad requerida». */
   readonly quantity: string;
