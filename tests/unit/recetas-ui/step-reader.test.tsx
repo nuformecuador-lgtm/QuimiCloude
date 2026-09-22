@@ -530,6 +530,91 @@ describe('StepReader — R2: sin espera activa el comportamiento no cambia', () 
   });
 });
 
+describe('StepReader — mode="ejecucion" (rediseno de planta, 2026-09-21, fuera de SDD)', () => {
+  it('el modo por defecto sigue siendo "lectura": no aparece nada de la variante de ejecucion', () => {
+    renderReader();
+
+    expect(screen.queryByTestId('step-reader-progress')).toBeNull();
+    expect(screen.queryByTestId('step-reader-actions')).toBeNull();
+    expect(screen.queryByTestId('step-reader-reason-slot')).toBeNull();
+  });
+
+  it('la barra de Anterior/Siguiente queda pegada abajo del contenedor', () => {
+    render(
+      <StepReader steps={TRES_PASOS} onFinish={vi.fn()} title="Receta de prueba" mode="ejecucion" />,
+    );
+
+    const barra = screen.getByTestId('step-reader-actions');
+    expect(barra.className).toContain('sticky');
+    expect(barra.className).toContain('bottom-0');
+    expect(within(barra).getByTestId('step-reader-previous')).toBeVisible();
+    expect(within(barra).getByTestId('step-reader-next')).toBeVisible();
+  });
+
+  it('muestra un tramo de progreso por paso, con el paso actual marcado', async () => {
+    const user = setupUser();
+    render(
+      <StepReader steps={TRES_PASOS} onFinish={vi.fn()} title="Receta de prueba" mode="ejecucion" />,
+    );
+
+    const segmentos = [0, 1, 2].map((i) => screen.getByTestId(`step-reader-progress-segment-${i}`));
+    expect(segmentos).toHaveLength(3);
+    expect(segmentos[0]).toHaveAttribute('data-state', 'current');
+    expect(segmentos[1]).toHaveAttribute('data-state', 'pending');
+    expect(segmentos[2]).toHaveAttribute('data-state', 'pending');
+
+    await marcarTodo(user);
+    await user.click(screen.getByTestId('step-reader-next'));
+
+    expect(screen.getByTestId('step-reader-progress-segment-0')).toHaveAttribute('data-state', 'done');
+    expect(screen.getByTestId('step-reader-progress-segment-1')).toHaveAttribute('data-state', 'current');
+  });
+
+  it('el contenedor del motivo de bloqueo conserva su hueco aunque no haya nada pendiente', async () => {
+    const user = setupUser();
+    render(
+      <StepReader steps={TRES_PASOS} onFinish={vi.fn()} title="Receta de prueba" mode="ejecucion" />,
+    );
+
+    const slot = screen.getByTestId('step-reader-reason-slot');
+    expect(slot.className).toContain('min-h-6');
+
+    let motivo = screen.getByTestId('step-reader-blocked-reason');
+    expect(motivo.className).not.toContain('invisible');
+
+    await marcarTodo(user);
+
+    motivo = screen.getByTestId('step-reader-blocked-reason');
+    expect(motivo.className).toContain('invisible');
+    expect(screen.getByTestId('step-reader-reason-slot')).toContainElement(motivo);
+  });
+
+  it('al avanzar de paso, el foco se mueve al encabezado del paso', async () => {
+    const user = setupUser();
+    render(
+      <StepReader steps={TRES_PASOS} onFinish={vi.fn()} title="Receta de prueba" mode="ejecucion" />,
+    );
+
+    await marcarTodo(user);
+    await user.click(screen.getByTestId('step-reader-next'));
+
+    expect(document.activeElement).toBe(screen.getByTestId('step-reader-heading'));
+  });
+
+  it('en "lectura" avanzar de paso NO roba el foco (interrumpiria a quien edita)', async () => {
+    const user = setupUser();
+    renderReader();
+
+    await marcarTodo(user);
+    const siguiente = screen.getByTestId('step-reader-next');
+    await user.click(siguiente);
+
+    // El foco se queda donde lo dejo el click -el propio boton-, nunca salta al titulo.
+    expect(document.activeElement).toBe(siguiente);
+    expect(document.activeElement).not.toBe(screen.getByTestId('step-reader-title'));
+  });
+});
+
 describe('StepReader — espera minima por paso', () => {
   afterEach(() => {
     vi.useRealTimers();

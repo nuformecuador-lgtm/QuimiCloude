@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { DocumentUpload } from '@/components/shared/document-upload';
 import type { ErrorCode } from '@/lib/modules/errores';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { getSupplierAction } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
@@ -122,6 +123,7 @@ export default async function ProveedorDetallePage({
           units={unitsResult.data}
         />
       </Suspense>
+      <DocumentUpload strategy="catalogo" />
     </div>
   );
 }

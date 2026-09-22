@@ -81,6 +81,7 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
           title={execution.numberText}
           onFinish={() => formRef.current?.requestSubmit()}
           minStepSeconds={MIN_STEP_SECONDS}
+          mode="ejecucion"
         />
       </div>
 

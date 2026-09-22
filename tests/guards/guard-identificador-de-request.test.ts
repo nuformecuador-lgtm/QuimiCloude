@@ -118,6 +118,9 @@ export const E2E_ESPERADOS = [
   // estado. NO ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni
   // afirma nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21
   // sigue INTACTO.
+  // Sube tres PDFs desde el detalle de un proveedor y ve cambiar el estado de cada uno, con el
+  // almacenamiento, la cola y la IA doblados. No afirma nada sobre el identificador de peticion.
+  'documentos.spec.ts',
   'ejecucion-receta.spec.ts',
   'errores.spec.ts',
   'grupos-de-trabajo.spec.ts',
