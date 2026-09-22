@@ -222,10 +222,21 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
     // `ASSIGNED_ORDERS_ROUTE`-. Aparece aqui porque EJECUTA la receta de un pedido asignado, que
     // es el alcance de esa ficha: llega por `Order.recipeId`, nunca navegando el catalogo. El
     // orden es el que devuelve `readdirSync`, asi que va SEGUNDO.
+    //
+    // AMPLIADA de nuevo el 2026-09-22 (QC-147, cantidades-de-receta-en-porcentaje): la lista pasa
+    // de CUATRO a CINCO literales, y sigue siendo CERRADA -mismo criterio de siempre: un sexto
+    // spec de recetas sin ficha tiene que seguir poniendo esto en rojo-. El spec que entra lo
+    // pide R22 de `specs/QC-147-cantidades-de-receta-en-porcentaje/requirements.md`: cubre que
+    // una receta cuyas lineas suman 97,50 % no se guarda y con 100,00 % si, que una receta sin
+    // ninguna linea no se guarda, el costo de ingredientes de un pedido calculado con el
+    // porcentaje, y lo que ve el Operario en la linea de un pedido. VERIFICADO con `readdirSync`
+    // antes de darlo de alta: `recetas-porcentaje.spec.ts` cae entre `recetas-pasos.spec.ts` y
+    // `recetas.spec.ts`, asi que va en medio de esas dos.
     expect(e2eMatches, `spec E2E de recetas inesperado: ${e2eMatches.join(', ')}`).toEqual([
       'aislamiento-recetas.spec.ts', // QC-50 / R31: E2E de aislamiento por empresa
       'ejecucion-receta.spec.ts', // QC-63 / R29, R30: E2E de la ejecucion desde un pedido asignado
       'recetas-pasos.spec.ts', // QC-64 / R28: E2E del camino completo del editor y el asistente
+      'recetas-porcentaje.spec.ts', // QC-147 / R22: E2E del porcentaje en lineas de receta
       'recetas.spec.ts', // QC-26: E2E del CRUD de la pantalla de recetas
     ])
   })

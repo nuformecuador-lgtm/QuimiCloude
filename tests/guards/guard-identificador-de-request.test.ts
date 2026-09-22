@@ -134,6 +134,15 @@ export const E2E_ESPERADOS = [
   'presentaciones.spec.ts',
   'proveedores.spec.ts',
   'recetas-pasos.spec.ts',
+  // Alta el 2026-09-22 (QC-147) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se
+  // relaja -el archivo se nombra, uno a uno-. Lo que ejercita (R22): una receta cuyas lineas
+  // suman 97,50 % no se guarda y con 100,00 % si; una receta sin ninguna linea no se guarda; el
+  // costo de ingredientes de un pedido sale calculado con el porcentaje; y el Operario ve el
+  // porcentaje y la cantidad convertida en la linea de un pedido. NO ejercita el cruce borde ->
+  // accion del identificador de peticion: el spec no lee ni afirma nada sobre el identificador
+  // ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
+  'recetas-porcentaje.spec.ts',
   'recetas.spec.ts',
   'session.spec.ts',
   'theme.spec.ts',
