@@ -1,26 +1,18 @@
--- QC-144: el rol Empacador y el permiso `terminados.consultar` en una instalacion QUE YA EXISTE.
 -- Migracion de DATOS: no crea, altera ni borra ninguna tabla, columna, indice, restriccion, tipo
 -- ni politica de RLS; solo escribe filas en `roles`, `permissions` y `role_permissions`.
 --
--- Es la PRIMERA migracion que inserta en `roles`: los dos roles de hoy solo los crea el seed, que
--- corre en la instalacion y no en cada despliegue. Sin este INSERT, en una base ya sembrada el
--- subselect por nombre de los pasos 3a y 3b no encontraria al Empacador y no le asignaria nada, en
--- silencio.
+-- Es la primera migracion que inserta en `roles`. Sin este INSERT, en una base ya sembrada el
+-- subselect por nombre de los pasos 3a y 3b no encontraria al Empacador y no le asignaria nada,
+-- en silencio.
 --
--- Ninguna sentencia nombra al Operador: sus asignaciones no cambian. Las cuatro llevan
--- `ON CONFLICT ... DO NOTHING`, asi que aplicarla sobre una base donde el seed ya creo el rol, el
--- permiso o alguna asignacion no falla y no reescribe ninguna fila existente.
+-- Ninguna sentencia nombra al Operador a proposito: sus asignaciones no cambian. Las cuatro son
+-- idempotentes por `ON CONFLICT ... DO NOTHING`.
 --
--- Generada a mano (sin `prisma migrate dev --create-only`): la base local tenia drift de checksum
--- en cuatro migraciones anteriores ajenas a esta ficha (`*_company_scope`), y `migrate dev` solo
--- ofrece resolverlo con un reset completo de la base de datos. `pnpm run db:migrate` (`prisma
--- migrate deploy`) no exige ese chequeo y aplica esta carpeta igual que cualquier otra. No hay
--- DDL generado que borrar: el archivo es enteramente manual, con la forma literal de QC-66 y QC-86.
+-- Los literales se duplican porque una migracion no puede importar TypeScript, y un test estatico
+-- de esquema los compara contra las constantes de la app.
 --
--- Los literales `'Empacador'`, `'Administrador'` y las descripciones se duplican aqui porque una
--- migracion no puede importar TypeScript: el test estatico de esquema los compara importando
--- `ROLE_EMPACADOR`, `SEED_ROLES`, `PERMISSIONS` y `SEED_ROLE_PERMISSIONS`, para que divergir sea
--- rojo.
+-- Escrita a mano porque `migrate dev` exigia un reset completo de la base por drift de checksum
+-- en migraciones anteriores.
 
 -- 1. El rol.
 INSERT INTO "roles" ("name", "description", "updated_at") VALUES

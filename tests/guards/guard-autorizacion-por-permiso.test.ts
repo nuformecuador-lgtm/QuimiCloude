@@ -462,7 +462,7 @@ describe('guardia — ningun servicio de negocio autoriza por nombre de rol (R20
   // QC-144 (R11) — casos sinteticos propios del rol Empacador, misma tecnica que los de
   // Administrador/Operador de mas arriba: la regla dispara con el literal Y con la constante, y no
   // dispara con el literal dentro de un comentario.
-  it('QC-144: dispara con un actor.ts sintetico que compara el literal del rol Empacador', () => {
+  it('QC-144 R11: dispara con un actor.ts sintetico que compara el literal del rol Empacador', () => {
     const conLiteral = (comilla: string) =>
       [
         'export function requireEmpacador(actor: Actor): void {',
@@ -481,7 +481,7 @@ describe('guardia — ningun servicio de negocio autoriza por nombre de rol (R20
     ]);
   });
 
-  it('QC-144: dispara con un actor.ts sintetico que importa y usa ROLE_EMPACADOR', () => {
+  it('QC-144 R11: dispara con un actor.ts sintetico que importa y usa ROLE_EMPACADOR', () => {
     const conConstante = [
       "import { ROLE_EMPACADOR } from '@/lib/modules/identity';",
       '',
@@ -493,7 +493,7 @@ describe('guardia — ningun servicio de negocio autoriza por nombre de rol (R20
     expect(findForbiddenPatternsInSource(conConstante)).toEqual(['ROLE_EMPACADOR']);
   });
 
-  it('QC-144: el caso simetrico — el literal del rol Empacador dentro de un comentario NO dispara', () => {
+  it('QC-144 R11: el caso simetrico — el literal del rol Empacador dentro de un comentario NO dispara', () => {
     expect(
       findForbiddenPatternsInSource(`// el Empacador hereda la pantalla del Operador, no compara '${ROLE_EMPACADOR}'`),
     ).toEqual([]);

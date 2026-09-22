@@ -265,7 +265,7 @@ describe('migration.sql — es EXACTAMENTE cuatro INSERT, uno por tabla (R7, R17
     expect(upIsExactlyFourInserts(conUnaQuinta)).toBe(false)
   })
 
-  it('el UP no toca el esquema: ni ALTER, ni CREATE ni DROP, y cae si se cuela uno', () => {
+  it('R20, R26: el UP no toca el esquema: ni ALTER, ni CREATE ni DROP, y cae si se cuela uno', () => {
     expect(schemaStatements(upSource)).toEqual([])
 
     expect(schemaStatements(`${upSource}\nALTER TABLE "roles" ADD COLUMN "nickname" TEXT;`)).toHaveLength(1)
