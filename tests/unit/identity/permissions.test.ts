@@ -141,15 +141,36 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
     expect(codigos).toEqual([...CATALOGO_PREVIO, 'terminados.consultar'])
   })
 
-  it('QC-144 R6: el fuente del catalogo nombra QC-144 y dice que es una enmienda', () => {
+  it('R6: la enmienda de terminados.consultar en el fuente no cita ficha ni requisito', () => {
     const raiz = join(__dirname, '..', '..', '..')
     const fuente = readFileSync(
       join(raiz, 'lib', 'modules', 'identity', 'domain', 'permissions.ts'),
       'utf8',
     )
+    const citaFichaORequisito = /QC-\d+|\bR\d+\b|design\.md|decisi[oó]n cerrada/i
+    const jsdoc = fuente.match(/\/\*\*([\s\S]*?)\*\/\s*export const PERMISSIONS/)?.[1] ?? ''
+    const parrafos = jsdoc
+      .split(/\n\s*\*\s*\n/)
+      .map((bloque) => bloque.trim())
+      .filter(Boolean)
+    const primeraFrase = (parrafos[0] ?? '').split('.')[0] ?? ''
+    const parrafoDeLaEnmienda = parrafos.find((parrafo) => parrafo.includes('terminados.consultar'))
 
-    expect(fuente).toContain('QC-144')
-    expect(fuente).toMatch(/enmienda/i)
+    expect(parrafoDeLaEnmienda).toBeDefined()
+    const lineas = parrafoDeLaEnmienda!.split('\n')
+    expect(lineas.length).toBeLessThanOrEqual(5)
+    expect(parrafoDeLaEnmienda).toMatch(/enmienda/i)
+    expect(parrafoDeLaEnmienda).toContain('lib/modules/')
+    expect(parrafoDeLaEnmienda).not.toMatch(citaFichaORequisito)
+    expect(primeraFrase).not.toMatch(citaFichaORequisito)
+  })
+
+  it('R6: el detector de citas caza un JSDoc sintetico que si nombra una ficha', () => {
+    const citaFichaORequisito = /QC-\d+|\bR\d+\b|design\.md|decisi[oó]n cerrada/i
+    const parrafoSintetico =
+      ' * Cuarta enmienda al catalogo cerrado (QC-144): suma terminados.consultar en lib/modules/.'
+
+    expect(parrafoSintetico).toMatch(citaFichaORequisito)
   })
 })
 
