@@ -1,7 +1,7 @@
 /**
  * La base es compartida: ningun caso afirma conteos globales y cada uno siembra sus propias filas
  * con marcadores irrepetibles.
- * `quantity` nunca pasa a `number`: la coma flotante binaria es justo lo que la columna evita.
+ * `percentage` nunca pasa a `number`: la coma flotante binaria es justo lo que la columna evita.
  * Sin tests de RLS: Prisma conecta como dueno de las tablas y saldrian verdes siempre.
  */
 import { randomUUID } from 'node:crypto'
@@ -204,41 +204,14 @@ async function createRecipe(tx: Prisma.TransactionClient, seed: RecipeSeed): Pro
   return recipe.id
 }
 
-/**
- * Nombre y simbolo llevan marcador: sin empresa la unidad es de sistema, donde ya estan las del
- * arrancador, y los dos son unicos dentro del ambito.
- */
-async function createUnit(
-  tx: Prisma.TransactionClient,
-  symbol?: string | null,
-): Promise<string> {
-  const marca = token()
-  const unit = await tx.unit.create({
-    data: {
-      name: `unidad ${marca}`,
-      nameNormalized: `unidad${marca}`,
-      symbol: symbol === undefined ? `unidad ${marca}` : symbol,
-    },
-    select: { id: true },
-  })
-  return unit.id
-}
-
-/** Si no se pasa unidad se crea una: la linea no puede quedarse sin ella. */
 async function createLine(
   tx: Prisma.TransactionClient,
   recipeId: string,
   productId: string,
-  quantity: string,
-  unitId?: string,
+  percentage = '100.00',
 ): Promise<string> {
   const line = await tx.recipeLine.create({
-    data: {
-      recipeId,
-      productId,
-      quantity: new Prisma.Decimal(quantity),
-      unitId: unitId ?? (await createUnit(tx)),
-    },
+    data: { recipeId, productId, percentage: new Prisma.Decimal(percentage) },
     select: { id: true },
   })
   return line.id
@@ -255,8 +228,7 @@ type WritableColumn =
   | 'company_id'
   | 'recipe_id'
   | 'product_id'
-  | 'quantity'
-  | 'unit_id'
+  | 'percentage'
 
 /**
  * Omitir una entrada de `columns` es el caso «falta un dato obligatorio», que la API tipada no
@@ -603,22 +575,20 @@ describe('unicidad del nombre de la receta', () => {
 })
 
 describe('estructura de la linea de receta', () => {
-  it('crea una linea con cantidad y unidad propias y las relee', async () => {
+  it('crea una linea con producto y porcentaje propios y la relee', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
       const productId = await createProduct(tx)
-      const unitId = await createUnit(tx)
 
-      const lineId = await createLine(tx, recipeId, productId, '2.5000', unitId)
+      const lineId = await createLine(tx, recipeId, productId, '2.50')
 
       const line = await tx.recipeLine.findUniqueOrThrow({ where: { id: lineId } })
       expect(line.id).toMatch(UUID_SHAPE)
       expect(line.recipeId).toBe(recipeId)
       expect(line.productId).toBe(productId)
-      expect(line.quantity.equals(new Prisma.Decimal('2.5'))).toBe(true)
-      expect(line.quantity.toString()).toBe('2.5')
-      expect(line.unitId).toBe(unitId)
+      expect(line.percentage.equals(new Prisma.Decimal('2.5'))).toBe(true)
+      expect(line.percentage.toString()).toBe('2.5')
       expect(line.createdAt).toBeInstanceOf(Date)
       expect(line.updatedAt).toBeInstanceOf(Date)
     })
@@ -630,10 +600,7 @@ describe('estructura de la linea de receta', () => {
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
       const productId = await createProduct(tx)
 
-      // Unidades distintas: el unico `(recipe_id, product_id)` no depende de la unidad.
-      const unitId = await createUnit(tx)
-      const otraUnidad = await createUnit(tx, 'L')
-      const firstLine = await createLine(tx, recipeId, productId, '1.0000', unitId)
+      const firstLine = await createLine(tx, recipeId, productId, '40.00')
 
       const sqlState = await expectRejectedByDatabase(
         tx,
@@ -641,8 +608,7 @@ describe('estructura de la linea de receta', () => {
           rawInsert(tx, 'recipe_lines', {
             recipe_id: asUuid(recipeId),
             product_id: asUuid(productId),
-            quantity: Prisma.sql`3.0000`,
-            unit_id: asUuid(otraUnidad),
+            percentage: Prisma.sql`30.00`,
           }),
         'segunda linea del mismo producto en la misma receta',
       )
@@ -650,9 +616,9 @@ describe('estructura de la linea de receta', () => {
 
       const lines = await tx.recipeLine.findMany({
         where: { recipeId },
-        select: { id: true, unitId: true },
+        select: { id: true },
       })
-      expect(lines).toEqual([{ id: firstLine, unitId }])
+      expect(lines).toEqual([{ id: firstLine }])
     })
   })
 
@@ -666,10 +632,10 @@ describe('estructura de la linea de receta', () => {
       const product2 = await createProduct(tx, 'Hidroxido de sodio')
       const product3 = await createProduct(tx, 'Colorante azul')
 
-      await createLine(tx, recipeA, product1, '10.0000')
-      await createLine(tx, recipeA, product2, '0.5000')
-      await createLine(tx, recipeA, product3, '0.0100')
-      await createLine(tx, recipeB, product1, '4.0000')
+      await createLine(tx, recipeA, product1, '89.50')
+      await createLine(tx, recipeA, product2, '10.49')
+      await createLine(tx, recipeA, product3, '0.01')
+      await createLine(tx, recipeB, product1, '100.00')
 
       const linesOfA = await tx.recipeLine.findMany({
         where: { recipeId: recipeA },
@@ -687,47 +653,44 @@ describe('estructura de la linea de receta', () => {
     })
   })
 
-  it('la cantidad conserva cuatro decimales exactos y su columna es numeric(14,4)', async () => {
+  it('el porcentaje conserva dos decimales exactos y su columna es numeric(5,2)', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
       const productoGrande = await createProduct(tx, 'Agua desmineralizada')
       const productoMinimo = await createProduct(tx, 'Catalizador')
 
-      // 14 digitos de precision: 10 enteros + 4 decimales, el maximo que cabe.
-      const grande = await createLine(tx, recipeId, productoGrande, '1234567890.1234')
-      const minimo = await createLine(tx, recipeId, productoMinimo, '0.0001')
+      const grande = await createLine(tx, recipeId, productoGrande, '100.00')
+      const minimo = await createLine(tx, recipeId, productoMinimo, '0.01')
 
       const lines = await tx.recipeLine.findMany({
         where: { id: { in: [grande, minimo] } },
-        select: { id: true, quantity: true },
+        select: { id: true, percentage: true },
       })
-      const byId = new Map(lines.map((line) => [line.id, line.quantity]))
-      expect(byId.get(grande)?.toString()).toBe('1234567890.1234')
-      expect(byId.get(minimo)?.toString()).toBe('0.0001')
+      const byId = new Map(lines.map((line) => [line.id, line.percentage]))
+      expect(byId.get(grande)?.toString()).toBe('100')
+      expect(byId.get(minimo)?.toString()).toBe('0.01')
 
       // Sin pasar por el cliente: si la columna fuera de coma flotante, aqui se veria la deriva.
-      const asText = await tx.$queryRaw<{ id: string; cantidad: string }[]>`
-        SELECT "id"::text AS id, "quantity"::text AS cantidad
+      const asText = await tx.$queryRaw<{ id: string; porcentaje: string }[]>`
+        SELECT "id"::text AS id, "percentage"::text AS porcentaje
         FROM "recipe_lines" WHERE "id" IN (${asUuid(grande)}, ${asUuid(minimo)})
-        ORDER BY "quantity" DESC`
-      expect(asText.map((row) => row.cantidad)).toEqual(['1234567890.1234', '0.0001'])
+        ORDER BY "percentage" DESC`
+      expect(asText.map((row) => row.porcentaje)).toEqual(['100.00', '0.01'])
 
-      const columns = await columnInfo(tx, 'recipe_lines', ['quantity'])
+      const columns = await columnInfo(tx, 'recipe_lines', ['percentage'])
       expect(columns).toHaveLength(1)
       expect(columns[0]?.data_type).toBe('numeric')
-      expect(Number(columns[0]?.numeric_precision)).toBe(14)
-      expect(Number(columns[0]?.numeric_scale)).toBe(4)
+      expect(Number(columns[0]?.numeric_precision)).toBe(5)
+      expect(Number(columns[0]?.numeric_scale)).toBe(2)
     })
   })
 
-  it('rechaza cantidad cero y negativa con SQLSTATE 23514, y cantidad ausente con 23502', async () => {
+  it('rechaza porcentaje cero, negativo y mayor que 100 con SQLSTATE 23514, y porcentaje ausente con 23502', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
       const productId = await createProduct(tx)
-      // Unidad valida en los tres intentos: la unica razon posible del rechazo es la cantidad.
-      const unitId = await createUnit(tx)
 
       const cero = await expectRejectedByDatabase(
         tx,
@@ -735,36 +698,45 @@ describe('estructura de la linea de receta', () => {
           rawInsert(tx, 'recipe_lines', {
             recipe_id: asUuid(recipeId),
             product_id: asUuid(productId),
-            quantity: Prisma.sql`0.0000`,
-            unit_id: asUuid(unitId),
+            percentage: Prisma.sql`0.00`,
           }),
-        'linea con cantidad cero',
+        'linea con porcentaje cero',
       )
       expect(cero).toBe(CHECK_VIOLATION)
 
-      const negativa = await expectRejectedByDatabase(
+      const negativo = await expectRejectedByDatabase(
         tx,
         () =>
           rawInsert(tx, 'recipe_lines', {
             recipe_id: asUuid(recipeId),
             product_id: asUuid(productId),
-            quantity: Prisma.sql`-1.5000`,
-            unit_id: asUuid(unitId),
+            percentage: Prisma.sql`-1.00`,
           }),
-        'linea con cantidad negativa',
+        'linea con porcentaje negativo',
       )
-      expect(negativa).toBe(CHECK_VIOLATION)
+      expect(negativo).toBe(CHECK_VIOLATION)
 
-      // Ausente la rechaza el NOT NULL, no el CHECK.
+      const excedido = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsert(tx, 'recipe_lines', {
+            recipe_id: asUuid(recipeId),
+            product_id: asUuid(productId),
+            percentage: Prisma.sql`100.01`,
+          }),
+        'linea con porcentaje mayor que 100',
+      )
+      expect(excedido).toBe(CHECK_VIOLATION)
+
+      // Ausente lo rechaza el NOT NULL, no el CHECK.
       const ausente = await expectRejectedByDatabase(
         tx,
         () =>
           rawInsert(tx, 'recipe_lines', {
             recipe_id: asUuid(recipeId),
             product_id: asUuid(productId),
-            unit_id: asUuid(unitId),
           }),
-        'linea sin cantidad',
+        'linea sin porcentaje',
       )
       expect(ausente).toBe(NOT_NULL_VIOLATION)
 
@@ -773,119 +745,18 @@ describe('estructura de la linea de receta', () => {
     })
   })
 
-  it('acepta cualquier unidad del catalogo, sin restriccion por producto, y rechaza la linea sin unidad', async () => {
-    // Cada producto recibe una unidad distinta de la de su linea: la base no deduce una de la
-    // otra. Y el catalogo es una tabla, no un `enum`, para poder ampliarlo sin desplegar.
-    await inRolledBackTransaction(async (tx) => {
-      const marker = token()
-      const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
-
-      // Cada simbolo lleva marcador porque es unico dentro del ambito y `kg` ya esta en el
-      // arrancador. `null` puede repetirse: el indice es parcial.
-      const symbols = [
-        `kg ${marker}`,
-        `gotas por litro ${marker}`,
-        `ug/mL ${marker}`,
-        `cucharadas soperas ${marker}`,
-        null,
-      ]
-      for (const symbol of symbols) {
-        const unidadDeLaLinea = await createUnit(tx, symbol)
-        const unidadDelProducto = await createUnit(tx)
-        // El producto gana la unidad de la presentacion de su lote: sin ella,
-        // `product_batches_check_unit` rechazaria el lote de mas abajo.
-        const productId = await createProduct(tx, `Insumo ${symbol ?? 'sin simbolo'}`, unidadDelProducto)
-        const marcaPresentacion = token()
-        const presentation = await tx.presentation.create({
-          data: {
-            name: `Presentacion ${marcaPresentacion}`,
-            nameNormalized: `presentacion${marcaPresentacion}`,
-            unitId: unidadDelProducto,
-            companyId: await inventoryCompanyOf(tx),
-          },
-          select: { id: true },
-        })
-        await tx.productBatch.create({
-          data: {
-            productId,
-            presentationId: presentation.id,
-            stock: 1,
-            unitCost: new Prisma.Decimal('1.0000'),
-            // `lot` es unico por empresa.
-            lot: `L-${randomUUID()}`,
-            purchaseDate: new Date('2026-09-01T00:00:00Z'),
-            companyId: await inventoryCompanyOf(tx),
-          },
-          select: { id: true },
-        })
-        const lineId = await createLine(tx, recipeId, productId, '1.0000', unidadDeLaLinea)
-        const line = await tx.recipeLine.findUniqueOrThrow({
-          where: { id: lineId },
-          select: { unitId: true },
-        })
-        expect(line.unitId).toBe(unidadDeLaLinea)
-        expect(line.unitId).not.toBe(unidadDelProducto)
-      }
-
-      const productoSinUnidad = await createProduct(tx, 'Insumo sin unidad de linea')
-      const sqlState = await expectRejectedByDatabase(
-        tx,
-        () =>
-          rawInsert(tx, 'recipe_lines', {
-            recipe_id: asUuid(recipeId),
-            product_id: asUuid(productoSinUnidad),
-            quantity: Prisma.sql`1.0000`,
-          }),
-        'linea sin unidad',
-      )
-      expect(sqlState).toBe(NOT_NULL_VIOLATION)
-
-      const survivors = await tx.recipeLine.findMany({
-        where: { productId: productoSinUnidad },
-        select: { id: true },
-      })
-      expect(survivors).toEqual([])
-
-      // Otros modulos si tienen enums: se filtran los que parecen de unidades, por nombre o por
-      // etiquetas, y no por los nombres de los ajenos, que ataria este archivo a ellos.
-      const enumTypes = await tx.$queryRaw<{ typname: string; labels: string[] }[]>`
-        SELECT t.typname,
-               array_remove(array_agg(e.enumlabel::text ORDER BY e.enumsortorder), NULL) AS labels
-        FROM pg_type t
-        JOIN pg_namespace n ON n.oid = t.typnamespace
-        LEFT JOIN pg_enum e ON e.enumtypid = t.oid
-        WHERE n.nspname = 'public' AND t.typtype = 'e'
-        GROUP BY t.typname`
-      const unitWords = new Set(
-        (await tx.unit.findMany({ select: { name: true, symbol: true } })).flatMap((unit) =>
-          [unit.name, unit.symbol ?? ''].filter((word) => word.length > 0).map((word) => word.toUpperCase()),
-        ),
-      )
-      expect(unitWords.size, 'sin unidades en el catalogo el filtro se quedaria sin sujeto').toBeGreaterThan(0)
-      const unitTypes = enumTypes.filter(
-        (candidate) =>
-          /unit|unidad|uom|medida|measure/i.test(candidate.typname) ||
-          candidate.labels.some((label) => unitWords.has(label.toUpperCase())),
-      )
-      expect(unitTypes).toEqual([])
-    })
-  })
-
   it('rechaza una linea sin receta, sin producto, o con receta o producto inexistentes (23502 / 23503)', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
       const productId = await createProduct(tx)
-      // La unidad propia del caso marca las filas que los cuatro intentos habrian escrito.
-      const trace = await createUnit(tx)
 
       const sinReceta = await expectRejectedByDatabase(
         tx,
         () =>
           rawInsert(tx, 'recipe_lines', {
             product_id: asUuid(productId),
-            quantity: Prisma.sql`1.0000`,
-            unit_id: asUuid(trace),
+            percentage: Prisma.sql`1.00`,
           }),
         'linea sin receta',
       )
@@ -896,8 +767,7 @@ describe('estructura de la linea de receta', () => {
         () =>
           rawInsert(tx, 'recipe_lines', {
             recipe_id: asUuid(recipeId),
-            quantity: Prisma.sql`1.0000`,
-            unit_id: asUuid(trace),
+            percentage: Prisma.sql`1.00`,
           }),
         'linea sin producto',
       )
@@ -909,8 +779,7 @@ describe('estructura de la linea de receta', () => {
           rawInsert(tx, 'recipe_lines', {
             recipe_id: asUuid(randomUUID()),
             product_id: asUuid(productId),
-            quantity: Prisma.sql`1.0000`,
-            unit_id: asUuid(trace),
+            percentage: Prisma.sql`1.00`,
           }),
         'linea con receta inexistente',
       )
@@ -922,15 +791,14 @@ describe('estructura de la linea de receta', () => {
           rawInsert(tx, 'recipe_lines', {
             recipe_id: asUuid(recipeId),
             product_id: asUuid(randomUUID()),
-            quantity: Prisma.sql`1.0000`,
-            unit_id: asUuid(trace),
+            percentage: Prisma.sql`1.00`,
           }),
         'linea con producto inexistente',
       )
       expect(productoInexistente).toBe(FOREIGN_KEY_VIOLATION)
 
       const survivors = await tx.recipeLine.findMany({
-        where: { unitId: trace },
+        where: { recipeId },
         select: { id: true },
       })
       expect(survivors).toEqual([])
@@ -943,9 +811,6 @@ describe('frontera con inventario e identity: FK reales sin relacion de Prisma',
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
-      // Unidad valida a proposito: en la linea, la unica FK que puede dispararse es la del
-      // producto.
-      const unitId = await createUnit(tx)
 
       const productoFantasma = await expectRejectedByDatabase(
         tx,
@@ -953,8 +818,7 @@ describe('frontera con inventario e identity: FK reales sin relacion de Prisma',
           rawInsert(tx, 'recipe_lines', {
             recipe_id: asUuid(recipeId),
             product_id: asUuid(randomUUID()),
-            quantity: Prisma.sql`1.0000`,
-            unit_id: asUuid(unitId),
+            percentage: Prisma.sql`1.00`,
           }),
         'linea con product_id inventado',
       )
@@ -990,7 +854,6 @@ describe('frontera con inventario e identity: FK reales sin relacion de Prisma',
       expect(foreignKeys).toEqual([
         { conname: 'recipe_lines_product_id_fkey', referencia: 'products' },
         { conname: 'recipe_lines_recipe_id_fkey', referencia: 'recipes' },
-        { conname: 'recipe_lines_unit_id_fkey', referencia: 'units' },
         // `recipes.company_id` es del mismo tipo que `created_by`/`updated_by`: la FK esta
         // escrita a mano en el `migration.sql` de QC-50 y sin `@relation` en el esquema de
         // Prisma, a proposito. Con `@relation` el cliente generado dejaria hacer un `include`
@@ -1130,7 +993,7 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
       const productId = await createProduct(tx)
-      const lineId = await createLine(tx, recipeId, productId, '1.0000')
+      const lineId = await createLine(tx, recipeId, productId, '100.00')
 
       const recipeAntes = await tx.recipe.findUniqueOrThrow({
         where: { id: recipeId },
@@ -1149,7 +1012,7 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       await tx.recipe.update({ where: { id: recipeId }, data: { description: 'Cambiada' } })
       await tx.recipeLine.update({
         where: { id: lineId },
-        data: { quantity: new Prisma.Decimal('2.0000') },
+        data: { percentage: new Prisma.Decimal('50.00') },
       })
 
       const recipeDespues = await tx.recipe.findUniqueOrThrow({
@@ -1175,8 +1038,8 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       const productoQueSale = await createProduct(tx, 'Producto que sale')
       const productoQueQueda = await createProduct(tx, 'Producto que queda')
 
-      const lineaQueSale = await createLine(tx, recipeId, productoQueSale, '1.0000')
-      const lineaQueQueda = await createLine(tx, recipeId, productoQueQueda, '2.0000')
+      const lineaQueSale = await createLine(tx, recipeId, productoQueSale, '40.00')
+      const lineaQueQueda = await createLine(tx, recipeId, productoQueQueda, '60.00')
 
       await tx.recipeLine.delete({ where: { id: lineaQueSale } })
 
@@ -1202,8 +1065,8 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       const product1 = await createProduct(tx, 'Insumo 1')
       const product2 = await createProduct(tx, 'Insumo 2')
 
-      const line1 = await createLine(tx, recipeId, product1, '1.0000')
-      const line2 = await createLine(tx, recipeId, product2, '2.0000')
+      const line1 = await createLine(tx, recipeId, product1, '40.00')
+      const line2 = await createLine(tx, recipeId, product2, '60.00')
 
       // Solo un borrado fisico (una purga, un script) dispara el CASCADE: el normal es logico y
       // ninguna FK reacciona a un UPDATE.
@@ -1225,24 +1088,24 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       const product1 = await createProduct(tx, 'Insumo 1')
       const product2 = await createProduct(tx, 'Insumo 2')
 
-      // Ordenar por `unit_id` solo sirve para comparar las dos lecturas fila a fila.
-      const line1 = await createLine(tx, recipeId, product1, '10.5000', await createUnit(tx))
-      const line2 = await createLine(tx, recipeId, product2, '0.2500', await createUnit(tx, 'L'))
+      // Ordenar por `id` solo sirve para comparar las dos lecturas fila a fila.
+      const line1 = await createLine(tx, recipeId, product1, '10.50')
+      const line2 = await createLine(tx, recipeId, product2, '0.25')
       const antes = await tx.recipeLine.findMany({
         where: { recipeId },
-        orderBy: { unitId: 'asc' },
+        orderBy: { id: 'asc' },
       })
 
       await tx.recipe.update({ where: { id: recipeId }, data: { deletedAt: new Date() } })
 
       const despues = await tx.recipeLine.findMany({
         where: { recipeId },
-        orderBy: { unitId: 'asc' },
+        orderBy: { id: 'asc' },
       })
       expect(despues.map((line) => line.id).sort()).toEqual([line1, line2].sort())
       expect(despues.map((line) => line.recipeId)).toEqual([recipeId, recipeId])
-      expect(despues.map((line) => line.quantity.toString())).toEqual(
-        antes.map((line) => line.quantity.toString()),
+      expect(despues.map((line) => line.percentage.toString())).toEqual(
+        antes.map((line) => line.percentage.toString()),
       )
       expect(despues.map((line) => line.updatedAt.getTime())).toEqual(
         antes.map((line) => line.updatedAt.getTime()),
@@ -1255,16 +1118,14 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
       const productId = await createProduct(tx, 'Insumo descatalogado')
-      const unitId = await createUnit(tx)
-      const lineId = await createLine(tx, recipeId, productId, '3.0000', unitId)
+      const lineId = await createLine(tx, recipeId, productId, '3.00')
 
       // El borrado de producto es logico: un UPDATE, no un DELETE.
       await tx.product.update({ where: { id: productId }, data: { deletedAt: new Date() } })
 
       const line = await tx.recipeLine.findUniqueOrThrow({ where: { id: lineId } })
       expect(line.productId).toBe(productId)
-      expect(line.quantity.toString()).toBe('3')
-      expect(line.unitId).toBe(unitId)
+      expect(line.percentage.toString()).toBe('3')
 
       // Que la fila del producto siga existiendo es lo que evita que la linea apunte al vacio.
       const product = await tx.product.findUniqueOrThrow({ where: { id: productId } })
@@ -1277,7 +1138,7 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       const marker = token()
       const recipeId = await createRecipe(tx, { name: `Receta ${marker}`, nameNormalized: marker })
       const productId = await createProduct(tx, 'Insumo en uso')
-      const lineId = await createLine(tx, recipeId, productId, '1.0000')
+      const lineId = await createLine(tx, recipeId, productId, '100.00')
 
       // El RESTRICT existe para que un borrado fisico por consola o script no deje lineas
       // apuntando al vacio.

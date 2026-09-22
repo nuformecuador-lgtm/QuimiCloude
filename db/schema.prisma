@@ -392,25 +392,22 @@ model Recipe {
 }
 
 /// Sin `deletedAt`: la linea es parte de la receta, y corregir una formula es una edicion normal.
-/// `productId` y `unitId` no llevan `@relation` porque apuntan a otros modulos; sus FK estan
-/// escritas a mano y son drift. La unidad es anotativa: no hay conversion. Sin `companyId` a
-/// proposito: la linea no tiene empresa propia, solo se alcanza a traves de su receta y cae
-/// con ella por el `ON DELETE CASCADE` de `recipe_lines_recipe_id_fkey`.
+/// `productId` no lleva `@relation` porque apunta a otro modulo; su FK esta escrita a mano y es
+/// drift. Sin `companyId` a proposito: la linea no tiene empresa propia, solo se alcanza a traves
+/// de su receta y cae con ella por el `ON DELETE CASCADE` de `recipe_lines_recipe_id_fkey`.
 /// @module recetas
 model RecipeLine {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  recipeId  String   @map("recipe_id") @db.Uuid
-  productId String   @map("product_id") @db.Uuid
-  quantity  Decimal  @db.Decimal(14, 4)
-  unitId    String   @map("unit_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipeId   String   @map("recipe_id") @db.Uuid
+  productId  String   @map("product_id") @db.Uuid
+  percentage Decimal  @db.Decimal(5, 2)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([recipeId, productId], map: "recipe_lines_recipe_id_product_id_key")
   @@index([productId], map: "recipe_lines_product_id_idx")
-  @@index([unitId], map: "recipe_lines_unit_id_idx")
   @@map("recipe_lines")
 }
 

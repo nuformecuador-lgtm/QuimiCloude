@@ -407,14 +407,12 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
       'id',
       'recipeId',
       'productId',
-      'quantity',
-      'unitId',
+      'percentage',
       'createdAt',
       'updatedAt',
       'recipe',
       '@@unique([recipeId, productId], map: "recipe_lines_recipe_id_product_id_key")',
       '@@index([productId], map: "recipe_lines_product_id_idx")',
-      '@@index([unitId], map: "recipe_lines_unit_id_idx")',
       '@@map("recipe_lines")',
     ]
 
