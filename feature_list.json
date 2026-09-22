@@ -2198,7 +2198,7 @@
       "epic_name": "Pedidos",
       "name": "presentacion-del-pedido",
       "description": "Cada pedido declara en qué **presentación** se entrega lo fabricado, elegida del catálogo de presentaciones de su empresa (el mismo que usan los lotes: bidón, tambor, saco). Es **obligatoria al crear y al editar**; los pedidos ya cargados quedan «sin presentación». **Solo informa**: no cambia la cantidad, ni el importe, ni el inventario. Se elige en el alta/edición de `/pedidos`, se muestra en su listado y en `/asignacion` (lista y pantalla de ejecución del Operador).\n\n**ACOTADA EL 2026-09-22 con** `/afinar-feature`. Decisiones en `specs/QC-146-presentacion-del-pedido/requirements.md`.\n\n**NO ENTRA:** mostrarla en la lista de terminados del Empacador (QC-145, bloqueada por esta); contar la cantidad en envases o convertir envases a litros (QC-130); descontar o reservar envases vacíos del inventario; filtrar u ordenar el listado por presentación.",
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "complexity": "medium",
       "zone": "fullstack",
