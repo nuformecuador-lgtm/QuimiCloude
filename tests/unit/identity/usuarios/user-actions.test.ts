@@ -10,7 +10,8 @@
 //     de asercion.
 //   - **R40**: `FormData` de verdad en las CUATRO mutaciones y argumentos ya tipados en las DOS
 //     consultas.
-//   - **R41**: cada uno de los NUEVE errores de `design.md > 6.4` se traduce a
+//   - **R41**: cada error de dominio de `design.md > 6.4` —y los que anadieron QC-79 y el fix
+//     directo— se traduce a
 //     `{ status: 'error', code, message }` por su `code` ESTABLE, **nunca** por el texto del
 //     mensaje; y un error que no es de dominio no se descarta.
 //
@@ -33,6 +34,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorMessage, type ErrorCode } from '@/lib/modules/errores';
 import {
+  ActionNotAllowedError,
   CredentialPolicyRejectedError,
   DuplicateDocumentError,
   DuplicateEmailError,
@@ -479,11 +481,12 @@ describe('R6 — falta la SEGUNDA cara: hay getSessionUser pero no getSessionCon
 });
 
 // ---------------------------------------------------------------------------------------------
-// R41 — la traduccion de los NUEVE `code` de `design.md > 6.4`, por CODIGO y nunca por el texto.
+// R41 — la traduccion de los `code` de `design.md > 6.4`, por CODIGO y nunca por el texto.
+// NUEVE de origen, DIEZ desde el fix directo (2026-09-22) que anadio `action_not_allowed`.
 // ---------------------------------------------------------------------------------------------
 
 describe('R41 — traduccion de errores de dominio por su code estable', () => {
-  const LOS_NUEVE: ReadonlyArray<{ readonly error: Error; readonly code: ErrorCode }> = [
+  const LOS_DIEZ: ReadonlyArray<{ readonly error: Error; readonly code: ErrorCode }> = [
     { error: new UnauthorizedError(), code: 'unauthorized' },
     { error: new UserNotFoundError(), code: 'user_not_found' },
     { error: new DuplicateEmailError(), code: 'duplicate_email' },
@@ -493,9 +496,11 @@ describe('R41 — traduccion de errores de dominio por su code estable', () => {
     { error: new SelfOperationError(), code: 'self_operation' },
     { error: new LastAdministratorError(), code: 'last_administrator' },
     { error: new ValidationError(), code: 'invalid_input' },
+    // Fix directo (2026-09-22): la regla de negocio que rechaza la ACCION, no el permiso.
+    { error: new ActionNotAllowedError(), code: 'action_not_allowed' },
   ];
 
-  for (const caso of LOS_NUEVE) {
+  for (const caso of LOS_DIEZ) {
     it(`createUserAction traduce ${caso.error.constructor.name} a code '${caso.code}'`, async () => {
       createUserMock.mockRejectedValue(caso.error);
 
@@ -546,7 +551,7 @@ describe('R41 — traduccion de errores de dominio por su code estable', () => {
   ];
 
   for (const camino of CAMINOS) {
-    for (const caso of LOS_NUEVE) {
+    for (const caso of LOS_DIEZ) {
       it(`${camino.nombre} traduce ${caso.error.constructor.name} a code '${caso.code}'`, async () => {
         camino.doble.mockRejectedValue(caso.error);
 

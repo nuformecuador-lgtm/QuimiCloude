@@ -185,6 +185,24 @@ export class LastAdministratorError extends IdentityError {
 }
 
 /**
+ * Fix directo (2026-09-22): la accion pedida, con la entrada bien formada y el permiso presente,
+ * choca con una regla de negocio. El caso que la motiva: asignar el rol de administrador al crear
+ * o editar un usuario. El rol no se puede conceder por esa via -el select ya no lo ofrece (R24
+ * filtrado en el catalogo) y el puerto la rechaza igualmente por si llega por otra ruta-, asi que
+ * se responde `action_not_allowed` y **no se escribe nada**.
+ *
+ * Se distingue a proposito de `unauthorized` (el actor TIENE permiso) y de `invalid_input` (la
+ * entrada tiene la forma correcta): es la ACCION, no la autorizacion ni la forma, lo que falla.
+ */
+export class ActionNotAllowedError extends IdentityError {
+  readonly code = 'action_not_allowed';
+
+  constructor(diagnostic?: string) {
+    super('action_not_allowed', diagnostic);
+  }
+}
+
+/**
  * R18: la entrada externa no pasa el esquema `zod` del borde —un campo obligatorio ausente,
  * un tipo de documento que no esta en el conjunto cerrado, un campo prohibido por R14/R20—.
  *

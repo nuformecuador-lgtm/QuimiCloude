@@ -15,7 +15,8 @@
  * POR QUE NO SE AFIRMA IGUALDAD EXACTA CONTRA «LOS DOS ROLES DEL SEED» (`design.md > 9.2`):
  * `e2e/login.spec.ts` crea y borra roles EFIMEROS (`qc9_e2e_rol_<RUN_ID>`), y los de integracion no
  * estan aislados entre suites. Un `toEqual([Administrador, Operador])` se pondria rojo por culpa de
- * otra suite. Asi que se afirma lo que es cierto pase lo que pase: que los dos del seed ESTAN, que
+ * otra suite. Asi que se afirma lo que es cierto pase lo que pase: que el Operador del seed ESTA
+ * —y, desde el fix directo del 2026-09-22, que el Administrador NO sale—, que
  * cada elemento tiene EXACTAMENTE dos claves, y que la secuencia COMPLETA —sea cual sea su
  * contenido— esta ordenada con el MISMO criterio que la base.
  *
@@ -37,11 +38,15 @@ import { listAllRoles } from '@/lib/modules/identity/adapters/driven/persistence
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
 import { prisma } from '@/lib/shared/db/prisma';
 
-/** El orden que la BASE considera correcto, preguntado a la base. Ver la cabecera. */
+/** El orden que la BASE considera correcto entre lo que el catalogo devuelve, preguntado a la base.
+ *  Ver la cabecera. Comparte con `listAllRoles` el filtro que excluye al administrador (fix directo
+ *  del 2026-09-22), asi que la comparacion no depende de como el motor resuelva el `<>`. */
 async function ordenSegunLaBase(): Promise<readonly string[]> {
-  const filas = await prisma.$queryRaw<{ name: string }[]>`
-    SELECT name FROM roles ORDER BY name ASC
-  `;
+  const filas = await prisma.role.findMany({
+    where: { name: { not: ROLE_ADMINISTRADOR } },
+    select: { name: true },
+    orderBy: { name: 'asc' },
+  });
   return filas.map((fila) => fila.name);
 }
 
@@ -49,25 +54,29 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-describe('QC-94 — listAllRoles devuelve el catalogo completo (R8)', () => {
-  it('los dos roles del seed estan, cada uno con su identificador', async () => {
+describe('QC-94 — listAllRoles devuelve el catalogo sin el rol administrador (R8, fix directo 2026-09-22)', () => {
+  it('el rol del seed que SI se ofrece —Operador— esta, con su identificador', async () => {
     const roles = await listAllRoles();
 
-    for (const nombre of [ROLE_ADMINISTRADOR, ROLE_OPERADOR]) {
-      const encontrado = roles.find((rol) => rol.name === nombre);
-      expect(encontrado, `falta el rol del seed «${nombre}»`).toBeDefined();
-      expect(typeof encontrado!.id).toBe('string');
-      expect(encontrado!.id.length).toBeGreaterThan(0);
-    }
+    const encontrado = roles.find((rol) => rol.name === ROLE_OPERADOR);
+    expect(encontrado, `falta el rol del seed «${ROLE_OPERADOR}»`).toBeDefined();
+    expect(typeof encontrado!.id).toBe('string');
+    expect(encontrado!.id.length).toBeGreaterThan(0);
   });
 
-  it('no omite ninguna fila de la tabla', async () => {
+  it('el rol administrador NO se ofrece: el select no puede concederlo', async () => {
     const roles = await listAllRoles();
-    const [{ total }] = await prisma.$queryRaw<{ total: bigint }[]>`
-      SELECT count(*)::bigint AS total FROM roles
-    `;
 
-    expect(roles).toHaveLength(Number(total));
+    expect(roles.find((rol) => rol.name === ROLE_ADMINISTRADOR)).toBeUndefined();
+  });
+
+  it('no omite ninguna fila salvo la del rol administrador', async () => {
+    const roles = await listAllRoles();
+    const total = await prisma.role.count({
+      where: { name: { not: ROLE_ADMINISTRADOR } },
+    });
+
+    expect(roles).toHaveLength(total);
   });
 });
 
@@ -94,12 +103,5 @@ describe('QC-94 — la secuencia la ordena la BASE por nombre ascendente (R10)',
     const segunda = await listAllRoles();
 
     expect(segunda).toEqual(primera);
-  });
-
-  it('el Administrador del seed va antes que el Operador', async () => {
-    const nombres = (await listAllRoles()).map((rol) => rol.name);
-
-    expect(nombres.indexOf(ROLE_ADMINISTRADOR)).toBeGreaterThanOrEqual(0);
-    expect(nombres.indexOf(ROLE_ADMINISTRADOR)).toBeLessThan(nombres.indexOf(ROLE_OPERADOR));
   });
 });

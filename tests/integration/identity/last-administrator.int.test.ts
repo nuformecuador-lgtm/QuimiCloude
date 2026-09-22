@@ -491,9 +491,10 @@ describe('R22 — el UNICO administrador activo de la empresa no puede dejar de 
     });
   });
 
-  it('cambiarle el rol AL MISMO rol administrador NO se rechaza: no lo saca del conjunto', async () => {
+  it('cambiarle el rol administrador se rechaza con `action_not_allowed` sin escribir nada', async () => {
     await withScenario(1, async (scenario) => {
       const [unico] = scenario.adminIds;
+      const antes = await snapshotUser(unico as string);
 
       const resultado = await adapterA.updateAliveInCompany(
         scenario.companyId,
@@ -502,7 +503,10 @@ describe('R22 — el UNICO administrador activo de la empresa no puede dejar de 
         new Date(),
       );
 
-      expect(resultado).toBe('ok');
+      // Fix directo (2026-09-22): el rol administrador ya no se concede por la edicion, ni siquiera
+      // a quien ya lo es. El corte ocurre ANTES de la guardia de R22 y antes de escribir nada.
+      expect(resultado).toBe('action_not_allowed');
+      expect(await snapshotUser(unico as string)).toEqual(antes);
       expect(await countActiveAdministrators(scenario.companyId)).toBe(1);
     });
   });
