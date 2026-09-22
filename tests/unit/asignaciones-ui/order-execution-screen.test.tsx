@@ -117,6 +117,14 @@ describe('pantalla de ejecucion — QC-147 R26: la cantidad del pedido en su pro
     expect(cantidadPedido).toHaveTextContent('Pedido 250');
     expect(cantidadPedido.closest('[data-testid="order-execution-lines"]')).toBeNull();
   });
+
+  it('pinta "Pedido 200" cuando la cantidad del pedido llega con ceros de relleno', () => {
+    render(<OrderExecutionScreen execution={{ ...EXECUTION, orderQuantity: '200.0000' }} />);
+
+    expect(screen.getByTestId(ORDER_EXECUTION_ORDER_QUANTITY_TESTID)).toHaveTextContent(
+      'Pedido 200',
+    );
+  });
 });
 
 describe('pantalla de ejecucion — R19: bloqueo sin escape con el motivo visible', () => {
