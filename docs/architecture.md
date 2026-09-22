@@ -115,6 +115,12 @@ del dominio.
    hoy por defecto y **nunca futura**. `expiry_date` **sigue siendo opcional**. Esto **no cierra
    la pregunta**: lo que sigue abierto es el resto, que nada consume todavia el lote ni el
    vencimiento. Detalle en `specs/QC-81-lote-y-fecha-de-compra/requirements.md`.
+   **Avanza el 2026-09-22 (QC-141, acotada, sin implementar): primer consumidor del lote.** La
+   reserva de material de un pedido elige **de que lote sale** lo que se despacha: los mas
+   antiguos por fecha de compra, desempatando por numero de lote -el mismo orden que el coste de
+   QC-123-, y entregar lo consume como salida real. El vencimiento **sigue sin consumidor** y la
+   pregunta **sigue abierta** en esa mitad. La existencia pasa de entera a **decimal** en la misma ficha. Detalle en
+   `specs/QC-141-reserva-de-material-del-pedido/requirements.md`.
 3. **Fichas de seguridad y clasificacion de peligro.** ¿El sistema debe almacenar FDS/SDS,
    clasificacion GHS, o restricciones de almacenamiento/transporte por incompatibilidad?
    Eso decide si hay gestion de archivos (Supabase Storage) y reglas de validacion.
