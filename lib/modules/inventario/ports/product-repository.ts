@@ -56,7 +56,7 @@ export interface ProductRepository {
   listAlive(query: ListQuery, scope: InventoryScope): Promise<Page<ProductView>>;
 
   /**
-   * QC-90 (R15, R19, R20): ¿hay ya un producto VIVO que se llame asi?
+   * ¿Hay ya un producto VIVO con este nombre EN LA UNIDAD de esta presentacion?
    *
    * Recibe el nombre TAL CUAL lo escribio quien da de alta, no normalizado: normalizar es
    * del adaptador, porque `normalizeProductName` es la unica definicion de «mismo nombre»
@@ -64,25 +64,38 @@ export interface ProductRepository {
    * se compara. Si el caso de uso normalizara aqui, habria dos sitios que decidir mantener
    * de acuerdo.
    *
+   * La unidad no la elige quien llama: la RESUELVE el adaptador leyendo `presentationId`, con
+   * el ambito de empresa de la presentacion. Si esa presentacion no existe o es de otra empresa,
+   * devuelve `null` -el alta sigue por crear, y ese camino fallara con `invalid_input` al no
+   * encontrar la presentacion, igual que si `presentationId` fuera invalido por cualquier otro
+   * motivo-.
+   *
    * QC-49 (R18): mira UNICAMENTE los productos vivos DE LA EMPRESA del ambito. Si el unico
    * homonimo vivo es de otra empresa, este metodo devuelve `null` y el alta crea un producto
    * nuevo en la empresa de quien pide, en vez de colgarle el lote al producto ajeno.
    *
    * El filtro de vivos (`deleted_at IS NULL`) es del adaptador, como en el resto del
    * puerto: por eso un nombre que solo coincide con productos BORRADOS devuelve `null` y el
-   * alta acaba creando uno nuevo (R19). Con varios homonimos vivos, el adaptador devuelve
-   * SIEMPRE el mismo -el mas antiguo, desempatando por identificador ascendente- (R20).
+   * alta acaba creando uno nuevo. Con varios homonimos vivos en la MISMA unidad, el
+   * adaptador devuelve SIEMPRE el mismo -el mas antiguo, desempatando por identificador
+   * ascendente-. Un homonimo vivo en OTRA unidad no cuenta como el mismo producto: nace
+   * uno nuevo.
    */
-  findAliveIdByName(name: string, scope: InventoryScope): Promise<string | null>;
+  findAliveIdByNameInPresentationUnit(
+    name: string,
+    presentationId: string,
+    scope: InventoryScope,
+  ): Promise<string | null>;
 
   /**
-   * QC-90 (R16, R21): alta de un producto NUEVO junto con su primer lote, en UNA sola
-   * transaccion. Devuelve los dos identificadores porque las dos filas se escriben aqui: si
-   * cualquiera de las dos falla, no queda ninguna, que es lo que hace imposible el producto
-   * sin lote que R1 prohibe.
+   * Alta de un producto NUEVO junto con su primer lote, en UNA sola transaccion. Devuelve los
+   * dos identificadores porque las dos filas se escriben aqui: si cualquiera de las dos falla,
+   * no queda ninguna, que es lo que hace imposible un producto sin ningun lote.
    *
-   * La existencia se escribe UNICAMENTE en `batch.stock`: el producto no tiene columna
-   * propia, es la suma de sus lotes.
+   * El producto nace con la unidad de la presentacion de este lote -la resuelve el adaptador,
+   * no quien llama- y con la existencia recalculada a partir de sus lotes en la MISMA
+   * transaccion: `stock` no lo escribe quien llama, es el adaptador el que suma tras crear el
+   * lote.
    *
    * El `lot` devuelto es el TEXTO que quedo escrito en la fila -el que tecleo la persona o el
    * que genero el correlativo-, no el `batchId`. El adaptador ya lo calcula para escribir la
@@ -96,15 +109,16 @@ export interface ProductRepository {
   ): Promise<{ id: string; batchId: string; lot: string }>;
 
   /**
-   * QC-90 (R17, R18): agrega el lote a un producto que YA EXISTE.
+   * Agrega el lote a un producto que YA EXISTE.
    *
-   * Escribe UNICAMENTE la fila de `product_batches`: no toca `name`, `qty_alert` ni
-   * `unit_id` del producto, ni siquiera su `updated_at`. Por eso no recibe ningun
-   * `NewProduct`: lo que no viaja no se puede escribir por accidente.
+   * Escribe la fila de `product_batches` y RECALCULA `products.stock` en la misma transaccion;
+   * no toca `name`, `qty_alert` ni `unit_id` del producto, ni siquiera su `updated_at` -la unica
+   * columna del producto que cambia es `stock`-. Por eso no recibe ningun `NewProduct`: lo que
+   * no viaja no se puede escribir por accidente.
    *
    * Devuelve `null` cuando el producto ya NO esta vivo -se borro entre la consulta de
-   * `findAliveIdByName` y esta escritura-. Es un resultado, no una excepcion, por la misma
-   * razon que `updateAlive` devuelve `boolean`: el dominio no ve errores de Prisma.
+   * `findAliveIdByNameInPresentationUnit` y esta escritura-. Es un resultado, no una excepcion,
+   * por la misma razon que `updateAlive` devuelve `boolean`: el dominio no ve errores de Prisma.
    *
    * QC-49 (R16): tambien devuelve `null` cuando el producto es de OTRA empresa, por el mismo
    * camino y sin ningun resultado nuevo. El ambito va en el `where` de la lectura, no en un
@@ -124,6 +138,10 @@ export interface ProductRepository {
    * Mueve la existencia de un lote por `delta` (con signo) y deja su asiento en el libro,
    * las dos cosas en la MISMA transaccion. El total nuevo no lo calcula quien llama: lo calcula la
    * base con un `UPDATE` relativo, para que dos ajustes concurrentes no se pisen el uno al otro.
+   *
+   * En esa misma transaccion, el ajuste tambien RECALCULA la existencia guardada del producto
+   * -igual que hace el alta al escribir un lote-, sin tocar su nombre, su alerta, su unidad ni
+   * su fecha de modificacion.
    *
    * Devuelve `null` cuando el lote no existe o es de OTRA empresa -las dos por el mismo camino,
    * igual que el resto del puerto-. Un `stock` que quedaria negativo se rechaza antes de

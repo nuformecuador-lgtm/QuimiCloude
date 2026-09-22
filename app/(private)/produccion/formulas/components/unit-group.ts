@@ -67,12 +67,11 @@ export function compareDecimalText(a: string, b: string): number {
  * se sabe de que magnitud se esta hablando, y recortar la lista a partir de un dato que no se
  * tiene esconderia unidades legitimas.
  *
- * **De donde viene ese `null`, desde QC-80 (R22, R23):** la unidad de un ingrediente se deriva
- * de la PRESENTACION DE SU LOTE MAS RECIENTE (`ProductView.latestBatchUnitId`), ya no de
- * `products.unit_id` -esa columna se elimino: el producto no declara unidad-. Asi que `null`
- * quiere decir **«este producto todavia no tiene ningun lote»**, y nunca «no se pudo leer».
- * **Esta funcion no cambio ni una linea por eso**: lo que ya hacia con `null` es exactamente
- * lo que R23 pide -catalogo entero, sin bloquear la linea ni impedir guardar la receta-.
+ * **De donde viene ese `null`:** la unidad de un ingrediente sale de `ProductView.unitId`, la
+ * unidad guardada y fija del producto. `null` quiere decir **«este producto todavia no tiene
+ * unidad»**, y nunca «no se pudo leer». **Esta funcion no cambio ni una linea por eso**: lo que
+ * ya hacia con `null` es exactamente lo que hace falta -catalogo entero, sin bloquear la linea
+ * ni impedir guardar la receta-.
  */
 export function unitsOfGroup(
   units: readonly UnitRef[],

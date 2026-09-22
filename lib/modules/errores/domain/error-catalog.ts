@@ -54,6 +54,7 @@ export const ERROR_MESSAGE_KEY = {
   batch_not_found: 'errors.batch_not_found',
   batch_stock_negative: 'errors.batch_stock_negative',
   ai_unavailable: 'errors.ai_unavailable',
+  presentation_unit_locked: 'errors.presentation_unit_locked',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -132,4 +133,6 @@ export const ERROR_MESSAGES_ES = {
   'errors.batch_stock_negative': 'El ajuste dejaria la existencia del lote por debajo de cero.',
   'errors.ai_unavailable':
     'La lectura automatica no esta disponible en este momento. Intentalo mas tarde.',
+  'errors.presentation_unit_locked':
+    'La presentacion ya tiene lotes y no puede cambiar de unidad.',
 } as const satisfies Record<ErrorMessageKey, string>;

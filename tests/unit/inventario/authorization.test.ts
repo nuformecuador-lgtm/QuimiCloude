@@ -125,7 +125,9 @@ function repositorioProductoQueFalla(): ProductRepository {
     listAlive: vi.fn<ProductRepository['listAlive']>(explota),
     // QC-90 (R23): los tres del alta con primer lote tambien EXPLOTAN. Sin ellos aqui, el
     // camino nuevo del alta seria justo el que se escapa de esta red.
-    findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(explota),
+    findAliveIdByNameInPresentationUnit: vi.fn<
+      ProductRepository['findAliveIdByNameInPresentationUnit']
+    >(explota),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(explota),
     addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(explota),
     // QC-92: los tres del libro de inventario tambien EXPLOTAN, por la misma razon.
@@ -198,11 +200,9 @@ const PRODUCTO_EN_BASE = {
   id: 'producto-1',
   name: 'Acido sulfurico',
   imagePath: null,
-  stockByUnit: [],
+  stock: 0,
+  unitId: null,
   qtyAlert: 0,
-  // QC-80 (R21, R22): el producto ya no declara unidad; la derivada del lote mas reciente es
-  // `latestBatchUnitId`, y este doble no tiene lotes.
-  latestBatchUnitId: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 };
@@ -223,7 +223,9 @@ function montarReposPermisivos(): Repos {
       softDeleteAlive: vi.fn<ProductRepository['softDeleteAlive']>(async () => true),
       listAlive: vi.fn<ProductRepository['listAlive']>(async () => PAGINA_VACIA),
       // QC-90: sin producto vivo homonimo, el alta cae al camino de creacion (R16).
-      findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => null),
+      findAliveIdByNameInPresentationUnit: vi.fn<
+        ProductRepository['findAliveIdByNameInPresentationUnit']
+      >(async () => null),
       createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
         id: 'producto-1',
         batchId: 'lote-1',
@@ -263,7 +265,7 @@ function todosLosMetodos(repos: Repos): ReadonlyArray<() => void> {
     () => expect(repos.products.listAlive).not.toHaveBeenCalled(),
     // QC-90 (R23): «sin una sola llamada al repositorio» incluye los tres metodos del alta
     // con primer lote. Un metodo nuevo en el puerto que no se anada aqui es un hueco.
-    () => expect(repos.products.findAliveIdByName).not.toHaveBeenCalled(),
+    () => expect(repos.products.findAliveIdByNameInPresentationUnit).not.toHaveBeenCalled(),
     () => expect(repos.products.createWithFirstBatch).not.toHaveBeenCalled(),
     () => expect(repos.products.addBatchToAlive).not.toHaveBeenCalled(),
     // QC-92 (T8): los tres del libro de inventario. Faltaban, y eran justo el hueco por el que un

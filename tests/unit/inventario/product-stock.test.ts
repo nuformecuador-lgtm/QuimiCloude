@@ -1,4 +1,4 @@
-import { sumStockByUnit } from '@/lib/modules/inventario/domain/product-stock';
+import { singleUnitStock, sumStockByUnit } from '@/lib/modules/inventario/domain/product-stock';
 
 describe('sumStockByUnit', () => {
   it('R5: suma dos lotes de la misma unidad con presentaciones distintas', () => {
@@ -38,5 +38,30 @@ describe('sumStockByUnit', () => {
       { unitId: 'u-a', quantity: 10 },
       { unitId: 'u-z', quantity: 10 },
     ]);
+  });
+});
+
+describe('singleUnitStock', () => {
+  it('R8: sin lotes devuelve 0', () => {
+    expect(singleUnitStock([])).toBe(0);
+  });
+
+  it('R8: tres lotes de 5 en la misma unidad dan 15', () => {
+    const result = singleUnitStock([
+      { stock: 5, unitId: 'u-kg' },
+      { stock: 5, unitId: 'u-kg' },
+      { stock: 5, unitId: 'u-kg' },
+    ]);
+
+    expect(result).toBe(15);
+  });
+
+  it('R13: lotes en dos unidades lanza', () => {
+    expect(() =>
+      singleUnitStock([
+        { stock: 10, unitId: 'u-kg' },
+        { stock: 20, unitId: 'u-l' },
+      ]),
+    ).toThrow();
   });
 });

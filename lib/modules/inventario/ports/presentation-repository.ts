@@ -74,11 +74,15 @@ export interface PresentationRepository {
    * que miente es dentro del adaptador. La edicion ya era reemplazo completo desde QC-20:
    * el nombre se pone al dia con lo que hace.
    */
+  /**
+   * `'unit_locked'`: la unidad enviada no coincide con la anterior y la presentacion ya
+   * tiene algun lote. Lo detecta la base, nunca una lectura previa de este puerto.
+   */
   replace(
     id: string,
     data: PresentationData,
     scope: InventoryScope,
-  ): Promise<'ok' | 'not_found' | 'duplicate' | 'invalid_unit'>;
+  ): Promise<'ok' | 'not_found' | 'duplicate' | 'invalid_unit' | 'unit_locked'>;
   deleteById(id: string, scope: InventoryScope): Promise<'deleted' | 'not_found' | 'in_use'>;
   /** QC-57: el CONTRATO GENERICO ya saneado por el caso de uso (mismo criterio que
    *  `ProductRepository.listAlive`). */

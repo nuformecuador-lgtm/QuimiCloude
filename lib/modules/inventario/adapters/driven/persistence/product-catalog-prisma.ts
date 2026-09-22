@@ -2,7 +2,6 @@ import type { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { sumStockByUnit } from '../../../domain/product-stock';
 import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { ProductId, ProductRef } from '../../../domain/product-catalog';
 import type { CostingBatch } from '../../../domain/costing-batch';
@@ -40,11 +39,12 @@ export function toProductRef(row: ProductCatalogRow): ProductRef {
   };
 }
 
-/** Fila cruda que devuelve la consulta: trae `batches`, no el `stockByUnit` ya sumado. */
-type ProductBatchRow = {
+/** Fila cruda que devuelve la consulta: existencia y unidad guardadas, ya en `products`. */
+type ProductStockRow = {
   readonly id: string;
   readonly name: string;
-  readonly batches: readonly { readonly stock: number; readonly presentation: { readonly unitId: string } }[];
+  readonly stock: number;
+  readonly unitId: string | null;
 };
 
 /**
@@ -55,22 +55,12 @@ type ProductBatchRow = {
 async function findAliveProducts(
   ids: readonly ProductId[],
   scope: InventoryScope,
-): Promise<readonly ProductBatchRow[]> {
-  // Sin JOIN desde el 2026-09-09: la presentacion se mudo a `product_batches`, asi que una
-  // referencia de producto ya no la expone. Y sin `unit_id` desde QC-80 (R21): la columna
-  // desaparecio de `products` y `ProductRef` no la sustituye por la unidad derivada del lote,
-  // porque el unico llamante -`recetas`- nunca la consumio.
+): Promise<readonly ProductStockRow[]> {
   return prisma.product.findMany({
     where: {
       AND: [productCompanyScope(scope), { id: { in: [...ids] }, deletedAt: null }],
     },
-    select: {
-      id: true,
-      name: true,
-      batches: {
-        select: { stock: true, presentation: { select: { unitId: true } } },
-      },
-    },
+    select: { id: true, name: true, stock: true, unitId: true },
   });
 }
 
@@ -86,9 +76,7 @@ export async function findProductRefs(
     toProductRef({
       id: row.id,
       name: row.name,
-      stockByUnit: sumStockByUnit(
-        row.batches.map((batch) => ({ stock: batch.stock, unitId: batch.presentation.unitId })),
-      ),
+      stockByUnit: row.unitId === null ? [] : [{ unitId: row.unitId, quantity: row.stock }],
     }),
   );
 }

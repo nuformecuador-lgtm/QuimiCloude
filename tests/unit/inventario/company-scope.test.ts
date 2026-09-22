@@ -158,9 +158,10 @@ describe('QC-49 R19 — la empresa entra en la consulta y no sale hacia el naveg
       name: 'Bidon 20 L',
       imagePath: null,
       qtyAlert: 2,
+      stock: 0,
+      unitId: null,
       createdAt: new Date('2026-09-11T10:00:00.000Z'),
       updatedAt: new Date('2026-09-11T10:00:00.000Z'),
-      batches: [],
       companyId: AMBITO.companyId,
     };
 
@@ -173,10 +174,10 @@ describe('QC-49 R19 — la empresa entra en la consulta y no sale hacia el naveg
       'createdAt',
       'id',
       'imagePath',
-      'latestBatchUnitId',
       'name',
       'qtyAlert',
-      'stockByUnit',
+      'stock',
+      'unitId',
       'updatedAt',
     ]);
   });

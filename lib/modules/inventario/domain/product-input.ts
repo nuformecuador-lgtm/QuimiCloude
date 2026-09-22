@@ -21,14 +21,12 @@ const productNameSchema = z.string().trim().min(1).max(120);
 const nonNegativeIntSchema = z.number().int().min(0);
 
 /**
- * QC-80 (R21): AQUI VIVIA `unitIdSchema`, y se fue con la columna. El producto YA NO declara
- * unidad -ni en el borde, ni en el contrato de salida, ni en la base: `products.unit_id`,
- * `products_unit_id_idx` y `products_unit_id_fkey` se eliminaron en
- * `20260911120000_presentation_unit`-. La unidad la declara ahora la PRESENTACION
- * (`presentations.unit_id`, NOT NULL), y la de un producto se DERIVA de la presentacion de su
- * lote mas reciente (`ProductView.latestBatchUnitId`, R22): un dato que se lee, no uno que se
- * envie. Por eso el alta y la edicion no aceptan `unitId` -y con `strictObject`, enviarlo es
- * `invalid_input`, no un campo ignorado en silencio-.
+ * El producto no declara unidad en el borde: la unidad la declara la PRESENTACION
+ * (`presentations.unit_id`, NOT NULL), y `products.unit_id` la escribe `createWithFirstBatch`
+ * copiandola de esa presentacion -el disparador solo RECHAZA lo que no cuadra-, asi que es un
+ * dato que se lee (`ProductView.unitId`), no uno que se envie. Por eso
+ * el alta y la edicion no aceptan `unitId` -y con `strictObject`, enviarlo es `invalid_input`,
+ * no un campo ignorado en silencio-.
  */
 
 /**

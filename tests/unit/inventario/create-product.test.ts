@@ -63,7 +63,7 @@ function montarRepositorio(overrides: Partial<DobleDelPuerto> = {}): DobleDelPue
       pageSize: 10,
       totalPages: 1,
     })),
-    findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => null),
+    findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => null),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
       id: 'producto-nuevo-1',
       batchId: 'lote-1',
@@ -90,7 +90,7 @@ function afirmarPuertoIntacto(products: Repositorio): void {
   expect(products.updateAlive).not.toHaveBeenCalled();
   expect(products.softDeleteAlive).not.toHaveBeenCalled();
   expect(products.listAlive).not.toHaveBeenCalled();
-  expect(products.findAliveIdByName).not.toHaveBeenCalled();
+  expect(products.findAliveIdByNameInPresentationUnit).not.toHaveBeenCalled();
   expect(products.createWithFirstBatch).not.toHaveBeenCalled();
   expect(products.addBatchToAlive).not.toHaveBeenCalled();
 }
@@ -198,7 +198,7 @@ describe('QC-103 — el lote asignado viaja de vuelta con el resultado del alta'
 
   it('createProduct devuelve el lote asignado al agregar batch a un producto existente (R13)', async () => {
     const products = montarRepositorio({
-      findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => 'producto-9'),
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => 'producto-9'),
       addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => ({
         batchId: 'lote-2',
         lot: 'ACME-2026-07',
@@ -225,15 +225,20 @@ describe('QC-103 — el lote asignado viaja de vuelta con el resultado del alta'
 });
 
 describe('R15, R16, R21 — producto nuevo', () => {
-  it('busca por el nombre ESCRITO y crea producto y lote en una sola operacion del puerto', async () => {
-    // Normalizar el nombre y descartar los borrados es del adaptador: el caso de uso pasa el
-    // nombre tal cual y USA lo que el puerto devuelva.
+  it('busca por el nombre ESCRITO y la presentacion recibida, y crea producto y lote en una sola operacion del puerto', async () => {
+    // Normalizar el nombre, resolver la unidad de la presentacion y descartar los borrados es
+    // del adaptador: el caso de uso pasa el nombre y la presentacion tal cual y USA lo que el
+    // puerto devuelva.
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
     const resultado = await createProduct(ALTA_VALIDA, ADMIN);
 
-    expect(products.findAliveIdByName).toHaveBeenCalledWith('Acido sulfurico', { companyId: EMPRESA });
+    expect(products.findAliveIdByNameInPresentationUnit).toHaveBeenCalledWith(
+      'Acido sulfurico',
+      PRESENTACION,
+      { companyId: EMPRESA },
+    );
     expect(products.createWithFirstBatch).toHaveBeenCalledTimes(1);
     expect(products.addBatchToAlive).not.toHaveBeenCalled();
     expect(resultado).toEqual({ id: 'producto-nuevo-1', lot: '1' });
@@ -340,7 +345,7 @@ describe('QC-81 R8, R10 y QC-90 R12 — lote que pide generarse y expiracion opc
 
   it('pide la generacion tambien por el camino del producto que ya existe', async () => {
     const products = montarRepositorio({
-      findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => 'producto-9'),
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => 'producto-9'),
     });
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -385,7 +390,7 @@ describe('R22 — autoria del lote', () => {
 
   it('tambien por el camino del producto que ya existe', async () => {
     const products = montarRepositorio({
-      findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => 'producto-9'),
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => 'producto-9'),
     });
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -398,7 +403,7 @@ describe('R22 — autoria del lote', () => {
 describe('R17, R18 — el nombre corresponde a un producto que ya existe', () => {
   function montarConExistente() {
     const products = montarRepositorio({
-      findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => 'producto-9'),
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => 'producto-9'),
     });
     return { products, createProduct: createCreateProduct({ products, now: () => AHORA }) };
   }
@@ -441,7 +446,7 @@ describe('R17, R18 — el nombre corresponde a un producto que ya existe', () =>
     // El desempate entre homonimos vivos es del ADAPTADOR, con su `orderBy`, y se prueba contra
     // la base. Al caso de uso solo le toca no aplicar ningun criterio propio.
     const products = montarRepositorio({
-      findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => 'el-mas-viejo'),
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => 'el-mas-viejo'),
     });
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -452,9 +457,9 @@ describe('R17, R18 — el nombre corresponde a un producto que ya existe', () =>
   it('rechaza si el producto dejo de estar vivo entre la consulta y la escritura', async () => {
     // Se LANZA en vez de crear: crear escribiria en silencio el nombre, la existencia y la alerta
     // del panel, que en este camino se ignoran. Quien reintenta vuelve a pasar por
-    // `findAliveIdByName`, que ya dira `null`, y creara.
+    // `findAliveIdByNameInPresentationUnit`, que ya dira `null`, y creara.
     const products = montarRepositorio({
-      findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => 'producto-9'),
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => 'producto-9'),
       addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => null),
     });
     const createProduct = createCreateProduct({ products, now: () => AHORA });
@@ -473,7 +478,7 @@ describe('R19 — sin id del puerto, el alta crea producto nuevo', () => {
     // El `null` explicito repite el valor por defecto del doble a proposito: deja el escenario
     // escrito en el propio caso en vez de obligar a ir a leer `montarRepositorio`.
     const products = montarRepositorio({
-      findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => null),
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => null),
     });
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -481,6 +486,78 @@ describe('R19 — sin id del puerto, el alta crea producto nuevo', () => {
 
     expect(products.createWithFirstBatch).toHaveBeenCalledTimes(1);
     expect(products.addBatchToAlive).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-121 R6 — mismo nombre en otra unidad: nace otro producto, sin aviso', () => {
+  it('el puerto no encuentra homonimo en la unidad de esta presentacion y el alta crea sin rechazar', async () => {
+    // El adaptador es quien decide «misma unidad»; el dominio solo actua sobre lo que devuelve.
+    // Un `null` aqui es indistinguible de «no existe ningun homonimo»: es el mismo caso que R19,
+    // pero el motivo de fondo es distinto (hay homonimo, en otra unidad).
+    const products = montarRepositorio({
+      findAliveIdByNameInPresentationUnit: vi.fn<
+        ProductRepository['findAliveIdByNameInPresentationUnit']
+      >(async () => null),
+    });
+    const createProduct = createCreateProduct({ products, now: () => AHORA });
+
+    await expect(createProduct(ALTA_VALIDA, ADMIN)).resolves.toEqual({
+      id: 'producto-nuevo-1',
+      lot: '1',
+    });
+    expect(products.createWithFirstBatch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('QC-121 R7 — con varios homonimos en la misma unidad, usa el que el puerto elige', () => {
+  it('no aplica ningun criterio propio de desempate: usa el id que devuelve el puerto', async () => {
+    // El desempate -el mas antiguo, por id ascendente- es del ADAPTADOR, contra la base
+    // (`product-prisma.test.ts`, `product-unit.int.test.ts`). Aqui solo se afirma que el
+    // dominio no reimplementa ese criterio.
+    const products = montarRepositorio({
+      findAliveIdByNameInPresentationUnit: vi.fn<
+        ProductRepository['findAliveIdByNameInPresentationUnit']
+      >(async () => 'el-mas-viejo'),
+    });
+    const createProduct = createCreateProduct({ products, now: () => AHORA });
+
+    await expect(createProduct(ALTA_VALIDA, ADMIN)).resolves.toEqual({
+      id: 'el-mas-viejo',
+      lot: '1',
+    });
+    expect(products.createWithFirstBatch).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-121 R3 — el rechazo de la base por unidad llega al llamante como invalid_input', () => {
+  it('propaga el ValidationError del puerto sin envolverlo ni escribir nada mas, al crear', async () => {
+    // Simula la carrera en la que la presentacion cambio de unidad entre la busqueda y la
+    // escritura, y el adaptador traduce el 23514 del disparador a ValidationError ANTES de que
+    // este caso de uso la vea. Aqui solo se mide que no la atrapa ni la sustituye.
+    const products = montarRepositorio({
+      createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => {
+        throw new ValidationError('lote en otra unidad que la del producto');
+      }),
+    });
+    const createProduct = createCreateProduct({ products, now: () => AHORA });
+
+    const error = await capturarRechazo(createProduct(ALTA_VALIDA, ADMIN));
+    expect(error.code).toBe('invalid_input');
+  });
+
+  it('lo mismo por el camino del producto que ya existe', async () => {
+    const products = montarRepositorio({
+      findAliveIdByNameInPresentationUnit: vi.fn<
+        ProductRepository['findAliveIdByNameInPresentationUnit']
+      >(async () => 'producto-9'),
+      addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => {
+        throw new ValidationError('lote en otra unidad que la del producto');
+      }),
+    });
+    const createProduct = createCreateProduct({ products, now: () => AHORA });
+
+    const error = await capturarRechazo(createProduct(ALTA_VALIDA, ADMIN));
+    expect(error.code).toBe('invalid_input');
   });
 });
 
@@ -520,7 +597,7 @@ describe('QC-81 R2 — sin fecha de compra, al puerto le llega HOY del mismo rel
 
   it('tambien cuando la fecha viene explicitamente en null, y por el camino del producto existente', async () => {
     const products = montarRepositorio({
-      findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => 'producto-9'),
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => 'producto-9'),
     });
     const now = vi.fn(() => AHORA);
     const createProduct = createCreateProduct({ products, now });
@@ -558,7 +635,7 @@ describe('QC-81 R3, R5 — la fecha escrita, si no es futura, llega al puerto id
 
   it('pasa la fecha escrita identica tambien al agregar el lote a un producto existente', async () => {
     const products = montarRepositorio({
-      findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => 'producto-9'),
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => 'producto-9'),
     });
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 

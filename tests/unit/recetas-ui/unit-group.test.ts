@@ -21,11 +21,9 @@ import type { UnitRef } from '@/lib/modules/unidades';
  * el catalogo completo` se pone en rojo si `unitsOfGroup` deja de tratar `null` como "no se
  * sabe" y devuelve un array vacio.
  *
- * **QC-80 (R22, R23, R24) no cambio ninguna de las tres reglas ni una linea de `unit-group.ts`:
- * cambio la FUENTE del dato.** La unidad de un ingrediente se deriva ahora de la presentacion de
- * su LOTE MAS RECIENTE (`ProductView.latestBatchUnitId`) y no de `products.unit_id`, columna que
- * se elimino. Consecuencia para estos casos: donde antes se leia "producto sin unidad" ahora se
- * lee **"producto sin ningun lote"**, que es el supuesto de R23.
+ * La unidad de un ingrediente sale de `ProductView.unitId`, que es `null` mientras el producto
+ * no tenga ningun lote: donde estos casos leen "producto sin unidad" hay que leer "producto sin
+ * ningun lote".
  */
 
 const GRAMO: UnitRef = { id: 'u-g', name: 'Gramo', symbol: 'g', baseUnitId: null, factor: null };

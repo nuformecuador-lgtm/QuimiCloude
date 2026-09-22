@@ -80,7 +80,7 @@ import {
   adjustBatchStock,
   createProduct,
   createWithFirstBatch,
-  findAliveIdByName,
+  findAliveIdByNameInPresentationUnit,
   findAliveProductById,
   findBatchesOfAliveProduct,
   listAliveProducts,
@@ -667,7 +667,7 @@ const productRepository: ProductRepository = {
   // QC-90 (T7, `design.md > 7`): las tres del alta con su primer lote. Nada mas cambia aqui
   // -`createProduct: createCreateProduct({ products: productRepository })` sigue igual-,
   // porque el alta que ya existia es la MISMA que ahora escribe el lote (`design.md > 10 C`).
-  findAliveIdByName,
+  findAliveIdByNameInPresentationUnit,
   createWithFirstBatch,
   addBatchToAlive,
   adjustBatchStock,

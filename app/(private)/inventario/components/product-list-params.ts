@@ -46,10 +46,13 @@ export const PAGE_PARAM = 'page';
 export const PAGE_SIZE_PARAM = 'pageSize';
 export const SORT_PARAM = 'sort';
 export const SEARCH_PARAM = 'q';
+export const STOCK_MIN_PARAM = 'stockMin';
+export const STOCK_MAX_PARAM = 'stockMax';
 export const QTY_ALERT_MIN_PARAM = 'alertMin';
 export const QTY_ALERT_MAX_PARAM = 'alertMax';
 
-/** Id de la columna filtrable, que es tambien la clave de `DataTableParams.filters`. */
+/** Ids de las columnas filtrables, que son tambien las claves de `DataTableParams.filters`. */
+export const STOCK_COLUMN_ID = 'stock';
 export const QTY_ALERT_COLUMN_ID = 'qtyAlert';
 
 /** Separador de `campo:direccion` en el parametro de orden. */
@@ -150,6 +153,12 @@ export function parseProductListParams(
 
   const filters: Record<string, DataTableFilterValue> = {};
 
+  const stock = parseNumberRange(
+    firstValue(searchParams?.[STOCK_MIN_PARAM]),
+    firstValue(searchParams?.[STOCK_MAX_PARAM]),
+  );
+  if (stock !== null) filters[STOCK_COLUMN_ID] = stock;
+
   const qtyAlert = parseNumberRange(
     firstValue(searchParams?.[QTY_ALERT_MIN_PARAM]),
     firstValue(searchParams?.[QTY_ALERT_MAX_PARAM]),
@@ -183,6 +192,12 @@ export function buildProductListQuery(params: DataTableParams): string {
 
   const search = params.search.trim();
   if (search !== '') query.set(SEARCH_PARAM, search);
+
+  const stock = params.filters[STOCK_COLUMN_ID];
+  if (stock?.kind === 'numberRange') {
+    if (stock.min !== null) query.set(STOCK_MIN_PARAM, String(stock.min));
+    if (stock.max !== null) query.set(STOCK_MAX_PARAM, String(stock.max));
+  }
 
   const qtyAlert = params.filters[QTY_ALERT_COLUMN_ID];
   if (qtyAlert?.kind === 'numberRange') {

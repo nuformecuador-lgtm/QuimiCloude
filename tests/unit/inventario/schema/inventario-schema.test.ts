@@ -165,6 +165,7 @@ function expectUnitCatalogIsNotAnEnum(): void {
 /** Los datos de negocio del producto, con su columna en la base. */
 const PRODUCT_BUSINESS_FIELDS: ReadonlyArray<readonly [string, string]> = [
   ['name', 'name'],
+  ['stock', 'stock'],
   ['qtyAlert', 'qty_alert'],
   ['imagePath', 'image_path'],
 ]
@@ -264,17 +265,20 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(schema).not.toMatch(/@@map\("(inventory|inventory_items|stock_items|items)"\)/)
   })
 
-  it('R2, R11: Product ya no declara stock', () => {
-    expect(has(product, 'stock'), 'Product.stock se quito con la migracion (R2, R11)').toBe(false)
-    expect(product.body).not.toMatch(/^\s*stock\s+Int/m)
+  it('QC-121 R8, R12: Product vuelve a declarar stock, guardado por la aplicacion', () => {
+    const stock = field(product, 'stock')
+    expect(stock.type).toBe('Int')
+    expect(stock.isOptional).toBe(false)
+    expect(stock.attributes).toMatch(/@default\(0\)/)
+    // El indice parcial no lo modela Prisma: vive en la migracion, no aqui (R12).
     expect(product.body).not.toMatch(/products_stock_idx|products_stock_non_negative/)
   })
 
-  it('R7: Product declara sus datos de negocio en una sola tabla, y ya no declara unidad', () => {
+  it('QC-121 R1, R7: Product declara sus datos de negocio en una sola tabla, con su unidad propia', () => {
     for (const [name] of PRODUCT_BUSINESS_FIELDS) {
       expect(has(product, name), `falta el campo Product.${name}`).toBe(true)
     }
-    expect(PRODUCT_BUSINESS_FIELDS).toHaveLength(3)
+    expect(PRODUCT_BUSINESS_FIELDS).toHaveLength(4)
 
     // Son terminos comerciales del proveedor: se vetan aparte para que no vuelvan por descuido.
     for (const name of ['cost', 'minPurchase', 'deliveryTime']) {
@@ -291,13 +295,15 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       .filter((candidate) => !candidate.isList && candidate.type !== 'Presentation')
       .map((candidate) => candidate.name)
       .sort()
-    // `nameNormalized` (forma canonica de `name`) y `companyId` (dueno de la fila) no son datos de
-    // negocio: van aparte para que el censo siga siendo una igualdad exacta.
+    // `nameNormalized` (forma canonica de `name`), `unitId` (referencia a otro modulo) y
+    // `companyId` (dueno de la fila) no son datos de negocio: van aparte para que el censo siga
+    // siendo una igualdad exacta.
     expect(scalarNames).toEqual(
       [
         'id',
         ...PRODUCT_BUSINESS_FIELDS.map(([name]) => name),
         'nameNormalized',
+        'unitId',
         'companyId',
         'createdAt',
         'updatedAt',
@@ -387,7 +393,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(candidate.type).toBe('String')
   })
 
-  it('R7: qtyAlert e imagePath son opcionales, y unitId ya no esta entre ellos', () => {
+  it('R7: qtyAlert e imagePath son opcionales', () => {
     // Un `@default` convertiria la ausencia en un valor sin que nadie lo note.
     for (const name of OPTIONAL_FIELDS) {
       const candidate = field(product, name)
@@ -397,8 +403,16 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       )
     }
     expect(OPTIONAL_FIELDS).toHaveLength(2)
-    // `unitId` se afirma aparte para que no vuelva como opcional sin discutirlo.
-    expect(OPTIONAL_FIELDS as readonly string[]).not.toContain('unitId')
+  })
+
+  it('QC-121 R1, R23: unitId es opcional y sin @default: NULL significa producto sin lotes', () => {
+    const unitId = field(product, 'unitId')
+    expect(unitId.type).toBe('String')
+    expect(unitId.isOptional, 'Product.unitId es anulable: sin lotes, sin unidad').toBe(true)
+    expect(unitId.attributes).toContain('@map("unit_id")')
+    expect(unitId.attributes).toContain('@db.Uuid')
+    expect(unitId.attributes).not.toMatch(/@default\(/)
+    expect(unitId.attributes).not.toMatch(/@relation/)
   })
 
   it('imagePath esta declarado en el modelo, es opcional y mapea a image_path', () => {
@@ -434,15 +448,14 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(schema).not.toMatch(/@db\.(Real|DoublePrecision)/)
   })
 
-  it('R7: Product no declara ninguna unidad, ni por referencia ni como texto', () => {
-    // Ausencia afirmada en positivo: la unidad de un producto se deriva de la presentacion de su
-    // lote mas reciente, y declararla aqui abriria una segunda verdad.
-    expect(has(product, 'unitId'), 'Product.unitId tenia que haber desaparecido (QC-80 R7)').toBe(
-      false,
+  it('QC-121 R1, R2: Product declara su propia unidad, escalar y sin @relation', () => {
+    // Escalar sin `@relation`: `Unit` es del modulo `unidades`, y una relacion dejaria al cliente de
+    // `inventario` atravesarlo con un `include` sin que ninguna guardia lo vea.
+    expect(has(product, 'unitId'), 'Product.unitId vuelve a declararse (QC-121 R1)').toBe(true)
+    expect(has(product, 'unit'), 'Product.unit no se declara: unitId es escalar').toBe(false)
+    expect(product.body, 'unitId es escalar, sin @relation').not.toMatch(
+      /unitId\s+String[^\n]*@relation/,
     )
-    expect(has(product, 'unit'), 'Product.unit no puede resucitar (QC-32 R10)').toBe(false)
-    expect(product.body).not.toMatch(/unit_id/)
-    expect(product.body).not.toMatch(/^\s*unit\s+String/m)
     expect(product.body).not.toMatch(/\bUnit\b/)
 
     expectUnitCatalogIsNotAnEnum()
@@ -603,11 +616,11 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       (match) => match[1],
     )
     // Igualdad exacta: un indice de mas es una migracion que nadie declaro.
-    expect(indexMaps).toEqual(['products_company_id_idx'])
+    expect(indexMaps).toEqual(['products_company_id_idx', 'products_unit_id_idx'])
     for (const name of indexMaps) {
       expect(name ?? '', `el indice ${name ?? ''} debe ir en snake_case ingles`).toMatch(SNAKE_CASE)
     }
-    expect(product.body, 'products_unit_id_idx se fue con la columna (R7)').not.toMatch(
+    expect(product.body, 'products_unit_id_idx vuelve con la columna (QC-121 R1)').toMatch(
       /products_unit_id_idx/,
     )
 

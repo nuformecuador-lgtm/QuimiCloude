@@ -39,9 +39,9 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 49 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 50 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
-      expect(ERROR_CODES).toHaveLength(49)
+      expect(ERROR_CODES).toHaveLength(50)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -51,7 +51,7 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       expect(Object.keys(ERROR_MESSAGES_ES).sort()).toEqual([...claves].sort())
     })
 
-    it('errorMessage devuelve el texto del catalogo para los 49 codigos', () => {
+    it('errorMessage devuelve el texto del catalogo para los 50 codigos', () => {
       for (const code of ERROR_CODES) {
         expect(errorMessage(code)).toBe(ERROR_MESSAGES_ES[ERROR_MESSAGE_KEY[code]])
         expect(errorMessage(code).trim().length).toBeGreaterThan(0)
@@ -233,6 +233,29 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
     it('la cabecera de error-codes.ts redacta la octava enmienda con su fecha y su aprobacion', () => {
       const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
       expect(source).toContain('**Octava enmienda, el 2026-09-18**')
+      expect(source).toContain('Aprobada por el humano el 2026-09-18')
+    })
+  })
+
+  describe('QC-121 R20 — presentation_unit_locked es la novena enmienda al catalogo cerrado', () => {
+    it('presentation_unit_locked esta en el catalogo con su clave y su texto propio', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('presentation_unit_locked')
+      expect(ERROR_MESSAGE_KEY.presentation_unit_locked).toBe('errors.presentation_unit_locked')
+      expect(errorMessage('presentation_unit_locked')).toBe(
+        'La presentacion ya tiene lotes y no puede cambiar de unidad.',
+      )
+    })
+
+    it('se distingue de invalid_input y de presentation_in_use', () => {
+      const texto = errorMessage('presentation_unit_locked')
+      expect(texto).not.toBe(errorMessage('invalid_input'))
+      expect(texto).not.toBe(errorMessage('presentation_in_use'))
+    })
+
+    it('la cabecera de error-codes.ts redacta la novena enmienda con su fecha y su aprobacion', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toContain('**Novena enmienda, el 2026-09-18**')
       expect(source).toContain('Aprobada por el humano el 2026-09-18')
     })
   })

@@ -56,18 +56,17 @@ import {
  * - al elegir ingrediente se preselecciona la unidad **más pequeña** del grupo, salvo que la ya
  *   elegida sea de ese mismo grupo: entonces se mantiene.
  *
- * **De dónde sale esa unidad, desde QC-80 (R22, R23):** de `ProductView.latestBatchUnitId`, o
- * sea de la **presentación del lote más reciente** del ingrediente -`created_at DESC`,
- * desempatando por `id DESC`-. Antes salía de `products.unit_id`, una columna que el producto
- * declaraba y que ya NO EXISTE: la unidad la declara la presentación. Cambió la **fuente** del
- * dato; **ninguna de las tres reglas de arriba cambió**, y `unit-group.ts` no se tocó.
+ * **De dónde sale esa unidad:** de `ProductView.unitId`, la unidad guardada y fija del producto
+ * -ya no la del lote más reciente-. `ProductPicker` la pinta además junto al nombre de cada
+ * opción («nombre · unidad»), con el catálogo que este campo le pasa en `units`.
+ * **Ninguna de las tres reglas de arriba cambió**, y `unit-group.ts` no se tocó.
  *
  * Cuando esa unidad es `null` -o la línea viene de la precarga de edición, que no trae la del
  * producto- el grupo es el **catálogo completo**: no se recorta una lista a partir de un dato
- * que no se tiene. Con la fuente nueva, `null` significa **«este producto todavía no tiene
- * ningún lote»**, no «no se pudo leer» ni «no tiene unidad». Y por eso la línea **no se bloquea
- * nunca** por ese motivo (R23): el selector se habilita en cuanto hay ingrediente elegido y la
- * receta se puede guardar igual, porque se escriben recetas antes de comprar el ingrediente.
+ * que no se tiene. `null` significa **«este producto todavía no tiene unidad»**, no «no se pudo
+ * leer». Y por eso la línea **no se bloquea nunca** por ese motivo: el selector se
+ * habilita en cuanto hay ingrediente elegido y la receta se puede guardar igual, porque se
+ * escriben recetas antes de comprar el ingrediente.
  *
  * **Producto dado de baja (R53, R54, `design.md > 6.1`, decisión cerrada del 2026-09-03):** el
  * ÚNICO discriminante es `line.productName === null`. Cuando lo es:
@@ -241,6 +240,7 @@ export function RecipeLinesField({
                   testId={`recipe-line-product-${index}`}
                   initialPage={initialProductPage}
                   excludedIds={usedProductIds(index)}
+                  units={units}
                 />
               </div>
 

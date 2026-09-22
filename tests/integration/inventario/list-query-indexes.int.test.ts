@@ -107,12 +107,15 @@ const SEARCH_INDEXES = [
 
 /** Los de las cinco tablas con borrado logico: PARCIALES (R7).
  *
- * `products_stock_idx` estuvo aqui hasta el 2026-09-17: cayo con su columna en
- * `db/migrations/20260917120000_drop_product_stock` (QC-91 R2), y con ella `stock` salio de
- * `PRODUCT_QUERYABLE.sortable`/`.filterable`, asi que ya no hay orden ni filtro que servir. */
+ * `products_stock_idx` cayo el 2026-09-17 con su columna
+ * (`db/migrations/20260917120000_drop_product_stock`, QC-91 R2) y vuelve el 2026-09-18 con la
+ * columna guardada de nuevo, con el mismo nombre y la misma forma
+ * (`db/migrations/20260918130000_product_unit_and_stored_stock`): `stock` vuelve a
+ * `PRODUCT_QUERYABLE.sortable`/`.filterable`. */
 const PARTIAL_INDEXES = [
   'products_name_normalized_trgm_idx',
   'products_name_idx',
+  'products_stock_idx',
   'products_qty_alert_idx',
   'products_created_at_idx',
   'products_updated_at_idx',
@@ -210,13 +213,9 @@ const PRE_EXISTING_INDEXES = [
   // en la misma migracion que creo `product_batches`: la presentacion se mudo al lote, y el
   // lado hijo de la FK ya no es `products` sino `product_batches` (cuyo indice, tambien
   // del lado hijo, esta arriba en `PARTIAL_INDEXES`).
-  // `products_unit_id_idx` salio de esta lista el 2026-09-11 con QC-80, y NO por descuido -que
-  // es justo lo que este caso vigila-: la ficha elimina la columna `products.unit_id` entera
-  // (R7), y Postgres se lleva el indice con ella. El producto deja de declarar unidad y la
-  // deriva de la presentacion de su lote mas reciente (R22). Su RELEVO es
-  // `presentations_unit_id_idx` (R3), que se afirma abajo en su propio caso: si la migracion se
-  // hubiera llevado el de `products` SIN crear el de `presentations`, la FK nueva se quedaria sin
-  // indice y este archivo seguiria siendo quien lo dijera.
+  // `products_unit_id_idx` salio de esta lista el 2026-09-11 con QC-80 -el producto dejaba de
+  // declarar unidad- y vuelve a existir el 2026-09-18, cuando el producto la vuelve a declarar
+  // como columna propia y fija: se afirma en `ALL_INDEXES`, no aqui.
   'supplier_catalog_lines_presentation_id_idx',
   'supplier_catalog_lines_unit_id_idx',
   'orders_recipe_id_idx',
@@ -269,19 +268,20 @@ describe('QC-57 — la migracion en la base (R21, R23)', () => {
     expect(rows).toHaveLength(1)
   })
 
-  it('los 34 indices nuevos existen, cada uno con su nombre exacto', async () => {
+  it('los 35 indices nuevos existen, cada uno con su nombre exacto', async () => {
     const indexes = await readIndexes()
-    // 34 desde el 2026-09-18: `recipes_name_normalized_all_trgm_idx` sumo uno (QC-68). Antes eran
-    // 33 desde el 2026-09-17, cuando `products_stock_idx` cayo con su columna (QC-91 R2), y 35
-    // hasta que `orders_unit_price_idx` cayo con la suya.
-    expect(ALL_INDEXES).toHaveLength(34)
+    // 35 desde el 2026-09-18: `products_stock_idx` vuelve con la columna guardada
+    // (`20260918130000_product_unit_and_stored_stock`). Antes eran 34, desde que
+    // `recipes_name_normalized_all_trgm_idx` sumo uno (QC-68) sobre las 33 que quedaron cuando
+    // `products_stock_idx` cayo con su columna el 2026-09-17 (QC-91 R2).
+    expect(ALL_INDEXES).toHaveLength(35)
     const faltan = ALL_INDEXES.filter((name) => !indexes.has(name))
     expect(faltan, `indices que la base no tiene: ${faltan.join(', ')}`).toEqual([])
   })
 
-  it('R2: products_stock_idx ya no existe', async () => {
+  it('products_stock_idx vuelve a existir', async () => {
     const indexes = await readIndexes()
-    expect(indexes.has('products_stock_idx')).toBe(false)
+    expect(indexes.has('products_stock_idx')).toBe(true)
   })
 
   it('los siete de busqueda son GIN de trigramas sobre name_normalized', async () => {

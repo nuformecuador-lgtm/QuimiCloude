@@ -112,9 +112,10 @@ async function createProduct(
   tx: Prisma.TransactionClient,
   marker: string,
   companyId: string,
+  unitId: string | null = null,
 ): Promise<string> {
   const product = await tx.product.create({
-    data: { name: `Producto ${marker}`, nameNormalized: `producto${marker}`, companyId },
+    data: { name: `Producto ${marker}`, nameNormalized: `producto${marker}`, companyId, unitId },
     select: { id: true },
   })
   return product.id
@@ -141,7 +142,9 @@ async function createBatch(
   stock = 10,
 ): Promise<string> {
   const unitId = await createUnit(tx, marker)
-  const productId = await createProduct(tx, marker, companyId)
+  // El producto del fixture gana la unidad de su presentacion: sin ella,
+  // `product_batches_check_unit` rechazaria el lote de mas abajo.
+  const productId = await createProduct(tx, marker, companyId, unitId)
   const presentationId = await createPresentation(tx, marker, unitId, companyId)
   const batch = await tx.productBatch.create({
     data: {

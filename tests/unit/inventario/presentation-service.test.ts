@@ -15,6 +15,7 @@ import {
   PresentationDuplicateNameError,
   PresentationNotFoundError,
   PresentationInUseError,
+  PresentationUnitLockedError,
   UnauthorizedError,
   ValidationError,
 } from '@/lib/modules/inventario/domain/errors';
@@ -276,6 +277,26 @@ describe('update-presentation', () => {
     await expect(
       updatePresentation(PRESENTACION.id, { name: 'Bidon 20 L', unitId: OTRA_UNIDAD }, ADMIN),
     ).rejects.toThrow(ValidationError);
+  });
+
+  it("traduce 'unit_locked' a PresentationUnitLockedError, DISTINGUIBLE de ValidationError, sin exigir mas permiso que inventario.modificar (R20, R24)", async () => {
+    const replace = vi.fn<PresentationRepository['replace']>(
+      async () => 'unit_locked' as const,
+    );
+    const presentations = montarRepositorio({ replace });
+    const updatePresentation = createUpdatePresentation({ presentations });
+
+    const fallo = updatePresentation(
+      PRESENTACION.id,
+      { name: PRESENTACION.name, unitId: OTRA_UNIDAD },
+      ADMIN,
+    );
+
+    await expect(fallo).rejects.toBeInstanceOf(PresentationUnitLockedError);
+    await expect(
+      updatePresentation(PRESENTACION.id, { name: PRESENTACION.name, unitId: OTRA_UNIDAD }, ADMIN),
+    ).rejects.not.toBeInstanceOf(ValidationError);
+    expect(new PresentationUnitLockedError().code).toBe('presentation_unit_locked');
   });
 });
 
