@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ORDER_EXECUTION_ORDER_ID_FIELD,
+  ORDER_EXECUTION_PRESENTATION_TESTID,
   ORDER_EXECUTION_RECIPE_NAME_TESTID,
   ORDER_EXECUTION_SCREEN_TESTID,
   OrderExecutionScreen,
@@ -65,6 +66,7 @@ const EXECUTION: AssignedOrderExecutionView = {
       alternativeUnits: [MILILITRO],
     },
   ],
+  presentationName: 'Caja x 12',
 };
 
 function marcarTodo(): void {
@@ -228,6 +230,33 @@ describe('pantalla de ejecucion — R18: el envio no lleva la espera y remontar 
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('pantalla de ejecucion — R25: muestra la presentación o Sin presentación', () => {
+  it('con presentationName pinta el nombre en su propia linea', () => {
+    render(<OrderExecutionScreen execution={EXECUTION} />);
+
+    const linea = screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID);
+    expect(linea).toHaveTextContent('Presentación:');
+    expect(linea).toHaveTextContent('Caja x 12');
+  });
+
+  it('con presentationName null pinta «Sin presentación»', () => {
+    render(<OrderExecutionScreen execution={{ ...EXECUTION, presentationName: null }} />);
+
+    expect(screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID)).toHaveTextContent(
+      'Sin presentación',
+    );
+  });
+});
+
+describe('pantalla de ejecucion — R26: no hay ningún control de presentación', () => {
+  it('la linea de presentación no ofrece ningun boton, enlace ni campo de edicion', () => {
+    render(<OrderExecutionScreen execution={EXECUTION} />);
+
+    const linea = screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID);
+    expect(linea.querySelectorAll('button, a, input, select, textarea')).toHaveLength(0);
   });
 });
 

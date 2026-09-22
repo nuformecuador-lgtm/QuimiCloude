@@ -66,6 +66,7 @@ const EXECUCION_MINIMA = {
   scaleFactorText: null,
   steps: [],
   lines: [],
+  presentationName: null,
 };
 
 function arbolDeLaPagina(id = 'order-1') {
