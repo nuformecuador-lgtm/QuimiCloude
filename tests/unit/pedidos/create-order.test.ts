@@ -22,7 +22,7 @@ import { RecipeNotFoundError, UnauthorizedError, type PedidosError } from '@/lib
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
-import type { CostingBatch, ProductCatalog } from '@/lib/modules/inventario';
+import type { CostingBatch, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeExecutionLine, RecipeRef } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
 
@@ -90,10 +90,17 @@ function catalogoDeRecetas(lineasPorReceta: ReadonlyMap<string, readonly RecipeE
   };
 }
 
-/** Catalogo de lotes con existencia (T5): una sola llamada por alta o edicion. */
-function catalogoDeProductos(batches: readonly CostingBatch[] = []) {
+/** Catalogo de productos (T5): una llamada a `findCostingBatches` y otra a `findRefs` por alta
+ *  o edicion, ninguna crece con el numero de lineas. Sin `refs` explicitas, la unidad de cada
+ *  producto sale de sus propios lotes -asi los dobles no repiten la misma unidad dos veces-. */
+function catalogoDeProductos(batches: readonly CostingBatch[] = [], refs?: readonly ProductRef[]) {
+  const refsPorDefecto =
+    refs ??
+    [...new Map(batches.map((batch) => [batch.productId, batch.unitId])).entries()].map(
+      ([id, unitId]): ProductRef => ({ id, name: 'producto', unitId, stockByUnit: [] }),
+    );
   const findCostingBatches = vi.fn(async () => batches);
-  const findRefs = vi.fn(async () => []);
+  const findRefs = vi.fn(async () => refsPorDefecto);
   return { products: { findRefs, findCostingBatches } as unknown as ProductCatalog, findCostingBatches, findRefs };
 }
 
@@ -222,8 +229,10 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
 const PRODUCTO_X = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const LITRO: UnitConversion = { id: 'l', baseUnitId: null, factor: null };
 
+/** Una unica linea al 100 %: la cantidad necesaria queda igual a la del pedido, y cada test
+ *  pone la necesaria que le conviene directamente en `quantity` del pedido. */
 function lineaDeReceta(overrides: Partial<RecipeExecutionLine> = {}): RecipeExecutionLine {
-  return { productId: PRODUCTO_X, productName: null, quantity: '2.0000', unitId: LITRO.id, ...overrides };
+  return { productId: PRODUCTO_X, productName: null, percentage: '100.00', ...overrides };
 }
 
 function loteCosteable(overrides: Partial<CostingBatch> = {}): CostingBatch {
@@ -271,7 +280,7 @@ function catalogosQueExplotan() {
 
 describe('T5 — el alta calcula el importe de los ingredientes', () => {
   it('el alta calcula el importe y lo pasa al puerto (R10)', async () => {
-    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta({ quantity: '2.0000' })]]]));
+    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
     const prod = catalogoDeProductos([loteCosteable({ stock: 100, unitCost: '3.0000' })]);
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
     const repo = repositorioDePedidos();
@@ -283,9 +292,9 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
       now: () => AHORA,
     });
 
-    await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000' }, ACTOR_A);
+    await createOrder({ recipeId: RECETA_DE_A, quantity: '20.0000' }, ACTOR_A);
 
-    // necesaria = 2 * 10 = 20, cubierta por el unico lote a 3.0000: 20 * 3 = 60.
+    // necesaria = 20 * 100 % = 20, cubierta por el unico lote a 3.0000: 20 * 3 = 60.
     expect(repo.create).toHaveBeenCalledTimes(1);
     expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toBe('60.0000');
   });
@@ -293,7 +302,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
   it('las lecturas de lotes y de unidades son UNA sola, tenga la receta 1 o 20 lineas', async () => {
     for (const cantidad of [1, 20]) {
       const lineas = Array.from({ length: cantidad }, (_, i) =>
-        lineaDeReceta({ productId: `${PRODUCTO_X}-${i % 5}`, quantity: '1.0000' }),
+        lineaDeReceta({ productId: `${PRODUCTO_X}-${i % 5}` }),
       );
       const lotes = Array.from({ length: 5 }, (_, i) =>
         loteCosteable({ productId: `${PRODUCTO_X}-${i}`, stock: 100, unitCost: '1.0000' }),
@@ -339,7 +348,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
 
   it('el alta se completa aunque el importe desborde (R24)', async () => {
     const cat = catalogoDeRecetas(
-      new Map([[RECETA_DE_A, [lineaDeReceta({ quantity: '1.0000' })]]]),
+      new Map([[RECETA_DE_A, [lineaDeReceta()]]]),
     );
     const prod = catalogoDeProductos([loteCosteable({ stock: 1, unitCost: '10000000000.0000' })]);
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
