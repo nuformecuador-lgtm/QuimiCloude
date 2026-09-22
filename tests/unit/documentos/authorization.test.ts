@@ -58,6 +58,7 @@ function dobleDeAlmacenamiento() {
     createSignedUpload: vi.fn(),
     createSignedReadUrl: vi.fn(),
     download: vi.fn(),
+    remove: vi.fn(),
   };
 }
 

@@ -243,9 +243,10 @@ describe('pantalla de ejecucion — R20: ningun control de edicion', () => {
 });
 
 describe('pantalla de ejecucion — R26: objetivos tactiles de 44x44 en todo control nuevo', () => {
-  /** Las dos clases que, en este repo, SON el objetivo tactil de 44x44. */
+  /** El alto minimo de 44x44, o el de 64px de la accion primaria de StepReader en ejecucion. */
   function esObjetivoTactil(elemento: Element): boolean {
-    return elemento.className.includes('min-h-11') && elemento.className.includes('min-w-11');
+    const alturaMinima = elemento.className.includes('min-h-11') || elemento.className.includes('min-h-16');
+    return alturaMinima && elemento.className.includes('min-w-11');
   }
 
   it('todo boton y todo selector de la pantalla cumple el objetivo tactil minimo', () => {

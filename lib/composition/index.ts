@@ -70,7 +70,10 @@ import {
   createUpdatePresentation,
   createUpdateProduct,
 } from '@/lib/modules/inventario';
-import { findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
+import {
+  findCostingBatches,
+  findProductRefs,
+} from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import {
   addBatchToAlive,
@@ -295,24 +298,45 @@ import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity
 import {
   createConvertPdfs,
   createDownloadDocument,
+  createEnqueueBatch,
+  createGetBatchStatus,
   createIssueReadLink,
   createIssueUploadLinks,
+  createProcessPdfByStrategy,
   createReadPdfWithAi,
+  createRunDocumentJob,
 } from '@/lib/modules/documentos';
+import { readCannedText } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-canned';
 import { readWithGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
+import { documentsE2EDoublesEnabled } from '@/lib/modules/documentos/adapters/driven/config/e2e-doubles-env';
+import { readProcessingConfigFromEnv } from '@/lib/modules/documentos/adapters/driven/config/processing-config-env';
+import { readStrategyPromptFromEnv } from '@/lib/modules/documentos/adapters/driven/config/strategy-prompt-env';
+import { createStrategyRunLogConsole } from '@/lib/modules/documentos/adapters/driven/observability/strategy-run-log-console';
 import {
   countPages,
   extractPdfText,
   renderPages,
 } from '@/lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf';
+import { documentBatchRepositoryPrisma } from '@/lib/modules/documentos/adapters/driven/persistence/document-batch-repository-prisma';
+import { createProcessingQueueInline } from '@/lib/modules/documentos/adapters/driven/queue/processing-queue-inline';
+import { processingQueueQstash } from '@/lib/modules/documentos/adapters/driven/queue/processing-queue-qstash';
+import { queueSignatureQstash } from '@/lib/modules/documentos/adapters/driven/queue/queue-signature-qstash';
+import { documentStorageMemory } from '@/lib/modules/documentos/adapters/driven/storage/document-storage-memory';
 import {
   createDocumentSignedReadUrl,
   createDocumentSignedUpload,
   downloadDocument,
+  removeDocument,
 } from '@/lib/modules/documentos/adapters/driven/storage/document-storage-supabase';
 import type { AiReader } from '@/lib/modules/documentos/ports/ai-reader';
+import type { DocumentBatchRepository } from '@/lib/modules/documentos/ports/document-batch-repository';
 import type { DocumentStorage } from '@/lib/modules/documentos/ports/document-storage';
 import type { PdfConverter } from '@/lib/modules/documentos/ports/pdf-converter';
+import type { ProcessingConfig } from '@/lib/modules/documentos/ports/processing-config';
+import type { ProcessingQueue } from '@/lib/modules/documentos/ports/processing-queue';
+import type { QueueSignature } from '@/lib/modules/documentos/ports/queue-signature';
+import type { StrategyPrompt } from '@/lib/modules/documentos/ports/strategy-prompt';
+import type { StrategyRunLog } from '@/lib/modules/documentos/ports/strategy-run-log';
 import { requestScoped } from '@/lib/shared/request-scope';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
@@ -706,7 +730,7 @@ export const inventario = {
 /** `ProductCatalog` cableado con el adaptador driven DE INVENTARIO (`design.md > 6`):
  *  es el hueco que QC-24 dejo abierto en el contrato publico de `inventario` y que T9
  *  llena. `recetas` solo conoce el TIPO `ProductCatalog`, nunca esta implementacion. */
-const productCatalog: ProductCatalog = { findRefs: findProductRefs };
+const productCatalog: ProductCatalog = { findRefs: findProductRefs, findCostingBatches };
 
 /** `UnitCatalog` cableado con el adaptador driven DE UNIDADES (R50): `recetas` solo
  *  conoce el TIPO `UnitCatalog`, nunca esta implementacion. `findRefsSharingBaseInCompany`
@@ -932,18 +956,30 @@ const orderRepository: OrderRepository = {
  * no necesita recibirla.
  *
  * `cancelOrder` y `deleteOrder` reciben SOLO el repositorio: ninguno de los dos toca la receta,
- * y darles catalogos que no usan seria cablear una dependencia falsa. Desde el 2026-09-07 los
- * otros cuatro reciben SOLO el catalogo de recetas, por el mismo motivo.
+ * y darles catalogos que no usan seria cablear una dependencia falsa. `getOrder` y `listOrders`
+ * reciben SOLO el catalogo de recetas, por el mismo motivo: no calculan ningun importe.
+ * `createOrder` y `updateOrder` son los dos que si costean, asi que son los dos que reciben
+ * tambien `products` y `units`.
  */
 export const pedidos = {
-  createOrder: createCreateOrder({ orders: orderRepository, recipes: recipeCatalog }),
+  createOrder: createCreateOrder({
+    orders: orderRepository,
+    recipes: recipeCatalog,
+    products: productCatalog,
+    units: unitCatalog,
+  }),
   getOrder: createGetOrder({ orders: orderRepository, recipes: recipeCatalog }),
   listOrders: createListOrders({
     orders: orderRepository,
     recipes: recipeCatalog,
     log: pedidosListQueryLog,
   }),
-  updateOrder: createUpdateOrder({ orders: orderRepository, recipes: recipeCatalog }),
+  updateOrder: createUpdateOrder({
+    orders: orderRepository,
+    recipes: recipeCatalog,
+    products: productCatalog,
+    units: unitCatalog,
+  }),
   cancelOrder: createCancelOrder({ orders: orderRepository }),
   deleteOrder: createDeleteOrder({ orders: orderRepository }),
 } as const;
@@ -1119,18 +1155,36 @@ export const asignaciones = {
 // ---------------------------------------------------------------------------------------
 
 /**
- * `DocumentStorage` cableado con el adaptador del bucket PRIVADO de estos PDFs. Ninguna de sus tres
- * funciones se INVOCA aqui —solo se referencian—, asi que construir esta fachada no lee ni una
- * variable de entorno ni toca la red: el adaptador resuelve su configuracion en cada llamada real.
- * Importar este archivo con las variables del Storage vacias sigue funcionando.
- *
- * Ninguna de las tres BORRA, porque el puerto no lo expresa: el borrado del PDF temporal es de otra
- * ficha, y aqui no hay nada que elegir al respecto.
+ * `DocumentStorage` cableado con el adaptador del bucket PRIVADO de estos PDFs. Ninguna de sus
+ * cuatro funciones se INVOCA aqui —solo se referencian—, asi que construir esta fachada no lee ni
+ * una variable de entorno ni toca la red: el adaptador resuelve su configuracion en cada llamada
+ * real. Importar este archivo con las variables del Storage vacias sigue funcionando.
  */
-const documentStorage: DocumentStorage = {
+const documentStorageSupabase: DocumentStorage = {
   createSignedUpload: createDocumentSignedUpload,
   createSignedReadUrl: createDocumentSignedReadUrl,
   download: downloadDocument,
+  remove: removeDocument,
+};
+
+/**
+ * La UNICA bifurcacion por entorno del modulo, repetida para sus tres puertos externos y vigilada
+ * por `tests/guards/guard-dobles-e2e.test.ts`: sin la variable puesta se elige el adaptador REAL,
+ * siempre.
+ *
+ * Se consulta EN CADA LLAMADA, no al construir estas fachadas, por el mismo motivo que el resto de
+ * la configuracion de este archivo: importar `lib/composition` no lee ni una variable de entorno.
+ */
+function selectedDocumentStorage(): DocumentStorage {
+  return documentsE2EDoublesEnabled() ? documentStorageMemory : documentStorageSupabase;
+}
+
+const documentStorage: DocumentStorage = {
+  createSignedUpload: (path) => selectedDocumentStorage().createSignedUpload(path),
+  createSignedReadUrl: (path, expiresInSeconds) =>
+    selectedDocumentStorage().createSignedReadUrl(path, expiresInSeconds),
+  download: (path) => selectedDocumentStorage().download(path),
+  remove: (path) => selectedDocumentStorage().remove(path),
 };
 
 /**
@@ -1151,7 +1205,76 @@ const pdfConverter: PdfConverter = {
  * solo se referencia, asi que construir esta fachada no lee ninguna variable de entorno ni
  * toca la red: la suite entera arranca sin claves de IA.
  */
-const aiReader: AiReader = { read: readWithGenai };
+const aiReader: AiReader = {
+  read: (request) =>
+    documentsE2EDoublesEnabled() ? readCannedText(request) : readWithGenai(request),
+};
+
+/**
+ * La lectura con IA, construida UNA vez: la publica la fachada y la reutiliza el procesamiento por
+ * estrategia. Dos construcciones serian dos cableados que pueden divergir.
+ */
+const readPdfWithAi = createReadPdfWithAi({ ai: aiReader, converter: pdfConverter });
+
+/** `StrategyRunLog` cableado con la unica implementacion que hay: una linea en el registro. */
+const strategyRunLog: StrategyRunLog = createStrategyRunLogConsole();
+
+/**
+ * `StrategyPrompt` cableado con el adaptador que lee el texto del entorno. Se REFERENCIA, no
+ * se invoca: construir esta fachada no lee ninguna variable.
+ */
+const strategyPrompt: StrategyPrompt = { promptFor: readStrategyPromptFromEnv };
+
+/**
+ * El procesamiento por estrategia, construido UNA vez: lo usa la fachada de abajo y lo necesita
+ * `runDocumentJob`. Dos construcciones serian dos cableados que pueden divergir.
+ */
+const processPdfByStrategy = createProcessPdfByStrategy({
+  readPdfWithAi,
+  countPages: pdfConverter.countPages,
+  log: strategyRunLog,
+  prompt: strategyPrompt,
+});
+
+// ---------------------------------------------------------------------------------------
+// `documentos` — el procesamiento en cola. Bloque nuevo dentro del mismo modulo, no reordena nada
+// de lo de arriba: la firma, la cola y la persistencia de la tanda se atan aqui y solo aqui.
+//
+// El puerto `QueueSignature` NO envuelve ningun caso de uso: verificar una firma no comprueba
+// permiso ni empresa, y es la unica autorizacion del webhook, asi que se publica tal cual
+// -- mismo criterio que `documentStorage` de arriba, un objeto que cumple el puerto y nada mas.
+// ---------------------------------------------------------------------------------------
+
+const documentBatchRepository: DocumentBatchRepository = documentBatchRepositoryPrisma;
+const queueSignature: QueueSignature = queueSignatureQstash;
+
+/**
+ * El trabajo de la cola, construido UNA vez: lo publica la fachada y lo necesita la cola en linea,
+ * que lo ejecuta en este mismo proceso en vez de publicar nada. Dos construcciones serian dos
+ * cableados que pueden divergir.
+ */
+const runDocumentJob = createRunDocumentJob({
+  repository: documentBatchRepository,
+  storage: documentStorage,
+  processPdfByStrategy,
+});
+
+const processingQueue: ProcessingQueue = {
+  publish: (message) =>
+    documentsE2EDoublesEnabled()
+      ? createProcessingQueueInline({ run: runDocumentJob }).publish(message)
+      : processingQueueQstash.publish(message),
+};
+
+/**
+ * `ProcessingConfig` cableado con la lectura de entorno, pero DIFERIDA: cada metodo relee al
+ * invocarse, nunca al construir esta fachada, para que importar `lib/composition` sin las
+ * variables de la cola configuradas siga funcionando.
+ */
+const processingConfig: ProcessingConfig = {
+  timeoutSeconds: () => readProcessingConfigFromEnv().timeoutSeconds(),
+  maxRetries: () => readProcessingConfigFromEnv().maxRetries(),
+};
 
 /**
  * Fachada del modulo `documentos` ya cableada. Es lo que consume su Server Action.
@@ -1167,6 +1290,9 @@ const aiReader: AiReader = { read: readWithGenai };
  *
  * `convertPdfs` NO recibe actor ni reloj: la frontera de autorizacion es la emision de enlaces, y
  * quien convierte es el trabajo que procesa una tanda ya admitida.
+ *
+ * `runDocumentJob` tampoco recibe actor: no hay usuario delante, y su ambito de empresa sale
+ * del `claim` sobre la propia fila.
  */
 export const documentos = {
   issueUploadLinks: createIssueUploadLinks({
@@ -1184,5 +1310,20 @@ export const documentos = {
   // una variable ni tocar la red.
   issueReadLink: createIssueReadLink({ storage: documentStorage }),
   downloadDocument: createDownloadDocument({ storage: documentStorage }),
-  readPdfWithAi: createReadPdfWithAi({ ai: aiReader, converter: pdfConverter }),
+  readPdfWithAi,
+  // El procesamiento por estrategia recibe la LECTURA ya construida, no el puerto de IA: el plazo y
+  // el tope de paginas son de ella. `countPages` es solo para el resumen que se registra. Tampoco
+  // recibe actor, por el mismo motivo que `convertPdfs`.
+  processPdfByStrategy,
+  // Las TRES capacidades nuevas del procesamiento en cola. `enqueueBatch` es la unica que recibe
+  // actor -- lo construye el adaptador driving con las dos caras de la sesion --, y las otras dos
+  // ninguna: `runDocumentJob` porque no hay usuario delante, y `queueSignature` porque verificar
+  // una firma no es un caso de uso del dominio.
+  enqueueBatch: createEnqueueBatch({ repository: documentBatchRepository, queue: processingQueue }),
+  runDocumentJob,
+  getBatchStatus: createGetBatchStatus({
+    repository: documentBatchRepository,
+    config: processingConfig,
+  }),
+  queueSignature,
 } as const;

@@ -59,6 +59,18 @@ function primerGrupo(): NavGroup {
 }
 
 /**
+ * El orden REAL en el que `AppSidebar` dibuja los items de nivel superior: agrupados por
+ * `section` con `groupNavItemsBySection`, no el orden crudo de `PRIVATE_NAV_ITEMS`.
+ *
+ * Antes de que «Usuarios» pasara a `NAV_SECTION_OPERATION` (2026-09-21), ambos ordenes
+ * coincidian porque cada seccion era un bloque contiguo del array. Dejaron de coincidir en
+ * cuanto un item cambio de seccion sin moverse de sitio en el array: el DOM sigue la seccion.
+ */
+function ordenDeNivelSuperiorEnDom(): readonly NavItem[] {
+  return privateNav.groupNavItemsBySection(PRIVATE_NAV_ITEMS).flatMap((seccion) => seccion.items);
+}
+
+/**
  * Fixture propia con dos grupos de un hijo cada uno, reconocible como dato de prueba y
  * desacoplada de `PRIVATE_NAV_ITEMS` (R9, R10): no referencia `SUPPLIERS_ROUTE` (retirada en
  * QC-13) ni `FORMULAS_ROUTE` (terreno de QC-26).
@@ -207,7 +219,22 @@ describe('barra lateral privada', () => {
     const enDom = entradas.map((entrada) =>
       entrada.querySelector('[data-testid]')?.getAttribute('data-testid'),
     );
-    const esperado = PRIVATE_NAV_ITEMS.map((item) => item.testId);
+    // La lista va A MANO y no sale de `groupNavItemsBySection`: si esa funcion ordenara mal, una
+    // expectativa derivada de ella se moveria junto con el DOM y R6 dejaria de cazar el fallo. El
+    // orden lo manda la SECCION (Operacion, Cadena, Configuracion), no la posicion en el array:
+    // «Usuarios» es el ultimo item declarado en `PRIVATE_NAV_ITEMS` pero se dibuja junto a los
+    // demas de «Operación».
+    const esperado = [
+      'nav-dashboard',
+      'nav-asignacion',
+      'nav-inventario',
+      'nav-pedidos',
+      'nav-usuarios',
+      'nav-produccion',
+      'nav-proveedores',
+      'nav-presentaciones',
+      'nav-unidades',
+    ];
 
     expect(enDom).toEqual(esperado);
   });
@@ -257,9 +284,12 @@ describe('barra lateral privada', () => {
     expect(screen.queryByRole('link', { name: grupo.label })).toBeNull();
     expect(control).toHaveAccessibleName(grupo.label);
 
-    // Alcanzable con Tab desde la entrada anterior de la navegacion.
-    const indiceGrupo = PRIVATE_NAV_ITEMS.indexOf(grupo);
-    const anterior = PRIVATE_NAV_ITEMS[indiceGrupo - 1];
+    // Alcanzable con Tab desde la entrada anterior EN EL DOM, que sigue el orden agrupado por
+    // seccion (`groupNavItemsBySection`), no el orden crudo del array: desde el 2026-09-21
+    // difieren, porque «Usuarios» vive en «Operación» aunque sea el ultimo del array.
+    const ordenEnDom = ordenDeNivelSuperiorEnDom();
+    const indiceGrupo = ordenEnDom.indexOf(grupo);
+    const anterior = ordenEnDom[indiceGrupo - 1];
     if (!anterior) {
       throw new Error('el primer grupo no tiene ninguna entrada anterior');
     }
@@ -380,10 +410,13 @@ describe('barra lateral privada', () => {
     }
   });
 
-  it('el item de recetas apunta a la constante FORMULAS_ROUTE, es el unico, y ya no dice Formulas (R5)', async () => {
+  it('el item de recetas apunta a la constante FORMULAS_ROUTE, es el unico, y el enlace muestra RECIPES_LABEL (R5)', async () => {
     // R5 — QC-26 T23. El item nace en el barrel `private-nav.ts` (T3) ya migrado; aqui se
     // afirma sobre el DOM real: un solo item apunta a `FORMULAS_ROUTE`, con el testId nuevo, y
     // el testId viejo (`nav-produccion-formulas`) ya no existe en ningun sitio del arbol.
+    // Decision humana del 2026-09-21: el literal 'Fórmulas' deja de ser el nombre placeholder
+    // que QC-13 desterro y pasa a ser el nombre definitivo de esta pantalla; la aserción del
+    // enlace compara contra RECIPES_LABEL, la unica fuente de verdad, no contra un literal.
     const user = setupUser();
 
     const itemsDeRecetas = PRIVATE_NAV_ITEMS.flatMap((item) =>
@@ -413,7 +446,7 @@ describe('barra lateral privada', () => {
 
     const enlace = screen.getByTestId('nav-produccion-recetas');
     expect(enlace).toHaveAttribute('href', FORMULAS_ROUTE);
-    expect(enlace.textContent).not.toContain('Fórmulas');
+    expect(enlace.textContent).toContain(RECIPES_LABEL);
 
     // El testId viejo ya no aparece en ningun sitio del arbol renderizado.
     expect(screen.queryByTestId('nav-produccion-formulas')).toBeNull();
@@ -492,12 +525,15 @@ describe('el borrado de items de relleno (QC-13)', () => {
     // `tests/unit/configuracion-ui/private-nav-unidades.test.ts` sobre `UNITS_ROUTE` y
     // `UNITS_LABEL`, nunca sobre el literal del copy.
     // TENSADO el 2026-09-11 (QC-67 T2, R2/R39): la entrada nueva es la pantalla de usuarios,
-    // TERCER item de la seccion «Configuración» -que no se crea, no se renombra y no se reordena-
-    // y ULTIMO del array, detras de unidades. El ancla se TENSA, nunca se afloja: sube de siete a
+    // ULTIMO del array, detras de unidades. El ancla se TENSA, nunca se afloja: sube de siete a
     // OCHO y sigue exigiendo la lista exacta y su orden, asi que una novena entrada sin ficha que
     // la respalde lo vuelve a poner en rojo. El destino, la etiqueta y el permiso del item nuevo
     // los afirma `tests/unit/configuracion-ui/private-nav-usuarios.test.ts` sobre `USERS_ROUTE` y
     // `USERS_LABEL`, nunca sobre el literal del copy.
+    // POR DECISION HUMANA del 2026-09-21, `nav-usuarios` paso de la seccion «Configuración» a
+    // «Operación» -usuarios es operacion, no configuracion-: NO se movio de sitio en el array,
+    // solo cambio su `section`, asi que este centinela de POSICION sigue exigiendo la MISMA lista
+    // y el MISMO orden.
     // «Asignación» va ENTRE Dashboard e Inventario, no al final: el aterrizaje de quien no tiene
     // `dashboard.consultar` es el primer item visible de su menu, asi que ese orden lo decide.
     expect(PRIVATE_NAV_ITEMS).toHaveLength(9);

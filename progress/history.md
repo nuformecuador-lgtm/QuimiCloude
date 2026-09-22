@@ -4154,7 +4154,99 @@ en QC-108.
 ficha puede quedar **partida entre el árbol principal y su worktree**, y aquí chocó en tres merges
 seguidos.
 
+## QC-125 — espera-minima-por-paso (cerrada el 2026-09-18, PR #88, merge `530fedf1`)
+
+Cada paso de la ejecucion de receta del operario exige **5 s** antes de dejar avanzar, con cuenta
+regresiva visible y el boton deshabilitado mientras corre. **R1–R22 y T1–T8**, todos mapeados.
+Solo en la pantalla de ejecucion: el lector de pasos es compartido con la vista previa del
+formulario de recetas, y ahi **no** hay espera.
+
+**No hubo `/afinar-feature`, y estuvo bien no haberlo**: el humano cerro por escrito las cuatro
+decisiones —comenzar es abrir la pantalla, siempre 5 s aunque se vuelva con Anterior, finalizar
+tambien espera, y la espera se **suma** al bloqueo de elementos marcados de QC-64— dentro de la
+propia `description` antes de crear la ficha. La acotacion existe para que no falte eso, no para
+repetirlo.
+
+**Absorbio trabajo que existia sin ficha**: `CountdownTimer` (`components/shared/countdown-timer.tsx`)
+estaba construido en `feat/cronometro-shared`, una rama sin tarjeta, y entro aqui cherry-pickeado
+(`42396946`). Es la forma barata de cerrar ese hueco: el codigo huerfano se adopta en la ficha que
+lo necesita en vez de quedarse esperando una propia.
+
+**El test de una ficha anterior se puso rojo por hacer justo lo que esta pedia.** El caso «R18 — el
+asistente heredado no aparece en el diff» de QC-63 prohibia tocar `components/shared/step-reader/**`
+entero. Se tenso a **lista cerrada** con solo `step-reader.tsx` (T1), ratificado por el humano al
+aprobar el spec. La leccion es de la especie de las guardias: una guardia escrita por glob ancho
+caduca en cuanto alguien tiene un motivo legitimo para entrar; la que nombra archivos sobrevive.
+
+**Una vuelta de reviewer RECHAZADA, y por el hallazgo correcto.** H1: a R8 le faltaba el caso de
+pulsar Anterior **mientras corre** la cuenta del paso 2, que es el unico que atrapa el mutante de
+guardar el indice cumplido en un **escalar** en vez de por paso. Se anadio en `2ec1e6b7` y el
+reviewer lo verifico rojo/verde. Segunda vuelta OK (`65b0f83b`).
+
+**Verificacion, con su agujero dicho por escrito**: E2E **8/8 verde** en Chromium y WebKit tras
+instalar los navegadores con autorizacion humana —cerro H3, que el reviewer habia dejado abierto
+justamente por no poder correrlo—. Pero **el PR se abrio con el gate completo en ROJO, por
+autorizacion expresa del humano**: `validate-features` cortaba por QC-68 y QC-92, `in_progress` en
+`dev` sin su `specs/`, ajenos a esta rama. Los pasos del gate corridos a mano por el reviewer salen
+verdes. **La suite completa no se corrio sobre esta rama**, y eso queda dicho aqui en vez de
+figurar como verde.
+
+**Deuda del arnes que esto deja a la vista**: `validate-features` bloquea el gate de una rama por el
+estado de fichas ajenas en `dev`. Es la tercera vez que una feature paga el peaje de otra. Candidata
+a `/afinar-regla`.
+
 ## QC-61 — guardia-empresa-en-esquema (cerrada el 2026-09-18, PR #90, merge `05a0615`)
+
+Una guardia que lee `db/schema.prisma` y se pone roja si una tabla de negocio nace sin columna de
+empresa. **R1–R16 y T1–T9**, cada requisito mapeado a un `it` concreto. Sin migracion, sin tabla
+nueva, sin E2E (no pedido, D7) y **sin una sola dependencia**: `git diff origin/dev -- package.json
+pnpm-lock.yaml` da 0 lineas.
+
+**La ficha estaba vieja y medirla fue la mitad del trabajo.** Daba por exentas `users`, `roles` y
+`document_types`, pero **`users` ya llevaba empresa** desde hacia fichas. En disco habia **ocho**
+modelos sin `companyId` —`document_types`, `roles`, `permissions`, `role_permissions`, `companies`,
+`credential_setup_tokens`, `revoked_sessions` y `recipe_lines`— y **ninguno pendiente de aislar**:
+`recipe_lines` **hereda** la empresa de su cabecera por decision de QC-50, y `units` la lleva
+anulable a proposito por QC-76. O sea que la lista de «pendientes, que solo encoge» que la ficha
+pedia **habria nacido vacia**, y faltaba una tercera clase que nadie habia nombrado: **las hijas que
+heredan**. Todo esto salio de contar en el esquema antes de escribir el spec, no de creerle a la
+description.
+
+**La lista vivia copiada en cuatro sitios y tres estaban desincronizados.** Al aprobar, el humano
+eligio A, B y C: corregir tambien `CHECKPOINTS.md` y `.claude/agents/reviewer.md` —que repetian la
+lista vieja—, **que la guardia tambien de rojo cuando a `EXENTAS` le SOBRA una entrada** (eso entro
+como **R16**, y es lo que impide que la lista se pudra en la direccion contraria), y atar el bullet
+de `docs/architecture.md` al gate para que R14 fuera testeable. Los dos documentos derivados ya no
+enumeran: **remiten a `architecture.md > Dominio` y a la guardia**. Una lista copiada en cuatro
+sitios se desincroniza; una copiada en uno y referida en tres, no.
+
+**Review aprobada a la primera: 0 bloqueantes, 0 mayores, 5 menores.** La guardia muerde en todas
+sus ramas —**11 mutaciones locales, 11 rojos**, restauradas—. De los cinco menores, dos son limites
+del lector declarados y no verdes falsos (`@map(name: "…")` de Prisma, que falla **hacia el rojo**;
+y un campo de relacion llamado literalmente `company_id`), uno es un **defecto del mapa, no del
+codigo** —el `it` de R12 no contiene el rojo que promete: lo ponen R1:187, R10 y R16— y el quinto es
+entorno.
+
+**Verificacion, con lo que no salio verde dicho por escrito**: `test:guardias` **45/45 archivos,
+555 passed / 9 skipped**, exit 0. El `./init.sh` completo **NO** paso, y el PR se abrio asi por
+decision humana, con las tres causas separadas y ninguna de la rama: `validate-features` cortando
+por el spec de QC-92 (otra maquina), **11 de integracion por Postgres 18.6 local** contra el 17 que
+se busca (lo arreglo el PR #89) y `user-table.test.tsx` intermitente, verde 3/3 a solas. El reviewer
+lo midio en vez de suponerlo: los 36 archivos rojos fuera del baseline son **identicos por diff** a
+los del padre sin los commits de la rama, que no toca ni un archivo de produccion.
+
+**Dos cosas para el que venga.** La primera corrida de `test:guardias` dio **tres rojos por timeout**
+en guardias que recorren el arbol, verdes a solas y en la segunda corrida: flakiness de E/S de
+OneDrive, y conviene recordarlo antes de creerle a un `--rapido` rojo. La segunda: `29145768` pasa
+QC-59 a `done` **dentro de la rama de QC-61**. Es estado del arnes, no de la feature; va en commit
+propio y estaba justificado, pero es la costura por la que `feature_list.json` choca en cada merge.
+
+
+### Segunda redaccion, de la otra sesion (conservada al reconciliar el 2026-09-18)
+
+> Las dos sesiones resumieron QC-61 por separado y **no dicen lo mismo**: esta aporta el nombre
+> del archivo de la guardia, el rastro de `localStorage` / `--no-experimental-webstorage` y la
+> relacion con QC-126 y QC-91, que la de arriba no trae. Se conservan las dos en vez de elegir.
 
 **Qué quedó**: `tests/guards/guard-empresa-en-esquema.test.ts` lee `db/schema.prisma` como texto y da
 rojo si un modelo no declara `company_id` y su tabla no está en la lista cerrada de **ocho exentas**
@@ -4162,18 +4254,370 @@ rojo si un modelo no declara `company_id` y su tabla no está en la lista cerrad
 `revoked_sessions`, `recipe_lines`). Basta con que la columna exista. También da rojo si a la lista le
 **sobra** una entrada y si el bullet de `docs/architecture.md` no dice lo mismo. La lista vieja se
 corrigió en `architecture.md`, `CHECKPOINTS.md` y `.claude/agents/reviewer.md`.
-
 **La ficha llegó vieja** (escrita el 2026-09-04, antes del arco multiempresa): daba como exenta a
 `users`, que ya lleva empresa, y pedía una lista de «pendientes de aislar» que habría nacido vacía.
 Se midió en disco y se corrigió el board **antes** de sembrar. El leader contó «siete» modelos sin
 empresa donde había **ocho**: el mismo tipo de error de conteo que en QC-106, QC-91 y QC-59.
-
 **Verificación**: guardia 15/15, también sobre el `dev` ya mergeado; review aprobada con 0/0/5 y 19
 mutaciones que dieron rojo donde tocaba. El gate completo **no salió verde** y el PR lo declaró, por
 decisión humana: el validador por el spec de QC-92 (en otra máquina), 11 de integración por la base
 local en **Postgres 18.6** y un intermitente de `user-table.test.tsx` (ya tiene ficha: QC-126).
-
 **Lo que destapó, fuera de la ficha**: 24 archivos de UI en rojo por el `localStorage` nativo de
 Node 26, arreglado en el PR #89 (`--no-experimental-webstorage` en el proyecto `ui`), y la decisión
 humana de que **Postgres 17 es la versión objetivo**, escrita en `docs/verification.md`. Queda que
 el humano monte un Postgres 17 local.
+## QC-92 — ajuste-de-inventario (cerrada el 2026-09-18, PR #91, merge `f91ea75`)
+
+Corregir la existencia de un **lote** registrando un **movimiento** que suma o resta, en vez de
+sobrescribir un numero a ciegas. Nace `inventory_movements`, el alta de lote pasa a asentar tambien,
+y el producto gana un panel que lista sus lotes con el historial de cada uno. **20 tasks**, R1-R37,
+trazabilidad **34/34**, E2E **6/6** en Chromium y WebKit.
+
+**EL CENSO ACHICO LA FICHA ANTES DE EMPEZAR**: en produccion habia **exactamente DOS** escrituras de
+`product_batches`, las dos `create` y las dos en `product-prisma.ts`. Ni un `update` ni SQL crudo.
+Por eso fueron 18 tasks y no cuarenta.
+
+**El review RECHAZO en la primera vuelta, y su bloqueante era real**: faltaba el **rechazo cruzado
+por empresa contra Postgres** para los tres metodos nuevos. El camino de **escritura**
+`update({ where: { id, companyId } })` no tenia prueba contra la base: si ese filtro no estuviera, un
+ajuste habria escrito en el lote de otra empresa. Se cerro con **seis casos A/B** con control
+positivo, y el reviewer los valido **mutando la produccion**, no el test.
+
+**LA LECCION QUE HAY QUE LLEVARSE, y esta medida**: la ficha **habia predicho ese agujero y no lo
+persiguio**. La bitacora de la tanda 3 escribio que «quien lo demuestra de verdad es el test de
+integracion de T15», y T15 cuadra el libro **con una sola empresa**. Nadie volvio sobre ello, y el
+mapa de trazabilidad presentaba cinco casos de unidad **como si zanjaran R18** —con Prisma mockeado,
+que prueba que el codigo pasa la empresa, no que Postgres la honre—. Por eso el agujero sobrevivio a
+T17. **Una prediccion correcta que no se persigue vale lo mismo que no haberla hecho.**
+
+**OCHO archivos de guardia heredados tocados**, cada uno con aprobacion humana, nota fechada y prueba
+por mutacion; el reviewer los revisó **como bloque** y verifico que **ningun detector se toco**:
+
+- La prohibicion de listar lotes (**QC-81 R32** y **QC-90 R30**) se **DEROGA**, no se acota por rama:
+  R30 decia en su propio mensaje que listar lotes «NO tiene ficha: si hace falta, se pide una», y
+  QC-92 es esa ficha. Acotar por rama habria dejado la guardia roja otra vez al mergear y habria
+  escrito una afirmacion falsa en el archivo. **Editar y borrar siguen prohibidos**, probado por
+  mutacion.
+- La guardia de la ruta (**QC-22**) se **RETENSA**: la premisa seguia en pie —la pantalla no debe
+  decidir autorizacion— pero **preguntar si se pinta un control no es decidir autorizacion**, y el
+  repo ya lo habia distinguido en `order-list-section.tsx`. Ademas **gana marca positiva**: borrar el
+  `requirePermission` de la primera linea del caso de uso **la pone roja**; antes no. El repo queda
+  mejor protegido que `dev`.
+- Aparte, **dos altas de censo** (`E2E_ESPERADOS` y la lista de specs de catalogo), que **NO son
+  enmiendas**: solo registran el E2E nuevo en listas cuyo punto de extension documentado es darse de
+  alta. Diff puramente aditivo.
+
+**ENMIENDA A D5, pedida por el humano ya con el PR abierto**: `kind` pasa a
+`enum InventoryMovementKind { opening, adjustment }` y `reason` gana un **CHECK** con los cuatro
+motivos. **No es compatible con D5 y se escribio como enmienda**: D5 eligio constante + zod + `TEXT`
+para que el catalogo creciera **sin migrar**, y con el CHECK anadir un motivo **cuesta migracion**.
+**R9 se reescribio**, porque afirmaba «NO DEBE requerir migracion alguna». El enum lleva **solo** los
+dos valores que existen: `consumption` habria dado la falsa impresion de que el consumo por lote esta
+resuelto, y sigue siendo **pregunta abierta del dominio sin ficha**.
+
+**La lista de motivos quedo en DOS sitios, asi que se cerro con guardia**:
+`guard-motivos-de-ajuste.test.ts` exige **igualdad exacta** entre el CHECK de la migracion en disco y
+`MOVEMENT_REASONS`. Va en `tests/guards/` **a proposito** —se demostro que ahi corre y en
+`tests/unit/` no habria corrido—. De paso se caza **una tercera copia a mano** de la lista en el test
+de integracion, con un comentario que **prometia** sincronia y nada que la comprobara: con un quinto
+motivo habria seguido probando cuatro y diciendo verde.
+
+**Verificacion**: suite completa **558 archivos, 8126 passed, 0 fallos**; E2E re-corrido contra la
+base ya migrada, **3/3 Chromium y 3/3 WebKit**, con la base recreada entre motores. **`./init.sh`
+NO llego a correr los tests**: cae antes en `validate-features` por `QC-82`, que esta `spec_ready`
+**sin spec en disco tambien en `dev`** —medido corriendo el validador con el `feature_list.json` de
+`dev`—. No es de esta rama.
+
+**Tres deudas quedan vivas y con ficha**: **QC-127** (el rojo de `dev` por el PR #85 cruzado con R14
+de QC-91, que aparecio al sincronizar), **QC-126** (el flake de jsdom, medido tres veces) y **QC-99**
+(la familia de censos, que mordio a esta ficha ocho veces). **Sin ficha todavia**: que
+`./init.sh --rapido` **no pueda ver** un censo que vive en `tests/unit/` y lee `.prisma` como texto
+—tres tandas cerraron «en verde» con rojo dentro—, y la **contradiccion R26 ↔ `conventions`**: uno
+exige que la nota diga que ficha cambio la guardia, el otro prohibe citar la ficha.
+
+**Para el que venga**: `guard-identificador-de-request.test.ts` lleva **dos listas cerradas
+independientes** y esta ficha **las rompio las dos**, en momentos distintos y por motivos que no
+tienen nada que ver entre si ni con el identificador de peticion. Choco **cuatro veces** al mergear.
+Es el mejor ejemplar vivo de lo que QC-99 persigue.
+
+## QC-109 — procesamiento-de-pdf-por-estrategia (cerrada el 2026-09-18, PR #92, merge `a2d6fa6`)
+
+Procesa un PDF según una estrategia de un enum cerrado: `catalogo` lo lee **como imagen**, `formula`
+**como texto**. Cada una aporta su prompt y las dos llaman a la lectura con IA que QC-108 dejó
+publicada; devuelve el texto tal cual y registra un resumen. **R1–R17 y T0–T11**, todos mapeados.
+
+**Es la raíz de una cadena, y por eso se eligió.** El humano pidió arrancar **QC-107** y estaba
+bloqueada: depende de QC-111, que depende de ésta. Se le ofrecieron tres salidas —solo Fase 1 de
+QC-107, atacar la raíz, o levantar la dependencia y recortar alcance— y eligió la raíz. Orden que
+queda: **QC-109 → QC-111 → QC-107**.
+
+**LA FICHA SE CONTRADECÍA CON EL CÓDIGO, y salió al acotar, antes de escribir una línea.** Mandaba
+crear los archivos de prompt «con el CONTENIDO VACIO», pero QC-108 había cerrado que un prompt en
+blanco se rechaza sin llamar al proveedor, y su `ai-read-input.ts:19` lo hace cumplir con
+`z.string().trim().min(1)`: **las dos estrategias nacían incapaces de ejecutarse**. Se resolvió con
+texto provisional que sí funciona, y los definitivos nacieron como **QC-129** — trabajo que hasta
+entonces no tenía dueño, porque «el texto se escribe más adelante» no era de nadie.
+
+**Los prompts van en `.json` y eso disuelve un roce en vez de excepcionarlo.** El diseño proponía
+`.ts`, que era la opción que el humano había descartado al acotar; el motivo técnico del
+`spec_author` era correcto —el repo no tiene `?raw` ni loader— pero no lo dijo, lo presentó como si
+cumpliera la decisión. La salida que nadie había mirado: `resolveJsonModule` ya estaba activo. Efecto
+secundario: la marca de provisional deja de ser un comentario que cita una ficha —prohibido por
+`docs/conventions.md`— y pasa a ser un **campo de datos**, así que la excepción sobra.
+
+**Una enmienda al spec, aprobada en F2.1**: la entrada con **estrategia inválida** pasa a registrarse,
+con el modo vacío. Antes se iba sin dejar rastro y no había ningún modo que poner sin inventarlo. El
+motivo pesa más que el caso: **QC-111 leerá la estrategia de la base de datos**, así que un valor
+inválido puede llegar de verdad en ejecución y no solo por un error que TypeScript frene en el borde.
+
+**Trampa evitada**: «leer como texto» **no** es `PdfConverter.extractText`. Ese método existe en el
+puerto pero `readPdfWithAi` no lo usa. El mapeo (`catalogo`→`images`, `formula`→`pdf`) se verificó en
+el código, no por el nombre.
+
+**Verificación**: review con **0 bloqueantes y 6 menores**, con la trazabilidad comprobada uno a uno
+y **tres mutaciones propias del reviewer** —invertir el mapa, meter `trim()` al texto, suprimir el
+registro del rechazo— que dieron 3, 3 y 2 rojos. Ningún requisito quedó «demostrado por partes», que
+era el encargo heredado de QC-68. Tres menores se cerraron **sin tocar una línea de producción** y
+uno era del leader.
+
+**T11 se cerró declarando una salvedad, no maquillándola**: `./init.sh` completo **no llegó a mirar
+la rama** porque `validate-features.mjs` corta en su bloque 0 con `faltan specs para features sdd en
+vuelo: QC-82` —deuda de otra sesión—, y eso ocurre **antes de typecheck**. Se corrió a mano lo que el
+gate no alcanzó: typecheck y lint limpios y **152 archivos / 2373 tests en verde**. Excepción a la
+regla 5 autorizada por el humano con las tres salidas a la vista, y declarada en el PR.
+
+**Deuda del arnés que dejó esta ficha**: el commit de F1.0 se quedó **sin empujar** en el árbol
+principal, así que la fila de la ficha no existía en su worktree y hubo que crearla allí; al cerrar,
+el árbol principal tenía **cinco commits locales sin empujar**, tres de ellos cierres de otras fichas.
+Y al reconciliar, `history.md` traía **dos redacciones distintas de QC-61** escritas por dos sesiones:
+**se conservaron las dos**, porque no decían lo mismo.
+
+## QC-129 — textos-definitivos-de-los-prompts (CERRADA el 2026-09-18, PR #93)
+
+**Qué entregó.** Los textos de prompt **salen del repositorio**: puerto `documentos/ports/strategy-prompt.ts`
+y adaptador `adapters/driven/config/strategy-prompt-env.ts`, calcado de `ai-config-env.ts`, que lee
+`CATALOG_PROMPT` o `FORMULA_PROMPT` **dentro de la invocación** —nunca al importar, que es lo que permite
+que la suite entera siga corriendo sin variables configuradas—. Una variable por estrategia, **sin texto
+de repuesto ni valor por defecto**: si falta, el procesamiento falla nombrándola y no llama a Gemini. Los
+tres archivos de `domain/prompts/` se borraron con su `PROMPT_BY_STRATEGY`, y `.env.example` ganó las dos
+variables **vacías**.
+
+**Derogó parte de una ficha ya `done`, y con permiso.** `[D6]`, `[D15]` y R4 de **QC-109** decían que los
+textos viven dentro del módulo y entran en tiempo de compilación. Por eso esta ficha actualizó
+`tests/unit/documentos/qc109-alcance.test.ts` —R4 derogado en su primera mitad, R6 borrado, `ARCHIVOS_NUEVOS`
+de 7 a **6**— y añadió una **nota fechada** al `requirements.md` de QC-109 con **28 adiciones y 0 supresiones**.
+Las guardias vivas de QC-109 (R11, R13, R14, R15, R16, R17) quedaron intactas. Precedente: la T3 de QC-81.
+
+**Se cierra con 6 de sus 21 requisitos SIN verificar, y está escrito.** R10–R14 y R17 no se mapean a Vitest
+sino a una fila firmada del registro humano, porque `[D5]` prohíbe que un test llame a Gemini. Esa firma
+**hoy no se puede producir**: sus criterios de hecho exigen disparar una lectura real, y la pantalla (QC-107)
+y la cola (QC-111) no existen todavía. Por eso T10 y T11 salieron a **QC-131**, bloqueada por las dos.
+
+**El board cambió antes del spec.** `/afinar-feature` cerró **13 decisiones** y subió la ficha de `medium` a
+**`high`**: dejó de ser «escribir dos textos» al descubrirse que tocaba el contrato de otra ficha. Dos
+preguntas siguen **abiertas** y nadie las rellenó: quién pone las variables en *preview* —sin ellas ese
+entorno no procesa nada— y cómo llega el texto al desarrollo local y a la suite.
+
+**Verificación.** `./init.sh` completo: `== init OK ==`, 562 archivos, 8176 pasados, 107 saltados, cero rojos,
+sin rojos nuevos sobre el baseline. `reviewer`: aprobado, 0 mayores y 5 menores —los 3 reales cerrados; de
+los otros dos, uno lo exige el propio spec y el otro es deuda ajena—. **Ninguna dependencia nueva.**
+
+**Dos cosas que esta ficha destapó y no eran suyas.** (1) El gate llevaba días muriendo en el validador con
+«faltan specs para features sdd en vuelo: QC-82», y el diagnóstico no era el que decía la etiqueta: el spec
+de QC-82 **sí existe** en su rama; lo que faltaba era **su worktree**, que es donde el validador lo busca
+mientras la feature está en vuelo. Montarlo devolvió el gate a verde para todo el repo, incluida la sesión
+de QC-111. (2) El gate avisa de **8 archivos del baseline de rojos que ya pasan** y siguen sin podar.
+
+**Deuda del arnés que dejó esta ficha.** Al desmontar, `wt.sh done` **desregistró el worktree y no borró los
+archivos** —«is not a working tree» y después el aviso de archivo en uso—: es la **novena** vez que ocurre el
+mismo patrón, y ya tiene ficha propia (**QC-128**, `wt-borra-antes-de-desregistrar`). Se limpió a mano y
+`git worktree prune` quedó en verde.
+
+## QC-127 — decimales-caso-r14-sin-actualizar (CERRADA el 2026-09-19, PR #95)
+
+**Qué entregó, y qué NO.** El diff de producción es **vacío**: la ficha entera vive en `tests/`. El caso
+**R14** de `tests/unit/pedidos-ui/order-form.test.tsx` recuperó el patrón completo de sus tres vecinos
+—igualdad **exacta** del texto pintado y el `title` con el valor **exacto** `'-0.201'`—. Hasta esta rama
+**ningún test del repositorio afirmaba que el cálculo de ese caso da `-0.201`**: la afirmación vieja
+(`toHaveTextContent('-0.2')`) casaba por **subcadena** y pasaba en verde también con `-0.204`.
+
+**Nació con la premisa derogada, y eso se descubrió antes de trabajar.** La ficha decía que `dev` estaba en
+rojo desde el PR #85; ya no: lo arregló `bd6e504e` **fuera del ciclo de la ficha**. El board se corrigió en
+`description` **y** en `summary` —que decía literalmente «y dev esta rojo»— antes de seguir. La ficha no se
+canceló porque quedaba trabajo real: el arreglo había aplicado **medio patrón** y el censo seguía sin hacerse.
+
+**La decisión de producto quedó ratificada, no heredada.** Un faltante de `-0.001` se pinta «0», **sin
+signo**, y el único resalte que queda es `text-destructive`. **La pantalla no se toca**, el resalte se decide
+con el valor **exacto** y nunca con el pintado, y la consecuencia se acepta a sabiendas: en teléfono o impreso
+no hay `title`, así que ahí el único aviso es el color. Se evaluó pintar `<0.01` y se descartó. **Corrección
+al propio leader**, que la acotación dejó por escrito: él había dicho que la decisión «entró por inercia» y
+**no era exacto** —el PR #85 la razonó en un comentario fechado dentro del test—; lo que faltaba era
+ratificarla.
+
+**El censo de las seis pantallas del PR #85**, archivo por archivo y con fila de constancia. Un hallazgo del
+mismo tipo, corregido aquí (**R17**, enmienda que añadió T12 y que el reviewer avaló): la celda de mínimo de
+compra pintaba `'0.1005'` como `'0.1'` y nada afirmaba que conserva el exacto. **Un hallazgo de otro tipo NO
+se arregló**, por diseño: `order-columns.tsx:201` pinta `0.1255` como `0.13` sin `title`, toca `app/` y R5 lo
+prohíbe aquí → **QC-133**.
+
+**Ninguna guardia automática, y el motivo tiene ficha.** R12 lo prohíbe citando **QC-99**: las guardias de
+censo rompieron **tres guardias ajenas** al cerrar QC-79. `tests/guards` cerró con **41** archivos, los mismos
+que `dev`. Tampoco `tests/baseline-rojos.json` (R15), ni `e2e/` (R14), ni `package.json` (R16).
+
+**La mordida está demostrada, no supuesta.** Con el cálculo roto a propósito, la afirmación **vieja pasaba en
+verde** y la **nueva cae**. El `reviewer` lo **reprodujo por su cuenta** y coincidió; rechazó con **2
+bloqueantes y 3 menores**, cerrados en `043ee12f` —uno de ellos, B2, se cerró **justificando por escrito** en
+el censo por qué una ocurrencia no cuenta (afirma la precondición, antes del `user.type`), que era una de las
+dos salidas que el reviewer admitía—.
+
+**Verificación.** `./init.sh` completo: **562 archivos, 8176 pasados, 107 saltados, cero rojos**. Sin E2E, con
+motivo escrito: no hay recorrido ni pantalla nueva. **Ninguna dependencia nueva.**
+
+**Lo que esta ficha destapó y no era suyo.** El primer gate completo cayó con **un rojo ajeno**,
+`tests/unit/composition/documentos-facade.test.ts` (de QC-129). La causa **se midió antes de tocar nada**, y
+las tres corridas importan porque «será el `.env`» es una hipótesis, no un diagnóstico: (1) reproduce
+**aislado**, así que no es contaminación de otro archivo del mismo worker; (2) con `CATALOG_PROMPT=SENTINELA`
+en el shell **sigue recibiendo cadena vacía**, o sea que el valor lo reinyecta **Vitest desde `.env`** después
+del `delete` previo al import; (3) **ningún código de producción asigna** esa variable. **El fallo es del
+test**, que afirma una precondición de entorno (`toBeUndefined()`) en vez de controlarla —su hermano
+`strategy-prompt-env.test.ts` la pone, la borra y la restaura, y por eso está verde—. **Al humano se le
+advirtió que rellenar las variables no pondría verde el caso** y decidió **quitar las dos líneas vacías del
+`.env`**; hecho con copia previa y `diff` comprobado. **No** se dio de alta en el baseline (R15 lo prohíbe
+aquí) ni se arregló el test ajeno dentro de esta rama → **QC-134**.
+
+**Deuda que deja.** El `.env` del **árbol principal sigue con las dos líneas**, así que ahí el rojo sigue vivo
+hasta que entre QC-134. Y el gate volvió a avisar de los **8 archivos del baseline que ya pasan** y siguen sin
+podar.
+
+## 2026-09-19 — QC-123-el-total-del-pedido-decidir-donde-vive-el-precio
+
+- El pedido gana `orders.ingredients_cost DECIMAL(14,4)` NULL: el **coste de los ingredientes**
+  que consume su receta, leído de los lotes de inventario con existencia. **No es un precio de
+  venta** — no existe ninguno en el ERP. Se calcula en el servidor, viaja como cadena decimal, se
+  guarda en el pedido y se recalcula en cada edición con los lotes de ese día. La ficha solo
+  **lee** lotes: no descuenta ni reserva existencia.
+- Requisitos cubiertos: **R1–R23** del spec más **R24–R26** de la enmienda humana = **26
+  declarados / 26 mapeados**, cada uno a un test que existe y cuyo cuerpo prueba el requisito.
+  PR **#96**, merge `63d15088`.
+- **La premisa de la ficha cambió entera antes de escribir una línea.** Nació como «decidir dónde
+  vive el precio» con cinco preguntas abiertas; `/afinar-feature` las cerró y descubrió que no hay
+  precio de venta en ninguna parte. `complexity` subió de `medium` a `high`, el board se corrigió
+  antes de sembrar, y de ahí nacieron **QC-130** (una presentación no sabe que «bidón» son 20 L) y
+  la recuperación de la columna del importe en **QC-122**. **Deroga** el punto 4 de
+  `docs/architecture.md > Preguntas abiertas del dominio`, que describía columnas que QC-35bis
+  borró el 2026-09-07.
+- **Decisiones de diseño**: NO nace puerto `pedidos -> inventario` — `inventario` amplía su
+  contrato ya publicado con `findCostingBatches`. El cálculo vive en `pedidos/domain/order-cost.ts`,
+  **puro y probable sin base**, con enteros escalados y **sin dependencia nueva**. La migración no
+  lleva `UPDATE`: los pedidos anteriores se quedan sin importe y **nunca** se rellenan con 0, que
+  sería un dato falso indistinguible de un pedido gratis.
+- **Las tres decisiones que el spec dejó abiertas las cerró el humano ANTES del implementer**, y se
+  devolvieron al `spec_author` como enmienda en vez de dejar que las inventara el código: el
+  **desbordamiento** de `Decimal(14,4)` deja el importe en blanco —lo que enmienda `[D5]` de cuatro
+  casos a **cinco**—; el **desempate de lote** compara como número si ambos son sólo dígitos y como
+  texto si no, sin tocar QC-81; y se convierte **la cantidad y el coste unitario** a la unidad de la
+  línea de receta. `pedidos` **recupera la dependencia de `unidades`** que QC-35bis le quitó:
+  retroceso consciente, con motivo escrito en `[D6]`.
+- **Dos vueltas de `reviewer`.** La primera rechazó por **dos líneas de comentario** que citaban
+  ficha o requisito (`docs/conventions.md > Comentarios`), cerradas en `015593c6`. La segunda
+  aprobó sobre `015593c6` sin fiarse del barrido ajeno: repitió el suyo sobre todo lo añadido en
+  `lib/`, `app/`, `db/`, `components/` y `scripts/`, con patrón validado contra una línea de
+  control.
+- **Verificación**: `./init.sh` completo verde sobre la rama ya sincronizada con `dev` —
+  **566 archivos, 8238 tests, 0 rojos**. Ninguna dependencia nueva.
+- **Lo que este cierre destapó, y es la lección que conviene no perder.** El primer gate completo
+  salió **rojo con un rojo propio que el gate rápido no podía ver**:
+  `tests/unit/unidades/module-contract.test.ts` lee `product-catalog.ts` **con `fs`** y prohíbe que
+  aparezca `unitId`, y la ficha había metido ahí el tipo `CostingBatch`. `vitest run guard` no la
+  recoge (vive fuera de `tests/guards`) y `vitest related` no la relaciona (no importa el archivo,
+  lo lee). Es exactamente el agujero que la regla 5 describe al exigir el gate completo antes de
+  cada PR. Se arregló **sin tocar la guardia** (`314e687e`), con el precedente del propio módulo:
+  `CostingBatch` se mudó a `domain/costing-batch.ts`, como ya vivía `ProductStockByUnit`.
+  **Candidato a `/afinar-regla`.**
+- **Deuda que deja, y NO es de esta ficha.** (a) Ocho archivos de `tests/baseline-rojos.json` ya
+  pasan y siguen sin podar — ninguno de `pedidos`, `inventario` ni `recetas`; va en ficha propia
+  porque meterlo aquí ensancharía el diff. (b) Una guardia de `tests/unit/pedidos-ui/` lee
+  `git status --porcelain` **sin filtrar por ficha**, así que con el árbol sucio toma cambios ajenos
+  como propios y da un rojo falso — **segundo candidato a `/afinar-regla`**. (c) Menores del primer
+  informe, ninguno bloqueante: `INTERNAL_SCALE` duplica `CONVERSION_SCALE` sin que nada avise si
+  divergen; `design.md > 10.1` promete en indicativo un diagnóstico al log que el código no hace.
+- **El cierre en disco se hizo el 2026-09-21, dos días después del merge.** El PR #96 se mergeó el
+  2026-09-19 y nadie cerró la ficha: `feature_list.json` siguió en `in_progress`, la tarjeta en
+  *En curso* y el worktree montado. Se detectó al retomarla. El barrido de comprobación —93 PRs
+  mergeados contra las 30 fichas no cerradas, por rama y por clave— confirmó que **era la única**.
+
+## 2026-09-21 — QC-111-procesamiento-de-pdf-en-cola
+
+- Cada tanda de PDFs (hasta 10) se encola en **Upstash QStash**, que entrega cada trabajo al
+  **primer Route Handler del repo** (`app/api/documentos/trabajos/route.ts`, `runtime = 'nodejs'`),
+  y ese trabajo ejecuta la conversión y la estrategia de QC-109. Cada archivo lleva su propio
+  estado —en cola, procesando, listo, error con su motivo— y la ficha expone su consulta, que
+  pintará QC-107.
+- Requisitos cubiertos: **R1–R27, 27 mapeados**, comprobados uno a uno abriendo cada test.
+  PR **#97**, merge `f97b594a`.
+- **Dos tablas nuevas**, `document_batches` y `document_files`, con `company_id`, **RLS activada y
+  forzada** en las dos, FK compuesta contra la empresa y su `down.sql`.
+- **Idempotencia por candado de fila**: un solo `UPDATE ... WHERE status='queued' ... RETURNING`
+  reclama el trabajo; dos entregas concurrentes se serializan en Postgres y la segunda no hace
+  nada. Test de integración real con dos conexiones (`attempts === 1`).
+- **La firma se valida antes de cualquier efecto**, y los fallos se clasifican reintentable /
+  definitivo con un `Record` tipado que no compila si un código del catálogo queda sin clasificar.
+  El código HTTP va invertido a propósito: un fallo **definitivo responde 200** para que la cola no
+  reintente, y solo el reintentable pide 5xx.
+- **Una dependencia nueva, `@upstash/qstash`**, con los cuatro checks de salud y su fila en
+  `docs/dependencias.md`. `@upstash/redis` no entra.
+- **Verificación**: `./init.sh` completo verde sobre la rama sincronizada — **576/576 archivos,
+  8289 tests, 0 rojos**. Sin E2E, deliberado: R27 lo difiere a QC-107 porque un E2E real exigiría
+  URL pública y cuenta, y el gate deja de correr sin red.
+- **Aflojó cinco guardias de alcance ajenas, y ninguna encontró un defecto**: las cinco afirmaban
+  «el repo no tiene X» cuando esta ficha tenía permiso explícito para añadir X —la dependencia
+  aprobada y el primer Route Handler—. En `pedidos-convenciones` se **borra** la afirmación
+  absoluta sobre todo `app/` y se conserva la acotada, con un caso nuevo que demuestra que el
+  detector sigue mordiendo. El baseline pierde dos entradas y conserva seis.
+- **Deuda declarada con encargo de ficha**: las guardias de alcance escritas como absolutos;
+  `tests/unit/pedidos/module-contract.test.ts` ciego con CRLF; y la guardia de QC-129, que afirma
+  que `CATALOG_PROMPT` no existe cuando `.env.example` la trae y el procedimiento de montar un
+  worktree es copiar ese archivo —el camino documentado produce el rojo—.
+- **Lo que quedó abierto al cerrar, y no es un defecto de la ficha sino un presupuesto que el spec
+  nunca puso.** Revisado al mergear: el trabajo corre **síncrono dentro de la petición** —el Route
+  Handler espera a `runDocumentJob` entero—, así que el techo lo pone `maxDuration` de Vercel,
+  **300 s por defecto**, y no QStash, que aguanta 15 min en el plan Free. El PR **no fija
+  `maxDuration` ni el `timeout` del publish**. Con `catalogo` y 50 páginas —el tope exacto de
+  `MAX_PDF_PAGES`— el paso caro es rasterizar a 150 DPI, y **el timeout de 60 s de la IA no lo
+  cubre**: `buildImageParts` corre *antes* del `runWithTimeout`. Si la función muere a mitad, la
+  fila se queda en `processing`, **los reintentos de QStash no sirven** —`claim` exige
+  `status='queued'`— y solo la cierra `expireStale` a los 900 s, que además no es un cron sino una
+  llamada perezosa desde `getBatchStatus`. Tres fichas propias: subir `maxDuration`, acotar la
+  rasterización y hacer re-reclamable la fila colgada.
+- **El nombre de la cabecera del message id sigue sin verificar**: el SDK nunca la lee —comprobado,
+  `message-id` no aparece en el paquete—, así que se implementó con `upstash-message-id` en una
+  sola constante, sin rellenar con un supuesto. Si fuera otro, la ruta responde 400 siempre y no se
+  procesa ni un PDF, sin que ningún test lo note. **El servidor dev local de QStash (`QSTASH_DEV=true`)
+  lo responde sin desplegar.**
+
+## 2026-09-21 — QC-136-canvas-no-empaquetable-rompe-el-build
+
+- `next build` sobre `dev` salía con **exit 1** y la aplicación no se podía desplegar.
+  `serverExternalPackages: ['@napi-rs/canvas']` en `next.config.ts` lo deja en **exit 0**. Medido
+  el mismo día, mismo árbol y misma máquina, cambiando solo esa línea. PR **#101**.
+- **La causa era una línea de configuración que faltaba desde QC-106.** `next.config.ts` seguía
+  tal cual lo generó `create-next-app`, vacío. `@napi-rs/canvas` no es JavaScript: es un envoltorio
+  sobre un binario compilado que su `js-binding.js` elige por plataforma **en ejecución**.
+  Turbopack no puede darle un *module id* a un `.node`, así que el build ni terminaba.
+- **Lo que no bastaba, y conviene no perderlo:** el adaptador **ya** lo cargaba con
+  `await import()`. Un especificador literal sigue siendo analizable estáticamente, así que el
+  bundler lo mete en el grafo igual. La carga diferida ayuda en **ejecución**, no en
+  **compilación**.
+- **Guardia:** `tests/unit/documentos/canvas-no-empaquetado.test.ts`, 3 casos con control positivo,
+  sobre la **configuración** y no sobre el build —correr `next build` en un test de unidad lo
+  volvería de minutos—.
+- **Verificación:** `next build` exit 0 y `./init.sh` completo verde (582/582 archivos, 8354
+  tests). Ninguna dependencia nueva.
+- **Derogó** lo que QC-106 declaró como riesgo acotado: no era un fallo de ejecución capturable por
+  la rama de R16, es que no compilaba.
+- **Riesgo de QC-106 que además queda muy reducido:** el lockfile declara
+  `@napi-rs/canvas-linux-x64-gnu` y `-musl`, así que el entorno de Vercel tendrá su binario.
+- **El orden del merge dejó un cabo suelto y conviene recordarlo.** El PR #100 se mergeó contra la
+  rama del #99 cuando esa ya estaba en `dev`, así que su commit existía pero no llegaba. Se
+  detectó comprobando `dev` antes de arrancar otra ficha, y se rehizo como PR #101. **Encadenar un
+  PR sobre otro solo funciona si el padre se mergea antes de que el hijo esté listo.**

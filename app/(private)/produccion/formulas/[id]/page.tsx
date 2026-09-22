@@ -12,7 +12,7 @@ import { FORMULAS_ROUTE } from '@/lib/shared/routes';
 import { RecipeForm, RecipeListError } from '../components';
 
 export const metadata: Metadata = {
-  title: `Editar receta · ${RECIPES_LABEL} · ${BRAND_LABEL}`,
+  title: `Editar fórmula · ${RECIPES_LABEL} · ${BRAND_LABEL}`,
 };
 
 const FIRST_PAGE = 1;
@@ -107,7 +107,7 @@ export default async function EditarRecetaPage({
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
       <h1 data-testid="recipe-form-title" className="text-2xl font-semibold">
-        Editar receta
+        Editar fórmula
       </h1>
       <RecipeForm
         mode="edit"

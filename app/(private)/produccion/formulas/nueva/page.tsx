@@ -9,7 +9,7 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { RecipeForm, RecipeListError } from '../components';
 
 export const metadata: Metadata = {
-  title: `Nueva receta · ${RECIPES_LABEL} · ${BRAND_LABEL}`,
+  title: `Nueva fórmula · ${RECIPES_LABEL} · ${BRAND_LABEL}`,
 };
 
 const FIRST_PAGE = 1;
@@ -64,7 +64,7 @@ export default async function NuevaRecetaPage() {
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
       <h1 data-testid="recipe-form-title" className="text-2xl font-semibold">
-        Nueva receta
+        Nueva fórmula
       </h1>
       <RecipeForm
         mode="create"

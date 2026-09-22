@@ -144,6 +144,18 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
   listPresentationsAction: listPresentationsActionMock,
 }));
 
+// La pagina de detalle monta la pieza de subida, que importa sus Server Actions por ruta exacta;
+// esas acciones resuelven sus puertos por `@/lib/composition`, doblado aqui solo con `identity`.
+// Sin estos dos dobles el archivo ni siquiera llega a montar la pantalla.
+vi.mock('@/lib/modules/documentos/adapters/driving/document-upload-actions', () => ({
+  issueUploadLinksAction: vi.fn(),
+}));
+
+vi.mock('@/lib/modules/documentos/adapters/driving/document-batch-actions', () => ({
+  enqueueBatchAction: vi.fn(),
+  getBatchStatusAction: vi.fn(),
+}));
+
 const testId = {
   detalle: 'supplier-detail',
   nombre: 'supplier-detail-name',
@@ -638,6 +650,15 @@ describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
 
     expect(screen.getByTestId('data-table-cell-cost').textContent).toBe('1234.57');
     expect(screen.getByTestId('data-table-cell-minPurchase').textContent).toBe('0.1');
+    // 2026-09-18: el minimo de compra se pinta redondeado y ningun otro caso afirmaba su valor
+    // exacto, asi que este queda con el patron completo: texto exacto + `title` exacto, igual
+    // que el caso vecino de abajo.
+    expect(
+      screen.getByTestId('data-table-cell-cost').querySelector('span'),
+    ).toHaveAttribute('title', '1234.5678');
+    expect(
+      screen.getByTestId('data-table-cell-minPurchase').querySelector('span'),
+    ).toHaveAttribute('title', '0.1005');
   });
 
   it('el redondeo de la celda no esconde la cifra: el valor exacto viaja en el `title`', async () => {

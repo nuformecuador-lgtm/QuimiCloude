@@ -5,9 +5,9 @@
  * driven, y por eso la suite puede ejercitar las operaciones con un doble en memoria, sin red y sin
  * bucket configurado.
  *
- * **Ninguna de las tres operaciones BORRA, y es a proposito.** El borrado del PDF temporal es
- * trabajo de la ficha que procesa la tanda; mientras no sea expresable desde este puerto, ningun
- * codigo de este modulo puede borrar un archivo aunque quiera.
+ * **Cuatro operaciones, y el borrado ya es una de ellas.** Quien procesa la tanda borra el archivo
+ * SOLO tras terminar bien: mientras una fila siga en cola, procesando o en error, ningun codigo de
+ * este modulo la borra.
  *
  * La lectura firmada y la descarga entran aqui —y no donde se consumen— porque el bucket es
  * PRIVADO: sin ellas, quien procese la tanda no tendria forma de leer el archivo sin conocer al
@@ -35,4 +35,6 @@ export interface DocumentStorage {
   /** Firma la LECTURA de una ruta. Este plazo SI se cumple: el servicio lo aplica. */
   createSignedReadUrl(path: string, expiresInSeconds: number): Promise<string>;
   download(path: string): Promise<Uint8Array>;
+  /** Borra la ruta del bucket. Solo se llama tras terminar bien el procesamiento del archivo. */
+  remove(path: string): Promise<void>;
 }

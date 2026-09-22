@@ -26,6 +26,14 @@ import type { RenderedPage } from '../../../ports/pdf-converter';
  */
 const PDF_POINTS_PER_INCH = 72;
 
+/**
+ * La libreria se queda con el `ArrayBuffer` que recibe y lo DETACHA: el arreglo del llamante queda
+ * vacio y ya no sirve para nada mas. Entregarle una copia deja los bytes de quien llama utilizables.
+ */
+function copyForLibrary(pdf: Uint8Array): Uint8Array {
+  return new Uint8Array(pdf);
+}
+
 /** Texto del fallo, a secas, sin arrastrar la pila de una libreria al mensaje. */
 function describeCause(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
@@ -53,7 +61,7 @@ export async function resolveRasterizer<T>(load: () => Promise<T>): Promise<T> {
 export async function countPages(pdf: Uint8Array): Promise<number> {
   let document;
   try {
-    document = await getDocumentProxy(pdf);
+    document = await getDocumentProxy(copyForLibrary(pdf));
   } catch (cause) {
     throw new Error(`fallo al abrir el documento para contar sus paginas: ${describeCause(cause)}`);
   }
@@ -68,7 +76,7 @@ export async function countPages(pdf: Uint8Array): Promise<number> {
 /** `extractText` del puerto: el texto del documento entero, en una sola cadena. */
 export async function extractPdfText(pdf: Uint8Array): Promise<string> {
   try {
-    const { text } = await extractText(pdf, { mergePages: true });
+    const { text } = await extractText(copyForLibrary(pdf), { mergePages: true });
     return text;
   } catch (cause) {
     throw new Error(`fallo al extraer el texto del documento: ${describeCause(cause)}`);
@@ -88,7 +96,7 @@ export async function renderPages(pdf: Uint8Array, dpi: number): Promise<readonl
 
   let document;
   try {
-    document = await getDocumentProxy(pdf);
+    document = await getDocumentProxy(copyForLibrary(pdf));
   } catch (cause) {
     throw new Error(`fallo al abrir el documento para rasterizar sus paginas: ${describeCause(cause)}`);
   }

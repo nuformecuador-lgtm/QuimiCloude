@@ -14,6 +14,7 @@
     "asignaciones/reapply-work-group.int.test.ts",
     "asignaciones/remove-work-group.int.test.ts",
     "asignaciones/unassign.int.test.ts",
+    "documentos/document-batches-and-files-constraints.int.test.ts",
     "identity/identity-constraints.int.test.ts",
     "identity/identity-seed.int.test.ts",
     "identity/work-groups-constraints.int.test.ts",
@@ -37,6 +38,11 @@
     "unidades/unidades-constraints.int.test.ts"
   ],
   "commit": [
+    {
+      "archivo": "documentos/document-batch-claim-concurrency.int.test.ts",
+      "motivo": "QC-111 T17: mide la ATOMICIDAD del `UPDATE ... WHERE status='queued' ... RETURNING` de `claim` (`document-batch-repository-prisma.ts`), que llama al cliente Prisma GLOBAL sin abrir su propia transaccion. Envolver la corrida en una transaccion del test con ROLLBACK seria aislamiento de mentira: dentro de una unica transaccion no hay dos conexiones compitiendo por la fila, que es justo lo que R10 exige demostrar con `Promise.all`. Cada caso fabrica su empresa, tanda y archivo efimeros con randomUUID y los borra en un `finally` en el orden que exigen las FK (archivo -> tanda -> empresa); se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-18"
+    },
     {
       "archivo": "identity/assignment-directory.int.test.ts",
       "motivo": "QC-87 T3: ejercita el adaptador driven assignment-directory-prisma, que habla con el cliente Prisma GLOBAL y reutiliza listMembersAliveInCompany de QC-84, tambien global. Envolver esas llamadas en una transaccion del test seria un aislamiento de mentira -correrian en otra conexion del pool y no verian ni una fila del fixture-. Cada caso fabrica su empresa efimera (randomUUID) y la borra en un finally en el orden que respetan las FK; el afterAll afirma que no quedo ninguna. Se apoya en que la base de la corrida es suya.",
@@ -166,6 +172,11 @@
       "archivo": "pedidos/order-duplicate-number.int.test.ts",
       "motivo": "Nacido con QC-77 ya en pie (QC-60, decision humana del 2026-09-16): provoca un 23505 AUTENTICO sobre 'orders_company_year_sequence_key' a traves del adaptador real 'createOrder', que usa el cliente Prisma GLOBAL y abre SU PROPIA 'prisma.$transaction' por intento, asi que una transaccion del test no lo envolveria. Para que choquen los tres intentos crea, desde un 'pg.Client' aparte, una funcion y un trigger BEFORE INSERT con nombre unico y acotados por WHEN a la empresa efimera del caso, que reescriben 'order_sequence' a un numero ya ocupado. En un 'finally' borra el trigger y la funcion y despues el fixture (pedidos -> usuario -> rol y tipo de documento -> empresa); la receta se borra en el afterAll. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-16"
+    },
+    {
+      "archivo": "pedidos/order-ingredients-cost.int.test.ts",
+      "motivo": "QC-123 T10: ejercita el flujo REAL de alta y edicion ('createCreateOrder'/'createUpdateOrder') cableado a mano con los adaptadores driven REALES de 'pedidos', 'recetas', 'inventario' y 'unidades' -el mismo conjunto que 'lib/composition' ata-, y esos adaptadores hablan con el cliente Prisma GLOBAL, asi que una transaccion del test no los envolveria. Dos empresas efimeras (randomUUID) nacen en 'beforeAll' y mueren en 'afterAll'; cada caso siembra su propio producto/lote/receta/pedido y los borra en un 'finally' por su id exacto, en el orden que exigen las FK. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-18"
     },
     {
       "archivo": "pedidos/order-repository.int.test.ts",

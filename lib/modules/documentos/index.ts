@@ -99,3 +99,46 @@ export {
   type AiReadResult,
   type ReadPdfWithAiDeps,
 } from './domain/read-pdf-with-ai';
+
+// La estrategia de lectura, con su esquema y su tipo: es el borde de la capacidad de abajo, asi que
+// quien la invoque valida con el mismo esquema y no escribe los dos literales a mano.
+export { pdfStrategySchema, type PdfStrategy } from './domain/pdf-strategy';
+
+// El procesamiento por estrategia, tambien como FABRICA. Su puerto de registro y su puerto de
+// prompt NO salen por aqui: los ve solo `lib/composition`, que es quien ata cada uno a su
+// adaptador. El texto del prompt llega por dependencia, desde el entorno.
+export {
+  createProcessPdfByStrategy,
+  type ProcessPdfByStrategyDeps,
+  type ProcessPdfByStrategyInput,
+  type StrategyRunResult,
+} from './domain/process-pdf-by-strategy';
+
+// El esquema del borde de ENCOLAR una tanda y su tipo inferido: mismo criterio que los esquemas de
+// arriba, una sola definicion de la entrada.
+export { enqueueBatchSchema, type EnqueueBatchInput } from './domain/enqueue-input';
+
+// El estado de un archivo y el de una tanda, tal como los ve quien consulta: es lo que devuelve la
+// tercera capacidad de abajo y lo que pintara la pantalla.
+export {
+  type BatchStatus,
+  type DocumentFileStatus,
+  type DocumentFileStatusEntry,
+} from './domain/batch-status';
+
+// El cuerpo que entrega la cola, con su tipo: el Route Handler valida con el MISMO esquema, no con
+// una copia que pudiera diverger.
+export { queueMessageSchema, type QueueMessageBody } from './domain/queue-message';
+
+// Las TRES capacidades del procesamiento en cola, publicadas como FABRICAS por el mismo motivo que
+// las de arriba: quien las usa recibe el caso de uso ya construido y nunca ve a sus puertos.
+// `enqueueBatch` escribe la tanda y publica un mensaje por archivo; `runDocumentJob` es el trabajo
+// que ejecuta el Route Handler por cada mensaje; `getBatchStatus` consulta y caduca. Atar puerto ->
+// adaptador sigue siendo trabajo exclusivo de `lib/composition`.
+export { createEnqueueBatch, type EnqueuedBatch } from './domain/enqueue-batch';
+export {
+  createRunDocumentJob,
+  type RunDocumentJobMessage,
+  type RunDocumentJobResult,
+} from './domain/run-document-job';
+export { createGetBatchStatus } from './domain/get-batch-status';

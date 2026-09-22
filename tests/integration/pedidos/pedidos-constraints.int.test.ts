@@ -470,6 +470,10 @@ describe('el pedido como fila completa', () => {
       'created_by',
       'deleted_at',
       'id',
+      // `ingredients_cost` es el COSTE DE LOS INGREDIENTES, leido de los lotes vigentes al
+      // guardar: no es un precio de venta, ni un total, ni un subtotal, ni un impuesto. Entre
+      // `id` y `order_sequence` por el mismo `sort()` lexicografico ('id' < 'in' < 'or').
+      'ingredients_cost',
       'order_sequence',
       'order_year',
       'priority',
