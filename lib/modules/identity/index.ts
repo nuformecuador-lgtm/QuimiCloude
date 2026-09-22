@@ -92,6 +92,7 @@ export {
   RoleNotFoundError,
   SelfOperationError,
   LastAdministratorError,
+  ActionNotAllowedError,
   ValidationError,
 } from './domain/errors';
 

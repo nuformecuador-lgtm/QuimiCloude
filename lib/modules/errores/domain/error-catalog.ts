@@ -54,6 +54,7 @@ export const ERROR_MESSAGE_KEY = {
   batch_not_found: 'errors.batch_not_found',
   batch_stock_negative: 'errors.batch_stock_negative',
   ai_unavailable: 'errors.ai_unavailable',
+  action_not_allowed: 'errors.action_not_allowed',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -132,4 +133,6 @@ export const ERROR_MESSAGES_ES = {
   'errors.batch_stock_negative': 'El ajuste dejaria la existencia del lote por debajo de cero.',
   'errors.ai_unavailable':
     'La lectura automatica no esta disponible en este momento. Intentalo mas tarde.',
+  // No es «no tienes permiso»: la operacion esta autorizada, lo que se rechaza es la accion.
+  'errors.action_not_allowed': 'La accion no esta permitida.',
 } as const satisfies Record<ErrorMessageKey, string>;

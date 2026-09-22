@@ -11,6 +11,10 @@
  *      pasar por el contrato de listado de QC-57.
  *   2. **Ningun metodo de escritura** (R17): crear, editar o borrar roles no se puede expresar
  *      aqui. El catalogo solo cambia por migracion y seed, como QC-4 lo dejo.
+* 3. **El rol administrador NO se devuelve** (fix directo, 2026-09-22): el catalogo que sale de
+ *    aqui es el que puede ofrecer el select de usuarios, y el rol administrador no se concede
+ *    por esa via. La exclusion es de la implementacion (`listAllRoles`, que la hace por nombre
+ *    y de forma invisible para este puerto); este contrato declara la intencion.
  *
  * El orden lo pone la IMPLEMENTACION, con el `ORDER BY` de la base (R10, `design.md > 4.3`): tiene
  * que haber UN solo sitio que ordene, y el dominio no reordena lo que recibe.
@@ -22,6 +26,7 @@
 import type { RoleOption } from '../domain/role-view';
 
 export interface RoleCatalogRepository {
-  /** TODOS los roles del catalogo, ordenados por nombre ascendente (R8, R10). */
+  /** Los roles seleccionables del catalogo, ordenados por nombre ascendente; SIN el administrador
+   * (R8, R10; fix directo 2026-09-22). */
   listAll(): Promise<readonly RoleOption[]>;
 }

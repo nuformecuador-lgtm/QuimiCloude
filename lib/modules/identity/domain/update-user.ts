@@ -4,6 +4,7 @@ import { requirePermission, type Actor } from './actor';
 import { toBirthDate } from './birth-date';
 import { throwDuplicate } from './create-user';
 import {
+  ActionNotAllowedError,
   LastAdministratorError,
   RoleNotFoundError,
   SelfOperationError,
@@ -83,6 +84,9 @@ export function createUpdateUser(
     // R22: el adaptador aborto DENTRO de su transaccion, asi que no se escribio nada.
     if (result === 'last_administrator') throw new LastAdministratorError();
     if (result === 'role_not_found') throw new RoleNotFoundError();
+    // Fix directo (2026-09-22): asignar el rol de administrador no se concede por esta via. El
+    // adaptador tambien aborto dentro de su transaccion: no se escribio nada.
+    if (result === 'action_not_allowed') throw new ActionNotAllowedError();
     throwDuplicate(result);
   };
 }

@@ -273,6 +273,13 @@ function writeFailureOutcome(error: unknown): DuplicateKey | 'role_not_found' | 
  *
  * La unicidad la garantizan **SOLO** los tres indices de QC-47, sin ningun `SELECT` previo —que seria
  * una carrera— (R17): por eso dos altas simultaneas con el mismo correo acaban con una sola fila.
+ *
+ * **Fix directo (2026-09-22): la UNICA excepcion a ese «sin `SELECT` previo» es resolver el id del
+ * rol administrador** para rechazar el rol antes de escribir (`data.roleId === adminRole?.id` →
+ * `'action_not_allowed'`, y no se escribe ninguna fila). No es una comprobacion de unicidad y por
+ * eso sigue sin ser una carrera: el rol administrador solo cambia por migracion o seed, asi que
+ * entre esta lectura y el `INSERT` no hay ninguna escritura que pueda invalidarla. La unicidad
+ * sigue garantizada solo por los tres indices.
  */
 export async function create(
   companyId: string,
@@ -280,7 +287,17 @@ export async function create(
   credential: NewUserCredential,
   accountStatus: 'pending',
   now: Date,
-): Promise<{ id: string } | DuplicateKey | 'role_not_found'> {
+): Promise<{ id: string } | DuplicateKey | 'role_not_found' | 'action_not_allowed'> {
+  // Fix directo (2026-09-22): el rol administrador no se concede por esta via. Se resuelve el id
+  // del rol (la MISMA lectura por nombre que usa la transaccion de la edicion) y si el `roleId`
+  // pedido es el suyo, se responde `'action_not_allowed'` sin escribir. `ROLE_ADMINISTRADOR` viene
+  // importado del dominio (R24): ni literal ni constante nueva.
+  const adminRole = await prisma.role.findFirst({
+    where: { name: ROLE_ADMINISTRADOR },
+    select: { id: true },
+  });
+  if (data.roleId === adminRole?.id) return 'action_not_allowed';
+
   try {
     const created = await prisma.user.create({
       data: {
@@ -638,7 +655,7 @@ export async function updateAliveInCompany(
   id: string,
   data: NewUser,
   now: Date,
-): Promise<'ok' | 'not_found' | DuplicateKey | 'role_not_found' | 'last_administrator'> {
+): Promise<'ok' | 'not_found' | DuplicateKey | 'role_not_found' | 'last_administrator' | 'action_not_allowed'> {
   return prisma.$transaction(async (tx) => {
     // 1. El bloqueo, en su unico sitio.
     //
@@ -664,6 +681,12 @@ export async function updateAliveInCompany(
       where: { name: ROLE_ADMINISTRADOR },
       select: { id: true },
     });
+    // Fix directo (2026-09-22): el rol administrador no se concede por esta via. Se decide DENTRO
+    // de la transaccion, justo despues de resolver `adminRole`, y se aborta antes de escribir:
+    // cuando el dominio recibe `'action_not_allowed'`, no se escribio nada. Va ANTES de la guardia
+    // de R22: ningun alta puede crear un administrador, luego ningun rol administrador llega a
+    // «sacar al objetivo del conjunto».
+    if (data.roleId === adminRole?.id) return 'action_not_allowed';
     const leavesTheSet = data.roleId !== adminRole?.id;
     if (wouldLeaveNoAdministrator(activeAdministratorIds, id, leavesTheSet)) {
       // Se aborta ANTES de escribir: cuando el dominio recibe esto, no se escribio nada.

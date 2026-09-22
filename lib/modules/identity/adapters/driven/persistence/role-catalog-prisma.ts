@@ -1,6 +1,7 @@
 // lib/modules/identity/adapters/driven/persistence/role-catalog-prisma.ts
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { ROLE_ADMINISTRADOR } from '../../../domain/roles';
 import type { RoleOption } from '../../../domain/role-view';
 
 /**
@@ -26,11 +27,18 @@ import type { RoleOption } from '../../../domain/role-view';
  *
  * **SOLO LECTURA (R17):** en este archivo no hay —ni puede haber— ningun `create`, `update`,
  * `upsert` ni `delete` sobre `roles` ni sobre `role_permissions`. Y **sin empresa** (R11): el
- * `where` no existe porque el catalogo es global.
+ * catalogo es global y el `where` no filtra por `company_id`.
+ *
+ * **Fix directo (2026-09-22): el catalogo ya NO es «todos los roles».** El rol administrador se
+ * queda fuera: el select de la pantalla de usuarios no debe poder ofrecerlo (R24) y el alta/edicion
+ * lo rechaza igualmente en el puerto —dos capas, la de listado y la de escritura, por si un
+ * llamante se salta el catalogo. El nombre sale de `ROLE_ADMINISTRADOR` importado del dominio
+ * (R24): ni literal nuevo ni constante nueva.
  */
 export async function listAllRoles(): Promise<readonly RoleOption[]> {
   return prisma.role.findMany({
     select: { id: true, name: true },
+    where: { name: { not: ROLE_ADMINISTRADOR } },
     orderBy: { name: 'asc' },
   });
 }

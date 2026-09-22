@@ -171,6 +171,10 @@ export interface UserAdminRepository {
    *
    * Tambien escribe `must_change_credential` en VERDADERO (R13): es invariante del alta, no una
    * eleccion del llamante, asi que tampoco es un parametro.
+   *
+   * `'action_not_allowed'` = el `roleId` pedido es el del rol **administrador**, que no se concede
+   * por esta via (fix directo, 2026-09-22); el adaptador lo decide antes de escribir, asi que
+   * cuando llega no se escribio ninguna fila.
    */
   create(
     companyId: string,
@@ -178,7 +182,7 @@ export interface UserAdminRepository {
     credential: NewUserCredential,
     accountStatus: 'pending',
     now: Date,
-  ): Promise<{ id: string } | DuplicateKey | 'role_not_found'>;
+  ): Promise<{ id: string } | DuplicateKey | 'role_not_found' | 'action_not_allowed'>;
 
   /**
    * Ficha por identificador (R32, R33, R34). `null` = no existe, esta borrado logicamente o es de
@@ -219,6 +223,9 @@ export interface UserAdminRepository {
    * en `active` (R22), comprobado con el mismo bloqueo de `applyGuardedChange` y dentro de la misma
    * transaccion que la escritura (ver la nota de `GuardedChange`): cuando llega, **no se escribio
    * nada**.
+   * `'action_not_allowed'` = el `roleId` pedido es el del rol **administrador** (fix directo,
+   * 2026-09-22): el rol no se concede por esta via. Se decide dentro de la misma transaccion, justo
+   * despues de resolver el id del rol administrador, y cuando llega **no se escribio nada**.
    *
    * **Por que aqui el nombre del rol administrador NO es un parametro, a diferencia de
    * `applyGuardedChange`:** la firma de este metodo esta fijada en `design.md > 7` con cuatro
@@ -232,7 +239,7 @@ export interface UserAdminRepository {
     id: string,
     data: NewUser,
     now: Date,
-  ): Promise<'ok' | 'not_found' | DuplicateKey | 'role_not_found' | 'last_administrator'>;
+  ): Promise<'ok' | 'not_found' | DuplicateKey | 'role_not_found' | 'last_administrator' | 'action_not_allowed'>;
 
   /**
    * Las operaciones guardadas -mover el estado y borrar- detras de UN metodo unico y transaccional

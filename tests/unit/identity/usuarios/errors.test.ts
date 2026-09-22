@@ -1,7 +1,7 @@
 // QC-66 T3 — La jerarquia de errores del dominio `identity` (`design.md > 6.4`).
 //
-// Lo que se vigila (R41): las ONCE clases —NUEVE de QC-66 mas las DOS que anadio QC-79 el
-// 2026-09-11— exponen el `code` ESTABLE que la tabla de
+// Lo que se vigila (R41): las DOCE clases —las ONCE de QC-66/QC-79 mas la que anadio el fix
+// directo del 2026-09-22— exponen el `code` ESTABLE que la tabla de
 // `design.md > 6.4` fija, cada una el suyo y por clase; todas derivan de `IdentityError`, que
 // es como el adaptador driving las reconoce (`error instanceof IdentityError`) antes de
 // serializarlas a `{ status: 'error', code, message }`.
@@ -23,6 +23,7 @@
 
 import { errorMessage, ERROR_CODES, type ErrorCode } from '@/lib/modules/errores';
 import {
+  ActionNotAllowedError,
   CredentialLinkInvalidError,
   DuplicateDocumentError,
   DuplicateEmailError,
@@ -52,10 +53,12 @@ const CASOS: readonly { readonly clase: string; readonly error: IdentityError; r
   // QC-79 (R34), el 2026-09-11: las dos clases del enlace para establecer la contrasena.
   { clase: 'CredentialLinkInvalidError', error: new CredentialLinkInvalidError(), code: 'credential_link_invalid' },
   { clase: 'UserNotPendingError', error: new UserNotPendingError(), code: 'user_not_pending' },
+  // Fix directo, el 2026-09-22: la accion que la regla de negocio rechaza con el permiso presente.
+  { clase: 'ActionNotAllowedError', error: new ActionNotAllowedError(), code: 'action_not_allowed' },
 ];
 
 /**
- * Las mismas once clases, por su CONSTRUCTOR: hace falta para construirlas una segunda vez con un
+ * Las mismas doce clases, por su CONSTRUCTOR: hace falta para construirlas una segunda vez con un
  * `diagnostic` y demostrar que el mensaje no se puede sobreescribir. Se escribe a mano y no se
  * deduce de `CASOS` para que anadir una clase obligue a tocar los dos sitios.
  */
@@ -71,6 +74,7 @@ const CLASES: Readonly<Record<string, new (diagnostic?: string) => IdentityError
   ValidationError,
   CredentialLinkInvalidError,
   UserNotPendingError,
+  ActionNotAllowedError,
 };
 
 describe('lib/modules/identity — errores de dominio', () => {
@@ -89,14 +93,15 @@ describe('lib/modules/identity — errores de dominio', () => {
     });
   }
 
-  // R41 — once clases, once codigos distintos: dos casos con el mismo `code` serian
+  // R41 — doce clases, doce codigos distintos: dos casos con el mismo `code` serian
   // indistinguibles para la pantalla de QC-67, que decide por el codigo. Eran NUEVE hasta que
-  // QC-79 anadio las dos suyas (R34); el conteo sigue siendo literal a proposito.
-  it('los once codigos del modulo son distintos entre si', () => {
+  // QC-79 anadio las dos suyas (R34) y el fix directo la decimo segunda; el conteo sigue siendo
+  // literal a proposito.
+  it('los doce codigos del modulo son distintos entre si', () => {
     const codigos = CASOS.map(({ code }) => code);
 
-    expect(codigos).toHaveLength(11);
-    expect(new Set(codigos).size).toBe(11);
+    expect(codigos).toHaveLength(12);
+    expect(new Set(codigos).size).toBe(12);
   });
 
   // `design.md > 6.4`: «de otra empresa» y «soy yo» responden no-encontrado y NO `unauthorized`,
@@ -119,9 +124,9 @@ describe('lib/modules/identity — errores de dominio', () => {
     expect(new LastAdministratorError().name).toBe('LastAdministratorError');
   });
 
-  // QC-70 (R22): los once codigos estan en el catalogo unico. Un codigo inventado por el modulo
+  // QC-70 (R22): los doce codigos estan en el catalogo unico. Un codigo inventado por el modulo
   // —el caso que la guardia del catalogo persigue— pondria esta linea en rojo.
-  it('los once codigos pertenecen al catalogo unico de la aplicacion', () => {
+  it('los doce codigos pertenecen al catalogo unico de la aplicacion', () => {
     for (const { clase, code } of CASOS) {
       expect(ERROR_CODES, `${clase} declara un code fuera del catalogo`).toContain(code);
     }
@@ -175,6 +180,19 @@ describe('lib/modules/identity — errores de dominio', () => {
     expect(noPendiente.code).not.toBe(new UserNotFoundError().code);
     expect(noPendiente.code).not.toBe(new UnauthorizedError().code);
     expect(noPendiente.name).toBe('UserNotPendingError');
+  });
+
+  // Fix directo (2026-09-22): `action_not_allowed` no es `unauthorized` (el actor tiene permiso) ni
+  // `invalid_input` (la entrada tiene la forma correcta): es la ACCION la que la regla de negocio
+  // rechaza, distinta de las dos.
+  it('action_not_allowed se distingue de unauthorized y de invalid_input', () => {
+    const noPermitida = new ActionNotAllowedError();
+
+    expect(noPermitida.code).toBe('action_not_allowed');
+    expect(noPermitida.code).not.toBe(new UnauthorizedError().code);
+    expect(noPermitida.code).not.toBe(new ValidationError().code);
+    expect(noPermitida.message).not.toBe(new UnauthorizedError().message);
+    expect(noPermitida.name).toBe('ActionNotAllowedError');
   });
 
   // Y sin diagnostico, el campo no existe: el traductor unico solo registra cuando hay algo que

@@ -514,6 +514,36 @@ describe('alta de usuario (R13, R14, R16, R17, R18, R49; QC-79 R1-R7, R30)', () 
       'role_not_found',
     );
   });
+
+  it('fix directo (2026-09-22) — asignar el rol administrador se rechaza con `action_not_allowed` sin emitir enlace ni correo', async () => {
+    // Rama sin contrasena (R4): el alta no emite enlace ni toca el correo.
+    const sinCredencial = montar({ create: 'action_not_allowed' });
+    expect(await codeDeFallo(sinCredencial.createUser(ACTOR, ENTRADA_USUARIO))).toBe(
+      'action_not_allowed',
+    );
+    expect(sinCredencial.users.create).toHaveBeenCalledTimes(1);
+    expect(sinCredencial.users.updateAliveInCompany).not.toHaveBeenCalled();
+    expect(sinCredencial.users.applyGuardedChange).not.toHaveBeenCalled();
+    expect(sinCredencial.links.issueForPendingUser).not.toHaveBeenCalled();
+    expect(sinCredencial.mailer.sendCredentialSetupLink).not.toHaveBeenCalled();
+
+    // Rama con contrasena (R2): el rechazo llega DESPUES de hashear —igual que en R17 el duplicado—;
+    // lo que no se emite es enlace ni correo.
+    const conCredencial = montar({ create: 'action_not_allowed' });
+    expect(
+      await codeDeFallo(
+        conCredencial.createUser(ACTOR, { ...ENTRADA_USUARIO, credential: CREDENCIAL }),
+      ),
+    ).toBe('action_not_allowed');
+    expect(conCredencial.links.issueForPendingUser).not.toHaveBeenCalled();
+    expect(conCredencial.mailer.sendCredentialSetupLink).not.toHaveBeenCalled();
+
+    // Edicion (R19, R20): la misma respuesta por esta via.
+    const d = montar({ update: 'action_not_allowed' });
+    expect(await codeDeFallo(d.updateUser(ACTOR, TARGET_ID, ENTRADA_USUARIO))).toBe(
+      'action_not_allowed',
+    );
+  });
 });
 
 describe('edicion de usuario (R19, R20)', () => {

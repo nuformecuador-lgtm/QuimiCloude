@@ -8,6 +8,7 @@ import { toBirthDate } from './birth-date';
 import { CredentialPolicyRejectedError } from './credential-rejected';
 import { credentialSetupLinkExpiresAt } from './credential-setup-link';
 import {
+  ActionNotAllowedError,
   DuplicateDocumentError,
   DuplicateEmailError,
   DuplicateUsernameError,
@@ -237,10 +238,11 @@ export function createCreateUser(
  * llamadas a `create` -una por rama- y dos copias del `if` serian dos sitios donde olvidarlo.
  */
 function resolveCreated(
-  result: { id: string } | DuplicateKey | 'role_not_found',
+  result: { id: string } | DuplicateKey | 'role_not_found' | 'action_not_allowed',
 ): string {
   if (typeof result === 'string') {
     if (result === 'role_not_found') throw new RoleNotFoundError();
+    if (result === 'action_not_allowed') throw new ActionNotAllowedError();
     throwDuplicate(result);
   }
   return result.id;
