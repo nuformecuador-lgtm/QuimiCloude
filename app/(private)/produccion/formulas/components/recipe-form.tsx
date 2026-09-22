@@ -20,14 +20,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
-import { createRecipeSchema, updateRecipeSchema, type RecipeDetail } from '@/lib/modules/recetas';
+import {
+  createRecipeSchema,
+  formatPercentage,
+  sumPercentages,
+  updateRecipeSchema,
+  type RecipeDetail,
+} from '@/lib/modules/recetas';
 import {
   createRecipeAction,
   updateRecipeAction,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { FORMULAS_ROUTE } from '@/lib/shared/routes';
-import { trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { cn } from '@/lib/utils';
 
 import type { ProductPickerOption } from './product-picker';
@@ -152,18 +157,12 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
         key: createLocalKey('line'),
         productId: line.productId,
         productName: line.productName,
-        // La cantidad guardada llega con la escala de la columna («15.0000») y se precarga SIN
-        // sus ceros de relleno: `trimDecimal` deja «15». NO redondea, y eso es deliberado: este
-        // valor es el que se vuelve a guardar al aceptar el formulario, asi que recortar ceros
-        // -que no cambia el numero- es seguro, pero redondear no lo seria. Una linea de 0.1255
-        // reabierta y guardada se convertiria en 0.13 sin que nadie lo hubiera pedido, y la
-        // cantidad admite cuatro decimales justamente porque alguien los usa.
-        quantity: trimDecimal(line.quantity),
-        unitId: line.unitId,
-        // El detalle de la receta trae la unidad de la LINEA, no la del producto: aqui no se
-        // sabe de que grupo es el ingrediente, y `null` es exactamente eso -no un olvido-.
-        // El selector de esa linea ofrece entonces el catalogo completo y no pisa `unitId`.
-        productUnitId: null,
+        // R25: el campo se precarga con la MISMA función que formatea en el resto de la
+        // receta -«12.50» -> «12,50»-, nunca con el valor crudo del contrato.
+        percentage: formatPercentage(line.percentage),
+        // La unidad del PRODUCTO (R12), no de la línea -que ya no tiene una-: el detalle de la
+        // receta la trae en `productUnitId` desde `RecipeLineView`.
+        productUnitId: line.productUnitId,
       }),
     ),
     // QC-64 R9: el paso guardado entra en el estado COMO DOCUMENTO, tal cual. Ya no se aplana a
@@ -189,8 +188,21 @@ export function RecipeForm(props: RecipeFormProps) {
 
   const isEdit = props.mode === 'edit';
 
+  // R10, R11: se recalcula en CADA render con la misma función que el indicador de suma y que el
+  // esquema del contrato -nunca una copia local de la regla-, también con cero líneas (R23). La
+  // coma se sustituye por un punto igual que en `buildRecipePayload`: `sumPercentages` opera
+  // sobre el formato del contrato.
+  const isComplete = sumPercentages(
+    state.lines.map((line) => line.percentage.replace(',', '.')),
+  ).isComplete;
+
   function handleSubmit() {
     setSaveError(null);
+
+    // R11: Enter en un campo no se salta la comprobación -`disabled` en el botón no basta,
+    // porque el formulario también se envía por teclado-. Se repite la MISMA función que ya
+    // deshabilita el botón, no una regla nueva.
+    if (!isComplete) return;
 
     const payload = buildRecipePayload(props.mode, state);
     const schema = isEdit ? updateRecipeSchema : createRecipeSchema;
@@ -400,7 +412,7 @@ export function RecipeForm(props: RecipeFormProps) {
         <Button
           type="submit"
           className={TOUCH_TARGET}
-          disabled={isPending}
+          disabled={isPending || !isComplete}
           aria-busy={isPending}
           data-testid="recipe-form-submit"
         >

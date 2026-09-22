@@ -151,6 +151,7 @@ const PRODUCT_PAGE2_ID = '33333333-3333-4333-8333-333333333333';
 const UNIT_LITRO_ID = '44444444-4444-4444-8444-444444444444';
 const UNIT_GRAMO_ID = '55555555-5555-4555-8555-555555555555';
 const RECIPE_ID = '66666666-6666-4666-8666-666666666666';
+const PRODUCT_WITH_UNIT_ID = '77777777-7777-4777-8777-777777777777';
 
 // QC-39 (T1): el listado devuelve `UnitView` -equivalencia y `isSystem` incluidos-. El
 // selector sigue tipado con `UnitRef` y no se entera: `UnitView` lo extiende (R4).
@@ -173,16 +174,21 @@ const UNITS: readonly UnitView[] = [
 const PRODUCT_1_NAME = 'Ácido cítrico';
 const PRODUCT_2_NAME = 'Sosa cáustica';
 const PRODUCT_PAGE2_NAME = 'Glicerina de página 2';
+const PRODUCT_WITH_UNIT_NAME = 'Hipoclorito de sodio';
+/** «nombre · unidad» tal como lo pinta `ProductPicker` para `PRODUCT_WITH_UNIT` (R12). */
+const PRODUCT_WITH_UNIT_LABEL = `${PRODUCT_WITH_UNIT_NAME} · L`;
 
 /**
- * Página 1 precargada del selector de ingrediente. Los dos productos llegan con `unitId: null`
- * porque **todavía no tienen ningún lote** (QC-80 R23): la unidad de un ingrediente se deriva de
- * la presentación de su lote más reciente, así que sin lote no hay con qué acotar el selector.
+ * Página 1 precargada del selector de ingrediente. `PRODUCT_1` y `PRODUCT_2` NO tienen ningún
+ * lote (R24): sin lote no hay unidad que mostrar, y la receta se puede guardar igual con esas
+ * líneas. `PRODUCT_WITH_UNIT` SÍ tiene unidad guardada, para probar que se ve «nombre · unidad»
+ * junto al ingrediente elegido (R12).
  */
 const PRODUCT_PAGE_1 = {
   items: [
     { id: PRODUCT_1_ID, name: PRODUCT_1_NAME, unitId: null },
     { id: PRODUCT_2_ID, name: PRODUCT_2_NAME, unitId: null },
+    { id: PRODUCT_WITH_UNIT_ID, name: PRODUCT_WITH_UNIT_NAME, unitId: UNIT_LITRO_ID },
   ],
   totalPages: 2,
 };
@@ -206,9 +212,9 @@ function lineView(overrides: Partial<RecipeLineView> = {}): RecipeLineView {
     id: 'line-1',
     productId: PRODUCT_1_ID,
     productName: PRODUCT_1_NAME,
-    quantity: '1.0000',
-    unitId: UNIT_LITRO_ID,
-    productStock: 10,
+    percentage: '100.00',
+    productUnitId: null,
+    productStock: null,
     ...overrides,
   };
 }
@@ -269,24 +275,17 @@ async function chooseProductForLine(user: UserEvent, index: number, productName:
   await user.click(await esperarInteractiva(await screen.findByRole('option', { name: productName })));
 }
 
-/** Selecciona una unidad del catálogo por su etiqueta visible (símbolo o, en su ausencia, nombre). */
-async function chooseUnitForLine(user: UserEvent, index: number, unitLabel: string) {
-  await user.click(screen.getByTestId(`recipe-line-unit-${index}`));
-  await user.click(await esperarInteractiva(await screen.findByRole('option', { name: unitLabel })));
-}
-
-/** Añade una línea completa y válida en la posición `index` (siguiente hueco libre). */
+/** Añade una línea con ingrediente y porcentaje en la posición `index` (siguiente hueco libre). */
 async function addValidLine(
   user: UserEvent,
   index: number,
-  { productName = PRODUCT_1_NAME, unitLabel = 'L', quantity = '1' } = {},
+  { productName = PRODUCT_1_NAME, percentage = '100' } = {},
 ) {
   // La fila 0 ya está en pantalla al abrir el formulario (fila en blanco de arranque); las
   // siguientes se piden con el `+` de la anterior.
   if (index > 0) await user.click(screen.getByTestId(`recipe-line-add-${index - 1}`));
   await chooseProductForLine(user, index, productName);
-  await chooseUnitForLine(user, index, unitLabel);
-  await user.type(screen.getByTestId(`recipe-line-quantity-${index}`), quantity);
+  await user.type(screen.getByTestId(`recipe-line-percentage-${index}`), percentage);
 }
 
 /**
@@ -527,6 +526,8 @@ describe('R20 — cancelar o terminar devuelve a la lista', () => {
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta que termina');
+    // D14: una línea al 100 % -sin ella el botón queda deshabilitado (R11, R23).
+    await addValidLine(user, 0);
     await user.click(screen.getByTestId('recipe-form-submit'));
 
     await waitFor(() => expect(routerMock.push).toHaveBeenCalledWith(FORMULAS_ROUTE));
@@ -545,8 +546,7 @@ describe('R21 — precarga de la edición y receta inexistente', () => {
           id: 'line-baja',
           productId: PRODUCT_1_ID,
           productName: null,
-          quantity: '3.2500',
-          unitId: UNIT_LITRO_ID,
+          percentage: '100.00',
         }),
       ],
     });
@@ -559,13 +559,9 @@ describe('R21 — precarga de la edición y receta inexistente', () => {
     // no sobre `value`, que un `contenteditable` no tiene.
     expect(areaDePaso(0)).toHaveTextContent('Paso uno');
     expect(areaDePaso(1)).toHaveTextContent('Paso dos');
-    // El campo es `type="number"` desde el 2026-09-08, y `toHaveValue` lee entonces
-    // `valueAsNumber`: `'3.25'` se compara como `3.25`.
-    expect(screen.getByTestId('recipe-line-quantity-0')).toHaveValue(3.25);
-    // 2026-09-17: el campo se PRECARGA sin los ceros de relleno («3.2500» -> «3.25»). El texto
-    // del control lo confirma; `toHaveValue` no distingue las dos cadenas porque las lee como
-    // numero, y aqui la diferencia es justo lo que se esta comprobando.
-    expect((screen.getByTestId('recipe-line-quantity-0') as HTMLInputElement).value).toBe('3.25');
+    // R25: el campo se precarga con `formatPercentage` -coma y 2 decimales-, no con el valor
+    // crudo del contrato.
+    expect((screen.getByTestId('recipe-line-percentage-0') as HTMLInputElement).value).toBe('100,00');
     // Producto dado de baja (R53): la línea se conserva y se marca, no se descarta.
     expect(screen.getByTestId('recipe-line-unavailable-0')).toBeInTheDocument();
 
@@ -573,45 +569,36 @@ describe('R21 — precarga de la edición y receta inexistente', () => {
 
     await waitFor(() => expect(updateRecipeActionMock).toHaveBeenCalledTimes(1));
     const [, payload] = updateRecipeActionMock.mock.calls[0] as [string, { lines: unknown[] }];
-    // La cantidad viaja como CADENA y sin tocar el numero (R29), pero SIN los ceros de relleno
-    // con los que llego: «3.2500» sale «3.25». Es el mismo numero -la columna es `Decimal(14,4)`
-    // y lo guarda igual-, escrito sin las cifras que no aportan.
-    //
-    // Lo que R29 protege sigue en pie, y es lo que el caso de la linea de 4 decimales de mas
-    // abajo afirma: la precarga NO REDONDEA. Recortar ceros no puede cambiar un valor; redondear
-    // si, y por eso el formulario usa `trimDecimal` y no `formatDecimalDisplay`.
-    expect(payload.lines).toEqual([
-      { productId: PRODUCT_1_ID, quantity: '3.25', unitId: UNIT_LITRO_ID },
-    ]);
+    // R1: sin unidad. `buildRecipePayload` sustituye la coma por un punto, sin pasar por `number`.
+    expect(payload.lines).toEqual([{ productId: PRODUCT_1_ID, percentage: '100.00' }]);
   });
 
-  it('la precarga NO redondea: una linea de cuatro decimales se reenvia intacta', async () => {
-    // 2026-09-17, la mitad que de verdad importa de la decision: el valor precargado es el que
-    // se vuelve a guardar, asi que la edicion solo puede quitarle ceros de relleno. Si aqui se
-    // redondeara a dos decimales, abrir una receta y darle a guardar -sin tocar nada- convertiria
-    // esta linea en 0.13 y nadie lo habria pedido.
+  it('R25 — la precarga muestra cada porcentaje con formatPercentage, y así se reenvía tras sustituir la coma', async () => {
     const user = setupUser();
     const recipe = recipeDetail({
       lines: [
+        lineView({ id: 'line-a', productId: PRODUCT_1_ID, percentage: '92.50' }),
         lineView({
-          id: 'line-precisa',
-          productId: PRODUCT_1_ID,
-          quantity: '0.1255',
-          unitId: UNIT_LITRO_ID,
+          id: 'line-b',
+          productId: PRODUCT_2_ID,
+          productName: PRODUCT_2_NAME,
+          percentage: '7.50',
         }),
       ],
     });
 
     renderEditForm(recipe);
 
-    expect((screen.getByTestId('recipe-line-quantity-0') as HTMLInputElement).value).toBe('0.1255');
+    expect((screen.getByTestId('recipe-line-percentage-0') as HTMLInputElement).value).toBe('92,50');
+    expect((screen.getByTestId('recipe-line-percentage-1') as HTMLInputElement).value).toBe('7,50');
 
     await user.click(screen.getByTestId('recipe-form-submit'));
 
     await waitFor(() => expect(updateRecipeActionMock).toHaveBeenCalledTimes(1));
     const [, payload] = updateRecipeActionMock.mock.calls[0] as [string, { lines: unknown[] }];
     expect(payload.lines).toEqual([
-      { productId: PRODUCT_1_ID, quantity: '0.1255', unitId: UNIT_LITRO_ID },
+      { productId: PRODUCT_1_ID, percentage: '92.50' },
+      { productId: PRODUCT_2_ID, percentage: '7.50' },
     ]);
   });
 
@@ -642,8 +629,10 @@ describe('R22 — el guardado envía la lista final completa en una sola invocac
     const user = setupUser();
     const recipe = recipeDetail({
       lines: [
-        lineView({ id: 'line-a', productId: PRODUCT_1_ID, quantity: '1.0000' }),
-        lineView({ id: 'line-b', productId: PRODUCT_2_ID, productName: PRODUCT_2_NAME, quantity: '2.0000' }),
+        // La que queda tras el `remove` de más abajo va al 100 %; la que se quita no importa
+        // (D14, R11): se retira antes de enviar.
+        lineView({ id: 'line-a', productId: PRODUCT_1_ID, percentage: '100.00' }),
+        lineView({ id: 'line-b', productId: PRODUCT_2_ID, productName: PRODUCT_2_NAME, percentage: '50.00' }),
       ],
       steps: [stepView('Mezclar'), stepView('Calentar')],
     });
@@ -721,12 +710,42 @@ describe('R23 (QC-70 R20, R32) — el nombre repetido llega con su código abier
   });
 });
 
+describe('R3 — un rechazo atribuido a las líneas se pinta en el bloque de líneas, sin invocar la operación', () => {
+  // R11 impide llegar a esta validación a través de la suma -el botón está deshabilitado
+  // mientras la suma no sea exacta, así que un rechazo de la suma no puede demostrarse
+  // pulsando Guardar-. El MISMO mecanismo -el esquema del contrato rechaza con un issue en
+  // `path: ['lines']`, y `extractGeneralLinesError` lo pinta en el bloque- se dispara igual
+  // con dos líneas del mismo producto: una receta sembrada (precarga) puede traerlas
+  // repetidas aunque la interfaz nunca deje ELEGIRLAS así.
+  it('dos líneas precargadas con el mismo producto se rechazan con el error general de líneas, en el bloque', async () => {
+    const user = setupUser();
+    const recipe = recipeDetail({
+      lines: [
+        lineView({ id: 'line-a', productId: PRODUCT_1_ID, percentage: '50.00' }),
+        lineView({ id: 'line-b', productId: PRODUCT_1_ID, percentage: '50.00' }),
+      ],
+    });
+
+    renderEditForm(recipe);
+    // La suma SÍ es exacta -100,00 %-, así que Guardar está habilitado y la validación de
+    // líneas repetidas es lo único que puede rechazar el envío.
+    expect(screen.getByTestId('recipe-lines-sum')).toHaveAttribute('data-complete', 'true');
+
+    await user.click(screen.getByTestId('recipe-form-submit'));
+
+    const error = await screen.findByTestId('recipe-lines-error');
+    expect(error).toHaveAttribute('role', 'alert');
+    expect(updateRecipeActionMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('R24 — un guardado con éxito navega, avisa por toast y refresca', () => {
   it('createRecipeAction con éxito navega a la lista, avisa y refresca', async () => {
     const user = setupUser();
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta nueva');
+    await addValidLine(user, 0);
     await user.click(screen.getByTestId('recipe-form-submit'));
 
     await waitFor(() => expect(routerMock.push).toHaveBeenCalledWith(FORMULAS_ROUTE));
@@ -740,6 +759,9 @@ describe('R26 — la validación previa usa los esquemas del contrato', () => {
     const user = setupUser();
     renderCreateForm();
 
+    // Una línea al 100 % para que el botón no esté deshabilitado por R11: lo que se comprueba
+    // aquí es la validación del NOMBRE, no la de las líneas.
+    await addValidLine(user, 0);
     // El nombre queda vacío a propósito: `recipeNameSchema` exige `.trim().min(1)`.
     await user.click(screen.getByTestId('recipe-form-submit'));
 
@@ -750,8 +772,12 @@ describe('R26 — la validación previa usa los esquemas del contrato', () => {
   });
 });
 
-describe('R27 — añadir y quitar líneas; una receta sin ninguna se guarda', () => {
-  it('añadir y luego quitar la única línea deja la receta sin líneas, y así se guarda', async () => {
+describe('R27 — añadir y quitar líneas; sin líneas no se guarda', () => {
+  // D14 deroga para esta ficha «una receta sin líneas se puede guardar» de QC-26 (R27 original):
+  // 0 líneas suman 0,00 % y el mismo `superRefine` del contrato las rechaza (R3, R23). Este caso
+  // se invierte: añadir y quitar la única línea deja el botón deshabilitado y la acción sin
+  // invocar, en vez de guardar con `lines: []`.
+  it('añadir y luego quitar la única línea deja la receta sin líneas, y Guardar queda deshabilitado sin invocar la acción', async () => {
     const user = setupUser();
     renderCreateForm();
 
@@ -759,17 +785,23 @@ describe('R27 — añadir y quitar líneas; una receta sin ninguna se guarda', (
 
     await addValidLine(user, 0);
     expect(screen.getAllByTestId('recipe-line-row')).toHaveLength(1);
+    expect(screen.getByTestId('recipe-form-submit')).toBeEnabled();
 
     await user.click(screen.getByTestId('recipe-line-remove-0'));
-    // Sigue viéndose UNA fila, pero es la de arranque: no está en el estado, así que el payload
-    // viaja sin líneas igual que antes de que existiera esa fila (R27).
+    // Sigue viéndose UNA fila, pero es la de arranque: no está en el estado, así que el
+    // indicador de suma vuelve a "Suma: 0,00 % — faltan 100,00 %" (R11, R23).
     expect(screen.getAllByTestId('recipe-line-row')).toHaveLength(1);
+    expect(screen.getByTestId('recipe-lines-sum')).toHaveAttribute('data-complete', 'false');
 
-    await user.click(screen.getByTestId('recipe-form-submit'));
+    const submit = screen.getByTestId('recipe-form-submit');
+    expect(submit).toBeDisabled();
 
-    await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
-    const [payload] = createRecipeActionMock.mock.calls[0] as [{ lines: unknown[] }];
-    expect(payload.lines).toEqual([]);
+    await user.click(submit);
+    // Enter en un campo tampoco se lo salta: `handleSubmit` vuelve a comprobar `isComplete`.
+    screen.getByTestId('recipe-field-name').focus();
+    await user.keyboard('{Enter}');
+
+    expect(createRecipeActionMock).not.toHaveBeenCalled();
   });
 });
 
@@ -821,60 +853,74 @@ describe('R28 — el selector de producto alcanza la segunda página sin filtrar
   });
 });
 
-describe('R30 — la unidad viaja como id; sin símbolo se presenta por su nombre', () => {
-  it('elige Litro (con símbolo "L") y luego Gramo (sin símbolo, mostrado por su nombre) y envía su id', async () => {
+describe('R12 — sin selector de unidad; el ingrediente se ve con su unidad', () => {
+  it('el formulario no monta ningún selector de unidad en las líneas', async () => {
     const user = setupUser();
     renderCreateForm();
 
-    await user.type(screen.getByTestId('recipe-field-name'), 'Receta con unidades');
-    await chooseProductForLine(user, 0, PRODUCT_1_NAME);
+    await addValidLine(user, 0);
 
-    await chooseUnitForLine(user, 0, 'L');
-    expect(screen.getByTestId('recipe-line-unit-0')).toHaveTextContent('L');
+    const row = screen.getAllByTestId('recipe-line-row')[0] as HTMLElement;
+    // El ÚNICO combobox de la fila es el del ingrediente: ninguno más para la unidad.
+    expect(within(row).getAllByRole('combobox')).toHaveLength(1);
+    expect(screen.queryByTestId('recipe-line-unit-0')).toBeNull();
+    expect(screen.getByTestId('recipe-line-percentage-0')).toHaveAttribute('type', 'text');
+  });
 
-    await chooseUnitForLine(user, 0, 'Gramo');
-    expect(screen.getByTestId('recipe-line-unit-0')).toHaveTextContent('Gramo');
+  it('el ingrediente elegido se ve como «nombre · unidad» cuando el insumo la tiene', async () => {
+    const user = setupUser();
+    renderCreateForm();
 
-    await user.type(screen.getByTestId('recipe-line-quantity-0'), '5');
-    await user.click(screen.getByTestId('recipe-form-submit'));
+    await user.click(screen.getByTestId('recipe-line-product-0'));
+    await user.click(
+      await esperarInteractiva(await screen.findByRole('option', { name: PRODUCT_WITH_UNIT_LABEL })),
+    );
 
-    await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
-    const [payload] = createRecipeActionMock.mock.calls[0] as [{ lines: { unitId: string }[] }];
-    expect(payload.lines[0]?.unitId).toBe(UNIT_GRAMO_ID);
+    expect(screen.getByTestId('recipe-line-product-0')).toHaveValue(PRODUCT_WITH_UNIT_LABEL);
+  });
+
+  it('en edición, la línea precargada trae la unidad del producto y se ve igual', () => {
+    renderEditForm(
+      recipeDetail({
+        lines: [
+          lineView({
+            id: 'line-a',
+            productId: PRODUCT_WITH_UNIT_ID,
+            productName: PRODUCT_WITH_UNIT_NAME,
+            percentage: '100.00',
+            productUnitId: UNIT_LITRO_ID,
+          }),
+        ],
+      }),
+    );
+
+    expect(screen.getByTestId('recipe-line-product-0')).toHaveValue(PRODUCT_WITH_UNIT_LABEL);
   });
 });
 
-describe('QC-80 R23 — un ingrediente SIN NINGÚN LOTE no bloquea la línea ni impide guardar', () => {
-  it('el selector de unidad queda habilitado, ofrece el catálogo entero y la receta se envía', async () => {
+describe('R24 — un ingrediente SIN NINGÚN LOTE ni de baja no bloquea la línea ni impide guardar', () => {
+  it('un ingrediente sin unidad se puede elegir y la receta se envía sin unidad en la línea', async () => {
     const user = setupUser();
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta de un ingrediente sin lotes');
-    // `PRODUCT_1` todavia no tiene unidad guardada: llega como `unitId: null`.
+    // `PRODUCT_1` todavia no tiene unidad guardada: llega como `unitId: null`, y no hay ningun
+    // selector que bloquear (R12).
     await chooseProductForLine(user, 0, PRODUCT_1_NAME);
+    await user.type(screen.getByTestId('recipe-line-percentage-0'), '100');
 
-    // No se bloquea: sin lote no hay dato con el que acotar, pero se escriben recetas antes de
-    // comprar el ingrediente.
-    expect(screen.getByTestId('recipe-line-unit-0')).toBeEnabled();
-
-    // Y ofrece el catálogo entero, no una lista vacía ni un grupo recortado.
-    await user.click(screen.getByTestId('recipe-line-unit-0'));
-    const opciones = await screen.findAllByTestId('recipe-line-unit-0-option');
-    expect(opciones.map((opcion) => opcion.textContent ?? '').sort()).toEqual(['Gramo', 'L']);
-    await user.click(await esperarInteractiva(await screen.findByRole('option', { name: 'L' })));
-
-    await user.type(screen.getByTestId('recipe-line-quantity-0'), '2');
     await user.click(screen.getByTestId('recipe-form-submit'));
 
     await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
     const [payload] = createRecipeActionMock.mock.calls[0] as [
-      { lines: { productId: string; unitId: string }[] },
+      { lines: { productId: string; percentage: string }[] },
     ];
-    expect(payload.lines[0]).toMatchObject({ productId: PRODUCT_1_ID, unitId: UNIT_LITRO_ID });
+    expect(payload.lines[0]).toEqual({ productId: PRODUCT_1_ID, percentage: '100' });
+    expect(payload.lines[0]).not.toHaveProperty('unitId');
   });
 });
 
-describe('R31 — dos líneas del mismo producto y una cantidad inválida no se envían', () => {
+describe('R31 — dos líneas del mismo producto y un porcentaje inválido no se envían', () => {
   it('un ingrediente ya usado NO se ofrece en las demás líneas: no se puede repetir', async () => {
     // R16 desde la interfaz. La regla vive en `createRecipeSchema` y su test está en
     // `tests/unit/recetas/recipe-input.test.ts`; lo que se afirma AQUÍ es que el formulario ya
@@ -884,7 +930,7 @@ describe('R31 — dos líneas del mismo producto y una cantidad inválida no se 
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta sin repetidos');
-    await addValidLine(user, 0, { quantity: '1' });
+    await addValidLine(user, 0, { percentage: '100' });
 
     await user.click(screen.getByTestId('recipe-line-add-0'));
     await user.click(screen.getByTestId('recipe-line-product-1'));
@@ -897,20 +943,26 @@ describe('R31 — dos líneas del mismo producto y una cantidad inválida no se 
     expect(await screen.findByRole('option', { name: PRODUCT_1_NAME })).toBeInTheDocument();
   });
 
-  it('una cantidad que el esquema rechaza presenta el error junto a la línea afectada', async () => {
+  it('un porcentaje que el esquema rechaza presenta el error junto a la línea afectada', async () => {
+    // La suma solo cuenta lo que casa el patrón (`sumPercentages`): con la primera línea al
+    // 100 % y la segunda con un texto inválido -que no suma nada-, el indicador da por completa
+    // la suma y el botón se habilita, pero el ESQUEMA sigue rechazando la segunda línea por su
+    // formato (R2), sin escribir ninguna fila.
     const user = setupUser();
     renderCreateForm();
 
-    await user.type(screen.getByTestId('recipe-field-name'), 'Receta con cantidad inválida');
-    await chooseProductForLine(user, 0, PRODUCT_1_NAME);
-    await chooseUnitForLine(user, 0, 'L');
-    await user.type(screen.getByTestId('recipe-line-quantity-0'), 'abc'); // no cumple el patrón decimal
+    await user.type(screen.getByTestId('recipe-field-name'), 'Receta con porcentaje inválido');
+    await addValidLine(user, 0, { productName: PRODUCT_1_NAME, percentage: '100' });
+    await user.click(screen.getByTestId('recipe-line-add-0'));
+    await chooseProductForLine(user, 1, PRODUCT_2_NAME);
+    await user.type(screen.getByTestId('recipe-line-percentage-1'), 'abc'); // no cumple el patrón decimal
 
+    expect(screen.getByTestId('recipe-form-submit')).toBeEnabled();
     await user.click(screen.getByTestId('recipe-form-submit'));
 
-    const error = await screen.findByTestId('recipe-line-quantity-error-0');
+    const error = await screen.findByTestId('recipe-line-percentage-error-1');
     expect(error).toBeInTheDocument();
-    expect(screen.getByTestId('recipe-line-quantity-0')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByTestId('recipe-line-percentage-1')).toHaveAttribute('aria-invalid', 'true');
     expect(createRecipeActionMock).not.toHaveBeenCalled();
   });
 });
@@ -921,6 +973,7 @@ describe('R32 — los pasos se añaden, editan y quitan, y se envían en el orde
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta con pasos');
+    await addValidLine(user, 0);
 
     await user.click(screen.getByTestId('recipe-step-add'));
     await escribirEnPaso(0, 'Mezclar');
@@ -950,6 +1003,7 @@ describe('R33 — reordenar por arrastre (ratón) cambia el orden enviado', () =
     try {
       renderCreateForm();
       await user.type(screen.getByTestId('recipe-field-name'), 'Receta con arrastre por ratón');
+      await addValidLine(user, 0);
 
       await user.click(screen.getByTestId('recipe-step-add'));
       await escribirEnPaso(0, 'Mezclar');
@@ -993,6 +1047,7 @@ describe('R34 — el equivalente por teclado reordena y el asa anuncia su posici
     try {
       renderCreateForm();
       await user.type(screen.getByTestId('recipe-field-name'), 'Receta con arrastre por teclado');
+      await addValidLine(user, 0);
 
       await user.click(screen.getByTestId('recipe-step-add'));
       await escribirEnPaso(0, 'Mezclar');
@@ -1045,6 +1100,7 @@ describe('R37 — vista previa de la imagen y bloqueo de un segundo envío', () 
 
     renderCreateForm();
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta con imagen');
+    await addValidLine(user, 0);
 
     expect(screen.getByTestId('recipe-image-preview-placeholder')).toBeInTheDocument();
     await user.upload(screen.getByTestId('recipe-image-input'), validPngFile());
@@ -1082,6 +1138,7 @@ describe('R38 — un archivo rechazado no llega al payload y su error queda junt
     expect(screen.queryByTestId('recipe-image-preview')).toBeNull();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta');
+    await addValidLine(user, 0);
     await user.click(screen.getByTestId('recipe-form-submit'));
 
     await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
@@ -1101,6 +1158,7 @@ describe('R38 — un archivo rechazado no llega al payload y su error queda junt
     expect(screen.queryByTestId('recipe-image-preview')).toBeNull();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta');
+    await addValidLine(user, 0);
     await user.click(screen.getByTestId('recipe-form-submit'));
 
     await waitFor(() => expect(createRecipeActionMock).toHaveBeenCalledTimes(1));
@@ -1214,6 +1272,7 @@ describe('QC-64 R24 — el arrastre por teclado sigue funcionando con el editor 
     try {
       renderCreateForm();
       await user.type(screen.getByTestId('recipe-field-name'), 'Receta con editor y arrastre');
+      await addValidLine(user, 0);
 
       await user.click(screen.getByTestId('recipe-step-add'));
       await escribirEnPaso(0, 'Mezclar');
@@ -1277,6 +1336,9 @@ describe('QC-64 R11, R13 y R22 — la vista previa lee lo que hay escrito y no g
   async function rellenarFormulario(user: UserEvent, textoDelPaso: string): Promise<void> {
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta con vista previa');
     await user.type(screen.getByTestId('recipe-field-description'), 'Una descripcion');
+    // D14: una línea al 100 % para que Guardar no quede deshabilitado (R11, R23) en los casos
+    // de este bloque que sí llegan a enviar.
+    await addValidLine(user, 0);
     await user.click(screen.getByTestId('recipe-step-add'));
     await escribirEnPaso(0, textoDelPaso);
   }

@@ -30,8 +30,7 @@ function line(overrides: Partial<RecipeLineFormValue> = {}): RecipeLineFormValue
     key: 'line-key-1',
     productId: 'product-1',
     productName: 'Producto uno',
-    quantity: '1.0000',
-    unitId: 'unit-1',
+    percentage: '100',
     productUnitId: null,
     ...overrides,
   };
@@ -129,18 +128,25 @@ describe('buildRecipePayload — en el alta el valor nulo nunca viaja (R36, en n
   });
 });
 
-describe('buildRecipePayload — la cantidad viaja como la MISMA cadena que se escribió (R29)', () => {
-  it.each(['0.1005', '1.0000', '10.0001'])(
-    'copia "%s" tal cual, sin pasar por conversión a coma flotante',
-    (quantity) => {
-      const payload = buildRecipePayload('edit', baseState({ lines: [line({ quantity })] }));
+describe('buildRecipePayload — el porcentaje viaja con una única sustitución de coma por punto (R1, R25)', () => {
+  it('sustituye la coma por un punto sin pasar por número', () => {
+    const payload = buildRecipePayload('edit', baseState({ lines: [line({ percentage: '92,5' })] }));
 
-      // Igualdad de CADENA, no de número: `1.0000` !== `String(1)`, y una conversión a
-      // `Number`/`parseFloat` de por medio perdería los ceros o redondearía `0.1005`.
-      expect(payload.lines[0]?.quantity).toBe(quantity);
-      expect(typeof payload.lines[0]?.quantity).toBe('string');
-    },
-  );
+    expect(payload.lines[0]?.percentage).toBe('92.5');
+    expect(typeof payload.lines[0]?.percentage).toBe('string');
+  });
+
+  it('un porcentaje ya escrito con punto se copia tal cual', () => {
+    const payload = buildRecipePayload('edit', baseState({ lines: [line({ percentage: '7.50' })] }));
+
+    expect(payload.lines[0]?.percentage).toBe('7.50');
+  });
+
+  it('no redondea ni convierte: "100,00" sale "100.00", no "100"', () => {
+    const payload = buildRecipePayload('edit', baseState({ lines: [line({ percentage: '100,00' })] }));
+
+    expect(payload.lines[0]?.percentage).toBe('100.00');
+  });
 });
 
 describe('buildRecipePayload — cada paso viaja como el documento del contrato (QC-64 R5)', () => {
@@ -225,15 +231,16 @@ describe('buildRecipePayload — los pasos salen en el orden mostrado (R32)', ()
   });
 });
 
-describe('buildRecipePayload — las líneas van completas y quitar una la saca de la lista (R22)', () => {
-  it('cada línea viaja con productId, quantity y unitId; sin "key" ni "productName"', () => {
-    const theLine = line({ productId: 'p-9', quantity: '3.5', unitId: 'u-9' });
+describe('buildRecipePayload — las líneas van completas y quitar una la saca de la lista (R1, R22)', () => {
+  it('cada línea viaja con productId y percentage, sin unidad ni "key" ni "productName"', () => {
+    const theLine = line({ productId: 'p-9', percentage: '3.5' });
 
     const payload = buildRecipePayload('edit', baseState({ lines: [theLine] }));
 
-    expect(payload.lines[0]).toEqual({ productId: 'p-9', quantity: '3.5', unitId: 'u-9' });
+    expect(payload.lines[0]).toEqual({ productId: 'p-9', percentage: '3.5' });
     expect(payload.lines[0]).not.toHaveProperty('key');
     expect(payload.lines[0]).not.toHaveProperty('productName');
+    expect(payload.lines[0]).not.toHaveProperty('unitId');
   });
 
   it('quitar una línea de state.lines la excluye del payload enviado', () => {

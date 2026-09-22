@@ -692,18 +692,15 @@ describe('contrato de la ruta de recetas', () => {
     ]);
   });
 
-  it('la cantidad nunca se convierte a numero en ningun archivo de la ruta', () => {
+  it('el porcentaje nunca se convierte a numero en ningun archivo de la ruta', () => {
     ningunArchivoContiene(['parseFloat(', 'Number.parseFloat(', 'toFixed(']);
 
     for (const ruta of FUENTES_DE_LA_RUTA) {
       for (const linea of fuenteSinComentarios(ruta).split('\n')) {
-        if (!linea.includes('quantity')) continue;
-        expect(linea, `${ruta}: la cantidad no puede pasar por «Number(»`).not.toContain('Number(');
+        if (!linea.includes('percentage')) continue;
+        expect(linea, `${ruta}: el porcentaje no puede pasar por «Number(»`).not.toContain('Number(');
       }
     }
-
-    // No veta `type="number"`: lo que se protege es que la cantidad no se parsee ni se redondee,
-    // no el control que la captura.
   });
 
   it('la pantalla obtiene las unidades solo por listUnitsAction y ninguna operacion de escritura de unidades entra en esta feature', () => {
