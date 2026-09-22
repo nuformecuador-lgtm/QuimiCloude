@@ -183,7 +183,7 @@ Tres decisiones que conviene entender antes de cambiarlas:
 - **La épica agrupa, no bloquea.** Una épica es un módulo del ERP, y su frontera es la
   misma que la del módulo hexagonal (`QC-15`): la épica dice a *qué* módulo pertenece la
   feature, no *cuándo* puede arrancar. El orden lo siguen marcando `depends_on` y la regla
-  de máx. 2 `in_progress` por zona, que se cuentan sobre features y nunca por épica.
+  del cupo de `in_progress` por zona, que se cuentan sobre features y nunca por épica.
   «Plataforma» es la excepción consciente: no es un módulo de dominio sino el armazón donde
   se montan los demás, y conviene que sea la única.
 - **La identidad es el `key`, no el número.** El `id` numérico se conserva como fallback
@@ -342,7 +342,7 @@ la sesión siguiente.
   responsabilidad del leader en F0, no del gate.
 - **El estado de trabajo sigue en disco** (regla 3 de `CLAUDE.md`). Jira es la entrada
   humana; `feature_list.json`, `progress/` y `specs/` siguen siendo lo que el arnés lee.
-- **La regla de máx. 2 `in_progress` por zona** ahora también se puede violar arrastrando
+- **La regla del cupo de `in_progress` por zona** ahora también se puede violar arrastrando
   tarjetas. La valida el leader al importar y `./init.sh` después
   (`scripts/validate-features.mjs`). Si el board la incumple, gana la regla: el leader deja
   la feature sobrante fuera y lo dice.
