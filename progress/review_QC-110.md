@@ -283,3 +283,161 @@ los detectores de las guardias vienen todos con su entrada infractora.
 
 El `menor 3` (hueco de registro) **no** vuelve al implementer: pide decision del leader o del
 humano sobre `design.md > 4`.
+
+---
+
+# Segunda vuelta — revision de `41e13631..8faf8f37`
+
+> Un solo commit: `8faf8f37 fix(QC-110): cierra el rechazo del reviewer y el hueco de registro`.
+> Revisado el delta **y** comprobado que lo aprobado en la primera vuelta sigue en pie.
+
+## Veredicto: **OK**
+
+Los dos bloqueantes y los cinco menores estan cerrados. Queda **una accion mecanica del leader**
+—marcar T17— y **un menor nuevo** de cobertura, ninguno de los dos motivo de rechazo.
+
+## El gate, corrido por mi
+
+`./init.sh` completo en el worktree, no me fie del reporte:
+
+```
+Test Files  591 passed (591)
+     Tests  8428 passed | 111 skipped (8539)
+  Duration  283.95s
+los tres proyectos corrieron (ui, node, integration)
+tests: sin rojos nuevos (0 rojos, todos en el baseline de 6); 6 por limpiar
+== init OK ==
+```
+
+Coincide con lo reportado. **Aviso, no rojo, y es del leader:** los **seis** archivos del baseline
+ya pasan y toca limpiarlos (`tests/baseline-rojos.json`). Es deuda ajena, anterior a esta ficha.
+
+## Los hallazgos de la primera vuelta, uno a uno
+
+- **B1 — CERRADO.** `storage-config.test.ts`: `IMPORTADORES_PERMITIDOS` a **tres**, en orden
+  alfabetico (que es como se compara), caso renombrado a «exactamente TRES… y este modulo aporta el
+  tercero», cabecera que explica **por que** son tres. **Conservados** el control positivo
+  («el detector dispara») y el centinela anti-vacuidad («el barrido recorre de verdad el arbol»,
+  >100 archivos). Sin `skip`, sin borrado y **sin entrada en el baseline** (comprobado).
+- **B2 — ABIERTO, y es del leader.** `tasks.md` **T17 sigue `[ ]`**. Ahora si es solo una casilla: el
+  gate verde ya esta medido, por el y por mi. No es defecto de implementacion, pero
+  `CHECKPOINTS.md > Especificacion` lo pide literal y sin marcarlo la ficha no puede pasar a `done`.
+- **menor 1 — CERRADO, y bien.** El caso que mentia pasa a «R5 — un fallo del paso de recorte deja
+  error/requeue y NO borra el PDF» con el **cuerpo intacto**, y **nace el R17 de verdad**:
+  `{ ok: true, uploaded: 2, skipped: 1 }` -> `{ kind: 'done' }`, `finish` en «listo» y `remove` del
+  PDF. Es exactamente el caso que faltaba.
+- **menor 2 — CERRADO.** R10/R11 descruzadas, **ningun cuerpo tocado**: R10 son ahora los cuatro
+  casos de `serverExternalPackages` con sus dos controles positivos, R11 los dos de que el canvas
+  sigue rasterizando. Contrastado con el texto de R10 y R11 en `requirements.md`.
+- **menor 4 — CERRADO.** Cabeceras recortadas sin perder ningun porque verificado: siguen dichos la
+  configuracion resuelta en cada llamada, el puerto en proporciones, el minimo de 1 pixel **como
+  tecnico y no umbral de negocio** y el segundo render aceptado a sabiendas.
+- **menor 5 — CERRADO.** `next.config.ts` ya no afirma en falso: dice que el argumento del
+  `await import()` vale para el canvas y que a `sharp`, de import estatico, **ni le aplica**.
+  Contrastado con `image-cropper-sharp.ts`, que efectivamente hace un import estatico.
+- **menor 3 (hueco de registro) — CERRADO POR ARRIBA**, por decision humana. Detalle abajo.
+
+## Las cuatro comprobaciones que pediste
+
+### 1. ¿El registro registra de verdad? **Si en el codigo; los tests cubren DOS de las TRES rutas**
+
+- El test **afirma sobre un doble** (`dobleDeRegistro()` con `vi.fn`), **nunca sobre la consola
+  real**. El adaptador recibe `escribir` por parametro con `console.log` por defecto, calcado de
+  `strategy-run-log-console.ts`. Ningun test parchea la consola global.
+- El caso nuevo es estricto de verdad: `skip` llamado **una** vez y **con el objeto exacto**
+  —ruta, `page: 1`, `index: 2` y la causa literal del error—, y las otras dos regiones subidas igual.
+- En el **codigo**, las tres rutas de salto registran: pagina inexistente
+  (`CAUSA_PAGINA_INEXISTENTE`), region sin area tras el ajuste (`CAUSA_REGION_VACIA`) y fallo al
+  recortar o subir (la causa real del error). El `if` unico se partio en dos precisamente para poder
+  dar causa propia a cada uno.
+- **Pero en los tests solo dos**: ver `menor 6`.
+
+### 2. ¿`StrategyRunLog` de verdad no encajaba? **Confirmado: no encajaba**
+
+Lo comprobe abriendo `ports/strategy-run-log.ts`, no por la explicacion del implementer. Su
+`StrategyRunSummary` es `{ strategy, mode, path, pages, textLength }`, y dos cosas lo cierran:
+
+1. **`textLength` es requerido y no nullable** (`mode` y `pages` si admiten `null`, el no). Una
+   region que no se pudo recortar tendria que inventarse un cero que no significa nada — justo el
+   tipo de dato falso que ese puerto evita al prohibir el texto de la IA.
+2. La operacion se llama `run` y su semantica es **una ejecucion por estrategia**. Registrar por ahi
+   un rectangulo saltado seria mentir sobre lo que la linea describe, ademas de obligar a inventar
+   un `PdfStrategy` y un `AiReadMode` que en una region no existen.
+
+Y **no es un canal paralelo**: mismo `ports/`, mismo `adapters/driven/observability/`, mismo patron
+de prefijo fijo localizable, mismo `escribir` inyectable, cableado en el **unico** sitio que ata
+puerto -> adaptador. Es el patron del vecino aplicado, no un segundo mecanismo.
+
+### 3. ¿`log` es requerida? **Si**
+
+`readonly log: CropRegionLog;` — **sin `?`**, y sin valor por defecto en la fabrica, a diferencia de
+`prompt` y `timeout`, que si lo tienen. O sea que el typecheck impide construir el caso de uso sin
+registro: los nueve sitios de construccion —los ocho del test y el de `lib/composition`— tuvieron
+que pasarlo. El agujero no se puede volver a abrir por omision.
+
+### 4. ¿`requirements.md` y `tasks.md` intactos? **Si, confirmado por mi cuenta**
+
+`git diff 41e13631..8faf8f37` sobre los dos archivos -> **vacio**. El unico cambio del spec es la
+fila `log` en la tabla `Deps` de `design.md > 4`, con su nota fechada de decision humana. Correcto:
+era esa tabla la que se contradecia con su propio paso 6.
+
+## Sobre R17: **lo leo igual que el implementer**
+
+El texto literal dice «nada **fuera del registro de ejecucion** dice que se perdieron recortes por
+el camino». Esa redaccion **presupone** que el registro de ejecucion si lo dice; lo que faltaba no
+era el requisito sino el codigo, que llevaba un `catch` pelado. Con el puerto dentro, R17 pasa a
+describir lo que de verdad ocurre: en pantalla sigue sin distinguirse un archivo con recortes
+perdidos de uno limpio, y el rastro vive en el registro del servidor. **R17 no queda desfasado y no
+habia que reescribirlo.** Bien hecho no tocarlo.
+
+## Hallazgos nuevos de esta vuelta
+
+### menor 6 — la tercera ruta de salto no tiene test
+
+`crop-catalog-images.ts` registra tres causas distintas, pero los tests del caso de uso solo
+ejercitan dos: el fallo al recortar (con el objeto exacto) y la pagina inexistente. La tercera
+—`isEmptyAfterClamp` -> `CAUSA_REGION_VACIA`, la region que el ajuste al borde deja sin area
+(`design.md > 5.4`)— **no la ejercita ningun caso**, ni antes ni ahora: `crop-region.test.ts` solo
+prueba que el ajuste devuelve cero, y ahi se acaba. Si alguien quitara ese `continue`, el caso de
+uso llamaria a la libreria con un rectangulo vacio y **ninguna prueba caeria**.
+
+Falta un caso con `x: 1` (o `y: 1`), que el esquema acepta y el ajuste deja en ancho cero: afirmar
+`skipped: 1`, cero subidas y `skip` llamado con la causa de region vacia. No es bloqueante —el
+comportamiento esta implementado y es el mismo `continue` de siempre—, pero la frase de la bitacora
+«las tres regiones que se saltan dejan rastro» es cierta **en el codigo** y solo **dos tercios** en
+la verificacion.
+
+### observacion — el caso de la pagina inexistente afirma menos que su hermano
+
+Usa `expect.objectContaining({ path, page: 2, index: 1 })`, sin comprobar la causa. El otro caso
+afirma el objeto completo. Con `CAUSA_PAGINA_INEXISTENTE` siendo una constante del modulo, afirmarla
+es gratis y cierra el unico hueco que deja ese `objectContaining`.
+
+### observacion — cita de decisiones en un comentario de test
+
+La cabecera nueva de `IMPORTADORES_PERMITIDOS` en `storage-config.test.ts` cita las decisiones D11 y
+D17. En tests, `docs/conventions.md > Comentarios` mantiene la misma regla y solo exceptua `R<n>`
+**en el nombre del caso**. No lo elevo a hallazgo por consistencia con la primera vuelta: las
+guardias de alcance del repo citan fichas en sus cabeceras como practica establecida, y esta
+cabecera explica precisamente **por que** la lista crecio. Queda anotado para cuando QC-115 decida
+si la guardia mira tambien `tests/`.
+
+## Lo aprobado en la primera vuelta, sigue en pie
+
+- **Comentarios**: barrido propio sobre las lineas **anadidas** del delta en `lib/`, `app/`, `db/`,
+  `components/`, `hooks/` y `next.config.ts`, con el mismo patron ya validado -> **cero citas**.
+- **Guardia de QC-111**: el caso enmendado se actualizo a **tres** puertos
+  (`crop-region-log.ts`, `crop-storage.ts`, `image-cropper.ts`) porque el puerto nuevo lleva «crop»
+  en el nombre. **Sigue afirmando**, no desactivando; detector y palabras intactos; sin `skip` ni
+  baseline. El implementer lo encontro con su propio gate completo y lo dice.
+- **`sharp`**: sigue en un solo archivo, fuera de `domain/` y `ports/`, en `serverExternalPackages`,
+  con la guardia exigiendo las dos. El adaptador nuevo de registro no la toca.
+- **Contrato del modulo**: el barril **no** publica `CropRegionLog` ni su adaptador; las listas de
+  `module-contract.test.ts` no cambian y siguen verdes. R21 intacto.
+- **Las 18 decisiones y las tres preguntas abiertas**: sin cambios. El registro **no** cierra
+  ninguna de las tres —no hay umbral, ni caducidad, ni tope—, solo deja rastro de lo que se pierde.
+
+## Lo que queda para cerrar
+
+1. **Marcar T17 `[x]`** en `tasks.md` (leader). El verde ya esta medido dos veces.
+2. `menor 6` y las dos observaciones: opcionales, decide el leader si entran ahora o como ficha.

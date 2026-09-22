@@ -144,7 +144,7 @@
 
 ## T17 — Gate completo · depende de T16
 
-- [ ] `./init.sh` en verde: typecheck, lint, suite entera y todas las guardias.
+- [x] `./init.sh` en verde: typecheck, lint, suite entera y todas las guardias.
 - **Hecho cuando:** termina en verde y queda anotado en `progress/`.
 
 ### Orden corto

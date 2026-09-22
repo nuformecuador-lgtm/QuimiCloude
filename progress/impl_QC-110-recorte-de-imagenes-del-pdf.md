@@ -101,7 +101,7 @@ Bajo `tests/unit/documentos/`: `crop-region.test.ts`, `crop-coordinates.test.ts`
 | R15 | `qc111-alcance.test.ts` | `R12: db/schema.prisma no declara ninguna columna de salida para el recorte` (conservado de la ficha anterior: sigue vivo y es exactamente lo que R15 pide) |
 | R16 | `crop-catalog-images.test.ts` | `R16 — {"images": []} termina bien con cero subidas` |
 | R16 | `run-document-job.test.ts` | `R16 — cero recortes deja la fila en listo y borra el PDF` |
-| R17 | `crop-catalog-images.test.ts` | `R17 — tres regiones, la segunda revienta al recortar: la primera y la tercera se suben, skipped: 1` · `R17 — una region que apunta a una pagina inexistente se salta sin abortar las demas` · `R17 — la region que revienta al recortar deja su causa en el registro, y las otras dos se suben igual` |
+| R17 | `crop-catalog-images.test.ts` | `R17 — tres regiones, la segunda revienta al recortar: la primera y la tercera se suben, skipped: 1` · `R17 — una region que apunta a una pagina inexistente se salta sin abortar las demas` · `R17 — la region que revienta al recortar deja su causa en el registro, y las otras dos se suben igual` · `R17 — una region que queda sin area tras el ajuste al borde se salta sin abortar las demas` |
 | R17 | `run-document-job.test.ts` | `R17 — una region perdida (skipped > 0) igual deja la fila en listo y borra el PDF` |
 | R18 | `crop-prompt.test.ts` | `R18 — el texto no esta vacio ni en blanco` · `R18 — la cabecera del archivo declara que el texto es provisional` |
 | R19 | `qc110-alcance.test.ts` | `R19: ningun archivo .ts nuevo bajo lib/modules/documentos nombra un simbolo de sesion`, mas su control positivo |
@@ -367,6 +367,64 @@ El registro **no** cierra ninguna de las tres. No se anadio ningun umbral minimo
 caducidad, ni tope por PDF; ningun numero nuevo vive fuera de `domain/limits.ts`. Lo unico que
 cambia es que ahora **queda rastro** de las regiones que se pierden, que no es lo mismo que
 acotarlas.
+
+---
+
+# Cuarta vuelta — menor 6: la tercera ruta de salto, ahora probada
+
+El `reviewer` **aprobo** la ficha (`41e13631..8faf8f37`). Quedaba **un menor de cobertura**, y es lo
+unico de esta vuelta. **Ni una linea de produccion se toco**: lo que faltaba era el test, no el
+comportamiento (`git diff` sobre `lib/`, `app/`, `db/`, `components/`, `scripts/` y `next.config.ts`
+sale **vacio**).
+
+## Que faltaba
+
+`crop-catalog-images.ts` tiene **tres** rutas por las que una region se salta, cada una con su causa
+—pagina inexistente, region sin area tras el ajuste al borde, y el recorte o la subida reventando—.
+Los tests ejercitaban **dos**. La rama `isEmptyAfterClamp` -> `CAUSA_REGION_VACIA` **no la cubria
+ningun caso del caso de uso**: si alguien le quitaba el `continue`, nada caia.
+
+El caso de `crop-region.test.ts` que prueba el ajuste a cero cubre **la funcion de dominio**, no la
+decision del bucle de saltarse esa region. Son dos cosas distintas y solo estaba probada la primera.
+
+## Que entro
+
+Un solo archivo, `tests/unit/documentos/crop-catalog-images.test.ts`:
+
+1. **Caso nuevo**: `R17 — una region que queda sin area tras el ajuste al borde se salta sin abortar
+   las demas`. Monta dos regiones en la pagina 1: `{ page: 1, x: 1, y: 0, width: 0.3, height: 0.3 }`
+   —que el esquema **acepta**, porque `x` llega hasta 1 y `width` solo tiene que ser `> 0`, y que
+   `clampRegionToPage` deja con `width = clamp(0.3, 0, 1 - 1) = 0`— y una sana. Afirma
+   `{ ok: true, uploaded: 1, skipped: 1 }`, que **la sana si se sube**, y que `skip` se llamo **una**
+   vez con el **objeto completo**, causa incluida.
+2. **El caso hermano al mismo rasero**: el de «pagina inexistente» afirmaba con `objectContaining` y
+   sin mirar `cause`; ahora afirma el objeto completo, como el tercero.
+
+Las dos causas se afirman como **literal escrito en el test**, no importando la constante de
+produccion: si alguien cambia el mensaje, el test tiene que enterarse.
+
+De regalo, el caso nuevo deja probado algo que no estaba dicho en ningun sitio: una region saltada
+**igual consume su indice**, porque la sana sube a `1-2.png` y no a `1-1.png`.
+
+## La mordida, comprobada a mano
+
+Se quito el `continue` de la rama `isEmptyAfterClamp` y se corrio el archivo: **1 rojo, 10 verdes**,
+y el rojo es exactamente el caso nuevo —`uploaded` pasa de 1 a 2, porque sin el corte la region
+vacia cae tambien en el bloque de recorte y subida—. Deshecho el cambio, `git diff` de produccion
+**vacio** y los 11 casos en verde.
+
+## Gate COMPLETO — verde
+
+```
+ Test Files  591 passed (591)
+      Tests  8429 passed | 111 skipped (8540)
+   Duration  280.81s
+✓ los tres proyectos corrieron (ui, node, integration)
+✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 6); 6 por limpiar
+== init OK ==
+```
+
+Sigue el aviso de los **6 archivos del baseline que ya pasan**: deuda ajena, aviso y no rojo.
 
 ## Decisiones tomadas durante la implementacion
 

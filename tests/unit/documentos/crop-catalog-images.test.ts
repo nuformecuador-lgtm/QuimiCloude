@@ -346,9 +346,51 @@ describe('documentos — recorte de las imagenes de un catalogo', () => {
     expect(resultado).toEqual({ ok: true, uploaded: 1, skipped: 1 });
     expect(storage.rutas).toEqual([`${EMPRESA}/${ARCHIVO}/1-1.png`]);
     expect(registro.skip).toHaveBeenCalledTimes(1);
-    expect(registro.skip).toHaveBeenCalledWith(
-      expect.objectContaining({ path: PATH, page: 2, index: 1 }),
+    expect(registro.skip).toHaveBeenCalledWith({
+      path: PATH,
+      page: 2,
+      index: 1,
+      cause: 'la pagina no esta entre las paginas rasterizadas',
+    });
+  });
+
+  it('R17 — una region que queda sin area tras el ajuste al borde se salta sin abortar las demas', async () => {
+    const conversion = dobleDeConversion({ pageCount: 1, pages: [pngDe(1)] });
+    const ia = dobleDeIa(
+      JSON.stringify({
+        images: [
+          { page: 1, x: 1, y: 0, width: 0.3, height: 0.3 },
+          { page: 1, x: 0.1, y: 0.1, width: 0.2, height: 0.2 },
+        ],
+      }),
     );
+    const cropper = dobleDeCropper();
+    const storage = dobleDeAlmacenamiento();
+    const registro = dobleDeRegistro();
+    const recortar = createCropCatalogImages({
+      converter: conversion.converter,
+      ai: ia.ai,
+      cropper: cropper.cropper,
+      storage: storage.storage,
+      log: registro.log,
+    });
+
+    const resultado = await recortar({
+      documentFileId: ARCHIVO,
+      companyId: EMPRESA,
+      path: PATH,
+      bytes: pdfBytes(),
+    });
+
+    expect(resultado).toEqual({ ok: true, uploaded: 1, skipped: 1 });
+    expect(storage.rutas).toEqual([`${EMPRESA}/${ARCHIVO}/1-2.png`]);
+    expect(registro.skip).toHaveBeenCalledTimes(1);
+    expect(registro.skip).toHaveBeenCalledWith({
+      path: PATH,
+      page: 1,
+      index: 1,
+      cause: 'el ajuste al borde dejo la region sin area',
+    });
   });
 
   it('R5 — un plazo agotado en la lectura de coordenadas es ai_unavailable, no invalid_input', async () => {
