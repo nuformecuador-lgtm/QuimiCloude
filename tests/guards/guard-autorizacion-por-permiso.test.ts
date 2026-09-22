@@ -30,7 +30,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity';
+import { ROLE_ADMINISTRADOR, ROLE_EMPACADOR, ROLE_OPERADOR } from '@/lib/modules/identity';
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -168,20 +168,27 @@ export type ForbiddenPattern = {
  * Las tres familias:
  *
  * 1. El literal del rol entre comillas — la comparacion a mano, la peor version.
- * 2. Los identificadores `ROLE_ADMINISTRADOR`, `ROLE_OPERADOR`, `assertAdminRole` y `requireAdmin` —
- *    autorizar por rol importando la constante o la comprobacion «es Administrador» heredada de
- *    QC-54. Compila y es exactamente lo que esta ficha borro.
+ * 2. Los identificadores `ROLE_ADMINISTRADOR`, `ROLE_OPERADOR`, `ROLE_EMPACADOR`, `assertAdminRole`
+ *    y `requireAdmin` — autorizar por rol importando la constante o la comprobacion «es
+ *    Administrador» heredada de QC-54. Compila y es exactamente lo que esta ficha borro.
  * 3. El identificador `roleName` — el campo que R18 saca del `Actor` de estos seis modulos. Que hoy
  *    no compile es una casualidad del tipo actual, no una regla: quien lo reintroduzca en su `Actor`
  *    lo hara compilar de nuevo.
+ *
+ * **AMPLIADO por QC-144 (R11): `ROLE_EMPACADOR` y su literal.** El Empacador es un rol mas cuya
+ * diferencia con el Operador es SOLO el conjunto de permisos sembrado (D4); si algun caso de uso de
+ * los seis modulos de negocio comparara por su nombre o importara su constante, seria exactamente
+ * la misma deuda que esta guardia ya vigila para Administrador y Operador.
  */
 export function buildForbiddenPatterns(): readonly ForbiddenPattern[] {
   const literal = (role: string) => new RegExp(`['"\`]${escapeRegExp(role)}['"\`]`);
   return [
     { nombre: `literal del rol ${ROLE_ADMINISTRADOR}`, regex: literal(ROLE_ADMINISTRADOR) },
     { nombre: `literal del rol ${ROLE_OPERADOR}`, regex: literal(ROLE_OPERADOR) },
+    { nombre: `literal del rol ${ROLE_EMPACADOR}`, regex: literal(ROLE_EMPACADOR) },
     { nombre: 'ROLE_ADMINISTRADOR', regex: /\bROLE_ADMINISTRADOR\b/ },
     { nombre: 'ROLE_OPERADOR', regex: /\bROLE_OPERADOR\b/ },
+    { nombre: 'ROLE_EMPACADOR', regex: /\bROLE_EMPACADOR\b/ },
     { nombre: 'assertAdminRole', regex: /\bassertAdminRole\b/ },
     { nombre: 'requireAdmin', regex: /\brequireAdmin\b/ },
     { nombre: 'roleName', regex: /\broleName\b/ },
@@ -427,16 +434,19 @@ describe('guardia — ningun servicio de negocio autoriza por nombre de rol (R20
 
   // Ancla del valor (R21): si `identity` renombrara los roles, el patron derivado cambia con el, y
   // este caso lo dice en vez de dejar la guardia vigilando un nombre inexistente.
-  it('los patrones se derivan de los roles reales de identity, que siguen siendo Administrador y Operador', () => {
+  it('los patrones se derivan de los roles reales de identity, que siguen siendo Administrador, Operador y Empacador', () => {
     expect(ROLE_ADMINISTRADOR).toBe('Administrador');
     expect(ROLE_OPERADOR).toBe('Operador');
+    expect(ROLE_EMPACADOR).toBe('Empacador');
 
     const nombres = buildForbiddenPatterns().map((pattern) => pattern.nombre);
     expect(nombres).toEqual([
       'literal del rol Administrador',
       'literal del rol Operador',
+      'literal del rol Empacador',
       'ROLE_ADMINISTRADOR',
       'ROLE_OPERADOR',
+      'ROLE_EMPACADOR',
       'assertAdminRole',
       'requireAdmin',
       'roleName',
@@ -447,5 +457,48 @@ describe('guardia — ningun servicio de negocio autoriza por nombre de rol (R20
     for (const pattern of buildForbiddenPatterns()) {
       expect(pattern.regex.global, `el patron ${pattern.nombre} no debe ser global`).toBe(false);
     }
+  });
+
+  // QC-144 (R11) — casos sinteticos propios del rol Empacador, misma tecnica que los de
+  // Administrador/Operador de mas arriba: la regla dispara con el literal Y con la constante, y no
+  // dispara con el literal dentro de un comentario.
+  it('QC-144: dispara con un actor.ts sintetico que compara el literal del rol Empacador', () => {
+    const conLiteral = (comilla: string) =>
+      [
+        'export function requireEmpacador(actor: Actor): void {',
+        `  if (actor.role !== ${comilla}${ROLE_EMPACADOR}${comilla}) throw new UnauthorizedError();`,
+        '}',
+      ].join('\n');
+
+    expect(findForbiddenPatternsInSource(conLiteral("'"))).toEqual([
+      `literal del rol ${ROLE_EMPACADOR}`,
+    ]);
+    expect(findForbiddenPatternsInSource(conLiteral('"'))).toEqual([
+      `literal del rol ${ROLE_EMPACADOR}`,
+    ]);
+    expect(findForbiddenPatternsInSource(conLiteral('`'))).toEqual([
+      `literal del rol ${ROLE_EMPACADOR}`,
+    ]);
+  });
+
+  it('QC-144: dispara con un actor.ts sintetico que importa y usa ROLE_EMPACADOR', () => {
+    const conConstante = [
+      "import { ROLE_EMPACADOR } from '@/lib/modules/identity';",
+      '',
+      'export function requireEmpacador(actor: Actor): void {',
+      '  if (actor.role !== ROLE_EMPACADOR) throw new UnauthorizedError();',
+      '}',
+    ].join('\n');
+
+    expect(findForbiddenPatternsInSource(conConstante)).toEqual(['ROLE_EMPACADOR']);
+  });
+
+  it('QC-144: el caso simetrico — el literal del rol Empacador dentro de un comentario NO dispara', () => {
+    expect(
+      findForbiddenPatternsInSource(`// el Empacador hereda la pantalla del Operador, no compara '${ROLE_EMPACADOR}'`),
+    ).toEqual([]);
+    expect(
+      findForbiddenPatternsInSource(`/** ROLE_EMPACADOR se importa del barrel, no se compara por rol */`),
+    ).toEqual([]);
   });
 });
