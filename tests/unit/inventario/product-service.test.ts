@@ -53,6 +53,7 @@ const VISTA_PRODUCTO: ProductView = {
   stock: 0,
   unitId: null,
   qtyAlert: null,
+  type: 'PRODUCT' as const,
   createdAt: AHORA,
   updatedAt: AHORA,
 };
