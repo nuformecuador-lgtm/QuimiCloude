@@ -144,7 +144,7 @@ zona no lo impide por sí sola.
       **Hecho cuando:** `pnpm run test:integration` (o el comando del gate completo) verde para este
       archivo. Cubre R3, R19, R25. Depende de: T3.
 
-- [ ] **T12. [P]** `tests/integration/identity/packer-role-migration.int.test.ts`, en transacción
+- [x] **T12. [P]** `tests/integration/identity/packer-role-migration.int.test.ts`, en transacción
       revertida y con el SQL **leído del archivo** (patrón de `identity-seed.int.test.ts:327-350`):
       (a) base sembrada, se borran las filas de esta ficha, se aplica el UP → rol, permiso y las tres
       asignaciones exactas, Operador idéntico al de antes; (b) UP dos veces sobre base sembrada →
@@ -152,13 +152,13 @@ zona no lo impide por sí sola.
       previo exacto; (d) DOWN con un usuario Empacador → `23503` y nada borrado.
       **Hecho cuando:** verde. Cubre R17, R18, R21. Depende de: T5.
 
-- [ ] **T13. [P]** `role-catalog.int.test.ts`: `listAllRoles()` incluye `Empacador` y no
+- [x] **T13. [P]** `role-catalog.int.test.ts`: `listAllRoles()` incluye `Empacador` y no
       `Administrador` (R22). `user-crud.int.test.ts`: alta y edición con el rol Empacador por un actor
       con `usuarios.modificar` se aceptan y persisten; sin el permiso, rechazo; dos usuarios de
       empresas distintas con el mismo rol (R23, R3).
       **Hecho cuando:** verde. Depende de: T11.
 
-- [ ] **T14. [P]** `tests/integration/asignaciones/assigned-orders.int.test.ts`: un usuario con rol
+- [x] **T14. [P]** `tests/integration/asignaciones/assigned-orders.int.test.ts`: un usuario con rol
       Empacador ve solo los pedidos en que es responsable; no ve los de otro responsable de su
       empresa ni los de otra empresa.
       **Hecho cuando:** verde. Cubre R14. Depende de: T11.
