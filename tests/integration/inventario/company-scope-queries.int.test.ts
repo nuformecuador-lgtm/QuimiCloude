@@ -19,7 +19,7 @@ import {
   adjustBatchStock,
   createProduct,
   createWithFirstBatch,
-  findAliveIdByName,
+  findAliveIdByNameInPresentationUnit,
   findAliveProductById,
   findBatchesOfAliveProduct,
   listAliveProducts,
@@ -135,6 +135,10 @@ async function sembrarProducto(
     data: {
       name,
       nameNormalized: normalizeProductName(name),
+      // El disparador `product_batches_check_unit` rechaza un lote sobre un producto sin
+      // unidad; `sembrarLote` cuelga lotes sobre estos productos, asi que nacen con la unidad
+      // que comparten todas las presentaciones del fixture.
+      unitId: unidadDeSistema,
       qtyAlert: extras.qtyAlert ?? null,
       companyId: empresa.companyId,
     },
@@ -416,11 +420,17 @@ describe('R14 — la busqueda y los filtros NO ensanchan lo visible', () => {
     }
   });
 
-  it('findAliveIdByName no resuelve el homonimo de otra empresa (R18 por el lado del SQL)', async () => {
-    // Por eso el alta desde A crea un producto nuevo en vez de colgar el lote al de B.
+  it('findAliveIdByNameInPresentationUnit no resuelve el homonimo de otra empresa (R18 por el lado del SQL)', async () => {
+    // Por eso el alta desde A crea un producto nuevo en vez de colgar el lote al de B. La misma
+    // unidad en las dos empresas (`unidadDeSistema`) deja claro que lo que aisla es la empresa
+    // y no la unidad.
     const nombreDeB = `${MARCA} ${SOLO_B} Producto B uno`;
-    expect(await findAliveIdByName(nombreDeB, ambitoDe(A))).toBeNull();
-    expect(await findAliveIdByName(nombreDeB, ambitoDe(B))).toBe(B.productos[0]);
+    expect(
+      await findAliveIdByNameInPresentationUnit(nombreDeB, A.presentaciones[0] ?? '', ambitoDe(A)),
+    ).toBeNull();
+    expect(
+      await findAliveIdByNameInPresentationUnit(nombreDeB, B.presentaciones[0] ?? '', ambitoDe(B)),
+    ).toBe(B.productos[0]);
   });
 });
 

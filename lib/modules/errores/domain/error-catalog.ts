@@ -54,6 +54,7 @@ export const ERROR_MESSAGE_KEY = {
   batch_not_found: 'errors.batch_not_found',
   batch_stock_negative: 'errors.batch_stock_negative',
   ai_unavailable: 'errors.ai_unavailable',
+  presentation_unit_locked: 'errors.presentation_unit_locked',
   action_not_allowed: 'errors.action_not_allowed',
 } as const satisfies Record<ErrorCode, string>;
 
@@ -133,6 +134,8 @@ export const ERROR_MESSAGES_ES = {
   'errors.batch_stock_negative': 'El ajuste dejaria la existencia del lote por debajo de cero.',
   'errors.ai_unavailable':
     'La lectura automatica no esta disponible en este momento. Intentalo mas tarde.',
+  'errors.presentation_unit_locked':
+    'La presentacion ya tiene lotes y no puede cambiar de unidad.',
   // No es «no tienes permiso»: la operacion esta autorizada, lo que se rechaza es la accion.
   'errors.action_not_allowed': 'La accion no esta permitida.',
 } as const satisfies Record<ErrorMessageKey, string>;

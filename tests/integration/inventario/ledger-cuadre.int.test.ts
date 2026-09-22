@@ -306,6 +306,9 @@ describe('la excepcion permanente de los lotes anteriores a LEDGER_START (R30)',
         data: {
           name: `Producto ${token()}`,
           nameNormalized: normalizeForTest(token()),
+          // La misma unidad que `fixture.presentationId`: sin ella, `product_batches_check_unit`
+          // rechazaria los dos lotes fabricados a mano mas abajo.
+          unitId: await unidadDeSistema(prisma),
           companyId: fixture.companyId,
         },
         select: { id: true },

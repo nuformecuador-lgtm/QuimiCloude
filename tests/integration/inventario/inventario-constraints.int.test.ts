@@ -342,11 +342,9 @@ describe('estructura de la presentacion', () => {
 describe('estructura del producto', () => {
   it('crea un producto con todos sus datos y los relee sin perdida', async () => {
     await inRolledBackTransaction(async (tx) => {
-      // ACTUALIZADO EL 2026-09-11 POR QC-80 (R7, R21). ANTES este caso creaba la unidad y la
-      // escribia en `products.unit_id`, y afirmaba que se releia igual. Esa columna YA NO
-      // EXISTE, asi que la afirmacion no se borra: se INVIERTE en positivo -el producto no
-      // declara unidad por ningun nombre de columna, abajo- y su sujeto nuevo, la unidad de la
-      // PRESENTACION, se prueba en `presentation-unit.int.test.ts`.
+      // El producto declara `unit_id` (fija, la de la presentacion de su primer lote) y
+      // `stock` (guardada, recalculada por la aplicacion). Sin lotes -como este caso- las dos
+      // nacen en su valor de "todavia nada": `unit_id` en NULL y `stock` en 0.
       const { id } = await tx.product.create({
         data: {
           name: 'Acido citrico monohidratado',
@@ -363,12 +361,14 @@ describe('estructura del producto', () => {
       expect(product.name).toBe('Acido citrico monohidratado')
       expect(product.qtyAlert).toBe(20)
       expect(product.deletedAt).toBeNull()
-      // R21 de QC-80: el producto NO declara unidad, ni como uuid ni como texto. Se lee de
-      // `information_schema` y no del objeto de Prisma: el cliente solo sabe lo que el esquema
-      // le dijo, y lo que aqui se vigila es la TABLA.
-      expect(await columnTypes(tx, 'products', ['unit_id', 'unit'])).toEqual([])
-      // R2: el producto ya no declara existencia; la suma vive en sus lotes.
-      expect(Object.keys(product)).not.toContain('stock')
+      // `unit_id` existe como columna real de la tabla (uuid), y esta fila -sin lotes- la
+      // tiene en NULL.
+      expect(await columnTypes(tx, 'products', ['unit_id'])).toEqual([
+        { column_name: 'unit_id', data_type: 'uuid', numeric_precision: null, numeric_scale: null },
+      ])
+      expect(product.unitId).toBeNull()
+      // `stock` existe y, sin lotes, vale 0.
+      expect(product.stock).toBe(0)
       expect(product.id).toMatch(/^[0-9a-f-]{36}$/u)
     })
   })
@@ -396,7 +396,7 @@ describe('estructura del producto', () => {
     })
   })
 
-  it('acepta un producto sin cantidad de alerta, la devuelve como ausencia de valor, y ya no tiene donde declarar unidad ni existencia (R2, R21)', async () => {
+  it('acepta un producto sin cantidad de alerta, la devuelve como ausencia de valor, y sin lotes su unidad y su existencia son NULL y 0 (R2, QC-121 R1, R8, R23)', async () => {
     await inRolledBackTransaction(async (tx) => {
       const { id } = await tx.product.create({
         data: {
@@ -412,15 +412,14 @@ describe('estructura del producto', () => {
       // cosas; un `toBeFalsy` las confundiria y el test no valdria nada.
       expect(product.qtyAlert).toBeNull()
       expect(product.qtyAlert).not.toBe(0)
-      // ACTUALIZADO EL 2026-09-11 POR QC-80 (R21). ANTES esto decia «la unidad ausente vuelve
-      // como AUSENCIA de valor» sobre `products.unit_id`. Hoy la ausencia es MAS FUERTE y se
-      // afirma como tal: el producto no tiene NINGUNA columna donde declarar unidad, asi que no
-      // hay valor que pueda volver mal. Quien declara unidad es la presentacion (R1).
-      expect(await columnTypes(tx, 'products', ['unit_id', 'unit'])).toEqual([])
-      expect(Object.keys(product)).not.toContain('unitId')
-      // R2: sin lotes, la existencia es 0, pero eso ya no es una columna del producto.
-      expect(Object.keys(product)).not.toContain('stock')
-      expect(await columnTypes(tx, 'products', ['stock'])).toEqual([])
+      // `unit_id` es NULL mientras el producto no tenga ningun lote: no hay unidad que sacar
+      // de ninguna presentacion todavia.
+      expect(await columnTypes(tx, 'products', ['unit_id'])).toEqual([
+        { column_name: 'unit_id', data_type: 'uuid', numeric_precision: null, numeric_scale: null },
+      ])
+      expect(product.unitId).toBeNull()
+      // Sin lotes, la existencia GUARDADA es 0.
+      expect(product.stock).toBe(0)
     })
   })
 
@@ -801,7 +800,8 @@ describe('borrado logico y marcas de tiempo', () => {
  */
 describe('QC-52/QC-91 — censo de products tras las migraciones', () => {
   /** Columnas exactas que `products` debe tener tras las migraciones (R1, R2, R4 de QC-52;
-   * la mudanza a `product_batches` del 2026-09-09; y R2 de QC-91). */
+   * la mudanza a `product_batches` del 2026-09-09; R2 de QC-91; y QC-121, que devuelve
+   * `unit_id` y `stock` como columnas guardadas de nuevo). */
   const COLUMNAS_ESPERADAS = [
     // QC-49 (R1): `company_id`, NOT NULL con FK a `companies`. Todo producto es de UNA empresa.
     // La lista es una igualdad exacta, asi que es ella quien vigila que no desaparezca.
@@ -816,13 +816,17 @@ describe('QC-52/QC-91 — censo de products tras las migraciones', () => {
     // del producto no es unico, QC-14 decision cerrada 6-.
     'name_normalized',
     'qty_alert',
-    // QC-80 (R7) se llevo `unit_id` --columna, indice y FK--: el producto ya no declara
-    // unidad. Esta lista es una igualdad exacta, asi que es ella quien lo vigila.
+    // La existencia guardada, suma de los lotes, que la aplicacion recalcula.
+    'stock',
+    // La unidad del producto, fija desde su primer lote. Esta lista es una igualdad exacta,
+    // asi que es ella quien vigila que no vuelva a desaparecer.
+    'unit_id',
     'updated_at',
   ] as const
 
-  /** Las que la migracion se llevo y que no pueden volver por ninguna via (QC-52 R1, QC-91 R2). */
-  const COLUMNAS_ELIMINADAS = ['cost', 'min_purchase', 'delivery_time', 'stock'] as const
+  /** Las que la migracion de QC-52/QC-91 se llevo y que no pueden volver por ninguna via
+   *  (QC-52 R1, QC-91 R2). `stock` ya no esta aqui: esta en `COLUMNAS_ESPERADAS`. */
+  const COLUMNAS_ELIMINADAS = ['cost', 'min_purchase', 'delivery_time'] as const
 
   async function nombresDeColumna(): Promise<string[]> {
     const rows = await prisma.$queryRaw<{ column_name: string }[]>`
@@ -856,13 +860,8 @@ describe('QC-52/QC-91 — censo de products tras las migraciones', () => {
     expect(row?.column_default).toBeNull()
   })
 
-  it('su unica clave foranea es la de la empresa, y ninguna mas', async () => {
-    // ACTUALIZADO EL 2026-09-11 POR QC-49 (R1). ANTES este caso afirmaba que `products` no
-    // conservaba NINGUNA FK -QC-80 se llevo la ultima, la de la unidad, con su columna-. La
-    // migracion de esta ficha le da una nueva, `products_company_id_fkey` -> `companies`, asi
-    // que la afirmacion no se borra ni se afloja: sigue siendo una IGUALDAD EXACTA y ahora
-    // nombra la que tiene que haber. Si apareciera una segunda por cualquier via --un drift del
-    // modelo, una migracion futura--, esto lo dice igual.
+  it('sus claves foraneas son la de la empresa y la de la unidad, y ninguna mas', async () => {
+    // Igualdad exacta y no `toContain`: una FK de mas o de menos la pone roja.
     const rows = await prisma.$queryRaw<{ conname: string; confrelid: string }[]>`
       SELECT c.conname, c.confrelid::regclass::text AS confrelid
       FROM pg_constraint c
@@ -870,6 +869,7 @@ describe('QC-52/QC-91 — censo de products tras las migraciones', () => {
       ORDER BY c.conname`
     expect(rows.map((row) => [row.conname, row.confrelid])).toEqual([
       ['products_company_id_fkey', 'companies'],
+      ['products_unit_id_fkey', 'units'],
     ])
 
     // Ancla: la consulta SI ve las FK de esta base. Sin esto, un error de escritura en el
@@ -880,16 +880,18 @@ describe('QC-52/QC-91 — censo de products tras las migraciones', () => {
     expect(deLosLotes.length).toBeGreaterThan(0)
   })
 
-  it('R2: conserva un unico CHECK de no negatividad, el de qty_alert', async () => {
-    // QC-52 R3: los de `cost` y `min_purchase` se fueron CON su columna, sin sentencia
-    // propia: Postgres borra el CHECK que solo menciona la columna eliminada. QC-91 se lleva
-    // ademas el de `stock`, con su columna. El de `qty_alert` no menciona ninguna de las
-    // eliminadas, asi que tiene que seguir entero.
+  it('R2: conserva los CHECK de no negatividad de qty_alert y, de nuevo, de stock', async () => {
+    // Los de `cost` y `min_purchase` se fueron CON su columna, sin sentencia propia: Postgres
+    // borra el CHECK que solo menciona la columna eliminada. El de `qty_alert` no menciono
+    // nunca ninguna de las eliminadas, asi que sigue entero.
     const rows = await prisma.$queryRaw<{ conname: string }[]>`
       SELECT conname FROM pg_constraint
       WHERE conrelid = 'public.products'::regclass AND contype = 'c'
       ORDER BY conname`
-    expect(rows.map((row) => row.conname)).toEqual(['products_qty_alert_non_negative'])
+    expect(rows.map((row) => row.conname)).toEqual([
+      'products_qty_alert_non_negative',
+      'products_stock_non_negative',
+    ])
   })
 
   it('no queda ninguna restriccion que mencione una columna eliminada', async () => {

@@ -534,22 +534,11 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
       )}
 
       {/*
-        AQUI IBA LA UNIDAD, y su ausencia es deliberada (decision humana del 2026-09-03).
-
-        R23 la pedia como TEXTO LIBRE porque eso era lo que la columna guardaba. El merge de QC-32
-        (`modelo-unidades`) tumbo esa premisa mientras esta feature seguia en vuelo: `ProductView`
-        ya no trae `unit: string | null` sino `unitId: UnitId | null`, una clave foranea al
-        catalogo. Un campo de texto ya no vale, y un selector **no se puede construir hoy**: el
-        contrato publico de `lib/modules/unidades` solo publica `normalizeUnitName` y los tipos,
-        sin ninguna operacion para listar el catalogo.
-
-        QC-80 (R21) cierra la pregunta en vez de aplazarla: `products.unit_id` YA NO EXISTE -ni la
-        columna, ni su indice, ni su FK-, asi que aqui no falta un selector, no hay nada que
-        pedir. La unidad la declara la PRESENTACION (`presentations.unit_id`, obligatoria) y la de
-        un producto se DERIVA de la presentacion de su lote mas reciente
-        (`ProductView.latestBatchUnitId`, R22): es un dato que se lee, nunca uno que este
-        formulario envie. El alta, por tanto, no manda `unitId` -y si lo mandara, el esquema es
-        `strictObject` y lo rechazaria con `invalid_input`-.
+        AQUI IBA LA UNIDAD, y su ausencia es deliberada: la declara la PRESENTACION
+        (`presentations.unit_id`, obligatoria), y `products.unit_id` -expuesto como
+        `ProductView.unitId`- es un dato que se lee, nunca uno que este formulario envie. El
+        alta, por tanto, no manda `unitId` -y si lo mandara, el esquema es `strictObject` y lo
+        rechazaria con `invalid_input`-.
       */}
 
       <ProductField

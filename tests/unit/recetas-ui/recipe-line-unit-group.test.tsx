@@ -7,7 +7,7 @@ import {
   RecipeLinesField,
   type RecipeLineFormValue,
 } from '@/app/(private)/produccion/formulas/components';
-
+import { productDisplayName } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 /**
@@ -16,10 +16,10 @@ import type { UnitRef } from '@/lib/modules/unidades';
  * -que el campo está deshabilitado, qué opciones ofrece y qué queda elegido tras el gesto-; el
  * cálculo puro de las tres reglas se prueba aparte, en `unit-group.test.ts`.
  *
- * **QC-80 no cambió ninguna regla, cambió la FUENTE del dato**: `option.unitId` sale ahora de
- * `ProductView.latestBatchUnitId` -la unidad de la presentación del LOTE MÁS RECIENTE del
- * producto- y ya no de `products.unit_id`, columna eliminada. Por eso aquí `null` quiere decir
- * **«este ingrediente todavía no tiene ningún lote»** (R23), no «no tiene unidad».
+ * `option.unitId` sale de `ProductView.unitId`, la unidad guardada y fija del producto; `null`
+ * quiere decir **«este ingrediente todavía no tiene unidad»** (R23), no «no se pudo leer». El
+ * selector de ingrediente pinta cada opción como «nombre · unidad» (R18): `elegirIngrediente`
+ * busca por esa etiqueta, no solo por el nombre.
  *
  * `listProductsAction` está mockeada porque `ProductPicker` la importa, pero la página 1 baja
  * precargada por props (R49), así que abrir el desplegable de ingrediente NO la invoca.
@@ -57,11 +57,7 @@ const UNITS = [KILOGRAMO, GRAMO, LITRO, MILILITRO] as const;
 
 const SOSA = { id: 'p-sosa', name: 'Sosa cáustica', unitId: KILOGRAMO.id };
 const AGUA = { id: 'p-agua', name: 'Agua destilada', unitId: LITRO.id };
-/**
- * Producto SIN NINGÚN LOTE (R23): `latestBatchUnitId` es `null`, así que no hay presentación de
- * la que derivar su unidad. Es el caso de la receta que se escribe antes de comprar el
- * ingrediente.
- */
+/** Producto SIN UNIDAD (R23): sin ella no hay grupo del que derivar el catálogo de la línea. */
 const COLORANTE = { id: 'p-colorante', name: 'Colorante rojo', unitId: null };
 
 const INITIAL_PRODUCT_PAGE = { items: [SOSA, AGUA, COLORANTE], totalPages: 1 };
@@ -78,9 +74,18 @@ function Harness({ initialLines = [] as readonly RecipeLineFormValue[] }) {
   );
 }
 
-async function elegirIngrediente(user: ReturnType<typeof setupUser>, nombre: string) {
+/** Etiqueta que pinta el selector para un ingrediente: «nombre · unidad», o solo el nombre (R18). */
+function pickerLabel(product: { readonly name: string; readonly unitId: string | null }): string {
+  const unit = product.unitId === null ? undefined : UNITS.find((u) => u.id === product.unitId);
+  return productDisplayName(product.name, unit === undefined ? null : (unit.symbol ?? unit.name));
+}
+
+async function elegirIngrediente(
+  user: ReturnType<typeof setupUser>,
+  product: { readonly name: string; readonly unitId: string | null },
+) {
   await user.click(screen.getByTestId('recipe-line-product-0'));
-  await user.click(await screen.findByRole('option', { name: nombre }));
+  await user.click(await screen.findByRole('option', { name: pickerLabel(product) }));
 }
 
 /** Etiquetas de las opciones que ofrece el selector de unidad de la línea 0. */
@@ -103,7 +108,7 @@ describe('el selector de unidad depende del ingrediente de su línea', () => {
     const user = setupUser();
     render(<Harness />);
 
-    await elegirIngrediente(user, SOSA.name);
+    await elegirIngrediente(user, SOSA);
 
     expect(screen.getByTestId('recipe-line-unit-0')).toBeEnabled();
   });
@@ -112,7 +117,7 @@ describe('el selector de unidad depende del ingrediente de su línea', () => {
     const user = setupUser();
     render(<Harness />);
 
-    await elegirIngrediente(user, SOSA.name);
+    await elegirIngrediente(user, SOSA);
 
     expect((await opcionesDeUnidad(user)).sort()).toEqual(['g', 'kg']);
   });
@@ -121,7 +126,7 @@ describe('el selector de unidad depende del ingrediente de su línea', () => {
     const user = setupUser();
     render(<Harness />);
 
-    await elegirIngrediente(user, AGUA.name);
+    await elegirIngrediente(user, AGUA);
 
     const opciones = await opcionesDeUnidad(user);
     expect(opciones.sort()).toEqual(['L', 'mL']);
@@ -132,7 +137,7 @@ describe('el selector de unidad depende del ingrediente de su línea', () => {
     const user = setupUser();
     render(<Harness />);
 
-    await elegirIngrediente(user, SOSA.name);
+    await elegirIngrediente(user, SOSA);
 
     // `g` frente a `kg`: gana el factor menor, no el orden en que llegó el catálogo.
     expect(screen.getByTestId('recipe-line-unit-0')).toHaveTextContent('g');
@@ -143,14 +148,14 @@ describe('el selector de unidad depende del ingrediente de su línea', () => {
     const user = setupUser();
     render(<Harness initialLines={[]} />);
 
-    await elegirIngrediente(user, SOSA.name);
+    await elegirIngrediente(user, SOSA);
     // El usuario sube a `kg` a mano...
     await user.click(screen.getByTestId('recipe-line-unit-0'));
     await user.click(await screen.findByRole('option', { name: 'kg' }));
     expect(screen.getByTestId('recipe-line-unit-0')).toHaveTextContent('kg');
 
     // ...y cambia el ingrediente por otro que se mide igual: su elección sobrevive.
-    await elegirIngrediente(user, SOSA.name);
+    await elegirIngrediente(user, SOSA);
     expect(screen.getByTestId('recipe-line-unit-0')).toHaveTextContent('kg');
   });
 
@@ -158,10 +163,10 @@ describe('el selector de unidad depende del ingrediente de su línea', () => {
     const user = setupUser();
     render(<Harness />);
 
-    await elegirIngrediente(user, SOSA.name);
+    await elegirIngrediente(user, SOSA);
     expect(screen.getByTestId('recipe-line-unit-0')).toHaveTextContent('g');
 
-    await elegirIngrediente(user, AGUA.name);
+    await elegirIngrediente(user, AGUA);
     // `g` no significa nada en una línea que se mide en litros.
     expect(screen.getByTestId('recipe-line-unit-0')).toHaveTextContent('mL');
   });
@@ -170,7 +175,7 @@ describe('el selector de unidad depende del ingrediente de su línea', () => {
     const user = setupUser();
     render(<Harness />);
 
-    await elegirIngrediente(user, COLORANTE.name);
+    await elegirIngrediente(user, COLORANTE);
 
     expect((await opcionesDeUnidad(user)).sort()).toEqual(['L', 'g', 'kg', 'mL']);
   });
@@ -179,7 +184,7 @@ describe('el selector de unidad depende del ingrediente de su línea', () => {
     const user = setupUser();
     render(<Harness />);
 
-    await elegirIngrediente(user, COLORANTE.name);
+    await elegirIngrediente(user, COLORANTE);
 
     // Sin lote no hay dato con el que acotar, pero eso no es motivo para bloquear la línea: se
     // escriben recetas antes de comprar el ingrediente.
@@ -190,7 +195,7 @@ describe('el selector de unidad depende del ingrediente de su línea', () => {
     const user = setupUser();
     render(<Harness />);
 
-    await elegirIngrediente(user, COLORANTE.name);
+    await elegirIngrediente(user, COLORANTE);
 
     // La más pequeña del catálogo entero, que es el grupo cuando no hay con qué acotar: `mL` y
     // `g` empatan a factor mínimo dentro de su grupo, y aquí compiten `0.0010` (mL) contra `1`
@@ -202,11 +207,11 @@ describe('el selector de unidad depende del ingrediente de su línea', () => {
     const user = setupUser();
     render(<Harness />);
 
-    await elegirIngrediente(user, SOSA.name);
+    await elegirIngrediente(user, SOSA);
     await user.click(screen.getByTestId('recipe-line-unit-0'));
     await user.click(await screen.findByRole('option', { name: 'kg' }));
 
-    await elegirIngrediente(user, COLORANTE.name);
+    await elegirIngrediente(user, COLORANTE);
 
     // El grupo es el catálogo entero, así que `kg` sigue perteneciendo a él: no se pisa.
     expect(screen.getByTestId('recipe-line-unit-0')).toHaveTextContent('kg');

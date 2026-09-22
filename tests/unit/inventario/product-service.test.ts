@@ -50,11 +50,9 @@ const VISTA_PRODUCTO: ProductView = {
   id: 'producto-1',
   name: 'Acido sulfurico',
   imagePath: null,
-  stockByUnit: [],
+  stock: 0,
+  unitId: null,
   qtyAlert: null,
-  // QC-80 (R22): `unitId` dejo de ser un campo del producto; lo que la vista trae es la unidad
-  // DERIVADA del lote mas reciente, `null` mientras no haya ninguno.
-  latestBatchUnitId: null,
   createdAt: AHORA,
   updatedAt: AHORA,
 };
@@ -79,7 +77,9 @@ function montarRepositorio(overrides: Partial<ProductRepository> = {}): ProductR
     })),
     // QC-90 (T4): los tres metodos del alta con primer lote. Por defecto NO hay producto
     // vivo homonimo, asi que el alta cae al camino de creacion (R16).
-    findAliveIdByName: vi.fn<ProductRepository['findAliveIdByName']>(async () => null),
+    findAliveIdByNameInPresentationUnit: vi.fn<
+      ProductRepository['findAliveIdByNameInPresentationUnit']
+    >(async () => null),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
       id: 'producto-1',
       batchId: 'lote-1',
@@ -124,7 +124,7 @@ describe('R12 — nombres duplicados', () => {
     // al puerto, ninguna rechazada.
     //
     // QC-90 acota lo que este caso mide, y conviene decirlo: quien decide si hay homonimo
-    // es el PUERTO (`findAliveIdByName`), y aqui devuelve `null` -no hay producto vivo con
+    // es el PUERTO (`findAliveIdByNameInPresentationUnit`), y aqui devuelve `null` -no hay producto vivo con
     // ese nombre-. Lo que sigue vigente es que el DOMINIO no rechaza por nombre repetido;
     // con un producto vivo homonimo, el alta agrega lote en vez de crear (R17), y eso se
     // prueba en `create-product.test.ts`.
@@ -197,7 +197,7 @@ describe('el borrado usa la operacion logica del puerto, nunca una fisica', () =
  *  nombre o escribio un lote pese al rechazo. */
 function afirmarPuertoIntacto(products: ProductRepository): void {
   expect(products.create).not.toHaveBeenCalled();
-  expect(products.findAliveIdByName).not.toHaveBeenCalled();
+  expect(products.findAliveIdByNameInPresentationUnit).not.toHaveBeenCalled();
   expect(products.createWithFirstBatch).not.toHaveBeenCalled();
   expect(products.addBatchToAlive).not.toHaveBeenCalled();
 }

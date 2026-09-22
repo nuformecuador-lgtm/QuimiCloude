@@ -73,6 +73,10 @@ type Semilla = {
   readonly qtyAlert?: number | null;
   readonly createdAt?: Date;
   readonly deletedAt?: Date | null;
+  /** Sin ella, el disparador `product_batches_check_unit` rechaza cualquier lote posterior. */
+  readonly unitId?: string | null;
+  /** Columna directa, sin pasar por lotes: aqui solo importa que la consulta la ordene y la filtre. */
+  readonly stock?: number;
 };
 
 async function sembrar(semillas: readonly Semilla[]): Promise<readonly string[]> {
@@ -84,6 +88,8 @@ async function sembrar(semillas: readonly Semilla[]): Promise<readonly string[]>
         nameNormalized: normalizeProductName(semilla.name),
         qtyAlert: semilla.qtyAlert ?? null,
         deletedAt: semilla.deletedAt ?? null,
+        unitId: semilla.unitId ?? null,
+        stock: semilla.stock ?? 0,
         companyId: empresaDelArchivo,
         ...(semilla.createdAt === undefined ? {} : { createdAt: semilla.createdAt }),
       },
@@ -227,6 +233,44 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
 
     expect(pagina.pageSize).toBe(MAX_PAGE_SIZE);
     expect(pagina.items.length).toBeLessThanOrEqual(MAX_PAGE_SIZE);
+  });
+});
+
+describe('el listado vuelve a ordenar y a filtrar por existencia guardada (R15)', () => {
+  const PREFIJO = `ZZ-stock-${token()}`;
+  const NOMBRES = Array.from({ length: 4 }, (_, i) => `${PREFIJO} ${String(i + 1).padStart(2, '0')}`);
+  const EXISTENCIAS = [30, 10, 40, 20];
+
+  beforeAll(async () => {
+    await sembrar(NOMBRES.map((name, i) => ({ name, stock: EXISTENCIAS[i] })));
+  });
+
+  it('ordena por existencia ascendente y descendente sobre el conjunto completo', async () => {
+    const asc = await listAliveProducts(
+      consulta({ pageSize: 25, search: PREFIJO, sort: { columnId: 'stock', direction: 'asc' } }),
+      ambito(),
+    );
+    expect(asc.items.map((p) => p.stock)).toEqual([10, 20, 30, 40]);
+
+    const desc = await listAliveProducts(
+      consulta({ pageSize: 25, search: PREFIJO, sort: { columnId: 'stock', direction: 'desc' } }),
+      ambito(),
+    );
+    expect(desc.items.map((p) => p.stock)).toEqual([40, 30, 20, 10]);
+  });
+
+  it('filtra por un rango de existencia, en los dos extremos inclusivos', async () => {
+    const pagina = await listAliveProducts(
+      consulta({
+        pageSize: 25,
+        search: PREFIJO,
+        filters: { stock: { kind: 'numberRange', min: 20, max: 30 } },
+      }),
+      ambito(),
+    );
+
+    expect(pagina.items.map((p) => p.stock).sort((a, b) => a - b)).toEqual([20, 30]);
+    expect(pagina.total).toBe(2);
   });
 });
 
@@ -375,28 +419,32 @@ describe('el rango de fechas se compara en UTC, con los dos extremos inclusivos'
   });
 });
 
-describe('QC-80 — el listado devuelve la unidad derivada del lote mas reciente (R22, R23)', () => {
-  it('un producto con DOS lotes de presentaciones distintas devuelve la unidad del MAS RECIENTE (R22)', async () => {
-    // El lote viejo se inserta el ultimo: si el adaptador ordenara por insercion, o se olvidara
-    // del `orderBy`, este caso lo diria.
+describe('el mismo nombre en dos unidades distintas son dos productos, cada uno con su unidad (R4)', () => {
+  it('dos productos homonimos en unidades distintas salen como dos filas con su propia unidad', async () => {
+    // El disparador `product_batches_check_unit` prohibe un producto con lotes en dos unidades:
+    // lo que antes era un solo producto con dos lotes ahora son dos productos.
     const marca = `Derivada ${token()}`;
-    const [productId] = await sembrar([{ name: `${marca} con lotes` }]);
-    if (productId === undefined) throw new Error('el producto de apoyo no se sembro');
+    const unidadA = await sembrarUnidad();
+    const unidadB = await sembrarUnidad();
+    const presentacionA = await sembrarPresentacion(unidadA);
+    const presentacionB = await sembrarPresentacion(unidadB);
+    const [productoA, productoB] = await sembrar([
+      { name: `${marca} con lotes`, unitId: unidadA },
+      { name: `${marca} con lotes`, unitId: unidadB },
+    ]);
+    if (productoA === undefined || productoB === undefined) {
+      throw new Error('los productos de apoyo no se sembraron');
+    }
 
-    const unidadVieja = await sembrarUnidad();
-    const unidadReciente = await sembrarUnidad();
-    const presentacionVieja = await sembrarPresentacion(unidadVieja);
-    const presentacionReciente = await sembrarPresentacion(unidadReciente);
-
-    await sembrarLote(productId, presentacionReciente, new Date('2031-05-02T00:00:00.000Z'));
-    await sembrarLote(productId, presentacionVieja, new Date('2031-05-01T00:00:00.000Z'));
+    await sembrarLote(productoA, presentacionA, new Date('2031-05-02T00:00:00.000Z'));
+    await sembrarLote(productoB, presentacionB, new Date('2031-05-01T00:00:00.000Z'));
 
     const pagina = await listAliveProducts(consulta({ pageSize: 25, search: marca }), ambito());
 
-    expect(pagina.items).toHaveLength(1);
-    expect(pagina.items[0]?.latestBatchUnitId).toBe(unidadReciente);
-    // Sin esto, un adaptador que devolviera la primera unidad que encuentra pasaria a veces.
-    expect(pagina.items[0]?.latestBatchUnitId).not.toBe(unidadVieja);
+    expect(pagina.items).toHaveLength(2);
+    const porUnidad = new Map(pagina.items.map((p) => [p.unitId, p]));
+    expect(porUnidad.get(unidadA)?.id).toBe(productoA);
+    expect(porUnidad.get(unidadB)?.id).toBe(productoB);
   });
 
   it('un producto SIN ningun lote devuelve null, y no desaparece del listado (R23)', async () => {
@@ -406,45 +454,53 @@ describe('QC-80 — el listado devuelve la unidad derivada del lote mas reciente
     const pagina = await listAliveProducts(consulta({ pageSize: 25, search: marca }), ambito());
 
     expect(pagina.items).toHaveLength(1);
-    expect(pagina.items[0]?.latestBatchUnitId).toBeNull();
+    expect(pagina.items[0]?.unitId).toBeNull();
+    expect(pagina.items[0]?.stock).toBe(0);
   });
 });
 
-describe('QC-91 — el listado agrega la existencia por unidad (R1, R2, R3)', () => {
-  it('un producto con dos lotes en dos unidades devuelve las dos existencias', async () => {
+describe('la existencia guardada distingue dos unidades por dos productos (R15)', () => {
+  it('el mismo nombre en dos unidades produce dos productos, cada uno con la existencia de sus propios lotes', async () => {
     const marca = `Existencia por unidad ${token()}`;
-    const [productId] = await sembrar([{ name: `${marca} con lotes` }]);
-    if (productId === undefined) throw new Error('el producto de apoyo no se sembro');
-
     const unidadA = await sembrarUnidad();
     const unidadB = await sembrarUnidad();
     const presentacionA = await sembrarPresentacion(unidadA);
     const presentacionB = await sembrarPresentacion(unidadB);
+    // `stock` va tambien en la semilla: el lote se inserta a mano y no pasa por
+    // `recalculateProductStock` (eso lo cubre `product-stock.int.test.ts`). Aqui solo importa que
+    // el listado LEA la columna guardada, no que la recalcule.
+    const [productoA, productoB] = await sembrar([
+      { name: `${marca} con lotes`, unitId: unidadA, stock: 10 },
+      { name: `${marca} con lotes`, unitId: unidadB, stock: 20 },
+    ]);
+    if (productoA === undefined || productoB === undefined) {
+      throw new Error('los productos de apoyo no se sembraron');
+    }
 
-    await sembrarLote(productId, presentacionA, new Date('2031-05-02T00:00:00.000Z'), 10);
-    await sembrarLote(productId, presentacionB, new Date('2031-05-01T00:00:00.000Z'), 20);
+    await sembrarLote(productoA, presentacionA, new Date('2031-05-02T00:00:00.000Z'), 10);
+    await sembrarLote(productoB, presentacionB, new Date('2031-05-01T00:00:00.000Z'), 20);
 
     const pagina = await listAliveProducts(consulta({ pageSize: 25, search: marca }), ambito());
 
-    expect(pagina.items).toHaveLength(1);
-    expect(pagina.items[0]?.stockByUnit).toEqual(
-      expect.arrayContaining([
-        { unitId: unidadA, quantity: 10 },
-        { unitId: unidadB, quantity: 20 },
-      ]),
-    );
-    expect(pagina.items[0]?.stockByUnit).toHaveLength(2);
+    expect(pagina.items).toHaveLength(2);
+    const porUnidad = new Map(pagina.items.map((p) => [p.unitId, p]));
+    expect(porUnidad.get(unidadA)?.stock).toBe(10);
+    expect(porUnidad.get(unidadB)?.stock).toBe(20);
   });
 });
 
-describe('QC-91 — un lote vencido sigue sumando a la existencia (R4)', () => {
-  it('un producto con un lote vencido y otro vigente en la misma unidad muestra la suma de los dos', async () => {
+// Que el vencido SUME es cosa del recalculo, y se prueba donde el recalculo corre:
+// `product-stock.int.test.ts` > «un lote vencido sigue sumando en products.stock (R8)». Aqui los
+// lotes se escriben a mano y la columna se siembra, asi que lo unico que se comprueba es que el
+// listado sirve la existencia guardada sin recalcular ni descontar nada.
+describe('el listado sirve la existencia guardada tal cual, haya lotes vencidos o no (R15)', () => {
+  it('un producto con un lote vencido y otro vigente en la misma unidad muestra su existencia guardada', async () => {
     const marca = `Lote vencido ${token()}`;
-    const [productId] = await sembrar([{ name: `${marca} con lotes` }]);
-    if (productId === undefined) throw new Error('el producto de apoyo no se sembro');
-
     const unidad = await sembrarUnidad();
     const presentacion = await sembrarPresentacion(unidad);
+    // `stock` explicito por el mismo motivo que arriba: el lote a mano no recalcula la columna.
+    const [productId] = await sembrar([{ name: `${marca} con lotes`, unitId: unidad, stock: 15 }]);
+    if (productId === undefined) throw new Error('el producto de apoyo no se sembro');
 
     await sembrarLote(
       productId,
@@ -458,6 +514,6 @@ describe('QC-91 — un lote vencido sigue sumando a la existencia (R4)', () => {
     const pagina = await listAliveProducts(consulta({ pageSize: 25, search: marca }), ambito());
 
     expect(pagina.items).toHaveLength(1);
-    expect(pagina.items[0]?.stockByUnit).toEqual([{ unitId: unidad, quantity: 15 }]);
+    expect(pagina.items[0]?.stock).toBe(15);
   });
 });

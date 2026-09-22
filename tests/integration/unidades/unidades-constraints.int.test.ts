@@ -164,11 +164,13 @@ function inventoryCompanyOf(tx: Prisma.TransactionClient): Promise<string> {
 async function createProduct(
   tx: Prisma.TransactionClient,
   name = 'Acido citrico monohidratado',
+  unitId: string | null = null,
 ): Promise<string> {
   const product = await tx.product.create({
     data: {
       name,
       nameNormalized: normalizeProductNameForTest(name),
+      unitId,
       companyId: await inventoryCompanyOf(tx),
     },
     select: { id: true },
@@ -545,7 +547,7 @@ describe('la unidad como entidad del catalogo', () => {
 })
 
 describe('el uso de la unidad desde inventario y recetas', () => {
-  it('la unidad la declara la PRESENTACION, obligatoria, y el producto ya no tiene donde declararla (QC-80 R1, R21)', async () => {
+  it('la unidad la declara la PRESENTACION, obligatoria; el producto la tiene GUARDADA, anulable, y fija (QC-80 R1; QC-121 R1)', async () => {
     await inRolledBackTransaction(async (tx) => {
       const marker = token()
       const primera = await createUnit(tx, `a${marker}`)
@@ -564,7 +566,13 @@ describe('el uso de la unidad desde inventario y recetas', () => {
       expect(await columnInfo(tx, 'presentations', ['unit_id'])).toEqual([
         { column_name: 'unit_id', data_type: 'uuid', is_nullable: 'NO' },
       ])
-      expect(await columnInfo(tx, 'products', ['unit_id', 'unit'])).toEqual([])
+      // `products.unit_id` es ANULABLE -un producto sin lotes no tiene de donde sacarla- y
+      // GUARDADA -no se calcula al leer-. Un producto nuevo, sin lotes, todavia no la tiene.
+      expect(await columnInfo(tx, 'products', ['unit_id'])).toEqual([
+        { column_name: 'unit_id', data_type: 'uuid', is_nullable: 'YES' },
+      ])
+      const productId = await createProduct(tx)
+      expect((await tx.product.findUniqueOrThrow({ where: { id: productId } })).unitId).toBeNull()
     })
   })
 
@@ -703,7 +711,9 @@ describe('el uso de la unidad desde inventario y recetas', () => {
       const unidadDelProducto = await createUnit(tx, `kg${marker}`)
       const unidadDeLaLinea = await createUnit(tx, `g${marker}`)
 
-      const productId = await createProduct(tx, 'Colorante azul')
+      // La unidad del producto, de entrada: sin ella, `product_batches_check_unit` rechazaria
+      // el lote antes de llegar a lo que este caso mide (la unidad de la LINEA).
+      const productId = await createProduct(tx, 'Colorante azul', unidadDelProducto)
       const presentationId = await createPresentation(tx, marker, unidadDelProducto)
       await createBatch(tx, productId, presentationId)
       const recipeId = await createRecipe(tx, marker)
@@ -796,6 +806,12 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
       expect(foreignKeys).toEqual([
         {
           conname: 'presentations_unit_id_fkey',
+          referencia: 'units',
+          confdeltype: 'r',
+          confupdtype: 'c',
+        },
+        {
+          conname: 'products_unit_id_fkey',
           referencia: 'units',
           confdeltype: 'r',
           confupdtype: 'c',

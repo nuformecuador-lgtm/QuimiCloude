@@ -7,6 +7,8 @@ import {
   SEARCH_PARAM,
   SHARED_PAGE_SIZES,
   SORT_PARAM,
+  STOCK_MAX_PARAM,
+  STOCK_MIN_PARAM,
   buildProductListQuery,
   parseProductListParams,
 } from '@/app/(private)/inventario/components';
@@ -124,12 +126,13 @@ describe('parametros de lista de productos', () => {
       expect(parseProductListParams(Object.fromEntries(consulta))).toEqual(params);
     }
 
-    // Y con TODO puesto: orden, el rango que queda y la busqueda.
+    // Y con TODO puesto: orden, los dos rangos que quedan y la busqueda.
     const completos = {
       page: 2,
       pageSize: MAX_PAGE_SIZE,
-      sort: { columnId: 'name', direction: 'asc' as const },
+      sort: { columnId: 'stock', direction: 'asc' as const },
       filters: {
+        stock: { kind: 'numberRange' as const, min: 5, max: null },
         qtyAlert: { kind: 'numberRange' as const, min: null, max: 3 },
       },
       search: 'acido',
@@ -173,15 +176,24 @@ describe('orden, filtros y busqueda (2026-09-07: la pantalla estrena la tabla co
     expect(parseProductListParams({}).filters).toEqual({});
   });
 
-  it('R8: un filtro o un orden por existencia que llega por la URL se ignora sin fallar', () => {
+  it('R15: se puede ordenar y filtrar por la existencia guardada', () => {
     const params = parseProductListParams({
       [SORT_PARAM]: 'stock:asc',
-      stockMin: '5',
-      stockMax: '40',
+      [STOCK_MIN_PARAM]: '5',
+      [STOCK_MAX_PARAM]: '40',
     });
 
-    expect(params.sort).toBeNull();
-    expect(params.filters).toEqual({});
+    expect(params.sort).toEqual({ columnId: 'stock', direction: 'asc' });
+    expect(params.filters).toEqual({ stock: { kind: 'numberRange', min: 5, max: 40 } });
+  });
+
+  it('R15: un extremo de existencia roto no se lleva el filtro entero', () => {
+    const params = parseProductListParams({
+      [STOCK_MIN_PARAM]: '',
+      [STOCK_MAX_PARAM]: '40',
+    });
+
+    expect(params.filters.stock).toEqual({ kind: 'numberRange', min: null, max: 40 });
   });
 
   it('la busqueda se recorta, y la de solo espacios es AUSENCIA de busqueda', () => {

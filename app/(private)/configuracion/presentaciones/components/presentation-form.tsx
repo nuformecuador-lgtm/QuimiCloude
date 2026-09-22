@@ -142,9 +142,13 @@ const FIELD_LABELS: Readonly<Record<PresentationFieldName, string>> = {
  * QC-70 (R20): la clave es `presentation_duplicate_name`, el codigo abierto por caso concreto, y
  * el tipo es `ErrorCode`, asi que un codigo mal escrito -o retirado del catalogo- rompe el
  * typecheck aqui mismo en vez de caer callado al mensaje por defecto.
+ *
+ * `presentation_unit_locked`: cambiar la unidad de una presentacion que ya tiene lotes se rechaza
+ * junto al selector, con el mismo mecanismo.
  */
 const CODE_TO_FIELD: Readonly<Partial<Record<ErrorCode, PresentationFieldName>>> = {
   presentation_duplicate_name: PRESENTATION_NAME_FIELD,
+  presentation_unit_locked: PRESENTATION_UNIT_FIELD,
 };
 
 /**

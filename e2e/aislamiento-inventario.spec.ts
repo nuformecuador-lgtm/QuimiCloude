@@ -12,7 +12,11 @@ import { expect, test } from '@playwright/test';
 // el fixture la usa en vez de repetirla.
 import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
-import { normalizePresentationName, normalizeProductName } from '@/lib/modules/inventario';
+import {
+  normalizePresentationName,
+  normalizeProductName,
+  productDisplayName,
+} from '@/lib/modules/inventario';
 import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 import { INVENTORY_ROUTE, PRESENTATIONS_ROUTE } from '@/lib/shared/routes';
@@ -130,12 +134,16 @@ async function seedCompanyInventory(input: {
       name: input.productName,
       nameNormalized: normalizeProductName(input.productName),
       qtyAlert: 2,
+      // La unidad de la presentacion de su lote: sin ella, `product_batches_check_unit`
+      // rechazaria el INSERT de mas abajo. La existencia guardada la fija esta siembra
+      // directa; en la aplicacion la recalcula el alta.
+      unitId: unit.id,
+      stock: 10,
       companyId: company.id,
     },
     select: { id: true },
   });
 
-  // Sin lote el producto no tiene de donde derivar su unidad y la fila de la lista saldria a medias.
   await prisma.productBatch.create({
     data: {
       productId: product.id,
@@ -293,8 +301,14 @@ test.describe('aislamiento por empresa del inventario', () => {
       'el producto de la empresa B no puede viajar en el HTML servido de una sesion de A',
     ).toBe(false);
 
+    // La celda del producto pinta «nombre · unidad», no solo el nombre. El fixture no declara
+    // `symbol` para su unidad, asi que la etiqueta es el NOMBRE de la unidad (`productUnitLabel`,
+    // `product-columns.tsx`): se compone con la misma funcion que usa la pantalla, en vez de
+    // adivinar el separador a mano.
     await expect(
-      page.getByTestId(NAME_CELL).filter({ hasText: exactText(PRODUCT_A_NAME) }),
+      page
+        .getByTestId(NAME_CELL)
+        .filter({ hasText: exactText(productDisplayName(PRODUCT_A_NAME, UNIT_A_NAME)) }),
     ).toHaveCount(1, { timeout: 60_000 });
     await expect(
       page.getByTestId(NAME_CELL).filter({ hasText: exactText(PRODUCT_B_NAME) }),

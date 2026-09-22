@@ -58,6 +58,14 @@ export class PresentationInUseError extends InventarioError {
   }
 }
 
+export class PresentationUnitLockedError extends InventarioError {
+  readonly code = 'presentation_unit_locked';
+
+  constructor(diagnostic?: string) {
+    super('presentation_unit_locked', diagnostic);
+  }
+}
+
 /**
  * Solo para el lote escrito a mano: si choca uno generado, se reintenta. Es un codigo propio y no
  * `ValidationError` porque la entrada tiene forma valida; lo que choca es su valor contra la base.

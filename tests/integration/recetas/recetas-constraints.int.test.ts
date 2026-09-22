@@ -165,11 +165,13 @@ function inventoryCompanyOf(tx: Prisma.TransactionClient): Promise<string> {
 async function createProduct(
   tx: Prisma.TransactionClient,
   name = 'Acido citrico monohidratado',
+  unitId: string | null = null,
 ): Promise<string> {
   const product = await tx.product.create({
     data: {
       name,
       nameNormalized: normalizeProductNameForTest(name),
+      unitId,
       companyId: await inventoryCompanyOf(tx),
     },
     select: { id: true },
@@ -790,8 +792,9 @@ describe('estructura de la linea de receta', () => {
       for (const symbol of symbols) {
         const unidadDeLaLinea = await createUnit(tx, symbol)
         const unidadDelProducto = await createUnit(tx)
-        // El producto no declara unidad: la toma de la presentacion de su lote mas reciente.
-        const productId = await createProduct(tx, `Insumo ${symbol ?? 'sin simbolo'}`)
+        // El producto gana la unidad de la presentacion de su lote: sin ella,
+        // `product_batches_check_unit` rechazaria el lote de mas abajo.
+        const productId = await createProduct(tx, `Insumo ${symbol ?? 'sin simbolo'}`, unidadDelProducto)
         const marcaPresentacion = token()
         const presentation = await tx.presentation.create({
           data: {

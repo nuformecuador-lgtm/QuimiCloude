@@ -10,7 +10,9 @@
  * Aprobada por el humano el 2026-09-17 en la puerta F1.4 de QC-92.
  * **Octava enmienda, el 2026-09-18**: `ai_unavailable`.
  * Aprobada por el humano el 2026-09-18.
- * **Novena enmienda, el 2026-09-22 (fix directo)**: `action_not_allowed`.
+ * **Novena enmienda, el 2026-09-18**: `presentation_unit_locked`.
+ * Aprobada por el humano el 2026-09-18.
+ * **Decima enmienda, el 2026-09-22 (fix directo)**: `action_not_allowed`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -70,6 +72,9 @@ export const ERROR_CODES = [
   // Distinto de `unexpected`: la entrada era correcta, lo que fallo es que el proveedor de IA no
   // respondio o agoto el plazo.
   'ai_unavailable',
+  // Distinto de `invalid_input`: la entrada tiene forma valida y lo que falla es que la
+  // presentacion ya tiene lotes en la unidad que se quiere reemplazar.
+  'presentation_unit_locked',
   // Distinto de `invalid_input` y de `unauthorized`: la entrada tiene la forma correcta y el actor
   // tiene permiso; lo que la regla de negocio rechaza es la ACCION pedida (por ejemplo, asignar el
   // rol de administrador, que no se concede por esta via).

@@ -145,7 +145,7 @@ describe('createProductSchema', () => {
       listAlive: vi.fn(),
       // QC-90 (T4): los tres metodos del alta con primer lote. Estan aqui porque el doble
       // tiene que cumplir el puerto ENTERO; ninguno debe llegar a llamarse en este caso.
-      findAliveIdByName: vi.fn(),
+      findAliveIdByNameInPresentationUnit: vi.fn(),
       createWithFirstBatch: vi.fn(),
       addBatchToAlive: vi.fn(),
       // QC-92: mismo criterio, ninguno debe llegar a llamarse en este caso.
@@ -170,7 +170,7 @@ describe('createProductSchema', () => {
     expect(products.create).not.toHaveBeenCalled();
     // QC-90: el alta ya no pasa por `create`, asi que «no toca el puerto» tambien tiene
     // que afirmarse sobre los metodos por los que ahora SI pasaria.
-    expect(products.findAliveIdByName).not.toHaveBeenCalled();
+    expect(products.findAliveIdByNameInPresentationUnit).not.toHaveBeenCalled();
     expect(products.createWithFirstBatch).not.toHaveBeenCalled();
     expect(products.addBatchToAlive).not.toHaveBeenCalled();
   });
@@ -188,8 +188,9 @@ describe('createProductSchema', () => {
     //      (QC-52 R1) convierte el campo de mas en `invalid_input`: ignorarlo en silencio le
     //      haria creer a quien lo envia que guardo una unidad que nunca se guardo.
     //
-    // La unidad de un producto hoy se LEE, no se envia: sale de la presentacion de su lote mas
-    // reciente (`ProductView.latestBatchUnitId`, R22), y eso se prueba en `product-prisma.test.ts`.
+    // La unidad de un producto hoy se LEE, no se envia: la escribe `createWithFirstBatch`
+    // copiandola de la presentacion del lote -el disparador solo rechaza lo que no cuadra-, y
+    // eso se prueba en `product-prisma.test.ts`.
     const base = { name: 'Producto', ...REQUERIDOS };
 
     const parsed = createProductSchema.parse(base);

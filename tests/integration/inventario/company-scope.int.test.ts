@@ -149,9 +149,10 @@ async function crearProducto(
   marcador: string,
   companyId: string,
   name = `Producto ${marcador}`,
+  unitId: string | null = null,
 ): Promise<string> {
   const product = await tx.product.create({
-    data: { name, nameNormalized: `producto${marcador}`, companyId },
+    data: { name, nameNormalized: `producto${marcador}`, companyId, unitId },
     select: { id: true },
   })
   return product.id
@@ -221,7 +222,9 @@ describe('R1 — la empresa es obligatoria y tiene que existir, en las tres tabl
       const marcador = token()
       const companyId = await crearEmpresa(tx, marcador)
       const unitId = await crearUnidadDeSistema(tx, marcador)
-      const productId = await crearProducto(tx, marcador, companyId)
+      // Con la unidad del producto: sin ella, `product_batches_check_unit` rechazaria el lote
+      // antes de que el 23502 de `company_id` tuviera ocasion de saltar.
+      const productId = await crearProducto(tx, marcador, companyId, undefined, unitId)
       const presentationId = await crearPresentacion(tx, `p${marcador}`, companyId, unitId)
 
       // En cada INSERT la unica columna obligatoria que falta es `company_id`, asi que el 23502
@@ -373,7 +376,9 @@ describe('R22 — la empresa del lote tiene que ser la de su producto Y la de su
       const empresaA = await crearEmpresa(tx, `a${marcador}`)
       const empresaB = await crearEmpresa(tx, `b${marcador}`)
       const unitId = await crearUnidadDeSistema(tx, marcador)
-      const productId = await crearProducto(tx, `a${marcador}`, empresaA)
+      // La misma unidad que la presentacion: sin ella, `product_batches_check_unit` rechazaria
+      // el lote antes de llegar a lo que este caso mide.
+      const productId = await crearProducto(tx, `a${marcador}`, empresaA, undefined, unitId)
       const presentationId = await crearPresentacion(tx, `p${marcador}`, empresaA, unitId)
 
       // Sin esta mitad, un disparador que rechazara siempre pasaria los casos anteriores.
@@ -551,12 +556,15 @@ describe('R3 — el backfill asigna TODAS las filas que ya existian a «QuimiClo
       const lote = randomUUID()
 
       // El borrado logico sigue siendo fila: un backfill que lo saltara impediria el `SET NOT NULL`.
+      // La unidad va desde ya: sin ella, `product_batches_check_unit` rechazaria el lote de mas
+      // abajo antes de llegar a lo que este caso mide (el backfill de empresa).
       await tx.$executeRawUnsafe(
-        `INSERT INTO "products" ("id","name","name_normalized","updated_at")
-         VALUES ($1::uuid, $2, $3, CURRENT_TIMESTAMP)`,
+        `INSERT INTO "products" ("id","name","name_normalized","unit_id","updated_at")
+         VALUES ($1::uuid, $2, $3, $4::uuid, CURRENT_TIMESTAMP)`,
         vivo,
         `Vivo ${marcador}`,
         `vivo${marcador}`,
+        unitId,
       )
       await tx.$executeRawUnsafe(
         `INSERT INTO "products" ("id","name","name_normalized","deleted_at","updated_at")
