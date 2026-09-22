@@ -2165,7 +2165,7 @@
       "epic_name": "Identidad y acceso",
       "name": "rol-empacador",
       "description": "Un tercer rol de semilla, **Empacador**: la misma logica y la misma pantalla `/asignacion` que el Operador (ve lo que le asignaron y lo prepara), **sin inventario**, y con un **permiso nuevo** que le deja ver **todos los pedidos terminados de la empresa** (la lista la construye QC-145).\n\n**ACOTADA EL 2026-09-22 con** `/afinar-feature`.\n\n* Permisos del Empacador: `asignaciones.consultar` + el permiso nuevo de terminados. Sin `inventario.consultar` y sin `asignaciones.modificar`.\n* El catalogo gana **exactamente una entrada** (enmienda a QC-74), por migracion y seed. QC-142 tambien suma una: el recuento se fija contra el catalogo de `dev` al implementar. El nombre lo fija `spec_author` con la forma `<modulo>.<accion>`.\n* El **Administrador** tambien recibe el permiso nuevo. El **Operador no cambia**: no ve los terminados de otros.\n* La diferencia se hace por permiso, nunca por nombre de rol (guardia de autorizacion por permiso, QC-86/87).\n* El rol es global y aparece en el selector de alta/edicion de usuarios sin tocar la UI (QC-94/QC-67).\n* E2E diferida a QC-145, que tiene la pantalla.\n\n**NO ENTRA:** la lista de pedidos terminados ni la fecha de terminado (**QC-145**), ninguna pantalla nueva, ninguna tabla.",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
