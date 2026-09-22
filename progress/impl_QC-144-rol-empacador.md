@@ -29,6 +29,9 @@ Asignaciones del seed: Administrador 15 -> 16, Operador 2, Empacador 2 -> total 
 | `a20e0b95` | limpieza de comentarios de la migración; `R11`/`R20`/`R26` en los nombres de los casos |
 | `383213aa` | T12, T14 |
 | `b3943f33` | T11, T13 |
+| `c57b579a` | T2, T3 reabiertas (enmienda D10): comentarios sin citas en las líneas de la rama; bloque de enmienda de `permissions.ts` con el texto de `design.md > 2` |
+| `4238eaff` | T3: caso R6 enmendado (bloque sin citas, ≤5 líneas, con «enmienda» y `lib/modules/`; simétrico sintético) |
+| `aaff8cf0` | T16: `guard-permisos-no-administrables` vigila también `Role` y SQL crudo sobre `roles`/`permissions`/`role_permissions` |
 
 ## Archivos
 
@@ -89,8 +92,8 @@ Asignaciones del seed: Administrador 15 -> 16, Operador 2, Empacador 2 -> total 
 | R3 | `empacador-rol.test.ts` › `R3 — … el modelo Role de db/schema.prisma no declara ninguna columna de empresa`; `tests/integration/identity/identity-seed.int.test.ts` › «la primera corrida sobre base vacia crea los tres roles y el administrador; la segunda no cambia nada» (una sola fila Empacador tras cada corrida); `tests/integration/identity/user-crud.int.test.ts` › `QC-144 R3 — …` › «dos usuarios de dos empresas distintas nacen con el MISMO rol Empacador, cada uno en su empresa» |
 | R4 | `tests/unit/identity/permissions.test.ts` › `QC-144 R4: el catalogo contiene terminados.consultar con su modulo, accion y descripcion exactos` |
 | R5 | `permissions.test.ts` › `QC-144 R5: el catalogo es el previo mas terminados.consultar, ningun otro codigo cambia` (+ recuentos a 16 en los unitarios y guardias de `design.md > 5`) |
-| R6 | `permissions.test.ts` › `QC-144 R6: el fuente del catalogo nombra QC-144 y dice que es una enmienda` |
-| R7 | `tests/guards/guard-permisos-no-administrables.test.ts` (preexistente: ninguna vía de aplicación escribe `permissions`/`role_permissions`) + `packer-role-migration.test.ts` › `migration.sql — es EXACTAMENTE cuatro INSERT, uno por tabla (R7, R17)`. **Hueco:** ninguna guardia fija que solo el adaptador del seed escriba en `roles`; hoy es cierto (único `role.create` de producción en `initial-access-repository-prisma.ts`), pero no está vigilado |
+| R6 | `permissions.test.ts` › `R6: la enmienda de terminados.consultar en el fuente no cita ficha ni requisito` (párrafo ≤5 líneas, contiene «enmienda» y `lib/modules/`; ni él ni la primera frase del JSDoc casan con el detector de citas) y `R6: el detector de citas caza un JSDoc sintetico que si nombra una ficha` (simétrico) |
+| R7 | `tests/guards/guard-permisos-no-administrables.test.ts` › `ningun archivo de produccion escribe sobre roles, permissions ni role_permissions, salvo el adaptador del seed` (ahora también `Role` y SQL crudo, T16) + `packer-role-migration.test.ts` › `migration.sql — es EXACTAMENTE cuatro INSERT, uno por tabla (R7, R17)`. El hueco anotado en la tanda 1 (nadie vigilaba escrituras en `roles`) lo cierra R27 |
 | R8 | `permissions.test.ts` › `QC-144 R8: el Empacador tiene exactamente asignaciones.consultar y terminados.consultar` y `QC-144 R8: el Empacador NO recibe inventario.consultar ni asignaciones.modificar`; `packer-role-migration.test.ts` › `(R8, R17)` |
 | R9 | `permissions.test.ts` › `QC-144 R9: el Administrador incluye terminados.consultar y los dieciseis, uno a uno` |
 | R10 | `permissions.test.ts` › `QC-144 R10: el Operador sigue con exactamente inventario.consultar y asignaciones.consultar, sin terminados.consultar` |
@@ -110,6 +113,7 @@ Asignaciones del seed: Administrador 15 -> 16, Operador 2, Empacador 2 -> total 
 | R24 | Verificación de revisión: `git diff --name-only origin/dev...HEAD` no contiene `e2e/` (comprobado) |
 | R25 | `identity-seed.int.test.ts` › `R25 — cada rol de semilla tiene en role_permissions exactamente los permisos que declara SEED_ROLE_PERMISSIONS` |
 | R26 | `tests/guards/guard-dependencias-aprobadas.test.ts` + `packer-role-migration.test.ts` › `R20, R26: …`; el diff no contiene `package.json` ni `db/schema.prisma` (comprobado) |
+| R27 | `tests/guards/guard-permisos-no-administrables.test.ts` › `R27: dispara con un role-actions.ts sintetico que crea un rol` (incluye los ocho verbos sobre `tx.role`), `R27: dispara con SQL crudo de escritura sobre roles, permissions o role_permissions`, `R27: NO dispara con lecturas sobre role, ni con SQL de lectura sobre roles` (+ comentarios en `NO dispara con un comentario …`); anclas tensadas: la exención del seed exige escritura sobre `permission`, `rolePermission` **y** `role`. Prueba manual: `prisma.role.create(...)` y `DELETE FROM "roles"` en un archivo sintético de `app/` ponen roja la guardia nombrando el archivo (revertido) |
 
 ## Salida de los tests
 
@@ -119,6 +123,7 @@ Por tanda (subagentes, solo sus archivos):
 - T7–T10: 4 files, 37 passed.
 - T11+T13 (integration): 3 files, 63 passed. T12+T14 (integration): 2 files, 11 passed.
 - Limpieza: `packer-role-migration.test.ts` + `tests/guards`: 43 files, 545 passed, 5 skipped.
+- Tanda 2 (T2, T3 reabiertas, T16): `tests/guards`: 42 files, 535 passed, 5 skipped; `tests/guards` + `tests/unit/{identity,asignaciones,documentos,navegacion}`: 225 files, 3253 passed, 65 skipped; integración de la rama (5 archivos): 74 passed. `typecheck` y `lint` limpios. Grep de cierre sobre las líneas `+` de comentario del diff `c802c645..HEAD -- lib db tests` con `QC-\d+|\bR\d+\b|design\.md|decisi[oó]n cerrada`: vacío (solo quedan dos strings de fixture sintético, que no son comentarios).
 
 `./init.sh --rapido` tras T1–T3 (commit `0ef4662c`): rojo esperado. 7 casos de
 `identity-seed.int.test.ts` (15/16 y 2/3, tanda T11 aún sin hacer) y 1 de
@@ -137,5 +142,27 @@ Por tanda (subagentes, solo sus archivos):
 ✓ todas las migraciones tienen down.sql
 ```
 
-`./init.sh` completo: **no corrido** (regla del gate: lo corre el leader). T15 queda abierto hasta
-entonces.
+`./init.sh` **completo** (sin flags, cierre de la feature, HEAD `aaff8cf0`): **verde, exit 0** (646 s de vitest).
+
+```
+✓ typecheck paso
+✓ lint paso
+ Test Files  613 passed (613)
+      Tests  8638 passed | 117 skipped (8755)
+aviso: 6 archivo(s) del baseline ya pasan; toca limpiarlos:
+  tests/integration/inventario/product-crud.int.test.ts
+  tests/unit/configuracion-ui/configuracion-convenciones.test.ts
+  tests/unit/configuracion-ui/unidades-convenciones.test.ts
+  tests/unit/recetas-ui/recipe-route-contract.test.ts
+  tests/unit/recetas/module-contract.test.ts
+  tests/unit/unidades/modulo-intacto.test.ts
+✓ los tres proyectos corrieron (ui, node, integration)
+✓ tests: sin rojos nuevos (0 rojos, todos en el baseline de 6); 6 por limpiar
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==
+```
+
+Cero rojos, ni propios ni ajenos. El aviso de «6 por limpiar» es deuda del baseline
+(`tests/baseline-rojos.json`), ajena a la rama: ninguno de esos seis archivos está en el diff.
+Sin E2E: la rama no toca `app/`, `components/` ni `e2e/`.

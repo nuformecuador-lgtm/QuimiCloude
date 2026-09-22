@@ -63,7 +63,7 @@ zona no lo impide por sí sola.
       **Hecho cuando:** `pnpm run typecheck` pasa y el literal `'Empacador'` aparece una sola vez en
       `lib/`. Depende de: —.
 
-- [ ] **T2.** *(Reabierta el 2026-09-22: solo el comentario.)* `permissions.ts`: entrada
+- [x] **T2.** *(Reabierta el 2026-09-22: solo el comentario.)* `permissions.ts`: entrada
       `terminados.consultar` **al final** de `PERMISSIONS` (`design.md > 2`); bloque de enmienda en el
       JSDoc con ordinal y recuento contra el catálogo previo; primera línea del JSDoc con el número
       nuevo; `'terminados.consultar'` al final de la lista del Administrador; clave
@@ -77,7 +77,7 @@ zona no lo impide por sí sola.
       y ni el bloque de enmienda ni la frase del recuento casan con
       `/QC-\d+|\bR\d+\b|design\.md|decisi[oó]n cerrada/i`. Depende de: T1.
 
-- [ ] **T3.** *(Reabierta el 2026-09-22.)* Actualizar los tests unitarios y guardias que fijan recuento o roles
+- [x] **T3.** *(Reabierta el 2026-09-22.)* Actualizar los tests unitarios y guardias que fijan recuento o roles
       (`design.md > 5`, primeras filas de cada tabla que no sean de integración):
       `permissions.test.ts`, `guard-permisos-sembrados.test.ts`, `guard-nav-permisos-declarados.test.ts`,
       `qc75-convenciones.test.ts`, `documentos/authorization.test.ts`,
@@ -156,7 +156,7 @@ zona no lo impide por sí sola.
 
 ## T11–T14 — Integración (base real)
 
-- [ ] **T11.** `tests/integration/identity/identity-seed.int.test.ts`: el reset (`:259`) y
+- [x] **T11.** `tests/integration/identity/identity-seed.int.test.ts`: el reset (`:259`) y
       `seedRoleNames` (`:267`) filtran por `SEED_ROLES.map(r => r.name)`, no por dos constantes;
       subir los números de `:776-777`, `:894-895`, `:924-925`; ajustar `:375-394` a los tres roles;
       nuevo caso R25 que recorre **cada** rol de `SEED_ROLES` y compara `codigosEnBaseDe` con
@@ -186,7 +186,7 @@ zona no lo impide por sí sola.
 
 ## T16 — Guardia de escritura sobre `roles` (añadida el 2026-09-22)
 
-- [ ] **T16. [P]** `tests/guards/guard-permisos-no-administrables.test.ts`, según
+- [x] **T16. [P]** `tests/guards/guard-permisos-no-administrables.test.ts`, según
       `design.md > 4.1`: `PERMISSION_MODELS` suma `'Role'` (renombrar la constante es opcional);
       detector de SQL crudo `INSERT INTO` / `UPDATE` / `DELETE FROM` sobre `roles`, `permissions` y
       `role_permissions`, aplicado al fuente sin comentarios y sumado a los hallazgos de cada archivo;
@@ -208,7 +208,7 @@ zona no lo impide por sí sola.
 > **Orden (2026-09-22):** T15 sigue siendo la **última** task en ejecutarse, después de T16 aunque
 > su número sea menor.
 
-- [ ] **T15.** `progress/impl_QC-144-rol-empacador.md` con el mapa completo `R1..R27 -> test`
+- [x] **T15.** `progress/impl_QC-144-rol-empacador.md` con el mapa completo `R1..R27 -> test`
       (R24: diff sin `e2e/`; R26: `guard-dependencias-aprobadas` + T6 sin DDL + `db/schema.prisma`
       sin cambios en el diff; R27: `guard-permisos-no-administrables.test.ts`).
       **Hecho cuando:** `./init.sh` **completo** verde y ningún `R<n>` queda sin test o sin
