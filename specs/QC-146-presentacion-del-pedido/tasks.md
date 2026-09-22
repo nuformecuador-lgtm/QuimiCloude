@@ -13,7 +13,7 @@
 
 ## Bloque 1 — base y contrato (paralelizable)
 
-- [ ] **T1. [P con T2] Migración y esquema: `orders.presentation_id` con FK compuesta.**
+- [x] **T1. [P con T2] Migración y esquema: `orders.presentation_id` con FK compuesta.**
       (`design.md > 1`; R1–R5.)
       - Archivos: `db/schema.prisma` (modelo `Order`: `presentationId String?`, `@@index`, una línea
         en el comentario del modelo sobre la FK nueva, que es drift),
@@ -31,7 +31,7 @@
       - **Hecho**: migración aplicada, revertida y reaplicada; los tests de arriba en verde.
       - Depende de: nada.
 
-- [ ] **T2. [P con T1] Contrato `PresentationCatalog` de `inventario`.** (`design.md > 2`; R28.)
+- [x] **T2. [P con T1] Contrato `PresentationCatalog` de `inventario`.** (`design.md > 2`; R28.)
       - Archivos: `lib/modules/inventario/domain/presentation-catalog.ts` (nuevo),
         `lib/modules/inventario/index.ts` (una línea de `export type`),
         `lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma.ts` (nuevo).
@@ -110,7 +110,7 @@
 
 ## Bloque 4 — UI (paralelizable)
 
-- [ ] **T7. [P con T8] Marca compartida «Sin presentación».** (`design.md > 6.2`.)
+- [x] **T7. [P con T8] Marca compartida «Sin presentación».** (`design.md > 6.2`.)
       - Archivos: `components/shared/order-presentation-label.tsx` (nuevo).
       - Tests: `tests/unit/shared/order-presentation-label.test.tsx` (nuevo: nombre, y «Sin
         presentación» con `data-missing` cuando es `null`).

@@ -234,6 +234,8 @@ export const MIGRACIONES_ESPERADAS = [
   // la columna `ingredients_cost` a `orders` no persiste el identificador de peticion ni lo
   // menciona; se nombra aqui a mano y la lista sigue CERRADA para la siguiente.
   '20260918130000_orders_add_ingredients_cost',
+  // Igual patron: la columna de presentacion del pedido no toca el identificador de peticion.
+  '20260922120000_orders_presentation',
 ] as const
 
 export function hallazgosDeMigraciones(
