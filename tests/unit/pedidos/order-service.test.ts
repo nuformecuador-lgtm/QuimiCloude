@@ -285,7 +285,7 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
 })
 
 describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
-  it('devuelve la ficha completa, con los nombres resueltos por los contratos (R42, R43)', async () => {
+  it('R23: la ficha devuelve id y nombre de la presentacion, con los nombres resueltos por los contratos (R42, R43)', async () => {
     const d = dobles({ fila: fila() })
 
     const vista = await createGetOrder(d)(ORDER_ID, ADMIN)

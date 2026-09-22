@@ -77,10 +77,9 @@ export function createUpdateOrder(
     // una edicion rechazada no lee nada mas y no modifica ninguna fila.
     assertTransition(row.status, data.status);
 
-    // R7, R9: la presentacion se comprueba SIEMPRE, cambie o no -es una consulta de un id y
-    // evita una rama «si cambio» que habria que probar aparte. Con un pedido viejo sin
-    // presentacion, `row.presentationId` es `null` y la entrada trae una: la comprobacion es
-    // la misma.
+    // La presentacion se comprueba SIEMPRE, cambie o no -es una consulta de un id y evita una
+    // rama «si cambio» que habria que probar aparte. Con un pedido viejo sin presentacion,
+    // `row.presentationId` es `null` y la entrada trae una: la comprobacion es la misma.
     const [presentation] = await deps.presentations.findRefs([data.presentationId], actor.companyId);
     if (presentation === undefined) throw new PresentationNotFoundError();
 

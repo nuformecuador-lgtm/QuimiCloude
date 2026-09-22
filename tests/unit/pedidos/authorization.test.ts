@@ -308,6 +308,18 @@ describe('QC-74 — falla cerrado (R14)', () => {
   })
 })
 
+describe('R12: alta y edicion rechazan sin pedidos.modificar antes del catalogo de presentaciones', () => {
+  const CON_PRESENTACION = SEIS.filter(([nombre]) => ['createOrder', 'updateOrder'].includes(nombre))
+
+  for (const [nombre, , invocacion] of CON_PRESENTACION) {
+    it(`R12: ${nombre} sin pedidos.modificar rechaza con unauthorized y no llama a presentations.findRefs`, async () => {
+      const { error, llamadas } = await ejecutar(invocacion, actorCon('otro.permiso'))
+      esperaRechazo(error, llamadas, nombre)
+      expect(enCurso.presentations.findRefs).not.toHaveBeenCalled()
+    })
+  }
+})
+
 describe('QC-74 — la autorizacion va ANTES de la validacion (R12)', () => {
   // Las operaciones que validan entrada con zod. Con entrada invalida Y sin permiso, el error
   // tiene que ser el de PERMISO: si saliera `ValidationError`, zod habria corrido antes.

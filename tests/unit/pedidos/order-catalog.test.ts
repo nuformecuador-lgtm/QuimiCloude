@@ -172,8 +172,8 @@ describe('toOrderAssignmentTarget', () => {
   })
 })
 
-describe('toAssignedOrderSummary — QC-146 R27: el resumen publicado lleva la presentacion', () => {
-  it('copia presentationId tal cual, con y sin presentacion', () => {
+describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion', () => {
+  it('R27: copia presentationId tal cual, con y sin presentacion', () => {
     const conPresentacion = toAssignedOrderSummary({
       id: 'o-1',
       orderYear: 2026,

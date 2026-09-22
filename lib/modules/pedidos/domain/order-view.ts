@@ -39,7 +39,7 @@ export type NewOrder = {
   readonly quantity: string;
   readonly priority: OrderPriority;
   readonly status: EditableOrderStatus;
-  /** Obligatoria: toda escritura de `NewOrder` la lleva (R6, R7). */
+  /** Obligatoria: toda escritura de `NewOrder` la lleva. */
   readonly presentationId: string;
 };
 
@@ -67,7 +67,7 @@ export type OrderRow = {
   readonly updatedAt: Date;
   readonly createdBy: string | null;
   readonly updatedBy: string | null;
-  /** `null` = pedido viejo, sin presentacion (R2). */
+  /** `null` = pedido viejo, sin presentacion. */
   readonly presentationId: string | null;
 };
 
@@ -104,7 +104,7 @@ export type OrderView = {
   readonly updatedAt: Date;
   readonly createdBy: string | null;
   readonly updatedBy: string | null;
-  /** `null` = sin presentacion; viaja para precargar el selector en la edicion (R18). */
+  /** `null` = sin presentacion; viaja para precargar el selector en la edicion. */
   readonly presentationId: string | null;
   /** `null` cuando el pedido esta sin presentacion, nunca cuando el id no vuelve del
    *  catalogo: la FK compuesta con `RESTRICT` hace ese caso imposible por construccion. */

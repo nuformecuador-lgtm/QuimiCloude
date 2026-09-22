@@ -200,4 +200,12 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
       await codigoDelFallo(() => createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN)),
     ).toBe('order_not_found')
   })
+
+  it('R11: un pedido sin presentación se cancela', async () => {
+    const d = dobles({ fila: fila('PENDIENTE') })
+
+    await createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN)
+
+    expect(d.cancelAlive).toHaveBeenCalledTimes(1)
+  })
 })

@@ -44,8 +44,8 @@ export type CreateOrderDeps = {
   /** Contrato PUBLICO de `unidades`: las conversiones con las que se normaliza cantidad y coste. */
   readonly units: UnitCatalog;
   /** Contrato PUBLICO de `inventario`: la presentacion que se elige, solo para comprobar que
-   *  existe en la empresa de quien escribe (R8). No se le pasa al coste: la presentacion no
-   *  cambia nada de lo que se calcula (R13). */
+   *  existe en la empresa de quien escribe. No se le pasa al coste: la presentacion no cambia
+   *  nada de lo que se calcula. */
   readonly presentations: PresentationCatalog;
   /**
    * El reloj entra INYECTADO -mismo patron que `recetas` y `proveedores`- para que el test
@@ -105,8 +105,8 @@ export function createCreateOrder(
     const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId], actor.companyId);
     if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
 
-    // R8: la presentacion tiene que existir en el catalogo de la EMPRESA de quien escribe. Un
-    // id que no vuelve es indistinguible de uno de otra empresa (`PresentationCatalog.findRefs`).
+    // La presentacion tiene que existir en el catalogo de la EMPRESA de quien escribe. Un id
+    // que no vuelve es indistinguible de uno de otra empresa (`PresentationCatalog.findRefs`).
     const [presentation] = await deps.presentations.findRefs([data.presentationId], actor.companyId);
     if (presentation === undefined) throw new PresentationNotFoundError();
 

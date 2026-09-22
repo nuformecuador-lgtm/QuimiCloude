@@ -475,6 +475,54 @@ describe('QC-60 R16, R28 — el PERMISO se exige ANTES que el ambito', () => {
   })
 })
 
+describe('R8: una presentación de otra empresa se rechaza como inexistente', () => {
+  /** Catalogo que solo devuelve la presentacion cuando la empresa pedida coincide con la suya,
+   *  igual que el contrato real de `inventario`. */
+  function presentacionesDe(companyId: string) {
+    return {
+      findRefs: vi.fn(async (ids: readonly string[], solicitante: string) =>
+        solicitante === companyId ? ids.map((id) => ({ id, name: 'Bidon' })) : [],
+      ),
+    } as unknown as PresentationCatalog
+  }
+
+  it('createOrder: la presentación es de la empresa B y el actor es de A -> presentation_not_found, sin crear', async () => {
+    const a = almacen()
+    const presentations = presentacionesDe(EMPRESA_B)
+    const createOrder = createCreateOrder({
+      orders: a.orders,
+      recipes: a.recipes,
+      products: a.products,
+      units: a.units,
+      presentations,
+      now: () => new Date('2026-09-15T10:00:00.000Z'),
+    })
+
+    const error = await capturar(createOrder(ENTRADA_ALTA, ACTOR_A))
+    expect((error as Error).constructor.name).toBe('PresentationNotFoundError')
+    expect((error as { code: string }).code).toBe('presentation_not_found')
+    expect(a.espias.create).not.toHaveBeenCalled()
+  })
+
+  it('updateOrder: la presentación es de la empresa B y el actor es de A -> presentation_not_found, sin modificar', async () => {
+    const a = almacen()
+    const presentations = presentacionesDe(EMPRESA_B)
+    const updateOrder = createUpdateOrder({
+      orders: a.orders,
+      recipes: a.recipes,
+      products: a.products,
+      units: a.units,
+      presentations,
+      now: () => new Date('2026-09-15T10:00:00.000Z'),
+    })
+
+    const error = await capturar(updateOrder(PEDIDO_DE_A, ENTRADA_EDICION, ACTOR_A))
+    expect((error as Error).constructor.name).toBe('PresentationNotFoundError')
+    expect((error as { code: string }).code).toBe('presentation_not_found')
+    expect(a.espias.updateAlive).not.toHaveBeenCalled()
+  })
+})
+
 describe('QC-60 R27 — `OrderCatalog` consultado desde `asignaciones` se acota a la empresa de quien pregunta', () => {
   const ASIG_ACTOR_B: AsignacionesActor = {
     id: 'u-b',

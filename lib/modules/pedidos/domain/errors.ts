@@ -89,7 +89,7 @@ export class RecipeNotFoundError extends PedidosError {
  */
 
 /**
- * R8: la presentacion indicada no existe en el catalogo de la empresa de quien escribe -incluida
+ * La presentacion indicada no existe en el catalogo de la empresa de quien escribe -incluida
  * una de otra empresa-. Mismo criterio que `RecipeNotFoundError`: `presentation_not_found` es una
  * entrada COMPARTIDA del catalogo de errores, ya usada por `inventario`.
  */

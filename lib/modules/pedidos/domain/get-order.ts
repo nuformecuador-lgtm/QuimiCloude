@@ -18,7 +18,7 @@ import type { OrderRepository } from '../ports/order-repository';
 export type GetOrderDeps = {
   readonly orders: OrderRepository;
   readonly recipes: RecipeCatalog;
-  /** Contrato PUBLICO de `inventario`: resuelve el nombre de la presentacion (R23). */
+  /** Contrato PUBLICO de `inventario`: resuelve el nombre de la presentacion. */
   readonly presentations: PresentationCatalog;
 };
 
@@ -62,7 +62,7 @@ export function toOrderView(
     updatedBy: row.updatedBy,
     presentationId: row.presentationId,
     // `null` si el pedido esta sin presentacion; la FK compuesta con RESTRICT hace imposible
-    // el caso «tiene id pero no vuelve del catalogo» (R23).
+    // el caso «tiene id pero no vuelve del catalogo».
     presentationName: row.presentationId === null ? null : presentationNames.get(row.presentationId) ?? null,
   };
 }
@@ -92,7 +92,7 @@ export function createGetOrder(
 
     const recipes = await deps.recipes.findRefsIncludingDeleted([row.recipeId], actor.companyId);
 
-    // R23: una sola llamada al catalogo de presentaciones, ninguna si el pedido no tiene.
+    // Una sola llamada al catalogo de presentaciones, ninguna si el pedido no tiene.
     const presentations =
       row.presentationId === null
         ? []

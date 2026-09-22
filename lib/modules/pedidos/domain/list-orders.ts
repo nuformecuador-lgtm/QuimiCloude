@@ -20,7 +20,7 @@ import type { OrderRepository } from '../ports/order-repository';
 export type ListOrdersDeps = {
   readonly orders: OrderRepository;
   readonly recipes: RecipeCatalog;
-  /** Contrato PUBLICO de `inventario`: resuelve los nombres de presentacion de la pagina (R22). */
+  /** Contrato PUBLICO de `inventario`: resuelve los nombres de presentacion de la pagina. */
   readonly presentations: PresentationCatalog;
   readonly log: ListQueryLog;
 };
@@ -161,7 +161,7 @@ export function createListOrders(
 
     const recipeNames = new Map(recipes.map((recipe) => [recipe.id, recipe.name]));
 
-    // R22: los ids NO NULOS de la pagina, deduplicados, con UNA sola llamada al catalogo de
+    // Los ids NO NULOS de la pagina, deduplicados, con UNA sola llamada al catalogo de
     // presentaciones -y ninguna si ningun pedido de la pagina tiene presentacion.
     const presentationIds = [
       ...new Set(

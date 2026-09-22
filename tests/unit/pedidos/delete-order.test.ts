@@ -138,4 +138,12 @@ describe('deleteOrder — borrado logico (R31, R32, R33)', () => {
       'order_not_found',
     )
   })
+
+  it('R11: un pedido sin presentación se da de baja', async () => {
+    const d = dobles({ fila: fila('PENDIENTE') })
+
+    await createDeleteOrder(d)(ORDER_ID, ADMIN)
+
+    expect(d.softDeleteAlive).toHaveBeenCalledTimes(1)
+  })
 })
