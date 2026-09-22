@@ -2165,7 +2165,7 @@
       "epic_name": "Recetas",
       "name": "cantidades-de-receta-en-porcentaje",
       "description": "Las lineas de una receta se expresan en **porcentaje** (hasta 2 decimales) y **suman exactamente 100,00 %**; la linea deja de llevar unidad (gr/ml). Lo que consume un pedido es **cantidad del pedido x %**, en la **unidad del insumo**: pedido 200 con 10 % de hipoclorito consume 20 L, y con 2 % de soda consume 4 kg. El formulario muestra la suma en vivo y **no deja guardar** si no da 100 %; el servidor tambien lo rechaza. Se aplica en el costo de ingredientes del pedido, la tabla de ingredientes de Pedidos y la pantalla del Operario («10 % · 20 L»). Se empieza limpio: no se convierte ninguna receta existente.\n\n**NO ENTRA:** densidad ni conversion masa/volumen; los pasos de la receta (QC-62/64); consumo o reserva de inventario (QC-92, QC-141), que heredan la formula. QC-120 se cancela: la absorbe esta ficha.\n\n\\--- Acotada por `/afinar-feature` el 2026-09-22. Las decisiones estan en `specs/QC-147-cantidades-de-receta-en-porcentaje/requirements.md`. ---",
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "complexity": "high",
       "zone": "fullstack",
