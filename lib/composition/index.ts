@@ -312,6 +312,7 @@ import { readProcessingConfigFromEnv } from '@/lib/modules/documentos/adapters/d
 import { readStrategyPromptFromEnv } from '@/lib/modules/documentos/adapters/driven/config/strategy-prompt-env';
 import { cropImage } from '@/lib/modules/documentos/adapters/driven/image/image-cropper-sharp';
 import { createStrategyRunLogConsole } from '@/lib/modules/documentos/adapters/driven/observability/strategy-run-log-console';
+import { createCropRegionLogConsole } from '@/lib/modules/documentos/adapters/driven/observability/crop-region-log-console';
 import {
   countPages,
   extractPdfText,
@@ -338,6 +339,7 @@ import type { ProcessingQueue } from '@/lib/modules/documentos/ports/processing-
 import type { QueueSignature } from '@/lib/modules/documentos/ports/queue-signature';
 import type { StrategyPrompt } from '@/lib/modules/documentos/ports/strategy-prompt';
 import type { StrategyRunLog } from '@/lib/modules/documentos/ports/strategy-run-log';
+import type { CropRegionLog } from '@/lib/modules/documentos/ports/crop-region-log';
 import { requestScoped } from '@/lib/shared/request-scope';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
@@ -1228,34 +1230,25 @@ const processingQueue: ProcessingQueue = processingQueueQstash;
 const queueSignature: QueueSignature = queueSignatureQstash;
 
 // ---------------------------------------------------------------------------------------
-// `documentos` — el recorte de las imagenes de un catalogo. Bloque nuevo dentro del mismo modulo,
-// no reordena nada de lo de arriba: los dos puertos nuevos se atan a su implementacion aqui y solo
-// aqui.
+// `documentos` — el recorte de las imagenes de un catalogo.
 // ---------------------------------------------------------------------------------------
 
-/**
- * `ImageCropper` cableado con el adaptador que es el UNICO archivo del repositorio que importa la
- * libreria de recorte de imagen. Se REFERENCIA, no se invoca: cablear esta fachada no toca ningun
- * PNG.
- */
+/** Se REFERENCIA, no se invoca: cablear esta fachada no toca ningun PNG. */
 const imageCropper: ImageCropper = { crop: cropImage };
 
-/**
- * `CropStorage` cableado con el adaptador del bucket PROPIO de estos recortes, distinto del de
- * `documentStorage` de arriba. Tampoco se invoca aqui: el adaptador resuelve su configuracion en
- * cada llamada, asi que construir esta fachada no lee ninguna variable de entorno.
- */
+/** Bucket PROPIO de estos recortes, distinto del de `documentStorage` de arriba. */
 const cropStorage: CropStorage = { upload: uploadCrop };
 
-/**
- * El recorte de catalogo, construido UNA vez: lo necesita `runDocumentJob` de la fachada de abajo.
- * Reutiliza el MISMO `pdfConverter` y el MISMO `aiReader` que ya cablea el resto del modulo.
- */
+/** `CropRegionLog` cableado con la unica implementacion que hay: una linea en el registro. */
+const cropRegionLog: CropRegionLog = createCropRegionLogConsole();
+
+/** Reutiliza el MISMO `pdfConverter` y el MISMO `aiReader` que ya cablea el resto del modulo. */
 const cropCatalogImages = createCropCatalogImages({
   converter: pdfConverter,
   ai: aiReader,
   cropper: imageCropper,
   storage: cropStorage,
+  log: cropRegionLog,
 });
 
 /**

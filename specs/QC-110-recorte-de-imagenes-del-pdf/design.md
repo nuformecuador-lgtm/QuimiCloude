@@ -110,10 +110,13 @@ export type CropCatalogImagesDeps = {
   readonly ai: AiReader;                  // el MISMO puerto, sin tocar (R3)
   readonly cropper: ImageCropper;         // puerto nuevo
   readonly storage: CropStorage;          // puerto nuevo, una sola operación (R13)
+  readonly log: CropRegionLog;            // puerto nuevo, registra cada región saltada (paso 6)
   readonly prompt?: () => string;         // por defecto, el provisional de §5
   readonly timeout?: TimeoutRunner;       // por defecto, el corredor ya existente
 };
 ```
+
+> Tabla corregida el 2026-09-21 por decisión humana tras el rechazo del reviewer: faltaba `log`, que el paso 6 ya exigía.
 
 Pasos, en este orden:
 

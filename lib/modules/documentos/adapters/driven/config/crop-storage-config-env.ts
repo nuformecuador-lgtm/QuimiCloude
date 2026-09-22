@@ -1,17 +1,8 @@
 /**
- * Las tres variables de entorno del almacenamiento de estos recortes, leidas EN EL MOMENTO DE LA
- * INVOCACION —dentro de una funcion, nunca al importar el modulo—.
+ * Las tres variables se leen EN EL MOMENTO DE LA INVOCACION, nunca al importar el modulo: asi la
+ * composicion arma la fachada sin bucket configurado y sin tocar la red.
  *
- * Que se lean aqui y no en el top-level es lo que permite que un archivo que solo IMPORTE el
- * adaptador (sin invocar ninguna de sus operaciones) no falle con las variables vacias: el punto de
- * composicion construye la fachada del modulo sin leer una sola variable y sin tocar la red, y la
- * suite entera corre sin bucket configurado.
- *
- * Si falta alguna, el error las NOMBRA y no incluye jamas ningun valor: un mensaje que filtrara la
- * credencial acabaria en un log.
- *
- * Este modulo tiene su PROPIO lector y no reutiliza el de otro modulo: un adaptador driven ajeno
- * esta fuera de lo que este modulo puede importar.
+ * Si falta alguna, el error las NOMBRA sin incluir jamas ningun valor.
  */
 
 export type CropStorageConfig = {

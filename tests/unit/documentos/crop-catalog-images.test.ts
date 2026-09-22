@@ -12,6 +12,7 @@ import { CROP_COORDINATES_PROMPT } from '@/lib/modules/documentos/domain/crop-pr
 import { MAX_PDF_PAGES, PAGE_RENDER_DPI } from '@/lib/modules/documentos/domain/limits';
 
 import type { AiReadRequest, AiReader } from '@/lib/modules/documentos/ports/ai-reader';
+import type { CropRegionLog, CropRegionSkipSummary } from '@/lib/modules/documentos/ports/crop-region-log';
 import type { CropStorage } from '@/lib/modules/documentos/ports/crop-storage';
 import type { CropRegion, ImageCropper } from '@/lib/modules/documentos/ports/image-cropper';
 import type { PdfConverter, RenderedPage } from '@/lib/modules/documentos/ports/pdf-converter';
@@ -64,6 +65,12 @@ function dobleDeAlmacenamiento() {
   return { storage, upload, rutas };
 }
 
+function dobleDeRegistro() {
+  const skip = vi.fn<(summary: CropRegionSkipSummary) => void>();
+  const log: CropRegionLog = { skip };
+  return { log, skip };
+}
+
 function falloDe(resultado: CropCatalogImagesResult): { readonly code: string; readonly reason: string } {
   if (resultado.ok) throw new Error('se esperaba un fallo y el resultado fue exito');
   return resultado;
@@ -75,11 +82,13 @@ describe('documentos — recorte de las imagenes de un catalogo', () => {
     const ia = dobleDeIa();
     const cropper = dobleDeCropper();
     const storage = dobleDeAlmacenamiento();
+    const registro = dobleDeRegistro();
     const recortar = createCropCatalogImages({
       converter: conversion.converter,
       ai: ia.ai,
       cropper: cropper.cropper,
       storage: storage.storage,
+      log: registro.log,
     });
 
     const resultado = await recortar({
@@ -99,11 +108,13 @@ describe('documentos — recorte de las imagenes de un catalogo', () => {
     const ia = dobleDeIa();
     const cropper = dobleDeCropper();
     const storage = dobleDeAlmacenamiento();
+    const registro = dobleDeRegistro();
     const recortar = createCropCatalogImages({
       converter: conversion.converter,
       ai: ia.ai,
       cropper: cropper.cropper,
       storage: storage.storage,
+      log: registro.log,
     });
 
     await recortar({ documentFileId: ARCHIVO, companyId: EMPRESA, path: PATH, bytes: pdfBytes() });
@@ -116,11 +127,13 @@ describe('documentos — recorte de las imagenes de un catalogo', () => {
     const ia = dobleDeIa();
     const cropper = dobleDeCropper();
     const storage = dobleDeAlmacenamiento();
+    const registro = dobleDeRegistro();
     const recortar = createCropCatalogImages({
       converter: conversion.converter,
       ai: ia.ai,
       cropper: cropper.cropper,
       storage: storage.storage,
+      log: registro.log,
     });
 
     await recortar({ documentFileId: ARCHIVO, companyId: EMPRESA, path: PATH, bytes: pdfBytes() });
@@ -136,11 +149,13 @@ describe('documentos — recorte de las imagenes de un catalogo', () => {
     const ia = dobleDeIa('esto no trae ningun objeto');
     const cropper = dobleDeCropper();
     const storage = dobleDeAlmacenamiento();
+    const registro = dobleDeRegistro();
     const recortar = createCropCatalogImages({
       converter: conversion.converter,
       ai: ia.ai,
       cropper: cropper.cropper,
       storage: storage.storage,
+      log: registro.log,
     });
 
     const resultado = await recortar({
@@ -161,11 +176,13 @@ describe('documentos — recorte de las imagenes de un catalogo', () => {
     );
     const cropper = dobleDeCropper();
     const storage = dobleDeAlmacenamiento();
+    const registro = dobleDeRegistro();
     const recortar = createCropCatalogImages({
       converter: conversion.converter,
       ai: ia.ai,
       cropper: cropper.cropper,
       storage: storage.storage,
+      log: registro.log,
     });
 
     const resultado = await recortar({
@@ -189,11 +206,13 @@ describe('documentos — recorte de las imagenes de un catalogo', () => {
     const ia = dobleDeIa('{"images": []}');
     const cropper = dobleDeCropper();
     const storage = dobleDeAlmacenamiento();
+    const registro = dobleDeRegistro();
     const recortar = createCropCatalogImages({
       converter: conversion.converter,
       ai: ia.ai,
       cropper: cropper.cropper,
       storage: storage.storage,
+      log: registro.log,
     });
 
     const resultado = await recortar({
@@ -225,11 +244,13 @@ describe('documentos — recorte de las imagenes de un catalogo', () => {
     });
     cropper.crop.mockImplementationOnce(async () => new Uint8Array([3]));
     const storage = dobleDeAlmacenamiento();
+    const registro = dobleDeRegistro();
     const recortar = createCropCatalogImages({
       converter: conversion.converter,
       ai: ia.ai,
       cropper: cropper.cropper,
       storage: storage.storage,
+      log: registro.log,
     });
 
     const resultado = await recortar({
@@ -246,6 +267,54 @@ describe('documentos — recorte de las imagenes de un catalogo', () => {
     ]);
   });
 
+  it('R17 — la region que revienta al recortar deja su causa en el registro, y las otras dos se suben igual', async () => {
+    const conversion = dobleDeConversion({ pageCount: 1, pages: [pngDe(1)] });
+    const ia = dobleDeIa(
+      JSON.stringify({
+        images: [
+          { page: 1, x: 0.0, y: 0.0, width: 0.2, height: 0.2 },
+          { page: 1, x: 0.3, y: 0.3, width: 0.2, height: 0.2 },
+          { page: 1, x: 0.6, y: 0.6, width: 0.2, height: 0.2 },
+        ],
+      }),
+    );
+    const cropper = dobleDeCropper();
+    cropper.crop.mockImplementationOnce(async () => new Uint8Array([1]));
+    cropper.crop.mockImplementationOnce(async () => {
+      throw new Error('la libreria no pudo recortar esta region');
+    });
+    cropper.crop.mockImplementationOnce(async () => new Uint8Array([3]));
+    const storage = dobleDeAlmacenamiento();
+    const registro = dobleDeRegistro();
+    const recortar = createCropCatalogImages({
+      converter: conversion.converter,
+      ai: ia.ai,
+      cropper: cropper.cropper,
+      storage: storage.storage,
+      log: registro.log,
+    });
+
+    const resultado = await recortar({
+      documentFileId: ARCHIVO,
+      companyId: EMPRESA,
+      path: PATH,
+      bytes: pdfBytes(),
+    });
+
+    expect(resultado).toEqual({ ok: true, uploaded: 2, skipped: 1 });
+    expect(storage.rutas).toEqual([
+      `${EMPRESA}/${ARCHIVO}/1-1.png`,
+      `${EMPRESA}/${ARCHIVO}/1-3.png`,
+    ]);
+    expect(registro.skip).toHaveBeenCalledTimes(1);
+    expect(registro.skip).toHaveBeenCalledWith({
+      path: PATH,
+      page: 1,
+      index: 2,
+      cause: 'la libreria no pudo recortar esta region',
+    });
+  });
+
   it('R17 — una region que apunta a una pagina inexistente se salta sin abortar las demas', async () => {
     const conversion = dobleDeConversion({ pageCount: 1, pages: [pngDe(1)] });
     const ia = dobleDeIa(
@@ -258,11 +327,13 @@ describe('documentos — recorte de las imagenes de un catalogo', () => {
     );
     const cropper = dobleDeCropper();
     const storage = dobleDeAlmacenamiento();
+    const registro = dobleDeRegistro();
     const recortar = createCropCatalogImages({
       converter: conversion.converter,
       ai: ia.ai,
       cropper: cropper.cropper,
       storage: storage.storage,
+      log: registro.log,
     });
 
     const resultado = await recortar({
@@ -274,6 +345,10 @@ describe('documentos — recorte de las imagenes de un catalogo', () => {
 
     expect(resultado).toEqual({ ok: true, uploaded: 1, skipped: 1 });
     expect(storage.rutas).toEqual([`${EMPRESA}/${ARCHIVO}/1-1.png`]);
+    expect(registro.skip).toHaveBeenCalledTimes(1);
+    expect(registro.skip).toHaveBeenCalledWith(
+      expect.objectContaining({ path: PATH, page: 2, index: 1 }),
+    );
   });
 
   it('R5 — un plazo agotado en la lectura de coordenadas es ai_unavailable, no invalid_input', async () => {
@@ -281,6 +356,7 @@ describe('documentos — recorte de las imagenes de un catalogo', () => {
     const ia = dobleDeIa();
     const cropper = dobleDeCropper();
     const storage = dobleDeAlmacenamiento();
+    const registro = dobleDeRegistro();
     const timeout = vi.fn(async () => {
       throw new Error('el plazo de la lectura se agoto');
     });
@@ -289,6 +365,7 @@ describe('documentos — recorte de las imagenes de un catalogo', () => {
       ai: ia.ai,
       cropper: cropper.cropper,
       storage: storage.storage,
+      log: registro.log,
       timeout,
     });
 

@@ -303,7 +303,8 @@ describe('QC-111 R8 — el Route Handler no comprueba permiso ni resuelve actor 
 // ---------------------------------------------------------------------------------------------
 //
 // La propia QC-111 dejo escrito `[D7]` que "QC-110 engancha su paso cuando exista". Ese dia
-// llego: `lib/modules/documentos/ports/crop-storage.ts` e `image-cropper.ts` existen, y
+// llego: bajo `lib/modules/documentos/ports/` existen `crop-storage.ts`, `image-cropper.ts` y
+// `crop-region-log.ts`, y
 // `run-document-job.ts` invoca el recorte cuando la estrategia es `catalogo`. Los dos casos que
 // afirmaban esa ausencia se han QUITADO porque dejaron de ser ciertos, no porque el recorte sea
 // aceptable en cualquier otro sitio: siguen sin serlo, y eso lo vigila ahora `qc110-alcance.test.ts`.
@@ -333,14 +334,14 @@ describe('QC-111 R12 — enmendado: el recorte de imagenes ya existe (QC-110)', 
     expect(nombraRecorte('pdf-converter-unpdf.ts')).toEqual([]);
   });
 
-  it('R12: el detector sigue mordiendo ahora que el recorte existe: los dos puertos nuevos lo nombran', () => {
+  it('R12: el detector sigue mordiendo ahora que el recorte existe: los tres puertos nuevos lo nombran', () => {
     const puertos = readdirSync(join(repoRoot, 'lib/modules/documentos/ports'));
     const conRecorte = puertos.filter((nombre) => nombraRecorte(nombre).length > 0).sort();
     expect(
       conRecorte,
       'R12 enmendado: el detector no se desactivo, cambio de signo. Ahora AFIRMA que los puertos ' +
         `del recorte existen y se llaman como se espera. Nombres bajo ports/:\n${puertos.join('\n')}`,
-    ).toEqual(['crop-storage.ts', 'image-cropper.ts']);
+    ).toEqual(['crop-region-log.ts', 'crop-storage.ts', 'image-cropper.ts']);
   });
 });
 

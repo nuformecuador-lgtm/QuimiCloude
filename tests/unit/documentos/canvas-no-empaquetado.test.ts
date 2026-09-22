@@ -49,11 +49,11 @@ describe('documentos — los binarios nativos de imagen no se empaquetan', () =>
     expect([RASTERIZADOR]).toContain(RASTERIZADOR);
   });
 
-  it('R11 — incluye el recortador, tan binario nativo como el rasterizador', () => {
+  it('R10 — incluye el recortador, tan binario nativo como el rasterizador', () => {
     expect(nextConfig.serverExternalPackages).toContain(RECORTADOR);
   });
 
-  it('R11 — y la comprobacion MUERDE ante una lista a la que le falta el recortador', () => {
+  it('R10 — y la comprobacion MUERDE ante una lista a la que le falta el recortador', () => {
     // Control positivo: sin el, este archivo pasaria aunque la afirmacion no mirase nada.
     const sinElRecortador = [RASTERIZADOR];
     expect(sinElRecortador).not.toContain(RECORTADOR);

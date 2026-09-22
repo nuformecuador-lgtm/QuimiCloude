@@ -26,10 +26,11 @@ const REQUIRED_VARS = ['SUPABASE_STORAGE_URL', 'SUPABASE_DOCUMENTS_BUCKET', 'SUP
 const ARBOL_DE_PRODUCCION = ['lib', 'app', 'components', 'hooks', 'scripts'];
 
 /**
- * Los DOS archivos que pueden importar la libreria de Storage, y ninguno mas. El primero es el
- * precedente que ya existia; el segundo, el que anade este modulo.
+ * Los TRES archivos que pueden importar la libreria de Storage, y ninguno mas: tres buckets,
+ * tres adaptadores (recetas, documentos y, desde [D11]/[D17], el bucket propio de los recortes).
  */
 const IMPORTADORES_PERMITIDOS = [
+  'lib/modules/documentos/adapters/driven/storage/crop-storage-supabase.ts',
   'lib/modules/documentos/adapters/driven/storage/document-storage-supabase.ts',
   'lib/modules/recetas/adapters/driven/storage/recipe-image-supabase.ts',
 ];
@@ -190,7 +191,7 @@ describe('documentos — configuracion del almacenamiento y aislamiento de su li
       expect(fuentesDeProduccion.length).toBeGreaterThan(100);
     });
 
-    it('R26 — exactamente DOS archivos de produccion importan la libreria, y este modulo aporta el segundo', () => {
+    it('R26 — exactamente TRES archivos de produccion importan la libreria, y este modulo aporta el tercero', () => {
       const importadores = fuentesDeProduccion
         .filter((abs) => importaElPaquete(readFileSync(abs, 'utf8'), '@supabase/storage-js'))
         .map((abs) => toPosix(relative(repoRoot, abs)))

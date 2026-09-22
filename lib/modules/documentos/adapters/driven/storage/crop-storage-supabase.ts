@@ -3,19 +3,12 @@ import { StorageClient } from '@supabase/storage-js';
 import { readCropStorageConfigFromEnv } from '../config/crop-storage-config-env';
 
 /**
- * Implementa el puerto del recorte contra el bucket PROPIO de estos PNG.
+ * Implementa el puerto del recorte contra el bucket PROPIO de estos PNG, distinto del de los PDF
+ * y del publico de imagenes de receta.
  *
- * La configuracion se resuelve EN CADA LLAMADA —nunca al importar el archivo, ni una sola vez al
- * construir un cliente en el top-level—: importar este adaptador sin invocar su unica operacion no
- * debe fallar con las variables vacias, que es lo que sostiene el cableado del punto de composicion
- * y la suite sin red.
- *
- * El bucket que se lee aqui es el PROPIO de estos recortes, distinto del de los PDF y del publico
- * de imagenes de receta: ni una sola de estas operaciones puede alcanzarlos.
- *
- * El error del servicio se ENVUELVE diciendo que operacion fallo y sobre que ruta. No se traga
- * ninguno: la libreria devuelve el fallo en `error` en vez de lanzarlo, asi que ignorarlo seria
- * fingir que la subida ocurrio.
+ * La configuracion se resuelve EN CADA LLAMADA, nunca al importar el archivo: asi importar este
+ * adaptador sin invocar su operacion no falla con las variables vacias. El error del servicio se
+ * ENVUELVE; no se traga ninguno, la libreria lo devuelve en `error` en vez de lanzarlo.
  */
 
 function bucketApi(): ReturnType<StorageClient['from']> {

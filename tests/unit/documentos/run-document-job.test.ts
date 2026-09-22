@@ -391,7 +391,7 @@ describe('documentos — runDocumentJob', () => {
     expect(storage.remove).toHaveBeenCalledWith(RUTA);
   });
 
-  it('R17 — un fallo del recorte deja error/requeue y NO borra el PDF', async () => {
+  it('R5 — un fallo del paso de recorte deja error/requeue y NO borra el PDF', async () => {
     const repo = dobleDeRepositorio('catalogo');
     const storage = dobleDeAlmacenamiento();
     const processPdfByStrategy = dobleDeProcesamiento({
@@ -422,5 +422,30 @@ describe('documentos — runDocumentJob', () => {
       reason: 'el texto de la IA no traia un JSON interpretable',
     });
     expect(storage.remove).not.toHaveBeenCalled();
+  });
+
+  it('R17 — una region perdida (skipped > 0) igual deja la fila en listo y borra el PDF', async () => {
+    const repo = dobleDeRepositorio('catalogo');
+    const storage = dobleDeAlmacenamiento();
+    const processPdfByStrategy = dobleDeProcesamiento({
+      ok: true,
+      strategy: 'catalogo',
+      path: RUTA,
+      mode: 'images',
+      text: TEXTO_DE_LA_IA,
+    });
+    const cropCatalogImages = dobleDeRecorte({ ok: true, uploaded: 2, skipped: 1 });
+    const runDocumentJob = createRunDocumentJob({
+      repository: repo.repository,
+      storage: storage.storage,
+      processPdfByStrategy,
+      cropCatalogImages,
+    });
+
+    const resultado = await runDocumentJob({ documentFileId: ARCHIVO, messageId: MENSAJE });
+
+    expect(resultado).toEqual({ kind: 'done' });
+    expect(repo.finish).toHaveBeenCalledWith(ARCHIVO, { kind: 'done', text: TEXTO_DE_LA_IA });
+    expect(storage.remove).toHaveBeenCalledWith(RUTA);
   });
 });

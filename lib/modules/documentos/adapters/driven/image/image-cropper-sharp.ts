@@ -4,12 +4,10 @@ import type { CropRegion } from '../../../ports/image-cropper';
 
 /**
  * Implementa el puerto del recorte. **UNICO archivo del repositorio que importa la libreria de
- * recorte de imagen**, y esa no es una preferencia de orden: es la condicion con la que la
- * dependencia fue aprobada. Sustituirla tiene que ser reescribir este archivo, no buscarla por
- * el arbol.
+ * recorte de imagen**: es la condicion con la que la dependencia fue aprobada.
  *
  * El puerto habla en proporcion (0..1) porque quien conoce el tamano real del PNG es esta
- * libreria, no el dominio; aqui se convierte la proporcion a pixeles usando ese tamano real.
+ * libreria; aqui se convierte a pixeles usando ese tamano.
  */
 
 /** Texto del fallo, a secas, sin arrastrar la pila de la libreria al mensaje. */

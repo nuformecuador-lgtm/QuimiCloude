@@ -1,18 +1,11 @@
 /**
  * El caso de uso del RECORTE de las imagenes de un catalogo: rasteriza el PDF, le pide a la IA
- * donde estan las imagenes de cada pagina, ajusta esas coordenadas al borde y sube cada region
- * recortada al bucket de recortes.
+ * donde estan las imagenes de cada pagina, ajusta esas coordenadas al borde y sube cada region al
+ * bucket de recortes.
  *
- * Rasteriza el PDF por SEGUNDA vez en el mismo trabajo -la lectura con IA de la estrategia
- * `catalogo` ya rasterizo para pedir el texto, pero no devuelve las paginas- porque devolverlas
- * obligaria a cambiar el contrato publico de esa lectura para un unico consumidor. El coste se
- * paga aqui, con el mismo convertidor y a la misma resolucion.
- *
- * Un fallo de UNA region no aborta las demas: se cuenta y se sigue, porque perder un recorte no
- * es motivo para perder los que si salieron bien.
- *
- * Dominio puro: su propio `domain/` y sus `ports/`. No conoce a `sharp` ni al cliente de
- * Supabase Storage; eso vive en los adaptadores driven detras de `ImageCropper` y `CropStorage`.
+ * Rasteriza el PDF por SEGUNDA vez, a sabiendas: la lectura con IA ya rasterizo para pedir el
+ * texto pero no devuelve las paginas, y devolverlas obligaria a cambiar su contrato publico para
+ * un unico consumidor. Un fallo de UNA region no aborta las demas: se cuenta y se sigue.
  */
 import { clampRegionToPage, type CropRegionInput } from './crop-region';
 import { extractCropCoordinates } from './crop-coordinates';
@@ -24,6 +17,7 @@ import { raceAgainstTimeout, type TimeoutRunner } from './read-pdf-with-ai';
 
 import type { ErrorCode } from '@/lib/modules/errores';
 import type { AiDocumentPart, AiReader } from '../ports/ai-reader';
+import type { CropRegionLog } from '../ports/crop-region-log';
 import type { CropRegion as PortCropRegion, ImageCropper } from '../ports/image-cropper';
 import type { CropStorage } from '../ports/crop-storage';
 import type { PdfConverter, RenderedPage } from '../ports/pdf-converter';
@@ -46,6 +40,7 @@ export type CropCatalogImagesDeps = {
   readonly ai: AiReader;
   readonly cropper: ImageCropper;
   readonly storage: CropStorage;
+  readonly log: CropRegionLog;
   readonly prompt?: () => string;
   readonly timeout?: TimeoutRunner;
 };
@@ -88,6 +83,9 @@ function toPortRegion(region: CropRegionInput): PortCropRegion {
 function isEmptyAfterClamp(region: CropRegionInput): boolean {
   return region.width <= 0 || region.height <= 0;
 }
+
+const CAUSA_PAGINA_INEXISTENTE = 'la pagina no esta entre las paginas rasterizadas';
+const CAUSA_REGION_VACIA = 'el ajuste al borde dejo la region sin area';
 
 export function createCropCatalogImages(
   deps: CropCatalogImagesDeps,
@@ -150,8 +148,24 @@ export function createCropCatalogImages(
 
         const region = clampRegionToPage(rawRegion);
         const png = pngByPage.get(rawRegion.page);
-        if (png === undefined || isEmptyAfterClamp(region)) {
+        if (png === undefined) {
           skipped += 1;
+          deps.log.skip({
+            path: input.path,
+            page: rawRegion.page,
+            index: nextIndex,
+            cause: CAUSA_PAGINA_INEXISTENTE,
+          });
+          continue;
+        }
+        if (isEmptyAfterClamp(region)) {
+          skipped += 1;
+          deps.log.skip({
+            path: input.path,
+            page: rawRegion.page,
+            index: nextIndex,
+            cause: CAUSA_REGION_VACIA,
+          });
           continue;
         }
 
@@ -160,8 +174,9 @@ export function createCropCatalogImages(
           const path = buildCropPath(input.companyId, input.documentFileId, rawRegion.page, nextIndex);
           await deps.storage.upload(path, cropped);
           uploaded += 1;
-        } catch {
+        } catch (error) {
           skipped += 1;
+          deps.log.skip({ path: input.path, page: rawRegion.page, index: nextIndex, cause: causaDe(error) });
         }
       }
 
