@@ -1795,7 +1795,7 @@
       "epic_name": "Recetas",
       "name": "rendimiento-de-la-receta",
       "description": "Una receta debe guardar PARA QUE CANTIDAD esta escrita: su rendimiento. Hoy no lo guarda -el modelo Recipe tiene nombre, descripcion, pasos, lineas e imagen, y nada de cantidad-, y sin ese dato no se puede decir a cuanto equivale la receta respecto de lo que pide un pedido.\n\nNACE EL 2026-09-17 al escribir el spec de QC-63. Esa ficha tiene como decision cerrada mostrarle al Operador el factor bien visible -\"Pedido 250 L, receta para 100 L, x2,5\"- y al bajar a diseno se verifico en el esquema que la mitad del dato NO EXISTE. QC-63 sale igualmente, con una rama degradada: muestra la cantidad del pedido sin factor, y sus dos campos ya estan tipados para admitir el dato el dia que exista, asi que encender el factor no obliga a rehacer la pantalla.\n\nEL DATO ES CANTIDAD MAS UNIDAD, no un numero suelto: \"100 L\" y no \"100\". La unidad sale del catalogo de unidades que ya existe (QC-32, QC-76), igual que en las lineas de la receta, porque el factor solo tiene sentido entre cantidades que comparten base efectiva.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO:\n\n* Si el rendimiento es OBLIGATORIO en toda receta o puede quedar vacio. Hay recetas ya cargadas sin el, asi que hacerlo obligatorio obliga a decidir que pasa con ellas.\n* Si se puede editar despues de creada la receta, y que pasa con los pedidos que ya apuntan a ella: el factor que vio un Operador ayer dejaria de coincidir con el de hoy.\n* Si la pantalla de recetas lo muestra en el listado o solo en el detalle.\n* Que se hace con las recetas existentes en la migracion: quedan nulas, o se les pone un valor.\n\nLO QUE NO ENTRA: encender el factor en la pantalla de ejecucion es de QC-63, que ya deja el sitio hecho. Escalar las cantidades sigue descartado por decision cerrada de QC-63: el factor se MUESTRA, no se aplica, porque los pasos son texto libre y escalar solo las lineas haria que la lista y el paso que el operario esta leyendo se contradigan.",
-      "status": "pending",
+      "status": "cancelled",
       "sdd": true,
       "complexity": null,
       "zone": "fullstack",
@@ -2157,6 +2157,21 @@
         "QC-107"
       ],
       "spec_path": "specs/QC-142-permiso-propio-de-documentos"
+    },
+    {
+      "key": "QC-147",
+      "id": 147,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "cantidades-de-receta-en-porcentaje",
+      "description": "Las lineas de una receta se expresan en **porcentaje** (hasta 2 decimales) y **suman exactamente 100,00 %**; la linea deja de llevar unidad (gr/ml). Lo que consume un pedido es **cantidad del pedido x %**, en la **unidad del insumo**: pedido 200 con 10 % de hipoclorito consume 20 L, y con 2 % de soda consume 4 kg. El formulario muestra la suma en vivo y **no deja guardar** si no da 100 %; el servidor tambien lo rechaza. Se aplica en el costo de ingredientes del pedido, la tabla de ingredientes de Pedidos y la pantalla del Operario («10 % · 20 L»). Se empieza limpio: no se convierte ninguna receta existente.\n\n**NO ENTRA:** densidad ni conversion masa/volumen; los pasos de la receta (QC-62/64); consumo o reserva de inventario (QC-92, QC-141), que heredan la formula. QC-120 se cancela: la absorbe esta ficha.\n\n\\--- Acotada por `/afinar-feature` el 2026-09-22. Las decisiones estan en `specs/QC-147-cantidades-de-receta-en-porcentaje/requirements.md`. ---",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "fullstack",
+      "branch": "feature/QC-147-cantidades-de-receta-en-porcentaje",
+      "depends_on": [],
+      "spec_path": "specs/QC-147-cantidades-de-receta-en-porcentaje"
     }
   ]
 }
