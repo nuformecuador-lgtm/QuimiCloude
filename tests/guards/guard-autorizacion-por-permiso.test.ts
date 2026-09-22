@@ -169,16 +169,15 @@ export type ForbiddenPattern = {
  *
  * 1. El literal del rol entre comillas — la comparacion a mano, la peor version.
  * 2. Los identificadores `ROLE_ADMINISTRADOR`, `ROLE_OPERADOR`, `ROLE_EMPACADOR`, `assertAdminRole`
- *    y `requireAdmin` — autorizar por rol importando la constante o la comprobacion «es
- *    Administrador» heredada de QC-54. Compila y es exactamente lo que esta ficha borro.
+ *    y `requireAdmin` — autorizar por rol importando la constante o una comprobacion «es
+ *    Administrador» hecha a mano. Compila y es exactamente lo que esta guardia prohibe.
  * 3. El identificador `roleName` — el campo que R18 saca del `Actor` de estos seis modulos. Que hoy
  *    no compile es una casualidad del tipo actual, no una regla: quien lo reintroduzca en su `Actor`
  *    lo hara compilar de nuevo.
  *
- * **AMPLIADO por QC-144 (R11): `ROLE_EMPACADOR` y su literal.** El Empacador es un rol mas cuya
- * diferencia con el Operador es SOLO el conjunto de permisos sembrado (D4); si algun caso de uso de
- * los seis modulos de negocio comparara por su nombre o importara su constante, seria exactamente
- * la misma deuda que esta guardia ya vigila para Administrador y Operador.
+ * `ROLE_EMPACADOR` y su literal entran con el mismo criterio: la diferencia entre el Empacador y el
+ * Operador es solo el conjunto de permisos sembrado, asi que compararlos por nombre o importar su
+ * constante en un modulo de negocio es la misma deuda que esta guardia ya vigila para los otros dos.
  */
 export function buildForbiddenPatterns(): readonly ForbiddenPattern[] {
   const literal = (role: string) => new RegExp(`['"\`]${escapeRegExp(role)}['"\`]`);
@@ -459,9 +458,9 @@ describe('guardia — ningun servicio de negocio autoriza por nombre de rol (R20
     }
   });
 
-  // QC-144 (R11) — casos sinteticos propios del rol Empacador, misma tecnica que los de
-  // Administrador/Operador de mas arriba: la regla dispara con el literal Y con la constante, y no
-  // dispara con el literal dentro de un comentario.
+  // Casos sinteticos propios del rol Empacador, misma tecnica que los de Administrador/Operador de
+  // mas arriba: la regla dispara con el literal Y con la constante, y no dispara con el literal
+  // dentro de un comentario.
   it('QC-144 R11: dispara con un actor.ts sintetico que compara el literal del rol Empacador', () => {
     const conLiteral = (comilla: string) =>
       [

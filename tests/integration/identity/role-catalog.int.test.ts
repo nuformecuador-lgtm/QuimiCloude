@@ -64,7 +64,7 @@ describe('QC-94 — listAllRoles devuelve el catalogo sin el rol administrador (
     expect(encontrado!.id.length).toBeGreaterThan(0);
   });
 
-  // QC-144 R22: el Empacador nace en el mismo selector, por el mismo filtro, sin tocar la pantalla.
+  // El Empacador nace en el mismo selector, por el mismo filtro, sin tocar la pantalla.
   it('R22 — el rol Empacador tambien esta, con su identificador', async () => {
     const roles = await listAllRoles();
 

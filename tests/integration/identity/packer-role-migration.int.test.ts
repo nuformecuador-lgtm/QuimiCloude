@@ -1,7 +1,6 @@
 // tests/integration/identity/packer-role-migration.int.test.ts
 /**
- * T12 (QC-144) — la migracion `db/migrations/*_packer_role/` contra Postgres REAL. Cubre R17,
- * R18, R21.
+ * La migracion `db/migrations/*_packer_role/` contra Postgres REAL.
  *
  * AISLAMIENTO — mismo patron que `identity-seed.int.test.ts`: cada `it` corre dentro de
  * `prisma.$transaction` interactiva y termina lanzando `RollbackSignal`, asi que Prisma emite
@@ -11,10 +10,10 @@
  * si alguien le quita un `ON CONFLICT` o reordena el `down.sql`, este archivo lo nota aplicando
  * el SQL real, no una copia que ya no lo representa.
  *
- * "BASE SEMBRADA ANTES DE QC-144" se simula DENTRO del `tx`: se borran las tres asignaciones, el
- * permiso y el rol que esta ficha trae, dejando el resto de la instalacion (incluido el Operador)
- * intacto. Es la unica forma de observar "antes de esta migracion" sin depender de en que orden
- * hayan corrido las tareas anteriores sobre la base local.
+ * "BASE SEMBRADA ANTES DE LA MIGRACION" se simula DENTRO del `tx`: se borran las tres
+ * asignaciones, el permiso y el rol que trae esta migracion, dejando el resto de la instalacion
+ * (incluido el Operador) intacto. Es la unica forma de observar "antes de esta migracion" sin
+ * depender de en que orden hayan corrido las tareas anteriores sobre la base local.
  *
  * SAVEPOINTS — el DOWN con un usuario Empacador vivo aborta la transaccion de Postgres con un
  * error de FK; se envuelve en `SAVEPOINT`/`ROLLBACK TO SAVEPOINT` para poder seguir consultando
@@ -160,7 +159,7 @@ async function applyStatements(tx: Prisma.TransactionClient, statements: readonl
 }
 
 // ---------------------------------------------------------------------------
-// El escenario "antes de QC-144", simulado DENTRO del tx
+// El escenario "antes de la migracion", simulado DENTRO del tx
 // ---------------------------------------------------------------------------
 
 const TERMINADOS_CONSULTAR = 'terminados.consultar';

@@ -1,10 +1,10 @@
-// T10 (QC-144) — R15: con los permisos del Empacador, el menu privado deja visible unicamente el
-// enlace de Asignacion, y el aterrizaje tras el login es su ruta.
+// Con los permisos del Empacador, el menu privado deja visible unicamente el enlace de
+// Asignacion, y el aterrizaje tras el login es su ruta.
 //
-// Sobre `PRIVATE_NAV_ITEMS` REAL (design.md > 0.6): el menu y el aterrizaje ya funcionan por
-// permiso, asi que este archivo no toca `lib/shared/navigation/**`, solo prueba el resultado con
-// el conjunto exacto que el seed le da al Empacador. `SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]`, nunca
-// una lista copiada a mano (misma regla que `tests/unit/asignaciones/empacador-authorization.test.ts`).
+// Sobre `PRIVATE_NAV_ITEMS` REAL: el menu y el aterrizaje ya funcionan por permiso, asi que este
+// archivo no toca `lib/shared/navigation/**`, solo prueba el resultado con el conjunto exacto que
+// el seed le da al Empacador. `SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]`, nunca una lista copiada a
+// mano (misma regla que `tests/unit/asignaciones/empacador-authorization.test.ts`).
 //
 // El caso simetrico del Operador demuestra que el test distingue: con sus permisos aparece ademas
 // `nav-inventario`, que el Empacador no ve.

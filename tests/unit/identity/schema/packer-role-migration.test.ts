@@ -1,17 +1,16 @@
-// Contrato estatico del SQL de la migracion del rol Empacador (QC-144).
+// Contrato estatico del SQL de la migracion del rol Empacador.
 //
-// Cubre R7, R17, R18, R20, R21. Lo que se vigila aqui NO esta en `db/schema.prisma` y Prisma no lo
-// regenera nunca: esta es una migracion de DATOS, escrita entera a mano.
+// Lo que se vigila aqui NO esta en `db/schema.prisma` y Prisma no lo regenera nunca: esta es una
+// migracion de DATOS, escrita entera a mano.
 //
 // El rol, el permiso, las descripciones y las claves de `SEED_ROLE_PERMISSIONS` se escriben DOS
-// veces -en el dominio y en el SQL-, y `design.md > 3.1` acepta ese precio a condicion de
-// mitigarlo AQUI: nada se copia en este archivo, todo se IMPORTA del barril de `identity` y se
-// compara con lo que el SQL dice.
+// veces -en el dominio y en el SQL-, y eso se acepta a condicion de mitigarlo AQUI: nada se copia
+// en este archivo, todo se IMPORTA del barril de `identity` y se compara con lo que el SQL dice.
 //
 // Cada afirmacion es un PREDICADO PURO EXPORTADO que recibe el texto SQL y devuelve el veredicto,
 // aplicado dos veces: al SQL real y a una copia MUTADA EN MEMORIA. El archivo en disco no se
 // toca. Un test que no puede fallar no vigila nada (mismo patron que
-// `user-permissions-migration.test.ts`, QC-66).
+// `user-permissions-migration.test.ts`).
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -86,7 +85,7 @@ const CODIGOS_DEL_EMPACADOR = SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR] ?? []
 
 // --- Predicados puros ----------------------------------------------------------------------
 
-/** R7, R17. ¿El UP son EXACTAMENTE cuatro `INSERT`, uno sobre cada tabla que le toca, y nada mas? */
+/** ¿El UP son EXACTAMENTE cuatro `INSERT`, uno sobre cada tabla que le toca, y nada mas? */
 export function upIsExactlyFourInserts(sql: string): boolean {
   const todas = statements(sql)
   if (todas.length !== 4) return false
@@ -101,7 +100,7 @@ export function upIsExactlyFourInserts(sql: string): boolean {
   )
 }
 
-/** R18. ¿Los CUATRO `INSERT` llevan `ON CONFLICT ... DO NOTHING`? Es lo que hace idempotente el UP. */
+/** ¿Los CUATRO `INSERT` llevan `ON CONFLICT ... DO NOTHING`? Es lo que hace idempotente el UP. */
 export function everyInsertIgnoresConflicts(sql: string): boolean {
   const inserts = statements(sql).filter((statement) => /^INSERT INTO/i.test(statement))
   if (inserts.length !== 4) return false
@@ -120,7 +119,7 @@ export function roleRowInUp(sql: string): { name: string; description: string; u
   return { name: campos[0] as string, description: campos[1] as string, updatedAt }
 }
 
-/** R1, R17. ¿El rol que el UP inserta es EXACTAMENTE el `ROLE_EMPACADOR` de `SEED_ROLES`? */
+/** ¿El rol que el UP inserta es EXACTAMENTE el `ROLE_EMPACADOR` de `SEED_ROLES`? */
 export function roleRowMatchesTheDomain(sql: string): boolean {
   const fila = roleRowInUp(sql)
   if (fila === null || EMPACADOR_SEED_ROW === undefined) return false
@@ -151,7 +150,7 @@ export function permissionRowInUp(
   }
 }
 
-/** R4, R17. ¿El permiso que el UP inserta es EXACTAMENTE la entrada `terminados.consultar` de `PERMISSIONS`? */
+/** ¿El permiso que el UP inserta es EXACTAMENTE la entrada `terminados.consultar` de `PERMISSIONS`? */
 export function permissionRowMatchesTheDomain(sql: string): boolean {
   const fila = permissionRowInUp(sql)
   if (fila === null || TERMINADOS_CONSULTAR === undefined) return false
@@ -170,7 +169,7 @@ export function roleNamesInRolePermissionInserts(sql: string): readonly string[]
   return inserts.map((insert) => /WHERE\s+"r"\."name"\s*=\s*'([^']*)'/i.exec(insert)?.[1] ?? '')
 }
 
-/** R17. ¿El tercer `INSERT` asigna `terminados.consultar` al Administrador, por nombre? */
+/** ¿El tercer `INSERT` asigna `terminados.consultar` al Administrador, por nombre? */
 export function administratorGetsTheNewPermission(sql: string): boolean {
   const inserts = statements(sql).filter((statement) => /^INSERT INTO "role_permissions"/i.test(statement))
   const admin = inserts[0]
@@ -180,7 +179,7 @@ export function administratorGetsTheNewPermission(sql: string): boolean {
   return /'terminados\.consultar'/i.test(admin) && !/CROSS JOIN/i.test(admin)
 }
 
-/** R8, R17. Los codigos que el cuarto `INSERT` asigna al Empacador, leidos del `CROSS JOIN (VALUES ...)`. */
+/** Los codigos que el cuarto `INSERT` asigna al Empacador, leidos del `CROSS JOIN (VALUES ...)`. */
 export function empacadorAssignedCodesInUp(sql: string): readonly string[] | null {
   const inserts = statements(sql).filter((statement) => /^INSERT INTO "role_permissions"/i.test(statement))
   const empacador = inserts[1]
@@ -193,7 +192,7 @@ export function empacadorAssignedCodesInUp(sql: string): readonly string[] | nul
   return literales.length === 0 ? null : literales
 }
 
-/** R8. ¿Los codigos asignados al Empacador son EXACTAMENTE los de `SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]`, uno a uno? */
+/** ¿Los codigos asignados al Empacador son EXACTAMENTE los de `SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]`, uno a uno? */
 export function empacadorAssignedCodesMatchTheSeed(sql: string): boolean {
   const codigos = empacadorAssignedCodesInUp(sql)
   if (codigos === null) return false
@@ -201,8 +200,8 @@ export function empacadorAssignedCodesMatchTheSeed(sql: string): boolean {
 }
 
 /**
- * R20. Las sentencias de ESQUEMA del SQL: esta migracion solo inserta FILAS, asi que un `ALTER`,
- * un `CREATE` o un `DROP` -de tabla, de indice, de restriccion o de tipo- no tienen nada que hacer
+ * Las sentencias de ESQUEMA del SQL: esta migracion solo inserta FILAS, asi que un `ALTER`, un
+ * `CREATE` o un `DROP` -de tabla, de indice, de restriccion o de tipo- no tienen nada que hacer
  * aqui.
  */
 export function schemaStatements(sql: string): readonly string[] {
@@ -213,14 +212,14 @@ export function schemaStatements(sql: string): readonly string[] {
   )
 }
 
-/** R7, R17. ¿Aparece el literal `Operador` en alguna linea EJECUTABLE del SQL? */
+/** ¿Aparece el literal `Operador` en alguna linea EJECUTABLE del SQL? */
 export function mentionsOperador(sql: string): boolean {
   return /Operador/.test(stripSqlComments(sql))
 }
 
 /**
- * R21. ¿El DOWN borra en el orden de `design.md > 3.3`: el permiso de cualquier rol, las
- * asignaciones que le queden al Empacador, el permiso del catalogo y por ultimo el rol?
+ * ¿El DOWN borra en este orden: el permiso de cualquier rol, las asignaciones que le queden al
+ * Empacador, el permiso del catalogo y por ultimo el rol?
  */
 export function downDeletesInDesignOrder(sql: string): boolean {
   const sentencias = statements(sql)
@@ -237,7 +236,7 @@ export function downDeletesInDesignOrder(sql: string): boolean {
   )
 }
 
-/** R21. ¿El DOWN no lleva `CASCADE`, `INSERT`, `UPDATE` ni `ALTER` en ninguna linea ejecutable? */
+/** ¿El DOWN no lleva `CASCADE`, `INSERT`, `UPDATE` ni `ALTER` en ninguna linea ejecutable? */
 export function downHasOnlyBareDeletes(sql: string): boolean {
   const ejecutable = stripSqlComments(sql)
   if (/CASCADE/i.test(ejecutable)) return false
@@ -387,7 +386,7 @@ describe('migration.sql — el Administrador y el Empacador se resuelven por NOM
 
 // --- El DOWN ----------------------------------------------------------------------------------
 
-describe('down.sql — cuatro DELETE, en el orden de design.md > 3.3 (R21)', () => {
+describe('down.sql — cuatro DELETE, en el orden acordado (R21)', () => {
   it('el orden y la forma de cada DELETE son exactos, y cae si se invierte', () => {
     expect(downDeletesInDesignOrder(downSource)).toBe(true)
     expect(down).toHaveLength(4)

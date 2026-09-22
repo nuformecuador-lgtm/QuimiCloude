@@ -234,9 +234,9 @@ export const MIGRACIONES_ESPERADAS = [
   // la columna `ingredients_cost` a `orders` no persiste el identificador de peticion ni lo
   // menciona; se nombra aqui a mano y la lista sigue CERRADA para la siguiente.
   '20260918130000_orders_add_ingredients_cost',
-  // Alta el 2026-09-22 (QC-144) con el mismo patron que las anteriores: la migracion que crea el
-  // rol Empacador y el permiso terminados.consultar no persiste el identificador de peticion ni
-  // lo menciona; se nombra aqui a mano y la lista sigue CERRADA para la siguiente.
+  // Con el mismo patron que las anteriores: la migracion que crea el rol Empacador y el permiso
+  // terminados.consultar no persiste el identificador de peticion ni lo menciona; se nombra aqui
+  // a mano y la lista sigue CERRADA para la siguiente.
   '20260922120000_packer_role',
 ] as const
 

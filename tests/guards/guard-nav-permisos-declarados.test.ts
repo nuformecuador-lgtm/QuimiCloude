@@ -122,10 +122,10 @@ describe('guardia — los permisos declarados en el menu existen en el catalogo 
     // El numero es el del catalogo cerrado y se SUBE cuando el catalogo crece, nunca se relaja a
     // `toContain` ni a `toBeGreaterThan`: relajarlo aqui devolveria esta guardia al verde por
     // vacuidad que este mismo caso existe para impedir. Eran diez en QC-74; QC-38 lo llevo a once,
-    // QC-66 a trece, QC-86 a quince y QC-144 a DIECISEIS, al sumar `terminados.consultar` (ver la
-    // enmienda escrita en `lib/modules/identity/domain/permissions.ts`). Que QC-144 tenga que
-    // tocar este archivo NO significa que anada un enlace de menu: el permiso nuevo no lo consume
-    // nadie todavia (su R16), y esta guardia va en el sentido menu -> catalogo, asi que el ancla de
+    // luego a trece, luego a quince y ahora a DIECISEIS, al sumar `terminados.consultar` (ver la
+    // enmienda escrita en `lib/modules/identity/domain/permissions.ts`). Que esa enmienda tenga
+    // que tocar este archivo NO significa que anada un enlace de menu: el permiso nuevo no lo
+    // consume nadie todavia, y esta guardia va en el sentido menu -> catalogo, asi que el ancla de
     // enlaces de aqui arriba se queda EXACTAMENTE como estaba.
     expect(CODIGOS_VALIDOS).toHaveLength(16);
     expect(CODIGOS_VALIDOS).toContain('inventario.consultar');

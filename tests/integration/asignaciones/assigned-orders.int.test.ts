@@ -222,10 +222,10 @@ describe('asignaciones · los pedidos de una persona en su empresa (integracion)
 });
 
 // ---------------------------------------------------------------------------------------------
-// T14 (QC-144 R14) — el caso de uso COMPLETO de `listAssignedOrders`, con un actor cuyos
-// permisos son EXACTAMENTE los del Empacador (`SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]`, nunca una
-// lista copiada a mano). El dominio ya prueba en unidad que ese conjunto concede (T9); esto
-// prueba, contra Postgres real, que lo que ve es solo lo suyo: su empresa y su responsabilidad.
+// El caso de uso COMPLETO de `listAssignedOrders`, con un actor cuyos permisos son EXACTAMENTE
+// los del Empacador (`SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]`, nunca una lista copiada a mano). El
+// dominio ya prueba en unidad que ese conjunto concede; esto prueba, contra Postgres real, que lo
+// que ve es solo lo suyo: su empresa y su responsabilidad.
 // ---------------------------------------------------------------------------------------------
 
 const PERMISOS_DEL_EMPACADOR = SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR];
@@ -283,7 +283,7 @@ describe('asignaciones · listAssignedOrders con los permisos del Empacador (int
       );
 
       // El actor ES el Empacador: su id es el de la persona asignada, y sus permisos son
-      // EXACTAMENTE los que el seed le declara (design.md > 6, tabla de tests nuevos).
+      // EXACTAMENTE los que el seed le declara.
       const actorEmpacador: Actor = {
         id: empacador,
         companyId: fixture.companyA,

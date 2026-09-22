@@ -1,12 +1,9 @@
-// T7 (QC-144) — Guardia y unit del rol Empacador (R1, R2, R3, R16).
-//
-// R1: el rol nace en SEED_ROLES con descripcion no vacia, y los otros dos roles quedan intactos.
-// R2: el literal `Empacador` tiene un unico dueño en produccion, `roles.ts` -- barrido, mismo
-// patron que `tests/guards/guard-rol-administrador-unico.test.ts`, reescrito en este archivo
-// porque protege un requisito de ESTA ficha, no una convencion transversal (design.md > 4).
-// R3: el modelo `Role` de `db/schema.prisma` es global, sin campo de empresa.
-// R16: nadie en esta ficha consume `terminados.consultar` todavia; el mismo barrido, sobre otro
-// literal, lo demuestra. QC-145 tendra que relajar este caso cuando lo consuma.
+// Guardia y unit del rol Empacador: nace en SEED_ROLES con descripcion no vacia y los otros dos
+// roles quedan intactos; el literal `Empacador` tiene un unico dueño en produccion, `roles.ts`
+// -- barrido, mismo patron que `tests/guards/guard-rol-administrador-unico.test.ts`, reescrito en
+// este archivo porque protege un requisito propio, no una convencion transversal; el modelo
+// `Role` de `db/schema.prisma` es global, sin campo de empresa; y nadie en esta ficha consume
+// `terminados.consultar` todavia, lo que el mismo barrido, sobre otro literal, demuestra.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, join, sep } from 'node:path';
@@ -38,7 +35,7 @@ function findRepoRoot(startDir: string): string {
 
 const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
 
-/** Mismo alcance que `guard-rol-administrador-unico.test.ts` (design.md > 4). */
+/** Mismo alcance que `guard-rol-administrador-unico.test.ts`. */
 const PRODUCTION_DIRS = ['lib', 'app', 'components', 'hooks'];
 
 const IGNORED_DIRS = new Set(['node_modules', '.next', '.git', '.prisma', 'dist', '.worktrees']);

@@ -1160,15 +1160,15 @@ describe('R35 — el propio actor NO sale en su listado', () => {
 });
 
 // ---------------------------------------------------------------------------
-// QC-144 R23 + R3 — el rol Empacador llega a los usuarios por el CASO DE USO completo
-// (`identity.createUser` / `identity.updateUser`, ya cableados con la base real por
-// `lib/composition`), no por el adaptador suelto: es la unica forma de ejercitar
-// `requirePermission(actor, 'usuarios.modificar')` en el mismo camino que usa produccion.
+// El rol Empacador llega a los usuarios por el CASO DE USO completo (`identity.createUser` /
+// `identity.updateUser`, ya cableados con la base real por `lib/composition`), no por el
+// adaptador suelto: es la unica forma de ejercitar `requirePermission(actor, 'usuarios.modificar')`
+// en el mismo camino que usa produccion.
 // ---------------------------------------------------------------------------
 
-/** Cumple la politica real de QC-19 (mayuscula, minuscula, digito, simbolo, 8..64): evidentemente
- *  ficticia, y solo sirve para que el alta con credencial tome la rama `'not_needed'` y no toque
- *  el emisor de enlaces ni el correo. */
+/** Cumple la politica real de credenciales (mayuscula, minuscula, digito, simbolo, 8..64):
+ *  evidentemente ficticia, y solo sirve para que el alta con credencial tome la rama
+ *  `'not_needed'` y no toque el emisor de enlaces ni el correo. */
 const FAKE_USE_CASE_CREDENTIAL = 'QC144-credencial-de-prueba-no-real-00';
 
 function actorWithPermissions(companyId: string, permissions: readonly string[]): Actor {
@@ -1194,7 +1194,7 @@ function baseUserInputData(roleId: string, overrides: Record<string, unknown> = 
 }
 
 /** Entrada de ALTA: los ocho campos comunes mas `credential`, para tomar la rama `'not_needed'`
- *  (QC-79) y no rozar el emisor de enlaces ni el correo. */
+ *  y no rozar el emisor de enlaces ni el correo. */
 function createUserInputData(roleId: string, overrides: Record<string, unknown> = {}) {
   return { ...baseUserInputData(roleId), credential: FAKE_USE_CASE_CREDENTIAL, ...overrides };
 }

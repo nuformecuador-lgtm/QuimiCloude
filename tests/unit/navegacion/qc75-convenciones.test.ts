@@ -46,12 +46,14 @@ const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Los dieciseis codigos del catalogo, escritos a mano A PROPOSITO: son el contrato que R15 congela.
+ * Los dieciseis codigos del catalogo, escritos a mano A PROPOSITO: son el contrato que este test
+ * congela.
  * Eran diez en QC-74; QC-38 sumo `unidades.modificar` al darle escritura a `unidades`, enmendando
  * QC-74 R2; QC-66 sumo `usuarios.consultar` y `usuarios.modificar`, enmendando QC-74 R1; QC-86 suma
- * `asignaciones.consultar` y `asignaciones.modificar` (su R25), volviendo a enmendar QC-74 R2;
- * QC-144 suma `terminados.consultar`, volviendo a enmendar QC-74 R1 (las cuatro enmiendas estan
- * escritas en `lib/modules/identity/domain/permissions.ts`).
+ * `asignaciones.consultar` y `asignaciones.modificar`, volviendo a enmendar la regla del numero
+ * cerrado; la ultima enmienda suma `terminados.consultar`, volviendo a enmendar la regla de
+ * nombres de modulo (las cuatro enmiendas estan escritas en
+ * `lib/modules/identity/domain/permissions.ts`).
  */
 export const CODIGOS_QC74 = [
   'dashboard.consultar',
@@ -141,8 +143,8 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
     // `unidades` ya esta entre los de negocio, y `asignaciones` entro ahi con QC-86; el catalogo
     // suma `dashboard`, que es una pantalla y no un modulo del ERP (QC-74 R4: solo `consultar`),
     // `usuarios`, que NO es ninguna carpeta de `lib/modules/` -los usuarios viven dentro de
-    // `identity`-, y `terminados`, que tampoco es carpeta de `lib/modules/` (QC-144, la misma
-    // enmienda que hizo `usuarios` en QC-66).
+    // `identity`-, y `terminados`, que tampoco es carpeta de `lib/modules/`: la misma enmienda
+    // que ya se hizo con `usuarios`.
     const esperados = [...new Set([...MODULOS_DE_NEGOCIO, 'dashboard', 'usuarios', 'terminados'])].sort();
     expect(modulos).toEqual(esperados);
     expect(modulos).toContain('unidades');

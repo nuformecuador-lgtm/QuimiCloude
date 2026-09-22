@@ -1,8 +1,8 @@
-// T9 (QC-144) — R12, R13: el Empacador se autoriza EXACTAMENTE como cualquier otro conjunto de
-// permisos, por los mismos casos de uso que ya existen. No hay codigo de produccion nuevo que
-// probar aqui (design.md > 4): lo que este archivo fija es que el conjunto de permisos que el seed
-// le da al Empacador concede en los cuatro casos de uso de pedidos asignados y rechaza en los seis
-// que exigen `inventario.consultar`, `inventario.modificar` o `asignaciones.modificar`.
+// El Empacador se autoriza EXACTAMENTE como cualquier otro conjunto de permisos, por los mismos
+// casos de uso que ya existen. No hay codigo de produccion nuevo que probar aqui: lo que este
+// archivo fija es que el conjunto de permisos que el seed le da al Empacador concede en los
+// cuatro casos de uso de pedidos asignados y rechaza en los seis que exigen
+// `inventario.consultar`, `inventario.modificar` o `asignaciones.modificar`.
 //
 // El actor se construye con `SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]`, NUNCA con una lista copiada a
 // mano: si el seed cambiara ese conjunto, este archivo tiene que enterarse con el, no seguir
@@ -66,9 +66,8 @@ const EMPACADOR = uuid('1');
 const PEDIDO = uuid('7');
 
 /**
- * El actor del Empacador, con el conjunto que EL SEED le declara — nunca una copia a mano
- * (design.md > 6, tabla de tests nuevos). Si `SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]` cambiara,
- * este actor cambia con el.
+ * El actor del Empacador, con el conjunto que EL SEED le declara — nunca una copia a mano. Si
+ * `SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]` cambiara, este actor cambia con el.
  */
 const PERMISOS_DEL_EMPACADOR = SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR];
 if (PERMISOS_DEL_EMPACADOR === undefined) {
@@ -103,7 +102,7 @@ describe('QC-144 R12 — el Empacador concede en los cuatro casos de uso de pedi
         listByOrdersInCompany: explode(),
         deleteOne: explode(),
         deleteByWorkGroup: explode(),
-        // Sin ids asignados: el caso de uso corta antes de tocar ningun otro puerto (R8 de QC-88).
+        // Sin ids asignados: el caso de uso corta antes de tocar ningun otro puerto.
         listOrderIdsByUserInCompany: vi.fn(async () => []),
       },
       orders: { findAliveById: explode(), listAliveSummariesByIds: explode() },

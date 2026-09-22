@@ -15,12 +15,12 @@ import {
   SEED_ROLE_PERMISSIONS,
 } from '@/lib/modules/identity'
 
-/** Los dieciseis codigos, copiados a mano DESDE EL REQUISITO R2 -no derivados del catalogo-: si el
- *  catalogo cambia, este test tiene que cambiar tambien, que es justamente lo que se quiere.
+/** Los dieciseis codigos, copiados a mano -no derivados del catalogo-: si el catalogo cambia,
+ *  este test tiene que cambiar tambien, que es justamente lo que se quiere.
  *  Eran diez en QC-74; QC-38 sumo `unidades.modificar` al darle escritura a `unidades`,
  *  enmendando QC-74 R2; QC-66 sumo los dos de `usuarios` (su R8), enmendando QC-74 R1; QC-86 suma
- *  los dos de `asignaciones` (su R25), volviendo a enmendar QC-74 R2; QC-144 suma
- *  `terminados.consultar`: once, trece, quince y ahora dieciseis
+ *  los dos de `asignaciones`, volviendo a enmendar la regla del numero cerrado; la ultima
+ *  enmienda suma `terminados.consultar`: once, trece, quince y ahora dieciseis
  *  (ver `lib/modules/identity/domain/permissions.ts`). */
 const CODIGOS_DEL_REQUISITO = [
   'dashboard.consultar',
@@ -46,8 +46,8 @@ const CODIGOS_DEL_REQUISITO = [
  *  codigo lo lee una persona: es la SEGUNDA enmienda a QC-74 R1, la de la decision cerrada 2 de
  *  QC-66 (su R12), escrita en `lib/modules/identity/domain/permissions.ts`. `asignaciones`, que
  *  entra con QC-86, NO necesita esa enmienda: SI es una carpeta real de `lib/modules/`, asi que
- *  cumple QC-74 R1 al pie de la letra. `terminados`, que entra con QC-144, tambien necesita la
- *  enmienda: no es una carpeta de `lib/modules/`. */
+ *  cumple esa regla al pie de la letra. `terminados`, que entra con la ultima enmienda, tambien
+ *  necesita la misma: no es una carpeta de `lib/modules/`. */
 const MODULOS = [
   'inventario',
   'recetas',

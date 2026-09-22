@@ -207,8 +207,8 @@ function asignacionesDelSeed(rolesPorNombre: ReadonlyMap<string, string>): Reado
   return pares;
 }
 
-/** Numero total de asignaciones que el seed tiene que dejar: QC-144 lo sube a veinte (Administrador
- *  16 + Operador 2 + Empacador 2). Se deriva de `SEED_ROLE_PERMISSIONS`, no se escribe a mano. */
+/** Numero total de asignaciones que el seed tiene que dejar: veinte (Administrador 16 + Operador 2
+ *  + Empacador 2). Se deriva de `SEED_ROLE_PERMISSIONS`, no se escribe a mano. */
 const TOTAL_DE_ASIGNACIONES_DEL_SEED = Object.values(SEED_ROLE_PERMISSIONS).reduce(
   (total, codes) => total + codes.length,
   0,
@@ -259,7 +259,7 @@ describe('seedInitialAccess', () => {
     const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
 
     expect(repository.llamadas.length).toBeGreaterThan(0);
-    // QC-144: el seed asegura los tres roles de `SEED_ROLES`, no solo los dos historicos.
+    // El seed asegura los tres roles de `SEED_ROLES`, no solo los dos historicos.
     expect(outcome.createdRoles.slice().sort()).toEqual(
       [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR].sort(),
     );
@@ -325,8 +325,8 @@ describe('seedInitialAccess', () => {
     expect(input.passwordHash).not.toBe(CREDENCIAL_DE_PRUEBA);
   });
 
-  // Caso 4 (R2), enmendado por QC-144: con tres roles de semilla, faltar el Administrador deja
-  // faltando tambien a Operador y Empacador.
+  // Con tres roles de semilla, faltar el Administrador deja faltando tambien a Operador y
+  // Empacador.
   it('si el rol Operador falta y el Administrador ya existe, crea Operador y Empacador', async () => {
     const repository = crearRepositorioFalso({
       rolesExistentes: new Map([[ROLE_ADMINISTRADOR, 'rol-admin-existente']]),
@@ -457,8 +457,8 @@ describe('seedInitialAccess', () => {
       errorCapturado = error as Error;
     }
 
-    // Primero: que los roles SI se crearon (los tres, exactamente; QC-144 suma Empacador).
-    // Ocurrio ANTES de afirmar cualquier otra cosa, siguiendo el orden de `design.md > 11`.
+    // Primero: que los roles SI se crearon (los tres, exactamente). Ocurrio ANTES de
+    // afirmar cualquier otra cosa, siguiendo el orden en que el dominio los crea.
     const creacionesDeRol = repository.llamadas.filter((llamada) => llamada.metodo === 'createRole');
     expect(creacionesDeRol).toHaveLength(3);
 
@@ -697,7 +697,7 @@ describe('seedInitialAccess', () => {
   // «se llamo con nada».
   // ---------------------------------------------------------------------------------
 
-  // Caso 14 (QC-74 R8, R9, R10; QC-144 R8, R9)
+  // El catalogo completo y las asignaciones de los tres roles, contra el repositorio falso.
   it('sobre una base vacia crea los dieciseis permisos del catalogo y las veinte asignaciones del seed', async () => {
     const repository = crearRepositorioFalso();
     const passwordHasher = crearHasherFalso();
@@ -727,7 +727,7 @@ describe('seedInitialAccess', () => {
     expect(outcome.createdPermissions).toEqual(PERMISSIONS.map((permission) => permission.code));
 
     // Luego: las asignaciones, las veinte (dieciseis del Administrador + dos del Operador + dos
-    // del Empacador, QC-144).
+    // del Empacador).
     const creacionesDeAsignaciones = repository.llamadas.filter(
       (llamada) => llamada.metodo === 'createRolePermissions',
     );
@@ -762,7 +762,7 @@ describe('seedInitialAccess', () => {
         .filter((par) => par.roleId === rolesCreados.get(ROLE_OPERADOR))
         .map((par) => par.permissionCode),
     ).toEqual(['inventario.consultar', 'asignaciones.consultar']);
-    // QC-144: el Empacador nace con exactamente sus dos permisos, en el orden de
+    // El Empacador nace con exactamente sus dos permisos, en el orden de
     // `SEED_ROLE_PERMISSIONS`.
     expect(
       paresCreados

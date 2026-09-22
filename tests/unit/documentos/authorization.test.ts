@@ -154,7 +154,7 @@ describe('documentos — autorizacion', () => {
     it('R4 — el codigo exigido YA EXISTE en el catalogo: no se amplia nada', () => {
       const codigos = PERMISSIONS.map((permiso) => permiso.code);
       expect(codigos).toContain(DOCUMENT_UPLOAD_PERMISSION);
-      // Ancla anti-vacuidad: el catalogo sigue siendo el cerrado de dieciseis (QC-144 lo sumo a uno).
+      // Ancla anti-vacuidad: el catalogo sigue siendo el cerrado de dieciseis.
       expect(codigos).toHaveLength(16);
       // Y ninguna entrada nace para este modulo.
       expect(codigos.filter((codigo) => codigo.startsWith('documentos.'))).toEqual([]);
