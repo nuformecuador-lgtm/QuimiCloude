@@ -35,11 +35,11 @@ const UNIT_ID = '44444444-4444-4444-8444-444444444444';
 const LINEA_VIEJA = { productId: PRODUCTO_VIEJO, quantity: '10.0000', unitId: UNIT_ID };
 const LINEA_NUEVA = { productId: PRODUCTO_NUEVO, quantity: '2.0000', unitId: UNIT_ID };
 
-// QC-80 (R21): `ProductRef` ya no lleva unidad -nadie la consumia-, asi que el doble tampoco.
-// QC-91 (R11): tampoco lleva `stock`; la existencia sale unicamente de `stockByUnit`.
+// QC-91 (R11): `ProductRef` no lleva `stock`; la existencia sale unicamente de `stockByUnit`.
 const REF_NUEVO: ProductRef = {
   id: PRODUCTO_NUEVO,
   name: 'Sosa caustica',
+  unitId: null,
   stockByUnit: [],
 };
 
@@ -178,7 +178,7 @@ describe('R46 — anadir una linea nueva cuyo producto no existe o esta de baja 
     const products: ProductCatalog = {
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
         REF_NUEVO,
-        { id: PRODUCTO_VIEJO, name: 'Acido sulfurico', stockByUnit: [] },
+        { id: PRODUCTO_VIEJO, name: 'Acido sulfurico', unitId: null, stockByUnit: [] },
       ]),
       findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
         throw new Error('recetas no debe costear nada');

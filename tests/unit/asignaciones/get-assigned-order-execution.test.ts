@@ -113,7 +113,9 @@ function montar(options?: {
   const findRefs = vi.fn(async () => options?.ownUnits ?? [unidad()]);
   const findRefsSharingBaseInCompany = vi.fn(async () => options?.sisterUnits ?? []);
 
-  const productFindRefs = vi.fn(async () => [{ id: PRODUCTO, name: 'Sosa caustica', stockByUnit: [] }]);
+  const productFindRefs = vi.fn(async () => [
+    { id: PRODUCTO, name: 'Sosa caustica', unitId: null, stockByUnit: [] },
+  ]);
 
   const deps: GetAssignedOrderExecutionDeps = {
     assignments: {
