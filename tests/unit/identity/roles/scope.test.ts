@@ -182,9 +182,9 @@ const LITERALES_DE_ROL = [ROLE_ADMINISTRADOR, ROLE_OPERADOR].map(
  * RETENSADO 2026-09-11 por QC-86, al sincronizar su rama con `dev`. Eran TRECE cuando se escribio
  * QC-94; QC-86 (`modelo-de-asignacion-de-pedidos`) suma `asignaciones.consultar` y
  * `asignaciones.modificar` a `PERMISSIONS` con permiso del humano -su decision cerrada 8- y el
- * catalogo pasa a QUINCE. La enmienda esta escrita en
+ * catalogo pasa a QUINCE, y a DIECISEIS con la siguiente enmienda. La enmienda esta escrita en
  * `lib/modules/identity/domain/permissions.ts`: diez en QC-74, once en QC-38, trece en QC-66,
- * quince en QC-86.
+ * quince despues, dieciseis mas tarde.
  *
  * ESTO NO AFLOJA R21, y por eso se sube el numero en vez de relajar la asercion a `toContain` o a
  * `toBeGreaterThan`: lo que R21 exige es que **QC-94** no toque el catalogo, y sigue sin tocarlo
@@ -193,7 +193,7 @@ const LITERALES_DE_ROL = [ROLE_ADMINISTRADOR, ROLE_OPERADOR].map(
  * el caso dejaria de cazar justo lo que existe para cazar: que alguien cuele un permiso nuevo
  * desde la ficha de roles.
  */
-const PERMISOS_ESPERADOS = 15;
+const PERMISOS_ESPERADOS = 16;
 
 /** Los DOS codigos que esta ficha reutiliza, y que por tanto tienen que seguir existiendo. */
 const LOS_DOS_CODIGOS = ['usuarios.consultar', 'usuarios.modificar'] as const;

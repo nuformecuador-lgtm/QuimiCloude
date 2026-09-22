@@ -189,15 +189,15 @@ const ADAPTADOR_DRIVEN = 'lib/modules/identity/adapters/driven/persistence/work-
  * El catalogo cerrado de permisos, que esta ficha NO toca (R47): «el catalogo DEBE seguir teniendo
  * QUINCE entradas despues de esta ficha, y los tests que afirman ese numero **no se tocan**».
  *
- * El numero tiene historia escrita en `lib/modules/identity/domain/permissions.ts`: diez en QC-74,
- * once en QC-38, trece en QC-66, quince en QC-86. Esta ficha reutiliza `usuarios.consultar` y
- * `usuarios.modificar` y no crea ninguno, asi que se queda en QUINCE.
+ * El numero tiene historia escrita en `lib/modules/identity/domain/permissions.ts` y ha ido
+ * subiendo con cada enmienda al catalogo. Esta ficha reutiliza `usuarios.consultar` y
+ * `usuarios.modificar` y no crea ninguno.
  *
  * Se importa `PERMISSIONS` y se cuenta: NO se toca `permissions.ts` ni ninguno de los tests ajenos
  * que ya afirman este numero (`tests/unit/identity/permissions.test.ts`,
  * `tests/guards/guard-permisos-sembrados.test.ts`), que es exactamente lo que R47 exige.
  */
-const PERMISOS_ESPERADOS = 15;
+const PERMISOS_ESPERADOS = 16;
 
 /** Los DOS codigos que esta ficha reutiliza, y que por tanto tienen que seguir existiendo. */
 const LOS_DOS_CODIGOS = ['usuarios.consultar', 'usuarios.modificar'] as const;

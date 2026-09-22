@@ -35,7 +35,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { listAllRoles } from '@/lib/modules/identity/adapters/driven/persistence/role-catalog-prisma';
-import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
+import { ROLE_ADMINISTRADOR, ROLE_EMPACADOR, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
 import { prisma } from '@/lib/shared/db/prisma';
 
 /** El orden que la BASE considera correcto entre lo que el catalogo devuelve, preguntado a la base.
@@ -60,6 +60,16 @@ describe('QC-94 — listAllRoles devuelve el catalogo sin el rol administrador (
 
     const encontrado = roles.find((rol) => rol.name === ROLE_OPERADOR);
     expect(encontrado, `falta el rol del seed «${ROLE_OPERADOR}»`).toBeDefined();
+    expect(typeof encontrado!.id).toBe('string');
+    expect(encontrado!.id.length).toBeGreaterThan(0);
+  });
+
+  // El Empacador nace en el mismo selector, por el mismo filtro, sin tocar la pantalla.
+  it('R22 — el rol Empacador tambien esta, con su identificador', async () => {
+    const roles = await listAllRoles();
+
+    const encontrado = roles.find((rol) => rol.name === ROLE_EMPACADOR);
+    expect(encontrado, `falta el rol del seed «${ROLE_EMPACADOR}»`).toBeDefined();
     expect(typeof encontrado!.id).toBe('string');
     expect(encontrado!.id.length).toBeGreaterThan(0);
   });
