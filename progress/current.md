@@ -1347,3 +1347,27 @@ meter alcance que nadie pidió.
 
 **No se ha creado la ficha todavía: espera decisión humana.** El patrón a copiar está identificado:
 el `recipe-picker` de QC-35, que **busca en servidor** en vez de filtrar lo ya traído.
+
+### QC-110 - F2 completa y PR #105 abierto (2026-09-22)
+
+**CUATRO vueltas de implementer y DOS de reviewer.** R1-R23 mapeados, 18 tasks cerradas, spec
+intacto salvo la tabla de `Deps` de `design.md > 4`, que se corrigio por decision humana porque
+se contradecia con su propio paso 6.
+
+**EL PR SE ABRIO SIN GATE VERDE, POR DECISION HUMANA Y CON LA EVIDENCIA ESCRITA.** La suite
+completa es INESTABLE BAJO CARGA: dos corridas consecutivas sobre el mismo arbol tumbaron DOS
+ARCHIVOS DISTINTOS -`user-table.test.tsx` (27/27 aislado, ficha QC-126) y
+`credential-setup.int.test.ts` (15/15 aislado, ficha NUEVA **QC-143**)-, ninguno tocado por esta
+rama. Que en la corrida donde uno pasa caiga el otro es lo que dice que no son el mismo problema.
+**Antes de sincronizar con `dev` el gate salio VERDE TRES VECES** (591 archivos, 8427/8428/8429
+tests), una de ellas corrida por el propio reviewer sin fiarse del informe.
+
+**LO QUE ESTO LE HACE A LA REGLA 5, y va en QC-143**: si la suite tumba un archivo distinto por
+corrida, «gate completo en verde antes de cada PR» **no se puede cumplir repitiendo**, porque no
+converge.
+
+**Ninguno de los dos se metio en el baseline**: enmascarar un flake apaga tambien sus casos sanos,
+que es lo que la review de QC-111 rechazo expresamente.
+
+**QC-143 esta en el board pero NO en `feature_list.json`**: nacio despues del ultimo F0 y la
+importa el proximo arranque de sesion.
