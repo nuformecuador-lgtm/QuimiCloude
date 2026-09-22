@@ -12,7 +12,7 @@ import type { AssignedOrderExecutionView } from '@/lib/modules/asignaciones/doma
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
 import type { AssignedOrderSummary, OrderCatalog } from '@/lib/modules/pedidos';
 import type { RecipeCatalog, RecipeExecutionContent } from '@/lib/modules/recetas';
-import type { ProductCatalog } from '@/lib/modules/inventario';
+import type { PresentationCatalog, PresentationRef, ProductCatalog } from '@/lib/modules/inventario';
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
 function uuid(seed: string): string {
@@ -58,6 +58,12 @@ function unidad(overrides?: Partial<UnitRef>): UnitRef {
   return { id: LITRO, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, ...overrides };
 }
 
+const PRESENTACION = uuid('b');
+
+function presentacion(overrides?: Partial<PresentationRef>): PresentationRef {
+  return { id: PRESENTACION, name: 'Bidon 20L', ...overrides };
+}
+
 type Dobles = {
   readonly deps: GetAssignedOrderExecutionDeps;
   readonly listOrderIdsByUserInCompany: ReturnType<typeof vi.fn>;
@@ -67,6 +73,7 @@ type Dobles = {
   readonly findRefs: ReturnType<typeof vi.fn>;
   readonly findRefsSharingBaseInCompany: ReturnType<typeof vi.fn>;
   readonly productFindRefs: ReturnType<typeof vi.fn>;
+  readonly findRefsPresentations: ReturnType<typeof vi.fn>;
   readonly todos: readonly ReturnType<typeof vi.fn>[];
 };
 
@@ -77,6 +84,7 @@ function montar(options?: {
   readonly content?: RecipeExecutionContent | null;
   readonly ownUnits?: readonly UnitRef[];
   readonly sisterUnits?: readonly UnitRef[];
+  readonly presentations?: readonly PresentationRef[];
 }): Dobles {
   const listOrderIdsByUserInCompany = vi.fn(async () => options?.ids ?? [PEDIDO]);
   const listByOrderInCompany = vi.fn(async () => {
@@ -116,6 +124,8 @@ function montar(options?: {
 
   const productFindRefs = vi.fn(async () => [{ id: PRODUCTO, name: 'Sosa caustica', stockByUnit: [] }]);
 
+  const findRefsPresentations = vi.fn(async () => options?.presentations ?? []);
+
   const deps: GetAssignedOrderExecutionDeps = {
     assignments: {
       insertMissing,
@@ -134,6 +144,7 @@ function montar(options?: {
         throw new Error('la ejecucion de un pedido asignado no costea nada');
       }),
     } as ProductCatalog,
+    presentations: { findRefs: findRefsPresentations } as unknown as PresentationCatalog,
   };
 
   return {
@@ -145,6 +156,7 @@ function montar(options?: {
     findRefs,
     findRefsSharingBaseInCompany,
     productFindRefs,
+    findRefsPresentations,
     todos: [
       listOrderIdsByUserInCompany,
       listByOrderInCompany,
@@ -160,6 +172,7 @@ function montar(options?: {
       findRefs,
       findRefsSharingBaseInCompany,
       productFindRefs,
+      findRefsPresentations,
     ],
   };
 }
@@ -267,6 +280,7 @@ const _r15TipoSinImporte: AssignedOrderExecutionView = {
   scaleFactorText: null,
   steps: [],
   lines: [],
+  presentationName: null,
   // @ts-expect-error `AssignedOrderExecutionView` no declara `ingredientsCost` (R15): si esto
   // compila, la pantalla de ejecucion gano el importe.
   ingredientsCost: '10.0000',
@@ -293,6 +307,7 @@ describe('QC-123 — la pantalla de ejecucion no lleva importe (R15)', () => {
         'scaleFactorText',
         'steps',
         'lines',
+        'presentationName',
       ].sort(),
     );
     for (const line of view.lines) {
@@ -300,6 +315,31 @@ describe('QC-123 — la pantalla de ejecucion no lleva importe (R15)', () => {
         ['productName', 'quantity', 'unit', 'alternativeUnits'].sort(),
       );
     }
+  });
+});
+
+describe('getAssignedOrderExecution — la presentacion del pedido asignado', () => {
+  it('R25: la vista lleva el nombre de la presentacion cuando el pedido tiene una', async () => {
+    const { deps, findRefsPresentations } = montar({
+      summary: resumen({ presentationId: PRESENTACION }),
+      presentations: [presentacion()],
+    });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(findRefsPresentations).toHaveBeenCalledWith([PRESENTACION], EMPRESA);
+    expect(view.presentationName).toBe('Bidon 20L');
+  });
+
+  it('R25: un pedido sin presentacion devuelve `presentationName: null`, sin consultar el catalogo', async () => {
+    const { deps, findRefsPresentations } = montar({ summary: resumen({ presentationId: null }) });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(findRefsPresentations).not.toHaveBeenCalled();
+    expect(view.presentationName).toBeNull();
   });
 });
 

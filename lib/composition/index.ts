@@ -1129,6 +1129,7 @@ export const asignaciones = {
     orders: orderCatalog,
     recipes: recipeCatalog,
     people: peopleDirectory,
+    presentations: presentationCatalog,
     now: () => new Date(),
   }),
   // La pantalla de ejecucion. MISMO `orderCatalog`, `recipeCatalog` y
@@ -1140,6 +1141,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     units: unitCatalog,
     products: productCatalog,
+    presentations: presentationCatalog,
   }),
   startAssignedOrder: createStartAssignedOrder({
     assignments: orderAssignmentRepository,
@@ -1147,6 +1149,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     units: unitCatalog,
     products: productCatalog,
+    presentations: presentationCatalog,
     now: () => new Date(),
   }),
   finishAssignedOrder: createFinishAssignedOrder({

@@ -20,7 +20,7 @@ import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
 import type { AssignedOrderSummary, OrderCatalog, OrderStatus } from '@/lib/modules/pedidos';
 import type { RecipeCatalog, RecipeExecutionContent } from '@/lib/modules/recetas';
-import type { ProductCatalog } from '@/lib/modules/inventario';
+import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
 function uuid(seed: string): string {
@@ -112,6 +112,7 @@ function montar(options?: {
         throw new Error('arrancar un pedido asignado no costea nada');
       }),
     } as ProductCatalog,
+    presentations: { findRefs: vi.fn(async () => []) } as unknown as PresentationCatalog,
     now: () => new Date('2026-09-17T10:00:00.000Z'),
   };
 

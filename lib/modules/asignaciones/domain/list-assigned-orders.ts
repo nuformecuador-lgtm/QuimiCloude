@@ -16,6 +16,7 @@ import type { OrderAssignmentRepository } from '../ports/order-assignment-reposi
 
 import { formatOrderNumber, type OrderCatalog, type Page } from '@/lib/modules/pedidos';
 import type { PeopleDirectory } from '@/lib/modules/identity';
+import type { PresentationCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 
 /**
@@ -40,6 +41,7 @@ export type ListAssignedOrdersDeps = {
   readonly orders: OrderCatalog;
   readonly recipes: RecipeCatalog;
   readonly people: PeopleDirectory;
+  readonly presentations: PresentationCatalog;
   readonly now?: () => Date;
 };
 
@@ -94,6 +96,23 @@ export function createListAssignedOrders(
     const recipes = await deps.recipes.findRefsIncludingDeleted(recipeIds, actor.companyId);
     const recipeNames = new Map(recipes.map((recipe) => [recipe.id, recipe.name]));
 
+    // Los ids de presentacion no nulos de la pagina, deduplicados, con UNA sola llamada -y
+    // ninguna si ningun pedido de la pagina tiene presentacion.
+    const presentationIds = [
+      ...new Set(
+        ordersPage.items
+          .map((row) => row.presentationId)
+          .filter((id): id is string => id !== null),
+      ),
+    ];
+    const presentations =
+      presentationIds.length === 0
+        ? []
+        : await deps.presentations.findRefs(presentationIds, actor.companyId);
+    const presentationNames = new Map(
+      presentations.map((presentation) => [presentation.id, presentation.name]),
+    );
+
     // Solo los ids DE LA PAGINA, no todos los de la persona.
     const pageOrderIds = ordersPage.items.map((row) => row.id);
     const assignmentRows = await deps.assignments.listByOrdersInCompany(
@@ -136,6 +155,8 @@ export function createListAssignedOrders(
       otherResponsibles: (responsiblesByOrder.get(row.id) ?? [])
         .filter((responsible) => responsible.userId !== actor.id)
         .sort(compareResponsibles),
+      presentationName:
+        row.presentationId === null ? null : presentationNames.get(row.presentationId) ?? null,
     }));
 
     return {
