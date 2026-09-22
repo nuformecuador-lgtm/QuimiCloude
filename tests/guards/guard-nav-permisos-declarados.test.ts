@@ -91,10 +91,11 @@ describe('guardia — los permisos declarados en el menu existen en el catalogo 
   // «Configuración», que declara `unidades.consultar`. El ancla se **tensa**, nunca se relaja
   // (QC-39 R47): darse de alta en la lista exacta es el punto de extension por diseño de este
   // caso, y subir el numero sin nombrar el enlace nuevo lo dejaria pasar sin comprobar.
-  // AMPLIADA el 2026-09-11 (QC-67 T2): el octavo es «Usuarios», TERCER item de la seccion
-  // «Configuración», que declara `usuarios.consultar` —el mismo codigo que exige su pantalla—. El
-  // ancla se **tensa**: sube el numero Y se nombra el enlace nuevo, porque darse de alta en la
-  // lista exacta es el punto de extension por diseño de este caso (R39).
+  // AMPLIADA el 2026-09-11 (QC-67 T2): el octavo es «Usuarios», que declara `usuarios.consultar`
+  // —el mismo codigo que exige su pantalla—. El ancla se **tensa**: sube el numero Y se nombra el
+  // enlace nuevo, porque darse de alta en la lista exacta es el punto de extension por diseño de
+  // este caso (R39). Nacio en la seccion «Configuración» y paso a «Operación» el 2026-09-21 por
+  // decision humana; esta guardia mide permisos, no secciones, asi que no le afecta.
   it('ancla: el recorrido encuentra hoy los nueve enlaces reales del menu', () => {
     // Anti-vacuidad. Si el recorrido se rompiera —un grupo que deja de visitarse, un cambio de
     // forma en `PRIVATE_NAV_ITEMS`—, `findUndeclaredNavPermissions` devolveria [] sobre una lista

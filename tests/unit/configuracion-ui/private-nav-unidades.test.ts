@@ -76,7 +76,7 @@ function paginaDe(href: string): string {
 }
 
 describe('la seccion Configuración sigue siendo una y ahora tiene dos items (R9)', () => {
-  it('hay exactamente UNA seccion Configuración y lleva exactamente TRES items', () => {
+  it('hay exactamente UNA seccion Configuración y lleva exactamente DOS items', () => {
     // Ni se crea una segunda seccion ni se renombra la que existe: se anade un item a la de
     // QC-45, que nacio con uno.
     const secciones = groupNavItemsBySection(PRIVATE_NAV_ITEMS).filter(
@@ -84,10 +84,12 @@ describe('la seccion Configuración sigue siendo una y ahora tiene dos items (R9
     );
 
     expect(secciones).toHaveLength(1);
-    // TENSADA el 2026-09-11 (QC-67 T2, R2/R39): de DOS a TRES con «Usuarios», que entra al FINAL.
-    // Lo que R9 promete sigue intacto y lo comprueba el caso de abajo: el item de presentaciones
-    // no se toca y sigue siendo el primero; el de unidades tampoco se mueve.
-    expect(secciones[0]?.items).toHaveLength(3);
+    // TENSADA el 2026-09-11 (QC-67 T2, R2/R39) a TRES con «Usuarios», que entraba al FINAL, y
+    // RELAJADA de vuelta a DOS el 2026-09-21: «Usuarios» paso a `NAV_SECTION_OPERATION` por
+    // decision humana (es operacion, no configuracion). Lo que R9 promete sigue intacto y lo
+    // comprueba el caso de abajo: el item de presentaciones no se toca y sigue siendo el primero;
+    // el de unidades tampoco se mueve.
+    expect(secciones[0]?.items).toHaveLength(2);
     expect((secciones[0]?.items[1] as NavLink | undefined)?.href).toBe(UNITS_ROUTE);
   });
 
