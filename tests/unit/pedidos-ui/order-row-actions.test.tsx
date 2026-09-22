@@ -38,6 +38,17 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
   };
 });
 
+// El barrel de la ruta arrastra el formulario de edicion, que importa el selector de
+// presentacion: se aisla igual que `order-actions` de aqui arriba.
+vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
+  listPresentationsAction: vi.fn(() => {
+    throw new Error('listPresentationsAction no debe invocarse desde las acciones de fila');
+  }),
+  createPresentationAction: vi.fn(() => {
+    throw new Error('createPresentationAction no debe invocarse desde las acciones de fila');
+  }),
+}));
+
 function pedido(status: OrderStatus, overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
     id: '11111111-1111-4111-8111-111111111111',
@@ -54,6 +65,8 @@ function pedido(status: OrderStatus, overrides: Partial<OrderSummary> = {}): Ord
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
+    presentationId: null,
+    presentationName: null,
     ...overrides,
   };
 }

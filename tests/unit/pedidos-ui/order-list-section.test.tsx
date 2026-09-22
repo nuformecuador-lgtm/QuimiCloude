@@ -127,6 +127,18 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
   listUnitsAction: listUnitsActionMock,
 }));
 
+// El panel de edicion monta ahora `PresentationSelect` por fila: sin este doble, la llamada
+// iria a la sesion real (mismo criterio que `listRecipesAction` justo arriba).
+vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
+  listPresentationsAction: vi.fn(async () => ({
+    status: 'success' as const,
+    data: { items: [], page: 1, pageSize: 25, total: 0, totalPages: 1 },
+  })),
+  createPresentationAction: vi.fn(() => {
+    throw new Error('createPresentationAction no debe invocarse desde este archivo');
+  }),
+}));
+
 // QC-102 — el borde de `asignaciones`, importado por su RUTA EXACTA (R40), nunca por el barrel.
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions', () => ({
   listResponsiblesForOrdersAction: listResponsiblesForOrdersActionMock,
@@ -196,6 +208,8 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
+    presentationId: null,
+    presentationName: null,
     ...overrides,
   };
 }

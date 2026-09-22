@@ -77,6 +77,7 @@ const {
   listRecipesActionMock,
   listUnitsActionMock,
   getRecipeActionMock,
+  listPresentationsActionMock,
 } = vi.hoisted(() => ({
   usePathnameMock: vi.fn<() => string>(),
   redirectMock: vi.fn<(ruta: string) => never>(),
@@ -101,6 +102,7 @@ const {
   listRecipesActionMock: vi.fn<(query: unknown) => Promise<RecipeListResult>>(),
   listUnitsActionMock: vi.fn<() => Promise<UnitListResult>>(),
   getRecipeActionMock: vi.fn<(id: string) => Promise<RecipeQueryResult>>(),
+  listPresentationsActionMock: vi.fn<(query: unknown) => Promise<unknown>>(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -192,6 +194,13 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
   listUnitsAction: listUnitsActionMock,
 }));
 
+vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
+  listPresentationsAction: listPresentationsActionMock,
+  createPresentationAction: vi.fn(() => {
+    throw new Error('createPresentationAction no debe invocarse desde este archivo');
+  }),
+}));
+
 const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul', imageUrl: null };
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
@@ -200,6 +209,9 @@ const UNIDADES: readonly UnitView[] = [
 ];
 
 const CANTIDAD = '12.5000';
+
+/** Presentacion del catalogo, ofrecida por `listPresentationsAction` en el selector del panel. */
+const PRESENTACION = { id: crypto.randomUUID(), name: 'Bidón 20L' };
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
@@ -217,6 +229,8 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
+    presentationId: PRESENTACION.id,
+    presentationName: PRESENTACION.name,
     ...overrides,
   };
 }
@@ -324,6 +338,10 @@ beforeEach(() => {
     numberText: formatOrderNumber({ year: 2026, sequence: 43 }),
   });
   updateOrderActionMock.mockResolvedValue({ status: 'success' });
+  listPresentationsActionMock.mockResolvedValue({
+    status: 'success',
+    data: { items: [PRESENTACION], page: 1, pageSize: 25, total: 1, totalPages: 1 },
+  });
   toastExito = vi.spyOn(toast, 'success');
   clearSidebarStateCookie();
   setViewportWidth(WIDE_VIEWPORT);
@@ -340,6 +358,8 @@ afterEach(() => {
 async function rellenarAlta(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByTestId(RECIPE_PICKER_TESTID));
   await user.click(await esperarInteractiva(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`)));
+  await user.click(screen.getByTestId('presentation-select'));
+  await user.click(await esperarInteractiva(await screen.findByTestId('presentation-option')));
   await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 }
 

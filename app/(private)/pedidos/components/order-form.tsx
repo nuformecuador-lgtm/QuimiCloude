@@ -3,6 +3,7 @@
 import { useActionState, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import { PRESENTATION_FIELD, PresentationSelect } from '@/components/shared/presentation-select';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
 import {
@@ -122,15 +123,12 @@ export const ORDER_SHEET_RESPONSIBLES_TESTID = 'order-sheet-responsibles';
  * al envio.
  */
 
-/** Los CINCO campos de negocio, con el MISMO nombre que el adaptador driving lee del `FormData`. */
 /**
- * QC-35bis (decision humana del 2026-09-07): eran CINCO. La unidad y el precio unitario salieron
- * del pedido -del formulario, del contrato del modulo y de la tabla `orders`-, asi que esta lista
- * tiene TRES campos. Sigue siendo la unica fuente: `readValues` la recorre para armar el
- * `FormData` que la action lee, de modo que anadir un campo aqui y no en el formulario -o al
- * reves- no es posible sin que algo se note.
+ * Los campos de negocio, con el MISMO nombre que el adaptador driving lee del `FormData`.
+ * Unica fuente: `readValues` la recorre para armar el `FormData` que la action lee, de modo que
+ * anadir un campo aqui y no en el formulario -o al reves- no es posible sin que algo se note.
  */
-export const ORDER_BUSINESS_FIELDS = [RECIPE_FIELD, 'quantity', 'priority'] as const;
+export const ORDER_BUSINESS_FIELDS = [RECIPE_FIELD, 'quantity', PRESENTATION_FIELD, 'priority'] as const;
 
 /** Campo que SOLO existe en la edicion (R26, R29). */
 export const ORDER_STATUS_FIELD = 'status';
@@ -181,6 +179,7 @@ function describeOrder(recipeName: string, quantity: string): string | null {
 const FIELD_MESSAGES: Readonly<Record<OrderFieldName, string>> = {
   recipeId: 'Elige una receta de la lista.',
   quantity: 'Escribe una cantidad decimal mayor que cero.',
+  presentationId: 'Elige una presentación de la lista.',
   priority: 'Elige una de las prioridades disponibles.',
   status: 'Elige uno de los estados disponibles.',
 };
@@ -205,6 +204,7 @@ const CODE_TO_FIELD: Readonly<Partial<Record<ErrorCode, OrderFieldName>>> = {
   recipe_not_found: RECIPE_FIELD,
   // `unit_not_found` ya no existe como codigo del modulo (2026-09-07): sin unidad en el pedido,
   // no hay nada que pueda emitirlo, y mantener la entrada seria mapear un error imposible.
+  presentation_not_found: PRESENTATION_FIELD,
   invalid_transition: ORDER_STATUS_FIELD,
 };
 
@@ -611,6 +611,16 @@ export function OrderForm({
               defaultValue={initialValue('quantity', trimDecimal(order?.quantity ?? ''))}
               onValueChange={setQuantity}
               error={fieldErrors.quantity}
+            />
+
+            {/*
+              Sin la prop `units`: este panel no ofrece dar de alta una presentacion nueva, solo
+              elegir una existente del catalogo.
+            */}
+            <PresentationSelect
+              defaultValue={initialValue(PRESENTATION_FIELD, order?.presentationId ?? '')}
+              defaultLabel={order?.presentationName ?? ''}
+              error={fieldErrors.presentationId}
             />
 
             {/* R27: prioridad opcional, con el defecto del contrato PRESELECCIONADO y VISIBLE. */}

@@ -124,6 +124,7 @@ const {
   listRecipesActionMock,
   listUnitsActionMock,
   getRecipeActionMock,
+  listPresentationsActionMock,
 } = vi.hoisted(() => ({
   usePathnameMock: vi.fn<() => string>(),
   redirectMock: vi.fn<(ruta: string) => never>(),
@@ -148,6 +149,7 @@ const {
   listRecipesActionMock: vi.fn<(query: unknown) => Promise<RecipeListResult>>(),
   listUnitsActionMock: vi.fn<() => Promise<UnitListResult>>(),
   getRecipeActionMock: vi.fn<(id: string) => Promise<RecipeQueryResult>>(),
+  listPresentationsActionMock: vi.fn<(query: unknown) => Promise<unknown>>(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -241,11 +243,21 @@ vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
   listUnitsAction: listUnitsActionMock,
 }));
 
+vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
+  listPresentationsAction: listPresentationsActionMock,
+  createPresentationAction: vi.fn(() => {
+    throw new Error('createPresentationAction no debe invocarse desde este archivo');
+  }),
+}));
+
 const RECETA = {
   id: crypto.randomUUID(),
   name: 'Esmalte azul de temporada',
   imageUrl: null,
 };
+
+/** Presentacion del catalogo, ofrecida por `listPresentationsAction` en el selector del panel. */
+const PRESENTACION = { id: crypto.randomUUID(), name: 'Bidón 20L' };
 // QC-39 (T1): el listado devuelve `UnitView` -equivalencia y `isSystem` incluidos-. Lo que
 // cambia es la forma del fixture; ningun aserto de este archivo cambia de exigencia.
 const UNIDAD: UnitView = {
@@ -281,6 +293,8 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
+    presentationId: PRESENTACION.id,
+    presentationName: PRESENTACION.name,
     ...overrides,
   };
 }
@@ -373,6 +387,10 @@ beforeEach(() => {
     },
   });
   listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD] });
+  listPresentationsActionMock.mockResolvedValue({
+    status: 'success',
+    data: { items: [PRESENTACION], page: 1, pageSize: 25, total: 1, totalPages: 1 },
+  });
   // El panel de edicion pide el detalle de la receta para los ingredientes: por defecto una
   // receta sin lineas, que es lo unico que este archivo necesita.
   getRecipeActionMock.mockResolvedValue({
@@ -523,6 +541,7 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     const campos = [
       screen.getByTestId(`order-field-${QUANTITY_COLUMN_ID}`),
       screen.getByTestId(RECIPE_PICKER_TESTID),
+      screen.getByTestId('presentation-select'),
       screen.getByTestId(ORDER_PRIORITY_SELECT_TESTID),
     ];
 
@@ -573,8 +592,7 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     // Primera mitad: la CONFIGURACION. Si una columna declarase `size`, la libreria si tendria un
     // ancho que imponer, y los 150 px por defecto dejarian de ser inertes.
     const columnas = buildOrderColumns({ recipes: RECETAS, units: [] });
-    // QC-102: NUEVE desde que existe la columna de responsables. Cambia el NUMERO, no el guion.
-    expect(columnas).toHaveLength(9);
+    expect(columnas).toHaveLength(10);
 
     for (const columna of columnas) {
       for (const clave of ['size', 'width', 'minSize', 'maxSize', 'minWidth', 'maxWidth']) {

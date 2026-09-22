@@ -26,19 +26,16 @@ import {
  */
 
 /**
- * Cuantas celdas por fila pinta el esqueleto. Son las NUEVE columnas de `design.md > 7` (eran
- * diez hasta el 2026-09-07: la unidad y el precio unitario salieron del pedido; el 2026-09-13
- * QC-102 anade la de RESPONSABLES, R22).
+ * Cuantas celdas por fila pinta el esqueleto: el esqueleto y la tabla declaran el MISMO numero
+ * de columnas, de modo que resolverse la carga no cambie cuantas columnas hay y la pantalla no
+ * de un salto.
  *
- * **QC-102 R22**: el esqueleto y la tabla declaran el MISMO numero de columnas, de modo que
- * resolverse la carga no cambie cuantas columnas hay y la pantalla no de un salto.
- *
- * **No se importa `ORDER_COLUMNS`** (T7) a proposito: esa declaracion vive en un modulo de
+ * **No se importa `ORDER_COLUMNS`** a proposito: esa declaracion vive en un modulo de
  * **cliente** —sus celdas devuelven elementos y funciones— y este esqueleto lo renderiza un
- * Server Component. Para que el numero no se quede atras en silencio, T7 anade el test que ata
- * esta constante a `ORDER_COLUMNS.length`.
+ * Server Component. Para que el numero no se quede atras en silencio, un test ata esta constante
+ * a `ORDER_COLUMNS.length`.
  */
-export const ORDER_SKELETON_COLUMN_COUNT = 9;
+export const ORDER_SKELETON_COLUMN_COUNT = 10;
 
 export function OrderListSkeleton({ rows }: { readonly rows: number }) {
   const columns = Array.from({ length: ORDER_SKELETON_COLUMN_COUNT }, (_, index) => index);
