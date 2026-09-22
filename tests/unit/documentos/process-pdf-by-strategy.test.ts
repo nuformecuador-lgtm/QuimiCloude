@@ -1,10 +1,15 @@
 // El procesamiento de un PDF por ESTRATEGIA, contra dobles: un `readPdfWithAi` falso, un
 // `countPages` falso y un `log` espia.
 //
-// Sin red, sin claves y sin PDF real: quien interpreta los bytes es el doble, asi que cualquier
-// `Uint8Array` no vacio sirve. Lo que se vigila es tanto lo que se hace —que modo y prompt salen de
-// la estrategia, que el texto vuelve intacto, que se registra una vez en toda ejecucion, incluida la
-// que rechaza la estrategia— como lo que NO se hace: con una estrategia desconocida no se lee nada.
+// Sin red y sin claves. En casi todos los casos quien interpreta los bytes es el doble, asi que
+// cualquier `Uint8Array` no vacio sirve. Lo que se vigila es tanto lo que se hace —que modo y
+// prompt salen de la estrategia, que el texto vuelve intacto, que se registra una vez en toda
+// ejecucion, incluida la que rechaza la estrategia— como lo que NO se hace: con una estrategia
+// desconocida no se lee nada.
+//
+// El ultimo caso es la excepcion: encadena el conversor REAL sobre un PDF minimo escrito en ASCII
+// aqui mismo, porque hay defectos que solo se ven cuando dos piezas comparten el mismo arreglo y
+// ningun doble los reproduce.
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -15,12 +20,20 @@ import {
   type StrategyRunResult,
 } from '@/lib/modules/documentos/domain/process-pdf-by-strategy';
 import { createStrategyRunLogConsole } from '@/lib/modules/documentos/adapters/driven/observability/strategy-run-log-console';
+import {
+  countPages as countPagesReal,
+  extractPdfText,
+  renderPages,
+} from '@/lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf';
+import { createReadPdfWithAi } from '@/lib/modules/documentos/domain/read-pdf-with-ai';
 
 import type { PdfStrategy } from '@/lib/modules/documentos/domain/pdf-strategy';
 import type {
   AiReadRequestInput,
   AiReadResult,
 } from '@/lib/modules/documentos/domain/read-pdf-with-ai';
+import type { AiReadRequest } from '@/lib/modules/documentos/ports/ai-reader';
+import type { PdfConverter } from '@/lib/modules/documentos/ports/pdf-converter';
 import type { StrategyRunSummary } from '@/lib/modules/documentos/ports/strategy-run-log';
 import type { ErrorCode } from '@/lib/modules/errores';
 
@@ -589,7 +602,78 @@ describe('documentos — procesar un PDF por estrategia', () => {
       expect(comoTexto.includes(TEXTO_QUE_NUNCA_DEBE_APARECER)).toBe(false);
     }
   });
+  it('la lectura con IA recibe los bytes completos despues de contar las paginas (R24)', async () => {
+    /**
+     * Un PDF de una pagina, valido y en ASCII: se escribe aqui para no meter ningun binario en el
+     * repositorio y para que se pueda leer que documento se esta abriendo.
+     */
+    const pdfDeUnaPagina = (): Uint8Array =>
+      new TextEncoder().encode(
+        [
+          '%PDF-1.4',
+          '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj',
+          '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj',
+          '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj',
+          'trailer<</Root 1 0 R>>',
+        ].join('\n'),
+      );
+
+    // El mismo conversor que se cablea en produccion, y la misma lectura con IA: lo unico doblado
+    // es el proveedor. Con los tres dobles habituales este caso no veria nada.
+    const converter: PdfConverter = {
+      countPages: countPagesReal,
+      extractText: extractPdfText,
+      renderPages,
+    };
+
+    for (const strategy of ['catalogo', 'formula'] as const) {
+      const recibidas: AiReadRequest[] = [];
+      const ai = {
+        read: vi.fn(async (request: AiReadRequest): Promise<string> => {
+          recibidas.push(request);
+          return TEXTO_DE_LA_IA;
+        }),
+      };
+
+      const espia = espiaDeRegistro();
+      const procesar = createProcessPdfByStrategy({
+        readPdfWithAi: createReadPdfWithAi({ ai, converter }),
+        countPages: converter.countPages,
+        log: espia.log,
+        prompt: dobleDePrompt(),
+      });
+
+      const bytes = pdfDeUnaPagina();
+      const resultado = await procesar({ strategy, path: PATH, bytes });
+
+      expect(
+        resultado.ok ? null : falloDe(resultado).code,
+        `R24: '${strategy}' no puede acabar en invalid_input por contar las paginas antes de leer. ` +
+          `Motivo: ${resultado.ok ? '' : falloDe(resultado).reason}`,
+      ).not.toBe('invalid_input');
+      expect(resultado.ok, `R24: '${strategy}' tiene que llegar hasta la IA y volver con su texto.`).toBe(true);
+      expect(textoDe(resultado)).toBe(TEXTO_DE_LA_IA);
+
+      // Las paginas se contaron de verdad: sin conteo previo el defecto no se ejercita.
+      expect((espia.run.mock.calls[0]?.[0] as StrategyRunSummary).pages).toBe(1);
+
+      const partes = recibidas[0]?.parts ?? [];
+      expect(partes.length, `R24: '${strategy}' llego a la IA sin ninguna parte del documento.`).toBe(1);
+
+      const parte = partes[0];
+      if (parte?.kind === 'pdf') {
+        // `formula` manda el PDF entero: los bytes tienen que llegar completos.
+        expect(Array.from(parte.bytes)).toEqual(Array.from(pdfDeUnaPagina()));
+      } else {
+        // `catalogo` manda la pagina ya rasterizada: si los bytes hubieran llegado vacios, no
+        // habria imagen que mandar.
+        expect(parte?.png.length ?? 0).toBeGreaterThan(0);
+        expect(parte?.pageNumber).toBe(1);
+      }
+    }
+  });
 });
+
 
 describe('documentos — el adaptador de consola del registro por estrategia', () => {
   function resumen(cambios: Partial<StrategyRunSummary> = {}): StrategyRunSummary {

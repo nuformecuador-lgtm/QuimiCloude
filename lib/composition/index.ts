@@ -306,7 +306,9 @@ import {
   createReadPdfWithAi,
   createRunDocumentJob,
 } from '@/lib/modules/documentos';
+import { readCannedText } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-canned';
 import { readWithGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
+import { documentsE2EDoublesEnabled } from '@/lib/modules/documentos/adapters/driven/config/e2e-doubles-env';
 import { readProcessingConfigFromEnv } from '@/lib/modules/documentos/adapters/driven/config/processing-config-env';
 import { readStrategyPromptFromEnv } from '@/lib/modules/documentos/adapters/driven/config/strategy-prompt-env';
 import { createStrategyRunLogConsole } from '@/lib/modules/documentos/adapters/driven/observability/strategy-run-log-console';
@@ -316,8 +318,10 @@ import {
   renderPages,
 } from '@/lib/modules/documentos/adapters/driven/pdf/pdf-converter-unpdf';
 import { documentBatchRepositoryPrisma } from '@/lib/modules/documentos/adapters/driven/persistence/document-batch-repository-prisma';
+import { createProcessingQueueInline } from '@/lib/modules/documentos/adapters/driven/queue/processing-queue-inline';
 import { processingQueueQstash } from '@/lib/modules/documentos/adapters/driven/queue/processing-queue-qstash';
 import { queueSignatureQstash } from '@/lib/modules/documentos/adapters/driven/queue/queue-signature-qstash';
+import { documentStorageMemory } from '@/lib/modules/documentos/adapters/driven/storage/document-storage-memory';
 import {
   createDocumentSignedReadUrl,
   createDocumentSignedUpload,
@@ -1156,11 +1160,31 @@ export const asignaciones = {
  * una variable de entorno ni toca la red: el adaptador resuelve su configuracion en cada llamada
  * real. Importar este archivo con las variables del Storage vacias sigue funcionando.
  */
-const documentStorage: DocumentStorage = {
+const documentStorageSupabase: DocumentStorage = {
   createSignedUpload: createDocumentSignedUpload,
   createSignedReadUrl: createDocumentSignedReadUrl,
   download: downloadDocument,
   remove: removeDocument,
+};
+
+/**
+ * La UNICA bifurcacion por entorno del modulo, repetida para sus tres puertos externos y vigilada
+ * por `tests/guards/guard-dobles-e2e.test.ts`: sin la variable puesta se elige el adaptador REAL,
+ * siempre.
+ *
+ * Se consulta EN CADA LLAMADA, no al construir estas fachadas, por el mismo motivo que el resto de
+ * la configuracion de este archivo: importar `lib/composition` no lee ni una variable de entorno.
+ */
+function selectedDocumentStorage(): DocumentStorage {
+  return documentsE2EDoublesEnabled() ? documentStorageMemory : documentStorageSupabase;
+}
+
+const documentStorage: DocumentStorage = {
+  createSignedUpload: (path) => selectedDocumentStorage().createSignedUpload(path),
+  createSignedReadUrl: (path, expiresInSeconds) =>
+    selectedDocumentStorage().createSignedReadUrl(path, expiresInSeconds),
+  download: (path) => selectedDocumentStorage().download(path),
+  remove: (path) => selectedDocumentStorage().remove(path),
 };
 
 /**
@@ -1181,7 +1205,10 @@ const pdfConverter: PdfConverter = {
  * solo se referencia, asi que construir esta fachada no lee ninguna variable de entorno ni
  * toca la red: la suite entera arranca sin claves de IA.
  */
-const aiReader: AiReader = { read: readWithGenai };
+const aiReader: AiReader = {
+  read: (request) =>
+    documentsE2EDoublesEnabled() ? readCannedText(request) : readWithGenai(request),
+};
 
 /**
  * La lectura con IA, construida UNA vez: la publica la fachada y la reutiliza el procesamiento por
@@ -1219,8 +1246,25 @@ const processPdfByStrategy = createProcessPdfByStrategy({
 // ---------------------------------------------------------------------------------------
 
 const documentBatchRepository: DocumentBatchRepository = documentBatchRepositoryPrisma;
-const processingQueue: ProcessingQueue = processingQueueQstash;
 const queueSignature: QueueSignature = queueSignatureQstash;
+
+/**
+ * El trabajo de la cola, construido UNA vez: lo publica la fachada y lo necesita la cola en linea,
+ * que lo ejecuta en este mismo proceso en vez de publicar nada. Dos construcciones serian dos
+ * cableados que pueden divergir.
+ */
+const runDocumentJob = createRunDocumentJob({
+  repository: documentBatchRepository,
+  storage: documentStorage,
+  processPdfByStrategy,
+});
+
+const processingQueue: ProcessingQueue = {
+  publish: (message) =>
+    documentsE2EDoublesEnabled()
+      ? createProcessingQueueInline({ run: runDocumentJob }).publish(message)
+      : processingQueueQstash.publish(message),
+};
 
 /**
  * `ProcessingConfig` cableado con la lectura de entorno, pero DIFERIDA: cada metodo relee al
@@ -1276,11 +1320,7 @@ export const documentos = {
   // ninguna: `runDocumentJob` porque no hay usuario delante, y `queueSignature` porque verificar
   // una firma no es un caso de uso del dominio.
   enqueueBatch: createEnqueueBatch({ repository: documentBatchRepository, queue: processingQueue }),
-  runDocumentJob: createRunDocumentJob({
-    repository: documentBatchRepository,
-    storage: documentStorage,
-    processPdfByStrategy,
-  }),
+  runDocumentJob,
   getBatchStatus: createGetBatchStatus({
     repository: documentBatchRepository,
     config: processingConfig,
