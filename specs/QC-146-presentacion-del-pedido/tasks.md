@@ -154,7 +154,7 @@
       - **Hecho**: `pnpm run e2e` de esos dos archivos en verde.
       - Depende de: T8.
 
-- [ ] **T11. Alcance, trazabilidad y gate.** (R13, R15, R30; `CHECKPOINTS.md`.)
+- [x] **T11. Alcance, trazabilidad y gate.** (R13, R15, R30; `CHECKPOINTS.md`.)
       - Archivos: `tests/unit/pedidos/qc146-alcance.test.ts` (nuevo: el costo no nombra la
         presentación, R13; ningún permiso nuevo y el Operador conserva sus dos, R15;
         `package.json` sin dependencias nuevas, R30), `progress/impl_QC-146-presentacion-del-pedido.md`
