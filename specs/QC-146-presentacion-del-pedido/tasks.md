@@ -46,7 +46,7 @@
 
 ## Bloque 2 — `pedidos`
 
-- [ ] **T3. Dominio de `pedidos`: entrada, tipos, error y casos de uso.** (`design.md > 3.1`–`> 3.4`;
+- [x] **T3. Dominio de `pedidos`: entrada, tipos, error y casos de uso.** (`design.md > 3.1`–`> 3.4`;
       R6–R13, R21–R23, R27.)
       - Archivos: `lib/modules/pedidos/domain/order-input.ts`, `order-view.ts`, `errors.ts`,
         `create-order.ts`, `update-order.ts`, `get-order.ts`, `list-orders.ts`,
@@ -67,7 +67,7 @@
         T4 si el tipo `NewOrder` lo exige: se hace T4 en la misma tanda); tests de arriba en verde.
       - Depende de: T2 (tipo `PresentationCatalog`).
 
-- [ ] **T4. Adaptadores driven de `pedidos`.** (`design.md > 3.5`; R1, R5, R9, R14, R27.)
+- [x] **T4. Adaptadores driven de `pedidos`.** (`design.md > 3.5`; R1, R5, R9, R14, R27.)
       - Archivos: `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts`
         (`ORDER_SELECT`, `toOrderRow`, `INSERT` del alta, `updateAliveOrder`),
         `lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts` (`select` y mapeo
@@ -84,7 +84,7 @@
 
 ## Bloque 3 — `asignaciones` y composición
 
-- [ ] **T5. [P con T4] Dominio de `asignaciones`.** (`design.md > 5`; R24–R27.)
+- [x] **T5. [P con T4] Dominio de `asignaciones`.** (`design.md > 5`; R24–R27.)
       - Archivos: `lib/modules/asignaciones/domain/assigned-order-view.ts`,
         `assigned-order-execution-view.ts`, `list-assigned-orders.ts`,
         `get-assigned-order-execution.ts`.
@@ -98,7 +98,7 @@
       - **Hecho**: tests de arriba en verde.
       - Depende de: T2, T3 (`AssignedOrderSummary.presentationId`).
 
-- [ ] **T6. Composición y Server Action.** (`design.md > 3.1`, `> 7`.)
+- [x] **T6. Composición y Server Action.** (`design.md > 3.1`, `> 7`.)
       - Archivos: `lib/composition/index.ts` (construye `presentationCatalog` y lo pasa a los seis
         casos de uso), `lib/modules/pedidos/adapters/driving/order-actions.ts`
         (`buildCreateCandidate` lee `presentationId`).
@@ -117,7 +117,7 @@
       - **Hecho**: test en verde.
       - Depende de: nada.
 
-- [ ] **T8. Pantalla `/pedidos`: panel y listado.** (`design.md > 6.1`, `> 6.3`; R16–R21.)
+- [x] **T8. Pantalla `/pedidos`: panel y listado.** (`design.md > 6.1`, `> 6.3`; R16–R21.)
       - Archivos: `app/(private)/pedidos/components/order-form.tsx`, `order-columns.tsx`,
         `order-list-skeleton.tsx` (9 → 10), `index.ts` si hay que reexportar algo. `order-sheet.tsx`
         solo si no pasa ya `order` entero al formulario (verificar; no se espera cambio).
@@ -131,7 +131,7 @@
         `design.md > 6.5` hecha (selector ≥ 44 px, 16 px).
       - Depende de: T3 (tipos), T6 (action), T7.
 
-- [ ] **T9. [P con T8] Pantallas `/asignacion`: lista y ejecución.** (`design.md > 6.4`; R24–R26.)
+- [x] **T9. [P con T8] Pantallas `/asignacion`: lista y ejecución.** (`design.md > 6.4`; R24–R26.)
       - Archivos: `app/(private)/asignacion/components/assigned-orders-columns.tsx`,
         `assigned-orders-skeleton.tsx` (7 → 8),
         `app/(private)/asignacion/[id]/components/order-execution-screen.tsx`.
