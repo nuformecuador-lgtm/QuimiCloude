@@ -44,14 +44,14 @@ zona no lo impide por sí sola.
 
 ## T1–T3 — El dominio
 
-- [ ] **T1.** `roles.ts`: `ROLE_EMPACADOR = 'Empacador'` y su fila **al final** de `SEED_ROLES`
+- [x] **T1.** `roles.ts`: `ROLE_EMPACADOR = 'Empacador'` y su fila **al final** de `SEED_ROLES`
       con la descripción de `design.md > 2.1`; actualizar el comentario de cabecera («los tres
       literales») y el de `SEED_ROLES` («los tres roles»). Reexportar `ROLE_EMPACADOR` en
       `lib/modules/identity/index.ts` junto a los otros dos.
       **Hecho cuando:** `pnpm run typecheck` pasa y el literal `'Empacador'` aparece una sola vez en
       `lib/`. Depende de: —.
 
-- [ ] **T2.** `permissions.ts`: entrada `terminados.consultar` **al final** de `PERMISSIONS`
+- [x] **T2.** `permissions.ts`: entrada `terminados.consultar` **al final** de `PERMISSIONS`
       (`design.md > 2`); bloque de enmienda en el JSDoc con ordinal y recuento contra el catálogo
       previo; primera línea del JSDoc con el número nuevo; `'terminados.consultar'` al final de la
       lista del Administrador; clave `[ROLE_EMPACADOR]: ['asignaciones.consultar',
@@ -60,7 +60,7 @@ zona no lo impide por sí sola.
       **Hecho cuando:** `pnpm run typecheck` pasa y `PermissionCode` incluye `'terminados.consultar'`.
       Depende de: T1.
 
-- [ ] **T3.** Actualizar los tests unitarios y guardias que fijan recuento o roles
+- [x] **T3.** Actualizar los tests unitarios y guardias que fijan recuento o roles
       (`design.md > 5`, primeras filas de cada tabla que no sean de integración):
       `permissions.test.ts`, `guard-permisos-sembrados.test.ts`, `guard-nav-permisos-declarados.test.ts`,
       `qc75-convenciones.test.ts`, `documentos/authorization.test.ts`,
@@ -75,19 +75,19 @@ zona no lo impide por sí sola.
 
 ## T4–T6 — La migración
 
-- [ ] **T4.** `pnpm run db:migrate:create` con nombre `packer_role`; completar `migration.sql` con las
+- [x] **T4.** `pnpm run db:migrate:create` con nombre `packer_role`; completar `migration.sql` con las
       cuatro sentencias de `design.md > 3.1` y su cabecera (qué hace, por qué es la primera que
       inserta en `roles`, por qué no nombra al Operador, idempotencia). Si Prisma genera DDL por
       drift, borrarlo a mano y dejarlo dicho en la cabecera, como QC-66/QC-86.
       **Hecho cuando:** el archivo no contiene `CREATE`, `ALTER`, `DROP` ni `Operador` en líneas
       ejecutables, y `pnpm run db:migrate` lo aplica sobre la base local. Depende de: T2.
 
-- [ ] **T5.** `down.sql` con los cuatro `DELETE` de `design.md > 3.3`, en ese orden, con cabecera.
+- [x] **T5.** `down.sql` con los cuatro `DELETE` de `design.md > 3.3`, en ese orden, con cabecera.
       **Hecho cuando:** `pnpm run db:rollback` sobre la base local (sin usuarios Empacador) devuelve
       rol, permiso y asignaciones al estado previo, `pnpm run db:migrate` vuelve a aplicarla, y un
       segundo `pnpm run db:seed` imprime «nada que crear». Depende de: T4.
 
-- [ ] **T6. [P]** `tests/unit/identity/schema/packer-role-migration.test.ts` (plantilla:
+- [x] **T6. [P]** `tests/unit/identity/schema/packer-role-migration.test.ts` (plantilla:
       `user-permissions-migration.test.ts`): localiza la carpeta por patrón `/_packer_role$/`;
       UP = exactamente cuatro `INSERT … ON CONFLICT … DO NOTHING` sobre `roles`, `permissions`,
       `role_permissions`; literales comparados contra `ROLE_EMPACADOR`, la descripción de
@@ -101,7 +101,7 @@ zona no lo impide por sí sola.
 
 ## T7–T10 — Comportamiento del rol
 
-- [ ] **T7. [P]** `tests/unit/identity/roles/empacador-rol.test.ts`: R1 (fila en `SEED_ROLES`,
+- [x] **T7. [P]** `tests/unit/identity/roles/empacador-rol.test.ts`: R1 (fila en `SEED_ROLES`,
       descripción no vacía, Administrador y Operador con nombre y descripción intactos); R2 (barrido
       de `lib/`, `app/`, `middleware.ts` sin comentarios: el literal entre cualquiera de las tres
       comillas solo en `roles.ts`, más caso sintético que dispara y simétrico que no); R3 (el modelo
@@ -111,14 +111,14 @@ zona no lo impide por sí sola.
       **Hecho cuando:** verde, y añadir `'Empacador'` o `'terminados.consultar'` a cualquier archivo
       de `app/` lo pone rojo. Depende de: T2.
 
-- [ ] **T8. [P]** `tests/guards/guard-autorizacion-por-permiso.test.ts`: `buildForbiddenPatterns()`
+- [x] **T8. [P]** `tests/guards/guard-autorizacion-por-permiso.test.ts`: `buildForbiddenPatterns()`
       suma `literal del rol Empacador` (vía `literal(ROLE_EMPACADOR)`) y `ROLE_EMPACADOR`; tensar el
       ancla de nombres; caso sintético que dispara con el literal y con la constante, y simétrico que
       no dispara con el literal dentro de un comentario.
       **Hecho cuando:** `./init.sh --rapido` verde (incluye todas las guardias). Cubre R11.
       Depende de: T1.
 
-- [ ] **T9. [P]** `tests/unit/asignaciones/empacador-authorization.test.ts`: actor con
+- [x] **T9. [P]** `tests/unit/asignaciones/empacador-authorization.test.ts`: actor con
       `SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]`. Conceden: `listAssignedOrders`,
       `getAssignedOrderExecution`, `startAssignedOrder`, `finishAssignedOrder` (con dobles de sus
       puertos, afirmando que **no** lanzan el error de autorización). Rechazan sin invocar ningún
@@ -127,7 +127,7 @@ zona no lo impide por sí sola.
       autorización de su módulo.
       **Hecho cuando:** verde. Cubre R12, R13. Depende de: T2.
 
-- [ ] **T10. [P]** `tests/unit/navegacion/menu-empacador.test.ts`: con los permisos del Empacador,
+- [x] **T10. [P]** `tests/unit/navegacion/menu-empacador.test.ts`: con los permisos del Empacador,
       `filterNavItemsByPermissions` deja solo `nav-asignacion` y `firstVisibleNavHref` devuelve
       `ASSIGNED_ORDERS_ROUTE`; con los del Operador sigue apareciendo además `nav-inventario` (caso
       simétrico que prueba que el test distingue).

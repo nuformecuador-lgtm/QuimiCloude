@@ -6,12 +6,11 @@ import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR } from './roles';
 
 /**
  * El catalogo cerrado: dieciseis permisos, ni uno mas ni uno menos (QC-74 R2, enmendado por
- * QC-38, por QC-66, por QC-86 y por QC-144). El codigo tiene la forma `<modulo>.<accion>`, con
- * modulo y accion en español y en minusculas, siguiendo los nombres de modulo del repositorio
- * (R1). Un modulo con
- * escritura declara `consultar` y `modificar`, y `modificar` cubre tambien el borrado (R3); un
- * modulo sin escritura declara solo `consultar` (R4: solo `dashboard`). NINGUNA entrada lleva
- * campo de empresa (R6).
+ * QC-38, por QC-66 y por QC-86). El codigo tiene la forma `<modulo>.<accion>`, con modulo y
+ * accion en español y en minusculas, siguiendo los nombres de modulo del repositorio (R1). Un
+ * modulo con escritura declara `consultar` y `modificar`, y `modificar` cubre tambien el borrado
+ * (R3); un modulo sin escritura declara solo `consultar` (R4: solo `dashboard`). NINGUNA entrada
+ * lleva campo de empresa (R6).
  *
  * **Esto enmienda QC-74 R2** («exactamente diez permisos, ni uno mas ni uno menos»). QC-74 R4 dejo
  * a `unidades` sin escritura justificandolo con «no tiene escritura»; QC-38 es justamente la ficha
