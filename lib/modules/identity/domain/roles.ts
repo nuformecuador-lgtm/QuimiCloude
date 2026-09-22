@@ -1,17 +1,18 @@
 /**
- * Catalogo de roles base (`design.md > 5.1`, decision 2026-09-01 «cuales son los roles
- * base»). Este archivo es el UNICO sitio del repo que escribe a mano los literales
- * `'Administrador'` y `'Operador'`: cualquier otro archivo que necesite nombrar uno de
- * los dos roles importa estas constantes, nunca copia el texto (R2, R3).
+ * Catalogo de roles base. Este archivo es el UNICO sitio del repo que escribe a mano los
+ * literales `'Administrador'`, `'Operador'` y `'Empacador'`: cualquier otro archivo que
+ * necesite nombrar uno de los tres roles importa estas constantes, nunca copia el texto.
  */
 export const ROLE_ADMINISTRADOR = 'Administrador'
 export const ROLE_OPERADOR = 'Operador'
+export const ROLE_EMPACADOR = 'Empacador'
 
 /**
- * Los dos roles que el seed asegura que existan, con su descripcion (R2). El seed crea
- * solo los que falten (`design.md > 5.2`); ningun rol fuera de esta lista es cosa suya (R3).
+ * Los tres roles que el seed asegura que existan, con su descripcion. El seed crea solo
+ * los que falten; ningun rol fuera de esta lista es cosa suya.
  */
 export const SEED_ROLES = [
   { name: ROLE_ADMINISTRADOR, description: 'Acceso total al sistema.' },
   { name: ROLE_OPERADOR, description: 'Operacion del dia a dia.' },
+  { name: ROLE_EMPACADOR, description: 'Prepara los pedidos asignados y consulta los terminados.' },
 ] as const
