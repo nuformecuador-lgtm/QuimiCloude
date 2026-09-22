@@ -4,8 +4,9 @@
 > con las demás `[P]` cuyas dependencias estén cumplidas; ninguna `[P]` comparte archivos con otra.
 > «Hecho» siempre incluye `./init.sh --rapido` en verde al cerrar la tanda; `./init.sh` completo en
 > T12. Los archivos listados son los esperados, para cruzar conflictos con otras features en F2.0.
-> Las preguntas abiertas 1–4 de `requirements.md` no bloquean ninguna task: el diseño deja el punto
-> de cambio aislado (`design.md > 4.1`, `> 6`, `> 7`, `> 8.1`) y se ajusta cuando F1.4 las cierre.
+> No queda ninguna pregunta abierta: D13–D16 las cerraron el 2026-09-22. Los tests existentes que
+> guardan una receta sin líneas —permitido por QC-26, prohibido por D14— están tabulados en
+> `design.md > 12` con su tratamiento; cada uno aparece abajo en la task de su capa.
 
 ## Grafo
 
@@ -47,22 +48,26 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
   - Archivos: `lib/modules/recetas/domain/recipe-percentage.ts` (nuevo),
     `lib/modules/recetas/index.ts`, `tests/unit/recetas/recipe-percentage.test.ts` (nuevo).
   - Qué: `design.md > 3`: `PERCENTAGE_PATTERN`, `percentageToHundredths`, `sumPercentages`,
-    `consumedQuantity`, exportados por el barrel.
+    `consumedQuantity` y `formatPercentage`, exportados por el barrel.
   - Hecho cuando: los tests cubren 200 × 10 → 20 y 200 × 2 → 4 (R13), suma 90 + 7.5 → total
     `97.50`, diferencia `2.50`, incompleta; 92.5 + 7.5 → completa; 60 + 41 → diferencia `-1.00`
-    (R10); los mismos porcentajes con pedidos de 200 y 300 dan cantidades en proporción 2:3 (R21);
-    `0.0001 × 0.01` es exacto; ningún resultado pasa por `number`. La guardia de arquitectura sigue
-    verde (el barrel se importa desde cliente).
+    (R10); **la lista vacía da total `0.00`, incompleta** (R3, D14); los mismos porcentajes con
+    pedidos de 200 y 300 dan cantidades en proporción 2:3 (R21); `0.0001 × 0.01` es exacto;
+    `formatPercentage` da «12,50» para «12.5», «10,00» para «10.00», «100,00» para «100» y
+    «-1,00» para «-1.00» (R25); ningún resultado pasa por `number` ni por `Intl`. La guardia de
+    arquitectura sigue verde (el barrel se importa desde cliente).
 
 - [ ] **T3 — Contrato de entrada de receta**
   - Depende de: T2
   - Archivos: `lib/modules/recetas/domain/recipe-input.ts`, `tests/unit/recetas/recipe-input.test.ts`.
   - Qué: `design.md > 4.1`: `percentageSchema`, `recipeLineSchema` estricto sin `unitId`,
-    `superRefine` de suma con la guarda de receta vacía aislada en una línea.
+    `superRefine` de suma **sin guarda para la lista vacía** (D14).
   - Hecho cuando: los tests rechazan `'0'`, `'-1'`, `'100.01'`, `'12.345'`, `'abc'` con el issue en
     `['lines', i, 'percentage']` (R2); rechazan una línea con `unitId` (R5); rechazan 97,50 % con
-    el issue en `['lines']` (R3); aceptan 97.5 + 2.5 (R4); y fijan explícitamente el
-    comportamiento vigente de la lista vacía, con el nombre del test citando la pregunta abierta 2.
+    el issue en `['lines']` (R3); **rechazan `lines: []` y la ausencia de la clave `lines`, en alta
+    y en edición, con el mismo issue en `['lines']`** (R3, R23); aceptan 97.5 + 2.5 (R4). Los casos
+    de `recipe-input.test.ts` que hoy aceptan una entrada sin líneas se invierten o pasan a una
+    línea al 100 %.
 
 - [ ] **T4 — Servicio, puertos y persistencia de `recetas`**
   - Depende de: T1, T3, T5
@@ -72,17 +77,26 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
     `recipe-catalog-prisma.ts`, `lib/composition/index.ts` (solo el cableado de
     `createRecipe`/`updateRecipe`), `tests/unit/recetas/recipe-service.test.ts`,
     `recipe-lines-catalog.test.ts`, `recipe-catalog.test.ts`, `recipe-actions.test.ts`,
+    `tests/unit/recetas/authorization.test.ts`, `company-isolation-service.test.ts`,
+    `company-scope.test.ts`, `recipe-image-url.test.ts`, `recipe-image-lifecycle.test.ts`,
     `tests/integration/recetas/recipe-lines.int.test.ts`, `recipe-crud.int.test.ts`,
     `company-scope.int.test.ts`, `company-scope-queries.int.test.ts`.
   - Qué: `design.md > 4.2` y `> 6`: fuera `UnitCatalog` de alta y edición, `percentage` en puertos
     y adaptadores (`toFixed(2)`), `RecipeLineView` con `percentage`, `productUnitId` y existencia
-    en la unidad del producto; `RecipeExecutionLine` con `percentage`.
-  - Hecho cuando: un actor sin `recetas.modificar` que envía una receta al 97,50 % recibe el error
-    de permiso y el repositorio no se llama (R7); el service rechaza 97,50 % sin llamar al
-    repositorio aunque la entrada no venga del formulario (R3); guarda y relee 97.50 + 2.50 (R4,
-    integración); el detalle devuelve `productUnitId` y la existencia en esa unidad, `null` de
-    unidad para un insumo sin lotes y para uno de baja (R14); ninguna vista de receta tiene clave
-    `unitId` (R1).
+    en la unidad del producto; `RecipeExecutionLine` con `percentage`. Tratamiento de los tests que
+    hoy guardan sin líneas, según la tabla de `design.md > 12`.
+  - Hecho cuando: un actor sin `recetas.modificar` que envía una receta al 97,50 % —y otro que la
+    envía sin líneas— recibe el error de permiso y el repositorio no se llama (R7); el service
+    rechaza 97,50 % y la receta sin líneas sin llamar al repositorio aunque la entrada no venga del
+    formulario (R3); **editar una receta sembrada sin líneas cambiando solo el nombre se rechaza y
+    el nombre no cambia** (R23, unitario e integración); guarda y relee 97.50 + 2.50 (R4,
+    integración); **guarda una receta cuyo insumo no tiene lotes** (R24); el detalle devuelve
+    `productUnitId` y la existencia en esa unidad, `null` de unidad para un insumo sin lotes y para
+    uno de baja (R14, R24); ninguna vista de receta tiene clave `unitId` (R1). En
+    `authorization.test.ts`, `company-isolation-service.test.ts`, `company-scope.test.ts`,
+    `recipe-image-url.test.ts` y `recipe-image-lifecycle.test.ts` ninguna entrada que deba
+    **guardarse** va sin líneas; en los tres de integración, cada caso que pasa por el servicio
+    lleva una línea al 100 %.
 
 - [ ] **T5 [P] — `ProductRef.unitId` en el contrato de `inventario`**
   - Depende de: —
@@ -118,8 +132,9 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
     `order-table.test.tsx`, `read-only.test.tsx`, `pedidos-viewport.test.tsx`.
   - Qué: `design.md > 8.2`.
   - Hecho cuando: con cantidad 200 y una línea al 10 % en L con existencia 15, la fila muestra
-    porcentaje 10, unidad L, requerida 20 y restante −5 resaltado; sin cantidad escrita, requerida
-    0; la unidad sale de `productUnitId` y con `null` se pinta el marcador (R17).
+    porcentaje «10,00 %» (R25), unidad L, requerida 20 y restante −5 resaltado; sin cantidad
+    escrita, requerida 0 (R17); la unidad sale de `productUnitId` y con `null` se pinta el marcador
+    mientras porcentaje y requerida se siguen mostrando (R24).
 
 - [ ] **T8 [P] — Pantalla de ejecución del Operario**
   - Depende de: T2, T4, T5
@@ -132,11 +147,12 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
     `order-execution-screen.test.tsx`, `order-execution-page.test.tsx`,
     `tests/unit/composition/asignaciones-facade.test.ts`.
   - Qué: `design.md > 7`.
-  - Hecho cuando: pedido 200 y línea al 10 % en L → la fila dice «Hipoclorito · 10 % · 20 L» (R18);
-    la vista no tiene las claves `recipeBaseQuantity` ni `scaleFactorText` y la pantalla no monta
-    ningún factor (R19); con unidades hermanas, elegir mL muestra 20000 y el «10 %» no cambia (R20);
-    una línea con unidad desconocida muestra porcentaje y cantidad sin selector; la cantidad del
-    pedido sigue visible con su `data-testid` (pregunta abierta 4).
+  - Hecho cuando: pedido 200 y línea al 10 % en L → la fila dice «Hipoclorito · 10,00 % · 20 L»
+    (R18, R25); la vista no tiene las claves `recipeBaseQuantity` ni `scaleFactorText` y la pantalla
+    no monta ningún factor (R19); con unidades hermanas, elegir mL muestra 20000 y el «10,00 %» no
+    cambia (R20); una línea con unidad desconocida muestra porcentaje y cantidad sin selector ni
+    símbolo (R24); «Pedido 200» se pinta en un elemento propio con
+    `data-testid="order-execution-order-quantity"`, fuera de la lista de líneas (R26).
 
 - [ ] **T9 [P] — Formulario de recetas en porcentaje**
   - Depende de: T2, T3, T4
@@ -148,23 +164,36 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
     `recipe-route-contract.test.ts`, `recipe-lines-sum.test.tsx` (nuevo),
     `unit-group.test.ts` y `recipe-line-unit-group.test.tsx` (se borran),
     `tests/unit/unidades/consumidores-catalogo.test.tsx`.
-  - Qué: `design.md > 8.1`.
+  - Qué: `design.md > 8.1`: campo `type="text"` + `inputMode="decimal"` que acepta coma,
+    sustitución `,` → `.` en `buildRecipePayload`, precarga con `formatPercentage`, indicador de
+    suma, Guardar deshabilitado también con cero líneas.
   - Hecho cuando: no hay ningún selector de unidad en las líneas y el campo se rotula como
     porcentaje; el ingrediente elegido y el precargado en edición se ven con su unidad (R12); al
-    escribir 90 y 7.5 el indicador dice «Suma: 97,50 % — faltan 2,50 %» con `data-complete="false"`
-    y cambia en cada pulsación sin llamar a ninguna acción (R10); Guardar está deshabilitado y
-    Enter en un campo no llama a la acción; con 92.5 + 7.5 se habilita y envía
-    `{ productId, percentage }` sin `unitId` (R11, R1); un rechazo del servidor por suma se pinta en
-    el bloque de líneas (R3).
+    escribir «90» y «7,5» el indicador dice «Suma: 97,50 % — faltan 2,50 %» con
+    `data-complete="false"` y cambia en cada pulsación sin llamar a ninguna acción (R10, R25);
+    Guardar está deshabilitado y Enter en un campo no llama a la acción; con «92,5» + «7,5» se
+    habilita y envía `{ productId, percentage: '92.5' }` sin `unitId` (R11, R1, R25); **sin ninguna
+    línea el indicador dice «Suma: 0,00 % — faltan 100,00 %», Guardar está deshabilitado y la acción
+    no se llama** (R11, R23); al precargar una receta con `12.5` el campo muestra «12,50» (R25); un
+    rechazo del servidor por suma se pinta en el bloque de líneas (R3); un insumo sin unidad se
+    puede elegir y la receta se guarda (R24).
+  - Tests de QC-26 que cambian por D14: el `describe('R27 — … una receta sin ninguna se guarda')`
+    de `recipe-form.test.tsx:753-765` **se invierte** a «sin líneas no se guarda»;
+    `recipe-form-payload.test.ts:72` se queda si solo arma el payload, y se corrige si afirma que es
+    válido; el resto de casos de `recipe-form.test.tsx` que pulsan Guardar sin líneas pasan a una
+    línea al 100 %.
 
 - [ ] **T10 — E2E**
   - Depende de: T1, T4, T6, T8, T9
   - Archivos: `e2e/recetas-porcentaje.spec.ts` (nuevo), `e2e/recetas.spec.ts`,
     `e2e/recetas-pasos.spec.ts`.
   - Qué: `design.md > 13`.
-  - Hecho cuando: los tres escenarios pasan en Chromium y WebKit contra la base de test (R22, y de
-    extremo a extremo R3, R4, R15, R18); los dos specs existentes rellenan una línea al 100 % sin
-    elegir unidad y siguen verdes.
+  - Hecho cuando: los cuatro escenarios de `design.md > 13` pasan en Chromium y WebKit contra la
+    base de test (R22, y de extremo a extremo R3, R4, R15, R18, R23, R25, R26); los dos specs
+    existentes rellenan una línea al 100 % sin elegir unidad y siguen verdes; la receta que
+    `e2e/recetas.spec.ts` siembra sin líneas (`:280`) no se guarda en ningún paso del spec sin
+    cargarle antes líneas que sumen 100 %, y ningún otro guardado por la UI en esos dos specs va sin
+    líneas.
 
 - [ ] **T11 — Documentación y guardias**
   - Depende de: T1–T10
@@ -177,6 +206,6 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
 - [ ] **T12 — Gate y trazabilidad**
   - Depende de: T11
   - Archivos: `progress/impl_QC-147-cantidades-de-receta-en-porcentaje.md`.
-  - Hecho cuando: `./init.sh` completo termina en verde; la bitácora tiene el mapa `R1`–`R22` →
-    test concreto, sin ningún requisito huérfano, y deja escrito cómo quedó cada pregunta abierta
-    que F1.4 haya cerrado.
+  - Hecho cuando: `./init.sh` completo termina en verde; la bitácora tiene el mapa `R1`–`R26` →
+    test concreto, sin ningún requisito huérfano, y lista los tests de QC-26 que se invirtieron o
+    se ajustaron por D14.

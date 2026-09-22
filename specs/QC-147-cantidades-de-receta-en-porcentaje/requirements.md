@@ -19,8 +19,10 @@
 ## Requisitos (EARS)
 
 Cada requisito cita entre corchetes la decisión cerrada que lo origina: `[D1]` es la primera fila
-de la tabla de abajo y `[D12]` la última, en el orden en que están escritas. Lo que depende de una
-pregunta abierta lo dice y no se da por resuelto.
+de la tabla de abajo y `[D16]` la última, en el orden en que están escritas. D13–D16 cierran, en la
+revisión del 2026-09-22, las cuatro preguntas que dejó abiertas la primera versión de este spec;
+R23–R26 nacen de ellas y se numeran al final para no mover las referencias de `design.md` y
+`tasks.md`.
 
 ### La línea de receta
 
@@ -31,11 +33,11 @@ pregunta abierta lo dice y no se da por resuelto.
   menor o igual que 0, que es mayor que 100 o que tiene más de 2 decimales, ENTONCES el sistema DEBE
   rechazar el alta o la edición de la receta con un error de validación atribuido a esa línea, sin
   escribir ninguna fila. [D4]
-- **R3** (condicional) — SI una receta con al menos una línea llega a guardarse y la suma de sus
-  porcentajes no es exactamente 100,00, ENTONCES el servicio DEBE rechazar el alta o la edición con
-  un error de validación general de las líneas, sin escribir ninguna fila, también cuando la
-  petición no la envía el formulario (llamada directa a la Server Action). El caso de una receta
-  **sin ninguna línea** queda en la pregunta abierta 2. [D4] [D5]
+- **R3** (condicional) — SI la suma de los porcentajes de las líneas de una receta que llega a
+  guardarse no es exactamente 100,00 —incluida una receta **sin ninguna línea**, cuya suma es
+  0,00—, ENTONCES el servicio DEBE rechazar el alta o la edición con un error de validación general
+  de las líneas, sin escribir ninguna fila, también cuando la petición no la envía el formulario
+  (llamada directa a la Server Action). [D4] [D5] [D14]
 - **R4** (condicional) — SI la suma de los porcentajes de las líneas es exactamente 100,00 y el
   resto de la receta es válido, ENTONCES el sistema DEBE guardarla, y al leerla DEBE devolver cada
   porcentaje con el mismo valor que se envió (p. ej. 97,50 + 2,50 se guarda y se relee como 97,50 y
@@ -64,10 +66,11 @@ pregunta abierta lo dice y no se da por resuelto.
 - **R10** (de estado) — MIENTRAS el usuario edita las líneas de una receta, el formulario DEBE
   mostrar la suma de los porcentajes con 2 decimales y lo que falta o sobra hasta 100,00 %
   («Suma: 97,50 % — faltan 2,50 %»), recalculada con cada cambio de cualquier línea, sin enviar
-  nada al servidor. El formato exacto del número queda en la pregunta abierta 3. [D5]
+  nada al servidor, con el formato de R25. [D5] [D15]
 - **R11** (de estado) — MIENTRAS la suma de los porcentajes de las líneas no sea exactamente
-  100,00 %, el formulario DEBE impedir guardar la receta; en cuanto la suma sea exactamente 100,00 %
-  y el resto del formulario sea válido, DEBE permitirlo. [D5]
+  100,00 % —también cuando la receta no tiene ninguna línea—, el formulario DEBE impedir guardar la
+  receta; en cuanto la suma sea exactamente 100,00 % y el resto del formulario sea válido, DEBE
+  permitirlo. [D5] [D14]
 - **R12** (ubicuo) — El formulario de recetas NO DEBE ofrecer ningún selector de unidad en las
   líneas; el campo de cada línea DEBE pedir un porcentaje, y el ingrediente elegido DEBE mostrarse
   con la unidad del insumo cuando el insumo la tiene. [D2] [D3]
@@ -109,41 +112,33 @@ pregunta abierta lo dice y no se da por resuelto.
 ### Verificación
 
 - **R22** (ubicuo) — Un test E2E (Playwright) DEBE cubrir, contra la base de test: que una receta
-  cuyas líneas suman 97,50 % no se guarda y con 100,00 % sí; que el costo de ingredientes de un
-  pedido sale calculado con el porcentaje; y que el Operario ve «10 % · 20 L» en la línea de un
-  pedido de 200. [D11]
+  cuyas líneas suman 97,50 % no se guarda y con 100,00 % sí; que una receta sin ninguna línea no se
+  guarda; que el costo de ingredientes de un pedido sale calculado con el porcentaje; y que el
+  Operario ve el porcentaje y «20 L» en la línea de un pedido de 200 con un insumo al 10 %, con el
+  porcentaje en el formato de R25 («10,00 %»). [D11] [D14] [D15]
+
+### Nacidos de la revisión del 2026-09-22
+
+- **R23** (condicional) — SI una receta existente no tiene ninguna línea —como todas las que deja la
+  migración de R8—, ENTONCES el sistema DEBE rechazar cualquier edición suya, aunque solo cambie el
+  nombre, la descripción, la imagen o los pasos, hasta que la edición traiga líneas que sumen
+  exactamente 100,00 %. Es una consecuencia aceptada a sabiendas. [D6] [D14]
+- **R24** (condicional) — SI el insumo de una línea no tiene unidad resoluble —porque no tiene lotes
+  o porque está dado de baja—, ENTONCES el sistema DEBE permitir guardar la receta con esa línea, y
+  la tabla de ingredientes de Pedidos, la ficha de la receta y la pantalla del Operario DEBEN
+  mostrar su porcentaje y su cantidad calculada sin ninguna unidad. [D13]
+- **R25** (ubicuo) — Todo porcentaje de receta DEBE mostrarse con coma decimal y exactamente 2
+  decimales («12,50 %», «10,00 %», «Suma: 97,50 % — faltan 2,50 %») en el formulario de recetas
+  —incluido el valor del campo al precargar una receta—, en el indicador de suma, en la ficha de la
+  receta y en la pantalla del Operario, y también en la columna de porcentaje de la tabla de
+  ingredientes de Pedidos, que pinta el mismo dato; y el campo de porcentaje DEBE aceptar la coma como
+  separador decimal al escribir. [D15]
+- **R26** (ubicuo) — La pantalla de ejecución DEBE mostrar la cantidad del pedido («Pedido 200») en
+  una línea propia, separada de las líneas de la receta. [D16]
 
 ## Preguntas abiertas
 
-1. **Un insumo sin lotes no tiene unidad** (hoy la unidad del producto sale de la presentación de su
-   último lote, QC-80). Queda abierto si la línea muestra la cantidad calculada sin unidad o si la
-   receta rechaza ese insumo. `spec_author` lo lleva a F1.4.
-   **Medido al bajar a diseño (2026-09-22):** en esta rama la unidad ya no sale del último lote:
-   `products.unit_id` existe (migración `20260918130000_product_unit_and_stored_stock`, de QC-121) y
-   es **anulable**, con `NULL` = «el producto no tiene lotes». La pregunta sigue en pie con ese dato.
-   Hay además un **segundo caso con la misma forma**: una línea cuyo insumo se dio de **baja** —la
-   línea se conserva, como hoy— tampoco resuelve unidad, porque inventario solo publica productos
-   vivos. `design.md > 6` deja las vistas preparadas para «unidad desconocida» y aísla en un único
-   punto la validación que habría que añadir si la respuesta es «rechazar».
-2. **¿Se puede guardar una receta sin ninguna línea?** (nueva, 2026-09-22). Leída al pie de la
-   letra, D5 dice que no: la suma de cero líneas es 0,00 %, no 100,00 %. Pero hoy sí se puede
-   (QC-26: «una receta sin líneas se puede guardar»), y D6 deja **todas** las recetas sin líneas
-   tras la migración: con la lectura literal, ninguna se podría volver a guardar —ni para renombrarla
-   ni para tocar sus pasos— hasta cargarle líneas que sumen 100 %. R3 está escrito para «al menos una
-   línea» y deja este caso fuera a propósito. El diseño lo resuelve con una sola condición en un
-   solo sitio, en cualquiera de los dos sentidos.
-3. **Formato del porcentaje en pantalla** (nueva, 2026-09-22). El ejemplo de D5 usa coma decimal y
-   dos decimales fijos («97,50 %»); el de D7 no lleva decimales («10 % · 20 L»); y la aplicación
-   pinta hoy los decimales con punto y sin ceros de relleno (`formatDecimalDisplay`: «12.5»).
-   Propuesta de `design.md > 8`: el indicador de suma con coma y dos decimales, como el ejemplo de
-   D5, y porcentajes y cantidades de las líneas con el formato del resto de la aplicación. Queda
-   para confirmar en F1.4.
-4. **¿Sigue visible «Pedido 200» en la pantalla del Operario?** (nueva, 2026-09-22). D7 retira «el
-   hueco del factor (`recipeBaseQuantity` / `scaleFactorText`, banner de escala)». El componente de
-   ese banner pinta hoy dos cosas: la cantidad del pedido, que no es un factor, y el factor, que
-   nunca se encendió. `design.md > 7` retira el componente y el factor y **conserva la cantidad del
-   pedido** como una línea de texto propia, porque ya se mostraba y R18 la usa. Si la intención era
-   retirarla también, es una línea menos.
+Ninguna.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -161,3 +156,7 @@ pregunta abierta lo dice y no se da por resuelto.
 | 2026-09-22 | ¿Permisos? | **Sin cambios**: editar recetas sigue exigiendo `recetas.modificar` (**QC-86**), validado en el service |
 | 2026-09-22 | ¿E2E? | **Sí**, porque toca importes (`CHECKPOINTS.md`): una receta al 97,50 % no se guarda y al 100,00 % sí; el costo del pedido sale con el %; el Operario ve «10 % · 20 L» |
 | 2026-09-22 | ¿Dependencia o tabla nueva? | **Ninguna librería ni tabla.** Cambia `recipe_lines` por migración, con su `down.sql` |
+| 2026-09-22 | **D13** — ¿Qué pasa con un insumo sin unidad? (sin lotes: en esta rama `products.unit_id` es `NULL` mientras el producto no tiene lotes; o dado de baja: inventario solo publica productos vivos) | **Se muestra sin unidad** —porcentaje y cantidad calculada, sin símbolo— y la receta **se puede guardar** con esa línea |
+| 2026-09-22 | **D14** — ¿Se puede guardar una receta sin ninguna línea? | **No.** Lectura literal de D5: si no suma 100,00 %, no se guarda, y 0 líneas suman 0,00 %. Deroga para esta ficha «una receta sin líneas se puede guardar» de **QC-26**. **Consecuencia aceptada:** las recetas que la migración deja vacías (D6) no se pueden editar —ni siquiera renombrar— hasta cargarles líneas que sumen 100 % |
+| 2026-09-22 | **D15** — ¿Formato del porcentaje en pantalla? | **Coma y 2 decimales en toda la receta** («12,50 %»): el formulario, el indicador de suma, el detalle y la pantalla del Operario. No solo en la suma |
+| 2026-09-22 | **D16** — ¿Sigue visible «Pedido 200» en la pantalla del Operario? | **Sí**, como una línea propia. Se retira solo el factor |

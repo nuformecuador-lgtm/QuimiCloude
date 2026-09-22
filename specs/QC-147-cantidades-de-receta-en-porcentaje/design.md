@@ -1,8 +1,8 @@
 # QC-147 — cantidades-de-receta-en-porcentaje · design.md
 
-> Cómo se construye lo que pide `requirements.md`. Las decisiones `[D1]`–`[D12]` son del humano y
-> no se reabren aquí; lo que este documento decide es técnico. Lo que depende de una pregunta
-> abierta está marcado.
+> Cómo se construye lo que pide `requirements.md`. Las decisiones `[D1]`–`[D16]` son del humano y
+> no se reabren aquí; lo que este documento decide es técnico. D13–D16 cerraron el 2026-09-22 las
+> cuatro preguntas que dejó abiertas la primera versión; no queda ninguna.
 
 ## 0. Lo medido en disco antes de diseñar
 
@@ -105,9 +105,10 @@ se escriba.
 7. Cierre del paréntesis: `ENABLE` + `FORCE ROW LEVEL SECURITY`.
 
 No toca `orders.ingredients_cost`: los importes ya guardados se quedan como estaban (se guardan a
-propósito, QC-123) y cada pedido se recalcula en su siguiente edición. **Consecuencia que conviene
+propósito, QC-123) y cada pedido se recalcula en su siguiente edición. **Consecuencias que conviene
 saber**: tras la migración ninguna receta tiene líneas, así que editar un pedido antes de recargar
-su receta deja su costo sin importe (R16).
+su receta deja su costo sin importe (R16); y, por [D14], ninguna de esas recetas se puede guardar
+—ni para renombrarla— hasta cargarle líneas que sumen 100 % (R23).
 
 ### 2.3 `down.sql` (DOWN)
 
@@ -143,6 +144,9 @@ export function sumPercentages(values: readonly string[]): PercentageTotal;
 
 /** R13: cantidad del pedido × porcentaje / 100, exacta. Sin unidad: la pone quien pinta. */
 export function consumedQuantity(orderQuantity: string, percentage: string): string;
+
+/** R25: "12.5" -> "12,50". Coma y exactamente 2 decimales; sin " %" (lo pone quien pinta). */
+export function formatPercentage(value: string): string;
 ```
 
 - Todo en enteros `BigInt`: `percentage` en centésimas, `orderQuantity` a su escala; el producto
@@ -179,11 +183,14 @@ export const recipeLineSchema = z.object({
 («Las líneas suman 97,50 %: deben sumar exactamente 100,00 %.») que el formulario ya sabe pintar
 como error general (`extractGeneralLinesError`) (R3).
 
-**Receta sin líneas (pregunta abierta 2):** la condición vive **solo** en ese `superRefine`:
-`if (lines.length === 0) return;` (se puede guardar, como hoy) o sin esa línea (no se puede). El
-diseño se entrega con la guarda puesta —es el comportamiento vigente y el que no deja bloqueadas las
-recetas que la migración vacía— y se quita si F1.4 decide lo contrario. El formulario (§8.1) lee el
-mismo resultado, así que cambia solo.
+**Receta sin líneas [D14]:** **no hay guarda** para la lista vacía. `sumPercentages([])` da
+`total = 0.00`, `isComplete = false`, y el mismo `superRefine` la rechaza con el mismo issue
+(«Las líneas suman 0,00 %: …»). Se conserva `.default([])` en el esquema: un payload sin la clave
+`lines` se trata como lista vacía y se rechaza igual, en vez de colarse como `undefined`. Como el
+esquema es el mismo para alta y edición, R23 sale solo: editar una receta vaciada por la migración
+sin traer líneas —aunque solo cambie el nombre— falla en el borde, antes de tocar el repositorio.
+Es la consecuencia que [D14] acepta a sabiendas; no se añade ningún camino de «renombrar sin
+líneas».
 
 ### 4.2 Casos de uso
 
@@ -240,17 +247,14 @@ export type RecipeExecutionLine = {
 `get-recipe.ts` sustituye `stockInLineUnit` por la existencia en la unidad del propio producto:
 `ref.unitId === null ? 0 : (ref.stockByUnit.find(e => e.unitId === ref.unitId)?.quantity ?? 0)`.
 
-**Unidad desconocida** es un único estado con dos causas —insumo sin lotes, insumo dado de baja
-(pregunta abierta 1)—, y todas las vistas lo soportan igual: el porcentaje y la cantidad calculada
-se muestran; la unidad se pinta con el marcador de ausencia que ya usa cada pantalla (`—`), o se
-omite en la frase del Operario. El costo no necesita el caso: un insumo sin lotes o de baja no
-tiene lotes con existencia y R16 ya lo deja sin importe.
+**Unidad desconocida [D13]** es un único estado con dos causas —insumo sin lotes, insumo dado de
+baja—, y todas las vistas lo soportan igual: el porcentaje y la cantidad calculada se muestran **sin
+unidad**. En la tabla de Pedidos la celda de unidad lleva el marcador de ausencia que ya usa (`—`);
+en la frase del Operario simplemente no hay símbolo («Sosa · 2,00 % · 4»). El costo no necesita el
+caso: un insumo sin lotes o de baja no tiene lotes con existencia y R16 ya lo deja sin importe.
 
-**Si la respuesta a la pregunta 1 es «rechazar el insumo sin unidad»**, se añade en un solo punto:
-`create-recipe.ts`/`update-recipe.ts` ya piden `products.findRefs` para validar que los productos
-viven; comprobarían además `ref.unitId !== null` y lanzarían el mismo `ValidationError` con un issue
-en la línea. Y el `ProductPicker` desactivaría esas opciones. Son dos cambios acotados; no se hacen
-hasta que F1.4 lo decida.
+La receta **se puede guardar** con esa línea (R24): alta y edición no miran `ref.unitId`, y el
+`ProductPicker` no desactiva los productos sin unidad. No se añade ninguna validación.
 
 ## 7. Pantalla de ejecución (QC-63) [D7]
 
@@ -281,12 +285,14 @@ export type ExecutionLineView = {
 con `unit: null` y sin alternativas (hoy fabrica un `UnitRef` con el id como nombre; eso se retira).
 
 UI:
-- `order-execution-lines.tsx`: «{insumo} · {porcentaje} % · {cantidad} {unidad}» (R18). El selector
-  de unidad (R20) convierte `line.quantity` —la calculada— con `convertQuantity`, igual que hoy; el
-  porcentaje es texto fijo. Con `unit === null` no hay selector y no hay símbolo.
+- `order-execution-lines.tsx`: «{insumo} · {porcentaje} · {cantidad} {unidad}», con el porcentaje
+  en el formato de [D15] —«Hipoclorito · 10,00 % · 20 L»— (R18, R25). La cantidad calculada sigue
+  el formato del resto de la aplicación (`formatDecimalDisplay`): [D15] habla del porcentaje. El
+  selector de unidad (R20) convierte `line.quantity` —la calculada— con `convertQuantity`, igual que
+  hoy; el porcentaje es texto fijo. Con `unit === null` no hay selector ni símbolo (R24).
 - `order-scale-banner.tsx` **se borra** y `order-execution-screen.tsx` pinta la cantidad del pedido
-  como un `<p>` propio con su `data-testid` (pregunta abierta 4: si el humano decide quitarla, se
-  quita ese `<p>`).
+  como un `<p>` propio, «Pedido 200», con `data-testid="order-execution-order-quantity"` [D16]
+  (R26). Del banner solo desaparece el factor.
 
 ## 8. UI de recetas y de Pedidos
 
@@ -294,34 +300,47 @@ UI:
 
 - `recipe-form-state.ts`: `RecipeLineFormValue = { key, productId, productName, percentage,
   productUnitId }`; `RecipeLinePayload = { productId, percentage }`; `RecipeLineFieldName =
-  'productId' | 'percentage'`. `buildRecipePayload` sigue copiando la cadena tal cual.
+  'productId' | 'percentage'`. En el estado, `percentage` es **lo que el usuario escribió**, con
+  coma. `buildRecipePayload` la pasa al formato del contrato con una única sustitución de cadena
+  (`,` → `.`), sin `parseFloat`, `Number` ni `toFixed`: el valor sigue sin pasar nunca por `number`.
 - `recipe-lines-field.tsx`: sin `UnitPicker`; la columna de unidad desaparece del grid. El campo
-  «Porcentaje» es `type="number"`, `step="any"`, `min="0"`, `max="100"`, `inputMode="decimal"`, con
-  el sufijo «%» visual. Se conserva `step="any"` (decisión humana de QC-26bis sobre el widget) para
-  que el navegador no bloquee el envío con su propia validación y el mensaje sea siempre el del
-  esquema. El ingrediente elegido ya se ve como «nombre · unidad» (`ProductPicker`, QC-121), y la
-  precarga de edición gana `productUnitId` desde `RecipeLineView` (R12).
+  «Porcentaje» pasa a **`type="text"` con `inputMode="decimal"`** y el sufijo «%» visual.
+  **Esto cambia a sabiendas el `type="number"` de QC-26bis para este campo**, y es consecuencia
+  directa de [D15]: un `input type="number"` pinta el separador según la configuración regional del
+  navegador y, en los que usan punto, rechaza la coma —justo el coste que QC-26bis ya anotó—, así
+  que con él no se puede garantizar «12,50». `inputMode="decimal"` sigue sacando el teclado numérico
+  en iOS y Android. Se aceptan coma y punto al escribir (R25); el esquema valida lo que llega tras
+  la sustitución. El ingrediente elegido ya se ve como «nombre · unidad» (`ProductPicker`, QC-121),
+  y la precarga de edición gana `productUnitId` desde `RecipeLineView` (R12).
+- **Precarga de edición** (`recipe-form.tsx`, hoy `trimDecimal(line.quantity)`): el campo se
+  rellena con `formatPercentage(line.percentage)`, es decir «12,50», no «12.5» (R25).
 - **Indicador de suma** al pie del bloque de líneas, `role="status"` + `aria-live="polite"`,
   `data-testid="recipe-lines-sum"` y `data-complete="true|false"`, calculado en cada render con
-  `sumPercentages` sobre `lines` (el fantasma no suma). Texto: «Suma: 97,50 % — faltan 2,50 %»,
-  «Suma: 101,00 % — sobran 1,00 %», «Suma: 100,00 %» (R10).
-- `recipe-form.tsx`: el botón Guardar queda `disabled` mientras `!isComplete` (y, según la
-  pregunta 2, `lines.length > 0`). Además el `onSubmit` vuelve a comprobarlo antes de llamar a la
-  Server Action, para que Enter en un campo no se lo salte (R11). El servidor lo rechaza igual (R3).
+  `sumPercentages` sobre las líneas (el fantasma no suma). Texto: «Suma: 97,50 % — faltan 2,50 %»,
+  «Suma: 101,00 % — sobran 1,00 %», «Suma: 100,00 %»; sin ninguna línea, «Suma: 0,00 % — faltan
+  100,00 %» (R10, R25).
+- `recipe-form.tsx`: el botón Guardar queda `disabled` mientras `!isComplete`, **también con cero
+  líneas** [D14]. Además el `onSubmit` vuelve a comprobarlo antes de llamar a la Server Action, para
+  que Enter en un campo no se lo salte (R11). El servidor lo rechaza igual (R3, R23).
 - **Se borran** `unit-picker.tsx` y `unit-group.ts` y sus exportaciones del barrel. Sus tests
   (`unit-group.test.ts`, `recipe-line-unit-group.test.tsx`) se borran y
   `consumidores-catalogo.test.tsx` deja de montar `UnitPicker`.
 
-**Formato (pregunta abierta 3).** Propuesta: el indicador de suma usa coma y dos decimales fijos,
-como el ejemplo de D5, con un `formatPercentageTotal` local al componente; porcentajes y cantidades
-de las líneas usan `formatDecimalDisplay` como el resto de la aplicación («10 %», «12.5 %»,
-«20 L»). Es una función de presentación de ~5 líneas; si F1.4 pide coma en todas partes, se cambia
-en `lib/shared/ui/decimal-display.ts` y eso ya no es de esta ficha.
+**Formato [D15].** Una sola función, `formatPercentage(value: string): string`, en el dominio de
+`recetas` junto a la aritmética (§3) y publicada por su barrel, porque la usan tres rutas distintas
+(recetas, pedidos, asignación) y no puede vivir en una de ellas: «12.5» → «12,50», «100» →
+«100,00», «-1.00» → «-1,00». Opera sobre la cadena —rellenar a 2 decimales y cambiar el
+separador—, sin pasar por `number` ni por `Intl`, cuyo resultado depende de la configuración
+regional del entorno. El símbolo « %» lo pone quien pinta. Aplica a todo porcentaje de receta:
+formulario, indicador de suma, ficha de la receta, pantalla del Operario y la columna de porcentaje
+de la tabla de Pedidos, que pinta el mismo dato (R25). **No** cambia `formatDecimalDisplay` ni el
+formato de las cantidades, existencias o importes: [D15] trata del porcentaje.
 
 ### 8.2 Tabla de ingredientes de Pedidos [D9]
 
-`order-ingredients-table.tsx`: columnas Producto · **Porcentaje** · Unidad (del insumo,
-`productUnitId`) · Stock · Cantidad requerida · Restante. `requiredOf = quantity === '' ? '0' :
+`order-ingredients-table.tsx`: columnas Producto · **Porcentaje** (con `formatPercentage`, «10,00 %»)
+· Unidad (del insumo, `productUnitId`; `—` si es desconocida, R24) · Stock · Cantidad requerida ·
+Restante. `requiredOf = quantity === '' ? '0' :
 consumedQuantity(quantity, line.percentage)`. Restante y resaltado, igual que hoy (R17). La
 multiplicación deja de usar `multiplyDecimal` local; `order-decimal.ts` sigue existiendo para la
 resta.
@@ -370,7 +389,8 @@ export type RecipeCostLine = {
    sobre `recipe_lines`). Descartada: es una regla entre filas, la edición de hoy borra y hace
    `upsert` línea a línea dentro de la transacción, así que solo un disparador diferido la
    comprobaría en el momento correcto; añade PL/pgSQL que Prisma no modela, un código SQLSTATE más
-   que traducir y un caso difícil de probar (la receta vacía, pregunta 2). [D5] pide «el servidor
+   que traducir, y la receta sin filas (que [D14] rechaza) ni siquiera dispara un disparador por
+  fila: habría que ponerlo también en `recipes`. [D5] pide «el servidor
    también lo rechaza», y en este repo la frontera es el service
    (`docs/architecture.md > Acceso a datos`). La base se queda con el rango por fila (R6).
 2. **Guardar la fracción (0–1) en vez del porcentaje.** Descartada: [D4] define el dato en
@@ -402,6 +422,25 @@ Se ponen rojos **por hacer lo que la ficha pide** y se actualizan en la task de 
 | `tests/unit/inventario/product-catalog.test.ts:55` | enumera las claves exactas de `ProductRef` |
 | `tests/unit/unidades/consumidores-catalogo.test.tsx` | monta `UnitPicker` |
 
+**Tests que hoy guardan una receta sin líneas** —QC-26 lo permitía y [D14] lo prohíbe—. Medido
+con `grep` de `lines: []` y «sin líneas» en `tests/` y `e2e/` de recetas. Cada uno se trata de una
+de tres formas, y la task de su capa dice cuál:
+
+| Test | Qué hace hoy | Tratamiento |
+|---|---|---|
+| `tests/unit/recetas-ui/recipe-form.test.tsx:753-765` («R27 — … una receta sin ninguna se guarda») | afirma que se guarda sin líneas | **Se invierte**: pasa a probar R11/R23 (sin líneas, Guardar deshabilitado y la acción no se llama) |
+| `tests/unit/recetas/authorization.test.ts:43, :55, :134` | entradas de alta/edición con `lines: []` | los casos **sin** permiso siguen igual (el permiso va antes que la suma, R7); los casos **con** permiso pasan a una línea al 100 % |
+| `tests/unit/recetas/company-isolation-service.test.ts:80, :96`, `tests/unit/recetas/company-scope.test.ts:69` | entradas de servicio con `lines: []` | pasan a una línea al 100 % (lo que prueban es el ámbito, no las líneas) |
+| `tests/unit/recetas/recipe-image-url.test.ts:29, :108, :133, :161`, `recipe-image-lifecycle.test.ts:28, :44` | entradas de alta/edición con imagen y `lines: []` | pasan a una línea al 100 % |
+| `tests/unit/recetas-ui/recipe-form-payload.test.ts:72` | arma el payload de un estado sin líneas | se queda: `buildRecipePayload` no valida; se revisa que ningún caso afirme que ese payload es **válido** |
+| `tests/unit/recetas/recipe-catalog.test.ts:222, :238, :330` | filas **leídas** sin líneas | se quedan: son lecturas, y las recetas vacías existen tras la migración |
+| `tests/integration/recetas/recipe-crud.int.test.ts:237`, `recipe-lines.int.test.ts:172`, `company-scope-queries.int.test.ts:154` | escriben por el **repositorio**, que no valida | se revisan una a una: si el caso pasa por el servicio, línea al 100 %; si va directo al repositorio, se queda |
+| `e2e/recetas.spec.ts` (siembra de `:280`, «existe sin líneas») y `e2e/recetas-pasos.spec.ts` | crean o editan recetas por la UI | todo guardado por la UI lleva una línea al 100 %; una receta sembrada sin líneas que el spec **edita** tiene que cargar líneas antes de guardar (R23) |
+
+Además, cualquier otro test que construya una entrada válida de alta o edición **sin** la clave
+`lines` (el esquema la rellena con `[]`) cae en el mismo caso: el `grep` de T3/T4/T9 incluye las
+constantes de entrada válidas de cada archivo, no solo el literal `lines: []`.
+
 Los tests de migraciones **viejas** (`recetas-migration.test.ts`, `unidades-migration.test.ts`, …)
 leen archivos que no cambian y siguen verdes. Si alguna guardia inventaría FK o índices del esquema
 final, se ajusta en T1 y se dice en la bitácora.
@@ -411,13 +450,19 @@ final, se ajusta en T1 y se dice en la bitácora.
 `e2e/recetas-porcentaje.spec.ts`, datos propios con prefijo único y limpieza al final (patrón de
 `e2e/recetas.spec.ts`):
 
-1. En el formulario de recetas, dos insumos al 90 % y 7,5 %: el indicador dice «faltan 2,50 %» y
-   Guardar está deshabilitado; se cambia a 92,5 %: «100,00 %», se guarda y la receta existe con esos
-   porcentajes en la base.
-2. Un pedido de 200 sobre una receta sembrada con 10 % de un insumo en L (lote con existencia y
-   coste conocidos): la columna «Cantidad requerida» dice 20 y `orders.ingredients_cost` es el que
-   sale de 20 × coste.
-3. Ese pedido asignado al Operario: la pantalla de ejecución muestra «10 % · 20 L».
+1. En el formulario de recetas, dos insumos, escritos con coma, al «90» y «7,5»: el indicador dice
+   «Suma: 97,50 % — faltan 2,50 %» y Guardar está deshabilitado; se cambia a «92,5»: «Suma:
+   100,00 %», se guarda y la receta existe en la base con `92.50` y `7.50`. Al reabrirla, los campos
+   muestran «92,50» y «7,50» (R25).
+2. Una receta sin ninguna línea: el indicador dice «Suma: 0,00 % — faltan 100,00 %», Guardar está
+   deshabilitado y la receta no se crea. Y una receta **sembrada** sin líneas (como las que deja la
+   migración) no se puede guardar tras cambiarle solo el nombre: el nombre en la base no cambia
+   (R3, R23).
+3. Un pedido de 200 sobre una receta sembrada con 10 % de un insumo en L (lote con existencia y
+   coste conocidos): la columna «Porcentaje» dice «10,00 %», «Cantidad requerida» dice 20 y
+   `orders.ingredients_cost` es el que sale de 20 × coste.
+4. Ese pedido asignado al Operario: la pantalla de ejecución muestra «Pedido 200» en su propia
+   línea y «10,00 % · 20 L» en la del insumo (R18, R25, R26).
 
 Se actualizan `e2e/recetas.spec.ts` y `e2e/recetas-pasos.spec.ts`: hoy rellenan «12.5» y eligen
 unidad; pasan a una línea al 100 % sin unidad.
