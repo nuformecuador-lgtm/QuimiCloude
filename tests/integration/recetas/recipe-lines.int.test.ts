@@ -2,10 +2,10 @@
  * Tests de integracion de QC-25 (crud-de-recetas), Grupo D (T14), sobre las LINEAS de
  * receta, contra una base Postgres REAL.
  *
- * Cubre R14 (CHECK de cantidad positiva), R16 (unico `(recipe_id, product_id)`) y R18
+ * Cubre R6 (CHECK de rango de porcentaje), R16 (unico `(recipe_id, product_id)`) y R18
  * (la linea de un producto borrado logicamente se conserva y el detalle la trae).
  *
- * R14 y R16 se verifican en DOS NIVELES:
+ * R6 y R16 se verifican en DOS NIVELES:
  *   1) contra la base cruda, con `SAVEPOINT` + `ROLLBACK TO SAVEPOINT` dentro de una
  *      transaccion que termina siempre en `ROLLBACK` (mismo patron que
  *      `recetas-constraints.int.test.ts`), afirmando sobre el SQLSTATE;
@@ -177,10 +177,6 @@ function baseRecipeInput(overrides: Partial<NewRecipe> = {}): NewRecipe {
 
 // ---------------------------------------------------------------------------
 
-/** Unidad real, sembrada por la migracion `..._units_catalog` (QC-32, R25): `RecipeLine.unitId`
- *  es una FK real a `units`, asi que las lineas de estos tests necesitan un id existente. */
-let sharedUnitId: string;
-
 beforeAll(async () => {
   const tables = await prisma.$queryRaw<{ tablename: string }[]>`
     SELECT tablename FROM pg_tables
@@ -191,8 +187,6 @@ beforeAll(async () => {
         'Corre `pnpm run db:migrate` antes de estos tests.',
     );
   }
-
-  sharedUnitId = (await prisma.unit.findFirstOrThrow()).id;
 });
 
 afterAll(async () => {
@@ -201,8 +195,8 @@ afterAll(async () => {
 
 // ---------------------------------------------------------------------------
 
-describe('R14: el CHECK de cantidad positiva', () => {
-  it('rechaza con SQLSTATE 23514 la cantidad no positiva, en crudo', async () => {
+describe('R6: el CHECK de rango de porcentaje', () => {
+  it('rechaza con SQLSTATE 23514 el porcentaje fuera de rango, en crudo', async () => {
     await inRolledBackTransaction(async (tx) => {
       const recipeId = await createTestRecipe(tx);
       const productId = await createTestProduct(tx);
@@ -210,20 +204,29 @@ describe('R14: el CHECK de cantidad positiva', () => {
       const cero = await expectRejectedByDatabase(
         tx,
         () =>
-          tx.$executeRaw`INSERT INTO "recipe_lines" ("recipe_id", "product_id", "quantity", "unit_id", "updated_at")
-            VALUES (CAST(${recipeId} AS uuid), CAST(${productId} AS uuid), 0.0000, CAST(${sharedUnitId} AS uuid), CURRENT_TIMESTAMP)`,
-        'linea con cantidad cero',
+          tx.$executeRaw`INSERT INTO "recipe_lines" ("recipe_id", "product_id", "percentage", "updated_at")
+            VALUES (CAST(${recipeId} AS uuid), CAST(${productId} AS uuid), 0.00, CURRENT_TIMESTAMP)`,
+        'linea con porcentaje cero',
       );
       expect(cero).toBe(CHECK_VIOLATION);
 
       const negativa = await expectRejectedByDatabase(
         tx,
         () =>
-          tx.$executeRaw`INSERT INTO "recipe_lines" ("recipe_id", "product_id", "quantity", "unit_id", "updated_at")
-            VALUES (CAST(${recipeId} AS uuid), CAST(${productId} AS uuid), -1.5000, CAST(${sharedUnitId} AS uuid), CURRENT_TIMESTAMP)`,
-        'linea con cantidad negativa',
+          tx.$executeRaw`INSERT INTO "recipe_lines" ("recipe_id", "product_id", "percentage", "updated_at")
+            VALUES (CAST(${recipeId} AS uuid), CAST(${productId} AS uuid), -1.50, CURRENT_TIMESTAMP)`,
+        'linea con porcentaje negativo',
       );
       expect(negativa).toBe(CHECK_VIOLATION);
+
+      const excedida = await expectRejectedByDatabase(
+        tx,
+        () =>
+          tx.$executeRaw`INSERT INTO "recipe_lines" ("recipe_id", "product_id", "percentage", "updated_at")
+            VALUES (CAST(${recipeId} AS uuid), CAST(${productId} AS uuid), 100.01, CURRENT_TIMESTAMP)`,
+        'linea con porcentaje mayor que 100',
+      );
+      expect(excedida).toBe(CHECK_VIOLATION);
 
       const survivors = await tx.recipeLine.findMany({ where: { recipeId }, select: { id: true } });
       expect(survivors).toEqual([]);
@@ -232,14 +235,14 @@ describe('R14: el CHECK de cantidad positiva', () => {
 
   it('el adaptador traduce el CHECK a ValidationError contra Postgres real', async () => {
     // IMPORTANTE: este caso ejercita `createRecipe` de `recipe-prisma.ts` de verdad, no un
-    // doble. Verifica empiricamente que `translateWriteError`/`isQuantityCheckViolation`
+    // doble. Verifica empiricamente que `translateWriteError`/`isPercentageCheckViolation`
     // reconocen el SQLSTATE 23514 que Postgres devuelve de verdad en esta maquina.
     const productId = await createTestProduct(prisma);
     let recipeId: string | null = null;
 
     try {
       const input = baseRecipeInput({
-        lines: [{ productId, quantity: '0.0000', unitId: sharedUnitId }],
+        lines: [{ productId, percentage: '0.00' }],
       });
       const scope: RecipeScope = { companyId: await andamiajeCompanyId(prisma) };
 
@@ -266,21 +269,21 @@ describe('R16: unicidad de (recipe_id, product_id)', () => {
       const productId = await createTestProduct(tx);
 
       const first = await tx.recipeLine.create({
-        data: { recipeId, productId, quantity: new Prisma.Decimal('1.0000'), unitId: sharedUnitId },
+        data: { recipeId, productId, percentage: new Prisma.Decimal('100.00') },
         select: { id: true },
       });
 
       const sqlState = await expectRejectedByDatabase(
         tx,
         () =>
-          tx.$executeRaw`INSERT INTO "recipe_lines" ("recipe_id", "product_id", "quantity", "unit_id", "updated_at")
-            VALUES (CAST(${recipeId} AS uuid), CAST(${productId} AS uuid), 3.0000, CAST(${sharedUnitId} AS uuid), CURRENT_TIMESTAMP)`,
+          tx.$executeRaw`INSERT INTO "recipe_lines" ("recipe_id", "product_id", "percentage", "updated_at")
+            VALUES (CAST(${recipeId} AS uuid), CAST(${productId} AS uuid), 50.00, CURRENT_TIMESTAMP)`,
         'segunda linea del mismo producto en la misma receta',
       );
       expect(sqlState).toBe(UNIQUE_VIOLATION);
 
-      const lines = await tx.recipeLine.findMany({ where: { recipeId }, select: { id: true, unitId: true } });
-      expect(lines).toEqual([{ id: first.id, unitId: sharedUnitId }]);
+      const lines = await tx.recipeLine.findMany({ where: { recipeId }, select: { id: true } });
+      expect(lines).toEqual([{ id: first.id }]);
     });
   });
 });
@@ -292,7 +295,7 @@ describe('R18: la linea de un producto borrado logicamente se conserva', () => {
 
     try {
       const input = baseRecipeInput({
-        lines: [{ productId, quantity: '3.0000', unitId: sharedUnitId }],
+        lines: [{ productId, percentage: '100.00' }],
       });
       const scope: RecipeScope = { companyId: await andamiajeCompanyId(prisma) };
       const created = await createRecipe(input, null as unknown as string, new Date(), scope);
@@ -306,8 +309,7 @@ describe('R18: la linea de un producto borrado logicamente se conserva', () => {
       expect(detail).not.toBeNull();
       expect(detail?.lines).toHaveLength(1);
       expect(detail?.lines[0]?.productId).toBe(productId);
-      expect(detail?.lines[0]?.quantity).toBe('3.0000');
-      expect(detail?.lines[0]?.unitId).toBe(sharedUnitId);
+      expect(detail?.lines[0]?.percentage).toBe('100.00');
 
       // Y el producto sigue existiendo (borrado logico, no fisico): es justo lo que hace
       // que la linea no apunte al vacio.

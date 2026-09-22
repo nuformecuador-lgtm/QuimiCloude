@@ -5,8 +5,8 @@
 // que la pregunta pasa de «es Administrador» a «su conjunto contiene el codigo exigido». Es la
 // unica red que existe para R16: un service test de un solo caso de uso puede seguir verde
 // aunque el codigo exigido en otro archivo sea el equivocado, asi que aqui se barren los cinco,
-// uno por uno, con dobles de los CUATRO puertos -repositorio, catalogo de productos, catalogo
-// de unidades y almacenamiento- que FALLAN si se les llama.
+// uno por uno, con dobles de los TRES puertos -repositorio, catalogo de productos y
+// almacenamiento- que FALLAN si se les llama.
 
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
@@ -23,7 +23,6 @@ import type { RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/re
 
 import { PERMISSIONS } from '@/lib/modules/identity';
 import type { ProductCatalog } from '@/lib/modules/inventario';
-import type { UnitCatalog } from '@/lib/modules/unidades';
 
 /** Los dos codigos que este modulo puede exigir (R16). */
 const CONSULTAR = 'recetas.consultar';
@@ -36,11 +35,15 @@ function actorCon(...permisos: readonly string[]): Actor {
 
 const AHORA = new Date('2026-09-07T10:00:00.000Z');
 
+const PRODUCTO_ID = '11111111-1111-4111-8111-111111111111';
+
+// R7, D14: una entrada valida ya no puede ir sin lineas -0 lineas suman 0,00 %-, asi que la
+// que usan los casos "concede" trae una linea al 100 %.
 const RECETA_VALIDA = {
   name: 'Desengrasante 5%',
   description: null,
   steps: [],
-  lines: [],
+  lines: [{ productId: PRODUCTO_ID, percentage: '100.00' }],
 };
 
 /**
@@ -84,16 +87,6 @@ function catalogoQueFalla(): ProductCatalog {
   };
 }
 
-function catalogoUnidadesQueFalla(): UnitCatalog {
-  const explota = () => {
-    throw new Error('el catalogo de unidades no debe ser llamado');
-  };
-  return {
-    findRefs: vi.fn<UnitCatalog['findRefs']>(explota),
-    findRefsSharingBaseInCompany: vi.fn<UnitCatalog['findRefsSharingBaseInCompany']>(explota),
-  };
-}
-
 function almacenamientoQueFalla(): RecipeImageStorage {
   const explota = () => {
     throw new Error('el almacenamiento de imagenes no debe ser llamado');
@@ -108,7 +101,6 @@ function almacenamientoQueFalla(): RecipeImageStorage {
 type Puertos = {
   readonly recipes: RecipeRepository;
   readonly products: ProductCatalog;
-  readonly units: UnitCatalog;
   readonly images: RecipeImageStorage;
 };
 
@@ -116,7 +108,6 @@ function montarPuertosQueFallan(): Puertos {
   return {
     recipes: repositorioQueFalla(),
     products: catalogoQueFalla(),
-    units: catalogoUnidadesQueFalla(),
     images: almacenamientoQueFalla(),
   };
 }
@@ -145,14 +136,14 @@ function montarPuertosPermisivos(): Puertos {
       softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
     },
     products: {
-      findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []),
+      // Resuelve el producto de `RECETA_VALIDA`: sin esto, `createRecipe`/`updateRecipe`
+      // rechazarian por producto inexistente antes de llegar al repositorio.
+      findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
+        { id: PRODUCTO_ID, name: 'Acido sulfurico', unitId: null, stockByUnit: [] },
+      ]),
       findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
         throw new Error('recetas no debe costear nada');
       }),
-    },
-    units: {
-      findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []),
-      findRefsSharingBaseInCompany: vi.fn<UnitCatalog['findRefsSharingBaseInCompany']>(async () => []),
     },
     images: {
       upload: vi.fn<RecipeImageStorage['upload']>(async () => 'recetas/x.jpg'),
@@ -169,7 +160,6 @@ function afirmarQueNingunPuertoFueLlamado(puertos: Puertos): void {
   expect(puertos.recipes.replaceAlive).not.toHaveBeenCalled();
   expect(puertos.recipes.softDeleteAlive).not.toHaveBeenCalled();
   expect(puertos.products.findRefs).not.toHaveBeenCalled();
-  expect(puertos.units.findRefs).not.toHaveBeenCalled();
   expect(puertos.images.upload).not.toHaveBeenCalled();
   expect(puertos.images.remove).not.toHaveBeenCalled();
   expect(puertos.images.publicUrl).not.toHaveBeenCalled();
@@ -225,7 +215,6 @@ const CASOS_DE_USO: ReadonlyArray<{
       createCreateRecipe({
         recipes: puertos.recipes,
         products: puertos.products,
-        units: puertos.units,
         images: puertos.images,
       })(entrada ?? RECETA_VALIDA, actor),
   },
@@ -236,7 +225,6 @@ const CASOS_DE_USO: ReadonlyArray<{
       createUpdateRecipe({
         recipes: puertos.recipes,
         products: puertos.products,
-        units: puertos.units,
         images: puertos.images,
       })('receta-1', entrada ?? RECETA_VALIDA, actor),
   },

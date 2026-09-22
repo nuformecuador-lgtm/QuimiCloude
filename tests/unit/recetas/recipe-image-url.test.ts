@@ -11,7 +11,6 @@ import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-imag
 import type { NewRecipe, RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
 import type { ProductCatalog } from '@/lib/modules/inventario';
-import type { UnitCatalog } from '@/lib/modules/unidades';
 
 // QC-74 (R16, R18): el actor ya no lleva nombre de rol, lleva el conjunto de permisos.
 // Los dos codigos de `recetas`, que es lo que exigen los cinco casos de uso.
@@ -22,11 +21,14 @@ const ADMIN: Actor = {
 };
 const AHORA = new Date('2026-09-03T10:00:00.000Z');
 
+const PRODUCTO_ID = '11111111-1111-4111-8111-111111111111';
+
+// R7, D14: una entrada valida ya no puede ir sin lineas.
 const RECETA_VALIDA = {
   name: 'Desengrasante 5%',
   description: null,
   steps: [],
-  lines: [],
+  lines: [{ productId: PRODUCTO_ID, percentage: '100.00' }],
 };
 
 // Un doble que compone una URL PUBLICA sin firma ni caducidad -sin parametros de query,
@@ -56,17 +58,12 @@ function montarRepositorio(overrides: Partial<RecipeRepository> = {}): RecipeRep
 
 function montarCatalogo(): ProductCatalog {
   return {
-    findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []),
+    findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
+      { id: PRODUCTO_ID, name: 'Acido sulfurico', unitId: null, stockByUnit: [] },
+    ]),
     findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
       throw new Error('recetas no debe costear nada');
     }),
-  };
-}
-
-function montarCatalogoUnidades(): UnitCatalog {
-  return {
-    findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []),
-    findRefsSharingBaseInCompany: vi.fn<UnitCatalog['findRefsSharingBaseInCompany']>(async () => []),
   };
 }
 
@@ -80,7 +77,6 @@ describe('R24 — se persiste la ruta, no la URL', () => {
     const createRecipe = createCreateRecipe({
       recipes,
       products,
-      units: montarCatalogoUnidades(),
       images,
       now: () => AHORA,
     });

@@ -14,12 +14,11 @@ export type GetRecipeDeps = {
   readonly images: RecipeImageStorage;
 };
 
-/** Existencia del producto en la unidad de la linea que lo pide: 0 sin lotes, `null` cuando
- *  hay lotes pero ninguno en esa unidad. */
-function stockInLineUnit(ref: ProductRef, unitId: string): number | null {
-  if (ref.stockByUnit.length === 0) return 0;
-  const match = ref.stockByUnit.find((entry) => entry.unitId === unitId);
-  return match?.quantity ?? null;
+/** Existencia del producto en SU PROPIA unidad (R14, R24): 0 cuando no tiene lotes -y por
+ *  tanto ninguna unidad resoluble-, la cantidad de esa unidad en el resto de los casos. */
+function stockInProductUnit(ref: ProductRef): number {
+  if (ref.unitId === null) return 0;
+  return ref.stockByUnit.find((entry) => entry.unitId === ref.unitId)?.quantity ?? 0;
 }
 
 /**
@@ -69,9 +68,9 @@ export function createGetRecipe(
           id: line.id,
           productId: line.productId,
           productName: namesById.get(line.productId) ?? null,
-          quantity: line.quantity,
-          unitId: line.unitId,
-          productStock: ref === undefined ? null : stockInLineUnit(ref, line.unitId),
+          percentage: line.percentage,
+          productUnitId: ref?.unitId ?? null,
+          productStock: ref === undefined ? null : stockInProductUnit(ref),
         };
       }),
     };

@@ -25,8 +25,8 @@ import type { NewRecipe, RecipeLineData, RecipeLineRow, RecipeRow } from '../../
  * definicion de `normalizeRecipeName` que publica el contrato del modulo (R8), y se
  * escribe siempre junto al nombre, en la misma escritura.
  *
- * `quantity` viaja como CADENA por el puerto (el dominio no puede importar
- * `@prisma/client`, `design.md > 2`): `toDecimalInput`/`fromDecimalQuantity` son el UNICO
+ * `percentage` viaja como CADENA por el puerto (el dominio no puede importar
+ * `@prisma/client`, `design.md > 2`): `toDecimalInput`/`fromDecimalPercentage` son el UNICO
  * sitio del modulo que convierte en los dos sentidos.
  */
 
@@ -34,14 +34,14 @@ const RECIPE_INCLUDE = { lines: true } satisfies Prisma.RecipeInclude;
 
 type RecipeWithLines = Prisma.RecipeGetPayload<{ include: typeof RECIPE_INCLUDE }>;
 
-/** Cadena decimal(14,4) del puerto -> `Prisma.Decimal` para escribir. */
-export function toDecimalInput(quantity: string): Prisma.Decimal {
-  return new Prisma.Decimal(quantity);
+/** Cadena decimal(5,2) del puerto -> `Prisma.Decimal` para escribir. */
+export function toDecimalInput(percentage: string): Prisma.Decimal {
+  return new Prisma.Decimal(percentage);
 }
 
-/** `Prisma.Decimal` de una lectura -> cadena con 4 decimales fijos (mismo criterio que `cost` en `inventario`). */
-export function fromDecimalQuantity(quantity: Prisma.Decimal): string {
-  return quantity.toFixed(4);
+/** `Prisma.Decimal` de una lectura -> cadena con 2 decimales fijos (mismo criterio que `cost` en `inventario`). */
+export function fromDecimalPercentage(percentage: Prisma.Decimal): string {
+  return percentage.toFixed(2);
 }
 
 /**
@@ -70,8 +70,7 @@ function toLineRow(line: RecipeWithLines['lines'][number]): RecipeLineRow {
   return {
     id: line.id,
     productId: line.productId,
-    quantity: fromDecimalQuantity(line.quantity),
-    unitId: line.unitId,
+    percentage: fromDecimalPercentage(line.percentage),
   };
 }
 
@@ -164,14 +163,14 @@ function isUniqueNameViolation(error: unknown): boolean {
   return false;
 }
 
-/** `23514`: el `CHECK` de `quantity > 0` (`design.md > 7.3`, R14). Nunca `'duplicate'`. */
-function isQuantityCheckViolation(error: unknown): boolean {
+/** `23514`: el `CHECK` de rango de `percentage` (`design.md > 2.1`, R6). Nunca `'duplicate'`. */
+function isPercentageCheckViolation(error: unknown): boolean {
   return sqlStateOf(error) === '23514';
 }
 
 /** Traduce el SQLSTATE al resultado discriminado del puerto, o relanza si no lo reconoce. */
 function translateWriteError(error: unknown): never {
-  if (isQuantityCheckViolation(error)) throw new ValidationError();
+  if (isPercentageCheckViolation(error)) throw new ValidationError();
   throw error;
 }
 
@@ -199,8 +198,7 @@ export async function createRecipe(
         lines: {
           create: data.lines.map((line) => ({
             productId: line.productId,
-            quantity: toDecimalInput(line.quantity),
-            unitId: line.unitId,
+            percentage: toDecimalInput(line.percentage),
           })),
         },
       },
@@ -421,12 +419,10 @@ export async function replaceAliveRecipe(
           create: {
             recipeId: id,
             productId: line.productId,
-            quantity: toDecimalInput(line.quantity),
-            unitId: line.unitId,
+            percentage: toDecimalInput(line.percentage),
           },
           update: {
-            quantity: toDecimalInput(line.quantity),
-            unitId: line.unitId,
+            percentage: toDecimalInput(line.percentage),
           },
         });
       }

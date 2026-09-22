@@ -186,7 +186,7 @@ beforeAll(async () => {
   // A: tres vivas, la tercera se borra logicamente despues (indice 3 = borrada).
   await alta(A, {
     name: `Solucion comun ${token()}`,
-    lines: [{ productId: A.productId, quantity: '1.0000', unitId: A.unitId }],
+    lines: [{ productId: A.productId, percentage: '100.00' }],
   });
   await alta(A, { name: `Segunda receta A ${token()}` });
   await alta(A, { name: `Tercera receta A ${token()}` });
@@ -196,7 +196,7 @@ beforeAll(async () => {
   // B: dos vivas. La primera lleva el termino distintivo para el caso de busqueda (R15).
   await alta(B, {
     name: `Jabon especial ${MARCA_BUSQUEDA_B}`,
-    lines: [{ productId: B.productId, quantity: '2.0000', unitId: B.unitId }],
+    lines: [{ productId: B.productId, percentage: '100.00' }],
   });
   await alta(B, { name: `Segunda receta B ${token()}` });
 });
@@ -343,7 +343,7 @@ describe('R16, R17, R20 — findAliveById / replaceAlive / softDeleteAlive con u
       ajena,
       recetaNueva({
         name: `Nombre inyectado desde A ${token()}`,
-        lines: [{ productId: A.productId, quantity: '9.0000', unitId: A.unitId }],
+        lines: [{ productId: A.productId, percentage: '90.00' }],
       }),
       A.userId,
       new Date(),
@@ -356,7 +356,7 @@ describe('R16, R17, R20 — findAliveById / replaceAlive / softDeleteAlive con u
     expect(await prisma.recipeLine.count({ where: { recipeId: ajena } })).toBe(lineasAntes);
     const lineaOriginal = await prisma.recipeLine.findFirstOrThrow({ where: { recipeId: ajena } });
     expect(lineaOriginal.productId).toBe(B.productId);
-    expect(lineaOriginal.quantity.toFixed(4)).toBe('2.0000');
+    expect(lineaOriginal.percentage.toFixed(2)).toBe('100.00');
   });
 
   it('control positivo: el mismo replaceAlive, desde B, SI escribe y concilia sus lineas', async () => {
@@ -369,7 +369,7 @@ describe('R16, R17, R20 — findAliveById / replaceAlive / softDeleteAlive con u
       propia,
       recetaNueva({
         name: nuevoNombre,
-        lines: [{ productId: B.productId, quantity: '5.0000', unitId: B.unitId }],
+        lines: [{ productId: B.productId, percentage: '50.00' }],
       }),
       B.userId,
       new Date(),
@@ -381,7 +381,7 @@ describe('R16, R17, R20 — findAliveById / replaceAlive / softDeleteAlive con u
     const detalle = await findAliveRecipeById(propia, ambitoDe(B));
     expect(detalle?.name).toBe(nuevoNombre);
     expect(detalle?.lines).toHaveLength(1);
-    expect(detalle?.lines[0]?.quantity).toBe('5.0000');
+    expect(detalle?.lines[0]?.percentage).toBe('50.00');
     expect(await empresaDeLaReceta(propia)).toBe(B.companyId);
   });
 
@@ -599,8 +599,8 @@ describe('R11 — el duplicado de nombre llega como \'duplicate\', con el meta.t
     const promesa = createRecipe(
       recetaNueva({
         lines: [
-          { productId: A.productId, quantity: '1.0000', unitId: A.unitId },
-          { productId: A.productId, quantity: '2.0000', unitId: A.unitId },
+          { productId: A.productId, percentage: '40.00' },
+          { productId: A.productId, percentage: '60.00' },
         ],
       }),
       A.userId,

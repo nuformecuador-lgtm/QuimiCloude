@@ -786,7 +786,6 @@ export const recetas = {
   createRecipe: createCreateRecipe({
     recipes: recipeRepository,
     products: productCatalog,
-    units: unitCatalog,
     images: recipeImageStorage,
   }),
   getRecipe: createGetRecipe({ recipes: recipeRepository, products: productCatalog, images: recipeImageStorage }),
@@ -800,7 +799,6 @@ export const recetas = {
   updateRecipe: createUpdateRecipe({
     recipes: recipeRepository,
     products: productCatalog,
-    units: unitCatalog,
     images: recipeImageStorage,
   }),
   deleteRecipe: createDeleteRecipe({ recipes: recipeRepository }),
