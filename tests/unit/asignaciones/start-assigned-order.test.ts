@@ -54,7 +54,7 @@ function contenido(): RecipeExecutionContent {
     name: 'Jabon liquido',
     isDeleted: false,
     steps: [],
-    lines: [{ productId: PRODUCTO, productName: null, quantity: '90', unitId: LITRO }],
+    lines: [{ productId: PRODUCTO, productName: null, percentage: '90.00' }],
   };
 }
 
