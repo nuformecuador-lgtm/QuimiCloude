@@ -1,5 +1,10 @@
 # QC-144 — rol-empacador · requirements.md
 
+> **Enmendado el 2026-09-22** por decisión del humano tras la implementación (fila D10 de «Decisiones
+> cerradas»): R6 se reescribe para que mande `docs/conventions.md > Comentarios` (el código no cita
+> fichas) y nace **R27**, la guardia de que ninguna vía de producción salvo el seed escribe en
+> `roles`. El resto de requisitos no cambia.
+
 > **Zona:** `backend` · **Complejidad:** `medium` · **depends_on:** — ·
 > **Rama:** `feature/QC-144-rol-empacador`
 >
@@ -24,7 +29,8 @@
 > cerradas» que lo origina, numeradas en el orden de la tabla: **[D1]** qué rol nace · **[D2]** qué
 > hace · **[D3]** qué lo distingue · **[D4]** cómo se hace la diferencia · **[D5]** permisos de cada
 > rol · **[D6]** quién usa el permiso · **[D7]** cómo llega a los usuarios · **[D8]** E2E ·
-> **[D9]** dependencia o tabla nueva.
+> **[D9]** dependencia o tabla nueva · **[D10]** enmienda del 2026-09-22 (comentarios sin citas y
+> guardia de escritura sobre `roles`).
 >
 > «Permisos del Empacador» significa siempre el conjunto que el seed le declara (R8), nunca una
 > copia escrita a mano en un test. «Catálogo previo» significa el catálogo de permisos que haya en
@@ -54,15 +60,17 @@ empresa.». [D3, D4]
 **R5.** El catálogo de permisos DEBE contener exactamente los códigos del catálogo previo más
 `terminados.consultar`: esta feature NO DEBE añadir, quitar ni renombrar ningún otro permiso. [D4]
 
-**R6.** El catálogo de permisos DEBE declarar, en el propio código y nombrando a QC-144, que la
-entrada `terminados.consultar` es una enmienda más al catálogo cerrado de QC-74: a su R2 (el
-recuento cambia) y a su R1 (`terminados` no es una carpeta de `lib/modules/`, como ya ocurrió con
-`usuarios` en QC-66). [D4]
+**R6.** *(Enmendado el 2026-09-22, D10.)* El comentario de documentación del catálogo de permisos
+DEBE contener un bloque de como mucho cinco líneas que diga que la entrada `terminados.consultar` es
+una enmienda más al catálogo cerrado, porque cambia su recuento y porque su módulo `terminados` no es
+una carpeta de `lib/modules/` (como ya ocurre con `usuarios`). Ni ese bloque ni la frase del
+recuento del catálogo DEBEN citar una ficha (`QC-<n>`), un requisito (`R<n>`), `design.md` ni una
+«decisión cerrada» (`docs/conventions.md > Comentarios`, que no admite excepciones). [D4, D10]
 
 **R7.** El sistema NO DEBE ofrecer ninguna vía de aplicación —Server Action, route handler ni caso de
 uso— que cree, edite o borre el rol `Empacador`, el permiso `terminados.consultar` o cualquiera de
 sus asignaciones permiso-rol; esas filas DEBEN llegar a la base únicamente por la migración de esta
-feature y por el seed. [D4, D9]
+feature y por el seed. [D4, D9] *(La mitad de `roles` la vigila además R27.)*
 
 ### Los permisos de cada rol
 
@@ -152,6 +160,17 @@ el seed le declara, ni uno más ni uno menos. [D5, D8]
 **R26.** Esta feature NO DEBE añadir ninguna dependencia a `package.json` ni ningún modelo o campo a
 `db/schema.prisma`. [D9]
 
+### Los roles no se administran desde la aplicación
+
+**R27.** *(Añadido el 2026-09-22, D10.)* SI un archivo de producción (`lib/`, `app/`,
+`components/`, `hooks/` o un `.ts`/`.tsx` de la raíz del repositorio) distinto del adaptador del
+seed contiene, fuera de comentarios, una escritura sobre la tabla `roles` —un verbo de escritura del
+cliente de Prisma sobre el modelo `Role` o una sentencia SQL `INSERT INTO`, `UPDATE` o `DELETE FROM`
+sobre `roles`—, ENTONCES la guardia ejecutable de permisos no administrables DEBE fallar nombrando
+ese archivo; y DEBE demostrarlo sobre un fuente sintético que crea o borra un rol (dispara) junto con
+el caso simétrico que solo lee `roles` o lo menciona en un comentario (no dispara). Refuerza R7 en
+su mitad de roles. [D4, D10]
+
 ## Preguntas abiertas
 
 Ninguna.
@@ -169,3 +188,4 @@ Ninguna.
 | 2026-09-22 | ¿Cómo llega a los usuarios? | Aparece en el selector de **alta y edición** sin tocar la pantalla (heredado de **QC-94/QC-67**). Los usuarios los sigue creando quien tenga `usuarios.modificar` (**QC-66**) |
 | 2026-09-22 | ¿E2E? | **No en esta ficha: se difiere a QC-145**, que tiene la pantalla; su E2E entra como Empacador y como Operador. Precedente **QC-94 → QC-67**. Unitarios e integración **sí**, incluido el que fija que el seed da a cada rol exactamente sus permisos |
 | 2026-09-22 | ¿Dependencia o tabla nueva? | **Ninguna dependencia y ninguna tabla nueva.** El rol y el permiso entran por migración y seed, que crea solo lo que falta (heredado de **QC-6**) |
+| 2026-09-22 | Enmienda tras la implementación: ¿se cita la ficha en el código? ¿quién vigila las escrituras sobre `roles`? | **Manda `docs/conventions.md > Comentarios` sobre el spec:** el bloque de enmienda del catálogo explica QUÉ cambia sin citar fichas ni requisitos, y ningún test tocado tiene que citar la ficha en comentarios. **Guardia nueva en esta ficha:** ninguna ruta de producción distinta del adaptador del seed escribe en `roles` (hoy solo se vigilaban `permissions`/`role_permissions`) |

@@ -1,6 +1,11 @@
 # QC-144 — rol-empacador · design.md
 
-> El QUÉ está en `requirements.md` (R1–R26) y el alcance lo cerró el humano antes del spec. Aquí va
+> **Enmendado el 2026-09-22** por decisión del humano tras la implementación (D10): §2 reescribe el
+> bloque de enmienda del catálogo sin citas a fichas ni requisitos (R6), §6 cambia cómo se prueba R6,
+> y nace **§4.1**, la ampliación de `guard-permisos-no-administrables` a la tabla `roles` (R27),
+> con su alternativa descartada en §7.
+
+> El QUÉ está en `requirements.md` (R1–R27) y el alcance lo cerró el humano antes del spec. Aquí va
 > el CÓMO: **un** rol más en `SEED_ROLES`, **una** entrada más en el catálogo cerrado de permisos,
 > **una** clave más en `SEED_ROLE_PERMISSIONS`, **una** migración de datos con su `down.sql`, y
 > **cero** caso de uso, Server Action, pantalla, tabla o dependencia.
@@ -55,6 +60,7 @@
 |---|---|---|
 | `lib/modules/identity/domain/roles.ts` | `ROLE_EMPACADOR = 'Empacador'` y su fila en `SEED_ROLES`; el comentario de cabecera pasa de «los dos literales» a «los tres» | R1, R2, R3 |
 | `lib/modules/identity/domain/permissions.ts` | Entrada `terminados.consultar` al final de `PERMISSIONS`; bloque de enmienda en el JSDoc; `terminados.consultar` al final de la lista del Administrador; clave `[ROLE_EMPACADOR]` en `SEED_ROLE_PERMISSIONS` | R4, R5, R6, R8, R9, R10 |
+| `tests/guards/guard-permisos-no-administrables.test.ts` | *(2026-09-22)* Suma el modelo `Role` y el SQL crudo de escritura al barrido (§4.1) | R27 |
 | `lib/modules/identity/index.ts` | Reexporta `ROLE_EMPACADOR` junto a los otros dos | R2 (los tests lo importan del barril) |
 | `db/migrations/<ts>_packer_role/migration.sql` | Migración de solo datos (§3) | R7, R17, R18, R20 |
 | `db/migrations/<ts>_packer_role/down.sql` | Reversión acotada (§3.3) | R21 |
@@ -96,20 +102,41 @@ Cumple QC-74 R4 como `dashboard` (módulo sin escritura, declara solo `consultar
 como lo que abre: «consultar terminados». El precio es **una enmienda a QC-74 R1** («siguiendo los
 nombres de módulo del repositorio»): `terminados` no es una carpeta de `lib/modules/`. Es
 exactamente la enmienda que QC-66 ya hizo con `usuarios` (decisión cerrada 2 de QC-66), y se dice
-igual: por escrito en el JSDoc (R6).
+igual: por escrito en el JSDoc (R6) — pero **sin citar fichas** (enmienda del 2026-09-22, D10).
 
-**El bloque de enmienda** que se añade al JSDoc de `PERMISSIONS`, después del de QC-86:
+**El bloque de enmienda** que se añade al JSDoc de `PERMISSIONS`, después del bloque anterior
+(texto enmendado el 2026-09-22; cuatro líneas a 100 columnas, dentro del «~5 líneas» de
+`docs/conventions.md > Comentarios`):
 
-> **Esto vuelve a enmendar QC-74 R1 y R2** (QC-144). Suma `terminados.consultar`: ver todos los
-> pedidos terminados de la empresa, sin filtro por usuario. `terminados` NO es una carpeta de
-> `lib/modules/` —igual que `usuarios` en QC-66— y declara solo `consultar` porque no tiene
-> escritura (R4). Lo reciben el Administrador y el Empacador; el Operador no. Nadie lo exige todavía:
-> la lista que lo consume es QC-145.
+```ts
+ * **Cuarta enmienda al catalogo cerrado**: suma `terminados.consultar`, ver todos los pedidos
+ * terminados de la empresa sin filtro por usuario. Cambia el recuento y, como `usuarios`, su
+ * modulo no es una carpeta de `lib/modules/`. Declara solo `consultar` porque no tiene escritura.
+ * Lo reciben el Administrador y el Empacador; el Operador no.
+```
+
+Qué se quitó respecto de la redacción original y por qué: `QC-74 R1 y R2`, `(QC-144)`, `QC-66`,
+`(R4)` y la frase «la lista que lo consume es QC-145». La convención dice «nunca se cita una ficha ni
+un requisito en un comentario de producción … Sin excepciones», así que no hay excepción que
+aplicar. Lo que esas citas decían se dice con palabras: «cambia el recuento» es la enmienda a la
+regla del número cerrado, y «su módulo no es una carpeta de `lib/modules/`» es la enmienda a la
+regla de nombres de módulo. La historia (qué ficha enmienda a cuál) vive en este spec y en git.
+«Nadie lo exige todavía» también se cae: es verdad hoy y deja de serlo con la ficha que lo consuma,
+y R16 ya lo vigila con un test.
+
+**La frase del recuento** (primera frase del JSDoc, `permissions.ts:8-9`) es una línea que toca esta
+rama (el número cambia), así que se limpia con ella: queda «El catalogo cerrado: dieciseis permisos,
+ni uno mas ni uno menos.» sin el paréntesis «(QC-74 R2, enmendado por QC-38, por QC-66 y por
+QC-86)», que se quita entero aunque su final caiga en la línea 9, porque es la misma frase. Los
+bloques anteriores (QC-38, QC-66, QC-86) **no se tocan**: son comentarios preexistentes y la
+convención no los arrastra a la limpieza. Por la misma regla, en el JSDoc de
+`SEED_ROLE_PERMISSIONS` las líneas que añade o modifica la rama (la frase del Empacador y la línea
+que la precede si se partió para acogerla) quedan sin `R<n>` ni `QC-<n>`.
 
 El **ordinal** de la enmienda («cuarta», «quinta») y el **recuento** («dieciséis», «diecisiete»)
-de la primera línea del JSDoc (`permissions.ts:8`, «quince permisos») se escriben al implementar
-contra el catálogo que haya en `dev` (D4): si QC-142 ha entrado antes, esta es la quinta y el número
-lo suma a su recuento; si no, es la cuarta y QC-142 lo ajustará.
+se escriben al implementar contra el catálogo que haya en `dev` (D4): si QC-142 ha entrado antes,
+esta es la quinta y el número lo suma a su recuento; si no, es la cuarta y QC-142 lo ajustará. Un
+ordinal no cita ninguna ficha, así que la convención lo admite.
 
 **`SEED_ROLE_PERMISSIONS` queda así** (el orden del Administrador sigue el de `PERMISSIONS`, porque
 `permissions.test.ts:124` lo compara con `toEqual` contra la lista del requisito):
@@ -120,8 +147,9 @@ lo suma a su recuento; si no, es la cuarta y QC-142 lo ajustará.
 [ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar'],
 ```
 
-El comentario del JSDoc de `SEED_ROLE_PERMISSIONS` se amplía con una frase: el Empacador nace con
-exactamente esos dos, **sin** `inventario.consultar` y **sin** `asignaciones.modificar` (QC-144 D5).
+El comentario del JSDoc de `SEED_ROLE_PERMISSIONS` se amplía con una frase, sin citas: el
+Empacador nace con exactamente esos dos, **sin** `inventario.consultar` y **sin**
+`asignaciones.modificar` (el origen, D5, se queda en este spec).
 
 ## 2.1 El rol
 
@@ -238,7 +266,62 @@ DELETE FROM "roles" WHERE "name" = 'Empacador';
   transversal.
 - **R16** (sin consumidor) se prueba con el mismo barrido buscando `terminados.consultar` fuera de
   `permissions.ts`. **QC-145 tendrá que relajar ese caso** cuando lo consuma: el test lo dice en su
-  mensaje de fallo, con el nombre de la ficha, como hizo QC-86 con su R29.
+  mensaje de fallo, con el nombre de la ficha, como hizo QC-86 con su R29. (Es un mensaje de
+  `expect`, no un comentario: `docs/conventions.md > Comentarios` no lo alcanza.)
+
+## 4.1 Guardia de escritura sobre `roles` (R27) — añadido el 2026-09-22
+
+**Hallazgo al leer el código.** Hoy la única escritura de producción sobre `roles` es
+`db.role.create` en `lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma.ts:72`
+(el `createRole` del seed); no hay SQL crudo sobre `roles`, `permissions` ni `role_permissions` en
+`lib/`, `app/`, `components/` ni `hooks/`, ni escrituras anidadas del tipo `role: { create … }`.
+R27 se cumple, pero por casualidad: `guard-permisos-no-administrables.test.ts` solo mira los
+modelos `Permission` y `RolePermission`, y el único barrido que conoce `role.create` es el de
+`tests/unit/identity/roles/scope.test.ts`, que se limita a los cinco archivos nuevos de la ficha
+que lo escribió.
+
+**Dónde vive: se amplía `tests/guards/guard-permisos-no-administrables.test.ts`.** Ya tiene todo
+lo que R27 necesita y exactamente con la misma exención:
+
+1. **`PERMISSION_MODELS` suma `'Role'`** (el nombre de `model Role` en `db/schema.prisma:32`). El
+   accessor `role` sale de `prismaAccessor` y el patrón `\.role\.(?:<verbos>)\b` de
+   `buildForbiddenWrites()`, sin escribir nada a mano. Se renombra la constante a algo que no diga
+   solo «permission» (p. ej. `CATALOG_MODELS`) si el implementador lo ve más claro; no es
+   obligatorio. `\.role\.` no casa con `actor.roles.x` ni con `rolePermission` (el punto que sigue a
+   `role` lo impide).
+2. **Un detector de SQL crudo** `(insert\s+into|update|delete\s+from)\s+"?(roles|permissions|role_permissions)"?\b`
+   (insensible a mayúsculas, sin bandera `g`), el mismo que ya validó
+   `tests/unit/identity/roles/scope.test.ts:152-153`, aplicado al fuente sin comentarios. Se aplica a
+   las tres tablas y no solo a `roles` porque cuesta lo mismo y hoy ninguna de las tres tiene SQL de
+   escritura en producción (comprobado): el barrido de Prisma no ve un `$executeRaw`, y R7 cubre
+   las tres. Su nombre en el mensaje: `escritura SQL sobre <tabla>`.
+3. **La exención no cambia**: sigue siendo el adaptador del seed, un archivo. `db/` sigue fuera del
+   barrido (la migración es la vía permitida).
+
+**Anclas que se tensan** (se pondrán rojas y se actualizan nombrando la entrada nueva):
+
+- «la exención sigue siendo necesaria»: `delSeed` pasa a `['… permission', '… rolePermission',
+  '… role']` (el seed escribe en **las tres** tablas; si dejara de crear roles, rojo).
+- «los modelos y los verbos se derivan de constantes documentadas»: la lista de nombres de
+  `buildForbiddenWrites()` suma `escritura Prisma sobre role`, y el bucle de `model X {` comprueba
+  también `model Role {`.
+- El texto del `describe` y del mensaje de fallo del primer caso nombran también los roles.
+
+**Casos sintéticos nuevos** (nombre del caso con `R27`; comentarios sin citas):
+
+- **Dispara**: un `role-actions.ts` sintético con `'use server'` y `prisma.role.create({ data })`
+  → `['escritura Prisma sobre role']`; los ocho `PRISMA_WRITE_VERBS` sobre `tx.role.<verbo>` caen
+  todos; un `$executeRaw` con `DELETE FROM "roles" WHERE "id" = …` → `['escritura SQL sobre roles']`.
+- **No dispara** (simétrico): `prisma.role.findMany({ select })`, `findUniqueOrThrow`, `count`; un
+  `SELECT "id", "name" FROM "roles"`; un comentario de línea y uno de bloque que mencionan
+  `prisma.role.create` o `INSERT INTO "roles"`; y `actor.roles.create` (plural, no es el modelo).
+
+**Lo que la ampliación NO cubre, dicho en voz alta.** La mitad «de contrato» por nombre de export
+(`isPermissionMutationName`) no se extiende a `Role`: la raíz `rol` casa con demasiadas palabras
+(`control`, `enrollment`) y cualquier implementación que escriba cae igualmente en el barrido de
+escrituras, que no depende de cómo se llame nada. El puerto del seed ya queda cubierto por el caso
+existente «el puerto del seed no declara ningún método upsert, update ni delete»: declara
+`createRole` (permitido) y ningún mutador.
 
 ---
 
@@ -299,9 +382,10 @@ conflicto sumando las dos entradas y subiendo el número otra vez; ninguna de la
 | Archivo | Tipo | Cubre |
 |---|---|---|
 | `tests/unit/identity/roles/empacador-rol.test.ts` | unit | R1 (fila en `SEED_ROLES`, los otros dos intactos), R2 (barrido del literal), R3 (el modelo `Role` de `db/schema.prisma` no tiene campo de empresa), R16 (barrido de `terminados.consultar`) |
-| `tests/unit/identity/permissions.test.ts` (ampliado) | unit | R4, R5, R6 (el fuente de `permissions.ts` contiene `QC-144` y la palabra «enmienda» en el JSDoc), R8, R9, R10 |
+| `tests/unit/identity/permissions.test.ts` (ampliado) | unit | R4, R5, R6 *(enmendado el 2026-09-22)*: se localiza en el JSDoc de `PERMISSIONS` el párrafo que nombra `terminados.consultar`; tiene como mucho cinco líneas, contiene «enmienda» y `lib/modules/`, y ni él ni la primera frase del JSDoc (la del recuento) casan con `/QC-\d+\|\bR\d+\b\|design\.md\|decisi[oó]n cerrada/i`; más el caso simétrico sobre un JSDoc sintético con `(QC-144)` que el mismo detector sí caza. R8, R9, R10 |
 | `tests/unit/identity/schema/packer-role-migration.test.ts` | unit estático | R7, R17, R18, R20, R21: sentencias del UP (solo `INSERT … ON CONFLICT DO NOTHING` sobre las tres tablas, ninguna DDL, ningún `Operador`), literales comparados contra `ROLE_EMPACADOR`/`SEED_ROLES`/`PERMISSIONS`/`SEED_ROLE_PERMISSIONS` importados, orden y acotación de los `DELETE` del DOWN, sin `CASCADE`. Plantilla: `user-permissions-migration.test.ts` |
 | `tests/guards/guard-autorizacion-por-permiso.test.ts` (ampliado) | guardia | R11 |
+| `tests/guards/guard-permisos-no-administrables.test.ts` (ampliado, 2026-09-22) | guardia | R27 (§4.1) |
 | `tests/unit/asignaciones/empacador-authorization.test.ts` | unit | R12 (los cuatro casos de uso de asignados conceden con los permisos del Empacador), R13 (`listProducts`, `getProduct`, `createProduct` de `inventario` y `assignResponsibles`, `unassignResponsible`, `removeWorkGroupFromOrder` de `asignaciones` rechazan sin invocar puertos). El actor se construye con `SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]`, nunca con una lista copiada |
 | `tests/unit/navegacion/menu-empacador.test.ts` | unit | R15: `filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, <permisos del Empacador>)` deja solo `nav-asignacion` y `firstVisibleNavHref` devuelve `ASSIGNED_ORDERS_ROUTE` |
 | `tests/integration/identity/packer-role-migration.int.test.ts` | integración | R17 (en transacción revertida: base sembrada, se borran rol/permiso/asignaciones de esta ficha para simular «antes de QC-144», se ejecuta el UP **leído del archivo** y se comprueban filas exactas y Operador intacto), R18 (UP dos veces sobre base ya sembrada: mismos conteos y mismas filas, `updated_at` incluido), R21 (DOWN leído del archivo: sin usuarios Empacador deja la base como antes; con uno, falla con `23503`). Patrón de lectura del SQL: `identity-seed.int.test.ts:327-350` |
@@ -339,6 +423,18 @@ completo comprueba además que `db/schema.prisma` y las migraciones no divergen.
    subselect por nombre del paso 3b no encontrarían al Empacador y la migración se aplicaría «en
    verde» sin asignarle nada; el rol aparecería luego, cuando alguien corriera el seed, sin permisos
    hasta la corrida siguiente. Descartado por silencioso.
+6. *(2026-09-22, R27)* **Una guardia nueva `tests/guards/guard-roles-no-administrables.test.ts`.**
+   Deja intacta la guardia de QC-74 y separa responsabilidades por tabla. Se descarta porque
+   duplicaría entero el andamiaje (`findRepoRoot`, `listProductionFiles`, `stripComments` con su
+   orden línea-antes-que-bloque y el caso anti-cegado, el ancla de más de 200 archivos) y, sobre
+   todo, **la lista de exentos**: dos copias del mismo adaptador del seed pueden divergir el día que
+   el seed se mude, y una de las dos guardias perdonaría a un archivo inocente mientras el culpable
+   pasa. Las tres tablas son un solo catálogo que solo cambia por migración y seed (R7): una sola
+   guardia con una sola exención lo dice mejor.
+7. *(2026-09-22, R27)* **Ampliar `tests/unit/identity/roles/scope.test.ts`**, que ya conoce
+   `role.create` y el SQL sobre `roles`. Se descarta porque barre solo los cinco archivos nuevos de
+   la ficha que lo escribió (`ARCHIVOS_NUEVOS_DE_LA_FEATURE`): es un test de alcance de esa ficha,
+   no una guardia del árbol, y ampliarlo mezclaría dos contratos distintos en un archivo.
 
 ---
 

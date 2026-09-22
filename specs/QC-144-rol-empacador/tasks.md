@@ -1,8 +1,19 @@
 # QC-144 — rol-empacador · tasks.md
 
+> **Enmendado el 2026-09-22** por decisión del humano tras la implementación (D10): T2 y T3 se
+> **reabren** (el bloque de enmienda y los comentarios de tests ya no citan la ficha, R6 enmendado),
+> nace **T16** (guardia de escritura sobre `roles`, R27) y T15 pasa a depender también de T16:
+> **T15 sigue siendo la última en ejecutarse**.
+>
+> **Regla transversal (2026-09-22).** Manda `docs/conventions.md > Comentarios` sobre este spec, sin
+> excepción: ninguna task pide citar `QC-<n>`, `R<n>`, `design.md` ni «decisión cerrada» en un
+> comentario, ni en producción ni en tests; en los tests `R<n>` va en el **nombre del caso**. Las
+> líneas de comentario que añade o modifica esta rama se dejan así; los comentarios preexistentes no
+> se arrastran.
+
 > Zona: `backend` · Complejidad: `medium` · depends_on: — · Rama: `feature/QC-144-rol-empacador`
 >
-> El **qué** está en `requirements.md` (R1–R26), el **cómo** en `design.md`. Aquí va el desglose.
+> El **qué** está en `requirements.md` (R1–R27), el **cómo** en `design.md`. Aquí va el desglose.
 > `[P]` = paralelizable con las tareas marcadas igual dentro del mismo bloque.
 > Cada task se cierra con `./init.sh --rapido` en verde salvo que diga otra cosa; la feature se cierra
 > con `./init.sh` completo (regla 5 de `CLAUDE.md`).
@@ -27,6 +38,7 @@
 
 **Tests modificados:** los de `design.md > 5` (recuento y roles) y
 `tests/guards/guard-autorizacion-por-permiso.test.ts`,
+`tests/guards/guard-permisos-no-administrables.test.ts` (T16, 2026-09-22),
 `tests/integration/identity/role-catalog.int.test.ts`,
 `tests/integration/identity/user-crud.int.test.ts`,
 `tests/integration/asignaciones/assigned-orders.int.test.ts`.
@@ -51,16 +63,21 @@ zona no lo impide por sí sola.
       **Hecho cuando:** `pnpm run typecheck` pasa y el literal `'Empacador'` aparece una sola vez en
       `lib/`. Depende de: —.
 
-- [x] **T2.** `permissions.ts`: entrada `terminados.consultar` **al final** de `PERMISSIONS`
-      (`design.md > 2`); bloque de enmienda en el JSDoc con ordinal y recuento contra el catálogo
-      previo; primera línea del JSDoc con el número nuevo; `'terminados.consultar'` al final de la
-      lista del Administrador; clave `[ROLE_EMPACADOR]: ['asignaciones.consultar',
-      'terminados.consultar']`; una frase en el JSDoc de `SEED_ROLE_PERMISSIONS` sobre el Empacador.
-      El Operador **no se toca**.
-      **Hecho cuando:** `pnpm run typecheck` pasa y `PermissionCode` incluye `'terminados.consultar'`.
-      Depende de: T1.
+- [ ] **T2.** *(Reabierta el 2026-09-22: solo el comentario.)* `permissions.ts`: entrada
+      `terminados.consultar` **al final** de `PERMISSIONS` (`design.md > 2`); bloque de enmienda en el
+      JSDoc con ordinal y recuento contra el catálogo previo; primera línea del JSDoc con el número
+      nuevo; `'terminados.consultar'` al final de la lista del Administrador; clave
+      `[ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar']`; una frase en el JSDoc
+      de `SEED_ROLE_PERMISSIONS` sobre el Empacador. El Operador **no se toca**.
+      **Lo que se rehace:** el bloque de enmienda se sustituye por el texto de `design.md > 2`
+      (cuatro líneas, sin `QC-<n>` ni `R<n>`); la frase del recuento pierde su paréntesis de citas;
+      las líneas del JSDoc de `SEED_ROLE_PERMISSIONS` que tocó la rama quedan sin citas. El código
+      (entradas y listas) no cambia.
+      **Hecho cuando:** `pnpm run typecheck` pasa, `PermissionCode` incluye `'terminados.consultar'`
+      y ni el bloque de enmienda ni la frase del recuento casan con
+      `/QC-\d+|\bR\d+\b|design\.md|decisi[oó]n cerrada/i`. Depende de: T1.
 
-- [x] **T3.** Actualizar los tests unitarios y guardias que fijan recuento o roles
+- [ ] **T3.** *(Reabierta el 2026-09-22.)* Actualizar los tests unitarios y guardias que fijan recuento o roles
       (`design.md > 5`, primeras filas de cada tabla que no sean de integración):
       `permissions.test.ts`, `guard-permisos-sembrados.test.ts`, `guard-nav-permisos-declarados.test.ts`,
       `qc75-convenciones.test.ts`, `documentos/authorization.test.ts`,
@@ -69,9 +86,13 @@ zona no lo impide por sí sola.
       `terminados.consultar` / `terminados` / `Empacador`; nada se relaja a `toContain` ni a
       `toBeGreaterThan`. En `permissions.test.ts` se añaden los casos de R4, R6, R8, R9 y R10
       (Empacador exacto y en negativo: sin `inventario.consultar`, sin `asignaciones.modificar`;
-      Operador sin `terminados.consultar`).
-      **Hecho cuando:** `./init.sh --rapido` verde y cada archivo tocado cita QC-144 en el comentario
-      junto al número o la lista que cambió. Depende de: T2.
+      Operador sin `terminados.consultar`). El caso de R6 sigue `design.md > 6` (enmendado el
+      2026-09-22): bloque de como mucho cinco líneas, con «enmienda» y `lib/modules/`, sin citas, más
+      el simétrico sintético que el detector sí caza.
+      **Hecho cuando:** `./init.sh --rapido` verde y ningún comentario en las líneas que toca la rama
+      cita `QC-<n>`, `R<n>`, `design.md` ni «decisión cerrada» (`docs/conventions.md > Comentarios`;
+      `R<n>` sí en el nombre del caso). La exigencia anterior de citar QC-144 junto a cada número o
+      lista cambiada **queda retirada**; las citas que se añadieron por ella se quitan. Depende de: T2.
 
 ## T4–T6 — La migración
 
@@ -163,10 +184,32 @@ zona no lo impide por sí sola.
       empresa ni los de otra empresa.
       **Hecho cuando:** verde. Cubre R14. Depende de: T11.
 
+## T16 — Guardia de escritura sobre `roles` (añadida el 2026-09-22)
+
+- [ ] **T16. [P]** `tests/guards/guard-permisos-no-administrables.test.ts`, según
+      `design.md > 4.1`: `PERMISSION_MODELS` suma `'Role'` (renombrar la constante es opcional);
+      detector de SQL crudo `INSERT INTO` / `UPDATE` / `DELETE FROM` sobre `roles`, `permissions` y
+      `role_permissions`, aplicado al fuente sin comentarios y sumado a los hallazgos de cada archivo;
+      tensar las anclas («la exención sigue siendo necesaria» → el seed escribe en las tres tablas;
+      lista de nombres de `buildForbiddenWrites()`; `model Role {` en el schema); casos sintéticos
+      `R27` que disparan (`prisma.role.create` en un `role-actions.ts` con `'use server'`, los ocho
+      verbos sobre `tx.role`, un `DELETE FROM "roles"` en `$executeRaw`) y simétricos que no
+      (`findMany`/`findUniqueOrThrow`/`count` sobre `role`, `SELECT … FROM "roles"`, comentarios de
+      línea y de bloque, `actor.roles.create`). Comentarios nuevos sin citas.
+      **Archivos esperados:** solo `tests/guards/guard-permisos-no-administrables.test.ts`. Ningún
+      archivo de producción cambia (hoy R27 ya se cumple: la única escritura es la del adaptador del
+      seed, exento).
+      **Hecho cuando:** `./init.sh --rapido` verde (incluye todas las guardias), y añadir a mano
+      `prisma.role.create(...)` o un `DELETE FROM "roles"` en cualquier archivo de `app/` lo pone
+      rojo nombrando ese archivo. Cubre R27 (y refuerza R7). Depende de: T1.
+
 ## T15 — Cierre
 
-- [ ] **T15.** `progress/impl_QC-144-rol-empacador.md` con el mapa completo `R1..R26 -> test`
+> **Orden (2026-09-22):** T15 sigue siendo la **última** task en ejecutarse, después de T16 aunque
+> su número sea menor.
+
+- [ ] **T15.** `progress/impl_QC-144-rol-empacador.md` con el mapa completo `R1..R27 -> test`
       (R24: diff sin `e2e/`; R26: `guard-dependencias-aprobadas` + T6 sin DDL + `db/schema.prisma`
-      sin cambios en el diff).
+      sin cambios en el diff; R27: `guard-permisos-no-administrables.test.ts`).
       **Hecho cuando:** `./init.sh` **completo** verde y ningún `R<n>` queda sin test o sin
-      verificación nombrada. Depende de: T1–T14.
+      verificación nombrada. Depende de: T1–T14 y T16.
