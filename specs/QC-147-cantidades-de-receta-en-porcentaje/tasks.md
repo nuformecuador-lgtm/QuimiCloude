@@ -22,7 +22,7 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
 
 ---
 
-- [ ] **T1 — Migración y esquema de `recipe_lines`**
+- [x] **T1 — Migración y esquema de `recipe_lines`**
   - Depende de: —
   - Archivos: `db/migrations/<ts>_recipe_lines_percentage/migration.sql`,
     `db/migrations/<ts>_recipe_lines_percentage/down.sql`, `db/schema.prisma`,
@@ -43,7 +43,7 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
     base de test deja `recipe_lines` con `quantity` + `unit_id` y `_prisma_migrations` coherente,
     y se vuelve a aplicar (R9). Los tests de esquema existentes dejan de esperar `unitId`.
 
-- [ ] **T2 [P] — Aritmética del porcentaje en el dominio de `recetas`**
+- [x] **T2 [P] — Aritmética del porcentaje en el dominio de `recetas`**
   - Depende de: —
   - Archivos: `lib/modules/recetas/domain/recipe-percentage.ts` (nuevo),
     `lib/modules/recetas/index.ts`, `tests/unit/recetas/recipe-percentage.test.ts` (nuevo).
@@ -57,7 +57,7 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
     «-1,00» para «-1.00» (R25); ningún resultado pasa por `number` ni por `Intl`. La guardia de
     arquitectura sigue verde (el barrel se importa desde cliente).
 
-- [ ] **T3 — Contrato de entrada de receta**
+- [x] **T3 — Contrato de entrada de receta**
   - Depende de: T2
   - Archivos: `lib/modules/recetas/domain/recipe-input.ts`, `tests/unit/recetas/recipe-input.test.ts`.
   - Qué: `design.md > 4.1`: `percentageSchema`, `recipeLineSchema` estricto sin `unitId`,
@@ -69,7 +69,7 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
     de `recipe-input.test.ts` que hoy aceptan una entrada sin líneas se invierten o pasan a una
     línea al 100 %.
 
-- [ ] **T4 — Servicio, puertos y persistencia de `recetas`**
+- [x] **T4 — Servicio, puertos y persistencia de `recetas`**
   - Depende de: T1, T3, T5
   - Archivos: `lib/modules/recetas/domain/create-recipe.ts`, `update-recipe.ts`, `get-recipe.ts`,
     `recipe-view.ts`, `recipe-catalog.ts`, `lib/modules/recetas/ports/recipe-repository.ts`,
@@ -98,7 +98,7 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
     **guardarse** va sin líneas; en los tres de integración, cada caso que pasa por el servicio
     lleva una línea al 100 %.
 
-- [ ] **T5 [P] — `ProductRef.unitId` en el contrato de `inventario`**
+- [x] **T5 [P] — `ProductRef.unitId` en el contrato de `inventario`**
   - Depende de: —
   - Archivos: `lib/modules/inventario/domain/product-catalog.ts`,
     `lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma.ts`,
@@ -109,7 +109,7 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
     `stockByUnit` siguen verdes sin tocarlos.
   - Ojo F2.0: son los archivos con más riesgo de cruce con QC-121 (`design.md > 10`).
 
-- [ ] **T6 [P] — Costo de ingredientes con porcentaje**
+- [x] **T6 [P] — Costo de ingredientes con porcentaje**
   - Depende de: T2, T4, T5
   - Archivos: `lib/modules/pedidos/domain/order-cost.ts`,
     `lib/modules/pedidos/domain/resolve-ingredients-cost.ts`,
@@ -123,7 +123,7 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
     número de llamadas a cada catálogo no crece con el número de líneas; las pruebas de orden de
     lotes, promedio y redondeo previas siguen verdes con fixtures en porcentaje.
 
-- [ ] **T7 [P] — Tabla de ingredientes de Pedidos**
+- [x] **T7 [P] — Tabla de ingredientes de Pedidos**
   - Depende de: T2, T4
   - Archivos: `app/(private)/pedidos/components/order-ingredients-table.tsx`,
     `tests/unit/pedidos-ui/order-ingredients-table.test.tsx` (nuevo), y las fixtures de
@@ -136,7 +136,7 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
     escrita, requerida 0 (R17); la unidad sale de `productUnitId` y con `null` se pinta el marcador
     mientras porcentaje y requerida se siguen mostrando (R24).
 
-- [ ] **T8 [P] — Pantalla de ejecución del Operario**
+- [x] **T8 [P] — Pantalla de ejecución del Operario**
   - Depende de: T2, T4, T5
   - Archivos: `lib/modules/asignaciones/domain/assigned-order-execution-view.ts`,
     `get-assigned-order-execution.ts`,
@@ -154,7 +154,7 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
     símbolo (R24); «Pedido 200» se pinta en un elemento propio con
     `data-testid="order-execution-order-quantity"`, fuera de la lista de líneas (R26).
 
-- [ ] **T9 [P] — Formulario de recetas en porcentaje**
+- [x] **T9 [P] — Formulario de recetas en porcentaje**
   - Depende de: T2, T3, T4
   - Archivos: `app/(private)/produccion/formulas/components/recipe-lines-field.tsx`,
     `recipe-form-state.ts`, `recipe-form.tsx`, `index.ts`, `unit-picker.tsx` (se borra),
@@ -183,7 +183,7 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
     válido; el resto de casos de `recipe-form.test.tsx` que pulsan Guardar sin líneas pasan a una
     línea al 100 %.
 
-- [ ] **T10 — E2E**
+- [x] **T10 — E2E**
   - Depende de: T1, T4, T6, T8, T9
   - Archivos: `e2e/recetas-porcentaje.spec.ts` (nuevo), `e2e/recetas.spec.ts`,
     `e2e/recetas-pasos.spec.ts`.
@@ -195,7 +195,7 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
     cargarle antes líneas que sumen 100 %, y ningún otro guardado por la UI en esos dos specs va sin
     líneas.
 
-- [ ] **T11 — Documentación y guardias**
+- [x] **T11 — Documentación y guardias**
   - Depende de: T1–T10
   - Archivos: `docs/architecture.md` (Dominio, punto 1: la línea de receta ya no apunta a
     unidades), cualquier guardia de `tests/guards/` que inventaríe FK o índices del esquema final.
