@@ -19,6 +19,11 @@
 
 ## Evaluaciones
 
+### QC-144 - ACOTADA con `/afinar-feature` (2026-09-22)
+
+Alcance y **9 decisiones cerradas** en `specs/QC-144-rol-empacador/requirements.md`. Nace **QC-145**
+(`pedidos-terminados-en-asignacion`, `pending`, bloqueada por QC-144); la vieja ficha en disco `id: 142` sin `key` pasa a ser QC-144.
+
 ### QC-121 - acotada con `/afinar-feature` (2026-09-18)
 
 Alcance, **15 decisiones cerradas** y **1 pregunta abierta** (la unidad de la linea de receta) en
