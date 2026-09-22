@@ -350,14 +350,12 @@ test.describe('catalogo de recetas', () => {
     // --- 3. Nombre de la receta.
     await page.getByTestId('recipe-field-name').fill(recipeName);
 
-    // --- 4. Una linea de producto: producto de FIXTURE, unidad TOMADA DEL SELECTOR, cantidad
-    // decimal escrita como texto (R27, R28, R29, R30).
+    // --- 4. Una linea de producto: producto de FIXTURE, sin unidad -ya no la lleva la linea
+    // (QC-147 R1)-, al 100 % para que la suma sea exacta y el Guardar se habilite (QC-147 R11).
     // La fila 0 ya esta en pantalla al abrir el formulario: es la fila en blanco de arranque,
     // asi que no hay que pedirla con ningun boton.
     await selectProductByName(page, 'recipe-line-product-0', productName);
-    await page.getByTestId('recipe-line-quantity-0').fill('12.5');
-    await page.getByTestId('recipe-line-unit-0').click();
-    await page.getByTestId('recipe-line-unit-0-option').first().click();
+    await page.getByTestId('recipe-line-percentage-0').fill('100');
 
     // --- 5. Un paso.
     await page.getByTestId('recipe-step-add').click();
