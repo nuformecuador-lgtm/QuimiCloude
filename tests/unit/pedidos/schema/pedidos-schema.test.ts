@@ -127,13 +127,13 @@ const recipe = parseModel('Recipe')
 const unit = parseModel('Unit')
 const user = parseModel('User')
 
-/** Los QUINCE campos de `Order`, con la columna en ingles que le toca (R36). Fueron catorce en
+/** Los DIECISEIS campos de `Order`, con la columna en ingles que le toca (R36). Fueron catorce en
  *  QC-33 y quince con `cancellationReason` (QC-34 R48); el 2026-09-07 la decision humana quito
  *  `unit_id` y `unit_price` de la tabla
  *  (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`) y quedaron trece. QC-60 (R1)
  *  anade `company_id`, obligatoria, y vuelven a ser catorce. `ingredientsCost` opcional las lleva
- *  a quince. La lista sigue siendo cerrada: anadir o quitar cualquier otra columna pone este test
- *  rojo. */
+ *  a quince. `presentationId` opcional las lleva a dieciseis. La lista sigue siendo cerrada:
+ *  anadir o quitar cualquier otra columna pone este test rojo. */
 const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
   ['orderYear', 'order_year'],
@@ -150,6 +150,7 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['updatedAt', 'updated_at'],
   ['deletedAt', 'deleted_at'],
   ['ingredientsCost', 'ingredients_cost'],
+  ['presentationId', 'presentation_id'], // el envase en que se entrega, opcional
 ]
 
 /** Las CUATRO referencias que cruzan de modulo y por eso NO llevan `@relation` (R33). Fueron cuatro
@@ -648,6 +649,7 @@ describe('db/schema.prisma — modelo de pedido', () => {
       'orders_recipe_id_idx',
       'orders_created_by_idx',
       'orders_updated_by_idx',
+      'orders_presentation_id_idx',
     ])
     // Los dos unicos, tambien en ingles y `snake_case` (QC-60 sustituye el de QC-33).
     const uniqueMaps = [...order.body.matchAll(/@@unique\([^)]*map:\s*"([^"]+)"/g)].map(
@@ -675,6 +677,19 @@ describe('db/schema.prisma — modelo de pedido', () => {
       .filter((modelName): modelName is string => modelName !== undefined)
     expect(pedidosModels).toEqual(['Order'])
     expect(modelNames.filter((name) => /cost|price|import/i.test(name))).toEqual([])
+  })
+
+  it('presentationId es uuid anulable, sin @relation y con su indice (R1, R2, R5)', () => {
+    const presentationId = field(order, 'presentationId')
+    expect(presentationId.type).toBe('String')
+    expect(presentationId.isOptional).toBe(true)
+    expect(presentationId.attributes).toContain('@db.Uuid')
+    expect(presentationId.attributes).toContain('@map("presentation_id")')
+    expect(presentationId.attributes).not.toMatch(/@default\(/)
+    expect(presentationId.attributes).not.toMatch(/@relation/)
+    expect(order.body).toMatch(
+      /@@index\(\[presentationId\],\s*map:\s*"orders_presentation_id_idx"\)/,
+    )
   })
 
   it('no nace ninguna columna de moneda (R16)', () => {
