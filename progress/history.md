@@ -4621,3 +4621,25 @@ podar.
   rama del #99 cuando esa ya estaba en `dev`, así que su commit existía pero no llegaba. Se
   detectó comprobando `dev` antes de arrancar otra ficha, y se rehizo como PR #101. **Encadenar un
   PR sobre otro solo funciona si el padre se mergea antes de que el hijo esté listo.**
+
+## 2026-09-22 — QC-144-rol-empacador
+
+- **Qué:** tercer rol de semilla, **Empacador**: la misma lógica y la misma pantalla `/asignacion`
+  que el Operador, **sin inventario**. Nace el permiso `terminados.consultar` (ver todos los pedidos
+  terminados de la empresa), que tienen el Empacador y el Administrador; el Operador no cambia. Nadie
+  lo exige todavía: lo consume **QC-145**.
+- **PR #107**, merge `ec8bce2e`. Spec R1–R27, T1–T16. Review aprobado a la primera (0 mayores, 7
+  menores en `progress/review_QC-144-rol-empacador.md`). `./init.sh` completo verde tras sincronizar
+  (613/613). Sin E2E: diferido a QC-145 (D8).
+- **Catálogo 15 → 16** (cuarta enmienda a QC-74). Migración de datos `20260922120000_packer_role`,
+  idempotente y sin DDL; su `down` falla entera si hay usuarios Empacador, para no inventar a qué rol
+  pasarlos.
+- **La acotación costó tres vueltas** y conviene recordar por qué: el humano pidió varias veces «lo
+  mismo que el Operador, pero ve más», y eso **no se puede sin un permiso nuevo**, porque el repo no
+  autoriza por nombre de rol. Explicarlo con la tabla quién-ve-qué lo cerró.
+- **Enmienda del spec aprobada a mitad de F2.1 (D10):** el spec pedía citar la ficha en comentarios
+  y `docs/conventions.md` lo prohíbe; mandó la convención. Y nació R27: la guardia de permisos no
+  administrables vigila ahora también escrituras en `roles` (Prisma y SQL crudo).
+- **La migración se escribió a mano**: Prisma no la generaba por drift de checksum en cuatro
+  migraciones `*_company_scope` de la base local. Deuda local, ajena al repo.
+- **Baseline de rojos podado a cero**: las 6 entradas que quedaban ya pasaban.

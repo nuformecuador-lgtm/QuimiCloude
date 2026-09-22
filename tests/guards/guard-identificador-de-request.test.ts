@@ -234,8 +234,12 @@ export const MIGRACIONES_ESPERADAS = [
   // la columna `ingredients_cost` a `orders` no persiste el identificador de peticion ni lo
   // menciona; se nombra aqui a mano y la lista sigue CERRADA para la siguiente.
   '20260918130000_orders_add_ingredients_cost',
+  // Con el mismo patron que las anteriores: la migracion que crea el rol Empacador y el permiso
+  // terminados.consultar no persiste el identificador de peticion ni lo menciona; se nombra aqui
+  // a mano y la lista sigue CERRADA para la siguiente.
+  '20260922120000_packer_role',
   // Igual patron: la columna de presentacion del pedido no toca el identificador de peticion.
-  '20260922120000_orders_presentation',
+  '20260922130000_orders_presentation',
 ] as const
 
 export function hallazgosDeMigraciones(

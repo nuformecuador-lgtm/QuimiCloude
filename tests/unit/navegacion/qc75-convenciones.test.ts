@@ -46,11 +46,14 @@ const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Los quince codigos del catalogo, escritos a mano A PROPOSITO: son el contrato que R15 congela.
+ * Los dieciseis codigos del catalogo, escritos a mano A PROPOSITO: son el contrato que este test
+ * congela.
  * Eran diez en QC-74; QC-38 sumo `unidades.modificar` al darle escritura a `unidades`, enmendando
  * QC-74 R2; QC-66 sumo `usuarios.consultar` y `usuarios.modificar`, enmendando QC-74 R1; QC-86 suma
- * `asignaciones.consultar` y `asignaciones.modificar` (su R25), volviendo a enmendar QC-74 R2 (las
- * tres enmiendas estan escritas en `lib/modules/identity/domain/permissions.ts`).
+ * `asignaciones.consultar` y `asignaciones.modificar`, volviendo a enmendar la regla del numero
+ * cerrado; la ultima enmienda suma `terminados.consultar`, volviendo a enmendar la regla de
+ * nombres de modulo (las cuatro enmiendas estan escritas en
+ * `lib/modules/identity/domain/permissions.ts`).
  */
 export const CODIGOS_QC74 = [
   'dashboard.consultar',
@@ -68,6 +71,7 @@ export const CODIGOS_QC74 = [
   'usuarios.modificar',
   'asignaciones.consultar',
   'asignaciones.modificar',
+  'terminados.consultar',
 ] as const;
 
 /** Los seis modulos de negocio del ERP. Eran cinco hasta que QC-86 sumo `asignaciones`. */
@@ -118,8 +122,8 @@ export function comodinesDe(permisos: readonly PermisoLeido[]): string[] {
 describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', () => {
   const catalogo: readonly PermisoLeido[] = PERMISSIONS;
 
-  it('tiene exactamente quince codigos, los quince del catalogo', () => {
-    expect(catalogo).toHaveLength(15);
+  it('tiene exactamente dieciseis codigos, los dieciseis del catalogo', () => {
+    expect(catalogo).toHaveLength(16);
     expect(catalogo.map((permiso) => permiso.code).sort()).toEqual([...CODIGOS_QC74].sort());
   });
 
@@ -138,10 +142,10 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
     const modulos = [...new Set(catalogo.map((permiso) => permiso.module))].sort();
     // `unidades` ya esta entre los de negocio, y `asignaciones` entro ahi con QC-86; el catalogo
     // suma `dashboard`, que es una pantalla y no un modulo del ERP (QC-74 R4: solo `consultar`),
-    // y `usuarios`, que NO es ninguna carpeta de `lib/modules/` -los usuarios viven dentro de
-    // `identity`-: es la segunda enmienda a QC-74 R1, la de la decision cerrada 2 de QC-66 (su
-    // R12).
-    const esperados = [...new Set([...MODULOS_DE_NEGOCIO, 'dashboard', 'usuarios'])].sort();
+    // `usuarios`, que NO es ninguna carpeta de `lib/modules/` -los usuarios viven dentro de
+    // `identity`-, y `terminados`, que tampoco es carpeta de `lib/modules/`: la misma enmienda
+    // que ya se hizo con `usuarios`.
+    const esperados = [...new Set([...MODULOS_DE_NEGOCIO, 'dashboard', 'usuarios', 'terminados'])].sort();
     expect(modulos).toEqual(esperados);
     expect(modulos).toContain('unidades');
   });
