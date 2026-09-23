@@ -18,54 +18,11 @@ import {
 } from './recipe-form-state';
 
 /**
- * Campo de líneas de producto en porcentaje.
- *
- * **Sin unidad**: la línea ya no la lleva, así que no hay ningún selector de unidad en esta
- * pantalla ni columna que lo pinte. El ingrediente elegido se ve como «nombre · unidad»
- * -lo pinta `ProductPicker` a partir de `productUnitId`- cuando el insumo la tiene.
- *
- * **Añadir y quitar líneas, y una receta SIN ninguna se puede llegar a enviar** (aunque el
- * servidor y el propio formulario la rechacen): el botón de quitar no tiene
- * mínimo que respetar.
- *
- * **La fila en blanco de arranque es un FANTASMA, no una línea del estado**: cuando `lines` está
- * vacío se pinta una fila vacía que todavía NO existe en `lines`, y solo se materializa cuando el
- * usuario toca uno de sus dos campos o pulsa su `+`. Nada de filtrar líneas vacías en el
- * payload -esa función no toma decisiones sobre las líneas-.
- *
- * **Un ingrediente no se puede repetir**: cada selector recibe en `excludedIds` los ingredientes
- * ya elegidos en las OTRAS líneas y los aparta de su lista. El de la propia línea nunca se aparta
- * a sí mismo.
- *
- * **Cada fila lleva sus dos acciones, `X` y `+`** (no hay botón de añadir en la cabecera): la `X`
- * quita esa línea -y si era la última, reaparece el fantasma, así que nunca se queda la pantalla
- * sin filas- y el `+` deja la fila donde está y añade otra vacía debajo.
- *
- * **El campo de porcentaje es `type="text"` con `inputMode="decimal"`**:
- * un `type="number"` pinta el separador según la configuración regional del navegador y, en los
- * que usan punto, rechaza la coma -justo lo que impide garantizar «12,50»-. Se aceptan coma y
- * punto al escribir; el esquema del contrato valida lo que llega tras la sustitución que hace
- * `buildRecipePayload`. El valor sigue viajando como CADENA, tal cual lo escribió el usuario: ni
- * `parseFloat(`, ni `Number(`, ni `toFixed(` en ningún punto de este archivo.
- *
- * **El indicador de suma** se calcula en CADA render con `sumPercentages` sobre las
- * líneas reales -el fantasma no suma, porque no está en `lines`- y se pinta al pie del bloque,
- * `role="status"`, `aria-live="polite"`, con `data-complete` para que el test no dependa del
- * copy exacto además de comprobarlo.
- *
- * **Producto dado de baja:** el ÚNICO discriminante es
- * `line.productName === null`. Cuando lo es:
- * - la CELDA de producto de esa línea, y solo esa, lleva
- *   `data-testid="recipe-line-unavailable-<índice>"`;
- * - el bloque cierra con un aviso `role="status"`, `data-testid="recipe-lines-unavailable-notice"`
- *   y `data-count` con el número de líneas afectadas.
- *
- * El número **se calcula en cada render a partir de `lines`** (`lines.filter(...).length`), nunca
- * de un booleano guardado al cargar.
- *
- * **El marcador no deshabilita la línea, no la quita y no impide guardar**: la línea sigue
- * completa en `lines` y `buildRecipePayload` la reenvía intacta porque no conoce `productName`,
- * solo `productId` y `percentage`.
+ * Campo de líneas de producto en porcentaje, sin selector de unidad -el insumo ya trae la suya-.
+ * Quitar la última línea no tiene mínimo que respetar: que la suma llegue a 100 % lo exige el
+ * formulario que envuelve este campo, no esta pieza. La fila en blanco de arranque es un
+ * FANTASMA fuera de `lines` hasta que el usuario la toca. El porcentaje es `type="text"` porque
+ * `type="number"` rechaza la coma en los navegadores con configuración regional de punto.
  */
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';

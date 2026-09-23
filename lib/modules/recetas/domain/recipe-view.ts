@@ -31,9 +31,9 @@ export type RecipeSummary = {
  *
  * `productUnitId` es la unidad del PRODUCTO, no de la linea: sale de
  * `ProductCatalog.findRefs` y es `null` cuando el insumo no tiene lotes o esta dado de
- * baja. `productStock` es la existencia en esa misma unidad: `null` cuando el
- * producto esta dado de baja o cuando `productUnitId` es `null`, `0` cuando no tiene
- * ningun lote, y la cantidad sumada cuando tiene lotes en esa unidad.
+ * baja. `productStock` es la existencia en esa misma unidad: `null` solo cuando el
+ * producto esta dado de baja; `0` cuando esta vivo pero sin unidad resoluble o sin
+ * ningun lote en ella, y la cantidad sumada en el resto de los casos.
  */
 export type RecipeLineView = {
   readonly id: string;

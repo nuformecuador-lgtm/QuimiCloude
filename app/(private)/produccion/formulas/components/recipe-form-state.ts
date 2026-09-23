@@ -125,9 +125,7 @@ export type RecipePayload = {
  *
  * **El porcentaje viaja como cadena, con una única sustitución de texto**: esta función
  * cambia la coma que el usuario pudo escribir por un punto (`replace(',', '.')`) y nada más -no
- * la parsea, no la redondea y no la convierte a número en ningún punto-. `grep` de la ruta
- * confirma que en ningún archivo de esta feature aparece `parseFloat(`, `Number(` ni `toFixed(`
- * sobre el porcentaje.
+ * la parsea, no la redondea y no la convierte a número en ningún punto-.
  *
  * **Cada paso viaja como el DOCUMENTO del contrato, TAL CUAL** (QC-64 R5): esta funcion ya no
  * proyecta texto -el puente de QC-62 R19 se retiro-, solo copia `step.document` y descarta la
