@@ -215,6 +215,18 @@ describe('createProductSchema', () => {
     if (parsed.type !== PRODUCT_TYPES.MACHINE) {
       expect(parsed.qtyAlert).toBe(3);
     }
+
+    // Los campos del primer lote viajan en el ALTA (QC-90), asi que ademas de nombre, alerta
+    // y tipo quedan existencia, presentacion y costos -este ultimo con su default `PRODUCT`
+    // puesto por el esquema, aunque la entrada no lo haya declarado-.
+    expect(Object.keys(parsed).sort()).toEqual([
+      'name',
+      'presentationId',
+      'qtyAlert',
+      'stock',
+      'type',
+      'unitCost',
+    ]);
   });
 
   it('la edicion rechaza la existencia como invalid_input: R9', () => {

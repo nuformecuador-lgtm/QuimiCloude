@@ -1826,10 +1826,10 @@
       "epic": "QC-31",
       "epic_name": "Pedidos",
       "name": "busqueda-y-total-en-la-pantalla-de-pedidos",
-      "description": "Enchufar en la pantalla de pedidos la caja de busqueda por nombre de receta que QC-68 construye por debajo, y la columna del importe que QC-123 calcula.\n\nNACE EL 2026-09-17 al acotar QC-68. La pantalla de pedidos (QC-35) se especifico y se construyo A PROPOSITO sin busqueda, por decision del humano del 2026-09-06, para no quedar bloqueada por QC-68 ni nacer con una caja que no hace nada. Esta ficha es la otra mitad.\n\nRECUPERA LA COLUMNA DEL IMPORTE EL 2026-09-18, al acotar QC-123. Nacio llevandola, la perdio el mismo 2026-09-17 -orders no guardaba precio y el total no tenia con que multiplicarse- y vuelve ahora con otro significado: QC-123 cierra que el importe del pedido NO es un precio de venta sino el COSTE DE SUS INGREDIENTES, calculado desde los lotes de inventario, guardado en el pedido y devuelto por la consulta. ESTA FICHA LO PINTA, NO LO CALCULA.\n\nCUANDO EL PEDIDO NO TIENE IMPORTE se muestra un guion y nunca un cero. Los cuatro motivos -existencia insuficiente, unidad no convertible, receta sin ingredientes, pedido anterior a la columna- NO se distinguen en pantalla: se decidio un solo simbolo para \"no se pudo calcular\".\n\nEL IMPORTE SOLO SE MUESTRA: la columna no ordena ni filtra (QC-68, confirmado al acotar QC-123).\n\nEL E2E ES DE ESTA FICHA, tanto el de la busqueda como el de los importes. QC-68 y QC-123 lo difirieron aqui con motivo escrito: ninguna de las dos tiene pantalla, y sin caja que manejar ni columna que leer no hay recorrido que ejercitar en un navegador. El recorrido: escribir en la caja, ver la lista recortada, que lo que se ve coincide con lo que la consulta devuelve, y que un pedido sin importe muestra el guion.\n\nLO QUE YA ESTA DECIDIDO EN QC-68 y esta ficha NO reabre: se busca solo por nombre de receta, ignorando acentos y mayusculas, sobre el conjunto completo y nunca sobre la pagina; y la busqueda encuentra tambien los pedidos cuya receta esta de baja.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO:\n\n* Que ve el usuario mientras la busqueda esta en vuelo.\n* Que ve cuando no hay ninguna coincidencia: la lista ya tiene estado vacio, pero \"no hay pedidos\" y \"no hay pedidos que coincidan\" no son lo mismo, y el segundo tiene que ofrecer una salida.\n* Si el termino buscado se conserva al navegar entre paginas y al volver de un detalle.\n* Como se formatea el importe en pantalla -separadores, decimales visibles- sabiendo que viaja como cadena decimal y que la moneda es implicita y no se guarda.\n\nNO ENTRA: la consulta, la migracion ni el indice de la busqueda, que son de QC-68. El calculo del importe, su columna en la base y la seleccion de lotes, que son de QC-123.",
-      "status": "pending",
+      "description": "Enchufar en la pantalla de pedidos la CAJA DE BUSQUEDA por nombre de receta que QC-68 construyo por debajo.\n\nNACE EL 2026-09-17 al acotar QC-68. La pantalla de pedidos (QC-35) se especifico y se construyo A PROPOSITO sin busqueda (decision humana del 2026-09-06). Esta ficha es la otra mitad.\n\nEL IMPORTE SALE DE ESTA FICHA el 2026-09-23, por decision humana al aprobar el spec: no va como columna del listado. Es una cotizacion del coste de produccion que se ve en el formulario al generar el pedido y en la edicion. Se va a QC-151 (fullstack).\n\nACOTADA el 2026-09-23 con /afinar-feature:\n\n* Solo por nombre de receta, sin acentos ni mayusculas, sobre el conjunto completo; incluye recetas de baja (QC-68).\n* Mientras busca, se queda la lista anterior atenuada, con indicador de carga.\n* Sin coincidencias: «No hay pedidos que coincidan…» con «Limpiar la busqueda», dentro de la tabla (patron de proveedores).\n* El termino va en la URL (?q=): se conserva al paginar, al abrir y cerrar el panel de un pedido y al volver con Atras. Una busqueda nueva vuelve a la pagina 1.\n* E2E si (diferido aqui por QC-68).\n\nNO ENTRA: la consulta, la migracion y el indice de la busqueda (QC-68); el importe (QC-151).",
+      "status": "in_progress",
       "sdd": true,
-      "complexity": null,
+      "complexity": "medium",
       "zone": "frontend",
       "branch": "feature/QC-122-busqueda-y-total-en-la-pantalla-de-pedidos",
       "depends_on": [
@@ -2273,7 +2273,7 @@
       "epic_name": "Inventario",
       "name": "producto-terminado",
       "description": "Nace el tipo de producto «producto terminado» (FINISHED_PRODUCT), junto a PRODUCT, MACHINE y PACKAGING. Su existencia SOLO ENTRA AL TERMINAR UN PEDIDO.\n\nNACE DEL CHAT el 2026-09-23. ACOTADA el mismo dia con /afinar-feature.\n\n* Al Finalizar un pedido en /asignacion/[id] (pasa a ENTREGADO), entra en la misma operacion un LOTE del producto terminado de su RECETA + PRESENTACION («Desengrasante industrial · Botella 1L»). Ese producto nace solo la primera vez.\n* Cantidad en ENVASES ENTEROS, redondeando hacia abajo: 50,5 L en «Botella 1L» son 50 botellas, que se guardan como 50 L (la unidad de la presentacion, como QC-91). Las botellas solo se muestran. El sobrante no entra.\n* Coste unitario = coste de ingredientes (QC-123) / cantidad que entra.\n* La presentacion gana su «contenido» (la cantidad en su unidad), editable en la pantalla de presentaciones. Es el alcance de QC-130, absorbido aqui. Un pedido cuya presentacion no tenga contenido no se puede finalizar.\n* Se prohibe: crear a mano un producto terminado, darle de alta lotes a mano, usarlo como ingrediente de receta y ajustarlo sumando. Se permiten los ajustes que restan (la «venta» de hoy, QC-92).\n* E2E si.\n\nNO ENTRA: consumir los ingredientes al entregar y la existencia decimal (QC-141, que bloquea esta); una pantalla de ventas (sin ficha); los tests que rompio cd7f07a6 (PR aparte).\n\nDetalle y preguntas abiertas en specs/QC-150-producto-terminado/requirements.md.\n\nBLOQUEADA POR QC-141.",
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "complexity": "high",
       "zone": "fullstack",
@@ -2282,6 +2282,21 @@
         "QC-141"
       ],
       "spec_path": "specs/QC-150-producto-terminado"
+    },
+    {
+      "key": "QC-151",
+      "id": 151,
+      "epic": "QC-31",
+      "epic_name": "Pedidos",
+      "name": "cotizacion-del-coste-en-el-pedido",
+      "description": "Mientras se crea un pedido, el formulario muestra EN VIVO una cotizacion del coste de produccion (el importe de QC-123: coste de ingredientes para la cantidad pedida). Se GUARDA con el pedido y se ve en la vista de edicion.\n\nNACE EL 2026-09-23 al acotar QC-122, por decision humana: el importe no va en el listado de pedidos.\n\nYa decidido: no va en el listado; en edicion se ve el guardado y se recotiza al cambiar receta o cantidad (se guarda al guardar); formato $ 1,234,567.50 con el valor exacto en el title (QC-132), sin Intl ni coma flotante; sin importe, un guion (QC-123).\n\nFullstack: hoy el importe solo se calcula en el servidor al guardar; cotizar antes exige una consulta nueva de solo lectura, con su permiso.\n\nACOTADA el 2026-09-23 con /afinar-feature: se recalcula al guardar (la cotizacion es orientativa); recotiza al dejar de escribir (~500 ms) y al cambiar receta; mientras cotiza, cifra anterior atenuada con «cotizando…»; permiso pedidos.modificar, sin permiso nuevo; E2E si. Detalle en specs/QC-151-cotizacion-del-coste-en-el-pedido/requirements.md.\n\nNO ENTRA: el calculo del coste (QC-123) y la busqueda de pedidos (QC-122).",
+      "status": "in_progress",
+      "sdd": true,
+      "complexity": "medium",
+      "zone": "fullstack",
+      "branch": "feature/QC-151-cotizacion-del-coste-en-el-pedido",
+      "depends_on": [],
+      "spec_path": "specs/QC-151-cotizacion-del-coste-en-el-pedido"
     }
   ]
 }

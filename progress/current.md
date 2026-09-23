@@ -19,9 +19,17 @@
 
 ## Evaluaciones
 
+### QC-151 - CREADA al acotar QC-122 y ACOTADA con `/afinar-feature` (2026-09-23)
+
+`fullstack`, **`complexity: medium`** (label en Jira). **9 decisiones cerradas, cero abiertas** en `specs/QC-151-cotizacion-del-coste-en-el-pedido/requirements.md`. Cupo `fullstack` 2 de 3 (QC-121, QC-141). Worktree montado. **F1.2 y F1.3 hechos**: R1-R22, T1-T8, 1 pregunta abierta (que se ve si la cotizacion falla); tarjeta en *En revision*. **F1.4 APROBADO el 2026-09-23 por chat**: si la cotizacion falla se pinta el mensaje del error. **EXCEPCION HUMANA A LA REGLA DE PARALELISMO**: arranca YA pese a solapar con QC-141 (quien mergee segundo resuelve el conflicto de texto). Solapa con QC-141 en `lib/composition/index.ts`, `lib/modules/pedidos/index.ts`, `order-form.tsx` y su test.
+
+### QC-122 - F1.0 y ACOTADA con `/afinar-feature` (2026-09-23)
+
+`zone: frontend`, **`complexity: medium`** (leader, label en Jira). Dependencias QC-68 y QC-123 `done`. **Cupo `frontend` 1 de 2** (QC-107). Worktree montado desde `dev`. **8 decisiones cerradas (3 heredadas de QC-68/QC-123, 5 nuevas), cero abiertas** en `specs/QC-122-busqueda-y-total-en-la-pantalla-de-pedidos/requirements.md`; board actualizado antes de sembrar. **F1.2 y F1.3 hechos**: R1-R25, T1-T8 (rama pusheada), semilla intacta; tarjeta en *En revision*. **F1.4 APROBADO el 2026-09-23 por chat, con cambio de alcance**: el IMPORTE SALE (va a QC-151, nueva, fullstack) y QC-122 queda solo en busqueda (R17-R25b retirados sin renumerar, R26 nuevo, T1-T6). **F2.0 hecho**: `in_progress`, tarjeta *En curso*; cupo `frontend` 2 de 2 con QC-107, sin cruce de archivos (documentos vs pedidos). **Ampliacion humana del 2026-09-23 (R27)**: con Atras dentro de /pedidos, la caja de busqueda muestra el termino de la URL; pasada al implementer en curso y pendiente de escribir en el spec (spec_author, al terminar la implementacion).
+
 ### QC-150 - CREADA del chat y ACOTADA con `/afinar-feature` (2026-09-23)
 
-Creada en el board (épica Inventario) a pedido del humano; **10 decisiones cerradas y 3 preguntas abiertas** en `specs/QC-150-producto-terminado/requirements.md`. `complexity:high`, **bloqueada por QC-141** (existencia decimal). Absorbe el «contenido de la presentación» de QC-130, que sigue cancelada (comentado en su issue).
+Creada en el board (épica Inventario) a pedido del humano; **10 decisiones cerradas y 3 preguntas abiertas** en `specs/QC-150-producto-terminado/requirements.md`. `complexity:high`, **bloqueada por QC-141** (existencia decimal). Absorbe el «contenido de la presentación» de QC-130, que sigue cancelada (comentado en su issue). **F1.0-F1.3 hechos el 2026-09-23**: worktree montado; `spec_author` entrego **R1-R37 y T0-T13** (rama pusheada), semilla intacta por diff; tarjeta en *En revision*. **F1.4 APROBADO el 2026-09-23 por chat**: 9 preguntas cerradas (D11-D21), enmienda al catalogo aprobada (`presentation_without_content`, `no_whole_package`), R1-R44, sin preguntas abiertas. **Queda `spec_ready` y la tarjeta en *En revision* a proposito: F2.0 espera a que QC-141 este `done`** (T0 lo exige). **Solapa fuerte con QC-141 (va detras) y QC-145 (no en paralelo).**
 
 ### QC-132 y QC-130 - CERRADAS (2026-09-23)
 
