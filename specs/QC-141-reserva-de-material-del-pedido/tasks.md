@@ -103,7 +103,7 @@ Archivos: `app/(private)/inventario/components/{product-columns,product-batches-
 `toFixed` sobre cantidades en esos archivos: se amplía la guardia de convenciones de la ruta si no
 los cubre), y `e2e/ajuste-de-inventario.spec.ts` verde con un ajuste de `-0.5`.
 
-## TM — Merge de `origin/dev` y renumeración de migraciones `[primera de lo pendiente]` (enmienda del 2026-09-23)
+## [ ] TM — Merge de `origin/dev` y renumeración de migraciones `[primera de lo pendiente]` (enmienda del 2026-09-23)
 
 Archivos: todo lo que traiga el merge; `db/migrations/20260922160000_inventory_movement_kind_consumption/`
 y `db/migrations/20260922160100_reservations_and_decimal_stock/` (se renombran),
@@ -153,7 +153,13 @@ los nueve de `Product.type`, que `dev` ya arregló); y `./init.sh --rapido` verd
 T1-T5 y las guardias. Los tests de T6 y T7 pueden seguir verdes contra el contrato viejo: se
 reescriben en T6 y T7.
 
-## [ ] T6 — Necesidad y reparto, dominio puro `[depende de TM y de la aprobación de E1]` — **REHACER** (enmienda del 2026-09-23)
+*Estado al 2026-09-23 (tanda 2):* merge `fe240487`, renumeración `5e1d7572`; typecheck y lint limpios.
+Abierto: (a) la base de desarrollo compartida `QuimiCloude` sigue con las dos migraciones con el
+nombre viejo aplicadas (no se revirtió: es compartida y la acción se denegó); (b) `…120100` revierte
+y reaplica limpia sobre una base efímera con QC-147 aplicada, pero `…120000` no se pudo revertir
+ahí porque `db:rollback` elige por directorio y mover la carpeta se denegó. Ver bitácora.
+
+## [x] T6 — Necesidad y reparto, dominio puro `[depende de TM y de la aprobación de E1]` — **REHACER** (enmienda del 2026-09-23)
 
 Archivos: `lib/modules/pedidos/domain/order-requirement.ts`,
 `lib/modules/inventario/domain/{plan-reservation,reservation}.ts`, `lib/modules/inventario/index.ts`,
@@ -174,7 +180,7 @@ aparta `0.0001`; `200 × 10 %` aparta `20` sin redondeo) y `R49` (receta vacía:
 `reserved` sin asignaciones); ningún caso de unidad sin base común ni de conversión queda en esos
 archivos, y `order-requirement.ts` no multiplica por su cuenta.
 
-## [ ] T7 — Reservas en la persistencia de `inventario` `[depende de T2, T4, T6]` — **reabierta para un ajuste parcial** (enmienda del 2026-09-23)
+## [x] T7 — Reservas en la persistencia de `inventario` `[depende de T2, T4, T6]` — **reabierta para un ajuste parcial** (enmienda del 2026-09-23)
 
 *Ajuste de la enmienda (lo demás de T7 está hecho y no se repite):* `createMaterialReservations(db)`
 sin `UnitCatalog` ni `resolveUnitConversions` (`reservation-prisma.ts:4,86-92,119,166-171,307-311,370-375`);
@@ -247,7 +253,7 @@ Archivos: `lib/modules/pedidos/domain/transition-order.ts` (nuevo),
 por los **dos** caminos (Finalizar y edición), `guard-catalogo-de-errores` verde, y el E2E existente
 `e2e/ejecucion-receta.spec.ts` sigue verde.
 
-## T11 — Migración que aparta los pedidos vivos `[depende de T2, T6]` `[P con T7-T10]`
+## [x] T11 — Migración que aparta los pedidos vivos `[depende de T2, T6]` `[P con T7-T10]`
 
 Archivos: `db/migrations/20260923120200_reserve_existing_orders/{migration.sql,down.sql}` (o el
 prefijo que toque tras TM: siempre posterior a las dos renombradas),

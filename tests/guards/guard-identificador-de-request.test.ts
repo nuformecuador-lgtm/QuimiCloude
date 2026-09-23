@@ -261,6 +261,9 @@ export const MIGRACIONES_ESPERADAS = [
   // cambia el tipo de columnas de existencia y crea el libro de reservas.
   '20260923120000_inventory_movement_kind_consumption',
   '20260923120100_reservations_and_decimal_stock',
+  // Aparta los pedidos vivos existentes con un bloque PL/pgSQL: no toca el identificador de
+  // peticion.
+  '20260923120200_reserve_existing_orders',
 ] as const
 
 export function hallazgosDeMigraciones(

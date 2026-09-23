@@ -26,6 +26,7 @@
     "inventario/product-batch-write.int.test.ts",
     "inventario/product-unit.int.test.ts",
     "inventario/reservations-and-decimal-stock-migration.int.test.ts",
+    "inventario/reserve-existing-orders-migration.int.test.ts",
     "pedidos/company-scope.int.test.ts",
     "pedidos/order-crud.int.test.ts",
     "pedidos/pedidos-constraints.int.test.ts",
