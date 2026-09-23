@@ -19,6 +19,20 @@
 
 ## Evaluaciones
 
+### QC-130 - F0, F1.0 y F1.1 (2026-09-23)
+
+**F0** (import incremental, issues tocados desde el 2026-09-22): QC-141 pasa a `in_progress` / `complexity:high`
+(el board la tiene *En curso*), QC-145 recibe `complexity:high`, entran QC-143 (`pending`, backend) y QC-149
+(`cancelled`, absorbida por QC-141). QC-130 sin cambios en el board. **F1.0**: `zone: fullstack` del board, **no se
+parte** (criterio de QC-121/145/147); **`complexity: medium`** la asigna el leader y va como label a Jira: una columna
+nueva en `presentations` con migracion de las existentes y el campo en la pantalla de QC-45, sin integracion externa;
+se reevalua al acotar. `depends_on` vacio. **Cupo `fullstack`: 2 de 3** (QC-121 y QC-141), QC-130 cabe; el cruce de archivos
+**con QC-141 es probable** (inventario y presentaciones) y se hace en F2.0 con `tasks.md`. Worktree montado desde
+`origin/dev` (`ad9fb3fe`) con `.env` copiado. **PARADA EN F1.2**: la ficha declara tres cosas abiertas -si el
+contenido es obligatorio, que pasa con las presentaciones existentes, y si una sin contenido sigue valida- y una
+medicion pendiente -cuantos productos caen en el caso sin base comun-; no hay `requirements.md`, asi que se ofrece
+`/afinar-feature`.
+
 ### QC-145 - ACOTADA con `/afinar-feature` (2026-09-22) y DESBLOQUEADA (2026-09-23)
 
 Alcance, **12 decisiones cerradas** (11 + la presentacion que anadio QC-146) y **1 pregunta abierta** en
