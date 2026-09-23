@@ -1,10 +1,6 @@
 import type { Prisma } from '@prisma/client';
 
-// Alias deliberado: esta funcion abre la transaccion compartida y no consulta ninguna tabla por
-// su cuenta -el `run` que recibe es opaco, y quien de verdad filtra por empresa son las
-// funciones de `order-prisma.ts` que ese `run` invoca sobre `tx`-, asi que aqui no hay ningun
-// `prisma.<modelo>` ni `tx.<modelo>` que vigilar.
-import { prisma as sharedPrismaClient } from '@/lib/shared/db/prisma';
+import { prisma } from '@/lib/shared/db/prisma';
 
 import { CREATE_ORDER_MAX_ATTEMPTS, isDuplicateOrderNumber } from './order-prisma';
 
@@ -24,7 +20,7 @@ export async function withOrderTransaction<T>(
 ): Promise<T> {
   for (let attempt = 1; ; attempt += 1) {
     try {
-      return await sharedPrismaClient.$transaction(run, { maxWait: 10_000, timeout: 30_000 });
+      return await prisma.$transaction(run, { maxWait: 10_000, timeout: 30_000 });
     } catch (error) {
       if (!isDuplicateOrderNumber(error) || attempt >= CREATE_ORDER_MAX_ATTEMPTS) throw error;
     }
