@@ -13,7 +13,12 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { OrderListSection, OrderListSkeleton } from '@/app/(private)/pedidos/components';
+import {
+  ORDER_LIST_CLEAR_SEARCH_TESTID,
+  ORDER_LIST_NO_MATCHES_TESTID,
+  OrderListSection,
+  OrderListSkeleton,
+} from '@/app/(private)/pedidos/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import type { OrderSummary } from '@/lib/modules/pedidos';
 import type { OrderListResult } from '@/lib/modules/pedidos/adapters/driving/order-actions';
@@ -296,6 +301,60 @@ describe('los tres estados son mutuamente excluyentes y se distinguen por data-t
     expect(screen.queryByTestId(testId.lista)).toBeNull();
     expect(screen.queryByTestId(testId.vacio)).toBeNull();
     expect(screen.queryByTestId(testId.esqueleto)).toBeNull();
+  });
+});
+
+describe('sin coincidencias: DENTRO de la tabla, con la caja montada (R13, R14, R15, R16)', () => {
+  it('con termino y cero filas pinta "sin coincidencias" dentro de la tabla, y NO el vacio de siempre', async () => {
+    listOrdersActionMock.mockResolvedValue(pagina([]));
+
+    render(await OrderListSection({ params: parametros({ search: 'sin-coincidencias' }) }));
+
+    const tabla = screen.getByTestId('order-table');
+    expect(within(tabla).getByTestId(ORDER_LIST_NO_MATCHES_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(testId.vacio)).toBeNull();
+    expect(within(tabla).getByTestId('data-table-search')).toHaveValue('sin-coincidencias');
+  });
+
+  it('con termino y cero filas no se pide el lote de responsables: no hay filas a las que repartirlo', async () => {
+    listOrdersActionMock.mockResolvedValue(pagina([]));
+
+    render(await OrderListSection({ params: parametros({ search: 'sin-coincidencias' }) }));
+
+    expect(listResponsiblesForOrdersActionMock).not.toHaveBeenCalled();
+  });
+
+  it('«Limpiar la busqueda» enlaza sin `q`, con la primera pagina, y conserva tamano, orden y filtros (R15)', async () => {
+    listOrdersActionMock.mockResolvedValue(pagina([]));
+
+    render(
+      await OrderListSection({
+        params: parametros({
+          search: 'sin-coincidencias',
+          page: 3,
+          pageSize: MAX_PAGE_SIZE,
+          sort: { columnId: 'createdAt', direction: 'asc' },
+        }),
+      }),
+    );
+
+    const enlace = new URL(
+      screen.getByTestId(ORDER_LIST_CLEAR_SEARCH_TESTID).getAttribute('href') as string,
+      'http://localhost',
+    );
+    expect(enlace.searchParams.has('q')).toBe(false);
+    expect(enlace.searchParams.get('page')).toBe('1');
+    expect(enlace.searchParams.get('pageSize')).toBe(String(MAX_PAGE_SIZE));
+    expect(enlace.searchParams.get('sort')).toBe('createdAt:asc');
+  });
+
+  it('sin termino y cero filas sigue siendo el vacio de siempre, sin "Limpiar la busqueda" (R16)', async () => {
+    listOrdersActionMock.mockResolvedValue(pagina([]));
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(screen.getByTestId(testId.vacio)).toBeInTheDocument();
+    expect(screen.queryByTestId(ORDER_LIST_CLEAR_SEARCH_TESTID)).toBeNull();
   });
 });
 

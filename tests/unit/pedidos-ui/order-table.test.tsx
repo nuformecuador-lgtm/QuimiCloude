@@ -12,6 +12,8 @@ import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  ORDER_LIST_CLEAR_SEARCH_TESTID,
+  ORDER_LIST_NO_MATCHES_TESTID,
   ORDER_NUMBER_COLUMN_ID,
   ORDER_TABLE_TEXTS,
   OrderTable,
@@ -189,6 +191,23 @@ function montarConNavegacionEnVuelo(overrides: Partial<DataTableParams> = {}, to
   );
   routerMock.push.mockImplementationOnce(() => retenerNavegacion?.());
   return params;
+}
+
+const CLEAR_HREF = `${ORDERS_ROUTE}?page=1&pageSize=${DEFAULT_PAGE_SIZE}`;
+
+function montarSinCoincidencias(overrides: Partial<DataTableParams> = {}) {
+  const params = parametros({ search: 'sin-coincidencias', ...overrides });
+  const resultado = render(
+    <OrderTable
+      orders={[]}
+      params={params}
+      totalPages={1}
+      recipes={RECETAS}
+      units={UNIDADES}
+      noMatches={{ clearHref: CLEAR_HREF }}
+    />,
+  );
+  return { params, ...resultado };
 }
 
 /** El ultimo destino al que la tabla pidio navegar. */
@@ -396,5 +415,41 @@ describe('cambiar orden, filtro o pagina navega con la consulta esperada (R15, R
     await user.click(screen.getByTestId('data-table-next'));
 
     expect(ultimoDestino().startsWith(`${ORDERS_ROUTE}?`)).toBe(true);
+  });
+});
+
+describe('sin coincidencias: «Limpiar la busqueda» navega y vacia la caja (R15)', () => {
+  it('el clic simple navega al `clearHref` y la caja queda vacia antes y despues del rerender', () => {
+    const { params, rerender } = montarSinCoincidencias();
+
+    expect(screen.getByTestId(ORDER_LIST_NO_MATCHES_TESTID)).toBeInTheDocument();
+    const boton = screen.getByTestId(ORDER_LIST_CLEAR_SEARCH_TESTID);
+
+    fireEvent.click(boton);
+
+    expect(routerMock.push).toHaveBeenCalledWith(CLEAR_HREF);
+    // Adelanta el vaciado sin esperar a que vuelva la navegacion.
+    expect(screen.getByTestId('data-table-search')).toHaveValue('');
+
+    // La navegacion vuelve: los `params` que llegan ya no traen termino.
+    rerender(
+      <OrderTable
+        orders={[]}
+        params={{ ...params, search: '' }}
+        totalPages={1}
+        recipes={RECETAS}
+        units={UNIDADES}
+      />,
+    );
+    expect(screen.getByTestId('data-table-search')).toHaveValue('');
+  });
+
+  it('un clic con modificador no intercepta: el navegador decide abrir otra pestana', () => {
+    montarSinCoincidencias();
+
+    const boton = screen.getByTestId(ORDER_LIST_CLEAR_SEARCH_TESTID);
+    fireEvent.click(boton, { metaKey: true });
+
+    expect(routerMock.push).not.toHaveBeenCalled();
   });
 });

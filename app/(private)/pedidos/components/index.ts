@@ -179,4 +179,12 @@ export {
   OrderPriorityBadge,
   OrderStatusBadge,
 } from './order-status-badge';
-export { ORDER_TABLE_ID, ORDER_TABLE_TEXTS, OrderTable, type OrderTableProps } from './order-table';
+export {
+  ORDER_LIST_CLEAR_SEARCH_TESTID,
+  ORDER_LIST_NO_MATCHES_TESTID,
+  ORDER_NO_MATCHES_MESSAGE,
+  ORDER_TABLE_ID,
+  ORDER_TABLE_TEXTS,
+  OrderTable,
+  type OrderTableProps,
+} from './order-table';

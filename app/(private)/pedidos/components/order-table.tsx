@@ -1,16 +1,19 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useTransition } from 'react';
+import { useMemo, useState, useTransition, type MouseEvent } from 'react';
 
 import { DataTable, type DataTableParams, type DataTableTexts } from '@/components/shared/data-table';
+import { buttonVariants } from '@/components/ui/button';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { OrderSummary } from '@/lib/modules/pedidos';
 import type { UnitView } from '@/lib/modules/unidades';
+import { cn } from '@/lib/utils';
 
 import { ORDER_DEFAULT_PINNED_COLUMNS, buildOrderColumns } from './order-columns';
 import type { OrderResponsiblesCatalog } from './order-responsibles';
-import { orderListHref, withSearchResetsPage } from './order-list-params';
+import { FIRST_PAGE, orderListHref, withSearchResetsPage } from './order-list-params';
 import type { RecipePickerPage } from './recipe-picker';
 
 /**
@@ -76,6 +79,19 @@ export const ORDER_TABLE_TEXTS: DataTableTexts = {
   lastYear: 'Último año',
 };
 
+/** Copy del estado «sin coincidencias», distinto del de «no hay pedidos». */
+export const ORDER_NO_MATCHES_MESSAGE = 'No hay pedidos que coincidan con la búsqueda.';
+
+export const ORDER_LIST_NO_MATCHES_TESTID = 'order-list-no-matches';
+export const ORDER_LIST_CLEAR_SEARCH_TESTID = 'order-list-clear-search';
+
+const CLEAR_SEARCH_LABEL = 'Limpiar la búsqueda';
+
+// Con modificadores o boton central se deja al navegador abrir otra pestaña.
+function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
+  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+}
+
 export type OrderTableProps = {
   /** Las filas **ya resueltas** por la consulta, en el orden en que las entrega (R13). */
   readonly orders: readonly OrderSummary[];
@@ -97,6 +113,11 @@ export type OrderTableProps = {
   readonly responsiblesByOrder?: Readonly<Record<string, readonly OrderResponsible[]>>;
   /** QC-102 R27, R28 — catalogos y `canWrite` del panel, tambien de paso. */
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
+  /**
+   * Presente solo con cero filas y un termino vigente: pinta el estado «sin coincidencias»
+   * DENTRO de la tabla, con la caja montada, en vez del vacio de `order-list-empty.tsx`.
+   */
+  readonly noMatches?: { readonly clearHref: string };
 };
 
 export function OrderTable({
@@ -107,9 +128,18 @@ export function OrderTable({
   units,
   responsiblesByOrder,
   responsiblesCatalog,
+  noMatches,
 }: OrderTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  /*
+    `boxEpoch` remonta la caja de busqueda SOLO en el clic de «Limpiar»: la instancia de
+    `DataTableSearchField` guarda su borrador una vez al montarse, asi que sin remontarla seguiria
+    mostrando el termino viejo aunque la navegacion ya haya vuelto sin `q`. `clearing` adelanta el
+    vaciado mientras esa navegacion todavia esta en vuelo.
+  */
+  const [boxEpoch, setBoxEpoch] = useState(0);
+  const [clearing, setClearing] = useState(false);
   // Las columnas se construyen con sus dependencias (`buildOrderColumns`). `useMemo` para que la
   // identidad del array no cambie en cada render y la tabla compartida no se reconstruya entera.
   const columns = useMemo(
@@ -135,6 +165,23 @@ export function OrderTable({
     });
   };
 
+  // Cualquier emision real de la tabla ya trae los `params` del servidor: a partir de ahi dejan
+  // de mandar los que esta funcion adelantaba mientras la navegacion de «Limpiar» volvia.
+  const handleParamsChange = (next: DataTableParams) => {
+    setClearing(false);
+    navigate(orderListHref(withSearchResetsPage(params, next)));
+  };
+
+  const handleClearSearch = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (noMatches === undefined || !isPlainClick(event)) return;
+    event.preventDefault();
+    setBoxEpoch((epoch) => epoch + 1);
+    setClearing(true);
+    navigate(noMatches.clearHref);
+  };
+
+  const visibleParams = clearing ? { ...params, search: '', page: FIRST_PAGE } : params;
+
   return (
     <div
       data-testid="order-table"
@@ -152,15 +199,34 @@ export function OrderTable({
         <p className="text-xs text-muted-foreground">{ORDER_TABLE_TEXTS.loading}</p>
       ) : null}
       <DataTable
+        key={boxEpoch}
         tableId={ORDER_TABLE_ID}
         columns={columns}
         rows={orders}
         getRowId={(order) => order.id}
-        params={params}
+        params={visibleParams}
         totalPages={totalPages}
-        onParamsChange={(next) => navigate(orderListHref(withSearchResetsPage(params, next)))}
+        onParamsChange={handleParamsChange}
         status="idle"
-        texts={ORDER_TABLE_TEXTS}
+        texts={noMatches === undefined ? ORDER_TABLE_TEXTS : { ...ORDER_TABLE_TEXTS, empty: ORDER_NO_MATCHES_MESSAGE }}
+        emptyAction={
+          noMatches === undefined ? undefined : (
+            <div
+              data-testid={ORDER_LIST_NO_MATCHES_TESTID}
+              className="flex flex-wrap items-center justify-center gap-2"
+            >
+              <Link
+                href={noMatches.clearHref}
+                onClick={handleClearSearch}
+                data-slot="button"
+                data-testid={ORDER_LIST_CLEAR_SEARCH_TESTID}
+                className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11')}
+              >
+                {CLEAR_SEARCH_LABEL}
+              </Link>
+            </div>
+          )
+        }
         defaultPinnedColumns={ORDER_DEFAULT_PINNED_COLUMNS}
       />
     </div>
