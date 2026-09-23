@@ -21,7 +21,7 @@
 
 ### QC-150 - CREADA del chat y ACOTADA con `/afinar-feature` (2026-09-23)
 
-Creada en el board (épica Inventario) a pedido del humano; **10 decisiones cerradas y 3 preguntas abiertas** en `specs/QC-150-producto-terminado/requirements.md`. `complexity:high`, **bloqueada por QC-141** (existencia decimal). Absorbe el «contenido de la presentación» de QC-130, que sigue cancelada (comentado en su issue). **F1.0-F1.3 hechos el 2026-09-23**: worktree montado; `spec_author` entrego **R1-R37 y T0-T13** (rama pusheada), semilla intacta por diff; tarjeta en *En revision*. **PARADA EN F1.4** con 7 preguntas (3 de la semilla + 4 del codigo), enmienda al catalogo de errores y 2 derivaciones. **Solapa fuerte con QC-141 (va detras) y QC-145 (no en paralelo).**
+Creada en el board (épica Inventario) a pedido del humano; **10 decisiones cerradas y 3 preguntas abiertas** en `specs/QC-150-producto-terminado/requirements.md`. `complexity:high`, **bloqueada por QC-141** (existencia decimal). Absorbe el «contenido de la presentación» de QC-130, que sigue cancelada (comentado en su issue). **F1.0-F1.3 hechos el 2026-09-23**: worktree montado; `spec_author` entrego **R1-R37 y T0-T13** (rama pusheada), semilla intacta por diff; tarjeta en *En revision*. **F1.4 APROBADO el 2026-09-23 por chat**: 9 preguntas cerradas (D11-D21), enmienda al catalogo aprobada (`presentation_without_content`, `no_whole_package`), R1-R44, sin preguntas abiertas. **Queda `spec_ready` y la tarjeta en *En revision* a proposito: F2.0 espera a que QC-141 este `done`** (T0 lo exige). **Solapa fuerte con QC-141 (va detras) y QC-145 (no en paralelo).**
 
 ### QC-132 y QC-130 - CERRADAS (2026-09-23)
 
