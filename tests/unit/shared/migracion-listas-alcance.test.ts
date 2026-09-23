@@ -64,7 +64,11 @@ const TESTS_DE_LA_MIGRACION = [
   ESTE_ARCHIVO,
 ] as const;
 
-const E2E_CON_RECORRIDO_DE_BUSQUEDA = ['e2e/recetas.spec.ts', 'e2e/proveedores.spec.ts'] as const;
+// 2026-09-23 (QC-140): sale `e2e/proveedores.spec.ts`. Su test de busqueda y orden por columna
+// (R26) se retira con la vista paginada que lo sostenia: el catalogo visual nuevo busca por un
+// filtro de proveedor y no ordena por columnas, asi que ya no hay ningun bloque `busca ... (R26)`
+// que este archivo pueda leer en ese spec.
+const E2E_CON_RECORRIDO_DE_BUSQUEDA = ['e2e/recetas.spec.ts'] as const;
 
 const CONSULTA_POR_TEXTO =
   /\b(?:get|find|query)(?:All)?By(?:Text|Title|AltText|DisplayValue|LabelText|PlaceholderText)\s*\(/g;
