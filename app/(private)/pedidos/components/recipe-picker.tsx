@@ -1,7 +1,7 @@
 'use client';
 
 import { Loader2Icon } from 'lucide-react';
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useId, useRef, useState } from 'react';
 
 import {
   Autocomplete,
@@ -153,6 +153,14 @@ export function RecipePicker({
   const [selectedName, setSelectedName] = useState(defaultLabel);
   /** Lo que el usuario esta escribiendo. `null` = no esta escribiendo: se muestra lo elegido. */
   const [draft, setDraft] = useState<string | null>(null);
+  /**
+   * Espejo SINCRONO de `selectedName`, para leerlo dentro del mismo evento en que `choose` lo
+   * cambia: el primitivo dispara su propio `onValueChange` con el nombre recien elegido justo
+   * despues de nuestro `onClick`, y en ese instante el estado de React todavia no re-rendero, asi
+   * que `selectedName` seguiria leyendo el nombre ANTERIOR y `handleValueChange` retiraria la
+   * eleccion que se acaba de hacer.
+   */
+  const selectedNameRef = useRef(defaultLabel);
 
   /**
    * Pide una pagina del catalogo, con el termino vigente si lo hay (R31). La primera pagina SIN
@@ -212,6 +220,7 @@ export function RecipePicker({
   );
 
   function choose(option: RecipePickerOption) {
+    selectedNameRef.current = option.name;
     setSelectedId(option.id);
     setSelectedName(option.name);
     setDraft(null);
@@ -228,7 +237,8 @@ export function RecipePicker({
   function handleValueChange(next: string) {
     setDraft(next);
 
-    if (selectedName !== '' && next.trim() !== selectedName) {
+    if (selectedNameRef.current !== '' && next.trim() !== selectedNameRef.current) {
+      selectedNameRef.current = '';
       setSelectedId('');
       setSelectedName('');
       onSelect?.(null);
