@@ -126,6 +126,8 @@ let companyId: string;
 let adminUserId: string;
 let operatorUserId: string;
 let unitId: string;
+/** Simbolo real de la unidad sembrada, para no cablear en el test lo que ya guarda la BD. */
+let unitSymbol: string;
 let productAId: string;
 let productBId: string;
 let productWithUnitId: string;
@@ -241,12 +243,13 @@ test.beforeAll(async () => {
   operatorUserId = await createUserWithRole(operatorUser, ROLE_OPERADOR);
 
   // La unidad NO se crea: es una de las cuatro del catalogo arrancador.
-  unitId = (
-    await prisma.unit.findFirstOrThrow({
-      where: { nameNormalized: 'litro', companyId: null },
-      select: { id: true },
-    })
-  ).id;
+  const unit = await prisma.unit.findFirstOrThrow({
+    where: { nameNormalized: 'litro', companyId: null },
+    select: { id: true, symbol: true, name: true },
+  });
+  unitId = unit.id;
+  // Mismo fallback que `unitLabel` en la pantalla: si no hay simbolo, se pinta el nombre.
+  unitSymbol = unit.symbol ?? unit.name;
 
   // Los dos ingredientes SIN unidad resoluble del escenario 1: no tienen lotes (guardar la linea
   // igual esta permitido), y asi el alta por la UI no depende de ningun lote de fixture.
@@ -532,7 +535,7 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
     expect(await ingredientsCostText(created.id)).toBe('40.0000');
   });
 
-  test('escenario 4 (R18, R22, R25, R26) - el Operario ve "Pedido 200" en su propia linea y "10,00 % · 20 L" en la del insumo', async ({
+  test('escenario 4 (R18, R22, R25, R26) - el Operario ve "Pedido 200" en su propia linea y "10,00 % · 20" con el simbolo del litro en la del insumo', async ({
     page,
   }) => {
     await loginAndLand(page, operatorUser);
@@ -548,9 +551,9 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
       page.locator('[data-testid="order-execution-lines"] [data-testid="order-execution-order-quantity"]'),
     ).toHaveCount(0);
 
-    // La linea del insumo: 10,00 %, 20 y su unidad (L), cada dato en su propio elemento.
+    // La linea del insumo: 10,00 %, 20 y su unidad, cada dato en su propio elemento.
     await expect(page.getByTestId('order-execution-line-percentage-0')).toHaveText('10,00 %');
     await expect(page.getByTestId('order-execution-line-quantity-0')).toHaveText('20');
-    await expect(page.getByTestId('order-execution-line-unit-0')).toHaveText('L');
+    await expect(page.getByTestId('order-execution-line-unit-0')).toHaveText(unitSymbol);
   });
 });
