@@ -13,6 +13,13 @@
 > vive en la cabecera de la vista nueva—. Tampoco entra el botón desde un pedido con faltante:
 > eso es QC-139.
 >
+> **Enmienda del 2026-09-23 (D19), solo en este punto.** Esta ficha **sí toca** `/proveedores/<id>`,
+> y solo para montar en su cabecera los controles ya existentes de editar y dar de baja el
+> proveedor. Por qué: en `dev` esos dos controles viven únicamente en las filas de la lista de
+> QC-44, que D2 retira, y la página de detalle no los tiene. Sin esta enmienda la aplicación se
+> quedaría sin ninguna forma de editar ni de dar de baja un proveedor. El resto de la página de
+> detalle (datos de contacto, catálogo, subida de documentos) no se toca.
+>
 > Sembrado por `/afinar-feature` el 2026-09-21. El bloque de Alcance y la tabla de «Decisiones
 > cerradas» los fijó el humano ANTES del spec. `spec_author` los respeta, no los reabre y no los
 > reescribe: su trabajo aquí es `## Requisitos (EARS)`.
@@ -26,13 +33,11 @@
 > **Vivo**: sin marca de baja lógica. **Tanda de proveedores**: el bloque de proveedores que se
 > carga de una vez. **Tanda de líneas**: el bloque de líneas que se añade a un carrusel de una vez.
 > **Lecturas de la vista**: las tres consultas que la alimentan —la tanda inicial, cada tanda
-> siguiente de proveedores y cada «cargar más» de una fila—. **Filtro de producto** y **filtro de
-> proveedor**: los dos campos de búsqueda de la vista.
+> siguiente de proveedores y cada «cargar más» de una fila—. **Carga incremental**: una tanda
+> siguiente de proveedores o un «cargar más». **Filtro de producto** y **filtro de proveedor**: los
+> dos campos de búsqueda de la vista. **Página de detalle**: `/proveedores/<id>`.
 >
-> **Citas.** `[D<n>]` es la fila n de `## Decisiones cerradas`, contada de arriba abajo. `[P<n>]`
-> marca un requisito cuyo contenido **depende de una pregunta abierta**: no está decidido y no se
-> implementa hasta que el humano la cierre en F1.4. El `design.md` da para cada una la opción
-> recomendada y lo que cambia con la otra.
+> **Citas.** `[D<n>]` es la fila n de `## Decisiones cerradas`, contada de arriba abajo.
 
 ### Ruta, permiso y sustitución
 
@@ -71,9 +76,10 @@ identificadores de esas personas. [D11]
 ### Imagen
 
 **R9** — SI la ruta de imagen de una línea es nula, es la cadena vacía o no resuelve al cargarse,
-ENTONCES el sistema DEBE pintar en su lugar el marcador `MISSING_IMAGE_SRC`, y la imagen de la línea
-—con o sin marcador— DEBE pintarla el componente compartido `EntityImage`, sin una segunda
-implementación de ese comportamiento en la ruta. [D5]
+ENTONCES el sistema DEBE pintar en su lugar el marcador `MISSING_IMAGE_SRC`. La imagen de la línea
+—con o sin marcador— DEBE pintarla el componente compartido `EntityImage` a su tamaño actual de
+60x60 px, sin una segunda implementación de ese comportamiento en la ruta y sin cambiar el
+componente compartido. [D5] [D20]
 
 **R10** — El sistema DEBE listar las líneas sin imagen exactamente igual que las que la tienen: la
 ausencia de imagen NO DEBE excluir una línea de ningún carrusel ni de ningún filtro. [D4]
@@ -107,9 +113,10 @@ ofrecer en ella el control «cargar más». [D7]
 DEBE ser exactamente el prefijo del listado completo en su orden: sin proveedores ni líneas
 repetidas y sin huecos entre una tanda y la siguiente. [D1] [D7]
 
-**R18** — La detección de «el usuario llegó al final de la lista» DEBE hacerla la librería aprobada
-en F1.4 y registrada en `docs/dependencias.md`; ningún archivo de producción DEBE crear un
-observador de intersección ni escuchar el desplazamiento a mano para ese fin. [D8] [P5]
+**R18** — La detección de «el usuario llegó al final de la lista» DEBE hacerla la librería
+`react-intersection-observer` (su hook `useInView`), registrada en `docs/dependencias.md` e
+importada por **un solo** archivo de producción; ningún archivo de producción DEBE crear un
+observador de intersección ni escuchar el desplazamiento a mano para ese fin. [D8] [D18]
 
 ### Filtros
 
@@ -119,9 +126,8 @@ contiene el término escrito, de forma parcial e insensible a mayúsculas. [D6]
 **R20** — MIENTRAS el filtro de producto está activo, el sistema DEBE mostrar solo los proveedores
 que tengan al menos una línea viva que coincida con él. [D6]
 
-**R21** — MIENTRAS el filtro de producto está activo, el carrusel de cada fila DEBE mostrar el
-conjunto de líneas que fije P1 —opción A: solo las que coinciden; opción B: todas las vivas del
-proveedor—, y «cargar más» DEBE recorrer ese mismo conjunto. [D6] [P1]
+**R21** — MIENTRAS el filtro de producto está activo, el carrusel de cada fila DEBE mostrar **solo
+las líneas que coinciden** con él, y «cargar más» DEBE recorrer ese mismo conjunto. [D6] [D14]
 
 **R22** — El sistema DEBE ofrecer un filtro de proveedor que seleccione los proveedores cuyo nombre
 contiene el término escrito, de forma parcial e insensible a mayúsculas.
@@ -138,7 +144,7 @@ cargado y volver a la primera tanda con los filtros nuevos.
 **R26** — SI con algún filtro activo ningún proveedor coincide, ENTONCES el sistema DEBE mostrar un
 aviso de «sin resultados», distinto del estado vacío, con una acción que limpia los dos filtros.
 
-### Censo, vida y empresa
+### Censo, vida, empresa y orden
 
 **R27** — Todas las lecturas de la vista DEBEN excluir los proveedores dados de baja y las líneas
 dadas de baja; ninguna DEBE ofrecer la forma de verlos. [D13]
@@ -152,11 +158,13 @@ objeto de base de datos (un índice), ENTONCES su nombre y los de sus columnas D
 su migración DEBE traer `down.sql`; la ficha NO DEBE crear tablas ni columnas. [D13]
 
 **R30** — SI un proveedor vivo no tiene ninguna línea viva y no hay filtro de producto activo,
-ENTONCES el sistema DEBE tratarlo como fije P2 —opción A: pinta su fila con un aviso de «sin
-productos» y cuenta en su tanda; opción B: no aparece y no cuenta en ninguna tanda—. [D1] [P2]
+ENTONCES el sistema DEBE pintar su fila, contarla en su tanda como cualquier otra y mostrar en
+lugar del carrusel el aviso «Sin productos todavía» junto a un enlace a su página de detalle,
+construido con `supplierDetailRoute`. [D1] [D15]
 
-**R31** — El sistema DEBE ordenar los proveedores y las líneas de cada carrusel con un orden total y
-estable, desempatado por identificador, cuyo criterio principal fije P4. [P4]
+**R31** — El sistema DEBE ordenar los proveedores **alfabéticamente por nombre**, y las líneas de
+cada carrusel **alfabéticamente por nombre**, las dos en orden ascendente y desempatadas por
+identificador para que el orden sea total y estable. [D17]
 
 ### Estados de carga y de error
 
@@ -169,35 +177,42 @@ DEBE mostrar el estado vacío de proveedores, con el botón de alta.
 **R34** — SI falla la tanda inicial, ENTONCES el sistema DEBE mostrar el estado de error de la lista
 de proveedores, sin ningún dato de proveedores ni de líneas y sin el detalle técnico del fallo.
 
-**R35** — SI falla una tanda siguiente de proveedores o un «cargar más», ENTONCES el sistema DEBE
-conservar todo lo ya cargado, no mostrar el detalle técnico del fallo, y reaccionar como fije P3.
-[P3]
+**R35** — SI falla una carga incremental, ENTONCES el sistema DEBE conservar todo lo ya cargado y
+mostrar un aviso **en el punto del fallo** —al pie de la lista si falló una tanda de proveedores;
+al final del carrusel de esa fila si falló su «cargar más»— con un control «Reintentar», sin el
+detalle técnico del fallo. CUANDO el usuario activa «Reintentar», el sistema DEBE repetir esa misma
+carga y, si tiene éxito, retirar el aviso. [D16]
 
 ### Alta, edición y baja
 
 **R36** — La cabecera de la vista DEBE mostrar el botón de alta de proveedor, que abre el panel de
 alta ya existente; CUANDO un alta termina con éxito, el sistema DEBE cerrar el panel, avisar y
-volver a cargar la vista desde la primera tanda con los filtros vigentes. [D3]
+volver a cargar la vista desde la primera tanda con los filtros vigentes. [D3] [D15]
 
-**R37** — Las filas de la vista NO DEBEN ofrecer la edición ni la baja del proveedor. Dónde quedan
-esas dos operaciones lo fija P6. [D3] [P6]
+**R37** — Las filas de la vista NO DEBEN ofrecer la edición ni la baja del proveedor. [D3] [D19]
+
+**R38** — La cabecera de la página de detalle DEBE ofrecer el control de edición del proveedor
+(el panel de edición ya existente, precargado con sus datos) y el control de baja (el diálogo de
+confirmación ya existente). CUANDO una edición termina con éxito, la página de detalle DEBE mostrar
+los datos nuevos; CUANDO una baja termina con éxito, el sistema DEBE llevar al usuario a la vista de
+catálogo visual. El resto de la página de detalle NO DEBE cambiar. [D3] [D19]
 
 ### Multiplataforma y accesibilidad
 
-**R38** — Cada carrusel DEBE poder desplazarse en horizontal con gesto táctil, con rueda o
+**R39** — Cada carrusel DEBE poder desplazarse en horizontal con gesto táctil, con rueda o
 trackpad y con teclado; ningún control de la vista DEBE depender de `:hover` para descubrirse o
 activarse, los controles pulsables DEBEN medir al menos 44x44 px y los campos de filtro DEBEN usar
 un tamaño de letra de al menos 16 px.
 
-**R39** — Cada carrusel DEBE exponer a las tecnologías de asistencia un nombre accesible que
-identifique al proveedor de su fila, y el control «cargar más» DEBE nombrar también a ese
-proveedor.
+**R40** — Cada carrusel DEBE exponer a las tecnologías de asistencia un nombre accesible que
+identifique al proveedor de su fila, y los controles «cargar más» y «Reintentar» de una fila DEBEN
+nombrar también a ese proveedor.
 
 ### Verificación
 
-**R40** — Esta ficha NO DEBE añadir un E2E propio; los E2E ya existentes que recorren la URL de
+**R41** — Esta ficha NO DEBE añadir un E2E propio; los E2E ya existentes que recorren la URL de
 proveedores —el 404 sin permiso, el aislamiento entre empresas y el alta— DEBEN seguir pasando
-contra la vista nueva, adaptados a ella. [D9]
+contra la vista nueva, adaptados a ella y a la baja desde la página de detalle. [D9] [D19]
 
 ### Mapa decisión -> requisito
 
@@ -205,47 +220,28 @@ contra la vista nueva, adaptados a ella. [D9]
 | --- | --- |
 | D1 · fila = proveedor | R5, R6, R7, R17, R30 |
 | D2 · sustituye a QC-44 | R2 |
-| D3 · alta/edición/baja en `/proveedores/<id>`, alta en cabecera | R6, R36, R37 |
+| D3 · alta/edición/baja en `/proveedores/<id>`, alta en cabecera | R6, R36, R37, R38 |
 | D4 · imagen nullable | R10 |
 | D5 · marcador y `EntityImage` | R9 |
 | D6 · filtro de producto iLike | R19, R20, R21 |
 | D7 · tandas 10 / +10 / 5 | R11, R12, R13, R14, R15, R16, R17 |
 | D8 · carga perezosa con librería | R12, R18 |
-| D9 · E2E diferido | R40 |
+| D9 · E2E diferido | R41 |
 | D10 · `proveedores.consultar` en el service | R3, R4 |
 | D11 · sin autores | R8 |
 | D12 · `SUPPLIERS_ROUTE` | R1, R6 |
 | D13 · borrado lógico, identificadores en inglés | R27, R29 |
+| D14 · con filtro de producto, solo las líneas que coinciden | R21 |
+| D15 · proveedor sin líneas aparece con aviso y enlace | R30, R36 |
+| D16 · fallo incremental: aviso en el punto con Reintentar | R35 |
+| D17 · orden alfabético | R31 |
+| D18 · `react-intersection-observer` | R18 |
+| D19 · editar y dar de baja en la cabecera del detalle | R37, R38, R41 |
+| D20 · `EntityImage` a 60 px | R9 |
 
 ## Preguntas abiertas
 
-1. **Qué enseña la fila con el filtro de producto activo.** ¿Solo los productos que coinciden, o
-   todos los del proveedor y el filtro solo decide **qué proveedores** salen? Las dos son
-   defendibles y dan pantallas distintas.
-2. **Proveedor sin ninguna línea de catálogo.** ¿Aparece la fila vacía con un aviso, o no aparece
-   en la lista? Afecta al censo de proveedores y por tanto a las tandas de 5.
-3. **Fallo de una carga incremental.** Qué se ve si falla la tanda de 5 proveedores o el «cargar
-   más» de una fila. El estado de error de la carga INICIAL sí sigue el patrón de QC-44; lo que
-   no tiene precedente es el fallo a mitad de scroll.
-4. **Orden por defecto** de los proveedores y de los productos dentro del carrusel.
-5. **Qué librería concreta** de scroll infinito. Se decide en F1.4 (ver decisiones cerradas).
-
-_Añadidas por spec_author (F1.2), 2026-09-23. Salen de leer el código, no de reabrir ninguna
-decisión:_
-
-6. **La edición y la baja del proveedor no existen hoy en `/proveedores/<id>`.** La decisión D3 las
-   da por mudadas a esa página «que QC-44 ya monta y que esta ficha NO toca», pero en `dev` la
-   página de detalle solo pinta nombre, teléfono, correo y el catálogo
-   (`app/(private)/proveedores/[id]/components/supplier-detail-header.tsx`). Los controles de edición
-   (`SupplierSheet` con proveedor) y de baja (`DeleteSupplierDialog`) viven en las filas de la tabla de la lista
-   (`app/(private)/proveedores/components/supplier-table.tsx`, líneas 77-81), que D2 retira. Si se
-   aplican D2 y D3 tal cual, la aplicación se queda sin ninguna forma de editar ni de dar de baja un
-   proveedor. Hay que elegir: ¿esta ficha lleva los dos controles a la cabecera del detalle
-   —tocando `/proveedores/<id>` en ese punto—, los deja en la fila de la vista nueva, o se abre una
-   ficha aparte y se acepta el hueco mientras tanto? Afecta a R37 y a dos E2E existentes.
-7. **Tamaño de la imagen.** `EntityImage` pinta una miniatura fija de 60x60 px, sin prop de tamaño.
-   ¿Basta ese tamaño para un «catálogo visual», o la imagen tiene que ser mayor? Si tiene que serlo,
-   hay que tocar el componente compartido, que usan otras dos pantallas.
+Ninguna.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -264,3 +260,10 @@ decisión:_
 | 2026-09-21 | ¿Se muestra quién creó o modificó? | **No**, heredado de QC-44, que ya cerró ese reenvío: las vistas traen ids, no nombres, y resolverlos exige consumir el contrato público de `identity` |
 | 2026-09-21 | La URL | **`SUPPLIERS_ROUTE`**, la constante que ya vive en `lib/shared/routes.ts`. Ningún archivo la incrusta como literal (QC-11 R13) |
 | 2026-09-21 | Borrado e identificadores de la DB | **Lógico** y **en inglés**, heredado de QC-4. Esta ficha no crea tablas, así que solo aplica a lo que consulte |
+| 2026-09-23 | (D14, era P1) ¿Qué enseña la fila con el filtro de producto activo? | **Solo los productos que coinciden.** El filtro decide qué proveedores salen **y** qué líneas enseña cada carrusel; «cargar más» recorre ese mismo conjunto |
+| 2026-09-23 | (D15, era P2) ¿Aparece un proveedor sin ninguna línea de catálogo? | **Sí.** Aparece en la lista y cuenta en su tanda, con «Sin productos todavía» en lugar del carrusel y un enlace a su ficha. Así el proveedor recién dado de alta no desaparece al guardar |
+| 2026-09-23 | (D16, era P3) ¿Qué se ve si falla una carga incremental? | **Un aviso en ese punto con «Reintentar»**: al pie de la lista si falla la tanda de 5 proveedores, al final del carrusel si falla el «cargar más» de una fila. Lo ya cargado se queda |
+| 2026-09-23 | (D17, era P4) Orden por defecto | **Alfabético**, ascendente, para los proveedores y para los productos de cada carrusel, con desempate por identificador |
+| 2026-09-23 | (D18, era P5) ¿Qué librería de carga perezosa? | **`react-intersection-observer`** (`useInView`), importada por un solo archivo. Los cuatro checks los verificó el leader el 2026-09-23: v11.0.1 del 2026-08-26, 3.538.265 descargas/semana (2026-09-15 a 2026-09-21), MIT, sin `deprecated` |
+| 2026-09-23 | (D19, era P6) ¿Dónde quedan la edición y la baja del proveedor? | **En la cabecera de `/proveedores/<id>`, dentro de esta ficha.** Enmienda D3 («que se queda intacto») y el «NO toca» del Alcance **solo en ese punto**: en `dev` esos controles solo existían en las filas de la lista que D2 retira, y sin moverlos la aplicación se queda sin forma de editar ni de dar de baja proveedores. Se reutilizan los componentes existentes; el resto del detalle no cambia |
+| 2026-09-23 | (D20, era P7) ¿Tamaño de la imagen? | **`EntityImage` tal cual, a 60 px.** No se toca el componente compartido |
