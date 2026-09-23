@@ -334,6 +334,11 @@ describe('sin coincidencias: DENTRO de la tabla, con la caja montada (R13, R14, 
           page: 3,
           pageSize: MAX_PAGE_SIZE,
           sort: { columnId: 'createdAt', direction: 'asc' },
+          filters: {
+            status: { kind: 'select', values: ['CANCELADO'] },
+            priority: { kind: 'select', values: ['ALTA'] },
+            createdAt: { kind: 'dateRange', from: '2026-01-01', to: '2026-01-31' },
+          },
         }),
       }),
     );
@@ -346,6 +351,10 @@ describe('sin coincidencias: DENTRO de la tabla, con la caja montada (R13, R14, 
     expect(enlace.searchParams.get('page')).toBe('1');
     expect(enlace.searchParams.get('pageSize')).toBe(String(MAX_PAGE_SIZE));
     expect(enlace.searchParams.get('sort')).toBe('createdAt:asc');
+    expect(enlace.searchParams.get('status')).toBe('CANCELADO');
+    expect(enlace.searchParams.get('priority')).toBe('ALTA');
+    expect(enlace.searchParams.get('createdFrom')).toBe('2026-01-01');
+    expect(enlace.searchParams.get('createdTo')).toBe('2026-01-31');
   });
 
   it('sin termino y cero filas sigue siendo el vacio de siempre, sin "Limpiar la busqueda" (R16)', async () => {
@@ -400,7 +409,7 @@ describe('una sola llamada de lectura por pantalla (R7, R41)', () => {
     render(await OrderListSection({ params }));
 
     expect(listOrdersActionMock).toHaveBeenCalledTimes(1);
-    // Campo a campo la misma forma que `ListQuery`: sin claves de mas, `search` siempre vacio.
+    // Campo a campo la misma forma que `ListQuery`: sin claves de mas.
     expect(listOrdersActionMock).toHaveBeenCalledWith(params);
     expect(Object.keys(listOrdersActionMock.mock.calls[0][0] as object).sort()).toEqual([
       'filters',

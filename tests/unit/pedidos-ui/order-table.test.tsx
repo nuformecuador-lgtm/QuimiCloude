@@ -155,11 +155,11 @@ function montar(overrides: Partial<DataTableParams> = {}, totalPages = 3) {
 
 // El `router.push` simulado termina al instante y la transicion no llegaria a verse en vuelo.
 // Suspender una actualizacion dentro de esa misma transicion la retiene, como una navegacion que
-// aun no ha recibido la pagina nueva (patron de `supplier-page.test.tsx > R14`).
-const NAVEGACION_QUE_NO_TERMINA = new Promise<never>(() => {});
+// aun no ha recibido la pagina nueva (patron de `supplier-page.test.tsx`).
+const NAVEGACION_QUE_NO_TERMINA: Promise<unknown> = new Promise(() => {});
 let retenerNavegacion: (() => void) | null = null;
 
-function NavegacionEnVuelo() {
+function NavegacionEnVuelo({ promesa = NAVEGACION_QUE_NO_TERMINA }: { readonly promesa?: Promise<unknown> }) {
   const [enVuelo, setEnVuelo] = useState(false);
 
   useEffect(() => {
@@ -169,13 +169,17 @@ function NavegacionEnVuelo() {
     };
   }, []);
 
-  if (enVuelo) use(NAVEGACION_QUE_NO_TERMINA);
+  if (enVuelo) use(promesa);
   return null;
 }
 
-function montarConNavegacionEnVuelo(overrides: Partial<DataTableParams> = {}, totalPages = 3) {
+function montarConNavegacionEnVuelo(
+  overrides: Partial<DataTableParams> = {},
+  totalPages = 3,
+  promesa: Promise<unknown> = NAVEGACION_QUE_NO_TERMINA,
+) {
   const params = parametros(overrides);
-  render(
+  const resultado = render(
     <>
       <OrderTable
         orders={PEDIDOS}
@@ -185,12 +189,21 @@ function montarConNavegacionEnVuelo(overrides: Partial<DataTableParams> = {}, to
         units={UNIDADES}
       />
       <Suspense fallback={null}>
-        <NavegacionEnVuelo />
+        <NavegacionEnVuelo promesa={promesa} />
       </Suspense>
     </>,
   );
   routerMock.push.mockImplementationOnce(() => retenerNavegacion?.());
-  return params;
+  return { params, ...resultado };
+}
+
+/** Una navegacion en vuelo que se puede soltar cuando el test lo decida. */
+function crearNavegacionControlable(): { promesa: Promise<unknown>; liberar: () => void } {
+  let resolver: (value: unknown) => void = () => {};
+  const promesa = new Promise<unknown>((resolve) => {
+    resolver = resolve;
+  });
+  return { promesa, liberar: () => resolver(undefined) };
 }
 
 const CLEAR_HREF = `${ORDERS_ROUTE}?page=1&pageSize=${DEFAULT_PAGE_SIZE}`;
@@ -320,10 +333,11 @@ describe('las filas se pintan tal cual llegan aunque ninguna contenga el termino
   });
 });
 
-describe('mientras la navegacion esta en vuelo, la caja conserva foco y texto (R10, R11, R12)', () => {
-  it('aria-busy, rotulo de carga, sin esqueleto, y la misma caja con foco y texto', async () => {
+describe('mientras la navegacion esta en vuelo, la caja conserva foco y texto, y al soltarla la tabla se actualiza (R10, R11, R12)', () => {
+  it('aria-busy y atenuacion en vuelo; al soltar la navegacion, filas nuevas sin atenuar ni rotulo', async () => {
     const user = setupUser();
-    montarConNavegacionEnVuelo();
+    const { liberar, promesa } = crearNavegacionControlable();
+    const { rerender } = montarConNavegacionEnVuelo({}, 3, promesa);
 
     expect(screen.getByTestId('order-table')).toHaveAttribute('aria-busy', 'false');
 
@@ -336,11 +350,34 @@ describe('mientras la navegacion esta en vuelo, la caja conserva foco y texto (R
     );
 
     expect(screen.getByText(ORDER_TABLE_TEXTS.loading)).toBeInTheDocument();
+    expect(screen.getByTestId('order-table').className).toContain('opacity-60');
     expect(screen.queryByTestId('order-list-skeleton')).toBeNull();
     expect(screen.queryByTestId('data-table-loading')).toBeNull();
     expect(screen.getByTestId('data-table-search')).toBe(busqueda);
     expect(busqueda).toHaveFocus();
     expect(busqueda).toHaveValue('norte');
+
+    // Se suelta la navegacion retenida: la transicion termina y llega la lista nueva.
+    liberar();
+    await waitFor(() =>
+      expect(screen.getByTestId('order-table')).toHaveAttribute('aria-busy', 'false'),
+    );
+
+    const filasNuevas: readonly OrderSummary[] = [pedido('o9', 90)];
+    rerender(
+      <OrderTable
+        orders={filasNuevas}
+        params={parametros({ search: 'norte' })}
+        totalPages={3}
+        recipes={RECETAS}
+        units={UNIDADES}
+      />,
+    );
+
+    expect(screen.getByTestId('order-table').className).not.toContain('opacity-60');
+    expect(screen.queryByText(ORDER_TABLE_TEXTS.loading)).toBeNull();
+    expect(screen.getByTestId('data-table-row-o9')).toBeInTheDocument();
+    expect(screen.queryByTestId('data-table-row-o1')).toBeNull();
   });
 });
 
@@ -502,6 +539,40 @@ describe('la caja sigue a la URL cuando el termino cambia por fuera (R27)', () =
     expect(screen.getByTestId('data-table-search')).toBe(caja);
     expect(caja).toHaveFocus();
     expect(caja).toHaveValue('acido');
+  });
+
+  it('tras «Limpiar», el eco y despues un cambio externo de `params` no dejan la caja atras (R27, R15)', () => {
+    const { rerender } = montarSinCoincidencias({ search: 'x' });
+
+    fireEvent.click(screen.getByTestId(ORDER_LIST_CLEAR_SEARCH_TESTID));
+    expect(routerMock.push).toHaveBeenCalledWith(CLEAR_HREF);
+    expect(screen.getByTestId('data-table-search')).toHaveValue('');
+
+    // El eco de la limpieza: la lista vuelve sin termino.
+    rerender(
+      <OrderTable
+        orders={PEDIDOS}
+        params={parametros({ search: '' })}
+        totalPages={3}
+        recipes={RECETAS}
+        units={UNIDADES}
+      />,
+    );
+    expect(screen.getByTestId('data-table-search')).toHaveValue('');
+
+    // Un cambio externo posterior (p. ej. «Atras» del navegador): termino y pagina distintos.
+    rerender(
+      <OrderTable
+        orders={PEDIDOS}
+        params={parametros({ search: 'x', page: 2 })}
+        totalPages={3}
+        recipes={RECETAS}
+        units={UNIDADES}
+      />,
+    );
+
+    expect(screen.getByTestId('data-table-search')).toHaveValue('x');
+    expect(screen.getByTestId('data-table-page-indicator')).toHaveTextContent('Página 2 de 3');
   });
 
   it('la carrera del rebote: seguir tecleando tras emitir no se pierde cuando llega la respuesta vieja (R27, R11)', async () => {

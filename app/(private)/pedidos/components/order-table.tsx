@@ -142,13 +142,9 @@ export function OrderTable({
   const [boxEpoch, setBoxEpoch] = useState(0);
   const [clearing, setClearing] = useState(false);
   /*
-    Terminos que esta misma caja pidio (por tecleo o por «Limpiar») y cuya vuelta por `params`
-    todavia no se vio. Al llegar un `params.search` distinto del ultimo visto: si esta en esta
-    cola, era la propia caja esperando su eco -se descarta ese termino y los anteriores, sin
-    remontar-; si no esta, el cambio vino de fuera y toca remontar para que la caja nazca con el
-    termino nuevo.
-    Comparacion durante el render (no en un efecto) para que el remonte llegue en el mismo commit,
-    sin parpadeo del termino viejo.
+    Compara durante el render (no en un efecto) para que el remonte llegue en el mismo commit, sin
+    parpadeo. `pendingSearches` distingue el eco de la propia caja (se descarta, sin remontar) de
+    un cambio externo (remonta).
   */
   const [pendingSearches, setPendingSearches] = useState<readonly string[]>([]);
   const [lastSearch, setLastSearch] = useState(params.search);
@@ -160,6 +156,9 @@ export function OrderTable({
     } else {
       setPendingSearches(pendingSearches.slice(index + 1));
     }
+    // El eco de la limpieza o cualquier otro cambio real de `params.search` ya trae el termino
+    // vigente: `clearing` deja de forzarlo para no pisar un cambio externo posterior (Atras).
+    if (clearing) setClearing(false);
   }
   // Las columnas se construyen con sus dependencias (`buildOrderColumns`). `useMemo` para que la
   // identidad del array no cambie en cada render y la tabla compartida no se reconstruya entera.

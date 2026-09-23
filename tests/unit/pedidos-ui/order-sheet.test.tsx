@@ -543,7 +543,7 @@ it('con el pedido en estado final la accion de editar no abre ningun panel', asy
   });
 });
 
-describe('el termino de busqueda sobrevive al panel lateral (QC-122 R4, R9)', () => {
+describe('el termino de busqueda sobrevive al panel lateral (R4, R9)', () => {
   it('con "q" en la URL, la consulta recibe el termino y la caja lo muestra (R4)', async () => {
     const termino = 'esmalte';
     await renderPantalla({ [SEARCH_PARAM]: termino });
