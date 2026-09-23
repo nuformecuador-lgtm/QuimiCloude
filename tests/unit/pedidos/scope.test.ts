@@ -376,7 +376,7 @@ describe('QC-34 — limite de alcance de la feature', () => {
     ])
   })
 
-  it('los specs E2E de pedidos son estos CINCO -QC-35, QC-102, QC-60, QC-145 y QC-122-, y la lista sigue cerrada (R57)', () => {
+  it('los specs E2E de pedidos son estos SEIS -QC-35, QC-102, QC-60, QC-145, QC-122 y QC-151-, y la lista sigue cerrada (R57)', () => {
     // CENTINELA INVERTIDO el 2026-09-07 (QC-35). El E2E estaba diferido a esa ficha y el
     // humano lo aprobo el 2026-09-06 (R48, R49). La lista es CERRADA: un spec de pedidos sin
     // ficha que lo respalde vuelve a poner esto en rojo.
@@ -417,10 +417,21 @@ describe('QC-34 — limite de alcance de la feature', () => {
     // empresa, terminados- porque lo que ejercita es otra cosa: la busqueda. La lista se AMPLIA y
     // se TENSA -el ancla pasa de cuatro entradas a cinco-, nunca se afloja: sigue CERRADA y un
     // SEXTO spec de pedidos sin ficha que lo respalde vuelve a ponerla en rojo.
+    //
+    // AMPLIADA el 2026-09-23 (QC-151, cotizacion-del-coste-en-el-pedido, R11): entra la SEXTA
+    // entrada, el spec e2e/pedidos-cotizacion.spec.ts. Abre el alta, escoge una receta y comprueba
+    // que el bloque de coste cotiza con cada cantidad -incluido el guion cuando la existencia no
+    // alcanza-, que guarda el mismo importe que queda en `orders.ingredients_cost` y que la edicion
+    // lo reabre sin teclear nada. No sustituye a ninguno de los cinco anteriores -alta y edicion,
+    // responsables, aislamiento por empresa, terminados, busqueda- porque lo que ejercita es otra
+    // cosa: la cotizacion del coste. La lista se AMPLIA y se TENSA -el ancla pasa de cinco entradas
+    // a seis-, nunca se afloja: sigue CERRADA y un SEPTIMO spec de pedidos sin ficha que lo
+    // respalde vuelve a ponerla en rojo.
     expect(rutasE2e.length).toBeGreaterThan(0)
     expect(specsE2eDePedidos(rutasE2e)).toEqual([
       'e2e/aislamiento-pedidos.spec.ts',
       'e2e/pedidos-busqueda.spec.ts',
+      'e2e/pedidos-cotizacion.spec.ts',
       'e2e/pedidos-responsables.spec.ts',
       'e2e/pedidos-terminados.spec.ts',
       'e2e/pedidos.spec.ts',
@@ -428,6 +439,7 @@ describe('QC-34 — limite de alcance de la feature', () => {
     expect(specsE2eDePedidos([...rutasE2e, 'e2e/orders-extra.spec.ts'])).toEqual([
       'e2e/aislamiento-pedidos.spec.ts',
       'e2e/pedidos-busqueda.spec.ts',
+      'e2e/pedidos-cotizacion.spec.ts',
       'e2e/pedidos-responsables.spec.ts',
       'e2e/pedidos-terminados.spec.ts',
       'e2e/pedidos.spec.ts',
