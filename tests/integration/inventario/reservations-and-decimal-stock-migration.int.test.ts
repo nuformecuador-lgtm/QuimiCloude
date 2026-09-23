@@ -5,12 +5,12 @@
  * `RollbackSignal`, asi que ninguna fila ni ningun cambio de tipo sobrevive (mismo patron que
  * `identity/packer-role-migration.int.test.ts`).
  *
- * R2 se comprueba REVIRTIENDO primero las cuatro columnas a entero DENTRO de la transaccion
+ * Se comprueba REVIRTIENDO primero las cuatro columnas a entero DENTRO de la transaccion
  * -asi se puede sembrar un entero "de antes"-, y aplicando despues, LEIDAS DEL ARCHIVO REAL, las
  * mismas sentencias `ALTER COLUMN ... TYPE DECIMAL(14,4)` que trae `migration.sql`: si alguien les
  * quita el `USING` o cambia la escala, este archivo lo nota aplicando el SQL real, no una copia.
  *
- * R45 aplica el `down.sql` real sobre una fila con parte decimal, dentro de un SAVEPOINT, y
+ * El `down.sql` real se aplica sobre una fila con parte decimal, dentro de un SAVEPOINT, y se
  * comprueba que el intento se rechaza y que nada cambio.
  */
 import { randomUUID } from 'node:crypto'

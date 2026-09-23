@@ -165,8 +165,8 @@ describe('pedidos — el puerto declara los dos metodos de LECTURA de design.md 
   it('un doble que implementa la interfaz completa compila', () => {
     // No se ejecuta ninguna operacion: lo que se comprueba es la FORMA del puerto. Si algun dia
     // se le anadiera un tercer metodo, este doble dejaria de compilar y habria que decidirlo.
-    // QC-141 T9: la escritura salio entera hacia `OrderWriteRepository`, dentro de la
-    // transaccion compartida con `inventario`; este puerto ya solo lee.
+    // La escritura salio entera hacia `OrderWriteRepository`, dentro de la transaccion
+    // compartida con `inventario`; este puerto ya solo lee.
     const doble: OrderRepository = {
       findAliveById: async () => null,
       // `listAlive` devuelve una `Page` ya armada, no `{ rows, total }`: la firma se corrigio

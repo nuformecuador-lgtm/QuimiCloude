@@ -358,11 +358,11 @@ describe('migracion reserve_existing_orders contra Postgres real', () => {
         createdAt: new Date('2026-01-02T00:00:00.000Z'),
       });
 
-      // --- Escenario 3 (E2): receta sin lineas no aparta y no da error. ---
+      // --- Escenario 3: receta sin lineas no aparta y no da error. ---
       const recipeVacia = await createRecipe(tx, companyA);
       const orderVacio = await createOrder(tx, companyA, recipeVacia, '5', { createdAt: new Date('2026-01-01T00:00:00.000Z') });
 
-      // --- Escenario 4 (E1): producto sin unidad no cubre. ---
+      // --- Escenario 4: producto sin unidad no cubre. ---
       const productSinUnidad = await createProduct(tx, companyA, { withUnit: false });
       const recipeSinUnidad = await createRecipe(tx, companyA);
       await addRecipeLine(tx, recipeSinUnidad, productSinUnidad, '100.00');
@@ -378,7 +378,7 @@ describe('migracion reserve_existing_orders contra Postgres real', () => {
       const orderBorrado = await createOrder(tx, companyA, recipeEstados, '5', { deletedAt: new Date() });
       const orderEnCurso = await createOrder(tx, companyA, recipeEstados, '5', { status: 'EN_CURSO' });
 
-      // --- Escenario 6: techo a 4 decimales (R11, N1). ---
+      // --- Escenario 6: techo a 4 decimales. ---
       const productTecho = await createProduct(tx, companyA);
       const batchTecho = await createBatch(tx, companyA, productTecho, { stock: '1', purchaseDate: '2026-09-01' });
       const recipeTecho = await createRecipe(tx, companyA);
@@ -409,11 +409,11 @@ describe('migracion reserve_existing_orders contra Postgres real', () => {
       expect(await reservationsOf(tx, orderCompiteNuevo)).toEqual([]);
       expect(await reservedAtOf(tx, orderCompiteNuevo)).toBeNull();
 
-      // Escenario 3 (E2, R49)
+      // Escenario 3
       expect(await reservationsOf(tx, orderVacio)).toEqual([]);
       expect(await reservedAtOf(tx, orderVacio)).toBeNull();
 
-      // Escenario 4 (E1)
+      // Escenario 4
       expect(await reservationsOf(tx, orderSinUnidad)).toEqual([]);
       expect(await reservedAtOf(tx, orderSinUnidad)).toBeNull();
 

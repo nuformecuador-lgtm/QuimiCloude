@@ -329,8 +329,8 @@ describe('inventory_movements — restricciones', () => {
 
       const rejection = await expectRejectedByDatabase(
         tx,
-        // `consumption` YA NO SIRVE de ejemplo aqui desde QC-141: entro al enum. Cualquier otro
-        // texto que el tipo no declare sigue dando 22P02.
+        // `consumption` YA NO SIRVE de ejemplo aqui: entro al enum. Cualquier otro texto que el
+        // tipo no declare sigue dando 22P02.
         () => rawInsertMovement(tx, { batchId, kind: 'bogus_kind', quantity: -1, reason: 'merma', companyId }),
         'asiento con una clase que el enum no declara',
       )

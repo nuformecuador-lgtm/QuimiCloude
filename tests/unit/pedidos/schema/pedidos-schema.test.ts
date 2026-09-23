@@ -127,13 +127,13 @@ const recipe = parseModel('Recipe')
 const unit = parseModel('Unit')
 const user = parseModel('User')
 
-/** Los DIECISIETE campos de `Order`, con la columna en ingles que le toca (R36). Fueron catorce
- *  en QC-33 y quince con `cancellationReason` (QC-34 R48); el 2026-09-07 la decision humana quito
- *  `unit_id` y `unit_price` de la tabla
- *  (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`) y quedaron trece. QC-60 (R1)
- *  anade `company_id`, obligatoria, y vuelven a ser catorce. `ingredientsCost` opcional las lleva
- *  a quince, `reservedAt` a dieciseis y `presentationId` a diecisiete. La lista sigue siendo
- *  cerrada: anadir o quitar cualquier otra columna pone este test rojo. */
+/** Los DIECISIETE campos de `Order`, con la columna en ingles que le toca. Fueron catorce y
+ *  quince con `cancellationReason`; el 2026-09-07 la decision humana quito `unit_id` y
+ *  `unit_price` de la tabla
+ *  (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`) y quedaron trece. Despues
+ *  se anade `company_id`, obligatoria, y vuelven a ser catorce. `ingredientsCost` opcional las
+ *  lleva a quince, `reservedAt` a dieciseis y `presentationId` a diecisiete. La lista sigue
+ *  siendo cerrada: anadir o quitar cualquier otra columna pone este test rojo. */
 const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
   ['orderYear', 'order_year'],

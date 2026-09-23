@@ -1,4 +1,4 @@
-// Doble compartido de `OrderUnitOfWork` para los tests unitarios de `pedidos` (QC-141 T9).
+// Doble compartido de `OrderUnitOfWork` para los tests unitarios de `pedidos`.
 //
 // `run` invoca el trabajo DIRECTAMENTE con el `scope` que se le da, sin abrir ninguna
 // transaccion real: eso es lo que corresponde a un test UNITARIO, que dobla los dos puertos de

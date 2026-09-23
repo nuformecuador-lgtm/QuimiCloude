@@ -340,7 +340,7 @@ function loteCosteable(overrides: Partial<CostingBatch> = {}): CostingBatch {
 }
 
 /** La unidad de trabajo y el catalogo de recetas FALLAN SI SE LLAMAN: no basta con que el alta
- *  rechace, tiene que rechazar SIN haber leido nada ni abierto la transaccion (R23, R41). */
+ *  rechace, tiene que rechazar SIN haber leido nada ni abierto la transaccion. */
 function catalogosQueExplotan() {
   const explota = (nombre: string) =>
     vi.fn(() => {
@@ -466,8 +466,8 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
 
 describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
   /** Registra el ORDEN real de las llamadas al `scope` de la unidad de trabajo, no solo si se
-   *  llamaron: `create` -> `syncForOrder` -> `setReservedAt` es el pseudocodigo literal de
-   *  `design.md > 8`. */
+   *  llamaron: `create` -> `syncForOrder` -> `setReservedAt` es el pseudocodigo literal del
+   *  caso de uso. */
   function repositorioConOrden(outcome: 'reserved' | 'not_reserved' = 'reserved') {
     const orden: string[] = [];
     const create = vi.fn(async () => {

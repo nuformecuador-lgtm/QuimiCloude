@@ -358,8 +358,8 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // ningun script tocan `orders`.
     const DUENOS_DE_ORDERS = [
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
-      // QC-141 T8: `OrderNumberDirectory` de `inventario` -el numero visible de un pedido para
-      // el historial de un lote-, tercer y ultimo dueno.
+      // `OrderNumberDirectory` de `inventario` -el numero visible de un pedido para el
+      // historial de un lote-, tercer y ultimo dueno.
       'lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma.ts',
       'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts',
     ]
@@ -473,7 +473,7 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // una lista CERRADA y sigue sin haber nada de Prisma en el dominio ni en los puertos.
     const DUENO_DE_PRISMA = 'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts'
     const AMBITO_DE_EMPRESA = 'lib/modules/pedidos/adapters/driven/persistence/company-scope.ts'
-    // QC-141 T8: `order-unit-of-work-prisma.ts` importa `@prisma/client` SOLO por el tipo
+    // `order-unit-of-work-prisma.ts` importa `@prisma/client` SOLO por el tipo
     // `Prisma.TransactionClient` -el `tx` que le pasa a `order-prisma.ts` y a `inventario`-, sin
     // un solo `prisma.<modelo>` propio.
     const UNIDAD_DE_TRABAJO = 'lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma.ts'
@@ -619,11 +619,11 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // `NotCancellableError` (R28)- y borrar tampoco (R32). `order-catalog-prisma.ts` se sumo
     // como tercer consumidor, DECISION explicita y no descuido: es el unico adaptador con
     // permiso para escribir `status` fuera de `update-order.ts`, y su escritura tambien pasa
-    // por la misma guardia antes de tocar la fila. `transition-order.ts` se suma con QC-141
-    // T10: es quien implementa `OrderCatalog.transitionAliveById` desde ahora -el Finalizar de
-    // la planta y una edicion que entrega comparten la MISMA comprobacion antes de abrir la
-    // unidad de trabajo-, y `order-catalog-prisma.ts` conserva su propia llamada porque su
-    // funcion sigue viva -sin llamantes en produccion, pero probada- y no se borro (T10).
+    // por la misma guardia antes de tocar la fila. `transition-order.ts` se suma: es quien
+    // implementa `OrderCatalog.transitionAliveById` desde ahora -el Finalizar de la planta y
+    // una edicion que entrega comparten la MISMA comprobacion antes de abrir la unidad de
+    // trabajo-, y `order-catalog-prisma.ts` conserva su propia llamada porque su funcion sigue
+    // viva -sin llamantes en produccion, pero probada- y no se borro.
     expect(
       pedidosSources.filter((file) => CONSUME_LA_GUARDIA.test(read(file))).map(etiqueta),
     ).toEqual([
@@ -640,10 +640,10 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       // `canTransition`, un `nextStatus` o una segunda `stateMachine` siguen cayendo aqui.
       const sinConsumo = read(file)
         .replace(/from\s+'[^']*order-transitions'/g, ' ')
-        // QC-141 T10: la RUTA del archivo nuevo -`domain/transition-order.ts`, quien tambien
-        // consume la guardia- contiene la palabra "transition" delimitada por el guion, y el
-        // criterio de abajo la leeria como una segunda tabla si no se descuenta aqui igual que
-        // la ruta del dueno.
+        // La RUTA del archivo nuevo -`domain/transition-order.ts`, quien tambien consume la
+        // guardia- contiene la palabra "transition" delimitada por el guion, y el criterio de
+        // abajo la leeria como una segunda tabla si no se descuenta aqui igual que la ruta del
+        // dueno.
         .replace(/from\s+'[^']*transition-order'/g, ' ')
         .replace(/\b(assertTransition|isAllowedTransition)\b/g, ' ')
       expect(sinConsumo, `${etiqueta(file)} declara una transicion de estado`).not.toMatch(PROHIBIDO)

@@ -1,5 +1,5 @@
-// QC-141 T10 — `createTransitionOrder`: implementa `OrderCatalog['transitionAliveById']` sobre
-// la unidad de trabajo compartida con `inventario`. Doble de `OrderUnitOfWork`, sin base de
+// `createTransitionOrder`: implementa `OrderCatalog['transitionAliveById']` sobre la unidad de
+// trabajo compartida con `inventario`. Doble de `OrderUnitOfWork`, sin base de
 // datos: lo que se prueba es el ORDEN de llamadas (permiso implicito en `assertTransition`
 // antes de abrir la unidad, `lockAliveById` antes de `setStatus`, `setStatus` antes de
 // `consumeForOrder`) y los CINCO resultados posibles.

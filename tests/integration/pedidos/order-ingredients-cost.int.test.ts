@@ -84,9 +84,8 @@ const orders: OrderRepository = {
   listAlive: listAliveOrders,
 }
 
-// Mismo cableado que `lib/composition` para `orderUnitOfWork` (`design.md > 5.2`): abre la
-// transaccion compartida con `inventario` y ata, sobre el MISMO `tx`, la escritura de `pedidos`
-// y las reservas.
+// Mismo cableado que `lib/composition` para `orderUnitOfWork`: abre la transaccion compartida
+// con `inventario` y ata, sobre el MISMO `tx`, la escritura de `pedidos` y las reservas.
 const unitOfWork: OrderUnitOfWork = {
   run: (work) =>
     withOrderTransaction((tx) => {
@@ -285,8 +284,8 @@ function borrarReceta(recipeId: string): Promise<unknown> {
 }
 
 /**
- * QC-141 T9: el alta y la edicion de este archivo pasan ahora por la reserva real -el mismo
- * `unitOfWork` que `lib/composition`-, asi que cada pedido puede haber dejado asientos en
+ * El alta y la edicion de este archivo pasan por la reserva real -el mismo `unitOfWork` que
+ * `lib/composition`-, asi que cada pedido puede haber dejado asientos en
  * `reservation_movements`. `reservation_movements_order_id_fkey` es `RESTRICT`: hay que
  * borrarlos antes que el pedido, igual que `inventory_movements` antes que el lote.
  */

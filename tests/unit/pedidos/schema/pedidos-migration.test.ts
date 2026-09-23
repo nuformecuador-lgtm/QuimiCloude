@@ -1424,19 +1424,19 @@ describe('QC-34 down.sql — reversion exacta al esquema de QC-33', () => {
 })
 
 // ---------------------------------------------------------------------------------------------
-// EL RELEVO (QC-60, T11) — por que este archivo sigue vigilando dos objetos que ya no viven.
+// EL RELEVO — por que este archivo sigue vigilando dos objetos que ya no viven.
 //
-// Los dos bloques de arriba describen el SQL HISTORICO de QC-33 y QC-34, que no cambia nunca.
-// Pero dos de las cosas que describen dejaron de estar vivas con
+// Los dos bloques de arriba describen el SQL HISTORICO de las migraciones originales de
+// `orders`, que no cambia nunca. Pero dos de las cosas que describen dejaron de estar vivas con
 // `20260915120000_orders_company_scope`: el indice unico GLOBAL `(ano, secuencia)` y la funcion
 // `next_order_sequence(integer)`. Sin este bloque, un lector honesto saldria de aqui creyendo
 // que el correlativo sigue siendo global y que la funcion sigue repartiendo numeros.
 //
 // No se apaga ninguna afirmacion de arriba --las dos siguen siendo ciertas SOBRE SU ARCHIVO, y
-// la de la funcion ademas hace falta: el `down.sql` de QC-60 la recrea IDENTICA y aquella es la
-// unica descripcion de «identica» que hay en el repo--. Lo que se anade es el puntero al
-// sucesor, comprobado y no comentado: si alguien borrara la migracion de QC-60 o le quitara el
-// relevo, este bloque cae.
+// la de la funcion ademas hace falta: el `down.sql` de la migracion del relevo la recrea
+// IDENTICA y aquella es la unica descripcion de «identica» que hay en el repo--. Lo que se anade
+// es el puntero al sucesor, comprobado y no comentado: si alguien borrara esa migracion o le
+// quitara el relevo, este bloque cae.
 //
 // El contrato COMPLETO de esa migracion --la columna, la FK, la clave candidata, la FK
 // compuesta, las tres guardias del DOWN y todo lo que NO hace-- esta en
@@ -1464,7 +1464,7 @@ describe('QC-60 orders_company_scope — el relevo de los dos objetos de arriba'
       join(findMigrationDir('_orders_company_scope'), 'down.sql'),
       'utf8',
     )
-    // «Identica» se mide contra el cuerpo que vigila el bloque de QC-34 de este mismo archivo.
+    // «Identica» se mide contra el cuerpo que vigila el bloque HISTORICO de este mismo archivo.
     const original = onlyStatement(cancelUp, /CREATE OR REPLACE FUNCTION "next_order_sequence"/i)
     const cuerpoOriginal = /AS \$\$([\s\S]*)\$\$/.exec(original)?.[1]
     const cuerpoRecreado = /CREATE OR REPLACE FUNCTION "next_order_sequence"[\s\S]*?AS \$\$([\s\S]*?)\$\$;/.exec(

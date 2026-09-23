@@ -337,8 +337,8 @@ function cableadoDe(constante: string, interfaz: string): Cableado {
       crudo.set(abreviado[1] ?? '', (abreviado[1] ?? '').trim())
       continue
     }
-    // QC-141 T10: `metodo: fabricaDeDominio(...)` -una llamada, no una referencia suelta- es la
-    // forma de `transitionAliveById` (`METODOS_DELEGADOS_EN_DOMINIO`, mas abajo). Se registra
+    // `metodo: fabricaDeDominio(...)` -una llamada, no una referencia suelta- es la forma de
+    // `transitionAliveById` (`METODOS_DELEGADOS_EN_DOMINIO`, mas abajo). Se registra
     // metodo -> nombre de la fabrica para que el cableado SIGA teniendo la clave correcta; el
     // resto de la verificacion la hace un `it` propio, no el barrido generico.
     const conLlamada = /^(\w+)\s*:\s*(\w+)\s*\(/.exec(entrada)
@@ -376,8 +376,8 @@ const PUERTOS = [
 ] as const
 
 /**
- * QC-141 T10 (`design.md > 5.4`): `OrderCatalog.transitionAliveById` ya no cablea una funcion
- * cruda de `order-catalog-prisma.ts` -cablea `createTransitionOrder`, un caso de uso de
+ * `OrderCatalog.transitionAliveById` ya no cablea una funcion cruda de
+ * `order-catalog-prisma.ts` -cablea `createTransitionOrder`, un caso de uso de
  * `pedidos/domain` que abre `OrderUnitOfWork` y, por dentro, llama a
  * `OrderWriteRepository.lockAliveById` y `.setStatus`, implementadas en `order-prisma.ts`. Esas
  * dos SI declaran y consumen `scope: OrderScope`, y el barrido sin lista de excepciones de mas

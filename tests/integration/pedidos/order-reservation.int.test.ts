@@ -1,8 +1,8 @@
 /**
- * QC-141 T9 — crear, editar, cancelar y borrar con reserva, contra Postgres real: los cuatro
- * casos de uso de `pedidos` cableados a mano con los adaptadores driven REALES de `pedidos`,
- * `recetas`, `inventario` y `unidades` -el mismo conjunto que `lib/composition` ata, sin pasar
- * por `lib/composition` para no arrastrar el resto de la aplicacion a un test de dominio-.
+ * Crear, editar, cancelar y borrar con reserva, contra Postgres real: los cuatro casos de uso
+ * de `pedidos` cableados a mano con los adaptadores driven REALES de `pedidos`, `recetas`,
+ * `inventario` y `unidades` -el mismo conjunto que `lib/composition` ata, sin pasar por
+ * `lib/composition` para no arrastrar el resto de la aplicacion a un test de dominio-.
  *
  * AISLAMIENTO — `withOrderTransaction` abre su PROPIA `prisma.$transaction` sobre el cliente
  * global (mismo criterio que `order-unit-of-work.int.test.ts`): envolver la corrida en una
@@ -11,7 +11,7 @@
  * y la limpia en un `finally`.
  *
  * Recetas en PORCENTAJE: `crearLinea` inserta en `recipe_lines` con `percentage`, nunca
- * `quantity` -esa columna ya no existe (QC-147)-.
+ * `quantity` -esa columna ya no existe-.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -287,7 +287,7 @@ describe('R12 — editar a la baja deja solo la diferencia', () => {
         { kind: 'reserve', quantity: '10.0000', createdBy: fixture.actorId },
         { kind: 'release', quantity: '6.0000', createdBy: fixture.actorId },
       ]);
-      // R20: la edicion reinicia el plazo -sigue fijado, y no es necesariamente un instante
+      // La edicion reinicia el plazo -sigue fijado, y no es necesariamente un instante
       // distinto en un reloj de baja resolucion, pero el pedido sigue "apartado".
       expect(await reservedAtDe(creado.id)).not.toBeNull();
       expect(primeraReservedAt).not.toBeNull();
@@ -550,7 +550,7 @@ describe('QC-141 T10 — el Finalizar consume (R27, R28, R32)', () => {
       const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
 
       await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'ENTREGADO', fixture.actorId, new Date());
-      // ENTREGADO no admite ninguna transicion (design.md > 5): un segundo intento, con
+      // ENTREGADO no admite ninguna transicion: un segundo intento, con
       // ENTREGADO como `from`, es ilegal por construccion y no vuelve a tocar el inventario.
       await expect(
         transitionAliveById(creado.id, fixture.companyId, 'ENTREGADO', 'ENTREGADO', fixture.actorId, new Date()),
@@ -609,7 +609,7 @@ describe('QC-141 T10 — Finalizar sin material suficiente (R30, R31)', () => {
 
     try {
       // Se crea con la receta VACIA -no aparta nada- y se recarga con lineas por fuera del
-      // caso de uso, como en R14: el pedido llega al Finalizar sin nada apartado.
+      // caso de uso: el pedido llega al Finalizar sin nada apartado.
       const creado = await createOrder(nuevoPedido(recipeVacia, fixture.presentationId, '10.0000'), actorDe(fixture));
       expect(await movimientosDe(creado.id)).toEqual([]);
       await prisma.order.update({ where: { id: creado.id }, data: { recipeId } });
@@ -625,7 +625,7 @@ describe('QC-141 T10 — Finalizar sin material suficiente (R30, R31)', () => {
 
       expect(resultado).toBe('ok');
       expect(await stockDe(batchId)).toBe('90.0000');
-      // N2: sin apartado previo no hay nada que resolver en `reservation_movements` -la salida
+      // Sin apartado previo no hay nada que resolver en `reservation_movements` -la salida
       // fisica queda en `inventory_movements`, asentada por `consumeBatchStock`-.
       expect(await movimientosDe(creado.id)).toEqual([]);
     } finally {

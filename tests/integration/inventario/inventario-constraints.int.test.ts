@@ -429,8 +429,8 @@ describe('estructura del producto', () => {
 
   it('QC-141 (5b): qty_alert es numeric(14,4) en information_schema y conserva la parte decimal', async () => {
     await inRolledBackTransaction(async (tx) => {
-      // QC-141 (pregunta 5b, aprobada): `qty_alert` deja de ser entero para compararse contra
-      // la existencia decimal sin convertir ninguna de las dos.
+      // `qty_alert` deja de ser entero para compararse contra la existencia decimal sin
+      // convertir ninguna de las dos.
       const types = await columnTypes(tx, 'products', ['qty_alert'])
       expect(types.map((type) => [type.column_name, type.data_type])).toEqual([
         ['qty_alert', 'numeric'],

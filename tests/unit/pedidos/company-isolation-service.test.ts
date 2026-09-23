@@ -168,7 +168,7 @@ function almacen() {
   const setReservedAt = vi.fn(async () => undefined)
   const writeOrders = { lockAliveById, create, updateAlive, cancelAlive, softDeleteAlive, setReservedAt }
 
-  // Reservas de `inventario`: no forman parte de lo que R16/R20/R21 miden -el ambito de ESE
+  // Reservas de `inventario`: no forman parte de lo que este archivo mide -el ambito de ESE
   // puerto es otro archivo-, asi que aparta y libera sin tocar el almacen de pedidos.
   const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }))
   const releaseForOrder = vi.fn(async () => undefined)
@@ -218,7 +218,7 @@ function almacen() {
     unitOfWork,
     // Los espias del puerto DE PEDIDOS -lectura y escritura-, con nombre, para que
     // `llamadasAlPuerto` los recorra igual que antes. Los de `reservations` quedan fuera: su
-    // ambito -otro puerto, otro modulo- no es lo que R16 mide aqui.
+    // ambito -otro puerto, otro modulo- no es lo que este archivo mide aqui.
     espias: { findAliveById, listAlive, ...writeOrders },
     recipes: recipes as unknown as RecipeCatalog,
     products: products as unknown as ProductCatalog,
@@ -292,7 +292,7 @@ describe('QC-60 R16 — los seis casos de uso pasan al puerto el ambito DEL ACTO
 
     const llamadas = [...llamadasAlPuerto(a), ...llamadasAlPuerto(b)]
     // Los ocho metodos se ejercitaron: sin esto, un metodo que nadie llamo pasaria el bucle.
-    // QC-141 T9: `lockAliveById` y `setReservedAt` son nuevos -la escritura vive dentro de
+    // `lockAliveById` y `setReservedAt` son nuevos -la escritura vive dentro de
     // `unitOfWork.run`-, y el ambito les llega igual que a los seis de siempre.
     expect(new Set(llamadas.map(([metodo]) => metodo))).toEqual(
       new Set([

@@ -1,16 +1,15 @@
 /**
- * QC-141 T7 — `createMaterialReservations` (`reservation-prisma.ts`) y `consumeBatchStock`/
+ * `createMaterialReservations` (`reservation-prisma.ts`) y `consumeBatchStock`/
  * `adjustBatchStock` (`product-prisma.ts`) contra Postgres real.
  *
  * AISLAMIENTO -- `createWithFirstBatch`, `addBatchToAlive` y `adjustBatchStock` usan el cliente
  * Prisma GLOBAL y abren cada uno SU PROPIA `prisma.$transaction` (mismo criterio que
  * `product-stock.int.test.ts` y `ledger-cuadre.int.test.ts`): envolver la corrida en una
  * transaccion del test seria aislamiento de mentira. Cada caso fabrica su propia empresa
- * efimera con randomUUID, escribe solo en ella y la limpia en un `finally`. El caso de R30/R15
- * que verifica «sin cambiar nada» envuelve SOLO esa llamada en su propia
- * `prisma.$transaction` con una senal de rollback -el mismo patron que usaria el llamante real
- * (`pedidos`, T10) al recibir `insufficient`-, y comprueba el estado con el cliente global
- * despues de deshacerla.
+ * efimera con randomUUID, escribe solo en ella y la limpia en un `finally`. El caso que
+ * verifica «sin cambiar nada» envuelve SOLO esa llamada en su propia `prisma.$transaction` con
+ * una senal de rollback -el mismo patron que usaria el llamante real (`pedidos`) al recibir
+ * `insufficient`-, y comprueba el estado con el cliente global despues de deshacerla.
  */
 import { randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -52,7 +51,7 @@ function normalizeForTest(name: string): string {
     .replace(/[^a-z0-9]/gu, '');
 }
 
-/** Senal de rollback: no es un fallo, es como se deshace la transaccion del caso de R15/R30. */
+/** Senal de rollback: no es un fallo, es como se deshace la transaccion del caso. */
 class RollbackSignal extends Error {
   constructor() {
     super('rollback de aislamiento del caso');
@@ -150,7 +149,7 @@ async function createFixture(): Promise<Fixture> {
 let orderSequence = 0;
 
 /** Un pedido REAL y minimo: la reserva exige la FK compuesta `(order_id, company_id)` contra
- *  `orders_id_company_id_key` (R17), asi que no vale un uuid escrito a mano. */
+ *  `orders_id_company_id_key`, asi que no vale un uuid escrito a mano. */
 async function createOrderRow(fixture: Fixture): Promise<string> {
   orderSequence += 1;
   const order = await prisma.order.create({
@@ -254,7 +253,7 @@ afterAll(async () => {
 });
 
 // -------------------------------------------------------------------------------------------
-// R39 — deteccion estatica: ningun UPDATE/DELETE sobre los dos libros en todo `lib/`.
+// Deteccion estatica: ningun UPDATE/DELETE sobre los dos libros en todo `lib/`.
 // -------------------------------------------------------------------------------------------
 
 const RAIZ_REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -321,7 +320,7 @@ const TABLAS = { reservationMovement: 'reservation_movements', inventoryMovement
 const METODOS_PROHIBIDOS = ['update', 'updateMany', 'delete', 'deleteMany'] as const;
 
 /** Los hallazgos de un archivo dado, ya leido: un asiento no se corrige ni se borra, solo se le
- *  asienta encima (`R39`, D11). */
+ *  asienta encima. */
 function hallazgosDe(fuente: string, archivo = 'lib/fabricado.ts'): string[] {
   const codigo = stripComments(fuente);
   const hallazgos: string[] = [];
@@ -522,8 +521,8 @@ describe('R32 — el sistema no consume dos veces el material de un mismo pedido
       const stockTrasPrimeraEntrega = await batchStockOf(batchId);
       const asientosTrasPrimeraEntrega = await inventoryMovementsOf(batchId);
 
-      // Segunda entrega del MISMO pedido: ya no tiene nada apartado (R32), y sin necesidad de
-      // respaldo -N2- no hay nada que consumir.
+      // Segunda entrega del MISMO pedido: ya no tiene nada apartado, y sin necesidad de
+      // respaldo no hay nada que consumir.
       const segunda = await reservations.consumeForOrder({
         orderId,
         companyId: fixture.companyId,
@@ -588,7 +587,7 @@ describe('R30 — una merma sobre el lote apartado completa desde otros lotes co
     const reservations = createMaterialReservations(prisma);
 
     try {
-      // Reparte 8 en el lote mas antiguo (R8): el unico con disponible en ese momento.
+      // Reparte 8 en el lote mas antiguo: el unico con disponible en ese momento.
       await reservations.syncForOrder({
         orderId,
         companyId: fixture.companyId,
@@ -657,7 +656,7 @@ describe('R30 — una merma sobre el lote apartado completa desde otros lotes co
       const asientosAntes = await inventoryMovementsOf(batchId);
 
       // La transaccion la abriria `pedidos` en produccion; aqui se simula ese contorno para
-      // demostrar que, si el llamante aborta ante `insufficient`, no queda NADA escrito (R15).
+      // demostrar que, si el llamante aborta ante `insufficient`, no queda NADA escrito.
       let resultado: unknown;
       try {
         await prisma.$transaction(async (tx) => {
@@ -729,7 +728,7 @@ describe('R34, R37 — el lote sobre-reservado se marca, con su apartado y su di
         expect.objectContaining({ id: batchId, reserved: '8.0000', available: '2.0000', overReserved: false }),
       ]);
 
-      // La merma deja el apartado (8) por encima de la existencia nueva (5): sobre-reservado (R33).
+      // La merma deja el apartado (8) por encima de la existencia nueva (5): sobre-reservado.
       await adjustBatchStock(batchId, '-5', 'merma', fixture.actorId, new Date(), ambito(fixture));
 
       const sobreReservado = await findBatchesOfAliveProduct(productId, ambito(fixture));

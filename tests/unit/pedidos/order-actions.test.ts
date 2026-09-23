@@ -72,7 +72,7 @@ const {
   updateOrderMock: vi.fn(),
   cancelOrderMock: vi.fn(),
   deleteOrderMock: vi.fn(),
-  // QC-141 T14: la cobertura de la pagina (R35).
+  // La cobertura de la pagina.
   findCoverageMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   // QC-60 (R17): la action pide las DOS caras de la sesion. Sin contexto no hay actor.
@@ -535,8 +535,8 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     findCoverageMock.mockRejectedValueOnce(ajeno)
     sinDetalle(await listOrderCoverageAction([ORDER_ID]), 'listOrderCoverageAction')
 
-    // Y no hay ni un `catch` que se quede callado: los SIETE `catch` del archivo (QC-141 T14
-    // anade `listOrderCoverageAction` a los seis originales) devuelven `toErrorState`, que o
+    // Y no hay ni un `catch` que se quede callado: los SIETE `catch` del archivo -uno por
+    // Server Action, incluida `listOrderCoverageAction`- devuelven `toErrorState`, que o
     // traduce el error de dominio o registra el ajeno y devuelve el codigo generico. Ninguno se
     // lo traga sin dejar rastro.
     const source = readActionsSource()
@@ -738,7 +738,7 @@ describe('QC-60 R34 — las seis firmas publicas de las Server Actions no cambia
       ['createOrderAction', 2],
       ['deleteOrderAction', 2],
       ['getOrderAction', 1],
-      // QC-141 T14: la cobertura de la pagina (R35), argumento ya tipado, ningun `FormData`.
+      // La cobertura de la pagina, argumento ya tipado, ningun `FormData`.
       ['listOrderCoverageAction', 1],
       ['listOrdersAction', 1],
       ['updateOrderAction', 3],

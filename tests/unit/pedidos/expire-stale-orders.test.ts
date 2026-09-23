@@ -1,7 +1,7 @@
-// QC-141 T12 — el proceso diario (R21, R22, R25, R26): `createExpireStaleOrders` sobre dobles
-// de `OrderUnitOfWork`, sin base de datos. `findExpirable` ya viene con el filtro de R22 hecho
-// -es contrato del driven-, asi que estos tests afirman sobre lo que hace el CASO DE USO con
-// cada candidato: bloquear, recomprobar bajo el candado y, solo entonces, cancelar y liberar.
+// El proceso diario: `createExpireStaleOrders` sobre dobles de `OrderUnitOfWork`, sin base de
+// datos. `findExpirable` ya viene con el filtro de vencidos hecho -es contrato del driven-, asi
+// que estos tests afirman sobre lo que hace el CASO DE USO con cada candidato: bloquear,
+// recomprobar bajo el candado y, solo entonces, cancelar y liberar.
 import { describe, expect, it, vi } from 'vitest'
 
 import { createExpireStaleOrders } from '@/lib/modules/pedidos/domain/expire-stale-orders'

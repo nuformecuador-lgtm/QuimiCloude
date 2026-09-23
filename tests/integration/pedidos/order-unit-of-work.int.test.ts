@@ -1,12 +1,12 @@
 /**
- * QC-141 T8 — `OrderUnitOfWork` contra Postgres real: `withOrderTransaction` cableado a mano con
+ * `OrderUnitOfWork` contra Postgres real: `withOrderTransaction` cableado a mano con
  * `createOrderWriteRepository` (`pedidos`) y `createMaterialReservations` (`inventario`), el
  * MISMO par que ata `lib/composition`.
  *
  * AISLAMIENTO POR COMMIT: `withOrderTransaction` abre su PROPIA `prisma.$transaction` sobre el
  * cliente global, asi que envolver la corrida en una transaccion del test seria aislamiento de
  * mentira. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, presentacion,
- * receta, producto y lote) y la limpia en un `finally`. El caso de R15 fuerza el fallo DESPUES de
+ * receta, producto y lote) y la limpia en un `finally`. Un caso fuerza el fallo DESPUES de
  * apartar y comprueba, con el cliente global, que no quedo ni el pedido ni la reserva. El caso del
  * reintento reutiliza el trigger determinista de `order-duplicate-number.int.test.ts` -sin el no
  * hay forma de provocar el choque del correlativo sin una carrera de verdad- para demostrar que
@@ -54,7 +54,7 @@ function connectionString(): string {
 }
 
 /** El mismo cableado que `lib/composition`: los dos repositorios sobre el `tx` de la MISMA
- *  transaccion (`design.md > 5.2`), sin `unitCatalog`. */
+ *  transaccion, sin `unitCatalog`. */
 function runInOrderTransaction<T>(work: (scope: OrderTransactionScope) => Promise<T>): Promise<T> {
   return withOrderTransaction((tx) =>
     work({ orders: createOrderWriteRepository(tx), reservations: createMaterialReservations(tx) }),

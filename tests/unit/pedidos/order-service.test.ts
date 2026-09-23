@@ -279,10 +279,10 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
     ).rejects.toBeInstanceOf(ValidationError)
   })
 
-  // QC-141 T9: el `23505` del correlativo ya NO se traduce aqui. `OrderWriteRepository.create`
-  // lo deja SUBIR, y quien reintenta con una transaccion nueva es `OrderUnitOfWork`
-  // (`design.md > 5.3`); agotados los tres intentos, la excepcion de Prisma sube sin traducir.
-  // Lo prueba `tests/integration/pedidos/order-unit-of-work.int.test.ts`, contra Postgres real.
+  // El `23505` del correlativo ya NO se traduce aqui. `OrderWriteRepository.create` lo deja
+  // SUBIR, y quien reintenta con una transaccion nueva es `OrderUnitOfWork`; agotados los tres
+  // intentos, la excepcion de Prisma sube sin traducir. Lo prueba
+  // `tests/integration/pedidos/order-unit-of-work.int.test.ts`, contra Postgres real.
 })
 
 describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {

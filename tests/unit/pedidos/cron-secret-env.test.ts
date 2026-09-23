@@ -1,6 +1,6 @@
-// QC-141 T12 — R24: la puerta del proceso diario. `verifyCronSecret` es pura sobre
-// `process.env.CRON_SECRET` y la cabecera que le pasan: se restaura la variable en cada test para
-// no ensuciar el resto de la suite.
+// La puerta del proceso diario. `verifyCronSecret` es pura sobre `process.env.CRON_SECRET` y
+// la cabecera que le pasan: se restaura la variable en cada test para no ensuciar el resto de
+// la suite.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { verifyCronSecret } from '@/lib/modules/pedidos/adapters/driven/config/cron-secret-env'

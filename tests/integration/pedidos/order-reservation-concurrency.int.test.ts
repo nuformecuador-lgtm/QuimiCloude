@@ -1,16 +1,16 @@
 /**
- * QC-141 T15 — concurrencia de la reserva contra Postgres real, con DOS conexiones autenticas
- * compitiendo por la misma fila de producto: dos altas simultaneas, una merma simultanea a un
- * apartado, y cien vueltas de combinaciones de crear/editar/cancelar/borrar/Finalizar sobre el
- * mismo producto sin interbloqueo.
+ * Concurrencia de la reserva contra Postgres real, con DOS conexiones autenticas compitiendo
+ * por la misma fila de producto: dos altas simultaneas, una merma simultanea a un apartado, y
+ * cien vueltas de combinaciones de crear/editar/cancelar/borrar/Finalizar sobre el mismo
+ * producto sin interbloqueo.
  *
  * AISLAMIENTO — mismo criterio que `order-reservation.int.test.ts`: `withOrderTransaction` y
  * `adjustBatchStock` abren cada uno SU PROPIA `prisma.$transaction` contra el cliente GLOBAL, asi
  * que envolver la corrida en una transaccion del test seria aislamiento de mentira -correrian en
  * otra conexion del pool y no competirian por la misma fila-. `Promise.all`, sin `await` entre
  * las dos llamadas, es lo que las hace competir de verdad por el bloqueo `FOR NO KEY UPDATE` del
- * producto, igual que `product-stock.int.test.ts` R10/R31. Cada caso fabrica su propia empresa
- * efimera con randomUUID y la limpia en un `finally`.
+ * producto, igual que `product-stock.int.test.ts`. Cada caso fabrica su propia empresa efimera
+ * con randomUUID y la limpia en un `finally`.
  */
 import { randomUUID } from 'node:crypto';
 

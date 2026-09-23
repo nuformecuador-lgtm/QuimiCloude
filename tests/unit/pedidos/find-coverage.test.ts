@@ -1,4 +1,4 @@
-// QC-141 T14 — La cobertura de VARIOS pedidos a la vez (`design.md > 5.1`, `> 10`; R35).
+// La cobertura de VARIOS pedidos a la vez.
 //
 // Con un doble de `ReservationQueries` que CUENTA invocaciones: «una consulta por pagina, sin
 // N+1» no se puede demostrar mirando el resultado -un resultado correcto sale igual con una

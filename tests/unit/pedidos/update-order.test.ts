@@ -432,8 +432,8 @@ function loteCosteable(overrides: Partial<CostingBatch> = {}): CostingBatch {
 }
 
 /** Los DOS puertos, la unidad de trabajo y el catalogo de recetas FALLAN SI SE LLAMAN: no basta
- *  con que la edicion rechace, tiene que rechazar SIN haber leido nada ni abierto la transaccion
- *  (R23, R41). */
+ *  con que la edicion rechace, tiene que rechazar SIN haber leido nada ni abierto la
+ *  transaccion. */
 function catalogosQueExplotan() {
   const explota = (nombre: string) =>
     vi.fn(() => {

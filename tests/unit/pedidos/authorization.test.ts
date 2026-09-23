@@ -73,7 +73,7 @@ function dobles() {
     listAlive: explota('orders.listAlive'),
   } as unknown as OrderRepository
 
-  // La unidad de trabajo TAMBIEN explota si se abre sin autorizacion: R41 exige el permiso
+  // La unidad de trabajo TAMBIEN explota si se abre sin autorizacion: el permiso se exige
   // ANTES de abrir la transaccion compartida con `inventario`, y `run` es justo el punto por
   // el que se abre.
   const unitOfWork = { run: explota('unitOfWork.run') } as unknown as OrderUnitOfWork
