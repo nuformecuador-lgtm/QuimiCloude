@@ -1,9 +1,9 @@
 /**
  * E2E de la caja de busqueda de `/pedidos`: recorta la lista por nombre de receta, entra y sale
  * de la URL como `q`, muestra «sin coincidencias» cuando corresponde y sobrevive a la
- * paginacion, al panel lateral, a recargar y a «Atras» (R25 a, c, d; R9; R26).
+ * paginacion, al panel lateral, a recargar y a «Atras».
  *
- * Nada del importe: esa mitad del guion original se movio a QC-151.
+ * Nada del importe: esa mitad del guion original se movio a otra pantalla.
  *
  * DATOS: empresa, usuario y recetas efimeros de este worker, con el prefijo `qc122_e2e_` y el
  * `RUN_ID` dentro, igual que el resto de `e2e/`. La receta B nace y se da de baja aparte: un
@@ -246,7 +246,7 @@ test.describe('busqueda en la pantalla de pedidos', () => {
   test('escribir un termino recorta la lista a lo que devuelve la consulta, y la URL lleva `q` (R25 a)', async ({
     page,
   }) => {
-    if (!companyId || !recipeAId || !recipeBId || !companyId) {
+    if (!companyId || !recipeAId || !recipeBId) {
       throw new Error('el fixture no existe: fallo el beforeAll');
     }
     const year = new Date().getUTCFullYear();
@@ -263,8 +263,9 @@ test.describe('busqueda en la pantalla de pedidos', () => {
     const searchBox = page.getByTestId(SEARCH_BOX);
     await searchFor(page, searchBox, SEARCH_TERM_A_AND_B);
 
-    const numbers = await visibleOrderNumbers(page);
-    expect(numbers.sort()).toEqual([...expectedNumbers].sort());
+    await expect
+      .poll(() => visibleOrderNumbers(page).then((numbers) => numbers.sort()), { timeout: 60_000 })
+      .toEqual([...expectedNumbers].sort());
   });
 
   test('un termino sin coincidencias muestra el estado propio dentro de la tabla, y limpiar devuelve todo (R25 c)', async ({
@@ -302,8 +303,10 @@ test.describe('busqueda en la pantalla de pedidos', () => {
     const searchBox = page.getByTestId(SEARCH_BOX);
     await searchFor(page, searchBox, SEARCH_TERM_C);
 
+    await expect
+      .poll(() => visibleOrderNumbers(page).then((numbers) => numbers.length), { timeout: 60_000 })
+      .toBe(10);
     const firstPageNumbers = await visibleOrderNumbers(page);
-    expect(firstPageNumbers).toHaveLength(10);
 
     await page.getByTestId(NEXT_PAGE).click();
     await expect(page).toHaveURL(
@@ -311,8 +314,10 @@ test.describe('busqueda en la pantalla de pedidos', () => {
       { timeout: 60_000 },
     );
 
+    await expect
+      .poll(() => visibleOrderNumbers(page).then((numbers) => numbers.length), { timeout: 60_000 })
+      .toBe(RECIPE_C_ORDER_COUNT - 10);
     const secondPageNumbers = await visibleOrderNumbers(page);
-    expect(secondPageNumbers).toHaveLength(RECIPE_C_ORDER_COUNT - 10);
     expect(new Set([...firstPageNumbers, ...secondPageNumbers]).size).toBe(RECIPE_C_ORDER_COUNT);
 
     const rowWithFirstNumber = (numbers: readonly string[]): Locator =>
@@ -322,7 +327,7 @@ test.describe('busqueda en la pantalla de pedidos', () => {
           has: page.getByTestId(ORDER_NUMBER_CELL).filter({ hasText: exactText(numbers[0] ?? '') }),
         });
 
-    // --- El panel lateral: abrir y cerrar no navega ni pierde el termino ni la pagina (R9).
+    // --- El panel lateral: abrir y cerrar no navega ni pierde el termino ni la pagina.
     await rowWithFirstNumber(secondPageNumbers).getByTestId(EDIT_ACTION).click();
     await expect(page.getByTestId(ORDER_FORM)).toBeVisible({ timeout: 60_000 });
     expect(new URL(page.url()).searchParams.get('page')).toBe('2');
@@ -333,14 +338,14 @@ test.describe('busqueda en la pantalla de pedidos', () => {
     await expect(searchBox).toHaveValue(SEARCH_TERM_C);
     expect(await visibleOrderNumbers(page)).toEqual(secondPageNumbers);
 
-    // --- Recargar (R9): misma URL, misma caja, misma pagina.
+    // --- Recargar: misma URL, misma caja, misma pagina.
     await page.reload();
     await expect(page.getByTestId(ORDERS_TITLE)).toBeVisible({ timeout: 60_000 });
     expect(new URL(page.url()).searchParams.get('page')).toBe('2');
     await expect(searchBox).toHaveValue(SEARCH_TERM_C);
     expect(await visibleOrderNumbers(page)).toEqual(secondPageNumbers);
 
-    // --- Ir a otra pantalla y volver con Atras (R26): el termino y la pagina vuelven con la URL.
+    // --- Ir a otra pantalla y volver con Atras: el termino y la pagina vuelven con la URL.
     await page.goto(DASHBOARD_ROUTE);
     expect(new URL(page.url()).pathname).toBe(DASHBOARD_ROUTE);
 
@@ -384,7 +389,34 @@ test.describe('busqueda en la pantalla de pedidos', () => {
     });
     await expect(searchBox).toHaveValue(SEARCH_TERM_A_AND_B);
 
-    const numbers = await visibleOrderNumbers(page);
-    expect(numbers.sort()).toEqual([...expectedANumbers].sort());
+    await expect
+      .poll(() => visibleOrderNumbers(page).then((numbers) => numbers.sort()), { timeout: 60_000 })
+      .toEqual([...expectedANumbers].sort());
+  });
+
+  test('Atras despues de Limpiar deja la caja y la lista con el termino de antes de limpiar (R27)', async ({
+    page,
+  }) => {
+    if (!companyId) throw new Error('el fixture no existe: fallo el beforeAll');
+
+    await loginAndLand(page, { username: adminUsername, password: adminPassword });
+    await page.goto(ordersUrl());
+    await expect(page.getByTestId(ORDERS_TITLE)).toBeVisible({ timeout: 60_000 });
+
+    const searchBox = page.getByTestId(SEARCH_BOX);
+    await searchFor(page, searchBox, SEARCH_TERM_NO_MATCH);
+
+    const orderTable = page.getByTestId(ORDER_TABLE);
+    await expect(orderTable.getByTestId(NO_MATCHES)).toBeVisible({ timeout: 60_000 });
+
+    await orderTable.getByTestId(CLEAR_SEARCH).click();
+    await expect(page).toHaveURL((url) => url.searchParams.get('q') === null, { timeout: 60_000 });
+
+    await page.goBack();
+    await expect(page).toHaveURL((url) => url.searchParams.get('q') === SEARCH_TERM_NO_MATCH, {
+      timeout: 60_000,
+    });
+    await expect(searchBox).toHaveValue(SEARCH_TERM_NO_MATCH);
+    await expect(orderTable.getByTestId(NO_MATCHES)).toBeVisible({ timeout: 60_000 });
   });
 });
