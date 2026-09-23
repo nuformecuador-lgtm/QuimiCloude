@@ -181,3 +181,14 @@ export {
   type ListCompanyOrdersDeps,
 } from './domain/list-company-orders';
 export type { CompanyOrderView } from './domain/company-order-view';
+
+// ---------------------------------------------------------------------------------------
+// Los candidatos del selector de responsables. Bloque NUEVO al final: no reordena ni reformatea
+// nada de lo de arriba.
+// ---------------------------------------------------------------------------------------
+export {
+  createListResponsibleCandidates,
+  MAX_CANDIDATES,
+  type ListResponsibleCandidatesDeps,
+  type ResponsibleCandidate,
+} from './domain/list-responsible-candidates';
