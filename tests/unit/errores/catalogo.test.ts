@@ -39,9 +39,9 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 51 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 53 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
-      expect(ERROR_CODES).toHaveLength(51)
+      expect(ERROR_CODES).toHaveLength(53)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 

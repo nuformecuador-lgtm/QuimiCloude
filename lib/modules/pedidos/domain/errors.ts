@@ -154,3 +154,22 @@ export class ValidationError extends PedidosError {
     super('invalid_input', diagnostic);
   }
 }
+
+/** R27, R30, R31: al entregar, ni el lote apartado ni el resto de lotes con disponible
+ *  alcanzan la cantidad que hace falta. La transaccion se deshace entera (R15). */
+export class InsufficientMaterialError extends PedidosError {
+  readonly code = 'insufficient_material';
+
+  constructor(diagnostic?: string) {
+    super('insufficient_material', diagnostic);
+  }
+}
+
+/** R50: se entrega un pedido sin material apartado cuya receta actual no tiene ninguna linea. */
+export class RecipeWithoutLinesError extends PedidosError {
+  readonly code = 'recipe_without_lines';
+
+  constructor(diagnostic?: string) {
+    super('recipe_without_lines', diagnostic);
+  }
+}
