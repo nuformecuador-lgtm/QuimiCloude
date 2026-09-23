@@ -17,7 +17,7 @@ import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-
 import type { Page } from '../../../domain/page';
 import type { OrderScope } from '../../../domain/order-scope';
 import type { NewOrder, OrderEdit, OrderRow } from '../../../domain/order-view';
-import type { OrderWriteRepository } from '../../../ports/order-write-repository';
+import type { LockedOrderRow, OrderWriteRepository } from '../../../ports/order-write-repository';
 
 /** Cliente global o el transaccional que abra quien llama: los metodos de mas abajo no
  *  distinguen, mismo patron que `createOrderAssignmentRepository`. */
@@ -616,9 +616,10 @@ export async function softDeleteAliveOrder(
   return count === 1 ? 'ok' : 'not_found';
 }
 
-/** Fila minima del bloqueo: solo hace falta el identificador para saber que la fila existia,
- *  era viva y de esta empresa; el resto de columnas se relee con la API tipada. */
-type LockedOrderIdRow = { readonly id: string };
+/** Fila minima del bloqueo: el identificador para saber que la fila existia, era viva y de esta
+ *  empresa, y `reserved_at` para que quien recomprueba el plazo bajo el candado no pida una
+ *  segunda lectura; el resto de columnas se relee con la API tipada. */
+type LockedOrderIdRow = { readonly id: string; readonly reserved_at: Date | null };
 
 /**
  * `lockAliveById` de `OrderWriteRepository`: `SELECT ... FOR UPDATE` de un pedido vivo, con el
@@ -629,10 +630,10 @@ async function lockAliveOrderById(
   id: string,
   scope: OrderScope,
   tx: PrismaLike,
-): Promise<OrderRow | null> {
+): Promise<LockedOrderRow | null> {
   const { companyId } = companyScopeColumns(scope);
   const rows = await tx.$queryRaw<ReadonlyArray<LockedOrderIdRow>>(Prisma.sql`
-    SELECT "id"
+    SELECT "id", "reserved_at"
       FROM "orders"
      WHERE "id" = ${id}::uuid
        AND "company_id" = ${companyId}::uuid
@@ -643,7 +644,7 @@ async function lockAliveOrderById(
   if (alive === undefined) return null;
 
   const row = await tx.order.findUnique({ where: { id: alive.id }, select: ORDER_SELECT });
-  return row === null ? null : toOrderRow(row);
+  return row === null ? null : { ...toOrderRow(row), reservedAt: alive.reserved_at };
 }
 
 /**

@@ -314,6 +314,46 @@ describe('R22 — el proceso diario NO toca lo que no debe', () => {
   });
 });
 
+describe('R53 — una edicion intercalada entre el lote y el candado gana', () => {
+  it('si la edicion reinicia reserved_at entre findExpirableOrders y el bloqueo, el pedido sigue PENDIENTE con su material', async () => {
+    const fixture = await crearFixture();
+    const { productId } = await crearProductoConLote(fixture, '100');
+    const recipeId = await crearReceta(fixture);
+    await crearLineaCompleta(recipeId, productId);
+
+    try {
+      const orderId = await crearPedidoCaducado(fixture, recipeId);
+
+      // Doble de `findExpirableOrders`: devuelve el lote real y, ANTES de que el caso de uso
+      // bloquee la fila, otra conexion -otra edicion, fuera de esta transaccion- reinicia
+      // `reserved_at` al instante presente.
+      const findExpirableConEdicionIntercalada: typeof findExpirableOrders = async (
+        companyId,
+        threshold,
+        limit,
+      ) => {
+        const lote = await findExpirableOrders(companyId, threshold, limit);
+        await prisma.$executeRaw`UPDATE "orders" SET "reserved_at" = ${new Date()}::timestamptz WHERE "id" = ${orderId}::uuid`;
+        return lote;
+      };
+      const expireConEdicionIntercalada = createExpireStaleOrders({
+        listCompanyIds: listActiveCompanyIds,
+        findExpirable: findExpirableConEdicionIntercalada,
+        unitOfWork,
+      });
+
+      const resultado = await expireConEdicionIntercalada();
+
+      expect(resultado.failed).toEqual([]);
+      const estado = await estadoDe(orderId);
+      expect(estado.status).toBe('PENDIENTE');
+      expect(estado.reservedAt).not.toBeNull();
+    } finally {
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+});
+
 describe('R25 — idempotente ante una repeticion o un solape', () => {
   it('dos ejecuciones SEGUIDAS cancelan y liberan una sola vez', async () => {
     const fixture = await crearFixture();

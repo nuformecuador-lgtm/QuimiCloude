@@ -107,7 +107,7 @@ function dobles(opciones: {
   const create = vi.fn(async () => opciones.alta ?? fila())
   const filaVista = opciones.fila === undefined ? null : opciones.fila
   const findAliveById = vi.fn(async () => filaVista)
-  const lockAliveById = vi.fn(async () => filaVista)
+  const lockAliveById = vi.fn(async () => (filaVista === null ? null : { ...filaVista, reservedAt: null }))
   const updateAlive = vi.fn(async () => opciones.edicion ?? 'ok')
   const findRefsIncludingDeleted = vi.fn(async () => opciones.recetas ?? [RECETA_VIVA])
   const findPresentationRefs = vi.fn(

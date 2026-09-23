@@ -11,13 +11,13 @@ import { InvalidTransitionError } from '@/lib/modules/pedidos/domain/errors';
 import { createTransitionOrder } from '@/lib/modules/pedidos/domain/transition-order';
 import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
 
-import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
+import type { LockedOrderRow } from '@/lib/modules/pedidos/ports/order-write-repository';
 import type { RecipeCatalog, RecipeExecutionLine } from '@/lib/modules/recetas';
 
 const EMPRESA = 'c-1';
 const AHORA = new Date('2026-09-23T12:00:00Z');
 
-function filaBloqueada(overrides: Partial<OrderRow> = {}): OrderRow {
+function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow {
   return {
     id: 'o-1',
     number: { year: 2026, sequence: 7 },
@@ -32,6 +32,7 @@ function filaBloqueada(overrides: Partial<OrderRow> = {}): OrderRow {
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
     presentationId: null,
+    reservedAt: null,
     ...overrides,
   };
 }

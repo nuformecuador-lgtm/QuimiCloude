@@ -138,7 +138,7 @@ function repositorioDePedidos() {
 
   // `lockAliveById` bloquea la MISMA fila que `findAliveById`: en estos tests no hay carrera
   // que las separe.
-  const lockAliveById = vi.fn(async () => filaVista);
+  const lockAliveById = vi.fn(async () => ({ ...filaVista, reservedAt: null }));
   const updateAlive = vi.fn(async () => 'ok' as const);
   const setReservedAt = vi.fn(async () => undefined);
   const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
@@ -183,7 +183,7 @@ function repositorioConEstado(status: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | '
     listAlive: explota('listAlive'),
   } as unknown as OrderRepository;
 
-  const lockAliveById = vi.fn(async () => filaVista);
+  const lockAliveById = vi.fn(async () => ({ ...filaVista, reservedAt: null }));
   const updateAlive = vi.fn(async () => 'ok' as const);
   const setReservedAt = vi.fn(async () => undefined);
   const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
@@ -648,7 +648,7 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
     const orders = { findAliveById, listAlive: vi.fn() } as unknown as OrderRepository;
 
     const orden: string[] = [];
-    const lockAliveById = vi.fn(async () => filaVista);
+    const lockAliveById = vi.fn(async () => ({ ...filaVista, reservedAt: null }));
     const updateAlive = vi.fn(async () => {
       orden.push('orders.updateAlive');
       return 'ok' as const;

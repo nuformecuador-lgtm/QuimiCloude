@@ -2,6 +2,10 @@ import type { OrderStatus } from '../domain/order-classification';
 import type { OrderScope } from '../domain/order-scope';
 import type { NewOrder, OrderEdit, OrderRow } from '../domain/order-view';
 
+/** La fila que bloquea `lockAliveById`, con `reservedAt`: quien vuelve a comprobar el plazo bajo
+ *  el candado -el proceso diario- lo necesita sin pedir una segunda lectura. */
+export type LockedOrderRow = OrderRow & { readonly reservedAt: Date | null };
+
 /**
  * Puerto de escritura del pedido DENTRO de una transaccion compartida con `inventario`
  * (`OrderUnitOfWork`, `ports/order-unit-of-work.ts`). No reemplaza a `OrderRepository`: ese
@@ -16,7 +20,7 @@ export interface OrderWriteRepository {
   /** `SELECT ... FOR UPDATE` del pedido vivo: `null` si no existe, esta borrado o es de otra
    *  empresa. El dominio repite su comprobacion de transicion sobre la fila que esto devuelve,
    *  nunca sobre la que leyo antes de abrir la transaccion. */
-  lockAliveById(id: string, scope: OrderScope): Promise<OrderRow | null>;
+  lockAliveById(id: string, scope: OrderScope): Promise<LockedOrderRow | null>;
 
   /** Alta dentro de la transaccion ya abierta. El choque del correlativo (indice unico
    *  `orders_company_year_sequence_key`) se deja SUBIR: la transaccion entera ya quedo

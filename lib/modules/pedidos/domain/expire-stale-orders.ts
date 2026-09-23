@@ -81,7 +81,7 @@ export function createExpireStaleOrders(
 
         for (const id of batch) {
           try {
-            const cancelled = await expireOne(deps.unitOfWork, id, companyId, instant);
+            const cancelled = await expireOne(deps.unitOfWork, id, companyId, instant, threshold);
             if (cancelled) expired += 1;
           } catch {
             failed.push({ id, companyId });
@@ -96,20 +96,29 @@ export function createExpireStaleOrders(
   };
 }
 
-/** Una transaccion por pedido: bloquea, recomprueba y, si sigue vivo, cancela y libera. */
+/** Una transaccion por pedido: bloquea, recomprueba plazo y estado, y si sigue vencido cancela y
+ *  libera. */
 async function expireOne(
   unitOfWork: OrderUnitOfWork,
   id: string,
   companyId: string,
   instant: Date,
+  threshold: Date,
 ): Promise<boolean> {
   const scope = { companyId };
 
   return unitOfWork.run(async (transaction) => {
     const locked = await transaction.orders.lockAliveById(id, scope);
-    // Idempotencia: otra ejecucion ya lo canceló, o dejó de estar vivo entre el lote y el
-    // candado.
-    if (locked === null || locked.status !== 'PENDIENTE') return false;
+    // Idempotencia: otra ejecucion ya lo canceló, dejó de estar vivo, o una edicion intercalada
+    // reinicio el plazo o dejo el pedido sin material apartado entre el lote y el candado.
+    if (
+      locked === null ||
+      locked.status !== 'PENDIENTE' ||
+      locked.reservedAt === null ||
+      locked.reservedAt > threshold
+    ) {
+      return false;
+    }
 
     const cancelled = await transaction.orders.cancelAlive(
       id,

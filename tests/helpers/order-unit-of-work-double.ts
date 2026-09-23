@@ -11,8 +11,7 @@ import type {
   OrderTransactionScope,
   OrderUnitOfWork,
 } from '@/lib/modules/pedidos/ports/order-unit-of-work';
-import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
-import type { OrderWriteRepository } from '@/lib/modules/pedidos/ports/order-write-repository';
+import type { LockedOrderRow, OrderWriteRepository } from '@/lib/modules/pedidos/ports/order-write-repository';
 import type {
   ConsumptionOutcome,
   MaterialReservations,
@@ -82,9 +81,11 @@ export function fakeUnitOfWork(overrides: {
   return { unitOfWork: fakeOrderUnitOfWork({ orders, reservations }), orders, reservations };
 }
 
-/** Fila minima de `OrderWriteRepository.lockAliveById`/`create`: los tests que no la personalizan
- *  usan esta, para no repetir los catorce campos de `OrderRow` en cada archivo. */
-export function fakeOrderRow(overrides: Partial<OrderRow> = {}): OrderRow {
+/** Fila minima de `OrderWriteRepository.lockAliveById`: los tests que no la personalizan usan
+ *  esta, para no repetir los campos de `LockedOrderRow` en cada archivo. `reservedAt` por
+ *  defecto queda DENTRO del plazo (anterior a `AHORA` de los tests), como un pedido con material
+ *  apartado hace rato. */
+export function fakeOrderRow(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow {
   return {
     id: '11111111-1111-4111-8111-111111111111',
     number: { year: 2026, sequence: 1 },
@@ -99,6 +100,7 @@ export function fakeOrderRow(overrides: Partial<OrderRow> = {}): OrderRow {
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
     presentationId: '66666666-6666-4666-8666-666666666666',
+    reservedAt: new Date('2026-01-02T03:04:05.000Z'),
     ...overrides,
   };
 }

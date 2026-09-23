@@ -103,6 +103,48 @@ describe('createExpireStaleOrders — R22: solo toca lo que sigue PENDIENTE bajo
   })
 })
 
+describe('createExpireStaleOrders — R53: una edicion intercalada gana bajo el candado', () => {
+  it('si la edicion reinicio el plazo (reserved_at posterior al umbral) al bloquear, no cancela ni libera', async () => {
+    const d = fakeUnitOfWork({
+      orders: { lockAliveById: vi.fn(async () => fakeOrderRow({ reservedAt: AHORA })) },
+    })
+    const listCompanyIds = vi.fn(async () => [EMPRESA_A])
+    const findExpirable = vi.fn(async () => [PEDIDO_A_ID])
+
+    const resultado = await createExpireStaleOrders({
+      listCompanyIds,
+      findExpirable,
+      unitOfWork: d.unitOfWork,
+      now: () => AHORA,
+    })()
+
+    expect(d.orders.cancelAlive).not.toHaveBeenCalled()
+    expect(d.reservations.releaseForOrder).not.toHaveBeenCalled()
+    expect(d.orders.setReservedAt).not.toHaveBeenCalled()
+    expect(resultado).toEqual({ expired: 0, failed: [] })
+  })
+
+  it('si la edicion dejo el pedido sin material apartado (reserved_at nulo) al bloquear, no cancela ni libera', async () => {
+    const d = fakeUnitOfWork({
+      orders: { lockAliveById: vi.fn(async () => fakeOrderRow({ reservedAt: null })) },
+    })
+    const listCompanyIds = vi.fn(async () => [EMPRESA_A])
+    const findExpirable = vi.fn(async () => [PEDIDO_A_ID])
+
+    const resultado = await createExpireStaleOrders({
+      listCompanyIds,
+      findExpirable,
+      unitOfWork: d.unitOfWork,
+      now: () => AHORA,
+    })()
+
+    expect(d.orders.cancelAlive).not.toHaveBeenCalled()
+    expect(d.reservations.releaseForOrder).not.toHaveBeenCalled()
+    expect(d.orders.setReservedAt).not.toHaveBeenCalled()
+    expect(resultado).toEqual({ expired: 0, failed: [] })
+  })
+})
+
 describe('createExpireStaleOrders — R25: idempotente ante una repeticion o un solape', () => {
   it('un pedido ya CANCELADO por una ejecucion anterior no se cancela ni se libera otra vez', async () => {
     const d = fakeUnitOfWork({
