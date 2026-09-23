@@ -24,7 +24,7 @@
 `zone: frontend`, **`complexity: low`** (leader, label en Jira). **Cupo `frontend` 2 de 2** (QC-107, QC-114): **solo
 Fase 1**, F2.0 espera hueco. Worktree montado desde `dev`. Alcance crecio a tres sitios (board reescrito antes de
 sembrar), **5 decisiones cerradas y 1 pregunta abierta** en `specs/QC-132-cantidad-del-pedido-sin-title-exacto/requirements.md`.
-Siguiente: F1.2 (`spec_author`).
+**F1.2 y F1.3 hechos**: `spec_author` entrego R1-R11 y T1-T10 (`f71070e3`, rama pusheada), semilla intacta por diff; tarjeta en *En revision*. **PARADA EN F1.4** con dos decisiones: la pregunta abierta de la linea convertida (bloquea T4) y QC-133, duplicada de R1-R2.
 
 ### QC-130 - F0, F1.0 y F1.1 (2026-09-23)
 

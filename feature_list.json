@@ -1987,7 +1987,7 @@
       "epic_name": "Pedidos",
       "name": "cantidad-del-pedido-sin-title-exacto",
       "description": "La cantidad se pinta redondeada a dos decimales y su valor exacto no aparece en ninguna parte de la pantalla. Medido el 2026-09-18 por el censo de QC-127: `'0.1255'` se pinta `'0.13'` y no hay `title`.\n\n**ACOTADA el 2026-09-23 con** `/afinar-feature`. Entran **tres sitios**, todos con el patrón que ya existe (`exactDecimalTitle`, como el restante y el mínimo de compra):\n\n* la columna Cantidad del listado de `/pedidos`;\n* la cantidad del pedido en la pantalla de ejecución de `/asignacion/[id]`;\n* la cantidad de cada línea de receta en esa misma pantalla.\n\n**Fue un olvido, no una decisión:** la cantidad lleva su valor exacto al pasar el ratón. **Se hereda de QC-127** el límite conocido: el `title` no existe en móvil ni en papel.\n\n**Sin E2E:** basta con tests de componente, porque no es un flujo crítico.\n\n**NO ENTRA:** rehacer el redondeo de `decimal-display.ts`; los tests que QC-127 ya dejó completos; el campo del formulario de pedidos (`order-field.tsx`), que redondea lo tecleado y no una cifra mostrada.\n\nDetalle y la pregunta abierta en `specs/QC-132-cantidad-del-pedido-sin-title-exacto/requirements.md`.",
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "complexity": "low",
       "zone": "frontend",
