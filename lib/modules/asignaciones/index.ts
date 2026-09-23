@@ -171,3 +171,13 @@ export type { FinishedOrderView } from './domain/finished-order-view';
 // modulo) y cualquier lector externo apliquen el MISMO criterio que usa `assign-responsibles.ts`.
 // ---------------------------------------------------------------------------------------
 export { canBeResponsible } from './domain/responsible-eligibility';
+
+// ---------------------------------------------------------------------------------------
+// La vista «Todos»: los pedidos de la empresa en cualquier estado, sin filtro por usuario. Bloque
+// NUEVO al final: no reordena ni reformatea nada de lo de arriba.
+// ---------------------------------------------------------------------------------------
+export {
+  createListCompanyOrders,
+  type ListCompanyOrdersDeps,
+} from './domain/list-company-orders';
+export type { CompanyOrderView } from './domain/company-order-view';
