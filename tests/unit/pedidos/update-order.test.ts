@@ -345,6 +345,33 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
       expect(pres.findRefs, status).not.toHaveBeenCalled();
     }
   });
+
+  it('receta y presentacion invalidas a la vez -> `recipe_not_found`: la receta se comprueba primero', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const pres = catalogoDePresentaciones();
+    const PRESENTACION_INEXISTENTE = '77777777-7777-4777-8777-777777777777';
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: pres.presentations,
+      now: () => AHORA,
+    });
+
+    const codigo = await codigoDelFallo(() =>
+      updateOrder(
+        ORDER_ID,
+        { ...EDICION_HACIA_B, presentationId: PRESENTACION_INEXISTENTE },
+        ACTOR_A,
+      ),
+    );
+
+    expect(codigo).toBe('recipe_not_found');
+    expect(pres.findRefs).not.toHaveBeenCalled();
+    expect(repo.updateAlive).not.toHaveBeenCalled();
+  });
 });
 
 // T5 — la edicion RECALCULA el importe de los ingredientes con la receta del DATO ENTRANTE.

@@ -77,12 +77,6 @@ export function createUpdateOrder(
     // una edicion rechazada no lee nada mas y no modifica ninguna fila.
     assertTransition(row.status, data.status);
 
-    // La presentacion se comprueba SIEMPRE, cambie o no -es una consulta de un id y evita una
-    // rama «si cambio» que habria que probar aparte. Con un pedido viejo sin presentacion,
-    // `row.presentationId` es `null` y la entrada trae una: la comprobacion es la misma.
-    const [presentation] = await deps.presentations.findRefs([data.presentationId], actor.companyId);
-    if (presentation === undefined) throw new PresentationNotFoundError();
-
     // R25 -la sutileza de esta ficha-. Si la receta NO cambia se acepta aunque este dada de
     // baja: corregir la cantidad de un pedido viejo no puede obligar a cambiarle la formula.
     // Si CAMBIA, se exige viva igual que en el alta (R15), asi que sigue siendo imposible
@@ -91,6 +85,12 @@ export function createUpdateOrder(
       const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId], actor.companyId);
       if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
     }
+
+    // La presentacion se comprueba SIEMPRE, cambie o no -es una consulta de un id y evita una
+    // rama «si cambio» que habria que probar aparte. Con un pedido viejo sin presentacion,
+    // `row.presentationId` es `null` y la entrada trae una: la comprobacion es la misma.
+    const [presentation] = await deps.presentations.findRefs([data.presentationId], actor.companyId);
+    if (presentation === undefined) throw new PresentationNotFoundError();
 
     // El coste se recalcula con la receta del DATO ENTRANTE, no con la de la fila vieja: una
     // edicion que solo cambia la cantidad o la prioridad tambien reescribe el importe con los
