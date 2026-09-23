@@ -154,7 +154,12 @@ export async function transitionAliveOrder(
 
   const { count } = await prisma.order.updateMany({
     where: { AND: [orderCompanyScope({ companyId }), { id, deletedAt: null, status: from }] },
-    data: { status: to, updatedAt: now, updatedBy: actorId },
+    data: {
+      status: to,
+      updatedAt: now,
+      updatedBy: actorId,
+      ...(to === 'ENTREGADO' ? { finishedAt: now } : {}),
+    },
   });
   if (count === 1) return 'ok';
 

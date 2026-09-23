@@ -292,6 +292,22 @@ describe('transitionAliveOrder', () => {
     })
   })
 
+  it('R3 - a ENTREGADO lleva finishedAt en el mismo data; a EN_CURSO no', async () => {
+    updateMany.mockResolvedValue({ count: 1 })
+
+    await transitionAliveOrder('o-1', EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA)
+    await transitionAliveOrder('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA)
+
+    const [aEnCurso, aEntregado] = updateMany.mock.calls
+    expect(aEnCurso?.[0]?.data).not.toHaveProperty('finishedAt')
+    expect(aEntregado?.[0]?.data).toEqual({
+      status: 'ENTREGADO',
+      updatedAt: AHORA,
+      updatedBy: 'actor-1',
+      finishedAt: AHORA,
+    })
+  })
+
   it('T1(b) - ENTREGADO->EN_CURSO lanza InvalidTransitionError SIN escribir', async () => {
     await expect(
       transitionAliveOrder('o-1', EMPRESA, 'ENTREGADO', 'EN_CURSO', 'actor-1', AHORA),
