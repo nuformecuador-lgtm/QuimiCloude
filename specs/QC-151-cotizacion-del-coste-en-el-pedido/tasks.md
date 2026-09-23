@@ -51,7 +51,7 @@ Archivos: `lib/composition/index.ts`, `tests/unit/pedidos/authorization.test.ts`
 siguen verdes sin tocarlos (`R4`); `guard-arquitectura-modulos`, `guard-autorizacion-por-permiso` y
 `guard-permisos-sembrados` verdes (`R4`).
 
-## [ ] T3 — Server Action `[depende de T2]`
+## [x] T3 — Server Action `[depende de T2]`
 
 Archivos: `lib/modules/pedidos/adapters/driving/order-actions.ts`,
 `tests/unit/pedidos/order-actions.test.ts`, `tests/unit/pedidos-ui/pedidos-convenciones.test.ts`.
