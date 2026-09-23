@@ -99,8 +99,10 @@
   habilitar o deshabilitar Guardar: el importe que queda guardado es el que calcula el guardado con los
   lotes de ese momento.
 - **R21.** SI la petición de cotización falla —rechazo de autorización, de validación o error
-  inesperado—, ENTONCES el bloque de coste DEBE mostrar el guion y el formulario DEBE seguir
-  permitiendo guardar. *(Posición por defecto, pendiente de confirmar: pregunta abierta 1.)*
+  inesperado—, ENTONCES el bloque de coste DEBE mostrar, bajo el bloque, el mensaje de ese error tal
+  como lo da el catálogo de errores (p. ej. «No se pudo cotizar: <mensaje>»), NO DEBE mostrar el guion
+  ni ninguna cifra, y el formulario DEBE seguir permitiendo guardar. *(Cerrada el 2026-09-23 en F1.4:
+  ver la nota al final.)*
 
 ### E2E
 
@@ -126,11 +128,7 @@
 
 ## Preguntas abiertas
 
-1. **¿Qué muestra el bloque de coste si la cotización falla?** (sesión caducada, permiso retirado
-   tras el login, error inesperado del servidor). Ninguna decisión lo cubre. **Posición por defecto
-   escrita en R21:** el guion, sin mensaje propio, y Guardar sigue disponible —el propio guardado
-   dará el error que corresponda—. Alternativa: pintar el mensaje del error bajo el bloque. Si el
-   humano elige la alternativa, R21 cambia y se añade su test; nada más del spec se mueve.
+Ninguna.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -145,3 +143,14 @@
 | 2026-09-23 | ¿Sin importe? | Un guion, nunca un cero (heredado de **QC-123**); también si aún no hay receta o cantidad válida. |
 | 2026-09-23 | ¿Permiso? | `pedidos.modificar`, el del formulario, validado en el service. Sin permiso nuevo; el catálogo no cambia. |
 | 2026-09-23 | ¿E2E? | **Sí**: los importes son flujo crítico (`CHECKPOINTS.md`). Elegir receta, teclear cantidad, ver la cotización y ver el importe guardado al reabrir. |
+
+## Nota del 2026-09-23 — F1.4: spec aprobado y pregunta abierta 1 cerrada
+
+El humano aprobó el spec y respondió la única pregunta abierta. Se ajusta R21 sin renumerar.
+
+| Fecha | Pregunta | Decisión |
+|---|---|---|
+| 2026-09-23 | ¿Qué muestra el bloque de coste si la cotización falla (sesión caducada, error inesperado)? | Se pinta el **mensaje del error** bajo el bloque (p. ej. «No se pudo cotizar: …», con el mensaje que ya da el catálogo de errores) y Guardar sigue disponible. **Nunca un guion**, para no confundir un fallo con «sin importe». |
+
+Cobertura: R21. Consecuencia sobre R17: un fallo no deja cifra visible, así que la siguiente
+cotización en vuelo muestra solo «cotizando…».

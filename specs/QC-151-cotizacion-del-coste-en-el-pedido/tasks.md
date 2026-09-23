@@ -5,9 +5,8 @@
 > `feat(QC-151): …` / `test(QC-151): …`, uno por task. Ningún comentario de producción cita la ficha
 > ni un `R<n>` (`docs/conventions.md > Comentarios`).
 >
-> **Antes de T1:** confirmar con el leader el solape con QC-141 en `lib/composition/index.ts`
-> (`design.md > 9`). Por `AGENTS.md > Paralelismo` bloquea hasta que QC-141 esté `done`, salvo que el
-> humano acepte el solape.
+> **Solape con QC-141** (`lib/composition/index.ts` y otros, `design.md > 9`): el humano aceptó el
+> 2026-09-23 arrancar en paralelo; quien mergee segundo resuelve el conflicto.
 
 ## [ ] T1 — Esquema y caso de uso de cotización `[primera]`
 
@@ -112,7 +111,11 @@ Archivos: `app/(private)/pedidos/components/use-order-cost-quote.ts` (nuevo),
 - `R17`: sin cifra visible (alta, o tras un guion) y petición en vuelo -> solo «cotizando…», ni guion
   ni `$`;
 - `R19`: el elemento de la cifra lleva `title` cuando difiere y no lo lleva cuando no;
-- `R21`: respuesta `{ status: 'error', code: 'unauthorized' }` y `code: 'unexpected'` -> guion.
+- `R21`: respuesta `{ status: 'error', code: 'unauthorized', message }` -> el testid
+  `order-cost-quote-error` contiene ese `message`, y el bloque NO contiene el guion ni `$` (también
+  partiendo de una cifra visible); con `code: 'unexpected'` se pinta `UnexpectedErrorNotice` con su
+  identificador; una cotización posterior que responde bien quita el mensaje; y con el error visible,
+  la siguiente petición en vuelo muestra solo «cotizando…» (`R17`).
 
 ## [ ] T6 — El bloque en el formulario `[depende de T3, T4, T5]`
 
@@ -136,8 +139,8 @@ esos archivos se ponen rojos por la export que falta; `design.md > 10`).
 - `R20`: el `FormData` que recibe `createOrderAction`/`updateOrderAction` tiene exactamente las claves
   de `ORDER_BUSINESS_FIELDS` (más `status` en la edición), ninguna de importe; y Guardar está
   habilitado con una cotización en vuelo y con el guion;
-- `R21`: con la acción de cotizar devolviendo error, Guardar sigue habilitado y guardar invoca
-  `createOrderAction`.
+- `R21`: con la acción de cotizar devolviendo error, el mensaje del error aparece bajo el bloque (sin
+  guion), Guardar sigue habilitado y guardar invoca `createOrderAction`.
 
 `order-form.test.tsx`, `order-sheet.test.tsx`, `pedidos-viewport.test.tsx`, `read-only.test.tsx`,
 `order-row-wiring.test.tsx`, `order-sheet-responsibles.test.tsx` y
@@ -202,5 +205,5 @@ la app local y el Postgres local con `db:seed`, sin red externa (`R22`); la sali
 | R18 | `tests/unit/pedidos-ui/order-amount.test.ts`, `e2e/pedidos-cotizacion.spec.ts` (a, b) |
 | R19 | `order-amount.test.ts`, `order-cost-quote.test.tsx` |
 | R20 | `order-form-quote.test.tsx` |
-| R21 | `order-cost-quote.test.tsx`, `order-form-quote.test.tsx` (pendiente de la pregunta abierta 1) |
+| R21 | `order-cost-quote.test.tsx`, `order-form-quote.test.tsx` (mensaje del error, nunca guion; cerrada en F1.4) |
 | R22 | `e2e/pedidos-cotizacion.spec.ts` |

@@ -177,8 +177,11 @@ export function useOrderCostQuote(initialAmount: string | null): {
   `setTimeout(pedir, ORDER_COST_QUOTE_DEBOUNCE_MS)` (R13). Cada tecla reinicia la ventana.
 - `pedir`: `const id = ++requestRef.current; quoting = true;` y
   `quoteOrderCostAction({ recipeId, quantity }).then(r => { if (id !== requestRef.current) return; ... })`
-  (R15). Éxito -> `amount = r.data.ingredientsCost` (R10 si es `null`); error -> `amount = null` (R21).
-  En los dos, `quoting = false`.
+  (R15). Éxito -> `amount = r.data.ingredientsCost`, `error = null` (R10 si es `null`); error ->
+  `amount = null`, `error = r` (el `ErrorState` entero, R21). En los dos, `quoting = false`. Cualquier
+  paso al guion de R9 y cualquier petición nueva limpian `error`.
+- El estado gana `readonly error: ErrorState | null`: con él el bloque distingue «sin importe» (guion)
+  de «falló» (mensaje), que la decisión de F1.4 exige no confundir.
 - El temporizador se limpia al desmontar (el panel monta un `OrderForm` nuevo por apertura).
 - La espera de 500 ms **no** atenúa: la cifra se atenúa desde que sale la petición hasta que vuelve
   («mientras cotiza» = petición en vuelo). Durante la ventana se ve la cifra de antes, sin marca.
@@ -189,15 +192,22 @@ export function useOrderCostQuote(initialAmount: string | null): {
 export const ORDER_COST_QUOTE_TESTID = 'order-cost-quote';
 export const ORDER_COST_QUOTE_VALUE_TESTID = 'order-cost-quote-value';
 export const ORDER_COST_QUOTE_QUOTING_TESTID = 'order-cost-quote-quoting';
+export const ORDER_COST_QUOTE_ERROR_TESTID = 'order-cost-quote-error';
 export function OrderCostQuote(props: OrderCostQuoteState): JSX.Element;
 ```
 
-| `amount` | `quoting` | Se pinta |
-|---|---|---|
-| cifra | `false` | `$ 12,752.55`, `title` según R19, `data-state="idle"` |
-| cifra | `true` | la misma cifra con `opacity-60`, `data-state="quoting"`, y «cotizando…» (R16) |
-| `null` | `false` | `—` (R9, R10, R21) |
-| `null` | `true` | solo «cotizando…», sin guion ni cifra (R17) |
+| `amount` | `quoting` | `error` | Se pinta |
+|---|---|---|---|
+| cifra | `false` | `null` | `$ 12,752.55`, `title` según R19, `data-state="idle"` |
+| cifra | `true` | `null` | la misma cifra con `opacity-60`, `data-state="quoting"`, y «cotizando…» (R16) |
+| `null` | `false` | `null` | `—` (R9, R10) |
+| `null` | `true` | — | solo «cotizando…», sin guion ni cifra (R17) |
+| `null` | `false` | `ErrorState` | **ni guion ni cifra**; bajo el bloque, `data-state="error"` y «No se pudo cotizar: <`error.message`>» (R21). Si `error.code` es `unexpected`, el mensaje lo pinta `UnexpectedErrorNotice` (con su identificador de petición), igual que la región de error del formulario (`order-form.tsx:562`) |
+
+- El mensaje del error sale del `message` que ya trae el `ErrorState` (catálogo de errores); el
+  prefijo «No se pudo cotizar:» es el único texto propio y ningún test depende de él (van por
+  `ORDER_COST_QUOTE_ERROR_TESTID` y por el `code`). No usa `role="alert"`: no interrumpe; va dentro
+  de la misma región `role="status"`.
 
 - Rótulo del bloque: «Coste estimado de ingredientes» (copy no afirmado por ningún test; los tests van
   por `data-testid`).
@@ -218,7 +228,7 @@ export function OrderCostQuote(props: OrderCostQuoteState): JSX.Element;
 
 ### 5.5 Barrel de la ruta
 
-`components/index.ts` gana un bloque nuevo con `OrderCostQuote`, sus tres testids,
+`components/index.ts` gana un bloque nuevo con `OrderCostQuote`, sus cuatro testids,
 `useOrderCostQuote`, `ORDER_COST_QUOTE_DEBOUNCE_MS`, `formatOrderAmount`, `orderAmountTitle` y
 `ORDER_AMOUNT_SYMBOL`. Hace falta: `pedidos-convenciones.test.ts` (R40 de QC-35) prohíbe que `tests/`
 importe la ruta por ruta profunda, así que los tests de estas piezas entran por el barrel. Ningún
@@ -270,6 +280,9 @@ Ninguno. `orders.ingredients_cost` ya existe (QC-123) y esta ficha no lo escribe
 | QC-141 | `tests/unit/pedidos/authorization.test.ts` | No consta que QC-141 lo toque; lo cito porque su T10 añade `transition-order.ts` al dominio y podría ampliar la misma tabla. | Bajo. |
 | **QC-122** (frontend, `in_progress`) | `app/(private)/pedidos/components/index.ts` | QC-122 añade exports en los bloques de `order-list-params` y `order-table`; esta ficha, un bloque nuevo tras el de `order-ingredients-table`. | Zonas distintas: no bloquea. Sin conflicto textual previsible (no adyacente). |
 | QC-122 | `tests/unit/pedidos-ui/order-table.test.tsx`, `order-list-section.test.tsx` | Solo si al correr la suite esos archivos rompen por el doble de `order-actions` sin `quoteOrderCostAction` (§10). No deberían: no teclean en el formulario. | Bajo; no se tocan salvo rojo. |
+
+**El humano aceptó el 2026-09-23 arrancar en paralelo con QC-141 pese al solape; quien mergee
+segundo resuelve el conflicto.**
 
 `order-ingredients-table.tsx`, `order-cost.ts`, `resolve-ingredients-cost.ts`, `create-order.ts` y
 `update-order.ts` (los que QC-141 reescribe en el coste) **no se tocan aquí**.
