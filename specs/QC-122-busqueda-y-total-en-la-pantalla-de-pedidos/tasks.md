@@ -88,7 +88,7 @@ Depende de T3.
   `progress/impl_QC-122-busqueda-y-total-en-la-pantalla-de-pedidos.md`; `guard-e2e-landing.test.ts` en
   verde.
 
-## T6 — Cierre
+## [x] T6 — Cierre — gate completo 2026-09-23: 640 archivos verdes y 1 rojo AJENO (`guard-arquitectura-modulos`, de `a01c90cb` en dev; lo arregla `fix/import-profundo-product-type`)
 
 Depende de T1–T5.
 
