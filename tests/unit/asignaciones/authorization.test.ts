@@ -28,6 +28,10 @@ import {
   createListFinishedOrders,
   type ListFinishedOrdersDeps,
 } from '@/lib/modules/asignaciones/domain/list-finished-orders';
+import {
+  createListCompanyOrders,
+  type ListCompanyOrdersDeps,
+} from '@/lib/modules/asignaciones/domain/list-company-orders';
 
 import type { PermissionCode } from '@/lib/modules/identity';
 
@@ -372,6 +376,78 @@ describe('QC-145 — `listFinishedOrders` (R18)', () => {
     const listFinishedOrders = createListFinishedOrders(deps);
 
     await listFinishedOrders(conPermisos('terminados.consultar'), { page: 1 });
+
+    expect(todos[0]).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------------------
+// QC-145 T8 — `listCompanyOrders` exige `pedidos.consultar` en su PRIMERA linea (R23): antes de
+// validar la entrada y antes de leer ningun dato.
+// ---------------------------------------------------------------------------------------
+describe('QC-145 — `listCompanyOrders` (R23)', () => {
+  function montarDeps(): { deps: ListCompanyOrdersDeps; todos: readonly ReturnType<typeof vi.fn>[] } {
+    const listAliveSummariesInCompany = vi.fn(async () => ({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 10,
+      totalPages: 1,
+    }));
+    const listByOrdersInCompany = vi.fn(async () => []);
+    const findRefsIncludingDeleted = vi.fn(async () => []);
+    const findRefsIncludingDeletedInCompany = vi.fn(async () => []);
+    const findRefsPresentations = vi.fn(async () => []);
+
+    const deps = {
+      assignments: {
+        insertMissing: vi.fn(),
+        listByOrderInCompany: vi.fn(),
+        listByOrdersInCompany,
+        deleteOne: vi.fn(),
+        deleteByWorkGroup: vi.fn(),
+        listOrderIdsByUserInCompany: vi.fn(),
+      },
+      orders: { listAliveSummariesInCompany },
+      recipes: { findRefsIncludingDeleted },
+      people: { findRefsIncludingDeletedInCompany },
+      presentations: { findRefs: findRefsPresentations },
+    } as unknown as ListCompanyOrdersDeps;
+
+    return {
+      deps,
+      todos: [
+        listAliveSummariesInCompany,
+        listByOrdersInCompany,
+        findRefsIncludingDeleted,
+        findRefsIncludingDeletedInCompany,
+        findRefsPresentations,
+      ],
+    };
+  }
+
+  it('R23: un actor sin `pedidos.consultar` lanza `unauthorized` ANTES de validar la entrada y sin leer nada', async () => {
+    const { deps, todos } = montarDeps();
+    const listCompanyOrders = createListCompanyOrders(deps);
+
+    for (const [, actor] of ACTORES_DENEGADOS) {
+      // La entrada `{ page: 0 }` es invalida: si la autorizacion corriera despues, esto lanzaria
+      // `invalid_input` en vez de `unauthorized`.
+      await expect(listCompanyOrders(actor, { page: 0 })).rejects.toThrow(UnauthorizedError);
+    }
+    // `asignaciones.consultar` no sustituye a `pedidos.consultar`: tampoco llega al repositorio.
+    await expect(
+      listCompanyOrders(conPermisos('asignaciones.consultar'), { page: 1 }),
+    ).rejects.toThrow(UnauthorizedError);
+
+    for (const doble of todos) expect(doble).not.toHaveBeenCalled();
+  });
+
+  it('con `pedidos.consultar` SI llega al repositorio', async () => {
+    const { deps, todos } = montarDeps();
+    const listCompanyOrders = createListCompanyOrders(deps);
+
+    await listCompanyOrders(conPermisos(PERMISO_CONSULTA), { page: 1 });
 
     expect(todos[0]).toHaveBeenCalledTimes(1);
   });
