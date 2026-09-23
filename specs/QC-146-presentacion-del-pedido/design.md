@@ -343,8 +343,13 @@ listAssignedOrders:        createListAssignedOrders({ ..., presentations: presen
 getAssignedOrderExecution: createGetAssignedOrderExecution({ ..., presentations: presentationCatalog }),
 ```
 
-`cancelOrder`, `deleteOrder`, `startAssignedOrder`, `finishAssignedOrder` no lo reciben: no lo
+`cancelOrder`, `deleteOrder`, `finishAssignedOrder` no lo reciben: no lo
 usan, y cablear una dependencia que no se usa es lo que QC-35bis quitó de `getOrder`.
+
+> **Enmienda F2.1 (2026-09-22, aceptada en la review F2.2).** `startAssignedOrder` **sí** recibe
+> `presentations`: `StartAssignedOrderDeps = GetAssignedOrderExecutionDeps & {...}` y el caso de
+> uso envuelve `createGetAssignedOrderExecution`, así que la dependencia es obligatoria por tipo, y
+> la vista que devuelve ya lleva `presentationName`. No es cablear algo que no se usa.
 
 ---
 

@@ -5,10 +5,8 @@
 
 ## Estado de las tasks
 
-T1–T9 y T11 `[x]`. **T10 `[ ]`**: el E2E está escrito (`e2e/pedidos.spec.ts`,
-`e2e/aislamiento-pedidos.spec.ts`), pasa typecheck y lint, pero **no se ha ejecutado**: el
-implementer no corre E2E (`AGENTS.md > Regla del gate`). Su «hecho» depende de que el leader corra
-`pnpm run e2e -- e2e/pedidos.spec.ts e2e/aislamiento-pedidos.spec.ts`.
+T1–T11 `[x]`. T10: el E2E lo corrió el leader tras la review F2.2 (el implementer no corre E2E,
+`AGENTS.md > Regla del gate`); resultado en «Salida real de los tests».
 
 ## Desviaciones del design, con su porqué
 
@@ -82,7 +80,7 @@ los ajenos del punto 3; `e2e/pedidos.spec.ts`, `e2e/aislamiento-pedidos.spec.ts`
 | R5 | `tests/integration/pedidos/order-crud.int.test.ts` › «R5: la baja logica conserva la presentacion»; `pedidos-schema.test.ts` (R1, R2, R5) |
 | R6 | `tests/unit/pedidos/order-input.test.ts` › «R6: rechaza la presentacion ausente o con forma que no es un uuid»; `create-order.test.ts` › «R6: sin presentacion lanza invalid_input y no escribe» |
 | R7 | `order-input.test.ts` › «R7: la edicion exige presentacion…»; `update-order.test.ts` › «R7: editar un pedido sin presentacion exige elegir una» |
-| R8 | `create-order.test.ts` › «R8: una presentacion ausente del catalogo de la empresa -> presentation_not_found, sin escribir»; `update-order.test.ts` (R8); `company-isolation-service.test.ts` › «R8: una presentación de otra empresa se rechaza como inexistente» |
+| R8 | `create-order.test.ts` › «R8: una presentacion ausente del catalogo de la empresa -> presentation_not_found, sin escribir» (alta); `company-isolation-service.test.ts` › «R8: una presentación de otra empresa se rechaza como inexistente» (alta y edición: caso «updateOrder: la presentacion es de la empresa B y el actor es de A») |
 | R9 | `update-order.test.ts` › «R9: un pedido PENDIENTE y uno EN_CURSO cambian de presentacion»; `order-crud.int.test.ts` › «R9: editar sustituye la presentacion por otra de la misma empresa» |
 | R10 | `update-order.test.ts` › «R10: ENTREGADO y CANCELADO rechazan con invalid_transition sin consultar el catalogo de presentaciones» |
 | R11 | `cancel-order.test.ts` › «R11: un pedido sin presentación se cancela»; `delete-order.test.ts` › «R11: un pedido sin presentación se da de baja» |
@@ -103,7 +101,7 @@ los ajenos del punto 3; `e2e/pedidos.spec.ts`, `e2e/aislamiento-pedidos.spec.ts`
 | R26 | `list-assigned-orders.test.ts` › «R26: un actor con solo asignaciones.consultar recibe la presentacion…»; `order-execution-screen.test.tsx` › «R26: no hay ningún control de presentación» |
 | R27 | `tests/unit/pedidos/order-catalog.test.ts` › «R27: copia presentationId tal cual, con y sin presentacion»; `tests/integration/pedidos/order-repository.int.test.ts` › «R27 — listAliveOrderSummariesByIds devuelve la presentacion» |
 | R28 | `tests/unit/inventario/presentation-catalog.test.ts` › «R28 — findRefs compone el ambito con presentationCompanyScope y con ids vacios no consulta»; `tests/integration/inventario/company-scope-queries.int.test.ts` › «R28 … PresentationCatalog.findRefs no devuelve presentaciones de otra empresa» |
-| R29 | `e2e/pedidos.spec.ts` › «el Administrador entra, da de alta un pedido, lo ve por su correlativo y lo cancela con motivo (R48, R29)». **Escrito, sin ejecutar** |
+| R29 | `e2e/pedidos.spec.ts` › «el Administrador entra, da de alta un pedido, lo ve por su correlativo y lo cancela con motivo (R48, R29)», verde en chromium y webkit |
 | R30 | `tests/guards/guard-dependencias-aprobadas.test.ts` (existente); `qc146-alcance.test.ts` › «R30 — package.json no gana ninguna dependencia» |
 
 ## Salida real de los tests
@@ -136,4 +134,7 @@ los ajenos del punto 3; `e2e/pedidos.spec.ts`, `e2e/aislamiento-pedidos.spec.ts`
 Migración: `db:migrate` → `db:rollback` → `db:migrate` hecho dos veces (con el nombre original y
 con `20260922130000`); `_prisma_migrations` con una sola fila, sin `rolled_back_at`.
 
-E2E: **no ejecutado** (ver T10).
+E2E (corrido por el leader, 2026-09-22, `pnpm run e2e -- e2e/pedidos.spec.ts
+e2e/aislamiento-pedidos.spec.ts`): `e2e/pedidos.spec.ts` (R48/R29 alta con presentación +
+cancelación; R49 sin permiso) y `e2e/aislamiento-pedidos.spec.ts` (R31) **pasan en chromium y
+webkit: 6 tests, 0 rojos** de esas specs.

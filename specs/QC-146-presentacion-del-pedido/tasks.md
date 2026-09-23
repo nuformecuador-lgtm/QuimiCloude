@@ -146,7 +146,7 @@
 
 ## Bloque 5 — E2E, alcance y cierre
 
-- [ ] **T10. E2E: el recorrido de pedidos elige presentación.** (`design.md > 8`; R29.)
+- [x] **T10. E2E: el recorrido de pedidos elige presentación.** (`design.md > 8`; R29.)
       - Archivos: `e2e/pedidos.spec.ts` (siembra una presentación de la empresa del test, la elige
         en el panel, afirma la celda y la fila de la base; limpia pedidos antes que la
         presentación), `e2e/aislamiento-pedidos.spec.ts` (siembra y elige una presentación de A
