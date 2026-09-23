@@ -1,5 +1,4 @@
 // Sin 'use client': la frontera la declara cada componente, y así page.tsx sigue siendo de servidor.
-export { DeleteSupplierDialog } from './delete-supplier-dialog';
 export {
   ACTIONS_COLUMN_ID,
   SUPPLIER_DEFAULT_PINNED_COLUMNS,

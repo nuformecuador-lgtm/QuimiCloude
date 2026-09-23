@@ -1491,9 +1491,10 @@ describe('pantalla de proveedores — baja con aviso de arrastre', () => {
     expect(toastExito).not.toHaveBeenCalled();
   });
 
-  it('al confirmar invoca la baja con el id oculto, cierra, avisa por toast y refresca', async () => {
-    // R35 (segunda mitad) + R33 — el `id` viaja en un campo oculto, que es la forma que
-    // `deleteSupplierAction` espera; no hace falta `bind`.
+  it('al confirmar invoca la baja con el id oculto, cierra, avisa por toast y navega a la lista', async () => {
+    // El `id` viaja en un campo oculto, que es la forma que `deleteSupplierAction` espera; no
+    // hace falta `bind`. El dialogo ya no refresca -lo hace `router.replace` a la propia lista-,
+    // asi que aqui basta comprobar que llega a ella.
     const user = setupUser();
     const elProveedor = proveedor({ name: 'Reactivos del Golfo' });
     listSuppliersActionMock.mockResolvedValue(paginaDeProveedores([elProveedor]));
@@ -1508,7 +1509,7 @@ describe('pantalla de proveedores — baja con aviso de arrastre', () => {
 
     await waitFor(() => expect(screen.queryByTestId(testId.dialogoBaja)).toBeNull());
     expect(toastExito).toHaveBeenCalledTimes(1);
-    expect(routerMock.refresh).toHaveBeenCalledTimes(1);
+    expect(routerMock.replace).toHaveBeenCalledWith(SUPPLIERS_ROUTE);
   });
 
   it('una baja rechazada mantiene el dialogo abierto con el mensaje a la vista', async () => {

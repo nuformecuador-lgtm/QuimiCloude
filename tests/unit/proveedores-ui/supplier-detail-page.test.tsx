@@ -1,4 +1,5 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { toast } from 'sonner';
 import {
   UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
   UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
@@ -30,7 +31,11 @@ import type {
   CatalogLineMutationFormState,
   CreateCatalogLineFormState,
 } from '@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions';
-import type { SupplierQueryResult } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
+import type {
+  CreateSupplierFormState,
+  SupplierMutationFormState,
+  SupplierQueryResult,
+} from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { SUPPLIERS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
@@ -67,6 +72,9 @@ const {
   usePathnameMock,
   routerMock,
   getSupplierActionMock,
+  createSupplierActionMock,
+  updateSupplierActionMock,
+  deleteSupplierActionMock,
   listCatalogLinesActionMock,
   createCatalogLineActionMock,
   updateCatalogLineActionMock,
@@ -85,6 +93,18 @@ const {
     prefetch: vi.fn<(href: string) => void>(),
   },
   getSupplierActionMock: vi.fn<(id: string) => Promise<SupplierQueryResult>>(),
+  createSupplierActionMock:
+    vi.fn<(prev: CreateSupplierFormState, data: FormData) => Promise<CreateSupplierFormState>>(),
+  updateSupplierActionMock:
+    vi.fn<
+      (
+        id: string,
+        prev: SupplierMutationFormState,
+        data: FormData,
+      ) => Promise<SupplierMutationFormState>
+    >(),
+  deleteSupplierActionMock:
+    vi.fn<(prev: SupplierMutationFormState, data: FormData) => Promise<SupplierMutationFormState>>(),
   listCatalogLinesActionMock:
     vi.fn<(supplierId: string, query: unknown) => Promise<CatalogLineListResult>>(),
   createCatalogLineActionMock:
@@ -124,6 +144,9 @@ vi.mock('next/navigation', async (importOriginal) => ({
 
 vi.mock('@/lib/modules/proveedores/adapters/driving/supplier-actions', () => ({
   getSupplierAction: getSupplierActionMock,
+  createSupplierAction: createSupplierActionMock,
+  updateSupplierAction: updateSupplierActionMock,
+  deleteSupplierAction: deleteSupplierActionMock,
 }));
 
 // Las cuatro operaciones del catalogo: la de lectura y las tres de escritura que el panel
@@ -161,6 +184,13 @@ const testId = {
   nombre: 'supplier-detail-name',
   telefono: 'supplier-detail-phone',
   correo: 'supplier-detail-email',
+  abrirEdicion: 'supplier-edit-open',
+  panel: 'supplier-sheet',
+  formulario: 'supplier-form',
+  enviar: 'supplier-form-submit',
+  abrirBaja: 'supplier-delete-open',
+  dialogoBaja: 'delete-supplier-dialog',
+  confirmarBaja: 'delete-supplier-confirm',
   noEncontrado: 'supplier-not-found',
   enlaceLista: 'supplier-not-found-link',
   lista: 'catalog-list',
@@ -335,8 +365,11 @@ async function renderPantallaCargando(searchParams: Consulta = {}) {
   return render(await arbolDeLaPantalla(searchParams));
 }
 
+let toastExito: ReturnType<typeof vi.spyOn>;
+
 beforeEach(() => {
   vi.clearAllMocks();
+  toastExito = vi.spyOn(toast, 'success');
   getSessionUserMock.mockResolvedValue({
     id: 'u-test-42',
     username: 'carla.duarte',
@@ -346,6 +379,9 @@ beforeEach(() => {
   });
   usePathnameMock.mockReturnValue(supplierDetailRoute(PROVEEDOR_ID));
   getSupplierActionMock.mockResolvedValue({ status: 'success', data: proveedor() });
+  createSupplierActionMock.mockResolvedValue({ status: 'success', id: 'proveedor-creado' });
+  updateSupplierActionMock.mockResolvedValue({ status: 'success' });
+  deleteSupplierActionMock.mockResolvedValue({ status: 'success' });
   listCatalogLinesActionMock.mockResolvedValue(paginaDeLineas([linea()]));
   listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD] });
   createCatalogLineActionMock.mockResolvedValue({ status: 'success', id: 'linea-creada' });
@@ -357,6 +393,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  toast.dismiss();
   vi.restoreAllMocks();
   resetViewport();
 });
@@ -923,5 +960,74 @@ describe('catalogo del proveedor — el identificador del error inesperado (QC-7
     expect(screen.queryByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toBeNull();
     expect(screen.queryByText(REFERENCIA_DEL_CASO)).toBeNull();
     expect(document.body.textContent ?? '').not.toContain(UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL);
+  });
+});
+
+describe('pagina de detalle — editar y dar de baja en la cabecera (R38)', () => {
+  it('la cabecera monta los controles de editar y de dar de baja', async () => {
+    await renderPantalla();
+
+    expect(screen.getByTestId(testId.abrirEdicion)).toBeInTheDocument();
+    expect(screen.getByTestId(testId.abrirBaja)).toBeInTheDocument();
+  });
+
+  it('editar con exito cierra el panel, avisa por toast y refresca el detalle con los datos nuevos', async () => {
+    const user = setupUser();
+    const original = proveedor({ name: 'Químicos del Norte' });
+    const actualizado = proveedor({ name: 'Químicos del Norte Renovado' });
+    getSupplierActionMock.mockResolvedValue({ status: 'success', data: original });
+
+    const pantalla = await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await screen.findByTestId(testId.formulario);
+
+    await user.clear(screen.getByTestId('supplier-field-name'));
+    await user.type(screen.getByTestId('supplier-field-name'), actualizado.name);
+    await user.click(screen.getByTestId(testId.enviar));
+
+    await waitFor(() => expect(updateSupplierActionMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByTestId(testId.panel)).toBeNull());
+
+    expect(toastExito).toHaveBeenCalledTimes(1);
+    expect(routerMock.refresh).toHaveBeenCalledTimes(1);
+
+    // `router.refresh()` vuelve a ejecutar la pagina en el servidor: se simula pintando de nuevo
+    // el arbol con lo que la ficha devuelve ahora.
+    getSupplierActionMock.mockResolvedValue({ status: 'success', data: actualizado });
+    pantalla.rerender(await resolverServerComponents(await arbolDeLaPantalla()));
+
+    expect(screen.getByTestId(testId.nombre)).toHaveTextContent(actualizado.name);
+  });
+
+  it('la baja con exito cierra el dialogo, avisa por toast y navega a la vista de proveedores', async () => {
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirBaja));
+    await screen.findByTestId(testId.dialogoBaja);
+    await user.click(screen.getByTestId(testId.confirmarBaja));
+
+    await waitFor(() => expect(deleteSupplierActionMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByTestId(testId.dialogoBaja)).toBeNull());
+
+    expect(toastExito).toHaveBeenCalledTimes(1);
+    expect(routerMock.replace).toHaveBeenCalledWith(SUPPLIERS_ROUTE);
+    expect(routerMock.refresh).not.toHaveBeenCalled();
+  });
+
+  it('el catalogo sigue igual: la baja no lo pide de nuevo ni cambia su estado', async () => {
+    const user = setupUser();
+
+    await renderPantalla();
+    await waitFor(() => expect(listCatalogLinesActionMock).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByTestId(testId.abrirBaja));
+    await screen.findByTestId(testId.dialogoBaja);
+    await user.click(screen.getByTestId(testId.confirmarBaja));
+
+    await waitFor(() => expect(deleteSupplierActionMock).toHaveBeenCalledTimes(1));
+
+    expect(listCatalogLinesActionMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId(testId.tabla)).toBeInTheDocument();
   });
 });

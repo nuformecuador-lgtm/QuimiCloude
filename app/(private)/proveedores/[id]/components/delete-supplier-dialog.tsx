@@ -24,6 +24,7 @@ import {
   deleteSupplierAction,
   type SupplierMutationFormState,
 } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
+import { SUPPLIERS_ROUTE } from '@/lib/shared/routes';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
@@ -32,47 +33,31 @@ const DELETE_SUCCESS = 'Proveedor dado de baja.';
 const INITIAL_STATE: SupplierMutationFormState = { status: 'idle' };
 
 /**
- * Confirmacion de la baja de un proveedor (R35, R33, R47, `design.md > 7`).
+ * Confirmacion de la baja de un proveedor, montada en la cabecera de su detalle.
  *
- * **El dialogo NOMBRA al proveedor**, avisa de que **sus lineas de catalogo se dan de baja con
- * el** y dice que la accion no se puede deshacer. Las tres cosas son requisito, no adorno: la
- * baja arrastra las lineas vivas del proveedor en una sola transaccion
- * (`supplier-prisma.ts > deleteSupplier`), y quien pulsa «dar de baja» sobre un proveedor no
- * tiene por que suponer que ademas se lleva su catalogo. En base es borrado logico
- * (`deletedAt`), pero el backend **no expone ninguna forma de restaurar**: para quien lo usa es
- * irreversible, y se le dice asi en vez de prometerle una vuelta atras que no existe.
+ * El dialogo nombra al proveedor y avisa de que sus lineas de catalogo se dan de baja con el: la
+ * baja arrastra el catalogo entero en una sola transaccion y no hay forma de restaurarlo, asi que
+ * se le dice al usuario en vez de prometerle una vuelta atras que no existe. Ese aviso tiene su
+ * propio `data-testid` (`delete-supplier-cascade`) para que un test lo localice sin depender de
+ * su copy.
  *
- * **El aviso del arrastre tiene su propio `data-testid`** (`delete-supplier-cascade`) para que
- * el test lo afirme por identificador y no por su copy (R47): el texto puede reescribirse; que
- * el aviso exista, no.
- *
- * **Sin confirmar no se invoca NADA** (R35): la operacion sale del `submit` del formulario del
- * dialogo, que solo existe dentro de su contenido y solo se envia al pulsar el boton de
- * confirmar. El `id` viaja en un campo oculto, que es la forma que `deleteSupplierAction`
- * espera —lo dice su propia cabecera— y por eso no necesita `bind`.
- *
- * Con exito se cierra, se avisa por toast sobre la region que el layout privado ya monta (R34,
- * **no se monta otra**) y se refresca la lista con `router.refresh()` (R33). Con error el
- * dialogo **sigue abierto** con el mensaje a la vista: cerrarlo dejaria al usuario creyendo que
- * el proveedor se dio de baja.
+ * Con exito refrescar este mismo detalle mostraria «no encontrado» -el proveedor ya no existe-,
+ * asi que en vez de refrescar se navega a la lista y se avisa por toast sobre la region que el
+ * layout privado ya monta. Con error el dialogo sigue abierto con el mensaje a la vista.
  */
 export function DeleteSupplierDialog({ supplier }: { readonly supplier: SupplierView }) {
   const [requestedOpen, setRequestedOpen] = useState(false);
   const router = useRouter();
   const [state, formAction] = useActionState(deleteSupplierAction, INITIAL_STATE);
 
-  /*
-    El dialogo abierto se DERIVA de dos cosas: lo que pidio el usuario y el resultado de la
-    operacion. Una baja con exito lo cierra sin necesidad de un `setState` dentro de un efecto
-    -que es lo que `react-hooks/set-state-in-effect` prohibe, y con razon: es un render de mas y
-    una via facil para un bucle-.
-  */
+  // El dialogo abierto se deriva del pedido del usuario y del resultado de la operacion, para no
+  // cerrar con un `setState` dentro de un efecto.
   const open = requestedOpen && state.status !== 'success';
 
   useEffect(() => {
     if (state.status !== 'success') return;
     toast.success(DELETE_SUCCESS);
-    router.refresh();
+    router.replace(SUPPLIERS_ROUTE);
   }, [state, router]);
 
   return (

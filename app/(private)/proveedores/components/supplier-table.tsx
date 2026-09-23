@@ -14,7 +14,7 @@ import { buttonVariants } from '@/components/ui/button';
 import type { SupplierView } from '@/lib/modules/proveedores';
 import { cn } from '@/lib/utils';
 
-import { DeleteSupplierDialog } from './delete-supplier-dialog';
+import { DeleteSupplierDialog } from '../[id]/components/delete-supplier-dialog';
 import { SUPPLIER_DEFAULT_PINNED_COLUMNS, buildSupplierColumns } from './supplier-columns';
 import { supplierListHref } from './supplier-list-params';
 
