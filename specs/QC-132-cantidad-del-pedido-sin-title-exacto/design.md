@@ -1,6 +1,7 @@
 # QC-132 — cantidad-del-pedido-sin-title-exacto · design.md
 
-> Requisitos: `requirements.md` (R1–R11). Zona frontend, complejidad low.
+> Requisitos: `requirements.md` (R1–R11, más R12 en la nota del 2026-09-23). **Aprobado en F1.4
+> (2026-09-23)** con la respuesta (a) a la pregunta de la línea convertida. Zona frontend, complejidad low.
 > **Sin modelo de datos, sin migraciones, sin RLS, sin rutas ni endpoints nuevos, sin integraciones y
 > sin dependencias nuevas.** Es un atributo `title` en tres nodos que ya existen.
 
@@ -60,16 +61,22 @@ cambian.
 
 ### 3.3 Cantidad de cada línea (R5, R6)
 
-El `title` va **en el `span` que ya tiene `${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-${index}`**. En
-la unidad propia de la línea —o sin unidad resoluble, donde `displayedQuantity === line.quantity`—
-el valor es `exactDecimalTitle(line.quantity)`. Lo que pasa con la línea convertida está en §4.
+El `title` va **en el `span` que ya tiene `${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-${index}`**, con
+una sola expresión para todos los estados de la fila:
 
-## 4. Lo que depende de la pregunta abierta 1 (línea convertida)
+```tsx
+title={exactDecimalTitle(displayedQuantity)}
+```
 
-**El diseño depende de ella y no se resuelve aquí.** La expresión del `title` de §3.3 tiene que decir
-algo también cuando el usuario elige otra unidad en el selector, y cualquier expresión que escriba el
-implementer **decide la pregunta por la vía de los hechos**. Las tres respuestas posibles, con lo
-que cada una implica en código:
+En la unidad propia —o sin unidad resoluble— `displayedQuantity === line.quantity` (R5, R6); con otra
+unidad elegida es el resultado de `convertQuantity` (R12, §4).
+
+## 4. La línea convertida (pregunta abierta 1) — respondida el 2026-09-23 (F1.4)
+
+**Respuesta elegida por el humano: (a).** El `title` muestra el valor convertido tal cual, sin
+acotar: `exactDecimalTitle(displayedQuantity)`. Queda como R12 y como fila de «Decisiones cerradas».
+Las (b) y (c) quedan descartadas por decisión humana. La tabla de opciones que se presentó se conserva
+como registro:
 
 | Respuesta del humano | Expresión del `title` | Nota |
 |---|---|---|
@@ -77,11 +84,8 @@ que cada una implica en código:
 | b) Hay que acotarlo | — | `exactDecimalTitle` solo sabe comparar con lo pintado; acotar el valor del `title` a N decimales necesita código que hoy no existe, y `decimal-display.ts` está cerrado (R8). Habría que decidir dónde vive y con qué N. **Probablemente saca de `low` esta parte.** |
 | c) Sin `title` mientras está convertida | `displayedQuantity === line.quantity ? exactDecimalTitle(line.quantity) : undefined` | El valor exacto solo se ofrece en la unidad en la que se calculó. |
 
-Hasta la respuesta, `tasks.md` deja la task de ese estado **bloqueada** (T4) y el requisito sin
-escribir. La recomendación es responderla **en la misma puerta de aprobación del spec**: sin ella, T3
-puede cerrar R5 y R6 pero la línea queda con un comportamiento no especificado en el estado
-convertido. Si el humano responde (a) o (c), se añade `R12` en una nota fechada al final de
-`requirements.md` sin renumerar nada.
+Consecuencia aceptada: el `title` de una línea convertida puede llevar hasta 12 decimales. T4 queda
+desbloqueada y se hace junto con T3, porque es la misma expresión.
 
 ## 5. Tests (R9, R11)
 
@@ -98,10 +102,12 @@ forma que QC-127 fijó.
 | R4 | ídem | `orderQuantity: '200.0000'` -> sin `title` |
 | R5, R7 | `tests/unit/asignaciones-ui/order-execution-lines.test.tsx` | línea `quantity: '0.1255'` en su unidad (`alternativeUnits: []`) -> `textContent` `'0.13'`, `title` `'0.1255'`; y el mismo caso con `unit: null` |
 | R6 | ídem | línea `quantity: '20'` -> sin `title` |
+| R12, R7 | ídem | Línea con valor exacto largo: `unit: MILILITRO`, `alternativeUnits: [LITRO]`, `quantity: '1'`; se elige `L` en el selector (`setupUser` + `esperarInteractiva`, como los casos existentes) -> `convertQuantity` da `'0.001'`: `textContent` `'0'` y `title` `'0.001'` |
+| R12 | ídem | Línea que ya sale exacta: `unit: LITRO`, `alternativeUnits: [MILILITRO]`, `quantity: '0.1255'`; se elige `ml` -> `'125.5'`: `textContent` `'125.5'` y **sin** `title` |
 
 Los nombres de los casos llevan `QC-132 R<n>` (enlace de trazabilidad, `docs/conventions.md > Tests`).
 
-**Que muerde.** Para R1, R3 y R5 se hace la comprobación de QC-127: quitar temporalmente el `title`
+**Que muerde.** Para R1, R3, R5 y R12 se hace la comprobación de QC-127: quitar temporalmente el `title`
 de producción, ver el rojo del caso nuevo y revertir; se anota en el informe.
 
 R8, R10 y R11 no son comportamiento en pantalla: se verifican sobre el diff y con el censo de §1
@@ -135,6 +141,6 @@ que conocer la excepción de `order-field.tsx` y no la ha pedido nadie.
   en la ruta de pedidos; `exactDecimalTitle` no la usa. `guard-pantalla-pedidos-se-amplia.test.ts`
   fija los exports de `order-columns.tsx`; no se añade ningún export. `order-execution-lines.test.tsx`
   lee la fuente de su archivo buscando `Number(`, `parseFloat`, `catch`: no aparecen.
-- **Solapamiento con QC-133** (`cantidad-del-listado-sin-title-exacto`, `pending`, sin acotar): su
-  descripción es el mismo hallazgo que R1–R2 de esta ficha. No es decisión de este spec; se señala al
-  leader.
+- **QC-133 (`cantidad-del-listado-sin-title-exacto`), CANCELADA en el board el 2026-09-23 y
+  absorbida por esta ficha** (decisión humana en F1.4). Su hallazgo —la columna Cantidad de
+  `/pedidos` sin `title` exacto— es el que cierran R1 y R2. Ya no hay solapamiento.

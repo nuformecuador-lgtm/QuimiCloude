@@ -49,9 +49,8 @@
   resoluble, SI el valor exacto de su cantidad coincide con su valor pintado, ENTONCES el elemento
   que muestra la cantidad de esa línea NO DEBE tener atributo `title` (`'20'` -> pinta `20`, sin
   `title`).
-- **Sin requisito todavía: la línea convertida a otra unidad.** Lo que expone el `title` MIENTRAS la
-  línea se muestra en una unidad elegida en el selector depende de la pregunta abierta 1 y no se
-  escribe hasta que el humano la responda. Ver `design.md > 4`.
+- **La línea convertida a otra unidad:** la cubre **R12**, en la nota fechada al final de este
+  archivo (respuesta humana del 2026-09-23).
 
 ### Comunes a los tres sitios
 
@@ -82,13 +81,11 @@
 | Sin E2E, tests de componente sobre el `title` | R9 |
 | El `title` no se ve en móvil ni en papel: se acepta | R7 |
 | Se reutiliza `decimal-display.ts` sin tocarla | R8 |
+| La línea convertida muestra en el `title` el valor convertido tal cual | R12 |
 
 ## Preguntas abiertas
 
-1. **Línea convertida a otra unidad.** En la ejecución, la cantidad de la línea puede mostrarse en otra
-   unidad (`convertQuantity`, hasta 12 decimales, truncando). El `title` mostraría el valor convertido
-   entero (p. ej. `0.333333333333`). No está decidido si eso vale tal cual o si hay que acotarlo; no
-   se rellena con un supuesto.
+Ninguna.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -99,3 +96,15 @@
 | 2026-09-23 | ¿E2E? | No. Tests de componente que comprueban el `title` en el DOM; no es un flujo crítico de `CHECKPOINTS.md`. |
 | 2026-09-23 | El `title` no se ve en móvil ni en papel | Se acepta, heredado de QC-127. |
 | 2026-09-23 | Utilidad de redondeo | Se reutiliza `lib/shared/ui/decimal-display.ts` sin tocarla (PR #85). |
+| 2026-09-23 | Línea convertida a otra unidad: `convertQuantity` da hasta 12 decimales truncando, ¿el `title` lo muestra tal cual o se acota? | Tal cual (respuesta (a) de `design.md > 4`, F1.4): el `title` es el valor convertido exacto, p. ej. `0.333333333333`. Sin acotar. |
+
+## Nota del 2026-09-23 — respuesta a la pregunta abierta 1 (F1.4)
+
+Se añade un requisito sin renumerar ni reescribir los anteriores.
+
+- **R12.** MIENTRAS una línea de receta se muestra en una unidad elegida en el selector distinta de
+  la unidad propia de su insumo, el elemento que muestra la cantidad de esa línea DEBE exponer como
+  atributo `title` el valor convertido completo, sin ceros de relleno y sin acotar, SI ese valor
+  difiere del pintado; y NO DEBE tener atributo `title` SI coincide con él (`'0.1255'` L a `ml` ->
+  pinta `125.5`, sin `title`; un valor convertido de más de dos decimales -> pinta su redondeo a dos,
+  `title` con todos los decimales que da la conversión).

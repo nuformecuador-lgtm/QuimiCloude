@@ -1,6 +1,7 @@
 # QC-132 — cantidad-del-pedido-sin-title-exacto · tasks.md
 
-> Requisitos: `requirements.md` (R1–R11). Diseño: `design.md`.
+> Requisitos: `requirements.md` (R1–R11, más R12 en la nota del 2026-09-23). Diseño: `design.md`.
+> **Spec aprobado en F1.4 (2026-09-23).**
 > `[P]` = paralelizable con las demás `[P]` de la misma tanda (tocan archivos distintos).
 > Cada task de la tanda A es **test primero**: el caso nuevo se escribe, se ve en rojo, y luego se
 > cambia producción.
@@ -39,38 +40,38 @@ intactos.
 ### [ ] T3 `[P]` — Cantidad de la línea en su unidad propia (R5, R6, R7)
 **Archivos:** `tests/unit/asignaciones-ui/order-execution-lines.test.tsx`;
 `app/(private)/asignacion/[id]/components/order-execution-lines.tsx:77-82`.
-**Depende de:** nada. **Ver T4 antes de escribir la expresión del `title`.**
+**Depende de:** nada.
 
 1. Añadir `QC-132 R5` (línea `'0.1255'` con `alternativeUnits: []`, y otra con `unit: null`: texto
    `'0.13'`, `title` `'0.1255'`) y `QC-132 R6` (línea `'20'`: sin `title`).
 2. Ver el rojo de R5.
-3. Poner el `title` en el `span` del testid de la cantidad. **Si la pregunta abierta 1 sigue sin
-   respuesta, no se elige expresión por cuenta propia** (`design.md > 4`): se para y se avisa al
-   leader.
+3. Poner `title={exactDecimalTitle(displayedQuantity)}` en el `span` del testid de la cantidad
+   (`design.md > 3.3`; es la respuesta (a) del humano, 2026-09-23).
 
-**Hecho cuando:** los casos nuevos y todo el archivo pasan, y la expresión usada corresponde a una
-respuesta escrita del humano a la pregunta abierta 1.
+**Hecho cuando:** los casos nuevos y todo el archivo pasan.
 
-### [ ] T4 — Línea convertida a otra unidad (pregunta abierta 1) — **BLOQUEADA**
-**Archivos:** los de T3; `requirements.md` (nota fechada al final).
-**Depende de:** respuesta del humano a la pregunta abierta 1 y de T3.
+### [ ] T4 — Línea convertida a otra unidad (R12, R7)
+**Archivos:** `tests/unit/asignaciones-ui/order-execution-lines.test.tsx`. Producción ya queda
+cubierta por la expresión de T3; si no, se ajusta allí.
+**Depende de:** T3. **Desbloqueada el 2026-09-23 (F1.4, respuesta (a)).**
 
-- Respuesta (a) o (c): añadir `R12` en una nota fechada al final de `requirements.md` sin renumerar
-  ni reescribir nada, y un caso `QC-132 R12` que elija `ml` en el selector (patrón de los casos
-  existentes con `setupUser` y `esperarInteractiva`) y afirme el `title` resultante.
-- Respuesta (b): **no se implementa aquí**; vuelve a `spec_author` porque cambia el diseño
-  (`design.md > 4`).
+Añadir dos casos `QC-132 R12` con el patrón de selector de los casos existentes (`setupUser` +
+`esperarInteractiva`), según `design.md > 5`:
+- **Valor exacto largo:** línea en `ml` con `L` como alternativa, `quantity: '1'`, elegir `L` ->
+  `textContent` `'0'` y `title` `'0.001'`.
+- **Ya sale exacta:** línea en `L` con `ml` como alternativa, `quantity: '0.1255'`, elegir `ml` ->
+  `textContent` `'125.5'` y **sin** `title`.
 
-**Hecho cuando:** hay `R12` con su test en verde, o consta por escrito que el humano sacó ese caso de
-la ficha.
+**Hecho cuando:** los dos casos pasan, y quitar el `title` de producción pone en rojo el primero (se
+anota en T5).
 
 ---
 
 ## Tanda B — demostrar que muerde
 
-### [ ] T5 — Quitar el `title`, ver el rojo, revertir (R1, R3, R5, R9)
+### [ ] T5 — Quitar el `title`, ver el rojo, revertir (R1, R3, R5, R12, R9)
 **Archivos:** temporalmente los tres de producción. **Revertidos al terminar.**
-**Depende de:** T1, T2, T3. **No paralelizable.**
+**Depende de:** T1, T2, T3, T4. **No paralelizable.**
 
 Quitar el atributo `title` de cada sitio, uno a uno, correr solo su archivo de test y anotar el
 mensaje de rojo.
@@ -104,5 +105,5 @@ Buscar `formatDecimalDisplay(` en `app/`. **Hecho cuando:** el informe lista cad
 sin esto no hay PR).
 
 ### [ ] T10 — Mapa de trazabilidad
-**Depende de:** T9. **Hecho cuando:** el informe de implementación contiene el mapa `R1`–`R11` (y
-`R12` si T4 lo añadió) -> test o comprobación concreta, según `design.md > 5`.
+**Depende de:** T9. **Hecho cuando:** el informe de implementación contiene el mapa `R1`–`R12` ->
+test o comprobación concreta, según `design.md > 5`.
