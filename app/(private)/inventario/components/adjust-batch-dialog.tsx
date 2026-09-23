@@ -46,6 +46,8 @@ const CANCEL_LABEL = 'Cancelar';
 const ADJUST_SUCCESS = 'Existencia ajustada.';
 const ZERO_DELTA_MESSAGE = 'La cantidad no puede ser cero.';
 const MISSING_REASON_MESSAGE = 'Elegi un motivo.';
+const OVER_RESERVED_MESSAGE =
+  'El lote queda sobre-reservado: hay pedidos sin cobertura completa.';
 
 /** Mismo patron que la action: el signo se conserva, hasta 4 decimales pasan. */
 const DECIMAL_DELTA_PATTERN = /^-?\d{1,10}(\.\d{1,4})?$/;
@@ -122,7 +124,10 @@ function AdjustBatchDialogContent({
 
   // El dialogo abierto se DERIVA del pedido del usuario y del resultado de la operacion, igual
   // que en `delete-product-dialog.tsx`: evita el `setState` sincrono dentro de un efecto.
-  const open = requestedOpen && state.status !== 'success';
+  // Sobre-reservado es la unica excepcion: se queda abierto con el aviso a la vista hasta que el
+  // usuario lo cierra a proposito, en vez de desaparecer con el resto del exito.
+  const overReserved = state.status === 'success' && state.overReserved;
+  const open = requestedOpen && (state.status !== 'success' || overReserved);
 
   useEffect(() => {
     if (state.status !== 'success') return;
@@ -202,6 +207,16 @@ function AdjustBatchDialogContent({
             data-testid="adjust-batch-reason-error"
           >
             {MISSING_REASON_MESSAGE}
+          </p>
+        ) : null}
+
+        {overReserved ? (
+          <p
+            role="alert"
+            className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+            data-testid="adjust-batch-over-reserved"
+          >
+            {OVER_RESERVED_MESSAGE}
           </p>
         ) : null}
 

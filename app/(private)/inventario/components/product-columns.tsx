@@ -187,6 +187,35 @@ function qtyAlertCell(product: ProductView): ReactNode {
   );
 }
 
+/**
+ * Celda de una cantidad agregada (reservado, disponible), junto a la unidad del producto.
+ *
+ * `undefined` pinta el marcador de vacio sin `title` ni `aria-label`: es lo que devuelve toda
+ * lectura que no sea el listado paginado, que es la unica que agrega estas dos columnas.
+ */
+function aggregateQuantityCell(
+  value: string | undefined,
+  testId: string,
+  product: ProductView,
+  units: readonly UnitRef[] | undefined,
+): ReactNode {
+  if (value === undefined) return EMPTY_CELL;
+
+  const label = productUnitLabel(product, units);
+  const amount = formatDecimalDisplay(value);
+  const exact = trimDecimal(value);
+
+  return (
+    <span
+      data-testid={testId}
+      title={exactDecimalTitle(value)}
+      aria-label={label === null ? exact : `${exact} ${label}`}
+    >
+      {label === null ? amount : `${amount} ${label}`}
+    </span>
+  );
+}
+
 export type ProductColumnsDeps = {
   /**
    * Acciones de la fila (editar, dar de baja). Es un **slot**: la declaracion de columnas no
@@ -235,6 +264,19 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       sortable: true,
       filter: { kind: 'numberRange' },
       cell: (product) => qtyAlertCell(product),
+    },
+    {
+      id: 'reserved',
+      label: 'Reservado',
+      align: 'end',
+      // No ordena ni filtra: es un agregado de los lotes, no una columna de `products`.
+      cell: (product) => aggregateQuantityCell(product.reserved, 'product-reserved', product, units),
+    },
+    {
+      id: 'available',
+      label: 'Disponible',
+      align: 'end',
+      cell: (product) => aggregateQuantityCell(product.available, 'product-available', product, units),
     },
     {
       id: ACTIONS_COLUMN_ID,

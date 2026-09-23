@@ -11,13 +11,15 @@ import { join } from 'node:path';
 
 const RAIZ = join(__dirname, '..', '..', '..');
 
-/** Los archivos de T5 que pintan o teclean una cantidad decimal. */
+/** Los archivos de T5 que pintan o teclean una cantidad decimal, mas `batch-history.tsx` (T13):
+ *  el historial del lote pinta la cantidad de cada apartado, liberacion, caducidad o consumo. */
 const ARCHIVOS_VIGILADOS = [
   'app/(private)/inventario/components/product-columns.tsx',
   'app/(private)/inventario/components/product-batches-panel.tsx',
   'app/(private)/inventario/components/product-form.tsx',
   'app/(private)/inventario/components/adjust-batch-dialog.tsx',
   'app/(private)/inventario/components/product-cost-amount.ts',
+  'app/(private)/inventario/components/batch-history.tsx',
   'app/(private)/pedidos/components/order-ingredients-table.tsx',
 ] as const;
 
@@ -33,7 +35,7 @@ function sinComentarios(fuente: string): string {
 /**
  * `Number(`, `parseFloat(` y `.toFixed(` sobre una cantidad decimal: las tres formas de que un
  * `decimal(14,4)` pase por el binario de coma flotante. Ninguna de las tres tiene uso legitimo en
- * estos seis archivos -a diferencia de `product-list-params.ts`, que si usa `Number(` para la
+ * estos siete archivos -a diferencia de `product-list-params.ts`, que si usa `Number(` para la
  * pagina y el tamano de pagina de la URL, enteros de consulta y no cantidades-.
  */
 function conversionesDeComaFlotante(fuente: string): string[] {
@@ -52,7 +54,7 @@ function conversionesDeComaFlotante(fuente: string): string[] {
 }
 
 describe('las cantidades decimales de inventario no pasan por coma flotante (R6)', () => {
-  it('ninguno de los seis archivos de T5 usa Number(, parseFloat( ni .toFixed(', () => {
+  it('ninguno de los siete archivos vigilados usa Number(, parseFloat( ni .toFixed(', () => {
     const culpables = ARCHIVOS_VIGILADOS.flatMap((archivo) =>
       conversionesDeComaFlotante(leer(archivo)).map((detalle) => `${archivo}:${detalle}`),
     );

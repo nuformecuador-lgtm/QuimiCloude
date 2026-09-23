@@ -11,6 +11,9 @@ import { EMPTY_CELL } from './product-columns';
 const LOT_LABEL = 'Lote';
 const QUANTITY_LABEL = 'Cantidad';
 const PURCHASE_DATE_LABEL = 'Fecha de compra';
+const RESERVED_LABEL = 'Apartado';
+const AVAILABLE_LABEL = 'Disponible';
+const OVER_RESERVED_LABEL = 'Sobre-reservado';
 
 /**
  * Panel de lotes de un producto: numero de lote, cantidad con su unidad y fecha de compra.
@@ -47,15 +50,34 @@ function unitLabel(unitId: string, units: readonly UnitRef[] | undefined): strin
  * celda, no el dato.
  */
 function quantityLabel(batch: ProductBatchView, units: readonly UnitRef[] | undefined): string {
-  const label = unitLabel(batch.unitId, units);
-  const amount = formatDecimalDisplay(batch.stock);
-  return label === null ? amount : `${amount} ${label}`;
+  return formattedQuantity(batch.stock, batch.unitId, units);
 }
 
 /** Cifra exacta de la cantidad, para quien no puede quedarse con el redondeo del pixel. */
 function quantityAriaLabel(batch: ProductBatchView, units: readonly UnitRef[] | undefined): string {
-  const label = unitLabel(batch.unitId, units);
-  const amount = trimDecimal(batch.stock);
+  return exactQuantity(batch.stock, batch.unitId, units);
+}
+
+/** La misma composicion «cantidad · unidad» que `quantityLabel`, para un valor cualquiera del
+ *  lote -apartado, disponible-, no solo su existencia. */
+function formattedQuantity(
+  value: string,
+  unitId: string,
+  units: readonly UnitRef[] | undefined,
+): string {
+  const label = unitLabel(unitId, units);
+  const amount = formatDecimalDisplay(value);
+  return label === null ? amount : `${amount} ${label}`;
+}
+
+/** Cifra exacta de `formattedQuantity`, para el `title` y el `aria-label`. */
+function exactQuantity(
+  value: string,
+  unitId: string,
+  units: readonly UnitRef[] | undefined,
+): string {
+  const label = unitLabel(unitId, units);
+  const amount = trimDecimal(value);
   return label === null ? amount : `${amount} ${label}`;
 }
 
@@ -101,7 +123,39 @@ export function ProductBatchesPanel({
                 <dt className="text-xs text-muted-foreground">{PURCHASE_DATE_LABEL}</dt>
                 <dd data-testid="product-batch-purchase-date">{batch.purchaseDate}</dd>
               </div>
+              {batch.reserved === undefined ? null : (
+                <div className="flex flex-col">
+                  <dt className="text-xs text-muted-foreground">{RESERVED_LABEL}</dt>
+                  <dd
+                    data-testid="product-batch-reserved"
+                    title={exactDecimalTitle(batch.reserved)}
+                    aria-label={exactQuantity(batch.reserved, batch.unitId, units)}
+                  >
+                    {formattedQuantity(batch.reserved, batch.unitId, units)}
+                  </dd>
+                </div>
+              )}
+              {batch.available === undefined ? null : (
+                <div className="flex flex-col">
+                  <dt className="text-xs text-muted-foreground">{AVAILABLE_LABEL}</dt>
+                  <dd
+                    data-testid="product-batch-available"
+                    title={exactDecimalTitle(batch.available)}
+                    aria-label={exactQuantity(batch.available, batch.unitId, units)}
+                  >
+                    {formattedQuantity(batch.available, batch.unitId, units)}
+                  </dd>
+                </div>
+              )}
             </dl>
+            {batch.overReserved !== true ? null : (
+              <span
+                data-testid="product-batch-over-reserved"
+                className="rounded-full border border-destructive/40 px-2 py-0.5 text-xs font-medium text-destructive"
+              >
+                {OVER_RESERVED_LABEL}
+              </span>
+            )}
             {renderBatchActions === undefined ? null : <div>{renderBatchActions(batch)}</div>}
           </div>
           {renderBatchDetail === undefined ? null : <div>{renderBatchDetail(batch)}</div>}

@@ -1,12 +1,13 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { BatchHistory, movementReasonLabel } from '@/app/(private)/inventario/components';
-import type { InventoryMovementView } from '@/lib/modules/inventario';
+import { BatchHistory, movementKindLabel, movementReasonLabel } from '@/app/(private)/inventario/components';
+import type { BatchHistoryEntry } from '@/lib/modules/inventario';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
 /**
- * `batch-history.tsx`: R23, R24 (`specs/QC-92-ajuste-de-inventario/tasks.md > T11`).
+ * `batch-history.tsx`: R34, R37, R38 (`specs/QC-141-reserva-de-material-del-pedido/tasks.md >
+ * T13`).
  *
  * La Server Action `listBatchMovementsAction` esta mockeada: es el borde del modulo `inventario`,
  * y sustituirla es lo que permite ejercitar los tres estados sin base de datos (mismo criterio que
@@ -23,12 +24,12 @@ vi.mock('@/lib/modules/inventario/adapters/driving/batch-actions', () => ({
 
 const BATCH_ID = 'batch-42';
 
-function movimiento(overrides: Partial<InventoryMovementView> = {}): InventoryMovementView {
+function asiento(overrides: Partial<BatchHistoryEntry> = {}): BatchHistoryEntry {
   return {
-    id: crypto.randomUUID(),
     kind: 'adjustment',
     quantity: '-3',
     reason: 'merma',
+    orderNumberText: null,
     authorName: 'Carla Duarte',
     createdAt: '2026-09-10T08:15:00.000Z',
     ...overrides,
@@ -50,52 +51,89 @@ afterEach(() => {
 });
 
 describe('BatchHistory', () => {
-  it('R23 — con asientos, muestra motivo, autor y fecha en el orden en que llegan, alta incluida', async () => {
-    const reciente = movimiento({
-      id: 'mov-reciente',
-      reason: 'conteo_fisico',
+  it('R38 — con asientos, muestra tipo, cantidad, motivo, pedido, autor y fecha en el orden en que llegan', async () => {
+    const apartado = asiento({
+      kind: 'reserve',
+      quantity: '5',
+      reason: null,
+      orderNumberText: 'PED-0042',
       authorName: 'Carla Duarte',
       createdAt: '2026-09-15T10:00:00.000Z',
     });
-    const alta = movimiento({
-      id: 'mov-alta',
+    const alta = asiento({
       kind: 'opening',
+      quantity: '20',
       reason: null,
+      orderNumberText: null,
       authorName: 'Ana Rios',
       createdAt: '2026-01-05T09:30:00.000Z',
     });
     // La action ya devuelve del mas reciente al mas antiguo: el componente NO reordena.
-    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [reciente, alta] });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [apartado, alta] });
 
     render(<BatchHistory batchId={BATCH_ID} batchLot="L-2026-09" />);
     await abrirDespliegue();
 
     const lista = await screen.findByTestId('batch-history-list');
-    const filas = screen.getAllByTestId(/^batch-history-entry-(?!reason|author|date)/);
-    expect(filas.map((fila) => fila.getAttribute('data-testid'))).toEqual([
-      'batch-history-entry-mov-reciente',
-      'batch-history-entry-mov-alta',
-    ]);
+    const filas = within(lista).getAllByRole('listitem');
+    expect(filas).toHaveLength(2);
 
-    const [filaReciente, filaAlta] = filas;
-    expect(filaReciente).toHaveTextContent(movementReasonLabel('conteo_fisico'));
-    expect(filaReciente).toHaveTextContent('Carla Duarte');
-    expect(filaReciente).toHaveTextContent('2026-09-15');
+    const [filaApartado, filaAlta] = filas;
+    expect(filaApartado).toHaveTextContent(movementKindLabel('reserve'));
+    expect(filaApartado).toHaveTextContent('5');
+    expect(filaApartado).toHaveTextContent('PED-0042');
+    expect(filaApartado).toHaveTextContent('Carla Duarte');
+    expect(filaApartado).toHaveTextContent('2026-09-15');
 
+    expect(filaAlta).toHaveTextContent(movementKindLabel('opening'));
     expect(filaAlta).toHaveTextContent('Ana Rios');
     expect(filaAlta).toHaveTextContent('2026-01-05');
-    // El asiento de alta no tiene motivo: no se le inventa uno de los cuatro cerrados.
-    for (const motivo of ['Merma', 'Rotura', 'Conteo fisico', 'Error de carga']) {
-      expect(filaAlta).not.toHaveTextContent(motivo);
-    }
+    // El asiento de apertura no tiene ni motivo ni pedido: no se inventa ninguno de los dos.
+    expect(within(filaAlta!).queryByTestId('batch-history-entry-reason')).toBeNull();
+    expect(within(filaAlta!).queryByTestId('batch-history-entry-order')).toBeNull();
 
     expect(screen.queryByTestId('batch-history-before-ledger')).toBeNull();
     expect(screen.queryByTestId('batch-history-error')).toBeNull();
     expect(lista).toBeInTheDocument();
 
-    expect(within(filaReciente!).getByText('Motivo')).toBeVisible();
-    expect(within(filaReciente!).getByText('Autor')).toBeVisible();
-    expect(within(filaReciente!).getByText('Fecha')).toBeVisible();
+    expect(within(filaApartado!).getByText('Tipo')).toBeVisible();
+    expect(within(filaApartado!).getByText('Cantidad')).toBeVisible();
+    expect(within(filaApartado!).getByText('Pedido')).toBeVisible();
+    expect(within(filaApartado!).getByText('Autor')).toBeVisible();
+    expect(within(filaApartado!).getByText('Fecha')).toBeVisible();
+  });
+
+  it('R38 — sin autor, indica que lo hizo el sistema', async () => {
+    const caducidad = asiento({
+      kind: 'expire',
+      quantity: '-2',
+      reason: null,
+      orderNumberText: 'PED-0007',
+      authorName: null,
+    });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [caducidad] });
+
+    render(<BatchHistory batchId={BATCH_ID} />);
+    await abrirDespliegue();
+
+    const fila = (await screen.findAllByRole('listitem'))[0]!;
+    expect(within(fila).getByTestId('batch-history-entry-author')).toHaveTextContent('Sistema');
+    expect(within(fila).getByTestId('batch-history-entry-kind')).toHaveTextContent(
+      movementKindLabel('expire'),
+    );
+  });
+
+  it('R6 — la cantidad de cada asiento se pinta a dos decimales, con la cifra exacta en el title y el aria-label', async () => {
+    const consumo = asiento({ kind: 'consume', quantity: '12345.6789', reason: null });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [consumo] });
+
+    render(<BatchHistory batchId={BATCH_ID} />);
+    await abrirDespliegue();
+
+    const cantidad = await screen.findByTestId('batch-history-entry-quantity');
+    expect(cantidad).toHaveTextContent('12345.68');
+    expect(cantidad).toHaveAttribute('title', '12345.6789');
+    expect(cantidad).toHaveAttribute('aria-label', '12345.6789');
   });
 
   it('R24 — sin ningun asiento, dice que el lote es anterior al libro y no parece un error ni una lista', async () => {
@@ -131,7 +169,7 @@ describe('BatchHistory', () => {
   });
 
   it('no vuelve a pedir los movimientos en aperturas posteriores', async () => {
-    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [movimiento()] });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [asiento()] });
 
     const user = setupUser();
     render(<BatchHistory batchId={BATCH_ID} />);
@@ -147,5 +185,23 @@ describe('BatchHistory', () => {
   it('deriva la etiqueta de un motivo del propio valor, sin enumerarlos a mano', () => {
     expect(movementReasonLabel('conteo_fisico')).toBe('Conteo fisico');
     expect(movementReasonLabel('error_de_carga')).toBe('Error de carga');
+  });
+
+  it('R38 — cada tipo de asiento tiene una etiqueta legible propia, sin reutilizar la de otro', () => {
+    const kinds: readonly BatchHistoryEntry['kind'][] = [
+      'opening',
+      'adjustment',
+      'consumption',
+      'reserve',
+      'release',
+      'expire',
+      'consume',
+    ];
+    const etiquetas = kinds.map(movementKindLabel);
+
+    expect(new Set(etiquetas).size).toBe(kinds.length);
+    for (const etiqueta of etiquetas) {
+      expect(etiqueta.length).toBeGreaterThan(0);
+    }
   });
 });

@@ -20,6 +20,7 @@ import {
 } from '@/components/shared/unexpected-error-notice';
 import { UNEXPECTED_ERROR_CODE, errorMessage } from '@/lib/modules/errores';
 import {
+  EMPTY_CELL,
   PAGE_PARAM,
   PAGE_SIZE_OPTIONS,
   PAGE_SIZE_PARAM,
@@ -532,6 +533,8 @@ describe('pantalla de productos — lista', () => {
       'name',
       'stock',
       'qtyAlert',
+      'reserved',
+      'available',
       'actions',
     ]);
   });
@@ -770,6 +773,46 @@ describe('pantalla de productos — lista', () => {
     expect(celda).toHaveTextContent('12345.68');
     expect(celda).toHaveAttribute('title', '12345.6789');
     expect(celda).toHaveAttribute('aria-label', '12345.6789');
+  });
+
+  it('R36 — muestra lo reservado y lo disponible del producto junto a su unidad, con la cifra exacta', async () => {
+    const UNIDAD_KG = { ...UNIDAD, id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
+    listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD_KG] });
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([
+        producto({
+          stock: '15',
+          unitId: UNIDAD_KG.id,
+          reserved: '3.5001',
+          available: '11.4999',
+        }),
+      ]),
+    );
+
+    await renderPantalla();
+
+    const reservado = screen.getByTestId('product-reserved');
+    expect(reservado).toHaveTextContent('3.5 kg');
+    expect(reservado).toHaveAttribute('title', '3.5001');
+    expect(reservado).toHaveAttribute('aria-label', '3.5001 kg');
+
+    const disponible = screen.getByTestId('product-available');
+    expect(disponible).toHaveTextContent('11.5 kg');
+    expect(disponible).toHaveAttribute('title', '11.4999');
+    expect(disponible).toHaveAttribute('aria-label', '11.4999 kg');
+  });
+
+  it('R36 — sin lo reservado ni lo disponible (fuera del listado paginado), pinta el marcador neutro', async () => {
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ reserved: undefined, available: undefined })]),
+    );
+
+    await renderPantalla();
+
+    expect(screen.getByTestId('data-table-cell-reserved')).toHaveTextContent(EMPTY_CELL);
+    expect(screen.getByTestId('data-table-cell-available')).toHaveTextContent(EMPTY_CELL);
+    expect(screen.queryByTestId('product-reserved')).toBeNull();
+    expect(screen.queryByTestId('product-available')).toBeNull();
   });
 
   it('el desbordamiento horizontal lo absorbe el envoltorio de la tabla y ningun ancestro', async () => {

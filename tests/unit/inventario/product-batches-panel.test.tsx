@@ -114,6 +114,55 @@ describe('ProductBatchesPanel', () => {
     expect(b3).toHaveAttribute('aria-label', '12345.6789');
   });
 
+  it('R37 — pinta el apartado y el disponible de un lote junto a su unidad, con la cifra exacta', () => {
+    const kilogramo = unidad({ id: 'unit-kg', name: 'Kilogramo', symbol: 'kg' });
+    const batches: ProductBatchView[] = [
+      lote({ id: 'b1', stock: '10', unitId: 'unit-kg', reserved: '4.1234', available: '5.8766' }),
+    ];
+
+    render(<ProductBatchesPanel batches={batches} units={[kilogramo]} />);
+
+    const apartado = screen.getByTestId('product-batch-reserved');
+    expect(apartado).toHaveTextContent('4.12 kg');
+    expect(apartado).toHaveAttribute('title', '4.1234');
+    expect(apartado).toHaveAttribute('aria-label', '4.1234 kg');
+
+    const disponible = screen.getByTestId('product-batch-available');
+    expect(disponible).toHaveTextContent('5.88 kg');
+    expect(disponible).toHaveAttribute('title', '5.8766');
+    expect(disponible).toHaveAttribute('aria-label', '5.8766 kg');
+  });
+
+  it('sin apartado ni disponible (fuera de `findBatchesOfAliveProduct`), no pinta esas dos celdas', () => {
+    const batches: ProductBatchView[] = [lote({ id: 'b1' })];
+
+    render(<ProductBatchesPanel batches={batches} />);
+
+    expect(screen.queryByTestId('product-batch-reserved')).toBeNull();
+    expect(screen.queryByTestId('product-batch-available')).toBeNull();
+  });
+
+  it('R34 — un lote sobre-reservado lleva la marca «Sobre-reservado» como texto, no solo como color', () => {
+    const batches: ProductBatchView[] = [
+      lote({ id: 'b1', stock: '5', reserved: '8', available: '0', overReserved: true }),
+    ];
+
+    render(<ProductBatchesPanel batches={batches} />);
+
+    const marca = screen.getByTestId('product-batch-over-reserved');
+    expect(marca).toHaveTextContent('Sobre-reservado');
+  });
+
+  it('R34 — sin sobre-reserva, la marca no aparece', () => {
+    const batches: ProductBatchView[] = [
+      lote({ id: 'b1', stock: '10', reserved: '4', available: '6', overReserved: false }),
+    ];
+
+    render(<ProductBatchesPanel batches={batches} />);
+
+    expect(screen.queryByTestId('product-batch-over-reserved')).toBeNull();
+  });
+
   it('lista vacia: texto propio, no una lista vacia indistinguible de un fallo', () => {
     render(<ProductBatchesPanel batches={[]} />);
 

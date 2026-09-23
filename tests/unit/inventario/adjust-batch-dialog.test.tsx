@@ -153,6 +153,47 @@ describe('el envio manda el batchId, la cantidad con signo y el motivo (R2, R8)'
     expect(routerMock.refresh).toHaveBeenCalledTimes(1);
   });
 
+  it('R33 — con el lote sobre-reservado, muestra un aviso de texto y no cierra solo', async () => {
+    adjustBatchStockActionMock.mockResolvedValue({
+      status: 'success',
+      stock: '2',
+      reserved: '8',
+      overReserved: true,
+    });
+    const user = setupUser();
+    render(<AdjustBatchDialog batch={lote()} canAdjust />);
+
+    await abrirDialogo(user);
+    await user.type(screen.getByTestId('adjust-batch-delta'), '-8');
+    await elegirMotivo(user);
+    await user.click(screen.getByTestId('adjust-batch-confirm'));
+
+    const aviso = await screen.findByTestId('adjust-batch-over-reserved');
+    expect(aviso).toHaveAttribute('role', 'alert');
+    expect(aviso).toHaveTextContent(
+      'El lote queda sobre-reservado: hay pedidos sin cobertura completa.',
+    );
+    // El aviso se lee: el dialogo no desaparece con el resto del exito.
+    expect(screen.getByTestId('adjust-batch-dialog')).toBeInTheDocument();
+    expect(toastExito).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByTestId('adjust-batch-cancel'));
+    await waitFor(() => expect(screen.queryByTestId('adjust-batch-dialog')).toBeNull());
+  });
+
+  it('sin sobre-reserva, el aviso no aparece', async () => {
+    const user = setupUser();
+    render(<AdjustBatchDialog batch={lote()} canAdjust />);
+
+    await abrirDialogo(user);
+    await user.type(screen.getByTestId('adjust-batch-delta'), '5');
+    await elegirMotivo(user);
+    await user.click(screen.getByTestId('adjust-batch-confirm'));
+
+    await waitFor(() => expect(screen.queryByTestId('adjust-batch-dialog')).toBeNull());
+    expect(screen.queryByTestId('adjust-batch-over-reserved')).toBeNull();
+  });
+
   it('con error el dialogo sigue abierto con el mensaje a la vista', async () => {
     adjustBatchStockActionMock.mockResolvedValue({
       status: 'error',
