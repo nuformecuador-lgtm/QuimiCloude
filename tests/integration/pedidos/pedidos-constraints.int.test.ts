@@ -1260,16 +1260,47 @@ describe('la presentacion del pedido', () => {
     })
   })
 
-  it('R4: borrar una presentacion usada por un pedido vivo, cancelado o dado de baja se rechaza con 23503 y deja las dos filas', async () => {
+  /** Un unico pedido apuntando a `f.presentationId`, en el ESTADO que pide el caso, y la
+   *  afirmacion comun: el `DELETE` de la presentacion se rechaza con 23503 y las dos filas
+   *  quedan intactas. */
+  async function esperaRechazoDelBorradoConUnPedido(
+    tx: Prisma.TransactionClient,
+    f: Fixtures,
+    orderId: string,
+    etiqueta: string,
+  ): Promise<void> {
+    const rechazado = await expectRejectedByDatabase(
+      tx,
+      () =>
+        tx.$executeRaw`DELETE FROM "presentations" WHERE "id" = CAST(${f.presentationId} AS uuid)`,
+      `borrado de una presentacion usada por un pedido ${etiqueta}`,
+    )
+    expect(rechazado).toBe(FOREIGN_KEY_VIOLATION)
+
+    expect(await tx.presentation.count({ where: { id: f.presentationId } })).toBe(1)
+    const stored = await tx.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: { presentationId: true },
+    })
+    expect(stored.presentationId).toBe(f.presentationId)
+  }
+
+  it('R4: borrar una presentacion usada por un pedido vivo se rechaza con 23503 y deja las dos filas', async () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
-
       const vivo = await createOrder(tx, {
         companyId: f.companyId,
         recipeId: f.recipeId,
         presentationId: f.presentationId,
       })
 
+      await esperaRechazoDelBorradoConUnPedido(tx, f, vivo, 'vivo')
+    })
+  })
+
+  it('R4: borrar una presentacion usada por un pedido CANCELADO se rechaza con 23503 y deja las dos filas', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
       const cancelado = await createOrder(tx, {
         companyId: f.companyId,
         recipeId: f.recipeId,
@@ -1280,6 +1311,27 @@ describe('la presentacion del pedido', () => {
         data: { status: 'CANCELADO', cancellationReason: 'motivo de prueba' },
       })
 
+      await esperaRechazoDelBorradoConUnPedido(tx, f, cancelado, 'CANCELADO')
+    })
+  })
+
+  it('R4: borrar una presentacion usada por un pedido ENTREGADO se rechaza con 23503 y deja las dos filas', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      const entregado = await createOrder(tx, {
+        companyId: f.companyId,
+        recipeId: f.recipeId,
+        presentationId: f.presentationId,
+      })
+      await tx.order.update({ where: { id: entregado }, data: { status: 'ENTREGADO' } })
+
+      await esperaRechazoDelBorradoConUnPedido(tx, f, entregado, 'ENTREGADO')
+    })
+  })
+
+  it('R4: borrar una presentacion usada por un pedido dado de baja se rechaza con 23503 y deja las dos filas', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
       const dadoDeBaja = await createOrder(tx, {
         companyId: f.companyId,
         recipeId: f.recipeId,
@@ -1287,22 +1339,7 @@ describe('la presentacion del pedido', () => {
       })
       await tx.order.update({ where: { id: dadoDeBaja }, data: { deletedAt: new Date() } })
 
-      const rechazado = await expectRejectedByDatabase(
-        tx,
-        () =>
-          tx.$executeRaw`DELETE FROM "presentations" WHERE "id" = CAST(${f.presentationId} AS uuid)`,
-        'borrado de una presentacion usada por pedidos en tres estados distintos',
-      )
-      expect(rechazado).toBe(FOREIGN_KEY_VIOLATION)
-
-      expect(await tx.presentation.count({ where: { id: f.presentationId } })).toBe(1)
-      for (const id of [vivo, cancelado, dadoDeBaja]) {
-        const stored = await tx.order.findUniqueOrThrow({
-          where: { id },
-          select: { presentationId: true },
-        })
-        expect(stored.presentationId).toBe(f.presentationId)
-      }
+      await esperaRechazoDelBorradoConUnPedido(tx, f, dadoDeBaja, 'dado de baja')
     })
   })
 })
