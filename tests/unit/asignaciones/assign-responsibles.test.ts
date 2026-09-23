@@ -91,8 +91,18 @@ function montar(opts: {
   readonly añadidas?: number;
 }): Montaje {
   const order = opts.order === undefined ? { id: PEDIDO, status: 'PENDIENTE' as const } : opts.order;
-  const personas = opts.personas ?? [];
+  const personasExplicitas = opts.personas ?? [];
   const gruposVivos = opts.gruposVivos ?? [];
+
+  // R34, R36: el caso de uso pregunta por la elegibilidad de los miembros de los grupos con una
+  // segunda llamada al mismo puerto. Quien no se declara explicito en `personas` entra aqui como
+  // activo y elegible por defecto -el caso comun-; el test que quiera un miembro NO elegible lo
+  // declara explicito con sus permisos, y esa entrada gana sobre el relleno.
+  const idsDeMiembros = new Set(gruposVivos.flatMap((g) => g.activeMemberIds));
+  const relleno = [...idsDeMiembros]
+    .filter((id) => !personasExplicitas.some((p) => p.id === id))
+    .map((id) => persona(id));
+  const personas = [...personasExplicitas, ...relleno];
 
   const orders = { findAliveById: vi.fn(async () => order) };
 
@@ -342,6 +352,45 @@ describe('QC-87 — `assignResponsibles`', () => {
     });
   });
 
+  /** R33 — una persona SUELTA con `pedidos.consultar` no se puede asignar como responsable. */
+  describe('personas sueltas con `pedidos.consultar` (R33)', () => {
+    it("una sola persona con `pedidos.consultar` -> 'user_cannot_be_responsible', ninguna fila", async () => {
+      const m = montar({ personas: [persona(ANA, true, ['pedidos.consultar'])] });
+
+      expect(
+        await codigoDelFallo(m.assign(ACTOR, { orderId: PEDIDO, userIds: [ANA], workGroupIds: [] }, AHORA)),
+      ).toBe('user_cannot_be_responsible');
+
+      expect(m.assignments.insertMissing).not.toHaveBeenCalled();
+    });
+
+    it('el rechazo es ENTERO: no se escribe ni la que iba delante y era elegible', async () => {
+      const m = montar({
+        personas: [persona(ANA), persona(BEA, true, ['pedidos.consultar'])],
+      });
+
+      await codigoDelFallo(
+        m.assign(ACTOR, { orderId: PEDIDO, userIds: [ANA, BEA], workGroupIds: [] }, AHORA),
+      );
+
+      expect(m.assignments.insertMissing).not.toHaveBeenCalled();
+    });
+
+    it('el orden de rechazos es: no existe -> cuenta inactiva -> no elegible', async () => {
+      const noExiste = montar({ personas: [] });
+      const inactiva = montar({ personas: [persona(ANA, false, ['pedidos.consultar'])] });
+      const noElegible = montar({ personas: [persona(ANA, true, ['pedidos.consultar'])] });
+      const entrada = { orderId: PEDIDO, userIds: [ANA], workGroupIds: [] };
+
+      expect(await codigoDelFallo(noExiste.assign(ACTOR, entrada, AHORA))).toBe('user_not_found');
+      // Inactiva Y con `pedidos.consultar`: gana la inactividad, que se comprueba antes.
+      expect(await codigoDelFallo(inactiva.assign(ACTOR, entrada, AHORA))).toBe('user_not_assignable');
+      expect(await codigoDelFallo(noElegible.assign(ACTOR, entrada, AHORA))).toBe(
+        'user_cannot_be_responsible',
+      );
+    });
+  });
+
   /** R19, R20, R25, R26, R28 — aplicar grupos. */
   describe('aplicar grupos (R19, R20, R25, R26, R28)', () => {
     it('R19, R28: una fila por miembro activo, con la referencia y el NOMBRE CONGELADO', async () => {
@@ -427,6 +476,78 @@ describe('QC-87 — `assignResponsibles`', () => {
       );
 
       // Ni error, ni fila. Un grupo vacio NO es `work_group_not_found`: el grupo existe.
+      expect(outcome).toEqual({ added: 0 });
+      expect(m.filas()).toEqual([]);
+    });
+  });
+
+  /**
+   * R34, R36 — un grupo con un miembro no elegible (`pedidos.consultar`) no rechaza la operacion:
+   * se le omite EN SILENCIO, igual que a un inactivo, y el resto del grupo se asigna.
+   */
+  describe('grupos con un miembro que tiene `pedidos.consultar` (R34, R36)', () => {
+    it('un Administrador y un Operador en el mismo grupo: el Operador queda asignado, el Administrador sin fila', async () => {
+      const ADMINISTRADOR = CARLOS;
+      const OPERADOR = BEA;
+      const m = montar({
+        personas: [persona(ADMINISTRADOR, true, ['pedidos.consultar'])],
+        gruposVivos: [grupo(TURNO_NOCHE, 'Turno noche', [ADMINISTRADOR, OPERADOR])],
+      });
+
+      const outcome = await m.assign(
+        ACTOR,
+        { orderId: PEDIDO, userIds: [], workGroupIds: [TURNO_NOCHE] },
+        AHORA,
+      );
+
+      // La operacion NO falla (R34): tiene exito con una sola fila.
+      expect(outcome).toEqual({ added: 1 });
+      expect(m.filas()).toEqual([
+        {
+          orderId: PEDIDO,
+          userId: OPERADOR,
+          companyId: EMPRESA,
+          workGroupId: TURNO_NOCHE,
+          workGroupName: 'Turno noche',
+        },
+      ]);
+      expect(m.filas().map((fila) => fila.userId)).not.toContain(ADMINISTRADOR);
+    });
+
+    it('una sola llamada extra, con la union de TODOS los grupos, no una por grupo', async () => {
+      const m = montar({
+        gruposVivos: [
+          grupo(TURNO_NOCHE, 'Turno noche', [ANA, BEA]),
+          grupo(TURNO_DIA, 'Turno dia', [BEA, CARLOS]),
+        ],
+      });
+
+      await m.assign(ACTOR, { orderId: PEDIDO, userIds: [], workGroupIds: [TURNO_NOCHE, TURNO_DIA] }, AHORA);
+
+      // Una llamada por las personas sueltas (aqui, ninguna) y UNA sola mas por los DOS grupos
+      // juntos: no una por grupo.
+      expect(m.people.findAliveRefsInCompany).toHaveBeenCalledTimes(2);
+      const llamadaDeGrupos = m.people.findAliveRefsInCompany.mock.calls[1] as [
+        string,
+        readonly string[],
+        Date,
+      ];
+      expect(new Set(llamadaDeGrupos[1])).toEqual(new Set([ANA, BEA, CARLOS]));
+    });
+
+    it('un grupo formado ENTERO por gente no elegible termina con EXITO y cero anadidas, como uno sin activos', async () => {
+      const ADMINISTRADOR = CARLOS;
+      const m = montar({
+        personas: [persona(ADMINISTRADOR, true, ['pedidos.consultar'])],
+        gruposVivos: [grupo(TURNO_NOCHE, 'Turno noche', [ADMINISTRADOR])],
+      });
+
+      const outcome = await m.assign(
+        ACTOR,
+        { orderId: PEDIDO, userIds: [], workGroupIds: [TURNO_NOCHE] },
+        AHORA,
+      );
+
       expect(outcome).toEqual({ added: 0 });
       expect(m.filas()).toEqual([]);
     });

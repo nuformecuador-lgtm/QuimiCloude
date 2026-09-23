@@ -153,3 +153,17 @@ export class WorkGroupNotFoundError extends AsignacionesError {
     super('work_group_not_found', diagnostic);
   }
 }
+
+/**
+ * La persona existe y su cuenta esta activa, pero tiene permiso para consultar sus propios
+ * pedidos: no se le puede asignar la responsabilidad de uno. Se distingue de
+ * `user_not_assignable`, cuyo mensaje habla de una cuenta que no esta activa, algo que aqui no es
+ * cierto.
+ */
+export class UserCannotBeResponsibleError extends AsignacionesError {
+  readonly code = 'user_cannot_be_responsible';
+
+  constructor(diagnostic?: string) {
+    super('user_cannot_be_responsible', diagnostic);
+  }
+}
