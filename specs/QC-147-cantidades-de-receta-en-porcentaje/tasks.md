@@ -203,7 +203,7 @@ T6, T7, T8 y T9 son `[P]` entre sí una vez hecha T4.
     guardias en verde; ningún comentario de producción tocado cita fichas ni requisitos
     (`docs/conventions.md`).
 
-- [ ] **T12 — Gate y trazabilidad**
+- [x] **T12 — Gate y trazabilidad**
   - Depende de: T11
   - Archivos: `progress/impl_QC-147-cantidades-de-receta-en-porcentaje.md`.
   - Hecho cuando: `./init.sh` completo termina en verde; la bitácora tiene el mapa `R1`–`R26` →
