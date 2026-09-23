@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/table';
 import type { RecipeLineView } from '@/lib/modules/recetas';
 import type { UnitView } from '@/lib/modules/unidades';
-import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
+import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 
 import { multiplyDecimal, subtractDecimal } from './order-decimal';
 
@@ -106,7 +106,7 @@ export function OrderIngredientsTable({
 
   /** Restante de una linea: el stock MENOS lo requerido. `null` = el producto no tiene stock. */
   const remainingOf = (line: RecipeLineView): string | null =>
-    line.productStock === null ? null : subtractDecimal(line.productStock.toString(), requiredOf(line));
+    line.productStock === null ? null : subtractDecimal(line.productStock, requiredOf(line));
 
   /** Faltante: el restante es negativo, el pedido pide mas de lo que hay. Se resalta en rojo. */
   const isShort = (remaining: string): boolean => remaining.startsWith('-');
@@ -158,6 +158,7 @@ export function OrderIngredientsTable({
                   <TableCell
                     className="text-right"
                     title={exactDecimalTitle(line.quantity)}
+                    aria-label={trimDecimal(line.quantity)}
                     data-testid="order-ingredient-quantity"
                   >
                     {formatDecimalDisplay(line.quantity)}
@@ -167,20 +168,18 @@ export function OrderIngredientsTable({
                   </TableCell>
                   <TableCell
                     className="text-right"
-                    title={
-                      line.productStock === null
-                        ? undefined
-                        : exactDecimalTitle(line.productStock.toString())
-                    }
+                    title={line.productStock === null ? undefined : exactDecimalTitle(line.productStock)}
+                    aria-label={line.productStock === null ? undefined : trimDecimal(line.productStock)}
                     data-testid="order-ingredient-stock"
                   >
                     {line.productStock === null
                       ? MISSING_VALUE_MARK
-                      : formatDecimalDisplay(line.productStock.toString())}
+                      : formatDecimalDisplay(line.productStock)}
                   </TableCell>
                   <TableCell
                     className="text-right"
                     title={exactDecimalTitle(required)}
+                    aria-label={trimDecimal(required)}
                     data-testid="order-ingredient-required"
                   >
                     {formatDecimalDisplay(required)}
@@ -188,6 +187,7 @@ export function OrderIngredientsTable({
                   <TableCell
                     className="text-right"
                     title={remaining === null ? undefined : exactDecimalTitle(remaining)}
+                    aria-label={remaining === null ? undefined : trimDecimal(remaining)}
                     data-testid="order-ingredient-remaining"
                   >
                     {remaining === null ? (

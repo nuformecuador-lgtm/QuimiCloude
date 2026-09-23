@@ -192,7 +192,7 @@ function productView(overrides: Partial<ProductView> = {}): ProductView {
     id: PRODUCT_PAGE2_ID,
     name: PRODUCT_PAGE2_NAME,
     imagePath: null,
-    stock: 0,
+    stock: '0',
     unitId: null,
     qtyAlert: null,
     type: 'PRODUCT' as const,
@@ -209,7 +209,7 @@ function lineView(overrides: Partial<RecipeLineView> = {}): RecipeLineView {
     productName: PRODUCT_1_NAME,
     quantity: '1.0000',
     unitId: UNIT_LITRO_ID,
-    productStock: 10,
+    productStock: '10',
     ...overrides,
   };
 }

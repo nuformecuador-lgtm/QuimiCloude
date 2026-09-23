@@ -6,6 +6,7 @@ import type { DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import { compareQuantities, productDisplayName, type ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 
 /**
  * Declaracion de las columnas de la tabla de productos (R6, R7, R8, `design.md > 7`).
@@ -84,8 +85,9 @@ export const ACTIONS_COLUMN_LABEL = 'Acciones';
  */
 export const PRODUCT_DEFAULT_PINNED_COLUMNS: readonly string[] = [IMAGE_COLUMN_ID];
 
-function formatOptionalInt(value: string | null): string {
-  return value === null ? EMPTY_CELL : String(value);
+/** `null` no tiene cifra exacta que anunciar: el `aria-label` queda sin poner. */
+function decimalAriaLabel(value: string | null): string | undefined {
+  return value === null ? undefined : trimDecimal(value);
 }
 
 /**
@@ -123,10 +125,23 @@ export function productUnitLabel(
   return product.unitId === null ? null : unitLabel(product.unitId, units);
 }
 
-/** Existencia guardada junto a la unidad del producto, o solo el numero sin unidad ni catalogo. */
+/**
+ * Existencia guardada junto a la unidad del producto, o solo el numero sin unidad ni catalogo.
+ *
+ * El numero se pinta a dos decimales (`formatDecimalDisplay`): la celda no es donde se vuelve a
+ * guardar, y cuatro decimales de relleno no informan de nada.
+ */
 function existenceLabel(product: ProductView, units: readonly UnitRef[] | undefined): string {
   const label = productUnitLabel(product, units);
-  return label === null ? String(product.stock) : `${product.stock} ${label}`;
+  const amount = formatDecimalDisplay(product.stock);
+  return label === null ? amount : `${amount} ${label}`;
+}
+
+/** Cifra exacta de la existencia para quien no puede quedarse con el redondeo del pixel. */
+function existenceAriaLabel(product: ProductView, units: readonly UnitRef[] | undefined): string {
+  const label = productUnitLabel(product, units);
+  const amount = trimDecimal(product.stock);
+  return label === null ? amount : `${amount} ${label}`;
 }
 
 /** «nombre · unidad», o solo el nombre sin unidad o sin catalogo. */
@@ -149,8 +164,25 @@ function stockCell(product: ProductView, units: readonly UnitRef[] | undefined):
       data-testid="product-stock"
       data-alert={alerted ? 'true' : undefined}
       className={alerted ? 'font-semibold text-destructive' : undefined}
+      title={exactDecimalTitle(product.stock)}
+      aria-label={existenceAriaLabel(product, units)}
     >
       {existenceLabel(product, units)}
+    </span>
+  );
+}
+
+/** La alerta de cantidad, opcional: sin valor pinta el marcador de vacio, sin `title` ni `aria-label`. */
+function qtyAlertCell(product: ProductView): ReactNode {
+  if (product.qtyAlert === null) return EMPTY_CELL;
+
+  return (
+    <span
+      data-testid="product-qty-alert"
+      title={exactDecimalTitle(product.qtyAlert)}
+      aria-label={decimalAriaLabel(product.qtyAlert)}
+    >
+      {formatDecimalDisplay(product.qtyAlert)}
     </span>
   );
 }
@@ -202,7 +234,7 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       align: 'end',
       sortable: true,
       filter: { kind: 'numberRange' },
-      cell: (product) => formatOptionalInt(product.qtyAlert),
+      cell: (product) => qtyAlertCell(product),
     },
     {
       id: ACTIONS_COLUMN_ID,

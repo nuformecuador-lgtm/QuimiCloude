@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 
 import type { ProductBatchView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 
 import { EMPTY_CELL } from './product-columns';
 
@@ -40,10 +41,22 @@ function unitLabel(unitId: string, units: readonly UnitRef[] | undefined): strin
   return unit?.symbol ?? unit?.name ?? EMPTY_CELL;
 }
 
-/** Cantidad del lote, sin convertir entre unidades: la que trae `batch.stock`, tal cual. */
+/**
+ * Cantidad del lote, sin convertir entre unidades: la que trae `batch.stock`, redondeada a dos
+ * decimales para pintarla (`formatDecimalDisplay`). El valor guardado no cambia: esto es la
+ * celda, no el dato.
+ */
 function quantityLabel(batch: ProductBatchView, units: readonly UnitRef[] | undefined): string {
   const label = unitLabel(batch.unitId, units);
-  return label === null ? String(batch.stock) : `${batch.stock} ${label}`;
+  const amount = formatDecimalDisplay(batch.stock);
+  return label === null ? amount : `${amount} ${label}`;
+}
+
+/** Cifra exacta de la cantidad, para quien no puede quedarse con el redondeo del pixel. */
+function quantityAriaLabel(batch: ProductBatchView, units: readonly UnitRef[] | undefined): string {
+  const label = unitLabel(batch.unitId, units);
+  const amount = trimDecimal(batch.stock);
+  return label === null ? amount : `${amount} ${label}`;
 }
 
 export function ProductBatchesPanel({
@@ -76,7 +89,13 @@ export function ProductBatchesPanel({
               </div>
               <div className="flex flex-col">
                 <dt className="text-xs text-muted-foreground">{QUANTITY_LABEL}</dt>
-                <dd data-testid="product-batch-quantity">{quantityLabel(batch, units)}</dd>
+                <dd
+                  data-testid="product-batch-quantity"
+                  title={exactDecimalTitle(batch.stock)}
+                  aria-label={quantityAriaLabel(batch, units)}
+                >
+                  {quantityLabel(batch, units)}
+                </dd>
               </div>
               <div className="flex flex-col">
                 <dt className="text-xs text-muted-foreground">{PURCHASE_DATE_LABEL}</dt>

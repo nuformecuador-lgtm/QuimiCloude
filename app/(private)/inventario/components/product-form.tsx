@@ -26,6 +26,7 @@ import {
 
 import { PresentationSelect } from '@/components/shared/presentation-select';
 
+import { sanitizeQuantityInput } from './product-cost-amount';
 import { ProductBatchDateField, formatDateLocalISO } from './product-batch-date-field';
 import { ProductCostFields } from './product-cost-fields';
 import { ProductField } from './product-field';
@@ -44,8 +45,8 @@ const TOUCH_TARGET = 'min-h-11 min-w-11';
  */
 const TEXT_FIELDS = ['name'] as const;
 
-/** Campo entero del producto. `FormData` solo entrega cadenas, asi que se convierte antes de validar. */
-const PRODUCT_INT_FIELDS = ['qtyAlert'] as const;
+/** Campo decimal del producto: cadena de hasta 4 decimales, como la columna. */
+const PRODUCT_DECIMAL_FIELDS = ['qtyAlert'] as const;
 
 /**
  * Campos del LOTE que el alta pide junto al producto (`product_batches`), incluida su existencia.
@@ -67,17 +68,21 @@ const BATCH_FIELDS = [
 
 type ProductFieldName =
   | (typeof TEXT_FIELDS)[number]
-  | (typeof PRODUCT_INT_FIELDS)[number]
+  | (typeof PRODUCT_DECIMAL_FIELDS)[number]
   | (typeof BATCH_FIELDS)[number];
 
 const ALL_FIELDS: readonly ProductFieldName[] = [
   ...TEXT_FIELDS,
-  ...PRODUCT_INT_FIELDS,
+  ...PRODUCT_DECIMAL_FIELDS,
   ...BATCH_FIELDS,
 ];
 
-/** Campos que se convierten a entero antes de validar: el del producto y la existencia del lote. */
-const NUMBER_FIELDS = [...PRODUCT_INT_FIELDS, 'stock'] as const;
+/**
+ * Campos que se validan como decimal antes de llamar al esquema: el del producto y la existencia
+ * del lote. Viajan como CADENA -el esquema los valida como tal-; aqui solo se comprueba la forma
+ * para poder senalar el campo exacto, en vez de dejar que un unico mensaje generico cubra los dos.
+ */
+const DECIMAL_FIELDS = [...PRODUCT_DECIMAL_FIELDS, 'stock'] as const;
 
 /**
  * Copy de los errores por campo. Se escribe aqui y no se toma de zod: los mensajes de zod estan
@@ -85,8 +90,8 @@ const NUMBER_FIELDS = [...PRODUCT_INT_FIELDS, 'stock'] as const;
  */
 const FIELD_MESSAGES: Record<ProductFieldName, string> = {
   name: 'Escribe un nombre de 1 a 120 caracteres.',
-  stock: 'Debe ser un número entero de 0 o más.',
-  qtyAlert: 'Debe ser un número entero de 0 o más.',
+  stock: 'Debe ser un número decimal de 0 o más, con hasta 4 decimales.',
+  qtyAlert: 'Debe ser un número decimal de 0 o más, con hasta 4 decimales.',
   presentationId: 'Elige una presentación.',
   // «Mayor que 0» porque la columna lleva `CHECK (unit_cost > 0)`. Y dos decimales, no los cuatro
   // del esquema: el campo ya no deja teclear mas, asi que prometer cuatro mandaria a escribir algo
@@ -173,17 +178,22 @@ function readValues(formData: FormData): FieldValues {
   return values;
 }
 
+/** El mismo patron que valida el esquema: decimal sin signo, hasta 4 decimales (`decimal(14,4)`). */
+const DECIMAL_FIELD_PATTERN = /^\d{1,10}(\.\d{1,4})?$/;
+
 /**
- * Traduce una cadena de `FormData` al numero que espera el esquema. Una cadena vacia es "campo
- * omitido" (es lo que el esquema admite como `nullish`); una cadena presente que no es un entero
- * es un error de ESE campo, y se dice ahi -en vez de dejar que la action devuelva un unico
- * mensaje generico para los cuatro campos numericos-.
+ * Comprueba la forma de una cadena de `FormData` SIN convertirla: el esquema la sigue validando
+ * como cadena decimal, nunca como `number` -un decimal de cuatro cifras no cabe en el binario de
+ * coma flotante sin arriesgar el redondeo-. Una cadena vacia es "campo omitido" (lo que el
+ * esquema admite como `nullish`); una presente que no tiene forma de decimal es un error de ESE
+ * campo, y se dice ahi -en vez de dejar que la action devuelva un unico mensaje generico para los
+ * dos campos decimales-.
  */
-function parseInteger(raw: string): number | undefined | 'invalid' {
+function parseDecimalField(raw: string): string | undefined | 'invalid' {
   const trimmed = raw.trim();
   if (trimmed === '') return undefined;
-  if (!/^-?\d+$/.test(trimmed)) return 'invalid';
-  return Number(trimmed);
+  if (!DECIMAL_FIELD_PATTERN.test(trimmed)) return 'invalid';
+  return trimmed;
 }
 
 /**
@@ -289,24 +299,25 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
 
   function applyTemplate(option: ProductNameOption) {
     setTemplate({
-      qtyAlert: option.qtyAlert === null ? '' : String(option.qtyAlert),
+      qtyAlert: option.qtyAlert ?? '',
       presentationId: option.presentationId ?? '',
       presentationName: option.presentationName ?? '',
     });
+    setQtyAlertValue(option.qtyAlert ?? '');
   }
 
   async function save(_previous: ProductFormState, formData: FormData): Promise<ProductFormState> {
     const values = readValues(formData);
     const fieldErrors: FieldErrors = {};
 
-    const numbers: Partial<Record<(typeof NUMBER_FIELDS)[number], number>> = {};
-    for (const field of NUMBER_FIELDS) {
-      const parsed = parseInteger(values[field]);
+    const decimals: Partial<Record<(typeof DECIMAL_FIELDS)[number], string>> = {};
+    for (const field of DECIMAL_FIELDS) {
+      const parsed = parseDecimalField(values[field]);
       if (parsed === 'invalid') {
         fieldErrors[field] = FIELD_MESSAGES[field];
         continue;
       }
-      if (parsed !== undefined) numbers[field] = parsed;
+      if (parsed !== undefined) decimals[field] = parsed;
     }
 
     const isCreate = product === undefined;
@@ -326,7 +337,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
     const parsed = isCreate
       ? createProductWithFirstBatchSchema.safeParse({
           name: values.name,
-          ...numbers,
+          ...decimals,
           presentationId: values.presentationId,
           unitCost,
           totalCost,
@@ -336,7 +347,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
         })
       : createProductSchema.safeParse({
           name: values.name,
-          ...numbers,
+          ...decimals,
         });
 
     if (!parsed.success) {
@@ -407,6 +418,18 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
   /** Valor inicial de un campo: lo escrito en el intento fallido; si no, el del producto que se edita. */
   const initialValue = (field: ProductFieldName, fromProduct: string): string =>
     values?.[field] ?? fromProduct;
+
+  /**
+   * La existencia y la alerta de cantidad son CONTROLADAS -y no `defaultValue` + `key`, como el
+   * resto del formulario-, porque necesitan filtrar lo tecleado (coma a punto) mientras se
+   * escribe, igual que los dos importes del lote (`ProductCostFields`). Un intento fallido no
+   * pierde nada: el estado de React nunca se destruye entre reintentos, asi que lo escrito
+   * sigue ahi sin necesidad de restaurarlo desde `values`.
+   */
+  const [stockValue, setStockValue] = useState(() => initialValue('stock', ''));
+  const [qtyAlertValue, setQtyAlertValue] = useState(() =>
+    initialValue('qtyAlert', template?.qtyAlert ?? product?.qtyAlert ?? ''),
+  );
 
   // Todo error de campo tiene ya SU campo en pantalla: desde QC-52 el formulario no tiene
   // ningun campo oculto, asi que no hay rechazo que se quede sin sitio donde pintarse. La region
@@ -525,10 +548,12 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
         <ProductField
           name="stock"
           label={FIELD_LABELS.stock}
-          type="number"
+          type="text"
+          inputMode="decimal"
           required
           helper="La existencia con la que entra este lote al inventario."
-          defaultValue={initialValue('stock', '')}
+          value={stockValue}
+          onChange={(event) => setStockValue(sanitizeQuantityInput(event.currentTarget.value))}
           error={fieldErrors.stock}
         />
       )}
@@ -544,10 +569,12 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
       <ProductField
         name="qtyAlert"
         label={FIELD_LABELS.qtyAlert}
-        type="number"
+        type="text"
+        inputMode="decimal"
         required
         helper="Cantidad a partir de la cual quieres que se avise de que queda poco. Hoy solo se guarda: todavía no dispara ningún aviso."
-        defaultValue={initialValue('qtyAlert', template?.qtyAlert ?? product?.qtyAlert?.toString() ?? '')}
+        value={qtyAlertValue}
+        onChange={(event) => setQtyAlertValue(sanitizeQuantityInput(event.currentTarget.value))}
         error={fieldErrors.qtyAlert}
       />
 

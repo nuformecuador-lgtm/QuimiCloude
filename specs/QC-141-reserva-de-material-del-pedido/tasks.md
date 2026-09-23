@@ -83,7 +83,7 @@ Archivos: los de la tabla de `design.md > 2.1` bajo `lib/modules/inventario/**`,
 negativo, notación científica) y el test de integración de sumas de `product-stock.int.test.ts`
 reescrito con decimales.
 
-## T5 — Existencia decimal en pantallas `[depende de T4]` `[P con T6]`
+## [x] T5 — Existencia decimal en pantallas `[depende de T4]` `[P con T6]`
 
 Archivos: `app/(private)/inventario/components/{product-columns,product-batches-panel,product-form,adjust-batch-dialog,product-cost-amount}.tsx|ts`,
 `app/(private)/pedidos/components/order-ingredients-table.tsx`.

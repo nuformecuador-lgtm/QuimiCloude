@@ -271,9 +271,9 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
     id: crypto.randomUUID(),
     name: 'Hidróxido de sodio',
     imagePath: null,
-    stock: 0,
+    stock: '0',
     unitId: null,
-    qtyAlert: 5,
+    qtyAlert: '5',
     type: 'PRODUCT' as const,
     createdAt: new Date('2026-01-15T10:20:30.000Z'),
     updatedAt: new Date('2026-02-20T08:00:00.000Z'),
@@ -624,9 +624,9 @@ describe('pantalla de productos — lista', () => {
     const UNIDAD_A = crypto.randomUUID();
     listProductsActionMock.mockResolvedValue(
       paginaDeProductos([
-        producto({ id: crypto.randomUUID(), stock: 2, unitId: UNIDAD_A, qtyAlert: 5 }),
-        producto({ id: crypto.randomUUID(), stock: 5, unitId: UNIDAD_A, qtyAlert: 5 }),
-        producto({ id: crypto.randomUUID(), stock: 9, unitId: UNIDAD_A, qtyAlert: 5 }),
+        producto({ id: crypto.randomUUID(), stock: '2', unitId: UNIDAD_A, qtyAlert: '5' }),
+        producto({ id: crypto.randomUUID(), stock: '5', unitId: UNIDAD_A, qtyAlert: '5' }),
+        producto({ id: crypto.randomUUID(), stock: '9', unitId: UNIDAD_A, qtyAlert: '5' }),
       ]),
     );
 
@@ -648,7 +648,7 @@ describe('pantalla de productos — lista', () => {
 
   it('R17 — un producto sin lotes y con alerta de cantidad configurada se marca en alerta', async () => {
     listProductsActionMock.mockResolvedValue(
-      paginaDeProductos([producto({ id: crypto.randomUUID(), stock: 0, unitId: null, qtyAlert: 5 })]),
+      paginaDeProductos([producto({ id: crypto.randomUUID(), stock: '0', unitId: null, qtyAlert: '5' })]),
     );
 
     await renderPantalla();
@@ -660,8 +660,8 @@ describe('pantalla de productos — lista', () => {
     const UNIDAD_A = crypto.randomUUID();
     listProductsActionMock.mockResolvedValue(
       paginaDeProductos([
-        producto({ id: crypto.randomUUID(), stock: 0, unitId: UNIDAD_A, qtyAlert: null }),
-        producto({ id: crypto.randomUUID(), stock: 0, unitId: null, qtyAlert: null }),
+        producto({ id: crypto.randomUUID(), stock: '0', unitId: UNIDAD_A, qtyAlert: null }),
+        producto({ id: crypto.randomUUID(), stock: '0', unitId: null, qtyAlert: null }),
       ]),
     );
 
@@ -704,7 +704,7 @@ describe('pantalla de productos — lista', () => {
     const UNIDAD_KG = { ...UNIDAD, id: crypto.randomUUID(), name: 'Kilogramo', symbol: 'kg' };
     listUnitsActionMock.mockResolvedValue({ status: 'success', data: [UNIDAD_KG] });
     listProductsActionMock.mockResolvedValue(
-      paginaDeProductos([producto({ stock: 15, unitId: UNIDAD_KG.id })]),
+      paginaDeProductos([producto({ stock: '15', unitId: UNIDAD_KG.id })]),
     );
 
     await renderPantalla();
@@ -714,7 +714,7 @@ describe('pantalla de productos — lista', () => {
 
   it('R16 — un producto sin unidad muestra su existencia como 0', async () => {
     listProductsActionMock.mockResolvedValue(
-      paginaDeProductos([producto({ stock: 0, unitId: null })]),
+      paginaDeProductos([producto({ stock: '0', unitId: null })]),
     );
 
     await renderPantalla();
@@ -725,12 +725,51 @@ describe('pantalla de productos — lista', () => {
   it('sin catalogo de unidades, la celda pinta la cantidad sin etiqueta', async () => {
     listUnitsActionMock.mockResolvedValue(errorInesperado());
     listProductsActionMock.mockResolvedValue(
-      paginaDeProductos([producto({ stock: 10, unitId: crypto.randomUUID() })]),
+      paginaDeProductos([producto({ stock: '10', unitId: crypto.randomUUID() })]),
     );
 
     await renderPantalla();
 
     expect(screen.getByTestId('product-stock')).toHaveTextContent('10');
+  });
+
+  it('R6 — la existencia se pinta a dos decimales, con la cifra exacta en el title y el aria-label', async () => {
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([
+        producto({ id: crypto.randomUUID(), stock: '0.0001', unitId: null }),
+        producto({ id: crypto.randomUUID(), stock: '1.5', unitId: null }),
+        producto({ id: crypto.randomUUID(), stock: '12345.6789', unitId: null }),
+      ]),
+    );
+
+    await renderPantalla();
+
+    const [celda1, celda2, celda3] = screen.getAllByTestId('product-stock');
+
+    expect(celda1).toHaveTextContent('0');
+    expect(celda1).toHaveAttribute('title', '0.0001');
+    expect(celda1).toHaveAttribute('aria-label', '0.0001');
+
+    expect(celda2).toHaveTextContent('1.5');
+    expect(celda2).not.toHaveAttribute('title');
+    expect(celda2).toHaveAttribute('aria-label', '1.5');
+
+    expect(celda3).toHaveTextContent('12345.68');
+    expect(celda3).toHaveAttribute('title', '12345.6789');
+    expect(celda3).toHaveAttribute('aria-label', '12345.6789');
+  });
+
+  it('R6 — la alerta de cantidad se pinta a dos decimales, con la cifra exacta en el title y el aria-label', async () => {
+    listProductsActionMock.mockResolvedValue(
+      paginaDeProductos([producto({ id: crypto.randomUUID(), qtyAlert: '12345.6789' })]),
+    );
+
+    await renderPantalla();
+
+    const celda = screen.getByTestId('product-qty-alert');
+    expect(celda).toHaveTextContent('12345.68');
+    expect(celda).toHaveAttribute('title', '12345.6789');
+    expect(celda).toHaveAttribute('aria-label', '12345.6789');
   });
 
   it('el desbordamiento horizontal lo absorbe el envoltorio de la tabla y ningun ancestro', async () => {
@@ -1044,9 +1083,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     const FUERA_DEL_PRODUCTO = ['cost', 'minPurchase', 'deliveryTime', 'stock'] as const;
 
     for (const [campo, valor] of Object.entries(precargado)) {
-      expect(screen.getByTestId(`product-field-${campo}`), campo).toHaveValue(
-        campo === 'name' ? valor : Number(valor),
-      );
+      expect(screen.getByTestId(`product-field-${campo}`), campo).toHaveValue(valor);
     }
 
     // Ninguno de los cuatro tiene control, ni visible ni oculto.
@@ -1104,7 +1141,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.getByTestId(testId.panel)).toBeInTheDocument();
     // Y no se pierde lo escrito: ni lo que provoco el rechazo ni el resto.
     expect(screen.getByTestId('product-field-name')).toHaveValue(nombreLargo);
-    expect(screen.getByTestId('product-field-stock')).toHaveValue(Number(ALTA_VALIDA.stock));
+    expect(screen.getByTestId('product-field-stock')).toHaveValue(ALTA_VALIDA.stock);
   });
 
   it('un guardado rechazado por la operacion muestra el error del formulario y conserva lo escrito', async () => {
@@ -1137,7 +1174,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(toastExito).not.toHaveBeenCalled();
     expect(routerMock.refresh).not.toHaveBeenCalled();
     expect(screen.getByTestId('product-field-name')).toHaveValue(ALTA_VALIDA.name);
-    expect(screen.getByTestId('product-field-stock')).toHaveValue(Number(ALTA_VALIDA.stock));
+    expect(screen.getByTestId('product-field-stock')).toHaveValue(ALTA_VALIDA.stock);
   });
 
   it('un guardado con exito cierra el panel, avisa por toast y refresca la lista', async () => {
@@ -1260,7 +1297,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     // es el inventario actual del producto nuevo, que escribe el usuario. (La presentacion ya no
     // es del producto: se mudo a `product_batches`.)
     const user = setupUser();
-    const existente = producto({ name: 'Sosa cáustica perlas', qtyAlert: 7 });
+    const existente = producto({ name: 'Sosa cáustica perlas', qtyAlert: '7' });
     listProductsActionMock.mockResolvedValue(paginaDeProductos([existente]));
 
     await renderPantalla();

@@ -91,8 +91,12 @@ const operatorUser: Credentials = {
 /** Existencia inicial del lote sembrado, y su asiento de alta. */
 const INITIAL_STOCK = 12;
 
-/** Cantidad con signo del ajuste feliz: positiva, para distinguirla a simple vista del alta. */
-const HAPPY_DELTA = 6;
+/**
+ * Cantidad con signo del ajuste feliz: NEGATIVA y decimal (QC-141 R4, R6 — la columna admite hasta
+ * 4 decimales y el campo del dialogo teclea uno). `-0.5` es exactamente el caso que un `number`
+ * binario arriesga y que la cadena decimal evita.
+ */
+const HAPPY_DELTA = '-0.5';
 
 /** El motivo de ese ajuste es el primero del conjunto cerrado: es el que elige el dialogo cuando
  * se pulsa su primera opcion, en el mismo orden en que `MOVEMENT_REASONS` las declara. */
@@ -166,11 +170,17 @@ async function chooseFirstReason(page: Page): Promise<void> {
   await options.first().click();
 }
 
-/** Abre el dialogo de ajuste, escribe la cantidad con signo y elige el primer motivo. */
-async function fillAdjustDialog(page: Page, delta: number): Promise<void> {
+/**
+ * Abre el dialogo de ajuste, escribe la cantidad con signo y elige el primer motivo.
+ *
+ * `delta` es CADENA -y no `number`- desde QC-141 (R4): la columna admite hasta 4 decimales
+ * (`-0.5`, por ejemplo), y un `number` de JavaScript es justo lo que el dominio evita para no
+ * arriesgar el redondeo binario. `String(delta)` habria sido el mismo riesgo un paso antes.
+ */
+async function fillAdjustDialog(page: Page, delta: string): Promise<void> {
   await page.getByTestId('adjust-batch-open').click();
   await expect(page.getByTestId('adjust-batch-dialog')).toBeVisible({ timeout: 60_000 });
-  await page.getByTestId('adjust-batch-delta').fill(String(delta));
+  await page.getByTestId('adjust-batch-delta').fill(delta);
   await chooseFirstReason(page);
 }
 
@@ -344,7 +354,7 @@ test.describe('ajuste de existencia de un lote', () => {
     await page.getByTestId('adjust-batch-confirm').click();
     await expect(page.getByTestId('adjust-batch-dialog')).toHaveCount(0, { timeout: 60_000 });
 
-    const expectedStock = INITIAL_STOCK + HAPPY_DELTA;
+    const expectedStock = INITIAL_STOCK + Number(HAPPY_DELTA);
     await expect(page.getByTestId('product-batch-quantity')).toContainText(String(expectedStock));
 
     // Contra Postgres: el lote quedo en el valor esperado y hay exactamente dos asientos, el
@@ -353,7 +363,10 @@ test.describe('ajuste de existencia de un lote', () => {
       where: { id: batchId },
       select: { stock: true },
     });
-    expect(batchAfter?.stock, 'el stock del lote debe reflejar el ajuste').toBe(expectedStock);
+    expect(
+      batchAfter?.stock.toNumber(),
+      'el stock del lote debe reflejar el ajuste',
+    ).toBe(expectedStock);
 
     const movements = await prisma.inventoryMovement.findMany({
       where: { batchId },
@@ -361,8 +374,13 @@ test.describe('ajuste de existencia de un lote', () => {
       select: { id: true, kind: true, quantity: true, reason: true },
     });
     expect(movements, 'debe haber exactamente el asiento de alta y el del ajuste').toHaveLength(2);
-    expect(movements[0]).toMatchObject({ id: openingMovementId, kind: 'opening', quantity: INITIAL_STOCK, reason: null });
-    expect(movements[1]).toMatchObject({ kind: 'adjustment', quantity: HAPPY_DELTA, reason: HAPPY_REASON });
+    expect(movements[0]!.id).toBe(openingMovementId);
+    expect(movements[0]!.kind).toBe('opening');
+    expect(movements[0]!.quantity.toNumber()).toBe(INITIAL_STOCK);
+    expect(movements[0]!.reason).toBeNull();
+    expect(movements[1]!.kind).toBe('adjustment');
+    expect(movements[1]!.quantity.toNumber()).toBe(Number(HAPPY_DELTA));
+    expect(movements[1]!.reason).toBe(HAPPY_REASON);
 
     const adjustmentMovementId = movements[1]!.id;
 
@@ -419,7 +437,7 @@ test.describe('ajuste de existencia de un lote', () => {
     await openBatchesPanel(page);
 
     const overshoot = -(stockBefore.toNumber() + 1);
-    await fillAdjustDialog(page, overshoot);
+    await fillAdjustDialog(page, String(overshoot));
     await page.getByTestId('adjust-batch-confirm').click();
 
     const error = page.getByTestId('adjust-batch-error');

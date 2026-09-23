@@ -45,7 +45,7 @@ function lote(overrides: Partial<ProductBatchView> = {}): ProductBatchView {
   return {
     id: 'batch-42',
     lot: 'L-001',
-    stock: 10,
+    stock: '10',
     unitId: 'unit-kg',
     purchaseDate: '2026-03-05',
     expiryDate: null,
@@ -57,7 +57,12 @@ let toastExito: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  adjustBatchStockActionMock.mockResolvedValue({ status: 'success', stock: 7 });
+  adjustBatchStockActionMock.mockResolvedValue({
+    status: 'success',
+    stock: '7',
+    reserved: '0',
+    overReserved: false,
+  });
   toastExito = vi.spyOn(toast, 'success');
 });
 
@@ -109,6 +114,29 @@ describe('el envio manda el batchId, la cantidad con signo y el motivo (R2, R8)'
     await waitFor(() => expect(adjustBatchStockActionMock).toHaveBeenCalledTimes(1));
     const enviado = adjustBatchStockActionMock.mock.calls[0]![1];
     expect(enviado.get('delta')).toBe('-3');
+  });
+
+  it('R6 — un delta decimal viaja tal cual, sin pasar por coma flotante', async () => {
+    const user = setupUser();
+    render(<AdjustBatchDialog batch={lote()} canAdjust />);
+
+    await abrirDialogo(user);
+    await user.type(screen.getByTestId('adjust-batch-delta'), '-0.5');
+    await elegirMotivo(user);
+    await user.click(screen.getByTestId('adjust-batch-confirm'));
+
+    await waitFor(() => expect(adjustBatchStockActionMock).toHaveBeenCalledTimes(1));
+    const enviado = adjustBatchStockActionMock.mock.calls[0]![1];
+    expect(enviado.get('delta')).toBe('-0.5');
+  });
+
+  it('R6 — la coma se convierte en punto mientras se teclea', async () => {
+    const user = setupUser();
+    render(<AdjustBatchDialog batch={lote()} canAdjust />);
+
+    await abrirDialogo(user);
+    await user.type(screen.getByTestId('adjust-batch-delta'), '1,5');
+    expect((screen.getByTestId('adjust-batch-delta') as HTMLInputElement).value).toBe('1.5');
   });
 
   it('con exito cierra, avisa por toast y refresca (R21)', async () => {

@@ -27,7 +27,7 @@ function movimiento(overrides: Partial<InventoryMovementView> = {}): InventoryMo
   return {
     id: crypto.randomUUID(),
     kind: 'adjustment',
-    quantity: -3,
+    quantity: '-3',
     reason: 'merma',
     authorName: 'Carla Duarte',
     createdAt: '2026-09-10T08:15:00.000Z',

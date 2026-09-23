@@ -173,7 +173,7 @@ const LINEA_INGREDIENTE = {
   productName: 'Sosa cáustica',
   quantity: '2.0000',
   unitId: 'u-litro',
-  productStock: 40,
+  productStock: '40',
 };
 
 /** Detalle de la receta que devuelve `getRecipeAction` (el JOIN con `products` lo hace `recetas`). */
@@ -708,11 +708,14 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 
     // 2.0000 × 0.1005 = 0.20100 y 40 − 0.201 = 39.799. Se CALCULAN exactos y se PINTAN a dos
-    // decimales (2026-09-17): «0.2» y «39.8». El valor exacto no se pierde, viaja en el `title`.
+    // decimales (2026-09-17): «0.2» y «39.8». El valor exacto no se pierde, viaja en el `title` Y
+    // en el `aria-label` (R6): no depende de `:hover` para llegar a quien usa lector de pantalla.
     await waitFor(() => expect(requerida.textContent).toBe('0.2'));
     expect(requerida).toHaveAttribute('title', '0.201');
+    expect(requerida).toHaveAttribute('aria-label', '0.201');
     expect(restante.textContent).toBe('39.8');
     expect(restante).toHaveAttribute('title', '39.799');
+    expect(restante).toHaveAttribute('aria-label', '39.799');
     expect(restante.firstChild).not.toHaveClass('text-destructive');
   });
 
@@ -722,7 +725,7 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     const user = setupUser();
     getRecipeActionMock.mockResolvedValue({
       status: 'success',
-      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, productStock: 0.2 }] }),
+      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, productStock: '0.2' }] }),
     });
     renderFormulario();
 
@@ -746,7 +749,7 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     const user = setupUser();
     getRecipeActionMock.mockResolvedValue({
       status: 'success',
-      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, productStock: 40 }] }),
+      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, productStock: '40' }] }),
     });
     renderFormulario();
 
@@ -776,7 +779,7 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     const user = setupUser();
     getRecipeActionMock.mockResolvedValue({
       status: 'success',
-      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, productStock: 0 }] }),
+      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, productStock: '0' }] }),
     });
     renderFormulario();
 
