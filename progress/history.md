@@ -4746,3 +4746,12 @@ podar.
   (QC-145; QC-122 + #114). **Excepción humana al paralelismo**: arrancó solapando con QC-141 en
   `lib/composition/index.ts`, `lib/modules/pedidos/index.ts` y `order-form.tsx`: **QC-141 resolverá el conflicto al
   mergear**.
+
+## 2026-09-22 — QC-110-recorte-de-imagenes-del-pdf (cerrada en disco el 2026-09-23)
+
+- **Qué:** dentro del trabajo de la cola, Gemini devuelve las coordenadas de las imágenes de cada página y
+  otra librería las recorta y las sube a un bucket propio de Supabase Storage (QC-110).
+- **PR #105**, merge `efd8f06d` el 2026-09-22. El detalle (spec, review y gate) está en su spec, en su bitácora
+  y en el PR.
+- **Cierre tardío:** el PR se mergeó el 2026-09-22 pero la ficha seguía `in_progress` y la tarjeta *En curso*.
+  El leader lo detectó y lo cerró el 2026-09-23, sin volver a verificar nada.
