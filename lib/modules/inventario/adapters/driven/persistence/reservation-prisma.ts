@@ -1,7 +1,6 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
 
 import { prisma } from '@/lib/shared/db/prisma';
-import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
 
 import { addQuantities, compareQuantities, subtractQuantities } from '../../../domain/decimal-quantity';
 import { planReservation, type ReservationCandidateBatch } from '../../../domain/plan-reservation';
@@ -82,17 +81,6 @@ async function lockProductsAscending(
   return result;
 }
 
-async function resolveUnitConversions(
-  units: UnitCatalog,
-  unitIds: Iterable<string>,
-  companyId: string,
-): Promise<Map<string, UnitConversion>> {
-  const ids = [...new Set(unitIds)];
-  if (ids.length === 0) return new Map();
-  const refs = await units.findRefs(ids, companyId);
-  return new Map(refs.map((ref) => [ref.id, ref]));
-}
-
 type BatchRow = {
   readonly id: string;
   readonly productId: string;
@@ -116,7 +104,7 @@ function toCandidateBatches(
   }));
 }
 
-export function createMaterialReservations(db: PrismaLike = prisma, units: UnitCatalog): MaterialReservations {
+export function createMaterialReservations(db: PrismaLike = prisma): MaterialReservations {
   return {
     async syncForOrder(input): Promise<ReservationOutcome> {
       const { orderId, companyId, requirement, actorId, now } = input;
@@ -163,12 +151,7 @@ export function createMaterialReservations(db: PrismaLike = prisma, units: UnitC
 
       const candidateBatches = toCandidateBatches(batches, othersByBatch);
 
-      const unitIds = new Set<string>();
-      for (const line of requirement) unitIds.add(line.unitId);
-      for (const unitId of productUnits.values()) if (unitId !== null) unitIds.add(unitId);
-      const unitConversions = await resolveUnitConversions(units, unitIds, companyId);
-
-      const plan = planReservation({ requirement, products: productUnits, batches: candidateBatches, units: unitConversions });
+      const plan = planReservation({ requirement, products: productUnits, batches: candidateBatches });
       const targetByBatch =
         plan.kind === 'reserved' ? new Map(plan.allocations.map((allocation) => [allocation.batchId, allocation.quantity])) : new Map<string, string>();
 
@@ -223,7 +206,7 @@ export function createMaterialReservations(db: PrismaLike = prisma, units: UnitC
       // una edicion que luego no volvio a apartar-. Se calcula y consume todo-o-nada de lo que
       // haya, sin pasar por `reservation_movements`: no hubo apartado que resolver.
       if (ownByBatch.size === 0) {
-        return consumeWithoutReservation(db, units, scope, orderId, actorId, now, fallbackRequirement);
+        return consumeWithoutReservation(db, scope, orderId, actorId, now, fallbackRequirement);
       }
 
       const ownBatchRows = await db.productBatch.findMany({
@@ -272,14 +255,10 @@ export function createMaterialReservations(db: PrismaLike = prisma, units: UnitC
 
       if (deficitByProduct.size > 0) {
         const deficitProductIds = [...deficitByProduct.keys()];
-        const requirementLines: ReservationRequirementLine[] = [];
-        for (const productId of deficitProductIds) {
-          const unitId = productUnits.get(productId);
-          if (unitId === null || unitId === undefined) {
-            return { kind: 'insufficient', productIds: deficitProductIds as ProductId[] };
-          }
-          requirementLines.push({ productId: productId as ProductId, quantity: deficitByProduct.get(productId) as string, unitId });
-        }
+        const requirementLines: ReservationRequirementLine[] = deficitProductIds.map((productId) => ({
+          productId: productId as ProductId,
+          quantity: deficitByProduct.get(productId) as string,
+        }));
 
         const candidateRows = await db.productBatch.findMany({
           where: { companyId, productId: { in: deficitProductIds } },
@@ -304,11 +283,9 @@ export function createMaterialReservations(db: PrismaLike = prisma, units: UnitC
           othersByBatch,
         );
 
-        const unitIds = new Set(requirementLines.map((line) => line.unitId));
-        const unitConversions = await resolveUnitConversions(units, unitIds, companyId);
-        const productUnitMap = new Map(requirementLines.map((line) => [line.productId, line.unitId]));
+        const productUnitMap = new Map(deficitProductIds.map((id) => [id, productUnits.get(id) ?? null]));
 
-        const plan = planReservation({ requirement: requirementLines, products: productUnitMap, batches: candidateBatches, units: unitConversions });
+        const plan = planReservation({ requirement: requirementLines, products: productUnitMap, batches: candidateBatches });
         if (plan.kind === 'insufficient') {
           return { kind: 'insufficient', productIds: plan.productIds };
         }
@@ -336,17 +313,16 @@ export function createMaterialReservations(db: PrismaLike = prisma, units: UnitC
 
 /** N2: consume la necesidad de respaldo todo-o-nada, sin tocar `reservation_movements` -no hubo
  *  apartado que resolver-. Misma regla de reparto que `syncForOrder`, pero consumiendo en vez de
- *  reservar. */
+ *  reservar. Una necesidad vacia (receta sin lineas, E2) no escribe nada. */
 async function consumeWithoutReservation(
   db: PrismaLike,
-  units: UnitCatalog,
   scope: InventoryScope,
   orderId: string,
   actorId: string,
   now: Date,
   fallbackRequirement: readonly ReservationRequirementLine[],
 ): Promise<ConsumptionOutcome> {
-  if (fallbackRequirement.length === 0) return { kind: 'consumed' };
+  if (fallbackRequirement.length === 0) return { kind: 'nothing_to_consume' };
 
   const { companyId } = scope;
   const productIds = [...new Set(fallbackRequirement.map((line) => line.productId))];
@@ -367,12 +343,7 @@ async function consumeWithoutReservation(
   const reservedByBatch = netReservedByBatch(reservedRows.map(toLedgerRow));
   const candidateBatches = toCandidateBatches(batches, reservedByBatch);
 
-  const unitIds = new Set<string>();
-  for (const line of fallbackRequirement) unitIds.add(line.unitId);
-  for (const unitId of productUnits.values()) if (unitId !== null) unitIds.add(unitId);
-  const unitConversions = await resolveUnitConversions(units, unitIds, companyId);
-
-  const plan = planReservation({ requirement: fallbackRequirement, products: productUnits, batches: candidateBatches, units: unitConversions });
+  const plan = planReservation({ requirement: fallbackRequirement, products: productUnits, batches: candidateBatches });
   if (plan.kind === 'insufficient') return { kind: 'insufficient', productIds: plan.productIds };
 
   const batchProduct = new Map(batches.map((batch) => [batch.id, batch.productId]));

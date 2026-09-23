@@ -34,7 +34,6 @@ import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-s
 import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-batch';
 import type { NewProduct } from '@/lib/modules/inventario/domain/product-view';
 import type { ReservationRequirementLine } from '@/lib/modules/inventario/domain/reservation';
-import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -132,21 +131,6 @@ function ambito(fixture: Fixture): InventoryScope {
   return { companyId: fixture.companyId };
 }
 
-/** Todos los productos y lineas de este archivo comparten la MISMA unidad: lo que se prueba es
- *  el reparto y el libro, no la conversion -eso es `plan-reservation.test.ts`-. */
-function unitCatalogDe(fixture: Fixture): UnitCatalog {
-  return {
-    async findRefs(ids: readonly string[]): Promise<readonly UnitRef[]> {
-      return ids
-        .filter((id) => id === fixture.unitId)
-        .map((id) => ({ id, name: 'unidad de prueba', symbol: null, baseUnitId: null, factor: null }));
-    },
-    findRefsSharingBaseInCompany(): Promise<readonly UnitRef[]> {
-      throw new Error('no lo usa reservation-prisma.ts');
-    },
-  };
-}
-
 async function createFixture(): Promise<Fixture> {
   const { userId, companyId } = await createTestUser();
   const unitId = await unidadDeSistema('kilogramo');
@@ -208,8 +192,8 @@ async function createProductWithBatch(
   return { productId: created.id, batchId: created.batchId };
 }
 
-function requirementOf(productId: string, quantity: string, fixture: Fixture): readonly ReservationRequirementLine[] {
-  return [{ productId, quantity, unitId: fixture.unitId }];
+function requirementOf(productId: string, quantity: string): readonly ReservationRequirementLine[] {
+  return [{ productId, quantity }];
 }
 
 async function batchStockOf(batchId: string): Promise<string> {
@@ -363,13 +347,13 @@ describe('R12 — editar recalcula desde cero, pero solo asienta la DIFERENCIA p
     const fixture = await createFixture();
     const { productId, batchId } = await createProductWithBatch(fixture, { stock: '20' });
     const orderId = await createOrderRow(fixture);
-    const reservations = createMaterialReservations(prisma, unitCatalogDe(fixture));
+    const reservations = createMaterialReservations(prisma);
 
     try {
       const primero = await reservations.syncForOrder({
         orderId,
         companyId: fixture.companyId,
-        requirement: requirementOf(productId, '10', fixture),
+        requirement: requirementOf(productId, '10'),
         actorId: fixture.actorId,
         now: new Date(),
       });
@@ -378,7 +362,7 @@ describe('R12 — editar recalcula desde cero, pero solo asienta la DIFERENCIA p
       const segundo = await reservations.syncForOrder({
         orderId,
         companyId: fixture.companyId,
-        requirement: requirementOf(productId, '6', fixture),
+        requirement: requirementOf(productId, '6'),
         actorId: fixture.actorId,
         now: new Date(),
       });
@@ -400,13 +384,13 @@ describe('R13 — si tras editar ya no cubre, libera TODO lo que tenia apartado'
     const fixture = await createFixture();
     const { productId, batchId } = await createProductWithBatch(fixture, { stock: '5' });
     const orderId = await createOrderRow(fixture);
-    const reservations = createMaterialReservations(prisma, unitCatalogDe(fixture));
+    const reservations = createMaterialReservations(prisma);
 
     try {
       const primero = await reservations.syncForOrder({
         orderId,
         companyId: fixture.companyId,
-        requirement: requirementOf(productId, '5', fixture),
+        requirement: requirementOf(productId, '5'),
         actorId: fixture.actorId,
         now: new Date(),
       });
@@ -416,7 +400,7 @@ describe('R13 — si tras editar ya no cubre, libera TODO lo que tenia apartado'
       const segundo = await reservations.syncForOrder({
         orderId,
         companyId: fixture.companyId,
-        requirement: requirementOf(productId, '999', fixture),
+        requirement: requirementOf(productId, '999'),
         actorId: fixture.actorId,
         now: new Date(),
       });
@@ -467,13 +451,13 @@ describe('R27, R28 — entregar consume: baja el lote, asienta la salida y recal
     const fixture = await createFixture();
     const { productId, batchId } = await createProductWithBatch(fixture, { stock: '10' });
     const orderId = await createOrderRow(fixture);
-    const reservations = createMaterialReservations(prisma, unitCatalogDe(fixture));
+    const reservations = createMaterialReservations(prisma);
 
     try {
       await reservations.syncForOrder({
         orderId,
         companyId: fixture.companyId,
-        requirement: requirementOf(productId, '4', fixture),
+        requirement: requirementOf(productId, '4'),
         actorId: fixture.actorId,
         now: new Date(),
       });
@@ -509,13 +493,13 @@ describe('R32 — el sistema no consume dos veces el material de un mismo pedido
     const fixture = await createFixture();
     const { productId, batchId } = await createProductWithBatch(fixture, { stock: '10' });
     const orderId = await createOrderRow(fixture);
-    const reservations = createMaterialReservations(prisma, unitCatalogDe(fixture));
+    const reservations = createMaterialReservations(prisma);
 
     try {
       await reservations.syncForOrder({
         orderId,
         companyId: fixture.companyId,
-        requirement: requirementOf(productId, '4', fixture),
+        requirement: requirementOf(productId, '4'),
         actorId: fixture.actorId,
         now: new Date(),
       });
@@ -539,10 +523,37 @@ describe('R32 — el sistema no consume dos veces el material de un mismo pedido
         actorId: fixture.actorId,
         now: new Date(),
       });
-      expect(segunda).toEqual({ kind: 'consumed' });
+      expect(segunda).toEqual({ kind: 'nothing_to_consume' });
 
       expect(await batchStockOf(batchId)).toBe(stockTrasPrimeraEntrega);
       expect(await inventoryMovementsOf(batchId)).toEqual(asientosTrasPrimeraEntrega);
+    } finally {
+      await dropFixture(fixture, [productId], [orderId]);
+    }
+  });
+});
+
+describe('R50 — entregar sin apartado y sin necesidad de respaldo no consume nada', () => {
+  it('un pedido sin nada apartado y con la receta sin lineas devuelve nothing_to_consume sin escribir nada', async () => {
+    const fixture = await createFixture();
+    const { productId, batchId } = await createProductWithBatch(fixture, { stock: '10' });
+    const orderId = await createOrderRow(fixture);
+    const reservations = createMaterialReservations(prisma);
+
+    try {
+      const resultado = await reservations.consumeForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        fallbackRequirement: [],
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+      expect(resultado).toEqual({ kind: 'nothing_to_consume' });
+
+      expect(await batchStockOf(batchId)).toBe('10.0000');
+      expect(await productStockOf(productId)).toBe('10.0000');
+      expect(await reservationMovementsOf(orderId)).toEqual([]);
+      expect(await inventoryMovementsOf(batchId)).toEqual([expect.objectContaining({ kind: 'opening' })]);
     } finally {
       await dropFixture(fixture, [productId], [orderId]);
     }
@@ -566,14 +577,14 @@ describe('R30 — una merma sobre el lote apartado completa desde otros lotes co
     const batchIdNuevo = agregado.batchId;
 
     const orderId = await createOrderRow(fixture);
-    const reservations = createMaterialReservations(prisma, unitCatalogDe(fixture));
+    const reservations = createMaterialReservations(prisma);
 
     try {
       // Reparte 8 en el lote mas antiguo (R8): el unico con disponible en ese momento.
       await reservations.syncForOrder({
         orderId,
         companyId: fixture.companyId,
-        requirement: requirementOf(productId, '8', fixture),
+        requirement: requirementOf(productId, '8'),
         actorId: fixture.actorId,
         now: new Date(),
       });
@@ -619,13 +630,13 @@ describe('R30 — una merma sobre el lote apartado completa desde otros lotes co
     const fixture = await createFixture();
     const { productId, batchId } = await createProductWithBatch(fixture, { stock: '10' });
     const orderId = await createOrderRow(fixture);
-    const reservations = createMaterialReservations(prisma, unitCatalogDe(fixture));
+    const reservations = createMaterialReservations(prisma);
 
     try {
       await reservations.syncForOrder({
         orderId,
         companyId: fixture.companyId,
-        requirement: requirementOf(productId, '10', fixture),
+        requirement: requirementOf(productId, '10'),
         actorId: fixture.actorId,
         now: new Date(),
       });
@@ -642,7 +653,7 @@ describe('R30 — una merma sobre el lote apartado completa desde otros lotes co
       let resultado: unknown;
       try {
         await prisma.$transaction(async (tx) => {
-          resultado = await createMaterialReservations(tx, unitCatalogDe(fixture)).consumeForOrder({
+          resultado = await createMaterialReservations(tx).consumeForOrder({
             orderId,
             companyId: fixture.companyId,
             fallbackRequirement: [],
@@ -670,13 +681,13 @@ describe('R33 — un ajuste que deja el apartado por encima de la existencia se 
     const fixture = await createFixture();
     const { productId, batchId } = await createProductWithBatch(fixture, { stock: '10' });
     const orderId = await createOrderRow(fixture);
-    const reservations = createMaterialReservations(prisma, unitCatalogDe(fixture));
+    const reservations = createMaterialReservations(prisma);
 
     try {
       await reservations.syncForOrder({
         orderId,
         companyId: fixture.companyId,
-        requirement: requirementOf(productId, '8', fixture),
+        requirement: requirementOf(productId, '8'),
         actorId: fixture.actorId,
         now: new Date(),
       });
