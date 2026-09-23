@@ -22,7 +22,7 @@
 
 ## Fase 0 — Dependencia
 
-- [ ] **T0 — Instalar `react-intersection-observer` (D18).** Añadir la fila a `docs/dependencias.md`
+- [x] **T0 — Instalar `react-intersection-observer` (D18).** Añadir la fila a `docs/dependencias.md`
   con los cuatro checks que verificó el leader el 2026-09-23 (v11.0.1 del 2026-08-26, 3.538.265
   descargas/semana entre el 2026-09-15 y el 2026-09-21, MIT, sin `deprecated`), la aprobación
   humana de F1.4 y la nota «aislada en `showcase-load-trigger.tsx`». Instalar con `pnpm add`.
@@ -36,7 +36,7 @@
 
 ## Fase 1 — Dominio y backend
 
-- [ ] **T1 [P con T0] — Tipos, constantes y esquemas de la vista.** `supplier-showcase.ts` con
+- [x] **T1 [P con T0] — Tipos, constantes y esquemas de la vista.** `supplier-showcase.ts` con
   `SHOWCASE_SUPPLIER_BATCH`, `SHOWCASE_LINE_BATCH`, `SHOWCASE_SUPPLIER_SORT` y `SHOWCASE_LINE_SORT`
   (nombre ascendente, D17), los cinco tipos y los dos esquemas zod (`design.md > 2.1, 2.2`).
   - Archivos: `lib/modules/proveedores/domain/supplier-showcase.ts`,
@@ -45,7 +45,7 @@
     líneas) y que un término de solo espacios cuenta como vacío (R24).
   - Depende de: nada.
 
-- [ ] **T2 — Puerto: `listShowcaseAlive`.** Añadir el método a `SupplierRepository`, con `scope:
+- [x] **T2 — Puerto: `listShowcaseAlive`.** Añadir el método a `SupplierRepository`, con `scope:
   SupplierScope` al final. Subir de 5 a 6 el `metodosEsperados` de `SupplierRepository` en la guardia
   de ámbito.
   - Archivos: `lib/modules/proveedores/ports/supplier-repository.ts`,
@@ -54,7 +54,7 @@
     implementan; se cierra en T4.
   - Depende de: T1.
 
-- [ ] **T3 — Casos de uso `listSupplierShowcase` y `listShowcaseLines`.** Permiso primero, luego zod,
+- [x] **T3 — Casos de uso `listSupplierShowcase` y `listShowcaseLines`.** Permiso primero, luego zod,
   luego puerto (`design.md > 2.3`). `listShowcaseLines` reutiliza
   `SupplierCatalogRepository.listBySupplierAlive` con `search: productSearch` (D14), traduce
   `'supplier_not_found'` y proyecta a `ShowcaseLine`. Reexportar en `index.ts` las dos factories,
@@ -70,7 +70,7 @@
     - `hasMore` en la última página.
   - Depende de: T1, T2.
 
-- [ ] **T4 — Adaptador `listShowcaseAliveSuppliers` y cableado.** En `supplier-prisma.ts`, según
+- [x] **T4 — Adaptador `listShowcaseAliveSuppliers` y cableado.** En `supplier-prisma.ts`, según
   `design.md > 3`:
   - `take: 6`, con orden `name asc, id asc`;
   - `some` de líneas **solo** si hay filtro de producto (D15);
@@ -86,7 +86,7 @@
     en verde.
   - Depende de: T3.
 
-- [ ] **T5 — Integración contra `QuimiCloude_QC140`.** Datos del caso:
+- [x] **T5 — Integración contra `QuimiCloude_QC140`.** Datos del caso:
   - dos empresas;
   - proveedores vivos, dados de baja y sin líneas;
   - líneas con imagen, con `null` y con `''`, con acentos y mayúsculas;
@@ -102,7 +102,7 @@
     R28, R30 y R31**; `guard-aislamiento-integracion` en verde.
   - Depende de: T4.
 
-- [ ] **T6 [P con T5] — Server Actions.** `listSupplierShowcaseAction` y `listShowcaseLinesAction`
+- [x] **T6 [P con T5] — Server Actions.** `listSupplierShowcaseAction` y `listShowcaseLinesAction`
   en `supplier-actions.ts` (`design.md > 4`). Si el test de conteo de sesión lo exige, se añaden a
   su lista.
   - Archivos: `lib/modules/proveedores/adapters/driving/supplier-actions.ts`,
@@ -114,7 +114,7 @@
 
 ## Fase 2 — Pantallas
 
-- [ ] **T7 [P con T5, T6] — Promover el panel de proveedor a `components/shared/supplier/`
+- [x] **T7 [P con T5, T6] — Promover el panel de proveedor a `components/shared/supplier/`
   (D19).** Mover `supplier-sheet.tsx`, `supplier-form.tsx` y `supplier-field.tsx` de
   `app/(private)/proveedores/components/` a `components/shared/supplier/`, con su `index.ts`, y
   actualizar sus importadores y sus tests. Es un movimiento sin cambio de comportamiento
@@ -127,7 +127,7 @@
     de comportamiento; mismos `data-testid`.
   - Depende de: nada de backend.
 
-- [ ] **T8 — Editar y dar de baja en la cabecera del detalle (D19).** Mudar
+- [x] **T8 — Editar y dar de baja en la cabecera del detalle (D19).** Mudar
   `delete-supplier-dialog.tsx` a `app/(private)/proveedores/[id]/components/` y exportarlo en su
   barrel. Tras una baja con éxito, el diálogo navega con `router.replace(SUPPLIERS_ROUTE)` en lugar
   de `router.refresh()`. La cabecera del detalle monta `SupplierSheet supplier={…}` (desde
