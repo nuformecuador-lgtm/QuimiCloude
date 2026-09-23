@@ -7,6 +7,9 @@ import type { UnitId } from '@/lib/modules/unidades';
  * (solo reexporta de `./domain`).
  */
 
+/** Tipo de producto: PRODUCT, MACHINE o PACKAGING. */
+export type ProductType = 'PRODUCT' | 'MACHINE' | 'PACKAGING';
+
 /**
  * Datos de negocio de un producto, ya validados por `product-input.ts` (`design.md >
  * 6.1`, `7`).
@@ -48,6 +51,8 @@ export type ProductView = {
   /** Unidad guardada en `products.unit_id`, o `null` si el producto todavia no tiene lotes. */
   readonly unitId: UnitId | null;
   readonly qtyAlert: number | null;
+  /** Tipo del producto: PRODUCT, MACHINE o PACKAGING. */
+  readonly type: ProductType;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 };

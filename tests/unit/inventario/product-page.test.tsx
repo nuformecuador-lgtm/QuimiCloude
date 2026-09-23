@@ -274,6 +274,7 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
     stock: 0,
     unitId: null,
     qtyAlert: 5,
+    type: 'PRODUCT' as const,
     createdAt: new Date('2026-01-15T10:20:30.000Z'),
     updatedAt: new Date('2026-02-20T08:00:00.000Z'),
     ...overrides,

@@ -15,6 +15,7 @@
  */
 
 import type { ListQueryable } from './list-query';
+import type { ProductType } from './product-view';
 
 export const PRODUCT_QUERYABLE: ListQueryable = {
   sortable: ['name', 'stock', 'qtyAlert', 'createdAt', 'updatedAt'],
@@ -22,6 +23,9 @@ export const PRODUCT_QUERYABLE: ListQueryable = {
     stock: 'numberRange',
     qtyAlert: 'numberRange',
     createdAt: 'dateRange',
+    type: 'select',
   },
   searchable: true,
-};
+} as const satisfies ListQueryable & { filterable: { type: 'select' } };
+
+export const PRODUCT_TYPE_VALUES: readonly ProductType[] = ['PRODUCT', 'MACHINE', 'PACKAGING'] as const;

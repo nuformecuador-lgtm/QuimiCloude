@@ -203,6 +203,7 @@ const PRODUCTO_EN_BASE = {
   stock: 0,
   unitId: null,
   qtyAlert: 0,
+  type: 'PRODUCT' as const,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 };
