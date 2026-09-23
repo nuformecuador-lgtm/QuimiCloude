@@ -1,13 +1,15 @@
-// T6 — Los cinco casos de uso de receta, con dobles de los tres puertos (`design.md > 3`,
-// `> 4.2`, `> 6`, `> 7`; `tasks.md > T4`). Sin base de datos ni bucket: lo que se prueba
-// aqui es la DECISION que vive en `domain/`, no la implementacion Prisma/Supabase.
-// Cierra R3, R4, R5, R6, R7, R8, R11, R12, R14, R15, R17, R19, R21, R22, R23, R24, R26, R27,
-// R33, R34, R36, R37.
+// Los cinco casos de uso de receta, con dobles de sus tres puertos. Sin base de datos ni
+// bucket: lo que se prueba aqui es la DECISION que vive en `domain/`, no la implementacion
+// Prisma/Supabase.
 
 import type { Actor } from '@/lib/modules/recetas/domain/actor';
 import { createCreateRecipe } from '@/lib/modules/recetas/domain/create-recipe';
 import { createDeleteRecipe } from '@/lib/modules/recetas/domain/delete-recipe';
-import { RecipeDuplicateNameError, RecipeNotFoundError } from '@/lib/modules/recetas/domain/errors';
+import {
+  RecipeDuplicateNameError,
+  RecipeNotFoundError,
+  UnauthorizedError,
+} from '@/lib/modules/recetas/domain/errors';
 import { createGetRecipe } from '@/lib/modules/recetas/domain/get-recipe';
 import { createListRecipes } from '@/lib/modules/recetas/domain/list-recipes';
 import { createUpdateRecipe } from '@/lib/modules/recetas/domain/update-recipe';
@@ -407,7 +409,7 @@ describe('R7 — sin permiso, el repositorio no se llama', () => {
 
     const receta97 = { ...RECETA_VALIDA, lines: [{ productId: LINEA_VALIDA.productId, percentage: '97.50' }] };
 
-    await expect(createRecipe(receta97, SIN_PERMISO)).rejects.toThrow();
+    await expect(createRecipe(receta97, SIN_PERMISO)).rejects.toBeInstanceOf(UnauthorizedError);
     expect(products.findRefs).not.toHaveBeenCalled();
     expect(recipes.create).not.toHaveBeenCalled();
   });
@@ -418,7 +420,9 @@ describe('R7 — sin permiso, el repositorio no se llama', () => {
     const images = montarAlmacenamiento();
     const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
 
-    await expect(createRecipe({ ...RECETA_VALIDA, lines: [] }, SIN_PERMISO)).rejects.toThrow();
+    await expect(createRecipe({ ...RECETA_VALIDA, lines: [] }, SIN_PERMISO)).rejects.toBeInstanceOf(
+      UnauthorizedError,
+    );
     expect(products.findRefs).not.toHaveBeenCalled();
     expect(recipes.create).not.toHaveBeenCalled();
   });
