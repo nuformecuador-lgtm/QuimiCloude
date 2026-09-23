@@ -19,11 +19,13 @@
 
 > Vocabulario. **Término**: el texto de la caja de búsqueda, sin espacios al principio ni al final;
 > vacío = sin búsqueda. **Consulta de lista**: la operación de listado de pedidos que ya existe
-> (QC-68), la única que decide qué pedidos casan con el término. **Importe**: el campo
-> `ingredientsCost` que cada fila de la consulta ya trae (QC-123), cadena decimal o `null`.
-> **Valor exacto**: el importe sin ceros de relleno y sin redondear (`12.3456` -> `12.3456`,
-> `12.5000` -> `12.5`). **Estado «no hay pedidos»**: el vacío que existe hoy
-> (`order-list-empty`). **Estado «sin coincidencias»**: el vacío nuevo de esta ficha.
+> (QC-68), la única que decide qué pedidos casan con el término. **Estado «no hay pedidos»**: el
+> vacío que existe hoy (`order-list-empty`). **Estado «sin coincidencias»**: el vacío nuevo de esta
+> ficha.
+>
+> **Cambio de alcance en F1.4 (2026-09-23):** el importe sale de esta ficha y se va a **QC-151**.
+> R17–R24 y la parte (b) de R25 quedan **retirados sin renumerar**. R26 se añade por la misma nota
+> (ver `## Cambio de alcance en F1.4` al final).
 
 ### Caja de búsqueda
 
@@ -55,6 +57,9 @@
 - **R9.** MIENTRAS hay un término vigente, abrir y cerrar el panel lateral de un pedido (el detalle
   del pedido en esta pantalla) y recargar la página DEBEN conservar el término en la URL, en la caja
   y en la lista mostrada.
+- **R26.** CUANDO, con un término vigente, el usuario va desde `/pedidos` a otra pantalla y vuelve
+  con «Atrás» del navegador, el sistema DEBE mostrar de nuevo el mismo término en la URL y en la caja
+  y la lista filtrada por él. *(Añadido en F1.4, 2026-09-23.)*
 
 ### Mientras la búsqueda está en vuelo
 
@@ -80,29 +85,17 @@
 - **R16.** SI no hay término y la consulta de lista devuelve cero pedidos, ENTONCES el sistema DEBE
   seguir mostrando el estado «no hay pedidos» de hoy, sin la acción «Limpiar la búsqueda».
 
-### Columna Importe
+### Columna Importe — retirada
 
-- **R17.** La lista DEBE mostrar una columna «Importe» que pinta, para cada pedido, el importe que
-  trae la fila de la consulta de lista, sin calcularlo, completarlo ni pedirlo por otra vía.
-- **R18.** La columna Importe NO DEBE ofrecer ordenación ni filtro: su cabecera NO DEBE tener
-  control de orden y la barra de filtros NO DEBE tener control para ella.
-- **R19.** SI un pedido no tiene importe, ENTONCES su celda DEBE mostrar el marcador de ausencia
-  (un guion) y NO DEBE mostrar un cero ni ningún texto que distinga el motivo de la ausencia.
-- **R20.** SI el importe de un pedido es cero, ENTONCES su celda DEBE mostrar `$ 0.00`, no el
-  marcador de ausencia.
-- **R21.** La celda DEBE mostrar el importe como `$`, un espacio, la parte entera con una coma cada
-  tres cifras, un punto y exactamente dos decimales, redondeando al más cercano y el empate
-  alejándose del cero: `1234567.5000` -> `$ 1,234,567.50`; `12.3456` -> `$ 12.35`; `999.9950` ->
-  `$ 1,000.00`; `100.0000` -> `$ 100.00`; `0.1250` -> `$ 0.13`.
-- **R22.** SI el valor exacto del importe difiere de su valor redondeado a dos decimales, ENTONCES el
-  elemento que lo muestra DEBE llevar ese valor exacto, solo la cifra, en el atributo `title`
-  (`12.3456` -> `title` `12.3456`); SI coincide, ENTONCES NO DEBE llevar atributo `title`
-  (`1234567.5000` -> sin `title`).
-- **R23.** El formato del importe NO DEBE usar `Intl.NumberFormat`, `toLocaleString`, `parseFloat`,
-  `Number(`, `.toFixed(` ni ninguna otra conversión a coma flotante; y la rama NO DEBE modificar
-  `lib/shared/ui/decimal-display.ts`.
-- **R24.** El esqueleto de la primera carga DEBE seguir teniendo tantas columnas como la tabla, con
-  la columna Importe incluida.
+- **R17.** *Retirado el 2026-09-23 (va a QC-151).*
+- **R18.** *Retirado el 2026-09-23 (va a QC-151).*
+- **R19.** *Retirado el 2026-09-23 (va a QC-151).*
+- **R20.** *Retirado el 2026-09-23 (va a QC-151).*
+- **R21.** *Retirado el 2026-09-23 (va a QC-151).*
+- **R22.** *Retirado el 2026-09-23 (va a QC-151).*
+- **R23.** *Retirado el 2026-09-23 (va a QC-151).*
+- **R24.** *Retirado el 2026-09-23 (va a QC-151).* La tabla sigue con sus diez columnas y el
+  esqueleto con diez; esta ficha no los toca.
 
 ### E2E
 
@@ -110,33 +103,37 @@
   local, sobre pedidos de una empresa creada para el propio spec, y que compruebe: (a) al escribir en
   la caja un término sin acentos ni mayúsculas, la lista se recorta a exactamente los pedidos cuya
   receta casa con él —incluida una receta con acentos y una dada de baja—, que es el resultado que la
-  consulta de lista da para ese término, y la URL lleva `q`; (b) un pedido sin importe muestra el
-  guion y uno con importe muestra su cifra con el formato de R21; (c) con un término sin
-  coincidencias aparece el estado «sin coincidencias» y «Limpiar la búsqueda» devuelve la lista
-  completa; (d) el término sobrevive a cambiar de página y a abrir y cerrar el panel lateral.
+  consulta de lista da para ese término, y la URL lleva `q`; (b) *retirado el 2026-09-23 (va a
+  QC-151)*; (c) con un término sin coincidencias aparece el estado «sin coincidencias» y «Limpiar la
+  búsqueda» devuelve la lista completa; (d) el término sobrevive a cambiar de página, a abrir y
+  cerrar el panel lateral, y a ir a otra pantalla y volver con «Atrás».
 
 ### Lo que esta ficha retira
 
-Dos afirmaciones vigentes dejan de ser ciertas con esta ficha, y sus tests se **sustituyen** por los de
-R1–R24, no se relajan en silencio:
+Una afirmación vigente deja de ser cierta con esta ficha, y sus tests se **sustituyen** por los de
+R1–R16, no se relajan en silencio:
 
 - «La pantalla no tiene caja de búsqueda y nunca lee ni escribe `search`» (QC-35 R20; nota de QC-68
   R16 en `order-list-params.test.ts`; bloque «la caja de busqueda NO existe» de `order-table.test.tsx`).
-- «La tabla de pedidos no pinta el importe» (QC-123 R18, en `order-columns.test.tsx`), y con ella la
-  lista cerrada de diez columnas, que pasa a once.
+
+«La tabla de pedidos no pinta el importe» (QC-123 R18, en `order-columns.test.tsx`) **sigue en pie**:
+esta ficha ya no la retira.
 
 ### Cobertura de las decisiones cerradas
 
 | Decisión cerrada | Requisitos |
 |---|---|
 | ¿Qué busca la caja? (nombre de receta, sin acentos ni mayúsculas, conjunto completo, bajas incluidas) | R1, R2, R3, R25 (a) |
-| ¿Qué es el importe? (lo pinta, no lo calcula; no ordena ni filtra) | R17, R18 |
-| ¿Pedido sin importe? (guion, nunca cero; motivos indistinguibles) | R19, R20, R25 (b) |
+| ¿Qué es el importe? | Pasa a QC-151 (nota de F1.4) |
+| ¿Pedido sin importe? | Pasa a QC-151 (nota de F1.4) |
 | ¿Qué se ve mientras la búsqueda está en vuelo? | R10, R11, R12 |
 | ¿Y sin coincidencias? | R13, R14, R15, R16, R25 (c) |
-| ¿Se conserva el término? (`?q=`, paginación, volver del detalle) | R4, R5, R6, R7, R8, R9, R25 (d) |
-| ¿Formato del importe? | R21, R22, R23, R24 |
-| ¿E2E? | R25 |
+| ¿Se conserva el término? (`?q=`, paginación, volver del detalle) | R4, R5, R6, R7, R8, R9, R26, R25 (d) |
+| ¿Formato del importe? | Pasa a QC-151 (nota de F1.4) |
+| ¿E2E? | R25 (a), (c), (d); la parte del guion pasa a QC-151 |
+| F1.4: sin coincidencias DENTRO de la tabla | R13, R14 |
+| F1.4: búsqueda nueva vuelve a la página 1 | R2 |
+| F1.4: el término sigue tras el panel lateral y tras Atrás | R9, R26, R25 (d) |
 
 ## Preguntas abiertas
 
@@ -154,3 +151,23 @@ Ninguna.
 | 2026-09-23 | ¿Se conserva el término? | Sí: vive en la URL como `?q=` (patrón de `product-list-params.ts`); sobrevive a la paginación y a volver del detalle. |
 | 2026-09-23 | ¿Formato del importe? | `$ 1,234,567.50`: símbolo `$` fijo (la moneda no se guarda), coma de miles, punto decimal (como el resto de la app) y siempre dos decimales. El valor exacto va en el `title` (patrón de **QC-132**). Sin `Intl.NumberFormat` ni coma flotante: aritmética sobre el texto (regla de `order-columns.tsx`). |
 | 2026-09-23 | ¿E2E? | **Sí, aquí** (diferido por QC-68 y QC-123): escribir en la caja, ver la lista recortada, que coincide con la consulta, y que un pedido sin importe muestra el guion. |
+
+## Cambio de alcance en F1.4 (2026-09-23)
+
+El humano aprobó el spec en F1.4 con un cambio de alcance. El texto sembrado de arriba —bloque de
+Alcance, «Lo que NO entra» y tabla de decisiones— **no se reescribe**; esta nota lo corrige:
+
+- **El importe sale de esta ficha.** No será una columna del listado: es una cotización del coste que
+  se ve en el formulario al generar el pedido y al editarlo, y va a la ficha nueva **QC-151**
+  (fullstack). Las filas «¿Qué es el importe?», «¿Pedido sin importe?» y «¿Formato del importe?»
+  **pasan a QC-151**, y la mitad de «¿E2E?» sobre el guion también. **QC-122 queda en solo
+  búsqueda**: donde el Alcance dice «y la columna Importe» y «el E2E de las dos cosas», léase solo la
+  búsqueda.
+- R17–R24 y R25 (b) quedan retirados sin renumerar.
+
+| Fecha | Pregunta | Decisión |
+|---|---|---|
+| 2026-09-23 | ¿Dónde se pinta «sin coincidencias»? | **Dentro de la tabla**, con la caja montada (patrón de `supplier-table.tsx`, proveedores), no fuera como `unit-list-empty.tsx`. |
+| 2026-09-23 | ¿Qué página muestra una búsqueda nueva? | Vuelve a la **página 1**. |
+| 2026-09-23 | ¿Qué es «volver del detalle»? | El término sigue al **abrir y cerrar el panel lateral** de un pedido **y** al **ir a otra pantalla y volver con Atrás**: vive en la URL. |
+| 2026-09-23 | ¿Dónde va la columna Importe? | Descartado: no hay columna. |

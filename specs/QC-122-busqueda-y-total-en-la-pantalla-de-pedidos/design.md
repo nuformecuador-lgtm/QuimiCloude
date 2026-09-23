@@ -1,21 +1,24 @@
 # QC-122 — busqueda-y-total-en-la-pantalla-de-pedidos · design.md
 
+> **Cambio de alcance en F1.4 (2026-09-23):** el importe salió de esta ficha y va a **QC-151**. Este
+> diseño cubre **solo la búsqueda**. Todo lo del importe que había en la versión anterior (columna,
+> `order-amount.ts`, el paso de 10 a 11 columnas, el retiro del bloque R18 de QC-123 en
+> `order-columns.test.tsx`, las guardias de `Intl`/`toLocaleString` y el guion en el E2E) **no se
+> hace aquí**.
+
 > Ficha **de pantalla**: todo el cambio vive en `app/(private)/pedidos/components/`, sus tests y un
 > spec E2E nuevo. **No toca** `lib/modules/**`, `db/**`, `lib/composition/**`,
-> `components/shared/data-table/**`, `components/ui/**`, `lib/shared/ui/decimal-display.ts` ni
-> `package.json`. Sin dependencias nuevas.
+> `components/shared/data-table/**`, `components/ui/**`, `order-columns.tsx`, `order-list-skeleton.tsx`,
+> `order-list-empty.tsx` ni `package.json`. Sin dependencias nuevas.
 
 ## 0. Lo que ya existe y se usa tal cual (verificado en disco el 2026-09-23)
 
 | Pieza | Dónde | Qué aporta |
 |---|---|---|
 | La consulta con búsqueda | `lib/modules/pedidos/domain/list-orders.ts` | Recibe `search` (ya `trim` + `max(120)` en `createListQuerySchema`), lo resuelve a ids de receta con `findIdsMatchingName` (sin acentos, bajas incluidas, empresa del actor) y pagina sobre el conjunto filtrado. `ORDER_QUERYABLE.searchable === true`. |
-| El importe en la fila | `OrderSummary = OrderView`, `ingredientsCost: string \| null` (`order-view.ts`) | Cadena `decimal(14,4)` o `null`. Ya llega a `OrderTable` en cada fila. |
 | La caja de búsqueda | `DataTableSearchField` dentro de `DataTable` (`components/shared/data-table/data-table-filters.tsx`) | `<Input type="search">` con `min-h-11 text-base`, `data-testid="data-table-search"`, rebote de `SEARCH_DEBOUNCE_MS` (300 ms), emite `withSearch(params, draft)`. Hoy apagada con `searchable={false}`. |
 | «En vuelo» sin desmontar | `OrderTable` (`useTransition` + `router.push`) | `aria-busy`, `opacity-60` y el rótulo `ORDER_TABLE_TEXTS.loading` mientras `isPending`. La tabla no se desmonta: el foco de la caja sobrevive. Mismo patrón en inventario y proveedores. Cubre R10–R12 sin código nuevo. |
-| Vacío filtrado **dentro** de la tabla | `supplier-table.tsx` (proveedores) | `texts.empty` sustituido y `emptyAction` con un `<Link>` que en clic simple navega dentro de la transición. Es el precedente directo de §3. |
-| Marcador de ausencia | `MissingValue` en `order-columns.tsx` (`—`, `aria-label="Sin dato"`, `data-testid="order-missing-<campo>"`) | R19 lo reutiliza. |
-| Presentación de decimales | `formatDecimalDisplay` / `exactDecimalTitle` (`lib/shared/ui/decimal-display.ts`) | Redondeo exacto con `BigInt` a 2 decimales (empate alejándose del cero) y el `title` exacto solo si difiere. **No se toca** (R23). |
+| Vacío filtrado **dentro** de la tabla | `supplier-table.tsx` (proveedores) | `texts.empty` sustituido y `emptyAction` con un `<Link>` que en clic simple navega dentro de la transición. Precedente de §3 (confirmado en F1.4). |
 | Parámetro `q` | `product-list-params.ts` (`SEARCH_PARAM = 'q'`) | Nombre y forma de lectura/escritura que se copia. |
 
 ## 1. Parámetros de lista: `order-list-params.ts`
@@ -30,8 +33,9 @@ comportamiento— y se sustituye por:
   Truncar tras el `trim` y volver a hacer `trim` (un corte puede dejar un espacio final).
 - `buildOrderListQuery`: `if (search !== '') query.set(SEARCH_PARAM, search)`, con `search` ya
   recortado. Nunca `search` (R5). `parse(build(p))` sigue devolviendo `p` con término (R5).
-- Exportaciones nuevas al barrel `components/index.ts`: `SEARCH_PARAM`, `ORDER_SEARCH_MAX_LENGTH`.
-  Ninguna existente se quita (lo vigila `guard-pantalla-pedidos-se-amplia.test.ts`).
+- Función pura nueva `withSearchResetsPage(current, next)` (ver §2).
+- Exportaciones nuevas al barrel `components/index.ts`: `SEARCH_PARAM`, `ORDER_SEARCH_MAX_LENGTH`,
+  `withSearchResetsPage`. Ninguna existente se quita (lo vigila `guard-pantalla-pedidos-se-amplia.test.ts`).
 
 ### 1.1 El tope de 120 (R7)
 
@@ -55,14 +59,8 @@ en la caja mientras la consulta usa 120. No se toca el componente compartido por
 
 - Se quita `searchable={false}` (queda el defecto `true`). `ORDER_TABLE_TEXTS.search` pasa a
   `'Buscar por receta'` (copy no afirmado por ningún test; se localiza por `data-testid`/rol).
-- **Vuelta a la primera página al cambiar el término (R2).** `onParamsChange` pasa por una función pura
-  nueva de `order-list-params.ts`:
-
-  ```ts
-  export function withSearchResetsPage(current: DataTableParams, next: DataTableParams): DataTableParams
-  // next.search !== current.search ? { ...next, page: FIRST_PAGE } : next
-  ```
-
+- **Vuelta a la primera página al cambiar el término (R2; confirmado en F1.4).** `onParamsChange` pasa
+  por `withSearchResetsPage(params, next)`: `next.search !== current.search ? { ...next, page: FIRST_PAGE } : next`.
   Pura y testeable sin montar nada. `withSearch` de la tabla compartida no toca la página, y se deja así
   (lo usan otras cuatro pantallas).
 - R10–R12 no requieren código: `navigate` ya envuelve `router.push` en `startTransition`. Se añaden los
@@ -70,7 +68,7 @@ en la caja mientras la consulta usa 120. No se toca el componente compartido por
   la navegacion en vuelo…», con el `push` retenido): `aria-busy="true"`, rótulo visible, la misma caja
   con foco y texto, sin `order-list-skeleton` ni `data-table-loading`.
 
-## 3. Estado «sin coincidencias» (R13–R16)
+## 3. Estado «sin coincidencias» (R13–R16), dentro de la tabla
 
 ### 3.1 Dónde se pinta
 
@@ -83,8 +81,7 @@ items.length === 0 && params.search !== ''  -> <OrderTable … noMatches={{ clea
 
 `clearHref = orderListHref({ ...params, search: '', page: FIRST_PAGE })` (R15: conserva tamaño, orden y
 filtros). Con cero filas **no** se llama a `listResponsiblesForOrdersAction` ni a
-`loadResponsiblesCatalog`: no hay filas a las que repartir (se mantiene «con cero pedidos no hay nada
-que preguntar»).
+`loadResponsiblesCatalog`: no hay filas a las que repartir.
 
 `OrderTable` recibe la prop opcional `noMatches?: { readonly clearHref: string }` y, cuando viene:
 
@@ -125,95 +122,32 @@ columnas se restaura de `localStorage` al remontar (`usePinnedColumns`), sin pé
 ### 3.3 Alternativas descartadas
 
 - **B. El vacío fuera de la tabla, como `unit-list-empty.tsx`** (una variante de `OrderListEmpty` con
-  `clearSearchHref`). Es el precedente que cita la decisión y el más barato. **Descartado** porque
-  desmonta la tabla —y con ella la caja— en cuanto la consulta devuelve cero filas: quien teclea
-  «ác», «áci», «ácix» pierde la caja y el foco a mitad de palabra en cuanto llega el vacío, y para
-  corregir tiene que limpiar y volver a escribir. Contradice R11 y R14. Del precedente se conservan
-  el copy, la acción y el `<Link>` pintado con `buttonVariants`; lo que cambia es dónde se monta, que es
-  lo que ya hace proveedores.
+  `clearSearchHref`). Descartado —y confirmado así en F1.4— porque desmonta la tabla y con ella la caja
+  en cuanto la consulta devuelve cero filas: quien teclea pierde la caja y el foco a mitad de palabra.
+  Contradice R11 y R14. Del precedente se conservan el copy, la acción y el `<Link>` pintado con
+  `buttonVariants`.
 - **C. Arreglar la sincronía en `DataTableSearchField`** (resincronizar el borrador cuando
   `params.search` cambia por fuera). Es el arreglo de fondo y beneficiaría a inventario, proveedores,
-  recetas, unidades y usuarios, pero toca una pieza compartida por cinco pantallas con sus propios
-  tests, fuera de una ficha de pedidos. Se deja anotado como candidato a ficha propia.
+  recetas, unidades y usuarios, pero toca una pieza compartida por cinco pantallas, fuera de una ficha
+  de pedidos. Candidato a ficha propia.
 - **D. `key` del `OrderTable` derivada de «hay/no hay coincidencias»** desde el Server Component.
   Remontaría la caja cada vez que el término pasa de casar a no casar mientras se teclea. Rompe R11.
 
-## 4. Columna Importe (R17–R24)
+## 4. El término sobrevive al panel lateral y a «Atrás» (R9, R26)
 
-### 4.1 Declaración (`order-columns.tsx`)
+Se sigue de que el término vive **solo en la URL** y de que nada de esta pantalla la reescribe fuera
+de `navigate`:
 
-```ts
-export const INGREDIENTS_COST_COLUMN_ID = 'ingredientsCost';
-{
-  id: INGREDIENTS_COST_COLUMN_ID,
-  label: 'Importe',
-  align: 'end',
-  // sin sortable y sin filter (R18); pinnable por defecto, como las demás de datos
-  cell: (order) =>
-    order.ingredientsCost === null
-      ? <MissingValue field={INGREDIENTS_COST_COLUMN_ID} />
-      : <span title={exactDecimalTitle(order.ingredientsCost)}>{formatOrderAmount(order.ingredientsCost)}</span>,
-}
-```
+- **Panel lateral** (`OrderSheet`, diálogos de cancelar/borrar, responsables): abrir y cerrar no
+  navega; guardar hace `router.refresh()`, que conserva la URL. No se toca nada; se añade el test.
+- **Otra pantalla y «Atrás»**: la navegación con `router.push` apila cada consulta en el historial, así
+  que «Atrás» vuelve a `/pedidos?…&q=<término>`. La página vuelve a leer `searchParams`, el parser saca
+  el término, la consulta lo usa y la caja nace con él (su borrador se inicializa con `params.search`).
+  Tampoco requiere código; lo cubre el E2E (R25 d), porque jsdom no tiene historial real.
 
-**Posición:** entre «Presentación» y «Fecha de solicitud» (tras las dos columnas que describen qué se
-pidió y cuánto). La decisión no fija la posición: es la propuesta de este diseño, revisable en F1.4.
-Pasan a ser **once** columnas; `ORDER_SKELETON_COLUMN_COUNT` sube a 11 (R24) y el test que lo ata a
-`ORDER_COLUMNS.length` ya existe.
-
-Al tocar el archivo se limpian los comentarios de las líneas tocadas (`docs/conventions.md >
-Comentarios`): en particular el docblock que dice «No hay columna de total… lo calculará el servidor en
-QC-68», que pasa a ser falso.
-
-### 4.2 El formateador: `app/(private)/pedidos/components/order-amount.ts` (nuevo)
-
-`formatDecimalDisplay` redondea a dos decimales pero **recorta** los ceros (`12.5`, `100`) y no agrupa
-miles; el formato decidido pide **siempre dos decimales**, coma de miles y `$ `. Hace falta una utilidad
-nueva; `decimal-display.ts` no se toca (R23).
-
-```ts
-export const ORDER_AMOUNT_SYMBOL = '$';
-/** '1234567.5000' -> '$ 1,234,567.50'. Texto no decimal -> se devuelve tal cual. */
-export function formatOrderAmount(value: string): string
-```
-
-Algoritmo, todo sobre texto:
-
-1. Si `value` no es un decimal en notación plana (`^-?\d+(\.\d+)?$`, el patrón de `decimal-display.ts`),
-   devolverlo tal cual, con el mismo criterio que `formatDecimalDisplay`. Si lo es,
-   `rounded = formatDecimalDisplay(value)`: reutiliza el redondeo exacto con `BigInt` que ya existe.
-2. Separar signo, parte entera y fracción con `split('.')`; `fraction.padEnd(2, '0')`.
-3. Agrupar la parte entera con un bucle de `slice` de tres en tres desde la derecha, uniendo con `,`.
-4. `${sign}${ORDER_AMOUNT_SYMBOL} ${grouped}.${fraction}`. Un negativo no ocurre (QC-123 promedia costes
-   de lote), pero el formateador es total y lo pinta `-$ 12.50`.
-
-Sin `.replace(` (la guardia `conversionesDeImporte` lo prohíbe en líneas que nombran `amount`), sin
-`Number(`, `parseFloat`, `.toFixed(`, `Intl` ni `toLocaleString`.
-
-**Dónde vive, y por qué ahí.** Un solo consumidor (la celda de pedidos): `docs/architecture.md >
-Componentes > sin sobre-ingeniería` lo deja junto a la ruta. Hermano de `order-decimal.ts`, al que se
-parece. Si mañana otra pantalla pinta importes con este formato, se promueve a `lib/shared/ui/` en esa
-ficha. **Descartado (alternativa E):** `lib/shared/ui/money-display.ts` desde ya —una utilidad
-compartida sin segundo consumidor—, y **(F)** añadir un parámetro `minFractionDigits` a
-`formatDecimalDisplay`, que es modificar el archivo que la decisión y QC-132 declaran intocable.
-
-**Librería.** Formatear moneda es lo que hace `Intl.NumberFormat` (nativo, sin dependencia), y la
-decisión lo excluye expresamente; `decimal.js` / `big.js` resolverían aritmética, no agrupar miles, y
-el redondeo ya está resuelto en `decimal-display.ts`. Ninguna dependencia nueva.
-
-### 4.3 El `title` (R22)
-
-`exactDecimalTitle(order.ingredientsCost)` sin cambios: devuelve el valor exacto (`trimDecimal`) solo si
-difiere de `formatDecimalDisplay`. Relleno a dos decimales y separadores no cambian el valor, así que
-«difiere» es exactamente «el redondeo a 2 esconde cifras». Es el patrón de QC-132, sin `$` ni comas.
-
-### 4.4 La guardia (R23)
-
-`tests/unit/pedidos-ui/pedidos-convenciones.test.ts > conversionesDeImporte` gana dos reglas, con su
-caso negativo como el resto del archivo: `\bIntl\s*\.` y `\.toLocaleString\s*\(` prohibidos en toda la
-ruta (el `toLocaleLowerCase` de `order-responsibles.tsx` no casa). Y un test de diff que comprueba que la
-rama no modifica `lib/shared/ui/decimal-display.ts`, con el `skip` ruidoso cuando el rango
-`origin/dev..HEAD` no está (mismo criterio que los casos de diff del archivo).
+Límite conocido y fuera de alcance: dentro de la propia `/pedidos`, «Atrás» entre dos términos
+distintos cambia la URL y la lista pero **no** el texto de la caja (el mismo desfase de §3.2, sin clic
+que lo dispare). Lo arregla la alternativa C.
 
 ## 5. Contratos de entrada/salida
 
@@ -226,7 +160,7 @@ URL: `/pedidos?page=1&pageSize=10[&sort=…][&status=…][&priority=…][&create
 
 ## 6. Modelo de datos, RLS, migraciones
 
-Ninguno. `orders.ingredients_cost` y la búsqueda por receta existen (QC-123, QC-68).
+Ninguno. La búsqueda por receta existe (QC-68).
 
 ## 7. Tests que se sustituyen (no se relajan en silencio)
 
@@ -234,39 +168,36 @@ Ninguno. `orders.ingredients_cost` y la búsqueda por receta existen (QC-123, QC
 |---|---|---|
 | `order-list-params.test.ts` | «la pantalla todavia no busca…» (ignora `q`/`search`, nunca emite) | R4–R7: lee `q`, emite `q`, sigue ignorando `search`, recorta a 120, ida y vuelta con término |
 | `order-table.test.tsx` | «la caja de busqueda NO existe (R20)» | R1, R2, R8, R10–R15 |
-| `order-columns.test.tsx` | «las diez acordadas» y «la tabla de pedidos no pinta el importe (R18)» | once ids con `INGREDIENTS_COST_COLUMN_ID` entre presentación y fecha; R17–R22 |
 | `order-list-section.test.tsx` | comentario «`search` siempre vacío» | R13, R16 y la ausencia de la llamada de responsables con cero filas |
 
-El caso «ninguna columna es `total`, `createdBy`, `updatedBy`, unidad ni precio» **se conserva**: el id
-nuevo es `ingredientsCost`.
+`order-columns.test.tsx` **no se toca**: sus diez columnas y el bloque «la tabla de pedidos no pinta el
+importe (R18)» de QC-123 siguen vigentes.
 
-## 8. E2E: `e2e/pedidos-busqueda-importe.spec.ts` (R25)
+## 8. E2E: `e2e/pedidos-busqueda.spec.ts` (R25)
 
-Sobre el patrón de `e2e/aislamiento-pedidos.spec.ts` y `e2e/pedidos.spec.ts`: prefijo
-`qc122_e2e_` + `RUN_ID`, empresa efímera (así la lista solo contiene lo del spec y no hace falta filtrar
-por correlativo para contar filas), administrador creado con hash real, `loginAndLand` de
-`e2e/helpers/landing.ts` (lo exige `guard-e2e-landing.test.ts`), URL derivada de `ORDERS_ROUTE`,
-correlativo con `formatOrderNumber`, limpieza en `afterAll` en el orden de las FK y limpieza defensiva
-de huérfanos por prefijo y edad. Chromium y WebKit.
+Sobre el patrón de `e2e/aislamiento-pedidos.spec.ts` y `e2e/pedidos.spec.ts`: prefijo `qc122_e2e_` +
+`RUN_ID`, empresa efímera (la lista solo contiene lo del spec), administrador creado con hash real,
+`loginAndLand` de `e2e/helpers/landing.ts` (lo exige `guard-e2e-landing.test.ts`), URL derivada de
+`ORDERS_ROUTE`, correlativo con `formatOrderNumber`, limpieza en `afterAll` en el orden de las FK y
+limpieza defensiva de huérfanos por prefijo y edad. Chromium y WebKit.
 
 Fixture (Prisma directo, sin pasar por la UI):
 
 - Receta A `Ácido Cítrico <RUN_ID>` (viva), receta B `Acido citrico baja <RUN_ID>` (dada de baja,
   `deletedAt` puesto), receta C `Sosa <RUN_ID>` (viva).
-- Pedidos: A1 con `ingredientsCost = '1234567.5000'`, A2 con `ingredientsCost = null`, B1 con
-  importe, C1 con importe; y los suficientes de C para que haya **dos páginas** con `pageSize=10` y
-  término que case con C (R25 d).
+- Pedidos: dos de A, uno de B, y más de diez de C, para que el término de C dé **dos páginas** con
+  `pageSize=10`.
 
 Recorrido:
 
-1. Entrar en la lista: los pedidos de A, B y C visibles; A1 muestra `$ 1,234,567.50`; A2 muestra el
-   marcador `order-missing-ingredientsCost` y no `$ 0.00` (R25 b).
-2. Escribir `acido citrico` en `data-table-search`: esperar a que la URL lleve `q=acido+citrico`; las
-   filas son exactamente A1, A2 y B1, por correlativo (R25 a).
-3. Escribir un término que no casa: aparece `order-list-no-matches` y no `order-list-empty`; la caja
-   sigue con el término. «Limpiar la búsqueda» -> la URL sin `q`, la caja vacía, vuelven todos (R25 c).
-4. Escribir el término de C: pasar a la página 2 -> la URL conserva `q`; abrir el panel lateral de una
-   fila y cerrarlo -> la URL, la caja y las filas siguen (R25 d). Recargar -> igual.
+1. Escribir `acido citrico` en `data-table-search`: esperar a que la URL lleve `q=acido+citrico`; las
+   filas son exactamente las de A y B, por correlativo (R25 a).
+2. Escribir un término que no casa: aparece `order-list-no-matches` dentro de `order-table` y no
+   `order-list-empty`; la caja sigue con el término. «Limpiar la búsqueda» -> la URL sin `q`, la caja
+   vacía, vuelven todos (R25 c).
+3. Escribir el término de C: pasar a la página 2 -> la URL conserva `q`; abrir el panel lateral de una
+   fila y cerrarlo -> URL, caja y filas siguen; recargar -> igual; ir a otra pantalla del menú y
+   volver con `page.goBack()` -> URL, caja y filas siguen (R25 d, R9, R26).
 
 «Sin red»: no llama a ningún servicio externo; necesita la app (`webServer` de Playwright) y el Postgres
 local con `db:seed` (roles), igual que el resto de `e2e/`. `init.sh` no corre Playwright: el E2E se
@@ -275,15 +206,12 @@ ejecuta con `pnpm run e2e` y su salida va a `progress/impl_QC-122-….md`.
 ## 9. Multiplataforma
 
 La caja es el `Input` compartido con `min-h-11` y `text-base` (44 px, 16 px); la acción de limpiar,
-`min-h-11 min-w-11`. La columna nueva entra en el scroll horizontal que ya absorbe
-`components/ui/table.tsx`. Nada depende de `:hover`: el `title` es complemento (aceptado en QC-127 /
-QC-132 que no se ve en móvil). Sin excepción de escritorio.
+`min-h-11 min-w-11`. Nada depende de `:hover`. Sin excepción de escritorio.
 
-## 10. Puntos que el diseño decide y conviene mirar en F1.4
+## 10. Decisiones de este diseño cerradas en F1.4 (2026-09-23)
 
-1. **Posición de la columna Importe** (§4.1): entre Presentación y Fecha de solicitud.
-2. **«Volver del detalle»** se lee como abrir y cerrar el panel lateral: `/pedidos` no tiene página de
-   detalle (`lib/shared/routes.ts`, «no hay pagina de detalle»).
-3. **El vacío se pinta dentro de la tabla** (§3.1, patrón de proveedores) y no fuera como en unidades,
-   para no perder la caja.
-4. **Cambiar el término vuelve a la página 1** (R2), derivado de «sobre el conjunto completo».
+1. El estado «sin coincidencias» va **dentro de la tabla** (§3, patrón de proveedores).
+2. Una búsqueda nueva vuelve a la **página 1** (§2).
+3. «Volver del detalle» = abrir y cerrar el panel lateral **y** ir a otra pantalla y volver con Atrás
+   (§4, R9, R26).
+4. «Importe entre Presentación y Fecha de solicitud»: **descartada**, no hay columna (importe -> QC-151).
