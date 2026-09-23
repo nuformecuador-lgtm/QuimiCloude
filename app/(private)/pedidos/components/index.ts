@@ -83,10 +83,12 @@ export {
   CREATED_TO_PARAM,
   FILTER_SEPARATOR,
   FIRST_PAGE,
+  ORDER_SEARCH_MAX_LENGTH,
   PAGE_PARAM,
   PAGE_SIZE_PARAM,
   PRIORITY_COLUMN_ID,
   PRIORITY_PARAM,
+  SEARCH_PARAM,
   SORT_PARAM,
   SORT_SEPARATOR,
   STATUS_COLUMN_ID,
@@ -94,6 +96,7 @@ export {
   buildOrderListQuery,
   orderListHref,
   parseOrderListParams,
+  withSearchResetsPage,
   type OrderListSearchParams,
 } from './order-list-params';
 export { OrderListSection } from './order-list-section';
@@ -176,4 +179,12 @@ export {
   OrderPriorityBadge,
   OrderStatusBadge,
 } from './order-status-badge';
-export { ORDER_TABLE_ID, ORDER_TABLE_TEXTS, OrderTable, type OrderTableProps } from './order-table';
+export {
+  ORDER_LIST_CLEAR_SEARCH_TESTID,
+  ORDER_LIST_NO_MATCHES_TESTID,
+  ORDER_NO_MATCHES_MESSAGE,
+  ORDER_TABLE_ID,
+  ORDER_TABLE_TEXTS,
+  OrderTable,
+  type OrderTableProps,
+} from './order-table';

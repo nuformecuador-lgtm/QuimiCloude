@@ -205,7 +205,7 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
   const { items, page: currentPage, totalPages } = result.data;
   const { recipes, units } = await loadFormCatalogs();
 
-  if (items.length === 0) {
+  if (items.length === 0 && params.search === '') {
     // El slot de «crear el primer pedido» (R21) lo llena `<OrderSheet />` (T10) como `children`:
     // es la unica accion util cuando no hay ni un pedido, y bajando el disparador desde aqui el
     // estado vacio no tiene que conocer el panel lateral ni convertirse en modulo de cliente.
@@ -219,6 +219,27 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
       >
         <OrderSheet recipes={recipes} units={units} />
       </OrderListEmpty>
+    );
+  }
+
+  if (items.length === 0) {
+    // Con termino vigente y cero filas el vacio es «sin coincidencias», no «no hay pedidos»: se
+    // pinta DENTRO de la tabla, con la caja montada, y sin pedir responsables (no hay filas a las
+    // que repartirlos).
+    return (
+      <div className="flex flex-col gap-4" data-testid="order-list">
+        <div className="flex justify-end">
+          <OrderSheet recipes={recipes} units={units} />
+        </div>
+        <OrderTable
+          orders={items}
+          params={params}
+          totalPages={totalPages}
+          recipes={recipes}
+          units={units}
+          noMatches={{ clearHref: orderListHref({ ...params, search: '', page: FIRST_PAGE }) }}
+        />
+      </div>
     );
   }
 
