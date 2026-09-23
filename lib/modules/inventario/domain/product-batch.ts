@@ -1,10 +1,15 @@
 /** En tipos del dominio y no de Prisma: convertir es del adaptador driven. */
 export type NewProductBatch = {
-  readonly presentationId: string;
+  /**
+   * `null` solo cuando el tipo es MACHINE (2026-09-23): el producto nace sin unidad y el
+   * lote sin presentacion. PRODUCT y PACKAGING la siguen exigiendo en el borde.
+   */
+  readonly presentationId: string | null;
 
   readonly stock: number;
 
-  readonly unitCost: string;
+  /** `null` solo para MACHINE sin costo en el borde; PRODUCT y PACKAGING la exigen. */
+  readonly unitCost: string | null;
 
   /**
    * `null` significa «que lo genere el backend». El correlativo lo calcula el adaptador dentro de

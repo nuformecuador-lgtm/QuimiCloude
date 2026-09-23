@@ -271,6 +271,9 @@ export const MIGRACIONES_ESPERADAS = [
   // listado de terminados, no persiste el identificador de peticion ni lo menciona; se nombra
   // aqui a mano y la lista sigue CERRADA para la siguiente.
   '20260923120000_orders_finished_at',
+  // Igual patron: anula `product_batches.presentation_id` y `unit_cost` (solo MACHINE los
+  // omite en el borde); no toca el identificador de peticion.
+  '20260923140000_product_batch_nullable_machine',
 ] as const
 
 export function hallazgosDeMigraciones(

@@ -13,6 +13,7 @@
 // La unidad tambien es columna propia del producto (`products.unit_id`): el mapeo la lee
 // tal cual, sin recorrer ningun lote.
 
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import {
   PRODUCT_SELECT,
   toProductView,
@@ -28,7 +29,7 @@ describe('toProductView', () => {
     stock: 15,
     unitId: 'u-9',
     qtyAlert: 5,
-    type: 'PRODUCT' as const,
+    type: PRODUCT_TYPES.PRODUCT,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-02T00:00:00Z'),
   };

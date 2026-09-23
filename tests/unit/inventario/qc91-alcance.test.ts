@@ -367,9 +367,10 @@ describe('QC-91 R11 — ProductRef expone stockByUnit; ProductView expone la exi
     const cuerpo = cuerpoDeConst(leer(PRODUCT_INPUT), 'productFieldsShape');
     expect(cuerpo, 'productFieldsShape no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
     expect(mencionaStock(cuerpo as string)).toBe(false);
-    // updateProductSchema reutiliza createProductSchema (misma forma, sin stock): reemplazo
-    // completo con los mismos campos para las dos operaciones (R9).
-    expect(leer(PRODUCT_INPUT)).toMatch(/export const updateProductSchema = createProductSchema/);
+    // updateProductSchema ya NO es un alias de createProductSchema: es una union discriminada
+    // por `type` que NO conoce el lote (R9, R26). El alta es la union con lote.
+    expect(leer(PRODUCT_INPUT)).toMatch(/export const updateProductSchema = withDefaultType\(updateUnion\)/);
+    expect(leer(PRODUCT_INPUT)).toMatch(/export const createProductSchema = withDefaultType\(createUnion\)/);
   });
 
   it('R14: PRODUCT_SELECT trae products.stock y products.unit_id, sin catalogo de lotes', () => {

@@ -50,7 +50,7 @@ describe('findCostingBatches', () => {
     expect(findMany).not.toHaveBeenCalled();
   });
 
-  it('una sola consulta para todos los productId, con stock > 0, producto vivo y ambito de empresa (R3)', async () => {
+  it('una sola consulta para todos los productId, con stock > 0, presentacion y costo, producto vivo y ambito de empresa (R3)', async () => {
     findMany.mockResolvedValue([]);
 
     await findCostingBatches(['p-1', 'p-2'], 'empresa-1');
@@ -60,7 +60,13 @@ describe('findCostingBatches', () => {
     expect(args.where).toEqual({
       AND: [
         batchCompanyScope({ companyId: 'empresa-1' }),
-        { productId: { in: ['p-1', 'p-2'] }, stock: { gt: 0 }, product: { deletedAt: null } },
+        {
+          productId: { in: ['p-1', 'p-2'] },
+          stock: { gt: 0 },
+          presentationId: { not: null },
+          unitCost: { not: null },
+          product: { deletedAt: null },
+        },
       ],
     });
   });

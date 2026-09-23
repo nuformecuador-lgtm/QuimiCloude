@@ -70,6 +70,9 @@ export interface ProductRepository {
    * encontrar la presentacion, igual que si `presentationId` fuera invalido por cualquier otro
    * motivo-.
    *
+   * `presentationId` puede ser `null` (solo MACHINE, 2026-09-23): entonces no hay unidad que
+   * comparar y el adaptador busca un vivo con el mismo nombre y `unit_id` NULL.
+   *
    * QC-49 (R18): mira UNICAMENTE los productos vivos DE LA EMPRESA del ambito. Si el unico
    * homonimo vivo es de otra empresa, este metodo devuelve `null` y el alta crea un producto
    * nuevo en la empresa de quien pide, en vez de colgarle el lote al producto ajeno.
@@ -83,7 +86,7 @@ export interface ProductRepository {
    */
   findAliveIdByNameInPresentationUnit(
     name: string,
-    presentationId: string,
+    presentationId: string | null,
     scope: InventoryScope,
   ): Promise<string | null>;
 

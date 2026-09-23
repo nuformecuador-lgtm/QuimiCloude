@@ -31,7 +31,7 @@ import {
   parseProductListParams,
 } from '@/app/(private)/inventario/components';
 import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
-import type { ProductView } from '@/lib/modules/inventario';
+import { PRODUCT_TYPES, type ProductView } from '@/lib/modules/inventario';
 import type {
   CreateProductFormState,
   ProductListResult,
@@ -274,7 +274,7 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
     stock: 0,
     unitId: null,
     qtyAlert: 5,
-    type: 'PRODUCT' as const,
+    type: PRODUCT_TYPES.PRODUCT,
     createdAt: new Date('2026-01-15T10:20:30.000Z'),
     updatedAt: new Date('2026-02-20T08:00:00.000Z'),
     ...overrides,
@@ -415,6 +415,15 @@ async function elegirPresentacion(user: ReturnType<typeof setupUser>, nombre = P
   // El desplegable se cierra al elegir: hasta que no se va, su capa se come los clicks de lo
   // que hay debajo -incluido el boton de guardar-.
   await waitFor(() => expect(screen.queryByTestId('presentation-popup')).toBeNull());
+}
+
+/**
+ * Elige un tipo en el selector compartido del formulario. El `data-testid` vive en el root de
+ * Base UI Select, no en el nodo `role=combobox`, asi que el trigger se localiza por su Label.
+ */
+async function elegirTipo(user: ReturnType<typeof setupUser>, nombre: string) {
+  await user.click(screen.getByLabelText('Tipo'));
+  await user.click(await esperarInteractiva(await screen.findByRole('option', { name: nombre })));
 }
 
 /**
@@ -1655,6 +1664,112 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.queryByTestId('product-batch-date-value')).toBeNull();
   });
 
+  it('al elegir Instrumento se muestra solo existencia y fecha de compra del lote', async () => {
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await elegirTipo(user, 'Instrumento');
+
+    // MACHINE (Instrumento): solo stock y purchaseDate entre los campos del lote (2026-09-23).
+    expect(screen.getByTestId('product-field-purchaseDate')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-stock')).toBeInTheDocument();
+    expect(screen.queryByTestId('presentation-select')).toBeNull();
+    expect(screen.queryByTestId('product-field-lot')).toBeNull();
+    expect(screen.queryByTestId('product-field-qtyAlert')).toBeNull();
+    expect(screen.queryByTestId('product-field-expiryDate')).toBeNull();
+    // Los costos van juntos en ProductCostFields: sin testid propio, se comprueba por su label.
+    expect(screen.queryByLabelText('Costo unitario')).toBeNull();
+    expect(screen.queryByLabelText('Costo total')).toBeNull();
+    expect(screen.getByLabelText('Tipo')).toHaveTextContent('Instrumento');
+  });
+
+  it('al elegir Envase se oculta la fecha de expiracion y se mantiene el resto del lote', async () => {
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    expect(screen.getByTestId('product-field-expiryDate')).toBeInTheDocument();
+
+    await elegirTipo(user, 'Envase');
+
+    expect(screen.getByLabelText('Tipo')).toHaveTextContent('Envase');
+    expect(screen.queryByTestId('product-field-expiryDate')).toBeNull();
+    expect(screen.getByTestId('product-field-qtyAlert')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-stock')).toBeInTheDocument();
+    expect(screen.getByTestId('presentation-select')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-lot')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-purchaseDate')).toBeInTheDocument();
+  });
+
+  it('cambiar de tipo en el alta alterna los campos sin cerrar el panel', async () => {
+    // Producto -> Instrumento -> Envase -> Producto: cada salto tiene que reevaluar
+    // shouldShowField con el tipo recien elegido, no con el del montaje.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    // PRODUCT: alerta, presentacion, costos, lote y expiracion a la vista.
+    expect(screen.getByTestId('product-field-qtyAlert')).toBeInTheDocument();
+    expect(screen.getByTestId('presentation-select')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-expiryDate')).toBeInTheDocument();
+
+    await elegirTipo(user, 'Instrumento');
+    expect(screen.queryByTestId('product-field-qtyAlert')).toBeNull();
+    expect(screen.queryByTestId('presentation-select')).toBeNull();
+    expect(screen.queryByTestId('product-field-expiryDate')).toBeNull();
+    expect(screen.getByTestId('product-field-stock')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-purchaseDate')).toBeInTheDocument();
+
+    await elegirTipo(user, 'Envase');
+    expect(screen.getByTestId('product-field-qtyAlert')).toBeInTheDocument();
+    expect(screen.getByTestId('presentation-select')).toBeInTheDocument();
+    expect(screen.queryByTestId('product-field-expiryDate')).toBeNull();
+
+    await elegirTipo(user, 'Producto');
+    expect(screen.getByTestId('product-field-qtyAlert')).toBeInTheDocument();
+    expect(screen.getByTestId('presentation-select')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-expiryDate')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tipo')).toHaveTextContent('Producto');
+    expect(screen.getByTestId(testId.formulario)).toBeInTheDocument();
+  });
+
+  it('cerrar y reabrir el panel vuelve a Producto: el selector no recuerda el ultimo tipo', async () => {
+    // El bug: `ProductForm` se quedaba montado como hijo del Sheet mientras `SharedSelect`
+    // -dentro del portal- se desmontaba y volvia al default PRODUCT. El estado `productType`
+    // sobrevivia, el selector mostraba Producto y los campos del formulario seguian siendo
+    // los de Instrumento. Remontar el form al abrir (`open ? <ProductForm/> : null`) es el fix.
+    const user = setupUser();
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    await elegirTipo(user, 'Instrumento');
+    expect(screen.getByTestId('product-field-purchaseDate')).toBeInTheDocument();
+    expect(screen.queryByTestId('product-field-qtyAlert')).toBeNull();
+
+    await user.click(screen.getByTestId(testId.cancelarFormulario));
+    await waitFor(() => expect(screen.queryByTestId(testId.panel)).toBeNull());
+
+    await user.click(screen.getByTestId(testId.abrirAlta));
+    await screen.findByTestId(testId.formulario);
+
+    // Selector y campos coinciden otra vez en PRODUCT.
+    expect(screen.getByLabelText('Tipo')).toHaveTextContent('Producto');
+    expect(screen.getByTestId('product-field-stock')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-qtyAlert')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-purchaseDate')).toBeInTheDocument();
+    expect(screen.getByTestId('product-field-lot')).toBeInTheDocument();
+    expect(screen.getByTestId('presentation-select')).toBeInTheDocument();
+  });
+
   it('los campos con ayuda la ofrecen en la etiqueta y la muestran al pasar por encima', async () => {
     // El formulario perdio tres campos el 2026-09-03 y gano una ayuda por campo en su lugar.
     // Se vigilan las tres cosas que pueden romperse en silencio:
@@ -1747,6 +1862,9 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     const combos = within(formulario).getAllByRole('combobox');
     expect(combos).toHaveLength(3);
     expect(combos).toContain(screen.getByTestId('product-field-name'));
+    // El trigger del tipo se localiza por su Label (htmlFor), no por data-testid: el atributo
+    // vive en el root de Base UI Select, que no es el nodo role=combobox.
+    expect(combos).toContain(screen.getByLabelText('Tipo'));
     expect(combos).toContain(screen.getByTestId('presentation-select'));
     const selectorDeTipo = screen.getByLabelText('Tipo');
     expect(combos).toContain(selectorDeTipo);
