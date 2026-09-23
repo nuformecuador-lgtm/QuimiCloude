@@ -130,7 +130,7 @@ describe('SupplierShowcaseRow — cargar más (R15, R16, R40)', () => {
       page: 2,
       productSearch: '',
     });
-    // Se agotó: el control desaparece (R16).
+    // Se agotó: el control desaparece.
     expect(screen.queryByTestId('supplier-showcase-row-load-more')).toBeNull();
   });
 

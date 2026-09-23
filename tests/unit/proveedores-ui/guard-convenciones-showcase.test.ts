@@ -5,14 +5,13 @@ import { join, relative } from 'node:path';
 import { SUPPLIERS_ROUTE } from '@/lib/shared/routes';
 
 /**
- * Guardia de convenciones de QC-140 (`specs/QC-140-catalogo-visual-de-proveedores/tasks.md > T12`).
+ * Guardia de convenciones del catalogo visual de proveedores.
  *
  * Cubre lo que ningun render puede ver: que `react-intersection-observer` siga aislada en un solo
- * archivo (R18), que nadie escuche el desplazamiento a mano (D8), que la URL de proveedores no se
- * incruste como literal (R1), que los componentes de cliente de la vista no arrastren la
- * composicion ni la base de datos al navegador (R46 del modulo, aplicado aqui a la vista nueva), y
- * dos propiedades del DIFF de la rama: que no aparezca ningun archivo bajo `db/` (R29) y que
- * `components/shared/entity-image.tsx` no cambie (D20: se reutiliza tal cual, a 60 px).
+ * archivo, que nadie escuche el desplazamiento a mano, que la URL de proveedores no se incruste
+ * como literal, que los componentes de cliente de la vista no arrastren la composicion ni la base
+ * de datos al navegador, y dos propiedades del DIFF de la rama: que no aparezca ningun archivo
+ * bajo `db/` y que `components/shared/entity-image.tsx` no cambie (se reutiliza tal cual).
  */
 
 const RAIZ = join(__dirname, '..', '..', '..');

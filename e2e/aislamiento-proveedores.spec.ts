@@ -485,11 +485,10 @@ test.describe('aislamiento por empresa de proveedores', () => {
     await expect(page.getByTestId(DETAIL_NAME)).toHaveText(SUPPLIER_A_NAME, { timeout: 60_000 });
     await expect(page.getByTestId(NOT_FOUND)).toHaveCount(0);
 
-    // --- 3. Baja cruzada conociendo el identificador (R28). El control de baja vive en la
-    // cabecera del propio detalle, donde ya se esta tras el control positivo anterior. El id de B
-    // se mete por DOM en el campo oculto del dialogo del proveedor PROPIO: es el gesto de quien
-    // abre las herramientas de desarrollo, y ejercita la Server Action real sin fabricar ninguna
-    // peticion.
+    // --- 3. Baja cruzada conociendo el identificador. El control de baja vive en la cabecera del
+    // propio detalle, donde ya se esta tras el control positivo anterior. El id de B se mete por
+    // DOM en el campo oculto del dialogo del proveedor PROPIO: es el gesto de quien abre las
+    // herramientas de desarrollo, y ejercita la Server Action real sin fabricar ninguna peticion.
     await page.getByTestId(DELETE_OPEN).click();
     await expect(page.getByTestId(DELETE_DIALOG)).toBeVisible({ timeout: 60_000 });
 

@@ -49,12 +49,11 @@ const COMPONENTES_PATH = join(CARPETA_RUTA, 'components');
 const FUENTES_DE_LA_RUTA = fuentesBajo(CARPETA_RUTA);
 
 const RECIPE_PAGE_TEST = 'tests/unit/recetas-ui/recipe-page.test.tsx';
-// 2026-09-23 (QC-140): la lista paginada de proveedores sobre la tabla compartida desaparece
-// (D2 de `specs/QC-140-catalogo-visual-de-proveedores/requirements.md`) y con ella
-// `supplier-page.test.tsx` y `supplier-list-params.test.ts`, que QC-140 T11 borra. La pantalla
-// nueva es un catalogo visual, no una migracion a la tabla compartida, asi que no hay un sucesor
-// que enlazar en su lugar: se retira la fila de proveedores de este censo en vez de apuntarla a un
-// archivo que ya no juega ese papel. Los ADMITIDOS de mas abajo se actualizan al mismo tiempo.
+// 2026-09-23: la lista paginada de proveedores sobre la tabla compartida desaparece, y con ella
+// `supplier-page.test.tsx` y `supplier-list-params.test.ts`. La pantalla nueva es un catalogo
+// visual, no una migracion a la tabla compartida, asi que no hay un sucesor que enlazar en su
+// lugar: se retira la fila de proveedores de este censo en vez de apuntarla a un archivo que ya no
+// juega ese papel. Los ADMITIDOS de mas abajo se actualizan al mismo tiempo.
 const ESTE_ARCHIVO = 'tests/unit/shared/migracion-listas-alcance.test.ts';
 
 const TESTS_DE_LA_MIGRACION = [
@@ -64,10 +63,10 @@ const TESTS_DE_LA_MIGRACION = [
   ESTE_ARCHIVO,
 ] as const;
 
-// 2026-09-23 (QC-140): sale `e2e/proveedores.spec.ts`. Su test de busqueda y orden por columna
-// (R26) se retira con la vista paginada que lo sostenia: el catalogo visual nuevo busca por un
-// filtro de proveedor y no ordena por columnas, asi que ya no hay ningun bloque `busca ... (R26)`
-// que este archivo pueda leer en ese spec.
+// 2026-09-23: sale `e2e/proveedores.spec.ts`. Su test de busqueda y orden por columna se retira
+// con la vista paginada que lo sostenia: el catalogo visual nuevo busca por un filtro de
+// proveedor y no ordena por columnas, asi que ya no hay ningun bloque de busqueda que este
+// archivo pueda leer en ese spec.
 const E2E_CON_RECORRIDO_DE_BUSQUEDA = ['e2e/recetas.spec.ts'] as const;
 
 const CONSULTA_POR_TEXTO =

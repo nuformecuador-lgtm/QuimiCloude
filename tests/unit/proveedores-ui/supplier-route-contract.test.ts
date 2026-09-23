@@ -112,10 +112,10 @@ describe('contrato de la ruta de proveedores', () => {
   });
 
   it('R30 (QC-140, 2026-09-23): la lista ya no monta la tabla compartida ni paginacion propia, y conserva su vacio, su error y su esqueleto', () => {
-    // QC-140 sustituye la lista paginada de QC-44 (D2 de su requirements.md) por el catalogo
-    // visual: cada fila es un proveedor con su carrusel de lineas, sin tabla, sin controles de
-    // pagina y sin orden por columnas (R2). Este caso se reescribe para esa forma nueva en vez
-    // de seguir exigiendo `DataTable`, que la lista ya no usa.
+    // La lista paginada sobre tabla compartida da paso al catalogo visual: cada fila es un
+    // proveedor con su carrusel de lineas, sin tabla, sin controles de pagina y sin orden por
+    // columnas. Este caso se reescribe para esa forma nueva en vez de seguir exigiendo
+    // `DataTable`, que la lista ya no usa.
     const nombres = readdirSync(join(RAIZ, COMPONENTES_PATH));
 
     for (const borrado of [
@@ -135,7 +135,7 @@ describe('contrato de la ruta de proveedores', () => {
     ).toEqual([]);
 
     // El filtro (`supplier-showcase-filters.tsx`) reutiliza legitimamente `SEARCH_DEBOUNCE_MS` del
-    // paquete de la tabla compartida (mismo rebote que su busqueda global); lo que R2 prohibe es
+    // paquete de la tabla compartida (mismo rebote que su busqueda global); lo que se prohibe es
     // el COMPONENTE de tabla, no cualquier import de ese paquete.
     const montaComponenteDeTabla = /\bDataTable\b/;
     const importaTablaPrimitiva = /from\s*['"]@\/components\/ui\/table['"]/;

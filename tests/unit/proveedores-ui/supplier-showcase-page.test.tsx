@@ -47,8 +47,8 @@ import {
 } from '../../helpers/viewport';
 
 /**
- * QC-140 T11 — catalogo visual de proveedores, montado dentro del armazon privado con el arbol
- * real de `page.tsx`.
+ * Catalogo visual de proveedores, montado dentro del armazon privado con el arbol real de
+ * `page.tsx`.
  *
  * `listSupplierShowcaseAction` y `listShowcaseLinesAction` estan mockeadas: son el borde del
  * modulo. `createSupplierAction`/`updateSupplierAction` tambien, porque `SupplierForm` (panel de
@@ -545,7 +545,7 @@ describe('catalogo visual de proveedores — alta reinicia la lista (R36)', () =
     expect(routerMock.refresh).toHaveBeenCalledTimes(1);
 
     // `router.refresh()` vuelve a ejecutar la seccion en el servidor: la simulacion es pintar de
-    // nuevo el arbol, con la primera pagina de nuevo desde el principio (D15: el proveedor nuevo
+    // nuevo el arbol, con la primera pagina de nuevo desde el principio (el proveedor nuevo
     // aparece aunque todavia no tenga lineas).
     const nuevoProveedor = fila({ name: 'Ácido Cítrico del Bajío', lines: [], hasMoreLines: false });
     listSupplierShowcaseActionMock.mockReset();
@@ -593,7 +593,7 @@ describe('catalogo visual de proveedores — alta en panel lateral', () => {
   });
 });
 
-/** QC-71 T9 — R17 y R18 en el catalogo visual de proveedores: lista y formulario de alta. */
+/** Identificador de error inesperado en el catalogo visual de proveedores: lista y formulario de alta. */
 describe('pantalla de proveedores — el identificador del error inesperado (QC-71 R17, R18)', () => {
   it('la lista con el error inesperado ensena el identificador como texto y con su etiqueta', async () => {
     listSupplierShowcaseActionMock.mockResolvedValue(errorInesperado());

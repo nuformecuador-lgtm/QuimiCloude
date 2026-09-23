@@ -42,8 +42,7 @@ export type ShowcaseLinesPage = {
   readonly hasMore: boolean;
 };
 
-/** Mismo tope que el contrato generico de listas (QC-57), para que las dos busquedas del
- *  modulo no discrepen. */
+/** Mismo tope que el resto de busquedas del modulo, para que no discrepen entre si. */
 const SEARCH_MAX_LENGTH = 120;
 
 /**

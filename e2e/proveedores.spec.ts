@@ -386,8 +386,8 @@ test.describe('proveedores', () => {
     await expect(page.getByTestId('supplier-sheet')).toHaveCount(0, { timeout: 60_000 });
     await expect(page.locator('[data-sonner-toast]').first()).toBeVisible({ timeout: 60_000 });
 
-    // --- 6. Y el proveedor esta en la vista sin que el usuario recargue nada (R33), buscado por
-    // el filtro de proveedor; sale aunque todavia no tenga ninguna linea de catalogo.
+    // --- 6. Y el proveedor esta en la vista sin que el usuario recargue nada, buscado por el
+    // filtro de proveedor; sale aunque todavia no tenga ninguna linea de catalogo.
     const supplierRow = await findSupplierRow(page, supplierName);
     await expect(supplierRow.first()).toBeVisible({ timeout: 60_000 });
 

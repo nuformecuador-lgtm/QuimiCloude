@@ -1,4 +1,4 @@
-// QC-74 T12 — Autorizacion POR PERMISO de los ONCE casos de uso de `proveedores`
+// Autorizacion POR PERMISO de los ONCE casos de uso de `proveedores`
 // (R12, R13, R14, R15, R16, R17, R18).
 //
 // `docs/architecture.md > Acceso a datos y autorizacion` es explicito: Prisma se conecta
@@ -333,8 +333,8 @@ describe('autorizacion por permiso de los once casos de uso de proveedores (QC-7
     expect(factoriasEnElDominio).toEqual([...CASOS_DE_USO].map((c) => c.archivo).sort())
     expect(CASOS_DE_USO).toHaveLength(11)
 
-    // Y la tabla R16 esta completa por los dos lados: cinco lecturas y seis escrituras, y los
-    // dos codigos existen en el catalogo REAL de `identity`, no en una copia escrita a mano.
+    // Y la tabla de permisos esta completa por los dos lados: cinco lecturas y seis escrituras, y
+    // los dos codigos existen en el catalogo REAL de `identity`, no en una copia escrita a mano.
     expect(
       CASOS_DE_USO.filter((c) => c.permiso === CONSULTAR)
         .map((c) => c.nombre)
