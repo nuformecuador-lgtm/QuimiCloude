@@ -154,3 +154,20 @@ El humano aprobó el spec y respondió la única pregunta abierta. Se ajusta R21
 
 Cobertura: R21. Consecuencia sobre R17: un fallo no deja cifra visible, así que la siguiente
 cotización en vuelo muestra solo «cotizando…».
+
+## Nota del 2026-09-23 — Ampliación en F2.1
+
+Durante la implementación apareció un defecto **anterior a esta ficha** en el selector de recetas del
+pedido: en la edición, elegir una receta distinta de la ya elegida retiraba la elección y la
+cotización volvía al guion. El humano aprobó el 2026-09-23 que el arreglo se quede en esta ficha. Se
+añade un requisito sin renumerar ni reescribir los anteriores.
+
+- **R23.** CUANDO, en la edición de un pedido, se elige en el selector una receta distinta de la ya
+  elegida, el sistema DEBE dejar elegida la receta nueva —su identificador es el que viaja al
+  guardar— y la cotización DEBE recalcularse con esa receta (R14), sin pasar al guion.
+
+| Fecha | Pregunta | Decisión |
+|---|---|---|
+| 2026-09-23 | El selector retiraba la receta nueva al cambiarla en la edición (defecto previo a la ficha, arreglado en `395ff106`): ¿se queda en QC-151? | **Sí.** El arreglo y su test se quedan en esta ficha. |
+
+Cobertura: R23.

@@ -317,3 +317,28 @@ Ninguna nueva. Formato y redondeo con `BigInt` y `decimal-display.ts`, como ya h
 - **La cotización puede no coincidir con lo guardado** si los lotes cambian entre cotizar y guardar.
   Es la decisión cerrada («orientativa»), no un defecto.
 - **El `title` no se ve en móvil**: límite heredado de QC-127/QC-132, aceptado.
+
+## 14. Ampliación en F2.1: el selector de recetas en la edición (R23)
+
+Aprobada por el humano el 2026-09-23. Commit `395ff106`, aislado para poder revertirlo solo.
+Fuentes: bitácora `progress/impl_QC-151-cotizacion-del-coste-en-el-pedido.md` (ronda 2, menor 4) y
+`app/(private)/pedidos/components/recipe-picker.tsx` tal como está en la rama.
+
+- **Síntoma.** En la edición, al elegir una receta distinta de la ya elegida, la elección se retiraba
+  (`onSelect(null)`): Guardar se deshabilitaba y la cotización volvía al guion. Salió al escribir el
+  caso «elegir otra receta» de R12 en `order-form-quote.test.tsx`. En el alta no se veía porque no hay
+  receta previa.
+- **Causa.** El autocomplete dispara su propio `onValueChange` con el nombre recién elegido justo
+  después del `onClick` de la opción. `handleValueChange` comparaba ese texto contra el estado
+  `selectedName`, que en ese instante todavía tenía el nombre **anterior** (React no había vuelto a
+  pintar). Como no coincidían, aplicaba la regla del 2026-09-09 —«lo escrito ya no es lo elegido»— y
+  retiraba la receta que se acababa de elegir.
+- **Arreglo.** Un espejo síncrono, `selectedNameRef` (`useRef(defaultLabel)`): `choose` lo actualiza
+  antes de tocar el estado, `handleValueChange` compara contra el ref y lo vacía cuando retira. La
+  regla de retirar la elección cuando lo escrito deja de coincidir sigue intacta; solo cambia contra
+  qué valor se compara.
+- **Fuera del diseño original.** `recipe-picker.tsx` no estaba en los archivos de §5; entra por esta
+  ampliación. No cambia exports, así que `guard-pantalla-pedidos-se-amplia.test.ts` no se ve afectada.
+- **Alternativa descartada.** Leer el nombre elegido de un efecto (`useEffect`) posterior al
+  render: seguiría habiendo un evento intermedio con el valor viejo, y el ref lo resuelve en el mismo
+  evento sin otro render.

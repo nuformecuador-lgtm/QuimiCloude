@@ -146,6 +146,11 @@ esos archivos se ponen rojos por la export que falta; `design.md > 10`).
 `order-row-wiring.test.tsx`, `order-sheet-responsibles.test.tsx` y
 `guard-pantalla-pedidos-se-amplia.test.ts` verdes. `./init.sh --rapido` verde.
 
+**Ampliación en F2.1 (2026-09-23), dentro de T6:** `R23`, arreglo de
+`app/(private)/pedidos/components/recipe-picker.tsx` (`selectedNameRef`, `design.md > 14`), commit
+`395ff106`. Test: `order-form-quote.test.tsx`, «elegir otra receta pide de inmediato, con la receta
+nueva» (afirma la receta nueva en la llamada y `$ 30.00` en el bloque).
+
 ## [x] T7 — Integración contra Postgres `[depende de T2]` `[P con T4-T6]`
 
 Archivos: `tests/integration/pedidos/order-cost-quote.int.test.ts` (nuevo).
@@ -207,3 +212,4 @@ la app local y el Postgres local con `db:seed`, sin red externa (`R22`); la sali
 | R20 | `order-form-quote.test.tsx` |
 | R21 | `order-cost-quote.test.tsx`, `order-form-quote.test.tsx` (mensaje del error, nunca guion; cerrada en F1.4) |
 | R22 | `e2e/pedidos-cotizacion.spec.ts` |
+| R23 | `order-form-quote.test.tsx` («elegir otra receta pide de inmediato, con la receta nueva»; T6, `395ff106`) |
