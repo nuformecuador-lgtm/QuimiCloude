@@ -234,7 +234,7 @@ unidad) y tests de integración verdes para `R7`, `R12`, `R13`, `R14`, `R18`, `R
 y *(enmienda del 2026-09-23)* `R49`: crear y editar un pedido con receta sin líneas guarda sin error
 y deja `reserved_at` nulo. Los datos de prueba usan recetas en porcentaje.
 
-## T10 — Entregar consume: Finalizar y edición `[depende de T8]` `[P con T9]`
+## [x] T10 — Entregar consume: Finalizar y edición `[depende de T8]` `[P con T9]`
 
 Archivos: `lib/modules/pedidos/domain/transition-order.ts` (nuevo),
 `lib/modules/pedidos/domain/{order-catalog,errors}.ts`,
@@ -269,7 +269,7 @@ vivos, receta sin líneas no aparta), `R44` y la **paridad** con `planReservatio
 datos, incluidos un caso de techo a 4 decimales y uno de producto sin unidad (sustituye al de unidad
 sin base común).
 
-## T12 — El proceso diario `[depende de T8]` `[P con T9-T11]`
+## [ ] T12 — El proceso diario `[depende de T8]` `[P con T9-T11]`
 
 Archivos: `vercel.json` (nuevo), `app/api/cron/caducar-pedidos/route.ts` (nuevo),
 `lib/modules/pedidos/adapters/driving/order-expiry-cron-route.ts` (nuevo),
@@ -286,7 +286,12 @@ el repositorio), `R25` (dos ejecuciones seguidas y dos solapadas en integración
 que falla no impide los demás y se registra el evento); `tests/unit/documentos/route-segment-config.test.ts`
 o uno equivalente comprueba los literales de la ruta nueva.
 
-## T13 — Inventario muestra reservado, disponible y el historial `[depende de T5, T7]`
+*Estado al 2026-09-23:* **parcial y bloqueada** (`3c721563`: dominio, secreto y sus unitarios). `findExpirableOrders`
+consulta todas las empresas (§9.1) y `guard-ambito-empresa-pedidos` la rechaza: la guardia solo admite
+una excepción nombrada que apruebe un humano en el spec. Faltan la consulta, el handler, la ruta,
+`vercel.json`, `.env.example`, el cableado y los tests de R23, R24 (handler) y R25 (integración).
+
+## [x] T13 — Inventario muestra reservado, disponible y el historial `[depende de T5, T7]`
 
 Archivos: `lib/modules/inventario/domain/{list-products,list-product-batches,list-batch-movements}.ts`,
 `lib/modules/inventario/adapters/driving/batch-actions.ts`,
@@ -297,7 +302,7 @@ Archivos: `lib/modules/inventario/domain/{list-products,list-product-batches,lis
 **Hecho cuando:** tests verdes para `R34`, `R36`, `R37`, `R38`, `R40` (sin permiso no se lee nada)
 y `R42` (lote de otra empresa = inexistente), y la guardia de viewport de inventario sigue verde.
 
-## T14 — Cobertura del pedido en Pedidos `[depende de T7, T9]` `[P con T13]`
+## [x] T14 — Cobertura del pedido en Pedidos `[depende de T7, T9]` `[P con T13]`
 
 Archivos: `lib/modules/pedidos/domain/*` (consulta de cobertura), `app/(private)/pedidos/**`
 (fila y hoja), `lib/composition/index.ts`.
@@ -307,7 +312,7 @@ Archivos: `lib/modules/pedidos/domain/*` (consulta de cobertura), `app/(private)
 **Hecho cuando:** tests de componente y de caso de uso verdes para `R35`, con una sola llamada a
 `findCoverageByOrderIds` por página.
 
-## T15 — Concurrencia y aislamiento en integración `[depende de T9, T10]`
+## [x] T15 — Concurrencia y aislamiento en integración `[depende de T9, T10]`
 
 Archivos: `tests/integration/pedidos/order-reservation-concurrency.int.test.ts` (nuevo),
 `tests/integration/aislamiento.json` si procede.
@@ -317,7 +322,7 @@ exactamente una apartada (`R16`), una merma simultánea a un apartado no deja el
 y ninguna combinación de las operaciones de T9 y T10 sobre el mismo producto se interbloquea en
 cien vueltas.
 
-## T16 — E2E `[depende de T10, T13, T14]`
+## [ ] T16 — E2E `[depende de T10, T13, T14]`
 
 Archivos: `e2e/reserva-de-material.spec.ts` (nuevo).
 
@@ -327,7 +332,7 @@ Archivos: `e2e/reserva-de-material.spec.ts` (nuevo).
 **Hecho cuando:** `pnpm run e2e -- reserva-de-material` verde en local y en el gate completo
 (`R48`).
 
-## T17 — Documentación y trazabilidad `[depende de T1-T16]`
+## [ ] T17 — Documentación y trazabilidad `[depende de T1-T16]`
 
 Archivos: `docs/architecture.md` (pregunta 2 del dominio: el lote ya tiene consumidor; «Cron
 interno» ya existe como caso, se añade que el primero es este y su variable), 

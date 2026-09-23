@@ -731,3 +731,152 @@ Paso 0, T6 y T7 (ajuste parcial) cerrados: `plan-reservation.ts`, `reservation.t
 `reservation-prisma.ts` sin `UnitCatalog`; `nothing_to_consume` cubierto con un caso que demuestra
 que no escribe nada en ningún libro. `typecheck` y `lint` limpios. Único rojo detectado en la
 corrida amplia es ajeno (migración de QC-147, tanda TM anterior a esta sesión).
+
+*Nota del implementer:* ese rojo no era ajeno: lo causó la renumeración de TM. Se corrigió en
+`9cbf62cc` (el orden se mide contra las migraciones de las que depende).
+
+---
+
+## Tanda 2 (2026-09-23): TM, T8-T16 y limpieza de comentarios
+
+Consolida lo que el implementer coordinó tras la enmienda (D19; E1 y E2 aprobados).
+
+### Estado de las tasks
+
+| Task | Estado | Commits |
+|---|---|---|
+| TM | **abierta**: código hecho, faltan dos verificaciones de base (abajo) | `5e1d7572` renumeración, `fe240487` merge de `origin/dev` (`0093acf9`: QC-147 y QC-146), `46cc70fd`, `9cbf62cc`, `4b45c83b` (tests rotos por el merge o la renumeración) |
+| T6 | [x] | `a4c02ad3` |
+| T7 | [x] | `152d8efe` |
+| T8 | [x] | `cac9f6c9` |
+| T9 | [x] | `94f566b4`, `9b28f846`, `f36df156` |
+| T10 | [x] (su E2E sin ejecutar) | `ff9dfd6b`, `1ec2a2b5`, `c1cd169b`, `810e9876`; fixture E2E `28ea602c` |
+| T11 | [x] | `167d9c93` |
+| T12 | **parcial, bloqueada** | `3c721563` (dominio, secreto y unitarios) |
+| T13 | [x] | `3ff3cfad` (backend), `9a76ed95` (UI) |
+| T14 | [x] | `c1b3167a` (backend), `b080fc0b` (UI) |
+| T15 | [x] | `b7ca7fdb` |
+| T16 | escrita, **sin ejecutar** | `edf2ef8b`, `c029c262` (censo de la guardia) |
+| T17 | pendiente | — |
+| Comentarios de la rama | limpios | `0a222afe`, `514b9905`, `c37559cc`, `b5076ba2` |
+
+### TM: lo que queda abierto
+
+1. **No se tocó la base de desarrollo compartida `QuimiCloude`.** Otra sesión ya le había aplicado
+   `20260922130000_orders_presentation` y `20260922160000_recipe_lines_percentage`, y todavía tiene
+   aplicadas nuestras dos migraciones con el nombre viejo. El clasificador de permisos denegó
+   revertirlas ahí («Modify Shared Resources»). El gate no depende de esa base (la integración usa
+   bases efímeras desde plantilla), pero `db:test status` la verá con dos migraciones que ya no
+   existen en disco y tres por aplicar. Lo decide el humano.
+2. **No está demostrado que `…120000` revierta sobre una base con QC-147.** Sobre una base efímera
+   copiada de la plantilla, `…120100` revierte y reaplica limpia. Para revertir `…120000`,
+   `scripts/db-rollback.ts` tiene que verla como la última carpeta, y eso exige mover
+   temporalmente la de `…120100`: acción denegada («Irreversible Local Destruction»). Su `down.sql`
+   lo cubren los tests de esquema de T1.
+
+### Bloqueo de T12 (decisión humana)
+
+`findExpirableOrders` (`design.md > 9.1`) lee `orders` de **todas** las empresas: el proceso diario
+no actúa en nombre de ninguna. `guard-ambito-empresa-pedidos` la rechaza (sin `scope`, SQL sin
+`company_id`). Según su cabecera, una consulta sin ámbito solo entra con una excepción con nombre
+aprobada por un humano en el spec, y nunca la añade quien escribe el adaptador. El spec aprobado
+dice «todas las empresas», pero no menciona la guardia. Hecho: `order-expiry.ts`,
+`expire-stale-orders.ts` (dominio puro), `cron-secret-env.ts` y sus unitarios. Falta: la consulta,
+el handler, `app/api/cron/caducar-pedidos/route.ts`, `vercel.json`, `.env.example`, el cableado y
+los tests de R23, R24 (handler) y R25 (integración con ejecuciones solapadas).
+
+### Para la revisión: decisiones de subagentes sobre guardias
+
+- **T8**: `order-unit-of-work-prisma.ts` importa `prisma` con el alias `sharedPrismaClient`. Motivo:
+  la expresión `TOCA_LA_BASE` de `guard-ambito-empresa-pedidos` solo reconoce `prisma.`/`tx.`, y
+  daba un falso positivo en una función que solo abre la transacción. En la práctica **esquiva la
+  guardia cambiando el nombre**: decide el reviewer o el humano.
+- **T8**: `insertAliveOrder` copia el `INSERT` de `createOrder`, porque un test anti-placebo de la
+  misma guardia exige SQL crudo dentro de `order-prisma.ts:createOrder`. `createOrder` se conserva
+  porque lo usa `order-sequence.int.test.ts`.
+- **T10**: la misma guardia ganó en `cableadoDe` el reconocimiento de `metodo: fabrica(...)` y un
+  `METODOS_DELEGADOS_EN_DOMINIO` para `transitionAliveById`, que ahora cablea `createTransitionOrder`.
+  No es una consulta sin ámbito, pero amplía la guardia y la escribió quien hizo el cableado.
+- **`error-codes.ts`**: en su registro de enmiendas todas las entradas previas citan su ficha; la
+  entrada nueva va sin cita, por la regla de comentarios.
+
+### Archivos creados en esta tanda (además de los de «Paso 0, T6 y T7»)
+
+- `db/migrations/20260923120200_reserve_existing_orders/{migration.sql,down.sql}`.
+- `lib/modules/pedidos/ports/{order-unit-of-work,order-write-repository}.ts`.
+- `lib/modules/pedidos/adapters/driven/persistence/{order-unit-of-work-prisma,order-number-directory-prisma}.ts`.
+- `lib/modules/pedidos/adapters/driven/config/cron-secret-env.ts`.
+- `lib/modules/pedidos/domain/{transition-order,find-coverage,order-expiry,expire-stale-orders}.ts`.
+- `tests/helpers/order-unit-of-work-double.ts`.
+- `tests/integration/inventario/reserve-existing-orders-migration.int.test.ts`,
+  `tests/integration/pedidos/{order-unit-of-work,order-reservation,order-reservation-concurrency}.int.test.ts`,
+  `tests/unit/pedidos/{transition-order,find-coverage,expire-stale-orders,cron-secret-env}.test.ts`,
+  `tests/unit/pedidos-ui/order-sheet-coverage.test.tsx`, `e2e/reserva-de-material.spec.ts`.
+
+### Archivos modificados (principales)
+
+`db/schema.prisma` (merge), `lib/composition/index.ts`; en `pedidos`: `create-order`, `update-order`,
+`cancel-order`, `delete-order`, `order-catalog`, `errors`, `index`, `ports/order-repository`,
+`order-prisma`, `order-actions`; en `asignaciones`: `finish-assigned-order`, `errors`,
+`start-assigned-order`, `index`; en `errores`: `error-codes`, `error-catalog`; en `inventario`:
+`product-view`, `product-batch-view`, `list-batch-movements`, `ports/product-repository`,
+`product-prisma`, `batch-movement-prisma`, `company-scope`, `reservation-prisma`, `batch-actions`;
+en `recetas`: `recipe-view` y `get-recipe` (merge). En UI:
+`app/(private)/inventario/components/{product-columns,product-columns-skeleton,product-batches-panel,batch-history,adjust-batch-dialog,index}`
+y `app/(private)/pedidos/components/{order-status-badge,order-columns,order-list-section,order-table,order-sheet,order-form,order-list-skeleton,order-ingredients-table,index}`.
+Además: `e2e/ejecucion-receta.spec.ts` (receta con una línea al 100 % y un lote), las guardias
+`guard-identificador-de-request` (censos de migraciones y E2E) y `guard-ambito-empresa-pedidos`,
+`tests/integration/aislamiento.json`, y los tests ajustados que lista cada commit.
+
+### R → test (acumulado; T17 lo cierra)
+
+| R | Test |
+|---|---|
+| R1, R2, R45, R46 | ver «Tanda T1 — T3» |
+| R3, R4, R5 | ver «Tanda T4» |
+| R6 | ver «Tanda T5»; `batch-history.test.tsx` («R6 — la cantidad de cada asiento…») |
+| R7, R20 | `tests/integration/pedidos/order-reservation.int.test.ts` («R7, R20 — crear aparta y fija reserved_at») |
+| R8, R10 | `tests/unit/inventario/plan-reservation.test.ts` (casos `R8:`, `R10:`) |
+| R9 | `plan-reservation.test.ts` («R9: un producto sin unidad no se cubre y arrastra a todo el pedido») |
+| R11 | `plan-reservation.test.ts` (tres `R11:`), `tests/unit/pedidos/order-requirement.test.ts` (dos `R11:`) |
+| R12, R13 | `tests/integration/inventario/reservation.int.test.ts`; `order-reservation.int.test.ts` («R12 — …», «R13 — …») |
+| R14 | `order-reservation.int.test.ts` («R14 — editar la receta no toca lo apartado…») |
+| R15 | `tests/integration/pedidos/order-unit-of-work.int.test.ts`; rechazos sin cambios en `order-reservation.int.test.ts` |
+| R16 | `tests/integration/pedidos/order-reservation-concurrency.int.test.ts` («R16 — dos altas simultaneas…») |
+| R17 | `reservation.int.test.ts` (FK compuesta) |
+| R18, R19 | `order-reservation.int.test.ts` («R18 — cancelar libera con autor», «R19 — borrar libera») |
+| R21, R22, R25, R26 | `tests/unit/pedidos/expire-stale-orders.test.ts` (solo dominio: T12 bloqueada) |
+| R23 | **sin test** (T12 bloqueada) |
+| R24 | `tests/unit/pedidos/cron-secret-env.test.ts` (solo el secreto; falta el handler) |
+| R27, R28 | `reservation.int.test.ts`; `tests/unit/pedidos/transition-order.test.ts`; `order-reservation.int.test.ts` («R27, R28: Finalizar…») |
+| R29 | `order-reservation.int.test.ts` («R29 — editar a ENTREGADO cambiando cantidad recalcula y consume») |
+| R30, R31 | `reservation.int.test.ts`; `transition-order.test.ts`; `order-reservation.int.test.ts`; `tests/unit/asignaciones/finish-assigned-order.test.ts` |
+| R32 | `reservation.int.test.ts`; `order-reservation.int.test.ts` («R32: un segundo Finalizar…») |
+| R33 | `reservation.int.test.ts`, `adjust-batch-stock-prisma.test.ts`, `adjust-batch-dialog.test.tsx` («R33 — …») |
+| R34, R37 | `reservation.int.test.ts` («R34, R37 — …»); `product-batches-panel.test.tsx` |
+| R35 | `tests/unit/pedidos/find-coverage.test.ts`; `order-columns.test.tsx`, `order-list-section.test.tsx`, `order-sheet-coverage.test.tsx` |
+| R36 | `reservation.int.test.ts` («R36 — …»); `product-page.test.tsx` |
+| R38 | `reservation.int.test.ts`; `adjust-batch-stock.test.ts`; `batch-history.test.tsx` |
+| R39 | `reservation.int.test.ts` |
+| R40 | `tests/unit/inventario/authorization.test.ts` |
+| R41 | `create-order`, `update-order`, `cancel-order` y `delete-order.test.ts` («R41: el permiso se exige ANTES…»); `tests/unit/pedidos/authorization.test.ts` |
+| R42 | `reservation.int.test.ts` («R42 — …») |
+| R43, R44 | `tests/integration/inventario/reserve-existing-orders-migration.int.test.ts` (con paridad contra `planReservation`) |
+| R47 | `guard-dependencias-aprobadas` (sin cambios en `package.json`) |
+| R48 | `e2e/reserva-de-material.spec.ts` (**sin ejecutar**) |
+| R49 | `plan-reservation`, `order-requirement`, `create-order` y `update-order.test.ts`; `order-reservation.int.test.ts`; `reserve-existing-orders-migration.int.test.ts` |
+| R50 | `reservation.int.test.ts`, `transition-order.test.ts`, `update-order.test.ts`, `finish-assigned-order.test.ts`, `order-reservation.int.test.ts` |
+
+Sin test: **R23**. R21, R22, R24, R25 y R26 solo en su parte de dominio (T12).
+
+### Salida de los comandos al cierre (HEAD `b5076ba2` más `tasks.md`)
+
+- `pnpm run typecheck`: sin errores. `pnpm run lint`: sin salida.
+- `pnpm run test:rapido` (los tests que corre `./init.sh --rapido`): relacionados **424 archivos,
+  6245 pasan, 29 saltados, 0 fallan**; guardias **48 archivos, 605 pasan, 9 saltados, 0 fallan**.
+- `./init.sh --rapido`: **rojo antes de los tests**, en la validación de `feature_list.json`:
+  `zona fullstack: QC-121, QC-141, QC-146, QC-147 (4 in_progress, max 3)`. QC-146 y QC-147 llegan
+  en `in_progress` con el `feature_list.json` de `dev`, con sus PR ya mergeados. Es bookkeeping del
+  leader, no de esta rama.
+- No se ejecutaron, por regla: la suite completa, `./init.sh` completo y los E2E (nuevo
+  `reserva-de-material.spec.ts`; modificados `ejecucion-receta.spec.ts` y `ajuste-de-inventario.spec.ts`).
