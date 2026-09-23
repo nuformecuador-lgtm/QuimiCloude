@@ -145,9 +145,39 @@ de `navigate`:
   el término, la consulta lo usa y la caja nace con él (su borrador se inicializa con `params.search`).
   Tampoco requiere código; lo cubre el E2E (R25 d), porque jsdom no tiene historial real.
 
-Límite conocido y fuera de alcance: dentro de la propia `/pedidos`, «Atrás» entre dos términos
-distintos cambia la URL y la lista pero **no** el texto de la caja (el mismo desfase de §3.2, sin clic
-que lo dispare). Lo arregla la alternativa C.
+### 4.1 «Atrás» entre dos términos dentro de `/pedidos` (R27, ampliación del 2026-09-23)
+
+El problema: si se busca A, luego B, y se pulsa «Atrás» sin salir de `/pedidos`, la URL y la lista
+vuelven a A pero la caja sigue mostrando B. Es el mismo desfase de §3.2, esta vez sin un clic que lo
+provoque. Se arregla en `order-table.tsx` (T7), **sin tocar** `components/shared/data-table`:
+
+- **Dos estados más en `OrderTable`:** `pendingSearches`, la cola de términos que la propia caja pidió
+  (al teclear o con «Limpiar») y cuyo eco todavía no ha llegado por `params`, y `lastSearch`, el último
+  `params.search` visto.
+- **Qué hace `handleParamsChange`:** si el destino (ya pasado por `withSearchResetsPage`) cambia el
+  término, lo encola en `pendingSearches` antes de navegar. `handleClearSearch` encola `''`.
+- **Comparación durante el render:** cuando llega un `params.search` distinto de `lastSearch`, se
+  actualiza `lastSearch` y hay dos casos.
+  - **El término está en la cola:** es el eco de la propia caja. Se descartan él y los anteriores
+    (los más viejos de una carrera del rebote) y **no se remonta**: R11 intacto aunque el usuario
+    siga tecleando.
+  - **El término no está en la cola:** el cambio vino de fuera (Atrás, un enlace). `boxEpoch + 1`, y
+    la `DataTable` (`key={boxEpoch}`) se remonta con la caja naciendo del término de la URL.
+- **Por qué en el render y no en un efecto:** es el patrón «ajustar estado durante el render». El
+  remonte llega en el mismo commit, sin que parpadee el término viejo. `useRef` queda descartado
+  porque lo rechaza el lint `react-hooks/refs`, y un `useEffect` con `setState` lo rechaza
+  `react-hooks/set-state-in-effect`.
+
+Es el mismo `boxEpoch` de §3.2, que ahora tiene dos causas de remonte: el clic en «Limpiar» y un cambio
+externo del término.
+
+Lo que queda fuera: proveedores e inventario **siguen** con el mismo fallo. El arreglo de fondo en la
+caja compartida sigue siendo la alternativa C de §3.3, candidata a ficha propia.
+
+Tests (mapa en `progress/impl_QC-122-…md`):
+- `order-table.test.tsx`: un `params.search` externo se muestra en la caja tras el rerender; el eco del
+  término propio no remonta (mismo nodo, foco y texto); la carrera del rebote no pierde lo tecleado.
+- E2E: «Atras entre dos terminos distintos deja la caja con el termino de la URL (R27)».
 
 ## 5. Contratos de entrada/salida
 
@@ -215,3 +245,5 @@ La caja es el `Input` compartido con `min-h-11` y `text-base` (44 px, 16 px); la
 3. «Volver del detalle» = abrir y cerrar el panel lateral **y** ir a otra pantalla y volver con Atrás
    (§4, R9, R26).
 4. «Importe entre Presentación y Fecha de solicitud»: **descartada**, no hay columna (importe -> QC-151).
+5. (Ampliación del 2026-09-23) La caja sigue a la URL también con «Atrás» entre dos términos dentro de
+   `/pedidos` (R27, §4.1). Proveedores e inventario quedan fuera de esta ficha.

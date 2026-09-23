@@ -134,6 +134,7 @@ esta ficha ya no la retira.
 | F1.4: sin coincidencias DENTRO de la tabla | R13, R14 |
 | F1.4: búsqueda nueva vuelve a la página 1 | R2 |
 | F1.4: el término sigue tras el panel lateral y tras Atrás | R9, R26, R25 (d) |
+| Ampliación 2026-09-23: Atrás entre dos términos dentro de `/pedidos` | R27 |
 
 ## Preguntas abiertas
 
@@ -171,3 +172,12 @@ Alcance, «Lo que NO entra» y tabla de decisiones— **no se reescribe**; esta 
 | 2026-09-23 | ¿Qué página muestra una búsqueda nueva? | Vuelve a la **página 1**. |
 | 2026-09-23 | ¿Qué es «volver del detalle»? | El término sigue al **abrir y cerrar el panel lateral** de un pedido **y** al **ir a otra pantalla y volver con Atrás**: vive en la URL. |
 | 2026-09-23 | ¿Dónde va la columna Importe? | Descartado: no hay columna. |
+| 2026-09-23 | ¿Atrás entre dos términos dentro de `/pedidos`? | La caja se sincroniza con la URL (R27). Ampliación decidida por el humano («sí, arréglalo aquí») y arreglada en `order-table.tsx` **sin tocar** `components/shared`. Proveedores e inventario siguen con el mismo fallo y quedan fuera de esta ficha. |
+
+### Requisito añadido por la ampliación del 2026-09-23 (sin renumerar)
+
+- **R27.** CUANDO el término de la URL (`q`) cambia sin que el usuario haya tecleado en la caja —por
+  ejemplo, buscar A, luego B, y pulsar «Atrás» dentro de `/pedidos`—, el texto de la caja DEBE mostrar
+  el término de la URL (A), igual que la lista; y un término que la propia caja emitió NO DEBE
+  remontarla ni quitarle el foco ni el texto que se sigue escribiendo (R11). Tarea: T7 de `tasks.md`.
+  Diseño: `design.md > 4`.
