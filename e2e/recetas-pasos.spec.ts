@@ -328,8 +328,8 @@ test.describe('editor y lectura de pasos', () => {
     await fillControlled(page.getByTestId('recipe-field-name'), recipeName);
 
     // --- 3. Una linea de producto: el formulario la exige, y no es lo que esta feature prueba.
-    // Sin unidad -la linea ya no la lleva (QC-147 R1)- y al 100 % para que la suma sea exacta y
-    // el Guardar se habilite (QC-147 R11).
+    // Sin unidad -la linea ya no la lleva- y al 100 % para que la suma sea exacta y el Guardar
+    // se habilite.
     await selectProductByName(page, 'recipe-line-product-0', productName);
     await fillControlled(page.getByTestId('recipe-line-percentage-0'), '100');
 

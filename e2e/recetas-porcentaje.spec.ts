@@ -1,16 +1,16 @@
 /**
- * E2E de QC-147 (cantidades de receta en porcentaje): los cuatro escenarios de `design.md > 13`
- * (R22), de punta a punta contra un navegador real y Postgres.
+ * E2E de cantidades de receta en porcentaje: los cuatro escenarios de alta, edicion, pedido y
+ * ejecucion, de punta a punta contra un navegador real y Postgres.
  *
  * Que aporta sobre unit e integracion, que es lo unico que justifica su coste:
  *  - El campo de porcentaje `type="text"` aceptando coma en un navegador de verdad, y el
- *    indicador de suma recalculandose con cada pulsacion sin llamar a ninguna accion (R10, R25).
- *  - El corte real de Guardar deshabilitado -tambien con cero lineas (R11, R23)- y que Enter en
+ *    indicador de suma recalculandose con cada pulsacion sin llamar a ninguna accion.
+ *  - El corte real de Guardar deshabilitado -tambien con cero lineas- y que Enter en
  *    un campo no lo salta, con la Server Action REAL de `recetas` contra Postgres.
- *  - El pedido REAL de `pedidos` (QC-34) calculando `ingredients_cost` con el porcentaje, con la
- *    tabla de ingredientes pintando el mismo dato que guarda el backend (R13, R15).
- *  - La pantalla del Operario (QC-63) mostrando el porcentaje y la cantidad calculada, con la
- *    cantidad del pedido en su propia linea (R18, R25, R26).
+ *  - El pedido REAL de `pedidos` calculando `ingredients_cost` con el porcentaje, con la
+ *    tabla de ingredientes pintando el mismo dato que guarda el backend.
+ *  - La pantalla del Operario mostrando el porcentaje y la cantidad calculada, con la
+ *    cantidad del pedido en su propia linea.
  *  - Chromium y WebKit. WebKit es el motor de iOS, y la regla multiplataforma pide ejercitarlo.
  *
  * DATOS: `recipes`, `recipe_lines`, `products`, `presentations`, `product_batches` y `orders` son
@@ -30,11 +30,11 @@
  * SEMBRADO SIN PASAR POR LA PANTALLA (`e2e/ajuste-de-inventario.spec.ts`): el producto CON unidad,
  * su presentacion y su primer lote se crean con Prisma, fijando `products.unit_id` a mano -tal
  * como lo deja el alta real-, porque `product_batches_check_unit` rechaza un lote cuyo producto no
- * tenga ya esa misma unidad. LA UNIDAD ES `litro`, del catalogo arrancador de QC-32
+ * tenga ya esa misma unidad. LA UNIDAD ES `litro`, del catalogo arrancador
  * (`db/migrations/20260903121404_units_catalog`): no se crea, se busca por su nombre.
  *
  * LAS DOS RECETAS SEMBRADAS DIRECTAMENTE EN `recipe_lines` (una sin ninguna linea, como deja la
- * migracion de R8; otra con una unica linea al 10 %) NO pasan por `createRecipe`: son sembrado de
+ * migracion sembradora; otra con una unica linea al 10 %) NO pasan por `createRecipe`: son sembrado de
  * base de datos, y nada en el esquema exige que la suma de un `INSERT` directo llegue a 100,00 %
  * -esa suma solo la exige el SERVICIO, que aqui no se invoca-. Es el mismo criterio que usan
  * `e2e/ejecucion-receta.spec.ts` y `tests/integration/pedidos/order-ingredients-cost.int.test.ts`.
@@ -92,11 +92,11 @@ const operatorUser: Credentials = {
   password: `Qc147-Operador-${RUN_ID.slice(0, 12)}`,
 };
 
-/** Los dos ingredientes sin unidad resoluble del escenario 1 (alta por la UI, R25). */
+/** Los dos ingredientes sin unidad resoluble del escenario 1 (alta por la UI). */
 const productAName = `${SHARED_TOKEN}_ingrediente_a`;
 const productBName = `${SHARED_TOKEN}_ingrediente_b`;
 
-/** El ingrediente CON unidad (litro) y lote del escenario 3-4 (R13, R15, R18). */
+/** El ingrediente CON unidad (litro) y lote de los escenarios 3-4. */
 const productWithUnitName = `${SHARED_TOKEN}_hipoclorito`;
 const presentationName = `${SHARED_TOKEN}_presentacion`;
 
@@ -106,11 +106,11 @@ const recipeName = `${SHARED_TOKEN}_receta_alta`;
 /** Receta nueva del escenario 2a: nunca debe llegar a existir. */
 const emptyRecipeName = `${SHARED_TOKEN}_receta_vacia`;
 
-/** Receta SEMBRADA sin ninguna linea, como deja la migracion de R8 (escenario 2b, R23). */
+/** Receta SEMBRADA sin ninguna linea, como deja la migracion sembradora (escenario 2b). */
 const recipeSinLineasName = `${SHARED_TOKEN}_receta_sembrada_sin_lineas`;
 const recipeSinLineasEditedName = `${recipeSinLineasName}_editada`;
 
-/** Receta SEMBRADA con una unica linea al 10 % (escenarios 3 y 4, R13, R15, R18). */
+/** Receta SEMBRADA con una unica linea al 10 % (escenarios 3 y 4). */
 const recipeConLineaName = `${SHARED_TOKEN}_receta_10pct`;
 
 /** El porcentaje unico de esa receta y la cantidad del pedido de los dos escenarios. */
@@ -118,7 +118,7 @@ const LINE_PERCENTAGE = '10.00';
 const ORDER_QUANTITY_TEXT = '200';
 const ORDER_QUANTITY_DB = '200.0000';
 
-/** Lote con existencia y coste conocidos (R15): 20 L requeridos x 2.0000 = 40.0000. */
+/** Lote con existencia y coste conocidos: 20 L requeridos x 2.0000 = 40.0000. */
 const BATCH_STOCK = 50;
 const UNIT_COST = '2.0000';
 
@@ -156,8 +156,8 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
       passwordHash: await createPasswordHash(user.password),
       roleId: role.id,
       companyId,
-      // QC-78 R1: explicito, no por defecto. La columna es `@default(pending)` y desde esa ficha
-      // `pending` no entra por el login.
+      // Explicito, no por defecto: la columna es `@default(pending)` y `pending` no entra por
+      // el login.
       accountStatus: 'active',
     },
     select: { id: true },
@@ -240,7 +240,7 @@ test.beforeAll(async () => {
   adminUserId = await createUserWithRole(adminUser, ROLE_ADMINISTRADOR);
   operatorUserId = await createUserWithRole(operatorUser, ROLE_OPERADOR);
 
-  // La unidad NO se crea: es una de las cuatro del catalogo arrancador de QC-32.
+  // La unidad NO se crea: es una de las cuatro del catalogo arrancador.
   unitId = (
     await prisma.unit.findFirstOrThrow({
       where: { nameNormalized: 'litro', companyId: null },
@@ -248,8 +248,8 @@ test.beforeAll(async () => {
     })
   ).id;
 
-  // Los dos ingredientes SIN unidad resoluble del escenario 1: no tienen lotes (R24 permite
-  // guardar la linea igual), y asi el alta por la UI no depende de ningun lote de fixture.
+  // Los dos ingredientes SIN unidad resoluble del escenario 1: no tienen lotes (guardar la linea
+  // igual esta permitido), y asi el alta por la UI no depende de ningun lote de fixture.
   productAId = (
     await prisma.product.create({
       data: { name: productAName, nameNormalized: normalizeProductName(productAName), companyId },
@@ -303,7 +303,7 @@ test.beforeAll(async () => {
     select: { id: true },
   });
 
-  // Receta SEMBRADA sin ninguna linea, tal como deja la migracion de R8 (escenario 2b).
+  // Receta SEMBRADA sin ninguna linea, tal como deja la migracion sembradora (escenario 2b).
   recipeSinLineasId = (
     await prisma.recipe.create({
       data: {
@@ -401,7 +401,7 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
     await selectProductByName(page, 'recipe-line-product-0', productAName);
     await page.getByTestId('recipe-line-percentage-0').fill('90');
 
-    // Se anade la segunda linea y el ingrediente B al 7,5 %, ESCRITO CON COMA (R25).
+    // Se anade la segunda linea y el ingrediente B al 7,5 %, ESCRITO CON COMA.
     await page.getByTestId('recipe-line-add-0').click();
     await selectProductByName(page, 'recipe-line-product-1', productBName);
     await page.getByTestId('recipe-line-percentage-1').fill('7,5');
@@ -432,7 +432,7 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
     expect(byProduct.get(productAId)).toBe('92.50');
     expect(byProduct.get(productBId)).toBe('7.50');
 
-    // Al reabrirla, los campos muestran «92,50» y «7,50» (R25).
+    // Al reabrirla, los campos muestran «92,50» y «7,50».
     await page.goto(recipeEditRoute(saved.id));
     await expect(page.getByTestId('recipe-form')).toBeVisible({ timeout: 60_000 });
     const percentageInputs = page.locator('[data-testid^="recipe-line-percentage-"]');
@@ -460,15 +460,15 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
     await expect(sumNueva).toContainText('100,00');
     await expect(page.getByTestId('recipe-form-submit')).toBeDisabled();
 
-    // R11: Enter en un campo no salta la comprobacion aunque el boton este deshabilitado.
+    // Enter en un campo no salta la comprobacion aunque el boton este deshabilitado.
     await page.getByTestId('recipe-field-name').press('Enter');
     await expect(page.getByTestId('recipe-form')).toBeVisible();
     expect(new URL(page.url()).pathname).toBe(NEW_RECIPE_ROUTE);
 
     expect(await prisma.recipe.count({ where: { name: emptyRecipeName } })).toBe(0);
 
-    // --- 2b. Una receta SEMBRADA sin ninguna linea -como deja la migracion de R8-: editar solo el
-    // nombre se rechaza igual (R23), decision aceptada a sabiendas.
+    // --- 2b. Una receta SEMBRADA sin ninguna linea -como deja la migracion sembradora-: editar
+    // solo el nombre se rechaza igual, decision aceptada a sabiendas.
     await page.goto(recipeEditRoute(recipeSinLineasId));
     await expect(page.getByTestId('recipe-form')).toBeVisible({ timeout: 60_000 });
 
@@ -512,8 +512,8 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
 
     await page.getByTestId('order-field-quantity').fill(ORDER_QUANTITY_TEXT);
 
-    // La tabla de ingredientes pinta el porcentaje y la cantidad requerida ANTES de guardar
-    // (R17): 200 x 10 % = 20 (R13).
+    // La tabla de ingredientes pinta el porcentaje y la cantidad requerida ANTES de guardar:
+    // 200 x 10 % = 20.
     await expect(page.getByTestId('order-ingredients-table')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('order-ingredient-percentage')).toHaveText('10,00 %');
     await expect(page.getByTestId('order-ingredient-required')).toHaveText('20');
@@ -528,7 +528,7 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
       select: { id: true },
     });
 
-    // 20 L requeridos x 2.0000 de coste = 40.0000 (R15).
+    // 20 L requeridos x 2.0000 de coste = 40.0000.
     expect(await ingredientsCostText(created.id)).toBe('40.0000');
   });
 
@@ -540,7 +540,7 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
     await page.goto(assignedOrderRoute(assignedOrderId));
     await expect(page.getByTestId('order-execution-title')).toBeVisible({ timeout: 60_000 });
 
-    // R26: la cantidad del pedido va en SU PROPIA linea, fuera de la lista de la receta.
+    // La cantidad del pedido va en SU PROPIA linea, fuera de la lista de la receta.
     const orderQuantity = page.getByTestId('order-execution-order-quantity');
     await expect(orderQuantity).toBeVisible();
     await expect(orderQuantity).toContainText('Pedido 200');
@@ -548,10 +548,9 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
       page.locator('[data-testid="order-execution-lines"] [data-testid="order-execution-order-quantity"]'),
     ).toHaveCount(0);
 
-    // La linea del insumo: 10,00 %, 20 y su unidad (L), en el formato de R18/R22/R25.
-    const line = page.getByTestId('order-execution-line-0');
-    await expect(line).toContainText('10,00 %');
-    await expect(line).toContainText('20');
-    await expect(line).toContainText('L');
+    // La linea del insumo: 10,00 %, 20 y su unidad (L), cada dato en su propio elemento.
+    await expect(page.getByTestId('order-execution-line-percentage-0')).toHaveText('10,00 %');
+    await expect(page.getByTestId('order-execution-line-quantity-0')).toHaveText('20');
+    await expect(page.getByTestId('order-execution-line-unit-0')).toHaveText('L');
   });
 });
