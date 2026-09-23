@@ -40,23 +40,21 @@ export type ImageFieldState =
  * - `null`: la línea vino de la precarga de edición con un producto DADO DE BAJA (R21, R53). Dejar
  *   de estar marcada es automático: en cuanto el usuario elige otro producto por el selector,
  *   `productName` pasa a la cadena elegida y ya no es `null`.
+ *
+ * **Sin unidad propia**: la línea ya no lleva `unitId` ni un selector que lo pida. `percentage`
+ * es LO QUE EL USUARIO ESCRIBIO, con coma si la usó -`buildRecipePayload` es quien la sustituye por
+ * un punto, sin pasar nunca por `number`-.
  */
 export type RecipeLineFormValue = {
   readonly key: string;
   readonly productId: string;
   readonly productName: string | null;
-  readonly quantity: string;
-  readonly unitId: string;
+  readonly percentage: string;
   /**
-   * Unidad en la que se mide el INGREDIENTE elegido (no la de la linea), o `null` si no se
-   * sabe. Es de PRESENTACION pura -acota el selector de unidad al grupo del ingrediente- y
-   * `buildRecipePayload` la descarta igual que `key` y `productName`: el contrato de receta no
-   * la declara.
-   *
-   * Es `null` en dos casos legitimos, y en ambos el selector ofrece el catalogo completo: el
-   * producto no declara unidad (`products.unit_id` es anulable), y la linea viene de la
-   * precarga de edicion -el detalle de la receta trae `unitId` de la LINEA, nunca la del
-   * producto-.
+   * Unidad del INGREDIENTE elegido (no de la línea, que ya no tiene una), o `null` si no se
+   * sabe -sin lotes o dado de baja-. Es de PRESENTACION pura, para mostrar «nombre ·
+   * unidad» junto al ingrediente elegido; `buildRecipePayload` la descarta igual que `key`
+   * y `productName`, porque el contrato de receta no la declara.
    */
   readonly productUnitId: string | null;
 };
@@ -87,11 +85,10 @@ export type RecipeFormState = {
   readonly image: ImageFieldState;
 };
 
-/** Línea tal como la espera el contrato (`recipeLineSchema`): sin `key` ni `productName`. */
+/** Línea tal como la espera el contrato (`recipeLineSchema`): sin `key` ni `productName`, sin unidad. */
 export type RecipeLinePayload = {
   readonly productId: string;
-  readonly quantity: string;
-  readonly unitId: string;
+  readonly percentage: string;
 };
 
 /**
@@ -126,9 +123,9 @@ export type RecipePayload = {
  * prueba correcta de un test sobre esto es `'image' in payload`, nunca `payload.image ===
  * undefined` (`design.md > 8`, riesgo 6).
  *
- * **La cantidad se copia TAL CUAL, como cadena** (R29): esta función no la parsea, no la
- * redondea y no la convierte a número en ningún punto. `grep` de la ruta confirma que en ningún
- * archivo de esta feature aparece `parseFloat(`, `Number(` ni `toFixed(` sobre la cantidad.
+ * **El porcentaje viaja como cadena, con una única sustitución de texto**: esta función
+ * cambia la coma que el usuario pudo escribir por un punto (`replace(',', '.')`) y nada más -no
+ * la parsea, no la redondea y no la convierte a número en ningún punto-.
  *
  * **Cada paso viaja como el DOCUMENTO del contrato, TAL CUAL** (QC-64 R5): esta funcion ya no
  * proyecta texto -el puente de QC-62 R19 se retiro-, solo copia `step.document` y descarta la
@@ -140,9 +137,9 @@ export type RecipePayload = {
  * mediante; esta función solo proyecta cada paso a su documento.
  *
  * **Las líneas van completas y sin decisión propia** (R21, R22): `productName` y `key` -que son
- * de PRESENTACIÓN, nunca del contrato- se descartan aquí, pero `productId`, `quantity` y `unitId`
- * viajan intactos incluso si la línea está marcada como "producto no disponible" en la interfaz:
- * esta función no conoce esa marca, es derivada en `recipe-lines-field.tsx` a partir de
+ * de PRESENTACIÓN, nunca del contrato- se descartan aquí, pero `productId` y el porcentaje ya
+ * convertido viajan intactos incluso si la línea está marcada como "producto no disponible" en la
+ * interfaz: esta función no conoce esa marca, es derivada en `recipe-lines-field.tsx` a partir de
  * `productName === null` y nunca llega hasta aquí.
  */
 export function buildRecipePayload(mode: RecipeFormMode, state: RecipeFormState): RecipePayload {
@@ -162,8 +159,7 @@ export function buildRecipePayload(mode: RecipeFormMode, state: RecipeFormState)
     lines: state.lines.map(
       (line): RecipeLinePayload => ({
         productId: line.productId,
-        quantity: line.quantity,
-        unitId: line.unitId,
+        percentage: line.percentage.replace(',', '.'),
       }),
     ),
   };
@@ -187,7 +183,7 @@ export function createLocalKey(prefix: string): string {
 }
 
 /** Campos de línea a los que el esquema del contrato puede atribuir un error (R31). */
-export type RecipeLineFieldName = 'productId' | 'quantity' | 'unitId';
+export type RecipeLineFieldName = 'productId' | 'percentage';
 
 /** Errores por línea, indexados por posición, tal como sale de `error.issues[].path` (R31). */
 export type RecipeLineErrors = Readonly<Record<number, Partial<Record<RecipeLineFieldName, string>>>>;
@@ -206,7 +202,7 @@ export function extractLineErrors(issues: readonly ZodIssue[]): RecipeLineErrors
   for (const issue of issues) {
     const [root, index, field] = issue.path;
     if (root !== 'lines' || typeof index !== 'number') continue;
-    if (field !== 'productId' && field !== 'quantity' && field !== 'unitId') continue;
+    if (field !== 'productId' && field !== 'percentage') continue;
     result[index] = { ...result[index], [field]: issue.message };
   }
   return result;

@@ -8,12 +8,10 @@ import type { RecipeImageStorage } from '../ports/recipe-image-storage';
 import type { NewRecipe, RecipeRepository } from '../ports/recipe-repository';
 
 import type { ProductCatalog } from '@/lib/modules/inventario';
-import type { UnitCatalog } from '@/lib/modules/unidades';
 
 export type CreateRecipeDeps = {
   readonly recipes: RecipeRepository;
   readonly products: ProductCatalog;
-  readonly units: UnitCatalog;
   readonly images: RecipeImageStorage;
   /**
    * El puerto exige un `now: Date`, sin decir de donde sale (no es entrada del actor ni
@@ -56,18 +54,6 @@ export function createCreateRecipe(
       const foundIds = new Set(refs.map((ref) => ref.id));
       const missing = productIds.some((id) => !foundIds.has(id));
       if (missing) throw new ValidationError();
-    }
-
-    // R50: TODAS las lineas del alta validan su `unitId` contra el catalogo de
-    // `unidades`, a traves de `UnitCatalog` -nunca contra su tabla ni su repositorio-.
-    // `Unit` no tiene borrado logico, asi que no hay diferencia de conjuntos que hacer
-    // aqui (a diferencia de `productId`).
-    const unitIds = [...new Set(data.lines.map((line) => line.unitId))];
-    if (unitIds.length > 0) {
-      const unitRefs = await deps.units.findRefs(unitIds, actor.companyId);
-      const foundUnitIds = new Set(unitRefs.map((ref) => ref.id));
-      const missingUnit = unitIds.some((id) => !foundUnitIds.has(id));
-      if (missingUnit) throw new ValidationError();
     }
 
     // R21: sin imagen no se toca el almacenamiento en absoluto.

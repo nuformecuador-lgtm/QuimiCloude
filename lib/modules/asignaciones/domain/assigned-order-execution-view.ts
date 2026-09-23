@@ -5,9 +5,6 @@ import type { UnitRef } from '@/lib/modules/unidades';
 /**
  * Proyeccion cerrada de la pantalla de ejecucion. Sin autoria, sin marcas de tiempo y sin
  * existencia de producto: lo que no esta en el tipo no se puede filtrar por descuido.
- *
- * `recipeBaseQuantity` y `scaleFactorText` viajan `| null` porque `Recipe` no declara ninguna
- * cantidad base: la pantalla los pinta sin factor cuando son `null`.
  */
 export type AssignedOrderExecutionView = {
   readonly orderId: string;
@@ -17,8 +14,6 @@ export type AssignedOrderExecutionView = {
   readonly recipeName: string | null;
   /** Cadena decimal, nunca `number`. */
   readonly orderQuantity: string;
-  readonly recipeBaseQuantity: string | null;
-  readonly scaleFactorText: string | null;
   readonly steps: readonly RecipeStepView[];
   readonly lines: readonly ExecutionLineView[];
   /** `null` = sin presentacion. Solo lectura: el Operador no tiene forma de cambiarla. */
@@ -27,9 +22,12 @@ export type AssignedOrderExecutionView = {
 
 export type ExecutionLineView = {
   readonly productName: string | null;
-  /** Tal cual esta escrita en la receta, sin escalar. */
+  /** "10.00" */
+  readonly percentage: string;
+  /** `consumedQuantity(orderQuantity, percentage)`. */
   readonly quantity: string;
-  readonly unit: UnitRef;
-  /** Misma base efectiva que `unit`, sin ella misma. */
+  /** La del insumo; `null` = sin lotes o dado de baja. */
+  readonly unit: UnitRef | null;
+  /** Misma base efectiva que `unit`, sin ella misma; vacio si `unit` es `null`. */
   readonly alternativeUnits: readonly UnitRef[];
 };

@@ -55,7 +55,7 @@ function contenido(): RecipeExecutionContent {
     name: 'Jabon liquido',
     isDeleted: false,
     steps: [],
-    lines: [{ productId: PRODUCTO, productName: null, quantity: '90', unitId: LITRO }],
+    lines: [{ productId: PRODUCTO, productName: null, percentage: '90.00' }],
   };
 }
 
@@ -107,7 +107,9 @@ function montar(options?: {
       findRefsSharingBaseInCompany: vi.fn(async () => []),
     } as UnitCatalog,
     products: {
-      findRefs: vi.fn(async () => [{ id: PRODUCTO, name: 'Sosa caustica', stockByUnit: [] }]),
+      findRefs: vi.fn(async () => [
+        { id: PRODUCTO, name: 'Sosa caustica', unitId: null, stockByUnit: [] },
+      ]),
       findCostingBatches: vi.fn(async () => {
         throw new Error('arrancar un pedido asignado no costea nada');
       }),

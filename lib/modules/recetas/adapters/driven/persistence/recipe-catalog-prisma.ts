@@ -105,8 +105,7 @@ type RecipeExecutionContentRow = {
   readonly steps: unknown;
   readonly lines: ReadonlyArray<{
     readonly productId: string;
-    readonly quantity: { toFixed(digits: number): string };
-    readonly unitId: string;
+    readonly percentage: { toFixed(digits: number): string };
   }>;
 };
 
@@ -120,8 +119,7 @@ export function toRecipeExecutionContent(row: RecipeExecutionContentRow): Recipe
     lines: row.lines.map((line) => ({
       productId: line.productId,
       productName: null,
-      quantity: line.quantity.toFixed(4),
-      unitId: line.unitId,
+      percentage: line.percentage.toFixed(2),
     })),
   };
 }
@@ -143,7 +141,7 @@ export async function findRecipeExecutionContentById(
       name: true,
       deletedAt: true,
       steps: true,
-      lines: { select: { productId: true, quantity: true, unitId: true } },
+      lines: { select: { productId: true, percentage: true } },
     },
   });
 

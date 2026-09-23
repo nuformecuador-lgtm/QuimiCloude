@@ -1,21 +1,22 @@
 // QC-39 T2 — Los consumidores de hoy del catalogo siguen en pie (R4).
 //
-// R4 dice dos cosas y aqui se comprueban las dos:
-//   1. que el selector de unidad del formulario de recetas (`UnitPicker`) y el del detalle de
-//      proveedor (`UnitSelect`) RENDERIZAN con datos de `UnitView` -sin estrechar ninguna union
-//      y sin descartar campos-, y
-//   2. que sus archivos NO HAN CAMBIADO respecto a la rama base: seguir compilando «porque se
-//      les retoco algo» no es seguir compilando sin cambios.
+// Este archivo comprueba dos cosas sobre el consumidor que queda del catalogo de unidades:
+//   1. que el selector de unidad del detalle de proveedor (`UnitSelect`) RENDERIZA con datos de
+//      `UnitView` -sin estrechar ninguna union y sin descartar campos-, y
+//   2. que su archivo NO HA CAMBIADO respecto a la rama base: seguir compilando «porque se le
+//      retoco algo» no es seguir compilando sin cambios.
+//
+// El formulario de recetas ya no lleva selector de unidad -la linea de receta ya no tiene
+// unidad propia-, asi que ese consumidor desaparecio y este archivo deja de montarlo.
 //
 // El punto 1 tiene ademas una mitad que este archivo demuestra en COMPILACION y no en ejecucion:
-// las props de los dos componentes siguen tipadas con `UnitRef`, y se les pasa `UnitView`. Si
-// `UnitView` dejara de extender `UnitRef`, este archivo no compilaria -y `pnpm typecheck` es
-// parte del gate-.
+// las props de `UnitSelect` siguen tipadas con `UnitRef`, y se le pasa `UnitView`. Si `UnitView`
+// dejara de extender `UnitRef`, este archivo no compilaria -y `pnpm typecheck` es parte del
+// gate-.
 //
-// No se abre ningun desplegable: lo que R4 exige es que estos componentes sigan aceptando y
-// pintando el catalogo, no volver a probar su comportamiento -eso ya lo hacen
-// `tests/unit/recetas-ui/recipe-form.test.tsx` y `tests/unit/proveedores-ui/unit-select.test.tsx`,
-// que son suyos-.
+// No se abre ningun desplegable: lo que aqui se exige es que este componente siga aceptando y
+// pintando el catalogo, no volver a probar su comportamiento -eso ya lo hace
+// `tests/unit/proveedores-ui/unit-select.test.tsx`, que es suyo-.
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -25,7 +26,6 @@ import { fileURLToPath } from 'node:url';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { UnitPicker } from '@/app/(private)/produccion/formulas/components';
 import { NO_UNIT_VALUE, UNIT_FIELD, UnitSelect } from '@/app/(private)/proveedores/[id]/components';
 
 import type { UnitRef, UnitView } from '@/lib/modules/unidades';
@@ -92,24 +92,8 @@ afterEach(() => {
   cleanup();
 });
 
-describe('el selector del formulario de recetas renderiza con datos de UnitView (R4)', () => {
-  it('se monta con el catalogo ampliado y presenta su disparador', () => {
-    render(
-      <UnitPicker
-        units={UNIDADES}
-        value={UNIDADES[0]?.id ?? ''}
-        onChange={() => undefined}
-        label="Unidad"
-        testId="unit-picker"
-      />,
-    );
-
-    // Por `data-testid` y por rol/nombre accesible, nunca por copy de la pantalla (R49).
-    expect(screen.getByTestId('unit-picker')).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Unidad' })).toBeInTheDocument();
-  });
-
-  it('acepta el catalogo entero sin descartar ninguna unidad ni ningun campo', () => {
+describe('la ampliacion de UnitView no descarta ninguna unidad ni ningun campo (R4)', () => {
+  it('acepta el catalogo entero sin estrechar la union para quien solo conoce UnitRef', () => {
     expect(COMO_LOS_VE_QUIEN_SOLO_CONOCE_UNITREF).toHaveLength(UNIDADES.length);
     expect(COMO_LOS_VE_QUIEN_SOLO_CONOCE_UNITREF[1]?.symbol).toBeNull();
   });

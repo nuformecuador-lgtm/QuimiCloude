@@ -91,8 +91,7 @@ const VALID_RECIPE_INPUT = {
   lines: [
     {
       productId: '11111111-1111-4111-8111-111111111111',
-      quantity: '10.0000',
-      unitId: '22222222-2222-4222-8222-222222222222',
+      percentage: '100.00',
     },
   ],
 };

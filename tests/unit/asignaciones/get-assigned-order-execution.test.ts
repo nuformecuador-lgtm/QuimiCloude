@@ -12,7 +12,7 @@ import type { AssignedOrderExecutionView } from '@/lib/modules/asignaciones/doma
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
 import type { AssignedOrderSummary, OrderCatalog } from '@/lib/modules/pedidos';
 import type { RecipeCatalog, RecipeExecutionContent } from '@/lib/modules/recetas';
-import type { PresentationCatalog, PresentationRef, ProductCatalog } from '@/lib/modules/inventario';
+import type { PresentationCatalog, PresentationRef, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
 function uuid(seed: string): string {
@@ -35,7 +35,7 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     id: PEDIDO,
     number: { year: 2026, sequence: 1 },
     recipeId: RECETA,
-    quantity: '250.0000',
+    quantity: '200',
     priority: 'MEDIA',
     status: 'PENDIENTE',
     presentationId: null,
@@ -49,9 +49,13 @@ function contenido(overrides?: Partial<RecipeExecutionContent>): RecipeExecution
     name: 'Jabon liquido',
     isDeleted: false,
     steps: [],
-    lines: [{ productId: PRODUCTO, productName: null, quantity: '90', unitId: LITRO }],
+    lines: [{ productId: PRODUCTO, productName: null, percentage: '10.00' }],
     ...overrides,
   };
+}
+
+function producto(overrides?: Partial<ProductRef>): ProductRef {
+  return { id: PRODUCTO, name: 'Hipoclorito', unitId: LITRO, stockByUnit: [], ...overrides };
 }
 
 function unidad(overrides?: Partial<UnitRef>): UnitRef {
@@ -82,6 +86,7 @@ function montar(options?: {
   readonly order?: { id: string; status: 'PENDIENTE' | 'EN_CURSO' } | null;
   readonly summary?: AssignedOrderSummary;
   readonly content?: RecipeExecutionContent | null;
+  readonly products?: readonly ProductRef[];
   readonly ownUnits?: readonly UnitRef[];
   readonly sisterUnits?: readonly UnitRef[];
   readonly presentations?: readonly PresentationRef[];
@@ -122,7 +127,7 @@ function montar(options?: {
   const findRefs = vi.fn(async () => options?.ownUnits ?? [unidad()]);
   const findRefsSharingBaseInCompany = vi.fn(async () => options?.sisterUnits ?? []);
 
-  const productFindRefs = vi.fn(async () => [{ id: PRODUCTO, name: 'Sosa caustica', stockByUnit: [] }]);
+  const productFindRefs = vi.fn(async () => options?.products ?? [producto()]);
 
   const findRefsPresentations = vi.fn(async () => options?.presentations ?? []);
 
@@ -241,9 +246,7 @@ describe('getAssignedOrderExecution — la vista', () => {
     expect(view.orderId).toBe(PEDIDO);
     expect(view.numberText).toBe('2026-0000001');
     expect(view.recipeName).toBe('Jabon liquido');
-    expect(view.orderQuantity).toBe('250.0000');
-    expect(view.recipeBaseQuantity).toBeNull();
-    expect(view.scaleFactorText).toBeNull();
+    expect(view.orderQuantity).toBe('200');
   });
 
   it('una receta dada de baja pinta `recipeName: null`, sin bloquear la lectura', async () => {
@@ -263,48 +266,43 @@ describe('getAssignedOrderExecution — la vista', () => {
     const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
 
     expect(productFindRefs).toHaveBeenCalledWith([PRODUCTO], EMPRESA);
-    expect(view.lines[0]?.productName).toBe('Sosa caustica');
+    expect(view.lines[0]?.productName).toBe('Hipoclorito');
   });
 });
 
-// QC-123 T8 (R15) — comprobacion de TIPO: un literal con `ingredientsCost` de mas sobre
-// `AssignedOrderExecutionView` tiene que dejar de compilar. Si la vista de ejecucion ganara el
-// campo, el `@ts-expect-error` se quedaria sin usar y `tsc` se pondria rojo aqui mismo.
-const _r15TipoSinImporte: AssignedOrderExecutionView = {
-  orderId: PEDIDO,
-  numberText: '2026-0000001',
-  status: 'PENDIENTE',
-  recipeName: null,
-  orderQuantity: '250.0000',
-  recipeBaseQuantity: null,
-  scaleFactorText: null,
-  steps: [],
-  lines: [],
-  presentationName: null,
-  // @ts-expect-error `AssignedOrderExecutionView` no declara `ingredientsCost` (R15): si esto
-  // compila, la pantalla de ejecucion gano el importe.
-  ingredientsCost: '10.0000',
-};
-void _r15TipoSinImporte;
+describe('getAssignedOrderExecution — R18: porcentaje y cantidad de la linea', () => {
+  it('pedido 200 y linea al 10 % en L muestra porcentaje "10.00" y cantidad "20..." en L', async () => {
+    const { deps } = montar({ summary: resumen({ quantity: '200' }) });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
 
-describe('QC-123 — la pantalla de ejecucion no lleva importe (R15)', () => {
-  it('la pantalla de ejecucion no lleva importe (R15)', async () => {
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    const [line] = view.lines;
+    expect(line?.productName).toBe('Hipoclorito');
+    expect(line?.percentage).toBe('10.00');
+    expect(line?.quantity).toBe('20');
+    expect(line?.unit?.id).toBe(LITRO);
+    expect(line?.unit?.symbol).toBe('L');
+  });
+});
+
+describe('getAssignedOrderExecution — R19: sin factor de escala', () => {
+  it('la vista no tiene las claves `recipeBaseQuantity` ni `scaleFactorText`', async () => {
     const { deps } = montar();
     const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
 
     const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
 
-    // La FORMA completa de la vista, no solo un campo: si ganara `ingredientsCost` (o
-    // cualquier otro campo nuevo), esta lista de claves dejaria de coincidir.
-    expect(Object.keys(view).sort()).toEqual(
+    const claves = Object.keys(view);
+    expect(claves).not.toContain('recipeBaseQuantity');
+    expect(claves).not.toContain('scaleFactorText');
+    expect(claves.sort()).toEqual(
       [
         'orderId',
         'numberText',
         'status',
         'recipeName',
         'orderQuantity',
-        'recipeBaseQuantity',
-        'scaleFactorText',
         'steps',
         'lines',
         'presentationName',
@@ -312,7 +310,7 @@ describe('QC-123 — la pantalla de ejecucion no lleva importe (R15)', () => {
     );
     for (const line of view.lines) {
       expect(Object.keys(line).sort()).toEqual(
-        ['productName', 'quantity', 'unit', 'alternativeUnits'].sort(),
+        ['productName', 'percentage', 'quantity', 'unit', 'alternativeUnits'].sort(),
       );
     }
   });
@@ -343,8 +341,8 @@ describe('getAssignedOrderExecution — la presentacion del pedido asignado', ()
   });
 });
 
-describe('getAssignedOrderExecution — R22: unidades alternativas', () => {
-  it('solo vuelven unidades de la misma base efectiva, sin la propia', async () => {
+describe('getAssignedOrderExecution — R20: unidades hermanas', () => {
+  it('solo vuelven unidades de la misma base efectiva, sin la propia, y el porcentaje no cambia', async () => {
     const litro = unidad({ id: LITRO, baseUnitId: null, factor: null });
     const mililitro = unidad({ id: MILILITRO, name: 'Mililitro', symbol: 'mL', baseUnitId: LITRO, factor: '0.001' });
     const kilogramo = unidad({ id: KILOGRAMO, name: 'Kilogramo', symbol: 'kg', baseUnitId: null, factor: null });
@@ -362,5 +360,85 @@ describe('getAssignedOrderExecution — R22: unidades alternativas', () => {
     expect(alternativas.map((u) => u.id)).toEqual([MILILITRO]);
     expect(alternativas.some((u) => u.id === LITRO)).toBe(false);
     expect(alternativas.some((u) => u.id === KILOGRAMO)).toBe(false);
+    expect(view.lines[0]?.percentage).toBe('10.00');
+  });
+});
+
+describe('getAssignedOrderExecution — R21: proporcionalidad entre pedidos', () => {
+  it('dos pedidos de 200 y 300 con los mismos porcentajes dan cantidades en proporcion 2:3', async () => {
+    const { deps: deps200 } = montar({ summary: resumen({ quantity: '200' }) });
+    const { deps: deps300 } = montar({ summary: resumen({ quantity: '300' }) });
+
+    const vista200 = await createGetAssignedOrderExecution(deps200)(ACTOR, { orderId: PEDIDO });
+    const vista300 = await createGetAssignedOrderExecution(deps300)(ACTOR, { orderId: PEDIDO });
+
+    expect(vista200.lines[0]?.quantity).toBe('20');
+    expect(vista300.lines[0]?.quantity).toBe('30');
+  });
+});
+
+describe('getAssignedOrderExecution — R24: insumo sin unidad resoluble', () => {
+  it('un insumo sin lotes viene con `unit: null` y sin alternativas, con porcentaje y cantidad', async () => {
+    const { deps } = montar({ products: [producto({ unitId: null })] });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    const [line] = view.lines;
+    expect(line?.unit).toBeNull();
+    expect(line?.alternativeUnits).toEqual([]);
+    expect(line?.percentage).toBe('10.00');
+    expect(line?.quantity).toBe('20');
+  });
+
+  it('un insumo dado de baja (no vuelve en `findRefs`) viene con `unit: null` y `productName: null`', async () => {
+    const { deps } = montar({ products: [] });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    const [line] = view.lines;
+    expect(line?.productName).toBeNull();
+    expect(line?.unit).toBeNull();
+    expect(line?.alternativeUnits).toEqual([]);
+  });
+});
+
+describe('getAssignedOrderExecution — R26: la cantidad del pedido sigue en la vista', () => {
+  it('`orderQuantity` viaja en la vista, fuera de las lineas', async () => {
+    const { deps } = montar({ summary: resumen({ quantity: '200' }) });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(view.orderQuantity).toBe('200');
+  });
+});
+
+// R15 — comprobacion de TIPO: un literal con `ingredientsCost` de mas sobre
+// `AssignedOrderExecutionView` tiene que dejar de compilar. Si la vista de ejecucion ganara el
+// campo, el `@ts-expect-error` se quedaria sin usar y `tsc` se pondria rojo aqui mismo.
+const _r15TipoSinImporte: AssignedOrderExecutionView = {
+  orderId: PEDIDO,
+  numberText: '2026-0000001',
+  status: 'PENDIENTE',
+  recipeName: null,
+  orderQuantity: '200',
+  steps: [],
+  lines: [],
+  // @ts-expect-error `AssignedOrderExecutionView` no declara `ingredientsCost` (R15): si esto
+  // compila, la pantalla de ejecucion gano el importe.
+  ingredientsCost: '10.0000',
+};
+void _r15TipoSinImporte;
+
+describe('la pantalla de ejecucion no lleva importe (R15)', () => {
+  it('la pantalla de ejecucion no lleva importe (R15)', async () => {
+    const { deps } = montar();
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(Object.keys(view)).not.toContain('ingredientsCost');
   });
 });

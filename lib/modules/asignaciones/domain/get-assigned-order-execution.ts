@@ -9,7 +9,7 @@ import type { OrderAssignmentRepository } from '../ports/order-assignment-reposi
 
 import { formatOrderNumber, type OrderCatalog } from '@/lib/modules/pedidos';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
-import type { RecipeCatalog } from '@/lib/modules/recetas';
+import { consumedQuantity, type RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
 const getAssignedOrderExecutionSchema = z.strictObject({
@@ -71,9 +71,15 @@ export function createGetAssignedOrderExecution(
 
     const productIds = [...new Set(lines.map((line) => line.productId))];
     const productRefs = productIds.length > 0 ? await deps.products.findRefs(productIds, actor.companyId) : [];
-    const productNames = new Map(productRefs.map((ref) => [ref.id, ref.name]));
+    const productRefsById = new Map(productRefs.map((ref) => [ref.id, ref]));
 
-    const unitIds = [...new Set(lines.map((line) => line.unitId))];
+    const unitIds = [
+      ...new Set(
+        productRefs
+          .map((ref) => ref.unitId)
+          .filter((unitId): unitId is string => unitId !== null),
+      ),
+    ];
     const ownUnits = unitIds.length > 0 ? await deps.units.findRefs(unitIds, actor.companyId) : [];
     const ownUnitsById = new Map(ownUnits.map((unit) => [unit.id, unit]));
 
@@ -82,29 +88,29 @@ export function createGetAssignedOrderExecution(
         ? await deps.units.findRefsSharingBaseInCompany(actor.companyId, unitIds)
         : [];
     const sistersByBase = new Map<string, UnitRef[]>();
-    for (const unit of sisterUnits) {
-      const base = effectiveBase(unit);
+    for (const sisterUnit of sisterUnits) {
+      const base = effectiveBase(sisterUnit);
       const grupo = sistersByBase.get(base) ?? [];
-      grupo.push(unit);
+      grupo.push(sisterUnit);
       sistersByBase.set(base, grupo);
     }
 
     const executionLines: ExecutionLineView[] = lines.map((line) => {
-      const unit: UnitRef = ownUnitsById.get(line.unitId) ?? {
-        id: line.unitId,
-        name: line.unitId,
-        symbol: null,
-        baseUnitId: null,
-        factor: null,
-      };
-      const base = effectiveBase(unit);
-      const alternativeUnits = (sistersByBase.get(base) ?? []).filter(
-        (sister) => sister.id !== unit.id,
-      );
+      const productRef = productRefsById.get(line.productId);
+      const unit = productRef?.unitId !== null && productRef?.unitId !== undefined
+        ? ownUnitsById.get(productRef.unitId) ?? null
+        : null;
+      const alternativeUnits =
+        unit === null
+          ? []
+          : (sistersByBase.get(effectiveBase(unit)) ?? []).filter(
+              (sister) => sister.id !== unit.id,
+            );
 
       return {
-        productName: productNames.get(line.productId) ?? null,
-        quantity: line.quantity,
+        productName: productRef?.name ?? null,
+        percentage: line.percentage,
+        quantity: consumedQuantity(summary.quantity, line.percentage),
         unit,
         alternativeUnits,
       };
@@ -122,8 +128,6 @@ export function createGetAssignedOrderExecution(
       status: target.status,
       recipeName,
       orderQuantity: summary.quantity,
-      recipeBaseQuantity: null,
-      scaleFactorText: null,
       steps,
       lines: executionLines,
       presentationName,

@@ -55,8 +55,7 @@ function availableLine(key: string, name: string): RecipeLineFormValue {
     key,
     productId: `product-${key}`,
     productName: name,
-    quantity: '1',
-    unitId: 'unit-1',
+    percentage: '10',
     productUnitId: null,
   };
 }
@@ -67,8 +66,7 @@ function unavailableLine(key: string): RecipeLineFormValue {
     key,
     productId: `product-${key}`,
     productName: null,
-    quantity: '2.5000',
-    unitId: 'unit-2',
+    percentage: '25',
     productUnitId: null,
   };
 }
@@ -171,8 +169,7 @@ describe('aviso y marcador de líneas con producto dado de baja', () => {
     expect(payload.lines).toHaveLength(2);
     expect(payload.lines[0]).toEqual({
       productId: markedLine.productId,
-      quantity: markedLine.quantity,
-      unitId: markedLine.unitId,
+      percentage: markedLine.percentage,
     });
   });
 });

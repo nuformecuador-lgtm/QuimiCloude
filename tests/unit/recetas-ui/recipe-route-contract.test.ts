@@ -407,11 +407,42 @@ const MIGRACION_QC121 = [
   'db/migrations/20260918130000_product_unit_and_stored_stock/down.sql',
 ];
 
+// QC-147 (2026-09-22): la linea de receta pasa de cantidad absoluta a PORCENTAJE. Toca la
+// aritmetica nueva (`domain/recipe-percentage.ts`), el contrato de entrada y la vista de la
+// linea (`recipe-input.ts`, `recipe-view.ts`), los tres casos de uso que la escriben o la leen
+// (`create-recipe.ts`, `get-recipe.ts`, `update-recipe.ts`), el catalogo y el puerto del
+// repositorio (`recipe-catalog.ts`, `ports/recipe-repository.ts`), los dos adaptadores de
+// persistencia (`recipe-catalog-prisma.ts`, `recipe-prisma.ts`) y el barrel del contrato
+// publico (`index.ts`). Exactamente los archivos que el diff de esta rama toca bajo
+// `lib/modules/recetas/`, ninguno mas.
+const CANTIDADES_EN_PORCENTAJE_QC147 = [
+  'lib/modules/recetas/index.ts',
+  'lib/modules/recetas/domain/create-recipe.ts',
+  'lib/modules/recetas/domain/get-recipe.ts',
+  'lib/modules/recetas/domain/recipe-catalog.ts',
+  'lib/modules/recetas/domain/recipe-input.ts',
+  'lib/modules/recetas/domain/recipe-percentage.ts',
+  'lib/modules/recetas/domain/recipe-view.ts',
+  'lib/modules/recetas/domain/update-recipe.ts',
+  'lib/modules/recetas/ports/recipe-repository.ts',
+  'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
+  'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
+];
+
+// La migracion que convierte la cantidad de la linea de receta a porcentaje: `recipes_lines`
+// gana la columna de porcentaje y `db/schema.prisma` refleja el modelo nuevo.
+const MIGRACION_QC147 = [
+  'db/schema.prisma',
+  'db/migrations/20260922160000_recipe_lines_percentage/migration.sql',
+  'db/migrations/20260922160000_recipe_lines_percentage/down.sql',
+];
+
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
   ...AUTORIZACION_POR_PERMISO_QC74,
   ...RENOMBRADO_DE_COMENTARIOS_QC70,
   ...AISLAMIENTO_POR_EMPRESA_QC50,
+  ...CANTIDADES_EN_PORCENTAJE_QC147,
 ];
 
 export const DB_PERMITIDAS: readonly string[] = [
@@ -429,6 +460,7 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC50,
   ...MIGRACION_QC68,
   ...MIGRACION_QC121,
+  ...MIGRACION_QC147,
 ];
 
 /** Espera rutas con separadores POSIX, como las devuelve `git diff --name-only`. */
@@ -692,18 +724,15 @@ describe('contrato de la ruta de recetas', () => {
     ]);
   });
 
-  it('la cantidad nunca se convierte a numero en ningun archivo de la ruta', () => {
+  it('el porcentaje nunca se convierte a numero en ningun archivo de la ruta', () => {
     ningunArchivoContiene(['parseFloat(', 'Number.parseFloat(', 'toFixed(']);
 
     for (const ruta of FUENTES_DE_LA_RUTA) {
       for (const linea of fuenteSinComentarios(ruta).split('\n')) {
-        if (!linea.includes('quantity')) continue;
-        expect(linea, `${ruta}: la cantidad no puede pasar por «Number(»`).not.toContain('Number(');
+        if (!linea.includes('percentage')) continue;
+        expect(linea, `${ruta}: el porcentaje no puede pasar por «Number(»`).not.toContain('Number(');
       }
     }
-
-    // No veta `type="number"`: lo que se protege es que la cantidad no se parsee ni se redondee,
-    // no el control que la captura.
   });
 
   it('la pantalla obtiene las unidades solo por listUnitsAction y ninguna operacion de escritura de unidades entra en esta feature', () => {

@@ -27,6 +27,7 @@ import { batchCompanyScope, productCompanyScope } from './company-scope';
 type ProductCatalogRow = {
   readonly id: string;
   readonly name: string;
+  readonly unitId: string | null;
   readonly stockByUnit: readonly ProductStockByUnit[];
 };
 
@@ -35,6 +36,7 @@ export function toProductRef(row: ProductCatalogRow): ProductRef {
   return {
     id: row.id,
     name: row.name,
+    unitId: row.unitId,
     stockByUnit: row.stockByUnit,
   };
 }
@@ -76,6 +78,7 @@ export async function findProductRefs(
     toProductRef({
       id: row.id,
       name: row.name,
+      unitId: row.unitId,
       stockByUnit: row.unitId === null ? [] : [{ unitId: row.unitId, quantity: row.stock }],
     }),
   );
