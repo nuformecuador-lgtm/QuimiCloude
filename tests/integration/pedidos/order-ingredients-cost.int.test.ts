@@ -211,7 +211,7 @@ function actorDe(empresa: Empresa): Actor {
 function newBatch(empresa: Empresa, overrides: Partial<NewProductBatch> = {}): NewProductBatch {
   return {
     presentationId: empresa.presentationId,
-    stock: 10,
+    stock: '10',
     unitCost: '5.0000',
     lot: null,
     purchaseDate: '2026-01-01',
@@ -300,7 +300,7 @@ async function fotoDeInventario(
 
 describe('el alta lo deja guardado en la fila (R10)', () => {
   it('calcula el coste con los lotes vigentes y lo persiste en `ingredients_cost`', async () => {
-    const { productId } = await crearProductoConLote(A, { stock: 10, unitCost: '5.0000' })
+    const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
     const recipeId = await crearReceta(A, productId, '2.0000')
     let orderId: string | null = null
 
@@ -322,7 +322,7 @@ describe('el alta lo deja guardado en la fila (R10)', () => {
 
 describe('la edicion lo reescribe, incluso a nulo (R11)', () => {
   it('recalcula con los lotes de hoy, y deja el importe en NULL cuando ya no cubre', async () => {
-    const { productId } = await crearProductoConLote(A, { stock: 10, unitCost: '5.0000' })
+    const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
     const recipeId = await crearReceta(A, productId, '2.0000')
     let orderId: string | null = null
 
@@ -356,7 +356,7 @@ describe('la edicion lo reescribe, incluso a nulo (R11)', () => {
 
 describe('comprar un lote despues no cambia el importe de un pedido ya creado (R12)', () => {
   it('un lote nuevo del mismo producto deja el importe guardado intacto', async () => {
-    const { productId } = await crearProductoConLote(A, { stock: 10, unitCost: '5.0000' })
+    const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
     const recipeId = await crearReceta(A, productId, '2.0000')
     let orderId: string | null = null
 
@@ -370,7 +370,7 @@ describe('comprar un lote despues no cambia el importe de un pedido ya creado (R
       // leer, este lote lo cambiaria de inmediato.
       await addBatchToAlive(
         productId,
-        newBatch(A, { stock: 5000, unitCost: '0.5000', purchaseDate: '2026-05-04' }),
+        newBatch(A, { stock: '5000', unitCost: '0.5000', purchaseDate: '2026-05-04' }),
         new Date('2026-05-04T12:00:00.000Z'),
         { companyId: A.companyId },
       )
@@ -387,7 +387,7 @@ describe('comprar un lote despues no cambia el importe de un pedido ya creado (R
 
 describe('un pedido anterior a la columna sigue sin importe (R8, R13)', () => {
   it('con `ingredients_cost` en NULL por fuera de la aplicacion, leerlo no lo recalcula', async () => {
-    const { productId } = await crearProductoConLote(A, { stock: 10, unitCost: '5.0000' })
+    const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
     const recipeId = await crearReceta(A, productId, '2.0000')
     let orderId: string | null = null
 
@@ -426,7 +426,7 @@ describe('un pedido anterior a la columna sigue sin importe (R8, R13)', () => {
 
 describe('un lote de otra empresa no entra en el calculo (R21)', () => {
   it('`findCostingBatches` con el ambito de otra empresa no devuelve el lote, ni por identificador', async () => {
-    const { productId } = await crearProductoConLote(Q, { stock: 999, unitCost: '1000.0000' })
+    const { productId } = await crearProductoConLote(Q, { stock: '999', unitCost: '1000.0000' })
 
     try {
       // Con el AMBITO correcto (Q), el lote SI aparece: control positivo.
@@ -445,7 +445,7 @@ describe('un lote de otra empresa no entra en el calculo (R21)', () => {
 
 describe('un pedido de otra empresa no se alcanza ni por identificador (R14, R21)', () => {
   it('la ficha de un pedido de A pedida desde Q es null, y desde A trae el importe', async () => {
-    const { productId } = await crearProductoConLote(A, { stock: 10, unitCost: '5.0000' })
+    const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
     const recipeId = await crearReceta(A, productId, '2.0000')
     let orderId: string | null = null
 
@@ -469,7 +469,7 @@ describe('un pedido de otra empresa no se alcanza ni por identificador (R14, R21
 
 describe('tras el alta y la edicion, los lotes y los asientos quedan intactos (R22)', () => {
   it('`product_batches` e `inventory_movements` de la empresa son byte a byte iguales', async () => {
-    const { productId } = await crearProductoConLote(A, { stock: 10, unitCost: '5.0000' })
+    const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
     const recipeId = await crearReceta(A, productId, '2.0000')
     let orderId: string | null = null
 
@@ -505,7 +505,7 @@ describe('el pedido queda creado con el importe en blanco y la base no lanza 220
   it('un coste que desborda `Decimal(14,4)` no aborta el alta', async () => {
     // Un lote al maximo de `Decimal(14,4)`: la linea necesita exactamente ese stock, asi que
     // el importe es `necesaria * unit_cost`, muy por encima de lo que la columna admite.
-    const { productId } = await crearProductoConLote(A, { stock: 100, unitCost: '9999999999.9999' })
+    const { productId } = await crearProductoConLote(A, { stock: '100', unitCost: '9999999999.9999' })
     const recipeId = await crearReceta(A, productId, '10.0000')
     let orderId: string | null = null
 

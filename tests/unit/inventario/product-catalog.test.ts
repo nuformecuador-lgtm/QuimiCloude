@@ -31,12 +31,12 @@ describe('toProductRef', () => {
     const ref = toProductRef({
       id: 'p-1',
       name: 'Acido sulfurico',
-      stockByUnit: [{ unitId: 'kg', quantity: 12 }],
+      stockByUnit: [{ unitId: 'kg', quantity: '12.0000' }],
     });
     expect(ref).toEqual({
       id: 'p-1',
       name: 'Acido sulfurico',
-      stockByUnit: [{ unitId: 'kg', quantity: 12 }],
+      stockByUnit: [{ unitId: 'kg', quantity: '12.0000' }],
     });
   });
 
@@ -71,7 +71,7 @@ describe('R14 — findRefs lee la existencia y la unidad de las columnas del pro
 
     const [ref] = await findProductRefs(['p-1'], 'empresa-1');
 
-    expect(ref?.stockByUnit).toEqual([{ unitId: 'kg', quantity: 12 }]);
+    expect(ref?.stockByUnit).toEqual([{ unitId: 'kg', quantity: '12.0000' }]);
   });
 
   it('sin unidad guardada, stockByUnit es un array vacio', async () => {

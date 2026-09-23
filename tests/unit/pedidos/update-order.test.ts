@@ -243,7 +243,7 @@ function loteCosteable(overrides: Partial<CostingBatch> = {}): CostingBatch {
   return {
     productId: PRODUCTO_X,
     lot: '1',
-    stock: 100,
+    stock: '100',
     unitCost: '3.0000',
     unitId: LITRO.id,
     purchaseDate: '2026-01-01',
@@ -285,7 +285,7 @@ function catalogosQueExplotan() {
 describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
   it('la edicion recalcula y sustituye el importe (R11)', async () => {
     const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta({ quantity: '2.0000' })]]]));
-    const prod = catalogoDeProductos([loteCosteable({ stock: 100, unitCost: '3.0000' })]);
+    const prod = catalogoDeProductos([loteCosteable({ stock: '100', unitCost: '3.0000' })]);
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
@@ -305,7 +305,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
 
   it('el catalogo de recetas se pregunta por la del DATO ENTRANTE, no por la de la fila vieja', async () => {
     const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta({ quantity: '2.0000' })]]]));
-    const prod = catalogoDeProductos([loteCosteable({ stock: 100, unitCost: '3.0000' })]);
+    const prod = catalogoDeProductos([loteCosteable({ stock: '100', unitCost: '3.0000' })]);
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
@@ -329,7 +329,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
         lineaDeReceta({ productId: `${PRODUCTO_X}-${i % 5}`, quantity: '1.0000' }),
       );
       const lotes = Array.from({ length: 5 }, (_, i) =>
-        loteCosteable({ productId: `${PRODUCTO_X}-${i}`, stock: 100, unitCost: '1.0000' }),
+        loteCosteable({ productId: `${PRODUCTO_X}-${i}`, stock: '100', unitCost: '1.0000' }),
       );
       const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, lineas]]));
       const prod = catalogoDeProductos(lotes);

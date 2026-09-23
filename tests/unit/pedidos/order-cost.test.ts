@@ -35,7 +35,7 @@ function lote(overrides: Partial<CostingBatch> = {}): CostingBatch {
   return {
     productId: PRODUCT_A,
     lot: '1',
-    stock: 1,
+    stock: '1',
     unitCost: '1.0000',
     unitId: LITRO.id,
     purchaseDate: '2026-01-01',
@@ -59,7 +59,7 @@ describe('calculateIngredientsCost', () => {
       input({
         orderQuantity: '10.0000',
         lines: [linea({ quantity: '2.0000' })],
-        batches: [lote({ stock: 20, unitCost: '3.0000' })],
+        batches: [lote({ stock: '20', unitCost: '3.0000' })],
         units: unitsMap(LITRO),
       }),
     );
@@ -73,7 +73,7 @@ describe('calculateIngredientsCost', () => {
       input({
         orderQuantity: '200.0000',
         lines: [linea({ quantity: '10.0000' })],
-        batches: [lote({ stock: 2000, unitCost: '1.0000' })],
+        batches: [lote({ stock: '2000', unitCost: '1.0000' })],
         units: unitsMap(LITRO),
       }),
     );
@@ -87,9 +87,9 @@ describe('calculateIngredientsCost', () => {
         orderQuantity: '1.0000',
         lines: [linea({ quantity: '50.0000' })],
         batches: [
-          lote({ lot: '1', purchaseDate: '2026-01-01', stock: 50, unitCost: '10.0000' }),
+          lote({ lot: '1', purchaseDate: '2026-01-01', stock: '50', unitCost: '10.0000' }),
           // Mas nuevo y con existencia de sobra: no debe tocarse porque el primero ya cubre.
-          lote({ lot: '2', purchaseDate: '2026-02-01', stock: 1000, unitCost: '999.0000' }),
+          lote({ lot: '2', purchaseDate: '2026-02-01', stock: '1000', unitCost: '999.0000' }),
         ],
         units: unitsMap(LITRO),
       }),
@@ -104,8 +104,8 @@ describe('calculateIngredientsCost', () => {
         orderQuantity: '1.0000',
         lines: [linea({ quantity: '50.0000' })],
         batches: [
-          lote({ lot: '2', purchaseDate: '2026-01-01', stock: 50, unitCost: '100.0000' }),
-          lote({ lot: '1', purchaseDate: '2026-01-01', stock: 50, unitCost: '200.0000' }),
+          lote({ lot: '2', purchaseDate: '2026-01-01', stock: '50', unitCost: '100.0000' }),
+          lote({ lot: '1', purchaseDate: '2026-01-01', stock: '50', unitCost: '200.0000' }),
         ],
         units: unitsMap(LITRO),
       }),
@@ -125,8 +125,8 @@ describe('calculateIngredientsCost', () => {
         orderQuantity: '1.0000',
         lines: [linea({ quantity: '50.0000' })],
         batches: [
-          lote({ lot: '2', purchaseDate: '2026-02-01', stock: 1000, unitCost: '999.0000' }),
-          lote({ lot: '1', purchaseDate: '2026-01-01', stock: 50, unitCost: '10.0000' }),
+          lote({ lot: '2', purchaseDate: '2026-02-01', stock: '1000', unitCost: '999.0000' }),
+          lote({ lot: '1', purchaseDate: '2026-01-01', stock: '50', unitCost: '10.0000' }),
         ],
         units: unitsMap(LITRO),
       }),
@@ -141,8 +141,8 @@ describe('calculateIngredientsCost', () => {
         orderQuantity: '1.0000',
         lines: [linea({ quantity: '100.0000' })],
         batches: [
-          lote({ lot: '1', purchaseDate: '2026-01-01', stock: 90, unitCost: '10.0000' }),
-          lote({ lot: '2', purchaseDate: '2026-02-01', stock: 10, unitCost: '100.0000' }),
+          lote({ lot: '1', purchaseDate: '2026-01-01', stock: '90', unitCost: '10.0000' }),
+          lote({ lot: '2', purchaseDate: '2026-02-01', stock: '10', unitCost: '100.0000' }),
         ],
         units: unitsMap(LITRO),
       }),
@@ -157,7 +157,7 @@ describe('calculateIngredientsCost', () => {
       input({
         orderQuantity: '10.0000',
         lines: [linea({ quantity: '150.0000', unitId: GRAMO.id })],
-        batches: [lote({ unitId: KILOGRAMO.id, stock: 2, unitCost: '5.0000' })],
+        batches: [lote({ unitId: KILOGRAMO.id, stock: '2', unitCost: '5.0000' })],
         units: unitsMap(GRAMO, KILOGRAMO),
       }),
     );
@@ -182,7 +182,7 @@ describe('calculateIngredientsCost', () => {
     const resultado = calculateIngredientsCost(
       input({
         lines: [linea({ quantity: '10.0000' })],
-        batches: [lote({ stock: 5 })],
+        batches: [lote({ stock: '5' })],
         units: unitsMap(LITRO),
       }),
     );
@@ -218,9 +218,9 @@ describe('calculateIngredientsCost', () => {
         ],
         batches: [
           // El primer ingrediente se cubre sin problema...
-          lote({ productId: PRODUCT_A, stock: 10, unitCost: '100.0000' }),
+          lote({ productId: PRODUCT_A, stock: '10', unitCost: '100.0000' }),
           // ...pero el segundo no tiene existencia suficiente: el importe entero se pierde.
-          lote({ productId: PRODUCT_B, stock: 1, unitCost: '1.0000' }),
+          lote({ productId: PRODUCT_B, stock: '1', unitCost: '1.0000' }),
         ],
         units: unitsMap(LITRO),
       }),
@@ -233,7 +233,7 @@ describe('calculateIngredientsCost', () => {
 
   it('los cuatro caminos sin importe del calculo devuelven exactamente la misma salida (R9)', () => {
     const existenciaInsuficiente = calculateIngredientsCost(
-      input({ lines: [linea({ quantity: '10.0000' })], batches: [lote({ stock: 5 })], units: unitsMap(LITRO) }),
+      input({ lines: [linea({ quantity: '10.0000' })], batches: [lote({ stock: '5' })], units: unitsMap(LITRO) }),
     );
     const unidadIncompatible = calculateIngredientsCost(
       input({
@@ -247,7 +247,7 @@ describe('calculateIngredientsCost', () => {
       input({
         orderQuantity: '1.0000',
         lines: [linea({ quantity: '1.0000' })],
-        batches: [lote({ stock: 1, unitCost: '10000000000.0000' })],
+        batches: [lote({ stock: '1', unitCost: '10000000000.0000' })],
         units: unitsMap(LITRO),
       }),
     );
@@ -265,7 +265,7 @@ describe('calculateIngredientsCost', () => {
       input({
         orderQuantity: '3.0000',
         lines: [linea({ quantity: '1.0000' })],
-        batches: [lote({ stock: 3, unitCost: '2.5000' })],
+        batches: [lote({ stock: '3', unitCost: '2.5000' })],
         units: unitsMap(LITRO),
       }),
     );
@@ -280,7 +280,7 @@ describe('calculateIngredientsCost', () => {
       input({
         orderQuantity: '1.0000',
         lines: [linea({ quantity: '1.0000' })],
-        batches: [lote({ stock: 1, unitCost: '10000000000.0000' })],
+        batches: [lote({ stock: '1', unitCost: '10000000000.0000' })],
         units: unitsMap(LITRO),
       }),
     );
@@ -294,8 +294,8 @@ describe('calculateIngredientsCost', () => {
         orderQuantity: '1.0000',
         lines: [linea({ quantity: '5.0000' })],
         batches: [
-          lote({ lot: '10', purchaseDate: '2026-01-01', stock: 100, unitCost: '999.0000' }),
-          lote({ lot: '9', purchaseDate: '2026-01-01', stock: 5, unitCost: '10.0000' }),
+          lote({ lot: '10', purchaseDate: '2026-01-01', stock: '100', unitCost: '999.0000' }),
+          lote({ lot: '9', purchaseDate: '2026-01-01', stock: '5', unitCost: '10.0000' }),
         ],
         units: unitsMap(LITRO),
       }),
@@ -311,8 +311,8 @@ describe('calculateIngredientsCost', () => {
         orderQuantity: '1.0000',
         lines: [linea({ quantity: '5.0000' })],
         batches: [
-          lote({ lot: 'A9', purchaseDate: '2026-01-01', stock: 100, unitCost: '999.0000' }),
-          lote({ lot: 'A10', purchaseDate: '2026-01-01', stock: 5, unitCost: '10.0000' }),
+          lote({ lot: 'A9', purchaseDate: '2026-01-01', stock: '100', unitCost: '999.0000' }),
+          lote({ lot: 'A10', purchaseDate: '2026-01-01', stock: '5', unitCost: '10.0000' }),
         ],
         units: unitsMap(LITRO),
       }),
@@ -327,7 +327,7 @@ describe('calculateIngredientsCost', () => {
       input({
         orderQuantity: '1.0000',
         lines: [linea({ quantity: '20.0000', unitId: LITRO.id })],
-        batches: [lote({ unitId: BIDON_20L.id, stock: 1, unitCost: '20.0000' })],
+        batches: [lote({ unitId: BIDON_20L.id, stock: '1', unitCost: '20.0000' })],
         units: unitsMap(LITRO, BIDON_20L),
       }),
     );
@@ -342,8 +342,8 @@ describe('calculateIngredientsCost', () => {
         orderQuantity: '1.0000',
         lines: [linea({ quantity: '30.0000', unitId: LITRO.id })],
         batches: [
-          lote({ lot: '1', purchaseDate: '2026-01-01', unitId: LITRO.id, stock: 10, unitCost: '2.0000' }),
-          lote({ lot: '2', purchaseDate: '2026-02-01', unitId: BIDON_20L.id, stock: 1, unitCost: '20.0000' }),
+          lote({ lot: '1', purchaseDate: '2026-01-01', unitId: LITRO.id, stock: '10', unitCost: '2.0000' }),
+          lote({ lot: '2', purchaseDate: '2026-02-01', unitId: BIDON_20L.id, stock: '1', unitCost: '20.0000' }),
         ],
         units: unitsMap(LITRO, BIDON_20L),
       }),
@@ -359,7 +359,7 @@ describe('calculateIngredientsCost', () => {
       input({
         orderQuantity: '1.0000',
         lines: [linea({ quantity: '25.0000' })],
-        batches: [lote({ stock: 25, unitCost: '4.0000' })],
+        batches: [lote({ stock: '25', unitCost: '4.0000' })],
         units: unitsMap(LITRO),
       }),
     );
@@ -372,7 +372,7 @@ describe('calculateIngredientsCost', () => {
       input({
         orderQuantity: '1.0000',
         lines: [linea({ quantity: '25.0001' })],
-        batches: [lote({ stock: 25, unitCost: '4.0000' })],
+        batches: [lote({ stock: '25', unitCost: '4.0000' })],
         units: unitsMap(LITRO),
       }),
     );

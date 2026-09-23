@@ -230,7 +230,7 @@ function loteCosteable(overrides: Partial<CostingBatch> = {}): CostingBatch {
   return {
     productId: PRODUCTO_X,
     lot: '1',
-    stock: 100,
+    stock: '100',
     unitCost: '3.0000',
     unitId: LITRO.id,
     purchaseDate: '2026-01-01',
@@ -272,7 +272,7 @@ function catalogosQueExplotan() {
 describe('T5 — el alta calcula el importe de los ingredientes', () => {
   it('el alta calcula el importe y lo pasa al puerto (R10)', async () => {
     const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta({ quantity: '2.0000' })]]]));
-    const prod = catalogoDeProductos([loteCosteable({ stock: 100, unitCost: '3.0000' })]);
+    const prod = catalogoDeProductos([loteCosteable({ stock: '100', unitCost: '3.0000' })]);
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
@@ -296,7 +296,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
         lineaDeReceta({ productId: `${PRODUCTO_X}-${i % 5}`, quantity: '1.0000' }),
       );
       const lotes = Array.from({ length: 5 }, (_, i) =>
-        loteCosteable({ productId: `${PRODUCTO_X}-${i}`, stock: 100, unitCost: '1.0000' }),
+        loteCosteable({ productId: `${PRODUCTO_X}-${i}`, stock: '100', unitCost: '1.0000' }),
       );
       const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, lineas]]));
       const prod = catalogoDeProductos(lotes);
@@ -341,7 +341,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
     const cat = catalogoDeRecetas(
       new Map([[RECETA_DE_A, [lineaDeReceta({ quantity: '1.0000' })]]]),
     );
-    const prod = catalogoDeProductos([loteCosteable({ stock: 1, unitCost: '10000000000.0000' })]);
+    const prod = catalogoDeProductos([loteCosteable({ stock: '1', unitCost: '10000000000.0000' })]);
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({

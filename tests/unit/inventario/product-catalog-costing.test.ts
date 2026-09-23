@@ -31,7 +31,7 @@ describe('toCostingBatch', () => {
     expect(batch).toEqual({
       productId: 'p-1',
       lot: 'L-7',
-      stock: 12,
+      stock: '12.0000',
       unitCost: '3.5000',
       unitId: 'kg',
       purchaseDate: '2026-03-04',

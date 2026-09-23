@@ -32,8 +32,8 @@ export type RecipeSummary = {
  * identificador tal cual.
  *
  * `productStock` sale del MISMO `ProductCatalog.findRefs`, leido en la unidad de ESTA linea
- * (`unitId`), nunca convertido: `null` cuando el producto esta dado de baja, `0` cuando no
- * tiene ningun lote, la cantidad sumada cuando tiene un lote en esa unidad, y `null` cuando
+ * (`unitId`), nunca convertido: `null` cuando el producto esta dado de baja, `'0.0000'` cuando
+ * no tiene ningun lote, la cantidad sumada cuando tiene un lote en esa unidad, y `null` cuando
  * tiene lotes pero ninguno en esa unidad -mismo marcador de dato ausente que `productName`,
  * distinto motivo-. La presentacion YA NO viaja aqui: se mudo de `products` a
  * `product_batches` el 2026-09-09, y una linea de receta referencia un PRODUCTO, no un lote,
@@ -46,7 +46,7 @@ export type RecipeLineView = {
   readonly quantity: string;
   readonly unitId: string;
   /** Existencia del producto en la unidad de esta linea; ver el comentario del tipo. */
-  readonly productStock: number | null;
+  readonly productStock: string | null;
 };
 
 /** Detalle de una receta (D14, R33): el resumen mas los pasos y las lineas completas. */

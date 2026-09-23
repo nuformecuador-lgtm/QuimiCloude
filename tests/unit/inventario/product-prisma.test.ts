@@ -45,7 +45,7 @@ describe('toProductView', () => {
 
   it('mapea la alerta de cantidad sin reinterpretarla', () => {
     const vista = toProductView(filaBase);
-    expect(vista.qtyAlert).toBe(5);
+    expect(vista.qtyAlert).toBe('5.0000');
     expect(toProductView({ ...filaBase, qtyAlert: null }).qtyAlert).toBeNull();
   });
 
@@ -65,7 +65,7 @@ describe('toProductView', () => {
 
   it('mapea `stock` y `unitId` tal cual, directamente desde la columna de la fila', () => {
     const vista = toProductView(filaBase);
-    expect(vista.stock).toBe(15);
+    expect(vista.stock).toBe('15.0000');
     expect(vista.unitId).toBe('u-9');
     expect(Object.keys(PRODUCT_SELECT)).toContain('stock');
     expect(Object.keys(PRODUCT_SELECT)).toContain('unitId');

@@ -125,7 +125,7 @@ function calculateLineCost(
     let stockConverted: string
     let unitFactor: string
     try {
-      stockConverted = convertQuantity(String(batch.stock), batchUnit, lineUnit)
+      stockConverted = convertQuantity(batch.stock, batchUnit, lineUnit)
       unitFactor = convertQuantity('1', lineUnit, batchUnit)
     } catch (error) {
       if (error instanceof IncompatibleUnitsError) {

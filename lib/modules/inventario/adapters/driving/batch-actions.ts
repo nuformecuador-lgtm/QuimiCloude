@@ -14,7 +14,7 @@ import { runInRequestScope } from '@/lib/shared/request-scope';
 
 export type AdjustBatchStockFormState =
   | { status: 'idle' }
-  | { status: 'success'; stock: number }
+  | { status: 'success'; stock: string }
   | ErrorState;
 
 export type ProductBatchesResult =
@@ -27,7 +27,7 @@ export type BatchMovementsResult =
 
 // Sin constante `INITIAL_STATE`: un archivo con `'use server'` solo puede exportar funciones async.
 
-const NUMERIC_FIELD_ERROR = 'La cantidad del ajuste no es un numero entero valido.';
+const NUMERIC_FIELD_ERROR = 'La cantidad del ajuste no es un numero decimal valido.';
 
 const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
 
@@ -41,18 +41,18 @@ function readOptionalFormString(formData: FormData, name: string): string | unde
 }
 
 /**
- * El signo se conserva: el ajuste que resta llega negativo. El patron va antes de la conversion,
- * porque sin el `'1e3'` o `'0x10'` pasarian como enteros validos.
+ * El signo se conserva: el ajuste que resta llega negativo. El patron va antes de pasar el
+ * valor al caso de uso, porque sin el `'1e3'` pasaria como decimal valido.
  */
-function readOptionalFormInt(
+function readOptionalFormDecimal(
   formData: FormData,
   name: string,
-): number | undefined | typeof INVALID_NUMBER {
+): string | undefined | typeof INVALID_NUMBER {
   const value = formData.get(name);
   if (typeof value !== 'string' || value.trim() === '') return undefined;
   const trimmed = value.trim();
-  if (!/^-?\d+$/.test(trimmed)) return INVALID_NUMBER;
-  return Number(trimmed);
+  if (!/^-?\d+(\.\d+)?$/.test(trimmed)) return INVALID_NUMBER;
+  return trimmed;
 }
 
 const toErrorState = createErrorStateTranslator(InventarioError, observabilidad.readRequestIdHeader);
@@ -83,7 +83,7 @@ export async function adjustBatchStockAction(
 ): Promise<AdjustBatchStockFormState> {
   void prevState;
 
-  const delta = readOptionalFormInt(formData, 'delta');
+  const delta = readOptionalFormDecimal(formData, 'delta');
   if (delta === INVALID_NUMBER) {
     return { status: 'error', code: INVALID_INPUT_CODE, message: NUMERIC_FIELD_ERROR };
   }

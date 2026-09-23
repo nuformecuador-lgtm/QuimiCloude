@@ -361,8 +361,8 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
     // `strictObject`, asi que un campo de mas no seria un detalle sino un `invalid_input`.
     expect(candidato).toEqual({
       name: 'Bidon 20 L',
-      stock: 10,
-      qtyAlert: 2,
+      stock: '10',
+      qtyAlert: '2',
       presentationId: '11111111-1111-4111-8111-111111111111',
       unitCost: '12.3456',
       totalCost: '123.4560',
@@ -452,7 +452,7 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
     // edicion ganara estos cinco campos, cada edicion moriria con `invalid_input`.
     expect(candidato).toEqual({
       name: 'Bidon 20 L',
-      qtyAlert: 2,
+      qtyAlert: '2',
     });
     for (const campo of Object.keys(VALID_BATCH_FIELDS)) {
       expect(Object.keys(candidato)).not.toContain(campo);
@@ -520,10 +520,9 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
       );
     }
 
-    // `Number(` SI aparece, una sola vez: la conversion de `stock`/`qtyAlert`, que son
-    // enteros y no importes. Si alguien envolviera un costo, serian dos.
-    expect(codigo.match(/Number\(/g) ?? []).toHaveLength(1);
-    expect(codigo).toContain('return Number(trimmed);');
+    // `stock` y `qtyAlert` son decimales y viajan como cadena, igual que los importes: ya no
+    // pasan por `Number(`.
+    expect(codigo).not.toMatch(/Number\(/);
 
     for (const linea of codigo.split('\n')) {
       if (!linea.includes('unitCost') && !linea.includes('totalCost')) continue;
@@ -546,8 +545,8 @@ describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () =>
     // nombre no seria un detalle sino un `invalid_input`.
     expect(candidato).toEqual({
       name: 'Bidon 20 L',
-      stock: 10,
-      qtyAlert: 2,
+      stock: '10',
+      qtyAlert: '2',
       presentationId: '11111111-1111-4111-8111-111111111111',
       unitCost: '12.3456',
       totalCost: '123.4560',
@@ -592,7 +591,7 @@ describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () =>
     );
 
     const [, candidato] = updateProductMock.mock.calls[0] as [string, Record<string, unknown>];
-    expect(candidato).toEqual({ name: 'Bidon 20 L', qtyAlert: 2 });
+    expect(candidato).toEqual({ name: 'Bidon 20 L', qtyAlert: '2' });
     for (const campo of [...Object.keys(VALID_BATCH_FIELDS), 'purchaseDate']) {
       expect(Object.keys(candidato)).not.toContain(campo);
     }

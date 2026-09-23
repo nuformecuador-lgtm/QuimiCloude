@@ -148,7 +148,7 @@ function newBatch(
 ): NewProductBatch {
   return {
     presentationId,
-    stock: 5,
+    stock: '5',
     unitCost: '2.5000',
     lot: null,
     purchaseDate: '2026-09-01',
@@ -158,12 +158,12 @@ function newBatch(
   };
 }
 
-async function stockOf(productId: string): Promise<number> {
+async function stockOf(productId: string): Promise<string> {
   const product = await prisma.product.findUniqueOrThrow({
     where: { id: productId },
     select: { stock: true },
   });
-  return product.stock.toNumber();
+  return product.stock.toFixed(4);
 }
 
 afterAll(async () => {
@@ -183,7 +183,7 @@ describe('R1, R8, R9 — el alta fija la unidad del producto y guarda la suma de
         ambito(fixture),
       );
       productIds.push(creado.id);
-      expect(await stockOf(creado.id)).toBe(5);
+      expect(await stockOf(creado.id)).toBe('5.0000');
 
       await addBatchToAlive(
         creado.id,
@@ -191,7 +191,7 @@ describe('R1, R8, R9 — el alta fija la unidad del producto y guarda la suma de
         new Date(),
         ambito(fixture),
       );
-      expect(await stockOf(creado.id)).toBe(10);
+      expect(await stockOf(creado.id)).toBe('10.0000');
 
       await addBatchToAlive(
         creado.id,
@@ -199,7 +199,7 @@ describe('R1, R8, R9 — el alta fija la unidad del producto y guarda la suma de
         new Date(),
         ambito(fixture),
       );
-      expect(await stockOf(creado.id)).toBe(15);
+      expect(await stockOf(creado.id)).toBe('15.0000');
 
       const producto = await prisma.product.findUniqueOrThrow({
         where: { id: creado.id },
@@ -225,7 +225,7 @@ describe('R1, R8, R9 — el alta fija la unidad del producto y guarda la suma de
       const creado = await createWithFirstBatch(
         newProduct(),
         newBatch(fixture, fixture.kgPresentationId, {
-          stock: 7,
+          stock: '7',
           purchaseDate: '2019-06-01',
           expiryDate: '2020-01-31',
         }),
@@ -233,11 +233,11 @@ describe('R1, R8, R9 — el alta fija la unidad del producto y guarda la suma de
         ambito(fixture),
       );
       productIds.push(creado.id);
-      expect(await stockOf(creado.id)).toBe(7);
+      expect(await stockOf(creado.id)).toBe('7.0000');
 
       const agregado = await addBatchToAlive(
         creado.id,
-        newBatch(fixture, fixture.kgPresentationId, { stock: 4, expiryDate: '2099-12-31' }),
+        newBatch(fixture, fixture.kgPresentationId, { stock: '4', expiryDate: '2099-12-31' }),
         new Date(),
         ambito(fixture),
       );
@@ -249,13 +249,40 @@ describe('R1, R8, R9 — el alta fija la unidad del producto y guarda la suma de
         select: { stock: true, expiryDate: true },
         orderBy: { stock: 'asc' },
       });
-      expect(lotes.map((lote) => lote.stock.toNumber())).toEqual([4, 7]);
-      const vencido = lotes.find((lote) => lote.stock.toNumber() === 7);
+      expect(lotes.map((lote) => lote.stock.toFixed(4))).toEqual(['4.0000', '7.0000']);
+      const vencido = lotes.find((lote) => lote.stock.toFixed(4) === '7.0000');
       expect(vencido?.expiryDate).not.toBeNull();
       expect(vencido?.expiryDate?.getTime()).toBeLessThan(Date.now());
 
       // 11 = 7 vencido + 4 vigente. Un recalculo que excluyera los vencidos dejaria 4.
-      expect(await stockOf(creado.id)).toBe(11);
+      expect(await stockOf(creado.id)).toBe('11.0000');
+    } finally {
+      await dropFixture(fixture, productIds);
+    }
+  });
+
+  it('R3: dos lotes con decimales exactos suman sin rastro de coma flotante', async () => {
+    const fixture = await createFixture();
+    const productIds: string[] = [];
+
+    try {
+      const creado = await createWithFirstBatch(
+        newProduct(),
+        newBatch(fixture, fixture.kgPresentationId, { stock: '1.5' }),
+        new Date(),
+        ambito(fixture),
+      );
+      productIds.push(creado.id);
+      expect(await stockOf(creado.id)).toBe('1.5000');
+
+      await addBatchToAlive(
+        creado.id,
+        newBatch(fixture, fixture.kgPresentationId, { stock: '0.0001' }),
+        new Date(),
+        ambito(fixture),
+      );
+      // 1.5 + 0.0001 = 1.5001 exacto: 0.1 + 0.0001 en coma flotante binaria no da esto.
+      expect(await stockOf(creado.id)).toBe('1.5001');
     } finally {
       await dropFixture(fixture, productIds);
     }
@@ -272,7 +299,7 @@ describe('R1, R8, R9 — el alta fija la unidad del producto y guarda la suma de
     });
 
     try {
-      expect(await stockOf(producto.id)).toBe(0);
+      expect(await stockOf(producto.id)).toBe('0.0000');
       expect(await prisma.productBatch.count({ where: { productId: producto.id } })).toBe(0);
     } finally {
       await dropFixture(fixture, [producto.id]);
@@ -289,7 +316,7 @@ describe('R5, R6, R7 — el alta busca por nombre Y unidad, no por nombre solo',
     try {
       const enKg = await createWithFirstBatch(
         newProduct({ name: nombre }),
-        newBatch(fixture, fixture.kgPresentationId, { stock: 5 }),
+        newBatch(fixture, fixture.kgPresentationId, { stock: '5' }),
         new Date(),
         ambito(fixture),
       );
@@ -306,15 +333,15 @@ describe('R5, R6, R7 — el alta busca por nombre Y unidad, no por nombre solo',
 
       const enLitro = await createWithFirstBatch(
         newProduct({ name: nombre }),
-        newBatch(fixture, fixture.litroPresentationId, { stock: 20 }),
+        newBatch(fixture, fixture.litroPresentationId, { stock: '20' }),
         new Date(),
         ambito(fixture),
       );
       productIds.push(enLitro.id);
 
       expect(enLitro.id).not.toBe(enKg.id);
-      expect(await stockOf(enKg.id)).toBe(5);
-      expect(await stockOf(enLitro.id)).toBe(20);
+      expect(await stockOf(enKg.id)).toBe('5.0000');
+      expect(await stockOf(enLitro.id)).toBe('20.0000');
 
       // Y AHORA que el producto en kg existe, la busqueda en kg SI lo encuentra (R5): un
       // segundo lote en kg se le agrega a el, no crea un tercero.
@@ -327,13 +354,13 @@ describe('R5, R6, R7 — el alta busca por nombre Y unidad, no por nombre solo',
 
       const agregado = await addBatchToAlive(
         enKg.id,
-        newBatch(fixture, fixture.kgPresentationId, { stock: 3 }),
+        newBatch(fixture, fixture.kgPresentationId, { stock: '3' }),
         new Date(),
         ambito(fixture),
       );
       expect(agregado).not.toBeNull();
-      expect(await stockOf(enKg.id)).toBe(8);
-      expect(await stockOf(enLitro.id)).toBe(20);
+      expect(await stockOf(enKg.id)).toBe('8.0000');
+      expect(await stockOf(enLitro.id)).toBe('20.0000');
       expect(await prisma.product.count({ where: { id: { in: [enKg.id, enLitro.id] } } })).toBe(2);
     } finally {
       await dropFixture(fixture, productIds);
@@ -349,7 +376,7 @@ describe('R10 — dos altas concurrentes sobre el mismo producto suman las dos, 
     try {
       const creado = await createWithFirstBatch(
         newProduct(),
-        newBatch(fixture, fixture.kgPresentationId, { stock: 5 }),
+        newBatch(fixture, fixture.kgPresentationId, { stock: '5' }),
         new Date(),
         ambito(fixture),
       );
@@ -359,13 +386,13 @@ describe('R10 — dos altas concurrentes sobre el mismo producto suman las dos, 
       const [primero, segundo] = await Promise.all([
         addBatchToAlive(
           creado.id,
-          newBatch(fixture, fixture.kgPresentationId, { stock: 7 }),
+          newBatch(fixture, fixture.kgPresentationId, { stock: '7' }),
           new Date(),
           ambito(fixture),
         ),
         addBatchToAlive(
           creado.id,
-          newBatch(fixture, fixture.kgPresentationId, { stock: 11 }),
+          newBatch(fixture, fixture.kgPresentationId, { stock: '11' }),
           new Date(),
           ambito(fixture),
         ),
@@ -375,7 +402,7 @@ describe('R10 — dos altas concurrentes sobre el mismo producto suman las dos, 
       expect(segundo).not.toBeNull();
       expect(await prisma.productBatch.count({ where: { productId: creado.id } })).toBe(3);
       // 5 + 7 + 11: si el recalculo de uno pisara al del otro, esto quedaria en 16 o en 12.
-      expect(await stockOf(creado.id)).toBe(23);
+      expect(await stockOf(creado.id)).toBe('23.0000');
     } finally {
       await dropFixture(fixture, productIds);
     }
@@ -389,7 +416,7 @@ describe('R29, R32 — el ajuste de lote recalcula stock sin tocar el resto del 
 
     try {
       const creado = await createWithFirstBatch(
-        newProduct({ qtyAlert: 4 }),
+        newProduct({ qtyAlert: '4' }),
         newBatch(fixture, fixture.kgPresentationId),
         new Date(),
         ambito(fixture),
@@ -397,36 +424,36 @@ describe('R29, R32 — el ajuste de lote recalcula stock sin tocar el resto del 
       productIds.push(creado.id);
       await addBatchToAlive(creado.id, newBatch(fixture, fixture.kgPresentationId), new Date(), ambito(fixture));
       await addBatchToAlive(creado.id, newBatch(fixture, fixture.kgPresentationId), new Date(), ambito(fixture));
-      expect(await stockOf(creado.id)).toBe(15);
+      expect(await stockOf(creado.id)).toBe('15.0000');
 
       const antes = await prisma.product.findUniqueOrThrow({ where: { id: creado.id } });
 
       const subida = await adjustBatchStock(
         creado.batchId,
-        6,
+        '6',
         'conteo_fisico',
         fixture.actorId,
         new Date(Date.now() + 60_000),
         ambito(fixture),
       );
-      expect(subida).toEqual({ stock: 11 });
-      expect(await stockOf(creado.id)).toBe(21);
+      expect(subida).toEqual({ stock: '11.0000' });
+      expect(await stockOf(creado.id)).toBe('21.0000');
 
       const bajada = await adjustBatchStock(
         creado.batchId,
-        -9,
+        '-9',
         'merma',
         fixture.actorId,
         new Date(Date.now() + 120_000),
         ambito(fixture),
       );
-      expect(bajada).toEqual({ stock: 2 });
-      expect(await stockOf(creado.id)).toBe(12);
+      expect(bajada).toEqual({ stock: '2.0000' });
+      expect(await stockOf(creado.id)).toBe('12.0000');
 
       // R32: la unica columna del producto que cambio es `stock`.
       const despues = await prisma.product.findUniqueOrThrow({ where: { id: creado.id } });
       expect(despues.name).toBe(antes.name);
-      expect(despues.qtyAlert).toBe(antes.qtyAlert);
+      expect(despues.qtyAlert?.toFixed(4)).toBe(antes.qtyAlert?.toFixed(4));
       expect(despues.unitId).toBe(antes.unitId);
       expect(despues.updatedAt.toISOString()).toBe(antes.updatedAt.toISOString());
     } finally {
@@ -443,17 +470,17 @@ describe('R30 — un ajuste rechazado no cambia la existencia guardada', () => {
     try {
       const creado = await createWithFirstBatch(
         newProduct(),
-        newBatch(fixture, fixture.kgPresentationId, { stock: 5 }),
+        newBatch(fixture, fixture.kgPresentationId, { stock: '5' }),
         new Date(),
         ambito(fixture),
       );
       productIds.push(creado.id);
 
       await expect(
-        adjustBatchStock(creado.batchId, -6, 'merma', fixture.actorId, new Date(), ambito(fixture)),
+        adjustBatchStock(creado.batchId, '-6', 'merma', fixture.actorId, new Date(), ambito(fixture)),
       ).rejects.toBeInstanceOf(BatchStockNegativeError);
 
-      expect(await stockOf(creado.id)).toBe(5);
+      expect(await stockOf(creado.id)).toBe('5.0000');
     } finally {
       await dropFixture(fixture, productIds);
     }
@@ -468,7 +495,7 @@ describe('R30 — un ajuste rechazado no cambia la existencia guardada', () => {
     try {
       const productoDeA = await createWithFirstBatch(
         newProduct(),
-        newBatch(fixtureA, fixtureA.kgPresentationId, { stock: 5 }),
+        newBatch(fixtureA, fixtureA.kgPresentationId, { stock: '5' }),
         new Date(),
         ambito(fixtureA),
       );
@@ -476,7 +503,7 @@ describe('R30 — un ajuste rechazado no cambia la existencia guardada', () => {
 
       const productoDeB = await createWithFirstBatch(
         newProduct(),
-        newBatch(fixtureB, fixtureB.kgPresentationId, { stock: 9 }),
+        newBatch(fixtureB, fixtureB.kgPresentationId, { stock: '9' }),
         new Date(),
         ambito(fixtureB),
       );
@@ -485,7 +512,7 @@ describe('R30 — un ajuste rechazado no cambia la existencia guardada', () => {
       // El lote es de A, pero el ambito con el que se ajusta es el de B.
       const resultado = await adjustBatchStock(
         productoDeA.batchId,
-        3,
+        '3',
         'conteo_fisico',
         fixtureB.actorId,
         new Date(),
@@ -493,8 +520,8 @@ describe('R30 — un ajuste rechazado no cambia la existencia guardada', () => {
       );
       expect(resultado).toBeNull();
 
-      expect(await stockOf(productoDeA.id)).toBe(5);
-      expect(await stockOf(productoDeB.id)).toBe(9);
+      expect(await stockOf(productoDeA.id)).toBe('5.0000');
+      expect(await stockOf(productoDeB.id)).toBe('9.0000');
     } finally {
       await dropFixture(fixtureA, productIdsA);
       await dropFixture(fixtureB, productIdsB);
@@ -510,30 +537,30 @@ describe('R31 — dos escrituras concurrentes sobre el mismo producto suman las 
     try {
       const creado = await createWithFirstBatch(
         newProduct(),
-        newBatch(fixture, fixture.kgPresentationId, { stock: 10 }),
+        newBatch(fixture, fixture.kgPresentationId, { stock: '10' }),
         new Date(),
         ambito(fixture),
       );
       productIds.push(creado.id);
       const segundo = await addBatchToAlive(
         creado.id,
-        newBatch(fixture, fixture.kgPresentationId, { stock: 20 }),
+        newBatch(fixture, fixture.kgPresentationId, { stock: '20' }),
         new Date(),
         ambito(fixture),
       );
       if (segundo === null) throw new Error('addBatchToAlive devolvio null con el producto vivo');
-      expect(await stockOf(creado.id)).toBe(30);
+      expect(await stockOf(creado.id)).toBe('30.0000');
 
       // Sin `await` entre los dos: compiten de verdad por la fila del producto.
       const [primero, segundoAjuste] = await Promise.all([
-        adjustBatchStock(creado.batchId, 5, 'conteo_fisico', fixture.actorId, new Date(), ambito(fixture)),
-        adjustBatchStock(segundo.batchId, -3, 'merma', fixture.actorId, new Date(), ambito(fixture)),
+        adjustBatchStock(creado.batchId, '5', 'conteo_fisico', fixture.actorId, new Date(), ambito(fixture)),
+        adjustBatchStock(segundo.batchId, '-3', 'merma', fixture.actorId, new Date(), ambito(fixture)),
       ]);
       expect(primero).not.toBeNull();
       expect(segundoAjuste).not.toBeNull();
 
       // 10 + 5 + 20 - 3: si el recalculo de uno pisara al del otro, esto quedaria en 32 o en 27.
-      expect(await stockOf(creado.id)).toBe(32);
+      expect(await stockOf(creado.id)).toBe('32.0000');
     } finally {
       await dropFixture(fixture, productIds);
     }
@@ -546,17 +573,17 @@ describe('R31 — dos escrituras concurrentes sobre el mismo producto suman las 
     try {
       const creado = await createWithFirstBatch(
         newProduct(),
-        newBatch(fixture, fixture.kgPresentationId, { stock: 10 }),
+        newBatch(fixture, fixture.kgPresentationId, { stock: '10' }),
         new Date(),
         ambito(fixture),
       );
       productIds.push(creado.id);
 
       const [ajuste, agregado] = await Promise.all([
-        adjustBatchStock(creado.batchId, 4, 'conteo_fisico', fixture.actorId, new Date(), ambito(fixture)),
+        adjustBatchStock(creado.batchId, '4', 'conteo_fisico', fixture.actorId, new Date(), ambito(fixture)),
         addBatchToAlive(
           creado.id,
-          newBatch(fixture, fixture.kgPresentationId, { stock: 6 }),
+          newBatch(fixture, fixture.kgPresentationId, { stock: '6' }),
           new Date(),
           ambito(fixture),
         ),
@@ -565,7 +592,7 @@ describe('R31 — dos escrituras concurrentes sobre el mismo producto suman las 
       expect(agregado).not.toBeNull();
 
       // 10 + 4 + 6: ninguno de los dos cambios se pierde.
-      expect(await stockOf(creado.id)).toBe(20);
+      expect(await stockOf(creado.id)).toBe('20.0000');
     } finally {
       await dropFixture(fixture, productIds);
     }

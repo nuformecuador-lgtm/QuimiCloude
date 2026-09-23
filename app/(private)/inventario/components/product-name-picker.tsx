@@ -43,7 +43,7 @@ export const PRODUCT_NAME_FIELD = 'name';
 export type ProductNameOption = {
   readonly id: string;
   readonly name: string;
-  readonly qtyAlert: number | null;
+  readonly qtyAlert: string | null;
   /**
    * Presentacion del producto elegido, para que el alta la autocomplete (2026-09-10).
    *

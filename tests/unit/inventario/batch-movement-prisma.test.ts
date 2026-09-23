@@ -39,7 +39,7 @@ describe('writeMovement (R6, R12) — recibe la tx, no la abre', () => {
 
     await writeMovement(
       tx,
-      { batchId: LOTE_ID, kind: 'opening', quantity: 10, reason: null, createdBy: ACTOR_ID },
+      { batchId: LOTE_ID, kind: 'opening', quantity: '10', reason: null, createdBy: ACTOR_ID },
       AHORA,
       AMBITO,
     );
@@ -49,7 +49,7 @@ describe('writeMovement (R6, R12) — recibe la tx, no la abre', () => {
       data: {
         batchId: LOTE_ID,
         kind: 'opening',
-        quantity: 10,
+        quantity: '10',
         reason: null,
         createdBy: ACTOR_ID,
         companyId: EMPRESA,
@@ -64,13 +64,13 @@ describe('writeMovement (R6, R12) — recibe la tx, no la abre', () => {
 
     await writeMovement(
       tx,
-      { batchId: LOTE_ID, kind: 'adjustment', quantity: -3, reason: 'merma', createdBy: ACTOR_ID },
+      { batchId: LOTE_ID, kind: 'adjustment', quantity: '-3', reason: 'merma', createdBy: ACTOR_ID },
       AHORA,
       AMBITO,
     );
 
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ kind: 'adjustment', quantity: -3, reason: 'merma' }) }),
+      expect.objectContaining({ data: expect.objectContaining({ kind: 'adjustment', quantity: '-3', reason: 'merma' }) }),
     );
   });
 });
@@ -109,7 +109,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
       {
         id: 'movimiento-2',
         kind: 'adjustment',
-        quantity: -3,
+        quantity: '-3.0000',
         reason: 'merma',
         authorName: ACTOR_ID,
         createdAt: '2026-09-17T14:00:00.000Z',
@@ -117,7 +117,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
       {
         id: 'movimiento-1',
         kind: 'opening',
-        quantity: 10,
+        quantity: '10.0000',
         reason: null,
         authorName: ACTOR_ID,
         createdAt: AHORA.toISOString(),

@@ -36,8 +36,8 @@ const PRESENTACION = '11111111-1111-4111-8111-111111111111';
 
 const ALTA_VALIDA = {
   name: 'Acido sulfurico',
-  stock: 4,
-  qtyAlert: 1,
+  stock: '4',
+  qtyAlert: '1',
   presentationId: PRESENTACION,
   unitCost: '12.5000',
 };
@@ -165,14 +165,14 @@ describe('R24 — la entrada invalida se rechaza sin tocar el puerto', () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
-    const sinExistencia = { ...ALTA_VALIDA, unitCost: undefined, totalCost: '10', stock: 0 };
+    const sinExistencia = { ...ALTA_VALIDA, unitCost: undefined, totalCost: '10', stock: '0' };
     await expect(createProduct(sinExistencia, ADMIN)).rejects.toBeInstanceOf(ValidationError);
 
     const totalInsuficiente = {
       ...ALTA_VALIDA,
       unitCost: undefined,
       totalCost: '0.0001',
-      stock: 5,
+      stock: '5',
     };
     await expect(createProduct(totalInsuficiente, ADMIN)).rejects.toBeInstanceOf(ValidationError);
 
@@ -251,9 +251,9 @@ describe('R15, R16, R21 — producto nuevo', () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
-    await createProduct({ ...ALTA_VALIDA, stock: 7 }, ADMIN);
+    await createProduct({ ...ALTA_VALIDA, stock: '7' }, ADMIN);
 
-    expect(loteCreado(products).stock).toBe(7);
+    expect(loteCreado(products).stock).toBe('7');
     expect(Object.keys(productoCreado(products))).not.toContain('stock');
   });
 
@@ -263,7 +263,7 @@ describe('R15, R16, R21 — producto nuevo', () => {
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
     await createProduct(ALTA_VALIDA, ADMIN);
-    await createProduct({ ...ALTA_VALIDA, stock: 0 }, ADMIN);
+    await createProduct({ ...ALTA_VALIDA, stock: '0' }, ADMIN);
 
     expect(products.create).not.toHaveBeenCalled();
   });
@@ -276,10 +276,10 @@ describe('R3 — existencia cero', () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
-    await createProduct({ ...ALTA_VALIDA, stock: 0 }, ADMIN);
+    await createProduct({ ...ALTA_VALIDA, stock: '0' }, ADMIN);
 
     expect(products.createWithFirstBatch).toHaveBeenCalledTimes(1);
-    expect(loteCreado(products).stock).toBe(0);
+    expect(loteCreado(products).stock).toBe('0');
   });
 });
 
@@ -298,7 +298,7 @@ describe('R6, R7, R10 — el costo que se guarda', () => {
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
     await createProduct(
-      { ...ALTA_VALIDA, unitCost: undefined, totalCost: '10', stock: 3 },
+      { ...ALTA_VALIDA, unitCost: undefined, totalCost: '10', stock: '3' },
       ADMIN,
     );
 
@@ -313,7 +313,7 @@ describe('R6, R7, R10 — el costo que se guarda', () => {
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
     await createProduct(
-      { ...ALTA_VALIDA, unitCost: '12.5000', totalCost: '999999', stock: 4 },
+      { ...ALTA_VALIDA, unitCost: '12.5000', totalCost: '999999', stock: '4' },
       ADMIN,
     );
 
@@ -423,7 +423,7 @@ describe('R17, R18 — el nombre corresponde a un producto que ya existe', () =>
     // Lo que no viaja al puerto no se puede escribir por accidente.
     const { products, createProduct } = montarConExistente();
 
-    await createProduct({ ...ALTA_VALIDA, stock: 999, qtyAlert: 888, name: 'Otro nombre' }, ADMIN);
+    await createProduct({ ...ALTA_VALIDA, stock: '999', qtyAlert: '888', name: 'Otro nombre' }, ADMIN);
 
     const llamada = products.addBatchToAlive.mock.calls[0];
     expect(llamada).toHaveLength(4);

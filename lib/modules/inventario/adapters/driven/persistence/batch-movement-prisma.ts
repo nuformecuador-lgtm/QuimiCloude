@@ -52,7 +52,7 @@ function toMovementView(row: MovementRow): InventoryMovementView {
   return {
     id: row.id,
     kind: row.kind as InventoryMovementView['kind'],
-    quantity: row.quantity.toNumber(),
+    quantity: row.quantity.toFixed(4),
     reason: row.reason as MovementReason | null,
     authorName: row.createdBy,
     createdAt: row.createdAt.toISOString(),

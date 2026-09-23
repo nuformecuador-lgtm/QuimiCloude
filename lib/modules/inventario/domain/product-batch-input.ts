@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { compareQuantities } from './decimal-quantity';
 import { productFieldsShape } from './product-input';
 import { deriveUnitCost } from './unit-cost';
 
@@ -24,8 +25,10 @@ const amountSchema = z
 /** Que la presentacion exista lo garantiza la FK, no zod. */
 const presentationIdSchema = z.string().uuid();
 
-/** La existencia es del lote que se crea, no del producto: el alta la declara por su cuenta. */
-const stockSchema = z.number().int().min(0);
+/** La existencia es del lote que se crea, no del producto: el alta la declara por su cuenta.
+ *  Decimal de hasta diez enteros y cuatro decimales, sin signo: el cero es una existencia
+ *  valida, la negativa no tiene forma que acepte el patron. */
+const stockSchema = z.string().trim().regex(DECIMAL_PATTERN);
 
 export const PRODUCT_BATCH_LOT_MAX_LENGTH = 60;
 
@@ -94,7 +97,7 @@ function esImporteAceptado(amount: unknown): boolean {
 }
 
 const MESSAGE_SIN_COSTO = 'Indica el costo unitario o el costo total.';
-const MESSAGE_EXISTENCIA = 'Indica una existencia de 1 o mas para derivar el costo del total.';
+const MESSAGE_EXISTENCIA = 'Indica una existencia mayor que 0 para derivar el costo del total.';
 const MESSAGE_TOTAL_INSUFICIENTE =
   'El costo total es demasiado bajo para esa existencia: el costo unitario quedaria en 0.';
 
@@ -120,7 +123,7 @@ export const createProductWithFirstBatchSchema = z
     // cobraria dos veces.
     if ((unitCost !== null && !esImporteAceptado(unitCost)) ||
         (totalCost !== null && !esImporteAceptado(totalCost)) ||
-        !Number.isInteger(value.stock)) {
+        !DECIMAL_PATTERN.test(value.stock)) {
       return;
     }
 
@@ -138,7 +141,7 @@ export const createProductWithFirstBatchSchema = z
     // Ya no puede ser `null`, pero el tipo no lo sabe; mejor estrecharlo que afirmarlo con `!`.
     if (totalCost === null) return;
 
-    if (value.stock < 1) {
+    if (compareQuantities(value.stock, '0') <= 0) {
       ctx.addIssue({ code: 'custom', message: MESSAGE_EXISTENCIA, path: ['stock'] });
       return;
     }

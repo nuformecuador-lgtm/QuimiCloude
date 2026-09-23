@@ -43,7 +43,7 @@ export function toProductRef(row: ProductCatalogRow): ProductRef {
 type ProductStockRow = {
   readonly id: string;
   readonly name: string;
-  readonly stock: number;
+  readonly stock: string;
   readonly unitId: string | null;
 };
 
@@ -62,7 +62,7 @@ async function findAliveProducts(
     },
     select: { id: true, name: true, stock: true, unitId: true },
   });
-  return rows.map((row) => ({ ...row, stock: row.stock.toNumber() }));
+  return rows.map((row) => ({ ...row, stock: row.stock.toFixed(4) }));
 }
 
 export async function findProductRefs(
@@ -103,7 +103,7 @@ export function toCostingBatch(row: CostingBatchRow): CostingBatch {
   return {
     productId: row.productId,
     lot: row.lot,
-    stock: row.stock.toNumber(),
+    stock: row.stock.toFixed(4),
     unitCost: row.unitCost.toFixed(4),
     unitId: row.presentation.unitId,
     purchaseDate: toCivilDate(row.purchaseDate),

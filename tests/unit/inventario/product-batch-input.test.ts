@@ -7,8 +7,8 @@ import { createProductWithFirstBatchSchema } from '@/lib/modules/inventario';
 
 const VALIDA = {
   name: 'Cloro Granulado',
-  stock: 10,
-  qtyAlert: 2,
+  stock: '10',
+  qtyAlert: '2',
   presentationId: '11111111-1111-4111-8111-111111111111',
   unitCost: '12.5000',
 } as const;
@@ -131,14 +131,14 @@ describe('createProductWithFirstBatchSchema', () => {
       ...VALIDA,
       unitCost: undefined,
       totalCost: '100',
-      stock: 0,
+      stock: '0',
     });
 
     expect(result.success).toBe(false);
     if (result.success) return;
     expect(result.error.issues).toHaveLength(1);
     expect(result.error.issues[0]?.path).toEqual(['stock']);
-    expect(result.error.issues[0]?.message).toMatch(/existencia de 1 o mas/i);
+    expect(result.error.issues[0]?.message).toMatch(/existencia mayor que 0/i);
   });
 
   it('rechaza el alta con solo costo total cuyo unitario derivado redondea a cero, en totalCost', () => {
@@ -147,7 +147,7 @@ describe('createProductWithFirstBatchSchema', () => {
       ...VALIDA,
       unitCost: undefined,
       totalCost: '0.0001',
-      stock: 5,
+      stock: '5',
     });
     expect(rechazados).toEqual(['totalCost']);
   });
@@ -158,7 +158,7 @@ describe('createProductWithFirstBatchSchema', () => {
       ...VALIDA,
       unitCost: undefined,
       totalCost: '10',
-      stock: 3,
+      stock: '3',
     });
     expect(parsed.totalCost).toBe('10');
     expect(parsed.unitCost ?? null).toBeNull();
@@ -171,7 +171,7 @@ describe('createProductWithFirstBatchSchema', () => {
       ...VALIDA,
       unitCost: '2.0000',
       totalCost: '999',
-      stock: 10,
+      stock: '10',
     });
 
     expect(parsed.unitCost).toBe('2.0000');
@@ -328,21 +328,32 @@ describe('createProductWithFirstBatchSchema', () => {
   it('acepta la existencia 0 mientras venga el costo unitario', () => {
     // Una existencia de 0 solo es motivo de rechazo cuando hay que dividir el total entre ella.
     expect(
-      createProductWithFirstBatchSchema.safeParse({ ...VALIDA, stock: 0 }).success,
+      createProductWithFirstBatchSchema.safeParse({ ...VALIDA, stock: '0' }).success,
     ).toBe(true);
   });
 
-  it('R10: el alta sigue aceptando y exigiendo la existencia como entero de 0 o mas', () => {
+  it('R3: el alta exige la existencia como decimal de hasta cuatro decimales, cero o mas', () => {
     expect(createProductWithFirstBatchSchema.safeParse({ ...VALIDA }).success).toBe(true);
 
     const sinExistencia: Record<string, unknown> = { ...VALIDA };
     delete sinExistencia.stock;
     expect(createProductWithFirstBatchSchema.safeParse(sinExistencia).success).toBe(false);
     expect(
-      createProductWithFirstBatchSchema.safeParse({ ...VALIDA, stock: -1 }).success,
+      createProductWithFirstBatchSchema.safeParse({ ...VALIDA, stock: '-1' }).success,
+    ).toBe(false);
+    // Decimal con hasta cuatro cifras: ya no se rechaza (R3).
+    expect(
+      createProductWithFirstBatchSchema.safeParse({ ...VALIDA, stock: '1.5' }).success,
+    ).toBe(true);
+    // Mas de cuatro decimales, mas de diez enteros o notacion no plana si se rechazan.
+    expect(
+      createProductWithFirstBatchSchema.safeParse({ ...VALIDA, stock: '1.00001' }).success,
     ).toBe(false);
     expect(
-      createProductWithFirstBatchSchema.safeParse({ ...VALIDA, stock: 1.5 }).success,
+      createProductWithFirstBatchSchema.safeParse({ ...VALIDA, stock: '12345678901' }).success,
+    ).toBe(false);
+    expect(
+      createProductWithFirstBatchSchema.safeParse({ ...VALIDA, stock: '1e3' }).success,
     ).toBe(false);
   });
 });

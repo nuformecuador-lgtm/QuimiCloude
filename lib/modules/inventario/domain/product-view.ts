@@ -23,7 +23,7 @@ export type ProductType = 'PRODUCT' | 'MACHINE' | 'PACKAGING';
  */
 export type NewProduct = {
   readonly name: string;
-  readonly qtyAlert?: number | null;
+  readonly qtyAlert?: string | null;
 };
 
 /**
@@ -46,11 +46,12 @@ export type ProductView = {
    * Sigue SIN ordenarse ni filtrarse (`PRODUCT_QUERYABLE`): no se ordena por una ruta de archivo.
    */
   readonly imagePath: string | null;
-  /** Existencia guardada en `products.stock`: la suma de los lotes en la unidad del producto. */
-  readonly stock: number;
+  /** Existencia guardada en `products.stock`: la suma de los lotes en la unidad del producto,
+   *  con sus cuatro decimales. */
+  readonly stock: string;
   /** Unidad guardada en `products.unit_id`, o `null` si el producto todavia no tiene lotes. */
   readonly unitId: UnitId | null;
-  readonly qtyAlert: number | null;
+  readonly qtyAlert: string | null;
   /** Tipo del producto: PRODUCT, MACHINE o PACKAGING. */
   readonly type: ProductType;
   readonly createdAt: Date;

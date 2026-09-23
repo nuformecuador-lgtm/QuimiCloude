@@ -18,7 +18,14 @@ import { z } from 'zod';
  */
 const productNameSchema = z.string().trim().min(1).max(120);
 
-const nonNegativeIntSchema = z.number().int().min(0);
+/**
+ * Duplicado a proposito del de `product-batch-input.ts`: de otro campo del mismo modulo solo se
+ * comparte por el dominio, no por una constante compartida entre archivos que no la exportan.
+ */
+const QTY_ALERT_PATTERN = /^\d{1,10}(\.\d{1,4})?$/;
+
+/** Decimal de hasta diez enteros y cuatro decimales, sin signo: el cero es una alerta valida. */
+const qtyAlertSchema = z.string().trim().regex(QTY_ALERT_PATTERN);
 
 /**
  * El producto no declara unidad en el borde: la unidad la declara la PRESENTACION
@@ -44,7 +51,7 @@ const nonNegativeIntSchema = z.number().int().min(0);
  */
 export const productFieldsShape = {
   name: productNameSchema,
-  qtyAlert: nonNegativeIntSchema,
+  qtyAlert: qtyAlertSchema,
 } as const;
 
 export const createProductSchema = z.strictObject({ ...productFieldsShape });

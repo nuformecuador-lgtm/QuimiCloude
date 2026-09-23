@@ -162,7 +162,7 @@ function newProduct(overrides: Partial<NewProduct> = {}): NewProduct {
 function newBatch(fixture: Fixture, overrides: Partial<NewProductBatch> = {}): NewProductBatch {
   return {
     presentationId: fixture.presentationId,
-    stock: 10,
+    stock: '10',
     unitCost: '2.5000',
     lot: null,
     purchaseDate: '2026-09-01',
@@ -229,7 +229,7 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
     const productIds: string[] = [];
 
     try {
-      const creado = await createWithFirstBatch(newProduct(), newBatch(fixture, { stock: 12 }), new Date(), ambito(fixture));
+      const creado = await createWithFirstBatch(newProduct(), newBatch(fixture, { stock: '12' }), new Date(), ambito(fixture));
       productIds.push(creado.id);
 
       await assertLedgerBalances(creado.batchId);
@@ -243,10 +243,10 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
     const productIds: string[] = [];
 
     try {
-      const primero = await createWithFirstBatch(newProduct(), newBatch(fixture, { stock: 5 }), new Date(), ambito(fixture));
+      const primero = await createWithFirstBatch(newProduct(), newBatch(fixture, { stock: '5' }), new Date(), ambito(fixture));
       productIds.push(primero.id);
 
-      const agregado = await addBatchToAlive(primero.id, newBatch(fixture, { stock: 8 }), new Date(), ambito(fixture));
+      const agregado = await addBatchToAlive(primero.id, newBatch(fixture, { stock: '8' }), new Date(), ambito(fixture));
       if (agregado === null) throw new Error('el producto deberia seguir vivo');
 
       await assertLedgerBalances(primero.batchId);
@@ -261,16 +261,16 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
     const productIds: string[] = [];
 
     try {
-      const creado = await createWithFirstBatch(newProduct(), newBatch(fixture, { stock: 20 }), new Date(), ambito(fixture));
+      const creado = await createWithFirstBatch(newProduct(), newBatch(fixture, { stock: '20' }), new Date(), ambito(fixture));
       productIds.push(creado.id);
 
-      const sumado = await adjustBatchStock(creado.batchId, 6, 'conteo_fisico', fixture.actorId, new Date(), ambito(fixture));
+      const sumado = await adjustBatchStock(creado.batchId, '6', 'conteo_fisico', fixture.actorId, new Date(), ambito(fixture));
       if (sumado === null) throw new Error('el lote deberia existir');
-      expect(sumado.stock).toBe(26);
+      expect(sumado.stock).toBe('26.0000');
 
-      const restado = await adjustBatchStock(creado.batchId, -9, 'merma', fixture.actorId, new Date(), ambito(fixture));
+      const restado = await adjustBatchStock(creado.batchId, '-9', 'merma', fixture.actorId, new Date(), ambito(fixture));
       if (restado === null) throw new Error('el lote deberia existir');
-      expect(restado.stock).toBe(17);
+      expect(restado.stock).toBe('17.0000');
 
       await assertLedgerBalances(creado.batchId);
     } finally {
@@ -283,7 +283,7 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
     const productIds: string[] = [];
 
     try {
-      const creado = await createWithFirstBatch(newProduct(), newBatch(fixture, { stock: 4 }), new Date(), ambito(fixture));
+      const creado = await createWithFirstBatch(newProduct(), newBatch(fixture, { stock: '4' }), new Date(), ambito(fixture));
       productIds.push(creado.id);
 
       // Ningun camino del repositorio escribe asi: es exactamente el descuadre que R29 vigila.

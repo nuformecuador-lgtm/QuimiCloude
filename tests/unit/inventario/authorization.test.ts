@@ -73,14 +73,14 @@ function actorCon(...permissions: readonly PermissionCode[]): Actor {
  *  `product_batches` (2026-09-09). */
 const PRODUCTO_VALIDO = {
   name: 'Acido sulfurico',
-  qtyAlert: 0,
+  qtyAlert: '0',
 };
 
 /** QC-90 (R1): el ALTA ya no acepta un producto pelado -siempre crea su primer lote-, asi
  *  que el fixture del alta lleva ademas la existencia del lote, presentacion y costo. */
 const PRODUCTO_VALIDO_CON_LOTE = {
   ...PRODUCTO_VALIDO,
-  stock: 0,
+  stock: '0',
   presentationId: '11111111-1111-4111-8111-111111111111',
   unitCost: '10.0000',
 };
@@ -97,7 +97,7 @@ const PRESENTACION_VALIDA = {
  *  conjunto cerrado; el `batchId` es un uuid cualquiera porque aqui no hay base. */
 const AJUSTE_VALIDO = {
   batchId: '22222222-2222-4222-8222-222222222222',
-  delta: 2,
+  delta: '2',
   reason: 'merma',
 };
 
@@ -200,9 +200,9 @@ const PRODUCTO_EN_BASE = {
   id: 'producto-1',
   name: 'Acido sulfurico',
   imagePath: null,
-  stock: 0,
+  stock: '0.0000',
   unitId: null,
-  qtyAlert: 0,
+  qtyAlert: '0.0000',
   type: 'PRODUCT' as const,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -236,7 +236,7 @@ function montarReposPermisivos(): Repos {
         batchId: 'lote-1',
         lot: '1',
       })),
-      adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(async () => ({ stock: 1 })),
+      adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(async () => ({ stock: '1.0000' })),
       findBatchesOfAliveProduct: vi.fn<ProductRepository['findBatchesOfAliveProduct']>(async () => []),
       findBatchMovements: vi.fn<ProductRepository['findBatchMovements']>(async () => []),
     },

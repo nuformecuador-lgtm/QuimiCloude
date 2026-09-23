@@ -73,7 +73,7 @@ function directorioQueExplota(): PeopleDirectory {
   } as unknown as PeopleDirectory;
 }
 
-const ENTRADA_VALIDA = { batchId: LOTE, delta: -3, reason: 'merma' };
+const ENTRADA_VALIDA = { batchId: LOTE, delta: '-3', reason: 'merma' };
 
 describe('QC-92 R20 — el permiso se exige en la primera linea del ajuste', () => {
   const sinPermiso: ReadonlyArray<{ etiqueta: string; actor: Actor | null | undefined }> = [
@@ -104,19 +104,22 @@ describe('QC-92 R20 — el permiso se exige en la primera linea del ajuste', () 
   });
 });
 
-describe('QC-92 R3 — la cantidad del ajuste', () => {
+describe('QC-92 R4 — la cantidad decimal del ajuste', () => {
   const entradasInvalidas: ReadonlyArray<{ etiqueta: string; entrada: unknown }> = [
-    { etiqueta: 'delta cero', entrada: { batchId: LOTE, delta: 0, reason: 'merma' } },
-    { etiqueta: 'delta no entero', entrada: { batchId: LOTE, delta: 1.5, reason: 'merma' } },
+    { etiqueta: 'delta cero', entrada: { batchId: LOTE, delta: '0', reason: 'merma' } },
+    { etiqueta: 'delta cero con decimales', entrada: { batchId: LOTE, delta: '-0.0000', reason: 'merma' } },
+    { etiqueta: 'delta de mas de cuatro decimales', entrada: { batchId: LOTE, delta: '1.00001', reason: 'merma' } },
+    { etiqueta: 'delta en notacion cientifica', entrada: { batchId: LOTE, delta: '1e3', reason: 'merma' } },
+    { etiqueta: 'delta numerico, no cadena', entrada: { batchId: LOTE, delta: 1.5, reason: 'merma' } },
     { etiqueta: 'delta ausente', entrada: { batchId: LOTE, reason: 'merma' } },
     {
       etiqueta: 'batchId que no es uuid',
-      entrada: { batchId: 'lote-1', delta: 2, reason: 'merma' },
+      entrada: { batchId: 'lote-1', delta: '2', reason: 'merma' },
     },
   ];
 
   for (const { etiqueta, entrada } of entradasInvalidas) {
-    it(`R3: rechaza ${etiqueta} sin tocar el repositorio`, async () => {
+    it(`R4: rechaza ${etiqueta} sin tocar el repositorio`, async () => {
       const dobles = montarDobles();
       const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
 
@@ -124,6 +127,18 @@ describe('QC-92 R3 — la cantidad del ajuste', () => {
       expect(dobles.adjustBatchStock).not.toHaveBeenCalled();
     });
   }
+
+  it('R4: acepta un delta con hasta cuatro decimales', async () => {
+    const dobles = montarDobles();
+    const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
+
+    await expect(
+      ajustar({ batchId: LOTE, delta: '1.5', reason: 'merma' }, ADMINISTRADOR),
+    ).resolves.toEqual({ stock: 7 });
+    expect(dobles.adjustBatchStock).toHaveBeenCalledWith(LOTE, '1.5', 'merma', 'actor-1', AHORA, {
+      companyId: 'company-a',
+    });
+  });
 });
 
 describe('QC-92 R8 — el motivo del conjunto cerrado', () => {
@@ -153,10 +168,10 @@ describe('QC-92 R8 — el motivo del conjunto cerrado', () => {
       const dobles = montarDobles();
       const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
 
-      await expect(ajustar({ batchId: LOTE, delta: 2, reason }, ADMINISTRADOR)).resolves.toEqual({
+      await expect(ajustar({ batchId: LOTE, delta: '2', reason }, ADMINISTRADOR)).resolves.toEqual({
         stock: 7,
       });
-      expect(dobles.adjustBatchStock).toHaveBeenCalledWith(LOTE, 2, reason, 'actor-1', AHORA, {
+      expect(dobles.adjustBatchStock).toHaveBeenCalledWith(LOTE, '2', reason, 'actor-1', AHORA, {
         companyId: 'company-a',
       });
     }
@@ -169,9 +184,9 @@ describe('QC-92 R1/R2 — el delta viaja con signo y nadie lee el stock previo',
     const ajustar = createAdjustBatchStock({ products: dobles.products, now: () => AHORA });
 
     await expect(
-      ajustar({ batchId: LOTE, delta: -5, reason: 'rotura' }, ADMINISTRADOR),
+      ajustar({ batchId: LOTE, delta: '-5', reason: 'rotura' }, ADMINISTRADOR),
     ).resolves.toEqual({ stock: 7 });
-    expect(dobles.adjustBatchStock).toHaveBeenCalledWith(LOTE, -5, 'rotura', 'actor-1', AHORA, {
+    expect(dobles.adjustBatchStock).toHaveBeenCalledWith(LOTE, '-5', 'rotura', 'actor-1', AHORA, {
       companyId: 'company-a',
     });
   });
@@ -245,7 +260,7 @@ describe('QC-92 R21 — listar los lotes de un producto exige inventario.consult
       {
         id: LOTE,
         lot: '1',
-        stock: 10,
+        stock: '10',
         unitId: 'unidad-1',
         purchaseDate: '2026-09-01',
         expiryDate: null,
@@ -285,7 +300,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
     {
       id: 'asiento-2',
       kind: 'adjustment',
-      quantity: -3,
+      quantity: '-3',
       reason: 'merma',
       authorName: 'usuario-conocido',
       createdAt: '2026-09-18T10:00:00.000Z',
@@ -293,7 +308,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
     {
       id: 'asiento-1',
       kind: 'opening',
-      quantity: 10,
+      quantity: '10',
       reason: null,
       authorName: 'usuario-desaparecido',
       createdAt: '2026-09-17T10:00:00.000Z',

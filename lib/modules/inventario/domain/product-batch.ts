@@ -2,7 +2,7 @@
 export type NewProductBatch = {
   readonly presentationId: string;
 
-  readonly stock: number;
+  readonly stock: string;
 
   readonly unitCost: string;
 

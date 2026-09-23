@@ -151,12 +151,12 @@ export interface ProductRepository {
    */
   adjustBatchStock(
     batchId: string,
-    delta: number,
+    delta: string,
     reason: MovementReason,
     actorId: string,
     now: Date,
     scope: InventoryScope,
-  ): Promise<{ stock: number } | null>;
+  ): Promise<{ stock: string } | null>;
 
   /**
    * Todos los lotes del producto, siempre que el producto siga VIVO -el filtro de vivos es

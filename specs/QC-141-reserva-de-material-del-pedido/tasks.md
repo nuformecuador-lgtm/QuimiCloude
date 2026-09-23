@@ -69,7 +69,7 @@ Archivos: `lib/modules/inventario/domain/decimal-quantity.ts` (nuevo),
 (con los lotes `'9'` y `'10'`), y `tests/unit/pedidos/order-cost.test.ts` sigue verde **sin
 cambios**.
 
-## T4 — Existencia decimal en el módulo `inventario` `[depende de T2, T3]`
+## [x] T4 — Existencia decimal en el módulo `inventario` `[depende de T2, T3]`
 
 Archivos: los de la tabla de `design.md > 2.1` bajo `lib/modules/inventario/**`, y
 `lib/modules/recetas/domain/{recipe-view,get-recipe}.ts`.

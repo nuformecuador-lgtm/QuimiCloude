@@ -5,7 +5,6 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 import { BatchDuplicateLotError, BatchStockNegativeError, ValidationError } from '../../../domain/errors';
 import { normalizeProductName } from '../../../domain/product-name';
-import { singleUnitStock } from '../../../domain/product-stock';
 
 import { writeMovement } from './batch-movement-prisma';
 import {
@@ -20,6 +19,7 @@ import {
   numberRangeCondition,
   selectCondition,
   textCondition,
+  type NumberRangeCondition,
 } from './list-query-sql';
 
 import type { InventoryScope } from '../../../domain/inventory-scope';
@@ -54,9 +54,9 @@ export function toProductView(row: ProductRow): ProductView {
     id: row.id,
     name: row.name,
     imagePath: row.imagePath,
-    stock: row.stock.toNumber(),
+    stock: row.stock.toFixed(4),
     unitId: row.unitId,
-    qtyAlert: row.qtyAlert === null ? null : row.qtyAlert.toNumber(),
+    qtyAlert: row.qtyAlert === null ? null : row.qtyAlert.toFixed(4),
     type: row.type as ProductType,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -164,6 +164,16 @@ export function productOrderBy(
   }
 }
 
+/** Del rango generico del contrato al rango en `Prisma.Decimal`: `stock` y `qtyAlert` son
+ *  columnas `Decimal(14,4)`, y compararlas contra un `number` de JavaScript perderia precision
+ *  a partir de 2^53. Mismo patron que `toDecimalRange` de `pedidos/order-prisma.ts`. */
+function toDecimalRange(condition: NumberRangeCondition): { gte?: Prisma.Decimal; lte?: Prisma.Decimal } {
+  return {
+    ...(condition.gte === undefined ? {} : { gte: new Prisma.Decimal(condition.gte) }),
+    ...(condition.lte === undefined ? {} : { lte: new Prisma.Decimal(condition.lte) }),
+  };
+}
+
 function productFilterWhere(
   field: string,
   value: ListFilterValue,
@@ -182,8 +192,8 @@ function productFilterWhere(
     case 'numberRange': {
       const condition = numberRangeCondition(value.min, value.max);
       if (condition === null) return null;
-      if (field === 'stock') return { stock: condition };
-      if (field === 'qtyAlert') return { qtyAlert: condition };
+      if (field === 'stock') return { stock: toDecimalRange(condition) };
+      if (field === 'qtyAlert') return { qtyAlert: toDecimalRange(condition) };
       return null;
     }
     case 'dateRange': {
@@ -287,32 +297,33 @@ export async function findAliveIdByNameInPresentationUnit(
 }
 
 /**
- * Suma los lotes vivos-de-empresa del producto y escribe `products.stock`. No exportada y sin
- * tocar `product_batches`: quien la llama ya escribio el lote (o el ajuste) y su asiento antes
- * de invocarla, en la MISMA transaccion.
+ * Suma los lotes vivos-de-empresa del producto y escribe `products.stock`. No toca
+ * `product_batches`: quien la llama ya escribio el lote (o el ajuste) y su asiento antes de
+ * invocarla, en la MISMA transaccion. Exportada para el consumo del pedido.
+ *
+ * La suma la hace Postgres en `numeric`, sobre las filas de la MISMA empresa: pasar por
+ * JavaScript convertiria cada `Decimal` a un tipo intermedio antes de sumar y perderia
+ * precision. Que los lotes sumados compartan unidad ya lo garantiza el disparador
+ * `product_batches_check_unit`, asi que este `UPDATE` no necesita comprobarlo.
  *
  * El `UPDATE` es SQL crudo -y no `updateMany`- para no disparar el `@updatedAt` de Prisma: el
  * recalculo no debe mover `products.updated_at`.
  */
-async function recalculateProductStock(
+export async function recalculateProductStock(
   tx: Prisma.TransactionClient,
   productId: string,
   scope: InventoryScope,
 ): Promise<void> {
   const { companyId } = companyScopeColumns(scope);
 
-  const rows = await tx.productBatch.findMany({
-    where: { AND: [batchCompanyScope(scope), { productId }] },
-    select: { stock: true, presentation: { select: { unitId: true } } },
-  });
-
-  const stock = singleUnitStock(
-    rows.map((row) => ({ stock: row.stock.toNumber(), unitId: row.presentation.unitId })),
-  );
-
   await tx.$executeRaw(Prisma.sql`
     UPDATE "products"
-       SET "stock" = ${stock}
+       SET "stock" = COALESCE((
+             SELECT sum("stock")
+               FROM "product_batches"
+              WHERE "product_id" = ${productId}::uuid
+                AND "company_id" = ${companyId}::uuid
+           ), 0)
      WHERE "id" = ${productId}::uuid
        AND "company_id" = ${companyId}::uuid
   `);
@@ -676,7 +687,7 @@ function toBatchView(row: BatchViewRow): ProductBatchView {
   return {
     id: row.id,
     lot: row.lot,
-    stock: row.stock.toNumber(),
+    stock: row.stock.toFixed(4),
     unitId: row.presentation.unitId,
     purchaseDate: toCivilDate(row.purchaseDate),
     expiryDate: row.expiryDate === null ? null : toCivilDate(row.expiryDate),
@@ -722,12 +733,12 @@ type AdjustProductRow = { readonly id: string };
  */
 export async function adjustBatchStock(
   batchId: string,
-  delta: number,
+  delta: string,
   reason: MovementReason,
   actorId: string,
   now: Date,
   scope: InventoryScope,
-): Promise<{ stock: number } | null> {
+): Promise<{ stock: string } | null> {
   const { companyId } = companyScopeColumns(scope);
 
   try {
@@ -745,7 +756,7 @@ export async function adjustBatchStock(
 
       const updated = await tx.productBatch.update({
         where: { id: batchId, companyId },
-        data: { stock: { increment: delta }, updatedBy: actorId, updatedAt: now },
+        data: { stock: { increment: new Prisma.Decimal(delta) }, updatedBy: actorId, updatedAt: now },
         select: { stock: true },
       });
 
@@ -753,7 +764,7 @@ export async function adjustBatchStock(
 
       await recalculateProductStock(tx, product.id, scope);
 
-      return { stock: updated.stock.toNumber() };
+      return { stock: updated.stock.toFixed(4) };
     });
   } catch (error) {
     if (isBatchNotFound(error)) return null;

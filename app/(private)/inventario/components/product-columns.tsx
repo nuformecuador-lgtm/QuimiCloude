@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
-import { productDisplayName, type ProductView } from '@/lib/modules/inventario';
+import { compareQuantities, productDisplayName, type ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 /**
@@ -84,7 +84,7 @@ export const ACTIONS_COLUMN_LABEL = 'Acciones';
  */
 export const PRODUCT_DEFAULT_PINNED_COLUMNS: readonly string[] = [IMAGE_COLUMN_ID];
 
-function formatOptionalInt(value: number | null): string {
+function formatOptionalInt(value: string | null): string {
   return value === null ? EMPTY_CELL : String(value);
 }
 
@@ -107,7 +107,7 @@ function unitLabel(unitId: UnitRef['id'], units: readonly UnitRef[] | undefined)
  * una funcion de presentacion en un archivo de UI, que es justo lo que esa prohibicion deja vivo.
  */
 function isBelowAlert(product: ProductView): boolean {
-  return typeof product.qtyAlert === 'number' && product.qtyAlert > product.stock;
+  return typeof product.qtyAlert === 'string' && compareQuantities(product.qtyAlert, product.stock) > 0;
 }
 
 /**

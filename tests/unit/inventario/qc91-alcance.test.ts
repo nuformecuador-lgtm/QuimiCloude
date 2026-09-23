@@ -265,14 +265,18 @@ export function llamaAUpdateFueraDe(fuente: string, nombreFuncionPermitida: stri
 // ---------------------------------------------------------------------------------------------
 
 describe('QC-91 R1 — la existencia sale de sumar filas de lote, no de un numero propio', () => {
-  it('R1: recalculateProductStock arma la existencia desde los lotes con singleUnitStock', () => {
+  it('R1 (QC-141 R6): recalculateProductStock suma los lotes en SQL, no en JavaScript', () => {
+    // QC-141 movio la suma de `singleUnitStock` (JS) a un `SELECT sum(...)` que hace Postgres en
+    // `numeric`: pasar un `Decimal` por `number` antes de sumar es justo el redondeo binario que
+    // R6 prohibe. El `SUM` en SQL crudo ya no es un hallazgo aqui, es la forma nueva.
     const cuerpo = cuerpoDeFuncion(leer(PRODUCT_PRISMA), 'recalculateProductStock');
     expect(
       cuerpo,
       'recalculateProductStock no existe con esa forma: el sujeto de esta prueba cambio',
     ).not.toBeNull();
-    expect(derivaDeLotesConSumStockByUnit(cuerpo as string)).toBe(true);
-    expect(sumaPropia(cuerpo as string)).toEqual([]);
+    expect(cuerpo as string).toMatch(/SELECT\s+sum\(/i);
+    expect(cuerpo as string).toMatch(/"product_batches"/);
+    expect(cuerpo as string).not.toMatch(/singleUnitStock\s*\(/);
   });
 
   it('R1: toProductView ya no deriva nada de los lotes: lee la columna guardada tal cual', () => {

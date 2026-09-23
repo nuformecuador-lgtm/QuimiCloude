@@ -67,7 +67,7 @@ const FILA_RECETA: RecipeRow = {
 const PRODUCTO_REF: ProductRef = {
   id: LINEA_VALIDA.productId,
   name: 'Acido sulfurico',
-  stockByUnit: [{ unitId: '55555555-5555-4555-8555-555555555555', quantity: 3 }],
+  stockByUnit: [{ unitId: '55555555-5555-4555-8555-555555555555', quantity: '3.0000' }],
 };
 
 const UNIDAD_REF: UnitRef = { id: UNIT_ID, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null };
@@ -415,18 +415,18 @@ describe('R12, R13, R14, R15 — existencia de la linea en su propia unidad', ()
     const getRecipe = montarConProducto({
       id: LINEA_VALIDA.productId,
       name: 'Acido sulfurico',
-      stockByUnit: [{ unitId: UNIT_ID, quantity: 15 }],
+      stockByUnit: [{ unitId: UNIT_ID, quantity: '15.0000' }],
     });
 
     const detalle = await getRecipe('receta-1', ADMIN);
-    expect(detalle.lines[0].productStock).toBe(15);
+    expect(detalle.lines[0].productStock).toBe('15.0000');
   });
 
   it('R13: con lotes pero ninguno en la unidad de la linea, la existencia es null', async () => {
     const getRecipe = montarConProducto({
       id: LINEA_VALIDA.productId,
       name: 'Acido sulfurico',
-      stockByUnit: [{ unitId: '55555555-5555-4555-8555-555555555555', quantity: 3 }],
+      stockByUnit: [{ unitId: '55555555-5555-4555-8555-555555555555', quantity: '3.0000' }],
     });
 
     const detalle = await getRecipe('receta-1', ADMIN);
@@ -441,7 +441,7 @@ describe('R12, R13, R14, R15 — existencia de la linea en su propia unidad', ()
     });
 
     const detalle = await getRecipe('receta-1', ADMIN);
-    expect(detalle.lines[0].productStock).toBe(0);
+    expect(detalle.lines[0].productStock).toBe('0.0000');
   });
 
   it('R15: producto de baja, la existencia es null', async () => {

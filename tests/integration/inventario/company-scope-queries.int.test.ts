@@ -189,7 +189,7 @@ async function sembrarLote(
 function loteNuevo(empresa: Empresa, presentationId: string): NewProductBatch {
   return {
     presentationId,
-    stock: 2,
+    stock: '2',
     unitCost: '1.5000',
     lot: null,
     purchaseDate: '2026-09-01',
@@ -414,7 +414,7 @@ describe('R14 — la busqueda y los filtros NO ensanchan lo visible', () => {
     );
 
     expect(pagina.total).toBe(3);
-    expect(pagina.items.map((p) => p.qtyAlert)).toEqual([3, 2]);
+    expect(pagina.items.map((p) => p.qtyAlert)).toEqual(['3.0000', '2.0000']);
     for (const ajeno of B.productos) {
       expect(pagina.items.map((p) => p.id)).not.toContain(ajeno);
     }
@@ -447,7 +447,7 @@ describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', (
 
     const resultado = await updateAliveProduct(
       ajeno,
-      { name: 'Nombre inyectado desde A', qtyAlert: 1 },
+      { name: 'Nombre inyectado desde A', qtyAlert: '1' },
       new Date(),
       ambitoDe(A),
     );
@@ -464,7 +464,7 @@ describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', (
 
     const resultado = await updateAliveProduct(
       propio,
-      { name: nuevoNombre, qtyAlert: 92 },
+      { name: nuevoNombre, qtyAlert: '92' },
       new Date(),
       ambitoDe(B),
     );
@@ -579,7 +579,7 @@ describe('R17 — el alta escribe la empresa del AMBITO, no la de la entrada', (
     // `NewProduct` no declara empresa, asi que la entrada no puede elegirla: falta ver que se
     // escribe la correcta.
     const name = `${MARCA} Alta en A ${token().slice(0, 8)}`;
-    const creado = await createProduct({ name, qtyAlert: 1 }, AHORA, ambitoDe(A));
+    const creado = await createProduct({ name, qtyAlert: '1' }, AHORA, ambitoDe(A));
     A.productos.push(creado.id);
 
     expect(await empresaDelProducto(creado.id)).toBe(A.companyId);
@@ -592,7 +592,7 @@ describe('R17 — el alta escribe la empresa del AMBITO, no la de la entrada', (
   it('createWithFirstBatch escribe la MISMA empresa en el producto y en su lote', async () => {
     const name = `${MARCA} Alta con lote en A ${token().slice(0, 8)}`;
     const creado = await createWithFirstBatch(
-      { name, qtyAlert: 1 },
+      { name, qtyAlert: '1' },
       loteNuevo(A, A.presentaciones[0] ?? ''),
       AHORA,
       ambitoDe(A),
@@ -667,7 +667,7 @@ describe('R18 — adjustBatchStock / findBatchesOfAliveProduct / findBatchMoveme
     const antes = await fotoLote(ajeno);
     const asientosAntes = await prisma.inventoryMovement.count({ where: { batchId: ajeno } });
 
-    const resultado = await adjustBatchStock(ajeno, 1, 'conteo_fisico', A.userId, new Date(), ambitoDe(A));
+    const resultado = await adjustBatchStock(ajeno, '1', 'conteo_fisico', A.userId, new Date(), ambitoDe(A));
 
     expect(resultado).toBeNull();
     expect(await fotoLote(ajeno)).toBe(antes);
@@ -682,12 +682,12 @@ describe('R18 — adjustBatchStock / findBatchesOfAliveProduct / findBatchMoveme
     const asientosAntes = await prisma.inventoryMovement.count({ where: { batchId: propio } });
     const delta = 1;
 
-    const resultado = await adjustBatchStock(propio, delta, 'conteo_fisico', B.userId, new Date(), ambitoDe(B));
+    const resultado = await adjustBatchStock(propio, String(delta), 'conteo_fisico', B.userId, new Date(), ambitoDe(B));
 
-    expect(resultado).toEqual({ stock: 7 + delta });
+    expect(resultado).toEqual({ stock: (7 + delta).toFixed(4) });
     expect(await fotoLote(propio)).not.toBe(antes);
     const fila = await prisma.productBatch.findUniqueOrThrow({ where: { id: propio } });
-    expect(fila.stock).toBe(7 + delta);
+    expect(fila.stock.toFixed(4)).toBe((7 + delta).toFixed(4));
     expect(fila.companyId).toBe(B.companyId);
 
     const asientosDespues = await prisma.inventoryMovement.findMany({
@@ -697,7 +697,7 @@ describe('R18 — adjustBatchStock / findBatchesOfAliveProduct / findBatchMoveme
     expect(asientosDespues).toHaveLength(asientosAntes + 1);
     const asiento = asientosDespues[0];
     expect(asiento?.kind).toBe('adjustment');
-    expect(asiento?.quantity).toBe(delta);
+    expect(asiento?.quantity.toFixed(4)).toBe(delta.toFixed(4));
     expect(asiento?.reason).toBe('conteo_fisico');
     expect(asiento?.companyId).toBe(B.companyId);
   });
@@ -744,7 +744,7 @@ async function retrato(empresa: Empresa): Promise<string> {
   const fichaAjena = await findAliveProductById(ajeno.productos[0] ?? '', ambitoDe(empresa));
   const escrituraAjena = await updateAliveProduct(
     ajeno.productos[0] ?? '',
-    { name: 'no deberia escribirse', qtyAlert: 0 },
+    { name: 'no deberia escribirse', qtyAlert: '0' },
     new Date(),
     ambitoDe(empresa),
   );

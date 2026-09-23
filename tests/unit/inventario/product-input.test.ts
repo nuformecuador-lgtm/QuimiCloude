@@ -15,7 +15,7 @@ import { pageQuerySchema } from '@/lib/modules/inventario/domain/page';
  * `safeParse` correcto fallaria por un motivo que ese caso no esta midiendo.
  * Su propia obligatoriedad tiene caso aparte, al final del describe.
  */
-const REQUERIDOS = { qtyAlert: 0 } as const;
+const REQUERIDOS = { qtyAlert: '0' } as const;
 
 /**
  * Unidad de fixture para las presentaciones (QC-80 R10): desde esta feature
@@ -158,8 +158,8 @@ describe('createProductSchema', () => {
     const error = await createProduct(
       {
         name: 'Producto',
-        stock: 0,
-        qtyAlert: 0,
+        stock: '0',
+        qtyAlert: '0',
         cost: '10.0000',
       },
       { id: 'actor-1', companyId: 'company-a', permissions: ['inventario.modificar'] },
@@ -215,10 +215,11 @@ describe('createProductSchema', () => {
     }
   });
 
-  it('exige qtyAlert, y lo sigue queriendo entero de 0 o mas', () => {
-    // DECISION DEL HUMANO, 2026-09-03: acota a R5, que lo declaraba opcional. La COLUMNA sigue
-    // siendo nullable -eso lo afirma `inventario-schema.test.ts`-; lo que cambia es lo que la
-    // aplicacion acepta. Ni ausente, ni nulo, ni negativo, ni con decimales.
+  it('exige qtyAlert, y ahora lo acepta decimal de hasta cuatro decimales, cero o mas', () => {
+    // DECISION DEL HUMANO, 2026-09-03 (acotada por QC-141, pregunta 5b): `qtyAlert` sigue
+    // obligatorio, pero la columna paso a `Decimal(14,4)` para compararse con la existencia sin
+    // convertir. Ni ausente, ni nulo, ni negativo, ni con mas de cuatro decimales, ni en
+    // notacion cientifica.
     const soloObligatoriosDeAntes = {
       name: 'Producto',
     };
@@ -228,17 +229,25 @@ describe('createProductSchema', () => {
       createProductSchema.safeParse({ ...soloObligatoriosDeAntes, qtyAlert: null }).success,
     ).toBe(false);
     expect(
-      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, qtyAlert: -1 }).success,
+      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, qtyAlert: '-1' }).success,
     ).toBe(false);
     expect(
-      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, qtyAlert: 1.5 }).success,
+      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, qtyAlert: '1.00001' }).success,
     ).toBe(false);
+    expect(
+      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, qtyAlert: '1e3' }).success,
+    ).toBe(false);
+
+    // Decimal de hasta cuatro cifras: ya no se rechaza.
+    expect(
+      createProductSchema.safeParse({ ...soloObligatoriosDeAntes, qtyAlert: '1.5' }).success,
+    ).toBe(true);
 
     const parsed = createProductSchema.parse({
       ...soloObligatoriosDeAntes,
-      qtyAlert: 3,
+      qtyAlert: '3',
     });
-    expect(parsed.qtyAlert).toBe(3);
+    expect(parsed.qtyAlert).toBe('3');
 
     // La existencia ya no cruza el borde del producto -ni en el alta ni en la edicion-, asi que
     // solo quedan nombre y alerta.
@@ -250,7 +259,7 @@ describe('createProductSchema', () => {
 
     expect(updateProductSchema.safeParse(base).success).toBe(true);
 
-    const conExistencia = updateProductSchema.safeParse({ ...base, stock: 5 });
+    const conExistencia = updateProductSchema.safeParse({ ...base, stock: '5' });
     expect(conExistencia.success).toBe(false);
     if (!conExistencia.success) {
       expect(

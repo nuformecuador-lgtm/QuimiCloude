@@ -14,10 +14,12 @@ export type GetRecipeDeps = {
   readonly images: RecipeImageStorage;
 };
 
-/** Existencia del producto en la unidad de la linea que lo pide: 0 sin lotes, `null` cuando
- *  hay lotes pero ninguno en esa unidad. */
-function stockInLineUnit(ref: ProductRef, unitId: string): number | null {
-  if (ref.stockByUnit.length === 0) return 0;
+const NO_BATCHES_STOCK = '0.0000';
+
+/** Existencia del producto en la unidad de la linea que lo pide: `'0.0000'` sin lotes, `null`
+ *  cuando hay lotes pero ninguno en esa unidad. */
+function stockInLineUnit(ref: ProductRef, unitId: string): string | null {
+  if (ref.stockByUnit.length === 0) return NO_BATCHES_STOCK;
   const match = ref.stockByUnit.find((entry) => entry.unitId === unitId);
   return match?.quantity ?? null;
 }
