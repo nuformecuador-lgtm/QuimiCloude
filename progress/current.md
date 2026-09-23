@@ -20,7 +20,7 @@
 
 ### QC-158 / QC-159 - lectura de PDF con IA a datos, del chat (2026-09-23)
 
-**QC-158** `catalogo-desde-pdf` (fullstack, high) ACOTADA y sembrada: 9 decisiones y 4 preguntas abiertas en `specs/QC-158-catalogo-desde-pdf/requirements.md`; enmienda R10 de QC-129 (avisado en QC-131). **QC-159** `formula-desde-pdf` (fullstack) nace sin sembrar, bloqueada por QC-142.
+**QC-158** `catalogo-desde-pdf` (fullstack, high) ACOTADA y sembrada: 9 decisiones y 4 preguntas abiertas en `specs/QC-158-catalogo-desde-pdf/requirements.md`; enmienda R10 de QC-129 (avisado en QC-131). **F1.0 de QC-158 hecho el 2026-09-23** (worktree montado; cupo `fullstack` 1 de 3 con QC-141; el cruce de archivos con QC-141 se mira en F2.0). **QC-159** `formula-desde-pdf` (fullstack) nace sin sembrar, bloqueada por QC-142.
 
 ### QC-131 - F1.0 (2026-09-23)
 
