@@ -56,6 +56,7 @@ export const ERROR_MESSAGE_KEY = {
   ai_unavailable: 'errors.ai_unavailable',
   presentation_unit_locked: 'errors.presentation_unit_locked',
   action_not_allowed: 'errors.action_not_allowed',
+  user_cannot_be_responsible: 'errors.user_cannot_be_responsible',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -138,4 +139,5 @@ export const ERROR_MESSAGES_ES = {
     'La presentacion ya tiene lotes y no puede cambiar de unidad.',
   // No es «no tienes permiso»: la operacion esta autorizada, lo que se rechaza es la accion.
   'errors.action_not_allowed': 'La accion no esta permitida.',
+  'errors.user_cannot_be_responsible': 'Esta persona no puede ser responsable de un pedido.',
 } as const satisfies Record<ErrorMessageKey, string>;

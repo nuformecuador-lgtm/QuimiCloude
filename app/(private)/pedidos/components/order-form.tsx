@@ -22,7 +22,6 @@ import {
 } from '@/components/ui/sheet';
 import {
   DEFAULT_ORDER_PRIORITY,
-  EDITABLE_STATUS_VALUES,
   ORDER_PRIORITY_VALUES,
   createOrderSchema,
   updateOrderSchema,
@@ -54,7 +53,7 @@ import {
   type OrderResponsiblesCatalog,
 } from './order-responsibles';
 import { isFinalOrderStatus } from './order-row-actions';
-import { ORDER_PRIORITY_LABELS, ORDER_STATUS_LABELS } from './order-status-badge';
+import { ORDER_PRIORITY_LABELS } from './order-status-badge';
 
 /**
  * QC-102 T14 — EN QUE SECCION abre el panel (R23, R24).
@@ -101,11 +100,9 @@ export const ORDER_SHEET_RESPONSIBLES_TESTID = 'order-sheet-responsibles';
  * este formulario emite **siempre** un valor valido y arranca con `DEFAULT_ORDER_PRIORITY`
  * preseleccionada.
  *
- * **R28, R29 — la edicion precarga y es REEMPLAZO COMPLETO** de los cinco campos mas el estado, y
- * es el UNICO sitio donde el estado se cambia. El selector de estado ofrece
- * `EDITABLE_STATUS_VALUES`, que **excluye `CANCELADO` por construccion** -se deriva de
- * `ORDER_STATUS_VALUES` en el contrato, no se escribe a mano aqui-: el unico camino a `CANCELADO`
- * es `cancelOrderAction`.
+ * La edicion precarga y es REEMPLAZO COMPLETO de los campos de negocio. El formulario de
+ * edicion no ofrece ningun control de estado: el estado no se cambia desde aqui, ni siquiera
+ * hacia `CANCELADO` -ese camino sigue siendo unicamente `cancelOrderAction`-.
  *
  * **R30 — no hay campo de fecha de solicitud** en ningun modo: la pone el sistema.
  *
@@ -133,7 +130,11 @@ export const ORDER_SHEET_RESPONSIBLES_TESTID = 'order-sheet-responsibles';
  */
 export const ORDER_BUSINESS_FIELDS = [RECIPE_FIELD, 'quantity', PRESENTATION_FIELD, 'priority'] as const;
 
-/** Campo que SOLO existe en la edicion (R26, R29). */
+/**
+ * El estado ya no tiene control propio en este formulario: ninguna de las tres constantes de
+ * abajo etiqueta ya ningun elemento del DOM. Se conservan porque otro archivo del repo las sigue
+ * exportando desde aqui.
+ */
 export const ORDER_STATUS_FIELD = 'status';
 
 export const ORDER_PRIORITY_SELECT_TESTID = 'order-priority-select';
@@ -146,9 +147,7 @@ export const ORDER_FORM_ERROR_TESTID = 'order-form-error';
 export const ORDER_FORM_SUBMIT_TESTID = 'order-form-submit';
 export const ORDER_FORM_CANCEL_TESTID = 'order-form-cancel';
 
-type OrderFieldName =
-  | (typeof ORDER_BUSINESS_FIELDS)[number]
-  | typeof ORDER_STATUS_FIELD;
+type OrderFieldName = (typeof ORDER_BUSINESS_FIELDS)[number];
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base md:text-base';
@@ -184,19 +183,18 @@ const FIELD_MESSAGES: Readonly<Record<OrderFieldName, string>> = {
   quantity: 'Escribe una cantidad decimal mayor que cero.',
   presentationId: 'Elige una presentación de la lista.',
   priority: 'Elige una de las prioridades disponibles.',
-  status: 'Elige uno de los estados disponibles.',
 };
 
 const FIELD_LABELS = {
   quantity: 'Cantidad',
   priority: 'Prioridad',
-  status: 'Estado',
 } as const;
 
 /**
  * Donde se pinta cada `code` estable de `pedidos/domain/errors.ts` (`design.md > 8`). Los codigos
- * que NO estan aqui -`order_not_found`, `duplicate_number`, `unauthorized`, `invalid_input` sin
- * campo senalado- van a la region `role="alert"` del formulario.
+ * que NO estan aqui -`order_not_found`, `duplicate_number`, `unauthorized`, `invalid_transition`,
+ * `invalid_input` sin campo senalado- van a la region `role="alert"` del formulario: sin control
+ * de estado en la pantalla, `invalid_transition` ya no puede senalar ningun campo.
  *
  * QC-70 (R20): las claves se tipan con `ErrorCode`, la union CERRADA del catalogo. **Ningun valor
  * cambia** -los dos codigos que esta pantalla mapea ya eran inequivocos y R19 los congela-; lo que
@@ -208,7 +206,6 @@ const CODE_TO_FIELD: Readonly<Partial<Record<ErrorCode, OrderFieldName>>> = {
   // `unit_not_found` ya no existe como codigo del modulo (2026-09-07): sin unidad en el pedido,
   // no hay nada que pueda emitirlo, y mantener la entrada seria mapear un error imposible.
   presentation_not_found: PRESENTATION_FIELD,
-  invalid_transition: ORDER_STATUS_FIELD,
 };
 
 /**
@@ -260,13 +257,10 @@ function readString(formData: FormData, name: string): string {
   return typeof value === 'string' ? value : '';
 }
 
-function readValues(formData: FormData, isEdit: boolean): FieldValues {
+function readValues(formData: FormData): FieldValues {
   const values: FieldValues = {};
   for (const field of ORDER_BUSINESS_FIELDS) {
     values[field] = readString(formData, field);
-  }
-  if (isEdit) {
-    values[ORDER_STATUS_FIELD] = readString(formData, ORDER_STATUS_FIELD);
   }
   return values;
 }
@@ -288,16 +282,6 @@ async function submit(
   const update = updateOrderAction.bind(null, order.id);
   const result = await update({ status: 'idle' }, formData);
   return result.status === 'error' ? result : { status: 'success' };
-}
-
-/**
- * Estado inicial del selector de edicion. `EDITABLE_STATUS_VALUES` no incluye `CANCELADO`, y un
- * pedido cancelado no llega hasta aqui -sus acciones de fila estan deshabilitadas (R24)-, pero el
- * desplegable tiene que arrancar con un valor que EXISTA entre sus opciones.
- */
-function editableStatusOf(order: OrderSummary): string {
-  const match = EDITABLE_STATUS_VALUES.find((value) => value === order.status);
-  return match ?? EDITABLE_STATUS_VALUES[0];
 }
 
 export type OrderFormProps = {
@@ -452,10 +436,10 @@ export function OrderForm({
   }
 
   async function save(_previous: OrderFormState, formData: FormData): Promise<OrderFormState> {
-    const values = readValues(formData, isEdit);
+    const values = readValues(formData);
 
-    // El esquema de la edicion es el del alta MAS el estado (reemplazo completo, R28). Se nombran
-    // los dos para que quede escrito de donde sale cada regla.
+    // El esquema del alta y el de la edicion son el mismo objeto (reemplazo completo); se
+    // nombran los dos para que quede escrito de donde sale cada regla.
     const parsed = isEdit
       ? updateOrderSchema.safeParse(values)
       : createOrderSchema.safeParse(values);
@@ -639,25 +623,6 @@ export function OrderForm({
               optionTestId={ORDER_PRIORITY_OPTION_TESTID}
               error={fieldErrors.priority}
             />
-
-            {/*
-              R26 y R29: el selector de estado existe SOLO en la edicion, y ofrece exactamente
-              `EDITABLE_STATUS_VALUES` -sin `CANCELADO`, por construccion del contrato-.
-            */}
-            {isEdit ? (
-              <SelectField
-                name={ORDER_STATUS_FIELD}
-                label={FIELD_LABELS.status}
-                defaultValue={initialValue(ORDER_STATUS_FIELD, editableStatusOf(order))}
-                options={EDITABLE_STATUS_VALUES.map((value) => ({
-                  value,
-                  label: ORDER_STATUS_LABELS[value],
-                }))}
-                triggerTestId={ORDER_STATUS_SELECT_TESTID}
-                optionTestId={ORDER_STATUS_OPTION_TESTID}
-                error={fieldErrors.status}
-              />
-            ) : null}
           </div>
         </div>
 
@@ -720,9 +685,9 @@ type SelectFieldProps = {
 };
 
 /**
- * Desplegable no controlado de un conjunto CERRADO del contrato (prioridad, estado). El valor
- * viaja en el `FormData` por el `input` oculto que monta el primitivo; el conjunto de opciones
- * llega ya derivado del contrato, nunca escrito a mano aqui.
+ * Desplegable no controlado de un conjunto CERRADO del contrato (prioridad). El valor viaja en
+ * el `FormData` por el `input` oculto que monta el primitivo; el conjunto de opciones llega ya
+ * derivado del contrato, nunca escrito a mano aqui.
  */
 function SelectField({
   name,

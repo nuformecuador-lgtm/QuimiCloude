@@ -4685,3 +4685,37 @@ podar.
   arreglo va en `fix/rojos-de-cd7f07a6`, PR aparte.
 - **Misma sesión: QC-130 cancelada** al acotarla: QC-121 y QC-147 ya cerraron la premisa (unidades sin base
   común en el coste del pedido).
+
+## 2026-09-23 — QC-145-pedidos-terminados-en-asignacion
+
+- **Qué:** `/asignacion` reparte vistas por permiso. El Operador ve «Mis asignados»; el Empacador
+  (`terminados.consultar`) suma «Terminados»; el Administrador (`pedidos.consultar`) ve solo «Todos»,
+  filtrable por estado. Nace `orders.finished_at`, escrita en la misma operación del Finalizar;
+  «Terminados» se ordena por ella con los «sin fecha» al final. La edición en Pedidos deja de mover
+  el estado (solo la planta), y quien tiene `pedidos.consultar` ya no puede ser responsable.
+- **PR #112**, merge `51f2d101`. Spec R1–R37, D1–D18, T1–T17, tres vueltas de spec para cerrar sus
+  preguntas. Review: rechazado por 1 mayor (comentarios que citaban requisitos), aprobado en la
+  segunda con 1 menor abierto. E2E con los tres roles 8/8 en Chromium y WebKit. `./init.sh` completo
+  verde (640/640) antes de abrir el PR.
+- **Base propia desde el primer paso** (`QuimiCloude_QC145`): la lección de QC-147 se aplicó.
+- **Cierra también QC-121** en disco: mergeada en el PR #102 y nunca cerrada, seguía ocupando el cupo
+  `fullstack` y habría dejado `dev` en rojo. Le faltan su resumen aquí y desmontar su worktree.
+- **Rojo de dev al baseline:** `guard-arquitectura-modulos` por `a01c90cb` (import profundo en
+  `product-actions.ts`). Sigue rojo en `dev` al cerrar.
+- **Corrige un test mal planteado de QC-147** que comparaba su migración con la ÚLTIMA del repo y se
+  rompía con cualquier migración posterior.
+- **La máquina se quedó sin memoria dos veces** y cortó gates en segundo plano. Un gate a la vez y sin
+  servidores ni E2E de otras sesiones en paralelo.
+- **Queda abierto:** el menor m4 (constantes muertas en `order-form.tsx` que exige
+  `guard-pantalla-pedidos-se-amplia`); el flake de `user-table` ya tiene ficha (QC-126); el commit
+  `c16d8172` quedó sin Co-Authored-By.
+
+## 2026-09-23 — QC-107-componente-de-carga-de-archivos
+
+- **Qué:** componente de subida de PDFs, varios a la vez (hasta 10 por tanda), con el modo de conversión
+  por prop y el estado de cada archivo (en cola, procesando, listo, error con motivo) leído de la cola de
+  QC-111. Incluye su recorrido E2E y arregla los dos defectos que ese E2E destapó.
+- **PR #103**, merge `be5c75c0`, mergeado el 2026-09-22. Bitácora y review en
+  `progress/impl_QC-107-componente-de-carga-de-archivos.md` y `progress/review_QC-107-componente-de-carga-de-archivos.md`.
+- **Cierre tardío:** el PR se mergeó el 2026-09-22 y la ficha siguió `in_progress` hasta el 2026-09-23,
+  ocupando cupo de `frontend`. La cerró el leader de QC-145 al verificar el merge.

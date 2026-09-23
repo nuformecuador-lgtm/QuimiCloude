@@ -87,6 +87,10 @@ const ACCIONES = [
   'listOrderResponsiblesAction',
   'listResponsiblesForOrdersAction',
   'listAssignedOrdersAction',
+  // Las TRES acciones de las vistas de asignacion (terminados, todos y resumen por pedido).
+  'listFinishedOrdersAction',
+  'listCompanyOrdersAction',
+  'listResponsibleCandidatesAction',
 ] as const
 
 export type Fuente = { readonly relPath: string; readonly content: string }

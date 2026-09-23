@@ -120,3 +120,25 @@ describe('toAssignedOrdersQuery traduce SOLO page y pageSize (design.md > 9.1)',
     expect(Object.keys(toAssignedOrdersQuery(params)).sort()).toEqual(['page', 'pageSize']);
   });
 });
+
+describe('assignedOrdersListHref conserva `vista` cuando se le pasa (design.md > 6.2, QC-145)', () => {
+  const params: DataTableParams = {
+    page: 2,
+    pageSize: MAX_PAGE_SIZE,
+    sort: null,
+    filters: {},
+    search: '',
+  };
+
+  it('sin `vista`, el comportamiento de siempre: solo page y pageSize', () => {
+    const url = new URLSearchParams(assignedOrdersListHref(params).split('?')[1]);
+    expect([...url.keys()].sort()).toEqual([PAGE_PARAM, PAGE_SIZE_PARAM].sort());
+  });
+
+  it('con `vista`, el href la lleva ademas de page y pageSize', () => {
+    const url = new URLSearchParams(assignedOrdersListHref(params, 'terminados').split('?')[1]);
+    expect(url.get('vista')).toBe('terminados');
+    expect(url.get(PAGE_PARAM)).toBe('2');
+    expect(url.get(PAGE_SIZE_PARAM)).toBe(String(MAX_PAGE_SIZE));
+  });
+});
