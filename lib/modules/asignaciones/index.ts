@@ -154,6 +154,17 @@ export {
   resolveAssignmentView,
   type AssignmentViewKind,
 } from './domain/assignment-views';
+
+// ---------------------------------------------------------------------------------------
+// La vista «Terminados»: los `ENTREGADO` de toda la empresa, sin filtro por usuario. Bloque
+// NUEVO al final: no reordena ni reformatea nada de lo de arriba.
+// ---------------------------------------------------------------------------------------
+export {
+  createListFinishedOrders,
+  type ListFinishedOrdersDeps,
+} from './domain/list-finished-orders';
+export type { FinishedOrderView } from './domain/finished-order-view';
+
 // ---------------------------------------------------------------------------------------
 // Quien puede ser responsable de un pedido, por permiso. Bloque NUEVO al final: no reordena ni
 // reformatea nada de lo de arriba. Se publica para que `list-responsible-candidates.ts` (mismo
