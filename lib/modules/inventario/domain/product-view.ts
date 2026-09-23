@@ -56,4 +56,9 @@ export type ProductView = {
   readonly type: ProductType;
   readonly createdAt: Date;
   readonly updatedAt: Date;
+  /** Suma de lo apartado en los lotes vivos del producto. Opcional: solo lo rellena
+   *  `listAliveProducts`, con una consulta agregada por pagina; las demas lecturas no la traen. */
+  readonly reserved?: string;
+  /** Suma de lo disponible en los lotes vivos del producto. Misma condicion que `reserved`. */
+  readonly available?: string;
 };

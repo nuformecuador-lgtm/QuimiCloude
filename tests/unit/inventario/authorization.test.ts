@@ -37,6 +37,7 @@ import { createListPresentations } from '@/lib/modules/inventario/domain/list-pr
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
 import { createProductWithFirstBatchSchema } from '@/lib/modules/inventario/domain/product-batch-input';
 import { createProductSchema } from '@/lib/modules/inventario/domain/product-input';
+import type { OrderNumberDirectory } from '@/lib/modules/inventario/domain/reservation';
 import { createUpdatePresentation } from '@/lib/modules/inventario/domain/update-presentation';
 import { createUpdateProduct } from '@/lib/modules/inventario/domain/update-product';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
@@ -185,7 +186,18 @@ type Repos = {
   readonly presentations: PresentationRepository;
   readonly log: ListQueryLog;
   readonly people: PeopleDirectory;
+  readonly orders: OrderNumberDirectory;
 };
+
+/** El hueco que `inventario` declara para el numero visible de un pedido (`design.md > 5.5`):
+ *  sin permiso el historial no puede haber llegado a preguntar por ninguno. */
+function directorioDePedidosQueFalla(): OrderNumberDirectory {
+  return {
+    findNumberTexts: vi.fn<OrderNumberDirectory['findNumberTexts']>(() => {
+      throw new Error('el directorio de pedidos no debe ser llamado');
+    }),
+  };
+}
 
 function montarReposQueFallan(): Repos {
   return {
@@ -193,6 +205,7 @@ function montarReposQueFallan(): Repos {
     presentations: repositorioPresentacionQueFalla(),
     log: logQueFalla(),
     people: directorioQueFalla(),
+    orders: directorioDePedidosQueFalla(),
   };
 }
 
@@ -258,6 +271,9 @@ function montarReposPermisivos(): Repos {
         PeopleDirectory['findRefsIncludingDeletedInCompany']
       >(async () => []),
     },
+    orders: {
+      findNumberTexts: vi.fn<OrderNumberDirectory['findNumberTexts']>(async () => new Map()),
+    },
   };
 }
 
@@ -287,6 +303,8 @@ function todosLosMetodos(repos: Repos): ReadonlyArray<() => void> {
     // QC-92: sin permiso tampoco se pregunta por el nombre del autor de ningun asiento.
     () => expect(repos.people.findAliveRefsInCompany).not.toHaveBeenCalled(),
     () => expect(repos.people.findRefsIncludingDeletedInCompany).not.toHaveBeenCalled(),
+    // QC-141 (design.md > 5.5): sin permiso tampoco se pregunta el numero visible de ningun pedido.
+    () => expect(repos.orders.findNumberTexts).not.toHaveBeenCalled(),
   ];
 }
 
@@ -408,7 +426,11 @@ const CASOS_DE_USO: ReadonlyArray<{
     nombre: 'list-batch-movements',
     permiso: CONSULTAR,
     invocar: (repos, actor) =>
-      createListBatchMovements({ products: repos.products, people: repos.people })('lote-1', actor),
+      createListBatchMovements({
+        products: repos.products,
+        people: repos.people,
+        orders: repos.orders,
+      })('lote-1', actor),
     invocarConEntradaInvalida: null,
   },
 ];

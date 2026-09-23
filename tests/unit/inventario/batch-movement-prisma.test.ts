@@ -5,12 +5,14 @@
 const doble = vi.hoisted(() => ({
   productBatchFindFirst: vi.fn(),
   movementFindMany: vi.fn(),
+  reservationMovementFindMany: vi.fn(),
 }));
 
 vi.mock('@/lib/shared/db/prisma', () => ({
   prisma: {
     productBatch: { findFirst: doble.productBatchFindFirst },
     inventoryMovement: { findMany: doble.movementFindMany },
+    reservationMovement: { findMany: doble.reservationMovementFindMany },
   },
 }));
 
@@ -30,6 +32,9 @@ const ACTOR_ID = '33333333-3333-4333-8333-333333333333';
 
 beforeEach(() => {
   vi.resetAllMocks();
+  // Por defecto, ningun asiento de reserva: los casos que solo miran el libro fisico no lo
+  // repiten en cada uno.
+  doble.reservationMovementFindMany.mockResolvedValue([]);
 });
 
 describe('writeMovement (R6, R12) — recibe la tx, no la abre', () => {
@@ -93,6 +98,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         kind: 'adjustment',
         quantity: new Prisma.Decimal(-3),
         reason: 'merma',
+        orderId: null,
         createdBy: ACTOR_ID,
         createdAt: new Date('2026-09-17T14:00:00.000Z'),
       },
@@ -101,6 +107,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         kind: 'opening',
         quantity: new Prisma.Decimal(10),
         reason: null,
+        orderId: null,
         createdBy: ACTOR_ID,
         createdAt: AHORA,
       },
@@ -108,18 +115,18 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
 
     await expect(findBatchMovements(LOTE_ID, AMBITO)).resolves.toEqual([
       {
-        id: 'movimiento-2',
         kind: 'adjustment',
         quantity: '-3.0000',
         reason: 'merma',
+        orderNumberText: null,
         authorName: ACTOR_ID,
         createdAt: '2026-09-17T14:00:00.000Z',
       },
       {
-        id: 'movimiento-1',
         kind: 'opening',
         quantity: '10.0000',
         reason: null,
+        orderNumberText: null,
         authorName: ACTOR_ID,
         createdAt: AHORA.toISOString(),
       },
@@ -128,6 +135,56 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
     const llamada = doble.movementFindMany.mock.calls[0]?.[0] as { where: unknown; orderBy: unknown };
     expect(llamada.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
     expect(llamada.where).toEqual({ AND: [{ companyId: EMPRESA }, { batchId: LOTE_ID }] });
+
+    const llamadaReservas = doble.reservationMovementFindMany.mock.calls[0]?.[0] as {
+      where: unknown;
+      orderBy: unknown;
+    };
+    expect(llamadaReservas.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
+    expect(llamadaReservas.where).toEqual({ AND: [{ companyId: EMPRESA }, { batchId: LOTE_ID }] });
+  });
+
+  it('intercala los asientos de reserva con los del libro fisico, por fecha descendente', async () => {
+    doble.productBatchFindFirst.mockResolvedValue({ id: LOTE_ID });
+    doble.movementFindMany.mockResolvedValue([
+      {
+        id: 'movimiento-1',
+        kind: 'opening',
+        quantity: new Prisma.Decimal(10),
+        reason: null,
+        orderId: null,
+        createdBy: ACTOR_ID,
+        createdAt: new Date('2026-09-17T10:00:00.000Z'),
+      },
+    ]);
+    doble.reservationMovementFindMany.mockResolvedValue([
+      {
+        kind: 'reserve',
+        quantity: new Prisma.Decimal(4),
+        orderId: 'pedido-1',
+        createdBy: ACTOR_ID,
+        createdAt: new Date('2026-09-17T12:00:00.000Z'),
+      },
+    ]);
+
+    await expect(findBatchMovements(LOTE_ID, AMBITO)).resolves.toEqual([
+      {
+        kind: 'reserve',
+        quantity: '4.0000',
+        reason: null,
+        orderNumberText: 'pedido-1',
+        authorName: ACTOR_ID,
+        createdAt: '2026-09-17T12:00:00.000Z',
+      },
+      {
+        kind: 'opening',
+        quantity: '10.0000',
+        reason: null,
+        orderNumberText: null,
+        authorName: ACTOR_ID,
+        createdAt: '2026-09-17T10:00:00.000Z',
+      },
+    ]);
   });
 
   it('un lote vivo sin ningun asiento devuelve un array vacio, no null', async () => {

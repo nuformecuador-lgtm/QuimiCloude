@@ -15,11 +15,11 @@ import {
   UnauthorizedError,
   ValidationError,
 } from '@/lib/modules/inventario/domain/errors';
-import type { InventoryMovementView } from '@/lib/modules/inventario/domain/inventory-movement';
 import { createListBatchMovements } from '@/lib/modules/inventario/domain/list-batch-movements';
 import { createListProductBatches } from '@/lib/modules/inventario/domain/list-product-batches';
 import { MOVEMENT_REASONS } from '@/lib/modules/inventario/domain/movement-reason';
 import type { ProductBatchView } from '@/lib/modules/inventario/domain/product-batch-view';
+import type { BatchHistoryEntry, OrderNumberDirectory } from '@/lib/modules/inventario/domain/reservation';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 
 const LOTE = '11111111-1111-4111-8111-111111111111';
@@ -51,7 +51,7 @@ function montarDobles(): Dobles {
     async (): Promise<readonly ProductBatchView[]> => [],
   );
   const findBatchMovements = vi.fn(
-    async (): Promise<readonly InventoryMovementView[] | null> => [],
+    async (): Promise<readonly BatchHistoryEntry[] | null> => [],
   );
 
   const products = {
@@ -71,6 +71,12 @@ function directorioQueExplota(): PeopleDirectory {
     findAliveRefsInCompany: vi.fn(explota),
     findRefsIncludingDeletedInCompany: vi.fn(explota),
   } as unknown as PeopleDirectory;
+}
+
+/** Sin pedidos citados en el historial no hay nada que resolver: el doble por defecto no
+ *  necesita responder nada. */
+function directorioDePedidosVacio(): OrderNumberDirectory {
+  return { findNumberTexts: vi.fn(async () => new Map()) };
 }
 
 const ENTRADA_VALIDA = { batchId: LOTE, delta: '-3', reason: 'merma' };
@@ -295,21 +301,22 @@ describe('QC-92 R21 — listar los lotes de un producto exige inventario.consult
 });
 
 describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () => {
-  /** Lo que llega del puerto en `authorName` es el IDENTIFICADOR del autor, no su nombre. */
-  const ASIENTOS: readonly InventoryMovementView[] = [
+  /** Lo que llega del puerto en `authorName` y `orderNumberText` es el IDENTIFICADOR crudo, no
+   *  la forma mostrable. */
+  const ASIENTOS: readonly BatchHistoryEntry[] = [
     {
-      id: 'asiento-2',
       kind: 'adjustment',
       quantity: '-3',
       reason: 'merma',
+      orderNumberText: null,
       authorName: 'usuario-conocido',
       createdAt: '2026-09-18T10:00:00.000Z',
     },
     {
-      id: 'asiento-1',
       kind: 'opening',
       quantity: '10',
       reason: null,
+      orderNumberText: null,
       authorName: 'usuario-desaparecido',
       createdAt: '2026-09-17T10:00:00.000Z',
     },
@@ -336,6 +343,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
     const listar = createListBatchMovements({
       products: dobles.products,
       people: directorioQueExplota(),
+      orders: directorioDePedidosVacio(),
       now: () => AHORA,
     });
 
@@ -355,6 +363,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
     const listar = createListBatchMovements({
       products: dobles.products,
       people,
+      orders: directorioDePedidosVacio(),
       now: () => AHORA,
     });
     const salida = await listar(LOTE, OPERADOR);
@@ -382,6 +391,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
     const listar = createListBatchMovements({
       products: dobles.products,
       people,
+      orders: directorioDePedidosVacio(),
       now: () => AHORA,
     });
     const salida = await listar(LOTE, OPERADOR);
@@ -398,6 +408,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
     const listar = createListBatchMovements({
       products: dobles.products,
       people,
+      orders: directorioDePedidosVacio(),
       now: () => AHORA,
     });
 
@@ -412,6 +423,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
     const listar = createListBatchMovements({
       products: dobles.products,
       people: directorioQueExplota(),
+      orders: directorioDePedidosVacio(),
       now: () => AHORA,
     });
 
@@ -423,6 +435,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
     const listar = createListBatchMovements({
       products: dobles.products,
       people: directorioQueExplota(),
+      orders: directorioDePedidosVacio(),
       now: () => AHORA,
     });
 
@@ -431,5 +444,41 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
 
     expect(dobles.findBatchMovements.mock.calls[0]?.[1]).toEqual({ companyId: 'company-a' });
     expect(dobles.findBatchMovements.mock.calls[1]?.[1]).toEqual({ companyId: 'company-b' });
+  });
+
+  it('R38: el pedido citado sale con su numero visible, y el que no vuelve del directorio con su identificador', async () => {
+    const dobles = montarDobles();
+    const asientos: readonly BatchHistoryEntry[] = [
+      { ...ASIENTOS[0]!, kind: 'reserve', orderNumberText: 'pedido-conocido' },
+      { ...ASIENTOS[1]!, kind: 'consume', orderNumberText: 'pedido-desaparecido' },
+      { ...ASIENTOS[0]!, kind: 'opening', orderNumberText: null },
+    ];
+    dobles.findBatchMovements.mockResolvedValue(asientos);
+    const { people } = directorioCon([]);
+    const findNumberTexts = vi.fn(async () => new Map([['pedido-conocido', '2026-A-0007']]));
+    const orders: OrderNumberDirectory = { findNumberTexts };
+
+    const listar = createListBatchMovements({ products: dobles.products, people, orders, now: () => AHORA });
+    const salida = await listar(LOTE, OPERADOR);
+
+    expect(salida.map((asiento) => asiento.orderNumberText)).toEqual([
+      '2026-A-0007',
+      'pedido-desaparecido',
+      null,
+    ]);
+    expect(findNumberTexts).toHaveBeenCalledWith('company-a', ['pedido-conocido', 'pedido-desaparecido']);
+  });
+
+  it('R38: sin ningun pedido citado no se pregunta al directorio de pedidos', async () => {
+    const dobles = montarDobles();
+    dobles.findBatchMovements.mockResolvedValue(ASIENTOS);
+    const { people } = directorioCon([]);
+    const findNumberTexts = vi.fn(async () => new Map());
+    const orders: OrderNumberDirectory = { findNumberTexts };
+
+    const listar = createListBatchMovements({ products: dobles.products, people, orders, now: () => AHORA });
+    await listar(LOTE, OPERADOR);
+
+    expect(findNumberTexts).not.toHaveBeenCalled();
   });
 });

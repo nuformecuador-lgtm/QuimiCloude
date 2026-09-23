@@ -26,11 +26,15 @@ import {
   adjustBatchStock,
   consumeBatchStock,
   createWithFirstBatch,
+  findBatchesOfAliveProduct,
+  listAliveProducts,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { findBatchMovements } from '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma';
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
+import type { ListQuery } from '@/lib/modules/inventario/domain/list-query';
 import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-batch';
 import type { NewProduct } from '@/lib/modules/inventario/domain/product-view';
 import type { ReservationRequirementLine } from '@/lib/modules/inventario/domain/reservation';
@@ -194,6 +198,10 @@ async function createProductWithBatch(
 
 function requirementOf(productId: string, quantity: string): readonly ReservationRequirementLine[] {
   return [{ productId, quantity }];
+}
+
+function listQueryOf(): ListQuery {
+  return { page: 1, pageSize: 25, sort: null, filters: {}, search: '' };
 }
 
 async function batchStockOf(batchId: string): Promise<string> {
@@ -696,6 +704,161 @@ describe('R33 — un ajuste que deja el apartado por encima de la existencia se 
       expect(ajuste).toEqual({ stock: '5.0000', reserved: '8.0000', overReserved: true });
     } finally {
       await dropFixture(fixture, [productId], [orderId]);
+    }
+  });
+});
+
+describe('R34, R37 — el lote sobre-reservado se marca, con su apartado y su disponible', () => {
+  it('findBatchesOfAliveProduct trae reserved/available/overReserved de un lote sano y de uno sobre-reservado', async () => {
+    const fixture = await createFixture();
+    const { productId, batchId } = await createProductWithBatch(fixture, { stock: '10' });
+    const orderId = await createOrderRow(fixture);
+    const reservations = createMaterialReservations(prisma);
+
+    try {
+      await reservations.syncForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        requirement: requirementOf(productId, '8'),
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+
+      const sano = await findBatchesOfAliveProduct(productId, ambito(fixture));
+      expect(sano).toEqual([
+        expect.objectContaining({ id: batchId, reserved: '8.0000', available: '2.0000', overReserved: false }),
+      ]);
+
+      // La merma deja el apartado (8) por encima de la existencia nueva (5): sobre-reservado (R33).
+      await adjustBatchStock(batchId, '-5', 'merma', fixture.actorId, new Date(), ambito(fixture));
+
+      const sobreReservado = await findBatchesOfAliveProduct(productId, ambito(fixture));
+      expect(sobreReservado).toEqual([
+        expect.objectContaining({ id: batchId, reserved: '8.0000', available: '0.0000', overReserved: true }),
+      ]);
+    } finally {
+      await dropFixture(fixture, [productId], [orderId]);
+    }
+  });
+});
+
+describe('R36 — por producto: total, reservado y disponible, incluido el caso sobre-reservado', () => {
+  it('total = reservado + disponible mientras nada este sobre-reservado', async () => {
+    const fixture = await createFixture();
+    const { productId } = await createProductWithBatch(fixture, { stock: '10' });
+    const orderId = await createOrderRow(fixture);
+    const reservations = createMaterialReservations(prisma);
+
+    try {
+      await reservations.syncForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        requirement: requirementOf(productId, '6'),
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+
+      const pagina = await listAliveProducts(listQueryOf(), ambito(fixture));
+      const vista = pagina.items.find((item) => item.id === productId);
+      expect(vista).toEqual(expect.objectContaining({ stock: '10.0000', reserved: '6.0000', available: '4.0000' }));
+    } finally {
+      await dropFixture(fixture, [productId], [orderId]);
+    }
+  });
+
+  it('con un lote sobre-reservado, total NO es igual a reservado + disponible', async () => {
+    const fixture = await createFixture();
+    const { productId, batchId } = await createProductWithBatch(fixture, { stock: '10' });
+    const orderId = await createOrderRow(fixture);
+    const reservations = createMaterialReservations(prisma);
+
+    try {
+      await reservations.syncForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        requirement: requirementOf(productId, '8'),
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+      await adjustBatchStock(batchId, '-5', 'merma', fixture.actorId, new Date(), ambito(fixture));
+
+      const pagina = await listAliveProducts(listQueryOf(), ambito(fixture));
+      const vista = pagina.items.find((item) => item.id === productId);
+      // total 5, reservado 8 (por encima de lo que hay), disponible 0: 5 != 8 + 0.
+      expect(vista).toEqual(expect.objectContaining({ stock: '5.0000', reserved: '8.0000', available: '0.0000' }));
+    } finally {
+      await dropFixture(fixture, [productId], [orderId]);
+    }
+  });
+});
+
+describe('R38 — el historial de un lote une los dos libros, del mas reciente al mas antiguo', () => {
+  it('intercala apartados, liberaciones y consumos con el alta y el ajuste, con el pedido crudo en orderNumberText', async () => {
+    const fixture = await createFixture();
+    const { productId, batchId } = await createProductWithBatch(fixture, { stock: '10' });
+    const orderId = await createOrderRow(fixture);
+    const reservations = createMaterialReservations(prisma);
+
+    try {
+      await reservations.syncForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        requirement: requirementOf(productId, '4'),
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+      await adjustBatchStock(batchId, '-1', 'merma', fixture.actorId, new Date(), ambito(fixture));
+      await reservations.releaseForOrder({
+        orderId,
+        companyId: fixture.companyId,
+        reason: 'release',
+        actorId: fixture.actorId,
+        now: new Date(),
+      });
+
+      const historial = await findBatchMovements(batchId, ambito(fixture));
+      expect(historial, 'el lote deberia existir').not.toBeNull();
+      const kinds = (historial ?? []).map((entry) => entry.kind);
+      // Del mas reciente al mas antiguo: release, adjustment (la merma), reserve, opening (el alta).
+      expect(kinds).toEqual(['release', 'adjustment', 'reserve', 'opening']);
+
+      const reserva = (historial ?? []).find((entry) => entry.kind === 'reserve');
+      expect(reserva).toEqual(
+        expect.objectContaining({ quantity: '4.0000', orderNumberText: orderId, authorName: fixture.actorId }),
+      );
+      const alta = (historial ?? []).find((entry) => entry.kind === 'opening');
+      expect(alta).toEqual(expect.objectContaining({ orderNumberText: null, reason: null }));
+    } finally {
+      await dropFixture(fixture, [productId], [orderId]);
+    }
+  });
+});
+
+describe('R42 — el historial y lo reservado de un lote de otra empresa responden como inexistente', () => {
+  it('findBatchMovements devuelve null para un lote de otra empresa', async () => {
+    const fixtureA = await createFixture();
+    const fixtureB = await createFixture();
+    const { productId, batchId } = await createProductWithBatch(fixtureA, { stock: '10' });
+
+    try {
+      expect(await findBatchMovements(batchId, ambito(fixtureB))).toBeNull();
+      expect(await findBatchMovements(batchId, ambito(fixtureA))).not.toBeNull();
+    } finally {
+      await dropFixture(fixtureA, [productId], []);
+      await dropFixture(fixtureB, [], []);
+    }
+  });
+
+  it('findBatchesOfAliveProduct de otra empresa no devuelve el lote ajeno', async () => {
+    const fixtureA = await createFixture();
+    const fixtureB = await createFixture();
+    const { productId } = await createProductWithBatch(fixtureA, { stock: '10' });
+
+    try {
+      expect(await findBatchesOfAliveProduct(productId, ambito(fixtureB))).toEqual([]);
+    } finally {
+      await dropFixture(fixtureA, [productId], []);
+      await dropFixture(fixtureB, [], []);
     }
   });
 });

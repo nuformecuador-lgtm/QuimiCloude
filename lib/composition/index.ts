@@ -185,6 +185,7 @@ import {
   createCancelOrder,
   createCreateOrder,
   createDeleteOrder,
+  createFindCoverage,
   createGetOrder,
   createListOrders,
   createTransitionOrder,
@@ -699,6 +700,12 @@ const presentationRepository: PresentationRepository = {
   list: listPresentations,
 };
 
+/** `OrderNumberDirectory` cableado con el adaptador driven DE PEDIDOS: `inventario` solo conoce
+ *  el TIPO, para el historial de un lote (`design.md > 5.5`). Declarado ANTES de la fachada de
+ *  `inventario` -y no junto al resto de lo de `pedidos`, mas abajo- porque `listBatchMovements`
+ *  lo necesita ya cableado: un `const` no existe antes de su linea. */
+const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
+
 /**
  * Fachada del modulo `inventario` ya cableada (T11, `design.md > 3`, `> 7`). Es lo que
  * consumen las Server Actions de T12.
@@ -727,9 +734,12 @@ export const inventario = {
   listProductBatches: createListProductBatches({ products: productRepository }),
   // Se nombra el adaptador importado y no la constante `peopleDirectory`, que apunta al mismo
   // objeto pero se declara mas abajo: un `const` no existe antes de su linea.
+  // `orderNumberDirectory`, en cambio, SI esta declarada arriba (a proposito, por la misma
+  // razon): `listBatchMovements` la necesita.
   listBatchMovements: createListBatchMovements({
     products: productRepository,
     people: assignmentDirectoryPrisma,
+    orders: orderNumberDirectory,
   }),
 } as const;
 
@@ -975,6 +985,10 @@ const orderUnitOfWork: OrderUnitOfWork = {
     }),
 };
 
+/** Lectura de la cobertura de un pedido, FUERA de transaccion, sobre el cliente global
+ *  (`design.md > 5.1`): `findCoverage` (QC-141 T14) la usa una vez por pagina. */
+const reservationQueries: ReservationQueries = createReservationQueries();
+
 /**
  * Fachada del modulo `pedidos` ya cableada (T14, `design.md > 9`). Es lo que consumen las
  * Server Actions de T15.
@@ -1024,14 +1038,8 @@ export const pedidos = {
   }),
   cancelOrder: createCancelOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
   deleteOrder: createDeleteOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
+  findCoverage: createFindCoverage({ reservations: reservationQueries }),
 } as const;
-
-/** `OrderNumberDirectory` cableado con el adaptador driven DE PEDIDOS: `inventario` solo conoce
- *  el TIPO, para el historial de un lote (`design.md > 5.5`). */
-const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
-
-/** Lectura fuera de transaccion de la cobertura de un pedido, sobre el cliente global. */
-const reservationQueries: ReservationQueries = createReservationQueries();
 
 // ---------------------------------------------------------------------------------------
 // `observabilidad` (QC-71, T7). Bloque NUEVO al final, mismo criterio que los anteriores: no

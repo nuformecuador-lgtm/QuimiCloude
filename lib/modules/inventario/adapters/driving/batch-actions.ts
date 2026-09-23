@@ -5,7 +5,7 @@ import { createErrorStateTranslator, type ErrorCode, type ErrorState } from '@/l
 import {
   InventarioError,
   type Actor,
-  type InventoryMovementView,
+  type BatchHistoryEntry,
   type ProductBatchView,
 } from '@/lib/modules/inventario';
 import { runInRequestScope } from '@/lib/shared/request-scope';
@@ -22,7 +22,7 @@ export type ProductBatchesResult =
   | ErrorState;
 
 export type BatchMovementsResult =
-  | { status: 'success'; data: readonly InventoryMovementView[] }
+  | { status: 'success'; data: readonly BatchHistoryEntry[] }
   | ErrorState;
 
 // Sin constante `INITIAL_STATE`: un archivo con `'use server'` solo puede exportar funciones async.

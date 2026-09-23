@@ -15,6 +15,7 @@ import {
   presentationCompanyScope,
   productCompanyScope,
 } from './company-scope';
+import { findReservedAndAvailableByBatch, findReservedAndAvailableByProduct } from './reservation-prisma';
 import {
   dateRangeCondition,
   normalizedSearchCondition,
@@ -50,6 +51,8 @@ export const PRODUCT_SELECT = {
 } satisfies Prisma.ProductSelect;
 
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>;
+
+const ZERO_QUANTITY = '0.0000';
 
 export function toProductView(row: ProductRow): ProductView {
   return {
@@ -262,7 +265,19 @@ export async function listAliveProducts(
     prisma.product.count({ where }),
   ]);
 
-  return buildPage(rows.map(toProductView), total, query.page, limit);
+  // UNA consulta agregada mas para la pagina entera, nunca una por fila: `reserved`/`available`
+  // salen del libro de reservas, sumados por producto (`design.md > 3.4`).
+  const reservedByProduct = await findReservedAndAvailableByProduct(
+    prisma,
+    scope.companyId,
+    rows.map((row) => row.id),
+  );
+  const items = rows.map((row) => {
+    const aggregate = reservedByProduct.get(row.id);
+    return { ...toProductView(row), reserved: aggregate?.reserved ?? ZERO_QUANTITY, available: aggregate?.available ?? ZERO_QUANTITY };
+  });
+
+  return buildPage(items, total, query.page, limit);
 }
 
 /**
@@ -733,7 +748,21 @@ export async function findBatchesOfAliveProduct(
     select: BATCH_VIEW_SELECT,
   });
 
-  return rows.map(toBatchView);
+  // UNA consulta agregada para todos los lotes del producto, no una por lote (`design.md > 3.4`).
+  const reservedByBatch = await findReservedAndAvailableByBatch(
+    prisma,
+    scope.companyId,
+    rows.map((row) => row.id),
+  );
+  return rows.map((row) => {
+    const aggregate = reservedByBatch.get(row.id);
+    return {
+      ...toBatchView(row),
+      reserved: aggregate?.reserved ?? ZERO_QUANTITY,
+      available: aggregate?.available ?? row.stock.toFixed(4),
+      overReserved: aggregate?.overReserved ?? false,
+    };
+  });
 }
 
 /** `P2025`: el `where` unico mas el filtro de empresa no encontraron fila que actualizar. */

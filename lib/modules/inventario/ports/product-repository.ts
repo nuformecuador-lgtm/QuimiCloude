@@ -1,4 +1,3 @@
-import type { InventoryMovementView } from '../domain/inventory-movement';
 import type { InventoryScope } from '../domain/inventory-scope';
 import type { ListQuery } from '../domain/list-query';
 import type { MovementReason } from '../domain/movement-reason';
@@ -6,6 +5,7 @@ import type { Page } from '../domain/page';
 import type { NewProductBatch } from '../domain/product-batch';
 import type { ProductBatchView } from '../domain/product-batch-view';
 import type { NewProduct, ProductView } from '../domain/product-view';
+import type { BatchHistoryEntry } from '../domain/reservation';
 
 /**
  * Puerto de acceso a datos de producto (`design.md > 7`). El sufijo `Alive` en los
@@ -173,12 +173,18 @@ export interface ProductRepository {
   ): Promise<readonly ProductBatchView[]>;
 
   /**
-   * El historial de asientos de un lote, del mas reciente al mas antiguo. `null` cuando el
-   * lote no existe o es de otra empresa; un lote vivo sin ningun asiento -anterior al libro-
-   * devuelve un array vacio, que no es lo mismo que `null`.
+   * El historial de asientos de un lote, del mas reciente al mas antiguo: une `inventory_movements`
+   * y `reservation_movements` en un `BatchHistoryEntry` por asiento. `null` cuando el lote no
+   * existe o es de otra empresa; un lote vivo sin ningun asiento -anterior al libro- devuelve un
+   * array vacio, que no es lo mismo que `null`.
+   *
+   * `orderNumberText` y `authorName` llegan como el IDENTIFICADOR crudo de la fila -el pedido y
+   * quien escribio el asiento-, igual que `authorName` en `InventoryMovementView`: resolverlos a
+   * texto mostrable es del caso de uso (`list-batch-movements.ts`), que es quien conoce los
+   * directorios de `pedidos` e `identity`.
    */
   findBatchMovements(
     batchId: string,
     scope: InventoryScope,
-  ): Promise<readonly InventoryMovementView[] | null>;
+  ): Promise<readonly BatchHistoryEntry[] | null>;
 }
