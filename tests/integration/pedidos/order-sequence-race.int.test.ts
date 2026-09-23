@@ -4,10 +4,15 @@
  * El patron medido de QC-81 (`specs/QC-81-lote-y-fecha-de-compra/design.md > 8`,
  * `tests/integration/inventario/product-batch-lot.int.test.ts`), trasladado al alta de pedido.
  *
- * Aislamiento por COMMIT y no por transaccion: `createOrder` usa el cliente Prisma GLOBAL y abre
- * SU PROPIA `prisma.$transaction` por intento —con el `pg_advisory_xact_lock` dentro—, asi que un
- * rollback del test no desharia nada; y la carrera necesita ademas que cada alta CONFIRME para que
- * la siguiente vea su fila. Cada caso fabrica su empresa efimera y la borra en un `finally`.
+ * Tras Tm2 (QC-141, `design.md > 5.3` enmendado): el alta pasa por `withOrderTransaction` +
+ * `createOrderWriteRepository` -el mismo par que ata `OrderUnitOfWork` en `lib/composition`-, en
+ * vez del `createOrder` retirado.
+ *
+ * Aislamiento por COMMIT y no por transaccion: `withOrderTransaction` usa el cliente Prisma
+ * GLOBAL y abre SU PROPIA `prisma.$transaction` por intento —con el `pg_advisory_xact_lock`
+ * dentro—, asi que un rollback del test no desharia nada; y la carrera necesita ademas que cada
+ * alta CONFIRME para que la siguiente vea su fila. Cada caso fabrica su empresa efimera y la
+ * borra en un `finally`.
  *
  * **REQUISITO: EL POOL DE PRISMA TIENE QUE TENER MAS DE UNA CONEXION.** Con `connection_limit=1`
  * las altas se serializarian en el pool —una transaccion detras de otra, cada una viendo la fila de
@@ -24,7 +29,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { normalizePresentationName } from '@/lib/modules/inventario';
-import { createOrder } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope';
@@ -126,15 +132,17 @@ function pedidoNuevo(presentationId: string): NewOrder {
 
 /** El ano sale del MISMO `now` que se escribe en `created_at`, como en el caso de uso: lo exige el
  *  `CHECK orders_order_year_matches_created_at`. */
-function altaDe(fixture: Fixture): Promise<OrderRow | 'duplicate_number'> {
+function altaDe(fixture: Fixture): Promise<OrderRow> {
   const now = new Date();
-  return createOrder(
-    pedidoNuevo(fixture.presentationId),
-    now.getUTCFullYear(),
-    fixture.actorId,
-    now,
-    null,
-    ambito(fixture),
+  return withOrderTransaction((tx) =>
+    createOrderWriteRepository(tx).create(
+      pedidoNuevo(fixture.presentationId),
+      now.getUTCFullYear(),
+      fixture.actorId,
+      now,
+      null,
+      ambito(fixture),
+    ),
   );
 }
 
@@ -190,10 +198,10 @@ describe('R14, R15 — altas simultaneas de la MISMA empresa obtienen correlativ
   const ALTAS_POR_RONDA = 8;
   const RONDAS = 3;
 
-  it('3 rondas de 8 altas a la vez resuelven todas, sin duplicate_number, sin reintentos y consecutivas', async () => {
-    // Sin el lock, las 8 altas de una ronda leen el mismo maximo, chocan contra
-    // `orders_company_year_sequence_key` y reintentan —o agotan los tres intentos y devuelven
-    // `duplicate_number`—. Si el reintento lo tapara, el conteo de transacciones pasaria de 8: por
+  it('3 rondas de 8 altas a la vez resuelven todas, sin reintentos, y consecutivas', async () => {
+    // Sin el lock, las 8 altas de una ronda leen el mismo maximo y chocan contra
+    // `orders_company_year_sequence_key`: `withOrderTransaction` reintentaria cada una en una
+    // transaccion NUEVA. Si el reintento lo tapara, el conteo de transacciones pasaria de 8: por
     // eso se cuenta. Tres rondas para que no pase por suerte, y la segunda y la tercera parten de
     // un maximo que ya no es cero.
     const fixture = await createFixture();
@@ -206,16 +214,12 @@ describe('R14, R15 — altas simultaneas de la MISMA empresa obtienen correlativ
         const altas = Array.from({ length: ALTAS_POR_RONDA }, () => altaDe(fixture));
         const resultados = cumplidasOLanza(await Promise.allSettled(altas));
 
-        const duplicados = resultados.filter((r) => r === 'duplicate_number').length;
-        expect(duplicados, `ronda ${String(ronda + 1)}: altas que agotaron los reintentos`).toBe(0);
         // Ningun reintento: exactamente una transaccion por alta.
         expect(spy, `ronda ${String(ronda + 1)}: transacciones abiertas`).toHaveBeenCalledTimes(
           ALTAS_POR_RONDA,
         );
 
-        const numeros = resultados
-          .map((r) => (r === 'duplicate_number' ? Number.NaN : r.number.sequence))
-          .sort((a, b) => a - b);
+        const numeros = resultados.map((r) => r.number.sequence).sort((a, b) => a - b);
         const desde = ronda * ALTAS_POR_RONDA + 1;
         const esperados = Array.from({ length: ALTAS_POR_RONDA }, (_, i) => desde + i);
 
@@ -328,8 +332,7 @@ describe('R14 — dos altas de empresas DISTINTAS no se esperan', () => {
       const [resultadoB] = cumplidasOLanza(
         await Promise.allSettled([antesDe(altaB, COTA_DE_BLOQUEO_MS, 'el alta de B, con A bloqueada')]),
       );
-      expect(resultadoB).not.toBe('duplicate_number');
-      if (resultadoB === undefined || resultadoB === 'duplicate_number') throw new Error('alta de B fallida');
+      if (resultadoB === undefined) throw new Error('alta de B fallida');
       expect(resultadoB.number.sequence).toBe(1);
       // Y A sigue esperando: B no la adelanto ni la desbloqueo.
       expect(altaA.haTerminado()).toBe(false);
@@ -337,7 +340,7 @@ describe('R14 — dos altas de empresas DISTINTAS no se esperan', () => {
       await sujetador.query('COMMIT');
 
       const [resultadoA] = cumplidasOLanza(await Promise.allSettled([altaA.operacion]));
-      if (resultadoA === undefined || resultadoA === 'duplicate_number') throw new Error('alta de A fallida');
+      if (resultadoA === undefined) throw new Error('alta de A fallida');
       expect(resultadoA.number.sequence).toBe(1);
     } finally {
       // Cerrar la conexion deshace lo que no se confirmo y suelta el lock antes de limpiar.

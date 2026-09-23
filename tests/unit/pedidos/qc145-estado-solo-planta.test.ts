@@ -80,9 +80,9 @@ export function stripComments(source: string): string {
 /**
  * Extrae, del fuente ya sin comentarios, el texto balanceado en llaves de cada bloque que sigue
  * a la palabra `data:` -la forma exacta en que Prisma recibe lo que escribe en `create`,
- * `update`, `updateMany`, `createMany` y `upsert` en este repo (comprobado: `createOrder` usa
- * SQL crudo con `VALUES (...)`, sin `data:`, asi que no aparece aqui y no hace falta excluirlo
- * a mano).
+ * `update`, `updateMany`, `createMany` y `upsert` en este repo (comprobado: `insertAliveOrder`
+ * usa SQL crudo con `VALUES (...)`, sin `data:`, asi que no aparece aqui y no hace falta
+ * excluirlo a mano).
  */
 export function extractDataBlocks(source: string): readonly string[] {
   const codigo = stripComments(source);
@@ -123,35 +123,26 @@ function findDataBlockMatches(
     .filter((hallazgo) => hallazgo.bloques.length > 0);
 }
 
-const ORDER_CATALOG_PRISMA = 'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts';
 const ORDER_PRISMA = 'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts';
 
-describe('R5 — finishedAt/finished_at solo se escribe en setAliveOrderStatus (y en la transitionAliveOrder muerta que la precede)', () => {
-  // Enmendado por QC-141 (design.md > 5.3, review B4): `setStatus` de `OrderWriteRepository`
+describe('R5 — finishedAt/finished_at solo se escribe en setAliveOrderStatus', () => {
+  // Enmendado por QC-141 (design.md > 5.3, review B4, Tm2): `setStatus` de `OrderWriteRepository`
   // -implementada como `setAliveOrderStatus` en order-prisma.ts- escribe `finishedAt` en el
   // mismo `UPDATE` que mueve a ENTREGADO, para que el estado y la fecha de terminado queden
-  // atomicos con el consumo. `transitionAliveOrder` sigue en order-catalog-prisma.ts sin
-  // llamantes (se retira en Tm2) y conserva su propio `data:` con finishedAt.
-  it('ningun bloque `data:` de lib/** fuera de order-catalog-prisma.ts y order-prisma.ts nombra finishedAt/finished_at', () => {
+  // atomicos con el consumo. `transitionAliveOrder` (order-catalog-prisma.ts), que llevaba su
+  // propio `data:` con finishedAt y se habia quedado sin llamantes, se retiro en Tm2: ya no
+  // queda ningun bloque `data:` de ese archivo.
+  it('ningun bloque `data:` de lib/** fuera de order-prisma.ts nombra finishedAt/finished_at', () => {
     const conLaColumna = findDataBlockMatches(repoRoot, (block) => /finishedAt|finished_at/.test(block));
     const rutas = conLaColumna.map((hallazgo) => hallazgo.ruta).sort();
 
     expect(
       rutas,
-      rutas.length === 2 && rutas[0] === ORDER_CATALOG_PRISMA && rutas[1] === ORDER_PRISMA
+      rutas.length === 1 && rutas[0] === ORDER_PRISMA
         ? undefined
-        : 'finishedAt/finished_at solo puede escribirse en `data:` de order-catalog-prisma.ts ' +
-            `(transitionAliveOrder, sin llamantes) y order-prisma.ts (setAliveOrderStatus). ` +
-            `Se encontro en: ${JSON.stringify(conLaColumna)}.`,
-    ).toEqual([ORDER_CATALOG_PRISMA, ORDER_PRISMA]);
-  });
-
-  it('order-catalog-prisma.ts tiene exactamente un bloque `data:` que nombra finishedAt (el de transitionAliveOrder)', () => {
-    const fuente = readFileSync(join(repoRoot, ORDER_CATALOG_PRISMA), 'utf8');
-    const bloques = extractDataBlocks(fuente).filter((block) => /finishedAt/.test(block));
-
-    expect(bloques).toHaveLength(1);
-    expect(bloques[0]).toMatch(/status\s*:\s*to\b/);
+        : 'finishedAt/finished_at solo puede escribirse en `data:` de order-prisma.ts ' +
+            `(setAliveOrderStatus). Se encontro en: ${JSON.stringify(conLaColumna)}.`,
+    ).toEqual([ORDER_PRISMA]);
   });
 
   it('order-prisma.ts tiene exactamente un bloque `data:` que nombra finishedAt (el de setAliveOrderStatus)', () => {
@@ -162,9 +153,9 @@ describe('R5 — finishedAt/finished_at solo se escribe en setAliveOrderStatus (
     expect(bloques[0]).toMatch(/status\s*:\s*to\b/);
   });
 
-  it('las escrituras conocidas que R5 nombra -create, updateAliveOrder, cancelAliveOrder, softDeleteAliveOrder- no llevan finishedAt', () => {
+  it('las escrituras conocidas que R5 nombra -insertAliveOrder, updateAliveOrder, cancelAliveOrder, softDeleteAliveOrder- no llevan finishedAt', () => {
     const fuente = readFileSync(join(repoRoot, ORDER_PRISMA), 'utf8');
-    for (const nombre of ['createOrder', 'insertAliveOrder', 'updateAliveOrder', 'cancelAliveOrder', 'softDeleteAliveOrder']) {
+    for (const nombre of ['insertAliveOrder', 'updateAliveOrder', 'cancelAliveOrder', 'softDeleteAliveOrder']) {
       const inicio = fuente.indexOf(`async function ${nombre}`);
       expect(inicio, `no existe ${nombre} en ${ORDER_PRISMA}`).toBeGreaterThanOrEqual(0);
       const finFuncion = fuente.indexOf('\n}', inicio);
@@ -192,11 +183,11 @@ describe('R5 — finishedAt/finished_at solo se escribe en setAliveOrderStatus (
   });
 });
 
-describe('R10 — EN_CURSO/ENTREGADO solo los escribe transitionAliveOrder; updateAliveOrder ya no escribe status', () => {
+describe('R10 — EN_CURSO/ENTREGADO solo los escribe setAliveOrderStatus; updateAliveOrder ya no escribe status', () => {
   it('ningun bloque `data:` de lib/** fija status a mano en EN_CURSO ni ENTREGADO', () => {
     // El patron busca `status: 'EN_CURSO'` o `status: 'ENTREGADO'` como VALOR escrito, no
     // cualquier mencion del literal: `...(to === 'ENTREGADO' ? { finishedAt: now } : {})` de
-    // transitionAliveOrder es una COMPARACION dentro del mismo bloque `data:`, no una escritura
+    // setAliveOrderStatus es una COMPARACION dentro del mismo bloque `data:`, no una escritura
     // de `status` a mano, y no debe disparar esta regla (el caso simetrico, mas abajo, lo fija).
     const conElLiteral = findDataBlockMatches(repoRoot, (block) =>
       /\bstatus\s*:\s*['"`](EN_CURSO|ENTREGADO)['"`]/.test(block),
@@ -207,18 +198,17 @@ describe('R10 — EN_CURSO/ENTREGADO solo los escribe transitionAliveOrder; upda
       conElLiteral.length === 0
         ? undefined
         : 'Ningun `data:` de lib/** debe fijar EN_CURSO/ENTREGADO como literal: ' +
-            'transitionAliveOrder los recibe parametrizados (`status: to`), nunca a mano. ' +
+            'setAliveOrderStatus los recibe parametrizados (`status: to`), nunca a mano. ' +
             `Se encontro en: ${JSON.stringify(conElLiteral)}.`,
     ).toEqual([]);
   });
 
-  it('transitionAliveOrder (order-catalog-prisma.ts) es el unico bloque `data:` de ese archivo que fija `status`', () => {
-    const fuente = readFileSync(join(repoRoot, ORDER_CATALOG_PRISMA), 'utf8');
+  it('setAliveOrderStatus (order-prisma.ts) es el unico bloque `data:` de ese archivo que fija `status` a `to`', () => {
+    const fuente = readFileSync(join(repoRoot, ORDER_PRISMA), 'utf8');
     const bloques = extractDataBlocks(fuente);
-    const conStatus = bloques.filter((block) => /\bstatus\s*:/.test(block));
+    const conStatusTo = bloques.filter((block) => /\bstatus\s*:\s*to\b/.test(block));
 
-    expect(conStatus).toHaveLength(1);
-    expect(conStatus[0]).toMatch(/status\s*:\s*to\b/);
+    expect(conStatusTo).toHaveLength(1);
   });
 
   it('updateAliveOrder ya no escribe status: su bloque `data:` en order-prisma.ts no lleva la clave', () => {

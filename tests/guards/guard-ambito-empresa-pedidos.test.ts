@@ -31,8 +31,9 @@
 //      traves de un ayudante del mismo archivo al que se le pasa-. Declararlo y no usarlo seria la
 //      misma fuga con mejor cara.
 //
-// EL CAMINO DEL SQL CRUDO DEL ALTA (`design.md > 5`, «el caso raro»). `createOrder` no puede
-// recibir un `Prisma.OrderWhereInput`: escribe con `$queryRaw`. Para ese camino no basta con que
+// EL CAMINO DEL SQL CRUDO DEL ALTA (`design.md > 5`, «el caso raro»). `insertAliveOrder` (m2,
+// QC-141: el UNICO `INSERT` de pedido tras retirar `createOrder`) no puede recibir un
+// `Prisma.OrderWhereInput`: escribe con `$queryRaw`. Para ese camino no basta con que
 // la funcion llame a `companyScopeColumns(scope)`, porque podria llamarla y luego escribir
 // `scope.companyId` a mano en el SQL. Asi que aqui se LEE LA PLANTILLA SQL y se exige que la
 // empresa que se ESCRIBE en `company_id` y la que acota el SUBSELECT DEL MAXIMO (R24) sean las dos
@@ -458,7 +459,7 @@ const PUERTOS = [
  * adaptador», que asume un adaptador que lee `prisma.order` directamente.
  */
 const METODOS_DELEGADOS_EN_DOMINIO: ReadonlyMap<string, RegExp> = new Map([
-  ['transitionAliveById', /^createTransitionOrder\s*\(\s*\{\s*unitOfWork\s*:\s*orderUnitOfWork\s*,\s*recipes\s*:\s*recipeCatalog\s*\}\s*\)$/],
+  ['transitionAliveById', /^createTransitionOrder\s*\(\s*\{\s*unitOfWork\s*:\s*orderUnitOfWork\s*\}\s*\)$/],
 ])
 
 describe('QC-60 R18 — el punto unico es de verdad UNA definicion', () => {
@@ -591,17 +592,17 @@ describe('QC-60 R18, D21 — ninguna consulta del modulo se queda sin ambito, sa
 
     // ANTI-PLACEBO del troceador. Si `funcionesDe` dejara de reconocer las declaraciones -o se
     // quedara con la llave de un tipo de retorno-, el barrido de abajo no encontraria NINGUNA
-    // funcion que toque la base y pasaria en verde sin mirar nada. Las cuentas de hoy: seis en
-    // `order-prisma.ts` (el alta, la ficha, el listado y las tres escrituras) y una en el
-    // catalogo. Se exige el minimo, no la igualdad: la consulta numero ocho entra por el barrido,
-    // que es donde tiene que morder.
+    // funcion que toque la base y pasaria en verde sin mirar nada. Las cuentas de hoy, tras
+    // retirar `createOrder` (Tm2, QC-141): seis en `order-prisma.ts` (`insertAliveOrder`, la
+    // ficha, el listado y las tres escrituras) y una en el catalogo. Se exige el minimo, no la
+    // igualdad: la consulta numero ocho entra por el barrido, que es donde tiene que morder.
     const conConsulta = (archivo: string): readonly string[] =>
       analizar(archivo)
         .funciones.filter((f) => tocaLaBase(f.cuerpo))
         .map((f) => f.nombre)
 
     expect(conConsulta('order-prisma.ts').length).toBeGreaterThanOrEqual(6)
-    expect(conConsulta('order-prisma.ts')).toContain('createOrder')
+    expect(conConsulta('order-prisma.ts')).toContain('insertAliveOrder')
     expect(conConsulta('order-catalog-prisma.ts').length).toBeGreaterThanOrEqual(1)
   })
 
@@ -720,11 +721,11 @@ describe('QC-60 R18, R22, R24 — el SQL crudo escribe y numera con la empresa d
         .map((funcion) => ({ archivo, funcion })),
     )
 
-  it('el barrido encuentra el alta: `createOrder` ejecuta SQL crudo', () => {
+  it('el barrido encuentra el alta: `insertAliveOrder` ejecuta SQL crudo', () => {
     // ANTI-PLACEBO: si el troceo no viera el `$queryRaw`, los casos de abajo no correrian sobre
     // nada y R24 quedaria sin vigilar.
     expect(conSqlCrudo.map(({ archivo, funcion }) => `${archivo}:${funcion.nombre}`)).toContain(
-      'order-prisma.ts:createOrder',
+      'order-prisma.ts:insertAliveOrder',
     )
   })
 

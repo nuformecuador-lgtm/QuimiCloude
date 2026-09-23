@@ -616,18 +616,20 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     )
 
     // Quien la CONSUME, y nadie mas: cancelar no pasa por aqui -es `cancelOrder` y su propio
-    // `NotCancellableError` (R28)- y borrar tampoco (R32). `order-catalog-prisma.ts` se sumo
-    // como tercer consumidor, DECISION explicita y no descuido: es el unico adaptador con
-    // permiso para escribir `status` fuera de `update-order.ts`, y su escritura tambien pasa
-    // por la misma guardia antes de tocar la fila. `transition-order.ts` se suma: es quien
-    // implementa `OrderCatalog.transitionAliveById` desde ahora -el Finalizar de la planta y
-    // una edicion que entrega comparten la MISMA comprobacion antes de abrir la unidad de
-    // trabajo-, y `order-catalog-prisma.ts` conserva su propia llamada porque su funcion sigue
-    // viva -sin llamantes en produccion, pero probada- y no se borro.
+    // `NotCancellableError` (R28)- y borrar tampoco (R32). `transition-order.ts` consume la
+    // guardia: es quien implementa `OrderCatalog.transitionAliveById`, y el Finalizar de la
+    // planta la comprueba antes de abrir la unidad de trabajo. `update-order.ts` la consume
+    // sobre la fila que se acaba de leer -y otra vez sobre la que acaba de bloquear
+    // `lockAliveById`-, pero desde QC-141 (Tm2, `design.md > 5.3` enmendado) SOLO para
+    // comprobar que el pedido admite seguir en su mismo estado: la edicion ya no mueve el
+    // estado, asi que nunca llama con dos estados distintos. `order-catalog-prisma.ts` PERDIO
+    // su llamada: `transitionAliveOrder`, la unica que la hacia, se retiro sin llamantes -el
+    // Finalizar consume dentro de `createTransitionOrder`, que YA es quien cablea
+    // `OrderCatalog.transitionAliveById`-, y con ella se fue la ultima razon para que ese
+    // adaptador importara `order-transitions.ts`.
     expect(
       pedidosSources.filter((file) => CONSUME_LA_GUARDIA.test(read(file))).map(etiqueta),
     ).toEqual([
-      'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
       DUENO,
       'lib/modules/pedidos/domain/transition-order.ts',
       'lib/modules/pedidos/domain/update-order.ts',

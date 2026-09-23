@@ -121,8 +121,8 @@ function sqlStateOf(error: unknown): string | null {
 }
 
 /** Duplicado del correlativo: SQLSTATE `23505`, sin leer texto. Es seguro solo porque se usa acotado
- *  al `INSERT` de `createOrder`, que no escribe `id` (lo genera `gen_random_uuid()`): de los unicos
- *  de `orders` solo puede chocar `orders_company_year_sequence_key`. */
+ *  al `INSERT` de `insertAliveOrder`, que no escribe `id` (lo genera `gen_random_uuid()`): de los
+ *  unicos de `orders` solo puede chocar `orders_company_year_sequence_key`. */
 export function isDuplicateOrderNumber(error: unknown): boolean {
   return sqlStateOf(error) === '23505';
 }
@@ -149,115 +149,6 @@ const ORDER_SEQUENCE_LOCK_KEY_PREFIX = 'orders_sequence:';
  *  —por ejemplo el que insertara otra via— en un bucle infinito. Exportada porque
  *  `withOrderTransaction` reintenta con el mismo tope. */
 export const CREATE_ORDER_MAX_ATTEMPTS = 3;
-
-/**
- * Alta con su propio reintento: SQL crudo en una transaccion, porque el maximo del correlativo
- * tiene que evaluarse DENTRO del `INSERT`, sin ventana entre leerlo y escribirlo. Es la UNICA
- * operacion del modulo que no usa la API tipada. Dejo de cablearse a `OrderRepository` -el
- * alta ya escribe a traves de `insertAliveOrder`, dentro de la transaccion compartida con
- * `inventario`-, pero sigue viva: `order-sequence.int.test.ts` la ejercita directamente.
- *
- * El lock va en una sentencia APARTE y ANTERIOR: en `READ COMMITTED` cada sentencia toma su
- * instantanea al empezar, asi que dentro del `INSERT` la sesion que espera leeria el mismo maximo
- * que la que comitea. Es `xact` y se pide uno solo: se suelta al terminar y no puede interbloquear.
- *
- * El maximo no filtra `deleted_at` ni el estado: un pedido borrado o cancelado conserva su numero,
- * y los huecos existentes se conservan. La empresa del ambito va, parametrizada con `::uuid`, en la
- * columna que se escribe y en el subselect del maximo.
- *
- * UN SOLO RELOJ: `created_at`, `updated_at` y el ANO salen del mismo `now`; con otro reloj, un alta
- * en el cambio de ano violaria `orders_order_year_matches_created_at` con `23514`. `created_by` y
- * `updated_by` llevan el mismo `actorId`, y el `status` va parametrizado porque lo decide el caso
- * de uso.
- *
- * El reintento va FUERA de `prisma.$transaction`: una transaccion abortada por el `23505` no
- * admite ni una sentencia mas. Agotados los intentos, `'duplicate_number'`. Ninguna salida lleva
- * `companyId`.
- */
-export async function createOrder(
-  data: NewOrder,
-  year: number,
-  actorId: string,
-  now: Date,
-  ingredientsCost: string | null,
-  scope: OrderScope,
-): Promise<OrderRow | 'duplicate_number'> {
-  const { companyId } = companyScopeColumns(scope);
-  const lockKey = `${ORDER_SEQUENCE_LOCK_KEY_PREFIX}${companyId}:${String(year)}`;
-
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      const fila = await prisma.$transaction(async (tx) => {
-        // `$executeRaw` y no `$queryRaw`: `pg_advisory_xact_lock` devuelve `void`, y el cliente no
-        // sabe deserializar una columna de ese tipo.
-        await tx.$executeRaw(
-          Prisma.sql`SELECT pg_advisory_xact_lock(${ORDER_SEQUENCE_LOCK_NAMESPACE}::int, hashtext(${lockKey}::text))`,
-        );
-
-        const filas = await tx.$queryRaw<readonly CreatedOrderRow[]>(Prisma.sql`
-          INSERT INTO "orders" (
-            "company_id", "order_year", "order_sequence", "recipe_id", "quantity",
-            "priority", "status", "ingredients_cost", "created_by", "updated_by", "created_at",
-            "updated_at", "presentation_id"
-          ) VALUES (
-            ${companyId}::uuid,
-            ${year}::integer,
-            (SELECT COALESCE(max("order_sequence"), 0) + 1
-               FROM "orders"
-              WHERE "company_id" = ${companyId}::uuid
-                AND "order_year" = ${year}::integer),
-            ${data.recipeId}::uuid,
-            ${data.quantity}::numeric,
-            ${data.priority}::"OrderPriority",
-            ${data.status}::"OrderStatus",
-            ${ingredientsCost}::numeric,
-            ${actorId}::uuid,
-            ${actorId}::uuid,
-            ${now}::timestamptz,
-            ${now}::timestamptz,
-            ${data.presentationId}::uuid
-          )
-          RETURNING "id", "order_year", "order_sequence"
-        `);
-
-        const row = filas[0];
-        if (row === undefined) {
-          // Un `INSERT ... RETURNING` que no devuelve fila no tiene lectura posible: no se
-          // inventa un pedido con id vacio, se propaga con contexto (`docs/conventions.md`).
-          throw new Error('El INSERT de pedido no devolvio ninguna fila.');
-        }
-        return row;
-      });
-
-      // El resto de la fila es exactamente lo que se acaba de escribir, asi que no hace falta
-      // un segundo viaje para leerlo. Los importes se normalizan con la MISMA funcion que usa
-      // la lectura, para que el alta y la consulta no devuelvan dos formatos del mismo numero.
-      return {
-        id: fila.id,
-        number: { year: Number(fila.order_year), sequence: Number(fila.order_sequence) },
-        recipeId: data.recipeId,
-        quantity: fromDecimal(toDecimalInput(data.quantity)),
-        priority: data.priority,
-        status: data.status,
-        // El motivo solo existe en un pedido cancelado, y cancelar es `cancelAlive`.
-        cancellationReason: null,
-        // Misma normalizacion que `quantity`: el alta y la consulta no pueden devolver dos
-        // formatos del mismo numero. `null` sigue `null`.
-        ingredientsCost: ingredientsCost === null ? null : fromDecimal(toDecimalInput(ingredientsCost)),
-        createdAt: now,
-        updatedAt: now,
-        createdBy: actorId,
-        updatedBy: actorId,
-        presentationId: data.presentationId,
-      };
-    } catch (error) {
-      // Lo que no se sabe traducir se RELANZA: el dominio recibe un resultado DISCRIMINADO, jamas
-      // un SQLSTATE, y aqui no hay ni un `catch` vacio.
-      if (!isDuplicateOrderNumber(error)) throw error;
-      if (attempt >= CREATE_ORDER_MAX_ATTEMPTS) return 'duplicate_number';
-    }
-  }
-}
 
 /** `findAliveById`: `deleted_at IS NULL` Y EL AMBITO en el `where`, no en un `if` posterior. Un
  *  pedido de otra empresa vuelve como `null`, igual que uno que no existe. Un pedido CANCELADO si
@@ -648,11 +539,11 @@ async function lockAliveOrderById(
 }
 
 /**
- * `create` de `OrderWriteRepository`: el mismo bloqueo de aviso y el mismo `INSERT` que
- * `createOrder`, pero sobre el cliente que ya abrio `OrderUnitOfWork` y SIN su bucle de
- * reintento -si el correlativo choca aqui la transaccion entera ya quedo abortada, y quien
- * reintenta con una transaccion NUEVA es `withOrderTransaction`-. El choque se deja SUBIR tal
- * cual, sin traducir.
+ * `create` de `OrderWriteRepository`: el UNICO `INSERT` de pedido del modulo, con el lock de
+ * aviso del correlativo (`design.md > 5.3`, m2). Corre sobre el cliente que ya abrio
+ * `OrderUnitOfWork`, SIN bucle de reintento propio -si el correlativo choca aqui la transaccion
+ * entera ya quedo abortada, y quien reintenta con una transaccion NUEVA es
+ * `withOrderTransaction`-. El choque se deja SUBIR tal cual, sin traducir.
  */
 async function insertAliveOrder(
   tx: PrismaLike,
@@ -698,7 +589,8 @@ async function insertAliveOrder(
 
   const row = filas[0];
   if (row === undefined) {
-    // Mismo caso raro que en `createOrder`: un `RETURNING` sin fila no tiene lectura posible.
+    // Un `INSERT ... RETURNING` que no devuelve fila no tiene lectura posible: no se inventa
+    // un pedido con id vacio, se propaga con contexto (`docs/conventions.md`).
     throw new Error('El INSERT de pedido no devolvio ninguna fila.');
   }
 

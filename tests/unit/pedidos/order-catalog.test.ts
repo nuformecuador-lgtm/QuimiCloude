@@ -22,7 +22,6 @@ import { fileURLToPath } from 'node:url'
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { InvalidTransitionError } from '@/lib/modules/pedidos'
 import type { OrderAssignmentTarget } from '@/lib/modules/pedidos'
 
 /** Doble del cliente Prisma. */
@@ -40,8 +39,15 @@ const {
   listAliveSummariesInCompany,
   toAssignedOrderSummary,
   toOrderAssignmentTarget,
-  transitionAliveOrder,
 } = await import('@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma')
+
+// Tm2 (QC-141, `design.md > 5.3` enmendado): `transitionAliveOrder` se retiro -sin llamantes
+// desde que `createTransitionOrder` cablea el Finalizar sobre la unidad de trabajo-, y con ella
+// su `describe` de aqui abajo. El `UPDATE` condicional que movia `status` (y `finishedAt` a
+// ENTREGADO) sigue vivo en `setAliveOrderStatus`, tras `createOrderWriteRepository(tx).setStatus`.
+const { createOrderWriteRepository } = await import(
+  '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
+)
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -306,17 +312,18 @@ describe('el cambio es ADITIVO: pedidos no gano ningun caso de uso ni perdio nad
   })
 })
 
-describe('transitionAliveOrder', () => {
+describe('setAliveOrderStatus (createOrderWriteRepository(tx).setStatus), el camino vivo tras retirar transitionAliveOrder (Tm2)', () => {
   const AHORA = new Date('2026-09-17T12:00:00Z')
+  const setStatus = createOrderWriteRepository().setStatus
 
   it('T1(a) - mueve PENDIENTE->EN_CURSO y EN_CURSO->ENTREGADO', async () => {
     updateMany.mockResolvedValue({ count: 1 })
 
     await expect(
-      transitionAliveOrder('o-1', EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA),
+      setStatus('o-1', 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA, { companyId: EMPRESA }),
     ).resolves.toBe('ok')
     await expect(
-      transitionAliveOrder('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA),
+      setStatus('o-1', 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA, { companyId: EMPRESA }),
     ).resolves.toBe('ok')
 
     expect(updateMany).toHaveBeenCalledTimes(2)
@@ -334,8 +341,8 @@ describe('transitionAliveOrder', () => {
   it('R3 - a ENTREGADO lleva finishedAt en el mismo data; a EN_CURSO no', async () => {
     updateMany.mockResolvedValue({ count: 1 })
 
-    await transitionAliveOrder('o-1', EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA)
-    await transitionAliveOrder('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA)
+    await setStatus('o-1', 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA, { companyId: EMPRESA })
+    await setStatus('o-1', 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA, { companyId: EMPRESA })
 
     const [aEnCurso, aEntregado] = updateMany.mock.calls
     expect(aEnCurso?.[0]?.data).not.toHaveProperty('finishedAt')
@@ -347,20 +354,19 @@ describe('transitionAliveOrder', () => {
     })
   })
 
-  it('T1(b) - ENTREGADO->EN_CURSO lanza InvalidTransitionError SIN escribir', async () => {
-    await expect(
-      transitionAliveOrder('o-1', EMPRESA, 'ENTREGADO', 'EN_CURSO', 'actor-1', AHORA),
-    ).rejects.toBeInstanceOf(InvalidTransitionError)
-
-    expect(updateMany).not.toHaveBeenCalled()
-  })
+  // T1(b) de `transitionAliveOrder` (ENTREGADO->EN_CURSO lanza `InvalidTransitionError` SIN
+  // escribir) no tiene equivalente AQUI: `setAliveOrderStatus` corre DENTRO de
+  // `unitOfWork.run`, sobre la fila que ya bloqueo `lockAliveById`, y la transicion la valida
+  // `assertTransition` en el dominio ANTES de llegar aqui (`transition-order.ts`), no el
+  // adaptador. Esa comprobacion -que una transicion ilegal no abre la unidad de trabajo ni
+  // escribe- la prueba `tests/unit/pedidos/transition-order.test.ts` ('R21/R22').
 
   it('T1(c) - devuelve not_found cuando el pedido es de otra empresa', async () => {
     updateMany.mockResolvedValue({ count: 0 })
     findFirst.mockResolvedValue(null)
 
     await expect(
-      transitionAliveOrder('o-ajeno', EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA),
+      setStatus('o-ajeno', 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA, { companyId: EMPRESA }),
     ).resolves.toBe('not_found')
   })
 
@@ -369,7 +375,7 @@ describe('transitionAliveOrder', () => {
     findFirst.mockResolvedValue({ id: 'o-1', status: 'EN_CURSO' })
 
     await expect(
-      transitionAliveOrder('o-1', EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA),
+      setStatus('o-1', 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA, { companyId: EMPRESA }),
     ).resolves.toBe('stale')
   })
 })

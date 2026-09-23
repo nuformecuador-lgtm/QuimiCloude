@@ -39,12 +39,14 @@ import { findRecipeExecutionContentById } from '@/lib/modules/recetas/adapters/d
 import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
-  transitionAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
+import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import { assertTransition } from '@/lib/modules/pedidos/domain/order-transitions';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
+import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
@@ -86,13 +88,35 @@ const recipes: RecipeCatalog = {
   findIdsMatchingName: async () => noLlamar('recipes.findIdsMatchingName'),
 };
 
+/**
+ * `OrderCatalog['transitionAliveById']` real, tras retirar `transitionAliveOrder` (Tm2, QC-141):
+ * `assertTransition` -la misma comprobacion que hacia la funcion retirada, y la que
+ * `createTransitionOrder` hace en produccion antes de abrir la unidad de trabajo- seguida del
+ * mismo `UPDATE` condicional, `setStatus` de `createOrderWriteRepository()` sobre el cliente
+ * global -aqui, el proxy de la transaccion del test-. No pasa por `withOrderTransaction`: esa
+ * funcion abre su PROPIA `prisma.$transaction` con el cliente REAL sin pasar por el proxy
+ * (`$transaction` no viaja por el, ver `prisma-tx-holder.ts`), lo que confirmaria de verdad en
+ * vez de participar en el `ROLLBACK` del fixture.
+ */
+async function transitionAliveByIdReal(
+  id: string,
+  companyId: string,
+  from: OrderStatus,
+  to: OrderStatus,
+  actorId: string,
+  now: Date,
+): Promise<'ok' | 'not_found' | 'stale'> {
+  assertTransition(from, to);
+  return createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
+}
+
 /** El `OrderCatalog` REAL: los tres metodos de escritura y lectura que la ejecucion necesita. */
 function ordersReales(): OrderCatalog {
   return {
     findAliveById: findAliveOrderTargetById,
     listAliveSummariesByIds: listAliveOrderSummariesByIds,
     listAliveSummariesInCompany: async () => noLlamar('orders.listAliveSummariesInCompany'),
-    transitionAliveById: transitionAliveOrder,
+    transitionAliveById: transitionAliveByIdReal,
   };
 }
 

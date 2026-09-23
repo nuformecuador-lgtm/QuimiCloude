@@ -31,7 +31,6 @@ import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
   listAliveSummariesInCompany,
-  transitionAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
@@ -51,7 +50,11 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
     findAliveById: findAliveOrderTargetById,
     listAliveSummariesByIds: listAliveOrderSummariesByIds,
     listAliveSummariesInCompany,
-    transitionAliveById: transitionAliveOrder,
+    // Tm2 (QC-141): `transitionAliveOrder` se retiro sin llamantes. Este archivo prueba
+    // `listFinishedOrders`, que nunca transiciona un pedido.
+    transitionAliveById: async () => {
+      throw new Error('listFinishedOrders no ejecuta ninguna transicion');
+    },
   };
   const assignments = createOrderAssignmentRepository(tx);
 

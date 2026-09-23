@@ -24,12 +24,13 @@ import { normalizePresentationName } from '@/lib/modules/inventario';
 import { findAliveOrderTargetById } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import {
   cancelAliveOrder,
-  createOrder,
+  createOrderWriteRepository,
   findAliveOrderById,
   listAliveOrders,
   softDeleteAliveOrder,
   updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { ListQuery } from '@/lib/modules/pedidos/domain/list-query';
@@ -175,15 +176,16 @@ function pedidoNuevo(overrides: Partial<NewOrder> & { readonly presentationId: s
 
 /** Alta por el adaptador REAL: la transaccion, el lock y el `max()+1` son los de produccion. */
 async function alta(empresa: Empresa): Promise<OrderRow> {
-  const resultado = await createOrder(
-    pedidoNuevo({ presentationId: empresa.presentationId }),
-    ANO,
-    empresa.userId,
-    new Date(),
-    null,
-    ambitoDe(empresa),
+  const resultado = await withOrderTransaction((tx) =>
+    createOrderWriteRepository(tx).create(
+      pedidoNuevo({ presentationId: empresa.presentationId }),
+      ANO,
+      empresa.userId,
+      new Date(),
+      null,
+      ambitoDe(empresa),
+    ),
   );
-  if (resultado === 'duplicate_number') throw new Error('el alta devolvio duplicate_number');
   empresa.pedidos.push(resultado.id);
   return resultado;
 }

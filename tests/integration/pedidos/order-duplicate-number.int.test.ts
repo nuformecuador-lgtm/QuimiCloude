@@ -1,5 +1,9 @@
 /**
- * El choque del correlativo, AUTENTICO y contra Postgres real, a traves del adaptador `createOrder`.
+ * El choque del correlativo, AUTENTICO y contra Postgres real, a traves de
+ * `withOrderTransaction` + `createOrderWriteRepository` -el mismo par que ata `OrderUnitOfWork`
+ * en `lib/composition`, y el UNICO camino de alta desde que Tm2 (QC-141, `design.md > 5.3`
+ * enmendado) retiro `createOrder`, que llevaba su propio bucle de reintento y traducia el
+ * choque agotado a `'duplicate_number'`.
  *
  * Por que un trigger: con el lock de aviso el choque no se puede provocar por carrera, y un error
  * fabricado a mano no dice nada de la forma que tiene de verdad. Un trigger `BEFORE INSERT`,
@@ -7,18 +11,26 @@
  * `INSERT` del adaptador choca contra `orders_company_year_sequence_key` en los TRES intentos, y
  * el `23505` que vuelve es el que produce el motor, con el mensaje en el idioma del servidor.
  *
- * Aislamiento por COMMIT: `createOrder` abre su propia `prisma.$transaction` con el cliente global.
- * El trigger y su funcion llevan un nombre unico, solo actuan sobre la empresa del caso y se borran
- * en el `finally`, antes que el fixture.
+ * El reintento sigue siendo el mismo -tres transacciones nuevas, una por intento-, pero ya NO
+ * traduce a una cadena: `withOrderTransaction` reintenta y, agotados los intentos, deja SUBIR el
+ * `23505` sin traducir (`isDuplicateOrderNumber`/`CREATE_ORDER_MAX_ATTEMPTS` de `order-prisma.ts`
+ * son los mismos que usaba `createOrder`). Lo que este archivo prueba sigue siendo R15 del
+ * correlativo: tres intentos, ni uno mas, y ningun duplicado llega a escribirse.
+ *
+ * Aislamiento por COMMIT: `withOrderTransaction` abre su propia `prisma.$transaction` con el
+ * cliente global. El trigger y su funcion llevan un nombre unico, solo actuan sobre la empresa
+ * del caso y se borran en el `finally`, antes que el fixture.
  */
 import { randomUUID } from 'node:crypto';
 
+import { Prisma } from '@prisma/client';
 import { Client, DatabaseError } from 'pg';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { normalizePresentationName } from '@/lib/modules/inventario';
-import { createOrder } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { NewOrder, OrderRow } from '@/lib/modules/pedidos/domain/order-view';
@@ -121,11 +133,28 @@ function pedidoNuevo(presentationId: string): NewOrder {
   return { recipeId: recetaId, quantity: '3.0000', priority: 'BAJA', status: 'PENDIENTE', presentationId };
 }
 
-function altaDe(fixture: Fixture): Promise<OrderRow | 'duplicate_number'> {
+function altaDe(fixture: Fixture): Promise<OrderRow> {
   const now = new Date();
-  return createOrder(pedidoNuevo(fixture.presentationId), now.getUTCFullYear(), fixture.actorId, now, null, {
-    companyId: fixture.companyId,
-  });
+  return withOrderTransaction((tx) =>
+    createOrderWriteRepository(tx).create(
+      pedidoNuevo(fixture.presentationId),
+      now.getUTCFullYear(),
+      fixture.actorId,
+      now,
+      null,
+      { companyId: fixture.companyId },
+    ),
+  );
+}
+
+/** SQLSTATE de un error de Prisma, leido del campo ESTRUCTURADO -nunca del texto del mensaje,
+ *  que en esta maquina responde en espanol-. Mismo criterio que `order-prisma.ts`. */
+function sqlStateOf(error: unknown): string | null {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return null;
+  const meta: unknown = error.meta;
+  if (typeof meta !== 'object' || meta === null || !('code' in meta)) return null;
+  const code: unknown = (meta as { code: unknown }).code;
+  return typeof code === 'string' ? code : null;
 }
 
 afterAll(async () => {
@@ -133,8 +162,8 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-describe('un 23505 real del correlativo se traduce a duplicate_number', () => {
-  it('con el correlativo ocupado en los tres intentos devuelve duplicate_number, sin lanzar, tras 3 transacciones', async () => {
+describe('un 23505 real del correlativo agota los tres intentos y sube sin traducir', () => {
+  it('con el correlativo ocupado en los tres intentos rechaza con el 23505 del motor, tras 3 transacciones, sin escribir un duplicado', async () => {
     const fixture = await createFixture();
     // La receta es de la MISMA empresa que la del fixture: QC-50 hizo `recipes.company_id`
     // obligatoria.
@@ -155,7 +184,6 @@ describe('un 23505 real del correlativo se traduce a duplicate_number', () => {
 
       // El numero 1 queda ocupado por un alta normal.
       const primera = await altaDe(fixture);
-      if (primera === 'duplicate_number') throw new Error('el alta semilla no deberia chocar');
       expect(primera.number.sequence).toBe(1);
 
       await admin.query(
@@ -185,9 +213,13 @@ describe('un 23505 real del correlativo se traduce a duplicate_number', () => {
       expect((control as DatabaseError).constraint).toBe('orders_company_year_sequence_key');
 
       spy = vi.spyOn(prisma, '$transaction');
-      const resultado = await altaDe(fixture);
+      const rechazo = await altaDe(fixture).then(
+        () => null,
+        (error: unknown) => error,
+      );
 
-      expect(resultado).toBe('duplicate_number');
+      expect(rechazo, 'el alta con el correlativo ocupado en los tres intentos tenia que rechazar').not.toBeNull();
+      expect(sqlStateOf(rechazo)).toBe('23505');
       expect(spy).toHaveBeenCalledTimes(3);
 
       const guardados = await prisma.order.count({ where: { companyId: fixture.companyId } });
