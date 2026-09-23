@@ -187,6 +187,7 @@ import {
   createDeleteOrder,
   createGetOrder,
   createListOrders,
+  createTransitionOrder,
   createUpdateOrder,
 } from '@/lib/modules/pedidos';
 import {
@@ -297,7 +298,6 @@ import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports
 import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
-  transitionAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
@@ -1070,11 +1070,15 @@ export const observabilidad = {
 
 /** `OrderCatalog` cableado con el adaptador driven DE PEDIDOS (`design.md > 2.1`): mismo patron
  *  que `RecipeCatalog` arriba. `asignaciones` solo conoce el TIPO, y por el solo puede saber si
- *  el pedido esta VIVO y en que ESTADO —ni el numero, ni la receta, ni las cantidades—. */
+ *  el pedido esta VIVO y en que ESTADO —ni el numero, ni la receta, ni las cantidades—.
+ *
+ *  `transitionAliveById` ya no es la funcion cruda de `order-catalog-prisma.ts` (QC-141 T10,
+ *  `design.md > 5.4`): es `createTransitionOrder`, que abre `orderUnitOfWork` y, si el destino
+ *  es `ENTREGADO`, consume el material en la misma transaccion. */
 const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: listAliveOrderSummariesByIds,
-  transitionAliveById: transitionAliveOrder,
+  transitionAliveById: createTransitionOrder({ unitOfWork: orderUnitOfWork, recipes: recipeCatalog }),
 };
 
 /**
