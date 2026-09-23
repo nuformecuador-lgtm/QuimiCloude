@@ -21,7 +21,7 @@
 |---|---|---|---|---|
 | 1 | Cantidad del pedido en la unidad de su presentación | D11 | R12 | §4.1 sin conversión |
 | 2 | Coste / cantidad que entra | D12 | R14 | §4.1 |
-| 3 | Ingrediente sin coste = 0; sin ninguno, coste 0; el importe de QC-123 no cambia; `unit_cost` sigue `NOT NULL` | D13 | R15 (derogado), R42, R43 | §4.1, §4.3 (y abre la pregunta 9) |
+| 3 | Ingrediente sin coste = 0; sin ninguno, coste 0; el importe de QC-123 no cambia; `unit_cost` sigue `NOT NULL` | D13 | R15 (derogado), R42, R43 | §4.1, §4.3 (el momento del cálculo lo cierra D21) |
 | 4 | Rechazar con `no_whole_package` | D14 | R19 | §4.1, §6 |
 | 5 | Solo el Finalizar; la edición en Pedidos no da de alta | D15 | R27 (negativo) | §4.3 |
 | 6 | No se bloquea: se **copia** en el pedido y en el lote | D16 | R12, R18, R25, R38-R41, R44 | §2.2-2.5, §3, §4, §5. Desaparece el disparador `presentations_check_content_locked` |
@@ -29,12 +29,14 @@
 | — | Confirmadas: pedido sin presentación no se finaliza; el tipo terminado no cambia; el día del despliegue no se finaliza nada hasta rellenar contenidos | D18 | R4, R18 | — |
 | — | Enmienda del catálogo aprobada | D19 | R18, R19, R4, R28, R29, R31 | §6 |
 
-### 0.2 Siguen abiertas
+### 0.2 Respondidas al aprobar el spec (2026-09-23)
 
-| # | Pregunta | Propuesta | Requisitos | Tasks bloqueadas |
+| # | Respuesta | Fila | Requisitos | Efecto en el diseño |
 |---|---|---|---|---|
-| 8 | Pedido sin copia del contenido: (a) vivos anteriores a la ficha; (b) creados cuando su presentación aún no tenía contenido. En el caso (b), rellenar después el contenido de la presentación no le da copia al pedido, porque D16 solo recopia al cambiar de presentación | **Al Finalizar, usar el contenido vigente de la presentación** (leído con `FOR SHARE` dentro de la transacción), y si tampoco lo tiene, rechazar con R18. Es lo único que desbloquea (b) sin obligar a cambiar de presentación y volver. Se descarta rellenar la copia de los vivos al migrar: hoy ninguna presentación tiene contenido (R9), así que el relleno no copiaría nada | R44 | T7 (solo la rama sin copia) |
-| 9 | Cuándo se calcula el coste del lote si falta el coste de algún ingrediente | **Si `orders.ingredients_cost` no es nulo, se usa ese** (D4 no cambia: todos los ingredientes tenían coste y el importe es el congelado de QC-123). **Si es nulo, se recalcula al Finalizar**, **antes** de consumir el material, con la misma regla de QC-123 y contando como cero cada ingrediente sin coste (§4.1). Alternativa: guardar en el pedido un segundo importe en cada alta o edición. Es más coherente con QC-123 D8, pero añade una columna, toca `create-order.ts`/`update-order.ts` (que ya se solapan con QC-141 y QC-145) y deja sin valor los pedidos existentes | R42 | T8 (el recálculo), T5 (solo la función que recibe líneas ya costeadas: no bloqueada) |
+| 8 | Pedido sin copia del contenido (vivos anteriores a la ficha, o creados cuando su presentación aún no tenía contenido): **al Finalizar se usa el contenido vigente** de la presentación, leído con `FOR SHARE` dentro de la transacción; si tampoco lo tiene, se rechaza con `presentation_without_content` | D20 | R44, R18 | §4.4 paso 2. Sin relleno en la migración |
+| 9 | Coste del lote: **si `orders.ingredients_cost` no es nulo, se usa ese**; si es nulo, **se recalcula al Finalizar**, **antes** de consumir, con la regla de QC-123 y el ingrediente sin coste como cero. Se descarta guardar un segundo importe en el pedido | D21 | R42, R43 | §4.1, §4.3 paso 2 |
+
+**No queda ninguna pregunta abierta.**
 
 ---
 
@@ -137,7 +139,8 @@ model Order {
 - `CHECK (presentation_content IS NULL OR presentation_content > 0)`, y
   `CHECK (presentation_id IS NOT NULL OR presentation_content IS NULL)`: no hay copia sin
   presentación.
-- **Sin relleno** en la migración (pregunta 8): hoy ninguna presentación tiene contenido.
+- **Sin relleno** en la migración (D20: el Finalizar usa el contenido vigente cuando no hay copia);
+  además, hoy ninguna presentación tiene contenido.
 - La escriben `create`/`updateAlive` del repositorio de escritura de `pedidos` (§4.5). Nada más la
   toca.
 
@@ -302,7 +305,7 @@ export interface FinishedGoodsIntake {
 
 1. Tras `lockAliveById`: si `locked.presentationId === null` → `PresentationWithoutContentError`
    (R18), antes de consumir.
-2. **Coste del lote, antes de consumir** (R42, provisional pregunta 9): si
+2. **Coste del lote, antes de consumir** (R42, D21): si
    `locked.ingredientsCost !== null`, es ese; si es nulo, `resolveLotIngredientsCost(...)` con
    `locked.recipeId` y `locked.quantity`. Tiene que ir antes de `consumeForOrder`: después, los lotes
    ya habrían bajado. Las lecturas van por los catálogos públicos (cliente global), que leen lo
@@ -342,7 +345,7 @@ caminos que deja QC-141 a **cinco**. `createFinishedGoodsIntake(db)` (nuevo,
 1. **Presentación** de la empresa, `FOR SHARE`: `name`, `unit_id`, `content`. Sin fila →
    `presentation_without_content`.
 2. **Contenido a usar** = `orderContent` si no es nulo (D16); si lo es, el `content` vigente de la
-   presentación (R44, provisional pregunta 8); si los dos son nulos → `presentation_without_content`
+   presentación (R44, D20); si los dos son nulos → `presentation_without_content`
    (R18).
 3. `planFinishedGoods`. `no_whole_package` → devolver sin escribir.
 4. **Producto terminado vivo**, sin carrera (R22): `INSERT ... ON CONFLICT (company_id, recipe_id,
@@ -422,9 +425,8 @@ Sin librerías de UI nuevas; targets de 44 px; nada depende de `:hover`.
 
 Con D16 ya no hace falta ningún código de «contenido bloqueado».
 
-Nota para la pregunta 8: si su respuesta fuera «no usar el vigente», un pedido del caso (b) mostraría
-`presentation_without_content` aunque su presentación ya tenga contenido. El mensaje tendría que
-decir entonces que hay que volver a elegir la presentación.
+Con D20, `presentation_without_content` solo sale cuando ni el pedido tiene copia ni la presentación
+tiene contenido, así que el mensaje («complétala en Presentaciones») es siempre la corrección.
 
 ---
 
@@ -497,7 +499,7 @@ Cada `R<n>` va en el nombre de su caso; el mapa `R → test` lo escribe el imple
   `ENTREGADO`. **No deben estar las dos `in_progress` a la vez** salvo reparto de archivos.
 - **Pedidos anteriores a QC-146** sin presentación no se pueden finalizar (D18). **Toda
   presentación nace sin contenido** (R9, aceptado en D18).
-- **Coste del lote cuando falta un ingrediente** (pregunta 9): si se aprueba la propuesta, dos lotes
+- **Coste del lote cuando falta un ingrediente** (D21, aceptado al aprobar): dos lotes
   de pedidos iguales pueden tener costes calculados en momentos distintos: uno en la última edición
   (importe completo) y otro al Finalizar (importe parcial). Es la consecuencia de no añadir columna.
 - **Dos motivos nuevos de fallo del Finalizar** (tres con QC-141).

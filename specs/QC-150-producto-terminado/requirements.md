@@ -26,7 +26,8 @@
 > D8 existencia decimal, D9 E2E, D10 identificadores y borrado; y las filas añadidas en F1.4 el
 > 2026-09-23: D11 unidad de la cantidad del pedido, D12 divisor del coste, D13 ingrediente sin coste,
 > D14 cero envases, D15 solo por Finalizar, D16 copia del contenido, D17 producto dado de baja,
-> D18 derivaciones confirmadas, D19 enmienda del catálogo de errores.
+> D18 derivaciones confirmadas, D19 enmienda del catálogo de errores; y, al aprobar el spec,
+> D20 pedido sin copia del contenido y D21 momento del cálculo del coste del lote.
 >
 > **Vocabulario.** *Producto terminado*: producto de tipo `FINISHED_PRODUCT`. *Combinación* de un
 > pedido: su receta más su presentación. *Contenido* de una presentación: la cantidad que cabe en un
@@ -35,7 +36,8 @@
 > presentación. *Envases enteros* de un pedido: ⌊cantidad del pedido / contenido del pedido⌋.
 > *Cantidad que entra*: envases enteros × contenido del pedido.
 >
-> **Requisitos provisionales.** Los marcados **(provisional, pregunta N)** dependen de una pregunta
+> **Requisitos provisionales** *(ya no queda ninguno desde el 2026-09-23; se conserva la
+> definición porque la citan las enmiendas)*. Los marcados **(provisional, pregunta N)** dependían de una pregunta
 > abierta; llevan escrita la opción que recomienda `design.md > 0` y **no se implementan** hasta que
 > el humano la confirme en F1.4. Los marcados **(abierto, pregunta N)** fijan solo lo que vale con
 > cualquier respuesta.
@@ -218,51 +220,26 @@ guardado de ningún lote `[D16]`.
 **R41.** CUANDO entre un lote de producto terminado, el sistema DEBE guardar en el lote el contenido
 con el que se calcularon sus envases `[D16]`.
 
-**R42.** El sistema DEBE calcular el coste del lote como la suma de los costes de los ingredientes de
-la receta del pedido con la misma regla de coste que el importe del pedido, contando como cero cada
-ingrediente cuyo coste no se pueda calcular; y SI ninguno tiene coste, ENTONCES el coste del lote DEBE
-ser cero y el lote DEBE entrar con coste unitario cero `[D4]` `[D13]` **(provisional, pregunta 9: en
-qué momento se calcula)**.
+**R42.** *(Enmendado el 2026-09-23: deja de ser provisional por D21.)* SI el pedido tiene coste de
+ingredientes guardado, ENTONCES el sistema DEBE usarlo como coste del lote; y SI no lo tiene,
+ENTONCES el sistema DEBE calcular el coste del lote al Finalizar, antes de consumir el material, como
+la suma de los costes de los ingredientes de la receta del pedido con la misma regla de coste que el
+importe del pedido, contando como cero cada ingrediente cuyo coste no se pueda calcular; y SI ninguno
+tiene coste, ENTONCES el coste del lote DEBE ser cero y el lote DEBE entrar con coste unitario cero
+`[D4]` `[D13]` `[D21]`.
 
 **R43.** El sistema NO DEBE cambiar, al finalizar un pedido ni por ninguna regla de esta ficha, el
 coste de ingredientes que el pedido tiene guardado, que sigue siendo nulo cuando falta el coste de
 algún ingrediente, y NO DEBE guardar nunca un lote de producto terminado sin coste unitario `[D13]`.
 
-**R44.** SI el pedido que se finaliza tiene presentación pero no tiene copia de su contenido,
-ENTONCES el sistema DEBE usar el contenido que su presentación tenga en el instante del Finalizar, y
-SI tampoco lo tiene, ENTONCES DEBE aplicar R18 `[D16]` **(provisional, pregunta 8)**.
+**R44.** *(Enmendado el 2026-09-23: deja de ser provisional por D20.)* SI el pedido que se finaliza
+tiene presentación pero no tiene copia de su contenido, ENTONCES el sistema DEBE usar el contenido que
+su presentación tenga en el instante del Finalizar, y SI tampoco lo tiene, ENTONCES DEBE rechazar el
+Finalizar con `presentation_without_content` como dice R18 `[D16]` `[D20]`.
 
 ## Preguntas abiertas
 
-> Las preguntas 1 a 7 las respondió el humano en F1.4 el 2026-09-23 y pasan a la tabla de
-> decisiones como D11 a D17 (ver la nota del final). Se conserva su número para no romper las
-> referencias de `design.md` y `tasks.md`.
-
-1. ~~**Unidad de la cantidad del pedido.**~~ **Respondida el 2026-09-23 → D11.**
-2. ~~**Coste unitario con sobrante.**~~ **Respondida el 2026-09-23 → D12.**
-3. ~~**Pedido sin coste.**~~ **Respondida el 2026-09-23 → D13** (deja abierta la pregunta 9).
-4. ~~**Menos de un envase.**~~ **Respondida el 2026-09-23 → D14.**
-5. ~~**Entregar desde la edición en Pedidos.**~~ **Respondida el 2026-09-23 → D15.**
-6. ~~**Cambiar el contenido de una presentación con lotes de producto terminado.**~~ **Respondida el
-   2026-09-23 → D16** (abre la pregunta 8).
-7. ~~**Producto terminado dado de baja.**~~ **Respondida el 2026-09-23 → D17.**
-
-*Abiertas tras F1.4 (2026-09-23). La propuesta de cada una está en `design.md > 0`.*
-
-8. **Pedidos sin copia del contenido.** D16 hace que el pedido guarde una copia del contenido de su
-   presentación al crearse o al cambiar de presentación. No tienen copia: (a) los pedidos vivos
-   creados antes de esta ficha, y (b) los creados después cuya presentación aún no tenía contenido.
-   En el caso (b), completar después el contenido de la presentación no le da copia al pedido,
-   porque D16 solo recopia al cambiar de presentación. **Propuesta (R44):** al Finalizar un pedido
-   sin copia se usa el contenido vigente de su presentación, y sin él se rechaza (R18).
-9. **Cuándo se calcula el coste del lote cuando falta el coste de algún ingrediente.** D13 cuenta
-   como cero el ingrediente sin coste, pero el importe de QC-123 es un único número, nulo si falta
-   uno, y no dice qué ingredientes tenían coste. Hay que recalcular. **Propuesta (R42):** si el
-   pedido tiene importe guardado, se usa ese (D4, sin cambios); si es nulo, se recalcula al
-   Finalizar con la regla de QC-123, antes de consumir el material y contando como cero lo que no
-   se pueda costear. La otra opción es guardar un segundo importe en el pedido en cada edición. Es
-   más coherente con el «importe congelado» de QC-123 D8, pero añade una columna, toca el alta y la
-   edición de pedidos y no resuelve los pedidos existentes.
+Ninguna.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -287,6 +264,8 @@ SI tampoco lo tiene, ENTONCES DEBE aplicar R18 `[D16]` **(provisional, pregunta 
 | 2026-09-23 (F1.4) | ¿Producto terminado dado de baja? (pregunta 7) | **Nace uno nuevo** al finalizar otro pedido de su combinación. |
 | 2026-09-23 (F1.4) | Derivaciones de `spec_author` | **Confirmadas**: un pedido sin presentación no se finaliza; el tipo de un producto terminado no se cambia y nadie pasa a serlo por edición; se acepta que el día del despliegue ningún pedido se pueda finalizar hasta rellenar el contenido de su presentación. |
 | 2026-09-23 (F1.4) | Enmienda del catálogo de errores | **Aprobada**: códigos nuevos `presentation_without_content` y `no_whole_package`; las prohibiciones usan el existente `action_not_allowed`. |
+| 2026-09-23 (aprobación) | ¿Y un pedido sin copia del contenido? (pregunta 8: vivos anteriores a la ficha, o creados cuando su presentación aún no tenía contenido) | Al Finalizar se usa el **contenido vigente** de su presentación; si tampoco lo tiene, se **rechaza** con `presentation_without_content`. |
+| 2026-09-23 (aprobación) | ¿Cuándo se calcula el coste del lote? (pregunta 9) | Si el pedido tiene **importe guardado** (QC-123), se usa ese. Si es **nulo**, se **recalcula al Finalizar** —ingrediente sin coste = 0— **antes de consumir** el material. |
 
 ## Nota del 2026-09-23 — respuestas de F1.4
 
@@ -301,3 +280,8 @@ se reordenó nada). Efecto sobre los requisitos, **sin renumerar**:
 - **Nuevos:** R38 a R44 (copia del contenido y coste del lote). R42 queda provisional por la
   pregunta 9 y R44 por la pregunta 8.
 - **Siguen abiertas:** las preguntas 8 y 9, que nacen de estas respuestas.
+
+**Cierre, mismo día (aprobación del spec).** El humano aprobó el spec y respondió las preguntas 8 y 9
+con las propuestas de `spec_author`: son las filas **D20** (pedido sin copia → contenido vigente, o
+rechazo) y **D21** (coste del lote: el importe guardado, o recalculado al Finalizar antes de consumir).
+R42 y R44 dejan de ser provisionales. No queda ninguna pregunta abierta.

@@ -3,17 +3,18 @@
 > **Enmendado el 2026-09-23 con las respuestas de F1.4** (D11-D19 de `requirements.md`). Se
 > desbloquean las tasks que esperaban a las preguntas 1-7. **T3 se cancela** (D16: no se bloquea el
 > contenido). **T9 se reescribe como requisito negativo** (D15). **Nace T14** (copia del contenido en
-> el pedido). Siguen condicionadas solo dos ramas: la del pedido sin copia (pregunta 8, en T7) y la
-> del recálculo del coste cuando falta alguno (pregunta 9, en T8).
+> el pedido).
+>
+> **Spec aprobado el 2026-09-23** con las preguntas 8 y 9 cerradas (D20, D21): se desbloquean las
+> ramas del pedido sin copia (T7) y del recálculo del coste (T8), y se retira el parche provisional
+> de T8. No queda ninguna rama condicionada.
 >
 > Orden de arriba abajo salvo donde se marque `[P]` (paralelizable con la task indicada). Cada task
 > dice **qué archivos toca** y su **criterio de hecho**. Nada se da por hecho sin gate
 > (`CLAUDE.md`, regla 5): `./init.sh --rapido` al cerrar cada task, `./init.sh` completo al cerrar la
 > feature y antes del PR.
 >
-> **Ninguna task empieza antes de que QC-141 esté mergeada en `dev`** (`depends_on`). Las ramas
-> marcadas **(según pregunta N)** no se escriben mientras esa pregunta siga abierta; el resto de la
-> task sí.
+> **Ninguna task empieza antes de que QC-141 esté mergeada en `dev`** (`depends_on`).
 >
 > **Base de datos**: toda migración, test de integración y E2E de esta ficha corre contra su **base
 > propia `QuimiCloude_QC150`**, con la variable de entorno del proceso apuntando a ella. El `.env`
@@ -171,9 +172,8 @@ Archivos: `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`
 `tests/integration/inventario/finished-goods.int.test.ts`.
 
 - Los pasos 1-7 de `design.md > 4.4`, con el orden de bloqueos escrito ahí.
-- **Rama del pedido sin copia (según pregunta 8)**: mientras siga abierta, un pedido sin copia se
-  rechaza con `presentation_without_content`, y el test del contenido vigente queda como `it.todo`
-  con el número de la pregunta.
+- **Pedido sin copia (D20)**: se usa el contenido vigente de la presentación, leído en el paso 1
+  bajo `FOR SHARE`; si tampoco lo tiene, `presentation_without_content`.
 - Medir el largo máximo de `recipeNameSchema` + « · » + 60 frente a los 120 de `productNameSchema`, y
   anotarlo en la bitácora. Si lo supera, parar y subirlo al leader.
 
@@ -187,7 +187,7 @@ Archivos: `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`
 - R23 y R35.
 - R41: el lote guarda el contenido usado.
 - R43: ningún lote queda sin `unit_cost`.
-- R44, solo si la pregunta 8 se ha respondido.
+- R44: un pedido sin copia usa el contenido vigente, y sin copia ni contenido se rechaza.
 
 El censo de la guardia del libro pasa con `receiveFinishedGoods` y se pone rojo con un camino
 fabricado sin asiento.
@@ -203,10 +203,9 @@ Archivos: `lib/modules/pedidos/ports/order-unit-of-work.ts`,
 `app/(private)/asignacion/[id]/components/order-execution-screen.tsx`, `lib/composition/index.ts`.
 
 - Los pasos 1-7 de `design.md > 4.3`.
-- **Rama del recálculo del coste cuando `ingredients_cost` es nulo (según pregunta 9)**: mientras
-  siga abierta, se escribe todo lo demás. Un pedido con importe nulo se rechaza al Finalizar con
-  `unexpected` y un evento en el log que lo dice, y el test queda como `it.todo`. **No** se guarda
-  un coste inventado (R43).
+- **Coste del lote (D21)**: el `ingredients_cost` guardado si no es nulo; si es nulo,
+  `resolveLotIngredientsCost` al Finalizar, **antes** de `consumeForOrder`, con el ingrediente sin
+  coste como cero. El importe guardado del pedido no se toca (R43).
 
 **Hecho cuando:** hay tests verdes para:
 
@@ -214,7 +213,9 @@ Archivos: `lib/modules/pedidos/ports/order-unit-of-work.ts`,
   resuelve antes de consumir y la producción va después del consumo.
 - Integración: R10, R18, R20 (un fallo forzado tras el lote no deja ni estado, ni consumo, ni
   producto), R21, R24, R26 y R42 con importe guardado.
-- R42 con importe nulo, solo tras responder la pregunta 9.
+- R42 con importe nulo: se recalcula antes de consumir, y un ingrediente sin lotes cuenta como
+  cero.
+- R43: el pedido sigue con su importe nulo después de finalizarlo.
 
 `guard-arquitectura-modulos` y `guard-ambito-empresa-pedidos` siguen verdes.
 `e2e/ejecucion-receta.spec.ts` y el E2E de QC-141 siguen verdes **con contenido sembrado en su
@@ -280,12 +281,11 @@ Archivos: `e2e/producto-terminado.spec.ts` (nuevo) y, si hace falta, su fixture.
 
 Archivos: `docs/architecture.md` (pregunta 2 del dominio: el lote tiene ya una **entrada** por
 producción; tipos de producto), `progress/impl_QC-150-producto-terminado.md` (mapa
-`R1..R44 → test`, con R15 marcado derogado y R42/R44 según las preguntas 9 y 8).
+`R1..R44 → test`, con R15 marcado derogado).
 
 **Hecho cuando:**
 
-- Los requisitos vigentes (R1-R44 salvo R15) tienen test en el mapa, o figuran como pendientes de
-  una pregunta abierta con su `it.todo`.
+- Los requisitos vigentes (R1-R44 salvo R15) tienen test en el mapa, sin ningún `it.todo`.
 - `docs/dependencias.md` no tiene filas nuevas y `guard-dependencias-aprobadas` sigue verde.
 - La base propia está anotada para borrarla al cerrar.
 - `./init.sh` completo termina en verde contra `QuimiCloude_QC150`.
