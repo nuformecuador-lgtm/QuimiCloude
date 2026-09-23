@@ -173,7 +173,7 @@
     - el disparador, probado con el centinela simulado.
   - Depende de: T0, T6.
 
-- [ ] **T11 — Lista con carga perezosa, sección, esqueleto, página y retirada de la lista de
+- [x] **T11 — Lista con carga perezosa, sección, esqueleto, página y retirada de la lista de
   QC-44.**
   - `supplier-showcase-list.tsx`: acumula, descarta `id` repetidos, un solo vuelo a la vez, para
     en `hasMore: false`, y si una tanda falla pinta el aviso al pie con «Reintentar».
@@ -196,7 +196,7 @@
 
 ## Fase 3 — Guardias, E2E y cierre
 
-- [ ] **T12 — Guardia de convenciones de la ficha.** Comprueba que:
+- [x] **T12 — Guardia de convenciones de la ficha.** Comprueba que:
   - `react-intersection-observer` tiene un solo importador;
   - no hay ningún `new IntersectionObserver` ni escucha de `scroll` en `app/(private)/proveedores/`;
   - la URL no aparece como literal, ni entre comillas ni en plantilla;
