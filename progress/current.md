@@ -19,33 +19,10 @@
 
 ## Evaluaciones
 
-### QC-132 - F1.0 y ACOTADA con `/afinar-feature` (2026-09-23)
+### QC-132 y QC-130 - CERRADAS (2026-09-23)
 
-`zone: frontend`, **`complexity: low`** (leader, label en Jira). **Cupo `frontend` 2 de 2** (QC-107, QC-114): **solo
-Fase 1**, F2.0 espera hueco. Worktree montado desde `dev`. Alcance crecio a tres sitios (board reescrito antes de
-sembrar), **5 decisiones cerradas y 1 pregunta abierta** en `specs/QC-132-cantidad-del-pedido-sin-title-exacto/requirements.md`.
-**F1.2 y F1.3 hechos**: `spec_author` entrego R1-R11 y T1-T10 (`f71070e3`, rama pusheada), semilla intacta por diff; tarjeta en *En revision*. **F1.4 APROBADO el 2026-09-23 por chat**: linea convertida muestra el valor convertido tal cual (R12, T4 desbloqueada) y **QC-133 CANCELADA**, absorbida (board y disco). Spec final en la rama. **La tarjeta sigue en *En revision* a proposito y la ficha en `spec_ready`**: cupo `frontend` 2 de 2 (QC-107, QC-114); F2.0 en cuanto se libere hueco. **EXCEPCION HUMANA el 2026-09-23 («arranca sin importar el zone, tienes permiso»): F2.1 LANZADA con el cupo `frontend` lleno.** El validador no admite excepciones, asi que la ficha **sigue `spec_ready` en disco y la tarjeta en *En revision*** para no poner rojo el gate de `dev`; pasa a `in_progress` cuando QC-107 o QC-114 cierren. **RESUELTA el mismo dia**: el humano movio QC-114 a *Por hacer* para liberar el hueco; QC-132 pasa a `in_progress` y su tarjeta a *En curso*. **QC-114 queda `pending` por decision humana**, con su worktree, su rama (`de35b88`) y su spec aprobado INTACTOS: retoma cuando haya iPhone, y al retomarla vuelve directa a F2.1 sin re-especificar. Cruce comprobado con `git diff` de las dos ramas: **cero archivos en comun**. **F2.1-F2.4 hechos el 2026-09-23**: implementer T1-T7 (`86c6b2cf`), reviewer **aprobado** 0 mayores/3 menores (dos arreglados en `66f72cb5`), `--rapido` verde, F2.3 sin migraciones. **Gate completo ROJO AJENO**: 3 archivos de inventario rotos por `cd7f07a6` (subido directo a `dev` sin PR, trae ademas `package-lock.json` y `.board_snapshot.json`). **PR #110 abierto con la evidencia por decision humana.** Esperando merge (F2.5). Cruce de archivos a revisar entonces: QC-107 toca `lib/composition` y `playwright.config.ts`, QC-132 solo pedidos/asignacion.
-
-### QC-130 - F0, F1.0 y F1.1 (2026-09-23)
-
-**F0** (import incremental, issues tocados desde el 2026-09-22): QC-141 pasa a `in_progress` / `complexity:high`
-(el board la tiene *En curso*), QC-145 recibe `complexity:high`, entran QC-143 (`pending`, backend) y QC-149
-(`cancelled`, absorbida por QC-141). QC-130 sin cambios en el board. **F1.0**: `zone: fullstack` del board, **no se
-parte** (criterio de QC-121/145/147); **`complexity: medium`** la asigna el leader y va como label a Jira: una columna
-nueva en `presentations` con migracion de las existentes y el campo en la pantalla de QC-45, sin integracion externa;
-se reevalua al acotar. `depends_on` vacio. **Cupo `fullstack`: 2 de 3** (QC-121 y QC-141), QC-130 cabe; el cruce de archivos
-**con QC-141 es probable** (inventario y presentaciones) y se hace en F2.0 con `tasks.md`. Worktree montado desde
-`origin/dev` (`ad9fb3fe`) con `.env` copiado. **PARADA EN F1.2**: la ficha declara tres cosas abiertas -si el
-contenido es obligatorio, que pasa con las presentaciones existentes, y si una sin contenido sigue valida- y una
-medicion pendiente -cuantos productos caen en el caso sin base comun-; no hay `requirements.md`, asi que se ofrece
-`/afinar-feature`.
-**CANCELADA el mismo dia en `/afinar-feature`, por decision humana.** Su premisa ya no existe: con QC-121 (trigger
-`product_batches_check_unit`) y QC-147 (la linea usa la unidad del producto), `order-cost.ts` siempre convierte entre la
-misma unidad, asi que la rama «sin base comun» no puede darse. Contar en envases (lo que le paso QC-146) queda sin
-ficha a proposito. Board: *Cancelado* con comentario; sin `requirements.md`. Rama borrada; la carpeta
-`.worktrees/QC-130-...` no se pudo borrar (archivo en uso en Windows) y queda para borrar a mano. Sin `depends_on` ni
-links que la apunten. **Arrastre de texto**: QC-138 y QC-139 citan «dato incompleto (QC-130)» para el caso gramos
-contra bidones, que hoy ya no ocurre; lo corrige su propia acotacion, no se toca aqui.
+QC-132 `done` (PR #110, `b7e64eb9`) y QC-130 `cancelled` al acotarla; QC-133 `cancelled` (absorbida). Resumen en `progress/history.md`.
+**Quedan abiertos**: (1) carpetas `.worktrees/QC-130-...` y `.worktrees/QC-132-...` sin borrar (archivo en uso en Windows; ramas ya desregistradas), borrar a mano; (2) **`dev` con 3 rojos de `cd7f07a6`**, arreglo en `fix/rojos-de-cd7f07a6` (PR aparte); (3) **QC-114 `pending` por decision humana** con spec aprobado, worktree y rama intactos: retoma directo en F2.1; (4) QC-138 y QC-139 citan «dato incompleto (QC-130)» para un caso que ya no ocurre: se corrige en su acotacion.
 
 ### QC-145 - ACOTADA con `/afinar-feature` (2026-09-22) y DESBLOQUEADA (2026-09-23)
 
