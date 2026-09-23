@@ -1739,16 +1739,17 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(screen.queryByTestId('product-field-unitId')).toBeNull();
     expect(formulario.textContent).not.toContain('Unidad');
 
-    // El unico combobox del formulario es el nombre, que paso a ser un autocomplete de texto
-    // libre que busca productos existentes. La presentacion ya no esta -se mudo a
-    // `product_batches` el 2026-09-09-, asi que no hay selector de presentacion.
-    // Los comboboxes del formulario son dos: el nombre -autocomplete de texto libre que busca
-    // productos existentes- y la presentacion, que volvio al alta el 2026-09-10 como campo del
-    // primer LOTE (no del producto). Ninguno de los dos es una unidad.
+    // Los comboboxes del formulario son tres: el nombre -autocomplete de texto libre que busca
+    // productos existentes-, la presentacion -que volvio al alta el 2026-09-10 como campo del
+    // primer LOTE, no del producto- y el TIPO de producto, que esta ficha anadio. Ninguno de los
+    // tres es una unidad: el tercero se identifica por su propia etiqueta ("Tipo"), no por
+    // descarte de un conteo que cualquiera podria leer como magico.
     const combos = within(formulario).getAllByRole('combobox');
-    expect(combos).toHaveLength(2);
+    expect(combos).toHaveLength(3);
     expect(combos).toContain(screen.getByTestId('product-field-name'));
     expect(combos).toContain(screen.getByTestId('presentation-select'));
+    const selectorDeTipo = screen.getByLabelText('Tipo');
+    expect(combos).toContain(selectorDeTipo);
 
     await rellenarFormulario(user);
     await user.click(screen.getByTestId(testId.enviar));
