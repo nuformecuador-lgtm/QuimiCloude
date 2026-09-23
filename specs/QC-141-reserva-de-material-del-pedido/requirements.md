@@ -1,5 +1,10 @@
 # QC-141 — reserva-de-material-del-pedido · requirements.md
 
+> **Enmendado el 2026-09-23**, a petición del humano, tras el merge de QC-147 en `dev`: adopta la
+> fórmula «cantidad del pedido × %» en la unidad del producto (fila D19 de la tabla de decisiones).
+> Cambian el vocabulario, R9, R11, R31 y R43; nacen R49 y R50. Las decisiones nuevas **E1** y
+> **E2** esperan aprobación (`design.md > 0.3`); los requisitos que dependen de ellas van marcados.
+
 > **Zona:** `fullstack` · **Complejidad:** `high` · **depends_on:** — ·
 > **Rama:** `feature/QC-141-reserva-de-material-del-pedido`
 >
@@ -28,11 +33,12 @@
 > reserva, D4 de qué lotes, D5 precisión y existencia decimal, D6 caducidad a 15 días, D7 qué pasa
 > al caducar, D8 proceso diario, D9 merma sobre reservado, D10 pedidos existentes, D11 historial,
 > D12 caminos de entrega, D13 concurrencia, D14 existencia del producto, D15 permisos, D16 borrado
-> e identificadores, D17 E2E, D18 sin dependencia nueva.
+> e identificadores, D17 E2E, D18 sin dependencia nueva, D19 enmienda del 2026-09-23 (fórmula de
+> QC-147).
 >
 > **Vocabulario.** *Pedido vivo*: `PENDIENTE` o `EN_CURSO`, no borrado. *Cantidad necesaria* de un
-> ingrediente: cantidad de su línea de receta × cantidad del pedido, expresada en la unidad del
-> producto. *Apartado de un lote*: lo que los pedidos vivos tienen reservado en él. *Disponible de
+> ingrediente: cantidad del pedido × porcentaje de su línea de receta / 100, expresada en la unidad
+> del producto, sin conversión de unidades `[D19]`. *Apartado de un lote*: lo que los pedidos vivos tienen reservado en él. *Disponible de
 > un lote*: su existencia menos su apartado, nunca por debajo de cero. *Sobre-reservado*: lote cuyo
 > apartado supera su existencia.
 >
@@ -79,18 +85,21 @@ ascendente** desempatando por **número de lote** —numérico si los dos son so
 en otro caso—, y tomar de cada uno lo menor entre su disponible y lo que falte, hasta cubrir la
 cantidad necesaria `[D4]`.
 
-**R9.** SI la unidad de la línea de receta no comparte unidad base con la unidad del producto,
-ENTONCES el sistema NO DEBE apartar nada para ese ingrediente, y ese ingrediente NO DEBE impedir que
-se aparten los demás `[D4]` **(provisional, pregunta N3)**.
+**R9.** *(Enmendado el 2026-09-23; sustituye a la versión que saltaba el ingrediente de unidad sin
+base común, pregunta N3, que queda derogada.)* SI el producto de un ingrediente no tiene unidad,
+ENTONCES el sistema DEBE tratar ese ingrediente como no cubierto, con el efecto de R10 sobre todo el
+pedido `[D2]` `[D19]` **(provisional, decisión E1)**.
 
 **R10.** SI la existencia disponible no cubre la cantidad necesaria de al menos un ingrediente,
 ENTONCES el sistema NO DEBE apartar nada para ese pedido, tampoco para los ingredientes que sí
 alcanzan, y el material queda libre para otros pedidos `[D2]`.
 
-**R11.** El sistema DEBE apartar exactamente la cantidad necesaria, sin redondear, cuando cabe en
-cuatro decimales `[D5]`; SI la cantidad necesaria tiene más de cuatro decimales, ENTONCES el
-sistema DEBE apartar esa cantidad redondeada **hacia arriba** al cuarto decimal **(provisional,
-pregunta N1)**.
+**R11.** *(Enmendado el 2026-09-23: la cantidad necesaria sale ahora de una cantidad de hasta cuatro
+decimales por un porcentaje de hasta dos, entre cien, así que puede traer hasta ocho decimales.)* El
+sistema DEBE apartar exactamente la cantidad necesaria, sin redondear, cuando cabe en cuatro
+decimales `[D5]`; SI la cantidad necesaria tiene más de cuatro decimales, ENTONCES el sistema DEBE
+apartar esa cantidad redondeada **hacia arriba** al cuarto decimal, una vez por ingrediente: un
+pedido de `0.0001` con un ingrediente al `0.01 %` aparta `0.0001` `[D5]` `[D19]` (pregunta N1).
 
 **R12.** CUANDO se edite un pedido vivo —cantidad, receta, prioridad o estado—, el sistema DEBE, en
 la misma operación, recalcular lo apartado desde cero con la regla de R8 a R11, contando como
@@ -174,7 +183,9 @@ pedido ni el inventario `[D9]` `[D12]` **(provisional, pregunta 2)**.
 **R31.** SI el pedido que se entrega no tiene material apartado, ENTONCES el sistema DEBE calcular
 su cantidad necesaria con su receta actual y consumirla de los lotes con disponible con la regla de
 R8 a R11, y SI no alcanza, ENTONCES DEBE rechazar la entrega con `insufficient_material` sin
-cambiar el pedido ni el inventario `[D2]` `[D12]` **(provisional, pregunta N2)**.
+cambiar el pedido ni el inventario `[D2]` `[D12]` **(provisional, pregunta N2)**. *(Enmendado el
+2026-09-23: la cantidad necesaria es la de la fórmula de D19; si la receta actual no tiene líneas,
+aplica R50.)*
 
 **R32.** El sistema NO DEBE consumir dos veces el material de un mismo pedido `[D12]`.
 
@@ -220,9 +231,11 @@ empresa, y un lote de otra empresa DEBE responderse igual que uno inexistente `[
 
 ### H. Pedidos existentes
 
-**R43.** CUANDO se aplique la migración, el sistema DEBE apartar material para cada pedido vivo
-existente, empresa por empresa y del pedido más antiguo al más nuevo, con la misma regla todo-o-nada,
-el mismo orden de lotes y la misma precisión que R8 a R11 `[D10]`.
+**R43.** *(Enmendado el 2026-09-23.)* CUANDO se aplique la migración, el sistema DEBE apartar
+material para cada pedido vivo existente, empresa por empresa y del pedido más antiguo al más nuevo,
+con la misma cantidad necesaria (cantidad del pedido × porcentaje / 100, en la unidad del
+producto), la misma regla todo-o-nada, el mismo orden de lotes y la misma precisión que R8 a R11, y
+NO DEBE apartar nada para un pedido cuya receta no tenga líneas `[D10]` `[D19]`.
 
 **R44.** CUANDO un pedido aparte en la migración, el sistema DEBE contar su plazo de caducidad desde
 el instante de la migración `[D10]` `[D6]`.
@@ -242,6 +255,17 @@ DEBE borrar físicamente ninguna fila de reserva, movimiento o pedido `[D16]`.
 segundo no aparta; cancelar el primero libera su material; entregar un pedido consume y baja la
 existencia `[D17]`.
 
+### J. Receta sin líneas (enmienda del 2026-09-23)
+
+**R49.** SI la receta de un pedido no tiene ninguna línea al crearlo o editarlo, ENTONCES el
+sistema DEBE guardar la operación sin apartar nada y sin error, y el pedido DEBE quedar sin material
+apartado `[D2]` `[D19]` **(provisional, decisión E2)**.
+
+**R50.** SI se entrega un pedido sin material apartado cuya receta actual no tiene ninguna línea,
+ENTONCES el sistema DEBE rechazar la entrega con `recipe_without_lines`, por cualquiera de los
+caminos de R27, sin cambiar el pedido ni el inventario `[D12]` `[D19]` **(provisional, decisión
+E2)**.
+
 ## Preguntas abiertas
 
 1. **Pedido que nunca se cubre.** Con «todo o nada», un pedido que no alcanza no aparta nada, así
@@ -255,6 +279,9 @@ existencia `[D17]`.
    `spec_author` y se aprueba en F1.4.
 5. **Detalles de la existencia decimal** que traía QC-149 sin acotar: cuántos decimales se
    **muestran** en pantalla y si la **cantidad de alerta** del producto también pasa a decimal.
+6. **(Enmienda del 2026-09-23.)** Las decisiones **E1** (producto sin unidad) y **E2** (receta sin
+   líneas) que recoge la fila D19, con su propuesta en `design.md > 0.3`. Hasta que el humano las
+   apruebe, R9, R49 y R50 no se implementan.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -278,3 +305,4 @@ existencia `[D17]`.
 | Heredada de la feature 4 | Borrado e identificadores | Borrado **lógico** donde aplique e identificadores de base **en inglés** |
 | 2026-09-22 | ¿E2E? | **Sí**: es movimiento de inventario (`CHECKPOINTS.md`). Mínimo: dos pedidos compiten por el mismo lote y el segundo no aparta; cancelar libera; entregar consume y baja la existencia |
 | 2026-09-22 | ¿Dependencia nueva? | **Ninguna librería.** La tarea programada es configuración de Vercel, no dependencia |
+| 2026-09-23 | ¿Qué fórmula usa la reserva tras QC-147? | **Adopta la fórmula de QC-147**: lo que aparta, libera y consume un pedido es **cantidad del pedido × % de la línea / 100**, en la **unidad fija del producto** (QC-121), sin unidad en la línea ni conversión; se retira la regla de «unidad sin base común» de D4 (pregunta N3). Enmienda pedida por el humano. **Pendientes de aprobar** (propuesta en `design.md > 0.3`): **E1** — un producto **sin unidad** (sin lotes) cuenta como **«no alcanza»**, y el pedido no aparta nada (todo o nada); **E2** — un pedido con receta **sin líneas** (todas tras la migración de QC-147) **no aparta** y no da error al crear, editar o migrar, y **su entrega se rechaza** con `recipe_without_lines` si no tiene nada apartado |

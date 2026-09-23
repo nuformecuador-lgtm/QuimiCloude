@@ -1,5 +1,10 @@
 # QC-141 — reserva-de-material-del-pedido · design.md
 
+> **Enmendado el 2026-09-23** tras el merge de QC-147 (`cantidades-de-receta-en-porcentaje`,
+> PR #108) en `dev`. Cambian §0 (nueva §0.3), §4 (nombres y §4.3), §5.1, §5.2, §6.1, §6.2, §6.4,
+> §11, §12, §13 (nuevas §13.6 y §13.7) y §15. Las referencias de la enmienda marcadas «`dev`» son
+> del árbol de `origin/dev` en `9003bf70`; el resto sigue siendo de esta rama al 2026-09-22.
+
 > Cómo se construye lo que pide `requirements.md`. Las referencias `archivo:línea` son del árbol de
 > la rama `feature/QC-141-reserva-de-material-del-pedido` al escribir este diseño (2026-09-22).
 > Ninguna librería nueva (`[D18]`, `R47`).
@@ -27,9 +32,9 @@ la apruebe o la cambie; los requisitos que dependen de ella están marcados **pr
 
 | # | Pregunta | Opción recomendada | Requisitos |
 |---|---|---|---|
-| N1 | **D5 dice «sin redondear», pero no siempre cabe.** La cantidad necesaria es `línea (4 dec.) × pedido (4 dec.)`: hasta **8 decimales** (`0.1234 × 1.5678 = 0.19346652`), y convertir a la unidad del producto puede dar una división periódica (`convert-quantity.ts:128-153`, escala 12). La columna guarda 4. | **Redondear hacia arriba al cuarto decimal**, una vez por ingrediente y en la unidad del producto. Nunca aparta menos de lo necesario, y el exceso es menor que `0,0001` por ingrediente. Cuando cabe en 4 decimales no se redondea nada, que es D5 al pie de la letra. | R11 |
+| N1 | *(Enmendada el 2026-09-23: la necesidad es ahora `pedido (4 dec.) × % (2 dec.) / 100`, hasta 8 decimales, sin conversión; el techo se mantiene. Ver §0.3.)* **D5 dice «sin redondear», pero no siempre cabe.** La cantidad necesaria es `línea (4 dec.) × pedido (4 dec.)`: hasta **8 decimales** (`0.1234 × 1.5678 = 0.19346652`), y convertir a la unidad del producto puede dar una división periódica (`convert-quantity.ts:128-153`, escala 12). La columna guarda 4. | **Redondear hacia arriba al cuarto decimal**, una vez por ingrediente y en la unidad del producto. Nunca aparta menos de lo necesario, y el exceso es menor que `0,0001` por ingrediente. Cuando cabe en 4 decimales no se redondea nada, que es D5 al pie de la letra. | R11 |
 | N2 | **Entregar un pedido que no tiene nada apartado** (no alcanzó al crearlo). D12 dice que entregar consume, pero no hay qué. | **Calcular con la receta actual y consumir con la regla todo-o-nada de lo disponible**; si no alcanza, rechazar con `insufficient_material`. Misma respuesta que la pregunta 2 para que haya una sola regla de entrega. Coste: hoy el Finalizar de la planta nunca falla por material; con esto puede fallar. | R31 |
-| N3 | **D2 y D4 juntas.** D2: «si falta un solo ingrediente, no aparta ninguno». D4: el ingrediente de unidad incompatible «no se reserva». ¿Ese ingrediente cuenta como «falta»? | **No cuenta**: se salta y los demás se apartan. Es lo que QC-138 D1 fijó para el bloqueo («unidad sin base común no bloquea: es un dato incompleto, no falta de material»). | R9 |
+| N3 | *(**Derogada** el 2026-09-23: la línea ya no tiene unidad. La sustituye E1, §0.3.)* **D2 y D4 juntas.** D2: «si falta un solo ingrediente, no aparta ninguno». D4: el ingrediente de unidad incompatible «no se reserva». ¿Ese ingrediente cuenta como «falta»? | **No cuenta**: se salta y los demás se apartan. Es lo que QC-138 D1 fijó para el bloqueo («unidad sin base común no bloquea: es un dato incompleto, no falta de material»). | R9 |
 | N4 | **La columna «restante» del formulario de pedido** (`order-ingredients-table.tsx:107-112`) resta lo requerido a la existencia **total**. Con reserva, dos pedidos de 1.500 sobre 2.000 se siguen viendo cubiertos en el formulario, que es el síntoma que originó la ficha. | Que reste de lo **disponible** (en una edición, sumando lo que el propio pedido tiene apartado). Cambia `RecipeLineView.productStock` de significado: pasa a ser «disponible». Si se prefiere no tocarlo, queda en total y solo cambia de tipo (R6). | R6 (tipo); el cambio de significado no está en ninguna decisión |
 | N5 | **Borrar un pedido vivo** (`delete-order.ts:20` deja borrar `PENDIENTE` y `EN_CURSO`). Ninguna decisión lo menciona, y sin liberar, su material queda apartado para siempre por un pedido invisible. | **Liberar**, igual que cancelar, registrado como liberación. | R19 |
 | N6 | **Cómo se ve la cobertura en Pedidos.** D9 exige «sin cobertura completa»; el E2E (D17) necesita ver que el segundo pedido «no aparta». | Una etiqueta en la fila del listado y en la hoja del pedido con tres valores: **«Apartado»**, **«Sin apartar»** y **«Sin cobertura completa»**. Texto y lugar a aprobar. | R35, R48 |
@@ -37,6 +42,53 @@ la apruebe o la cambie; los requisitos que dependen de ella están marcados **pr
 | N8 | **La migración aparta con SQL** (§4.3), así que el reparto por lotes queda escrito **dos veces**: en TypeScript para la operación y en PL/pgSQL para la migración. | Aceptarlo, con un test de integración que compara las dos sobre los mismos datos (§12). La alternativa (un script de TypeScript en el `build`) está descartada en §13.3. | R43 |
 | N9 | **Mensaje del alta** «Indica una existencia de 1 o más para derivar el costo del total» (`product-batch-input.ts:97`): con decimales el límite es «mayor que 0». | Cambiar a «Indica una existencia mayor que 0 para derivar el costo del total.». | R5 |
 | N10 | **Material que entra después.** Un pedido que no apartó no vuelve a intentarlo cuando entra un lote: D3 solo recalcula al crear y al editar. | No hacer nada en esta ficha: es lo que QC-138 D2 hará al desbloquear. Se anota para que nadie lo lea como un olvido. | — |
+
+F1.4 aprobó el 2026-09-22, por chat, todas las opciones recomendadas de §0.1 y §0.2
+(`progress/current.md:19`). La enmienda de §0.3 toca dos de ellas: **N3 queda derogada** (ya no hay
+unidad en la línea) y **N1 sigue en pie con otra escala**.
+
+### 0.3 Enmienda del 2026-09-23: la fórmula de QC-147
+
+**Qué cambió en `dev`** (`9003bf70`):
+
+- `recipe_lines` pierde `quantity` y `unit_id` y gana `percentage DECIMAL(5,2)`, con
+  `CHECK (percentage > 0 AND percentage <= 100)`
+  (`db/migrations/20260922160000_recipe_lines_percentage/migration.sql:18-34`; modelo en
+  `db/schema.prisma:407-420`). Las líneas de una receta suman exactamente 100,00 % (lo exige el
+  service de `recetas`, no la base).
+- Esa migración **borra todas las líneas de receta** (`migration.sql:13`). Una receta sin líneas no
+  se puede guardar ni editar hasta traer líneas que sumen 100 % (R3 y R23 de QC-147).
+- La cantidad consumida es `consumedQuantity(orderQuantity, percentage)`
+  (`lib/modules/recetas/domain/recipe-percentage.ts:98-104`, publicada en
+  `lib/modules/recetas/index.ts:45`): exacta, sin redondeo, con escala `s + 4` —hasta **8
+  decimales** con una cantidad de pedido de 4—.
+- La unidad del ingrediente es la del producto: `ProductRef.unitId`
+  (`lib/modules/inventario/domain/product-catalog.ts:18-19`), `null` mientras el producto no tiene
+  lotes. Un producto sin unidad **no puede tener lotes**: el disparador `product_batches_check_unit`
+  rechaza el lote si `product_unit_id IS NULL`
+  (`db/migrations/20260918130000_product_unit_and_stored_stock/migration.sql:89`).
+- El coste ya la usa: `order-cost.ts:132` y `resolve-ingredients-cost.ts:26-36`.
+
+**Lo que se corrige en este diseño:**
+
+| Pieza | Antes | Ahora |
+|---|---|---|
+| Necesidad (§6.1, T6) | `línea.quantity × pedido`, en la unidad de la línea | `consumedQuantity(pedido, línea.percentage)`, en la unidad del producto |
+| `ReservationRequirementLine` (§5.1) | `{ productId, quantity, unitId }` | `{ productId, quantity }` |
+| Reparto (§6.2) | convierte de la unidad de la línea a la del producto; salta la unidad sin base común (N3) | sin conversión; producto sin unidad = no alcanza (E1) |
+| Redondeo (N1, R11) | hasta 8 decimales por la multiplicación, más la división de la conversión | hasta 8 decimales por la multiplicación; se mantiene el techo al 4º decimal |
+| `createMaterialReservations` (§5.2, T7) | recibe `UnitCatalog` para convertir | no lo necesita |
+| Migración de pedidos vivos (§4.3, T11) | lee `recipe_lines.quantity` y `units` | lee `recipe_lines.percentage` y `products.unit_id`; la receta vacía no aparta (E2) |
+| Nombres de migración (§4) | `20260922160000_…` choca con la de QC-147 | renumeradas (§4.0) |
+
+**Decisiones nuevas para aprobar:**
+
+| # | Pregunta | Opción recomendada | Por qué | Requisitos |
+|---|---|---|---|---|
+| E1 | **Producto sin unidad** (sin lotes). Con la línea sin unidad, R9/N3 ya no tienen objeto; queda el ingrediente cuyo producto no tiene unidad en la que expresar la necesidad. | **Cuenta como «no alcanza»**: el pedido no aparta nada (D2), y una entrega sin apartado (R31) se rechaza con `insufficient_material`. | Es la realidad física: un producto sin unidad no puede tener lotes (`migration.sql:89` de QC-121), así que no hay material. Saltarlo, como hacía N3, dejaría apartar un pedido al que le falta un ingrediente entero y verlo «Apartado» sin serlo. QC-138 lo bloqueará igual que cualquier otro pedido que no alcanza. | R9 |
+| E2 | **Receta sin líneas.** Tras QC-147 todas las recetas existentes están vacías, y con ellas los pedidos vivos. | **Crear, editar y migrar: no aparta y no da error**; el pedido queda «Sin apartar» (sin `reserved_at`, no caduca, pregunta 1). **Entregar sin nada apartado: se rechaza** con el código nuevo `recipe_without_lines`, «La receta del pedido no tiene ingredientes: complétala antes de entregarlo.», por el Finalizar de la planta y por la edición en Pedidos. | Entregar sin consumir registraría producto terminado sin ninguna salida de material, en silencio. Con la receta recargada, la entrega consume por R31 con la receta actual. Coste, dicho a sabiendas: hasta que alguien recargue la receta, el Finalizar de esos pedidos falla con ese mensaje. Alternativa si ese coste no se acepta: entregar sin consumir (§13.7). | R49, R50 |
+
+Mientras E1 y E2 no se aprueben, R9, R49 y R50 no se implementan (T6 y T10 esperan).
 
 ---
 
@@ -62,7 +114,8 @@ la apruebe o la cambie; los requisitos que dependen de ella están marcados **pr
 - **`inventario` es dueño de la reserva**: las tablas, el reparto por lotes y el consumo. Es el
   dueño de los lotes y de la existencia; nadie más escribe `product_batches`.
 - **`pedidos` decide cuándo** se aparta, libera o consume, porque es quien sabe de la receta y del
-  estado. Le pasa a `inventario` la **necesidad ya calculada** (producto, cantidad, unidad).
+  estado. Le pasa a `inventario` la **necesidad ya calculada** (producto y cantidad, ya en la unidad
+  del producto; enmendado el 2026-09-23).
 - **La transacción la abre un adaptador driven de `pedidos`** y la comparten los dos repositorios
   por inyección desde `lib/composition` (§5.2).
 - **El grafo de módulos no cambia de forma**: `pedidos → inventario` ya existe
@@ -251,6 +304,26 @@ por `batch_id` (§13.4).
 
 Tres, por orden. Cada una con su `down.sql`.
 
+### 4.0 Nombres (enmendado el 2026-09-23)
+
+T1 y T2 se crearon como `20260922160000_inventory_movement_kind_consumption` y
+`20260922160100_reservations_and_decimal_stock`. La primera **comparte prefijo** con
+`20260922160000_recipe_lines_percentage` de `dev`, y Prisma ordena por nombre: la nuestra quedaría
+antes que la de QC-147 solo por el orden alfabético del sufijo. Se renumeran las dos, y la de T11
+nace ya con prefijo posterior, **siempre por detrás de la última migración de `dev` en el momento
+del merge**. Con la de `dev` en `9003bf70`:
+
+| Migración | Nombre |
+|---|---|
+| §4.1 | `20260923120000_inventory_movement_kind_consumption` |
+| §4.2 | `20260923120100_reservations_and_decimal_stock` |
+| §4.3 | `20260923120200_reserve_existing_orders` |
+
+Ninguna de las dos ha llegado a `dev`. Constan aplicadas en la base local y en la plantilla de
+integración de esta rama (bitácora, «Salida de los comandos» de T1-T3); si alguna otra base las
+aplicó —no consta—, hay que revertirlas allí igual antes de renombrar. El procedimiento está en la
+task TM.
+
 ### 4.1 `<ts>_inventory_movement_kind_consumption`
 
 `ALTER TYPE "InventoryMovementKind" ADD VALUE 'consumption';` y nada más. Va sola porque Postgres
@@ -284,12 +357,23 @@ bloque que falla si alguna de esas columnas tiene parte decimal
 Un bloque `DO $$ ... $$` en PL/pgSQL que, **por empresa y por pedido vivo en orden de
 `created_at, order_year, order_sequence, id`**:
 
-1. Lee las líneas de su receta (`recipe_lines`) y la cantidad del pedido.
-2. Por línea: `need = line.quantity × order.quantity`; si la unidad de la línea y la del producto
-   (`products.unit_id`) no comparten base (`coalesce(units.unit_id, units.id)`), la salta (N3); si
-   la comparten, `need = need × factor(línea) / factor(producto)` truncado a 12 decimales si la
-   división no termina, y redondeado **hacia arriba** a 4 (N1). Es la misma fórmula que
-   `convertQuantity` (`convert-quantity.ts:188-210`).
+*(Pasos 1, 2 y 4 y el paréntesis de RLS enmendados el 2026-09-23 por la fórmula de QC-147: la
+versión anterior leía `recipe_lines.quantity` y la unidad de la línea, columnas que ya no existen en
+`dev` — `migration.sql:18-26` de `20260922160000_recipe_lines_percentage`.)*
+
+1. Lee las líneas de su receta (`recipe_lines.product_id`, `recipe_lines.percentage`), la cantidad
+   del pedido y la unidad de cada producto (`products.unit_id`). **Si la receta no tiene líneas, el
+   pedido no aparta y se pasa al siguiente** (E2, R43, R49). Tras QC-147, que vació todas las
+   recetas (`migration.sql:13`), eso es lo esperable para todos los pedidos vivos cuya receta nadie
+   haya recargado antes de que corra esta migración; la migración sigue haciendo falta para los que
+   sí.
+2. Por línea: si `products.unit_id IS NULL`, la línea **no se cubre** (E1). Si no,
+   `need = ceil(order.quantity × line.percentage × 100) / 10000` como `numeric(14,4)`: es
+   `pedido × % / 100` redondeado **hacia arriba** al cuarto decimal (N1), con `numeric` exacto y sin
+   división real (el `× 100` y el `/ 10000` solo mueven la coma). Sin conversión de unidades: la
+   necesidad ya está en la unidad del producto, que es la de sus lotes (`product_batches_check_unit`).
+   Es la misma cifra que `ceilToScale4(consumedQuantity(...))` en TypeScript
+   (`recipe-percentage.ts:98-104`).
 3. Recorre los lotes del producto con disponible `> 0` por `purchase_date`, y desempata por
    `lot` —numérico si los dos son solo dígitos (`lot ~ '^[0-9]+$'`), texto si no—, restando lo que
    ya apartaron los pedidos anteriores de **esta misma** migración.
@@ -297,8 +381,8 @@ Un bloque `DO $$ ... $$` en PL/pgSQL que, **por empresa y por pedido vivo en ord
    inserta un `reserve` por lote, sin autor, con `created_at = now()`, y pone
    `orders.reserved_at = now()` (`R44`).
 
-El paréntesis de RLS abarca `orders`, `recipe_lines`, `units`, `products`, `product_batches` y
-`reservation_movements`.
+El paréntesis de RLS abarca `orders`, `recipe_lines`, `products`, `product_batches` y
+`reservation_movements` (ya no `units`).
 
 `down.sql`: `UPDATE orders SET reserved_at = NULL` y el borrado de los asientos `reserve` con
 `created_by IS NULL` y `created_at` igual al de la migración. Es la **única** baja física de la
@@ -315,18 +399,25 @@ elimina la tabla entera.
 
 En `lib/modules/inventario/index.ts`, bloque nuevo al final:
 
+*(Enmendado el 2026-09-23: `ReservationRequirementLine` pierde `unitId` —hoy en
+`lib/modules/inventario/domain/reservation.ts:16` de esta rama— y `ConsumptionOutcome` gana
+`nothing_to_consume` para E2.)*
+
 ```ts
 export type ReservationRequirementLine = {
   readonly productId: ProductId;
-  readonly quantity: string;      // ya multiplicada por la cantidad del pedido, en la unidad de la línea
-  readonly unitId: UnitId;
+  /** Cantidad del pedido por el porcentaje de la línea, exacta y sin redondear, en la unidad del
+   *  producto. */
+  readonly quantity: string;
 };
 
 export type ReservationOutcome = { readonly kind: 'reserved' } | { readonly kind: 'not_reserved' };
 
 export type ConsumptionOutcome =
   | { readonly kind: 'consumed' }
-  | { readonly kind: 'insufficient'; readonly productIds: readonly ProductId[] };
+  | { readonly kind: 'insufficient'; readonly productIds: readonly ProductId[] }
+  /** Sin nada apartado y con una necesidad de respaldo vacía (receta sin líneas). */
+  | { readonly kind: 'nothing_to_consume' };
 
 export type OrderCoverage = 'full' | 'partial' | 'none';
 
@@ -408,16 +499,16 @@ transaccional a esta misma fábrica».
     run: (work) => withOrderTransaction((tx) =>
       work({
         orders: createOrderWriteRepository(tx),
-        reservations: createMaterialReservations(tx, unitCatalog),
+        reservations: createMaterialReservations(tx),
       })),
   };
   ```
 
-  El tipo de `tx` se infiere: la composición no nombra Prisma. `unitCatalog` es la constante que
-  ya existe (`lib/composition/index.ts:745-748`): `inventario` necesita las conversiones para
-  repartir y no puede importar el driven de `unidades`, así que las recibe por el contrato
-  `UnitCatalog`. Esa lectura va por el cliente global, fuera de la transacción: las unidades no
-  forman parte de lo que se serializa.
+  El tipo de `tx` se infiere: la composición no nombra Prisma. *(Enmendado el 2026-09-23: la
+  versión anterior pasaba también `unitCatalog` para convertir de la unidad de la línea a la del
+  producto; con la fórmula de QC-147 la necesidad ya llega en la unidad del producto y
+  `createMaterialReservations` deja de recibir `UnitCatalog` —hoy
+  `reservation-prisma.ts:4,86-92,119` de esta rama—.)*
 
 ### 5.3 `OrderWriteRepository` (puerto nuevo de `pedidos`)
 
@@ -448,6 +539,11 @@ retiran, para no dejar dos caminos de escritura.
 la planta consume sin que `asignaciones` sepa de inventario**: `finish-assigned-order.ts` solo
 aprende a traducir `'insufficient_material'` a un error propio (`R27`, `R30`, `R31`).
 
+*(Enmendado el 2026-09-23, si se aprueba E2.)* El resultado gana también `'recipe_without_lines'`,
+que `createTransitionOrder` devuelve cuando `consumeForOrder` responde `nothing_to_consume`, y que
+`finish-assigned-order.ts` traduce a un segundo error propio (`R50`). La edición en Pedidos lanza
+`RecipeWithoutLinesError` de `pedidos` en el mismo caso.
+
 ### 5.5 Puertos que `inventario` declara para no importar `pedidos`
 
 `inventario` no puede importar `pedidos` (ciclo). Para el historial (`R38`) necesita el número
@@ -470,30 +566,46 @@ en `listBatchMovements` (`lib/composition/index.ts:720-723`).
 
 ### 6.1 La necesidad (dominio de `pedidos`, `order-requirement.ts` nuevo)
 
-`buildRequirement(lines, orderQuantity)` → por línea `{ productId, unitId, quantity: línea × pedido }`
-con multiplicación exacta de cadenas (la de `order-cost.ts:71-73` a escala entera, sin truncar).
-Lee las líneas con `RecipeCatalog.findExecutionContentById`, igual que el coste
-(`resolve-ingredients-cost.ts:20`).
+*(Reescrita el 2026-09-23. La versión anterior, ya implementada en T6 —`order-requirement.ts:11-15`
+con `RequirementSourceLine = { productId, quantity, unitId }` y `:47-57`, que multiplica
+`line.quantity × orderQuantity`—, lee columnas que `dev` ya no tiene. **T6 se rehace.**)*
+
+`buildRequirement(lines, orderQuantity)` con `lines: readonly { productId; percentage }[]` → por
+línea `{ productId, quantity: consumedQuantity(orderQuantity, line.percentage) }`. Usa la función
+de `recetas` (`recipe-percentage.ts:98-104`, publicada en `recetas/index.ts:45`) en vez de una
+multiplicación propia: es la única definición de la fórmula, la misma que usan el coste
+(`order-cost.ts:132`) y la tabla de ingredientes (`order-ingredients-table.tsx:113-114`), y
+`pedidos → recetas` ya es una arista del grafo (`order-cost.ts:7`). Es exacta y **no redondea**;
+el techo lo pone `inventario` al repartir (N1). Lee las líneas con
+`RecipeCatalog.findExecutionContentById` (`RecipeExecutionLine = { productId, productName,
+percentage }`, `recetas/domain/recipe-catalog.ts:61-64`), igual que el coste
+(`resolve-ingredients-cost.ts:22`). La unidad **no** viaja en la necesidad: `inventario` ya conoce
+la de cada producto y es la de sus lotes. Receta sin líneas → necesidad vacía (E2).
 
 ### 6.2 El reparto (dominio de `inventario`, `plan-reservation.ts` nuevo, puro)
 
+*(Enmendado el 2026-09-23: sin conversión y con E1. La versión ya implementada en T7
+—`plan-reservation.ts:45-68`, `resolveNeed`— convierte con `convertQuantity` y **salta** el producto
+sin unidad (`:52`); las dos cosas cambian.)*
+
 ```
 planReservation({ requirement, products: Map<productId, unitId|null>,
-                  batches: [{ id, productId, lot, purchaseDate, available }], units })
+                  batches: [{ id, productId, lot, purchaseDate, available }] })
   para cada línea:
-    si el producto no tiene unidad o no comparte base con la línea  -> saltar (N3)
-    need := ceilToScale4(convertQuantity(line.quantity, lineUnit, productUnit))   (N1)
-    si need == 0 -> saltar
+    si el producto no tiene unidad            -> la línea no se cubre (E1)
+    need := ceilToScale4(line.quantity)                                   (N1)
     lotes := batches del producto con available > 0, ordenados con compareBatchesOldestFirst
     tomar min(available, pendiente) de cada lote hasta pendiente == 0
-    si pendiente > 0 -> devolver { kind: 'insufficient', productIds: [...] }
+    si pendiente > 0 -> la línea no se cubre
+  si alguna línea no se cubre -> devolver { kind: 'insufficient', productIds: [...] }
   devolver { kind: 'reserved', allocations: [{ batchId, quantity }] }
 ```
 
-Todos los lotes de un producto están en la unidad del producto
-(`product_batches_check_unit`), así que se convierte **una vez por línea**, no por lote. Una
-receta sin líneas, o con todas saltadas, da `reserved` con cero asignaciones, que para `pedidos` es
-«sin apartar» (`reserved_at = NULL`).
+`need` nunca es cero: el pedido y el porcentaje son mayores que cero, y el techo de cualquier
+positivo es al menos `0.0001`. Todos los lotes de un producto están en la unidad del producto
+(`product_batches_check_unit`), así que la necesidad y el disponible se comparan sin convertir.
+`planReservation` deja de recibir `units`. Una receta sin líneas da `reserved` con cero
+asignaciones, que para `pedidos` es «sin apartar» (`reserved_at = NULL`, R49).
 
 ### 6.3 `syncForOrder` (driven de `inventario`, `reservation-prisma.ts` nuevo)
 
@@ -520,6 +632,13 @@ receta sin líneas, o con todas saltadas, da `reserved` con cero asignaciones, q
 3. Por cada lote consumido: `writeMovement` con `kind: 'consumption'`, `quantity` negativa y
    `orderId`; y un `consume` en `reservation_movements` por lo que estaba apartado.
 4. `recalculateProductStock` de cada producto tocado, en la misma transacción (`[D14]`, `R28`).
+
+*(Enmendado el 2026-09-23.)* La necesidad de respaldo de N2 se calcula como en §6.1 y se reparte
+como en §6.2, sin `UnitCatalog` (hoy `consumeWithoutReservation`, `reservation-prisma.ts:342-375` de
+esta rama, resuelve conversiones; deja de hacerlo). Si el pedido **no tiene nada apartado y la
+necesidad de respaldo está vacía** (receta sin líneas), devuelve `nothing_to_consume` sin escribir
+nada (E2, R50). El déficit por merma de la pregunta 2 (`reservation-prisma.ts:277-311`) ya se
+expresa en la unidad del producto; solo pierde la unidad que hoy le cuelga a cada línea.
 
 El decremento vive en una función **exportada de `product-prisma.ts`**, `consumeBatchStock`, con
 su `writeMovement` en el cuerpo: `tests/guards/guard-libro-de-inventario.test.ts:18,244-265` exige
@@ -649,6 +768,7 @@ En `lib/modules/errores/domain/error-codes.ts` y `error-catalog.ts` (la guardia
 | Código | Mensaje | Lo lanzan |
 |---|---|---|
 | `insufficient_material` | «No hay material suficiente en inventario para entregar el pedido.» | `pedidos` (`InsufficientMaterialError`) y `asignaciones` (`MaterialShortageError`) |
+| `recipe_without_lines` *(enmienda del 2026-09-23, si se aprueba E2)* | «La receta del pedido no tiene ingredientes: complétala antes de entregarlo.» | `pedidos` (`RecipeWithoutLinesError`) y `asignaciones` (su traducción en el Finalizar) |
 
 La respuesta del ajuste sobre-reservado **no es un error** (`R33`): es un campo del éxito.
 
@@ -658,12 +778,12 @@ La respuesta del ajuste sobre-reservado **no es un error** (`R33`): es un campo 
 
 | Nivel | Qué |
 |---|---|
-| Unit, puro | `plan-reservation.test.ts`: FIFO, desempate `'9'`/`'10'`, todo-o-nada, unidad sin base común saltada, conversión, redondeo hacia arriba solo con más de 4 decimales, receta vacía. `decimal-quantity.test.ts`. `batch-order.test.ts` y el `order-cost.test.ts` actual en verde con el comparador movido. `order-requirement.test.ts` |
+| Unit, puro | `plan-reservation.test.ts` *(enmendado el 2026-09-23)*: FIFO, desempate `'9'`/`'10'`, todo-o-nada, **producto sin unidad = no alcanza y arrastra al pedido (E1)**, redondeo hacia arriba solo con más de 4 decimales (`0.0001 × 0.01 %` aparta `0.0001`; `200 × 10 %` aparta `20` exacto), receta vacía. Salen los casos de unidad sin base común y de conversión. `decimal-quantity.test.ts`. `batch-order.test.ts` y el `order-cost.test.ts` actual en verde con el comparador movido. `order-requirement.test.ts`: pedido × % con `consumedQuantity`, sin redondeo, receta vacía → necesidad vacía |
 | Unit, casos de uso | crear/editar/cancelar/borrar/transicionar con dobles de `OrderUnitOfWork` que registran el orden de llamadas; autorización antes de abrir la unidad (dobles que fallan si los llaman); `expire-stale-orders.test.ts` (un fallo no para los demás, idempotencia); handler del cron (401, 500 sin secreto, 500 con fallos, 200) |
 | Integración (`tests/integration/inventario/reservation.int.test.ts`, `.../pedidos/order-reservation.int.test.ts`) | carrera real de dos altas por 1.500 sobre 2.000 con dos conexiones (`R16`); edición a la baja deja solo la diferencia en el libro; cancelar y borrar liberan; entregar baja lote, asiento `consumption`, `products.stock` y `consume`; merma deja el lote sobre-reservado; la segunda entrega no consume (`R32`); aislamiento por empresa; `CHECK` y FK de §3 |
-| Migraciones | tests de esquema de la tabla, enum, columnas, `numeric(14,4)`; `down.sql` falla con decimales; **paridad**: la migración 4.3 y `planReservation` producen el mismo reparto sobre los mismos datos (N8) |
+| Migraciones | tests de esquema de la tabla, enum, columnas, `numeric(14,4)`; `down.sql` falla con decimales; **paridad**: la migración 4.3 y `planReservation` producen el mismo reparto sobre los mismos datos (N8), *(enmendado el 2026-09-23)* con recetas en porcentaje, un caso de techo a 4 decimales, un producto sin unidad y una receta sin líneas |
 | Guardias | `guard-libro-de-inventario` con cuatro caminos; `guard-empresa-en-esquema`, `guard-rls-force`, `guard-arquitectura-modulos` (sin ciclo, sin Prisma en composición), `guard-ambito-empresa-*`, `guard-dependencias-aprobadas` (sin cambios en `package.json`, `R47`) |
-| E2E (`e2e/reserva-de-material.spec.ts`) | `R48`: lote de 2.000; pedido A de 1.500 → inventario muestra 1.500 reservado y 500 disponible; pedido B de 1.500 → «Sin apartar» y el reservado sigue en 1.500; cancelar A → reservado 0; editar B (reintenta) → aparta; entregar B por la edición en Pedidos → total 500, reservado 0, historial con el consumo |
+| E2E (`e2e/reserva-de-material.spec.ts`) | `R48` *(enmendado el 2026-09-23: la receta del recorrido tiene una sola línea al 100,00 % del producto, así que un pedido de 1.500 necesita 1.500)*: lote de 2.000; pedido A de 1.500 → inventario muestra 1.500 reservado y 500 disponible; pedido B de 1.500 → «Sin apartar» y el reservado sigue en 1.500; cancelar A → reservado 0; editar B (reintenta) → aparta; entregar B por la edición en Pedidos → total 500, reservado 0, historial con el consumo |
 
 Cada `R<n>` va en el nombre de su caso; el mapa `R → test` lo escribe el implementer en
 `progress/impl_QC-141-reserva-de-material-del-pedido.md`.
@@ -709,6 +829,22 @@ Guardar el pedido y apartar después, en otra transacción, deshaciendo a mano s
 viola `R15`, y cancelar o entregar con la reserva fuera de la transacción deja material apartado
 por un pedido muerto o existencia sin bajar por uno entregado.
 
+### 13.6 Saltar el ingrediente cuyo producto no tiene unidad (enmienda del 2026-09-23)
+
+Es lo que hacía N3 para la unidad sin base común, y lo que hoy hace `plan-reservation.ts:52`.
+Descartada para E1: con la línea sin unidad, el único caso que queda es un producto sin lotes, es
+decir, sin material. Saltarlo dejaría «Apartado» un pedido al que le falta un ingrediente entero, y
+en la entrega sin apartado (N2) lo daría por consumido sin tocar ese ingrediente. D2 dice que si
+falta uno, no aparta ninguno.
+
+### 13.7 Entregar sin consumir un pedido con receta sin líneas (enmienda del 2026-09-23)
+
+Mantendría el Finalizar de la planta sin fallos nuevos mientras las recetas vaciadas por QC-147 se
+recargan. Descartada como recomendación de E2: registra producto terminado sin ninguna salida de
+material ni rastro de por qué, que es justo lo que D11 (historial completo) y D12 (entregar consume)
+quieren evitar. Es la alternativa si el humano no acepta que el Finalizar falle hasta recargar la
+receta.
+
 ---
 
 ## 14. Dependencias
@@ -728,6 +864,15 @@ comparación en tiempo constante es `node:crypto`. Los decimales, `BigInt` (§2.
   del PR.
 - **El Finalizar puede fallar** por material si se aprueban 2 y N2: hoy nunca falla. La pantalla
   del operario tiene que mostrar el mensaje del catálogo.
+- *(Enmienda del 2026-09-23.)* **Lotes anteriores al disparador de unidad de QC-121**: esa
+  migración no partió ni rechazó los lotes que ya mezclaran unidades
+  (`20260918130000_product_unit_and_stored_stock/migration.sql:23-27`). Sin conversión, un lote así
+  se contaría como si estuviera en la unidad del producto —igual que ya lo cuenta
+  `recalculateProductStock`, que suma todos los lotes—. No consta que exista ninguno; si aparece,
+  es una ficha de saneamiento, no de esta.
+- *(Enmienda del 2026-09-23.)* **Recetas vacías tras QC-147**: la migración §4.3 casi no apartará
+  nada si corre antes de que se recarguen las recetas, y con E2 el Finalizar de esos pedidos falla
+  hasta recargarlas.
 - **Paralelismo**: la ficha toca `lib/composition/index.ts`, `db/schema.prisma`,
   `order-prisma.ts`, `product-prisma.ts` y `finish-assigned-order.ts`. Cualquier otra ficha
   `in_progress` sobre esos archivos choca (`AGENTS.md > Paralelismo`).
