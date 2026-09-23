@@ -22,7 +22,7 @@
 
 ## Bloque 1 — Base
 
-- [ ] **T1. Migración `orders.finished_at`: columna, CHECK e índice parcial.** (`design.md > 1`; R1, R2, R4, R29.)
+- [x] **T1. Migración `orders.finished_at`: columna, CHECK e índice parcial.** (`design.md > 1`; R1, R2, R4, R29.)
       - Archivos: `db/schema.prisma` (modelo `Order`: `finishedAt`, una línea sobre el `CHECK`),
         `db/migrations/20260923120000_orders_finished_at/migration.sql` y `down.sql` (nuevos; el
         timestamp, mayor que el último de `db/migrations/` al crearla).
@@ -37,7 +37,7 @@
 
 ## Bloque 2 — `pedidos`
 
-- [ ] **T2. Finalizar escribe la fecha.** (`design.md > 2.1`; R3, R5, R10.)
+- [x] **T2. Finalizar escribe la fecha.** (`design.md > 2.1`; R3, R5, R10.)
       - Archivos: `lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts` (solo el
         `data` de `transitionAliveOrder`). **No** toca `finish-assigned-order.ts`.
       - Tests: `tests/unit/pedidos/order-catalog.test.ts` (R3);
@@ -46,7 +46,7 @@
       - **Hecho**: estos tests y `guard-ambito-empresa-pedidos` en verde.
       - Depende de: T1.
 
-- [ ] **T3. [P con T2] La edición deja de mover el estado.** (`design.md > 2.3`; R6, R8, R9.)
+- [x] **T3. [P con T2] La edición deja de mover el estado.** (`design.md > 2.3`; R6, R8, R9.)
       - Archivos: `lib/modules/pedidos/domain/order-input.ts`, `order-view.ts` (`OrderEdit`),
         `update-order.ts`, `ports/order-repository.ts`,
         `adapters/driven/persistence/order-prisma.ts` (`updateAliveOrder`),
@@ -59,7 +59,7 @@
         y estos tests en verde.
       - Depende de: nada.
 
-- [ ] **T4. `OrderCatalog.listAliveSummariesInCompany` y `finishedAt` en el resumen.** (`design.md > 2.2`; R17, R20, R22, R24, R27.)
+- [x] **T4. `OrderCatalog.listAliveSummariesInCompany` y `finishedAt` en el resumen.** (`design.md > 2.2`; R17, R20, R22, R24, R27.)
       - Archivos: `lib/modules/pedidos/domain/order-catalog.ts`, `lib/modules/pedidos/index.ts`,
         `adapters/driven/persistence/order-catalog-prisma.ts`.
       - Tests: `order-catalog.test.ts` (R20: `nulls: 'last'` y número descendente [D14]; `work_queue`
@@ -71,14 +71,14 @@
 
 ## Bloque 3 — `identity` y `asignaciones`
 
-- [ ] **T5. [P con T1-T4] Vistas por permiso.** (`design.md > 3.1`; R11-R15.)
+- [x] **T5. [P con T1-T4] Vistas por permiso.** (`design.md > 3.1`; R11-R15.)
       - Archivos: `lib/modules/asignaciones/domain/assignment-views.ts` (nuevo),
         `lib/modules/asignaciones/index.ts`.
       - Tests: `tests/unit/asignaciones/assignment-views.test.ts` (nuevo).
       - **Hecho**: tests en verde.
       - Depende de: nada.
 
-- [ ] **T6. [P con T1-T5] `PeopleDirectory`: permisos en `PersonRef` y `listAliveInCompany`.** (`design.md > 3.5`, `> 3.6`; R32, R33.)
+- [x] **T6. [P con T1-T5] `PeopleDirectory`: permisos en `PersonRef` y `listAliveInCompany`.** (`design.md > 3.5`, `> 3.6`; R32, R33.)
       - Archivos: `lib/modules/identity/domain/people-directory.ts`,
         `lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma.ts` (`select`
         con los códigos de permiso del rol; método nuevo con empresa, vivos, orden y tope).
@@ -90,7 +90,7 @@
         (sin `prisma.<modelo>` ajeno).
       - Depende de: nada.
 
-- [ ] **T7. Caso de uso «Terminados» y helper de composición.** (`design.md > 3.2`; R17-R21, R27.)
+- [x] **T7. Caso de uso «Terminados» y helper de composición.** (`design.md > 3.2`; R17-R21, R27.)
       - Archivos: `lib/modules/asignaciones/domain/list-finished-orders.ts`,
         `finished-order-view.ts`, `compose-order-rows.ts` (nuevos),
         `list-assigned-orders.ts` (usa el helper **sin cambiar su salida**),
@@ -104,7 +104,7 @@
       - **Hecho**: estos tests en verde.
       - Depende de: T4, T5.
 
-- [ ] **T8. Caso de uso «Todos».** (`design.md > 3.3`; R22-R25, R27, R31.)
+- [x] **T8. Caso de uso «Todos».** (`design.md > 3.3`; R22-R25, R27, R31.)
       - Archivos: `lib/modules/asignaciones/domain/list-company-orders.ts`,
         `company-order-view.ts` (nuevos), `lib/modules/asignaciones/index.ts`.
       - Tests: `tests/unit/asignaciones/list-company-orders.test.ts` (nuevo: R22; R24/D16:
@@ -113,7 +113,7 @@
       - **Hecho**: estos tests en verde.
       - Depende de: T7 (el helper). Tocan el mismo `index.ts`: van en serie.
 
-- [ ] **T9. [P con T7-T8] Quién puede ser responsable: rechazo en el service.** (`design.md > 3.5`; R33-R37.)
+- [x] **T9. [P con T7-T8] Quién puede ser responsable: rechazo en el service.** (`design.md > 3.5`; R33-R37.)
       - Archivos: `lib/modules/asignaciones/domain/responsible-eligibility.ts` (nuevo:
         `canBeResponsible`), `assign-responsibles.ts` (paso 4: rechazo; paso 5: omitir en silencio,
         D18), `errors.ts` (`UserCannotBeResponsibleError`),
@@ -134,7 +134,7 @@
       - **Hecho**: estos tests en verde.
       - Depende de: T6.
 
-- [ ] **T10. [P con T9] Candidatos del selector.** (`design.md > 3.6`; R32.)
+- [x] **T10. [P con T9] Candidatos del selector.** (`design.md > 3.6`; R32.)
       - Archivos: `lib/modules/asignaciones/domain/list-responsible-candidates.ts` (nuevo),
         `lib/modules/asignaciones/index.ts`.
       - Tests: `tests/unit/asignaciones/list-responsible-candidates.test.ts` (nuevo: excluye a quien
@@ -143,7 +143,7 @@
       - **Hecho**: estos tests en verde.
       - Depende de: T6, T9 (`canBeResponsible`).
 
-- [ ] **T11. Server Actions y composición.** (`design.md > 4`, `> 5`.)
+- [x] **T11. Server Actions y composición.** (`design.md > 4`, `> 5`.)
       - Archivos: `lib/modules/asignaciones/adapters/driving/order-assignment-actions.ts` (tres
         acciones), `lib/composition/index.ts`, `tests/guards/guard-qc87-no-reimplementado.test.ts`
         (`ACCIONES` +3), `tests/unit/identity/session-once-per-request-actions.test.ts` si su lista lo
@@ -158,7 +158,7 @@
 
 ## Bloque 4 — UI
 
-- [ ] **T12. `/asignacion`: vistas, pestañas y parámetros.** (`design.md > 6.1`, `> 6.2`, `> 6.6`; R11-R15, R27.)
+- [x] **T12. `/asignacion`: vistas, pestañas y parámetros.** (`design.md > 6.1`, `> 6.2`, `> 6.6`; R11-R15, R27.)
       - Archivos: `app/(private)/asignacion/page.tsx`,
         `components/assignment-view-tabs.tsx`, `components/assignment-view-params.ts` (nuevos),
         `components/assigned-orders-list-params.ts` (los href conservan `vista`),
@@ -170,7 +170,7 @@
       - **Hecho**: estos tests en verde y las pestañas miden al menos 44 × 44 px.
       - Depende de: T5, T11.
 
-- [ ] **T13. Listas «Terminados» y «Todos».** (`design.md > 6.3`, `> 6.4`; R19, R21, R24-R27, R31.)
+- [x] **T13. Listas «Terminados» y «Todos».** (`design.md > 6.3`, `> 6.4`; R19, R21, R24-R27, R31.)
       - Archivos (nuevos, en `app/(private)/asignacion/components/`): `finished-orders-*` y
         `company-orders-*` (sección, tabla, columnas, vacío, esqueleto), `index.ts`. El error se
         reutiliza de `assigned-orders-error.tsx` si su API lo permite.
@@ -181,14 +181,14 @@
       - **Hecho**: `tests/unit/asignaciones-ui/` en verde y la revisión multiplataforma hecha.
       - Depende de: T11, T12.
 
-- [ ] **T14. [P con T13] Pedidos: formulario de edición sin estado.** (`design.md > 6.5`; R7.)
+- [x] **T14. [P con T13] Pedidos: formulario de edición sin estado.** (`design.md > 6.5`; R7.)
       - Archivos: `app/(private)/pedidos/components/order-form.tsx`.
       - Tests: `tests/unit/pedidos-ui/order-form.test.tsx` (R7); `order-sheet.test.tsx`,
         `read-only.test.tsx` y `a11y-tactil.test.tsx` si cuentan controles.
       - **Hecho**: `tests/unit/pedidos-ui/` en verde.
       - Depende de: T3.
 
-- [ ] **T15. [P con T13] Pedidos: selector de responsables sin personas con `pedidos.consultar`.** (`design.md > 6.7`; R32.)
+- [x] **T15. [P con T13] Pedidos: selector de responsables sin personas con `pedidos.consultar`.** (`design.md > 6.7`; R32.)
       - Archivos: `app/(private)/pedidos/components/order-list-section.tsx`
         (`loadResponsiblesCatalog` usa `listResponsibleCandidatesAction`).
       - Tests: `tests/unit/pedidos-ui/order-list-section.test.tsx` (R32: el catálogo de personas sale
@@ -199,7 +199,7 @@
 
 ## Bloque 5 — E2E, alcance y cierre
 
-- [ ] **T16. E2E con los tres roles.** (R28, R30, R7, R32, R35.)
+- [x] **T16. E2E con los tres roles.** (R28, R30, R7, R32, R35.)
       - Archivos: `e2e/pedidos-terminados.spec.ts` (nuevo). Usa los roles **reales del seed**. La
         siembra va en una empresa propia del test: un ENTREGADO con `finished_at` no asignado al
         Empacador, un ENTREGADO sin fecha, un PENDIENTE y un CANCELADO.
