@@ -1,6 +1,6 @@
 import type { OrderStatus } from '../domain/order-classification';
 import type { OrderScope } from '../domain/order-scope';
-import type { NewOrder, OrderRow } from '../domain/order-view';
+import type { NewOrder, OrderEdit, OrderRow } from '../domain/order-view';
 
 /**
  * Puerto de escritura del pedido DENTRO de una transaccion compartida con `inventario`
@@ -33,7 +33,7 @@ export interface OrderWriteRepository {
   /** Edicion como reemplazo completo. No puede escribir `CANCELADO` ni motivo. */
   updateAlive(
     id: string,
-    data: NewOrder,
+    data: OrderEdit,
     actorId: string,
     now: Date,
     ingredientsCost: string | null,

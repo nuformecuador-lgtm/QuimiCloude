@@ -63,7 +63,7 @@ function quantityAriaLabel(batch: ProductBatchView, units: readonly UnitRef[] | 
  *  lote -apartado, disponible-, no solo su existencia. */
 function formattedQuantity(
   value: string,
-  unitId: string,
+  unitId: string | null,
   units: readonly UnitRef[] | undefined,
 ): string {
   const label = unitLabel(unitId, units);
@@ -74,7 +74,7 @@ function formattedQuantity(
 /** Cifra exacta de `formattedQuantity`, para el `title` y el `aria-label`. */
 function exactQuantity(
   value: string,
-  unitId: string,
+  unitId: string | null,
   units: readonly UnitRef[] | undefined,
 ): string {
   const label = unitLabel(unitId, units);

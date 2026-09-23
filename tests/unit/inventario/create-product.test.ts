@@ -281,7 +281,7 @@ describe('MACHINE — crea producto con primer lote, sin qtyAlert', () => {
   const ALTA_INSTRUMENTO = {
     name: 'Instrumento de laboratorio',
     type: PRODUCT_TYPES.MACHINE,
-    stock: 2,
+    stock: '2',
   };
 
   it('crea producto y lote en una sola operacion, con purchaseDate en el lote', async () => {
@@ -301,7 +301,7 @@ describe('MACHINE — crea producto con primer lote, sin qtyAlert', () => {
     });
     expect(Object.keys(productoCreado(products))).not.toContain('qtyAlert');
     expect(loteCreado(products)).toMatchObject({
-      stock: 2,
+      stock: '2',
       presentationId: null,
       unitCost: null,
       purchaseDate: SEMANA_PASADA_MQ,

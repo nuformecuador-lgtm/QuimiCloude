@@ -16,7 +16,7 @@ import { dateRangeCondition, numberRangeCondition, selectCondition } from './lis
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
 import type { OrderScope } from '../../../domain/order-scope';
-import type { NewOrder, OrderRow } from '../../../domain/order-view';
+import type { NewOrder, OrderEdit, OrderRow } from '../../../domain/order-view';
 import type { OrderWriteRepository } from '../../../ports/order-write-repository';
 
 /** Cliente global o el transaccional que abra quien llama: los metodos de mas abajo no

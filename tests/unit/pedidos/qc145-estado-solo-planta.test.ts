@@ -126,18 +126,24 @@ function findDataBlockMatches(
 const ORDER_CATALOG_PRISMA = 'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts';
 const ORDER_PRISMA = 'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts';
 
-describe('R5 — finishedAt/finished_at solo se escribe en transitionAliveOrder', () => {
-  it('ningun bloque `data:` de lib/** fuera de order-catalog-prisma.ts nombra finishedAt/finished_at', () => {
+describe('R5 — finishedAt/finished_at solo se escribe en setAliveOrderStatus (y en la transitionAliveOrder muerta que la precede)', () => {
+  // Enmendado por QC-141 (design.md > 5.3, review B4): `setStatus` de `OrderWriteRepository`
+  // -implementada como `setAliveOrderStatus` en order-prisma.ts- escribe `finishedAt` en el
+  // mismo `UPDATE` que mueve a ENTREGADO, para que el estado y la fecha de terminado queden
+  // atomicos con el consumo. `transitionAliveOrder` sigue en order-catalog-prisma.ts sin
+  // llamantes (se retira en Tm2) y conserva su propio `data:` con finishedAt.
+  it('ningun bloque `data:` de lib/** fuera de order-catalog-prisma.ts y order-prisma.ts nombra finishedAt/finished_at', () => {
     const conLaColumna = findDataBlockMatches(repoRoot, (block) => /finishedAt|finished_at/.test(block));
+    const rutas = conLaColumna.map((hallazgo) => hallazgo.ruta).sort();
 
     expect(
-      conLaColumna.map((hallazgo) => hallazgo.ruta),
-      conLaColumna.length === 1 && conLaColumna[0]?.ruta === ORDER_CATALOG_PRISMA
+      rutas,
+      rutas.length === 2 && rutas[0] === ORDER_CATALOG_PRISMA && rutas[1] === ORDER_PRISMA
         ? undefined
-        : 'finishedAt/finished_at solo puede escribirse en el `data:` de transitionAliveOrder ' +
-            `(${ORDER_CATALOG_PRISMA}). Se encontro tambien en, o en un numero distinto de bloques ` +
-            `de ese archivo: ${JSON.stringify(conLaColumna)}.`,
-    ).toEqual([ORDER_CATALOG_PRISMA]);
+        : 'finishedAt/finished_at solo puede escribirse en `data:` de order-catalog-prisma.ts ' +
+            `(transitionAliveOrder, sin llamantes) y order-prisma.ts (setAliveOrderStatus). ` +
+            `Se encontro en: ${JSON.stringify(conLaColumna)}.`,
+    ).toEqual([ORDER_CATALOG_PRISMA, ORDER_PRISMA]);
   });
 
   it('order-catalog-prisma.ts tiene exactamente un bloque `data:` que nombra finishedAt (el de transitionAliveOrder)', () => {
@@ -148,13 +154,24 @@ describe('R5 — finishedAt/finished_at solo se escribe en transitionAliveOrder'
     expect(bloques[0]).toMatch(/status\s*:\s*to\b/);
   });
 
+  it('order-prisma.ts tiene exactamente un bloque `data:` que nombra finishedAt (el de setAliveOrderStatus)', () => {
+    const fuente = readFileSync(join(repoRoot, ORDER_PRISMA), 'utf8');
+    const bloques = extractDataBlocks(fuente).filter((block) => /finishedAt/.test(block));
+
+    expect(bloques).toHaveLength(1);
+    expect(bloques[0]).toMatch(/status\s*:\s*to\b/);
+  });
+
   it('las escrituras conocidas que R5 nombra -create, updateAliveOrder, cancelAliveOrder, softDeleteAliveOrder- no llevan finishedAt', () => {
     const fuente = readFileSync(join(repoRoot, ORDER_PRISMA), 'utf8');
-    const bloques = extractDataBlocks(fuente);
-
-    expect(bloques.length).toBeGreaterThan(0);
-    for (const bloque of bloques) {
-      expect(bloque).not.toMatch(/finishedAt|finished_at/);
+    for (const nombre of ['createOrder', 'insertAliveOrder', 'updateAliveOrder', 'cancelAliveOrder', 'softDeleteAliveOrder']) {
+      const inicio = fuente.indexOf(`async function ${nombre}`);
+      expect(inicio, `no existe ${nombre} en ${ORDER_PRISMA}`).toBeGreaterThanOrEqual(0);
+      const finFuncion = fuente.indexOf('\n}', inicio);
+      const cuerpo = fuente.slice(inicio, finFuncion);
+      for (const bloque of extractDataBlocks(cuerpo)) {
+        expect(bloque, `${nombre} no debe escribir finishedAt`).not.toMatch(/finishedAt|finished_at/);
+      }
     }
   });
 
@@ -336,7 +353,7 @@ describe('R29 — el esquema no gana modelos ni tablas: el unico cambio es la co
     return [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map((match) => match[1] as string).sort();
   }
 
-  it('los modelos de db/schema.prisma son los mismos que en la base de fusion con origin/dev', () => {
+  it('los modelos de db/schema.prisma son los mismos que en la base de fusion con origin/dev, salvo el libro de reservas de QC-141', () => {
     let modelosDev: string[];
     try {
       const base = git('git merge-base origin/dev HEAD').trim();
@@ -350,7 +367,13 @@ describe('R29 — el esquema no gana modelos ni tablas: el unico cambio es la co
 
     const modelosActuales = modelosDe(readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8'));
 
-    expect(modelosActuales).toEqual(modelosDev);
+    // Tras mergear origin/dev, ese merge-base ES la punta de dev: la comparacion pasa a medir
+    // esta rama contra dev, y esta rama SI anade una tabla propia (T2, el libro de reservas).
+    // `ReservationMovement` es el unico modelo nuevo esperado; cualquier otro sigue siendo R29.
+    const ESPERADOS_DE_ESTA_RAMA = ['ReservationMovement'];
+    const modelosDevConLosEsperados = [...modelosDev, ...ESPERADOS_DE_ESTA_RAMA].sort();
+
+    expect(modelosActuales).toEqual(modelosDevConLosEsperados);
   });
 
   it('dispara con un esquema sintetico que gana un modelo respecto del de referencia', () => {

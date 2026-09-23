@@ -7,7 +7,6 @@ import { compareQuantities } from '../../../domain/decimal-quantity';
 import { BatchDuplicateLotError, BatchStockNegativeError, ValidationError } from '../../../domain/errors';
 import { normalizeProductName } from '../../../domain/product-name';
 import { netReservedQuantity } from '../../../domain/reservation-ledger';
-import { singleUnitStock } from '../../../domain/product-stock';
 
 import { writeMovement } from './batch-movement-prisma';
 import {
@@ -346,18 +345,14 @@ export async function recalculateProductStock(
 ): Promise<void> {
   const { companyId } = companyScopeColumns(scope);
 
-  const rows = await tx.productBatch.findMany({
-    where: { AND: [batchCompanyScope(scope), { productId }] },
-    select: { stock: true, presentation: { select: { unitId: true } } },
-  });
-
-  const stock = singleUnitStock(
-    rows.map((row) => ({ stock: row.stock.toString(), unitId: row.presentation?.unitId ?? null })),
-  );
-
   await tx.$executeRaw(Prisma.sql`
     UPDATE "products"
-       SET "stock" = ${stock}::numeric
+       SET "stock" = COALESCE((
+             SELECT sum("stock")
+               FROM "product_batches"
+              WHERE "product_id" = ${productId}::uuid
+                AND "company_id" = ${companyId}::uuid
+           ), 0)
      WHERE "id" = ${productId}::uuid
        AND "company_id" = ${companyId}::uuid
   `);

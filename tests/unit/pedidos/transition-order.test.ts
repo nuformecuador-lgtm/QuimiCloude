@@ -1,8 +1,9 @@
 // `createTransitionOrder`: implementa `OrderCatalog['transitionAliveById']` sobre la unidad de
 // trabajo compartida con `inventario`. Doble de `OrderUnitOfWork`, sin base de
 // datos: lo que se prueba es el ORDEN de llamadas (permiso implicito en `assertTransition`
-// antes de abrir la unidad, `lockAliveById` antes de `setStatus`, `setStatus` antes de
-// `consumeForOrder`) y los CINCO resultados posibles.
+// antes de abrir la unidad, `lockAliveById` antes de `consumeForOrder`, `consumeForOrder` antes
+// de `setStatus`: si falta material o la receta no tiene lineas, ni el estado ni `finishedAt`
+// quedan escritos) y los CINCO resultados posibles.
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -151,7 +152,7 @@ describe('createTransitionOrder', () => {
     ).resolves.toBe('ok');
 
     expect(findExecutionContentById).toHaveBeenCalledWith('r-9', EMPRESA);
-    expect(orden).toEqual(['lockAliveById', 'setStatus', 'consumeForOrder', 'setReservedAt']);
+    expect(orden).toEqual(['lockAliveById', 'consumeForOrder', 'setStatus', 'setReservedAt']);
     expect(setReservedAt).toHaveBeenCalledWith('o-1', null, { companyId: EMPRESA });
   });
 
@@ -171,6 +172,8 @@ describe('createTransitionOrder', () => {
       transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA),
     ).resolves.toBe('insufficient_material');
 
+    // R51: si el consumo falla, ni el estado ni `finishedAt` quedan escritos.
+    expect(setStatus).not.toHaveBeenCalled();
     expect(setReservedAt).not.toHaveBeenCalled();
   });
 
@@ -190,6 +193,8 @@ describe('createTransitionOrder', () => {
       transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA),
     ).resolves.toBe('recipe_without_lines');
 
+    // R51: si el consumo falla, ni el estado ni `finishedAt` quedan escritos.
+    expect(setStatus).not.toHaveBeenCalled();
     expect(setReservedAt).not.toHaveBeenCalled();
   });
 });

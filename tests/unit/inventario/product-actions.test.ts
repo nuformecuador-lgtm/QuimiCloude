@@ -624,7 +624,7 @@ describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () =>
     expect(candidato).toEqual({
       name: 'Instrumento de laboratorio',
       type: PRODUCT_TYPES.MACHINE,
-      stock: 9,
+      stock: '9',
       purchaseDate: '2026-09-01',
     });
     expect(Object.keys(candidato)).not.toContain('qtyAlert');
@@ -651,7 +651,7 @@ describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () =>
     expect(candidato).toEqual({
       name: 'Instrumento de laboratorio',
       type: PRODUCT_TYPES.MACHINE,
-      stock: 1,
+      stock: '1',
       purchaseDate: undefined,
     });
     expect(Object.keys(candidato)).not.toContain('qtyAlert');
