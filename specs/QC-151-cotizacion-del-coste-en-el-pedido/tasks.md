@@ -66,7 +66,7 @@ actor sale de `getSessionContext` aunque la entrada traiga otra (`R7`).
 `session-once-per-request-actions.test.ts`, `module-contract.test.ts` y `pedidos-convenciones.test.ts`
 verdes sin más cambios que la línea de `ACCIONES`.
 
-## [ ] T4 — Formateador del importe `[P con T1-T3]`
+## [x] T4 — Formateador del importe `[P con T1-T3]`
 
 Archivos: `app/(private)/pedidos/components/order-amount.ts` (nuevo),
 `app/(private)/pedidos/components/index.ts`, `tests/unit/pedidos-ui/order-amount.test.ts` (nuevo).
