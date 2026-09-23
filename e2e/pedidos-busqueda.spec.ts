@@ -324,7 +324,7 @@ test.describe('busqueda en la pantalla de pedidos', () => {
     expect(new URL(page.url()).searchParams.get('page')).toBe('2');
     expect(new URL(page.url()).searchParams.get('q')).toBe(SEARCH_TERM_C);
 
-    await page.locator('[data-slot="sheet-close"]').click();
+    await page.getByTestId('order-form-cancel').click();
     await expect(page.getByTestId(ORDER_FORM)).toHaveCount(0, { timeout: 60_000 });
     await expect(searchBox).toHaveValue(SEARCH_TERM_C);
     expect(await visibleOrderNumbers(page)).toEqual(secondPageNumbers);

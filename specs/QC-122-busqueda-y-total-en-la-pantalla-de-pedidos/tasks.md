@@ -9,7 +9,7 @@
 > Comentarios: en cada archivo tocado se limpian los de las líneas que toca la rama, sin citar fichas ni
 > `R<n>` en producción (`docs/conventions.md > Comentarios`).
 
-## T1 — Parámetros: `q` entra y sale de la URL (R4, R5, R6, R7, R2)
+## [x] T1 — Parámetros: `q` entra y sale de la URL (R4, R5, R6, R7, R2)
 
 - `order-list-params.ts`: `SEARCH_PARAM = 'q'`, `ORDER_SEARCH_MAX_LENGTH = 120`; `parseOrderListParams`
   lee `q` (trim, truncar, trim); `buildOrderListQuery` escribe `q` solo si no está vacío; nunca `search`.
@@ -24,7 +24,7 @@
   (acepta 120, rechaza 121).
 - **Hecho:** los casos nuevos, con `R<n>` en el nombre, en verde; el bloque viejo ya no existe.
 
-## T2 — La caja montada y la vuelta a la página 1 (R1, R2, R3, R8, R10, R11, R12)
+## [x] T2 — La caja montada y la vuelta a la página 1 (R1, R2, R3, R8, R10, R11, R12)
 
 Depende de T1.
 
@@ -41,7 +41,7 @@ Depende de T1.
 - **Hecho:** tests en verde; ningún test de `order-table.test.tsx` fuera del bloque sustituido cambia
   sus afirmaciones.
 
-## T3 — Estado «sin coincidencias» dentro de la tabla, y limpiar (R13, R14, R15, R16)
+## [x] T3 — Estado «sin coincidencias» dentro de la tabla, y limpiar (R13, R14, R15, R16)
 
 Depende de T2.
 
@@ -62,7 +62,7 @@ Depende de T2.
 - **Hecho:** tests en verde; `order-list-empty.tsx`, `order-columns.tsx` y `order-list-skeleton.tsx`
   sin diff.
 
-## T4 [P] — El término sobrevive al panel lateral (R4, R9) y regresiones
+## [x] T4 [P] — El término sobrevive al panel lateral (R4, R9) y regresiones
 
 Depende de T3.
 
@@ -76,7 +76,7 @@ Depende de T3.
   `guard-pantalla-pedidos-se-amplia`.
 - **Hecho:** `./init.sh --rapido` en verde.
 
-## T5 [P] — E2E (R25 a, c, d; R9; R26)
+## [x] T5 [P] — E2E (R25 a, c, d; R9; R26)
 
 Depende de T3.
 
@@ -97,3 +97,23 @@ Depende de T1–T5.
   «retirados en F1.4, van a QC-151», sin test; y la lista de tests sustituidos de `design.md > 7`.
 - `./init.sh` completo en verde.
 - **Hecho:** todos los requisitos vigentes mapeados a un test concreto; gate completo verde.
+
+## [x] T7 — La caja sigue a la URL cuando el término cambia por fuera (R27)
+
+> Ampliación de alcance decidida por el humano el 2026-09-23 («sí, arréglalo aquí»). R27 lo escribirá
+> formalmente `spec_author` en `requirements.md`.
+
+Depende de T3.
+
+- **R27.** Cuando el término de búsqueda de la URL (`?q=`) cambie sin que el usuario teclee en la caja
+  —p. ej. buscar A, luego B, y pulsar Atrás dentro de `/pedidos`—, el texto de la caja DEBE mostrar el
+  término de la URL (A), igual que ya lo hacen la lista y la paginación.
+- Resolverlo en `order-table.tsx` **sin tocar** `components/shared/data-table` y sin romper el foco
+  mientras el usuario escribe (R11): remontar la caja solo cuando `params.search` llega con un valor
+  que no salió de la propia caja.
+- Test de componente en `order-table.test.tsx` que muerda (rojo sin el arreglo): rerender con un
+  `params.search` externo -> la caja lo muestra; rerender con el término que la propia caja emitió
+  (y con uno intermedio ya superado mientras se teclea) -> la caja no se remonta y conserva foco y texto.
+- Paso en `e2e/pedidos-busqueda.spec.ts`: buscar A, buscar B, `page.goBack()` -> URL con `q=A` y la caja
+  dice A.
+- **Hecho:** tests en verde; `components/shared/**` sin diff; anotado en la bitácora.
