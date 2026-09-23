@@ -19,6 +19,13 @@
 
 ## Evaluaciones
 
+### QC-132 - F1.0 y ACOTADA con `/afinar-feature` (2026-09-23)
+
+`zone: frontend`, **`complexity: low`** (leader, label en Jira). **Cupo `frontend` 2 de 2** (QC-107, QC-114): **solo
+Fase 1**, F2.0 espera hueco. Worktree montado desde `dev`. Alcance crecio a tres sitios (board reescrito antes de
+sembrar), **5 decisiones cerradas y 1 pregunta abierta** en `specs/QC-132-cantidad-del-pedido-sin-title-exacto/requirements.md`.
+Siguiente: F1.2 (`spec_author`).
+
 ### QC-130 - F0, F1.0 y F1.1 (2026-09-23)
 
 **F0** (import incremental, issues tocados desde el 2026-09-22): QC-141 pasa a `in_progress` / `complexity:high`
