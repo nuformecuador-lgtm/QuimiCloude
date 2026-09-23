@@ -8,7 +8,7 @@ import type { AssignedOrderExecutionView, ExecutionLineView } from './assigned-o
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
 
 import { formatOrderNumber, type OrderCatalog } from '@/lib/modules/pedidos';
-import type { ProductCatalog } from '@/lib/modules/inventario';
+import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import { consumedQuantity, type RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
@@ -22,6 +22,7 @@ export type GetAssignedOrderExecutionDeps = {
   readonly recipes: RecipeCatalog;
   readonly units: UnitCatalog;
   readonly products: ProductCatalog;
+  readonly presentations: PresentationCatalog;
 };
 
 /** La base efectiva de una unidad: la que declara, o ella misma si no deriva de nadie. */
@@ -115,6 +116,12 @@ export function createGetAssignedOrderExecution(
       };
     });
 
+    const presentations =
+      summary.presentationId === null
+        ? []
+        : await deps.presentations.findRefs([summary.presentationId], actor.companyId);
+    const presentationName = presentations[0]?.name ?? null;
+
     return {
       orderId: summary.id,
       numberText: formatOrderNumber(summary.number),
@@ -123,6 +130,7 @@ export function createGetAssignedOrderExecution(
       orderQuantity: summary.quantity,
       steps,
       lines: executionLines,
+      presentationName,
     };
   };
 }

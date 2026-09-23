@@ -36,6 +36,7 @@ import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { Page } from '@/lib/modules/pedidos/domain/page'
 import type { ListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { PresentationCatalog, PresentationRef } from '@/lib/modules/inventario'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
@@ -75,6 +76,7 @@ function fila(overrides: Partial<OrderRow> & { readonly id: string }): OrderRow 
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
+    presentationId: null,
     ...overrides,
   }
 }
@@ -89,6 +91,7 @@ function dobles(opciones: {
   // QC-68: `null` = «el termino no es una busqueda», que es el comportamiento por defecto de
   // este doble cuando el caso no necesita otra cosa.
   idsQueCasan?: readonly string[] | null
+  presentaciones?: readonly PresentationRef[]
 }) {
   // Los parametros van TIPADOS -y no `vi.fn(async () => ...)`- porque lo que este archivo
   // afirma es lo que se LE PASO a cada doble: sin ellos, TypeScript infiere una tupla vacia y
@@ -127,15 +130,22 @@ function dobles(opciones: {
     softDeleteAlive: explota('orders.softDeleteAlive'),
   } as unknown as OrderRepository
 
+  // R22: una sola llamada al catalogo de presentaciones por pagina, con los ids DEDUPLICADOS.
+  const findRefs = vi.fn(async (ids: readonly string[]) =>
+    (opciones.presentaciones ?? []).filter((ref) => ids.includes(ref.id)),
+  )
+
   const log: ListQueryLog = { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() }
 
   return {
     orders,
     recipes: { findRefsIncludingDeleted, findIdsMatchingName } as unknown as RecipeCatalog,
+    presentations: { findRefs } as unknown as PresentationCatalog,
     log,
     listAlive,
     findRefsIncludingDeleted,
     findIdsMatchingName,
+    findRefs,
   }
 }
 
@@ -675,5 +685,60 @@ describe('listOrders — el importe no es consultable (R17)', () => {
     )
     expect(consultaRecibida(porFiltro.listAlive.mock.calls).filters).toEqual({})
     expect(porFiltro.log.ignoredFields).toHaveBeenCalledWith('orders', ['ingredientsCost'])
+  })
+})
+
+describe('listOrders — la presentacion del pedido (R21, R22)', () => {
+  const PRESENTACION_A = '77777777-7777-4777-8777-777777777777'
+
+  it('R22: una sola llamada al catalogo de presentaciones por pagina, con alguna presentacion en la pagina', async () => {
+    const filas = [
+      fila({ id: 'o-1', presentationId: PRESENTACION_A }),
+      fila({ id: 'o-2', presentationId: PRESENTACION_A }),
+      fila({ id: 'o-3', presentationId: null }),
+    ]
+    const d = dobles({
+      pagina: pagina(filas, { total: 3 }),
+      presentaciones: [{ id: PRESENTACION_A, name: 'Bidon 20L' }],
+    })
+
+    const salida = await createListOrders(d)({ page: 1 }, ADMIN)
+
+    expect(d.findRefs).toHaveBeenCalledTimes(1)
+    expect(d.findRefs.mock.calls[0]?.[0]).toEqual([PRESENTACION_A])
+    expect(salida.items[0]?.presentationName).toBe('Bidon 20L')
+    expect(salida.items[1]?.presentationName).toBe('Bidon 20L')
+    expect(salida.items[2]?.presentationName).toBeNull()
+  })
+
+  it('R22: ninguna llamada al catalogo de presentaciones si ningun pedido de la pagina tiene presentacion', async () => {
+    const d = dobles({ pagina: pagina([fila({ id: 'o-1' }), fila({ id: 'o-2' })], { total: 2 }) })
+
+    const salida = await createListOrders(d)({ page: 1 }, ADMIN)
+
+    expect(d.findRefs).not.toHaveBeenCalled()
+    expect(salida.items.every((item) => item.presentationName === null)).toBe(true)
+  })
+
+  it('R21: ordenar o filtrar por presentacion se OMITE y se anota, como cualquier campo no declarado', async () => {
+    expect(Object.keys(ORDER_QUERYABLE.filterable)).not.toContain('presentationName')
+    expect(Object.keys(ORDER_QUERYABLE.filterable)).not.toContain('presentationId')
+    expect(ORDER_QUERYABLE.sortable).not.toContain('presentationName')
+
+    const porOrden = dobles({ pagina: pagina([]) })
+    await createListOrders(porOrden)(
+      { page: 1, sort: { columnId: 'presentationName', direction: 'desc' } },
+      ADMIN,
+    )
+    expect(consultaRecibida(porOrden.listAlive.mock.calls).sort).toBeNull()
+    expect(porOrden.log.ignoredFields).toHaveBeenCalledWith('orders', ['presentationName'])
+
+    const porFiltro = dobles({ pagina: pagina([]) })
+    await createListOrders(porFiltro)(
+      { page: 1, filters: { presentationId: { kind: 'select', values: ['x'] } } },
+      ADMIN,
+    )
+    expect(consultaRecibida(porFiltro.listAlive.mock.calls).filters).toEqual({})
+    expect(porFiltro.log.ignoredFields).toHaveBeenCalledWith('orders', ['presentationId'])
   })
 })

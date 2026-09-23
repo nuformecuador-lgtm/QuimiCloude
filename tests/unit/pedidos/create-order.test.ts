@@ -22,7 +22,7 @@ import { RecipeNotFoundError, UnauthorizedError, type PedidosError } from '@/lib
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
-import type { CostingBatch, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
+import type { CostingBatch, PresentationCatalog, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeExecutionLine, RecipeRef } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
 
@@ -38,6 +38,7 @@ const ACTOR_A: Actor = {
 const RECETA_DE_A = '22222222-2222-4222-8222-222222222222';
 const RECETA_DE_B = '55555555-5555-4555-8555-555555555555';
 const RECETA_INEXISTENTE = '99999999-9999-4999-8999-999999999999';
+const PRESENTACION_DE_A = '66666666-6666-4666-8666-666666666666';
 
 const AHORA = new Date('2026-09-16T10:00:00.000Z');
 
@@ -55,6 +56,7 @@ function filaCreada(): OrderRow {
     updatedAt: AHORA,
     createdBy: ACTOR_A.id,
     updatedBy: ACTOR_A.id,
+    presentationId: PRESENTACION_DE_A,
   };
 }
 
@@ -116,6 +118,14 @@ function catalogoDeUnidades(unidades: ReadonlyMap<string, UnitConversion> = new 
   return { units: { findRefs, findRefsSharingBaseInCompany } as unknown as UnitCatalog, findRefs };
 }
 
+/** Catalogo de presentaciones: acepta por defecto `PRESENTACION_DE_A` de la empresa A. */
+function catalogoDePresentaciones(): { presentations: PresentationCatalog; findRefs: ReturnType<typeof vi.fn> } {
+  const findRefs = vi.fn(async (ids: readonly string[]) =>
+    ids.includes(PRESENTACION_DE_A) ? [{ id: PRESENTACION_DE_A, name: 'Bidon 20L' }] : [],
+  );
+  return { presentations: { findRefs } as unknown as PresentationCatalog, findRefs };
+}
+
 function repositorioDePedidos() {
   const create = vi.fn(async () => filaCreada());
   const explota = (nombre: string) =>
@@ -151,11 +161,12 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
       now: () => AHORA,
     });
 
     const codigoAjena = await codigoDelFallo(() =>
-      createOrder({ recipeId: RECETA_DE_B, quantity: '10.0000' }, ACTOR_A),
+      createOrder({ recipeId: RECETA_DE_B, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A),
     );
 
     expect(codigoAjena).toBe('recipe_not_found');
@@ -170,8 +181,9 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
         recipes: cat.recipes,
         products: catalogoDeProductos().products,
         units: catalogoDeUnidades().units,
+        presentations: catalogoDePresentaciones().presentations,
         now: () => AHORA,
-      })({ recipeId: RECETA_DE_B, quantity: '10.0000' }, ACTOR_A),
+      })({ recipeId: RECETA_DE_B, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A),
     ).rejects.toBeInstanceOf(RecipeNotFoundError);
 
     // Indistinguible de una receta que no existe en absoluto: mismo `code`, mismo mensaje.
@@ -182,8 +194,9 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
       recipes: cat2.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
       now: () => AHORA,
-    })({ recipeId: RECETA_INEXISTENTE, quantity: '10.0000' }, ACTOR_A).catch((e: unknown) => e);
+    })({ recipeId: RECETA_INEXISTENTE, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A).catch((e: unknown) => e);
 
     expect((errorInexistente as PedidosError).code).toBe(codigoAjena);
     expect((errorInexistente as Error).constructor.name).toBe(RecipeNotFoundError.name);
@@ -197,10 +210,11 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
       now: () => AHORA,
     });
 
-    await codigoDelFallo(() => createOrder({ recipeId: RECETA_DE_B, quantity: '10.0000' }, ACTOR_A));
+    await codigoDelFallo(() => createOrder({ recipeId: RECETA_DE_B, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A));
 
     expect(cat.findRefsIncludingDeleted).toHaveBeenCalledWith([RECETA_DE_B], EMPRESA_A);
   });
@@ -213,13 +227,96 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
       now: () => AHORA,
     });
 
-    const creado = await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000' }, ACTOR_A);
+    const creado = await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
 
     expect(creado.id).toBe(filaCreada().id);
     expect(repo.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('QC-146 — la presentacion del pedido en el alta (R6, R8, R13)', () => {
+  it('R6: sin presentacion lanza invalid_input y no escribe', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const pres = catalogoDePresentaciones();
+    const createOrder = createCreateOrder({
+      orders: repo.orders,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: pres.presentations,
+      now: () => AHORA,
+    });
+
+    expect(
+      await codigoDelFallo(() => createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000' }, ACTOR_A)),
+    ).toBe('invalid_input');
+    expect(repo.create).not.toHaveBeenCalled();
+    expect(pres.findRefs).not.toHaveBeenCalled();
+  });
+
+  it('R8: una presentacion ausente del catalogo de la empresa -> presentation_not_found, sin escribir', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const pres = catalogoDePresentaciones();
+    const createOrder = createCreateOrder({
+      orders: repo.orders,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: pres.presentations,
+      now: () => AHORA,
+    });
+
+    const AJENA = '88888888-8888-4888-8888-888888888888';
+    expect(
+      await codigoDelFallo(() =>
+        createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: AJENA }, ACTOR_A),
+      ),
+    ).toBe('presentation_not_found');
+    expect(repo.create).not.toHaveBeenCalled();
+    expect(pres.findRefs).toHaveBeenCalledWith([AJENA], EMPRESA_A);
+  });
+
+  it('R13: el coste y la cantidad no dependen de la presentacion', async () => {
+    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
+    const prod = catalogoDeProductos([loteCosteable({ stock: 100, unitCost: '3.0000' })]);
+    const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
+    const repo1 = repositorioDePedidos();
+    const repo2 = repositorioDePedidos();
+
+    const createOrder1 = createCreateOrder({
+      orders: repo1.orders,
+      recipes: cat.recipes,
+      products: prod.products,
+      units: uni.units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+    const createOrder2 = createCreateOrder({
+      orders: repo2.orders,
+      recipes: cat.recipes,
+      products: prod.products,
+      units: uni.units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await createOrder1({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
+    await createOrder2({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
+
+    const costeUno = (repo1.create.mock.calls[0] as unknown as readonly unknown[])[4];
+    const costeDos = (repo2.create.mock.calls[0] as unknown as readonly unknown[])[4];
+    expect(costeUno).toBe(costeDos);
+    expect(costeUno).toBe('30.0000');
+    // El `NewOrder` que llega al puerto lleva la presentacion, pero nunca se le pasa a
+    // `resolveIngredientsCost`: firma de esa funcion en `resolve-ingredients-cost.ts`.
+    const dataUno = (repo1.create.mock.calls[0] as unknown as readonly unknown[])[0] as { presentationId: string };
+    expect(dataUno.presentationId).toBe(PRESENTACION_DE_A);
   });
 });
 
@@ -275,6 +372,9 @@ function catalogosQueExplotan() {
       findRefs: explota('units.findRefs'),
       findRefsSharingBaseInCompany: explota('units.findRefsSharingBaseInCompany'),
     } as unknown as UnitCatalog,
+    presentations: {
+      findRefs: explota('presentations.findRefs'),
+    } as unknown as PresentationCatalog,
   };
 }
 
@@ -289,10 +389,14 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
       recipes: cat.recipes,
       products: prod.products,
       units: uni.units,
+      presentations: catalogoDePresentaciones().presentations,
       now: () => AHORA,
     });
 
-    await createOrder({ recipeId: RECETA_DE_A, quantity: '20.0000' }, ACTOR_A);
+    await createOrder(
+      { recipeId: RECETA_DE_A, quantity: '20.0000', presentationId: PRESENTACION_DE_A },
+      ACTOR_A,
+    );
 
     // necesaria = 20 * 100 % = 20, cubierta por el unico lote a 3.0000: 20 * 3 = 60.
     expect(repo.create).toHaveBeenCalledTimes(1);
@@ -316,10 +420,11 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
         recipes: cat.recipes,
         products: prod.products,
         units: uni.units,
+        presentations: catalogoDePresentaciones().presentations,
         now: () => AHORA,
       });
 
-      await createOrder({ recipeId: RECETA_DE_A, quantity: '1.0000' }, ACTOR_A);
+      await createOrder({ recipeId: RECETA_DE_A, quantity: '1.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
 
       expect(prod.findCostingBatches, `${cantidad} lineas`).toHaveBeenCalledTimes(1);
       expect(uni.findRefs, `${cantidad} lineas`).toHaveBeenCalledTimes(1);
@@ -338,11 +443,12 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
       recipes: catalogos.recipes,
       products: catalogos.products,
       units: catalogos.units,
+      presentations: catalogos.presentations,
       now: () => AHORA,
     });
 
     await expect(
-      createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000' }, ACTOR_SIN_MODIFICAR),
+      createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_SIN_MODIFICAR),
     ).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
@@ -358,10 +464,11 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
       recipes: cat.recipes,
       products: prod.products,
       units: uni.units,
+      presentations: catalogoDePresentaciones().presentations,
       now: () => AHORA,
     });
 
-    const creado = await createOrder({ recipeId: RECETA_DE_A, quantity: '1.0000' }, ACTOR_A);
+    const creado = await createOrder({ recipeId: RECETA_DE_A, quantity: '1.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
 
     expect(creado.id).toBe(filaCreada().id);
     expect(repo.create).toHaveBeenCalledTimes(1);

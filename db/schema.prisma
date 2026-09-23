@@ -564,12 +564,17 @@ model Order {
   /// Coste de los ingredientes de la receta del pedido, con los lotes del momento en que se
   /// escribio. NULL = no se pudo calcular; nunca 0.
   ingredientsCost    Decimal?      @map("ingredients_cost") @db.Decimal(14, 4)
+  /// El envase en que se entrega lo fabricado, del catalogo de `inventario`. NULL en los
+  /// pedidos que existian antes de esta columna. Sin `@relation`: es drift, con FK COMPUESTA
+  /// `(company_id, presentation_id)` escrita a mano en la migracion.
+  presentationId     String?       @map("presentation_id") @db.Uuid
 
   @@unique([companyId, orderYear, orderSequence], map: "orders_company_year_sequence_key")
   @@unique([id, companyId], map: "orders_id_company_id_key")
   @@index([recipeId], map: "orders_recipe_id_idx")
   @@index([createdBy], map: "orders_created_by_idx")
   @@index([updatedBy], map: "orders_updated_by_idx")
+  @@index([presentationId], map: "orders_presentation_id_idx")
   @@map("orders")
 }
 

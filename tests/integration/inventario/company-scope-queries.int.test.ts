@@ -32,6 +32,7 @@ import {
   listPresentations,
   replacePresentation,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-prisma';
+import { findPresentationRefs } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
@@ -571,6 +572,27 @@ describe('R16 — updateAlive / softDeleteAlive / deleteById con un id AJENO', (
     expect(resultado).toBe('deleted');
     expect(await prisma.presentation.count({ where: { id: propia } })).toBe(0);
     B.presentaciones.splice(2, 1);
+  });
+});
+
+describe('R28 (QC-146) — PresentationCatalog.findRefs no devuelve presentaciones de otra empresa', () => {
+  it('pedidas desde A, las propias de A vuelven y la de B —aunque se pida su id— no', async () => {
+    const propia = A.presentaciones[0] ?? '';
+    const ajena = B.presentaciones[0] ?? '';
+
+    const refs = await findPresentationRefs([propia, ajena], A.companyId);
+
+    expect(refs.map((ref) => ref.id)).toEqual([propia]);
+
+    // Control positivo: la misma presentacion de B, pedida con la empresa de B, si vuelve.
+    const desdeB = await findPresentationRefs([ajena], B.companyId);
+    expect(desdeB.map((ref) => ref.id)).toEqual([ajena]);
+  });
+
+  it('un id inexistente y uno de otra empresa se resuelven igual: ninguno vuelve', async () => {
+    const refs = await findPresentationRefs([randomUUID(), B.presentaciones[1] ?? ''], A.companyId);
+
+    expect(refs).toEqual([]);
   });
 });
 

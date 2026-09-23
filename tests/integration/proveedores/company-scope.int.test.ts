@@ -350,6 +350,39 @@ expect(SIN_RESTAURAR_EL_GLOBAL.length, 'la mutacion del CREATE INDEX no encontro
   SENTENCIAS_DEL_DOWN.length - 1,
 );
 
+/**
+ * Los `down.sql` de migraciones POSTERIORES cuyo `migration.sql` referencia la clave compuesta
+ * de `presentations` que este `down.sql` quita (`DROP CONSTRAINT
+ * "presentations_company_id_id_key"`). Un rollback real las revierte en el orden inverso al de
+ * aplicacion, es decir ANTES que esta: sin ejecutarlas primero, ese `DROP CONSTRAINT` choca con
+ * 2BP01 porque la FK compuesta que dejaron sigue dependiendo de la clave. Se detectan por texto
+ * y se leen del disco, nunca se copian a mano; si hubiera mas de una, se ejecutan de la mas
+ * reciente a la mas antigua, que es el mismo orden inverso.
+ */
+const REFERENCIA_A_LA_CLAVE_DE_PRESENTATIONS = 'REFERENCES "presentations" ("company_id", "id")';
+const timestampDe = (nombreDeMigracion: string): string => nombreDeMigracion.split('_')[0] as string;
+const esteTimestamp = timestampDe(scopeDirs[0] as string);
+const migracionesPosterioresDependientes = readdirSync(migrationsDir)
+  .filter((nombre) => timestampDe(nombre) > esteTimestamp)
+  .filter((nombre) => {
+    try {
+      return readFileSync(join(migrationsDir, nombre, 'migration.sql'), 'utf8').includes(
+        REFERENCIA_A_LA_CLAVE_DE_PRESENTATIONS,
+      );
+    } catch {
+      return false;
+    }
+  })
+  .sort((a, b) => (timestampDe(a) < timestampDe(b) ? 1 : -1));
+expect(
+  migracionesPosterioresDependientes,
+  'se esperaba encontrar la migracion de la presentacion del pedido como dependiente',
+).toContain('20260922130000_orders_presentation');
+
+const SENTENCIAS_DE_DEPENDIENTES_POSTERIORES = migracionesPosterioresDependientes.flatMap((nombre) =>
+  sentenciasSql(readFileSync(join(migrationsDir, nombre, 'down.sql'), 'utf8')),
+);
+
 // ---------------------------------------------------------------------------
 // Los dos retratos del esquema
 // ---------------------------------------------------------------------------
@@ -1233,6 +1266,9 @@ describe('R10 — ejecutar el down.sql entero devuelve el esquema al estado ante
     const capturado: { antes?: Fotografia; despues?: Fotografia } = {};
 
     await inRolledBackTransaction(async (tx) => {
+      // Orden inverso de aplicacion: primero el down de quien depende de la clave que este down
+      // va a quitar.
+      await ejecutarDown(tx, SENTENCIAS_DE_DEPENDIENTES_POSTERIORES);
       capturado.antes = await fotografiaDeEsquema(tx);
       await ejecutarDown(tx, SENTENCIAS_DEL_DOWN);
       capturado.despues = await fotografiaDeEsquema(tx);
@@ -1327,6 +1363,8 @@ describe('R10 — ejecutar el down.sql entero devuelve el esquema al estado ante
     const antesDeTodo = await fotografiaDeEsquema(prisma);
 
     await inRolledBackTransaction(async (tx) => {
+      // Orden inverso de aplicacion, igual que en el caso de arriba.
+      await ejecutarDown(tx, SENTENCIAS_DE_DEPENDIENTES_POSTERIORES);
       await ejecutarDown(tx, SENTENCIAS_DEL_DOWN);
       // Dentro de la transaccion el esquema SI cambio: si no, el ROLLBACK no estaria deshaciendo
       // nada y este caso pasaria con un DOWN que no hiciera absolutamente nada.
@@ -1341,6 +1379,9 @@ describe('R10 — ejecutar el down.sql entero devuelve el esquema al estado ante
     const capturado: { despues?: Fotografia } = {};
 
     await inRolledBackTransaction(async (tx) => {
+      // Orden inverso de aplicacion, igual que en los dos casos de arriba: la mutacion solo
+      // quita el CREATE INDEX final y deja intacto el DROP CONSTRAINT que depende de esto.
+      await ejecutarDown(tx, SENTENCIAS_DE_DEPENDIENTES_POSTERIORES);
       await ejecutarDown(tx, SIN_RESTAURAR_EL_GLOBAL);
       capturado.despues = await fotografiaDeEsquema(tx);
     });

@@ -17,6 +17,7 @@ import { Client, DatabaseError } from 'pg';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
+import { normalizePresentationName } from '@/lib/modules/inventario';
 import { createOrder } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -41,6 +42,9 @@ type Fixture = {
   readonly actorId: string;
   readonly roleId: string;
   readonly documentTypeCode: string;
+  /** QC-146: presentacion de la MISMA empresa, obligatoria en `NewOrder`. */
+  readonly presentationId: string;
+  readonly unitId: string;
 };
 
 let recetaId: string;
@@ -76,16 +80,33 @@ async function createFixture(): Promise<Fixture> {
     },
     select: { id: true },
   });
+  const unit = await prisma.unit.create({
+    data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `kg${marca}` },
+    select: { id: true },
+  });
+  const presentation = await prisma.presentation.create({
+    data: {
+      name: `Bidon ${marca}`,
+      nameNormalized: normalizePresentationName(`Bidon ${marca}`),
+      unitId: unit.id,
+      companyId: company.id,
+    },
+    select: { id: true },
+  });
   return {
     companyId: company.id,
     actorId: user.id,
     roleId: role.id,
     documentTypeCode: documentType.code,
+    presentationId: presentation.id,
+    unitId: unit.id,
   };
 }
 
 async function dropFixture(fixture: Fixture): Promise<void> {
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
+  await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
+  await prisma.unit.deleteMany({ where: { id: fixture.unitId } });
   await prisma.user.deleteMany({ where: { id: fixture.actorId } });
   await prisma.role.deleteMany({ where: { id: fixture.roleId } });
   await prisma.documentType.deleteMany({ where: { code: fixture.documentTypeCode } });
@@ -96,13 +117,13 @@ async function dropFixture(fixture: Fixture): Promise<void> {
   await prisma.company.deleteMany({ where: { id: fixture.companyId } });
 }
 
-function pedidoNuevo(): NewOrder {
-  return { recipeId: recetaId, quantity: '3.0000', priority: 'BAJA', status: 'PENDIENTE' };
+function pedidoNuevo(presentationId: string): NewOrder {
+  return { recipeId: recetaId, quantity: '3.0000', priority: 'BAJA', status: 'PENDIENTE', presentationId };
 }
 
 function altaDe(fixture: Fixture): Promise<OrderRow | 'duplicate_number'> {
   const now = new Date();
-  return createOrder(pedidoNuevo(), now.getUTCFullYear(), fixture.actorId, now, null, {
+  return createOrder(pedidoNuevo(fixture.presentationId), now.getUTCFullYear(), fixture.actorId, now, null, {
     companyId: fixture.companyId,
   });
 }

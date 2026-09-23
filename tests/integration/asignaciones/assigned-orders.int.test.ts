@@ -24,6 +24,7 @@ import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adap
 import { createListAssignedOrders } from '@/lib/modules/asignaciones/domain/list-assigned-orders';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import { ROLE_EMPACADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
+import { findPresentationRefs } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import {
   findAliveOrderTargetById,
@@ -254,6 +255,7 @@ describe('asignaciones · listAssignedOrders con los permisos del Empacador (int
             throw new Error('QC-144: listAssignedOrders no busca recetas por nombre');
           },
         },
+        presentations: { findRefs: findPresentationRefs },
         people: assignmentDirectoryPrisma,
         now: () => NOW,
       });

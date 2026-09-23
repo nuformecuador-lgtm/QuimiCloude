@@ -246,6 +246,7 @@ describe('QC-88 — `listAssignedOrders` (R5, R40)', () => {
     }));
     const findRefsIncludingDeleted = vi.fn(async () => []);
     const findRefsIncludingDeletedInCompany = vi.fn(async () => []);
+    const findRefsPresentations = vi.fn(async () => []);
 
     const deps = {
       assignments: {
@@ -259,6 +260,7 @@ describe('QC-88 — `listAssignedOrders` (R5, R40)', () => {
       orders: { findAliveById: vi.fn(), listAliveSummariesByIds },
       recipes: { findRefsIncludingDeleted },
       people: { findAliveRefsInCompany: vi.fn(), findRefsIncludingDeletedInCompany },
+      presentations: { findRefs: findRefsPresentations },
     } as unknown as ListAssignedOrdersDeps;
 
     return {
@@ -269,6 +271,7 @@ describe('QC-88 — `listAssignedOrders` (R5, R40)', () => {
         listAliveSummariesByIds,
         findRefsIncludingDeleted,
         findRefsIncludingDeletedInCompany,
+        findRefsPresentations,
       ],
     };
   }

@@ -78,6 +78,16 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   })),
 }));
 
+vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
+  listPresentationsAction: vi.fn(async () => ({
+    status: 'success' as const,
+    data: { items: [], page: 1, pageSize: 25, total: 0, totalPages: 1 },
+  })),
+  createPresentationAction: vi.fn(() => {
+    throw new Error('createPresentationAction no debe invocarse desde la tabla');
+  }),
+}));
+
 function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
     id,
@@ -94,6 +104,8 @@ function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> =
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
+    presentationId: null,
+    presentationName: null,
     ...overrides,
   };
 }

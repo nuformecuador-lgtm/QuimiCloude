@@ -155,6 +155,7 @@ function buildCreateCandidate(formData: FormData): unknown {
     recipeId: readFormString(formData, 'recipeId'),
     quantity: readFormString(formData, 'quantity'),
     priority: readOptionalFormString(formData, 'priority'),
+    presentationId: readFormString(formData, 'presentationId'),
   };
 }
 

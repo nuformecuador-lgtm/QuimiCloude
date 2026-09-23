@@ -88,4 +88,6 @@ export type AssignedOrderSummary = {
   readonly quantity: string;
   readonly priority: OrderPriority;
   readonly status: OrderStatus;
+  /** `null` = sin presentacion: el contrato que `asignaciones` usa para pintarla. */
+  readonly presentationId: string | null;
 };

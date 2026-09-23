@@ -1,6 +1,7 @@
 'use client';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
+import { OrderPresentationLabel } from '@/components/shared/order-presentation-label';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import type { UnitView } from '@/lib/modules/unidades';
@@ -80,6 +81,7 @@ export const ORDER_NUMBER_COLUMN_ID = 'orderNumber';
 /** Ids de las columnas que no filtran ni ordenan, pero que los tests localizan por su celda. */
 export const RECIPE_NAME_COLUMN_ID = 'recipeName';
 export const QUANTITY_COLUMN_ID = 'quantity';
+export const PRESENTATION_NAME_COLUMN_ID = 'presentationName';
 export const CANCELLATION_REASON_COLUMN_ID = 'cancellationReason';
 /** QC-102 R16 — la columna propia de responsables. */
 export const RESPONSIBLES_COLUMN_ID = 'responsibles';
@@ -199,6 +201,13 @@ export function buildOrderColumns({
       // celda no alimenta ningun envio. El pedido guardado conserva sus cuatro decimales; lo
       // que se lee ya no arrastra el «.0000» que no dice nada.
       cell: (order) => formatDecimalDisplay(order.quantity),
+    },
+    {
+      id: PRESENTATION_NAME_COLUMN_ID,
+      label: 'Presentación',
+      align: 'start',
+      // Solo informa, como el importe: sin `sortable` y sin `filter`.
+      cell: (order) => <OrderPresentationLabel name={order.presentationName} />,
     },
     {
       id: CREATED_AT_COLUMN_ID,

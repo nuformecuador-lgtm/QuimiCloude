@@ -4,6 +4,7 @@ import { formatOrderNumber } from './order-number';
 import type { OrderScope } from './order-scope';
 import type { OrderRow, OrderView } from './order-view';
 
+import type { PresentationCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 
 import type { OrderRepository } from '../ports/order-repository';
@@ -17,6 +18,8 @@ import type { OrderRepository } from '../ports/order-repository';
 export type GetOrderDeps = {
   readonly orders: OrderRepository;
   readonly recipes: RecipeCatalog;
+  /** Contrato PUBLICO de `inventario`: resuelve el nombre de la presentacion. */
+  readonly presentations: PresentationCatalog;
 };
 
 /**
@@ -38,6 +41,7 @@ export type GetOrderDeps = {
 export function toOrderView(
   row: OrderRow,
   recipeNames: ReadonlyMap<string, string>,
+  presentationNames: ReadonlyMap<string, string> = new Map(),
 ): OrderView {
   return {
     id: row.id,
@@ -56,6 +60,10 @@ export function toOrderView(
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
+    presentationId: row.presentationId,
+    // `null` si el pedido esta sin presentacion; la FK compuesta con RESTRICT hace imposible
+    // el caso «tiene id pero no vuelve del catalogo».
+    presentationName: row.presentationId === null ? null : presentationNames.get(row.presentationId) ?? null,
   };
 }
 
@@ -84,6 +92,15 @@ export function createGetOrder(
 
     const recipes = await deps.recipes.findRefsIncludingDeleted([row.recipeId], actor.companyId);
 
-    return toOrderView(row, new Map(recipes.map((recipe) => [recipe.id, recipe.name])));
+    const presentations =
+      row.presentationId === null
+        ? []
+        : await deps.presentations.findRefs([row.presentationId], actor.companyId);
+
+    return toOrderView(
+      row,
+      new Map(recipes.map((recipe) => [recipe.id, recipe.name])),
+      new Map(presentations.map((presentation) => [presentation.id, presentation.name])),
+    );
   };
 }

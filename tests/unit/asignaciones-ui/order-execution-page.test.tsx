@@ -64,6 +64,7 @@ const EXECUCION_MINIMA = {
   orderQuantity: '250',
   steps: [],
   lines: [],
+  presentationName: null,
 };
 
 function arbolDeLaPagina(id = 'order-1') {

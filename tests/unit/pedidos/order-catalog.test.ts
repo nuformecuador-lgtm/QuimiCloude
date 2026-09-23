@@ -30,9 +30,12 @@ const findFirst = vi.fn()
 const updateMany = vi.fn()
 vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { order: { findFirst, updateMany } } }))
 
-const { findAliveOrderTargetById, toOrderAssignmentTarget, transitionAliveOrder } = await import(
-  '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma'
-)
+const {
+  findAliveOrderTargetById,
+  toAssignedOrderSummary,
+  toOrderAssignmentTarget,
+  transitionAliveOrder,
+} = await import('@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma')
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -166,6 +169,34 @@ describe('toOrderAssignmentTarget', () => {
       'id',
       'status',
     ])
+  })
+})
+
+describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion', () => {
+  it('R27: copia presentationId tal cual, con y sin presentacion', () => {
+    const conPresentacion = toAssignedOrderSummary({
+      id: 'o-1',
+      orderYear: 2026,
+      orderSequence: 7,
+      recipeId: 'r-1',
+      quantity: { toFixed: () => '10.0000' },
+      priority: 'MEDIA',
+      status: 'PENDIENTE',
+      presentationId: 'p-1',
+    })
+    expect(conPresentacion.presentationId).toBe('p-1')
+
+    const sinPresentacion = toAssignedOrderSummary({
+      id: 'o-2',
+      orderYear: 2026,
+      orderSequence: 8,
+      recipeId: 'r-1',
+      quantity: { toFixed: () => '10.0000' },
+      priority: 'MEDIA',
+      status: 'PENDIENTE',
+      presentationId: null,
+    })
+    expect(sinPresentacion.presentationId).toBeNull()
   })
 })
 

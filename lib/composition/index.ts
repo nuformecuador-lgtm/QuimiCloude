@@ -93,10 +93,11 @@ import {
   listPresentations,
   replacePresentation,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-prisma';
+import { findPresentationRefs } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
-import type { ProductCatalog } from '@/lib/modules/inventario';
+import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
 import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
@@ -739,6 +740,8 @@ export const inventario = {
  *  llena. `recetas` solo conoce el TIPO `ProductCatalog`, nunca esta implementacion. */
 const productCatalog: ProductCatalog = { findRefs: findProductRefs, findCostingBatches };
 
+const presentationCatalog: PresentationCatalog = { findRefs: findPresentationRefs };
+
 /** `UnitCatalog` cableado con el adaptador driven DE UNIDADES (R50): `recetas` solo
  *  conoce el TIPO `UnitCatalog`, nunca esta implementacion. `findRefsSharingBaseInCompany`
  *  la estrena `asignaciones`, mas abajo. */
@@ -972,11 +975,17 @@ export const pedidos = {
     recipes: recipeCatalog,
     products: productCatalog,
     units: unitCatalog,
+    presentations: presentationCatalog,
   }),
-  getOrder: createGetOrder({ orders: orderRepository, recipes: recipeCatalog }),
+  getOrder: createGetOrder({
+    orders: orderRepository,
+    recipes: recipeCatalog,
+    presentations: presentationCatalog,
+  }),
   listOrders: createListOrders({
     orders: orderRepository,
     recipes: recipeCatalog,
+    presentations: presentationCatalog,
     log: pedidosListQueryLog,
   }),
   updateOrder: createUpdateOrder({
@@ -984,6 +993,7 @@ export const pedidos = {
     recipes: recipeCatalog,
     products: productCatalog,
     units: unitCatalog,
+    presentations: presentationCatalog,
   }),
   cancelOrder: createCancelOrder({ orders: orderRepository }),
   deleteOrder: createDeleteOrder({ orders: orderRepository }),
@@ -1117,6 +1127,7 @@ export const asignaciones = {
     orders: orderCatalog,
     recipes: recipeCatalog,
     people: peopleDirectory,
+    presentations: presentationCatalog,
     now: () => new Date(),
   }),
   // La pantalla de ejecucion. MISMO `orderCatalog`, `recipeCatalog` y
@@ -1128,6 +1139,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     units: unitCatalog,
     products: productCatalog,
+    presentations: presentationCatalog,
   }),
   startAssignedOrder: createStartAssignedOrder({
     assignments: orderAssignmentRepository,
@@ -1135,6 +1147,7 @@ export const asignaciones = {
     recipes: recipeCatalog,
     units: unitCatalog,
     products: productCatalog,
+    presentations: presentationCatalog,
     now: () => new Date(),
   }),
   finishAssignedOrder: createFinishAssignedOrder({

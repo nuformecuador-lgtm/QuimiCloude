@@ -57,6 +57,16 @@ const recipeIdSchema = z.string().uuid();
 const prioritySchema = z.enum(ORDER_PRIORITY_VALUES);
 
 /**
+ * La presentacion en que se entrega lo fabricado: aqui solo se valida la FORMA -un UUID-. La
+ * EXISTENCIA y que sea de la empresa de quien escribe las comprueba el caso de uso a traves
+ * del contrato publico `@/lib/modules/inventario`, nunca consultando su tabla.
+ *
+ * Obligatoria en el alta y heredada por la edicion: un pedido viejo sin presentacion se edita
+ * enviando una, sin rama especial.
+ */
+const presentationIdSchema = z.string().uuid();
+
+/**
  * Alta (R8, R9). Lo que este esquema NO declara, no puede llegar: no hay `status`, ni
  * `cancellationReason`, ni `orderYear`/`orderSequence`, ni `createdAt`, ni `createdBy` /
  * `updatedBy`. `z.object` DESCARTA las claves desconocidas, asi que un cliente que las envie
@@ -73,6 +83,7 @@ export const createOrderSchema = z.object({
   recipeId: recipeIdSchema,
   quantity: quantitySchema,
   priority: prioritySchema.default(DEFAULT_ORDER_PRIORITY),
+  presentationId: presentationIdSchema,
 });
 
 /**

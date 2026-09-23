@@ -107,6 +107,16 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   })),
 }));
 
+vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
+  listPresentationsAction: vi.fn(async () => ({
+    status: 'success' as const,
+    data: { items: [], page: 1, pageSize: 25, total: 0, totalPages: 1 },
+  })),
+  createPresentationAction: vi.fn(() => {
+    throw new Error('createPresentationAction no debe invocarse desde este archivo');
+  }),
+}));
+
 const RECETA = { id: '22222222-2222-4222-8222-222222222222', name: 'Esmalte azul', imageUrl: null };
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 const UNIDADES = [
@@ -160,6 +170,8 @@ function pedido(status: OrderStatus): OrderSummary {
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
+    presentationId: null,
+    presentationName: null,
   };
 }
 

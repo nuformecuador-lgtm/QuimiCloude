@@ -16,6 +16,8 @@ export type AssignedOrderExecutionView = {
   readonly orderQuantity: string;
   readonly steps: readonly RecipeStepView[];
   readonly lines: readonly ExecutionLineView[];
+  /** `null` = sin presentacion. Solo lectura: el Operador no tiene forma de cambiarla. */
+  readonly presentationName: string | null;
 };
 
 export type ExecutionLineView = {

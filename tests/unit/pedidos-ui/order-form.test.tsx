@@ -78,6 +78,7 @@ const {
   prohibida,
   listRecipesActionMock,
   getRecipeActionMock,
+  listPresentationsActionMock,
 } = vi.hoisted(() => {
   const noDebeInvocarse = (nombre: string) => () => {
     throw new Error(`${nombre} no debe invocarse desde el formulario`);
@@ -96,6 +97,7 @@ const {
     prohibida: noDebeInvocarse,
     listRecipesActionMock: vi.fn<(query: unknown) => Promise<RecipeListResult>>(),
     getRecipeActionMock: vi.fn<(id: string) => Promise<RecipeQueryResult>>(),
+    listPresentationsActionMock: vi.fn<(query: unknown) => Promise<unknown>>(),
   };
 });
 
@@ -146,6 +148,11 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   getRecipeAction: getRecipeActionMock,
 }));
 
+vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
+  listPresentationsAction: listPresentationsActionMock,
+  createPresentationAction: vi.fn(prohibida('createPresentationAction')),
+}));
+
 const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul', imageUrl: null };
 /** Segunda receta, esta CON imagen: es la que prueba que el marcador se sustituye (2026-09-08). */
 const RECETA_CON_IMAGEN = {
@@ -154,6 +161,9 @@ const RECETA_CON_IMAGEN = {
   imageUrl: 'https://ejemplo.test/barniz.png',
 };
 const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
+
+/** Presentacion del catalogo, ofrecida por `listPresentationsAction` en el selector del panel. */
+const PRESENTACION = { id: crypto.randomUUID(), name: 'Bidón 20L' };
 
 /** Cuatro decimales a proposito: es una cadena que ninguna coma flotante devuelve intacta (R39).
  *  Desde el 2026-09-07 la cantidad es el UNICO decimal del pedido, asi que es ella la que lleva
@@ -209,6 +219,8 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
+    presentationId: PRESENTACION.id,
+    presentationName: PRESENTACION.name,
     ...overrides,
   };
 }
@@ -229,6 +241,12 @@ async function elegirCatalogos(user: ReturnType<typeof setupUser>) {
   await user.click(await esperarInteractiva(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`)));
 }
 
+/** Elige la presentacion del catalogo que trae `listPresentationsAction`. */
+async function elegirPresentacion(user: ReturnType<typeof setupUser>) {
+  await user.click(screen.getByTestId('presentation-select'));
+  await user.click(await esperarInteractiva(await screen.findByTestId('presentation-option')));
+}
+
 /** El control de cantidad, tipado: sus asserts miran la CADENA del DOM, no `valueAsNumber`. */
 function cantidad(): HTMLInputElement {
   return screen.getByTestId('order-field-quantity') as HTMLInputElement;
@@ -236,6 +254,7 @@ function cantidad(): HTMLInputElement {
 
 async function rellenarAlta(user: ReturnType<typeof setupUser>) {
   await elegirCatalogos(user);
+  await elegirPresentacion(user);
   await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 }
 
@@ -248,6 +267,10 @@ beforeEach(() => {
   });
   updateOrderActionMock.mockResolvedValue({ status: 'success' });
   getRecipeActionMock.mockResolvedValue({ status: 'success', data: recetaDetalle() });
+  listPresentationsActionMock.mockResolvedValue({
+    status: 'success',
+    data: { items: [PRESENTACION], page: 1, pageSize: 25, total: 1, totalPages: 1 },
+  });
 });
 
 afterEach(() => {
@@ -399,6 +422,64 @@ describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
         expect(nombres, `«${prohibido}» no debe existir`).not.toContain(prohibido);
       }
     }
+  });
+});
+
+describe('la presentación del pedido (R16, R17, R18, R19)', () => {
+  it('R16: el alta ofrece el campo Presentación obligatorio', () => {
+    renderFormulario();
+
+    const campo = screen.getByTestId('presentation-select');
+    expect(campo).toBeInTheDocument();
+    expect(screen.getByTestId('presentation-value')).toBeRequired();
+  });
+
+  it('R17: el selector de presentación no ofrece crear', () => {
+    renderFormulario();
+
+    expect(screen.queryByTestId('presentation-create-open')).toBeNull();
+  });
+
+  it('R18: la edición precarga la presentación; sin presentación el campo arranca vacío y no guarda', async () => {
+    const user = setupUser();
+    const elPedido = pedido();
+    renderFormulario(elPedido);
+
+    expect(screen.getByTestId('presentation-value')).toHaveValue(elPedido.presentationId);
+
+    cleanup();
+    const sinPresentacion = pedido({ presentationId: null, presentationName: null });
+    renderFormulario(sinPresentacion);
+
+    const campo = screen.getByTestId('presentation-value') as HTMLInputElement;
+    expect(campo).toHaveValue('');
+    // El campo espejo conserva la validacion nativa de `required` (mismo primitivo que el
+    // selector de producto): el navegador bloquea el envio antes de que la action se invoque.
+    expect(campo.validity.valid).toBe(false);
+
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    expect(updateOrderActionMock).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it('R19: presentation_not_found se pinta junto al campo y conserva lo escrito', async () => {
+    const user = setupUser();
+    updateOrderActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'presentation_not_found',
+      message: 'La presentación no existe.',
+    });
+    renderFormulario(pedido());
+
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('presentation-select-error')).toBeInTheDocument();
+      expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
+    });
+    expect(cantidad().value).toBe(CANTIDAD);
+    expect(onSaved).not.toHaveBeenCalled();
   });
 });
 

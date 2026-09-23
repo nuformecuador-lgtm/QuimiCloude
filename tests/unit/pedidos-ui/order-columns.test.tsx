@@ -25,6 +25,7 @@ import {
   ORDER_PRIORITY_LABELS,
   ORDER_SKELETON_COLUMN_COUNT,
   ORDER_STATUS_LABELS,
+  PRESENTATION_NAME_COLUMN_ID,
   PRIORITY_COLUMN_ID,
   QUANTITY_COLUMN_ID,
   RESPONSIBLES_COLUMN_ID,
@@ -82,6 +83,8 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
+    presentationId: null,
+    presentationName: null,
     ...overrides,
   };
 }
@@ -100,20 +103,21 @@ afterEach(() => {
 // QC-35bis (2026-09-07): eran DIEZ. La unidad y el precio unitario salieron del pedido -de la
 // tabla `orders` hacia arriba-, asi que sus dos columnas ya no tienen dato que pintar y la lista
 // acordada baja a ocho. Sigue siendo cerrada y en el orden de `design.md > 7`.
-describe('las columnas declaradas son exactamente las nueve acordadas (R8)', () => {
-  it('en positivo: los nueve ids, en el orden de `design.md > 7`', () => {
+describe('las columnas declaradas son exactamente las diez acordadas (R8, R20)', () => {
+  it('en positivo: los diez ids, en el orden de `design.md > 7`', () => {
     expect(ORDER_COLUMNS.map((column) => column.id)).toEqual([
       ORDER_NUMBER_COLUMN_ID,
       STATUS_COLUMN_ID,
       PRIORITY_COLUMN_ID,
       RECIPE_NAME_COLUMN_ID,
       QUANTITY_COLUMN_ID,
+      PRESENTATION_NAME_COLUMN_ID,
       CREATED_AT_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
       RESPONSIBLES_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
-    expect(ORDER_COLUMNS).toHaveLength(9);
+    expect(ORDER_COLUMNS).toHaveLength(10);
   });
 
   it('en negativo: ninguna columna es `total`, `createdBy`, `updatedBy`, unidad ni precio', () => {
@@ -155,6 +159,7 @@ describe('solo cuatro columnas ordenan, y son las de la lista blanca menos la no
     expect(noOrdenables).toEqual([
       RECIPE_NAME_COLUMN_ID,
       QUANTITY_COLUMN_ID,
+      PRESENTATION_NAME_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
       RESPONSIBLES_COLUMN_ID,
       ACTIONS_COLUMN_ID,
@@ -289,6 +294,35 @@ describe('la cantidad se pinta REDONDEADA A DOS DECIMALES (enmienda del 2026-09-
   });
 });
 
+describe('R20: la columna Presentación pinta el nombre o Sin presentación', () => {
+  it('con presentación informada se pinta su nombre', () => {
+    const { container } = pintarCelda(
+      PRESENTATION_NAME_COLUMN_ID,
+      pedido({ presentationId: 'p-1', presentationName: 'Bidón 20L' }),
+    );
+
+    expect(container.textContent).toBe('Bidón 20L');
+  });
+
+  it('sin presentación se pinta «Sin presentación»', () => {
+    const { container } = pintarCelda(
+      PRESENTATION_NAME_COLUMN_ID,
+      pedido({ presentationId: null, presentationName: null }),
+    );
+
+    expect(container.textContent).toBe('Sin presentación');
+  });
+});
+
+describe('R21: Presentación no ordena ni filtra', () => {
+  it('la columna no declara `sortable` ni `filter`', () => {
+    const columna = ORDER_COLUMNS.find((c) => c.id === PRESENTATION_NAME_COLUMN_ID);
+
+    expect(columna?.sortable).not.toBe(true);
+    expect(columna?.filter).toBeUndefined();
+  });
+});
+
 describe('estado y prioridad se leen como etiqueta, no como valor crudo del enum (R8)', () => {
   it('cada estado del contrato tiene su etiqueta legible', () => {
     pintarCelda(STATUS_COLUMN_ID, pedido({ status: 'EN_CURSO' }));
@@ -323,7 +357,7 @@ describe('la tabla de pedidos no pinta el importe (R18)', () => {
     const ids = ORDER_COLUMNS.map((column) => column.id);
     expect(ids).not.toContain('ingredientsCost');
     expect(ids).not.toContain('importe');
-    expect(ids).toHaveLength(9);
+    expect(ids).toHaveLength(10);
 
     const VALOR_DELATOR = '999999.9999';
     const order = pedido({ ingredientsCost: VALOR_DELATOR });
@@ -333,6 +367,7 @@ describe('la tabla de pedidos no pinta el importe (R18)', () => {
       PRIORITY_COLUMN_ID,
       RECIPE_NAME_COLUMN_ID,
       QUANTITY_COLUMN_ID,
+      PRESENTATION_NAME_COLUMN_ID,
       CREATED_AT_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
     ];

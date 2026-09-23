@@ -20,6 +20,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
+import { normalizePresentationName } from '@/lib/modules/inventario';
 import { findAliveOrderTargetById } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import {
   cancelAliveOrder,
@@ -51,11 +52,16 @@ type Empresa = {
   readonly userId: string;
   readonly roleId: string;
   readonly documentTypeCode: string;
+  /** QC-146: presentacion de la MISMA empresa, obligatoria en toda alta por el adaptador. */
+  readonly presentationId: string;
   /** En orden de siembra. Los casos los toman por indice. */
   readonly pedidos: string[];
 };
 
 let recetaId: string;
+/** Unidad de SISTEMA compartida: `presentations.unit_id` es obligatoria y una unidad no tiene
+ *  que ser de una empresa concreta para servir a las cuatro presentaciones de este archivo. */
+let unitId: string;
 
 /** Tres pedidos vivos, uno con borrado logico (4) y uno cancelado (5). */
 let A: Empresa;
@@ -105,11 +111,21 @@ async function sembrarEmpresa(etiqueta: string): Promise<Empresa> {
     },
     select: { id: true },
   });
+  const presentation = await prisma.presentation.create({
+    data: {
+      name: `Bidon ${marca}`,
+      nameNormalized: normalizePresentationName(`Bidon ${marca}`),
+      unitId,
+      companyId: company.id,
+    },
+    select: { id: true },
+  });
   return {
     companyId: company.id,
     userId: user.id,
     roleId: role.id,
     documentTypeCode: documentType.code,
+    presentationId: presentation.id,
     pedidos: [],
   };
 }
@@ -147,7 +163,7 @@ async function sembrarPedido(empresa: Empresa, datos: SiembraDePedido): Promise<
   return id;
 }
 
-function pedidoNuevo(overrides: Partial<NewOrder> = {}): NewOrder {
+function pedidoNuevo(overrides: Partial<NewOrder> & { readonly presentationId: string }): NewOrder {
   return {
     recipeId: recetaId,
     quantity: '7.0000',
@@ -159,13 +175,27 @@ function pedidoNuevo(overrides: Partial<NewOrder> = {}): NewOrder {
 
 /** Alta por el adaptador REAL: la transaccion, el lock y el `max()+1` son los de produccion. */
 async function alta(empresa: Empresa): Promise<OrderRow> {
-  const resultado = await createOrder(pedidoNuevo(), ANO, empresa.userId, new Date(), null, ambitoDe(empresa));
+  const resultado = await createOrder(
+    pedidoNuevo({ presentationId: empresa.presentationId }),
+    ANO,
+    empresa.userId,
+    new Date(),
+    null,
+    ambitoDe(empresa),
+  );
   if (resultado === 'duplicate_number') throw new Error('el alta devolvio duplicate_number');
   empresa.pedidos.push(resultado.id);
   return resultado;
 }
 
 beforeAll(async () => {
+  const marcaUnidad = token();
+  const unit = await prisma.unit.create({
+    data: { name: `Unidad ${marcaUnidad}`, nameNormalized: `unidad${marcaUnidad}`, symbol: `kg${marcaUnidad}` },
+    select: { id: true },
+  });
+  unitId = unit.id;
+
   A = await sembrarEmpresa('A');
   B = await sembrarEmpresa('B');
   C = await sembrarEmpresa('C');
@@ -224,12 +254,18 @@ afterAll(async () => {
     await prisma.order.deleteMany({ where: { companyId: empresa.companyId } });
   }
   if (recetaId !== undefined) await prisma.recipe.deleteMany({ where: { id: recetaId } });
+  // Las presentaciones DESPUES de borrar los pedidos (arriba) y ANTES que las empresas:
+  // `orders_company_id_presentation_id_fkey` y `presentations_company_id_fkey` son RESTRICT.
+  for (const empresa of empresas) {
+    await prisma.presentation.deleteMany({ where: { id: empresa.presentationId } });
+  }
   for (const empresa of empresas) {
     await prisma.user.deleteMany({ where: { id: empresa.userId } });
     await prisma.role.deleteMany({ where: { id: empresa.roleId } });
     await prisma.documentType.deleteMany({ where: { code: empresa.documentTypeCode } });
     await prisma.company.deleteMany({ where: { id: empresa.companyId } });
   }
+  if (unitId !== undefined) await prisma.unit.deleteMany({ where: { id: unitId } });
   await prisma.$disconnect();
 });
 
@@ -400,7 +436,7 @@ describe('R21 — findAliveById / updateAlive / cancelAlive / softDeleteAlive co
 
     const resultado = await updateAliveOrder(
       ajeno,
-      pedidoNuevo({ quantity: '1.0000' }),
+      pedidoNuevo({ quantity: '1.0000', presentationId: A.presentationId }),
       A.userId,
       new Date(),
       null,
@@ -418,7 +454,7 @@ describe('R21 — findAliveById / updateAlive / cancelAlive / softDeleteAlive co
 
     const resultado = await updateAliveOrder(
       propio,
-      pedidoNuevo({ quantity: '921.0000', priority: 'CRITICA', status: 'EN_CURSO' }),
+      pedidoNuevo({ quantity: '921.0000', priority: 'CRITICA', status: 'EN_CURSO', presentationId: B.presentationId }),
       B.userId,
       new Date(),
       null,
@@ -564,7 +600,7 @@ async function retrato(empresa: Empresa, ajena: Empresa): Promise<string> {
   const catalogoAjeno = await findAliveOrderTargetById(ajena.pedidos[0] ?? '', empresa.companyId);
   const escrituraAjena = await updateAliveOrder(
     ajena.pedidos[0] ?? '',
-    pedidoNuevo({ quantity: '2.0000' }),
+    pedidoNuevo({ quantity: '2.0000', presentationId: empresa.presentationId }),
     empresa.userId,
     new Date(),
     null,

@@ -38,12 +38,13 @@ import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
-import type { ProductCatalog } from '@/lib/modules/inventario'
+import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222'
+const PRESENTATION_ID = '66666666-6666-4666-8666-666666666666'
 
 const CONSULTAR = 'pedidos.consultar'
 const MODIFICAR = 'pedidos.modificar'
@@ -51,6 +52,7 @@ const MODIFICAR = 'pedidos.modificar'
 const ENTRADA_ALTA = {
   recipeId: RECIPE_ID,
   quantity: '10.0000',
+  presentationId: PRESENTATION_ID,
 }
 const ENTRADA_EDICION = { ...ENTRADA_ALTA, status: 'EN_CURSO' }
 
@@ -92,6 +94,11 @@ function dobles() {
     findRefsSharingBaseInCompany: explota('units.findRefsSharingBaseInCompany'),
   } as unknown as UnitCatalog
 
+  // R12: el catalogo de presentaciones tampoco puede tocarse sin autorizacion.
+  const presentations = {
+    findRefs: explota('presentations.findRefs'),
+  } as unknown as PresentationCatalog
+
   // QC-57 (R34): el log del campo omitido tampoco puede sonar sin autorizacion.
   // `requirePermission` va antes de zod y antes de sanear, asi que un actor rechazado no llega
   // ni a saber que su consulta traia campos no declarados.
@@ -103,10 +110,11 @@ function dobles() {
       ...Object.values(recipes as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(products as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(units as unknown as Record<string, ReturnType<typeof vi.fn>>),
+      ...Object.values(presentations as unknown as Record<string, ReturnType<typeof vi.fn>>),
       ...Object.values(log as unknown as Record<string, ReturnType<typeof vi.fn>>),
     ] as readonly ReturnType<typeof vi.fn>[]
 
-  return { orders, recipes, products, units, log, llamadas }
+  return { orders, recipes, products, units, presentations, log, llamadas }
 }
 
 /** Los dobles de la invocacion en curso. Se renuevan en CADA caso para que el contador de uno
@@ -119,6 +127,7 @@ function depsDeTurno() {
     recipes: enCurso.recipes,
     products: enCurso.products,
     units: enCurso.units,
+    presentations: enCurso.presentations,
     log: enCurso.log,
   }
 }
@@ -297,6 +306,18 @@ describe('QC-74 — falla cerrado (R14)', () => {
       esperaRechazo(error, llamadas, nombre)
     }
   })
+})
+
+describe('R12: alta y edicion rechazan sin pedidos.modificar antes del catalogo de presentaciones', () => {
+  const CON_PRESENTACION = SEIS.filter(([nombre]) => ['createOrder', 'updateOrder'].includes(nombre))
+
+  for (const [nombre, , invocacion] of CON_PRESENTACION) {
+    it(`R12: ${nombre} sin pedidos.modificar rechaza con unauthorized y no llama a presentations.findRefs`, async () => {
+      const { error, llamadas } = await ejecutar(invocacion, actorCon('otro.permiso'))
+      esperaRechazo(error, llamadas, nombre)
+      expect(enCurso.presentations.findRefs).not.toHaveBeenCalled()
+    })
+  }
 })
 
 describe('QC-74 — la autorizacion va ANTES de la validacion (R12)', () => {

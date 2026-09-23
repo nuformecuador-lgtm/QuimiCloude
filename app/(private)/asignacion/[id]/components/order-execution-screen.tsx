@@ -2,6 +2,7 @@
 
 import { useActionState, useRef } from 'react';
 
+import { OrderPresentationLabel } from '@/components/shared/order-presentation-label';
 import { StepReader } from '@/components/shared/step-reader';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import type { AssignedOrderExecutionView } from '@/lib/modules/asignaciones';
@@ -31,6 +32,7 @@ export const ORDER_EXECUTION_ORDER_ID_FIELD = 'orderId';
 export const ORDER_EXECUTION_TITLE_TESTID = 'order-execution-title';
 export const ORDER_EXECUTION_RECIPE_NAME_TESTID = 'order-execution-recipe-name';
 export const ORDER_EXECUTION_ORDER_QUANTITY_TESTID = 'order-execution-order-quantity';
+export const ORDER_EXECUTION_PRESENTATION_TESTID = 'order-execution-presentation';
 
 const RECIPE_MISSING_TEXT = 'Esta receta esta dada de baja.';
 const ORDER_QUANTITY_LABEL = 'Pedido';
@@ -71,6 +73,10 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
         data-testid={ORDER_EXECUTION_RECIPE_NAME_TESTID}
       >
         {execution.recipeName ?? RECIPE_MISSING_TEXT}
+      </p>
+
+      <p className="text-base text-muted-foreground" data-testid={ORDER_EXECUTION_PRESENTATION_TESTID}>
+        Presentación: <OrderPresentationLabel name={execution.presentationName} />
       </p>
 
       <OrderExecutionLines lines={execution.lines} />
