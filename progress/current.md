@@ -18,6 +18,10 @@
 
 ## Evaluaciones
 
+### QC-140 - F1.0 (2026-09-23)
+
+`zone: fullstack` sin partir, `complexity: high` (ya evaluada al acotar). Dependencias QC-44, QC-52 y QC-57 `done`. Cupo `fullstack` 3 de 3 con QC-141 y QC-151. Worktree desde `origin/dev`. F1.2 lanzado con las 5 preguntas abiertas de la semilla: el humano las deja para F1.4. **Base propia obligatoria en F2** (`QuimiCloude_QC140`).
+
 ### QC-151 - CREADA al acotar QC-122 y ACOTADA con `/afinar-feature` (2026-09-23)
 
 `fullstack`, **`complexity: medium`** (label en Jira). **9 decisiones cerradas, cero abiertas** en `specs/QC-151-cotizacion-del-coste-en-el-pedido/requirements.md`. Cupo `fullstack` 2 de 3 (QC-121, QC-141). Worktree montado. **F1.2 y F1.3 hechos**: R1-R22, T1-T8, 1 pregunta abierta (que se ve si la cotizacion falla); tarjeta en *En revision*. **F1.4 APROBADO el 2026-09-23 por chat**: si la cotizacion falla se pinta el mensaje del error. **EXCEPCION HUMANA A LA REGLA DE PARALELISMO**: arranca YA pese a solapar con QC-141 (quien mergee segundo resuelve el conflicto de texto). Solapa con QC-141 en `lib/composition/index.ts`, `lib/modules/pedidos/index.ts`, `order-form.tsx` y su test.
