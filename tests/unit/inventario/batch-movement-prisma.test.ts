@@ -18,6 +18,8 @@ const { writeMovement, findBatchMovements } = await import(
   '@/lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma'
 );
 
+import { Prisma } from '@prisma/client';
+
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 
 const EMPRESA = '11111111-1111-4111-8111-111111111111';
@@ -88,7 +90,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
       {
         id: 'movimiento-2',
         kind: 'adjustment',
-        quantity: -3,
+        quantity: new Prisma.Decimal(-3),
         reason: 'merma',
         createdBy: ACTOR_ID,
         createdAt: new Date('2026-09-17T14:00:00.000Z'),
@@ -96,7 +98,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
       {
         id: 'movimiento-1',
         kind: 'opening',
-        quantity: 10,
+        quantity: new Prisma.Decimal(10),
         reason: null,
         createdBy: ACTOR_ID,
         createdAt: AHORA,

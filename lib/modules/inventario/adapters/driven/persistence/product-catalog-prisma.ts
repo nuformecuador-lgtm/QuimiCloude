@@ -56,12 +56,13 @@ async function findAliveProducts(
   ids: readonly ProductId[],
   scope: InventoryScope,
 ): Promise<readonly ProductStockRow[]> {
-  return prisma.product.findMany({
+  const rows = await prisma.product.findMany({
     where: {
       AND: [productCompanyScope(scope), { id: { in: [...ids] }, deletedAt: null }],
     },
     select: { id: true, name: true, stock: true, unitId: true },
   });
+  return rows.map((row) => ({ ...row, stock: row.stock.toNumber() }));
 }
 
 export async function findProductRefs(
@@ -102,7 +103,7 @@ export function toCostingBatch(row: CostingBatchRow): CostingBatch {
   return {
     productId: row.productId,
     lot: row.lot,
-    stock: row.stock,
+    stock: row.stock.toNumber(),
     unitCost: row.unitCost.toFixed(4),
     unitId: row.presentation.unitId,
     purchaseDate: toCivilDate(row.purchaseDate),

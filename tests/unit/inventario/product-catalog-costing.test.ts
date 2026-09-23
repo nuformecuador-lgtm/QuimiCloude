@@ -22,7 +22,7 @@ describe('toCostingBatch', () => {
     const batch = toCostingBatch({
       productId: 'p-1',
       lot: 'L-7',
-      stock: 12,
+      stock: new Prisma.Decimal(12),
       unitCost: new Prisma.Decimal('3.5'),
       purchaseDate: new Date('2026-03-04T00:00:00.000Z'),
       presentation: { unitId: 'kg' },

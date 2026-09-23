@@ -54,9 +54,9 @@ export function toProductView(row: ProductRow): ProductView {
     id: row.id,
     name: row.name,
     imagePath: row.imagePath,
-    stock: row.stock,
+    stock: row.stock.toNumber(),
     unitId: row.unitId,
-    qtyAlert: row.qtyAlert,
+    qtyAlert: row.qtyAlert === null ? null : row.qtyAlert.toNumber(),
     type: row.type as ProductType,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -307,7 +307,7 @@ async function recalculateProductStock(
   });
 
   const stock = singleUnitStock(
-    rows.map((row) => ({ stock: row.stock, unitId: row.presentation.unitId })),
+    rows.map((row) => ({ stock: row.stock.toNumber(), unitId: row.presentation.unitId })),
   );
 
   await tx.$executeRaw(Prisma.sql`
@@ -676,7 +676,7 @@ function toBatchView(row: BatchViewRow): ProductBatchView {
   return {
     id: row.id,
     lot: row.lot,
-    stock: row.stock,
+    stock: row.stock.toNumber(),
     unitId: row.presentation.unitId,
     purchaseDate: toCivilDate(row.purchaseDate),
     expiryDate: row.expiryDate === null ? null : toCivilDate(row.expiryDate),
@@ -753,7 +753,7 @@ export async function adjustBatchStock(
 
       await recalculateProductStock(tx, product.id, scope);
 
-      return { stock: updated.stock };
+      return { stock: updated.stock.toNumber() };
     });
   } catch (error) {
     if (isBatchNotFound(error)) return null;

@@ -163,7 +163,7 @@ async function stockOf(productId: string): Promise<number> {
     where: { id: productId },
     select: { stock: true },
   });
-  return product.stock;
+  return product.stock.toNumber();
 }
 
 afterAll(async () => {
@@ -249,8 +249,8 @@ describe('R1, R8, R9 — el alta fija la unidad del producto y guarda la suma de
         select: { stock: true, expiryDate: true },
         orderBy: { stock: 'asc' },
       });
-      expect(lotes.map((lote) => lote.stock)).toEqual([4, 7]);
-      const vencido = lotes.find((lote) => lote.stock === 7);
+      expect(lotes.map((lote) => lote.stock.toNumber())).toEqual([4, 7]);
+      const vencido = lotes.find((lote) => lote.stock.toNumber() === 7);
       expect(vencido?.expiryDate).not.toBeNull();
       expect(vencido?.expiryDate?.getTime()).toBeLessThan(Date.now());
 

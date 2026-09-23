@@ -418,7 +418,7 @@ test.describe('ajuste de existencia de un lote', () => {
 
     await openBatchesPanel(page);
 
-    const overshoot = -(stockBefore + 1);
+    const overshoot = -(stockBefore.toNumber() + 1);
     await fillAdjustDialog(page, overshoot);
     await page.getByTestId('adjust-batch-confirm').click();
 

@@ -189,8 +189,8 @@ async function assertLedgerBalances(batchId: string): Promise<void> {
     where: { batchId },
     select: { quantity: true },
   });
-  const sumOfMovements = movements.reduce((total, movement) => total + movement.quantity, 0);
-  expect(batch.stock).toBe(sumOfMovements);
+  const sumOfMovements = movements.reduce((total, movement) => total + movement.quantity.toNumber(), 0);
+  expect(batch.stock.toNumber()).toBe(sumOfMovements);
 }
 
 /** Lote fabricado sin pasar por el repositorio: simula uno anterior al libro, sin ningun asiento. */

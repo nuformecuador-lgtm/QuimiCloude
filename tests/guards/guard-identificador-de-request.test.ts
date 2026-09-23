@@ -238,6 +238,10 @@ export const MIGRACIONES_ESPERADAS = [
   // terminados.consultar no persiste el identificador de peticion ni lo menciona; se nombra aqui
   // a mano y la lista sigue CERRADA para la siguiente.
   '20260922120000_packer_role',
+  // Ninguna de las dos toca el identificador de peticion: una anade un valor a un enum, la otra
+  // cambia el tipo de columnas de existencia y crea el libro de reservas.
+  '20260922160000_inventory_movement_kind_consumption',
+  '20260922160100_reservations_and_decimal_stock',
 ] as const
 
 export function hallazgosDeMigraciones(

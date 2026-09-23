@@ -170,7 +170,7 @@ const PRODUCT_BUSINESS_FIELDS: ReadonlyArray<readonly [string, string]> = [
   ['imagePath', 'image_path'],
 ]
 
-const INTEGER_FIELDS = ['qtyAlert'] as const
+const DECIMAL_FIELDS = ['qtyAlert'] as const
 
 /** Opcionales: la ausencia de valor no puede convertirse en cero ni en cadena vacia. */
 const OPTIONAL_FIELDS = ['qtyAlert', 'imagePath'] as const
@@ -232,10 +232,9 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(field(presentation, 'nameNormalized').attributes).not.toMatch(/@unique/)
   })
 
-  // 2026-09-18 (QC-92): el censo pasa de tres modelos a cuatro. `InventoryMovement` (R1) es
-  // el historial de ajustes del lote y nace con dueno `inventario`. El titulo anterior decia
-  // «exactamente dos modelos nuevos» y ya era mentira antes de esta ficha.
-  it('el esquema declara exactamente cuatro modelos del modulo inventario', () => {
+  // El censo paso de tres modelos a cuatro con `InventoryMovement` y de cuatro a cinco con
+  // `ReservationMovement`, el libro de lo apartado por pedido.
+  it('el esquema declara exactamente cinco modelos del modulo inventario', () => {
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
       .map((match) => match[1])
       .filter((name): name is string => name !== undefined)
@@ -252,8 +251,9 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       'Presentation',
       'Product',
       'ProductBatch',
+      'ReservationMovement',
     ])
-    expect(inventarioModels).toHaveLength(4)
+    expect(inventarioModels).toHaveLength(5)
 
     for (const owned of ['DocumentType', 'Role', 'User']) {
       expect(modelNames, `el modelo ${owned} no debe desaparecer`).toContain(owned)
@@ -267,7 +267,8 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
 
   it('QC-121 R8, R12: Product vuelve a declarar stock, guardado por la aplicacion', () => {
     const stock = field(product, 'stock')
-    expect(stock.type).toBe('Int')
+    expect(stock.type, 'stock es decimal exacto, nunca entero ni coma flotante').toBe('Decimal')
+    expect(stock.attributes).toMatch(/@db\.Decimal\(14,\s*4\)/)
     expect(stock.isOptional).toBe(false)
     expect(stock.attributes).toMatch(/@default\(0\)/)
     // El indice parcial no lo modela Prisma: vive en la migracion, no aqui (R12).
@@ -341,7 +342,8 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(presentationId.attributes).toContain('@map("presentation_id")')
 
     const stock = field(productBatch, 'stock')
-    expect(stock.type).toBe('Int')
+    expect(stock.type).toBe('Decimal')
+    expect(stock.attributes).toMatch(/@db\.Decimal\(14,\s*4\)/)
     expect(stock.isOptional).toBe(false)
 
     const unitCost = field(productBatch, 'unitCost')
@@ -426,15 +428,15 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(imagePath.attributes).not.toMatch(/@db\./)
   })
 
-  it('qtyAlert es Int', () => {
-    for (const name of INTEGER_FIELDS) {
+  it('qtyAlert es Decimal(14,4), como stock', () => {
+    for (const name of DECIMAL_FIELDS) {
       const candidate = field(product, name)
-      expect(candidate.type, `Product.${name} debe ser Int`).toBe('Int')
-      expect(candidate.attributes, `Product.${name} no debe declarar tipo nativo`).not.toMatch(
-        /@db\.(Decimal|Money|Real|DoublePrecision)/,
+      expect(candidate.type, `Product.${name} debe ser Decimal`).toBe('Decimal')
+      expect(candidate.attributes, `Product.${name} debe declarar decimal(14,4)`).toMatch(
+        /@db\.Decimal\(14,\s*4\)/,
       )
     }
-    expect(INTEGER_FIELDS).toHaveLength(1)
+    expect(DECIMAL_FIELDS).toHaveLength(1)
   })
 
   it('en el esquema no hay ningun Float, y el producto ya no declara ningun importe', () => {
@@ -486,7 +488,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
   it('no hay ninguna columna derivada de bajo de existencias ni relacion entre qtyAlert y stock', () => {
     // `qtyAlert` solo se almacena: nada de columna calculada ni estado derivado.
     const qtyAlert = field(product, 'qtyAlert')
-    expect(qtyAlert.type).toBe('Int')
+    expect(qtyAlert.type).toBe('Decimal')
     expect(qtyAlert.isOptional).toBe(true)
     expect(qtyAlert.attributes).not.toMatch(/@default\(/)
     // Una columna generada seria justo el derivado prohibido.
@@ -633,10 +635,9 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     }
   })
 
-  // 2026-09-18 (QC-92): son cuatro desde que `InventoryMovement` (R1) entro al modulo. Un
-  // modelo sin `/// @module` es un hallazgo de la guardia de arquitectura, asi que el nuevo
-  // se cita por nombre igual que sus tres hermanos.
-  it('los cuatro modelos declaran /// @module inventario', () => {
+  // Un modelo sin `/// @module` es un hallazgo de la guardia de arquitectura, asi que cada uno
+  // se cita por nombre.
+  it('los cinco modelos declaran /// @module inventario', () => {
     // Texto crudo: `stripComments` se lleva justo lo que aqui hay que comprobar.
     const owners = new Map<string, string>()
     for (const match of rawSchema.matchAll(/\/\/\/\s*@module\s+(\S+)\s*\n\s*model\s+(\w+)\s*\{/g)) {
@@ -648,6 +649,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(owners.get('Product')).toBe('inventario')
     expect(owners.get('ProductBatch')).toBe('inventario')
     expect(owners.get('InventoryMovement')).toBe('inventario')
+    expect(owners.get('ReservationMovement')).toBe('inventario')
 
     const inventarioModels = [...owners.entries()]
       .filter(([, moduleName]) => moduleName === 'inventario')
@@ -658,6 +660,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       'Presentation',
       'Product',
       'ProductBatch',
+      'ReservationMovement',
     ])
     expect(owners.get('User')).toBe('identity')
     expect(owners.get('Role')).toBe('identity')
@@ -921,10 +924,11 @@ describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batch
     expect(presentation.body).not.toMatch(/\bProduct\b\[?\]?\s/)
   })
 
-  it('R28: ProductBatch conserva stock y unitCost con su forma, y esta ficha no los toca', () => {
+  it('R28: ProductBatch conserva unitCost con su forma; stock paso de entero a decimal(14,4)', () => {
     // Se fija la forma de las columnas que guardan valor: un cambio de tipo no altera el censo.
     const stock = field(productBatch, 'stock')
-    expect(stock.type, 'stock sigue siendo Int (entero, sin parte decimal)').toBe('Int')
+    expect(stock.type, 'stock es decimal exacto, nunca entero ni coma flotante').toBe('Decimal')
+    expect(stock.attributes).toMatch(/@db\.Decimal\(14,\s*4\)/)
     expect(stock.isOptional).toBe(false)
 
     const unitCost = field(productBatch, 'unitCost')

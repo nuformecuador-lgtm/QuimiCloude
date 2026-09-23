@@ -187,8 +187,8 @@ describe('createWithFirstBatch — unidad del producto y recalculo (QC-121, R1, 
 
   it('recalcula stock DESPUES del asiento del lote, sumando de los lotes del producto', async () => {
     doble.batchFindMany.mockResolvedValue([
-      { stock: 4, presentation: { unitId: UNIDAD_ID } },
-      { stock: 6, presentation: { unitId: UNIDAD_ID } },
+      { stock: new Prisma.Decimal(4), presentation: { unitId: UNIDAD_ID } },
+      { stock: new Prisma.Decimal(6), presentation: { unitId: UNIDAD_ID } },
     ]);
 
     await createWithFirstBatch(PRODUCTO, LOTE_GENERADO, AHORA, AMBITO);

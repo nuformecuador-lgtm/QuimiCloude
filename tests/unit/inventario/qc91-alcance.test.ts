@@ -444,10 +444,11 @@ describe('QC-91 R11 — ProductRef expone stockByUnit; ProductView expone la exi
 // tener un `update` -esta guardia no fija ese estado-, solo que si hay uno en el archivo, no
 // puede estar en ningun otro sitio.
 describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ninguna fila de lote', () => {
-  it('R21: product_batches.stock sigue intacto en el esquema', () => {
+  it('R21: product_batches.stock sigue siendo la existencia del lote, ahora decimal(14,4)', () => {
     const cuerpo = cuerpoDeModelo(leer(SCHEMA), 'ProductBatch');
     expect(cuerpo, 'el modelo ProductBatch no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
-    expect(cuerpo).toMatch(/\bstock\s+Int\b/);
+    expect(cuerpo).toMatch(/\bstock\s+Decimal\b/);
+    expect(cuerpo).toMatch(/@db\.Decimal\(14,\s*4\)/);
   });
 
   it('R21: product-prisma.ts no borra, reemplaza en bloque ni multiplica filas de product_batches', () => {

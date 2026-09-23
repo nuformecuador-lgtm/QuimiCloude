@@ -153,7 +153,7 @@ describe('R12 — el alta deja su asiento de apertura en la misma transaccion', 
 
 describe('adjustBatchStock (R1, R2, R4, R6, R7, R18) — increment relativo mas su asiento, en una tx', () => {
   it('R2, R7: un delta positivo suma sobre lo que la base tenga, y el asiento queda como ajuste', async () => {
-    doble.batchUpdate.mockResolvedValueOnce({ stock: 15 });
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal(15) });
 
     await expect(adjustBatchStock(LOTE_ID, 5, 'conteo_fisico', ACTOR_ID, AHORA, AMBITO)).resolves.toEqual({
       stock: 15,
@@ -178,7 +178,7 @@ describe('adjustBatchStock (R1, R2, R4, R6, R7, R18) — increment relativo mas 
   });
 
   it('R2, R7: un delta negativo resta sobre lo que la base tenga', async () => {
-    doble.batchUpdate.mockResolvedValueOnce({ stock: 6 });
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal(6) });
 
     await expect(adjustBatchStock(LOTE_ID, -4, 'merma', ACTOR_ID, AHORA, AMBITO)).resolves.toEqual({
       stock: 6,
@@ -214,7 +214,7 @@ describe('adjustBatchStock (R1, R2, R4, R6, R7, R18) — increment relativo mas 
   });
 
   it('R6: si el asiento falla, el ajuste entero se rechaza -no queda el ajuste sin su asiento-', async () => {
-    doble.batchUpdate.mockResolvedValueOnce({ stock: 15 });
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal(15) });
     const fallo = new Error('la base rechazo el INSERT del asiento');
     doble.movementCreate.mockRejectedValueOnce(fallo);
 
@@ -243,7 +243,7 @@ describe('adjustBatchStock (R1, R2, R4, R6, R7, R18) — increment relativo mas 
 
 describe('adjustBatchStock — bloqueo del producto y recalculo de stock (QC-121, R29, R31, R32)', () => {
   it('bloquea la fila del PRODUCTO -no la del lote- antes de tocar nada, con la empresa en el where', async () => {
-    doble.batchUpdate.mockResolvedValueOnce({ stock: 15 });
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal(15) });
 
     await adjustBatchStock(LOTE_ID, 5, 'conteo_fisico', ACTOR_ID, AHORA, AMBITO);
 
@@ -258,9 +258,9 @@ describe('adjustBatchStock — bloqueo del producto y recalculo de stock (QC-121
   });
 
   it('recalcula DESPUES del asiento, y la unica columna que escribe en products es stock (R32)', async () => {
-    doble.batchUpdate.mockResolvedValueOnce({ stock: 15 });
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal(15) });
     doble.batchFindMany.mockResolvedValueOnce([
-      { stock: 15, presentation: { unitId: '77777777-7777-4777-8777-777777777777' } },
+      { stock: new Prisma.Decimal(15), presentation: { unitId: '77777777-7777-4777-8777-777777777777' } },
     ]);
 
     await adjustBatchStock(LOTE_ID, 5, 'conteo_fisico', ACTOR_ID, AHORA, AMBITO);
@@ -280,7 +280,7 @@ describe('adjustBatchStock — bloqueo del producto y recalculo de stock (QC-121
   });
 
   it('si el recalculo lanza, el ajuste se rechaza en vez de darse por bueno (R29)', async () => {
-    doble.batchUpdate.mockResolvedValueOnce({ stock: 15 });
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal(15) });
     const fallo = new Error('mezcla de unidades');
     doble.batchFindMany.mockRejectedValueOnce(fallo);
 
