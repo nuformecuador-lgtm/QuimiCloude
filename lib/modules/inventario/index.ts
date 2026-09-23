@@ -105,6 +105,8 @@ export type {
   OrderCoverage,
   MaterialReservations,
   ReservationQueries,
+  OrderNumberDirectory,
+  BatchHistoryEntry,
 } from './domain/reservation';
 export { planReservation } from './domain/plan-reservation';
 export type {

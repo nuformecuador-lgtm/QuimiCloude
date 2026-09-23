@@ -684,7 +684,7 @@ describe('R18 — adjustBatchStock / findBatchesOfAliveProduct / findBatchMoveme
 
     const resultado = await adjustBatchStock(propio, String(delta), 'conteo_fisico', B.userId, new Date(), ambitoDe(B));
 
-    expect(resultado).toEqual({ stock: (7 + delta).toFixed(4) });
+    expect(resultado).toEqual({ stock: (7 + delta).toFixed(4), reserved: '0.0000', overReserved: false });
     expect(await fotoLote(propio)).not.toBe(antes);
     const fila = await prisma.productBatch.findUniqueOrThrow({ where: { id: propio } });
     expect(fila.stock.toFixed(4)).toBe((7 + delta).toFixed(4));

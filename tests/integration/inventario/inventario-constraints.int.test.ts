@@ -359,7 +359,7 @@ describe('estructura del producto', () => {
       // «elemento de inventario» que haya que juntar con un join.
       const product = await tx.product.findUniqueOrThrow({ where: { id } })
       expect(product.name).toBe('Acido citrico monohidratado')
-      expect(product.qtyAlert).toBe(20)
+      expect(product.qtyAlert?.toFixed(4)).toBe('20.0000')
       expect(product.deletedAt).toBeNull()
       // `unit_id` existe como columna real de la tabla (uuid), y esta fila -sin lotes- la
       // tiene en NULL.
@@ -368,7 +368,7 @@ describe('estructura del producto', () => {
       ])
       expect(product.unitId).toBeNull()
       // `stock` existe y, sin lotes, vale 0.
-      expect(product.stock).toBe(0)
+      expect(product.stock.toFixed(4)).toBe('0.0000')
       expect(product.id).toMatch(/^[0-9a-f-]{36}$/u)
     })
   })
@@ -419,7 +419,7 @@ describe('estructura del producto', () => {
       ])
       expect(product.unitId).toBeNull()
       // Sin lotes, la existencia GUARDADA es 0.
-      expect(product.stock).toBe(0)
+      expect(product.stock.toFixed(4)).toBe('0.0000')
     })
   })
 
@@ -427,20 +427,15 @@ describe('estructura del producto', () => {
   // DEFAULT 0 no tiene nada que defender aqui. El caso no se relaja, se muda: el minimo de
   // compra vive hoy en la linea del catalogo del proveedor y alli tiene sus propias reglas.
 
-  it('R2: la columna entera que queda, qty_alert, es integer en information_schema', async () => {
+  it('QC-141 (5b): qty_alert es numeric(14,4) en information_schema y conserva la parte decimal', async () => {
     await inRolledBackTransaction(async (tx) => {
-      // QC-52 (R1, R2) dejo dos de las cuatro de QC-14 R7; esta ficha se lleva `stock` con
-      // la columna, y `qty_alert` conserva su tipo exacto.
+      // QC-141 (pregunta 5b, aprobada): `qty_alert` deja de ser entero para compararse contra
+      // la existencia decimal sin convertir ninguna de las dos.
       const types = await columnTypes(tx, 'products', ['qty_alert'])
-      // R7: el tipo REAL en la base, no el declarado en el esquema. `numeric` o
-      // `double precision` harian caer esta lista.
       expect(types.map((type) => [type.column_name, type.data_type])).toEqual([
-        ['qty_alert', 'integer'],
+        ['qty_alert', 'numeric'],
       ])
 
-      // Y en la practica: lo que se guarda no conserva parte decimal. Se escribe con SQL
-      // crudo porque la API tipada de Prisma exige un `number` entero y no dejaria
-      // expresar el caso.
       await rawInsertProduct(
         tx,
         { name: Prisma.sql`${'Con parte decimal'}`, qty_alert: Prisma.sql`${'7.4'}::numeric` },
@@ -450,7 +445,7 @@ describe('estructura del producto', () => {
         select: { qtyAlert: true },
       })
       expect(stored.qtyAlert).not.toBeNull()
-      expect(Number.isInteger(stored.qtyAlert)).toBe(true)
+      expect(stored.qtyAlert?.toFixed(4)).toBe('7.4000')
     })
   })
 
@@ -505,7 +500,7 @@ describe('estructura del producto', () => {
         select: { id: true },
       })
       const zeroed = await tx.product.findUniqueOrThrow({ where: { id } })
-      expect(zeroed.qtyAlert).toBe(0)
+      expect(zeroed.qtyAlert?.toFixed(4)).toBe('0.0000')
     })
   })
 
@@ -653,7 +648,7 @@ describe('estructura del producto', () => {
       await tx.product.update({ where: { id }, data: { qtyAlert: 10 } })
 
       const after = await tx.product.findUniqueOrThrow({ where: { id } })
-      expect(after.qtyAlert).toBe(10)
+      expect(after.qtyAlert?.toFixed(4)).toBe('10.0000')
       expect(after.deletedAt).toBeNull()
       // R11: la fila entera es identica salvo la propia alerta y la marca de
       // modificacion. Nada se derivo, nada se recalculo, nada se marco.
@@ -771,7 +766,7 @@ describe('borrado logico y marcas de tiempo', () => {
         where: { id: created.id },
         data: { qtyAlert: 42 },
       })
-      expect(modified.qtyAlert).toBe(42)
+      expect(modified.qtyAlert?.toFixed(4)).toBe('42.0000')
       expect(modified.createdAt.getTime()).toBe(created.createdAt.getTime())
       expect(modified.updatedAt.getTime()).toBeGreaterThan(created.updatedAt.getTime())
 

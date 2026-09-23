@@ -436,7 +436,7 @@ describe('R29, R32 — el ajuste de lote recalcula stock sin tocar el resto del 
         new Date(Date.now() + 60_000),
         ambito(fixture),
       );
-      expect(subida).toEqual({ stock: '11.0000' });
+      expect(subida).toEqual({ stock: '11.0000', reserved: '0.0000', overReserved: false });
       expect(await stockOf(creado.id)).toBe('21.0000');
 
       const bajada = await adjustBatchStock(
@@ -447,7 +447,7 @@ describe('R29, R32 — el ajuste de lote recalcula stock sin tocar el resto del 
         new Date(Date.now() + 120_000),
         ambito(fixture),
       );
-      expect(bajada).toEqual({ stock: '2.0000' });
+      expect(bajada).toEqual({ stock: '2.0000', reserved: '0.0000', overReserved: false });
       expect(await stockOf(creado.id)).toBe('12.0000');
 
       // R32: la unica columna del producto que cambio es `stock`.

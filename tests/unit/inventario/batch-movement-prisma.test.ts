@@ -39,7 +39,7 @@ describe('writeMovement (R6, R12) — recibe la tx, no la abre', () => {
 
     await writeMovement(
       tx,
-      { batchId: LOTE_ID, kind: 'opening', quantity: '10', reason: null, createdBy: ACTOR_ID },
+      { batchId: LOTE_ID, kind: 'opening', quantity: '10', reason: null, orderId: null, createdBy: ACTOR_ID },
       AHORA,
       AMBITO,
     );
@@ -51,6 +51,7 @@ describe('writeMovement (R6, R12) — recibe la tx, no la abre', () => {
         kind: 'opening',
         quantity: '10',
         reason: null,
+        orderId: null,
         createdBy: ACTOR_ID,
         companyId: EMPRESA,
         createdAt: AHORA,
@@ -64,7 +65,7 @@ describe('writeMovement (R6, R12) — recibe la tx, no la abre', () => {
 
     await writeMovement(
       tx,
-      { batchId: LOTE_ID, kind: 'adjustment', quantity: '-3', reason: 'merma', createdBy: ACTOR_ID },
+      { batchId: LOTE_ID, kind: 'adjustment', quantity: '-3', reason: 'merma', orderId: null, createdBy: ACTOR_ID },
       AHORA,
       AMBITO,
     );

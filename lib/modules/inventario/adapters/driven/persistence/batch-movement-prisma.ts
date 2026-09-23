@@ -25,6 +25,7 @@ export async function writeMovement(
       kind: movement.kind,
       quantity: movement.quantity,
       reason: movement.reason,
+      orderId: movement.orderId,
       createdBy: movement.createdBy,
       ...companyScopeColumns(scope),
       createdAt: now,
@@ -51,6 +52,8 @@ type MovementRow = Prisma.InventoryMovementGetPayload<{ select: typeof MOVEMENT_
 function toMovementView(row: MovementRow): InventoryMovementView {
   return {
     id: row.id,
+    // `consumption` es el unico valor del enum de base que un asiento de alta o ajuste jamas
+    // trae, asi que la conversion es segura sin comprobarla uno a uno.
     kind: row.kind as InventoryMovementView['kind'],
     quantity: row.quantity.toFixed(4),
     reason: row.reason as MovementReason | null,

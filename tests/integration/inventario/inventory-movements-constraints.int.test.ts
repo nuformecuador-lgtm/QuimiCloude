@@ -329,14 +329,16 @@ describe('inventory_movements — restricciones', () => {
 
       const rejection = await expectRejectedByDatabase(
         tx,
-        () => rawInsertMovement(tx, { batchId, kind: 'consumption', quantity: -1, reason: 'merma', companyId }),
+        // `consumption` YA NO SIRVE de ejemplo aqui desde QC-141: entro al enum. Cualquier otro
+        // texto que el tipo no declare sigue dando 22P02.
+        () => rawInsertMovement(tx, { batchId, kind: 'bogus_kind', quantity: -1, reason: 'merma', companyId }),
         'asiento con una clase que el enum no declara',
       )
       expect(rejection.sqlState).toBe(INVALID_TEXT_REPRESENTATION)
       // Por el nombre del tipo y el valor rechazado, no por el texto: el mensaje de Postgres esta
       // traducido y decir «invalid input value for enum» ata el caso al idioma del servidor.
       expect(rejection.message).toContain('InventoryMovementKind')
-      expect(rejection.message).toContain('consumption')
+      expect(rejection.message).toContain('bogus_kind')
 
       expect(await tx.inventoryMovement.findMany({ where: { batchId }, select: { id: true } })).toEqual([])
     })
@@ -357,7 +359,7 @@ describe('inventory_movements — restricciones', () => {
       expect(rejection.sqlState).toBe(CHECK_VIOLATION)
 
       const batch = await tx.productBatch.findUniqueOrThrow({ where: { id: batchId }, select: { stock: true } })
-      expect(batch.stock).toBe(3)
+      expect(batch.stock.toFixed(4)).toBe('3.0000')
     })
   })
 })

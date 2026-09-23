@@ -109,7 +109,7 @@ Archivos: `lib/modules/pedidos/domain/order-requirement.ts` (nuevo),
 datos, para `R8`, `R9`, `R10`, `R11`: FIFO, desempate numérico, todo-o-nada, unidad sin base común,
 conversión, techo solo con más de cuatro decimales, receta vacía.
 
-## T7 — Reservas en la persistencia de `inventario` `[depende de T2, T4, T6]`
+## [x] T7 — Reservas en la persistencia de `inventario` `[depende de T2, T4, T6]`
 
 Archivos: `lib/modules/inventario/adapters/driven/persistence/reservation-prisma.ts` (nuevo),
 `product-prisma.ts` (`consumeBatchStock` exportada, `adjustBatchStock` con `overReserved`),

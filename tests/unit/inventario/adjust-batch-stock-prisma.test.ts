@@ -13,11 +13,13 @@ const doble = vi.hoisted(() => {
   const executeRaw = vi.fn();
   const queryRaw = vi.fn();
   const movementCreate = vi.fn();
+  const reservationMovementFindMany = vi.fn();
   const tx = {
     product: { create: productCreate },
     presentation: { findFirst: presentationFindFirst },
     productBatch: { create: batchCreate, update: batchUpdate, findMany: batchFindMany },
     inventoryMovement: { create: movementCreate },
+    reservationMovement: { findMany: reservationMovementFindMany },
     $executeRaw: executeRaw,
     $queryRaw: queryRaw,
   };
@@ -31,6 +33,7 @@ const doble = vi.hoisted(() => {
     executeRaw,
     queryRaw,
     movementCreate,
+    reservationMovementFindMany,
     transaction: vi.fn(),
   };
 });
@@ -96,6 +99,7 @@ beforeEach(() => {
   doble.executeRaw.mockResolvedValue(0);
   doblarLecturaDelProducto({ id: PRODUCTO_ID });
   doble.movementCreate.mockResolvedValue({ id: 'movimiento-1' });
+  doble.reservationMovementFindMany.mockResolvedValue([]);
 });
 
 /** El `23514` construido como lo entrega el conector para una restriccion nombrada. */
@@ -129,6 +133,7 @@ describe('R12 — el alta deja su asiento de apertura en la misma transaccion', 
         kind: 'opening',
         quantity: LOTE.stock,
         reason: null,
+        orderId: null,
         createdBy: ACTOR_ID,
         companyId: EMPRESA,
         createdAt: AHORA,
@@ -157,6 +162,8 @@ describe('adjustBatchStock (R1, R2, R4, R6, R7, R18) — increment relativo mas 
 
     await expect(adjustBatchStock(LOTE_ID, '5', 'conteo_fisico', ACTOR_ID, AHORA, AMBITO)).resolves.toEqual({
       stock: '15.0000',
+      reserved: '0.0000',
+      overReserved: false,
     });
 
     expect(doble.batchUpdate).toHaveBeenCalledWith({
@@ -170,6 +177,7 @@ describe('adjustBatchStock (R1, R2, R4, R6, R7, R18) — increment relativo mas 
         kind: 'adjustment',
         quantity: '5',
         reason: 'conteo_fisico',
+        orderId: null,
         createdBy: ACTOR_ID,
         companyId: EMPRESA,
         createdAt: AHORA,
@@ -182,6 +190,8 @@ describe('adjustBatchStock (R1, R2, R4, R6, R7, R18) — increment relativo mas 
 
     await expect(adjustBatchStock(LOTE_ID, '-4', 'merma', ACTOR_ID, AHORA, AMBITO)).resolves.toEqual({
       stock: '6.0000',
+      reserved: '0.0000',
+      overReserved: false,
     });
 
     expect(doble.batchUpdate).toHaveBeenCalledWith(
@@ -192,6 +202,19 @@ describe('adjustBatchStock (R1, R2, R4, R6, R7, R18) — increment relativo mas 
     expect(doble.movementCreate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ quantity: '-4', reason: 'merma' }) }),
     );
+  });
+
+  it('R33: un delta que deja el apartado por encima de la existencia nueva marca overReserved', async () => {
+    doble.batchUpdate.mockResolvedValueOnce({ stock: new Prisma.Decimal(3) });
+    doble.reservationMovementFindMany.mockResolvedValueOnce([
+      { kind: 'reserve', quantity: new Prisma.Decimal(5) },
+    ]);
+
+    await expect(adjustBatchStock(LOTE_ID, '-7', 'merma', ACTOR_ID, AHORA, AMBITO)).resolves.toEqual({
+      stock: '3.0000',
+      reserved: '5.0000',
+      overReserved: true,
+    });
   });
 
   it('R18: sin fila que bloquear (lote inexistente o de otra empresa), devuelve null sin llamar a productBatch.update', async () => {

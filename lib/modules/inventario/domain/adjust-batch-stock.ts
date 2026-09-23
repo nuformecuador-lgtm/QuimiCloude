@@ -48,13 +48,16 @@ export type AdjustBatchStockInput = z.infer<typeof adjustBatchStockSchema>;
  */
 export function createAdjustBatchStock(
   deps: AdjustBatchStockDeps,
-): (input: unknown, actor: Actor | null | undefined) => Promise<{ stock: string }> {
+): (
+  input: unknown,
+  actor: Actor | null | undefined,
+) => Promise<{ stock: string; reserved: string; overReserved: boolean }> {
   const now = deps.now ?? (() => new Date());
 
   return async function adjustBatchStock(
     input: unknown,
     actor: Actor | null | undefined,
-  ): Promise<{ stock: string }> {
+  ): Promise<{ stock: string; reserved: string; overReserved: boolean }> {
     requirePermission(actor, 'inventario.modificar');
 
     const parsed = adjustBatchStockSchema.safeParse(input);

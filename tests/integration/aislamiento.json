@@ -156,6 +156,11 @@
       "desde": "2026-09-12"
     },
     {
+      "archivo": "inventario/reservation.int.test.ts",
+      "motivo": "QC-141 T7: llama a 'createMaterialReservations' (reservation-prisma.ts) y a 'createWithFirstBatch'/'addBatchToAlive'/'adjustBatchStock'/'consumeBatchStock' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL -las tres primeras abren cada una SU PROPIA 'prisma.$transaction'-, igual que 'product-stock.int.test.ts' y 'ledger-cuadre.int.test.ts': envolver la corrida en una transaccion del test seria aislamiento de mentira. Cada caso fabrica su propia empresa efimera con randomUUID (receta, presentacion, producto, lotes y pedidos), escribe solo en ella y la limpia en un 'finally' en orden de FK (los dos libros -> pedidos -> lotes -> productos -> receta -> presentacion -> usuario). El caso de R30/R15 que comprueba 'sin cambiar nada' ante 'insufficient' SI abre su propia 'prisma.$transaction' con una senal de rollback, sobre el mismo fixture ya committeado, para simular el contorno que abrira 'pedidos' (T10) y demostrar que no queda nada escrito. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-23"
+    },
+    {
       "archivo": "inventario/product-stock.int.test.ts",
       "motivo": "QC-121 T4/T14: llama a 'createWithFirstBatch', 'addBatchToAlive' y 'adjustBatchStock' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL y abren cada uno SU PROPIA 'prisma.$transaction', igual que 'ledger-cuadre.int.test.ts' -envolverlos en una transaccion del test seria aislamiento de mentira, y ademas dos altas o dos ajustes concurrentes (R10, R31) necesitan que cada uno CONFIRME para que el otro vea su cambio-. Cada caso fabrica su empresa efimera con randomUUID, escribe solo en ella y la limpia en un 'finally' en orden de FK (asientos -> lotes -> productos -> presentacion -> usuario). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-18"

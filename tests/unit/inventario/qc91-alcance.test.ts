@@ -236,7 +236,12 @@ export function sumaPropia(cuerpo: string): string[] {
 export function escrituraDestructivaDeLotes(fuente: string): string[] {
   const codigo = stripComments(fuente);
   const hallazgos: string[] = [];
-  if (/\.productBatch\.(?:delete|deleteMany|updateMany|upsert)\s*\(/.test(codigo)) {
+  // `updateMany` YA NO ESTA AQUI (QC-141): `consumeBatchStock` la usa a proposito -el decremento
+  // CONDICIONAL del consumo (`stock >= cantidad` en el `where`), que solo puede tocar CERO o UNA
+  // fila porque el `where` ya trae el identificador unico-. Que solo viva en esa funcion lo vigila
+  // `llamaAUpdateManyFueraDe`, no este detector: `delete`, `deleteMany` y `upsert` no tienen ningun
+  // uso legitimo sobre un lote y siguen prohibidos en TODO el archivo.
+  if (/\.productBatch\.(?:delete|deleteMany|upsert)\s*\(/.test(codigo)) {
     hallazgos.push('llama a un metodo de escritura destructiva sobre productBatch');
   }
   if (/DELETE\s+FROM\s+"?product_batches"?/i.test(codigo)) {
@@ -249,15 +254,26 @@ export function escrituraDestructivaDeLotes(fuente: string): string[] {
 }
 
 /**
- * `true` si `.productBatch.update(` aparece en algun lugar del archivo QUE NO sea el cuerpo de
+ * `true` si `.productBatch.<metodo>(` aparece en algun lugar del archivo QUE NO sea el cuerpo de
  * `nombreFuncionPermitida`. Aisla ese cuerpo con `cuerpoDeFuncion` y busca en el resto, para que
- * un `update` movido a otra funcion -o uno nuevo, en cualquier sitio distinto- siga dando rojo.
+ * una llamada movida a otra funcion -o una nueva, en cualquier sitio distinto- siga dando rojo.
  */
-export function llamaAUpdateFueraDe(fuente: string, nombreFuncionPermitida: string): boolean {
+function llamaAMetodoFueraDe(fuente: string, metodo: string, nombreFuncionPermitida: string): boolean {
   const codigo = stripComments(fuente);
   const cuerpoPermitido = cuerpoDeFuncion(fuente, nombreFuncionPermitida);
   const resto = cuerpoPermitido === null ? codigo : codigo.replace(stripComments(cuerpoPermitido), '');
-  return /\.productBatch\.update\s*\(/.test(resto);
+  return new RegExp(`\\.productBatch\\.${metodo}\\s*\\(`).test(resto);
+}
+
+/** El `update` (singular) del ajuste: sigue viviendo SOLO en `adjustBatchStock`. */
+export function llamaAUpdateFueraDe(fuente: string, nombreFuncionPermitida: string): boolean {
+  return llamaAMetodoFueraDe(fuente, 'update', nombreFuncionPermitida);
+}
+
+/** El `updateMany` del decremento condicional del consumo: sigue viviendo SOLO en
+ *  `consumeBatchStock` (QC-141, `design.md > 6.4`). */
+export function llamaAUpdateManyFueraDe(fuente: string, nombreFuncionPermitida: string): boolean {
+  return llamaAMetodoFueraDe(fuente, 'updateMany', nombreFuncionPermitida);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -470,6 +486,11 @@ describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ningu
     expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(false);
   });
 
+  it('R21, R30: el unico updateMany vive en consumeBatchStock -el decremento condicional del consumo-', () => {
+    const fuente = leer(PRODUCT_PRISMA);
+    expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(false);
+  });
+
   it('R21: el detector de escrituras destructivas muerde con fuentes fabricadas y no con una limpia', () => {
     expect(escrituraDestructivaDeLotes('await tx.productBatch.delete({ where });')).toEqual([
       'llama a un metodo de escritura destructiva sobre productBatch',
@@ -541,6 +562,50 @@ describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ningu
       expect(
         escrituraDestructivaDeLotes('await tx.$executeRaw`DELETE FROM "product_batches" WHERE id = ${id}`;'),
       ).not.toEqual([]);
+    });
+  });
+
+  describe('llamaAUpdateManyFueraDe — el updateMany de consumeBatchStock queda aislado del resto (R30)', () => {
+    it('R30: un updateMany DENTRO de consumeBatchStock no cuenta como hallazgo', () => {
+      const fuente = [
+        'export function otraCosa() {',
+        '  return 1;',
+        '}',
+        'export async function consumeBatchStock(batchId) {',
+        '  return tx.productBatch.updateMany({ where: { id: batchId, stock: { gte: q } } });',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(false);
+    });
+
+    it('R30: el MISMO updateMany movido a OTRA funcion si cuenta como hallazgo', () => {
+      const fuente = [
+        'export async function consumeBatchStock(batchId) {',
+        '  return 1;',
+        '}',
+        'export function otraFuncion() {',
+        '  return tx.productBatch.updateMany({ where: { id: 1 } });',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(true);
+    });
+
+    it('R30: sin ningun updateMany en el archivo, no hay hallazgo', () => {
+      const fuente = 'export async function consumeBatchStock() { return 1; }';
+      expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(false);
+    });
+
+    it('R30: el update de adjustBatchStock no se confunde con un updateMany de consumeBatchStock', () => {
+      const fuente = [
+        'export async function adjustBatchStock(batchId) {',
+        '  return tx.productBatch.update({ where: { id: batchId } });',
+        '}',
+        'export async function consumeBatchStock(batchId) {',
+        '  return tx.productBatch.updateMany({ where: { id: batchId, stock: { gte: q } } });',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(false);
+      expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(false);
     });
   });
 });

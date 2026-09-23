@@ -236,7 +236,11 @@ function montarReposPermisivos(): Repos {
         batchId: 'lote-1',
         lot: '1',
       })),
-      adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(async () => ({ stock: '1.0000' })),
+      adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(async () => ({
+        stock: '1.0000',
+        reserved: '0.0000',
+        overReserved: false,
+      })),
       findBatchesOfAliveProduct: vi.fn<ProductRepository['findBatchesOfAliveProduct']>(async () => []),
       findBatchMovements: vi.fn<ProductRepository['findBatchMovements']>(async () => []),
     },

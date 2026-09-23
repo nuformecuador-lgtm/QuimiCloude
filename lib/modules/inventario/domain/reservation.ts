@@ -4,6 +4,7 @@
 // interfaces que otro modulo implementa contra o consume. La implementacion (Prisma, la
 // transaccion) vive en los adaptadores driven de este modulo.
 
+import type { MovementReason } from './movement-reason';
 import type { ProductId } from './product-catalog';
 import type { UnitId } from '@/lib/modules/unidades';
 
@@ -58,3 +59,23 @@ export interface ReservationQueries {
     orderIds: readonly string[],
   ): Promise<ReadonlyMap<string, OrderCoverage>>;
 }
+
+/** `inventario` no puede importar `pedidos` (ciclo), asi que declara aqui el HUECO que necesita
+ *  para el historial: el numero visible de un pedido. `pedidos` lo implementa y
+ *  `lib/composition` lo cabla, con el mismo patron que `people` en `listBatchMovements`. */
+export interface OrderNumberDirectory {
+  findNumberTexts(companyId: string, orderIds: readonly string[]): Promise<ReadonlyMap<string, string>>;
+}
+
+/** Una fila del historial de un lote: union de `inventory_movements` -el
+ *  libro fisico- y `reservation_movements` -el libro de la reserva-, ya resueltos sus nombres. */
+export type BatchHistoryEntry = {
+  readonly kind: 'opening' | 'adjustment' | 'consumption' | 'reserve' | 'release' | 'expire' | 'consume';
+  readonly quantity: string;
+  readonly reason: MovementReason | null;
+  /** `null` cuando el asiento no viene de un pedido: alta, ajuste. */
+  readonly orderNumberText: string | null;
+  /** `null` cuando lo hizo el sistema: caducidad, la migracion que aparta los pedidos vivos. */
+  readonly authorName: string | null;
+  readonly createdAt: string;
+};

@@ -3,8 +3,10 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
+import { compareQuantities } from '../../../domain/decimal-quantity';
 import { BatchDuplicateLotError, BatchStockNegativeError, ValidationError } from '../../../domain/errors';
 import { normalizeProductName } from '../../../domain/product-name';
+import { netReservedQuantity } from '../../../domain/reservation-ledger';
 
 import { writeMovement } from './batch-movement-prisma';
 import {
@@ -335,6 +337,13 @@ function toBatchUnitCost(unitCost: string): Prisma.Decimal {
   return new Prisma.Decimal(unitCost);
 }
 
+/** `'5.0000'` -> `'-5.0000'`: la salida del consumo se guarda en negativo, como la resta de un
+ *  ajuste. `quantity` llega siempre positiva -es lo que se decremento-, asi que basta anteponer
+ *  el signo. */
+function negateQuantity(quantity: string): string {
+  return quantity.startsWith('-') ? quantity.slice(1) : `-${quantity}`;
+}
+
 /** Con `Z`: sin zona, la cadena se leeria en la hora local del servidor y la fecha podria correrse un
  *  dia al pasar a UTC. */
 function toBatchExpiryDate(expiryDate: string | null): Date | null {
@@ -608,7 +617,14 @@ export async function createWithFirstBatch(
 
     await writeMovement(
       tx,
-      { batchId: createdBatch.id, kind: 'opening', quantity: batch.stock, reason: null, createdBy: batch.createdBy },
+      {
+        batchId: createdBatch.id,
+        kind: 'opening',
+        quantity: batch.stock,
+        reason: null,
+        orderId: null,
+        createdBy: batch.createdBy,
+      },
       now,
       scope,
     );
@@ -656,7 +672,14 @@ export async function addBatchToAlive(
 
     await writeMovement(
       tx,
-      { batchId: createdBatch.id, kind: 'opening', quantity: batch.stock, reason: null, createdBy: batch.createdBy },
+      {
+        batchId: createdBatch.id,
+        kind: 'opening',
+        quantity: batch.stock,
+        reason: null,
+        orderId: null,
+        createdBy: batch.createdBy,
+      },
       now,
       scope,
     );
@@ -738,7 +761,7 @@ export async function adjustBatchStock(
   actorId: string,
   now: Date,
   scope: InventoryScope,
-): Promise<{ stock: string } | null> {
+): Promise<{ stock: string; reserved: string; overReserved: boolean } | null> {
   const { companyId } = companyScopeColumns(scope);
 
   try {
@@ -760,15 +783,87 @@ export async function adjustBatchStock(
         select: { stock: true },
       });
 
-      await writeMovement(tx, { batchId, kind: 'adjustment', quantity: delta, reason, createdBy: actorId }, now, scope);
+      await writeMovement(
+        tx,
+        { batchId, kind: 'adjustment', quantity: delta, reason, orderId: null, createdBy: actorId },
+        now,
+        scope,
+      );
 
       await recalculateProductStock(tx, product.id, scope);
 
-      return { stock: updated.stock.toFixed(4) };
+      // El apartado no lo escribe este archivo -es un libro aparte, `reservation_movements`,
+      // dueno de `reservation-prisma.ts`-, pero un ajuste tiene que poder decir si deja el lote
+      // sobre-reservado, y las dos tablas estan en la misma transaccion.
+      const reservationRows = await tx.reservationMovement.findMany({
+        where: { companyId, batchId },
+        select: { kind: true, quantity: true },
+      });
+      const reserved = netReservedQuantity(
+        reservationRows.map((row) => ({ kind: row.kind, quantity: row.quantity.toFixed(4) })),
+      );
+      const stock = updated.stock.toFixed(4);
+
+      return { stock, reserved, overReserved: compareQuantities(reserved, stock) > 0 };
     });
   } catch (error) {
     if (isBatchNotFound(error)) return null;
     if (isBatchStockNegativeViolation(error)) throw new BatchStockNegativeError();
     throw error;
   }
+}
+
+/**
+ * El decremento CONDICIONAL del consumo al entregar: `stock >= quantity` va
+ * en el `WHERE`, asi que dos escrituras concurrentes nunca dejan el lote negativo aunque las dos
+ * pasen el mismo bloqueo de producto. `count === 0` no dice POR QUE fallo -lote de otra empresa,
+ * inexistente o con menos de lo pedido-, y con el producto ya bloqueado por quien llama la unica
+ * causa posible es la merma: por eso se resuelve leyendo el `stock` actual, sin lanzar.
+ *
+ * Como `adjustBatchStock`, asienta en la MISMA transaccion con `kind: 'consumption'`, cantidad EN
+ * NEGATIVO -es una salida- y el pedido que la causa. No recalcula `products.stock`: con varios
+ * lotes de un mismo producto consumidos en la misma entrega, recalcular una vez por producto (en
+ * `consumeForOrder`) evita sumar la misma tabla varias veces por nada.
+ */
+export async function consumeBatchStock(
+  tx: Prisma.TransactionClient,
+  input: { readonly batchId: string; readonly quantity: string; readonly orderId: string; readonly actorId: string },
+  now: Date,
+  scope: InventoryScope,
+): Promise<{ kind: 'consumed'; stock: string } | { kind: 'insufficient'; available: string }> {
+  const { companyId } = companyScopeColumns(scope);
+  const decimalQuantity = new Prisma.Decimal(input.quantity);
+
+  const { count } = await tx.productBatch.updateMany({
+    where: { id: input.batchId, companyId, stock: { gte: decimalQuantity } },
+    data: { stock: { decrement: decimalQuantity }, updatedBy: input.actorId, updatedAt: now },
+  });
+
+  if (count === 0) {
+    const current = await tx.productBatch.findFirst({
+      where: { id: input.batchId, companyId },
+      select: { stock: true },
+    });
+    return { kind: 'insufficient', available: current === null ? '0.0000' : current.stock.toFixed(4) };
+  }
+
+  await writeMovement(
+    tx,
+    {
+      batchId: input.batchId,
+      kind: 'consumption',
+      quantity: negateQuantity(input.quantity),
+      reason: null,
+      orderId: input.orderId,
+      createdBy: input.actorId,
+    },
+    now,
+    scope,
+  );
+
+  const updated = await tx.productBatch.findFirst({
+    where: { id: input.batchId, companyId },
+    select: { stock: true },
+  });
+  return { kind: 'consumed', stock: (updated?.stock ?? new Prisma.Decimal(0)).toFixed(4) };
 }

@@ -147,6 +147,10 @@ export interface ProductRepository {
    * igual que el resto del puerto-. Un `stock` que quedaria negativo se rechaza antes de
    * escribir nada; el adaptador decide como lo comunica.
    *
+   * Tambien devuelve `reserved` -lo que los pedidos vivos tienen apartado en el lote tras el
+   * ajuste- y `overReserved` -si ese apartado supera la existencia nueva-: un ajuste a la
+   * baja se acepta igual, y esto es lo que permite avisar sin convertirlo en un error.
+   *
    * La empresa no viaja en ningun tipo de entrada, igual que en `NewProduct` y `NewProductBatch`.
    */
   adjustBatchStock(
@@ -156,7 +160,7 @@ export interface ProductRepository {
     actorId: string,
     now: Date,
     scope: InventoryScope,
-  ): Promise<{ stock: string } | null>;
+  ): Promise<{ stock: string; reserved: string; overReserved: boolean } | null>;
 
   /**
    * Todos los lotes del producto, siempre que el producto siga VIVO -el filtro de vivos es

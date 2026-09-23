@@ -310,3 +310,296 @@ sumas de `product-stock.int.test.ts` está reescrito con decimales y pasa contra
 Typecheck y tests no tienen ningún rojo nuevo fuera de los nueve del hallazgo ajeno
 `product_type_enum` y los treinta y seis que son la superficie exacta de T5. No se hicieron
 commits.
+
+## Tanda T5 (2026-09-22)
+
+### Qué hace
+
+Cierra la superficie de UI que T4 dejó pendiente (`design.md > 2.1`, filas de `app/`): pintado
+decimal con `formatDecimalDisplay` + `exactDecimalTitle` + `aria-label` (pregunta 5a), campos
+decimales con `inputMode="decimal"` y coma→punto en el alta de lote y el ajuste, y la aritmética
+exacta de los dos importes derivados del panel de costo con una cantidad decimal.
+
+### Archivos de producción modificados
+
+- `app/(private)/inventario/components/product-columns.tsx`: `stockCell`/`existenceLabel` pintan
+  con `formatDecimalDisplay`, `title` con `exactDecimalTitle` y `aria-label` con la cifra completa
+  (`trimDecimal`); nueva `qtyAlertCell` con el mismo tratamiento (antes `formatOptionalInt` pintaba
+  la cadena cruda). `isBelowAlert` ya comparaba con `compareQuantities` desde T4; sin cambios ahí.
+- `app/(private)/inventario/components/product-batches-panel.tsx`: `quantityLabel` pinta con
+  `formatDecimalDisplay`; `title`/`aria-label` nuevos en la celda de cantidad.
+- `app/(private)/inventario/components/product-form.tsx`: los campos `stock` y `qtyAlert` pasan de
+  `type="number"` a `type="text"` + `inputMode="decimal"`, controlados con `sanitizeQuantityInput`
+  (coma a punto, 4 decimales) — antes eran incontrolados con `defaultValue`. `parseInteger`
+  (convertía a `number`) se sustituye por `parseDecimalField` (deja la cadena, sólo valida forma):
+  el esquema de zod ya exige cadena decimal desde T4 y antes se le pasaba un `number`, que
+  `safeParse` acepta sin error de tipos por ser `unknown` pero rechaza siempre en tiempo de
+  ejecución — bug real que este cambio corrige, no sólo de tipos.
+- `app/(private)/inventario/components/adjust-batch-dialog.tsx`: el campo `delta` pasa de
+  `type="number" step={1}` a `type="text"` + `inputMode="decimal"`, controlado con
+  `sanitizeDeltaInput` (con signo, coma a punto, 4 decimales). El chequeo de cero en cliente pasa
+  de `INTEGER_PATTERN`/`Number(delta) === 0` a `DECIMAL_DELTA_PATTERN`/`ZERO_DELTA_PATTERN` sobre
+  la cadena.
+- `app/(private)/inventario/components/product-cost-amount.ts`: `multiplyCost`/`divideCost` pasan
+  de `quantity: number` (con `Number.isInteger` como guarda) a `quantity: string` decimal; la
+  aritmética escala la cantidad a 4 decimales con `BigInt` en vez de multiplicar/dividir por un
+  entero de JavaScript. `sanitizeCostInput` se apoya en una `sanitizeUnsignedDecimalInput` interna,
+  parametrizada por escala, de la que sale también `sanitizeQuantityInput` (4 decimales) para el
+  alta de lote y `product-form.tsx`.
+- `app/(private)/inventario/components/product-cost-fields.tsx`: `readQuantity` deja de convertir a
+  `Number` y devuelve la cadena decimal tal cual (con el mismo patrón que el esquema del lote).
+- `app/(private)/pedidos/components/order-ingredients-table.tsx`: `aria-label` nuevo en las cuatro
+  celdas decimales (cantidad, stock, requerida, restante), con la cifra exacta
+  (`trimDecimal`) — el `title` con `exactDecimalTitle` ya estaba desde antes de esta ficha. Se
+  quita un `.toString()` redundante sobre `line.productStock`, que T4 ya dejó en `string`.
+  «Restante» sigue restando de la existencia TOTAL, no de la disponible: N4 no tiene decisión que
+  lo cambie (`design.md > 0.2`).
+- `e2e/ajuste-de-inventario.spec.ts`: `fillAdjustDialog` recibe `delta: string` en vez de `number`;
+  `HAPPY_DELTA` pasa de `6` a `'-0.5'` (negativo y decimal, el caso que pide `tasks.md > T5`). Los
+  asserts que comparaban `Prisma.Decimal` con `.toBe(número)` pasan por `.toNumber()`. No se
+  ejecutó (el encargo lo prohíbe expresamente en esta fase).
+
+### Tests actualizados
+
+Fixtures `stock`/`qtyAlert` de `number` a `string` (mismo `type: 'PRODUCT'` que ya traían donde
+hacía falta): `tests/unit/inventario/{product-field,product-batches-panel,product-batches-sheet,
+product-page}.test.tsx`, `tests/unit/pedidos-ui/order-form.test.tsx` (`productStock`),
+`tests/unit/recetas-ui/recipe-form.test.tsx` (`stock`, `productStock`).
+`tests/unit/inventario/batch-history.test.tsx`: `quantity: -3` a `'-3'`.
+`tests/unit/inventario/adjust-batch-dialog.test.tsx`: fixture de lote a cadena; el resultado de
+éxito de la action gana `reserved`/`overReserved` (tipo ampliado por T7, en paralelo, ajeno a esta
+tanda); dos casos nuevos (`R6`: delta decimal `-0.5` viaja tal cual; coma se convierte en punto).
+`tests/unit/inventario/product-cost-amount.test.ts`: reescrito con `quantity: string`; dos casos
+nuevos (`R6`: `multiplyCost('12.50', '1.5')` y `divideCost('150.00', '2.5')`, que antes de esta
+tanda rechazaban por no ser enteros y ahora dan resultado). `tests/unit/inventario/product-page.
+test.tsx`: `Number(ALTA_VALIDA.stock)`/`Number(valor)` en los asserts de `toHaveValue` se quitan —
+los campos ya no son `type="number"`—; dos casos nuevos (`R6`: pintado de `0.0001`/`1.5`/
+`12345.6789` en `product-stock` y `product-qty-alert`, con `title`/`aria-label`).
+`tests/unit/pedidos-ui/order-form.test.tsx`: se añaden los asserts de `aria-label` al caso ya
+existente de «cantidad requerida»/«restante».
+
+### Archivo nuevo
+
+`tests/unit/inventario/decimal-quantity-convenciones.test.ts` — R6: ningún `Number(`,
+`parseFloat(` ni `.toFixed(` en los seis archivos de esta tanda, con detector puro + barrido real +
+caso negativo (mismo patrón que `conversionesDeImporte` de `pedidos-convenciones.test.ts`). No hay
+guardia de ruta que cubra `app/(private)/inventario/components` con este alcance -
+`product-route-contract.test.ts` vigila otras quince reglas, no ésta- ni `order-ingredients-
+table.tsx`, que no vive bajo esa ruta.
+
+### R → test de esta tanda
+
+| R | Qué exige | Test |
+|---|---|---|
+| R6 | Pintado con `formatDecimalDisplay`/`exactDecimalTitle`/`aria-label`; ninguna cantidad pasa por coma flotante | `product-page.test.tsx` (dos casos `R6 —`), `product-batches-panel.test.tsx` (`R6 —`), `order-form.test.tsx` (aria-label en «cantidad requerida»/«restante»), `product-cost-amount.test.ts` (dos casos `R6 —`), `adjust-batch-dialog.test.tsx` (dos casos `R6 —`), `decimal-quantity-convenciones.test.ts` (los dos casos) |
+
+R3, R4, R5 ya quedaron cubiertos por T4. El resto de los 48 requisitos dependen de T6-T16 y se
+mapean en esas tandas; el mapa completo lo consolida T17.
+
+### Salida de los comandos
+
+**`pnpm run typecheck`**: 9 errores, los mismos de siempre — el hallazgo ajeno `product_type_enum`
+(`product-prisma.ts` y las ocho líneas de `product-prisma.test.ts`). Ningún error de `app/**` ni de
+`e2e/**`. Los errores nuevos que aparecieron a mitad de la tanda por `AdjustBatchStockFormState`
+ganando `reserved`/`overReserved` (T7, en paralelo) se corrigieron en el mock del test propio
+(`adjust-batch-dialog.test.tsx`).
+
+**`pnpm run lint`**: limpio, sin salida (sólo un warning preexistente en
+`reservation-prisma.ts`, de T7, ajeno a esta tanda).
+
+**Tests**: `pnpm exec vitest related --run` sobre los siete archivos de producción tocados:
+**461/461 pasan** (34 archivos). Además, dirigidos: `product-page.test.tsx` (62/62),
+`order-form.test.tsx`/`recipe-form.test.tsx` (65/65), `product-cost-amount.test.ts`,
+`product-batches-panel.test.tsx`, `product-batches-sheet.test.tsx`, `adjust-batch-dialog.test.tsx`,
+`batch-history.test.tsx`, `product-field.test.tsx`, `decimal-quantity-convenciones.test.ts`: todos
+verdes. Guardias: `product-route-contract.test.ts`, `pedidos-convenciones.test.ts` (20/20, 3
+saltados por rango git ausente, igual que siempre), `guard-arquitectura-modulos.test.ts`: verdes.
+No se corrió la suite completa ni `pnpm run e2e` (fuera del encargo de esta tanda).
+
+## Veredicto T5
+
+Hecho cuando pide `tasks.md`: pintado decimal con `formatDecimalDisplay`/`exactDecimalTitle` en los
+cinco componentes de `design.md > 2.1` más `qtyAlert`, `aria-label` con la cifra completa en todos
+ellos (decisión de F1.4 ampliada por el encargo: `aria-label`, no sólo `title`, para no depender de
+`:hover`), campos con `inputMode="decimal"` y coma→punto en el alta y el ajuste, R6 con test de
+componente para `0.0001`/`1.5`/`12345.6789` y guardia dedicada sin `Number(`/`parseFloat(`/
+`.toFixed(`, y `e2e/ajuste-de-inventario.spec.ts` adaptado a un delta `-0.5` (sin ejecutar). No se
+tocó `lib/**`; los únicos rojos son los nueve del hallazgo ajeno `product_type_enum`. No se hicieron
+commits.
+
+## Tanda T7 (2026-09-22)
+
+### Qué hace
+
+La reserva en la persistencia de `inventario` (`design.md > 6.3-6.5`, `> 5.1`, `> 5.5`, `> 10`):
+`createMaterialReservations` (`syncForOrder`, `releaseForOrder`, `consumeForOrder`) sobre el
+cliente que recibe, `consumeBatchStock` (decremento condicional del consumo) y `adjustBatchStock`
+con `reserved`/`overReserved` (R33) en `product-prisma.ts`, `orderId`/`kind: 'consumption'` en
+`batch-movement-prisma.ts`, los tipos de dominio que faltaban (`OrderNumberDirectory`,
+`BatchHistoryEntry`, `ReservationMovementKind`), `ReservationQueries.findCoverageByOrderIds` y los
+agregados de reservado/disponible por producto y por lote (para que T13 los consuma), el censo de
+`guard-libro-de-inventario` a cuatro caminos, y `tests/integration/inventario/reservation.int.test.ts`.
+
+### Archivos nuevos
+
+- `lib/modules/inventario/adapters/driven/persistence/reservation-prisma.ts`: `createMaterialReservations(db, units)`
+  implementa `MaterialReservations`; `createReservationQueries(db)` implementa `ReservationQueries`;
+  `findReservedAndAvailableByBatch`/`findReservedAndAvailableByProduct` exportadas para T13.
+- `lib/modules/inventario/domain/reservation-ledger.ts`: `netReservedQuantity`/`netReservedByBatch`,
+  dominio puro (suma con signo de `reservation_movements`), compartido por `product-prisma.ts`
+  (R33) y `reservation-prisma.ts` sin crear un import driven-a-driven cruzado (los dos son driven
+  del mismo módulo, pero el cálculo no toca la base).
+- `tests/integration/inventario/reservation.int.test.ts`: R12, R13, R17, R27, R28, R30, R32, R33,
+  R39, más un caso directo de `consumeBatchStock`.
+
+### Archivos modificados
+
+- `lib/modules/inventario/domain/reservation.ts`: gana `OrderNumberDirectory` y `BatchHistoryEntry`
+  (§5.5, §10; solo tipos, el caso de uso y las pantallas son T13).
+- `lib/modules/inventario/domain/inventory-movement.ts`: `InventoryMovementView.kind` y
+  `NewInventoryMovement.kind` ganan `consumption`; `NewInventoryMovement` gana
+  `orderId: string | null`.
+- `lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma.ts`: `writeMovement`
+  escribe `orderId`.
+- `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`: los dos `writeMovement`
+  de `createWithFirstBatch`/`addBatchToAlive` pasan `orderId: null`; `adjustBatchStock` devuelve
+  `{ stock, reserved, overReserved }` (lee `reservation_movements` del lote en la misma
+  transacción); nueva `consumeBatchStock` exportada (decremento condicional
+  `productBatch.updateMany({ where: { id, companyId, stock: { gte: quantity } } })` + `writeMovement`
+  `kind: consumption`, cantidad negativa, `orderId` en el cuerpo). No usa `.update()` singular para
+  no chocar con el "un solo `update` en `adjustBatchStock`" que ya vigilaba `qc91-alcance`; usa
+  `updateMany` a propósito, con su propio detector (ver más abajo).
+- `lib/modules/inventario/ports/product-repository.ts` y `domain/adjust-batch-stock.ts`:
+  `adjustBatchStock` devuelve `{ stock: string; reserved: string; overReserved: boolean }`.
+- `lib/modules/inventario/adapters/driving/batch-actions.ts`: `AdjustBatchStockFormState` y
+  `adjustBatchStockAction` propagan `reserved`/`overReserved`.
+- `lib/modules/inventario/index.ts`: exporta `OrderNumberDirectory`, `BatchHistoryEntry`.
+- `tests/guards/guard-libro-de-inventario.test.ts`: censo pasa de tres a cuatro caminos
+  (`+ consumeBatchStock`).
+- `tests/unit/inventario/qc91-alcance.test.ts`: `escrituraDestructivaDeLotes` deja de tratar
+  `updateMany` como destructivo (era un falso positivo contra el `updateMany` legítimo y acotado
+  de `consumeBatchStock`: su `where` ya trae el identificador único, así que solo puede tocar cero
+  o una fila); nuevo detector `llamaAUpdateManyFueraDe` (mismo patrón que `llamaAUpdateFueraDe`,
+  para `updateMany`) con sus propios casos fabricados, y una guardia real de que el único
+  `updateMany` vive en `consumeBatchStock`.
+- `tests/unit/inventario/qc121-alcance.test.ts`: `consumeBatchStock` es la única excepción
+  documentada a "toda escritura exportada de `product_batches` recalcula `products.stock` en su
+  propio cuerpo" — recalcula una vez por producto en `consumeForOrder`/`consumeWithoutReservation`
+  (`reservation-prisma.ts`), no una vez por lote, para no sumar la misma tabla varias veces en una
+  entrega con varios lotes del mismo producto. El recalculo sigue en la misma transacción (R28).
+- Tests que ya rompían por el cambio de forma de `adjustBatchStock`/`writeMovement` (regresión
+  directa de esta tanda, no del hallazgo ajeno): `tests/unit/inventario/authorization.test.ts`,
+  `tests/unit/inventario/batch-movement-prisma.test.ts`,
+  `tests/unit/inventario/adjust-batch-stock-prisma.test.ts` (añade el doble de
+  `reservationMovement.findMany`, `orderId: null` en los `movementCreate` esperados, y un caso
+  nuevo de R33).
+- Tests de integración corregidos por `Prisma.Decimal` vs número crudo (pendiente de la tanda
+  anterior, confirmado y resuelto en esta):
+  `tests/integration/inventario/presentation-unit.int.test.ts` (`stock.toFixed(4)`),
+  `tests/integration/inventario/inventario-constraints.int.test.ts` (`qtyAlert`/`stock` en cuatro
+  sitios más la reescritura completa del caso `qty_alert es integer` a `numeric(14,4)`, pregunta 5b
+  aprobada: el título, el tipo esperado y el aserto de que SÍ conserva el decimal, en vez de
+  truncarlo), `tests/integration/inventario/inventory-movements-constraints.int.test.ts`
+  (`batch.stock.toFixed(4)`, y el caso "clase fuera del enum" cambia su ejemplo de `consumption`
+  —que ya es un valor válido del enum desde T1— a `bogus_kind`). `reservations-and-decimal-stock-migration.int.test.ts`
+  y `product-stock.int.test.ts`/`company-scope-queries.int.test.ts` (los dos últimos, forma de
+  `adjustBatchStock`) también se revisaron: solo los dos últimos necesitaban `reserved`/`overReserved`
+  añadidos a su `toEqual`.
+- `tests/integration/aislamiento.json`: registra `inventario/reservation.int.test.ts` como
+  `commit`, con motivo.
+
+### Decisiones de diseño tomadas dentro de T7 (no estaban en `design.md` al nivel de detalle del código)
+
+1. **`consume` en `reservation_movements` se escribe por el importe QUE ESTABA RESERVADO, no por
+   lo que el lote pudo dar de verdad.** Si una merma deja el lote con menos de lo apartado, el
+   déficit se cubre de otro lote (pregunta 2); el asiento `consume` del lote ORIGINAL sigue siendo
+   la cantidad completa que tenía reservada, porque lo que se resuelve es el apartado de ESE
+   pedido en ESE lote (pasa a cero), no cuánto salió físicamente de él. Los lotes de RESPALDO
+   -los que cubren el déficit sin haber tenido una reserva previa de este pedido- NO ganan ningún
+   asiento en `reservation_movements`: no había ningún `reserve` que resolver, y escribir uno
+   igualmente restaría del total agregado del lote (`design.md > 3.4`) sin que nadie lo hubiera
+   apartado, hundiendo el «reservado» que ven otros pedidos sobre ese lote por debajo de la
+   realidad. El libro FÍSICO (`inventory_movements`, `kind: consumption`) sí se asienta en TODOS
+   los lotes tocados, con o sin reserva previa: es la salida real.
+2. **N2 (pedido sin nada apartado) tampoco escribe `reservation_movements`**: no hay ningún
+   `reserve` previo que netear, y por el mismo argumento del punto 1 un `consume` sin `reserve`
+   correspondiente distorsionaría el agregado. Solo queda el rastro físico
+   (`inventory_movements`).
+3. **`insufficient` no lo deshace `reservation-prisma.ts`.** El contrato (§5.1) dice que las tres
+   operaciones de `MaterialReservations` corren SIEMPRE dentro de la transacción que abre quien
+   llama; si `consumeForOrder` devuelve `insufficient` después de escrituras parciales (p. ej. el
+   consumo completo del lote mermado, antes de descubrir que el resto tampoco alcanza), es el
+   LLAMANTE (T10, `pedidos`) quien tiene que lanzar para abortar la transacción entera (R15). El
+   caso de integración de R30/`insufficient` lo demuestra envolviendo la llamada en su propia
+   `prisma.$transaction` con una señal de rollback, simulando ese contorno.
+4. **Bloqueo de productos, uno por uno y en orden ascendente**, en vez de un único
+   `SELECT ... WHERE id IN (...) FOR NO KEY UPDATE`: no hay precedente en el repo de castear una
+   lista de identificadores dentro de SQL crudo (`Prisma.join` no se usa en ningún sitio), y el
+   patrón de una fila por vez con `${id}::uuid` ya es el que usan `addBatchToAlive` y
+   `adjustBatchStock`. El orden ascendente sigue siendo el mismo tanto en una sentencia como en
+   varias.
+
+### R → test de esta tanda
+
+| R | Qué exige | Test |
+|---|---|---|
+| R12 | Editar recalcula desde cero pero solo asienta la DIFERENCIA por lote | `reservation.int.test.ts` (`'bajar de 10 a 6 deja un reserve de 10 y un release de 4...'`) |
+| R13 | Si tras editar ya no cubre, libera TODO lo apartado | `reservation.int.test.ts` (`'un pedido que ya no cabe en su lote libera su apartado entero'`) |
+| R17 | Ningún asiento de reserva apunta a un pedido de otra empresa | `reservation.int.test.ts` (`'la FK compuesta (order_id, company_id) rechaza un pedido ajeno'`) |
+| R27 | Entregar consume: baja el lote, asienta la salida, asienta el consumo | `reservation.int.test.ts` (`'consumeForOrder baja el lote apartado...'`, `'decrementa condicionalmente y asienta la salida negativa con el pedido'`) |
+| R28 | Recalcula `products.stock` en la misma transacción | `reservation.int.test.ts` (mismo caso de R27: `productStockOf` tras `consumeForOrder`) |
+| R30 | Merma completa desde otros lotes; si no alcanza, rechaza sin cambiar nada | `reservation.int.test.ts` (`'lo que falte en el lote apartado se cubre del siguiente lote...'`, `'SI NI ASI ALCANZA, rechaza la entrega con insufficient...'`) |
+| R32 | No consume dos veces el material de un mismo pedido | `reservation.int.test.ts` (`'una segunda llamada de entrega, sin nada que respaldarla, no vuelve a tocar el lote'`) |
+| R33 | Ajuste que deja el lote sobre-reservado se acepta y lo indica | `reservation.int.test.ts` (`'adjustBatchStock devuelve overReserved...'`), `adjust-batch-stock-prisma.test.ts` (`'R33: un delta que deja el apartado por encima...'`) |
+| R39 | Ningún `UPDATE`/`DELETE` sobre los dos libros en `lib/**` | `reservation.int.test.ts` (`'ni reservation_movements ni inventory_movements se corrigen nunca...'` + detector probado con fuentes fabricadas) |
+
+R1-R11, R14-R16, R18-R26, R29, R31, R34-R38, R40-R48 dependen de T8-T16 y se mapean en esas
+tandas; el mapa completo lo cierra T17.
+
+### Salida de los comandos
+
+**`pnpm run typecheck`**: 9 errores, exactamente los del hallazgo ajeno `product_type_enum`
+(`product-prisma.ts` filtro de `type`, 8 líneas de `product-prisma.test.ts` con
+`Property 'type' is missing`). Ninguno nuevo.
+
+**`pnpm run lint`**: limpio, sin salida.
+
+**Tests**:
+- `tests/integration/inventario/reservation.int.test.ts` (nuevo): **11/11 verdes**, contra la base
+  efímera de integración (`qct_qc141_...`, plantilla reutilizada).
+- `tests/integration/inventario/**` completo: **203/204 pasan**; el único rojo es el censo de
+  columnas de `products` del hallazgo ajeno (`type`).
+- `tests/unit/inventario`, `tests/unit/pedidos`, `tests/unit/recetas`, `tests/unit/asignaciones`:
+  **2032 pasan, 3 fallan** — los tres del hallazgo ajeno (`company-scope.test.ts`,
+  `list-query.test.ts`, `inventario-schema.test.ts`).
+- Guardias (`vitest run guard`): **600 pasan, 1 falla** (`guard-identificador-de-request`, mismo
+  hallazgo ajeno), incluidas `guard-libro-de-inventario` (censo de cuatro caminos),
+  `guard-arquitectura-modulos`, `guard-empresa-en-esquema` en verde.
+- `tests/integration/inventario/inventario-constraints.int.test.ts`,
+  `inventory-movements-constraints.int.test.ts`, `presentation-unit.int.test.ts`: los tres
+  corregidos por `Prisma.Decimal` crudo, **verdes salvo el hallazgo ajeno** (censo de columnas de
+  `products` en `inventario-constraints`).
+- `pnpm exec vitest related` sobre los diez archivos de producción tocados de esta tanda más
+  `tests/integration/inventario` completo: sin ningún rojo nuevo fuera del hallazgo ajeno.
+- No se corrió la suite completa ni E2E (fuera del encargo).
+
+### Lo que queda para T8+
+
+- `reservation-prisma.ts` no se cablea todavía en `lib/composition` (eso es T8, con
+  `OrderUnitOfWork`).
+- `findCoverageByOrderIds`, `findReservedAndAvailableByBatch/Product` están implementadas y
+  probadas indirectamente por los casos de arriba, pero sin pantalla ni caso de uso que las
+  consuma: T13/T14.
+- `OrderNumberDirectory` es solo el tipo; su implementación (driven de `pedidos`) y su cableado son
+  T8 (§5.5).
+
+## Veredicto T7
+
+Hecho cuando pide `tasks.md`: `reservation.int.test.ts` verde para R12, R13, R17, R27, R28, R30,
+R32, R33, R39, y el censo de `guard-libro-de-inventario` pasa con `consumeBatchStock`. Sin
+commits. Dos guardias hermanas (`qc91-alcance`, `qc121-alcance`) se actualizaron para reflejar la
+misma decisión de diseño que ya modificaba `guard-libro-de-inventario` -un cuarto camino de
+escritura con reglas propias, documentadas, no una relajación muda-. Se corrigieron además los
+`Prisma.Decimal` crudos pendientes de la tanda anterior en tres archivos de integración, incluida
+una reescritura de fondo (no solo de forma) en el caso de `qty_alert` que probaba lo contrario de
+lo que la pregunta 5b aprobó.

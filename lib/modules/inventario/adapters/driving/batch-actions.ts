@@ -14,7 +14,7 @@ import { runInRequestScope } from '@/lib/shared/request-scope';
 
 export type AdjustBatchStockFormState =
   | { status: 'idle' }
-  | { status: 'success'; stock: string }
+  | { status: 'success'; stock: string; reserved: string; overReserved: boolean }
   | ErrorState;
 
 export type ProductBatchesResult =
@@ -97,8 +97,8 @@ export async function adjustBatchStockAction(
   const actor = await currentActor();
 
   try {
-    const { stock } = await inventario.adjustBatchStock(candidate, actor);
-    return { status: 'success', stock };
+    const { stock, reserved, overReserved } = await inventario.adjustBatchStock(candidate, actor);
+    return { status: 'success', stock, reserved, overReserved };
   } catch (error) {
     return toErrorState(error);
   }
