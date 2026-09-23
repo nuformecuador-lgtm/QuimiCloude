@@ -2297,6 +2297,72 @@
       "branch": "feature/QC-151-cotizacion-del-coste-en-el-pedido",
       "depends_on": [],
       "spec_path": "specs/QC-151-cotizacion-del-coste-en-el-pedido"
+    },
+    {
+      "key": "QC-153",
+      "id": 153,
+      "epic": "QC-152",
+      "epic_name": "Clientes",
+      "name": "modelo-de-clientes",
+      "description": "La tabla de clientes, su migracion y los permisos nuevos. ACOTADA el 2026-09-23: nombres y apellidos (columnas separadas) y ciudad obligatorios; telefono, correo y direccion opcionales; sin NIT ni persona de contacto; duplicados permitidos; identificadores en ingles, borrado logico, company_id con FK compuesta desde el dia uno; permisos clientes.consultar y clientes.modificar solo del Administrador (enmienda al catalogo, precedente QC-144). Decisiones en specs/QC-153-modelo-de-clientes/requirements.md. NO ENTRA: CRUD (QC-154), pantalla (QC-155), pedido con cliente (QC-156).",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-153-modelo-de-clientes",
+      "depends_on": [],
+      "spec_path": "specs/QC-153-modelo-de-clientes"
+    },
+    {
+      "key": "QC-154",
+      "id": 154,
+      "epic": "QC-152",
+      "epic_name": "Clientes",
+      "name": "crud-de-clientes",
+      "description": "Casos de uso y Server Actions de clientes: alta, edicion, baja logica, detalle y listado paginado con busqueda. Leer exige clientes.consultar y escribir clientes.modificar (solo Administrador), validado en el service. Campos y reglas de QC-153. Decisiones en specs/QC-154-crud-de-clientes/requirements.md. BLOQUEADA POR QC-153.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-154-crud-de-clientes",
+      "depends_on": [
+        "QC-153"
+      ],
+      "spec_path": "specs/QC-154-crud-de-clientes"
+    },
+    {
+      "key": "QC-155",
+      "id": 155,
+      "epic": "QC-152",
+      "epic_name": "Clientes",
+      "name": "pantalla-de-clientes",
+      "description": "Pantalla /clientes: tabla compartida (busqueda, paginacion, orden), panel de alta y edicion, entrada del menu solo con clientes.consultar. E2E si (permisos). Decisiones en specs/QC-155-pantalla-de-clientes/requirements.md. BLOQUEADA POR QC-154.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "frontend",
+      "branch": "feature/QC-155-pantalla-de-clientes",
+      "depends_on": [
+        "QC-154"
+      ],
+      "spec_path": "specs/QC-155-pantalla-de-clientes"
+    },
+    {
+      "key": "QC-156",
+      "id": 156,
+      "epic": "QC-152",
+      "epic_name": "Clientes",
+      "name": "pedido-con-cliente",
+      "description": "El pedido elige un cliente. NACE el 2026-09-23 al acotar la epica Clientes (QC-152): el enlace pedido-cliente no entra en el modulo base. Se acota con /afinar-feature (obligatoriedad, pedidos existentes, donde se ve, quien puede elegirlo si los permisos de clientes son solo del Administrador). BLOQUEADA POR QC-154.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "fullstack",
+      "branch": "feature/QC-156-pedido-con-cliente",
+      "depends_on": [
+        "QC-154"
+      ],
+      "spec_path": "specs/QC-156-pedido-con-cliente"
     }
   ]
 }

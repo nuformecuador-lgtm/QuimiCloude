@@ -18,6 +18,10 @@
 
 ## Evaluaciones
 
+### QC-152 Clientes - EPICA NUEVA del chat, ACOTADA con `/afinar-feature` (2026-09-23)
+
+Epica **QC-152** y tareas **QC-153** (modelo, backend), **QC-154** (CRUD, backend, bloqueada por 153), **QC-155** (pantalla, frontend, bloqueada por 154) y **QC-156** (pedido con cliente, fullstack, bloqueada por 154, sin sembrar). 153-155 sembradas con 7 decisiones comunes y 1 pregunta abierta (largos y formato de telefono/correo) en `specs/QC-15{3,4,5}-*/requirements.md`. `complexity` pendiente de F1.0.
+
 ### QC-151 - CERRADA (2026-09-23)
 
 PR #115 (`6ec67aab`); resumen en `progress/history.md`. **Aviso para QC-141**: al sincronizar con dev chocara con QC-151 en `lib/composition/index.ts`, `lib/modules/pedidos/index.ts` y `order-form.tsx` (cambios de QC-151 aditivos).
