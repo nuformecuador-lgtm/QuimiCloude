@@ -49,16 +49,18 @@ const COMPONENTES_PATH = join(CARPETA_RUTA, 'components');
 const FUENTES_DE_LA_RUTA = fuentesBajo(CARPETA_RUTA);
 
 const RECIPE_PAGE_TEST = 'tests/unit/recetas-ui/recipe-page.test.tsx';
-const SUPPLIER_PAGE_TEST = 'tests/unit/proveedores-ui/supplier-page.test.tsx';
+// 2026-09-23 (QC-140): la lista paginada de proveedores sobre la tabla compartida desaparece
+// (D2 de `specs/QC-140-catalogo-visual-de-proveedores/requirements.md`) y con ella
+// `supplier-page.test.tsx` y `supplier-list-params.test.ts`, que QC-140 T11 borra. La pantalla
+// nueva es un catalogo visual, no una migracion a la tabla compartida, asi que no hay un sucesor
+// que enlazar en su lugar: se retira la fila de proveedores de este censo en vez de apuntarla a un
+// archivo que ya no juega ese papel. Los ADMITIDOS de mas abajo se actualizan al mismo tiempo.
 const ESTE_ARCHIVO = 'tests/unit/shared/migracion-listas-alcance.test.ts';
 
 const TESTS_DE_LA_MIGRACION = [
   RECIPE_PAGE_TEST,
-  SUPPLIER_PAGE_TEST,
   'tests/unit/recetas-ui/recipe-list-params.test.ts',
-  'tests/unit/proveedores-ui/supplier-list-params.test.ts',
   'tests/unit/recetas-ui/recipe-route-contract.test.ts',
-  'tests/unit/proveedores-ui/supplier-route-contract.test.ts',
   ESTE_ARCHIVO,
 ] as const;
 
@@ -97,24 +99,6 @@ const ADMITIDOS = [
     archivo: RECIPE_PAGE_TEST,
     describe: 'borrado de receta — el identificador del error inesperado (QC-71 R17, R18)',
     caso: 'el error inesperado ensena el identificador como texto, con su etiqueta',
-    motivo: MOTIVO_IDENTIFICADOR,
-  },
-  {
-    archivo: SUPPLIER_PAGE_TEST,
-    describe: 'pantalla de proveedores — el identificador del error inesperado (QC-71 R17, R18)',
-    caso: 'la lista con el error inesperado ensena el identificador como texto y con su etiqueta',
-    motivo: MOTIVO_IDENTIFICADOR,
-  },
-  {
-    archivo: SUPPLIER_PAGE_TEST,
-    describe: 'pantalla de proveedores — el identificador del error inesperado (QC-71 R17, R18)',
-    caso: 'el formulario conserva el identificador que devolvio la operacion',
-    motivo: MOTIVO_IDENTIFICADOR,
-  },
-  {
-    archivo: SUPPLIER_PAGE_TEST,
-    describe: 'pantalla de proveedores — el identificador del error inesperado (QC-71 R17, R18)',
-    caso: 'el dialogo de baja ensena el identificador del error inesperado',
     motivo: MOTIVO_IDENTIFICADOR,
   },
 ] as const;
