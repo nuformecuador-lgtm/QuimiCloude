@@ -410,6 +410,12 @@ test.describe('reserva de material del pedido', () => {
       sequence: orderA.orderSequence,
     });
 
+    // `OrderSheet.handleSaved` llama a `router.refresh()` al cerrar el formulario: si el `goto`
+    // de mas abajo sale antes de que ese refresco termine, WebKit lo interrumpe («another
+    // navigation to /pedidos»). Esperar a que la fila de A aparezca en la lista -todavia en esta
+    // misma pagina, sin navegar- es la senal de que el refresco ya se aplico.
+    await expect(rowByNumber(page, orderANumber)).toBeVisible({ timeout: 60_000 });
+
     // --- 2. Inventario refleja el apartado de A: 1.500 reservado, 500 disponible del total de 2.000.
     let productRow = await inventoryRow(page);
     await expect(productRow.getByTestId('product-stock')).toContainText('2000');
@@ -430,6 +436,10 @@ test.describe('reserva de material del pedido', () => {
       sequence: orderB.orderSequence,
     });
 
+    // Mismo motivo que con A: la fila de B recien creada es la senal de que el refresco del
+    // formulario ya se aplico, antes de navegar a Inventario.
+    await expect(rowByNumber(page, orderBNumber)).toBeVisible({ timeout: 60_000 });
+
     productRow = await inventoryRow(page);
     await expect(productRow.getByTestId('product-reserved')).toContainText('1500');
     await expect(productRow.getByTestId('product-available')).toContainText('500');
@@ -445,6 +455,12 @@ test.describe('reserva de material del pedido', () => {
     await page.getByTestId('cancel-order-confirm').click();
     await expect(page.getByTestId('cancel-order-dialog')).toHaveCount(0, { timeout: 60_000 });
 
+    // `CancelOrderDialog` tambien cierra y LUEGO llama a `router.refresh()`: la misma fila de A,
+    // sin navegar, es la senal de que el estado nuevo ya llego antes del `goto` de Inventario.
+    await expect(rowA.getByTestId('order-status')).toHaveAttribute('data-status', 'CANCELADO', {
+      timeout: 60_000,
+    });
+
     productRow = await inventoryRow(page);
     await expect(productRow.getByTestId('product-reserved')).toContainText('0');
     await expect(productRow.getByTestId('product-available')).toContainText('2000');
@@ -454,6 +470,16 @@ test.describe('reserva de material del pedido', () => {
     await openEdit(page, orderBNumber);
     await page.getByTestId('order-form-submit').click();
     await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
+
+    // Reeditar tambien cierra el formulario y despues llama a `router.refresh()`
+    // (`OrderSheet.handleSaved`): la cobertura nueva en la fila de B -sin navegar, `openEdit` ya
+    // nos dejo en `ordersUrl()`- es la senal de que el refresco termino antes del `goto` que hace
+    // `coverageOf`.
+    await expect(rowByNumber(page, orderBNumber).getByTestId('order-coverage')).toHaveAttribute(
+      'data-coverage',
+      'full',
+      { timeout: 60_000 },
+    );
 
     expect(await coverageOf(page, orderBNumber)).toBe('full');
 
@@ -468,6 +494,14 @@ test.describe('reserva de material del pedido', () => {
     await page.locator('[data-testid="order-status-option"][data-value="ENTREGADO"]').click();
     await page.getByTestId('order-form-submit').click();
     await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
+
+    // Mismo patron: el estado nuevo en la fila de B, todavia en `ordersUrl()` sin navegar, es la
+    // senal de que el refresco de `handleSaved` ya termino antes del `goto` de Inventario.
+    await expect(rowByNumber(page, orderBNumber).getByTestId('order-status')).toHaveAttribute(
+      'data-status',
+      'ENTREGADO',
+      { timeout: 60_000 },
+    );
 
     const deliveredOrderB = await prisma.order.findUniqueOrThrow({
       where: { id: orderB.id },

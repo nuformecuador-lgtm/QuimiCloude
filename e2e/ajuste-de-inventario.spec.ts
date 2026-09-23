@@ -397,9 +397,9 @@ test.describe('ajuste de existencia de un lote', () => {
       select: { stock: true },
     });
     expect(
-      productAfterAdjustment?.stock,
+      productAfterAdjustment?.stock.toString(),
       'products.stock debe reflejar el ajuste sin recargar la pagina',
-    ).toBe(expectedStock);
+    ).toBe(String(expectedStock));
 
     // El panel se vuelve a abrir: es lo que desmonta y remonta el historial, para pedirlo de
     // nuevo y ver el asiento que se acaba de escribir.
@@ -449,7 +449,9 @@ test.describe('ajuste de existencia de un lote', () => {
       where: { id: batchId },
       select: { stock: true },
     });
-    expect(after?.stock, 'un ajuste rechazado no puede tocar el stock').toBe(stockBefore);
+    expect(after?.stock.toString(), 'un ajuste rechazado no puede tocar el stock').toBe(
+      stockBefore.toString(),
+    );
 
     const movementsAfter = await prisma.inventoryMovement.count({ where: { batchId } });
     expect(
