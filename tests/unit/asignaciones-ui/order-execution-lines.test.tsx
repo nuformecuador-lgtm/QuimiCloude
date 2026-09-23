@@ -18,11 +18,6 @@ import {
 import type { ExecutionLineView } from '@/lib/modules/asignaciones';
 import type { UnitRef } from '@/lib/modules/unidades';
 
-/**
- * Las lineas de ejecucion: insumo, porcentaje y cantidad (R18, R25), sin factor (R19),
- * el selector de unidad (R20) y la unidad desconocida (R24).
- */
-
 afterEach(() => {
   cleanup();
 });
@@ -58,16 +53,11 @@ function linea(overrides: Partial<ExecutionLineView> = {}): ExecutionLineView {
 
 describe('linea de ejecucion — insumo, porcentaje y cantidad (R18)', () => {
   it('muestra "Hipoclorito · 10,00 % · 20 L" para un pedido de 200 con la linea al 10 %', () => {
-    render(<OrderExecutionLines lines={[linea()]} />);
+    render(<OrderExecutionLines lines={[linea({ alternativeUnits: [] })]} />);
 
-    expect(screen.getByText('Hipoclorito')).toBeVisible();
-    expect(screen.getByTestId(`${ORDER_EXECUTION_LINE_PERCENTAGE_TESTID}-0`)).toHaveTextContent(
-      '10,00 %',
-    );
-    expect(screen.getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-0`)).toHaveTextContent(
-      '20',
-    );
-    expect(screen.getByText('L')).toBeVisible();
+    const fila = screen.getByTestId('order-execution-line-0');
+    // El selector de unidad no aparece sin hermanas: la fila es solo texto, comparable tal cual.
+    expect(fila.textContent?.replace(/\s+/g, ' ').trim()).toBe('Hipoclorito · 10,00 % · 20 L');
   });
 
   it('sin producto resuelto presenta el marcador, nunca un hueco', () => {

@@ -31,6 +31,7 @@ export const ORDER_EXECUTION_LINE_PERCENTAGE_TESTID = 'order-execution-line-perc
 export const ORDER_EXECUTION_LINE_QUANTITY_TESTID = 'order-execution-line-quantity';
 export const ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID = 'order-execution-line-unit-select';
 export const ORDER_EXECUTION_LINE_UNIT_OPTION_TESTID = 'order-execution-line-unit-option';
+export const ORDER_EXECUTION_LINE_UNIT_TESTID = 'order-execution-line-unit';
 export const PRODUCT_NAME_FALLBACK = 'Producto no disponible';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
@@ -61,11 +62,17 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
   return (
     <li data-testid={rowTestId} className="flex flex-wrap items-center gap-3 py-2">
       <span className="min-w-0 flex-1 text-base">{productLabel}</span>
+      <span aria-hidden="true" className="text-base text-muted-foreground">
+        {' · '}
+      </span>
       <span
         data-testid={`${ORDER_EXECUTION_LINE_PERCENTAGE_TESTID}-${index}`}
         className="text-base"
       >
         {formatPercentage(line.percentage)} %
+      </span>
+      <span aria-hidden="true" className="text-base text-muted-foreground">
+        {' · '}
       </span>
       <span
         data-testid={`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-${index}`}
@@ -101,7 +108,13 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
           </SelectContent>
         </Select>
       ) : (
-        <span className="text-base text-muted-foreground">{unitLabel(line.unit)}</span>
+        <span
+          data-testid={`${ORDER_EXECUTION_LINE_UNIT_TESTID}-${index}`}
+          className="text-base text-muted-foreground"
+        >
+          {' '}
+          {unitLabel(line.unit)}
+        </span>
       )}
     </li>
   );

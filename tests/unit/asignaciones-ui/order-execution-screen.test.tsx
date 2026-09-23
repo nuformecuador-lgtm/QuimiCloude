@@ -89,7 +89,7 @@ const EXECUTION_DOS_PASOS: AssignedOrderExecutionView = {
   ],
 };
 
-describe('pantalla de ejecucion — R21: el factor y las cantidades tal cual estan escritas', () => {
+describe('pantalla de ejecucion — sin factor de escala, con la cantidad de la linea ya calculada', () => {
   it('muestra la cantidad del pedido y la cantidad de la linea CARACTER A CARACTER', () => {
     render(<OrderExecutionScreen execution={EXECUTION} />);
 
