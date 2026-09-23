@@ -1,6 +1,6 @@
-// El bloque de coste dentro del formulario de pedido: R8, R9, R11, R12, R13, R14, R20 y R21. La
-// recotizacion en si (R9, R10, R13-R17, R19) ya la cubre `order-cost-quote.test.tsx`; aqui solo se
-// comprueba el CABLEADO con el formulario real.
+// El bloque de coste dentro del formulario de pedido: R8, R9, R11, R12, R13, R14, R20, R21 y R23.
+// La recotizacion en si (R9, R10, R13-R17, R19) ya la cubre `order-cost-quote.test.tsx`; aqui solo
+// se comprueba el CABLEADO con el formulario real.
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { setupUser, esperarInteractiva } from '../../helpers/user-event';
@@ -400,6 +400,39 @@ describe('R20 — lo que se guarda no lleva la cotizacion mostrada', () => {
       ),
     );
     expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeEnabled();
+  });
+});
+
+describe('R23 — en la edicion, elegir otra receta deja la eleccion nueva, sin retirarla', () => {
+  it('la cotizacion se pide con la receta nueva y, al guardar, viaja su id', async () => {
+    const user = setupUser();
+    quoteOrderCostActionMock.mockResolvedValue({
+      status: 'success',
+      data: { ingredientsCost: '30.0000' },
+    });
+    const elPedido = pedido({ ingredientsCost: '40.0000' });
+    renderFormulario(elPedido);
+
+    await elegirReceta(user, RECETA2);
+
+    await waitFor(() =>
+      expect(quoteOrderCostActionMock).toHaveBeenCalledWith({
+        recipeId: RECETA2.id,
+        quantity: elPedido.quantity,
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID).textContent).toBe('$ 30.00'),
+    );
+    expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID).textContent).not.toBe(
+      MISSING_VALUE_MARK,
+    );
+
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
+    const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
+    expect(enviado.get('recipeId')).toBe(RECETA2.id);
   });
 });
 

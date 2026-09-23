@@ -83,6 +83,7 @@ Tests:
 | R20 | `order-form-quote.test.tsx` (claves del FormData; Guardar habilitado en vuelo y con guion) |
 | R21 | `order-cost-quote.test.tsx` (mensaje, UnexpectedErrorNotice, se limpia al acertar), `order-form-quote.test.tsx` (no bloquea guardar) |
 | R22 | `e2e/pedidos-cotizacion.spec.ts` (local, sin red externa) |
+| R23 | `tests/unit/pedidos-ui/order-form-quote.test.tsx` › «R23 — en la edicion, elegir otra receta deja la eleccion nueva, sin retirarla» › «la cotizacion se pide con la receta nueva y, al guardar, viaja su id». Con `recipe-picker.tsx` de `395ff106^` falla (`Expected "$ 30.00", Received "—"`); con el arreglo, el archivo da 12/12 |
 
 ## Salida de la verificación (solo lo relacionado; la suite completa y el gate son del leader)
 
@@ -151,4 +152,6 @@ Verificación de la ronda:
 ## Pendiente
 
 - `./init.sh` completo (gate de T8/cierre): lo corre el leader.
-- Decidir si se acepta el arreglo de `recipe-picker.tsx` (`395ff106`).
+- ~~Decidir si se acepta el arreglo de `recipe-picker.tsx` (`395ff106`).~~ El humano lo aceptó; en el spec
+  queda como R23 (`08c95636`), con su caso propio en `order-form-quote.test.tsx`: `vitest related`
+  da 1 archivo y 12 tests en verde; typecheck y lint, limpios.
