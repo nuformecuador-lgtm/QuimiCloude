@@ -110,7 +110,6 @@ export function createGetAssignedOrderExecution(
       };
     });
 
-    // Una sola llamada si el resumen tiene presentacion; ninguna si no.
     const presentations =
       summary.presentationId === null
         ? []

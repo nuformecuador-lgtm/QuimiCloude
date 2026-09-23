@@ -1,5 +1,3 @@
-// lib/modules/inventario/domain/presentation-catalog.ts
-
 /** Identificador de una presentacion visto DESDE FUERA de `inventario`. */
 export type PresentationId = string;
 

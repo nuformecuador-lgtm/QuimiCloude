@@ -96,8 +96,6 @@ export function createListAssignedOrders(
     const recipes = await deps.recipes.findRefsIncludingDeleted(recipeIds, actor.companyId);
     const recipeNames = new Map(recipes.map((recipe) => [recipe.id, recipe.name]));
 
-    // Los ids de presentacion no nulos de la pagina, deduplicados, con UNA sola llamada -y
-    // ninguna si ningun pedido de la pagina tiene presentacion.
     const presentationIds = [
       ...new Set(
         ordersPage.items

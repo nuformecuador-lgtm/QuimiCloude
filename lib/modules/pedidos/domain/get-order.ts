@@ -92,7 +92,6 @@ export function createGetOrder(
 
     const recipes = await deps.recipes.findRefsIncludingDeleted([row.recipeId], actor.companyId);
 
-    // Una sola llamada al catalogo de presentaciones, ninguna si el pedido no tiene.
     const presentations =
       row.presentationId === null
         ? []

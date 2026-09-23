@@ -161,8 +161,6 @@ export function createListOrders(
 
     const recipeNames = new Map(recipes.map((recipe) => [recipe.id, recipe.name]));
 
-    // Los ids NO NULOS de la pagina, deduplicados, con UNA sola llamada al catalogo de
-    // presentaciones -y ninguna si ningun pedido de la pagina tiene presentacion.
     const presentationIds = [
       ...new Set(
         page.items
