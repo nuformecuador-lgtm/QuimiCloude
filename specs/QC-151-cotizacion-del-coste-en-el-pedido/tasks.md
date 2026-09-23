@@ -8,7 +8,7 @@
 > **Solape con QC-141** (`lib/composition/index.ts` y otros, `design.md > 9`): el humano aceptó el
 > 2026-09-23 arrancar en paralelo; quien mergee segundo resuelve el conflicto.
 
-## [ ] T1 — Esquema y caso de uso de cotización `[primera]`
+## [x] T1 — Esquema y caso de uso de cotización `[primera]`
 
 Archivos: `lib/modules/pedidos/domain/order-input.ts`, `lib/modules/pedidos/domain/quote-order-cost.ts`
 (nuevo), `lib/modules/pedidos/index.ts`, `tests/unit/pedidos/quote-order-cost.test.ts` (nuevo),

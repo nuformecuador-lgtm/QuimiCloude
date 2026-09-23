@@ -79,12 +79,14 @@ export {
   createOrderSchema,
   updateOrderSchema,
   cancelOrderSchema,
+  quoteOrderCostSchema,
   EDITABLE_STATUS_VALUES,
 } from './domain/order-input';
 export type {
   CreateOrderInput,
   UpdateOrderInput,
   CancelOrderInput,
+  QuoteOrderCostInput,
   EditableOrderStatus,
 } from './domain/order-input';
 
@@ -126,3 +128,5 @@ export { createCancelOrder } from './domain/cancel-order';
 export type { CancelOrderDeps } from './domain/cancel-order';
 export { createDeleteOrder } from './domain/delete-order';
 export type { DeleteOrderDeps } from './domain/delete-order';
+export { createQuoteOrderCost } from './domain/quote-order-cost';
+export type { QuoteOrderCostDeps, OrderCostQuote } from './domain/quote-order-cost';
