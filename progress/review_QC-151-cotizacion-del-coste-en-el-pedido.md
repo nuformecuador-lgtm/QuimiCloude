@@ -153,3 +153,75 @@ Los cuatro cambios son mínimos y aditivos. No reordenan nada ni tocan `create-o
 
 Corregir el bloqueante 1, que solo afecta a esos tres comentarios. Después, que el leader corra
 `./init.sh` completo antes del PR. Los menores no bloquean.
+
+---
+
+## Vuelta 2 (2026-09-23)
+
+HEAD `1eebef56`. Commits revisados: `fa7f187c` (bloqueante y menores), `395ff106` (arreglo de
+`recipe-picker.tsx`), `08c95636` (R23 en el spec), `60f26d5e` y `1eebef56` (bitácora y test de R23).
+
+### Veredicto vuelta 2: OK
+
+No queda ningún bloqueante abierto. Quedan 3 menores, ninguno bloquea.
+
+### Verificación ejecutada por el reviewer
+- Repetí el barrido `git diff origin/dev...HEAD -- app lib components` buscando líneas añadidas
+  con `QC-\d+`, `R\d+`, `design.md` o «decisión cerrada». No hay ninguna.
+- `./init.sh --rapido`: typecheck, lint y guardias pasan. `vitest related` (186 archivos): 185 pasan y
+  1 falla, `tests/unit/configuracion-ui/user-table.test.tsx` › «la accion de editar de una fila abre
+  el panel SOBRE ESE usuario». Es ajeno al diff (módulo `configuracion`). Falló por un `findByTestId`
+  que se quedó sin tiempo bajo la carga de la corrida, y **corrido solo pasa, 27/27**. Tampoco está en
+  `tests/baseline-rojos.json`. No es un hallazgo de esta ficha, pero el gate completo del leader
+  puede volver a verlo.
+- **Prueba de que el test de R23 muerde:** restauré `recipe-picker.tsx` a `395ff106^` y corrí
+  `order-form-quote.test.tsx`. Fallan 2/12: el caso de R23 y el de R12 «elegir otra receta». Con
+  el arreglo pasan los 12. Después dejé el archivo como estaba en la rama; el árbol quedó limpio.
+
+### Bloqueante de la vuelta 1: cerrado
+- `order-actions.ts` (los dos comentarios) y `order-input.ts` ya no citan la ficha ni requisitos.
+  Se conservó el porqué.
+
+### Menores de la vuelta 1
+1. Rechazo de transporte: **cerrado.** `.catch` descarta la respuesta si ya no es la vigente,
+   igual que el `.then`, y si lo es pasa a `unexpected` con el mensaje del catálogo
+   (`errorMessage`) y una referencia nueva (`newRequestId`). `newRequestId` es seguro en cliente
+   (usa el global `crypto.randomUUID`, sin imports). Tiene test propio en `order-cost-quote.test.tsx`
+   (error visible con referencia, sin «cotizando…» y sin guion).
+2. Citas en comentarios de tests: **parcialmente cerrado.** Ya no quedan `QC-151 T<n>`. Siguen las
+   listas `R<n>` en comentarios de cabecera (`order-form-quote.test.tsx`, `order-cost-quote.test.tsx`,
+   `order-amount.test.ts`). Además, una línea que el diff reescribe en `authorization.test.ts`
+   conserva `QC-74 T13`. La convención admite `R<n>` en el nombre del caso, no en comentarios. Pasa
+   a ser el menor abierto 2.
+3. Nombres desfasados: **parcialmente cerrado.** `authorization.test.ts` ya dice «siete». En
+   `order-actions.test.ts`, el bloque de sesión incompleta (QC-60 R17) aún se llama `SEIS` y dice
+   «las seis actions», aunque la lista ya tiene siete. Pasa a ser el menor abierto 1.
+4. R12, rama del cambio de receta: **cerrado.** Ahora comprueba que el bloque muestra `$ 30.00`.
+   Fue al escribir este caso cuando salió el defecto de R23.
+5. Comentarios que repetían el código: **cerrado.**
+
+### Ampliación R23 (`recipe-picker.tsx`)
+- **El arreglo es correcto.** La causa está bien diagnosticada: `handleValueChange` leía el estado
+  `selectedName` de un render anterior, dentro del mismo evento en que `choose` lo cambia. El ref
+  síncrono se actualiza en los dos únicos sitios que cambian el nombre elegido, `choose` y la
+  retirada, así que no puede desincronizarse del estado. La regla de retirar la elección cuando lo
+  tecleado deja de coincidir sigue igual y la cubre `recipe-picker.test.tsx` (`onSelect(null)`, que pasa).
+- **No rompe el alta ni otros usos.** `RecipePicker` solo lo usa `order-form.tsx`. No cambia exports
+  (`guard-pantalla-pedidos-se-amplia` pasa). `recipe-picker.test.tsx`, `order-form.test.tsx`,
+  `order-sheet.test.tsx` y `pedidos-viewport.test.tsx` pasan.
+- **Trazabilidad:** R23 está en `requirements.md` con su decisión fechada, `design.md` §14 incluye
+  una alternativa descartada, y `tasks.md` y el mapa de la bitácora lo recogen.
+
+### Menores abiertos (vuelta 2)
+1. `order-actions.test.ts`: la constante `SEIS`, el título «las seis actions bajan actor null» y los
+   comentarios del bloque QC-60 R17 hablan de seis cuando la lista tiene siete.
+2. Comentarios de tests con citas: listas `R<n>` en cabeceras y `QC-74 T13` en una línea reescrita
+   de `authorization.test.ts` (`docs/conventions.md > Comentarios`, apartado de tests).
+3. `design.md` §14 dice que en el alta el defecto «no se veía porque no hay receta previa». No es
+   del todo exacto: en el alta, elegir A y luego B tenía el mismo fallo, porque `selectedName`
+   ya vale A. El arreglo lo cubre igual, porque el código es el mismo, pero no hay un caso de alta
+   A→B. Recomendable corregir la frase y añadir ese caso.
+
+### Qué falta
+Nada bloqueante. Antes del PR, `./init.sh` completo (leader) y el E2E `pedidos-cotizacion.spec.ts`,
+que en esta vuelta no volví a correr.
