@@ -40,8 +40,6 @@ import {
   ORDER_PRIORITY_OPTION_TESTID,
   ORDER_PRIORITY_SELECT_TESTID,
   ORDER_STATUS_FIELD,
-  ORDER_STATUS_LABELS,
-  ORDER_STATUS_OPTION_TESTID,
   ORDER_STATUS_SELECT_TESTID,
   OrderForm,
   RECIPE_FIELD,
@@ -56,7 +54,6 @@ import {
 import { Sheet } from '@/components/ui/sheet';
 import {
   DEFAULT_ORDER_PRIORITY,
-  EDITABLE_STATUS_VALUES,
   ORDER_PRIORITY_VALUES,
   formatOrderNumber,
   type OrderSummary,
@@ -483,9 +480,10 @@ describe('la presentación del pedido (R16, R17, R18, R19)', () => {
   });
 });
 
-describe('formulario de edicion de pedido (R28, R29, R34)', () => {
-  it('precarga los valores actuales y envia el REEMPLAZO COMPLETO mas el estado', async () => {
-    // R28 — no hay envio por campos sueltos: se manda todo el conjunto de negocio y el estado.
+describe('formulario de edicion de pedido (R7, R28, R34)', () => {
+  it('precarga los valores actuales y envia el REEMPLAZO COMPLETO del conjunto de negocio', async () => {
+    // R28 — no hay envio por campos sueltos: se manda todo el conjunto de negocio, y nada de
+    // estado (R7).
     const user = setupUser();
     const elPedido = pedido();
     renderFormulario(elPedido);
@@ -503,28 +501,26 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
     // `bind(null, id)`: el id es el PRIMER argumento de la action, no un campo del formulario.
     expect(updateOrderActionMock.mock.calls[0]?.[0]).toBe(elPedido.id);
     const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
-    for (const campo of [...ORDER_BUSINESS_FIELDS, ORDER_STATUS_FIELD]) {
+    for (const campo of ORDER_BUSINESS_FIELDS) {
       expect(enviado.get(campo), `falta el campo «${campo}»`).not.toBeNull();
     }
     expect(enviado.get(RECIPE_FIELD)).toBe(elPedido.recipeId);
     expect(enviado.get('priority')).toBe(elPedido.priority);
-    expect(enviado.get(ORDER_STATUS_FIELD)).toBe(elPedido.status);
     expect(createOrderActionMock).not.toHaveBeenCalled();
   });
 
-  it('el selector de estado ofrece los editables del contrato y NUNCA «CANCELADO»', async () => {
-    // R29 — `EDITABLE_STATUS_VALUES` excluye `CANCELADO` por construccion. El unico camino a
-    // cancelado es `cancelOrderAction`, y el doble de esa action falla si se le llama.
+  it('R7: la edicion no ofrece ningun control de estado ni lo envia', async () => {
     const user = setupUser();
-    renderFormulario(pedido());
+    const elPedido = pedido();
+    renderFormulario(elPedido);
 
-    await user.click(screen.getByTestId(ORDER_STATUS_SELECT_TESTID));
+    expect(screen.queryByTestId(ORDER_STATUS_SELECT_TESTID)).toBeNull();
 
-    const opciones = await screen.findAllByTestId(ORDER_STATUS_OPTION_TESTID);
-    const valores = opciones.map((o) => o.getAttribute('data-value'));
-    expect(valores).toEqual([...EDITABLE_STATUS_VALUES]);
-    expect(valores).not.toContain('CANCELADO');
-    expect(opciones.map((o) => o.textContent)).not.toContain(ORDER_STATUS_LABELS.CANCELADO);
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
+    const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
+    expect(enviado.get(ORDER_STATUS_FIELD)).toBeNull();
   });
 
   it('«recipe_not_found» se pinta junto al SELECTOR DE RECETA, no en la region del formulario', async () => {
@@ -550,12 +546,9 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
     expect(onSaved).not.toHaveBeenCalled();
   });
 
-  it('«invalid_transition» va al selector de estado', async () => {
-    // R34 — el resto de la tabla de `design.md > 8`, tambien por codigo.
-    //
-    // QC-35bis (2026-09-07): este caso comprobaba TAMBIEN que «unit_not_found» iba al selector de
-    // unidad. Ese codigo ya no lo emite nadie -la unidad salio del pedido, y con ella
-    // `UnitNotFoundError`-, asi que la mitad que sobrevive es la de la transicion.
+  it('R7: «invalid_transition» va a la region general del formulario, sin campo de estado que senalar', async () => {
+    // Sin selector de estado (R7), `invalid_transition` ya no puede senalar ningun campo: cae
+    // en la region general, junto con `duplicate_number` y compania.
     const user = setupUser();
 
     updateOrderActionMock.mockResolvedValue({
@@ -567,11 +560,10 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
 
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
-    await waitFor(() =>
-      expect(screen.getByTestId(`order-error-${ORDER_STATUS_FIELD}`)).toBeInTheDocument(),
-    );
-    // El aviso va al CAMPO, no a la region general del formulario.
-    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
+    const region = await screen.findByTestId(ORDER_FORM_ERROR_TESTID);
+    expect(region).toHaveAttribute('role', 'alert');
+    expect(screen.getByTestId('order-form-error-code')).toHaveTextContent('invalid_transition');
+    expect(screen.queryByTestId(`order-error-${ORDER_STATUS_FIELD}`)).toBeNull();
     expect(onSaved).not.toHaveBeenCalled();
   });
 
