@@ -142,7 +142,7 @@
     aviso. `catalog-route-contract.test.ts` sigue en verde: el detalle no importa de `../components`.
   - Depende de: T7.
 
-- [ ] **T9 [P con T8] — Parámetros y filtros.** `supplier-showcase-params.ts` (nombres de los dos
+- [x] **T9 [P con T8] — Parámetros y filtros.** `supplier-showcase-params.ts` (nombres de los dos
   parámetros, parseo y `showcaseHref` derivado de `SUPPLIERS_ROUTE`) y
   `supplier-showcase-filters.tsx`.
   - Archivos: `app/(private)/proveedores/components/supplier-showcase-params.ts`,
@@ -153,7 +153,7 @@
     controles con `min-h-11` (R39), y «limpiar» vacía los dos filtros.
   - Depende de: T6.
 
-- [ ] **T10 [P con T8, T9] — Tarjeta, fila y disparador.** `showcase-line-card.tsx` (reutiliza
+- [x] **T10 [P con T8, T9] — Tarjeta, fila y disparador.** `showcase-line-card.tsx` (reutiliza
   `EntityImage` a 60 px); `supplier-showcase-row.tsx` (enlace con `supplierDetailRoute`, «Sin
   productos todavía» con enlace a la ficha, carrusel accesible, «cargar más», aviso con
   «Reintentar» en la fila); y `showcase-load-trigger.tsx`, que es el **único** importador de
