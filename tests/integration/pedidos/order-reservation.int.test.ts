@@ -42,12 +42,13 @@ import {
   createCancelOrder,
   createCreateOrder,
   createDeleteOrder,
+  createTransitionOrder,
   createUpdateOrder,
   InsufficientMaterialError,
   RecipeWithoutLinesError,
 } from '@/lib/modules/pedidos';
 
-import type { Actor, NewOrder } from '@/lib/modules/pedidos';
+import type { Actor, NewOrder, OrderCatalog } from '@/lib/modules/pedidos';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
@@ -101,6 +102,10 @@ const createOrder = createCreateOrder({ recipes, products, units, presentations,
 const updateOrder = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork, now: () => new Date() });
 const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date() });
 const deleteOrder = createDeleteOrder({ orders, unitOfWork, now: () => new Date() });
+
+/** El camino del Finalizar de la planta: `OrderCatalog['transitionAliveById']` cableado igual
+ *  que `lib/composition`, sin pasar por `asignaciones`. */
+const transitionAliveById: OrderCatalog['transitionAliveById'] = createTransitionOrder({ unitOfWork, recipes });
 
 // ---------------------------------------------------------------------------
 // Empresa efimera
@@ -493,6 +498,161 @@ describe('R50 — entregar sin apartado y con receta sin lineas rechaza con reci
         updateOrder(creado.id, nuevoPedido(recipeId, fixture.presentationId, '10.0000', 'ENTREGADO'), actorDe(fixture)),
       ).rejects.toBeInstanceOf(RecipeWithoutLinesError);
 
+      expect(await movimientosDe(creado.id)).toEqual([]);
+      const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true } });
+      expect(row.status).toBe('PENDIENTE');
+    } finally {
+      await borrarFixture(fixture, []);
+    }
+  });
+});
+
+describe('QC-141 T10 — el Finalizar consume (R27, R28, R32)', () => {
+  it('R27, R28: Finalizar baja el lote apartado, asienta consume y recalcula la existencia', async () => {
+    const fixture = await crearFixture();
+    const { productId, batchId } = await crearProductoConLote(fixture, '100');
+    const recipeId = await crearReceta(fixture);
+    await crearLineaCompleta(recipeId, productId);
+
+    try {
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      expect(await stockDe(batchId)).toBe('100.0000');
+
+      const resultado = await transitionAliveById(
+        creado.id,
+        fixture.companyId,
+        'PENDIENTE',
+        'ENTREGADO',
+        fixture.actorId,
+        new Date(),
+      );
+
+      expect(resultado).toBe('ok');
+      expect(await stockDe(batchId)).toBe('90.0000');
+      const movimientos = await movimientosDe(creado.id);
+      expect(movimientos.map((m) => m.kind)).toEqual(['reserve', 'consume']);
+      expect(movimientos.at(-1)).toMatchObject({ kind: 'consume', quantity: '10.0000' });
+      expect(await reservedAtDe(creado.id)).toBeNull();
+      const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true } });
+      expect(row.status).toBe('ENTREGADO');
+    } finally {
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+
+  it('R32: un segundo Finalizar sobre el mismo pedido no consume otra vez', async () => {
+    const fixture = await crearFixture();
+    const { productId, batchId } = await crearProductoConLote(fixture, '100');
+    const recipeId = await crearReceta(fixture);
+    await crearLineaCompleta(recipeId, productId);
+
+    try {
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+
+      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'ENTREGADO', fixture.actorId, new Date());
+      // ENTREGADO no admite ninguna transicion (design.md > 5): un segundo intento, con
+      // ENTREGADO como `from`, es ilegal por construccion y no vuelve a tocar el inventario.
+      await expect(
+        transitionAliveById(creado.id, fixture.companyId, 'ENTREGADO', 'ENTREGADO', fixture.actorId, new Date()),
+      ).rejects.toThrow();
+
+      expect(await stockDe(batchId)).toBe('90.0000');
+      const movimientos = await movimientosDe(creado.id);
+      expect(movimientos.filter((m) => m.kind === 'consume')).toHaveLength(1);
+    } finally {
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+});
+
+describe('QC-141 T10 — Finalizar sin material suficiente (R30, R31)', () => {
+  it('R30, R31: sin alcanzar en ningun lote, rechaza con insufficient_material sin cambiar nada', async () => {
+    const fixture = await crearFixture();
+    const { productId, batchId } = await crearProductoConLote(fixture, '5');
+    const recipeId = await crearReceta(fixture);
+    await crearLineaCompleta(recipeId, productId);
+
+    try {
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '5.0000'), actorDe(fixture));
+      expect(await stockDe(batchId)).toBe('5.0000');
+
+      // La existencia merma por fuera de la reserva (una merma de otro camino), y al Finalizar
+      // ya no alcanza lo apartado ni el resto de lotes con disponible.
+      await prisma.productBatch.update({ where: { id: batchId }, data: { stock: '0' } });
+
+      const resultado = await transitionAliveById(
+        creado.id,
+        fixture.companyId,
+        'PENDIENTE',
+        'ENTREGADO',
+        fixture.actorId,
+        new Date(),
+      );
+
+      expect(resultado).toBe('insufficient_material');
+      expect(await stockDe(batchId)).toBe('0.0000');
+      const movimientos = await movimientosDe(creado.id);
+      expect(movimientos.map((m) => m.kind)).toEqual(['reserve']);
+      const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true } });
+      expect(row.status).toBe('PENDIENTE');
+    } finally {
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+
+  it('R31: sin nada apartado, calcula con la receta actual y consume si alcanza', async () => {
+    const fixture = await crearFixture();
+    const { productId, batchId } = await crearProductoConLote(fixture, '100');
+    const recipeId = await crearReceta(fixture);
+    const recipeVacia = await crearReceta(fixture);
+    await crearLineaCompleta(recipeId, productId);
+
+    try {
+      // Se crea con la receta VACIA -no aparta nada- y se recarga con lineas por fuera del
+      // caso de uso, como en R14: el pedido llega al Finalizar sin nada apartado.
+      const creado = await createOrder(nuevoPedido(recipeVacia, fixture.presentationId, '10.0000'), actorDe(fixture));
+      expect(await movimientosDe(creado.id)).toEqual([]);
+      await prisma.order.update({ where: { id: creado.id }, data: { recipeId } });
+
+      const resultado = await transitionAliveById(
+        creado.id,
+        fixture.companyId,
+        'PENDIENTE',
+        'ENTREGADO',
+        fixture.actorId,
+        new Date(),
+      );
+
+      expect(resultado).toBe('ok');
+      expect(await stockDe(batchId)).toBe('90.0000');
+      // N2: sin apartado previo no hay nada que resolver en `reservation_movements` -la salida
+      // fisica queda en `inventory_movements`, asentada por `consumeBatchStock`-.
+      expect(await movimientosDe(creado.id)).toEqual([]);
+    } finally {
+      await borrarFixture(fixture, [productId]);
+    }
+  });
+});
+
+describe('QC-141 T10 — Finalizar de un pedido sin apartado y receta sin lineas (R50)', () => {
+  it('rechaza con recipe_without_lines sin cambiar el pedido ni el inventario', async () => {
+    const fixture = await crearFixture();
+    const recipeId = await crearReceta(fixture);
+
+    try {
+      const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
+      expect(await movimientosDe(creado.id)).toEqual([]);
+
+      const resultado = await transitionAliveById(
+        creado.id,
+        fixture.companyId,
+        'PENDIENTE',
+        'ENTREGADO',
+        fixture.actorId,
+        new Date(),
+      );
+
+      expect(resultado).toBe('recipe_without_lines');
       expect(await movimientosDe(creado.id)).toEqual([]);
       const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true } });
       expect(row.status).toBe('PENDIENTE');
