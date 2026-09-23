@@ -348,4 +348,42 @@ test.describe('busqueda en la pantalla de pedidos', () => {
     await expect(searchBox).toHaveValue(SEARCH_TERM_C);
     expect(await visibleOrderNumbers(page)).toEqual(secondPageNumbers);
   });
+
+  test('Atras entre dos terminos distintos deja la caja con el termino de la URL (R27)', async ({
+    page,
+  }) => {
+    if (!companyId || !recipeAId || !recipeBId || !recipeCId) {
+      throw new Error('el fixture no existe: fallo el beforeAll');
+    }
+    const year = new Date().getUTCFullYear();
+    const expectedANumbers = [
+      formatOrderNumber({ year, sequence: 1 }),
+      formatOrderNumber({ year, sequence: 2 }),
+      formatOrderNumber({ year, sequence: 3 }),
+    ];
+
+    await loginAndLand(page, { username: adminUsername, password: adminPassword });
+    await page.goto(ordersUrl());
+    await expect(page.getByTestId(ORDERS_TITLE)).toBeVisible({ timeout: 60_000 });
+
+    const searchBox = page.getByTestId(SEARCH_BOX);
+    await searchBox.fill(SEARCH_TERM_A_AND_B);
+    await page.waitForURL((url) => url.searchParams.get('q') === SEARCH_TERM_A_AND_B, {
+      timeout: 60_000,
+    });
+
+    await searchBox.fill(SEARCH_TERM_C);
+    await page.waitForURL((url) => url.searchParams.get('q') === SEARCH_TERM_C, {
+      timeout: 60_000,
+    });
+
+    await page.goBack();
+    await page.waitForURL((url) => url.searchParams.get('q') === SEARCH_TERM_A_AND_B, {
+      timeout: 60_000,
+    });
+    await expect(searchBox).toHaveValue(SEARCH_TERM_A_AND_B);
+
+    const numbers = await visibleOrderNumbers(page);
+    expect(numbers.sort()).toEqual([...expectedANumbers].sort());
+  });
 });

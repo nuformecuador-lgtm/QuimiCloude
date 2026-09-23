@@ -133,13 +133,34 @@ export function OrderTable({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   /*
-    `boxEpoch` remonta la caja de busqueda SOLO en el clic de «Limpiar»: la instancia de
-    `DataTableSearchField` guarda su borrador una vez al montarse, asi que sin remontarla seguiria
-    mostrando el termino viejo aunque la navegacion ya haya vuelto sin `q`. `clearing` adelanta el
-    vaciado mientras esa navegacion todavia esta en vuelo.
+    `boxEpoch` remonta la caja de busqueda: la instancia de `DataTableSearchField` guarda su
+    borrador una vez al montarse, asi que sin remontarla seguiria mostrando el termino viejo tanto
+    tras «Limpiar» como tras un cambio de `params.search` que no vino de la propia caja (Atras,
+    otro enlace). `clearing` adelanta el vaciado del «Limpiar» mientras esa navegacion todavia esta
+    en vuelo.
   */
   const [boxEpoch, setBoxEpoch] = useState(0);
   const [clearing, setClearing] = useState(false);
+  /*
+    Terminos que esta misma caja pidio (por tecleo o por «Limpiar») y cuya vuelta por `params`
+    todavia no se vio. Al llegar un `params.search` distinto del ultimo visto: si esta en esta
+    cola, era la propia caja esperando su eco -se descarta ese termino y los anteriores, sin
+    remontar-; si no esta, el cambio vino de fuera y toca remontar para que la caja nazca con el
+    termino nuevo.
+    Comparacion durante el render (no en un efecto) para que el remonte llegue en el mismo commit,
+    sin parpadeo del termino viejo.
+  */
+  const [pendingSearches, setPendingSearches] = useState<readonly string[]>([]);
+  const [lastSearch, setLastSearch] = useState(params.search);
+  if (params.search !== lastSearch) {
+    setLastSearch(params.search);
+    const index = pendingSearches.indexOf(params.search);
+    if (index === -1) {
+      setBoxEpoch((epoch) => epoch + 1);
+    } else {
+      setPendingSearches(pendingSearches.slice(index + 1));
+    }
+  }
   // Las columnas se construyen con sus dependencias (`buildOrderColumns`). `useMemo` para que la
   // identidad del array no cambie en cada render y la tabla compartida no se reconstruya entera.
   const columns = useMemo(
@@ -169,12 +190,17 @@ export function OrderTable({
   // de mandar los que esta funcion adelantaba mientras la navegacion de «Limpiar» volvia.
   const handleParamsChange = (next: DataTableParams) => {
     setClearing(false);
-    navigate(orderListHref(withSearchResetsPage(params, next)));
+    const target = withSearchResetsPage(params, next);
+    if (target.search !== params.search) {
+      setPendingSearches((pending) => [...pending, target.search]);
+    }
+    navigate(orderListHref(target));
   };
 
   const handleClearSearch = (event: MouseEvent<HTMLAnchorElement>) => {
     if (noMatches === undefined || !isPlainClick(event)) return;
     event.preventDefault();
+    setPendingSearches((pending) => [...pending, '']);
     setBoxEpoch((epoch) => epoch + 1);
     setClearing(true);
     navigate(noMatches.clearHref);

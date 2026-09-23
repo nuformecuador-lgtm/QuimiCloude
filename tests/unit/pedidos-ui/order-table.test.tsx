@@ -453,3 +453,83 @@ describe('sin coincidencias: «Limpiar la busqueda» navega y vacia la caja (R15
     expect(routerMock.push).not.toHaveBeenCalled();
   });
 });
+
+describe('la caja sigue a la URL cuando el termino cambia por fuera (R27)', () => {
+  it('un `params.search` externo, ajeno a la caja, se muestra tras el rerender', () => {
+    const params = parametros({ search: 'acido' });
+    const { rerender } = render(
+      <OrderTable orders={PEDIDOS} params={params} totalPages={3} recipes={RECETAS} units={UNIDADES} />,
+    );
+
+    expect(screen.getByTestId('data-table-search')).toHaveValue('acido');
+
+    rerender(
+      <OrderTable
+        orders={PEDIDOS}
+        params={{ ...params, search: 'base' }}
+        totalPages={3}
+        recipes={RECETAS}
+        units={UNIDADES}
+      />,
+    );
+
+    expect(screen.getByTestId('data-table-search')).toHaveValue('base');
+  });
+
+  it('el termino que la propia caja emitio no la remonta: mismo nodo, foco y texto (R27, R11)', async () => {
+    vi.useFakeTimers();
+    const params = parametros();
+    const { rerender } = render(
+      <OrderTable orders={PEDIDOS} params={params} totalPages={3} recipes={RECETAS} units={UNIDADES} />,
+    );
+
+    const caja = screen.getByTestId('data-table-search');
+    caja.focus();
+    fireEvent.change(caja, { target: { value: 'acido' } });
+    await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
+    vi.useRealTimers();
+
+    rerender(
+      <OrderTable
+        orders={PEDIDOS}
+        params={{ ...params, search: 'acido' }}
+        totalPages={3}
+        recipes={RECETAS}
+        units={UNIDADES}
+      />,
+    );
+
+    expect(screen.getByTestId('data-table-search')).toBe(caja);
+    expect(caja).toHaveFocus();
+    expect(caja).toHaveValue('acido');
+  });
+
+  it('la carrera del rebote: seguir tecleando tras emitir no se pierde cuando llega la respuesta vieja (R27, R11)', async () => {
+    vi.useFakeTimers();
+    const params = parametros();
+    const { rerender } = render(
+      <OrderTable orders={PEDIDOS} params={params} totalPages={3} recipes={RECETAS} units={UNIDADES} />,
+    );
+
+    const caja = screen.getByTestId('data-table-search');
+    caja.focus();
+    fireEvent.change(caja, { target: { value: 'a' } });
+    await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
+    fireEvent.change(caja, { target: { value: 'ab' } });
+    vi.useRealTimers();
+
+    rerender(
+      <OrderTable
+        orders={PEDIDOS}
+        params={{ ...params, search: 'a' }}
+        totalPages={3}
+        recipes={RECETAS}
+        units={UNIDADES}
+      />,
+    );
+
+    expect(screen.getByTestId('data-table-search')).toBe(caja);
+    expect(caja).toHaveFocus();
+    expect(caja).toHaveValue('ab');
+  });
+});
