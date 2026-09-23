@@ -175,14 +175,13 @@ const PRODUCT_1_NAME = 'Ácido cítrico';
 const PRODUCT_2_NAME = 'Sosa cáustica';
 const PRODUCT_PAGE2_NAME = 'Glicerina de página 2';
 const PRODUCT_WITH_UNIT_NAME = 'Hipoclorito de sodio';
-/** «nombre · unidad» tal como lo pinta `ProductPicker` para `PRODUCT_WITH_UNIT`. */
-const PRODUCT_WITH_UNIT_LABEL = `${PRODUCT_WITH_UNIT_NAME} · L`;
+/** Nombre tal como lo pinta `ProductPicker` para `PRODUCT_WITH_UNIT` (sin unidad en fórmulas). */
+const PRODUCT_WITH_UNIT_LABEL = PRODUCT_WITH_UNIT_NAME;
 
 /**
  * Página 1 precargada del selector de ingrediente. `PRODUCT_1` y `PRODUCT_2` NO tienen ningún
  * lote: sin lote no hay unidad que mostrar, y la receta se puede guardar igual con esas
- * líneas. `PRODUCT_WITH_UNIT` SÍ tiene unidad guardada, para probar que se ve «nombre · unidad»
- * junto al ingrediente elegido.
+ * líneas. `PRODUCT_WITH_UNIT` SÍ tiene unidad guardada, y aun así se ve solo el nombre.
  */
 const PRODUCT_PAGE_1 = {
   items: [
@@ -237,13 +236,31 @@ function recipeDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
   };
 }
 
+const MACHINE_PAGE = {
+  items: [],
+  totalPages: 1,
+};
+
 function renderCreateForm() {
-  return render(<RecipeForm mode="create" units={UNITS} initialProductPage={PRODUCT_PAGE_1} />);
+  return render(
+    <RecipeForm
+      mode="create"
+      units={UNITS}
+      initialProductPage={PRODUCT_PAGE_1}
+      initialMachinePage={MACHINE_PAGE}
+    />,
+  );
 }
 
 function renderEditForm(recipe: RecipeDetail) {
   return render(
-    <RecipeForm mode="edit" recipe={recipe} units={UNITS} initialProductPage={PRODUCT_PAGE_1} />,
+    <RecipeForm
+      mode="edit"
+      recipe={recipe}
+      units={UNITS}
+      initialProductPage={PRODUCT_PAGE_1}
+      initialMachinePage={MACHINE_PAGE}
+    />,
   );
 }
 
@@ -822,7 +839,13 @@ describe('R28 — el selector de producto alcanza la segunda página sin filtrar
     scrollAlFinalDelSelector('recipe-line-product-0');
 
     await waitFor(() =>
-      expect(listProductsActionMock).toHaveBeenCalledWith({ page: 2, pageSize: MAX_PAGE_SIZE }),
+      expect(listProductsActionMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          page: 2,
+          pageSize: MAX_PAGE_SIZE,
+          filters: { type: { kind: 'select', values: ['PRODUCT'] } },
+        }),
+      ),
     );
 
     const opcionPagina2 = await screen.findByRole('option', { name: PRODUCT_PAGE2_NAME });
@@ -841,13 +864,17 @@ describe('R28 — el selector de producto alcanza la segunda página sin filtrar
     await user.type(screen.getByTestId('recipe-line-product-0'), 'áci');
 
     // La prueba de que no filtra en cliente es que el término VIAJA al backend: si el
-    // componente recortara `items` por su cuenta, esta llamada no existiría.
+    // componente recortara `items` por su cuenta, esta llamada no existiría. El tab de
+    // ingredientes suma su filtro de tipo a la misma llamada.
     await waitFor(() =>
-      expect(listProductsActionMock).toHaveBeenCalledWith({
-        page: 1,
-        pageSize: MAX_PAGE_SIZE,
-        search: 'áci',
-      }),
+      expect(listProductsActionMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          page: 1,
+          pageSize: MAX_PAGE_SIZE,
+          search: 'áci',
+          filters: { type: { kind: 'select', values: ['PRODUCT'] } },
+        }),
+      ),
     );
   });
 });
@@ -866,7 +893,7 @@ describe('R12 — sin selector de unidad; el ingrediente se ve con su unidad', (
     expect(screen.getByTestId('recipe-line-percentage-0')).toHaveAttribute('type', 'text');
   });
 
-  it('el ingrediente elegido se ve como «nombre · unidad» cuando el insumo la tiene', async () => {
+  it('el ingrediente elegido se ve solo con su nombre aunque el insumo tenga unidad', async () => {
     const user = setupUser();
     renderCreateForm();
 
@@ -878,7 +905,7 @@ describe('R12 — sin selector de unidad; el ingrediente se ve con su unidad', (
     expect(screen.getByTestId('recipe-line-product-0')).toHaveValue(PRODUCT_WITH_UNIT_LABEL);
   });
 
-  it('en edición, la línea precargada trae la unidad del producto y se ve igual', () => {
+  it('en edición, la línea precargada se ve solo con el nombre del producto', () => {
     renderEditForm(
       recipeDetail({
         lines: [
@@ -929,7 +956,8 @@ describe('R31 — dos líneas del mismo producto y un porcentaje inválido no se
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta sin repetidos');
-    await addValidLine(user, 0, { percentage: '100' });
+    // Al 60 % el `+` sigue habilitado; al 100 % ya no dejaría pedir la segunda línea.
+    await addValidLine(user, 0, { percentage: '60' });
 
     await user.click(screen.getByTestId('recipe-line-add-0'));
     await user.click(screen.getByTestId('recipe-line-product-1'));
@@ -946,15 +974,19 @@ describe('R31 — dos líneas del mismo producto y un porcentaje inválido no se
     // La suma solo cuenta lo que casa el patrón (`sumPercentages`): con la primera línea al
     // 100 % y la segunda con un texto inválido -que no suma nada-, el indicador da por completa
     // la suma y el botón se habilita, pero el ESQUEMA sigue rechazando la segunda línea por su
-    // formato, sin escribir ninguna fila.
+    // formato, sin escribir ninguna fila. La segunda línea se pide ANTES de completar el
+    // 100 %: al 100 % el `+` ya no deja agregarla.
     const user = setupUser();
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta con porcentaje inválido');
-    await addValidLine(user, 0, { productName: PRODUCT_1_NAME, percentage: '100' });
+    await addValidLine(user, 0, { productName: PRODUCT_1_NAME, percentage: '60' });
     await user.click(screen.getByTestId('recipe-line-add-0'));
     await chooseProductForLine(user, 1, PRODUCT_2_NAME);
     await user.type(screen.getByTestId('recipe-line-percentage-1'), 'abc'); // no cumple el patrón decimal
+    // Se completa la primera línea hasta el 100 % con la segunda ya creada.
+    await user.clear(screen.getByTestId('recipe-line-percentage-0'));
+    await user.type(screen.getByTestId('recipe-line-percentage-0'), '100');
 
     expect(screen.getByTestId('recipe-form-submit')).toBeEnabled();
     await user.click(screen.getByTestId('recipe-form-submit'));

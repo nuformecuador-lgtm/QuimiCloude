@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import { getRecipeAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
@@ -52,10 +53,19 @@ export default async function EditarRecetaPage({
 
   const { id } = await params;
 
-  const [recipeResult, unitsResult, productsResult] = await Promise.all([
+  const [recipeResult, unitsResult, productsResult, machinesResult] = await Promise.all([
     getRecipeAction(id),
     listUnitsAction(),
-    listProductsAction({ page: FIRST_PAGE, pageSize: MAX_PAGE_SIZE }),
+    listProductsAction({
+      page: FIRST_PAGE,
+      pageSize: MAX_PAGE_SIZE,
+      filters: { type: { kind: 'select', values: [PRODUCT_TYPES.PRODUCT] } },
+    }),
+    listProductsAction({
+      page: FIRST_PAGE,
+      pageSize: MAX_PAGE_SIZE,
+      filters: { type: { kind: 'select', values: [PRODUCT_TYPES.MACHINE] } },
+    }),
   ]);
 
   if (recipeResult.status === 'error') {
@@ -104,6 +114,14 @@ export default async function EditarRecetaPage({
     );
   }
 
+  if (machinesResult.status === 'error') {
+    return (
+      <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
+        <RecipeListError error={machinesResult} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
       <h1 data-testid="recipe-form-title" className="text-2xl font-semibold">
@@ -120,6 +138,14 @@ export default async function EditarRecetaPage({
             unitId: item.unitId,
           })),
           totalPages: productsResult.data.totalPages,
+        }}
+        initialMachinePage={{
+          items: machinesResult.data.items.map((item) => ({
+            id: item.id,
+            name: item.name,
+            unitId: item.unitId,
+          })),
+          totalPages: machinesResult.data.totalPages,
         }}
       />
     </div>
