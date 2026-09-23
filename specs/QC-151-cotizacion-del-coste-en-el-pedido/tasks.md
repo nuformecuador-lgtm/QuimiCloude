@@ -85,7 +85,7 @@ Archivos: `app/(private)/pedidos/components/order-amount.ts` (nuevo),
 `pedidos-convenciones.test.ts` (`conversionesDeImporte`) y `guard-pantalla-pedidos-se-amplia.test.ts`
 verdes.
 
-## [ ] T5 — Estado y bloque de la cotización `[P con T1-T4]` (necesita la firma de T3; con un doble basta)
+## [x] T5 — Estado y bloque de la cotización `[P con T1-T4]` (necesita la firma de T3; con un doble basta)
 
 Archivos: `app/(private)/pedidos/components/use-order-cost-quote.ts` (nuevo),
 `app/(private)/pedidos/components/order-cost-quote.tsx` (nuevo),
