@@ -378,7 +378,7 @@ export function OrderForm({
   // 0.13 sin que nadie lo pidiera-.
   const [quantity, setQuantity] = useState(trimDecimal(order?.quantity ?? ''));
 
-  /** Cotizacion del coste de ingredientes de la receta y cantidad elegidas. */
+  /** Arranca con el importe guardado en la edicion; `null` en el alta. */
   const quote = useOrderCostQuote(order?.ingredientsCost ?? null);
 
   const recipeName = recipe?.name ?? '';

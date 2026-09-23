@@ -234,7 +234,7 @@ describe('pedidos — cancelOrderSchema (cancelacion)', () => {
   })
 })
 
-// QC-151 T1: `quoteOrderCostSchema` es un `pick` de `createOrderSchema` y acepta/rechaza
+// `quoteOrderCostSchema` es un `pick` de `createOrderSchema` y acepta/rechaza
 // exactamente lo mismo que el alta en `recipeId` y `quantity`, sin declarar nada mas.
 describe('pedidos — quoteOrderCostSchema (cotizacion)', () => {
   it('acepta y rechaza exactamente lo mismo que createOrderSchema en recipeId y quantity', () => {

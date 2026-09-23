@@ -147,7 +147,7 @@ export type UpdateOrderInput = z.infer<typeof updateOrderSchema>;
 export type CancelOrderInput = z.infer<typeof cancelOrderSchema>;
 
 /**
- * Cotizacion (QC-151): receta y cantidad, con la MISMA regla que el alta -`pick` hereda la
+ * Receta y cantidad, con la MISMA regla que el alta -`pick` hereda la
  * forma UUID y el patron decimal sin copiarlos-. Un `companyId` en la entrada no llega a
  * ninguna parte: `z.object` descarta las claves de mas.
  */

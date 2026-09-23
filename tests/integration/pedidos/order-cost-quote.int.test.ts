@@ -1,5 +1,5 @@
 /**
- * QC-151 T7 — `pedidos.quoteOrderCost` contra Postgres real (R1, R2, R6). Mismo patron que
+ * `pedidos.quoteOrderCost` contra Postgres real. Mismo patron que
  * `order-ingredients-cost.int.test.ts`: los adaptadores driven REALES de `pedidos`, `recetas`,
  * `inventario` y `unidades`, cableados a mano sin pasar por `lib/composition`.
  *

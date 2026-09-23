@@ -301,6 +301,23 @@ describe('useOrderCostQuote — cuando la cotizacion falla (R21)', () => {
     expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID).textContent).toBe('$ 40.00');
   });
 
+  it('la accion rechazada (fallo de transporte) pasa a error, sin guion ni «cotizando…»', async () => {
+    quoteOrderCostActionMock.mockRejectedValue(new Error('fetch failed'));
+    const handlers = mount(null);
+
+    await act(async () => {
+      handlers.current!.onRecipeChange(RECIPE_ID, '5');
+      await Promise.resolve();
+    });
+
+    const bloque = screen.getByTestId(ORDER_COST_QUOTE_TESTID);
+    expect(screen.getByTestId(ORDER_COST_QUOTE_ERROR_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(ORDER_COST_QUOTE_VALUE_TESTID)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(ORDER_COST_QUOTE_QUOTING_TESTID)).not.toBeInTheDocument();
+    expect(bloque.textContent).not.toContain('—');
+  });
+
   it('con el error visible, la siguiente peticion en vuelo pinta solo «cotizando…» (R17)', async () => {
     quoteOrderCostActionMock.mockResolvedValueOnce({
       status: 'error',

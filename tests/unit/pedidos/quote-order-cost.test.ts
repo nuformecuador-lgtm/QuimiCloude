@@ -1,4 +1,4 @@
-// QC-151 T1 — `createQuoteOrderCost` (R1, R2, R3, R5, R6, R7).
+// `createQuoteOrderCost`: autorizacion, forma de entrada y aislamiento por empresa.
 
 import { describe, expect, it, vi } from 'vitest'
 

@@ -541,7 +541,7 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       'quoteOrderCostAction',
     )
 
-    // Y no hay ni un `catch` que se quede callado: los seis `catch` del archivo devuelven
+    // Y no hay ni un `catch` que se quede callado: los siete `catch` del archivo devuelven
     // `toErrorState`, que o traduce el error de dominio o registra el ajeno y devuelve el
     // codigo generico. Ninguno se lo traga sin dejar rastro.
     const source = readActionsSource()

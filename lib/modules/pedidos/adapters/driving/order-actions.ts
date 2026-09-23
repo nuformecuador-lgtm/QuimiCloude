@@ -85,7 +85,7 @@ export type OrderListResult =
   | { status: 'success'; data: Page<OrderSummary> }
   | ErrorState;
 
-/** QC-151: la cotizacion de coste no persiste nada, asi que su resultado no necesita un
+/** La cotizacion de coste no persiste nada, asi que su resultado no necesita un
  *  estado `idle` -no hay ningun formulario que la dispare-. */
 export type OrderCostQuoteResult =
   | { status: 'success'; data: OrderCostQuote }
@@ -298,7 +298,7 @@ export async function listOrdersAction(query: unknown): Promise<OrderListResult>
 }
 
 /**
- * Cotizacion del coste de ingredientes (R1-R7). Consulta: argumento tipado, no `FormData` -no
+ * Cotizacion del coste de ingredientes. Consulta: argumento tipado, no `FormData` -no
  * hay formulario que enviar, es un efecto del teclado-. No escribe nada: sin
  * `revalidatePath`.
  */

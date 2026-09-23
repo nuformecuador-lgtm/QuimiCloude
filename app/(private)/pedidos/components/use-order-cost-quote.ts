@@ -2,12 +2,28 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { ErrorState } from '@/lib/modules/errores';
+import { errorMessage, UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
+import { newRequestId } from '@/lib/modules/observabilidad';
 import { quoteOrderCostSchema } from '@/lib/modules/pedidos';
 import {
   quoteOrderCostAction,
   type OrderCostQuoteResult,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
+
+/**
+ * El rechazo de transporte no trae `code` ni `message` de dominio -no llego a ejecutarse la
+ * accion-, asi que aqui no hay traductor de errores de dominio al que delegar (ese vive en el
+ * servidor y depende de `next/headers`). Se fabrica el mismo `unexpected` que produciria el
+ * servidor: mensaje del catalogo y una referencia nueva para poder citarla al reportar el fallo.
+ */
+function unexpectedFromRejection(): ErrorState {
+  return {
+    status: 'error',
+    code: UNEXPECTED_ERROR_CODE,
+    message: errorMessage(UNEXPECTED_ERROR_CODE),
+    reference: newRequestId(),
+  };
+}
 
 /** Ventana de espera tras la ultima tecla antes de pedir una cotizacion nueva. */
 export const ORDER_COST_QUOTE_DEBOUNCE_MS = 500;
@@ -15,7 +31,7 @@ export const ORDER_COST_QUOTE_DEBOUNCE_MS = 500;
 export type OrderCostQuoteState = {
   /** Lo que se pinta: `null` es el guion. */
   readonly amount: string | null;
-  /** Hay una cotizacion en vuelo. */
+  /** Marca el `aria-busy` del bloque que lo pinta. */
   readonly quoting: boolean;
   /** El rechazo de la ultima cotizacion pedida, o `null` si no fallo. */
   readonly error: ErrorState | null;
@@ -56,18 +72,26 @@ export function useOrderCostQuote(initialAmount: string | null): OrderCostQuoteH
     const id = ++requestRef.current;
     setQuoting(true);
     setError(null);
-    void quoteOrderCostAction({ recipeId, quantity }).then((result: OrderCostQuoteResult) => {
-      if (id !== requestRef.current) return;
+    void quoteOrderCostAction({ recipeId, quantity })
+      .then((result: OrderCostQuoteResult) => {
+        if (id !== requestRef.current) return;
 
-      setQuoting(false);
-      if (result.status === 'success') {
-        setAmount(result.data.ingredientsCost);
-        setError(null);
-        return;
-      }
-      setAmount(null);
-      setError(result);
-    });
+        setQuoting(false);
+        if (result.status === 'success') {
+          setAmount(result.data.ingredientsCost);
+          setError(null);
+          return;
+        }
+        setAmount(null);
+        setError(result);
+      })
+      .catch(() => {
+        if (id !== requestRef.current) return;
+
+        setQuoting(false);
+        setAmount(null);
+        setError(unexpectedFromRejection());
+      });
   }, []);
 
   const goToDash = useCallback(() => {
