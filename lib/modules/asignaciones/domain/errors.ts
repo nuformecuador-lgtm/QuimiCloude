@@ -153,3 +153,26 @@ export class WorkGroupNotFoundError extends AsignacionesError {
     super('work_group_not_found', diagnostic);
   }
 }
+
+/** QC-141 (R27, R30, R31): el Finalizar de la planta intento entregar y `pedidos` respondio
+ *  `'insufficient_material'` -ni el lote apartado ni el resto de lotes con disponible
+ *  alcanzan-. Mismo `code` que `InsufficientMaterialError` de `pedidos`: es la misma frase para
+ *  quien la lee, la entregue desde la edicion o desde la planta. */
+export class MaterialShortageError extends AsignacionesError {
+  readonly code = 'insufficient_material';
+
+  constructor(diagnostic?: string) {
+    super('insufficient_material', diagnostic);
+  }
+}
+
+/** QC-141 (R50): el Finalizar de la planta intento entregar un pedido sin material apartado
+ *  cuya receta actual no tiene ninguna linea. Mismo `code` que `RecipeWithoutLinesError` de
+ *  `pedidos`. */
+export class RecipeWithoutLinesError extends AsignacionesError {
+  readonly code = 'recipe_without_lines';
+
+  constructor(diagnostic?: string) {
+    super('recipe_without_lines', diagnostic);
+  }
+}
