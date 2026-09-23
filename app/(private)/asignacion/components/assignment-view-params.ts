@@ -97,3 +97,16 @@ export function assignmentViewHref(vista: AssignmentViewKind): string {
   query.set(VIEW_PARAM, vista);
   return `${ASSIGNED_ORDERS_ROUTE}?${query.toString()}`;
 }
+
+/**
+ * El filtro exacto que activa el orden y la columna de terminados: la lista de
+ * estados aplicada tiene que ser, sin mas, `['ENTREGADO']`. Vacio significa «sin filtro» (los
+ * cuatro estados) y nunca cuenta como exacto.
+ *
+ * Vive junto a los demas parseos de la URL, no en `company-orders-columns.tsx`: ese modulo es
+ * `'use client'` y tanto `page.tsx` como `CompanyOrdersSkeleton` (Server Components) necesitan
+ * invocarla directamente, no solo pintarla como JSX.
+ */
+export function isExactlyDelivered(statuses: readonly RouteOrderStatus[]): boolean {
+  return statuses.length === 1 && statuses[0] === 'ENTREGADO';
+}

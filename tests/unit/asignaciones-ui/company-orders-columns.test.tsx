@@ -12,7 +12,6 @@ import {
   COMPANY_ORDER_STATUS_COLUMN_ID,
   COMPANY_ORDER_STATUS_FILTER_OPTIONS,
   buildCompanyOrdersColumns,
-  isExactlyDelivered,
 } from '@/app/(private)/asignacion/components';
 import type { CompanyOrderView } from '@/lib/modules/asignaciones';
 
@@ -72,13 +71,8 @@ describe('R25 - las columnas base de «Todos», sin el filtro exacto de Entregad
 });
 
 describe('R31 - la columna de fecha de terminado solo con el filtro exactamente ENTREGADO', () => {
-  it('isExactlyDelivered: solo ["ENTREGADO"] cuenta como exacto', () => {
-    expect(isExactlyDelivered(['ENTREGADO'])).toBe(true);
-    expect(isExactlyDelivered([])).toBe(false);
-    expect(isExactlyDelivered(['ENTREGADO', 'CANCELADO'])).toBe(false);
-    expect(isExactlyDelivered(['PENDIENTE'])).toBe(false);
-  });
-
+  // isExactlyDelivered vive en assignment-view-params.test.ts: page.tsx (Server Component) la
+  // invoca directamente y no puede depender de un modulo `'use client'`.
   it('showFinishedAt=false no añade la columna', () => {
     const columns = buildCompanyOrdersColumns({ showFinishedAt: false });
     expect(columns.some((column) => column.id === COMPANY_ORDER_DATE_COLUMN_ID)).toBe(false);

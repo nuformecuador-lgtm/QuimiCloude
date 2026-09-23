@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -5,6 +8,7 @@ import {
   STATUS_PARAM,
   VIEW_PARAM,
   assignmentViewHref,
+  isExactlyDelivered,
   parseAssignmentListParams,
   parseAssignmentViewParam,
   parseStatusFilter,
@@ -114,5 +118,36 @@ describe('assignmentViewHref deriva SIEMPRE de ASSIGNED_ORDERS_ROUTE y lleva sol
   it('no arrastra pagina ni filtro de la vista de origen', () => {
     const url = new URLSearchParams(assignmentViewHref('todos').split('?')[1]);
     expect([...url.keys()]).toEqual([VIEW_PARAM]);
+  });
+});
+
+describe('isExactlyDelivered (R31)', () => {
+  it('solo ["ENTREGADO"] cuenta como exacto', () => {
+    expect(isExactlyDelivered(['ENTREGADO'])).toBe(true);
+    expect(isExactlyDelivered([])).toBe(false);
+    expect(isExactlyDelivered(['ENTREGADO', 'CANCELADO'])).toBe(false);
+    expect(isExactlyDelivered(['PENDIENTE'])).toBe(false);
+  });
+});
+
+describe('R31 - page.tsx (Server Component) no invoca funciones de un modulo `\'use client\'`', () => {
+  const componentsDir = join(process.cwd(), 'app', '(private)', 'asignacion', 'components');
+
+  /**
+   * `page.tsx` invoca `isExactlyDelivered(statuses)` como funcion, no la pinta como JSX: si
+   * viviera en un archivo `'use client'` (como `company-orders-columns.tsx`), Next.js revienta en
+   * runtime aunque `tsc` y el barrel no digan nada. Barato de comprobar aqui, sin levantar el
+   * servidor: el modulo que la define no puede empezar con `'use client'`.
+   */
+  it('el modulo que define isExactlyDelivered no es `use client`', () => {
+    const pageSource = readFileSync(
+      join(process.cwd(), 'app', '(private)', 'asignacion', 'page.tsx'),
+      'utf8',
+    );
+    expect(pageSource).toContain('isExactlyDelivered(statuses)');
+
+    const ownerModule = readFileSync(join(componentsDir, 'assignment-view-params.ts'), 'utf8');
+    expect(ownerModule).toContain('export function isExactlyDelivered');
+    expect(ownerModule.trimStart().startsWith("'use client'")).toBe(false);
   });
 });

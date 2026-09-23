@@ -12,12 +12,19 @@ import {
 import type { CompanyOrderView } from '@/lib/modules/asignaciones';
 import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 
-import { PAGE_PARAM, PAGE_SIZE_PARAM, STATUS_PARAM, VIEW_PARAM, ROUTE_ORDER_STATUS_VALUES, type RouteOrderStatus } from './assignment-view-params';
+import {
+  PAGE_PARAM,
+  PAGE_SIZE_PARAM,
+  STATUS_PARAM,
+  VIEW_PARAM,
+  ROUTE_ORDER_STATUS_VALUES,
+  isExactlyDelivered,
+  type RouteOrderStatus,
+} from './assignment-view-params';
 import {
   COMPANY_ORDERS_DEFAULT_PINNED_COLUMNS,
   COMPANY_ORDER_STATUS_COLUMN_ID,
   buildCompanyOrdersColumns,
-  isExactlyDelivered,
 } from './company-orders-columns';
 
 export const COMPANY_ORDERS_TABLE_ID = 'asignacion-todos';

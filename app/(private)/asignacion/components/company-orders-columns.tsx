@@ -7,7 +7,7 @@ import type { CompanyOrderView } from '@/lib/modules/asignaciones';
 import type { OrderPriority, OrderStatus } from '@/lib/modules/pedidos';
 import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
-import { ROUTE_ORDER_STATUS_VALUES, type RouteOrderStatus } from './assignment-view-params';
+import { ROUTE_ORDER_STATUS_VALUES } from './assignment-view-params';
 
 /**
  * Las columnas de «Todos»: número, receta, cantidad,
@@ -60,15 +60,6 @@ export const COMPANY_ORDER_PRIORITY_LABELS: Readonly<Record<OrderPriority, strin
 /** Las opciones del filtro «Estado», derivadas del mismo conjunto que la URL reconoce. */
 export const COMPANY_ORDER_STATUS_FILTER_OPTIONS: readonly { value: string; label: string }[] =
   ROUTE_ORDER_STATUS_VALUES.map((value) => ({ value, label: COMPANY_ORDER_STATUS_LABELS[value] }));
-
-/**
- * El filtro exacto que activa el orden y la columna de terminados: la lista de
- * estados aplicada tiene que ser, sin mas, `['ENTREGADO']`. Vacio significa «sin filtro» (los
- * cuatro estados) y nunca cuenta como exacto.
- */
-export function isExactlyDelivered(statuses: readonly RouteOrderStatus[]): boolean {
-  return statuses.length === 1 && statuses[0] === 'ENTREGADO';
-}
 
 /**
  * `YYYY-MM-DD` en UTC, nunca `toLocaleDateString`.

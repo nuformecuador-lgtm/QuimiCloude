@@ -62,6 +62,7 @@ export {
   STATUS_PARAM,
   VIEW_PARAM,
   assignmentViewHref,
+  isExactlyDelivered,
   parseAssignmentListParams,
   parseAssignmentViewParam,
   parseStatusFilter,
@@ -82,7 +83,6 @@ export {
   COMPANY_ORDER_STATUS_LABELS,
   COMPANY_ORDERS_DEFAULT_PINNED_COLUMNS,
   buildCompanyOrdersColumns,
-  isExactlyDelivered,
   type CompanyOrdersColumnsDeps,
 } from './company-orders-columns';
 export { CompanyOrdersEmpty, type CompanyOrdersEmptyProps } from './company-orders-empty';
