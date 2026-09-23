@@ -81,6 +81,7 @@ async function currentActor(): Promise<Actor | null> {
 
 function buildProductFields(formData: FormData): Record<string, unknown> | typeof INVALID_NUMBER {
   const qtyAlert = readOptionalFormInt(formData, 'qtyAlert');
+  const type = readOptionalFormString(formData, 'type');
 
   if (qtyAlert === INVALID_NUMBER) {
     return INVALID_NUMBER;
@@ -89,6 +90,7 @@ function buildProductFields(formData: FormData): Record<string, unknown> | typeo
   return {
     name: readFormString(formData, 'name'),
     qtyAlert,
+    type,
   };
 }
 

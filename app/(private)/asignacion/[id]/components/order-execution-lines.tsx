@@ -12,7 +12,7 @@ import {
 import type { ExecutionLineView } from '@/lib/modules/asignaciones';
 import { formatPercentage } from '@/lib/modules/recetas';
 import { convertQuantity, type UnitRef } from '@/lib/modules/unidades';
-import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
+import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 /**
  * Las lineas de la receta, en modo lectura, con selector de unidad de visualizacion.
@@ -77,6 +77,7 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
       <span
         data-testid={`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-${index}`}
         className="text-base font-medium"
+        title={exactDecimalTitle(displayedQuantity)}
       >
         {formatDecimalDisplay(displayedQuantity)}
       </span>

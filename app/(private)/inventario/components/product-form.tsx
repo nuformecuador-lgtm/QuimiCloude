@@ -17,6 +17,7 @@ import {
   createProductSchema,
   createProductWithFirstBatchSchema,
   type ProductView,
+  type ProductType,
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 import {
@@ -25,6 +26,7 @@ import {
 } from '@/lib/modules/inventario/adapters/driving/product-actions';
 
 import { PresentationSelect } from '@/components/shared/presentation-select';
+import { SharedSelect } from '@/components/shared/shared-select';
 
 import { ProductBatchDateField, formatDateLocalISO } from './product-batch-date-field';
 import { ProductCostFields } from './product-cost-fields';
@@ -47,6 +49,9 @@ const TEXT_FIELDS = ['name'] as const;
 /** Campo entero del producto. `FormData` solo entrega cadenas, asi que se convierte antes de validar. */
 const PRODUCT_INT_FIELDS = ['qtyAlert'] as const;
 
+/** Campo select del producto. */
+const PRODUCT_SELECT_FIELDS = ['type'] as const;
+
 /**
  * Campos del LOTE que el alta pide junto al producto (`product_batches`), incluida su existencia.
  * Solo existen en el ALTA: la edicion no pinta ninguno, no los envia y valida con un esquema que
@@ -68,11 +73,13 @@ const BATCH_FIELDS = [
 type ProductFieldName =
   | (typeof TEXT_FIELDS)[number]
   | (typeof PRODUCT_INT_FIELDS)[number]
+  | (typeof PRODUCT_SELECT_FIELDS)[number]
   | (typeof BATCH_FIELDS)[number];
 
 const ALL_FIELDS: readonly ProductFieldName[] = [
   ...TEXT_FIELDS,
   ...PRODUCT_INT_FIELDS,
+  ...PRODUCT_SELECT_FIELDS,
   ...BATCH_FIELDS,
 ];
 
@@ -85,6 +92,7 @@ const NUMBER_FIELDS = [...PRODUCT_INT_FIELDS, 'stock'] as const;
  */
 const FIELD_MESSAGES: Record<ProductFieldName, string> = {
   name: 'Escribe un nombre de 1 a 120 caracteres.',
+  type: 'Elige un tipo de producto.',
   stock: 'Debe ser un número entero de 0 o más.',
   qtyAlert: 'Debe ser un número entero de 0 o más.',
   presentationId: 'Elige una presentación.',
@@ -103,6 +111,7 @@ const COST_REQUIRED_MESSAGE = 'Escribe el costo unitario o el costo total; basta
 
 const FIELD_LABELS: Record<ProductFieldName, string> = {
   name: 'Nombre',
+  type: 'Tipo',
   stock: 'Existencia',
   qtyAlert: 'Alerta de cantidad',
   presentationId: 'Presentación',
@@ -112,6 +121,28 @@ const FIELD_LABELS: Record<ProductFieldName, string> = {
   expiryDate: 'Fecha de expiración',
   purchaseDate: 'Fecha de compra',
 };
+
+/** Determina si un campo debe mostrarse segun el tipo de producto seleccionado. */
+function shouldShowField(field: ProductFieldName, productType: ProductType | undefined): boolean {
+  // Para Instrumento (MACHINE), ocultar campos especificos
+  if (productType === 'MACHINE') {
+    const hiddenForMachine: ProductFieldName[] = [
+      'qtyAlert',
+      'presentationId',
+      'unitCost',
+      'totalCost',
+      'lot',
+      'expiryDate',
+    ];
+    return !hiddenForMachine.includes(field);
+  }
+  // Para Envase (PACKAGING), no tiene fecha de vencimiento
+  if (productType === 'PACKAGING') {
+    const hiddenForPackaging: ProductFieldName[] = ['expiryDate'];
+    return !hiddenForPackaging.includes(field);
+  }
+  return true;
+}
 
 type FieldErrors = Partial<Record<ProductFieldName, string>>;
 
@@ -270,6 +301,9 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
 
+  /** Tipo de producto seleccionado (por defecto PRODUCT). Se usa para mostrar/ocultar campos. */
+  const [productType, setProductType] = useState<ProductType>('PRODUCT');
+
   /**
    * Autocompletado al elegir un producto existente (decision humana del 2026-09-09, ampliada el
    * 2026-09-10 con la presentacion): alerta de cantidad y presentacion. La existencia y los
@@ -285,6 +319,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
     readonly qtyAlert: string;
     readonly presentationId: string;
     readonly presentationName: string;
+    readonly type: ProductType;
   } | null>(null);
 
   function applyTemplate(option: ProductNameOption) {
@@ -292,6 +327,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
       qtyAlert: option.qtyAlert === null ? '' : String(option.qtyAlert),
       presentationId: option.presentationId ?? '',
       presentationName: option.presentationName ?? '',
+      type: option.type ?? 'PRODUCT',
     });
   }
 
@@ -498,6 +534,25 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
       )}
 
       {/*
+        Tipo de producto (select). Determina que campos se muestran en el formulario.
+        Por defecto: Producto. Instrumento oculta: alerta, presentacion, costos, lote, expiracion.
+        Envase oculta: fecha de expiracion.
+      */}
+      <SharedSelect
+        name="type"
+        label={FIELD_LABELS.type}
+        required
+        defaultValue={initialValue('type', template?.type ?? product?.type ?? 'PRODUCT')}
+        error={fieldErrors.type}
+        options={[
+          { value: 'PRODUCT', label: 'Producto' },
+          { value: 'MACHINE', label: 'Instrumento' },
+          { value: 'PACKAGING', label: 'Envase' },
+        ]}
+        onChange={(value) => setProductType(value as ProductType)}
+      />
+
+      {/*
         Presentacion (obligatoria en el alta, 2026-09-10). La presentacion es del LOTE, no del
         producto (2026-09-09), asi que solo se pide al dar de alta: en la EDICION el producto no
         tiene ninguna que cambiar. Se reusa el selector compartido -mismo control que proveedores,
@@ -507,7 +562,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
         -o recuperar lo escrito tras un rechazo- lo remonta con el valor nuevo. El campo sigue sin
         estar controlado, igual que `ProductField`.
       */}
-      {isEdit ? null : (
+      {isEdit ? null : shouldShowField('presentationId', productType) && (
         <PresentationSelect
           key={`${initialValue('presentationId', '')}-${template?.presentationId ?? ''}`}
           defaultValue={initialValue('presentationId', template?.presentationId ?? '')}
@@ -541,15 +596,17 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
         rechazaria con `invalid_input`-.
       */}
 
-      <ProductField
-        name="qtyAlert"
-        label={FIELD_LABELS.qtyAlert}
-        type="number"
-        required
-        helper="Cantidad a partir de la cual quieres que se avise de que queda poco. Hoy solo se guarda: todavía no dispara ningún aviso."
-        defaultValue={initialValue('qtyAlert', template?.qtyAlert ?? product?.qtyAlert?.toString() ?? '')}
-        error={fieldErrors.qtyAlert}
-      />
+      {shouldShowField('qtyAlert', productType) && (
+        <ProductField
+          name="qtyAlert"
+          label={FIELD_LABELS.qtyAlert}
+          type="number"
+          required
+          helper="Cantidad a partir de la cual quieres que se avise de que queda poco. Hoy solo se guarda: todavía no dispara ningún aviso."
+          defaultValue={initialValue('qtyAlert', template?.qtyAlert ?? product?.qtyAlert?.toString() ?? '')}
+          error={fieldErrors.qtyAlert}
+        />
+      )}
 
       {/*
         Resto del primer lote (2026-09-10). Solo en el ALTA, y todos opcionales salvo la regla del
@@ -562,32 +619,38 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
       */}
       {isEdit ? null : (
         <>
-          <ProductCostFields
-            unitCostLabel={FIELD_LABELS.unitCost}
-            totalCostLabel={FIELD_LABELS.totalCost}
-            initialUnitCost={initialValue('unitCost', '')}
-            initialTotalCost={initialValue('totalCost', '')}
-            unitCostError={fieldErrors.unitCost}
-            totalCostError={fieldErrors.totalCost}
-          />
+          {shouldShowField('unitCost', productType) && (
+            <ProductCostFields
+              unitCostLabel={FIELD_LABELS.unitCost}
+              totalCostLabel={FIELD_LABELS.totalCost}
+              initialUnitCost={initialValue('unitCost', '')}
+              initialTotalCost={initialValue('totalCost', '')}
+              unitCostError={fieldErrors.unitCost}
+              totalCostError={fieldErrors.totalCost}
+            />
+          )}
 
-          <ProductField
-            name="lot"
-            label={FIELD_LABELS.lot}
-            type="text"
-            helper="El identificador del lote que trae el proveedor, tal cual viene en el envase. Déjalo vacío para que el sistema lo asigne."
-            defaultValue={initialValue('lot', '')}
-            error={fieldErrors.lot}
-          />
+          {shouldShowField('lot', productType) && (
+            <ProductField
+              name="lot"
+              label={FIELD_LABELS.lot}
+              type="text"
+              helper="El identificador del lote que trae el proveedor, tal cual viene en el envase. Déjalo vacío para que el sistema lo asigne."
+              defaultValue={initialValue('lot', '')}
+              error={fieldErrors.lot}
+            />
+          )}
 
-          <ProductField
-            name="expiryDate"
-            label={FIELD_LABELS.expiryDate}
-            type="date"
-            helper="La fecha en la que este lote caduca. Opcional: hoy solo se guarda, todavía no dispara ningún aviso."
-            defaultValue={initialValue('expiryDate', '')}
-            error={fieldErrors.expiryDate}
-          />
+          {shouldShowField('expiryDate', productType) && (
+            <ProductField
+              name="expiryDate"
+              label={FIELD_LABELS.expiryDate}
+              type="date"
+              helper="La fecha en la que este lote caduca. Opcional: hoy solo se guarda, todavía no dispara ningún aviso."
+              defaultValue={initialValue('expiryDate', '')}
+              error={fieldErrors.expiryDate}
+            />
+          )}
 
           {/*
             El componente ya cae en "hoy" si no recibe valor, pero aqui SIEMPRE se le pasa uno -el
