@@ -148,9 +148,32 @@ async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string
 const EDICION_HACIA_B = {
   recipeId: RECETA_DE_B,
   quantity: '10.0000',
-  status: 'PENDIENTE' as const,
   presentationId: PRESENTACION_DE_A,
 };
+
+/** Repositorio con la fila en el ESTADO que pide el caso, para ejercitar R8 (QC-145) y R9/R10
+ *  (QC-146). */
+function repositorioConEstado(status: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'CANCELADO') {
+  const findAliveById = vi.fn(async () => ({
+    ...filaExistente(),
+    status,
+    cancellationReason: status === 'CANCELADO' ? 'anulado' : null,
+  }));
+  const updateAlive = vi.fn(async () => 'ok' as const);
+  const explota = (nombre: string) =>
+    vi.fn(() => {
+      throw new Error(`${nombre} no deberia llamarse en este caso`);
+    });
+  const orders = {
+    create: explota('create'),
+    findAliveById,
+    listAlive: explota('listAlive'),
+    updateAlive,
+    cancelAlive: explota('cancelAlive'),
+    softDeleteAlive: explota('softDeleteAlive'),
+  } as unknown as OrderRepository;
+  return { orders, findAliveById, updateAlive };
+}
 
 describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empresa se rechaza como inexistente', () => {
   it('receta de OTRA empresa -> `recipe_not_found`, el MISMO codigo que una receta inexistente, y no modifica ninguna fila', async () => {
@@ -255,29 +278,6 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
 });
 
 describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', () => {
-  /** Repositorio con la fila en el ESTADO que pide el caso, para ejercitar R9 y R10. */
-  function repositorioConEstado(status: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'CANCELADO') {
-    const findAliveById = vi.fn(async () => ({
-      ...filaExistente(),
-      status,
-      cancellationReason: status === 'CANCELADO' ? 'anulado' : null,
-    }));
-    const updateAlive = vi.fn(async () => 'ok' as const);
-    const explota = (nombre: string) =>
-      vi.fn(() => {
-        throw new Error(`${nombre} no deberia llamarse en este caso`);
-      });
-    const orders = {
-      create: explota('create'),
-      findAliveById,
-      listAlive: explota('listAlive'),
-      updateAlive,
-      cancelAlive: explota('cancelAlive'),
-      softDeleteAlive: explota('softDeleteAlive'),
-    } as unknown as OrderRepository;
-    return { orders, findAliveById, updateAlive };
-  }
-
   it('R7: editar un pedido sin presentacion exige elegir una', async () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
@@ -318,7 +318,7 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
 
       await updateOrder(
         ORDER_ID,
-        { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status, presentationId: OTRA_PRESENTACION },
+        { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, presentationId: OTRA_PRESENTACION },
         ACTOR_A,
       );
 
@@ -378,6 +378,78 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
     expect(codigo).toBe('recipe_not_found');
     expect(pres.findRefs).not.toHaveBeenCalled();
     expect(repo.updateAlive).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-145 R6 — la edicion no mueve el estado', () => {
+  it('un `status` en la entrada se ignora: el pedido se guarda sin que el dato viaje al puerto', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await updateOrder(
+      ORDER_ID,
+      { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status: 'ENTREGADO' },
+      ACTOR_A,
+    );
+
+    expect(repo.updateAlive).toHaveBeenCalledTimes(1);
+    const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(dataEscrita).not.toHaveProperty('status');
+  });
+
+  it('un `status` fuera del conjunto conocido tampoco rompe la entrada: se ignora igual', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await updateOrder(
+      ORDER_ID,
+      { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status: 'NO_EXISTE' },
+      ACTOR_A,
+    );
+
+    expect(repo.updateAlive).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('QC-145 R8 — un pedido ENTREGADO o CANCELADO rechaza toda edicion, sin escribir', () => {
+  it('ENTREGADO y CANCELADO -> `invalid_transition`, aunque la entrada no traiga ningun `status`', async () => {
+    for (const status of ['ENTREGADO', 'CANCELADO'] as const) {
+      const cat = catalogoDeRecetas();
+      const repo = repositorioConEstado(status);
+      const pres = catalogoDePresentaciones();
+      const updateOrder = createUpdateOrder({
+        orders: repo.orders,
+        recipes: cat.recipes,
+        products: catalogoDeProductos().products,
+        units: catalogoDeUnidades().units,
+        presentations: pres.presentations,
+        now: () => AHORA,
+      });
+
+      expect(
+        await codigoDelFallo(() =>
+          updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A }, ACTOR_A),
+        ),
+        status,
+      ).toBe('invalid_transition');
+      expect(repo.updateAlive, status).not.toHaveBeenCalled();
+    }
   });
 });
 

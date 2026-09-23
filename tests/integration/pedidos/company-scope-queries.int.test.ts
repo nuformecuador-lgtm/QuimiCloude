@@ -449,12 +449,15 @@ describe('R21 — findAliveById / updateAlive / cancelAlive / softDeleteAlive co
 
   it('control positivo: el mismo updateAlive, desde B, SI escribe', async () => {
     // Sin este caso, un `updateMany` que nunca actualizara dejaria verde el anterior.
+    // QC-145 (enmienda, R6): `updateAliveOrder` ya no escribe `status` -el pedido se queda en
+    // `PENDIENTE`, con el que nacio en la siembra-, asi que lo que demuestra el escrito es la
+    // prioridad y la cantidad, no el estado.
     const propio = B.pedidos[1] ?? '';
     const antes = await foto(propio);
 
     const resultado = await updateAliveOrder(
       propio,
-      pedidoNuevo({ quantity: '921.0000', priority: 'CRITICA', status: 'EN_CURSO', presentationId: B.presentationId }),
+      pedidoNuevo({ quantity: '921.0000', priority: 'CRITICA', presentationId: B.presentationId }),
       B.userId,
       new Date(),
       null,
@@ -464,7 +467,8 @@ describe('R21 — findAliveById / updateAlive / cancelAlive / softDeleteAlive co
     expect(resultado).toBe('ok');
     expect(await foto(propio)).not.toBe(antes);
     const fila = await prisma.order.findUniqueOrThrow({ where: { id: propio } });
-    expect(fila.status).toBe('EN_CURSO');
+    expect(fila.status).toBe('PENDIENTE');
+    expect(fila.priority).toBe('CRITICA');
     expect(fila.companyId).toBe(B.companyId);
   });
 

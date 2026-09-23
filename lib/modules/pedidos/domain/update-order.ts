@@ -37,9 +37,8 @@ export type UpdateOrderDeps = {
  * edicion parcial campo a campo. Es la pregunta abierta 5 del spec, con su posicion por
  * defecto escrita y su coste (subir la prioridad obliga a reenviar todo el pedido).
  *
- * `status: 'CANCELADO'` y cualquier motivo mueren ANTES, en `updateOrderSchema` (R24): la
- * edicion no puede ni EXPRESAR una cancelacion, porque `NewOrder.status` es
- * `EditableOrderStatus` (`design.md > 8`, capas 1 y 2).
+ * `status` muere ANTES, en `updateOrderSchema` (R6): la edicion no puede ni EXPRESAR un cambio
+ * de estado, porque `updateOrderSchema` no lo declara y `OrderEdit` no tiene el campo.
  *
  * R6: el actor queda como autor de la ULTIMA MODIFICACION y el de creacion NO se toca. Esa
  * mitad la cierra el adaptador -`data` no lleva `createdBy` y el `UPDATE` tampoco-, y su
@@ -71,11 +70,11 @@ export function createUpdateOrder(
     const row = await deps.orders.findAliveById(id, scope);
     if (row === null) throw new OrderNotFoundError();
 
-    // R21 y R22 caen sobre la MISMA tabla y no hay dos verdades: `ENTREGADO` y `CANCELADO`
-    // tienen la lista de destinos VACIA, asi que un pedido final no admite NINGUNA edicion,
-    // ni siquiera la que solo cambia la prioridad. Va antes de preguntar a los catalogos:
-    // una edicion rechazada no lee nada mas y no modifica ninguna fila.
-    assertTransition(row.status, data.status);
+    // R6, R8: la edicion ya no mueve el estado, asi que la comprobacion es «¿puede el pedido
+    // quedarse en el mismo estado?» -legal en `PENDIENTE`/`EN_CURSO`, vacio en los finales
+    // (`design.md > 2.3`)-. Va antes de preguntar a los catalogos: una edicion rechazada no lee
+    // nada mas y no modifica ninguna fila.
+    assertTransition(row.status, row.status);
 
     // R25 -la sutileza de esta ficha-. Si la receta NO cambia se acepta aunque este dada de
     // baja: corregir la cantidad de un pedido viejo no puede obligar a cambiarle la formula.
