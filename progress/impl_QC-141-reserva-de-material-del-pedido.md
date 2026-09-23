@@ -629,3 +629,105 @@ QC-147 dice expresamente que QC-141 «hereda la fórmula nueva». Contradice el 
   `get-recipe.ts`, `recipe-view.ts`, `guard-identificador-de-request.test.ts`,
   `order-ingredients-cost.int.test.ts`, `product-catalog.test.ts`, `product-prisma.test.ts`,
   `order-form.test.tsx` y `feature_list.json`.
+
+---
+
+## Paso 0, T6 (rehecha) y T7 (ajuste parcial) — 2026-09-23
+
+### Paso 0 — censos de pedidos tras el merge
+
+- `tests/integration/pedidos/order-crud.int.test.ts`: `expect(stockDespues.stock).toBe(batch.stock)`
+  comparaba dos `Prisma.Decimal` con `toBe` (igualdad por referencia, no por valor: pasaba de
+  casualidad). Cambia a `.toFixed(4)` en los dos lados.
+- `tests/integration/pedidos/pedidos-constraints.int.test.ts`: el censo de columnas de `orders`
+  no tenía `reserved_at` (QC-141). Añadida en su sitio alfabético, con un comentario de una línea
+  igual al patrón de las demás columnas del censo.
+- Commit `46cc70fd`.
+
+### T6 — necesidad y reparto, rehechos según `design.md > 6.1-6.2` enmendados
+
+- `lib/modules/pedidos/domain/order-requirement.ts`: `buildRequirement(lines: { productId;
+  percentage }[], orderQuantity)` usa `consumedQuantity` del barril de `recetas` por línea; se
+  retira toda la aritmética de cadenas propia (`parseDecimal`/`multiplyExact`/`formatScaled`) y
+  `RequirementSourceLine` pierde `quantity`/`unitId`.
+- `lib/modules/inventario/domain/reservation.ts`: `ReservationRequirementLine` pierde `unitId`;
+  `ConsumptionOutcome` gana `{ kind: 'nothing_to_consume' }` (E2).
+- `lib/modules/inventario/domain/plan-reservation.ts`: `PlanReservationInput` pierde `units`;
+  se retira `resolveNeed` (convertía con `convertQuantity`/`IncompatibleUnitsError`). Un producto
+  sin unidad ahora **cuenta como línea no cubierta** (`insufficientProductIds.add`) en vez de
+  saltarse con `continue` — el bug de la versión N3 derogada. `need = ceilToScale4(line.quantity)`
+  directo, sin conversión previa.
+- Tests reescritos sin ningún caso de conversión ni de unidad sin base común:
+  `tests/unit/pedidos/order-requirement.test.ts`, `tests/unit/inventario/plan-reservation.test.ts`.
+
+### T7 — ajuste parcial: sin `UnitCatalog` en la persistencia
+
+- `lib/modules/inventario/adapters/driven/persistence/reservation-prisma.ts`:
+  `createMaterialReservations(db = prisma)` pierde el parámetro `units`; se retiran
+  `resolveUnitConversions` y toda la reunión de `unitIds` antes de cada `planReservation`. Las tres
+  llamadas (`syncForOrder`, la rama de déficit de `consumeForOrder`, `consumeWithoutReservation`)
+  pasan `products`/`batches`/`requirement` directo. `consumeWithoutReservation` devuelve
+  `{ kind: 'nothing_to_consume' }` sin tocar la base cuando `fallbackRequirement` está vacío (antes
+  devolvía `consumed` sin escribir nada, que ocultaba el caso bajo un nombre que no era el suyo).
+- `tests/integration/inventario/reservation.int.test.ts`: se retira `unitCatalogDe` y el `unitId`
+  de `requirementOf`; el segundo caso de R32 (segunda entrega sin nada que respaldarla) ahora
+  espera `nothing_to_consume` en vez de `consumed`, que es el contrato correcto tras el cambio.
+  Caso nuevo `R50` (`'un pedido sin nada apartado y con la receta sin lineas devuelve
+  nothing_to_consume sin escribir nada'`): comprueba que ni `reservation_movements` ni
+  `inventory_movements` ganan filas y que el lote/producto no cambian de existencia.
+- No hubo que tocar `lib/composition` ni otro llamante: `createMaterialReservations` todavía no
+  está cableada (T8).
+- Commits `a4c02ad3` (T6) y `152d8efe` (T7).
+
+### R → test de esta tanda
+
+| R | Qué exige | Test |
+|---|---|---|
+| R8 | Orden de lotes: fecha ascendente, desempate numérico de lote | `plan-reservation.test.ts` (los dos casos `R8:`) |
+| R9 | Producto sin unidad = línea no cubierta, arrastra a todo el pedido (E1) | `plan-reservation.test.ts` (`'R9: un producto sin unidad no se cubre y arrastra a todo el pedido'`) |
+| R10 | Todo o nada: un ingrediente que no alcanza no aparta ninguno | `plan-reservation.test.ts` (`'R10: si un ingrediente no alcanza...'`) |
+| R11 | Aparta exacto sin redondear cuando cabe en 4 decimales; techo hacia arriba si no cabe | `plan-reservation.test.ts` (los tres casos `R11:`), `order-requirement.test.ts` (los dos casos `R11:`) |
+| R49 | Receta vacía: necesidad vacía y `reserved` sin asignaciones (E2) | `plan-reservation.test.ts` (`'R49: ...'`), `order-requirement.test.ts` (`'R49: ...'`) |
+| R12 | Editar recalcula, asienta solo la diferencia | `reservation.int.test.ts` (sin cambio de tanda, sigue verde) |
+| R13 | Si ya no cubre, libera todo | `reservation.int.test.ts` (sigue verde) |
+| R17 | Ningún asiento apunta a un pedido de otra empresa | `reservation.int.test.ts` (sigue verde) |
+| R27, R28 | Entregar consume y recalcula `products.stock` en la misma transacción | `reservation.int.test.ts` (sigue verde) |
+| R30 | Merma completa desde otro lote; si no alcanza, rechaza sin cambiar nada | `reservation.int.test.ts` (sigue verde) |
+| R32 | No consume dos veces | `reservation.int.test.ts` (ajustado a `nothing_to_consume`) |
+| R33 | Ajuste que sobre-reserva se acepta y se marca | `reservation.int.test.ts` (sigue verde) |
+| R39 | Ningún `UPDATE`/`DELETE` sobre los dos libros en `lib/**` | `reservation.int.test.ts` (sigue verde) |
+| R50 | Entregar sin apartado y sin necesidad de respaldo: `nothing_to_consume` sin escribir nada | `reservation.int.test.ts` (`'R50: ...'`) |
+
+### Salida de los comandos
+
+**`pnpm run typecheck`**: limpio, 0 errores (el hallazgo ajeno `product_type_enum` ya lo arregló
+`dev` antes del merge de esta rama).
+
+**`pnpm run lint`**: limpio, sin salida.
+
+**Tests**:
+- `pnpm exec vitest related --run` sobre los cuatro archivos de dominio/adaptador tocados
+  (`order-requirement.ts`, `reservation.ts`, `plan-reservation.ts`, `reservation-prisma.ts`),
+  proyecto `node`: **1271 pasan, 5 se saltan** (67 archivos).
+- `tests/integration/inventario/reservation.int.test.ts` (`--project=integration`): **12/12
+  pasan** (11 + el caso nuevo `R50`).
+- `tests/integration/pedidos/order-crud.int.test.ts` + `pedidos-constraints.int.test.ts`
+  (`--project=integration`): **49/49 pasan**.
+- `tests/integration/inventario/**` completo (`--project=integration`): **207/207 pasan**.
+- `tests/guards/guard-libro-de-inventario.test.ts` + `guard-arquitectura-modulos.test.ts`:
+  **76/76 pasan**.
+- `tests/unit/inventario` + `tests/unit/pedidos` + `tests/unit/recetas` completos: **1712 pasan, 1
+  falla, 8 se saltan** — el único rojo es
+  `tests/unit/recetas/schema/recipe-lines-percentage-migration.test.ts` (`'el timestamp es
+  posterior al de la ultima migracion conocida'`), un hallazgo **ajeno**: quedó así tras la
+  renumeración de migraciones de la tanda TM (commit `5e1d7572`, previo a esta sesión, dueño de
+  `20260922160000_recipe_lines_percentage` de QC-147), no lo tocó ni lo causó esta tanda. No
+  estaba en el encargo del Paso 0 ni de T6/T7; no se corrige aquí.
+
+### Veredicto
+
+Paso 0, T6 y T7 (ajuste parcial) cerrados: `plan-reservation.ts`, `reservation.ts` y
+`order-requirement.ts` sin ninguna conversión de unidades ni caso de unidad sin base común;
+`reservation-prisma.ts` sin `UnitCatalog`; `nothing_to_consume` cubierto con un caso que demuestra
+que no escribe nada en ningún libro. `typecheck` y `lint` limpios. Único rojo detectado en la
+corrida amplia es ajeno (migración de QC-147, tanda TM anterior a esta sesión).
