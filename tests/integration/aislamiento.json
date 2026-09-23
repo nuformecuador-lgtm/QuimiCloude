@@ -193,6 +193,11 @@
       "desde": "2026-09-23"
     },
     {
+      "archivo": "pedidos/order-reservation-concurrency.int.test.ts",
+      "motivo": "QC-141 T15: la carrera del apartado (R16), la merma simultanea a un apartado, y cien vueltas de combinaciones de crear/editar/cancelar/borrar/Finalizar, todas cableadas igual que 'order-reservation.int.test.ts' -'withOrderTransaction' y 'adjustBatchStock' abren cada uno SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL-, asi que una transaccion del test no las envolveria y ademas necesitan que cada rama CONFIRME para que la otra la vea. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, presentacion, unidad, receta, producto y lote) y la limpia en un 'finally'. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-23"
+    },
+    {
       "archivo": "pedidos/order-reservation.int.test.ts",
       "motivo": "QC-141 T9: crear/editar/cancelar/borrar ('createCreateOrder'/'createUpdateOrder'/'createCancelOrder'/'createDeleteOrder') cableados a mano con los adaptadores driven REALES de 'pedidos', 'recetas', 'inventario' y 'unidades', igual que 'order-ingredients-cost.int.test.ts' y 'order-unit-of-work.int.test.ts': 'withOrderTransaction' abre su PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test no la envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, presentacion, unidad, receta y, cuando hace falta, producto y lote) y la limpia en un 'finally'. Los casos de R30/R15 y R50 comprueban con el cliente global que un rechazo -'insufficient_material', 'recipe_without_lines'- no dejo escrito ni el pedido ni la reserva.",
       "desde": "2026-09-23"
