@@ -1043,4 +1043,4 @@ nuevos (643 archivos ejecutados, baseline vacio)», «todas las migraciones tien
 
 ### Veredicto
 
-T16 y T17 cerradas; TM la cerró el leader. Las 18 tasks de `tasks.md` en `[x]`.
+T16 y T17 cerradas; TM la cerró el leader. Las 19 tasks de `tasks.md` (T0-T17 y TM) en `[x]`.
