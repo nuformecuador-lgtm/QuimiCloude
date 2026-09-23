@@ -51,6 +51,7 @@ afterEach(() => {
 describe('BatchHistory', () => {
   it('R38 — con asientos, muestra tipo, cantidad, motivo, pedido, autor y fecha en el orden en que llegan', async () => {
     const apartado = asiento({
+      id: 'apartado-1',
       kind: 'reserve',
       quantity: '5',
       reason: null,
@@ -59,6 +60,7 @@ describe('BatchHistory', () => {
       createdAt: '2026-09-15T10:00:00.000Z',
     });
     const alta = asiento({
+      id: 'alta-1',
       kind: 'opening',
       quantity: '20',
       reason: null,
@@ -201,5 +203,17 @@ describe('BatchHistory', () => {
     for (const etiqueta of etiquetas) {
       expect(etiqueta.length).toBeGreaterThan(0);
     }
+  });
+
+  it('R38 — cada fila lleva el data-testid del id de su propio asiento, sea de libro fisico o de reserva', async () => {
+    const ajuste = asiento({ id: 'fisico-9', kind: 'adjustment' });
+    const reserva = asiento({ id: 'reserva-9', kind: 'reserve', reason: null, orderNumberText: 'PED-0099' });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [ajuste, reserva] });
+
+    render(<BatchHistory batchId={BATCH_ID} />);
+    await abrirDespliegue();
+
+    expect(await screen.findByTestId('batch-history-entry-fisico-9')).toBeInTheDocument();
+    expect(screen.getByTestId('batch-history-entry-reserva-9')).toBeInTheDocument();
   });
 });

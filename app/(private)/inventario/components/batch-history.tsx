@@ -125,13 +125,13 @@ export function BatchHistory({ batchId, batchLot }: BatchHistoryProps) {
 
         {state.status === 'success' && state.data.length > 0 ? (
           <ul data-testid="batch-history-list">
-            {state.data.map((movimiento, indice) => {
-              // Sin `id` en `BatchHistoryEntry` (une dos libros distintos): la posicion en un
-              // orden ya fijo, junto a la fecha y el tipo, es clave suficiente para la lista.
-              const clave = `${indice}-${movimiento.createdAt}-${movimiento.kind}`;
-
+            {state.data.map((movimiento) => {
+              // `kind` distingue los dos libros; su `id` es unico dentro del suyo.
               return (
-                <li key={clave} data-testid={`batch-history-entry-${clave}`}>
+                <li
+                  key={`${movimiento.kind}-${movimiento.id}`}
+                  data-testid={`batch-history-entry-${movimiento.id}`}
+                >
                   <span className="text-xs text-muted-foreground">{KIND_LABEL}</span>
                   <span data-testid="batch-history-entry-kind">
                     {movementKindLabel(movimiento.kind)}
