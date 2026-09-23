@@ -149,6 +149,15 @@ export const E2E_ESPERADOS = [
   'unidades.spec.ts',
   'establecer-contrasena.spec.ts',
   'usuarios.spec.ts',
+  // Alta por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su
+  // punto de extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo
+  // se nombra, uno a uno-. Lo que ejercita: el recorrido de las vistas de /asignacion por
+  // permiso -Operador, Empacador y Administrador, cada uno con lo que ve y lo que no en
+  // "Mis asignados", "Terminados" y "Todos"- y que el formulario de Pedidos ya no ofrece
+  // cambiar el estado ni al Administrador como responsable. NO ejercita el cruce borde ->
+  // accion del identificador de peticion: el spec no lee ni afirma nada sobre el identificador
+  // ni sobre `reference`, asi que el diferimiento sigue INTACTO.
+  'pedidos-terminados.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
