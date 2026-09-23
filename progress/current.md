@@ -19,6 +19,34 @@
 
 ## Evaluaciones
 
+### QC-132 - F1.0 y ACOTADA con `/afinar-feature` (2026-09-23)
+
+`zone: frontend`, **`complexity: low`** (leader, label en Jira). **Cupo `frontend` 2 de 2** (QC-107, QC-114): **solo
+Fase 1**, F2.0 espera hueco. Worktree montado desde `dev`. Alcance crecio a tres sitios (board reescrito antes de
+sembrar), **5 decisiones cerradas y 1 pregunta abierta** en `specs/QC-132-cantidad-del-pedido-sin-title-exacto/requirements.md`.
+Siguiente: F1.2 (`spec_author`).
+
+### QC-130 - F0, F1.0 y F1.1 (2026-09-23)
+
+**F0** (import incremental, issues tocados desde el 2026-09-22): QC-141 pasa a `in_progress` / `complexity:high`
+(el board la tiene *En curso*), QC-145 recibe `complexity:high`, entran QC-143 (`pending`, backend) y QC-149
+(`cancelled`, absorbida por QC-141). QC-130 sin cambios en el board. **F1.0**: `zone: fullstack` del board, **no se
+parte** (criterio de QC-121/145/147); **`complexity: medium`** la asigna el leader y va como label a Jira: una columna
+nueva en `presentations` con migracion de las existentes y el campo en la pantalla de QC-45, sin integracion externa;
+se reevalua al acotar. `depends_on` vacio. **Cupo `fullstack`: 2 de 3** (QC-121 y QC-141), QC-130 cabe; el cruce de archivos
+**con QC-141 es probable** (inventario y presentaciones) y se hace en F2.0 con `tasks.md`. Worktree montado desde
+`origin/dev` (`ad9fb3fe`) con `.env` copiado. **PARADA EN F1.2**: la ficha declara tres cosas abiertas -si el
+contenido es obligatorio, que pasa con las presentaciones existentes, y si una sin contenido sigue valida- y una
+medicion pendiente -cuantos productos caen en el caso sin base comun-; no hay `requirements.md`, asi que se ofrece
+`/afinar-feature`.
+**CANCELADA el mismo dia en `/afinar-feature`, por decision humana.** Su premisa ya no existe: con QC-121 (trigger
+`product_batches_check_unit`) y QC-147 (la linea usa la unidad del producto), `order-cost.ts` siempre convierte entre la
+misma unidad, asi que la rama «sin base comun» no puede darse. Contar en envases (lo que le paso QC-146) queda sin
+ficha a proposito. Board: *Cancelado* con comentario; sin `requirements.md`. Rama borrada; la carpeta
+`.worktrees/QC-130-...` no se pudo borrar (archivo en uso en Windows) y queda para borrar a mano. Sin `depends_on` ni
+links que la apunten. **Arrastre de texto**: QC-138 y QC-139 citan «dato incompleto (QC-130)» para el caso gramos
+contra bidones, que hoy ya no ocurre; lo corrige su propia acotacion, no se toca aqui.
+
 ### QC-145 - ACOTADA con `/afinar-feature` (2026-09-22) y DESBLOQUEADA (2026-09-23)
 
 Alcance, **12 decisiones cerradas** (11 + la presentacion que anadio QC-146) y **1 pregunta abierta** en

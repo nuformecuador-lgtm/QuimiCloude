@@ -1954,9 +1954,9 @@
       "epic_name": "Inventario",
       "name": "contenido-de-la-presentacion",
       "description": "Una presentacion declara CUANTO CONTIENE: un bidon son 20 L, un saco son 25 kg. Hoy la presentacion solo tiene nombre y unidad, asi que \"bidon\" no sabe que son 20 litros y nadie puede bajar de bidones a litros.\n\nNACE EL 2026-09-18 al acotar QC-123. Esa ficha calcula el coste de un pedido leyendo los lotes del inventario, y se encontro con que la linea de receta pide en su unidad -10 gr- mientras el lote guarda existencia ENTERA de una presentacion con su coste por unidad de esa presentacion. QC-123 cerro que se convierte con convertQuantity (QC-76) cuando las dos unidades COMPARTEN BASE, y que cuando no la comparten -gramos contra bidones- ese ingrediente NO TIENE COSTE y el pedido entero se queda sin importe. Esta ficha es lo unico que cierra ese agujero de verdad.\n\nNO ESTA MEDIDO, y es lo primero que habria que mirar: cuantos productos del catalogo real caen hoy en ese caso. Si son pocos, esta ficha puede esperar; si son la mayoria, el importe del pedido no sirve sin ella.\n\nLO QUE PROBABLEMENTE ENTRA, y lo decide su propia acotacion: la cantidad que contiene una presentacion y en que unidad, la migracion de las presentaciones ya cargadas -que no tienen ese dato-, y el campo en la pantalla de presentaciones (QC-45).\n\nZONA fullstack de partida porque el dato hay que teclearlo en alguna parte; el leader la parte en backend y frontend en F1.0 si sigue siendo fullstack al acotarla.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO: si el contenido es obligatorio o no, que pasa con las presentaciones existentes, y si una presentacion sin contenido sigue siendo valida para el inventario aunque deje sin coste a los pedidos que la usan.\n\nNO ENTRA: el calculo del coste del pedido, que es de QC-123, ni la conversion entre unidades, que ya existe desde QC-76.",
-      "status": "pending",
+      "status": "cancelled",
       "sdd": true,
-      "complexity": null,
+      "complexity": "medium",
       "zone": "fullstack",
       "branch": "feature/QC-130-contenido-de-la-presentacion",
       "depends_on": [],
@@ -1986,10 +1986,10 @@
       "epic": "QC-31",
       "epic_name": "Pedidos",
       "name": "cantidad-del-pedido-sin-title-exacto",
-      "description": "MEDIDO EL 2026-09-18 por el censo de QC-127, y verificado por su reviewer.\n\nEN `app/(private)/pedidos/components/order-columns.tsx:201` la columna de cantidad pinta `formatDecimalDisplay(order.quantity)` SIN acompanarlo de `exactDecimalTitle`. Medido: una cantidad de origen `'0.1255'` se pinta `'0.13'` y el atributo `title` esta AUSENTE en el DOM. Resultado: en el listado de pedidos el valor exacto de la cantidad NO ESTA EN NINGUNA PARTE de la pantalla -ni pintado ni a un raton de distancia-, y quien lo necesite tiene que abrir el detalle.\n\nES DISTINTO DE LO QUE ARREGLO QC-127, y por eso es ficha aparte. QC-127 se limito a los TESTS: su R5 le prohibia tocar `app/` y `lib/` porque la pantalla quedaba ratificada. Corregir esto SI toca la pantalla, asi que su implementer lo dejo tal cual, lo midio y lo reporto, que es exactamente lo que su `[D7]` manda.\n\nEL PATRON YA EXISTE Y NO HAY QUE INVENTARLO. `order-ingredients-table.tsx:190` hace `title={remaining === null ? undefined : exactDecimalTitle(remaining)}`, y `catalog-columns.tsx` lo hace tambien. La utilidad `lib/shared/ui/decimal-display.ts` es del PR #85, esta aprobada y NO se toca.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO: SI FUE DECISION U OLVIDO. El comentario de esa columna razona el redondeo pero NO MENCIONA el `title`, asi que no consta que nadie decidiera dejarlo fuera. Antes de anadirlo hay que cerrar si la cantidad del listado debe llevar su valor exacto -como lo llevan el restante y el minimo de compra- o si hay un motivo para que no. Si la respuesta es que debe llevarlo, el cambio es de una linea mas su test.\n\nTAMBIEN ABIERTO: si alguna OTRA columna de otra pantalla esta en el mismo caso. El censo de QC-127 se acoto a los seis archivos de TEST del PR #85 y encontro este mirando el codigo; nadie ha censado las COLUMNAS de las pantallas.\n\nCONSECUENCIA CONOCIDA Y HEREDADA, que esta ficha no resuelve: el `title` no existe en un telefono ni en un impreso. QC-127 lo acepto a sabiendas para el caso del faltante y lo dejo escrito; si aqui se decide lo mismo, se hereda el mismo limite.\n\nLO QUE NO ENTRA: rehacer el redondeo de `decimal-display.ts`; y volver a tocar los tests que QC-127 ya dejo con el patron completo.\n\nNace del censo de QC-127 (`[D7]`, R11). La ficha original la midio sin arreglarla y NO la abrio por su cuenta: la abre el leader con el humano el 2026-09-18.",
+      "description": "La cantidad se pinta redondeada a dos decimales y su valor exacto no aparece en ninguna parte de la pantalla. Medido el 2026-09-18 por el censo de QC-127: `'0.1255'` se pinta `'0.13'` y no hay `title`.\n\n**ACOTADA el 2026-09-23 con** `/afinar-feature`. Entran **tres sitios**, todos con el patrón que ya existe (`exactDecimalTitle`, como el restante y el mínimo de compra):\n\n* la columna Cantidad del listado de `/pedidos`;\n* la cantidad del pedido en la pantalla de ejecución de `/asignacion/[id]`;\n* la cantidad de cada línea de receta en esa misma pantalla.\n\n**Fue un olvido, no una decisión:** la cantidad lleva su valor exacto al pasar el ratón. **Se hereda de QC-127** el límite conocido: el `title` no existe en móvil ni en papel.\n\n**Sin E2E:** basta con tests de componente, porque no es un flujo crítico.\n\n**NO ENTRA:** rehacer el redondeo de `decimal-display.ts`; los tests que QC-127 ya dejó completos; el campo del formulario de pedidos (`order-field.tsx`), que redondea lo tecleado y no una cifra mostrada.\n\nDetalle y la pregunta abierta en `specs/QC-132-cantidad-del-pedido-sin-title-exacto/requirements.md`.",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
+      "complexity": "low",
       "zone": "frontend",
       "branch": "feature/QC-132-cantidad-del-pedido-sin-title-exacto",
       "depends_on": [],
@@ -2132,10 +2132,10 @@
       "epic": "QC-18",
       "epic_name": "Inventario",
       "name": "reserva-de-material-del-pedido",
-      "description": "Un pedido APARTA el material que va a consumir, para que otro pedido no cuente con lo mismo.\n\nNACE EL 2026-09-21 al acotar QC-138, y de un agujero real: hoy hay 2.000 gr de hipoclorito, se crean dos pedidos que necesitan 1.500 gr cada uno, y LOS DOS se ven cubiertos. Ninguno queda bloqueado. QC-123 cerro que el calculo del coste solo LEE lotes y no mueve inventario, asi que nada aparta nada.\n\nESTO CAMBIA LA PREGUNTA QUE SE HACE QC-138. Su bloqueo deja de ser «¿hay existencia?» y pasa a ser «¿hay existencia NO RESERVADA?». Por eso esta ficha BLOQUEA a QC-138 y no al reves.\n\nLO QUE EL HUMANO YA DECIDIO EL 2026-09-21 Y NO SE REABRE:\n\n* CANCELAR UN PEDIDO LIBERA su material. Vuelve a estar disponible para otros.\n* ENTREGAR UN PEDIDO CONSUME el material de verdad: la reserva se convierte en salida real de inventario y la existencia baja.\n* EDITAR A LA BAJA libera la diferencia. Si el pedido pasa de 500 a 50, lo que sobraba vuelve al disponible.\n* LA PANTALLA DE INVENTARIO MUESTRA LAS DOS CIFRAS: el total fisico del lote y lo disponible, con lo reservado a la vista. Son dos preguntas distintas y las dos legitimas: que hay en el almacen, y con que puedo contar.\n\nQUEDA ABIERTO Y NO SE RELLENA CON UN SUPUESTO. Se cierra con /afinar-feature antes del spec:\n\n* COMO SE MODELA LA RESERVA. ¿Tabla propia que apunta a pedido y lote? ¿Un tercer valor del enum `InventoryMovementKind`, que hoy solo tiene `opening` y `adjustment`? Ojo: ese modelo dice que «un asiento no se corrige, se corrige con otro» y no lleva `updatedAt` ni `deletedAt`, asi que una reserva que se libera no encaja de forma obvia ahi.\n* SI UN PEDIDO BLOQUEADO RESERVA LO QUE PUEDE. Hacen falta 2.000 gr y hay 1.500: ¿aparta esos 1.500 mientras espera, o no aparta nada hasta poder cubrirlo entero? Aparta-parcial evita que otro se lleve lo poco que hay; no-apartar evita que un pedido imposible congele material.\n* QUE PASA CON RESERVAS DE PEDIDOS QUE NUNCA SE CIERRAN. Un pedido que se queda en PENDIENTE seis meses mantiene su material apartado. ¿Caducan? ¿Las libera alguien? ¿Se avisa?\n* DE QUE LOTES CONCRETOS se reserva, y si se respeta el mismo orden que QC-123 usa para costear -fecha de compra de la mas antigua a la mas nueva, desempatando por numero de lote-. Lo coherente es que si, pero hay que decidirlo.\n* CONCURRENCIA. Dos pedidos creados a la vez tienen que serializarse sobre el mismo lote o el problema vuelve por otra puerta. QC-81 ya resolvio algo parecido con `pg_advisory_xact_lock` por empresa y QC-111 con un `UPDATE` condicional; hay precedente que mirar.\n\nLO QUE NO ENTRA: el estado BLOQUEADO y su modal, que son de QC-138. Pintar el importe del pedido, que es de QC-122. Que la presentacion declare cuanto contiene, que es QC-130.\n\nBLOQUEA A QC-138.",
-      "status": "pending",
+      "description": "Un pedido vivo APARTA el material que va a consumir, para que otro pedido no cuente con lo mismo.\n\nNACE EL 2026-09-21 al acotar QC-138, de un agujero real: hay 2.000 gr de hipoclorito, se crean dos pedidos de 1.500 gr cada uno y LOS DOS se ven cubiertos.\n\n**ACOTADA EL 2026-09-22 con** `/afinar-feature`.\n\n* **Ciclo (2026-09-21):** cancelar libera, entregar consume de verdad (salida real de inventario), editar recalcula lo apartado; inventario muestra total, disponible y reservado.\n* **Todo o nada por pedido:** si falta un solo ingrediente, el pedido no aparta nada.\n* **Lotes más antiguos primero**, mismo orden que el coste de QC-123.\n* **Existencia decimal (absorbe QC-149):** lotes, movimientos y `products.stock` pasan de entero a `Decimal(14,4)`; alta de lote y ajuste aceptan decimales; se aparta exactamente lo necesario, sin redondear.\n* **Caducidad:** a los **15 días** (desde que apartó o su última edición) un pedido **PENDIENTE** se **cancela solo** con motivo «pedido caducado». Lo dispara un **proceso diario programado** en Vercel, el primero del sistema. EN_CURSO no caduca.\n* **Merma sobre reservado:** se permite y se avisa (lote «sobre-reservado»).\n* **Pedidos existentes apartan al migrar.**\n* **Historial completo** de reservas, consultable desde inventario.\n* Sin permiso nuevo. E2E sí.\n\nDetalle y preguntas abiertas en `specs/QC-141-reserva-de-material-del-pedido/requirements.md`.\n\n**NO ENTRA:** el estado BLOQUEADO y su modal (**QC-138**), que solo la planta mueva el estado (**QC-145**), pintar el importe (**QC-122**), el contenido de la presentación (**QC-130**), plazo configurable por empresa.\n\n**BLOQUEA A QC-138.**",
+      "status": "in_progress",
       "sdd": true,
-      "complexity": null,
+      "complexity": "high",
       "zone": "fullstack",
       "branch": "feature/QC-141-reserva-de-material-del-pedido",
       "depends_on": [],
@@ -2157,6 +2157,21 @@
         "QC-107"
       ],
       "spec_path": "specs/QC-142-permiso-propio-de-documentos"
+    },
+    {
+      "key": "QC-143",
+      "id": 143,
+      "epic": "QC-17",
+      "epic_name": "Identidad y acceso",
+      "name": "flake-credential-setup-bajo-carga",
+      "description": "credential-setup.int.test.ts se pone ROJO con la suite completa y pasa 15/15 AISLADO (medido el 2026-09-21 al cerrar QC-110). Ficha propia, distinta de QC-126: en dos corridas del gate sobre el mismo arbol cayeron archivos distintos. Queda por acotar con /afinar-feature: causa (sin medir), si es el mismo fenomeno que QC-126, frecuencia, caso concreto que cae, y si entra o no en tests/baseline-rojos.json. Texto completo en el issue del board.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": null,
+      "zone": "backend",
+      "branch": "feature/QC-143-flake-credential-setup-bajo-carga",
+      "depends_on": [],
+      "spec_path": "specs/QC-143-flake-credential-setup-bajo-carga"
     },
     {
       "key": "QC-144",
@@ -2182,7 +2197,7 @@
       "description": "Dentro de `/asignacion`, dos vistas nuevas segun permiso. **Terminados**: los pedidos `ENTREGADO` de toda la empresa, sin filtro por usuario, solo lectura; la abre el permiso de terminados de QC-144. **Todos**: todos los pedidos de la empresa en cualquier estado, filtrable por estado, solo lectura; la abre `pedidos.consultar`.\n\n* Operador: «Mis asignados», como hoy. Empacador: «Mis asignados» + «Terminados». Administrador: solo «Todos», que sustituye a las otras.\n* **Fecha de terminado**: empieza a guardarse (cambio de base). Terminados se ordena por ella, de la mas reciente a la mas antigua; los entregados sin fecha van al final, marcados «sin fecha», por numero. No se rellena con la ultima edicion. Los cancelados no salen en Terminados.\n* **Solo la planta mueve el estado**: En curso al arrancar, Entregado al Finalizar. Desde Pedidos ya no se cambia el estado; al Administrador le queda Cancelar (QC-34). Asi todo entregado desde hoy tiene fecha.\n* **Terminados muestra la presentacion de cada pedido** (la crea QC-146, que bloquea a esta; los pedidos viejos salen «sin presentacion»). Anadido el 2026-09-22 al acotar QC-146.\n* E2E como Operador, Empacador y Administrador (diferida desde QC-144).\n\n**NO ENTRA:** el rol Empacador ni su permiso (QC-144), un estado «empacado», el detalle del pedido desde estas listas, rellenar la fecha de los ya entregados.\n\n\\--- Acotada por `/afinar-feature` el 2026-09-22. Las decisiones estan en `specs/QC-145-pedidos-terminados-en-asignacion/requirements.md`. ---",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
+      "complexity": "high",
       "zone": "fullstack",
       "branch": "feature/QC-145-pedidos-terminados-en-asignacion",
       "depends_on": [
@@ -2207,6 +2222,21 @@
       "spec_path": "specs/QC-146-presentacion-del-pedido"
     },
     {
+      "key": "QC-147",
+      "id": 147,
+      "epic": "QC-27",
+      "epic_name": "Recetas",
+      "name": "cantidades-de-receta-en-porcentaje",
+      "description": "Las lineas de una receta se expresan en **porcentaje** (hasta 2 decimales) y **suman exactamente 100,00 %**; la linea deja de llevar unidad (gr/ml). Lo que consume un pedido es **cantidad del pedido x %**, en la **unidad del insumo**: pedido 200 con 10 % de hipoclorito consume 20 L, y con 2 % de soda consume 4 kg. El formulario muestra la suma en vivo y **no deja guardar** si no da 100 %; el servidor tambien lo rechaza. Se aplica en el costo de ingredientes del pedido, la tabla de ingredientes de Pedidos y la pantalla del Operario («10 % · 20 L»). Se empieza limpio: no se convierte ninguna receta existente.\n\n**NO ENTRA:** densidad ni conversion masa/volumen; los pasos de la receta (QC-62/64); consumo o reserva de inventario (QC-92, QC-141), que heredan la formula. QC-120 se cancela: la absorbe esta ficha.\n\n\\--- Acotada por `/afinar-feature` el 2026-09-22. Las decisiones estan en `specs/QC-147-cantidades-de-receta-en-porcentaje/requirements.md`. ---",
+      "status": "done",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "fullstack",
+      "branch": "feature/QC-147-cantidades-de-receta-en-porcentaje",
+      "depends_on": [],
+      "spec_path": "specs/QC-147-cantidades-de-receta-en-porcentaje"
+    },
+    {
       "key": "QC-148",
       "id": 148,
       "epic": "QC-18",
@@ -2222,19 +2252,19 @@
       "spec_path": "specs/QC-148-producto-sin-lotes"
     },
     {
-      "key": "QC-147",
-      "id": 147,
-      "epic": "QC-27",
-      "epic_name": "Recetas",
-      "name": "cantidades-de-receta-en-porcentaje",
-      "description": "Las lineas de una receta se expresan en **porcentaje** (hasta 2 decimales) y **suman exactamente 100,00 %**; la linea deja de llevar unidad (gr/ml). Lo que consume un pedido es **cantidad del pedido x %**, en la **unidad del insumo**: pedido 200 con 10 % de hipoclorito consume 20 L, y con 2 % de soda consume 4 kg. El formulario muestra la suma en vivo y **no deja guardar** si no da 100 %; el servidor tambien lo rechaza. Se aplica en el costo de ingredientes del pedido, la tabla de ingredientes de Pedidos y la pantalla del Operario («10 % · 20 L»). Se empieza limpio: no se convierte ninguna receta existente.\n\n**NO ENTRA:** densidad ni conversion masa/volumen; los pasos de la receta (QC-62/64); consumo o reserva de inventario (QC-92, QC-141), que heredan la formula. QC-120 se cancela: la absorbe esta ficha.\n\n\\--- Acotada por `/afinar-feature` el 2026-09-22. Las decisiones estan en `specs/QC-147-cantidades-de-receta-en-porcentaje/requirements.md`. ---",
-      "status": "done",
+      "key": "QC-149",
+      "id": 149,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "existencia-decimal",
+      "description": "La existencia de inventario pasa de entero a Decimal(14,4). Nacio el 2026-09-22 al acotar QC-141 y QC-141 la ABSORBIO: cancelada en el board.",
+      "status": "cancelled",
       "sdd": true,
-      "complexity": "high",
+      "complexity": null,
       "zone": "fullstack",
-      "branch": "feature/QC-147-cantidades-de-receta-en-porcentaje",
+      "branch": "feature/QC-149-existencia-decimal",
       "depends_on": [],
-      "spec_path": "specs/QC-147-cantidades-de-receta-en-porcentaje"
+      "spec_path": "specs/QC-149-existencia-decimal"
     }
   ]
 }

@@ -11,7 +11,7 @@ import {
   type FinishAssignedOrderResult,
 } from '@/lib/modules/asignaciones/adapters/driving/order-execution-actions';
 import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
-import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
+import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 import { OrderExecutionLines } from './order-execution-lines';
 
@@ -64,7 +64,11 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
         {execution.numberText}
       </h1>
 
-      <p className="text-base font-medium" data-testid={ORDER_EXECUTION_ORDER_QUANTITY_TESTID}>
+      <p
+        className="text-base font-medium"
+        data-testid={ORDER_EXECUTION_ORDER_QUANTITY_TESTID}
+        title={exactDecimalTitle(execution.orderQuantity)}
+      >
         {ORDER_QUANTITY_LABEL} {formatDecimalDisplay(execution.orderQuantity)}
       </p>
 
