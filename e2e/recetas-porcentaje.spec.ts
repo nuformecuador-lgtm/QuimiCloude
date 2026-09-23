@@ -398,7 +398,14 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
     await page.goto(NEW_RECIPE_ROUTE);
     await expect(page.getByTestId('recipe-form')).toBeVisible({ timeout: 60_000 });
 
-    await page.getByTestId('recipe-field-name').fill(recipeName);
+    // `pressSequentially`, no `fill`: tras una navegacion dura (`goto`), este es el primer campo
+    // que el test toca, y WebKit puede tardar en engancharse a el mientras React todavia hidrata
+    // -`fill` pone el valor y dispara un unico evento que, si llega antes de que ese enganche
+    // exista, se pierde en silencio: el DOM ensena el valor pero el estado de React nunca se
+    // entera, y un re-render posterior de cualquier OTRO campo lo deja en blanco de nuevo. Teclear
+    // caracter a caracter reparte el valor en varios eventos, así que aunque los primeros se
+    // pierdan, el ultimo -ya con React enganchado- llega con el valor completo.
+    await page.getByTestId('recipe-field-name').pressSequentially(recipeName, { delay: 20 });
 
     // Linea 0: ingrediente A al 90 %.
     await selectProductByName(page, 'recipe-line-product-0', productAName);
