@@ -115,6 +115,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
 
     await expect(findBatchMovements(LOTE_ID, AMBITO)).resolves.toEqual([
       {
+        id: 'movimiento-2',
         kind: 'adjustment',
         quantity: '-3.0000',
         reason: 'merma',
@@ -123,6 +124,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         createdAt: '2026-09-17T14:00:00.000Z',
       },
       {
+        id: 'movimiento-1',
         kind: 'opening',
         quantity: '10.0000',
         reason: null,
@@ -159,6 +161,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
     ]);
     doble.reservationMovementFindMany.mockResolvedValue([
       {
+        id: 'reserva-1',
         kind: 'reserve',
         quantity: new Prisma.Decimal(4),
         orderId: 'pedido-1',
@@ -169,6 +172,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
 
     await expect(findBatchMovements(LOTE_ID, AMBITO)).resolves.toEqual([
       {
+        id: 'reserva-1',
         kind: 'reserve',
         quantity: '4.0000',
         reason: null,
@@ -177,6 +181,7 @@ describe('findBatchMovements (R18) — null cuando el lote no existe o es de otr
         createdAt: '2026-09-17T12:00:00.000Z',
       },
       {
+        id: 'movimiento-1',
         kind: 'opening',
         quantity: '10.0000',
         reason: null,

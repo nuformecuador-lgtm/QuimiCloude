@@ -52,6 +52,7 @@ const MOVEMENT_SELECT = {
 type MovementRow = Prisma.InventoryMovementGetPayload<{ select: typeof MOVEMENT_SELECT }>;
 
 const RESERVATION_MOVEMENT_SELECT = {
+  id: true,
   kind: true,
   quantity: true,
   orderId: true,
@@ -70,6 +71,7 @@ type ReservationMovementRow = Prisma.ReservationMovementGetPayload<{
  */
 function toInventoryHistoryEntry(row: MovementRow): BatchHistoryEntry {
   return {
+    id: row.id,
     kind: row.kind as BatchHistoryEntry['kind'],
     quantity: row.quantity.toFixed(4),
     reason: row.reason as MovementReason | null,
@@ -81,6 +83,7 @@ function toInventoryHistoryEntry(row: MovementRow): BatchHistoryEntry {
 
 function toReservationHistoryEntry(row: ReservationMovementRow): BatchHistoryEntry {
   return {
+    id: row.id,
     kind: row.kind as BatchHistoryEntry['kind'],
     quantity: row.quantity.toFixed(4),
     // `reservation_movements` no tiene columna de motivo: solo la lleva el libro fisico.

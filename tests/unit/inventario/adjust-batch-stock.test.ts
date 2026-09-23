@@ -305,6 +305,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
    *  la forma mostrable. */
   const ASIENTOS: readonly BatchHistoryEntry[] = [
     {
+      id: 'asiento-1',
       kind: 'adjustment',
       quantity: '-3',
       reason: 'merma',
@@ -313,6 +314,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
       createdAt: '2026-09-18T10:00:00.000Z',
     },
     {
+      id: 'asiento-2',
       kind: 'opening',
       quantity: '10',
       reason: null,

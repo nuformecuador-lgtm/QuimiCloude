@@ -820,6 +820,8 @@ describe('R38 — el historial de un lote une los dos libros, del mas reciente a
       const kinds = (historial ?? []).map((entry) => entry.kind);
       // Del mas reciente al mas antiguo: release, adjustment (la merma), reserve, opening (el alta).
       expect(kinds).toEqual(['release', 'adjustment', 'reserve', 'opening']);
+      // Cada asiento trae el id de su propia fila, no el de otro libro.
+      expect(new Set((historial ?? []).map((entry) => entry.id)).size).toBe((historial ?? []).length);
 
       const reserva = (historial ?? []).find((entry) => entry.kind === 'reserve');
       expect(reserva).toEqual(

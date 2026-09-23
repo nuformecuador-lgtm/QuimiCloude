@@ -23,6 +23,7 @@ const BATCH_ID = 'batch-42';
 
 function asiento(overrides: Partial<BatchHistoryEntry> = {}): BatchHistoryEntry {
   return {
+    id: 'asiento-1',
     kind: 'adjustment',
     quantity: '-3',
     reason: 'merma',
