@@ -142,3 +142,14 @@ export type {
   AssignedOrderExecutionView,
   ExecutionLineView,
 } from './domain/assigned-order-execution-view';
+
+// ---------------------------------------------------------------------------------------
+// Que vistas de `/asignacion` puede ver un usuario, solo por permiso. Bloque NUEVO al final: no
+// reordena ni reformatea nada de lo de arriba. `app/**` compone la pantalla con estas dos
+// funciones y nunca escribe un codigo de permiso por su cuenta.
+// ---------------------------------------------------------------------------------------
+export {
+  resolveAssignmentViews,
+  resolveAssignmentView,
+  type AssignmentViewKind,
+} from './domain/assignment-views';
