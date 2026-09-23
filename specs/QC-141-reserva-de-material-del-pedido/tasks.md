@@ -12,7 +12,7 @@
 
 ---
 
-## T0 — Lo que se hereda y no se rehace
+## [x] T0 — Lo que se hereda y no se rehace
 
 No es una task de escritura. **Hecho cuando:** leídas y confirmadas en la rama.
 
@@ -28,7 +28,7 @@ No es una task de escritura. **Hecho cuando:** leídas y confirmadas en la rama.
 
 ---
 
-## T1 — Migración: valor `consumption` del enum `[depende de F1.4]`
+## [x] T1 — Migración: valor `consumption` del enum `[depende de F1.4]`
 
 Archivos: `db/migrations/<ts>_inventory_movement_kind_consumption/{migration.sql,down.sql}`,
 `db/schema.prisma` (enum `InventoryMovementKind`).
@@ -40,7 +40,7 @@ Archivos: `db/migrations/<ts>_inventory_movement_kind_consumption/{migration.sql
 pruebas, y un test de esquema comprueba el orden del enum (`opening`, `adjustment`,
 `consumption`) y que el `down.sql` contiene el `RAISE EXCEPTION`.
 
-## T2 — Migración: existencia decimal, libro de reservas y `orders.reserved_at` `[depende de T1]`
+## [x] T2 — Migración: existencia decimal, libro de reservas y `orders.reserved_at` `[depende de T1]`
 
 Archivos: `db/schema.prisma` (`Product`, `ProductBatch`, `InventoryMovement`, `Order`, enum y
 modelo `ReservationMovement` con `/// @module inventario`),
@@ -55,7 +55,7 @@ modelo `ReservationMovement` con `/// @module inventario`),
 `guard-empresa-en-esquema`, `guard-rls-force` y `guard-arquitectura-modulos` verdes; un test de
 integración siembra enteros antes de migrar y comprueba que valen lo mismo después (`R2`).
 
-## T3 — Decimal exacto y orden de lotes en `inventario` `[P con T2]`
+## [x] T3 — Decimal exacto y orden de lotes en `inventario` `[P con T2]`
 
 Archivos: `lib/modules/inventario/domain/decimal-quantity.ts` (nuevo),
 `lib/modules/inventario/domain/batch-order.ts` (nuevo), `lib/modules/inventario/index.ts`,
