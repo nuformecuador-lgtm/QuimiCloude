@@ -1,5 +1,4 @@
-// T4 — La FORMA del `where`/`orderBy` de `listShowcaseAliveSuppliers`, con un Prisma DOBLE
-// (`design.md > 3`).
+// La FORMA del `where`/`orderBy` de `listShowcaseAliveSuppliers`, con un Prisma DOBLE.
 //
 // HONESTIDAD: este archivo NO toca Postgres. El cliente Prisma esta sustituido por un doble que
 // captura los argumentos, mismo patron que `tests/unit/unidades/unit-prisma-where.test.ts`. Que
@@ -51,7 +50,7 @@ beforeEach(() => {
   findManyLines.mockResolvedValue([]);
 });
 
-describe('el `where` de proveedores: sin filtro de producto no se exige ninguna linea (D15)', () => {
+describe('el `where` de proveedores: sin filtro de producto no se exige ninguna linea', () => {
   it('sin busqueda de ninguno de los dos filtros, el where es solo vida y empresa', async () => {
     await listShowcaseAliveSuppliers(CONSULTA_VACIA, SCOPE);
 
@@ -81,7 +80,7 @@ describe('el `where` de proveedores: con filtro de producto, exige el `some` de 
   });
 });
 
-describe('orden, paginacion y el truco del +1 para no contar (D17, R11)', () => {
+describe('orden, paginacion y el truco del +1 para no contar (R11)', () => {
   it('orden name asc, id asc; take 6; skip por pagina de 5', async () => {
     await listShowcaseAliveSuppliers({ ...CONSULTA_VACIA, page: 2 }, SCOPE);
 

@@ -2,7 +2,7 @@
 import { z } from 'zod';
 
 /**
- * Tipos, constantes y esquemas de la vista de catalogo visual (`design.md > 2.1`, `> 2.2`).
+ * Tipos, constantes y esquemas de la vista de catalogo visual.
  *
  * Los tamanos de tanda y el orden son CONSTANTES DEL DOMINIO, no entrada: el cliente no puede
  * pedir mas proveedores ni mas lineas de las que aqui se declaran, ni otro orden. Los tipos de

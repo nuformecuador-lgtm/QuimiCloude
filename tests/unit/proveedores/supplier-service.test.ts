@@ -242,12 +242,13 @@ describe('casos de uso del proveedor (QC-43 T8)', () => {
       email: 'ventas@andinos.test',
     })
 
-    // Y no hay ninguna operacion por campo suelto: el puerto tiene EXACTAMENTE cinco
+    // Y no hay ninguna operacion por campo suelto: el puerto tiene EXACTAMENTE seis
     // metodos. Mutacion que lo pone rojo: anadir `renameAlive` o `updatePhone` al puerto.
     expect(metodosDelPuerto('supplier-repository.ts')).toEqual([
       'create',
       'findAliveById',
       'listAlive',
+      'listShowcaseAlive',
       'softDeleteAlive',
       'updateAlive',
     ])
@@ -301,7 +302,7 @@ describe('casos de uso del proveedor (QC-43 T8)', () => {
   it('no existe ninguna operacion de restaurar ni de listar dados de baja', async () => {
     // R22 (decision cerrada 6). Dos mitades:
     //
-    // 1. El puerto no puede EXPRESAR ninguna de las dos: sus cinco metodos son los del
+    // 1. El puerto no puede EXPRESAR ninguna de las dos: sus seis metodos son los del
     //    caso de arriba y ninguno admite un `includeDeleted`. Mutacion: anadir
     //    `restore(id)` o `listDeleted(query)` al puerto -la lista exacta de metodos cae-.
     // 2. Ni el dominio ni el puerto nombran la idea en ninguna forma.
@@ -311,6 +312,7 @@ describe('casos de uso del proveedor (QC-43 T8)', () => {
       'create',
       'findAliveById',
       'listAlive',
+      'listShowcaseAlive',
       'softDeleteAlive',
       'updateAlive',
     ])

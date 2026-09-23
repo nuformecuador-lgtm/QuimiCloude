@@ -73,10 +73,10 @@ export interface SupplierRepository {
   listAlive(query: ListQuery, scope: SupplierScope): Promise<Page<SupplierView>>;
 
   /**
-   * Tanda de proveedores VIVOS de esa empresa para la vista de catalogo visual
-   * (`design.md > 3`). A diferencia de `listAlive`, no es el contrato generico de listas: el
-   * tamano de tanda y el orden son constantes del dominio (`supplier-showcase.ts`), no
-   * entrada, y cada fila trae ademas su primera tanda de lineas del catalogo.
+   * Tanda de proveedores VIVOS de esa empresa para la vista de catalogo visual. A diferencia de
+   * `listAlive`, no es el contrato generico de listas: el tamano de tanda y el orden son
+   * constantes del dominio (`supplier-showcase.ts`), no entrada, y cada fila trae ademas su
+   * primera tanda de lineas del catalogo.
    */
   listShowcaseAlive(query: ShowcaseQuery, scope: SupplierScope): Promise<ShowcasePage>;
 }

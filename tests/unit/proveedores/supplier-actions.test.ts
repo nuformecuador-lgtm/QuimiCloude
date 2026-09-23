@@ -583,7 +583,7 @@ describe('Server Actions de proveedores — actor, forma de entrada y errores', 
   })
 })
 
-describe('T6 — las dos Server Actions de la vista de catalogo visual', () => {
+describe('las dos Server Actions de la vista de catalogo visual', () => {
   it('listSupplierShowcaseAction: exito, y el actor sale de la sesion como las demas', async () => {
     const PAGINA = { items: [], page: 1, hasMore: false }
     listSupplierShowcaseMock.mockResolvedValue(PAGINA)

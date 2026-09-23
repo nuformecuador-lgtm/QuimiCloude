@@ -13,20 +13,20 @@ export type ListShowcaseLinesDeps = {
   readonly catalog: SupplierCatalogRepository;
 };
 
-/** `CatalogLineView` -> `ShowcaseLine`: sin autores, sin fechas, sin importes (R8). */
+/** `CatalogLineView` -> `ShowcaseLine`: sin autores, sin fechas, sin importes. */
 function toShowcaseLine(line: CatalogLineView): ShowcaseLine {
   return { id: line.id, name: line.name, imagePath: line.imagePath };
 }
 
 /**
- * «Cargar mas» de una fila (`design.md > 2.3`). Reutiliza el puerto YA EXISTENTE
- * `SupplierCatalogRepository.listBySupplierAlive`, con `search: productSearch` (D14) y el
+ * «Cargar mas» de una fila. Reutiliza el puerto YA EXISTENTE
+ * `SupplierCatalogRepository.listBySupplierAlive`, con `search: productSearch` y el
  * orden y el tamano de tanda fijos del dominio: son el mismo que usa el adaptador para la
- * primera tanda de cada fila, y por eso el prefijo no tiene huecos ni repetidos (R17).
+ * primera tanda de cada fila, y por eso el prefijo no tiene huecos ni repetidos.
  *
  * Mismo orden que el resto del modulo: `requirePermission` primero, despues zod, despues el
- * puerto. `'supplier_not_found'` se traduce igual que en `listCatalogLines` (R28): un
- * proveedor de otra empresa o dado de baja responde «no encontrado», nunca una pagina vacia.
+ * puerto. `'supplier_not_found'` se traduce igual que en `listCatalogLines`: un proveedor de
+ * otra empresa o dado de baja responde «no encontrado», nunca una pagina vacia.
  */
 export function createListShowcaseLines(
   deps: ListShowcaseLinesDeps,

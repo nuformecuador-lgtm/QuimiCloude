@@ -387,17 +387,17 @@ export async function listAliveSuppliers(
 }
 
 /**
- * `listShowcaseAlive` de `SupplierRepository` (`design.md > 3`): la tanda de proveedores de la
- * vista de catalogo visual, con la primera tanda de lineas de cada uno.
+ * `listShowcaseAlive` de `SupplierRepository`: la tanda de proveedores de la vista de catalogo
+ * visual, con la primera tanda de lineas de cada uno.
  *
- * SIN `some` de lineas si no hay filtro de producto (D15): asi el proveedor sin catalogo sale
- * y cuenta en su tanda. `take: SHOWCASE_SUPPLIER_BATCH + 1` evita un `count` aparte: la fila
+ * SIN `some` de lineas si no hay filtro de producto: asi el proveedor sin catalogo sale y
+ * cuenta en su tanda. `take: SHOWCASE_SUPPLIER_BATCH + 1` evita un `count` aparte: la fila
  * de mas solo dice `hasMore` y se descarta antes de devolver la pagina.
  *
  * Para las lineas de cada proveedor de la tanda, UNA `findMany` por proveedor en paralelo, con
  * `buildCatalogLineWhere`/`catalogLineOrderBy` -las MISMAS funciones que usa el «cargar mas»
  * (`list-showcase-lines.ts`)-, para que la primera tanda de una fila y su continuacion nunca
- * discrepen en el orden ni en el filtro (R17). `take: SHOWCASE_LINE_BATCH + 1` es el mismo
+ * discrepen en el orden ni en el filtro. `take: SHOWCASE_LINE_BATCH + 1` es el mismo
  * truco que arriba, por fila.
  */
 export async function listShowcaseAliveSuppliers(

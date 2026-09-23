@@ -1,9 +1,9 @@
-// T3 — Los dos casos de uso de la vista de catalogo visual, con los puertos MOCKEADOS
-// (`design.md > 2.3`).
+// Los dos casos de uso de la vista de catalogo visual, con los puertos MOCKEADOS.
 //
-// Cubre R4 (los dos casos de uso), R8, R21, R28 y `hasMore` en la ultima pagina. Lo que NO se
-// prueba aqui es como se traduce la consulta a SQL: eso es de
-// `tests/integration/proveedores/supplier-showcase.int.test.ts`.
+// Cubre la autorizacion previa al puerto, la traduccion de un proveedor no encontrado, la forma
+// exacta de la consulta que llega al puerto del catalogo, la proyeccion sin autores y el
+// calculo de `hasMore` en la ultima pagina. Lo que NO se prueba aqui es como se traduce la
+// consulta a SQL: eso es de `tests/integration/proveedores/supplier-showcase.int.test.ts`.
 
 import { describe, expect, it, vi } from 'vitest';
 

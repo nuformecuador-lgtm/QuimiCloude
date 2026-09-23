@@ -224,9 +224,9 @@ export async function listSuppliersAction(query: unknown): Promise<SupplierListR
 }
 
 /**
- * Tanda de proveedores de la vista de catalogo visual (`design.md > 4`). Consulta: argumento
- * tipado, no `FormData`. `query` es `unknown` porque la forma entera vive dentro del caso de
- * uso (`showcaseQuerySchema`).
+ * Tanda de proveedores de la vista de catalogo visual. Consulta: argumento tipado, no
+ * `FormData`. `query` es `unknown` porque la forma entera vive dentro del caso de uso
+ * (`showcaseQuerySchema`).
  */
 export async function listSupplierShowcaseAction(query: unknown): Promise<SupplierShowcaseResult> {
   const actor = await currentActor();
@@ -239,7 +239,7 @@ export async function listSupplierShowcaseAction(query: unknown): Promise<Suppli
   }
 }
 
-/** «Cargar mas» de una fila de la vista de catalogo visual (`design.md > 4`). */
+/** «Cargar mas» de una fila de la vista de catalogo visual. */
 export async function listShowcaseLinesAction(
   supplierId: string,
   query: unknown,

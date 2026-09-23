@@ -1,4 +1,4 @@
-// T1 — Los dos esquemas de la vista de catalogo visual (`design.md > 2.2`).
+// Los dos esquemas de entrada de la vista de catalogo visual.
 import { describe, expect, it } from 'vitest';
 
 import { showcaseLinesQuerySchema, showcaseQuerySchema } from '@/lib/modules/proveedores/domain/supplier-showcase';

@@ -882,8 +882,7 @@ export const proveedores = {
     catalog: supplierCatalogRepository,
     log: proveedoresListQueryLog,
   }),
-  // T4 (`design.md > 2.3`, `> 3`) — la vista de catalogo visual. Claves nuevas al final:
-  // ninguna de las de arriba se toca.
+  // La vista de catalogo visual. Claves nuevas al final: ninguna de las de arriba se toca.
   listSupplierShowcase: createListSupplierShowcase({ suppliers: supplierRepository }),
   listShowcaseLines: createListShowcaseLines({ catalog: supplierCatalogRepository }),
 };
