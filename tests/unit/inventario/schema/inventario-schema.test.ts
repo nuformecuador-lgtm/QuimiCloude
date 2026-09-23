@@ -303,6 +303,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
         'id',
         ...PRODUCT_BUSINESS_FIELDS.map(([name]) => name),
         'nameNormalized',
+        'type',
         'unitId',
         'companyId',
         'createdAt',
