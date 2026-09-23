@@ -386,11 +386,11 @@ describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R
 describe('updateOrder — edicion (R6, R8, R9, R20, R21, R22, R24, R25, R33)', () => {
   const EDICION = { ...ENTRADA_ALTA, priority: 'ALTA' }
 
-  // QC-145 (enmienda). Antes de esta ficha, la edicion escribia el `status` de la entrada y
-  // `assertTransition` comparaba `row.status` contra `data.status`: una edicion podia mover el
-  // pedido hacia delante. Ahora la edicion NUNCA mueve el estado (R6): `updateOrderSchema` ya
-  // no declara `status` -lo descarta como cualquier clave desconocida- y la guardia compara
-  // `row.status` contra si mismo, asi que solo importa si el pedido YA es final (R8, R9).
+  // ENMIENDA. Antes, la edicion escribia el `status` de la entrada y `assertTransition` comparaba
+  // `row.status` contra `data.status`: una edicion podia mover el pedido hacia delante. Ahora la
+  // edicion NUNCA mueve el estado: `updateOrderSchema` ya no declara `status` -lo descarta como
+  // cualquier clave desconocida- y la guardia compara `row.status` contra si mismo, asi que solo
+  // importa si el pedido YA es final.
 
   it('reemplaza el conjunto completo y registra al actor como autor de la modificacion (R20); un `status` en la entrada se descarta (R6)', async () => {
     const d = dobles({ fila: fila() })

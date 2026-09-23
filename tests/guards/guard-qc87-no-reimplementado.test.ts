@@ -87,7 +87,7 @@ const ACCIONES = [
   'listOrderResponsiblesAction',
   'listResponsiblesForOrdersAction',
   'listAssignedOrdersAction',
-  // QC-145 T11: las TRES acciones de las vistas nuevas (`design.md > 4`).
+  // Las TRES acciones de las vistas de asignacion (terminados, todos y resumen por pedido).
   'listFinishedOrdersAction',
   'listCompanyOrdersAction',
   'listResponsibleCandidatesAction',

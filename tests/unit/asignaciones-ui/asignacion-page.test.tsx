@@ -1,5 +1,4 @@
-// QC-145 T12 — `/asignacion` reparte pestañas y sección solo por permiso (R11-R15, R27;
-// `design.md > 6.1`, `> 6.2`, `> 6.6`).
+// `/asignacion` reparte pestañas y sección solo por permiso.
 //
 // No se renderiza el árbol: `AsignacionPage` se invoca como la invoca el App Router y se inspecciona
 // el elemento de React devuelto sin montarlo, el mismo criterio que

@@ -1,6 +1,6 @@
-// QC-145 T13 — `CompanyOrdersListSection` es un Server Component `async`, calcado del test de
-// `FinishedOrdersListSection` (R19, R27). `listCompanyOrdersAction` esta mockeada: es el borde del
-// modulo `asignaciones` (T11, ya en disco).
+// `CompanyOrdersListSection` es un Server Component `async`, calcado del test de
+// `FinishedOrdersListSection`. `listCompanyOrdersAction` esta mockeada: es el borde del modulo
+// `asignaciones`.
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

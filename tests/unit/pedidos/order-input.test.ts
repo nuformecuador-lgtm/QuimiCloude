@@ -136,10 +136,9 @@ describe('pedidos — updateOrderSchema (edicion)', () => {
   const edicionValida = { ...altaValida(), priority: 'ALTA' }
 
   it('EDITABLE_STATUS se DERIVA del conjunto cerrado quitando CANCELADO, no se escribe a mano', () => {
-    // R24 (QC-34) y `design.md > 7.2`: el dia que aparezca un quinto estado, quien lo anada
-    // tiene que decidir explicitamente si es editable. Se comprueba la derivacion, no la lista
-    // literal. Se sigue publicando para QC-145 T14 (el selector de estado del formulario), pero
-    // `updateOrderSchema` ya no lo usa (R6).
+    // El dia que aparezca un quinto estado, quien lo anada tiene que decidir explicitamente si es
+    // editable. Se comprueba la derivacion, no la lista literal. Se sigue publicando para el
+    // selector de estado del formulario, pero `updateOrderSchema` ya no lo usa.
     expect([...EDITABLE_STATUS_VALUES]).toEqual(
       ORDER_STATUS_VALUES.filter((status) => status !== 'CANCELADO'),
     )

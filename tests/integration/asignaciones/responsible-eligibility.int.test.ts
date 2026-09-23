@@ -236,8 +236,8 @@ describe('asignaciones · quien puede ser responsable, contra la base (integraci
         fixture.companyA,
       );
       const pedido = await createOrder(fixture);
-      // Sembrada DIRECTAMENTE en la tabla, sin pasar por `assignResponsibles`: es exactamente lo
-      // que D17 acepta que ya exista de antes de esta ficha.
+      // Sembrada DIRECTAMENTE en la tabla, sin pasar por `assignResponsibles`: una asignacion que
+      // ya existia se acepta tal cual, sin migrarla ni rechazarla.
       await fixture.tx.orderAssignment.create({
         data: {
           orderId: pedido,

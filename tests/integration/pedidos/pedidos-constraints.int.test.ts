@@ -496,9 +496,9 @@ describe('el pedido como fila completa', () => {
       'created_at',
       'created_by',
       'deleted_at',
-      // `finished_at` (QC-145) es el instante en que el pedido paso a ENTREGADO al
-      // finalizarlo en planta: no es un total, un subtotal, un impuesto ni un cliente. Entre
-      // `deleted_at` e `id` por el mismo `sort()` lexicografico ('d' < 'f' < 'i').
+      // `finished_at` es el instante en que el pedido paso a ENTREGADO al finalizarlo en
+      // planta: no es un total, un subtotal, un impuesto ni un cliente. Entre `deleted_at` e
+      // `id` por el mismo `sort()` lexicografico ('d' < 'f' < 'i').
       'finished_at',
       'id',
       // `ingredients_cost` es el COSTE DE LOS INGREDIENTES, leido de los lotes vigentes al

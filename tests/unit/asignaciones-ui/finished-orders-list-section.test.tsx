@@ -1,8 +1,8 @@
-// QC-145 T13 — `FinishedOrdersListSection` es un Server Component `async`, asi que se le llama
-// como funcion y se renderiza lo que devuelve (R19, R27), calcado de `order-list-section.test.tsx`.
+// `FinishedOrdersListSection` es un Server Component `async`, asi que se le llama como funcion y
+// se renderiza lo que devuelve, calcado de `order-list-section.test.tsx`.
 //
-// `listFinishedOrdersAction` esta mockeada: es el borde del modulo `asignaciones` (T11, ya en
-// disco), y sustituirla es lo unico que permite ejercitar error, vacio y lista sin base de datos.
+// `listFinishedOrdersAction` esta mockeada: es el borde del modulo `asignaciones`, y sustituirla
+// es lo unico que permite ejercitar error, vacio y lista sin base de datos.
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

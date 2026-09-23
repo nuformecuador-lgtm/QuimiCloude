@@ -371,7 +371,7 @@ test.beforeAll(async () => {
     seedOrder({ sequence: SEQUENCE_PENDING, status: 'PENDIENTE' }),
     seedOrder({ sequence: SEQUENCE_IN_PROGRESS, status: 'EN_CURSO' }),
     seedOrder({ sequence: SEQUENCE_DELIVERED_WITH_DATE, status: 'ENTREGADO', finishedAt: FINISHED_AT }),
-    // «Entregado antes de esta ficha» (R30): sin fecha de terminado.
+    // Entregado sin fecha de terminado registrada.
     seedOrder({ sequence: SEQUENCE_DELIVERED_NO_DATE, status: 'ENTREGADO', finishedAt: null }),
     seedOrder({
       sequence: SEQUENCE_CANCELLED,
@@ -503,7 +503,7 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
       byTestIdAndUserId(withDateRow.getByTestId(RESPONSIBLES_CELL_TESTID), RESPONSIBLE_AVATAR_TESTID, respUserId),
     ).toBeVisible();
 
-    // El entregado «de antes de esta ficha», SIN fecha, marcado y AL FINAL (R20, R30).
+    // El entregado sin fecha registrada, marcado y AL FINAL del listado.
     const noDateRow = rowByNumber(page, noDateNumber);
     await expect(noDateRow).toHaveCount(1);
     const noDateDate = noDateRow.getByTestId(FINISHED_ORDER_DATE_TESTID);

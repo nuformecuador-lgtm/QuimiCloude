@@ -310,8 +310,8 @@ describe('QC-88 — `listAssignedOrders` (R5, R40)', () => {
 });
 
 // ---------------------------------------------------------------------------------------
-// QC-145 T7 — `listFinishedOrders` exige `terminados.consultar` en su PRIMERA linea (R18): antes
-// de validar la entrada y antes de leer ningun dato.
+// `listFinishedOrders` exige `terminados.consultar` en su PRIMERA linea: antes de validar la
+// entrada y antes de leer ningun dato.
 // ---------------------------------------------------------------------------------------
 describe('QC-145 — `listFinishedOrders` (R18)', () => {
   function montarDeps(): { deps: ListFinishedOrdersDeps; todos: readonly ReturnType<typeof vi.fn>[] } {
@@ -382,8 +382,8 @@ describe('QC-145 — `listFinishedOrders` (R18)', () => {
 });
 
 // ---------------------------------------------------------------------------------------
-// QC-145 T8 — `listCompanyOrders` exige `pedidos.consultar` en su PRIMERA linea (R23): antes de
-// validar la entrada y antes de leer ningun dato.
+// `listCompanyOrders` exige `pedidos.consultar` en su PRIMERA linea: antes de validar la entrada
+// y antes de leer ningun dato.
 // ---------------------------------------------------------------------------------------
 describe('QC-145 — `listCompanyOrders` (R23)', () => {
   function montarDeps(): { deps: ListCompanyOrdersDeps; todos: readonly ReturnType<typeof vi.fn>[] } {

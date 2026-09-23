@@ -41,7 +41,7 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
     it('las 52 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
-      // 52 y no 51: QC-145 R33 anadio `user_cannot_be_responsible`.
+      // 52 y no 51: entra `user_cannot_be_responsible`.
       expect(ERROR_CODES).toHaveLength(52)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })

@@ -643,10 +643,10 @@ describe('R33/R40 — los discriminantes de las tres escrituras', () => {
 
       // VIVO -> 'ok', y la edicion escribe de verdad.
       //
-      // QC-145 R6 (enmienda): `editado` sigue llevando `status` porque `baseOrder` devuelve un
-      // `NewOrder` completo -el mismo helper del alta-, pero `updateAliveOrder` ya no lo lee
-      // (`OrderEdit` no tiene el campo): la fila se queda en el estado con el que nacio,
-      // `PENDIENTE`, aunque `editado.status` pida `EN_CURSO`.
+      // ENMIENDA: `editado` sigue llevando `status` porque `baseOrder` devuelve un `NewOrder`
+      // completo -el mismo helper del alta-, pero `updateAliveOrder` ya no lo lee (`OrderEdit` no
+      // tiene el campo): la fila se queda en el estado con el que nacio, `PENDIENTE`, aunque
+      // `editado.status` pida `EN_CURSO`.
       const editado = baseOrder({ quantity: '99.0000', priority: 'CRITICA', status: 'EN_CURSO' })
       expect(await updateAliveOrder(pedido.id, editado, actorId, despues, null, scope())).toBe('ok')
       const relectura = await findAliveOrderById(pedido.id, scope())

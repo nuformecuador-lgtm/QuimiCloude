@@ -159,7 +159,7 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions', 
     // no afirman nada sobre responsables, y con el lote vacio la columna pinta su marcador de
     // ausencia sin cambiar una sola asercion de aqui.
     listResponsiblesForOrdersAction: vi.fn(async () => ({ status: 'success', data: [] })),
-    // QC-145 T15 (R32): el catalogo de personas del panel sale ahora de esta accion.
+    // El catalogo de personas del panel sale de esta accion.
     listResponsibleCandidatesAction: vi.fn(async () => ({ status: 'success', data: [] })),
   };
 });

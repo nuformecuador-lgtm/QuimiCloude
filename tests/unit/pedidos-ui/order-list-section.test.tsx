@@ -60,8 +60,8 @@ const {
     id: '55555555-5555-4555-8555-555555555555',
     permissions: ['pedidos.consultar', 'asignaciones.modificar', 'usuarios.consultar'],
   })),
-  // R32: el catalogo de personas del panel sale de esta accion, que ya filtra por
-  // `asignaciones.modificar` y por elegibilidad (design.md > 3.6).
+  // El catalogo de personas del panel sale de esta accion, que ya filtra por
+  // `asignaciones.modificar` y por elegibilidad.
   listResponsibleCandidatesActionMock: vi.fn(async () => ({
     status: 'success' as const,
     data: [] as readonly { id: string; displayName: string }[],
@@ -538,14 +538,14 @@ describe('QC-102 — los catalogos del panel solo se piden si el actor puede esc
 });
 
 // ---------------------------------------------------------------------------------------------
-// QC-145 T15 (R32) — El catalogo de personas ya no depende de `usuarios.consultar`.
+// El catalogo de personas ya no depende de `usuarios.consultar`.
 //
-// Antes (QC-102) el catalogo salia de `listUsersAction`, que exige `usuarios.consultar` y se
-// degradaba a lista vacia sin ese permiso. `design.md > 3.6` cambia la fuente a
-// `listResponsibleCandidatesAction`, que solo exige `asignaciones.modificar` -el mismo permiso
-// con el que ya se decide si el panel de escritura existe- y excluye ya a quien tiene
-// `pedidos.consultar`. Reescribir la vieja prueba de degradacion por `usuarios.consultar` sin
-// dejar rastro simularia un permiso que esta pantalla ya no consulta.
+// Antes el catalogo salia de `listUsersAction`, que exige `usuarios.consultar` y se degradaba a
+// lista vacia sin ese permiso. Ahora la fuente es `listResponsibleCandidatesAction`, que solo
+// exige `asignaciones.modificar` -el mismo permiso con el que ya se decide si el panel de
+// escritura existe- y excluye ya a quien tiene `pedidos.consultar`. Reescribir la vieja prueba de
+// degradacion por `usuarios.consultar` sin dejar rastro simularia un permiso que esta pantalla ya
+// no consulta.
 // ---------------------------------------------------------------------------------------------
 describe('QC-145 — el catalogo de personas sale de listResponsibleCandidatesAction (R32)', () => {
   it('las personas del panel llegan de la accion nueva, no de listUsersAction', async () => {

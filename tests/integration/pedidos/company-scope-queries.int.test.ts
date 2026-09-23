@@ -449,9 +449,9 @@ describe('R21 — findAliveById / updateAlive / cancelAlive / softDeleteAlive co
 
   it('control positivo: el mismo updateAlive, desde B, SI escribe', async () => {
     // Sin este caso, un `updateMany` que nunca actualizara dejaria verde el anterior.
-    // QC-145 (enmienda, R6): `updateAliveOrder` ya no escribe `status` -el pedido se queda en
-    // `PENDIENTE`, con el que nacio en la siembra-, asi que lo que demuestra el escrito es la
-    // prioridad y la cantidad, no el estado.
+    // ENMIENDA: `updateAliveOrder` ya no escribe `status` -el pedido se queda en `PENDIENTE`, con
+    // el que nacio en la siembra-, asi que lo que demuestra el escrito es la prioridad y la
+    // cantidad, no el estado.
     const propio = B.pedidos[1] ?? '';
     const antes = await foto(propio);
 

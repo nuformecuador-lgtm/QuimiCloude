@@ -5,7 +5,7 @@
 // anulable, sin `DEFAULT`, que el `CHECK` exija `ENTREGADO`, que el indice sea el parcial de
 // `finished_at DESC NULLS LAST, order_year DESC, order_sequence DESC`, y que el `down.sql`
 // exista y revierta exactamente los tres objetos que el `migration.sql` declara. Ademas, que
-// el SQL entero no nombre `order_assignments`: esta ficha no toca esa tabla (R37).
+// el SQL entero no nombre `order_assignments`: esta migracion no toca esa tabla.
 //
 // PATRON: predicados puros sobre el texto SQL, aplicados dos veces -al archivo real (pasa) y a
 // una version mutada en memoria (falla)-. El archivo en disco no se toca nunca. Mismo patron
@@ -167,8 +167,8 @@ describe('migration.sql de orders_finished_at — la columna nace opcional, con 
     expect(obligatoria, 'la mutacion no se aplico').not.toBe(upSource)
     expect(addsNullableTimestampColumn(obligatoria)).toBe(false)
 
-    // Sensibilidad 2: un `UPDATE` de relleno dejaria pedidos entregados antes de esta ficha con
-    // una fecha que nunca se midio (R2).
+    // Sensibilidad 2: un `UPDATE` de relleno dejaria pedidos entregados antes de la migracion con
+    // una fecha que nunca se midio.
     const conRelleno = `${upSource}\nUPDATE "orders" SET "finished_at" = now() WHERE "status" = 'ENTREGADO';`
     expect(conRelleno).not.toBe(upSource)
     expect(fillsNothing(conRelleno)).toBe(false)
@@ -198,7 +198,7 @@ describe('migration.sql de orders_finished_at — la columna nace opcional, con 
     expect(createsPartialFinishedIndex(sinNullsLast)).toBe(false)
 
     // Sensibilidad 2: el numero de pedido ASCENDENTE para los "sin fecha" seria el orden
-    // contrario al que fijo D14.
+    // contrario al que se busca.
     const secuenciaAscendente = upSource.replace(
       '"order_sequence" DESC',
       '"order_sequence" ASC',

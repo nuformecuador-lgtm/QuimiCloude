@@ -825,9 +825,9 @@ describe('QC-88 T9 — listAssignedOrdersAction', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// QC-145 T11 — las TRES acciones nuevas: `design.md > 4`. Mismo cuerpo tonto que
-// `listAssignedOrdersAction`, asi que se prueba lo mismo y no mas: delegan con el actor de la
-// sesion, devuelven la salida TAL CUAL bajo `data` y traducen el error por su `code`.
+// Las TRES acciones nuevas: mismo cuerpo tonto que `listAssignedOrdersAction`, asi que se prueba
+// lo mismo y no mas: delegan con el actor de la sesion, devuelven la salida TAL CUAL bajo `data`
+// y traducen el error por su `code`.
 // ---------------------------------------------------------------------------------------------
 
 describe('QC-145 T11 — listFinishedOrdersAction', () => {
@@ -947,8 +947,8 @@ describe('QC-145 T11 — listResponsibleCandidatesAction', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// QC-145 T11/R33 — `user_cannot_be_responsible` sale traducido por su `code`, igual que cualquier
-// otro error del catalogo: esta capa no lo reconoce por su texto ni por ningun `if` especial.
+// `user_cannot_be_responsible` sale traducido por su `code`, igual que cualquier otro error del
+// catalogo: esta capa no lo reconoce por su texto ni por ningun `if` especial.
 // ---------------------------------------------------------------------------------------------
 
 describe('QC-145 R33 — assignResponsiblesAction traduce user_cannot_be_responsible por su code', () => {
