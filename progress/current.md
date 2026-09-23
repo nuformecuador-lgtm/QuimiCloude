@@ -18,6 +18,10 @@
 
 ## Evaluaciones
 
+### QC-131 - F1.0 (2026-09-23)
+
+`backend`, **`complexity: low`** (label en Jira). Deps QC-107 y QC-111 `done`. **Ficha HUMANA**: ningun agente redacta el texto definitivo, lo pone en Vercel ni firma. Decisiones del humano el 2026-09-23: (1) el arnes le prepara BORRADORES de los dos prompts y una guia paso a paso, en el `design.md` del spec (sin diff de codigo); el texto final lo decide y lo pone el; (2) **cierra la pregunta abierta 1 de QC-129**: el humano pone las dos variables TAMBIEN en Preview, con el mismo texto que en produccion. Worktree montado. Siguiente: F1.2.
+
 ### QC-152 Clientes - EPICA NUEVA del chat, ACOTADA con `/afinar-feature` (2026-09-23)
 
 Epica **QC-152** y tareas **QC-153** (modelo, backend), **QC-154** (CRUD, backend, bloqueada por 153), **QC-155** (pantalla, frontend, bloqueada por 154) y **QC-156** (pedido con cliente, fullstack, bloqueada por 154, sin sembrar). 153-155 sembradas con 7 decisiones comunes y 1 pregunta abierta (largos y formato de telefono/correo) en `specs/QC-15{3,4,5}-*/requirements.md`. `complexity` pendiente de F1.0.
