@@ -3,16 +3,23 @@ import { listAssignedOrdersAction } from '@/lib/modules/asignaciones/adapters/dr
 
 import { AssignedOrdersEmpty } from './assigned-orders-empty';
 import { AssignedOrdersError } from './assigned-orders-error';
-import { FIRST_PAGE, assignedOrdersListHref, toAssignedOrdersQuery } from './assigned-orders-list-params';
+import {
+  FIRST_PAGE,
+  assignedOrdersListHref,
+  toAssignedOrdersQuery,
+  type AssignmentViewKind,
+} from './assigned-orders-list-params';
 import { AssignedOrdersTable } from './assigned-orders-table';
 
 type AssignedOrdersListSectionProps = {
   /** Ya acotados por `parseAssignedOrdersListParams`. */
   readonly params: DataTableParams;
+  /** La vista vigente: viaja a cada `href` de paginacion para que no se pierda al navegar. */
+  readonly vista: AssignmentViewKind;
 };
 
 /** La accion se importa por su ruta exacta: el barrel del modulo no la reexporta a proposito. */
-export async function AssignedOrdersListSection({ params }: AssignedOrdersListSectionProps) {
+export async function AssignedOrdersListSection({ params, vista }: AssignedOrdersListSectionProps) {
   const result = await listAssignedOrdersAction(toAssignedOrdersQuery(params));
 
   if (result.status === 'error') {
@@ -25,13 +32,15 @@ export async function AssignedOrdersListSection({ params }: AssignedOrdersListSe
     return (
       <AssignedOrdersEmpty
         firstPageHref={
-          currentPage > FIRST_PAGE ? assignedOrdersListHref({ ...params, page: FIRST_PAGE }) : undefined
+          currentPage > FIRST_PAGE
+            ? assignedOrdersListHref({ ...params, page: FIRST_PAGE }, vista)
+            : undefined
         }
       />
     );
   }
 
   return (
-    <AssignedOrdersTable rows={items} params={params} totalPages={totalPages} />
+    <AssignedOrdersTable rows={items} params={params} totalPages={totalPages} vista={vista} />
   );
 }
