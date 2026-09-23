@@ -103,7 +103,9 @@ Archivos: `app/(private)/inventario/components/{product-columns,product-batches-
 `toFixed` sobre cantidades en esos archivos: se amplía la guardia de convenciones de la ruta si no
 los cubre), y `e2e/ajuste-de-inventario.spec.ts` verde con un ajuste de `-0.5`.
 
-## [ ] TM — Merge de `origin/dev` y renumeración de migraciones `[primera de lo pendiente]` (enmienda del 2026-09-23)
+## [x] TM — Merge de `origin/dev` y renumeración de migraciones `[primera de lo pendiente]` (enmienda del 2026-09-23)
+
+> **Cerrada por el leader el 2026-09-23.** Merge (`fe240487`) y renumeración (`5e1d7572`) hechos por el implementer. **Rollback probado** por el leader en una base efímera `qct_qc141_rollback`: `migrate deploy` completo, `db:rollback` de `…120200`, `…120100` y `…120000` en ese orden —apartando cada carpeta tras revertirla, solo en una copia de la rama—, las tres OK, y `migrate deploy` las reaplica limpias; base borrada. El paso 1 (revertir en la base local compartida `QuimiCloude`) **se sustituye** por una base propia de la rama, `QuimiCloude_QC141`, a la que apunta el `.env` del worktree; el saneo de `QuimiCloude` queda como deuda local con script entregado al humano.
 
 Archivos: todo lo que traiga el merge; `db/migrations/20260922160000_inventory_movement_kind_consumption/`
 y `db/migrations/20260922160100_reservations_and_decimal_stock/` (se renombran),
@@ -321,7 +323,9 @@ exactamente una apartada (`R16`), una merma simultánea a un apartado no deja el
 y ninguna combinación de las operaciones de T9 y T10 sobre el mismo producto se interbloquea en
 cien vueltas.
 
-## [ ] T16 — E2E `[depende de T10, T13, T14]`
+## [x] T16 — E2E `[depende de T10, T13, T14]`
+
+> **Cerrada el 2026-09-23.** `reserva-de-material`, `ejecucion-receta` y `ajuste-de-inventario` en Chromium y WebKit: 14/14 verdes sobre `QuimiCloude_QC141` (commits `5b0794ea`, `b1e7b8a3`, `a6f3d073`; detalle en la bitácora, «Tanda 4»).
 
 Archivos: `e2e/reserva-de-material.spec.ts` (nuevo).
 
@@ -331,7 +335,9 @@ Archivos: `e2e/reserva-de-material.spec.ts` (nuevo).
 **Hecho cuando:** `pnpm run e2e -- reserva-de-material` verde en local y en el gate completo
 (`R48`).
 
-## [ ] T17 — Documentación y trazabilidad `[depende de T1-T16]`
+## [x] T17 — Documentación y trazabilidad `[depende de T1-T16]`
+
+> **Cerrada el 2026-09-23.** Mapa R1–R50 completo en la bitácora; `./init.sh` completo verde (643/643 archivos, sin rojos, baseline vacío).
 
 Archivos: `docs/architecture.md` (pregunta 2 del dominio: el lote ya tiene consumidor; «Cron
 interno» ya existe como caso, se añade que el primero es este y su variable), 

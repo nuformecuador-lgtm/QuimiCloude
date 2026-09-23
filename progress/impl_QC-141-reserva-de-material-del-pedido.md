@@ -856,7 +856,7 @@ Además: `e2e/ejecucion-receta.spec.ts` (receta con una línea al 100 % y un lot
 | R34, R37 | `reservation.int.test.ts` («R34, R37 — …»); `product-batches-panel.test.tsx` |
 | R35 | `tests/unit/pedidos/find-coverage.test.ts`; `order-columns.test.tsx`, `order-list-section.test.tsx`, `order-sheet-coverage.test.tsx` |
 | R36 | `reservation.int.test.ts` («R36 — …»); `product-page.test.tsx` |
-| R38 | `reservation.int.test.ts`; `adjust-batch-stock.test.ts`; `batch-history.test.tsx` |
+| R38 | `reservation.int.test.ts` (ids únicos en la unión de los dos libros); `adjust-batch-stock.test.ts`; `batch-movement-prisma.test.ts`; `batch-history.test.tsx` («R38 — cada fila lleva el data-testid del id de su propio asiento…»); `e2e/ajuste-de-inventario.spec.ts` y `e2e/reserva-de-material.spec.ts` (paso 7) |
 | R39 | `reservation.int.test.ts` |
 | R40 | `tests/unit/inventario/authorization.test.ts` |
 | R41 | `create-order`, `update-order`, `cancel-order` y `delete-order.test.ts` («R41: el permiso se exige ANTES…»); `tests/unit/pedidos/authorization.test.ts` |
@@ -971,11 +971,11 @@ las empresas una a una. `R47`: ningún cambio en `package.json` ni filas nuevas 
 | R45 | `inventory-movement-kind-consumption-migration.test.ts` y `reservations-and-decimal-stock-migration.test.ts` («R45: el down.sql falla…»); `reservations-and-decimal-stock-migration.int.test.ts` (dos `R45`) |
 | R46 | los dos tests de esquema de migración («R46: no nombra ninguna tabla ni columna fuera de ingles…»); `guard-libro-de-inventario` (sin `UPDATE`/`DELETE` sobre el libro) |
 | R47 | `tests/guards/guard-dependencias-aprobadas.test.ts` (sin cambios en `package.json`) |
-| R48 | `e2e/reserva-de-material.spec.ts` (**escrito, sin ejecutar**) |
+| R48 | `e2e/reserva-de-material.spec.ts` («R48 - dos pedidos compiten por el mismo lote…»), verde en Chromium y WebKit (tanda 4) |
 | R49 | `plan-reservation`, `order-requirement`, `create-order` y `update-order.test.ts`; `order-reservation.int.test.ts`; `reserve-existing-orders-migration.int.test.ts` |
 | R50 | `reservation.int.test.ts`, `transition-order.test.ts`, `update-order.test.ts`, `finish-assigned-order.test.ts`, `order-reservation.int.test.ts` |
 
-Los 50 tienen test. Solo R48 no se ha ejecutado.
+Los 50 tienen test, y todos se han ejecutado en verde (R48 en la tanda 4).
 
 ### Salida de los comandos (HEAD `4f76de88`)
 
@@ -996,3 +996,51 @@ Los 50 tienen test. Solo R48 no se ha ejecutado.
   tocó), y después vino la falta de memoria. Además, el servidor del E2E usa el `DATABASE_URL` del
   `.env`, es decir `QuimiCloude`, que va 3 migraciones atrás y tiene las dos nuestras aplicadas con
   el nombre viejo: el esquema coincide, pero falta `20260923120200_reserve_existing_orders` (solo datos).
+
+## Tanda 4 (2026-09-23): cierre de T16 y T17
+
+Base del E2E: `QuimiCloude_QC141`, propia de la rama (`.env` del worktree). `QuimiCloude` no se tocó.
+
+### Qué se arregló
+
+1. **Contrato de testid del historial (`ajuste-de-inventario`, 3 casos × 2 navegadores).** T13 quitó el
+   `id` de `BatchHistoryEntry` al unir los dos libros, y `batch-history.tsx` pasó a componer
+   `batch-history-entry-<índice>-<fecha>-<kind>`. **Decisión: se mantiene el contrato y no se toca el
+   E2E ajeno.** Motivo: el spec no pide cambiar el historial existente, solo intercalar en él los
+   asientos de reserva (`design.md > 0`, pregunta 4: «dentro del Historial del lote que ya existe»);
+   `batch-history-entry-<movementId>` es el contrato que QC-92 fijó y sobre el que afirma su E2E, y una
+   clave por posición además es inestable para React. `BatchHistoryEntry` recupera `id` (el de la fila
+   en su propio libro); la clave React es `${kind}-${id}`, única porque los `kind` de los dos libros
+   son disjuntos. Commits `5b0794ea` (backend: tipo, `batch-movement-prisma.ts`, tests) y `a6f3d073`
+   (componente y `batch-history.test.tsx`, caso nuevo `R38 —`).
+2. **Decimal en `ajuste-de-inventario`.** `products.stock` y `product_batches.stock` son `Decimal`:
+   las comparaciones con `toBe` pasan a `toString()` (línea ~400 contra `String(expectedStock)`;
+   línea ~452 las dos partes). `Decimal('12.0000').toString()` es `"12"`. Commit `b1e7b8a3`.
+3. **Navegación interrumpida en WebKit (`reserva-de-material`).** El diálogo de cancelar y la hoja del
+   pedido se cierran y luego hacen `router.refresh()`; el `goto` siguiente chocaba con ese refresh.
+   Tras cada mutación se espera a que la lista refrescada lo refleje, sin tocar timeouts: fila nueva
+   visible tras crear A y B, `data-status="CANCELADO"` tras cancelar A, `data-coverage="full"` tras
+   reeditar B y `data-status="ENTREGADO"` tras entregar B. Commit `b1e7b8a3`.
+4. **«Encountered two children with the same key».** No lo introduce esta rama:
+   `components/shared/step-reader/step-reader.tsx:275-277` pone `key={arrival}` a dos hermanos
+   (`WaitRing` y `CountdownTimer`) dentro del mismo `<p>`, con `arrival` 0, 1…; viene de `e195b3b7`
+   (en `dev`) y la rama no toca `components/`. El log del navegador intercala los workers en paralelo,
+   por eso parecía salir tras el login de este E2E. **No se arregla aquí** (fuera de alcance).
+
+### E2E (`npx playwright test e2e/reserva-de-material.spec.ts e2e/ejecucion-receta.spec.ts e2e/ajuste-de-inventario.spec.ts`)
+
+- Corrida 1: 9 pasan y 5 fallan, ninguno por la rama. 4 por `P1001 Can't reach database server at
+  localhost:5432` en el login (`waitForURL`, seis errores en el log del servidor), 1 en WebKit
+  (`ajuste…:463`) con el historial colgado en «Cargando historial…» tras un `TypeError: Load failed`
+  del navegador. Con el mismo patrón `void action().then(...)` en `dev`.
+- Corrida 2, sin cambios de código: **14 passed (4.5m)**, 0 errores de base ni de `Load failed`.
+
+### `./init.sh` completo (HEAD `a6f3d073`)
+
+`Test Files 643 passed (643)`, `Tests 8970 passed | 114 skipped (9084)`, 490.88 s; «tests: sin rojos
+nuevos (643 archivos ejecutados, baseline vacio)», «todas las migraciones tienen down.sql», `== init OK ==`.
+`ciclo-de-vida-de-la-base.int.test.ts` no se cayó esta vez.
+
+### Veredicto
+
+T16 y T17 cerradas; TM la cerró el leader. Las 18 tasks de `tasks.md` en `[x]`.
