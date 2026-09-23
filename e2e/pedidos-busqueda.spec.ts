@@ -80,6 +80,19 @@ async function visibleOrderNumbers(page: Page): Promise<string[]> {
   return page.getByTestId(ORDER_NUMBER_CELL).allTextContents();
 }
 
+/**
+ * Escribe el termino y espera a que la URL lo lleve. Se reintenta porque lo escrito antes de
+ * hidratar no emite la busqueda, y WebKit hidrata tarde -el mismo motivo que
+ * `e2e/proveedores.spec.ts`-.
+ */
+async function searchFor(page: Page, searchBox: Locator, term: string): Promise<void> {
+  await expect(async () => {
+    await searchBox.fill('');
+    await searchBox.fill(term);
+    await expect(page).toHaveURL((url) => url.searchParams.get('q') === term, { timeout: 15_000 });
+  }).toPass({ timeout: 120_000 });
+}
+
 async function seedOrder(sequence: number, recipeId: string) {
   if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
   return prisma.order.create({
@@ -248,10 +261,7 @@ test.describe('busqueda en la pantalla de pedidos', () => {
     await expect(page.getByTestId(ORDERS_TITLE)).toBeVisible({ timeout: 60_000 });
 
     const searchBox = page.getByTestId(SEARCH_BOX);
-    await searchBox.fill(SEARCH_TERM_A_AND_B);
-    await page.waitForURL((url) => url.searchParams.get('q') === SEARCH_TERM_A_AND_B, {
-      timeout: 60_000,
-    });
+    await searchFor(page, searchBox, SEARCH_TERM_A_AND_B);
 
     const numbers = await visibleOrderNumbers(page);
     expect(numbers.sort()).toEqual([...expectedNumbers].sort());
@@ -267,10 +277,7 @@ test.describe('busqueda en la pantalla de pedidos', () => {
     await expect(page.getByTestId(ORDERS_TITLE)).toBeVisible({ timeout: 60_000 });
 
     const searchBox = page.getByTestId(SEARCH_BOX);
-    await searchBox.fill(SEARCH_TERM_NO_MATCH);
-    await page.waitForURL((url) => url.searchParams.get('q') === SEARCH_TERM_NO_MATCH, {
-      timeout: 60_000,
-    });
+    await searchFor(page, searchBox, SEARCH_TERM_NO_MATCH);
 
     const orderTable = page.getByTestId(ORDER_TABLE);
     await expect(orderTable.getByTestId(NO_MATCHES)).toBeVisible({ timeout: 60_000 });
@@ -278,7 +285,7 @@ test.describe('busqueda en la pantalla de pedidos', () => {
     await expect(searchBox).toHaveValue(SEARCH_TERM_NO_MATCH);
 
     await orderTable.getByTestId(CLEAR_SEARCH).click();
-    await page.waitForURL((url) => url.searchParams.get('q') === null, { timeout: 60_000 });
+    await expect(page).toHaveURL((url) => url.searchParams.get('q') === null, { timeout: 60_000 });
     await expect(searchBox).toHaveValue('');
     await expect(orderTable.getByTestId(NO_MATCHES)).toHaveCount(0, { timeout: 60_000 });
   });
@@ -293,16 +300,13 @@ test.describe('busqueda en la pantalla de pedidos', () => {
     await expect(page.getByTestId(ORDERS_TITLE)).toBeVisible({ timeout: 60_000 });
 
     const searchBox = page.getByTestId(SEARCH_BOX);
-    await searchBox.fill(SEARCH_TERM_C);
-    await page.waitForURL((url) => url.searchParams.get('q') === SEARCH_TERM_C, {
-      timeout: 60_000,
-    });
+    await searchFor(page, searchBox, SEARCH_TERM_C);
 
     const firstPageNumbers = await visibleOrderNumbers(page);
     expect(firstPageNumbers).toHaveLength(10);
 
     await page.getByTestId(NEXT_PAGE).click();
-    await page.waitForURL(
+    await expect(page).toHaveURL(
       (url) => url.searchParams.get('q') === SEARCH_TERM_C && url.searchParams.get('page') === '2',
       { timeout: 60_000 },
     );
@@ -367,18 +371,15 @@ test.describe('busqueda en la pantalla de pedidos', () => {
     await expect(page.getByTestId(ORDERS_TITLE)).toBeVisible({ timeout: 60_000 });
 
     const searchBox = page.getByTestId(SEARCH_BOX);
-    await searchBox.fill(SEARCH_TERM_A_AND_B);
-    await page.waitForURL((url) => url.searchParams.get('q') === SEARCH_TERM_A_AND_B, {
-      timeout: 60_000,
-    });
+    await searchFor(page, searchBox, SEARCH_TERM_A_AND_B);
 
     await searchBox.fill(SEARCH_TERM_C);
-    await page.waitForURL((url) => url.searchParams.get('q') === SEARCH_TERM_C, {
+    await expect(page).toHaveURL((url) => url.searchParams.get('q') === SEARCH_TERM_C, {
       timeout: 60_000,
     });
 
     await page.goBack();
-    await page.waitForURL((url) => url.searchParams.get('q') === SEARCH_TERM_A_AND_B, {
+    await expect(page).toHaveURL((url) => url.searchParams.get('q') === SEARCH_TERM_A_AND_B, {
       timeout: 60_000,
     });
     await expect(searchBox).toHaveValue(SEARCH_TERM_A_AND_B);
