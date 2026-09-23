@@ -117,7 +117,7 @@ Archivos: `app/(private)/pedidos/components/use-order-cost-quote.ts` (nuevo),
   identificador; una cotización posterior que responde bien quita el mensaje; y con el error visible,
   la siguiente petición en vuelo muestra solo «cotizando…» (`R17`).
 
-## [ ] T6 — El bloque en el formulario `[depende de T3, T4, T5]`
+## [x] T6 — El bloque en el formulario `[depende de T3, T4, T5]`
 
 Archivos: `app/(private)/pedidos/components/order-form.tsx`,
 `tests/unit/pedidos-ui/order-form-quote.test.tsx` (nuevo), y el doble de `order-actions` en
@@ -162,7 +162,7 @@ Archivos: `tests/integration/pedidos/order-cost-quote.int.test.ts` (nuevo).
 - `R6`: cotizar la receta de la empresa B con un actor de la empresa A -> `null`, igual que una
   receta sin líneas de A.
 
-## [ ] T8 — E2E `[depende de T6]`
+## [x] T8 — E2E `[depende de T6]`
 
 Archivos: `e2e/pedidos-cotizacion.spec.ts` (nuevo).
 
