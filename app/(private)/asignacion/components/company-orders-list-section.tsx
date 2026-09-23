@@ -2,7 +2,9 @@ import type { DataTableParams } from '@/components/shared/data-table';
 import { listCompanyOrdersAction } from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
 
 import { AssignedOrdersError } from './assigned-orders-error';
-import type { RouteOrderStatus } from './assignment-view-params';
+import { FIRST_PAGE, type RouteOrderStatus } from './assignment-view-params';
+import { CompanyOrdersEmpty } from './company-orders-empty';
+import { CompanyOrdersTable, companyOrdersHref } from './company-orders-table';
 
 export const COMPANY_ORDERS_SECTION_TESTID = 'company-orders-list-section';
 
@@ -14,9 +16,9 @@ type CompanyOrdersListSectionProps = {
 };
 
 /**
- * Punto de montaje de la vista «Todos», conectado a su Server Action. Es un ESQUELETO MINIMO: el
- * filtro de estado, la columna de fecha y el resto de columnas propias los completa la task
- * siguiente.
+ * `/asignacion?vista=todos` (R22, R24, R25, R26, R27, R31): pide la pagina con el filtro de
+ * estado vigente y reparte error, vacio o tabla. La accion se importa por su ruta exacta: el
+ * barrel del modulo no la reexporta a proposito.
  */
 export async function CompanyOrdersListSection({ params, statuses }: CompanyOrdersListSectionProps) {
   const result = await listCompanyOrdersAction({
@@ -29,7 +31,21 @@ export async function CompanyOrdersListSection({ params, statuses }: CompanyOrde
     return <AssignedOrdersError error={result} />;
   }
 
+  const { items, page: currentPage, totalPages } = result.data;
+
+  if (items.length === 0) {
+    return (
+      <CompanyOrdersEmpty
+        firstPageHref={
+          currentPage > FIRST_PAGE
+            ? companyOrdersHref({ page: FIRST_PAGE, pageSize: params.pageSize }, statuses)
+            : undefined
+        }
+      />
+    );
+  }
+
   return (
-    <div data-testid={COMPANY_ORDERS_SECTION_TESTID}>{result.data.items.length} pedido(s).</div>
+    <CompanyOrdersTable rows={items} params={params} totalPages={totalPages} statuses={statuses} />
   );
 }

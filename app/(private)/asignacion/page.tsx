@@ -13,8 +13,11 @@ import {
   AssignedOrdersSkeleton,
   AssignmentViewTabs,
   CompanyOrdersListSection,
+  CompanyOrdersSkeleton,
   FinishedOrdersListSection,
+  FinishedOrdersSkeleton,
   VIEW_PARAM,
+  isExactlyDelivered,
   parseAssignedOrdersListParams,
   parseAssignmentListParams,
   parseStatusFilter,
@@ -73,12 +76,19 @@ export default async function AsignacionPage({
         </Suspense>
       ) : null}
       {vista === 'terminados' ? (
-        <Suspense fallback={<AssignedOrdersSkeleton rows={genericListParams.pageSize} />}>
+        <Suspense fallback={<FinishedOrdersSkeleton rows={genericListParams.pageSize} />}>
           <FinishedOrdersListSection params={genericListParams} />
         </Suspense>
       ) : null}
       {vista === 'todos' ? (
-        <Suspense fallback={<AssignedOrdersSkeleton rows={genericListParams.pageSize} />}>
+        <Suspense
+          fallback={
+            <CompanyOrdersSkeleton
+              rows={genericListParams.pageSize}
+              showFinishedAt={isExactlyDelivered(statuses)}
+            />
+          }
+        >
           <CompanyOrdersListSection params={genericListParams} statuses={statuses} />
         </Suspense>
       ) : null}
