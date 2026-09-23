@@ -205,7 +205,7 @@ diferencia en el libro), `R13`, `R17`, `R27`, `R28`, `R30`, `R32`, `R33`, `R39` 
 ni `DELETE` sobre el libro en `lib/**`), y el censo de la guardia del libro pasa con
 `consumeBatchStock`.
 
-## T8 — La unidad de trabajo de `pedidos` y su cableado `[depende de T7]`
+## [x] T8 — La unidad de trabajo de `pedidos` y su cableado `[depende de T7]`
 
 Archivos: `lib/modules/pedidos/ports/{order-unit-of-work,order-write-repository}.ts` (nuevos),
 `lib/modules/pedidos/adapters/driven/persistence/{order-unit-of-work-prisma,order-prisma}.ts`,
