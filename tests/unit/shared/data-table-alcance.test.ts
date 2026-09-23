@@ -438,7 +438,16 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // -con sesion en una empresa no aparece ninguna fila del proveedor de otra, ni al pedirla
   // conociendo su identificador-. Se TENSA el centinela de dieciseis a DIECISIETE; la lista sigue
   // CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos diecisiete', () => {
+  //
+  // 2026-09-23: entra `e2e/reserva-de-material.spec.ts` (QC-141, R48), y no afloja la lista. No
+  // estrena pantalla: recorre las de pedidos e inventario, las dos ya en esta lista desde QC-35 y
+  // QC-49. Su recorrido crea dos pedidos que compiten por el mismo lote, cancela, reedita y entrega,
+  // y localiza `data-table-row-<id>`, `data-table-cell-orderNumber`, `data-table-next` y las filas de
+  // inventario por `product-stock` porque lo que afirma -lo apartado, lo disponible y la cobertura de
+  // cada pedido- se lee de las dos listas que monta la tabla compartida. Se TENSA el centinela de
+  // diecisiete a DIECIOCHO; la lista sigue CERRADA, y un spec mas que referencie `data-table` vuelve
+  // a ponerla en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos dieciocho', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -448,7 +457,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos diecisiete E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos dieciocho E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
       // ya consumen la tabla compartida -inventario y presentaciones- y localiza
       // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
@@ -485,6 +494,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // '-' precede a '.', igual que en pedidos.
       'e2e/recetas-pasos.spec.ts',
       'e2e/recetas.spec.ts',
+      // La DECIMOCTAVA la trae QC-141 el 2026-09-23 (R48): ver la nota de arriba. Llega a la tabla
+      // por las listas de pedidos e inventario, que ya la consumian.
+      'e2e/reserva-de-material.spec.ts',
       // La QUINTA la trae QC-39 el 2026-09-08 (R50): el E2E de la pantalla de unidades localiza
       // las celdas y la fila de la tabla compartida, que es la que su lista monta (QC-39 R15).
       'e2e/unidades.spec.ts',
