@@ -70,6 +70,7 @@ function directorioQueExplota(): PeopleDirectory {
   return {
     findAliveRefsInCompany: vi.fn(explota),
     findRefsIncludingDeletedInCompany: vi.fn(explota),
+    listAliveInCompany: vi.fn(explota),
   } as unknown as PeopleDirectory;
 }
 

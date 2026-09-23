@@ -35,12 +35,15 @@ import {
   findAliveRefsInCompany,
   findRefsIncludingDeletedInCompany,
   findSnapshotAliveInCompany,
+  listAliveInCompany,
 } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import {
   DOCUMENT_TYPE_CC,
   normalizeCompanyName,
   normalizeWorkGroupName,
+  ROLE_ADMINISTRADOR,
   ROLE_OPERADOR,
+  SEED_ROLE_PERMISSIONS,
 } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -64,8 +67,9 @@ const FAKE_CREDENTIAL_HASH = '$2b$10$marcador.de.prueba.qc87.t3.no.es.un.hash.re
 // Escenario: empresas propias, personas propias, limpieza propia
 // ---------------------------------------------------------------------------
 
-/** Rol del que cuelgan las personas. Se REUTILIZA el del seed, no se crea ninguno. */
+/** Roles de los que cuelgan las personas. Se REUTILIZAN los del seed, no se crea ninguno. */
 let operadorRoleId = '';
+let administradorRoleId = '';
 
 const createdCompanyIds = new Set<string>();
 
@@ -118,6 +122,7 @@ type SeedUserFields = Partial<{
   accountStatus: UserAccountStatus;
   lockedUntil: Date | null;
   deletedAt: Date | null;
+  roleId: string;
 }>;
 
 /** Una persona de esa empresa con el estado y el plazo que pida el caso. */
@@ -134,7 +139,7 @@ async function seedUser(companyId: string, fields: SeedUserFields = {}): Promise
       documentNumber: tag.replaceAll('-', '').slice(0, 20),
       username: `qc87.t3.${tag}`,
       passwordHash: FAKE_CREDENTIAL_HASH,
-      roleId: operadorRoleId,
+      roleId: fields.roleId ?? operadorRoleId,
       companyId,
       accountStatus: fields.accountStatus ?? 'active',
       lockedUntil: fields.lockedUntil ?? null,
@@ -197,6 +202,18 @@ beforeAll(async () => {
     );
   }
   operadorRoleId = operador.id;
+
+  const administrador = await prisma.role.findFirst({
+    where: { name: ROLE_ADMINISTRADOR },
+    select: { id: true },
+  });
+  if (administrador === null) {
+    throw new Error(
+      `falta el rol base \`${ROLE_ADMINISTRADOR}\` en la base: corre \`pnpm run db:seed\` contra la ` +
+        'base de esta feature antes de correr este archivo.',
+    );
+  }
+  administradorRoleId = administrador.id;
 });
 
 afterAll(async () => {
@@ -407,6 +424,72 @@ describe('PeopleDirectory — quien vuelve y con que `isActive`', () => {
     await withCompany(async (companyId) => {
       expect(await findAliveRefsInCompany(companyId, [], AHORA)).toEqual([]);
       expect(await findRefsIncludingDeletedInCompany(companyId, [], AHORA)).toEqual([]);
+    });
+  });
+
+  it('R32, R33 — `permissions` trae exactamente los codigos que el seed asigna al rol de la persona', async () => {
+    await withCompany(async (companyId) => {
+      const operador = await seedUser(companyId, { lastNames: 'Aaa', roleId: operadorRoleId });
+      const administrador = await seedUser(companyId, {
+        lastNames: 'Bbb',
+        roleId: administradorRoleId,
+      });
+
+      const refs = await findAliveRefsInCompany(companyId, [operador, administrador], AHORA);
+      const byId = new Map(refs.map((ref) => [ref.id, ref]));
+
+      expect([...(byId.get(operador)?.permissions ?? [])].sort()).toEqual(
+        [...SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]].sort(),
+      );
+      expect([...(byId.get(administrador)?.permissions ?? [])].sort()).toEqual(
+        [...SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]].sort(),
+      );
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PeopleDirectory — `listAliveInCompany` (R32, R33)
+// ---------------------------------------------------------------------------
+
+describe('listAliveInCompany — personas vivas de la empresa, ordenadas y acotadas', () => {
+  it('trae solo las personas VIVAS de esa empresa, con sus permisos', async () => {
+    await withTwoCompanies(async (companyA, companyB) => {
+      const viva = await seedUser(companyA, { lastNames: 'Aaa', roleId: operadorRoleId });
+      await seedUser(companyA, { lastNames: 'Bbb', deletedAt: AHORA });
+      await seedUser(companyB, { lastNames: 'Ccc' });
+
+      const refs = await listAliveInCompany(companyA, AHORA, 25);
+
+      expect(refs.map((ref) => ref.id)).toEqual([viva]);
+      expect([...refs[0]!.permissions].sort()).toEqual([...SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]].sort());
+    });
+  });
+
+  it('ordena por `last_names, first_names, id`', async () => {
+    await withCompany(async (companyId) => {
+      const zzz = await seedUser(companyId, { firstNames: 'Zoe', lastNames: 'Zeta' });
+      const aaa = await seedUser(companyId, { firstNames: 'Ana', lastNames: 'Alfa' });
+      const mismoApellidoA = await seedUser(companyId, { firstNames: 'Bea', lastNames: 'Alfa' });
+
+      const refs = await listAliveInCompany(companyId, AHORA, 25);
+
+      const ordenEsperado = [aaa, mismoApellidoA].sort();
+      expect(refs.slice(0, 2).map((ref) => ref.id).sort()).toEqual(ordenEsperado);
+      expect(refs.map((ref) => ref.id)).toContain(zzz);
+      expect(refs.map((ref) => ref.id).indexOf(zzz)).toBe(2);
+    });
+  });
+
+  it('respeta el tope: con mas de 25 personas vivas, devuelve exactamente 25', async () => {
+    await withCompany(async (companyId) => {
+      for (let i = 0; i < 30; i += 1) {
+        await seedUser(companyId, { lastNames: `Persona${String(i).padStart(2, '0')}` });
+      }
+
+      const refs = await listAliveInCompany(companyId, AHORA, 25);
+
+      expect(refs).toHaveLength(25);
     });
   });
 });

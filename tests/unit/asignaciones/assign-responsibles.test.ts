@@ -34,6 +34,7 @@ import type {
 } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
 import type {
   PeopleDirectory,
+  PermissionCode,
   PersonRef,
   WorkGroupDirectory,
   WorkGroupSnapshot,
@@ -57,8 +58,8 @@ const AHORA = new Date('2026-09-13T10:00:00.000Z');
 
 const ACTOR: Actor = { id: uuid('9'), companyId: EMPRESA, permissions: ['asignaciones.modificar'] };
 
-function persona(id: string, isActive = true): PersonRef {
-  return { id, displayName: `Persona ${id.slice(0, 1)}`, isActive };
+function persona(id: string, isActive = true, permissions: readonly PermissionCode[] = []): PersonRef {
+  return { id, displayName: `Persona ${id.slice(0, 1)}`, isActive, permissions };
 }
 
 function grupo(id: string, name: string, activeMemberIds: readonly string[]): WorkGroupSnapshot {
@@ -113,6 +114,9 @@ function montar(opts: {
       personas.filter((p) => ids.includes(p.id)),
     ),
     findRefsIncludingDeletedInCompany: vi.fn(async () => []),
+    // Ningun caso de uso de este archivo la invoca; el doble la declara para seguir satisfaciendo
+    // la interfaz completa.
+    listAliveInCompany: vi.fn(async () => []),
   };
 
   const groups = {
@@ -648,6 +652,9 @@ function montarSobreBase(
       findAliveById: async () => ({ id: PEDIDO, status: 'PENDIENTE' as const }),
       listAliveSummariesByIds: async () => {
         throw new Error('QC-88: no lo usa `assignResponsibles`');
+      },
+      listAliveSummariesInCompany: async () => {
+        throw new Error('QC-145: no lo usa `assignResponsibles`');
       },
       transitionAliveById: async () => {
         throw new Error('QC-87: no lo usa `assignResponsibles`');
