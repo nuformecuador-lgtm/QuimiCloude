@@ -603,3 +603,29 @@ escritura con reglas propias, documentadas, no una relajación muda-. Se corrigi
 `Prisma.Decimal` crudos pendientes de la tanda anterior en tres archivos de integración, incluida
 una reescritura de fondo (no solo de forma) en el caso de `qty_alert` que probaba lo contrario de
 lo que la pregunta 5b aprobó.
+
+---
+
+## Parada tras T7 (2026-09-22) — el spec choca con `origin/dev`
+
+**Estado.** T0–T7 cerradas y commiteadas. T8–T17 pendientes. `./init.sh --rapido` rojo en `typecheck`:
+solo 9 errores de `Product.type` (deuda de `bc902800`, que llegó con el merge de `dev`). `dev`
+ya la arregló (`645228b8`, `c77ec8b8`, `a57570f4`), pero esta rama todavía no ha mergeado esos commits.
+
+**Por qué se para.** `origin/dev` ya trae QC-147 (`9003bf70`, migración
+`20260922160000_recipe_lines_percentage`): `recipe_lines` pierde `quantity` y `unit_id`, gana
+`percentage DECIMAL(5,2)` (las líneas suman 100 %), y la migración **borra todas las líneas de receta
+existentes**. Lo que consume un pedido pasa a ser `cantidad del pedido × %` en la unidad del insumo, y
+QC-147 dice expresamente que QC-141 «hereda la fórmula nueva». Contradice el spec aprobado en:
+- design §6.1 / T6: `buildRequirement` = línea × pedido, con la unidad de la línea (ya implementado así).
+- design §5.1: `ReservationRequirementLine.unitId` (la línea ya no tiene unidad).
+- design §6.2, R9 y N3: la regla de la unidad sin base común deja de tener sentido tal como está escrita.
+- R11 y N1: la escala de la necesidad cambia (4 decimales × 2 decimales / 100).
+- design §4.3, T11 y R43: el SQL lee `recipe_lines.quantity` y la unidad de la línea; además, tras
+  QC-147 los pedidos vivos no tienen líneas, así que la migración no apartaría nada.
+- Colisión de timestamp: `20260922160000_inventory_movement_kind_consumption` (esta rama) y
+  `20260922160000_recipe_lines_percentage` (dev) comparten prefijo.
+- Merge con `origin/dev`: conflictos en `order-ingredients-table.tsx`, `order-cost.ts`,
+  `get-recipe.ts`, `recipe-view.ts`, `guard-identificador-de-request.test.ts`,
+  `order-ingredients-cost.int.test.ts`, `product-catalog.test.ts`, `product-prisma.test.ts`,
+  `order-form.test.tsx` y `feature_list.json`.
