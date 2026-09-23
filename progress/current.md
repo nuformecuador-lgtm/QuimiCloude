@@ -21,7 +21,7 @@
 
 ### QC-122 - F1.0 y ACOTADA con `/afinar-feature` (2026-09-23)
 
-`zone: frontend`, **`complexity: medium`** (leader, label en Jira). Dependencias QC-68 y QC-123 `done`. **Cupo `frontend` 1 de 2** (QC-107). Worktree montado desde `dev`. **8 decisiones cerradas (3 heredadas de QC-68/QC-123, 5 nuevas), cero abiertas** en `specs/QC-122-busqueda-y-total-en-la-pantalla-de-pedidos/requirements.md`; board actualizado antes de sembrar. Siguiente: F1.2.
+`zone: frontend`, **`complexity: medium`** (leader, label en Jira). Dependencias QC-68 y QC-123 `done`. **Cupo `frontend` 1 de 2** (QC-107). Worktree montado desde `dev`. **8 decisiones cerradas (3 heredadas de QC-68/QC-123, 5 nuevas), cero abiertas** en `specs/QC-122-busqueda-y-total-en-la-pantalla-de-pedidos/requirements.md`; board actualizado antes de sembrar. **F1.2 y F1.3 hechos**: R1-R25, T1-T8 (rama pusheada), semilla intacta; tarjeta en *En revision*. **PARADA EN F1.4** con 4 elecciones del diseno a confirmar (design.md §10).
 
 ### QC-150 - CREADA del chat y ACOTADA con `/afinar-feature` (2026-09-23)
 
