@@ -161,7 +161,7 @@ describe('sanitize contra la lista blanca', () => {
     // `?filters[unitId]=...` en un marcador tiene que seguir pintando la lista.
     expect(Object.keys(PRODUCT_QUERYABLE.filterable)).not.toContain('unitId');
     expect(PRODUCT_QUERYABLE.sortable).not.toContain('unitId');
-    expect(Object.keys(PRODUCT_QUERYABLE.filterable)).toEqual(['stock', 'qtyAlert', 'createdAt']);
+    expect(Object.keys(PRODUCT_QUERYABLE.filterable)).toEqual(['stock', 'qtyAlert', 'createdAt', 'type']);
 
     const resultado = sanitizeListQuery(
       query({ filters: { unitId: { kind: 'select', values: ['u1'] } } }),
