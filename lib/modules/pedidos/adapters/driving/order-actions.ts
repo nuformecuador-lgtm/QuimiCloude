@@ -160,15 +160,12 @@ function buildCreateCandidate(formData: FormData): unknown {
 }
 
 /**
- * El candidato de la edicion: los mismos campos del alta MAS el estado, porque la edicion es
- * un REEMPLAZO COMPLETO (R20). No lleva `reason`, y un `status` de cancelacion lo rechaza
- * `updateOrderSchema` en el borde sin llegar al repositorio (R24).
+ * El candidato de la edicion: los mismos campos del alta, porque la edicion es un REEMPLAZO
+ * COMPLETO de los datos de negocio, y ya no mueve el estado. Un `status` que el
+ * formulario siga enviando se ignora aqui, sin llegar siquiera a `updateOrderSchema`.
  */
 function buildUpdateCandidate(formData: FormData): unknown {
-  return {
-    ...(buildCreateCandidate(formData) as object),
-    status: readFormString(formData, 'status'),
-  };
+  return buildCreateCandidate(formData);
 }
 
 /** Alta de pedido (R8, R9, R15, R16). Devuelve el id y el numero visible ya compuesto. */

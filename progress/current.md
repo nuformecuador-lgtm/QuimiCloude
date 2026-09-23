@@ -36,12 +36,9 @@ Creada en el board (épica Inventario) a pedido del humano; **10 decisiones cerr
 QC-132 `done` (PR #110, `b7e64eb9`) y QC-130 `cancelled` al acotarla; QC-133 `cancelled` (absorbida). Resumen en `progress/history.md`.
 **Quedan abiertos**: (1) carpetas `.worktrees/QC-130-...` y `.worktrees/QC-132-...` sin borrar (archivo en uso en Windows; ramas ya desregistradas), borrar a mano; (2) **`dev` con 3 rojos de `cd7f07a6`**, arreglo en `fix/rojos-de-cd7f07a6` (PR aparte); (3) **QC-114 `pending` por decision humana** con spec aprobado, worktree y rama intactos: retoma directo en F2.1; (4) QC-138 y QC-139 citan «dato incompleto (QC-130)» para un caso que ya no ocurre: se corrige en su acotacion.
 
-### QC-145 - ACOTADA con `/afinar-feature` (2026-09-22) y DESBLOQUEADA (2026-09-23)
+### QC-145 - CERRADA (2026-09-23)
 
-Alcance, **12 decisiones cerradas** (11 + la presentacion que anadio QC-146) y **1 pregunta abierta** en
-`specs/QC-145-pedidos-terminados-en-asignacion/requirements.md`. El alcance **crecio** al acotarla: la edicion
-en Pedidos deja de cambiar el estado. **Desbloqueada el 2026-09-23**: QC-144 (PR #107) y QC-146 (PR #109) `done`.
-Pendiente F1.0 (`complexity`) y F1.2.
+PR #112, merge `51f2d101`. Resumen en `progress/history.md`.
 
 ### QC-147 - CERRADA (2026-09-23)
 
@@ -624,7 +621,7 @@ porque es validacion de entrada y no una regla nueva de dominio.
 
 ## Deudas y cosas abiertas
 
-- **2026-09-23 · restos de worktree en disco**: `.worktrees/QC-146-presentacion-del-pedido` y `.worktrees/QC-147-cantidades-de-receta-en-porcentaje` ya no estan registrados en git, pero sus carpetas siguen con `node_modules` bloqueados por Windows (proceso node vivo). Borrarlas a mano cuando no haya servidores ni E2E corriendo. Las ramas locales tambien quedan: ya estan mergeadas. La base `QuimiCloude_QC147` sobra y se puede borrar.
+- **2026-09-23 · restos de worktree en disco**: `.worktrees/QC-145-pedidos-terminados-en-asignacion`, `.worktrees/QC-146-presentacion-del-pedido` y `.worktrees/QC-147-cantidades-de-receta-en-porcentaje` ya no estan registrados en git, pero sus carpetas siguen con `node_modules` bloqueados por Windows (proceso node vivo). Borrarlas a mano cuando no haya servidores ni E2E corriendo. Las ramas locales tambien quedan: ya estan mergeadas. Las bases `QuimiCloude_QC145` y `QuimiCloude_QC147` sobran y se puede borrar.
 ### El E2E de dev tiene 11 rojos que no son de ninguna ficha en curso (2026-09-22)
 
 Medido por el leader al cerrar QC-146, sobre `origin/dev` limpio (`bc902800`), chromium, un worker: fallan `cierre-de-sesiones` (cierra sesiones de otra persona), `documentos` R20, `errores` R33, `inventario` R26 y QC-90 R32, `permisos` (Operador aterriza en asignacion), `presentaciones` R36, `proveedores` R51, `session` (dos casos) y `usuarios` R4/R42. Los mismos fallan en la rama de QC-146, que no los toca. Nadie tiene la ficha: hace falta una en el board.

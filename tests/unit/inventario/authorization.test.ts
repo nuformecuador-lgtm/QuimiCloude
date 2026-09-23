@@ -178,6 +178,7 @@ function directorioQueFalla(): PeopleDirectory {
     findRefsIncludingDeletedInCompany: vi.fn<PeopleDirectory['findRefsIncludingDeletedInCompany']>(
       explota,
     ),
+    listAliveInCompany: vi.fn<PeopleDirectory['listAliveInCompany']>(explota),
   };
 }
 
@@ -254,6 +255,7 @@ function montarReposPermisivos(): Repos {
       findRefsIncludingDeletedInCompany: vi.fn<
         PeopleDirectory['findRefsIncludingDeletedInCompany']
       >(async () => []),
+      listAliveInCompany: vi.fn<PeopleDirectory['listAliveInCompany']>(async () => []),
     },
   };
 }

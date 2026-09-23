@@ -7,6 +7,8 @@ import {
   AssignedOrderEnterTrigger,
   AssignedOrdersEmpty,
   AssignedOrdersError,
+  CompanyOrdersEmpty,
+  FinishedOrdersEmpty,
 } from '@/app/(private)/asignacion/components';
 
 // `AssignedOrdersError` llama `useRouter()` para el reintento y jsdom no monta el App Router.
@@ -60,6 +62,18 @@ describe('objetivos tactiles de 44x44 en todo lo que esta feature monta (R32)', 
     );
 
     expect(esObjetivoTactil(screen.getByTestId('assigned-orders-retry'))).toBe(true);
+  });
+
+  it('el enlace de «volver a la primera pagina» del estado vacio de «Terminados» (T13)', () => {
+    render(<FinishedOrdersEmpty firstPageHref="/asignacion?vista=terminados&page=1&pageSize=10" />);
+
+    expect(esObjetivoTactil(screen.getByTestId('finished-orders-first-page'))).toBe(true);
+  });
+
+  it('el enlace de «volver a la primera pagina» del estado vacio de «Todos» (T13)', () => {
+    render(<CompanyOrdersEmpty firstPageHref="/asignacion?vista=todos&page=1&pageSize=10" />);
+
+    expect(esObjetivoTactil(screen.getByTestId('company-orders-first-page'))).toBe(true);
   });
 });
 

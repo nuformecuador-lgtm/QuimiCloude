@@ -128,7 +128,7 @@ function filaDeGrupo(
 }
 
 function persona(id: string, displayName: string, isActive = true): PersonRef {
-  return { id, displayName, isActive };
+  return { id, displayName, isActive, permissions: [] };
 }
 
 // ---------------------------------------------------------------------------------------------

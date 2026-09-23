@@ -99,17 +99,15 @@ describe(`${migrationName}/migration.sql`, () => {
     }
   })
 
-  it('el timestamp es posterior al de la ultima migracion conocida', () => {
+  it('el timestamp es posterior al de la ultima migracion que existia cuando esta nacio', () => {
+    // Compara con un nombre fijo, no con "la ultima del repo": esa ultima cambia con cada
+    // migracion posterior y rompia este caso sin que esta migracion tuviera nada que ver.
+    const ultimaAlNacer = '20260922150000_product_type_enum'
     const match = /^(\d{14})_/.exec(migrationName)
     expect(match).not.toBeNull()
     const timestamp = match?.[1] as string
-    const others = readdirSync(migrationsDir).filter(
-      (name) => /^\d{14}_/.test(name) && name !== migrationName,
-    )
-    for (const other of others) {
-      const otherTimestamp = (/^(\d{14})_/.exec(other)?.[1]) as string
-      expect(timestamp > otherTimestamp, `${migrationName} debe ser posterior a ${other}`).toBe(true)
-    }
+    const otherTimestamp = (/^(\d{14})_/.exec(ultimaAlNacer)?.[1]) as string
+    expect(timestamp > otherTimestamp, `${migrationName} debe ser posterior a ${ultimaAlNacer}`).toBe(true)
   })
 })
 

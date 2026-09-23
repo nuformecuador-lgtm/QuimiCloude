@@ -79,6 +79,9 @@ export const ERROR_CODES = [
   // tiene permiso; lo que la regla de negocio rechaza es la ACCION pedida (por ejemplo, asignar el
   // rol de administrador, que no se concede por esta via).
   'action_not_allowed',
+  // Distinto de `user_not_assignable`: la cuenta esta activa. Lo que impide asignar a esta persona
+  // como responsable es que supervisa los pedidos de toda la empresa.
+  'user_cannot_be_responsible',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

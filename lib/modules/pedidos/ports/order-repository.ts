@@ -1,7 +1,7 @@
 import type { ListQuery } from '../domain/list-query';
 import type { Page } from '../domain/page';
 import type { OrderScope } from '../domain/order-scope';
-import type { NewOrder, OrderRow } from '../domain/order-view';
+import type { NewOrder, OrderEdit, OrderRow } from '../domain/order-view';
 
 /**
  * Puerto de acceso a datos del pedido (`design.md > 7.4`). Seis metodos, uno por caso de uso.
@@ -98,14 +98,15 @@ export interface OrderRepository {
     scope: OrderScope,
   ): Promise<Page<OrderRow>>;
 
-  /** Edicion como REEMPLAZO COMPLETO. No puede escribir `CANCELADO` ni motivo.
+  /** Edicion como REEMPLAZO COMPLETO. No puede escribir `CANCELADO` ni motivo, y ya no puede
+   *  escribir NINGUN estado: `OrderEdit` no tiene `status`.
    *
    *  `ingredientsCost`: mismo criterio que en `create` -parametro aparte, `null` distinto de
    *  `0`-. La edicion lo SUSTITUYE por completo, incluso a `null`: no hay fusion con el valor
    *  anterior. */
   updateAlive(
     id: string,
-    data: NewOrder,
+    data: OrderEdit,
     actorId: string,
     now: Date,
     ingredientsCost: string | null,
