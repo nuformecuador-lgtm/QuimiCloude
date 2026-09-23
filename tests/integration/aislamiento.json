@@ -188,6 +188,11 @@
       "desde": "2026-09-18"
     },
     {
+      "archivo": "pedidos/order-unit-of-work.int.test.ts",
+      "motivo": "QC-141 T8: 'withOrderTransaction' (order-unit-of-work-prisma.ts) abre su PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que envolver la corrida en una transaccion del test seria aislamiento de mentira -correria en otra conexion del pool-. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, presentacion, unidad, receta y, cuando hace falta, producto y lote) y la limpia en un 'finally'. El caso de R15 fuerza el fallo DENTRO de 'run', despues de 'create' y de 'syncForOrder', y comprueba con el cliente global que no quedo ni el pedido ni el asiento de reserva. El caso del reintento reutiliza el trigger determinista de 'order-duplicate-number.int.test.ts' -sin el no hay forma de provocar el choque del correlativo sin una carrera de verdad- para demostrar que la unidad ENTERA se reintenta, no solo el INSERT.",
+      "desde": "2026-09-23"
+    },
+    {
       "archivo": "pedidos/order-repository.int.test.ts",
       "motivo": "Nacido antes de QC-77 (QC-34). Existe justamente como contrapunto de 'order-crud.int.test.ts', que si se aisla por transaccion pero ejecutando su PROPIA copia de las sentencias: aqui se llaman las funciones REALES del adaptador que cablea lib/composition, y esas hablan con el cliente Prisma global. Committea y limpia lo suyo.",
       "desde": "2026-09-12"

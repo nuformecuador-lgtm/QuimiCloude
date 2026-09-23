@@ -94,10 +94,19 @@ import {
   replacePresentation,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-prisma';
 import { findPresentationRefs } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
+import {
+  createMaterialReservations,
+  createReservationQueries,
+} from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
+import type {
+  OrderNumberDirectory,
+  PresentationCatalog,
+  ProductCatalog,
+  ReservationQueries,
+} from '@/lib/modules/inventario';
 import { logIgnoredListQueryFields } from '@/lib/shared/observability/list-query-log';
 import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
@@ -183,13 +192,17 @@ import {
 import {
   cancelAliveOrder,
   createOrder,
+  createOrderWriteRepository,
   findAliveOrderById,
   listAliveOrders,
   softDeleteAliveOrder,
   updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
+import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import {
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
@@ -998,6 +1011,37 @@ export const pedidos = {
   cancelOrder: createCancelOrder({ orders: orderRepository }),
   deleteOrder: createDeleteOrder({ orders: orderRepository }),
 } as const;
+
+// ---------------------------------------------------------------------------------------
+// QC-141 T8 — la unidad de trabajo compartida entre `pedidos` e `inventario`. Bloque NUEVO al
+// final: no reordena ni reformatea nada de arriba. `orderRepository` arriba SIGUE cableado tal
+// cual -sus cuatro metodos de escritura se quedan hasta que T9 mueva a sus llamantes-; esto es
+// el camino NUEVO que usaran crear/editar/cancelar/borrar/entregar.
+// ---------------------------------------------------------------------------------------
+
+/**
+ * `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye, con el
+ * MISMO `tx`, el repositorio de escritura de `pedidos` y las reservas de `inventario`
+ * (`design.md > 5.2`). Sin `unitCatalog`: la necesidad ya llega en la unidad del producto, asi
+ * que `createMaterialReservations` no convierte nada.
+ */
+const orderUnitOfWork: OrderUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) => {
+      const scope: OrderTransactionScope = {
+        orders: createOrderWriteRepository(tx),
+        reservations: createMaterialReservations(tx),
+      };
+      return work(scope);
+    }),
+};
+
+/** `OrderNumberDirectory` cableado con el adaptador driven DE PEDIDOS: `inventario` solo conoce
+ *  el TIPO, para el historial de un lote (`design.md > 5.5`). */
+const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
+
+/** Lectura fuera de transaccion de la cobertura de un pedido, sobre el cliente global. */
+const reservationQueries: ReservationQueries = createReservationQueries();
 
 // ---------------------------------------------------------------------------------------
 // `observabilidad` (QC-71, T7). Bloque NUEVO al final, mismo criterio que los anteriores: no
