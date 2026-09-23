@@ -50,6 +50,7 @@ export {
   OrderAssignmentNotFoundError,
   UserNotFoundError,
   UserNotAssignableError,
+  UserCannotBeResponsibleError,
   WorkGroupNotFoundError,
 } from './domain/errors';
 
@@ -153,3 +154,9 @@ export {
   resolveAssignmentView,
   type AssignmentViewKind,
 } from './domain/assignment-views';
+// ---------------------------------------------------------------------------------------
+// Quien puede ser responsable de un pedido, por permiso. Bloque NUEVO al final: no reordena ni
+// reformatea nada de lo de arriba. Se publica para que `list-responsible-candidates.ts` (mismo
+// modulo) y cualquier lector externo apliquen el MISMO criterio que usa `assign-responsibles.ts`.
+// ---------------------------------------------------------------------------------------
+export { canBeResponsible } from './domain/responsible-eligibility';

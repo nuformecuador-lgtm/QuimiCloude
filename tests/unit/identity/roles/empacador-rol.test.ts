@@ -123,12 +123,13 @@ export function mentionsTerminadosConsultarLiteral(source: string): boolean {
 
 /**
  * Enmienda: `assignment-views.ts` decide si el usuario ve la vista "Terminados" comprobando este
- * permiso, y por eso necesita nombrarlo. Es la primera puerta que se abre; el caso de uso que
- * consulta esos pedidos abrira la segunda mas adelante, por su propio archivo exacto.
+ * permiso, y por eso necesita nombrarlo. `list-finished-orders.ts` es la segunda puerta, el caso
+ * de uso que consulta esos pedidos y lo exige en su primera linea (QC-145 T7).
  */
 const RUTAS_PERMITIDAS = new Set([
   'lib/modules/identity/domain/permissions.ts',
   'lib/modules/asignaciones/domain/assignment-views.ts',
+  'lib/modules/asignaciones/domain/list-finished-orders.ts',
 ]);
 
 function findTerminadosConsultarDeclarations(root: string): readonly string[] {
