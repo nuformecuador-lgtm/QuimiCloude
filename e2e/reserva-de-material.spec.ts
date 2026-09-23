@@ -175,7 +175,7 @@ async function openEdit(page: Page, numberText: string): Promise<void> {
   await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
 }
 
-/** La cobertura de un pedido, leida de su fila (R35: «Apartado», «Sin apartar»). */
+/** La cobertura de un pedido, leida de su fila («Apartado», «Sin apartar»). */
 async function coverageOf(page: Page, numberText: string): Promise<string | null> {
   await page.goto(ordersUrl());
   const row = await findOrderRow(page, numberText);

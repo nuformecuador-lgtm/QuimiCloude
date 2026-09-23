@@ -144,6 +144,8 @@ export const E2E_ESPERADOS = [
   // ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
   'recetas-porcentaje.spec.ts',
   'recetas.spec.ts',
+  // Alta con el mismo patron que las demas: no toca el identificador de peticion.
+  'reserva-de-material.spec.ts',
   'session.spec.ts',
   'theme.spec.ts',
   'unidades.spec.ts',
