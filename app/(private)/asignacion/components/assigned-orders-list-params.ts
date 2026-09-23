@@ -69,10 +69,9 @@ export function buildAssignedOrdersListQuery(params: DataTableParams): string {
 }
 
 /**
- * `vista` es OPCIONAL a proposito: cuando esta pantalla solo tiene una vista no
- * hay pestañas ni parametro que conservar, y las pruebas existentes de esta lista siguen fijando un
- * `href` con solo `page` y `pageSize`. Cuando la pantalla ofrece mas de una vista, quien construye
- * el `href` pasa la vigente para que paginar «Mis asignados» no vuelva a la vista por defecto.
+ * `vista` es OPCIONAL: cuando la pantalla solo tiene una vista no hay pestañas ni parametro que
+ * conservar. Cuando ofrece mas de una, quien construye el `href` pasa la vigente para que paginar
+ * «Mis asignados» no vuelva a la vista por defecto.
  */
 export function assignedOrdersListHref(params: DataTableParams, vista?: AssignmentViewKind): string {
   const query = new URLSearchParams(buildAssignedOrdersListQuery(params));

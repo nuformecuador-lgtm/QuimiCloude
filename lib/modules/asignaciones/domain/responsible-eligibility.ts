@@ -1,8 +1,8 @@
 // lib/modules/asignaciones/domain/responsible-eligibility.ts
 /**
  * Quien puede ser responsable de un pedido, decidido solo por permisos: nunca por el nombre del
- * rol. Una persona que ya puede consultar sus propios pedidos no se asigna como responsable de
- * uno ajeno.
+ * rol. Quien puede consultar todos los pedidos de la empresa los supervisa, y no se le asigna
+ * como responsable de ejecutar uno.
  *
  * La pertenencia se resuelve con `assertPermission` capturado en `try/catch`, el mismo patron que
  * `canModifyAssignments` de `actor.ts` y que `resolveAssignmentViews` de `assignment-views.ts`: es

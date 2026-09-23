@@ -1,10 +1,5 @@
--- La fecha de terminado.
---
--- `orders` gana `finished_at`, anulable y sin DEFAULT: nace en NULL en todas las filas
--- existentes, incluidas las ya ENTREGADO. Un CHECK impide que quede con valor si el estado
--- no es ENTREGADO. El indice parcial es para "Terminados": solo cubre los pedidos vivos y
--- entregados, ordenados por fecha de terminado descendente con los nulos al final, y como
--- desempate por numero de pedido descendente.
+-- `finished_at` nace anulable y sin DEFAULT para no obligar a rellenar los pedidos ya
+-- entregados.
 --
 -- Escrita a mano: el CHECK es drift para `prisma migrate dev`, como los demas CHECK de
 -- `orders`. Se aplica con `pnpm run db:migrate` (`prisma migrate deploy`), que no mira drift.

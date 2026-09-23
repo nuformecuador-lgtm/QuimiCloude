@@ -80,7 +80,7 @@ export const ERROR_CODES = [
   // rol de administrador, que no se concede por esta via).
   'action_not_allowed',
   // Distinto de `user_not_assignable`: la cuenta esta activa. Lo que impide asignar a esta persona
-  // como responsable es que ya tiene permiso para consultar sus propios pedidos.
+  // como responsable es que supervisa los pedidos de toda la empresa.
   'user_cannot_be_responsible',
 ] as const;
 

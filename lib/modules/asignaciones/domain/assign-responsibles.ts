@@ -119,8 +119,8 @@ export function createAssignResponsibles(
       // propio y distinto de `user_not_found`: lo que no admite es que se le asigne trabajo HOY.
       // Quien decide que es «activo» es `identity` (R21); aqui solo se lee el booleano.
       if (!person.isActive) throw new UserNotAssignableError();
-      // Tiene permiso para consultar sus propios pedidos: no se le puede asignar la
-      // responsabilidad de uno. Rechazo ENTERO, igual que los dos anteriores.
+      // Supervisa los pedidos de toda la empresa: no se le puede asignar la responsabilidad de
+      // ejecutar uno. Rechazo ENTERO, igual que los dos anteriores.
       if (!canBeResponsible(person)) throw new UserCannotBeResponsibleError();
     }
 
@@ -130,7 +130,7 @@ export function createAssignResponsibles(
       return snapshot;
     });
 
-    // Quien tiene permiso para consultar sus propios pedidos se omite EN SILENCIO de los grupos,
+    // Quien supervisa los pedidos de toda la empresa se omite EN SILENCIO de los grupos,
     // igual que a un miembro inactivo, sin rechazar la operacion. Una sola llamada con la union de
     // todos los miembros activos, no una por grupo.
     const memberIds = new Set<string>();

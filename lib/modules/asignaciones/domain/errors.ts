@@ -155,8 +155,8 @@ export class WorkGroupNotFoundError extends AsignacionesError {
 }
 
 /**
- * La persona existe y su cuenta esta activa, pero tiene permiso para consultar sus propios
- * pedidos: no se le puede asignar la responsabilidad de uno. Se distingue de
+ * La persona existe y su cuenta esta activa, pero supervisa los pedidos de toda la empresa: no
+ * se le puede asignar la responsabilidad de ejecutar uno. Se distingue de
  * `user_not_assignable`, cuyo mensaje habla de una cuenta que no esta activa, algo que aqui no es
  * cierto.
  */
