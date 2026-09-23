@@ -4643,3 +4643,30 @@ podar.
 - **La migración se escribió a mano**: Prisma no la generaba por drift de checksum en cuatro
   migraciones `*_company_scope` de la base local. Deuda local, ajena al repo.
 - **Baseline de rojos podado a cero**: las 6 entradas que quedaban ya pasaban.
+
+## 2026-09-23 — QC-147-cantidades-de-receta-en-porcentaje
+
+- **Qué:** las líneas de receta pasan de cantidad + unidad (gr/ml) a **porcentaje de hasta 2
+  decimales que suma exactamente 100,00 %**. Consumo de un pedido = cantidad del pedido × %, en la
+  unidad del insumo (sin densidad). Aplica al costo de ingredientes, a la tabla de ingredientes de
+  Pedidos y a la pantalla del Operario («10,00 % · 20 l»); se retira el factor de escala de QC-63.
+- **PR #108**, merge `9003bf70`. Spec R1–R26, D1–D16, T1–T12. Review: 0 mayores, 11 menores (10
+  cerrados, el 9 justificado). E2E de recetas 16/16 en Chromium y WebKit. `./init.sh` completo verde.
+- **Nació del chat** y se creó en el board el mismo día; **QC-120 (rendimiento) quedó cancelada**
+  porque una receta en porcentaje vale para cualquier cantidad.
+- **Lección de base de datos:** la primera tanda migró la base COMPARTIDA de `.env` (`QuimiCloude`) por
+  indicación del leader, y el `down.sql` no devuelve las líneas borradas. Se revirtió y la ficha siguió
+  en `QuimiCloude_QC147`. **Toda migración de una ficha va contra su base propia.**
+- **Enmiendas de contratos ajenos**, con motivo en el test: `unidades/module-contract` (`ProductRef`
+  admite `unitId`) y los dos contratos de diff de recetas (QC-147 como ampliación nombrada).
+- **Queda para el humano:** el símbolo del litro es «l» en el catálogo y «L» en el spec; y el menor 9
+  del reviewer (comentarios de `unidades` que citan fichas) pide una ficha de limpieza.
+
+## 2026-09-23 — QC-146-presentacion-del-pedido
+
+- **Qué:** cada pedido declara su **presentación** (del catálogo de la empresa), obligatoria al crear y
+  editar; los viejos quedan «sin presentación». Solo informa: no cambia cantidad, importe ni inventario.
+- **PR #109**, merge `0093acf9`. Llevada por otra sesión: el detalle (review rechazado por 2 mayores y
+  corregido, hotfixes de `bc902800` en `dev`, cupo `fullstack` subido a 3 con `/afinar-regla`) está en
+  su informe y en el PR. Cerrada en disco por el leader de QC-147.
+- **Desbloquea QC-145**, que muestra la presentación en «Terminados».
