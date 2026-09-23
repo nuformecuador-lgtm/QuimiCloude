@@ -2384,7 +2384,7 @@
     {
       "epic": "QC-105",
       "epic_name": "Documentos e IA",
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "branch": "feature/QC-158-catalogo-desde-pdf",
       "spec_path": "specs/QC-158-catalogo-desde-pdf",
