@@ -4709,3 +4709,13 @@ podar.
 - **Queda abierto:** el menor m4 (constantes muertas en `order-form.tsx` que exige
   `guard-pantalla-pedidos-se-amplia`); el flake de `user-table` ya tiene ficha (QC-126); el commit
   `c16d8172` quedó sin Co-Authored-By.
+
+## 2026-09-23 — QC-107-componente-de-carga-de-archivos
+
+- **Qué:** componente de subida de PDFs, varios a la vez (hasta 10 por tanda), con el modo de conversión
+  por prop y el estado de cada archivo (en cola, procesando, listo, error con motivo) leído de la cola de
+  QC-111. Incluye su recorrido E2E y arregla los dos defectos que ese E2E destapó.
+- **PR #103**, merge `be5c75c0`, mergeado el 2026-09-22. Bitácora y review en
+  `progress/impl_QC-107-componente-de-carga-de-archivos.md` y `progress/review_QC-107-componente-de-carga-de-archivos.md`.
+- **Cierre tardío:** el PR se mergeó el 2026-09-22 y la ficha siguió `in_progress` hasta el 2026-09-23,
+  ocupando cupo de `frontend`. La cerró el leader de QC-145 al verificar el merge.
