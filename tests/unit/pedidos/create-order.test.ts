@@ -571,4 +571,55 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
     expect(requerido.requirement).toEqual([]);
     expect(repo.setReservedAt.mock.calls[0]?.[1]).toBeNull();
   });
+
+  it('m7: la receta para la reserva se lee con `scope.recipes`, no con el lector global del coste', async () => {
+    const lineas = [lineaDeReceta()];
+    // El lector GLOBAL solo responde por el COSTE (fuera de la unidad de trabajo): una sola
+    // llamada. Si `create-order.ts` volviera a preguntarle por la reserva, esta prueba lo
+    // detectaria contando sus llamadas.
+    const findExecutionContentByIdGlobal = vi.fn(async (id: string) => ({
+      id,
+      name: 'Receta',
+      isDeleted: false,
+      steps: [],
+      lines: lineas,
+    }));
+    const recipesGlobal = {
+      findRefsIncludingDeleted: vi.fn(async (ids: readonly string[]) => ids.map((id) => ({ id, name: 'x', isDeleted: false }))),
+      findExecutionContentById: findExecutionContentByIdGlobal,
+    } as unknown as RecipeCatalog;
+    // El lector de `scope.recipes` -sobre el cliente de LA transaccion- es el UNICO que puede
+    // responder por la reserva (`design.md > 5.2.2`, m7).
+    const findExecutionContentByIdDeLaTransaccion = vi.fn(async (id: string) => ({
+      id,
+      name: 'Receta',
+      isDeleted: false,
+      steps: [],
+      lines: lineas,
+    }));
+    const create = vi.fn(async () => filaCreada());
+    const setReservedAt = vi.fn(async () => undefined);
+    const syncForOrder = vi.fn(async (input: { requirement: readonly unknown[] }) => {
+      expect(input.requirement).toEqual([{ productId: PRODUCTO_X, quantity: '10' }]);
+      return { kind: 'reserved' as const };
+    });
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { create, setReservedAt },
+      reservations: { syncForOrder },
+      recipes: { findExecutionContentById: findExecutionContentByIdDeLaTransaccion },
+    });
+    const createOrder = createCreateOrder({
+      unitOfWork,
+      recipes: recipesGlobal,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A }, ACTOR_A);
+
+    expect(findExecutionContentByIdGlobal).toHaveBeenCalledTimes(1);
+    expect(findExecutionContentByIdDeLaTransaccion).toHaveBeenCalledWith(RECETA_DE_A, EMPRESA_A);
+  });
 });

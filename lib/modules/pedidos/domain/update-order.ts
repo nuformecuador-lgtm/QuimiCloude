@@ -117,12 +117,6 @@ export function createUpdateOrder(
 
     const instant = now();
 
-    // La necesidad se calcula con la receta del DATO ENTRANTE y NUNCA modifica lo apartado por
-    // otro pedido que use la misma receta -`buildRequirement` es dominio puro sobre las lineas
-    // de ESTA receta, y `syncForOrder` solo toca el libro de ESTE pedido.
-    const content = await deps.recipes.findExecutionContentById(data.recipeId, actor.companyId);
-    const requirement = buildRequirement(content?.lines ?? [], data.quantity);
-
     await deps.unitOfWork.run(async (transaction) => {
       const locked = await transaction.orders.lockAliveById(id, scope);
       if (locked === null) throw new OrderNotFoundError();
@@ -130,6 +124,14 @@ export function createUpdateOrder(
       // Repetida sobre la fila BLOQUEADA: otra operacion pudo moverla entre la lectura de
       // arriba y este bloqueo.
       assertTransition(locked.status, locked.status);
+
+      // La necesidad se calcula con la receta del DATO ENTRANTE y NUNCA modifica lo apartado
+      // por otro pedido que use la misma receta -`buildRequirement` es dominio puro sobre las
+      // lineas de ESTA receta, y `syncForOrder` solo toca el libro de ESTE pedido-. Se lee con
+      // `scope.recipes`, sobre el cliente de ESTA transaccion, para que la lectura vea la
+      // misma instantanea que acaba de bloquear `lockAliveById` (`design.md > 5.2.2`).
+      const content = await transaction.recipes.findExecutionContentById(data.recipeId, actor.companyId);
+      const requirement = buildRequirement(content?.lines ?? [], data.quantity);
 
       const result = await transaction.orders.updateAlive(id, data, actor.id, instant, ingredientsCost, scope);
       if (result === 'not_found') throw new OrderNotFoundError();

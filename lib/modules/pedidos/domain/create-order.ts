@@ -137,8 +137,10 @@ export function createCreateOrder(
       );
 
       // Una receta sin lineas da una necesidad vacia, y `syncForOrder` la sincroniza sin
-      // apartar nada ni fallar.
-      const content = await deps.recipes.findExecutionContentById(data.recipeId, actor.companyId);
+      // apartar nada ni fallar. Se lee con `scope.recipes`, sobre el cliente de ESTA
+      // transaccion: pedir una segunda conexion mientras esta retiene la suya es lo que
+      // `design.md > 5.2.2` evita.
+      const content = await transaction.recipes.findExecutionContentById(data.recipeId, actor.companyId);
       const requirement = buildRequirement(content?.lines ?? [], data.quantity);
 
       const outcome = await transaction.reservations.syncForOrder({

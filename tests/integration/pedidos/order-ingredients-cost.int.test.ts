@@ -41,6 +41,7 @@ import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/pers
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma'
 import { createRecipe } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma'
 import {
+  createRecipeExecutionReader,
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
@@ -92,6 +93,7 @@ const unitOfWork: OrderUnitOfWork = {
       const scope: OrderTransactionScope = {
         orders: createOrderWriteRepository(tx),
         reservations: createMaterialReservations(tx),
+        recipes: createRecipeExecutionReader(tx),
       }
       return work(scope)
     }),

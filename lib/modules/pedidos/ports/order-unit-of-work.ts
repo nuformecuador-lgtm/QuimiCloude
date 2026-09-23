@@ -1,15 +1,18 @@
 import type { MaterialReservations } from '@/lib/modules/inventario';
+import type { RecipeCatalog } from '@/lib/modules/recetas';
 
 import type { OrderWriteRepository } from './order-write-repository';
 
 /**
  * Lo que ve el trabajo que corre DENTRO de la transaccion compartida: el repositorio de
- * escritura de `pedidos` y las reservas de `inventario`, los dos atados al MISMO cliente
- * transaccional. Ninguno de los dos abre su propia transaccion.
+ * escritura de `pedidos`, las reservas de `inventario` y el lector de contenido de receta, los
+ * tres atados al MISMO cliente transaccional. Ninguno abre su propia transaccion ni pide una
+ * segunda conexion mientras esta se mantiene abierta (`design.md > 5.2.2`).
  */
 export type OrderTransactionScope = {
   readonly orders: OrderWriteRepository;
   readonly reservations: MaterialReservations;
+  readonly recipes: Pick<RecipeCatalog, 'findExecutionContentById'>;
 };
 
 /**

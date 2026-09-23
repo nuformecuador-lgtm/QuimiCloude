@@ -29,6 +29,7 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import {
+  createRecipeExecutionReader,
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
@@ -78,6 +79,7 @@ const unitOfWork: OrderUnitOfWork = {
       const scope: OrderTransactionScope = {
         orders: createOrderWriteRepository(tx),
         reservations: createMaterialReservations(tx),
+        recipes: createRecipeExecutionReader(tx),
       };
       return work(scope);
     }),
@@ -100,7 +102,7 @@ const createOrder = createCreateOrder({ recipes, products, units, presentations,
 const updateOrder = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork, now: () => new Date() });
 const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date() });
 const deleteOrder = createDeleteOrder({ orders, unitOfWork, now: () => new Date() });
-const transitionAliveById: OrderCatalog['transitionAliveById'] = createTransitionOrder({ unitOfWork, recipes });
+const transitionAliveById: OrderCatalog['transitionAliveById'] = createTransitionOrder({ unitOfWork });
 
 // ---------------------------------------------------------------------------
 // Empresa efimera

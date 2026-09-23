@@ -205,6 +205,7 @@ import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import {
+  createRecipeExecutionReader,
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
@@ -978,9 +979,9 @@ const orderRepository: OrderRepository = {
 
 /**
  * `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye, con el
- * MISMO `tx`, el repositorio de escritura de `pedidos` y las reservas de `inventario`. Sin
- * `unitCatalog`: la necesidad ya llega en la unidad del producto, asi que
- * `createMaterialReservations` no convierte nada.
+ * MISMO `tx`, el repositorio de escritura de `pedidos`, las reservas de `inventario` y el
+ * lector de contenido de receta (`design.md > 5.2.2`, m7). Sin `unitCatalog`: la necesidad ya
+ * llega en la unidad del producto, asi que `createMaterialReservations` no convierte nada.
  */
 const orderUnitOfWork: OrderUnitOfWork = {
   run: (work) =>
@@ -988,6 +989,7 @@ const orderUnitOfWork: OrderUnitOfWork = {
       const scope: OrderTransactionScope = {
         orders: createOrderWriteRepository(tx),
         reservations: createMaterialReservations(tx),
+        recipes: createRecipeExecutionReader(tx),
       };
       return work(scope);
     }),
@@ -1112,7 +1114,7 @@ const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: listAliveOrderSummariesByIds,
   listAliveSummariesInCompany,
-  transitionAliveById: createTransitionOrder({ unitOfWork: orderUnitOfWork, recipes: recipeCatalog }),
+  transitionAliveById: createTransitionOrder({ unitOfWork: orderUnitOfWork }),
 };
 
 /**

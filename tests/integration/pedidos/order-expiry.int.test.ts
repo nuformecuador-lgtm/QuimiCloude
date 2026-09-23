@@ -31,6 +31,7 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import {
+  createRecipeExecutionReader,
   findRecipeExecutionContentById,
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
@@ -75,6 +76,7 @@ const unitOfWork: OrderUnitOfWork = {
       const scope: OrderTransactionScope = {
         orders: createOrderWriteRepository(tx),
         reservations: createMaterialReservations(tx),
+        recipes: createRecipeExecutionReader(tx),
       };
       return work(scope);
     }),

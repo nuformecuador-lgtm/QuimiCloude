@@ -175,11 +175,6 @@ function almacen() {
   const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }))
   const reservations = { syncForOrder, releaseForOrder, consumeForOrder }
 
-  const unitOfWork = fakeOrderUnitOfWork({
-    orders: writeOrders as unknown as OrderTransactionScope['orders'],
-    reservations: reservations as unknown as OrderTransactionScope['reservations'],
-  })
-
   const recipes = {
     findRefsIncludingDeleted: vi.fn(async (ids: readonly string[]) =>
       ids.map((id) => ({ id, name: 'Acido citrico 50%', isDeleted: false })),
@@ -193,6 +188,12 @@ function almacen() {
       lines: [],
     })),
   }
+
+  const unitOfWork = fakeOrderUnitOfWork({
+    orders: writeOrders as unknown as OrderTransactionScope['orders'],
+    reservations: reservations as unknown as OrderTransactionScope['reservations'],
+    recipes: recipes as unknown as OrderTransactionScope['recipes'],
+  })
   const products = { findRefs: vi.fn(async () => []), findCostingBatches: vi.fn(async () => []) }
   const units = {
     findRefs: vi.fn(async () => []),

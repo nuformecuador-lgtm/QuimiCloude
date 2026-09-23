@@ -759,4 +759,64 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
     expect(findAliveById).not.toHaveBeenCalled();
     expect(unitOfWork.run).not.toHaveBeenCalled();
   });
+
+  it('m7: la receta para la reserva se lee con `scope.recipes`, no con el lector global del coste', async () => {
+    const lineas = [lineaDeReceta()];
+    // El lector GLOBAL solo responde por el COSTE (fuera de la unidad de trabajo): una sola
+    // llamada, y nunca por `findRefsIncludingDeleted` -la receta no cambia respecto a la fila-.
+    const findExecutionContentByIdGlobal = vi.fn(async (id: string) => ({
+      id,
+      name: 'Receta',
+      isDeleted: false,
+      steps: [],
+      lines: lineas,
+    }));
+    const recipesGlobal = {
+      findRefsIncludingDeleted: vi.fn(() => {
+        throw new Error('findRefsIncludingDeleted no deberia llamarse: la receta no cambia');
+      }),
+      findExecutionContentById: findExecutionContentByIdGlobal,
+    } as unknown as RecipeCatalog;
+    // El lector de `scope.recipes` -sobre el cliente de LA transaccion- es el UNICO que puede
+    // responder por la reserva (`design.md > 5.2.2`, m7).
+    const findExecutionContentByIdDeLaTransaccion = vi.fn(async (id: string) => ({
+      id,
+      name: 'Receta',
+      isDeleted: false,
+      steps: [],
+      lines: lineas,
+    }));
+    const filaVista = filaExistente();
+    const findAliveById = vi.fn(async () => filaVista);
+    const lockAliveById = vi.fn(async () => ({ ...filaVista, reservedAt: null }));
+    const updateAlive = vi.fn(async () => 'ok' as const);
+    const setReservedAt = vi.fn(async () => undefined);
+    const syncForOrder = vi.fn(async (input: { requirement: readonly unknown[] }) => {
+      expect(input.requirement).toEqual([{ productId: PRODUCTO_X, quantity: '10' }]);
+      return { kind: 'reserved' as const };
+    });
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { lockAliveById, updateAlive, setReservedAt },
+      reservations: { syncForOrder },
+      recipes: { findExecutionContentById: findExecutionContentByIdDeLaTransaccion },
+    });
+    const updateOrder = createUpdateOrder({
+      orders: { findAliveById, listAlive: vi.fn() } as unknown as OrderRepository,
+      unitOfWork,
+      recipes: recipesGlobal,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await updateOrder(
+      ORDER_ID,
+      { recipeId: RECETA_DE_A, quantity: '10.0000', presentationId: PRESENTACION_DE_A },
+      ACTOR_A,
+    );
+
+    expect(findExecutionContentByIdGlobal).toHaveBeenCalledTimes(1);
+    expect(findExecutionContentByIdDeLaTransaccion).toHaveBeenCalledWith(RECETA_DE_A, EMPRESA_A);
+  });
 });

@@ -65,20 +65,43 @@ export function fakeOrderUnitOfWork(scope: OrderTransactionScope): OrderUnitOfWo
   return { run: (work) => work(scope) };
 }
 
-/** Combina los tres: el par de dobles del `scope` y la unidad de trabajo que los expone,
- *  lista para inyectar en `CreateOrderDeps.unitOfWork`, etc. */
+/** Lector de receta del `scope`, sobre el `tx` (`design.md > 5.2.2`, m7): por defecto una
+ *  receta SIN lineas, para que quien no la personaliza obtenga una necesidad vacia y no un
+ *  dato inventado. Quien necesite lineas concretas pasa su propio `RecipeCatalog` de dobles
+ *  -el mismo que usa para `deps.recipes`- como `overrides`. */
+export function fakeRecipeExecutionReader(
+  overrides: Partial<OrderTransactionScope['recipes']> = {},
+): OrderTransactionScope['recipes'] & Record<'findExecutionContentById', ReturnType<typeof vi.fn>> {
+  const findExecutionContentById = vi.fn(async (id: string) => ({
+    id,
+    name: 'Receta',
+    isDeleted: false,
+    steps: [],
+    lines: [],
+  }));
+  return {
+    findExecutionContentById,
+    ...overrides,
+  } as OrderTransactionScope['recipes'] & Record<'findExecutionContentById', ReturnType<typeof vi.fn>>;
+}
+
+/** Combina los tres puertos del `scope` y la unidad de trabajo que los expone, lista para
+ *  inyectar en `CreateOrderDeps.unitOfWork`, etc. */
 export function fakeUnitOfWork(overrides: {
   readonly orders?: Partial<OrderWriteRepository>;
   readonly reservations?: Partial<MaterialReservations>;
+  readonly recipes?: Partial<OrderTransactionScope['recipes']>;
 } = {}): {
   readonly unitOfWork: OrderUnitOfWork;
   readonly orders: OrderWriteRepository & Record<keyof OrderWriteRepository, ReturnType<typeof vi.fn>>;
   readonly reservations: MaterialReservations &
     Record<keyof MaterialReservations, ReturnType<typeof vi.fn>>;
+  readonly recipes: OrderTransactionScope['recipes'] & Record<'findExecutionContentById', ReturnType<typeof vi.fn>>;
 } {
   const orders = fakeOrderWriteRepository(overrides.orders);
   const reservations = fakeMaterialReservations(overrides.reservations);
-  return { unitOfWork: fakeOrderUnitOfWork({ orders, reservations }), orders, reservations };
+  const recipes = fakeRecipeExecutionReader(overrides.recipes);
+  return { unitOfWork: fakeOrderUnitOfWork({ orders, reservations, recipes }), orders, reservations, recipes };
 }
 
 /** Fila minima de `OrderWriteRepository.lockAliveById`: los tests que no la personalizan usan

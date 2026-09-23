@@ -12,14 +12,10 @@ import { assertTransition } from './order-transitions';
 import type { OrderStatus } from './order-classification';
 import type { OrderCatalog } from './order-catalog';
 
-import type { RecipeCatalog } from '@/lib/modules/recetas';
-
 import type { OrderUnitOfWork } from '../ports/order-unit-of-work';
 
 export type TransitionOrderDeps = {
   readonly unitOfWork: OrderUnitOfWork;
-  /** Solo para la necesidad de respaldo de un pedido sin nada apartado. */
-  readonly recipes: RecipeCatalog;
 };
 
 /** Firma exacta de `OrderCatalog['transitionAliveById']`: es lo que `asignaciones` invoca sin
@@ -47,7 +43,9 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
         // Consume ANTES de mover el estado: si falta material o la receta no tiene lineas, la
         // excepcion deshace la transaccion entera y ni el estado ni `finishedAt` quedan escritos.
         if (to === 'ENTREGADO') {
-          const content = await deps.recipes.findExecutionContentById(locked.recipeId, companyId);
+          // Con el cliente de ESTA transaccion (`scope.recipes`), no con el lector global: una
+          // segunda conexion mientras esta retiene la suya es lo que `design.md > 5.2.2` evita.
+          const content = await scope.recipes.findExecutionContentById(locked.recipeId, companyId);
           const requirement = buildRequirement(content?.lines ?? [], locked.quantity);
 
           const outcome = await scope.reservations.consumeForOrder({

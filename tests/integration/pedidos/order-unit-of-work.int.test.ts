@@ -23,6 +23,7 @@ import { createWithFirstBatch } from '@/lib/modules/inventario/adapters/driven/p
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
+import { createRecipeExecutionReader } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
@@ -57,7 +58,11 @@ function connectionString(): string {
  *  transaccion, sin `unitCatalog`. */
 function runInOrderTransaction<T>(work: (scope: OrderTransactionScope) => Promise<T>): Promise<T> {
   return withOrderTransaction((tx) =>
-    work({ orders: createOrderWriteRepository(tx), reservations: createMaterialReservations(tx) }),
+    work({
+      orders: createOrderWriteRepository(tx),
+      reservations: createMaterialReservations(tx),
+      recipes: createRecipeExecutionReader(tx),
+    }),
   );
 }
 
