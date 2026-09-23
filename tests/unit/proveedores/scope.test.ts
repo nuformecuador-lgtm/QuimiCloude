@@ -260,9 +260,19 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
       `pieza de proveedores fuera de app/${RUTA_DE_LA_PANTALLA}/: ${fueraDeSuCarpeta.join(', ')}`,
     ).toEqual([])
 
-    // Esta mitad sigue INTACTA y en negativo: QC-44 monto sus piezas dentro de la carpeta de
-    // ruta, asi que `components/` (compartido entre pantallas) no gano ninguna de proveedores.
-    const enComponents = coincidenciasEn(join(repoRoot, 'components'))
+    // Esta mitad sigue en negativo, pero con una unica excepcion, tan estrecha como la carpeta
+    // que la motiva: `components/` (compartido entre pantallas) no gana ninguna pieza de
+    // proveedores salvo el panel `components/shared/supplier/` (alta, edicion y sus campos).
+    //
+    // 2026-09-23: ese panel lo usan DOS rutas -el alta en la lista y la edicion en el detalle-,
+    // y una pieza que dos rutas comparten no puede vivir dentro de la carpeta de ninguna de
+    // las dos; por eso vive en `components/shared/supplier/`. La excepcion nombra esa carpeta
+    // exacta y ninguna otra: cualquier otra pieza de proveedores que aparezca en otro rincon de
+    // `components/` sigue poniendo esto en rojo igual que antes.
+    const CARPETA_DEL_PANEL_COMPARTIDO = 'shared/supplier/'
+    const enComponents = coincidenciasEn(join(repoRoot, 'components')).filter(
+      (relativa) => !relativa.startsWith(CARPETA_DEL_PANEL_COMPARTIDO),
+    )
     expect(
       enComponents,
       `componente de proveedores encontrado bajo components/: ${enComponents.join(', ')}`,
