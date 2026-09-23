@@ -49,15 +49,15 @@ function findMigrationDir(suffix: string): string {
   return join(migrationsDir, candidates[0] as string)
 }
 
-/** Las migraciones ordenan por su prefijo de timestamp: `<ts>_orders_presentation` debe ser
- *  estrictamente mayor que cualquier otra ya existente en el momento de esta lectura. */
-function latestTimestampBefore(dirName: string): string {
-  const timestamps = readdirSync(migrationsDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name !== dirName)
-    .map((entry) => entry.name.split('_')[0])
-    .filter((ts): ts is string => ts !== undefined)
-    .sort()
-  return timestamps[timestamps.length - 1] ?? ''
+/** El timestamp (prefijo) de la migracion localizada por sufijo. Falla claro si no existe: sin
+ *  esto el test pasaria en vacio si alguien renombra o borra la dependencia. */
+function timestampOf(suffix: string): string {
+  const dirName = findMigrationDir(suffix).split(/[\\/]/).pop() ?? ''
+  const ts = dirName.split('_')[0]
+  if (ts === undefined || ts.length === 0) {
+    throw new Error(`no se pudo extraer el timestamp de "${dirName}"`)
+  }
+  return ts
 }
 
 const migrationDir = findMigrationDir('_orders_presentation')
@@ -138,12 +138,22 @@ function dropsExactlyTheThreeObjectsInReverseOrder(sql: string): boolean {
   )
 }
 
-describe('el nombre de la migracion es posterior a todas las demas', () => {
-  it('R2: <ts>_orders_presentation es estrictamente mayor que el ultimo timestamp existente', () => {
+describe('el nombre de la migracion es posterior a las que necesita para aplicar', () => {
+  it('R2: <ts>_orders_presentation es estrictamente mayor que orders_company_scope y suppliers_company_scope', () => {
     const ts = migrationDirName.split('_')[0] ?? ''
-    const previous = latestTimestampBefore(migrationDirName)
     expect(ts.length).toBeGreaterThan(0)
-    expect(ts > previous, `${ts} debe ser mayor que ${previous}`).toBe(true)
+
+    // Depende de `orders.company_id` (orders_company_scope) y de
+    // `presentations_company_id_id_key` (suppliers_company_scope), la clave candidata que su FK
+    // compuesta referencia. No de "la ultima migracion que exista": eso envejeceria con cualquier
+    // migracion futura de cualquier otra ficha.
+    const ordersCompanyScope = timestampOf('_orders_company_scope')
+    const suppliersCompanyScope = timestampOf('_suppliers_company_scope')
+    expect(ts > ordersCompanyScope, `${ts} debe ser mayor que ${ordersCompanyScope}`).toBe(true)
+    expect(
+      ts > suppliersCompanyScope,
+      `${ts} debe ser mayor que ${suppliersCompanyScope}`,
+    ).toBe(true)
   })
 })
 
