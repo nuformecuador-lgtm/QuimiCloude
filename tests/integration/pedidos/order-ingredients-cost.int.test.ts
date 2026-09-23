@@ -33,13 +33,12 @@ import {
   createWithFirstBatch,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma'
 import {
-  cancelAliveOrder,
-  createOrder,
+  createOrderWriteRepository,
   findAliveOrderById,
   listAliveOrders,
-  softDeleteAliveOrder,
-  updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
+import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
+import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma'
 import { createRecipe } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma'
 import {
   findRecipeExecutionContentById,
@@ -61,6 +60,7 @@ import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { RecipeScope } from '@/lib/modules/recetas/domain/recipe-scope'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
 
 function token(): string {
   return randomUUID().replace(/-/gu, '')
@@ -80,12 +80,22 @@ function normalizeForTest(name: string): string {
 // ---------------------------------------------------------------------------
 
 const orders: OrderRepository = {
-  create: createOrder,
   findAliveById: findAliveOrderById,
   listAlive: listAliveOrders,
-  updateAlive: updateAliveOrder,
-  cancelAlive: cancelAliveOrder,
-  softDeleteAlive: softDeleteAliveOrder,
+}
+
+// Mismo cableado que `lib/composition` para `orderUnitOfWork` (`design.md > 5.2`): abre la
+// transaccion compartida con `inventario` y ata, sobre el MISMO `tx`, la escritura de `pedidos`
+// y las reservas.
+const unitOfWork: OrderUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) => {
+      const scope: OrderTransactionScope = {
+        orders: createOrderWriteRepository(tx),
+        reservations: createMaterialReservations(tx),
+      }
+      return work(scope)
+    }),
 }
 
 const recipes: RecipeCatalog = {
@@ -274,8 +284,15 @@ function borrarReceta(recipeId: string): Promise<unknown> {
   return prisma.recipe.deleteMany({ where: { id: recipeId } })
 }
 
-function borrarPedido(orderId: string): Promise<unknown> {
-  return prisma.order.deleteMany({ where: { id: orderId } })
+/**
+ * QC-141 T9: el alta y la edicion de este archivo pasan ahora por la reserva real -el mismo
+ * `unitOfWork` que `lib/composition`-, asi que cada pedido puede haber dejado asientos en
+ * `reservation_movements`. `reservation_movements_order_id_fkey` es `RESTRICT`: hay que
+ * borrarlos antes que el pedido, igual que `inventory_movements` antes que el lote.
+ */
+async function borrarPedido(orderId: string): Promise<void> {
+  await prisma.reservationMovement.deleteMany({ where: { orderId } })
+  await prisma.order.deleteMany({ where: { id: orderId } })
 }
 
 /** Coste de la columna, leido con `::text` para no perder ni un decimal ni confundir `NULL`
@@ -311,7 +328,7 @@ describe('el alta lo deja guardado en la fila (R10)', () => {
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now: () => new Date('2026-05-01T12:00:00.000Z') })
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-01T12:00:00.000Z') })
       const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
 
@@ -334,8 +351,8 @@ describe('la edicion lo reescribe, incluso a nulo (R11)', () => {
 
     try {
       const now = () => new Date('2026-05-02T12:00:00.000Z')
-      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now })
-      const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, now })
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now })
+      const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork, now })
 
       const creado = await alta({ recipeId, quantity: '4.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
@@ -367,7 +384,7 @@ describe('comprar un lote despues no cambia el importe de un pedido ya creado (R
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now: () => new Date('2026-05-03T12:00:00.000Z') })
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-03T12:00:00.000Z') })
       const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
@@ -398,7 +415,7 @@ describe('un pedido anterior a la columna sigue sin importe (R8, R13)', () => {
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now: () => new Date('2026-05-05T12:00:00.000Z') })
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-05T12:00:00.000Z') })
       const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
@@ -456,7 +473,7 @@ describe('un pedido de otra empresa no se alcanza ni por identificador (R14, R21
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now: () => new Date('2026-05-06T12:00:00.000Z') })
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-06T12:00:00.000Z') })
       const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
 
@@ -483,8 +500,8 @@ describe('tras el alta y la edicion, los lotes y los asientos quedan intactos (R
       const antesDeAlta = await fotoDeInventario(A)
 
       const now = () => new Date('2026-05-07T12:00:00.000Z')
-      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now })
-      const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, now })
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now })
+      const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork, now })
 
       const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
@@ -516,7 +533,7 @@ describe('el pedido queda creado con el importe en blanco y la base no lanza 220
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now: () => new Date('2026-05-08T12:00:00.000Z') })
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-08T12:00:00.000Z') })
 
       // necesaria = 100 * 100 % = 100, cubierta EXACTAMENTE por el lote (stock 100).
       // importe = 100 * 9999999999.9999 = 999999999999.9900, muy por encima de 9999999999.9999.

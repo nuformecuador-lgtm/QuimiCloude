@@ -193,6 +193,11 @@
       "desde": "2026-09-23"
     },
     {
+      "archivo": "pedidos/order-reservation.int.test.ts",
+      "motivo": "QC-141 T9: crear/editar/cancelar/borrar ('createCreateOrder'/'createUpdateOrder'/'createCancelOrder'/'createDeleteOrder') cableados a mano con los adaptadores driven REALES de 'pedidos', 'recetas', 'inventario' y 'unidades', igual que 'order-ingredients-cost.int.test.ts' y 'order-unit-of-work.int.test.ts': 'withOrderTransaction' abre su PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test no la envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, presentacion, unidad, receta y, cuando hace falta, producto y lote) y la limpia en un 'finally'. Los casos de R30/R15 y R50 comprueban con el cliente global que un rechazo -'insufficient_material', 'recipe_without_lines'- no dejo escrito ni el pedido ni la reserva.",
+      "desde": "2026-09-23"
+    },
+    {
       "archivo": "pedidos/order-repository.int.test.ts",
       "motivo": "Nacido antes de QC-77 (QC-34). Existe justamente como contrapunto de 'order-crud.int.test.ts', que si se aisla por transaccion pero ejecutando su PROPIA copia de las sentencias: aqui se llaman las funciones REALES del adaptador que cablea lib/composition, y esas hablan con el cliente Prisma global. Committea y limpia lo suyo.",
       "desde": "2026-09-12"
