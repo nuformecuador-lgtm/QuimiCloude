@@ -125,3 +125,57 @@ El caso de `clearHref` comprueba `page`, `pageSize` y `sort`, pero no pasa ning�
 | R25 a, c, d y R26 | e2e/pedidos-busqueda.spec.ts | Chromium sí, **WebKit rojo** (B3) |
 | R27 | order-table > (R27), 3 casos; E2E R27 | parcial: no cubre «tras Limpiar», y ahí falla (B1) |
 | R17–R24, R25 b | retirados, sin test ni código | OK |
+
+---
+
+## Vuelta 2 (2026-09-23): veredicto OK
+
+Revisados a9f94015, 7f5be715, c8064a72 y d6906f37 (HEAD `f7ebc128` tras el merge de `origin/dev`).
+**0 bloqueantes abiertos, 1 menor abierto.** El veredicto de la vuelta 1 (RECHAZADO) queda sustituido
+por este.
+
+### Estado de cada hallazgo
+
+| Hallazgo | Estado | Cómo lo comprobé |
+|---|---|---|
+| B1 (Limpiar y luego Atrás) | **Cerrado** | `order-table.tsx`: `clearing` pasa a `false` dentro del bloque que detecta un `params.search` nuevo (el eco de la limpieza o un cambio externo). Repetí mi recorrido con un test temporal (ya borrado): Limpiar -> eco sin `q` -> `params` con `q=x` y `page: 2` -> la caja muestra `x`. Pasa, y con el código de la vuelta 1 fallaba. También probé Limpiar y un re-render antes del eco: la caja sigue vacía. El test nuevo del repo cubre el mismo recorrido y además afirma «Página 2 de 3». Hay también un caso E2E nuevo: «Atras despues de Limpiar…». |
+| B2 (R12 sin test) | **Cerrado** | El caso de «en vuelo» ahora suelta la navegación (`crearNavegacionControlable`) y afirma `aria-busy="false"`, sin `opacity-60`, sin rótulo de carga y con las filas nuevas (`o9` sí, `o1` no). Durante el vuelo afirma también `opacity-60` (R10). |
+| B3 (E2E rojo en WebKit) | **Cerrado** | `searchFor(...)` hace el primer `fill` con `toPass()`, el patrón de `proveedores.spec.ts`. Lo corrí yo: `pnpm run e2e e2e/pedidos-busqueda.spec.ts --project=webkit` -> **5 passed (1.6m)**. En Chromium no lo volví a correr; la bitácora pega 5/5. T5 queda cumplida. |
+| m1 (comentario largo) | Cerrado | El bloque de `pendingSearches` queda en 3 líneas. El comentario nuevo sobre `clearing` (2 líneas) no cita fichas. |
+| m2 (comentario «search siempre vacio») | Cerrado | Corregido en `order-list-section.test.tsx`. |
+| m3 (R15, filtros) | Cerrado | El caso de `clearHref` pasa `status`, `priority` y fechas, y afirma los cuatro parámetros. |
+| m4 (citas en comentarios de tests) | Cerrado en los archivos señalados | Cabecera y comentarios del E2E, `describe` de `order-sheet.test.tsx` y comentario de `order-table.test.tsx` sin fichas. Pero la vuelta 2 añade citas nuevas: ver m6. |
+| m5 (detalles del E2E) | Cerrado | Guarda duplicada quitada; `expect.poll` en las lecturas de filas; `opacity-60` afirmado en el unitario. |
+
+### El alta en las listas cerradas no relaja nada
+
+- `tests/guards/guard-identificador-de-request.test.ts`: se añade `'pedidos-busqueda.spec.ts'` por
+  nombre a `E2E_ESPERADOS`, en su sitio alfabético. No cambia ningún ancla, patrón ni condición. El
+  spec no toca el identificador de petición ni `reference` (comprobado en su código).
+- `tests/unit/pedidos/scope.test.ts`: la lista cerrada de specs E2E de pedidos pasa de tres a cuatro
+  entradas por nombre, y la sonda `orders-extra.spec.ts` sigue saliendo como sobrante. Se aprieta, no
+  se afloja.
+- `tests/unit/shared/data-table-alcance.test.ts`: la lista pasa de 17 a 18 por nombre, en orden.
+  Igual de cerrada.
+
+### Verificación ejecutada por mí en la vuelta 2
+
+- `vitest run tests/unit/pedidos-ui tests/unit/pedidos/scope.test.ts tests/unit/shared/data-table-alcance.test.ts tests/guards/guard-identificador-de-request.test.ts tests/guards/guard-e2e-landing.test.ts`
+  -> **30 archivos pasan; 416 tests pasan y 5 skip**.
+- E2E WebKit 5/5 (arriba). La suite completa no la corrí: la corre el leader.
+- Lo retirado sigue sin código; `components/shared/**`, `lib/`, `db/` y `package.json` siguen sin
+  diff de la feature.
+
+### Menor abierto
+
+- **m6 — menor.** Los comentarios nuevos de los tres tests de inventario de e2e
+  (`guard-identificador-de-request.test.ts`, `pedidos/scope.test.ts` y `shared/data-table-alcance.test.ts`)
+  citan `QC-122`, `R25/R9/R26/R27` y `QC-71 R21`, y ocupan de 6 a 11 líneas. Imitan el estilo que
+  tienen alrededor, y `docs/conventions.md > Comentarios` dice que no se imita y que la ficha no va
+  en los comentarios de tests. No es bloqueante: son tests, no producción.
+
+### Pendiente del leader (no es hallazgo)
+
+- T6 (`./init.sh` completo y cierre), que es suyo.
+
+### Veredicto: OK
