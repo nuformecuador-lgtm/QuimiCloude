@@ -246,7 +246,7 @@ export const MIGRACIONES_ESPERADAS = [
   // Alta con el mismo patron que las anteriores: la migracion que cambia `recipe_lines.quantity`
   // + `unit_id` por `percentage` no persiste el identificador de peticion ni lo menciona; se
   // nombra aqui a mano y la lista sigue CERRADA para la siguiente.
-  '20260919120000_recipe_lines_percentage',
+  '20260922160000_recipe_lines_percentage',
 ] as const
 
 export function hallazgosDeMigraciones(
