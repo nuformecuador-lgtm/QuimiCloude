@@ -10,7 +10,7 @@ import type { OrderRepository } from '../ports/order-repository';
 export type CancelOrderDeps = {
   readonly orders: OrderRepository;
   /** Cancelar solo libera: no toca la receta, asi que no recibe `recipes`, `products` ni
-   *  `units` (`design.md > 8`). */
+   *  `units`. */
   readonly unitOfWork: OrderUnitOfWork;
   /** Ver el comentario identico de `create-order.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
@@ -25,19 +25,18 @@ export type CancelOrderDeps = {
 const CANCELABLES: readonly OrderStatus[] = ['PENDIENTE', 'EN_CURSO'];
 
 /**
- * Cancelacion (R18, R26, R27, R28, R29, R33). CASO DE USO PROPIO y UNICO camino capaz de
- * escribir el estado `CANCELADO` y el motivo (decision cerrada 7): la edicion normal no puede
- * cancelar, ni siquiera expresarlo, porque `NewOrder.status` es `EditableOrderStatus` y
- * `cancelAlive` es el unico metodo del puerto con `reason` (`design.md > 8`).
+ * Cancelacion. CASO DE USO PROPIO y UNICO camino capaz de escribir el estado `CANCELADO` y
+ * el motivo: la edicion normal no puede cancelar, ni siquiera expresarlo, porque
+ * `NewOrder.status` es `EditableOrderStatus` y `cancelAlive` es el unico metodo del puerto
+ * con `reason`.
  *
  * Es el UNICO de los seis que recibe y escribe un motivo. Y una vez escrito no se vuelve a
  * tocar: de `CANCELADO` no se sale -R21 lo deja sin edicion y su lista de transiciones esta
  * vacia- y `cancelAlive` solo acepta pedidos no cancelados. Eso es R29 sin necesidad de
  * ninguna columna inmutable.
  *
- * R18: libera todo lo apartado en la MISMA operacion, con quien cancelo como autor, y fija
- * `reserved_at` a `null` (`design.md > 3.3`). El orden es el pseudocodigo literal de
- * `design.md > 8`.
+ * Libera todo lo apartado en la MISMA operacion, con quien cancelo como autor, y fija
+ * `reserved_at` a `null`.
  */
 export function createCancelOrder(
   deps: CancelOrderDeps,
@@ -75,7 +74,7 @@ export function createCancelOrder(
       if (locked === null) return 'not_found' as const;
       if (!CANCELABLES.includes(locked.status)) throw new NotCancellableError();
 
-      // R6: el actor queda como autor de la ultima modificacion, sin tocar el de creacion.
+      // El actor queda como autor de la ultima modificacion, sin tocar el de creacion.
       const cancelled = await transaction.orders.cancelAlive(id, reason, actor.id, instant, scope);
       if (cancelled === 'not_found') return 'not_found' as const;
 

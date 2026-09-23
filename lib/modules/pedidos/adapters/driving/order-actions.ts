@@ -16,7 +16,7 @@ import {
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
 // Solo el TIPO, del contrato publico de `inventario`: la arista `pedidos -> inventario` ya
-// existe (`design.md > 5.1`).
+// existe.
 import type { OrderCoverage } from '@/lib/modules/inventario';
 
 /**
@@ -295,8 +295,8 @@ export async function listOrdersAction(query: unknown): Promise<OrderListResult>
 }
 
 // ---------------------------------------------------------------------------------------------
-// QC-141 T14 (`design.md > 5.1`, `> 10`) — La cobertura de VARIOS pedidos a la vez, UNA consulta
-// por pagina (R35). Bloque nuevo al final: no reordena ni reformatea nada de arriba.
+// La cobertura de VARIOS pedidos a la vez, UNA consulta por pagina. Bloque nuevo al final: no
+// reordena ni reformatea nada de arriba.
 // ---------------------------------------------------------------------------------------------
 
 /** Una entrada del array plano: un `Map` no cruza el borde de una Server Action tan bien como un
@@ -308,7 +308,7 @@ export type OrderCoverageBatchResult =
   | ErrorState;
 
 /**
- * La cobertura de la pagina entera (R35): argumento ya tipado, no `FormData` -no viene de un
+ * La cobertura de la pagina entera: argumento ya tipado, no `FormData` -no viene de un
  * `<form>`-. Ningun permiso se comprueba aqui: la frontera es `requirePermission(actor,
  * 'pedidos.consultar')` en la primera linea del caso de uso.
  */

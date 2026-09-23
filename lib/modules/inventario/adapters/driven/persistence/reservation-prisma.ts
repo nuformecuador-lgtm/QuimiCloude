@@ -202,7 +202,7 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
         [...netReservedByBatch(ownRows.map(toLedgerRow))].filter(([, quantity]) => isPositive(quantity)),
       );
 
-      // N2: el pedido no tiene nada apartado -no alcanzo al crearlo, o su reserva se libero por
+      // El pedido no tiene nada apartado -no alcanzo al crearlo, o su reserva se libero por
       // una edicion que luego no volvio a apartar-. Se calcula y consume todo-o-nada de lo que
       // haya, sin pasar por `reservation_movements`: no hubo apartado que resolver.
       if (ownByBatch.size === 0) {
@@ -226,8 +226,8 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
         let consumedHere = quantity;
 
         if (result.kind === 'insufficient') {
-          // Merma sobre el lote apartado (pregunta 2): se consume lo que quede en el, y el resto
-          // se completa de otros lotes con disponible, mas abajo.
+          // Merma sobre el lote apartado: se consume lo que quede en el, y el resto se
+          // completa de otros lotes con disponible, mas abajo.
           consumedHere = isPositive(result.available) ? result.available : '0.0000';
           if (isPositive(consumedHere)) {
             const partial = await consumeBatchStock(db, { batchId, quantity: consumedHere, orderId, actorId }, now, scope);
@@ -311,9 +311,9 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
   };
 }
 
-/** N2: consume la necesidad de respaldo todo-o-nada, sin tocar `reservation_movements` -no hubo
+/** Consume la necesidad de respaldo todo-o-nada, sin tocar `reservation_movements` -no hubo
  *  apartado que resolver-. Misma regla de reparto que `syncForOrder`, pero consumiendo en vez de
- *  reservar. Una necesidad vacia (receta sin lineas, E2) no escribe nada. */
+ *  reservar. Una necesidad vacia (receta sin lineas) no escribe nada. */
 async function consumeWithoutReservation(
   db: PrismaLike,
   scope: InventoryScope,

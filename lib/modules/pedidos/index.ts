@@ -129,13 +129,13 @@ export type { CancelOrderDeps } from './domain/cancel-order';
 export { createDeleteOrder } from './domain/delete-order';
 export type { DeleteOrderDeps } from './domain/delete-order';
 
-/** Implementa `OrderCatalog['transitionAliveById']` (QC-141 T10, `design.md > 5.4`): mueve el
- *  pedido de estado y, si el destino es `ENTREGADO`, consume el material en la misma
- *  transaccion. `lib/composition` la cablea en el lugar de la funcion cruda del driven. */
+/** Implementa `OrderCatalog['transitionAliveById']`: mueve el pedido de estado y, si el
+ *  destino es `ENTREGADO`, consume el material en la misma transaccion. `lib/composition`
+ *  la cablea en el lugar de la funcion cruda del driven. */
 export { createTransitionOrder } from './domain/transition-order';
 export type { TransitionOrderDeps } from './domain/transition-order';
 
-/** QC-141 T14 (`design.md > 5.1`, `> 10`): la cobertura de varios pedidos a la vez, una consulta
- *  por pagina, para pintar «sin cobertura completa» (R35) sin N+1. */
+/** La cobertura de varios pedidos a la vez, una consulta por pagina, para pintar «sin
+ *  cobertura completa» sin N+1. */
 export { createFindCoverage, MAX_ORDERS_PER_COVERAGE_BATCH } from './domain/find-coverage';
 export type { FindCoverageDeps } from './domain/find-coverage';

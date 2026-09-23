@@ -701,9 +701,9 @@ const presentationRepository: PresentationRepository = {
 };
 
 /** `OrderNumberDirectory` cableado con el adaptador driven DE PEDIDOS: `inventario` solo conoce
- *  el TIPO, para el historial de un lote (`design.md > 5.5`). Declarado ANTES de la fachada de
- *  `inventario` -y no junto al resto de lo de `pedidos`, mas abajo- porque `listBatchMovements`
- *  lo necesita ya cableado: un `const` no existe antes de su linea. */
+ *  el TIPO, para el historial de un lote. Declarado ANTES de la fachada de `inventario` -y no
+ *  junto al resto de lo de `pedidos`, mas abajo- porque `listBatchMovements` lo necesita ya
+ *  cableado: un `const` no existe antes de su linea. */
 const orderNumberDirectory: OrderNumberDirectory = { findNumberTexts: findOrderNumberTextsByIds };
 
 /**
@@ -961,8 +961,8 @@ const recipeCatalog: RecipeCatalog = {
 const pedidosListQueryLog: PedidosListQueryLog = { ignoredFields: logIgnoredListQueryFields };
 
 /** Puerto de LECTURA de `pedidos` (`ports/order-repository.ts`): la fila previa de una edicion,
- *  cancelacion o borrado, y el listado. La escritura ya no vive aqui -QC-141 T9 la movio entera
- *  a `orderUnitOfWork`, abajo-. */
+ *  cancelacion o borrado, y el listado. La escritura ya no vive aqui: se movio entera a
+ *  `orderUnitOfWork`, abajo. */
 const orderRepository: OrderRepository = {
   findAliveById: findAliveOrderById,
   listAlive: listAliveOrders,
@@ -970,9 +970,9 @@ const orderRepository: OrderRepository = {
 
 /**
  * `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye, con el
- * MISMO `tx`, el repositorio de escritura de `pedidos` y las reservas de `inventario`
- * (`design.md > 5.2`). Sin `unitCatalog`: la necesidad ya llega en la unidad del producto, asi
- * que `createMaterialReservations` no convierte nada.
+ * MISMO `tx`, el repositorio de escritura de `pedidos` y las reservas de `inventario`. Sin
+ * `unitCatalog`: la necesidad ya llega en la unidad del producto, asi que
+ * `createMaterialReservations` no convierte nada.
  */
 const orderUnitOfWork: OrderUnitOfWork = {
   run: (work) =>
@@ -985,8 +985,8 @@ const orderUnitOfWork: OrderUnitOfWork = {
     }),
 };
 
-/** Lectura de la cobertura de un pedido, FUERA de transaccion, sobre el cliente global
- *  (`design.md > 5.1`): `findCoverage` (QC-141 T14) la usa una vez por pagina. */
+/** Lectura de la cobertura de un pedido, FUERA de transaccion, sobre el cliente global:
+ *  `findCoverage` la usa una vez por pagina. */
 const reservationQueries: ReservationQueries = createReservationQueries();
 
 /**
@@ -1076,13 +1076,13 @@ export const observabilidad = {
 // `prisma.workGroup` por ninguna via.
 // ---------------------------------------------------------------------------------------
 
-/** `OrderCatalog` cableado con el adaptador driven DE PEDIDOS (`design.md > 2.1`): mismo patron
- *  que `RecipeCatalog` arriba. `asignaciones` solo conoce el TIPO, y por el solo puede saber si
- *  el pedido esta VIVO y en que ESTADO —ni el numero, ni la receta, ni las cantidades—.
+/** `OrderCatalog` cableado con el adaptador driven DE PEDIDOS: mismo patron que `RecipeCatalog`
+ *  arriba. `asignaciones` solo conoce el TIPO, y por el solo puede saber si el pedido esta VIVO
+ *  y en que ESTADO —ni el numero, ni la receta, ni las cantidades—.
  *
- *  `transitionAliveById` ya no es la funcion cruda de `order-catalog-prisma.ts` (QC-141 T10,
- *  `design.md > 5.4`): es `createTransitionOrder`, que abre `orderUnitOfWork` y, si el destino
- *  es `ENTREGADO`, consume el material en la misma transaccion. */
+ *  `transitionAliveById` ya no es la funcion cruda de `order-catalog-prisma.ts`: es
+ *  `createTransitionOrder`, que abre `orderUnitOfWork` y, si el destino es `ENTREGADO`,
+ *  consume el material en la misma transaccion. */
 const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: listAliveOrderSummariesByIds,

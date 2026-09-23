@@ -92,9 +92,9 @@ function toReservationHistoryEntry(row: ReservationMovementRow): BatchHistoryEnt
 }
 
 /**
- * El historial de un lote, union de los dos libros (`design.md > 5.1`, `> 10`), del mas reciente
- * al mas antiguo. `null` cuando el lote no existe o es de otra empresa; comprobarlo aparte evita
- * que un lote sin asientos -anterior al libro- se confunda con uno que no existe.
+ * El historial de un lote, union de los dos libros, del mas reciente al mas antiguo. `null`
+ * cuando el lote no existe o es de otra empresa; comprobarlo aparte evita que un lote sin
+ * asientos -anterior al libro- se confunda con uno que no existe.
  */
 export async function findBatchMovements(
   batchId: string,

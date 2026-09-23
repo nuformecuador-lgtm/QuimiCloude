@@ -4,12 +4,11 @@ import type { OrderScope } from '../domain/order-scope';
 import type { OrderRow } from '../domain/order-view';
 
 /**
- * Puerto de LECTURA del pedido (`design.md > 7.4`, `> 5.3`). La escritura vive en
- * `OrderWriteRepository` (`ports/order-write-repository.ts`), dentro de la transaccion
- * compartida con `inventario`: crear, editar, cancelar y borrar leen aqui la fila previa y
- * escriben alli. Este puerto ya NO declara `create`, `updateAlive`, `cancelAlive` ni
- * `softDeleteAlive` -QC-141 T9 movio a sus llamantes a la unidad de trabajo-, para no dejar dos
- * caminos de escritura del mismo pedido.
+ * Puerto de LECTURA del pedido. La escritura vive en `OrderWriteRepository`
+ * (`ports/order-write-repository.ts`), dentro de la transaccion compartida con `inventario`:
+ * crear, editar, cancelar y borrar leen aqui la fila previa y escriben alli. Este puerto ya NO
+ * declara `create`, `updateAlive`, `cancelAlive` ni `softDeleteAlive` -se movio a sus llamantes
+ * a la unidad de trabajo-, para no dejar dos caminos de escritura del mismo pedido.
  *
  * El sufijo `Alive` NO es adorno: el filtro `deleted_at IS NULL` es responsabilidad de ESTE
  * puerto y de su adaptador, no del dominio (R40), asi que ningun caso de uso puede olvidarlo.

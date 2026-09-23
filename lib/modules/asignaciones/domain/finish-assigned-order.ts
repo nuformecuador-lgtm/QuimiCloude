@@ -29,9 +29,9 @@ export type FinishAssignedOrderResult = { readonly numberText: string };
  * entrega. Se lee ANTES de transicionar: una vez `ENTREGADO`, el pedido ya no aparece entre
  * los estados de trabajo que consulta `listAliveSummariesByIds`.
  *
- * `transitionAliveById` consume el material por dentro (QC-141): `'insufficient_material'` se
- * traduce a `MaterialShortageError` y `'recipe_without_lines'` a `RecipeWithoutLinesError`, las
- * dos propias de este modulo para que el adaptador driving las traduzca con su propio
+ * `transitionAliveById` consume el material por dentro: `'insufficient_material'` se traduce a
+ * `MaterialShortageError` y `'recipe_without_lines'` a `RecipeWithoutLinesError`, las dos
+ * propias de este modulo para que el adaptador driving las traduzca con su propio
  * `instanceof`.
  */
 export function createFinishAssignedOrder(

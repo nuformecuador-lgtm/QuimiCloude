@@ -45,7 +45,7 @@ BEGIN
   LOOP
     SELECT count(*) INTO v_line_count FROM "recipe_lines" WHERE recipe_id = order_row.recipe_id;
     IF v_line_count = 0 THEN
-      CONTINUE; -- receta sin lineas: no aparta, sin error (E2)
+      CONTINUE; -- receta sin lineas: no aparta, sin error
     END IF;
 
     DELETE FROM tmp_order_allocations;
@@ -59,7 +59,7 @@ BEGIN
         WHERE p.id = line_row.product_id AND p.company_id = order_row.company_id;
 
       IF v_unit_id IS NULL THEN
-        v_covered := FALSE; -- producto sin unidad: no cubierto (E1)
+        v_covered := FALSE; -- producto sin unidad: no cubierto
         EXIT lines_loop;
       END IF;
 

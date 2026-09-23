@@ -18,7 +18,7 @@ import type { OrderUnitOfWork } from '../ports/order-unit-of-work';
 
 export type TransitionOrderDeps = {
   readonly unitOfWork: OrderUnitOfWork;
-  /** Solo para la necesidad de respaldo de un pedido sin nada apartado (N2). */
+  /** Solo para la necesidad de respaldo de un pedido sin nada apartado. */
   readonly recipes: RecipeCatalog;
 };
 
@@ -59,7 +59,7 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
             now,
           });
 
-          // Deshace la transaccion entera (R15): el pedido y su reserva quedan como estaban.
+          // Deshace la transaccion entera: el pedido y su reserva quedan como estaban.
           if (outcome.kind === 'insufficient') throw new InsufficientMaterialError();
           if (outcome.kind === 'nothing_to_consume') throw new RecipeWithoutLinesError();
 

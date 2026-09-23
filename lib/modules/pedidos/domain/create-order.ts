@@ -42,8 +42,8 @@ export type CreateOrderDeps = {
    *  existe en la empresa de quien escribe. No se le pasa al coste: la presentacion no cambia
    *  nada de lo que se calcula. */
   readonly presentations: PresentationCatalog;
-  /** La transaccion compartida con `inventario` (`design.md > 5.2`, `> 8`): crea el pedido,
-   *  aparta su material y fija `reserved_at`, las tres o ninguna. */
+  /** La transaccion compartida con `inventario`: crea el pedido, aparta su material y fija
+   *  `reserved_at`, las tres o ninguna. */
   readonly unitOfWork: OrderUnitOfWork;
   /**
    * El reloj entra INYECTADO -mismo patron que `recetas` y `proveedores`- para que el test
@@ -62,12 +62,12 @@ export type CreatedOrder = {
 };
 
 /**
- * Alta de pedido (R7-R11, R15, R16, R49).
+ * Alta de pedido.
  *
  * `requirePermission(actor, 'pedidos.modificar')` es la PRIMERA linea, antes de `zod` y antes
- * de tocar ningun puerto (QC-74 R12, R41): un actor sin ese permiso no dispara ni la
- * validacion ni una sola lectura, ni siquiera abre la transaccion, y el test de autorizacion
- * lo demuestra con dobles que fallan si los llaman.
+ * de tocar ningun puerto: un actor sin ese permiso no dispara ni la validacion ni una sola
+ * lectura, ni siquiera abre la transaccion, y el test de autorizacion lo demuestra con
+ * dobles que fallan si los llaman.
  *
  * R6: los DOS autores salen del actor de la sesion, jamas de la entrada -el esquema ni
  * siquiera declara esos campos-. El puerto recibe un solo `actorId` y el adaptador lo
@@ -80,7 +80,7 @@ export type CreatedOrder = {
  *
  * El choque del correlativo (`orders_company_year_sequence_key`) ya no se traduce aqui: lo
  * reintenta `OrderUnitOfWork` con una transaccion nueva, y si los tres intentos chocan la
- * excepcion sube sin traducir (`design.md > 5.3`).
+ * excepcion sube sin traducir.
  */
 export function createCreateOrder(
   deps: CreateOrderDeps,
@@ -136,7 +136,7 @@ export function createCreateOrder(
         scope,
       );
 
-      // R49: una receta sin lineas da una necesidad vacia, y `syncForOrder` la sincroniza sin
+      // Una receta sin lineas da una necesidad vacia, y `syncForOrder` la sincroniza sin
       // apartar nada ni fallar.
       const content = await deps.recipes.findExecutionContentById(data.recipeId, actor.companyId);
       const requirement = buildRequirement(content?.lines ?? [], data.quantity);

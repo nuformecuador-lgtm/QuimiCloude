@@ -62,7 +62,7 @@ export function movementCompanyScope(scope: InventoryScope): Prisma.InventoryMov
 }
 
 /** Misma regla, para `reservation_movements`: su consumidor es `findBatchMovements`, que une los
- *  dos libros para el historial de un lote (`design.md > 5.1`). */
+ *  dos libros para el historial de un lote. */
 export function reservationMovementCompanyScope(
   scope: InventoryScope,
 ): Prisma.ReservationMovementWhereInput {

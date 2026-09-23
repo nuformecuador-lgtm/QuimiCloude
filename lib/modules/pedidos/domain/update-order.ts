@@ -23,7 +23,7 @@ import type { OrderRepository } from '../ports/order-repository';
 /** Recupera `products` y `units` porque cada escritura recalcula el coste de los ingredientes:
  *  hace falta leer los lotes disponibles y convertir entre la unidad de la receta y la del
  *  lote. `orders` sigue siendo `OrderRepository`: solo lee la fila previa. La escritura y el
- *  apartado viven en `unitOfWork` (`design.md > 5.2`, `> 8`). */
+ *  apartado viven en `unitOfWork`. */
 export type UpdateOrderDeps = {
   readonly orders: OrderRepository;
   readonly recipes: RecipeCatalog;
@@ -37,7 +37,7 @@ export type UpdateOrderDeps = {
 };
 
 /**
- * Edicion de pedido (R12-R14, R20-R22, R24, R25, R27, R29, R30, R31, R33, R49, R50).
+ * Edicion de pedido.
  *
  * REEMPLAZO COMPLETO del conjunto de datos de negocio (R20), como QC-25 y QC-43: no hay
  * edicion parcial campo a campo. Es la pregunta abierta 5 del spec, con su posicion por
@@ -56,10 +56,10 @@ export type UpdateOrderDeps = {
  * bloquear `lockAliveById`, porque otra operacion pudo moverla entre las dos lecturas.
  *
  * Si el destino es `ENTREGADO`, la misma operacion recalcula lo apartado con los datos nuevos
- * (R29) y consume el resultado (R27): `insufficient` se traduce a `InsufficientMaterialError` y
- * `nothing_to_consume` a `RecipeWithoutLinesError` (R50). Cualquiera de las dos deshace la
+ * y consume el resultado: `insufficient` se traduce a `InsufficientMaterialError` y
+ * `nothing_to_consume` a `RecipeWithoutLinesError`. Cualquiera de las dos deshace la
  * transaccion entera -el pedido y su reserva quedan como estaban- porque `unitOfWork.run`
- * propaga la excepcion (R15).
+ * propaga la excepcion.
  */
 export function createUpdateOrder(
   deps: UpdateOrderDeps,
@@ -122,9 +122,9 @@ export function createUpdateOrder(
 
     const instant = now();
 
-    // R14: la necesidad se calcula con la receta del DATO ENTRANTE y NUNCA modifica lo
-    // apartado por otro pedido que use la misma receta -`buildRequirement` es dominio puro
-    // sobre las lineas de ESTA receta, y `syncForOrder` solo toca el libro de ESTE pedido.
+    // La necesidad se calcula con la receta del DATO ENTRANTE y NUNCA modifica lo apartado por
+    // otro pedido que use la misma receta -`buildRequirement` es dominio puro sobre las lineas
+    // de ESTA receta, y `syncForOrder` solo toca el libro de ESTE pedido.
     const content = await deps.recipes.findExecutionContentById(data.recipeId, actor.companyId);
     const requirement = buildRequirement(content?.lines ?? [], data.quantity);
 
@@ -132,15 +132,15 @@ export function createUpdateOrder(
       const locked = await transaction.orders.lockAliveById(id, scope);
       if (locked === null) throw new OrderNotFoundError();
 
-      // Repetida sobre la fila BLOQUEADA (R33): otra operacion pudo moverla entre la lectura
-      // de arriba y este bloqueo.
+      // Repetida sobre la fila BLOQUEADA: otra operacion pudo moverla entre la lectura de
+      // arriba y este bloqueo.
       assertTransition(locked.status, data.status);
 
       const result = await transaction.orders.updateAlive(id, data, actor.id, instant, ingredientsCost, scope);
       if (result === 'not_found') throw new OrderNotFoundError();
 
       if (data.status === 'ENTREGADO') {
-        // R29: recalcula primero lo apartado con los datos nuevos y consume el resultado.
+        // Recalcula primero lo apartado con los datos nuevos y consume el resultado.
         await transaction.reservations.syncForOrder({
           orderId: id,
           companyId: actor.companyId,

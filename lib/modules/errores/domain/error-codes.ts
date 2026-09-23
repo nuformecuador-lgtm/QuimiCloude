@@ -13,8 +13,7 @@
  * **Novena enmienda, el 2026-09-18**: `presentation_unit_locked`.
  * Aprobada por el humano el 2026-09-18.
  * **Decima enmienda, el 2026-09-22 (fix directo)**: `action_not_allowed`.
- * **Decimoprimera enmienda, el 2026-09-23 (QC-141, decision E2)**: `insufficient_material`,
- * `recipe_without_lines`.
+ * **Decimoprimera enmienda, el 2026-09-23**: `insufficient_material`, `recipe_without_lines`.
  */
 export const ERROR_CODES = [
   'unauthorized',

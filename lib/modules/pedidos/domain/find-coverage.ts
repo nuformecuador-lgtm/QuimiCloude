@@ -1,12 +1,12 @@
 // lib/modules/pedidos/domain/find-coverage.ts
 /**
- * QC-141 T14 — La cobertura de VARIOS pedidos a la vez (`design.md > 5.1`, `> 10`; R35).
+ * La cobertura de VARIOS pedidos a la vez.
  *
  * Existe para que el listado de Pedidos pinte la cobertura de una pagina entera con un numero de
  * consultas CONSTANTE: la pantalla pide la pagina a `pedidos` y despues, de golpe, la cobertura
  * de esos identificadores. Mismo espiritu que `listResponsiblesForOrders` de `asignaciones`
- * (QC-102 T4) -permiso en la primera linea, UNA sola consulta al puerto para toda la pagina-, con
- * la firma `(input, actor)` de los seis casos de uso de este modulo.
+ * -permiso en la primera linea, UNA sola consulta al puerto para toda la pagina-, con la firma
+ * `(input, actor)` de los seis casos de uso de este modulo.
  *
  * Dominio PURO: `zod` y el tipo que publica `inventario`. Sin `next/*`, sin `@prisma/client`, sin
  * adaptadores y sin `@/lib/shared/**`.
@@ -31,7 +31,7 @@ export const MAX_ORDERS_PER_COVERAGE_BATCH = 25;
 const orderIdsSchema = z.array(z.string().uuid()).max(MAX_ORDERS_PER_COVERAGE_BATCH);
 
 export type FindCoverageDeps = {
-  /** Lectura pura de `inventario`, fuera de transaccion (`design.md > 5.1`). */
+  /** Lectura pura de `inventario`, fuera de transaccion. */
   readonly reservations: ReservationQueries;
 };
 

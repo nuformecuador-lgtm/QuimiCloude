@@ -48,9 +48,9 @@ const BATCH_LIMIT = 100;
 const DEFAULT_BUDGET_MS = 240_000;
 
 /**
- * CUANDO un pedido caducado falla, se anota y se sigue con los demas (R26): ni un fallo de
+ * CUANDO un pedido caducado falla, se anota y se sigue con los demas: ni un fallo de
  * `unitOfWork.run` detiene el lote. `findExpirable` ya trae solo `PENDIENTE`, sin borrar y con
- * la reserva vencida (R22); bajo el candado se repite la comprobacion de estado por si la fila
+ * la reserva vencida; bajo el candado se repite la comprobacion de estado por si la fila
  * cambio entre el lote y el bloqueo.
  */
 export function createExpireStaleOrders(
@@ -97,7 +97,7 @@ async function expireOne(
 
   return unitOfWork.run(async (transaction) => {
     const locked = await transaction.orders.lockAliveById(candidate.id, scope);
-    // Idempotencia (R25): otra ejecucion ya lo canceló, o dejó de estar vivo entre el lote y el
+    // Idempotencia: otra ejecucion ya lo canceló, o dejó de estar vivo entre el lote y el
     // candado.
     if (locked === null || locked.status !== 'PENDIENTE') return false;
 

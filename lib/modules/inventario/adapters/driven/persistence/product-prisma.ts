@@ -266,7 +266,7 @@ export async function listAliveProducts(
   ]);
 
   // UNA consulta agregada mas para la pagina entera, nunca una por fila: `reserved`/`available`
-  // salen del libro de reservas, sumados por producto (`design.md > 3.4`).
+  // salen del libro de reservas, sumados por producto.
   const reservedByProduct = await findReservedAndAvailableByProduct(
     prisma,
     scope.companyId,
@@ -748,7 +748,7 @@ export async function findBatchesOfAliveProduct(
     select: BATCH_VIEW_SELECT,
   });
 
-  // UNA consulta agregada para todos los lotes del producto, no una por lote (`design.md > 3.4`).
+  // UNA consulta agregada para todos los lotes del producto, no una por lote.
   const reservedByBatch = await findReservedAndAvailableByBatch(
     prisma,
     scope.companyId,

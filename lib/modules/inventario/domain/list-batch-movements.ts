@@ -13,7 +13,7 @@ export type ListBatchMovementsDeps = {
   readonly products: ProductRepository;
   /** Los nombres mostrables de los autores, incluidos los de las cuentas dadas de baja. */
   readonly people: PeopleDirectory;
-  /** El numero visible de cada pedido citado en el historial (`design.md > 5.5`). */
+  /** El numero visible de cada pedido citado en el historial. */
   readonly orders: OrderNumberDirectory;
   /** Inyectable para que los tests fijen el instante sin tocar el reloj global. */
   readonly now?: () => Date;
@@ -21,7 +21,7 @@ export type ListBatchMovementsDeps = {
 
 /**
  * El historial de un lote, del asiento mas reciente al mas antiguo: une lo que aparto, libero,
- * caduco o consumio un pedido con los movimientos del libro fisico (`design.md > 5.1`, `> 10`).
+ * caduco o consumio un pedido con los movimientos del libro fisico.
  *
  * **`orderNumberText` y `authorName` llegan del puerto como el IDENTIFICADOR** de la fila -el
  * pedido y quien escribio el asiento-, y este caso de uso los sustituye por su forma mostrable.

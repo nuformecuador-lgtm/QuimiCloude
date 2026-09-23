@@ -23,15 +23,15 @@ export type DeleteOrderDeps = {
 const NO_BORRABLES: readonly OrderStatus[] = ['ENTREGADO', 'CANCELADO'];
 
 /**
- * Borrado de pedido (R19, R31, R32, R33). Borrado LOGICO y sin restaurar (decision cerrada 9):
- * `softDeleteAlive`, jamas un borrado fisico. El pedido conserva su fila entera y su numero
- * correlativo -que no se libera ni se reutiliza (R13)- y solo gana `deleted_at`.
+ * Borrado de pedido. Borrado LOGICO y sin restaurar: `softDeleteAlive`, jamas un borrado
+ * fisico. El pedido conserva su fila entera y su numero correlativo -que no se libera ni se
+ * reutiliza- y solo gana `deleted_at`.
  *
  * No existe ninguna operacion de restaurar ni ningun listado de borrados, y no por olvido:
- * el puerto no las declara (R31), asi que no se pueden hacer por descuido.
+ * el puerto no las declara, asi que no se pueden hacer por descuido.
  *
- * R19 (N5): un pedido vivo que se borra tambien libera su material, igual que cancelar, en
- * la MISMA operacion, sin persona autora en la reserva mas alla del actor que borro.
+ * Un pedido vivo que se borra tambien libera su material, igual que cancelar, en la MISMA
+ * operacion, sin persona autora en la reserva mas alla del actor que borro.
  */
 export function createDeleteOrder(
   deps: DeleteOrderDeps,
@@ -76,7 +76,7 @@ export function createDeleteOrder(
       });
       await transaction.orders.setReservedAt(id, null, scope);
 
-      // R6: el borrado tambien registra al actor como autor de la ultima modificacion.
+      // El borrado tambien registra al actor como autor de la ultima modificacion.
       const deleted = await transaction.orders.softDeleteAlive(id, actor.id, instant, scope);
       if (deleted === 'not_found') return 'not_found' as const;
       return 'ok' as const;

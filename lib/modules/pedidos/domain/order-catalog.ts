@@ -66,8 +66,8 @@ export interface OrderCatalog {
    * empresa, pero su estado ya no es `from` porque alguien lo movio entre la lectura y esta
    * llamada.
    *
-   * Si `to` es `'ENTREGADO'`, la misma llamada consume el material apartado (`design.md >
-   * 5.4`): `'insufficient_material'` si no alcanza y `'recipe_without_lines'` si la receta no
+   * Si `to` es `'ENTREGADO'`, la misma llamada consume el material apartado:
+   * `'insufficient_material'` si no alcanza y `'recipe_without_lines'` si la receta no
    * tiene lineas y el pedido no tiene nada apartado. Los dos deshacen la operacion entera.
    */
   transitionAliveById(
