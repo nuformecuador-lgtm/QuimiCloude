@@ -2180,7 +2180,7 @@
       "epic_name": "Pedidos",
       "name": "pedidos-terminados-en-asignacion",
       "description": "Dentro de `/asignacion`, dos vistas nuevas segun permiso. **Terminados**: los pedidos `ENTREGADO` de toda la empresa, sin filtro por usuario, solo lectura; la abre el permiso de terminados de QC-144. **Todos**: todos los pedidos de la empresa en cualquier estado, filtrable por estado, solo lectura; la abre `pedidos.consultar`.\n\n* Operador: «Mis asignados», como hoy. Empacador: «Mis asignados» + «Terminados». Administrador: solo «Todos», que sustituye a las otras.\n* **Fecha de terminado**: empieza a guardarse (cambio de base). Terminados se ordena por ella, de la mas reciente a la mas antigua; los entregados sin fecha van al final, marcados «sin fecha», por numero. No se rellena con la ultima edicion. Los cancelados no salen en Terminados.\n* **Solo la planta mueve el estado**: En curso al arrancar, Entregado al Finalizar. Desde Pedidos ya no se cambia el estado; al Administrador le queda Cancelar (QC-34). Asi todo entregado desde hoy tiene fecha.\n* **Terminados muestra la presentacion de cada pedido** (la crea QC-146, que bloquea a esta; los pedidos viejos salen «sin presentacion»). Anadido el 2026-09-22 al acotar QC-146.\n* E2E como Operador, Empacador y Administrador (diferida desde QC-144).\n\n**NO ENTRA:** el rol Empacador ni su permiso (QC-144), un estado «empacado», el detalle del pedido desde estas listas, rellenar la fecha de los ya entregados.\n\n\\--- Acotada por `/afinar-feature` el 2026-09-22. Las decisiones estan en `specs/QC-145-pedidos-terminados-en-asignacion/requirements.md`. ---",
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "high",
       "zone": "fullstack",
