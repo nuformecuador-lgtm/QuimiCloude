@@ -53,6 +53,7 @@ function montarProveedores() {
     updateAlive: vi.fn<SupplierRepository['updateAlive']>(),
     softDeleteAlive: vi.fn<SupplierRepository['softDeleteAlive']>(),
     listAlive,
+    listShowcaseAlive: vi.fn<SupplierRepository['listShowcaseAlive']>(),
   } satisfies SupplierRepository;
   const log: ListQueryLog = { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() };
   return { suppliers, log, listSuppliers: createListSuppliers({ suppliers, log }) };
