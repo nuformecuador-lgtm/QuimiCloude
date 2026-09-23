@@ -6,7 +6,10 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { FinishedOrdersListSection } from '@/app/(private)/asignacion/components';
+import {
+  FINISHED_ORDERS_SECTION_TESTID,
+  FinishedOrdersListSection,
+} from '@/app/(private)/asignacion/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import type { FinishedOrderView } from '@/lib/modules/asignaciones';
 import type { Page } from '@/lib/modules/pedidos';
@@ -67,6 +70,14 @@ describe('R19 - sin pedidos terminados en la empresa, estado vacio y no error', 
     expect(screen.getByTestId('finished-orders-empty')).toBeInTheDocument();
     expect(screen.queryByTestId('finished-orders-first-page')).toBeNull();
   });
+
+  it('R19 - la seccion expone su testid en el estado vacio', async () => {
+    listFinishedOrdersActionMock.mockResolvedValue({ status: 'success', data: pagina([]) });
+
+    render(await FinishedOrdersListSection({ params: parametros() }));
+
+    expect(screen.getByTestId(FINISHED_ORDERS_SECTION_TESTID)).toBeInTheDocument();
+  });
 });
 
 describe('R27 - pagina inexistente: vacio con vuelta a la primera pagina', () => {
@@ -94,6 +105,14 @@ describe('con pedidos, pinta la tabla y no el estado vacio', () => {
     expect(screen.getByText('2026-000123')).toBeInTheDocument();
     expect(screen.queryByTestId('finished-orders-empty')).toBeNull();
   });
+
+  it('R19 - la seccion expone su testid en el estado con tabla', async () => {
+    listFinishedOrdersActionMock.mockResolvedValue({ status: 'success', data: pagina([ORDER]) });
+
+    render(await FinishedOrdersListSection({ params: parametros() }));
+
+    expect(screen.getByTestId(FINISHED_ORDERS_SECTION_TESTID)).toBeInTheDocument();
+  });
 });
 
 describe('un error de la accion se pinta con `AssignedOrdersError`, nunca una tabla vacia', () => {
@@ -108,5 +127,18 @@ describe('un error de la accion se pinta con `AssignedOrdersError`, nunca una ta
     render(await FinishedOrdersListSection({ params: parametros() }));
 
     expect(screen.getByTestId('assigned-orders-error')).toBeInTheDocument();
+  });
+
+  it('R19 - la seccion expone su testid en el estado de error', async () => {
+    listFinishedOrdersActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'sin permiso',
+      reference: 'r-1',
+    });
+
+    render(await FinishedOrdersListSection({ params: parametros() }));
+
+    expect(screen.getByTestId(FINISHED_ORDERS_SECTION_TESTID)).toBeInTheDocument();
   });
 });

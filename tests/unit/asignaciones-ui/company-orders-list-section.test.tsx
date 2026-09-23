@@ -4,7 +4,10 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CompanyOrdersListSection } from '@/app/(private)/asignacion/components';
+import {
+  COMPANY_ORDERS_SECTION_TESTID,
+  CompanyOrdersListSection,
+} from '@/app/(private)/asignacion/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import type { CompanyOrderView } from '@/lib/modules/asignaciones';
 import type { Page } from '@/lib/modules/pedidos';
@@ -67,6 +70,14 @@ describe('R19 - sin pedidos que cumplan el filtro, estado vacio y no error', () 
     expect(screen.getByTestId('company-orders-empty')).toBeInTheDocument();
     expect(screen.queryByTestId('company-orders-first-page')).toBeNull();
   });
+
+  it('R27 - la seccion expone su testid en el estado vacio', async () => {
+    listCompanyOrdersActionMock.mockResolvedValue({ status: 'success', data: pagina([]) });
+
+    render(await CompanyOrdersListSection({ params: parametros(), statuses: [] }));
+
+    expect(screen.getByTestId(COMPANY_ORDERS_SECTION_TESTID)).toBeInTheDocument();
+  });
 });
 
 describe('R27 - pagina inexistente: vacio con vuelta a la primera pagina, conservando el filtro', () => {
@@ -112,6 +123,14 @@ describe('con pedidos, pinta la tabla y no el estado vacio', () => {
 
     expect(listCompanyOrdersActionMock).toHaveBeenCalledWith({ page: 1, pageSize: 10 });
   });
+
+  it('R27 - la seccion expone su testid en el estado con tabla', async () => {
+    listCompanyOrdersActionMock.mockResolvedValue({ status: 'success', data: pagina([ORDER]) });
+
+    render(await CompanyOrdersListSection({ params: parametros(), statuses: [] }));
+
+    expect(screen.getByTestId(COMPANY_ORDERS_SECTION_TESTID)).toBeInTheDocument();
+  });
 });
 
 describe('un error de la accion se pinta con `AssignedOrdersError`, nunca una tabla vacia', () => {
@@ -126,5 +145,18 @@ describe('un error de la accion se pinta con `AssignedOrdersError`, nunca una ta
     render(await CompanyOrdersListSection({ params: parametros(), statuses: [] }));
 
     expect(screen.getByTestId('assigned-orders-error')).toBeInTheDocument();
+  });
+
+  it('R27 - la seccion expone su testid en el estado de error', async () => {
+    listCompanyOrdersActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'sin permiso',
+      reference: 'r-1',
+    });
+
+    render(await CompanyOrdersListSection({ params: parametros(), statuses: [] }));
+
+    expect(screen.getByTestId(COMPANY_ORDERS_SECTION_TESTID)).toBeInTheDocument();
   });
 });

@@ -22,22 +22,32 @@ export async function FinishedOrdersListSection({ params }: FinishedOrdersListSe
   const result = await listFinishedOrdersAction({ page: params.page, pageSize: params.pageSize });
 
   if (result.status === 'error') {
-    return <AssignedOrdersError error={result} />;
+    return (
+      <div data-testid={FINISHED_ORDERS_SECTION_TESTID}>
+        <AssignedOrdersError error={result} />
+      </div>
+    );
   }
 
   const { items, page: currentPage, totalPages } = result.data;
 
   if (items.length === 0) {
     return (
-      <FinishedOrdersEmpty
-        firstPageHref={
-          currentPage > FIRST_PAGE
-            ? finishedOrdersHref({ ...params, page: FIRST_PAGE })
-            : undefined
-        }
-      />
+      <div data-testid={FINISHED_ORDERS_SECTION_TESTID}>
+        <FinishedOrdersEmpty
+          firstPageHref={
+            currentPage > FIRST_PAGE
+              ? finishedOrdersHref({ ...params, page: FIRST_PAGE })
+              : undefined
+          }
+        />
+      </div>
     );
   }
 
-  return <FinishedOrdersTable rows={items} params={params} totalPages={totalPages} />;
+  return (
+    <div data-testid={FINISHED_ORDERS_SECTION_TESTID}>
+      <FinishedOrdersTable rows={items} params={params} totalPages={totalPages} />
+    </div>
+  );
 }

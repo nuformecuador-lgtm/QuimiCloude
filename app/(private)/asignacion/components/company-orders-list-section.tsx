@@ -28,24 +28,32 @@ export async function CompanyOrdersListSection({ params, statuses }: CompanyOrde
   });
 
   if (result.status === 'error') {
-    return <AssignedOrdersError error={result} />;
+    return (
+      <div data-testid={COMPANY_ORDERS_SECTION_TESTID}>
+        <AssignedOrdersError error={result} />
+      </div>
+    );
   }
 
   const { items, page: currentPage, totalPages } = result.data;
 
   if (items.length === 0) {
     return (
-      <CompanyOrdersEmpty
-        firstPageHref={
-          currentPage > FIRST_PAGE
-            ? companyOrdersHref({ page: FIRST_PAGE, pageSize: params.pageSize }, statuses)
-            : undefined
-        }
-      />
+      <div data-testid={COMPANY_ORDERS_SECTION_TESTID}>
+        <CompanyOrdersEmpty
+          firstPageHref={
+            currentPage > FIRST_PAGE
+              ? companyOrdersHref({ page: FIRST_PAGE, pageSize: params.pageSize }, statuses)
+              : undefined
+          }
+        />
+      </div>
     );
   }
 
   return (
-    <CompanyOrdersTable rows={items} params={params} totalPages={totalPages} statuses={statuses} />
+    <div data-testid={COMPANY_ORDERS_SECTION_TESTID}>
+      <CompanyOrdersTable rows={items} params={params} totalPages={totalPages} statuses={statuses} />
+    </div>
   );
 }
