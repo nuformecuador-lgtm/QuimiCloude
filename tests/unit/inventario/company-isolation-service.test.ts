@@ -15,6 +15,7 @@
 // aserciones caerian. Lo que este archivo NO puede demostrar es que el SQL filtre: eso es
 // `tests/integration/inventario/company-scope-queries.int.test.ts` (T13).
 
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createCreatePresentation } from '@/lib/modules/inventario/domain/create-presentation';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
@@ -81,7 +82,7 @@ function vista(id: string, name: string): ProductView {
     stock: 0,
     unitId: null,
     qtyAlert: 2,
-    type: 'PRODUCT' as const,
+    type: PRODUCT_TYPES.PRODUCT,
     createdAt: AHORA,
     updatedAt: AHORA,
   };

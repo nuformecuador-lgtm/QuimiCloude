@@ -26,7 +26,7 @@ import type {
 import type { ProductListResult } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import type { UnitView } from '@/lib/modules/unidades';
-import type { ProductView } from '@/lib/modules/inventario';
+import { PRODUCT_TYPES, type ProductView } from '@/lib/modules/inventario';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { FORMULAS_ROUTE } from '@/lib/shared/routes';
 import { PERMISSIONS } from '@/lib/modules/identity';
@@ -201,7 +201,7 @@ function productView(overrides: Partial<ProductView> = {}): ProductView {
     stock: 0,
     unitId: null,
     qtyAlert: null,
-    type: 'PRODUCT' as const,
+    type: PRODUCT_TYPES.PRODUCT,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     ...overrides,

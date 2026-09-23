@@ -17,6 +17,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { PERMISSIONS, type PeopleDirectory, type PermissionCode } from '@/lib/modules/identity';
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { canAdjustBatchStock } from '@/lib/modules/inventario/domain/actor';
 import { createAdjustBatchStock } from '@/lib/modules/inventario/domain/adjust-batch-stock';
@@ -36,7 +37,7 @@ import { createListProductBatches } from '@/lib/modules/inventario/domain/list-p
 import { createListPresentations } from '@/lib/modules/inventario/domain/list-presentations';
 import { createListProducts } from '@/lib/modules/inventario/domain/list-products';
 import { createProductWithFirstBatchSchema } from '@/lib/modules/inventario/domain/product-batch-input';
-import { createProductSchema } from '@/lib/modules/inventario/domain/product-input';
+import { createProductSchema, updateProductSchema } from '@/lib/modules/inventario/domain/product-input';
 import { createUpdatePresentation } from '@/lib/modules/inventario/domain/update-presentation';
 import { createUpdateProduct } from '@/lib/modules/inventario/domain/update-product';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
@@ -203,7 +204,7 @@ const PRODUCTO_EN_BASE = {
   stock: 0,
   unitId: null,
   qtyAlert: 0,
-  type: 'PRODUCT' as const,
+  type: PRODUCT_TYPES.PRODUCT,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 };
@@ -481,13 +482,14 @@ describe('QC-74 R16 — la tabla que se barre es la tabla del requisito', () => 
     expect(codigos).toContain(MODIFICAR);
   });
 
-  it('PRODUCTO_VALIDO pasa createProductSchema y ENTRADA_INVALIDA no', () => {
+  it('PRODUCTO_VALIDO pasa updateProductSchema, PRODUCTO_VALIDO_CON_LOTE pasa createProductSchema, y ENTRADA_INVALIDA no', () => {
     // QC-52 R25: si el fixture dejara de ser entrada valida -y con `strictObject` basta un
     // campo de mas-, los rechazos de abajo seguirian rojos por `ValidationError` y este
-    // archivo dejaria de medir el permiso. El segundo `expect` ancla lo simetrico: la
-    // entrada invalida tiene que ser invalida de verdad para que R12 signifique algo.
-    expect(createProductSchema.safeParse(PRODUCTO_VALIDO).success).toBe(true);
+    // archivo dejaria de medir el permiso.
+    expect(updateProductSchema.safeParse(PRODUCTO_VALIDO).success).toBe(true);
+    expect(createProductSchema.safeParse(PRODUCTO_VALIDO_CON_LOTE).success).toBe(true);
     expect(createProductSchema.safeParse(ENTRADA_INVALIDA).success).toBe(false);
+    expect(updateProductSchema.safeParse(ENTRADA_INVALIDA).success).toBe(false);
     // QC-90: el fixture del ALTA se ancla contra SU esquema, que es otro. Si dejara de ser
     // entrada valida, la mitad de la concesion se pondria verde por el motivo equivocado.
     expect(createProductWithFirstBatchSchema.safeParse(PRODUCTO_VALIDO_CON_LOTE).success).toBe(

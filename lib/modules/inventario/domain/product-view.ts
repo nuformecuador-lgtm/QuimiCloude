@@ -1,5 +1,7 @@
 import type { UnitId } from '@/lib/modules/unidades';
 
+import type { ProductType } from './product-type';
+
 /**
  * Contratos de entrada y salida de producto (`design.md > 6.1`, `> 3`). Viven en
  * `domain/` -no en `ports/`- porque describen el QUE se dice, no el COMO se habla con el
@@ -7,8 +9,7 @@ import type { UnitId } from '@/lib/modules/unidades';
  * (solo reexporta de `./domain`).
  */
 
-/** Tipo de producto: PRODUCT, MACHINE o PACKAGING. */
-export type ProductType = 'PRODUCT' | 'MACHINE' | 'PACKAGING';
+export type { ProductType } from './product-type';
 
 /**
  * Datos de negocio de un producto, ya validados por `product-input.ts` (`design.md >
