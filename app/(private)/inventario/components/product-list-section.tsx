@@ -4,7 +4,7 @@ import { canAdjustBatchStock } from '@/lib/modules/inventario';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
 
-import { FIRST_PAGE, productListHref } from './product-list-params';
+import { FIRST_PAGE, productListHref, STOCK_COLUMN_ID, QTY_ALERT_COLUMN_ID, TYPE_COLUMN_ID } from './product-list-params';
 import { ProductListEmpty } from './product-list-empty';
 import { ProductListError } from './product-list-error';
 import { ProductSheet } from './product-sheet';
@@ -56,7 +56,19 @@ export async function ProductListSection({ params, units }: ProductListSectionPr
   // Quien autoriza de verdad es requirePermission en adjust-batch-stock.ts.
   const canAdjust = canAdjustBatchStock(await identity.getSessionUser());
 
-  if (items.length === 0) {
+  // Hay filtros activos si: busqueda, tipo, rango stock o rango alerta
+  const hasActiveFilters =
+    (params.search?.trim() ?? '') !== '' ||
+    (params.filters[TYPE_COLUMN_ID]?.kind === 'select' && params.filters[TYPE_COLUMN_ID].values.length > 0) ||
+    (params.filters[STOCK_COLUMN_ID]?.kind === 'numberRange' &&
+      (params.filters[STOCK_COLUMN_ID].min !== null || params.filters[STOCK_COLUMN_ID].max !== null)) ||
+    (params.filters[QTY_ALERT_COLUMN_ID]?.kind === 'numberRange' &&
+      (params.filters[QTY_ALERT_COLUMN_ID].min !== null || params.filters[QTY_ALERT_COLUMN_ID].max !== null));
+
+  // Si no hay items:
+  // - Sin filtros -> catalogo vacio: muestra estado vacio completo con formulario de alta
+  // - Con filtros -> resultado vacio filtrado: muestra la tabla con su estado vacio ("No hay productos que mostrar.")
+  if (items.length === 0 && !hasActiveFilters) {
     return (
       <ProductListEmpty
         firstPageHref={

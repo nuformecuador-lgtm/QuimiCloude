@@ -19,6 +19,23 @@
 
 ## Evaluaciones
 
+### QC-151 - CREADA al acotar QC-122 y ACOTADA con `/afinar-feature` (2026-09-23)
+
+`fullstack`, **`complexity: medium`** (label en Jira). **9 decisiones cerradas, cero abiertas** en `specs/QC-151-cotizacion-del-coste-en-el-pedido/requirements.md`. Cupo `fullstack` 2 de 3 (QC-121, QC-141). Worktree montado. Siguiente: F1.2.
+
+### QC-122 - F1.0 y ACOTADA con `/afinar-feature` (2026-09-23)
+
+`zone: frontend`, **`complexity: medium`** (leader, label en Jira). Dependencias QC-68 y QC-123 `done`. **Cupo `frontend` 1 de 2** (QC-107). Worktree montado desde `dev`. **8 decisiones cerradas (3 heredadas de QC-68/QC-123, 5 nuevas), cero abiertas** en `specs/QC-122-busqueda-y-total-en-la-pantalla-de-pedidos/requirements.md`; board actualizado antes de sembrar. **F1.2 y F1.3 hechos**: R1-R25, T1-T8 (rama pusheada), semilla intacta; tarjeta en *En revision*. **F1.4 APROBADO el 2026-09-23 por chat, con cambio de alcance**: el IMPORTE SALE (va a QC-151, nueva, fullstack) y QC-122 queda solo en busqueda (R17-R25b retirados sin renumerar, R26 nuevo, T1-T6). **F2.0 hecho**: `in_progress`, tarjeta *En curso*; cupo `frontend` 2 de 2 con QC-107, sin cruce de archivos (documentos vs pedidos).
+
+### QC-150 - CREADA del chat y ACOTADA con `/afinar-feature` (2026-09-23)
+
+Creada en el board (épica Inventario) a pedido del humano; **10 decisiones cerradas y 3 preguntas abiertas** en `specs/QC-150-producto-terminado/requirements.md`. `complexity:high`, **bloqueada por QC-141** (existencia decimal). Absorbe el «contenido de la presentación» de QC-130, que sigue cancelada (comentado en su issue). **F1.0-F1.3 hechos el 2026-09-23**: worktree montado; `spec_author` entrego **R1-R37 y T0-T13** (rama pusheada), semilla intacta por diff; tarjeta en *En revision*. **F1.4 APROBADO el 2026-09-23 por chat**: 9 preguntas cerradas (D11-D21), enmienda al catalogo aprobada (`presentation_without_content`, `no_whole_package`), R1-R44, sin preguntas abiertas. **Queda `spec_ready` y la tarjeta en *En revision* a proposito: F2.0 espera a que QC-141 este `done`** (T0 lo exige). **Solapa fuerte con QC-141 (va detras) y QC-145 (no en paralelo).**
+
+### QC-132 y QC-130 - CERRADAS (2026-09-23)
+
+QC-132 `done` (PR #110, `b7e64eb9`) y QC-130 `cancelled` al acotarla; QC-133 `cancelled` (absorbida). Resumen en `progress/history.md`.
+**Quedan abiertos**: (1) carpetas `.worktrees/QC-130-...` y `.worktrees/QC-132-...` sin borrar (archivo en uso en Windows; ramas ya desregistradas), borrar a mano; (2) **`dev` con 3 rojos de `cd7f07a6`**, arreglo en `fix/rojos-de-cd7f07a6` (PR aparte); (3) **QC-114 `pending` por decision humana** con spec aprobado, worktree y rama intactos: retoma directo en F2.1; (4) QC-138 y QC-139 citan «dato incompleto (QC-130)» para un caso que ya no ocurre: se corrige en su acotacion.
+
 ### QC-145 - ACOTADA con `/afinar-feature` (2026-09-22) y DESBLOQUEADA (2026-09-23)
 
 Alcance, **12 decisiones cerradas** (11 + la presentacion que anadio QC-146) y **1 pregunta abierta** en

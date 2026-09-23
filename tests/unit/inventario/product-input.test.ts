@@ -241,8 +241,9 @@ describe('createProductSchema', () => {
     expect(parsed.qtyAlert).toBe(3);
 
     // La existencia ya no cruza el borde del producto -ni en el alta ni en la edicion-, asi que
-    // solo quedan nombre y alerta.
-    expect(Object.keys(parsed).sort()).toEqual(['name', 'qtyAlert']);
+    // solo quedan nombre, alerta y tipo -este ultimo con su default `PRODUCT` puesto por el
+    // esquema, aunque la entrada no lo haya declarado-.
+    expect(Object.keys(parsed).sort()).toEqual(['name', 'qtyAlert', 'type']);
   });
 
   it('la edicion rechaza la existencia como invalid_input: R9', () => {

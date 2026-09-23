@@ -4670,3 +4670,18 @@ podar.
   corregido, hotfixes de `bc902800` en `dev`, cupo `fullstack` subido a 3 con `/afinar-regla`) está en
   su informe y en el PR. Cerrada en disco por el leader de QC-147.
 - **Desbloquea QC-145**, que muestra la presentación en «Terminados».
+
+## 2026-09-23 — QC-132-cantidad-del-pedido-sin-title-exacto
+
+- **Qué:** la cantidad redondeada a dos decimales gana su valor exacto en el `title` (`exactDecimalTitle`) en
+  tres sitios: columna Cantidad de `/pedidos`, y cantidad del pedido y de cada línea en `/asignacion/[id]`
+  (la línea convertida lleva el valor convertido completo, R12). Sin `title` si lo pintado ya es exacto.
+- **PR #110**, merge `b7e64eb9`. Spec R1–R12, T1–T10, acotada con `/afinar-feature` (alcance crecido de 1 a 3
+  sitios). Review aprobado, 0 mayores y 3 menores (dos de aserciones de tests, arreglados en `66f72cb5`).
+- **QC-133 cancelada**: describía el mismo defecto. **QC-114 aparcada a `pending` por el humano** para liberar
+  cupo `frontend`; F2.1 había arrancado antes por excepción humana al cupo.
+- **Gate completo ROJO AJENO**: 3 archivos de inventario rotos por `cd7f07a6` (subido directo a `dev` sin PR,
+  con `package-lock.json` y `.board_snapshot.json`). PR abierto con la evidencia por decisión humana; el
+  arreglo va en `fix/rojos-de-cd7f07a6`, PR aparte.
+- **Misma sesión: QC-130 cancelada** al acotarla: QC-121 y QC-147 ya cerraron la premisa (unidades sin base
+  común en el coste del pedido).
