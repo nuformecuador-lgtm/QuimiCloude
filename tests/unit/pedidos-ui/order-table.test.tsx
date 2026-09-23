@@ -6,17 +6,19 @@
 // **Ningun assert sobre copy** (R44): filas, celdas y controles se localizan por los
 // `data-testid` del componente compartido y por constantes exportadas.
 
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { Suspense, use, useEffect, useState } from 'react';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ORDER_NUMBER_COLUMN_ID,
+  ORDER_TABLE_TEXTS,
   OrderTable,
   STATUS_COLUMN_ID,
   buildOrderListQuery,
 } from '@/app/(private)/pedidos/components';
-import type { DataTableParams } from '@/components/shared/data-table';
+import { SEARCH_DEBOUNCE_MS, type DataTableParams } from '@/components/shared/data-table';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
@@ -149,6 +151,46 @@ function montar(overrides: Partial<DataTableParams> = {}, totalPages = 3) {
   return params;
 }
 
+// El `router.push` simulado termina al instante y la transicion no llegaria a verse en vuelo.
+// Suspender una actualizacion dentro de esa misma transicion la retiene, como una navegacion que
+// aun no ha recibido la pagina nueva (patron de `supplier-page.test.tsx > R14`).
+const NAVEGACION_QUE_NO_TERMINA = new Promise<never>(() => {});
+let retenerNavegacion: (() => void) | null = null;
+
+function NavegacionEnVuelo() {
+  const [enVuelo, setEnVuelo] = useState(false);
+
+  useEffect(() => {
+    retenerNavegacion = () => setEnVuelo(true);
+    return () => {
+      retenerNavegacion = null;
+    };
+  }, []);
+
+  if (enVuelo) use(NAVEGACION_QUE_NO_TERMINA);
+  return null;
+}
+
+function montarConNavegacionEnVuelo(overrides: Partial<DataTableParams> = {}, totalPages = 3) {
+  const params = parametros(overrides);
+  render(
+    <>
+      <OrderTable
+        orders={PEDIDOS}
+        params={params}
+        totalPages={totalPages}
+        recipes={RECETAS}
+        units={UNIDADES}
+      />
+      <Suspense fallback={null}>
+        <NavegacionEnVuelo />
+      </Suspense>
+    </>,
+  );
+  routerMock.push.mockImplementationOnce(() => retenerNavegacion?.());
+  return params;
+}
+
 /** El ultimo destino al que la tabla pidio navegar. */
 function ultimoDestino(): string {
   const ultima = routerMock.push.mock.calls.at(-1);
@@ -200,21 +242,86 @@ describe('las filas se pintan en el orden en que llegan (R13)', () => {
   });
 });
 
-describe('la caja de busqueda NO existe (R20)', () => {
-  it('no se pinta inerte ni deshabilitada: no esta en el DOM', () => {
+describe('la caja de busqueda existe y respeta el area tactil minima (R1)', () => {
+  it('se pinta con al menos 44px de alto y 16px de letra', () => {
     montar();
 
-    expect(screen.queryByTestId('data-table-search')).toBeNull();
-    expect(screen.queryByRole('searchbox')).toBeNull();
+    const busqueda = screen.getByTestId('data-table-search');
+    expect(busqueda).toBeInTheDocument();
+    expect(busqueda.className).toContain('min-h-11');
+    expect(busqueda.className).toContain('text-base');
+  });
+});
+
+describe('escribir en la caja navega desde la primera pagina, conservando lo demas (R2, R8)', () => {
+  it('un termino nuevo vuelve a la pagina 1 y conserva tamano, orden y filtros', async () => {
+    vi.useFakeTimers();
+    montar(
+      {
+        page: 3,
+        sort: { columnId: ORDER_NUMBER_COLUMN_ID, direction: 'asc' },
+        filters: { [STATUS_COLUMN_ID]: { kind: 'select', values: ['CANCELADO'] } },
+      },
+      5,
+    );
+
+    fireEvent.change(screen.getByTestId('data-table-search'), {
+      target: { value: 'acido citrico' },
+    });
+    await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
+    vi.useRealTimers();
+
+    const destino = new URL(ultimoDestino(), 'http://localhost');
+    expect(destino.searchParams.get('q')).toBe('acido citrico');
+    expect(destino.searchParams.get('page')).toBe('1');
+    expect(destino.searchParams.get('sort')).toBe(`${ORDER_NUMBER_COLUMN_ID}:asc`);
+    expect(destino.searchParams.get('status')).toBe('CANCELADO');
   });
 
-  it('ninguna navegacion de la tabla escribe un termino de busqueda en la URL', async () => {
+  it('avanzar de pagina con un termino vigente conserva ese termino (R8)', async () => {
     const user = setupUser();
-    montar();
+    montar({ page: 1, search: 'sosa' }, 3);
 
     await user.click(screen.getByTestId('data-table-next'));
 
-    expect(ultimoDestino()).not.toContain('search');
+    expect(new URL(ultimoDestino(), 'http://localhost').searchParams.get('q')).toBe('sosa');
+  });
+});
+
+describe('las filas se pintan tal cual llegan aunque ninguna contenga el termino (R3)', () => {
+  it('la tabla no filtra, ni ordena, ni recorta en el cliente', () => {
+    montar({ search: 'nada-que-vaya-a-coincidir' });
+
+    const filas = screen.getAllByRole('row').slice(1);
+    expect(filas.map((fila) => fila.getAttribute('data-testid'))).toEqual([
+      'data-table-row-o3',
+      'data-table-row-o1',
+      'data-table-row-o2',
+    ]);
+  });
+});
+
+describe('mientras la navegacion esta en vuelo, la caja conserva foco y texto (R10, R11, R12)', () => {
+  it('aria-busy, rotulo de carga, sin esqueleto, y la misma caja con foco y texto', async () => {
+    const user = setupUser();
+    montarConNavegacionEnVuelo();
+
+    expect(screen.getByTestId('order-table')).toHaveAttribute('aria-busy', 'false');
+
+    const busqueda = screen.getByTestId('data-table-search');
+    await user.type(busqueda, 'norte');
+
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByTestId('order-table')).toHaveAttribute('aria-busy', 'true'),
+    );
+
+    expect(screen.getByText(ORDER_TABLE_TEXTS.loading)).toBeInTheDocument();
+    expect(screen.queryByTestId('order-list-skeleton')).toBeNull();
+    expect(screen.queryByTestId('data-table-loading')).toBeNull();
+    expect(screen.getByTestId('data-table-search')).toBe(busqueda);
+    expect(busqueda).toHaveFocus();
+    expect(busqueda).toHaveValue('norte');
   });
 });
 

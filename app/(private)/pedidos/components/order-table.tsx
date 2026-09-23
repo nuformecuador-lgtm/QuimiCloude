@@ -10,7 +10,7 @@ import type { UnitView } from '@/lib/modules/unidades';
 
 import { ORDER_DEFAULT_PINNED_COLUMNS, buildOrderColumns } from './order-columns';
 import type { OrderResponsiblesCatalog } from './order-responsibles';
-import { orderListHref } from './order-list-params';
+import { orderListHref, withSearchResetsPage } from './order-list-params';
 import type { RecipePickerPage } from './recipe-picker';
 
 /**
@@ -30,9 +30,9 @@ import type { RecipePickerPage } from './recipe-picker';
  * **El destino sale de `orderListHref`** (R2): ningun archivo de la ruta escribe la URL como
  * literal.
  *
- * **`searchable={false}`**: la caja de busqueda **no se monta** —no se pinta inerte ni
- * deshabilitada: no existe en el DOM—. Esta pantalla todavia no tiene caja de busqueda propia.
- * `texts.search` se entrega igual porque el contrato de textos lo exige obligatorio.
+ * **La caja de busqueda esta montada** (`searchable` por defecto): teclear en ella emite
+ * `onParamsChange`, que pasa por `withSearchResetsPage` antes de navegar, de modo que un termino
+ * nuevo vuelve siempre a la primera pagina.
  *
  * **`status` es SIEMPRE `'idle'`** (alternativa Q, descartada): el error y la lista vacia se
  * pintan fuera de `<DataTable>`, con copy y acciones propias. El «cargando» de R21 ya no viene de
@@ -58,8 +58,7 @@ export const ORDER_TABLE_TEXTS: DataTableTexts = {
   empty: 'No hay pedidos que mostrar.',
   loading: 'Cargando pedidos…',
   error: 'No se pudo cargar la lista de pedidos.',
-  // Obligatorio en el contrato de textos; sin caja de busqueda montada no se pinta en ningun sitio.
-  search: 'Buscar',
+  search: 'Buscar por receta',
   filters: 'Filtros',
   columnMenu: 'opciones de la columna',
   previousPage: 'Página anterior',
@@ -159,10 +158,9 @@ export function OrderTable({
         getRowId={(order) => order.id}
         params={params}
         totalPages={totalPages}
-        onParamsChange={(next) => navigate(orderListHref(next))}
+        onParamsChange={(next) => navigate(orderListHref(withSearchResetsPage(params, next)))}
         status="idle"
         texts={ORDER_TABLE_TEXTS}
-        searchable={false}
         defaultPinnedColumns={ORDER_DEFAULT_PINNED_COLUMNS}
       />
     </div>
