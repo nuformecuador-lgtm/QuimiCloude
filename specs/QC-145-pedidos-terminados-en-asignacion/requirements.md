@@ -21,9 +21,13 @@
 
 > Escritos por `spec_author` el 2026-09-23. Cada requisito cita entre corchetes la fila de
 > `## Decisiones cerradas` de la que sale, numeradas **por su orden en la tabla**: `[D1]` es la
-> primera fila («¿Qué sale en "Terminados"?») y `[D12]` la última («¿"Terminados" muestra la
-> presentación?»). La numeración solo sirve para citar: la tabla no se toca ni se reordena. El test
-> concreto de cada `R<n>` está en `design.md > 10`.
+> primera fila («¿Qué sale en "Terminados"?»), `[D12]` la de la presentación, y `[D13]`-`[D16]` las
+> cuatro que el humano cerró el 2026-09-23 al revisar el spec (vuelta 2). La numeración solo sirve
+> para citar: la tabla no se toca ni se reordena. El test concreto de cada `R<n>` está en
+> `design.md > 10`.
+>
+> **Responsable elegible** = persona de la empresa **sin** `pedidos.consultar` [D13]. Se decide por
+> permiso y nunca por el nombre del rol.
 >
 > Vocabulario. **Permiso de terminados** = `terminados.consultar`, creado por QC-144.
 > **Fecha de terminado** = el instante en que el pedido pasó a `ENTREGADO` por **Finalizar**.
@@ -95,12 +99,13 @@
   DEBE mostrar un estado vacío y no un error. `[D1]`
 - **R20**: El sistema DEBE ordenar «Terminados» por fecha de terminado, de la más reciente a la más
   antigua. Los pedidos sin fecha DEBEN ir **después** de todos los que la tienen y ordenarse entre sí
-  por número de pedido (el sentido está en la Pregunta abierta 2). El orden DEBE ser total y
-  estable entre páginas. `[D2]`
+  por número de pedido **descendente**, del más nuevo al más viejo. El orden DEBE ser total y
+  estable entre páginas. `[D2]` `[D14]`
 - **R21**: Cada fila de «Terminados» DEBE mostrar el número, la receta, la cantidad, la
-  **presentación** del pedido y su **fecha de terminado**. SI el pedido no tiene presentación,
-  ENTONCES DEBE mostrar «Sin presentación». SI no tiene fecha, ENTONCES DEBE mostrar «Sin fecha».
-  `[D2]` `[D12]`
+  **presentación**, la **fecha de terminado** y **todos los responsables** del pedido. SI el pedido
+  no tiene presentación, ENTONCES DEBE mostrar «Sin presentación». SI no tiene fecha, ENTONCES DEBE
+  mostrar «Sin fecha». SI no tiene responsables, ENTONCES esa celda DEBE quedar vacía y no dar
+  error. `[D2]` `[D12]` `[D15]`
 
 ### Vista «Todos»
 
@@ -111,11 +116,16 @@
 - **R23**: SI quien consulta «Todos» no tiene `pedidos.consultar`, ENTONCES el caso de uso DEBE
   rechazar con `unauthorized` antes de validar la entrada y antes de leer ningún dato. `[D4]`
 - **R24**: CUANDO se filtra «Todos» por estado, el sistema DEBE devolver solo los pedidos de los
-  estados elegidos. SI el filtro es exactamente `ENTREGADO`, ENTONCES DEBE ordenarlos con el orden de
-  terminados (R20). Con cualquier otro filtro DEBE mantener el orden de la lista de trabajo. `[D7]`
-- **R25**: Cada fila de «Todos» DEBE mostrar el número del pedido, su **estado** y **todos sus
-  responsables**, incluido el propio usuario si lo es. SI el pedido no tiene responsables, ENTONCES
-  la celda DEBE quedar vacía y no dar error. `[D7]`
+  estados elegidos. SI el filtro es **exactamente** `ENTREGADO`, y solo ese estado, ENTONCES DEBE
+  ordenarlos con el orden de terminados (R20). Con cualquier otra combinación, aunque incluya
+  `ENTREGADO`, DEBE mantener el orden de la lista de trabajo. `[D7]` `[D16]`
+- **R25**: Cada fila de «Todos» DEBE mostrar el número, la receta, la cantidad, la presentación
+  («Sin presentación» si no tiene), la prioridad, el **estado** y **todos los responsables** del
+  pedido. SI el pedido no tiene responsables, ENTONCES la celda DEBE quedar vacía y no dar error.
+  `[D7]` `[D15]`
+- **R31**: MIENTRAS el filtro de «Todos» sea exactamente `ENTREGADO`, cada fila DEBE mostrar además
+  la **fecha de terminado**, o «Sin fecha» si no la tiene. Con cualquier otro filtro, o sin filtro,
+  esa columna NO DEBE mostrarse. `[D15]` `[D16]`
 
 ### Solo lectura
 
@@ -136,12 +146,28 @@
   «Mis asignados» y no ve «Terminados» ni «Todos»), como **Empacador** (ve «Mis asignados» y
   «Terminados» con un pedido entregado de la empresa no asignado a él, y no ve «Todos») y como
   **Administrador** (ve solo «Todos», con pedidos en varios estados y el filtro por estado). También
-  DEBE comprobar que el formulario de edición de Pedidos ya no ofrece cambiar el estado. `[D10]`
+  DEBE comprobar que el formulario de edición de Pedidos ya no ofrece cambiar el estado y que el
+  selector de responsables de Pedidos no ofrece al Administrador. `[D10]` `[D13]`
 - **R29**: Esta ficha NO DEBE añadir dependencias a `package.json` ni tablas a la base. El único
   cambio de esquema DEBE ser la columna de R1, con su migración y su `down.sql`. `[D11]`
 - **R30**: CUANDO un pedido se entrega con **Finalizar** después de esta ficha, DEBE aparecer en
   «Terminados» con su fecha de terminado **sin ninguna otra acción**. Un pedido entregado antes de
   esta ficha DEBE aparecer marcado «Sin fecha». `[D2]` `[D3]` `[D8]`
+
+### Quién puede ser responsable
+
+- **R32**: CUANDO se carga el selector de responsables de un pedido en Pedidos, el sistema NO DEBE
+  ofrecer a ninguna persona que tenga `pedidos.consultar`. Las demás personas de la empresa DEBEN
+  seguir ofreciéndose como hasta ahora. `[D13]`
+- **R33**: SI una operación de asignar incluye como persona suelta a alguien con `pedidos.consultar`,
+  ENTONCES el caso de uso DEBE rechazar la operación **entera** con `user_cannot_be_responsible`, sin
+  crear ninguna fila, venga o no la petición del formulario. `[D13]`
+- **R34**: El sistema NO DEBE crear, por ninguna vía de la aplicación (persona suelta o miembro de
+  un grupo de trabajo), una asignación de un pedido a una persona con `pedidos.consultar`. Qué pasa
+  con el resto del grupo es la Pregunta abierta 2. `[D13]`
+- **R35**: SI quien tiene `pedidos.consultar` no está asignado a un pedido, ENTONCES abrir la
+  ejecución de ese pedido por su dirección, arrancarlo o finalizarlo DEBE responder `order_not_found`
+  sin escribir nada. `[D13]`
 
 ### Cobertura de decisiones
 
@@ -159,48 +185,45 @@
 | D10: E2E | R28 |
 | D11: sin dependencia ni tabla | R1, R29 |
 | D12: presentación en «Terminados» | R21 |
+| D13: el Administrador no puede ser responsable | R28, R32, R33, R34, R35 |
+| D14: «sin fecha» por número descendente | R20 |
+| D15: columnas de «Terminados» y «Todos» | R21, R25, R31 |
+| D16: orden de terminados solo con filtro exactamente Entregado | R24, R31 |
 
 ## Preguntas abiertas
 
-1. **Un Administrador asignado como responsable no tiene por dónde ejecutar el pedido**: su única
-   vista es «Todos», que es de solo lectura (decisión «¿Qué se puede hacer desde…?»). El humano lo
-   eligió sabiéndolo. Queda abierto si el selector de responsables deja de ofrecer Administradores o
-   si se acepta tal cual. No se rellena con supuestos: `spec_author` lo lleva a F1.4.
-   **Datos del código (spec_author, 2026-09-23, sobre `dev`). La pregunta sigue abierta.**
-   - Hoy el selector de responsables **no filtra por rol ni por permiso**. `assign-responsibles.ts`
-     solo exige que la persona exista, sea de la empresa y tenga la cuenta activa. Un Administrador
-     se puede asignar hoy igual que un Operador.
-   - Los tres casos de uso de la ejecución (`get-`, `start-` y `finish-assigned-order.ts`) solo
-     exigen `asignaciones.consultar` y estar asignado. El Administrador tiene los dos en el seed.
-     Por eso, después de esta ficha, un Administrador asignado **no ve entrada** a la ejecución
-     desde `/asignacion` (R13, R26). Pero si escribe a mano la dirección `/asignacion/<id>`,
-     **puede ejecutar y finalizar** el pedido. Esta ficha no cambia eso: ver la Pregunta 5.
+> Las cinco preguntas de la vuelta 1 las cerró el humano el 2026-09-23 y pasaron a D13-D16. Estas
+> dos salen de aplicar D13 y quedan abiertas. No se rellenan con supuestos.
 
-2. **¿En qué sentido se ordenan por número los terminados «sin fecha»?** D2 dice «ordenados por
-   número» y no dice si ascendente (el más viejo primero, como en la lista de trabajo) o descendente
-   (coherente con el resto de «Terminados», que va del más reciente al más antiguo). R20 lo deja
-   sin fijar y su test depende de la respuesta. El `design.md` deja preparado **descendente** como
-   propuesta y no lo da por decidido. (Abierta al diseñar, 2026-09-23.)
+1. **¿Qué se hace con los pedidos que ya tienen asignada a una persona con `pedidos.consultar`?**
+   Medido en el código de `dev` el 2026-09-23 (sin acceso a la base, así que **no se sabe cuántas
+   filas hay**):
+   - Desde QC-87 nada lo impedía. `assign-responsibles.ts:113-120` solo exige que la persona exista,
+     sea de la empresa y tenga la cuenta activa. El selector (`order-list-section.tsx:173-194`) ofrece
+     todo lo que devuelve `listUsersAction`, sin filtro de rol ni de permiso. Ninguna restricción de
+     la base (`order_assignments`) lo impide.
+   - `scripts/seed.ts` no crea asignaciones. Las filas, si existen, las ha creado alguien desde la
+     pantalla.
+   - Consecuencia: para esas filas, D13 **no cierra** la ejecución por dirección directa. Los casos
+     de uso de ejecución solo exigen `asignaciones.consultar` y estar asignado, y esa persona lo está.
+     Esta ficha no las toca: ni las borra ni las filtra al leer. Siguen apareciendo como
+     responsables en «Todos», «Terminados» y la lista de Pedidos, y se pueden quitar a mano con
+     «quitar responsable», que no cambia.
+   - Hay que decidir si se dejan así, si se quitan con una migración de datos (borrado físico, que
+     es lo que hace «quitar responsable») o si los casos de uso de ejecución rechazan además a
+     quien tenga `pedidos.consultar`. Esta última opción cambiaría QC-63 y QC-82.
+   (Abierta al aplicar D13, 2026-09-23.)
 
-3. **Columnas de «Terminados» y de «Todos» que las decisiones no fijan.** D7 fija estado y
-   responsables en «Todos», y D12 y D2 fijan presentación y fecha en «Terminados». No está decidido:
-   (a) si «Terminados» muestra también **prioridad** y **responsables**; (b) si «Todos» muestra
-   receta, cantidad, presentación y prioridad (la propuesta de `design.md > 6.4` dice que sí, igual
-   que «Mis asignados»); (c) si «Todos», filtrado por Entregado, muestra además la **fecha de
-   terminado**. R21 y R25 exigen solo lo decidido. (Abierta al diseñar, 2026-09-23.)
-
-4. **Filtro de «Todos» con varios estados, uno de ellos Entregado.** La tabla compartida permite
-   elegir **varios** estados a la vez. D7 dice «filtrado por Entregado, se ordena como Terminados».
-   R24 lo lee de forma literal: solo cuando el filtro es **exactamente** Entregado. Con Entregado más
-   otro estado se mantiene el orden de trabajo. Queda por confirmar que esa lectura es la buscada.
-   (Abierta al diseñar, 2026-09-23.)
-
-5. **¿La ejecución por dirección directa debe cerrarse para quien tiene `pedidos.consultar`?**
-   Continúa la Pregunta 1. D6 hace «Todos» de solo lectura, pero `/asignacion/<id>` y
-   arrancar/finalizar siguen aceptando a cualquier responsable asignado con
-   `asignaciones.consultar`, incluido el Administrador. Cerrarla cambiaría los casos de uso de QC-63
-   y QC-82. Esta ficha **no la cierra** y ningún `R<n>` la toca. Si el humano quiere cerrarla, es
-   un requisito nuevo. (Abierta al diseñar, 2026-09-23.)
+2. **Grupo de trabajo con un miembro que tiene `pedidos.consultar`.** Asignar un grupo crea una fila
+   por cada miembro con la cuenta activa (`WorkGroupSnapshot.activeMemberIds`). A los inactivos se
+   les **omite en silencio**, sin rechazar la operación. R34 prohíbe crear la fila del miembro
+   con `pedidos.consultar`, pero falta decidir qué pasa con el resto:
+   (a) **se le omite** y los demás se asignan, como a un inactivo; o
+   (b) **se rechaza la operación entera** con `user_cannot_be_responsible`, como con una persona
+   suelta (R33).
+   El `design.md > 3.5` deja preparada **(a)** como propuesta, sin darla por decidida. El test de R34
+   vale para las dos: solo afirma que no queda fila de esa persona. (Abierta al aplicar D13,
+   2026-09-23.)
 
 ## Decisiones cerradas (no reabrir)
 
@@ -218,3 +241,7 @@
 | 2026-09-22 | ¿E2E? | **Sí, aquí**: se difirió desde **QC-144**. Entra como **Operador** (no ve Terminados), como **Empacador** (ve Terminados, no Todos) y como **Administrador** (ve Todos). Más el caso de que **Pedidos ya no ofrece cambiar el estado** |
 | 2026-09-22 | ¿Dependencia o tabla nueva? | **Ninguna dependencia ni tabla.** Una columna, por migración |
 | 2026-09-22 | ¿«Terminados» muestra la presentación? | **Sí**, la de cada pedido; los viejos salen «sin presentación». La columna la crea **QC-146**, que por eso **bloquea a esta** (añadido al acotar QC-146; `depends_on` pasa a QC-144 + QC-146) |
+| 2026-09-23 | ¿Puede un Administrador ser responsable de un pedido? (antes Preguntas abiertas 1 y 5) | **No.** Se aplica **por permiso, nunca por nombre de rol** (QC-86/87): quien tiene **`pedidos.consultar`**, el mismo permiso que abre «Todos», **no se ofrece** en el selector de responsables, y el **service rechaza** asignarlo aunque la petición no venga del formulario. Como ejecutar exige estar asignado, la ejecución por dirección directa queda cerrada sin tocar la ruta (para las asignaciones que ya existan, ver la Pregunta abierta 1). Requisitos y tests: selector, rechazo en el service y caso E2E. **D13** |
+| 2026-09-23 | ¿En qué sentido se ordenan por número los «sin fecha»? (antes Pregunta abierta 2) | **Descendente**, del más nuevo al más viejo, como proponía el diseño. **D14** |
+| 2026-09-23 | ¿Qué columnas llevan «Terminados» y «Todos»? (antes Pregunta abierta 3) | Las del spec, tal cual. **«Terminados»**: número, receta, cantidad, presentación, fecha de terminado y responsables. **«Todos»**: número, receta, cantidad, presentación, prioridad, estado y responsables; **filtrado por Entregado**, añade la fecha de terminado. **D15** |
+| 2026-09-23 | ¿Cuándo se ordena «Todos» por fecha de terminado? (antes Pregunta abierta 4) | **Solo cuando el filtro es exactamente Entregado.** Con cualquier otra combinación, orden de la lista de trabajo. **D16** |
