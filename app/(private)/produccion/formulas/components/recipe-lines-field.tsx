@@ -1,13 +1,19 @@
 'use client';
 
 import { PlusIcon, XIcon } from 'lucide-react';
-import { useId } from 'react';
+import { useId, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { productDisplayName } from '@/lib/modules/inventario';
-import { formatPercentage, sumPercentages } from '@/lib/modules/recetas';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
+import {
+  consumedQuantity,
+  formatPercentage,
+  percentageToHundredths,
+  sumPercentages,
+} from '@/lib/modules/recetas';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 import { ProductPicker, type ProductPickerOption } from './product-picker';
@@ -40,25 +46,98 @@ const GHOST_LINE: RecipeLineFormValue = {
 };
 const FIELD_TEXT = 'text-base';
 
-/** Etiqueta de una unidad por su id: símbolo o, si no tiene, su nombre; `null` si no está en el catálogo. */
-function unitLabel(unitId: string, units: readonly UnitRef[]): string | null {
-  const unit = units.find((candidate) => candidate.id === unitId);
-  return unit === undefined ? null : (unit.symbol ?? unit.name);
+/**
+ * Texto del selector de ingrediente según el estado de la línea. Sin depender del copy en los
+ * tests. Solo el nombre: la unidad ya no se concatena en fórmulas («Hipoclorito · kg» pasa a
+ * «Hipoclorito»); el inventario la sigue mostrando. `emptyLabel` distingue el tab de máquinas
+ * («Buscar máquina») del de ingredientes.
+ */
+function productPickerLabel(productName: string | null, emptyLabel = 'Buscar ingrediente'): string {
+  if (productName === null) return 'Ingrediente no disponible';
+  if (productName === '') return emptyLabel;
+  return productName;
 }
 
 /**
- * Texto del selector de ingrediente según el estado de la línea. Sin depender del copy en los
- * tests. Con ingrediente elegido y disponible, incluye su unidad -«nombre · unidad»- cuando el
- * insumo la tiene; sin ella -sin lotes o dado de baja- se ve solo el nombre.
+ * Máquina seleccionada en el tab de máquinas. Selección pura: sin porcentaje ni cantidad de
+ * referencia -el instrumento no lleva %-. UI-only por decisión de producto: no viaja al payload
+ * ni al contrato; cuando se persista, este tipo alimenta la relación nueva.
  */
-function productPickerLabel(
-  productName: string | null,
-  productUnitId: string | null,
-  units: readonly UnitRef[],
-): string {
-  if (productName === null) return 'Ingrediente no disponible';
-  if (productName === '') return 'Buscar ingrediente';
-  return productDisplayName(productName, productUnitId === null ? null : unitLabel(productUnitId, units));
+export type RecipeMachineFormValue = {
+  readonly key: string;
+  readonly productId: string;
+  readonly productName: string | null;
+};
+
+type LinesTab = 'ingredients' | 'machines';
+
+/**
+ * Base de referencia en gramos para la cantidad estimada que acompaña a cada línea: 20 %
+ * equivale a 200 g. Es presentación pura -no viaja al payload ni al contrato-.
+ */
+const REFERENCE_BASE_QUANTITY = '1000';
+
+/** Tope del porcentaje en centésimas (100,00 %). */
+const MAX_PERCENTAGE_HUNDREDTHS = BigInt(10000);
+
+/**
+ * Deja solo dígitos y UN separador decimal (el primero; el punto se normaliza a coma, que es
+ * lo que muestra la pantalla), con hasta 3 enteros y 2 decimales. Los estados intermedios de
+ * tecleo (`''`, `'5,'`) pasan tal cual para no romper la escritura.
+ */
+export function sanitizePercentageInput(raw: string): string {
+  const cleaned = raw.replace(/[^0-9.,]/g, '');
+  if (cleaned === '') return '';
+  const separatorIndex = cleaned.search(/[.,]/);
+  if (separatorIndex === -1) return cleaned.slice(0, 3);
+  const integers = cleaned.slice(0, separatorIndex).replace(/[.,]/g, '').slice(0, 3);
+  const fractions = cleaned
+    .slice(separatorIndex + 1)
+    .replace(/[.,]/g, '')
+    .slice(0, 2);
+  return fractions === '' ? `${integers},` : `${integers},${fractions}`;
+}
+
+/** Centésimas que le quedan a la línea `exceptIndex`: 100,00 % menos la suma de las OTRAS. */
+function remainingHundredths(lines: readonly RecipeLineFormValue[], exceptIndex: number): bigint {
+  const othersHundredths = lines.reduce((sum, line, i) => {
+    if (i === exceptIndex) return sum;
+    const hundredths = percentageToHundredths(line.percentage.replace(',', '.'));
+    return hundredths === null ? sum : sum + hundredths;
+  }, BigInt(0));
+  const remaining = MAX_PERCENTAGE_HUNDREDTHS - othersHundredths;
+  return remaining < BigInt(0) ? BigInt(0) : remaining;
+}
+
+/**
+ * Recorta un porcentaje ya saneado al mínimo entre su valor, lo que queda por asignar y
+ * 100. Los intermedios (`''`, `'5,'`) y lo que no parsea pasan intactos: el esquema del
+ * contrato los valida al guardar. Ej.: otras líneas suman 50 y se escribe 80 → anota 50.
+ */
+export function clampPercentageToRemaining(sanitized: string, remaining: bigint): string {
+  const dotted = sanitized.replace(',', '.');
+  const hundredths = percentageToHundredths(dotted);
+  if (hundredths === null) return sanitized;
+  const cap = remaining < MAX_PERCENTAGE_HUNDREDTHS ? remaining : MAX_PERCENTAGE_HUNDREDTHS;
+  if (hundredths <= cap) return sanitized;
+  const cappedWhole = cap / BigInt(100);
+  const cents = (cap % BigInt(100)).toString().padStart(2, '0');
+  // Sin decimales significativos se muestra entero («50» y no «50,00»): es lo que el usuario
+  // habría escrito de haber tecleado el tope directamente.
+  if (cents === '00') return cappedWhole.toString();
+  const trimmed = cents.endsWith('0') ? cents.slice(0, 1) : cents;
+  return `${cappedWhole.toString()},${trimmed}`;
+}
+
+/**
+ * Cantidad estimada sobre la base de referencia para pintar junto al porcentaje («20» →
+ * «200»). Vacío si el porcentaje no parsea todavía: el readonly no inventa un cero mientras
+ * se está escribiendo.
+ */
+export function referenceAmountForPercentage(percentage: string): string {
+  const dotted = percentage.replace(',', '.');
+  if (percentageToHundredths(dotted) === null) return '';
+  return consumedQuantity(REFERENCE_BASE_QUANTITY, dotted).replace('.', ',');
 }
 
 export type RecipeLinesFieldProps = {
@@ -69,8 +148,24 @@ export type RecipeLinesFieldProps = {
     readonly items: readonly ProductPickerOption[];
     readonly totalPages: number;
   };
+  /**
+   * Primera página de MÁQUINAS, ya filtrada por tipo desde la página del formulario. El tab de
+   * máquinas es UI-only: su selección vive en el estado interno de este campo y no sale al
+   * payload.
+   */
+  readonly initialMachinePage: {
+    readonly items: readonly ProductPickerOption[];
+    readonly totalPages: number;
+  };
   readonly errors?: RecipeLineErrors;
   readonly generalError?: string;
+};
+
+/** Fantasma del tab de máquinas: misma idea que `GHOST_LINE`, sin porcentaje. */
+const GHOST_MACHINE: RecipeMachineFormValue = {
+  key: 'maquina-en-blanco',
+  productId: '',
+  productName: '',
 };
 
 export function RecipeLinesField({
@@ -78,11 +173,14 @@ export function RecipeLinesField({
   onChange,
   units,
   initialProductPage,
+  initialMachinePage,
   errors,
   generalError,
 }: RecipeLinesFieldProps) {
   const headingId = useId();
   const sumId = useId();
+  const [activeTab, setActiveTab] = useState<LinesTab>('ingredients');
+  const [machines, setMachines] = useState<readonly RecipeMachineFormValue[]>([]);
 
   // Derivado en CADA render, nunca cacheado: borrar este `.filter(` tiene que poner el test en
   // rojo, así que no puede sustituirse por un contador guardado en el estado.
@@ -129,6 +227,16 @@ export function RecipeLinesField({
   }
 
   /**
+   * Entrada del porcentaje: solo números (saneado) y sin pasarse de lo que queda por asignar
+   * ni de 100. Con el fantasma en pantalla no hay otras líneas: el tope es 100.
+   */
+  function handlePercentageChange(index: number, raw: string) {
+    const sanitized = sanitizePercentageInput(raw);
+    const remaining = isGhost ? MAX_PERCENTAGE_HUNDREDTHS : remainingHundredths(lines, index);
+    updateLine(index, { percentage: clampPercentageToRemaining(sanitized, remaining) });
+  }
+
+  /**
    * Ingredientes ya elegidos en las OTRAS líneas: el selector los ofrece deshabilitados, así que
    * el mismo ingrediente no puede entrar dos veces en la receta. Se deriva en cada render de
    * `lines` -nunca de un conjunto guardado-, para que quitar una línea libere su ingrediente de
@@ -147,10 +255,54 @@ export function RecipeLinesField({
     onChange(lines.filter((_, i) => i !== index));
   }
 
+  // --- Tab de máquinas (UI-only): el mismo ciclo fantasma/materializar del de ingredientes,
+  // pero sin porcentaje. Cada lista excluye lo suyo: son tipos disjuntos, así que no comparten
+  // `excludedIds` entre tabs.
+  const isMachineGhost = machines.length === 0;
+  const machineRows: readonly RecipeMachineFormValue[] = isMachineGhost
+    ? [GHOST_MACHINE]
+    : machines;
+  const unavailableMachines = machines.filter((machine) => machine.productName === null).length;
+
+  function blankMachine(): RecipeMachineFormValue {
+    return { key: createLocalKey('machine'), productId: '', productName: '' };
+  }
+
+  function addMachineAfter(index: number) {
+    if (isMachineGhost) {
+      setMachines([blankMachine(), blankMachine()]);
+      return;
+    }
+    setMachines([...machines.slice(0, index + 1), blankMachine(), ...machines.slice(index + 1)]);
+  }
+
+  function updateMachine(index: number, patch: Partial<RecipeMachineFormValue>) {
+    if (isMachineGhost) {
+      setMachines([{ ...blankMachine(), ...patch }]);
+      return;
+    }
+    setMachines(machines.map((machine, i) => (i === index ? { ...machine, ...patch } : machine)));
+  }
+
+  function removeMachine(index: number) {
+    if (isMachineGhost) return;
+    setMachines(machines.filter((_, i) => i !== index));
+  }
+
+  function usedMachineIds(exceptIndex: number): readonly string[] {
+    return machineRows
+      .filter((machine, i) => i !== exceptIndex && machine.productId !== '')
+      .map((machine) => machine.productId);
+  }
+
+  function handleTabChange(value: string) {
+    setActiveTab(value === 'machines' ? 'machines' : 'ingredients');
+  }
+
   return (
     <section aria-labelledby={headingId} data-testid="recipe-lines-field" className="flex flex-col gap-3">
       <h2 id={headingId} className="text-lg font-medium">
-        Ingredientes
+        Ingredientes y herramientas
       </h2>
 
       {generalError === undefined ? null : (
@@ -159,6 +311,17 @@ export function RecipeLinesField({
         </p>
       )}
 
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <TabsList aria-label="Líneas de la receta por tipo">
+          <TabsTrigger value="ingredients" data-testid="recipe-lines-tab-ingredients">
+            Ingredientes
+          </TabsTrigger>
+          <TabsTrigger value="machines" data-testid="recipe-lines-tab-machines">
+            Herramientas
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="ingredients">
       <div className="flex flex-col gap-4">
         {rows.map((line, index) => {
           const isUnavailable = line.productName === null;
@@ -169,7 +332,7 @@ export function RecipeLinesField({
             <div
               key={line.key}
               data-testid="recipe-line-row"
-              className="grid grid-cols-1 gap-2 rounded-lg border p-3 sm:grid-cols-[2fr_1fr_auto] sm:items-start"
+              className="grid grid-cols-1 gap-2 rounded-lg border p-3 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-start"
             >
               <div
                 data-testid={isUnavailable ? `recipe-line-unavailable-${index}` : undefined}
@@ -178,7 +341,7 @@ export function RecipeLinesField({
                 <Label className="text-sm">Ingrediente</Label>
                 <ProductPicker
                   value={line.productId}
-                  label={productPickerLabel(line.productName, line.productUnitId, units)}
+                  label={productPickerLabel(line.productName)}
                   ariaLabel={`Ingrediente de la línea ${index + 1}`}
                   onSelect={(option: ProductPickerOption) =>
                     updateLine(index, {
@@ -192,6 +355,7 @@ export function RecipeLinesField({
                   initialPage={initialProductPage}
                   excludedIds={usedProductIds(index)}
                   units={units}
+                  productType={PRODUCT_TYPES.PRODUCT}
                 />
               </div>
 
@@ -205,7 +369,7 @@ export function RecipeLinesField({
                     type="text"
                     inputMode="decimal"
                     value={line.percentage}
-                    onChange={(event) => updateLine(index, { percentage: event.target.value })}
+                    onChange={(event) => handlePercentageChange(index, event.target.value)}
                     className={`${TOUCH_TARGET} ${FIELD_TEXT} pr-7`}
                     aria-invalid={lineErrors?.percentage === undefined ? undefined : true}
                     aria-describedby={
@@ -231,6 +395,32 @@ export function RecipeLinesField({
                 )}
               </div>
 
+              <div className="flex flex-col gap-1">
+                <Label htmlFor={`recipe-line-amount-input-${index}`} className="text-sm">
+                  Cantidad (base 1000 g)
+                </Label>
+                <div className="relative">
+                  <Input
+                    id={`recipe-line-amount-input-${index}`}
+                    type="text"
+                    inputMode="decimal"
+                    value={referenceAmountForPercentage(line.percentage)}
+                    readOnly
+                    tabIndex={-1}
+                    aria-readonly
+                    aria-label={`Cantidad estimada de la línea ${index + 1} sobre base de 1000 gramos`}
+                    className={`${TOUCH_TARGET} ${FIELD_TEXT} pr-7`}
+                    data-testid={`recipe-line-amount-${index}`}
+                  />
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground"
+                  >
+                    g
+                  </span>
+                </div>
+              </div>
+
               <div className="flex gap-1 self-start sm:mt-6">
                 <Button
                   type="button"
@@ -250,7 +440,7 @@ export function RecipeLinesField({
                   className={TOUCH_TARGET}
                   aria-label={`Añadir una línea después de la ${index + 1}`}
                   data-testid={`recipe-line-add-${index}`}
-                  disabled={line.productId === ''}
+                  disabled={line.productId === '' || line.productName === null}
                   onClick={() => addLineAfter(index)}
                 >
                   <PlusIcon aria-hidden />
@@ -294,6 +484,86 @@ export function RecipeLinesField({
             : `Hay ${unavailableCount} líneas con un producto que ya no está disponible.`}
         </p>
       ) : null}
+        </TabsContent>
+
+        <TabsContent value="machines">
+          <div className="flex flex-col gap-4">
+            {machineRows.map((machine, index) => {
+              const isUnavailable = machine.productName === null;
+
+              return (
+                <div
+                  key={machine.key}
+                  data-testid="recipe-machine-row"
+                  className="grid grid-cols-1 gap-2 rounded-lg border p-3 sm:grid-cols-[2fr_auto] sm:items-start"
+                >
+                  <div
+                    data-testid={isUnavailable ? `recipe-machine-unavailable-${index}` : undefined}
+                    className="flex flex-col gap-1"
+                  >
+                    <Label className="text-sm">Herramienta</Label>
+                    <ProductPicker
+                      value={machine.productId}
+                      label={productPickerLabel(machine.productName, 'Buscar herramienta')}
+                      ariaLabel={`Herramienta de la línea ${index + 1}`}
+                      onSelect={(option: ProductPickerOption) =>
+                        updateMachine(index, {
+                          productId: option.id,
+                          productName: option.name,
+                        })
+                      }
+                      testId={`recipe-machine-product-${index}`}
+                      initialPage={initialMachinePage}
+                      excludedIds={usedMachineIds(index)}
+                      units={units}
+                      productType={PRODUCT_TYPES.MACHINE}
+                    />
+                  </div>
+
+                  <div className="flex gap-1 self-start sm:mt-6">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className={TOUCH_TARGET}
+                      aria-label={`Quitar herramienta ${index + 1}`}
+                      data-testid={`recipe-machine-remove-${index}`}
+                      onClick={() => removeMachine(index)}
+                    >
+                      <XIcon aria-hidden />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className={TOUCH_TARGET}
+                      aria-label={`Añadir una herramienta después de la ${index + 1}`}
+                      data-testid={`recipe-machine-add-${index}`}
+                      disabled={machine.productId === '' || machine.productName === null}
+                      onClick={() => addMachineAfter(index)}
+                    >
+                      <PlusIcon aria-hidden />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {unavailableMachines > 0 ? (
+            <p
+              role="status"
+              data-testid="recipe-machines-unavailable-notice"
+              data-count={String(unavailableMachines)}
+              className="text-sm text-muted-foreground"
+            >
+              {unavailableMachines === 1
+                ? 'Hay 1 herramienta que ya no está disponible.'
+                : `Hay ${unavailableMachines} herramientas que ya no están disponibles.`}
+            </p>
+          ) : null}
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }
@@ -305,8 +575,9 @@ export function RecipeLinesField({
  */
 function sumText(total: ReturnType<typeof sumPercentages>): string {
   if (total.isComplete) return `Suma: ${formatPercentage(total.total)} %`;
-  const negative = total.difference.startsWith('-');
-  const magnitude = negative ? total.difference.slice(1) : total.difference;
-  const palabra = negative ? 'sobran' : 'faltan';
-  return `Suma: ${formatPercentage(total.total)} % — ${palabra} ${formatPercentage(magnitude)} %`;
+  // El clamp del input impide pasarse de 100 por pantalla, así que el «sobran» se retiró: solo
+  // se informa lo que falta. Si un dato precargado trajera más de 100, se muestra la suma sin
+  // palabra en vez de reintroducir el texto retirado.
+  if (total.difference.startsWith('-')) return `Suma: ${formatPercentage(total.total)} %`;
+  return `Suma: ${formatPercentage(total.total)} % — faltan ${formatPercentage(total.difference)} %`;
 }

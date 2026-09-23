@@ -447,7 +447,13 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // cada pedido- se lee de las dos listas que monta la tabla compartida. Se TENSA el centinela de
   // diecisiete a DIECIOCHO; la lista sigue CERRADA, y un spec mas que referencie `data-table` vuelve
   // a ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos dieciocho', () => {
+  //
+  // 2026-09-23: entra tambien `e2e/pedidos-terminados.spec.ts` (QC-145), y no afloja la lista. No
+  // estrena pantalla de tabla propia: recorre la nueva pantalla de asignacion, que monta la tabla
+  // compartida para sus listas de asignados y terminados, y localiza `data-table-row-<id>` y las
+  // celdas de pedido y responsables. Se TENSA el centinela de dieciocho a DIECINUEVE; la lista
+  // sigue CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos diecinueve', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -457,7 +463,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos dieciocho E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos diecinueve E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
       // ya consumen la tabla compartida -inventario y presentaciones- y localiza
       // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
@@ -485,6 +491,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // La NOVENA la trae QC-102 el 2026-09-13 (T16, R37): ver la nota de arriba. Va antes que
       // `e2e/pedidos.spec.ts` porque la lista esta ORDENADA y '-' precede a '.'.
       'e2e/pedidos-responsables.spec.ts',
+      // 2026-09-23: la pantalla de asignacion monta la tabla compartida para «Mis asignados» y
+      // «Terminados»; ver la nota de arriba.
+      'e2e/pedidos-terminados.spec.ts',
       'e2e/pedidos.spec.ts',
       // La CUARTA entrada la trae QC-45 el 2026-09-07: su E2E localiza la tabla compartida porque
       // la pantalla de presentaciones la consume (QC-45 R8, R36). La lista sigue CERRADA: un

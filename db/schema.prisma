@@ -302,9 +302,11 @@ model Product {
 model ProductBatch {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   productId      String    @map("product_id") @db.Uuid
-  presentationId String    @map("presentation_id") @db.Uuid
+  /// Anulable: solo MACHINE (Instrumento) omite presentacion y costo en el borde; PRODUCT y
+  /// PACKAGING siguen exigiendolos en `product-input.ts`. La obligatoriedad vive en dominio.
+  presentationId String?   @map("presentation_id") @db.Uuid
   stock          Decimal   @db.Decimal(14, 4)
-  unitCost       Decimal   @map("unit_cost") @db.Decimal(14, 4)
+  unitCost       Decimal?  @map("unit_cost") @db.Decimal(14, 4)
   /// Texto exacto, sin normalizar: la unicidad por empresa distingue mayusculas.
   lot            String    @map("lot")
   /// Sin `@default`: el «hoy» lo pone el caso de uso con su reloj, y que no sea futura solo lo
@@ -317,8 +319,8 @@ model ProductBatch {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  product      Product             @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  presentation Presentation        @relation(fields: [presentationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  product      Product              @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  presentation Presentation?        @relation(fields: [presentationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   movements    InventoryMovement[]
 
   @@unique([companyId, lot], map: "product_batches_company_lot_unique")
@@ -611,6 +613,10 @@ model Order {
   /// pedidos que existian antes de esta columna. Sin `@relation`: es drift, con FK COMPUESTA
   /// `(company_id, presentation_id)` escrita a mano en la migracion.
   presentationId     String?       @map("presentation_id") @db.Uuid
+  /// Instante en que el pedido paso a ENTREGADO al finalizarlo en planta. NULL en los entregados
+  /// antes de existir la columna. Solo puede tener valor si el estado es ENTREGADO, lo exige el
+  /// CHECK `orders_finished_at_requires_delivered`.
+  finishedAt         DateTime?     @map("finished_at") @db.Timestamptz(6)
 
   @@unique([companyId, orderYear, orderSequence], map: "orders_company_year_sequence_key")
   @@unique([id, companyId], map: "orders_id_company_id_key")

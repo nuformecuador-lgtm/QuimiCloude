@@ -13,6 +13,7 @@ import {
 import { errorMessage } from '@/lib/modules/errores';
 import {
   BatchDuplicateLotError,
+  PRODUCT_TYPES,
   ProductNotFoundError,
   UnauthorizedError,
   ValidationError,
@@ -90,6 +91,7 @@ const VALID_PRODUCT_FIELDS = {
   name: 'Bidon 20 L',
   stock: '10',
   qtyAlert: '2',
+  type: PRODUCT_TYPES.PRODUCT,
 };
 
 /** Un `FormData` manipulado: nadie lo pinta, pero el borde no puede fiarse de eso. */
@@ -363,6 +365,7 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
       name: 'Bidon 20 L',
       stock: '10',
       qtyAlert: '2',
+      type: PRODUCT_TYPES.PRODUCT,
       presentationId: '11111111-1111-4111-8111-111111111111',
       unitCost: '12.3456',
       totalCost: '123.4560',
@@ -448,11 +451,12 @@ describe('el primer lote viaja del FormData al caso de uso (QC-90)', () => {
     );
 
     const [, candidato] = updateProductMock.mock.calls[0] as [string, Record<string, unknown>];
-    // `updateProductSchema` es `strictObject` y NO conoce el lote: si el candidato de la
-    // edicion ganara estos cinco campos, cada edicion moriria con `invalid_input`.
+    // `updateProductSchema` es una union discriminada `strictObject` y NO conoce el lote: si el
+    // candidato de la edicion ganara estos cinco campos, cada edicion moriria con `invalid_input`.
     expect(candidato).toEqual({
       name: 'Bidon 20 L',
       qtyAlert: '2',
+      type: PRODUCT_TYPES.PRODUCT,
     });
     for (const campo of Object.keys(VALID_BATCH_FIELDS)) {
       expect(Object.keys(candidato)).not.toContain(campo);
@@ -547,6 +551,7 @@ describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () =>
       name: 'Bidon 20 L',
       stock: '10',
       qtyAlert: '2',
+      type: PRODUCT_TYPES.PRODUCT,
       presentationId: '11111111-1111-4111-8111-111111111111',
       unitCost: '12.3456',
       totalCost: '123.4560',
@@ -591,10 +596,67 @@ describe('QC-81 — la fecha de compra viaja del FormData al caso de uso', () =>
     );
 
     const [, candidato] = updateProductMock.mock.calls[0] as [string, Record<string, unknown>];
-    expect(candidato).toEqual({ name: 'Bidon 20 L', qtyAlert: '2' });
+    expect(candidato).toEqual({ name: 'Bidon 20 L', qtyAlert: '2', type: PRODUCT_TYPES.PRODUCT });
     for (const campo of [...Object.keys(VALID_BATCH_FIELDS), 'purchaseDate']) {
       expect(Object.keys(candidato)).not.toContain(campo);
     }
+  });
+
+  it('MACHINE lleva solo existencia y fecha de compra al caso de uso, sin qtyAlert ni presentacion', async () => {
+    createProductMock.mockResolvedValue({ id: 'product-1' });
+
+    await createProductAction(
+      CREATE_INITIAL,
+      formDataOf({
+        name: 'Instrumento de laboratorio',
+        type: PRODUCT_TYPES.MACHINE,
+        stock: '9',
+        // El formulario no pinta presentacion ni costos para Instrumento (2026-09-23):
+        // aunque lleguen en el FormData, la action no los manda.
+        presentationId: VALID_BATCH_FIELDS.presentationId,
+        unitCost: VALID_BATCH_FIELDS.unitCost,
+        purchaseDate: '2026-09-01',
+        qtyAlert: '',
+      }),
+    );
+
+    const [candidato] = createProductMock.mock.calls[0] as [Record<string, unknown>];
+    expect(candidato).toEqual({
+      name: 'Instrumento de laboratorio',
+      type: PRODUCT_TYPES.MACHINE,
+      stock: 9,
+      purchaseDate: '2026-09-01',
+    });
+    expect(Object.keys(candidato)).not.toContain('qtyAlert');
+    expect(Object.keys(candidato)).not.toContain('presentationId');
+    expect(Object.keys(candidato)).not.toContain('unitCost');
+  });
+
+  it('MACHINE sin purchaseDate en el FormData llega undefined, y sigue sin qtyAlert', async () => {
+    createProductMock.mockResolvedValue({ id: 'product-1' });
+
+    await createProductAction(
+      CREATE_INITIAL,
+      formDataOf({
+        name: 'Instrumento de laboratorio',
+        type: PRODUCT_TYPES.MACHINE,
+        stock: '1',
+        presentationId: VALID_BATCH_FIELDS.presentationId,
+        unitCost: VALID_BATCH_FIELDS.unitCost,
+        purchaseDate: '',
+      }),
+    );
+
+    const [candidato] = createProductMock.mock.calls[0] as [Record<string, unknown>];
+    expect(candidato).toEqual({
+      name: 'Instrumento de laboratorio',
+      type: PRODUCT_TYPES.MACHINE,
+      stock: 1,
+      purchaseDate: undefined,
+    });
+    expect(Object.keys(candidato)).not.toContain('qtyAlert');
+    expect(Object.keys(candidato)).not.toContain('presentationId');
+    expect(Object.keys(candidato)).not.toContain('unitCost');
   });
 
   it('entrega batch_duplicate_lot al llamante con el texto del catalogo, como los demas codigos (R13)', async () => {

@@ -39,8 +39,6 @@ import {
   ORDER_PRIORITY_OPTION_TESTID,
   ORDER_PRIORITY_SELECT_TESTID,
   ORDER_STATUS_FIELD,
-  ORDER_STATUS_LABELS,
-  ORDER_STATUS_OPTION_TESTID,
   ORDER_STATUS_SELECT_TESTID,
   OrderForm,
   RECIPE_FIELD,
@@ -55,7 +53,6 @@ import {
 import { Sheet } from '@/components/ui/sheet';
 import {
   DEFAULT_ORDER_PRIORITY,
-  EDITABLE_STATUS_VALUES,
   ORDER_PRIORITY_VALUES,
   formatOrderNumber,
   type OrderSummary,
@@ -480,16 +477,17 @@ describe('la presentación del pedido (R16, R17, R18, R19)', () => {
   });
 });
 
-describe('formulario de edicion de pedido (R28, R29, R34)', () => {
-  it('precarga los valores actuales y envia el REEMPLAZO COMPLETO mas el estado', async () => {
-    // No hay envio por campos sueltos: se manda todo el conjunto de negocio y el estado.
+describe('formulario de edicion de pedido (R7, R28, R34)', () => {
+  it('precarga los valores actuales y envia el REEMPLAZO COMPLETO del conjunto de negocio', async () => {
+    // No hay envio por campos sueltos: se manda todo el conjunto de negocio, y nada de
+    // estado.
     const user = setupUser();
     const elPedido = pedido();
     renderFormulario(elPedido);
 
     expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(elPedido.recipeId);
     // El valor del control se lee como CADENA a proposito: `toHaveValue` sobre un control
-    // numerico devuelve `valueAsNumber`, y esa conversion es justo lo que no se admite como
+    // numerico devuelve `valueAsNumber`, que es justo la conversion que R39 no admite como
     // prueba. Lo que importa es que el DOM siga guardando la cadena tal cual.
     expect(cantidad().value).toBe(elPedido.quantity);
 
@@ -500,32 +498,30 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
     // `bind(null, id)`: el id es el PRIMER argumento de la action, no un campo del formulario.
     expect(updateOrderActionMock.mock.calls[0]?.[0]).toBe(elPedido.id);
     const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
-    for (const campo of [...ORDER_BUSINESS_FIELDS, ORDER_STATUS_FIELD]) {
+    for (const campo of ORDER_BUSINESS_FIELDS) {
       expect(enviado.get(campo), `falta el campo «${campo}»`).not.toBeNull();
     }
     expect(enviado.get(RECIPE_FIELD)).toBe(elPedido.recipeId);
     expect(enviado.get('priority')).toBe(elPedido.priority);
-    expect(enviado.get(ORDER_STATUS_FIELD)).toBe(elPedido.status);
     expect(createOrderActionMock).not.toHaveBeenCalled();
   });
 
-  it('el selector de estado ofrece los editables del contrato y NUNCA «CANCELADO»', async () => {
-    // `EDITABLE_STATUS_VALUES` excluye `CANCELADO` por construccion. El unico camino a cancelado
-    // es `cancelOrderAction`, y el doble de esa action falla si se le llama.
+  it('R7: la edicion no ofrece ningun control de estado ni lo envia', async () => {
     const user = setupUser();
-    renderFormulario(pedido());
+    const elPedido = pedido();
+    renderFormulario(elPedido);
 
-    await user.click(screen.getByTestId(ORDER_STATUS_SELECT_TESTID));
+    expect(screen.queryByTestId(ORDER_STATUS_SELECT_TESTID)).toBeNull();
 
-    const opciones = await screen.findAllByTestId(ORDER_STATUS_OPTION_TESTID);
-    const valores = opciones.map((o) => o.getAttribute('data-value'));
-    expect(valores).toEqual([...EDITABLE_STATUS_VALUES]);
-    expect(valores).not.toContain('CANCELADO');
-    expect(opciones.map((o) => o.textContent)).not.toContain(ORDER_STATUS_LABELS.CANCELADO);
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
+    const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
+    expect(enviado.get(ORDER_STATUS_FIELD)).toBeNull();
   });
 
   it('«recipe_not_found» se pinta junto al SELECTOR DE RECETA, no en la region del formulario', async () => {
-    // Se decide por el `code` estable, nunca por el texto del mensaje.
+    // R34 — se decide por el `code` estable, nunca por el texto del mensaje.
     const user = setupUser();
     updateOrderActionMock.mockResolvedValue({
       status: 'error',
@@ -536,9 +532,9 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
 
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
-    // Las tres condiciones del DOM, en la misma espera: el mensaje, la ausencia de aviso de
-    // formulario y el `aria-invalid` cambian en la misma interaccion pero no tienen por que caer
-    // en el mismo commit.
+    // Las tres condiciones del DOM, en la misma espera (QC-58, T11): el mensaje, la ausencia de
+    // aviso de formulario y el `aria-invalid` cambian en la misma interaccion pero no tienen por
+    // que caer en el mismo commit.
     await waitFor(() => {
       expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-error`)).toBeInTheDocument();
       expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
@@ -547,8 +543,9 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
     expect(onSaved).not.toHaveBeenCalled();
   });
 
-  it('«invalid_transition» va al selector de estado', async () => {
-    // Tambien por codigo, no por el texto del mensaje.
+  it('R7: «invalid_transition» va a la region general del formulario, sin campo de estado que senalar', async () => {
+    // Sin selector de estado, `invalid_transition` ya no puede senalar ningun campo: cae
+    // en la region general, junto con `duplicate_number` y compania.
     const user = setupUser();
 
     updateOrderActionMock.mockResolvedValue({
@@ -560,17 +557,16 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
 
     await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
 
-    await waitFor(() =>
-      expect(screen.getByTestId(`order-error-${ORDER_STATUS_FIELD}`)).toBeInTheDocument(),
-    );
-    // El aviso va al CAMPO, no a la region general del formulario.
-    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
+    const region = await screen.findByTestId(ORDER_FORM_ERROR_TESTID);
+    expect(region).toHaveAttribute('role', 'alert');
+    expect(screen.getByTestId('order-form-error-code')).toHaveTextContent('invalid_transition');
+    expect(screen.queryByTestId(`order-error-${ORDER_STATUS_FIELD}`)).toBeNull();
     expect(onSaved).not.toHaveBeenCalled();
   });
 
   it('un codigo que no senala campo va a la region de aviso del formulario y no pierde lo escrito', async () => {
-    // `duplicate_number`, `not_found` y `unauthorized` no identifican campo. Y un rechazo NO
-    // cierra el panel ni vacia el formulario.
+    // R34 — `duplicate_number`, `not_found` y `unauthorized` no identifican campo. Y un rechazo
+    // NO cierra el panel ni vacia el formulario.
     const user = setupUser();
     updateOrderActionMock.mockResolvedValue({
       status: 'error',
@@ -587,16 +583,17 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
     const region = await screen.findByTestId(ORDER_FORM_ERROR_TESTID);
     expect(region).toHaveAttribute('role', 'alert');
     expect(screen.getByTestId('order-form-error-code')).toHaveTextContent('duplicate_number');
-    // Lo escrito sigue ahi: React 19 resetea los campos no controlados al completarse la action,
-    // asi que el estado de fallo los devuelve por `defaultValue`. Al pinchar Guardar el campo
-    // perdió el foco antes del submit, asi que el valor devuelto es el COLOCADO a dos decimales.
+    // Lo escrito sigue ahi (R34): React 19 resetea los campos no controlados al completarse la
+    // action, asi que el estado de fallo los devuelve por `defaultValue`. Al pinchar Guardar el
+    // campo perdió el foco antes del submit, asi que el valor devuelto es el COLOCADO a dos
+    // decimales (enmienda del 2026-09-09 a R39).
     expect(cantidad().value).toBe('7.78');
     expect(onSaved).not.toHaveBeenCalled();
   });
 
   it('una cantidad que el ESQUEMA del contrato rechaza no llega a la operacion', async () => {
-    // La validacion previa usa el mismo esquema que valida el servidor: no hay segunda copia de
-    // la regla «la cantidad es mayor que cero».
+    // R33 — la validacion previa usa el mismo esquema que valida el servidor: no hay segunda copia
+    // de la regla «la cantidad es mayor que cero».
     const user = setupUser();
     renderFormulario(pedido({ quantity: '0' }));
 
@@ -608,8 +605,8 @@ describe('formulario de edicion de pedido (R28, R29, R34)', () => {
   });
 
   it('valida con los esquemas del contrato y sin ninguna libreria de formularios', () => {
-    // Guardia de FUENTE: los esquemas salen del barrel de `pedidos` (client-safe) y las actions,
-    // de su ruta exacta.
+    // R33 — guardia de FUENTE: los esquemas salen del barrel de `pedidos` (client-safe) y las
+    // actions, de su ruta exacta. (Los paquetes descartados no se nombran aqui a proposito.)
     const fuente = readFileSync('app/(private)/pedidos/components/order-form.tsx', 'utf8');
 
     expect(fuente).toContain("createOrderSchema");

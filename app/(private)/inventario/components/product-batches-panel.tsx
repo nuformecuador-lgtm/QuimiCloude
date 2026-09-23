@@ -36,10 +36,11 @@ export type ProductBatchesPanelProps = {
 
 /**
  * Etiqueta de una unidad a partir de su id: simbolo, nombre, o el marcador si el catalogo no la
- * trae. Sin catalogo (`units` indefinido), devuelve `null` y quien llama pinta la cantidad sola.
+ * trae. Sin catalogo (`units` indefinido) o sin unidad en el lote (MACHINE), devuelve `null`
+ * y quien llama pinta la cantidad sola.
  */
-function unitLabel(unitId: string, units: readonly UnitRef[] | undefined): string | null {
-  if (units === undefined) return null;
+function unitLabel(unitId: string | null, units: readonly UnitRef[] | undefined): string | null {
+  if (unitId === null || units === undefined) return null;
   const unit = units.find((candidate) => candidate.id === unitId);
   return unit?.symbol ?? unit?.name ?? EMPTY_CELL;
 }

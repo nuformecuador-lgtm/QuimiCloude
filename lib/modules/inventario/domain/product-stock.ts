@@ -3,16 +3,16 @@ import { addQuantities, compareQuantities } from './decimal-quantity';
 import type { UnitId } from '@/lib/modules/unidades';
 
 export type ProductStockByUnit = {
-  readonly unitId: UnitId;
+  readonly unitId: UnitId | null;
   readonly quantity: string;
 };
 
 const NO_STOCK = '0';
 
 export function sumStockByUnit(
-  rows: readonly { readonly stock: string; readonly unitId: UnitId }[],
+  rows: readonly { readonly stock: string; readonly unitId: UnitId | null }[],
 ): readonly ProductStockByUnit[] {
-  const totals = new Map<UnitId, string>();
+  const totals = new Map<UnitId | null, string>();
 
   for (const row of rows) {
     totals.set(row.unitId, addQuantities(totals.get(row.unitId) ?? NO_STOCK, row.stock));
@@ -21,12 +21,14 @@ export function sumStockByUnit(
   return Array.from(totals, ([unitId, quantity]) => ({ unitId, quantity })).sort((a, b) => {
     const cmp = compareQuantities(a.quantity, b.quantity);
     if (cmp !== 0) return -cmp;
-    return a.unitId < b.unitId ? -1 : a.unitId > b.unitId ? 1 : 0;
+    const aId = a.unitId ?? '';
+    const bId = b.unitId ?? '';
+    return aId < bId ? -1 : aId > bId ? 1 : 0;
   });
 }
 
 export function singleUnitStock(
-  rows: readonly { readonly stock: string; readonly unitId: UnitId }[],
+  rows: readonly { readonly stock: string; readonly unitId: UnitId | null }[],
 ): string {
   const totals = sumStockByUnit(rows);
 

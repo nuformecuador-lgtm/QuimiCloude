@@ -44,9 +44,8 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
         // lectura de quien llama y este bloqueo.
         if (locked.status !== from) return 'stale';
 
-        const result = await scope.orders.setStatus(id, from, to, actorId, now, { companyId });
-        if (result !== 'ok') return result;
-
+        // Consume ANTES de mover el estado: si falta material o la receta no tiene lineas, la
+        // excepcion deshace la transaccion entera y ni el estado ni `finishedAt` quedan escritos.
         if (to === 'ENTREGADO') {
           const content = await deps.recipes.findExecutionContentById(locked.recipeId, companyId);
           const requirement = buildRequirement(content?.lines ?? [], locked.quantity);
@@ -59,14 +58,17 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
             now,
           });
 
-          // Deshace la transaccion entera: el pedido y su reserva quedan como estaban.
           if (outcome.kind === 'insufficient') throw new InsufficientMaterialError();
           if (outcome.kind === 'nothing_to_consume') throw new RecipeWithoutLinesError();
 
+          const result = await scope.orders.setStatus(id, from, to, actorId, now, { companyId });
+          if (result !== 'ok') return result;
+
           await scope.orders.setReservedAt(id, null, { companyId });
+          return 'ok';
         }
 
-        return 'ok';
+        return await scope.orders.setStatus(id, from, to, actorId, now, { companyId });
       });
     } catch (err) {
       if (err instanceof InsufficientMaterialError) return 'insufficient_material';

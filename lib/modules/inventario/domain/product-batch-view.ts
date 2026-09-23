@@ -2,7 +2,8 @@ export type ProductBatchView = {
   readonly id: string;
   readonly lot: string;
   readonly stock: string;
-  readonly unitId: string;
+  /** Unidad de la presentacion del lote; `null` cuando el lote no tiene presentacion (MACHINE). */
+  readonly unitId: string | null;
   readonly purchaseDate: string;
   readonly expiryDate: string | null;
   /** Lo apartado por pedidos vivos en este lote. Opcional: solo lo rellena

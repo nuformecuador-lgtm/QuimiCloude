@@ -101,8 +101,12 @@ function toCivilDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-/** Fila de Prisma -> `CostingBatch` del contrato publico. Funcion pura, testeable sin base. */
+/** Fila de Prisma -> `CostingBatch` del contrato publico. Funcion pura, testeable sin base.
+ *  Un lote de MACHINE sin presentacion o sin costo no costea: se filtra antes de llegar aqui. */
 export function toCostingBatch(row: CostingBatchRow): CostingBatch {
+  if (row.presentation === null || row.unitCost === null) {
+    throw new Error(`toCostingBatch: lote ${row.lot} sin presentacion o sin costo`);
+  }
   return {
     productId: row.productId,
     lot: row.lot,
@@ -126,7 +130,14 @@ async function findAliveBatchesWithStock(
     where: {
       AND: [
         batchCompanyScope(scope),
-        { productId: { in: [...ids] }, stock: { gt: 0 }, product: { deletedAt: null } },
+        {
+          productId: { in: [...ids] },
+          stock: { gt: 0 },
+          // MACHINE sin presentacion o sin costo no entra en el costeo de recetas.
+          presentationId: { not: null },
+          unitCost: { not: null },
+          product: { deletedAt: null },
+        },
       ],
     },
     select: COSTING_BATCH_SELECT,

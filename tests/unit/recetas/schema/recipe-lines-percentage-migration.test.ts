@@ -118,6 +118,17 @@ describe('el nombre de la migracion es posterior a las que necesita para aplicar
       expect(timestamp > dependencyTimestamp, `${migrationName} debe ser posterior a ${candidates[0]}`).toBe(true)
     }
   })
+
+  it('el timestamp es posterior al de la ultima migracion que existia cuando esta nacio', () => {
+    // Compara con un nombre fijo, no con "la ultima del repo": esa ultima cambia con cada
+    // migracion posterior y rompia este caso sin que esta migracion tuviera nada que ver.
+    const ultimaAlNacer = '20260922150000_product_type_enum'
+    const match = /^(\d{14})_/.exec(migrationName)
+    expect(match).not.toBeNull()
+    const timestamp = match?.[1] as string
+    const otherTimestamp = (/^(\d{14})_/.exec(ultimaAlNacer)?.[1]) as string
+    expect(timestamp > otherTimestamp, `${migrationName} debe ser posterior a ${ultimaAlNacer}`).toBe(true)
+  })
 })
 
 describe(`${migrationName}/down.sql`, () => {

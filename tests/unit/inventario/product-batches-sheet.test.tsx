@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProductTable } from '@/app/(private)/inventario/components';
 import type { DataTableParams } from '@/components/shared/data-table';
-import type { ProductBatchView, ProductView } from '@/lib/modules/inventario';
+import { PRODUCT_TYPES, type ProductBatchView, type ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
@@ -62,7 +62,7 @@ function producto(overrides: Partial<ProductView> = {}): ProductView {
     stock: '0',
     unitId: null,
     qtyAlert: null,
-    type: 'PRODUCT' as const,
+    type: PRODUCT_TYPES.PRODUCT,
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-01'),
     ...overrides,

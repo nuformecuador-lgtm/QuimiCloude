@@ -242,6 +242,9 @@ describe('asignaciones · listAssignedOrders con los permisos del Empacador (int
         orders: {
           findAliveById: findAliveOrderTargetById,
           listAliveSummariesByIds: listAliveOrderSummariesByIds,
+          listAliveSummariesInCompany: async () => {
+            throw new Error('QC-144: listAssignedOrders no lista toda la empresa')
+          },
           transitionAliveById: async () => {
             throw new Error('QC-144: listAssignedOrders no escribe el estado del pedido');
           },

@@ -41,6 +41,7 @@ import { effectiveAccountStatus } from '../../../domain/effective-account-status
 
 import type { AccountStatusView } from '../../../domain/effective-account-status';
 import type { PeopleDirectory, PersonRef } from '../../../domain/people-directory';
+import type { PermissionCode } from '../../../domain/permissions';
 import type { WorkGroupDirectory, WorkGroupSnapshot } from '../../../domain/work-group-directory';
 
 // ---------------------------------------------------------------------------------------------
@@ -48,9 +49,11 @@ import type { WorkGroupDirectory, WorkGroupSnapshot } from '../../../domain/work
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Exactamente lo que `PersonRef` necesita: los tres campos que consume `buildDisplayName` y los
- * DOS que consume `effectiveAccountStatus`. Ni correo, ni documento, ni rol, ni `passwordHash`:
- * lo que no esta en esta lista no puede escaparse a un payload del navegador.
+ * Exactamente lo que `PersonRef` necesita: los tres campos que consume `buildDisplayName`, los
+ * DOS que consume `effectiveAccountStatus` y los codigos de permiso del rol, en la MISMA consulta
+ * (por la relacion `Role.permissions`, igual que `session-user-prisma.ts`). Ni correo, ni
+ * documento, ni el nombre del rol, ni `passwordHash`: lo que no esta en esta lista no puede
+ * escaparse a un payload del navegador.
  *
  * Es la misma forma que `MEMBER_CANDIDATE_SELECT` de `work-group-prisma.ts` y **no se reutiliza a
  * proposito**: aquel es la proyeccion del puerto de grupos y este es la de este contrato; atarlos
@@ -63,6 +66,7 @@ const PERSON_REF_SELECT = {
   username: true,
   accountStatus: true,
   lockedUntil: true,
+  role: { select: { permissions: { select: { permissionCode: true } } } },
 } satisfies Prisma.UserSelect;
 
 type PersonRefPayload = Prisma.UserGetPayload<{ select: typeof PERSON_REF_SELECT }>;
@@ -89,6 +93,10 @@ function toPersonRef(row: PersonRefPayload, now: Date): PersonRef {
     id: row.id,
     displayName: buildDisplayName(row.firstNames, row.lastNames, row.username),
     isActive: isEffectivelyActive(row, now),
+    // `role_permissions.permission_code` es texto en la base; el catalogo cerrado de codigos es
+    // el TIPO, y `assertPermission` compara por pertenencia exacta, asi que un codigo que ya no
+    // exista en el catalogo simplemente no concederia nada.
+    permissions: row.role.permissions.map((asignacion) => asignacion.permissionCode) as PermissionCode[],
   };
 }
 
@@ -135,6 +143,25 @@ export async function findRefsIncludingDeletedInCompany(
   const rows = await prisma.user.findMany({
     where: { id: { in: [...ids] }, companyId },
     select: PERSON_REF_SELECT,
+  });
+
+  return rows.map((row) => toPersonRef(row, now));
+}
+
+/**
+ * Las personas VIVAS de la empresa, sin filtrar por identificador, para poblar un selector. El
+ * orden y el tope son los que ya tenia el selector de responsables antes de este archivo.
+ */
+export async function listAliveInCompany(
+  companyId: string,
+  now: Date,
+  limit: number,
+): Promise<readonly PersonRef[]> {
+  const rows = await prisma.user.findMany({
+    where: { companyId, deletedAt: null },
+    select: PERSON_REF_SELECT,
+    orderBy: [{ lastNames: 'asc' }, { firstNames: 'asc' }, { id: 'asc' }],
+    take: limit,
   });
 
   return rows.map((row) => toPersonRef(row, now));
@@ -188,5 +215,6 @@ export async function findSnapshotAliveInCompany(
 export const assignmentDirectoryPrisma: PeopleDirectory & WorkGroupDirectory = {
   findAliveRefsInCompany,
   findRefsIncludingDeletedInCompany,
+  listAliveInCompany,
   findSnapshotAliveInCompany,
 };

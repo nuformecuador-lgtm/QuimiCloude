@@ -86,6 +86,9 @@ export const ERROR_CODES = [
   // Distinto de `insufficient_material`: no falta existencia, falta la formula con la que
   // calcularla -la receta del pedido no tiene ninguna linea-.
   'recipe_without_lines',
+  // Distinto de `user_not_assignable`: la cuenta esta activa. Lo que impide asignar a esta persona
+  // como responsable es que supervisa los pedidos de toda la empresa.
+  'user_cannot_be_responsible',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

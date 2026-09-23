@@ -394,7 +394,7 @@ describe('QC-34 — limite de alcance de la feature', () => {
     ])
   })
 
-  it('los specs E2E de pedidos son estos TRES -QC-35, QC-102 y QC-60-, y la lista sigue cerrada (R57)', () => {
+  it('los specs E2E de pedidos son estos CUATRO -QC-35, QC-102, QC-60 y QC-145-, y la lista sigue cerrada (R57)', () => {
     // CENTINELA INVERTIDO el 2026-09-07 (QC-35). El E2E estaba diferido a esa ficha y el
     // humano lo aprobo el 2026-09-06 (R48, R49). La lista es CERRADA: un spec de pedidos sin
     // ficha que lo respalde vuelve a poner esto en rojo.
@@ -416,15 +416,25 @@ describe('QC-34 — limite de alcance de la feature', () => {
     // AMPLIA y se TENSA -el ancla pasa de dos entradas a tres-, nunca se afloja: sigue CERRADA y un
     // CUARTO spec de pedidos sin ficha que lo respalde vuelve a ponerla en rojo. El orden es el de
     // `filesIn` (orden alfabetico de ruta), no el de llegada.
+    //
+    // AMPLIADA el 2026-09-23: entra la CUARTA entrada,
+    // el spec e2e/pedidos-terminados.spec.ts. Con los tres roles reales del seed comprueba las
+    // pestañas de la nueva pantalla de asignacion y que el panel de edicion de pedidos ya no
+    // ofrece ningun control de estado. No sustituye a ninguno de los otros tres porque lo que
+    // ejercita es otra cosa: la vista de terminados y la retirada del estado del formulario. La
+    // lista se AMPLIA y se TENSA -el ancla pasa de tres entradas a cuatro-, nunca se afloja: sigue
+    // CERRADA y un QUINTO spec de pedidos sin ficha que lo respalde vuelve a ponerla en rojo.
     expect(rutasE2e.length).toBeGreaterThan(0)
     expect(specsE2eDePedidos(rutasE2e)).toEqual([
       'e2e/aislamiento-pedidos.spec.ts',
       'e2e/pedidos-responsables.spec.ts',
+      'e2e/pedidos-terminados.spec.ts',
       'e2e/pedidos.spec.ts',
     ])
     expect(specsE2eDePedidos([...rutasE2e, 'e2e/orders-extra.spec.ts'])).toEqual([
       'e2e/aislamiento-pedidos.spec.ts',
       'e2e/pedidos-responsables.spec.ts',
+      'e2e/pedidos-terminados.spec.ts',
       'e2e/pedidos.spec.ts',
       'e2e/orders-extra.spec.ts',
     ])

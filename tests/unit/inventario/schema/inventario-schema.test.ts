@@ -338,7 +338,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
 
     const presentationId = field(productBatch, 'presentationId')
     expect(presentationId.type).toBe('String')
-    expect(presentationId.isOptional).toBe(false)
+    expect(presentationId.isOptional, 'presentation_id es anulable: solo MACHINE la omite (2026-09-23)').toBe(true)
     expect(presentationId.attributes).toContain('@db.Uuid')
     expect(presentationId.attributes).toContain('@map("presentation_id")')
 
@@ -349,7 +349,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
 
     const unitCost = field(productBatch, 'unitCost')
     expect(unitCost.type).toBe('Decimal')
-    expect(unitCost.isOptional).toBe(false)
+    expect(unitCost.isOptional, 'unit_cost es anulable: solo MACHINE la omite (2026-09-23)').toBe(true)
     expect(unitCost.attributes).toContain('@map("unit_cost")')
     expect(unitCost.attributes).toMatch(/@db\.Decimal\(14,\s*4\)/)
 
@@ -378,8 +378,10 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(productBatch.body).not.toMatch(/\bUser\b/)
 
     // Con Product y Presentation si hay @relation: los tres modelos son de inventario.
+    // `presentationId` es anulable desde 20260923140000 (MACHINE no trae presentacion), asi que
+    // el lado de la relacion es `Presentation?`.
     expect(productBatch.body).toMatch(/product\s+Product\s+@relation\(/)
-    expect(productBatch.body).toMatch(/presentation\s+Presentation\s+@relation\(/)
+    expect(productBatch.body).toMatch(/presentation\s+Presentation\?\s+@relation\(/)
 
     expect(productBatch.body).toContain('@@map("product_batches")')
     expect(productBatch.body).toMatch(/@@index\(\[productId\],\s*map:\s*"product_batches_product_id_idx"\)/)
@@ -514,15 +516,15 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(generated.map((candidate) => candidate.name)).toEqual(['id'])
   })
 
-  it('la relacion ProductBatch-Presentation es obligatoria', () => {
+  it('la relacion ProductBatch-Presentation es anulable: MACHINE omite presentacion y costo', () => {
     const presentationId = field(productBatch, 'presentationId')
-    expect(presentationId.isOptional).toBe(false)
+    expect(presentationId.isOptional, 'presentation_id DROP NOT NULL (2026-09-23)').toBe(true)
     expect(presentationId.attributes).toContain('@db.Uuid')
     expect(presentationId.attributes).toContain('@map("presentation_id")')
 
     const relation = field(productBatch, 'presentation')
     expect(relation.type).toBe('Presentation')
-    expect(relation.isOptional).toBe(false)
+    expect(relation.isOptional, 'la FK es anulable junto a su columna').toBe(true)
     expect(relation.isList).toBe(false)
     expect(relation.attributes).toMatch(/@relation\(/)
     expect(relation.attributes).toMatch(/fields:\s*\[presentationId\]/)
@@ -934,7 +936,7 @@ describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batch
 
     const unitCost = field(productBatch, 'unitCost')
     expect(unitCost.type, 'unit_cost sigue siendo Decimal, nunca Float').toBe('Decimal')
-    expect(unitCost.isOptional).toBe(false)
+    expect(unitCost.isOptional, 'unit_cost es anulable: solo MACHINE la omite (2026-09-23)').toBe(true)
     expect(unitCost.attributes).toMatch(/@db\.Decimal\(14,\s*4\)/)
     expect(unitCost.attributes).not.toMatch(/@db\.(Real|DoublePrecision|Money)/)
 
@@ -958,7 +960,9 @@ describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batch
     ] as const) {
       const ejecutable = sql
         .split('\n')
-        .map((line) => line.replace(/--.*$/, ''))
+        // `\r` de un checkout con CRLF: `.` no lo cruza, asi que sin quitarlo antes el
+        // comentario no se va y la prosa contamina la asercion.
+        .map((line) => line.replace(/\r$/, '').replace(/--.*$/, ''))
         .join('\n')
       expect(ejecutable, `${nombre} no toca product_batches (R28)`).not.toMatch(/product_batches/i)
       expect(ejecutable, `${nombre} no toca ningun importe (R28)`).not.toMatch(
@@ -1008,7 +1012,9 @@ describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batch
     )
     const ejecutable = up
       .split('\n')
-      .map((line) => line.replace(/--.*$/, ''))
+      // `\r` de un checkout con CRLF: `.` no lo cruza, asi que sin quitarlo antes el
+      // comentario no se va y la prosa contamina la asercion.
+      .map((line) => line.replace(/\r$/, '').replace(/--.*$/, ''))
       .join('\n')
     expect(ejecutable, 'la migracion no anade deleted_at a presentations (R9)').not.toMatch(
       /deleted_at/i,

@@ -58,6 +58,7 @@ export const ERROR_MESSAGE_KEY = {
   action_not_allowed: 'errors.action_not_allowed',
   insufficient_material: 'errors.insufficient_material',
   recipe_without_lines: 'errors.recipe_without_lines',
+  user_cannot_be_responsible: 'errors.user_cannot_be_responsible',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -144,4 +145,5 @@ export const ERROR_MESSAGES_ES = {
     'No hay material suficiente en inventario para entregar el pedido.',
   'errors.recipe_without_lines':
     'La receta del pedido no tiene ingredientes: completala antes de entregarlo.',
+  'errors.user_cannot_be_responsible': 'Esta persona no puede ser responsable de un pedido.',
 } as const satisfies Record<ErrorMessageKey, string>;

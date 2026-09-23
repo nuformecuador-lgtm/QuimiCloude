@@ -15,6 +15,7 @@
 
 import { Prisma } from '@prisma/client';
 
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import {
   PRODUCT_SELECT,
   toProductView,
@@ -30,7 +31,7 @@ describe('toProductView', () => {
     stock: new Prisma.Decimal(15),
     unitId: 'u-9',
     qtyAlert: new Prisma.Decimal(5),
-    type: 'PRODUCT' as const,
+    type: PRODUCT_TYPES.PRODUCT,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-02T00:00:00Z'),
   };

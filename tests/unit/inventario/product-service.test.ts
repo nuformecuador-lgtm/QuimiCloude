@@ -2,6 +2,7 @@
 // `tasks.md > T6`). Sin base de datos: lo que se prueba aqui es la DECISION que vive en
 // `domain/`, no la implementacion Prisma (esa es T9).
 
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
 import { createDeleteProduct } from '@/lib/modules/inventario/domain/delete-product';
@@ -53,7 +54,7 @@ const VISTA_PRODUCTO: ProductView = {
   stock: '0.0000',
   unitId: null,
   qtyAlert: null,
-  type: 'PRODUCT' as const,
+  type: PRODUCT_TYPES.PRODUCT,
   createdAt: AHORA,
   updatedAt: AHORA,
 };

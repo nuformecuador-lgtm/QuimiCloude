@@ -15,8 +15,8 @@ import {
   useAsyncPaginatedOptions,
   type AsyncPageRequest,
 } from '@/hooks/use-async-paginated-options';
-import { productDisplayName } from '@/lib/modules/inventario';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
+import type { ProductType } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
@@ -97,8 +97,8 @@ export type ProductPickerOption = {
    * tiene unidad»: con `null`, `unitsOfGroup` devuelve el catalogo entero y la linea se puede
    * escribir igual, que es lo que permite escribir una receta antes de comprar el ingrediente.
    *
-   * Este componente la usa para pintar «nombre · unidad» en la opcion y en el valor elegido, y
-   * ademas la entrega intacta en `onSelect`.
+   * En fórmulas se pinta solo el nombre; la unidad se entrega intacta en `onSelect` para
+   * quien la necesite (el detalle la conserva en `productUnitId`).
    */
   readonly unitId: string | null;
 };
@@ -114,15 +114,13 @@ const SEARCH_DEBOUNCE_MS = 400;
 /** Alto máximo del desplegable: siempre hay scroll cuando quedan páginas por traer. */
 const MAX_LIST_HEIGHT = 256;
 
-/** Etiqueta de una unidad por su id: símbolo o, si no tiene, su nombre; `null` si no está en el catálogo. */
-function unitLabel(unitId: string, units: readonly UnitRef[]): string | null {
-  const unit = units.find((candidate) => candidate.id === unitId);
-  return unit === undefined ? null : (unit.symbol ?? unit.name);
-}
-
-/** «nombre · unidad» de una opción, o solo el nombre cuando no tiene unidad. */
-function optionLabel(option: ProductPickerOption, units: readonly UnitRef[]): string {
-  return productDisplayName(option.name, option.unitId === null ? null : unitLabel(option.unitId, units));
+/**
+ * Etiqueta de una opción del selector: solo el nombre. La unidad se retiró en fórmulas por
+ * decisión de producto («Hipoclorito · kg» pasa a «Hipoclorito»); el inventario la sigue
+ * mostrando con `productDisplayName`.
+ */
+function optionLabel(option: ProductPickerOption): string {
+  return option.name;
 }
 
 export type ProductPickerProps = {
@@ -140,8 +138,13 @@ export type ProductPickerProps = {
   readonly initialPage: { readonly items: readonly ProductPickerOption[]; readonly totalPages: number };
   /** Ingredientes ya elegidos en OTRAS líneas: se apartan de la lista. */
   readonly excludedIds?: readonly string[];
-  /** Catálogo de unidades, para pintar «nombre · unidad» en cada opción. */
+  /** Catálogo de unidades. Se conserva por firma; las opciones se pintan solo con el nombre. */
   readonly units: readonly UnitRef[];
+  /**
+   * Filtro de tipo aplicado en el SERVIDOR (`filters.type`, `select`): el tab de ingredientes
+   * pide `PRODUCT` y el de máquinas `MACHINE`. Sin el, el selector ofrece todo el catálogo.
+   */
+  readonly productType?: ProductType;
 };
 
 export function ProductPicker({
@@ -153,7 +156,7 @@ export function ProductPicker({
   testId,
   initialPage,
   excludedIds = [],
-  units,
+  productType,
 }: ProductPickerProps) {
   const errorId = useId();
   const [open, setOpen] = useState(false);
@@ -169,14 +172,23 @@ export function ProductPicker({
     async ({ query, page }: AsyncPageRequest) => {
       const search = query.trim();
 
+      // La página 1 sin búsqueda la trae `initialPage` por props (R49): cada tab recibe la suya
+      // ya filtrada por tipo desde la página del formulario, así que aquí no se filtra nada.
       if (page === FIRST_PAGE && search === '') {
         return { items: initialPage.items, page, totalPages: initialPage.totalPages };
       }
 
-      // Sin término, la consulta es EXACTAMENTE la de siempre: la página completa del catálogo.
-      // La clave `search` se omite por claridad del sitio de llamada, NO porque el esquema fuera
-      // a rechazarla: con el contrato de QC-57 una búsqueda vacía es AUSENCIA de búsqueda (R20).
-      const filtro = search === '' ? {} : { search };
+      // Sin término, la consulta es EXACTAMENTE la de siempre, más el filtro de tipo si el tab
+      // lo declaró. La clave `search` se omite por claridad del sitio de llamada, NO porque el
+      // esquema fuera a rechazarla: con el contrato de QC-57 una búsqueda vacía es AUSENCIA de
+      // búsqueda (R20). El filtro viaja al SERVIDOR (`PRODUCT_QUERYABLE` lo declara `select`);
+      // en cliente no se recorta nada (R28).
+      const filtro = {
+        ...(search === '' ? {} : { search }),
+        ...(productType === undefined
+          ? {}
+          : { filters: { type: { kind: 'select', values: [productType] } } }),
+      };
       const result = await listProductsAction({ page, pageSize: MAX_PAGE_SIZE, ...filtro });
 
       if (result.status === 'error') {
@@ -195,7 +207,7 @@ export function ProductPicker({
         totalPages: result.data.totalPages,
       };
     },
-    [initialPage],
+    [initialPage, productType],
   );
 
   const { items, isLoading, isLoadingMore, error: loadError, hasMore, loadMore } =
@@ -250,7 +262,7 @@ export function ProductPicker({
       <Autocomplete
         items={selectable}
         mode="none"
-        itemToStringValue={(option: ProductPickerOption) => optionLabel(option, units)}
+        itemToStringValue={(option: ProductPickerOption) => optionLabel(option)}
         value={displayValue}
         onValueChange={handleValueChange}
         open={open}
@@ -287,7 +299,7 @@ export function ProductPicker({
                       data-testid={`${testId}-option`}
                       onClick={() => choose(option)}
                     >
-                      <span className="truncate">{optionLabel(option, units)}</span>
+                      <span className="truncate">{optionLabel(option)}</span>
                     </AutocompleteItem>
                   )}
                 </AutocompleteList>

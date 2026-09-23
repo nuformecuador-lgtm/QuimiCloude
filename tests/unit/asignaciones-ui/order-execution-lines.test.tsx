@@ -207,6 +207,72 @@ describe('linea de ejecucion — el selector de unidad convierte la cantidad, no
   });
 });
 
+describe('linea de ejecucion — el title expone el valor exacto (QC-132 R5, R6)', () => {
+  it('QC-132 R5: title exacto cuando difiere del pintado, en su unidad propia', () => {
+    render(<OrderExecutionLines lines={[linea({ quantity: '0.1255', alternativeUnits: [] })]} />);
+
+    const cantidad = screen.getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-0`);
+    expect(cantidad.textContent).toBe('0.13');
+    expect(cantidad).toHaveAttribute('title', '0.1255');
+  });
+
+  it('QC-132 R5: title exacto tambien sin unidad resoluble', () => {
+    render(
+      <OrderExecutionLines
+        lines={[linea({ quantity: '0.1255', unit: null, alternativeUnits: [] })]}
+      />,
+    );
+
+    const cantidad = screen.getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-0`);
+    expect(cantidad.textContent).toBe('0.13');
+    expect(cantidad).toHaveAttribute('title', '0.1255');
+  });
+
+  it('QC-132 R6: sin title cuando el valor pintado coincide con el exacto', () => {
+    render(<OrderExecutionLines lines={[linea({ quantity: '20', alternativeUnits: [] })]} />);
+
+    const cantidad = screen.getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-0`);
+    expect(cantidad.textContent).toBe('20');
+    expect(cantidad).not.toHaveAttribute('title');
+  });
+});
+
+describe('linea de ejecucion — el title de la linea convertida (QC-132 R12)', () => {
+  it('QC-132 R12: title con el valor convertido tal cual, sin acotar', async () => {
+    const user = setupUser();
+    render(
+      <OrderExecutionLines
+        lines={[linea({ quantity: '1', unit: MILILITRO, alternativeUnits: [LITRO] })]}
+      />,
+    );
+
+    await user.click(screen.getByTestId(`${ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID}-0`));
+    const [, litro] = await screen.findAllByTestId(ORDER_EXECUTION_LINE_UNIT_OPTION_TESTID);
+    await user.click(await esperarInteractiva(litro));
+
+    const cantidad = screen.getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-0`);
+    expect(cantidad.textContent).toBe('0');
+    expect(cantidad).toHaveAttribute('title', '0.001');
+  });
+
+  it('QC-132 R12: sin title cuando el valor convertido ya sale exacto', async () => {
+    const user = setupUser();
+    render(
+      <OrderExecutionLines
+        lines={[linea({ quantity: '0.1255', unit: LITRO, alternativeUnits: [MILILITRO] })]}
+      />,
+    );
+
+    await user.click(screen.getByTestId(`${ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID}-0`));
+    const [, mililitro] = await screen.findAllByTestId(ORDER_EXECUTION_LINE_UNIT_OPTION_TESTID);
+    await user.click(await esperarInteractiva(mililitro));
+
+    const cantidad = screen.getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-0`);
+    expect(cantidad.textContent).toBe('125.5');
+    expect(cantidad).not.toHaveAttribute('title');
+  });
+});
+
 describe('linea de ejecucion — unidad desconocida (R24)', () => {
   it('con unidad null no ofrece selector ni simbolo, y sigue mostrando porcentaje y cantidad', () => {
     render(

@@ -297,6 +297,20 @@ describe('la cantidad se pinta REDONDEADA A DOS DECIMALES (enmienda del 2026-09-
     expect(pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '1.0050' })).container.textContent)
       .toBe('1.01');
   });
+
+  it('QC-132 R1: expone el valor exacto en el title cuando difiere del pintado', () => {
+    const { container } = pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '0.1255' }));
+
+    expect(container.textContent).toBe('0.13');
+    expect(container.firstElementChild).toHaveAttribute('title', '0.1255');
+  });
+
+  it('QC-132 R2: sin title cuando el valor pintado coincide con el exacto', () => {
+    const { container } = pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '12.5000' }));
+
+    expect(container.textContent).toBe('12.5');
+    expect(container.querySelector('[title]')).toBeNull();
+  });
 });
 
 describe('R20: la columna Presentación pinta el nombre o Sin presentación', () => {

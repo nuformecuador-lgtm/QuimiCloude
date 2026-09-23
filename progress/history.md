@@ -4643,3 +4643,79 @@ podar.
 - **La migración se escribió a mano**: Prisma no la generaba por drift de checksum en cuatro
   migraciones `*_company_scope` de la base local. Deuda local, ajena al repo.
 - **Baseline de rojos podado a cero**: las 6 entradas que quedaban ya pasaban.
+
+## 2026-09-23 — QC-147-cantidades-de-receta-en-porcentaje
+
+- **Qué:** las líneas de receta pasan de cantidad + unidad (gr/ml) a **porcentaje de hasta 2
+  decimales que suma exactamente 100,00 %**. Consumo de un pedido = cantidad del pedido × %, en la
+  unidad del insumo (sin densidad). Aplica al costo de ingredientes, a la tabla de ingredientes de
+  Pedidos y a la pantalla del Operario («10,00 % · 20 l»); se retira el factor de escala de QC-63.
+- **PR #108**, merge `9003bf70`. Spec R1–R26, D1–D16, T1–T12. Review: 0 mayores, 11 menores (10
+  cerrados, el 9 justificado). E2E de recetas 16/16 en Chromium y WebKit. `./init.sh` completo verde.
+- **Nació del chat** y se creó en el board el mismo día; **QC-120 (rendimiento) quedó cancelada**
+  porque una receta en porcentaje vale para cualquier cantidad.
+- **Lección de base de datos:** la primera tanda migró la base COMPARTIDA de `.env` (`QuimiCloude`) por
+  indicación del leader, y el `down.sql` no devuelve las líneas borradas. Se revirtió y la ficha siguió
+  en `QuimiCloude_QC147`. **Toda migración de una ficha va contra su base propia.**
+- **Enmiendas de contratos ajenos**, con motivo en el test: `unidades/module-contract` (`ProductRef`
+  admite `unitId`) y los dos contratos de diff de recetas (QC-147 como ampliación nombrada).
+- **Queda para el humano:** el símbolo del litro es «l» en el catálogo y «L» en el spec; y el menor 9
+  del reviewer (comentarios de `unidades` que citan fichas) pide una ficha de limpieza.
+
+## 2026-09-23 — QC-146-presentacion-del-pedido
+
+- **Qué:** cada pedido declara su **presentación** (del catálogo de la empresa), obligatoria al crear y
+  editar; los viejos quedan «sin presentación». Solo informa: no cambia cantidad, importe ni inventario.
+- **PR #109**, merge `0093acf9`. Llevada por otra sesión: el detalle (review rechazado por 2 mayores y
+  corregido, hotfixes de `bc902800` en `dev`, cupo `fullstack` subido a 3 con `/afinar-regla`) está en
+  su informe y en el PR. Cerrada en disco por el leader de QC-147.
+- **Desbloquea QC-145**, que muestra la presentación en «Terminados».
+
+## 2026-09-23 — QC-132-cantidad-del-pedido-sin-title-exacto
+
+- **Qué:** la cantidad redondeada a dos decimales gana su valor exacto en el `title` (`exactDecimalTitle`) en
+  tres sitios: columna Cantidad de `/pedidos`, y cantidad del pedido y de cada línea en `/asignacion/[id]`
+  (la línea convertida lleva el valor convertido completo, R12). Sin `title` si lo pintado ya es exacto.
+- **PR #110**, merge `b7e64eb9`. Spec R1–R12, T1–T10, acotada con `/afinar-feature` (alcance crecido de 1 a 3
+  sitios). Review aprobado, 0 mayores y 3 menores (dos de aserciones de tests, arreglados en `66f72cb5`).
+- **QC-133 cancelada**: describía el mismo defecto. **QC-114 aparcada a `pending` por el humano** para liberar
+  cupo `frontend`; F2.1 había arrancado antes por excepción humana al cupo.
+- **Gate completo ROJO AJENO**: 3 archivos de inventario rotos por `cd7f07a6` (subido directo a `dev` sin PR,
+  con `package-lock.json` y `.board_snapshot.json`). PR abierto con la evidencia por decisión humana; el
+  arreglo va en `fix/rojos-de-cd7f07a6`, PR aparte.
+- **Misma sesión: QC-130 cancelada** al acotarla: QC-121 y QC-147 ya cerraron la premisa (unidades sin base
+  común en el coste del pedido).
+
+## 2026-09-23 — QC-145-pedidos-terminados-en-asignacion
+
+- **Qué:** `/asignacion` reparte vistas por permiso. El Operador ve «Mis asignados»; el Empacador
+  (`terminados.consultar`) suma «Terminados»; el Administrador (`pedidos.consultar`) ve solo «Todos»,
+  filtrable por estado. Nace `orders.finished_at`, escrita en la misma operación del Finalizar;
+  «Terminados» se ordena por ella con los «sin fecha» al final. La edición en Pedidos deja de mover
+  el estado (solo la planta), y quien tiene `pedidos.consultar` ya no puede ser responsable.
+- **PR #112**, merge `51f2d101`. Spec R1–R37, D1–D18, T1–T17, tres vueltas de spec para cerrar sus
+  preguntas. Review: rechazado por 1 mayor (comentarios que citaban requisitos), aprobado en la
+  segunda con 1 menor abierto. E2E con los tres roles 8/8 en Chromium y WebKit. `./init.sh` completo
+  verde (640/640) antes de abrir el PR.
+- **Base propia desde el primer paso** (`QuimiCloude_QC145`): la lección de QC-147 se aplicó.
+- **Cierra también QC-121** en disco: mergeada en el PR #102 y nunca cerrada, seguía ocupando el cupo
+  `fullstack` y habría dejado `dev` en rojo. Le faltan su resumen aquí y desmontar su worktree.
+- **Rojo de dev al baseline:** `guard-arquitectura-modulos` por `a01c90cb` (import profundo en
+  `product-actions.ts`). Sigue rojo en `dev` al cerrar.
+- **Corrige un test mal planteado de QC-147** que comparaba su migración con la ÚLTIMA del repo y se
+  rompía con cualquier migración posterior.
+- **La máquina se quedó sin memoria dos veces** y cortó gates en segundo plano. Un gate a la vez y sin
+  servidores ni E2E de otras sesiones en paralelo.
+- **Queda abierto:** el menor m4 (constantes muertas en `order-form.tsx` que exige
+  `guard-pantalla-pedidos-se-amplia`); el flake de `user-table` ya tiene ficha (QC-126); el commit
+  `c16d8172` quedó sin Co-Authored-By.
+
+## 2026-09-23 — QC-107-componente-de-carga-de-archivos
+
+- **Qué:** componente de subida de PDFs, varios a la vez (hasta 10 por tanda), con el modo de conversión
+  por prop y el estado de cada archivo (en cola, procesando, listo, error con motivo) leído de la cola de
+  QC-111. Incluye su recorrido E2E y arregla los dos defectos que ese E2E destapó.
+- **PR #103**, merge `be5c75c0`, mergeado el 2026-09-22. Bitácora y review en
+  `progress/impl_QC-107-componente-de-carga-de-archivos.md` y `progress/review_QC-107-componente-de-carga-de-archivos.md`.
+- **Cierre tardío:** el PR se mergeó el 2026-09-22 y la ficha siguió `in_progress` hasta el 2026-09-23,
+  ocupando cupo de `frontend`. La cerró el leader de QC-145 al verificar el merge.

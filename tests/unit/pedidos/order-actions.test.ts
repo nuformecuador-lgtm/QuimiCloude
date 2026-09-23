@@ -297,8 +297,9 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     )
     expect(createOrderMock.mock.calls[1]?.[0]).toMatchObject({ priority: undefined })
 
-    // La edicion es REEMPLAZO COMPLETO y anade el estado; el `id` NO viaja en el `FormData`,
-    // es argumento (R20).
+    // La edicion es REEMPLAZO COMPLETO de los datos de negocio; el `id` NO viaja en el
+    // `FormData`, es argumento. Un `status` que el formulario siga enviando (aqui,
+    // `VALID_UPDATE_FIELDS`) NUNCA llega al caso de uso: la edicion ya no mueve el estado.
     await updateOrderAction(ORDER_ID, MUTATION_INITIAL, formDataOf(VALID_UPDATE_FIELDS))
     expect(updateOrderMock.mock.calls[0]?.[0]).toBe(ORDER_ID)
     expect(updateOrderMock.mock.calls[0]?.[1]).toEqual({
@@ -306,8 +307,8 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       quantity: '12.5000',
       priority: 'ALTA',
       presentationId: PRESENTATION_ID,
-      status: 'EN_CURSO',
     })
+    expect(updateOrderMock.mock.calls[0]?.[1]).not.toHaveProperty('status')
     // Y NUNCA lleva motivo: cancelar es `cancelOrder` y solo el (R24, R26).
     expect(updateOrderMock.mock.calls[0]?.[1]).not.toHaveProperty('reason')
     expect(updateOrderMock.mock.calls[0]?.[1]).not.toHaveProperty('cancellationReason')

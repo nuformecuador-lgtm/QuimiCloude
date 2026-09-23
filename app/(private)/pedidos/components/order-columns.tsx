@@ -5,7 +5,7 @@ import { OrderPresentationLabel } from '@/components/shared/order-presentation-l
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import type { UnitView } from '@/lib/modules/unidades';
-import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
+import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 import {
   CREATED_AT_COLUMN_ID,
@@ -208,12 +208,13 @@ export function buildOrderColumns({
       id: QUANTITY_COLUMN_ID,
       label: 'Cantidad',
       align: 'end',
-      // La cadena decimal de la consulta, redondeada a dos decimales SOLO PARA PINTARLA
-      // (`formatDecimalDisplay`). Lo que R39 protege sigue intacto: el redondeo es aritmetica
-      // exacta de enteros sobre el texto -ni `Intl`, ni `toFixed`, ni coma flotante- y esta
-      // celda no alimenta ningun envio. El pedido guardado conserva sus cuatro decimales; lo
-      // que se lee ya no arrastra el «.0000» que no dice nada.
-      cell: (order) => formatDecimalDisplay(order.quantity),
+      // Se pinta redondeada a dos decimales y el `title` lleva el valor exacto, para el caso
+      // en que el redondeo esconda una diferencia real.
+      cell: (order) => (
+        <span title={exactDecimalTitle(order.quantity)}>
+          {formatDecimalDisplay(order.quantity)}
+        </span>
+      ),
     },
     {
       id: PRESENTATION_NAME_COLUMN_ID,

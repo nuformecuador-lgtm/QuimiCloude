@@ -115,12 +115,14 @@ export type RecipeFormProps =
       readonly mode: 'create';
       readonly units: readonly UnitRef[];
       readonly initialProductPage: RecipeFormProductPage;
+      readonly initialMachinePage: RecipeFormProductPage;
     }
   | {
       readonly mode: 'edit';
       readonly recipe: RecipeDetail;
       readonly units: readonly UnitRef[];
       readonly initialProductPage: RecipeFormProductPage;
+      readonly initialMachinePage: RecipeFormProductPage;
     };
 
 type FieldErrors = {
@@ -196,13 +198,19 @@ export function RecipeForm(props: RecipeFormProps) {
     state.lines.map((line) => line.percentage.replace(',', '.')),
   ).isComplete;
 
+  // Cada línea necesita su ingrediente elegido: un 100 % sin producto no habilita el guardado.
+  // El esquema del contrato lo rechazaría igual (`productId` uuid); esto es refuerzo de UX.
+  const hasAllProducts =
+    state.lines.length > 0 && state.lines.every((line) => line.productId !== '');
+  const canSubmit = isComplete && hasAllProducts;
+
   function handleSubmit() {
     setSaveError(null);
 
     // Enter en un campo no se salta la comprobación -`disabled` en el botón no basta,
     // porque el formulario también se envía por teclado-. Se repite la MISMA función que ya
     // deshabilita el botón, no una regla nueva.
-    if (!isComplete) return;
+    if (!canSubmit) return;
 
     const payload = buildRecipePayload(props.mode, state);
     const schema = isEdit ? updateRecipeSchema : createRecipeSchema;
@@ -351,6 +359,7 @@ export function RecipeForm(props: RecipeFormProps) {
         onChange={(lines) => setState((previous) => ({ ...previous, lines }))}
         units={props.units}
         initialProductPage={props.initialProductPage}
+        initialMachinePage={props.initialMachinePage}
         errors={fieldErrors.lines}
         generalError={fieldErrors.linesGeneral}
       />
@@ -412,7 +421,7 @@ export function RecipeForm(props: RecipeFormProps) {
         <Button
           type="submit"
           className={TOUCH_TARGET}
-          disabled={isPending || !isComplete}
+          disabled={isPending || !canSubmit}
           aria-busy={isPending}
           data-testid="recipe-form-submit"
         >

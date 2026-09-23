@@ -519,10 +519,10 @@ export async function listAliveOrders(
  * `updateMany` con `deletedAt: null` en el `where` y no `update`: si el pedido no existe o ya
  * esta borrado, `count` sale 0 y se devuelve `'not_found'` en vez de lanzar.
  *
- * `data` NUNCA incluye `createdBy` ni `createdAt` (R6): conservar el autor y el instante de
- * la creacion es la mitad de R6 que solo se puede demostrar aqui. Tampoco incluye
- * `cancellationReason` ni puede escribir la cancelacion: `NewOrder.status` es
- * `EditableOrderStatus` y el `typecheck` es la primera de las cuatro capas de `design.md > 8`.
+ * `data` NUNCA incluye `createdBy` ni `createdAt`: conservar el autor y el instante de
+ * la creacion solo se puede demostrar aqui. Tampoco incluye `status` ni
+ * `cancellationReason`: `OrderEdit` no tiene esos campos, asi que esta sentencia no puede
+ * escribirlos ni por accidente.
  *
  * `updatedAt` se escribe con el `now` INYECTADO y no con el `@updatedAt` de Prisma, para que
  * el reloj sea el mismo que fijo el caso de uso.
@@ -532,7 +532,7 @@ export async function listAliveOrders(
  */
 export async function updateAliveOrder(
   id: string,
-  data: NewOrder,
+  data: OrderEdit,
   actorId: string,
   now: Date,
   ingredientsCost: string | null,
@@ -545,7 +545,6 @@ export async function updateAliveOrder(
       recipeId: data.recipeId,
       quantity: toDecimalInput(data.quantity),
       priority: data.priority,
-      status: data.status,
       ingredientsCost: ingredientsCost === null ? null : toDecimalInput(ingredientsCost),
       updatedAt: now,
       updatedBy: actorId,
@@ -724,6 +723,11 @@ async function insertAliveOrder(
  * `transitionAliveOrder` (`order-catalog-prisma.ts`), sin `assertTransition` -esa comprobacion
  * ya la hizo el dominio sobre la fila que acaba de bloquear `lockAliveById`- y sobre el cliente
  * de la transaccion en curso.
+ *
+ * Con destino `ENTREGADO` escribe tambien `finishedAt` en el mismo `UPDATE`, con el mismo `now`
+ * que ya recibe la llamada -misma fuente y zona horaria que `transitionAliveOrder`-: el cambio
+ * de estado y la fecha de terminado quedan atomicos entre si. Con cualquier otro destino no
+ * toca `finishedAt`.
  */
 async function setAliveOrderStatus(
   id: string,
@@ -736,7 +740,12 @@ async function setAliveOrderStatus(
 ): Promise<'ok' | 'not_found' | 'stale'> {
   const { count } = await tx.order.updateMany({
     where: { AND: [orderCompanyScope(scope), { id, deletedAt: null, status: from }] },
-    data: { status: to, updatedAt: now, updatedBy: actorId },
+    data: {
+      status: to,
+      updatedAt: now,
+      updatedBy: actorId,
+      ...(to === 'ENTREGADO' ? { finishedAt: now } : {}),
+    },
   });
   if (count === 1) return 'ok';
 
