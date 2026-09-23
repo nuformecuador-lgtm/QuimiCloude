@@ -39,8 +39,8 @@ const {
   listUnitsActionMock,
   listResponsiblesForOrdersActionMock,
   listOrderResponsiblesActionMock,
+  listResponsibleCandidatesActionMock,
   getSessionUserMock,
-  listUsersActionMock,
   listWorkGroupsActionMock,
 } = vi.hoisted(() => ({
   // QC-102 T11: la SEGUNDA llamada de la seccion, el lote de responsables de la pagina. Es el
@@ -60,9 +60,11 @@ const {
     id: '55555555-5555-4555-8555-555555555555',
     permissions: ['pedidos.consultar', 'asignaciones.modificar', 'usuarios.consultar'],
   })),
-  listUsersActionMock: vi.fn(async () => ({
+  // R32: el catalogo de personas del panel sale de esta accion, que ya filtra por
+  // `asignaciones.modificar` y por elegibilidad (design.md > 3.6).
+  listResponsibleCandidatesActionMock: vi.fn(async () => ({
     status: 'success' as const,
-    data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 },
+    data: [] as readonly { id: string; displayName: string }[],
   })),
   listWorkGroupsActionMock: vi.fn(async () => ({
     status: 'success' as const,
@@ -143,6 +145,7 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions', () => ({
   listResponsiblesForOrdersAction: listResponsiblesForOrdersActionMock,
   listOrderResponsiblesAction: listOrderResponsiblesActionMock,
+  listResponsibleCandidatesAction: listResponsibleCandidatesActionMock,
   assignResponsiblesAction: vi.fn(),
   unassignResponsibleAction: vi.fn(),
   removeWorkGroupFromOrderAction: vi.fn(),
@@ -152,10 +155,6 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions', 
 // las suites de `configuracion-ui`.
 vi.mock('@/lib/composition', () => ({
   identity: { getSessionUser: getSessionUserMock },
-}));
-
-vi.mock('@/lib/modules/identity/adapters/driving/user-actions', () => ({
-  listUsersAction: listUsersActionMock,
 }));
 
 vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => ({
@@ -504,7 +503,7 @@ describe('QC-102 — los catalogos del panel solo se piden si el actor puede esc
 
     render(await OrderListSection({ params: parametros() }));
 
-    expect(listUsersActionMock).toHaveBeenCalledTimes(1);
+    expect(listResponsibleCandidatesActionMock).toHaveBeenCalledTimes(1);
     expect(listWorkGroupsActionMock).toHaveBeenCalledTimes(1);
   });
 
@@ -517,19 +516,68 @@ describe('QC-102 — los catalogos del panel solo se piden si el actor puede esc
 
     render(await OrderListSection({ params: parametros() }));
 
-    expect(listUsersActionMock).not.toHaveBeenCalled();
+    expect(listResponsibleCandidatesActionMock).not.toHaveBeenCalled();
     expect(listWorkGroupsActionMock).not.toHaveBeenCalled();
     // Y la lista se pinta igual: el permiso de escritura no condiciona la LECTURA.
     expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
   });
 
   it('si un catalogo falla, el panel se degrada y la lista NO se tumba (H1)', async () => {
-    listUsersActionMock.mockResolvedValue({
+    listResponsibleCandidatesActionMock.mockResolvedValue({
       status: 'error',
       code: 'unauthorized',
       message: 'No tienes permiso para consultar usuarios.',
     } as never);
     listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
+    expect(screen.queryByTestId(testId.error)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// QC-145 T15 (R32) — El catalogo de personas ya no depende de `usuarios.consultar`.
+//
+// Antes (QC-102) el catalogo salia de `listUsersAction`, que exige `usuarios.consultar` y se
+// degradaba a lista vacia sin ese permiso. `design.md > 3.6` cambia la fuente a
+// `listResponsibleCandidatesAction`, que solo exige `asignaciones.modificar` -el mismo permiso
+// con el que ya se decide si el panel de escritura existe- y excluye ya a quien tiene
+// `pedidos.consultar`. Reescribir la vieja prueba de degradacion por `usuarios.consultar` sin
+// dejar rastro simularia un permiso que esta pantalla ya no consulta.
+// ---------------------------------------------------------------------------------------------
+describe('QC-145 — el catalogo de personas sale de listResponsibleCandidatesAction (R32)', () => {
+  it('las personas del panel llegan de la accion nueva, no de listUsersAction', async () => {
+    // `getSessionUserMock` queda con permisos limitados tras el test anterior de "sin el
+    // permiso"; aqui hace falta `canWrite`, asi que se repone.
+    getSessionUserMock.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      permissions: ['pedidos.consultar', 'asignaciones.modificar', 'usuarios.consultar'],
+    });
+    listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+    listResponsibleCandidatesActionMock.mockResolvedValue({
+      status: 'success',
+      data: [{ id: '0000000c-0000-4000-8000-00000000000c', displayName: 'Rosa Vidal' }],
+    });
+
+    render(await OrderListSection({ params: parametros() }));
+
+    expect(listResponsibleCandidatesActionMock).toHaveBeenCalledTimes(1);
+    expect(listResponsibleCandidatesActionMock).toHaveBeenCalledWith();
+  });
+
+  it('si la accion nueva falla, el panel degrada personas a vacio y la lista sigue en pie', async () => {
+    getSessionUserMock.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      permissions: ['pedidos.consultar', 'asignaciones.modificar', 'usuarios.consultar'],
+    });
+    listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+    listResponsibleCandidatesActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No tienes permiso para asignar responsables.',
+    } as never);
 
     render(await OrderListSection({ params: parametros() }));
 

@@ -2,8 +2,10 @@ import type { DataTableParams } from '@/components/shared/data-table';
 import { identity } from '@/lib/composition';
 import { canModifyAssignments } from '@/lib/modules/asignaciones';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
-import { listResponsiblesForOrdersAction } from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
-import { listUsersAction } from '@/lib/modules/identity/adapters/driving/user-actions';
+import {
+  listResponsibleCandidatesAction,
+  listResponsiblesForOrdersAction,
+} from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
 import { listWorkGroupsAction } from '@/lib/modules/identity/adapters/driving/work-group-actions';
 import { listOrdersAction } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import { listRecipesAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
@@ -162,30 +164,30 @@ async function loadResponsibles(
  * puede escribir**: sin `asignaciones.modificar` no se monta ningun control de escritura, asi que
  * pedirlos seria trabajo tirado.
  *
- * **Degrada como `loadFormCatalogs`** (`design.md > 0` H1): `listUsersAction` y
- * `listWorkGroupsAction` exigen `usuarios.consultar`, que la decision cerrada 2 no nombra. Quien
- * tenga `asignaciones.modificar` sin ese permiso ve el panel con los catalogos **vacios** y su
- * texto de lista vacia; no se inventa ningun permiso nuevo (R15) y no se tumba la lista.
+ * **Personas**: `listResponsibleCandidatesAction` ya exige `asignaciones.modificar` -la misma
+ * condicion con la que este panel se monta- y devuelve solo a quien puede ser responsable, asi
+ * que aqui no hace falta pedir nada por `usuarios.consultar` ni filtrar nada mas. Si falla,
+ * degrada a lista vacia igual que los grupos.
  *
- * El tamano es `MAX_PAGE_SIZE`, el tope que los propios casos de uso imponen: el buscador filtra
- * sobre lo que ya llego (R27).
+ * **Grupos**: siguen saliendo de `listWorkGroupsAction`, que exige `usuarios.consultar`; sin ese
+ * permiso el panel ofrece personas pero ningun grupo, en vez de tumbar la lista.
+ *
+ * El tamano de grupos es `MAX_PAGE_SIZE`, el tope que el propio caso de uso impone: el buscador
+ * filtra sobre lo que ya llego (R27).
  */
 async function loadResponsiblesCatalog(): Promise<OrderResponsiblesCatalog> {
   const canWrite = await canModifyResponsibles();
 
   if (!canWrite) return EMPTY_RESPONSIBLES_CATALOG;
 
-  const [users, groups] = await Promise.all([
-    listUsersAction({ page: FIRST_PAGE, pageSize: MAX_PAGE_SIZE }),
+  const [candidates, groups] = await Promise.all([
+    listResponsibleCandidatesAction(),
     listWorkGroupsAction({ page: FIRST_PAGE, pageSize: MAX_PAGE_SIZE }),
   ]);
 
   return {
     canWrite,
-    people:
-      users.status === 'success'
-        ? users.data.items.map((user) => ({ id: user.id, displayName: user.displayName }))
-        : [],
+    people: candidates.status === 'success' ? candidates.data : [],
     workGroups:
       groups.status === 'success'
         ? groups.data.items.map((group) => ({ id: group.id, name: group.name }))
