@@ -34,6 +34,7 @@ import { createDeleteOrder } from '@/lib/modules/pedidos/domain/delete-order'
 import { PedidosError, UnauthorizedError } from '@/lib/modules/pedidos/domain/errors'
 import { createGetOrder } from '@/lib/modules/pedidos/domain/get-order'
 import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
+import { createQuoteOrderCost } from '@/lib/modules/pedidos/domain/quote-order-cost'
 import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
@@ -165,6 +166,12 @@ const SEIS: readonly (readonly [string, string, Invocacion])[] = [
     MODIFICAR,
     (actor) => createDeleteOrder({ orders: depsDeTurno().orders })(ORDER_ID, actor),
   ],
+  [
+    'quoteOrderCost',
+    MODIFICAR,
+    (actor, entrada = { recipeId: RECIPE_ID, quantity: '10.0000' }) =>
+      createQuoteOrderCost(depsDeTurno())(entrada, actor),
+  ],
 ]
 
 /** Ejecuta un caso de uso con dobles NUEVOS y devuelve el error (o `null`) y los espias. */
@@ -216,6 +223,7 @@ describe('QC-74 — cada caso de uso de pedidos exige su permiso exacto (R16, R1
       'updateOrder:pedidos.modificar',
       'cancelOrder:pedidos.modificar',
       'deleteOrder:pedidos.modificar',
+      'quoteOrderCost:pedidos.modificar',
     ])
   })
 
@@ -240,12 +248,13 @@ describe('QC-74 — pertenencia exacta, sin implicacion entre permisos (R13)', (
   const ESCRITURAS = SEIS.filter(([, codigo]) => codigo === MODIFICAR)
   const LECTURAS = SEIS.filter(([, codigo]) => codigo === CONSULTAR)
 
-  it('hay cuatro escrituras y dos lecturas: el cruzado no corre sobre una lista vacia', () => {
+  it('hay cinco escrituras y dos lecturas: el cruzado no corre sobre una lista vacia', () => {
     expect(ESCRITURAS.map(([nombre]) => nombre)).toEqual([
       'createOrder',
       'updateOrder',
       'cancelOrder',
       'deleteOrder',
+      'quoteOrderCost',
     ])
     expect(LECTURAS.map(([nombre]) => nombre)).toEqual(['getOrder', 'listOrders'])
   })
@@ -373,6 +382,7 @@ const SEIS_ARCHIVOS = [
   ['update-order.ts', MODIFICAR],
   ['cancel-order.ts', MODIFICAR],
   ['delete-order.ts', MODIFICAR],
+  ['quote-order-cost.ts', MODIFICAR],
 ] as const
 
 /** Fuente sin comentarios: lo que se vigila es el CODIGO, no la prosa. */

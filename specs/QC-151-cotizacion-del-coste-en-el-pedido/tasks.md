@@ -37,7 +37,7 @@ Archivos: `lib/modules/pedidos/domain/order-input.ts`, `lib/modules/pedidos/doma
 `order-input.test.ts` gana un caso: `quoteOrderCostSchema` acepta y rechaza exactamente lo mismo que
 `createOrderSchema` en `recipeId` y `quantity`. `./init.sh --rapido` verde.
 
-## [ ] T2 — Cableado y autorización `[depende de T1]`
+## [x] T2 — Cableado y autorización `[depende de T1]`
 
 Archivos: `lib/composition/index.ts`, `tests/unit/pedidos/authorization.test.ts`.
 

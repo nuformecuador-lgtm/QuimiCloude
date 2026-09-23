@@ -178,6 +178,7 @@ import {
   createDeleteOrder,
   createGetOrder,
   createListOrders,
+  createQuoteOrderCost,
   createUpdateOrder,
 } from '@/lib/modules/pedidos';
 import {
@@ -997,6 +998,11 @@ export const pedidos = {
   }),
   cancelOrder: createCancelOrder({ orders: orderRepository }),
   deleteOrder: createDeleteOrder({ orders: orderRepository }),
+  quoteOrderCost: createQuoteOrderCost({
+    recipes: recipeCatalog,
+    products: productCatalog,
+    units: unitCatalog,
+  }),
 } as const;
 
 // ---------------------------------------------------------------------------------------
