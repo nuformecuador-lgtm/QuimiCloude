@@ -19,6 +19,10 @@
 
 ## Evaluaciones
 
+### QC-150 - CREADA del chat y ACOTADA con `/afinar-feature` (2026-09-23)
+
+Creada en el board (épica Inventario) a pedido del humano; **10 decisiones cerradas y 3 preguntas abiertas** en `specs/QC-150-producto-terminado/requirements.md`. `complexity:high`, **bloqueada por QC-141** (existencia decimal). Absorbe el «contenido de la presentación» de QC-130, que sigue cancelada (comentado en su issue).
+
 ### QC-132 y QC-130 - CERRADAS (2026-09-23)
 
 QC-132 `done` (PR #110, `b7e64eb9`) y QC-130 `cancelled` al acotarla; QC-133 `cancelled` (absorbida). Resumen en `progress/history.md`.

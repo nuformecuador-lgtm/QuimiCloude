@@ -2265,6 +2265,23 @@
       "branch": "feature/QC-149-existencia-decimal",
       "depends_on": [],
       "spec_path": "specs/QC-149-existencia-decimal"
+    },
+    {
+      "key": "QC-150",
+      "id": 150,
+      "epic": "QC-18",
+      "epic_name": "Inventario",
+      "name": "producto-terminado",
+      "description": "Nace el tipo de producto «producto terminado» (FINISHED_PRODUCT), junto a PRODUCT, MACHINE y PACKAGING. Su existencia SOLO ENTRA AL TERMINAR UN PEDIDO.\n\nNACE DEL CHAT el 2026-09-23. ACOTADA el mismo dia con /afinar-feature.\n\n* Al Finalizar un pedido en /asignacion/[id] (pasa a ENTREGADO), entra en la misma operacion un LOTE del producto terminado de su RECETA + PRESENTACION («Desengrasante industrial · Botella 1L»). Ese producto nace solo la primera vez.\n* Cantidad en ENVASES ENTEROS, redondeando hacia abajo: 50,5 L en «Botella 1L» son 50 botellas, que se guardan como 50 L (la unidad de la presentacion, como QC-91). Las botellas solo se muestran. El sobrante no entra.\n* Coste unitario = coste de ingredientes (QC-123) / cantidad que entra.\n* La presentacion gana su «contenido» (la cantidad en su unidad), editable en la pantalla de presentaciones. Es el alcance de QC-130, absorbido aqui. Un pedido cuya presentacion no tenga contenido no se puede finalizar.\n* Se prohibe: crear a mano un producto terminado, darle de alta lotes a mano, usarlo como ingrediente de receta y ajustarlo sumando. Se permiten los ajustes que restan (la «venta» de hoy, QC-92).\n* E2E si.\n\nNO ENTRA: consumir los ingredientes al entregar y la existencia decimal (QC-141, que bloquea esta); una pantalla de ventas (sin ficha); los tests que rompio cd7f07a6 (PR aparte).\n\nDetalle y preguntas abiertas en specs/QC-150-producto-terminado/requirements.md.\n\nBLOQUEADA POR QC-141.",
+      "status": "pending",
+      "sdd": true,
+      "complexity": "high",
+      "zone": "fullstack",
+      "branch": "feature/QC-150-producto-terminado",
+      "depends_on": [
+        "QC-141"
+      ],
+      "spec_path": "specs/QC-150-producto-terminado"
     }
   ]
 }
