@@ -99,10 +99,9 @@ export const EDITABLE_STATUS_VALUES: readonly EditableOrderStatus[] = ORDER_STAT
 );
 
 /**
- * Edicion: REEMPLAZO COMPLETO del conjunto de datos de negocio (R20), como QC-25 y QC-43. Un
- * parche parcial obligaria a distinguir «campo ausente» de «campo puesto a nulo». Es la
- * pregunta abierta 5 del spec, con su posicion por defecto escrita y su coste: subir la
- * prioridad obliga a reenviar todo el pedido.
+ * Edicion: REEMPLAZO COMPLETO del conjunto de datos de negocio. Un
+ * parche parcial obligaria a distinguir «campo ausente» de «campo puesto a nulo». El coste:
+ * subir la prioridad obliga a reenviar todo el pedido.
  *
  * La edicion ya no mueve el estado: un `status` que llegue en la entrada muere aqui, como
  * cualquier otra clave que el esquema no declare -`z.object` la descarta-, el mismo criterio

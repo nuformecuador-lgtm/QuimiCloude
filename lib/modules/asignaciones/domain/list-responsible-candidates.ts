@@ -21,10 +21,8 @@ import { canBeResponsible } from './responsible-eligibility';
 import type { PeopleDirectory } from '@/lib/modules/identity';
 
 /**
- * Tope de personas devueltas. Mismo numero que `MAX_PAGE_SIZE` (`lib/shared/pagination.ts`) y el
- * mismo tope que ya tenia el selector de responsables antes de esta ficha; declarado aqui porque
- * el dominio de un modulo no puede importar `lib/shared` (`docs/architecture.md > La regla de
- * dependencias`).
+ * Tope de personas devueltas. Mismo numero que `MAX_PAGE_SIZE` (`lib/shared/pagination.ts`);
+ * declarado aqui porque el dominio de un modulo no puede importar `lib/shared`.
  */
 export const MAX_CANDIDATES = 25;
 

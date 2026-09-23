@@ -173,7 +173,7 @@ async function loadResponsibles(
  * permiso el panel ofrece personas pero ningun grupo, en vez de tumbar la lista.
  *
  * El tamano de grupos es `MAX_PAGE_SIZE`, el tope que el propio caso de uso impone: el buscador
- * filtra sobre lo que ya llego (R27).
+ * filtra sobre lo que ya llego.
  */
 async function loadResponsiblesCatalog(): Promise<OrderResponsiblesCatalog> {
   const canWrite = await canModifyResponsibles();

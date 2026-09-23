@@ -31,7 +31,7 @@ export type ListCompanyOrdersDeps = ComposeOrderRowsDeps & {
   readonly orders: OrderCatalog;
 };
 
-/** Solo `['ENTREGADO']`, y nada mas, ordena como «Terminados» (D16). Cualquier otra combinacion,
+/** Solo `['ENTREGADO']`, y nada mas, ordena como «Terminados». Cualquier otra combinacion,
  *  aunque incluya `ENTREGADO`, usa el orden de la lista de trabajo. */
 function resolveOrdering(statuses: readonly OrderStatus[]): OrderSummaryOrdering {
   return statuses.length === 1 && statuses[0] === 'ENTREGADO' ? 'finished_recent_first' : 'work_queue';

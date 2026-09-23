@@ -88,7 +88,7 @@ export function CompanyOrdersTable({ rows, params, totalPages, statuses }: Compa
   const columns = useMemo(() => buildCompanyOrdersColumns({ showFinishedAt }), [showFinishedAt]);
 
   // El filtro «Estado» de la barra refleja el `status` de la URL: es la unica columna cuyo valor
-  // no viaja en `params` (T12 lo deja fuera del esquema compartido de pagina/tamano).
+  // no viaja en `params`, el esquema compartido de pagina y tamano.
   const tableParams: DataTableParams = useMemo(() => {
     const filters: Record<string, DataTableFilterValue> = {};
     if (statuses.length > 0) {

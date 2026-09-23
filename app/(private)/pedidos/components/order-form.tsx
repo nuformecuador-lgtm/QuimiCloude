@@ -100,7 +100,7 @@ export const ORDER_SHEET_RESPONSIBLES_TESTID = 'order-sheet-responsibles';
  * este formulario emite **siempre** un valor valido y arranca con `DEFAULT_ORDER_PRIORITY`
  * preseleccionada.
  *
- * **R28 — la edicion precarga y es REEMPLAZO COMPLETO** de los campos de negocio. El formulario de
+ * La edicion precarga y es REEMPLAZO COMPLETO de los campos de negocio. El formulario de
  * edicion no ofrece ningun control de estado: el estado no se cambia desde aqui, ni siquiera
  * hacia `CANCELADO` -ese camino sigue siendo unicamente `cancelOrderAction`-.
  *
@@ -438,7 +438,7 @@ export function OrderForm({
   async function save(_previous: OrderFormState, formData: FormData): Promise<OrderFormState> {
     const values = readValues(formData);
 
-    // El esquema del alta y el de la edicion son el mismo objeto (reemplazo completo, R28); se
+    // El esquema del alta y el de la edicion son el mismo objeto (reemplazo completo); se
     // nombran los dos para que quede escrito de donde sale cada regla.
     const parsed = isEdit
       ? updateOrderSchema.safeParse(values)
