@@ -1827,7 +1827,7 @@
       "epic_name": "Pedidos",
       "name": "busqueda-y-total-en-la-pantalla-de-pedidos",
       "description": "Enchufar en la pantalla de pedidos la CAJA DE BUSQUEDA por nombre de receta que QC-68 construyo por debajo.\n\nNACE EL 2026-09-17 al acotar QC-68. La pantalla de pedidos (QC-35) se especifico y se construyo A PROPOSITO sin busqueda (decision humana del 2026-09-06). Esta ficha es la otra mitad.\n\nEL IMPORTE SALE DE ESTA FICHA el 2026-09-23, por decision humana al aprobar el spec: no va como columna del listado. Es una cotizacion del coste de produccion que se ve en el formulario al generar el pedido y en la edicion. Se va a QC-151 (fullstack).\n\nACOTADA el 2026-09-23 con /afinar-feature:\n\n* Solo por nombre de receta, sin acentos ni mayusculas, sobre el conjunto completo; incluye recetas de baja (QC-68).\n* Mientras busca, se queda la lista anterior atenuada, con indicador de carga.\n* Sin coincidencias: «No hay pedidos que coincidan…» con «Limpiar la busqueda», dentro de la tabla (patron de proveedores).\n* El termino va en la URL (?q=): se conserva al paginar, al abrir y cerrar el panel de un pedido y al volver con Atras. Una busqueda nueva vuelve a la pagina 1.\n* E2E si (diferido aqui por QC-68).\n\nNO ENTRA: la consulta, la migracion y el indice de la busqueda (QC-68); el importe (QC-151).",
-      "status": "in_progress",
+      "status": "done",
       "sdd": true,
       "complexity": "medium",
       "zone": "frontend",

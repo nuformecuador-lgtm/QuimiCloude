@@ -4719,3 +4719,17 @@ podar.
   `progress/impl_QC-107-componente-de-carga-de-archivos.md` y `progress/review_QC-107-componente-de-carga-de-archivos.md`.
 - **Cierre tardío:** el PR se mergeó el 2026-09-22 y la ficha siguió `in_progress` hasta el 2026-09-23,
   ocupando cupo de `frontend`. La cerró el leader de QC-145 al verificar el merge.
+
+## 2026-09-23 — QC-122-busqueda-y-total-en-la-pantalla-de-pedidos
+
+- **Qué:** `/pedidos` gana la **caja de búsqueda por nombre de receta** (consulta de QC-68). El término vive en
+  `?q=` (paginación, panel lateral, recarga y Atrás); lista anterior atenuada mientras carga; «sin
+  coincidencias» dentro de la tabla con «Limpiar la búsqueda»; **R27**: la caja se sincroniza con la URL al
+  pulsar Atrás entre dos términos, arreglado en `order-table.tsx` sin tocar `components/shared`.
+- **PR #113**, merge `57527a0b`. Spec R1–R27 (R17–R24 y R25 b retirados), T1–T7. E2E 5/5 en Chromium y WebKit.
+- **Cambio de alcance en F1.4:** el importe no va en el listado; es una cotización en el formulario → nace
+  **QC-151**. Review: vuelta 1 rechazada (B1 Limpiar+Atrás, B2 test de R12, B3 WebKit), vuelta 2 OK.
+- **Rojo ajeno del gate** (`guard-arquitectura-modulos`, de `a01c90cb` subido directo a `dev`): arreglado en
+  el **PR #114** (`a63c6640`). **Queda**: proveedores e inventario tienen el mismo fallo de la caja con
+  Atrás (sin ficha); `pnpm run e2e -- <archivo>` no filtra en Git Bash (hay que usar `pnpm exec playwright
+  test`), mejora al arnés pendiente de `/afinar-regla`.
