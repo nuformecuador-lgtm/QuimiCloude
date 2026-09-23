@@ -16,12 +16,12 @@ export type GetRecipeDeps = {
 
 const NO_BATCHES_STOCK = '0.0000';
 
-/** Existencia del producto en la unidad de la linea que lo pide: `'0.0000'` sin lotes, `null`
- *  cuando hay lotes pero ninguno en esa unidad. */
-function stockInLineUnit(ref: ProductRef, unitId: string): string | null {
-  if (ref.stockByUnit.length === 0) return NO_BATCHES_STOCK;
-  const match = ref.stockByUnit.find((entry) => entry.unitId === unitId);
-  return match?.quantity ?? null;
+/** Existencia del producto en SU PROPIA unidad: `'0.0000'` cuando no tiene lotes -y por
+ *  tanto ninguna unidad resoluble-, la cantidad de esa unidad, en cadena, en el resto de los
+ *  casos. */
+function stockInProductUnit(ref: ProductRef): string {
+  if (ref.unitId === null) return NO_BATCHES_STOCK;
+  return ref.stockByUnit.find((entry) => entry.unitId === ref.unitId)?.quantity ?? NO_BATCHES_STOCK;
 }
 
 /**
@@ -71,9 +71,9 @@ export function createGetRecipe(
           id: line.id,
           productId: line.productId,
           productName: namesById.get(line.productId) ?? null,
-          quantity: line.quantity,
-          unitId: line.unitId,
-          productStock: ref === undefined ? null : stockInLineUnit(ref, line.unitId),
+          percentage: line.percentage,
+          productUnitId: ref?.unitId ?? null,
+          productStock: ref === undefined ? null : stockInProductUnit(ref),
         };
       }),
     };

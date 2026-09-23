@@ -38,6 +38,15 @@ export type {
 } from './domain/recipe-catalog';
 export { normalizeRecipeName } from './domain/recipe-name';
 export {
+  RECIPE_TOTAL_PERCENTAGE,
+  PERCENTAGE_PATTERN,
+  percentageToHundredths,
+  sumPercentages,
+  consumedQuantity,
+  formatPercentage,
+  type PercentageTotal,
+} from './domain/recipe-percentage';
+export {
   MAX_IMAGE_BYTES,
   validateRecipeImage,
   type RecipeImageFormat,

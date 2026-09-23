@@ -15,4 +15,6 @@ export type AssignedOrderView = {
   readonly status: 'PENDIENTE' | 'EN_CURSO';
   /** Sin el propio actor. */
   readonly otherResponsibles: readonly OrderResponsible[];
+  /** `null` = sin presentacion. Solo lectura: el Operador no tiene forma de cambiarla. */
+  readonly presentationName: string | null;
 };

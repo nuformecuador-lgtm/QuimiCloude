@@ -88,6 +88,19 @@ export class RecipeNotFoundError extends PedidosError {
  * tendria que seguir mapeando por si acaso-.
  */
 
+/**
+ * La presentacion indicada no existe en el catalogo de la empresa de quien escribe -incluida
+ * una de otra empresa-. Mismo criterio que `RecipeNotFoundError`: `presentation_not_found` es una
+ * entrada COMPARTIDA del catalogo de errores, ya usada por `inventario`.
+ */
+export class PresentationNotFoundError extends PedidosError {
+  readonly code = 'presentation_not_found';
+
+  constructor(diagnostic?: string) {
+    super('presentation_not_found', diagnostic);
+  }
+}
+
 /** R21, R22: la transicion de estado pedida no esta permitida, o se intenta editar un
  *  pedido final (`ENTREGADO` o `CANCELADO`), que no admite ninguna edicion.
  *

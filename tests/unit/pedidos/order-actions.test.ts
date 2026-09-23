@@ -25,6 +25,7 @@ import {
   NotCancellableError,
   NotDeletableError,
   OrderNotFoundError,
+  PresentationNotFoundError,
   RecipeNotFoundError,
   UnauthorizedError,
   ValidationError,
@@ -48,7 +49,7 @@ import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
 import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
 
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
-import type { ProductCatalog } from '@/lib/modules/inventario'
+import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 
@@ -109,6 +110,7 @@ const SESSION_CONTEXT = { companyId: '33333333-3333-4333-8333-333333333333' }
 
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222'
+const PRESENTATION_ID = '66666666-6666-4666-8666-666666666666'
 
 function formDataOf(fields: Record<string, string>): FormData {
   const formData = new FormData()
@@ -123,6 +125,7 @@ const VALID_CREATE_FIELDS = {
   recipeId: RECIPE_ID,
   quantity: '12.5000',
   priority: 'ALTA',
+  presentationId: PRESENTATION_ID,
 }
 
 const VALID_UPDATE_FIELDS = { ...VALID_CREATE_FIELDS, status: 'EN_CURSO' }
@@ -261,6 +264,7 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       recipeId: RECIPE_ID,
       quantity: '12.5000',
       priority: 'ALTA',
+      presentationId: PRESENTATION_ID,
     })
     // Y lo que el esquema no declara NO se envia: ni estado, ni motivo, ni correlativo, ni
     // autores (R6, R9). La action no puede colar por el formulario lo que el alta no acepta.
@@ -295,6 +299,7 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       recipeId: RECIPE_ID,
       quantity: '12.5000',
       priority: 'ALTA',
+      presentationId: PRESENTATION_ID,
       status: 'EN_CURSO',
     })
     // Y NUNCA lleva motivo: cancelar es `cancelOrder` y solo el (R24, R26).
@@ -397,6 +402,7 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       { error: new UnauthorizedError(), code: 'unauthorized' },
       { error: new OrderNotFoundError(), code: 'order_not_found' },
       { error: new RecipeNotFoundError(), code: 'recipe_not_found' },
+      { error: new PresentationNotFoundError(), code: 'presentation_not_found' },
       { error: new InvalidTransitionError(), code: 'invalid_transition' },
       { error: new NotCancellableError(), code: 'not_cancellable' },
       { error: new NotDeletableError(), code: 'not_deletable' },
@@ -648,12 +654,14 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
       findRefs: explota('units.findRefs'),
       findRefsSharingBaseInCompany: explota('units.findRefsSharingBaseInCompany'),
     }
+    const presentations = { findRefs: explota('presentations.findRefs') }
     const log = { ignoredFields: explota('ignoredFields') }
     const deps = {
       orders: orders as unknown as OrderRepository,
       recipes: recipes as unknown as RecipeCatalog,
       products: products as unknown as ProductCatalog,
       units: units as unknown as UnitCatalog,
+      presentations: presentations as unknown as PresentationCatalog,
       log,
     }
 

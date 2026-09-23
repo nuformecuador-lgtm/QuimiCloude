@@ -16,7 +16,7 @@ import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order';
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
-import type { CostingBatch, ProductCatalog } from '@/lib/modules/inventario';
+import type { CostingBatch, PresentationCatalog, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeExecutionLine, RecipeRef } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
 
@@ -33,6 +33,7 @@ const ORDER_ID = '11111111-1111-4111-8111-111111111111';
 const RECETA_DE_A = '22222222-2222-4222-8222-222222222222';
 const RECETA_DE_B = '55555555-5555-4555-8555-555555555555';
 const RECETA_INEXISTENTE = '99999999-9999-4999-8999-999999999999';
+const PRESENTACION_DE_A = '66666666-6666-4666-8666-666666666666';
 
 const AHORA = new Date('2026-09-16T10:00:00.000Z');
 
@@ -50,6 +51,7 @@ function filaExistente(): OrderRow {
     updatedAt: AHORA,
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
+    presentationId: PRESENTACION_DE_A,
   };
 }
 
@@ -82,10 +84,17 @@ function catalogoDeRecetas(lineasPorReceta: ReadonlyMap<string, readonly RecipeE
   };
 }
 
-/** Catalogo de lotes con existencia (T5): una sola llamada por alta o edicion. */
-function catalogoDeProductos(batches: readonly CostingBatch[] = []) {
+/** Catalogo de productos (T5): una llamada a `findCostingBatches` y otra a `findRefs` por alta
+ *  o edicion, ninguna crece con el numero de lineas. Sin `refs` explicitas, la unidad de cada
+ *  producto sale de sus propios lotes -asi los dobles no repiten la misma unidad dos veces-. */
+function catalogoDeProductos(batches: readonly CostingBatch[] = [], refs?: readonly ProductRef[]) {
+  const refsPorDefecto =
+    refs ??
+    [...new Map(batches.map((batch) => [batch.productId, batch.unitId])).entries()].map(
+      ([id, unitId]): ProductRef => ({ id, name: 'producto', unitId, stockByUnit: [] }),
+    );
   const findCostingBatches = vi.fn(async () => batches);
-  const findRefs = vi.fn(async () => []);
+  const findRefs = vi.fn(async () => refsPorDefecto);
   return { products: { findRefs, findCostingBatches } as unknown as ProductCatalog, findCostingBatches, findRefs };
 }
 
@@ -99,6 +108,14 @@ function catalogoDeUnidades(unidades: ReadonlyMap<string, UnitConversion> = new 
   );
   const findRefsSharingBaseInCompany = vi.fn(async () => []);
   return { units: { findRefs, findRefsSharingBaseInCompany } as unknown as UnitCatalog, findRefs };
+}
+
+/** Catalogo de presentaciones: acepta por defecto `PRESENTACION_DE_A` de la empresa A. */
+function catalogoDePresentaciones(): { presentations: PresentationCatalog; findRefs: ReturnType<typeof vi.fn> } {
+  const findRefs = vi.fn(async (ids: readonly string[]) =>
+    ids.includes(PRESENTACION_DE_A) ? [{ id: PRESENTACION_DE_A, name: 'Bidon 20L' }] : [],
+  );
+  return { presentations: { findRefs } as unknown as PresentationCatalog, findRefs };
 }
 
 function repositorioDePedidos() {
@@ -132,6 +149,7 @@ const EDICION_HACIA_B = {
   recipeId: RECETA_DE_B,
   quantity: '10.0000',
   status: 'PENDIENTE' as const,
+  presentationId: PRESENTACION_DE_A,
 };
 
 describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empresa se rechaza como inexistente', () => {
@@ -143,6 +161,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
       now: () => AHORA,
     });
 
@@ -160,6 +179,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
         recipes: cat.recipes,
         products: catalogoDeProductos().products,
         units: catalogoDeUnidades().units,
+        presentations: catalogoDePresentaciones().presentations,
         now: () => AHORA,
       })(ORDER_ID, EDICION_HACIA_B, ACTOR_A),
     ).rejects.toBeInstanceOf(RecipeNotFoundError);
@@ -172,6 +192,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
       recipes: cat2.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
       now: () => AHORA,
     })(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_INEXISTENTE }, ACTOR_A).catch((e: unknown) => e);
 
@@ -188,6 +209,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
       now: () => AHORA,
     });
 
@@ -204,6 +226,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
       now: () => AHORA,
     });
 
@@ -220,6 +243,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
       now: () => AHORA,
     });
 
@@ -230,13 +254,141 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
   });
 });
 
+describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', () => {
+  /** Repositorio con la fila en el ESTADO que pide el caso, para ejercitar R9 y R10. */
+  function repositorioConEstado(status: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'CANCELADO') {
+    const findAliveById = vi.fn(async () => ({
+      ...filaExistente(),
+      status,
+      cancellationReason: status === 'CANCELADO' ? 'anulado' : null,
+    }));
+    const updateAlive = vi.fn(async () => 'ok' as const);
+    const explota = (nombre: string) =>
+      vi.fn(() => {
+        throw new Error(`${nombre} no deberia llamarse en este caso`);
+      });
+    const orders = {
+      create: explota('create'),
+      findAliveById,
+      listAlive: explota('listAlive'),
+      updateAlive,
+      cancelAlive: explota('cancelAlive'),
+      softDeleteAlive: explota('softDeleteAlive'),
+    } as unknown as OrderRepository;
+    return { orders, findAliveById, updateAlive };
+  }
+
+  it('R7: editar un pedido sin presentacion exige elegir una', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const pres = catalogoDePresentaciones();
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: pres.presentations,
+      now: () => AHORA,
+    });
+
+    expect(
+      await codigoDelFallo(() => updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, presentationId: undefined }, ACTOR_A)),
+    ).toBe('invalid_input');
+    expect(repo.updateAlive).not.toHaveBeenCalled();
+    expect(pres.findRefs).not.toHaveBeenCalled();
+  });
+
+  it('R9: un pedido PENDIENTE y uno EN_CURSO cambian de presentacion', async () => {
+    for (const status of ['PENDIENTE', 'EN_CURSO'] as const) {
+      const cat = catalogoDeRecetas();
+      const repo = repositorioConEstado(status);
+      const pres = catalogoDePresentaciones();
+      const OTRA_PRESENTACION = '99999999-9999-4999-8999-999999999999';
+      pres.findRefs.mockImplementation(async (ids: readonly string[]) =>
+        ids.includes(OTRA_PRESENTACION) ? [{ id: OTRA_PRESENTACION, name: 'Tambor 200L' }] : [],
+      );
+      const updateOrder = createUpdateOrder({
+        orders: repo.orders,
+        recipes: cat.recipes,
+        products: catalogoDeProductos().products,
+        units: catalogoDeUnidades().units,
+        presentations: pres.presentations,
+        now: () => AHORA,
+      });
+
+      await updateOrder(
+        ORDER_ID,
+        { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status, presentationId: OTRA_PRESENTACION },
+        ACTOR_A,
+      );
+
+      expect(repo.updateAlive, status).toHaveBeenCalledTimes(1);
+      const [, dataEscrita] = repo.updateAlive.mock.calls[0] as unknown as [string, { presentationId: string }];
+      expect(dataEscrita.presentationId, status).toBe(OTRA_PRESENTACION);
+    }
+  });
+
+  it('R10: ENTREGADO y CANCELADO rechazan con invalid_transition sin consultar el catalogo de presentaciones', async () => {
+    for (const status of ['ENTREGADO', 'CANCELADO'] as const) {
+      const cat = catalogoDeRecetas();
+      const repo = repositorioConEstado(status);
+      const pres = catalogoDePresentaciones();
+      const updateOrder = createUpdateOrder({
+        orders: repo.orders,
+        recipes: cat.recipes,
+        products: catalogoDeProductos().products,
+        units: catalogoDeUnidades().units,
+        presentations: pres.presentations,
+        now: () => AHORA,
+      });
+
+      expect(
+        await codigoDelFallo(() =>
+          updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A }, ACTOR_A),
+        ),
+        status,
+      ).toBe('invalid_transition');
+      expect(repo.updateAlive, status).not.toHaveBeenCalled();
+      expect(pres.findRefs, status).not.toHaveBeenCalled();
+    }
+  });
+
+  it('receta y presentacion invalidas a la vez -> `recipe_not_found`: la receta se comprueba primero', async () => {
+    const cat = catalogoDeRecetas();
+    const repo = repositorioDePedidos();
+    const pres = catalogoDePresentaciones();
+    const PRESENTACION_INEXISTENTE = '77777777-7777-4777-8777-777777777777';
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: pres.presentations,
+      now: () => AHORA,
+    });
+
+    const codigo = await codigoDelFallo(() =>
+      updateOrder(
+        ORDER_ID,
+        { ...EDICION_HACIA_B, presentationId: PRESENTACION_INEXISTENTE },
+        ACTOR_A,
+      ),
+    );
+
+    expect(codigo).toBe('recipe_not_found');
+    expect(pres.findRefs).not.toHaveBeenCalled();
+    expect(repo.updateAlive).not.toHaveBeenCalled();
+  });
+});
+
 // T5 — la edicion RECALCULA el importe de los ingredientes con la receta del DATO ENTRANTE.
 
 const PRODUCTO_X = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const LITRO: UnitConversion = { id: 'l', baseUnitId: null, factor: null };
 
+/** Una unica linea al 100 %: la cantidad necesaria queda igual a la del pedido. */
 function lineaDeReceta(overrides: Partial<RecipeExecutionLine> = {}): RecipeExecutionLine {
-  return { productId: PRODUCTO_X, productName: null, quantity: '2.0000', unitId: LITRO.id, ...overrides };
+  return { productId: PRODUCTO_X, productName: null, percentage: '100.00', ...overrides };
 }
 
 function loteCosteable(overrides: Partial<CostingBatch> = {}): CostingBatch {
@@ -279,12 +431,15 @@ function catalogosQueExplotan() {
       findRefs: explota('units.findRefs'),
       findRefsSharingBaseInCompany: explota('units.findRefsSharingBaseInCompany'),
     } as unknown as UnitCatalog,
+    presentations: {
+      findRefs: explota('presentations.findRefs'),
+    } as unknown as PresentationCatalog,
   };
 }
 
 describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
   it('la edicion recalcula y sustituye el importe (R11)', async () => {
-    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta({ quantity: '2.0000' })]]]));
+    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
     const prod = catalogoDeProductos([loteCosteable({ stock: '100', unitCost: '3.0000' })]);
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
     const repo = repositorioDePedidos();
@@ -293,18 +448,19 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
       recipes: cat.recipes,
       products: prod.products,
       units: uni.units,
+      presentations: catalogoDePresentaciones().presentations,
       now: () => AHORA,
     });
 
-    await updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, quantity: '10.0000' }, ACTOR_A);
+    await updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, quantity: '20.0000' }, ACTOR_A);
 
-    // necesaria = 2 * 10 = 20, cubierta por el unico lote a 3.0000: 20 * 3 = 60.
+    // necesaria = 20 * 100 % = 20, cubierta por el unico lote a 3.0000: 20 * 3 = 60.
     expect(repo.updateAlive).toHaveBeenCalledTimes(1);
     expect((repo.updateAlive.mock.calls[0] as unknown as readonly unknown[])[4]).toBe('60.0000');
   });
 
   it('el catalogo de recetas se pregunta por la del DATO ENTRANTE, no por la de la fila vieja', async () => {
-    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta({ quantity: '2.0000' })]]]));
+    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
     const prod = catalogoDeProductos([loteCosteable({ stock: '100', unitCost: '3.0000' })]);
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
     const repo = repositorioDePedidos();
@@ -313,12 +469,13 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
       recipes: cat.recipes,
       products: prod.products,
       units: uni.units,
+      presentations: catalogoDePresentaciones().presentations,
       now: () => AHORA,
     });
 
     // La fila vieja tiene RECETA_DE_A (`filaExistente`); la edicion NO la cambia, y aun asi el
     // coste se recalcula con los lotes de HOY, no con el importe guardado.
-    await updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, quantity: '10.0000' }, ACTOR_A);
+    await updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, quantity: '20.0000' }, ACTOR_A);
 
     expect(cat.findExecutionContentById).toHaveBeenCalledWith(RECETA_DE_A, EMPRESA_A);
   });
@@ -326,7 +483,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
   it('las lecturas de lotes y de unidades son UNA sola, tenga la receta 1 o 20 lineas', async () => {
     for (const cantidad of [1, 20]) {
       const lineas = Array.from({ length: cantidad }, (_, i) =>
-        lineaDeReceta({ productId: `${PRODUCTO_X}-${i % 5}`, quantity: '1.0000' }),
+        lineaDeReceta({ productId: `${PRODUCTO_X}-${i % 5}` }),
       );
       const lotes = Array.from({ length: 5 }, (_, i) =>
         loteCosteable({ productId: `${PRODUCTO_X}-${i}`, stock: '100', unitCost: '1.0000' }),
@@ -340,6 +497,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
         recipes: cat.recipes,
         products: prod.products,
         units: uni.units,
+        presentations: catalogoDePresentaciones().presentations,
         now: () => AHORA,
       });
 
@@ -362,6 +520,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
       recipes: catalogos.recipes,
       products: catalogos.products,
       units: catalogos.units,
+      presentations: catalogos.presentations,
       now: () => AHORA,
     });
 

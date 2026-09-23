@@ -76,10 +76,9 @@ del dominio.
    **texto libre y opcional** en la columna `unit` del producto, asumiendo a conciencia que
    normalizarla despues costaria una limpieza de datos. El 2026-09-02, al acotar QC-32, el
    humano decidio normalizarla: la unidad pasa a ser un **catalogo propio** (modulo `unidades`,
-   tabla `Unit`, nombre unico normalizado y simbolo opcional), y el producto y la linea de
-   receta apuntan a el en vez de guardar texto. Se paga el coste que QC-14 anticipo, con la
-   suerte de que la base todavia esta vacia. Detalle en
-   `specs/QC-32-modelo-unidades/requirements.md`.
+   tabla `Unit`, nombre unico normalizado y simbolo opcional), y el producto apunta a el en vez
+   de guardar texto. Se paga el coste que QC-14 anticipo, con la suerte de que la base todavia
+   esta vacia. Detalle en `specs/QC-32-modelo-unidades/requirements.md`.
    **REABIERTA el 2026-09-07 (QC-76).** Lo que cambia es justo la mitad que QC-14 y QC-32
    daban por cerrada: **si va a haber conversion**. La unidad gana la unidad de la que deriva y
    un **factor decimal exacto de cuatro decimales, mayor que cero** —1 litro = 1000 mililitros—,
@@ -95,6 +94,12 @@ del dominio.
    (`company_id` opcional; sin el, la unidad es de sistema y vale para todas), lo que **absorbio y
    cancelo QC-51**. Detalle y las 30 decisiones cerradas en
    `specs/QC-76-equivalencia-y-ambito-de-unidades/requirements.md`.
+   **CORREGIDA el 2026-09-22 (QC-147): la linea de receta deja de tener unidad propia.** Pasa a
+   llevar un **porcentaje** (`recipe_lines.percentage`, `DECIMAL(5,2)`, sin `unit_id`) sobre la
+   cantidad del pedido; la unidad que se muestra junto a cada linea es la del producto ingrediente
+   (`ProductRef.unitId`), no una columna de la propia linea. El producto sigue apuntando al
+   catalogo de unidades sin cambios. Detalle en
+   `specs/QC-147-cantidades-de-receta-en-porcentaje/requirements.md`.
 2. **Trazabilidad por lote.** ¿Se rastrea lote/batch y fecha de vencimiento? En quimicos
    suele ser obligatorio por normativa, y retrofitear lotes sobre un inventario que solo
    guarda totales es de las migraciones mas dolorosas que existen.

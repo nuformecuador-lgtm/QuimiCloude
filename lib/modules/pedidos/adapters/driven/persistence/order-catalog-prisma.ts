@@ -64,6 +64,7 @@ type AssignedOrderSummaryRow = {
   readonly quantity: { toFixed(digits: number): string };
   readonly priority: string;
   readonly status: string;
+  readonly presentationId: string | null;
 };
 
 /** `quantity` llega como `Prisma.Decimal` -tipado aqui por su forma minima para no importar
@@ -76,6 +77,7 @@ export function toAssignedOrderSummary(row: AssignedOrderSummaryRow): AssignedOr
     quantity: row.quantity.toFixed(4),
     priority: row.priority as AssignedOrderSummary['priority'],
     status: row.status as OrderStatus,
+    presentationId: row.presentationId,
   };
 }
 
@@ -112,6 +114,7 @@ export async function listAliveOrderSummariesByIds(
         quantity: true,
         priority: true,
         status: true,
+        presentationId: true,
       },
       orderBy: [
         { priority: 'desc' },

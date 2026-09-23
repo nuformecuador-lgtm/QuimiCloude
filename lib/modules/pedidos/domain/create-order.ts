@@ -1,12 +1,17 @@
 import { requirePermission, type Actor } from './actor';
-import { DuplicateOrderNumberError, RecipeNotFoundError, ValidationError } from './errors';
+import {
+  DuplicateOrderNumberError,
+  PresentationNotFoundError,
+  RecipeNotFoundError,
+  ValidationError,
+} from './errors';
 import { DEFAULT_ORDER_STATUS } from './order-classification';
 import { createOrderSchema, type EditableOrderStatus } from './order-input';
 import { formatOrderNumber, type OrderNumber } from './order-number';
 import { resolveIngredientsCost } from './resolve-ingredients-cost';
 import type { OrderScope } from './order-scope';
 
-import type { ProductCatalog } from '@/lib/modules/inventario';
+import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
@@ -38,6 +43,10 @@ export type CreateOrderDeps = {
   readonly products: ProductCatalog;
   /** Contrato PUBLICO de `unidades`: las conversiones con las que se normaliza cantidad y coste. */
   readonly units: UnitCatalog;
+  /** Contrato PUBLICO de `inventario`: la presentacion que se elige, solo para comprobar que
+   *  existe en la empresa de quien escribe. No se le pasa al coste: la presentacion no cambia
+   *  nada de lo que se calcula. */
+  readonly presentations: PresentationCatalog;
   /**
    * El reloj entra INYECTADO -mismo patron que `recetas` y `proveedores`- para que el test
    * lo pueda fijar sin tocar el reloj global. Aqui NO se lee `next/headers` ni ninguna
@@ -95,6 +104,11 @@ export function createCreateOrder(
     // R25 en `update-order.ts`).
     const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId], actor.companyId);
     if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
+
+    // La presentacion tiene que existir en el catalogo de la EMPRESA de quien escribe. Un id
+    // que no vuelve es indistinguible de uno de otra empresa (`PresentationCatalog.findRefs`).
+    const [presentation] = await deps.presentations.findRefs([data.presentationId], actor.companyId);
+    if (presentation === undefined) throw new PresentationNotFoundError();
 
     const ingredientsCost = await resolveIngredientsCost(
       deps.recipes,

@@ -24,12 +24,14 @@ import {
 import { ORDER_QUERYABLE } from '@/lib/modules/pedidos/domain/order-queryable'
 
 const RECIPE_ID = '11111111-1111-4111-8111-111111111111'
+const PRESENTATION_ID = '22222222-2222-4222-8222-222222222222'
 
 /** Un alta valida, para mutarla campo a campo en cada caso. */
 function altaValida(): Record<string, unknown> {
   return {
     recipeId: RECIPE_ID,
     quantity: '12.5000',
+    presentationId: PRESENTATION_ID,
   }
 }
 
@@ -71,6 +73,16 @@ describe('pedidos — createOrderSchema (alta)', () => {
     expect(parsed).not.toHaveProperty('unitPrice')
   })
 
+  it('R6: rechaza la presentacion ausente o con forma que no es un uuid', () => {
+    for (const presentationId of [undefined, '', 'no-es-uuid', null, 123]) {
+      expect(
+        createOrderSchema.safeParse({ ...altaValida(), presentationId }).success,
+        `presentationId=${String(presentationId)}`,
+      ).toBe(false)
+    }
+    expect(createOrderSchema.safeParse(altaValida()).success).toBe(true)
+  })
+
   it('rechaza la receta ausente o con forma que no es un uuid', () => {
     // R15 en su mitad de BORDE: aqui solo se valida la forma; la existencia y la vigencia las
     // comprueba el caso de uso por el contrato publico de `recetas`.
@@ -110,7 +122,7 @@ describe('pedidos — createOrderSchema (alta)', () => {
       createdBy: '33333333-3333-4333-8333-333333333333',
       updatedBy: '33333333-3333-4333-8333-333333333333',
     })
-    expect(Object.keys(parsed).sort()).toEqual(['priority', 'quantity', 'recipeId'])
+    expect(Object.keys(parsed).sort()).toEqual(['presentationId', 'priority', 'quantity', 'recipeId'])
     expect(parsed).not.toHaveProperty('status')
     expect(parsed).not.toHaveProperty('cancellationReason')
     expect(parsed).not.toHaveProperty('orderYear')
@@ -140,6 +152,7 @@ describe('pedidos — updateOrderSchema (edicion)', () => {
       expect(parsed.status).toBe(status)
     }
     expect(Object.keys(updateOrderSchema.parse(edicionValida)).sort()).toEqual([
+      'presentationId',
       'priority',
       'quantity',
       'recipeId',
@@ -171,6 +184,16 @@ describe('pedidos — updateOrderSchema (edicion)', () => {
         `status=${String(status)}`,
       ).toBe(false)
     }
+  })
+
+  it('R7: la edicion exige presentacion, con las mismas reglas que el alta', () => {
+    for (const presentationId of [undefined, '', 'no-es-uuid', null]) {
+      expect(
+        updateOrderSchema.safeParse({ ...edicionValida, presentationId }).success,
+        `presentationId=${String(presentationId)}`,
+      ).toBe(false)
+    }
+    expect(updateOrderSchema.safeParse(edicionValida).success).toBe(true)
   })
 
   it('hereda del alta la regla de la cantidad', () => {

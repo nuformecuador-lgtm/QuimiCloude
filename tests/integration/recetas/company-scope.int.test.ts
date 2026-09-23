@@ -376,22 +376,6 @@ async function quimicloudId(tx: Prisma.TransactionClient): Promise<string> {
   return (filas[0] as { id: string }).id
 }
 
-/** `company_id` nulo: vale para cualquier empresa. */
-async function crearUnidadDeSistema(
-  tx: Prisma.TransactionClient,
-  marcador: string,
-): Promise<string> {
-  const unit = await tx.unit.create({
-    data: {
-      name: `Unidad ${marcador}`,
-      nameNormalized: `unidad${marcador}`,
-      symbol: `u${marcador.slice(0, 8)}`,
-      companyId: null,
-    },
-    select: { id: true },
-  })
-  return unit.id
-}
 
 async function crearProducto(
   tx: Prisma.TransactionClient,
@@ -423,10 +407,9 @@ async function crearLineaDeReceta(
   tx: Prisma.TransactionClient,
   recipeId: string,
   productId: string,
-  unitId: string,
 ): Promise<string> {
   const line = await tx.recipeLine.create({
-    data: { recipeId, productId, quantity: new Prisma.Decimal('1.0000'), unitId },
+    data: { recipeId, productId, percentage: new Prisma.Decimal('100.00') },
     select: { id: true },
   })
   return line.id
@@ -635,10 +618,9 @@ describe('R2 — recipe_lines no gana columna de empresa, y cae con su receta', 
     await inRolledBackTransaction(async (tx) => {
       const marcador = token()
       const companyId = await crearEmpresa(tx, marcador)
-      const unitId = await crearUnidadDeSistema(tx, marcador)
       const productId = await crearProducto(tx, marcador, companyId)
       const recipeId = await crearReceta(tx, companyId, `receta${marcador}`)
-      const lineId = await crearLineaDeReceta(tx, recipeId, productId, unitId)
+      const lineId = await crearLineaDeReceta(tx, recipeId, productId)
 
       await tx.recipe.delete({ where: { id: recipeId } })
 
@@ -917,10 +899,9 @@ describe('R29 — dar de baja logica una empresa no vacia ni altera sus recetas 
     await inRolledBackTransaction(async (tx) => {
       const marcador = token()
       const companyId = await crearEmpresa(tx, marcador)
-      const unitId = await crearUnidadDeSistema(tx, marcador)
       const productId = await crearProducto(tx, marcador, companyId)
       const recipeId = await crearReceta(tx, companyId, `receta${marcador}`)
-      const lineId = await crearLineaDeReceta(tx, recipeId, productId, unitId)
+      const lineId = await crearLineaDeReceta(tx, recipeId, productId)
 
       await tx.company.update({ where: { id: companyId }, data: { deletedAt: new Date() } })
 
@@ -933,9 +914,9 @@ describe('R29 — dar de baja logica una empresa no vacia ni altera sus recetas 
 
       const linea = await tx.recipeLine.findUniqueOrThrow({
         where: { id: lineId },
-        select: { recipeId: true, productId: true, unitId: true },
+        select: { recipeId: true, productId: true },
       })
-      expect(linea).toEqual({ recipeId, productId, unitId })
+      expect(linea).toEqual({ recipeId, productId })
       expect(await tx.recipeLine.count({ where: { recipeId } })).toBe(1)
 
       const empresa = await tx.company.findUniqueOrThrow({

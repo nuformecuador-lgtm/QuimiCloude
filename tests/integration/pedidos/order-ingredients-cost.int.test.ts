@@ -46,6 +46,7 @@ import {
   findRecipeIdsMatchingName,
   findRecipeRefsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma'
+import { findPresentationRefs } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma'
 import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma'
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
@@ -53,7 +54,7 @@ import { prisma } from '@/lib/shared/db/prisma'
 import { createCreateOrder, createUpdateOrder } from '@/lib/modules/pedidos'
 
 import type { Actor, NewOrder, OrderScope } from '@/lib/modules/pedidos'
-import type { ProductCatalog } from '@/lib/modules/inventario'
+import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-batch'
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
@@ -94,6 +95,8 @@ const recipes: RecipeCatalog = {
 }
 
 const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches }
+
+const presentations: PresentationCatalog = { findRefs: findPresentationRefs }
 
 const units: UnitCatalog = {
   findRefs: findUnitRefs,
@@ -234,13 +237,16 @@ async function crearProductoConLote(
   return { productId: creado.id, batchId: creado.batchId }
 }
 
-async function crearReceta(empresa: Empresa, productId: string, quantity: string): Promise<string> {
+/** Una receta con una unica linea al 100 %: la cantidad necesaria queda igual a la del
+ *  pedido. La unidad del insumo ya no la guarda la receta: sale de `products.unit_id`, que
+ *  el disparador de existencia fija al primer lote sembrado. */
+async function crearReceta(empresa: Empresa, productId: string): Promise<string> {
   const creada = await createRecipe(
     {
       name: `Receta ${token()}`,
       description: null,
       steps: [],
-      lines: [{ productId, quantity, unitId }],
+      lines: [{ productId, percentage: '100.00' }],
       imagePath: null,
     },
     empresa.actorId,
@@ -301,15 +307,15 @@ async function fotoDeInventario(
 describe('el alta lo deja guardado en la fila (R10)', () => {
   it('calcula el coste con los lotes vigentes y lo persiste en `ingredients_cost`', async () => {
     const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
-    const recipeId = await crearReceta(A, productId, '2.0000')
+    const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ orders, recipes, products, units, now: () => new Date('2026-05-01T12:00:00.000Z') })
-      const creado = await alta({ recipeId, quantity: '3.0000', priority: 'MEDIA' }, actorDe(A))
+      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now: () => new Date('2026-05-01T12:00:00.000Z') })
+      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
 
-      // necesaria = 2.0000 * 3.0000 = 6.0000, cubierta por el unico lote (stock 10, coste 5.0000).
+      // necesaria = 6.0000 * 100 % = 6.0000, cubierta por el unico lote (stock 10, coste 5.0000).
       // importe = 6.0000 * 5.0000 = 30.0000.
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
     } finally {
@@ -323,27 +329,27 @@ describe('el alta lo deja guardado en la fila (R10)', () => {
 describe('la edicion lo reescribe, incluso a nulo (R11)', () => {
   it('recalcula con los lotes de hoy, y deja el importe en NULL cuando ya no cubre', async () => {
     const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
-    const recipeId = await crearReceta(A, productId, '2.0000')
+    const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null
 
     try {
       const now = () => new Date('2026-05-02T12:00:00.000Z')
-      const alta = createCreateOrder({ orders, recipes, products, units, now })
-      const edicion = createUpdateOrder({ orders, recipes, products, units, now })
+      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now })
+      const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, now })
 
-      const creado = await alta({ recipeId, quantity: '2.0000', priority: 'MEDIA' }, actorDe(A))
+      const creado = await alta({ recipeId, quantity: '4.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
-      // necesaria = 2 * 2 = 4, cubierta -> 4 * 5 = 20.0000.
+      // necesaria = 4 * 100 % = 4, cubierta -> 4 * 5 = 20.0000.
       expect(await ingredientsCostCrudo(orderId)).toBe('20.0000')
 
       // Edicion #1: sube la cantidad sin desbordar la existencia. Recalcula a OTRO numero.
-      const editadoInput: NewOrder = { recipeId, quantity: '4.0000', priority: 'MEDIA', status: 'PENDIENTE' }
+      const editadoInput: NewOrder = { recipeId, quantity: '8.0000', priority: 'MEDIA', status: 'PENDIENTE', presentationId: A.presentationId }
       await edicion(orderId, editadoInput, actorDe(A))
-      // necesaria = 2 * 4 = 8, cubierta (stock 10) -> 8 * 5 = 40.0000.
+      // necesaria = 8 * 100 % = 8, cubierta (stock 10) -> 8 * 5 = 40.0000.
       expect(await ingredientsCostCrudo(orderId)).toBe('40.0000')
 
       // Edicion #2: sube la cantidad hasta que la existencia YA NO cubre -> sustituye por NULL.
-      const editadoSinCubrir: NewOrder = { recipeId, quantity: '100.0000', priority: 'MEDIA', status: 'PENDIENTE' }
+      const editadoSinCubrir: NewOrder = { recipeId, quantity: '200.0000', priority: 'MEDIA', status: 'PENDIENTE', presentationId: A.presentationId }
       await edicion(orderId, editadoSinCubrir, actorDe(A))
       expect(await ingredientsCostCrudo(orderId)).toBeNull()
     } finally {
@@ -357,12 +363,12 @@ describe('la edicion lo reescribe, incluso a nulo (R11)', () => {
 describe('comprar un lote despues no cambia el importe de un pedido ya creado (R12)', () => {
   it('un lote nuevo del mismo producto deja el importe guardado intacto', async () => {
     const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
-    const recipeId = await crearReceta(A, productId, '2.0000')
+    const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ orders, recipes, products, units, now: () => new Date('2026-05-03T12:00:00.000Z') })
-      const creado = await alta({ recipeId, quantity: '3.0000', priority: 'MEDIA' }, actorDe(A))
+      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now: () => new Date('2026-05-03T12:00:00.000Z') })
+      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 
@@ -388,12 +394,12 @@ describe('comprar un lote despues no cambia el importe de un pedido ya creado (R
 describe('un pedido anterior a la columna sigue sin importe (R8, R13)', () => {
   it('con `ingredients_cost` en NULL por fuera de la aplicacion, leerlo no lo recalcula', async () => {
     const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
-    const recipeId = await crearReceta(A, productId, '2.0000')
+    const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ orders, recipes, products, units, now: () => new Date('2026-05-05T12:00:00.000Z') })
-      const creado = await alta({ recipeId, quantity: '3.0000', priority: 'MEDIA' }, actorDe(A))
+      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now: () => new Date('2026-05-05T12:00:00.000Z') })
+      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 
@@ -446,12 +452,12 @@ describe('un lote de otra empresa no entra en el calculo (R21)', () => {
 describe('un pedido de otra empresa no se alcanza ni por identificador (R14, R21)', () => {
   it('la ficha de un pedido de A pedida desde Q es null, y desde A trae el importe', async () => {
     const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
-    const recipeId = await crearReceta(A, productId, '2.0000')
+    const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ orders, recipes, products, units, now: () => new Date('2026-05-06T12:00:00.000Z') })
-      const creado = await alta({ recipeId, quantity: '3.0000', priority: 'MEDIA' }, actorDe(A))
+      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now: () => new Date('2026-05-06T12:00:00.000Z') })
+      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
 
       expect(await orders.findAliveById(orderId, ambitoDe(Q))).toBeNull()
@@ -470,24 +476,24 @@ describe('un pedido de otra empresa no se alcanza ni por identificador (R14, R21
 describe('tras el alta y la edicion, los lotes y los asientos quedan intactos (R22)', () => {
   it('`product_batches` e `inventory_movements` de la empresa son byte a byte iguales', async () => {
     const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
-    const recipeId = await crearReceta(A, productId, '2.0000')
+    const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null
 
     try {
       const antesDeAlta = await fotoDeInventario(A)
 
       const now = () => new Date('2026-05-07T12:00:00.000Z')
-      const alta = createCreateOrder({ orders, recipes, products, units, now })
-      const edicion = createUpdateOrder({ orders, recipes, products, units, now })
+      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now })
+      const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, now })
 
-      const creado = await alta({ recipeId, quantity: '3.0000', priority: 'MEDIA' }, actorDe(A))
+      const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
 
       const despuesDeAlta = await fotoDeInventario(A)
       expect(despuesDeAlta.batches).toBe(antesDeAlta.batches)
       expect(despuesDeAlta.movements).toBe(antesDeAlta.movements)
 
-      const editado: NewOrder = { recipeId, quantity: '4.0000', priority: 'ALTA', status: 'PENDIENTE' }
+      const editado: NewOrder = { recipeId, quantity: '8.0000', priority: 'ALTA', status: 'PENDIENTE', presentationId: A.presentationId }
       await edicion(orderId, editado, actorDe(A))
 
       const despuesDeEdicion = await fotoDeInventario(A)
@@ -506,15 +512,15 @@ describe('el pedido queda creado con el importe en blanco y la base no lanza 220
     // Un lote al maximo de `Decimal(14,4)`: la linea necesita exactamente ese stock, asi que
     // el importe es `necesaria * unit_cost`, muy por encima de lo que la columna admite.
     const { productId } = await crearProductoConLote(A, { stock: '100', unitCost: '9999999999.9999' })
-    const recipeId = await crearReceta(A, productId, '10.0000')
+    const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ orders, recipes, products, units, now: () => new Date('2026-05-08T12:00:00.000Z') })
+      const alta = createCreateOrder({ orders, recipes, products, units, presentations, now: () => new Date('2026-05-08T12:00:00.000Z') })
 
-      // necesaria = 10 * 10 = 100, cubierta EXACTAMENTE por el lote (stock 100).
+      // necesaria = 100 * 100 % = 100, cubierta EXACTAMENTE por el lote (stock 100).
       // importe = 100 * 9999999999.9999 = 999999999999.9900, muy por encima de 9999999999.9999.
-      const creado = await alta({ recipeId, quantity: '10.0000', priority: 'MEDIA' }, actorDe(A))
+      const creado = await alta({ recipeId, quantity: '100.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
 
       expect(await ingredientsCostCrudo(orderId)).toBeNull()

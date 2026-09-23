@@ -1,11 +1,16 @@
 import { requirePermission, type Actor } from './actor';
-import { OrderNotFoundError, RecipeNotFoundError, ValidationError } from './errors';
+import {
+  OrderNotFoundError,
+  PresentationNotFoundError,
+  RecipeNotFoundError,
+  ValidationError,
+} from './errors';
 import { updateOrderSchema } from './order-input';
 import type { OrderScope } from './order-scope';
 import { assertTransition } from './order-transitions';
 import { resolveIngredientsCost } from './resolve-ingredients-cost';
 
-import type { ProductCatalog } from '@/lib/modules/inventario';
+import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
@@ -19,6 +24,8 @@ export type UpdateOrderDeps = {
   readonly recipes: RecipeCatalog;
   readonly products: ProductCatalog;
   readonly units: UnitCatalog;
+  /** Ver el comentario identico de `create-order.ts` sobre por que no se le pasa al coste. */
+  readonly presentations: PresentationCatalog;
   /** Ver el comentario identico de `create-order.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
 };
@@ -78,6 +85,12 @@ export function createUpdateOrder(
       const [recipe] = await deps.recipes.findRefsIncludingDeleted([data.recipeId], actor.companyId);
       if (recipe === undefined || recipe.isDeleted) throw new RecipeNotFoundError();
     }
+
+    // La presentacion se comprueba SIEMPRE, cambie o no -es una consulta de un id y evita una
+    // rama «si cambio» que habria que probar aparte. Con un pedido viejo sin presentacion,
+    // `row.presentationId` es `null` y la entrada trae una: la comprobacion es la misma.
+    const [presentation] = await deps.presentations.findRefs([data.presentationId], actor.companyId);
+    if (presentation === undefined) throw new PresentationNotFoundError();
 
     // El coste se recalcula con la receta del DATO ENTRANTE, no con la de la fila vieja: una
     // edicion que solo cambia la cantidad o la prioridad tambien reescribe el importe con los

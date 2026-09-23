@@ -34,6 +34,7 @@ import { Prisma } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
+import { normalizePresentationName } from '@/lib/modules/inventario';
 import { createOrder } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -58,12 +59,17 @@ function instantIn(year: number): Date {
 
 let recetaId: string;
 let recetaCompanyId: string;
+/** Unidad de SISTEMA compartida: `presentations.unit_id` es obligatoria y sirve a todos los
+ *  fixtures de este archivo. */
+let unitId: string;
 
 type Fixture = {
   readonly companyId: string;
   readonly actorId: string;
   readonly roleId: string;
   readonly documentTypeCode: string;
+  /** QC-146: presentacion de la MISMA empresa, obligatoria en `NewOrder`. */
+  readonly presentationId: string;
 };
 
 async function createFixture(): Promise<Fixture> {
@@ -99,29 +105,47 @@ async function createFixture(): Promise<Fixture> {
     },
     select: { id: true },
   });
+  const presentation = await prisma.presentation.create({
+    data: {
+      name: `Bidon ${marca}`,
+      nameNormalized: normalizePresentationName(`Bidon ${marca}`),
+      unitId,
+      companyId: company.id,
+    },
+    select: { id: true },
+  });
   return {
     companyId: company.id,
     actorId: user.id,
     roleId: role.id,
     documentTypeCode: documentType.code,
+    presentationId: presentation.id,
   };
 }
 
 async function dropFixture(fixture: Fixture): Promise<void> {
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
+  await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
   await prisma.user.deleteMany({ where: { id: fixture.actorId } });
   await prisma.role.deleteMany({ where: { id: fixture.roleId } });
   await prisma.documentType.deleteMany({ where: { code: fixture.documentTypeCode } });
   await prisma.company.deleteMany({ where: { id: fixture.companyId } });
 }
 
-function pedido(overrides: Partial<NewOrder> = {}): NewOrder {
-  return { recipeId: recetaId, quantity: '10.0000', priority: 'BAJA', status: 'PENDIENTE', ...overrides };
+function pedido(presentationId: string, overrides: Partial<NewOrder> = {}): NewOrder {
+  return {
+    recipeId: recetaId,
+    quantity: '10.0000',
+    priority: 'BAJA',
+    status: 'PENDIENTE',
+    presentationId,
+    ...overrides,
+  };
 }
 
 async function alta(fixture: Fixture, year: number, overrides: Partial<NewOrder> = {}): Promise<OrderRow> {
   const resultado = await createOrder(
-    pedido(overrides),
+    pedido(fixture.presentationId, overrides),
     year,
     fixture.actorId,
     instantIn(year),
@@ -162,6 +186,12 @@ function sqlStateOf(error: unknown): string {
 
 beforeAll(async () => {
   const marca = token();
+  unitId = (
+    await prisma.unit.create({
+      data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `kg${marca}` },
+      select: { id: true },
+    })
+  ).id;
   // La receta es compartida por todos los fixtures de este archivo —cada caso siembra su propia
   // empresa efimera para el pedido—, asi que se ancla a una empresa efimera propia: QC-50 hizo
   // `recipes.company_id` obligatoria.
@@ -181,6 +211,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await prisma.recipe.deleteMany({ where: { id: recetaId } });
   await prisma.company.deleteMany({ where: { id: recetaCompanyId } });
+  await prisma.unit.deleteMany({ where: { id: unitId } });
   await prisma.$disconnect();
 });
 

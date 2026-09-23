@@ -562,10 +562,13 @@ function seedsYearSequencesWithSetval(sql: string): boolean {
  */
 function ordersConstraintsBefore(exclude: string): ReadonlyMap<string, string> {
   const vivas = new Map<string, string>()
-  const dirs = readdirSync(migrationsDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && !entry.name.endsWith(exclude))
+  // Solo las ANTERIORES: una FK que otra ficha anada despues no es «previa» a esta migracion.
+  const todas = readdirSync(migrationsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort()
+  const propia = todas.findIndex((name) => name.endsWith(exclude))
+  const dirs = propia === -1 ? todas : todas.slice(0, propia)
   for (const dir of dirs) {
     let sql: string
     try {

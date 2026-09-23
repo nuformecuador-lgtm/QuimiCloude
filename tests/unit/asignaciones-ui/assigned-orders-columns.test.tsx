@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   ASSIGNED_ORDER_ENTER_COLUMN_ID,
   ASSIGNED_ORDER_NUMBER_COLUMN_ID,
+  ASSIGNED_ORDER_PRESENTATION_COLUMN_ID,
   ASSIGNED_ORDER_PRIORITY_COLUMN_ID,
   ASSIGNED_ORDER_QUANTITY_COLUMN_ID,
   ASSIGNED_ORDER_RECIPE_NAME_COLUMN_ID,
@@ -29,6 +30,7 @@ const BASE_ORDER: AssignedOrderView = {
   otherResponsibles: [
     { userId: 'user-2', displayName: 'Ana López García', origin: { kind: 'direct' } },
   ],
+  presentationName: 'Caja x 12',
 };
 
 function renderCell(columnId: string, order: AssignedOrderView) {
@@ -38,14 +40,15 @@ function renderCell(columnId: string, order: AssignedOrderView) {
   return render(<>{column.cell(order)}</>);
 }
 
-describe('las SIETE columnas, en el orden de design.md > 8.2', () => {
-  it('declara exactamente Numero, Receta, Cantidad, Prioridad, Estado, Responsables y Entrar', () => {
+describe('las OCHO columnas, en el orden de design.md > 6.4', () => {
+  it('declara exactamente Numero, Receta, Cantidad, Presentacion, Prioridad, Estado, Responsables y Entrar', () => {
     const columns = buildAssignedOrdersColumns();
 
     expect(columns.map((column) => column.id)).toEqual([
       ASSIGNED_ORDER_NUMBER_COLUMN_ID,
       ASSIGNED_ORDER_RECIPE_NAME_COLUMN_ID,
       ASSIGNED_ORDER_QUANTITY_COLUMN_ID,
+      ASSIGNED_ORDER_PRESENTATION_COLUMN_ID,
       ASSIGNED_ORDER_PRIORITY_COLUMN_ID,
       ASSIGNED_ORDER_STATUS_COLUMN_ID,
       ASSIGNED_ORDER_RESPONSIBLES_COLUMN_ID,
@@ -93,6 +96,22 @@ describe('la cantidad se pinta TAL CUAL (cadena, no formateada)', () => {
     renderCell(ASSIGNED_ORDER_QUANTITY_COLUMN_ID, { ...BASE_ORDER, quantity: '12.500' });
 
     expect(screen.getByText('12.500')).toBeInTheDocument();
+  });
+});
+
+describe('R24: columna Presentación', () => {
+  it('con presentationName pinta el nombre', () => {
+    renderCell(ASSIGNED_ORDER_PRESENTATION_COLUMN_ID, BASE_ORDER);
+
+    const label = screen.getByTestId('order-presentation');
+    expect(label).toHaveTextContent('Caja x 12');
+  });
+
+  it('con presentationName null pinta «Sin presentación»', () => {
+    renderCell(ASSIGNED_ORDER_PRESENTATION_COLUMN_ID, { ...BASE_ORDER, presentationName: null });
+
+    const label = screen.getByTestId('order-presentation');
+    expect(label).toHaveTextContent('Sin presentación');
   });
 });
 

@@ -8,6 +8,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ORDER_EXECUTION_ORDER_ID_FIELD,
+  ORDER_EXECUTION_ORDER_QUANTITY_TESTID,
+  ORDER_EXECUTION_PRESENTATION_TESTID,
   ORDER_EXECUTION_RECIPE_NAME_TESTID,
   ORDER_EXECUTION_SCREEN_TESTID,
   OrderExecutionScreen,
@@ -47,8 +49,6 @@ const EXECUTION: AssignedOrderExecutionView = {
   status: 'EN_CURSO',
   recipeName: 'Barniz acrílico',
   orderQuantity: '250',
-  recipeBaseQuantity: null,
-  scaleFactorText: null,
   steps: [
     {
       blocks: [
@@ -60,11 +60,13 @@ const EXECUTION: AssignedOrderExecutionView = {
   lines: [
     {
       productName: 'Resina acrílica',
+      percentage: '10.00',
       quantity: '10',
       unit: LITRO,
       alternativeUnits: [MILILITRO],
     },
   ],
+  presentationName: 'Caja x 12',
 };
 
 function marcarTodo(): void {
@@ -89,18 +91,41 @@ const EXECUTION_DOS_PASOS: AssignedOrderExecutionView = {
   ],
 };
 
-describe('pantalla de ejecucion — R21: el factor y las cantidades tal cual estan escritas', () => {
+describe('pantalla de ejecucion — sin factor de escala, con la cantidad de la linea ya calculada', () => {
   it('muestra la cantidad del pedido y la cantidad de la linea CARACTER A CARACTER', () => {
     render(<OrderExecutionScreen execution={EXECUTION} />);
 
     expect(screen.getByText(new RegExp(EXECUTION.orderQuantity))).toBeVisible();
-    expect(screen.getByText(EXECUTION.lines[0]!.quantity, { exact: false })).toBeVisible();
+    expect(screen.getByTestId('order-execution-line-quantity-0')).toHaveTextContent(
+      EXECUTION.lines[0]!.quantity,
+    );
   });
+});
 
-  it('sin cantidad base de receta no pinta ningun factor inventado', () => {
+describe('pantalla de ejecucion — QC-147 R19: sin ningun factor de escala', () => {
+  it('no monta ningun banner ni factor de escala: `order-scale-banner` se borro', () => {
     render(<OrderExecutionScreen execution={EXECUTION} />);
 
+    expect(screen.queryByTestId('order-scale-banner')).toBeNull();
     expect(screen.queryByTestId('order-scale-banner-factor')).toBeNull();
+  });
+});
+
+describe('pantalla de ejecucion — QC-147 R26: la cantidad del pedido en su propia linea', () => {
+  it('pinta "Pedido 250" en un elemento propio con su testid, fuera de la lista de lineas', () => {
+    render(<OrderExecutionScreen execution={EXECUTION} />);
+
+    const cantidadPedido = screen.getByTestId(ORDER_EXECUTION_ORDER_QUANTITY_TESTID);
+    expect(cantidadPedido).toHaveTextContent('Pedido 250');
+    expect(cantidadPedido.closest('[data-testid="order-execution-lines"]')).toBeNull();
+  });
+
+  it('pinta "Pedido 200" cuando la cantidad del pedido llega con ceros de relleno', () => {
+    render(<OrderExecutionScreen execution={{ ...EXECUTION, orderQuantity: '200.0000' }} />);
+
+    expect(screen.getByTestId(ORDER_EXECUTION_ORDER_QUANTITY_TESTID)).toHaveTextContent(
+      'Pedido 200',
+    );
   });
 });
 
@@ -228,6 +253,33 @@ describe('pantalla de ejecucion — R18: el envio no lleva la espera y remontar 
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('pantalla de ejecucion — R25: muestra la presentación o Sin presentación', () => {
+  it('con presentationName pinta el nombre en su propia linea', () => {
+    render(<OrderExecutionScreen execution={EXECUTION} />);
+
+    const linea = screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID);
+    expect(linea).toHaveTextContent('Presentación:');
+    expect(linea).toHaveTextContent('Caja x 12');
+  });
+
+  it('con presentationName null pinta «Sin presentación»', () => {
+    render(<OrderExecutionScreen execution={{ ...EXECUTION, presentationName: null }} />);
+
+    expect(screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID)).toHaveTextContent(
+      'Sin presentación',
+    );
+  });
+});
+
+describe('pantalla de ejecucion — R26: no hay ningún control de presentación', () => {
+  it('la linea de presentación no ofrece ningun boton, enlace ni campo de edicion', () => {
+    render(<OrderExecutionScreen execution={EXECUTION} />);
+
+    const linea = screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID);
+    expect(linea.querySelectorAll('button, a, input, select, textarea')).toHaveLength(0);
   });
 });
 

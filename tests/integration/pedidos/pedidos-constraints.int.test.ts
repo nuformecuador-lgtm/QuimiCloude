@@ -68,6 +68,7 @@ import { Prisma } from '@prisma/client'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { normalizeCompanyName } from '@/lib/modules/identity'
+import { normalizePresentationName } from '@/lib/modules/inventario'
 import { prisma } from '@/lib/shared/db/prisma'
 
 // ---------------------------------------------------------------------------
@@ -193,6 +194,24 @@ async function createUnit(tx: Prisma.TransactionClient): Promise<string> {
   return unit.id
 }
 
+/** Crea una presentacion del catalogo de `inventario`, de la empresa dada. Necesita su propia
+ *  unidad porque `presentations.unit_id` es obligatoria. */
+async function createPresentation(tx: Prisma.TransactionClient, companyId: string): Promise<string> {
+  const marca = token()
+  const unitId = await createUnit(tx)
+  const name = `Bidon ${marca}`
+  const presentation = await tx.presentation.create({
+    data: {
+      name,
+      nameNormalized: normalizePresentationName(name),
+      unitId,
+      companyId,
+    },
+    select: { id: true },
+  })
+  return presentation.id
+}
+
 /**
  * Crea un usuario completo con su tipo de documento y su rol propios. Los nombres y codigos
  * se aleatorizan porque `roles.name` es unico global y `users` tiene indices unicos parciales
@@ -247,6 +266,9 @@ interface Fixtures {
   readonly unitId: string
   readonly recipeId: string
   readonly userId: string
+  /** Presentacion de la MISMA empresa que el pedido, lista para el describe «la presentacion
+   *  del pedido». */
+  readonly presentationId: string
 }
 
 /**
@@ -284,12 +306,14 @@ async function seedFixtures(tx: Prisma.TransactionClient): Promise<Fixtures> {
     select: { id: true },
   })
   const userId = await createUser(tx)
+  const presentationId = await createPresentation(tx, company.id)
   return {
     companyId: company.id,
     productId: product.id,
     unitId,
     recipeId: recipe.id,
     userId,
+    presentationId,
   }
 }
 
@@ -306,6 +330,7 @@ interface OrderSeed {
   readonly priority?: OrderPriorityValue
   readonly createdBy?: string | null
   readonly updatedBy?: string | null
+  readonly presentationId?: string | null
 }
 
 /**
@@ -326,6 +351,7 @@ async function createOrder(tx: Prisma.TransactionClient, seed: OrderSeed): Promi
       priority: seed.priority,
       createdBy: seed.createdBy ?? null,
       updatedBy: seed.updatedBy ?? null,
+      presentationId: seed.presentationId ?? null,
     },
     select: { id: true },
   })
@@ -346,6 +372,7 @@ type WritableColumn =
   | 'updated_by'
   | 'created_at'
   | 'deleted_at'
+  | 'presentation_id'
 
 /**
  * `INSERT` crudo en `orders`. `columns` decide que se escribe: omitir una entrada es
@@ -476,6 +503,10 @@ describe('el pedido como fila completa', () => {
       'ingredients_cost',
       'order_sequence',
       'order_year',
+      // `presentation_id` es el envase en que se entrega lo fabricado, opcional: no es un
+      // total, un impuesto ni un cliente. Entre `order_year` y `priority` por el mismo
+      // `sort()` lexicografico ('presentation' < 'priority').
+      'presentation_id',
       'priority',
       'quantity',
       'recipe_id',
@@ -1165,6 +1196,150 @@ describe('las cuatro fronteras que Prisma no declara', () => {
           FOREIGN_KEY_VIOLATION,
         )
       }
+    })
+  })
+})
+
+describe('la presentacion del pedido', () => {
+  it('R1: guarda y relee un pedido con una presentacion de su empresa', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      const id = await createOrder(tx, {
+        companyId: f.companyId,
+        recipeId: f.recipeId,
+        presentationId: f.presentationId,
+      })
+
+      const stored = await tx.order.findUniqueOrThrow({
+        where: { id },
+        select: { presentationId: true },
+      })
+      expect(stored.presentationId).toBe(f.presentationId)
+    })
+  })
+
+  it('R2: un pedido sin presentacion se acepta y se relee con ausencia de valor', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      const id = await createOrder(tx, { companyId: f.companyId, recipeId: f.recipeId })
+
+      const stored = await tx.order.findUniqueOrThrow({
+        where: { id },
+        select: { presentationId: true },
+      })
+      expect(stored.presentationId).toBeNull()
+    })
+  })
+
+  it('R3: rechaza una presentacion de otra empresa y una inexistente con 23503', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      const otra = await seedFixtures(tx)
+
+      const deOtraEmpresa = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertOrder(tx, {
+            ...baseColumns(f, freshSequence()),
+            presentation_id: asUuid(otra.presentationId),
+          }),
+        'pedido con presentacion de otra empresa',
+      )
+      expect(deOtraEmpresa).toBe(FOREIGN_KEY_VIOLATION)
+
+      const inexistente = await expectRejectedByDatabase(
+        tx,
+        () =>
+          rawInsertOrder(tx, {
+            ...baseColumns(f, freshSequence()),
+            presentation_id: asUuid(randomUUID()),
+          }),
+        'pedido con presentacion inexistente',
+      )
+      expect(inexistente).toBe(FOREIGN_KEY_VIOLATION)
+    })
+  })
+
+  /** Un unico pedido apuntando a `f.presentationId`, en el ESTADO que pide el caso, y la
+   *  afirmacion comun: el `DELETE` de la presentacion se rechaza con 23503 y las dos filas
+   *  quedan intactas. */
+  async function esperaRechazoDelBorradoConUnPedido(
+    tx: Prisma.TransactionClient,
+    f: Fixtures,
+    orderId: string,
+    etiqueta: string,
+  ): Promise<void> {
+    const rechazado = await expectRejectedByDatabase(
+      tx,
+      () =>
+        tx.$executeRaw`DELETE FROM "presentations" WHERE "id" = CAST(${f.presentationId} AS uuid)`,
+      `borrado de una presentacion usada por un pedido ${etiqueta}`,
+    )
+    expect(rechazado).toBe(FOREIGN_KEY_VIOLATION)
+
+    expect(await tx.presentation.count({ where: { id: f.presentationId } })).toBe(1)
+    const stored = await tx.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: { presentationId: true },
+    })
+    expect(stored.presentationId).toBe(f.presentationId)
+  }
+
+  it('R4: borrar una presentacion usada por un pedido vivo se rechaza con 23503 y deja las dos filas', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      const vivo = await createOrder(tx, {
+        companyId: f.companyId,
+        recipeId: f.recipeId,
+        presentationId: f.presentationId,
+      })
+
+      await esperaRechazoDelBorradoConUnPedido(tx, f, vivo, 'vivo')
+    })
+  })
+
+  it('R4: borrar una presentacion usada por un pedido CANCELADO se rechaza con 23503 y deja las dos filas', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      const cancelado = await createOrder(tx, {
+        companyId: f.companyId,
+        recipeId: f.recipeId,
+        presentationId: f.presentationId,
+      })
+      await tx.order.update({
+        where: { id: cancelado },
+        data: { status: 'CANCELADO', cancellationReason: 'motivo de prueba' },
+      })
+
+      await esperaRechazoDelBorradoConUnPedido(tx, f, cancelado, 'CANCELADO')
+    })
+  })
+
+  it('R4: borrar una presentacion usada por un pedido ENTREGADO se rechaza con 23503 y deja las dos filas', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      const entregado = await createOrder(tx, {
+        companyId: f.companyId,
+        recipeId: f.recipeId,
+        presentationId: f.presentationId,
+      })
+      await tx.order.update({ where: { id: entregado }, data: { status: 'ENTREGADO' } })
+
+      await esperaRechazoDelBorradoConUnPedido(tx, f, entregado, 'ENTREGADO')
+    })
+  })
+
+  it('R4: borrar una presentacion usada por un pedido dado de baja se rechaza con 23503 y deja las dos filas', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const f = await seedFixtures(tx)
+      const dadoDeBaja = await createOrder(tx, {
+        companyId: f.companyId,
+        recipeId: f.recipeId,
+        presentationId: f.presentationId,
+      })
+      await tx.order.update({ where: { id: dadoDeBaja }, data: { deletedAt: new Date() } })
+
+      await esperaRechazoDelBorradoConUnPedido(tx, f, dadoDeBaja, 'dado de baja')
     })
   })
 })

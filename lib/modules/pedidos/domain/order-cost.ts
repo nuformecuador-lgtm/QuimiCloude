@@ -4,13 +4,15 @@
 // quien orquesta (alta o edicion) y devuelve el importe, o `null` cuando no se puede calcular.
 
 import { compareBatchesOldestFirst, type CostingBatch, type ProductId } from '@/lib/modules/inventario'
+import { consumedQuantity } from '@/lib/modules/recetas'
 import { convertQuantity, IncompatibleUnitsError, type UnitConversion } from '@/lib/modules/unidades'
 
-/** Linea de receta, vista con lo minimo que este calculo necesita. */
+/** Linea de receta, vista con lo minimo que este calculo necesita. `unitId` es la del insumo
+ *  (`ProductRef.unitId`) y llega `null` cuando el producto todavia no tiene ningun lote. */
 export type RecipeCostLine = {
   readonly productId: ProductId
-  readonly quantity: string
-  readonly unitId: string
+  readonly percentage: string
+  readonly unitId: string | null
 }
 
 export type CostInput = {
@@ -93,17 +95,20 @@ function formatFixedOutputScale(unscaled: bigint): string {
 /** Coste (escalado a `INTERNAL_SCALE`) de un ingrediente, o `null` si no se puede componer. */
 function calculateLineCost(
   line: RecipeCostLine,
-  orderQuantityInternal: bigint,
+  orderQuantity: string,
   batches: readonly CostingBatch[],
   units: ReadonlyMap<string, UnitConversion>,
 ): bigint | null {
+  if (line.unitId === null) {
+    return null
+  }
   const lineUnit = units.get(line.unitId)
-  const lineQuantity = parseDecimal(line.quantity)
-  if (lineUnit === undefined || lineQuantity === null) {
+  const neededQuantity = parseDecimal(consumedQuantity(orderQuantity, line.percentage))
+  if (lineUnit === undefined || neededQuantity === null) {
     return null
   }
 
-  const neededInternal = multiplyInternal(toInternal(lineQuantity), orderQuantityInternal)
+  const neededInternal = toInternal(neededQuantity)
   if (neededInternal <= ZERO) {
     return ZERO
   }
@@ -166,15 +171,13 @@ export function calculateIngredientsCost(input: CostInput): string | null {
     return null
   }
 
-  const orderQuantity = parseDecimal(input.orderQuantity)
-  if (orderQuantity === null) {
+  if (parseDecimal(input.orderQuantity) === null) {
     return null
   }
-  const orderQuantityInternal = toInternal(orderQuantity)
 
   let totalInternal = ZERO
   for (const line of input.lines) {
-    const lineCostInternal = calculateLineCost(line, orderQuantityInternal, input.batches, input.units)
+    const lineCostInternal = calculateLineCost(line, input.orderQuantity, input.batches, input.units)
     if (lineCostInternal === null) {
       return null
     }

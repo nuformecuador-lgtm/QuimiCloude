@@ -48,6 +48,7 @@ function fila(status: OrderStatus): OrderRow {
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
     updatedBy: 'admin-0',
+    presentationId: null,
   }
 }
 
@@ -136,5 +137,13 @@ describe('deleteOrder — borrado logico (R31, R32, R33)', () => {
     expect(await codigoDelFallo(() => createDeleteOrder(d)(ORDER_ID, ADMIN))).toBe(
       'order_not_found',
     )
+  })
+
+  it('R11: un pedido sin presentación se da de baja', async () => {
+    const d = dobles({ fila: fila('PENDIENTE') })
+
+    await createDeleteOrder(d)(ORDER_ID, ADMIN)
+
+    expect(d.softDeleteAlive).toHaveBeenCalledTimes(1)
   })
 })

@@ -162,6 +162,7 @@ describe('QC-49 R19 — la empresa entra en la consulta y no sale hacia el naveg
       qtyAlert: new Prisma.Decimal(2),
       stock: new Prisma.Decimal(0),
       unitId: null,
+      type: 'PRODUCT',
       createdAt: new Date('2026-09-11T10:00:00.000Z'),
       updatedAt: new Date('2026-09-11T10:00:00.000Z'),
       companyId: AMBITO.companyId,
@@ -179,6 +180,7 @@ describe('QC-49 R19 — la empresa entra en la consulta y no sale hacia el naveg
       'name',
       'qtyAlert',
       'stock',
+      'type',
       'unitId',
       'updatedAt',
     ]);

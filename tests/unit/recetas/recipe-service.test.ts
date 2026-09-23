@@ -1,13 +1,15 @@
-// T6 — Los cinco casos de uso de receta, con dobles de los cuatro puertos (`design.md > 3`,
-// `> 6`, `> 7`, `> 9`; `tasks.md > T6`). Sin base de datos ni bucket: lo que se prueba
-// aqui es la DECISION que vive en `domain/`, no la implementacion Prisma/Supabase (T9-T11).
-// Cierra R5, R6, R11, R12, R13, R14, R15, R17, R18, R19, R21, R22, R26, R27, R33, R34, R36,
-// R37, R50.
+// Los cinco casos de uso de receta, con dobles de sus tres puertos. Sin base de datos ni
+// bucket: lo que se prueba aqui es la DECISION que vive en `domain/`, no la implementacion
+// Prisma/Supabase.
 
 import type { Actor } from '@/lib/modules/recetas/domain/actor';
 import { createCreateRecipe } from '@/lib/modules/recetas/domain/create-recipe';
 import { createDeleteRecipe } from '@/lib/modules/recetas/domain/delete-recipe';
-import { RecipeDuplicateNameError, RecipeNotFoundError } from '@/lib/modules/recetas/domain/errors';
+import {
+  RecipeDuplicateNameError,
+  RecipeNotFoundError,
+  UnauthorizedError,
+} from '@/lib/modules/recetas/domain/errors';
 import { createGetRecipe } from '@/lib/modules/recetas/domain/get-recipe';
 import { createListRecipes } from '@/lib/modules/recetas/domain/list-recipes';
 import { createUpdateRecipe } from '@/lib/modules/recetas/domain/update-recipe';
@@ -15,7 +17,6 @@ import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-imag
 import type { NewRecipe, RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
 import type { ProductCatalog, ProductRef } from '@/lib/modules/inventario';
-import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
 
 // QC-74 (R16, R18): el actor ya no lleva nombre de rol, lleva el conjunto de permisos.
 // Los dos codigos de `recetas`, que es lo que exigen los cinco casos de uso.
@@ -32,8 +33,7 @@ const UNIT_ID = '33333333-3333-4333-8333-333333333333';
 
 const LINEA_VALIDA = {
   productId: '11111111-1111-4111-8111-111111111111',
-  quantity: '10.5000',
-  unitId: UNIT_ID,
+  percentage: '100.00',
 };
 
 const RECETA_VALIDA = {
@@ -59,18 +59,15 @@ const FILA_RECETA: RecipeRow = {
   updatedBy: 'admin-1',
   createdAt: AHORA,
   updatedAt: AHORA,
-  lines: [{ id: 'linea-1', productId: LINEA_VALIDA.productId, quantity: '10.5000', unitId: UNIT_ID }],
+  lines: [{ id: 'linea-1', productId: LINEA_VALIDA.productId, percentage: '100.00' }],
 };
 
-// `stockByUnit` trae un lote en una unidad DISTINTA a la de `LINEA_VALIDA`: el detalle debe
-// mostrar «—» para esa linea, no la cantidad de otra unidad.
 const PRODUCTO_REF: ProductRef = {
   id: LINEA_VALIDA.productId,
   name: 'Acido sulfurico',
-  stockByUnit: [{ unitId: '55555555-5555-4555-8555-555555555555', quantity: '3.0000' }],
+  unitId: UNIT_ID,
+  stockByUnit: [{ unitId: UNIT_ID, quantity: '3.0000' }],
 };
-
-const UNIDAD_REF: UnitRef = { id: UNIT_ID, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null };
 
 function montarRepositorio(overrides: Partial<RecipeRepository> = {}): RecipeRepository {
   return {
@@ -93,24 +90,6 @@ function montarCatalogo(overrides: Partial<ProductCatalog> = {}): ProductCatalog
   };
 }
 
-/** Doble de `UnitCatalog` (R50): por defecto resuelve como existentes TODOS los `unitId`
- *  que se le pidan -mismo patron que `montarCatalogo` para `ProductCatalog`-. */
-function montarCatalogoUnidades(overrides: Partial<UnitCatalog> = {}): UnitCatalog {
-  return {
-    findRefs: vi.fn<UnitCatalog['findRefs']>(async (ids) =>
-      ids.map((id) => ({
-        id,
-        name: UNIDAD_REF.name,
-        symbol: UNIDAD_REF.symbol,
-        baseUnitId: null,
-        factor: null,
-      })),
-    ),
-    findRefsSharingBaseInCompany: vi.fn<UnitCatalog['findRefsSharingBaseInCompany']>(async () => []),
-    ...overrides,
-  };
-}
-
 function montarAlmacenamiento(overrides: Partial<RecipeImageStorage> = {}): RecipeImageStorage {
   return {
     upload: vi.fn<RecipeImageStorage['upload']>(async () => 'recetas/nueva.jpg'),
@@ -120,7 +99,7 @@ function montarAlmacenamiento(overrides: Partial<RecipeImageStorage> = {}): Reci
   };
 }
 
-// Bytes con firma JPEG valida, para que `validateRecipeImage` la acepte (T2).
+// Bytes con firma JPEG valida, para que `validateRecipeImage` la acepte.
 const JPEG_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0, 0, 0]);
 
 describe('R5, R6 — alta de receta', () => {
@@ -128,7 +107,7 @@ describe('R5, R6 — alta de receta', () => {
     const recipes = montarRepositorio();
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const createRecipe = createCreateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
+    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
 
     const resultado = await createRecipe(RECETA_VALIDA, ADMIN);
 
@@ -149,8 +128,8 @@ describe('R5, R6 — alta de receta', () => {
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
 
-    const createRecipe = createCreateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
-    const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
+    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
     const deleteRecipe = createDeleteRecipe({ recipes, now: () => AHORA });
 
     await createRecipe(RECETA_VALIDA, ADMIN);
@@ -180,7 +159,7 @@ describe('R5, R6 — alta de receta', () => {
     // El puerto `replaceAlive`/`softDeleteAlive` no expone `createdBy` en su firma (solo
     // `actorId`, que aqui es siempre el autor de la ULTIMA modificacion): la conservacion
     // real del autor de creacion a traves de un `UPDATE` la cierra el adaptador Prisma
-    // (T10) y el test de integracion contra Postgres real (T14), no este archivo.
+    // y el test de integracion contra Postgres real, no este archivo.
   });
 });
 
@@ -191,7 +170,7 @@ describe('R8 — nombre duplicado', () => {
     });
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const createRecipe = createCreateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
+    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
 
     await expect(createRecipe(RECETA_VALIDA, ADMIN)).rejects.toBeInstanceOf(RecipeDuplicateNameError);
   });
@@ -202,19 +181,19 @@ describe('R11 — la edicion recibe la lista final completa', () => {
     const recipes = montarRepositorio();
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
 
     const nuevaListaCompleta = {
       ...RECETA_VALIDA,
       lines: [
-        LINEA_VALIDA,
-        { productId: '22222222-2222-4222-8222-222222222222', quantity: '1.0000', unitId: UNIT_ID },
+        { productId: LINEA_VALIDA.productId, percentage: '60.00' },
+        { productId: '22222222-2222-4222-8222-222222222222', percentage: '40.00' },
       ],
     };
     // La segunda linea es "nueva": hace falta que el catalogo la reconozca para pasar.
     (products.findRefs as ReturnType<typeof vi.fn>).mockResolvedValue([
       PRODUCTO_REF,
-      { id: '22222222-2222-4222-8222-222222222222', name: 'Sosa caustica', unitId: null },
+      { id: '22222222-2222-4222-8222-222222222222', name: 'Sosa caustica', unitId: null, stockByUnit: [] },
     ]);
 
     await updateRecipe('receta-1', nuevaListaCompleta, ADMIN);
@@ -238,43 +217,11 @@ describe('R17 — producto inexistente', () => {
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => []),
     });
     const images = montarAlmacenamiento();
-    const createRecipe = createCreateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
+    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
 
     await expect(createRecipe(RECETA_VALIDA, ADMIN)).rejects.toThrow();
     expect(products.findRefs).toHaveBeenCalledWith([LINEA_VALIDA.productId], EMPRESA);
     expect(recipes.create).not.toHaveBeenCalled();
-  });
-});
-
-describe('R50 — unidad inexistente', () => {
-  it('rechaza la linea cuyo unitId no existe en el catalogo de unidades, sin crear nada', async () => {
-    const recipes = montarRepositorio();
-    const products = montarCatalogo();
-    const units = montarCatalogoUnidades({
-      findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []),
-    });
-    const images = montarAlmacenamiento();
-    const createRecipe = createCreateRecipe({ recipes, products, units, images, now: () => AHORA });
-
-    await expect(createRecipe(RECETA_VALIDA, ADMIN)).rejects.toThrow();
-    expect(units.findRefs).toHaveBeenCalledWith([LINEA_VALIDA.unitId], EMPRESA);
-    expect(recipes.create).not.toHaveBeenCalled();
-  });
-
-  it('en la edicion valida el unitId de TODAS las lineas finales, no solo de las nuevas', async () => {
-    const recipes = montarRepositorio();
-    const products = montarCatalogo();
-    const units = montarCatalogoUnidades({
-      findRefs: vi.fn<UnitCatalog['findRefs']>(async () => []),
-    });
-    const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, units, images, now: () => AHORA });
-
-    // La linea es la MISMA que ya trae `FILA_RECETA` (existing) -no es "nueva"- pero R50
-    // no exime a las lineas preexistentes: se valida igual.
-    await expect(updateRecipe('receta-1', RECETA_VALIDA, ADMIN)).rejects.toThrow();
-    expect(units.findRefs).toHaveBeenCalledWith([LINEA_VALIDA.unitId], EMPRESA);
-    expect(recipes.replaceAlive).not.toHaveBeenCalled();
   });
 });
 
@@ -283,8 +230,8 @@ describe('R21 — receta sin imagen', () => {
     const recipes = montarRepositorio();
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const createRecipe = createCreateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
-    const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
+    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
 
     await createRecipe(RECETA_VALIDA, ADMIN);
     await updateRecipe('receta-1', RECETA_VALIDA, ADMIN);
@@ -299,7 +246,7 @@ describe('R22 — sube la imagen a traves del puerto', () => {
     const recipes = montarRepositorio();
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const createRecipe = createCreateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
+    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
 
     await createRecipe({ ...RECETA_VALIDA, image: { bytes: JPEG_BYTES } }, ADMIN);
 
@@ -317,7 +264,7 @@ describe('R26 — reemplazo de imagen', () => {
     });
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
-    const updateRecipe = createUpdateRecipe({ recipes, products, units: montarCatalogoUnidades(), images, now: () => AHORA });
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
 
     const llamadas: string[] = [];
     (recipes.replaceAlive as ReturnType<typeof vi.fn>).mockImplementation(async () => {
@@ -361,7 +308,7 @@ describe('R27 — borrar la receta conserva su imagen', () => {
 });
 
 describe('R33 — la lista no trae lineas, el detalle si', () => {
-  it('la lista no trae lineas y el detalle si las trae con producto, cantidad y unidad', async () => {
+  it('la lista no trae lineas y el detalle si las trae con producto y porcentaje', async () => {
     const recipes = montarRepositorio();
     const products = montarCatalogo();
     const images = montarAlmacenamiento();
@@ -392,16 +339,15 @@ describe('R33 — la lista no trae lineas, el detalle si', () => {
         id: 'linea-1',
         productId: LINEA_VALIDA.productId,
         productName: PRODUCTO_REF.name,
-        quantity: '10.5000',
-        unitId: UNIT_ID,
-        // `PRODUCTO_REF.stockByUnit` no trae la unidad de esta linea: marcador de dato ausente.
-        productStock: null,
+        percentage: '100.00',
+        productUnitId: UNIT_ID,
+        productStock: '3.0000',
       },
     ]);
   });
 });
 
-describe('R12, R13, R14, R15 — existencia de la linea en su propia unidad', () => {
+describe('R14, R24 — existencia del insumo en SU PROPIA unidad', () => {
   function montarConProducto(ref: ProductRef | undefined) {
     const recipes = montarRepositorio();
     const products = montarCatalogo({
@@ -411,44 +357,143 @@ describe('R12, R13, R14, R15 — existencia de la linea en su propia unidad', ()
     return createGetRecipe({ recipes, products, images });
   }
 
-  it('R12: con un lote en la unidad de la linea, la existencia es esa cantidad', async () => {
+  it('R14: con un lote en la unidad del producto, el detalle devuelve esa unidad y esa existencia', async () => {
     const getRecipe = montarConProducto({
       id: LINEA_VALIDA.productId,
       name: 'Acido sulfurico',
+      unitId: UNIT_ID,
       stockByUnit: [{ unitId: UNIT_ID, quantity: '15.0000' }],
     });
 
     const detalle = await getRecipe('receta-1', ADMIN);
+    expect(detalle.lines[0].productUnitId).toBe(UNIT_ID);
     expect(detalle.lines[0].productStock).toBe('15.0000');
   });
 
-  it('R13: con lotes pero ninguno en la unidad de la linea, la existencia es null', async () => {
-    const getRecipe = montarConProducto({
-      id: LINEA_VALIDA.productId,
-      name: 'Acido sulfurico',
-      stockByUnit: [{ unitId: '55555555-5555-4555-8555-555555555555', quantity: '3.0000' }],
+  it('R24: un insumo sin lotes se guarda con esa linea y el detalle sale sin unidad, con existencia 0', async () => {
+    const recipes = montarRepositorio();
+    const products = montarCatalogo({
+      findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
+        { id: LINEA_VALIDA.productId, name: 'Sosa caustica', unitId: null, stockByUnit: [] },
+      ]),
     });
+    const images = montarAlmacenamiento();
+    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
 
+    await createRecipe(RECETA_VALIDA, ADMIN);
+    expect(recipes.create).toHaveBeenCalledTimes(1);
+
+    const getRecipe = createGetRecipe({ recipes, products, images });
     const detalle = await getRecipe('receta-1', ADMIN);
-    expect(detalle.lines[0].productStock).toBeNull();
-  });
-
-  it('R14: sin ningun lote, la existencia es 0', async () => {
-    const getRecipe = montarConProducto({
-      id: LINEA_VALIDA.productId,
-      name: 'Acido sulfurico',
-      stockByUnit: [],
-    });
-
-    const detalle = await getRecipe('receta-1', ADMIN);
+    expect(detalle.lines[0].productUnitId).toBeNull();
     expect(detalle.lines[0].productStock).toBe('0.0000');
   });
 
-  it('R15: producto de baja, la existencia es null', async () => {
+  it('R24: un insumo dado de baja sale sin unidad y sin existencia (null)', async () => {
     const getRecipe = montarConProducto(undefined);
 
     const detalle = await getRecipe('receta-1', ADMIN);
+    expect(detalle.lines[0].productUnitId).toBeNull();
     expect(detalle.lines[0].productStock).toBeNull();
+  });
+});
+
+describe('R7 — sin permiso, el repositorio no se llama', () => {
+  const SIN_PERMISO: Actor = { id: 'op-1', companyId: EMPRESA, permissions: [] };
+
+  it('rechaza el alta al 97,50 % sin tocar el repositorio', async () => {
+    const recipes = montarRepositorio();
+    const products = montarCatalogo();
+    const images = montarAlmacenamiento();
+    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
+
+    const receta97 = { ...RECETA_VALIDA, lines: [{ productId: LINEA_VALIDA.productId, percentage: '97.50' }] };
+
+    await expect(createRecipe(receta97, SIN_PERMISO)).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(products.findRefs).not.toHaveBeenCalled();
+    expect(recipes.create).not.toHaveBeenCalled();
+  });
+
+  it('rechaza el alta sin ninguna linea sin tocar el repositorio', async () => {
+    const recipes = montarRepositorio();
+    const products = montarCatalogo();
+    const images = montarAlmacenamiento();
+    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
+
+    await expect(createRecipe({ ...RECETA_VALIDA, lines: [] }, SIN_PERMISO)).rejects.toBeInstanceOf(
+      UnauthorizedError,
+    );
+    expect(products.findRefs).not.toHaveBeenCalled();
+    expect(recipes.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('R3 — suma invalida, el service rechaza sin llamar al repositorio', () => {
+  it('rechaza 97,50 % aunque la entrada no venga del formulario', async () => {
+    const recipes = montarRepositorio();
+    const products = montarCatalogo();
+    const images = montarAlmacenamiento();
+    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
+
+    const receta97 = { ...RECETA_VALIDA, lines: [{ productId: LINEA_VALIDA.productId, percentage: '97.50' }] };
+
+    await expect(createRecipe(receta97, ADMIN)).rejects.toThrow();
+    expect(products.findRefs).not.toHaveBeenCalled();
+    expect(recipes.create).not.toHaveBeenCalled();
+  });
+
+  it('rechaza una receta sin ninguna linea', async () => {
+    const recipes = montarRepositorio();
+    const products = montarCatalogo();
+    const images = montarAlmacenamiento();
+    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
+
+    await expect(createRecipe({ ...RECETA_VALIDA, lines: [] }, ADMIN)).rejects.toThrow();
+    expect(products.findRefs).not.toHaveBeenCalled();
+    expect(recipes.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('R23 — editar una receta sembrada sin lineas se rechaza', () => {
+  it('rechaza cambiar solo el nombre de una receta sin lineas, y el nombre no cambia', async () => {
+    const filaSinLineas: RecipeRow = { ...FILA_RECETA, lines: [] };
+    const recipes = montarRepositorio({
+      findAliveById: vi.fn<RecipeRepository['findAliveById']>(async () => filaSinLineas),
+    });
+    const products = montarCatalogo();
+    const images = montarAlmacenamiento();
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+
+    await expect(
+      updateRecipe('receta-1', { ...RECETA_VALIDA, name: 'Nuevo nombre', lines: [] }, ADMIN),
+    ).rejects.toThrow();
+    expect(recipes.replaceAlive).not.toHaveBeenCalled();
+  });
+});
+
+describe('R4 — guarda y relee cada porcentaje con el mismo valor enviado', () => {
+  it('92,50 + 7,50 llegan intactas al repositorio', async () => {
+    const recipes = montarRepositorio();
+    const products = montarCatalogo({
+      findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
+        PRODUCTO_REF,
+        { id: '22222222-2222-4222-8222-222222222222', name: 'Sosa caustica', unitId: null, stockByUnit: [] },
+      ]),
+    });
+    const images = montarAlmacenamiento();
+    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
+
+    const receta = {
+      ...RECETA_VALIDA,
+      lines: [
+        { productId: LINEA_VALIDA.productId, percentage: '92.50' },
+        { productId: '22222222-2222-4222-8222-222222222222', percentage: '7.50' },
+      ],
+    };
+
+    await createRecipe(receta, ADMIN);
+    const [datos] = (recipes.create as ReturnType<typeof vi.fn>).mock.calls[0] as [NewRecipe];
+    expect(datos.lines).toEqual(receta.lines);
   });
 });
 

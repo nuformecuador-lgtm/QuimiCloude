@@ -35,7 +35,7 @@ import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
-import type { ProductCatalog } from '@/lib/modules/inventario'
+import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 
@@ -43,6 +43,7 @@ const EMPRESA = '33333333-3333-4333-8333-333333333333'
 const OTRA_EMPRESA = '44444444-4444-4444-8444-444444444444'
 const PEDIDO = '11111111-1111-4111-8111-111111111111'
 const RECETA = '22222222-2222-4222-8222-222222222222'
+const PRESENTACION = '66666666-6666-4666-8666-666666666666'
 
 const ACTOR: Actor = {
   id: 'u-1',
@@ -77,6 +78,7 @@ function filaConEmpresa(): OrderRow {
     createdBy: 'u-1',
     updatedBy: 'u-1',
     companyId: EMPRESA,
+    presentationId: null,
   }
   return row as OrderRow
 }
@@ -194,14 +196,19 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
       findRefs: vi.fn(async () => []),
       findRefsSharingBaseInCompany: vi.fn(async () => []),
     } as unknown as UnitCatalog
+    const presentations = {
+      findRefs: vi.fn(async () => [{ id: PRESENTACION, name: 'Bidon 20L' }]),
+    } as unknown as PresentationCatalog
 
-    const ficha = await createGetOrder({ orders, recipes })(PEDIDO, ACTOR)
-    const lista = await createListOrders({ orders, recipes, log: { ignoredFields: vi.fn() } })(
-      { page: 1 },
-      ACTOR,
-    )
-    const alta = await createCreateOrder({ orders, recipes, products, units })(
-      { recipeId: RECETA, quantity: '10.0000' },
+    const ficha = await createGetOrder({ orders, recipes, presentations })(PEDIDO, ACTOR)
+    const lista = await createListOrders({
+      orders,
+      recipes,
+      presentations,
+      log: { ignoredFields: vi.fn() },
+    })({ page: 1 }, ACTOR)
+    const alta = await createCreateOrder({ orders, recipes, products, units, presentations })(
+      { recipeId: RECETA, quantity: '10.0000', presentationId: PRESENTACION },
       ACTOR,
     )
 

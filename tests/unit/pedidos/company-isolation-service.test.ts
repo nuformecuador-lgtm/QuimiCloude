@@ -49,7 +49,7 @@ import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
-import type { ProductCatalog } from '@/lib/modules/inventario'
+import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 
@@ -71,7 +71,9 @@ const TODOS_LOS_PERMISOS = ['pedidos.consultar', 'pedidos.modificar']
 /** Actor de la empresa A con los dos permisos de `pedidos`. */
 const ACTOR_A: Actor = { id: 'u-a', companyId: EMPRESA_A, permissions: TODOS_LOS_PERMISOS }
 
-const ENTRADA_ALTA = { recipeId: RECETA, quantity: '10.0000' }
+const PRESENTACION = '77777777-7777-4777-8777-777777777777'
+
+const ENTRADA_ALTA = { recipeId: RECETA, quantity: '10.0000', presentationId: PRESENTACION }
 const ENTRADA_EDICION = { ...ENTRADA_ALTA, status: 'EN_CURSO' }
 
 function fila(id: string): OrderRow {
@@ -88,6 +90,7 @@ function fila(id: string): OrderRow {
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'u-0',
     updatedBy: 'u-0',
+    presentationId: null,
   }
 }
 
@@ -172,6 +175,9 @@ function almacen() {
     findRefs: vi.fn(async () => []),
     findRefsSharingBaseInCompany: vi.fn(async () => []),
   }
+  const presentations = {
+    findRefs: vi.fn(async (ids: readonly string[]) => ids.map((id) => ({ id, name: 'Bidon' }))),
+  }
   const log = { ignoredFields: vi.fn() }
 
   /** Lo que se puede afirmar despues: el estado de cada fila, tal cual quedo. */
@@ -190,6 +196,7 @@ function almacen() {
     recipes: recipes as unknown as RecipeCatalog,
     products: products as unknown as ProductCatalog,
     units: units as unknown as UnitCatalog,
+    presentations: presentations as unknown as PresentationCatalog,
     log,
     altas,
     foto,
@@ -202,10 +209,10 @@ type Almacen = ReturnType<typeof almacen>
 function casosDeUso(a: Almacen) {
   const now = () => new Date('2026-09-15T10:00:00.000Z')
   return {
-    createOrder: createCreateOrder({ orders: a.orders, recipes: a.recipes, products: a.products, units: a.units, now }),
-    getOrder: createGetOrder({ orders: a.orders, recipes: a.recipes }),
-    listOrders: createListOrders({ orders: a.orders, recipes: a.recipes, log: a.log }),
-    updateOrder: createUpdateOrder({ orders: a.orders, recipes: a.recipes, products: a.products, units: a.units, now }),
+    createOrder: createCreateOrder({ orders: a.orders, recipes: a.recipes, products: a.products, units: a.units, presentations: a.presentations, now }),
+    getOrder: createGetOrder({ orders: a.orders, recipes: a.recipes, presentations: a.presentations }),
+    listOrders: createListOrders({ orders: a.orders, recipes: a.recipes, presentations: a.presentations, log: a.log }),
+    updateOrder: createUpdateOrder({ orders: a.orders, recipes: a.recipes, products: a.products, units: a.units, presentations: a.presentations, now }),
     cancelOrder: createCancelOrder({ orders: a.orders, now }),
     deleteOrder: createDeleteOrder({ orders: a.orders, now }),
   }
@@ -412,12 +419,14 @@ describe('QC-60 R16, R28 — el PERMISO se exige ANTES que el ambito', () => {
       findRefs: explota('units.findRefs'),
       findRefsSharingBaseInCompany: explota('units.findRefsSharingBaseInCompany'),
     }
+    const presentations = { findRefs: explota('presentations.findRefs') }
     const log = { ignoredFields: explota('ignoredFields') }
     const deps = {
       orders: orders as unknown as OrderRepository,
       recipes: recipes as unknown as RecipeCatalog,
       products: products as unknown as ProductCatalog,
       units: units as unknown as UnitCatalog,
+      presentations: presentations as unknown as PresentationCatalog,
       log,
     }
     return {
@@ -427,6 +436,7 @@ describe('QC-60 R16, R28 — el PERMISO se exige ANTES que el ambito', () => {
         ...Object.values(recipes),
         ...Object.values(products),
         ...Object.values(units),
+        ...Object.values(presentations),
         log.ignoredFields,
       ],
     }
@@ -462,6 +472,54 @@ describe('QC-60 R16, R28 — el PERMISO se exige ANTES que el ambito', () => {
       expect(error, nombre).toBeInstanceOf(UnauthorizedError)
     }
     for (const espia of espias) expect(espia).not.toHaveBeenCalled()
+  })
+})
+
+describe('R8: una presentación de otra empresa se rechaza como inexistente', () => {
+  /** Catalogo que solo devuelve la presentacion cuando la empresa pedida coincide con la suya,
+   *  igual que el contrato real de `inventario`. */
+  function presentacionesDe(companyId: string) {
+    return {
+      findRefs: vi.fn(async (ids: readonly string[], solicitante: string) =>
+        solicitante === companyId ? ids.map((id) => ({ id, name: 'Bidon' })) : [],
+      ),
+    } as unknown as PresentationCatalog
+  }
+
+  it('createOrder: la presentación es de la empresa B y el actor es de A -> presentation_not_found, sin crear', async () => {
+    const a = almacen()
+    const presentations = presentacionesDe(EMPRESA_B)
+    const createOrder = createCreateOrder({
+      orders: a.orders,
+      recipes: a.recipes,
+      products: a.products,
+      units: a.units,
+      presentations,
+      now: () => new Date('2026-09-15T10:00:00.000Z'),
+    })
+
+    const error = await capturar(createOrder(ENTRADA_ALTA, ACTOR_A))
+    expect((error as Error).constructor.name).toBe('PresentationNotFoundError')
+    expect((error as { code: string }).code).toBe('presentation_not_found')
+    expect(a.espias.create).not.toHaveBeenCalled()
+  })
+
+  it('updateOrder: la presentación es de la empresa B y el actor es de A -> presentation_not_found, sin modificar', async () => {
+    const a = almacen()
+    const presentations = presentacionesDe(EMPRESA_B)
+    const updateOrder = createUpdateOrder({
+      orders: a.orders,
+      recipes: a.recipes,
+      products: a.products,
+      units: a.units,
+      presentations,
+      now: () => new Date('2026-09-15T10:00:00.000Z'),
+    })
+
+    const error = await capturar(updateOrder(PEDIDO_DE_A, ENTRADA_EDICION, ACTOR_A))
+    expect((error as Error).constructor.name).toBe('PresentationNotFoundError')
+    expect((error as { code: string }).code).toBe('presentation_not_found')
+    expect(a.espias.updateAlive).not.toHaveBeenCalled()
   })
 })
 

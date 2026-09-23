@@ -813,6 +813,8 @@ describe('QC-52/QC-91 — censo de products tras las migraciones', () => {
     'qty_alert',
     // La existencia guardada, suma de los lotes, que la aplicacion recalcula.
     'stock',
+    // El tipo de producto (PRODUCT/MACHINE/PACKAGING), la anade bc902800.
+    'type',
     // La unidad del producto, fija desde su primer lote. Esta lista es una igualdad exacta,
     // asi que es ella quien vigila que no vuelva a desaparecer.
     'unit_id',

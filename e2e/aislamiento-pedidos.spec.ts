@@ -23,8 +23,10 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
+import { normalizePresentationName } from '@/lib/modules/inventario';
 import { formatOrderNumber } from '@/lib/modules/pedidos';
 import { normalizeRecipeName } from '@/lib/modules/recetas';
+import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
@@ -48,6 +50,10 @@ const COMPANY_B_NAME = `${SHARED_TOKEN}_cb`;
 
 /** Las recetas no tienen empresa todavia (QC-50): una sola, compartida por los pedidos de A y B. */
 const RECIPE_NAME = `${SHARED_TOKEN}_receta`;
+
+/** Presentacion de la empresa A, para el alta por la UI: el alta la exige. */
+const UNIT_NAME = `${SHARED_TOKEN}_unidad`;
+const PRESENTATION_NAME = `${SHARED_TOKEN}_presentacion`;
 
 const ADMIN_USERNAME = `${SHARED_TOKEN}_admin`;
 const ADMIN_PASSWORD = `Qc60-Admin-${RUN_ID.slice(0, 12)}`;
@@ -75,6 +81,9 @@ const ORDER_FORM = 'order-form';
 const RECIPE_PICKER = 'recipe-picker';
 const RECIPE_PICKER_OPTION = 'recipe-picker-option';
 const RECIPE_PICKER_VALUE = 'recipe-picker-value';
+const PRESENTATION_SELECT = 'presentation-select';
+const PRESENTATION_OPTION = 'presentation-option';
+const PRESENTATION_VALUE = 'presentation-value';
 const QUANTITY_FIELD = 'order-field-quantity';
 const FORM_SUBMIT = 'order-form-submit';
 
@@ -84,6 +93,7 @@ const ORDER_NOT_FOUND_CODE = 'order_not_found';
 let companyAId: string | null = null;
 let companyBId: string | null = null;
 let recipeId: string | null = null;
+let presentationId: string | null = null;
 let orderAId: string | null = null;
 let orderBId: string | null = null;
 let orderBHighId: string | null = null;
@@ -206,6 +216,9 @@ test.beforeAll(async () => {
   if (orphanCompanyIds.length > 0) {
     await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    // La presentacion, ANTES que su unidad: su FK hacia `units` la rechaza si no.
+    await prisma.presentation.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.unit.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
   }
   if (orphanRecipeIds.length > 0) {
     await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
@@ -256,6 +269,23 @@ test.beforeAll(async () => {
     })
   ).id;
 
+  // Presentacion de la empresa A, para que el alta por la UI la pueda elegir.
+  const unit = await prisma.unit.create({
+    data: { name: UNIT_NAME, nameNormalized: normalizeUnitName(UNIT_NAME), companyId: companyAId },
+    select: { id: true },
+  });
+  presentationId = (
+    await prisma.presentation.create({
+      data: {
+        name: PRESENTATION_NAME,
+        nameNormalized: normalizePresentationName(PRESENTATION_NAME),
+        unitId: unit.id,
+        companyId: companyAId,
+      },
+      select: { id: true },
+    })
+  ).id;
+
   orderAId = (await seedOrder(companyAId, SHARED_SEQUENCE, admin.id)).id;
   // B no tiene usuarios: sus pedidos nacen sin autor, que la columna admite.
   orderBId = (await seedOrder(companyBId, SHARED_SEQUENCE, null)).id;
@@ -270,6 +300,9 @@ test.afterAll(async () => {
     () => prisma.orderAssignment.deleteMany({ where: { companyId: { in: companyIds } } }),
     () => prisma.order.deleteMany({ where: { companyId: { in: companyIds } } }),
     () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
+    // La presentacion, ANTES que su unidad: su FK hacia `units` la rechaza si no.
+    () => prisma.presentation.deleteMany({ where: { name: PRESENTATION_NAME } }),
+    () => prisma.unit.deleteMany({ where: { name: UNIT_NAME } }),
     () => prisma.user.deleteMany({ where: { username: ADMIN_USERNAME } }),
     () => prisma.company.deleteMany({ where: { name: { in: [COMPANY_A_NAME, COMPANY_B_NAME] } } }),
   ];
@@ -295,7 +328,15 @@ test.describe('aislamiento por empresa de pedidos', () => {
   test('con sesion en la empresa A: la lista no trae pedidos de B, borrar uno de B conociendo su identificador se rechaza como inexistente y lo deja intacto, y el alta de A numera en su propia serie (R31)', async ({
     page,
   }) => {
-    if (!companyAId || !companyBId || !recipeId || !orderAId || !orderBId || !orderBHighId) {
+    if (
+      !companyAId ||
+      !companyBId ||
+      !recipeId ||
+      !presentationId ||
+      !orderAId ||
+      !orderBId ||
+      !orderBHighId
+    ) {
       throw new Error('el fixture no existe: fallo el beforeAll');
     }
     const year = new Date().getUTCFullYear();
@@ -413,6 +454,16 @@ test.describe('aislamiento por empresa de pedidos', () => {
     await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
     await recipeOption.click();
     await expect(page.getByTestId(RECIPE_PICKER_VALUE)).toHaveValue(recipeId);
+
+    const presentationPicker = page.getByTestId(PRESENTATION_SELECT);
+    await presentationPicker.click();
+    await presentationPicker.fill(PRESENTATION_NAME);
+    const presentationOption = page
+      .getByTestId(PRESENTATION_OPTION)
+      .filter({ hasText: PRESENTATION_NAME });
+    await expect(presentationOption).toHaveCount(1, { timeout: 60_000 });
+    await presentationOption.click();
+    await expect(page.getByTestId(PRESENTATION_VALUE)).toHaveValue(presentationId ?? '');
 
     await page.getByTestId(QUANTITY_FIELD).fill(ORDER_QUANTITY);
     await page.getByTestId(FORM_SUBMIT).click();

@@ -96,26 +96,6 @@ async function seedUnit(
   return unit.id
 }
 
-/** Producto. Sin presentacion desde el 2026-09-09 y SIN UNIDAD desde QC-80 (R7, R21): la
- *  declara la presentacion, y la del producto se deriva de la del lote mas reciente (R22). */
-async function createProduct(
-  marker: string,
-  companyId: string,
-): Promise<{ readonly productId: string }> {
-  const product = await prisma.product.create({
-    data: {
-      name: `Producto ${marker}`,
-      nameNormalized: `producto${marker}`,
-      // QC-49 R1: `products.company_id` es NOT NULL. Va la MISMA empresa del actor del caso,
-      // no una cualquiera: la unidad que este producto acaba usando la creo ese actor, y el
-      // disparador `presentations_check_unit_scope` rechaza cruzar empresas (R23).
-      companyId,
-    },
-    select: { id: true },
-  })
-  return { productId: product.id }
-}
-
 /** Presentacion CON su unidad (QC-80 R1: `presentations.unit_id` es NOT NULL con FK a
  *  `units`, ON DELETE RESTRICT). Es la referencia al catalogo que antes traia el producto. */
 async function createPresentation(
@@ -138,33 +118,8 @@ async function createPresentation(
   return presentation.id
 }
 
-/** Receta viva, vacia. De la MISMA empresa que el resto del caso: QC-50 hizo
- *  `recipes.company_id` obligatoria. */
-async function createRecipe(marker: string, companyId: string): Promise<string> {
-  const recipe = await prisma.recipe.create({
-    data: { name: `Receta ${marker}`, nameNormalized: `receta${marker}`, companyId },
-    select: { id: true },
-  })
-  return recipe.id
-}
-
-/** Linea de receta, referenciando el producto y la unidad que se le pasen. */
-async function createLine(
-  recipeId: string,
-  productId: string,
-  unitId: string,
-  quantity = '1.0000',
-): Promise<string> {
-  const line = await prisma.recipeLine.create({
-    data: { recipeId, productId, unitId, quantity: new Prisma.Decimal(quantity) },
-    select: { id: true },
-  })
-  return line.id
-}
-
 /** IDs sembrados por un caso, listos para borrarse en el orden que respeta las FK. */
 interface Seeded {
-  recipeLines?: readonly string[]
   recipes?: readonly string[]
   products?: readonly string[]
   presentations?: readonly string[]
@@ -177,9 +132,6 @@ interface Seeded {
  *  por tabla en un solo `deleteMany`: Postgres comprueba las FK al final del enunciado, asi que
  *  una unidad base y su derivada que se borran en el MISMO `deleteMany` no chocan entre si. */
 async function cleanup(seeded: Seeded): Promise<void> {
-  if (seeded.recipeLines && seeded.recipeLines.length > 0) {
-    await prisma.recipeLine.deleteMany({ where: { id: { in: [...seeded.recipeLines] } } })
-  }
   if (seeded.recipes && seeded.recipes.length > 0) {
     await prisma.recipe.deleteMany({ where: { id: { in: [...seeded.recipes] } } })
   }
@@ -575,11 +527,11 @@ describe('updateUnit — R19: la edicion NO cambia la empresa', () => {
 })
 
 describe('updateUnit — R20: cambiar base y factor de una unidad ya en uso no toca lo guardado', () => {
-  it('un producto y una linea de receta siguen intactos tras cambiar la base y el factor', async () => {
+  it('una presentacion sigue intacta tras cambiar la base y el factor', async () => {
     const marker = token()
     const companyId = await createCompany(`comp${marker}`)
     const actor = actorFor(companyId)
-    const seeded: Seeded = { companies: [companyId], units: [], products: [], presentations: [], recipes: [], recipeLines: [] }
+    const seeded: Seeded = { companies: [companyId], units: [], products: [], presentations: [] }
 
     try {
       const baseVieja = await seedUnit(`vieja${marker}`, { companyId })
@@ -598,15 +550,11 @@ describe('updateUnit — R20: cambiar base y factor de una unidad ya en uso no t
       seeded.units = [...(seeded.units ?? []), unitId]
 
       // TRASLADADO EL 2026-09-11 POR QC-80 (R1): quien apunta a la unidad es la PRESENTACION.
+      // Este caso ya no arrastra una linea de receta: `recipe_lines` dejo de referenciar
+      // unidad (`percentage`, sin `unit_id`), asi que lo que R20 tiene que probar sobre
+      // "algo en uso" lo demuestra la presentacion sola.
       const presentationId = await createPresentation(`pres${marker}`, unitId, companyId)
       seeded.presentations = [presentationId]
-
-      const recipeId = await createRecipe(`rec${marker}`, companyId)
-      seeded.recipes = [recipeId]
-      const { productId: productoDeLaLinea } = await createProduct(`linea${marker}`, companyId)
-      seeded.products = [...(seeded.products ?? []), productoDeLaLinea]
-      const lineId = await createLine(recipeId, productoDeLaLinea, unitId, '3.5000')
-      seeded.recipeLines = [lineId]
 
       // El cambio: nueva base, nuevo factor.
       await unidades.updateUnit(
@@ -627,20 +575,12 @@ describe('updateUnit — R20: cambiar base y factor de una unidad ya en uso no t
       expect(unit.baseUnitId).toBe(baseNueva)
       expect(unit.factor?.toString()).toBe('2000')
 
-      // La presentacion y la linea SIGUEN apuntando a la misma unidad, con sus cantidades
-      // intactas.
+      // La presentacion SIGUE apuntando a la misma unidad.
       const presentation = await prisma.presentation.findUniqueOrThrow({
         where: { id: presentationId },
         select: { unitId: true },
       })
       expect(presentation.unitId).toBe(unitId)
-
-      const line = await prisma.recipeLine.findUniqueOrThrow({
-        where: { id: lineId },
-        select: { unitId: true, quantity: true },
-      })
-      expect(line.unitId).toBe(unitId)
-      expect(line.quantity.toString()).toBe('3.5')
     } finally {
       await cleanup(seeded)
     }
@@ -700,42 +640,10 @@ describe('deleteUnit — R24: bloqueado por uso, con UnitInUseError y las filas 
     }
   })
 
-  it('rechaza borrar una unidad usada por una LINEA DE RECETA, y la deja intacta', async () => {
-    const marker = token()
-    const companyId = await createCompany(`comp${marker}`)
-    const actor = actorFor(companyId)
-    const seeded: Seeded = {
-      companies: [companyId],
-      units: [],
-      products: [],
-      presentations: [],
-      recipes: [],
-      recipeLines: [],
-    }
-
-    try {
-      const { id: unitId } = await unidades.createUnit({ name: `Usada por linea ${marker}` }, actor)
-      seeded.units = [unitId]
-
-      const { productId } = await createProduct(`prod${marker}`, companyId)
-      seeded.products = [productId]
-      const recipeId = await createRecipe(`rec${marker}`, companyId)
-      seeded.recipes = [recipeId]
-      const lineId = await createLine(recipeId, productId, unitId)
-      seeded.recipeLines = [lineId]
-
-      await expect(unidades.deleteUnit(unitId, actor)).rejects.toBeInstanceOf(UnitInUseError)
-
-      expect(await prisma.unit.findUnique({ where: { id: unitId } })).not.toBeNull()
-      const line = await prisma.recipeLine.findUniqueOrThrow({
-        where: { id: lineId },
-        select: { unitId: true },
-      })
-      expect(line.unitId).toBe(unitId)
-    } finally {
-      await cleanup(seeded)
-    }
-  })
+  // La linea de receta dejo de referenciar unidad (`percentage`, sin `unit_id`): ya no
+  // existe un caso de "borrado bloqueado por una linea de receta" que probar aqui. Lo que
+  // R24 exige sobre "algo en uso" lo cubren la presentacion (arriba) y la unidad base
+  // (abajo).
 
   it('rechaza borrar una unidad que es BASE de otra, y las deja intactas a las dos', async () => {
     const marker = token()
