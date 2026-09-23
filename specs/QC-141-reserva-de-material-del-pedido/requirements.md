@@ -334,7 +334,7 @@ pedidos e inventario, que no lee ni escribe ninguna tabla `[D15]` `[D21]`.
 6. **(Enmienda del 2026-09-23.)** Las decisiones **E1** (producto sin unidad) y **E2** (receta sin
    líneas) que recoge la fila D19, con su propuesta en `design.md > 0.3`. **Aprobadas el
    2026-09-23** (D21).
-7. **(Enmienda del review, 2026-09-23. ABIERTA.) El orden de lotes no es un orden total.** El
+7. **(Enmienda del review, 2026-09-23. RESUELTA el mismo día por el humano: se ACEPTA el límite —opción (b)—; no se toca el comparador ni el orden de coste de QC-123, y R56 exige la paridad solo donde el orden no forma ciclo. Los dos refuerzos de B3 de `design.md > 5.2.1` quedan APROBADOS.) El orden de lotes no es un orden total.** El
    desempate de D4 («numérico si los dos son solo dígitos, como texto en otro caso») compara cada
    par por separado, y con tres lotes de la misma fecha puede cerrar un ciclo: `'9' < '10'` por
    número, `'10' < '1a'` y `'1a' < '9'` por texto. Con un ciclo el resultado depende del algoritmo
