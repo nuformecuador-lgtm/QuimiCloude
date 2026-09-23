@@ -363,7 +363,7 @@ termina en verde.
 > `./init.sh --rapido`; TC con `./init.sh` completo. Los comentarios de producción no citan fichas,
 > requisitos ni `design.md`; `R<n>` va en el nombre de los tests.
 
-## [ ] TR — Re-sincronizar con `origin/dev` (QC-145 y `a01c90cb`) `[primera de lo pendiente]`
+## [x] TR — Re-sincronizar con `origin/dev` (QC-145 y `a01c90cb`) `[primera de lo pendiente]`
 
 Archivos: todo lo que traiga el merge; `db/migrations/20260923120000_inventory_movement_kind_consumption/`,
 `…120100_reservations_and_decimal_stock/` y `…120200_reserve_existing_orders/` (se renombran);
@@ -418,7 +418,7 @@ comparte prefijo y las tres nuestras van por detrás de la última de `dev`; `_p
 **R50**; `./init.sh --rapido` verde, con los rojos que traiga `dev` (si los trae) declarados como
 heredados según `docs/verification.md` (`design.md > 15`).
 
-## [ ] TB1 — Comentarios de producción sin citas `[depende de TR]`
+## [x] TB1 — Comentarios de producción sin citas `[depende de TR]`
 
 Archivos: `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` (hoy `:772`),
 `lib/composition/index.ts` (hoy `:997`), y cualquier otro que salga del barrido.
@@ -431,7 +431,7 @@ Archivos: `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` (hoy
 **Hecho cuando:** el barrido no encuentra ninguna cita en comentarios de producción añadidos por la
 rama, y la lista de comandos y resultado queda en la bitácora.
 
-## [ ] TB2 — El proceso diario re-comprueba `reserved_at` bajo el candado `[depende de TR]`
+## [x] TB2 — El proceso diario re-comprueba `reserved_at` bajo el candado `[depende de TR]`
 
 Archivos: `lib/modules/pedidos/domain/expire-stale-orders.ts`, el tipo de fila que devuelve
 `lockAliveById` (`OrderRow` o el que corresponda) y su adaptador,
@@ -445,7 +445,7 @@ Archivos: `lib/modules/pedidos/domain/expire-stale-orders.ts`, el tipo de fila q
 `reserved_at` nulo: no cancela, no libera) y **R22**; integración verde con la edición intercalada
 por otra conexión (**R53**); `R21` y `R25` siguen verdes.
 
-## [ ] TB3 — Excepción con nombre en `guard-ambito-empresa-pedidos` `[depende de TR]` `[P con TB2]`
+## [x] TB3 — Excepción con nombre en `guard-ambito-empresa-pedidos` `[depende de TR]` `[P con TB2]`
 
 Archivos: `lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma.ts`,
 `tests/guards/guard-ambito-empresa-pedidos.test.ts`.
@@ -459,7 +459,7 @@ fuente fabricada salen en rojo —otra consulta en el archivo exento, un alias e
 `pedidos`, y una consulta sin empresa en un archivo no exento—; el caso de la guardia lleva **R58**
 en el nombre.
 
-## [ ] TB4 — Solo el Finalizar consume: fuera la entrega por la edición `[depende de TR]`
+## [x] TB4 — Solo el Finalizar consume: fuera la entrega por la edición `[depende de TR]`
 
 Archivos: `lib/modules/pedidos/domain/update-order.ts`, `lib/modules/pedidos/domain/errors.ts` (si
 un error queda sin lanzador), `tests/unit/pedidos/update-order.test.ts`,
@@ -484,7 +484,7 @@ El spec ya no marca nada como provisional (esta enmienda). Queda reflejarlo en l
 **Hecho cuando:** el mapa de la bitácora va de R1 a R58, con «R29 — retirado (D21)», y no dice que
 E1/E2 o ninguna pregunta esperen aprobación.
 
-## [ ] Tm2 — Retirar los caminos de escritura muertos `[depende de TB3, TB4]`
+## [x] Tm2 — Retirar los caminos de escritura muertos `[depende de TB3, TB4]`
 
 Archivos: `lib/modules/pedidos/adapters/driven/persistence/{order-prisma,order-catalog-prisma}.ts`,
 `tests/integration/pedidos/order-sequence.int.test.ts`,
@@ -500,7 +500,7 @@ orders` en el driven de `pedidos`; `order-sequence.int` verde (**R15** del corre
 anti-placebo de la guardia apunta a `insertAliveOrder` y sigue saliendo en rojo con su fuente
 fabricada.
 
-## [ ] Tm3 — Guardia: quien consume recalcula `products.stock` `[depende de TR]` `[P con TB2, TB3]`
+## [x] Tm3 — Guardia: quien consume recalcula `products.stock` `[depende de TR]` `[P con TB2, TB3]`
 
 Archivos: `tests/unit/inventario/qc121-alcance.test.ts` (o la guardia donde viva
 `EXCEPCIONES_SIN_RECALCULO`).
@@ -512,7 +512,7 @@ Archivos: `tests/unit/inventario/qc121-alcance.test.ts` (o la guardia donde viva
 y dos anti-placebos de fuente fabricada (sin recálculo: rojo; con recálculo: verde) llevan **R28** en
 el nombre.
 
-## [ ] Tm4 — Errores del proceso diario `[depende de TB2]`
+## [x] Tm4 — Errores del proceso diario `[depende de TB2]`
 
 Archivos: `lib/modules/pedidos/domain/expire-stale-orders.ts`,
 `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` (`findExpirableOrders` con
@@ -530,9 +530,9 @@ procesa) y **R55** (un pedido que falla siempre, en una empresa con más de 100 
 vez en `failed` y la empresa siguiente se procesa); el log no lleva mensajes de error ni datos del
 pedido; `R24` y `R25` siguen verdes.
 
-## [ ] Tm5 — Orden de lotes de la migración igual que en TypeScript `[depende de TR]` `[P con TB1-TB4]`
+## [x] Tm5 — Orden de lotes de la migración igual que en TypeScript `[depende de TR]` `[P con TB1-TB4]`
 
-## [ ] Tm6 — `down` de la migración que aparta, coherente tras uso `[depende de Tm5]`
+## [x] Tm6 — `down` de la migración que aparta, coherente tras uso `[depende de Tm5]`
 
 Las dos tocan `db/migrations/20260923150200_reserve_existing_orders/` (nombre tras TR) y
 `tests/integration/inventario/reserve-existing-orders-migration.int.test.ts`; van seguidas.
@@ -551,7 +551,7 @@ Procedimiento con la base propia, **antes de cualquier E2E o uso de la app sobre
 (**R56**, **R43**); el `down` falla con un `release` posterior sin cambiar nada y revierte limpio sin
 actividad (**R57**); `R44` sigue verde.
 
-## [ ] Tm7 — La receta se lee con el cliente de la transacción `[depende de TB4]`
+## [x] Tm7 — La receta se lee con el cliente de la transacción `[depende de TB4]`
 
 Archivos: `lib/modules/pedidos/ports/order-unit-of-work.ts` (`recipes` en el scope),
 `lib/modules/recetas/adapters/driven/persistence/*` (fábrica sobre cliente, si no existe),
