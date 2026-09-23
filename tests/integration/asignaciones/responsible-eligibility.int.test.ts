@@ -201,6 +201,11 @@ describe('asignaciones · quien puede ser responsable, contra la base (integraci
       };
       const ejecucion = wireExecutionUseCases(fixture);
 
+      const antes = await fixture.tx.order.findUniqueOrThrow({
+        where: { id: pedido },
+        select: { status: true, finishedAt: true, updatedAt: true },
+      });
+
       const errorGet = await withSavepoint(fixture.tx, () => ejecucion.get(actor, { orderId: pedido }));
       expect(codeOf(errorGet)).toBe('order_not_found');
 
@@ -212,9 +217,14 @@ describe('asignaciones · quien puede ser responsable, contra la base (integraci
 
       const fila = await fixture.tx.order.findUniqueOrThrow({
         where: { id: pedido },
-        select: { status: true },
+        select: { status: true, finishedAt: true, updatedAt: true },
       });
       expect(fila.status).toBe('PENDIENTE');
+      expect(fila.finishedAt).toEqual(antes.finishedAt);
+      expect(fila.updatedAt).toEqual(antes.updatedAt);
+
+      const asignaciones = await fixture.tx.orderAssignment.findMany({ where: { orderId: pedido } });
+      expect(asignaciones).toEqual([]);
     });
   });
 
