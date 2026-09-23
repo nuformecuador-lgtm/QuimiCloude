@@ -653,7 +653,7 @@ describe('R33/R40 — los discriminantes de las tres escrituras', () => {
       expect(relectura?.quantity).toBe('99.0000')
       expect(relectura?.priority).toBe('CRITICA')
       expect(relectura?.status).toBe('PENDIENTE')
-      // R6 (QC-34): la edicion NO toca el autor ni el instante de la creacion.
+      // La edicion NO toca el autor ni el instante de la creacion.
       expect(relectura?.createdBy).toBe(actorId)
       expect(relectura?.createdAt.toISOString()).toBe(now.toISOString())
       expect(relectura?.updatedAt.toISOString()).toBe(despues.toISOString())

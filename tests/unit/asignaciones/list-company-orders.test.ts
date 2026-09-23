@@ -2,7 +2,7 @@
 //
 // «Todos»: los pedidos de la empresa en cualquier estado, sin filtro por usuario asignado.
 // Filtrado por exactamente ENTREGADO, el orden es el de terminados; con cualquier otra
-// combinacion, el de la lista de trabajo (D16).
+// combinacion, el de la lista de trabajo.
 
 import { describe, expect, it, vi } from 'vitest';
 

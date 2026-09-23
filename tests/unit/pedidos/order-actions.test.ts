@@ -292,8 +292,8 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     expect(createOrderMock.mock.calls[1]?.[0]).toMatchObject({ priority: undefined })
 
     // La edicion es REEMPLAZO COMPLETO de los datos de negocio; el `id` NO viaja en el
-    // `FormData`, es argumento (R20). Un `status` que el formulario siga enviando (aqui,
-    // `VALID_UPDATE_FIELDS`) NUNCA llega al caso de uso: la edicion ya no mueve el estado (R6).
+    // `FormData`, es argumento. Un `status` que el formulario siga enviando (aqui,
+    // `VALID_UPDATE_FIELDS`) NUNCA llega al caso de uso: la edicion ya no mueve el estado.
     await updateOrderAction(ORDER_ID, MUTATION_INITIAL, formDataOf(VALID_UPDATE_FIELDS))
     expect(updateOrderMock.mock.calls[0]?.[0]).toBe(ORDER_ID)
     expect(updateOrderMock.mock.calls[0]?.[1]).toEqual({

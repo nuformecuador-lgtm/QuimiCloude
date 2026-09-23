@@ -1,8 +1,6 @@
 /**
- * QC-145 T2 — la fecha de terminado contra una base Postgres REAL, con la migracion
+ * La fecha de terminado contra una base Postgres REAL, con la migracion
  * `20260923120000_orders_finished_at` aplicada.
- *
- * Requisitos cubiertos: R2, R3, R4, R5, R9 (`design.md > 2.1`, `> 10`).
  *
  * POR QUE COMMITEA Y NO SE ENVUELVE EN UNA TRANSACCION CON ROLLBACK: `transitionAliveOrder`,
  * `createOrder`, `updateAliveOrder` y `cancelAliveOrder` hablan con el cliente Prisma GLOBAL
@@ -12,7 +10,7 @@
  * seria un aislamiento de mentira: esas llamadas correrian en otra conexion del pool. Cada caso
  * siembra su propio pedido y lo borra en un `finally`, por su `id` exacto.
  *
- * R4 (el `CHECK`) es la unica excepcion que usa SQL crudo dentro de un `SAVEPOINT`: la escritura
+ * El `CHECK` es la unica excepcion que usa SQL crudo dentro de un `SAVEPOINT`: la escritura
  * se espera que falle y no puede dejar la conexion del caso en un estado abortado para el resto
  * del archivo.
  */

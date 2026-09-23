@@ -1,20 +1,19 @@
 /**
- * E2E de QC-145 con los TRES roles reales del seed (T16; R28, R30, R7, R32, R35).
+ * E2E con los TRES roles reales del seed y la nueva pantalla de asignacion por vistas.
  *
  * QUE RECORRE, en cuatro `test()` independientes que comparten el MISMO fixture sembrado en
  * `beforeAll` -cada uno inicia su propia sesion, asi que no hay estado de un caso que otro
  * necesite-:
- *   A. el Operador entra y ve SOLO «Mis asignados», sin pestañas (R28);
+ *   A. el Operador entra y ve SOLO «Mis asignados», sin pestañas;
  *   B. el Empacador ve «Mis asignados» + «Terminados» -con el pedido ENTREGADO ajeno, su fecha y
- *      sus responsables, y el ENTREGADO sin fecha al final marcado «Sin fecha»- y no ve «Todos»
- *      (R28, R30);
+ *      sus responsables, y el ENTREGADO sin fecha al final marcado «Sin fecha»- y no ve «Todos»;
  *   C. el Administrador ve SOLO «Todos», con los cuatro estados; al filtrar exactamente por
  *      Entregado aparece la columna de fecha y el orden de terminados; sin ninguna entrada a
  *      ejecucion; y `/asignacion/<id>` de un pedido al que no esta asignado le responde
- *      "no encontrado" (R28, R35);
+ *      "no encontrado";
  *   D. en `/pedidos`, el panel de edicion del Administrador no ofrece ningun control de estado
- *      (R7) y el selector de responsables no ofrece a otro Administrador -que tiene
- *      `pedidos.consultar`- aunque si sigue ofreciendo a quien no lo tiene (R32).
+ *      y el selector de responsables no ofrece a otro Administrador -que tiene
+ *      `pedidos.consultar`- aunque si sigue ofreciendo a quien no lo tiene.
  *
  * QUE APORTA SOBRE UNIT E INTEGRACION: la cadena entera en un navegador de verdad -cookie firmada,
  * middleware, `resolveAssignmentViews`/`resolveAssignmentView` de verdad, las CINCO Server Actions
@@ -22,19 +21,19 @@
  * de unidad hace porque sus dobles de permisos son fijos. Chromium y WebKit: WebKit es el motor de
  * iOS y la regla multiplataforma pide ejercitarlo.
  *
- * POR QUE UN ADMINISTRADOR "OTRO" Y NO SOLO EL ACTOR (R32). El selector de candidatos no excluye
+ * POR QUE UN ADMINISTRADOR "OTRO" Y NO SOLO EL ACTOR. El selector de candidatos no excluye
  * al actor por su cuenta -`list-responsible-candidates.ts` no filtra por id, solo por
  * `canBeResponsible`-, asi que probar unicamente con el propio Administrador dejaria sin decidir
- * si la ausencia se debe al PERMISO (lo que R32 exige) o solo a ser quien pide la lista. Por eso el
+ * si la ausencia se debe al PERMISO o solo a ser quien pide la lista. Por eso el
  * fixture crea una SEGUNDA persona con `Administrador`, ajena a la sesion, y una persona con
  * `Operador` -sin `pedidos.consultar`- como control positivo de que la lista SI carga candidatos.
  *
  * LA FECHA DE TERMINADO DEL PEDIDO "CON FECHA" SE SIEMBRA DIRECTAMENTE POR LA BASE, no finalizando
- * de verdad por la ejecucion: R30 ya tiene su propio camino con el caso de uso real en
+ * de verdad por la ejecucion: ese camino ya se ejercita con el caso de uso real en
  * `tests/integration/asignaciones/finished-orders.int.test.ts` ("finalizar por el caso de uso real
  * -> aparece con fecha"), y repetirlo aqui alargaria el recorrido sin afirmar nada mas sobre la
  * UI. Lo que SI aporta este E2E es que un `ENTREGADO` CON fecha y uno SIN fecha -el que ya existia
- * "antes de esta ficha"- conviven en la MISMA pantalla con el orden y el marcador correctos.
+ * antes de esta pantalla- conviven en la MISMA pantalla con el orden y el marcador correctos.
  *
  * DATOS Y AISLAMIENTO, mismo patron que `e2e/pedidos-asignados.spec.ts` y
  * `e2e/pedidos-responsables.spec.ts`:
@@ -54,7 +53,7 @@
  * `e2e/pedidos-responsables.spec.ts`.
  *
  * ENMIENDA DE `e2e/pedidos.spec.ts`, `e2e/pedidos-asignados.spec.ts` y
- * `e2e/pedidos-responsables.spec.ts`: NINGUNA. Se revisaron los tres al cerrar esta ficha (T16) y
+ * `e2e/pedidos-responsables.spec.ts`: NINGUNA. Se revisaron los tres al cerrar esta pantalla y
  * ninguno usa el selector de estado de la edicion de pedidos ni asigna un `Administrador` como
  * responsable, asi que no hay nada que ajustar en ellos.
  *
@@ -101,7 +100,7 @@ const adminUser: Credentials = {
   username: `${SHARED_TOKEN}_admin`,
   password: `Qc145-Admin-${RUN_ID.slice(0, 12)}`,
 };
-/** El control de R32: OTRO Administrador, con `pedidos.consultar`, ajeno a la sesion. */
+/** Segundo Administrador, con `pedidos.consultar`, ajeno a la sesion: control de exclusion. */
 const otherAdminUser: Credentials = {
   username: `${SHARED_TOKEN}_otroadmin`,
   password: `Qc145-Otro-${RUN_ID.slice(0, 12)}`,
@@ -110,7 +109,7 @@ const empacadorUser: Credentials = {
   username: `${SHARED_TOKEN}_empacador`,
   password: `Qc145-Empac-${RUN_ID.slice(0, 12)}`,
 };
-/** Control positivo de R32: sin `pedidos.consultar`, DEBE seguir ofreciendose. */
+/** Sin `pedidos.consultar`: control positivo de que DEBE seguir ofreciendose. */
 const operatorUser: Credentials = {
   username: `${SHARED_TOKEN}_operador`,
   password: `Qc145-Oper-${RUN_ID.slice(0, 12)}`,
@@ -179,9 +178,9 @@ const ORDER_FORM_TESTID = 'order-form';
 const ORDER_FORM_CANCEL_TESTID = 'order-form-cancel';
 const ORDER_ACTION_EDIT_TESTID = 'order-action-edit';
 /**
- * El estado ya no tiene control propio en `order-form.tsx` (R7): la constante que el propio
+ * El estado ya no tiene control propio en `order-form.tsx`: la constante que el propio
  * componente exporta -`ORDER_STATUS_SELECT_TESTID`- no etiqueta a nada, y este literal es la
- * copia local de ese `data-testid` que R7 exige que NUNCA aparezca en el DOM.
+ * copia local de ese `data-testid`, que NUNCA debe aparecer en el DOM.
  */
 const ORDER_STATUS_SELECT_TESTID = 'order-status-select';
 
@@ -389,9 +388,9 @@ test.beforeAll(async () => {
   orderDeliveredNoDateNumber = deliveredNoDate.numberText;
   orderCancelledNumber = cancelled.numberText;
 
-  // El unico responsable de todo el fixture: el Operador, sobre el ENTREGADO CON fecha. Es «el
-  // pedido ajeno» que R28 pide para el Empacador -no esta asignado a el- y de paso prueba que
-  // «Terminados» pinta los responsables de CUALQUIERA, no solo los del actor (R17, R21).
+  // El unico responsable de todo el fixture: el Operador, sobre el ENTREGADO CON fecha. Es el
+  // pedido ajeno para el Empacador -no esta asignado a el- y de paso prueba que
+  // «Terminados» pinta los responsables de CUALQUIERA, no solo los del actor.
   await prisma.orderAssignment.create({
     data: { orderId: orderDeliveredWithDateId, userId: operatorUserId, companyId },
   });
@@ -446,7 +445,7 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await loginAndLand(page, operatorUser);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    // Sin pestañas: es la UNICA vista que este rol tiene (R11, R14).
+    // Sin pestañas: es la UNICA vista que este rol tiene.
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TABS_TESTID)).toHaveCount(0);
 
     // «Mis asignados» se monta -vacio, porque el fixture no le asigna ningun pedido vivo- y
@@ -482,7 +481,7 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await loginAndLand(page, empacadorUser);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    // Dos pestañas exactas: «Mis asignados» y «Terminados». Nunca «Todos» (R12, R13).
+    // Dos pestañas exactas: «Mis asignados» y «Terminados». Nunca «Todos».
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TABS_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.asignados)).toBeVisible();
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.terminados)).toBeVisible();
@@ -491,9 +490,9 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.terminados).click();
     await expect(page.getByTestId(FINISHED_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    // El pedido «ajeno» -no asignado al Empacador- SI aparece: «Terminados» es de toda la empresa
-    // (R17). Con su fecha (R21) y su responsable, que es OTRA persona (R21: todos los
-    // responsables, sin excluir a nadie).
+    // El pedido «ajeno» -no asignado al Empacador- SI aparece: «Terminados» es de toda la empresa.
+    // Con su fecha y su responsable, que es OTRA persona -todos los responsables, sin excluir a
+    // nadie-.
     const withDateRow = rowByNumber(page, withDateNumber);
     await expect(withDateRow).toHaveCount(1, { timeout: 60_000 });
     const withDateDate = withDateRow.getByTestId(FINISHED_ORDER_DATE_TESTID);
@@ -514,11 +513,11 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     const noDateIndex = await rowDomIndex(page, noDateId);
     expect(withDateIndex, 'la fila con fecha deberia estar en la tabla').toBeGreaterThanOrEqual(0);
     expect(noDateIndex, 'la fila sin fecha deberia estar en la tabla').toBeGreaterThanOrEqual(0);
-    expect(noDateIndex, 'el "sin fecha" va DESPUES del que si tiene fecha (R20)').toBeGreaterThan(
+    expect(noDateIndex, 'el "sin fecha" va DESPUES del que si tiene fecha').toBeGreaterThan(
       withDateIndex,
     );
 
-    // Ni el pendiente ni el cancelado son «Terminados» (R17).
+    // Ni el pendiente ni el cancelado son «Terminados».
     await expect(rowByNumber(page, pendingNumber)).toHaveCount(0);
     await expect(rowByNumber(page, cancelledNumber)).toHaveCount(0);
   });
@@ -553,11 +552,11 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    // Solo «Todos»: sin pestañas, aunque tenga tambien `terminados.consultar` (R13).
+    // Solo «Todos»: sin pestañas, aunque tenga tambien `terminados.consultar`.
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TABS_TESTID)).toHaveCount(0);
     await expect(page.getByTestId(COMPANY_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    // Los CUATRO estados, sin filtro (R22).
+    // Los CUATRO estados, sin filtro.
     for (const numberText of [pendingNumber, inProgressNumber, withDateNumber, noDateNumber, cancelledNumber]) {
       await expect(rowByNumber(page, numberText), `deberia verse el pedido ${numberText}`).toHaveCount(
         1,
@@ -569,16 +568,16 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
       .evaluateAll((cells) => cells.map((cell) => cell.getAttribute('data-status')));
     expect(new Set(statusesShown)).toEqual(new Set(['PENDIENTE', 'EN_CURSO', 'ENTREGADO', 'CANCELADO']));
 
-    // Sin filtro, sin columna de fecha (D16, R31).
+    // Sin filtro, sin columna de fecha.
     await expect(page.getByTestId(COMPANY_ORDER_DATE_TESTID)).toHaveCount(0);
 
-    // Sin ninguna entrada a ejecucion ni a responsables, tampoco para lo asignado al propio actor
-    // (R26): esta pantalla no tiene ningun pedido asignado al Administrador, y aun asi la
+    // Sin ninguna entrada a ejecucion ni a responsables, tampoco para lo asignado al propio actor:
+    // esta pantalla no tiene ningun pedido asignado al Administrador, y aun asi la
     // ausencia de estos controles es estructural, no circunstancial.
     await expect(page.getByTestId(ASSIGNED_ORDER_ENTER_TESTID)).toHaveCount(0);
     await expect(page.getByTestId(ORDER_ACTION_RESPONSIBLES_TESTID)).toHaveCount(0);
 
-    // Filtrar EXACTAMENTE por Entregado (R24, R31, D16).
+    // Filtrar EXACTAMENTE por Entregado.
     await page.getByTestId(COMPANY_ORDER_STATUS_FILTER_TESTID).click();
     await page.getByTestId(COMPANY_ORDER_STATUS_FILTER_OPTION_ENTREGADO_TESTID).click();
     await page.waitForFunction(
@@ -590,8 +589,8 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await page.keyboard.press('Escape');
     await expect(page.getByTestId(COMPANY_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    // Solo los dos ENTREGADO quedan (R24); la columna de fecha aparece (R31) y el orden es el de
-    // terminados: el que tiene fecha antes que el que no (R20, D16).
+    // Solo los dos ENTREGADO quedan; la columna de fecha aparece y el orden es el de
+    // terminados: el que tiene fecha antes que el que no.
     await expect(rowByNumber(page, withDateNumber)).toHaveCount(1, { timeout: 60_000 });
     await expect(rowByNumber(page, noDateNumber)).toHaveCount(1);
     await expect(rowByNumber(page, pendingNumber)).toHaveCount(0);
@@ -609,12 +608,12 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
 
     const withDateIndex = await rowDomIndex(page, withDateId);
     const noDateIndex = await rowDomIndex(page, noDateId);
-    expect(noDateIndex, 'con el filtro exacto Entregado tambien manda el orden de terminados (D16)').toBeGreaterThan(
+    expect(noDateIndex, 'con el filtro exacto Entregado tambien manda el orden de terminados').toBeGreaterThan(
       withDateIndex,
     );
 
-    // `/asignacion/<id>` de un pedido al que el Administrador NUNCA fue asignado: "no encontrado"
-    // (R35), sin que haya escrito nada -no hay boton para intentarlo desde aqui-.
+    // `/asignacion/<id>` de un pedido al que el Administrador NUNCA fue asignado: "no encontrado",
+    // sin que haya escrito nada -no hay boton para intentarlo desde aqui-.
     await page.goto(assignedOrderRoute(pendingId));
     await expect(page.getByTestId(ORDER_EXECUTION_ERROR_TESTID)).toBeVisible({ timeout: 60_000 });
   });
@@ -636,7 +635,7 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     const row = rowByNumber(page, pendingNumber);
     await expect(row).toHaveCount(1, { timeout: 60_000 });
 
-    // --- R7: el panel de edicion no ofrece NINGUN control de estado.
+    // --- El panel de edicion no ofrece NINGUN control de estado.
     await row.getByTestId(ORDER_ACTION_EDIT_TESTID).click();
     await expect(page.getByTestId(ORDER_FORM_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(ORDER_STATUS_SELECT_TESTID)).toHaveCount(0);
@@ -644,7 +643,7 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await page.getByTestId(ORDER_FORM_CANCEL_TESTID).click();
     await expect(page.getByTestId(ORDER_FORM_TESTID)).toHaveCount(0, { timeout: 60_000 });
 
-    // --- R32: el selector de responsables no ofrece a quien tiene `pedidos.consultar` -el OTRO
+    // --- El selector de responsables no ofrece a quien tiene `pedidos.consultar` -el OTRO
     // Administrador-, y SI sigue ofreciendo a quien no lo tiene -el Operador-, control positivo de
     // que la lista de candidatos cargo de verdad.
     const urlBeforeOpen = page.url();

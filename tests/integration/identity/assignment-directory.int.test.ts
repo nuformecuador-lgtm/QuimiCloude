@@ -449,7 +449,7 @@ describe('PeopleDirectory — quien vuelve y con que `isActive`', () => {
 });
 
 // ---------------------------------------------------------------------------
-// PeopleDirectory — `listAliveInCompany` (R32, R33)
+// PeopleDirectory — `listAliveInCompany`
 // ---------------------------------------------------------------------------
 
 describe('listAliveInCompany — personas vivas de la empresa, ordenadas y acotadas', () => {

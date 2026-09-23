@@ -1,7 +1,7 @@
 // tests/unit/asignaciones/responsible-eligibility.test.ts
 //
 // `canBeResponsible`: quien puede ser responsable de un pedido, decidido por permiso, nunca por
-// rol (R33, R34).
+// rol.
 
 import { describe, expect, it } from 'vitest';
 

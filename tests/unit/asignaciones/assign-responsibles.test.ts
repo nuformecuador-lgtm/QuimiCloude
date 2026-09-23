@@ -94,7 +94,7 @@ function montar(opts: {
   const personasExplicitas = opts.personas ?? [];
   const gruposVivos = opts.gruposVivos ?? [];
 
-  // R34, R36: el caso de uso pregunta por la elegibilidad de los miembros de los grupos con una
+  // El caso de uso pregunta por la elegibilidad de los miembros de los grupos con una
   // segunda llamada al mismo puerto. Quien no se declara explicito en `personas` entra aqui como
   // activo y elegible por defecto -el caso comun-; el test que quiera un miembro NO elegible lo
   // declara explicito con sus permisos, y esa entrada gana sobre el relleno.
@@ -352,7 +352,7 @@ describe('QC-87 — `assignResponsibles`', () => {
     });
   });
 
-  /** R33 — una persona SUELTA con `pedidos.consultar` no se puede asignar como responsable. */
+  /** Una persona SUELTA con `pedidos.consultar` no se puede asignar como responsable. */
   describe('personas sueltas con `pedidos.consultar` (R33)', () => {
     it("una sola persona con `pedidos.consultar` -> 'user_cannot_be_responsible', ninguna fila", async () => {
       const m = montar({ personas: [persona(ANA, true, ['pedidos.consultar'])] });
@@ -482,7 +482,7 @@ describe('QC-87 — `assignResponsibles`', () => {
   });
 
   /**
-   * R34, R36 — un grupo con un miembro no elegible (`pedidos.consultar`) no rechaza la operacion:
+   * Un grupo con un miembro no elegible (`pedidos.consultar`) no rechaza la operacion:
    * se le omite EN SILENCIO, igual que a un inactivo, y el resto del grupo se asigna.
    */
   describe('grupos con un miembro que tiene `pedidos.consultar` (R34, R36)', () => {
@@ -500,7 +500,7 @@ describe('QC-87 — `assignResponsibles`', () => {
         AHORA,
       );
 
-      // La operacion NO falla (R34): tiene exito con una sola fila.
+      // La operacion NO falla: tiene exito con una sola fila.
       expect(outcome).toEqual({ added: 1 });
       expect(m.filas()).toEqual([
         {

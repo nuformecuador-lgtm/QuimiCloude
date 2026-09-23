@@ -1,14 +1,14 @@
 // tests/integration/asignaciones/finished-orders.int.test.ts
 /**
- * QC-145 T11 — «Terminados» contra Postgres real (`design.md > 3.2`; R17, R19, R20, R30).
+ * «Terminados» contra Postgres real.
  *
  * En unidad, `list-finished-orders.test.ts` prueba el dominio con puertos de mentira: «los nulos
  * van al final» es una promesa del doble, no del `ORDER BY` real. Aqui corre
  * `listAliveSummariesInCompany` (`order-catalog-prisma.ts`) contra Postgres, con pedidos
  * `ENTREGADO` de verdad -algunos con `finished_at`, otro sin ella porque nacio ENTREGADO antes de
  * la migracion- y comprueba que el orden y la estabilidad entre paginas son del MOTOR, no del
- * mock. R30 se prueba llamando a `finishAssignedOrder`, el caso de uso real: es la unica forma de
- * demostrar que lo que finaliza en planta aparece despues con su fecha.
+ * mock. La finalizacion se prueba llamando a `finishAssignedOrder`, el caso de uso real: es la
+ * unica forma de demostrar que lo que finaliza en planta aparece despues con su fecha.
  *
  * AISLAMIENTO: `transaccion` (ver la cabecera de `./use-case-fixture.ts` y el censo).
  */
@@ -45,7 +45,7 @@ if (PERMISOS_DEL_EMPACADOR === undefined) {
 }
 
 /** Cablea el caso de uso REAL sobre la `tx` del fixture, con los mismos adaptadores que
- *  `lib/composition` ata en produccion (`design.md > 5`). */
+ *  `lib/composition` ata en produccion. */
 function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepository>[0]) {
   const orders: OrderCatalog = {
     findAliveById: findAliveOrderTargetById,
@@ -115,7 +115,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       const pagina = await listFinishedOrders(actorEmpacador, { page: 1 });
 
       // El pendiente no sale; el de la otra empresa tampoco; el entregado sale aunque el
-      // Empacador NO sea su responsable (R17: sin filtro por usuario asignado).
+      // Empacador NO sea su responsable: sin filtro por usuario asignado.
       expect(pagina.items.map((item) => item.id)).toEqual([entregadoAjeno]);
       expect(pagina.total).toBe(1);
       void otraPersona;
@@ -141,7 +141,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
         data: { finishedAt: new Date('2026-02-01T00:00:00.000Z') },
       });
       // `sinFechaPrimero` y `sinFechaSegundo` se crean en ese orden, asi que su `order_sequence`
-      // es creciente: «sin fecha» los ordena por numero DESCENDENTE (D14), o sea al reves.
+      // es creciente: «sin fecha» los ordena por numero DESCENDENTE, o sea al reves.
 
       const empacador = await createPerson(fixture, fixture.companyA);
       const actorEmpacador: Actor = {

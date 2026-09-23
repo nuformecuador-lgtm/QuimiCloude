@@ -60,7 +60,7 @@ function listSourceFiles(dir: string): readonly string[] {
   });
 }
 
-/** Solo `lib/**`: el alcance exacto que citan R5 y R10. */
+/** Solo `lib/**`: el alcance exacto del barrido de fuente. */
 function listLibFiles(root: string): readonly string[] {
   return listSourceFiles(join(root, 'lib'));
 }
@@ -261,7 +261,7 @@ describe('R10 — EN_CURSO/ENTREGADO solo los escribe transitionAliveOrder; upda
 });
 
 // -------------------------------------------------------------------------------------------
-// R16 — el catalogo sigue en 16 permisos
+// El catalogo sigue en 16 permisos
 // -------------------------------------------------------------------------------------------
 
 describe('R16 — el catalogo de permisos sigue en dieciseis codigos', () => {
@@ -276,7 +276,7 @@ describe('R16 — el catalogo de permisos sigue en dieciseis codigos', () => {
 });
 
 // -------------------------------------------------------------------------------------------
-// R29 — sin dependencias nuevas ni tablas nuevas, comparado contra origin/dev
+// Sin dependencias nuevas ni tablas nuevas, comparado contra origin/dev
 // -------------------------------------------------------------------------------------------
 
 function git(comando: string): string {

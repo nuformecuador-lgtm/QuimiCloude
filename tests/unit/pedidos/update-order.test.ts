@@ -151,8 +151,8 @@ const EDICION_HACIA_B = {
   presentationId: PRESENTACION_DE_A,
 };
 
-/** Repositorio con la fila en el ESTADO que pide el caso, para ejercitar R8 (QC-145) y R9/R10
- *  (QC-146). */
+/** Repositorio con la fila en el ESTADO que pide el caso, para ejercitar la edicion sobre
+ *  pedidos en distintos estados. */
 function repositorioConEstado(status: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'CANCELADO') {
   const findAliveById = vi.fn(async () => ({
     ...filaExistente(),

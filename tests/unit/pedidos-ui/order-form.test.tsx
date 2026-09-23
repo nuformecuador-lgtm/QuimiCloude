@@ -482,8 +482,8 @@ describe('la presentación del pedido (R16, R17, R18, R19)', () => {
 
 describe('formulario de edicion de pedido (R7, R28, R34)', () => {
   it('precarga los valores actuales y envia el REEMPLAZO COMPLETO del conjunto de negocio', async () => {
-    // R28 — no hay envio por campos sueltos: se manda todo el conjunto de negocio, y nada de
-    // estado (R7).
+    // No hay envio por campos sueltos: se manda todo el conjunto de negocio, y nada de
+    // estado.
     const user = setupUser();
     const elPedido = pedido();
     renderFormulario(elPedido);
@@ -547,7 +547,7 @@ describe('formulario de edicion de pedido (R7, R28, R34)', () => {
   });
 
   it('R7: «invalid_transition» va a la region general del formulario, sin campo de estado que senalar', async () => {
-    // Sin selector de estado (R7), `invalid_transition` ya no puede senalar ningun campo: cae
+    // Sin selector de estado, `invalid_transition` ya no puede senalar ningun campo: cae
     // en la region general, junto con `duplicate_number` y compania.
     const user = setupUser();
 

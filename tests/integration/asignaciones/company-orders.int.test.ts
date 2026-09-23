@@ -1,6 +1,6 @@
 // tests/integration/asignaciones/company-orders.int.test.ts
 /**
- * QC-145 T11 — «Todos» contra Postgres real (`design.md > 3.3`; R22, R24).
+ * «Todos» contra Postgres real.
  *
  * En unidad, `list-company-orders.test.ts` prueba que el filtro exactamente `['ENTREGADO']`
  * ordena distinto de cualquier otra mezcla contra puertos de mentira. Aqui corre
@@ -98,7 +98,7 @@ describe('asignaciones · listCompanyOrders con los permisos del Administrador (
       );
       expect(pagina.items.map((item) => item.id)).not.toContain(deOtraEmpresa);
       expect(pagina.total).toBe(4);
-      // `finishedAt` viaja siempre, aunque solo el filtrado exactamente ENTREGADO lo pinte (R31).
+      // `finishedAt` viaja siempre, aunque solo el filtrado exactamente ENTREGADO lo pinte.
       for (const item of pagina.items) expect('finishedAt' in item).toBe(true);
     });
   });

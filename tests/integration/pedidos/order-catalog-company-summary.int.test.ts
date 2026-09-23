@@ -1,8 +1,6 @@
 /**
- * QC-145 T4 — `OrderCatalog.listAliveSummariesInCompany` contra una base Postgres REAL: el
+ * `OrderCatalog.listAliveSummariesInCompany` contra una base Postgres REAL: el
  * ambito por empresa, el borrado logico, el filtro por estado y el `total`.
- *
- * Requisitos cubiertos: R17, R20, R22, R24, R27 (`design.md > 2.2`, `> 10`).
  *
  * POR QUE COMMITEA: `listAliveSummariesInCompany` habla con el cliente Prisma GLOBAL
  * (`@/lib/shared/db/prisma`), no con un `tx` inyectado, mismo motivo que

@@ -91,7 +91,7 @@ function addsNullableTimestampColumn(sql: string): boolean {
   )
 }
 
-/** ¿No hay ni un `UPDATE` en el UP? Sin relleno: los pedidos existentes quedan en NULL (R2). */
+/** ¿No hay ni un `UPDATE` en el UP? Sin relleno: los pedidos existentes quedan en NULL. */
 function fillsNothing(sql: string): boolean {
   return !/\bUPDATE\s+"?orders"?\b/i.test(stripSqlComments(sql))
 }
@@ -105,7 +105,7 @@ function addsDeliveredCheck(sql: string): boolean {
   )
 }
 
-/** ¿El indice parcial es el de R20/D14: fecha DESC NULLS LAST, ano DESC, secuencia DESC, solo
+/** ¿El indice parcial ordena por fecha DESC NULLS LAST, ano DESC, secuencia DESC, solo
  *  sobre los vivos y entregados? */
 function createsPartialFinishedIndex(sql: string): boolean {
   return statements(sql).some((statement) =>
@@ -159,7 +159,7 @@ describe('migration.sql de orders_finished_at — la columna nace opcional, con 
     expect(fillsNothing(upSource)).toBe(true)
 
     // Sensibilidad 1: `NOT NULL` volveria obligatoria la fecha de los pedidos ya existentes, que
-    // no tienen con que rellenarse (R2).
+    // no tienen con que rellenarse.
     const obligatoria = upSource.replace(
       'ADD COLUMN "finished_at" TIMESTAMPTZ(6);',
       'ADD COLUMN "finished_at" TIMESTAMPTZ(6) NOT NULL;',
@@ -192,7 +192,7 @@ describe('migration.sql de orders_finished_at — la columna nace opcional, con 
     expect(createsPartialFinishedIndex(upSource)).toBe(true)
 
     // Sensibilidad 1: sin `NULLS LAST` explicito, Postgres pondria los nulos PRIMERO en
-    // descendente, justo lo contrario de R20.
+    // descendente, justo lo contrario del orden esperado.
     const sinNullsLast = upSource.replace('"finished_at" DESC NULLS LAST', '"finished_at" DESC')
     expect(sinNullsLast, 'la mutacion no se aplico').not.toBe(upSource)
     expect(createsPartialFinishedIndex(sinNullsLast)).toBe(false)

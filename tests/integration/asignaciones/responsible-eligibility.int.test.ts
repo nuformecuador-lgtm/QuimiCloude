@@ -1,6 +1,6 @@
 // tests/integration/asignaciones/responsible-eligibility.int.test.ts
 /**
- * Quien puede ser responsable de un pedido, contra Postgres real (R33-R37).
+ * Quien puede ser responsable de un pedido, contra Postgres real.
  *
  * POR QUE AQUI Y NO SOLO EN UNIDAD. `tests/unit/asignaciones/assign-responsibles.test.ts` prueba
  * el caso de uso con un doble de `PeopleDirectory` que contesta lo que el test le dicta. Aqui el
@@ -9,7 +9,7 @@
  * permission.code`: solo contra la base se demuestra que esa lectura, y no una promesa del doble,
  * es lo que decide la elegibilidad.
  *
- * R35 y R37 ademas ejercitan los TRES casos de uso de ejecucion (`get-`, `start-` y
+ * Este archivo ademas ejercita los TRES casos de uso de ejecucion (`get-`, `start-` y
  * `finish-assigned-order.ts`) sin tocarlos: la receta del fixture nace SIN lineas ni pasos
  * (`use-case-fixture.ts`) y el pedido sin presentacion, asi que `recipes.findExecutionContentById`
  * es el UNICO catalogo de la ejecucion que este archivo necesita real; `units`, `products` y
@@ -97,7 +97,7 @@ function ordersReales(): OrderCatalog {
 }
 
 /** Los tres casos de uso de EJECUCION, cableados con los adaptadores reales de la transaccion del
- *  test. Este archivo no toca esos tres modulos (D17): solo demuestra su efecto desde fuera. */
+ *  test. Este archivo no toca esos tres modulos: solo demuestra su efecto desde fuera. */
 function wireExecutionUseCases(fixture: Fixture) {
   const assignments = createOrderAssignmentRepository(fixture.tx);
   const orders = ordersReales();

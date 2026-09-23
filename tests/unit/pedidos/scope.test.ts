@@ -399,7 +399,7 @@ describe('QC-34 — limite de alcance de la feature', () => {
     // CUARTO spec de pedidos sin ficha que lo respalde vuelve a ponerla en rojo. El orden es el de
     // `filesIn` (orden alfabetico de ruta), no el de llegada.
     //
-    // AMPLIADA el 2026-09-23 (QC-145, pedidos-terminados-en-asignacion): entra la CUARTA entrada,
+    // AMPLIADA el 2026-09-23: entra la CUARTA entrada,
     // el spec e2e/pedidos-terminados.spec.ts. Con los tres roles reales del seed comprueba las
     // pestañas de la nueva pantalla de asignacion y que el panel de edicion de pedidos ya no
     // ofrece ningun control de estado. No sustituye a ninguno de los otros tres porque lo que

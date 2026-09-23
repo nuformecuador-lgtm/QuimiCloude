@@ -1,6 +1,6 @@
 // tests/unit/asignaciones/list-responsible-candidates.test.ts
 //
-// Caso de uso «candidatos para el selector de responsables» (R32).
+// Caso de uso «candidatos para el selector de responsables».
 //
 // Con un doble de `PeopleDirectory`: aqui no hay base. Lo que la base demuestra —que el permiso
 // sale de una fila real de `role_permissions`— es de `tests/integration/identity/**`; lo que este
