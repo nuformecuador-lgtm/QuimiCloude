@@ -252,3 +252,65 @@ Specs: `e2e/pedidos-terminados.spec.ts`, `pedidos.spec.ts`, `pedidos-asignados.s
 8. **Degradación del selector** (`design.md > 3.6`, declarada al aprobar): la lista de personas ya
    no depende de `usuarios.consultar`, solo de `asignaciones.modificar`. El test de la vieja
    degradación se reescribió con su motivo.
+
+---
+
+## Vuelta 2 (2026-09-23): review rechazada (1 mayor, 7 menores) y 4 rojos nuevos del gate
+
+La rama ya venía sincronizada con `origin/dev` (merge `c674f8a5`, del leader). Misma base,
+`QuimiCloude_QC145`.
+
+### Hallazgos de la review
+
+| Hallazgo | Estado | Commit |
+|---|---|---|
+| **M1**: citas R28/R27/D16 en `order-form.tsx:103,:441`, `order-list-section.tsx:176` y `list-company-orders.ts:34` | Cerrado. El commit solo cambia comentarios | `c16d8172` |
+| m1: «T12» en `company-orders-table.tsx:91` | Cerrado | `c16d8172` |
+| m2: «pregunta abierta 5 del spec» en `order-input.ts`; «antes de esta ficha» en `list-responsible-candidates.ts` | Cerrado | `c16d8172` |
+| m3: motivo inexacto («sus propios pedidos») en `assign-responsibles.ts`, `responsible-eligibility.ts`, `errors.ts` y `error-codes.ts` | Cerrado. Motivo real: quien tiene `pedidos.consultar` supervisa los pedidos de toda la empresa | `6e669c5b` |
+| m4: constantes muertas en `order-form.tsx` y el paso R7 del E2E que no podía fallar | **Cerrado en parte.** El E2E ahora afirma además que no hay ningún `combobox` con nombre /estado/i, y eso sí puede fallar. Las constantes **se quedan**: las exige `tests/guards/guard-pantalla-pedidos-se-amplia.test.ts`, guardia de otra ficha, y retirarlas es cambiar un contrato fuera del alcance del spec. Se propone una ficha para enmendar esa guardia y retirar las constantes | `5ed60802` |
+| m5: citas QC-145/T/D/design.md en comentarios de tests y E2E | Cerrado. El grep sobre el diff de `tests/` y `e2e/` da 0 líneas de comentario con cita | `918ca399`, `5eaa3d2d` |
+| m6: cabecera larga de `migration.sql`, bloques repetidos en `asignaciones/index.ts` y motivo «las pruebas existentes» en `assigned-orders-list-params.ts` | Cerrado | `6e669c5b` |
+| m7: R35 no comprobaba «no se escribe nada» | Cerrado. Ahora también afirma que `finished_at` y `updated_at` no cambian y que no se crea ninguna fila en `order_assignments` | `e033caf2` |
+
+Barrido de producción tras la limpieza:
+`git diff <merge-base> HEAD -- app lib components hooks middleware.ts db | grep '^+' | grep -iE "QC-[0-9]+|\bR[0-9]+\b|\bD[0-9]+\b|\bT[0-9]+\b|design\.md|decisi[oó]n cerrada|esta ficha|del spec|pregunta abierta"` → sin salida.
+
+### Rojos nuevos del gate
+
+| Rojo | Diagnóstico | Arreglo |
+|---|---|---|
+| `tests/unit/pedidos/scope.test.ts`: «los specs E2E de pedidos son estos TRES (R57)» | Lista cerrada sin `e2e/pedidos-terminados.spec.ts` | Enmienda con el patrón del archivo: la lista pasa de TRES a CUATRO, con fecha y motivo (`4688bded`) |
+| `tests/unit/shared/data-table-alcance.test.ts`: «lista cerrada de diecisiete E2E (R36)» | Igual | Pasa de diecisiete a dieciocho, con motivo (`4688bded`) |
+| `tests/unit/recetas/schema/recipe-lines-percentage-migration.test.ts`: «el timestamp es posterior al de la ultima migracion conocida» | Estaba mal planteado: comparaba con la última migración del repo | Ahora compara con `20260922150000_product_type_enum`, con el porqué escrito (`3897a675`). `orders-finished-at-migration.test.ts` ya compara con un nombre fijo, así que no tiene el defecto. Barrido de `tests/unit/**/schema/*migration*.test.ts`: es el único con ese patrón |
+| `tests/unit/configuracion-ui/user-table.test.tsx` R26 (`toBeInTheDocument`) | **Flake de jsdom, no es de la rama.** Aislado 3 veces: 1 falla (`findByTestId(USER_SHEET_TESTID)` no aparece) y 2 pasan (27/27), con el mismo código. La rama no toca `app/(private)/configuracion/usuarios/**`, `components/shared/**`, `lib/modules/identity/index.ts` ni los tipos `UserRow`/`UserDetail` | No se toca. Nada al baseline |
+
+Ningún cambio fue a `tests/baseline-rojos.json`.
+
+### Verificación de la vuelta 2
+
+- `pnpm run typecheck` y `pnpm run lint` en verde.
+- `pnpm exec vitest run` sobre los cuatro archivos de los rojos más `tests/guards`:
+  `Test Files 46 passed (46)`, `Tests 575 passed | 7 skipped (582)`.
+- `tests/integration/asignaciones/responsible-eligibility.int.test.ts`: 4 passed, sobre una base
+  efímera copiada de la plantilla.
+- Los 12 archivos unitarios tocados por la limpieza de m5: 199 passed.
+- E2E, corrida 4: `e2e/pedidos-terminados.spec.ts` en Chromium y WebKit, `--workers=1`, contra
+  `QuimiCloude_QC145`: `8 passed (1.7m)`, es decir, 4 casos por 2 navegadores. El 3117 quedó libre.
+
+### Incidentes de proceso (no afectan al contenido)
+
+- Dos carriles paralelos chocaron en el índice del worktree. Un `commit --amend` sin pathspec y el
+  `reset --mixed` con que se deshizo tiraron el primer commit del carril de tests, que se rehízo
+  limpio (`4688bded`). Se verificó el contenido final.
+- Efecto colateral: **`c16d8172` quedó sin la línea `Co-Authored-By`**. No se reescribió la
+  historia para añadirla: exigiría un rebase interactivo por debajo de seis commits. Lo decide el
+  leader.
+
+### Commits de la vuelta 2
+
+`c16d8172`, `3897a675`, `6e669c5b`, `e033caf2`, `4688bded`, `918ca399`, `5ed60802` y `5eaa3d2d`.
+
+### T17
+
+Sigue `[ ]`, por instrucción del leader: se marca cuando su gate completo salga verde.
