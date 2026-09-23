@@ -998,7 +998,7 @@ const orderUnitOfWork: OrderUnitOfWork = {
 const reservationQueries: ReservationQueries = createReservationQueries();
 
 /**
- * El proceso diario (T12, `design.md > 9`): recorre las empresas de `identity` una por una y,
+ * El proceso diario: recorre las empresas de `identity` una por una y,
  * para cada una, sus candidatos con el `findExpirableOrders` de `pedidos` -ninguna consulta lee
  * pedidos de mas de una empresa a la vez-.
  */

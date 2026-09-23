@@ -778,7 +778,7 @@ async function setOrderReservedAt(
 }
 
 /**
- * Candidatos a caducar de UNA empresa (proceso diario, R21-R26): `PENDIENTE`, vivos, con la
+ * Candidatos a caducar de UNA empresa: `PENDIENTE`, vivos, con la
  * reserva vencida en el umbral o antes. Usa `orders_expirable_idx` -parcial, sobre
  * `reserved_at` con `status = 'PENDIENTE' AND deleted_at IS NULL AND reserved_at IS NOT NULL`-,
  * y el mismo orden que ese indice: `reserved_at, id`, para que dos lotes seguidos avancen sin
