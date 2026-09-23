@@ -269,7 +269,7 @@ vivos, receta sin líneas no aparta), `R44` y la **paridad** con `planReservatio
 datos, incluidos un caso de techo a 4 decimales y uno de producto sin unidad (sustituye al de unidad
 sin base común).
 
-## [ ] T12 — El proceso diario `[depende de T8]` `[P con T9-T11]`
+## [x] T12 — El proceso diario `[depende de T8]` `[P con T9-T11]`
 
 Archivos: `vercel.json` (nuevo), `app/api/cron/caducar-pedidos/route.ts` (nuevo),
 `lib/modules/pedidos/adapters/driving/order-expiry-cron-route.ts` (nuevo),
@@ -286,10 +286,9 @@ el repositorio), `R25` (dos ejecuciones seguidas y dos solapadas en integración
 que falla no impide los demás y se registra el evento); `tests/unit/documentos/route-segment-config.test.ts`
 o uno equivalente comprueba los literales de la ruta nueva.
 
-*Estado al 2026-09-23:* **parcial y bloqueada** (`3c721563`: dominio, secreto y sus unitarios). `findExpirableOrders`
-consulta todas las empresas (§9.1) y `guard-ambito-empresa-pedidos` la rechaza: la guardia solo admite
-una excepción nombrada que apruebe un humano en el spec. Faltan la consulta, el handler, la ruta,
-`vercel.json`, `.env.example`, el cableado y los tests de R23, R24 (handler) y R25 (integración).
+*Estado al 2026-09-23 (tanda 3):* **hecha**, empresa por empresa según `design.md > 9.1` enmendado
+(`3c721563`, `2ac1333f`, `d9209950`, `1b6caa8b`, `3df0a342`). `guard-ambito-empresa-pedidos` verde sin
+excepciones. Ver bitácora, «Tanda 3».
 
 ## [x] T13 — Inventario muestra reservado, disponible y el historial `[depende de T5, T7]`
 

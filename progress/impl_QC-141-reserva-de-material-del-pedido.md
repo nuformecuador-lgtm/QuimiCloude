@@ -880,3 +880,119 @@ Sin test: **R23**. R21, R22, R24, R25 y R26 solo en su parte de dominio (T12).
   leader, no de esta rama.
 - No se ejecutaron, por regla: la suite completa, `./init.sh` completo y los E2E (nuevo
   `reserva-de-material.spec.ts`; modificados `ejecucion-receta.spec.ts` y `ajuste-de-inventario.spec.ts`).
+
+## Tanda 3 (2026-09-23): T12, T16 y T17
+
+Tras la decisión del humano de F2.1 (`design.md > 9.1`, «Enmendado el 2026-09-23»): el proceso
+diario busca candidatos **empresa por empresa**.
+
+### Estado de las tasks
+
+| Task | Estado | Commits |
+|---|---|---|
+| TM | **abierta** solo por la prueba de rollback de `20260923120000` y el saneo de `QuimiCloude`: los dos esperan permiso del humano y no se intentaron | — |
+| T12 | [x] | `3c721563` (tanda 2), `2ac1333f`, `d9209950`, `1b6caa8b`, `3df0a342` |
+| T16 | **abierta**: E2E sin ejecutar (abajo) | `edf2ef8b`, `c029c262` (tanda 2), `4f76de88` (censo de la tabla compartida) |
+| T17 | **abierta**: documentación y mapa hechos; `./init.sh` completo interrumpido (abajo) | `60b672fa` (`docs/architecture.md`) |
+
+### T12: cómo quedó
+
+- `findExpirableOrders(companyId, threshold, limit)` en `order-prisma.ts`, con `orderCompanyScope`
+  como el resto del módulo; `guard-ambito-empresa-pedidos` verde **sin excepciones ni cambios**.
+- Listar las empresas es de `identity` (dueño de `companies`): `listActiveCompanyIds()` en
+  `lib/modules/identity/adapters/driven/persistence/company-directory-prisma.ts` (nuevo). `pedidos`
+  la recibe como dependencia de `createExpireStaleOrders`; solo `lib/composition` las ata.
+  **Para la revisión:** lee los ids de todas las filas vivas de `companies`, algo inherente a
+  «empresa por empresa»; no lee pedidos de varias empresas a la vez.
+- Handler `lib/modules/pedidos/adapters/driving/order-expiry-cron-route.ts`, ruta
+  `app/api/cron/caducar-pedidos/route.ts` (`runtime = 'nodejs'`, `maxDuration = 300`), `vercel.json`,
+  bloque `CRON_SECRET` en `.env.example` (antes del de `DOCUMENTS_E2E_DOUBLES`, que tiene que seguir
+  siendo el último por `guard-dobles-e2e`), cableado en `lib/composition/index.ts`.
+- **Para la revisión (`3df0a342`):** cuatro tests de alcance de otras fichas daban por hecho que no
+  había ningún Route Handler ni cron en el repo: `tests/unit/pedidos/scope.test.ts` y
+  `module-contract.test.ts` (QC-34/35), `tests/unit/documentos/qc111-alcance.test.ts` (QC-111) y
+  `tests/unit/identity/credencial/scope.test.ts` (QC-79). Cada uno gana una exclusión **nombrada
+  por archivo o ruta exacta** para este cron; en `qc111-alcance` la prohibición pasa de «ningún
+  `vercel.json` con crons» / «un solo `route.ts` en `app/api`» a «ningún cron que apunte a
+  `documentos`» / «un solo `route.ts` en `app/api/documentos`». No son guardias de `tests/guards/`,
+  pero cambian lo que afirmaban fichas cerradas.
+
+### T17: documentación
+
+`docs/architecture.md`: el primer consumidor del lote pasa a implementado, y bajo «Server Actions vs
+Route Handlers» se documenta el primer cron interno, su ruta, `CRON_SECRET` en Vercel y que recorre
+las empresas una a una. `R47`: ningún cambio en `package.json` ni filas nuevas en
+`docs/dependencias.md` en toda la rama.
+
+### R → test: mapa completo R1–R50
+
+| R | Test |
+|---|---|
+| R1 | `tests/unit/inventario/schema/inventario-schema.test.ts`; `tests/unit/inventario/qc91-alcance.test.ts` («R21: product_batches.stock… decimal(14,4)»); `tests/unit/inventario/schema/reservations-and-decimal-stock-migration.test.ts` («R1: convierte las cuatro columnas…») |
+| R2 | `tests/integration/inventario/reservations-and-decimal-stock-migration.int.test.ts` («R2: convertir a decimal(14,4) conserva exactamente…») |
+| R3 | `product-batch-input.test.ts` («R3: el alta exige la existencia…»); `product-stock.int.test.ts` («R3: dos lotes con decimales exactos…») |
+| R4 | `adjust-batch-stock.test.ts` (bloque «QC-92 R4 — la cantidad decimal del ajuste», siete casos) |
+| R5 | `unit-cost.test.ts` («R5: divide con una existencia decimal…» y resto del archivo) |
+| R6 | `product-page.test.tsx`, `product-batches-panel.test.tsx`, `product-cost-amount.test.ts`, `adjust-batch-dialog.test.tsx`, `batch-history.test.tsx` (casos `R6 —`); `order-form.test.tsx`; `decimal-quantity-convenciones.test.ts`; `unit-cost.test.ts` |
+| R7 | `tests/integration/pedidos/order-reservation.int.test.ts` («R7, R20 — crear aparta y fija reserved_at») |
+| R8 | `tests/unit/inventario/batch-order.test.ts` y `plan-reservation.test.ts` (casos `R8:`) |
+| R9 | `plan-reservation.test.ts` («R9: un producto sin unidad no se cubre y arrastra a todo el pedido») |
+| R10 | `plan-reservation.test.ts` (casos `R10:`) |
+| R11 | `plan-reservation.test.ts` (tres `R11:`); `tests/unit/pedidos/order-requirement.test.ts` (dos `R11:`) |
+| R12 | `tests/integration/inventario/reservation.int.test.ts`; `order-reservation.int.test.ts` («R12 — …») |
+| R13 | `reservation.int.test.ts`; `order-reservation.int.test.ts` («R13 — …») |
+| R14 | `order-reservation.int.test.ts` («R14 — editar la receta no toca lo apartado…») |
+| R15 | `tests/integration/pedidos/order-unit-of-work.int.test.ts`; rechazos sin cambios en `order-reservation.int.test.ts` |
+| R16 | `tests/integration/pedidos/order-reservation-concurrency.int.test.ts` («R16 — dos altas simultaneas…») |
+| R17 | `reservation.int.test.ts` (FK compuesta); `tests/integration/pedidos/order-expiry.int.test.ts` («R17, R21 — aislamiento por empresa») |
+| R18 | `order-reservation.int.test.ts` («R18 — cancelar libera con autor») |
+| R19 | `order-reservation.int.test.ts` («R19 — borrar libera») |
+| R20 | `order-reservation.int.test.ts` («R7, R20 — …») |
+| R21 | `tests/unit/pedidos/expire-stale-orders.test.ts` («R21: cancela con el motivo exacto…»); `order-expiry.int.test.ts` («R21 — el proceso diario cancela…») |
+| R22 | `expire-stale-orders.test.ts` (dos «R22: solo toca lo que sigue PENDIENTE…»); `order-expiry.int.test.ts` (dos «R22 — el proceso diario NO toca lo que no debe») |
+| R23 | `tests/unit/pedidos/vercel-cron.test.ts` (dos casos); literales de la ruta en `tests/unit/pedidos/route-segment-config.test.ts` |
+| R24 | `tests/unit/pedidos/order-expiry-cron-route.test.ts` (cuatro casos, dobles que fallan si se leen); `tests/unit/pedidos/cron-secret-env.test.ts` |
+| R25 | `expire-stale-orders.test.ts` («R25: idempotente…»); `order-expiry.int.test.ts` («R25 — idempotente…», seguidas y solapadas con `Promise.all`) |
+| R26 | `expire-stale-orders.test.ts` (dos «R26: un fallo no arrastra…»); `order-expiry-cron-route.test.ts` («R26 — con fallos: 500 y el evento estructurado») |
+| R27, R28 | `reservation.int.test.ts`; `tests/unit/pedidos/transition-order.test.ts`; `order-reservation.int.test.ts` («R27, R28: Finalizar…») |
+| R29 | `order-reservation.int.test.ts` («R29 — editar a ENTREGADO cambiando cantidad recalcula y consume») |
+| R30, R31 | `reservation.int.test.ts`; `transition-order.test.ts`; `order-reservation.int.test.ts`; `tests/unit/asignaciones/finish-assigned-order.test.ts` |
+| R32 | `reservation.int.test.ts`; `order-reservation.int.test.ts` («R32: un segundo Finalizar…») |
+| R33 | `reservation.int.test.ts`, `adjust-batch-stock-prisma.test.ts`, `adjust-batch-dialog.test.tsx` («R33 — …») |
+| R34, R37 | `reservation.int.test.ts` («R34, R37 — …»); `product-batches-panel.test.tsx` |
+| R35 | `tests/unit/pedidos/find-coverage.test.ts`; `order-columns.test.tsx`, `order-list-section.test.tsx`, `order-sheet-coverage.test.tsx` |
+| R36 | `reservation.int.test.ts` («R36 — …»); `product-page.test.tsx` |
+| R38 | `reservation.int.test.ts`; `adjust-batch-stock.test.ts`; `batch-history.test.tsx` |
+| R39 | `reservation.int.test.ts`; `tests/guards/guard-libro-de-inventario.test.ts` |
+| R40 | `tests/unit/inventario/authorization.test.ts` |
+| R41 | `create-order`, `update-order`, `cancel-order` y `delete-order.test.ts` («R41: el permiso se exige ANTES…»); `tests/unit/pedidos/authorization.test.ts` |
+| R42 | `reservation.int.test.ts` («R42 — …») |
+| R43, R44 | `tests/integration/inventario/reserve-existing-orders-migration.int.test.ts` (con paridad contra `planReservation`) |
+| R45 | `inventory-movement-kind-consumption-migration.test.ts` y `reservations-and-decimal-stock-migration.test.ts` («R45: el down.sql falla…»); `reservations-and-decimal-stock-migration.int.test.ts` (dos `R45`) |
+| R46 | los dos tests de esquema de migración («R46: no nombra ninguna tabla ni columna fuera de ingles…»); `guard-libro-de-inventario` (sin `UPDATE`/`DELETE` sobre el libro) |
+| R47 | `tests/guards/guard-dependencias-aprobadas.test.ts` (sin cambios en `package.json`) |
+| R48 | `e2e/reserva-de-material.spec.ts` (**escrito, sin ejecutar**) |
+| R49 | `plan-reservation`, `order-requirement`, `create-order` y `update-order.test.ts`; `order-reservation.int.test.ts`; `reserve-existing-orders-migration.int.test.ts` |
+| R50 | `reservation.int.test.ts`, `transition-order.test.ts`, `update-order.test.ts`, `finish-assigned-order.test.ts`, `order-reservation.int.test.ts` |
+
+Los 50 tienen test. Solo R48 no se ha ejecutado.
+
+### Salida de los comandos (HEAD `4f76de88`)
+
+- T12 (`backend_dev`): `pnpm run typecheck` y `pnpm run lint` limpios; `pnpm exec vitest run
+  tests/guards` → 42 archivos, 541 pasan, 5 saltados; `tests/guards tests/unit/pedidos
+  tests/unit/documentos tests/unit/identity` → 3578 pasan, 69 saltados y un timeout de hook en
+  `session-once-per-request-render.test.tsx` por carga de CPU, verde en tres corridas aisladas;
+  `tests/integration/pedidos/order-expiry.int.test.ts` → 6/6 sobre base efímera.
+- `./init.sh` completo: **interrumpido, sin veredicto.** Pasó la validación de `feature_list.json`
+  (cupo respetado), `typecheck` y `lint`; avisó de que `QuimiCloude` va 3 migraciones atrás
+  (`20260923120000` es la más antigua que falta; es un aviso, no un fallo). Durante `test:json`
+  Claude Code mató el proceso por falta de memoria del sistema. Antes de morir mostró **un** rojo:
+  `tests/unit/shared/data-table-alcance.test.ts` (censo cerrado de E2E que usan la tabla
+  compartida, sin `reserva-de-material.spec.ts`). Arreglado en `4f76de88`; el archivo da 14
+  pasan y 2 saltados. No se relanzó el gate: la memoria sigue justa y no se relanza sin que se pida.
+- E2E (`reserva-de-material`, `ejecucion-receta`, `ajuste-de-inventario`, Chromium y WebKit): **no
+  ejecutados.** El puerto 3117 lo ocupaba el `next dev` del E2E de QC-122 (otro worktree, no se
+  tocó), y después vino la falta de memoria. Además, el servidor del E2E usa el `DATABASE_URL` del
+  `.env`, es decir `QuimiCloude`, que va 3 migraciones atrás y tiene las dos nuestras aplicadas con
+  el nombre viejo: el esquema coincide, pero falta `20260923120200_reserve_existing_orders` (solo datos).
