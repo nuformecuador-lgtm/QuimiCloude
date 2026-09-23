@@ -98,5 +98,46 @@ con «Cancelar»); se cambió a `getByTestId('order-form-cancel')`. Segunda corr
 
 (Los `[WebServer] ⨯ Error: aborted` del log son las navegaciones que el rebote deja a medias en `next dev`.)
 
-**Pendiente del leader:** WebKit del E2E (T5 pide los dos navegadores; aquí solo Chromium por
-instrucción), `./init.sh` completo (T6) y la formalización de R27 en `requirements.md`.
+## Vuelta 2: rojos del gate rápido y revisión RECHAZADA (`progress/review_QC-122-….md`, d755d341)
+
+| Commit | Qué |
+|---|---|
+| a9f94015 | Alta de `pedidos-busqueda.spec.ts` en las listas cerradas de e2e: `tests/guards/guard-identificador-de-request.test.ts` (`E2E_ESPERADOS`), `tests/unit/pedidos/scope.test.ts` (tres -> cuatro specs de pedidos) y `tests/unit/shared/data-table-alcance.test.ts` (17 -> 18). Sin relajar nada. WebKit (B3): `waitForURL` -> `expect(page).toHaveURL`, y el primer `fill` de cada caso dentro de `searchFor(...)` con `toPass()` (patrón de `proveedores.spec.ts` / `recetas.spec.ts`: WebKit hidrata tarde y lo escrito antes no emite la búsqueda). |
+| 7f5be715 | m4 (sin R<n>/QC-<n> en comentarios del E2E), m5 (`companyId` duplicado; `expect.poll` para leer filas tras la URL) y un quinto caso E2E para B1: «Atras despues de Limpiar deja la caja y la lista con el termino de antes de limpiar (R27)». |
+| c8064a72 | **B1**: en `order-table.tsx`, `clearing` vuelve a `false` en cuanto llega cualquier `params.search` nuevo (el eco de «Limpiar» o un cambio externo), no solo cuando la tabla emite. Test nuevo `order-table.test.tsx` > «tras «Limpiar», el eco y despues un cambio externo de `params` no dejan la caja atras (R27, R15)» — sin el arreglo: `Expected the element to have value: x / Received: (vacío)`. **B2**: el caso «en vuelo» ahora suelta la navegación y afirma `aria-busy="false"`, sin `opacity-60`, sin rótulo de carga y filas nuevas (R12); durante el vuelo afirma también `opacity-60` (R10). **m1** comentario de `pendingSearches` a 3 líneas; **m2** comentario «search siempre vacio» corregido; **m3** el caso de `clearHref` pasa `status`, `priority` y fechas y afirma que se conservan; **m4** sin la ficha en el `describe` de `order-sheet.test.tsx` ni R<n> en comentarios de `order-table.test.tsx`. |
+
+Mapa actualizado: **R12** -> `order-table.test.tsx` > mientras la navegacion esta en vuelo, la caja conserva foco y
+texto, y al soltarla la tabla se actualiza (R10, R11, R12). **R27** añade el caso de B1 y el E2E «Atras despues de
+Limpiar…». Los cinco menores están arreglados; ninguno se deja con justificación.
+
+### Salida real (vuelta 2)
+
+- `pnpm run typecheck` -> sin errores. `pnpm run lint` -> sin salida.
+- `vitest related --run` sobre los 4 archivos de producción -> `Test Files 26 passed (26)`, `Tests 370 passed (370)`.
+- Guardias/listas de e2e (`guard-identificador-de-request`, `guard-e2e-landing`, `pedidos/scope`,
+  `shared/data-table-alcance`) -> `Test Files 4 passed (4)`, `Tests 63 passed | 2 skipped (65)`.
+- E2E `pnpm exec playwright test e2e/pedidos-busqueda.spec.ts`:
+  - Chromium 5/5 (corrida conjunta):
+    ```
+    ✓ escribir un termino recorta la lista … (R25 a) (53.6s)
+    ✓ un termino sin coincidencias … (R25 c) (56.6s)
+    ✓ Atras despues de Limpiar … (R27) (57.0s)
+    ✓ Atras entre dos terminos distintos … (R27) (57.4s)
+    ✓ el termino sobrevive a cambiar de pagina, al panel lateral, a recargar y a Atras (R25 d, R9, R26) (1.1m)
+    ```
+  - WebKit 5/5 (`--project=webkit`):
+    ```
+    ✓ escribir un termino recorta la lista … (R25 a) (33.4s)
+    ✓ un termino sin coincidencias … (R25 c) (37.3s)
+    ✓ Atras despues de Limpiar … (R27) (38.1s)
+    ✓ Atras entre dos terminos distintos … (R27) (38.3s)
+    ✓ el termino sobrevive … (R25 d, R9, R26) (46.4s)
+    5 passed (1.0m)
+    ```
+  - Aviso de entorno: dos corridas conjuntas anteriores tuvieron rojos en WebKit **después** de que
+    `next dev` terminara con `ELIFECYCLE … exit code 1` a mitad de la corrida (en la primera, además,
+    `Can't reach database server at localhost:5432`), con otras sesiones usando el mismo puerto 3117 y el
+    mismo Postgres. Los rojos venían después de la caída y no del spec. Si el gate vuelve a verlo, no es
+    un rojo de la feature. El subagente también obtuvo 10/10 (Chromium + WebKit) en una corrida conjunta limpia.
+
+**Pendiente del leader:** `./init.sh` completo (T6) y la nueva revisión.
