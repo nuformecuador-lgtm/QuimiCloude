@@ -2,8 +2,7 @@
 
 import { identity, inventario, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
-import { InventarioError, type Actor, type Page, type ProductView } from '@/lib/modules/inventario';
-import { PRODUCT_TYPES } from '@/lib/modules/inventario/domain/product-type';
+import { InventarioError, PRODUCT_TYPES, type Actor, type Page, type ProductView } from '@/lib/modules/inventario';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
 // Aqui no se repite `requirePermission`: es la primera linea de cada caso de uso.

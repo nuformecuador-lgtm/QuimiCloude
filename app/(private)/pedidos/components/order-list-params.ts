@@ -28,9 +28,8 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
  * no declarado (QC-57 R5). Se acota igual por no depender de esa cortesia y para que la URL que
  * el usuario ve sea la que la consulta usa.
  *
- * **`search` no se lee ni se escribe todavia**. Esta pantalla no tiene caja de busqueda: el campo
- * existe en `DataTableParams` porque el contrato de lista lo tiene, y esta pantalla lo emite
- * **siempre** como cadena vacia, que es «sin busqueda».
+ * **El termino de busqueda vive en `q`, nunca en `search`**: un `search` puesto a mano en la URL
+ * se ignora, y el vacio o solo espacios tambien es «sin busqueda».
  */
 
 /**
@@ -44,6 +43,14 @@ export const STATUS_PARAM = 'status';
 export const PRIORITY_PARAM = 'priority';
 export const CREATED_FROM_PARAM = 'createdFrom';
 export const CREATED_TO_PARAM = 'createdTo';
+export const SEARCH_PARAM = 'q';
+
+/**
+ * Tope del termino de busqueda. Copia el `SEARCH_MAX_LENGTH` privado de
+ * `lib/modules/pedidos/domain/list-query.ts` (no se exporta desde el dominio: acotar es de la
+ * capa de presentacion). El test de este archivo lo ata a `createListQuerySchema()`.
+ */
+export const ORDER_SEARCH_MAX_LENGTH = 120;
 
 /**
  * Ids de las columnas filtrables, que son tambien las claves de `DataTableParams.filters`.
@@ -178,12 +185,18 @@ export function parseOrderListParams(
     filters[CREATED_AT_COLUMN_ID] = { kind: 'dateRange', from, to };
   }
 
+  // Recortar tras el `trim` puede dejar un espacio final: se vuelve a hacer `trim`.
+  const search = firstValue(searchParams?.[SEARCH_PARAM])
+    ?.trim()
+    .slice(0, ORDER_SEARCH_MAX_LENGTH)
+    .trim() ?? '';
+
   return {
     page: rawPage === undefined || rawPage < FIRST_PAGE ? FIRST_PAGE : rawPage,
     pageSize: rawPageSize !== undefined && isPageSize(rawPageSize) ? rawPageSize : DEFAULT_PAGE_SIZE,
     sort: parseSort(firstValue(searchParams?.[SORT_PARAM])),
     filters,
-    search: '',
+    search,
   };
 }
 
@@ -193,8 +206,8 @@ export function parseOrderListParams(
  * que produce la pantalla es siempre la misma forma que el parser sabe leer, y `parse(build(p))`
  * devuelve `p`.
  *
- * **Nunca escribe `search`** (R20), ni siquiera vacio: un parametro que la pantalla ignora en la
- * URL invita a creer que la lista busca.
+ * **Escribe `q` solo cuando el termino no esta vacio, y nunca `search`**: un parametro vacio en
+ * la URL invitaria a creer que hay una busqueda vigente cuando no la hay.
  */
 export function buildOrderListQuery(params: DataTableParams): string {
   const query = new URLSearchParams();
@@ -204,6 +217,8 @@ export function buildOrderListQuery(params: DataTableParams): string {
   if (params.sort !== null) {
     query.set(SORT_PARAM, `${params.sort.columnId}${SORT_SEPARATOR}${params.sort.direction}`);
   }
+
+  if (params.search !== '') query.set(SEARCH_PARAM, params.search);
 
   const status = params.filters[STATUS_COLUMN_ID];
   if (status?.kind === 'select' && status.values.length > 0) {
@@ -231,4 +246,15 @@ export function buildOrderListQuery(params: DataTableParams): string {
  */
 export function orderListHref(params: DataTableParams): string {
   return `${ORDERS_ROUTE}?${buildOrderListQuery(params)}`;
+}
+
+/**
+ * Los parametros que se emiten tras un cambio, con la pagina reiniciada SI el termino cambio: una
+ * busqueda nueva es sobre el conjunto completo, no sobre la pagina en la que se estaba.
+ */
+export function withSearchResetsPage(
+  current: DataTableParams,
+  next: DataTableParams,
+): DataTableParams {
+  return current.search !== next.search ? { ...next, page: FIRST_PAGE } : next;
 }
