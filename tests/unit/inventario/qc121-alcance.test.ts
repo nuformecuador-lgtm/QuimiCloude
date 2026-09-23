@@ -336,6 +336,100 @@ describe('QC-121 R29 — toda escritura exportada de product_batches recalcula p
 });
 
 // -------------------------------------------------------------------------------------------
+// R28 (m3 del review) — quien llama a consumeBatchStock llama tambien a recalculateProductStock
+// -------------------------------------------------------------------------------------------
+
+type FuncionDeNivelSuperior = { readonly nombre: string; readonly cuerpo: string };
+
+/**
+ * Toda funcion declarada con `function` en el nivel superior del archivo -exportada o no,
+ * sincrona o `async`-. Un metodo dentro del objeto que ella devuelve (como `consumeForOrder`
+ * dentro de `createMaterialReservations`) queda dentro de SU cuerpo, asi que no hace falta
+ * detectarlo aparte: `EXCEPCIONES_SIN_RECALCULO` (mas arriba) traslada la garantia de
+ * `consumeBatchStock` a quien la envuelve, "en su cuerpo o en el de la funcion que la envuelve
+ * dentro del mismo archivo" (`design.md > 6.4`).
+ */
+function funcionesDeNivelSuperior(fuente: string): FuncionDeNivelSuperior[] {
+  const codigo = stripComments(fuente);
+  const funciones: FuncionDeNivelSuperior[] = [];
+  const patronEncabezado = /(?:export\s+)?(?:async\s+)?function\s+([A-Za-z0-9_]+)\s*\(/g;
+  let encabezado: RegExpExecArray | null;
+  while ((encabezado = patronEncabezado.exec(codigo)) !== null) {
+    const antes = codigo.slice(0, encabezado.index);
+    const profundidadAntes = (antes.match(/\{/g)?.length ?? 0) - (antes.match(/\}/g)?.length ?? 0);
+    if (profundidadAntes !== 0) continue; // solo funciones del nivel superior del archivo
+
+    const aperturaParametros = codigo.indexOf('(', encabezado.index);
+    const cierreParametros = cierreDeParametros(codigo, aperturaParametros);
+    if (cierreParametros === -1) continue;
+    const llave = llaveDeCuerpoTrasParametros(codigo, cierreParametros);
+    if (llave === -1) continue;
+    let profundidad = 0;
+    let fin = -1;
+    for (let i = llave; i < codigo.length; i += 1) {
+      if (codigo[i] === '{') profundidad += 1;
+      if (codigo[i] === '}') {
+        profundidad -= 1;
+        if (profundidad === 0) {
+          fin = i;
+          break;
+        }
+      }
+    }
+    if (fin === -1) continue;
+    funciones.push({ nombre: encabezado[1], cuerpo: codigo.slice(llave, fin + 1) });
+  }
+  return funciones;
+}
+
+/** Las funciones de nivel superior cuyo cuerpo llama a `consumeBatchStock` sin llamar tambien,
+ *  en el mismo cuerpo, a `recalculateProductStock`. */
+function funcionesQueConsumenSinRecalculo(fuente: string): string[] {
+  return funcionesDeNivelSuperior(fuente)
+    .filter((funcion) => /consumeBatchStock\s*\(/.test(funcion.cuerpo))
+    .filter((funcion) => !/recalculateProductStock\s*\(/.test(funcion.cuerpo))
+    .map((funcion) => funcion.nombre);
+}
+
+describe('QC-121 R28 — quien llama a consumeBatchStock recalcula products.stock', () => {
+  it('rojo (R28): una funcion fabricada que consume sin recalcular queda marcada', () => {
+    const fuente = [
+      'export async function fakeConsumerSinRecalculo(db) {',
+      '  await consumeBatchStock(db, { batchId, quantity }, now, scope);',
+      '}',
+    ].join('\n');
+    expect(funcionesQueConsumenSinRecalculo(fuente)).toEqual(['fakeConsumerSinRecalculo']);
+  });
+
+  it('verde (R28): una funcion fabricada que consume y recalcula no queda marcada', () => {
+    const fuente = [
+      'export async function fakeConsumerConRecalculo(db) {',
+      '  await consumeBatchStock(db, { batchId, quantity }, now, scope);',
+      '  await recalculateProductStock(db, productId, scope);',
+      '}',
+    ].join('\n');
+    expect(funcionesQueConsumenSinRecalculo(fuente)).toEqual([]);
+  });
+
+  it('verde (R28): ninguna funcion real de lib/ que llama a consumeBatchStock queda sin su recalculo', () => {
+    const archivos = archivosBajoCarpeta('lib');
+    expect(archivos.length).toBeGreaterThan(50);
+
+    const llamantes = archivos.flatMap((archivo) =>
+      funcionesDeNivelSuperior(leer(archivo))
+        .filter((funcion) => /consumeBatchStock\s*\(/.test(funcion.cuerpo))
+        .map((funcion) => `${archivo}::${funcion.nombre}`),
+    );
+    expect(llamantes.length).toBeGreaterThan(0); // el detector encuentra a los llamantes reales
+
+    const sinRecalculo = archivos.flatMap((archivo) =>
+      funcionesQueConsumenSinRecalculo(leer(archivo)).map((nombre) => `${archivo}::${nombre}`),
+    );
+    expect(sinRecalculo).toEqual([]);
+  });
+});
+
+// -------------------------------------------------------------------------------------------
 // R12 — ninguna migracion crea un disparador o funcion que escriba products.stock
 // -------------------------------------------------------------------------------------------
 
