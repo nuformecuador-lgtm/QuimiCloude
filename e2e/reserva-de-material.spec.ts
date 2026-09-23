@@ -13,6 +13,15 @@
  * tiene que demostrar -que la pantalla pinta lo que la base guarda-, siempre por `data-testid` y
  * nunca por posicion.
  *
+ * EL PASO FINAL ENTREGA B POR EL FINALIZAR DE LA PLANTA (asignar, iniciar y finalizar), no por la
+ * edicion en Pedidos: tras QC-145 la edicion ya no mueve el estado (`design.md > 12`, enmienda
+ * «2026-09-23 (review)»). El patron -y sus selectores/`data-testid`- es el mismo que
+ * `e2e/ejecucion-receta.spec.ts`: quien entra a `/asignacion` y finaliza necesita
+ * `asignaciones.consultar` SIN `pedidos.consultar` -con `pedidos.consultar` la pantalla muestra
+ * «Todos», que no tiene columna «Entrar»-, asi que este recorrido crea tambien un Operador real
+ * del seed y cambia de actor solo para ese tramo. La receta del fixture lleva ademas un paso, con
+ * su lista de verificacion, porque `StepReader` sin pasos no pinta boton de Finalizar.
+ *
  * DATOS: `products`, `orders`, `recipes` y `units` son tablas compartidas y varios
  * proyectos/worktrees pueden correr a la vez sobre la misma base. Por eso, con el mismo patron ya
  * asentado en el resto de la suite:
@@ -33,14 +42,21 @@
 import { randomUUID } from 'node:crypto';
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import type { Prisma } from '@prisma/client';
 
-import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
+import { normalizeCompanyName, ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { normalizePresentationName, normalizeProductName } from '@/lib/modules/inventario';
 import { formatOrderNumber } from '@/lib/modules/pedidos';
-import { normalizeRecipeName } from '@/lib/modules/recetas';
+import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
-import { INVENTORY_ROUTE, ORDERS_ROUTE } from '@/lib/shared/routes';
+import {
+  ASSIGNED_ORDERS_ROUTE,
+  DELIVERED_ORDER_PARAM,
+  INVENTORY_ROUTE,
+  ORDERS_ROUTE,
+  assignedOrderRoute,
+} from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
 
@@ -75,11 +91,45 @@ const ORDER_QUANTITY = '1500';
 
 const CANCELLATION_REASON = `Cancelado por el E2E ${RUN_ID}`;
 
+/**
+ * El unico paso de la receta del fixture, con una lista de verificacion: `StepReader` sin pasos
+ * no pinta boton de Finalizar (`step-reader.tsx`), y el Finalizar de la planta es justo lo que
+ * este tramo demuestra.
+ */
+const RECIPE_STEPS: readonly RecipeStepDocument[] = [
+  {
+    blocks: [
+      {
+        kind: 'checklist',
+        items: [{ spans: [{ text: `${SHARED_TOKEN}_verificar_reactor` }] }],
+      },
+    ],
+  },
+];
+
+/** Testids del tramo de Finalizar, mismo patron que `e2e/ejecucion-receta.spec.ts`. */
+const ASIGNACION_TITLE_TESTID = 'asignacion-title';
+const ASSIGNED_ORDER_ENTER_TESTID = 'assigned-order-enter';
+const EXECUTION_TITLE_TESTID = 'order-execution-title';
+const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-0-0';
+const STEP_FINISH_TESTID = 'step-reader-finish';
+const DELIVERED_NOTICE_TESTID = 'assigned-order-delivered-notice';
+
 type Credentials = { readonly username: string; readonly password: string };
 
 const adminUser: Credentials = {
   username: `${SHARED_TOKEN}_admin`,
   password: `Qc141-Admin-${RUN_ID.slice(0, 12)}`,
+};
+
+/**
+ * Sin `pedidos.consultar`: solo asi `/asignacion` muestra la vista «Mis asignados», con columna
+ * «Entrar» (`assignment-views.ts`). Con `pedidos.consultar` -como el admin de arriba- la pantalla
+ * fuerza «Todos», que no tiene ni «Entrar» ni Finalizar.
+ */
+const operatorUser: Credentials = {
+  username: `${SHARED_TOKEN}_operador`,
+  password: `Qc141-Operador-${RUN_ID.slice(0, 12)}`,
 };
 
 let companyId: string | null = null;
@@ -88,6 +138,7 @@ let batchId: string | null = null;
 let recipeId: string | null = null;
 let presentationId: string | null = null;
 let adminUserId: string | null = null;
+let operatorUserId: string | null = null;
 
 function ordersUrl(): string {
   const query = new URLSearchParams({ pageSize: LIST_PAGE_SIZE, sort: ORDERS_SORT });
@@ -227,6 +278,7 @@ test.beforeAll(async () => {
   if (orphanCompanyIds.length > 0) {
     await prisma.reservationMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.inventoryMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.product.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
@@ -259,6 +311,19 @@ test.beforeAll(async () => {
     );
   }
 
+  // El rol REAL del seed, nunca un fixture: es el unico que ve la columna «Entrar» de
+  // `/asignacion` (mismo motivo que `e2e/ejecucion-receta.spec.ts`).
+  const operatorRole = await prisma.role.findUnique({
+    where: { name: ROLE_OPERADOR },
+    select: { id: true },
+  });
+  if (!operatorRole) {
+    throw new Error(
+      `falta el rol "${ROLE_OPERADOR}": siembra la base con \`pnpm run db:seed\` antes de correr ` +
+        '`pnpm run e2e`.',
+    );
+  }
+
   companyId = (
     await prisma.company.create({
       data: { name: COMPANY_NAME, nameNormalized: normalizeCompanyName(COMPANY_NAME) },
@@ -267,6 +332,7 @@ test.beforeAll(async () => {
   ).id;
 
   adminUserId = await createUser(adminUser, adminRole.id);
+  operatorUserId = await createUser(operatorUser, operatorRole.id);
 
   // Una de las unidades del catalogo arrancador, nunca creada ni borrada por este archivo.
   const unit = await prisma.unit.findFirstOrThrow({
@@ -335,6 +401,7 @@ test.beforeAll(async () => {
         nameNormalized: normalizeRecipeName(RECIPE_NAME),
         createdBy: adminUserId,
         companyId,
+        steps: RECIPE_STEPS as unknown as Prisma.InputJsonValue,
         lines: { create: [{ productId, percentage: '100.00' }] },
       },
       select: { id: true },
@@ -354,6 +421,10 @@ test.afterAll(async () => {
         ? prisma.inventoryMovement.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
     () =>
+      scopedCompanyId
+        ? prisma.orderAssignment.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
+    () =>
       scopedCompanyId ? prisma.order.deleteMany({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),
     () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
     () =>
@@ -366,7 +437,10 @@ test.afterAll(async () => {
       scopedCompanyId
         ? prisma.presentation.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
-    () => prisma.user.deleteMany({ where: { username: adminUser.username } }),
+    () =>
+      prisma.user.deleteMany({
+        where: { username: { in: [adminUser.username, operatorUser.username] } },
+      }),
     () => prisma.company.deleteMany({ where: { name: COMPANY_NAME } }),
   ];
 
@@ -487,19 +561,38 @@ test.describe('reserva de material del pedido', () => {
     await expect(productRow.getByTestId('product-reserved')).toContainText('1500');
     await expect(productRow.getByTestId('product-available')).toContainText('500');
 
-    // --- 6. Entregar B desde la edicion en Pedidos: pasa a ENTREGADO, y esa misma operacion
-    // consume lo apartado como salida real de inventario.
-    await openEdit(page, orderBNumber);
-    await page.getByTestId('order-status-select').click();
-    await page.locator('[data-testid="order-status-option"][data-value="ENTREGADO"]').click();
-    await page.getByTestId('order-form-submit').click();
-    await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
+    // --- 6. Entregar B por el Finalizar de la planta: la edicion en Pedidos ya no mueve el
+    // estado (QC-145). Se asigna B al Operador por Prisma -mismo patron que
+    // `e2e/ejecucion-receta.spec.ts`, la asignacion no es lo que este recorrido demuestra-, y de
+    // ahi en mas el actor cambia al Operador: con `pedidos.consultar` -como el admin de arriba-
+    // `/asignacion` fuerza la vista «Todos», sin columna «Entrar» ni Finalizar.
+    await prisma.orderAssignment.create({
+      data: { orderId: orderB.id, userId: operatorUserId!, companyId: companyId! },
+    });
 
-    // Mismo patron: el estado nuevo en la fila de B, todavia en `ordersUrl()` sin navegar, es la
-    // senal de que el refresco de `handleSaved` ya termino antes del `goto` de Inventario.
-    await expect(rowByNumber(page, orderBNumber).getByTestId('order-status')).toHaveAttribute(
-      'data-status',
-      'ENTREGADO',
+    await loginAndLand(page, operatorUser);
+    await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
+
+    const assignedRowB = rowByNumber(page, orderBNumber);
+    await expect(assignedRowB).toHaveCount(1, { timeout: 60_000 });
+    await assignedRowB.getByTestId(ASSIGNED_ORDER_ENTER_TESTID).click();
+    await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderB.id), {
+      timeout: 60_000,
+    });
+    await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
+
+    // Entrar ya deja el pedido EN_CURSO, y eso se lee EN BASE, no en la pantalla.
+    const startedOrderB = await prisma.order.findUniqueOrThrow({
+      where: { id: orderB.id },
+      select: { status: true },
+    });
+    expect(startedOrderB.status).toBe('EN_CURSO');
+
+    // El unico paso de la receta del fixture: bloqueado hasta marcar su lista de verificacion.
+    await page.getByTestId(STEP_CHECKLIST_ITEM_TESTID).click();
+    await page.getByTestId(STEP_FINISH_TESTID).click();
+    await page.waitForURL(
+      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
       { timeout: 60_000 },
     );
 
@@ -509,6 +602,12 @@ test.describe('reserva de material del pedido', () => {
     });
     expect(deliveredOrderB.status).toBe('ENTREGADO');
 
+    const aviso = page.getByTestId(DELIVERED_NOTICE_TESTID);
+    await expect(aviso).toBeVisible({ timeout: 60_000 });
+    await expect(aviso).toContainText(orderBNumber);
+
+    // El Operador tiene `inventario.consultar`: no hace falta volver a entrar como admin para
+    // leer Inventario ni el historial del lote.
     productRow = await inventoryRow(page);
     await expect(productRow.getByTestId('product-stock')).toContainText('500');
     await expect(productRow.getByTestId('product-reserved')).toContainText('0');
