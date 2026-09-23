@@ -7,6 +7,9 @@ import { DataTable, type DataTableParams, type DataTableTexts } from '@/componen
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { OrderSummary } from '@/lib/modules/pedidos';
 import type { UnitView } from '@/lib/modules/unidades';
+// Solo el TIPO, del contrato publico de `inventario`: la arista `pedidos -> inventario` ya
+// existe (`design.md > 5.1`).
+import type { OrderCoverage } from '@/lib/modules/inventario';
 
 import { ORDER_DEFAULT_PINNED_COLUMNS, buildOrderColumns } from './order-columns';
 import type { OrderResponsiblesCatalog } from './order-responsibles';
@@ -98,6 +101,11 @@ export type OrderTableProps = {
   readonly responsiblesByOrder?: Readonly<Record<string, readonly OrderResponsible[]>>;
   /** QC-102 R27, R28 — catalogos y `canWrite` del panel, tambien de paso. */
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
+  /**
+   * QC-141 T14, R35 — la cobertura de la pagina, **ya repartida por fila en el SERVIDOR**: mismo
+   * patron que `responsiblesByOrder`. La tabla solo lo atraviesa hasta la celda.
+   */
+  readonly coverageByOrder?: Readonly<Record<string, OrderCoverage>>;
 };
 
 export function OrderTable({
@@ -108,14 +116,16 @@ export function OrderTable({
   units,
   responsiblesByOrder,
   responsiblesCatalog,
+  coverageByOrder,
 }: OrderTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   // Las columnas se construyen con sus dependencias (`buildOrderColumns`). `useMemo` para que la
   // identidad del array no cambie en cada render y la tabla compartida no se reconstruya entera.
   const columns = useMemo(
-    () => buildOrderColumns({ recipes, units, responsiblesByOrder, responsiblesCatalog }),
-    [recipes, units, responsiblesByOrder, responsiblesCatalog],
+    () =>
+      buildOrderColumns({ recipes, units, responsiblesByOrder, responsiblesCatalog, coverageByOrder }),
+    [recipes, units, responsiblesByOrder, responsiblesCatalog, coverageByOrder],
   );
 
   /*

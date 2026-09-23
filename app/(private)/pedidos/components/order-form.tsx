@@ -38,6 +38,9 @@ import type { RecipeQueryResult } from '@/lib/modules/recetas/adapters/driving/r
 import type { RecipeLineView } from '@/lib/modules/recetas';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { UnitView } from '@/lib/modules/unidades';
+// Solo el TIPO, del contrato publico de `inventario`: la arista `pedidos -> inventario` ya
+// existe (`design.md > 5.1`).
+import type { OrderCoverage } from '@/lib/modules/inventario';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { OrderField } from './order-field';
 import { OrderIngredientsTable } from './order-ingredients-table';
@@ -54,7 +57,7 @@ import {
   type OrderResponsiblesCatalog,
 } from './order-responsibles';
 import { isFinalOrderStatus } from './order-row-actions';
-import { ORDER_PRIORITY_LABELS, ORDER_STATUS_LABELS } from './order-status-badge';
+import { ORDER_PRIORITY_LABELS, ORDER_STATUS_LABELS, OrderCoverageBadge } from './order-status-badge';
 
 /**
  * QC-102 T14 — EN QUE SECCION abre el panel (R23, R24).
@@ -69,6 +72,9 @@ export type OrderSheetSection = 'form' | 'responsibles';
 
 /** La seccion de responsables, dentro del panel que ya existe. Se localiza por este `data-testid`. */
 export const ORDER_SHEET_RESPONSIBLES_TESTID = 'order-sheet-responsibles';
+
+/** QC-141 T14, R35 — la etiqueta de cobertura de la hoja. */
+export const ORDER_SHEET_COVERAGE_TESTID = 'order-sheet-coverage';
 
 /**
  * Formulario de alta y edicion de pedido (R26-R30, R33, R34, R39, R45, `design.md > 8`).
@@ -319,6 +325,12 @@ export type OrderFormProps = {
   readonly responsibles?: readonly OrderResponsible[];
   /** QC-102 R27, R28 — catalogos y `canWrite`, por props desde el servidor. */
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
+  /**
+   * QC-141 T14, R35 — la cobertura que **la fila del listado ya trajo**. `undefined` con el lote
+   * caido: la hoja no pinta la etiqueta, igual que `loadResponsiblesCatalog` se degrada sin decir
+   * nada (H1).
+   */
+  readonly coverage?: OrderCoverage;
   /** QC-102 R24 — en que seccion abre. Por defecto, el formulario de siempre. */
   readonly section?: OrderSheetSection;
 };
@@ -330,6 +342,7 @@ export function OrderForm({
   onSaved,
   responsibles = [],
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
+  coverage,
   section = 'form',
 }: OrderFormProps) {
   const fieldId = useId();
@@ -545,6 +558,16 @@ export function OrderForm({
             ? 'Cambia los datos del pedido. Se guardan todos los campos.'
             : 'Completa los datos del pedido. La fecha y el número los pone el sistema.'}
         </SheetDescription>
+        {/*
+          QC-141 T14, R35 — la cobertura, SOLO en la edicion: el alta todavia no tiene pedido del
+          que apartar nada. `undefined` (lote caido) no pinta nada, mismo criterio que
+          `loadResponsiblesCatalog` (H1): el panel no da una explicacion, simplemente calla.
+        */}
+        {isEdit && coverage !== undefined ? (
+          <div data-testid={ORDER_SHEET_COVERAGE_TESTID}>
+            <OrderCoverageBadge coverage={coverage} />
+          </div>
+        ) : null}
       </SheetHeader>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">

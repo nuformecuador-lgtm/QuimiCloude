@@ -18,8 +18,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ACTIONS_COLUMN_ID,
   CANCELLATION_REASON_COLUMN_ID,
+  COVERAGE_COLUMN_ID,
   CREATED_AT_COLUMN_ID,
   MISSING_VALUE_MARK,
+  ORDER_COVERAGE_LABELS,
   ORDER_DEFAULT_PINNED_COLUMNS,
   ORDER_NUMBER_COLUMN_ID,
   ORDER_PRIORITY_LABELS,
@@ -102,9 +104,10 @@ afterEach(() => {
 
 // QC-35bis (2026-09-07): eran DIEZ. La unidad y el precio unitario salieron del pedido -de la
 // tabla `orders` hacia arriba-, asi que sus dos columnas ya no tienen dato que pintar y la lista
-// acordada baja a ocho. Sigue siendo cerrada y en el orden de `design.md > 7`.
-describe('las columnas declaradas son exactamente las diez acordadas (R8, R20)', () => {
-  it('en positivo: los diez ids, en el orden de `design.md > 7`', () => {
+// acordada baja a ocho. QC-102 sube a diez con RESPONSABLES y QC-141 T14 a ONCE con COBERTURA
+// (R35). Sigue siendo cerrada y en el orden de `design.md > 7`.
+describe('las columnas declaradas son exactamente las once acordadas (R8, R20, R35)', () => {
+  it('en positivo: los once ids, en el orden acordado', () => {
     expect(ORDER_COLUMNS.map((column) => column.id)).toEqual([
       ORDER_NUMBER_COLUMN_ID,
       STATUS_COLUMN_ID,
@@ -114,10 +117,11 @@ describe('las columnas declaradas son exactamente las diez acordadas (R8, R20)',
       PRESENTATION_NAME_COLUMN_ID,
       CREATED_AT_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
+      COVERAGE_COLUMN_ID,
       RESPONSIBLES_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
-    expect(ORDER_COLUMNS).toHaveLength(10);
+    expect(ORDER_COLUMNS).toHaveLength(11);
   });
 
   it('en negativo: ninguna columna es `total`, `createdBy`, `updatedBy`, unidad ni precio', () => {
@@ -161,6 +165,7 @@ describe('solo cuatro columnas ordenan, y son las de la lista blanca menos la no
       QUANTITY_COLUMN_ID,
       PRESENTATION_NAME_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
+      COVERAGE_COLUMN_ID,
       RESPONSIBLES_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
@@ -357,7 +362,7 @@ describe('la tabla de pedidos no pinta el importe (R18)', () => {
     const ids = ORDER_COLUMNS.map((column) => column.id);
     expect(ids).not.toContain('ingredientsCost');
     expect(ids).not.toContain('importe');
-    expect(ids).toHaveLength(10);
+    expect(ids).toHaveLength(11);
 
     const VALOR_DELATOR = '999999.9999';
     const order = pedido({ ingredientsCost: VALOR_DELATOR });
@@ -420,5 +425,62 @@ describe('QC-102 — la columna propia de responsables (R16)', () => {
       props: { responsibles: readonly unknown[] };
     };
     expect(otra.props.responsibles).toEqual([]);
+  });
+});
+
+describe('QC-141 T14 — la columna propia de cobertura del material (R35)', () => {
+  it('existe una columna `coverage`, entre el motivo de cancelacion y responsables', () => {
+    const ids = ORDER_COLUMNS.map((column) => column.id);
+
+    expect(ids).toContain(COVERAGE_COLUMN_ID);
+    expect(ids.indexOf(CANCELLATION_REASON_COLUMN_ID)).toBeLessThan(ids.indexOf(COVERAGE_COLUMN_ID));
+    expect(ids.indexOf(COVERAGE_COLUMN_ID)).toBeLessThan(ids.indexOf(RESPONSIBLES_COLUMN_ID));
+  });
+
+  it('no ordena, no filtra y se puede fijar como cualquier otra columna de datos', () => {
+    const cobertura = ORDER_COLUMNS.find((column) => column.id === COVERAGE_COLUMN_ID);
+
+    expect(cobertura?.sortable).not.toBe(true);
+    expect(cobertura?.filter).toBeUndefined();
+    expect(cobertura?.pinnable).not.toBe(false);
+  });
+
+  it.each(['full', 'none', 'partial'] as const)(
+    'pinta la etiqueta de N6 para la cobertura `%s` (R35)',
+    (coverage) => {
+      const order = pedido();
+      const columnas = buildOrderColumns({
+        recipes: { items: [], totalPages: 1 },
+        units: [],
+        coverageByOrder: { [order.id]: coverage },
+      });
+      const columna = columnas.find((candidate) => candidate.id === COVERAGE_COLUMN_ID);
+
+      render(<>{columna?.cell(order)}</>);
+
+      const etiqueta = screen.getByTestId('order-coverage');
+      expect(etiqueta).toHaveAttribute('data-coverage', coverage);
+      expect(etiqueta).toHaveTextContent(ORDER_COVERAGE_LABELS[coverage]);
+      expect(screen.queryByTestId(`order-missing-${COVERAGE_COLUMN_ID}`)).toBeNull();
+    },
+  );
+
+  it('los tres textos de N6 son exactamente «Apartado», «Sin apartar» y «Sin cobertura completa» (R35)', () => {
+    expect(ORDER_COVERAGE_LABELS).toEqual({
+      full: 'Apartado',
+      none: 'Sin apartar',
+      partial: 'Sin cobertura completa',
+    });
+  });
+
+  it('sin entrada en el lote —fallo o carga en vuelo— pinta el marcador de ausencia (R20, R35)', () => {
+    // `ORDER_COLUMNS` (arriba del archivo) se construye SIN `coverageByOrder`: es exactamente el
+    // caso del lote caido, mismo criterio que ya usan las celdas de receta y motivo.
+    pintarCelda(COVERAGE_COLUMN_ID, pedido());
+
+    expect(screen.getByTestId(`order-missing-${COVERAGE_COLUMN_ID}`)).toHaveTextContent(
+      MISSING_VALUE_MARK,
+    );
+    expect(screen.queryByTestId('order-coverage')).toBeNull();
   });
 });

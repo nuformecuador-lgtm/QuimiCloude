@@ -7,6 +7,9 @@ import {
   type OrderPriority,
   type OrderStatus,
 } from '@/lib/modules/pedidos';
+// Solo el TIPO, del contrato publico de `inventario`: la arista `pedidos -> inventario` ya
+// existe (`design.md > 5.1`, mismo criterio que `order-actions.ts`).
+import type { OrderCoverage } from '@/lib/modules/inventario';
 
 /**
  * Estado y prioridad de un pedido como **etiqueta legible** (R8, `design.md > 7`).
@@ -83,6 +86,37 @@ export function OrderPriorityBadge({ priority }: { readonly priority: OrderPrior
   return (
     <Badge variant={PRIORITY_VARIANTS[priority]} data-testid="order-priority" data-priority={priority}>
       {ORDER_PRIORITY_LABELS[priority]}
+    </Badge>
+  );
+}
+
+/**
+ * QC-141 T14 — Cobertura del material del pedido (R35, `design.md > 0.2` N6).
+ *
+ * Los tres textos de N6, exhaustivos por tipo igual que `ORDER_STATUS_LABELS`: si `inventario`
+ * publica un cuarto valor, este archivo deja de compilar.
+ *
+ * `ENTREGADO` y `CANCELADO` llegan con `coverage: 'none'` (`design.md > 0.3`, T11): se pintan
+ * con la MISMA etiqueta «Sin apartar» y no con un guion, el mismo criterio que `OrderResponsibles`
+ * aplica a sus datos -el estado final apaga los controles de ESCRITURA (R29), nunca oculta lo que
+ * ya es un hecho consultable-. Aqui no hay nada que escribir, asi que no hay nada que apagar.
+ */
+export const ORDER_COVERAGE_LABELS: Readonly<Record<OrderCoverage, string>> = {
+  full: 'Apartado',
+  none: 'Sin apartar',
+  partial: 'Sin cobertura completa',
+};
+
+const COVERAGE_VARIANTS: Readonly<Record<OrderCoverage, 'default' | 'secondary' | 'outline' | 'destructive'>> = {
+  full: 'secondary',
+  none: 'outline',
+  partial: 'destructive',
+};
+
+export function OrderCoverageBadge({ coverage }: { readonly coverage: OrderCoverage }) {
+  return (
+    <Badge variant={COVERAGE_VARIANTS[coverage]} data-testid="order-coverage" data-coverage={coverage}>
+      {ORDER_COVERAGE_LABELS[coverage]}
     </Badge>
   );
 }

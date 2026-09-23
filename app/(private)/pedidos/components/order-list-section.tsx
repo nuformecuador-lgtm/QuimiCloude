@@ -5,11 +5,17 @@ import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import { listResponsiblesForOrdersAction } from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
 import { listUsersAction } from '@/lib/modules/identity/adapters/driving/user-actions';
 import { listWorkGroupsAction } from '@/lib/modules/identity/adapters/driving/work-group-actions';
-import { listOrdersAction } from '@/lib/modules/pedidos/adapters/driving/order-actions';
+import {
+  listOrderCoverageAction,
+  listOrdersAction,
+} from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import { listRecipesAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import type { UnitView } from '@/lib/modules/unidades';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
+// Solo el TIPO, del contrato publico de `inventario`: la arista `pedidos -> inventario` ya
+// existe (`design.md > 5.1`).
+import type { OrderCoverage } from '@/lib/modules/inventario';
 
 import { OrderListEmpty } from './order-list-empty';
 import {
@@ -157,6 +163,34 @@ async function loadResponsibles(
   return byOrder;
 }
 
+// ---------------------------------------------------------------------------------------------
+// QC-141 T14 — La cobertura de la PAGINA, compuesta AQUI, mismo patron que los responsables
+// (`design.md > 5.1`, `> 10`; R35).
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * La cobertura de los pedidos de ESTA pagina, en **UNA sola** llamada (R35).
+ *
+ * **Ni una consulta por fila**: el argumento es el array entero de identificadores de la pagina,
+ * mismo criterio que `loadResponsibles`.
+ *
+ * **Si falla, DEGRADA** (mismo criterio que `loadResponsibles`): devuelve el reparto vacio y la
+ * columna se pinta sin resolver -marcador de ausencia-, sin tumbar la lista.
+ */
+async function loadCoverage(
+  orderIds: readonly string[],
+): Promise<Readonly<Record<string, OrderCoverage>>> {
+  const result = await listOrderCoverageAction(orderIds);
+
+  if (result.status === 'error') return {};
+
+  const byOrder: Record<string, OrderCoverage> = {};
+  for (const entry of result.data) {
+    byOrder[entry.orderId] = entry.coverage;
+  }
+  return byOrder;
+}
+
 /**
  * Los dos catalogos que el panel ofrece para asignar, **por props** (R27) y **solo si el actor
  * puede escribir**: sin `asignaciones.modificar` no se monta ningun control de escritura, asi que
@@ -221,17 +255,19 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
   }
 
   /*
-    QC-102 R16 — La SEGUNDA llamada, seguida y con los ids de ESTA pagina. Va DESPUES de
-    `listOrdersAction` porque los identificadores salen de su resultado: es una dependencia real,
-    no una secuencia por descuido. Y va despues del estado VACIO porque con cero pedidos no hay
-    nada que preguntar. Se emite **UNA vez por render**, nunca una por fila.
+    QC-102 R16 y QC-141 R35 — Los TRES lotes de la pagina, seguidos y con los ids de ESTA pagina.
+    Van DESPUES de `listOrdersAction` porque los identificadores salen de su resultado: es una
+    dependencia real, no una secuencia por descuido. Y van despues del estado VACIO porque con
+    cero pedidos no hay nada que preguntar. Cada uno se emite **UNA vez por render**, nunca una
+    por fila.
 
-    Las dos lecturas de aqui si van en paralelo entre si: el catalogo del panel no depende del
-    lote, y esperarlas en fila solo sumaria latencia.
+    Las tres lecturas de aqui si van en paralelo entre si: ninguna depende de otra, y esperarlas
+    en fila solo sumaria latencia.
   */
-  const [responsiblesByOrder, responsiblesCatalog] = await Promise.all([
+  const [responsiblesByOrder, responsiblesCatalog, coverageByOrder] = await Promise.all([
     loadResponsibles(items.map((order) => order.id)),
     loadResponsiblesCatalog(),
+    loadCoverage(items.map((order) => order.id)),
   ]);
 
   return (
@@ -258,6 +294,7 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
         units={units}
         responsiblesByOrder={responsiblesByOrder}
         responsiblesCatalog={responsiblesCatalog}
+        coverageByOrder={coverageByOrder}
       />
     </div>
   );

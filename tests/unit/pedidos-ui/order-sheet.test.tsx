@@ -183,6 +183,10 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   getOrderAction: vi.fn(() => {
     throw new Error('getOrderAction no debe invocarse: la fila ya trae el pedido entero');
   }),
+  // QC-141 T14: el mismo criterio que `listResponsiblesForOrdersAction` justo arriba -la seccion
+  // de lista SI la invoca, una vez por pagina- con el lote vacio: este archivo no afirma nada
+  // sobre cobertura y con el lote vacio la columna pinta su marcador de ausencia.
+  listOrderCoverageAction: vi.fn(async () => ({ status: 'success', data: [] })),
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
