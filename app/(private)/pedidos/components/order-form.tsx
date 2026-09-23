@@ -123,10 +123,13 @@ export const ORDER_SHEET_RESPONSIBLES_TESTID = 'order-sheet-responsibles';
  * al envio.
  */
 
+/** Los CINCO campos de negocio, con el MISMO nombre que el adaptador driving lee del `FormData`. */
 /**
- * Los campos de negocio, con el MISMO nombre que el adaptador driving lee del `FormData`.
- * Unica fuente: `readValues` la recorre para armar el `FormData` que la action lee, de modo que
- * anadir un campo aqui y no en el formulario -o al reves- no es posible sin que algo se note.
+ * QC-35bis (decision humana del 2026-09-07): eran CINCO. La unidad y el precio unitario salieron
+ * del pedido -del formulario, del contrato del modulo y de la tabla `orders`-, asi que esta lista
+ * tiene CUATRO campos. Sigue siendo la unica fuente: `readValues` la recorre para armar el
+ * `FormData` que la action lee, de modo que anadir un campo aqui y no en el formulario -o al
+ * reves- no es posible sin que algo se note.
  */
 export const ORDER_BUSINESS_FIELDS = [RECIPE_FIELD, 'quantity', PRESENTATION_FIELD, 'priority'] as const;
 
