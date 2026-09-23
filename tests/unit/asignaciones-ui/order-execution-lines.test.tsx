@@ -212,7 +212,7 @@ describe('linea de ejecucion — el title expone el valor exacto (QC-132 R5, R6)
     render(<OrderExecutionLines lines={[linea({ quantity: '0.1255', alternativeUnits: [] })]} />);
 
     const cantidad = screen.getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-0`);
-    expect(cantidad).toHaveTextContent('0.13');
+    expect(cantidad.textContent).toBe('0.13');
     expect(cantidad).toHaveAttribute('title', '0.1255');
   });
 
@@ -224,16 +224,16 @@ describe('linea de ejecucion — el title expone el valor exacto (QC-132 R5, R6)
     );
 
     const cantidad = screen.getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-0`);
-    expect(cantidad).toHaveTextContent('0.13');
+    expect(cantidad.textContent).toBe('0.13');
     expect(cantidad).toHaveAttribute('title', '0.1255');
   });
 
   it('QC-132 R6: sin title cuando el valor pintado coincide con el exacto', () => {
     render(<OrderExecutionLines lines={[linea({ quantity: '20', alternativeUnits: [] })]} />);
 
-    expect(screen.getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-0`)).not.toHaveAttribute(
-      'title',
-    );
+    const cantidad = screen.getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-0`);
+    expect(cantidad.textContent).toBe('20');
+    expect(cantidad).not.toHaveAttribute('title');
   });
 });
 
@@ -251,7 +251,7 @@ describe('linea de ejecucion — el title de la linea convertida (QC-132 R12)', 
     await user.click(await esperarInteractiva(litro));
 
     const cantidad = screen.getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-0`);
-    expect(cantidad).toHaveTextContent('0');
+    expect(cantidad.textContent).toBe('0');
     expect(cantidad).toHaveAttribute('title', '0.001');
   });
 
@@ -268,7 +268,7 @@ describe('linea de ejecucion — el title de la linea convertida (QC-132 R12)', 
     await user.click(await esperarInteractiva(mililitro));
 
     const cantidad = screen.getByTestId(`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-0`);
-    expect(cantidad).toHaveTextContent('125.5');
+    expect(cantidad.textContent).toBe('125.5');
     expect(cantidad).not.toHaveAttribute('title');
   });
 });

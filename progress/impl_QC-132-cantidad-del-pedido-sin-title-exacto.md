@@ -85,3 +85,14 @@ no devuelve nada: los tests solo añaden.
   `Test Files 3 passed (3)`, `Tests 66 passed (66)`.
 
 Sin E2E (R9). Gate rápido y completo: pendientes, los corre el leader.
+
+## Arreglo tras la revisión (2026-09-23)
+
+Menores de `progress/review_QC-132-cantidad-del-pedido-sin-title-exacto.md`, solo tests (producción intacta):
+- En los casos QC-132 de `order-execution-lines.test.tsx` (R5 ×2, R12 ×2) y `order-execution-screen.test.tsx` (R3),
+  `toHaveTextContent(...)`, que compara por subcadena, pasa a igualdad exacta `expect(el.textContent).toBe(...)`,
+  como promete `design.md > 5`. El más sensible era R12 (`'0'`, que también casaría con `'0.001'`).
+- R6 afirma además el texto pintado: `textContent` `'20'`.
+
+Salida: `pnpm exec vitest related --run` sobre los dos archivos -> `Test Files 2 passed (2)`, `Tests 37 passed (37)`;
+`pnpm run typecheck` y `pnpm run lint` sin errores.

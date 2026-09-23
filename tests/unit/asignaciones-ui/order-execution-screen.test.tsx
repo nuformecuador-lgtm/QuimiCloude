@@ -132,7 +132,7 @@ describe('pantalla de ejecucion — QC-147 R26: la cantidad del pedido en su pro
     render(<OrderExecutionScreen execution={{ ...EXECUTION, orderQuantity: '0.1255' }} />);
 
     const cantidadPedido = screen.getByTestId(ORDER_EXECUTION_ORDER_QUANTITY_TESTID);
-    expect(cantidadPedido).toHaveTextContent('Pedido 0.13');
+    expect(cantidadPedido.textContent).toBe('Pedido 0.13');
     expect(cantidadPedido).toHaveAttribute('title', '0.1255');
   });
 
