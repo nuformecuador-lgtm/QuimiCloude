@@ -218,7 +218,7 @@
         selector de estado o asignaban a un Administrador).
       - Depende de: T12, T13, T14, T15.
 
-- [ ] **T17. Alcance, trazabilidad y gate.** (R5, R10, R16, R29; `CHECKPOINTS.md`.)
+- [x] **T17. Alcance, trazabilidad y gate.** (R5, R10, R16, R29; `CHECKPOINTS.md`.)
       - Archivos: `tests/unit/pedidos/qc145-estado-solo-planta.test.ts` (nuevo: `finishedAt` solo
         en `transitionAliveOrder`; quién escribe `status`; `package.json` sin dependencias nuevas;
         catálogo con 16 permisos), `progress/impl_QC-145-pedidos-terminados-en-asignacion.md` (mapa
