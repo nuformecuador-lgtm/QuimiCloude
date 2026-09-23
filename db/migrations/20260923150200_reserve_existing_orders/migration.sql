@@ -10,12 +10,24 @@ ALTER TABLE "products"              NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE "product_batches"       NO FORCE ROW LEVEL SECURITY;
 ALTER TABLE "reservation_movements" NO FORCE ROW LEVEL SECURITY;
 
+-- Compara dos numeros de lote como los compara `compareBatchesOldestFirst` en TypeScript: si los
+-- dos son solo digitos, por valor numerico; si no, por bytes UTF-8 (`COLLATE "C"`), que coinciden
+-- con el orden de unidades de codigo UTF-16 de JS salvo entre caracteres fuera del plano basico y
+-- los de U+E000-U+FFFF.
+CREATE FUNCTION pg_temp.lot_precedes(a TEXT, b TEXT) RETURNS BOOLEAN AS $$
+BEGIN
+  IF a ~ '^[0-9]+$' AND b ~ '^[0-9]+$' THEN
+    RETURN a::NUMERIC < b::NUMERIC;
+  END IF;
+  RETURN a COLLATE "C" < b COLLATE "C";
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
 DO $$
 DECLARE
   v_now         TIMESTAMPTZ := now();
   order_row     RECORD;
   line_row      RECORD;
-  batch_row     RECORD;
   alloc_row     RECORD;
   v_unit_id     UUID;
   v_line_count  INTEGER;
@@ -23,6 +35,17 @@ DECLARE
   v_pending     NUMERIC(14,4);
   v_take        NUMERIC(14,4);
   v_covered     BOOLEAN;
+  v_batch_ids   UUID[];
+  v_batch_dates DATE[];
+  v_batch_lots  TEXT[];
+  v_batch_avail NUMERIC(14,4)[];
+  v_n           INTEGER;
+  v_i           INTEGER;
+  v_j           INTEGER;
+  v_tmp_id      UUID;
+  v_tmp_date    DATE;
+  v_tmp_lot     TEXT;
+  v_tmp_avail   NUMERIC(14,4);
 BEGIN
   -- Cuanto lleva reservado cada lote dentro de ESTA migracion, para que un pedido posterior no
   -- vuelva a repartir lo que ya tomo uno anterior.
@@ -66,36 +89,57 @@ BEGIN
       v_need := ceil(order_row.quantity * line_row.percentage * 100) / 10000;
       v_pending := v_need;
 
-      FOR batch_row IN
-        SELECT sub.batch_id, sub.available
-        FROM (
-          SELECT
-            pb.id AS batch_id,
-            pb.purchase_date,
-            pb.lot,
-            pb.stock
-              - COALESCE((
-                  SELECT sum(CASE WHEN rm.kind = 'reserve' THEN rm.quantity ELSE -rm.quantity END)
-                  FROM "reservation_movements" rm
-                  WHERE rm.batch_id = pb.id
-                ), 0)
-              - COALESCE((SELECT tmr.reserved FROM tmp_migration_reserved tmr WHERE tmr.batch_id = pb.id), 0)
-              AS available
-          FROM "product_batches" pb
-          WHERE pb.product_id = line_row.product_id AND pb.company_id = order_row.company_id
-        ) sub
-        WHERE sub.available > 0
-        ORDER BY
-          sub.purchase_date ASC,
-          (CASE WHEN sub.lot ~ '^[0-9]+$' THEN sub.lot::NUMERIC END) ASC,
-          (CASE WHEN sub.lot ~ '^[0-9]+$' THEN NULL ELSE sub.lot END) ASC
-      LOOP
+      -- Los cuatro arrays deben quedar alineados posicion a posicion: se ordenan por la misma
+      -- clave, y esa clave (fecha, id de lote) es unica para que las cuatro agregaciones no
+      -- desempaten cada una por su cuenta. El desempate por numero de lote dentro de cada fecha lo
+      -- hace la ordenacion por insercion de abajo, con `lot_precedes`.
+      SELECT array_agg(sub.batch_id ORDER BY sub.purchase_date, sub.batch_id),
+             array_agg(sub.purchase_date ORDER BY sub.purchase_date, sub.batch_id),
+             array_agg(sub.lot ORDER BY sub.purchase_date, sub.batch_id),
+             array_agg(sub.available ORDER BY sub.purchase_date, sub.batch_id)
+        INTO v_batch_ids, v_batch_dates, v_batch_lots, v_batch_avail
+      FROM (
+        SELECT
+          pb.id AS batch_id,
+          pb.purchase_date,
+          pb.lot,
+          pb.stock
+            - COALESCE((
+                SELECT sum(CASE WHEN rm.kind = 'reserve' THEN rm.quantity ELSE -rm.quantity END)
+                FROM "reservation_movements" rm
+                WHERE rm.batch_id = pb.id
+              ), 0)
+            - COALESCE((SELECT tmr.reserved FROM tmp_migration_reserved tmr WHERE tmr.batch_id = pb.id), 0)
+            AS available
+        FROM "product_batches" pb
+        WHERE pb.product_id = line_row.product_id AND pb.company_id = order_row.company_id
+      ) sub
+      WHERE sub.available > 0;
+
+      v_n := COALESCE(array_length(v_batch_ids, 1), 0);
+
+      FOR v_i IN 2..v_n LOOP
+        v_j := v_i;
+        WHILE v_j > 1 AND (
+          v_batch_dates[v_j] < v_batch_dates[v_j - 1]
+          OR (v_batch_dates[v_j] = v_batch_dates[v_j - 1]
+              AND pg_temp.lot_precedes(v_batch_lots[v_j], v_batch_lots[v_j - 1]))
+        ) LOOP
+          v_tmp_id := v_batch_ids[v_j]; v_batch_ids[v_j] := v_batch_ids[v_j - 1]; v_batch_ids[v_j - 1] := v_tmp_id;
+          v_tmp_date := v_batch_dates[v_j]; v_batch_dates[v_j] := v_batch_dates[v_j - 1]; v_batch_dates[v_j - 1] := v_tmp_date;
+          v_tmp_lot := v_batch_lots[v_j]; v_batch_lots[v_j] := v_batch_lots[v_j - 1]; v_batch_lots[v_j - 1] := v_tmp_lot;
+          v_tmp_avail := v_batch_avail[v_j]; v_batch_avail[v_j] := v_batch_avail[v_j - 1]; v_batch_avail[v_j - 1] := v_tmp_avail;
+          v_j := v_j - 1;
+        END LOOP;
+      END LOOP;
+
+      FOR v_i IN 1..v_n LOOP
         EXIT WHEN v_pending <= 0;
 
-        v_take := LEAST(batch_row.available, v_pending);
+        v_take := LEAST(v_batch_avail[v_i], v_pending);
         v_pending := v_pending - v_take;
 
-        INSERT INTO tmp_order_allocations (batch_id, quantity) VALUES (batch_row.batch_id, v_take);
+        INSERT INTO tmp_order_allocations (batch_id, quantity) VALUES (v_batch_ids[v_i], v_take);
       END LOOP;
 
       IF v_pending > 0 THEN
