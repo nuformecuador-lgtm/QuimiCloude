@@ -1,8 +1,8 @@
-// T3 — Contrato de entrada de receta en porcentaje. Validacion de borde: cierra R2, R3, R4, R5,
-// R7 (orden), R9, R13, R16, R19, R23, R30, R47 y el test explicito de que el esquema no colapsa
-// `undefined` y `null` del campo `image`.
+// Contrato de entrada de receta en porcentaje. Validacion de borde: el esquema exige
+// porcentaje en vez de cantidad y unidad, ordena las lineas, exige que su suma sea exacta, y
+// el test explicito de que el esquema no colapsa `undefined` y `null` del campo `image`.
 //
-// QC-62: el paso dejo de ser `{ body, type }` y es un DOCUMENTO. La forma del documento en si la
+// El paso dejo de ser `{ body, type }` y es un DOCUMENTO. La forma del documento en si la
 // cubre `recipe-step-document.test.ts`.
 
 import {

@@ -235,8 +235,8 @@ async function crearProductoConLote(
 }
 
 /** Una receta con una unica linea al 100 %: la cantidad necesaria queda igual a la del
- *  pedido (QC-147). La unidad del insumo ya no la guarda la receta (R14): sale de
- *  `products.unit_id`, que el disparador de QC-121 fija al primer lote sembrado. */
+ *  pedido. La unidad del insumo ya no la guarda la receta: sale de `products.unit_id`, que
+ *  el disparador de existencia fija al primer lote sembrado. */
 async function crearReceta(empresa: Empresa, productId: string): Promise<string> {
   const creada = await createRecipe(
     {

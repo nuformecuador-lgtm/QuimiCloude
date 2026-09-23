@@ -3,7 +3,7 @@
 // `calculateIngredientsCost` es dominio puro: nada aqui toca la base ni el reloj. Los dobles
 // son literales -sin `vi.fn()`- porque no hay nada que espiar, solo datos que construir.
 //
-// Cada linea trae un porcentaje, no una cantidad (QC-147): la necesaria sale de
+// Cada linea trae un porcentaje, no una cantidad: la necesaria sale de
 // `consumedQuantity(orderQuantity, percentage)`. La mayoria de los casos usan `percentage:
 // '100.00'` y ponen la cantidad necesaria directamente en `orderQuantity` -asi el escenario
 // (orden de lotes, promedio, redondeo, conversion) queda igual de legible que con una cantidad

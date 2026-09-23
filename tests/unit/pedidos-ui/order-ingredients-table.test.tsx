@@ -1,5 +1,3 @@
-// QC-147 T7 — La tabla de ingredientes de Pedidos en porcentaje: R17, R24, R25.
-//
 // El componente es puramente presentacional (lineas, unidades y estado de la consulta llegan
 // por props), asi que se prueba montandolo directo, sin `OrderForm` alrededor.
 

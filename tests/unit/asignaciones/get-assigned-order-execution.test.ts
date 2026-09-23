@@ -367,7 +367,7 @@ describe('getAssignedOrderExecution — R26: la cantidad del pedido sigue en la 
   });
 });
 
-// QC-123 T8 (R15) — comprobacion de TIPO: un literal con `ingredientsCost` de mas sobre
+// R15 — comprobacion de TIPO: un literal con `ingredientsCost` de mas sobre
 // `AssignedOrderExecutionView` tiene que dejar de compilar. Si la vista de ejecucion ganara el
 // campo, el `@ts-expect-error` se quedaria sin usar y `tsc` se pondria rojo aqui mismo.
 const _r15TipoSinImporte: AssignedOrderExecutionView = {
@@ -384,7 +384,7 @@ const _r15TipoSinImporte: AssignedOrderExecutionView = {
 };
 void _r15TipoSinImporte;
 
-describe('QC-123 — la pantalla de ejecucion no lleva importe (R15)', () => {
+describe('la pantalla de ejecucion no lleva importe (R15)', () => {
   it('la pantalla de ejecucion no lleva importe (R15)', async () => {
     const { deps } = montar();
     const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);

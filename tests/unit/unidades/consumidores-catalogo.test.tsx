@@ -1,20 +1,20 @@
 // QC-39 T2 — Los consumidores de hoy del catalogo siguen en pie (R4).
 //
-// R4 dice dos cosas y aqui se comprueban las dos, solo sobre el consumidor que queda:
+// Este archivo comprueba dos cosas sobre el consumidor que queda del catalogo de unidades:
 //   1. que el selector de unidad del detalle de proveedor (`UnitSelect`) RENDERIZA con datos de
 //      `UnitView` -sin estrechar ninguna union y sin descartar campos-, y
 //   2. que su archivo NO HA CAMBIADO respecto a la rama base: seguir compilando «porque se le
 //      retoco algo» no es seguir compilando sin cambios.
 //
-// QC-147 retira `UnitPicker` del formulario de recetas: la linea de receta ya no lleva unidad
-// propia, asi que ese selector desaparecio y este archivo deja de montarlo.
+// El formulario de recetas ya no lleva selector de unidad -la linea de receta ya no tiene
+// unidad propia-, asi que ese consumidor desaparecio y este archivo deja de montarlo.
 //
 // El punto 1 tiene ademas una mitad que este archivo demuestra en COMPILACION y no en ejecucion:
 // las props de `UnitSelect` siguen tipadas con `UnitRef`, y se le pasa `UnitView`. Si `UnitView`
 // dejara de extender `UnitRef`, este archivo no compilaria -y `pnpm typecheck` es parte del
 // gate-.
 //
-// No se abre ningun desplegable: lo que R4 exige es que este componente siga aceptando y
+// No se abre ningun desplegable: lo que aqui se exige es que este componente siga aceptando y
 // pintando el catalogo, no volver a probar su comportamiento -eso ya lo hace
 // `tests/unit/proveedores-ui/unit-select.test.tsx`, que es suyo-.
 

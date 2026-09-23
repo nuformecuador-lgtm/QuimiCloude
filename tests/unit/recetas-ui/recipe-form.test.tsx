@@ -175,14 +175,14 @@ const PRODUCT_1_NAME = 'Ácido cítrico';
 const PRODUCT_2_NAME = 'Sosa cáustica';
 const PRODUCT_PAGE2_NAME = 'Glicerina de página 2';
 const PRODUCT_WITH_UNIT_NAME = 'Hipoclorito de sodio';
-/** «nombre · unidad» tal como lo pinta `ProductPicker` para `PRODUCT_WITH_UNIT` (R12). */
+/** «nombre · unidad» tal como lo pinta `ProductPicker` para `PRODUCT_WITH_UNIT`. */
 const PRODUCT_WITH_UNIT_LABEL = `${PRODUCT_WITH_UNIT_NAME} · L`;
 
 /**
  * Página 1 precargada del selector de ingrediente. `PRODUCT_1` y `PRODUCT_2` NO tienen ningún
- * lote (R24): sin lote no hay unidad que mostrar, y la receta se puede guardar igual con esas
+ * lote: sin lote no hay unidad que mostrar, y la receta se puede guardar igual con esas
  * líneas. `PRODUCT_WITH_UNIT` SÍ tiene unidad guardada, para probar que se ve «nombre · unidad»
- * junto al ingrediente elegido (R12).
+ * junto al ingrediente elegido.
  */
 const PRODUCT_PAGE_1 = {
   items: [
@@ -526,7 +526,7 @@ describe('R20 — cancelar o terminar devuelve a la lista', () => {
     renderCreateForm();
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta que termina');
-    // D14: una línea al 100 % -sin ella el botón queda deshabilitado (R11, R23).
+    // Una línea al 100 % -sin ella el botón queda deshabilitado.
     await addValidLine(user, 0);
     await user.click(screen.getByTestId('recipe-form-submit'));
 
@@ -559,7 +559,7 @@ describe('R21 — precarga de la edición y receta inexistente', () => {
     // no sobre `value`, que un `contenteditable` no tiene.
     expect(areaDePaso(0)).toHaveTextContent('Paso uno');
     expect(areaDePaso(1)).toHaveTextContent('Paso dos');
-    // R25: el campo se precarga con `formatPercentage` -coma y 2 decimales-, no con el valor
+    // El campo se precarga con `formatPercentage` -coma y 2 decimales-, no con el valor
     // crudo del contrato.
     expect((screen.getByTestId('recipe-line-percentage-0') as HTMLInputElement).value).toBe('100,00');
     // Producto dado de baja (R53): la línea se conserva y se marca, no se descarta.
@@ -569,7 +569,7 @@ describe('R21 — precarga de la edición y receta inexistente', () => {
 
     await waitFor(() => expect(updateRecipeActionMock).toHaveBeenCalledTimes(1));
     const [, payload] = updateRecipeActionMock.mock.calls[0] as [string, { lines: unknown[] }];
-    // R1: sin unidad. `buildRecipePayload` sustituye la coma por un punto, sin pasar por `number`.
+    // Sin unidad. `buildRecipePayload` sustituye la coma por un punto, sin pasar por `number`.
     expect(payload.lines).toEqual([{ productId: PRODUCT_1_ID, percentage: '100.00' }]);
   });
 
@@ -629,8 +629,8 @@ describe('R22 — el guardado envía la lista final completa en una sola invocac
     const user = setupUser();
     const recipe = recipeDetail({
       lines: [
-        // La que queda tras el `remove` de más abajo va al 100 %; la que se quita no importa
-        // (D14, R11): se retira antes de enviar.
+        // La que queda tras el `remove` de más abajo va al 100 %; la que se quita no importa:
+        // se retira antes de enviar.
         lineView({ id: 'line-a', productId: PRODUCT_1_ID, percentage: '100.00' }),
         lineView({ id: 'line-b', productId: PRODUCT_2_ID, productName: PRODUCT_2_NAME, percentage: '50.00' }),
       ],
@@ -711,9 +711,8 @@ describe('R23 (QC-70 R20, R32) — el nombre repetido llega con su código abier
 });
 
 describe('R3 — un rechazo atribuido a las líneas se pinta en el bloque de líneas, sin invocar la operación', () => {
-  // R11 impide llegar a esta validación a través de la suma -el botón está deshabilitado
-  // mientras la suma no sea exacta, así que un rechazo de la suma no puede demostrarse
-  // pulsando Guardar-. El MISMO mecanismo -el esquema del contrato rechaza con un issue en
+  // El botón está deshabilitado mientras la suma no sea exacta, así que un rechazo de la suma no
+  // puede demostrarse pulsando Guardar. El MISMO mecanismo -el esquema del contrato rechaza con un issue en
   // `path: ['lines']`, y `extractGeneralLinesError` lo pinta en el bloque- se dispara igual
   // con dos líneas del mismo producto: una receta sembrada (precarga) puede traerlas
   // repetidas aunque la interfaz nunca deje ELEGIRLAS así.
@@ -759,7 +758,7 @@ describe('R26 — la validación previa usa los esquemas del contrato', () => {
     const user = setupUser();
     renderCreateForm();
 
-    // Una línea al 100 % para que el botón no esté deshabilitado por R11: lo que se comprueba
+    // Una línea al 100 % para que el botón no esté deshabilitado: lo que se comprueba
     // aquí es la validación del NOMBRE, no la de las líneas.
     await addValidLine(user, 0);
     // El nombre queda vacío a propósito: `recipeNameSchema` exige `.trim().min(1)`.
@@ -773,10 +772,9 @@ describe('R26 — la validación previa usa los esquemas del contrato', () => {
 });
 
 describe('R27 — añadir y quitar líneas; sin líneas no se guarda', () => {
-  // D14 deroga para esta ficha «una receta sin líneas se puede guardar» de QC-26 (R27 original):
-  // 0 líneas suman 0,00 % y el mismo `superRefine` del contrato las rechaza (R3, R23). Este caso
-  // se invierte: añadir y quitar la única línea deja el botón deshabilitado y la acción sin
-  // invocar, en vez de guardar con `lines: []`.
+  // Esta ficha invierte «una receta sin líneas se puede guardar»: 0 líneas suman 0,00 % y el
+  // mismo `superRefine` del contrato las rechaza. Añadir y quitar la única línea deja el botón
+  // deshabilitado y la acción sin invocar, en vez de guardar con `lines: []`.
   it('añadir y luego quitar la única línea deja la receta sin líneas, y Guardar queda deshabilitado sin invocar la acción', async () => {
     const user = setupUser();
     renderCreateForm();
@@ -789,7 +787,7 @@ describe('R27 — añadir y quitar líneas; sin líneas no se guarda', () => {
 
     await user.click(screen.getByTestId('recipe-line-remove-0'));
     // Sigue viéndose UNA fila, pero es la de arranque: no está en el estado, así que el
-    // indicador de suma vuelve a "Suma: 0,00 % — faltan 100,00 %" (R11, R23).
+    // indicador de suma vuelve a "Suma: 0,00 % — faltan 100,00 %".
     expect(screen.getAllByTestId('recipe-line-row')).toHaveLength(1);
     expect(screen.getByTestId('recipe-lines-sum')).toHaveAttribute('data-complete', 'false');
 
@@ -905,7 +903,7 @@ describe('R24 — un ingrediente SIN NINGÚN LOTE ni de baja no bloquea la líne
 
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta de un ingrediente sin lotes');
     // `PRODUCT_1` todavia no tiene unidad guardada: llega como `unitId: null`, y no hay ningun
-    // selector que bloquear (R12).
+    // selector que bloquear.
     await chooseProductForLine(user, 0, PRODUCT_1_NAME);
     await user.type(screen.getByTestId('recipe-line-percentage-0'), '100');
 
@@ -947,7 +945,7 @@ describe('R31 — dos líneas del mismo producto y un porcentaje inválido no se
     // La suma solo cuenta lo que casa el patrón (`sumPercentages`): con la primera línea al
     // 100 % y la segunda con un texto inválido -que no suma nada-, el indicador da por completa
     // la suma y el botón se habilita, pero el ESQUEMA sigue rechazando la segunda línea por su
-    // formato (R2), sin escribir ninguna fila.
+    // formato, sin escribir ninguna fila.
     const user = setupUser();
     renderCreateForm();
 
@@ -1336,8 +1334,8 @@ describe('QC-64 R11, R13 y R22 — la vista previa lee lo que hay escrito y no g
   async function rellenarFormulario(user: UserEvent, textoDelPaso: string): Promise<void> {
     await user.type(screen.getByTestId('recipe-field-name'), 'Receta con vista previa');
     await user.type(screen.getByTestId('recipe-field-description'), 'Una descripcion');
-    // D14: una línea al 100 % para que Guardar no quede deshabilitado (R11, R23) en los casos
-    // de este bloque que sí llegan a enviar.
+    // Una línea al 100 % para que Guardar no quede deshabilitado en los casos de este bloque
+    // que sí llegan a enviar.
     await addValidLine(user, 0);
     await user.click(screen.getByTestId('recipe-step-add'));
     await escribirEnPaso(0, textoDelPaso);

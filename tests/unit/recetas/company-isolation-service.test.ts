@@ -68,8 +68,8 @@ function actorCon(companyId: string, ...permisos: readonly string[]): Actor {
 
 const ACTOR_A: Actor = actorCon(EMPRESA_A, CONSULTAR, MODIFICAR);
 
-// R7, D14: una entrada valida ya no puede ir sin lineas -0 lineas suman 0,00 %-, asi que
-// lleva una linea al 100 % del producto de la PROPIA empresa del actor.
+// Una entrada valida ya no puede ir sin lineas -0 lineas suman 0,00 %-, asi que lleva una
+// linea al 100 % del producto de la PROPIA empresa del actor.
 const ENTRADA_ALTA_VALIDA = {
   name: 'Desengrasante 5%',
   description: null,

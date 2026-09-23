@@ -87,7 +87,7 @@ describe('sumPercentages — R3, R10', () => {
     expect(resultado.isComplete).toBe(false)
   })
 
-  it('R3, D14: la lista vacia da total 0,00 e incompleta', () => {
+  it('R3: la lista vacia da total 0,00 e incompleta', () => {
     const resultado = sumPercentages([])
     expect(resultado.total).toBe('0.00')
     expect(resultado.difference).toBe('100.00')

@@ -655,10 +655,10 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     expect(within(tabla).getByTestId('order-ingredient-product')).toHaveTextContent(
       LINEA_INGREDIENTE.productName,
     );
-    // La columna «porcentaje» pinta la parte del insumo con coma y dos decimales (R25).
+    // La columna «porcentaje» pinta la parte del insumo con coma y dos decimales.
     expect(within(tabla).getByTestId('order-ingredient-percentage')).toHaveTextContent('10,00 %');
     // La unidad es la del PRODUCTO (`productUnitId`) y se resuelve con el catalogo bajado por
-    // props (R43).
+    // props.
     expect(within(tabla).getByTestId('order-ingredient-unit')).toHaveTextContent('L');
     expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent(
       String(LINEA_INGREDIENTE.productStock),
@@ -687,8 +687,8 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
   });
 
   it('la «cantidad requerida» parte de 0 y el «restante» la descuenta del stock', async () => {
-    // QC-147: la columna calcula `cantidad del pedido × porcentaje / 100` (`consumedQuantity`), y
-    // sin cantidad escrita vale 0; el restante es `stock − requerida` (`subtractDecimal`) y sin
+    // La columna calcula `cantidad del pedido × porcentaje / 100` (`consumedQuantity`), y sin
+    // cantidad escrita vale 0; el restante es `stock − requerida` (`subtractDecimal`) y sin
     // cantidad escrita coincide con el stock.
     const user = setupUser();
     renderFormulario();

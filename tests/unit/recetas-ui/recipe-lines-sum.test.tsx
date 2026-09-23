@@ -10,7 +10,7 @@ import {
 } from '@/app/(private)/produccion/formulas/components';
 
 /**
- * El indicador de suma del bloque de líneas (T9, R10, R11, R23, R25; `design.md > 8.1`).
+ * El indicador de suma del bloque de líneas.
  *
  * Se monta `RecipeLinesField` directamente -sin `RecipeForm`- porque el indicador es SUYO: se
  * calcula sobre `lines`, no sobre el estado del formulario entero. `listProductsAction` está

@@ -45,7 +45,7 @@ describe('toProductRef', () => {
     expect(ref.stockByUnit).toEqual([]);
   });
 
-  it('la referencia publica NO lleva existencia total del producto (QC-91, R11)', () => {
+  it('la referencia publica NO lleva existencia total del producto (R11)', () => {
     // R11 — `products.stock` ya no existe: la existencia sale UNICAMENTE de `stockByUnit`, que
     // agrupa por unidad (R5) y no es lo mismo que el producto declarando SU unidad.
     const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', unitId: null, stockByUnit: [] });

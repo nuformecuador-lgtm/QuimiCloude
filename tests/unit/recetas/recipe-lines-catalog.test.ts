@@ -32,7 +32,7 @@ const PRODUCTO_NUEVO_DE_BAJA = '33333333-3333-4333-8333-333333333333';
 const LINEA_VIEJA = { productId: PRODUCTO_VIEJO, percentage: '60.00' };
 const LINEA_NUEVA = { productId: PRODUCTO_NUEVO, percentage: '40.00' };
 
-// QC-91 (R11): `ProductRef` no lleva `stock`; la existencia sale unicamente de `stockByUnit`.
+// `ProductRef` no lleva `stock`; la existencia sale unicamente de `stockByUnit`.
 const REF_NUEVO: ProductRef = {
   id: PRODUCTO_NUEVO,
   name: 'Sosa caustica',

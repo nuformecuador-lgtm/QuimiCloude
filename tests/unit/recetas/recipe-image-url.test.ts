@@ -23,7 +23,7 @@ const AHORA = new Date('2026-09-03T10:00:00.000Z');
 
 const PRODUCTO_ID = '11111111-1111-4111-8111-111111111111';
 
-// R7, D14: una entrada valida ya no puede ir sin lineas.
+// Una entrada valida ya no puede ir sin lineas.
 const RECETA_VALIDA = {
   name: 'Desengrasante 5%',
   description: null,
