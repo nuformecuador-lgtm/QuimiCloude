@@ -330,9 +330,11 @@ describe('R53 — una edicion intercalada entre el lote y el candado gana', () =
       const findExpirableConEdicionIntercalada: typeof findExpirableOrders = async (
         companyId,
         threshold,
+        cursor,
         limit,
+        scope,
       ) => {
-        const lote = await findExpirableOrders(companyId, threshold, limit);
+        const lote = await findExpirableOrders(companyId, threshold, cursor, limit, scope);
         await prisma.$executeRaw`UPDATE "orders" SET "reserved_at" = ${new Date()}::timestamptz WHERE "id" = ${orderId}::uuid`;
         return lote;
       };
@@ -418,13 +420,19 @@ describe('R17, R21 — aislamiento por empresa: la busqueda de A no devuelve ped
       const orderIdB = await crearPedidoCaducado(fixtureB, recipeIdB);
       const threshold = new Date();
 
-      const candidatosDeA = await findExpirableOrders(fixtureA.companyId, threshold, 100);
-      const candidatosDeB = await findExpirableOrders(fixtureB.companyId, threshold, 100);
+      const candidatosDeA = await findExpirableOrders(fixtureA.companyId, threshold, null, 100, {
+        companyId: fixtureA.companyId,
+      });
+      const candidatosDeB = await findExpirableOrders(fixtureB.companyId, threshold, null, 100, {
+        companyId: fixtureB.companyId,
+      });
+      const idsDeA = candidatosDeA.map((c) => c.id);
+      const idsDeB = candidatosDeB.map((c) => c.id);
 
-      expect(candidatosDeA).toContain(orderIdA);
-      expect(candidatosDeA).not.toContain(orderIdB);
-      expect(candidatosDeB).toContain(orderIdB);
-      expect(candidatosDeB).not.toContain(orderIdA);
+      expect(idsDeA).toContain(orderIdA);
+      expect(idsDeA).not.toContain(orderIdB);
+      expect(idsDeB).toContain(orderIdB);
+      expect(idsDeB).not.toContain(orderIdA);
 
       // El proceso completo, que recorre TODAS las empresas, cancela las dos: cada una por su
       // propia consulta acotada, nunca por una consulta conjunta.

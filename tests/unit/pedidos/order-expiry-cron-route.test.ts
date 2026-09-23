@@ -83,13 +83,29 @@ describe('pedidos — el Route Handler del proceso diario', () => {
 
   it('R26 — con fallos: 500 y el evento estructurado, sin PII', async () => {
     verifyCronSecretMock.mockReturnValue('ok')
-    const fallo = { id: '11111111-1111-4111-8111-111111111111', companyId: '22222222-2222-4222-8222-222222222222' }
+    const fallo = {
+      stage: 'order' as const,
+      id: '11111111-1111-4111-8111-111111111111',
+      companyId: '22222222-2222-4222-8222-222222222222',
+      code: 'unexpected',
+    }
     expireStaleOrdersMock.mockResolvedValue({ expired: 1, failed: [fallo] })
 
     const respuesta = await GET(requestCon({ authorization: 'Bearer bueno' }))
 
     expect(respuesta.status).toBe(500)
     expect(await respuesta.json()).toEqual({ expired: 1 })
+    expect(consoleError).toHaveBeenCalledWith('order_expiry_failed', { failedCount: 1, failed: [fallo] })
+  })
+
+  it('R54 — un fallo al listar empresas tambien responde 500 con el evento, aunque no haya candidato ni pedido', async () => {
+    verifyCronSecretMock.mockReturnValue('ok')
+    const fallo = { stage: 'companies' as const, code: 'unexpected' }
+    expireStaleOrdersMock.mockResolvedValue({ expired: 0, failed: [fallo] })
+
+    const respuesta = await GET(requestCon({ authorization: 'Bearer bueno' }))
+
+    expect(respuesta.status).toBe(500)
     expect(consoleError).toHaveBeenCalledWith('order_expiry_failed', { failedCount: 1, failed: [fallo] })
   })
 })

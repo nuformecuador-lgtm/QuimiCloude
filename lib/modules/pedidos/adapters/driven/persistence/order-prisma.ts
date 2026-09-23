@@ -785,27 +785,48 @@ async function setOrderReservedAt(
  * y el mismo orden que ese indice: `reserved_at, id`, para que dos lotes seguidos avancen sin
  * saltarse ni repetir un pedido que empata en `reserved_at`.
  *
- * `companyId` es el PRIMER parametro y no `scope: OrderScope`: quien recorre las empresas no
- * tiene un `OrderScope` que construir, solo el identificador que le dio el directorio de
- * empresas.
+ * `cursor` es el ultimo `(reservedAt, id)` que devolvio el lote anterior: `null` en el primero.
+ * Con cursor, solo se piden filas ESTRICTAMENTE posteriores en ese orden, para que un candidato
+ * que fallo en el lote anterior no vuelva a salir en esta ejecucion.
+ *
+ * `companyId` es un parametro por su cuenta, y no solo lo que trae `scope`: quien recorre las
+ * empresas no tiene un `OrderScope` que construir para el bucle, solo el identificador que le
+ * dio el directorio de empresas. `scope` sigue yendo al final, como el resto del modulo.
  */
 export async function findExpirableOrders(
   companyId: string,
   threshold: Date,
+  cursor: { readonly reservedAt: Date; readonly id: string } | null,
   limit: number,
-): Promise<readonly string[]> {
+  scope: OrderScope,
+): Promise<readonly { readonly id: string; readonly reservedAt: Date }[]> {
   const rows = await prisma.order.findMany({
     where: {
       AND: [
-        orderCompanyScope({ companyId }),
+        orderCompanyScope(scope),
         { status: 'PENDIENTE', deletedAt: null, reservedAt: { lte: threshold } },
+        ...(cursor === null
+          ? []
+          : [
+              {
+                OR: [
+                  { reservedAt: { gt: cursor.reservedAt } },
+                  { reservedAt: cursor.reservedAt, id: { gt: cursor.id } },
+                ],
+              },
+            ]),
       ],
     },
-    select: { id: true },
+    select: { id: true, reservedAt: true },
     orderBy: [{ reservedAt: 'asc' }, { id: 'asc' }],
     take: limit,
   });
-  return rows.map((row) => row.id);
+  return rows.map((row) => {
+    if (row.reservedAt === null) {
+      throw new Error('candidato sin reserved_at pese al filtro de la consulta');
+    }
+    return { id: row.id, reservedAt: row.reservedAt };
+  });
 }
 
 /**
