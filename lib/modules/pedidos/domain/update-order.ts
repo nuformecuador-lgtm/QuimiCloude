@@ -1,10 +1,8 @@
 import { requirePermission, type Actor } from './actor';
 import {
-  InsufficientMaterialError,
   OrderNotFoundError,
   PresentationNotFoundError,
   RecipeNotFoundError,
-  RecipeWithoutLinesError,
   ValidationError,
 } from './errors';
 import { updateOrderSchema } from './order-input';
@@ -54,11 +52,9 @@ export type UpdateOrderDeps = {
  * abrir la transaccion; y otra vez dentro de `unitOfWork.run`, sobre la fila que acaba de
  * bloquear `lockAliveById`, porque otra operacion pudo moverla entre las dos lecturas.
  *
- * Si el destino es `ENTREGADO`, la misma operacion recalcula lo apartado con los datos nuevos
- * y consume el resultado: `insufficient` se traduce a `InsufficientMaterialError` y
- * `nothing_to_consume` a `RecipeWithoutLinesError`. Cualquiera de las dos deshace la
- * transaccion entera -el pedido y su reserva quedan como estaban- porque `unitOfWork.run`
- * propaga la excepcion.
+ * La edicion no consume: recalcula lo apartado con los datos nuevos y sincroniza el libro,
+ * nunca lo baja de existencia. Consumir de verdad es cosa del Finalizar de la planta
+ * (`transition-order.ts`), el unico camino a `ENTREGADO`.
  */
 export function createUpdateOrder(
   deps: UpdateOrderDeps,
@@ -133,48 +129,24 @@ export function createUpdateOrder(
 
       // Repetida sobre la fila BLOQUEADA: otra operacion pudo moverla entre la lectura de
       // arriba y este bloqueo.
-      assertTransition(locked.status, data.status);
+      assertTransition(locked.status, locked.status);
 
       const result = await transaction.orders.updateAlive(id, data, actor.id, instant, ingredientsCost, scope);
       if (result === 'not_found') throw new OrderNotFoundError();
 
-      if (data.status === 'ENTREGADO') {
-        // Recalcula primero lo apartado con los datos nuevos y consume el resultado.
-        await transaction.reservations.syncForOrder({
-          orderId: id,
-          companyId: actor.companyId,
-          requirement,
-          actorId: actor.id,
-          now: instant,
-        });
+      const outcome = await transaction.reservations.syncForOrder({
+        orderId: id,
+        companyId: actor.companyId,
+        requirement,
+        actorId: actor.id,
+        now: instant,
+      });
 
-        const outcome = await transaction.reservations.consumeForOrder({
-          orderId: id,
-          companyId: actor.companyId,
-          fallbackRequirement: requirement,
-          actorId: actor.id,
-          now: instant,
-        });
-
-        if (outcome.kind === 'insufficient') throw new InsufficientMaterialError();
-        if (outcome.kind === 'nothing_to_consume') throw new RecipeWithoutLinesError();
-
-        await transaction.orders.setReservedAt(id, null, scope);
-      } else {
-        const outcome = await transaction.reservations.syncForOrder({
-          orderId: id,
-          companyId: actor.companyId,
-          requirement,
-          actorId: actor.id,
-          now: instant,
-        });
-
-        await transaction.orders.setReservedAt(
-          id,
-          outcome.kind === 'reserved' ? instant : null,
-          scope,
-        );
-      }
+      await transaction.orders.setReservedAt(
+        id,
+        outcome.kind === 'reserved' ? instant : null,
+        scope,
+      );
     });
   };
 }

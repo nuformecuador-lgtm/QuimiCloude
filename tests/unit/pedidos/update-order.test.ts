@@ -11,9 +11,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  InsufficientMaterialError,
   RecipeNotFoundError,
-  RecipeWithoutLinesError,
   UnauthorizedError,
   type PedidosError,
 } from '@/lib/modules/pedidos/domain/errors';
@@ -639,7 +637,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
   });
 });
 
-describe('QC-141 T9 — editar con reserva (R12, R20, R29, R41, R49, R50)', () => {
+describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
   /** Registra el ORDEN real de las llamadas dentro de la unidad de trabajo. */
   function repositorioConOrden(opciones: {
     sync?: 'reserved' | 'not_reserved';
@@ -694,9 +692,9 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R29, R41, R49, R50)', () =
     expect(repo.setReservedAt.mock.calls[0]?.[1]).toBe(AHORA);
   });
 
-  it('destino ENTREGADO: updateAlive -> syncForOrder -> consumeForOrder -> setReservedAt(null) (R29)', async () => {
+  it('R52: un `status` de entrada no dispara consumo -ni siquiera "ENTREGADO"-, solo sincroniza la reserva', async () => {
     const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
-    const repo = repositorioConOrden({ sync: 'reserved', consume: 'consumed' });
+    const repo = repositorioConOrden({ sync: 'reserved' });
     const updateOrder = createUpdateOrder({
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
@@ -709,52 +707,8 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R29, R41, R49, R50)', () =
 
     await updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status: 'ENTREGADO' }, ACTOR_A);
 
-    expect(repo.orden).toEqual([
-      'orders.updateAlive',
-      'reservations.syncForOrder',
-      'reservations.consumeForOrder',
-      'orders.setReservedAt',
-    ]);
-    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBeNull();
-  });
-
-  it('R29/insufficient: entregar sin material suficiente lanza InsufficientMaterialError y no fija reserved_at', async () => {
-    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
-    const repo = repositorioConOrden({ sync: 'not_reserved', consume: 'insufficient' });
-    const updateOrder = createUpdateOrder({
-      orders: repo.orders,
-      unitOfWork: repo.unitOfWork,
-      recipes: cat.recipes,
-      products: catalogoDeProductos().products,
-      units: catalogoDeUnidades().units,
-      presentations: catalogoDePresentaciones().presentations,
-      now: () => AHORA,
-    });
-
-    await expect(
-      updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status: 'ENTREGADO' }, ACTOR_A),
-    ).rejects.toBeInstanceOf(InsufficientMaterialError);
-    expect(repo.setReservedAt).not.toHaveBeenCalled();
-  });
-
-  it('R50: entregar sin apartado y con receta sin lineas lanza RecipeWithoutLinesError sin cambiar nada', async () => {
-    // `catalogoDeRecetas()` por defecto: receta sin lineas.
-    const cat = catalogoDeRecetas();
-    const repo = repositorioConOrden({ sync: 'not_reserved', consume: 'nothing_to_consume' });
-    const updateOrder = createUpdateOrder({
-      orders: repo.orders,
-      unitOfWork: repo.unitOfWork,
-      recipes: cat.recipes,
-      products: catalogoDeProductos().products,
-      units: catalogoDeUnidades().units,
-      presentations: catalogoDePresentaciones().presentations,
-      now: () => AHORA,
-    });
-
-    await expect(
-      updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status: 'ENTREGADO' }, ACTOR_A),
-    ).rejects.toBeInstanceOf(RecipeWithoutLinesError);
-    expect(repo.setReservedAt).not.toHaveBeenCalled();
+    expect(repo.orden).toEqual(['orders.updateAlive', 'reservations.syncForOrder', 'orders.setReservedAt']);
+    expect(repo.consumeForOrder).not.toHaveBeenCalled();
   });
 
   it('R49: editar con una receta sin lineas guarda sin error y deja reserved_at nulo', async () => {
