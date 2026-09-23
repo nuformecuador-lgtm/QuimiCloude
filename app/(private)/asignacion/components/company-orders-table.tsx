@@ -53,7 +53,7 @@ function toRouteStatuses(value: DataTableFilterValue | undefined): readonly Rout
   );
 }
 
-/** Pagina «Todos» conservando la vista y el filtro de estado (R24, R27). Sin filtro, sin `status`. */
+/** Pagina «Todos» conservando la vista y el filtro de estado. Sin filtro, sin `status`. */
 export function companyOrdersHref(
   params: Pick<DataTableParams, 'page' | 'pageSize'>,
   statuses: readonly RouteOrderStatus[],

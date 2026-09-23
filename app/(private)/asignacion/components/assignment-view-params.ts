@@ -38,7 +38,7 @@ function isPageSize(value: number): boolean {
 }
 
 /**
- * La vista pedida por la direccion, resuelta contra las permitidas para este usuario (R11-R15):
+ * La vista pedida por la direccion, resuelta contra las permitidas para este usuario:
  * si no viene o no esta en `allowed`, cae a la primera sin lanzar y sin revelar que otra vista
  * existe.
  */
@@ -69,7 +69,7 @@ export function parseAssignmentListParams(
 }
 
 /**
- * El filtro de estado de «Todos» (R24): separado por comas, mismo formato que `/pedidos`. Los
+ * El filtro de estado de «Todos»: separado por comas, mismo formato que `/pedidos`. Los
  * valores que no estan en `ROUTE_ORDER_STATUS_VALUES` se descartan en silencio y los repetidos se
  * deduplican, en vez de fallar.
  */

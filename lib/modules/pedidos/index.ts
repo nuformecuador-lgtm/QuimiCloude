@@ -95,7 +95,7 @@ export { assertTransition, isAllowedTransition } from './domain/order-transition
 
 /** Los tipos de entrada y de salida (R42, R43, R46). `OrderRow` es lo que devuelve el PUERTO
  *  y se publica porque `lib/composition` tiene que poder nombrar el tipo del repositorio.
- *  `OrderEdit` es lo que acepta `updateAlive`, sin `status` (R6). */
+ *  `OrderEdit` es lo que acepta `updateAlive`, sin `status`. */
 export type { NewOrder, OrderEdit, OrderRow, OrderView, OrderSummary } from './domain/order-view';
 
 /** QC-57 (R25, R31): el contrato generico de consulta de lista y la lista blanca de pedidos.

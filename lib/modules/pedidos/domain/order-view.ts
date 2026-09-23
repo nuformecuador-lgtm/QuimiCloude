@@ -44,7 +44,7 @@ export type NewOrder = {
 };
 
 /**
- * Datos de negocio de una EDICION: lo mismo que `NewOrder` sin `status` (R6). La edicion ya no
+ * Datos de negocio de una EDICION: lo mismo que `NewOrder` sin `status`. La edicion ya no
  * puede ni EXPRESAR un cambio de estado -ni siquiera `PENDIENTE` a `PENDIENTE`-, asi que quien
  * decide si el pedido sigue siendo editable es `assertTransition(row.status, row.status)` en
  * `update-order.ts`, contra el estado ya leido de la fila.

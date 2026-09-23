@@ -30,7 +30,7 @@ export type OrderAssignmentTarget = {
 };
 
 /** El orden de un resumen paginado. `work_queue` es el de la lista de trabajo (prioridad,
- *  antiguedad, numero); `finished_recent_first` es el de «Terminados» (R20). */
+ *  antiguedad, numero); `finished_recent_first` es el de «Terminados». */
 export type OrderSummaryOrdering = 'work_queue' | 'finished_recent_first';
 
 export interface OrderCatalog {
@@ -64,7 +64,7 @@ export interface OrderCatalog {
    * usa para «Terminados» y «Todos», que no acotan por quien esta asignado. El `ordering`
    * decide el `ORDER BY`: `work_queue` es el mismo que `listAliveSummariesByIds`, extraido a
    * una constante compartida para que no diverjan; `finished_recent_first` ordena por fecha de
-   * terminado, con los nulos al final y, entre ellos, por numero de pedido descendente (R20).
+   * terminado, con los nulos al final y, entre ellos, por numero de pedido descendente.
    */
   listAliveSummariesInCompany(
     companyId: string,

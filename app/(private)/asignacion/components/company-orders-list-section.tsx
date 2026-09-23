@@ -16,7 +16,7 @@ type CompanyOrdersListSectionProps = {
 };
 
 /**
- * `/asignacion?vista=todos` (R22, R24, R25, R26, R27, R31): pide la pagina con el filtro de
+ * `/asignacion?vista=todos`: pide la pagina con el filtro de
  * estado vigente y reparte error, vacio o tabla. La accion se importa por su ruta exacta: el
  * barrel del modulo no la reexporta a proposito.
  */

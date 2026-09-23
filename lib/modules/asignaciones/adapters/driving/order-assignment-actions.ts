@@ -253,16 +253,16 @@ export async function listAssignedOrdersAction(
 }
 
 // ---------------------------------------------------------------------------------------------
-// QC-145 T11 - Las TRES acciones de las vistas nuevas (`design.md > 4`). Mismo cuerpo tonto que
-// `listAssignedOrdersAction`: resuelven el actor de las dos caras de la sesion, llaman al caso de
-// uso con la entrada CRUDA y traducen el error por su `code`. Ningun permiso se comprueba aqui.
+// Las TRES acciones de las vistas nuevas. Mismo cuerpo tonto que `listAssignedOrdersAction`:
+// resuelven el actor de las dos caras de la sesion, llaman al caso de uso con la entrada CRUDA y
+// traducen el error por su `code`. Ningun permiso se comprueba aqui.
 // ---------------------------------------------------------------------------------------------
 
 export type FinishedOrdersListResult =
   | { status: 'success'; data: Page<FinishedOrderView> }
   | ErrorState;
 
-/** Los `ENTREGADO` de toda la empresa (R17). */
+/** Los `ENTREGADO` de toda la empresa. */
 export async function listFinishedOrdersAction(
   query: unknown,
 ): Promise<FinishedOrdersListResult> {
@@ -280,7 +280,7 @@ export type CompanyOrdersListResult =
   | { status: 'success'; data: Page<CompanyOrderView> }
   | ErrorState;
 
-/** Los pedidos de la empresa en cualquier estado (R22). */
+/** Los pedidos de la empresa en cualquier estado. */
 export async function listCompanyOrdersAction(
   query: unknown,
 ): Promise<CompanyOrdersListResult> {
@@ -298,7 +298,7 @@ export type ResponsibleCandidatesResult =
   | { status: 'success'; data: readonly ResponsibleCandidate[] }
   | ErrorState;
 
-/** Los candidatos del selector de responsables (R32): sin `FormData`, no viene de un `<form>`. */
+/** Los candidatos del selector de responsables: sin `FormData`, no viene de un `<form>`. */
 export async function listResponsibleCandidatesAction(): Promise<ResponsibleCandidatesResult> {
   const actor = await currentActor();
 

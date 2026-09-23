@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-/** El estado vacío de «Terminados» (R19, R27), calcado de `AssignedOrdersEmpty`. */
+/** El estado vacío de «Terminados», calcado de `AssignedOrdersEmpty`. */
 
 export type FinishedOrdersEmptyProps = {
   /** Presente solo si la pagina pedida se paso del total; ausente si no hay ningun pedido. */

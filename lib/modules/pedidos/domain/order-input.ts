@@ -104,7 +104,7 @@ export const EDITABLE_STATUS_VALUES: readonly EditableOrderStatus[] = ORDER_STAT
  * pregunta abierta 5 del spec, con su posicion por defecto escrita y su coste: subir la
  * prioridad obliga a reenviar todo el pedido.
  *
- * La edicion ya no mueve el estado (R6): un `status` que llegue en la entrada muere aqui, como
+ * La edicion ya no mueve el estado: un `status` que llegue en la entrada muere aqui, como
  * cualquier otra clave que el esquema no declare -`z.object` la descarta-, el mismo criterio
  * que el alta. Tampoco hay campo `reason`: cancelar es `cancelOrder` y solo el.
  */

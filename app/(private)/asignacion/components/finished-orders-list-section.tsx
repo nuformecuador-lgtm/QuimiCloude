@@ -14,7 +14,7 @@ type FinishedOrdersListSectionProps = {
 };
 
 /**
- * `/asignacion?vista=terminados` (R17, R19, R21, R26, R27): pide la pagina y reparte error, vacio
+ * `/asignacion?vista=terminados`: pide la pagina y reparte error, vacio
  * o tabla. La accion se importa por su ruta exacta: el barrel del modulo no la reexporta a
  * proposito.
  */

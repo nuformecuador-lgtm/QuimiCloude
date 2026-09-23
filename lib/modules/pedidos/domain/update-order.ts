@@ -37,7 +37,7 @@ export type UpdateOrderDeps = {
  * edicion parcial campo a campo. Es la pregunta abierta 5 del spec, con su posicion por
  * defecto escrita y su coste (subir la prioridad obliga a reenviar todo el pedido).
  *
- * `status` muere ANTES, en `updateOrderSchema` (R6): la edicion no puede ni EXPRESAR un cambio
+ * `status` muere ANTES, en `updateOrderSchema`: la edicion no puede ni EXPRESAR un cambio
  * de estado, porque `updateOrderSchema` no lo declara y `OrderEdit` no tiene el campo.
  *
  * R6: el actor queda como autor de la ULTIMA MODIFICACION y el de creacion NO se toca. Esa
@@ -70,10 +70,10 @@ export function createUpdateOrder(
     const row = await deps.orders.findAliveById(id, scope);
     if (row === null) throw new OrderNotFoundError();
 
-    // R6, R8: la edicion ya no mueve el estado, asi que la comprobacion es «¿puede el pedido
-    // quedarse en el mismo estado?» -legal en `PENDIENTE`/`EN_CURSO`, vacio en los finales
-    // (`design.md > 2.3`)-. Va antes de preguntar a los catalogos: una edicion rechazada no lee
-    // nada mas y no modifica ninguna fila.
+    // La edicion ya no mueve el estado, asi que la comprobacion es «¿puede el pedido
+    // quedarse en el mismo estado?» -legal en `PENDIENTE`/`EN_CURSO`, vacio en los finales-.
+    // Va antes de preguntar a los catalogos: una edicion rechazada no lee nada mas y no
+    // modifica ninguna fila.
     assertTransition(row.status, row.status);
 
     // R25 -la sutileza de esta ficha-. Si la receta NO cambia se acepta aunque este dada de

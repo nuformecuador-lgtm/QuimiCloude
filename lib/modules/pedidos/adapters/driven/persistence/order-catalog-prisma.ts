@@ -88,7 +88,7 @@ const SUMMARY_SELECT = {
 
 /** El «orden de la lista de trabajo»: prioridad, antiguedad y numero, con `id ASC` de
  *  desempate para que sea total. Compartido por los dos listados de resumen para que no
- *  puedan divergir (`design.md > 2.2`). */
+ *  puedan divergir. */
 const WORK_QUEUE_ORDER_BY = [
   { priority: 'desc' },
   { createdAt: 'asc' },
@@ -97,7 +97,7 @@ const WORK_QUEUE_ORDER_BY = [
   { id: 'asc' },
 ] as const;
 
-/** El «orden de terminados» (R20, D14): fecha de terminado descendente con los nulos EXPLICITOS
+/** El «orden de terminados»: fecha de terminado descendente con los nulos EXPLICITOS
  *  al final, y entre los «sin fecha», numero de pedido descendente. */
 const FINISHED_RECENT_FIRST_ORDER_BY = [
   { finishedAt: { sort: 'desc', nulls: 'last' } },
@@ -158,9 +158,9 @@ export async function listAliveOrderSummariesByIds(
 }
 
 /**
- * Implementa `OrderCatalog['listAliveSummariesInCompany']` (`design.md > 2.2`): el mismo
+ * Implementa `OrderCatalog['listAliveSummariesInCompany']`: el mismo
  * resumen que `listAliveSummariesByIds`, pero SIN filtro de ids -toda la empresa-, para
- * «Terminados» y «Todos» (R17, R22), que no acotan por quien esta asignado.
+ * «Terminados» y «Todos», que no acotan por quien esta asignado.
  */
 export async function listAliveSummariesInCompany(
   companyId: string,

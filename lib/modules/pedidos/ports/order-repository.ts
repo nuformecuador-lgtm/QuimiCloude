@@ -99,7 +99,7 @@ export interface OrderRepository {
   ): Promise<Page<OrderRow>>;
 
   /** Edicion como REEMPLAZO COMPLETO. No puede escribir `CANCELADO` ni motivo, y ya no puede
-   *  escribir NINGUN estado (R6): `OrderEdit` no tiene `status`.
+   *  escribir NINGUN estado: `OrderEdit` no tiene `status`.
    *
    *  `ingredientsCost`: mismo criterio que en `create` -parametro aparte, `null` distinto de
    *  `0`-. La edicion lo SUSTITUYE por completo, incluso a `null`: no hay fusion con el valor

@@ -1,6 +1,6 @@
 // lib/modules/asignaciones/domain/list-responsible-candidates.ts
 /**
- * Caso de uso «candidatos para el selector de responsables» (`design.md > 3.6`; R32).
+ * Caso de uso «candidatos para el selector de responsables».
  *
  * Exige `asignaciones.modificar`: es la misma condicion con la que hoy se decide si el panel de
  * asignacion se pinta o no, no un permiso de lectura nuevo. La lista de personas depende SOLO de

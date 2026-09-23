@@ -7,7 +7,7 @@ import type { FinishedOrderView } from '@/lib/modules/asignaciones';
 import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 /**
- * Las SEIS columnas de «Terminados» (R21, R26; `design.md > 6.3`): número, receta, cantidad,
+ * Las SEIS columnas de «Terminados»: número, receta, cantidad,
  * presentación, fecha de terminado y responsables. **Sin columna «Entrar» ni acciones**: esta
  * vista es de solo lectura para toda la empresa, incluido el propio actor.
  */
@@ -35,7 +35,7 @@ export const FINISHED_ORDERS_DEFAULT_PINNED_COLUMNS: readonly string[] = [
 ];
 
 /**
- * `YYYY-MM-DD` en UTC, nunca `toLocaleDateString` (`design.md > 0`): el Server Component y el
+ * `YYYY-MM-DD` en UTC, nunca `toLocaleDateString`: el Server Component y el
  * navegador tienen husos y locales distintos.
  */
 function formatFinishedAt(value: Date): string {

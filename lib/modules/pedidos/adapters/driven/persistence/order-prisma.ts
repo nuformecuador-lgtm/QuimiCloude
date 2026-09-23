@@ -511,8 +511,8 @@ export async function listAliveOrders(
  * `updateMany` con `deletedAt: null` en el `where` y no `update`: si el pedido no existe o ya
  * esta borrado, `count` sale 0 y se devuelve `'not_found'` en vez de lanzar.
  *
- * `data` NUNCA incluye `createdBy` ni `createdAt` (R6): conservar el autor y el instante de
- * la creacion es la mitad de R6 que solo se puede demostrar aqui. Tampoco incluye `status` ni
+ * `data` NUNCA incluye `createdBy` ni `createdAt`: conservar el autor y el instante de
+ * la creacion solo se puede demostrar aqui. Tampoco incluye `status` ni
  * `cancellationReason`: `OrderEdit` no tiene esos campos, asi que esta sentencia no puede
  * escribirlos ni por accidente.
  *

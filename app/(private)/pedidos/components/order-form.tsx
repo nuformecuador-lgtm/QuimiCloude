@@ -101,7 +101,7 @@ export const ORDER_SHEET_RESPONSIBLES_TESTID = 'order-sheet-responsibles';
  * preseleccionada.
  *
  * **R28 — la edicion precarga y es REEMPLAZO COMPLETO** de los campos de negocio. El formulario de
- * edicion no ofrece ningun control de estado (R7): el estado no se cambia desde aqui, ni siquiera
+ * edicion no ofrece ningun control de estado: el estado no se cambia desde aqui, ni siquiera
  * hacia `CANCELADO` -ese camino sigue siendo unicamente `cancelOrderAction`-.
  *
  * **R30 — no hay campo de fecha de solicitud** en ningun modo: la pone el sistema.

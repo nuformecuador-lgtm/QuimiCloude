@@ -33,7 +33,7 @@ export type AssignmentViewTabsProps = {
 };
 
 /**
- * Pestañas-enlace de `/asignacion` (`design.md > 6.1`, `> 6.6`). No decide nada: cada disparador es
+ * Pestañas-enlace de `/asignacion`. No decide nada: cada disparador es
  * una navegacion real a `?vista=…` -sin `onValueChange`-, y quien resuelve la vista vigente y monta
  * la seccion correspondiente es `page.tsx`. Sin `:hover` como unica via, porque el estado activo lo
  * marca la primitiva por atributo (`data-active`) y la navegacion funciona igual con teclado, raton

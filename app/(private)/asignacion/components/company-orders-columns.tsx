@@ -10,12 +10,12 @@ import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 import { ROUTE_ORDER_STATUS_VALUES, type RouteOrderStatus } from './assignment-view-params';
 
 /**
- * Las columnas de «Todos» (R24, R25, R26, R31; `design.md > 6.4`): número, receta, cantidad,
+ * Las columnas de «Todos»: número, receta, cantidad,
  * presentación, prioridad, estado (con filtro `select` de los cuatro estados) y responsables.
  * **Sin columna «Entrar» ni acciones**, tampoco para los pedidos asignados al propio actor.
  *
  * La columna de **fecha de terminado** solo aparece cuando el filtro vigente es EXACTAMENTE
- * `['ENTREGADO']` (R31, D16): `showFinishedAt` la decide quien construye las columnas a partir de
+ * `['ENTREGADO']`: `showFinishedAt` la decide quien construye las columnas a partir de
  * los parametros ya parseados en el servidor, nunca esta declaracion por su cuenta.
  */
 
@@ -57,12 +57,12 @@ export const COMPANY_ORDER_PRIORITY_LABELS: Readonly<Record<OrderPriority, strin
   CRITICA: 'Crítica',
 };
 
-/** Las opciones del filtro «Estado» (R24), derivadas del mismo conjunto que la URL reconoce. */
+/** Las opciones del filtro «Estado», derivadas del mismo conjunto que la URL reconoce. */
 export const COMPANY_ORDER_STATUS_FILTER_OPTIONS: readonly { value: string; label: string }[] =
   ROUTE_ORDER_STATUS_VALUES.map((value) => ({ value, label: COMPANY_ORDER_STATUS_LABELS[value] }));
 
 /**
- * El filtro exacto que activa el orden y la columna de terminados (R24, R31, D16): la lista de
+ * El filtro exacto que activa el orden y la columna de terminados: la lista de
  * estados aplicada tiene que ser, sin mas, `['ENTREGADO']`. Vacio significa «sin filtro» (los
  * cuatro estados) y nunca cuenta como exacto.
  */
@@ -71,7 +71,7 @@ export function isExactlyDelivered(statuses: readonly RouteOrderStatus[]): boole
 }
 
 /**
- * `YYYY-MM-DD` en UTC, nunca `toLocaleDateString` (`design.md > 0`).
+ * `YYYY-MM-DD` en UTC, nunca `toLocaleDateString`.
  */
 function formatFinishedAt(value: Date): string {
   return value.toISOString().slice(0, 10);
@@ -90,7 +90,7 @@ function FinishedAtCell({ finishedAt }: { readonly finishedAt: Date | null }) {
 }
 
 export type CompanyOrdersColumnsDeps = {
-  /** Decidido en el servidor a partir del filtro de estado ya parseado (R31). */
+  /** Decidido en el servidor a partir del filtro de estado ya parseado. */
   readonly showFinishedAt: boolean;
 };
 

@@ -161,7 +161,7 @@ function buildCreateCandidate(formData: FormData): unknown {
 
 /**
  * El candidato de la edicion: los mismos campos del alta, porque la edicion es un REEMPLAZO
- * COMPLETO de los datos de negocio (R20) que ya no mueve el estado (R6). Un `status` que el
+ * COMPLETO de los datos de negocio, y ya no mueve el estado. Un `status` que el
  * formulario siga enviando se ignora aqui, sin llegar siquiera a `updateOrderSchema`.
  */
 function buildUpdateCandidate(formData: FormData): unknown {

@@ -1160,10 +1160,9 @@ export const asignaciones = {
     orders: orderCatalog,
     now: () => new Date(),
   }),
-  // QC-145 T11 (`design.md > 5`) - las TRES factories nuevas, ya cableadas. Claves NUEVAS al
-  // final: ninguna de las de arriba se toca. MISMOS `orderCatalog`, `recipeCatalog`,
-  // `presentationCatalog`, `orderAssignmentRepository` y `peopleDirectory` que el resto del
-  // modulo: ningun adaptador nuevo.
+  // Claves NUEVAS al final: ninguna de las de arriba se toca. MISMOS `orderCatalog`,
+  // `recipeCatalog`, `presentationCatalog`, `orderAssignmentRepository` y `peopleDirectory` que
+  // el resto del modulo: ningun adaptador nuevo.
   listFinishedOrders: createListFinishedOrders({
     orders: orderCatalog,
     assignments: orderAssignmentRepository,
