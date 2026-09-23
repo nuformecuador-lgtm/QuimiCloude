@@ -640,6 +640,7 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await row.getByTestId(ORDER_ACTION_EDIT_TESTID).click();
     await expect(page.getByTestId(ORDER_FORM_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(ORDER_STATUS_SELECT_TESTID)).toHaveCount(0);
+    await expect(page.getByRole('combobox', { name: /estado/i })).toHaveCount(0);
     await page.getByTestId(ORDER_FORM_CANCEL_TESTID).click();
     await expect(page.getByTestId(ORDER_FORM_TESTID)).toHaveCount(0, { timeout: 60_000 });
 
