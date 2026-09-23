@@ -222,6 +222,52 @@ describe('SupplierShowcaseList — fallo y Reintentar (R35)', () => {
     await waitFor(() => expect(listSupplierShowcaseActionMock).toHaveBeenCalledTimes(2));
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
+
+  it('R35: conserva lo cargado y pinta el aviso sin detalle tecnico cuando la accion rechaza (fallo de red)', async () => {
+    listSupplierShowcaseActionMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const primera = fila({ name: 'Alfa' });
+
+    render(
+      <SupplierShowcaseList
+        initialPage={{ items: [primera], hasMore: true }}
+        filters={EMPTY_SHOWCASE_FILTERS}
+      />,
+    );
+
+    mockAllIsIntersecting(true);
+
+    const aviso = await screen.findByRole('alert');
+    expect(aviso).not.toHaveTextContent('Failed to fetch');
+    expect(screen.getByTestId(`supplier-showcase-row-${primera.id}`)).toBeInTheDocument();
+    expect(screen.queryByTestId('showcase-load-trigger')).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByTestId('supplier-showcase-list')).toHaveAttribute('aria-busy', 'false'),
+    );
+  });
+
+  it('R35: cuando la accion rechaza (fallo de red), «Reintentar» repite la misma pagina y, si sale bien, retira el aviso', async () => {
+    const nueva = fila({ name: 'Beta' });
+    listSupplierShowcaseActionMock
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(exito([nueva], false));
+    const user = setupUser();
+
+    render(
+      <SupplierShowcaseList
+        initialPage={{ items: [fila()], hasMore: true }}
+        filters={EMPTY_SHOWCASE_FILTERS}
+      />,
+    );
+
+    mockAllIsIntersecting(true);
+    await screen.findByRole('alert');
+
+    await user.click(screen.getByTestId('supplier-showcase-list-retry'));
+
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    expect(screen.getByTestId(`supplier-showcase-row-${nueva.id}`)).toBeInTheDocument();
+    expect(listSupplierShowcaseActionMock).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('SupplierShowcaseList — filtros vigentes (D14)', () => {

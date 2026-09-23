@@ -245,6 +245,44 @@ describe('SupplierShowcaseRow — fallo de «cargar más» (R35, R40)', () => {
     await waitFor(() => expect(listShowcaseLinesActionMock).toHaveBeenCalledTimes(2));
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
+
+  it('R35: conserva lo ya cargado y pinta el aviso con Reintentar cuando la accion rechaza (fallo de red), sin detalle tecnico', async () => {
+    const proveedor = fila({ hasMoreLines: true });
+    listShowcaseLinesActionMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const user = setupUser();
+
+    render(<SupplierShowcaseRow row={proveedor} productSearch="" />);
+    const boton = screen.getByTestId('supplier-showcase-row-load-more');
+    await user.click(boton);
+
+    const aviso = await screen.findByRole('alert');
+    expect(aviso).not.toHaveTextContent('Failed to fetch');
+    expect(screen.getByTestId(`showcase-line-card-${proveedor.lines[0]!.id}`)).toBeInTheDocument();
+    expect(screen.queryByTestId('supplier-showcase-row-load-more')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('supplier-showcase-row-retry')).not.toHaveAttribute('aria-busy', 'true'));
+  });
+
+  it('R35: cuando la accion rechaza (fallo de red), «Reintentar» repite la misma carga y, si sale bien, retira el aviso', async () => {
+    const proveedor = fila({ hasMoreLines: true });
+    const nuevaLinea = linea({ id: crypto.randomUUID(), name: 'Hipoclorito de sodio' });
+    listShowcaseLinesActionMock
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce({
+        status: 'success',
+        data: { items: [nuevaLinea], page: 2, hasMore: false },
+      });
+    const user = setupUser();
+
+    render(<SupplierShowcaseRow row={proveedor} productSearch="" />);
+    await user.click(screen.getByTestId('supplier-showcase-row-load-more'));
+    await screen.findByRole('alert');
+
+    await user.click(screen.getByTestId('supplier-showcase-row-retry'));
+
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    expect(screen.getByTestId(`showcase-line-card-${nuevaLinea.id}`)).toBeInTheDocument();
+    expect(listShowcaseLinesActionMock).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('SupplierShowcaseRow — sin autores (R8)', () => {

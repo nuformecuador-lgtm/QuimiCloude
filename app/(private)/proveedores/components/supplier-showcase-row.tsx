@@ -40,14 +40,20 @@ export function SupplierShowcaseRow({ row, productSearch }: SupplierShowcaseRowP
     setLoading(true);
 
     const nextPage = loadedPage + 1;
-    const result = await listShowcaseLinesAction(row.id, { page: nextPage, productSearch });
 
-    if (result.status === 'success') {
-      setLines((current) => appendWithoutDuplicates(current, result.data.items));
-      setHasMoreLines(result.data.hasMore);
-      setLoadedPage(nextPage);
-      setFailed(false);
-    } else {
+    try {
+      const result = await listShowcaseLinesAction(row.id, { page: nextPage, productSearch });
+
+      if (result.status === 'success') {
+        setLines((current) => appendWithoutDuplicates(current, result.data.items));
+        setHasMoreLines(result.data.hasMore);
+        setLoadedPage(nextPage);
+        setFailed(false);
+      } else {
+        setFailed(true);
+      }
+    } catch {
+      // La Server Action rechaza (no resuelve) ante un fallo de transporte, no de negocio.
       setFailed(true);
     }
 

@@ -56,18 +56,24 @@ export function SupplierShowcaseList({ initialPage, filters }: SupplierShowcaseL
     setLoading(true);
 
     const nextPage = loadedPage + 1;
-    const result = await listSupplierShowcaseAction({
-      page: nextPage,
-      supplierSearch: filters.supplierSearch,
-      productSearch: filters.productSearch,
-    });
 
-    if (result.status === 'success') {
-      setRows((current) => appendWithoutDuplicates(current, result.data.items));
-      setHasMore(result.data.hasMore);
-      setLoadedPage(nextPage);
-      setFailed(false);
-    } else {
+    try {
+      const result = await listSupplierShowcaseAction({
+        page: nextPage,
+        supplierSearch: filters.supplierSearch,
+        productSearch: filters.productSearch,
+      });
+
+      if (result.status === 'success') {
+        setRows((current) => appendWithoutDuplicates(current, result.data.items));
+        setHasMore(result.data.hasMore);
+        setLoadedPage(nextPage);
+        setFailed(false);
+      } else {
+        setFailed(true);
+      }
+    } catch {
+      // La Server Action rechaza (no resuelve) ante un fallo de transporte, no de negocio.
       setFailed(true);
     }
 
