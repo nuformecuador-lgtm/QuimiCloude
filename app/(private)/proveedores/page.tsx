@@ -1,15 +1,11 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { SupplierSheet } from '@/components/shared/supplier';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { BRAND_LABEL, SUPPLIERS_LABEL } from '@/lib/shared/navigation/private-nav';
 
-import {
-  parseSupplierListParams,
-  SupplierListSection,
-  SupplierSheet,
-  SupplierTableSkeleton,
-} from './components';
+import { parseSupplierListParams, SupplierListSection, SupplierTableSkeleton } from './components';
 
 export const metadata: Metadata = {
   title: `${SUPPLIERS_LABEL} · ${BRAND_LABEL}`,

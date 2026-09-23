@@ -9,6 +9,7 @@ import {
   type DataTableParams,
   type DataTableTexts,
 } from '@/components/shared/data-table';
+import { SupplierSheet } from '@/components/shared/supplier';
 import { buttonVariants } from '@/components/ui/button';
 import type { SupplierView } from '@/lib/modules/proveedores';
 import { cn } from '@/lib/utils';
@@ -16,7 +17,6 @@ import { cn } from '@/lib/utils';
 import { DeleteSupplierDialog } from './delete-supplier-dialog';
 import { SUPPLIER_DEFAULT_PINNED_COLUMNS, buildSupplierColumns } from './supplier-columns';
 import { supplierListHref } from './supplier-list-params';
-import { SupplierSheet } from './supplier-sheet';
 
 export const SUPPLIER_TABLE_ID = 'proveedores';
 

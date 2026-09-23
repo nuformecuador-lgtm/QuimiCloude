@@ -1,4 +1,5 @@
 import type { DataTableParams } from '@/components/shared/data-table';
+import { SupplierSheet } from '@/components/shared/supplier';
 import { listSuppliersAction } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
 
 import {
@@ -9,7 +10,6 @@ import {
 } from './supplier-list-params';
 import { SupplierListEmpty } from './supplier-list-empty';
 import { SupplierListError } from './supplier-list-error';
-import { SupplierSheet } from './supplier-sheet';
 import { SupplierTable } from './supplier-table';
 
 type SupplierListSectionProps = {
