@@ -243,11 +243,11 @@ function funcionesQueEscribenLotes(fuente: string): string[] {
 }
 
 /**
- * QC-141: `consumeBatchStock` es la UNICA excepcion a proposito. Una entrega puede consumir de
- * VARIOS lotes del MISMO producto, y `consumeForOrder` -en `reservation-prisma.ts`, driven del
- * mismo modulo- recalcula una vez por producto DESPUES de todos los decrementos, no una vez por
- * lote: sumar `product_batches` de nuevo en cada iteracion seria trabajo repetido para el mismo
- * resultado. El recalculo sigue pasando, en la misma transaccion (R28): solo se mueve de sitio.
+ * `consumeBatchStock` es la UNICA excepcion a proposito. Una entrega puede consumir de VARIOS
+ * lotes del MISMO producto, y `consumeForOrder` -en `reservation-prisma.ts`, driven del mismo
+ * modulo- recalcula una vez por producto DESPUES de todos los decrementos, no una vez por lote:
+ * sumar `product_batches` de nuevo en cada iteracion seria trabajo repetido para el mismo
+ * resultado. El recalculo sigue pasando, en la misma transaccion: solo se mueve de sitio.
  */
 const EXCEPCIONES_SIN_RECALCULO = new Set(['consumeBatchStock']);
 
@@ -280,7 +280,7 @@ describe('QC-121 R29 — toda escritura exportada de product_batches recalcula p
       .join('\n');
 
   /** Los cuatro caminos fabricados; `sinRecalculoEn` deja ese uno sin la llamada.
-   *  `consumeBatchStock` nace SIN recalculo -es la excepcion de QC-141-, salvo que se pida a el
+   *  `consumeBatchStock` nace SIN recalculo -es la excepcion-, salvo que se pida a el
    *  explicitamente. */
   const fuenteCuatroCaminos = (sinRecalculoEn: string | null): string =>
     [

@@ -90,9 +90,8 @@ const {
   getOrderActionMock: vi.fn(() => {
     throw new Error('getOrderAction no debe invocarse desde la lista');
   }),
-  // QC-141 T14: la TERCERA llamada de la seccion, el lote de cobertura de la pagina. Es el borde
-  // de la accion nueva del propio modulo `pedidos`, y se sustituye por la MISMA razon que la
-  // lista: sin doble, `listOrderCoverageAction` intentaria leer la cookie de sesion real.
+  // Se sustituye por la MISMA razon que la lista: sin doble, `listOrderCoverageAction`
+  // intentaria leer la cookie de sesion real.
   listOrderCoverageActionMock: vi.fn(async () => ({
     status: 'success' as const,
     data: [] as readonly { orderId: string; coverage: 'full' | 'partial' | 'none' }[],
@@ -504,7 +503,7 @@ describe('QC-102 — si el lote falla, la lista NO se cae (R20)', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-// QC-141 T14 — El lote de cobertura se compone AQUI, mismo patron que el de responsables (R35).
+// El lote de cobertura se compone AQUI, mismo patron que el de responsables.
 // ---------------------------------------------------------------------------------------------
 
 describe('QC-141 — el listado trae la cobertura de su pagina (R35)', () => {
@@ -515,7 +514,7 @@ describe('QC-141 — el listado trae la cobertura de su pagina (R35)', () => {
 
     render(await OrderListSection({ params: parametros() }));
 
-    // UNA, no una por fila: son dos pedidos y sigue siendo una sola invocacion (R35).
+    // UNA, no una por fila: son dos pedidos y sigue siendo una sola invocacion.
     expect(listOrderCoverageActionMock).toHaveBeenCalledTimes(1);
     expect(listOrderCoverageActionMock).toHaveBeenCalledWith([pedido().id, OTRO_PEDIDO]);
   });

@@ -1,18 +1,18 @@
 // Guardia de convencion: las cantidades decimales de inventario y de la tabla de ingredientes
-// del pedido nunca cruzan por coma flotante binaria (R6, `specs/QC-141-reserva-de-material-del-
-// pedido/tasks.md > T5`). No hay guardia de ruta que cubra `app/(private)/inventario/components`
-// hoy con este alcance -`product-route-contract.test.ts` vigila otras quince reglas, no esta-, y
-// `order-ingredients-table.tsx` no vive bajo esa ruta: por eso este archivo, con la MISMA forma
-// que `conversionesDeImporte` de `tests/unit/pedidos-ui/pedidos-convenciones.test.ts` -detector
-// puro + barrido real + caso negativo que demuestra que la guardia muerde-.
+// del pedido nunca cruzan por coma flotante binaria. No hay guardia de ruta que cubra
+// `app/(private)/inventario/components` hoy con este alcance -`product-route-contract.test.ts`
+// vigila otras quince reglas, no esta-, y `order-ingredients-table.tsx` no vive bajo esa ruta:
+// por eso este archivo, con la MISMA forma que `conversionesDeImporte` de
+// `tests/unit/pedidos-ui/pedidos-convenciones.test.ts` -detector puro + barrido real + caso
+// negativo que demuestra que la guardia muerde-.
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const RAIZ = join(__dirname, '..', '..', '..');
 
-/** Los archivos de T5 que pintan o teclean una cantidad decimal, mas `batch-history.tsx` (T13):
- *  el historial del lote pinta la cantidad de cada apartado, liberacion, caducidad o consumo. */
+/** Los archivos que pintan o teclean una cantidad decimal, mas `batch-history.tsx`: el historial
+ *  del lote pinta la cantidad de cada apartado, liberacion, caducidad o consumo. */
 const ARCHIVOS_VIGILADOS = [
   'app/(private)/inventario/components/product-columns.tsx',
   'app/(private)/inventario/components/product-batches-panel.tsx',

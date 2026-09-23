@@ -189,8 +189,8 @@ type Repos = {
   readonly orders: OrderNumberDirectory;
 };
 
-/** El hueco que `inventario` declara para el numero visible de un pedido (`design.md > 5.5`):
- *  sin permiso el historial no puede haber llegado a preguntar por ninguno. */
+/** El hueco que `inventario` declara para el numero visible de un pedido: sin permiso el
+ *  historial no puede haber llegado a preguntar por ninguno. */
 function directorioDePedidosQueFalla(): OrderNumberDirectory {
   return {
     findNumberTexts: vi.fn<OrderNumberDirectory['findNumberTexts']>(() => {
@@ -303,7 +303,7 @@ function todosLosMetodos(repos: Repos): ReadonlyArray<() => void> {
     // QC-92: sin permiso tampoco se pregunta por el nombre del autor de ningun asiento.
     () => expect(repos.people.findAliveRefsInCompany).not.toHaveBeenCalled(),
     () => expect(repos.people.findRefsIncludingDeletedInCompany).not.toHaveBeenCalled(),
-    // QC-141 (design.md > 5.5): sin permiso tampoco se pregunta el numero visible de ningun pedido.
+    // Sin permiso tampoco se pregunta el numero visible de ningun pedido.
     () => expect(repos.orders.findNumberTexts).not.toHaveBeenCalled(),
   ];
 }

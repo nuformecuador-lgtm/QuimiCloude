@@ -4,9 +4,9 @@ import { join } from 'node:path';
 import { deriveUnitCost } from '@/lib/modules/inventario/domain/unit-cost';
 
 /**
- * Derivacion del costo unitario a partir del total (QC-90, T1; QC-141, R5). Cubre R5 y R7
- * -dividir `total / existencia` a 4 decimales, exacto, sin coma flotante, con la existencia
- * misma decimal- y R9 -el derivado que redondea a `0.0000` no es un costo guardable-.
+ * Derivacion del costo unitario a partir del total: dividir `total / existencia` a 4 decimales,
+ * exacto, sin coma flotante, con la existencia misma decimal. El derivado que redondea a
+ * `0.0000` no es un costo guardable.
  */
 describe('deriveUnitCost', () => {
   it('divide el costo total entre la existencia y devuelve el unitario con sus cuatro decimales', () => {
@@ -33,8 +33,8 @@ describe('deriveUnitCost', () => {
   it('R5: divide con una existencia decimal, no solo entera', () => {
     // 1.5 unidades a 3.0000 la unidad: 4.5 / 1.5 = 3.0000.
     expect(deriveUnitCost('4.5', '1.5')).toBe('3.0000');
-    // Existencia de cinco decimales: la columna solo guarda cuatro, asi que R5 espera la
-    // forma que ya rechaza el patron -no una que redondee la existencia por su cuenta-.
+    // Existencia de cinco decimales: la columna solo guarda cuatro, asi que se espera la forma
+    // que ya rechaza el patron -no una que redondee la existencia por su cuenta-.
     expect(deriveUnitCost('10', '0.00001')).toBeNull();
     // Existencia de exactamente cuatro decimales.
     expect(deriveUnitCost('1', '0.0001')).toBe('10000.0000');
@@ -68,9 +68,9 @@ describe('deriveUnitCost', () => {
   });
 
   it('no convierte ningun importe a numero de coma flotante en el codigo fuente', () => {
-    // R4, R6, comprobado sobre el TEXTO del archivo y no sobre su comportamiento: un
-    // `parseFloat` intermedio daria el mismo resultado en todos los casos de arriba y aun asi
-    // seria exactamente lo que R4/R6 prohiben. Esto cae en cuanto alguien lo escriba.
+    // Comprobado sobre el TEXTO del archivo y no sobre su comportamiento: un `parseFloat`
+    // intermedio daria el mismo resultado en todos los casos de arriba y aun asi seria
+    // exactamente lo que esta prohibido. Esto cae en cuanto alguien lo escriba.
     const fuente = readFileSync(
       join(__dirname, '..', '..', '..', 'lib', 'modules', 'inventario', 'domain', 'unit-cost.ts'),
       'utf8',

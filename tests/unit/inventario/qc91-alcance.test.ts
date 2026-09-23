@@ -236,7 +236,7 @@ export function sumaPropia(cuerpo: string): string[] {
 export function escrituraDestructivaDeLotes(fuente: string): string[] {
   const codigo = stripComments(fuente);
   const hallazgos: string[] = [];
-  // `updateMany` YA NO ESTA AQUI (QC-141): `consumeBatchStock` la usa a proposito -el decremento
+  // `updateMany` YA NO ESTA AQUI: `consumeBatchStock` la usa a proposito -el decremento
   // CONDICIONAL del consumo (`stock >= cantidad` en el `where`), que solo puede tocar CERO o UNA
   // fila porque el `where` ya trae el identificador unico-. Que solo viva en esa funcion lo vigila
   // `llamaAUpdateManyFueraDe`, no este detector: `delete`, `deleteMany` y `upsert` no tienen ningun
@@ -271,7 +271,7 @@ export function llamaAUpdateFueraDe(fuente: string, nombreFuncionPermitida: stri
 }
 
 /** El `updateMany` del decremento condicional del consumo: sigue viviendo SOLO en
- *  `consumeBatchStock` (QC-141, `design.md > 6.4`). */
+ *  `consumeBatchStock`. */
 export function llamaAUpdateManyFueraDe(fuente: string, nombreFuncionPermitida: string): boolean {
   return llamaAMetodoFueraDe(fuente, 'updateMany', nombreFuncionPermitida);
 }
@@ -282,9 +282,9 @@ export function llamaAUpdateManyFueraDe(fuente: string, nombreFuncionPermitida: 
 
 describe('QC-91 R1 — la existencia sale de sumar filas de lote, no de un numero propio', () => {
   it('R1 (QC-141 R6): recalculateProductStock suma los lotes en SQL, no en JavaScript', () => {
-    // QC-141 movio la suma de `singleUnitStock` (JS) a un `SELECT sum(...)` que hace Postgres en
+    // La suma de `singleUnitStock` paso de JS a un `SELECT sum(...)` que hace Postgres en
     // `numeric`: pasar un `Decimal` por `number` antes de sumar es justo el redondeo binario que
-    // R6 prohibe. El `SUM` en SQL crudo ya no es un hallazgo aqui, es la forma nueva.
+    // se quiere evitar. El `SUM` en SQL crudo ya no es un hallazgo aqui, es la forma nueva.
     const cuerpo = cuerpoDeFuncion(leer(PRODUCT_PRISMA), 'recalculateProductStock');
     expect(
       cuerpo,

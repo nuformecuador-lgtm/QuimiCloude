@@ -104,8 +104,8 @@ afterEach(() => {
 
 // QC-35bis (2026-09-07): eran DIEZ. La unidad y el precio unitario salieron del pedido -de la
 // tabla `orders` hacia arriba-, asi que sus dos columnas ya no tienen dato que pintar y la lista
-// acordada baja a ocho. QC-102 sube a diez con RESPONSABLES y QC-141 T14 a ONCE con COBERTURA
-// (R35). Sigue siendo cerrada y en el orden de `design.md > 7`.
+// acordada baja a ocho. Luego sube a diez con RESPONSABLES y a ONCE con COBERTURA.
+// Sigue siendo cerrada y en un orden acordado.
 describe('las columnas declaradas son exactamente las once acordadas (R8, R20, R35)', () => {
   it('en positivo: los once ids, en el orden acordado', () => {
     expect(ORDER_COLUMNS.map((column) => column.id)).toEqual([

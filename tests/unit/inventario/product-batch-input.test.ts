@@ -341,7 +341,7 @@ describe('createProductWithFirstBatchSchema', () => {
     expect(
       createProductWithFirstBatchSchema.safeParse({ ...VALIDA, stock: '-1' }).success,
     ).toBe(false);
-    // Decimal con hasta cuatro cifras: ya no se rechaza (R3).
+    // Decimal con hasta cuatro cifras: ya no se rechaza.
     expect(
       createProductWithFirstBatchSchema.safeParse({ ...VALIDA, stock: '1.5' }).success,
     ).toBe(true);

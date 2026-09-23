@@ -92,9 +92,8 @@ const operatorUser: Credentials = {
 const INITIAL_STOCK = 12;
 
 /**
- * Cantidad con signo del ajuste feliz: NEGATIVA y decimal (QC-141 R4, R6 — la columna admite hasta
- * 4 decimales y el campo del dialogo teclea uno). `-0.5` es exactamente el caso que un `number`
- * binario arriesga y que la cadena decimal evita.
+ * Cantidad con signo del ajuste feliz: NEGATIVA y decimal, la columna admite hasta 4 decimales.
+ * `-0.5` es exactamente el caso que un `number` binario arriesga y que la cadena decimal evita.
  */
 const HAPPY_DELTA = '-0.5';
 
@@ -173,9 +172,9 @@ async function chooseFirstReason(page: Page): Promise<void> {
 /**
  * Abre el dialogo de ajuste, escribe la cantidad con signo y elige el primer motivo.
  *
- * `delta` es CADENA -y no `number`- desde QC-141 (R4): la columna admite hasta 4 decimales
- * (`-0.5`, por ejemplo), y un `number` de JavaScript es justo lo que el dominio evita para no
- * arriesgar el redondeo binario. `String(delta)` habria sido el mismo riesgo un paso antes.
+ * `delta` es CADENA -y no `number`-: la columna admite hasta 4 decimales (`-0.5`, por ejemplo),
+ * y un `number` de JavaScript es justo lo que el dominio evita para no arriesgar el redondeo
+ * binario. `String(delta)` habria sido el mismo riesgo un paso antes.
  */
 async function fillAdjustDialog(page: Page, delta: string): Promise<void> {
   await page.getByTestId('adjust-batch-open').click();

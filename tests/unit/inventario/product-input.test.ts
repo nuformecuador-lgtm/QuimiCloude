@@ -216,10 +216,9 @@ describe('createProductSchema', () => {
   });
 
   it('exige qtyAlert, y ahora lo acepta decimal de hasta cuatro decimales, cero o mas', () => {
-    // DECISION DEL HUMANO, 2026-09-03 (acotada por QC-141, pregunta 5b): `qtyAlert` sigue
-    // obligatorio, pero la columna paso a `Decimal(14,4)` para compararse con la existencia sin
-    // convertir. Ni ausente, ni nulo, ni negativo, ni con mas de cuatro decimales, ni en
-    // notacion cientifica.
+    // `qtyAlert` sigue obligatorio, pero la columna paso a `Decimal(14,4)` para compararse con
+    // la existencia sin convertir. Ni ausente, ni nulo, ni negativo, ni con mas de cuatro
+    // decimales, ni en notacion cientifica.
     const soloObligatoriosDeAntes = {
       name: 'Producto',
     };

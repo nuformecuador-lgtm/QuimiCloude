@@ -1,4 +1,4 @@
-// QC-141 T14 — La etiqueta de cobertura DENTRO del panel que ya existe (R35, `design.md > 0.2` N6).
+// La etiqueta de cobertura DENTRO del panel que ya existe.
 //
 // Se ejercita la fila VIVA —desde `<OrderTable>`, con la factoria de columnas por dentro—, mismo
 // criterio que `order-sheet-responsibles.test.tsx`: la hoja es el `SheetContent` que ya existe, no

@@ -53,7 +53,7 @@ const COMPANY_NAME = `${SHARED_TOKEN}_empresa`;
 
 const RECIPE_NAME = `${SHARED_TOKEN}_receta`;
 
-/** El unico ingrediente de la receta del fixture: Finalizar lo consume al entregar (R27, R31). */
+/** El unico ingrediente de la receta del fixture: Finalizar lo consume al entregar. */
 const PRODUCT_NAME = `${SHARED_TOKEN}_producto`;
 const PRESENTATION_NAME = `${SHARED_TOKEN}_presentacion`;
 const BATCH_LOT = `${SHARED_TOKEN}_lote`;
@@ -316,7 +316,7 @@ test.beforeAll(async () => {
     select: { id: true },
   });
 
-  // Existencia de sobra: la entrega (R27, R31) consume del lote mas antiguo, y este es el unico.
+  // Existencia de sobra: la entrega consume del lote mas antiguo, y este es el unico.
   await prisma.productBatch.create({
     data: {
       productId,
@@ -340,8 +340,8 @@ test.beforeAll(async () => {
         companyId,
         steps: RECIPE_STEPS as unknown as Prisma.InputJsonValue,
         // Una unica linea al 100 %: sin ella la receta esta vacia y Finalizar la rechaza con
-        // `recipe_without_lines` (R50). El `INSERT` directo no pasa por el servicio, asi que la
-        // suma de 100 % no la valida nadie: mismo criterio que `e2e/recetas-porcentaje.spec.ts`.
+        // `recipe_without_lines`. El `INSERT` directo no pasa por el servicio, asi que la suma
+        // de 100 % no la valida nadie: mismo criterio que `e2e/recetas-porcentaje.spec.ts`.
         lines: { create: [{ productId, percentage: '100.00' }] },
       },
       select: { id: true },
@@ -370,7 +370,7 @@ test.afterAll(async () => {
   // Por los identificadores de ESTE worker, nunca por `FIXTURE_PREFIX`: el otro proyecto
   // (Chromium/WebKit) sigue corriendo. Cada paso corre aunque falle el anterior.
   const scopedCompanyId = companyId;
-  // El caso R29 entrega el pedido, y entregar consume: deja filas en `reservation_movements` e
+  // Uno de los casos entrega el pedido, y entregar consume: deja filas en `reservation_movements` e
   // `inventory_movements` que hay que borrar antes que el pedido y el lote (FK RESTRICT).
   const pasos: ReadonlyArray<() => Promise<unknown>> = [
     () =>

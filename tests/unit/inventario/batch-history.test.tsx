@@ -6,9 +6,6 @@ import type { BatchHistoryEntry } from '@/lib/modules/inventario';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
 /**
- * `batch-history.tsx`: R34, R37, R38 (`specs/QC-141-reserva-de-material-del-pedido/tasks.md >
- * T13`).
- *
  * La Server Action `listBatchMovementsAction` esta mockeada: es el borde del modulo `inventario`,
  * y sustituirla es lo que permite ejercitar los tres estados sin base de datos (mismo criterio que
  * `product-page.test.tsx`).
