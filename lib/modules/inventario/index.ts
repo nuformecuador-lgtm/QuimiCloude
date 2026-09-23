@@ -94,3 +94,22 @@ export { compareBatchesOldestFirst, type OrderableBatch } from './domain/batch-o
 // Solo tipos: por aqui otros modulos apuntan a un producto sin tocar la tabla ni Prisma. La
 // implementacion se cablea en `lib/composition`.
 export type { ProductCatalog, ProductId, ProductRef } from './domain/product-catalog';
+
+// La reserva de material: tipos y las dos interfaces que consume o implementa quien llama
+// desde fuera de `inventario`. La implementacion (Prisma, la transaccion) vive en los
+// adaptadores driven de este modulo y se cablea en `lib/composition`.
+export type {
+  ReservationRequirementLine,
+  ReservationOutcome,
+  ConsumptionOutcome,
+  OrderCoverage,
+  MaterialReservations,
+  ReservationQueries,
+} from './domain/reservation';
+export { planReservation } from './domain/plan-reservation';
+export type {
+  ReservationCandidateBatch,
+  PlanReservationInput,
+  ReservationAllocation,
+  ReservationPlan,
+} from './domain/plan-reservation';

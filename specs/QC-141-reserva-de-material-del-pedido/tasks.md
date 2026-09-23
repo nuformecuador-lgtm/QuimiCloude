@@ -97,7 +97,7 @@ Archivos: `app/(private)/inventario/components/{product-columns,product-batches-
 `toFixed` sobre cantidades en esos archivos: se amplía la guardia de convenciones de la ruta si no
 los cubre), y `e2e/ajuste-de-inventario.spec.ts` verde con un ajuste de `-0.5`.
 
-## T6 — Necesidad y reparto, dominio puro `[depende de T3]` `[P con T4, T5]`
+## [x] T6 — Necesidad y reparto, dominio puro `[depende de T3]` `[P con T4, T5]`
 
 Archivos: `lib/modules/pedidos/domain/order-requirement.ts` (nuevo),
 `lib/modules/inventario/domain/plan-reservation.ts` (nuevo), `lib/modules/inventario/index.ts`.
