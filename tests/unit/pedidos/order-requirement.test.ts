@@ -1,37 +1,34 @@
 import { buildRequirement, type RequirementSourceLine } from '@/lib/modules/pedidos/domain/order-requirement';
 
-function line(productId: string, quantity: string, unitId: string): RequirementSourceLine {
-  return { productId, quantity, unitId };
+function line(productId: string, percentage: string): RequirementSourceLine {
+  return { productId, percentage };
 }
 
 describe('buildRequirement', () => {
-  it('R7: multiplica cada linea por la cantidad del pedido, en la unidad de la linea', () => {
-    const result = buildRequirement([line('p1', '2.5000', 'kg')], '3.0000');
-    expect(result).toEqual([{ productId: 'p1', unitId: 'kg', quantity: '7.50000000' }]);
+  it('calcula la necesidad de cada linea como cantidad del pedido por porcentaje, sin multiplicacion propia', () => {
+    const result = buildRequirement([line('p1', '25')], '3.0000');
+    expect(result).toEqual([{ productId: 'p1', quantity: '0.75' }]);
   });
 
-  it('R11: no trunca ni redondea aunque el resultado tenga mas de cuatro decimales', () => {
-    const result = buildRequirement([line('p1', '0.1234', 'kg')], '1.5678');
-    expect(result[0]?.quantity).toBe('0.19346652');
+  it('R11: un pedido de 0.0001 con un ingrediente al 0.01 % da una necesidad exacta de 0.00000001, sin redondear', () => {
+    const result = buildRequirement([line('p1', '0.01')], '0.0001');
+    expect(result[0]?.quantity).toBe('0.00000001');
   });
 
-  it('multiplica exacto sin dejar el resultado atado a una escala interna fija', () => {
-    const result = buildRequirement([line('p1', '1', 'kg')], '1');
-    expect(result[0]?.quantity).toBe('1');
+  it('R11: 200 por 10 % da 20 exacto', () => {
+    const result = buildRequirement([line('p1', '10')], '200');
+    expect(result[0]?.quantity).toBe('20');
   });
 
-  it('receta vacia produce una necesidad vacia', () => {
+  it('R49: receta vacia produce una necesidad vacia', () => {
     expect(buildRequirement([], '2.0000')).toEqual([]);
   });
 
-  it('conserva el orden y el producto y la unidad de cada linea', () => {
-    const result = buildRequirement(
-      [line('p1', '1.0000', 'kg'), line('p2', '2.0000', 'l')],
-      '2.0000',
-    );
+  it('conserva el orden y el producto de cada linea', () => {
+    const result = buildRequirement([line('p1', '50'), line('p2', '25')], '2.0000');
     expect(result).toEqual([
-      { productId: 'p1', unitId: 'kg', quantity: '2.00000000' },
-      { productId: 'p2', unitId: 'l', quantity: '4.00000000' },
+      { productId: 'p1', quantity: '1' },
+      { productId: 'p2', quantity: '0.5' },
     ]);
   });
 });

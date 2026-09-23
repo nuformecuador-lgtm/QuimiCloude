@@ -8,7 +8,7 @@ import { ceilToScale4, compareQuantities, minQuantity, subtractQuantities, addQu
 import { compareBatchesOldestFirst } from './batch-order';
 import type { ProductId } from './product-catalog';
 import type { ReservationRequirementLine } from './reservation';
-import { convertQuantity, IncompatibleUnitsError, type UnitConversion, type UnitId } from '@/lib/modules/unidades';
+import type { UnitId } from '@/lib/modules/unidades';
 
 const ZERO_QUANTITY = '0';
 
@@ -26,7 +26,6 @@ export type PlanReservationInput = {
   /** Unidad del producto, o `null` si el producto no tiene una. */
   readonly products: ReadonlyMap<ProductId, UnitId | null>;
   readonly batches: readonly ReservationCandidateBatch[];
-  readonly units: ReadonlyMap<UnitId, UnitConversion>;
 };
 
 export type ReservationAllocation = {
@@ -42,31 +41,6 @@ function isPositive(quantity: string): boolean {
   return compareQuantities(quantity, ZERO_QUANTITY) > 0;
 }
 
-/** La cantidad necesaria de una linea en la unidad del PRODUCTO, o `null` si se salta: producto
- *  sin unidad, unidad sin base comun con la linea, o necesidad que redondea a cero. */
-function resolveNeed(
-  line: ReservationRequirementLine,
-  productUnitId: UnitId | null | undefined,
-  units: ReadonlyMap<UnitId, UnitConversion>,
-): string | null {
-  if (productUnitId === null || productUnitId === undefined) return null;
-
-  const lineUnit = units.get(line.unitId);
-  const productUnit = units.get(productUnitId);
-  if (lineUnit === undefined || productUnit === undefined) return null;
-
-  let converted: string;
-  try {
-    converted = convertQuantity(line.quantity, lineUnit, productUnit);
-  } catch (error) {
-    if (error instanceof IncompatibleUnitsError) return null;
-    throw error;
-  }
-
-  const need = ceilToScale4(converted);
-  return isPositive(need) ? need : null;
-}
-
 export function planReservation(input: PlanReservationInput): ReservationPlan {
   const remainingByBatch = new Map<string, string>();
   for (const batch of input.batches) remainingByBatch.set(batch.id, batch.available);
@@ -75,8 +49,13 @@ export function planReservation(input: PlanReservationInput): ReservationPlan {
   const insufficientProductIds = new Set<ProductId>();
 
   for (const line of input.requirement) {
-    const need = resolveNeed(line, input.products.get(line.productId), input.units);
-    if (need === null) continue;
+    const productUnitId = input.products.get(line.productId);
+    if (productUnitId === null || productUnitId === undefined) {
+      insufficientProductIds.add(line.productId);
+      continue;
+    }
+
+    const need = ceilToScale4(line.quantity);
 
     const productBatches = input.batches
       .filter((batch) => batch.productId === line.productId)

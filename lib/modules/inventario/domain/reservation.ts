@@ -6,21 +6,21 @@
 
 import type { MovementReason } from './movement-reason';
 import type { ProductId } from './product-catalog';
-import type { UnitId } from '@/lib/modules/unidades';
 
-/** Necesidad ya calculada de un ingrediente, en la unidad de la LINEA de receta (no la del
- *  producto): quien reparte por lote es quien convierte. */
+/** Necesidad ya calculada de un ingrediente: cantidad del pedido por el porcentaje de la linea,
+ *  exacta y sin redondear, en la unidad del producto. */
 export type ReservationRequirementLine = {
   readonly productId: ProductId;
   readonly quantity: string;
-  readonly unitId: UnitId;
 };
 
 export type ReservationOutcome = { readonly kind: 'reserved' } | { readonly kind: 'not_reserved' };
 
 export type ConsumptionOutcome =
   | { readonly kind: 'consumed' }
-  | { readonly kind: 'insufficient'; readonly productIds: readonly ProductId[] };
+  | { readonly kind: 'insufficient'; readonly productIds: readonly ProductId[] }
+  /** Sin nada apartado y con una necesidad de respaldo vacia (receta sin lineas). */
+  | { readonly kind: 'nothing_to_consume' };
 
 export type OrderCoverage = 'full' | 'partial' | 'none';
 
