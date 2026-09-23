@@ -183,6 +183,11 @@
       "desde": "2026-09-16"
     },
     {
+      "archivo": "pedidos/order-expiry.int.test.ts",
+      "motivo": "QC-141 T12: el proceso diario cableado a mano con 'createExpireStaleOrders', el 'listActiveCompanyIds' REAL de 'identity' y el 'findExpirableOrders' REAL de 'pedidos', igual que 'order-reservation.int.test.ts': 'withOrderTransaction' abre su PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test no la envolveria; el caso de las dos ejecuciones SOLAPADAS ademas necesita que cada rama confirme para que la otra la vea bajo el candado de la fila. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, presentacion, unidad, receta, producto y lote) y la limpia en un 'finally'. 'listActiveCompanyIds' lee TODAS las empresas de la base de la corrida, tambien las de otros archivos, pero ninguna aporta un candidato cuyo 'reserved_at' caiga antes del umbral de estos casos.",
+      "desde": "2026-09-23"
+    },
+    {
       "archivo": "pedidos/order-ingredients-cost.int.test.ts",
       "motivo": "QC-123 T10: ejercita el flujo REAL de alta y edicion ('createCreateOrder'/'createUpdateOrder') cableado a mano con los adaptadores driven REALES de 'pedidos', 'recetas', 'inventario' y 'unidades' -el mismo conjunto que 'lib/composition' ata-, y esos adaptadores hablan con el cliente Prisma GLOBAL, asi que una transaccion del test no los envolveria. Dos empresas efimeras (randomUUID) nacen en 'beforeAll' y mueren en 'afterAll'; cada caso siembra su propio producto/lote/receta/pedido y los borra en un 'finally' por su id exacto, en el orden que exigen las FK. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-18"
