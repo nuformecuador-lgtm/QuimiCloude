@@ -74,6 +74,7 @@ export async function createProduct(
       name: data.name,
       nameNormalized: normalizeProductName(data.name),
       qtyAlert: data.qtyAlert ?? null,
+      type: data.type ?? 'PRODUCT',
       ...companyScopeColumns(scope),
       createdAt: now,
       updatedAt: now,
@@ -173,9 +174,7 @@ function productFilterWhere(
       const condition = selectCondition(value.values);
       if (condition === null) return null;
       if (field === 'type') {
-        const validValues = value.values.filter(
-          (v): v is ProductType => PRODUCT_TYPE_VALUES.includes(v as ProductType),
-        );
+        const validValues = value.values.filter((v) => PRODUCT_TYPE_VALUES.includes(v as ProductType)) as ProductType[];
         if (validValues.length === 0) return null;
         return { type: { in: validValues } };
       }
@@ -582,7 +581,7 @@ export async function createWithFirstBatch(
         nameNormalized: normalizeProductName(product.name),
         unitId: presentation.unitId,
         qtyAlert: product.qtyAlert ?? null,
-        type: 'PRODUCT',
+        type: product.type ?? 'PRODUCT',
         ...companyScopeColumns(scope),
         createdAt: now,
         updatedAt: now,

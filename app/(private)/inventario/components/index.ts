@@ -64,12 +64,15 @@ export {
   STOCK_COLUMN_ID,
   STOCK_MAX_PARAM,
   STOCK_MIN_PARAM,
+  TYPE_COLUMN_ID,
+  TYPE_PARAM,
   buildProductListQuery,
   parseProductListParams,
   productListHref,
   type ProductListSearchParams,
   type ProductPageSize,
 } from './product-list-params';
+export { ProductTypeTabs, type ProductTypeTabsProps } from './product-type-tabs';
 export { ProductListSection } from './product-list-section';
 export { ProductSheet } from './product-sheet';
 export {

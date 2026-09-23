@@ -129,6 +129,7 @@ export function createCreateProduct(
     const producto: NewProduct = {
       name: entrada.name,
       qtyAlert: entrada.qtyAlert,
+      type: entrada.type,
     };
 
     const creado = await deps.products.createWithFirstBatch(producto, batch, instante, scope);

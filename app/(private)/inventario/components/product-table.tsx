@@ -32,6 +32,7 @@ import {
 import { productListHref } from './product-list-params';
 import { ProductBatchesPanel } from './product-batches-panel';
 import { ProductSheet } from './product-sheet';
+import { ProductTypeTabs } from './product-type-tabs';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
@@ -262,6 +263,7 @@ export function ProductTable({
       {isPending ? (
         <p className="text-xs text-muted-foreground">{PRODUCT_TABLE_TEXTS.loading}</p>
       ) : null}
+      <ProductTypeTabs params={params} onNavigate={navigate} />
       <DataTable
         tableId={PRODUCT_TABLE_ID}
         columns={columns}
