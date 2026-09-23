@@ -97,13 +97,13 @@ existente). Anotado en el informe.
 Buscar `formatDecimalDisplay(` en `app/`. **Hecho cuando:** el informe lista cada aparición con su
 `title` correspondiente, y la única sin él es `order-field.tsx`.
 
-### [ ] T8 — Gate rápido
+### [x] T8 — Gate rápido
 **Depende de:** T6, T7. **Hecho cuando:** `./init.sh --rapido` termina en verde.
 
-### [ ] T9 — Gate completo
+### [ ] T9 — Gate completo — **ROJO AJENO (2026-09-23)**: 3 archivos de inventario rotos por `cd7f07a6` en `dev`, que esta rama no toca; PR abierto con la evidencia por decisión humana
 **Depende de:** T8. **Hecho cuando:** `./init.sh` completo termina en verde (regla 5 de `CLAUDE.md`;
 sin esto no hay PR).
 
-### [ ] T10 — Mapa de trazabilidad
+### [x] T10 — Mapa de trazabilidad
 **Depende de:** T9. **Hecho cuando:** el informe de implementación contiene el mapa `R1`–`R12` ->
 test o comprobación concreta, según `design.md > 5`.
