@@ -3,8 +3,8 @@
 > Worktree `.worktrees/QC-147-cantidades-de-receta-en-porcentaje`, rama
 > `feature/QC-147-cantidades-de-receta-en-porcentaje`. Base: `6c9bbaf5`. Sin push ni PR.
 > T1–T11 cerradas y commiteadas, una por commit (T8 y T10 llevan un commit de ajuste más cada una).
-> **T12 sigue abierta**: pide `./init.sh` completo, y ese lo corre el leader. El E2E se escribió
-> pero **no se ha ejecutado**: lo corre el leader.
+> **T12 sigue abierta**: pide `./init.sh` completo, y ese lo corre el leader. El E2E ya está
+> ejecutado y en verde en Chromium y WebKit: ver «Vuelta 2», al final.
 
 ## Commits
 
@@ -13,7 +13,7 @@
 | T2 | `55988902` | aritmética del porcentaje (`recipe-percentage.ts`) en el barrel de `recetas` |
 | T5 | `fee34529` | `ProductRef.unitId` (inventario) |
 | T3 | `959696c1` | contrato de entrada: porcentaje, línea estricta, suma exacta de 100 |
-| T1 | `1c3f5310` | migración `20260919120000_recipe_lines_percentage` (+ `down.sql`), esquema Prisma |
+| T1 | `1c3f5310` | migración `20260922160000_recipe_lines_percentage (antes 20260919120000, renombrada en la vuelta 2)` (+ `down.sql`), esquema Prisma |
 | T4 | `1b838ff3` | servicio, puertos y persistencia de `recetas` |
 | T7 | `823d808b` | tabla de ingredientes de Pedidos |
 | T8 | `190e7a64` | vista y pantalla de ejecución del Operario, sin factor |
@@ -26,7 +26,7 @@
 
 ## Archivos tocados (82 en `git diff --stat 6c9bbaf5..HEAD`)
 
-**db/**: `db/migrations/20260919120000_recipe_lines_percentage/{migration.sql,down.sql}` (nuevos),
+**db/**: `db/migrations/20260922160000_recipe_lines_percentage (antes 20260919120000, renombrada en la vuelta 2)/{migration.sql,down.sql}` (nuevos),
 `db/schema.prisma`.
 
 **lib/**: `recetas/domain/{recipe-percentage.ts (nuevo), recipe-input.ts, create-recipe.ts,
@@ -72,9 +72,9 @@ Modificados: los de la tabla de `design.md > 12` más `unit/asignaciones/start-a
 | R4 | `tests/unit/recetas/recipe-input.test.ts` › `suma exacta de 100,00 % (R4)`; `tests/unit/recetas/recipe-service.test.ts` › `R4 — guarda y relee…`; `tests/integration/recetas/recipe-crud.int.test.ts` › `R4: guarda y relee…` › «92,50 % + 7,50 % se guardan y se releen exactos, contra Postgres real»; E2E escenario 1 |
 | R5 | `tests/unit/recetas/recipe-input.test.ts` › `recipeLineSchema — sin unidad (R5)` |
 | R6 | `tests/integration/recetas/recipe-lines-percentage.int.test.ts` › `rango y redondeo (R6)` (0/-1/100.01 → 23514; acepta 100.00; 12.345 → 12.35); `tests/integration/recetas/recetas-constraints.int.test.ts` (CHECK de rango); `tests/unit/recetas/schema/recipe-lines-percentage-migration.test.ts` › «declara percentage DECIMAL(5,2) con el CHECK de rango (R6)» |
-| R7 | `tests/unit/recetas/recipe-service.test.ts` › `R7 — sin permiso, el repositorio no se llama` (97,50 % y sin líneas); `tests/unit/recetas/authorization.test.ts` › «R16 — sin el codigo exigido se rechaza…» |
-| R8 | `tests/unit/recetas/schema/recipe-lines-percentage-migration.test.ts` › «el NO FORCE va antes del DELETE…» y «no menciona "recipes"…»; `tests/integration/recetas/recipe-lines-percentage.int.test.ts` › «una receta con cero lineas conserva nombre, pasos y updated_at» |
-| R9 | `tests/unit/recetas/schema/recipe-lines-percentage-migration.test.ts` › `down.sql` › «existe y revierte el UP en orden inverso…»; **más verificación manual** (nota 1) de `db:rollback` + re-`db:migrate` |
+| R7 | `tests/unit/recetas/authorization.test.ts` › «QC-74 R12 — con entrada invalida, el rechazo es por PERMISO y no por validacion» (entrada con `lines: []`); `tests/unit/recetas/recipe-service.test.ts` › `R7 — sin permiso, el repositorio no se llama` (97,50 % y sin líneas, `.rejects.toBeInstanceOf(UnauthorizedError)` desde la vuelta 2) |
+| R8 | `tests/unit/recetas/schema/recipe-lines-percentage-migration.test.ts` › «el NO FORCE va antes del DELETE…» y «no menciona "recipes"…»; `tests/integration/recetas/recipe-lines-percentage.int.test.ts` › caso de R8, reescrito en la vuelta 2: en una transacción aplica `down.sql`, siembra receta con pasos y una línea vieja, aplica `migration.sql` y comprueba que la receta conserva nombre, descripción, pasos, `updated_at` y `deleted_at` con cero líneas (ROLLBACK) |
+| R9 | `tests/integration/recetas/recipe-lines-percentage.int.test.ts` › describe de R9 (vuelta 2): en una transacción aplica `down.sql`, comprueba `quantity numeric(14,4) NOT NULL` + `recipe_lines_quantity_positive` + `unit_id uuid NOT NULL` + `recipe_lines_unit_id_fkey` + índice y sin `percentage`, reaplica `migration.sql` y comprueba que vuelve (ROLLBACK); `tests/unit/recetas/schema/recipe-lines-percentage-migration.test.ts` › `down.sql`; y a mano `db:rollback` + `db:migrate` sobre `QuimiCloude_QC147` (vuelta 2) |
 | R10 | `tests/unit/recetas-ui/recipe-lines-sum.test.tsx` › `el indicador de suma (R10, R25)`; `tests/unit/recetas/recipe-percentage.test.ts` › `sumPercentages — R3, R10` |
 | R11 | `tests/unit/recetas-ui/recipe-lines-sum.test.tsx` › «R11, R23 — sin ninguna línea…»; `tests/unit/recetas-ui/recipe-form.test.tsx` › «R27 — añadir y quitar líneas; sin líneas no se guarda» (Enter incluido; **invertido** por D14); E2E escenarios 1 y 2 |
 | R12 | `tests/unit/recetas-ui/recipe-form.test.tsx` › `R12 — sin selector de unidad; el ingrediente se ve con su unidad` (3 casos) |
@@ -87,7 +87,7 @@ Modificados: los de la tabla de `design.md > 12` más `unit/asignaciones/start-a
 | R19 | `tests/unit/asignaciones/get-assigned-order-execution.test.ts` › `R19: sin factor de escala` (claves exactas); `tests/unit/asignaciones-ui/order-execution-screen.test.tsx` › «no monta ningun banner ni factor de escala» |
 | R20 | `tests/unit/asignaciones-ui/order-execution-lines.test.tsx` › «elegir mL muestra 20000 y el "10,00 %" no cambia»; `tests/unit/asignaciones/get-assigned-order-execution.test.ts` › `R20: unidades hermanas` |
 | R21 | `tests/unit/recetas/recipe-percentage.test.ts` › `consumedQuantity — R13, R21` (200/300 → 2:3); `tests/unit/pedidos/resolve-ingredients-cost.test.ts` › «…pedidos de 200 y 300 … proporcion 2:3 (R21)»; `tests/unit/asignaciones/get-assigned-order-execution.test.ts` › `R21: proporcionalidad entre pedidos` |
-| R22 | `e2e/recetas-porcentaje.spec.ts` › escenarios 1–4 (**escrito, no ejecutado**) |
+| R22 | `e2e/recetas-porcentaje.spec.ts` › escenarios 1–4, **en verde en Chromium y WebKit** (vuelta 2, salida abajo) |
 | R23 | `tests/unit/recetas/recipe-input.test.ts` › `receta sin ninguna linea (R3, R23)` (alta y edición, `lines: []` y clave ausente); `tests/unit/recetas/recipe-service.test.ts` › `R23 — editar una receta sembrada sin lineas se rechaza`; `tests/integration/recetas/recipe-crud.int.test.ts` › «rechaza cambiar solo el nombre de una receta viva sin lineas, y el nombre no cambia»; E2E escenario 2 |
 | R24 | `tests/unit/recetas/recipe-service.test.ts` › «R24: un insumo sin lotes se guarda…», «R24: un insumo dado de baja sale sin unidad…»; `tests/unit/recetas-ui/recipe-form.test.tsx` › `R24 — un ingrediente SIN NINGÚN LOTE…`; `tests/unit/pedidos-ui/order-ingredients-table.test.tsx` › `R24 — un insumo sin unidad resoluble…`; `tests/unit/asignaciones-ui/order-execution-lines.test.tsx` › `unidad desconocida (R24)`; `tests/unit/asignaciones/get-assigned-order-execution.test.ts` › `R24: insumo sin unidad resoluble` |
 | R25 | `tests/unit/recetas/recipe-percentage.test.ts` › `formatPercentage — R25`; `tests/unit/recetas-ui/recipe-lines-sum.test.tsx`; `tests/unit/recetas-ui/recipe-form.test.tsx` › «R25 — la precarga muestra cada porcentaje con formatPercentage»; `tests/unit/pedidos-ui/order-ingredients-table.test.tsx` › `R25 — el porcentaje se pinta con coma y dos decimales`; `tests/unit/asignaciones-ui/order-execution-lines.test.tsx` (R18/R20); E2E escenarios 1, 3, 4 |
@@ -126,4 +126,155 @@ Modificados: los de la tabla de `design.md > 12` más `unit/asignaciones/start-a
 4. **Ajuste fuera de la letra de las tasks.** El E2E encontró que la pantalla del Operario pintaba «Pedido 200.0000». Ahora usa `formatDecimalDisplay` (commit `809131d2`), para cumplir R26 («Pedido 200»).
 5. **`tests/integration/unidades/unit-write.int.test.ts`.** Se quitaron dos casos que usaban `recipe_lines.unit_id`, porque esa columna ya no existe. Lo que probaban de unidades sigue cubierto por los casos paralelos con presentaciones.
 6. **Comentario desactualizado, sin tocar.** `lib/modules/unidades/adapters/driven/persistence/unit-write-prisma.ts:87` todavía nombra `recipe_lines_unit_id_fkey`. Ningún test depende de él.
-7. **E2E.** Se escribió `e2e/recetas-porcentaje.spec.ts` y se pasaron a porcentaje los dos specs de recetas, pero **no se ejecutaron**. Tocan importes, así que el E2E hace falta antes del PR. Los escenarios 3 y 4 usan dos pedidos distintos (uno creado por la UI y otro sembrado ya asignado), por `fullyParallel`.
+7. **E2E.** Se escribió `e2e/recetas-porcentaje.spec.ts` y se pasaron a porcentaje los dos specs de recetas, pero **no se ejecutaron**. Tocan importes, así que el E2E hace falta antes del PR. Los escenarios 3 y 4 usan dos pedidos distintos (uno creado por la UI y otro sembrado ya asignado), por `fullyParallel`. *(Vuelta 2: ya se han ejecutado, ver abajo.)*
+
+---
+
+# Vuelta 2 (2026-09-22): gate rojo y 11 menores del reviewer
+
+Encargo del leader: base propia, renombrar la migración, dos rojos nuevos, los menores y el E2E.
+Nada de `./init.sh`, `pnpm test` ni suite completa.
+
+## Commits de la vuelta 2
+
+| Punto | Commit | Qué |
+|---|---|---|
+| 1 | — (operación de base, sin commit) | rollback en la compartida `QuimiCloude` y base propia `QuimiCloude_QC147` |
+| 2 / menor 1 | `294fe0ee` | `20260919120000_recipe_lines_percentage` → `20260922160000_recipe_lines_percentage` (+ lista cerrada de la guardia) |
+| 3 | `e1788c4a` | `tests/unit/unidades/module-contract.test.ts` enmendado |
+| 5 / menores 2 y 4 | `ccbbbba4` | la migración y su `down.sql` se ejercitan en integración |
+| 5 / menor 3 | `5f97f3ad` | R7 afirma `UnauthorizedError` |
+| 5 / menores 5 y 7 | `b6279c78` | separador «·» en la línea del Operario; nombre de test que contradecía D7 |
+| 5 / menores 6 y 10 | `2d215666` | asertos del E2E del Operario por elemento; comentarios de e2e sin citas |
+| 5 / menor 8 | `17bd7895` | comentarios de producción corregidos y acotados (`recipe-view.ts`, `recipe-lines-field.tsx`, `recipe-form-state.ts`) |
+| 5 / menor 10 | `fdb26d12` | comentarios de test sin citas |
+| 6 | `234176c2`, `cce750d1`, `cab2d2b7` | correcciones que sacó el E2E (abajo) |
+
+## 1. Base de datos
+
+- **Compartida `QuimiCloude` (la del `.env` del árbol principal).** Seguía teniendo aplicada la migración de
+  QC-147 (`20260919120000_recipe_lines_percentage`), porque en la vuelta 1 se hizo rollback y
+  después se volvió a migrar. En esta vuelta se corrió `pnpm run db:rollback` desde el worktree
+  antes del rename. El script revierte la última carpeta del worktree, que era esa: aplicó su
+  `down.sql` y borró su fila de `_prisma_migrations`. `recipe_lines` vuelve a
+  `id, recipe_id, product_id, created_at, updated_at, quantity, unit_id`. Las demás filas del
+  registro no se tocaron. Entre ellas está la ajena `20260922130000_orders_presentation`, que no es
+  de esta rama. Las líneas de receta borradas no vuelven (asumido por el leader).
+- **Base propia `QuimiCloude_QC147`**, con la receta de QC-81 (`progress/current.md`):
+  `pnpm run db:test template` construyó la plantilla `qct_tpl_b7371fba8f31` con las 40
+  migraciones de la rama, ya con el nombre nuevo, y después se ejecutó
+  `CREATE DATABASE "QuimiCloude_QC147" TEMPLATE "qct_tpl_b7371fba8f31"`. `_prisma_migrations`
+  tiene 40 filas, todas terminadas y ninguna revertida.
+  **Solo el `.env` del WORKTREE** apunta a `QuimiCloude_QC147` (`DATABASE_URL` y `DIRECT_URL`).
+  El `.env` del árbol principal sigue en `QuimiCloude`.
+- R9 a mano, **sobre `QuimiCloude_QC147`**: `pnpm run db:rollback` → `db:test status` («1 migración
+  atrás») → `pnpm run db:migrate` → `db:test status` («al día: 40 migraciones»).
+
+## 2. Timestamp (menor 1)
+
+La migración se renombró a `20260922160000_recipe_lines_percentage`, posterior a
+`20260922150000_product_type_enum`, que es la última de `origin/dev`. La lista cerrada de
+`tests/guards/guard-identificador-de-request.test.ts` se actualizó. El test estático de la
+migración compara contra todas las carpetas de `db/migrations/` y no contra un literal, así que no
+hizo falta tocarlo. **Queda pendiente para F2.3:** al hacer merge con `origin/dev`, esa lista
+cerrada de la guardia seguirá dando conflicto, porque las dos ramas añaden su migración.
+
+## 3. `tests/unit/unidades/module-contract.test.ts`
+
+El caso «la unidad del producto es la columna guardada y nunca un texto» se enmendó con el patrón
+del propio archivo («QUE AFIRMABA ANTES / QUE AFIRMA AHORA»). Ahora afirma que
+`ProductRef.unitId: string | null` existe, porque lo consumen el costo con porcentaje, la tabla de
+Pedidos y la ejecución del Operario. Sigue prohibiendo el campo `unit` de texto. No se metió en el
+baseline. Resultado: 8/8 en verde.
+
+## 4. `ciclo-de-vida-de-la-base.int.test.ts`, R7: **es del entorno, no se ha tocado**
+
+Evidencia:
+- `git diff origin/dev...HEAD -- tests/helpers tests/integration/infra vitest.config.mts scripts`
+  no devuelve nada. La rama no toca la infraestructura de tests, y `dropRunDatabase` es un
+  `DROP DATABASE … WITH (FORCE)` sobre una base efímera.
+- Corridas aisladas en el worktree:
+  - Del subagente: 2/5 en rojo justo después de construir la plantilla y copiar
+    `QuimiCloude_QC147`, y 5/5 en verde las dos siguientes.
+  - Mías: 3 en rojo con 2 saltados (198 s, con el E2E de otro worktree ocupando la máquina), después
+    1 en rojo y 4 en verde (104 s), y por último **5/5 en verde (36 s)**.
+- En el árbol de dev, en paralelo: 5/5 en verde (54 s y 29 s).
+- Cada rojo es un timeout de 20 s en `DROP DATABASE`, y aparece solo con la máquina cargada. En ese
+  momento había otros worktrees corriendo E2E en el puerto 3117 (QC-146). Es la misma caída por
+  plazo que `docs/verification.md` ya documenta para este archivo. Con la máquina libre, la rama
+  pasa igual que dev.
+
+## 5. Menores del reviewer
+
+| n.º | Estado | Cómo |
+|---|---|---|
+| 1 | cerrado | punto 2 |
+| 2 | cerrado | el caso de R8 ejercita de verdad `down.sql` → datos viejos → `migration.sql` en una transacción |
+| 3 | cerrado | `recipe-service.test.ts › R7` usa `.rejects.toBeInstanceOf(UnauthorizedError)`; el mapa cita `authorization.test.ts › QC-74 R12` |
+| 4 | cerrado | describe de R9 en integración (en una transacción, con ROLLBACK) y rollback manual sobre `QuimiCloude_QC147` |
+| 5 | cerrado | «Hipoclorito · 10,00 % · 20 L» con separadores `aria-hidden`; el test compara el `textContent` de la fila entera |
+| 6 | cerrado | escenario 4: `line-percentage-0`, `line-quantity-0` y `line-unit-0` con `toHaveText` exacto |
+| 7 | cerrado | el describe de `order-execution-screen.test.tsx` pasa a «sin factor de escala, con la cantidad de la linea ya calculada» |
+| 8 | cerrado | `recipe-view.ts` (`productStock`: `null` solo si el insumo está de baja), cabecera de `recipe-lines-field.tsx` (ya no contradice R11, 5 líneas), `recipe-form-state.ts` (sin la afirmación del `grep`) |
+| 9 | **no se hace, justificado** | los comentarios de `unidades` (`unit-write-prisma.ts:87`, `delete-unit.ts:26`, `errors.ts:164`, `unit-catalog.ts:3`, `ports/unit-write-repository.ts:66`) no están en el diff de esta ficha, y el propio reviewer propone una ficha de limpieza de `unidades`. Además, tocar `lib/modules/unidades` activa las guardias de módulo intacto de QC-39 |
+| 10 | cerrado, con 2 excepciones | se quitaron las citas `QC-`/`R<n>`/`D<n>`/`design.md` de los comentarios añadidos en tests y e2e; el `R<n>` solo queda en nombres de caso. Excepción: las listas cerradas de `guard-identificador-de-request.test.ts` y `tests/unit/recetas/scope.test.ts`, donde cada entrada cita su ficha por el patrón del propio archivo |
+| 11 | cerrado | T10 cumple ahora su «Hecho cuando»: E2E en verde en Chromium y WebKit (punto 6) |
+
+## 6. E2E, contra `QuimiCloude_QC147`
+
+Lo que salió en las corridas y se corrigió:
+- **Escenario 1:** el test comparaba `Decimal.toString()` («92.5») con «92.50». Se corrigió a
+  `toFixed(2)`; es un fallo del test.
+- **Escenario 4:** el insumo en litro tiene unidades hermanas, así que la fila pinta el selector y
+  no existía `order-execution-line-unit-0`. El componente pone ahora ese testid también en el
+  `SelectValue`, y hay un test unitario nuevo (L → ml). Además, **el símbolo real de `litro` en el
+  catálogo arrancador es «l»** (`units_catalog/migration.sql:118`), no «L» como ponen los ejemplos
+  de R18/R22. El E2E afirma el símbolo leído del catálogo; no se cambia el dato.
+- **Escenario 1 en WebKit, siempre rojo:**
+  - Causa: tras `page.goto`, el `fill()` del nombre llegaba antes de que React hidratara. WebKit
+    no despachaba `input`, así que el estado quedaba en `''`, el nombre se borraba al elegir un
+    ingrediente, y la acción lo rechazaba («Revisa los campos marcados.», visto en la traza).
+  - Arreglo: ese primer campo se teclea con `pressSequentially`. Es un fallo del test, no del
+    producto. `e2e/recetas-pasos.spec.ts` ya documenta el mismo síntoma y lo esquiva con
+    `fillControlled`.
+
+Salida final: `pnpm exec playwright test e2e/recetas-porcentaje.spec.ts e2e/recetas.spec.ts e2e/recetas-pasos.spec.ts --project=chromium --project=webkit`, exit 0 (títulos recortados):
+
+```
+✓   4 [chromium] › e2e\recetas-porcentaje.spec.ts:503:7 › escenario 3 (R13, R15, R25) - un pedido de 200 …
+✓   6 [chromium] › e2e\recetas.spec.ts:335:7 › el Administrador entra, da de alta una receta con una linea …
+✓   5 [chromium] › e2e\recetas-porcentaje.spec.ts:545:7 › escenario 4 (R18, R22, R25, R26) - el Operario …
+✓   3 [chromium] › e2e\recetas-porcentaje.spec.ts:456:7 › escenario 2 (R3, R23) - una receta sin lineas …
+✓   2 [chromium] › e2e\recetas-porcentaje.spec.ts:393:7 › escenario 1 (R25) - dos ingredientes escritos …
+✓   1 [chromium] › e2e\recetas-pasos.spec.ts:307:7 › el Administrador redacta un paso …
+✓   8 [chromium] › e2e\recetas.spec.ts:437:7 › un usuario sin recetas.consultar recibe 404 …
+✓   7 [chromium] › e2e\recetas.spec.ts:385:7 › busca las recetas propias por su nombre …
+✓  10 [webkit] › e2e\recetas-porcentaje.spec.ts:456:7 › escenario 2 (R3, R23) …
+✓  12 [webkit] › e2e\recetas-porcentaje.spec.ts:503:7 › escenario 3 (R13, R15, R25) …
+✓  11 [webkit] › e2e\recetas-porcentaje.spec.ts:393:7 › escenario 1 (R25) …
+✓   9 [webkit] › e2e\recetas-pasos.spec.ts:307:7 › el Administrador redacta un paso …
+✓  13 [webkit] › e2e\recetas.spec.ts:385:7 › busca las recetas propias por su nombre …
+✓  14 [webkit] › e2e\recetas-porcentaje.spec.ts:545:7 › escenario 4 (R18, R22, R25, R26) …
+✓  15 [webkit] › e2e\recetas.spec.ts:437:7 › un usuario sin recetas.consultar recibe 404 …
+✓  16 [webkit] › e2e\recetas.spec.ts:335:7 › el Administrador entra, da de alta una receta …
+16 passed (2.9m)
+```
+
+(Al cerrar, el servidor de Playwright imprime `[WebServer] ELIFECYCLE Command failed with exit code 1`. Es el apagado del servidor de desarrollo y no afecta al exit 0 de la corrida.)
+
+## Salida real de los tests de la vuelta 2 (tras el último commit)
+
+- `pnpm run typecheck`: exit 0. `pnpm run lint`: exit 0.
+- `pnpm exec vitest run <22 archivos de test tocados en 646a88e1..HEAD> recipe-lines-percentage-migration.test.ts unidades/module-contract.test.ts`
+  → `Test Files 23 passed (23)` · `Tests 335 passed | 1 skipped (336)`. Incluye los dos de integración de la
+  ficha (`recipe-lines-percentage.int.test.ts` y `order-ingredients-cost.int.test.ts`).
+- `pnpm exec vitest run guard` → `Test Files 48 passed (48)` · `Tests 593 passed | 9 skipped (602)`.
+- Siguen en rojo, y están listados en `tests/baseline-rojos.json`: `tests/unit/recetas/module-contract.test.ts` y
+  `tests/unit/recetas-ui/recipe-route-contract.test.ts`, por su caso de diff de rama.
+
+## Qué queda abierto
+
+- T12: `./init.sh` completo, que corre el leader.
+- Conflicto que ya se sabe que habrá al hacer merge con `origin/dev` (F2.3): `feature_list.json` y la lista cerrada de migraciones de `guard-identificador-de-request.test.ts`.
+- Menor 9: los comentarios de `unidades` siguen citando una FK que ya no existe. Se propone una ficha de limpieza.
+- R18/R22 ponen «20 L» de ejemplo, pero en el catálogo el litro es «l». No se ha cambiado nada: se deja anotado por si el humano quiere cambiar el símbolo.
