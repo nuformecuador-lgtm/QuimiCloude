@@ -41,7 +41,7 @@ QC-132 `done` (PR #110, `b7e64eb9`) y QC-130 `cancelled` al acotarla; QC-133 `ca
 Alcance, **12 decisiones cerradas** (11 + la presentacion que anadio QC-146) y **1 pregunta abierta** en
 `specs/QC-145-pedidos-terminados-en-asignacion/requirements.md`. El alcance **crecio** al acotarla: la edicion
 en Pedidos deja de cambiar el estado. **Desbloqueada el 2026-09-23**: QC-144 (PR #107) y QC-146 (PR #109) `done`.
-Pendiente F1.0 (`complexity`) y F1.2.
+**F1.0 el 2026-09-23**: `complexity: high` (migracion + pedidos + asignaciones + tres vistas por permiso + E2E con tres roles), `zone: fullstack` sin partir; worktree desde `origin/dev`. F1.2: `spec_author` lanzado. **Base propia obligatoria en F2** (`QuimiCloude_QC145`), no la de `.env`.
 
 ### QC-147 - CERRADA (2026-09-23)
 

@@ -36,8 +36,11 @@ import {
   AsignacionesError,
   type Actor,
   type AssignedOrderView,
+  type CompanyOrderView,
+  type FinishedOrderView,
   type OrderResponsible,
   type OrderResponsiblesEntry,
+  type ResponsibleCandidate,
 } from '@/lib/modules/asignaciones';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
@@ -243,6 +246,64 @@ export async function listAssignedOrdersAction(
 
   try {
     const data = await asignaciones.listAssignedOrders(actor, query);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Las TRES acciones de las vistas nuevas. Mismo cuerpo tonto que `listAssignedOrdersAction`:
+// resuelven el actor de las dos caras de la sesion, llaman al caso de uso con la entrada CRUDA y
+// traducen el error por su `code`. Ningun permiso se comprueba aqui.
+// ---------------------------------------------------------------------------------------------
+
+export type FinishedOrdersListResult =
+  | { status: 'success'; data: Page<FinishedOrderView> }
+  | ErrorState;
+
+/** Los `ENTREGADO` de toda la empresa. */
+export async function listFinishedOrdersAction(
+  query: unknown,
+): Promise<FinishedOrdersListResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await asignaciones.listFinishedOrders(actor, query);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export type CompanyOrdersListResult =
+  | { status: 'success'; data: Page<CompanyOrderView> }
+  | ErrorState;
+
+/** Los pedidos de la empresa en cualquier estado. */
+export async function listCompanyOrdersAction(
+  query: unknown,
+): Promise<CompanyOrdersListResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await asignaciones.listCompanyOrders(actor, query);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export type ResponsibleCandidatesResult =
+  | { status: 'success'; data: readonly ResponsibleCandidate[] }
+  | ErrorState;
+
+/** Los candidatos del selector de responsables: sin `FormData`, no viene de un `<form>`. */
+export async function listResponsibleCandidatesAction(): Promise<ResponsibleCandidatesResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await asignaciones.listResponsibleCandidates(actor, {});
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

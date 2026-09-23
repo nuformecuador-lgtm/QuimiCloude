@@ -6,13 +6,16 @@
     "asignaciones/atomicity.int.test.ts",
     "asignaciones/batch-company-scope.int.test.ts",
     "asignaciones/batch-states.int.test.ts",
+    "asignaciones/company-orders.int.test.ts",
     "asignaciones/company-scope.int.test.ts",
+    "asignaciones/finished-orders.int.test.ts",
     "asignaciones/frozen-name.int.test.ts",
     "asignaciones/list-order-responsibles.int.test.ts",
     "asignaciones/order-assignment-prisma.int.test.ts",
     "asignaciones/order-assignments-constraints.int.test.ts",
     "asignaciones/reapply-work-group.int.test.ts",
     "asignaciones/remove-work-group.int.test.ts",
+    "asignaciones/responsible-eligibility.int.test.ts",
     "asignaciones/unassign.int.test.ts",
     "documentos/document-batches-and-files-constraints.int.test.ts",
     "identity/identity-constraints.int.test.ts",
@@ -174,6 +177,16 @@
       "archivo": "pedidos/order-duplicate-number.int.test.ts",
       "motivo": "Nacido con QC-77 ya en pie (QC-60, decision humana del 2026-09-16): provoca un 23505 AUTENTICO sobre 'orders_company_year_sequence_key' a traves del adaptador real 'createOrder', que usa el cliente Prisma GLOBAL y abre SU PROPIA 'prisma.$transaction' por intento, asi que una transaccion del test no lo envolveria. Para que choquen los tres intentos crea, desde un 'pg.Client' aparte, una funcion y un trigger BEFORE INSERT con nombre unico y acotados por WHEN a la empresa efimera del caso, que reescriben 'order_sequence' a un numero ya ocupado. En un 'finally' borra el trigger y la funcion y despues el fixture (pedidos -> usuario -> rol y tipo de documento -> empresa); la receta se borra en el afterAll. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-16"
+    },
+    {
+      "archivo": "pedidos/order-catalog-company-summary.int.test.ts",
+      "motivo": "QC-145 T4: ejercita 'listAliveSummariesInCompany' y 'createOrder'/'cancelAliveOrder' -los adaptadores driven REALES de 'pedidos'-, que hablan con el cliente Prisma GLOBAL y 'createOrder' abre ademas su PROPIA 'prisma.$transaction' con el lock de aviso del correlativo dentro, asi que una transaccion del test no los envolveria. Dos empresas efimeras (randomUUID) nacen en 'beforeAll' y mueren en 'afterAll'; cada caso siembra sus propios pedidos y los borra en un 'finally' por su id exacto. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-23"
+    },
+    {
+      "archivo": "pedidos/order-finished-at.int.test.ts",
+      "motivo": "QC-145 T2: ejercita 'transitionAliveOrder', 'createOrder', 'updateAliveOrder' y 'cancelAliveOrder' -los adaptadores driven REALES de 'pedidos'-, que hablan con el cliente Prisma GLOBAL y 'createOrder' ademas abre su PROPIA 'prisma.$transaction' con el lock de aviso del correlativo dentro, asi que una transaccion del test no los envolveria. Una empresa efimera (randomUUID) nace en 'beforeAll' y muere en 'afterAll'; cada caso siembra su propio pedido y lo borra en un 'finally' por su id exacto. El caso de R4 (el CHECK) usa SQL crudo dentro de un SAVEPOINT porque la escritura se espera que falle. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-23"
     },
     {
       "archivo": "pedidos/order-ingredients-cost.int.test.ts",

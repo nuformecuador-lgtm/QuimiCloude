@@ -133,11 +133,12 @@ describe('pedidos — createOrderSchema (alta)', () => {
 })
 
 describe('pedidos — updateOrderSchema (edicion)', () => {
-  const edicionValida = { ...altaValida(), priority: 'ALTA', status: 'EN_CURSO' }
+  const edicionValida = { ...altaValida(), priority: 'ALTA' }
 
   it('EDITABLE_STATUS se DERIVA del conjunto cerrado quitando CANCELADO, no se escribe a mano', () => {
-    // R24 y `design.md > 7.2`: el dia que aparezca un quinto estado, quien lo anada tiene que
-    // decidir explicitamente si es editable. Se comprueba la derivacion, no la lista literal.
+    // El dia que aparezca un quinto estado, quien lo anada tiene que decidir explicitamente si es
+    // editable. Se comprueba la derivacion, no la lista literal. Se sigue publicando para el
+    // selector de estado del formulario, pero `updateOrderSchema` ya no lo usa.
     expect([...EDITABLE_STATUS_VALUES]).toEqual(
       ORDER_STATUS_VALUES.filter((status) => status !== 'CANCELADO'),
     )
@@ -145,28 +146,28 @@ describe('pedidos — updateOrderSchema (edicion)', () => {
     expect(EDITABLE_STATUS_VALUES).not.toContain('CANCELADO')
   })
 
-  it('acepta los tres estados editables y la edicion completa', () => {
-    // R20: reemplazo COMPLETO del conjunto de datos de negocio, estado incluido.
-    for (const status of EDITABLE_STATUS_VALUES) {
-      const parsed = updateOrderSchema.parse({ ...edicionValida, status })
-      expect(parsed.status).toBe(status)
-    }
+  it('R6: `updateOrderSchema` es EXACTAMENTE `createOrderSchema`, sin campo de estado', () => {
+    expect(updateOrderSchema).toBe(createOrderSchema)
     expect(Object.keys(updateOrderSchema.parse(edicionValida)).sort()).toEqual([
       'presentationId',
       'priority',
       'quantity',
       'recipeId',
-      'status',
     ])
   })
 
-  it('rechaza status CANCELADO y no admite ningun motivo de cancelacion', () => {
-    // R24 y decision cerrada 7: la edicion NO puede cancelar. Muere aqui, en el borde, sin
-    // llegar al caso de uso ni al repositorio; y `reason` ni siquiera existe en este esquema,
-    // asi que se descarta silenciosamente en vez de convertirse en un motivo escrito.
-    expect(updateOrderSchema.safeParse({ ...edicionValida, status: 'CANCELADO' }).success).toBe(
-      false,
-    )
+  it('R6: un `status` en la entrada se DESCARTA, sea el que sea, y la edicion no falla por el', () => {
+    // La edicion ya no puede ni EXPRESAR un cambio de estado: `z.object` descarta la clave
+    // desconocida igual que con cualquier otro campo ajeno, no la rechaza como invalida.
+    for (const status of ['PENDIENTE', 'EN_CURSO', 'ENTREGADO', 'CANCELADO', 'ANULADO', 3]) {
+      const parsed = updateOrderSchema.parse({ ...edicionValida, status })
+      expect(parsed, `status=${String(status)}`).not.toHaveProperty('status')
+    }
+  })
+
+  it('no admite ningun motivo de cancelacion: cancelar es `cancelOrder` y solo el', () => {
+    // Decision cerrada 7: la edicion NO puede cancelar, y `reason` ni siquiera existe en este
+    // esquema, asi que se descarta silenciosamente en vez de convertirse en un motivo escrito.
     const parsed = updateOrderSchema.parse({
       ...edicionValida,
       reason: 'me arrepenti',
@@ -176,14 +177,8 @@ describe('pedidos — updateOrderSchema (edicion)', () => {
     expect(parsed).not.toHaveProperty('cancellationReason')
   })
 
-  it('el estado es obligatorio y rechaza cualquier valor fuera del conjunto', () => {
-    // R19: el conjunto es cerrado y el valor no puede llegar al repositorio.
-    for (const status of [undefined, '', 'entregado', 'ANULADO', 3]) {
-      expect(
-        updateOrderSchema.safeParse({ ...edicionValida, status }).success,
-        `status=${String(status)}`,
-      ).toBe(false)
-    }
+  it('la edicion es valida SIN estado: ya no es un campo obligatorio', () => {
+    expect(updateOrderSchema.safeParse(edicionValida).success).toBe(true)
   })
 
   it('R7: la edicion exige presentacion, con las mismas reglas que el alta', () => {

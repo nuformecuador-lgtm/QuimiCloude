@@ -45,6 +45,7 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     priority: 'MEDIA',
     status: 'PENDIENTE',
     presentationId: null,
+    finishedAt: null,
     ...overrides,
   };
 }

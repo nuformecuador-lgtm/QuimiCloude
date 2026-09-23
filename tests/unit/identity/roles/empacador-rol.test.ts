@@ -2,8 +2,9 @@
 // roles quedan intactos; el literal `Empacador` tiene un unico dueño en produccion, `roles.ts`
 // -- barrido, mismo patron que `tests/guards/guard-rol-administrador-unico.test.ts`, reescrito en
 // este archivo porque protege un requisito propio, no una convencion transversal; el modelo
-// `Role` de `db/schema.prisma` es global, sin campo de empresa; y nadie en esta ficha consume
-// `terminados.consultar` todavia, lo que el mismo barrido, sobre otro literal, demuestra.
+// `Role` de `db/schema.prisma` es global, sin campo de empresa; y `terminados.consultar` solo
+// puede nombrarse en el catalogo y en la lista corta de archivos que la enmienda abre por su
+// ruta exacta, lo que el mismo barrido, sobre otro literal, demuestra.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, join, sep } from 'node:path';
@@ -120,6 +121,17 @@ export function mentionsTerminadosConsultarLiteral(source: string): boolean {
   return literalPattern('terminados.consultar').test(stripComments(source));
 }
 
+/**
+ * Enmienda: `assignment-views.ts` decide si el usuario ve la vista "Terminados" comprobando este
+ * permiso, y por eso necesita nombrarlo. `list-finished-orders.ts` es la segunda puerta, el caso
+ * de uso que consulta esos pedidos y lo exige en su primera linea.
+ */
+const RUTAS_PERMITIDAS = new Set([
+  'lib/modules/identity/domain/permissions.ts',
+  'lib/modules/asignaciones/domain/assignment-views.ts',
+  'lib/modules/asignaciones/domain/list-finished-orders.ts',
+]);
+
 function findTerminadosConsultarDeclarations(root: string): readonly string[] {
   return listProductionFiles(root)
     .filter((absPath) => mentionsTerminadosConsultarLiteral(readFileSync(absPath, 'utf8')))
@@ -197,20 +209,20 @@ describe('R3 — el rol Empacador es global: Role no lleva campo de empresa', ()
   });
 });
 
-describe('R16 — ningun archivo de produccion distinto de permissions.ts exige terminados.consultar', () => {
-  it('el codigo `terminados.consultar` solo aparece en lib/modules/identity/domain/permissions.ts', () => {
+describe('R16 — ningun archivo de produccion fuera de la lista permitida exige terminados.consultar', () => {
+  it('el codigo `terminados.consultar` solo aparece en las rutas exactas permitidas', () => {
     const conElCodigo = findTerminadosConsultarDeclarations(repoRoot);
+    const inesperados = conElCodigo.filter((ruta) => !RUTAS_PERMITIDAS.has(ruta));
 
     expect(
-      conElCodigo,
-      conElCodigo.length === 1 && conElCodigo[0] === 'lib/modules/identity/domain/permissions.ts'
+      inesperados,
+      inesperados.length === 0
         ? undefined
-        : 'terminados.consultar no tiene todavia ningun consumidor fuera del catalogo (QC-144 R16): ' +
-            'lib/modules/identity/domain/permissions.ts. ' +
-            `Se encontro tambien en: ${conElCodigo.join(', ')}. ` +
-            'Si estas construyendo la lista de pedidos terminados, esa es QC-145: es la ficha ' +
-            'que tiene que relajar este caso, no esta.',
-    ).toEqual(['lib/modules/identity/domain/permissions.ts']);
+        : 'terminados.consultar solo puede nombrarse en: ' +
+            `${[...RUTAS_PERMITIDAS].join(', ')}. ` +
+            `Se encontro tambien en: ${inesperados.join(', ')}.`,
+    ).toEqual([]);
+    expect(conElCodigo).toEqual(expect.arrayContaining(['lib/modules/identity/domain/permissions.ts']));
   });
 
   it('dispara con un fuente sintetico que exige el codigo, con cualquiera de las tres comillas', () => {

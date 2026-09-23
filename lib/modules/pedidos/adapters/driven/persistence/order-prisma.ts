@@ -16,7 +16,7 @@ import { dateRangeCondition, numberRangeCondition, selectCondition } from './lis
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
 import type { OrderScope } from '../../../domain/order-scope';
-import type { NewOrder, OrderRow } from '../../../domain/order-view';
+import type { NewOrder, OrderEdit, OrderRow } from '../../../domain/order-view';
 
 /**
  * Implementa `OrderRepository` (`ports/order-repository.ts`, `design.md > 4.2`, `> 7.4`,
@@ -511,10 +511,10 @@ export async function listAliveOrders(
  * `updateMany` con `deletedAt: null` en el `where` y no `update`: si el pedido no existe o ya
  * esta borrado, `count` sale 0 y se devuelve `'not_found'` en vez de lanzar.
  *
- * `data` NUNCA incluye `createdBy` ni `createdAt` (R6): conservar el autor y el instante de
- * la creacion es la mitad de R6 que solo se puede demostrar aqui. Tampoco incluye
- * `cancellationReason` ni puede escribir la cancelacion: `NewOrder.status` es
- * `EditableOrderStatus` y el `typecheck` es la primera de las cuatro capas de `design.md > 8`.
+ * `data` NUNCA incluye `createdBy` ni `createdAt`: conservar el autor y el instante de
+ * la creacion solo se puede demostrar aqui. Tampoco incluye `status` ni
+ * `cancellationReason`: `OrderEdit` no tiene esos campos, asi que esta sentencia no puede
+ * escribirlos ni por accidente.
  *
  * `updatedAt` se escribe con el `now` INYECTADO y no con el `@updatedAt` de Prisma, para que
  * el reloj sea el mismo que fijo el caso de uso.
@@ -524,7 +524,7 @@ export async function listAliveOrders(
  */
 export async function updateAliveOrder(
   id: string,
-  data: NewOrder,
+  data: OrderEdit,
   actorId: string,
   now: Date,
   ingredientsCost: string | null,
@@ -536,7 +536,6 @@ export async function updateAliveOrder(
       recipeId: data.recipeId,
       quantity: toDecimalInput(data.quantity),
       priority: data.priority,
-      status: data.status,
       ingredientsCost: ingredientsCost === null ? null : toDecimalInput(ingredientsCost),
       updatedAt: now,
       updatedBy: actorId,

@@ -570,6 +570,10 @@ model Order {
   /// pedidos que existian antes de esta columna. Sin `@relation`: es drift, con FK COMPUESTA
   /// `(company_id, presentation_id)` escrita a mano en la migracion.
   presentationId     String?       @map("presentation_id") @db.Uuid
+  /// Instante en que el pedido paso a ENTREGADO al finalizarlo en planta. NULL en los entregados
+  /// antes de existir la columna. Solo puede tener valor si el estado es ENTREGADO, lo exige el
+  /// CHECK `orders_finished_at_requires_delivered`.
+  finishedAt         DateTime?     @map("finished_at") @db.Timestamptz(6)
 
   @@unique([companyId, orderYear, orderSequence], map: "orders_company_year_sequence_key")
   @@unique([id, companyId], map: "orders_id_company_id_key")
