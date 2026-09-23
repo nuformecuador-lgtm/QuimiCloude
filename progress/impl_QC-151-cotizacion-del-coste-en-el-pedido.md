@@ -106,6 +106,49 @@ Tests:
     (FK en limpiezas de huérfanos, probablemente por corridas concurrentes). No es de esta ficha, pero
     el comando documentado en tasks.md y docs/verification.md merece revisión.
 
+## Ronda 2 — respuesta al review (`progress/review_QC-151-cotizacion-del-coste-en-el-pedido.md`)
+
+Commits: `fa7f187c` (bloqueante + menores 1, 2, 3, 5) y `395ff106` (menor 4 + arreglo de
+`recipe-picker.tsx`, aislado para poder revertirlo solo).
+
+- Bloqueante: se quitan `QC-151:`, `(R1-R7)` y `(QC-151)` de los comentarios de `order-actions.ts` y
+  `order-input.ts`. Contra el merge-base de la rama (`df8af4ec`) no queda ninguna cita `QC-\d+`/`R\d+`
+  añadida en `lib/`, `app/` ni `components/`. `origin/dev...HEAD` saca ruido de otras fichas ya
+  mergeadas en `dev`.
+- Menor 1: `use-order-cost-quote.ts` gana un `.catch`. Si la acción se rechaza en el transporte y la
+  petición sigue vigente, pasa a `error` `unexpected` (`errorMessage(UNEXPECTED_ERROR_CODE)` +
+  `newRequestId()`) con `quoting: false`. Tiene un caso nuevo en `order-cost-quote.test.tsx`.
+  `loadIngredients` de `order-form.tsx` no se toca.
+- Menor 2: se quitan las citas de ficha y task en las cabeceras y comentarios de `order-input.test.ts`,
+  `quote-order-cost.test.ts`, `order-cost-quote.int.test.ts`, `order-form-quote.test.tsx` y del alta en
+  `guard-identificador-de-request.test.ts`. Las demás entradas de esa lista (QC-92, QC-147…) son
+  preexistentes y no se tocan.
+- Menor 3: en `authorization.test.ts`, `SEIS`/`SEIS_ARCHIVOS` pasan a `SIETE`/`SIETE_ARCHIVOS` y los
+  textos a «siete». En `order-actions.test.ts`, «los siete `catch`». En ese archivo quedan otras
+  menciones a «seis» que el review no listó (`const SEIS` local, «las seis actions»); se dejan.
+  `design.md > 10` y `progress/impl_QC-74-*.md` siguen nombrando `SEIS` en prosa.
+- Menor 4: la rama «elegir otra receta» de R12 en `order-form-quote.test.tsx` afirma ahora que el bloque
+  pasa a `$ 30.00`. **Al escribirla apareció un defecto real, anterior a esta ficha**, en
+  `recipe-picker.tsx`:
+  - Pasa al elegir una receta DISTINTA a la ya elegida, es decir, en la edición.
+  - El autocomplete dispara `onValueChange` con el nombre nuevo, pero `handleValueChange` compara
+    contra `selectedName` del render anterior, así que retira la elección (`onSelect(null)`) y la
+    cotización vuelve al guion.
+  - Arreglo mínimo: un `selectedNameRef` síncrono. Es cambio de comportamiento fuera de los archivos
+    del design; necesita visto bueno. Si no se acepta, se revierte `395ff106` entero.
+- Menor 5: se reescriben los dos comentarios que repetían el código (`order-form.tsx`, solo esa línea;
+  `use-order-cost-quote.ts`).
+
+Verificación de la ronda:
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: limpio.
+- `pnpm exec vitest related --run <13 archivos tocados>`: `Test Files 185 passed (185) · Tests 2852
+  passed | 1 skipped (2853)`, integración incluida (base efímera `qct_qc151_*` creada y borrada).
+- En la corrida paralela de backend_dev salió rojo `tests/unit/shared-ui/responsible-avatars.test.tsx`,
+  que no está en `tests/baseline-rojos.json` ni lo toca esta rama. En esta corrida pasa: parece
+  intermitente bajo carga.
+
 ## Pendiente
 
 - `./init.sh` completo (gate de T8/cierre): lo corre el leader.
+- Decidir si se acepta el arreglo de `recipe-picker.tsx` (`395ff106`).
