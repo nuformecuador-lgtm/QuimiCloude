@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { SharedSelect } from '@/components/shared/shared-select';
 
 describe('SharedSelect', () => {
@@ -14,12 +14,13 @@ describe('SharedSelect', () => {
   };
 
   it('renderiza el select con las opciones', async () => {
+    const user = setupUser();
     render(<SharedSelect {...defaultProps} />);
 
     const trigger = screen.getByLabelText('Test');
     expect(trigger).toBeInTheDocument();
 
-    await userEvent.click(trigger);
+    await user.click(trigger);
 
     expect(screen.getByText('Opción A')).toBeInTheDocument();
     expect(screen.getByText('Opción B')).toBeInTheDocument();
@@ -33,14 +34,15 @@ describe('SharedSelect', () => {
   });
 
   it('llama onChange al seleccionar una opcion', async () => {
+    const user = setupUser();
     const onChange = vi.fn();
     render(<SharedSelect {...defaultProps} onChange={onChange} />);
 
     const trigger = screen.getByLabelText('Test');
-    await userEvent.click(trigger);
+    await user.click(trigger);
 
-    const opcionB = screen.getByText('Opción B');
-    await userEvent.click(opcionB);
+    const opcionB = await screen.findByText('Opción B');
+    await user.click(await esperarInteractiva(opcionB));
 
     expect(onChange).toHaveBeenCalledWith('B');
   });
@@ -59,12 +61,13 @@ describe('SharedSelect', () => {
   });
 
   it('muestra el helper con tooltip', async () => {
+    const user = setupUser();
     render(<SharedSelect {...defaultProps} helper="Ayuda de prueba" />);
 
     const helperTrigger = screen.getByLabelText('Qué es Test');
     expect(helperTrigger).toBeInTheDocument();
 
-    await userEvent.hover(helperTrigger);
+    await user.hover(helperTrigger);
     expect(await screen.findByText('Ayuda de prueba')).toBeInTheDocument();
   });
 });
