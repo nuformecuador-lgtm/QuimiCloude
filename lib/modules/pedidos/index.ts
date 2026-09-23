@@ -25,6 +25,7 @@ export type {
   OrderAssignmentTarget,
   OrderCatalog,
   AssignedOrderSummary,
+  OrderSummaryOrdering,
 } from './domain/order-catalog';
 
 // ---------------------------------------------------------------------------------------
@@ -93,8 +94,9 @@ export type {
 export { assertTransition, isAllowedTransition } from './domain/order-transitions';
 
 /** Los tipos de entrada y de salida (R42, R43, R46). `OrderRow` es lo que devuelve el PUERTO
- *  y se publica porque `lib/composition` tiene que poder nombrar el tipo del repositorio. */
-export type { NewOrder, OrderRow, OrderView, OrderSummary } from './domain/order-view';
+ *  y se publica porque `lib/composition` tiene que poder nombrar el tipo del repositorio.
+ *  `OrderEdit` es lo que acepta `updateAlive`, sin `status` (R6). */
+export type { NewOrder, OrderEdit, OrderRow, OrderView, OrderSummary } from './domain/order-view';
 
 /** QC-57 (R25, R31): el contrato generico de consulta de lista y la lista blanca de pedidos.
  *  `listOrdersSchema`, `ListOrdersInput` y `OrderFilters` se fueron con el: el listado de

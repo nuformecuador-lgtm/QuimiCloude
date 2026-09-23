@@ -7,7 +7,11 @@ import { orderCompanyScope } from './company-scope';
 import { assertTransition } from '../../../domain/order-transitions';
 
 import type { OrderStatus } from '../../../domain/order-classification';
-import type { AssignedOrderSummary, OrderAssignmentTarget } from '../../../domain/order-catalog';
+import type {
+  AssignedOrderSummary,
+  OrderAssignmentTarget,
+  OrderSummaryOrdering,
+} from '../../../domain/order-catalog';
 import type { Page } from '../../../domain/page';
 
 /**
@@ -65,7 +69,42 @@ type AssignedOrderSummaryRow = {
   readonly priority: string;
   readonly status: string;
   readonly presentationId: string | null;
+  readonly finishedAt: Date | null;
 };
+
+/** `select` unico de los dos listados de resumen: si uno gana una columna y el otro no, el
+ *  tipo `AssignedOrderSummaryRow` lo dice enseguida. */
+const SUMMARY_SELECT = {
+  id: true,
+  orderYear: true,
+  orderSequence: true,
+  recipeId: true,
+  quantity: true,
+  priority: true,
+  status: true,
+  presentationId: true,
+  finishedAt: true,
+} as const;
+
+/** El «orden de la lista de trabajo»: prioridad, antiguedad y numero, con `id ASC` de
+ *  desempate para que sea total. Compartido por los dos listados de resumen para que no
+ *  puedan divergir (`design.md > 2.2`). */
+const WORK_QUEUE_ORDER_BY = [
+  { priority: 'desc' },
+  { createdAt: 'asc' },
+  { orderYear: 'asc' },
+  { orderSequence: 'asc' },
+  { id: 'asc' },
+] as const;
+
+/** El «orden de terminados» (R20, D14): fecha de terminado descendente con los nulos EXPLICITOS
+ *  al final, y entre los «sin fecha», numero de pedido descendente. */
+const FINISHED_RECENT_FIRST_ORDER_BY = [
+  { finishedAt: { sort: 'desc', nulls: 'last' } },
+  { orderYear: 'desc' },
+  { orderSequence: 'desc' },
+  { id: 'asc' },
+] as const;
 
 /** `quantity` llega como `Prisma.Decimal` -tipado aqui por su forma minima para no importar
  *  `@prisma/client`- y se fija a 4 decimales, la escala de la columna `Decimal(14,4)`. */
@@ -78,6 +117,7 @@ export function toAssignedOrderSummary(row: AssignedOrderSummaryRow): AssignedOr
     priority: row.priority as AssignedOrderSummary['priority'],
     status: row.status as OrderStatus,
     presentationId: row.presentationId,
+    finishedAt: row.finishedAt,
   };
 }
 
@@ -106,23 +146,43 @@ export async function listAliveOrderSummariesByIds(
   const [rows, total] = await Promise.all([
     prisma.order.findMany({
       where,
-      select: {
-        id: true,
-        orderYear: true,
-        orderSequence: true,
-        recipeId: true,
-        quantity: true,
-        priority: true,
-        status: true,
-        presentationId: true,
-      },
-      orderBy: [
-        { priority: 'desc' },
-        { createdAt: 'asc' },
-        { orderYear: 'asc' },
-        { orderSequence: 'asc' },
-        { id: 'asc' },
-      ],
+      select: SUMMARY_SELECT,
+      orderBy: [...WORK_QUEUE_ORDER_BY],
+      skip: offset,
+      take: limit,
+    }),
+    prisma.order.count({ where }),
+  ]);
+
+  return buildPage(rows.map(toAssignedOrderSummary), total, page, limit);
+}
+
+/**
+ * Implementa `OrderCatalog['listAliveSummariesInCompany']` (`design.md > 2.2`): el mismo
+ * resumen que `listAliveSummariesByIds`, pero SIN filtro de ids -toda la empresa-, para
+ * «Terminados» y «Todos» (R17, R22), que no acotan por quien esta asignado.
+ */
+export async function listAliveSummariesInCompany(
+  companyId: string,
+  statuses: readonly OrderStatus[],
+  ordering: OrderSummaryOrdering,
+  page: number,
+  pageSize?: number,
+): Promise<Page<AssignedOrderSummary>> {
+  const { offset, limit } = toOffsetLimit(page, pageSize);
+  const where = {
+    AND: [orderCompanyScope({ companyId }), { status: { in: [...statuses] }, deletedAt: null }],
+  };
+  const orderBy =
+    ordering === 'finished_recent_first'
+      ? [...FINISHED_RECENT_FIRST_ORDER_BY]
+      : [...WORK_QUEUE_ORDER_BY];
+
+  const [rows, total] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      select: SUMMARY_SELECT,
+      orderBy,
       skip: offset,
       take: limit,
     }),

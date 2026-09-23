@@ -288,6 +288,7 @@ import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports
 import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
+  listAliveSummariesInCompany,
   transitionAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
@@ -1040,6 +1041,7 @@ export const observabilidad = {
 const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: listAliveOrderSummariesByIds,
+  listAliveSummariesInCompany,
   transitionAliveById: transitionAliveOrder,
 };
 

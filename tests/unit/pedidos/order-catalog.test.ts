@@ -28,10 +28,16 @@ import type { OrderAssignmentTarget } from '@/lib/modules/pedidos'
 /** Doble del cliente Prisma. */
 const findFirst = vi.fn()
 const updateMany = vi.fn()
-vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { order: { findFirst, updateMany } } }))
+const findMany = vi.fn()
+const count = vi.fn()
+vi.mock('@/lib/shared/db/prisma', () => ({
+  prisma: { order: { findFirst, updateMany, findMany, count } },
+}))
 
 const {
   findAliveOrderTargetById,
+  listAliveOrderSummariesByIds,
+  listAliveSummariesInCompany,
   toAssignedOrderSummary,
   toOrderAssignmentTarget,
   transitionAliveOrder,
@@ -108,6 +114,8 @@ function baseConUnPedidoVivoYUnoDeBaja(): void {
 beforeEach(() => {
   findFirst.mockReset()
   updateMany.mockReset()
+  findMany.mockReset()
+  count.mockReset()
 })
 
 describe('contrato OrderCatalog', () => {
@@ -172,7 +180,7 @@ describe('toOrderAssignmentTarget', () => {
   })
 })
 
-describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion', () => {
+describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion y la fecha de terminado', () => {
   it('R27: copia presentationId tal cual, con y sin presentacion', () => {
     const conPresentacion = toAssignedOrderSummary({
       id: 'o-1',
@@ -183,6 +191,7 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion'
       priority: 'MEDIA',
       status: 'PENDIENTE',
       presentationId: 'p-1',
+      finishedAt: null,
     })
     expect(conPresentacion.presentationId).toBe('p-1')
 
@@ -195,8 +204,38 @@ describe('toAssignedOrderSummary — el resumen publicado lleva la presentacion'
       priority: 'MEDIA',
       status: 'PENDIENTE',
       presentationId: null,
+      finishedAt: null,
     })
     expect(sinPresentacion.presentationId).toBeNull()
+  })
+
+  it('R20: copia finishedAt tal cual, con y sin fecha', () => {
+    const fecha = new Date('2026-09-23T10:00:00.000Z')
+    const conFecha = toAssignedOrderSummary({
+      id: 'o-3',
+      orderYear: 2026,
+      orderSequence: 9,
+      recipeId: 'r-1',
+      quantity: { toFixed: () => '10.0000' },
+      priority: 'MEDIA',
+      status: 'ENTREGADO',
+      presentationId: null,
+      finishedAt: fecha,
+    })
+    expect(conFecha.finishedAt).toBe(fecha)
+
+    const sinFecha = toAssignedOrderSummary({
+      id: 'o-4',
+      orderYear: 2026,
+      orderSequence: 10,
+      recipeId: 'r-1',
+      quantity: { toFixed: () => '10.0000' },
+      priority: 'MEDIA',
+      status: 'ENTREGADO',
+      presentationId: null,
+      finishedAt: null,
+    })
+    expect(sinFecha.finishedAt).toBeNull()
   })
 })
 
@@ -332,5 +371,74 @@ describe('transitionAliveOrder', () => {
     await expect(
       transitionAliveOrder('o-1', EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA),
     ).resolves.toBe('stale')
+  })
+})
+
+describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
+  beforeEach(() => {
+    findMany.mockResolvedValue([])
+    count.mockResolvedValue(0)
+  })
+
+  it('el WHERE acota por empresa y estado, SIN filtro de ids (R17, R22)', async () => {
+    await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
+
+    const llamada = findMany.mock.calls[0]?.[0]
+    expect(llamada.where).toEqual({
+      AND: [{ companyId: EMPRESA }, { status: { in: ['ENTREGADO'] }, deletedAt: null }],
+    })
+    expect(llamada.where).not.toHaveProperty('id')
+    expect(JSON.stringify(llamada.where)).not.toContain('"id"')
+  })
+
+  it('con `work_queue`, el ORDER BY es IDENTICO al de listAliveSummariesByIds', async () => {
+    await listAliveSummariesInCompany(EMPRESA, ['PENDIENTE', 'EN_CURSO'], 'work_queue', 1)
+    const deTodaLaEmpresa = findMany.mock.calls[0]?.[0]?.orderBy
+
+    findMany.mockClear()
+    await listAliveOrderSummariesByIds(EMPRESA, ['o-1'], ['PENDIENTE', 'EN_CURSO'], 1)
+    const porIds = findMany.mock.calls[0]?.[0]?.orderBy
+
+    expect(deTodaLaEmpresa).toEqual(porIds)
+    expect(deTodaLaEmpresa).toEqual([
+      { priority: 'desc' },
+      { createdAt: 'asc' },
+      { orderYear: 'asc' },
+      { orderSequence: 'asc' },
+      { id: 'asc' },
+    ])
+  })
+
+  it('con `finished_recent_first`, ordena por finishedAt DESC con nulls "last" explicito y desempata por numero DESC (R20, D14)', async () => {
+    await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
+
+    const orderBy = findMany.mock.calls[0]?.[0]?.orderBy
+    expect(orderBy).toEqual([
+      { finishedAt: { sort: 'desc', nulls: 'last' } },
+      { orderYear: 'desc' },
+      { orderSequence: 'desc' },
+      { id: 'asc' },
+    ])
+  })
+
+  it('el resumen paginado incluye finishedAt (R20, R21, R31)', async () => {
+    findMany.mockResolvedValue([
+      {
+        id: 'o-1',
+        orderYear: 2026,
+        orderSequence: 1,
+        recipeId: 'r-1',
+        quantity: { toFixed: () => '10.0000' },
+        priority: 'MEDIA',
+        status: 'ENTREGADO',
+        presentationId: null,
+        finishedAt: new Date('2026-09-23T10:00:00.000Z'),
+      },
+    ])
+    count.mockResolvedValue(1)
+
+    const pagina = await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
+
+    expect(pagina.items[0]?.finishedAt).toEqual(new Date('2026-09-23T10:00:00.000Z'))
   })
 })
