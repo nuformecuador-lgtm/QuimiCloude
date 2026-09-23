@@ -221,7 +221,7 @@ Archivos: `lib/modules/pedidos/ports/{order-unit-of-work,order-write-repository}
 verde con los métodos nuevos, y un test de integración demuestra que un fallo forzado después de
 apartar deja sin escribir el pedido y la reserva (`R15`).
 
-## T9 — Crear, editar, cancelar y borrar con reserva `[depende de T8]`
+## [x] T9 — Crear, editar, cancelar y borrar con reserva `[depende de T8]`
 
 Archivos: `lib/modules/pedidos/domain/{create-order,update-order,cancel-order,delete-order}.ts`,
 `lib/composition/index.ts`.

@@ -48,12 +48,15 @@ const repoRoot = findRepoRoot(dirname(fileURLToPath(import.meta.url)))
 
 /**
  * Localiza la carpeta de la migracion por SUFIJO, no por el timestamp escrito a mano: si algun
- * dia se renombra, el test tiene que caer por lo que vigila, no por la ruta.
+ * dia se renombra, el test tiene que caer por lo que vigila, no por la ruta. Ancla el sufijo
+ * justo despues de los 14 digitos del timestamp (no un `endsWith` suelto): `_orders` no debe
+ * confundirse con `_reserve_existing_orders`, que tambien termina en `_orders`.
  */
 function findMigrationDir(suffix: string): string {
   const migrationsRoot = join(repoRoot, 'db', 'migrations')
+  const pattern = new RegExp(`^\\d{14}${suffix}$`)
   const candidates = readdirSync(migrationsRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name.endsWith(suffix))
+    .filter((entry) => entry.isDirectory() && pattern.test(entry.name))
     .map((entry) => entry.name)
     .sort()
   if (candidates.length !== 1) {
