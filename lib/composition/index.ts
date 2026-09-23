@@ -151,7 +151,9 @@ import {
   createDeleteSupplier,
   createGetSupplier,
   createListCatalogLines,
+  createListShowcaseLines,
   createListSuppliers,
+  createListSupplierShowcase,
   createUpdateCatalogLine,
   createUpdateSupplier,
 } from '@/lib/modules/proveedores';
@@ -159,6 +161,7 @@ import {
   createSupplier,
   findAliveSupplierById,
   listAliveSuppliers,
+  listShowcaseAliveSuppliers,
   softDeleteAliveSupplier,
   updateAliveSupplier,
 } from '@/lib/modules/proveedores/adapters/driven/persistence/supplier-prisma';
@@ -834,6 +837,7 @@ const supplierRepository: SupplierRepository = {
   updateAlive: updateAliveSupplier,
   softDeleteAlive: softDeleteAliveSupplier,
   listAlive: listAliveSuppliers,
+  listShowcaseAlive: listShowcaseAliveSuppliers,
 };
 
 const supplierCatalogRepository: SupplierCatalogRepository = {
@@ -878,6 +882,10 @@ export const proveedores = {
     catalog: supplierCatalogRepository,
     log: proveedoresListQueryLog,
   }),
+  // T4 (`design.md > 2.3`, `> 3`) — la vista de catalogo visual. Claves nuevas al final:
+  // ninguna de las de arriba se toca.
+  listSupplierShowcase: createListSupplierShowcase({ suppliers: supplierRepository }),
+  listShowcaseLines: createListShowcaseLines({ catalog: supplierCatalogRepository }),
 };
 
 // ---------------------------------------------------------------------------------------
