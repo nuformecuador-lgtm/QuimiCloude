@@ -32,6 +32,13 @@ se reevalua al acotar. `depends_on` vacio. **Cupo `fullstack`: 2 de 3** (QC-121 
 contenido es obligatorio, que pasa con las presentaciones existentes, y si una sin contenido sigue valida- y una
 medicion pendiente -cuantos productos caen en el caso sin base comun-; no hay `requirements.md`, asi que se ofrece
 `/afinar-feature`.
+**CANCELADA el mismo dia en `/afinar-feature`, por decision humana.** Su premisa ya no existe: con QC-121 (trigger
+`product_batches_check_unit`) y QC-147 (la linea usa la unidad del producto), `order-cost.ts` siempre convierte entre la
+misma unidad, asi que la rama «sin base comun» no puede darse. Contar en envases (lo que le paso QC-146) queda sin
+ficha a proposito. Board: *Cancelado* con comentario; sin `requirements.md`. Rama borrada; la carpeta
+`.worktrees/QC-130-...` no se pudo borrar (archivo en uso en Windows) y queda para borrar a mano. Sin `depends_on` ni
+links que la apunten. **Arrastre de texto**: QC-138 y QC-139 citan «dato incompleto (QC-130)» para el caso gramos
+contra bidones, que hoy ya no ocurre; lo corrige su propia acotacion, no se toca aqui.
 
 ### QC-145 - ACOTADA con `/afinar-feature` (2026-09-22) y DESBLOQUEADA (2026-09-23)
 
