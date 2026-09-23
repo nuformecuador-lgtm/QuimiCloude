@@ -240,6 +240,10 @@ export const MIGRACIONES_ESPERADAS = [
   '20260922120000_packer_role',
   // Igual patron: la columna de presentacion del pedido no toca el identificador de peticion.
   '20260922130000_orders_presentation',
+  // Con el mismo patron que las anteriores: la migracion que agrega el enum `ProductType` y la
+  // columna `type` a `products` no persiste el identificador de peticion ni lo menciona; se
+  // nombra aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260922150000_product_type_enum',
 ] as const
 
 export function hallazgosDeMigraciones(

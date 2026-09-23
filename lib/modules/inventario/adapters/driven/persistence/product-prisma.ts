@@ -173,7 +173,9 @@ function productFilterWhere(
       const condition = selectCondition(value.values);
       if (condition === null) return null;
       if (field === 'type') {
-        const validValues = value.values.filter((v) => PRODUCT_TYPE_VALUES.includes(v as ProductType));
+        const validValues = value.values.filter(
+          (v): v is ProductType => PRODUCT_TYPE_VALUES.includes(v as ProductType),
+        );
         if (validValues.length === 0) return null;
         return { type: { in: validValues } };
       }
