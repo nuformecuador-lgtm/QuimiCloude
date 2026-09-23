@@ -32,15 +32,37 @@ import {
   listAliveOrderSummariesByIds,
   listAliveSummariesInCompany,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
+import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
+import { assertTransition } from '@/lib/modules/pedidos/domain/order-transitions';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
+import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
 
 import { NOW, actorOf, createOrder, createPerson, inRolledBackTransaction } from './use-case-fixture';
 
 const PERMISOS_DEL_EMPACADOR = SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR];
 if (PERMISOS_DEL_EMPACADOR === undefined) {
   throw new Error('SEED_ROLE_PERMISSIONS no declara al Empacador: este archivo no puede construir su actor');
+}
+
+/**
+ * `OrderCatalog['transitionAliveById']` real, tras retirar `transitionAliveOrder` (Tm2, QC-141):
+ * `assertTransition` seguida del mismo `UPDATE` condicional, `setStatus` de
+ * `createOrderWriteRepository()` sobre el cliente global -aqui, el proxy de la transaccion del
+ * test-. Igual que la funcion retirada, NO consume material: `finishAssignedOrder` de este
+ * archivo solo ejercita el cambio de estado y `finished_at`, nunca la reserva.
+ */
+async function transitionAliveByIdReal(
+  id: string,
+  companyId: string,
+  from: OrderStatus,
+  to: OrderStatus,
+  actorId: string,
+  now: Date,
+): Promise<'ok' | 'not_found' | 'stale'> {
+  assertTransition(from, to);
+  return createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
 }
 
 /** Cablea el caso de uso REAL sobre la `tx` del fixture, con los mismos adaptadores que
@@ -50,11 +72,7 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
     findAliveById: findAliveOrderTargetById,
     listAliveSummariesByIds: listAliveOrderSummariesByIds,
     listAliveSummariesInCompany,
-    // Tm2 (QC-141): `transitionAliveOrder` se retiro sin llamantes. Este archivo prueba
-    // `listFinishedOrders`, que nunca transiciona un pedido.
-    transitionAliveById: async () => {
-      throw new Error('listFinishedOrders no ejecuta ninguna transicion');
-    },
+    transitionAliveById: transitionAliveByIdReal,
   };
   const assignments = createOrderAssignmentRepository(tx);
 
