@@ -146,7 +146,7 @@ esos archivos se ponen rojos por la export que falta; `design.md > 10`).
 `order-row-wiring.test.tsx`, `order-sheet-responsibles.test.tsx` y
 `guard-pantalla-pedidos-se-amplia.test.ts` verdes. `./init.sh --rapido` verde.
 
-## [ ] T7 — Integración contra Postgres `[depende de T2]` `[P con T4-T6]`
+## [x] T7 — Integración contra Postgres `[depende de T2]` `[P con T4-T6]`
 
 Archivos: `tests/integration/pedidos/order-cost-quote.int.test.ts` (nuevo).
 
