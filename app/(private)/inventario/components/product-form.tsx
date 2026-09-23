@@ -15,7 +15,8 @@ import {
 import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import {
   createProductSchema,
-  createProductWithFirstBatchSchema,
+  updateProductSchema,
+  PRODUCT_TYPES,
   type ProductView,
   type ProductType,
 } from '@/lib/modules/inventario';
@@ -57,8 +58,9 @@ const PRODUCT_SELECT_FIELDS = ['type'] as const;
  * Solo existen en el ALTA: la edicion no pinta ninguno, no los envia y valida con un esquema que
  * ni los conoce.
  *
- * `purchaseDate` siempre viaja con un valor -nunca vacia, "hoy" por defecto-, a diferencia de los
- * demas; aun asi es campo del lote y solo existe en el alta.
+ * `purchaseDate` siempre viaja con un valor -nunca vacia, "hoy" por defecto- y SOLO vive en el
+ * lote (`product_batches`): los tres tipos, incluido Instrumento, crean lote. Solo existe en el
+ * ALTA: la edicion no lo pinta ni lo envia.
  */
 const BATCH_FIELDS = [
   'stock',
@@ -124,8 +126,9 @@ const FIELD_LABELS: Record<ProductFieldName, string> = {
 
 /** Determina si un campo debe mostrarse segun el tipo de producto seleccionado. */
 function shouldShowField(field: ProductFieldName, productType: ProductType | undefined): boolean {
-  // Para Instrumento (MACHINE), ocultar campos especificos
-  if (productType === 'MACHINE') {
+  // Instrumento (MACHINE): solo existencia y fecha de compra entre los campos del lote;
+  // sin presentacion, costos, lote, caducidad ni alerta (2026-09-23).
+  if (productType === PRODUCT_TYPES.MACHINE) {
     const hiddenForMachine: ProductFieldName[] = [
       'qtyAlert',
       'presentationId',
@@ -137,7 +140,7 @@ function shouldShowField(field: ProductFieldName, productType: ProductType | und
     return !hiddenForMachine.includes(field);
   }
   // Para Envase (PACKAGING), no tiene fecha de vencimiento
-  if (productType === 'PACKAGING') {
+  if (productType === PRODUCT_TYPES.PACKAGING) {
     const hiddenForPackaging: ProductFieldName[] = ['expiryDate'];
     return !hiddenForPackaging.includes(field);
   }
@@ -279,13 +282,13 @@ type ProductFormProps = {
  * fuente que los busque no encuentre un falso positivo.)
  *
  * **La validacion previa usa el MISMO esquema que valida el servidor**, importado del contrato
- * publico de `inventario`, que es client-safe: `createProductWithFirstBatchSchema` en el ALTA
- * -producto + primer lote, QC-90 R25- y `createProductSchema` en la EDICION, que no conoce el
- * lote (R26). Asi los mensajes por campo salen de la misma regla, sin reescribir ninguna, y un
- * rechazo cae en el MISMO campo en los dos lados: es lo que hace que R8 -«solo costo total con
- * existencia 0»- se pinte en el campo de la EXISTENCIA sin una linea de reparto propia, porque el
- * esquema cuelga ese issue de `['stock']`. El servidor revalida igual; el cliente nunca es la
- * frontera.
+ * publico de `inventario`, que es client-safe: `createProductSchema` en el ALTA
+ * -union discriminada por tipo, QC-90 R25 y el tipo de producto- y `updateProductSchema` en la
+ * EDICION, que no conoce el lote (R26). Asi los mensajes por campo salen de la misma regla, sin
+ * reescribir ninguna, y un rechazo cae en el MISMO campo en los dos lados: es lo que hace que R8
+ * -«solo costo total con existencia 0»- se pinte en el campo de la EXISTENCIA sin una linea de
+ * reparto propia, porque el esquema cuelga ese issue de `['stock']`. El servidor revalida igual;
+ * el cliente nunca es la frontera.
  *
  * **R19 — la edicion es reemplazo completo**: el formulario precarga todos los valores actuales y
  * envia todos los campos, porque `updateProductSchema` es el mismo esquema del alta. No hay envio
@@ -301,8 +304,8 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
 
-  /** Tipo de producto seleccionado (por defecto PRODUCT). Se usa para mostrar/ocultar campos. */
-  const [productType, setProductType] = useState<ProductType>('PRODUCT');
+  /** Tipo de producto seleccionado. Parte del tipo del producto que se edita (o PRODUCT en alta). */
+  const [productType, setProductType] = useState<ProductType>(product?.type ?? PRODUCT_TYPES.PRODUCT);
 
   /**
    * Autocompletado al elegir un producto existente (decision humana del 2026-09-09, ampliada el
@@ -327,7 +330,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
       qtyAlert: option.qtyAlert === null ? '' : String(option.qtyAlert),
       presentationId: option.presentationId ?? '',
       presentationName: option.presentationName ?? '',
-      type: option.type ?? 'PRODUCT',
+      type: option.type ?? PRODUCT_TYPES.PRODUCT,
     });
   }
 
@@ -348,6 +351,9 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
     const isCreate = product === undefined;
     const unitCost = readOptionalText(values.unitCost);
     const totalCost = readOptionalText(values.totalCost);
+    const type = (values.type || PRODUCT_TYPES.PRODUCT) as ProductType;
+    const isMachine = type === PRODUCT_TYPES.MACHINE;
+    const isPackaging = type === PRODUCT_TYPES.PACKAGING;
 
     /*
       EXACTAMENTE las claves del esquema, ni una mas (R24): los dos esquemas son `strictObject`,
@@ -358,22 +364,37 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
 
       Dos constructores y no uno con campos condicionales, porque son dos contratos distintos:
       el alta valida producto + primer lote (R25) y la edicion NO conoce el lote (R26).
+      Ambos son uniones discriminadas por `type`: en el ALTA los tres tipos llevan lote -MACHINE
+      sin qtyAlert, PACKAGING sin expiryDate-; en la EDICION MACHINE no lleva qtyAlert.
     */
     const parsed = isCreate
-      ? createProductWithFirstBatchSchema.safeParse({
-          name: values.name,
-          ...numbers,
-          presentationId: values.presentationId,
-          unitCost,
-          totalCost,
-          lot: readOptionalText(values.lot),
-          expiryDate: readOptionalText(values.expiryDate),
-          purchaseDate: readOptionalText(values.purchaseDate),
-        })
-      : createProductSchema.safeParse({
-          name: values.name,
-          ...numbers,
-        });
+      ? createProductSchema.safeParse(
+          isMachine
+            ? {
+                name: values.name,
+                type: PRODUCT_TYPES.MACHINE,
+                stock: numbers.stock,
+                purchaseDate: readOptionalText(values.purchaseDate),
+              }
+            : {
+                name: values.name,
+                type,
+                qtyAlert: numbers.qtyAlert,
+                stock: numbers.stock,
+                presentationId: values.presentationId,
+                unitCost,
+                totalCost,
+                lot: readOptionalText(values.lot),
+                // PACKAGING no acepta expiryDate; PRODUCT si.
+                ...(isPackaging ? {} : { expiryDate: readOptionalText(values.expiryDate) }),
+                purchaseDate: readOptionalText(values.purchaseDate),
+              },
+        )
+      : updateProductSchema.safeParse(
+          isMachine
+            ? { name: values.name, type: PRODUCT_TYPES.MACHINE }
+            : { name: values.name, type, ...numbers },
+        );
 
     if (!parsed.success) {
       const faltanLosDosCostos = isCreate && unitCost === undefined && totalCost === undefined;
@@ -535,19 +556,20 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
 
       {/*
         Tipo de producto (select). Determina que campos se muestran en el formulario.
-        Por defecto: Producto. Instrumento oculta: alerta, presentacion, costos, lote, expiracion.
-        Envase oculta: fecha de expiracion.
+        Por defecto: Producto. Instrumento oculta: alerta, presentacion, costos, lote y
+        caducidad -solo quedan existencia y fecha de compra-. Envase oculta: fecha de
+        expiracion.
       */}
       <SharedSelect
         name="type"
         label={FIELD_LABELS.type}
         required
-        defaultValue={initialValue('type', template?.type ?? product?.type ?? 'PRODUCT')}
+        defaultValue={initialValue('type', template?.type ?? product?.type ?? PRODUCT_TYPES.PRODUCT)}
         error={fieldErrors.type}
         options={[
-          { value: 'PRODUCT', label: 'Producto' },
-          { value: 'MACHINE', label: 'Instrumento' },
-          { value: 'PACKAGING', label: 'Envase' },
+          { value: PRODUCT_TYPES.PRODUCT, label: 'Producto' },
+          { value: PRODUCT_TYPES.MACHINE, label: 'Instrumento' },
+          { value: PRODUCT_TYPES.PACKAGING, label: 'Envase' },
         ]}
         onChange={(value) => setProductType(value as ProductType)}
       />
@@ -576,7 +598,7 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
         />
       )}
 
-      {isEdit ? null : (
+      {isEdit ? null : shouldShowField('stock', productType) && (
         <ProductField
           name="stock"
           label={FIELD_LABELS.stock}
@@ -655,12 +677,14 @@ export function ProductForm({ product, units, onSaved }: ProductFormProps) {
           {/*
             El componente ya cae en "hoy" si no recibe valor, pero aqui SIEMPRE se le pasa uno -el
             de un intento fallido, o el de hoy- para que la recuperacion tras un rechazo y el valor
-            por defecto compartan la misma via.
+            por defecto compartan la misma via. En los tres tipos es un campo del lote.
           */}
-          <ProductBatchDateField
-            initialValue={initialValue('purchaseDate', formatDateLocalISO(new Date()))}
-            error={fieldErrors.purchaseDate}
-          />
+          {shouldShowField('purchaseDate', productType) && (
+            <ProductBatchDateField
+              initialValue={initialValue('purchaseDate', formatDateLocalISO(new Date()))}
+              error={fieldErrors.purchaseDate}
+            />
+          )}
         </>
       )}
 

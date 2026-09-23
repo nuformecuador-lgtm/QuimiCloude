@@ -35,6 +35,7 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-prisma';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 
 const AMBITO: InventoryScope = { companyId: '11111111-1111-4111-8111-111111111111' };
 const OTRO_AMBITO: InventoryScope = { companyId: '22222222-2222-4222-8222-222222222222' };
@@ -160,7 +161,7 @@ describe('QC-49 R19 — la empresa entra en la consulta y no sale hacia el naveg
       qtyAlert: 2,
       stock: 0,
       unitId: null,
-      type: 'PRODUCT',
+      type: PRODUCT_TYPES.PRODUCT,
       createdAt: new Date('2026-09-11T10:00:00.000Z'),
       updatedAt: new Date('2026-09-11T10:00:00.000Z'),
       companyId: AMBITO.companyId,
