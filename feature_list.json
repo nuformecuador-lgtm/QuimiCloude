@@ -2290,7 +2290,7 @@
       "epic_name": "Pedidos",
       "name": "cotizacion-del-coste-en-el-pedido",
       "description": "Mientras se crea un pedido, el formulario muestra EN VIVO una cotizacion del coste de produccion (el importe de QC-123: coste de ingredientes para la cantidad pedida). Se GUARDA con el pedido y se ve en la vista de edicion.\n\nNACE EL 2026-09-23 al acotar QC-122, por decision humana: el importe no va en el listado de pedidos.\n\nYa decidido: no va en el listado; en edicion se ve el guardado y se recotiza al cambiar receta o cantidad (se guarda al guardar); formato $ 1,234,567.50 con el valor exacto en el title (QC-132), sin Intl ni coma flotante; sin importe, un guion (QC-123).\n\nFullstack: hoy el importe solo se calcula en el servidor al guardar; cotizar antes exige una consulta nueva de solo lectura, con su permiso.\n\nACOTADA el 2026-09-23 con /afinar-feature: se recalcula al guardar (la cotizacion es orientativa); recotiza al dejar de escribir (~500 ms) y al cambiar receta; mientras cotiza, cifra anterior atenuada con «cotizando…»; permiso pedidos.modificar, sin permiso nuevo; E2E si. Detalle en specs/QC-151-cotizacion-del-coste-en-el-pedido/requirements.md.\n\nNO ENTRA: el calculo del coste (QC-123) y la busqueda de pedidos (QC-122).",
-      "status": "pending",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "medium",
       "zone": "fullstack",
