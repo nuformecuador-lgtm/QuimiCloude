@@ -257,6 +257,11 @@ export const MIGRACIONES_ESPERADAS = [
   // + `unit_id` por `percentage` no persiste el identificador de peticion ni lo menciona; se
   // nombra aqui a mano y la lista sigue CERRADA para la siguiente.
   '20260922160000_recipe_lines_percentage',
+  // Con el mismo patron que las anteriores: la migracion que agrega la columna `finished_at`
+  // a `orders`, con su CHECK que la exige solo en ENTREGADO y su indice parcial para el
+  // listado de terminados, no persiste el identificador de peticion ni lo menciona; se nombra
+  // aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260923120000_orders_finished_at',
 ] as const
 
 export function hallazgosDeMigraciones(
