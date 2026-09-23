@@ -2380,6 +2380,38 @@
         "QC-142"
       ],
       "spec_path": "specs/QC-157-prompt-de-formula-en-vercel"
+    },
+    {
+      "epic": "QC-105",
+      "epic_name": "Documentos e IA",
+      "status": "pending",
+      "sdd": true,
+      "branch": "feature/QC-158-catalogo-desde-pdf",
+      "spec_path": "specs/QC-158-catalogo-desde-pdf",
+      "key": "QC-158",
+      "id": 158,
+      "name": "catalogo-desde-pdf",
+      "zone": "fullstack",
+      "complexity": "high",
+      "depends_on": [],
+      "description": "Lo que la IA lee de un PDF de catalogo (subido en /proveedores/[id], procesado por imagen) se convierte en LINEAS DEL CATALOGO del proveedor tras una REVISION HUMANA. NACE Y SE ACOTA el 2026-09-23. Decidido: revision antes de guardar; producto existente (nombre+presentacion) -> se actualizan SOLO sus precios (sale como cambia); presentacion que no existe -> se crea; cada linea con su imagen recortada (QC-110); campos nuevos material (texto) y measurements (JSON: diametro, alto, boca), opcionales; permiso proveedores.modificar hasta QC-142; E2E si con IA simulada. Enmienda R10 de QC-129 (afecta al borrador de QC-131). Abiertas: unidad de la presentacion nueva, unidad de cada medida, emparejar imagen y linea, contrato JSON. Decisiones en specs/QC-158-catalogo-desde-pdf/requirements.md. NO ENTRA: formulas (QC-159)."
+    },
+    {
+      "epic": "QC-105",
+      "epic_name": "Documentos e IA",
+      "status": "pending",
+      "sdd": true,
+      "branch": "feature/QC-159-formula-desde-pdf",
+      "spec_path": "specs/QC-159-formula-desde-pdf",
+      "key": "QC-159",
+      "id": 159,
+      "name": "formula-desde-pdf",
+      "zone": "fullstack",
+      "complexity": null,
+      "depends_on": [
+        "QC-142"
+      ],
+      "description": "Lo que la IA lee de un PDF de formula (procesado por TEXTO) se convierte en una RECETA (nombre, ingredientes en porcentaje, pasos) tras una revision humana. NACE el 2026-09-23 al acotar la lectura de PDF con IA junto con QC-158. Ya decidido: revision antes de guardar; ingredientes en porcentaje (QC-147, QC-157). Se acota con /afinar-feature (ingrediente que no existe como producto, receta que ya existe, pasos). BLOQUEADA POR QC-142."
     }
   ]
 }

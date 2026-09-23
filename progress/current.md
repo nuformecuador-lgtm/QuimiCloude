@@ -18,6 +18,10 @@
 
 ## Evaluaciones
 
+### QC-158 / QC-159 - lectura de PDF con IA a datos, del chat (2026-09-23)
+
+**QC-158** `catalogo-desde-pdf` (fullstack, high) ACOTADA y sembrada: 9 decisiones y 4 preguntas abiertas en `specs/QC-158-catalogo-desde-pdf/requirements.md`; enmienda R10 de QC-129 (avisado en QC-131). **QC-159** `formula-desde-pdf` (fullstack) nace sin sembrar, bloqueada por QC-142.
+
 ### QC-131 - F1.0 (2026-09-23)
 
 `backend`, **`complexity: low`** (label en Jira). Deps QC-107 y QC-111 `done`. **Ficha HUMANA**: ningun agente redacta el texto definitivo, lo pone en Vercel ni firma. Decisiones del humano el 2026-09-23: (1) el arnes le prepara BORRADORES de los dos prompts y una guia paso a paso, en el `design.md` del spec (sin diff de codigo); el texto final lo decide y lo pone el; (2) **cierra la pregunta abierta 1 de QC-129**: el humano pone las dos variables TAMBIEN en Preview, con el mismo texto que en produccion. Worktree montado. **F1.2/F1.3 hechos**: recortada a SOLO CATALOGO (formula -> QC-157, bloqueada por QC-142); borradores en `borradores-de-prompts/` (gitignorada); spec en la rama (`16d4d35d`), tarjeta en *En revision*. **PARADA EN F1.4.**
