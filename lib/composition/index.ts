@@ -185,6 +185,7 @@ import {
   createCancelOrder,
   createCreateOrder,
   createDeleteOrder,
+  createExpireStaleOrders,
   createFindCoverage,
   createGetOrder,
   createListOrders,
@@ -194,10 +195,12 @@ import {
 import {
   createOrderWriteRepository,
   findAliveOrderById,
+  findExpirableOrders,
   listAliveOrders,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
+import { verifyCronSecret } from '@/lib/modules/pedidos/adapters/driven/config/cron-secret-env';
 import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
@@ -302,6 +305,7 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
+import { listActiveCompanyIds } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
 import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity';
 // `documentos` — las DOS factories salen del CONTRATO del modulo (solo dominio), los dos puertos de
 // `ports/` y las dos implementaciones de `adapters/driven/` por su ruta exacta. La Server Action del
@@ -990,6 +994,18 @@ const orderUnitOfWork: OrderUnitOfWork = {
 const reservationQueries: ReservationQueries = createReservationQueries();
 
 /**
+ * El proceso diario (T12, `design.md > 9`): recorre las empresas de `identity` una por una y,
+ * para cada una, sus candidatos con el `findExpirableOrders` de `pedidos` -ninguna consulta lee
+ * pedidos de mas de una empresa a la vez-.
+ */
+const expireStaleOrders = createExpireStaleOrders({
+  listCompanyIds: listActiveCompanyIds,
+  findExpirable: findExpirableOrders,
+  unitOfWork: orderUnitOfWork,
+  now: () => new Date(),
+});
+
+/**
  * Fachada del modulo `pedidos` ya cableada (T14, `design.md > 9`). Es lo que consumen las
  * Server Actions de T15.
  *
@@ -1039,6 +1055,11 @@ export const pedidos = {
   cancelOrder: createCancelOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
   deleteOrder: createDeleteOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
   findCoverage: createFindCoverage({ reservations: reservationQueries }),
+  // El proceso diario y su puerta: sin usuario delante, asi que ninguno de los dos recibe actor.
+  // El handler los llama en ese orden -primero la puerta- y `lib/composition` no impone el
+  // orden por su cuenta.
+  verifyCronSecret,
+  expireStaleOrders,
 } as const;
 
 // ---------------------------------------------------------------------------------------
