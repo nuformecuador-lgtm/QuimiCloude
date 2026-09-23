@@ -93,7 +93,7 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
             className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
             data-testid={`${ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID}-${index}`}
           >
-            <SelectValue />
+            <SelectValue data-testid={`${ORDER_EXECUTION_LINE_UNIT_TESTID}-${index}`} />
           </SelectTrigger>
           <SelectContent>
             {availableUnits.map((unit) => (

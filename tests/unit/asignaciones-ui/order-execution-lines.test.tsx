@@ -11,6 +11,7 @@ import {
   ORDER_EXECUTION_LINE_QUANTITY_TESTID,
   ORDER_EXECUTION_LINE_UNIT_OPTION_TESTID,
   ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID,
+  ORDER_EXECUTION_LINE_UNIT_TESTID,
   ORDER_EXECUTION_LINES_TESTID,
   OrderExecutionLines,
   PRODUCT_NAME_FALLBACK,
@@ -112,6 +113,19 @@ describe('linea de ejecucion — el selector de unidad convierte la cantidad, no
 
     const opciones = await screen.findAllByTestId(ORDER_EXECUTION_LINE_UNIT_OPTION_TESTID);
     expect(opciones.map((opcion) => opcion.textContent)).toEqual(['L', 'ml']);
+  });
+
+  it('con unidades hermanas, el testid de unidad esta en el selector y sigue el valor elegido', async () => {
+    const user = setupUser();
+    render(<OrderExecutionLines lines={[linea()]} />);
+
+    expect(screen.getByTestId(`${ORDER_EXECUTION_LINE_UNIT_TESTID}-0`)).toHaveTextContent('L');
+
+    await user.click(screen.getByTestId(`${ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID}-0`));
+    const [, mililitro] = await screen.findAllByTestId(ORDER_EXECUTION_LINE_UNIT_OPTION_TESTID);
+    await user.click(await esperarInteractiva(mililitro));
+
+    expect(screen.getByTestId(`${ORDER_EXECUTION_LINE_UNIT_TESTID}-0`)).toHaveTextContent('ml');
   });
 
   it('elegir mL muestra 20000 y el "10,00 %" no cambia', async () => {
