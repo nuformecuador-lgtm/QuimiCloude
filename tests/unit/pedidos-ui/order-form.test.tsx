@@ -141,6 +141,9 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   deleteOrderAction: vi.fn(prohibida('deleteOrderAction')),
   listOrdersAction: vi.fn(prohibida('listOrdersAction')),
   getOrderAction: vi.fn(prohibida('getOrderAction')),
+  quoteOrderCostAction: vi.fn(() =>
+    Promise.resolve({ status: 'success', data: { ingredientsCost: null } }),
+  ),
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
