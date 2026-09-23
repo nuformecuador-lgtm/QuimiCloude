@@ -713,15 +713,20 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // las actions estan en UN solo archivo dentro de `adapters/driving/`, ningun otro archivo
     // del modulo declara `'use server'`, no hay ninguna ruta HTTP ni pantalla de pedidos, y
     // `app/`/`components/` siguen sin conocer el modulo -la pantalla es QC-35 (R57)-.
+    //
+    // El proceso diario (QC-141 T12) suma un SEGUNDO archivo driving: un Route Handler, no una
+    // Server Action -no hay usuario delante, la puerta es un secreto, no una sesion-, por eso
+    // no declara `'use server'` y el `.toEqual` de mas abajo lo sigue dejando fuera.
     const ACTIONS = 'lib/modules/pedidos/adapters/driving/order-actions.ts'
+    const CRON_ROUTE = 'lib/modules/pedidos/adapters/driving/order-expiry-cron-route.ts'
     const driving = join(pedidosDir, 'adapters', 'driving')
-    expect(sourcesIn(driving).map(etiqueta)).toEqual([ACTIONS])
+    expect(sourcesIn(driving).map(etiqueta).sort()).toEqual([ACTIONS, CRON_ROUTE].sort())
     expect(readdirSync(driving), 'driving/ conserva un .gitkeep con codigo dentro').not.toContain(
       '.gitkeep',
     )
 
     // El `'use server'` esta en ese archivo y SOLO en ese: ni el dominio, ni los puertos, ni el
-    // adaptador driven pueden declararlo.
+    // adaptador driven, ni el Route Handler del cron pueden declararlo.
     expect(
       pedidosSources.filter((file) => /['"]use server['"]/.test(read(file))).map(etiqueta),
     ).toEqual([ACTIONS])
@@ -763,6 +768,11 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // por goteo de la pantalla de `pedidos`. Se excluye por PREFIJO DE CARPETA, no por archivo.
     const carpetaAsignacion = join(repoRoot, 'app', '(private)', 'asignacion')
 
+    // El Route Handler del proceso diario consume el driving de `pedidos` por su ruta exacta,
+    // no la pantalla: exclusion NOMBRADA, por ARCHIVO y no por carpeta -no hay ninguna otra
+    // pieza de pedidos ahi que deba colarse igual-.
+    const rutaCronCaducidad = join(repoRoot, 'app', 'api', 'cron', 'caducar-pedidos', 'route.ts')
+
     let consumidoresDeLaPantalla = 0
     for (const file of [
       ...sourcesIn(join(repoRoot, 'app')),
@@ -774,7 +784,8 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       )
       if (especificadores.length === 0) continue
 
-      const dentroDeOtraPantallaAutorizada = !relative(carpetaAsignacion, file).startsWith(`..${sep}`)
+      const dentroDeOtraPantallaAutorizada =
+        !relative(carpetaAsignacion, file).startsWith(`..${sep}`) || file === rutaCronCaducidad
       if (dentroDeOtraPantallaAutorizada) continue
 
       const dentroDeLaPantalla = !relative(carpetaDeLaPantalla, file).startsWith(`..${sep}`)

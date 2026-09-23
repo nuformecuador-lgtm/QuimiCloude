@@ -374,9 +374,13 @@ export function rutasDeRouteHandler(archivos: readonly string[]): string[] {
   return archivos.filter((archivo) => archivo.replace(/\\/g, '/').endsWith('/route.ts')).sort();
 }
 
-describe('QC-111 R17 y R19 — la caducidad no trae cron ni un segundo Route Handler', () => {
-  it('R17/R19: app/api/ contiene exactamente un route.ts en todo el arbol', () => {
-    const archivos = listarArchivos(join(repoRoot, 'app/api'));
+describe('QC-111 R17 y R19 — la caducidad no trae cron ni un segundo Route Handler DE DOCUMENTOS', () => {
+  it('R17/R19: app/api/documentos contiene exactamente un route.ts en todo el arbol', () => {
+    // Acotado a `app/api/documentos`, no a `app/api/` entero: QC-141 trae el primer cron del
+    // sistema para la caducidad de PEDIDOS (`app/api/cron/caducar-pedidos/route.ts`), un modulo
+    // distinto con su propia decision. Lo que R19 sigue prohibiendo es que `documentos` reciba
+    // UN SEGUNDO Route Handler con su propio calendario.
+    const archivos = listarArchivos(join(repoRoot, 'app/api/documentos'));
     const routeHandlers = rutasDeRouteHandler(archivos);
     expect(
       routeHandlers,
@@ -397,17 +401,26 @@ describe('QC-111 R17 y R19 — la caducidad no trae cron ni un segundo Route Han
     ).toEqual(['/repo/app/api/documentos/trabajos/route.ts', '/repo/app/api/webhooks/storage/route.ts']);
   });
 
-  it('R19: no hay ningun vercel.json en la raiz con crons declarados', () => {
+  it('R19: ningun cron de vercel.json apunta a una ruta de documentos', () => {
+    // QC-141 trae `vercel.json` con el primer cron del sistema, para PEDIDOS. Lo que R19 sigue
+    // prohibiendo es que `documentos` monte un calendario propio: ninguna entrada de `crons`
+    // puede apuntar a una ruta de `documentos`.
     let manifiesto: string | null = null;
     try {
       manifiesto = enDisco('vercel.json');
     } catch {
       manifiesto = null;
     }
+    if (manifiesto === null) return;
+
+    const config = JSON.parse(manifiesto) as { crons?: readonly { path?: string }[] };
+    const cronsDeDocumentos = (config.crons ?? []).filter((cron) =>
+      (cron.path ?? '').includes('documentos'),
+    );
     expect(
-      manifiesto,
-      'R19: la caducidad no monta ningun calendario; un vercel.json con crons seria exactamente eso.',
-    ).toBeNull();
+      cronsDeDocumentos,
+      'R19: la caducidad no monta ningun calendario; un cron que apunte a documentos seria exactamente eso.',
+    ).toEqual([]);
   });
 
   it('R19: ningun archivo nuevo del modulo documentos declara un calendario', () => {
