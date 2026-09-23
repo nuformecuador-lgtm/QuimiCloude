@@ -307,7 +307,14 @@ function porComasDeNivelCero(texto: string): readonly string[] {
  * (`{ findAliveById: findAliveOrderTargetById }`) y el troceo por lineas de la guardia de
  * inventario no veria nada.
  */
-function cableadoDe(constante: string, interfaz: string): ReadonlyMap<string, string> {
+type Cableado = {
+  readonly cableado: ReadonlyMap<string, string>
+  /** El lado derecho tal cual, por metodo: lo que necesita `METODOS_DELEGADOS_EN_DOMINIO` para
+   *  comprobar la llamada entera y no solo el nombre de la fabrica. */
+  readonly crudo: ReadonlyMap<string, string>
+}
+
+function cableadoDe(constante: string, interfaz: string): Cableado {
   const ruta = join(repoRoot, 'lib', 'composition', 'index.ts')
   const source = vaciarCadenas(sinComentarios(readFileSync(ruta, 'utf8')))
   const inicio = source.indexOf(`const ${constante}: ${interfaz} = {`)
@@ -316,23 +323,37 @@ function cableadoDe(constante: string, interfaz: string): ReadonlyMap<string, st
   const cuerpo = source.slice(abre + 1, cierreEquilibrado(source, abre, '{', '}'))
 
   const cableado = new Map<string, string>()
+  const crudo = new Map<string, string>()
   for (const entrada of porComasDeNivelCero(cuerpo)) {
     const conNombre = /^(\w+)\s*:\s*(\w+)$/.exec(entrada)
     if (conNombre !== null) {
       cableado.set(conNombre[1] ?? '', conNombre[2] ?? '')
+      crudo.set(conNombre[1] ?? '', (conNombre[2] ?? '').trim())
       continue
     }
     const abreviado = /^(\w+)$/.exec(entrada)
     if (abreviado !== null) {
       cableado.set(abreviado[1] ?? '', abreviado[1] ?? '')
+      crudo.set(abreviado[1] ?? '', (abreviado[1] ?? '').trim())
       continue
     }
-    // Una entrada que no es `metodo: funcion` ni `metodo` -una lambda en linea, un `bind`, un
-    // spread- no se puede seguir hasta una funcion del adaptador. Se registra tal cual para que el
-    // test la NOMBRE en vez de ignorarla en silencio.
+    // QC-141 T10: `metodo: fabricaDeDominio(...)` -una llamada, no una referencia suelta- es la
+    // forma de `transitionAliveById` (`METODOS_DELEGADOS_EN_DOMINIO`, mas abajo). Se registra
+    // metodo -> nombre de la fabrica para que el cableado SIGA teniendo la clave correcta; el
+    // resto de la verificacion la hace un `it` propio, no el barrido generico.
+    const conLlamada = /^(\w+)\s*:\s*(\w+)\s*\(/.exec(entrada)
+    if (conLlamada !== null) {
+      const metodo = conLlamada[1] ?? ''
+      cableado.set(metodo, conLlamada[2] ?? '')
+      crudo.set(metodo, entrada.slice(entrada.indexOf(':') + 1).trim())
+      continue
+    }
+    // Una entrada que no es `metodo: funcion`, `metodo` ni `metodo: fabrica(...)` -una lambda en
+    // linea, un `bind`, un spread- no se puede seguir hasta una funcion del adaptador. Se
+    // registra tal cual para que el test la NOMBRE en vez de ignorarla en silencio.
     cableado.set(entrada, '')
   }
-  return cableado
+  return { cableado, crudo }
 }
 
 const PUERTOS = [
@@ -353,6 +374,21 @@ const PUERTOS = [
     literal: 'companyId: string',
   },
 ] as const
+
+/**
+ * QC-141 T10 (`design.md > 5.4`): `OrderCatalog.transitionAliveById` ya no cablea una funcion
+ * cruda de `order-catalog-prisma.ts` -cablea `createTransitionOrder`, un caso de uso de
+ * `pedidos/domain` que abre `OrderUnitOfWork` y, por dentro, llama a
+ * `OrderWriteRepository.lockAliveById` y `.setStatus`, implementadas en `order-prisma.ts`. Esas
+ * dos SI declaran y consumen `scope: OrderScope`, y el barrido sin lista de excepciones de mas
+ * abajo -que recorre TODA funcion de persistencia que toque la base- ya lo exige de ellas: el
+ * ambito de este metodo no deja de vigilarse, se vigila donde la base se toca de verdad. Por eso
+ * este metodo se verifica aparte del barrido generico «cableado a una funcion con nombre del
+ * adaptador», que asume un adaptador que lee `prisma.order` directamente.
+ */
+const METODOS_DELEGADOS_EN_DOMINIO: ReadonlyMap<string, RegExp> = new Map([
+  ['transitionAliveById', /^createTransitionOrder\s*\(\s*\{\s*unitOfWork\s*:\s*orderUnitOfWork\s*,\s*recipes\s*:\s*recipeCatalog\s*\}\s*\)$/],
+])
 
 describe('QC-60 R18 — el punto unico es de verdad UNA definicion', () => {
   // Toda la guardia se apoya en que «llegar hasta una envoltura de `./company-scope`» significa
@@ -395,7 +431,7 @@ describe('QC-60 R18 — el punto unico es de verdad UNA definicion', () => {
 describe('QC-60 R18 — cada metodo de los dos puertos declara Y consume el ambito de empresa', () => {
   for (const puerto of PUERTOS) {
     const metodos = metodosDeLaInterfaz(puerto.ruta, puerto.nombre)
-    const cableado = cableadoDe(puerto.constante, puerto.nombre)
+    const { cableado, crudo } = cableadoDe(puerto.constante, puerto.nombre)
     const adaptador = analizar(puerto.adaptador)
     const forma = FORMAS_DE_AMBITO.find((f) => f.identificador === puerto.ambito)
 
@@ -405,6 +441,7 @@ describe('QC-60 R18 — cada metodo de los dos puertos declara Y consume el ambi
       expect(metodos.size, `${puerto.nombre} deberia declarar metodos`).toBeGreaterThan(0)
       expect([...cableado.keys()].sort()).toEqual([...metodos.keys()].sort())
       for (const [metodo, implementacion] of cableado) {
+        if (METODOS_DELEGADOS_EN_DOMINIO.has(metodo)) continue
         expect(
           implementacion,
           `${puerto.constante}.${metodo} no esta cableado a una funcion con nombre del adaptador: la guardia no puede seguir una lambda, un bind ni un spread`,
@@ -424,6 +461,24 @@ describe('QC-60 R18 — cada metodo de los dos puertos declara Y consume el ambi
     })
 
     for (const metodo of metodos.keys()) {
+      const delegado = METODOS_DELEGADOS_EN_DOMINIO.get(metodo)
+
+      if (delegado !== undefined) {
+        it(`${puerto.nombre}.${metodo} delega en una fabrica de dominio cuya escritura real YA vigila el barrido sin excepciones`, () => {
+          const llamada = crudo.get(metodo)
+          expect(
+            llamada !== undefined && delegado.test(llamada),
+            `${puerto.constante}.${metodo} deberia estar cableado exactamente a ${delegado.source}, y esta a: ${llamada ?? '(nada)'}`,
+          ).toBe(true)
+          // El adaptador crudo del puerto NO declara ya esta funcion: quien de verdad toca la
+          // base para este metodo es `OrderWriteRepository.lockAliveById`/`.setStatus`
+          // (`order-prisma.ts`), y esas SI estan en el barrido sin lista de excepciones de mas
+          // abajo.
+          expect(adaptador.funciones.some((f) => f.nombre === metodo)).toBe(false)
+        })
+        continue
+      }
+
       it(`${puerto.nombre}.${metodo} declara \`${puerto.literal}\` y lo lleva hasta el punto unico`, () => {
         const implementacion = cableado.get(metodo)
         expect(implementacion, `${metodo} no esta cableado en lib/composition`).toBeTruthy()

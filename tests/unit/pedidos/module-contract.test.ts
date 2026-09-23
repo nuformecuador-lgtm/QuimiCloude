@@ -619,12 +619,17 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // `NotCancellableError` (R28)- y borrar tampoco (R32). `order-catalog-prisma.ts` se sumo
     // como tercer consumidor, DECISION explicita y no descuido: es el unico adaptador con
     // permiso para escribir `status` fuera de `update-order.ts`, y su escritura tambien pasa
-    // por la misma guardia antes de tocar la fila.
+    // por la misma guardia antes de tocar la fila. `transition-order.ts` se suma con QC-141
+    // T10: es quien implementa `OrderCatalog.transitionAliveById` desde ahora -el Finalizar de
+    // la planta y una edicion que entrega comparten la MISMA comprobacion antes de abrir la
+    // unidad de trabajo-, y `order-catalog-prisma.ts` conserva su propia llamada porque su
+    // funcion sigue viva -sin llamantes en produccion, pero probada- y no se borro (T10).
     expect(
       pedidosSources.filter((file) => CONSUME_LA_GUARDIA.test(read(file))).map(etiqueta),
     ).toEqual([
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
       DUENO,
+      'lib/modules/pedidos/domain/transition-order.ts',
       'lib/modules/pedidos/domain/update-order.ts',
     ])
 
@@ -635,6 +640,11 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       // `canTransition`, un `nextStatus` o una segunda `stateMachine` siguen cayendo aqui.
       const sinConsumo = read(file)
         .replace(/from\s+'[^']*order-transitions'/g, ' ')
+        // QC-141 T10: la RUTA del archivo nuevo -`domain/transition-order.ts`, quien tambien
+        // consume la guardia- contiene la palabra "transition" delimitada por el guion, y el
+        // criterio de abajo la leeria como una segunda tabla si no se descuenta aqui igual que
+        // la ruta del dueno.
+        .replace(/from\s+'[^']*transition-order'/g, ' ')
         .replace(/\b(assertTransition|isAllowedTransition)\b/g, ' ')
       expect(sinConsumo, `${etiqueta(file)} declara una transicion de estado`).not.toMatch(PROHIBIDO)
     }
