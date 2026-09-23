@@ -28,7 +28,8 @@ import type { MovementReason } from '../../../domain/movement-reason';
 import type { Page } from '../../../domain/page';
 import type { NewProductBatch } from '../../../domain/product-batch';
 import type { ProductBatchView } from '../../../domain/product-batch-view';
-import type { NewProduct, ProductView } from '../../../domain/product-view';
+import type { NewProduct, ProductView, ProductType } from '../../../domain/product-view';
+import { PRODUCT_TYPE_VALUES } from '../../../domain/product-queryable';
 
 // El ambito de empresa va como conjuncion aparte en un `AND` de primer nivel, para que ninguna otra
 // condicion del `where` pueda relajarlo. Una fila de otra empresa sale igual que una que no existe
@@ -41,6 +42,7 @@ export const PRODUCT_SELECT = {
   stock: true,
   unitId: true,
   qtyAlert: true,
+  type: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.ProductSelect;
@@ -55,6 +57,7 @@ export function toProductView(row: ProductRow): ProductView {
     stock: row.stock,
     unitId: row.unitId,
     qtyAlert: row.qtyAlert,
+    type: row.type as ProductType,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -169,7 +172,11 @@ function productFilterWhere(
     case 'select': {
       const condition = selectCondition(value.values);
       if (condition === null) return null;
-      // Ningun campo de productos se filtra por eleccion: no hay columna a la que traducirlo.
+      if (field === 'type') {
+        const validValues = value.values.filter((v) => PRODUCT_TYPE_VALUES.includes(v as ProductType));
+        if (validValues.length === 0) return null;
+        return { type: { in: validValues } };
+      }
       return null;
     }
     case 'numberRange': {
@@ -573,6 +580,7 @@ export async function createWithFirstBatch(
         nameNormalized: normalizeProductName(product.name),
         unitId: presentation.unitId,
         qtyAlert: product.qtyAlert ?? null,
+        type: 'PRODUCT',
         ...companyScopeColumns(scope),
         createdAt: now,
         updatedAt: now,

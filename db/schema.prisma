@@ -272,17 +272,18 @@ model Presentation {
 /// modela indices parciales.
 /// @module inventario
 model Product {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name           String
-  nameNormalized String    @map("name_normalized")
-  unitId         String?   @map("unit_id") @db.Uuid
-  stock          Int       @default(0)
-  qtyAlert       Int?      @map("qty_alert")
-  imagePath      String?   @map("image_path")
-  companyId      String    @map("company_id") @db.Uuid
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+  nameNormalized String      @map("name_normalized")
+  type           ProductType @default(PRODUCT) @map("type")
+  unitId         String?     @map("unit_id") @db.Uuid
+  stock          Int         @default(0)
+  qtyAlert       Int?        @map("qty_alert")
+  imagePath      String?     @map("image_path")
+  companyId      String      @map("company_id") @db.Uuid
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?   @map("deleted_at") @db.Timestamptz(6)
 
   batches ProductBatch[]
 
@@ -365,6 +366,13 @@ model InventoryMovement {
 /// guardia de modulos lo vea. Sus FK estan escritas a mano. NULL = no la creo una persona.
 /// `companyId` tampoco lleva `@relation`, por el mismo motivo pero hacia `companies`: su FK
 /// (`recipes_company_id_fkey`) esta escrita a mano en la migracion y es drift a proposito.
+
+/// Enum y no tabla: el conjunto es cerrado a proposito y anadir un valor es una migracion.
+enum ProductType {
+  PRODUCT
+  MACHINE
+  PACKAGING
+}
 /// `recipes_company_name_unique` (empresa, nombre) es PARCIAL por `deleted_at IS NULL` y por
 /// eso no se declara `@@unique` aqui: Prisma no modela indices parciales. Ese mismo indice
 /// hace de indice de `companyId`, asi que tampoco hay un `@@index([companyId])` propio. Los
