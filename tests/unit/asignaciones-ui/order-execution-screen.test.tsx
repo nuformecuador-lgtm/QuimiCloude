@@ -127,6 +127,20 @@ describe('pantalla de ejecucion — QC-147 R26: la cantidad del pedido en su pro
       'Pedido 200',
     );
   });
+
+  it('QC-132 R3: expone el valor exacto en el title cuando difiere del pintado', () => {
+    render(<OrderExecutionScreen execution={{ ...EXECUTION, orderQuantity: '0.1255' }} />);
+
+    const cantidadPedido = screen.getByTestId(ORDER_EXECUTION_ORDER_QUANTITY_TESTID);
+    expect(cantidadPedido).toHaveTextContent('Pedido 0.13');
+    expect(cantidadPedido).toHaveAttribute('title', '0.1255');
+  });
+
+  it('QC-132 R4: sin title cuando el valor pintado coincide con el exacto', () => {
+    render(<OrderExecutionScreen execution={{ ...EXECUTION, orderQuantity: '200.0000' }} />);
+
+    expect(screen.getByTestId(ORDER_EXECUTION_ORDER_QUANTITY_TESTID)).not.toHaveAttribute('title');
+  });
 });
 
 describe('pantalla de ejecucion — R19: bloqueo sin escape con el motivo visible', () => {

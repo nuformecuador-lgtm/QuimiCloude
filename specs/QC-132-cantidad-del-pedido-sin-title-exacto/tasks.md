@@ -10,7 +10,7 @@
 
 ## Tanda A — los tres sitios
 
-### [ ] T1 `[P]` — Columna Cantidad de `/pedidos` (R1, R2, R7)
+### [x] T1 `[P]` — Columna Cantidad de `/pedidos` (R1, R2, R7)
 **Archivos:** `tests/unit/pedidos-ui/order-columns.test.tsx` (bloque «la cantidad se pinta
 REDONDEADA…», ~línea 271); `app/(private)/pedidos/components/order-columns.tsx:195-204`.
 **Depende de:** nada.
@@ -23,7 +23,7 @@ REDONDEADA…», ~línea 271); `app/(private)/pedidos/components/order-columns.t
 **Hecho cuando:** los dos casos nuevos pasan, los cuatro casos existentes del bloque pasan **sin
 haberlos tocado** y `pnpm vitest run tests/unit/pedidos-ui/order-columns.test.tsx` está en verde.
 
-### [ ] T2 `[P]` — Cantidad del pedido en ejecución (R3, R4, R7)
+### [x] T2 `[P]` — Cantidad del pedido en ejecución (R3, R4, R7)
 **Archivos:** `tests/unit/asignaciones-ui/order-execution-screen.test.tsx` (junto al bloque
 «QC-147 R26», ~línea 114); `app/(private)/asignacion/[id]/components/order-execution-screen.tsx:67-69`.
 **Depende de:** nada.
@@ -37,7 +37,7 @@ haberlos tocado** y `pnpm vitest run tests/unit/pedidos-ui/order-columns.test.ts
 **Hecho cuando:** los dos casos nuevos y todo el archivo pasan, y los casos de QC-147 R26 siguen
 intactos.
 
-### [ ] T3 `[P]` — Cantidad de la línea en su unidad propia (R5, R6, R7)
+### [x] T3 `[P]` — Cantidad de la línea en su unidad propia (R5, R6, R7)
 **Archivos:** `tests/unit/asignaciones-ui/order-execution-lines.test.tsx`;
 `app/(private)/asignacion/[id]/components/order-execution-lines.tsx:77-82`.
 **Depende de:** nada.
@@ -50,7 +50,7 @@ intactos.
 
 **Hecho cuando:** los casos nuevos y todo el archivo pasan.
 
-### [ ] T4 — Línea convertida a otra unidad (R12, R7)
+### [x] T4 — Línea convertida a otra unidad (R12, R7)
 **Archivos:** `tests/unit/asignaciones-ui/order-execution-lines.test.tsx`. Producción ya queda
 cubierta por la expresión de T3; si no, se ajusta allí.
 **Depende de:** T3. **Desbloqueada el 2026-09-23 (F1.4, respuesta (a)).**
@@ -69,7 +69,7 @@ anota en T5).
 
 ## Tanda B — demostrar que muerde
 
-### [ ] T5 — Quitar el `title`, ver el rojo, revertir (R1, R3, R5, R12, R9)
+### [x] T5 — Quitar el `title`, ver el rojo, revertir (R1, R3, R5, R12, R9)
 **Archivos:** temporalmente los tres de producción. **Revertidos al terminar.**
 **Depende de:** T1, T2, T3, T4. **No paralelizable.**
 
@@ -83,7 +83,7 @@ sitio (mutación · rojo obtenido · revertida) y `git diff` de producción coin
 
 ## Tanda C — cierre
 
-### [ ] T6 `[P]` — Requisitos negativos por diff (R8, R9, R11)
+### [x] T6 `[P]` — Requisitos negativos por diff (R8, R9, R11)
 **Depende de:** T5.
 
 **Hecho cuando:** `git diff --stat` contra la base **no** toca `lib/shared/ui/decimal-display.ts`, su
@@ -91,7 +91,7 @@ test, `order-field.tsx`, `components/shared/data-table/**`, `e2e/`, `package.jso
 el diff de los tres archivos de test solo **añade** líneas de caso (ningún `-` sobre una afirmación
 existente). Anotado en el informe.
 
-### [ ] T7 `[P]` — Repetir el censo (R10)
+### [x] T7 `[P]` — Repetir el censo (R10)
 **Depende de:** T5.
 
 Buscar `formatDecimalDisplay(` en `app/`. **Hecho cuando:** el informe lista cada aparición con su
