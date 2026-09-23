@@ -6,9 +6,11 @@
 >
 > **Vuelta 2 (2026-09-23).** El humano cerró las cinco preguntas de la vuelta 1 como D13-D16. Lo
 > que antes era «propuesta» en el orden (D14), las columnas (D15) y el filtro (D16) pasa a ser
-> diseño. D13 añade § 3.5, § 3.6, § 6.7 y R32-R35. Quedan dos preguntas abiertas nuevas
-> (`requirements.md > Preguntas abiertas`): la 1 no cambia ningún diseño de esta ficha y la 2 se
-> marca aquí como **propuesta**.
+> diseño. D13 añade § 3.5, § 3.6, § 6.7 y R32-R35.
+>
+> **Vuelta 3 (2026-09-23).** Las dos preguntas de la vuelta 2 se cerraron como D17 (las asignaciones
+> previas se dejan como están, R37) y D18 (el miembro de grupo con `pedidos.consultar` se omite en
+> silencio, R36). No queda ninguna pregunta abierta ni ninguna propuesta pendiente.
 
 ## 0. Hallazgos sobre `dev` (medidos el 2026-09-23, con QC-144, QC-146 y QC-147 ya mergeadas)
 
@@ -27,9 +29,9 @@
 | `tests/guards/guard-qc87-no-reimplementado.test.ts` enumera las acciones de `order-assignment-actions.ts` y comprueba que la lista es exacta | `ACCIONES`, línea 83 | Se añaden las tres acciones nuevas (T8) |
 | **El selector de responsables** ofrece todo lo que devuelve `listUsersAction` (primeros 25 usuarios; exige `usuarios.consultar` y, sin él, se degrada a lista vacía). La fila de usuario solo trae `roleName`, no permisos | `order-list-section.tsx:173-194`, `identity/domain/user-view.ts:48,76` | Con ese catálogo no se puede filtrar por permiso sin mirar el nombre del rol, que D13 prohíbe. Hace falta otra fuente (§ 3.6) |
 | **Asignar** comprueba existencia, empresa y cuenta activa (`PersonRef = { id, displayName, isActive }`). Nada mira permisos | `assign-responsibles.ts:98-120`, `identity/domain/people-directory.ts:33-37` | `PersonRef` gana los permisos del rol de la persona (§ 3.5) |
-| **Asignar un grupo** crea una fila por cada `activeMemberIds` y omite en silencio a los inactivos | `assignment-directory-prisma.ts:161-182` | El miembro con `pedidos.consultar` no puede quedar con fila (R34). Qué pasa con el resto es la Pregunta abierta 2 |
-| **Ejecutar exige estar asignado**: `get-`, `start-` y `finish-assigned-order.ts` comprueban `listOrderIdsByUserInCompany(...).includes(orderId)` antes de leer el pedido y responden `order_not_found` si no está | `get-assigned-order-execution.ts:48-49`, `start-assigned-order.ts:41-42`, `finish-assigned-order.ts:45-46`; la ruta `/asignacion/[id]/page.tsx:29` solo exige `asignaciones.consultar` | **Verificado:** si no puede nacer ninguna asignación nueva de alguien con `pedidos.consultar`, la ejecución por dirección directa le queda cerrada **sin tocar la ruta** (R35). **Excepción:** las asignaciones que ya existan. Esa persona sigue asignada y puede ejecutar (Pregunta abierta 1) |
-| `scripts/seed.ts` no crea asignaciones y ninguna restricción de `order_assignments` mira permisos | `scripts/`, migraciones de QC-86 | Pueden existir filas con un Administrador asignado desde la pantalla. No se sabe cuántas: no hay acceso a la base |
+| **Asignar un grupo** crea una fila por cada `activeMemberIds` y omite en silencio a los inactivos | `assignment-directory-prisma.ts:161-182` | El miembro con `pedidos.consultar` se omite igual, en silencio, y el resto se asigna (R34, R36, D18) |
+| **Ejecutar exige estar asignado**: `get-`, `start-` y `finish-assigned-order.ts` comprueban `listOrderIdsByUserInCompany(...).includes(orderId)` antes de leer el pedido y responden `order_not_found` si no está | `get-assigned-order-execution.ts:48-49`, `start-assigned-order.ts:41-42`, `finish-assigned-order.ts:45-46`; la ruta `/asignacion/[id]/page.tsx:29` solo exige `asignaciones.consultar` | **Verificado:** si no puede nacer ninguna asignación nueva de alguien con `pedidos.consultar`, la ejecución por dirección directa le queda cerrada **sin tocar la ruta** (R35). **Excepción:** las asignaciones que ya existan. Esa persona sigue asignada y puede ejecutar, consecuencia aceptada por D17 (R37) |
+| `scripts/seed.ts` no crea asignaciones y ninguna restricción de `order_assignments` mira permisos | `scripts/`, migraciones de QC-86 | Pueden existir filas con un Administrador asignado desde la pantalla. No se sabe cuántas porque no hay acceso a la base. D17: se dejan como están, sin migración de datos |
 | La presentación viaja en `AssignedOrderSummary.presentationId` y se pinta con `OrderPresentationLabel` («Sin presentación») | QC-146: `order-catalog.ts:92`, `components/shared/order-presentation-label.tsx` | Se reutiliza (R21, R25) |
 | Fechas en tabla: `YYYY-MM-DD` en UTC con `toISOString().slice(0, 10)`, nunca `toLocale*` | `order-columns.tsx:115-123` | Mismo formato para la fecha de terminado |
 | Pestañas: primitiva existente | `components/ui/tabs.tsx` | Sin componente ni librería nuevos |
@@ -234,28 +236,33 @@ no mira nunca el rol. Es la **única** definición de la regla. La usan § 3.5 y
 - **Paso 4 (personas sueltas):** después de `isActive`, `if (!canBeResponsible(person)) throw new
   UserCannotBeResponsibleError()`. La operación se rechaza **entera**, sin escribir (R33). El orden
   de rechazos queda así: no existe → cuenta inactiva → no elegible.
-- **Paso 5 (grupos), propuesta (a) de la Pregunta abierta 2:** tras resolver los snapshots, **una**
-  llamada `people.findAliveRefsInCompany(companyId, unión de activeMemberIds, now)` y se quitan del
-  grupo los miembros no elegibles antes de componer. Se les omite en silencio, igual que a los
-  inactivos. Si el humano elige (b), el cambio es sustituir el filtro por un `throw
-  UserCannotBeResponsibleError`. El test de R34 («no queda fila de esa persona») vale para las dos.
+- **Paso 5 (grupos), D18:** tras resolver los snapshots, se hace **una** llamada
+  `people.findAliveRefsInCompany(companyId, unión de activeMemberIds, now)` y se quitan del grupo los
+  miembros no elegibles antes de componer. Se les **omite en silencio**, igual que a los inactivos:
+  la operación no se rechaza y el resto del grupo se asigna (R34, R36). Si después de omitirlos no
+  queda nadie que asignar, el comportamiento es exactamente el de hoy para un grupo sin miembros
+  activos, sea cual sea. No se añade ninguna rama ni error nuevo.
 - `UserCannotBeResponsibleError`, con `code` estable `user_cannot_be_responsible`, se da de alta en
   el catálogo de `lib/modules/errores` (`error-codes.ts`, `error-catalog.ts`) con el mensaje «Esta
   persona no puede ser responsable de un pedido.». No se reutiliza `user_not_assignable`, cuyo
   mensaje habla de la cuenta inactiva y sería falso aquí.
 
-**Qué NO cambia.** Quitar responsable y quitar grupo siguen iguales: son la forma de limpiar a mano
-una asignación previa (Pregunta abierta 1). Ni la lectura de responsables ni la ejecución se
-tocan.
+**Qué NO cambia (D17, R37).** No hay migración de datos: las asignaciones previas de personas con
+`pedidos.consultar` se quedan como están, se siguen leyendo y pintando como responsables, y se
+pueden quitar a mano con «quitar responsable» o «quitar grupo», que no cambian. La lectura de
+responsables no filtra a nadie. **Los casos de uso de ejecución (`get-`, `start-`,
+`finish-assigned-order.ts`) y sus rutas no se tocan**, así que no se pisa nada de QC-63 ni de QC-82.
 
 **Por qué esto cierra la ejecución por dirección (R35).** Los tres casos de uso de ejecución
 responden `order_not_found` a quien no está en `order_assignments` para ese pedido (§ 0). Si § 3.5
 impide que nazcan filas nuevas para quien tiene `pedidos.consultar`, esa persona nunca llega a estar
 asignada y la ruta `/asignacion/<id>` le responde como a cualquier no asignado. **No se cierra**
 para las filas que ya existan antes de esta ficha, ni para una persona cuyo rol gane
-`pedidos.consultar` después de asignarla (hoy los permisos solo cambian por migración). Las dos
-cosas son la Pregunta abierta 1. R35 se prueba con los casos de uso reales para un Administrador no
-asignado.
+`pedidos.consultar` después de asignarla (hoy los permisos solo cambian por migración). Es la
+consecuencia que D17 acepta: esas personas pueden seguir ejecutando por URL los pedidos que ya
+tenían asignados, hasta que se terminen o se cancelen (R37). R35 se prueba con los casos de uso
+reales para un Administrador no asignado, y R37 con uno asignado **antes** mediante una fila
+sembrada directamente en la base.
 
 ### 3.6 El selector: `domain/list-responsible-candidates.ts` (R32)
 
@@ -385,8 +392,11 @@ QC-82 caen juntos estado, fecha y la anotación «finalizar». Esta ficha no cre
 7. **Filtrar el selector por `roleName === 'Administrador'`** con el `listUsersAction` de hoy.
    Prohibido por D13 y por QC-86/87: por permiso, nunca por nombre de rol.
 8. **Cerrar además la ruta `/asignacion/<id>` o los casos de uso de ejecución a quien tiene
-   `pedidos.consultar`.** D13 dice expresamente «sin tocar la ruta», y cambiaría QC-63 y QC-82. Lo
-   que eso cubriría (asignaciones previas) es la Pregunta abierta 1.
+   `pedidos.consultar`, o borrar sus asignaciones previas con una migración de datos.** D13 dice
+   «sin tocar la ruta», y D17 decide dejar las asignaciones previas como están y no tocar QC-63 ni
+   QC-82.
+9. **Rechazar la asignación de un grupo entero si contiene a alguien con `pedidos.consultar`**
+   (opción (b) de la vuelta 2). Descartada por D18, que prefiere omitirlo como a un inactivo.
 
 ## 10. Trazabilidad `R<n>` → test
 
@@ -413,15 +423,16 @@ QC-82 caen juntos estado, fecha y la anotación «finalizar». Esta ficha no cre
 | R30 | `finished-orders.int.test.ts` «finalizar por el caso de uso real → aparece con fecha»; E2E |
 | R32 | `tests/unit/asignaciones/list-responsible-candidates.test.ts` (excluye a quien tiene `pedidos.consultar`; firma sin rol; `asignaciones.modificar` exigido); `tests/unit/pedidos-ui/order-list-section.test.tsx` (el catálogo sale de la acción nueva); `tests/integration/identity/assignment-directory.int.test.ts` o equivalente (`listAliveInCompany` con permisos y ámbito de empresa); E2E |
 | R33 | `tests/unit/asignaciones/assign-responsibles.test.ts` «persona suelta con `pedidos.consultar` → `user_cannot_be_responsible`, ninguna escritura»; `tests/integration/asignaciones/responsible-eligibility.int.test.ts` (llamada directa al caso de uso, sin formulario) |
-| R34 | `assign-responsibles.test.ts` y `responsible-eligibility.int.test.ts` «asignar un grupo con un Administrador → no queda fila suya» |
+| R34, R36 | `assign-responsibles.test.ts` y `responsible-eligibility.int.test.ts` «asignar un grupo con un Administrador y un Operador → la operación no falla, el Operador queda asignado y el Administrador sin fila» |
+| R37 | `responsible-eligibility.int.test.ts` «un Administrador con una asignación sembrada antes (fila directa en `order_assignments`) sigue pudiendo abrir, arrancar y finalizar ese pedido; la migración de esta ficha no toca `order_assignments`»; `orders-finished-at-migration.test.ts` «el SQL no nombra `order_assignments`» |
 | R35 | `tests/integration/asignaciones/responsible-eligibility.int.test.ts` «Administrador no asignado: get/start/finish → `order_not_found`, sin escribir» (casos de uso reales); E2E (`/asignacion/<id>` como Administrador → 404/aviso de no encontrado) |
 | R29 (dependencias) | `tests/guards/guard-dependencias-aprobadas.test.ts` (existente) |
 
 ## 11. Riesgos
 
-1. **Asignaciones previas de personas con `pedidos.consultar`** (Pregunta abierta 1). Siguen vivas,
-   siguen pudiendo ejecutar por dirección y siguen pintándose como responsables. Esta ficha no las
-   toca.
+1. **Asignaciones previas de personas con `pedidos.consultar`** (D17, aceptado). Siguen vivas, se
+   pueden seguir ejecutando por dirección hasta que el pedido se termine o se cancele, y siguen
+   pintándose como responsables. Esta ficha no las toca.
 2. **Colisión con QC-82** en `order-catalog-prisma.ts` (solo el `data` de `transitionAliveOrder`).
    `finish-assigned-order.ts` no se toca.
 3. **`PersonRef` amplía su forma.** Los dobles de `PeopleDirectory` en `tests/unit/**` (asignaciones

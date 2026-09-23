@@ -14,9 +14,9 @@
 > nombran `QuimiCloude_QC145`.
 >
 > Cada tanda se cierra con `./init.sh --rapido`; la ficha y el PR, con `./init.sh` completo.
-> Preguntas abiertas: la 1 (asignaciones previas) no cambia ninguna task. La 2 (grupo con un
-> Administrador) solo afecta a T9: la propuesta (a) omite al miembro; la (b) sustituye ese filtro por
-> un rechazo.
+> No quedan preguntas abiertas. D17: las asignaciones previas se dejan como están, sin migración de
+> datos, y ninguna task toca los casos de uso de ejecución. D18: en T9, el miembro de grupo con
+> `pedidos.consultar` se omite en silencio.
 
 ---
 
@@ -28,8 +28,8 @@
         timestamp, mayor que el último de `db/migrations/` al crearla).
       - Tests: `tests/unit/pedidos/schema/orders-finished-at-migration.test.ts` (nuevo: anulable,
         sin `DEFAULT` ni backfill, `CHECK orders_finished_at_requires_delivered`, índice parcial
-        `finished_at DESC NULLS LAST, order_year DESC, order_sequence DESC`, `down.sql` inverso, con
-        casos de sensibilidad); `pedidos-schema.test.ts` si enumera columnas.
+        `finished_at DESC NULLS LAST, order_year DESC, order_sequence DESC`, `down.sql` inverso, el SQL no
+        nombra `order_assignments` (R37), con casos de sensibilidad); `pedidos-schema.test.ts` si enumera columnas.
       - Proceso: contra **`QuimiCloude_QC145`**, `db:migrate` → `db:rollback` → `db:migrate`; la
         salida se pega en `progress/impl_QC-145-…md`; `prisma generate`.
       - **Hecho**: ciclo real completo sobre `QuimiCloude_QC145` y el test del esquema en verde.
@@ -113,21 +113,24 @@
       - **Hecho**: estos tests en verde.
       - Depende de: T7 (el helper). Tocan el mismo `index.ts`: van en serie.
 
-- [ ] **T9. [P con T7-T8] Quién puede ser responsable: rechazo en el service.** (`design.md > 3.5`; R33, R34.)
+- [ ] **T9. [P con T7-T8] Quién puede ser responsable: rechazo en el service.** (`design.md > 3.5`; R33-R37.)
       - Archivos: `lib/modules/asignaciones/domain/responsible-eligibility.ts` (nuevo:
-        `canBeResponsible`), `assign-responsibles.ts` (paso 4: rechazo; paso 5: omitir según la
-        propuesta (a) de la Pregunta abierta 2), `errors.ts` (`UserCannotBeResponsibleError`),
+        `canBeResponsible`), `assign-responsibles.ts` (paso 4: rechazo; paso 5: omitir en silencio,
+        D18), `errors.ts` (`UserCannotBeResponsibleError`),
         `lib/modules/asignaciones/index.ts`, `lib/modules/errores/domain/error-codes.ts` y
         `error-catalog.ts` (`user_cannot_be_responsible`).
       - Tests: `tests/unit/asignaciones/responsible-eligibility.test.ts` (nuevo: por permiso, la
         firma no recibe rol); `assign-responsibles.test.ts` (R33: rechazo entero sin escribir, orden
-        de rechazos; R34: miembro de grupo con `pedidos.consultar` sin fila);
+        de rechazos; R34 y R36: un grupo con un Administrador y un Operador no falla, el Operador
+        queda asignado y el Administrador sin fila);
         `tests/integration/asignaciones/responsible-eligibility.int.test.ts` (nuevo, sobre
-        `QuimiCloude_QC145`: R33 llamando al caso de uso directamente; R34; R35: un Administrador no
-        asignado recibe `order_not_found` en get/start/finish y no se escribe nada); el test del
-        catálogo de `errores` si enumera códigos.
-      - Si la Pregunta abierta 2 se responde (b): solo cambia el paso 5 y su caso de R34 pasa a
-        esperar el rechazo.
+        `QuimiCloude_QC145`: R33 llamando al caso de uso directamente; R34 y R36; R35: un
+        Administrador no asignado recibe `order_not_found` en get/start/finish y no se escribe nada;
+        R37: un Administrador con una fila sembrada directamente en `order_assignments` antes sigue
+        pudiendo abrir, arrancar y finalizar ese pedido); el test del catálogo de `errores` si
+        enumera códigos.
+      - **No** toca `get-assigned-order-execution.ts`, `start-assigned-order.ts`,
+        `finish-assigned-order.ts` ni `app/(private)/asignacion/[id]/**` (D17).
       - **Hecho**: estos tests en verde.
       - Depende de: T6.
 
@@ -219,7 +222,7 @@
       - Archivos: `tests/unit/pedidos/qc145-estado-solo-planta.test.ts` (nuevo: `finishedAt` solo
         en `transitionAliveOrder`; quién escribe `status`; `package.json` sin dependencias nuevas;
         catálogo con 16 permisos), `progress/impl_QC-145-pedidos-terminados-en-asignacion.md` (mapa
-        `R1`-`R35` → test, verificado contra `design.md > 10`, más la salida del ciclo de T1).
+        `R1`-`R37` → test, verificado contra `design.md > 10`, más la salida del ciclo de T1).
       - **Hecho**: `./init.sh` **completo** en verde; cada `R<n>` tiene un test que existe y pasa;
         el diff no deja citas de ficha en comentarios de producción.
       - Depende de: T1-T16.

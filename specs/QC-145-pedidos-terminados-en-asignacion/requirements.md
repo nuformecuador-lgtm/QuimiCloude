@@ -21,8 +21,8 @@
 
 > Escritos por `spec_author` el 2026-09-23. Cada requisito cita entre corchetes la fila de
 > `## Decisiones cerradas` de la que sale, numeradas **por su orden en la tabla**: `[D1]` es la
-> primera fila («¿Qué sale en "Terminados"?»), `[D12]` la de la presentación, y `[D13]`-`[D16]` las
-> cuatro que el humano cerró el 2026-09-23 al revisar el spec (vuelta 2). La numeración solo sirve
+> primera fila («¿Qué sale en "Terminados"?»), `[D12]` la de la presentación, y `[D13]`-`[D18]` las
+> seis que el humano cerró el 2026-09-23 al revisar el spec (vueltas 2 y 3). La numeración solo sirve
 > para citar: la tabla no se toca ni se reordena. El test concreto de cada `R<n>` está en
 > `design.md > 10`.
 >
@@ -163,11 +163,17 @@
   ENTONCES el caso de uso DEBE rechazar la operación **entera** con `user_cannot_be_responsible`, sin
   crear ninguna fila, venga o no la petición del formulario. `[D13]`
 - **R34**: El sistema NO DEBE crear, por ninguna vía de la aplicación (persona suelta o miembro de
-  un grupo de trabajo), una asignación de un pedido a una persona con `pedidos.consultar`. Qué pasa
-  con el resto del grupo es la Pregunta abierta 2. `[D13]`
+  un grupo de trabajo), una asignación de un pedido a una persona con `pedidos.consultar`. `[D13]`
 - **R35**: SI quien tiene `pedidos.consultar` no está asignado a un pedido, ENTONCES abrir la
   ejecución de ese pedido por su dirección, arrancarlo o finalizarlo DEBE responder `order_not_found`
   sin escribir nada. `[D13]`
+- **R36**: CUANDO se asigna un grupo de trabajo con uno o más miembros que tienen `pedidos.consultar`,
+  el sistema DEBE **omitirlos en silencio**, como a los inactivos, y asignar a los demás miembros
+  elegibles sin rechazar la operación. `[D18]`
+- **R37**: Esta ficha NO DEBE borrar, modificar ni ocultar las asignaciones que ya existan de
+  personas con `pedidos.consultar`. Tampoco DEBE cambiar los casos de uso de ejecución. MIENTRAS
+  esa asignación exista, esa persona DEBE poder seguir abriendo, arrancando y finalizando por su
+  dirección el pedido asignado, hasta que el pedido se termine o se cancele. `[D17]`
 
 ### Cobertura de decisiones
 
@@ -189,41 +195,15 @@
 | D14: «sin fecha» por número descendente | R20 |
 | D15: columnas de «Terminados» y «Todos» | R21, R25, R31 |
 | D16: orden de terminados solo con filtro exactamente Entregado | R24, R31 |
+| D17: las asignaciones previas se dejan como están | R37 |
+| D18: el miembro de grupo con `pedidos.consultar` se omite en silencio | R34, R36 |
 
 ## Preguntas abiertas
 
-> Las cinco preguntas de la vuelta 1 las cerró el humano el 2026-09-23 y pasaron a D13-D16. Estas
-> dos salen de aplicar D13 y quedan abiertas. No se rellenan con supuestos.
+Ninguna.
 
-1. **¿Qué se hace con los pedidos que ya tienen asignada a una persona con `pedidos.consultar`?**
-   Medido en el código de `dev` el 2026-09-23 (sin acceso a la base, así que **no se sabe cuántas
-   filas hay**):
-   - Desde QC-87 nada lo impedía. `assign-responsibles.ts:113-120` solo exige que la persona exista,
-     sea de la empresa y tenga la cuenta activa. El selector (`order-list-section.tsx:173-194`) ofrece
-     todo lo que devuelve `listUsersAction`, sin filtro de rol ni de permiso. Ninguna restricción de
-     la base (`order_assignments`) lo impide.
-   - `scripts/seed.ts` no crea asignaciones. Las filas, si existen, las ha creado alguien desde la
-     pantalla.
-   - Consecuencia: para esas filas, D13 **no cierra** la ejecución por dirección directa. Los casos
-     de uso de ejecución solo exigen `asignaciones.consultar` y estar asignado, y esa persona lo está.
-     Esta ficha no las toca: ni las borra ni las filtra al leer. Siguen apareciendo como
-     responsables en «Todos», «Terminados» y la lista de Pedidos, y se pueden quitar a mano con
-     «quitar responsable», que no cambia.
-   - Hay que decidir si se dejan así, si se quitan con una migración de datos (borrado físico, que
-     es lo que hace «quitar responsable») o si los casos de uso de ejecución rechazan además a
-     quien tenga `pedidos.consultar`. Esta última opción cambiaría QC-63 y QC-82.
-   (Abierta al aplicar D13, 2026-09-23.)
-
-2. **Grupo de trabajo con un miembro que tiene `pedidos.consultar`.** Asignar un grupo crea una fila
-   por cada miembro con la cuenta activa (`WorkGroupSnapshot.activeMemberIds`). A los inactivos se
-   les **omite en silencio**, sin rechazar la operación. R34 prohíbe crear la fila del miembro
-   con `pedidos.consultar`, pero falta decidir qué pasa con el resto:
-   (a) **se le omite** y los demás se asignan, como a un inactivo; o
-   (b) **se rechaza la operación entera** con `user_cannot_be_responsible`, como con una persona
-   suelta (R33).
-   El `design.md > 3.5` deja preparada **(a)** como propuesta, sin darla por decidida. El test de R34
-   vale para las dos: solo afirma que no queda fila de esa persona. (Abierta al aplicar D13,
-   2026-09-23.)
+> Las cinco preguntas de la vuelta 1 pasaron a D13-D16 y las dos de la vuelta 2 a D17-D18, todas
+> cerradas por el humano el 2026-09-23.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -241,7 +221,9 @@
 | 2026-09-22 | ¿E2E? | **Sí, aquí**: se difirió desde **QC-144**. Entra como **Operador** (no ve Terminados), como **Empacador** (ve Terminados, no Todos) y como **Administrador** (ve Todos). Más el caso de que **Pedidos ya no ofrece cambiar el estado** |
 | 2026-09-22 | ¿Dependencia o tabla nueva? | **Ninguna dependencia ni tabla.** Una columna, por migración |
 | 2026-09-22 | ¿«Terminados» muestra la presentación? | **Sí**, la de cada pedido; los viejos salen «sin presentación». La columna la crea **QC-146**, que por eso **bloquea a esta** (añadido al acotar QC-146; `depends_on` pasa a QC-144 + QC-146) |
-| 2026-09-23 | ¿Puede un Administrador ser responsable de un pedido? (antes Preguntas abiertas 1 y 5) | **No.** Se aplica **por permiso, nunca por nombre de rol** (QC-86/87): quien tiene **`pedidos.consultar`**, el mismo permiso que abre «Todos», **no se ofrece** en el selector de responsables, y el **service rechaza** asignarlo aunque la petición no venga del formulario. Como ejecutar exige estar asignado, la ejecución por dirección directa queda cerrada sin tocar la ruta (para las asignaciones que ya existan, ver la Pregunta abierta 1). Requisitos y tests: selector, rechazo en el service y caso E2E. **D13** |
+| 2026-09-23 | ¿Puede un Administrador ser responsable de un pedido? (antes Preguntas abiertas 1 y 5) | **No.** Se aplica **por permiso, nunca por nombre de rol** (QC-86/87): quien tiene **`pedidos.consultar`**, el mismo permiso que abre «Todos», **no se ofrece** en el selector de responsables, y el **service rechaza** asignarlo aunque la petición no venga del formulario. Como ejecutar exige estar asignado, la ejecución por dirección directa queda cerrada sin tocar la ruta (para las asignaciones que ya existan, ver D17). Requisitos y tests: selector, rechazo en el service y caso E2E. **D13** |
 | 2026-09-23 | ¿En qué sentido se ordenan por número los «sin fecha»? (antes Pregunta abierta 2) | **Descendente**, del más nuevo al más viejo, como proponía el diseño. **D14** |
 | 2026-09-23 | ¿Qué columnas llevan «Terminados» y «Todos»? (antes Pregunta abierta 3) | Las del spec, tal cual. **«Terminados»**: número, receta, cantidad, presentación, fecha de terminado y responsables. **«Todos»**: número, receta, cantidad, presentación, prioridad, estado y responsables; **filtrado por Entregado**, añade la fecha de terminado. **D15** |
 | 2026-09-23 | ¿Cuándo se ordena «Todos» por fecha de terminado? (antes Pregunta abierta 4) | **Solo cuando el filtro es exactamente Entregado.** Con cualquier otra combinación, orden de la lista de trabajo. **D16** |
+| 2026-09-23 | ¿Qué se hace con las asignaciones que ya existen de personas con `pedidos.consultar`? (antes Pregunta abierta 1 de la vuelta 2) | **Se dejan como están.** No hay migración de datos y no se cierran los casos de uso de ejecución: **QC-63 y QC-82 no se tocan**. **Consecuencia que se acepta:** esas personas pueden seguir ejecutando por URL los pedidos que ya tenían asignados, hasta que se terminen o se cancelen. Solo las asignaciones **nuevas** cumplen D13. **D17** |
+| 2026-09-23 | ¿Qué pasa al asignar un grupo con un miembro que tiene `pedidos.consultar`? (antes Pregunta abierta 2 de la vuelta 2) | **Ese miembro se omite en silencio**, como un inactivo, y el resto del grupo se asigna. Es la opción (a) del diseño. **D18** |
