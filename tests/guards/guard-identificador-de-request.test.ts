@@ -142,6 +142,15 @@ export const E2E_ESPERADOS = [
   'pedidos-responsables.spec.ts',
   'permisos.spec.ts',
   'pedidos-asignados.spec.ts',
+  // Alta el 2026-09-23 por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se
+  // relaja -el archivo se nombra, uno a uno-. Lo que ejercita: el bloque de coste del panel de
+  // pedidos cotiza con cada cantidad tecleada y con el cambio de receta, guarda el mismo importe
+  // que llego a mostrar y lo vuelve a mostrar al reabrir la edicion sin teclear nada; y una
+  // cantidad sin existencia suficiente deja el guion. NO ejercita el cruce borde -> accion del
+  // identificador de peticion: el spec no lee ni afirma nada sobre el identificador ni sobre
+  // `reference`, asi que el diferimiento de la E2E de ese cruce sigue INTACTO.
+  'pedidos-cotizacion.spec.ts',
   'presentaciones.spec.ts',
   'proveedores.spec.ts',
   'recetas-pasos.spec.ts',

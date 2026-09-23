@@ -38,6 +38,7 @@ import type { RecipeLineView } from '@/lib/modules/recetas';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { UnitView } from '@/lib/modules/unidades';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
+import { OrderCostQuote } from './order-cost-quote';
 import { OrderField } from './order-field';
 import { OrderIngredientsTable } from './order-ingredients-table';
 import { OrderRecipeImage } from './order-recipe-image';
@@ -54,6 +55,7 @@ import {
 } from './order-responsibles';
 import { isFinalOrderStatus } from './order-row-actions';
 import { ORDER_PRIORITY_LABELS } from './order-status-badge';
+import { useOrderCostQuote } from './use-order-cost-quote';
 
 /**
  * QC-102 T14 — EN QUE SECCION abre el panel (R23, R24).
@@ -360,6 +362,9 @@ export function OrderForm({
   // 0.13 sin que nadie lo pidiera-.
   const [quantity, setQuantity] = useState(trimDecimal(order?.quantity ?? ''));
 
+  /** Arranca con el importe guardado en la edicion; `null` en el alta. */
+  const quote = useOrderCostQuote(order?.ingredientsCost ?? null);
+
   const recipeName = recipe?.name ?? '';
   const recipeImageUrl = recipe?.imageUrl ?? null;
   /** Id de la receta elegida: decide si la tabla de ingredientes se monta. */
@@ -427,12 +432,14 @@ export function OrderForm({
       setRecipe(null);
       setIngredients([]);
       setIngredientsError(null);
+      quote.onRecipeChange(null, quantity);
       return;
     }
     setRecipe({ id: option.id, name: option.name, imageUrl: option.imageUrl });
     setIngredientsLoading(true);
     setIngredientsError(null);
     loadIngredients(option.id);
+    quote.onRecipeChange(option.id, quantity);
   }
 
   async function save(_previous: OrderFormState, formData: FormData): Promise<OrderFormState> {
@@ -596,9 +603,15 @@ export function OrderForm({
               inputMode="decimal"
               roundDecimals={2}
               defaultValue={initialValue('quantity', trimDecimal(order?.quantity ?? ''))}
-              onValueChange={setQuantity}
+              onValueChange={(value) => {
+                setQuantity(value);
+                quote.onQuantityChange(recipe?.id ?? null, value);
+              }}
               error={fieldErrors.quantity}
             />
+
+            {/* El bloque de coste: fuera de la condicion de receta elegida, para verse con guion sin receta. */}
+            <OrderCostQuote {...quote.state} />
 
             {/*
               Sin la prop `units`: este panel no ofrece dar de alta una presentacion nueva, solo

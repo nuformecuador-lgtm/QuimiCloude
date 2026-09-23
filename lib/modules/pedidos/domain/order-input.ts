@@ -142,3 +142,12 @@ export const cancelOrderSchema = z.object({
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type UpdateOrderInput = z.infer<typeof updateOrderSchema>;
 export type CancelOrderInput = z.infer<typeof cancelOrderSchema>;
+
+/**
+ * Receta y cantidad, con la MISMA regla que el alta -`pick` hereda la
+ * forma UUID y el patron decimal sin copiarlos-. Un `companyId` en la entrada no llega a
+ * ninguna parte: `z.object` descarta las claves de mas.
+ */
+export const quoteOrderCostSchema = createOrderSchema.pick({ recipeId: true, quantity: true });
+
+export type QuoteOrderCostInput = z.infer<typeof quoteOrderCostSchema>;

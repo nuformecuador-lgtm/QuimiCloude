@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PrivateLayout from '@/app/(private)/layout';
 import PedidosPage from '@/app/(private)/pedidos/page';
 import {
+  ORDER_COST_QUOTE_TESTID,
   ORDER_CREATE_OPEN_TESTID,
   ORDER_FORM_CANCEL_TESTID,
   ORDER_FORM_SUBMIT_TESTID,
@@ -178,6 +179,9 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   getOrderAction: vi.fn(() => {
     throw new Error('getOrderAction no debe invocarse: la fila ya trae el pedido entero');
   }),
+  quoteOrderCostAction: vi.fn(() =>
+    Promise.resolve({ status: 'success', data: { ingredientsCost: null } }),
+  ),
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
@@ -467,11 +471,20 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
     expect(screen.getAllByRole('region')).toHaveLength(1);
     expect(document.querySelectorAll('[aria-live]')).toHaveLength(1);
 
-    // Tampoco al abrir el panel, que es donde una segunda region se colaria sin que nadie mirase.
+    // Al abrir el panel aparece el bloque de coste del propio formulario (`role="status"`, siempre
+    // montado): se cuenta aparte, y fuera de el sigue habiendo exactamente el mismo aviso de antes
+    // -asi que ningun `<Toaster />` propio de esta pantalla se ha sumado.
     await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
     await screen.findByTestId(ORDER_FORM_TESTID);
 
-    expect(document.querySelectorAll('[aria-live]')).toHaveLength(1);
+    const bloqueDeCoste = document.querySelector(`[data-testid="${ORDER_COST_QUOTE_TESTID}"]`);
+    const avisosFueraDelBloqueDeCoste = Array.from(document.querySelectorAll('[aria-live]')).filter(
+      (nodo) => !bloqueDeCoste?.contains(nodo),
+    );
+
+    expect(screen.getAllByRole('region')).toHaveLength(1);
+    expect(avisosFueraDelBloqueDeCoste).toHaveLength(1);
+    expect(bloqueDeCoste?.querySelectorAll('[aria-live]')).toHaveLength(1);
   });
 
   it('la accion de editar de la fila abre el panel con el pedido precargado', async () => {

@@ -226,6 +226,9 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   getOrderAction: vi.fn(() => {
     throw new Error('getOrderAction no debe invocarse: la fila ya trae el pedido entero');
   }),
+  quoteOrderCostAction: vi.fn(() =>
+    Promise.resolve({ status: 'success', data: { ingredientsCost: null } }),
+  ),
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
