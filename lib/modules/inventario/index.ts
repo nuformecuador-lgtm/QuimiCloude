@@ -82,6 +82,15 @@ export {
   type ListBatchMovementsDeps,
 } from './domain/list-batch-movements';
 
+export {
+  addQuantities,
+  subtractQuantities,
+  compareQuantities,
+  minQuantity,
+  ceilToScale4,
+} from './domain/decimal-quantity';
+export { compareBatchesOldestFirst, type OrderableBatch } from './domain/batch-order';
+
 // Solo tipos: por aqui otros modulos apuntan a un producto sin tocar la tabla ni Prisma. La
 // implementacion se cablea en `lib/composition`.
 export type { ProductCatalog, ProductId, ProductRef } from './domain/product-catalog';

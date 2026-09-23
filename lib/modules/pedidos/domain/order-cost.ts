@@ -3,7 +3,7 @@
 // Dominio puro: sin Prisma, sin framework, sin reloj y sin estado. Recibe datos ya leidos por
 // quien orquesta (alta o edicion) y devuelve el importe, o `null` cuando no se puede calcular.
 
-import type { CostingBatch, ProductId } from '@/lib/modules/inventario'
+import { compareBatchesOldestFirst, type CostingBatch, type ProductId } from '@/lib/modules/inventario'
 import { convertQuantity, IncompatibleUnitsError, type UnitConversion } from '@/lib/modules/unidades'
 
 /** Linea de receta, vista con lo minimo que este calculo necesita. */
@@ -39,7 +39,6 @@ const TEN = BigInt(10)
 const MAX_OUTPUT_UNSCALED = TEN ** BigInt(14) - BigInt(1)
 
 const DECIMAL_PATTERN = /^-?\d+(?:\.\d+)?$/
-const DIGITS_ONLY_PATTERN = /^\d+$/
 
 type Scaled = { readonly unscaled: bigint; readonly scale: number }
 
@@ -91,31 +90,6 @@ function formatFixedOutputScale(unscaled: bigint): string {
   return `${digits.slice(0, cut)}.${digits.slice(cut)}`
 }
 
-/** Desempate de lotes: numerico si los dos numeros de lote son solo digitos; como texto si
- *  alguno trae cualquier otro caracter. El correlativo que genera el backend no rellena con
- *  ceros, y comparar como texto pondria '10' antes que '9'. */
-function compareLots(a: string, b: string): number {
-  if (DIGITS_ONLY_PATTERN.test(a) && DIGITS_ONLY_PATTERN.test(b)) {
-    const numericA = BigInt(a)
-    const numericB = BigInt(b)
-    if (numericA === numericB) {
-      return 0
-    }
-    return numericA < numericB ? -1 : 1
-  }
-  if (a === b) {
-    return 0
-  }
-  return a < b ? -1 : 1
-}
-
-function compareBatches(a: CostingBatch, b: CostingBatch): number {
-  if (a.purchaseDate !== b.purchaseDate) {
-    return a.purchaseDate < b.purchaseDate ? -1 : 1
-  }
-  return compareLots(a.lot, b.lot)
-}
-
 /** Coste (escalado a `INTERNAL_SCALE`) de un ingrediente, o `null` si no se puede componer. */
 function calculateLineCost(
   line: RecipeCostLine,
@@ -137,7 +111,7 @@ function calculateLineCost(
   const productBatches = batches
     .filter((batch) => batch.productId === line.productId)
     .slice()
-    .sort(compareBatches)
+    .sort(compareBatchesOldestFirst)
 
   let coveredInternal = ZERO
   const usedUnitCostsInternal: bigint[] = []
