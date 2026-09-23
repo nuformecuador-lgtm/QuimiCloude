@@ -1,5 +1,12 @@
 # QC-141 — reserva-de-material-del-pedido · design.md
 
+> **Enmendado el 2026-09-23 (review).** Segunda enmienda, tras el review F2.2 (RECHAZADO) y la
+> decisión del humano registrada en **D21** (`requirements.md`). Resumen y mapa de lo que cambia en
+> **§0.4**. Secciones tocadas: §0.3 (E1/E2 aprobadas), §4.0, §4.3 (nuevas §4.3.1 y §4.3.2), §5.2,
+> §5.3, §5.4, §6.4, §8, §9.1, §9.2, §11, §12, §13 (nuevas §13.8-§13.10) y §15. **El código de
+> `dev` que trae QC-145 (PR #112) no está en este worktree**: lo que aquí se dice de él sale del
+> review y se confirma al mergear (task TR).
+
 > **Enmendado el 2026-09-23** tras el merge de QC-147 (`cantidades-de-receta-en-porcentaje`,
 > PR #108) en `dev`. Cambian §0 (nueva §0.3), §4 (nombres y §4.3), §5.1, §5.2, §6.1, §6.2, §6.4,
 > §11, §12, §13 (nuevas §13.6 y §13.7) y §15. Las referencias de la enmienda marcadas «`dev`» son
@@ -88,7 +95,27 @@ unidad en la línea) y **N1 sigue en pie con otra escala**.
 | E1 | **Producto sin unidad** (sin lotes). Con la línea sin unidad, R9/N3 ya no tienen objeto; queda el ingrediente cuyo producto no tiene unidad en la que expresar la necesidad. | **Cuenta como «no alcanza»**: el pedido no aparta nada (D2), y una entrega sin apartado (R31) se rechaza con `insufficient_material`. | Es la realidad física: un producto sin unidad no puede tener lotes (`migration.sql:89` de QC-121), así que no hay material. Saltarlo, como hacía N3, dejaría apartar un pedido al que le falta un ingrediente entero y verlo «Apartado» sin serlo. QC-138 lo bloqueará igual que cualquier otro pedido que no alcanza. | R9 |
 | E2 | **Receta sin líneas.** Tras QC-147 todas las recetas existentes están vacías, y con ellas los pedidos vivos. | **Crear, editar y migrar: no aparta y no da error**; el pedido queda «Sin apartar» (sin `reserved_at`, no caduca, pregunta 1). **Entregar sin nada apartado: se rechaza** con el código nuevo `recipe_without_lines`, «La receta del pedido no tiene ingredientes: complétala antes de entregarlo.», por el Finalizar de la planta y por la edición en Pedidos. | Entregar sin consumir registraría producto terminado sin ninguna salida de material, en silencio. Con la receta recargada, la entrega consume por R31 con la receta actual. Coste, dicho a sabiendas: hasta que alguien recargue la receta, el Finalizar de esos pedidos falla con ese mensaje. Alternativa si ese coste no se acepta: entregar sin consumir (§13.7). | R49, R50 |
 
-Mientras E1 y E2 no se aprueben, R9, R49 y R50 no se implementan (T6 y T10 esperan).
+~~Mientras E1 y E2 no se aprueben, R9, R49 y R50 no se implementan (T6 y T10 esperan).~~
+*(Enmendado el 2026-09-23 (review).)* **E1 y E2 están aprobadas** por el humano desde el
+2026-09-23 (D21 de `requirements.md`); R9, R49 y R50 ya no son provisionales.
+
+### 0.4 Enmienda del review (2026-09-23)
+
+Lo que decidió el humano (D21) y dónde se construye:
+
+| Hallazgo | Decisión | Diseño | Requisitos |
+|---|---|---|---|
+| **B1** Comentarios de producción que citan requisitos o `design.md` (`order-prisma.ts:772`, `lib/composition/index.ts:997`) | Se quitan las citas; queda el motivo | sin cambio de diseño; task TB1 | — (`docs/conventions.md > Comentarios`) |
+| **B2** El proceso diario no re-comprueba `reserved_at` con la fila bloqueada | La fila bloqueada trae `reserved_at`; nada si es `null` o posterior al umbral | §9.2 | R53 |
+| **B3** Alias `sharedPrismaClient` que esquiva `guard-ambito-empresa-pedidos` | **Excepción con nombre de archivo** en la guardia, con motivo que cita D21; vuelve `prisma` | §5.2.1 | R58 |
+| **B4** Rama sin integrar con `dev` (QC-145, `a01c90cb`) | **Solo el Finalizar consume**, en la misma transacción que escribe `finished_at`; R29 retirado | §4.0, §5.3, §5.4, §8, §12 | R12, R27, R29 (retirado), R50, R51, R52 |
+| **m1** Marcas «provisional» | Se quitan de `requirements.md` | — | R9, R19, R22, R26, R30, R31, R38, R49, R50 |
+| **m2** `createOrder`, `transitionAliveOrder` sin uso e `INSERT` duplicado | Se retiran; `order-sequence.int` ejercita la unidad de trabajo | §5.3 | R15 (el test del correlativo) |
+| **m3** Nadie vigila que quien llama a `consumeBatchStock` recalcule `products.stock` | Guardia nueva | §6.4 | R28 |
+| **m4** Errores del cron | Log en todo fallo, fallo aislado por empresa, código de error, sin repetir un pedido que falla | §9.2 | R26, R54, R55 |
+| **m5** El SQL de la migración no ordena los lotes como el comparador de TS | La migración usa el mismo comparador por pares | §4.3.1 | R43, R56; pregunta abierta 7 |
+| **m6** `…/down.sql` de la migración que aparta deja el libro incoherente tras uso de la app | El `down` falla si hubo actividad posterior | §4.3.2 | R57 |
+| **m7** La receta se lee con el cliente global dentro de la transacción | La unidad de trabajo ofrece también el lector de recetas sobre `tx` | §5.2.2 | — (no cambia comportamiento observable; test de dobles) |
 
 ---
 
@@ -324,6 +351,22 @@ integración de esta rama (bitácora, «Salida de los comandos» de T1-T3); si a
 aplicó —no consta—, hay que revertirlas allí igual antes de renombrar. El procedimiento está en la
 task TM.
 
+**Segunda renumeración (enmendado el 2026-09-23 (review), B4).** `dev` ganó con QC-145 y
+`a01c90cb` dos migraciones: `20260923120000_orders_finished_at` —**mismo prefijo** que nuestra
+§4.1— y `20260923140000_product_batch_nullable_machine`, que queda **por delante** de las tres
+nuestras. Las tres se renumeran por detrás de `20260923140000`:
+
+| Migración | Nombre anterior | Nombre nuevo |
+|---|---|---|
+| §4.1 | `20260923120000_inventory_movement_kind_consumption` | `20260923150000_inventory_movement_kind_consumption` |
+| §4.2 | `20260923120100_reservations_and_decimal_stock` | `20260923150100_reservations_and_decimal_stock` |
+| §4.3 | `20260923120200_reserve_existing_orders` | `20260923150200_reserve_existing_orders` |
+
+Si al mergear `dev` trae otra migración posterior a `20260923140000`, el prefijo sube hasta quedar
+por detrás de la última: la regla es la de arriba, no la cifra. La base propia de la rama
+(`QuimiCloude_QC141`) tiene aplicadas las tres con el nombre anterior; el procedimiento para
+ponerla al día está en la task TR.
+
 ### 4.1 `<ts>_inventory_movement_kind_consumption`
 
 `ALTER TYPE "InventoryMovementKind" ADD VALUE 'consumption';` y nada más. Va sola porque Postgres
@@ -390,6 +433,56 @@ ficha y es una reversión de esquema, no una operación de negocio. En la práct
 elimina la tabla entera.
 
 **Por qué SQL y no un script:** §13.3.
+
+### 4.3.1 El orden de lotes en SQL, igual que en TypeScript (enmendado el 2026-09-23 (review), m5)
+
+**Qué falla hoy.** El paso 3 ordena con un `ORDER BY` que pone primero los lotes de solo dígitos y
+compara el resto con la collation de la base. `compareBatchesOldestFirst` (TypeScript) compara **por
+pares**: por número si los dos son de solo dígitos; si no, como texto **por unidad de código**
+(operador `<`, sin `localeCompare`). Divergen en la misma fecha con `'-X'` y `'5'` (TS: `'-X'`
+primero, porque `'-'` es U+002D y `'5'` es U+0035; SQL: `'5'` primero) y con `'a'` y `'B'` (TS:
+`'B'` primero; la collation de la base puede poner `'a'` primero).
+
+**Cómo se arregla.** La migración deja de ordenar con una clave y usa el **mismo comparador por
+pares**:
+
+- Una función `lot_precedes(a text, b text) returns boolean` **dentro del bloque de la migración**
+  (`pg_temp`, para no dejar objetos en el esquema): si los dos casan con `'^[0-9]+$'`, compara
+  `a::numeric < b::numeric`; si no, `a COLLATE "C" < b COLLATE "C"`.
+- Por producto, los lotes con disponible se leen ordenados por `purchase_date` y, dentro de cada
+  fecha, se colocan con **ordenación por inserción** usando `lot_precedes`. Es cuadrática en el
+  número de lotes de una misma fecha y producto, que es pequeño; corre una sola vez.
+- `COLLATE "C"` compara bytes UTF-8, que coinciden con el orden de unidades de código UTF-16 de JS
+  **salvo** entre caracteres fuera del plano básico y los de U+E000-U+FFFF. No consta que el número
+  de lote admita esos caracteres; si los admite, es la única diferencia que queda y se anota en el
+  test.
+- El número de lote es único por empresa (QC-81), así que no hay empates entre lotes distintos.
+
+**Límite: el comparador no es un orden total.** Con tres lotes de la misma fecha puede cerrar un
+ciclo (`'9' < '10'` por número, `'10' < '1a'` y `'1a' < '9'` por texto). Con un ciclo, ni
+`Array.prototype.sort` ni la ordenación por inserción tienen un resultado único, y no hay forma de
+garantizar la paridad sin cambiar el comparador. Eso es la **pregunta abierta 7** de
+`requirements.md`; R56 exige la paridad solo en los conjuntos sin ciclo. Hasta que el humano
+decida, no se cambia `compareBatchesOldestFirst` (su orden lo usa también el coste de QC-123).
+
+**Test.** El de paridad (`reserve-existing-orders-migration.int.test.ts`) gana casos en la misma
+fecha con `'-X'`/`'5'`, `'a'`/`'B'` y una mezcla de cuatro lotes sin ciclo (`'2'`, `'10'`, `'-X'`,
+`'B'`), comparando el reparto de la migración con el de `planReservation`.
+
+### 4.3.2 El `down` que no deja el libro incoherente (enmendado el 2026-09-23 (review), m6)
+
+El `down.sql` de §4.3 empieza con un bloque `DO $$ ... RAISE EXCEPTION` que **falla sin cambiar
+nada** si, sobre algún pedido que apartó la migración, existe cualquier asiento de
+`reservation_movements` que **no** sea uno de los `reserve` de la propia migración (mismo criterio
+de hoy: `created_by IS NULL` y el `created_at` de la migración), o si su `orders.reserved_at` ya no
+es el instante de la migración (una edición volvió a apartar o lo dejó sin apartar). Solo si no hay
+nada de eso borra los `reserve` de la migración y anula `reserved_at`. Así el `down` solo corre en el
+caso para el que existe: revertir antes de que la app haya operado sobre esos pedidos (R57). Revertir
+después sigue siendo posible por §4.2, que elimina la tabla entera.
+
+Test en `reserve-existing-orders-migration.int.test.ts`: aplicar, registrar un `release` sobre un
+pedido apartado por la migración, ejecutar el `down` y comprobar que falla y que el libro y
+`reserved_at` no cambian; y el caso limpio, que revierte.
 
 ---
 
@@ -510,6 +603,49 @@ transaccional a esta misma fábrica».
   `createMaterialReservations` deja de recibir `UnitCatalog` —hoy
   `reservation-prisma.ts:4,86-92,119` de esta rama—.)*
 
+#### 5.2.1 La excepción con nombre en `guard-ambito-empresa-pedidos` (enmendado el 2026-09-23 (review), B3)
+
+`withOrderTransaction` necesita el cliente global para llamar a `prisma.$transaction`, que no lee
+ni escribe ninguna tabla. Hoy lo importa como `sharedPrismaClient` para que la expresión
+`TOCA_LA_BASE` de la guardia (`/\b(?:prisma|tx)\s*\./`) no lo vea: una excepción sin nombre y un
+patrón copiable. Por D21:
+
+- `order-unit-of-work-prisma.ts` vuelve a `import { prisma } from '@/lib/shared/db/prisma'`.
+- `tests/guards/guard-ambito-empresa-pedidos.test.ts` gana una lista de **archivos exentos por
+  nombre**, con una sola entrada: `order-unit-of-work-prisma.ts`, y su motivo escrito junto a ella:
+  «Solo abre la transacción que comparten pedidos e inventario (`prisma.$transaction`); no lee ni
+  escribe tablas. Excepción aprobada por el humano en QC-141, decisión D21 (2026-09-23).» Los tests
+  pueden citar fichas; los comentarios de producción no.
+- **Para que el nombre no sea un cheque en blanco**, la guardia comprueba además en ese archivo que
+  **todo** acceso `prisma.` es `prisma.$transaction`: cualquier otra consulta que alguien añada ahí
+  pone la guardia en rojo. Y un caso anti-placebo con una fuente fabricada (`prisma.order.findMany`
+  dentro de un archivo con ese nombre) demuestra que la exención no la deja pasar.
+- **Sin alias en `pedidos`**: la guardia rechaza cualquier `import { prisma as X }` en los
+  adaptadores de `pedidos`, con su anti-placebo. Es lo que impide que el truco se copie; no convierte
+  la guardia en la opción (a) del review (reconocer cualquier alias como `prisma` y tratar
+  `$transaction` como no-consulta en todos los archivos), descartada en §13.8.
+
+*Nota para el humano:* la comprobación de «solo `$transaction`» y la prohibición del alias son
+elección de este diseño para que la excepción quede estrecha; D21 fija la exención por nombre y el
+motivo. Si se prefieren sin ellas, se retiran sin tocar lo demás.
+
+#### 5.2.2 La receta se lee con el cliente de la transacción (enmendado el 2026-09-23 (review), m7)
+
+`create-order.ts` y `transition-order.ts` leen la receta con el lector global **dentro** de
+`unitOfWork.run`, así que piden una segunda conexión mientras la transacción retiene la suya: con el
+pool pequeño del pooler de Supabase eso es espera o `P2024` bajo carga.
+
+- `OrderTransactionScope` gana `recipes`: el lector de líneas de receta (`findExecutionContentById`,
+  el tipo que ya usa `pedidos` del barril de `recetas`) construido **sobre `tx`**.
+- `recetas` expone en su driven una fábrica sobre cliente (`db = prisma`), con el mismo patrón que
+  `createOrderWriteRepository` y `createMaterialReservations`; si ya existe una, se reutiliza.
+- `lib/composition` la ata con el mismo `tx` en `orderUnitOfWork.run`, sin nombrar Prisma.
+- Crear y Finalizar leen la receta con `scope.recipes`. Editar hoy la lee **antes** de abrir la
+  transacción, sin segunda conexión; se pasa también a `scope.recipes` para que haya **una sola**
+  forma de leerla dentro de pedidos y la lectura vea la misma instantánea que el bloqueo.
+- Test unitario con dobles: el lector global de recetas falla si se le llama mientras `run` está
+  abierto.
+
 ### 5.3 `OrderWriteRepository` (puerto nuevo de `pedidos`)
 
 Los métodos que escriben, sobre el cliente que se les da, más un bloqueo de fila:
@@ -529,6 +665,24 @@ Los métodos que escriben, sobre el cliente que se les da, más un bloqueo de fi
 cambia; sus cuatro métodos de escritura se quedan hasta que T8 mueva a sus llamantes y luego se
 retiran, para no dejar dos caminos de escritura.
 
+*(Enmendado el 2026-09-23 (review).)*
+
+- **`setStatus` y `finished_at` (B4).** Con QC-145, `orders` tiene `finished_at` y el `CHECK
+  orders_finished_at_requires_delivered`. Cuando el destino es `ENTREGADO`, `setStatus` escribe
+  `status` y `finished_at` en **el mismo `UPDATE` condicional**; para cualquier otro destino no toca
+  `finished_at`. El valor es el que escribe hoy el Finalizar de QC-145 en `dev`: al mergear se lleva
+  a `setStatus` tal cual (fuente y zona horaria incluidas), y la bitácora anota de dónde sale. Así
+  el cambio de estado, `finished_at` y el consumo viven en la misma transacción (R51).
+- **Lo que se retira (m2).** `createOrder` (`order-prisma.ts`), que solo mantenía vivo
+  `order-sequence.int.test.ts`, y `transitionAliveOrder` (`order-catalog-prisma.ts`), sin llamantes
+  y peligrosa: recableada, entregaría **sin consumir**. El `INSERT` del correlativo queda escrito
+  **una vez**, en `insertAliveOrder`. `order-sequence.int.test.ts` pasa a ejercitar
+  `withOrderTransaction` + `createOrderWriteRepository` (deja de ser «sin cambios», como pedía T8),
+  y el anti-placebo de `guard-ambito-empresa-pedidos` que apuntaba a `createOrder` apunta a
+  `insertAliveOrder`. **Ojo al mergear:** QC-145 cambia `transitionAliveOrder` para escribir
+  `finished_at`; ese cambio **no se conserva ahí** (se borra la función), se traslada a `setStatus`.
+- **`lockAliveById` devuelve también `reservedAt`** (B2, §9.2).
+
 ### 5.4 `OrderCatalog` (contrato que consume `asignaciones`)
 
 `transitionAliveById` (`order-catalog.ts:69-76`) **conserva su firma** y gana un resultado:
@@ -539,10 +693,22 @@ retiran, para no dejar dos caminos de escritura.
 la planta consume sin que `asignaciones` sepa de inventario**: `finish-assigned-order.ts` solo
 aprende a traducir `'insufficient_material'` a un error propio (`R27`, `R30`, `R31`).
 
-*(Enmendado el 2026-09-23, si se aprueba E2.)* El resultado gana también `'recipe_without_lines'`,
+*(Enmendado el 2026-09-23; E2 aprobada.)* El resultado gana también `'recipe_without_lines'`,
 que `createTransitionOrder` devuelve cuando `consumeForOrder` responde `nothing_to_consume`, y que
-`finish-assigned-order.ts` traduce a un segundo error propio (`R50`). La edición en Pedidos lanza
-`RecipeWithoutLinesError` de `pedidos` en el mismo caso.
+`finish-assigned-order.ts` traduce a un segundo error propio (`R50`). ~~La edición en Pedidos lanza
+`RecipeWithoutLinesError` de `pedidos` en el mismo caso.~~
+
+*(Enmendado el 2026-09-23 (review), B4.)* **El Finalizar es el único camino a `ENTREGADO`.** Tras
+QC-145 la edición en Pedidos no mueve el estado, así que `update-order.ts` pierde la rama que
+consumía y los errores que solo ella lanzaba (`InsufficientMaterialError` y
+`RecipeWithoutLinesError` desde la edición; si alguno se queda sin lanzador, se retira de `pedidos`
+y su código **sigue** en el catálogo porque lo usa `asignaciones`). `createTransitionOrder`, con
+destino `ENTREGADO`, hace dentro de **una** unidad de trabajo: `lockAliveById` → `assertTransition`
+→ `consumeForOrder` → si no es `consumed`, **lanza** para deshacer la unidad y devuelve el resultado
+(`'insufficient_material'` o `'recipe_without_lines'`) → `setStatus(..., 'ENTREGADO')` con
+`finished_at` (§5.3) → `setReservedAt(null)`. Ningún resultado distinto de `'ok'` deja escrito el
+estado, `finished_at` ni el inventario (R51). Con otro destino (`PENDIENTE → EN_CURSO`) no toca la
+reserva ni `finished_at`.
 
 ### 5.5 Puertos que `inventario` declara para no importar `pedidos`
 
@@ -645,6 +811,14 @@ su `writeMovement` en el cuerpo: `tests/guards/guard-libro-de-inventario.test.ts
 que toda escritura de `product_batches` esté en ese archivo y asiente, y su censo pasa de tres a
 cuatro caminos. `reservation-prisma.ts` la llama (driven → driven del mismo módulo).
 
+*(Enmendado el 2026-09-23 (review), m3.)* `qc121-alcance` saca `consumeBatchStock` de la garantía
+«toda escritura de lotes recalcula `products.stock`» (`EXCEPCIONES_SIN_RECALCULO`), y la traslada a
+sus llamantes sin que nadie la vigile. Se añade la comprobación en la misma guardia: **toda función
+de `lib/**` que llame a `consumeBatchStock` llama también a `recalculateProductStock` en su cuerpo**
+(o en el de la función que la envuelve dentro del mismo archivo, si el implementer lo prefiere así,
+dicho en la guardia). Con dos anti-placebos de fuente fabricada: un llamante sin recálculo (rojo) y
+uno con él (verde). Mapea a R28.
+
 ### 6.5 `releaseForOrder`
 
 Lee lo apartado propio por lote e inserta un `release` o `expire` por cada lote con saldo positivo.
@@ -683,6 +857,17 @@ toman `adjustBatchStock` (`product-prisma.ts:727-734`) y `addBatchToAlive`
 | Iniciar (`start-assigned-order.ts:50-67`) | `PENDIENTE → EN_CURSO` | la misma transición; al no ser `ENTREGADO`, no toca la reserva |
 | Edición que deja `ENTREGADO` | permitida por `order-transitions.ts:23-24` y `order-input.ts:86-102` | consume (`[D12]`). QC-145 la retirará |
 | Coste (`resolve-ingredients-cost.ts`) | total de lotes con existencia | **no cambia** (QC-123 sigue mandando sobre el importe) |
+
+*(Enmendado el 2026-09-23 (review), B4 y m7.)* La tabla de arriba es la del spec original. Tras
+QC-145 y D21 cambian tres filas:
+
+| Camino | Con la enmienda |
+|---|---|
+| Editar | lectura previa igual; `unitOfWork.run`: `lockAliveById`, `updateAlive` **sin cambio de estado** (QC-145), receta con `scope.recipes`, `syncForOrder` + `setReservedAt`. **Nunca consume** (R52). Se retira la rama `ENTREGADO` y con ella R29 |
+| Finalizar | misma llamada desde `asignaciones`; dentro, §5.4 enmendado: consumo + `status` + `finished_at` + `reserved_at = NULL` en una unidad (R27, R51) |
+| Edición que deja `ENTREGADO` | **ya no existe** (QC-145). Fila retirada |
+
+Crear lee la receta con `scope.recipes` (§5.2.2).
 
 `CreateOrderDeps`, `UpdateOrderDeps`, `CancelOrderDeps` y `DeleteOrderDeps` ganan una dependencia
 `unitOfWork`. Cancelar y borrar no necesitan la receta: liberar solo lee el libro.
@@ -736,6 +921,67 @@ GET /api/cron/caducar-pedidos
   hace nada; dos ejecuciones solapadas se serializan en la fila del pedido (`R25`).
 - **Un pedido que falla no arrastra a los demás**: una transacción por pedido (`R26`). Si el mismo
   pedido falla siempre, sale en el log cada día hasta que alguien lo mire.
+
+#### 9.2.1 Flujo enmendado (2026-09-23 (review), B2 y m4)
+
+El pseudocódigo de arriba ya decía «`reserved_at > threshold` → nada», pero el código no lo hace y
+el bucle no es el que pide §9.1 (empresa por empresa). Este es el que manda:
+
+```
+GET /api/cron/caducar-pedidos
+  auth igual que arriba                                                            (R24)
+  now = reloj; threshold = now - 15 días; failed = []
+  try companies = listActiveCompanyIds()
+  catch e -> failed += { stage: 'companies', code: codeOf(e) }; ir a «final»          (R54)
+  por cada companyId, mientras no se agoten 240 s:
+    cursor = null
+    repetir:
+      try lote = findExpirableOrders(companyId, threshold, cursor, 100, { companyId })
+      catch e -> failed += { stage: 'candidates', companyId, code: codeOf(e) }; siguiente empresa  (R54)
+      si lote vacío -> siguiente empresa
+      por cada { id, reservedAt }:
+        try unitOfWork.run:
+          fila = lockAliveById(id, { companyId })          // trae status y reserved_at
+          si fila == null
+             o fila.status != PENDIENTE
+             o fila.reservedAt == null
+             o fila.reservedAt > threshold  -> nada                                (R22, R25, R53)
+          cancelAlive(...); releaseForOrder('expire', null); setReservedAt(null)   (R21)
+        catch e -> failed += { stage: 'order', id, companyId, code: codeOf(e) }    (R26, R55)
+      cursor = último (reservedAt, id) del lote
+  final:
+  si failed no vacío -> console.error order_expiry_failed { failed, expired }, 500  (pregunta 3)
+  si no              -> 200 { expired: n }
+```
+
+- **B2.** `lockAliveById` devuelve también `reserved_at` (su `SELECT ... FOR UPDATE` ya lee la
+  fila; `OrderRow`, o el tipo que devuelva el bloqueo, gana `reservedAt: Date | null`). `expireOne`
+  no hace nada si la fila bloqueada tiene `reserved_at` nulo o posterior al umbral: una edición
+  intercalada entre la lectura del lote y el bloqueo gana.
+- **Cursor, no «volver a pedir el primer lote» (m4).** `findExpirableOrders` recibe el último
+  `(reserved_at, id)` visto y devuelve los siguientes con `(reserved_at, id) > cursor`, en el mismo
+  orden del índice. Un pedido que falla queda **detrás** del cursor y no se vuelve a pedir en esa
+  ejecución (R55); una empresa con 100 o más pedidos que fallan siempre termina en un número finito
+  de páginas y no deja sin procesar a las siguientes. `scope` sigue siendo el último parámetro.
+- **Todo fallo va al log (m4).** El `console.error` de `order_expiry_failed` sale también cuando
+  falla `listActiveCompanyIds` o `findExpirableOrders`, con `stage` para distinguirlos. La ruta
+  responde `500` si hubo cualquier fallo.
+- **Código de error (m4).** `codeOf(e)` es el código del catálogo de errores si el error lo trae
+  (los errores de dominio lo llevan), y si no, el literal `unexpected`. **Nunca** el mensaje ni datos
+  del pedido: el log lleva solo identificadores y códigos (sin PII).
+- **Aislamiento por empresa de verdad.** El fallo de una empresa —al buscar candidatos o en un
+  pedido— no impide procesar las siguientes. Se corrige el docblock de `expire-stale-orders.ts`
+  para que diga lo que el código hace, y el test `expire-stale-orders.test.ts` que hoy se llama
+  «una empresa que falla al listar sus candidatos…» pasa a hacer que **falle** (doble que lanza
+  para una empresa) y comprueba que la siguiente se procesa y que el fallo sale en `failed` con
+  `stage: 'candidates'` y su código.
+- **Tests (unit, con dobles):** edición intercalada con `reserved_at` reiniciado y con `reserved_at`
+  nulo → no cancela (R53); fallo al listar empresas → log + 500 (R54); fallo al buscar candidatos
+  de una empresa → sigue con la siguiente (R54); un pedido que falla siempre en una empresa con más
+  de 100 candidatos → aparece **una** vez en `failed` y la empresa siguiente se procesa (R55);
+  `code` presente en cada entrada (R26). **Integración:** un doble de `findExpirableOrders` que,
+  tras devolver el lote, edita el pedido por otra conexión (reinicia `reserved_at`) antes del
+  bloqueo, y el pedido sigue `PENDIENTE` con su material (R53).
 - **Sin actor**: es una operación del sistema; no hay permiso que comprobar y la puerta es el
   secreto. `R41` no se contradice: no escribe fuera de una operación de `pedidos`.
 - El motivo es la constante `EXPIRED_ORDER_REASON = 'pedido caducado'` de
@@ -769,8 +1015,8 @@ En `lib/modules/errores/domain/error-codes.ts` y `error-catalog.ts` (la guardia
 
 | Código | Mensaje | Lo lanzan |
 |---|---|---|
-| `insufficient_material` | «No hay material suficiente en inventario para entregar el pedido.» | `pedidos` (`InsufficientMaterialError`) y `asignaciones` (`MaterialShortageError`) |
-| `recipe_without_lines` *(enmienda del 2026-09-23, si se aprueba E2)* | «La receta del pedido no tiene ingredientes: complétala antes de entregarlo.» | `pedidos` (`RecipeWithoutLinesError`) y `asignaciones` (su traducción en el Finalizar) |
+| `insufficient_material` | «No hay material suficiente en inventario para entregar el pedido.» | `asignaciones` (`MaterialShortageError`). *(Enmendado el 2026-09-23 (review): `InsufficientMaterialError` de `pedidos` solo lo lanzaba la edición; se retira si queda sin lanzador.)* |
+| `recipe_without_lines` *(enmienda del 2026-09-23; E2 aprobada)* | «La receta del pedido no tiene ingredientes: complétala antes de entregarlo.» | `asignaciones` (su traducción en el Finalizar). *(Enmendado el 2026-09-23 (review): ya no lo lanza la edición en Pedidos.)* |
 
 La respuesta del ajuste sobre-reservado **no es un error** (`R33`): es un campo del éxito.
 
@@ -786,6 +1032,16 @@ La respuesta del ajuste sobre-reservado **no es un error** (`R33`): es un campo 
 | Migraciones | tests de esquema de la tabla, enum, columnas, `numeric(14,4)`; `down.sql` falla con decimales; **paridad**: la migración 4.3 y `planReservation` producen el mismo reparto sobre los mismos datos (N8), *(enmendado el 2026-09-23)* con recetas en porcentaje, un caso de techo a 4 decimales, un producto sin unidad y una receta sin líneas |
 | Guardias | `guard-libro-de-inventario` con cuatro caminos; `guard-empresa-en-esquema`, `guard-rls-force`, `guard-arquitectura-modulos` (sin ciclo, sin Prisma en composición), `guard-ambito-empresa-*`, `guard-dependencias-aprobadas` (sin cambios en `package.json`, `R47`) |
 | E2E (`e2e/reserva-de-material.spec.ts`) | `R48` *(enmendado el 2026-09-23: la receta del recorrido tiene una sola línea al 100,00 % del producto, así que un pedido de 1.500 necesita 1.500)*: lote de 2.000; pedido A de 1.500 → inventario muestra 1.500 reservado y 500 disponible; pedido B de 1.500 → «Sin apartar» y el reservado sigue en 1.500; cancelar A → reservado 0; editar B (reintenta) → aparta; entregar B por la edición en Pedidos → total 500, reservado 0, historial con el consumo |
+
+*(Enmendado el 2026-09-23 (review).)* Cambios sobre la tabla de arriba:
+
+| Nivel | Qué |
+|---|---|
+| E2E (`e2e/reserva-de-material.spec.ts`) | El último paso **entrega B por el Finalizar de la planta** (asignar, iniciar y finalizar, como `e2e/ejecucion-receta.spec.ts`), no por la edición en Pedidos, que ya no entrega. Comprueba total 500, reservado 0 y el consumo en el historial. Se corre en Chromium y WebKit junto con `ejecucion-receta`, `ajuste-de-inventario` y los E2E que traiga QC-145 sobre Pedidos y Finalizar |
+| Unit, casos de uso | `update-order`: ninguna llamada a `consumeForOrder` ni a `setStatus` en ningún caso (R52). `transition-order`: con `insufficient_material` y con `recipe_without_lines` no se llama a `setStatus` y la unidad se deshace (R51); con `ok`, `setStatus` recibe `finished_at`. Lector global de recetas que falla si se le llama dentro de `run` (m7). Cron: §9.2.1 |
+| Integración | `order-reservation.int.test.ts`: Finalizar con material deja `ENTREGADO`, `finished_at` no nulo, lote bajado y `consume`; Finalizar con material insuficiente y con receta sin líneas deja `status`, `finished_at` (nulo), lotes, libro y `products.stock` intactos (R51, R50). `order-sequence.int.test.ts` sobre la unidad de trabajo (m2). `order-expiry.int.test.ts`: la edición intercalada (R53). Migración: §4.3.1 y §4.3.2 (R56, R57) |
+| Guardias | `guard-ambito-empresa-pedidos`: exención por nombre con motivo, «solo `$transaction`» en el exento, sin alias, con anti-placebos (R58). `qc121-alcance`: llamante de `consumeBatchStock` recalcula (R28). La comprobación de comentarios de producción (B1) la hace el reviewer; si existe una guardia que la cubra, debe salir verde |
+| Retirados | Los casos cuyo nombre cita `R29` se borran o se reescriben contra R52; el mapa de la bitácora dice «R29 — retirado (D21)» |
 
 Cada `R<n>` va en el nombre de su caso; el mapa `R → test` lo escribe el implementer en
 `progress/impl_QC-141-reserva-de-material-del-pedido.md`.
@@ -847,6 +1103,30 @@ material ni rastro de por qué, que es justo lo que D11 (historial completo) y D
 quieren evitar. Es la alternativa si el humano no acepta que el Finalizar falle hasta recargar la
 receta.
 
+### 13.8 Que la guardia reconozca cualquier alias del cliente (opción (a) del review, B3)
+
+La guardia resolvería el nombre local de cualquier import de `@/lib/shared/db/prisma` y trataría
+`$transaction` como no-consulta en todos los archivos de `pedidos`. Descartada por decisión del
+humano (D21): convierte una excepción concreta en una regla general —cualquier archivo podría
+abrir transacciones con el cliente global sin que nadie lo apruebe— y la excepción deja de verse
+en la guardia. Con la exención por nombre, el único archivo que la usa está escrito y motivado. Lo
+que sí se toma de (a) es lo mínimo para cerrar el agujero: prohibir el alias (§5.2.1).
+
+### 13.9 Seguir consumiendo en la edición en Pedidos tras QC-145 (B4)
+
+Mantener la rama de `update-order.ts` que consumía al pasar a `ENTREGADO`, por si otra ficha
+devolviera ese camino. Descartada (D21): QC-145 ya no deja que la edición mueva el estado, así que
+esa rama sería código muerto que **escribe inventario**, y el review ya mostró lo que cuesta un
+camino de escritura sin llamantes (m2, `transitionAliveOrder`). Si un camino nuevo vuelve a
+entregar, se especifica con su ficha y pasa por `createTransitionOrder`.
+
+### 13.10 Guardar la lista de pedidos fallidos y excluirlos por `id` (m4)
+
+Pasar a `findExpirableOrders` los `id` que ya fallaron en la ejecución (`id NOT IN (...)`).
+Descartada frente al cursor: la lista crece sin tope dentro de una ejecución y la consulta con ella,
+y no aprovecha el orden `reserved_at, id` que ya da `orders_expirable_idx`. El cursor da lo mismo
+(ningún pedido se pide dos veces) en espacio constante.
+
 ---
 
 ## 14. Dependencias
@@ -875,6 +1155,14 @@ comparación en tiempo constante es `node:crypto`. Los decimales, `BigInt` (§2.
 - *(Enmienda del 2026-09-23.)* **Recetas vacías tras QC-147**: la migración §4.3 casi no apartará
   nada si corre antes de que se recarguen las recetas, y con E2 el Finalizar de esos pedidos falla
   hasta recargarlas.
+- *(Enmienda del 2026-09-23 (review).)* **La base propia no revierte sola.** Los E2E dejaron en
+  `QuimiCloude_QC141` asientos `consumption` y existencias con decimales (el ajuste de `-0.5`), y
+  los `down` de §4.1 y §4.2 **fallan a propósito** con esos datos (R45). Revertir para renumerar
+  (task TR) no pasa sin borrar datos o recrear la base: eso lo decide el humano, no el implementer.
+- *(Enmienda del 2026-09-23 (review).)* **`dev` puede traer rojos ajenos**: el log de `dev`
+  registra un baseline de QC-145 con `guard-arquitectura-modulos` en rojo por un import profundo de
+  `a01c90cb` en `product-actions`. Si llega con el merge, se trata como rojo heredado según
+  `docs/verification.md`, no se arregla aquí sin decirlo, y no cuenta como fallo de esta rama.
 - **Paralelismo**: la ficha toca `lib/composition/index.ts`, `db/schema.prisma`,
   `order-prisma.ts`, `product-prisma.ts` y `finish-assigned-order.ts`. Cualquier otra ficha
   `in_progress` sobre esos archivos choca (`AGENTS.md > Paralelismo`).

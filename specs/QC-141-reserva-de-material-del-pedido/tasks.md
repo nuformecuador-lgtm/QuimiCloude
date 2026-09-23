@@ -1,5 +1,11 @@
 # QC-141 — reserva-de-material-del-pedido · tasks.md
 
+> **Enmendado el 2026-09-23 (review).** Tras el review F2.2 (RECHAZADO) y la decisión D21, T0-T17
+> y TM siguen `[x]`, y **lo pendiente es el bloque «Enmienda del review»**, al final: **TR**
+> (re-sincronizar con `dev`: QC-145 y `a01c90cb`) va primero; después TB1-TB4 (bloqueantes),
+> Tm1-Tm7 (menores) y **TC** (cierre con E2E en Chromium y WebKit y `./init.sh` completo). T10 y
+> T16 quedan cerradas, pero su parte de «entregar por la edición en Pedidos» la retira TB4.
+
 > **Enmendado el 2026-09-23** tras el merge de QC-147 en `dev` (`design.md > 0.3`): nace **TM**
 > (merge de `origin/dev` y renumeración de migraciones), primera de lo pendiente; **T6 se rehace**,
 > **T7 se reabre** para un ajuste parcial, y cambian T9, T10, T11, T16 y T17. T6 y T10 esperan,
@@ -347,3 +353,230 @@ interno» ya existe como caso, se añade que el primero es este y su variable),
 **Hecho cuando:** los 50 requisitos tienen test en el mapa, `R47` lo cubre
 `guard-dependencias-aprobadas` sin filas nuevas en `docs/dependencias.md`, y `./init.sh` completo
 termina en verde.
+
+---
+
+# Enmienda del review (2026-09-23) — PENDIENTE
+
+> Decisión D21 de `requirements.md`; diseño en `design.md > 0.4` y las secciones que allí se citan.
+> Orden: **TR primero**; después, en este orden salvo `[P]`. Cada task cierra con
+> `./init.sh --rapido`; TC con `./init.sh` completo. Los comentarios de producción no citan fichas,
+> requisitos ni `design.md`; `R<n>` va en el nombre de los tests.
+
+## [ ] TR — Re-sincronizar con `origin/dev` (QC-145 y `a01c90cb`) `[primera de lo pendiente]`
+
+Archivos: todo lo que traiga el merge; `db/migrations/20260923120000_inventory_movement_kind_consumption/`,
+`…120100_reservations_and_decimal_stock/` y `…120200_reserve_existing_orders/` (se renombran);
+`tests/guards/guard-identificador-de-request.test.ts` (`MIGRACIONES_ESPERADAS`) y todo test que
+cite los tres nombres; `lib/modules/pedidos/ports/order-write-repository.ts`,
+`lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` (`setStatus`),
+`lib/modules/pedidos/domain/transition-order.ts`,
+`tests/integration/pedidos/order-reservation.int.test.ts`, `tests/unit/pedidos/transition-order.test.ts`.
+
+1. **Poner la base propia en su sitio, antes de mergear** (con el código de la rama tal cual, porque
+   los `down.sql` son los de los nombres actuales). En `QuimiCloude_QC141` (a la que apunta el
+   `.env` del worktree; **nunca** la compartida `QuimiCloude`): `db:rollback` de `…120200`, luego
+   `…120100`, luego `…120000`, forzando el orden como en TM. **Aviso** (`design.md > 15`): los E2E
+   dejaron asientos `consumption` y existencias con decimales, y los `down` de `…120100` y
+   `…120000` **fallan a propósito** con esos datos. **Si fallan, PARAR y preguntar al humano**: no
+   se borran filas a mano ni se recrea la base sin su permiso. Comprobar al final que
+   `_prisma_migrations` no tiene ninguna de las tres como aplicada.
+2. **Renumerar** a `20260923150000_…`, `20260923150100_…` y `20260923150200_…`
+   (`design.md > 4.0`, segunda renumeración), o al prefijo que haga falta para quedar **por detrás
+   de la última migración de `dev`** en el momento del merge. Actualizar nombres en tests y guardia.
+3. **`git merge origin/dev`.** Conflictos esperados según el review, a confirmar:
+   - `db/schema.prisma`: `Order.finishedAt` de QC-145 **y** nuestro `reservedAt`; `ProductBatch`
+     con `presentation_id`/`unit_cost` anulables (`a01c90cb`) **y** nuestro `stock Decimal(14,4)`.
+   - `lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts`: QC-145 hace que
+     `transitionAliveOrder` escriba `finished_at`. **No se conserva ahí**: ese cambio se traslada a
+     `setStatus` (paso 4) y la función se borra en Tm2.
+   - `update-order.ts`, `order-input.ts`, `order-transitions.ts` y la UI de edición: la forma de
+     QC-145 (la edición no mueve el estado) con nuestro recálculo de reserva; la rama de consumo se
+     retira en TB4.
+   - `asignaciones/domain/finish-assigned-order.ts`: lo de QC-145 con nuestra traducción de
+     `insufficient_material` y `recipe_without_lines`.
+   - `product-prisma.ts`, `product-form.tsx` y los esquemas de alta de lote (`a01c90cb`) con
+     nuestra existencia decimal.
+   - `lib/composition/index.ts`, `tests/guards/guard-identificador-de-request.test.ts` (unión, con
+     los nombres nuevos), `feature_list.json` (el de `dev`, conservando el estado de QC-141).
+4. **Adaptar el Finalizar a `finished_at`** (`design.md > 5.3` y `> 5.4` enmendados): `setStatus`
+   escribe `status = 'ENTREGADO'` y `finished_at` en el mismo `UPDATE` condicional, con el valor
+   que escribe QC-145 en `dev` (anotar en la bitácora de dónde sale); `createTransitionOrder` hace
+   consumo + `setStatus` + `setReservedAt(null)` en una unidad, y todo resultado distinto de `'ok'`
+   la deshace.
+5. **Reaplicar**: `pnpm run db:migrate` sobre `QuimiCloude_QC141` (aplica
+   `20260923120000_orders_finished_at`, `20260923140000_product_batch_nullable_machine` y las tres
+   nuestras renumeradas), `pnpm exec prisma generate`, y regenerar la plantilla de integración.
+   **No correr la app ni E2E sobre esa base hasta cerrar Tm5-Tm6** (tocan `…150200`).
+
+**Hecho cuando:** merge commiteado sin marcadores; ningún par de directorios de `db/migrations/`
+comparte prefijo y las tres nuestras van por detrás de la última de `dev`; `_prisma_migrations` de
+`QuimiCloude_QC141` tiene las de `dev` y las tres con el nombre nuevo, ninguna con el viejo;
+`pnpm run typecheck` sin errores; tests verdes para **R27** y **R51** (Finalizar con material:
+`ENTREGADO`, `finished_at` no nulo, consumo; con `insufficient_material` y con
+`recipe_without_lines`: `status`, `finished_at`, lotes, libro y `products.stock` sin cambios) y
+**R50**; `./init.sh --rapido` verde, con los rojos que traiga `dev` (si los trae) declarados como
+heredados según `docs/verification.md` (`design.md > 15`).
+
+## [ ] TB1 — Comentarios de producción sin citas `[depende de TR]`
+
+Archivos: `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` (hoy `:772`),
+`lib/composition/index.ts` (hoy `:997`), y cualquier otro que salga del barrido.
+
+- Quitar «R21-R26» y «T12, design.md > 9»; dejar el motivo.
+- Barrer el diff de la rama contra `origin/dev` buscando en comentarios de producción (`lib/`,
+  `app/`, `db/` salvo lo que la convención exceptúe) `R\d+`, `T\d+`, `QC-\d+`, `design.md`,
+  `requirements.md`, `tasks.md`.
+
+**Hecho cuando:** el barrido no encuentra ninguna cita en comentarios de producción añadidos por la
+rama, y la lista de comandos y resultado queda en la bitácora.
+
+## [ ] TB2 — El proceso diario re-comprueba `reserved_at` bajo el candado `[depende de TR]`
+
+Archivos: `lib/modules/pedidos/domain/expire-stale-orders.ts`, el tipo de fila que devuelve
+`lockAliveById` (`OrderRow` o el que corresponda) y su adaptador,
+`tests/unit/pedidos/expire-stale-orders.test.ts`,
+`tests/integration/pedidos/order-expiry.int.test.ts`.
+
+- `lockAliveById` devuelve `reservedAt`; `expireOne` no hace nada si es `null` o posterior al
+  umbral, ni si el estado no es `PENDIENTE` (`design.md > 9.2.1`).
+
+**Hecho cuando:** unit verdes para **R53** (edición intercalada que reinicia el plazo y que deja
+`reserved_at` nulo: no cancela, no libera) y **R22**; integración verde con la edición intercalada
+por otra conexión (**R53**); `R21` y `R25` siguen verdes.
+
+## [ ] TB3 — Excepción con nombre en `guard-ambito-empresa-pedidos` `[depende de TR]` `[P con TB2]`
+
+Archivos: `lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma.ts`,
+`tests/guards/guard-ambito-empresa-pedidos.test.ts`.
+
+- Fuera el alias: `import { prisma } from '@/lib/shared/db/prisma'`.
+- Exención por nombre de archivo con el motivo que cita D21; en el exento, todo `prisma.` es
+  `prisma.$transaction`; ningún `import { prisma as … }` en `pedidos` (`design.md > 5.2.1`).
+
+**Hecho cuando:** la guardia está verde con el archivo importando `prisma`; tres anti-placebos con
+fuente fabricada salen en rojo —otra consulta en el archivo exento, un alias en otro archivo de
+`pedidos`, y una consulta sin empresa en un archivo no exento—; el caso de la guardia lleva **R58**
+en el nombre.
+
+## [ ] TB4 — Solo el Finalizar consume: fuera la entrega por la edición `[depende de TR]`
+
+Archivos: `lib/modules/pedidos/domain/update-order.ts`, `lib/modules/pedidos/domain/errors.ts` (si
+un error queda sin lanzador), `tests/unit/pedidos/update-order.test.ts`,
+`tests/integration/pedidos/order-reservation.int.test.ts`, `e2e/reserva-de-material.spec.ts`,
+y los tests cuyo nombre cite `R29`.
+
+- `update-order.ts` sin rama `ENTREGADO`, sin `consumeForOrder` y sin los errores que solo ella
+  lanzaba (`design.md > 5.4` y `> 8` enmendados).
+- Tests de `R29`: se borran o se reescriben contra **R52**.
+- E2E: el paso final entrega B por el **Finalizar de la planta** (`design.md > 12` enmendado).
+
+**Hecho cuando:** unit verde para **R52** (ninguna edición llama a `consumeForOrder` ni a
+`setStatus`); integración: una edición no escribe `consumption` ni `consume`; ningún test cita
+`R29`; `R12` verde sin «estado» entre los campos editables; `guard-catalogo-de-errores` verde.
+
+## [ ] Tm1 — Marcas «provisional» (hecho en el spec) y mapa `[depende de TB4]`
+
+Archivos: `progress/impl_QC-141-reserva-de-material-del-pedido.md`.
+
+El spec ya no marca nada como provisional (esta enmienda). Queda reflejarlo en la bitácora.
+
+**Hecho cuando:** el mapa de la bitácora va de R1 a R58, con «R29 — retirado (D21)», y no dice que
+E1/E2 o ninguna pregunta esperen aprobación.
+
+## [ ] Tm2 — Retirar los caminos de escritura muertos `[depende de TB3, TB4]`
+
+Archivos: `lib/modules/pedidos/adapters/driven/persistence/{order-prisma,order-catalog-prisma}.ts`,
+`tests/integration/pedidos/order-sequence.int.test.ts`,
+`tests/guards/guard-ambito-empresa-pedidos.test.ts` (anti-placebo), `tests/guards/module-contract*`
+si lista esos métodos.
+
+- Borrar `createOrder` y `transitionAliveOrder`; el `INSERT` del correlativo, solo en
+  `insertAliveOrder` (`design.md > 5.3` enmendado).
+- `order-sequence.int.test.ts` sobre `withOrderTransaction` + `createOrderWriteRepository`.
+
+**Hecho cuando:** ningún `createOrder` ni `transitionAliveOrder` en `lib/**`; un solo `INSERT INTO
+orders` en el driven de `pedidos`; `order-sequence.int` verde (**R15** del correlativo); el
+anti-placebo de la guardia apunta a `insertAliveOrder` y sigue saliendo en rojo con su fuente
+fabricada.
+
+## [ ] Tm3 — Guardia: quien consume recalcula `products.stock` `[depende de TR]` `[P con TB2, TB3]`
+
+Archivos: `tests/unit/inventario/qc121-alcance.test.ts` (o la guardia donde viva
+`EXCEPCIONES_SIN_RECALCULO`).
+
+- Toda función de `lib/**` que llama a `consumeBatchStock` llama también a
+  `recalculateProductStock` (`design.md > 6.4` enmendado).
+
+**Hecho cuando:** la comprobación está verde con los llamantes actuales de `reservation-prisma.ts`,
+y dos anti-placebos de fuente fabricada (sin recálculo: rojo; con recálculo: verde) llevan **R28** en
+el nombre.
+
+## [ ] Tm4 — Errores del proceso diario `[depende de TB2]`
+
+Archivos: `lib/modules/pedidos/domain/expire-stale-orders.ts`,
+`lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` (`findExpirableOrders` con
+cursor), `lib/modules/pedidos/adapters/driving/order-expiry-cron-route.ts`,
+`tests/unit/pedidos/expire-stale-orders.test.ts`, el test del handler.
+
+- Bucle y registro de `design.md > 9.2.1`: `stage`, `code` (`codeOf`), cursor
+  `(reserved_at, id)`, log en todo fallo, `500` si hubo alguno.
+- Docblock de `expire-stale-orders.ts` que diga lo que el código hace; el test de «una empresa que
+  falla al listar sus candidatos» pasa a hacerla fallar de verdad.
+
+**Hecho cuando:** unit verdes para **R26** (cada fallo lleva `id`, `companyId` y `code`), **R54**
+(fallo al listar empresas → log + 500; fallo al buscar candidatos de una empresa → la siguiente se
+procesa) y **R55** (un pedido que falla siempre, en una empresa con más de 100 candidatos, sale una
+vez en `failed` y la empresa siguiente se procesa); el log no lleva mensajes de error ni datos del
+pedido; `R24` y `R25` siguen verdes.
+
+## [ ] Tm5 — Orden de lotes de la migración igual que en TypeScript `[depende de TR]` `[P con TB1-TB4]`
+
+## [ ] Tm6 — `down` de la migración que aparta, coherente tras uso `[depende de Tm5]`
+
+Las dos tocan `db/migrations/20260923150200_reserve_existing_orders/` (nombre tras TR) y
+`tests/integration/inventario/reserve-existing-orders-migration.int.test.ts`; van seguidas.
+
+Procedimiento con la base propia, **antes de cualquier E2E o uso de la app sobre ella**:
+`db:rollback` de `…150200` con el `down.sql` todavía sin cambiar; editar `migration.sql` (Tm5) y
+`down.sql` (Tm6); `db:migrate`; regenerar la plantilla de integración.
+
+- **Tm5** (`design.md > 4.3.1`): comparador por pares `lot_precedes` en `pg_temp`, ordenación por
+  inserción dentro de cada fecha, `COLLATE "C"`. **No** se toca `compareBatchesOldestFirst` hasta
+  que el humano responda la pregunta abierta 7.
+- **Tm6** (`design.md > 4.3.2`): bloque que falla si algún pedido apartado por la migración tiene
+  otro asiento o un `reserved_at` distinto del de la migración.
+
+**Hecho cuando:** paridad verde con `'-X'`/`'5'`, `'a'`/`'B'` y la mezcla de cuatro lotes sin ciclo
+(**R56**, **R43**); el `down` falla con un `release` posterior sin cambiar nada y revierte limpio sin
+actividad (**R57**); `R44` sigue verde.
+
+## [ ] Tm7 — La receta se lee con el cliente de la transacción `[depende de TB4]`
+
+Archivos: `lib/modules/pedidos/ports/order-unit-of-work.ts` (`recipes` en el scope),
+`lib/modules/recetas/adapters/driven/persistence/*` (fábrica sobre cliente, si no existe),
+`lib/composition/index.ts`, `lib/modules/pedidos/domain/{create-order,update-order,transition-order}.ts`,
+sus tests unitarios.
+
+- `design.md > 5.2.2`.
+
+**Hecho cuando:** unit verdes con un lector global de recetas que falla si se le llama dentro de
+`run` (crear, editar y finalizar); `guard-arquitectura-modulos` verde (sin Prisma en composición,
+sin ciclo); R7, R12, R27 y R31 siguen verdes.
+
+## [ ] TC — Cierre: E2E, gate completo y trazabilidad `[depende de TR, TB1-TB4, Tm1-Tm7]`
+
+Archivos: `progress/impl_QC-141-reserva-de-material-del-pedido.md`.
+
+- **Rollback** de las tres migraciones renumeradas probado en una base efímera, como en TM
+  (`…150200`, `…150100`, `…150000`, y `migrate deploy` las reaplica limpias).
+- **E2E en Chromium y WebKit** sobre la rama sincronizada: `reserva-de-material`, `ejecucion-receta`,
+  `ajuste-de-inventario` y los E2E de Pedidos y del Finalizar que traiga QC-145. **Una sola E2E a la
+  vez en la máquina** (`progress/current.md`, puerto y base compartidos).
+- **`./init.sh` completo** verde; rojos heredados de `dev`, si los hay, declarados.
+- Mapa R1-R58 completo (R29 retirado) y, para el PR, la nota del review sobre las guardias de
+  fichas cerradas que cambian lo que afirmaban (`qc91-alcance`, `qc121-alcance`, `qc111-alcance`,
+  `pedidos/scope`, `module-contract`, `credencial/scope`) más la excepción nueva de D21.
+
+**Hecho cuando:** los E2E verdes en los dos navegadores (**R48**), `./init.sh` completo verde, y la
+bitácora con comandos y resultados.
