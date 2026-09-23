@@ -769,6 +769,36 @@ async function setOrderReservedAt(
 }
 
 /**
+ * Candidatos a caducar de UNA empresa (proceso diario, R21-R26): `PENDIENTE`, vivos, con la
+ * reserva vencida en el umbral o antes. Usa `orders_expirable_idx` -parcial, sobre
+ * `reserved_at` con `status = 'PENDIENTE' AND deleted_at IS NULL AND reserved_at IS NOT NULL`-,
+ * y el mismo orden que ese indice: `reserved_at, id`, para que dos lotes seguidos avancen sin
+ * saltarse ni repetir un pedido que empata en `reserved_at`.
+ *
+ * `companyId` es el PRIMER parametro y no `scope: OrderScope`: quien recorre las empresas no
+ * tiene un `OrderScope` que construir, solo el identificador que le dio el directorio de
+ * empresas.
+ */
+export async function findExpirableOrders(
+  companyId: string,
+  threshold: Date,
+  limit: number,
+): Promise<readonly string[]> {
+  const rows = await prisma.order.findMany({
+    where: {
+      AND: [
+        orderCompanyScope({ companyId }),
+        { status: 'PENDIENTE', deletedAt: null, reservedAt: { lte: threshold } },
+      ],
+    },
+    select: { id: true },
+    orderBy: [{ reservedAt: 'asc' }, { id: 'asc' }],
+    take: limit,
+  });
+  return rows.map((row) => row.id);
+}
+
+/**
  * Fabrica de `OrderWriteRepository` sobre el cliente que le pasen -global o transaccional-,
  * mismo patron que `createOrderAssignmentRepository`. Sin argumento habla por el `PrismaClient`
  * global; `OrderUnitOfWork` la invoca con el `tx` de su transaccion.

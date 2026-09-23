@@ -139,3 +139,12 @@ export type { TransitionOrderDeps } from './domain/transition-order';
  *  cobertura completa» sin N+1. */
 export { createFindCoverage, MAX_ORDERS_PER_COVERAGE_BATCH } from './domain/find-coverage';
 export type { FindCoverageDeps } from './domain/find-coverage';
+
+/** El proceso diario que caduca la reserva de los pedidos `PENDIENTE`. */
+export { createExpireStaleOrders } from './domain/expire-stale-orders';
+export type {
+  ExpiredOrderFailure,
+  ExpireStaleOrdersDeps,
+  ExpireStaleOrdersResult,
+} from './domain/expire-stale-orders';
+export { EXPIRED_ORDER_REASON, ORDER_RESERVATION_TTL_DAYS } from './domain/order-expiry';
