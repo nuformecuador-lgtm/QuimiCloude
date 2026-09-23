@@ -23,12 +23,17 @@
 > **Cómo se citan las decisiones.** `[Dn]` es la **fila n** de la tabla `## Decisiones cerradas
 > (no reabrir)`, contando de arriba abajo: D1 qué es un producto terminado, D2 qué producto entra,
 > D3 cuándo entra, D4 qué entra, D5 cómo se cuenta, D6 contenido del envase, D7 qué se prohíbe,
-> D8 existencia decimal, D9 E2E, D10 identificadores y borrado.
+> D8 existencia decimal, D9 E2E, D10 identificadores y borrado; y las filas añadidas en F1.4 el
+> 2026-09-23: D11 unidad de la cantidad del pedido, D12 divisor del coste, D13 ingrediente sin coste,
+> D14 cero envases, D15 solo por Finalizar, D16 copia del contenido, D17 producto dado de baja,
+> D18 derivaciones confirmadas, D19 enmienda del catálogo de errores.
 >
 > **Vocabulario.** *Producto terminado*: producto de tipo `FINISHED_PRODUCT`. *Combinación* de un
 > pedido: su receta más su presentación. *Contenido* de una presentación: la cantidad que cabe en un
-> envase, en la unidad de la presentación. *Envases enteros* de un pedido: ⌊cantidad del pedido /
-> contenido de su presentación⌋. *Cantidad que entra*: envases enteros × contenido.
+> envase, en la unidad de la presentación. *Contenido del pedido* (enmienda del 2026-09-23, D16): la
+> copia del contenido de su presentación que el pedido guarda al crearse o al cambiar de
+> presentación. *Envases enteros* de un pedido: ⌊cantidad del pedido / contenido del pedido⌋.
+> *Cantidad que entra*: envases enteros × contenido del pedido.
 >
 > **Requisitos provisionales.** Los marcados **(provisional, pregunta N)** dependen de una pregunta
 > abierta; llevan escrita la opción que recomienda `design.md > 0` y **no se implementan** hasta que
@@ -52,7 +57,7 @@ tipos que se pueden elegir `[D1]`.
 
 **R4.** SI una edición de producto cambiaría su tipo a `FINISHED_PRODUCT`, o cambiaría el tipo de un
 producto terminado a cualquier otro, ENTONCES el sistema DEBE rechazarla con `action_not_allowed`
-sin modificar el producto `[D1]` `[D7]`.
+sin modificar el producto `[D1]` `[D7]` `[D18]` `[D19]`.
 
 **R5.** El sistema DEBE mostrar los productos terminados en el listado de inventario con la etiqueta
 «Producto terminado» y DEBE permitir filtrar el listado por ese tipo `[D1]`.
@@ -86,25 +91,27 @@ sistema DEBE crearlo en esa misma operación, con tipo `FINISHED_PRODUCT`, con e
 la presentación; y SI ya lo tiene, ENTONCES el sistema DEBE añadir el lote a ese producto sin crear
 otro `[D2]`.
 
-**R12.** El sistema DEBE calcular la cantidad del lote como envases enteros × contenido, en la
-unidad de la presentación y con aritmética decimal exacta: un pedido de `50.5` con contenido `1`
-da `50` envases y `50`; un pedido de `10` con contenido `3` da `3` envases y `9`; un pedido de `50`
-con contenido `0.75` da `66` envases y `49.5` `[D4]` `[D5]` `[D8]` **(provisional, pregunta 1: la
-cantidad del pedido se lee en la unidad de su presentación)**.
+**R12.** *(Enmendado el 2026-09-23: deja de ser provisional por D11 y el contenido es el del pedido
+por D16.)* El sistema DEBE leer la cantidad del pedido en la unidad de su presentación y calcular la
+cantidad del lote como envases enteros × contenido del pedido, en esa unidad y con aritmética
+decimal exacta: un pedido de `50.5` con contenido `1` da `50` envases y `50`; un pedido de `10` con
+contenido `3` da `3` envases y `9`; un pedido de `50` con contenido `0.75` da `66` envases y `49.5`
+`[D4]` `[D5]` `[D8]` `[D11]` `[D16]`.
 
 **R13.** El sistema DEBE dar de alta el lote con la presentación del pedido, un número de lote
 generado por el backend con el mismo correlativo por empresa que el alta de lotes, la fecha civil
 UTC del Finalizar como fecha de compra, sin fecha de vencimiento y con quien finaliza como autor
 `[D4]`.
 
-**R14.** El sistema DEBE guardar como coste unitario del lote el coste de ingredientes guardado en el
-pedido dividido entre la cantidad del lote, con aritmética decimal exacta y redondeo mitad arriba a
-cuatro decimales `[D4]` **(provisional, pregunta 2: el divisor es la cantidad que entra, no la
-cantidad del pedido)**.
+**R14.** *(Enmendado el 2026-09-23: deja de ser provisional por D12; el coste que se divide es el de
+R42.)* El sistema DEBE guardar como coste unitario del lote el coste del lote de R42 dividido entre
+la cantidad que entra —no entre la cantidad del pedido—, con aritmética decimal exacta y redondeo
+mitad arriba a cuatro decimales `[D4]` `[D12]`.
 
-**R15.** SI el pedido no tiene coste de ingredientes, ENTONCES el sistema NO DEBE guardar como coste
-unitario del lote cero ni ningún valor que no salga del coste del pedido `[D4]` **(abierto, pregunta
-3: el resto del comportamiento no se implementa hasta la respuesta)**.
+**R15.** *(Derogado el 2026-09-23 por D13: un lote sin ningún ingrediente con coste entra a coste
+cero. Lo sustituyen R42 y R43.)* ~~SI el pedido no tiene coste de ingredientes, ENTONCES el sistema
+NO DEBE guardar como coste unitario del lote cero ni ningún valor que no salga del coste del
+pedido.~~
 
 **R16.** CUANDO entre el lote, el sistema DEBE registrar en el libro de movimientos de inventario un
 asiento de **producción** con la cantidad del lote en positivo, el pedido que lo causa y quien
@@ -113,13 +120,15 @@ finaliza como autor `[D3]` `[D10]`.
 **R17.** CUANDO entre el lote, el sistema DEBE recalcular la existencia guardada del producto
 terminado en la misma transacción `[D3]` `[D8]`.
 
-**R18.** SI el pedido que se finaliza no tiene presentación, o su presentación no tiene contenido,
-ENTONCES el sistema DEBE rechazar el Finalizar con `presentation_without_content` sin cambiar el
-pedido, el material apartado, las existencias ni ningún producto `[D6]`.
+**R18.** *(Enmendado el 2026-09-23: el contenido que cuenta es el del pedido, D16; lo que pasa con un
+pedido sin copia lo fija R44.)* SI el pedido que se finaliza no tiene presentación, o no tiene
+contenido con el que calcular los envases, ENTONCES el sistema DEBE rechazar el Finalizar con
+`presentation_without_content` sin cambiar el pedido, el material apartado, las existencias ni
+ningún producto `[D6]` `[D16]` `[D18]` `[D19]`.
 
-**R19.** SI los envases enteros del pedido son cero, ENTONCES el sistema DEBE rechazar el Finalizar
-con `no_whole_package` sin cambiar el pedido, el material apartado, las existencias ni ningún
-producto `[D5]` **(provisional, pregunta 4)**.
+**R19.** *(Enmendado el 2026-09-23: deja de ser provisional por D14.)* SI los envases enteros del
+pedido son cero, ENTONCES el sistema DEBE rechazar el Finalizar con `no_whole_package` sin cambiar el
+pedido, el material apartado, las existencias ni ningún producto `[D5]` `[D14]` `[D19]`.
 
 **R20.** SI falla cualquier paso del alta del producto terminado —crear el producto, el lote, el
 asiento o el recálculo de su existencia—, ENTONCES el sistema NO DEBE dejar escrito ni el cambio de
@@ -139,31 +148,34 @@ o nombre `[D2]` `[D10]`.
 **R24.** CUANDO el Finalizar termine bien, el sistema DEBE mostrar en la confirmación cuántos envases
 enteros entraron y el nombre del producto terminado que los recibió `[D5]`.
 
-**R25.** MIENTRAS un lote pertenezca a un producto terminado y su presentación tenga contenido, el
-sistema DEBE mostrar en el panel de lotes, junto a la cantidad en la unidad de la presentación, el
-número de envases del lote `[D5]` **(provisional, pregunta 6)**.
+**R25.** *(Enmendado el 2026-09-23 por D16: los envases salen del contenido guardado en el lote, no
+del vigente de la presentación.)* MIENTRAS un lote pertenezca a un producto terminado, el sistema
+DEBE mostrar en el panel de lotes, junto a la cantidad en la unidad de la presentación, el número de
+envases del lote calculado con el contenido guardado en el lote, y SI esa división no da un número
+entero, ENTONCES NO DEBE mostrar ninguna cifra de envases `[D5]` `[D16]`.
 
 **R26.** El sistema DEBE dar de alta el producto terminado solo dentro del Finalizar y con el permiso
 que el Finalizar ya exige, validado en el service antes de leer o escribir nada, y NO DEBE añadir
 ningún permiso al catálogo `[D3]` `[D7]`.
 
-**R27.** CUANDO un pedido pase a `ENTREGADO` por la edición en Pedidos, el sistema DEBE dar de alta el
-lote del producto terminado con las mismas reglas de R10 a R23 `[D3]` **(provisional, pregunta 5)**.
+**R27.** *(Enmendado el 2026-09-23 por D15: pasa a requisito negativo.)* CUANDO un pedido pase a
+`ENTREGADO` por la edición en Pedidos, el sistema NO DEBE dar de alta ningún producto terminado, lote
+ni asiento de producción `[D3]` `[D15]`.
 
 ### D. Lo que se prohíbe
 
 **R28.** CUANDO el alta manual de un producto coincidiría con un producto terminado vivo —el camino
 que añade el lote a un producto que ya existe—, el sistema DEBE rechazarla con `action_not_allowed`
-sin escribir ningún producto, lote ni asiento `[D7]`.
+sin escribir ningún producto, lote ni asiento `[D7]` `[D19]`.
 
 **R29.** CUANDO se cree o edite una receta con una línea cuyo producto es un producto terminado, el
-sistema DEBE rechazarla con `action_not_allowed` sin escribir la receta ni sus líneas `[D7]`.
+sistema DEBE rechazarla con `action_not_allowed` sin escribir la receta ni sus líneas `[D7]` `[D19]`.
 
 **R30.** El selector de insumos del formulario de receta NO DEBE ofrecer productos terminados `[D7]`.
 
 **R31.** CUANDO se registre un ajuste con cantidad positiva sobre un lote de un producto terminado, el
 sistema DEBE rechazarlo con `action_not_allowed` sin mover la existencia ni escribir ningún asiento
-`[D7]`.
+`[D7]` `[D19]`.
 
 **R32.** CUANDO se registre un ajuste con cantidad negativa sobre un lote de un producto terminado, el
 sistema DEBE aplicarlo con las mismas reglas que a cualquier otro lote, incluido el rechazo de una
@@ -179,7 +191,7 @@ nuevos, y NO DEBE borrar físicamente ningún producto terminado, lote ni asient
 
 **R35.** CUANDO se dé de baja un producto terminado con el borrado lógico existente y después se
 finalice un pedido de su combinación, el sistema DEBE crear un producto terminado nuevo y NO DEBE
-añadir el lote al dado de baja `[D2]` `[D10]` **(provisional, pregunta 7)**.
+añadir el lote al dado de baja `[D2]` `[D10]` `[D17]` *(deja de ser provisional el 2026-09-23)*.
 
 **R36.** CUANDO se revierta la migración, el sistema DEBE dejar el esquema como estaba, y SI existe
 algún producto terminado o algún asiento de producción, ENTONCES la reversión DEBE fallar sin cambiar
@@ -189,34 +201,68 @@ nada `[D10]`.
 asignar un pedido con esa presentación, finalizarlo en `/asignacion/[id]` y ver en inventario el
 producto terminado con su lote, su cantidad y sus envases `[D9]`.
 
+### F. Enmienda de F1.4 (2026-09-23): copia del contenido y coste del lote
+
+**R38.** CUANDO se cree un pedido, el sistema DEBE guardar en él, en la misma operación, una copia del
+contenido que su presentación tenga en ese instante, o ninguna copia si la presentación no tiene
+contenido `[D16]`.
+
+**R39.** CUANDO una edición cambie la presentación de un pedido, el sistema DEBE sustituir su copia
+por el contenido que la presentación nueva tenga en ese instante (o por ninguna); y SI la edición no
+cambia la presentación, ENTONCES el sistema NO DEBE modificar la copia `[D16]`.
+
+**R40.** CUANDO se cambie el contenido de una presentación, el sistema DEBE aceptarlo aunque la
+presentación tenga pedidos o lotes, y NO DEBE modificar la copia de ningún pedido ni el contenido
+guardado de ningún lote `[D16]`.
+
+**R41.** CUANDO entre un lote de producto terminado, el sistema DEBE guardar en el lote el contenido
+con el que se calcularon sus envases `[D16]`.
+
+**R42.** El sistema DEBE calcular el coste del lote como la suma de los costes de los ingredientes de
+la receta del pedido con la misma regla de coste que el importe del pedido, contando como cero cada
+ingrediente cuyo coste no se pueda calcular; y SI ninguno tiene coste, ENTONCES el coste del lote DEBE
+ser cero y el lote DEBE entrar con coste unitario cero `[D4]` `[D13]` **(provisional, pregunta 9: en
+qué momento se calcula)**.
+
+**R43.** El sistema NO DEBE cambiar, al finalizar un pedido ni por ninguna regla de esta ficha, el
+coste de ingredientes que el pedido tiene guardado, que sigue siendo nulo cuando falta el coste de
+algún ingrediente, y NO DEBE guardar nunca un lote de producto terminado sin coste unitario `[D13]`.
+
+**R44.** SI el pedido que se finaliza tiene presentación pero no tiene copia de su contenido,
+ENTONCES el sistema DEBE usar el contenido que su presentación tenga en el instante del Finalizar, y
+SI tampoco lo tiene, ENTONCES DEBE aplicar R18 `[D16]` **(provisional, pregunta 8)**.
+
 ## Preguntas abiertas
 
-1. **Unidad de la cantidad del pedido.** El pedido no guarda unidad propia (QC-147: el consumo es
-   cantidad × % en la unidad de cada insumo). Esta ficha la lee en la unidad de su presentación
-   (50 con «Botella 1L» = 50 L). Falta confirmar que siempre es así, p. ej. con un «Saco 25 kg».
-2. **Coste unitario con sobrante.** Si se costó 50,5 L y entran 50 L, ¿el coste unitario es
-   coste / 50 (el sobrante encarece lo que entra) o coste / 50,5 (el sobrante se pierde a su coste)?
-3. **Pedido sin coste** (QC-123 lo deja en nulo): el lote entra sin coste unitario. ¿Vale un lote sin
-   coste, o hay que admitir el nulo en `unit_cost`?
+> Las preguntas 1 a 7 las respondió el humano en F1.4 el 2026-09-23 y pasan a la tabla de
+> decisiones como D11 a D17 (ver la nota del final). Se conserva su número para no romper las
+> referencias de `design.md` y `tasks.md`.
 
-*Añadidas por `spec_author` en F1.2 (2026-09-23). Salen del código, no de la semilla; la propuesta
-de cada una está en `design.md > 0`.*
+1. ~~**Unidad de la cantidad del pedido.**~~ **Respondida el 2026-09-23 → D11.**
+2. ~~**Coste unitario con sobrante.**~~ **Respondida el 2026-09-23 → D12.**
+3. ~~**Pedido sin coste.**~~ **Respondida el 2026-09-23 → D13** (deja abierta la pregunta 9).
+4. ~~**Menos de un envase.**~~ **Respondida el 2026-09-23 → D14.**
+5. ~~**Entregar desde la edición en Pedidos.**~~ **Respondida el 2026-09-23 → D15.**
+6. ~~**Cambiar el contenido de una presentación con lotes de producto terminado.**~~ **Respondida el
+   2026-09-23 → D16** (abre la pregunta 8).
+7. ~~**Producto terminado dado de baja.**~~ **Respondida el 2026-09-23 → D17.**
 
-4. **Menos de un envase.** Un pedido de 0,5 L en «Botella 1L» da cero envases enteros. No entra
-   nada y no hay divisor para el coste. ¿Se rechaza el Finalizar (propuesta, R19, código nuevo
-   `no_whole_package`) o se entrega sin lote?
-5. **Entregar desde la edición en Pedidos.** QC-141 consume también cuando la edición en Pedidos deja
-   el pedido `ENTREGADO`, y QC-145 (pendiente) retira ese camino. La decisión D3 habla solo del
-   Finalizar. Mientras los dos caminos convivan, ¿la edición también da de alta el lote (propuesta,
-   R27), o se acepta que un pedido entregado por ahí no genere producto terminado?
-6. **Cambiar el contenido de una presentación que ya tiene lotes de producto terminado.** Las
-   botellas se muestran dividiendo la cantidad guardada entre el contenido *vigente*: si el contenido
-   cambia, los lotes viejos mostrarían otra cifra. ¿Se bloquea el cambio como el de la unidad
-   (`presentations_check_unit_locked`, propuesta), o se permite y los envases dejan de mostrarse
-   cuando no dan un número entero?
-7. **Producto terminado dado de baja.** D10 dice que usa el borrado lógico existente, y D2 que nace
-   «solo la primera vez». Si se da de baja y se finaliza otro pedido de su combinación, ¿nace uno
-   nuevo (propuesta, R35) o se rechaza el Finalizar?
+*Abiertas tras F1.4 (2026-09-23). La propuesta de cada una está en `design.md > 0`.*
+
+8. **Pedidos sin copia del contenido.** D16 hace que el pedido guarde una copia del contenido de su
+   presentación al crearse o al cambiar de presentación. No tienen copia: (a) los pedidos vivos
+   creados antes de esta ficha, y (b) los creados después cuya presentación aún no tenía contenido.
+   En el caso (b), completar después el contenido de la presentación no le da copia al pedido,
+   porque D16 solo recopia al cambiar de presentación. **Propuesta (R44):** al Finalizar un pedido
+   sin copia se usa el contenido vigente de su presentación, y sin él se rechaza (R18).
+9. **Cuándo se calcula el coste del lote cuando falta el coste de algún ingrediente.** D13 cuenta
+   como cero el ingrediente sin coste, pero el importe de QC-123 es un único número, nulo si falta
+   uno, y no dice qué ingredientes tenían coste. Hay que recalcular. **Propuesta (R42):** si el
+   pedido tiene importe guardado, se usa ese (D4, sin cambios); si es nulo, se recalcula al
+   Finalizar con la regla de QC-123, antes de consumir el material y contando como cero lo que no
+   se pueda costear. La otra opción es guardar un segundo importe en el pedido en cada edición. Es
+   más coherente con el «importe congelado» de QC-123 D8, pero añade una columna, toca el alta y la
+   edición de pedidos y no resuelve los pedidos existentes.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -232,3 +278,26 @@ de cada una está en `design.md > 0`.*
 | 2026-09-23 | Existencia decimal | La trae **QC-141**, que por eso bloquea esta ficha. |
 | 2026-09-23 | ¿E2E? | **Sí**: es un movimiento de inventario (`CHECKPOINTS.md`). Finalizar un pedido y ver entrar el lote. |
 | 2026-09-23 | Identificadores y borrado | En inglés (QC-4); el producto terminado usa el borrado lógico que ya existe. |
+| 2026-09-23 (F1.4) | ¿En qué unidad está la cantidad del pedido? (pregunta 1) | En la **unidad de su presentación**. |
+| 2026-09-23 (F1.4) | ¿Divisor del coste unitario con sobrante? (pregunta 2) | **Coste / cantidad que entra**: el sobrante encarece lo que entra. |
+| 2026-09-23 (F1.4) | ¿Y si falta el coste? (pregunta 3) | Un **ingrediente sin coste cuenta como 0** y el coste del lote se calcula con el resto. **Solo** para el coste del lote de producto terminado: el importe del pedido de QC-123, nulo si falta un ingrediente, **no cambia**. `unit_cost` **sigue sin admitir nulo**. Si ningún ingrediente tiene coste, el lote entra a **coste 0**. |
+| 2026-09-23 (F1.4) | ¿Menos de un envase entero? (pregunta 4) | Se **rechaza el Finalizar** con `no_whole_package`. |
+| 2026-09-23 (F1.4) | ¿Entregar desde la edición en Pedidos da de alta el lote? (pregunta 5) | **No. Solo el Finalizar.** La edición en Pedidos que deja el pedido `ENTREGADO` no da de alta producto terminado. |
+| 2026-09-23 (F1.4) | ¿Se bloquea cambiar el contenido de una presentación? (pregunta 6) | **No se bloquea: se copia.** El pedido guarda el contenido de su presentación al crearse y al cambiar de presentación en la edición, y el Finalizar usa esa copia. El lote guarda también su contenido para mostrar los envases. Cambiar después la presentación no altera pedidos ya hechos ni lotes. Los pedidos vivos anteriores a esta ficha no tienen copia: queda como pregunta 8. |
+| 2026-09-23 (F1.4) | ¿Producto terminado dado de baja? (pregunta 7) | **Nace uno nuevo** al finalizar otro pedido de su combinación. |
+| 2026-09-23 (F1.4) | Derivaciones de `spec_author` | **Confirmadas**: un pedido sin presentación no se finaliza; el tipo de un producto terminado no se cambia y nadie pasa a serlo por edición; se acepta que el día del despliegue ningún pedido se pueda finalizar hasta rellenar el contenido de su presentación. |
+| 2026-09-23 (F1.4) | Enmienda del catálogo de errores | **Aprobada**: códigos nuevos `presentation_without_content` y `no_whole_package`; las prohibiciones usan el existente `action_not_allowed`. |
+
+## Nota del 2026-09-23 — respuestas de F1.4
+
+El humano respondió en F1.4 las preguntas 1 a 7 y confirmó las derivaciones y la enmienda del
+catálogo. Las respuestas son las filas D11 a D19 de la tabla de arriba (se añadieron al final y no
+se reordenó nada). Efecto sobre los requisitos, **sin renumerar**:
+
+- **Dejan de ser provisionales:** R12 (D11, y ahora usa el contenido del pedido, D16), R14 (D12), R19
+  (D14) y R35 (D17).
+- **Enmendados:** R18 y R25 (D16), y R27, que pasa a ser **negativo** (D15).
+- **Derogado:** R15 (D13). Lo sustituyen R42 y R43.
+- **Nuevos:** R38 a R44 (copia del contenido y coste del lote). R42 queda provisional por la
+  pregunta 9 y R44 por la pregunta 8.
+- **Siguen abiertas:** las preguntas 8 y 9, que nacen de estas respuestas.
