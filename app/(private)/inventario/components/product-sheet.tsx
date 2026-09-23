@@ -97,7 +97,13 @@ export function ProductSheet({
         {isEdit ? <PencilIcon /> : <PlusIcon />}
         {isEdit ? null : 'Nuevo producto'}
       </SheetTrigger>
-      <ProductForm product={product} units={units} onSaved={handleSaved} />
+      {/*
+        Solo monta el formulario cuando el panel esta abierto: `productType`, `template` y el
+        estado de `useActionState` viven en `ProductForm`, que si se dejara siempre en el arbol
+        conservaria el ultimo tipo elegido entre aperturas mientras `SharedSelect` -dentro del
+        portal, que si se desmonta- volviera a pintar el default PRODUCT.
+      */}
+      {open ? <ProductForm product={product} units={units} onSaved={handleSaved} /> : null}
     </Sheet>
   );
 }

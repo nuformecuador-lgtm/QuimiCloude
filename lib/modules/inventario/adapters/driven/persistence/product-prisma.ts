@@ -29,6 +29,7 @@ import type { Page } from '../../../domain/page';
 import type { NewProductBatch } from '../../../domain/product-batch';
 import type { ProductBatchView } from '../../../domain/product-batch-view';
 import type { NewProduct, ProductView, ProductType } from '../../../domain/product-view';
+import { PRODUCT_TYPES } from '../../../domain/product-type';
 import { PRODUCT_TYPE_VALUES } from '../../../domain/product-queryable';
 
 // El ambito de empresa va como conjuncion aparte en un `AND` de primer nivel, para que ninguna otra
@@ -74,7 +75,7 @@ export async function createProduct(
       name: data.name,
       nameNormalized: normalizeProductName(data.name),
       qtyAlert: data.qtyAlert ?? null,
-      type: data.type ?? 'PRODUCT',
+      type: data.type ?? PRODUCT_TYPES.PRODUCT,
       ...companyScopeColumns(scope),
       createdAt: now,
       updatedAt: now,
@@ -258,17 +259,27 @@ export async function listAliveProducts(
  * devuelve `null` (el alta seguira por crear y fallara alli). Con `created_at` empatado decide
  * el `id`: sin el, dos altas del mismo nombre y unidad podrian colgar su lote de productos
  * distintos.
+ *
+ * `presentationId === null` (solo MACHINE, 2026-09-23): no hay unidad; se busca el vivo
+ * con el mismo nombre y `unit_id` NULL.
  */
 export async function findAliveIdByNameInPresentationUnit(
   name: string,
-  presentationId: string,
+  presentationId: string | null,
   scope: InventoryScope,
 ): Promise<string | null> {
-  const presentation = await prisma.presentation.findFirst({
-    where: { AND: [presentationCompanyScope(scope), { id: presentationId }] },
-    select: { unitId: true },
-  });
-  if (presentation === null) return null;
+  let unitId: string | null | undefined;
+
+  if (presentationId === null) {
+    unitId = null;
+  } else {
+    const presentation = await prisma.presentation.findFirst({
+      where: { AND: [presentationCompanyScope(scope), { id: presentationId }] },
+      select: { unitId: true },
+    });
+    if (presentation === null) return null;
+    unitId = presentation.unitId;
+  }
 
   const row = await prisma.product.findFirst({
     where: {
@@ -276,7 +287,7 @@ export async function findAliveIdByNameInPresentationUnit(
         productCompanyScope(scope),
         {
           nameNormalized: normalizeProductName(name),
-          unitId: presentation.unitId,
+          unitId,
           deletedAt: null,
         },
       ],
@@ -308,7 +319,7 @@ async function recalculateProductStock(
   });
 
   const stock = singleUnitStock(
-    rows.map((row) => ({ stock: row.stock, unitId: row.presentation.unitId })),
+    rows.map((row) => ({ stock: row.stock, unitId: row.presentation?.unitId ?? null })),
   );
 
   await tx.$executeRaw(Prisma.sql`
@@ -320,9 +331,9 @@ async function recalculateProductStock(
 }
 
 /** Del texto directo a `Prisma.Decimal`: pasar por un numero del lenguaje meteria el error de la
- *  coma flotante antes de una columna `DECIMAL(14,4)`. */
-function toBatchUnitCost(unitCost: string): Prisma.Decimal {
-  return new Prisma.Decimal(unitCost);
+ *  coma flotante antes de una columna `DECIMAL(14,4)`. `null` solo llega de MACHINE sin costo. */
+function toBatchUnitCost(unitCost: string | null): Prisma.Decimal | null {
+  return unitCost === null ? null : new Prisma.Decimal(unitCost);
 }
 
 /** Con `Z`: sin zona, la cadena se leeria en la hora local del servidor y la fecha podria correrse un
@@ -561,6 +572,8 @@ async function writeBatchWithLotRetry<T>(
  * Producto y lote en la misma transaccion: si el lote falla, el producto tampoco queda. El
  * producto nace con la unidad de esta presentacion -sin fila viva de la empresa, se aborta con
  * `ValidationError` antes de escribir nada- y su existencia queda recalculada al final.
+ * `batch.presentationId === null` (MACHINE): el producto nace sin unidad y el lote sin
+ * presentacion.
  */
 export async function createWithFirstBatch(
   product: NewProduct,
@@ -569,19 +582,23 @@ export async function createWithFirstBatch(
   scope: InventoryScope,
 ): Promise<{ id: string; batchId: string; lot: string }> {
   return writeBatchWithLotRetry(batch, scope, async (tx, resolveBatchLot) => {
-    const presentation = await tx.presentation.findFirst({
-      where: { AND: [presentationCompanyScope(scope), { id: batch.presentationId }] },
-      select: { unitId: true },
-    });
-    if (presentation === null) throw new ValidationError();
+    let unitId: string | null = null;
+    if (batch.presentationId !== null) {
+      const presentation = await tx.presentation.findFirst({
+        where: { AND: [presentationCompanyScope(scope), { id: batch.presentationId }] },
+        select: { unitId: true },
+      });
+      if (presentation === null) throw new ValidationError();
+      unitId = presentation.unitId;
+    }
 
     const created = await tx.product.create({
       data: {
         name: product.name,
         nameNormalized: normalizeProductName(product.name),
-        unitId: presentation.unitId,
+        unitId,
         qtyAlert: product.qtyAlert ?? null,
-        type: product.type ?? 'PRODUCT',
+        type: product.type ?? PRODUCT_TYPES.PRODUCT,
         ...companyScopeColumns(scope),
         createdAt: now,
         updatedAt: now,
@@ -678,7 +695,7 @@ function toBatchView(row: BatchViewRow): ProductBatchView {
     id: row.id,
     lot: row.lot,
     stock: row.stock,
-    unitId: row.presentation.unitId,
+    unitId: row.presentation?.unitId ?? null,
     purchaseDate: toCivilDate(row.purchaseDate),
     expiryDate: row.expiryDate === null ? null : toCivilDate(row.expiryDate),
   };

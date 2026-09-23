@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useTransition } from 'react';
 
 import { DataTable, type DataTableParams, type DataTableTexts } from '@/components/shared/data-table';
-import type { AssignedOrderView } from '@/lib/modules/asignaciones';
+import type { AssignedOrderView, AssignmentViewKind } from '@/lib/modules/asignaciones';
 
 import {
   ASSIGNED_ORDERS_DEFAULT_PINNED_COLUMNS,
@@ -41,9 +41,11 @@ export type AssignedOrdersTableProps = {
   readonly rows: readonly AssignedOrderView[];
   readonly params: DataTableParams;
   readonly totalPages: number;
+  /** La vista vigente: viaja a cada `href` de paginacion para que no se pierda al navegar. */
+  readonly vista: AssignmentViewKind;
 };
 
-export function AssignedOrdersTable({ rows, params, totalPages }: AssignedOrdersTableProps) {
+export function AssignedOrdersTable({ rows, params, totalPages, vista }: AssignedOrdersTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const columns = useMemo(() => buildAssignedOrdersColumns(), []);
@@ -72,7 +74,7 @@ export function AssignedOrdersTable({ rows, params, totalPages }: AssignedOrders
         getRowId={(order) => order.id}
         params={params}
         totalPages={totalPages}
-        onParamsChange={(next) => navigate(assignedOrdersListHref(next))}
+        onParamsChange={(next) => navigate(assignedOrdersListHref(next, vista))}
         status="idle"
         texts={ASSIGNED_ORDERS_TABLE_TEXTS}
         searchable={false}

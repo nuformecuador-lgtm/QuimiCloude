@@ -99,18 +99,15 @@ export const EDITABLE_STATUS_VALUES: readonly EditableOrderStatus[] = ORDER_STAT
 );
 
 /**
- * Edicion: REEMPLAZO COMPLETO del conjunto de datos de negocio (R20), como QC-25 y QC-43. Un
- * parche parcial obligaria a distinguir «campo ausente» de «campo puesto a nulo» y a evaluar
- * la transicion contra un estado a medio llegar. Es la pregunta abierta 5 del spec, con su
- * posicion por defecto escrita y su coste: subir la prioridad obliga a reenviar todo el pedido.
+ * Edicion: REEMPLAZO COMPLETO del conjunto de datos de negocio. Un
+ * parche parcial obligaria a distinguir «campo ausente» de «campo puesto a nulo». El coste:
+ * subir la prioridad obliga a reenviar todo el pedido.
  *
- * `status: 'CANCELADO'` muere AQUI, sin llegar al caso de uso ni al repositorio (R24), y
- * tampoco hay campo `reason`: cancelar es `cancelOrder` y solo el (decision cerrada 7).
+ * La edicion ya no mueve el estado: un `status` que llegue en la entrada muere aqui, como
+ * cualquier otra clave que el esquema no declare -`z.object` la descarta-, el mismo criterio
+ * que el alta. Tampoco hay campo `reason`: cancelar es `cancelOrder` y solo el.
  */
-export const updateOrderSchema = z.object({
-  ...createOrderSchema.shape,
-  status: z.enum(EDITABLE_STATUS_VALUES),
-});
+export const updateOrderSchema = createOrderSchema;
 
 /**
  * Cancelacion (R27). El tope de 500 vive AQUI, en la validacion de aplicacion, y no en el tipo

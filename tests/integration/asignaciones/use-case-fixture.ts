@@ -48,6 +48,7 @@ import { DOCUMENT_TYPE_CC, normalizeCompanyName, normalizeWorkGroupName } from '
 import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
+  listAliveSummariesInCompany,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -71,6 +72,7 @@ import type { OrderCatalog } from '@/lib/modules/pedidos';
 const orders: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: listAliveOrderSummariesByIds,
+  listAliveSummariesInCompany,
   transitionAliveById: async () => {
     throw new Error('QC-87: los casos de uso de asignacion no escriben el estado del pedido');
   },

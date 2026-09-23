@@ -30,7 +30,7 @@ export {
 } from './domain/list-query';
 export { PRESENTATION_QUERYABLE } from './domain/presentation-queryable';
 export { PRODUCT_QUERYABLE, PRODUCT_TYPE_VALUES } from './domain/product-queryable';
-export { type ProductType } from './domain/product-view';
+export { PRODUCT_TYPES, type ProductType } from './domain/product-type';
 export { normalizePresentationName } from './domain/presentation-name';
 export { normalizeProductName } from './domain/product-name';
 export {

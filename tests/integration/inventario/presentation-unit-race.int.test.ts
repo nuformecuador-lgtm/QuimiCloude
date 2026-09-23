@@ -247,7 +247,7 @@ describe('R20 — la base rechaza el cambio de unidad de una presentacion con lo
         select: { presentation: { select: { unitId: true } } },
       });
       expect(lotes).toHaveLength(1);
-      expect(lotes[0]?.presentation.unitId).toBe(escenario.unidadOriginal);
+      expect(lotes[0]?.presentation?.unitId).toBe(escenario.unidadOriginal);
     } finally {
       await holder.end().catch(() => undefined);
       await contender.end().catch(() => undefined);

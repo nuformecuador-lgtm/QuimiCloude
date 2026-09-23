@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import type { Mock } from 'vitest';
 
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
 import {
@@ -266,6 +267,115 @@ describe('R15, R16, R21 — producto nuevo', () => {
     await createProduct({ ...ALTA_VALIDA, stock: 0 }, ADMIN);
 
     expect(products.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('MACHINE — crea producto con primer lote, sin qtyAlert', () => {
+  // Fechas locales al bloque: las de QC-81 estan mas abajo y un `const` no se usa antes de
+  // declararse.
+  const AHORA_MQ = new Date('2026-09-10T10:00:00.000Z');
+  const MANANA_MQ = '2026-09-11';
+  const SEMANA_PASADA_MQ = '2026-09-03';
+  // El formulario de Instrumento solo pinta stock y purchaseDate (2026-09-23):
+  // presentationId y unitCost son anulables unicamente para MACHINE.
+  const ALTA_INSTRUMENTO = {
+    name: 'Instrumento de laboratorio',
+    type: PRODUCT_TYPES.MACHINE,
+    stock: 2,
+  };
+
+  it('crea producto y lote en una sola operacion, con purchaseDate en el lote', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA_MQ });
+
+    const resultado = await createProduct(
+      { ...ALTA_INSTRUMENTO, purchaseDate: SEMANA_PASADA_MQ },
+      ADMIN,
+    );
+
+    expect(products.create).not.toHaveBeenCalled();
+    expect(products.createWithFirstBatch).toHaveBeenCalledTimes(1);
+    expect(productoCreado(products)).toEqual({
+      name: 'Instrumento de laboratorio',
+      type: PRODUCT_TYPES.MACHINE,
+    });
+    expect(Object.keys(productoCreado(products))).not.toContain('qtyAlert');
+    expect(loteCreado(products)).toMatchObject({
+      stock: 2,
+      presentationId: null,
+      unitCost: null,
+      purchaseDate: SEMANA_PASADA_MQ,
+    });
+    expect(resultado).toEqual({ id: 'producto-nuevo-1', lot: '1' });
+    // Sin presentacion: la busqueda de homonimo recibe `null` (no hay unidad que comparar).
+    expect(products.findAliveIdByNameInPresentationUnit).toHaveBeenCalledWith(
+      'Instrumento de laboratorio',
+      null,
+      { companyId: EMPRESA },
+    );
+  });
+
+  it('sin purchaseDate resuelve HOY en el lote, no en el producto', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA_MQ });
+
+    await createProduct(ALTA_INSTRUMENTO, ADMIN);
+
+    expect(loteCreado(products).purchaseDate).toBe('2026-09-10');
+    expect(productoCreado(products)).toEqual({
+      name: 'Instrumento de laboratorio',
+      type: PRODUCT_TYPES.MACHINE,
+    });
+  });
+
+  it('acepta expiryDate opcional y la guarda en el lote', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA_MQ });
+
+    await createProduct({ ...ALTA_INSTRUMENTO, expiryDate: '2027-12-31' }, ADMIN);
+
+    expect(loteCreado(products).expiryDate).toBe('2027-12-31');
+  });
+
+  it('acepta presentationId y unitCost opcionales si el llamante los manda', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA_MQ });
+
+    await createProduct(
+      { ...ALTA_INSTRUMENTO, presentationId: PRESENTACION, unitCost: '1500.0000' },
+      ADMIN,
+    );
+
+    expect(loteCreado(products)).toMatchObject({
+      presentationId: PRESENTACION,
+      unitCost: '1500.0000',
+    });
+    expect(products.findAliveIdByNameInPresentationUnit).toHaveBeenCalledWith(
+      'Instrumento de laboratorio',
+      PRESENTACION,
+      { companyId: EMPRESA },
+    );
+  });
+
+  it('rechaza una fecha de compra futura sin tocar el puerto', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA_MQ });
+
+    await expect(
+      createProduct({ ...ALTA_INSTRUMENTO, purchaseDate: MANANA_MQ }, ADMIN),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(products.create).not.toHaveBeenCalled();
+    expect(products.createWithFirstBatch).not.toHaveBeenCalled();
+  });
+
+  it('rechaza qtyAlert en el alta de un instrumento', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, now: () => AHORA_MQ });
+
+    await expect(
+      createProduct({ ...ALTA_INSTRUMENTO, qtyAlert: 3 }, ADMIN),
+    ).rejects.toBeInstanceOf(ValidationError);
+    afirmarPuertoIntacto(products);
   });
 });
 

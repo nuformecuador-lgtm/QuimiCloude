@@ -278,7 +278,10 @@ import {
   createFinishAssignedOrder,
   createGetAssignedOrderExecution,
   createListAssignedOrders,
+  createListCompanyOrders,
+  createListFinishedOrders,
   createListOrderResponsibles,
+  createListResponsibleCandidates,
   createListResponsiblesForOrders,
   createRemoveWorkGroupFromOrder,
   createStartAssignedOrder,
@@ -289,6 +292,7 @@ import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports
 import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
+  listAliveSummariesInCompany,
   transitionAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
@@ -1046,6 +1050,7 @@ export const observabilidad = {
 const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: listAliveOrderSummariesByIds,
+  listAliveSummariesInCompany,
   transitionAliveById: transitionAliveOrder,
 };
 
@@ -1159,6 +1164,29 @@ export const asignaciones = {
   finishAssignedOrder: createFinishAssignedOrder({
     assignments: orderAssignmentRepository,
     orders: orderCatalog,
+    now: () => new Date(),
+  }),
+  // Claves NUEVAS al final: ninguna de las de arriba se toca. MISMOS `orderCatalog`,
+  // `recipeCatalog`, `presentationCatalog`, `orderAssignmentRepository` y `peopleDirectory` que
+  // el resto del modulo: ningun adaptador nuevo.
+  listFinishedOrders: createListFinishedOrders({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    now: () => new Date(),
+  }),
+  listCompanyOrders: createListCompanyOrders({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    now: () => new Date(),
+  }),
+  listResponsibleCandidates: createListResponsibleCandidates({
+    people: peopleDirectory,
     now: () => new Date(),
   }),
 } as const;

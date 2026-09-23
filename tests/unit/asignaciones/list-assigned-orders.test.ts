@@ -45,6 +45,7 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
     priority: 'MEDIA',
     status: 'PENDIENTE',
     presentationId: null,
+    finishedAt: null,
     ...overrides,
   };
 }
@@ -54,7 +55,7 @@ function receta(overrides?: Partial<RecipeRef>): RecipeRef {
 }
 
 function persona(id: string): PersonRef {
-  return { id, displayName: `Persona ${id.slice(0, 1)}`, isActive: true };
+  return { id, displayName: `Persona ${id.slice(0, 1)}`, isActive: true, permissions: [] };
 }
 
 const PRESENTACION = uuid('7');

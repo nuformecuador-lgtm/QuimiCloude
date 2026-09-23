@@ -1,4 +1,9 @@
 {
   "_nota": "Mapa de archivos de test que YA estaban en rojo en dev por deuda ajena, para que el gate pueda responder '¿rompi algo YO?' sin exigir que la suite entera este verde. Cada entrada necesita motivo y desde; sin eso la lista se vuelve un vertedero. Todo lo que NO este aqui y salga rojo es bloqueante. Ver docs/verification.md > Rojos heredados.",
-  "archivos": {}
+  "archivos": {
+    "tests/guards/guard-arquitectura-modulos.test.ts": {
+      "motivo": "Deuda ajena de dev, medida en la rama de QC-145 el 2026-09-23 tras sincronizar con origin/dev: el commit a01c90cb (feat(inventario): MACHINE oculta campos de lote; catalogo PRODUCT_TYPES...) hace que lib/modules/inventario/adapters/driving/product-actions.ts importe @/lib/modules/inventario/domain/product-type por ruta profunda en vez del barrel, y el bloque 13 (fila driving de design.md > 5.1) lo marca. QC-145 no toca ese archivo. COSTE ACEPTADO: el archivo entero queda fuera del comparador mientras siga aqui. Salida limpia: que product-actions.ts importe desde @/lib/modules/inventario y borrar esta entrada.",
+      "desde": "2026-09-23"
+    }
+  }
 }

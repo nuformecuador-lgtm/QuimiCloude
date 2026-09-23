@@ -44,6 +44,14 @@ export type NewOrder = {
 };
 
 /**
+ * Datos de negocio de una EDICION: lo mismo que `NewOrder` sin `status`. La edicion ya no
+ * puede ni EXPRESAR un cambio de estado -ni siquiera `PENDIENTE` a `PENDIENTE`-, asi que quien
+ * decide si el pedido sigue siendo editable es `assertTransition(row.status, row.status)` en
+ * `update-order.ts`, contra el estado ya leido de la fila.
+ */
+export type OrderEdit = Omit<NewOrder, 'status'>;
+
+/**
  * La fila tal como la devuelve el puerto: lo que vive en `orders` y nada mas. NO trae el
  * nombre de la receta -eso lo resuelve el caso de uso con el contrato publico de `recetas`, con
  * UNA consulta por pagina (R43, R45)-, y por eso este tipo no es `OrderView`.

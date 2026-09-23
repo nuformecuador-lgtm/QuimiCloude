@@ -642,13 +642,18 @@ describe('R33/R40 — los discriminantes de las tres escrituras', () => {
       const despues = instantIn(YEAR_DISCRIMINANTES, 3, 13)
 
       // VIVO -> 'ok', y la edicion escribe de verdad.
+      //
+      // ENMIENDA: `editado` sigue llevando `status` porque `baseOrder` devuelve un `NewOrder`
+      // completo -el mismo helper del alta-, pero `updateAliveOrder` ya no lo lee (`OrderEdit` no
+      // tiene el campo): la fila se queda en el estado con el que nacio, `PENDIENTE`, aunque
+      // `editado.status` pida `EN_CURSO`.
       const editado = baseOrder({ quantity: '99.0000', priority: 'CRITICA', status: 'EN_CURSO' })
       expect(await updateAliveOrder(pedido.id, editado, actorId, despues, null, scope())).toBe('ok')
       const relectura = await findAliveOrderById(pedido.id, scope())
       expect(relectura?.quantity).toBe('99.0000')
       expect(relectura?.priority).toBe('CRITICA')
-      expect(relectura?.status).toBe('EN_CURSO')
-      // R6: la edicion NO toca el autor ni el instante de la creacion.
+      expect(relectura?.status).toBe('PENDIENTE')
+      // La edicion NO toca el autor ni el instante de la creacion.
       expect(relectura?.createdBy).toBe(actorId)
       expect(relectura?.createdAt.toISOString()).toBe(now.toISOString())
       expect(relectura?.updatedAt.toISOString()).toBe(despues.toISOString())
@@ -667,7 +672,7 @@ describe('R33/R40 — los discriminantes de las tres escrituras', () => {
       // Y ninguna de las tres llamadas rechazadas escribio nada: la fila borrada sigue con lo
       // que tenia, no con lo que pedia el `editado` de despues.
       const cruda = await prisma.order.findUnique({ where: { id: pedido.id } })
-      expect(cruda?.status).toBe('EN_CURSO')
+      expect(cruda?.status).toBe('PENDIENTE')
       expect(cruda?.cancellationReason).toBeNull()
     } finally {
       await limpiar(creados)

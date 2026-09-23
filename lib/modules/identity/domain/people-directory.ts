@@ -13,10 +13,12 @@
  * implementa es `adapters/driven/persistence/assignment-directory-prisma.ts`, y quien lo ata a
  * su implementacion es `lib/composition` (R47).
  */
+import type { PermissionCode } from './permissions';
 
 /**
  * Lo MINIMO que otro modulo necesita saber de una persona para asignarla o para mostrarla como
- * responsable: su identificador, su nombre mostrable **ya compuesto** y si su cuenta esta activa.
+ * responsable: su identificador, su nombre mostrable **ya compuesto**, si su cuenta esta activa y
+ * los codigos de permiso de su rol.
  *
  * `displayName` llega compuesto y no en tres campos a proposito: la regla de «primer nombre +
  * primer apellido, y el `username` si queda vacio» es `buildDisplayName` (QC-84 R19) y tiene sus
@@ -27,13 +29,18 @@
  * `blocked` con el plazo ya vencido (QC-78 R8). Quien traduce es `effectiveAccountStatus`, la
  * unica funcion por la que pasan todos los lectores del estado de una cuenta (QC-78 R7).
  *
- * Lo que este tipo **no** lleva —correo, documento, rol, ninguna marca de baja y ningun dato de
- * credencial— lo fija el TIPO, no una promesa.
+ * `permissions` son los codigos del rol de la persona, leidos en la MISMA consulta que ya trae el
+ * resto de la fila: es lo que permite decidir si una persona puede ser responsable de un pedido
+ * sin una segunda ida a la base y sin mirar nunca el nombre de su rol.
+ *
+ * Lo que este tipo **no** lleva —correo, documento, el nombre del rol, ninguna marca de baja y
+ * ningun dato de credencial— lo fija el TIPO, no una promesa.
  */
 export type PersonRef = {
   readonly id: string;
   readonly displayName: string;
   readonly isActive: boolean;
+  readonly permissions: readonly PermissionCode[];
 };
 
 export interface PeopleDirectory {
@@ -72,4 +79,14 @@ export interface PeopleDirectory {
     ids: readonly string[],
     now: Date,
   ): Promise<readonly PersonRef[]>;
+
+  /**
+   * Las personas VIVAS de la empresa, para poblar un selector: sin filtrar por identificador.
+   * Ordenadas por `last_names, first_names, id` y con un tope duro de `limit` filas, el mismo
+   * criterio y el mismo limite que ya usaba el selector de responsables.
+   *
+   * `now` entra por parametro por el mismo motivo que en los dos metodos de arriba: aqui tampoco
+   * hay reloj propio.
+   */
+  listAliveInCompany(companyId: string, now: Date, limit: number): Promise<readonly PersonRef[]>;
 }
