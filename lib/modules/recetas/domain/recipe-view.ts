@@ -26,26 +26,21 @@ export type RecipeSummary = {
 /**
  * Linea de producto tal como sale en el DETALLE (R33). `productName` sale de
  * `ProductCatalog.findRefs` (`design.md > 6`), y es `null` cuando el producto esta
- * borrado logicamente (R18): la linea se conserva igual. `quantity` sigue siendo cadena
- * -mismo criterio que en el borde (`design.md > 2`)-. `unitId` es la REFERENCIA al
- * catalogo de `unidades` (R50): este modulo no resuelve nombre ni simbolo, solo pasa el
- * identificador tal cual.
+ * borrado logicamente: la linea se conserva igual. `percentage` es cadena con 2
+ * decimales, sin unidad propia.
  *
- * `productStock` sale del MISMO `ProductCatalog.findRefs`, leido en la unidad de ESTA linea
- * (`unitId`), nunca convertido: `null` cuando el producto esta dado de baja, `0` cuando no
- * tiene ningun lote, la cantidad sumada cuando tiene un lote en esa unidad, y `null` cuando
- * tiene lotes pero ninguno en esa unidad -mismo marcador de dato ausente que `productName`,
- * distinto motivo-. La presentacion YA NO viaja aqui: se mudo de `products` a
- * `product_batches` el 2026-09-09, y una linea de receta referencia un PRODUCTO, no un lote,
- * asi que no tiene presentacion que mostrar.
+ * `productUnitId` es la unidad del PRODUCTO, no de la linea: sale de
+ * `ProductCatalog.findRefs` y es `null` cuando el insumo no tiene lotes o esta dado de
+ * baja. `productStock` es la existencia en esa misma unidad: `null` solo cuando el
+ * producto esta dado de baja; `0` cuando esta vivo pero sin unidad resoluble o sin
+ * ningun lote en ella, y la cantidad sumada en el resto de los casos.
  */
 export type RecipeLineView = {
   readonly id: string;
   readonly productId: string;
   readonly productName: string | null;
-  readonly quantity: string;
-  readonly unitId: string;
-  /** Existencia del producto en la unidad de esta linea; ver el comentario del tipo. */
+  readonly percentage: string;
+  readonly productUnitId: string | null;
   readonly productStock: number | null;
 };
 

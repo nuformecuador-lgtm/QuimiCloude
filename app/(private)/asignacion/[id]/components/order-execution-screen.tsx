@@ -10,9 +10,9 @@ import {
   type FinishAssignedOrderResult,
 } from '@/lib/modules/asignaciones/adapters/driving/order-execution-actions';
 import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
+import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 import { OrderExecutionLines } from './order-execution-lines';
-import { OrderScaleBanner } from './order-scale-banner';
 
 /**
  * El recorrido completo de la pantalla: monta `StepReader` por props y termina en
@@ -30,8 +30,10 @@ export const ORDER_EXECUTION_FINISH_FORM_TESTID = 'order-execution-finish-form';
 export const ORDER_EXECUTION_ORDER_ID_FIELD = 'orderId';
 export const ORDER_EXECUTION_TITLE_TESTID = 'order-execution-title';
 export const ORDER_EXECUTION_RECIPE_NAME_TESTID = 'order-execution-recipe-name';
+export const ORDER_EXECUTION_ORDER_QUANTITY_TESTID = 'order-execution-order-quantity';
 
 const RECIPE_MISSING_TEXT = 'Esta receta esta dada de baja.';
+const ORDER_QUANTITY_LABEL = 'Pedido';
 const MIN_STEP_SECONDS = 5;
 
 type FinishFormState = { readonly status: 'idle' } | FinishAssignedOrderResult;
@@ -60,11 +62,9 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
         {execution.numberText}
       </h1>
 
-      <OrderScaleBanner
-        orderQuantity={execution.orderQuantity}
-        recipeBaseQuantity={execution.recipeBaseQuantity}
-        scaleFactorText={execution.scaleFactorText}
-      />
+      <p className="text-base font-medium" data-testid={ORDER_EXECUTION_ORDER_QUANTITY_TESTID}>
+        {ORDER_QUANTITY_LABEL} {formatDecimalDisplay(execution.orderQuantity)}
+      </p>
 
       <p
         className="text-base text-muted-foreground"

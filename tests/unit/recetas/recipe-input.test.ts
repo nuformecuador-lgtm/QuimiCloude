@@ -1,15 +1,9 @@
-// T4 — Esquemas de entrada zod de receta (`design.md > 7.1`, `tasks.md > T4`). Validacion
-// de borde (R38): cierra R7, R9, R14, R16, R19, R30, R50 (minimo e integridad) y el
-// test explicito de que el esquema no colapsa `undefined` y `null` del campo `image`.
+// Contrato de entrada de receta en porcentaje. Validacion de borde: el esquema exige
+// porcentaje en vez de cantidad y unidad, ordena las lineas, exige que su suma sea exacta, y
+// el test explicito de que el esquema no colapsa `undefined` y `null` del campo `image`.
 //
-// QC-62: el paso dejo de ser `{ body, type }` y es un DOCUMENTO; R20 de QC-24 (1.000
-// caracteres por paso) queda DEROGADO por QC-62 R12. Aqui viven los requisitos de QC-62 que
-// se juegan en `createRecipeSchema`/`updateRecipeSchema` -R6 (validacion en el borde), R8
-// (posicion del paso que falla) y R13 (50 pasos, lista vacia por defecto)-; la forma del
-// documento en si la cubre `recipe-step-document.test.ts`.
-// R15 esta DEROGADO por R50: la unidad ya no es texto libre, es una referencia (UUID) al
-// catalogo de `unidades` -aqui solo se valida la FORMA, la existencia real es del caso de
-// uso, ver `tests/unit/recetas/recipe-service.test.ts`-.
+// El paso dejo de ser `{ body, type }` y es un DOCUMENTO. La forma del documento en si la
+// cubre `recipe-step-document.test.ts`.
 
 import {
   MAX_STEP_ELEMENTS,
@@ -21,8 +15,7 @@ import { pageQuerySchema } from '@/lib/modules/recetas/domain/page';
 
 const LINEA_VALIDA = {
   productId: '11111111-1111-4111-8111-111111111111',
-  quantity: '10.5000',
-  unitId: '33333333-3333-4333-8333-333333333333',
+  percentage: '100',
 };
 
 const RECETA_VALIDA = {
@@ -35,34 +28,107 @@ const RECETA_VALIDA = {
   lines: [LINEA_VALIDA],
 };
 
-describe('recipeLineSchema — cantidad y unidad (R14, R50)', () => {
-  it('rechaza la cantidad cero, negativa o ausente, y el unitId ausente', () => {
-    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, quantity: '0' }).success).toBe(false);
-    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, quantity: '0.0000' }).success).toBe(false);
-    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, quantity: '-1' }).success).toBe(false);
-    expect(
-      recipeLineSchema.safeParse({ productId: LINEA_VALIDA.productId, quantity: '1' }).success,
-    ).toBe(false);
+describe('recipeLineSchema — porcentaje invalido (R2)', () => {
+  it.each(['0', '-1', '100.01', '12.345', 'abc'])(
+    'rechaza "%s" con el issue en la propia linea',
+    (percentage) => {
+      const result = recipeLineSchema.safeParse({ ...LINEA_VALIDA, percentage });
+      expect(result.success).toBe(false);
+    },
+  );
+
+  it.each(['0', '-1', '100.01', '12.345', 'abc'])(
+    'la linea invalida "%s" ubica el issue en [lines, i, percentage] dentro de una receta',
+    (percentage) => {
+      const result = createRecipeSchema.safeParse({
+        ...RECETA_VALIDA,
+        lines: [LINEA_VALIDA, { ...LINEA_VALIDA, percentage, productId: '22222222-2222-4222-8222-222222222222' }],
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const rutas = result.error.issues.map((issue) => issue.path);
+        expect(rutas).toContainEqual(['lines', 1, 'percentage']);
+      }
+    },
+  );
+
+  it('acepta un porcentaje valido de hasta 3 enteros y 2 decimales', () => {
+    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, percentage: '97.5' }).success).toBe(true);
+    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, percentage: '0.01' }).success).toBe(true);
+    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, percentage: '100.00' }).success).toBe(true);
+  });
+});
+
+describe('recipeLineSchema — sin unidad (R5)', () => {
+  it('rechaza una linea que trae unitId', () => {
+    const result = recipeLineSchema.safeParse({
+      ...LINEA_VALIDA,
+      unitId: '33333333-3333-4333-8333-333333333333',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('recipeLinesSchema — suma distinta de 100,00 % (R3)', () => {
+  it('rechaza 97,50 % con el issue general en [lines]', () => {
+    const result = createRecipeSchema.safeParse({
+      ...RECETA_VALIDA,
+      lines: [
+        { productId: '11111111-1111-4111-8111-111111111111', percentage: '90' },
+        { productId: '22222222-2222-4222-8222-222222222222', percentage: '7.5' },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const rutas = result.error.issues.map((issue) => issue.path);
+      expect(rutas).toContainEqual(['lines']);
+    }
+  });
+});
+
+describe('recipeLinesSchema — receta sin ninguna linea (R3, R23)', () => {
+  it('rechaza lines: [] con el mismo issue en [lines], en alta y en edicion', () => {
+    const alta = createRecipeSchema.safeParse({ ...RECETA_VALIDA, lines: [] });
+    const edicion = updateRecipeSchema.safeParse({ ...RECETA_VALIDA, lines: [] });
+
+    expect(alta.success).toBe(false);
+    expect(edicion.success).toBe(false);
+    if (!alta.success) {
+      expect(alta.error.issues.map((issue) => issue.path)).toContainEqual(['lines']);
+    }
+    if (!edicion.success) {
+      expect(edicion.error.issues.map((issue) => issue.path)).toContainEqual(['lines']);
+    }
   });
 
-  it('rechaza un unitId que no es un UUID valido (R50)', () => {
-    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, unitId: '' }).success).toBe(false);
-    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, unitId: 'litros' }).success).toBe(false);
-    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, unitId: '123' }).success).toBe(false);
-  });
+  it('rechaza la ausencia de la clave lines con el mismo issue en [lines], en alta y en edicion', () => {
+    const sinLineas = { name: RECETA_VALIDA.name, description: RECETA_VALIDA.description, steps: RECETA_VALIDA.steps };
+    const alta = createRecipeSchema.safeParse(sinLineas);
+    const edicion = updateRecipeSchema.safeParse(sinLineas);
 
-  it('acepta cualquier UUID valido como unitId; la existencia real la valida el caso de uso (R50)', () => {
-    expect(
-      recipeLineSchema.safeParse({ ...LINEA_VALIDA, unitId: '44444444-4444-4444-8444-444444444444' })
-        .success,
-    ).toBe(true);
+    expect(alta.success).toBe(false);
+    expect(edicion.success).toBe(false);
+    if (!alta.success) {
+      expect(alta.error.issues.map((issue) => issue.path)).toContainEqual(['lines']);
+    }
+    if (!edicion.success) {
+      expect(edicion.error.issues.map((issue) => issue.path)).toContainEqual(['lines']);
+    }
   });
+});
 
-  it('acepta una cantidad decimal valida de hasta 14 digitos y 4 decimales, mayor que cero', () => {
-    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, quantity: '1234567890.1234' }).success).toBe(
-      true,
-    );
-    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, quantity: '0.0001' }).success).toBe(true);
+describe('recipeLinesSchema — suma exacta de 100,00 % (R4)', () => {
+  it('acepta 97,5 + 2,5', () => {
+    const result = createRecipeSchema.safeParse({
+      ...RECETA_VALIDA,
+      lines: [
+        { productId: '11111111-1111-4111-8111-111111111111', percentage: '97.5' },
+        { productId: '22222222-2222-4222-8222-222222222222', percentage: '2.5' },
+      ],
+    });
+    expect(result.success).toBe(true);
   });
 });
 
@@ -106,17 +172,17 @@ describe('createRecipeSchema — lineas repetidas (R16)', () => {
   it('rechaza dos lineas con el mismo producto', () => {
     const result = createRecipeSchema.safeParse({
       ...RECETA_VALIDA,
-      lines: [LINEA_VALIDA, { ...LINEA_VALIDA, quantity: '2.0000' }],
+      lines: [LINEA_VALIDA, { ...LINEA_VALIDA, percentage: '50' }],
     });
     expect(result.success).toBe(false);
   });
 
-  it('acepta lineas con productos distintos', () => {
+  it('acepta lineas con productos distintos que suman 100 %', () => {
     const result = createRecipeSchema.safeParse({
       ...RECETA_VALIDA,
       lines: [
-        LINEA_VALIDA,
-        { ...LINEA_VALIDA, productId: '22222222-2222-4222-8222-222222222222' },
+        { ...LINEA_VALIDA, percentage: '60' },
+        { productId: '22222222-2222-4222-8222-222222222222', percentage: '40' },
       ],
     });
     expect(result.success).toBe(true);

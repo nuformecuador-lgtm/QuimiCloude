@@ -62,8 +62,6 @@ const EXECUCION_MINIMA = {
   status: 'EN_CURSO' as const,
   recipeName: 'Barniz acrílico',
   orderQuantity: '250',
-  recipeBaseQuantity: null,
-  scaleFactorText: null,
   steps: [],
   lines: [],
 };

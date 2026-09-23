@@ -1,41 +1,42 @@
 import { z } from 'zod';
 
 import { normalizeRecipeName } from './recipe-name';
+import { PERCENTAGE_PATTERN, formatPercentage, percentageToHundredths, sumPercentages } from './recipe-percentage';
 
 /**
- * Esquemas de entrada de receta (`design.md > 7.1`). Validacion de borde (R38): nada sin
- * tipar ni sin validar cruza hacia el dominio.
+ * Esquemas de entrada de receta. Validacion de borde: nada sin tipar ni sin validar cruza
+ * hacia el dominio.
  */
 
 /**
- * Cantidad de una linea, como CADENA: el dominio no puede importar `@prisma/client`
- * (R40), asi que `Decimal(14,4)` viaja por el borde como texto -mismo criterio que
- * `cost` en `inventario` (`design.md > 2`). Hasta 10 enteros y 4 decimales, y el `refine`
- * cierra el `> 0` real: el patron por si solo deja pasar "0" y "0.0000".
+ * Porcentaje de una linea, como CADENA: el dominio no puede importar `@prisma/client` ni pasar
+ * por `number`. Hasta 3 enteros y 2 decimales, mayor que cero y hasta 100.
  */
-const QUANTITY_PATTERN = /^\d{1,10}(\.\d{1,4})?$/;
-
-const quantitySchema = z
+const percentageSchema = z
   .string()
-  .regex(QUANTITY_PATTERN, { message: 'La cantidad debe ser un numero decimal valido.' })
-  .refine((value) => Number.parseFloat(value) > 0, {
-    message: 'La cantidad debe ser mayor que cero.',
-  });
+  .regex(PERCENTAGE_PATTERN, { message: 'El porcentaje admite hasta 3 enteros y 2 decimales.' })
+  .refine(
+    (value) => {
+      const hundredths = percentageToHundredths(value);
+      return hundredths !== null && hundredths > BigInt(0);
+    },
+    { message: 'El porcentaje debe ser mayor que cero.' },
+  )
+  .refine(
+    (value) => {
+      const hundredths = percentageToHundredths(value);
+      return hundredths !== null && hundredths <= BigInt(10000);
+    },
+    { message: 'El porcentaje no puede pasar de 100.' },
+  );
 
-/**
- * Unidad de la linea: referencia al catalogo de `unidades`, no texto libre (R50,
- * deroga R15). Aqui, en el borde, solo se valida la FORMA -un UUID valido-; la
- * EXISTENCIA real contra el catalogo la comprueba el caso de uso a traves de
- * `UnitCatalog` (`@/lib/modules/unidades`), igual que `productId` no valida existencia
- * en zod.
- */
-const unitIdSchema = z.string().uuid();
-
-export const recipeLineSchema = z.object({
-  productId: z.string().uuid(),
-  quantity: quantitySchema,
-  unitId: unitIdSchema,
-});
+/** Sin unidad: `.strict()` rechaza cualquier clave extra, incluida `unitId`. */
+export const recipeLineSchema = z
+  .object({
+    productId: z.string().uuid(),
+    percentage: percentageSchema,
+  })
+  .strict();
 
 export type RecipeLineInput = z.infer<typeof recipeLineSchema>;
 
@@ -212,11 +213,26 @@ function sinProductoRepetido(lines: readonly RecipeLineInput[]): boolean {
   return new Set(ids).size === ids.length;
 }
 
+/**
+ * Suma de las lineas, sin guarda para la lista vacia: `sumPercentages([])` ya da
+ * `total: '0.00'`, `isComplete: false`, y cae por el mismo `superRefine`. Se conserva
+ * `.default([])`: un payload sin la clave `lines` se trata como lista vacia y se rechaza
+ * igual, en alta y en edicion.
+ */
 const recipeLinesSchema = z
   .array(recipeLineSchema)
   .default([])
   .refine(sinProductoRepetido, {
     message: 'No puede haber dos lineas con el mismo producto.',
+  })
+  .superRefine((lines, ctx) => {
+    const total = sumPercentages(lines.map((line) => line.percentage));
+    if (!total.isComplete) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `Las lineas suman ${formatPercentage(total.total)} %: deben sumar exactamente 100,00 %.`,
+      });
+    }
   });
 
 /**

@@ -71,7 +71,6 @@ import type {
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeDetail } from '@/lib/modules/recetas';
 import type { UnitView } from '@/lib/modules/unidades';
-import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 const {
   createOrderActionMock,
@@ -171,8 +170,8 @@ const LINEA_INGREDIENTE = {
   id: 'linea-1',
   productId: crypto.randomUUID(),
   productName: 'Sosa cáustica',
-  quantity: '2.0000',
-  unitId: 'u-litro',
+  percentage: '10.00',
+  productUnitId: 'u-litro',
   productStock: 40,
 };
 
@@ -656,13 +655,10 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     expect(within(tabla).getByTestId('order-ingredient-product')).toHaveTextContent(
       LINEA_INGREDIENTE.productName,
     );
-    // 2026-09-17: la celda pinta la cantidad REDONDEADA a dos decimales, no la cadena cruda del
-    // contrato: «2.0000» se lee «2». El dato de la linea no cambia, solo lo que se pinta.
-    expect(within(tabla).getByTestId('order-ingredient-quantity')).toHaveTextContent(
-      formatDecimalDisplay(LINEA_INGREDIENTE.quantity),
-    );
-    expect(within(tabla).getByTestId('order-ingredient-quantity').textContent).toBe('2');
-    // La unidad llega como id y se resuelve con el catalogo de unidades bajado por props (R43).
+    // La columna «porcentaje» pinta la parte del insumo con coma y dos decimales.
+    expect(within(tabla).getByTestId('order-ingredient-percentage')).toHaveTextContent('10,00 %');
+    // La unidad es la del PRODUCTO (`productUnitId`) y se resuelve con el catalogo bajado por
+    // props.
     expect(within(tabla).getByTestId('order-ingredient-unit')).toHaveTextContent('L');
     expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent(
       String(LINEA_INGREDIENTE.productStock),
@@ -691,9 +687,9 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
   });
 
   it('la «cantidad requerida» parte de 0 y el «restante» la descuenta del stock', async () => {
-    // 2026-09-09: la columna calcula `cantidad de la linea × cantidad del pedido`, con decimal
-    // EXACTO (`multiplyDecimal`), y sin cantidad escrita vale 0; el restante es `stock − requerida`
-    // (`subtractDecimal`) y sin cantidad escrita coincide con el stock.
+    // La columna calcula `cantidad del pedido × porcentaje / 100` (`consumedQuantity`), y sin
+    // cantidad escrita vale 0; el restante es `stock − requerida` (`subtractDecimal`) y sin
+    // cantidad escrita coincide con el stock.
     const user = setupUser();
     renderFormulario();
 
@@ -707,22 +703,22 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
 
     await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 
-    // 2.0000 × 0.1005 = 0.20100 y 40 − 0.201 = 39.799. Se CALCULAN exactos y se PINTAN a dos
-    // decimales (2026-09-17): «0.2» y «39.8». El valor exacto no se pierde, viaja en el `title`.
-    await waitFor(() => expect(requerida.textContent).toBe('0.2'));
-    expect(requerida).toHaveAttribute('title', '0.201');
-    expect(restante.textContent).toBe('39.8');
-    expect(restante).toHaveAttribute('title', '39.799');
+    // 0.1005 × 10,00 % = 0.01005 y 40 − 0.01005 = 39.98995. Se CALCULAN exactos y se PINTAN a dos
+    // decimales: «0.01» y «39.99». El valor exacto no se pierde, viaja en el `title`.
+    await waitFor(() => expect(requerida.textContent).toBe('0.01'));
+    expect(requerida).toHaveAttribute('title', '0.01005');
+    expect(restante.textContent).toBe('39.99');
+    expect(restante).toHaveAttribute('title', '39.98995');
     expect(restante.firstChild).not.toHaveClass('text-destructive');
   });
 
   it('un restante negativo se resalta en rojo', async () => {
-    // 2026-09-09: el pedido pide mas de lo que hay, el restante baja de cero y la celda se
-    // pinta con `text-destructive` sobre fondo suave.
+    // El pedido pide mas de lo que hay, el restante baja de cero y la celda se pinta con
+    // `text-destructive` sobre fondo suave.
     const user = setupUser();
     getRecipeActionMock.mockResolvedValue({
       status: 'success',
-      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, productStock: 0.2 }] }),
+      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, productStock: 0.005 }] }),
     });
     renderFormulario();
 
@@ -730,15 +726,15 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
 
     const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
     const restante = within(tabla).getByTestId('order-ingredient-remaining');
-    expect(restante).toHaveTextContent('0.2');
+    // Sin cantidad escrita, el restante coincide con el stock, redondeado a dos decimales.
+    expect(restante).toHaveTextContent('0.01');
 
     await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 
-    // 0.2 − 0.201 = −0.001, resaltado. A dos decimales eso se pinta «0» (2026-09-17), y por eso
-    // el resalte NO puede decidirse con el valor pintado: `isShort` mira el exacto. Un cero en
-    // rojo sigue avisando de que no alcanza, y el `title` lleva la cifra entera.
-    await waitFor(() => expect(restante.textContent).toBe('0'));
-    expect(restante).toHaveAttribute('title', '-0.001');
+    // 0.005 − 0.01005 = −0.00505, resaltado. A dos decimales eso se pinta «-0.01», y el `title`
+    // lleva la cifra exacta. El resalte (`isShort`) mira el exacto, no el pintado.
+    await waitFor(() => expect(restante.textContent).toBe('-0.01'));
+    expect(restante).toHaveAttribute('title', '-0.00505');
     expect(restante.firstElementChild).toHaveClass('text-destructive');
   });
 
@@ -788,14 +784,13 @@ describe('los ingredientes de la receta elegida (2026-09-09)', () => {
     await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
 
     const restante = within(tabla).getByTestId('order-ingredient-remaining');
-    // 0 − 0.201 = −0.201: sin ningun lote el pedido siempre pide mas de lo que hay. Se CALCULA
-    // exacto y se PINTA a dos decimales, «-0.2», igual que sus vecinos de este bloque.
-    // 2026-09-18: el resalte de faltante (`isShort`) se decide con el restante EXACTO, nunca con
-    // el pintado. En telefono o impreso no hay `title`, y alli el color es el unico aviso; se
-    // acepta a sabiendas. Se evaluo pintar «<0.01» en vez de «0» y se DESCARTO: cambia la
-    // pantalla, que esta ficha ratifica, y mete un segundo idioma de presentacion en la columna.
-    await waitFor(() => expect(restante.textContent).toBe('-0.2'));
-    expect(restante).toHaveAttribute('title', '-0.201');
+    // 0 − 0.01005 = −0.01005: sin ningun lote el pedido siempre pide mas de lo que hay. Se
+    // CALCULA exacto y se PINTA a dos decimales, «-0.01».
+    // El resalte de faltante (`isShort`) se decide con el restante EXACTO, nunca con el pintado.
+    // En telefono o impreso no hay `title`, y alli el color es el unico aviso; se acepta a
+    // sabiendas.
+    await waitFor(() => expect(restante.textContent).toBe('-0.01'));
+    expect(restante).toHaveAttribute('title', '-0.01005');
     expect(restante.firstElementChild).toHaveClass('text-destructive');
   });
 

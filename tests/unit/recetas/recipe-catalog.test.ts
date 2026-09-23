@@ -189,7 +189,7 @@ describe('findRecipeRefsIncludingDeleted', () => {
   })
 })
 
-const LINEA_CLORO = { productId: 'p-cloro', quantity: { toFixed: () => '10.0000' }, unitId: 'u-litro' }
+const LINEA_CLORO = { productId: 'p-cloro', percentage: { toFixed: () => '10.00' } }
 const PASO_VALIDO = { blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }] }] }
 
 describe('findRecipeExecutionContentById', () => {
@@ -209,7 +209,7 @@ describe('findRecipeExecutionContentById', () => {
       name: 'Cloro 5%',
       isDeleted: false,
       steps: [PASO_VALIDO],
-      lines: [{ productId: 'p-cloro', productName: null, quantity: '10.0000', unitId: 'u-litro' }],
+      lines: [{ productId: 'p-cloro', productName: null, percentage: '10.00' }],
     })
   })
 

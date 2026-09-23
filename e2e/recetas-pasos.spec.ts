@@ -328,10 +328,10 @@ test.describe('editor y lectura de pasos', () => {
     await fillControlled(page.getByTestId('recipe-field-name'), recipeName);
 
     // --- 3. Una linea de producto: el formulario la exige, y no es lo que esta feature prueba.
+    // Sin unidad -la linea ya no la lleva- y al 100 % para que la suma sea exacta y el Guardar
+    // se habilite.
     await selectProductByName(page, 'recipe-line-product-0', productName);
-    await fillControlled(page.getByTestId('recipe-line-quantity-0'), '12.5');
-    await page.getByTestId('recipe-line-unit-0').click();
-    await page.getByTestId('recipe-line-unit-0-option').first().click();
+    await fillControlled(page.getByTestId('recipe-line-percentage-0'), '100');
 
     // --- 4. EL PASO, escrito como lo escribiria una persona: teclado real dentro del
     // `contenteditable` y los BOTONES de la barra de formato. Nada de inyectar JSON por JS: el

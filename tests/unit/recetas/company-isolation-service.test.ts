@@ -41,7 +41,6 @@ import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-imag
 import type { NewRecipe, RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
 import type { ProductCatalog } from '@/lib/modules/inventario';
-import type { UnitCatalog } from '@/lib/modules/unidades';
 
 /** Los dos codigos que este modulo puede exigir. Ninguno nuevo nace en esta ficha (R28). */
 const CONSULTAR = 'recetas.consultar';
@@ -60,10 +59,6 @@ const PRODUCTO_A = '55555555-5555-4555-8555-555555555555';
 const PRODUCTO_B = '66666666-6666-4666-8666-666666666666';
 const PRODUCTO_INEXISTENTE = '77777777-7777-4777-8777-777777777777';
 
-const UNIDAD_SISTEMA = '88888888-8888-4888-8888-888888888888';
-const UNIDAD_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-const UNIDAD_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
-
 const AHORA = new Date('2026-09-16T10:00:00.000Z');
 
 /** Actor con exactamente los permisos que se le pasen, y ninguno mas. */
@@ -73,11 +68,13 @@ function actorCon(companyId: string, ...permisos: readonly string[]): Actor {
 
 const ACTOR_A: Actor = actorCon(EMPRESA_A, CONSULTAR, MODIFICAR);
 
+// Una entrada valida ya no puede ir sin lineas -0 lineas suman 0,00 %-, asi que lleva una
+// linea al 100 % del producto de la PROPIA empresa del actor.
 const ENTRADA_ALTA_VALIDA = {
   name: 'Desengrasante 5%',
   description: null,
   steps: [],
-  lines: [],
+  lines: [{ productId: PRODUCTO_A, percentage: '100.00' }],
 };
 
 const ENTRADA_EDICION_VALIDA = { ...ENTRADA_ALTA_VALIDA };
@@ -205,25 +202,6 @@ function catalogoProductos() {
   return { products: { findRefs } as unknown as ProductCatalog, findRefs };
 }
 
-/** Catalogo de unidades: de sistema (`companyId: null`) valen para todas; de empresa, solo
- *  para la suya (R23, R24). */
-function catalogoUnidades() {
-  const unidades = new Map<string, { companyId: string | null }>([
-    [UNIDAD_SISTEMA, { companyId: null }],
-    [UNIDAD_A, { companyId: EMPRESA_A }],
-    [UNIDAD_B, { companyId: EMPRESA_B }],
-  ]);
-  const findRefs = vi.fn(async (ids: readonly string[], companyId: string) =>
-    ids.flatMap((id) => {
-      const unidad = unidades.get(id);
-      if (unidad === undefined) return [];
-      if (unidad.companyId !== null && unidad.companyId !== companyId) return [];
-      return [{ id, name: 'Unidad', symbol: null, baseUnitId: null, factor: null }];
-    }),
-  );
-  return { units: { findRefs } as unknown as UnitCatalog, findRefs };
-}
-
 function almacenamientoMudo(): RecipeImageStorage {
   return {
     upload: vi.fn<RecipeImageStorage['upload']>(async () => 'recetas/x.jpg'),
@@ -232,16 +210,11 @@ function almacenamientoMudo(): RecipeImageStorage {
   };
 }
 
-/** Los cinco casos de uso cableados contra un almacen y dos catalogos concretos. */
-function casosDeUso(
-  recipes: RecipeRepository,
-  products: ProductCatalog,
-  units: UnitCatalog,
-  images: RecipeImageStorage,
-) {
+/** Los cinco casos de uso cableados contra un almacen y un catalogo concreto. */
+function casosDeUso(recipes: RecipeRepository, products: ProductCatalog, images: RecipeImageStorage) {
   const now = () => AHORA;
   return {
-    createRecipe: createCreateRecipe({ recipes, products, units, images, now }),
+    createRecipe: createCreateRecipe({ recipes, products, images, now }),
     getRecipe: createGetRecipe({ recipes, products, images }),
     listRecipes: createListRecipes({
       recipes,
@@ -250,18 +223,17 @@ function casosDeUso(
       toOffsetLimit: () => ({ offset: 0, limit: 10 }),
       buildPage: (items, total, page, pageSize) => ({ items, total, page, pageSize, totalPages: 1 }),
     }),
-    updateRecipe: createUpdateRecipe({ recipes, products, units, images, now }),
+    updateRecipe: createUpdateRecipe({ recipes, products, images, now }),
     deleteRecipe: createDeleteRecipe({ recipes, now }),
   };
 }
 
-/** Monta los cinco casos de uso sobre un almacen y catalogos nuevos, todo de una vez. */
+/** Monta los cinco casos de uso sobre un almacen y un catalogo nuevos, todo de una vez. */
 function montarTodo() {
   const a = almacen();
   const prod = catalogoProductos();
-  const uni = catalogoUnidades();
   const img = almacenamientoMudo();
-  return { a, prod, uni, img, c: casosDeUso(a.recipes, prod.products, uni.units, img) };
+  return { a, prod, img, c: casosDeUso(a.recipes, prod.products, img) };
 }
 
 async function capturar(promesa: Promise<unknown>): Promise<unknown> {
@@ -384,7 +356,6 @@ describe('QC-50 R28 — el PERMISO se exige ANTES que el ambito', () => {
       softDeleteAlive: explota('recipes.softDeleteAlive'),
     };
     const products = { findRefs: explota('products.findRefs') };
-    const units = { findRefs: explota('units.findRefs') };
     const images = {
       upload: explota('images.upload'),
       remove: explota('images.remove'),
@@ -395,13 +366,11 @@ describe('QC-50 R28 — el PERMISO se exige ANTES que el ambito', () => {
     return {
       recipes: recipes as unknown as RecipeRepository,
       products: products as unknown as ProductCatalog,
-      units: units as unknown as UnitCatalog,
       images: images as unknown as RecipeImageStorage,
       log,
       espias: [
         ...Object.values(recipes),
         ...Object.values(products),
-        ...Object.values(units),
         ...Object.values(images),
         log.ignoredFields,
       ],
@@ -489,7 +458,7 @@ describe('QC-50 R21 — un producto que no es de la empresa de la receta, en una
     const ajeno = montarTodo();
     const entradaAjena = {
       ...ENTRADA_ALTA_VALIDA,
-      lines: [{ productId: PRODUCTO_B, quantity: '1.0000', unitId: UNIDAD_SISTEMA }],
+      lines: [{ productId: PRODUCTO_B, percentage: '100.00' }],
     };
 
     const errorAjeno = await capturar(ajeno.c.createRecipe(entradaAjena, ACTOR_A));
@@ -499,7 +468,7 @@ describe('QC-50 R21 — un producto que no es de la empresa de la receta, en una
     const inexistente = montarTodo();
     const entradaInexistente = {
       ...ENTRADA_ALTA_VALIDA,
-      lines: [{ productId: PRODUCTO_INEXISTENTE, quantity: '1.0000', unitId: UNIDAD_SISTEMA }],
+      lines: [{ productId: PRODUCTO_INEXISTENTE, percentage: '100.00' }],
     };
     const errorInexistente = await capturar(inexistente.c.createRecipe(entradaInexistente, ACTOR_A));
 
@@ -514,7 +483,7 @@ describe('QC-50 R21 — un producto que no es de la empresa de la receta, en una
     const antes = new Map(a.filas);
     const entrada = {
       ...ENTRADA_EDICION_VALIDA,
-      lines: [{ productId: PRODUCTO_B, quantity: '1.0000', unitId: UNIDAD_SISTEMA }],
+      lines: [{ productId: PRODUCTO_B, percentage: '100.00' }],
     };
 
     const error = await capturar(c.updateRecipe(RECETA_A, entrada, ACTOR_A));
@@ -527,7 +496,7 @@ describe('QC-50 R21 — un producto que no es de la empresa de la receta, en una
     const { c } = montarTodo();
     const entrada = {
       ...ENTRADA_ALTA_VALIDA,
-      lines: [{ productId: PRODUCTO_A, quantity: '1.0000', unitId: UNIDAD_SISTEMA }],
+      lines: [{ productId: PRODUCTO_A, percentage: '100.00' }],
     };
 
     await expect(c.createRecipe(entrada, ACTOR_A)).resolves.toBeDefined();
@@ -535,32 +504,9 @@ describe('QC-50 R21 — un producto que no es de la empresa de la receta, en una
   });
 });
 
-describe('QC-50 R23 — una unidad que no es de sistema ni de la empresa de la receta', () => {
-  const CASOS_UNIDAD = [
-    ['de SISTEMA', UNIDAD_SISTEMA, true],
-    ['de la PROPIA empresa', UNIDAD_A, true],
-    ['de OTRA empresa', UNIDAD_B, false],
-  ] as const;
-
-  for (const [etiqueta, unitId, aceptada] of CASOS_UNIDAD) {
-    it(`alta con una linea de unidad ${etiqueta} -> ${aceptada ? 'se acepta' : 'ValidationError, sin escribir nada'}`, async () => {
-      const { a, c } = montarTodo();
-      const entrada = {
-        ...ENTRADA_ALTA_VALIDA,
-        lines: [{ productId: PRODUCTO_A, quantity: '1.0000', unitId }],
-      };
-
-      if (aceptada) {
-        await expect(c.createRecipe(entrada, ACTOR_A)).resolves.toBeDefined();
-        expect(a.espias.create).toHaveBeenCalledTimes(1);
-      } else {
-        const error = await capturar(c.createRecipe(entrada, ACTOR_A));
-        expect(error).toBeInstanceOf(ValidationError);
-        expect(a.espias.create).not.toHaveBeenCalled();
-      }
-    });
-  }
-});
+// La linea de receta ya no lleva unidad: el bloque que probaba el escaneo por empresa de
+// `UnitCatalog` sobre la unidad de una linea deja de tener materia y se retira sin
+// sustituto, sin ningun `unitId` de linea que validar.
 
 describe('QC-50 R18 — la empresa de la entrada se descarta; la fila se escribe con la del ACTOR', () => {
   it('un alta con `companyId`/`company_id` en la entrada escribe con la empresa del actor, y esos campos nunca llegan al puerto', async () => {
