@@ -1,4 +1,4 @@
-// QC-74 T13 — Autorizacion POR PERMISO de los SIETE casos de uso de `pedidos`
+// Autorizacion POR PERMISO de los SIETE casos de uso de `pedidos`
 // (R12, R13, R14, R15, R16, R17, R18).
 //
 // `docs/architecture.md > Acceso a datos y autorizacion` es explicito: Prisma se conecta como

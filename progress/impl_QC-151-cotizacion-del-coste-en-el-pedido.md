@@ -80,10 +80,10 @@ Tests:
 | R17 | `order-cost-quote.test.tsx` (sin cifra; tras error) |
 | R18 | `tests/unit/pedidos-ui/order-amount.test.ts` (tabla + fuente sin Intl/toLocaleString/parseFloat/toFixed/Number), `e2e/pedidos-cotizacion.spec.ts` (a, b) |
 | R19 | `order-amount.test.ts`, `order-cost-quote.test.tsx` |
-| R20 | `order-form-quote.test.tsx` (claves del FormData; Guardar habilitado en vuelo y con guion) |
+| R20 | `order-form-quote.test.tsx` (claves del FormData: los cuatro de `ORDER_BUSINESS_FIELDS` en alta y edición, sin estado desde QC-145; Guardar habilitado en vuelo y con guion) |
 | R21 | `order-cost-quote.test.tsx` (mensaje, UnexpectedErrorNotice, se limpia al acertar), `order-form-quote.test.tsx` (no bloquea guardar) |
 | R22 | `e2e/pedidos-cotizacion.spec.ts` (local, sin red externa) |
-| R23 | `tests/unit/pedidos-ui/order-form-quote.test.tsx` › «R23 — en la edicion, elegir otra receta deja la eleccion nueva, sin retirarla» › «la cotizacion se pide con la receta nueva y, al guardar, viaja su id». Con `recipe-picker.tsx` de `395ff106^` falla (`Expected "$ 30.00", Received "—"`); con el arreglo, el archivo da 12/12 |
+| R23 | `tests/unit/pedidos-ui/order-form-quote.test.tsx` › «R23 — en la edicion, elegir otra receta deja la eleccion nueva, sin retirarla» › «la cotizacion se pide con la receta nueva y, al guardar, viaja su id». Con `recipe-picker.tsx` de `395ff106^` falla (`Expected "$ 30.00", Received "—"`); con el arreglo, el archivo da 12/12. Caso de alta A->B, añadido en la vuelta 3: «en el alta, elegir una receta y despues otra deja la segunda, sin retirarla» |
 
 ## Salida de la verificación (solo lo relacionado; la suite completa y el gate son del leader)
 
@@ -149,9 +149,41 @@ Verificación de la ronda:
   que no está en `tests/baseline-rojos.json` ni lo toca esta rama. En esta corrida pasa: parece
   intermitente bajo carga.
 
+## Ronda 3 — F2.3, merge de origin/dev y menores de la vuelta 2
+
+- Merge `da71ad4f`: trae QC-145, que saca el estado del formulario de edición y añade la columna
+  `finishedAt` con su migración.
+  - En `order-form.tsx` el conflicto era solo el import: queda `ORDER_PRIORITY_LABELS` (sin
+    `ORDER_STATUS_LABELS`, que QC-145 retiró) más `useOrderCostQuote`.
+  - En `aislamiento.json` se conservan las altas de los dos lados.
+  - Después: `prisma generate`, `next typegen` y `pnpm run db:migrate` sobre la base local («All
+    migrations have been successfully applied»).
+- Coherencia post-merge: el caso R20 de edición de `order-form-quote.test.tsx` esperaba
+  `ORDER_BUSINESS_FIELDS` + `status`, y tras QC-145 fallaba (1 caso).
+  - Ahora afirma el FormData real, exacto: los cuatro campos, sin estado ni importe.
+  - `order-form.tsx` no tenía errores de merge.
+  - Los fixtures no necesitan `finishedAt`, que vive en `AssignedOrderSummary` y no en `OrderView`.
+- Menor 1: en el bloque de sesión incompleta de `order-actions.test.ts`, `SEIS` pasa a `SIETE`, con
+  sus títulos y comentarios.
+- Menor 2: se quitan las listas `R<n>` de las cabeceras de `order-form-quote.test.tsx`,
+  `order-cost-quote.test.tsx` y `order-amount.test.ts`, y `QC-74 T13` de la línea reescrita en
+  `authorization.test.ts`.
+- Menor 3: caso de alta A->B en el describe de R23.
+  - Con `recipe-picker.tsx` de `395ff106^` fallan 3: R12, R23 en edición y R23 en alta.
+  - Con el arreglo pasan los 13.
+  - La frase de `design.md > 14` la corrige el spec_author.
+
+Verificación:
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: limpio.
+- `pnpm exec vitest related --run` (lo tocado + `order-form.tsx` + `aislamiento.json`):
+  `Test Files 31 passed (31) · Tests 478 passed (478)`.
+- Integración `order-cost-quote.int.test.ts` tras el merge: `4 passed`.
+- El E2E no se ha vuelto a correr tras el merge.
+
 ## Pendiente
 
-- `./init.sh` completo (gate de T8/cierre): lo corre el leader.
+- `./init.sh` completo (gate de T8/cierre) y E2E tras el merge: los corre el leader.
 - ~~Decidir si se acepta el arreglo de `recipe-picker.tsx` (`395ff106`).~~ El humano lo aceptó; en el spec
   queda como R23 (`08c95636`), con su caso propio en `order-form-quote.test.tsx`: `vitest related`
   da 1 archivo y 12 tests en verde; typecheck y lint, limpios.

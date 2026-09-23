@@ -602,7 +602,7 @@ describe('QC-151 — quoteOrderCostAction', () => {
 // Lo que se afirma, y con que precision. La action NO repite `requirePermission` (R5, primer caso
 // de este archivo): con la sesion incompleta baja `null` al caso de uso, y es el caso de uso quien
 // rechaza en su primera linea, antes de tocar ningun puerto. Por eso aqui se prueban DOS cosas:
-//   1. que las seis actions bajan `null` -nunca un actor a medias, con `companyId: undefined` o
+//   1. que las siete actions bajan `null` -nunca un actor a medias, con `companyId: undefined` o
 //      con una empresa inventada- cuando falta CUALQUIERA de las dos caras;
 //   2. la CADENA REAL: action -> caso de uso de verdad -> puertos que EXPLOTAN. Sin contexto, el
 //      estado es `unauthorized` y ningun puerto se toco. Eso es R17 entero -«rechazar la operacion
@@ -610,8 +610,8 @@ describe('QC-151 — quoteOrderCostAction', () => {
 // ---------------------------------------------------------------------------------------
 
 describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta', () => {
-  /** Las seis actions con la posicion del argumento `actor` en la llamada al caso de uso. */
-  const SEIS = [
+  /** Las siete actions con la posicion del argumento `actor` en la llamada al caso de uso. */
+  const SIETE = [
     [
       'createOrderAction',
       createOrderMock,
@@ -653,11 +653,11 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
   ] as const
 
   for (const [sesion, usuario, contexto] of SESIONES_INCOMPLETAS) {
-    it(`${sesion}: las seis actions bajan actor null, nunca uno a medias`, async () => {
+    it(`${sesion}: las siete actions bajan actor null, nunca uno a medias`, async () => {
       getSessionUserMock.mockResolvedValue(usuario)
       getSessionContextMock.mockResolvedValue(contexto)
 
-      for (const [nombre, mock, posicion, invocar] of SEIS) {
+      for (const [nombre, mock, posicion, invocar] of SIETE) {
         mock.mockRejectedValueOnce(new UnauthorizedError())
         const estado = await invocar()
         expect(mock.mock.calls.at(-1)?.[posicion], `${nombre}: el actor tiene que ser null`).toBeNull()
@@ -665,8 +665,8 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
       }
       // Las dos caras se pidieron en CADA invocacion: una action que solo mirara el usuario
       // habria construido un actor sin empresa.
-      expect(getSessionContextMock).toHaveBeenCalledTimes(SEIS.length)
-      expect(getSessionUserMock).toHaveBeenCalledTimes(SEIS.length)
+      expect(getSessionContextMock).toHaveBeenCalledTimes(SIETE.length)
+      expect(getSessionUserMock).toHaveBeenCalledTimes(SIETE.length)
     })
   }
 
@@ -690,7 +690,7 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
     expect(JSON.stringify(createOrderMock.mock.calls[0]?.[0])).not.toContain(OTRA)
   })
 
-  it('CADENA REAL sin contexto de sesion: las seis devuelven unauthorized y NINGUN puerto se toca', async () => {
+  it('CADENA REAL sin contexto de sesion: las siete devuelven unauthorized y NINGUN puerto se toca', async () => {
     const explota = (nombre: string) =>
       vi.fn(() => {
         throw new Error(`el puerto ${nombre} no debe llamarse sin contexto de sesion`)
@@ -738,7 +738,7 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
     getSessionUserMock.mockResolvedValue(ADMIN_SESSION_USER)
     getSessionContextMock.mockResolvedValue(null)
 
-    for (const [nombre, , , invocar] of SEIS) {
+    for (const [nombre, , , invocar] of SIETE) {
       expect(await invocar(), nombre).toEqual({
         status: 'error',
         code: 'unauthorized',

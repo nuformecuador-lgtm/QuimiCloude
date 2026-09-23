@@ -1,6 +1,6 @@
-// El bloque de coste dentro del formulario de pedido: R8, R9, R11, R12, R13, R14, R20, R21 y R23.
-// La recotizacion en si (R9, R10, R13-R17, R19) ya la cubre `order-cost-quote.test.tsx`; aqui solo
-// se comprueba el CABLEADO con el formulario real.
+// El bloque de coste dentro del formulario de pedido.
+// La recotizacion en si ya la cubre `order-cost-quote.test.tsx`; aqui solo se comprueba el
+// CABLEADO con el formulario real.
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { setupUser, esperarInteractiva } from '../../helpers/user-event';
@@ -13,9 +13,9 @@ import {
   ORDER_COST_QUOTE_TESTID,
   ORDER_COST_QUOTE_VALUE_TESTID,
   ORDER_FORM_SUBMIT_TESTID,
-  ORDER_STATUS_FIELD,
   OrderForm,
   RECIPE_PICKER_TESTID,
+  type RecipePickerOption,
   type RecipePickerPage,
 } from '@/app/(private)/pedidos/components';
 import { Sheet } from '@/components/ui/sheet';
@@ -29,7 +29,7 @@ import type {
   RecipeListResult,
   RecipeQueryResult,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-import type { RecipeDetail } from '@/lib/modules/recetas';
+import type { RecipeDetail, RecipeSummary } from '@/lib/modules/recetas';
 import type { UnitView } from '@/lib/modules/unidades';
 
 const {
@@ -135,6 +135,20 @@ const LINEA_INGREDIENTE = {
 const UNIDADES: readonly UnitView[] = [
   { id: 'u-litro', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, isSystem: true },
 ];
+
+function recetaResumen(option: RecipePickerOption): RecipeSummary {
+  return {
+    id: option.id,
+    name: option.name,
+    description: null,
+    imageUrl: option.imageUrl,
+    stepCount: 0,
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    createdBy: null,
+    updatedBy: null,
+  };
+}
 
 function recetaDetalle(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
   return {
@@ -364,7 +378,7 @@ describe('R20 — lo que se guarda no lleva la cotizacion mostrada', () => {
     expect([...enviado.keys()].sort()).toEqual([...ORDER_BUSINESS_FIELDS].sort());
   });
 
-  it('el FormData de la edicion anade el estado y ninguna clave de importe', async () => {
+  it('el FormData de la edicion lleva los mismos CUATRO campos, sin estado ni importe', async () => {
     const user = setupUser();
     const elPedido = pedido({ ingredientsCost: '40.0000' });
     renderFormulario(elPedido);
@@ -373,9 +387,7 @@ describe('R20 — lo que se guarda no lleva la cotizacion mostrada', () => {
 
     await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
     const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
-    expect([...enviado.keys()].sort()).toEqual(
-      [...ORDER_BUSINESS_FIELDS, ORDER_STATUS_FIELD].sort(),
-    );
+    expect([...enviado.keys()].sort()).toEqual([...ORDER_BUSINESS_FIELDS].sort());
   });
 
   it('Guardar sigue habilitado con una cotizacion en vuelo y con el guion', async () => {
@@ -432,6 +444,56 @@ describe('R23 — en la edicion, elegir otra receta deja la eleccion nueva, sin 
 
     await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
     const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
+    expect(enviado.get('recipeId')).toBe(RECETA2.id);
+  });
+
+  it('en el alta, elegir una receta y despues otra deja la segunda, sin retirarla', async () => {
+    const user = setupUser();
+    quoteOrderCostActionMock.mockResolvedValue({
+      status: 'success',
+      data: { ingredientsCost: '30.0000' },
+    });
+    renderFormulario();
+
+    await user.type(cantidad(), '5');
+    await elegirReceta(user, RECETA);
+    await waitFor(() =>
+      expect(quoteOrderCostActionMock).toHaveBeenCalledWith({
+        recipeId: RECETA.id,
+        quantity: '5',
+      }),
+    );
+
+    listRecipesActionMock.mockResolvedValue({
+      status: 'success',
+      data: {
+        items: [recetaResumen(RECETA), recetaResumen(RECETA2)],
+        page: 1,
+        pageSize: 25,
+        total: 2,
+        totalPages: 1,
+      },
+    });
+    await elegirReceta(user, RECETA2);
+
+    await waitFor(() =>
+      expect(quoteOrderCostActionMock).toHaveBeenCalledWith({
+        recipeId: RECETA2.id,
+        quantity: '5',
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID).textContent).toBe('$ 30.00'),
+    );
+    expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID).textContent).not.toBe(
+      MISSING_VALUE_MARK,
+    );
+
+    await elegirPresentacion(user);
+    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
+    const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
     expect(enviado.get('recipeId')).toBe(RECETA2.id);
   });
 });

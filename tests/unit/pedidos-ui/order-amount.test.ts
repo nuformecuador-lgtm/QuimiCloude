@@ -1,5 +1,5 @@
 // El formateador del importe del bloque de coste: `$ 1,234,567.50`, sin `Intl` ni coma flotante
-// (R18) y con el valor exacto en el `title` solo cuando difiere de lo pintado (R19).
+// y con el valor exacto en el `title` solo cuando difiere de lo pintado.
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

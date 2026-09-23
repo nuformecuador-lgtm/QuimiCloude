@@ -1,5 +1,4 @@
-// El estado de la cotizacion (`useOrderCostQuote`) y el bloque que lo pinta (`OrderCostQuote`):
-// R9-R11, R13-R19, R21.
+// El estado de la cotizacion (`useOrderCostQuote`) y el bloque que lo pinta (`OrderCostQuote`).
 
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { useEffect } from 'react';
