@@ -7,8 +7,10 @@ import {
 
 import { setupUser } from '../../helpers/user-event';
 
-import { SupplierShowcaseList } from '@/app/(private)/proveedores/components/supplier-showcase-list';
-import { EMPTY_SHOWCASE_FILTERS } from '@/app/(private)/proveedores/components/supplier-showcase-params';
+import {
+  EMPTY_SHOWCASE_FILTERS,
+  SupplierShowcaseList,
+} from '@/app/(private)/proveedores/components';
 import type {
   ShowcaseLinesResult,
   SupplierShowcaseResult,

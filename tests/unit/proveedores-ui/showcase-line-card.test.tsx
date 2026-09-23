@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
-import { ShowcaseLineCard } from '@/app/(private)/proveedores/components/showcase-line-card';
+import { ShowcaseLineCard } from '@/app/(private)/proveedores/components';
 import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
 import type { ShowcaseLine } from '@/lib/modules/proveedores';
 

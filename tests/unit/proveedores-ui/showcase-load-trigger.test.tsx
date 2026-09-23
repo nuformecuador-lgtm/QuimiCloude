@@ -5,7 +5,7 @@ import {
   setupIntersectionMocking,
 } from 'react-intersection-observer/test-utils';
 
-import { ShowcaseLoadTrigger } from '@/app/(private)/proveedores/components/showcase-load-trigger';
+import { ShowcaseLoadTrigger } from '@/app/(private)/proveedores/components';
 
 beforeAll(() => {
   setupIntersectionMocking(vi.fn);

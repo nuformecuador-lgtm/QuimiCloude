@@ -20,8 +20,10 @@ vi.mock('next/navigation', async (importOriginal) => ({
   useRouter: () => routerMock,
 }));
 
-import { SupplierShowcaseFilters } from '@/app/(private)/proveedores/components/supplier-showcase-filters';
-import { EMPTY_SHOWCASE_FILTERS } from '@/app/(private)/proveedores/components/supplier-showcase-params';
+import {
+  EMPTY_SHOWCASE_FILTERS,
+  SupplierShowcaseFilters,
+} from '@/app/(private)/proveedores/components';
 
 afterEach(() => {
   routerMock.replace.mockClear();

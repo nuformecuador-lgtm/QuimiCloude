@@ -8,7 +8,7 @@ import {
   parseShowcaseParams,
   showcaseHref,
   type ShowcaseFilters,
-} from '@/app/(private)/proveedores/components/supplier-showcase-params';
+} from '@/app/(private)/proveedores/components';
 import { SUPPLIERS_ROUTE } from '@/lib/shared/routes';
 
 describe('parametros del catalogo visual de proveedores', () => {

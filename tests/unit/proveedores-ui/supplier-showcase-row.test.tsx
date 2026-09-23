@@ -2,7 +2,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 
 import { setupUser } from '../../helpers/user-event';
 
-import { SupplierShowcaseRow } from '@/app/(private)/proveedores/components/supplier-showcase-row';
+import { SupplierShowcaseRow } from '@/app/(private)/proveedores/components';
 import type { ShowcaseLinesResult } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
 import type { ShowcaseLine, ShowcaseRow } from '@/lib/modules/proveedores';
 import { supplierDetailRoute } from '@/lib/shared/routes';
