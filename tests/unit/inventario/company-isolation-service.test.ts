@@ -81,6 +81,7 @@ function vista(id: string, name: string): ProductView {
     stock: 0,
     unitId: null,
     qtyAlert: 2,
+    type: 'PRODUCT' as const,
     createdAt: AHORA,
     updatedAt: AHORA,
   };

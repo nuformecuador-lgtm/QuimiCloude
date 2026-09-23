@@ -53,7 +53,8 @@ import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { DOCUMENT_TYPE_CC, normalizeCompanyName } from '@/lib/modules/identity';
+import { identity } from '@/lib/composition';
+import { DOCUMENT_TYPE_CC, normalizeCompanyName, UnauthorizedError } from '@/lib/modules/identity';
 import {
   applyGuardedChange,
   create,
@@ -63,9 +64,10 @@ import {
 } from '@/lib/modules/identity/adapters/driven/persistence/user-admin-prisma';
 import { PERMISSIONS } from '@/lib/modules/identity/domain/permissions';
 import { clearedLockState } from '@/lib/modules/identity/domain/effective-account-status';
-import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
+import { ROLE_ADMINISTRADOR, ROLE_EMPACADOR, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import type { Actor } from '@/lib/modules/identity';
 import type { UserAccountStatus } from '@/lib/modules/identity/domain/account-status';
 import type { ListQuery } from '@/lib/modules/identity/domain/list-query';
 import type { UserDetail, UserRow } from '@/lib/modules/identity/domain/user-view';
@@ -89,6 +91,7 @@ const FAKE_CREDENTIAL_HASH = {
 
 let operadorRoleId = '';
 let administradorRoleId = '';
+let empacadorRoleId = '';
 
 /** Las empresas que este archivo creo, para comprobar en `afterAll` que no quedo ninguna. */
 const createdCompanyIds = new Set<string>();
@@ -322,19 +325,21 @@ beforeAll(async () => {
   }
 
   const roles = await prisma.role.findMany({
-    where: { name: { in: [ROLE_ADMINISTRADOR, ROLE_OPERADOR] } },
+    where: { name: { in: [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR] } },
     select: { id: true, name: true },
   });
   const administrador = roles.find((role) => role.name === ROLE_ADMINISTRADOR);
   const operador = roles.find((role) => role.name === ROLE_OPERADOR);
-  if (administrador === undefined || operador === undefined) {
+  const empacador = roles.find((role) => role.name === ROLE_EMPACADOR);
+  if (administrador === undefined || operador === undefined || empacador === undefined) {
     throw new Error(
-      `faltan los roles base (${ROLE_ADMINISTRADOR} / ${ROLE_OPERADOR}) en la base: corre ` +
-        '`pnpm run db:seed` antes de correr este archivo.',
+      `faltan los roles base (${ROLE_ADMINISTRADOR} / ${ROLE_OPERADOR} / ${ROLE_EMPACADOR}) en la ` +
+        'base: corre `pnpm run db:seed` antes de correr este archivo.',
     );
   }
   administradorRoleId = administrador.id;
   operadorRoleId = operador.id;
+  empacadorRoleId = empacador.id;
 });
 
 afterAll(async () => {
@@ -1150,6 +1155,127 @@ describe('R35 — el propio actor NO sale en su listado', () => {
 
       expect(page.total).toBe(1);
       expect(page.items.map((item) => item.id)).not.toContain(actorId);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// El rol Empacador llega a los usuarios por el CASO DE USO completo (`identity.createUser` /
+// `identity.updateUser`, ya cableados con la base real por `lib/composition`), no por el
+// adaptador suelto: es la unica forma de ejercitar `requirePermission(actor, 'usuarios.modificar')`
+// en el mismo camino que usa produccion.
+// ---------------------------------------------------------------------------
+
+/** Cumple la politica real de credenciales (mayuscula, minuscula, digito, simbolo, 8..64):
+ *  evidentemente ficticia, y solo sirve para que el alta con credencial tome la rama
+ *  `'not_needed'` y no toque el emisor de enlaces ni el correo. */
+const FAKE_USE_CASE_CREDENTIAL = 'QC144-credencial-de-prueba-no-real-00';
+
+function actorWithPermissions(companyId: string, permissions: readonly string[]): Actor {
+  return { id: randomUUID(), companyId, permissions };
+}
+
+/** Los ocho campos comunes de `createUserSchema`/`updateUserSchema` del CASO DE USO, con
+ *  `birthDate` como TEXTO ISO: distinto del puerto `NewUser` del adaptador, que pide un `Date`. */
+function baseUserInputData(roleId: string, overrides: Record<string, unknown> = {}) {
+  const tag = randomUUID();
+  return {
+    firstNames: 'QC144',
+    lastNames: `Empacador${tag.slice(0, 8)}`,
+    birthDate: '1990-01-01',
+    email: `qc144.${tag}@example.test`,
+    phone: '000000000',
+    documentTypeCode: DOCUMENT_TYPE_CC,
+    documentNumber: documentNumberFrom(tag),
+    username: `qc144.${tag}`,
+    roleId,
+    ...overrides,
+  };
+}
+
+/** Entrada de ALTA: los ocho campos comunes mas `credential`, para tomar la rama `'not_needed'`
+ *  y no rozar el emisor de enlaces ni el correo. */
+function createUserInputData(roleId: string, overrides: Record<string, unknown> = {}) {
+  return { ...baseUserInputData(roleId), credential: FAKE_USE_CASE_CREDENTIAL, ...overrides };
+}
+
+/** Entrada de EDICION: los ocho campos comunes y NADA MAS —`updateUserSchema` es
+ *  `createUserSchema.omit({ credential: true })` y `strictObject`, asi que una clave `credential`
+ *  presente (aunque valga `undefined`) la rechazaria. */
+function updateUserInputData(roleId: string, overrides: Record<string, unknown> = {}) {
+  return baseUserInputData(roleId, overrides);
+}
+
+describe('QC-144 R23 — alta y edicion con el rol Empacador, por un actor con `usuarios.modificar`', () => {
+  it('el alta con roleId del Empacador se acepta y persiste ese rol', async () => {
+    await withCompany(async (companyId) => {
+      const actor = actorWithPermissions(companyId, ['usuarios.modificar']);
+
+      const result = await identity.createUser(actor, createUserInputData(empacadorRoleId));
+
+      const detail = await findAliveInCompany(companyId, result.id);
+      expect(detail).not.toBeNull();
+      expect(detail?.roleId).toBe(empacadorRoleId);
+      expect(detail?.roleName).toBe(ROLE_EMPACADOR);
+    });
+  });
+
+  it('la edicion que pide el rol Empacador se acepta y persiste ese rol', async () => {
+    await withCompany(async (companyId) => {
+      const actor = actorWithPermissions(companyId, ['usuarios.modificar']);
+      const created = await identity.createUser(actor, createUserInputData(operadorRoleId));
+
+      await identity.updateUser(actor, created.id, updateUserInputData(empacadorRoleId));
+
+      const detail = await findAliveInCompany(companyId, created.id);
+      expect(detail).not.toBeNull();
+      expect(detail?.roleId).toBe(empacadorRoleId);
+      expect(detail?.roleName).toBe(ROLE_EMPACADOR);
+    });
+  });
+
+  it('sin `usuarios.modificar` el alta con rol Empacador se rechaza y no crea ninguna fila', async () => {
+    await withCompany(async (companyId) => {
+      const actor = actorWithPermissions(companyId, ['usuarios.consultar']);
+
+      await expect(
+        identity.createUser(actor, createUserInputData(empacadorRoleId)),
+      ).rejects.toBeInstanceOf(UnauthorizedError);
+      expect(await countRowsOf(companyId)).toBe(0);
+    });
+  });
+
+  it('sin `usuarios.modificar` la edicion hacia el rol Empacador se rechaza y no modifica la fila', async () => {
+    await withCompany(async (companyId) => {
+      const owner = actorWithPermissions(companyId, ['usuarios.modificar']);
+      const created = await identity.createUser(owner, createUserInputData(operadorRoleId));
+      const antes = await rawUser(created.id);
+
+      const actorSinPermiso = actorWithPermissions(companyId, ['usuarios.consultar']);
+      await expect(
+        identity.updateUser(actorSinPermiso, created.id, updateUserInputData(empacadorRoleId)),
+      ).rejects.toBeInstanceOf(UnauthorizedError);
+
+      expect(await rawUser(created.id)).toEqual(antes);
+    });
+  });
+});
+
+describe('QC-144 R3 — el rol Empacador se asigna a usuarios de empresas distintas', () => {
+  it('dos usuarios de dos empresas distintas nacen con el MISMO rol Empacador, cada uno en su empresa', async () => {
+    await withTwoCompanies(async (companyA, companyB) => {
+      const actorA = actorWithPermissions(companyA, ['usuarios.modificar']);
+      const actorB = actorWithPermissions(companyB, ['usuarios.modificar']);
+
+      const enA = await identity.createUser(actorA, createUserInputData(empacadorRoleId));
+      const enB = await identity.createUser(actorB, createUserInputData(empacadorRoleId));
+
+      const detalleA = await findAliveInCompany(companyA, enA.id);
+      const detalleB = await findAliveInCompany(companyB, enB.id);
+      expect(detalleA?.roleId).toBe(empacadorRoleId);
+      expect(detalleB?.roleId).toBe(empacadorRoleId);
+      expect(detalleA?.roleName).toBe(ROLE_EMPACADOR);
+      expect(detalleB?.roleName).toBe(ROLE_EMPACADOR);
     });
   });
 });

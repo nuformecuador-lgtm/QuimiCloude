@@ -59,7 +59,7 @@ import {
   normalizeCompanyName,
 } from '@/lib/modules/identity';
 import { PERMISSIONS, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity/domain/permissions';
-import { ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
+import { ROLE_ADMINISTRADOR, ROLE_EMPACADOR, ROLE_OPERADOR, SEED_ROLES } from '@/lib/modules/identity/domain/roles';
 import { seedInitialAccess } from '@/lib/modules/identity/domain/seed-initial-access';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -140,6 +140,11 @@ type ForeignKeyEdge = { readonly child: string; readonly parent: string };
 
 /** Identificador de tabla admisible para interpolar en un `DELETE FROM`. */
 const SAFE_TABLE_NAME = /^[a-z_][a-z0-9_]*$/;
+
+/** Los nombres de los roles de semilla, derivados de `SEED_ROLES` y nunca copiados a mano: asi el
+ *  reset y la lectura de "que roles de semilla hay" siguen correctos aunque el catalogo de roles
+ *  gane uno mas. */
+const SEED_ROLE_NAMES = SEED_ROLES.map((role) => role.name);
 
 /**
  * Las tablas que el llamador borra por su cuenta y que, por tanto, nunca deben aparecer en
@@ -256,7 +261,7 @@ async function resetIdentityToEmptyState(tx: Prisma.TransactionClient): Promise<
   // corrio el seed nuevo haria imposible observar la primera corrida.
   await tx.rolePermission.deleteMany({});
   await tx.permission.deleteMany({});
-  await tx.role.deleteMany({ where: { name: { in: [ROLE_ADMINISTRADOR, ROLE_OPERADOR] } } });
+  await tx.role.deleteMany({ where: { name: { in: SEED_ROLE_NAMES } } });
   // QC-47: y las empresas, DESPUES de los usuarios. Sin esto, la empresa de instalacion
   // sobreviviria al reset y el seed la reutilizaria: «base vacia» dejaria de serlo.
   await tx.company.deleteMany({});
@@ -264,7 +269,7 @@ async function resetIdentityToEmptyState(tx: Prisma.TransactionClient): Promise<
 
 async function seedRoleNames(tx: Prisma.TransactionClient): Promise<readonly string[]> {
   const roles = await tx.role.findMany({
-    where: { name: { in: [ROLE_ADMINISTRADOR, ROLE_OPERADOR] } },
+    where: { name: { in: SEED_ROLE_NAMES } },
     select: { name: true },
   });
   return roles.map((role) => role.name);
@@ -277,7 +282,7 @@ async function findLiveAdmin(tx: Prisma.TransactionClient) {
   });
 }
 
-/** Los quince codigos del catalogo, ordenados. Derivados de `PERMISSIONS`, nunca escritos aqui. */
+/** Los dieciseis codigos del catalogo, ordenados. Derivados de `PERMISSIONS`, nunca escritos aqui. */
 const CODIGOS_DEL_CATALOGO = PERMISSIONS.map((permission) => permission.code).slice().sort();
 
 /** Los codigos que el seed asigna a un rol, ordenados, tal como los declara el dominio. */
@@ -285,7 +290,7 @@ function codigosSembradosDe(roleName: string): readonly string[] {
   return [...(SEED_ROLE_PERMISSIONS[roleName] ?? [])].sort();
 }
 
-/** Numero total de asignaciones que el seed tiene que dejar (hoy: quince + dos = diecisiete). */
+/** Numero total de asignaciones que el seed tiene que dejar (hoy: dieciseis + dos + dos = veinte). */
 const TOTAL_DE_ASIGNACIONES_DEL_SEED = Object.values(SEED_ROLE_PERMISSIONS).reduce(
   (total, codes) => total + codes.length,
   0,
@@ -371,8 +376,8 @@ afterAll(async () => {
 });
 
 describe('seedInitialAccess contra base real — la doble corrida', () => {
-  // Caso 1 (R1, R2, R3, R4, R7, R14, R16): doble corrida sobre base vacia.
-  it('la primera corrida sobre base vacia crea los dos roles y el administrador; la segunda no cambia nada', async () => {
+  // Doble corrida sobre base vacia, ahora con los TRES roles de `SEED_ROLES`.
+  it('la primera corrida sobre base vacia crea los tres roles y el administrador; la segunda no cambia nada', async () => {
     await inRolledBackTransaction(async (tx) => {
       await resetIdentityToEmptyState(tx);
       expect(await seedRoleNames(tx)).toEqual([]);
@@ -391,13 +396,15 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       });
 
       // Se afirma PRIMERO que la primera corrida encontro/creo algo real.
-      expect(first.createdRoles.slice().sort()).toEqual([ROLE_ADMINISTRADOR, ROLE_OPERADOR].sort());
+      expect(first.createdRoles.slice().sort()).toEqual([...SEED_ROLE_NAMES].sort());
       expect(first.createdAdmin).toBe(true);
 
       const rolesAfterFirst = await tx.role.findMany({
-        where: { name: { in: [ROLE_ADMINISTRADOR, ROLE_OPERADOR] } },
+        where: { name: { in: SEED_ROLE_NAMES } },
       });
-      expect(rolesAfterFirst).toHaveLength(2);
+      expect(rolesAfterFirst).toHaveLength(3);
+      // El Empacador es global y una sola fila lo representa.
+      expect(rolesAfterFirst.filter((role) => role.name === ROLE_EMPACADOR)).toHaveLength(1);
 
       const adminAfterFirst = await findLiveAdmin(tx);
       expect(adminAfterFirst).not.toBeNull();
@@ -407,7 +414,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       const usersAfterFirst = await tx.user.count();
       expect(usersAfterFirst).toBe(1);
 
-      // Segunda corrida: no debe duplicar ni modificar nada (R14, R15, R16).
+      // Segunda corrida: no debe duplicar ni modificar nada.
       const second = await seedInitialAccess({
         repository,
         passwordHasher: identity.passwordHasher,
@@ -421,13 +428,15 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(second.createdAdmin).toBe(false);
 
       const rolesAfterSecond = await tx.role.findMany({
-        where: { name: { in: [ROLE_ADMINISTRADOR, ROLE_OPERADOR] } },
+        where: { name: { in: SEED_ROLE_NAMES } },
         orderBy: { name: 'asc' },
       });
-      expect(rolesAfterSecond).toHaveLength(2);
+      expect(rolesAfterSecond).toHaveLength(3);
       expect(rolesAfterSecond).toEqual(
         [...rolesAfterFirst].sort((a, b) => a.name.localeCompare(b.name)),
       );
+      // Sigue habiendo una sola fila `Empacador` tras la segunda corrida.
+      expect(rolesAfterSecond.filter((role) => role.name === ROLE_EMPACADOR)).toHaveLength(1);
 
       const adminAfterSecond = await findLiveAdmin(tx);
       expect(adminAfterSecond).not.toBeNull();
@@ -436,7 +445,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(adminAfterSecond).toEqual(adminAfterFirst);
 
       expect(await tx.user.count()).toBe(1);
-      expect(await tx.role.count({ where: { name: { in: [ROLE_ADMINISTRADOR, ROLE_OPERADOR] } } })).toBe(2);
+      expect(await tx.role.count({ where: { name: { in: SEED_ROLE_NAMES } } })).toBe(3);
     });
   });
 
@@ -509,7 +518,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         credentials: fakeCredentialsProvider,
       });
       expect(first.createdAdmin).toBe(true);
-      expect(first.createdRoles.length).toBe(2);
+      expect(first.createdRoles.length).toBe(3);
 
       const adminBeforeEdit = await findLiveAdmin(tx);
       expect(adminBeforeEdit).not.toBeNull();
@@ -550,8 +559,8 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
     });
   });
 
-  // Caso 5 (R2): solo falta un rol.
-  it('si solo falta el rol Operador, la corrida crea unicamente ese y deja Administrador intacto', async () => {
+  // Ahora conviven tres roles y solo falta uno.
+  it('si solo falta el rol Operador, la corrida crea unicamente ese y deja Administrador y Empacador intactos', async () => {
     await inRolledBackTransaction(async (tx) => {
       await resetIdentityToEmptyState(tx);
       const repository = createInitialAccessRepository(tx);
@@ -565,10 +574,11 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
-      expect(first.createdRoles.length).toBe(2);
+      expect(first.createdRoles.length).toBe(3);
       expect(first.createdAdmin).toBe(true);
 
       const administradorBeforeDelete = await tx.role.findUniqueOrThrow({ where: { name: ROLE_ADMINISTRADOR } });
+      const empacadorBeforeDelete = await tx.role.findUniqueOrThrow({ where: { name: ROLE_EMPACADOR } });
       // Operador no tiene usuarios asignados: es borrable (ya probado en
       // identity-constraints.int.test.ts > "permite borrar un rol sin usuarios asignados").
       // QC-74: pero SI tiene ya su asignacion de permiso, y esa FK es ON DELETE RESTRICT,
@@ -603,6 +613,9 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
 
       const administradorAfter = await tx.role.findUniqueOrThrow({ where: { name: ROLE_ADMINISTRADOR } });
       expect(administradorAfter).toEqual(administradorBeforeDelete);
+      // El Empacador nunca faltaba en este caso: la corrida no lo toca.
+      const empacadorAfter = await tx.role.findUniqueOrThrow({ where: { name: ROLE_EMPACADOR } });
+      expect(empacadorAfter).toEqual(empacadorBeforeDelete);
     });
   });
 
@@ -621,7 +634,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
-      expect(bootstrap.createdRoles.length).toBe(2);
+      expect(bootstrap.createdRoles.length).toBe(3);
       expect(bootstrap.createdAdmin).toBe(true);
 
       const outcome = await withSeedAdminEnvVarsCleared(() =>
@@ -636,7 +649,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(outcome.createdRoles).toEqual([]);
       expect(outcome.createdAdmin).toBe(false);
       expect(await tx.user.count()).toBe(1);
-      expect(await tx.role.count({ where: { name: { in: [ROLE_ADMINISTRADOR, ROLE_OPERADOR] } } })).toBe(2);
+      expect(await tx.role.count({ where: { name: { in: SEED_ROLE_NAMES } } })).toBe(3);
     });
   });
 
@@ -685,7 +698,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
-      expect(first.createdRoles.length).toBe(2);
+      expect(first.createdRoles.length).toBe(3);
       expect(first.createdAdmin).toBe(true);
 
       const second = await seedInitialAccess({
@@ -754,7 +767,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
   });
 
   // Caso 10 (QC-74 R7, R8, R9, R10): el catalogo y las asignaciones, contra base real.
-  it('la primera corrida deja el catalogo completo, el Administrador con los quince permisos y el Operador solo con inventario.consultar y asignaciones.consultar; la segunda no cambia ningun conteo', async () => {
+  it('la primera corrida deja el catalogo completo, el Administrador con los dieciseis permisos y el Operador solo con inventario.consultar y asignaciones.consultar; la segunda no cambia ningun conteo', async () => {
     await inRolledBackTransaction(async (tx) => {
       await resetIdentityToEmptyState(tx);
       expect(await tx.permission.count()).toBe(0);
@@ -769,19 +782,19 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         credentials: fakeCredentialsProvider,
       });
 
-      // Primero: la corrida SI creo el catalogo entero y las diecisiete asignaciones.
+      // Primero: la corrida SI creo el catalogo entero y las veinte asignaciones.
       expect(first.createdPermissions.slice().sort()).toEqual(CODIGOS_DEL_CATALOGO);
-      // QC-86 T12: los dos numeros, escritos. `PERMISSIONS.length` faltaba por literal: el
-      // catalogo paso de TRECE a QUINCE con esta ficha (R25) y las asignaciones, a DIECISIETE.
-      expect(PERMISSIONS.length).toBe(15);
-      expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(17);
+      // Los dos numeros, escritos: `PERMISSIONS.length` y el total de asignaciones del seed
+      // (Administrador 16 + Operador 2 + Empacador 2).
+      expect(PERMISSIONS.length).toBe(16);
+      expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(20);
       expect(first.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
 
       // Y la base lo confirma: las filas de `permissions` son exactamente las del catalogo.
       const catalogoEnBase = await tx.permission.findMany({ orderBy: { code: 'asc' } });
       expect(catalogoEnBase.map((permission) => permission.code)).toEqual(CODIGOS_DEL_CATALOGO);
 
-      // R8: el Administrador tiene los quince, escritos uno a uno — sin comodin ni regla
+      // El Administrador tiene los dieciseis, escritos uno a uno — sin comodin ni regla
       // implicita: se leen de `role_permissions`, no de su nombre de rol.
       expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
       expect(codigosSembradosDe(ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
@@ -829,6 +842,36 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
     });
   });
 
+  // CADA rol de `SEED_ROLES` -no solo Administrador y Operador- tiene en la base exactamente los
+  // permisos que el seed le declara, ni uno mas ni uno menos.
+  it('R25 — cada rol de semilla tiene en `role_permissions` exactamente los permisos que declara SEED_ROLE_PERMISSIONS', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      await resetIdentityToEmptyState(tx);
+      const repository = createInitialAccessRepository(tx);
+
+      await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+      });
+
+      for (const role of SEED_ROLES) {
+        expect(
+          await codigosEnBaseDe(tx, role.name),
+          `permisos en base del rol «${role.name}»`,
+        ).toEqual(codigosSembradosDe(role.name));
+      }
+      // Y el Empacador, nombrado, en negativo: ni inventario ni asignaciones.modificar.
+      expect(await codigosEnBaseDe(tx, ROLE_EMPACADOR)).toEqual([
+        'asignaciones.consultar',
+        'terminados.consultar',
+      ]);
+      expect(await codigosEnBaseDe(tx, ROLE_EMPACADOR)).not.toContain('inventario.consultar');
+      expect(await codigosEnBaseDe(tx, ROLE_EMPACADOR)).not.toContain('asignaciones.modificar');
+    });
+  });
+
   // Caso 11 (QC-65 R7, R10): el estado de cuenta del administrador inicial, contra Postgres
   // REAL. El unitario de `tests/unit/identity/seed/seed-initial-access.test.ts` afirma que el
   // dominio PASA el valor; este afirma que llega a la fila. Es el riesgo n.o 1 de
@@ -870,7 +913,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
   // Caso 12 (QC-86 R28, R26): la MIGRACION de las asignaciones sobre una instalacion QUE YA
   // EXISTE. El escenario no se toma prestado del estado con el que arranque la base local: se
   // CONSTRUYE dentro del `tx` —reset + una corrida del seed— para que «ya sembrada» signifique
-  // exactamente los quince permisos y las diecisiete asignaciones del dominio, con los dos
+  // exactamente los dieciseis permisos y las veinte asignaciones del dominio, con los dos
   // codigos de `asignaciones` ya presentes, que es el caso dificil de R28.
   //
   // El SQL se LEE del `migration.sql`, no se copia: si alguien le quita el
@@ -886,13 +929,13 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
-      // La instalacion de partida es la de verdad: quince permisos y diecisiete asignaciones.
+      // La instalacion de partida es la de verdad: dieciseis permisos y veinte asignaciones.
       expect(bootstrap.createdPermissions.slice().sort()).toEqual(CODIGOS_DEL_CATALOGO);
       expect(bootstrap.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
 
       const antes = await fotoDePermisos(tx);
-      expect(antes.permisos).toHaveLength(15);
-      expect(antes.asignaciones).toHaveLength(17);
+      expect(antes.permisos).toHaveLength(16);
+      expect(antes.asignaciones).toHaveLength(20);
       // Y los dos codigos de la ficha YA estan: sin esto, «no duplica» seria trivial.
       expect(antes.permisos.map((permiso) => permiso.code)).toEqual(
         expect.arrayContaining(['asignaciones.consultar', 'asignaciones.modificar']),
@@ -921,8 +964,8 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         const despues = await fotoDePermisos(tx);
 
         // Ni una fila de mas (no duplica) ni una de menos (no borra).
-        expect(despues.permisos, `conteo de permisos tras la pasada ${pasada}`).toHaveLength(15);
-        expect(despues.asignaciones, `conteo de asignaciones tras la pasada ${pasada}`).toHaveLength(17);
+        expect(despues.permisos, `conteo de permisos tras la pasada ${pasada}`).toHaveLength(16);
+        expect(despues.asignaciones, `conteo de asignaciones tras la pasada ${pasada}`).toHaveLength(20);
 
         // Ni una fila distinta: comparacion campo a campo, `created_at`/`updated_at` incluidos.
         expect(despues.permisos, `filas de permisos tras la pasada ${pasada}`).toEqual(antes.permisos);

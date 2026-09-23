@@ -19,6 +19,17 @@
 
 ## Evaluaciones
 
+### QC-146 - CREADA y ACOTADA con `/afinar-feature` (2026-09-22)
+
+Nace en el board a pedido del humano («pedidos debe tener presentacion») e importada sola. Alcance y
+**13 decisiones cerradas** en `specs/QC-146-presentacion-del-pedido/requirements.md`. Board: descripcion
+de QC-146 reescrita; QC-145 gana la presentacion en «Terminados» y queda **bloqueada por QC-146**.
+
+### QC-144 - ACOTADA con `/afinar-feature` (2026-09-22)
+
+Alcance y **9 decisiones cerradas** en `specs/QC-144-rol-empacador/requirements.md`. Nace **QC-145**
+(`pedidos-terminados-en-asignacion`, `pending`, bloqueada por QC-144); la vieja ficha en disco `id: 142` sin `key` pasa a ser QC-144 (el `QC-142` real del board es `permiso-propio-de-documentos`).
+
 ### QC-121 - acotada con `/afinar-feature` (2026-09-18)
 
 Alcance, **15 decisiones cerradas** y **1 pregunta abierta** (la unidad de la linea de receta) en

@@ -17,6 +17,7 @@
     "documentos/document-batches-and-files-constraints.int.test.ts",
     "identity/identity-constraints.int.test.ts",
     "identity/identity-seed.int.test.ts",
+    "identity/packer-role-migration.int.test.ts",
     "identity/work-groups-constraints.int.test.ts",
     "inventario/company-scope.int.test.ts",
     "inventario/inventario-constraints.int.test.ts",

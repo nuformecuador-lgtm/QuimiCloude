@@ -18,12 +18,16 @@
 // dispara Y el caso simetrico que no la viola.
 //
 // Esta guardia cubre las DOS mitades de R5:
-//   1. Que nadie ESCRIBA sobre las dos tablas (barrido de produccion, con una unica exencion).
+//   1. Que nadie ESCRIBA sobre las tres tablas (barrido de produccion, con una unica exencion).
 //   2. Que el CONTRATO no ofrezca por donde hacerlo: ni el puerto del seed declara metodos de
 //      modificacion, ni los modulos de negocio exportan un caso de uso que mute permisos.
 //
 // Lo que esta guardia NO cubre, dicho para que nadie lo suponga: que la migracion y el seed hagan
 // lo correcto. Eso lo cubren `tests/guards/guard-permisos-sembrados.test.ts` y los tests del seed.
+//
+// La tabla `roles` entra con el mismo criterio: el rol de un usuario tambien cuelga de un
+// catalogo cerrado que solo cambia por migracion y seed, y la unica escritura de produccion hoy
+// es la del mismo adaptador que ya estaba exento.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, join, sep } from 'node:path';
@@ -60,14 +64,15 @@ const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx']);
 const BUSINESS_MODULES = ['inventario', 'recetas', 'unidades', 'proveedores', 'pedidos'];
 
 /**
- * Los dos modelos de Prisma que R5 declara intocables, con el nombre tal cual esta en
- * `db/schema.prisma` (`model Permission` -> tabla `permissions`, `model RolePermission` -> tabla
- * `role_permissions`). El accessor del cliente de Prisma es el nombre del modelo con la primera
- * letra en minuscula, asi que se DERIVA de aqui en vez de escribirse a mano: si el schema
- * renombrara un modelo, el ultimo caso de este archivo lo dice en vez de dejar la guardia
- * vigilando un accessor inexistente (verde por vacuidad).
+ * Los tres modelos de Prisma que este catalogo declara intocables desde la aplicacion, con el
+ * nombre tal cual esta en `db/schema.prisma` (`model Permission` -> tabla `permissions`,
+ * `model RolePermission` -> tabla `role_permissions`, `model Role` -> tabla `roles`). El accessor
+ * del cliente de Prisma es el nombre del modelo con la primera letra en minuscula, asi que se
+ * DERIVA de aqui en vez de escribirse a mano: si el schema renombrara un modelo, el ultimo caso
+ * de este archivo lo dice en vez de dejar la guardia vigilando un accessor inexistente (verde por
+ * vacuidad).
  */
-const PERMISSION_MODELS = ['Permission', 'RolePermission'] as const;
+const PERMISSION_MODELS = ['Permission', 'RolePermission', 'Role'] as const;
 
 /**
  * Los verbos de ESCRITURA del cliente de Prisma: los ocho metodos que crean, modifican o borran
@@ -213,14 +218,35 @@ export function buildForbiddenWrites(): readonly ForbiddenWrite[] {
 const FORBIDDEN_WRITES = buildForbiddenWrites();
 
 /**
- * Los nombres de las escrituras prohibidas que aparecen en un fuente, ya sin comentarios.
+ * El SQL crudo equivalente a las escrituras de Prisma, por si alguien se saltara el cliente:
+ * un `INSERT INTO`, `UPDATE` o `DELETE FROM` que nombre una de las tres tablas. Se aplica a las
+ * tres y no solo a `roles` porque cuesta lo mismo y hoy ninguna tiene una via de escritura en SQL
+ * crudo fuera de la migracion.
+ */
+const RAW_SQL_WRITE_PATTERN = /(insert\s+into|update|delete\s+from)\s+"?(roles|permissions|role_permissions)"?\b/i;
+
+/** Las escrituras de SQL crudo que aparecen en un fuente ya sin comentarios, una por tabla. */
+function findRawSqlWritesInStrippedSource(code: string): readonly string[] {
+  const encontradas = new Set<string>();
+  for (const match of code.matchAll(new RegExp(RAW_SQL_WRITE_PATTERN.source, 'gi'))) {
+    encontradas.add(`escritura SQL sobre ${match[2]}`);
+  }
+  return [...encontradas];
+}
+
+/**
+ * Los nombres de las escrituras prohibidas que aparecen en un fuente, ya sin comentarios: las de
+ * Prisma y las de SQL crudo.
  *
  * Devuelve los NOMBRES y no un booleano para que el mensaje de fallo pueda decir *que* encontro:
  * tocar el catalogo y tocar las asignaciones se arreglan distinto.
  */
 export function findPermissionWritesInSource(source: string): readonly string[] {
   const code = stripComments(source);
-  return FORBIDDEN_WRITES.filter((write) => write.regex.test(code)).map((write) => write.nombre);
+  const deLosVerbosDePrisma = FORBIDDEN_WRITES.filter((write) => write.regex.test(code)).map(
+    (write) => write.nombre,
+  );
+  return [...deLosVerbosDePrisma, ...findRawSqlWritesInStrippedSource(code)];
 }
 
 /**
@@ -355,8 +381,8 @@ export function findMutationMethodsInPortSource(source: string): readonly string
     .filter((name, index, all) => all.indexOf(name) === index);
 }
 
-describe('guardia — los permisos y sus asignaciones no son administrables desde la app (R5)', () => {
-  it('ningun archivo de produccion escribe sobre permissions ni role_permissions, salvo el adaptador del seed', () => {
+describe('guardia — los roles, los permisos y sus asignaciones no son administrables desde la app (R5)', () => {
+  it('ningun archivo de produccion escribe sobre roles, permissions ni role_permissions, salvo el adaptador del seed', () => {
     const culpables = findPermissionWriteOffenses(repoRoot).filter(
       (offense) => !EXENTOS.includes(offense.file),
     );
@@ -365,15 +391,15 @@ describe('guardia — los permisos y sus asignaciones no son administrables desd
       culpables.map(describeOffense),
       culpables.length === 0
         ? undefined
-        : 'Estos archivos de produccion escriben sobre el catalogo de permisos o sobre las ' +
-            `asignaciones permiso-rol: ${culpables.map(describeOffense).join('; ')}. ` +
-            'R5 lo prohibe: el catalogo y las asignaciones SOLO cambian por migracion (db/) y ' +
+        : 'Estos archivos de produccion escriben sobre el catalogo de roles, el de permisos o ' +
+            `sobre las asignaciones permiso-rol: ${culpables.map(describeOffense).join('; ')}. ` +
+            'Esto lo prohibe: el catalogo y las asignaciones SOLO cambian por migracion (db/) y ' +
             'por el seed (lib/modules/identity/.../initial-access-repository-prisma.ts). ' +
-            'Si hace falta un permiso nuevo o una asignacion nueva, van al catalogo y al seed de ' +
-            '`lib/modules/identity/domain/permissions.ts` y, si toca retirar algo, a una ' +
-            'migracion con su down.sql — no a una Server Action. Un permiso editable en caliente ' +
-            'convierte el modelo de autorizacion en algo que cualquiera con acceso a la UI puede ' +
-            'ampliarse a si mismo.',
+            'Si hace falta un rol, un permiso o una asignacion nuevos, van al catalogo y al seed ' +
+            'de `lib/modules/identity/domain/roles.ts` o `permissions.ts` y, si toca retirar ' +
+            'algo, a una migracion con su down.sql — no a una Server Action. Un catalogo ' +
+            'editable en caliente convierte el modelo de autorizacion en algo que cualquiera con ' +
+            'acceso a la UI puede ampliarse a si mismo.',
     ).toEqual([]);
   });
 
@@ -416,15 +442,19 @@ describe('guardia — los permisos y sus asignaciones no son administrables desd
 
     expect(
       conEscritura,
-      `${EXENTOS[0]} esta exento porque es el adaptador del SEED: la via permitida por R5 junto ` +
-        'con la migracion. Si ya no escribe sobre permissions ni role_permissions, la exencion ' +
+      `${EXENTOS[0]} esta exento porque es el adaptador del SEED: la via permitida junto con la ` +
+        'migracion. Si ya no escribe sobre roles, permissions ni role_permissions, la exencion ' +
         'sobra: quitala de EXENTOS y revisa donde se mudo el seed, porque mientras tanto esta ' +
         'guardia estaria perdonando a un archivo inocente.',
     ).toContain(EXENTOS[0]);
 
-    // Y escribe sobre LAS DOS tablas: si perdiera una, el seed dejo de sembrar la mitad.
+    // Y escribe sobre LAS TRES tablas: si perdiera una, el seed dejo de sembrar una parte.
     const delSeed = findPermissionWritesInSource(readFileSync(join(repoRoot, EXENTOS[0]), 'utf8'));
-    expect(delSeed).toEqual(['escritura Prisma sobre permission', 'escritura Prisma sobre rolePermission']);
+    expect(delSeed).toEqual([
+      'escritura Prisma sobre permission',
+      'escritura Prisma sobre rolePermission',
+      'escritura Prisma sobre role',
+    ]);
 
     // La exencion es de UN archivo, no de la carpeta: cualquier otro archivo de identity que
     // escribiera seguiria siendo culpable.
@@ -471,6 +501,59 @@ describe('guardia — los permisos y sus asignaciones no son administrables desd
     }
   });
 
+  it('R27: dispara con un role-actions.ts sintetico que crea un rol', () => {
+    const accionProhibida = [
+      "'use server';",
+      '',
+      "import { prisma } from '@/lib/shared/prisma';",
+      '',
+      'export async function createRole(name: string, description: string) {',
+      '  return prisma.role.create({ data: { name, description } });',
+      '}',
+    ].join('\n');
+
+    expect(findPermissionWritesInSource(accionProhibida)).toEqual(['escritura Prisma sobre role']);
+
+    // Los ocho verbos de escritura caen igual sobre `role`, con cualquier receptor.
+    for (const verbo of PRISMA_WRITE_VERBS) {
+      expect(
+        findPermissionWritesInSource(`await tx.role.${verbo}({ data });`),
+        `el verbo de escritura ${verbo} sobre role tiene que caer`,
+      ).toEqual(['escritura Prisma sobre role']);
+    }
+  });
+
+  it('R27: dispara con SQL crudo de escritura sobre roles, permissions o role_permissions', () => {
+    expect(
+      findPermissionWritesInSource('await tx.$executeRaw`DELETE FROM "roles" WHERE "id" = ${id}`;'),
+    ).toEqual(['escritura SQL sobre roles']);
+    expect(
+      findPermissionWritesInSource(`await tx.$executeRawUnsafe('INSERT INTO "permissions" ("code") VALUES ($1)');`),
+    ).toEqual(['escritura SQL sobre permissions']);
+    expect(
+      findPermissionWritesInSource(`await tx.$executeRawUnsafe('UPDATE role_permissions SET permission_code = $1');`),
+    ).toEqual(['escritura SQL sobre role_permissions']);
+  });
+
+  it('R27: NO dispara con lecturas sobre role, ni con SQL de lectura sobre roles', () => {
+    const soloLectura = [
+      'export async function listRoles() {',
+      '  const filas = await prisma.role.findMany({ orderBy: { name: "asc" } });',
+      '  const uno = await prisma.role.findUniqueOrThrow({ where: { id } });',
+      '  const total = await prisma.role.count();',
+      '  return { filas, uno, total };',
+      '}',
+    ].join('\n');
+
+    expect(findPermissionWritesInSource(soloLectura)).toEqual([]);
+    expect(findPermissionWritesInSource('const sql = \'SELECT "id", "name" FROM "roles"\';')).toEqual(
+      [],
+    );
+
+    // El plural tampoco confunde: `actor.roles` es el campo del Actor, no el modelo `Role`.
+    expect(findPermissionWritesInSource('const r = actor.roles.create;')).toEqual([]);
+  });
+
   it('NO dispara con un fuente que solo LEE el catalogo de permisos', () => {
     const soloLectura = [
       'export async function listPermissions() {',
@@ -498,8 +581,14 @@ describe('guardia — los permisos y sus asignaciones no son administrables desd
     ).toEqual([]);
     expect(
       findPermissionWritesInSource(
-        '/** El seed usa db.permission.createMany y db.rolePermission.createMany (R5). */',
+        '/** El seed usa db.permission.createMany y db.rolePermission.createMany. */',
       ),
+    ).toEqual([]);
+    expect(
+      findPermissionWritesInSource('// nadie debe llamar a prisma.role.create fuera del seed'),
+    ).toEqual([]);
+    expect(
+      findPermissionWritesInSource('/** El SQL prohibido seria INSERT INTO "roles" (...). */'),
     ).toEqual([]);
   });
 
@@ -636,6 +725,7 @@ describe('guardia — los permisos y sus asignaciones no son administrables desd
     expect(buildForbiddenWrites().map((write) => write.nombre)).toEqual([
       'escritura Prisma sobre permission',
       'escritura Prisma sobre rolePermission',
+      'escritura Prisma sobre role',
     ]);
 
     // Ningun patron lleva la bandera `g`: un regex global guarda `lastIndex` entre llamadas y haria
@@ -643,6 +733,7 @@ describe('guardia — los permisos y sus asignaciones no son administrables desd
     for (const write of buildForbiddenWrites()) {
       expect(write.regex.global, `el patron ${write.nombre} no debe ser global`).toBe(false);
     }
+    expect(RAW_SQL_WRITE_PATTERN.global, 'el patron de SQL crudo no debe ser global').toBe(false);
 
     // Las lecturas NO estan en la lista de verbos: es la mitad del contrato de esta guardia.
     for (const lectura of ['findFirst', 'findMany', 'findUnique', 'count']) {
