@@ -4733,3 +4733,16 @@ podar.
   el **PR #114** (`a63c6640`). **Queda**: proveedores e inventario tienen el mismo fallo de la caja con
   Atrás (sin ficha); `pnpm run e2e -- <archivo>` no filtra en Git Bash (hay que usar `pnpm exec playwright
   test`), mejora al arnés pendiente de `/afinar-regla`.
+
+## 2026-09-23 — QC-151-cotizacion-del-coste-en-el-pedido
+
+- **Qué:** el formulario de pedido (alta y edición) muestra una **cotización del coste de ingredientes** en vivo
+  (`$ 1,234,567.50`, valor exacto en el `title`), con un caso de uso nuevo de solo lectura que reutiliza
+  `resolveIngredientsCost` (QC-123) bajo `pedidos.modificar`. Se recotiza 500 ms tras la última tecla y al cambiar
+  la receta; al guardar se recalcula. **R23**: arreglo de `recipe-picker.tsx` (elegir otra receta retiraba la
+  elección), ampliación aprobada por el humano.
+- **PR #115**, merge `6ec67aab`. Spec R1–R23, T1–T8. Nació al acotar QC-122 (el importe no va en el listado).
+- Review: vuelta 1 rechazada (comentarios de producción citando la ficha), vuelta 2 OK. Dos merges con `dev`
+  (QC-145; QC-122 + #114). **Excepción humana al paralelismo**: arrancó solapando con QC-141 en
+  `lib/composition/index.ts`, `lib/modules/pedidos/index.ts` y `order-form.tsx`: **QC-141 resolverá el conflicto al
+  mergear**.
