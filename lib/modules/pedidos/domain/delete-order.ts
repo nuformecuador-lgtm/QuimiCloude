@@ -3,10 +3,13 @@ import { NotDeletableError, OrderNotFoundError } from './errors';
 import type { OrderStatus } from './order-classification';
 import type { OrderScope } from './order-scope';
 
+import type { OrderUnitOfWork } from '../ports/order-unit-of-work';
 import type { OrderRepository } from '../ports/order-repository';
 
 export type DeleteOrderDeps = {
   readonly orders: OrderRepository;
+  /** Borrar tambien solo libera: mismo motivo que `CancelOrderDeps` para no recibir la receta. */
+  readonly unitOfWork: OrderUnitOfWork;
   /** Ver el comentario identico de `create-order.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
 };
@@ -20,12 +23,15 @@ export type DeleteOrderDeps = {
 const NO_BORRABLES: readonly OrderStatus[] = ['ENTREGADO', 'CANCELADO'];
 
 /**
- * Borrado de pedido (R31, R32, R33). Borrado LOGICO y sin restaurar (decision cerrada 9):
+ * Borrado de pedido (R19, R31, R32, R33). Borrado LOGICO y sin restaurar (decision cerrada 9):
  * `softDeleteAlive`, jamas un borrado fisico. El pedido conserva su fila entera y su numero
  * correlativo -que no se libera ni se reutiliza (R13)- y solo gana `deleted_at`.
  *
  * No existe ninguna operacion de restaurar ni ningun listado de borrados, y no por olvido:
  * el puerto no las declara (R31), asi que no se pueden hacer por descuido.
+ *
+ * R19 (N5): un pedido vivo que se borra tambien libera su material, igual que cancelar, en
+ * la MISMA operacion, sin persona autora en la reserva mas alla del actor que borro.
  */
 export function createDeleteOrder(
   deps: DeleteOrderDeps,
@@ -51,8 +57,31 @@ export function createDeleteOrder(
     // puede borrar» (`design.md > 7.4`).
     if (NO_BORRABLES.includes(row.status)) throw new NotDeletableError();
 
-    // R6: el borrado tambien registra al actor como autor de la ultima modificacion.
-    const result = await deps.orders.softDeleteAlive(id, actor.id, now(), scope);
+    const instant = now();
+
+    const result = await deps.unitOfWork.run(async (transaction) => {
+      const locked = await transaction.orders.lockAliveById(id, scope);
+      if (locked === null) return 'not_found' as const;
+      if (NO_BORRABLES.includes(locked.status)) throw new NotDeletableError();
+
+      // Libera y limpia `reserved_at` ANTES de marcar `deleted_at`: `setReservedAt` solo
+      // escribe sobre una fila viva (`WHERE deleted_at IS NULL`), asi que hacerlo despues del
+      // borrado no tocaria nada.
+      await transaction.reservations.releaseForOrder({
+        orderId: id,
+        companyId: actor.companyId,
+        reason: 'release',
+        actorId: actor.id,
+        now: instant,
+      });
+      await transaction.orders.setReservedAt(id, null, scope);
+
+      // R6: el borrado tambien registra al actor como autor de la ultima modificacion.
+      const deleted = await transaction.orders.softDeleteAlive(id, actor.id, instant, scope);
+      if (deleted === 'not_found') return 'not_found' as const;
+      return 'ok' as const;
+    });
+
     if (result === 'not_found') throw new OrderNotFoundError();
   };
 }

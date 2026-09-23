@@ -190,13 +190,9 @@ import {
   createUpdateOrder,
 } from '@/lib/modules/pedidos';
 import {
-  cancelAliveOrder,
-  createOrder,
   createOrderWriteRepository,
   findAliveOrderById,
   listAliveOrders,
-  softDeleteAliveOrder,
-  updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
@@ -954,13 +950,29 @@ const recipeCatalog: RecipeCatalog = {
 /** QC-57 (T7, R6): misma implementacion, tipada con el puerto que declara `pedidos`. */
 const pedidosListQueryLog: PedidosListQueryLog = { ignoredFields: logIgnoredListQueryFields };
 
+/** Puerto de LECTURA de `pedidos` (`ports/order-repository.ts`): la fila previa de una edicion,
+ *  cancelacion o borrado, y el listado. La escritura ya no vive aqui -QC-141 T9 la movio entera
+ *  a `orderUnitOfWork`, abajo-. */
 const orderRepository: OrderRepository = {
-  create: createOrder,
   findAliveById: findAliveOrderById,
   listAlive: listAliveOrders,
-  updateAlive: updateAliveOrder,
-  cancelAlive: cancelAliveOrder,
-  softDeleteAlive: softDeleteAliveOrder,
+};
+
+/**
+ * `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye, con el
+ * MISMO `tx`, el repositorio de escritura de `pedidos` y las reservas de `inventario`
+ * (`design.md > 5.2`). Sin `unitCatalog`: la necesidad ya llega en la unidad del producto, asi
+ * que `createMaterialReservations` no convierte nada.
+ */
+const orderUnitOfWork: OrderUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) => {
+      const scope: OrderTransactionScope = {
+        orders: createOrderWriteRepository(tx),
+        reservations: createMaterialReservations(tx),
+      };
+      return work(scope);
+    }),
 };
 
 /**
@@ -976,19 +988,20 @@ const orderRepository: OrderRepository = {
  * usa `toOffsetLimit`/`buildPage` directamente (R37, `design.md > 10`), asi que el dominio
  * no necesita recibirla.
  *
- * `cancelOrder` y `deleteOrder` reciben SOLO el repositorio: ninguno de los dos toca la receta,
- * y darles catalogos que no usan seria cablear una dependencia falsa. `getOrder` y `listOrders`
- * reciben SOLO el catalogo de recetas, por el mismo motivo: no calculan ningun importe.
- * `createOrder` y `updateOrder` son los dos que si costean, asi que son los dos que reciben
- * tambien `products` y `units`.
+ * `cancelOrder` y `deleteOrder` reciben `orders` (SOLO lectura, para la comprobacion previa de
+ * estado) y `unitOfWork` (para liberar): ninguno de los dos toca la receta, y darles catalogos
+ * que no usan seria cablear una dependencia falsa. `getOrder` y `listOrders` reciben SOLO el
+ * catalogo de recetas, por el mismo motivo: no calculan ningun importe ni apartan nada.
+ * `createOrder` y `updateOrder` son los dos que si costean y aparta, asi que son los dos que
+ * reciben tambien `products`, `units` y `unitOfWork`.
  */
 export const pedidos = {
   createOrder: createCreateOrder({
-    orders: orderRepository,
     recipes: recipeCatalog,
     products: productCatalog,
     units: unitCatalog,
     presentations: presentationCatalog,
+    unitOfWork: orderUnitOfWork,
   }),
   getOrder: createGetOrder({
     orders: orderRepository,
@@ -1007,34 +1020,11 @@ export const pedidos = {
     products: productCatalog,
     units: unitCatalog,
     presentations: presentationCatalog,
+    unitOfWork: orderUnitOfWork,
   }),
-  cancelOrder: createCancelOrder({ orders: orderRepository }),
-  deleteOrder: createDeleteOrder({ orders: orderRepository }),
+  cancelOrder: createCancelOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
+  deleteOrder: createDeleteOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
 } as const;
-
-// ---------------------------------------------------------------------------------------
-// QC-141 T8 — la unidad de trabajo compartida entre `pedidos` e `inventario`. Bloque NUEVO al
-// final: no reordena ni reformatea nada de arriba. `orderRepository` arriba SIGUE cableado tal
-// cual -sus cuatro metodos de escritura se quedan hasta que T9 mueva a sus llamantes-; esto es
-// el camino NUEVO que usaran crear/editar/cancelar/borrar/entregar.
-// ---------------------------------------------------------------------------------------
-
-/**
- * `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye, con el
- * MISMO `tx`, el repositorio de escritura de `pedidos` y las reservas de `inventario`
- * (`design.md > 5.2`). Sin `unitCatalog`: la necesidad ya llega en la unidad del producto, asi
- * que `createMaterialReservations` no convierte nada.
- */
-const orderUnitOfWork: OrderUnitOfWork = {
-  run: (work) =>
-    withOrderTransaction((tx) => {
-      const scope: OrderTransactionScope = {
-        orders: createOrderWriteRepository(tx),
-        reservations: createMaterialReservations(tx),
-      };
-      return work(scope);
-    }),
-};
 
 /** `OrderNumberDirectory` cableado con el adaptador driven DE PEDIDOS: `inventario` solo conoce
  *  el TIPO, para el historial de un lote (`design.md > 5.5`). */

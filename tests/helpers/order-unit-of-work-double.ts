@@ -1,0 +1,104 @@
+// Doble compartido de `OrderUnitOfWork` para los tests unitarios de `pedidos` (QC-141 T9).
+//
+// `run` invoca el trabajo DIRECTAMENTE con el `scope` que se le da, sin abrir ninguna
+// transaccion real: eso es lo que corresponde a un test UNITARIO, que dobla los dos puertos de
+// la transaccion (`OrderWriteRepository` de `pedidos`, `MaterialReservations` de `inventario`) y
+// no habla con Postgres. La transaccion de verdad la prueba
+// `tests/integration/pedidos/order-unit-of-work.int.test.ts`.
+import { vi } from 'vitest';
+
+import type {
+  OrderTransactionScope,
+  OrderUnitOfWork,
+} from '@/lib/modules/pedidos/ports/order-unit-of-work';
+import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
+import type { OrderWriteRepository } from '@/lib/modules/pedidos/ports/order-write-repository';
+import type {
+  ConsumptionOutcome,
+  MaterialReservations,
+  ReservationOutcome,
+} from '@/lib/modules/inventario';
+
+/** Un `OrderWriteRepository` que explota si se le llama un metodo que el test no espera: el
+ *  patron de `explota()` que ya usan `create-order.test.ts` y compania, aplicado al puerto de
+ *  escritura de la unidad de trabajo. */
+export function fakeOrderWriteRepository(
+  overrides: Partial<OrderWriteRepository> = {},
+): OrderWriteRepository & Record<keyof OrderWriteRepository, ReturnType<typeof vi.fn>> {
+  const explota = (nombre: string) =>
+    vi.fn(() => {
+      throw new Error(`OrderWriteRepository.${nombre} no deberia llamarse en este caso`);
+    });
+  return {
+    lockAliveById: vi.fn(explota('lockAliveById')),
+    create: vi.fn(explota('create')),
+    updateAlive: vi.fn(explota('updateAlive')),
+    cancelAlive: vi.fn(explota('cancelAlive')),
+    softDeleteAlive: vi.fn(explota('softDeleteAlive')),
+    setStatus: vi.fn(explota('setStatus')),
+    setReservedAt: vi.fn(explota('setReservedAt')),
+    ...overrides,
+  } as unknown as OrderWriteRepository & Record<keyof OrderWriteRepository, ReturnType<typeof vi.fn>>;
+}
+
+/** Un `MaterialReservations` que por defecto aparta todo lo que se le pida y no falla nunca:
+ *  quien necesite `insufficient` o `nothing_to_consume` lo pasa por `overrides`. */
+export function fakeMaterialReservations(
+  overrides: Partial<MaterialReservations> = {},
+): MaterialReservations & Record<keyof MaterialReservations, ReturnType<typeof vi.fn>> {
+  const syncForOrder = vi.fn(
+    async (): Promise<ReservationOutcome> => ({ kind: 'reserved' }),
+  );
+  const releaseForOrder = vi.fn(async (): Promise<void> => undefined);
+  const consumeForOrder = vi.fn(
+    async (): Promise<ConsumptionOutcome> => ({ kind: 'consumed' }),
+  );
+  return {
+    syncForOrder,
+    releaseForOrder,
+    consumeForOrder,
+    ...overrides,
+  } as unknown as MaterialReservations & Record<keyof MaterialReservations, ReturnType<typeof vi.fn>>;
+}
+
+/** El `OrderUnitOfWork` doble: `run` corre el trabajo con el `scope` dado, sin transaccion. */
+export function fakeOrderUnitOfWork(scope: OrderTransactionScope): OrderUnitOfWork {
+  return { run: (work) => work(scope) };
+}
+
+/** Combina los tres: el par de dobles del `scope` y la unidad de trabajo que los expone,
+ *  lista para inyectar en `CreateOrderDeps.unitOfWork`, etc. */
+export function fakeUnitOfWork(overrides: {
+  readonly orders?: Partial<OrderWriteRepository>;
+  readonly reservations?: Partial<MaterialReservations>;
+} = {}): {
+  readonly unitOfWork: OrderUnitOfWork;
+  readonly orders: OrderWriteRepository & Record<keyof OrderWriteRepository, ReturnType<typeof vi.fn>>;
+  readonly reservations: MaterialReservations &
+    Record<keyof MaterialReservations, ReturnType<typeof vi.fn>>;
+} {
+  const orders = fakeOrderWriteRepository(overrides.orders);
+  const reservations = fakeMaterialReservations(overrides.reservations);
+  return { unitOfWork: fakeOrderUnitOfWork({ orders, reservations }), orders, reservations };
+}
+
+/** Fila minima de `OrderWriteRepository.lockAliveById`/`create`: los tests que no la personalizan
+ *  usan esta, para no repetir los catorce campos de `OrderRow` en cada archivo. */
+export function fakeOrderRow(overrides: Partial<OrderRow> = {}): OrderRow {
+  return {
+    id: '11111111-1111-4111-8111-111111111111',
+    number: { year: 2026, sequence: 1 },
+    recipeId: '22222222-2222-4222-8222-222222222222',
+    quantity: '10.0000',
+    priority: 'BAJA',
+    status: 'PENDIENTE',
+    cancellationReason: null,
+    ingredientsCost: null,
+    createdAt: new Date('2026-01-02T03:04:05.000Z'),
+    updatedAt: new Date('2026-01-02T03:04:05.000Z'),
+    createdBy: 'admin-0',
+    updatedBy: 'admin-0',
+    presentationId: '66666666-6666-4666-8666-666666666666',
+    ...overrides,
+  };
+}

@@ -1,11 +1,14 @@
 import { requirePermission, type Actor } from './actor';
 import {
+  InsufficientMaterialError,
   OrderNotFoundError,
   PresentationNotFoundError,
   RecipeNotFoundError,
+  RecipeWithoutLinesError,
   ValidationError,
 } from './errors';
 import { updateOrderSchema } from './order-input';
+import { buildRequirement } from './order-requirement';
 import type { OrderScope } from './order-scope';
 import { assertTransition } from './order-transitions';
 import { resolveIngredientsCost } from './resolve-ingredients-cost';
@@ -14,11 +17,13 @@ import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventar
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
+import type { OrderUnitOfWork } from '../ports/order-unit-of-work';
 import type { OrderRepository } from '../ports/order-repository';
 
 /** Recupera `products` y `units` porque cada escritura recalcula el coste de los ingredientes:
  *  hace falta leer los lotes disponibles y convertir entre la unidad de la receta y la del
- *  lote. */
+ *  lote. `orders` sigue siendo `OrderRepository`: solo lee la fila previa. La escritura y el
+ *  apartado viven en `unitOfWork` (`design.md > 5.2`, `> 8`). */
 export type UpdateOrderDeps = {
   readonly orders: OrderRepository;
   readonly recipes: RecipeCatalog;
@@ -26,12 +31,13 @@ export type UpdateOrderDeps = {
   readonly units: UnitCatalog;
   /** Ver el comentario identico de `create-order.ts` sobre por que no se le pasa al coste. */
   readonly presentations: PresentationCatalog;
+  readonly unitOfWork: OrderUnitOfWork;
   /** Ver el comentario identico de `create-order.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
 };
 
 /**
- * Edicion de pedido (R20, R21, R22, R24, R25, R33).
+ * Edicion de pedido (R12-R14, R20-R22, R24, R25, R27, R29, R30, R31, R33, R49, R50).
  *
  * REEMPLAZO COMPLETO del conjunto de datos de negocio (R20), como QC-25 y QC-43: no hay
  * edicion parcial campo a campo. Es la pregunta abierta 5 del spec, con su posicion por
@@ -44,6 +50,16 @@ export type UpdateOrderDeps = {
  * R6: el actor queda como autor de la ULTIMA MODIFICACION y el de creacion NO se toca. Esa
  * mitad la cierra el adaptador -`data` no lleva `createdBy` y el `UPDATE` tampoco-, y su
  * prueba real es la de integracion.
+ *
+ * La transicion se comprueba DOS VECES: aqui, sobre la lectura previa, para fallar rapido sin
+ * abrir la transaccion; y otra vez dentro de `unitOfWork.run`, sobre la fila que acaba de
+ * bloquear `lockAliveById`, porque otra operacion pudo moverla entre las dos lecturas.
+ *
+ * Si el destino es `ENTREGADO`, la misma operacion recalcula lo apartado con los datos nuevos
+ * (R29) y consume el resultado (R27): `insufficient` se traduce a `InsufficientMaterialError` y
+ * `nothing_to_consume` a `RecipeWithoutLinesError` (R50). Cualquiera de las dos deshace la
+ * transaccion entera -el pedido y su reserva quedan como estaban- porque `unitOfWork.run`
+ * propaga la excepcion (R15).
  */
 export function createUpdateOrder(
   deps: UpdateOrderDeps,
@@ -104,10 +120,62 @@ export function createUpdateOrder(
       actor.companyId,
     );
 
-    const result = await deps.orders.updateAlive(id, data, actor.id, now(), ingredientsCost, scope);
+    const instant = now();
 
-    // La fila pudo borrarse entre el `SELECT` y el `UPDATE`: el puerto vuelve a filtrar por
-    // vivos y el caso de uso responde lo mismo que arriba (R33).
-    if (result === 'not_found') throw new OrderNotFoundError();
+    // R14: la necesidad se calcula con la receta del DATO ENTRANTE y NUNCA modifica lo
+    // apartado por otro pedido que use la misma receta -`buildRequirement` es dominio puro
+    // sobre las lineas de ESTA receta, y `syncForOrder` solo toca el libro de ESTE pedido.
+    const content = await deps.recipes.findExecutionContentById(data.recipeId, actor.companyId);
+    const requirement = buildRequirement(content?.lines ?? [], data.quantity);
+
+    await deps.unitOfWork.run(async (transaction) => {
+      const locked = await transaction.orders.lockAliveById(id, scope);
+      if (locked === null) throw new OrderNotFoundError();
+
+      // Repetida sobre la fila BLOQUEADA (R33): otra operacion pudo moverla entre la lectura
+      // de arriba y este bloqueo.
+      assertTransition(locked.status, data.status);
+
+      const result = await transaction.orders.updateAlive(id, data, actor.id, instant, ingredientsCost, scope);
+      if (result === 'not_found') throw new OrderNotFoundError();
+
+      if (data.status === 'ENTREGADO') {
+        // R29: recalcula primero lo apartado con los datos nuevos y consume el resultado.
+        await transaction.reservations.syncForOrder({
+          orderId: id,
+          companyId: actor.companyId,
+          requirement,
+          actorId: actor.id,
+          now: instant,
+        });
+
+        const outcome = await transaction.reservations.consumeForOrder({
+          orderId: id,
+          companyId: actor.companyId,
+          fallbackRequirement: requirement,
+          actorId: actor.id,
+          now: instant,
+        });
+
+        if (outcome.kind === 'insufficient') throw new InsufficientMaterialError();
+        if (outcome.kind === 'nothing_to_consume') throw new RecipeWithoutLinesError();
+
+        await transaction.orders.setReservedAt(id, null, scope);
+      } else {
+        const outcome = await transaction.reservations.syncForOrder({
+          orderId: id,
+          companyId: actor.companyId,
+          requirement,
+          actorId: actor.id,
+          now: instant,
+        });
+
+        await transaction.orders.setReservedAt(
+          id,
+          outcome.kind === 'reserved' ? instant : null,
+          scope,
+        );
+      }
+    });
   };
 }

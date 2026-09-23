@@ -10,12 +10,20 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { RecipeNotFoundError, UnauthorizedError, type PedidosError } from '@/lib/modules/pedidos/domain/errors';
+import {
+  InsufficientMaterialError,
+  RecipeNotFoundError,
+  RecipeWithoutLinesError,
+  UnauthorizedError,
+  type PedidosError,
+} from '@/lib/modules/pedidos/domain/errors';
 import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order';
+import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
+import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { CostingBatch, PresentationCatalog, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeExecutionLine, RecipeRef } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
@@ -119,21 +127,29 @@ function catalogoDePresentaciones(): { presentations: PresentationCatalog; findR
 }
 
 function repositorioDePedidos() {
-  const findAliveById = vi.fn(async () => filaExistente());
-  const updateAlive = vi.fn(async () => 'ok' as const);
+  const filaVista = filaExistente();
+  const findAliveById = vi.fn(async () => filaVista);
   const explota = (nombre: string) =>
     vi.fn(() => {
       throw new Error(`${nombre} no deberia llamarse en este caso`);
     });
   const orders = {
-    create: explota('create'),
     findAliveById,
     listAlive: explota('listAlive'),
-    updateAlive,
-    cancelAlive: explota('cancelAlive'),
-    softDeleteAlive: explota('softDeleteAlive'),
   } as unknown as OrderRepository;
-  return { orders, findAliveById, updateAlive };
+
+  // `lockAliveById` bloquea la MISMA fila que `findAliveById`: en estos tests no hay carrera
+  // que las separe.
+  const lockAliveById = vi.fn(async () => filaVista);
+  const updateAlive = vi.fn(async () => 'ok' as const);
+  const setReservedAt = vi.fn(async () => undefined);
+  const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
+  const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));
+  const { unitOfWork } = fakeUnitOfWork({
+    orders: { lockAliveById, updateAlive, setReservedAt },
+    reservations: { syncForOrder, consumeForOrder },
+  });
+  return { orders, unitOfWork, findAliveById, lockAliveById, updateAlive, setReservedAt, syncForOrder, consumeForOrder };
 }
 
 async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string> {
@@ -158,6 +174,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
       orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
@@ -176,6 +193,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
     await expect(
       createUpdateOrder({
         orders: repo2.orders,
+        unitOfWork: repo2.unitOfWork,
         recipes: cat.recipes,
         products: catalogoDeProductos().products,
         units: catalogoDeUnidades().units,
@@ -189,6 +207,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
     const repo3 = repositorioDePedidos();
     const errorInexistente = await createUpdateOrder({
       orders: repo3.orders,
+      unitOfWork: repo3.unitOfWork,
       recipes: cat2.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
@@ -206,6 +225,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
       orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
@@ -223,6 +243,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
       orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
@@ -240,6 +261,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
       orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
@@ -257,25 +279,27 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
 describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', () => {
   /** Repositorio con la fila en el ESTADO que pide el caso, para ejercitar R9 y R10. */
   function repositorioConEstado(status: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'CANCELADO') {
-    const findAliveById = vi.fn(async () => ({
-      ...filaExistente(),
-      status,
-      cancellationReason: status === 'CANCELADO' ? 'anulado' : null,
-    }));
-    const updateAlive = vi.fn(async () => 'ok' as const);
+    const filaVista = { ...filaExistente(), status, cancellationReason: status === 'CANCELADO' ? 'anulado' : null };
+    const findAliveById = vi.fn(async () => filaVista);
     const explota = (nombre: string) =>
       vi.fn(() => {
         throw new Error(`${nombre} no deberia llamarse en este caso`);
       });
     const orders = {
-      create: explota('create'),
       findAliveById,
       listAlive: explota('listAlive'),
-      updateAlive,
-      cancelAlive: explota('cancelAlive'),
-      softDeleteAlive: explota('softDeleteAlive'),
     } as unknown as OrderRepository;
-    return { orders, findAliveById, updateAlive };
+
+    const lockAliveById = vi.fn(async () => filaVista);
+    const updateAlive = vi.fn(async () => 'ok' as const);
+    const setReservedAt = vi.fn(async () => undefined);
+    const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
+    const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { lockAliveById, updateAlive, setReservedAt },
+      reservations: { syncForOrder, consumeForOrder },
+    });
+    return { orders, unitOfWork, findAliveById, lockAliveById, updateAlive, setReservedAt, syncForOrder, consumeForOrder };
   }
 
   it('R7: editar un pedido sin presentacion exige elegir una', async () => {
@@ -284,6 +308,7 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
     const pres = catalogoDePresentaciones();
     const updateOrder = createUpdateOrder({
       orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
@@ -309,6 +334,7 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
       );
       const updateOrder = createUpdateOrder({
         orders: repo.orders,
+        unitOfWork: repo.unitOfWork,
         recipes: cat.recipes,
         products: catalogoDeProductos().products,
         units: catalogoDeUnidades().units,
@@ -335,6 +361,7 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
       const pres = catalogoDePresentaciones();
       const updateOrder = createUpdateOrder({
         orders: repo.orders,
+        unitOfWork: repo.unitOfWork,
         recipes: cat.recipes,
         products: catalogoDeProductos().products,
         units: catalogoDeUnidades().units,
@@ -360,6 +387,7 @@ describe('QC-146 — la presentacion del pedido en la edicion (R7, R9, R10)', ()
     const PRESENTACION_INEXISTENTE = '77777777-7777-4777-8777-777777777777';
     const updateOrder = createUpdateOrder({
       orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
       units: catalogoDeUnidades().units,
@@ -403,8 +431,9 @@ function loteCosteable(overrides: Partial<CostingBatch> = {}): CostingBatch {
   };
 }
 
-/** Los DOS puertos y el catalogo de recetas FALLAN SI SE LLAMAN: no basta con que la edicion
- *  rechace, tiene que rechazar SIN haber leido nada (R23). */
+/** Los DOS puertos, la unidad de trabajo y el catalogo de recetas FALLAN SI SE LLAMAN: no basta
+ *  con que la edicion rechace, tiene que rechazar SIN haber leido nada ni abierto la transaccion
+ *  (R23, R41). */
 function catalogosQueExplotan() {
   const explota = (nombre: string) =>
     vi.fn(() => {
@@ -412,13 +441,10 @@ function catalogosQueExplotan() {
     });
   return {
     orders: {
-      create: explota('orders.create'),
       findAliveById: explota('orders.findAliveById'),
       listAlive: explota('orders.listAlive'),
-      updateAlive: explota('orders.updateAlive'),
-      cancelAlive: explota('orders.cancelAlive'),
-      softDeleteAlive: explota('orders.softDeleteAlive'),
     } as unknown as OrderRepository,
+    unitOfWork: { run: explota('unitOfWork.run') } as unknown as OrderUnitOfWork,
     recipes: {
       findRefsIncludingDeleted: explota('recipes.findRefsIncludingDeleted'),
       findExecutionContentById: explota('recipes.findExecutionContentById'),
@@ -445,6 +471,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
       orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: prod.products,
       units: uni.units,
@@ -466,6 +493,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
       orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: prod.products,
       units: uni.units,
@@ -494,6 +522,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
       const repo = repositorioDePedidos();
       const updateOrder = createUpdateOrder({
         orders: repo.orders,
+        unitOfWork: repo.unitOfWork,
         recipes: cat.recipes,
         products: prod.products,
         units: uni.units,
@@ -517,6 +546,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
     };
     const updateOrder = createUpdateOrder({
       orders: catalogos.orders,
+      unitOfWork: catalogos.unitOfWork,
       recipes: catalogos.recipes,
       products: catalogos.products,
       units: catalogos.units,
@@ -527,5 +557,173 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
     await expect(
       updateOrder(ORDER_ID, EDICION_HACIA_B, ACTOR_SIN_MODIFICAR),
     ).rejects.toBeInstanceOf(UnauthorizedError);
+  });
+});
+
+describe('QC-141 T9 — editar con reserva (R12, R20, R29, R41, R49, R50)', () => {
+  /** Registra el ORDEN real de las llamadas dentro de la unidad de trabajo. */
+  function repositorioConOrden(opciones: {
+    sync?: 'reserved' | 'not_reserved';
+    consume?: 'consumed' | 'insufficient' | 'nothing_to_consume';
+  } = {}) {
+    const filaVista = filaExistente();
+    const findAliveById = vi.fn(async () => filaVista);
+    const orders = { findAliveById, listAlive: vi.fn() } as unknown as OrderRepository;
+
+    const orden: string[] = [];
+    const lockAliveById = vi.fn(async () => filaVista);
+    const updateAlive = vi.fn(async () => {
+      orden.push('orders.updateAlive');
+      return 'ok' as const;
+    });
+    const setReservedAt = vi.fn(async (id: string, reservedAt: Date | null) => {
+      void [id, reservedAt];
+      orden.push('orders.setReservedAt');
+    });
+    const syncForOrder = vi.fn(async () => {
+      orden.push('reservations.syncForOrder');
+      return { kind: opciones.sync ?? 'reserved' } as const;
+    });
+    const consumeForOrder = vi.fn(async () => {
+      orden.push('reservations.consumeForOrder');
+      return { kind: opciones.consume ?? 'consumed', productIds: [] } as const;
+    });
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { lockAliveById, updateAlive, setReservedAt },
+      reservations: { syncForOrder, consumeForOrder },
+    });
+    return { orders, unitOfWork, orden, updateAlive, setReservedAt, syncForOrder, consumeForOrder };
+  }
+
+  it('destino distinto de ENTREGADO: updateAlive -> syncForOrder -> setReservedAt(now)', async () => {
+    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
+    const repo = repositorioConOrden({ sync: 'reserved' });
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status: 'EN_CURSO' }, ACTOR_A);
+
+    expect(repo.orden).toEqual(['orders.updateAlive', 'reservations.syncForOrder', 'orders.setReservedAt']);
+    expect(repo.consumeForOrder).not.toHaveBeenCalled();
+    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBe(AHORA);
+  });
+
+  it('destino ENTREGADO: updateAlive -> syncForOrder -> consumeForOrder -> setReservedAt(null) (R29)', async () => {
+    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
+    const repo = repositorioConOrden({ sync: 'reserved', consume: 'consumed' });
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status: 'ENTREGADO' }, ACTOR_A);
+
+    expect(repo.orden).toEqual([
+      'orders.updateAlive',
+      'reservations.syncForOrder',
+      'reservations.consumeForOrder',
+      'orders.setReservedAt',
+    ]);
+    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBeNull();
+  });
+
+  it('R29/insufficient: entregar sin material suficiente lanza InsufficientMaterialError y no fija reserved_at', async () => {
+    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
+    const repo = repositorioConOrden({ sync: 'not_reserved', consume: 'insufficient' });
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await expect(
+      updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status: 'ENTREGADO' }, ACTOR_A),
+    ).rejects.toBeInstanceOf(InsufficientMaterialError);
+    expect(repo.setReservedAt).not.toHaveBeenCalled();
+  });
+
+  it('R50: entregar sin apartado y con receta sin lineas lanza RecipeWithoutLinesError sin cambiar nada', async () => {
+    // `catalogoDeRecetas()` por defecto: receta sin lineas.
+    const cat = catalogoDeRecetas();
+    const repo = repositorioConOrden({ sync: 'not_reserved', consume: 'nothing_to_consume' });
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+
+    await expect(
+      updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status: 'ENTREGADO' }, ACTOR_A),
+    ).rejects.toBeInstanceOf(RecipeWithoutLinesError);
+    expect(repo.setReservedAt).not.toHaveBeenCalled();
+  });
+
+  it('R49: editar con una receta sin lineas guarda sin error y deja reserved_at nulo', async () => {
+    const cat = catalogoDeRecetas()
+    const repo = repositorioConOrden({ sync: 'not_reserved' })
+    const updateOrder = createUpdateOrder({
+      orders: repo.orders,
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    })
+
+    await updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status: 'EN_CURSO' }, ACTOR_A)
+
+    expect(repo.syncForOrder).toHaveBeenCalledTimes(1)
+    const requerido = (repo.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0]
+    expect(requerido.requirement).toEqual([])
+    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBeNull()
+  });
+
+  it('R41: el permiso se exige ANTES de abrir la unidad de trabajo', async () => {
+    const cat = catalogoDeRecetas();
+    const unitOfWork = {
+      run: vi.fn(() => {
+        throw new Error('unitOfWork.run no deberia llamarse sin permiso');
+      }),
+    };
+    const findAliveById = vi.fn(() => {
+      throw new Error('orders.findAliveById no deberia llamarse sin permiso');
+    });
+    const updateOrder = createUpdateOrder({
+      orders: { findAliveById, listAlive: vi.fn() } as unknown as OrderRepository,
+      unitOfWork: unitOfWork as unknown as ReturnType<typeof repositorioConOrden>['unitOfWork'],
+      recipes: cat.recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      now: () => AHORA,
+    });
+    const SIN_PERMISO: Actor = { id: 'u-1', companyId: EMPRESA_A, permissions: ['pedidos.consultar'] };
+
+    await expect(
+      updateOrder(ORDER_ID, EDICION_HACIA_B, SIN_PERMISO),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(findAliveById).not.toHaveBeenCalled();
+    expect(unitOfWork.run).not.toHaveBeenCalled();
   });
 });

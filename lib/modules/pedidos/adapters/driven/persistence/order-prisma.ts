@@ -151,9 +151,11 @@ const ORDER_SEQUENCE_LOCK_KEY_PREFIX = 'orders_sequence:';
 export const CREATE_ORDER_MAX_ATTEMPTS = 3;
 
 /**
- * `create` de `OrderRepository`: SQL crudo en una transaccion, porque el maximo del correlativo
+ * Alta con su propio reintento: SQL crudo en una transaccion, porque el maximo del correlativo
  * tiene que evaluarse DENTRO del `INSERT`, sin ventana entre leerlo y escribirlo. Es la UNICA
- * operacion del modulo que no usa la API tipada.
+ * operacion del modulo que no usa la API tipada. QC-141 T9 dejo de cablearla a `OrderRepository`
+ * -el alta ya escribe a traves de `insertAliveOrder`, dentro de la transaccion compartida con
+ * `inventario`-, pero sigue viva: `order-sequence.int.test.ts` la ejercita directamente.
  *
  * El lock va en una sentencia APARTE y ANTERIOR: en `READ COMMITTED` cada sentencia toma su
  * instantanea al empezar, asi que dentro del `INSERT` la sesion que espera leeria el mismo maximo

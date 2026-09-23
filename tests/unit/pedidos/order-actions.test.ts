@@ -49,6 +49,7 @@ import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
 import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
 
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
@@ -635,13 +636,10 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
         throw new Error(`el puerto ${nombre} no debe llamarse sin contexto de sesion`)
       })
     const orders = {
-      create: explota('create'),
       findAliveById: explota('findAliveById'),
       listAlive: explota('listAlive'),
-      updateAlive: explota('updateAlive'),
-      cancelAlive: explota('cancelAlive'),
-      softDeleteAlive: explota('softDeleteAlive'),
     }
+    const unitOfWork = { run: explota('unitOfWork.run') }
     const recipes = {
       findRefsIncludingDeleted: explota('findRefsIncludingDeleted'),
       findExecutionContentById: explota('findExecutionContentById'),
@@ -658,6 +656,7 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
     const log = { ignoredFields: explota('ignoredFields') }
     const deps = {
       orders: orders as unknown as OrderRepository,
+      unitOfWork: unitOfWork as unknown as OrderUnitOfWork,
       recipes: recipes as unknown as RecipeCatalog,
       products: products as unknown as ProductCatalog,
       units: units as unknown as UnitCatalog,
@@ -683,7 +682,12 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
         message: errorMessage('unauthorized'),
       })
     }
-    for (const espia of [...Object.values(orders), ...Object.values(recipes), log.ignoredFields]) {
+    for (const espia of [
+      ...Object.values(orders),
+      unitOfWork.run,
+      ...Object.values(recipes),
+      log.ignoredFields,
+    ]) {
       expect(espia).not.toHaveBeenCalled()
     }
 

@@ -358,6 +358,9 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // ningun script tocan `orders`.
     const DUENOS_DE_ORDERS = [
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
+      // QC-141 T8: `OrderNumberDirectory` de `inventario` -el numero visible de un pedido para
+      // el historial de un lote-, tercer y ultimo dueno.
+      'lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma.ts',
       'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts',
     ]
     expect(todoElCodigo.length).toBeGreaterThan(0)
@@ -470,10 +473,18 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // una lista CERRADA y sigue sin haber nada de Prisma en el dominio ni en los puertos.
     const DUENO_DE_PRISMA = 'lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts'
     const AMBITO_DE_EMPRESA = 'lib/modules/pedidos/adapters/driven/persistence/company-scope.ts'
-    const DUENOS_DE_PRISMA = [AMBITO_DE_EMPRESA, DUENO_DE_PRISMA]
+    // QC-141 T8: `order-unit-of-work-prisma.ts` importa `@prisma/client` SOLO por el tipo
+    // `Prisma.TransactionClient` -el `tx` que le pasa a `order-prisma.ts` y a `inventario`-, sin
+    // un solo `prisma.<modelo>` propio.
+    const UNIDAD_DE_TRABAJO = 'lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma.ts'
+    const DUENOS_DE_PRISMA = [AMBITO_DE_EMPRESA, DUENO_DE_PRISMA, UNIDAD_DE_TRABAJO]
+    // `order-number-directory-prisma.ts` (`OrderNumberDirectory` de `inventario`) tambien abre
+    // el cliente compartido, sin importar `@prisma/client`.
     const DUENOS_DEL_CLIENTE = [
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
+      'lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma.ts',
       DUENO_DE_PRISMA,
+      UNIDAD_DE_TRABAJO,
     ]
     expect(
       pedidosSources.filter((file) => /@prisma\/client/.test(read(file))).map(etiqueta),
