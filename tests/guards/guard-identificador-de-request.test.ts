@@ -261,11 +261,11 @@ export const MIGRACIONES_ESPERADAS = [
   '20260922160000_recipe_lines_percentage',
   // Ninguna de las dos toca el identificador de peticion: una anade un valor a un enum, la otra
   // cambia el tipo de columnas de existencia y crea el libro de reservas.
-  '20260923120000_inventory_movement_kind_consumption',
-  '20260923120100_reservations_and_decimal_stock',
+  '20260923150000_inventory_movement_kind_consumption',
+  '20260923150100_reservations_and_decimal_stock',
   // Aparta los pedidos vivos existentes con un bloque PL/pgSQL: no toca el identificador de
   // peticion.
-  '20260923120200_reserve_existing_orders',
+  '20260923150200_reserve_existing_orders',
 ] as const
 
 export function hallazgosDeMigraciones(

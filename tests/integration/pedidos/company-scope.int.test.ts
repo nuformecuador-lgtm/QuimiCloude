@@ -515,7 +515,7 @@ async function vaciarPedidos(tx: Prisma.TransactionClient) {
 
 /**
  * El DOWN de esta migracion suelta `orders_id_company_id_key` (paso 3), pero dos migraciones
- * posteriores (`20260923120100_reservations_and_decimal_stock`) le anadieron FK compuestas que
+ * posteriores (`20260923150100_reservations_and_decimal_stock`) le anadieron FK compuestas que
  * la referencian: `reservation_movements_order_id_fkey` e `inventory_movements_order_id_fkey`.
  * Sobre la base YA migrada a HEAD (con la que corre esta suite) esas FK existen, y Postgres
  * rechaza el `DROP CONSTRAINT` de la clave mientras algo la referencie. Se retiran antes de
