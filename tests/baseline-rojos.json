@@ -1,4 +1,17 @@
 {
   "_nota": "Mapa de archivos de test que YA estaban en rojo en dev por deuda ajena, para que el gate pueda responder '¿rompi algo YO?' sin exigir que la suite entera este verde. Cada entrada necesita motivo y desde; sin eso la lista se vuelve un vertedero. Todo lo que NO este aqui y salga rojo es bloqueante. Ver docs/verification.md > Rojos heredados.",
-  "archivos": {}
+  "archivos": {
+    "tests/integration/inventario/inventario-constraints.int.test.ts": {
+      "motivo": "Deuda ajena de dev, medida en la rama de QC-147 el 2026-09-22 tras sincronizar con origin/dev: el commit bc902800 (feat(inventario): add ProductType enum and type filter to products) agrego la columna products.type y el filtro por tipo sin actualizar los censos exactos de este archivo, que ahora ven un campo de mas ('type'). QC-147 no toca ni products ni el listado de inventario. Salida limpia: que quien trajo ProductType enmiende el censo y borre esta entrada.",
+      "desde": "2026-09-22"
+    },
+    "tests/unit/inventario/list-query.test.ts": {
+      "motivo": "Deuda ajena de dev, medida en la rama de QC-147 el 2026-09-22 tras sincronizar con origin/dev: el commit bc902800 (feat(inventario): add ProductType enum and type filter to products) agrego la columna products.type y el filtro por tipo sin actualizar los censos exactos de este archivo, que ahora ven un campo de mas ('type'). QC-147 no toca ni products ni el listado de inventario. Salida limpia: que quien trajo ProductType enmiende el censo y borre esta entrada.",
+      "desde": "2026-09-22"
+    },
+    "tests/unit/inventario/schema/inventario-schema.test.ts": {
+      "motivo": "Deuda ajena de dev, medida en la rama de QC-147 el 2026-09-22 tras sincronizar con origin/dev: el commit bc902800 (feat(inventario): add ProductType enum and type filter to products) agrego la columna products.type y el filtro por tipo sin actualizar los censos exactos de este archivo, que ahora ven un campo de mas ('type'). QC-147 no toca ni products ni el listado de inventario. Salida limpia: que quien trajo ProductType enmiende el censo y borre esta entrada.",
+      "desde": "2026-09-22"
+    }
+  }
 }
