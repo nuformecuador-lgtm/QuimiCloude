@@ -87,6 +87,10 @@ const ACCIONES = [
   'listOrderResponsiblesAction',
   'listResponsiblesForOrdersAction',
   'listAssignedOrdersAction',
+  // QC-145 T11: las TRES acciones de las vistas nuevas (`design.md > 4`).
+  'listFinishedOrdersAction',
+  'listCompanyOrdersAction',
+  'listResponsibleCandidatesAction',
 ] as const
 
 export type Fuente = { readonly relPath: string; readonly content: string }

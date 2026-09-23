@@ -16,18 +16,22 @@ vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
 
 import { asignaciones } from '@/lib/composition';
 
-describe('QC-88 T8 (censo crecido por QC-63, 2026-09-17) — la fachada de `asignaciones` lista sus NUEVE operaciones', () => {
-  // El censo CRECE, no se afloja: QC-63 anade las tres operaciones de la pantalla de ejecucion
-  // -`getAssignedOrderExecution`, `startAssignedOrder`, `finishAssignedOrder`- a las seis que ya
-  // habia. Siguen nombradas UNA A UNA y comparadas por igualdad exacta: una operacion futura que
-  // nadie declare aqui pone el caso en rojo, que es justo lo que este censo promete.
-  it('expone las seis anteriores mas las TRES de la ejecucion, y ninguna mas', () => {
+describe('QC-88 T8 (censo crecido por QC-63 y QC-145) — la fachada de `asignaciones` lista sus DOCE operaciones', () => {
+  // El censo CRECE, no se afloja: QC-63 anadio las tres de la pantalla de ejecucion y QC-145 anade
+  // las tres de las vistas nuevas -`listFinishedOrders`, `listCompanyOrders`,
+  // `listResponsibleCandidates`- (`design.md > 5`). Siguen nombradas UNA A UNA y comparadas por
+  // igualdad exacta: una operacion futura que nadie declare aqui pone el caso en rojo, que es
+  // justo lo que este censo promete.
+  it('expone las nueve anteriores mas las TRES de QC-145, y ninguna mas', () => {
     expect(Object.keys(asignaciones).sort()).toEqual([
       'assignResponsibles',
       'finishAssignedOrder',
       'getAssignedOrderExecution',
       'listAssignedOrders',
+      'listCompanyOrders',
+      'listFinishedOrders',
       'listOrderResponsibles',
+      'listResponsibleCandidates',
       'listResponsiblesForOrders',
       'removeWorkGroupFromOrder',
       'startAssignedOrder',
@@ -89,6 +93,32 @@ describe('QC-88 T8 (censo crecido por QC-63, 2026-09-17) — la fachada de `asig
     // demuestra a la vez que el cableado existe y que el permiso corta ANTES de ningun puerto.
     const error = await asignaciones
       .listAssignedOrders({ id: 'u', companyId: 'c', permissions: [] }, { page: 1 })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  // QC-145 T11 — las TRES operaciones nuevas: mismo criterio que las de arriba, el cliente Prisma
+  // doblado es `{}`, asi que `unauthorized` demuestra el cableado sin llegar a ningun puerto.
+  it('`listFinishedOrders` rechaza sin `terminados.consultar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .listFinishedOrders({ id: 'u', companyId: 'c', permissions: [] }, { page: 1 })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('`listCompanyOrders` rechaza sin `pedidos.consultar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .listCompanyOrders({ id: 'u', companyId: 'c', permissions: [] }, { page: 1 })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('`listResponsibleCandidates` rechaza sin `asignaciones.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .listResponsibleCandidates({ id: 'u', companyId: 'c', permissions: [] }, {})
       .catch((caught: unknown) => caught);
 
     expect((error as { code?: string }).code).toBe('unauthorized');
