@@ -50,6 +50,7 @@ export const STOCK_MIN_PARAM = 'stockMin';
 export const STOCK_MAX_PARAM = 'stockMax';
 export const QTY_ALERT_MIN_PARAM = 'alertMin';
 export const QTY_ALERT_MAX_PARAM = 'alertMax';
+export const TYPE_PARAM = 'type';
 
 /** Ids de las columnas filtrables, que son tambien las claves de `DataTableParams.filters`. */
 export const STOCK_COLUMN_ID = 'stock';
@@ -57,6 +58,9 @@ export const QTY_ALERT_COLUMN_ID = 'qtyAlert';
 
 /** Separador de `campo:direccion` en el parametro de orden. */
 export const SORT_SEPARATOR = ':';
+
+/** Columna del tipo de producto, clave del filtro 'select'. */
+export const TYPE_COLUMN_ID = 'type';
 
 /**
  * Las DOS opciones de tamano de pagina que fijo la decision del 2026-09-03 (R10). Salen de
@@ -165,6 +169,11 @@ export function parseProductListParams(
   );
   if (qtyAlert !== null) filters[QTY_ALERT_COLUMN_ID] = qtyAlert;
 
+  const rawType = firstValue(searchParams?.[TYPE_PARAM]);
+  if (rawType !== undefined && PRODUCT_QUERYABLE.filterable[TYPE_COLUMN_ID] === 'select') {
+    filters[TYPE_COLUMN_ID] = { kind: 'select', values: [rawType] };
+  }
+
   return {
     page: rawPage === undefined || rawPage < FIRST_PAGE ? FIRST_PAGE : rawPage,
     pageSize: rawPageSize !== undefined && isPageSize(rawPageSize) ? rawPageSize : DEFAULT_PAGE_SIZE,
@@ -203,6 +212,11 @@ export function buildProductListQuery(params: DataTableParams): string {
   if (qtyAlert?.kind === 'numberRange') {
     if (qtyAlert.min !== null) query.set(QTY_ALERT_MIN_PARAM, String(qtyAlert.min));
     if (qtyAlert.max !== null) query.set(QTY_ALERT_MAX_PARAM, String(qtyAlert.max));
+  }
+
+  const typeFilter = params.filters[TYPE_COLUMN_ID];
+  if (typeFilter?.kind === 'select' && typeFilter.values.length > 0) {
+    query.set(TYPE_PARAM, typeFilter.values[0]);
   }
 
   return query.toString();

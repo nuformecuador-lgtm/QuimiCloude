@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { PRODUCT_TYPE_VALUES } from './product-queryable';
+
 /**
  * Esquema de entrada del producto (`design.md > 6.1`). Validacion de borde (R28): nada
  * sin tipar ni sin validar cruza hacia el dominio.
@@ -19,6 +21,12 @@ import { z } from 'zod';
 const productNameSchema = z.string().trim().min(1).max(120);
 
 const nonNegativeIntSchema = z.number().int().min(0);
+
+/** Tipo de producto: opcional, por defecto PRODUCT. */
+const productTypeSchema = z
+  .enum(PRODUCT_TYPE_VALUES)
+  .optional()
+  .default('PRODUCT');
 
 /**
  * El producto no declara unidad en el borde: la unidad la declara la PRESENTACION
@@ -45,6 +53,7 @@ const nonNegativeIntSchema = z.number().int().min(0);
 export const productFieldsShape = {
   name: productNameSchema,
   qtyAlert: nonNegativeIntSchema,
+  type: productTypeSchema,
 } as const;
 
 export const createProductSchema = z.strictObject({ ...productFieldsShape });
