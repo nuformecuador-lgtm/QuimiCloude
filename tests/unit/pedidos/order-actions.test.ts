@@ -35,6 +35,7 @@ import {
   createOrderAction,
   deleteOrderAction,
   getOrderAction,
+  listOrderCoverageAction,
   listOrdersAction,
   updateOrderAction,
   type CreateOrderFormState,
@@ -61,6 +62,7 @@ const {
   updateOrderMock,
   cancelOrderMock,
   deleteOrderMock,
+  findCoverageMock,
   getSessionUserMock,
   getSessionContextMock,
 } = vi.hoisted(() => ({
@@ -70,6 +72,8 @@ const {
   updateOrderMock: vi.fn(),
   cancelOrderMock: vi.fn(),
   deleteOrderMock: vi.fn(),
+  // QC-141 T14: la cobertura de la pagina (R35).
+  findCoverageMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   // QC-60 (R17): la action pide las DOS caras de la sesion. Sin contexto no hay actor.
   getSessionContextMock: vi.fn(),
@@ -93,6 +97,7 @@ vi.mock('@/lib/composition', () => ({
     updateOrder: updateOrderMock,
     cancelOrder: cancelOrderMock,
     deleteOrder: deleteOrderMock,
+    findCoverage: findCoverageMock,
   },
 }))
 
@@ -527,16 +532,20 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       'deleteOrderAction',
     )
 
-    // Y no hay ni un `catch` que se quede callado: los seis `catch` del archivo devuelven
-    // `toErrorState`, que o traduce el error de dominio o registra el ajeno y devuelve el
-    // codigo generico. Ninguno se lo traga sin dejar rastro.
+    findCoverageMock.mockRejectedValueOnce(ajeno)
+    sinDetalle(await listOrderCoverageAction([ORDER_ID]), 'listOrderCoverageAction')
+
+    // Y no hay ni un `catch` que se quede callado: los SIETE `catch` del archivo (QC-141 T14
+    // anade `listOrderCoverageAction` a los seis originales) devuelven `toErrorState`, que o
+    // traduce el error de dominio o registra el ajeno y devuelve el codigo generico. Ninguno se
+    // lo traga sin dejar rastro.
     const source = readActionsSource()
     const catches = source.match(/catch\s*\(/g) ?? []
     const traducciones = source.match(/return toErrorState\(error\)/g) ?? []
     expect(catches.length).toBeGreaterThan(0)
     // Uno por action, sin ninguno de mas y sin ninguno de menos.
     expect(traducciones.length).toBe(catches.length)
-    expect(catches.length).toBe(6)
+    expect(catches.length).toBe(7)
     expect(source, 'hay un catch vacio').not.toMatch(/catch\s*\([^)]*\)\s*\{\s*\}/)
   })
 })
@@ -710,14 +719,15 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
       updateOrderMock,
       cancelOrderMock,
       deleteOrderMock,
+      findCoverageMock,
     ]) {
       mock.mockReset()
     }
   })
 })
 
-describe('QC-60 R34 — las seis firmas publicas de las Server Actions no cambian', () => {
-  it('el modulo exporta exactamente las seis actions, con su aridad de siempre', () => {
+describe('QC-60 R34 — las seis firmas publicas de las Server Actions no cambian, mas la de QC-141 T14', () => {
+  it('el modulo exporta las siete actions, con su aridad de siempre', () => {
     const exportadas = Object.entries(orderActions)
       .filter(([, valor]) => typeof valor === 'function')
       .map(([nombre, valor]) => [nombre, (valor as (...args: never[]) => unknown).length] as const)
@@ -728,6 +738,8 @@ describe('QC-60 R34 — las seis firmas publicas de las Server Actions no cambia
       ['createOrderAction', 2],
       ['deleteOrderAction', 2],
       ['getOrderAction', 1],
+      // QC-141 T14: la cobertura de la pagina (R35), argumento ya tipado, ningun `FormData`.
+      ['listOrderCoverageAction', 1],
       ['listOrdersAction', 1],
       ['updateOrderAction', 3],
     ])

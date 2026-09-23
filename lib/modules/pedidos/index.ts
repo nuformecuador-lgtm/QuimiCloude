@@ -134,3 +134,8 @@ export type { DeleteOrderDeps } from './domain/delete-order';
  *  transaccion. `lib/composition` la cablea en el lugar de la funcion cruda del driven. */
 export { createTransitionOrder } from './domain/transition-order';
 export type { TransitionOrderDeps } from './domain/transition-order';
+
+/** QC-141 T14 (`design.md > 5.1`, `> 10`): la cobertura de varios pedidos a la vez, una consulta
+ *  por pagina, para pintar «sin cobertura completa» (R35) sin N+1. */
+export { createFindCoverage, MAX_ORDERS_PER_COVERAGE_BATCH } from './domain/find-coverage';
+export type { FindCoverageDeps } from './domain/find-coverage';
