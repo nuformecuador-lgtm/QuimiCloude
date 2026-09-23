@@ -26,9 +26,7 @@ import {
  */
 
 /**
- * Cuantas celdas por fila pinta el esqueleto. Eran diez hasta el 2026-09-07 -la unidad y el
- * precio unitario salieron del pedido-, el 2026-09-13 QC-102 subio a diez con RESPONSABLES, y
- * QC-141 T14 anade la de COBERTURA (R35): ONCE.
+ * Cuantas celdas por fila pinta el esqueleto: ONCE, la misma cuenta que `ORDER_COLUMNS.length`.
  *
  * **QC-102 R22**: el esqueleto y la tabla declaran el MISMO numero de columnas, de modo que
  * resolverse la carga no cambie cuantas columnas hay y la pantalla no de un salto.

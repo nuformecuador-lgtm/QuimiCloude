@@ -13,8 +13,7 @@ import { listRecipesAction } from '@/lib/modules/recetas/adapters/driving/recipe
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import type { UnitView } from '@/lib/modules/unidades';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
-// Solo el TIPO, del contrato publico de `inventario`: la arista `pedidos -> inventario` ya
-// existe (`design.md > 5.1`).
+// Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
 
 import { OrderListEmpty } from './order-list-empty';
@@ -164,12 +163,11 @@ async function loadResponsibles(
 }
 
 // ---------------------------------------------------------------------------------------------
-// QC-141 T14 — La cobertura de la PAGINA, compuesta AQUI, mismo patron que los responsables
-// (`design.md > 5.1`, `> 10`; R35).
+// La cobertura de la PAGINA, compuesta AQUI, mismo patron que los responsables.
 // ---------------------------------------------------------------------------------------------
 
 /**
- * La cobertura de los pedidos de ESTA pagina, en **UNA sola** llamada (R35).
+ * La cobertura de los pedidos de ESTA pagina, en **UNA sola** llamada.
  *
  * **Ni una consulta por fila**: el argumento es el array entero de identificadores de la pagina,
  * mismo criterio que `loadResponsibles`.
@@ -255,11 +253,10 @@ export async function OrderListSection({ params }: OrderListSectionProps) {
   }
 
   /*
-    QC-102 R16 y QC-141 R35 — Los TRES lotes de la pagina, seguidos y con los ids de ESTA pagina.
-    Van DESPUES de `listOrdersAction` porque los identificadores salen de su resultado: es una
-    dependencia real, no una secuencia por descuido. Y van despues del estado VACIO porque con
-    cero pedidos no hay nada que preguntar. Cada uno se emite **UNA vez por render**, nunca una
-    por fila.
+    Los TRES lotes de la pagina, seguidos y con los ids de ESTA pagina. Van DESPUES de
+    `listOrdersAction` porque los identificadores salen de su resultado: es una dependencia real,
+    no una secuencia por descuido. Y van despues del estado VACIO porque con cero pedidos no hay
+    nada que preguntar. Cada uno se emite **UNA vez por render**, nunca una por fila.
 
     Las tres lecturas de aqui si van en paralelo entre si: ninguna depende de otra, y esperarlas
     en fila solo sumaria latencia.

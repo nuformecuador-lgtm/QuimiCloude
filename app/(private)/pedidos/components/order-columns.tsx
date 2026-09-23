@@ -25,8 +25,7 @@ import {
   OrderPriorityBadge,
   OrderStatusBadge,
 } from './order-status-badge';
-// Solo el TIPO, del contrato publico de `inventario`: la arista `pedidos -> inventario` ya
-// existe (`design.md > 5.1`).
+// Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
 
 /**
@@ -77,12 +76,6 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
  * `asignaciones` (R14)-: los trae un lote aparte que el Server Component de la seccion pide UNA
  * vez por pagina y reparte por fila (`design.md > 1`). La columna **no ordena y no filtra**, y el
  * esqueleto sube a nueve con ella (R22).
- *
- * **QC-141 T14: ONCE columnas.** Se anade la de COBERTURA (R35), entre el motivo de cancelacion
- * y la de responsables. La cobertura tampoco viaja en `OrderSummary` -`pedidos` no conoce
- * `inventario` en ese sentido (`design.md > 5.1`)-: llega por el mismo patron que los
- * responsables, un lote aparte pedido UNA vez por pagina (`listOrderCoverageAction`) y repartido
- * por fila antes de bajar aqui. Tampoco ordena ni filtra, y el esqueleto sube a once con ella.
  */
 
 /** Id de la columna del correlativo. Se exporta porque la tabla la fija por defecto (R19). */
@@ -93,7 +86,6 @@ export const RECIPE_NAME_COLUMN_ID = 'recipeName';
 export const QUANTITY_COLUMN_ID = 'quantity';
 export const PRESENTATION_NAME_COLUMN_ID = 'presentationName';
 export const CANCELLATION_REASON_COLUMN_ID = 'cancellationReason';
-/** QC-141 T14, R35 — la columna propia de cobertura del material. */
 export const COVERAGE_COLUMN_ID = 'coverage';
 /** QC-102 R16 — la columna propia de responsables. */
 export const RESPONSIBLES_COLUMN_ID = 'responsibles';
@@ -154,11 +146,10 @@ export type OrderColumnsDeps = {
   /** QC-102 R27, R28 — catalogos y `canWrite` del panel, compuestos una vez en el servidor. */
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
   /**
-   * QC-141 T14, R35 — la cobertura **ya repartida por fila**, mismo patron que
-   * `responsiblesByOrder`: un `Record` plano, `orderId` → `OrderCoverage`. El lote se pidio UNA
-   * vez por pagina (`listOrderCoverageAction`).
+   * La cobertura **ya repartida por fila**, mismo patron que `responsiblesByOrder`: un `Record`
+   * plano, `orderId` → `OrderCoverage`, pedido UNA vez por pagina (`listOrderCoverageAction`).
    *
-   * Opcional y con `{}` por defecto: si el lote fallo, la columna se pinta **sin resolver**
+   * Opcional y con `{}` por defecto: si el lote falla, la columna se pinta **sin resolver**
    * —marcador de ausencia, igual que responsables— y la lista se sigue viendo entera.
    */
   readonly coverageByOrder?: Readonly<Record<string, OrderCoverage>>;
@@ -252,12 +243,11 @@ export function buildOrderColumns({
       id: COVERAGE_COLUMN_ID,
       label: 'Cobertura',
       align: 'start',
-      // QC-141 T14, R35: columna PROPIA, mismo criterio que responsables. **Sin `sortable`**: el
-      // orden de la lista lo manda `pedidos` y la cobertura es un dato de `inventario` que ni
-      // siquiera viaja en la fila. **Sin `filter`**, por el mismo motivo.
+      // Sin `sortable`: el orden de la lista lo manda `pedidos` y la cobertura es un dato de
+      // `inventario` que ni siquiera viaja en la fila. Sin `filter`, por el mismo motivo.
       cell: (order) => {
         const coverage = coverageByOrder[order.id];
-        // R20: si el lote fallo, esta clave no existe y la celda pinta el marcador de ausencia,
+        // Si el lote fallo, esta clave no existe y la celda pinta el marcador de ausencia,
         // igual que responsables.
         return coverage === undefined ? (
           <MissingValue field={COVERAGE_COLUMN_ID} />
@@ -282,7 +272,7 @@ export function buildOrderColumns({
           // R20: si el lote fallo, esta clave no existe y la celda pinta el marcador de ausencia.
           responsibles={responsiblesByOrder[order.id] ?? []}
           responsiblesCatalog={responsiblesCatalog}
-          // QC-141 T14, R35: el panel es el mismo se abra por donde se abra.
+          // El panel es el mismo, se abra por donde se abra.
           coverage={coverageByOrder[order.id]}
         />
       ),
@@ -303,7 +293,7 @@ export function buildOrderColumns({
           // para esta fila. Sin esto, el panel abriria vacio y tendria que consultar.
           responsibles={responsiblesByOrder[order.id] ?? []}
           responsiblesCatalog={responsiblesCatalog}
-          // QC-141 T14, R35: la hoja pinta la cobertura de ESTA fila, ya traida por el lote.
+          // La hoja pinta la cobertura de ESTA fila, ya traida por el lote.
           coverage={coverageByOrder[order.id]}
         />
       ),

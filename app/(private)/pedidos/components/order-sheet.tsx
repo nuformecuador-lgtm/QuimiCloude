@@ -11,8 +11,7 @@ import { Sheet, SheetTrigger } from '@/components/ui/sheet';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { OrderSummary } from '@/lib/modules/pedidos';
 import type { UnitView } from '@/lib/modules/unidades';
-// Solo el TIPO, del contrato publico de `inventario`: la arista `pedidos -> inventario` ya
-// existe (`design.md > 5.1`).
+// Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
 
 import { CancelOrderDialog } from './cancel-order-dialog';
@@ -85,9 +84,9 @@ export type OrderSheetProps = {
   /** QC-102 R27, R28 — catalogos y `canWrite`, por props desde el servidor. */
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
   /**
-   * QC-141 T14, R35 — la cobertura que la fila ya trajo. `undefined` cuando el lote fallo o el
-   * pedido es de alta (no tiene id todavia): la hoja se degrada al marcador de ausencia, mismo
-   * criterio que `responsibles`.
+   * La cobertura que la fila ya trajo. `undefined` cuando el lote fallo o el pedido es de alta
+   * (no tiene id todavia): la hoja se degrada al marcador de ausencia, mismo criterio que
+   * `responsibles`.
    */
   readonly coverage?: OrderCoverage;
   /**
@@ -175,7 +174,7 @@ export type OrderRowSheetActionsProps = {
   readonly responsibles?: readonly OrderResponsible[];
   /** QC-102 R27, R28 — catalogos y `canWrite`, compuestos una vez en el servidor. */
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
-  /** QC-141 T14, R35 — la cobertura de ESTA fila, ya traida por el lote de la seccion. */
+  /** La cobertura de ESTA fila, ya traida por el lote de la seccion. */
   readonly coverage?: OrderCoverage;
 };
 
@@ -256,7 +255,7 @@ export type OrderRowResponsiblesProps = {
   /** Los responsables de ESTA fila, del lote que la seccion pidio una sola vez (R16, R26). */
   readonly responsibles: readonly OrderResponsible[];
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
-  /** QC-141 T14, R35 — la cobertura de ESTA fila: el panel es el mismo, se abra por donde se abra. */
+  /** La cobertura de ESTA fila: el panel es el mismo, se abra por donde se abra. */
   readonly coverage?: OrderCoverage;
 };
 

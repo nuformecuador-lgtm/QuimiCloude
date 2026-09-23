@@ -7,8 +7,7 @@ import { DataTable, type DataTableParams, type DataTableTexts } from '@/componen
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { OrderSummary } from '@/lib/modules/pedidos';
 import type { UnitView } from '@/lib/modules/unidades';
-// Solo el TIPO, del contrato publico de `inventario`: la arista `pedidos -> inventario` ya
-// existe (`design.md > 5.1`).
+// Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
 
 import { ORDER_DEFAULT_PINNED_COLUMNS, buildOrderColumns } from './order-columns';
@@ -102,8 +101,8 @@ export type OrderTableProps = {
   /** QC-102 R27, R28 — catalogos y `canWrite` del panel, tambien de paso. */
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
   /**
-   * QC-141 T14, R35 — la cobertura de la pagina, **ya repartida por fila en el SERVIDOR**: mismo
-   * patron que `responsiblesByOrder`. La tabla solo lo atraviesa hasta la celda.
+   * La cobertura de la pagina, **ya repartida por fila en el SERVIDOR**: mismo patron que
+   * `responsiblesByOrder`. La tabla solo lo atraviesa hasta la celda.
    */
   readonly coverageByOrder?: Readonly<Record<string, OrderCoverage>>;
 };

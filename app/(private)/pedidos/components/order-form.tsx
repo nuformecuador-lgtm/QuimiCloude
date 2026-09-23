@@ -38,8 +38,7 @@ import type { RecipeQueryResult } from '@/lib/modules/recetas/adapters/driving/r
 import type { RecipeLineView } from '@/lib/modules/recetas';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { UnitView } from '@/lib/modules/unidades';
-// Solo el TIPO, del contrato publico de `inventario`: la arista `pedidos -> inventario` ya
-// existe (`design.md > 5.1`).
+// Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { OrderField } from './order-field';
@@ -73,7 +72,7 @@ export type OrderSheetSection = 'form' | 'responsibles';
 /** La seccion de responsables, dentro del panel que ya existe. Se localiza por este `data-testid`. */
 export const ORDER_SHEET_RESPONSIBLES_TESTID = 'order-sheet-responsibles';
 
-/** QC-141 T14, R35 — la etiqueta de cobertura de la hoja. */
+/** La etiqueta de cobertura de la hoja. */
 export const ORDER_SHEET_COVERAGE_TESTID = 'order-sheet-coverage';
 
 /**
@@ -326,9 +325,8 @@ export type OrderFormProps = {
   /** QC-102 R27, R28 — catalogos y `canWrite`, por props desde el servidor. */
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
   /**
-   * QC-141 T14, R35 — la cobertura que **la fila del listado ya trajo**. `undefined` con el lote
-   * caido: la hoja no pinta la etiqueta, igual que `loadResponsiblesCatalog` se degrada sin decir
-   * nada (H1).
+   * La cobertura que **la fila del listado ya trajo**. `undefined` con el lote caido: la hoja no
+   * pinta la etiqueta, igual que `loadResponsiblesCatalog` se degrada sin decir nada.
    */
   readonly coverage?: OrderCoverage;
   /** QC-102 R24 — en que seccion abre. Por defecto, el formulario de siempre. */
@@ -559,9 +557,8 @@ export function OrderForm({
             : 'Completa los datos del pedido. La fecha y el número los pone el sistema.'}
         </SheetDescription>
         {/*
-          QC-141 T14, R35 — la cobertura, SOLO en la edicion: el alta todavia no tiene pedido del
-          que apartar nada. `undefined` (lote caido) no pinta nada, mismo criterio que
-          `loadResponsiblesCatalog` (H1): el panel no da una explicacion, simplemente calla.
+          Cobertura SOLO en la edicion: el alta todavia no tiene pedido del que apartar nada.
+          `undefined` (lote caido) no pinta nada, mismo criterio que `loadResponsiblesCatalog`.
         */}
         {isEdit && coverage !== undefined ? (
           <div data-testid={ORDER_SHEET_COVERAGE_TESTID}>
