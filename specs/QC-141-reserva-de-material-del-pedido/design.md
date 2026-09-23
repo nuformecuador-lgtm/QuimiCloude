@@ -694,6 +694,8 @@ toman `adjustBatchStock` (`product-prisma.ts:727-734`) y `addBatchToAlive`
 
 ### 9.1 Piezas
 
+> **Enmendado el 2026-09-23 por decisión del humano (F2.1, T12).** Los candidatos se buscan **empresa por empresa**: el proceso lista las empresas y, para cada una, llama a `findExpirableOrders(companyId, threshold, limit)` filtrando por esa empresa. Ninguna consulta lee pedidos de varias empresas a la vez y `guard-ambito-empresa-pedidos` se cumple **sin excepción**. Sustituye «todas las empresas» de la fila «Candidatos» y el pseudocódigo de abajo. Descartada: una excepción con nombre en la guardia.
+
 | Pieza | Archivo |
 |---|---|
 | Declaración | `vercel.json` (nuevo): `{ "crons": [{ "path": "/api/cron/caducar-pedidos", "schedule": "0 7 * * *" }] }` (N7) |
