@@ -230,3 +230,199 @@ Qué falta:
   tiene la suya. Con un pool pequeño (pooler de Supabase) eso es espera o P2024 bajo carga.
   `update-order.ts` ya la lee antes de abrir la transacción: conviene hacer lo mismo en alta, y
   en el Finalizar leer el `recipeId` antes o pasar el lector por `tx`.
+
+---
+---
+
+# Vuelta 2 (F2.2): 2026-09-23
+
+> HEAD `c13add6a`, contra el merge-base con `origin/dev` `899c3d22`. El reviewer no editó código
+> ni hizo commit. No corrió la suite completa ni los E2E: el leader estaba corriendo `./init.sh`
+> completo en este worktree. Los E2E (Chromium y WebKit) y el rollback de las tres migraciones se
+> toman de la bitácora y de los logs `progress/e2e_QC-141_vuelta2*.log`.
+
+## Veredicto: **RECHAZADO**
+
+Hay 4 bloqueantes (V2-B1 a V2-B4). Los bloqueantes B2, B3 y B4 de la vuelta 1 están resueltos
+como decidió el humano. B1 está resuelto en las dos líneas señaladas, pero la vuelta 2 metió
+ocho citas nuevas (V2-B1). La trazabilidad R1–R58 está completa, con R29 retirado. Dos de las
+adaptaciones de tests de Tm2 no están bien (V2-B2 y V2-B3). Además, `origin/dev` avanzó otra vez
+y ahora choca con la rama (V2-B4).
+
+## Lo que corrió el reviewer
+
+| Comando | Resultado |
+|---|---|
+| `vitest run` sobre `guard-ambito-empresa-pedidos`, `qc121-alcance`, `qc145-estado-solo-planta`, `transition-order`, `update-order`, `expire-stale-orders`, `order-expiry-cron-route`, `order-catalog`, `pedidos/module-contract`, `create-order`, `asignaciones/finish-assigned-order` y `guard-catalogo-de-errores` | 12 archivos, 221 pasan, 0 fallan |
+| `vitest run` (`.int`, base efímera) sobre `reserve-existing-orders-migration`, `order-expiry`, `order-reservation`, `order-duplicate-number`, `order-finished-at` y `asignaciones/finished-orders` | 6 archivos, 39 pasan, 0 fallan |
+| `vitest run` sobre `guard-ambito-empresa-recetas`, `guard-ambito-empresa-inventario`, `guard-arquitectura-modulos`, `qc91-alcance` y `pedidos/scope` | 155 pasan y 1 falla: `guard-arquitectura-modulos` (bloque 13, import profundo de `product-type`). Es el rojo heredado que ya está en `tests/baseline-rojos.json`, **no es hallazgo**, y `dev` ya lo arregla en `daa400c5` |
+| `git merge-tree --write-tree HEAD origin/dev` | **10 archivos en conflicto** → V2-B4 |
+| Barrido de comentarios en las líneas `+` de `git diff 899c3d22 HEAD -- lib app db components` | 8 citas → V2-B1 |
+
+## 1. Hallazgos de la vuelta 1 contra lo que decidió el humano
+
+| Hallazgo | Decisión (D21 / `02c5eda3`) | Estado |
+|---|---|---|
+| B1 | Quitar las citas | Las dos líneas señaladas están limpias. **Pero la vuelta 2 añade ocho citas nuevas** → V2-B1 |
+| B2 | Recomprobar `reserved_at` bajo el candado | **Resuelto.** `lockAliveOrderById` trae `reserved_at` en el mismo `SELECT … FOR UPDATE`. `expireOne` no hace nada si el valor es `null` o es posterior al umbral. Lo cubren el unit R53 y la integración R53, con la edición hecha desde otra conexión |
+| B3 | Excepción con nombre de archivo, más los dos refuerzos de §5.2.1 | **Resuelto como se decidió.** Se importa `prisma` sin alias. `EXENTOS_DEL_AMBITO` tiene una sola entrada, con el motivo que cita D21. El archivo exento solo admite `prisma.$transaction`. Se prohíbe el alias. Hay tres anti-placebos. No se implementó la opción (a) descartada. Detalles de alcance → m-V2-3 |
+| B4 | Solo el Finalizar consume y escribe `finished_at` en la misma transacción. Mergear `dev`. Renumerar | **Resuelto para el `dev` de `899c3d22`.** Las migraciones `…150000/150100/150200` quedan por detrás de `…140000` y no hay prefijos repetidos. `update-order.ts` ya no tiene la rama `ENTREGADO`. `createTransitionOrder` hace consumo → `setStatus` (con `finishedAt`) → `setReservedAt(null)` dentro de una sola `unitOfWork.run`. Pero `dev` volvió a avanzar → V2-B4 |
+| m1 | Reflejar la aprobación de E1/E2 | Resuelto en R9, R49 y R50 y en la cabecera. Queda una contradicción en «Preguntas abiertas» → m-V2-4 |
+| m2 | Retirar `createOrder` y `transitionAliveOrder` | Resuelto en `lib/**`: hay un solo `INSERT INTO "orders"` (`insertAliveOrder`) y el anti-placebo de la guardia apunta a él. Efecto colateral → V2-B3. Comentarios huérfanos → m-V2-1 |
+| m3 | Guardia «quien consume recalcula» | **Resuelto.** `qc121-alcance` tiene «QC-121 R28 — quien llama a consumeBatchStock recalcula», con un caso rojo y otro verde fabricados y el barrido real de `lib/` |
+| m4 | Errores del cron | **Resuelto.** Se registran `stage`, `companyId` y `code` (`codeOf`). El cursor `(reserved_at, id)` evita repetir pedidos. Un fallo al listar empresas o candidatos queda en `failed` y la ejecución sigue. El handler registra y responde 500. El docblock describe lo que hace el código. Cubierto por los tests R26, R54 y R55 |
+| m5 | Paridad del orden de lotes, aceptando el límite (pregunta 7) | **Resuelto como se decidió.** El comparador de TS no se tocó. R56 cubre `'-X'/'5'`, `'a'/'B'` y la mezcla de cuatro lotes sin ciclo |
+| m6 | `down` coherente después de usar la app | **Resuelto.** `…150200/down.sql` falla si hay otro asiento o si `reserved_at` cambió. R57 va en dos casos, que pasan |
+| m7 | La receta se lee por `tx` | **Resuelto.** `OrderTransactionScope.recipes` usa `createRecipeExecutionReader(tx)`. Crear, editar y finalizar la leen dentro de `run` |
+
+## 2. Trazabilidad R1–R58
+
+- [x] R1–R50 como en la vuelta 1, reverificados en los archivos que se volvieron a ejecutar.
+- [x] R29 **retirado** (D21). Ningún test de QC-141 lo cita. Los `R29` que aparecen en
+      `qc145-estado-solo-planta`, `order-service` y `cancel-order` son de **otras** fichas.
+- [x] R51: `transition-order.test.ts` (tres casos) y `order-reservation.int` (tres casos, que
+      miran `finished_at`, el lote, el libro y el estado).
+- [x] R52: `update-order.test.ts` y `order-reservation.int` (dos `describe`).
+- [x] R53: unit e integración, con la edición intercalada.
+- [x] R54 y R55: `expire-stale-orders.test.ts` y `order-expiry-cron-route.test.ts`.
+- [x] R56 y R57: `reserve-existing-orders-migration.int`.
+- [x] R58: `guard-ambito-empresa-pedidos` (tres casos R58 y tres anti-placebos).
+
+## 3. Tm2: ¿se debilitó lo que afirmaban los tests adaptados?
+
+| Archivo | Juicio |
+|---|---|
+| `asignaciones/company-orders.int` | Sin pérdida. El caso nunca transiciona, y el doble lanza si se le llama |
+| `asignaciones/finished-orders.int`, `responsible-eligibility.int` | Sin pérdida. `assertTransition` + `setStatus` reales, igual que hacía la función retirada, que tampoco consumía |
+| `order-finished-at.int` (QC-145 R3) | Sin pérdida. El mismo `UPDATE` condicional, ahora en `setAliveOrderStatus` |
+| `order-catalog.test.ts` | Sin pérdida. T1(b) (transición ilegal sin escribir) lo cubre `transition-order.test.ts:56`, que pasa |
+| `order-sequence.int`, `order-sequence-race.int` | Sin pérdida. Sobre `withOrderTransaction` + `createOrderWriteRepository`. El conteo de transacciones se mantiene |
+| `pedidos/module-contract.test.ts` | Aceptable. Exclusiones nombradas por archivo |
+| `qc145-estado-solo-planta.test.ts` R5 | Sin pérdida neta. La unicidad del bloque `finishedAt` pasa a `order-prisma.ts` |
+| `qc145-estado-solo-planta.test.ts` R10 | Algo más laxo: «un solo `status:` en el archivo» pasa a «un solo `status: to`» → m-V2-5 |
+| `qc145-estado-solo-planta.test.ts` R29 (esquema) | **Roto a futuro** → V2-B2 |
+| `order-duplicate-number.int` | **Cambia lo que afirma y da por buena una regresión** → V2-B3 |
+
+## 4. QC-145 después del merge
+
+- [x] `finished_at` se escribe en el mismo `UPDATE` que el estado (`order-prisma.ts:634-642`),
+      dentro de la misma `unitOfWork.run` que el consumo (`transition-order.ts:36-70`). Si el
+      consumo falla, no se escribe ni el estado ni `finished_at`: lo comprueban los tests de
+      integración R51, R30/R31 y R50. `finish-assigned-order.ts` traduce los dos resultados
+      nuevos.
+- [x] La edición ya no mueve el estado (`updateOrderSchema` sin `status`, más
+      `assertTransition(row.status, row.status)`).
+
+## 5. Comentarios
+
+- [ ] Hay 8 citas nuevas en producción → V2-B1.
+
+---
+
+## Hallazgos de la vuelta 2
+
+### BLOQUEANTES
+
+**V2-B1: la vuelta 2 añade ocho comentarios de producción que citan `design.md` y etiquetas de
+review** (`docs/conventions.md > Comentarios`). Todos entraron con Tm7 o Tm2, después del barrido
+de TB1:
+- `lib/composition/index.ts:983`: «(`design.md > 5.2.2`, m7)»
+- `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts:543`: «(`design.md > 5.3`, m2)»
+- `lib/modules/pedidos/domain/create-order.ts:142`: «`design.md > 5.2.2` evita»
+- `lib/modules/pedidos/domain/transition-order.ts:47`: «`design.md > 5.2.2` evita»
+- `lib/modules/pedidos/domain/update-order.ts:132`: «(`design.md > 5.2.2`)»
+- `lib/modules/pedidos/ports/order-unit-of-work.ts:10`: «(`design.md > 5.2.2`)»
+- `lib/modules/recetas/adapters/driven/persistence/company-scope.ts:5`: «(`design.md > 5.2.2`, m7)»
+- `lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts:161`: «(`design.md > 5.2.2`, m7)»
+
+Qué falta: quitar las citas y dejar el motivo. Después, repetir el barrido de TB1 **al final** de
+la vuelta, no a mitad.
+
+**V2-B2: `qc145-estado-solo-planta.test.ts` (R29 de QC-145, esquema) quedará en rojo en `dev` en
+cuanto se mergee QC-141.** En la línea 363-366 el test suma a mano
+`ESPERADOS_DE_ESTA_RAMA = ['ReservationMovement']` a los modelos de `git merge-base origin/dev
+HEAD`. Tras el merge, ese merge-base ya contiene `ReservationMovement`: el esperado lo tendrá dos
+veces y el real una, así que el test fallará en `dev` y en todas las ramas que salgan de él. Hoy
+pasa solo porque `origin/dev` todavía no tiene la tabla. Qué falta: que el esperado sea la
+**unión** (sin duplicar), o bien sacar ese caso del alcance de la rama con motivo. Además, un
+caso que demuestre que sigue verde cuando la base ya contiene el modelo.
+
+**V2-B3: el alta ya no devuelve `duplicate_number`, y `order-duplicate-number.int` se reescribió
+para dar eso por bueno.** En `dev` (`899c3d22`), cuando se agotan los tres intentos del
+correlativo, el resultado era `'duplicate_number'` y después `DuplicateOrderNumberError`
+(`create-order.ts:137`, que en pantalla muestra «Ya existe un pedido con ese numero
+correlativo.»). En la rama, `withOrderTransaction` relanza el `23505` crudo y nada lanza ya
+`DuplicateOrderNumberError`: la clase sigue exportada, y `order-actions.test.ts:416` y el catálogo
+la siguen dando por viva, pero en producción no existe ese camino. El usuario recibe un error
+inesperado en vez del código del catálogo. El test de integración pasó de afirmar «se traduce a
+`duplicate_number`» a afirmar «sube el `23505` sin traducir». Es justo lo que Tm2 prometía no
+hacer («sin debilitar lo que afirman»). La regresión venía ya de la vuelta 1 y el reviewer no la
+vio entonces; Tm2 la hizo explícita. Qué falta: que el camino de alta vuelva a producir
+`DuplicateOrderNumberError` cuando se agotan los intentos (por ejemplo, que el adaptador lo
+traduzca en `withOrderTransaction` o que `create-order.ts` lo haga sobre un resultado tipado), y
+que `order-duplicate-number.int` vuelva a afirmar `duplicate_number` / `DuplicateOrderNumberError`
+tras 3 transacciones y sin fila duplicada.
+
+**V2-B4: `origin/dev` avanzó después del merge y la rama ya no se integra limpia.** Desde
+`899c3d22` han entrado QC-122 (PR #113), QC-151 (PR #115, cotización del coste en el pedido) y
+`daa400c5`. `git merge-tree` da **10 conflictos**:
+- `order-form.tsx` y `order-table.tsx`
+- `lib/composition/index.ts`
+- `order-actions.ts` y `pedidos/index.ts`
+- `tests/integration/aislamiento.json`
+- `order-form.test.tsx`, `order-sheet.test.tsx`, `pedidos-viewport.test.tsx`,
+  `order-actions.test.ts` y `data-table-alcance.test.ts`
+
+QC-151 cotiza el coste de los lotes en el formulario del pedido, y eso toca de lleno la existencia
+decimal y el disponible de esta rama. No hay migraciones nuevas en `dev`. El `./init.sh` que está
+corriendo sobre `c13add6a` no cubre lo que se mergearía. Qué falta:
+- mergear `origin/dev`;
+- decidir cómo usa la cotización de QC-151 el disponible y los decimales de la reserva (si
+  cambia el comportamiento, con una enmienda del spec);
+- repetir `./init.sh` completo y los E2E (`reserva-de-material`, `ejecucion-receta`,
+  `ajuste-de-inventario`, `pedidos`, `pedidos-terminados`, y los nuevos `pedidos-busqueda` y
+  `pedidos-cotizacion`) sobre el resultado.
+
+Con `daa400c5` desaparece también el rojo heredado de `guard-arquitectura-modulos`.
+
+### Menores
+
+- **m-V2-1**: comentarios que el diff añade y que ya no son verdad:
+  - `order-prisma.ts:615-621`: describe `setAliveOrderStatus` por comparación con
+    `transitionAliveOrder`, que ya no existe;
+  - `order-unit-of-work-prisma.ts:12`: dice «mismo tope que `createOrder`», que también se
+    retiró;
+  - `asignaciones/domain/errors.ts:159-160`: dice «la entregue desde la edicion o desde la
+    planta», pero desde TB4 la edición ya no entrega.
+- **m-V2-2**: `transition-order.ts:62-63`. Si `setStatus` devuelve algo distinto de «ok»
+  **después** de consumir, el código hace `return result` sin lanzar, así que la transacción
+  confirmaría el consumo sin el cambio de estado. Eso contradice `design.md > 5.4` («Ningún
+  resultado distinto de ok deja escrito... el inventario») y la letra de R51. Hoy no puede
+  ocurrir, porque la fila está bloqueada con `FOR UPDATE` y se comprobó `status === from`. Aun
+  así, conviene lanzar para deshacer la unidad y añadir un unit con `setStatus` que devuelva
+  stale.
+- **m-V2-3**: el alcance de los refuerzos de B3.
+  - `aliasDePrisma` solo reconoce `import { prisma as X }` con un único especificador y comillas
+    simples. No detecta `import { foo, prisma as X }`, las comillas dobles ni
+    `import * as db` del módulo `@/lib/shared/db/prisma`.
+  - En el archivo exento, los accesos `tx.` dentro del callback de `$transaction` no se miran.
+  - Es lo que fijó §5.2.1, así que no bloquea, pero el agujero que quería cerrar B3 sigue
+    abierto por esas variantes.
+- **m-V2-4**: el spec no está al día:
+  - `requirements.md:321` dice «La 7 es nueva y sigue abierta», y la línea 337 la da por
+    RESUELTA;
+  - `tasks.md:359` sigue titulado «PENDIENTE»;
+  - Tm1 está `[ ]` aunque la bitácora lo da por hecho;
+  - TC está `[ ]`. Es legítimo mientras no termine `./init.sh`, pero hay que marcarlo al
+    cerrar.
+- **m-V2-5**: `qc145-estado-solo-planta.test.ts` R10 (el segundo caso) pasó de «un solo bloque
+  `data:` con `status:`» a «un solo bloque con `status: to`» en `order-prisma.ts`. Tiene que ser
+  así, porque `cancelAlive` escribe su propio estado. Pero ahora un `status: <variable>` nuevo en
+  otra escritura de `order-prisma.ts` no lo detecta ningún test, salvo que sea `updateAlive` o un
+  literal `EN_CURSO`/`ENTREGADO`. Convendría fijar la lista exacta de bloques con `status:`.
+
+### Qué hace falta para OK
+
+Resolver V2-B1 a V2-B4, volver a correr `./init.sh --rapido` después de cada una, y al final
+`./init.sh` completo y los E2E sobre la rama ya mergeada con el `origin/dev` actual. Marcar Tm1 y
+TC.
