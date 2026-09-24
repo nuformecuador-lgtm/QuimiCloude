@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { buildCropPath, isPathInCompany } from '@/lib/modules/documentos/domain/document-path';
+import { buildCropPath, isCropPathOf, isPathInCompany } from '@/lib/modules/documentos/domain/document-path';
 
 const EMPRESA = '6b1c0000-0000-4000-8000-000000000001';
 const OTRA_EMPRESA = '6b1c0000-0000-4000-8000-000000000002';
@@ -33,5 +33,37 @@ describe('documentos — ruta de un recorte (R12)', () => {
     const path = buildCropPath(EMPRESA, DOCUMENT_FILE_ID, 1, 1);
     expect(isPathInCompany(path, EMPRESA)).toBe(true);
     expect(isPathInCompany(path, OTRA_EMPRESA)).toBe(false);
+  });
+});
+
+const OTRO_ARCHIVO = 'c9a10000-0000-4000-8000-00000000000a';
+
+describe('documentos — isCropPathOf (R26)', () => {
+  it('R26 — cierto para la ruta de esa empresa y ese archivo', () => {
+    const path = buildCropPath(EMPRESA, DOCUMENT_FILE_ID, 1, 1);
+    expect(isCropPathOf(path, EMPRESA, DOCUMENT_FILE_ID)).toBe(true);
+  });
+
+  it('R26 — falso para otra empresa', () => {
+    const path = buildCropPath(EMPRESA, DOCUMENT_FILE_ID, 1, 1);
+    expect(isCropPathOf(path, OTRA_EMPRESA, DOCUMENT_FILE_ID)).toBe(false);
+  });
+
+  it('R26 — falso para otro archivo de la misma empresa', () => {
+    const path = buildCropPath(EMPRESA, DOCUMENT_FILE_ID, 1, 1);
+    expect(isCropPathOf(path, EMPRESA, OTRO_ARCHIVO)).toBe(false);
+  });
+
+  it('R26 — falso con un segmento `..`', () => {
+    expect(isCropPathOf(`${EMPRESA}/../${DOCUMENT_FILE_ID}/1-1.png`, EMPRESA, DOCUMENT_FILE_ID)).toBe(false);
+    expect(isCropPathOf(`${EMPRESA}/${DOCUMENT_FILE_ID}/../1-1.png`, EMPRESA, DOCUMENT_FILE_ID)).toBe(false);
+  });
+
+  it('R26 — falso con una extension distinta de .png', () => {
+    expect(isCropPathOf(`${EMPRESA}/${DOCUMENT_FILE_ID}/1-1.jpg`, EMPRESA, DOCUMENT_FILE_ID)).toBe(false);
+  });
+
+  it('R26 — falso si el nombre de archivo no tiene la forma <pagina>-<n>.png', () => {
+    expect(isCropPathOf(`${EMPRESA}/${DOCUMENT_FILE_ID}/uno.png`, EMPRESA, DOCUMENT_FILE_ID)).toBe(false);
   });
 });

@@ -235,7 +235,7 @@ const ALTA_VALIDA: Readonly<Record<string, string>> = {
   deliveryTime: '7',
 };
 
-/** Los SIETE campos de negocio de la linea, tal como los nombra el contrato (R29, R31). */
+/** Los campos de negocio de la linea, tal como los nombra el contrato. */
 const CAMPOS_DE_NEGOCIO = [
   'name',
   PRESENTATION_FIELD,
@@ -244,6 +244,12 @@ const CAMPOS_DE_NEGOCIO = [
   'cost',
   'minPurchase',
   'deliveryTime',
+  'material',
+  'diameterValue',
+  'diameterUnit',
+  'heightValue',
+  'heightUnit',
+  'mouth',
 ] as const;
 
 function proveedor(overrides: Partial<SupplierView> = {}): SupplierView {
@@ -272,6 +278,8 @@ function linea(overrides: Partial<CatalogLineView> = {}): CatalogLineView {
     cost: '99.5000',
     minPurchase: '2.5000',
     deliveryTime: 3,
+    material: null,
+    measurements: null,
     createdAt: new Date('2026-03-01T10:00:00.000Z'),
     updatedAt: new Date('2026-03-05T10:00:00.000Z'),
     createdBy: null,
@@ -486,7 +494,7 @@ describe('linea de catalogo — el panel lateral (R26)', () => {
   });
 });
 
-describe('linea de catalogo — lo que el formulario NO ofrece (R29, R30)', () => {
+describe('linea de catalogo — lo que el formulario NO ofrece (R29)', () => {
   it('no ofrece ningun campo ni selector de articulo del inventario', async () => {
     // R29 en negativo — QC-52 borro esa columna del modelo y del contrato: no hay donde
     // guardarla, y el esquema es `strictObject`, asi que colarla daria `invalid_input`.
@@ -499,22 +507,20 @@ describe('linea de catalogo — lo que el formulario NO ofrece (R29, R30)', () =
     const nombresDeCampo = Array.from(document.querySelectorAll('[name]'))
       .map((control) => control.getAttribute('name'))
       .sort();
-    expect(nombresDeCampo).toEqual(
-      [SUPPLIER_FIELD, 'name', PRESENTATION_FIELD, 'unitId', 'cost', 'minPurchase', 'deliveryTime'].sort(),
-    );
+    expect(nombresDeCampo).toEqual([SUPPLIER_FIELD, ...CAMPOS_DE_NEGOCIO].sort());
 
     // Y ninguna de las formas en que un articulo del inventario podria volver a colarse.
     for (const prohibido of ['productId', 'product', 'articleId', 'inventoryItemId']) {
       expect(document.querySelector(`[name="${prohibido}"]`), prohibido).toBeNull();
     }
-    // Los unicos dos selectores del panel son presentacion y unidad.
+    // Los selectores del panel: presentacion, unidad de la linea y las dos unidades de medida.
     const panel = screen.getByTestId(testId.panel);
-    expect(within(panel).getAllByRole('combobox')).toHaveLength(2);
+    expect(within(panel).getAllByRole('combobox')).toHaveLength(4);
   });
 
-  it('no pide ninguna imagen ni ofrece subirla, y no la emite al guardar', async () => {
-    // R30 — la columna existe desde QC-52 y nadie la llena (`P1`). El adaptador ya trata su
-    // ausencia como ausencia, asi que el campo simplemente no viaja.
+  it('no ofrece subir, quitar ni previsualizar ninguna imagen; solo conserva la ya asignada', async () => {
+    // La imagen viaja OCULTA, con el valor de la linea (vacio en el alta): no hay control de
+    // archivo ni miniatura, y el envio la conserva tal cual.
     const user = setupUser();
 
     await renderPantalla();
@@ -522,15 +528,17 @@ describe('linea de catalogo — lo que el formulario NO ofrece (R29, R30)', () =
 
     const panel = screen.getByTestId(testId.panel);
     expect(panel.querySelector('input[type="file"]')).toBeNull();
-    expect(document.querySelector('[name="imagePath"]')).toBeNull();
     expect(within(panel).queryAllByRole('img')).toHaveLength(0);
+    const campoImagen = document.querySelector<HTMLInputElement>('[name="imagePath"]');
+    expect(campoImagen).toHaveAttribute('type', 'hidden');
+    expect(campoImagen).toHaveValue('');
 
     await elegirPresentacion(user);
     await rellenarFormulario(user);
     await user.click(screen.getByTestId(testId.enviar));
 
     await waitFor(() => expect(createCatalogLineActionMock).toHaveBeenCalledTimes(1));
-    expect(createCatalogLineActionMock.mock.calls[0][1].get('imagePath')).toBeNull();
+    expect(createCatalogLineActionMock.mock.calls[0][1].get('imagePath')).toBe('');
   });
 });
 
@@ -1000,21 +1008,19 @@ describe('linea de catalogo — exito y plataforma (R33, R34, R48)', () => {
   });
 });
 
-describe('linea de catalogo — los siete campos declarados (R29)', () => {
-  it('el formulario cubre los siete campos de negocio, con la imagen declarada como ausente', async () => {
-    // R29 + R30 — los seis que se capturan estan presentes y el septimo, la ruta de imagen, es una
-    // ausencia DECIDIDA (`requirements.md > P1`), no un campo que alguien olvido cablear.
+describe('linea de catalogo — los campos declarados (R28, R29)', () => {
+  it('el formulario cubre todos los campos de negocio, con la imagen oculta y conservada', async () => {
+    // Material y medidas se ven y se escriben. La imagen no se pide ni se ofrece
+    // cambiar, pero SI viaja: oculta, con el valor de la linea.
     const user = setupUser();
 
     await renderPantalla();
     await abrirAlta(user);
 
-    const capturados = CAMPOS_DE_NEGOCIO.filter((campo) => campo !== 'imagePath');
-    for (const campo of capturados) {
+    for (const campo of CAMPOS_DE_NEGOCIO) {
       expect(document.querySelector(`[name="${campo}"]`), campo).not.toBeNull();
     }
-    expect(document.querySelector('[name="imagePath"]')).toBeNull();
-    expect(CAMPOS_DE_NEGOCIO).toHaveLength(7);
+    expect(document.querySelector('[name="imagePath"]')).toHaveAttribute('type', 'hidden');
   });
 });
 

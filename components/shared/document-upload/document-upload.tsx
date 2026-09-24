@@ -39,6 +39,11 @@ const TOUCH_TARGET = 'min-h-11 min-w-11 text-base';
 export type DocumentUploadProps = {
   /** La estrategia de TODA la tanda. */
   readonly strategy: PdfStrategy;
+  /**
+   * Opcional: si se pasa, la fila de un archivo en «listo» ofrece un acceso a su revision.
+   * Ausente, el componente se comporta exactamente como antes de que esta prop existiera.
+   */
+  readonly reviewHrefFor?: (documentFileId: string) => string;
 };
 
 type SelectedFile = {
@@ -47,7 +52,7 @@ type SelectedFile = {
   readonly path: string | null;
 };
 
-export function DocumentUpload({ strategy }: DocumentUploadProps) {
+export function DocumentUpload({ strategy, reviewHrefFor }: DocumentUploadProps) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<readonly SelectedFile[]>([]);
@@ -238,6 +243,7 @@ export function DocumentUpload({ strategy }: DocumentUploadProps) {
               fileName={entry.file.name}
               phase={entry.phase}
               entry={entryOf(entry.path)}
+              reviewHrefFor={reviewHrefFor}
             />
           ))}
         </ul>

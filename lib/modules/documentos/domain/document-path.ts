@@ -58,3 +58,24 @@ export function isPathInCompany(path: string, companyId: string): boolean {
   if (head !== companyId || rest.length === 0 || rest.join('/').length === 0) return false;
   return !rest.includes('..');
 }
+
+/** Nombre de archivo de un recorte: `<pagina>-<n>.png`, los dos numericos. */
+const CROP_FILENAME_PATTERN = /^\d+-\d+\.png$/;
+
+/**
+ * `true` si `path` es EXACTAMENTE el recorte de esa empresa y ese archivo: tres segmentos, el
+ * primero la empresa, el segundo el archivo, el tercero con la forma `<pagina>-<n>.png`.
+ *
+ * Exigir tres segmentos exactos, y no un `startsWith`, es lo que rechaza otra empresa, otro
+ * archivo, una extension distinta y cualquier `..` que pretenda colarse como segmento propio: con
+ * el largo fijo, un segmento igual a `..` nunca puede desviar la ruta fuera de estos dos
+ * identificadores.
+ */
+export function isCropPathOf(path: string, companyId: string, documentFileId: string): boolean {
+  if (companyId.length === 0 || documentFileId.length === 0) return false;
+  const segments = path.split('/');
+  if (segments.length !== 3) return false;
+  const [company, file, filename] = segments;
+  if (company !== companyId || file !== documentFileId) return false;
+  return CROP_FILENAME_PATTERN.test(filename ?? '');
+}

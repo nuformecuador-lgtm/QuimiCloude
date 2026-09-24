@@ -163,3 +163,16 @@ sin borrar ni reescribir el texto original. `[D12]`
 | 2026-09-18 | ¿Qué pasa con los dos `.json` provisionales? | **Desaparecen**, y con ellos el mapa de textos `PROMPT_BY_STRATEGY` tal como existe hoy. Ya no hay ningún texto de prompt en el repositorio. `[D11]` |
 | 2026-09-18 | Quitar la marca de provisional pone rojo un test de QC-109. ¿Qué se hace? | **QC-129 actualiza `tests/unit/documentos/qc109-alcance.test.ts`** —R4, R6 y las afirmaciones sobre `PROMPT_BY_STRATEGY`— y añade una **nota fechada** al `requirements.md` de QC-109 diciendo qué se derogó y por qué. Precedente: la **T3 de QC-81**, que actualizó un test que se ponía rojo por hacer justo lo que la ficha pedía. `[D12]` |
 | 2026-09-18 | ¿Se versionan los textos? | **No queda ningún rastro del texto vigente en el repositorio.** El registro de revisión de `docs/` existe, con fecha y veredicto por campo, pero **no copia el prompt**. Consecuencia aceptada y escrita: un veredicto **no se puede volver a comprobar** contra el texto al que se refería. `[D13]` |
+
+### Nota fechada — 2026-09-23, enmienda de R10 por QC-158
+
+**QC-158** (`catalogo-desde-pdf`) convierte lo que devuelve el prompt de `catalogo` en líneas del
+catálogo del proveedor, y para eso fija la forma del JSON que acepta (`specs/QC-158-catalogo-desde-pdf/design.md > 3`,
+decisión `[F4]` de su F1.4). **R10 pasa de seis a ocho datos por línea, más `page`**: a nombre,
+presentación, unidad, precio (`cost`), compra mínima y tiempo de entrega se suman **`material`** y
+**`measurements`** (diámetro y alto con unidad `mm|cm`, boca como texto libre), y **`page`** (página
+del PDF donde está la línea, para emparejarla con su recorte). `{"lines": null}` sigue siendo «sin
+líneas». Un costo, una compra mínima o un valor de medida **numérico** se tratan como vacíos: viajan
+como cadena decimal. El texto de R10 de arriba **no se reescribe**; esta nota lo enmienda. El texto
+del prompt sigue **fuera del repositorio** (R9, `[D13]`): el humano ajusta el borrador de QC-131 a
+esta forma. Precedente: la nota fechada que QC-129 dejó en el `requirements.md` de QC-109.

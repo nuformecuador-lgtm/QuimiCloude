@@ -101,6 +101,37 @@ function readOptionalFormInt(
   return Number(trimmed);
 }
 
+/** Una medida (diametro o alto): AUSENTE si su valor viene vacio, aunque la unidad traiga
+ *  algo seleccionado -el select del formulario no se vacia solo-. La validez de la unidad
+ *  la decide el esquema del dominio, no esta lectura del borde. */
+function readDimension(
+  formData: FormData,
+  valueField: string,
+  unitField: string,
+): { value: string; unit: string } | undefined {
+  const value = readOptionalFormString(formData, valueField);
+  if (value === undefined) return undefined;
+  return { value, unit: readOptionalFormString(formData, unitField) ?? '' };
+}
+
+/**
+ * `measurements` del formulario: diametro, alto y boca, con las MISMAS reglas de vacio que
+ * la importacion -un valor vacio deja esa medida ausente, y las tres ausentes hacen que el
+ * campo entero no viaje-. La normalizacion final -«ausente -> `null`»- la hace
+ * `measurementsSchema` del dominio; aqui solo se arma la forma cruda.
+ */
+function readMeasurements(
+  formData: FormData,
+): { diameter: unknown; height: unknown; mouth: string | undefined } | undefined {
+  const diameter = readDimension(formData, 'diameterValue', 'diameterUnit');
+  const height = readDimension(formData, 'heightValue', 'heightUnit');
+  const mouth = readOptionalFormString(formData, 'mouth');
+
+  if (diameter === undefined && height === undefined && mouth === undefined) return undefined;
+
+  return { diameter, height, mouth };
+}
+
 /** Alta de linea (R10, R14, R15, R23, R25, R31). */
 export async function createCatalogLineAction(
   prevState: CreateCatalogLineFormState,
@@ -122,6 +153,8 @@ export async function createCatalogLineAction(
     cost: readFormString(formData, 'cost'),
     minPurchase: readOptionalFormString(formData, 'minPurchase'),
     deliveryTime,
+    material: readOptionalFormString(formData, 'material'),
+    measurements: readMeasurements(formData),
   };
 
   const actor = await currentActor();
@@ -160,6 +193,8 @@ export async function updateCatalogLineAction(
     cost: readFormString(formData, 'cost'),
     minPurchase: readOptionalFormString(formData, 'minPurchase'),
     deliveryTime,
+    material: readOptionalFormString(formData, 'material'),
+    measurements: readMeasurements(formData),
   };
 
   const actor = await currentActor();

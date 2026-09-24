@@ -31,6 +31,7 @@ export const SUBMIT_LABEL = 'Subir';
 export const CLEAR_LABEL = 'Quitar la seleccion';
 export const RESUME_LABEL = 'Reanudar';
 export const UNKNOWN_BATCH_LABEL = 'La tanda ya no esta disponible.';
+export const REVIEW_LABEL = 'Revisar';
 
 export function tooManyFilesMessage(max: number): string {
   return `Se admiten como mucho ${max} archivos por tanda. Vuelve a elegir.`;
