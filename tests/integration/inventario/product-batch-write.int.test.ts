@@ -436,6 +436,33 @@ describe('R21: producto y primer lote se escriben en una sola transaccion', () =
   });
 });
 
+describe('D22: el tope del nombre de producto es 200, la columna es text sin limite propio', () => {
+  it('guarda un nombre de 183 caracteres completo, sin truncarlo', async () => {
+    const fixture = await createFixture();
+    const nombre = `${'e'.repeat(170)} ${token()}`.slice(0, 183);
+    let productoId: string | undefined;
+
+    try {
+      const resultado = await createWithFirstBatch(
+        newProduct({ name: nombre }),
+        newBatch(fixture),
+        new Date(),
+        ambito(fixture),
+      );
+      productoId = resultado.id;
+
+      const producto = await prisma.product.findUniqueOrThrow({
+        where: { id: productoId },
+        select: { name: true },
+      });
+      expect(producto.name).toBe(nombre);
+      expect(producto.name.length).toBe(183);
+    } finally {
+      await dropFixture(fixture, productoId ? [productoId] : []);
+    }
+  });
+});
+
 describe('R18: agregar un lote no toca el producto (QC-121, R2, R9, R11)', () => {
   it('deja name, qty_alert, unit_id y updated_at intactos, y recalcula stock', async () => {
     const fixture = await createFixture();

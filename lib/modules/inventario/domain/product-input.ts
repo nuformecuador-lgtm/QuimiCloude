@@ -19,7 +19,7 @@ import { MANUAL_PRODUCT_TYPE_VALUES, PRODUCT_TYPES } from './product-type';
  * guardarlo"-. Con `.trim().min(1)`, en ese orden, zod ya recorta el valor de salida del
  * `parse` y lo que queda vacio tras recortar se rechaza.
  */
-const productNameSchema = z.string().trim().min(1).max(120);
+const productNameSchema = z.string().trim().min(1).max(200);
 
 /**
  * Duplicado a proposito del de `product-batch-input.ts`: de otro campo del mismo modulo solo se

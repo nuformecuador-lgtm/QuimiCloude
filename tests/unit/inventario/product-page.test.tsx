@@ -1213,9 +1213,9 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
     // ACOTADO EL 2026-09-03: el rechazo se provocaba con un costo no numerico. Ese campo ya no se
     // pinta, asi que el caso se muda al nombre, que sigue en pantalla y tiene su propia regla en
-    // el MISMO esquema del servidor: 120 caracteres como maximo. Lo que R20 vigila -el error va
-    // junto a SU campo, la operacion ni se llama y el panel sigue abierto- no cambia.
-    const nombreLargo = 'x'.repeat(121);
+    // el MISMO esquema del servidor: 200 caracteres como maximo (D22). Lo que R20 vigila -el
+    // error va junto a SU campo, la operacion ni se llama y el panel sigue abierto- no cambia.
+    const nombreLargo = 'x'.repeat(201);
     await rellenarFormulario(user, { name: nombreLargo });
     await user.click(screen.getByTestId(testId.enviar));
 

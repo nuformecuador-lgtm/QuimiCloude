@@ -255,12 +255,12 @@ describe('la entrada invalida se rechaza antes de tocar el puerto', () => {
     afirmarPuertoIntacto(products);
   });
 
-  it('R11 — nombre de mas de 120 caracteres', async () => {
+  it('D22 — nombre de mas de 200 caracteres', async () => {
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
     await expect(
-      createProduct({ ...ALTA_VALIDA, name: 'x'.repeat(121) }, ADMIN),
+      createProduct({ ...ALTA_VALIDA, name: 'x'.repeat(201) }, ADMIN),
     ).rejects.toBeInstanceOf(ValidationError);
     afirmarPuertoIntacto(products);
   });

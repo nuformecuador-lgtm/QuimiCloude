@@ -100,7 +100,7 @@ const DECIMAL_FIELDS = [...PRODUCT_DECIMAL_FIELDS, 'stock'] as const;
  * en ingles y describen el esquema, no lo que el usuario tiene que hacer.
  */
 const FIELD_MESSAGES: Record<ProductFieldName, string> = {
-  name: 'Escribe un nombre de 1 a 120 caracteres.',
+  name: 'Escribe un nombre de 1 a 200 caracteres.',
   type: 'Elige un tipo de producto.',
   stock: 'Debe ser un número decimal de 0 o más, con hasta 4 decimales.',
   qtyAlert: 'Debe ser un número decimal de 0 o más, con hasta 4 decimales.',
