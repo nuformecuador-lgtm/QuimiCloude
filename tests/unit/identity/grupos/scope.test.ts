@@ -197,7 +197,7 @@ const ADAPTADOR_DRIVEN = 'lib/modules/identity/adapters/driven/persistence/work-
  * que ya afirman este numero (`tests/unit/identity/permissions.test.ts`,
  * `tests/guards/guard-permisos-sembrados.test.ts`), que es exactamente lo que R47 exige.
  */
-const PERMISOS_ESPERADOS = 16;
+const PERMISOS_ESPERADOS = 18;
 
 /** Los DOS codigos que esta ficha reutiliza, y que por tanto tienen que seguir existiendo. */
 const LOS_DOS_CODIGOS = ['usuarios.consultar', 'usuarios.modificar'] as const;

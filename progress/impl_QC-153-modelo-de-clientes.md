@@ -70,6 +70,35 @@ Verificado con T4 revertido en local (sin commitear, restaurado byte a byte desp
 casos caen, incluidos los tres de R21/R22 nuevos y los que ya afirmaban el recuento/lista del
 Administrador. Con T4 en su sitio: 31/31 verdes.
 
+## T6 — Recuentos en guardias y tests unitarios (`design.md > 6.1`)
+
+Archivos tocados: `tests/unit/navegacion/qc75-convenciones.test.ts` (`CODIGOS_QC74` +2,
+`MODULOS_DE_NEGOCIO` +`clientes`, recuento 16→18, ancla de 9 enlaces intacta),
+`tests/guards/guard-permisos-sembrados.test.ts` (16→18, mensaje sin la lista de fichas previas
+—se limpio la cita en la linea tocada, siguiendo `docs/conventions.md > Comentarios`—),
+`tests/guards/guard-nav-permisos-declarados.test.ts` (`CODIGOS_VALIDOS` 16→18, ancla de 9
+enlaces de menu intacta), `tests/unit/documentos/authorization.test.ts` (16→18),
+`tests/unit/pedidos/qc145-estado-solo-planta.test.ts` (16→18, solo el bloque R16 de permisos
+que design.md nombra explicitamente), `tests/unit/asignaciones/schema/order-assignments-migration.test.ts`
+(`CODIGOS_DE_FICHAS_POSTERIORES` +2 codigos, 16→18, resta a 13 sigue saliendo),
+`tests/unit/identity/grupos/scope.test.ts` y `tests/unit/identity/roles/scope.test.ts`
+(`PERMISOS_ESPERADOS` 16→18), `tests/unit/identity/seed/seed-initial-access.test.ts` (titulo,
+comentario derivado y aserciones: 16→18 permisos, 20→22 asignaciones).
+
+Verificado: los 8 archivos de arriba, 145 tests pasan (12 skip, no relacionados).
+
+**Hallazgo fuera del alcance de esta ficha (no arreglado, reportado):**
+`tests/unit/pedidos/qc145-estado-solo-planta.test.ts`, describe `R29 — el esquema no gana
+modelos ni tablas: el unico cambio es la columna de R1`, caso `los modelos de db/schema.prisma
+son los mismos que en la base de fusion con origin/dev`. Ese caso compara los modelos de
+`db/schema.prisma` en HEAD contra los de `git merge-base origin/dev HEAD`, sin acotarse al
+diff propio de esa ficha (QC-145): cualquier ficha posterior que añada un modelo Prisma —que es
+justo lo que R1 de esta ficha exige (`Customer`)— lo pone en rojo, igual que la deuda ya anotada
+de `guard-arquitectura-modulos.test.ts` en `tests/baseline-rojos.json`. No está en el alcance de
+`design.md > 6.1` ni en los archivos que `tasks.md` declara tocar, así que no lo he modificado:
+lo dejo señalado para que el leader/reviewer decida si entra en `baseline-rojos.json` o se
+corrige la guardia (acotarla al propio diff de QC-145 en vez de al merge-base actual).
+
 ## Verificación T0
 
 ```

@@ -193,7 +193,7 @@ const LITERALES_DE_ROL = [ROLE_ADMINISTRADOR, ROLE_OPERADOR].map(
  * el caso dejaria de cazar justo lo que existe para cazar: que alguien cuele un permiso nuevo
  * desde la ficha de roles.
  */
-const PERMISOS_ESPERADOS = 16;
+const PERMISOS_ESPERADOS = 18;
 
 /** Los DOS codigos que esta ficha reutiliza, y que por tanto tienen que seguir existiendo. */
 const LOS_DOS_CODIGOS = ['usuarios.consultar', 'usuarios.modificar'] as const;

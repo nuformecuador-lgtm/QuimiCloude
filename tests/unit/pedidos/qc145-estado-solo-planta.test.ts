@@ -261,12 +261,12 @@ describe('R10 — EN_CURSO/ENTREGADO solo los escribe transitionAliveOrder; upda
 });
 
 // -------------------------------------------------------------------------------------------
-// El catalogo sigue en 16 permisos
+// El catalogo sigue en 18 permisos
 // -------------------------------------------------------------------------------------------
 
-describe('R16 — el catalogo de permisos sigue en dieciseis codigos', () => {
-  it('PERMISSIONS tiene exactamente 16 entradas', () => {
-    expect(PERMISSIONS).toHaveLength(16);
+describe('R16 — el catalogo de permisos sigue en dieciocho codigos', () => {
+  it('PERMISSIONS tiene exactamente 18 entradas', () => {
+    expect(PERMISSIONS).toHaveLength(18);
   });
 
   it('PERMISSIONS no repite ningun codigo', () => {

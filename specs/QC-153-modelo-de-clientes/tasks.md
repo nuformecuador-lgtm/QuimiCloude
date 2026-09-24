@@ -78,7 +78,7 @@ QC-158 (`in_progress`) puede añadir migración: choca solo en `MIGRACIONES_ESPE
       casos nuevos de R21, R22 y R25 (con su caso sintético que el detector de citas sí caza).
       **Hecho cuando:** el archivo está verde y, con T4 revertido en local, los casos de R21/R22/R25
       caen. *Depende de T4.*
-- [ ] **T6.** [P] Recuentos en guardias y tests unitarios de `design.md > 6.1`: `qc75-convenciones`,
+- [x] **T6.** [P] Recuentos en guardias y tests unitarios de `design.md > 6.1`: `qc75-convenciones`,
       `guard-permisos-sembrados`, `guard-nav-permisos-declarados`, `documentos/authorization`,
       `qc145-estado-solo-planta`, `order-assignments-migration`, `grupos/scope`, `roles/scope`,
       `seed-initial-access`. Números **subidos**, listas **ampliadas**; nada relajado.
