@@ -2321,7 +2321,7 @@
       "epic_name": "Clientes",
       "name": "crud-de-clientes",
       "description": "Casos de uso y Server Actions de clientes: alta, edicion, baja logica, detalle y listado paginado con busqueda. Leer exige clientes.consultar y escribir clientes.modificar (solo Administrador), validado en el service. Campos y reglas de QC-153. Decisiones en specs/QC-154-crud-de-clientes/requirements.md. BLOQUEADA POR QC-153.",
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "complexity": "medium",
       "zone": "backend",
