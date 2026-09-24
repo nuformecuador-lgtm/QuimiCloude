@@ -104,9 +104,16 @@ async function transitionAliveByIdReal(
   to: OrderStatus,
   actorId: string,
   now: Date,
-): Promise<'ok' | 'not_found' | 'stale'> {
+): ReturnType<OrderCatalog['transitionAliveById']> {
   assertTransition(from, to);
-  return createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
+  const resultado = await createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
+  // QC-150: yendo a `ENTREGADO`, el exito real lleva `finishedGoods` -aqui no hay producto
+  // terminado que dar de alta, asi que el doble no inventa ninguno-. `finishAssignedOrder`
+  // reconoce el exito por esta forma, no por el literal `'ok'`.
+  if (resultado === 'ok' && to === 'ENTREGADO') {
+    return { kind: 'ok', finishedGoods: { productName: '', packages: '0' } };
+  }
+  return resultado;
 }
 
 /** El `OrderCatalog` REAL: los tres metodos de escritura y lectura que la ejecucion necesita. */
