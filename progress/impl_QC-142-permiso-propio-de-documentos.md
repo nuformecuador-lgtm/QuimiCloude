@@ -49,7 +49,7 @@
 | T6 | `b3512da9` | `tests/unit/identity/permissions.test.ts`, `tests/unit/navegacion/qc75-convenciones.test.ts`, `tests/unit/identity/seed/seed-initial-access.test.ts`, `tests/integration/identity/identity-seed.int.test.ts` |
 | T7 | `30464857` | `tests/guards/guard-permisos-sembrados.test.ts`, `tests/guards/guard-nav-permisos-declarados.test.ts`, `tests/unit/identity/roles/scope.test.ts`, `tests/unit/identity/grupos/scope.test.ts`, `tests/unit/asignaciones/schema/order-assignments-migration.test.ts`, `tests/unit/pedidos/qc145-estado-solo-planta.test.ts`, `tests/unit/documentos-ui/document-upload-convenciones.test.ts` |
 | T8 | `aee8ec43` | `tests/unit/identity/catalogo-sin-total-fijo.test.ts` (nuevo) |
-| T10 | `d7627bcf` | `e2e/documentos.spec.ts` (E2E sin correr) |
+| T10 | `d7627bcf` | `e2e/documentos.spec.ts` (E2E corrido: R20 verde, R19 rojo heredado; ver «Corrida E2E») |
 
 ### Sitio que no estaba en el design
 
