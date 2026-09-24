@@ -27,7 +27,7 @@
 
 ---
 
-## T0 — Partir de `dev` con QC-141 dentro `[bloqueante]`
+## [x] T0 — Partir de `dev` con QC-141 dentro `[bloqueante]`
 
 Archivos: los que traiga el merge; `specs/QC-150-producto-terminado/design.md` si algo cambió.
 
