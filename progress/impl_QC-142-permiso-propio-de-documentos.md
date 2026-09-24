@@ -2,7 +2,9 @@
 
 > Implementer, 2026-09-24. Rama `feature/QC-142-permiso-propio-de-documentos`, worktree
 > `.worktrees/QC-142-permiso-propio-de-documentos`. Sin push ni PR. No me autoapruebo.
-> **Estado: T1-T9 cerradas. T10: R20 verde en E2E, R19 ROJO en el procesado (tras autorizar). Ver «Corrida E2E».**
+> **Estado (vuelta 2, 2026-09-24):** T1-T10 cerradas; T10 con salvedad (el leader la cerró en `7d62679b`:
+> R19 es un rojo heredado de `dev`). T11 abierta, es del leader. Hechos los arreglos de la review de F2.2
+> (M1, m1-m9) y los dos rojos del gate; ver «Vuelta 2».
 
 ## Base de datos
 
@@ -30,9 +32,9 @@
 
 ## Tasks
 
-- **Cerradas `[x]`:** T1, T2, T3, T4, T5, T6, T7, T8, T9.
-- **Abiertas `[ ]`:** T10 (R19 rojo en E2E, abajo) y T11 (esta bitácora es parcial;
-  el `./init.sh` completo lo corre el leader).
+- **Cerradas `[x]`:** T1 a T9, y T10 con salvedad: el caso R20 pasa y R19 es un rojo heredado de `dev`
+  (lo cerró el leader en `7d62679b`, según `progress/current.md > Deudas`).
+- **Abierta `[ ]`:** T11 (`./init.sh` completo, lo corre el leader).
 
 ## Commits
 
@@ -70,7 +72,7 @@ casan son exactamente `documentos.consultar` y `documentos.modificar`. **No entr
 | R14, R15, R16 | `tests/unit/documentos/{issue-upload-links,enqueue-batch,get-batch-status}.test.ts` (describe «documentos.modificar decide, nunca proveedores.*»), `tests/unit/documentos/authorization.test.ts` |
 | R17 | `tests/unit/documentos/authorization.test.ts` (el literal se escribe una sola vez; ningún fuente compara nombres de rol) |
 | R18 | `tests/unit/documentos/read-document.test.ts` (un actor sin permisos lee y descarga su propia ruta) |
-| R19 | `e2e/documentos.spec.ts`, caso existente «sube tres PDFs y ve cambiar el estado … (R20)»: **ROJO en Chromium**, el archivo acaba en `error` en el procesado (ver «Corrida E2E») |
+| R19 | `e2e/documentos.spec.ts`, caso existente «sube tres PDFs y ve cambiar el estado … (R20)»: **ROJO en Chromium**: el archivo acaba en `error` en el procesado, después de autorizar. Es rojo heredado de `dev`, medido sobre `origin/dev` limpio al cerrar QC-146; decisión del leader en `7d62679b`. Tiene que constar en el PR |
 | R20 | `e2e/documentos.spec.ts`, caso nuevo «un rol con proveedores.consultar y proveedores.modificar pero sin documentos.modificar no puede subir (R20 permiso propio)»: **verde en Chromium** (8.7s) |
 | R21 | `tests/unit/identity/schema/documents-permissions-migration.test.ts` (sin DDL) y `git diff --stat` de la rama, que no lista `package.json`, `pnpm-lock.yaml`, `db/schema.prisma` ni `docs/dependencias.md` |
 
@@ -95,57 +97,19 @@ casan son exactamente `documentos.consultar` y `documentos.modificar`. **No entr
   `vitest related --run lib/modules/identity/domain/permissions.ts` en segundo plano, y abarcó 397 archivos y
   5797 tests (0 fallos). Es casi la suite entera y va contra la regla. Queda dicho aquí; ese resultado no sustituye al gate.
 
-## T10: bloqueada por una PREGUNTA NUEVA
+## T10: cómo se llegó al E2E (historia, ya resuelta)
 
-**Hecho medido.** `app/(private)/proveedores/[id]/page.tsx:85` pide `getSupplierAction(id)` y
-`listUnitsAction()` en paralelo. Si las unidades fallan (`:98-107`), la página entera pinta `CatalogListError`
-y no monta `<DocumentUpload>`. `lib/modules/unidades/domain/list-units.ts:108` exige
-`unidades.consultar`. El rol efímero de design §6 («exactamente `proveedores.consultar` y
-`proveedores.modificar`») recibe `unauthorized` **de unidades** y nunca llega a la subida, así que el test
-fallaría, o pasaría, por un motivo que no es R20. El caso R19 no lo sufre porque el Administrador tiene todos los permisos.
-
-**Opciones (decide el humano o el leader):**
-- (a) el rol efímero suma `unidades.consultar`. Seguiría sin `documentos.modificar`, así que R20 prueba lo
-  que tiene que probar, pero cambia el «exactamente» de design §6;
-- (b) entrar al componente de subida por otra vía que no dependa de las unidades;
-- (c) revisar el design.
-
-**Estado del archivo.** `e2e/documentos.spec.ts` lleva, **sin commitear**, el comentario corregido
-de las líneas ~133-135 y el caso nuevo escrito al pie de la letra de §6. typecheck y lint, verdes.
-
-**Incidencia de entorno en la corrida E2E.**
-- `pnpm run e2e -- documentos --project=chromium` **no filtró**: corrió la suite E2E entera en
-  Chromium y en WebKit (13,2 min, 118 passed / 28 failed). Es lo contrario de lo pedido: una sola corrida, solo Chromium y
-  solo documentos. La causa probable es que pnpm pasa el `--` literal a `playwright test`. La forma segura es
-  `pnpm exec playwright test e2e/documentos.spec.ts --project=chromium`.
-- Los 28 rojos **no se han analizado**. Esa misma tarde QC-158 tenía vivos un `next dev --port 3117` y
-  Playwright, y `playwright.config.ts:13` fija `E2E_PORT = 3117` para todos los worktrees
-  (con `reuseExistingServer: false`). La colisión puede explicar parte de los rojos. **Esa corrida no vale
-  como evidencia**, ni a favor ni en contra.
-- No quedan procesos `next` ni Playwright de este worktree.
-
-### Decisión del leader y estado actual (2026-09-24)
-
-- **Opción (a).** El rol efímero lleva `proveedores.consultar`, `proveedores.modificar` y
-  `unidades.consultar`, y sigue sin `documentos.modificar`. Design §6 se enmendó con el porqué
-  (commit `2680b3d4`).
-- `e2e/documentos.spec.ts` está commiteado en `d7627bcf`: el rol lleva el permiso nuevo y, antes de
-  comprobar el rechazo, el caso afirma
-  `expect(page.getByTestId('document-upload-trigger')).toBeVisible()`, para saber que la página montó la
-  subida. El cuerpo de R19 no cambia. typecheck verde; lint con 0 errores.
-- **El E2E no se ha corrido.** `prisma migrate status` → `QuimiCloude_QC142`. `netstat` mostraba solo
-  `TIME_WAIT` en el puerto 3117. Aun así, `pnpm exec playwright test e2e/documentos.spec.ts --project=chromium`
-  falló al arrancar el webServer con `listen EADDRINUSE: address already in use :::3117`: el puerto estaba en
-  `LISTENING` por el PID 12852, del worktree `QC-158-catalogo-desde-pdf`, que se lo quedó en ese intervalo.
-  No se ejecutó ningún caso y no se mató ningún proceso. No queda vivo ningún proceso de QC-142.
-- **R19 y R20 siguen sin verificar.** T10 sigue abierta.
-
-## Pendiente
-
-1. ~~Decidir el rol de R20.~~ Decidido: opción (a). Con la decisión, rehacer T10 y correr una sola vez
-   `pnpm exec playwright test e2e/documentos.spec.ts --project=chromium` contra `QuimiCloude_QC142`,
-   con el puerto 3117 libre.
-2. T11: `./init.sh` completo (lo corre el leader) y confirmar R21 con `git diff --stat dev...HEAD`.
+- **Pregunta nueva que salió, resuelta por el leader con la opción (a).** La página de detalle de proveedor
+  también pide las unidades (`app/(private)/proveedores/[id]/page.tsx:85, 98-107`; `list-units.ts:108`
+  exige `unidades.consultar`). El rol efímero de R20 lleva `proveedores.consultar`, `proveedores.modificar` y
+  `unidades.consultar`, y sigue sin `documentos.modificar`. Design §6 recoge la enmienda (`2680b3d4`) y el
+  spec va en `d7627bcf`. Antes de comprobar el rechazo, el caso exige ver `document-upload-trigger`.
+- **Corridas que NO valen como evidencia.** La primera fue `pnpm run e2e -- documentos --project=chromium`,
+  que no filtró: lanzó la suite entera en Chromium y WebKit (13,2 min, 118 passed / 28 failed) y chocó con
+  un `next dev` de QC-158 en el puerto 3117, que `playwright.config.ts:13` fija igual para todos los
+  worktrees. La segunda murió en el arranque con `EADDRINUSE` (el puerto lo había cogido QC-158) y no
+  ejecutó ningún caso. No se mató ningún proceso ajeno.
+- La única corrida válida es la de «Corrida E2E», abajo.
 
 ## Corrida E2E (única, 2026-09-24)
 
@@ -177,4 +141,31 @@ Running 2 tests using 2 workers
 - `tests/baseline-rojos.json` está vacío: este rojo no figura como deuda conocida.
 - No queda vivo ningún proceso de QC-142.
 
-**Para diagnosticar, sin tocar código:** correr el mismo spec sobre `dev` o sobre `origin/dev` limpio, o repetirlo aquí sin el `afterAll` para leer `document_files.error_code` y `error_reason`.
+**Resolución:** el leader midió el mismo rojo sobre `origin/dev` limpio al cerrar QC-146. Es deuda heredada y está anotada en `progress/current.md > Deudas`. T10 se cerró con esa salvedad en `7d62679b`. No va al baseline.
+
+## Vuelta 2 (review F2.2 rechazada: 1 mayor, 9 menores; y dos rojos del gate)
+
+La review está en `progress/review_QC-142-permiso-propio-de-documentos.md` (commit `ace494d6`).
+
+| Punto | Commit | Qué se hizo |
+|---|---|---|
+| M1 + m1 | `e4417e4c` | `catalogo-sin-total-fijo.test.ts`: `sinComentarios` tokeniza con `ts.createScanner` (typescript ya era devDependency), así que un `/**` dentro de un string deja de contar como comentario. Los patrones se prueban sobre la fuente con los espacios colapsados, con una ventana `.{0,300}?`: `[^;]` no sirve porque el mensaje real lleva un `;`. Hay dos casos sintéticos con el texto EXACTO de `origin/dev` (la aserción multilínea de `guard-permisos-sembrados` y el `it('… lib/** …')` + `toHaveLength(18)` de `qc145-estado-solo-planta`), y los dos disparan. Pasado sobre los dos archivos completos de `origin/dev`, el predicado dispara; el código viejo no lo hacía. Se añade un ancla del barrido: más de 0 archivos y entre ellos `guard-permisos-sembrados.test.ts`. `readdirSync` ya no se traga los errores. m1 amplía el predicado a `codigosDelAdministrador)`, `antes.permisos)` y `antes.asignaciones)` + `toHaveLength(`, cada uno con su caso. **No se amplió** a `codigos)`, `new Set(codigos).size)` ni `catalogo)`: esos identificadores se reutilizan con totales propios de otros catálogos (`grupos/errors` 7, `usuarios/errors` 12, `unidades/errors` 9, `list-query-units.int` 3) y darían falsos positivos. 13 passed; el barrido real no encuentra nada |
+| Gate: aislamiento | `cab8caf6` | `identity/documents-permissions-migration.int.test.ts` entra en `tests/integration/aislamiento.json > transaccion` (usa transacción revertida con `RollbackSignal`, como `packer-role-migration`). El modo `transaccion` no pide motivo ni fecha. `guard-aislamiento-integracion.test.ts`: 6 passed |
+| Gate: showcase R29 | `e476cfd1` | `guard-convenciones-showcase.test.ts`: R29 y su pareja comparan el merge de QC-140 (`a738d81f`, PR #118) contra `a738d81f~1`, igual que los precedentes `bb01139e` y `7cd534e8`. Si falta el commit, error explícito. Anti-placebo: el commit real `ffabc3af`, que añade archivos en `db/`, hace que el mismo diff no salga vacío. Revisados `guard-convenciones-proveedores` y `guard-herencia-armazon-privado`: son de QC-44, filtran por marca y hacen skip explícito, así que no fallan aquí y no se tocan. Ningún otro test de alcance de QC-140 mira `origin/dev..HEAD`. 17 passed, 4 skipped |
+| m2 + m3 | `2baf5a30` | Comentarios que habían quedado falsos (el «veintidos…» del seed; el «codigo QUE YA EXISTIA» de convenciones; el «un rol efimero no probaria…» del E2E) y citas de ficha o de R en comentarios añadidos por la rama (E2E, cabecera del int, JSDoc de los predicados). Los R<n> se quedan en los nombres de caso |
+| m4 | `e2b74a44` | Cabecera de `migration.sql` de 9 a 4 líneas. En `permissions.ts`, el párrafo con ordinal pasa a una frase corta, y se recomponen las líneas partidas del JSDoc. `prisma migrate status` sobre `QuimiCloude_QC142` antes y después: al día, sin aviso. Solo cambia un comentario, pero el checksum del archivo cambia: la base propia ya la tenía aplicada, y ninguna otra base la ha aplicado todavía |
+| m5 | `704ba223` | R17 importa `ROLE_EMPACADOR` y afirma que la lista de fuentes del módulo tiene elementos |
+| m6 | `abdc3e45` | R10 compara `permissions`, `role_permissions` y `roles` completas antes del UP y después del DOWN. «R9 UP tras seed» afirma que el Administrador ya tenía los dos `documentos.*` antes de aplicar |
+| m7 | `b5d451dd` | R2: `PERMISOS_PREVIOS`, las entradas de `origin/dev` con módulo, acción y descripción copiadas a mano; cada una tiene que seguir igual en `PERMISSIONS`. Sin total |
+| m8 | `1f05998c`, `be5413c7` | R13 «base sembrada antes de esta feature»: el unit parte de un repo sin `documentos.*` y el seed crea exactamente esos permisos y las asignaciones del Administrador; Operador y Empacador quedan sin ellos y la segunda corrida no escribe nada. Hay caso equivalente en `identity-seed.int.test.ts`. El segundo commit arregla un typecheck |
+| m9 | este commit | Bitácora coherente con `tasks.md` y con el cierre de T10 del leader |
+
+**Salidas de la vuelta 2** (archivos concretos, corridos por los subagentes):
+- `catalogo-sin-total-fijo.test.ts` 13 passed.
+- `guard-aislamiento-integracion.test.ts` 6 passed.
+- Los tres guards de `proveedores-ui`: 17 passed, 4 skipped.
+- Tanda unit de m2-m8 (6 archivos, `catalogo-sin-total-fijo` incluido): 110 passed, 0 failed.
+- Integración (`documents-permissions-migration.int` + `identity-seed.int`, base efímera de plantilla): 24 passed, 0 failed.
+- `pnpm run typecheck`: limpio. `pnpm run lint`: 0 errores (los 2 warnings preexistentes de `order-service.test.ts`).
+- No se corrieron ni `./init.sh` ni la suite completa ni el E2E. El baseline no cambia.
+
