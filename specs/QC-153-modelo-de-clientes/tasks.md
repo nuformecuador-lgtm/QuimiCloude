@@ -89,7 +89,7 @@ QC-158 (`in_progress`) puede añadir migración: choca solo en `MIGRACIONES_ESPE
 
 ## T8–T12 — Tests de la ficha
 
-- [ ] **T8.** [P] `tests/unit/clientes/schema/customers-schema.test.ts` (`design.md > 7`): R1, R3,
+- [x] **T8.** [P] `tests/unit/clientes/schema/customers-schema.test.ts` (`design.md > 7`): R1, R3,
       R4, R5, R7, R11, R15, R16, R19 y el tipo `Customer` atado al modelo. **Hecho cuando:** verde, y
       cada detector tiene su caso sintético que muerde (p. ej. un `@relation` en `companyId`, un
       `@unique` en `email`, un campo más en el tipo). *Depende de T1 y T3.*
