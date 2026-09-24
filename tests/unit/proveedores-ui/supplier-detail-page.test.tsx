@@ -4,7 +4,11 @@ import {
   UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
   UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
 } from '@/components/shared/unexpected-error-notice';
-import { REFERENCIA_DEL_CASO, errorInesperado } from '../../helpers/identificador-de-request';
+import {
+  REFERENCIA_DEL_CASO,
+  errorInesperado,
+  esperarSinIdentificador,
+} from '../../helpers/identificador-de-request';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 
@@ -190,7 +194,11 @@ const testId = {
   enviar: 'supplier-form-submit',
   abrirBaja: 'supplier-delete-open',
   dialogoBaja: 'delete-supplier-dialog',
+  mensajeBaja: 'delete-supplier-message',
+  arrastreBaja: 'delete-supplier-cascade',
+  cancelarBaja: 'delete-supplier-cancel',
   confirmarBaja: 'delete-supplier-confirm',
+  errorBaja: 'delete-supplier-error',
   noEncontrado: 'supplier-not-found',
   enlaceLista: 'supplier-not-found-link',
   lista: 'catalog-list',
@@ -1051,5 +1059,88 @@ describe('pagina de detalle — editar y dar de baja en la cabecera (R38)', () =
 
     expect(listCatalogLinesActionMock).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId(testId.tabla)).toBeInTheDocument();
+  });
+});
+
+describe('DeleteSupplierDialog — baja con aviso de arrastre (R35, R47)', () => {
+  it('sin confirmar no invoca la operacion de baja, y el dialogo nombra al proveedor y avisa del arrastre', async () => {
+    // El doble FALLA si se le llama: no basta con no haberlo visto llamado, se comprueba que
+    // ninguna via lo dispara.
+    const user = setupUser();
+    const elProveedor = proveedor({ name: 'Reactivos del Golfo' });
+    getSupplierActionMock.mockResolvedValue({ status: 'success', data: elProveedor });
+    deleteSupplierActionMock.mockImplementation(() => {
+      throw new Error('la baja no puede invocarse sin confirmacion');
+    });
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirBaja));
+
+    const dialogo = await screen.findByTestId(testId.dialogoBaja);
+    expect(within(dialogo).getByTestId(testId.mensajeBaja)).toHaveTextContent(elProveedor.name);
+    expect(within(dialogo).getByTestId(testId.arrastreBaja)).toBeInTheDocument();
+    expect(deleteSupplierActionMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId(testId.cancelarBaja));
+    await waitFor(() => expect(screen.queryByTestId(testId.dialogoBaja)).toBeNull());
+    expect(deleteSupplierActionMock).not.toHaveBeenCalled();
+    expect(toastExito).not.toHaveBeenCalled();
+  });
+
+  it('una baja rechazada mantiene el dialogo abierto con el mensaje a la vista', async () => {
+    const user = setupUser();
+    deleteSupplierActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No autorizado.',
+    });
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirBaja));
+    await screen.findByTestId(testId.dialogoBaja);
+    await user.click(screen.getByTestId(testId.confirmarBaja));
+
+    await waitFor(() => expect(deleteSupplierActionMock).toHaveBeenCalledTimes(1));
+
+    const error = await screen.findByTestId(testId.errorBaja);
+    expect(error).toHaveAttribute('role', 'alert');
+    expect(error).toHaveTextContent('No autorizado.');
+    expect(screen.getByTestId(testId.dialogoBaja)).toBeInTheDocument();
+    expect(toastExito).not.toHaveBeenCalled();
+    expect(routerMock.replace).not.toHaveBeenCalled();
+  });
+
+  it('el dialogo de baja ensena el identificador del error inesperado', async () => {
+    const user = setupUser();
+    deleteSupplierActionMock.mockResolvedValue(errorInesperado());
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirBaja));
+    await screen.findByTestId(testId.dialogoBaja);
+    await user.click(screen.getByTestId(testId.confirmarBaja));
+
+    const region = await screen.findByTestId(testId.errorBaja);
+    expect(within(region).getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
+    expect(within(region).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toHaveTextContent(
+      UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
+    );
+  });
+
+  it('el dialogo de baja con un error del catalogo no ensena identificador ninguno', async () => {
+    const user = setupUser();
+    deleteSupplierActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: 'No autorizado.',
+    });
+
+    await renderPantalla();
+    await user.click(screen.getByTestId(testId.abrirBaja));
+    await screen.findByTestId(testId.dialogoBaja);
+    await user.click(screen.getByTestId(testId.confirmarBaja));
+
+    const region = await screen.findByTestId(testId.errorBaja);
+    expect(region).toHaveTextContent('No autorizado.');
+    esperarSinIdentificador();
   });
 });
