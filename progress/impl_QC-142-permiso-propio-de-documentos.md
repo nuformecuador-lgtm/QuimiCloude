@@ -47,7 +47,7 @@
 | T6 | `b3512da9` | `tests/unit/identity/permissions.test.ts`, `tests/unit/navegacion/qc75-convenciones.test.ts`, `tests/unit/identity/seed/seed-initial-access.test.ts`, `tests/integration/identity/identity-seed.int.test.ts` |
 | T7 | `30464857` | `tests/guards/guard-permisos-sembrados.test.ts`, `tests/guards/guard-nav-permisos-declarados.test.ts`, `tests/unit/identity/roles/scope.test.ts`, `tests/unit/identity/grupos/scope.test.ts`, `tests/unit/asignaciones/schema/order-assignments-migration.test.ts`, `tests/unit/pedidos/qc145-estado-solo-planta.test.ts`, `tests/unit/documentos-ui/document-upload-convenciones.test.ts` |
 | T8 | `aee8ec43` | `tests/unit/identity/catalogo-sin-total-fijo.test.ts` (nuevo) |
-| T10 | **sin commit** | `e2e/documentos.spec.ts` modificado en el working tree |
+| T10 | `d7627bcf` | `e2e/documentos.spec.ts` (E2E sin correr) |
 
 ### Sitio que no estaba en el design
 
@@ -70,8 +70,8 @@ casan son exactamente `documentos.consultar` y `documentos.modificar`. **No entr
 | R14, R15, R16 | `tests/unit/documentos/{issue-upload-links,enqueue-batch,get-batch-status}.test.ts` (describe «documentos.modificar decide, nunca proveedores.*»), `tests/unit/documentos/authorization.test.ts` |
 | R17 | `tests/unit/documentos/authorization.test.ts` (el literal se escribe una sola vez; ningún fuente compara nombres de rol) |
 | R18 | `tests/unit/documentos/read-document.test.ts` (un actor sin permisos lee y descarga su propia ruta) |
-| R19 | `e2e/documentos.spec.ts`, caso existente «sube tres PDFs …»: **no verificado en esta rama** (ver T10) |
-| R20 | `e2e/documentos.spec.ts`, caso nuevo: **escrito, sin commitear y sin verde** (ver T10) |
+| R19 | `e2e/documentos.spec.ts`, caso existente «sube tres PDFs …»: **sin correr en esta rama** (ver T10) |
+| R20 | `e2e/documentos.spec.ts`, caso nuevo (commit `d7627bcf`): **sin correr**, puerto 3117 ocupado por QC-158 (ver T10) |
 | R21 | `tests/unit/identity/schema/documents-permissions-migration.test.ts` (sin DDL) y `git diff --stat` de la rama, que no lista `package.json`, `pnpm-lock.yaml`, `db/schema.prisma` ni `docs/dependencias.md` |
 
 ## Salida de los tests (corridas de los subagentes, archivo a archivo)
@@ -124,9 +124,25 @@ de las líneas ~133-135 y el caso nuevo escrito al pie de la letra de §6. typec
   como evidencia**, ni a favor ni en contra.
 - No quedan procesos `next` ni Playwright de este worktree.
 
+### Decisión del leader y estado actual (2026-09-24)
+
+- **Opción (a).** El rol efímero lleva `proveedores.consultar`, `proveedores.modificar` y
+  `unidades.consultar`, y sigue sin `documentos.modificar`. Design §6 se enmendó con el porqué
+  (commit `2680b3d4`).
+- `e2e/documentos.spec.ts` está commiteado en `d7627bcf`: el rol lleva el permiso nuevo y, antes de
+  comprobar el rechazo, el caso afirma
+  `expect(page.getByTestId('document-upload-trigger')).toBeVisible()`, para saber que la página montó la
+  subida. El cuerpo de R19 no cambia. typecheck verde; lint con 0 errores.
+- **El E2E no se ha corrido.** `prisma migrate status` → `QuimiCloude_QC142`. `netstat` mostraba solo
+  `TIME_WAIT` en el puerto 3117. Aun así, `pnpm exec playwright test e2e/documentos.spec.ts --project=chromium`
+  falló al arrancar el webServer con `listen EADDRINUSE: address already in use :::3117`: el puerto estaba en
+  `LISTENING` por el PID 12852, del worktree `QC-158-catalogo-desde-pdf`, que se lo quedó en ese intervalo.
+  No se ejecutó ningún caso y no se mató ningún proceso. No queda vivo ningún proceso de QC-142.
+- **R19 y R20 siguen sin verificar.** T10 sigue abierta.
+
 ## Pendiente
 
-1. Decidir el rol de R20. Con la decisión, rehacer T10 y correr una sola vez
+1. ~~Decidir el rol de R20.~~ Decidido: opción (a). Con la decisión, rehacer T10 y correr una sola vez
    `pnpm exec playwright test e2e/documentos.spec.ts --project=chromium` contra `QuimiCloude_QC142`,
    con el puerto 3117 libre.
 2. T11: `./init.sh` completo (lo corre el leader) y confirmar R21 con `git diff --stat dev...HEAD`.
