@@ -63,7 +63,7 @@ QC-158 (`in_progress`) puede añadir migración: choca solo en `MIGRACIONES_ESPE
       la ficha. **Hecho cuando:** migrar → revertir → migrar termina sin error, `_prisma_migrations`
       queda coherente, y `guard-rls-force` y `guard-identificador-de-request` están verdes.
       *Depende de T1.*
-- [ ] **T3.** [P] Armazón `lib/modules/clientes/` (`design.md > 4`): `index.ts`, `domain/customer.ts`,
+- [x] **T3.** [P] Armazón `lib/modules/clientes/` (`design.md > 4`): `index.ts`, `domain/customer.ts`,
       `ports/.gitkeep`, `adapters/.gitkeep`. **Hecho cuando:** `guard-arquitectura-modulos` (bloques 1,
       4 y 6) sigue verde y `typecheck` pasa. *Depende de T1 (el tipo copia sus campos).*
 

@@ -49,6 +49,12 @@ Alta de `20260924120000_customers` al final de `MIGRACIONES_ESPERADAS`
 (`tests/guards/guard-identificador-de-request.test.ts`). `guard-identificador-de-request.test.ts`
 y `guard-rls-force.test.ts`: 27 tests verdes.
 
+## T3 — Armazón `lib/modules/clientes/`
+
+`index.ts` (reexporta solo `Customer` de `./domain/customer`), `domain/customer.ts` (el tipo
+puro), `ports/.gitkeep`, `adapters/.gitkeep`. `typecheck` en verde;
+`guard-arquitectura-modulos.test.ts`: 62 tests verdes.
+
 ## Verificación T0
 
 ```
