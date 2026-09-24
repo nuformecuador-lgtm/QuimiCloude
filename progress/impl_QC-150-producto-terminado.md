@@ -237,3 +237,11 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
 - La guardia del libro ya tenía el caso rojo con un camino fabricado sin asiento (`:312`).
 - Tests: `vitest run tests/unit/inventario tests/guards tests/integration/inventario` → 131 archivos,
   1801 pasados, 10 skipped (`finished-goods.int.test.ts` 9 casos). Typecheck limpio; lint 0 errores.
+
+## T11 — R25 (`fd19010f`, frontend_dev) · T11 cerrada (R33 ya estaba en `eebc80d1`)
+
+- `app/(private)/inventario/components/product-batches-panel.tsx`: «N envases» («1 envase») junto a la
+  cantidad si `stock / packageContent` es entero exacto (BigInt a escala 4); nada en otro caso.
+- Tests: `tests/unit/inventario/product-batches-panel.test.tsx` › R25 (4 casos). Ojo: en ese archivo
+  ya había un caso con «(R25)» de otra ficha (objetivo táctil); se dejó igual.
+- `product-batches-panel`, `product-batches-sheet`, `product-page` (viewport) → 98/98.

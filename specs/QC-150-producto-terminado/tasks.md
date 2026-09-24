@@ -253,7 +253,7 @@ Archivos: `lib/modules/inventario/domain/{create-product,adjust-batch-stock}.ts`
 
 `guard-ambito-empresa-inventario` y `guard-ambito-empresa-recetas` siguen verdes.
 
-## T11 — Pantallas de inventario `[depende de T6, T7, T10]` `[P con T8]`
+## [x] T11 — Pantallas de inventario `[depende de T6, T7, T10]` `[P con T8]`
 
 Archivos: `app/(private)/inventario/components/{product-batches-panel,adjust-batch-dialog}.tsx`.
 
