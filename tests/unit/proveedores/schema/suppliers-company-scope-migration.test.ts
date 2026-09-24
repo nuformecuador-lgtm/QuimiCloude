@@ -584,10 +584,14 @@ function dropsBothColumnsAfterTheirConstraints(sql: string): boolean {
  */
 function constraintsBefore(tabla: string, exclude: string): ReadonlyMap<string, string> {
   const vivas = new Map<string, string>()
-  const dirs = readdirSync(migrationsDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && !entry.name.endsWith(exclude))
+  const todas = readdirSync(migrationsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort()
+  // Solo las ANTERIORES a esta migracion: las posteriores (p. ej. la de material y medidas de
+  // la linea, QC-158) no son «lo que ya estaba escrito» cuando esta se aplico.
+  const propia = todas.findIndex((name) => name.endsWith(exclude))
+  const dirs = propia === -1 ? todas : todas.slice(0, propia)
 
   for (const dir of dirs) {
     let sql: string

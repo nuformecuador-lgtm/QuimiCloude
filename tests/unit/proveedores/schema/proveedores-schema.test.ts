@@ -161,6 +161,9 @@ const SUPPLIER_CATALOG_LINE_COLUMNS: ReadonlyArray<readonly [string, string]> = 
   ['cost', 'cost'],
   ['minPurchase', 'min_purchase'],
   ['deliveryTime', 'delivery_time'],
+  // QC-158 (R27): material y medidas de la linea, opcionales.
+  ['material', 'material'],
+  ['measurements', 'measurements'],
   // La linea lleva su propia empresa, no la toma prestada de su proveedor: es lo que
   // permite que la clave foranea compuesta impida que las dos discrepen.
   ['companyId', 'company_id'],
