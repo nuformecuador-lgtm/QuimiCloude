@@ -6,7 +6,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { resolveIngredientsCost } from '@/lib/modules/pedidos/domain/resolve-ingredients-cost';
+import { resolveIngredientsCost, resolveLotIngredientsCost } from '@/lib/modules/pedidos/domain/resolve-ingredients-cost';
 
 import type { CostingBatch, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeExecutionContent } from '@/lib/modules/recetas';
@@ -241,6 +241,91 @@ describe('resolveIngredientsCost', () => {
       COMPANY_ID,
       { orderId: 'pedido-1' },
     );
+    expect(prod.findCostingBatches).toHaveBeenLastCalledWith([PRODUCT_A], COMPANY_ID, { excludeOrderId: 'pedido-1' });
+  });
+});
+
+// `resolveLotIngredientsCost` (D13, R42): la hermana que orquesta las mismas lecturas pero
+// termina en `calculateLotIngredientsCost` -un ingrediente sin costo cuenta cero- en vez de
+// `calculateIngredientsCost`. Comparte firma completa, incluido `options.orderId` (C5: el
+// pedido que se finaliza tiene su propio material apartado, que cuenta como disponible para si).
+describe('resolveLotIngredientsCost', () => {
+  it('pedido 200, 10 % de un insumo en L con un lote de 50 L a 2,0000 -> 40,0000, igual que resolveIngredientsCost', async () => {
+    const cat = catalogoDeRecetas(
+      contenido({ lines: [{ productId: PRODUCT_A, productName: null, percentage: '10.00' }] }),
+    );
+    const prod = catalogoDeProductos(
+      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
+      [lote({ stock: '50.0000', unitCost: '2.0000' })],
+    );
+    const uni = catalogoDeUnidades();
+
+    const resultado = await resolveLotIngredientsCost(
+      cat.recipes,
+      prod.products,
+      uni.units,
+      RECIPE_ID,
+      '200.0000',
+      COMPANY_ID,
+    );
+
+    expect(resultado).toBe('40.0000');
+  });
+
+  it('un insumo sin existencia disponible cuenta cero y el resultado nunca es nulo (R42)', async () => {
+    const cat = catalogoDeRecetas();
+    const prod = catalogoDeProductos(
+      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
+      [lote({ stock: '1.0000', unitCost: '2.0000' })],
+    );
+    const uni = catalogoDeUnidades();
+
+    // El disponible (1) no cubre lo necesario (200): resolveIngredientsCost da null, la hermana
+    // cuenta cero y devuelve '0.0000'.
+    const resultado = await resolveLotIngredientsCost(
+      cat.recipes,
+      prod.products,
+      uni.units,
+      RECIPE_ID,
+      '200.0000',
+      COMPANY_ID,
+    );
+
+    expect(resultado).toBe('0.0000');
+  });
+
+  it('receta sin lineas da 0.0000, no null', async () => {
+    const cat = catalogoDeRecetas(contenido({ lines: [] }));
+    const prod = catalogoDeProductos();
+    const uni = catalogoDeUnidades();
+
+    const resultado = await resolveLotIngredientsCost(
+      cat.recipes,
+      prod.products,
+      uni.units,
+      RECIPE_ID,
+      '200.0000',
+      COMPANY_ID,
+    );
+
+    expect(resultado).toBe('0.0000');
+  });
+
+  it('reenvia options.orderId a findCostingBatches como excludeOrderId (C5: el pedido a finalizar cuenta su propio apartado como disponible)', async () => {
+    const cat = catalogoDeRecetas();
+    const prod = catalogoDeProductos([{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }], [lote()]);
+    const uni = catalogoDeUnidades();
+
+    await resolveLotIngredientsCost(
+      cat.recipes,
+      prod.products,
+      uni.units,
+      RECIPE_ID,
+      '200.0000',
+      COMPANY_ID,
+      { orderId: 'pedido-1' },
+    );
+
     expect(prod.findCostingBatches).toHaveBeenLastCalledWith([PRODUCT_A], COMPANY_ID, { excludeOrderId: 'pedido-1' });
   });
 });

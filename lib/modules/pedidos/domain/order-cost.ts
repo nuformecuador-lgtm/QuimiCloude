@@ -197,3 +197,31 @@ export function calculateIngredientsCost(input: CostInput): string | null {
 
   return formatFixedOutputScale(roundedOutput)
 }
+
+/**
+ * Costo de los ingredientes de un LOTE de producto terminado (D13, R42): recorre las mismas
+ * lineas con `calculateLineCost`, pero un ingrediente sin costo cuenta como CERO en vez de
+ * invalidar el total entero -a diferencia de `calculateIngredientsCost`, que esta funcion no
+ * toca (R43)-. Una receta sin lineas, o en la que ningun ingrediente tiene costo, da `'0.0000'`:
+ * nunca `null`, porque el lote SIEMPRE entra con un costo unitario.
+ */
+export function calculateLotIngredientsCost(input: CostInput): string {
+  if (input.lines.length === 0) {
+    return '0.0000'
+  }
+
+  let totalInternal = ZERO
+  for (const line of input.lines) {
+    const lineCostInternal = calculateLineCost(line, input.orderQuantity, input.batches, input.units)
+    if (lineCostInternal !== null) {
+      totalInternal += lineCostInternal
+    }
+  }
+
+  const roundedOutput = roundHalfUpToOutputScale(totalInternal)
+  if (roundedOutput > MAX_OUTPUT_UNSCALED) {
+    throw new Error('calculateLotIngredientsCost: el costo del lote desborda decimal(14,4)')
+  }
+
+  return formatFixedOutputScale(roundedOutput)
+}

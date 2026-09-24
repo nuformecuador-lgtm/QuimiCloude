@@ -91,6 +91,7 @@ export {
   ceilToScale4,
 } from './domain/decimal-quantity';
 export { compareBatchesOldestFirst, type OrderableBatch } from './domain/batch-order';
+export { planFinishedGoods, type FinishedGoodsPlan } from './domain/finished-goods';
 
 // Solo tipos: por aqui otros modulos apuntan a un producto sin tocar la tabla ni Prisma. La
 // implementacion se cablea en `lib/composition`.
