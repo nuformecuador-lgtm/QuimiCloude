@@ -37,6 +37,7 @@ function lote(overrides: Partial<ProductBatchView> = {}): ProductBatchView {
     unitId: crypto.randomUUID(),
     purchaseDate: '2026-03-05',
     expiryDate: null,
+    packageContent: null,
     ...overrides,
   };
 }

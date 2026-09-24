@@ -15,7 +15,13 @@ import { describe, expect, it } from 'vitest';
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CARPETA_LIB = 'lib';
 const PRODUCT_PRISMA = 'lib/modules/inventario/adapters/driven/persistence/product-prisma.ts';
-const CAMINOS_ESPERADOS = ['createWithFirstBatch', 'addBatchToAlive', 'adjustBatchStock', 'consumeBatchStock'] as const;
+const CAMINOS_ESPERADOS = [
+  'createWithFirstBatch',
+  'addBatchToAlive',
+  'adjustBatchStock',
+  'consumeBatchStock',
+  'receiveFinishedGoods',
+] as const;
 const CARPETAS_IGNORADAS = new Set(['node_modules', '.next', '.git', 'dist', 'coverage']);
 const SUFIJOS_FUENTE = ['.ts', '.tsx'];
 
@@ -241,7 +247,7 @@ describe('guardia: censo de caminos de escritura de product_batches bajo lib/ (R
     ).toBeGreaterThan(50);
   });
 
-  it('el censo de caminos de escritura es exactamente { createWithFirstBatch, addBatchToAlive, adjustBatchStock, consumeBatchStock }', () => {
+  it('el censo de caminos de escritura es exactamente { createWithFirstBatch, addBatchToAlive, adjustBatchStock, consumeBatchStock, receiveFinishedGoods }', () => {
     const real = censoReal();
     expect(
       real,

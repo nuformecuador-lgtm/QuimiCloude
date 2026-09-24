@@ -296,6 +296,7 @@ describe('QC-92 R21 — listar los lotes de un producto exige inventario.consult
         unitId: 'unidad-1',
         purchaseDate: '2026-09-01',
         expiryDate: null,
+        packageContent: null,
       },
     ];
     dobles.findBatchesOfAliveProduct.mockResolvedValue(lotes);

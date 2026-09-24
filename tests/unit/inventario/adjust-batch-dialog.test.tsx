@@ -49,6 +49,7 @@ function lote(overrides: Partial<ProductBatchView> = {}): ProductBatchView {
     unitId: 'unit-kg',
     purchaseDate: '2026-03-05',
     expiryDate: null,
+    packageContent: null,
     ...overrides,
   };
 }
