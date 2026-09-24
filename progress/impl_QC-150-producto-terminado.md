@@ -245,3 +245,24 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
 - Tests: `tests/unit/inventario/product-batches-panel.test.tsx` › R25 (4 casos). Ojo: en ese archivo
   ya había un caso con «(R25)» de otra ficha (objetivo táctil); se dejó igual.
 - `product-batches-panel`, `product-batches-sheet`, `product-page` (viewport) → 98/98.
+
+## T8 — Engancharlo al Finalizar, backend (`88bf0067`..`af296973`, backend_dev)
+
+- Modificados: `lib/modules/pedidos/domain/{transition-order,order-catalog}.ts`,
+  `lib/modules/pedidos/ports/order-unit-of-work.ts` (`finishedGoods`), `lib/modules/pedidos/index.ts`,
+  `lib/composition/index.ts` (`createFinishedGoodsIntake(tx)`; `recipes`/`products`/`units` a
+  `createTransitionOrder`), `lib/modules/asignaciones/domain/{errors,finish-assigned-order}.ts`,
+  `lib/modules/asignaciones/index.ts`, `lib/modules/asignaciones/adapters/driving/order-execution-actions.ts`,
+  `lib/shared/routes.ts` (`entregado_envases`, `entregado_producto`).
+- Pasa a ENTREGADO → `{ kind: 'ok', finishedGoods }`; otros destinos siguen devolviendo `'ok'`.
+- Tests: `tests/unit/pedidos/transition-order.test.ts`, `tests/unit/asignaciones/{finish-assigned-order,order-execution-actions}.test.ts`,
+  `tests/integration/pedidos/finish-with-finished-goods.int.test.ts` (nuevo); `tests/helpers/order-unit-of-work-double.ts`
+  (`fakeFinishedGoodsIntake`, lanza si se llama sin configurar); ámbitos a mano en 7 integraciones de pedidos
+  y dobles de `transitionAliveById` en 2 de asignaciones; `order-reservation.int.test.ts` siembra
+  contenido `1.0000`; `guard-ambito-empresa-pedidos` acepta el cableado nuevo.
+- **Para el reviewer**: «un ingrediente sin lotes cuenta como cero» (R42 con importe nulo) no llega
+  a Finalizar en integración, porque QC-141 no deja finalizar un pedido si falta material. Queda cubierto en unit
+  (`resolve-ingredients-cost`, `order-cost`, `transition-order`); la integración del importe nulo usa
+  una receta cambiada tras el alta.
+- Tests: `vitest run tests/unit/pedidos tests/unit/asignaciones tests/integration/pedidos
+  tests/integration/asignaciones guard` → 191 archivos, 2554 pasados, 12 skipped.
