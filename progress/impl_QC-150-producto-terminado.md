@@ -476,3 +476,40 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
   `finish-assigned-order` 17 (sin cambios), `guard-convenciones-showcase` 4 pasados y 2 skipped con
   motivo; guardias de módulos, ámbito de inventario y de pedidos, catálogo de errores y libro: 174/174.
   Typecheck y lint salen con 0. No se repitió el E2E: el Finalizar feliz no cambia.
+
+## Vuelta 7 (2026-09-24): review vuelta 2 RECHAZADO por B4 (`0a651347`)
+
+- **Corrección a la vuelta 6:** el D24 de la vuelta 6 hacía que `inventario` leyera la tabla `recipes`
+  con SQL crudo (violaba «ningún módulo consulta un modelo ajeno»), y su comentario citaba un precedente
+  que no existía. Retirado.
+- **B4** (`7b23af62`, `76966d5c`): la comprobación de D24 está ahora en `pedidos/domain/transition-order.ts`,
+  rama `ENTREGADO`, justo después del rechazo por falta de presentación y **antes** del coste del lote,
+  del consumo y de `setStatus`. Usa `deps.recipes.findRefsIncludingDeleted([recipeId], companyId)`:
+  acotado por empresa y con las recetas borradas incluidas, así que una receta dada de baja después del
+  alta no rechaza. Sin referencia → `RecipeNotFoundError`; el nombre de la receta que se pasa a la producción sale de esa misma
+  lectura. `inventario` pierde la consulta y el `kind: 'recipe_not_found'` de `FinishedGoodsOutcome`;
+  `grep '"recipes"' lib/modules/inventario` sale vacío. Texto de D24 enmendado en `requirements.md`.
+  - Tests de D24: `tests/integration/pedidos/finish-with-finished-goods.int.test.ts` › «R23, D24 — un
+    pedido de la empresa B con su presentación y el recipeId de la empresa A se rechaza con
+    recipe_not_found y no escribe nada en ninguna empresa» (el pedido sigue `PENDIENTE`; conteos de
+    las dos empresas iguales); `tests/unit/pedidos/transition-order.test.ts` › «D24: sin receta de la
+    empresa en el catalogo global, rechaza ANTES de consumir y no escribe nada». Se retiran los casos
+    de inventario que probaban la consulta quitada.
+- **n3** (`604ebc51`): `tests/unit/asignaciones/finish-assigned-order.test.ts` › «D24: `recipe_not_found`
+  se traduce a RecipeNotFoundError, sin reintentar».
+- **n1** (`88ad567e`): la cuenta de «49 → 0» de la vuelta 5 **era falsa**: aquel filtro no veía las
+  líneas que abren con `/**`. Contado ahora con un tokenizador de comentarios sobre las líneas añadidas
+  por la rama: 31 → 11. Se limpiaron las 21 del alcance, en 13 archivos. Las 11 que quedan son a
+  propósito:
+  - 10 en `tests/unit/proveedores-ui/guard-convenciones-showcase.test.ts`, que nombran `QC-140` porque
+    es el dato que filtra la guardia, no una cita;
+  - 1 en `tests/unit/inventario/product-page.test.tsx`, una cita a R20 que ya venía de dev y que el diff
+    marca porque la rama cambió el número de la misma frase.
+- **n2** (`df6d0894`): la guardia de QC-140 filtra los commits por asunto con `/^\w+\(QC-140\)/`, no
+  por cualquier mensaje que nombre la ficha. En esta rama R29 y D20 se **saltan** con motivo (4
+  pasados y 2 skipped); antes corrían por culpa de `ae5597ce`. En el PR hay que decir que se tocó un
+  test de otra ficha.
+- Tests, en serie: `transition-order` 15, `finish-assigned-order` 18, `finished-goods-prisma` 6,
+  `finished-goods.int` 10, `finish-with-finished-goods.int` 12, guardias de módulos y de ámbito
+  125/125, más los 13 archivos de n1 (6 unit, 99 pasados; 6 de integración, todos verdes).
+  Typecheck y lint salen con 0. Sin E2E.
