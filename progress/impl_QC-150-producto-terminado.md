@@ -216,3 +216,6 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
 - Tests: `product-input`, `product-service`, `product-page` 107/107; `product-batch-write` 12/12.
 - **Rojo nuevo que no había visto nadie**: `tests/integration/inventario/inventario-constraints.int.test.ts`
   (3 casos), cuyo censo del esquema real de `products` no incluye lo que añadió T2. Encargado aparte.
+- Censo arreglado (`a43f161b`): `inventario-constraints.int.test.ts` gana las dos columnas, las dos
+  FK y el `CHECK` de identidad de `products`; 19/19. Los demás censos del esquema real (pedidos,
+  recetas, proveedores, unidades y otros cinco de inventario) ya estaban verdes sin cambios.
