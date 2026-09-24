@@ -110,7 +110,7 @@ export function createCreateOrder(
 
     // La presentacion tiene que existir en el catalogo de la EMPRESA de quien escribe. Un id
     // que no vuelve es indistinguible de uno de otra empresa (`PresentationCatalog.findRefs`).
-    // `presentation.content` es lo que se copia en el pedido (R38): `null` si aun no lo tiene.
+    // `presentation.content` es lo que se copia en el pedido: `null` si aun no lo tiene.
     const [presentation] = await deps.presentations.findRefs([data.presentationId], actor.companyId);
     if (presentation === undefined) throw new PresentationNotFoundError();
 

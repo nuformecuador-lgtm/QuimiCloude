@@ -68,7 +68,7 @@ export async function resolveIngredientsCost(
   return calculateIngredientsCost(input);
 }
 
-/** Coste del LOTE de producto terminado (D13, R42): comparte las mismas lecturas que
+/** Coste del LOTE de producto terminado: comparte las mismas lecturas que
  *  `resolveIngredientsCost` pero cuenta como cero cada ingrediente sin costo en vez de dejar
  *  el resultado entero sin importe. Nunca devuelve `null`. */
 export async function resolveLotIngredientsCost(

@@ -3,7 +3,7 @@
 // Implementa `OrderCatalog['transitionAliveById']` (`order-catalog.ts`) sobre la unidad de
 // trabajo compartida con `inventario`: mueve el estado del pedido y, si el destino es
 // `ENTREGADO`, consume el material apartado y da de alta el lote de producto terminado de su
-// combinacion (QC-150), todo en la MISMA transaccion. `asignaciones` solo conoce la firma del
+// combinacion, todo en la MISMA transaccion. `asignaciones` solo conoce la firma del
 // puerto, nunca este archivo.
 
 import { InsufficientMaterialError, NoWholePackageError, PresentationWithoutContentError, RecipeWithoutLinesError } from './errors';
@@ -22,8 +22,8 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 
 export type TransitionOrderDeps = {
   readonly unitOfWork: OrderUnitOfWork;
-  /** Nombre de la receta (R11) y coste del lote cuando el pedido no tiene importe guardado
-   *  (R42): las dos lecturas van por los catalogos publicos, sobre el cliente global -la misma
+  /** Nombre de la receta y coste del lote cuando el pedido no tiene importe guardado:
+   *  las dos lecturas van por los catalogos publicos, sobre el cliente global -la misma
    *  foto que veria una edicion en ese instante-, nunca sobre `scope.recipes`, que solo sirve
    *  el contenido de ejecucion dentro de la transaccion. */
   readonly recipes: RecipeCatalog;
@@ -64,12 +64,12 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
         // Consume ANTES de mover el estado: si falta material o la receta no tiene lineas, la
         // excepcion deshace la transaccion entera y ni el estado ni `finishedAt` quedan escritos.
         if (to === 'ENTREGADO') {
-          // Sin presentacion no hay combinacion que dar de alta (R18): se rechaza antes de
+          // Sin presentacion no hay combinacion que dar de alta: se rechaza antes de
           // tocar el apartado. Un pedido CON presentacion pero sin contenido -ni copiado ni
-          // vigente- lo rechaza mas abajo `finishedGoods.receiveFromOrder` (D20, R44).
+          // vigente- lo rechaza mas abajo `finishedGoods.receiveFromOrder`.
           if (locked.presentationId === null) throw new PresentationWithoutContentError();
 
-          // Coste del lote (R42, D21), ANTES de consumir: el importe guardado se usa tal cual,
+          // Coste del lote, ANTES de consumir: el importe guardado se usa tal cual,
           // y solo se recalcula si es nulo. Despues de consumir, los lotes ya habrian bajado.
           const lotCost =
             locked.ingredientsCost !== null

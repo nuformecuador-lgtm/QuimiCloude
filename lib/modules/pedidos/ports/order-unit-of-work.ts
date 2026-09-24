@@ -6,7 +6,7 @@ import type { OrderWriteRepository } from './order-write-repository';
 /**
  * Lo que ve el trabajo que corre DENTRO de la transaccion compartida: el repositorio de
  * escritura de `pedidos`, las reservas de `inventario`, el lector de contenido de receta y la
- * entrada de producto terminado (QC-150), los cuatro atados al MISMO cliente transaccional.
+ * entrada de producto terminado, los cuatro atados al MISMO cliente transaccional.
  * Ninguno abre su propia transaccion ni pide una segunda conexion mientras esta se mantiene
  * abierta.
  */

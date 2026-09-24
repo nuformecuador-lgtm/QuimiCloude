@@ -103,7 +103,7 @@ export function createUpdateOrder(
     const [presentation] = await deps.presentations.findRefs([data.presentationId], actor.companyId);
     if (presentation === undefined) throw new PresentationNotFoundError();
 
-    // R39: la copia solo se sustituye si la presentacion CAMBIA. Si no cambia, se conserva la
+    // La copia solo se sustituye si la presentacion CAMBIA. Si no cambia, se conserva la
     // de la fila ya leida -editar cantidad, prioridad o receta no la toca-.
     const presentationContent =
       data.presentationId === row.presentationId ? row.presentationContent : presentation.content;
