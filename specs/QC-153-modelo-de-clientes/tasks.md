@@ -69,7 +69,7 @@ QC-158 (`in_progress`) puede añadir migración: choca solo en `MIGRACIONES_ESPE
 
 ## T4–T7 — El catálogo de permisos
 
-- [ ] **T4.** `permissions.ts`: las dos entradas al final de `PERMISSIONS`, los dos códigos al final
+- [x] **T4.** `permissions.ts`: las dos entradas al final de `PERMISSIONS`, los dos códigos al final
       de la lista del Administrador, la frase del recuento y el párrafo de enmienda
       (`design.md > 3`). **Hecho cuando:** `typecheck` pasa y `guard-permisos-sembrados` solo está
       rojo por su número (lo sube T6). *Independiente de T1–T3; en la misma tanda que T5–T7.*
