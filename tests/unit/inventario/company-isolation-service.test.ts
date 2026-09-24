@@ -157,7 +157,9 @@ function montar() {
           candidata.companyId === scope.companyId &&
           normalizeProductName(candidata.name) === normalizeProductName(name),
       );
-      return fila?.id ?? null;
+      // El fixture de este archivo solo siembra tipo PRODUCT: el aislamiento por tipo es
+      // de `create-product.test.ts` (R28).
+      return fila === undefined ? null : { id: fila.id, type: PRODUCT_TYPES.PRODUCT };
     }),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(
       async (product, _batch, _now, scope) => {

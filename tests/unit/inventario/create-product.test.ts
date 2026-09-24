@@ -7,6 +7,7 @@ import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
 import {
+  ActionNotAllowedError,
   ProductNotFoundError,
   UnauthorizedError,
   ValidationError,
@@ -199,7 +200,7 @@ describe('QC-103 — el lote asignado viaja de vuelta con el resultado del alta'
 
   it('createProduct devuelve el lote asignado al agregar batch a un producto existente (R13)', async () => {
     const products = montarRepositorio({
-      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => 'producto-9'),
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
       addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => ({
         batchId: 'lote-2',
         lot: 'ACME-2026-07',
@@ -455,7 +456,7 @@ describe('QC-81 R8, R10 y QC-90 R12 — lote que pide generarse y expiracion opc
 
   it('pide la generacion tambien por el camino del producto que ya existe', async () => {
     const products = montarRepositorio({
-      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => 'producto-9'),
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
     });
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -500,7 +501,7 @@ describe('R22 — autoria del lote', () => {
 
   it('tambien por el camino del producto que ya existe', async () => {
     const products = montarRepositorio({
-      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => 'producto-9'),
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
     });
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -513,7 +514,7 @@ describe('R22 — autoria del lote', () => {
 describe('R17, R18 — el nombre corresponde a un producto que ya existe', () => {
   function montarConExistente() {
     const products = montarRepositorio({
-      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => 'producto-9'),
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
     });
     return { products, createProduct: createCreateProduct({ products, now: () => AHORA }) };
   }
@@ -556,7 +557,7 @@ describe('R17, R18 — el nombre corresponde a un producto que ya existe', () =>
     // El desempate entre homonimos vivos es del ADAPTADOR, con su `orderBy`, y se prueba contra
     // la base. Al caso de uso solo le toca no aplicar ningun criterio propio.
     const products = montarRepositorio({
-      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => 'el-mas-viejo'),
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => ({ id: 'el-mas-viejo', type: PRODUCT_TYPES.PRODUCT })),
     });
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -569,7 +570,7 @@ describe('R17, R18 — el nombre corresponde a un producto que ya existe', () =>
     // del panel, que en este camino se ignoran. Quien reintenta vuelve a pasar por
     // `findAliveIdByNameInPresentationUnit`, que ya dira `null`, y creara.
     const products = montarRepositorio({
-      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => 'producto-9'),
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
       addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => null),
     });
     const createProduct = createCreateProduct({ products, now: () => AHORA });
@@ -627,7 +628,7 @@ describe('QC-121 R7 — con varios homonimos en la misma unidad, usa el que el p
     const products = montarRepositorio({
       findAliveIdByNameInPresentationUnit: vi.fn<
         ProductRepository['findAliveIdByNameInPresentationUnit']
-      >(async () => 'el-mas-viejo'),
+      >(async () => ({ id: 'el-mas-viejo', type: PRODUCT_TYPES.PRODUCT })),
     });
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -659,7 +660,7 @@ describe('QC-121 R3 — el rechazo de la base por unidad llega al llamante como 
     const products = montarRepositorio({
       findAliveIdByNameInPresentationUnit: vi.fn<
         ProductRepository['findAliveIdByNameInPresentationUnit']
-      >(async () => 'producto-9'),
+      >(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
       addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => {
         throw new ValidationError('lote en otra unidad que la del producto');
       }),
@@ -707,7 +708,7 @@ describe('QC-81 R2 — sin fecha de compra, al puerto le llega HOY del mismo rel
 
   it('tambien cuando la fecha viene explicitamente en null, y por el camino del producto existente', async () => {
     const products = montarRepositorio({
-      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => 'producto-9'),
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
     });
     const now = vi.fn(() => AHORA);
     const createProduct = createCreateProduct({ products, now });
@@ -745,7 +746,7 @@ describe('QC-81 R3, R5 — la fecha escrita, si no es futura, llega al puerto id
 
   it('pasa la fecha escrita identica tambien al agregar el lote a un producto existente', async () => {
     const products = montarRepositorio({
-      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => 'producto-9'),
+      findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
     });
     const createProduct = createCreateProduct({ products, now: () => AHORA });
 
@@ -828,6 +829,36 @@ describe('QC-81 R24 — sin permiso no se valida, no se toca el puerto ni se cal
 
     expect(now).not.toHaveBeenCalled();
     afirmarPuertoIntacto(products);
+  });
+});
+
+describe('R28 — el homonimo vivo es un producto terminado', () => {
+  it('rechaza antes de tocar el puerto de escritura cuando el homonimo ya es FINISHED_PRODUCT', async () => {
+    const products = montarRepositorio({
+      findAliveIdByNameInPresentationUnit: vi.fn<
+        ProductRepository['findAliveIdByNameInPresentationUnit']
+      >(async () => ({ id: 'terminado-1', type: PRODUCT_TYPES.FINISHED_PRODUCT })),
+    });
+    const createProduct = createCreateProduct({ products, now: () => AHORA });
+
+    await expect(createProduct(ALTA_VALIDA, ADMIN)).rejects.toBeInstanceOf(ActionNotAllowedError);
+    expect(products.addBatchToAlive).not.toHaveBeenCalled();
+    expect(products.createWithFirstBatch).not.toHaveBeenCalled();
+  });
+
+  it('rechaza cuando addBatchToAlive lo descubre bajo la fila bloqueada -carrera cerrada-', async () => {
+    // El homonimo era PRODUCT en la lectura, pero el adaptador -con la fila ya bloqueada-
+    // descubre que nacio FINISHED_PRODUCT entre esa lectura y la escritura (R28).
+    const products = montarRepositorio({
+      findAliveIdByNameInPresentationUnit: vi.fn<
+        ProductRepository['findAliveIdByNameInPresentationUnit']
+      >(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
+      addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => 'finished_product'),
+    });
+    const createProduct = createCreateProduct({ products, now: () => AHORA });
+
+    await expect(createProduct(ALTA_VALIDA, ADMIN)).rejects.toBeInstanceOf(ActionNotAllowedError);
+    expect(products.createWithFirstBatch).not.toHaveBeenCalled();
   });
 });
 

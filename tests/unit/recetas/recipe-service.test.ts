@@ -6,6 +6,7 @@ import type { Actor } from '@/lib/modules/recetas/domain/actor';
 import { createCreateRecipe } from '@/lib/modules/recetas/domain/create-recipe';
 import { createDeleteRecipe } from '@/lib/modules/recetas/domain/delete-recipe';
 import {
+  ActionNotAllowedError,
   RecipeDuplicateNameError,
   RecipeNotFoundError,
   UnauthorizedError,
@@ -223,6 +224,46 @@ describe('R17 — producto inexistente', () => {
     await expect(createRecipe(RECETA_VALIDA, ADMIN)).rejects.toThrow();
     expect(products.findRefs).toHaveBeenCalledWith([LINEA_VALIDA.productId], EMPRESA);
     expect(recipes.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('R29 — un producto terminado no puede ser ingrediente', () => {
+  const REF_TERMINADO: ProductRef = { ...PRODUCTO_REF, type: 'FINISHED_PRODUCT' };
+
+  it('rechaza el alta cuando la linea senala un producto terminado, sin escribir la receta', async () => {
+    const recipes = montarRepositorio();
+    const products = montarCatalogo({
+      findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [REF_TERMINADO]),
+    });
+    const images = montarAlmacenamiento();
+    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
+
+    await expect(createRecipe(RECETA_VALIDA, ADMIN)).rejects.toBeInstanceOf(ActionNotAllowedError);
+    expect(recipes.create).not.toHaveBeenCalled();
+  });
+
+  it('rechaza la edicion cuando una linea NUEVA senala un producto terminado, sin escribir', async () => {
+    // La linea de `LINEA_VALIDA` ya esta en `FILA_RECETA`: update-recipe.ts solo revalida
+    // contra el catalogo las lineas NUEVAS (R45/R46), asi que el caso usa un producto
+    // distinto para que la comprobacion se dispare de verdad.
+    const terminadoId = '44444444-4444-4444-8444-444444444444';
+    const edicionConTerminado = {
+      ...RECETA_VALIDA,
+      lines: [{ productId: terminadoId, percentage: '100.00' }],
+    };
+    const recipes = montarRepositorio();
+    const products = montarCatalogo({
+      findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
+        { ...REF_TERMINADO, id: terminadoId },
+      ]),
+    });
+    const images = montarAlmacenamiento();
+    const updateRecipe = createUpdateRecipe({ recipes, products, images, now: () => AHORA });
+
+    await expect(updateRecipe('receta-1', edicionConTerminado, ADMIN)).rejects.toBeInstanceOf(
+      ActionNotAllowedError,
+    );
+    expect(recipes.replaceAlive).not.toHaveBeenCalled();
   });
 });
 

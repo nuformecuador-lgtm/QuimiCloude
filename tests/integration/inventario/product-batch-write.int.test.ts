@@ -543,11 +543,11 @@ describe('R20: con homonimos vivos se elige siempre el mismo producto', () => {
         fixture.presentationId,
         ambito(fixture),
       );
-      expect(elegido).toBe(menorId);
+      expect(elegido).toEqual({ id: menorId, type: 'PRODUCT' });
 
       expect(
         await findAliveIdByNameInPresentationUnit(nombre, fixture.presentationId, ambito(fixture)),
-      ).toBe(elegido);
+      ).toEqual(elegido);
     } finally {
       await dropFixture(fixture, productIds);
     }
@@ -571,7 +571,7 @@ describe('R19: un nombre que solo coincide con productos borrados no encuentra n
 
       expect(
         await findAliveIdByNameInPresentationUnit(nombre, fixture.presentationId, ambito(fixture)),
-      ).toBe(fila.id);
+      ).toEqual({ id: fila.id, type: 'PRODUCT' });
 
       await prisma.product.update({ where: { id: fila.id }, data: { deletedAt: new Date() } });
 

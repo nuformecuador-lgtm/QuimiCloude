@@ -545,7 +545,14 @@ describe('D22: el importe promedia TODOS los lotes con disponible, sin acumular 
       new Date('2026-01-03T00:00:00.000Z'),
       { companyId: A.companyId },
     )
-    if (loteB === null || loteC === null) throw new Error('no se pudo sembrar B o C')
+    if (
+      loteB === null ||
+      loteB === 'finished_product' ||
+      loteC === null ||
+      loteC === 'finished_product'
+    ) {
+      throw new Error('no se pudo sembrar B o C')
+    }
     const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null
 
@@ -585,7 +592,9 @@ describe('D22: el importe promedia TODOS los lotes con disponible, sin acumular 
       new Date('2026-01-02T00:00:00.000Z'),
       { companyId: A.companyId },
     )
-    if (loteNuevo === null) throw new Error('no se pudo sembrar el lote nuevo')
+    if (loteNuevo === null || loteNuevo === 'finished_product') {
+      throw new Error('no se pudo sembrar el lote nuevo')
+    }
     const recipeId = await crearReceta(A, productId)
     let ordenQueApartaTodo: string | null = null
     let ordenBajoPrueba: string | null = null

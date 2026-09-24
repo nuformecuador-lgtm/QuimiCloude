@@ -350,7 +350,7 @@ describe('R5, R6, R7 — el alta busca por nombre Y unidad, no por nombre solo',
         fixture.kgPresentationId,
         ambito(fixture),
       );
-      expect(idEnKg).toBe(enKg.id);
+      expect(idEnKg).toEqual({ id: enKg.id, type: 'PRODUCT' });
 
       const agregado = await addBatchToAlive(
         enKg.id,
@@ -548,7 +548,9 @@ describe('R31 — dos escrituras concurrentes sobre el mismo producto suman las 
         new Date(),
         ambito(fixture),
       );
-      if (segundo === null) throw new Error('addBatchToAlive devolvio null con el producto vivo');
+      if (segundo === null || segundo === 'finished_product') {
+        throw new Error('addBatchToAlive devolvio null con el producto vivo');
+      }
       expect(await stockOf(creado.id)).toBe('30.0000');
 
       // Sin `await` entre los dos: compiten de verdad por la fila del producto.
