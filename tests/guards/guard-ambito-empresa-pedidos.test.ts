@@ -292,11 +292,37 @@ function accesosPrismaFueraDeTransaction(codigoSinComentariosNiCadenas: string):
   return accesos.filter((acceso) => !/^prisma\s*\.\s*\$transaction\b/.test(acceso.replace(/\s+/g, ' ')))
 }
 
-/** ¿El archivo importa `prisma` con un alias distinto de `prisma`? Sobre el SOURCE original: un
- *  alias no vive dentro de una cadena ni de un comentario que valga la pena vaciar aparte. */
+/**
+ * En el archivo exento, `tx` -el cliente de transaccion que el `run` recibido de fuera declara
+ * como parametro- NO puede tocar ningun modelo aqui dentro: este archivo solo abre la
+ * transaccion y REENVIA `run`, nunca consulta por su cuenta. Cualquier `tx.<algo>` -un modelo, un
+ * metodo crudo- es la misma fuga que un `prisma.` suelto, con el nombre disfrazado.
+ */
+function accesosTxEnArchivoExento(codigoSinComentariosNiCadenas: string): readonly string[] {
+  return codigoSinComentariosNiCadenas.match(/\btx\s*\.\s*\w+/g) ?? []
+}
+
+/**
+ * ¿El archivo importa `prisma` con un alias distinto de `prisma`? Sobre el SOURCE original: un
+ * alias no vive dentro de una cadena ni de un comentario que valga la pena vaciar aparte.
+ *
+ * Cubre las tres formas del import de `@/lib/shared/db/prisma`: un especificador con nombre
+ * entre varios (`import { a, prisma as X }`), comillas simples o dobles, y el import de
+ * namespace (`import * as X from '...'`, donde CUALQUIER uso de `X.prisma` es ya un alias).
+ */
 function aliasDePrisma(source: string): string | null {
-  const match = /import\s*\{\s*prisma\s+as\s+(\w+)\s*\}\s*from\s*'@\/lib\/shared\/db\/prisma'/.exec(source)
-  return match === null ? null : (match[1] ?? null)
+  const importacion = /import\s*(?:\{([^}]*)\}|\*\s*as\s+(\w+))\s*from\s*(['"])@\/lib\/shared\/db\/prisma\3/g
+  for (const match of source.matchAll(importacion)) {
+    const especificadores = match[1]
+    const namespaceAlias = match[2]
+    if (namespaceAlias !== undefined) return namespaceAlias
+    if (especificadores === undefined) continue
+    for (const especificador of especificadores.split(',')) {
+      const conAlias = /^\s*prisma\s+as\s+(\w+)\s*$/.exec(especificador)
+      if (conAlias !== null) return conAlias[1] ?? null
+    }
+  }
+  return null
 }
 
 /** Los hallazgos de ambito de UN archivo (fuera del exento): la misma comprobacion que antes
@@ -610,11 +636,15 @@ describe('QC-60 R18, D21 — ninguna consulta del modulo se queda sin ambito, sa
     const motivoExencion = EXENTOS_DEL_AMBITO.get(archivo)
 
     if (motivoExencion !== undefined) {
-      it(`${archivo}: exento por nombre (${motivoExencion}) — todo \`prisma.\` que trae es \`prisma.$transaction\``, () => {
+      it(`${archivo}: exento por nombre (${motivoExencion}) — todo \`prisma.\` que trae es \`prisma.$transaction\`, y ningun \`tx.<modelo>\``, () => {
         const analizado = analizar(archivo)
         expect(
           accesosPrismaFueraDeTransaction(analizado.codigo),
           `${archivo} esta exento del ambito porque SOLO abre \`prisma.$transaction\` (design.md > 5.2.1, D21); cualquier otro acceso a \`prisma.\` no es parte de esa excepcion`,
+        ).toEqual([])
+        expect(
+          accesosTxEnArchivoExento(analizado.codigo),
+          `${archivo} esta exento porque no consulta ninguna tabla; un \`tx.<modelo>\` aqui es la misma fuga que un \`prisma.\` suelto, con el nombre disfrazado (R58)`,
         ).toEqual([])
       })
       continue
@@ -695,8 +725,38 @@ describe('QC-60 R18, D21, B3 — la excepcion con nombre no es un cheque en blan
     expect(accesosPrismaFueraDeTransaction(analizado.codigo).length).toBeGreaterThan(0)
   })
 
+  it('R58 — ANTI-PLACEBO: un `tx.order.findMany` dentro del callback de `$transaction`, en el archivo exento, sale en rojo', () => {
+    const fuenteFabricada = `
+      import { prisma } from '@/lib/shared/db/prisma';
+
+      export async function withOrderTransaction(run) {
+        return prisma.$transaction(async (tx) => {
+          await tx.order.findMany();
+          return run(tx);
+        });
+      }
+    `
+    const analizado = analizarFuente('order-unit-of-work-prisma.ts', fuenteFabricada)
+    expect(accesosTxEnArchivoExento(analizado.codigo).length).toBeGreaterThan(0)
+  })
+
   it('ANTI-PLACEBO — un alias de `prisma` en OTRO archivo de `pedidos` sale en rojo', () => {
     const fuenteFabricada = `import { prisma as ocultito } from '@/lib/shared/db/prisma';\n`
+    expect(aliasDePrisma(fuenteFabricada)).not.toBeNull()
+  })
+
+  it('R58 — ANTI-PLACEBO: un alias de `prisma` entre VARIOS especificadores sale en rojo', () => {
+    const fuenteFabricada = `import { algo, prisma as ocultito, otraCosa } from '@/lib/shared/db/prisma';\n`
+    expect(aliasDePrisma(fuenteFabricada)).not.toBeNull()
+  })
+
+  it('R58 — ANTI-PLACEBO: un alias de `prisma` con COMILLAS DOBLES sale en rojo', () => {
+    const fuenteFabricada = `import { prisma as ocultito } from "@/lib/shared/db/prisma";\n`
+    expect(aliasDePrisma(fuenteFabricada)).not.toBeNull()
+  })
+
+  it('R58 — ANTI-PLACEBO: un import de NAMESPACE (`import * as db`) del modulo de prisma sale en rojo', () => {
+    const fuenteFabricada = `import * as db from '@/lib/shared/db/prisma';\n`
     expect(aliasDePrisma(fuenteFabricada)).not.toBeNull()
   })
 
