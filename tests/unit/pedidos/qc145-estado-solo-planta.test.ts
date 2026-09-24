@@ -313,12 +313,15 @@ describe('R10 — EN_CURSO/ENTREGADO solo los escribe setAliveOrderStatus; updat
 });
 
 // -------------------------------------------------------------------------------------------
-// El catalogo sigue en 18 permisos
+// El catalogo no gana ningun permiso propio de pedidos
 // -------------------------------------------------------------------------------------------
 
-describe('R16 — el catalogo de permisos sigue en dieciocho codigos', () => {
-  it('PERMISSIONS tiene exactamente 18 entradas', () => {
-    expect(PERMISSIONS).toHaveLength(18);
+describe('R16 — el catalogo de permisos no gana ningun codigo pedidos.* nuevo', () => {
+  it('pedidos.* sigue siendo exactamente consultar y modificar', () => {
+    const codigosDePedidos = PERMISSIONS.filter((permiso) => permiso.module === 'pedidos').map(
+      (permiso) => permiso.code,
+    );
+    expect(codigosDePedidos.sort()).toEqual(['pedidos.consultar', 'pedidos.modificar']);
   });
 
   it('PERMISSIONS no repite ningun codigo', () => {
