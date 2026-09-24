@@ -375,3 +375,16 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
   otra causa, que antes quedaba tapada: tras Finalizar, la fila del producto terminado no aparece en
   Inventario (pestaña «Producto terminado» con búsqueda) en 60 s, aunque el producto existe en base.
   En diagnóstico. Puerto 3117 libre antes y después.
+- **Causa del rojo de R37** (`1b4d06fd`, frontend_dev): era del test. La celda de nombre de Inventario
+  pinta «<nombre> · <símbolo de unidad>» para todo producto con unidad (`product-columns.tsx`,
+  comportamiento de antes), y el producto terminado lleva la unidad de la presentación (`l`). El
+  test exigía el texto exacto sin sufijo. Ahora exige el nombre completo al principio y admite solo
+  un sufijo « · <unidad>». El nombre guardado se sigue comprobando exacto por Prisma.
+- Corrida 3 (`scratchpad/qc150-e2e-v3.log`): **9 passed, 1 failed**. `producto-terminado` verde en
+  chromium y webkit; `reserva-de-material` verde en los dos; `ejecucion-receta` verde en chromium y
+  en webkit R30 y R9. El rojo, R29 en webkit, fue `waitForURL` tras Finalizar a los 60 s, con el
+  servidor dando `Error: aborted` y `destination stream closed early` bajo carga (2,3 min frente a
+  1,4 min en chromium). Ya había pasado en la corrida 2.
+- Corrida 4, solo R29 en webkit (`scratchpad/qc150-e2e-v4-r29.log`, implementer): **1 passed**
+  (19,1 s). Rojo de carga, no de la rama. Puerto 3117 libre antes y después de cada corrida.
+- **T12 cerrada.** T13 queda a falta del `./init.sh` completo del leader.

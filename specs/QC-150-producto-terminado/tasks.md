@@ -267,7 +267,7 @@ Archivos: `app/(private)/inventario/components/{product-batches-panel,adjust-bat
 
 La guardia de viewport de inventario sigue verde.
 
-## T12 — E2E `[depende de T4, T8, T10, T11, T14]`
+## [x] T12 — E2E `[depende de T4, T8, T10, T11, T14]`
 
 Archivos: `e2e/producto-terminado.spec.ts` (nuevo) y, si hace falta, su fixture.
 
