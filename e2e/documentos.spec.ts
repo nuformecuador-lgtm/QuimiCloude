@@ -70,6 +70,22 @@ const adminUser: Credentials = {
   password: `Qc107-Admin-${RUN_ID.slice(0, 12)}`,
 };
 
+/** Prefijo del rol efimero sin permiso de subida. El barrido de huerfanos lo busca por este. */
+const ROLE_NAME_PREFIX = `${FIXTURE_PREFIX}rol_`;
+
+/**
+ * Nombre EXACTO del rol efimero de R20: lleva `proveedores.consultar`, `proveedores.modificar` y
+ * `unidades.consultar` (esta ultima porque la pantalla de detalle tambien pide la lista de
+ * unidades), y sigue sin `documentos.modificar`.
+ */
+const noUploadRoleName = `${ROLE_NAME_PREFIX}${RUN_ID}`;
+
+/** Usuario del rol efimero de R20: entra a la pantalla pero no puede subir. */
+const noUploadUser: Credentials = {
+  username: `${FIXTURE_PREFIX}noupload_${RUN_ID}`,
+  password: `Qc107-NoUpload-${RUN_ID.slice(0, 12)}`,
+};
+
 const companyName = `${FIXTURE_PREFIX}empresa_${RUN_ID}`;
 const supplierName = `${FIXTURE_PREFIX}proveedor_${RUN_ID}`;
 
@@ -92,8 +108,12 @@ const fileNames = Array.from(
  */
 const pdfBytes = Buffer.from('%PDF-1.4\n%%EOF\n', 'ascii');
 
+/** El PDF que elige el usuario sin `documentos.modificar` en el caso R20 de esta ficha. */
+const noUploadFileName = `${FIXTURE_PREFIX}noupload_doc_${RUN_ID}.pdf`;
+
 let companyId: string | null = null;
 let supplierId: string | null = null;
+let noUploadRoleId: string | null = null;
 
 test.beforeAll(async () => {
   // LIMPIEZA DEFENSIVA DE HUERFANOS: un `pnpm run e2e` interrumpido deja filas `qc107_e2e_*`, y esa
@@ -114,9 +134,27 @@ test.beforeAll(async () => {
   await prisma.supplier.deleteMany({
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
   });
+
+  // Roles efimeros huerfanos. El rol nace unos segundos ANTES que su usuario, asi que
+  // se decide primero QUE roles se van y se arrastran sus usuarios aunque sean recientes; si no,
+  // `role_permissions` -> `role` (`onDelete: Restrict`) tumbaria este `beforeAll`.
+  const orphanRoleIds = (
+    await prisma.role.findMany({
+      where: { name: { startsWith: ROLE_NAME_PREFIX }, createdAt: { lt: orphanCutoff } },
+      select: { id: true },
+    })
+  ).map((role) => role.id);
+
   await prisma.user.deleteMany({
-    where: { username: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
+    where: {
+      username: { startsWith: FIXTURE_PREFIX },
+      OR: [{ createdAt: { lt: orphanCutoff } }, { roleId: { in: orphanRoleIds } }],
+    },
   });
+  if (orphanRoleIds.length > 0) {
+    await prisma.rolePermission.deleteMany({ where: { roleId: { in: orphanRoleIds } } });
+    await prisma.role.deleteMany({ where: { id: { in: orphanRoleIds } } });
+  }
   // Las empresas van DESPUES de sus usuarios: `users.company_id` es `onDelete: Restrict`.
   if (orphanCompanyIds.length > 0) {
     await prisma.company.deleteMany({ where: { id: { in: orphanCompanyIds } } });
@@ -131,8 +169,9 @@ test.beforeAll(async () => {
   companyId = company.id;
 
   // El rol tiene que llamarse EXACTAMENTE asi: lo siembra `pnpm run db:seed` y lleva
-  // `proveedores.consultar` —que abre la pantalla— y `proveedores.modificar` —que el caso de uso de
-  // la subida exige—. Un rol efimero no probaria el permiso de verdad.
+  // `proveedores.consultar` —que abre la pantalla— y `documentos.modificar` —que el caso de uso de
+  // la subida exige—. Este caso usa el rol real del Administrador porque es a el a quien la
+  // migracion asigna esos permisos; el caso sin permiso, mas abajo, si usa un rol efimero.
   const role = await prisma.role.findUnique({
     where: { name: ROLE_ADMINISTRADOR },
     select: { id: true },
@@ -178,6 +217,44 @@ test.beforeAll(async () => {
     select: { id: true },
   });
   supplierId = supplier.id;
+
+  // Rol efimero sin permiso de subida: `proveedores.consultar`, `proveedores.modificar` y
+  // `unidades.consultar` (la pantalla de detalle tambien lista unidades y sin el permiso pinta el
+  // error de la pagina entera antes de montar la subida), sin `documentos.modificar`. Precedente de
+  // rol efimero: `e2e/inventario.spec.ts`.
+  const noUploadRole = await prisma.role.create({
+    data: {
+      name: noUploadRoleName,
+      description: 'Rol efimero del E2E de documentos (QC-142). Se borra en afterAll.',
+      permissions: {
+        create: [
+          { permissionCode: 'proveedores.consultar' },
+          { permissionCode: 'proveedores.modificar' },
+          { permissionCode: 'unidades.consultar' },
+        ],
+      },
+    },
+    select: { id: true },
+  });
+  noUploadRoleId = noUploadRole.id;
+
+  await prisma.user.create({
+    data: {
+      firstNames: `Qc142${RUN_ID.slice(0, 8)}`,
+      lastNames: 'Documentos',
+      birthDate: new Date('1990-01-01'),
+      email: `${noUploadUser.username}@example.test`,
+      phone: supplierPhone,
+      documentTypeCode: 'CC',
+      documentNumber: noUploadUser.username,
+      username: noUploadUser.username,
+      passwordHash: await createPasswordHash(noUploadUser.password),
+      roleId: noUploadRole.id,
+      companyId: company.id,
+      accountStatus: 'active',
+    },
+    select: { id: true },
+  });
 });
 
 test.afterAll(async () => {
@@ -197,10 +274,23 @@ test.afterAll(async () => {
         await prisma.user.deleteMany({ where: { username: adminUser.username } });
       } finally {
         try {
-          // La empresa, DESPUES de su usuario: `users.company_id` es `onDelete: Restrict`.
-          await prisma.company.deleteMany({ where: { name: companyName } });
+          await prisma.user.deleteMany({ where: { username: noUploadUser.username } });
         } finally {
-          await prisma.$disconnect();
+          try {
+            if (noUploadRoleId !== null) {
+              // Asignaciones del rol ANTES que el rol: `role_permissions.role_id` es
+              // `onDelete: Restrict`.
+              await prisma.rolePermission.deleteMany({ where: { roleId: noUploadRoleId } });
+              await prisma.role.deleteMany({ where: { id: noUploadRoleId } });
+            }
+          } finally {
+            try {
+              // La empresa, DESPUES de sus usuarios: `users.company_id` es `onDelete: Restrict`.
+              await prisma.company.deleteMany({ where: { name: companyName } });
+            } finally {
+              await prisma.$disconnect();
+            }
+          }
         }
       }
     }
@@ -310,5 +400,65 @@ test.describe('documentos', () => {
       await prisma.documentFile.count({ where: { batchId: batches[0].id, status: 'done' } }),
       'las tres filas deberian estar terminadas en la base',
     ).toBe(FILES_IN_BATCH);
+  });
+
+  test('un rol con proveedores.consultar y proveedores.modificar pero sin documentos.modificar no puede subir (R20 permiso propio)', async ({
+    page,
+  }) => {
+    const supplier = supplierId;
+    const company = companyId;
+    if (supplier === null || company === null) {
+      throw new Error('el fixture no esta completo: fallo el beforeAll');
+    }
+
+    // Ningun PUT deberia salir del navegador: el rechazo pasa en el service, antes de emitir el
+    // enlace firmado.
+    let intercepted = 0;
+    await page.route(`${STORAGE_ORIGIN}/**`, async (route) => {
+      const headers = {
+        'access-control-allow-origin': '*',
+        'access-control-allow-methods': 'PUT, OPTIONS',
+        'access-control-allow-headers': 'content-type',
+      };
+      if (route.request().method() === 'OPTIONS') {
+        await route.fulfill({ status: 204, headers });
+        return;
+      }
+      intercepted += 1;
+      await route.fulfill({ status: 200, headers, body: '' });
+    });
+
+    // Conteo tomado ANTES del intento: los dos casos comparten empresa, y este afirma sobre su
+    // propia variacion en vez de depender del orden de los tests.
+    const batchesBefore = await prisma.documentBatch.count({ where: { companyId: company } });
+
+    await loginAndLand(page, noUploadUser);
+
+    await page.goto(supplierDetailRoute(supplier));
+    await expect(page.getByTestId('supplier-detail-name')).toHaveText(supplierName, {
+      timeout: 60_000,
+    });
+    await expect(page.getByTestId('document-upload')).toBeVisible({ timeout: 60_000 });
+
+    // La pagina monto la subida antes de intentar nada: si esto fallara, el caso no probaria R20,
+    // probaria que la pantalla nunca llego a cargar.
+    await expect(page.getByTestId('document-upload-trigger')).toBeVisible({ timeout: 60_000 });
+
+    await page
+      .getByTestId('document-upload-input')
+      .setInputFiles([{ name: noUploadFileName, mimeType: PDF_MIME_TYPE, buffer: pdfBytes }]);
+
+    await page.getByTestId('document-upload-submit').click();
+
+    await expect(page.getByTestId('document-upload-error')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('document-upload-error')).toHaveAttribute(
+      'data-code',
+      'unauthorized',
+    );
+
+    expect(intercepted, 'el rechazo pasa antes de emitir ningun enlace firmado').toBe(0);
+
+    const batchesAfter = await prisma.documentBatch.count({ where: { companyId: company } });
+    expect(batchesAfter, 'ninguna tanda queda persistida en esta empresa').toBe(batchesBefore);
   });
 });

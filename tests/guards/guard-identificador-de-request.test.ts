@@ -316,6 +316,10 @@ export const MIGRACIONES_ESPERADAS = [
   // permisos de `clientes` no persiste el identificador de peticion ni lo menciona; se nombra
   // aqui a mano y la lista sigue CERRADA para la siguiente.
   '20260924120000_customers',
+  // Con el mismo patron que las anteriores: la migracion que agrega los permisos de `documentos`
+  // no persiste el identificador de peticion ni lo menciona; se nombra aqui a mano y la lista
+  // sigue CERRADA para la siguiente.
+  '20260924130000_documents_permissions',
   // Igual patron: agrega `material` y `measurements` a las lineas del catalogo de proveedor;
   // no toca el identificador de peticion.
   '20260924180000_supplier_catalog_line_material_and_measurements',
