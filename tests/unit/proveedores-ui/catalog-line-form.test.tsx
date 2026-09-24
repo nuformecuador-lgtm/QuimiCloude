@@ -76,6 +76,9 @@ vi.mock('next/navigation', async (importOriginal) => ({
 
 vi.mock('@/lib/modules/proveedores/adapters/driving/supplier-actions', () => ({
   getSupplierAction: getSupplierActionMock,
+  createSupplierAction: vi.fn(),
+  updateSupplierAction: vi.fn(),
+  deleteSupplierAction: vi.fn(),
 }));
 
 vi.mock('@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions', () => ({
