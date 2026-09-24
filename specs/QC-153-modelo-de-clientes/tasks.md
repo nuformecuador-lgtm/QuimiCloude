@@ -97,7 +97,7 @@ QC-158 (`in_progress`) puede añadir migración: choca solo en `MIGRACIONES_ESPE
       R10, R12, R13, R17, R18, R22–R24, R27, más la cabecera sin citas. **Hecho cuando:** verde, y un
       SQL sintético con `ON DELETE SET NULL`, con `CASCADE` en el `DROP`, con `'Operador'` en la
       asignación o con un `ALTER TABLE "orders"` lo pone rojo. *Depende de T2 y T4.*
-- [ ] **T10.** [P] `tests/unit/clientes/scope.test.ts` (`design.md > 7`): R20, R26, R28, R29. El
+- [x] **T10.** [P] `tests/unit/clientes/scope.test.ts` (`design.md > 7`): R20, R26, R28, R29. El
       mensaje de fallo de R26 dice que QC-154 lo relaja al consumir los permisos. **Hecho cuando:**
       verde, con casos sintéticos de un `'clientes.modificar'` en un archivo de `app/` y de un archivo
       en `adapters/driving/` que lo ponen rojo. *Depende de T3 y T4.*
