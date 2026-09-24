@@ -91,6 +91,7 @@ describe('R1: el mismo resultado que recibirian orders.create y orders.updateAli
     const d = crearDobles()
     const presentations: PresentationCatalog = {
       findRefs: vi.fn(async () => [{ id: PRESENTATION_ID, name: 'Presentacion de prueba', content: null }]),
+      findByNormalizedNames: vi.fn(async () => []),
     }
     const recipesConVigencia = {
       ...d.recipes,

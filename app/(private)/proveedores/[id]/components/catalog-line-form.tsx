@@ -10,6 +10,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   SheetClose,
   SheetContent,
   SheetDescription,
@@ -41,20 +48,41 @@ const FIELD_TEXT = 'text-base md:text-base';
 export const SUPPLIER_FIELD = 'supplierId';
 
 /**
- * Los campos de la linea que se capturan con un `<input>` de texto. La presentacion y la unidad
- * NO estan aqui: cada una tiene su propio selector (`PresentationSelect`, `UnitSelect`), que
- * aporta su valor al `FormData` por el `input` oculto del primitivo.
- *
- * **`imagePath` tampoco esta, y es una ausencia deliberada** (R30): la columna existe en la base
- * desde QC-52 y **nadie la llena** (`requirements.md > P1`). El formulario no la pide, no la
- * ofrece subir y **no la emite**; el adaptador driving ya trata su ausencia como ausencia.
+ * Campo oculto con la ruta de la imagen ya asignada a la linea. El formulario no ofrece subir ni
+ * quitar una imagen: solo conserva la que ya tenia, precargada en la edicion y vacia en el alta.
  */
-const TEXT_FIELDS = ['name', 'cost', 'minPurchase', 'deliveryTime'] as const;
+export const IMAGE_PATH_FIELD = 'imagePath';
+
+/**
+ * Los campos de la linea que se capturan con un `<input>` de texto. La presentacion, la unidad y
+ * las unidades de cada medida NO estan aqui: cada una tiene su propio selector
+ * (`PresentationSelect`, `UnitSelect`, `MeasurementUnitSelect`), que aporta su valor al
+ * `FormData` por el `input` oculto del primitivo.
+ */
+const TEXT_FIELDS = [
+  'name',
+  'cost',
+  'minPurchase',
+  'deliveryTime',
+  'material',
+  'diameterValue',
+  'heightValue',
+  'mouth',
+] as const;
 
 type TextFieldName = (typeof TEXT_FIELDS)[number];
 
+/** Selectores de unidad de cada medida: valores cerrados `mm`/`cm`, sin conversion. */
+const MEASUREMENT_UNIT_FIELDS = ['diameterUnit', 'heightUnit'] as const;
+
+type MeasurementUnitFieldName = (typeof MEASUREMENT_UNIT_FIELDS)[number];
+
 /** Todo lo que el formulario puede senalar como campo con error (R32). */
-type CatalogFieldName = TextFieldName | typeof PRESENTATION_FIELD | typeof UNIT_FIELD;
+type CatalogFieldName =
+  | TextFieldName
+  | typeof PRESENTATION_FIELD
+  | typeof UNIT_FIELD
+  | MeasurementUnitFieldName;
 
 /**
  * Copy de los errores por campo. Se escribe aqui y no se toma de zod: los mensajes de zod estan
@@ -69,6 +97,12 @@ const FIELD_MESSAGES: Record<CatalogFieldName, string> = {
   cost: 'Escribe un costo mayor que cero, con hasta 4 decimales.',
   minPurchase: 'Escribe un mínimo de compra de 0 o más, con hasta 4 decimales.',
   deliveryTime: 'Escribe el tiempo de entrega en días enteros.',
+  material: 'Escribe hasta 120 caracteres, o déjalo vacío.',
+  diameterValue: 'Escribe un valor mayor que cero, con hasta 4 decimales.',
+  diameterUnit: 'Elige mm o cm.',
+  heightValue: 'Escribe un valor mayor que cero, con hasta 4 decimales.',
+  heightUnit: 'Elige mm o cm.',
+  mouth: 'Escribe hasta 40 caracteres, o déjalo vacío.',
 };
 
 const FIELD_LABELS: Record<TextFieldName, string> = {
@@ -76,6 +110,10 @@ const FIELD_LABELS: Record<TextFieldName, string> = {
   cost: 'Costo',
   minPurchase: 'Mínimo de compra',
   deliveryTime: 'Tiempo de entrega (días)',
+  material: 'Material',
+  diameterValue: 'Diámetro',
+  heightValue: 'Alto',
+  mouth: 'Boca',
 };
 
 type FieldErrors = Partial<Record<CatalogFieldName, string>>;
@@ -139,6 +177,9 @@ const BACK_TO_LIST_LABEL = 'Volver a la lista de proveedores';
  */
 const DECIMAL_INPUT_PATTERN = '\\d{1,10}(\\.\\d{1,4})?';
 
+/** Unidad preseleccionada de una medida sin valor precargado. Ninguna medida es obligatoria. */
+const DEFAULT_MEASUREMENT_UNIT = 'cm';
+
 function readString(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === 'string' ? value : '';
@@ -151,7 +192,27 @@ function readValues(formData: FormData): FieldValues {
   }
   values[PRESENTATION_FIELD] = readString(formData, PRESENTATION_FIELD);
   values[UNIT_FIELD] = readString(formData, UNIT_FIELD);
+  for (const field of MEASUREMENT_UNIT_FIELDS) {
+    values[field] = readString(formData, field);
+  }
   return values;
+}
+
+/**
+ * Localiza, para un problema de validacion, el campo del formulario que lo senala. Los de
+ * `measurements` viajan anidados en el esquema (`measurements.diameter.value`, etc.); el resto
+ * son directos.
+ */
+function resolveFieldFromIssuePath(path: readonly PropertyKey[]): CatalogFieldName | undefined {
+  const [first, second, third] = path;
+  if (first === 'measurements') {
+    if (second === 'diameter') return third === 'unit' ? 'diameterUnit' : 'diameterValue';
+    if (second === 'height') return third === 'unit' ? 'heightUnit' : 'heightValue';
+    if (second === 'mouth') return 'mouth';
+    return undefined;
+  }
+  const field = String(first ?? '');
+  return field in FIELD_MESSAGES ? (field as CatalogFieldName) : undefined;
 }
 
 /** Un opcional vacio es AUSENCIA, igual que lo trata el adaptador driving. */
@@ -191,9 +252,10 @@ type CatalogLineFormProps = {
  * Formulario de alta y edicion de una linea de catalogo (R26, R29-R33, R37, R38, R41, R45, R48;
  * `design.md > 7`, `> 8`, `> 9`).
  *
- * **Los siete campos de negocio, con la ausencia de la imagen declarada** (R29, R30): nombre,
- * presentacion **obligatoria**, unidad **opcional**, costo, minimo de compra y tiempo de entrega.
- * El septimo -la ruta de imagen- no se pide ni se emite, por decision humana del 2026-09-04.
+ * **Los campos de negocio**: nombre, presentacion **obligatoria**, unidad **opcional**, costo,
+ * minimo de compra, tiempo de entrega, material y medidas (diametro, alto y boca). La imagen
+ * viaja en un campo oculto que solo conserva la ya asignada -el formulario no ofrece subirla,
+ * quitarla ni cambiarla-.
  *
  * **NINGUN selector, campo ni referencia a un articulo del inventario** (R29). No es un olvido:
  * QC-52 borro esa columna del modelo y del contrato, asi que no existe donde guardarla. El
@@ -205,7 +267,7 @@ type CatalogLineFormProps = {
  * previa usa `createCatalogLineSchema` / `updateCatalogLineSchema` del contrato publico de
  * `proveedores`, que es client-safe: no se reescribe ninguna regla y el servidor revalida igual.
  *
- * **R31 - la edicion es reemplazo completo de los SIETE campos**: el formulario los precarga
+ * **La edicion es reemplazo completo de los campos de negocio**: el formulario los precarga
  * todos y los envia todos, aunque solo se cambie uno, porque `updateCatalogLineSchema` los pide
  * todos. Y **no ofrece cambiar el proveedor**: `updateCatalogLineAction` ni siquiera lee
  * `supplierId` del formulario, asi que el campo oculto solo existe en el alta.
@@ -242,19 +304,27 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
       fieldErrors.deliveryTime = FIELD_MESSAGES.deliveryTime;
     }
 
+    const diameterValue = values.diameterValue.trim();
+    const heightValue = values.heightValue.trim();
+
     /*
-      Los SIETE campos de negocio, en la forma que el esquema espera. `imagePath` se declara como
-      ausente EN VEZ de omitirse: asi queda escrito que la decision es no emitirlo (R30) y no un
-      campo que alguien olvido cablear.
+      Los campos de negocio, en la forma que el esquema espera. `imagePath` viaja tal cual lo
+      trajo el campo oculto: el formulario no ofrece cambiarlo, solo conservarlo.
     */
     const fields = {
       name: values.name,
       presentationId: values.presentationId,
       unitId: blankToUndefined(values.unitId),
-      imagePath: undefined,
+      imagePath: blankToUndefined(readString(formData, IMAGE_PATH_FIELD)),
       cost: values.cost,
       minPurchase: blankToUndefined(values.minPurchase),
       deliveryTime: deliveryTime === 'invalid' ? undefined : deliveryTime,
+      material: blankToUndefined(values.material),
+      measurements: {
+        diameter: diameterValue === '' ? null : { value: diameterValue, unit: values.diameterUnit },
+        height: heightValue === '' ? null : { value: heightValue, unit: values.heightUnit },
+        mouth: blankToUndefined(values.mouth) ?? null,
+      },
     };
 
     // El alta lleva ademas el proveedor; la edicion NO puede llevarlo (R31), y no porque un `if`
@@ -266,8 +336,8 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
 
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
-        const field = String(issue.path[0] ?? '') as CatalogFieldName;
-        if (field in FIELD_MESSAGES && fieldErrors[field] === undefined) {
+        const field = resolveFieldFromIssuePath(issue.path);
+        if (field !== undefined && fieldErrors[field] === undefined) {
           fieldErrors[field] = FIELD_MESSAGES[field];
         }
       }
@@ -356,6 +426,17 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
   const deliveryTimeFromLine = line?.deliveryTime === null ? '' : String(line?.deliveryTime ?? '');
   const unitFromLine = initialValue(UNIT_FIELD, line?.unitId ?? NO_UNIT_VALUE);
 
+  // Material y medidas: ausentes en el alta, precargados en la edicion.
+  const measurements = line?.measurements ?? null;
+  const diameterUnitFromLine = initialValue(
+    'diameterUnit',
+    measurements?.diameter?.unit ?? DEFAULT_MEASUREMENT_UNIT,
+  );
+  const heightUnitFromLine = initialValue(
+    'heightUnit',
+    measurements?.height?.unit ?? DEFAULT_MEASUREMENT_UNIT,
+  );
+
   return (
     /*
       `isForm`: el panel ENTERO es el <form>, asi que el boton de guardar vive en el pie y
@@ -395,6 +476,18 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
             data-testid="catalog-line-supplier-id"
           />
         )}
+
+        {/*
+          La imagen viaja oculta y con el valor de la linea: el formulario no ofrece subirla ni
+          quitarla, asi que enviarla vacia -o distinta de la que ya tenia- solo puede pasar aqui
+          si alguien reemplaza este campo por su cuenta.
+        */}
+        <input
+          type="hidden"
+          name={IMAGE_PATH_FIELD}
+          defaultValue={line?.imagePath ?? ''}
+          data-testid="catalog-line-image-path"
+        />
 
         {formError === undefined ? null : (
           // Region de error del formulario (R32): aqui van los rechazos que no senalan campo.
@@ -501,6 +594,62 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
           defaultValue={initialValue('deliveryTime', deliveryTimeFromLine)}
           error={fieldErrors.deliveryTime}
         />
+
+        <CatalogField
+          name="material"
+          label={FIELD_LABELS.material}
+          defaultValue={initialValue('material', line?.material ?? '')}
+          error={fieldErrors.material}
+        />
+
+        {/*
+          Medidas: diametro y alto llevan su propio valor y su propia unidad (mm o cm), sin
+          convertir. La boca es texto libre -un acabado de rosca no es una longitud-.
+        */}
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+            <CatalogField
+              name="diameterValue"
+              label={FIELD_LABELS.diameterValue}
+              inputMode="decimal"
+              pattern={DECIMAL_INPUT_PATTERN}
+              defaultValue={initialValue('diameterValue', measurements?.diameter?.value ?? '')}
+              error={fieldErrors.diameterValue}
+            />
+            <MeasurementUnitSelect
+              key={`diameterUnit-${diameterUnitFromLine}`}
+              name="diameterUnit"
+              label="Unidad de diámetro"
+              defaultValue={diameterUnitFromLine}
+              error={fieldErrors.diameterUnit}
+            />
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+            <CatalogField
+              name="heightValue"
+              label={FIELD_LABELS.heightValue}
+              inputMode="decimal"
+              pattern={DECIMAL_INPUT_PATTERN}
+              defaultValue={initialValue('heightValue', measurements?.height?.value ?? '')}
+              error={fieldErrors.heightValue}
+            />
+            <MeasurementUnitSelect
+              key={`heightUnit-${heightUnitFromLine}`}
+              name="heightUnit"
+              label="Unidad de alto"
+              defaultValue={heightUnitFromLine}
+              error={fieldErrors.heightUnit}
+            />
+          </div>
+
+          <CatalogField
+            name="mouth"
+            label={FIELD_LABELS.mouth}
+            defaultValue={initialValue('mouth', measurements?.mouth ?? '')}
+            error={fieldErrors.mouth}
+          />
+        </div>
       </div>
     </SheetContent>
   );
@@ -576,6 +725,64 @@ function CatalogField({
         aria-describedby={error === undefined ? undefined : errorId}
         data-testid={`catalog-field-${name}`}
       />
+
+      {error === undefined ? null : (
+        <p id={errorId} className="text-sm text-destructive" data-testid={`catalog-error-${name}`}>
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Las dos unidades de medida que la linea acepta, sin conversion entre ellas. */
+const MEASUREMENT_UNIT_OPTIONS = [
+  { label: 'mm', value: 'mm' },
+  { label: 'cm', value: 'cm' },
+] as const;
+
+type MeasurementUnitSelectProps = {
+  readonly name: MeasurementUnitFieldName;
+  readonly label: string;
+  readonly defaultValue: string;
+  readonly error?: string;
+};
+
+/**
+ * Unidad de una medida (diametro o alto): lista cerrada de dos opciones, sin texto libre y sin
+ * ofrecer ninguna conversion entre ellas.
+ */
+function MeasurementUnitSelect({ name, label, defaultValue, error }: MeasurementUnitSelectProps) {
+  const labelId = useId();
+  const errorId = useId();
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span id={labelId} className="text-sm font-medium">
+        {label}
+      </span>
+      <Select name={name} defaultValue={defaultValue} items={MEASUREMENT_UNIT_OPTIONS}>
+        <SelectTrigger
+          aria-labelledby={labelId}
+          aria-invalid={error === undefined ? undefined : true}
+          aria-describedby={error === undefined ? undefined : errorId}
+          className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
+          data-testid={`catalog-field-${name}`}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {MEASUREMENT_UNIT_OPTIONS.map((option) => (
+            <SelectItem
+              key={option.value}
+              value={option.value}
+              data-testid={`catalog-option-${name}`}
+            >
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
       {error === undefined ? null : (
         <p id={errorId} className="text-sm text-destructive" data-testid={`catalog-error-${name}`}>

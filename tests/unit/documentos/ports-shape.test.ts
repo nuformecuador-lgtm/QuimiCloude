@@ -11,6 +11,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const PORTS = join(repoRoot, 'lib', 'modules', 'documentos', 'ports');
 const DOCUMENT_STORAGE = join(PORTS, 'document-storage.ts');
 const CROP_STORAGE = join(PORTS, 'crop-storage.ts');
+const CROP_CATALOG = join(PORTS, 'crop-catalog.ts');
 
 function stripComments(source: string): string {
   return source
@@ -64,5 +65,10 @@ describe('documentos — forma de los puertos de almacenamiento (R13)', () => {
   it('R13 — `CropStorage` declara UNA sola operacion', () => {
     const fuente = readFileSync(CROP_STORAGE, 'utf8');
     expect(operacionesDe(fuente, 'CropStorage')).toEqual(['upload']);
+  });
+
+  it('`CropCatalog` declara EXACTAMENTE sus dos operaciones de lectura', () => {
+    const fuente = readFileSync(CROP_CATALOG, 'utf8');
+    expect(operacionesDe(fuente, 'CropCatalog')).toEqual(['list', 'createSignedReadUrl']);
   });
 });

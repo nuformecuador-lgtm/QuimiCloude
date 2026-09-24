@@ -76,6 +76,16 @@ export function supplierDetailRoute(id: string): string {
 }
 
 /**
+ * Ruta de la revision de un archivo de catalogo importado desde PDF, derivada de
+ * `supplierDetailRoute`: no hay una segunda constante de prefijo, el segmento `importar` cuelga
+ * del mismo detalle. No necesita fila propia en `PRIVATE_ROUTE_PREFIXES`: la comparacion por
+ * segmentos de `SUPPLIERS_ROUTE` ya cubre cualquier subcamino, incluido este.
+ */
+export function supplierCatalogImportRoute(supplierId: string, documentFileId: string): string {
+  return `${supplierDetailRoute(supplierId)}/importar/${documentFileId}`;
+}
+
+/**
  * Pantalla de pedidos (QC-35, R2).
  *
  * Vive aqui y no en `navigation/private-nav.ts` porque el middleware y la regla ruta->rol de

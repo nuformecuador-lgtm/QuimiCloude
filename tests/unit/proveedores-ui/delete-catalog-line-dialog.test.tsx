@@ -215,6 +215,8 @@ function linea(overrides: Partial<CatalogLineView> = {}): CatalogLineView {
     cost: '99.5000',
     minPurchase: '2.5000',
     deliveryTime: 3,
+    material: null,
+    measurements: null,
     createdAt: new Date('2026-03-01T10:00:00.000Z'),
     updatedAt: new Date('2026-03-05T10:00:00.000Z'),
     createdBy: null,

@@ -201,11 +201,19 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     )
       .split(sep)
       .join('/')
+    // 2026-09-24 (importacion de catalogo desde PDF): CUARTO falso positivo por nombre, y se
+    // excluye un ARCHIVO, no una carpeta. La revision de la importacion elige la unidad de cada
+    // presentacion NUEVA en `new-presentation-units.tsx`; casa con `screenPattern` solo por llamarse
+    // `*presentation*`. No lista ni edita el catalogo de productos: es un selector de unidad dentro
+    // de la pantalla de proveedores. Cualquier otro archivo de esa carpeta que case sigue en rojo.
+    const SELECTOR_DE_UNIDAD_DE_LA_IMPORTACION =
+      '(private)/proveedores/[id]/importar/[documentoId]/components/new-presentation-units.tsx'
     const fueraDeSuCarpeta = appMatches.filter(
       (relPath) =>
         !relPath.startsWith(`${CATALOG_ROUTE_DIR}/`) &&
         !relPath.startsWith(`${RECIPES_ROUTE_DIR}/`) &&
-        !relPath.startsWith(`${PRESENTATIONS_ROUTE_DIR}/`),
+        !relPath.startsWith(`${PRESENTATIONS_ROUTE_DIR}/`) &&
+        relPath !== SELECTOR_DE_UNIDAD_DE_LA_IMPORTACION,
     )
     expect(
       fueraDeSuCarpeta,

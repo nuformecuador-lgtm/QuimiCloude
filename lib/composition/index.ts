@@ -93,7 +93,10 @@ import {
   listPresentations,
   replacePresentation,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-prisma';
-import { findPresentationRefs } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
+import {
+  findPresentationRefs,
+  findPresentationsByNormalizedNames,
+} from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import {
   createMaterialReservations,
   createReservationQueries,
@@ -159,7 +162,9 @@ import {
   createCreateSupplier,
   createDeleteCatalogLine,
   createDeleteSupplier,
+  createFindCatalogLinesByIdentity,
   createGetSupplier,
+  createImportCatalogLines,
   createListCatalogLines,
   createListShowcaseLines,
   createListSuppliers,
@@ -167,6 +172,14 @@ import {
   createUpdateCatalogLine,
   createUpdateSupplier,
 } from '@/lib/modules/proveedores';
+// La importacion por identidad de un catalogo. El adaptador y el puerto son
+// de uso EXCLUSIVO de esta operacion -por eso no se cablean junto al resto de `proveedores`, mas
+// abajo- y quien los necesita es solo `documentos`, en su propio bloque, al final de este archivo.
+import {
+  findAliveCatalogLinesByIdentities,
+  upsertCatalogLinesByIdentity,
+} from '@/lib/modules/proveedores/adapters/driven/persistence/supplier-catalog-import-prisma';
+import type { SupplierCatalogImportRepository } from '@/lib/modules/proveedores/ports/supplier-catalog-import-repository';
 import {
   createSupplier,
   findAliveSupplierById,
@@ -321,6 +334,7 @@ import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity
 // `ports/` y las dos implementaciones de `adapters/driven/` por su ruta exacta. La Server Action del
 // modulo NO se importa desde aqui: la flecha va driving -> composicion.
 import {
+  createConfirmCatalogImport,
   createConvertPdfs,
   createCropCatalogImages,
   createDownloadDocument,
@@ -328,9 +342,11 @@ import {
   createGetBatchStatus,
   createIssueReadLink,
   createIssueUploadLinks,
+  createPreviewCatalogImport,
   createProcessPdfByStrategy,
   createReadPdfWithAi,
   createRunDocumentJob,
+  type CatalogImportDeps,
 } from '@/lib/modules/documentos';
 import { readCannedText } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-canned';
 import { readWithGenai } from '@/lib/modules/documentos/adapters/driven/ai/ai-reader-genai';
@@ -357,7 +373,14 @@ import {
   removeDocument,
 } from '@/lib/modules/documentos/adapters/driven/storage/document-storage-supabase';
 import { uploadCrop } from '@/lib/modules/documentos/adapters/driven/storage/crop-storage-supabase';
+import { cropStorageMemory } from '@/lib/modules/documentos/adapters/driven/storage/crop-storage-memory';
+import {
+  createCropSignedReadUrl,
+  listCrops,
+} from '@/lib/modules/documentos/adapters/driven/storage/crop-catalog-supabase';
+import { cropCatalogMemory } from '@/lib/modules/documentos/adapters/driven/storage/crop-catalog-memory';
 import type { AiReader } from '@/lib/modules/documentos/ports/ai-reader';
+import type { CropCatalog } from '@/lib/modules/documentos/ports/crop-catalog';
 import type { CropStorage } from '@/lib/modules/documentos/ports/crop-storage';
 import type { DocumentBatchRepository } from '@/lib/modules/documentos/ports/document-batch-repository';
 import type { DocumentStorage } from '@/lib/modules/documentos/ports/document-storage';
@@ -773,7 +796,10 @@ export const inventario = {
  *  llena. `recetas` solo conoce el TIPO `ProductCatalog`, nunca esta implementacion. */
 const productCatalog: ProductCatalog = { findRefs: findProductRefs, findCostingBatches };
 
-const presentationCatalog: PresentationCatalog = { findRefs: findPresentationRefs };
+const presentationCatalog: PresentationCatalog = {
+  findRefs: findPresentationRefs,
+  findByNormalizedNames: findPresentationsByNormalizedNames,
+};
 
 /** `UnitCatalog` cableado con el adaptador driven DE UNIDADES (R50): `recetas` solo
  *  conoce el TIPO `UnitCatalog`, nunca esta implementacion. `findRefsSharingBaseInCompany`
@@ -1393,7 +1419,25 @@ const queueSignature: QueueSignature = queueSignatureQstash;
 const imageCropper: ImageCropper = { crop: cropImage };
 
 /** Bucket PROPIO de estos recortes, distinto del de `documentStorage` de arriba. */
-const cropStorage: CropStorage = { upload: uploadCrop };
+const cropStorage: CropStorage = {
+  upload: (path, png) =>
+    documentsE2EDoublesEnabled() ? cropStorageMemory.upload(path, png) : uploadCrop(path, png),
+};
+
+/**
+ * `CropCatalog`, la lectura de esos mismos recortes para mostrarlos en la revision. Mismo criterio
+ * de bifurcacion que `cropStorage`: se consulta la variable EN CADA LLAMADA.
+ */
+const cropCatalog: CropCatalog = {
+  list: (companyId, documentFileId) =>
+    documentsE2EDoublesEnabled()
+      ? cropCatalogMemory.list(companyId, documentFileId)
+      : listCrops(companyId, documentFileId),
+  createSignedReadUrl: (path, expiresInSeconds) =>
+    documentsE2EDoublesEnabled()
+      ? cropCatalogMemory.createSignedReadUrl(path, expiresInSeconds)
+      : createCropSignedReadUrl(path, expiresInSeconds),
+};
 
 /** `CropRegionLog` cableado con la unica implementacion que hay: una linea en el registro. */
 const cropRegionLog: CropRegionLog = createCropRegionLogConsole();
@@ -1435,6 +1479,41 @@ const processingConfig: ProcessingConfig = {
   timeoutSeconds: () => readProcessingConfigFromEnv().timeoutSeconds(),
   maxRetries: () => readProcessingConfigFromEnv().maxRetries(),
 };
+
+// ---------------------------------------------------------------------------------------
+// `documentos` — la vista previa y la confirmacion de una importacion de catalogo.
+//
+// `SupplierCatalogImportRepository` cableado con el adaptador driven DE PROVEEDORES: las dos
+// operaciones son de uso EXCLUSIVO de esta importacion (findAliveByIdentity/importLines viven en
+// `CatalogImportDeps`, no en la fachada `proveedores`), asi que se cablean aqui, en el bloque de
+// `documentos`, y no junto al resto de `proveedores` mas arriba.
+// ---------------------------------------------------------------------------------------
+
+const supplierCatalogImportRepository: SupplierCatalogImportRepository = {
+  findAliveByIdentities: findAliveCatalogLinesByIdentities,
+  upsertCostByIdentity: upsertCatalogLinesByIdentity,
+};
+
+/**
+ * `CatalogImportDeps`, compartido por la vista previa y la confirmacion (un solo tipo, para que
+ * no haya dos copias que puedan divergir). `createPresentation` es el MISMO caso de uso que ya
+ * cablea `inventario` mas arriba -dos construcciones serian dos cableados que pueden divergir-, y
+ * `presentations`/`units` son los MISMOS catalogos que ya usa `recetas`.
+ */
+const catalogImportDeps: CatalogImportDeps = {
+  repository: documentBatchRepository,
+  crops: cropCatalog,
+  presentations: presentationCatalog,
+  createPresentation: inventario.createPresentation,
+  units: unitCatalog,
+  catalog: {
+    findAliveByIdentity: createFindCatalogLinesByIdentity({ catalog: supplierCatalogImportRepository }),
+    importLines: createImportCatalogLines({ catalog: supplierCatalogImportRepository }),
+  },
+};
+
+const previewCatalogImport = createPreviewCatalogImport(catalogImportDeps);
+const confirmCatalogImport = createConfirmCatalogImport(catalogImportDeps);
 
 /**
  * Fachada del modulo `documentos` ya cableada. Es lo que consume su Server Action.
@@ -1486,4 +1565,8 @@ export const documentos = {
     config: processingConfig,
   }),
   queueSignature,
+  // Las DOS operaciones nuevas de la revision de catalogo, ya cableadas con `catalogImportDeps`
+  // de arriba. Claves NUEVAS al final: ninguna de las de arriba se toca.
+  previewCatalogImport,
+  confirmCatalogImport,
 } as const;

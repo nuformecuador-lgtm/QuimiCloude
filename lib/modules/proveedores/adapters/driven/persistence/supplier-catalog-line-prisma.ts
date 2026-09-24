@@ -7,6 +7,7 @@ import { normalizeSupplierName } from '../../../domain/supplier-name';
 
 import { ValidationError } from '../../../domain/errors';
 
+import type { CatalogLineMeasurements } from '../../../domain/catalog-line-input';
 import type {
   CatalogLineFields,
   CatalogLineView,
@@ -50,6 +51,8 @@ const CATALOG_LINE_SELECT = {
   cost: true,
   minPurchase: true,
   deliveryTime: true,
+  material: true,
+  measurements: true,
   createdAt: true,
   updatedAt: true,
   createdBy: true,
@@ -74,6 +77,32 @@ export function fromDecimal(value: Prisma.Decimal | null): string | null {
   return value === null ? null : value.toFixed(4);
 }
 
+/**
+ * `measurements` -> `Prisma.InputJsonValue` para escribir en la columna `JSONB`.
+ *
+ * `Prisma.DbNull`, NO `Prisma.JsonNull`: el CHECK de la migracion es
+ * `"measurements" IS NULL OR jsonb_typeof("measurements") = 'object'`, y `Prisma.JsonNull`
+ * escribiria el LITERAL json `null` -que no es SQL `NULL` y cuyo `jsonb_typeof` es `'null'`,
+ * no `'object'`-, lo que el CHECK rechaza. `Prisma.DbNull` es la unica forma de que la
+ * columna quede en SQL `NULL` de verdad. El unico camino de escritura es
+ * `measurementsSchema`, asi que el objeto que llega aqui ya tiene la forma exacta que se
+ * guarda; no hay nada que traducir.
+ */
+export function toMeasurementsInput(
+  value: CatalogLineMeasurements | null,
+): Prisma.InputJsonValue | typeof Prisma.DbNull {
+  return value === null ? Prisma.DbNull : (value as unknown as Prisma.InputJsonObject);
+}
+
+/**
+ * Camino inverso: la columna `JSONB` -> `CatalogLineMeasurements | null`. Lo que sale
+ * de la base es exactamente lo que `measurementsSchema` valido al escribir, asi que se lee
+ * en crudo sin volver a validar la forma.
+ */
+export function fromMeasurements(value: Prisma.JsonValue | null): CatalogLineMeasurements | null {
+  return value === null ? null : (value as unknown as CatalogLineMeasurements);
+}
+
 /** Fila -> `CatalogLineView`. Sin ninguna traduccion de negocio y sin ningun dato ajeno. */
 export function toCatalogLineView(row: CatalogLineRow): CatalogLineView {
   return {
@@ -87,6 +116,8 @@ export function toCatalogLineView(row: CatalogLineRow): CatalogLineView {
     cost: fromDecimal(row.cost) as string,
     minPurchase: fromDecimal(row.minPurchase),
     deliveryTime: row.deliveryTime,
+    material: row.material,
+    measurements: fromMeasurements(row.measurements),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
@@ -257,6 +288,8 @@ function writableFields(data: CatalogLineFields): {
   readonly cost: Prisma.Decimal;
   readonly minPurchase: Prisma.Decimal | null;
   readonly deliveryTime: number | null;
+  readonly material: string | null;
+  readonly measurements: Prisma.InputJsonValue | typeof Prisma.DbNull;
 } {
   return {
     name: data.name,
@@ -267,6 +300,8 @@ function writableFields(data: CatalogLineFields): {
     cost: toDecimalInput(data.cost) as Prisma.Decimal,
     minPurchase: toDecimalInput(data.minPurchase),
     deliveryTime: data.deliveryTime,
+    material: data.material,
+    measurements: toMeasurementsInput(data.measurements),
   };
 }
 

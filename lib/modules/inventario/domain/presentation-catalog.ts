@@ -9,6 +9,15 @@ export type PresentationRef = {
   readonly content: string | null;
 };
 
+/** Lo que otro modulo necesita para resolver una presentacion por su nombre: la unidad
+ *  incluida, porque quien resuelve por nombre lo hace para decidir si hace falta crearla. */
+export type PresentationByName = {
+  readonly id: PresentationId;
+  readonly name: string;
+  readonly nameNormalized: string;
+  readonly unitId: string;
+};
+
 /** Servicio que `inventario` ofrece a los demas modulos (`docs/architecture.md > Dominio`
  *  n.o 2: «se comparten servicios via interfaz, nunca repositorios ni tablas»).
  *  Lo implementa un adaptador driven DE INVENTARIO —el unico que puede tocar
@@ -20,4 +29,11 @@ export interface PresentationCatalog {
     ids: readonly PresentationId[],
     companyId: string,
   ): Promise<readonly PresentationRef[]>;
+
+  /** Las presentaciones de esa empresa entre los nombres normalizados pedidos. Uno que no
+   *  existe o que es de otra empresa simplemente no vuelve. Con `names` vacio no consulta. */
+  findByNormalizedNames(
+    names: readonly string[],
+    companyId: string,
+  ): Promise<readonly PresentationByName[]>;
 }
