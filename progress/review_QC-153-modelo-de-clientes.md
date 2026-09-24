@@ -4,10 +4,16 @@
 > `origin/dev` (`08935782`). Spec: `specs/QC-153-modelo-de-clientes/` (R1-R29 + nota F1.4).
 > Bitácora: `progress/impl_QC-153-modelo-de-clientes.md`.
 
-## Veredicto: **OK** — 0 bloqueantes, 8 menores
+## Veredicto: **OK** — 0 bloqueantes, 9 menores
 
-Condicionado a lo que corre el leader: `./init.sh` **completo** en verde (no lo corrí por
-instrucción) y T13 marcado `[x]` después.
+El OK tiene **tres condiciones**:
+
+1. **Hay que commitear el cambio de `tests/unit/pedidos/schema/pedidos-schema.test.ts`** y la nota
+   de `design.md > 6.1`. Están en el worktree **sin commitear** y no son míos. En el HEAD
+   commiteado, ese test sale **rojo**: prohíbe el modelo `Customer` y el `@@map("customers")`, y
+   no está en `tests/baseline-rojos.json`. Sin ese commit, la rama no pasa el gate. Ver el menor 9.
+2. `./init.sh` **completo** en verde. No lo corrí, por instrucción.
+3. T13 marcado `[x]` después del gate.
 
 ---
 
@@ -224,7 +230,22 @@ Ninguno es BLOQUEANTE.
    decision». La sección «Decision humana 2026-09-24», escrita *antes* en el archivo, lo resuelve
    (commit `b1064c9e`). Además, el mapa remite a «casos de R21 (T5)» en vez de nombrar los casos.
 
+9. **menor, pero condición del OK. `pedidos-schema.test.ts` está rojo en el HEAD commiteado**
+   (caso «Order no declara cliente, destinatario ni ninguna columna equivalente»).
+   - **Qué hay en el worktree.** Un cambio sin commitear, anotado en `design.md > 6.1` como
+     decisión humana del 2026-09-24. Solo quita `Customer` de la lista de modelos prohibidos y
+     `customers` del `@@map`.
+   - **Lo sigue prohibiendo.** El caso sigue prohibiendo `Client`, `Recipient` y `Buyer`, además de
+     `clients` y `recipients`. La parte que vigila los campos de `Order` (sin cliente ni
+     destinatario hasta QC-156) no cambia.
+   - **Juicio.** Es la derogación mínima que exige R1 y no relaja nada más. Con ese cambio,
+     `tests/unit/pedidos/schema`, `proveedores/schema` e `inventario/schema` están en verde
+     (21 archivos, 343 tests).
+   - **Lo que no puedo verificar** es la aprobación humana misma: solo consta en la nota.
+   - **Lo que falta.** Commitearlo. Las líneas de comentario reescritas citan «R3 y decision
+     cerrada 8», QC-156 y QC-152/QC-153, que es el mismo caso que el menor 2.
+
 ## Qué vuelve al implementer
 
-Nada que bloquee. Los menores 2-8 pueden ir en un commit de limpieza de tests antes del PR, o
+Nada que bloquee, siempre que se commitee el cambio del menor 9. Los menores 2-8 pueden ir en un commit de limpieza de tests antes del PR, o
 quedar anotados. El menor 1 lo cierra el leader al terminar el gate completo.
