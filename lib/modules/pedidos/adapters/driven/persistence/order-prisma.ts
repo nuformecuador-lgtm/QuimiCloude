@@ -540,10 +540,10 @@ async function lockAliveOrderById(
 
 /**
  * `create` de `OrderWriteRepository`: el UNICO `INSERT` de pedido del modulo, con el lock de
- * aviso del correlativo (`design.md > 5.3`, m2). Corre sobre el cliente que ya abrio
- * `OrderUnitOfWork`, SIN bucle de reintento propio -si el correlativo choca aqui la transaccion
- * entera ya quedo abortada, y quien reintenta con una transaccion NUEVA es
- * `withOrderTransaction`-. El choque se deja SUBIR tal cual, sin traducir.
+ * aviso del correlativo. Corre sobre el cliente que ya abrio `OrderUnitOfWork`, SIN bucle de
+ * reintento propio -si el correlativo choca aqui la transaccion entera ya quedo abortada, y
+ * quien reintenta con una transaccion NUEVA es `withOrderTransaction`-. El choque se deja SUBIR
+ * tal cual, sin traducir.
  */
 async function insertAliveOrder(
   tx: PrismaLike,
@@ -612,15 +612,13 @@ async function insertAliveOrder(
 }
 
 /**
- * `setStatus` de `OrderWriteRepository`: el mismo `UPDATE` condicional de
- * `transitionAliveOrder` (`order-catalog-prisma.ts`), sin `assertTransition` -esa comprobacion
- * ya la hizo el dominio sobre la fila que acaba de bloquear `lockAliveById`- y sobre el cliente
- * de la transaccion en curso.
+ * `setStatus` de `OrderWriteRepository`: `UPDATE` condicional `WHERE status = from` sobre el
+ * cliente de la transaccion en curso, sin `assertTransition` -esa comprobacion ya la hizo el
+ * dominio sobre la fila que acaba de bloquear `lockAliveById`-.
  *
  * Con destino `ENTREGADO` escribe tambien `finishedAt` en el mismo `UPDATE`, con el mismo `now`
- * que ya recibe la llamada -misma fuente y zona horaria que `transitionAliveOrder`-: el cambio
- * de estado y la fecha de terminado quedan atomicos entre si. Con cualquier otro destino no
- * toca `finishedAt`.
+ * que ya recibe la llamada: el cambio de estado y la fecha de terminado quedan atomicos entre
+ * si. Con cualquier otro destino no toca `finishedAt`.
  */
 async function setAliveOrderStatus(
   id: string,
