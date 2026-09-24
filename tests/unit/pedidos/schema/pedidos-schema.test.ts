@@ -127,14 +127,14 @@ const recipe = parseModel('Recipe')
 const unit = parseModel('Unit')
 const user = parseModel('User')
 
-/** Los DIECIOCHO campos de `Order`, con la columna en ingles que le toca. Fueron catorce y
+/** Los DIECINUEVE campos de `Order`, con la columna en ingles que le toca. Fueron catorce y
  *  quince con `cancellationReason`; el 2026-09-07 la decision humana quito `unit_id` y
  *  `unit_price` de la tabla
  *  (`db/migrations/20260907120000_orders_drop_unit_and_unit_price`) y quedaron trece. Despues
  *  se anade `company_id`, obligatoria, y vuelven a ser catorce. `ingredientsCost` opcional las
- *  lleva a quince, `reservedAt` a dieciseis, `presentationId` a diecisiete y `finishedAt` a
- *  dieciocho. La lista sigue siendo cerrada: anadir o quitar cualquier otra columna pone este
- *  test rojo. */
+ *  lleva a quince, `reservedAt` a dieciseis, `presentationId` a diecisiete, `finishedAt` a
+ *  dieciocho y `presentationContent` a diecinueve. La lista sigue siendo cerrada: anadir o
+ *  quitar cualquier otra columna pone este test rojo. */
 const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
   ['orderYear', 'order_year'],
@@ -154,6 +154,7 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['reservedAt', 'reserved_at'],
   ['presentationId', 'presentation_id'], // el envase en que se entrega, opcional
   ['finishedAt', 'finished_at'], // instante en que paso a ENTREGADO por Finalizar, opcional
+  ['presentationContent', 'presentation_content'], // copia del contenido de la presentacion, opcional
 ]
 
 /** Las CUATRO referencias que cruzan de modulo y por eso NO llevan `@relation` (R33). Fueron cuatro
@@ -298,10 +299,11 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(has(order, 'unitPrice')).toBe(false)
     expect(order.body).not.toContain('unit_price')
 
-    // Los DOS unicos decimales del modelo: la cantidad y el importe de ingredientes.
+    // Los TRES unicos decimales del modelo: la cantidad, el importe de ingredientes y la copia
+    // del contenido de la presentacion.
     expect(
       order.fields.filter((candidate) => candidate.type === 'Decimal').map((c) => c.name).sort(),
-    ).toEqual(['ingredientsCost', 'quantity'])
+    ).toEqual(['ingredientsCost', 'presentationContent', 'quantity'])
   })
 
   it('Order no declara total, subtotal ni ninguna columna derivada', () => {

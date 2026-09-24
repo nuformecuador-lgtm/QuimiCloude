@@ -198,6 +198,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       .sort()
     expect(scalarNames).toEqual([
       'companyId',
+      'content',
       'createdAt',
       'id',
       'name',
@@ -288,9 +289,12 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       )
     }
 
-    for (const name of ['presentationId', 'presentation', 'createdBy', 'updatedBy']) {
+    for (const name of ['presentation', 'createdBy', 'updatedBy']) {
       expect(has(product, name), `Product.${name} se mudo a ProductBatch`).toBe(false)
     }
+    // presentationId SI existe (ampliacion): es la mitad de la identidad receta+presentacion de
+    // un producto terminado, no la presentacion de un lote normal.
+    expect(field(product, 'presentationId').attributes).not.toMatch(/@relation/)
 
     const scalarNames = product.fields
       .filter((candidate) => !candidate.isList && candidate.type !== 'Presentation')
@@ -310,6 +314,8 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
         'createdAt',
         'updatedAt',
         'deletedAt',
+        'recipeId',
+        'presentationId',
       ].sort(),
     )
     expect(product.body).toContain('@@map("products")')
@@ -621,7 +627,11 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       (match) => match[1],
     )
     // Igualdad exacta: un indice de mas es una migracion que nadie declaro.
-    expect(indexMaps).toEqual(['products_company_id_idx', 'products_unit_id_idx'])
+    expect(indexMaps).toEqual([
+      'products_company_id_idx',
+      'products_unit_id_idx',
+      'products_recipe_id_idx',
+    ])
     for (const name of indexMaps) {
       expect(name ?? '', `el indice ${name ?? ''} debe ir en snake_case ingles`).toMatch(SNAKE_CASE)
     }
@@ -825,6 +835,8 @@ const PRODUCT_BATCH_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['companyId', 'company_id'],
   ['createdBy', 'created_by'],
   ['updatedBy', 'updated_by'],
+  // Contenido con el que se contaron los envases del lote; solo en lotes de producto terminado.
+  ['packageContent', 'package_content'],
 ]
 
 describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batches', () => {
@@ -915,10 +927,14 @@ describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batch
     )
   })
 
-  it('R25: products no recupera ninguna presentation_id en el esquema', () => {
-    // Con `presentation_id` tambien en `products` habria dos verdades sobre la presentacion.
-    expect(has(product, 'presentationId'), 'products no recupera presentation_id (R25)').toBe(false)
-    expect(product.body).not.toMatch(/presentation_id/)
+  it('R25 (ampliada): la presentacion de un lote sigue sin copiarse en products; presentation_id ahi es la identidad del producto terminado', () => {
+    // La presentacion de la existencia normal sigue viviendo solo en product_batches. El
+    // `presentationId` que products SI tiene hoy es la mitad de la identidad receta+presentacion
+    // de un producto terminado, no una copia de con que se compra el stock.
+    const presentationId = field(product, 'presentationId')
+    expect(presentationId.type).toBe('String')
+    expect(presentationId.isOptional).toBe(true)
+    expect(presentationId.attributes).not.toMatch(/@relation/)
     const relaciones = product.fields
       .filter((candidate) => /@relation/.test(candidate.attributes) || candidate.isList)
       .map((candidate) => candidate.name)

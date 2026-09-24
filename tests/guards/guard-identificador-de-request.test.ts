@@ -303,6 +303,10 @@ export const MIGRACIONES_ESPERADAS = [
   // Aparta los pedidos vivos existentes con un bloque PL/pgSQL: no toca el identificador de
   // peticion.
   '20260923150200_reserve_existing_orders',
+  // Ninguna de las dos toca el identificador de peticion: una anade valores a dos enums, la
+  // otra da forma a la identidad del producto terminado y a las copias de contenido.
+  '20260924120000_finished_product_enum_values',
+  '20260924120100_finished_products_and_content_copies',
 ] as const
 
 export function hallazgosDeMigraciones(
