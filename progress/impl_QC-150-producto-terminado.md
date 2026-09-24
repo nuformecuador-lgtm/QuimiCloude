@@ -72,3 +72,22 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
   `aislamiento.json`). Fixtures de 20 tests ajenos ampliados solo con `content` por tipos.
 - Tests: 21 archivos afectados → 414/414; integración nueva 3/3; guardias de aislamiento y de ámbito
   de inventario 32/32. Typecheck limpio; lint 0 errores.
+
+## T6 — Tipo de producto, backend (`583f4e98`, `335ce297`, `daa4b1b1`, `f480e5ce`, backend_dev)
+
+- Modificados: `lib/modules/inventario/domain/{product-type,product-queryable,product-input,errors,update-product,product-catalog}.ts`,
+  `lib/modules/inventario/ports/product-repository.ts`,
+  `lib/modules/inventario/adapters/driven/persistence/{product-prisma,product-catalog-prisma}.ts`
+  (`updateAliveProduct` bloquea la fila `FOR NO KEY UPDATE` y devuelve `'type_locked'`),
+  `lib/modules/inventario/index.ts`, `lib/modules/errores/domain/{error-codes,error-catalog}.ts`
+  (duodécima enmienda), `lib/modules/pedidos/domain/errors.ts` (`PresentationWithoutContentError`,
+  `NoWholePackageError`), `app/(private)/inventario/components/product-type-tabs.tsx` (solo la
+  etiqueta, para compilar).
+- Tests: `tests/guards/guard-tipos-de-producto.test.ts` (4 tipos), `tests/unit/errores/catalogo.test.ts`,
+  `tests/unit/inventario/{product-batch-input,product-service,product-catalog,product-prisma}.test.ts`,
+  `tests/integration/inventario/product-type-lock.int.test.ts` (nuevo); fixtures de `ProductRef`
+  ampliados en tests de pedidos, recetas y asignaciones.
+- **Para el reviewer**: la edición de un producto terminado admite `name` + `qtyAlert` (misma forma
+  que `PACKAGING`); la edición nunca escribió ni tipo ni unidad y sigue igual. El spec no dice nada
+  más de la edición de un producto terminado.
+- Tests: 71 archivos (inventario, errores y 5 guardias) → 1169 pasados, 5 skipped; integración 3/3.
