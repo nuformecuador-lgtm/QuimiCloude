@@ -20,6 +20,7 @@ import { DocumentosError, UnauthorizedError } from '@/lib/modules/documentos/dom
 import {
   PERMISSIONS,
   ROLE_ADMINISTRADOR,
+  ROLE_EMPACADOR,
   ROLE_OPERADOR,
   SEED_ROLE_PERMISSIONS,
 } from '@/lib/modules/identity';
@@ -241,8 +242,9 @@ describe('documentos — autorizacion', () => {
           return statSync(ruta).isDirectory() ? listar(ruta) : ruta.endsWith('.ts') ? [ruta] : [];
         });
       })(moduloDir);
+      expect(fuentes.length).toBeGreaterThan(0);
 
-      const nombresDeRol = [ROLE_ADMINISTRADOR, ROLE_OPERADOR, 'Empacador'];
+      const nombresDeRol = [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR];
       for (const ruta of fuentes) {
         const fuente = readFileSync(ruta, 'utf8');
         for (const nombre of nombresDeRol) {
