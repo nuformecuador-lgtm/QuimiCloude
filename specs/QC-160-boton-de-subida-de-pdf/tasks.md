@@ -63,9 +63,9 @@
 
 ### T2 [P] — `keepMounted` en `DialogContent` (D8)
 
-- [ ] `DialogContent` acepta `keepMounted?: boolean` y lo reenvía a `DialogPortal`. Sin valor por
+- [x] `DialogContent` acepta `keepMounted?: boolean` y lo reenvía a `DialogPortal`. Sin valor por
   defecto propio.
-- [ ] Verificar en jsdom que, con `keepMounted`, el popup cerrado no es visible para
+- [x] Verificar en jsdom que, con `keepMounted`, el popup cerrado no es visible para
   `not.toBeVisible()`. Si no lo es, anotar en el design cómo se afirma el estado cerrado (riesgo 13.4).
 - **Archivos:** `components/ui/dialog.tsx`.
 - **Depende de:** T0.
