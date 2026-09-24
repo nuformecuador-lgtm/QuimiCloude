@@ -804,9 +804,9 @@ describe('seedInitialAccess', () => {
   });
 
   it('QC-142 R13: sobre una base sembrada antes de esta feature -todo salvo documentos.*- el seed crea exactamente esos dos permisos y las dos asignaciones del Administrador, y la segunda corrida no cambia nada', async () => {
-    const codigosDeDocumentos = PERMISSIONS.filter((permission) => permission.module === 'documentos').map(
-      (permission) => permission.code,
-    );
+    const codigosDeDocumentos: readonly string[] = PERMISSIONS.filter(
+      (permission) => permission.module === 'documentos',
+    ).map((permission) => permission.code);
     const administradorId = ROLES_YA_SEMBRADOS.get(ROLE_ADMINISTRADOR) ?? '';
     const operadorId = ROLES_YA_SEMBRADOS.get(ROLE_OPERADOR) ?? '';
     const empacadorId = ROLES_YA_SEMBRADOS.get(ROLE_EMPACADOR) ?? '';
