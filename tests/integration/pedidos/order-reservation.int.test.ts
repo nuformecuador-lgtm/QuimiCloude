@@ -521,7 +521,7 @@ describe('R52 — un pedido sin apartado y receta vacia no rechaza la edicion au
 });
 
 describe('QC-141 T10 — el Finalizar consume (R27, R28, R32)', () => {
-  it('R27, R28: Finalizar baja el lote apartado, asienta consume y recalcula la existencia', async () => {
+  it('R27, R28, R51: Finalizar baja el lote apartado, asienta consume y recalcula la existencia', async () => {
     const fixture = await crearFixture();
     const { productId, batchId } = await crearProductoConLote(fixture, '100');
     const recipeId = await crearReceta(fixture);
@@ -580,7 +580,7 @@ describe('QC-141 T10 — el Finalizar consume (R27, R28, R32)', () => {
 });
 
 describe('QC-141 T10 — Finalizar sin material suficiente (R30, R31)', () => {
-  it('R30, R31: sin alcanzar en ningun lote, rechaza con insufficient_material sin cambiar nada', async () => {
+  it('R30, R31, R51: sin alcanzar en ningun lote, rechaza con insufficient_material sin cambiar nada', async () => {
     const fixture = await crearFixture();
     const { productId, batchId } = await crearProductoConLote(fixture, '5');
     const recipeId = await crearReceta(fixture);
@@ -650,7 +650,7 @@ describe('QC-141 T10 — Finalizar sin material suficiente (R30, R31)', () => {
 });
 
 describe('QC-141 T10 — Finalizar de un pedido sin apartado y receta sin lineas (R50)', () => {
-  it('rechaza con recipe_without_lines sin cambiar el pedido ni el inventario', async () => {
+  it('R50, R51: rechaza con recipe_without_lines sin cambiar el pedido ni el inventario', async () => {
     const fixture = await crearFixture();
     const recipeId = await crearReceta(fixture);
 

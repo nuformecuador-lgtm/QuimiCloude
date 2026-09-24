@@ -118,7 +118,7 @@ describe('createTransitionOrder', () => {
     expect(setReservedAt).not.toHaveBeenCalled();
   });
 
-  it('R27, R28: EN_CURSO -> ENTREGADO consume con la receta actual y libera reserved_at, en orden', async () => {
+  it('R27, R28, R51: EN_CURSO -> ENTREGADO consume con la receta actual y libera reserved_at, en orden', async () => {
     const { recipes, findExecutionContentById } = catalogoDeRecetas();
     const orden: string[] = [];
     const lockAliveById = vi.fn(async () => {
@@ -156,10 +156,14 @@ describe('createTransitionOrder', () => {
 
     expect(findExecutionContentById).toHaveBeenCalledWith('r-9', EMPRESA);
     expect(orden).toEqual(['lockAliveById', 'consumeForOrder', 'setStatus', 'setReservedAt']);
+    // `now` es el instante que el adaptador escribe en `finished_at` junto con el estado.
+    expect(setStatus).toHaveBeenCalledWith('o-1', 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA, {
+      companyId: EMPRESA,
+    });
     expect(setReservedAt).toHaveBeenCalledWith('o-1', null, { companyId: EMPRESA });
   });
 
-  it('R30, R31: material insuficiente deshace la transaccion entera', async () => {
+  it('R30, R31, R51: material insuficiente deshace la transaccion entera', async () => {
     const { recipes } = catalogoDeRecetas();
     const lockAliveById = vi.fn(async () => filaBloqueada({ status: 'EN_CURSO' }));
     const setStatus = vi.fn(async () => 'ok' as const);
@@ -181,7 +185,7 @@ describe('createTransitionOrder', () => {
     expect(setReservedAt).not.toHaveBeenCalled();
   });
 
-  it('R50: receta sin lineas y nada apartado deshace la transaccion entera', async () => {
+  it('R50, R51: receta sin lineas y nada apartado deshace la transaccion entera', async () => {
     const { recipes } = catalogoDeRecetas();
     const lockAliveById = vi.fn(async () => filaBloqueada({ status: 'EN_CURSO' }));
     const setStatus = vi.fn(async () => 'ok' as const);
