@@ -19,6 +19,10 @@
 >   ficha; el registro queda escrito y legible por la base.
 > - **Guardar lo que el operario marcó** dentro de cada paso: sigue fuera, como fijó QC-63.
 >
+> _Nota del 2026-09-24, añadida por decisión humana sin reescribir la lista de arriba: la consulta
+> del recorrido se hará en el **dashboard del Administrador**, en su ficha propia **QC-167**
+> (`recorrido-de-ejecucion-en-el-dashboard`), bloqueada por esta. Esta ficha sigue sin ofrecer ninguna pantalla de consulta._
+>
 > _Sembrado por `/afinar-feature` el 2026-09-18. El bloque de Alcance y la tabla de «Decisiones
 > cerradas» los fijó el humano ANTES del spec. `spec_author` los respeta, no los reabre y no los
 > reescribe: su trabajo aquí es `## Requisitos (EARS)`._
@@ -27,8 +31,10 @@
 
 > **Cómo se citan las decisiones.** `[D<n>]` es la fila **n-ésima** de `## Decisiones cerradas (no
 > reabrir)`, contando desde arriba y sin reordenar nada: `D1`–`D3` son las del 2026-09-08 y
-> `D4`–`D18` las del 2026-09-18. **Donde chocan, manda la del 2026-09-18**: `D12` enmienda a `D1`
-> (se añade **retomar**, y son **seis** acciones y ninguna más).
+> `D4`–`D18` las del 2026-09-18 y `D19`–`D20` las del 2026-09-24. **Donde chocan, manda la del
+> 2026-09-18**: `D12` enmienda a `D1` (se añade **retomar**, y son **seis** acciones y ninguna más).
+> `D19` y `D20` no enmiendan ninguna: precisan `D6` y `D7` sobre hechos del código posteriores a
+> ellas.
 >
 > **Vocabulario.** «La pantalla» es la pantalla de ejecución de QC-63 (`assignedOrderRoute(<id>)`).
 > «Responsable asignado» es quien figura como responsable del pedido en su empresa. «Posición» es el
@@ -42,8 +48,8 @@
 > **Revisión del 2026-09-24** (F1.2 contra el `dev` de ese día; detalle en `design.md > Revisión
 > 2026-09-24`). Se ajustaron **R24, R27, R29 y R37** sin tocar lo decidido: el camino de
 > cancelación de `pedidos` ahora libera el material apartado y el de entrega lo consume, y los dos
-> abren su propia transacción. Lo marcado con **⚑P1** y **⚑P2** depende de las preguntas abiertas
-> nuevas de abajo.
+> abren su propia transacción. Las dos preguntas que abrió la revisión las cerró el humano el mismo
+> día (`D19`, `D20`).
 
 ### Qué se anota
 
@@ -152,10 +158,10 @@ de tocar ninguna dependencia. SI el actor está ausente, no trae permisos, los t
 ese código, ENTONCES el caso de uso DEBE rechazar con su error de autorización **sin haber llamado a
 ninguna dependencia**. `[D7]`
 
-**R27.** ⚑P2 **Cualquier responsable asignado** al pedido DEBE poder cancelarlo desde la pantalla, no
-solo quien lo arrancó, sea cual sea su rol. SI el pedido no está asignado a quien pide, o es de otra
-empresa, ENTONCES el caso de uso DEBE rechazar con **la misma respuesta que si no existiera**, sin
-escribir nada. `[D7] [D15]`
+**R27.** **Cualquier responsable asignado** al pedido DEBE poder cancelarlo desde la pantalla, no
+solo quien lo arrancó, sea cual sea su rol, **incluido el Empacador**. SI el pedido no está asignado a
+quien pide, o es de otra empresa, ENTONCES el caso de uso DEBE rechazar con **la misma respuesta que
+si no existiera**, sin escribir nada. `[D7] [D15] [D20]`
 
 **R28.** La empresa de cada anotación DEBE salir **del actor** y **nunca de la entrada**, y toda
 lectura del registro DEBE filtrar por la empresa del actor. `[D15]`
@@ -164,11 +170,11 @@ lectura del registro DEBE filtrar por la empresa del actor. `[D15]`
 `asignaciones` **NO DEBE** escribir el estado ni el motivo del pedido y **NO DEBE** contener ninguna
 lista propia de estados cancelables. `pedidos` DEBE decidir si el pedido es cancelable con **la misma
 definición** que usa su caso de uso de cancelación, y DEBE existir **un solo camino de escritura**
-del estado `CANCELADO` con su motivo. ⚑P1 La cancelación desde la pantalla DEBE hacer en el pedido
+del estado `CANCELADO` con su motivo. La cancelación desde la pantalla DEBE hacer en el pedido
 **exactamente lo mismo** que hace el caso de uso de cancelación de `pedidos`, **incluida la liberación
-de todo el material apartado** del pedido, con quien cancela como autor. SI `pedidos` declara el
-pedido no cancelable, ENTONCES el sistema DEBE responder `not_cancellable` sin escribir nada. `[D6]
-[D7]`
+de todo el material apartado** del pedido, con quien cancela como autor, y **NO DEBE** consumir ni dar
+de baja ningún material. SI `pedidos` declara el pedido no cancelable, ENTONCES el sistema DEBE
+responder `not_cancellable` sin escribir nada. `[D6] [D7] [D19]`
 
 **R30.** El conjunto de permisos que el seed asigna a cada rol DEBE quedar **sin cambios**: el
 Operador DEBE poder cancelar desde la pantalla **sin** `pedidos.modificar` y **sin**
@@ -240,39 +246,12 @@ motivo**, y el pedido queda **`CANCELADO` con ese motivo**. `[D17]`
 | D16 — identificadores en inglés | R33 |
 | D17 — E2E | R39, R40 |
 | D18 — ninguna librería nueva | R35 |
+| D19 — cancelar desde la ejecución libera todo el material, por el camino único | R24, R29 |
+| D20 — el Empacador ejecuta, finaliza y (por D7) cancela lo que tenga asignado | R27 |
 
 ## Preguntas abiertas
 
-_Abiertas en la revisión F1.2 del 2026-09-24. Ninguna reabre una decisión cerrada: son hechos del
-código que no existían el 2026-09-18 y que la decisión no pudo tener en cuenta._
-
-**P1 — ¿Cancelar desde la pantalla libera todo el material apartado? (afecta a R29 ⚑P1 y a
-`[D6]`).** Medido en `dev`: desde QC-141, el camino único de cancelación
-(`pedidos/domain/cancel-order.ts`) ya no es solo «escribir `CANCELADO` y el motivo». En la misma
-transacción bloquea el pedido, lo cancela, **libera todo lo apartado** (`releaseForOrder`, motivo
-`release`, con quien cancela como autor) y pone `reserved_at` a `NULL`. `[D6]` pide cancelar «por el
-camino único»; seguirlo al pie de la letra devuelve a existencia **todo** el material del pedido. Pero
-un pedido `EN_CURSO` puede estar a medias en planta: el operario puede haber pesado o mezclado ya
-parte del material, y ese material no vuelve al estante. Opciones:
-- **(a) Liberar todo, igual que la oficina.** Es el camino único sin excepción y no toca `pedidos` ni
-  `inventario` más allá de reutilizar su cuerpo de cancelación. Lo gastado de verdad se da de baja
-  después con un ajuste que resta (QC-92). **Recomendada**: es lo que `[D6]` dice y no inventa
-  semántica de inventario en esta ficha.
-- (b) Consumir en vez de liberar, o liberar solo una parte. Exige un segundo camino de cancelación en
-  `pedidos` y saber cuánto se gastó, dato que nadie registra (lo marcado en los pasos no se guarda).
-  Contradice `[D6]` y sería otra ficha.
-- (c) No dejar cancelar desde la pantalla un pedido con material apartado. Contradice `[D6]`.
-Si se elige (a), R29 queda como está y se quita el ⚑P1. Si se elige otra, se reescribe R29 y el spec
-vuelve a F1.4.
-
-**P2 — ¿El Empacador, si es responsable asignado, también cancela desde la pantalla? (afecta a R27
-⚑P2 y a `[D7]`).** Medido en `dev`: el rol Empacador nació con QC-144 (migración
-`20260922120000_packer_role`), **después** de `[D7]`. Tiene `asignaciones.consultar` y no tiene
-`pedidos.consultar`, así que puede quedar como responsable, y QC-144 R12 ya le deja abrir la pantalla
-y Finalizar. `[D7]` dice «cualquier responsable asignado, con `asignaciones.consultar`», y eso le
-incluye. **Recomendación: sí**, como dice `[D7]` al pie de la letra; no cuesta código, porque el caso
-de uso no mira el rol. Si el humano no lo quiere, sería excluirle por permiso, y el permiso no
-cambia (R30), así que tendría que ser otra ficha.
+Ninguna.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -296,3 +275,5 @@ cambia (R30), así que tendría que ser otra ficha.
 | 2026-09-18 | Identificadores | **En inglés**. Heredado de la **feature 4** |
 | 2026-09-18 | ¿Hace falta E2E? | **Sí**: cambia el estado del pedido y es un flujo de permisos (`CHECKPOINTS.md`). Mínimo: el Operador abre un pedido, avanza dos pasos, **recarga y vuelve al paso 3**; y cancela otro con motivo y el pedido queda `CANCELADO` con ese motivo |
 | 2026-09-18 | ¿Librería? | **Ninguna nueva** |
+| 2026-09-24 | ¿Cancelar desde la ejecución un pedido `EN_CURSO` libera el material apartado? | **Sí, libera todo**, igual que la cancelación de oficina y **por el mismo camino único**. Lo que el operario ya gastó se da de baja después con un **ajuste de inventario (QC-92)**, fuera de esta ficha |
+| 2026-09-24 | ¿El Empacador puede ejecutar los pedidos que tenga asignados? | **Sí: ejecuta y finaliza** los que tenga asignados. **La fila «¿Quién puede cancelar desde la pantalla?» se aplica tal cual**, sin código extra |

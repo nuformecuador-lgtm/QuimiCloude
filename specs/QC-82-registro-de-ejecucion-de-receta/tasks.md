@@ -4,8 +4,9 @@
 > `design.md > Revisión 2026-09-24`. T4 se retira; T5 cambia de contenido; nacen T23 y T24.
 >
 > **Antes de T1**: los ocho puntos de F1.4 (`design.md > 12`) quedaron ratificados con el spec. Hay
-> **dos preguntas abiertas nuevas** (`requirements.md > Preguntas abiertas`): las tasks marcadas
-> **⚑P1** o **⚑P2** no se cierran sin la respuesta del humano.
+> las dos preguntas que abrió la revisión las cerró el humano el 2026-09-24 como **D19** (cancelar
+> desde la ejecución libera todo el material, por el camino único) y **D20** (el Empacador ejecuta,
+> finaliza y cancela lo que tenga asignado). No queda nada abierto.
 >
 > **Base de datos propia, sin excepción.** La migración (T1), **todos** los tests de integración (T2,
 > T19 y los que se toquen) y **todas** las E2E (T20, T23) corren contra una base propia
@@ -87,7 +88,7 @@ recibido y `setReservedAt(null)`, en ese orden), `'not_found'` y `'not_cancellab
 el módulo tiene **una** sola definición de «cancelable» y **una** sola llamada a `cancelAlive` fuera de
 la caducidad diaria (R29). Los tests existentes de `cancelOrder` (unit e integración), **sin tocar**,
 siguen verdes; `tests/unit/pedidos/module-contract.test.ts` y `authorization.test.ts` verdes.
-**Depende de:** nada. **⚑P1** (si el humano no elige liberar todo, esta task cambia).
+**Depende de:** nada.
 
 ### T4 — RETIRADA el 2026-09-24
 `cancelAliveOrder` no necesita `from` ni `db`: la comprobación bajo el candado de
@@ -160,7 +161,7 @@ la transacción (R9); tope de 501 caracteres rechazado igual que `cancelOrderSch
 `run` (R29); `'not_found'` ⇒ `OrderNotFoundError`; `'ok'` ⇒ un `append` con `action: 'cancel'` y
 `reason` **idéntico** al pasado a `cancelAliveById` (R22, R23); si `append` lanza, el error se propaga
 desde dentro de `run` (R24); lo puede hacer un responsable que no arrancó, también con los permisos del
-Empacador (R27 ⚑P2); el actor no necesita `pedidos.modificar` ni `asignaciones.modificar` (R30).
+Empacador (R27); el actor no necesita `pedidos.modificar` ni `asignaciones.modificar` (R30).
 **Depende de:** T6.
 
 ### T10 [ ] — `startAssignedOrder`: arrancar y retomar
@@ -307,7 +308,8 @@ con `append` fallido lo deja `EN_CURSO`, **sin** `finished_at` y **sin** consumo
 **finalizar con material insuficiente** no deja anotación, ni consumo, ni cambio de estado (R24);
 cancelar con `append` fallido lo deja `EN_CURSO`, con `cancellation_reason` a `NULL` y **las reservas
 intactas** (R24); cancelar con éxito deja `orders.cancellation_reason` **igual** a `reason` de la fila
-(R23) y las reservas del pedido liberadas, con quien canceló como autor (R29 ⚑P1); dos
+(R23) y **todas** las reservas del pedido liberadas, con quien canceló como autor, sin ningún
+movimiento de consumo ni de baja de material (R29); dos
 `startAssignedOrder` concurrentes sobre un `PENDIENTE` dejan **un** `START` y **un** `RESUME` (R16); un
 `recordStepMove` sobre un `ENTREGADO` no escribe (R20). Entrada `commit` en `aislamiento.json` con
 `motivo` y `desde`. Cada caso limpia lo suyo, anotaciones antes que pedidos.
@@ -357,8 +359,7 @@ afirma en verde.
 **Toca:** `progress/impl_QC-82-registro-de-ejecucion-de-receta.md`
 **Hacer:** el mapa `R1…R40 → test` completo; las mutaciones de T1, T5 y T12 anotadas con su rojo;
 `./init.sh` completo **con `DATABASE_URL` y `DIRECT_URL` apuntando a `QuimiCloude_QC82`**.
-**Hecho cuando:** los 40 requisitos tienen su test; P1 y P2 respondidas y sin ⚑ pendientes en
-`requirements.md`; `./init.sh` termina en verde (o solo con los rojos ya presentes en
+**Hecho cuando:** los 40 requisitos tienen su test; `./init.sh` termina en verde (o solo con los rojos ya presentes en
 `tests/baseline-rojos.json`); ningún archivo de `tests/guards/` quedó más laxo que en `origin/dev`
 (revisado por diff); `order-prisma.ts`, `order-catalog-prisma.ts`, `package.json` y
 `docs/dependencias.md` fuera del diff y `guard-dependencias-aprobadas` verde (R35).

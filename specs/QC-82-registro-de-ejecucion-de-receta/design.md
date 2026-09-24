@@ -2,7 +2,8 @@
 
 > Escrito el 2026-09-18 contra la base `4c057594` y **revisado el 2026-09-24** contra `dev` tras el
 > merge `9634f6ae` (la rama iba 813 commits por detrás). Lo que no sale de la acotación no se
-> rellena: está en `## 12. Puntos para F1.4` y en `requirements.md > Preguntas abiertas`, y los
+> rellena: está en `## 12. Puntos para F1.4` (y las dos preguntas de la revisión, ya cerradas como
+> `D19` y `D20`), y los
 > requisitos que dependen de ellos van marcados ⚑.
 
 ## Revisión 2026-09-24 — qué cambió y por qué
@@ -30,8 +31,10 @@ ya no es el del 2026-09-18. Punto por punto:
    `order-catalog-prisma.ts` salen del diff**: `cancelAliveOrder` no necesita `from` ni `db`, porque
    la comprobación bajo el candado ya impide cancelar un pedido que otro acaba de entregar. T4
    desaparece. (b) El cuerpo de la cancelación se extrae **una vez** y lo usan `cancelOrder` y la
-   cancelación desde la pantalla (`## 5`). (c) **Pregunta abierta P1**: seguir el camino único libera
-   **todo** el material, también el que el operario ya pudo gastar.
+   cancelación desde la pantalla (`## 5`). (c) Seguir el camino único libera **todo** el material,
+   también el que el operario ya pudo gastar. Se preguntó y el humano lo cerró como **`D19`**: se
+   libera todo, y lo gastado se da de baja después con un ajuste de inventario (QC-92), fuera de
+   esta ficha.
 3. **La cancelación no entra en `OrderCatalog`, sino en un contrato propio, `OrderCancellation`.**
    `OrderCatalog` tiene hoy **11 dobles** en tests que se romperían al compilar, y el `orderCatalog`
    global de la composición tendría que cablear un `cancelAliveById` que nadie llama: `asignaciones`
@@ -246,7 +249,7 @@ tuyo ⇒ `OrderNotFoundError`) → `orders.findAliveById(orderId, actor.companyI
 | `startAssignedOrder` (**ampliado**) | `{ orderId }` (sin cambios) | `PENDIENTE`: transición + `start` | Lee la vista **antes** de escribir (mismas consultas que hoy, en otro orden) para saber si hay pasos (R5). En `transaction.run`: `orders.transitionAliveById(…, 'PENDIENTE', 'EN_CURSO', …)`; si no es `'ok'`, lanza `ExecutionAbortedError`; si lo es, `log.append(start)`. Fuera: `'stale'` ⇒ relee y sigue (R16); `'not_found'` ⇒ `OrderNotFoundError`. |
 | | | `EN_CURSO`: solo `resume` | `log.findLastStepPosition` → posición (o 1, R14 ⚑) → `log.append(resume)`, fuera de transacción (una sola sentencia). **Si falla, lanza** y la pantalla no abre (R15 ⚑). |
 | `finishAssignedOrder` (**ampliado**) | `{ orderId, stepPosition }` | transición a `ENTREGADO` (con el consumo y `finished_at` que `pedidos` hace por dentro) + `finish` | En `transaction.run`, mismo esquema. Fuera, igual que hoy: `'stale'` ⇒ relee y reintenta; `'insufficient_material'` ⇒ `MaterialShortageError`; `'recipe_without_lines'` ⇒ `RecipeWithoutLinesError`; `'not_found'` ⇒ `OrderNotFoundError`. |
-| `cancelAssignedOrder` (**nuevo**) | `{ orderId, stepPosition, reason }` — `reason` con `cancelOrderSchema.shape.reason` del barril de `pedidos` (R10) | `CANCELADO` + motivo + liberación del material (⚑P1) + `cancel` con el mismo motivo | Lee el número **antes** de escribir (como `finish`), para R25 ⚑. En `transaction.run`: `orders.cancelAliveById(orderId, companyId, reason, actor.id, now)`; si no es `'ok'`, lanza `ExecutionAbortedError`; si lo es, `log.append({ action: 'cancel', reason, … })`. Fuera: `'not_cancellable'` ⇒ `NotCancellableError`; `'not_found'` ⇒ `OrderNotFoundError`. Sin `'stale'`: la comprobación va bajo el candado. |
+| `cancelAssignedOrder` (**nuevo**) | `{ orderId, stepPosition, reason }` — `reason` con `cancelOrderSchema.shape.reason` del barril de `pedidos` (R10) | `CANCELADO` + motivo + liberación de todo el material (`[D19]`) + `cancel` con el mismo motivo | Lee el número **antes** de escribir (como `finish`), para R25 ⚑. En `transaction.run`: `orders.cancelAliveById(orderId, companyId, reason, actor.id, now)`; si no es `'ok'`, lanza `ExecutionAbortedError`; si lo es, `log.append({ action: 'cancel', reason, … })`. Fuera: `'not_cancellable'` ⇒ `NotCancellableError`; `'not_found'` ⇒ `OrderNotFoundError`. Sin `'stale'`: la comprobación va bajo el candado. |
 | `recordStepMove` (**nuevo**) | `{ orderId, direction: 'advance' \| 'go_back', stepPosition }` | `advance` / `go_back` | Solo si el pedido está `EN_CURSO` (R20); si no, lanza sin escribir (`assertOrderAcceptsWrites` para los cerrados, `OrderNotFoundError` para `PENDIENTE`). Un solo `log.append`: **sin** transacción. |
 
 **Deps nuevas:** `start` y `finish` ganan `log` y `transaction`; `cancelAssignedOrder` recibe
@@ -587,8 +590,10 @@ que el código de hoy cambia de ellos.
    (ninguna función gana ese parámetro), sino el caso nuevo de `## 7`. Misma figura: la guardia
    crece, no se afloja.
 
-Y dos preguntas **nuevas**, en `requirements.md > Preguntas abiertas`: **P1** (liberar todo el material
-al cancelar desde la pantalla) y **P2** (el Empacador responsable también cancela).
+La revisión abrió dos preguntas **nuevas**, que el humano cerró el 2026-09-24: **`D19`** (cancelar
+desde la pantalla libera todo el material, por el camino único) y **`D20`** (el Empacador ejecuta,
+finaliza y, por `D7`, cancela lo que tenga asignado). La consulta del recorrido irá en el dashboard
+del Administrador, en **QC-167**, bloqueada por esta ficha.
 
 ## 13. Riesgos
 
