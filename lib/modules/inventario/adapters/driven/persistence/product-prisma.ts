@@ -5,6 +5,7 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 import { compareQuantities } from '../../../domain/decimal-quantity';
 import { BatchDuplicateLotError, BatchStockNegativeError, ValidationError } from '../../../domain/errors';
+import { planFinishedGoods } from '../../../domain/finished-goods';
 import { normalizeProductName } from '../../../domain/product-name';
 import { netReservedQuantity } from '../../../domain/reservation-ledger';
 
@@ -25,6 +26,7 @@ import {
   type NumberRangeCondition,
 } from './list-query-sql';
 
+import type { FinishedGoodsOutcome } from '../../../domain/finished-goods';
 import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { MovementReason } from '../../../domain/movement-reason';
@@ -761,6 +763,7 @@ const BATCH_VIEW_SELECT = {
   stock: true,
   purchaseDate: true,
   expiryDate: true,
+  packageContent: true,
   presentation: { select: { unitId: true } },
 } satisfies Prisma.ProductBatchSelect;
 
@@ -779,6 +782,7 @@ function toBatchView(row: BatchViewRow): ProductBatchView {
     unitId: row.presentation?.unitId ?? null,
     purchaseDate: toCivilDate(row.purchaseDate),
     expiryDate: row.expiryDate === null ? null : toCivilDate(row.expiryDate),
+    packageContent: row.packageContent === null ? null : row.packageContent.toFixed(4),
   };
 }
 
@@ -951,4 +955,113 @@ export async function consumeBatchStock(
     select: { stock: true },
   });
   return { kind: 'consumed', stock: (updated?.stock ?? new Prisma.Decimal(0)).toFixed(4) };
+}
+
+type PresentationForShareRow = { readonly name: string; readonly unitId: string; readonly content: string | null };
+
+/**
+ * La entrada de un lote de produccion al Finalizar un pedido: presentacion `FOR SHARE`,
+ * producto terminado (nace si falta, `ON CONFLICT ... DO NOTHING` sobre el indice parcial de
+ * la combinacion), lote, asiento `production` y recalculo, todo sobre la MISMA transaccion que
+ * el resto del Finalizar -no abre la suya, a diferencia de `createWithFirstBatch`-.
+ */
+export async function receiveFinishedGoods(
+  tx: Prisma.TransactionClient,
+  input: {
+    readonly orderId: string;
+    readonly recipeId: string;
+    readonly recipeName: string;
+    readonly presentationId: string;
+    readonly orderQuantity: string;
+    readonly orderContent: string | null;
+    readonly lotCost: string;
+    readonly actorId: string;
+    readonly now: Date;
+  },
+  scope: InventoryScope,
+): Promise<FinishedGoodsOutcome> {
+  const { companyId } = companyScopeColumns(scope);
+
+  const presentationRows = await tx.$queryRaw<ReadonlyArray<PresentationForShareRow>>(Prisma.sql`
+    SELECT "name", "unit_id" AS "unitId", "content"::text AS "content"
+      FROM "presentations"
+     WHERE "id" = ${input.presentationId}::uuid
+       AND "company_id" = ${companyId}::uuid
+       FOR SHARE
+  `);
+  const presentation = presentationRows[0];
+  if (presentation === undefined) return { kind: 'presentation_without_content' };
+
+  const content = input.orderContent ?? presentation.content;
+  if (content === null) return { kind: 'presentation_without_content' };
+
+  const plan = planFinishedGoods({ orderQuantity: input.orderQuantity, content, lotCost: input.lotCost });
+  if (plan.kind === 'no_content') return { kind: 'presentation_without_content' };
+  if (plan.kind === 'no_whole_package') return { kind: 'no_whole_package' };
+
+  const name = `${input.recipeName} · ${presentation.name}`;
+  // El arbitro de `ON CONFLICT ... WHERE` lo resuelve Postgres en el analisis de la sentencia,
+  // antes de que un parametro tenga valor: esa clausula necesita el texto tal cual, no un bind.
+  const finishedProductTypeSql = Prisma.raw(`'${PRODUCT_TYPES.FINISHED_PRODUCT}'`);
+  await tx.$executeRaw(Prisma.sql`
+    INSERT INTO "products"
+      ("name", "name_normalized", "type", "unit_id", "company_id", "recipe_id", "presentation_id", "created_at", "updated_at")
+    VALUES
+      (${name}, ${normalizeProductName(name)}, ${PRODUCT_TYPES.FINISHED_PRODUCT}::"ProductType", ${presentation.unitId}::uuid, ${companyId}::uuid,
+       ${input.recipeId}::uuid, ${input.presentationId}::uuid, ${input.now}, ${input.now})
+    ON CONFLICT (company_id, recipe_id, presentation_id) WHERE type = ${finishedProductTypeSql} AND deleted_at IS NULL
+    DO NOTHING
+  `);
+
+  const productRows = await tx.$queryRaw<ReadonlyArray<{ id: string; name: string }>>(Prisma.sql`
+    SELECT "id", "name"
+      FROM "products"
+     WHERE "company_id" = ${companyId}::uuid
+       AND "recipe_id" = ${input.recipeId}::uuid
+       AND "presentation_id" = ${input.presentationId}::uuid
+       AND "type" = ${PRODUCT_TYPES.FINISHED_PRODUCT}::"ProductType"
+       AND "deleted_at" IS NULL
+       FOR NO KEY UPDATE
+  `);
+  const product = productRows[0];
+  if (product === undefined) {
+    throw new Error('receiveFinishedGoods: el producto terminado no aparecio tras el INSERT ON CONFLICT');
+  }
+
+  const batch: NewProductBatch = {
+    presentationId: input.presentationId,
+    stock: plan.quantity,
+    unitCost: plan.unitCost,
+    lot: null,
+    purchaseDate: toCivilDate(input.now),
+    expiryDate: null,
+    createdBy: input.actorId,
+  };
+  const lot = await resolveLot(tx, batch, scope);
+
+  const createdBatch = await tx.productBatch.create({
+    data: {
+      ...toBatchCreateData(product.id, batch, lot, input.now, scope),
+      packageContent: new Prisma.Decimal(plan.content),
+    },
+    select: { id: true },
+  });
+
+  await writeMovement(
+    tx,
+    {
+      batchId: createdBatch.id,
+      kind: 'production',
+      quantity: plan.quantity,
+      reason: null,
+      orderId: input.orderId,
+      createdBy: input.actorId,
+    },
+    input.now,
+    scope,
+  );
+
+  await recalculateProductStock(tx, product.id, scope);
+
+  return { kind: 'received', productId: product.id, productName: product.name, packages: plan.packages };
 }
