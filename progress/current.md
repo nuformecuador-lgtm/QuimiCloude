@@ -19,6 +19,10 @@
 
 ## Evaluaciones
 
+### QC-142 - ACOTADA con `/afinar-feature` y F1.0 (2026-09-24)
+
+**8 decisiones**, ninguna abierta, en `specs/QC-142-permiso-propio-de-documentos/requirements.md`. `complexity: low`. Desbloquea QC-157, QC-159 y QC-160 (IA). Cupo `backend` lleno (QC-131, QC-153): solo spec hasta que se libere.
+
 ### QC-168 - NACE y se ACOTA con `/afinar-feature` (2026-09-24)
 
 **13 decisiones cerradas**, ninguna abierta, en `specs/QC-168-estado-por-empacar/requirements.md`. Bloqueada por QC-150 y **bloquea a QC-82**, cuyo spec aprobado hay que revisar antes de implementar (Finalizar deja Por empacar; dos acciones de empaque en el registro). Orden: QC-150 -> QC-168 -> QC-82. Tambien nacio **QC-167** (consulta del recorrido en el dashboard, bloqueada por QC-82).
