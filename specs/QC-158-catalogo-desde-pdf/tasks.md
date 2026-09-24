@@ -151,7 +151,7 @@ Archivos: `lib/modules/documentos/domain/preview-catalog-import.ts` (nuevo),
 `lines` editadas reclasifica) y **R31** (sin permiso: ningún puerto tocado; el orden de llamadas se
 registra).
 
-## T10 — Caso de uso de confirmación `[depende de T9]` `[F1]` `[F6]`
+## [x] T10 — Caso de uso de confirmación `[depende de T9]` `[F1]` `[F6]`
 
 Archivos: `lib/modules/documentos/domain/confirm-catalog-import.ts` (nuevo),
 `lib/modules/documentos/index.ts`, `tests/unit/documentos/{confirm-catalog-import,catalog-import-authorization}.test.ts`,
