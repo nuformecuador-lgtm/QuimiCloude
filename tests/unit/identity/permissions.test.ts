@@ -40,6 +40,120 @@ const CODIGOS_DEL_REQUISITO = [
   'documentos.modificar',
 ] as const
 
+/** Las entradas previas a esta ficha, copiadas a mano de `origin/dev` con sus tres campos: lo que
+ *  QC-142 R2 exige es que ninguna de ellas cambie de modulo, accion ni descripcion al sumar las
+ *  dos de `documentos`. */
+const PERMISOS_PREVIOS = [
+  {
+    code: 'dashboard.consultar',
+    module: 'dashboard',
+    action: 'consultar',
+    description: 'Consultar el panel de inicio.',
+  },
+  {
+    code: 'inventario.consultar',
+    module: 'inventario',
+    action: 'consultar',
+    description: 'Consultar productos y presentaciones del inventario.',
+  },
+  {
+    code: 'inventario.modificar',
+    module: 'inventario',
+    action: 'modificar',
+    description: 'Crear, editar y borrar productos y presentaciones del inventario.',
+  },
+  {
+    code: 'recetas.consultar',
+    module: 'recetas',
+    action: 'consultar',
+    description: 'Consultar recetas y sus pasos.',
+  },
+  {
+    code: 'recetas.modificar',
+    module: 'recetas',
+    action: 'modificar',
+    description: 'Crear, editar y borrar recetas y sus pasos.',
+  },
+  {
+    code: 'unidades.consultar',
+    module: 'unidades',
+    action: 'consultar',
+    description: 'Consultar las unidades de medida.',
+  },
+  {
+    code: 'unidades.modificar',
+    module: 'unidades',
+    action: 'modificar',
+    description: 'Crear, editar y borrar unidades de medida.',
+  },
+  {
+    code: 'proveedores.consultar',
+    module: 'proveedores',
+    action: 'consultar',
+    description: 'Consultar proveedores y su catalogo.',
+  },
+  {
+    code: 'proveedores.modificar',
+    module: 'proveedores',
+    action: 'modificar',
+    description: 'Crear, editar y borrar proveedores y lineas de su catalogo.',
+  },
+  {
+    code: 'pedidos.consultar',
+    module: 'pedidos',
+    action: 'consultar',
+    description: 'Consultar pedidos y su contenido.',
+  },
+  {
+    code: 'pedidos.modificar',
+    module: 'pedidos',
+    action: 'modificar',
+    description: 'Crear, editar, anular y borrar pedidos.',
+  },
+  {
+    code: 'usuarios.consultar',
+    module: 'usuarios',
+    action: 'consultar',
+    description: 'Consultar los usuarios de la empresa.',
+  },
+  {
+    code: 'usuarios.modificar',
+    module: 'usuarios',
+    action: 'modificar',
+    description: 'Crear, editar, borrar y cambiar el estado de cuenta de los usuarios de la empresa.',
+  },
+  {
+    code: 'asignaciones.consultar',
+    module: 'asignaciones',
+    action: 'consultar',
+    description: 'Consultar los pedidos asignados.',
+  },
+  {
+    code: 'asignaciones.modificar',
+    module: 'asignaciones',
+    action: 'modificar',
+    description: 'Asignar y desasignar responsables de un pedido.',
+  },
+  {
+    code: 'terminados.consultar',
+    module: 'terminados',
+    action: 'consultar',
+    description: 'Consultar todos los pedidos terminados de la empresa.',
+  },
+  {
+    code: 'clientes.consultar',
+    module: 'clientes',
+    action: 'consultar',
+    description: 'Consultar los clientes de la empresa.',
+  },
+  {
+    code: 'clientes.modificar',
+    module: 'clientes',
+    action: 'modificar',
+    description: 'Crear, editar y borrar clientes de la empresa.',
+  },
+] as const
+
 /** Los nombres de modulo del repositorio, mas `usuarios` y `terminados`: no son carpetas reales de
  *  `lib/modules/` -viven dentro de `identity`- pero valen igual como `<modulo>` porque el codigo
  *  lo lee una persona. */
@@ -118,6 +232,13 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
       'documentos.consultar',
       'documentos.modificar',
     ])
+  })
+
+  it('QC-142 R2: las entradas previas conservan su modulo, accion y descripcion exactos', () => {
+    for (const previo of PERMISOS_PREVIOS) {
+      const actual = PERMISSIONS.find((permiso) => permiso.code === previo.code)
+      expect(actual, `${previo.code} deberia seguir en el catalogo`).toEqual(previo)
+    }
   })
 
   it('R2: cada entrada trae descripcion no vacia', () => {
