@@ -281,7 +281,7 @@ async function contarPedidos(empresa: Empresa): Promise<number> {
 }
 
 describe('R1: la cotizacion coincide con el importe que guarda el alta', () => {
-  it('con existencia suficiente, la cotizacion y el alta dan el mismo importe', async () => {
+  it('con existencia suficiente, la cotizacion y el alta dan el mismo importe (R62)', async () => {
     const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
     const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null
@@ -313,7 +313,7 @@ describe('R1: la cotizacion coincide con el importe que guarda el alta', () => {
     }
   })
 
-  it('sin existencia suficiente, la cotizacion y el alta dan las dos null', async () => {
+  it('sin existencia suficiente, la cotizacion y el alta dan las dos null (R62)', async () => {
     const { productId } = await crearProductoConLote(A, { stock: '10', unitCost: '5.0000' })
     const recipeId = await crearReceta(A, productId)
     let orderId: string | null = null

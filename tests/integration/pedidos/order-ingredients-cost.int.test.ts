@@ -644,6 +644,90 @@ describe('D22: el importe promedia TODOS los lotes con disponible, sin acumular 
       await borrarProducto(productId)
     }
   })
+
+  it('un lote de maquina sin presentacion ni coste, con disponible, no contamina el promedio (R66)', async () => {
+    const { productId, batchId: idConCoste } = await crearProductoConLote(A, {
+      stock: '10',
+      unitCost: '5.0000',
+      lot: `X-${token()}`,
+      purchaseDate: '2026-01-01',
+    })
+    const loteMaquina = await addBatchToAlive(
+      productId,
+      newBatch(A, {
+        presentationId: null,
+        unitCost: null,
+        stock: '1000',
+        lot: `M-${token()}`,
+        purchaseDate: '2026-01-02',
+      }),
+      new Date('2026-01-02T00:00:00.000Z'),
+      { companyId: A.companyId },
+    )
+    if (loteMaquina === null) throw new Error('no se pudo sembrar el lote de maquina')
+    const recipeId = await crearReceta(A, productId)
+    let orderId: string | null = null
+
+    try {
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-12T12:00:00.000Z') })
+      const creado = await alta({ recipeId, quantity: '10.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      orderId = creado.id
+
+      // Si el lote de maquina entrara en el promedio, sobraria disponible de sobra (10 + 1000) y
+      // el coste promediaria dos costes distintos. Al quedar fuera de `findCostingBatches`, el
+      // importe sale solo del lote con coste: 10 * 5.0000 = 50.0000.
+      expect(await ingredientsCostCrudo(orderId)).toBe('50.0000')
+
+      const reservas = await prisma.reservationMovement.findMany({
+        where: { orderId },
+        select: { batchId: true },
+      })
+      expect(reservas.map((row) => row.batchId)).toEqual([idConCoste])
+    } finally {
+      if (orderId !== null) await borrarPedido(orderId)
+      await borrarReceta(recipeId)
+      await borrarProducto(productId)
+    }
+  })
+
+  it('un lote de maquina sin presentacion ni coste, aunque cubriria por si solo, no cuenta en la cobertura (R66)', async () => {
+    const { productId } = await crearProductoConLote(A, {
+      stock: '3',
+      unitCost: '5.0000',
+      lot: `X-${token()}`,
+      purchaseDate: '2026-01-01',
+    })
+    const loteMaquina = await addBatchToAlive(
+      productId,
+      newBatch(A, {
+        presentationId: null,
+        unitCost: null,
+        stock: '1000',
+        lot: `M-${token()}`,
+        purchaseDate: '2026-01-02',
+      }),
+      new Date('2026-01-02T00:00:00.000Z'),
+      { companyId: A.companyId },
+    )
+    if (loteMaquina === null) throw new Error('no se pudo sembrar el lote de maquina')
+    const recipeId = await crearReceta(A, productId)
+    let orderId: string | null = null
+
+    try {
+      const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now: () => new Date('2026-05-13T12:00:00.000Z') })
+      const creado = await alta({ recipeId, quantity: '10.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
+      orderId = creado.id
+
+      // El lote de maquina, sin coste, tiene disponible de sobra (1000) para cubrir la necesidad
+      // de 10 el solo, pero `findCostingBatches` lo deja fuera: el unico disponible que cuenta es
+      // el del lote con coste (3), que no alcanza -> sin importe.
+      expect(await ingredientsCostCrudo(orderId)).toBeNull()
+    } finally {
+      if (orderId !== null) await borrarPedido(orderId)
+      await borrarReceta(recipeId)
+      await borrarProducto(productId)
+    }
+  })
 })
 
 describe('el pedido queda creado con el importe en blanco y la base no lanza 22003 (R24)', () => {

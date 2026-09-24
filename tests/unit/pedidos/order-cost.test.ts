@@ -185,6 +185,27 @@ describe('calculateIngredientsCost', () => {
     expect(resultadoTexto).toBe('2522.5000');
   });
 
+  it('D22 de QC-141 deroga QC-123 D3/D4: la fecha de vencimiento no altera el orden ni la seleccion (R4)', () => {
+    const conVencimientoImaginarioAscendente = [
+      lote({ lot: '1', purchaseDate: '2026-01-01', stock: '50', unitCost: '10.0000' }),
+      lote({ lot: '2', purchaseDate: '2026-06-01', stock: '50', unitCost: '30.0000' }),
+    ];
+    const mismosLotesPermutados = [...conVencimientoImaginarioAscendente].reverse();
+
+    const resultadoAscendente = calculateIngredientsCost(
+      input({ orderQuantity: '50.0000', batches: conVencimientoImaginarioAscendente, units: unitsMap(LITRO) }),
+    );
+    const resultadoPermutado = calculateIngredientsCost(
+      input({ orderQuantity: '50.0000', batches: mismosLotesPermutados, units: unitsMap(LITRO) }),
+    );
+
+    // `CostingBatch` no declara fecha de vencimiento: el mismo conjunto de lotes, con las fechas
+    // permutadas como si alguien hubiera reordenado por una vencimiento imaginaria, promedia
+    // igual -(10+30)/2=20; 50*20=1000- porque D22 ya no ordena ni corta por cobertura.
+    expect(resultadoAscendente).toBe('1000.0000');
+    expect(resultadoPermutado).toBe('1000.0000');
+  });
+
   it('R60: no pondera el promedio por la cantidad de ningun lote', () => {
     const resultado = calculateIngredientsCost(
       input({
