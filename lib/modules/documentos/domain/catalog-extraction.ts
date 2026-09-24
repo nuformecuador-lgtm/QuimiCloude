@@ -4,13 +4,13 @@
  * crudo y decir que campo esta mal en vez de descartar la fila entera.
  *
  * Cada campo de cada linea se interpreta por separado (`catch(null)`): un tipo que no encaja deja
- * ESE campo en `null` y la linea sobrevive. Solo dos motivos rechazan el documento entero (R6): que
+ * ESE campo en `null` y la linea sobrevive. Solo dos motivos rechazan el documento entero: que
  * el texto no contenga ningun objeto JSON interpretable, o que su `lines` no sea ni lista ni
  * `null`. Un elemento de `lines` que no es un objeto se descarta en silencio.
  *
  * `cost`, `minPurchase` y el valor de cada medida viajan SOLO como cadena: tras `JSON.parse` un
  * numero ya paso por coma flotante y no hay forma de recuperar la cadena decimal original, asi que
- * se trata como vacio (R35).
+ * se trata como vacio.
  *
  * Dominio puro: `zod` y `extractJsonObject`.
  */
@@ -121,7 +121,7 @@ function diagnostico(reason: string): string {
   return `catalog-extraction: no se pudo interpretar el texto del catalogo (${reason})`;
 }
 
-/** Interpreta el texto de la IA. Lanza `ValidationError` si no hay JSON interpretable (R6). */
+/** Interpreta el texto de la IA. Lanza `ValidationError` si no hay JSON interpretable. */
 export function extractCatalogFromText(text: string): CatalogExtraction {
   const candidate = extractJsonObject(text);
   if (candidate === null) {
