@@ -24,7 +24,7 @@ import {
  */
 
 const TOUCH_TARGET = 'min-h-11';
-const FIELD_TEXT = 'text-base';
+const FIELD_TEXT = 'text-base md:text-base';
 
 export const SHOWCASE_FILTERS_TEXTS = {
   productLabel: 'Producto',

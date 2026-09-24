@@ -38,13 +38,13 @@ describe('SupplierShowcaseFilters: los dos campos y sus clases (R39)', () => {
     expect(screen.getByTestId('supplier-showcase-supplier-filter')).toBeInTheDocument();
   });
 
-  it('los dos campos cumplen text-base (>=16px) y min-h-11', () => {
+  it('los dos campos cumplen text-base (>=16px) desde 768px, sin que md:text-sm lo tape (R39)', () => {
     render(<SupplierShowcaseFilters filters={EMPTY_SHOWCASE_FILTERS} />);
 
     for (const testId of ['supplier-showcase-product-filter', 'supplier-showcase-supplier-filter']) {
       const campo = screen.getByTestId(testId);
-      expect(campo.className).toMatch(/text-base/);
-      expect(campo.className).toMatch(/min-h-11/);
+      expect(campo.className).toMatch(/\bmd:text-base\b/);
+      expect(campo.className).toMatch(/\bmin-h-11\b/);
     }
   });
 
