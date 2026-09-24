@@ -2149,7 +2149,7 @@
       "epic_name": "Identidad y acceso",
       "name": "permiso-propio-de-documentos",
       "description": "El modulo documentos deja de pedir prestado `proveedores.modificar` y pasa a tener permiso propio: **`documentos.consultar`** y **`documentos.modificar`**. Con eso, QC-160 puede montar la subida de PDFs tambien en formulas.\n\n**ACOTADA EL 2026-09-24 con** `/afinar-feature`: gana exactamente estos dos permisos, sin fijar el total (QC-161 y QC-168 tambien amplian el catalogo); los recibe solo el Administrador; todo rol con `proveedores.modificar` hereda `documentos.modificar` en la migracion; se valida en el service de documentos; E2E de documentos sigue verde mas el caso sin permiso.\n\n**NO ENTRA:** el montaje en formulas ni el boton en proveedores (**QC-160**). Solo backend.\n\n--- Acotada por `/afinar-feature` el 2026-09-24. Las decisiones estan en `specs/QC-142-permiso-propio-de-documentos/requirements.md`. ---",
-      "status": "pending",
+      "status": "spec_ready",
       "sdd": true,
       "complexity": "low",
       "zone": "backend",
