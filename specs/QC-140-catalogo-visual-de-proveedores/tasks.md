@@ -209,7 +209,7 @@
     (anti-placebo).
   - Depende de: T11.
 
-- [ ] **T13 — Adaptar los dos E2E afectados (R41, D19).** No se añade ningún E2E nuevo (D9).
+- [x] **T13 — Adaptar los dos E2E afectados (R41, D19).** No se añade ningún E2E nuevo (D9).
   - **`e2e/proveedores.spec.ts`**:
     - el alta busca la fila del proveedor nuevo en la vista, no en la tabla; sale aunque aún no
       tenga líneas (D15);

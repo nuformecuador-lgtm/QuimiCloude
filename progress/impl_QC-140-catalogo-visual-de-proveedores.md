@@ -20,13 +20,15 @@
 
 ## Tasks
 
-- **Cerradas `[x]`: T0-T12.**
+- **Cerradas `[x]`: T0-T13.**
+  - **T13 se cierra con una salvedad, por decisión del humano del 2026-09-23.** El caso R51 de
+    `e2e/proveedores.spec.ts` queda como **rojo heredado de `dev`**: espera `12.3456` y la pantalla
+    pinta `12.35` desde `682d3e3b fix(decimales)`. La aserción **no** se cambia en esta rama. El
+    resto de los dos specs pasa.
 - **Abiertas `[ ]`:**
-  - **T13**: código hecho y `aislamiento-proveedores.spec.ts` en verde. Pero el caso R51 de
-    `proveedores.spec.ts` sigue rojo por una causa ajena (ver *E2E*). Su criterio pide los dos
-    specs en verde.
-  - **T14**: hecha solo con emulación. Destapó el hallazgo A (ver *Hallazgos*), que se sube al leader
-    como pide la task.
+  - **T14**: la revisión emulada está hecha y el hallazgo A arreglado en la rama (ver *Hallazgos*).
+    **Sigue pendiente la revisión en dispositivos reales**, Safari iOS y Chrome Android, que hace
+    el humano.
   - **T15**: el mapa está abajo; `./init.sh` completo lo corre el leader.
 
 ## Commits (sobre el merge-base con `origin/dev`, sin los del spec)
@@ -219,7 +221,7 @@ Playwright contra `QuimiCloude_QC140`. Ningún perfil es un dispositivo físico.
 | «Cargar más» | líneas 10→20 | 10→20 | OK |
 | «Reintentar» | fallaba ante un fallo de red; **arreglado en `c0ea39a5`** | igual | igual |
 | Filtros | 14 px por `md:text-sm` del `Input` compartido (≥768 px, solo escritorio); controles de 44 px de alto | **16 px**; 248×44, 248×44 y 112×44 | no se llegó: se bloqueó antes, en el paso de editar |
-| Editar y dar de baja desde el detalle | OK | OK | **FALLA: hallazgo A** |
+| Editar y dar de baja desde el detalle | OK | OK | fallaba (hallazgo A); **arreglado en `b68d8570` y `ce1c8527`**: el clic `trial` en «Guardar» pasa en el alta y en la edición |
 
 **Nota sobre el teclado en Chromium.** La primera pasada dijo que el teclado no desplazaba el
 carrusel. El diagnóstico posterior demostró que era un artefacto de la medición: con 10 tarjetas el
@@ -231,20 +233,45 @@ código.
 
 ## Hallazgos y desviaciones para el leader y el reviewer
 
-1. **Hallazgo A: bloquea T14 y lo decide el leader.** En Chromium con `Pixel 7` emulado, el botón
-   «Guardar» (`supplier-form-submit`) del panel de proveedor queda tapado por el cuerpo con scroll
-   del `SheetContent` (`div …overflow-y-auto p-4 intercepts pointer events`, 401 reintentos en
-   240 s), así que no se puede guardar.
-   - Se reprodujo de forma consistente. No pasa en escritorio ni en WebKit con `iPhone 15`.
-   - El componente es `components/shared/supplier/supplier-form.tsx`, **movido sin cambiar ni una
-     línea** (rename al 100 %). Por eso casi seguro que ya pasa en `dev`, aunque no se comprobó
-     sobre `dev`.
-   - Afecta al alta de la vista (R36) y a la edición del detalle (R38) en Android.
-   - No lo toqué: T7 exige mover sin cambiar comportamiento, y T14 pide parar y subirlo. Hay que
-     decidir si se arregla aquí o en otra ficha, porque la causa está en el `SheetContent`
-     compartido.
-2. **R51 de `e2e/proveedores.spec.ts`**: rojo ajeno, visto arriba. Hay que decidir si se actualiza
-   la aserción a `12.35` en esta rama (una línea de E2E) o se deja como deuda de `dev`.
+1. **Hallazgo A (2026-09-23/24): «Guardar» tapado en Android. Era de la rama y está arreglado.**
+   - **Síntoma.** En Chromium con `Pixel 7` emulado, el clic en «Guardar» (`supplier-form-submit`)
+     no llegaba: `div …overflow-y-auto p-4 intercepts pointer events`.
+   - **Comparación con `dev`.**
+     - `supplier-sheet.tsx`, `supplier-form.tsx` y `supplier-field.tsx` son idénticos byte a byte
+       entre `origin/dev` y la rama. Se comprobó con `git show origin/dev:<ruta> | diff -q`.
+     - `git diff origin/dev HEAD` no da nada sobre `components/ui/` (incluido `sheet.tsx`),
+       `app/globals.css` ni los layouts.
+     - En un worktree temporal `--detach` de `origin/dev` (`f1530835`), con el `.env` apuntado a
+       `QuimiCloude_QC140` y la misma emulación, el alta desde la lista **es alcanzable**:
+       - el clic `trial` pasa;
+       - el botón está en `y=779`, con 44 px de alto, dentro de un viewport de 839;
+       - `elementFromPoint` devuelve el propio botón.
+     - El worktree temporal se desmontó después.
+   - **Causa, en la rama.** Un nombre de proveedor largo y sin espacios desbordaba en horizontal, en
+     dos sitios:
+     - el `<h1>` de `app/(private)/proveedores/[id]/components/supplier-detail-header.tsx`, al que
+       le faltaba `min-w-0`/`break-words`;
+     - el texto del `Link` en `app/(private)/proveedores/components/supplier-showcase-row.tsx`, que
+       era un item flex anónimo y no encogía.
+
+     Al desbordar el documento (`scrollWidth` de 722 frente a `clientWidth` de 412), Chromium móvil
+     infla `window.innerWidth/innerHeight` (hasta 722x1471). El `Sheet` fijo con `h-full` se
+     dimensiona sobre ese alto y deja el pie con «Guardar» fuera de la pantalla.
+   - **Arreglos**, con su test y su anti-placebo:
+     - `b68d8570`: la cabecera del detalle, con un caso R38 en `supplier-detail-page.test.tsx`;
+     - `ce1c8527`: la fila del catálogo, con un caso R39 en `supplier-showcase-row.test.tsx`.
+
+     No se tocaron `components/ui/` ni `components/shared/supplier/`.
+   - **Medido después, en Pixel 7**, tanto en `/proveedores` como en el detalle: `scrollWidth` =
+     `clientWidth` = `innerWidth` = 412, `innerHeight` 839, y el clic `trial` de «Guardar» pasa en
+     el alta y en la edición.
+   - Los E2E `proveedores.spec.ts` y `aislamiento-proveedores.spec.ts` se volvieron a correr tras
+     `b68d8570`, en Chromium y WebKit: el único rojo sigue siendo R51 (heredado). Tras `ce1c8527`,
+     que solo cambia las clases y envuelve el nombre en un `span` sin tocar los `data-testid`, se
+     corrió `vitest related` (108 passed) y la corrida de Pixel 7.
+2. **R51 de `e2e/proveedores.spec.ts`: rojo heredado de `dev`.** Lo decidió el humano el
+   2026-09-23. La causa es `682d3e3b` (la pantalla redondea a dos decimales), y la aserción no se
+   toca en esta rama.
 3. **Historia: el commit de T1 (`b3f56d93`) incluye los tres renames de T7.** Un `git commit` sin
    pathspec del carril backend se llevó lo que el carril frontend tenía en el índice. El contenido es
    correcto: son renames puros y `e75798ac` completa T7. Intenté separarlo con un rebase y el sistema
