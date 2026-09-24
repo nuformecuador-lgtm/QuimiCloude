@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
-import type { CatalogLineView } from '@/lib/modules/proveedores';
+import type { CatalogLineMeasurements, CatalogLineView } from '@/lib/modules/proveedores';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 import {
@@ -109,6 +109,26 @@ export const CATALOG_DEFAULT_PINNED_COLUMNS: readonly string[] = [IMAGE_COLUMN_I
  */
 function formatDate(value: Date): string {
   return value.toISOString().slice(0, 10);
+}
+
+/**
+ * Texto compacto de las medidas de una linea, p. ej. «Ø 7.5 cm · alto 12 cm · boca 28/410».
+ * `null` cuando no hay ninguna medida: la celda pinta la marca de «sin dato» en ese caso.
+ */
+function formatMeasurements(measurements: CatalogLineMeasurements | null): string | null {
+  if (measurements === null) return null;
+
+  const parts: string[] = [];
+  if (measurements.diameter !== null) {
+    parts.push(`Ø ${measurements.diameter.value} ${measurements.diameter.unit}`);
+  }
+  if (measurements.height !== null) {
+    parts.push(`alto ${measurements.height.value} ${measurements.height.unit}`);
+  }
+  if (measurements.mouth !== null) {
+    parts.push(`boca ${measurements.mouth}`);
+  }
+  return parts.length === 0 ? null : parts.join(' · ');
 }
 
 /**
@@ -219,6 +239,20 @@ export function buildCatalogColumns({
       sortable: true,
       filter: { kind: 'numberRange' },
       cell: (line) => (line.deliveryTime === null ? EMPTY_CELL : String(line.deliveryTime)),
+    },
+    {
+      id: 'material',
+      label: 'Material',
+      align: 'start',
+      // Sin `sortable` ni `filter`: no entra en la lista blanca del backend.
+      cell: (line) => line.material ?? EMPTY_CELL,
+    },
+    {
+      id: 'measurements',
+      label: 'Medidas',
+      align: 'start',
+      // Sin `sortable` ni `filter`: no entra en la lista blanca del backend.
+      cell: (line) => formatMeasurements(line.measurements) ?? EMPTY_CELL,
     },
     {
       id: 'createdAt',
