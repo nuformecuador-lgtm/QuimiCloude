@@ -35,3 +35,18 @@ Se arregla en T14 (el doble devuelve coordenadas con el prompt de recorte).
 ### Prefijo de la migración
 Última migración de `dev` (`origin/dev`): `20260923140000_product_batch_nullable_machine`. QC-141 ocupa
 `20260923150000`–`…150200` en su rama. Prefijo elegido: **`20260923180000`** (por detrás de ambas).
+
+## T8 — Tope de 1 MB del cuerpo de la Server Action
+
+Medido con `JSON.stringify` + `Buffer.byteLength` (UTF-8) sobre la entrada completa de la
+confirmación (`supplierId`, `documentFileId`, `lines`, `newPresentationUnits: []`):
+
+| Fila | Bytes/fila | Filas que caben en 1.048.576 B |
+|---|---|---|
+| Realista: nombre largo, presentación, costo, mínimo, material, medidas completas, `imagePath` | 405 | 2.582 |
+| Mínima: sin imagen, medidas ni material | 161 | 6.471 |
+
+El repo **no** tiene el catálogo de muestra de QC-129 (su spec dice que el PDF no entra al
+repositorio). Estimación para 50 páginas a 15–30 filas/página: 750–1.500 filas, por debajo de 2.582
+en el peor caso. **Cabe sin tocar `next.config.ts`**; no hace falta decisión humana. Queda como riesgo
+declarado para catálogos de más de ~2.500 líneas.
