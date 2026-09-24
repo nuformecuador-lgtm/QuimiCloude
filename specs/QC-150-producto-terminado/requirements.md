@@ -304,3 +304,10 @@ producto terminado no comprobaba que la receta fuera de la empresa del pedido, p
 código:** antes de escribir nada se comprueba que la receta sea de la empresa del pedido; si no lo
 es, se rechaza sin escribir nada, con el código existente `recipe_not_found`. Sin migración ni FK
 compuesta.
+
+*Enmienda de D24, 2026-09-24 (review vuelta 2, B4):* la decisión no cambia; cambia el sitio. La
+comprobación no la hace `inventario`, porque leer la tabla de recetas desde otro módulo lo prohíbe la
+arquitectura. La hace el Finalizar en `pedidos`, con el contrato público de `recetas` acotado por
+empresa, antes de consumir material o escribir nada. Test: `tests/integration/pedidos/finish-with-finished-goods.int.test.ts`
+› «R23, D24 — un pedido de la empresa B con su presentación y el recipeId de la empresa A se rechaza
+con recipe_not_found y no escribe nada en ninguna empresa».
