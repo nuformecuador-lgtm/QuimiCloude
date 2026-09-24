@@ -59,6 +59,8 @@ export const ERROR_MESSAGE_KEY = {
   insufficient_material: 'errors.insufficient_material',
   recipe_without_lines: 'errors.recipe_without_lines',
   user_cannot_be_responsible: 'errors.user_cannot_be_responsible',
+  presentation_without_content: 'errors.presentation_without_content',
+  no_whole_package: 'errors.no_whole_package',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -146,4 +148,8 @@ export const ERROR_MESSAGES_ES = {
   'errors.recipe_without_lines':
     'La receta del pedido no tiene ingredientes: completala antes de entregarlo.',
   'errors.user_cannot_be_responsible': 'Esta persona no puede ser responsable de un pedido.',
+  'errors.presentation_without_content':
+    'La presentacion del pedido no indica su contenido: completala en Presentaciones antes de finalizar.',
+  'errors.no_whole_package':
+    'La cantidad del pedido no llena ni un envase de su presentacion.',
 } as const satisfies Record<ErrorMessageKey, string>;
