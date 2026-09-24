@@ -25,21 +25,21 @@
 
 ### T0 — Precondiciones: QC-142 en `dev` y choque con QC-158 revisado
 
-- [ ] **QC-142 está en `dev`**: `git log origin/dev` contiene su merge, y en `origin/dev`
+- [x] **QC-142 está en `dev`**: `git log origin/dev` contiene su merge, y en `origin/dev`
   `lib/modules/documentos/domain/actor.ts` declara
   `DOCUMENT_UPLOAD_PERMISSION: PermissionCode = 'documentos.modificar'` y `PERMISSIONS` contiene
   `documentos.modificar`. **Si no está, no se empieza**: se para y se avisa al leader.
-- [ ] Traer `dev` a esta rama (`git merge origin/dev`) y confirmar que los cuatro puntos de
+- [x] Traer `dev` a esta rama (`git merge origin/dev`) y confirmar que los cuatro puntos de
   `design.md > 2` se cumplen tal cual. Si alguno cambió, se para y se vuelve al spec.
-- [ ] Comprobar si `tests/unit/documentos-ui/document-upload-convenciones.test.ts` está verde en `dev`.
+- [x] Comprobar si `tests/unit/documentos-ui/document-upload-convenciones.test.ts` está verde en `dev`.
   Lo normal es que sí: el arreglo de la línea del catálogo con `/documento/i` es del implementer de
   QC-142. **Solo si sigue en rojo** se anota para T6 (riesgo 13.2).
-- [ ] **Choque con QC-158 (D9)**: al sincronizar con `dev`, comparar los archivos que QC-158 ha
+- [ ] **Choque con QC-158 (D9)** — BLOQUEADA 2026-09-24: QC-158 cambió el montaje de `page.tsx` (ver `progress/impl_QC-160-boton-de-subida-de-pdf.md`).: al sincronizar con `dev`, comparar los archivos que QC-158 ha
   cambiado (en `dev` o en su rama) con los de esta ficha: `app/(private)/proveedores/[id]/page.tsx`,
   `tests/unit/documentos-ui/supplier-detail-upload.test.tsx`, `lib/modules/documentos/domain/actor.ts`,
   `lib/modules/documentos/index.ts` y `tests/unit/documentos/module-contract.test.ts`. Si alguno
   coincide, **se para antes de implementar** y se avisa al leader.
-- [ ] La base `QuimiCloude_QC160` existe, con migraciones aplicadas y sembrada.
+- [x] La base `QuimiCloude_QC160` existe, con migraciones aplicadas y sembrada.
 - **Archivos:** ninguno.
 - **Depende de:** aprobación del spec y merge de QC-142 en `dev`.
 - **Hecho cuando:** todas las casillas marcadas y `./init.sh --rapido` verde sobre la rama con `dev`
