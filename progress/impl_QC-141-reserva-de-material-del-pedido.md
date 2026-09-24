@@ -1215,3 +1215,162 @@ base `QuimiCloude_QC141`; log en `progress/e2e_QC-141_vuelta2.log`):
 
 TR, TB1-TB4 y Tm1-Tm7 cerradas. TC: rollback y E2E en verde; **falta un `./init.sh` completo que termine**,
 con la máquina liberada.
+
+## Vuelta 3 tras el review 2 (2026-09-23)
+
+Review de la vuelta 2 RECHAZADO (`a3a89083`: V2-B1..V2-B4, m-V2-1..m-V2-5). Tercera enmienda del spec
+`23dea288` (D22, R59-R66); preguntas 8 y 9 resueltas por el humano en `b148045a` (R65 y R66 firmes).
+Subagentes: `backend_dev` (conflictos de `lib/`, tests de QC-151, TD22, TV2-B1/B3/m1/m2, TV2-B2/m3/m5,
+barrido de tests, limpieza del E2E de cotización) y `frontend_dev` (conflictos de UI, fixture de
+`order-form-quote`, `orderId` en la cotización de edición, caso R59 del E2E, barrido de tests de UI/E2E).
+
+### Estado de las tasks
+
+| Task | Estado | Commits |
+|---|---|---|
+| TR2 | [x] | `9c82ab22` (merge de `origin/dev` `f1530835`) |
+| TD22 | [x] | `e459409e`, `183c0034`, `75f73671`, `2b394061`, `8968cf62` (UI), `f21aeddd` (E2E), `358fa00f` |
+| TV2-B1 | [x] | `e48d4e34`, `0a0ba381`, más las citas de `create-order.ts`, `update-order.ts` y `lib/composition/index.ts` dentro de `183c0034`; tests: `ab788092`, `f6d8d4bc` |
+| TV2-B2 | [x] | `6293c7c1` |
+| TV2-B3 | [x] | `165769ae` |
+| TV2-B4 | [x] | TR2 + TD22 + TC2; `git merge-tree --write-tree HEAD origin/dev` (`f1530835`) → 0 conflictos |
+| TV2-m1 | [x] | `0a0ba381`, `a4fdfdc6` |
+| TV2-m2 | [x] | `f1f945ac` |
+| TV2-m3 | [x] | `a06c1c37` |
+| TV2-m4 | [x] | spec en `23dea288`; esta sección; TC y TC2 marcadas `[x]` juntas |
+| TV2-m5 | [x] | `6293c7c1` |
+| TC, TC2 | [x] | `3166175c` (limpieza del E2E) y esta sección |
+
+### TR2
+
+- **Migraciones.** `git diff --name-only HEAD...origin/dev -- db/migrations` vacío: `dev` no trae
+  migraciones y no se renumera nada. `QuimiCloude_QC141`: `prisma migrate status` → 48 migraciones,
+  «Database schema is up to date!». `prisma generate` y `pnpm run db:test template` (plantilla reutilizada
+  `qct_tpl_51f079471849`, 48 migraciones). No hizo falta ningún `down` ni recrear la base.
+- **Conflictos reales: 11** (el review contaba 10; el que falta en su cuenta es `order-table.tsx`):
+  `order-form.tsx`, `order-table.tsx`, `lib/composition/index.ts`, `order-actions.ts`, `pedidos/index.ts`,
+  `tests/integration/aislamiento.json`, `order-form.test.tsx`, `order-sheet.test.tsx`,
+  `pedidos-viewport.test.tsx`, `order-actions.test.ts` y `data-table-alcance.test.ts`. Todos se resolvieron
+  por unión. `cancelOrder` y `deleteOrder` conservan `unitOfWork`, que necesitan para liberar la reserva.
+  `order-actions.test.ts` cuenta ocho Server Actions en vez de siete (se suman la cobertura y la
+  cotización). `data-table-alcance` pasa a 21 E2E.
+- **Tests de `dev` que no compilaban con la rama, sin conflicto de git:** `quote-order-cost.test.ts`,
+  `order-cost-quote.int.test.ts` y `order-form-quote.test.tsx`. Se adaptaron a `unitOfWork`, a
+  `withOrderTransaction` + `createOrderWriteRepository` y a las cantidades en cadena decimal. Frente a
+  `origin/dev` no se quitó ninguna aserción; solo sobra el campo `status` en la entrada de edición, que la
+  rama ya no acepta.
+- **Rojo heredado.** Con `daa400c5`, `guard-arquitectura-modulos` sale verde (62/62). Se retira de
+  `tests/baseline-rojos.json`, que queda vacío.
+- **Cotización de QC-151 (la usa TD22).** `quoteOrderCostAction` (`order-actions.ts:337`) →
+  `pedidos.quoteOrderCost` → `createQuoteOrderCost` (`quote-order-cost.ts:32`) → `resolveIngredientsCost`
+  (`resolve-ingredients-cost.ts:18`) → `calculateIngredientsCost` / `calculateLineCost` (`order-cost.ts`).
+  El alta (`create-order.ts:116`) y la edición (`update-order.ts:109`) llaman a la misma
+  `resolveIngredientsCost`, así que hay un solo cálculo (R62). QC-151 no lo duplicó.
+- `./init.sh --rapido` después del merge: 455 archivos en verde y 1 rojo,
+  `tests/unit/configuracion-ui/user-table.test.tsx` («la accion de editar de una fila abre el panel…»). La
+  rama no toca ese archivo ni `app/(private)/configuracion`; aislado da 27/27 en verde. El `./init.sh`
+  completo del cierre no lo reprodujo.
+
+### TD22
+
+- `CostingBatch.available` y `findCostingBatches(ids, companyId, { excludeOrderId? })` usan el mismo
+  agregado del libro de reservas (`reservation-prisma.ts`, `findReservedAndAvailableByBatch` con
+  `excludeOrderId`). Filtran por empresa las dos tablas y siguen excluyendo los lotes sin presentación o
+  sin coste.
+- `calculateLineCost`: la cobertura es la suma de los disponibles, y el coste es el promedio simple de todos
+  los lotes con disponible > 0, a escala 12 y con un solo redondeo final. `order-cost.ts` ya no importa
+  `compareBatchesOldestFirst`, que sigue en la reserva.
+- La entrada de la cotización pasa a `quoteOrderCostSchema` = `{ recipeId, quantity, orderId?: uuid }`
+  (`order-input.ts:156`). La edición envía el `id` del pedido y el alta no lo envía
+  (`use-order-cost-quote.ts`, `order-form.tsx`).
+- **Tests reescritos por D22 (para la nota del PR)**, en `tests/unit/pedidos/order-cost.test.ts`:
+  - «usa solo lotes con existencia, del mas antiguo al mas nuevo, hasta cubrir» → «D22 de QC-141 deroga
+    QC-123 D3/D4: promedia TODOS los lotes con disponible…».
+  - «desempata por numero de lote…» → «…el orden de los lotes… ya no afecta el coste (R60)».
+  - «el lote 9 se usa antes que el 10» y «desempate por texto» → «…numeros de lote numericos y de texto en
+    la misma fecha dan el mismo coste (R60)».
+  - «la fecha de vencimiento no altera el orden ni la seleccion (R15)» → «D22 de QC-141 deroga QC-123 D3/D4:
+    …(R4)». En el primer pase se había borrado y se repuso en `358fa00f`. El nombre pasó de citar `(R15)` a
+    `(R4)`, que es el requisito de QC-123 «no se usa la fecha de vencimiento» según `design.md > 6.6`
+    (el `R15` del nombre viejo no coincide con esa numeración).
+  - «promedia los costes unitarios de los lotes usados sin ponderar» se conserva numéricamente; el ejemplo
+    de D22 va en un caso aparte.
+  - En `tests/unit/pedidos-ui/order-form-quote.test.tsx`, tres aserciones de edición (R12 ×2 y R23) ahora
+    esperan también `orderId`.
+
+### TV2-B3: `order-duplicate-number.int` frente a `899c3d22`
+
+Se mantiene: `sequence === 1` en la primera alta, el control de que el trigger da un `23505` real contra
+`orders_company_year_sequence_key`, `$transaction` llamado exactamente 3 veces y 1 sola fila guardada. Lo
+que cambia es la forma del resultado: antes era la cadena `'duplicate_number'` y ahora es una
+`DuplicateOrderNumberError` con `.code === 'duplicate_number'`, porque el alta pasa por
+`withOrderTransaction`, que lanza (`design.md > 5.2.3`). Se añade una aserción: 0 filas en
+`reservation_movements`. Se retira el helper `sqlStateOf`, que solo servía para leer el `23505` crudo. En el
+segundo `describe` de `order-unit-of-work.int.test.ts`, que afirmaba el `23505` crudo, el caso pasa a
+afirmar `DuplicateOrderNumberError`.
+
+### Barrido final de citas (TV2-B1, sobre todo el diff de la rama, producción y tests)
+
+    MB=$(git merge-base origin/dev HEAD)   # f1530835
+    git diff -U0 $MB HEAD -- lib app db components hooks middleware.ts tests e2e \
+     | awk '/^\+\+\+ /{f=substr($0,7);next} /^\+/{print f": "substr($0,2)}' \
+     | grep -E '(//|/\*|^\S+: \s*\*|--)' \
+     | grep -E '(\bR[0-9]+\b|\bT[A-Za-z]*[0-9]+\b|QC-[0-9]+|design\.md|requirements\.md|tasks\.md|\bB[0-9]\b|\bm[0-9]\b|V2-|\bD[0-9]+\b)'
+
+- **Producción:** 0 líneas. Hice también un barrido sin filtrar por marcador de comentario (cualquier línea
+  `+` de `lib app db components hooks middleware.ts` con esos patrones, salvo `@module`): 0 líneas.
+- **Tests:** antes del barrido había 78 líneas; se limpiaron en `ab788092` y `f6d8d4bc`. Quedan 4, y
+  ninguna es una cita que la rama haya añadido:
+  - `reservation.int.test.ts`: `describe('R39 — …')`, que es un nombre de caso;
+  - tres comentarios de `data-table-alcance.test.ts` que ya estaban en `origin/dev` con la cita. La rama
+    solo cambió el ordinal al renumerar (VIGESIMA → VIGESIMOPRIMERA, etc.).
+
+### R → test: mapa completo R1–R66
+
+R1-R58 como en «Vuelta 2 > R → test: mapa completo R1–R58», con R29 **retirado (D21)**, más estos cambios:
+
+| R | Test |
+|---|---|
+| R15 | además, `order-duplicate-number.int.test.ts` y `order-unit-of-work.int.test.ts` (`DuplicateOrderNumberError` tras 3 transacciones) |
+| R51 | además, `transition-order.test.ts` «R51: setStatus devuelve stale tras consumir y la unidad se deshace» |
+| R58 | además, `guard-ambito-empresa-pedidos.test.ts`: cuatro «R58 — ANTI-PLACEBO» nuevos (varios especificadores, comillas dobles, `import * as`, `tx.order.findMany` en el exento) |
+| R59 | `order-cost.test.ts` «el ejemplo de D22 … da 370,0000 (R59)»; `order-ingredients-cost.int.test.ts` «D22: el importe promedia TODOS los lotes … (R59, R60, R64)»; `e2e/pedidos-cotizacion.spec.ts` «R59: el promedio simple de todos los lotes con disponible cotiza el ejemplo de D22» (`$ 370.00`, Chromium y WebKit) |
+| R60 | `order-cost.test.ts` «R60: no pondera…», «…promedia TODOS los lotes…», «…el orden de los lotes… (R60)», «…numericos y de texto… (R60)», «R60: no incluye… disponible cero»; `product-catalog-costing.test.ts` «no devuelve un lote con disponible cero (R60)»; `order-ingredients-cost.int.test.ts` «un lote apartado entero por OTRO pedido queda fuera del promedio (R60)» |
+| R61 | `order-cost.test.ts` «…no cubre por menos de lo necesario (R61)» y «cubre exactamente… (R61)»; `order-ingredients-cost.int.test.ts` «disponible insuficiente aunque la existencia TOTAL alcance… (R61)» |
+| R62 | `quote-order-cost.test.ts` describe «R1: el mismo resultado…»; `order-cost-quote.int.test.ts` «con existencia suficiente, la cotizacion y el alta dan el mismo importe (R62)» y «sin existencia suficiente, la cotizacion y el alta dan las dos null (R62)» |
+| R63 | `order-cost.test.ts` «el importe viaja como cadena decimal… (R59, R63)» y «un importe que no cabe… (R63)»; `order-ingredients-cost.int.test.ts` «la edicion lo reescribe, incluso a nulo (R11)» |
+| R64 | `order-ingredients-cost.int.test.ts` «D22: … (R59, R60, R64)» (aparta 20 de A y 10 de B, nada de C) |
+| R65 | `resolve-ingredients-cost.test.ts`, `update-order.test.ts` y `create-order.test.ts` («… (R65)»); `product-catalog-costing.test.ts` «con excludeOrderId no resta… (R65)»; `order-cost-quote.int.test.ts` describe «R65: un pedido que ya existe cuenta…» y «aislamiento: orderId de OTRA empresa no cambia nada (R65, ambito)»; `order-form-quote.test.tsx` «la edicion envia el orderId… (R65)» y «el alta no envia orderId… (R65)» |
+| R66 | `order-ingredients-cost.int.test.ts` «un lote de maquina sin presentacion ni coste, con disponible, no contamina el promedio (R66)» y «…aunque cubriria por si solo, no cuenta en la cobertura (R66)»; `product-catalog-costing.test.ts` «…(R66)» |
+
+### Cierre (TC2)
+
+- **Rollback:** TR2 no renumeró, así que vale la prueba de la vuelta 2.
+- **E2E** (`npx playwright test e2e/reserva-de-material.spec.ts e2e/ejecucion-receta.spec.ts
+  e2e/ajuste-de-inventario.spec.ts e2e/pedidos-terminados.spec.ts e2e/pedidos.spec.ts
+  e2e/pedidos-busqueda.spec.ts e2e/pedidos-cotizacion.spec.ts --project=chromium --project=webkit`,
+  puerto 3117 libre, base `QuimiCloude_QC141`):
+  - Corrida 1 (`progress/e2e_QC-141_vuelta3_intento1.log`): **38 passed, 2 failed**. Los dos fallos son el
+    `afterAll` de `pedidos-cotizacion` en los dos navegadores: `order.deleteMany` chocaba con el FK de
+    `reservation_movements` e `inventory_movements`, porque ahora el alta aparta. El cuerpo del test había
+    pasado. Se corrigió en `3166175c`, que borra los apartados y movimientos antes que los pedidos, y se
+    borraron las 2 empresas residuales `qc151_e2e_*` de `QuimiCloude_QC141`.
+  - Corrida 2 (`progress/e2e_QC-141_vuelta3.log`, HEAD `3166175c`): **40 passed, exit 0**, en Chromium y
+    WebKit, incluido el caso R59.
+- **`./init.sh` completo** (HEAD `3166175c`, sin otra suite de vitest en la máquina y con
+  `.next/dev/types` borrado antes; log en `progress/init_QC-141_vuelta3.log`): **`== init OK ==`, exit 0**.
+  Resultado: 669 archivos, 9365 tests en verde y 114 skipped; los tres proyectos (ui, node, integration);
+  «sin rojos nuevos (669 archivos ejecutados, baseline vacio)».
+- `git merge-tree --write-tree HEAD origin/dev` (`f1530835`): 0 conflictos.
+
+### Para la nota del PR
+
+- Guardias y tests de fichas cerradas que cambian lo que afirman: los de TC y la vuelta 2, más
+  `qc145-estado-solo-planta` (unión sin duplicar en R29 y lista exacta de `status:` en R10).
+- Tests de QC-123 y QC-151 reescritos por D22 (lista en «TD22»).
+- `order-duplicate-number.int` vuelve a afirmar `duplicate_number`.
+
+### Veredicto de la vuelta 3
+
+TR2, TD22, TV2-B1..TV2-B4, TV2-m1..TV2-m5, TC y TC2 cerradas. Los E2E de los 7 specs están en verde en
+Chromium y WebKit, y el `./init.sh` completo también.

@@ -574,7 +574,7 @@ sus tests unitarios.
 `run` (crear, editar y finalizar); `guard-arquitectura-modulos` verde (sin Prisma en composición,
 sin ciclo); R7, R12, R27 y R31 siguen verdes.
 
-## [ ] TC — Cierre: E2E, gate completo y trazabilidad `[depende de TR, TB1-TB4, Tm1-Tm7]`
+## [x] TC — Cierre: E2E, gate completo y trazabilidad `[depende de TR, TB1-TB4, Tm1-Tm7]`
 
 > **Absorbida por TC2** (enmienda del review 2): el rollback y los E2E de la vuelta 2 se hicieron
 > sobre una rama que ya no se integra con `dev`, y el `./init.sh` completo no terminó. Se marca
@@ -597,7 +597,7 @@ bitácora con comandos y resultados.
 
 ---
 
-# Enmienda del review 2 (2026-09-23) — PENDIENTE
+# Enmienda del review 2 (2026-09-23) — cerrada en la vuelta 3
 
 > Review de la vuelta 2 (V2-B1..V2-B4, m-V2-1..m-V2-5) y decisión **D22** de `requirements.md`;
 > diseño en `design.md > 0.5` y las secciones que allí se citan. Orden: **TR2 primero**; después
@@ -607,7 +607,7 @@ bitácora con comandos y resultados.
 > **TD22 no empieza** hasta que el humano responda las preguntas abiertas **8** y **9** (R65, R66);
 > las demás tasks no dependen de ellas.
 
-## [ ] TR2 — Re-sincronizar con `origin/dev` (QC-122, QC-151, `daa400c5`) `[primera de lo pendiente]`
+## [x] TR2 — Re-sincronizar con `origin/dev` (QC-122, QC-151, `daa400c5`) `[primera de lo pendiente]`
 
 Archivos: todo lo que traiga el merge; los 10 en conflicto según el review:
 `app/(private)/pedidos/components/{order-form,order-table}.tsx`, `lib/composition/index.ts`,
@@ -644,7 +644,7 @@ comparte prefijo y las tres nuestras van por detrás de la última de `dev`; `_p
 `guard-arquitectura-modulos` verde sin baseline; `./init.sh --rapido` verde; la bitácora lista los
 conflictos reales frente a los 10 esperados.
 
-## [ ] TD22 — Coste del pedido por promedio de los lotes con disponible `[depende de TR2 y de las preguntas 8 y 9]`
+## [x] TD22 — Coste del pedido por promedio de los lotes con disponible `[depende de TR2 y de las preguntas 8 y 9]`
 
 Archivos (a confirmar en el paso 1): `lib/modules/pedidos/domain/{order-cost,resolve-ingredients-cost,update-order,create-order}.ts`,
 la consulta de cotización de QC-151 y su esquema de entrada, `order-form.tsx` (envía `orderId` en
@@ -679,7 +679,7 @@ iguales, y los dos nulos), **R63** (edición recalcula, también a nulo), **R65*
 de aislamiento con `excludeOrderId` de otra empresa; `guard-ambito-empresa-inventario` y
 `guard-arquitectura-modulos` verdes; `R8`, `R12`, `R16` siguen verdes (la reserva no cambia).
 
-## [ ] TV2-B1 — Comentarios de producción sin citas (V2-B1) `[depende de TR2]` `[P con TD22]`
+## [x] TV2-B1 — Comentarios de producción sin citas (V2-B1) `[depende de TR2]` `[P con TD22]`
 
 Archivos: `lib/composition/index.ts` (hoy `:983`),
 `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts` (`:543`),
@@ -697,7 +697,7 @@ Archivos: `lib/composition/index.ts` (hoy `:983`),
 **Hecho cuando:** el barrido final no encuentra ninguna cita en comentarios de producción añadidos
 por la rama, con el comando y su salida en la bitácora.
 
-## [ ] TV2-B2 — `qc145-estado-solo-planta` correcto con QC-141 ya en `dev` (V2-B2) `[depende de TR2]` `[P con TD22]`
+## [x] TV2-B2 — `qc145-estado-solo-planta` correcto con QC-141 ya en `dev` (V2-B2) `[depende de TR2]` `[P con TD22]`
 
 Archivos: `tests/unit/.../qc145-estado-solo-planta.test.ts` (hoy `:363-366`).
 
@@ -709,7 +709,7 @@ merge-base **ya** contiene `ReservationMovement` sigue verde (sin duplicado); ot
 nuevo no declarado sale en rojo; los nombres de los casos citan el requisito de QC-145 que ya
 citaban.
 
-## [ ] TV2-B3 — El correlativo agotado vuelve a dar `duplicate_number` (V2-B3) `[depende de TR2]` `[P con TD22]`
+## [x] TV2-B3 — El correlativo agotado vuelve a dar `duplicate_number` (V2-B3) `[depende de TR2]` `[P con TD22]`
 
 Archivos: `lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma.ts`,
 `tests/integration/pedidos/order-duplicate-number.int.test.ts`, `tests/unit/pedidos/order-actions.test.ts`
@@ -725,7 +725,7 @@ Archivos: `lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-pr
 test contra `899c3d22` no quita ninguna aserción (o la bitácora explica cada una); `order-sequence.int`
 y `order-sequence-race.int` siguen verdes (**R15**); `guard-catalogo-de-errores` verde.
 
-## [ ] TV2-B4 — Integración con `dev` y cotización (V2-B4) `[depende de TR2, TD22]`
+## [x] TV2-B4 — Integración con `dev` y cotización (V2-B4) `[depende de TR2, TD22]`
 
 No es una task de escritura propia: V2-B4 lo cierran **TR2** (merge), **TD22** (D22, R59-R66) y
 **TC2** (E2E y gate sobre la rama mergeada).
@@ -734,7 +734,7 @@ No es una task de escritura propia: V2-B4 lo cierran **TR2** (merge), **TD22** (
 el `origin/dev` del momento del cierre no da conflictos (si `dev` volvió a avanzar, se repite TR2
 antes de TC2).
 
-## [ ] TV2-m1 — Comentarios que ya no son verdad `[depende de TR2]` `[P con TV2-B1]`
+## [x] TV2-m1 — Comentarios que ya no son verdad `[depende de TR2]` `[P con TV2-B1]`
 
 Archivos: `order-prisma.ts` (`:615-621`), `order-unit-of-work-prisma.ts` (`:12`),
 `lib/modules/asignaciones/domain/errors.ts` (`:159-160`).
@@ -745,7 +745,7 @@ Archivos: `order-prisma.ts` (`:615-621`), `order-unit-of-work-prisma.ts` (`:12`)
 **Hecho cuando:** ningún comentario de `lib/**` nombra `transitionAliveOrder` ni `createOrder`, y el
 de `asignaciones/domain/errors.ts` solo habla de la planta; sin citas (TV2-B1).
 
-## [ ] TV2-m2 — `setStatus` distinto de `ok` tras consumir deshace la unidad `[depende de TR2]` `[P con TD22]`
+## [x] TV2-m2 — `setStatus` distinto de `ok` tras consumir deshace la unidad `[depende de TR2]` `[P con TD22]`
 
 Archivos: `lib/modules/pedidos/domain/transition-order.ts` (`:62-63`),
 `tests/unit/pedidos/transition-order.test.ts`.
@@ -756,7 +756,7 @@ Archivos: `lib/modules/pedidos/domain/transition-order.ts` (`:62-63`),
 un consumo `consumed` → la unidad se deshace (el doble de `run` ve la excepción) y el resultado es
 `'stale'`; los casos R27, R30, R31, R50 y R51 siguen verdes.
 
-## [ ] TV2-m3 — Alias y `tx.` en `guard-ambito-empresa-pedidos` `[depende de TR2]` `[P con TV2-m2]`
+## [x] TV2-m3 — Alias y `tx.` en `guard-ambito-empresa-pedidos` `[depende de TR2]` `[P con TV2-m2]`
 
 Archivos: `tests/guards/guard-ambito-empresa-pedidos.test.ts`.
 
@@ -768,14 +768,14 @@ Archivos: `tests/guards/guard-ambito-empresa-pedidos.test.ts`.
 en rojo (varios especificadores, comillas dobles, `import * as`, `tx.order.findMany` en el exento), y
 la guardia está verde sobre el código real.
 
-## [ ] TV2-m4 — Spec al día (m-V2-4) `[hecha en el spec; queda la bitácora]`
+## [x] TV2-m4 — Spec al día (m-V2-4) `[hecha en el spec; queda la bitácora]`
 
 Hecho en esta enmienda: `requirements.md` ya no dice que la pregunta 7 siga abierta; el título
 «PENDIENTE» del bloque del review 1 se cambió; Tm1 marcada `[x]`; TC queda absorbida por TC2.
 
 **Hecho cuando:** la bitácora lo registra y TC y TC2 se marcan `[x]` juntas al cerrar.
 
-## [ ] TV2-m5 — Lista exacta de escrituras de `status:` en `order-prisma.ts` `[depende de TR2]` `[P con TV2-m3]`
+## [x] TV2-m5 — Lista exacta de escrituras de `status:` en `order-prisma.ts` `[depende de TR2]` `[P con TV2-m3]`
 
 Archivos: `qc145-estado-solo-planta.test.ts` (caso R10, segundo).
 
@@ -785,7 +785,7 @@ Archivos: `qc145-estado-solo-planta.test.ts` (caso R10, segundo).
 **Hecho cuando:** el caso está verde sobre el código real, y un anti-placebo con una escritura nueva
 `status: <variable>` en otra función de `order-prisma.ts` sale en rojo.
 
-## [ ] TC2 — Cierre: E2E, gate completo y trazabilidad `[depende de TR2, TD22, TV2-B1..TV2-B4, TV2-m1..TV2-m5]`
+## [x] TC2 — Cierre: E2E, gate completo y trazabilidad `[depende de TR2, TD22, TV2-B1..TV2-B4, TV2-m1..TV2-m5]`
 
 Archivos: `progress/impl_QC-141-reserva-de-material-del-pedido.md`.
 
