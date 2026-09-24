@@ -1044,3 +1044,174 @@ nuevos (643 archivos ejecutados, baseline vacio)», «todas las migraciones tien
 ### Veredicto
 
 T16 y T17 cerradas; TM la cerró el leader. Las 19 tasks de `tasks.md` (T0-T17 y TM) en `[x]`.
+
+---
+
+## Vuelta 2 tras review (2026-09-23)
+
+Review F2.2 RECHAZADO (`9f158f3a`: B1-B4, m1-m7). Segunda enmienda del spec `b54f4440` (D21, R51-R58,
+R29 retirado) y decisiones del humano `02c5eda3`: B3 como excepción con nombre con los dos refuerzos de
+`design.md > 5.2.1`; B4 = solo el Finalizar consume y escribe `finished_at`; todos los menores en esta
+vuelta; pregunta 7 = se acepta el límite (no se tocó `compareBatchesOldestFirst` ni el coste de QC-123).
+Subagentes: `backend_dev` (TR; TB1/TB2/Tm4/TB3; Tm5/Tm6/Tm3; TB4/Tm7/Tm2; rollback de TC) y
+`frontend_dev` (revisión de la UI del merge; E2E de TB4).
+
+### Estado de las tasks
+
+| Task | Estado | Commits |
+|---|---|---|
+| TR | [x] | `f0e67b2a` renumeración, `40a5ec3c` merge de `origin/dev` (`899c3d22`), `2f5a7106`, `8139b030` |
+| TB1 | [x] | `12609b93` |
+| TB2 | [x] | `c0b855b3` |
+| TB3 | [x] | `90ab4116` |
+| TB4 | [x] | `2f5a7106` (rama ENTREGADO fuera de `update-order.ts`), `b14e41dc` (tests R52), `74c5a68a` + `c1c82525` (E2E) |
+| Tm1 | [x] | esta sección (mapa R1-R58) |
+| Tm2 | [x] | `e8cfad9c`, `c3022c0d` |
+| Tm3 | [x] | `3623fea4` |
+| Tm4 | [x] | `2a1195ba` |
+| Tm5, Tm6 | [x] | `4fafde1b` |
+| Tm7 | [x] | `b14e41dc` (junto con TB4: comparten `order-reservation.int.test.ts` y un commit intermedio no compilaba) |
+| TC | ver «Cierre (TC)» | `811861fc` (R51 en los nombres), `c1c82525` |
+
+### TR: lo confirmado en el código de `dev`
+
+- **Migraciones.** La última de `dev` al mergear era `20260923140000_product_batch_nullable_machine`. Las
+  tres nuestras pasan a `20260923150000_inventory_movement_kind_consumption`,
+  `20260923150100_reservations_and_decimal_stock` y `20260923150200_reserve_existing_orders`. Ningún
+  prefijo repetido en `db/migrations/`.
+- **Base propia `QuimiCloude_QC141`.** Los tres `down` con el nombre viejo revirtieron **limpios** (en
+  orden, apartando cada carpeta revertida fuera del repo), sin el fallo que preveía `design.md > 15`: no
+  hizo falta recrear la base. Después `prisma migrate deploy` aplicó `orders_finished_at`,
+  `product_batch_nullable_machine` y las tres renumeradas; plantilla de integración regenerada
+  (`pnpm run db:test template`). Tm5/Tm6 volvieron a revertir `…150200` (limpio) y a aplicarla editada.
+  `_prisma_migrations`: 48 aplicadas, ninguna con nombre viejo.
+- **`finished_at` de QC-145.** `new Date()` del proceso Node, no `now()` de SQL:
+  `lib/modules/asignaciones/domain/finish-assigned-order.ts:73` (`const now = deps.now?.() ?? new Date();`),
+  escrito en `dev` por `transitionAliveOrder` (`order-catalog-prisma.ts:221`,
+  `...(to === 'ENTREGADO' ? { finishedAt: now } : {})`). Se lleva tal cual a `setAliveOrderStatus`
+  (`order-prisma.ts`, en el mismo `UPDATE` condicional que el estado); `transitionAliveOrder` se borra (Tm2).
+- **Rojo heredado.** `tests/guards/guard-arquitectura-modulos.test.ts`, un caso, por el import profundo de
+  `@/lib/modules/inventario/domain/product-type` en `lib/modules/inventario/adapters/driving/product-actions.ts`
+  (`a01c90cb`). `tests/baseline-rojos.json` de `dev` ya lo lista (desde 2026-09-23). No se toca.
+- **Merge.** `recalculateProductStock` conserva la suma en SQL `numeric` de la rama (no el `singleUnitStock`
+  en JS de `dev`): lo exige `qc91-alcance`. La UI del merge (`product-form.tsx`, `product-name-picker.tsx`,
+  `order-form.tsx`, `product-batches-panel.tsx`) la revisó `frontend_dev`: correcta, sin cambios.
+  `tests/unit/pedidos/qc145-estado-solo-planta.test.ts` (de QC-145) se adaptó: `finishedAt` se exige en
+  `setAliveOrderStatus`, y el modelo nuevo `ReservationMovement` se admite en su censo del esquema.
+  `update-order.ts` perdió la rama ENTREGADO en TR porque con QC-145 dejó de compilar (`status` ya no
+  existe en el esquema de edición).
+
+### TB1: barrido de comentarios
+
+```
+git diff origin/dev...HEAD -- lib/ app/ db/ > qc141_diff.txt
+grep -nE '^\+' qc141_diff.txt | grep -E '(//|/\*|\*[^/])' | grep -E 'R[0-9]+|T[0-9]+|QC-[0-9]+|design\.md|requirements\.md|tasks\.md'
+grep -nE '^\+' qc141_diff.txt | grep -E '\bR[0-9]+\b|\bT[0-9]+\b|QC-[0-9]+|design\.md|requirements\.md|tasks\.md'
+```
+
+Solo aparecieron las dos del review (`order-prisma.ts`, «R21-R26»; `lib/composition/index.ts`, «T12,
+design.md > 9»). Quitadas; queda el motivo.
+
+### Tm2: alcance mayor que el que decía el spec
+
+`design.md > 5.3` daba por hecho que `createOrder` solo lo usaba `order-sequence.int` y que
+`transitionAliveOrder` no tenía llamantes. En producción era así, pero **13 archivos de test** los usaban
+como fixture o como sujeto. Se borraron las dos funciones igual (D21) y se adaptaron los tests sin
+debilitar lo que afirman:
+
+- Fixture → `withOrderTransaction` + `createOrderWriteRepository`: `company-scope-queries`,
+  `list-query-orders`, `order-catalog-company-summary`, `order-repository` (`.int`).
+- Sujeto reapuntado: `order-sequence.int` y `order-sequence-race.int` (correlativo sobre la unidad de
+  trabajo); `order-duplicate-number.int` (ya no existe `'duplicate_number'`: afirma tres intentos y que sube
+  el `23505` sin fila duplicada); `order-finished-at.int` y `tests/unit/pedidos/order-catalog.test.ts` (a
+  `setStatus`; el caso de `InvalidTransitionError` lo cubre ahora `transition-order.test.ts`).
+- `asignaciones`: `company-orders.int` (el catálogo no ejercitado lanza si se le llama),
+  `finished-orders.int` y `responsible-eligibility.int` (sí finalizan: `assertTransition` + `setStatus` real).
+- `module-contract.test.ts`, `qc145-estado-solo-planta.test.ts` y el anti-placebo de
+  `guard-ambito-empresa-pedidos` (ahora contra `insertAliveOrder`; sigue en rojo con su fuente fabricada).
+
+Para el PR: cambia el sujeto de tests de fichas cerradas (QC-145 y `asignaciones`), además de las guardias
+que ya señaló el review (`qc91-alcance`, `qc121-alcance`, `qc111-alcance`, `pedidos/scope`,
+`module-contract`, `credencial/scope`) y la excepción nueva de D21 en `guard-ambito-empresa-pedidos`.
+
+### Otras notas para el review
+
+- **Tm7.** `OrderTransactionScope.recipes` sobre `tx`, con la fábrica nueva `createRecipeExecutionReader`
+  (`recipe-catalog-prisma.ts`); el tipo `PrismaLike` sube a `recetas/.../company-scope.ts`, que ya podía
+  importar `@prisma/client`. `createTransitionOrder` ya no recibe `recipes`. Crear, editar y finalizar
+  leen la receta dentro de `run` con `scope.recipes`; los unit de crear y editar usan un lector global
+  que no debe llamarse.
+- **Tm5.** Además del comparador, el `array_agg` paralelo desempata por `batch_id` para que los cuatro
+  arrays queden alineados. R57 va en dos casos, cada uno en su transacción, porque `now()` es fijo por
+  transacción.
+- **E2E de TB4.** El paso final asigna B al Operador por Prisma, entra como Operador y finaliza. La receta
+  del fixture gana un paso de checklist (sin pasos no hay botón Finalizar).
+- **Fuera de la rama.** `tests/unit/pedidos-ui/pedidos-convenciones.test.ts` (QC-35) mira `git status`
+  sin filtrar cuando un commit de la rama menciona «QC-35»: sale rojo con el árbol sucio y verde al
+  commitear. No se tocó.
+- **Stash compartido.** Queda `QC-141-tm5tm6-wip` (`def00ec7`) en la pila; su contenido ya está en
+  `4fafde1b`. El permiso automático denegó el `git stash drop`: lo tiene que soltar el humano.
+
+### R → test: mapa completo R1–R58
+
+R1-R11, R13, R14, R16-R20, R23, R32-R42 y R45-R47: como en «Tanda 3 > R → test: mapa completo R1–R50».
+Cambian o se añaden:
+
+| R | Test |
+|---|---|
+| R12 | `order-reservation.int.test.ts` («R12 — editar a la baja…»); la edición ya no ofrece estado (`e2e/pedidos-terminados.spec.ts`, «…no ofrece estado…») |
+| R15 | `order-unit-of-work.int.test.ts`; `order-sequence.int.test.ts` y `order-sequence-race.int.test.ts` sobre la unidad de trabajo (Tm2) |
+| R21, R22, R25 | `expire-stale-orders.test.ts`; `order-expiry.int.test.ts` (reverificados tras TB2 y Tm4) |
+| R24 | `order-expiry-cron-route.test.ts` (más el caso `stage: 'companies'`) |
+| R26 | `expire-stale-orders.test.ts` («R26: …», `code` presente y `unexpected` sin catálogo); `order-expiry-cron-route.test.ts` |
+| R27, R28 | `transition-order.test.ts` («R27, R28, R51: EN_CURSO -> ENTREGADO consume…», `setStatus` recibe el `now` que va a `finished_at`); `order-reservation.int.test.ts` («R27, R28, R51: Finalizar baja el lote…», `finished_at` no nulo); `reservation.int.test.ts`. R28 también en `qc121-alcance.test.ts` («rojo (R28)», «verde (R28)» y el barrido de `lib/**`) |
+| **R29** | **retirado (D21).** Ningún test de QC-141 lo cita |
+| R30, R31 | `transition-order.test.ts` («R30, R31, R51: …»); `order-reservation.int.test.ts` («R30, R31, R51: …», `finished_at` nulo); `finish-assigned-order.test.ts`; `reservation.int.test.ts` |
+| R43, R44 | `reserve-existing-orders-migration.int.test.ts` (paridad contra `planReservation`; R44 sigue verde) |
+| R48 | `e2e/reserva-de-material.spec.ts` («R48 - dos pedidos compiten…», entrega por el Finalizar), verde en Chromium y WebKit |
+| R49 | como antes; `order-reservation.int.test.ts` («R49 — …») |
+| R50 | `transition-order.test.ts` («R50, R51: …»); `order-reservation.int.test.ts` («R50, R51: rechaza con recipe_without_lines…»); `finish-assigned-order.test.ts`; `reservation.int.test.ts` |
+| R51 | `transition-order.test.ts` (tres casos «R51»); `order-reservation.int.test.ts` (tres casos «R51»); `order-finished-at.int.test.ts` |
+| R52 | `update-order.test.ts` («R52: …»); `order-reservation.int.test.ts` (dos `describe` «R52 — …») |
+| R53 | `expire-stale-orders.test.ts` (plazo reiniciado y `reserved_at` nulo); `order-expiry.int.test.ts` (edición intercalada por otra conexión) |
+| R54 | `expire-stale-orders.test.ts` (fallo al listar empresas; fallo al buscar candidatos de una empresa); `order-expiry-cron-route.test.ts` |
+| R55 | `expire-stale-orders.test.ts` (150 candidatos que fallan siempre: una vez cada uno en `failed`, la empresa siguiente se procesa) |
+| R56 | `reserve-existing-orders-migration.int.test.ts` («R56: …», con `'-X'`/`'5'`, `'a'`/`'B'` y `'2'`,`'10'`,`'-X'`,`'B'`) |
+| R57 | `reserve-existing-orders-migration.int.test.ts` (dos casos: falla con un `release` posterior sin cambiar nada; revierte limpio sin actividad) |
+| R58 | `tests/guards/guard-ambito-empresa-pedidos.test.ts` (exención por nombre con motivo, «solo `$transaction`», sin alias y tres anti-placebos, todos con R58 en el nombre) |
+
+E1, E2 y las preguntas abiertas 1-7 están resueltas por el humano; nada espera aprobación.
+
+### Cierre (TC)
+
+**Rollback en base efímera** (`qc141_rollback_1790208143`, copia de `b62cecc7` con `git archive` en el
+scratchpad, `node_modules` por junction): `migrate deploy` de las 48; `db:rollback` revierte `…150200`,
+`…150100` y `…150000` (apartando cada carpeta); `_prisma_migrations` sin ninguna de las tres, sin
+`reservation_movements`, sin `orders.reserved_at`, enum `['opening','adjustment']`, `stock` `integer`.
+Devueltas las carpetas, `migrate deploy` las reaplica y `migrate status` → «Database schema is up to
+date!». Base efímera y copia borradas.
+
+**E2E** (`npx playwright test e2e/reserva-de-material.spec.ts e2e/ejecucion-receta.spec.ts
+e2e/ajuste-de-inventario.spec.ts e2e/pedidos-terminados.spec.ts e2e/pedidos.spec.ts`, puerto 3117 libre,
+base `QuimiCloude_QC141`; log en `progress/e2e_QC-141_vuelta2.log`):
+- Corrida 1: **24 passed, 2 failed**. Los dos fallos, `reserva-de-material` en los dos navegadores:
+  `login-username` no aparecía porque la sesión del admin seguía viva al entrar como Operador.
+  Corregido en `c1c82525` (vacía las cookies antes).
+- Corrida 2 de `reserva-de-material` (`progress/e2e_QC-141_vuelta2_reserva.log`): **2 passed** (Chromium
+  56 s, WebKit 1.2 min). Los otros cuatro specs no cambiaron entre corridas.
+
+**`./init.sh` completo.**
+- Intento 1: paró en el typecheck por `.next/dev/types/routes.d.ts` truncado (artefacto que deja el
+  `next dev` del E2E, no código de la rama). Se borró `.next/dev/types` y `pnpm run typecheck` pasó limpio.
+- Intento 2 (HEAD `c1c82525`): typecheck y lint pasaron (2 warnings de imports sin usar en
+  `tests/unit/pedidos/order-service.test.ts`, que ya estaban). Los tests iban por **654 archivos en verde y
+  1 rojo**, `guard-arquitectura-modulos.test.ts` (1 caso), el heredado de `a01c90cb` que lista
+  `tests/baseline-rojos.json`. **Claude Code lo mató por falta de memoria de la máquina** antes de que
+  acabara la suite y de que el comparador del baseline diera su veredicto. **No se relanzó**: la orden es no
+  relanzarlo sin que lo pida el humano. **El `./init.sh` completo sigue PENDIENTE.**
+  `ciclo-de-vida-de-la-base.int.test.ts` no salió rojo en lo que llegó a correr.
+
+### Veredicto de la vuelta 2
+
+TR, TB1-TB4 y Tm1-Tm7 cerradas. TC: rollback y E2E en verde; **falta un `./init.sh` completo que termine**,
+con la máquina liberada.
