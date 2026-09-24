@@ -19,9 +19,9 @@
 
 ## Evaluaciones
 
-### QC-140 - F1.0 (2026-09-23)
+### QC-140 - CERRADA (2026-09-24)
 
-`zone: fullstack` sin partir, `complexity: high` (ya evaluada al acotar). Dependencias QC-44, QC-52 y QC-57 `done`. Cupo `fullstack` 3 de 3 con QC-141 y QC-151. Worktree desde `origin/dev`. F1.2 lanzado con las 5 preguntas abiertas de la semilla: el humano las deja para F1.4. **Base propia obligatoria en F2** (`QuimiCloude_QC140`).
+PR #118, merge `a738d81f`. Resumen en `progress/history.md`. **Deuda: T14, revision en iPhone y Android reales**, pendiente del humano.
 
 ### QC-141 cerrada y QC-150 F2.0 (2026-09-24)
 
@@ -657,7 +657,7 @@ porque es validacion de entrada y no una regla nueva de dominio.
 
 ## Deudas y cosas abiertas
 
-- **2026-09-23 · restos de worktree en disco**: `.worktrees/QC-107-componente-de-carga-de-archivos`, `.worktrees/QC-145-pedidos-terminados-en-asignacion`, `.worktrees/QC-146-presentacion-del-pedido` y `.worktrees/QC-147-cantidades-de-receta-en-porcentaje` ya no estan registrados en git, pero sus carpetas siguen con `node_modules` bloqueados por Windows (proceso node vivo). Borrarlas a mano cuando no haya servidores ni E2E corriendo. Las ramas locales tambien quedan: ya estan mergeadas. Las bases `QuimiCloude_QC145` y `QuimiCloude_QC147` sobran y se puede borrar.
+- **2026-09-23 · restos de worktree en disco**: `.worktrees/QC-107-componente-de-carga-de-archivos`, `.worktrees/QC-140-catalogo-visual-de-proveedores`, `.worktrees/QC-145-pedidos-terminados-en-asignacion`, `.worktrees/QC-146-presentacion-del-pedido` y `.worktrees/QC-147-cantidades-de-receta-en-porcentaje` ya no estan registrados en git, pero sus carpetas siguen con `node_modules` bloqueados por Windows (proceso node vivo). Borrarlas a mano cuando no haya servidores ni E2E corriendo. Las ramas locales tambien quedan: ya estan mergeadas. Las bases `QuimiCloude_QC140`, `QuimiCloude_QC145` y `QuimiCloude_QC147` sobran y se puede borrar.
 ### El E2E de dev tiene 11 rojos que no son de ninguna ficha en curso (2026-09-22)
 
 Medido por el leader al cerrar QC-146, sobre `origin/dev` limpio (`bc902800`), chromium, un worker: fallan `cierre-de-sesiones` (cierra sesiones de otra persona), `documentos` R20, `errores` R33, `inventario` R26 y QC-90 R32, `permisos` (Operador aterriza en asignacion), `presentaciones` R36, `proveedores` R51, `session` (dos casos) y `usuarios` R4/R42. Los mismos fallan en la rama de QC-146, que no los toca. Nadie tiene la ficha: hace falta una en el board.
