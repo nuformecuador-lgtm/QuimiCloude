@@ -113,7 +113,7 @@ QC-158 (`in_progress`) puede añadir migración: choca solo en `MIGRACIONES_ESPE
 
 ## T13 — Cierre
 
-- [ ] **T13.** Mapa `R<n> -> test` completo (R1–R29) en `progress/impl_QC-153-modelo-de-clientes.md`;
+- [x] **T13.** (gate completo verde el 2026-09-24: 674 archivos, 9418 tests) Mapa `R<n> -> test` completo (R1–R29) en `progress/impl_QC-153-modelo-de-clientes.md`;
       sincronizar con `origin/dev`, `pnpm install` si cambió `package.json`, `db:migrate` sobre
       `QuimiCloude_QC153`, y `./init.sh` **completo**. **Hecho cuando:** el gate completo no tiene
       ningún archivo rojo fuera de `tests/baseline-rojos.json`, `git diff origin/dev...HEAD` solo
