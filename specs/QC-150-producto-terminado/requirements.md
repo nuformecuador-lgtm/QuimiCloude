@@ -297,3 +297,10 @@ producto terminado admite nombre y alerta de cantidad, y el spec no decía nada.
 confirmó:** un producto terminado se puede editar como un envase: su nombre y su alerta de
 cantidad. Su identidad sigue siendo receta + presentación, así que un renombrado no crea un producto
 nuevo en los siguientes Finalizar.
+
+**D24 — 2026-09-24, en F2.2 (menor m9 del review).** Pregunta surgida al revisar: el alta del
+producto terminado no comprobaba que la receta fuera de la empresa del pedido, porque la FK hacia
+`recipes` es simple, y una receta ajena llegaba a escribirse. **El humano decidió comprobarlo en el
+código:** antes de escribir nada se comprueba que la receta sea de la empresa del pedido; si no lo
+es, se rechaza sin escribir nada, con el código existente `recipe_not_found`. Sin migración ni FK
+compuesta.
