@@ -39,7 +39,7 @@ Archivos: `lib/modules/documentos/domain/json-in-text.ts` (nuevo),
 **Hecho cuando:** `json-in-text.test.ts` verde (cercas, prosa alrededor, sin llaves, llaves
 invertidas) y `crop-coordinates.test.ts` **sin cambios** y verde.
 
-## T2 — Migración `material` y `measurements` `[P con T1, T7]`
+## [x] T2 — Migración `material` y `measurements` `[P con T1, T7]`
 
 Archivos: `db/migrations/<ts>_supplier_catalog_line_material_and_measurements/{migration.sql,down.sql}`,
 `db/schema.prisma` (`SupplierCatalogLine`), `tests/guards/guard-identificador-de-request.test.ts`
@@ -53,7 +53,7 @@ limpio (salida en la bitácora); test estático de que `down.sql` revierte exact
 2 CHECK (**R30**); integración: `material = '  '` y `measurements = '[]'` rechazados, `NULL` y
 objeto aceptados (**R27**); `guard-empresa-en-esquema` y `guard-rls-force` verdes.
 
-## T3 — Esquema de los campos nuevos en `proveedores` `[depende de T2]` `[F2]`
+## [x] T3 — Esquema de los campos nuevos en `proveedores` `[depende de T2]` `[F2]`
 
 Archivos: `lib/modules/proveedores/domain/{catalog-line-input,catalog-line-view,create-catalog-line,update-catalog-line}.ts`,
 `lib/modules/proveedores/index.ts`,
@@ -112,7 +112,7 @@ Archivos: `lib/modules/documentos/domain/{classify-catalog-import,suggest-unit,c
 (página con 2 filas y 2 recortes empareja; 2 y 3 no; huecos `1-1`,`1-3` en orden de `n`) y **R26**
 (`isCropPathOf` rechaza otra empresa, otro archivo, `..` y extensión distinta).
 
-## T7 — Presentaciones por nombre en `inventario` `[P con T1, T2]`
+## [x] T7 — Presentaciones por nombre en `inventario` `[P con T1, T2]`
 
 Archivos: `lib/modules/inventario/domain/presentation-catalog.ts`,
 `lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma.ts`,
