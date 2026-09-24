@@ -91,12 +91,8 @@ const MARCA_DE_LA_FEATURE = 'QC-140';
  * (PR #118) borra sus commits del rango de cualquier rama que arranque despues, esta incluida- o
  * la rama no tiene relacion con `origin/dev`.
  *
- * Antes, R29 y D20 miraban el diff COMPLETO de `origin/dev..HEAD` contra la base de fusion: eso
- * confunde «lo que trajo QC-140» con «lo que trae la rama que corre la guardia». Una rama con sus
- * propias migraciones -como esta- pone en rojo un caso que protege el alcance de OTRA ficha, ya
- * cerrada, sin que QC-140 haya tocado nada. Filtrar por `--grep` en vez de por el rango entero es
- * el mismo criterio que ya usa `archivosTocadosPorLaFeature` de
- * `guard-convenciones-proveedores.test.ts` para el mismo problema.
+ * Solo cuentan los commits firmados por la ficha, no el diff entero de la rama: una rama ajena con
+ * sus propias migraciones no debe poner en rojo un caso que protege el alcance de esta.
  */
 function archivosDeQC140(): readonly string[] | null {
   // `--grep` casa con cualquier mensaje que MENCIONE la marca, no solo con quien la firma: un
