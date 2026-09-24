@@ -270,3 +270,68 @@ bitácora). Los tests se corrieron en serie contra `QuimiCloude_QC150`, todos ve
    contrato de `recetas` (lo natural es en `transition-order.ts`), ajustando su test.
 2. n1: terminar la limpieza de citas en comentarios de tests.
 3. n2 y n3: opcionales, recomendados.
+
+---
+
+## Vuelta 3 (2026-09-24) — `0a651347..da7341fd`
+
+Solo lectura, por indicación del leader: no corrí ningún test. La verificación ejecutable es el
+`./init.sh` completo que corre el leader sobre `da7341fd`, y **este OK depende de que salga verde**.
+Merge-base con `origin/dev`: `cdfc6bba`.
+
+### Veredicto vuelta 3: **OK** (condicionado al `./init.sh` completo verde en `da7341fd`)
+
+No queda ningún bloqueante.
+
+| Hallazgo | Estado |
+|---|---|
+| B4 `inventario` leía `recipes` | **Cerrado.** Ver el detalle debajo de la tabla |
+| n1 citas en comentarios de tests | **Cerrado en lo que importa.** Quedan 11 líneas: la de `product-page.test.tsx:1216` viene de `dev`, y 10 están en `guard-convenciones-showcase.test.ts` (ver n4) |
+| n2 filtro de la guardia de QC-140 | **Cerrado.** Filtra en JS por asunto con `^\w+\(QC-140\)`; el commit de esta ficha (`fix(QC-150): ...`) ya no activa la guardia. En esta rama los casos R29 y D20 hacen `ctx.skip` con motivo, que es lo correcto |
+| n3 traducción de `recipe_not_found` | **Cerrado.** `tests/unit/asignaciones/finish-assigned-order.test.ts` › «D24: `recipe_not_found` se traduce a RecipeNotFoundError, sin reintentar» |
+
+Detalle de B4:
+
+- `product-prisma.ts` ya no consulta `recipes`, y `FinishedGoodsOutcome` pierde `recipe_not_found`.
+  Un barrido de SQL crudo en `lib/modules` confirma que ya no queda ningún acceso a la tabla de otro
+  módulo.
+- `lib/modules/pedidos/domain/transition-order.ts:82-83` comprueba la receta con
+  `deps.recipes.findRefsIncludingDeleted([...], companyId)`. Ese método filtra por empresa
+  (`recipe-catalog-prisma.ts:56`, `recipeCompanyScope`) e incluye las recetas dadas de baja. La
+  comprobación va **antes** del coste, del consumo y del estado, y `recipeRef.name` ya no cae a `''`.
+- Tests:
+  - Unit: `transition-order.test.ts` › «D24: ... rechaza ANTES de consumir y no escribe nada».
+    Afirma que no se llama ni a `consumeForOrder`, ni a `receiveFromOrder`, ni a `setStatus`.
+  - Integración a nivel Finalizar: `finish-with-finished-goods.int.test.ts` › «R23, D24 — ...». Un
+    pedido de B con la receta de A da `recipe_not_found`, el pedido sigue `PENDIENTE` y los conteos
+    de productos, lotes y asientos de las dos empresas no cambian.
+- La enmienda de D24 en `requirements.md` cambia el sitio y no el fondo. Es coherente con la
+  decisión humana.
+- Se retiró el test de D24 a nivel `receiveFinishedGoods`. Era lo correcto: fijaba un comportamiento
+  que ya no es de `inventario`.
+
+### Menores de la vuelta 3
+
+- **n4 — Las 10 citas de `tests/unit/proveedores-ui/guard-convenciones-showcase.test.ts`.** Ocho son
+  **aceptables** (`:13`, `:85`, `:89`, `:90`, `:104`, `:124`, `:126`, `:139`): nombran QC-140 como
+  **dato** del filtro, porque la guardia existe para mirar los commits de esa ficha. Dos no lo son:
+  - `:94-97` es historia («Antes, R29 y D20 miraban el diff COMPLETO...»), y eso pertenece a git.
+  - `:97` además ha quedado **falso**: dice «Filtrar por `--grep` en vez de por el rango entero»,
+    pero desde `df6d0894` el filtro ya no usa `--grep`, sino el asunto en JS. Un comentario con el
+    motivo equivocado es justo lo que `docs/conventions.md > Comentarios` pide no dejar.
+
+  Recomendado recortar `:94-97` a una frase sobre el porqué actual. No bloquea: es un test, no
+  producción.
+- **Del cierre.** El PR tiene que decir que toca un test de otra ficha
+  (`guard-convenciones-showcase.test.ts`, de QC-140), y que hay que borrar `QuimiCloude_QC150` al
+  cerrar.
+
+### Si el gate sale rojo
+
+Nada me hace sospechar de un test concreto. Si el `./init.sh` sale rojo, los candidatos naturales
+son:
+
+- `tests/unit/pedidos/transition-order.test.ts`, porque ahora la receta se lee antes, en todos los
+  casos a `ENTREGADO`: los dobles de `findRefsIncludingDeleted` de los casos existentes tienen que
+  devolver la receta.
+- `tests/integration/pedidos/finish-with-finished-goods.int.test.ts`.
