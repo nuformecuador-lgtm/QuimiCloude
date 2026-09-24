@@ -29,14 +29,14 @@ export const PRESENTATION_LIST_SKELETON_TESTID = 'presentation-list-skeleton';
 export const PRESENTATION_ROW_SKELETON_TESTID = 'presentation-row-skeleton';
 
 /**
- * Cuantas celdas por fila pinta el esqueleto: las DOS columnas de `design.md > 6`.
+ * Cuantas celdas por fila pinta el esqueleto: las columnas de la lista de presentaciones.
  *
  * **No se importa `PRESENTATION_COLUMNS`** a proposito: esa declaracion vive en un modulo de
  * **cliente** —su celda de acciones devuelve elementos— y este esqueleto lo renderiza un Server
  * Component. Para que el numero no se quede atras en silencio, el test lo ata a
  * `PRESENTATION_COLUMNS.length`.
  */
-export const PRESENTATION_SKELETON_COLUMN_COUNT = 2;
+export const PRESENTATION_SKELETON_COLUMN_COUNT = 3;
 
 export function PresentationListSkeleton({ rows }: { readonly rows: number }) {
   const columns = Array.from({ length: PRESENTATION_SKELETON_COLUMN_COUNT }, (_, index) => index);

@@ -3,43 +3,39 @@
 import type { DataTableColumn } from '@/components/shared/data-table';
 import type { PresentationView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { trimDecimal } from '@/lib/shared/ui/decimal-display';
 
 import { NAME_COLUMN_ID } from './presentation-list-params';
 import { PresentationRowActions } from './presentation-row-actions';
 
 /**
- * Las DOS columnas de la lista de presentaciones, declaradas **como datos** (R9, R11, R19, R20,
- * `design.md > 6`).
+ * Las columnas de la lista de presentaciones, declaradas **como datos**.
  *
  * **Modulo de CLIENTE, y no por gusto** (`design.md > 6`): la columna de acciones devuelve
  * elementos, y una configuracion con funciones de celda que devuelven elementos no cruza la
  * frontera servidor->cliente. Por eso `PresentationListSection` (servidor) baja solo datos
  * serializables y es `presentation-table.tsx` quien monta `<DataTable>`.
  *
- * **La columna de acciones es una columna NORMAL** (R20, alternativa B descartada):
- * `DataTableColumn.cell` ya devuelve `ReactNode` y `DataTable` lo pinta directamente. **No se
- * anade ninguna prop `renderRowActions`** —ni ningun otro mecanismo— al componente compartido, que
- * seria una segunda manera de hacer lo que `cell` ya hace, y obligaria ademas a abrir
- * `components/shared/data-table/`, que R20 prohibe. Es la respuesta que QC-35 dejo escrita en
- * `order-columns.tsx` y que esta ficha **hereda** en vez de volver a decidir.
+ * **La columna de acciones es una columna NORMAL** (alternativa descartada: una prop
+ * `renderRowActions` en el componente compartido, que seria una segunda manera de hacer lo que
+ * `cell` ya hace y obligaria a abrir `components/shared/data-table/`). `DataTableColumn.cell` ya
+ * devuelve `ReactNode` y `DataTable` lo pinta directamente.
  *
- * **Solo dos columnas, y ninguna mas** (R9): `Presentation` tiene un unico campo de negocio.
  * Aqui **no** se pinta el identificador tecnico, ni `nameNormalized` —lo deriva el dominio—, ni
- * `createdAt`/`updatedAt`, ni autoria (alternativa G, descartada). El test de R9 recorre esta
- * misma declaracion: anadir una columna prohibida obliga a tocarla, que es justo lo que vigila.
+ * `createdAt`/`updatedAt`, ni autoria.
  *
- * **Solo `name` ordena** (R11), y ordena porque esta en `PRESENTATION_QUERYABLE.sortable`: la
- * cabecera no promete un orden que la lista blanca del contrato no acepte. La de acciones **ni
- * ordena ni filtra**: ordenar por unos botones no significa nada.
+ * **Solo `name` ordena**, y ordena porque esta en `PRESENTATION_QUERYABLE.sortable`: la cabecera
+ * no promete un orden que la lista blanca del contrato no acepte. Ni la de contenido ni la de
+ * acciones ordenan ni filtran.
  *
  * El nombre se pinta **tal cual llega** de la consulta: sin recortes, sin mayusculas forzadas y
  * sin normalizar. Lo que el usuario ve es lo que el catalogo guarda.
  *
- * **QC-80: siguen siendo DOS columnas y la unidad NO gana una.** Es deliberado (`design.md > 5`):
- * no lo pide ninguna decision y pintarla abre una pregunta que nadie hizo -¿el nombre?, ¿el
- * simbolo?, ¿resuelto contra que catalogo?-. Coste aceptado: para ver la unidad hay que abrir el
- * panel. Las `units` que esta declaracion recibe son **solo** para el panel de edicion que monta
- * la celda de acciones (R15, R16), no para pintar ninguna celda.
+ * **La unidad NO gana columna propia**: pintarla abre una pregunta que nadie hizo -¿el nombre?,
+ * ¿el simbolo?, ¿resuelto contra que catalogo?-. Coste aceptado: para verla hay que abrir el
+ * panel. Va, en cambio, junto al contenido -«1 L»-, que si necesita decir en que unidad esta. Las
+ * `units` que esta declaracion recibe sirven para las dos cosas: la celda de contenido y el panel
+ * de edicion que monta la celda de acciones.
  *
  * **Por eso las columnas pasan a construirse con una funcion** en vez de ser una constante: la
  * celda de acciones necesita el catalogo, y el catalogo lo trae la seccion en tiempo de ejecucion.
@@ -49,8 +45,14 @@ import { PresentationRowActions } from './presentation-row-actions';
 /** Id de la unica columna de datos. Se **importa** del parser: un solo sitio lo declara (R11). */
 export { NAME_COLUMN_ID } from './presentation-list-params';
 
-/** Id de la columna de acciones de fila (R19, R20). */
+/** Id de la columna de acciones de fila. */
 export const ACTIONS_COLUMN_ID = 'actions';
+
+/** Id de la columna de contenido (R8). */
+export const CONTENT_COLUMN_ID = 'content';
+
+/** Texto de la celda de contenido cuando la presentacion no lo tiene declarado (R8). */
+export const NO_CONTENT_LABEL = 'Sin contenido';
 
 /**
  * Cuantas columnas hay. Existe para que el esqueleto de carga —que lo pinta un Server Component y
@@ -58,7 +60,21 @@ export const ACTIONS_COLUMN_ID = 'actions';
  * para que el test lo ate a `buildPresentationColumns(...).length` en vez de dejarlo desincronizarse en
  * silencio.
  */
-export const PRESENTATION_COLUMN_COUNT = 2;
+export const PRESENTATION_COLUMN_COUNT = 3;
+
+/** `symbol` cuando existe; `name` en caso contrario. */
+function unitLabel(unit: UnitRef): string {
+  return unit.symbol ?? unit.name;
+}
+
+/** «1 L» junto a la unidad, o el aviso de que no tiene, sin ceros de relleno del contenido guardado. */
+function contentCell(presentation: PresentationView, units: readonly UnitRef[]): string {
+  if (presentation.content === null) return NO_CONTENT_LABEL;
+
+  const unit = units.find((candidate) => candidate.id === presentation.unitId);
+  const amount = trimDecimal(presentation.content);
+  return unit === undefined ? amount : `${amount} ${unitLabel(unit)}`;
+}
 
 export function buildPresentationColumns(
   units: readonly UnitRef[],
@@ -68,15 +84,23 @@ export function buildPresentationColumns(
       id: NAME_COLUMN_ID,
       label: 'Nombre',
       align: 'start',
-      // Esta en `PRESENTATION_QUERYABLE.sortable`, asi que la cabecera no miente (R11).
+      // Esta en `PRESENTATION_QUERYABLE.sortable`, asi que la cabecera no miente.
       sortable: true,
       cell: (presentation) => presentation.name,
+    },
+    {
+      id: CONTENT_COLUMN_ID,
+      label: 'Contenido',
+      align: 'end',
+      // No ordena ni filtra: no esta en la lista blanca del catalogo para ninguna de las dos cosas.
+      pinnable: false,
+      cell: (presentation) => contentCell(presentation, units),
     },
     {
       id: ACTIONS_COLUMN_ID,
       label: 'Acciones',
       align: 'end',
-      // Sin `sortable` (no ordena) y sin `filter` (no aparece en la barra de filtros) — R11.
+      // Sin `sortable` (no ordena) y sin `filter` (no aparece en la barra de filtros).
       // `pinnable: false` para que el usuario no pueda fijarla y tapar la del nombre.
       pinnable: false,
       cell: (presentation) => <PresentationRowActions presentation={presentation} units={units} />,

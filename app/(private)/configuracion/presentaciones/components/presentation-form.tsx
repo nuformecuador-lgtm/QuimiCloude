@@ -30,6 +30,7 @@ import {
   updatePresentationAction,
 } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { trimDecimal } from '@/lib/shared/ui/decimal-display';
 
 /**
  * Formulario de alta y edicion de presentacion (R22, R23, R24, R31, R34, `design.md > 7`).
@@ -84,14 +85,18 @@ import type { UnitRef } from '@/lib/modules/unidades';
 /** El campo del nombre, con el mismo nombre que el adaptador driving lee del `FormData`. */
 export const PRESENTATION_NAME_FIELD = 'name';
 
+/** El campo del contenido, con el mismo nombre que el adaptador driving lee del `FormData`. */
+export const PRESENTATION_CONTENT_FIELD = 'content';
+
 /**
- * Fuente unica de los campos que este formulario captura (R22, QC-80 R15). `unitId` lo declara
- * `components/shared/presentation-unit-select.tsx` -promovido alli por T10-, que es quien pinta
- * el campo: aqui se importa, no se reescribe.
+ * Fuente unica de los campos que este formulario captura. `unitId` lo declara
+ * `components/shared/presentation-unit-select.tsx`, que es quien pinta el campo: aqui se
+ * importa, no se reescribe. `content` es opcional: vaciarlo es un envio valido.
  */
 export const PRESENTATION_BUSINESS_FIELDS = [
   PRESENTATION_NAME_FIELD,
   PRESENTATION_UNIT_FIELD,
+  PRESENTATION_CONTENT_FIELD,
 ] as const;
 
 /**
@@ -107,6 +112,8 @@ export const PRESENTATION_FORM_SUBMIT_TESTID = 'presentation-form-submit';
 export const PRESENTATION_FORM_CANCEL_TESTID = 'presentation-form-cancel';
 export const PRESENTATION_FIELD_NAME_TESTID = 'presentation-field-name';
 export const PRESENTATION_ERROR_NAME_TESTID = 'presentation-error-name';
+export const PRESENTATION_FIELD_CONTENT_TESTID = 'presentation-field-content';
+export const PRESENTATION_ERROR_CONTENT_TESTID = 'presentation-error-content';
 
 type PresentationFieldName = (typeof PRESENTATION_BUSINESS_FIELDS)[number];
 
@@ -123,14 +130,16 @@ const FIELD_TEXT = 'text-base md:text-base';
  */
 const FIELD_MESSAGES: Readonly<Record<PresentationFieldName, string>> = {
   name: 'Escribe un nombre con al menos una letra o número.',
-  // QC-80 R17: sin unidad no se envia nada. El esquema exige un uuid, y «no he elegido» llega
-  // como cadena vacia, que es justo lo que rechaza.
+  // Sin unidad no se envia nada: el esquema exige un uuid, y «no he elegido» llega como cadena
+  // vacia, que es justo lo que rechaza.
   unitId: 'Elige la unidad de la presentación.',
+  content: 'Escribe un contenido mayor que cero, con hasta 10 enteros y 4 decimales.',
 };
 
 const FIELD_LABELS: Readonly<Record<PresentationFieldName, string>> = {
   name: 'Nombre',
   unitId: PRESENTATION_UNIT_LABEL,
+  content: 'Contenido',
 };
 
 /**
@@ -198,10 +207,16 @@ function readString(formData: FormData, name: string): string {
   return typeof value === 'string' ? value : '';
 }
 
+/** La coma es el separador decimal del teclado en castellano; se convierte a punto al enviar. */
+function normalizeDecimalSeparator(raw: string): string {
+  return raw.replace(/,/g, '.');
+}
+
 function readValues(formData: FormData): FieldValues {
   const values: FieldValues = {};
   for (const field of PRESENTATION_BUSINESS_FIELDS) {
-    values[field] = readString(formData, field);
+    const raw = readString(formData, field);
+    values[field] = field === PRESENTATION_CONTENT_FIELD ? normalizeDecimalSeparator(raw) : raw;
   }
   return values;
 }
@@ -229,7 +244,7 @@ async function submit(
  * publico** y no escrito a mano: asi una `PresentationView` entera encaja sin conversion, y
  * ningun campo que la pantalla no pinta (R9) se cuela hasta aqui.
  */
-export type PresentationSheetTarget = Pick<PresentationView, 'id' | 'name' | 'unitId'>;
+export type PresentationSheetTarget = Pick<PresentationView, 'id' | 'name' | 'unitId' | 'content'>;
 
 export type PresentationFormProps = {
   /** Presentacion que se edita. Ausente en el alta (R22). */
@@ -249,6 +264,8 @@ export function PresentationForm({ presentation, units, onSaved }: PresentationF
   const formErrorId = `${fieldId}-form-error`;
   const inputId = `${fieldId}-${PRESENTATION_NAME_FIELD}`;
   const nameErrorId = `${inputId}-error`;
+  const contentId = `${fieldId}-${PRESENTATION_CONTENT_FIELD}`;
+  const contentErrorId = `${contentId}-error`;
   const isEdit = presentation !== undefined;
 
   async function save(
@@ -256,12 +273,17 @@ export function PresentationForm({ presentation, units, onSaved }: PresentationF
     formData: FormData,
   ): Promise<PresentationFormState> {
     const values = readValues(formData);
+    // La coma ya esta convertida en `values.content`; se refleja en el `FormData` que viaja a la
+    // Server Action para que el servidor reciba lo mismo que valido el cliente.
+    formData.set(PRESENTATION_CONTENT_FIELD, values.content ?? '');
 
     // El esquema de la edicion es el mismo que el del alta (reemplazo completo, R23). Se nombran
-    // los dos para que quede escrito de donde sale cada regla.
+    // los dos para que quede escrito de donde sale cada regla. El contenido vacio se envia como
+    // `undefined`, que es lo que el esquema opcional deja pasar como «sin contenido».
+    const candidate = { ...values, content: values.content === '' ? undefined : values.content };
     const parsed = isEdit
-      ? updatePresentationSchema.safeParse(values)
-      : createPresentationSchema.safeParse(values);
+      ? updatePresentationSchema.safeParse(candidate)
+      : createPresentationSchema.safeParse(candidate);
 
     if (!parsed.success) {
       const fieldErrors: FieldErrors = {};
@@ -308,6 +330,7 @@ export function PresentationForm({ presentation, units, onSaved }: PresentationF
   const values = state.status === 'error' ? state.values : undefined;
   const nameError = fieldErrors.name;
   const unitError = fieldErrors.unitId;
+  const contentError = fieldErrors.content;
 
   /** Valor inicial del campo: lo escrito en el intento fallido; si no, el de la presentacion. */
   const initialName = values?.name ?? presentation?.name ?? '';
@@ -317,6 +340,19 @@ export function PresentationForm({ presentation, units, onSaved }: PresentationF
    * eligio ninguna»-, y si no hubo intento, la de la presentacion que se edita. Vacia = marcador.
    */
   const initialUnitId = values?.unitId ?? presentation?.unitId ?? '';
+
+  /**
+   * Contenido inicial: lo escrito en el intento fallido, o el de la presentacion que se edita sin
+   * los ceros de relleno de su escala en base -precarga, no redondeo-. Vacio cuando no tiene.
+   */
+  const initialContent =
+    values?.content ?? (presentation?.content === null || presentation?.content === undefined
+      ? ''
+      : trimDecimal(presentation.content));
+
+  /** Sufijo visible con la unidad de la presentacion, junto al campo de contenido. */
+  const selectedUnit = units.find((unit) => unit.id === initialUnitId);
+  const contentUnit = selectedUnit === undefined ? '' : (selectedUnit.symbol ?? selectedUnit.name);
 
   /*
     Es el ERROR, no un booleano: asi el render estrecha por `code` y le pide el identificador al
@@ -413,6 +449,45 @@ export function PresentationForm({ presentation, units, onSaved }: PresentationF
               data-testid={PRESENTATION_ERROR_NAME_TESTID}
             >
               {nameError}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={contentId}>{FIELD_LABELS.content}</Label>
+          {/*
+            `key={initialContent}`: mismo remontaje que el nombre para el campo no controlado.
+            Sin `required`: el contenido es opcional (R6) y vaciarlo es un envio valido.
+          */}
+          <div className="flex items-center gap-2">
+            <Input
+              key={initialContent}
+              id={contentId}
+              name={PRESENTATION_CONTENT_FIELD}
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              defaultValue={initialContent}
+              className={`min-h-11 flex-1 ${FIELD_TEXT}`}
+              aria-invalid={contentError === undefined ? undefined : true}
+              aria-describedby={contentError === undefined ? undefined : contentErrorId}
+              data-testid={PRESENTATION_FIELD_CONTENT_TESTID}
+            />
+            {contentUnit === '' ? null : (
+              <span aria-hidden="true" className="text-sm text-muted-foreground">
+                {contentUnit}
+              </span>
+            )}
+          </div>
+
+          {contentError === undefined ? null : (
+            <p
+              id={contentErrorId}
+              role="alert"
+              className="text-sm text-destructive"
+              data-testid={PRESENTATION_ERROR_CONTENT_TESTID}
+            >
+              {contentError}
             </p>
           )}
         </div>
