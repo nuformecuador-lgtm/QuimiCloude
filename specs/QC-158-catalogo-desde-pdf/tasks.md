@@ -191,7 +191,7 @@ Archivos: `lib/shared/routes.ts` (`supplierCatalogImportRoute`),
 dos permisos) y **R37** (clases de 44 px y 16 px; ninguna acción solo con `hover:`);
 `proveedores/scope.test.ts` verde (todo bajo la carpeta de la pantalla).
 
-## T13 — Acceso «Revisar» desde el componente de carga `[depende de T12]`
+## [x] T13 — Acceso «Revisar» desde el componente de carga `[depende de T12]`
 
 Archivos: `components/shared/document-upload/{document-upload,document-upload-row,labels}.tsx|ts`,
 `app/(private)/proveedores/[id]/components/{catalog-pdf-upload,index}.tsx|ts`,
