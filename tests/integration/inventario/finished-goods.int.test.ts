@@ -446,6 +446,52 @@ describe('receiveFinishedGoods — R23: acotado por empresa', () => {
   });
 });
 
+describe('receiveFinishedGoods — R23 — acceso cruzado: presentacion de otra empresa', () => {
+  it('R23 — acceso cruzado: la empresa B con la presentacion de la empresa A no escribe nada en ninguna de las dos', async () => {
+    const empresaA = await nuevaEmpresa();
+    const empresaB = await nuevaEmpresa();
+    const unitA = await sembrarUnidad();
+    const presentationA = await sembrarPresentacion(empresaA.companyId, unitA, { content: '1', name: 'Solo de A' });
+    const recipeB = await sembrarReceta(empresaB.companyId, 'Receta de B');
+    // El pedido de B no puede guardar la presentacion de A (la FK compuesta lo impide): el
+    // ataque va directo al argumento de `receiveFinishedGoods`, no a la fila del pedido.
+    const orderB = await sembrarPedido(empresaB.companyId, recipeB, null);
+
+    const contarTodo = () =>
+      Promise.all([
+        prisma.product.count({ where: { companyId: { in: [empresaA.companyId, empresaB.companyId] } } }),
+        prisma.productBatch.count({ where: { companyId: { in: [empresaA.companyId, empresaB.companyId] } } }),
+        prisma.inventoryMovement.count({ where: { companyId: { in: [empresaA.companyId, empresaB.companyId] } } }),
+      ]);
+
+    try {
+      const antes = await contarTodo();
+
+      const outcome = await recibir(empresaB.companyId, {
+        orderId: orderB,
+        recipeId: recipeB,
+        recipeName: 'Receta de B',
+        presentationId: presentationA,
+        orderQuantity: '10',
+        orderContent: null,
+        lotCost: '10',
+        actorId: empresaB.userId,
+        now: new Date(),
+      });
+
+      expect(outcome).toEqual({ kind: 'presentation_without_content' });
+
+      const despues = await contarTodo();
+      expect(despues).toEqual(antes);
+    } finally {
+      await prisma.order.deleteMany({ where: { id: orderB } });
+      await prisma.recipe.deleteMany({ where: { id: recipeB } });
+      await prisma.presentation.deleteMany({ where: { id: presentationA } });
+      await prisma.unit.deleteMany({ where: { id: unitA } });
+    }
+  });
+});
+
 describe('receiveFinishedGoods — R35: producto dado de baja', () => {
   it('un pedido de la misma combinacion tras la baja crea un producto nuevo', async () => {
     const empresa = await nuevaEmpresa();
