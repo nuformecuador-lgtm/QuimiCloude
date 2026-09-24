@@ -1,10 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import {
+  Suspense,
   cloneElement,
   isValidElement,
+  use,
+  useEffect,
+  useState,
   type ReactElement,
   type ReactNode,
 } from 'react';
@@ -21,6 +25,8 @@ import {
 } from '../../helpers/identificador-de-request';
 import { setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
+
+import { SEARCH_DEBOUNCE_MS } from '@/components/shared/data-table';
 
 import PrivateLayout from '@/app/(private)/layout';
 import ProveedoresPage from '@/app/(private)/proveedores/page';
@@ -249,6 +255,25 @@ async function renderPantallaCargando(searchParams: Consulta = {}) {
   return render(await PrivateLayout({ children: await arbolDeLaPantalla(searchParams) }));
 }
 
+// Un sibling que se suspende de verdad al pedirselo, para demostrar que nada por encima de los
+// filtros los remonta mientras otra parte del arbol esta en vuelo (R32).
+const NAVEGACION_QUE_NO_TERMINA = new Promise<never>(() => {});
+let retenerNavegacion: (() => void) | null = null;
+
+function NavegacionEnVuelo() {
+  const [enVuelo, setEnVuelo] = useState(false);
+
+  useEffect(() => {
+    retenerNavegacion = () => setEnVuelo(true);
+    return () => {
+      retenerNavegacion = null;
+    };
+  }, []);
+
+  if (enVuelo) use(NAVEGACION_QUE_NO_TERMINA);
+  return null;
+}
+
 let toastExito: ReturnType<typeof vi.spyOn>;
 
 beforeAll(() => {
@@ -325,6 +350,36 @@ describe('catalogo visual de proveedores — estructura (R1, R2, R5)', () => {
 
     expect(indiceFiltros).toBeGreaterThan(-1);
     expect(indiceSuspense).toBeGreaterThan(indiceFiltros);
+  });
+
+  it('R32: el campo de filtro conserva el foco mientras una recarga esta en vuelo', async () => {
+    // Los filtros viven fuera del <Suspense> de la seccion (caso de arriba): no se remontan
+    // cuando la seccion vuelve a suspenderse. Se demuestra montando un sibling que se suspende de
+    // verdad dentro de su PROPIO <Suspense> cuando `router.replace` dispara, sin tocar el arbol
+    // real de la seccion: eso basta para probar que nada por encima de los filtros los remonta.
+    const user = setupUser();
+    render(
+      <>
+        {await pantallaMontada()}
+        <Suspense fallback={null}>
+          <NavegacionEnVuelo />
+        </Suspense>
+      </>,
+    );
+    routerMock.replace.mockImplementationOnce(() => retenerNavegacion?.());
+
+    const filtro = screen.getByTestId(testId.filtroProducto);
+    await user.click(filtro);
+    expect(filtro).toHaveFocus();
+
+    vi.useFakeTimers();
+    fireEvent.change(filtro, { target: { value: 'acido' } });
+    await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
+
+    expect(routerMock.replace).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId(testId.filtroProducto)).toBe(filtro);
+    expect(filtro).toHaveFocus();
+    expect(filtro).toHaveValue('acido');
   });
 });
 
