@@ -219,3 +219,21 @@ Rama `feature/QC-150-producto-terminado`, worktree `.worktrees/QC-150-producto-t
 - Censo arreglado (`a43f161b`): `inventario-constraints.int.test.ts` gana las dos columnas, las dos
   FK y el `CHECK` de identidad de `products`; 19/19. Los demás censos del esquema real (pedidos,
   recetas, proveedores, unidades y otros cinco de inventario) ya estaban verdes sin cambios.
+
+## T7 — La escritura del producto terminado (`6a4349c2`..`8f8a65f4`, backend_dev) · T7 cerrada
+
+- Nuevos: `lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma.ts`
+  (`createFinishedGoodsIntake(tx)`), `tests/unit/inventario/finished-goods-prisma.test.ts`,
+  `tests/integration/inventario/finished-goods.int.test.ts` (`commit` en `aislamiento.json`).
+- Modificados: `lib/modules/inventario/domain/{finished-goods,inventory-movement,product-batch-view}.ts`,
+  `lib/modules/inventario/index.ts`, `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`
+  (`receiveFinishedGoods`, pasos 1-7 de `design.md > 4.4`), `tests/guards/guard-libro-de-inventario.test.ts`
+  y `tests/unit/inventario/qc121-alcance.test.ts` (cinco caminos: los dos censos de escritura de
+  lotes), fixtures de `ProductBatchView` (`packageContent: null`) en 4 tests de inventario.
+- Largo del nombre: con D22 cabe entero (183 ≤ 200); el test de integración guarda uno de 183.
+- `ON CONFLICT ... WHERE type = 'FINISHED_PRODUCT'` lleva el literal sin parametrizar (Postgres
+  resuelve el índice parcial al analizar la sentencia), derivado de `PRODUCT_TYPES` con `Prisma.raw`
+  para no romper `guard-tipos-de-producto`.
+- La guardia del libro ya tenía el caso rojo con un camino fabricado sin asiento (`:312`).
+- Tests: `vitest run tests/unit/inventario tests/guards tests/integration/inventario` → 131 archivos,
+  1801 pasados, 10 skipped (`finished-goods.int.test.ts` 9 casos). Typecheck limpio; lint 0 errores.

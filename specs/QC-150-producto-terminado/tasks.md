@@ -161,7 +161,7 @@ Archivos: `lib/modules/pedidos/domain/{order-view,create-order,update-order}.ts`
 
 `guard-ambito-empresa-pedidos` sigue verde.
 
-## T7 — La escritura del producto terminado `[depende de T2, T5, T6]`
+## [x] T7 — La escritura del producto terminado `[depende de T2, T5, T6]`
 
 Archivos: `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`
 (`receiveFinishedGoods`), `.../persistence/finished-goods-prisma.ts` (nuevo),
