@@ -237,7 +237,7 @@ Archivos: `tests/unit/documentos/qc158-alcance.test.ts` (nuevo).
 `pnpm-lock.yaml` en el diff (sin dependencias nuevas), y el barrido del diff no encuentra `QC-`,
 `R<n>`, `T<n>` ni `design.md` en comentarios de producción (comandos en la bitácora).
 
-## T17 — Enmiendas documentales, trazabilidad y gate `[depende de T1-T16]`
+## [x] T17 — Enmiendas documentales, trazabilidad y gate `[depende de T1-T16]`
 
 Archivos: `specs/QC-129-textos-definitivos-de-los-prompts/requirements.md` (**nota fechada** al pie:
 R10 pasa de seis a ocho datos más `page`, por QC-158, sin reescribir el original — precedente de la
