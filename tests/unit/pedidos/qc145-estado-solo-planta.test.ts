@@ -335,49 +335,44 @@ function git(comando: string): string {
   return execSync(comando, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 }
 
-/** El `package.json` de la base de fusion con `origin/dev`, o `null` si no se puede leer sin red. */
-function packageJsonDeDev(): { dependencies: Record<string, string>; devDependencies: Record<string, string> } | null {
-  try {
-    const base = git('git merge-base origin/dev HEAD').trim();
-    const contenido = git(`git show ${base}:package.json`);
-    return JSON.parse(contenido) as {
-      dependencies: Record<string, string>;
-      devDependencies: Record<string, string>;
-    };
-  } catch {
-    return null;
-  }
+// Comparar el `package.json` actual con `origin/dev` castigaba a cualquier rama posterior que
+// anadiera una dependencia aprobada. Lo que se protege es un hecho historico: el merge con el que
+// este cambio entro en dev no anadio dependencias. Por eso se compara ese merge con su primer padre.
+// (2026-09-24)
+const MERGE_DE_ENTRADA = '51f2d101';
+
+type PackageJson = { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+
+function packageJsonEn(commit: string): PackageJson {
+  return JSON.parse(git(`git show ${commit}:package.json`)) as PackageJson;
 }
 
-function paquetesDe(pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }): Set<string> {
+function paquetesDe(pkg: PackageJson): Set<string> {
   return new Set([...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.devDependencies ?? {})]);
 }
 
-describe('R29 — package.json sin dependencias nuevas respecto a origin/dev', () => {
-  it('ningun paquete de dependencies/devDependencies actual falta en la base de fusion con origin/dev', () => {
-    const deDev = packageJsonDeDev();
-    if (deDev === null) {
-      // «No puedo mirar» no es un verde silencioso: se reporta y se detiene el caso, sin fingir
-      // que la comparacion se hizo.
+describe('R29 — package.json sin dependencias nuevas en el merge que trajo el cambio a dev', () => {
+  it('el merge de entrada no declara ningun paquete que no tuviera ya su primer padre', () => {
+    let antes: Set<string>;
+    let despues: Set<string>;
+    try {
+      antes = paquetesDe(packageJsonEn(`${MERGE_DE_ENTRADA}~1`));
+      despues = paquetesDe(packageJsonEn(MERGE_DE_ENTRADA));
+    } catch (error) {
+      // «No puedo mirar» no es un verde silencioso: se reporta y se detiene el caso.
       throw new Error(
-        'No se pudo leer package.json de la base de fusion con origin/dev ' +
-          '(`git merge-base origin/dev HEAD` + `git show <base>:package.json`), asi que R29 ' +
-          'no se ha comprobado en este caso.',
+        `No se pudo leer package.json de ${MERGE_DE_ENTRADA} ni de su primer padre, asi que R29 ` +
+          `no se ha comprobado en este caso. Causa: ${String(error)}`,
       );
     }
 
-    const actual = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
-
-    const nuevos = [...paquetesDe(actual)].filter((nombre) => !paquetesDe(deDev).has(nombre)).sort();
+    const nuevos = [...despues].filter((nombre) => !antes.has(nombre)).sort();
 
     expect(
       nuevos,
       nuevos.length === 0
         ? undefined
-        : `Esta ficha no debe anadir dependencias (R29). Nuevas respecto a origin/dev: ${nuevos.join(', ')}.`,
+        : `El merge ${MERGE_DE_ENTRADA} no debia anadir dependencias (R29). Nuevas: ${nuevos.join(', ')}.`,
     ).toEqual([]);
   });
 });
