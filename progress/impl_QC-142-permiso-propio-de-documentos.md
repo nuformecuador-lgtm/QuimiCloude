@@ -2,7 +2,7 @@
 
 > Implementer, 2026-09-24. Rama `feature/QC-142-permiso-propio-de-documentos`, worktree
 > `.worktrees/QC-142-permiso-propio-de-documentos`. Sin push ni PR. No me autoapruebo.
-> **Estado: PARADA en T10 por una pregunta nueva (abajo).**
+> **Estado: T1-T9 cerradas. T10: R20 verde en E2E, R19 ROJO en el procesado (tras autorizar). Ver «Corrida E2E».**
 
 ## Base de datos
 
@@ -31,7 +31,7 @@
 ## Tasks
 
 - **Cerradas `[x]`:** T1, T2, T3, T4, T5, T6, T7, T8, T9.
-- **Abiertas `[ ]`:** T10 (bloqueada por la pregunta de abajo) y T11 (esta bitácora es parcial;
+- **Abiertas `[ ]`:** T10 (R19 rojo en E2E, abajo) y T11 (esta bitácora es parcial;
   el `./init.sh` completo lo corre el leader).
 
 ## Commits
@@ -70,8 +70,8 @@ casan son exactamente `documentos.consultar` y `documentos.modificar`. **No entr
 | R14, R15, R16 | `tests/unit/documentos/{issue-upload-links,enqueue-batch,get-batch-status}.test.ts` (describe «documentos.modificar decide, nunca proveedores.*»), `tests/unit/documentos/authorization.test.ts` |
 | R17 | `tests/unit/documentos/authorization.test.ts` (el literal se escribe una sola vez; ningún fuente compara nombres de rol) |
 | R18 | `tests/unit/documentos/read-document.test.ts` (un actor sin permisos lee y descarga su propia ruta) |
-| R19 | `e2e/documentos.spec.ts`, caso existente «sube tres PDFs …»: **sin correr en esta rama** (ver T10) |
-| R20 | `e2e/documentos.spec.ts`, caso nuevo (commit `d7627bcf`): **sin correr**, puerto 3117 ocupado por QC-158 (ver T10) |
+| R19 | `e2e/documentos.spec.ts`, caso existente «sube tres PDFs y ve cambiar el estado … (R20)»: **ROJO en Chromium**, el archivo acaba en `error` en el procesado (ver «Corrida E2E») |
+| R20 | `e2e/documentos.spec.ts`, caso nuevo «un rol con proveedores.consultar y proveedores.modificar pero sin documentos.modificar no puede subir (R20 permiso propio)»: **verde en Chromium** (8.7s) |
 | R21 | `tests/unit/identity/schema/documents-permissions-migration.test.ts` (sin DDL) y `git diff --stat` de la rama, que no lista `package.json`, `pnpm-lock.yaml`, `db/schema.prisma` ni `docs/dependencias.md` |
 
 ## Salida de los tests (corridas de los subagentes, archivo a archivo)
@@ -146,3 +146,35 @@ de las líneas ~133-135 y el caso nuevo escrito al pie de la letra de §6. typec
    `pnpm exec playwright test e2e/documentos.spec.ts --project=chromium` contra `QuimiCloude_QC142`,
    con el puerto 3117 libre.
 2. T11: `./init.sh` completo (lo corre el leader) y confirmar R21 con `git diff --stat dev...HEAD`.
+
+## Corrida E2E (única, 2026-09-24)
+
+- Comprobado justo antes: el puerto 3117 sin LISTEN y ningún proceso `next` ni Playwright vivo en la máquina. `prisma migrate status` → `QuimiCloude_QC142`, al día.
+- Comando: `pnpm exec playwright test e2e/documentos.spec.ts --project=chromium --reporter=list` (lo corrió el implementer). El intento previo del subagente murió con `EADDRINUSE` antes de ejecutar ningún caso, así que esta es la única corrida con casos.
+
+```
+Running 2 tests using 2 workers
+  ✓  2 [chromium] › e2e\documentos.spec.ts:404:7 › documentos › un rol con proveedores.consultar y proveedores.modificar pero sin documentos.modificar no puede subir (R20 permiso propio) (8.7s)
+  ✘  1 [chromium] › e2e\documentos.spec.ts:305:7 › documentos › sube tres PDFs y ve cambiar el estado de cada uno hasta terminar (R20) (2.1m)
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+    Locator:  getByTestId('document-upload-row-status-0')
+    Expected: "done"
+    Received: "error"
+    Timeout:  120000ms
+      4 × ... data-status="queued" ... / 231 × ... data-status="error" ...
+      at e2e\documentos.spec.ts:373:77
+
+  1 failed
+  1 passed (2.5m)
+```
+
+**Qué dice el log del servidor sobre R19 (el rojo):**
+- La autorización con el Administrador pasó entera: `issueUploadLinksAction` (3 archivos), `enqueueBatchAction` y `getBatchStatusAction` respondieron 200 y la tanda se encoló.
+- El trabajo de la cola procesó los tres PDFs (`[process-pdf-by-strategy] estrategia=catalogo modo=images ... paginas=1 longitud=53`), y cada fila pasó de `queued` a `error`, no a `done`.
+- El log no tiene ningún error ni traza del motivo. El `afterAll` borró las filas, así que `error_code` y `error_reason` ya no se pueden leer: la consulta posterior sobre `document_files` salió vacía.
+- El fallo está **después** del permiso, en el procesado del PDF, que esta rama no toca: en `lib/modules/documentos` solo cambia la constante de `actor.ts`. En la revisión de QC-107 este mismo caso pasaba (2 passed). **No está aislado** si es un rojo que viene de `dev` o del entorno (por ejemplo, variables de IA en el `.env` del worktree): hace falta otra corrida, que ya no es mía.
+- `tests/baseline-rojos.json` está vacío: este rojo no figura como deuda conocida.
+- No queda vivo ningún proceso de QC-142.
+
+**Para diagnosticar, sin tocar código:** correr el mismo spec sobre `dev` o sobre `origin/dev` limpio, o repetirlo aquí sin el `afterAll` para leer `document_files.error_code` y `error_reason`.
