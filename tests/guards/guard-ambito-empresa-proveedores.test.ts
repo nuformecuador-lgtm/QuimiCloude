@@ -326,7 +326,7 @@ const PUERTOS = [
     ruta: join(MODULE_ROOT, 'ports', 'supplier-repository.ts'),
     constante: 'supplierRepository',
     adaptador: 'supplier-prisma.ts',
-    metodosEsperados: 5,
+    metodosEsperados: 6,
   },
   {
     nombre: 'SupplierCatalogRepository',

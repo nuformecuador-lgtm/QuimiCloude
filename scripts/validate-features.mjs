@@ -17,8 +17,8 @@ import path from 'node:path';
 
 const FEATURE_LIST = 'feature_list.json';
 const WT_DIR = '.worktrees';
-// Cupo de `in_progress` por zona (CLAUDE.md regla 1). `fullstack` sube a 3 el 2026-09-22.
-const MAX_POR_ZONA = { frontend: 2, backend: 2, fullstack: 3 };
+// Cupo de `in_progress` por zona (CLAUDE.md regla 1). `fullstack` sube a 3 el 2026-09-22 y `backend` el 2026-09-24.
+const MAX_POR_ZONA = { frontend: 2, backend: 3, fullstack: 3 };
 const cupoDe = (zone) => MAX_POR_ZONA[zone] ?? 2;
 const EN_VUELO = ['spec_ready', 'in_progress'];
 
@@ -216,7 +216,7 @@ for (const f of features) {
 // --- 3. Cupo de features in_progress por zona -----------------------------------------
 // Coincide con CLAUDE.md regla 1 y AGENTS.md > Paralelismo. Las de `zone: null` se
 // ignoran (aun sin evaluar), y falla al pasar el cupo de la zona, que es inclusive: 2 en
-// `frontend` y `backend`, 3 en `fullstack` (desde el 2026-09-22; caso: QC-146).
+// `frontend`, 3 en `backend` y `fullstack` (desde el 2026-09-22 y el 2026-09-24; casos: QC-146 y QC-142).
 // Ojo: esto NO valida el conflicto de archivos entre features de la misma zona; eso sigue
 // siendo criterio del leader leyendo la seccion "Archivos esperados" de cada tasks.md.
 const enProgreso = features.filter((f) => f.status === 'in_progress');

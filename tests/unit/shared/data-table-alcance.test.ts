@@ -468,14 +468,22 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // reabrir su edicion y comprobar que el coste se reabre sin teclear nada. Se TENSA el centinela
   // de veinte a VEINTIUNO; la lista sigue CERRADA, y un spec mas que referencie `data-table`
   // vuelve a ponerla en rojo.
-  // 2026-09-24 (QC-150, producto-terminado, R37): entra la VIGESIMOSEGUNDA entrada,
-  // `e2e/producto-terminado.spec.ts`, y no afloja la lista. No estrena pantalla: recorre las de
-  // presentaciones, pedidos, asignacion e inventario, ya en esta lista, y localiza
-  // `data-table-cell-orderNumber`, `data-table-row-<id>` y `data-table-cell-name` porque lo que
-  // afirma -el pedido finalizado y el lote de producto terminado que nace de el- se lee de las
-  // listas que monta la tabla compartida. Se TENSA el centinela de veintiuno a VEINTIDOS; la
-  // lista sigue CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos veintidos', () => {
+  //
+  // 2026-09-23: SALE `e2e/aislamiento-proveedores.spec.ts`. La pantalla que recorre dejo de montar
+  // la tabla compartida: ahora es una lista con carga perezosa que localiza sus filas por
+  // `supplier-showcase-row-<id>` y el nombre por el enlace de detalle, no por celdas de
+  // `data-table`. El centinela AFLOJA por primera vez, de VEINTIUNO a VEINTE, porque la unica
+  // razon de que este spec estuviera aqui ya no existe; sigue siendo una lista cerrada y un spec
+  // mas que referencie `data-table` vuelve a ponerla en rojo.
+  //
+  // 2026-09-24 (QC-150, producto-terminado, R37): entra `e2e/producto-terminado.spec.ts`, y no
+  // afloja la lista. No estrena pantalla: recorre las de presentaciones, pedidos, asignacion e
+  // inventario, ya en esta lista, y localiza `data-table-cell-orderNumber`, `data-table-row-<id>`
+  // y `data-table-cell-name` porque lo que afirma -el pedido finalizado y el lote de producto
+  // terminado que nace de el- se lee de las listas que monta la tabla compartida. El centinela
+  // vuelve de VEINTE a VEINTIUNO; la lista sigue CERRADA, y un spec mas que referencie
+  // `data-table` vuelve a ponerla en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos veintiuno', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -485,7 +493,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos veintidos E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos veintiuno E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
       // ya consumen la tabla compartida -inventario y presentaciones- y localiza
       // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
@@ -494,9 +502,6 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       'e2e/aislamiento-inventario.spec.ts',
       // Las filas servidas de la lista de pedidos con sesion en una empresa: ver la nota de arriba.
       'e2e/aislamiento-pedidos.spec.ts',
-      // Las filas servidas de la lista de proveedores con sesion en una empresa: ver la nota de
-      // arriba. Recorre la pantalla de proveedores, que ya consumia la tabla compartida.
-      'e2e/aislamiento-proveedores.spec.ts',
       // Las filas servidas de la lista de recetas con sesion en una empresa: ver la nota de arriba.
       'e2e/aislamiento-recetas.spec.ts',
       // La DECIMOSEXTA la trae QC-63 el 2026-09-17 (R29, R30): ver la nota de arriba. Llega a la
@@ -527,8 +532,8 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // la pantalla de presentaciones la consume (QC-45 R8, R36). La lista sigue CERRADA: un
       // sexto spec que referencie `data-table` vuelve a ponerla en rojo.
       'e2e/presentaciones.spec.ts',
-      // La VIGESIMOSEGUNDA la trae QC-150 el 2026-09-24 (R37): ver la nota de arriba. Va antes
-      // que `proveedores` porque la lista esta ORDENADA y 'd' precede a 'v'.
+      // La trae QC-150 el 2026-09-24 (R37): ver la nota de arriba. Va antes que `proveedores`
+      // porque la lista esta ORDENADA y 'd' precede a 'v'.
       'e2e/producto-terminado.spec.ts',
       'e2e/proveedores.spec.ts',
       // '-' precede a '.', igual que en pedidos.

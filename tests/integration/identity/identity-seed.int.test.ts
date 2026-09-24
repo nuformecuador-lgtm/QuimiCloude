@@ -282,7 +282,7 @@ async function findLiveAdmin(tx: Prisma.TransactionClient) {
   });
 }
 
-/** Los dieciseis codigos del catalogo, ordenados. Derivados de `PERMISSIONS`, nunca escritos aqui. */
+/** Los dieciocho codigos del catalogo, ordenados. Derivados de `PERMISSIONS`, nunca escritos aqui. */
 const CODIGOS_DEL_CATALOGO = PERMISSIONS.map((permission) => permission.code).slice().sort();
 
 /** Los codigos que el seed asigna a un rol, ordenados, tal como los declara el dominio. */
@@ -290,7 +290,7 @@ function codigosSembradosDe(roleName: string): readonly string[] {
   return [...(SEED_ROLE_PERMISSIONS[roleName] ?? [])].sort();
 }
 
-/** Numero total de asignaciones que el seed tiene que dejar (hoy: dieciseis + dos + dos = veinte). */
+/** Numero total de asignaciones que el seed tiene que dejar (hoy: dieciocho + dos + dos = veintidos). */
 const TOTAL_DE_ASIGNACIONES_DEL_SEED = Object.values(SEED_ROLE_PERMISSIONS).reduce(
   (total, codes) => total + codes.length,
   0,
@@ -767,7 +767,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
   });
 
   // Caso 10 (QC-74 R7, R8, R9, R10): el catalogo y las asignaciones, contra base real.
-  it('la primera corrida deja el catalogo completo, el Administrador con los dieciseis permisos y el Operador solo con inventario.consultar y asignaciones.consultar; la segunda no cambia ningun conteo', async () => {
+  it('la primera corrida deja el catalogo completo, el Administrador con los dieciocho permisos y el Operador solo con inventario.consultar y asignaciones.consultar; la segunda no cambia ningun conteo', async () => {
     await inRolledBackTransaction(async (tx) => {
       await resetIdentityToEmptyState(tx);
       expect(await tx.permission.count()).toBe(0);
@@ -782,19 +782,19 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         credentials: fakeCredentialsProvider,
       });
 
-      // Primero: la corrida SI creo el catalogo entero y las veinte asignaciones.
+      // Primero: la corrida SI creo el catalogo entero y las veintidos asignaciones.
       expect(first.createdPermissions.slice().sort()).toEqual(CODIGOS_DEL_CATALOGO);
       // Los dos numeros, escritos: `PERMISSIONS.length` y el total de asignaciones del seed
-      // (Administrador 16 + Operador 2 + Empacador 2).
-      expect(PERMISSIONS.length).toBe(16);
-      expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(20);
+      // (Administrador 18 + Operador 2 + Empacador 2).
+      expect(PERMISSIONS.length).toBe(18);
+      expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(22);
       expect(first.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
 
       // Y la base lo confirma: las filas de `permissions` son exactamente las del catalogo.
       const catalogoEnBase = await tx.permission.findMany({ orderBy: { code: 'asc' } });
       expect(catalogoEnBase.map((permission) => permission.code)).toEqual(CODIGOS_DEL_CATALOGO);
 
-      // El Administrador tiene los dieciseis, escritos uno a uno — sin comodin ni regla
+      // El Administrador tiene los dieciocho, escritos uno a uno — sin comodin ni regla
       // implicita: se leen de `role_permissions`, no de su nombre de rol.
       expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
       expect(codigosSembradosDe(ROLE_ADMINISTRADOR)).toEqual(CODIGOS_DEL_CATALOGO);
@@ -913,7 +913,7 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
   // Caso 12 (QC-86 R28, R26): la MIGRACION de las asignaciones sobre una instalacion QUE YA
   // EXISTE. El escenario no se toma prestado del estado con el que arranque la base local: se
   // CONSTRUYE dentro del `tx` —reset + una corrida del seed— para que «ya sembrada» signifique
-  // exactamente los dieciseis permisos y las veinte asignaciones del dominio, con los dos
+  // exactamente los dieciocho permisos y las veintidos asignaciones del dominio, con los dos
   // codigos de `asignaciones` ya presentes, que es el caso dificil de R28.
   //
   // El SQL se LEE del `migration.sql`, no se copia: si alguien le quita el
@@ -929,13 +929,13 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         checkCredentialPolicy: identity.checkCredentialPolicy,
         credentials: fakeCredentialsProvider,
       });
-      // La instalacion de partida es la de verdad: dieciseis permisos y veinte asignaciones.
+      // La instalacion de partida es la de verdad: dieciocho permisos y veintidos asignaciones.
       expect(bootstrap.createdPermissions.slice().sort()).toEqual(CODIGOS_DEL_CATALOGO);
       expect(bootstrap.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
 
       const antes = await fotoDePermisos(tx);
-      expect(antes.permisos).toHaveLength(16);
-      expect(antes.asignaciones).toHaveLength(20);
+      expect(antes.permisos).toHaveLength(18);
+      expect(antes.asignaciones).toHaveLength(22);
       // Y los dos codigos de la ficha YA estan: sin esto, «no duplica» seria trivial.
       expect(antes.permisos.map((permiso) => permiso.code)).toEqual(
         expect.arrayContaining(['asignaciones.consultar', 'asignaciones.modificar']),
@@ -964,8 +964,8 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         const despues = await fotoDePermisos(tx);
 
         // Ni una fila de mas (no duplica) ni una de menos (no borra).
-        expect(despues.permisos, `conteo de permisos tras la pasada ${pasada}`).toHaveLength(16);
-        expect(despues.asignaciones, `conteo de asignaciones tras la pasada ${pasada}`).toHaveLength(20);
+        expect(despues.permisos, `conteo de permisos tras la pasada ${pasada}`).toHaveLength(18);
+        expect(despues.asignaciones, `conteo de asignaciones tras la pasada ${pasada}`).toHaveLength(22);
 
         // Ni una fila distinta: comparacion campo a campo, `created_at`/`updated_at` incluidos.
         expect(despues.permisos, `filas de permisos tras la pasada ${pasada}`).toEqual(antes.permisos);

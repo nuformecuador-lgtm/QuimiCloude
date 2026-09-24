@@ -70,3 +70,20 @@ export { createCreateCatalogLine, type CreateCatalogLineDeps } from './domain/cr
 export { createUpdateCatalogLine, type UpdateCatalogLineDeps } from './domain/update-catalog-line';
 export { createDeleteCatalogLine, type DeleteCatalogLineDeps } from './domain/delete-catalog-line';
 export { createListCatalogLines, type ListCatalogLinesDeps } from './domain/list-catalog-lines';
+// La vista de catalogo visual: las dos factories, sus tipos `*Deps`, los cinco tipos de
+// salida/entrada y las cuatro constantes de tanda y orden.
+export {
+  createListSupplierShowcase,
+  type ListSupplierShowcaseDeps,
+} from './domain/list-supplier-showcase';
+export { createListShowcaseLines, type ListShowcaseLinesDeps } from './domain/list-showcase-lines';
+export {
+  SHOWCASE_SUPPLIER_BATCH,
+  SHOWCASE_LINE_BATCH,
+  SHOWCASE_SUPPLIER_SORT,
+  SHOWCASE_LINE_SORT,
+  type ShowcaseLine,
+  type ShowcaseRow,
+  type ShowcasePage,
+  type ShowcaseLinesPage,
+} from './domain/supplier-showcase';

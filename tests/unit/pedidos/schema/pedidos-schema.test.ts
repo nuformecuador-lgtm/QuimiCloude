@@ -215,9 +215,10 @@ describe('db/schema.prisma — modelo de pedido', () => {
   })
 
   it('Order no declara cliente, destinatario ni ninguna columna equivalente', () => {
-    // R3 y decision cerrada 8: no hay cliente ni destinatario, y es DELIBERADO. Tampoco se crea
-    // catalogo de clientes. Anadirlo despues obliga a decidir que cliente llevaban los pedidos
-    // ya cargados, y ese coste esta asumido y anotado.
+    // R3 y decision cerrada 8: no hay cliente ni destinatario en Order, y es DELIBERADO;
+    // sigue vigente hasta QC-156. La prohibicion de un catalogo de clientes que este mismo
+    // caso incluia queda derogada solo para Customer/customers por el modulo Clientes
+    // (QC-152/QC-153, 2026-09-24); el resto de nombres de catalogo sigue prohibido.
     const CLIENTE = /client|customer|cliente|recipient|destinatar|buyer|receiver|contact|party/i
     const sospechosos = order.fields
       .filter((candidate) => CLIENTE.test(candidate.name))
@@ -227,10 +228,10 @@ describe('db/schema.prisma — modelo de pedido', () => {
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
       .map((match) => match[1])
       .filter((name): name is string => name !== undefined)
-    for (const forbidden of ['Customer', 'Client', 'Recipient', 'Buyer']) {
+    for (const forbidden of ['Client', 'Recipient', 'Buyer']) {
       expect(modelNames, `el modelo ${forbidden} no debe existir`).not.toContain(forbidden)
     }
-    expect(schema).not.toMatch(/@@map\("(customers|clients|recipients)"\)/)
+    expect(schema).not.toMatch(/@@map\("(clients|recipients)"\)/)
   })
 
   it('Order no declara ninguna fecha de solicitud aparte de createdAt', () => {

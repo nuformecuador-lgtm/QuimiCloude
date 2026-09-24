@@ -4755,3 +4755,23 @@ podar.
   y en el PR.
 - **Cierre tardío:** el PR se mergeó el 2026-09-22 pero la ficha seguía `in_progress` y la tarjeta *En curso*.
   El leader lo detectó y lo cerró el 2026-09-23, sin volver a verificar nada.
+
+## 2026-09-24 — QC-140-catalogo-visual-de-proveedores
+
+- **Qué:** `/proveedores` deja la tabla de QC-44 y pasa a ser un catálogo visual: cada proveedor es
+  una fila con el carrusel de sus productos, cargado de 5 en 5 al hacer scroll y con «cargar más» por
+  fila. Filtro por proveedor o producto (con producto, el carrusel muestra solo lo que coincide),
+  proveedor sin líneas visible con aviso, fallo incremental con Reintentar, orden alfabético. Editar
+  y borrar proveedor se mudan a la cabecera de `/proveedores/<id>`.
+- **PR #118**, merge `a738d81f`. Spec R1–R41, D1–D20, T0–T15. Review: rechazado por 2 mayores (letra
+  de 14 px en los filtros desde 768 px; tests del panel y del diálogo perdidos al borrar la lista),
+  aprobado en la segunda. Dependencia nueva aprobada: `react-intersection-observer` (checks
+  verificados por el leader con `npm view`; el spec los tenía de memoria y uno era falso).
+- **El «Guardar» tapado en Android lo causaba la rama**: un nombre largo sin espacios desbordaba en
+  horizontal y Chromium móvil agrandaba el viewport. Se comprobó contra `origin/dev` antes de decidir.
+- **Tercera ficha seguida rota por un test de alcance que compara con `origin/dev`** (QC-145 y clientes
+  por dependencias, QC-147 por timestamp). Se corrigieron comparando el merge de su propia ficha. La
+  clase entera es **QC-99**, que conviene subir de prioridad.
+- **Deuda:** T14 (dispositivos reales), R51 de `proveedores.spec.ts` rojo heredado de `dev`
+  (`682d3e3b`), y los menores de la segunda revisión (tres aserciones sin sucesor en los tests
+  recuperados, citas en comentarios de tests).

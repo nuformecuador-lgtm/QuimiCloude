@@ -1,7 +1,7 @@
 // Test de fuente: quien escribe la fecha de terminado y el estado del pedido, y el alcance del
 // esquema y las dependencias. Mismo patron que `tests/unit/identity/roles/empacador-rol.test.ts`
 // (barrido de `lib/**` sobre el fuente sin comentarios) y `tests/unit/identity/qc78-alcance.test.ts`
-// (diff contra la base de fusion con `origin/dev`).
+// (lectura de un commit fijo de la historia; aqui, el merge con el que el cambio entro en dev).
 
 import { execSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -313,12 +313,12 @@ describe('R10 — EN_CURSO/ENTREGADO solo los escribe setAliveOrderStatus; updat
 });
 
 // -------------------------------------------------------------------------------------------
-// El catalogo sigue en 16 permisos
+// El catalogo sigue en 18 permisos
 // -------------------------------------------------------------------------------------------
 
-describe('R16 — el catalogo de permisos sigue en dieciseis codigos', () => {
-  it('PERMISSIONS tiene exactamente 16 entradas', () => {
-    expect(PERMISSIONS).toHaveLength(16);
+describe('R16 — el catalogo de permisos sigue en dieciocho codigos', () => {
+  it('PERMISSIONS tiene exactamente 18 entradas', () => {
+    expect(PERMISSIONS).toHaveLength(18);
   });
 
   it('PERMISSIONS no repite ningun codigo', () => {
@@ -328,119 +328,81 @@ describe('R16 — el catalogo de permisos sigue en dieciseis codigos', () => {
 });
 
 // -------------------------------------------------------------------------------------------
-// Sin dependencias nuevas ni tablas nuevas, comparado contra origin/dev
+// Sin dependencias nuevas ni tablas nuevas en el merge que trajo el cambio a dev
 // -------------------------------------------------------------------------------------------
 
 function git(comando: string): string {
   return execSync(comando, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 }
 
-/** El `package.json` de la base de fusion con `origin/dev`, o `null` si no se puede leer sin red. */
-function packageJsonDeDev(): { dependencies: Record<string, string>; devDependencies: Record<string, string> } | null {
-  try {
-    const base = git('git merge-base origin/dev HEAD').trim();
-    const contenido = git(`git show ${base}:package.json`);
-    return JSON.parse(contenido) as {
-      dependencies: Record<string, string>;
-      devDependencies: Record<string, string>;
-    };
-  } catch {
-    return null;
-  }
+// Comparar con `origin/dev` castigaba a cualquier rama posterior que anadiera una dependencia
+// aprobada. Lo que se protege es un hecho historico: el merge con el que este cambio entro en dev
+// no anadio dependencias ni modelos. Por eso se compara ese merge con su primer padre. (2026-09-24)
+const MERGE_DE_ENTRADA = '51f2d1013f33a3fde50594ac0dde7ec7b7535938';
+
+type PackageJson = { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+
+function packageJsonEn(commit: string): PackageJson {
+  return JSON.parse(git(`git show ${commit}:package.json`)) as PackageJson;
 }
 
-function paquetesDe(pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }): Set<string> {
+function paquetesDe(pkg: PackageJson): Set<string> {
   return new Set([...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.devDependencies ?? {})]);
 }
 
-describe('R29 — package.json sin dependencias nuevas respecto a origin/dev', () => {
-  it('ningun paquete de dependencies/devDependencies actual falta en la base de fusion con origin/dev', () => {
-    const deDev = packageJsonDeDev();
-    if (deDev === null) {
-      // «No puedo mirar» no es un verde silencioso: se reporta y se detiene el caso, sin fingir
-      // que la comparacion se hizo.
+describe('R29 — package.json sin dependencias nuevas en el merge que trajo el cambio a dev', () => {
+  it('el merge de entrada no declara ningun paquete que no tuviera ya su primer padre', () => {
+    let antes: Set<string>;
+    let despues: Set<string>;
+    try {
+      antes = paquetesDe(packageJsonEn(`${MERGE_DE_ENTRADA}~1`));
+      despues = paquetesDe(packageJsonEn(MERGE_DE_ENTRADA));
+    } catch (error) {
+      // «No puedo mirar» no es un verde silencioso: se reporta y se detiene el caso.
       throw new Error(
-        'No se pudo leer package.json de la base de fusion con origin/dev ' +
-          '(`git merge-base origin/dev HEAD` + `git show <base>:package.json`), asi que R29 ' +
-          'no se ha comprobado en este caso.',
+        `No se pudo leer package.json de ${MERGE_DE_ENTRADA} ni de su primer padre, asi que R29 ` +
+          `no se ha comprobado en este caso. Causa: ${String(error)}`,
       );
     }
 
-    const actual = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
-
-    const nuevos = [...paquetesDe(actual)].filter((nombre) => !paquetesDe(deDev).has(nombre)).sort();
+    const nuevos = [...despues].filter((nombre) => !antes.has(nombre)).sort();
 
     expect(
       nuevos,
       nuevos.length === 0
         ? undefined
-        : `Esta ficha no debe anadir dependencias (R29). Nuevas respecto a origin/dev: ${nuevos.join(', ')}.`,
+        : `El merge ${MERGE_DE_ENTRADA} no debia anadir dependencias (R29). Nuevas: ${nuevos.join(', ')}.`,
     ).toEqual([]);
   });
 });
 
+/** Nombres de `model X {` del esquema, en el texto dado. */
+function modelosDe(schema: string): string[] {
+  return [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map((match) => match[1] as string).sort();
+}
+
 describe('R29 — el esquema no gana modelos ni tablas: el unico cambio es la columna de R1', () => {
-  /** Nombres de `model X {` del esquema, en el texto dado. */
-  function modelosDe(schema: string): string[] {
-    return [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map((match) => match[1] as string).sort();
-  }
-
-  /**
-   * Lo esperado: la UNION sin duplicar entre los modelos de la base de fusion y los que anade
-   * esta rama. Una vez que la base de fusion YA trae alguno de `estaRama` (porque ya se mergeo),
-   * sumarlo dos veces romperia el test contra si mismo; la union lo evita sin dejar de exigir el
-   * resto.
-   */
-  function modelosEsperados(modelosDeLaBase: readonly string[], estaRama: readonly string[]): string[] {
-    return [...new Set([...modelosDeLaBase, ...estaRama])].sort();
-  }
-
-  it('los modelos de db/schema.prisma son los mismos que en la base de fusion con origin/dev, salvo el libro de reservas de QC-141', () => {
-    let modelosDev: string[];
+  it('los modelos de db/schema.prisma en el merge de QC-145 (PR #112) son los mismos que en su primer padre', () => {
+    let modelosPadre: string[];
+    let modelosMerge: string[];
     try {
-      const base = git('git merge-base origin/dev HEAD').trim();
-      modelosDev = modelosDe(git(`git show ${base}:db/schema.prisma`));
+      modelosPadre = modelosDe(git(`git show ${MERGE_DE_ENTRADA}~1:db/schema.prisma`));
+      modelosMerge = modelosDe(git(`git show ${MERGE_DE_ENTRADA}:db/schema.prisma`));
     } catch (error) {
       throw new Error(
-        'No se pudo leer db/schema.prisma de la base de fusion con origin/dev, asi que la ' +
-          `parte de esquema de R29 no se ha comprobado en este caso. Causa: ${String(error)}`,
+        `No se pudo leer db/schema.prisma en ${MERGE_DE_ENTRADA} ni en su padre (clon superficial ` +
+          `sin ese commit), asi que la parte de esquema de R29 no se ha comprobado en este ` +
+          `caso. Causa: ${String(error)}`,
       );
     }
 
-    const modelosActuales = modelosDe(readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8'));
-
-    // Tras mergear origin/dev, ese merge-base ES la punta de dev: la comparacion pasa a medir
-    // esta rama contra dev, y esta rama SI anade una tabla propia, el libro de reservas.
-    // `ReservationMovement` es el unico modelo nuevo esperado; cualquier otro sigue sin declararse.
-    const ESPERADOS_DE_ESTA_RAMA = ['ReservationMovement'];
-
-    expect(modelosActuales).toEqual(modelosEsperados(modelosDev, ESPERADOS_DE_ESTA_RAMA));
+    expect(modelosMerge).toEqual(modelosPadre);
   });
 
-  it('R29 (esquema) — con fuente fabricada, si la base de fusion YA tiene el modelo de esta rama, la union no lo duplica', () => {
-    const modelosDev = ['Order', 'ReservationMovement'];
+  it('dispara con un esquema sintetico que gana un modelo respecto de su padre', () => {
+    const padre = 'model Order {\n  id String\n}\n';
+    const conModeloNuevo = padre + '\nmodel OrderFinishedLog {\n  id String\n}\n';
 
-    expect(modelosEsperados(modelosDev, ['ReservationMovement'])).toEqual(['Order', 'ReservationMovement']);
-  });
-
-  it('R29 (esquema) — con fuente fabricada, un modelo nuevo no declarado en esta rama sigue dando rojo', () => {
-    const modelosDev = ['Order'];
-    const modelosActuales = ['Order', 'ReservationMovement', 'OrderFinishedLog'].sort();
-
-    expect(modelosActuales).not.toEqual(modelosEsperados(modelosDev, ['ReservationMovement']));
-  });
-
-  it('dispara con un esquema sintetico que gana un modelo respecto del de referencia', () => {
-    function modelosDe(schema: string): string[] {
-      return [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map((match) => match[1] as string).sort();
-    }
-
-    const referencia = 'model Order {\n  id String\n}\n';
-    const conModeloNuevo = referencia + '\nmodel OrderFinishedLog {\n  id String\n}\n';
-
-    expect(modelosDe(conModeloNuevo)).not.toEqual(modelosDe(referencia));
+    expect(modelosDe(conModeloNuevo)).not.toEqual(modelosDe(padre));
   });
 });

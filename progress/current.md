@@ -19,6 +19,34 @@
 
 ## Evaluaciones
 
+### QC-168 - NACE y se ACOTA con `/afinar-feature` (2026-09-24)
+
+**13 decisiones cerradas**, ninguna abierta, en `specs/QC-168-estado-por-empacar/requirements.md`. Bloqueada por QC-150 y **bloquea a QC-82**, cuyo spec aprobado hay que revisar antes de implementar (Finalizar deja Por empacar; dos acciones de empaque en el registro). Orden: QC-150 -> QC-168 -> QC-82. Tambien nacio **QC-167** (consulta del recorrido en el dashboard, bloqueada por QC-82).
+
+### QC-140 - CERRADA (2026-09-24)
+
+PR #118, merge `a738d81f`. Resumen en `progress/history.md`. **Deuda: T14, revision en iPhone y Android reales**, pendiente del humano.
+
+### QC-141 cerrada y QC-150 F2.0 (2026-09-24)
+
+**QC-141 `done`** (F2.5): PR #116 mergeado (`08935782`), tarjeta en *Finalizado* y comentada; worktree desregistrado pero la **carpeta `.worktrees/QC-141-...` sigue** (archivo en uso en Windows), borrar a mano; rama local intacta. **Pendiente F2.6**: resumen en `progress/history.md` y poda del baseline de rojos con el proximo gate completo. **QC-140** pasa a `in_progress` en disco: el board la tenia *En curso* y tiene worktree con implementacion (divergencia de F0 no importada). **QC-150 F2.0 hecho**: spec aprobado el 2026-09-23, bloqueo por QC-141 levantado; `in_progress`, *En curso*. Cupo `fullstack` **3 de 3** (QC-140, QC-150, QC-158). QC-164 (`pending`) cambiara los envases de QC-150: va detras.
+
+### QC-165 administradores-por-el-maestro y QC-166 area-del-maestro - NACEN con `/afinar-feature` (2026-09-24)
+
+**QC-165** (backend, bloqueada por QC-161): 8 decisiones y 2 abiertas en `specs/QC-165-administradores-por-el-maestro/requirements.md`. **QC-166** (frontend, bloqueada por QC-162 y QC-165) sin sembrar. **QC-162** pasa a backend (la pantalla sale a QC-166). **QC-161** cierra su pregunta del login (aterriza en su area) y queda sin preguntas abiertas.
+
+### QC-164 unidad-del-pedido - NACE con `/afinar-feature` (2026-09-24)
+
+**QC-164** (fullstack): 10 decisiones y 4 abiertas en `specs/QC-164-unidad-del-pedido/requirements.md`; **reabre QC-147** (el pedido vuelve a tener unidad) y toca el consumo de **QC-141** (in_progress) y los envases de **QC-150** (spec_ready): ordenar en F1.0. **QC-163** creada por error y **cancelada** el mismo dia: duplicaba el contenido de la presentacion que ya trae QC-150 (R6-R8). Pregunta del dominio 1 anotada en `docs/architecture.md`.
+
+### QC-161 rol-maestro y QC-162 gestion-de-empresas - NACEN con `/afinar-feature` (2026-09-24)
+
+**QC-161** (backend) creada y sembrada: 11 decisiones (Maestro sin empresa, enmienda QC-47; nunca en el selector de roles) y 1 pregunta abierta (su login sin empresa en la sesion) en `specs/QC-161-rol-maestro/requirements.md`. **QC-162** (fullstack, bloqueada por QC-161) creada sin sembrar. Choca con QC-153/QC-142 en el catalogo de permisos: no en paralelo.
+
+### QC-160 boton-de-subida-de-pdf - NACE y se ACOTA con `/afinar-feature` (2026-09-24)
+
+**QC-160** (frontend, bloqueada por QC-142) creada en el board y sembrada: 7 decisiones y 2 preguntas abiertas en `specs/QC-160-boton-de-subida-de-pdf/requirements.md`. Absorbe el montaje en formulas de **QC-142**, que queda solo permiso y pasa a `zone: backend` (editado en Jira y en `feature_list.json`). Toca `/proveedores/[id]` como QC-158: mirar en F1.0.
+
 ### QC-158 / QC-159 - lectura de PDF con IA a datos, del chat (2026-09-23)
 
 **QC-158** `catalogo-desde-pdf` (fullstack, high) ACOTADA y sembrada: 9 decisiones y 4 preguntas abiertas en `specs/QC-158-catalogo-desde-pdf/requirements.md`; enmienda R10 de QC-129 (avisado en QC-131). **F1.0 de QC-158 hecho el 2026-09-23** (worktree montado; cupo `fullstack` 1 de 3 con QC-141; el cruce de archivos con QC-141 se mira en F2.0). **F1.2/F1.3 hechos**: R1-R38, T0-T17; 7 preguntas con propuesta (design §10); tarjeta en *En revision*. **F1.4 APROBADO el 2026-09-23 por chat** (P1-P7 con las propuestas del design §10). **F2.0 hecho**: `in_progress`, *En curso*, cupo `fullstack` 2 de 3 con QC-141 (solapes pequenos: listas cerradas de e2e/migraciones y `lib/composition/index.ts`). Hallazgos: orquestacion en `documentos` (proveedores no puede importar inventario); editar una linea hoy borra su imagen (R29); el E2E de QC-107 probablemente rojo desde QC-110 (T0/T14). **QC-159** `formula-desde-pdf` (fullstack) nace sin sembrar, bloqueada por QC-142.
@@ -29,7 +57,7 @@
 
 ### QC-152 Clientes - EPICA NUEVA del chat, ACOTADA con `/afinar-feature` (2026-09-23)
 
-Epica **QC-152** y tareas **QC-153** (modelo, backend), **QC-154** (CRUD, backend, bloqueada por 153), **QC-155** (pantalla, frontend, bloqueada por 154) y **QC-156** (pedido con cliente, fullstack, bloqueada por 154, sin sembrar). 153-155 sembradas con 7 decisiones comunes y 1 pregunta abierta (largos y formato de telefono/correo) en `specs/QC-15{3,4,5}-*/requirements.md`. `complexity` pendiente de F1.0. **QC-153 F1.0 hecho el 2026-09-24**: `complexity: medium` (migracion con RLS, FK compuesta y enmienda al catalogo de permisos con seed), worktree montado, cupo `backend` 2 de 2 con QC-131 (humana). **F1.2/F1.3 hechos**: R1-R29, T0-T13; tarjeta en *En revision*; **F1.4 APROBADO el 2026-09-24** (FK de auditoria simples, descripciones propuestas, ciudad 80/direccion 200). **F2.0 hecho**: `in_progress`, *En curso*. Choca con QC-142 en el catalogo de permisos: no en paralelo.
+Epica **QC-152** y tareas **QC-153** (modelo, backend), **QC-154** (CRUD, backend, bloqueada por 153), **QC-155** (pantalla, frontend, bloqueada por 154) y **QC-156** (pedido con cliente, fullstack, bloqueada por 154, sin sembrar). 153-155 sembradas con 7 decisiones comunes y 1 pregunta abierta (largos y formato de telefono/correo) en `specs/QC-15{3,4,5}-*/requirements.md`. `complexity` pendiente de F1.0. **QC-153 F1.0 hecho el 2026-09-24**: `complexity: medium` (migracion con RLS, FK compuesta y enmienda al catalogo de permisos con seed), worktree montado, cupo `backend` 2 de 2 con QC-131 (humana). **F1.2/F1.3 hechos**: R1-R29, T0-T13; tarjeta en *En revision*; **F1.4 APROBADO el 2026-09-24** (FK de auditoria simples, descripciones propuestas, ciudad 80/direccion 200). **F2.0 hecho**: `in_progress`, *En curso*. **F2.1-F2.4 hechos el 2026-09-24**: review OK (0 bloqueantes, menores cerrados); decisiones humanas sobre tests ajenos (guardian de QC-145 fijado a su merge; `pedidos-schema` deroga solo la prohibicion de `Customer`); gate completo VERDE (674/9418). **PR #117 abierto.** Choca con QC-142 en el catalogo de permisos: no en paralelo.
 
 ### QC-151 - CERRADA (2026-09-23)
 
@@ -633,7 +661,7 @@ porque es validacion de entrada y no una regla nueva de dominio.
 
 ## Deudas y cosas abiertas
 
-- **2026-09-23 · restos de worktree en disco**: `.worktrees/QC-107-componente-de-carga-de-archivos`, `.worktrees/QC-145-pedidos-terminados-en-asignacion`, `.worktrees/QC-146-presentacion-del-pedido` y `.worktrees/QC-147-cantidades-de-receta-en-porcentaje` ya no estan registrados en git, pero sus carpetas siguen con `node_modules` bloqueados por Windows (proceso node vivo). Borrarlas a mano cuando no haya servidores ni E2E corriendo. Las ramas locales tambien quedan: ya estan mergeadas. Las bases `QuimiCloude_QC145` y `QuimiCloude_QC147` sobran y se puede borrar.
+- **2026-09-23 · restos de worktree en disco**: `.worktrees/QC-107-componente-de-carga-de-archivos`, `.worktrees/QC-140-catalogo-visual-de-proveedores`, `.worktrees/QC-145-pedidos-terminados-en-asignacion`, `.worktrees/QC-146-presentacion-del-pedido` y `.worktrees/QC-147-cantidades-de-receta-en-porcentaje` ya no estan registrados en git, pero sus carpetas siguen con `node_modules` bloqueados por Windows (proceso node vivo). Borrarlas a mano cuando no haya servidores ni E2E corriendo. Las ramas locales tambien quedan: ya estan mergeadas. Las bases `QuimiCloude_QC140`, `QuimiCloude_QC145` y `QuimiCloude_QC147` sobran y se puede borrar.
 ### El E2E de dev tiene 11 rojos que no son de ninguna ficha en curso (2026-09-22)
 
 Medido por el leader al cerrar QC-146, sobre `origin/dev` limpio (`bc902800`), chromium, un worker: fallan `cierre-de-sesiones` (cierra sesiones de otra persona), `documentos` R20, `errores` R33, `inventario` R26 y QC-90 R32, `permisos` (Operador aterriza en asignacion), `presentaciones` R36, `proveedores` R51, `session` (dos casos) y `usuarios` R4/R42. Los mismos fallan en la rama de QC-146, que no los toca. Nadie tiene la ficha: hace falta una en el board.

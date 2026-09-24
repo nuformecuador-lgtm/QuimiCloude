@@ -1,6 +1,7 @@
 import type { ListQuery } from '../domain/list-query';
 import type { Page } from '../domain/page';
 import type { SupplierScope } from '../domain/supplier-scope';
+import type { ShowcasePage, ShowcaseQuery } from '../domain/supplier-showcase';
 import type { NewSupplier, SupplierView } from '../domain/supplier-view';
 
 /**
@@ -70,4 +71,12 @@ export interface SupplierRepository {
    * describe ese conjunto ya filtrado (R14).
    */
   listAlive(query: ListQuery, scope: SupplierScope): Promise<Page<SupplierView>>;
+
+  /**
+   * Tanda de proveedores VIVOS de esa empresa para la vista de catalogo visual. A diferencia de
+   * `listAlive`, no es el contrato generico de listas: el tamano de tanda y el orden son
+   * constantes del dominio (`supplier-showcase.ts`), no entrada, y cada fila trae ademas su
+   * primera tanda de lineas del catalogo.
+   */
+  listShowcaseAlive(query: ShowcaseQuery, scope: SupplierScope): Promise<ShowcasePage>;
 }
