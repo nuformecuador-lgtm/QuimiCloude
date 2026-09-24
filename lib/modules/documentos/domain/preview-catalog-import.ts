@@ -1,39 +1,27 @@
 /**
  * La vista previa de una importacion de catalogo: interpreta (o reclasifica), clasifica cada fila,
- * empareja o respeta su imagen y firma lo que hace falta para MOSTRAR -nunca escribe nada (R8).
+ * empareja o respeta su imagen y firma lo que hace falta para mostrar. Nunca escribe nada.
  *
- * LOS PASOS, EN ESTE ORDEN, y el orden ES el requisito (`design.md > 5.1`):
+ * Pasos, en este orden -abrir la revision no puede filtrar si un archivo existe, esta en otra
+ * empresa o su tanda no es de catalogo, asi que los cuatro casos dan el mismo rechazo-:
+ *   1. Permiso, antes de leer nada.
+ *   2. Leer el archivo (mismo rechazo si no existe, no esta listo o su tanda no es catalogo).
+ *   3. Interpretar el texto de la IA solo si no llegan filas ya revisadas; si llegan, son esas
+ *      las que se reclasifican y la interpretacion no se repite.
+ *   4. Resolver presentaciones y lineas vivas por identidad, para clasificar y para mostrar el
+ *      costo actual de una fila que cambia.
+ *   5. Listar y firmar los recortes del archivo, para el selector de imagen.
+ *   6. Clasificar y emparejar o respetar la imagen de cada fila: por pagina si no hay filas
+ *      editadas; si las hay, la imagen es la que trae la fila solo si es un recorte real de este
+ *      archivo y empresa (rechazar la confirmacion por una imagen ajena es cosa de la confirmacion,
+ *      no de esta vista previa).
  *
- *   1. `requirePermission(actor, DOCUMENT_UPLOAD_PERMISSION)` — PRIMERA LINEA, antes de leer el
- *      archivo, sus recortes o el catalogo (R31).
- *   2. `repository.readFileForReview`: archivo ausente, de otra empresa, no en `done` o de una
- *      tanda que no es `catalogo` dan EL MISMO rechazo (R3), sin decir cual de los cuatro ocurrio.
- *   3. Interpretar el texto de la IA -SOLO si no llegan `lines` ya revisadas-; con `lines`, son
- *      esas las que se reclasifican (R10) y la interpretacion no se repite.
- *   4. Resolver las presentaciones nombradas y las lineas vivas por identidad, para poder
- *      clasificar y para poder MOSTRAR el costo actual de una fila que «cambia» (R9). El caso de
- *      uso de `proveedores` que resuelve las vivas propaga `supplier_not_found` (R4): esta
- *      funcion no lo comprueba aparte, lo deja subir.
- *   5. Listar los recortes del archivo y firmar su lectura, para el selector de imagen (R24) y
- *      para la imagen de cada fila.
- *   6. Clasificar, y emparejar o respetar la imagen de cada fila: emparejando por pagina
- *      (`pairCropsWithLines`) solo cuando NO llegaron `lines` editadas; con `lines`, la imagen es
- *      la que trae la fila SI es un recorte real de este archivo y esta empresa, o ninguna si no
- *      (R24, R25, R26 -aqui solo se descarta la imagen ajena; RECHAZAR la confirmacion entera por
- *      ese motivo es cosa de `confirm-catalog-import.ts`, no de la vista previa).
+ * `createPresentation` e `importLines` viven en `CatalogImportDeps` porque la confirmacion
+ * comparte el mismo tipo de dependencias; esta funcion no los toca.
  *
- * Este caso de uso no toca ningun puerto de ESCRITURA: `createPresentation` e `importLines` viven
- * en `CatalogImportDeps` unicamente porque `confirm-catalog-import.ts` (T10) comparte el mismo
- * tipo de dependencias -y por eso, si alguno de los dos se invocara desde aqui, seria un error de
- * este archivo, no de quien lo cablea.
- *
- * La sugerencia de unidad de una presentacion nueva (R19) NO sale de aqui: es una funcion PURA,
- * `suggestUnitId`, que la pantalla llama con la lista de unidades que ya carga aparte
- * (`design.md > 5.5`, `> 10.1`: R19 no figura entre los requisitos de esta pieza). Por eso
- * `CatalogImportPreview` publica el texto de unidad LEIDO por fila -y, una vez por presentacion
- * nueva- pero ningun identificador de unidad ya elegido.
- *
- * Dominio puro: solo su propio `domain/`, sus `ports/` y los barriles de otros modulos.
+ * La sugerencia de unidad de una presentacion nueva es una funcion pura aparte que la pantalla
+ * llama con la lista de unidades que ya carga; por eso esta vista previa publica el texto de
+ * unidad leido, no un identificador ya elegido.
  */
 import { requirePermission, DOCUMENT_UPLOAD_PERMISSION, type Actor } from './actor';
 import { extractCatalogFromText, type ExtractedLine } from './catalog-extraction';
@@ -73,10 +61,8 @@ type ImportCatalogLines = ReturnType<typeof createImportCatalogLines>;
 /** Idem para el alta de presentacion de `inventario`: tambien de uso exclusivo de T10. */
 type CreatePresentation = ReturnType<typeof createCreatePresentation>;
 
-/**
- * Dependencias COMPARTIDAS por la vista previa y la confirmacion (`design.md > 5.1`): un solo
- * tipo para que T10 no declare una copia que pudiera divergir de esta.
- */
+/** Dependencias compartidas por la vista previa y la confirmacion: un solo tipo para que no haya
+ *  dos copias que puedan divergir. */
 export type CatalogImportDeps = {
   readonly repository: DocumentBatchRepository;
   readonly crops: CropCatalog;
@@ -92,7 +78,7 @@ export type CatalogImportDeps = {
 
 export type CatalogImportPreviewCrop = { readonly path: string; readonly url: string };
 
-/** Una presentacion nueva vista una sola vez, aunque la nombren varias filas (R17). */
+/** Una presentacion nueva vista una sola vez, aunque la nombren varias filas. */
 export type CatalogImportNewPresentation = {
   readonly presentation: string;
   /** La unidad tal como la leyo la IA, o `null` si la fila viene de una edicion del revisor. */
@@ -134,7 +120,7 @@ type PreviewRow = {
   readonly deliveryTime: number | null;
   readonly material: string | null;
   readonly measurements: unknown;
-  /** Solo tiene sentido para filas extraidas: es la clave del emparejamiento por pagina (R25). */
+  /** Solo tiene sentido para filas extraidas: es la clave del emparejamiento por pagina. */
   readonly page: number | null;
   /** Solo tiene sentido para filas revisadas: la imagen que trae la fila, sin validar todavia. */
   readonly requestedImagePath: string | null;
@@ -195,9 +181,9 @@ function distinctNormalizedPresentationNames(rows: readonly PreviewRow[]): reado
 }
 
 /** Las claves de identidad -nombre normalizado y presentacion resuelta- de las filas que tienen
- *  las dos cosas, sin repetir: son las que hace falta preguntar por su linea viva (R9). Una fila
- *  sin nombre o sin presentacion resuelta no aporta ninguna clave -va a clasificar como
- *  «incompleta» o «nueva» sin necesitar esta consulta-. */
+ *  las dos cosas, sin repetir: son las que hace falta preguntar por su linea viva. Una fila sin
+ *  nombre o sin presentacion resuelta no aporta ninguna clave, porque va a clasificar como
+ *  incompleta o nueva sin necesitar esta consulta. */
 function distinctIdentityKeys(
   rows: readonly PreviewRow[],
   presentations: readonly PresentationMatch[],
@@ -216,7 +202,7 @@ function distinctIdentityKeys(
 }
 
 /** La imagen que trae una fila revisada, o ninguna si no es un recorte real de esta empresa y
- *  este archivo, o si ya no esta en la lista vigente de recortes (R24, R26). */
+ *  este archivo, o si ya no esta en la lista vigente de recortes. */
 function resolveRequestedImagePath(
   requestedImagePath: string | null,
   cropPaths: readonly string[],
@@ -228,8 +214,8 @@ function resolveRequestedImagePath(
   return cropPaths.includes(requestedImagePath) ? requestedImagePath : null;
 }
 
-/** Las presentaciones nuevas -sin resolver a ninguna existente- vistas una sola vez (R17),
- *  emparejadas con la unidad que se leyo la PRIMERA vez que aparecieron. */
+/** Las presentaciones nuevas -sin resolver a ninguna existente- vistas una sola vez, emparejadas
+ *  con la unidad que se leyo la primera vez que aparecieron. */
 function distinctNewPresentations(
   rows: readonly PreviewRow[],
   classified: readonly ClassifiedLine[],
@@ -278,28 +264,23 @@ export function createPreviewCatalogImport(
     actor: Actor | null | undefined,
     input: unknown,
   ): Promise<CatalogImportPreview> {
-    // 1. Antes que nada, y sin excepcion (R31).
     requirePermission(actor, DOCUMENT_UPLOAD_PERMISSION);
 
     const parsed = previewCatalogImportInputSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
     const { supplierId, documentFileId, lines } = parsed.data;
 
-    // 2. Archivo ausente, de otra empresa, no en `done` o de una tanda que no es `catalogo`: EL
-    //    MISMO rechazo en los cuatro casos, sin tocar ningun otro puerto (R3).
     const file = await deps.repository.readFileForReview(documentFileId, actor.companyId);
     if (file === null || file.status !== 'done' || file.strategy !== 'catalogo') {
       throw new ValidationError();
     }
 
-    // 3. Interpretar SOLO si no llegan filas ya revisadas (R7, R10).
     const rows: readonly PreviewRow[] =
       lines === undefined
         ? extractCatalogFromText(file.extractedText ?? '').lines.map(fromExtractedLine)
         : lines.map(fromReviewedLine);
 
-    // 4. Presentaciones por nombre y lineas vivas por identidad. `findAliveByIdentity` propaga
-    //    `SupplierNotFoundError` (R4) sin que esta funcion tenga que comprobarlo aparte.
+    // `findAliveByIdentity` propaga el proveedor no encontrado sin que esta funcion lo compruebe aparte.
     const presentationNames = distinctNormalizedPresentationNames(rows);
     const presentationsFound =
       presentationNames.length === 0
@@ -320,7 +301,6 @@ export function createPreviewCatalogImport(
 
     const classified = classifyCatalogImportRows(rows.map(toClassifyRow), presentationMatches, aliveLines);
 
-    // 5. Recortes del archivo, firmados para el selector (R24).
     const cropPaths = await deps.crops.list(actor.companyId, documentFileId);
     const crops: readonly CatalogImportPreviewCrop[] = await Promise.all(
       cropPaths.map(async (path) => ({ path, url: await deps.crops.createSignedReadUrl(path, READ_LINK_TTL_SECONDS) })),
