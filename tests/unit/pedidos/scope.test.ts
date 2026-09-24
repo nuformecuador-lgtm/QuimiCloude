@@ -148,7 +148,7 @@ export function pantallasDePedidosFueraDeSuCarpeta(
   )
 }
 
-/** R54, R57: ningun route handler —`app/**\/route.ts`— de esta feature, salvo el cron nombrado
+/** Ningun route handler —`app/**\/route.ts`— de esta feature, salvo el cron nombrado
  *  en `RUTA_CRON_CADUCIDAD`. Las mutaciones van como Server Actions y los webhooks no son de
  *  esta ficha; el proceso diario tampoco es una mutacion de usuario y no tiene sesion que
  *  abrir, asi que va como Route Handler (`docs/architecture.md > Server Actions vs Route

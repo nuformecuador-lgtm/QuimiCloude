@@ -632,7 +632,7 @@ describe('R40 — la unica interfaz de la ficha es la pagina publica', () => {
 
 /**
  * El unico cron real que `lib/composition/index.ts` cablea: el proceso diario de `pedidos` que
- * caduca pedidos, ajeno del todo a esta ficha (QC-79 es sobre el correo del alta sin contrasena).
+ * caduca pedidos, ajeno del todo al alcance de este archivo (sobre el correo del alta sin contrasena).
  * `hallazgosDeFondo` no distingue de que ficha es un cron -no tiene por que-, asi que esta linea,
  * y SOLO esta, se descuenta antes de mirar `CABLEADO`: cualquier otra mencion de fondo en ese
  * archivo sigue cayendo igual que antes.

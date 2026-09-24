@@ -154,12 +154,11 @@ function funcionesConStatusEnData(fuente: string): string[] {
 }
 
 describe('R5 — finishedAt/finished_at solo se escribe en setAliveOrderStatus', () => {
-  // Enmendado por QC-141 (design.md > 5.3, review B4, Tm2): `setStatus` de `OrderWriteRepository`
-  // -implementada como `setAliveOrderStatus` en order-prisma.ts- escribe `finishedAt` en el
-  // mismo `UPDATE` que mueve a ENTREGADO, para que el estado y la fecha de terminado queden
-  // atomicos con el consumo. `transitionAliveOrder` (order-catalog-prisma.ts), que llevaba su
-  // propio `data:` con finishedAt y se habia quedado sin llamantes, se retiro en Tm2: ya no
-  // queda ningun bloque `data:` de ese archivo.
+  // `setStatus` de `OrderWriteRepository` -implementada como `setAliveOrderStatus` en
+  // order-prisma.ts- escribe `finishedAt` en el mismo `UPDATE` que mueve a ENTREGADO, para que
+  // el estado y la fecha de terminado queden atomicos con el consumo. `transitionAliveOrder`
+  // (order-catalog-prisma.ts), que llevaba su propio `data:` con finishedAt y se habia quedado
+  // sin llamantes, se retiro: ya no queda ningun bloque `data:` de ese archivo.
   it('ningun bloque `data:` de lib/** fuera de order-prisma.ts nombra finishedAt/finished_at', () => {
     const conLaColumna = findDataBlockMatches(repoRoot, (block) => /finishedAt|finished_at/.test(block));
     const rutas = conLaColumna.map((hallazgo) => hallazgo.ruta).sort();
@@ -414,8 +413,8 @@ describe('R29 — el esquema no gana modelos ni tablas: el unico cambio es la co
     const modelosActuales = modelosDe(readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8'));
 
     // Tras mergear origin/dev, ese merge-base ES la punta de dev: la comparacion pasa a medir
-    // esta rama contra dev, y esta rama SI anade una tabla propia (T2, el libro de reservas).
-    // `ReservationMovement` es el unico modelo nuevo esperado; cualquier otro sigue siendo R29.
+    // esta rama contra dev, y esta rama SI anade una tabla propia, el libro de reservas.
+    // `ReservationMovement` es el unico modelo nuevo esperado; cualquier otro sigue sin declararse.
     const ESPERADOS_DE_ESTA_RAMA = ['ReservationMovement'];
 
     expect(modelosActuales).toEqual(modelosEsperados(modelosDev, ESPERADOS_DE_ESTA_RAMA));

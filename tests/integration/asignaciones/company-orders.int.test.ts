@@ -46,8 +46,7 @@ function wireListCompanyOrders(tx: Parameters<typeof createOrderAssignmentReposi
     findAliveById: findAliveOrderTargetById,
     listAliveSummariesByIds: listAliveOrderSummariesByIds,
     listAliveSummariesInCompany,
-    // Tm2 (QC-141): `transitionAliveOrder` se retiro sin llamantes. Este archivo prueba
-    // `listCompanyOrders`, que nunca transiciona un pedido.
+    // Este archivo prueba `listCompanyOrders`, que nunca transiciona un pedido.
     transitionAliveById: async () => {
       throw new Error('listCompanyOrders no ejecuta ninguna transicion');
     },

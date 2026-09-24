@@ -1,5 +1,5 @@
 // El Route Handler del proceso diario, invocado DIRECTO con un `Request` normal, sin levantar
-// Next: R24, R26. `verifyCronSecret` y `expireStaleOrders` se doblan en `@/lib/composition`
+// Next. `verifyCronSecret` y `expireStaleOrders` se doblan en `@/lib/composition`
 // -mismo patron que `tests/unit/documentos/document-job-route.test.ts`-: el handler NO puede
 // tocar ni el secreto ni el repositorio por su cuenta, asi que los dobles LANZAN si algo los
 // llama fuera de lo esperado.

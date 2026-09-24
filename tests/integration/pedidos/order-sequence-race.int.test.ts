@@ -4,9 +4,8 @@
  * El patron medido de QC-81 (`specs/QC-81-lote-y-fecha-de-compra/design.md > 8`,
  * `tests/integration/inventario/product-batch-lot.int.test.ts`), trasladado al alta de pedido.
  *
- * Tras Tm2 (QC-141, `design.md > 5.3` enmendado): el alta pasa por `withOrderTransaction` +
- * `createOrderWriteRepository` -el mismo par que ata `OrderUnitOfWork` en `lib/composition`-, en
- * vez del `createOrder` retirado.
+ * El alta pasa por `withOrderTransaction` + `createOrderWriteRepository` -el mismo par que ata
+ * `OrderUnitOfWork` en `lib/composition`-, en vez del `createOrder` retirado.
  *
  * Aislamiento por COMMIT y no por transaccion: `withOrderTransaction` usa el cliente Prisma
  * GLOBAL y abre SU PROPIA `prisma.$transaction` por intento —con el `pg_advisory_xact_lock`

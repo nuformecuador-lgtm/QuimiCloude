@@ -616,13 +616,13 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     )
 
     // Quien la CONSUME, y nadie mas: cancelar no pasa por aqui -es `cancelOrder` y su propio
-    // `NotCancellableError` (R28)- y borrar tampoco (R32). `transition-order.ts` consume la
+    // `NotCancellableError`- y borrar tampoco. `transition-order.ts` consume la
     // guardia: es quien implementa `OrderCatalog.transitionAliveById`, y el Finalizar de la
     // planta la comprueba antes de abrir la unidad de trabajo. `update-order.ts` la consume
     // sobre la fila que se acaba de leer -y otra vez sobre la que acaba de bloquear
-    // `lockAliveById`-, pero desde QC-141 (Tm2, `design.md > 5.3` enmendado) SOLO para
-    // comprobar que el pedido admite seguir en su mismo estado: la edicion ya no mueve el
-    // estado, asi que nunca llama con dos estados distintos. `order-catalog-prisma.ts` PERDIO
+    // `lockAliveById`-, pero SOLO para comprobar que el pedido admite seguir en su mismo
+    // estado: la edicion ya no mueve el estado, asi que nunca llama con dos estados distintos.
+    // `order-catalog-prisma.ts` PERDIO
     // su llamada: `transitionAliveOrder`, la unica que la hacia, se retiro sin llamantes -el
     // Finalizar consume dentro de `createTransitionOrder`, que YA es quien cablea
     // `OrderCatalog.transitionAliveById`-, y con ella se fue la ultima razon para que ese
@@ -716,7 +716,7 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // del modulo declara `'use server'`, no hay ninguna ruta HTTP ni pantalla de pedidos, y
     // `app/`/`components/` siguen sin conocer el modulo -la pantalla es QC-35 (R57)-.
     //
-    // El proceso diario (QC-141 T12) suma un SEGUNDO archivo driving: un Route Handler, no una
+    // El proceso diario suma un SEGUNDO archivo driving: un Route Handler, no una
     // Server Action -no hay usuario delante, la puerta es un secreto, no una sesion-, por eso
     // no declara `'use server'` y el `.toEqual` de mas abajo lo sigue dejando fuera.
     const ACTIONS = 'lib/modules/pedidos/adapters/driving/order-actions.ts'

@@ -1,7 +1,7 @@
 /**
  * Guardia: la configuracion de segmento del cron de caducidad de pedidos tiene que seguir
  * siendo algo que Next sepa leer. Mismo caso que `tests/unit/documentos/route-segment-config.test.ts`
- * -que nacio de un fallo real de build (QC-111)-, aplicado a la ruta nueva de esta ficha.
+ * -que nacio de un fallo real de build-, aplicado a la ruta nueva de esta ficha.
  *
  * Se lee el archivo con `fs` en vez de importarlo A PROPOSITO: lo que hay que comprobar es la
  * FORMA DEL CODIGO -que el valor sea un literal-, y un import solo devolveria el valor ya

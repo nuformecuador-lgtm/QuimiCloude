@@ -65,7 +65,7 @@ export function fakeOrderUnitOfWork(scope: OrderTransactionScope): OrderUnitOfWo
   return { run: (work) => work(scope) };
 }
 
-/** Lector de receta del `scope`, sobre el `tx` (`design.md > 5.2.2`, m7): por defecto una
+/** Lector de receta del `scope`, sobre el `tx`: por defecto una
  *  receta SIN lineas, para que quien no la personaliza obtenga una necesidad vacia y no un
  *  dato inventado. Quien necesite lineas concretas pasa su propio `RecipeCatalog` de dobles
  *  -el mismo que usa para `deps.recipes`- como `overrides`. */

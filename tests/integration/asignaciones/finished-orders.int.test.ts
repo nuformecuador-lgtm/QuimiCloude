@@ -47,10 +47,9 @@ if (PERMISOS_DEL_EMPACADOR === undefined) {
 }
 
 /**
- * `OrderCatalog['transitionAliveById']` real, tras retirar `transitionAliveOrder` (Tm2, QC-141):
- * `assertTransition` seguida del mismo `UPDATE` condicional, `setStatus` de
- * `createOrderWriteRepository()` sobre el cliente global -aqui, el proxy de la transaccion del
- * test-. Igual que la funcion retirada, NO consume material: `finishAssignedOrder` de este
+ * `OrderCatalog['transitionAliveById']` real: `assertTransition` seguida del mismo `UPDATE`
+ * condicional, `setStatus` de `createOrderWriteRepository()` sobre el cliente global -aqui, el
+ * proxy de la transaccion del test-. NO consume material: `finishAssignedOrder` de este
  * archivo solo ejercita el cambio de estado y `finished_at`, nunca la reserva.
  */
 async function transitionAliveByIdReal(

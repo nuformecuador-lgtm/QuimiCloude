@@ -31,8 +31,8 @@
 //      traves de un ayudante del mismo archivo al que se le pasa-. Declararlo y no usarlo seria la
 //      misma fuga con mejor cara.
 //
-// EL CAMINO DEL SQL CRUDO DEL ALTA (`design.md > 5`, «el caso raro»). `insertAliveOrder` (m2,
-// QC-141: el UNICO `INSERT` de pedido tras retirar `createOrder`) no puede recibir un
+// EL CAMINO DEL SQL CRUDO DEL ALTA, «el caso raro». `insertAliveOrder` (el UNICO `INSERT` de
+// pedido) no puede recibir un
 // `Prisma.OrderWhereInput`: escribe con `$queryRaw`. Para ese camino no basta con que
 // la funcion llame a `companyScopeColumns(scope)`, porque podria llamarla y luego escribir
 // `scope.companyId` a mano en el SQL. Asi que aqui se LEE LA PLANTILLA SQL y se exige que la
@@ -267,7 +267,7 @@ function analizar(archivo: string): ArchivoAnalizado {
 }
 
 /**
- * Archivos exentos por NOMBRE del barrido de ambito (`design.md > 5.2.1`, B3). Solo `pedidos`
+ * Archivos exentos por NOMBRE del barrido de ambito. Solo `pedidos`
  * puede llegar aqui: es la unica funcion del modulo que abre `prisma.$transaction` sin filtrar
  * ninguna tabla por su cuenta. La aprueba un humano en un spec -nunca quien escribe el
  * adaptador-, y por eso la lista lleva su motivo al lado, no solo el nombre.
@@ -618,9 +618,9 @@ describe('QC-60 R18, D21 — ninguna consulta del modulo se queda sin ambito, sa
 
     // ANTI-PLACEBO del troceador. Si `funcionesDe` dejara de reconocer las declaraciones -o se
     // quedara con la llave de un tipo de retorno-, el barrido de abajo no encontraria NINGUNA
-    // funcion que toque la base y pasaria en verde sin mirar nada. Las cuentas de hoy, tras
-    // retirar `createOrder` (Tm2, QC-141): seis en `order-prisma.ts` (`insertAliveOrder`, la
-    // ficha, el listado y las tres escrituras) y una en el catalogo. Se exige el minimo, no la
+    // funcion que toque la base y pasaria en verde sin mirar nada. Las cuentas de hoy: seis en
+    // `order-prisma.ts` (`insertAliveOrder`, la ficha, el listado y las tres escrituras) y una
+    // en el catalogo. Se exige el minimo, no la
     // igualdad: la consulta numero ocho entra por el barrido, que es donde tiene que morder.
     const conConsulta = (archivo: string): readonly string[] =>
       analizar(archivo)

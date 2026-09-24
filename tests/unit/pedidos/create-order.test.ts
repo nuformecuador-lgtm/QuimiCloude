@@ -613,7 +613,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
       findExecutionContentById: findExecutionContentByIdGlobal,
     } as unknown as RecipeCatalog;
     // El lector de `scope.recipes` -sobre el cliente de LA transaccion- es el UNICO que puede
-    // responder por la reserva (`design.md > 5.2.2`, m7).
+    // responder por la reserva.
     const findExecutionContentByIdDeLaTransaccion = vi.fn(async (id: string) => ({
       id,
       name: 'Receta',

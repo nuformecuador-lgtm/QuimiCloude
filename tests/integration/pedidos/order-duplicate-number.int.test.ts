@@ -1,7 +1,7 @@
 /**
  * El choque del correlativo, AUTENTICO y contra Postgres real, a traves de
  * `withOrderTransaction` + `createOrderWriteRepository` -el mismo par que ata `OrderUnitOfWork`
- * en `lib/composition`, y el UNICO camino de alta desde que Tm2 retiro `createOrder`.
+ * en `lib/composition`, y el UNICO camino de alta.
  *
  * Por que un trigger: con el lock de aviso el choque no se puede provocar por carrera, y un error
  * fabricado a mano no dice nada de la forma que tiene de verdad. Un trigger `BEFORE INSERT`,
@@ -11,7 +11,7 @@
  *
  * `withOrderTransaction` reintenta la unidad entera -tres transacciones nuevas, una por
  * intento- y, agotados los tres, traduce el choque agotado a `DuplicateOrderNumberError`. Este
- * archivo prueba R15 del correlativo: tres intentos, ni uno mas, ningun duplicado llega a
+ * archivo prueba el correlativo: tres intentos, ni uno mas, ningun duplicado llega a
  * escribirse y no queda ningun apartado de material.
  *
  * Aislamiento por COMMIT: `withOrderTransaction` abre su propia `prisma.$transaction` con el

@@ -1,4 +1,4 @@
-// R23 — el proceso diario tiene que estar declarado como tarea programada de la plataforma de
+// El proceso diario tiene que estar declarado como tarea programada de la plataforma de
 // despliegue, con una sola ejecucion al dia y apuntando a la ruta del handler.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'

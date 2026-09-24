@@ -41,7 +41,7 @@ const {
   toOrderAssignmentTarget,
 } = await import('@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma')
 
-// Tm2 (QC-141, `design.md > 5.3` enmendado): `transitionAliveOrder` se retiro -sin llamantes
+// `transitionAliveOrder` se retiro -sin llamantes
 // desde que `createTransitionOrder` cablea el Finalizar sobre la unidad de trabajo-, y con ella
 // su `describe` de aqui abajo. El `UPDATE` condicional que movia `status` (y `finishedAt` a
 // ENTREGADO) sigue vivo en `setAliveOrderStatus`, tras `createOrderWriteRepository(tx).setStatus`.
@@ -354,12 +354,12 @@ describe('setAliveOrderStatus (createOrderWriteRepository(tx).setStatus), el cam
     })
   })
 
-  // T1(b) de `transitionAliveOrder` (ENTREGADO->EN_CURSO lanza `InvalidTransitionError` SIN
+  // El caso de `transitionAliveOrder` (ENTREGADO->EN_CURSO lanza `InvalidTransitionError` SIN
   // escribir) no tiene equivalente AQUI: `setAliveOrderStatus` corre DENTRO de
   // `unitOfWork.run`, sobre la fila que ya bloqueo `lockAliveById`, y la transicion la valida
   // `assertTransition` en el dominio ANTES de llegar aqui (`transition-order.ts`), no el
   // adaptador. Esa comprobacion -que una transicion ilegal no abre la unidad de trabajo ni
-  // escribe- la prueba `tests/unit/pedidos/transition-order.test.ts` ('R21/R22').
+  // escribe- la prueba `tests/unit/pedidos/transition-order.test.ts`.
 
   it('T1(c) - devuelve not_found cuando el pedido es de otra empresa', async () => {
     updateMany.mockResolvedValue({ count: 0 })

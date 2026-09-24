@@ -5,16 +5,14 @@
  * —una secuencia de Postgres POR ANO evaluada dentro del `INSERT`— y QC-60 T3 dejo caer esa funcion
  * a proposito: el eje del correlativo paso de «ano» a «(empresa, ano)», y ahora lo reparte el
  * `INSERT` de `insertAliveOrder` con un `pg_advisory_xact_lock` por `(empresa, ano)` y un `max()+1`
- * dentro de si mismo (`specs/QC-60-aislamiento-por-empresa-en-pedidos/design.md > 3.2`). Los
- * requisitos que este archivo cubria para QC-34 —R11 «el numero lo entrega la base», R12 «la
- * primera alta del ano arranca en 1», R13 «no se reutiliza un numero entregado»— siguen en pie y se
+ * dentro de si mismo. Los requisitos que este archivo cubria siguen en pie —«el numero lo entrega
+ * la base», «la primera alta del ano arranca en 1», «no se reutiliza un numero entregado»— y se
  * prueban aqui contra el mecanismo NUEVO, llamando al adaptador REAL y no a una copia de su SQL.
  *
- * REESCRITO POR QC-141 (Tm2, `design.md > 5.3` enmendado): `createOrder` -el alta suelta con su
- * propio bucle de reintento- se retiro; el UNICO `INSERT` de pedido que queda es
- * `insertAliveOrder`, sobre `withOrderTransaction` + `createOrderWriteRepository`, el mismo par
- * que ata `OrderUnitOfWork` en `lib/composition`. El reintento del correlativo sigue vivo, pero
- * ahora en `withOrderTransaction`.
+ * `createOrder` -el alta suelta con su propio bucle de reintento- se retiro; el UNICO `INSERT` de
+ * pedido que queda es `insertAliveOrder`, sobre `withOrderTransaction` + `createOrderWriteRepository`,
+ * el mismo par que ata `OrderUnitOfWork` en `lib/composition`. El reintento del correlativo sigue
+ * vivo, pero ahora en `withOrderTransaction`.
  *
  * DOS CAMBIOS DE COMPORTAMIENTO, deliberados y escritos en `design.md > 3.4` de QC-60:
  *   - un alta ABORTADA ya NO deja hueco: con `max()+1` el numero no se consume. Aquellas fichas

@@ -336,7 +336,7 @@ describe('QC-121 R29 — toda escritura exportada de product_batches recalcula p
 });
 
 // -------------------------------------------------------------------------------------------
-// R28 (m3 del review) — quien llama a consumeBatchStock llama tambien a recalculateProductStock
+// Quien llama a consumeBatchStock llama tambien a recalculateProductStock
 // -------------------------------------------------------------------------------------------
 
 type FuncionDeNivelSuperior = { readonly nombre: string; readonly cuerpo: string };
@@ -347,7 +347,7 @@ type FuncionDeNivelSuperior = { readonly nombre: string; readonly cuerpo: string
  * dentro de `createMaterialReservations`) queda dentro de SU cuerpo, asi que no hace falta
  * detectarlo aparte: `EXCEPCIONES_SIN_RECALCULO` (mas arriba) traslada la garantia de
  * `consumeBatchStock` a quien la envuelve, "en su cuerpo o en el de la funcion que la envuelve
- * dentro del mismo archivo" (`design.md > 6.4`).
+ * dentro del mismo archivo".
  */
 function funcionesDeNivelSuperior(fuente: string): FuncionDeNivelSuperior[] {
   const codigo = stripComments(fuente);

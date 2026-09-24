@@ -15,12 +15,11 @@
  * se espera que falle y no puede dejar la conexion del caso en un estado abortado para el resto
  * del archivo.
  *
- * Tras Tm2 (QC-141, `design.md > 5.3` enmendado): `createOrder` y `transitionAliveOrder` -sin
- * llamantes desde que el Finalizar consume dentro de `createTransitionOrder`- se retiraron. El
- * alta de siembra pasa por `withOrderTransaction` + `createOrderWriteRepository`, y el `describe`
- * de R3 -que probaba `transitionAliveOrder` como sujeto- reapunta al camino vivo equivalente:
- * `createOrderWriteRepository(tx).setStatus`, el mismo `UPDATE` condicional que ahora escribe
- * `finished_at` (`design.md > 5.3`).
+ * `createOrder` y `transitionAliveOrder` -sin llamantes desde que el Finalizar consume dentro de
+ * `createTransitionOrder`- se retiraron. El alta de siembra pasa por `withOrderTransaction` +
+ * `createOrderWriteRepository`, y el `describe` que probaba `transitionAliveOrder` como sujeto
+ * reapunta al camino vivo equivalente: `createOrderWriteRepository(tx).setStatus`, el mismo
+ * `UPDATE` condicional que ahora escribe `finished_at`.
  */
 import { randomUUID } from 'node:crypto'
 
@@ -159,8 +158,7 @@ async function seedOrder(overrides: Partial<NewOrder> = {}): Promise<string> {
 }
 
 /** `setStatus` del `OrderWriteRepository` sobre el cliente global (`createOrderWriteRepository()`
- *  sin `tx`, valido fuera de una transaccion compartida): el camino vivo tras retirar
- *  `transitionAliveOrder` (Tm2). */
+ *  sin `tx`, valido fuera de una transaccion compartida): el camino vivo de transicion de estado. */
 function setStatus(
   id: string,
   from: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'CANCELADO',

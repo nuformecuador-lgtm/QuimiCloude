@@ -89,8 +89,7 @@ const recipes: RecipeCatalog = {
 };
 
 /**
- * `OrderCatalog['transitionAliveById']` real, tras retirar `transitionAliveOrder` (Tm2, QC-141):
- * `assertTransition` -la misma comprobacion que hacia la funcion retirada, y la que
+ * `OrderCatalog['transitionAliveById']` real: `assertTransition` -la misma comprobacion que
  * `createTransitionOrder` hace en produccion antes de abrir la unidad de trabajo- seguida del
  * mismo `UPDATE` condicional, `setStatus` de `createOrderWriteRepository()` sobre el cliente
  * global -aqui, el proxy de la transaccion del test-. No pasa por `withOrderTransaction`: esa

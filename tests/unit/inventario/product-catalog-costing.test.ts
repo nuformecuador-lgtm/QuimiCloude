@@ -157,7 +157,7 @@ describe('findCostingBatches', () => {
     const args = reservationFindMany.mock.calls[0]?.[0];
     expect(args.where.NOT).toEqual({ orderId: 'pedido-1' });
     // Con ese pedido excluido de lo apartado y sin nadie mas reservando, todo vuelve a estar
-    // disponible: el lote que el propio pedido aparto entero no sale del costeo (R65).
+    // disponible: el lote que el propio pedido aparto entero no sale del costeo.
     expect(batches[0]?.available).toBe('10.0000');
   });
 

@@ -201,7 +201,7 @@ describe('calculateIngredientsCost', () => {
 
     // `CostingBatch` no declara fecha de vencimiento: el mismo conjunto de lotes, con las fechas
     // permutadas como si alguien hubiera reordenado por una vencimiento imaginaria, promedia
-    // igual -(10+30)/2=20; 50*20=1000- porque D22 ya no ordena ni corta por cobertura.
+    // igual -(10+30)/2=20; 50*20=1000- porque el costeo ya no ordena ni corta por cobertura.
     expect(resultadoAscendente).toBe('1000.0000');
     expect(resultadoPermutado).toBe('1000.0000');
   });

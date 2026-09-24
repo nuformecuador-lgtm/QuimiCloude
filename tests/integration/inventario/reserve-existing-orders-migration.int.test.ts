@@ -252,7 +252,7 @@ async function createBatch(
 }
 
 /** Como `createBatch`, pero con un numero de lote explicito -- para probar el desempate de
- *  `lot_precedes` entre lotes de una misma fecha de compra (R56). */
+ *  `lot_precedes` entre lotes de una misma fecha de compra. */
 async function createBatchWithLot(
   tx: Prisma.TransactionClient,
   fixture: CompanyFixture,
@@ -526,8 +526,8 @@ describe('migracion reserve_existing_orders contra Postgres real', () => {
       // escenarios.
 
       // --- '-X' contra '5': ninguno de los dos es solo digitos, se compara como texto por
-      // unidad de codigo ('-' es U+002D, '5' es U+0035), asi que '-X' precede a '5'. Sin el
-      // arreglo de Tm5, la collation de la base pondria primero el lote numerico ('5').
+      // unidad de codigo ('-' es U+002D, '5' es U+0035), asi que '-X' precede a '5'. Sin este
+      // desempate, la collation de la base pondria primero el lote numerico ('5').
       const companyDashVsDigit = await createCompanyFixture(tx);
       const productDashVsDigit = await createProduct(tx, companyDashVsDigit);
       const batchDash = await createBatchWithLot(tx, companyDashVsDigit, productDashVsDigit, { stock: '6', purchaseDate: '2026-09-01', lot: '-X' });
@@ -659,7 +659,7 @@ describe('migracion reserve_existing_orders contra Postgres real', () => {
     });
   });
 
-  // Cada caso de R57 va en su propia transaccion: `now()` en Postgres es el instante en que
+  // Cada caso va en su propia transaccion: `now()` en Postgres es el instante en que
   // empezo la transaccion (no el de cada sentencia), asi que dos llamadas a `applyMigration`
   // dentro de la misma transaccion compartirian el mismo `created_at` y el `max(created_at)`
   // del down ya no distinguiria una migracion de otra.

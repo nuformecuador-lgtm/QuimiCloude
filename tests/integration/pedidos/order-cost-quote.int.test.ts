@@ -402,8 +402,9 @@ describe('R65: un pedido que ya existe cuenta lo que EL MISMO tiene apartado com
       const alta = createCreateOrder({ recipes, products, units, presentations, unitOfWork, now })
       const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, unitOfWork, now })
 
-      // necesaria = 6 * 100 % = 6: aparta el UNICO lote entero. Sin R65, el lote quedaria con
-      // disponible cero para el calculo de la propia edicion y el importe se perderia.
+      // necesaria = 6 * 100 % = 6: aparta el UNICO lote entero. Sin excluir la reserva propia del
+      // pedido, el lote quedaria con disponible cero para el calculo de la propia edicion y el
+      // importe se perderia.
       const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', presentationId: A.presentationId }, actorDe(A))
       orderId = creado.id
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')

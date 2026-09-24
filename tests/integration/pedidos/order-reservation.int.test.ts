@@ -338,7 +338,7 @@ describe('R14 — editar la receta no toca lo apartado de un pedido existente', 
       const antes = await movimientosDe(creado.id);
 
       // La receta se recarga con otra proporcion, POR FUERA del caso de uso de pedidos: nadie
-      // recalcula la reserva de un pedido ya escrito solo porque su receta cambio (D3).
+      // recalcula la reserva de un pedido ya escrito solo porque su receta cambio.
       await prisma.recipeLine.updateMany({ where: { recipeId }, data: { percentage: new Prisma.Decimal('50.00') } });
 
       const despues = await movimientosDe(creado.id);
@@ -438,7 +438,7 @@ describe('R52 — un `status` de entrada no dispara consumo, ni siquiera "ENTREG
       expect(await stockDe(batchId)).toBe('5.0000');
 
       // Subir por encima de la existencia no rechaza: la edicion nunca consume, asi que
-      // `insufficient_material` no puede salir de aqui (design.md > 5.4 enmendado, R13).
+      // `insufficient_material` no puede salir de aqui.
       await updateOrder(
         creado.id,
         nuevoPedido(recipeId, fixture.presentationId, '500.0000', 'ENTREGADO'),
@@ -506,7 +506,7 @@ describe('R52 — un pedido sin apartado y receta vacia no rechaza la edicion au
       const creado = await createOrder(nuevoPedido(recipeId, fixture.presentationId, '10.0000'), actorDe(fixture));
       expect(await movimientosDe(creado.id)).toEqual([]);
 
-      // `status` muere en el esquema (R52): esto es una edicion cualquiera, nunca una entrega.
+      // `status` muere en el esquema: esto es una edicion cualquiera, nunca una entrega.
       await updateOrder(creado.id, nuevoPedido(recipeId, fixture.presentationId, '20.0000', 'ENTREGADO'), actorDe(fixture));
 
       expect(await movimientosDe(creado.id)).toEqual([]);

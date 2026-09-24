@@ -22,8 +22,8 @@
  * `tests/integration/proveedores/supplier-crud.int.test.ts`: cada caso crea sus datos y LOS
  * BORRA EL MISMO, por su `id` exacto, en un bloque `finally`.
  *
- * Tras Tm2 (QC-141, `design.md > 5.3` enmendado): `createOrder` -que llevaba su propio bucle de
- * reintento sobre el cliente global- se retiro; el alta de siembra de este archivo pasa por
+ * `createOrder` -que llevaba su propio bucle de reintento sobre el cliente global- se retiro; el
+ * alta de siembra de este archivo pasa por
  * `withOrderTransaction` + `createOrderWriteRepository`, el mismo par que ata `OrderUnitOfWork`
  * en `lib/composition`. Las funciones REALES que este archivo ejercita son ahora esas dos, mas
  * `findAliveOrderById`, `listAliveOrders`, `updateAliveOrder`, `cancelAliveOrder` y

@@ -39,7 +39,7 @@ function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow 
 }
 
 /** Con una sola linea al 100%, para no repetir la formula de `consumedQuantity` en cada test.
- *  Es el lector de `scope.recipes` (`design.md > 5.2.2`, m7): sobre el cliente de la
+ *  Es el lector de `scope.recipes`: sobre el cliente de la
  *  transaccion, nunca el lector global. */
 function catalogoDeRecetas(lines: readonly RecipeExecutionLine[] = [{ productId: 'p-1', productName: null, percentage: '100.00' }]) {
   const findExecutionContentById = vi.fn(async (id: string) => ({
@@ -180,7 +180,7 @@ describe('createTransitionOrder', () => {
       transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA),
     ).resolves.toBe('insufficient_material');
 
-    // R51: si el consumo falla, ni el estado ni `finishedAt` quedan escritos.
+    // Si el consumo falla, ni el estado ni `finishedAt` quedan escritos.
     expect(setStatus).not.toHaveBeenCalled();
     expect(setReservedAt).not.toHaveBeenCalled();
   });
@@ -235,7 +235,7 @@ describe('createTransitionOrder', () => {
       transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA),
     ).resolves.toBe('recipe_without_lines');
 
-    // R51: si el consumo falla, ni el estado ni `finishedAt` quedan escritos.
+    // Si el consumo falla, ni el estado ni `finishedAt` quedan escritos.
     expect(setStatus).not.toHaveBeenCalled();
     expect(setReservedAt).not.toHaveBeenCalled();
   });
