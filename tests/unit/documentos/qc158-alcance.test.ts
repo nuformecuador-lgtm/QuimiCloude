@@ -1,9 +1,13 @@
 // Limites de FORMA: el texto del prompt de catalogo no viaja en ningun archivo
 // versionado, nadie fuera del adaptador de entorno lo lee, y el guion del doble de IA es JSON
-// puro -sin margen para llevar instrucciones-. Los de diff se miden contra la base de fusion con
-// `origin/dev` (o `dev`); si git no responde, el caso de borradores cae a listar TODO lo
-// versionado en vez de saltarse. Los detectores son puros y se prueban aparte con una entrada
-// infractora inventada, sin copiar el texto real del prompt para compararlo.
+// puro -sin margen para llevar instrucciones-. El invariante de borradores corre siempre, sobre el
+// diff contra `origin/dev` (o `dev`) y, si git no responde, sobre el listado completo de
+// versionados. Lo que si es propio de esta ficha (que su rango traiga algo bajo su carpeta de
+// spec, la dependencia del package.json y el lockfile) se mide solo sobre los commits cuyo asunto
+// firma `tipo(QC-158)` en `origin/dev..HEAD` mas el arbol sin commitear; sin ninguno de esos
+// commits el caso se salta en voz alta en vez de pasar en verde sin haber mirado nada. Los
+// detectores son puros y se prueban aparte con una entrada infractora inventada, sin copiar el
+// texto real del prompt para compararlo.
 
 import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -188,6 +192,57 @@ function archivosParaR36a(): { archivos: readonly string[]; modo: string } | nul
   return null;
 }
 
+/** Marca con la que QC-158 firma sus commits (`fix(QC-158): ...`, `test(QC-158): ...`, ...). */
+const MARCA_DE_QC158 = 'QC-158';
+
+/**
+ * Archivos que TOCAN los commits DE QC-158 dentro de `origin/dev..HEAD`, mas los del arbol de
+ * trabajo. `null` cuando no hay ningun commit firmado por la ficha: la rama actual no es la de
+ * QC-158 (o ya esta fusionada en dev), y este caso no tiene nada propio que mirar.
+ */
+function archivosDeQC158(): readonly string[] | null {
+  const salidaLog = git(['log', '--no-merges', '--format=%H%x09%s', 'origin/dev..HEAD']);
+  if (salidaLog === null) return null;
+  const ASUNTO_FIRMADO = new RegExp(`^\\w+\\(${MARCA_DE_QC158}\\)`);
+  const commits = salidaLog
+    .split('\n')
+    .map((linea) => linea.trim())
+    .filter((linea) => linea.length > 0)
+    .filter((linea) => ASUNTO_FIRMADO.test(linea.split('\t')[1] ?? ''))
+    .map((linea) => linea.split('\t')[0]);
+  if (commits.length === 0) return null;
+
+  const tocados = new Set<string>();
+  const salidaShow = git(['show', '--pretty=format:', '--name-only', ...commits]);
+  for (const ruta of (salidaShow ?? '').split('\n')) {
+    const limpia = ruta.trim();
+    if (limpia.length > 0) tocados.add(limpia);
+  }
+
+  const salidaEstado = git(['status', '--porcelain']);
+  for (const linea of (salidaEstado ?? '').split('\n')) {
+    if (linea.trim().length === 0) continue;
+    const camino = linea.slice(3).trim();
+    const destino = camino.includes(' -> ') ? camino.split(' -> ')[1] : camino;
+    tocados.add(destino.replace(/^"|"$/g, ''));
+  }
+
+  return [...tocados].sort();
+}
+
+/** Los archivos de QC-158, o `null` con un `ctx.skip()` en voz alta si no hay nada que mirar. */
+function archivosDeQC158OMudo(ctx: Pick<import('vitest').TestContext, 'skip'>): readonly string[] | null {
+  const tocados = archivosDeQC158();
+  if (tocados === null) {
+    ctx.skip(
+      `origin/dev..HEAD no tiene ningun commit de ${MARCA_DE_QC158} (ya fusionada en dev, o ` +
+        'esta rama no tiene relacion con ella): este caso NO ha comprobado nada.',
+    );
+    return null;
+  }
+  return tocados;
+}
+
 describe('QC-158 R36a — ningun archivo versionado vive bajo borradores-de-prompts/', () => {
   it('R36: ni el diff de la rama contra dev, ni (a falta de diff) el listado completo de versionados, traen nada bajo borradores-de-prompts/', () => {
     const resultado = archivosParaR36a();
@@ -197,20 +252,23 @@ describe('QC-158 R36a — ningun archivo versionado vive bajo borradores-de-prom
     ).not.toBeNull();
     const { archivos, modo } = resultado!;
 
-    if (modo.startsWith('diff contra')) {
-      expect(
-        archivos.some((archivo) => archivo.startsWith(CARPETA_SPEC)),
-        `el ${modo} no trae nada bajo ${CARPETA_SPEC}: el rango esta mal calculado y este caso ` +
-          'pasaria en verde sin haber mirado el cambio de QC-158.',
-      ).toBe(true);
-    }
-
     const infracciones = infraccionesDeBorrador(archivos);
     expect(
       infracciones,
       `R36: el borrador del prompt vive fuera de git (gitignorado); ninguna version de el debe ` +
         `colarse al repo. Modo: ${modo}. Hallazgos:\n${infracciones.join('\n')}`,
     ).toEqual([]);
+  });
+
+  it('R36a: los commits de QC-158 en el rango (o el arbol sin commitear) traen algo bajo specs/QC-158-catalogo-desde-pdf/', (ctx) => {
+    const tocados = archivosDeQC158OMudo(ctx);
+    if (tocados === null) return;
+
+    expect(
+      tocados.some((archivo) => archivo.startsWith(CARPETA_SPEC)),
+      `los commits de QC-158 (+ arbol sin commitear) no traen nada bajo ${CARPETA_SPEC}: el rango ` +
+        'esta mal calculado y este caso pasaria en verde sin haber mirado el cambio de QC-158.',
+    ).toBe(true);
   });
 
   it('R36: el detector muerde con una ruta bajo borradores-de-prompts/ y no con una que solo se le parece', () => {
