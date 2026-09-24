@@ -373,3 +373,10 @@ Los 10 archivos de la lista: `tests/unit/clientes/schema/customers-schema.test.t
 Los `R<n>` de T5–T7 (R21, R22, R25 en `permissions.test.ts`; recuentos en las ocho guardias/tests
 de T6; `identity-seed.int.test.ts` en T7) ya estaban mapeados en sus secciones respectivas de
 arriba.
+
+## Ajuste del implementer (2026-09-24): mensaje de fallo de R26
+
+T10 exige que el mensaje de fallo de R26 diga que QC-154 relaja la regla al consumir los permisos;
+faltaba. Añadido a los dos casos de R26 en `tests/unit/clientes/scope.test.ts` (literal fuera de
+`permissions.ts` y `adapters/driving/` vacío). `vitest run tests/unit/clientes/scope.test.ts`:
+verde; typecheck y lint limpios (2 warnings ajenos de dev).

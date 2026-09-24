@@ -175,13 +175,18 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
     const hallazgos = detectarLiteralesDePermiso()
     expect(
       hallazgos,
-      `ningun archivo distinto de permissions.ts puede nombrar clientes.consultar/modificar: ${hallazgos.join(', ')}`,
+      'ningun archivo distinto de permissions.ts puede nombrar clientes.consultar/modificar ' +
+        '(QC-154 relaja esta regla al consumir los permisos): ' +
+        hallazgos.join(', '),
     ).toEqual([])
   })
 
   it('adapters/driving/ esta vacio: ningun caso de uso ni Server Action todavia', () => {
     const driving = filesIn(join(moduloDir, 'adapters', 'driving'), /\.tsx?$/)
-    expect(driving, 'no puede haber ningun archivo en adapters/driving/ en esta ficha').toEqual([])
+    expect(
+      driving,
+      'no puede haber ningun archivo en adapters/driving/ en esta ficha (QC-154 relaja esta regla al consumir los permisos)',
+    ).toEqual([])
   })
 
   it('la regla de literales dispara con un archivo fabricado que si nombra el permiso', () => {
