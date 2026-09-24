@@ -92,6 +92,18 @@ describe('R24 — un insumo sin unidad resoluble se muestra sin unidad', () => {
   });
 });
 
+describe('linea sin porcentaje (maquina): guion sin cantidad', () => {
+  it('percentage null pinta «—» en porcentaje, requerida y restante', () => {
+    const linea: RecipeLineView = { ...LINEA, percentage: null };
+    renderTabla({ lines: [linea], quantity: '200' });
+
+    const tabla = screen.getByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
+    expect(within(tabla).getByTestId('order-ingredient-percentage')).toHaveTextContent('—');
+    expect(within(tabla).getByTestId('order-ingredient-required')).toHaveTextContent('—');
+    expect(within(tabla).getByTestId('order-ingredient-remaining')).toHaveTextContent('—');
+  });
+});
+
 describe('otros estados de la tabla, sin cambios por esta ficha', () => {
   it('un producto de baja se dice «Producto no disponible»', () => {
     renderTabla({ lines: [{ ...LINEA, productName: null }] });

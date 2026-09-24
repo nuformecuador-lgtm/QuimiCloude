@@ -34,14 +34,14 @@ const RECIPE_INCLUDE = { lines: true } satisfies Prisma.RecipeInclude;
 
 type RecipeWithLines = Prisma.RecipeGetPayload<{ include: typeof RECIPE_INCLUDE }>;
 
-/** Cadena decimal(5,2) del puerto -> `Prisma.Decimal` para escribir. */
-export function toDecimalInput(percentage: string): Prisma.Decimal {
-  return new Prisma.Decimal(percentage);
+/** Cadena decimal(5,2) del puerto -> `Prisma.Decimal` para escribir; NULL pasa intacto. */
+export function toDecimalInput(percentage: string | null): Prisma.Decimal | null {
+  return percentage === null ? null : new Prisma.Decimal(percentage);
 }
 
-/** `Prisma.Decimal` de una lectura -> cadena con 2 decimales fijos (mismo criterio que `cost` en `inventario`). */
-export function fromDecimalPercentage(percentage: Prisma.Decimal): string {
-  return percentage.toFixed(2);
+/** `Prisma.Decimal` de una lectura -> cadena con 2 decimales fijos (mismo criterio que `cost` en `inventario`); NULL pasa intacto. */
+export function fromDecimalPercentage(percentage: Prisma.Decimal | null): string | null {
+  return percentage === null ? null : percentage.toFixed(2);
 }
 
 /**

@@ -132,6 +132,39 @@ describe('recipeLinesSchema — suma exacta de 100,00 % (R4)', () => {
   });
 });
 
+describe('recipeLineSchema — porcentaje NULL (MACHINE, PACKAGING)', () => {
+  it('la linea acepta percentage null a nivel esquema: la regla por tipo vive en el servicio', () => {
+    expect(recipeLineSchema.safeParse({ ...LINEA_VALIDA, percentage: null }).success).toBe(true);
+  });
+
+  it('los NULL no suman: 60 + 40 + null da 100,00 % exacto', () => {
+    const result = createRecipeSchema.safeParse({
+      ...RECETA_VALIDA,
+      lines: [
+        { productId: '11111111-1111-4111-8111-111111111111', percentage: '60' },
+        { productId: '22222222-2222-4222-8222-222222222222', percentage: '40' },
+        { productId: '33333333-3333-4333-8333-333333333333', percentage: null },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('los NULL no completan: 60 + null se rechaza con el issue en [lines]', () => {
+    const result = createRecipeSchema.safeParse({
+      ...RECETA_VALIDA,
+      lines: [
+        { productId: '11111111-1111-4111-8111-111111111111', percentage: '60' },
+        { productId: '33333333-3333-4333-8333-333333333333', percentage: null },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((issue) => issue.path)).toContainEqual(['lines']);
+    }
+  });
+});
+
 describe('createRecipeSchema — nombre, descripcion (R7)', () => {
   it('rechaza el nombre vacio o de solo espacios y recorta los extremos del nombre valido', () => {
     expect(createRecipeSchema.safeParse({ ...RECETA_VALIDA, name: '' }).success).toBe(false);

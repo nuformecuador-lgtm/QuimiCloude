@@ -40,7 +40,7 @@ function catalogoDeRecetas(content: RecipeExecutionContent | null = contenido())
 }
 
 function catalogoDeProductos(
-  refs: readonly ProductRef[] = [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
+  refs: readonly ProductRef[] = [{ id: PRODUCT_A, name: 'A', type: 'PRODUCT' as const, unitId: LITRO.id, stockByUnit: [] }],
   batches: readonly CostingBatch[] = [],
 ) {
   const findRefs = vi.fn(async () => refs);
@@ -77,7 +77,7 @@ describe('resolveIngredientsCost', () => {
       contenido({ lines: [{ productId: PRODUCT_A, productName: null, percentage: '10.00' }] }),
     );
     const prod = catalogoDeProductos(
-      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
+      [{ id: PRODUCT_A, name: 'A', type: 'PRODUCT' as const, unitId: LITRO.id, stockByUnit: [] }],
       [lote({ stock: 50, unitCost: '2.0000' })],
     );
     const uni = catalogoDeUnidades();
@@ -116,7 +116,7 @@ describe('resolveIngredientsCost', () => {
   it('existencia insuficiente devuelve sin importe (R16)', async () => {
     const cat = catalogoDeRecetas();
     const prod = catalogoDeProductos(
-      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
+      [{ id: PRODUCT_A, name: 'A', type: 'PRODUCT' as const, unitId: LITRO.id, stockByUnit: [] }],
       [lote({ stock: 1, unitCost: '2.0000' })],
     );
     const uni = catalogoDeUnidades();
@@ -158,7 +158,7 @@ describe('resolveIngredientsCost', () => {
       contenido({ lines: [{ productId: PRODUCT_A, productName: null, percentage: '10.00' }] }),
     );
     const prod = catalogoDeProductos(
-      [{ id: PRODUCT_A, name: 'A', unitId: GRAMO.id, stockByUnit: [] }],
+      [{ id: PRODUCT_A, name: 'A', type: 'PRODUCT' as const, unitId: GRAMO.id, stockByUnit: [] }],
       [lote({ unitId: KILOGRAMO.id, stock: 2, unitCost: '5.0000' })],
     );
     const uni = catalogoDeUnidades(new Map([[GRAMO.id, GRAMO], [KILOGRAMO.id, KILOGRAMO]]));
@@ -185,6 +185,7 @@ describe('resolveIngredientsCost', () => {
     const refs = Array.from({ length: 4 }, (_, i) => ({
       id: `${PRODUCT_A}-${i}`,
       name: `producto ${i}`,
+      type: 'PRODUCT' as const,
       unitId: LITRO.id,
       stockByUnit: [],
     }));
@@ -203,12 +204,37 @@ describe('resolveIngredientsCost', () => {
     expect(uni.findRefs).toHaveBeenCalledTimes(1);
   });
 
+  it('una linea sin porcentaje (maquina) no se costea ni tumba el total: se salta', async () => {
+    const MAQUINA = '99999999-9999-4999-8999-999999999999';
+    const cat = catalogoDeRecetas(
+      contenido({
+        lines: [
+          { productId: PRODUCT_A, productName: null, percentage: '10.00' },
+          { productId: MAQUINA, productName: null, percentage: null },
+        ],
+      }),
+    );
+    const prod = catalogoDeProductos(
+      [
+        { id: PRODUCT_A, name: 'A', type: 'PRODUCT' as const, unitId: LITRO.id, stockByUnit: [] },
+        { id: MAQUINA, name: 'Agitador', type: 'MACHINE' as const, unitId: null, stockByUnit: [] },
+      ],
+      [lote({ stock: 1000, unitCost: '1.0000' })],
+    );
+    const uni = catalogoDeUnidades();
+
+    const resultado = await resolveIngredientsCost(cat.recipes, prod.products, uni.units, RECIPE_ID, '200.0000', COMPANY_ID);
+
+    // 200 * 10 % = 20 a 1.0000/L; la maquina aporta cero sin fallar.
+    expect(resultado).toBe('20.0000');
+  });
+
   it('la misma receta con pedidos de 200 y 300 da cantidades consumidas en proporcion 2:3 (R21)', async () => {
     const cat = catalogoDeRecetas(
       contenido({ lines: [{ productId: PRODUCT_A, productName: null, percentage: '10.00' }] }),
     );
     const prod = catalogoDeProductos(
-      [{ id: PRODUCT_A, name: 'A', unitId: LITRO.id, stockByUnit: [] }],
+      [{ id: PRODUCT_A, name: 'A', type: 'PRODUCT' as const, unitId: LITRO.id, stockByUnit: [] }],
       [lote({ stock: 1000, unitCost: '1.0000' })],
     );
     const uni = catalogoDeUnidades();

@@ -39,6 +39,7 @@
     "recetas/recetas-constraints.int.test.ts",
     "recetas/recipe-crud.int.test.ts",
     "recetas/recipe-lines-percentage.int.test.ts",
+    "recetas/recipe-lines-percentage-nullable.int.test.ts",
     "recetas/recipe-lines.int.test.ts",
     "unidades/unidades-constraints.int.test.ts"
   ],

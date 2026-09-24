@@ -371,16 +371,18 @@ describe('db/schema.prisma — modelo de receta y linea de receta', () => {
 
   it('RecipeLine declara receta, producto y porcentaje como entidad propia con id', () => {
     // R10: entidad propia, no tabla de union sin datos. Tiene clave primaria propia y un
-    // dato propio (el porcentaje).
+    // dato propio (el porcentaje, anulable desde `*_recipe_lines_percentage_nullable` para
+    // lineas de MACHINE y PACKAGING; las de PRODUCT lo exigen en el servicio).
     const id = field(recipeLine, 'id')
     expect(id.attributes).toContain('@id')
     expect(id.attributes).toContain('@db.Uuid')
     expect(recipeLine.body).not.toMatch(/@@id\(/)
 
-    for (const fieldName of ['recipeId', 'productId', 'percentage'] as const) {
+    for (const fieldName of ['recipeId', 'productId'] as const) {
       const candidate = field(recipeLine, fieldName)
       expect(candidate.isOptional, `RecipeLine.${fieldName} no puede ser opcional`).toBe(false)
     }
+    expect(field(recipeLine, 'percentage').isOptional).toBe(true)
     expect(scalarNames(recipeLine, ['Recipe'])).toEqual(
       RECIPE_LINE_COLUMNS.map(([name]) => name).sort(),
     )
@@ -397,12 +399,12 @@ describe('db/schema.prisma — modelo de receta y linea de receta', () => {
     expect(field(recipe, 'lines').type).toBe('RecipeLine')
   })
 
-  it('percentage es Decimal(5,2) obligatorio y en los dos modelos no hay ningun Float', () => {
+  it('percentage es Decimal(5,2) anulable y en los dos modelos no hay ningun Float', () => {
     // R1, R6: decimal exacto, hasta 2 decimales. La coma flotante binaria es un anti-patron
-    // bloqueante (`docs/architecture.md > Dominio` n.o 4).
+    // bloqueante (`docs/architecture.md > Dominio` n.o 4). Anulable para MACHINE y PACKAGING.
     const percentage = field(recipeLine, 'percentage')
     expect(percentage.type).toBe('Decimal')
-    expect(percentage.isOptional).toBe(false)
+    expect(percentage.isOptional).toBe(true)
     expect(percentage.attributes).toMatch(/@db\.Decimal\(\s*5\s*,\s*2\s*\)/)
     expect(percentage.attributes).not.toMatch(/@default\(/)
 

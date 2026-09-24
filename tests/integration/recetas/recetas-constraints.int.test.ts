@@ -587,8 +587,9 @@ describe('estructura de la linea de receta', () => {
       expect(line.id).toMatch(UUID_SHAPE)
       expect(line.recipeId).toBe(recipeId)
       expect(line.productId).toBe(productId)
-      expect(line.percentage.equals(new Prisma.Decimal('2.5'))).toBe(true)
-      expect(line.percentage.toString()).toBe('2.5')
+      expect(line.percentage).not.toBeNull()
+      expect(line.percentage!.equals(new Prisma.Decimal('2.5'))).toBe(true)
+      expect(line.percentage!.toString()).toBe('2.5')
       expect(line.createdAt).toBeInstanceOf(Date)
       expect(line.updatedAt).toBeInstanceOf(Date)
     })
@@ -1104,8 +1105,8 @@ describe('auditoria, borrado y marcas de tiempo', () => {
       })
       expect(despues.map((line) => line.id).sort()).toEqual([line1, line2].sort())
       expect(despues.map((line) => line.recipeId)).toEqual([recipeId, recipeId])
-      expect(despues.map((line) => line.percentage.toString())).toEqual(
-        antes.map((line) => line.percentage.toString()),
+      expect(despues.map((line) => line.percentage?.toString())).toEqual(
+        antes.map((line) => line.percentage?.toString()),
       )
       expect(despues.map((line) => line.updatedAt.getTime())).toEqual(
         antes.map((line) => line.updatedAt.getTime()),
@@ -1125,7 +1126,8 @@ describe('auditoria, borrado y marcas de tiempo', () => {
 
       const line = await tx.recipeLine.findUniqueOrThrow({ where: { id: lineId } })
       expect(line.productId).toBe(productId)
-      expect(line.percentage.toString()).toBe('3')
+      expect(line.percentage).not.toBeNull()
+      expect(line.percentage!.toString()).toBe('3')
 
       // Que la fila del producto siga existiendo es lo que evita que la linea apunte al vacio.
       const product = await tx.product.findUniqueOrThrow({ where: { id: productId } })

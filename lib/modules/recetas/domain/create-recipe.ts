@@ -2,6 +2,7 @@ import { requirePermission, type Actor } from './actor';
 import { RecipeDuplicateNameError, ValidationError } from './errors';
 import { validateRecipeImage } from './recipe-image';
 import { createRecipeSchema } from './recipe-input';
+import { hasNullPercentageOnProduct } from './recipe-line-percentage-rule';
 import type { RecipeScope } from './recipe-scope';
 
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
@@ -48,12 +49,13 @@ export function createCreateRecipe(
 
     // R17, R46: en el ALTA todas las lineas son "nuevas" a efecto de validar el
     // producto -no hay ninguna linea preexistente que eximir- (`design.md > 6`).
+    // El NULL de % solo vale en MACHINE y PACKAGING: en PRODUCT se rechaza.
     const productIds = data.lines.map((line) => line.productId);
     if (productIds.length > 0) {
       const refs = await deps.products.findRefs(productIds, actor.companyId);
       const foundIds = new Set(refs.map((ref) => ref.id));
       const missing = productIds.some((id) => !foundIds.has(id));
-      if (missing) throw new ValidationError();
+      if (missing || hasNullPercentageOnProduct(data.lines, refs)) throw new ValidationError();
     }
 
     // R21: sin imagen no se toca el almacenamiento en absoluto.

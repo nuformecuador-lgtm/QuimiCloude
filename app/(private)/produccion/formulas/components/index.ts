@@ -54,6 +54,7 @@ export {
   type RecipeLineFieldName,
   type RecipeLineFormValue,
   type RecipeLinePayload,
+  type RecipeMachineFormValue,
   type RecipePayload,
   type RecipeStepErrors,
   type RecipeStepFormValue,
@@ -65,7 +66,6 @@ export {
   referenceAmountForPercentage,
   sanitizePercentageInput,
   type RecipeLinesFieldProps,
-  type RecipeMachineFormValue,
 } from './recipe-lines-field';
 export { RecipeStepsField, type RecipeStepsFieldProps } from './recipe-steps-field';
 export { RecipeImageField, type RecipeImageFieldProps } from './recipe-image-field';

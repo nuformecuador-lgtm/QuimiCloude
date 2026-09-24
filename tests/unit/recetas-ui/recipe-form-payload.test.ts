@@ -69,6 +69,7 @@ function baseState(overrides: Partial<RecipeFormState> = {}): RecipeFormState {
     name: 'Receta de prueba',
     description: '',
     lines: [],
+    machines: [],
     steps: [],
     image: { kind: 'untouched' },
     ...overrides,
@@ -241,6 +242,25 @@ describe('buildRecipePayload — las líneas van completas y quitar una la saca 
     expect(payload.lines[0]).not.toHaveProperty('key');
     expect(payload.lines[0]).not.toHaveProperty('productName');
     expect(payload.lines[0]).not.toHaveProperty('unitId');
+  });
+
+  it('las máquinas viajan como líneas con percentage null, detrás de los ingredientes', () => {
+    const payload = buildRecipePayload(
+      'edit',
+      baseState({
+        lines: [line({ productId: 'p1', percentage: '100' })],
+        machines: [
+          { key: 'm1', productId: 'maq-1', productName: 'Agitador' },
+          { key: 'm2', productId: 'maq-2', productName: null },
+        ],
+      }),
+    );
+
+    expect(payload.lines).toEqual([
+      { productId: 'p1', percentage: '100' },
+      { productId: 'maq-1', percentage: null },
+      { productId: 'maq-2', percentage: null },
+    ]);
   });
 
   it('quitar una línea de state.lines la excluye del payload enviado', () => {

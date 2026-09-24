@@ -27,9 +27,9 @@ import type { RecipeStepView } from '../domain/recipe-view';
 /** Linea de producto, tal como el dominio la entrega al puerto o la recibe de vuelta. */
 export type RecipeLineData = {
   readonly productId: string;
-  /** Cadena con 2 decimales, "97.50": el dominio no puede importar `@prisma/client`.
-   *  Sin unidad. */
-  readonly percentage: string;
+  /** Cadena con 2 decimales, "97.50", o NULL en lineas de MACHINE y PACKAGING: el dominio
+   *  no puede importar `@prisma/client`. Sin unidad. */
+  readonly percentage: string | null;
 };
 
 /** Linea de producto tal como sale de una lectura, con su propio identificador. */

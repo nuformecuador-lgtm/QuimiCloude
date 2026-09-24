@@ -410,7 +410,9 @@ model RecipeLine {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   recipeId   String   @map("recipe_id") @db.Uuid
   productId  String   @map("product_id") @db.Uuid
-  percentage Decimal  @db.Decimal(5, 2)
+  // Anulable desde `20260923150000_recipe_lines_percentage_nullable`: lineas de
+  // MACHINE y PACKAGING sin %. Las de PRODUCT lo siguen exigiendo en el servicio.
+  percentage Decimal? @db.Decimal(5, 2)
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 

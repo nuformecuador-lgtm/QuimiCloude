@@ -145,7 +145,7 @@ type SaveError = ErrorState;
 
 function buildInitialState(props: RecipeFormProps): RecipeFormState {
   if (props.mode === 'create') {
-    return { name: '', description: '', lines: [], steps: [], image: { kind: 'untouched' } };
+    return { name: '', description: '', lines: [], machines: [], steps: [], image: { kind: 'untouched' } };
   }
 
   const { recipe } = props;
@@ -154,18 +154,30 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
     description: recipe.description ?? '',
     // R21: se conservan TAL CUAL, incluidas las líneas cuyo `productName` es `null` -producto
     // dado de baja-. `key` es una clave local de React, nunca el `id` de dominio de la línea.
-    lines: recipe.lines.map(
-      (line): RecipeLineFormValue => ({
-        key: createLocalKey('line'),
-        productId: line.productId,
-        productName: line.productName,
-        // El campo se precarga con la MISMA función que formatea en el resto de la
-        // receta -«12.50» -> «12,50»-, nunca con el valor crudo del contrato.
-        percentage: formatPercentage(line.percentage),
-        // La unidad del PRODUCTO, no de la línea -que ya no tiene una-: el detalle de la
-        // receta la trae en `productUnitId` desde `RecipeLineView`.
-        productUnitId: line.productUnitId,
-      }),
+    // Las líneas sin porcentaje (herramientas) precargan el tab de herramientas: si se
+    // quedaran fuera, editar la receta las borraría en silencio al guardar.
+    lines: recipe.lines.flatMap(
+      (line): readonly RecipeLineFormValue[] =>
+        line.percentage === null
+          ? []
+          : [
+              {
+                key: createLocalKey('line'),
+                productId: line.productId,
+                productName: line.productName,
+                // El campo se precarga con la MISMA función que formatea en el resto de la
+                // receta -«12.50» -> «12,50»-, nunca con el valor crudo del contrato.
+                percentage: formatPercentage(line.percentage),
+                // La unidad del PRODUCTO, no de la línea -que ya no tiene una-: el detalle de la
+                // receta la trae en `productUnitId` desde `RecipeLineView`.
+                productUnitId: line.productUnitId,
+              },
+            ],
+    ),
+    machines: recipe.lines.flatMap((line) =>
+      line.percentage === null
+        ? [{ key: createLocalKey('machine'), productId: line.productId, productName: line.productName }]
+        : [],
     ),
     // QC-64 R9: el paso guardado entra en el estado COMO DOCUMENTO, tal cual. Ya no se aplana a
     // texto -el puente de QC-62 R19 se retiro con T4-, asi que reabrir una receta conserva sus
@@ -202,7 +214,11 @@ export function RecipeForm(props: RecipeFormProps) {
   // El esquema del contrato lo rechazaría igual (`productId` uuid); esto es refuerzo de UX.
   const hasAllProducts =
     state.lines.length > 0 && state.lines.every((line) => line.productId !== '');
-  const canSubmit = isComplete && hasAllProducts;
+  // Cada ingrediente necesita su % definido: con una línea sin porcentaje el botón no
+  // habilita, aunque la suma de las demás dé 100. Las herramientas están exentas por diseño
+  // (viajan con `percentage: null`).
+  const hasAllPercentages = state.lines.every((line) => line.percentage !== '');
+  const canSubmit = isComplete && hasAllProducts && hasAllPercentages;
 
   function handleSubmit() {
     setSaveError(null);
@@ -360,6 +376,8 @@ export function RecipeForm(props: RecipeFormProps) {
         units={props.units}
         initialProductPage={props.initialProductPage}
         initialMachinePage={props.initialMachinePage}
+        machines={state.machines}
+        onMachinesChange={(machines) => setState((previous) => ({ ...previous, machines }))}
         errors={fieldErrors.lines}
         generalError={fieldErrors.linesGeneral}
       />

@@ -2,6 +2,7 @@ import { requirePermission, type Actor } from './actor';
 import { RecipeDuplicateNameError, RecipeNotFoundError, ValidationError } from './errors';
 import { validateRecipeImage } from './recipe-image';
 import { updateRecipeSchema } from './recipe-input';
+import { hasNullPercentageOnProduct } from './recipe-line-percentage-rule';
 import type { RecipeScope } from './recipe-scope';
 
 import type { RecipeImageStorage } from '../ports/recipe-image-storage';
@@ -82,15 +83,22 @@ export function createUpdateRecipe(
     // R45, R46 (`design.md > 6`): diferencia de conjuntos. Solo se valida contra el
     // catalogo la linea NUEVA -la que no estaba ya en la receta-; la preexistente se
     // admite aunque su producto este borrado logicamente, sin preguntarle al catalogo.
+    // La regla del % por tipo suma a la consulta los ids de las lineas NULL aunque sean
+    // preexistentes: una linea NULL de un PRODUCT vivo se rechaza; sin ref (borrado
+    // logico) no hay veredicto y la preexistente pasa como antes.
     const idsYaEnLaReceta = new Set(existing.lines.map((line) => line.productId));
     const idsEnviados = data.lines.map((line) => line.productId);
     const idsANuevoValidar = idsEnviados.filter((productId) => !idsYaEnLaReceta.has(productId));
+    const idsNull = data.lines
+      .filter((line) => line.percentage === null)
+      .map((line) => line.productId);
+    const idsAConsultar = [...new Set([...idsANuevoValidar, ...idsNull])];
 
-    if (idsANuevoValidar.length > 0) {
-      const refs = await deps.products.findRefs(idsANuevoValidar, actor.companyId);
+    if (idsAConsultar.length > 0) {
+      const refs = await deps.products.findRefs(idsAConsultar, actor.companyId);
       const foundIds = new Set(refs.map((ref) => ref.id));
       const missing = idsANuevoValidar.some((productId) => !foundIds.has(productId));
-      if (missing) throw new ValidationError();
+      if (missing || hasNullPercentageOnProduct(data.lines, refs)) throw new ValidationError();
     }
 
     // R47 (`design.md > 7.1`, `> 9.3`): los TRES estados de `image`.

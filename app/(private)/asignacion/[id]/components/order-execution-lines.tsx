@@ -34,6 +34,9 @@ export const ORDER_EXECUTION_LINE_UNIT_OPTION_TESTID = 'order-execution-line-uni
 export const ORDER_EXECUTION_LINE_UNIT_TESTID = 'order-execution-line-unit';
 export const PRODUCT_NAME_FALLBACK = 'Producto no disponible';
 
+/** Guion de linea sin porcentaje (MACHINE, PACKAGING). Constante para no depender del copy. */
+const NO_VALUE_MARK = '—';
+
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base';
 
@@ -51,8 +54,12 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
 
   const availableUnits = line.unit === null ? [] : [line.unit, ...line.alternativeUnits];
   const selectedUnit = availableUnits.find((unit) => unit.id === selectedUnitId) ?? line.unit;
+  // Sin porcentaje (MACHINE, PACKAGING) no hay cantidad que escalar ni convertir: guion.
   const displayedQuantity =
-    line.unit === null || selectedUnit === null || selectedUnit.id === line.unit.id
+    line.quantity === null ||
+    line.unit === null ||
+    selectedUnit === null ||
+    selectedUnit.id === line.unit.id
       ? line.quantity
       : convertQuantity(line.quantity, line.unit, selectedUnit);
 
@@ -69,7 +76,7 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
         data-testid={`${ORDER_EXECUTION_LINE_PERCENTAGE_TESTID}-${index}`}
         className="text-base"
       >
-        {formatPercentage(line.percentage)} %
+        {line.percentage === null ? NO_VALUE_MARK : `${formatPercentage(line.percentage)} %`}
       </span>
       <span aria-hidden="true" className="text-base text-muted-foreground">
         {' · '}
@@ -77,9 +84,9 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
       <span
         data-testid={`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-${index}`}
         className="text-base font-medium"
-        title={exactDecimalTitle(displayedQuantity)}
+        title={displayedQuantity === null ? undefined : exactDecimalTitle(displayedQuantity)}
       >
-        {formatDecimalDisplay(displayedQuantity)}
+        {displayedQuantity === null ? NO_VALUE_MARK : formatDecimalDisplay(displayedQuantity)}
       </span>
       {line.unit === null ? null : line.alternativeUnits.length > 0 ? (
         <Select

@@ -8,10 +8,11 @@ import { consumedQuantity } from '@/lib/modules/recetas'
 import { convertQuantity, IncompatibleUnitsError, type UnitConversion } from '@/lib/modules/unidades'
 
 /** Linea de receta, vista con lo minimo que este calculo necesita. `unitId` es la del insumo
- *  (`ProductRef.unitId`) y llega `null` cuando el producto todavia no tiene ningun lote. */
+ *  (`ProductRef.unitId`) y llega `null` cuando el producto todavia no tiene ningun lote.
+ *  `percentage` es `null` en lineas de MACHINE y PACKAGING: no se costean, se saltan. */
 export type RecipeCostLine = {
   readonly productId: ProductId
-  readonly percentage: string
+  readonly percentage: string | null
   readonly unitId: string | null
 }
 
@@ -118,13 +119,17 @@ function compareBatches(a: CostingBatch, b: CostingBatch): number {
   return compareLots(a.lot, b.lot)
 }
 
-/** Coste (escalado a `INTERNAL_SCALE`) de un ingrediente, o `null` si no se puede componer. */
+/** Coste (escalado a `INTERNAL_SCALE`) de un ingrediente, o `null` si no se puede componer.
+ *  Sin porcentaje (MACHINE, PACKAGING) la linea no consume: aporta cero sin fallar. */
 function calculateLineCost(
   line: RecipeCostLine,
   orderQuantity: string,
   batches: readonly CostingBatch[],
   units: ReadonlyMap<string, UnitConversion>,
 ): bigint | null {
+  if (line.percentage === null) {
+    return ZERO
+  }
   if (line.unitId === null) {
     return null
   }
@@ -191,7 +196,8 @@ function calculateLineCost(
 /** `null` = sin importe, indistinguible entre los cuatro casos que puede producir esta funcion:
  *  receta sin lineas, unidad sin base comun para convertir, existencia insuficiente para cubrir
  *  la cantidad pedida, o resultado que desborda la precision de la columna. Quien llama recibe
- *  el mismo `null` en los cuatro y no puede saber cual ocurrio. */
+ *  el mismo `null` en los cuatro y no puede saber cual ocurrio. Las lineas sin porcentaje se
+ *  saltan antes: una receta de solo maquinas cuesta `0.0000`, no `null`. */
 export function calculateIngredientsCost(input: CostInput): string | null {
   if (input.lines.length === 0) {
     return null

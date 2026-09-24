@@ -294,6 +294,9 @@ export const MIGRACIONES_ESPERADAS = [
   // Igual patron: anula `product_batches.presentation_id` y `unit_cost` (solo MACHINE los
   // omite en el borde); no toca el identificador de peticion.
   '20260923140000_product_batch_nullable_machine',
+  // Igual patron: relaja `recipe_lines.percentage` a NULL (MACHINE y PACKAGING sin %);
+  // no persiste el identificador de peticion ni lo menciona.
+  '20260923150000_recipe_lines_percentage_nullable',
 ] as const
 
 export function hallazgosDeMigraciones(

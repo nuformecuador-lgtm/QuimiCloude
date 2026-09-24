@@ -109,13 +109,24 @@ export function OrderIngredientsTable({
   loading,
   error,
 }: OrderIngredientsTableProps) {
-  /** Cantidad requerida de una linea: cantidad del pedido x porcentaje / 100, en decimal exacto. */
-  const requiredOf = (line: RecipeLineView): string =>
-    quantity.trim() === '' ? '0' : consumedQuantity(quantity, line.percentage);
+  /**
+   * Cantidad requerida de una linea: cantidad del pedido x porcentaje / 100, en decimal
+   * exacto. `null` en lineas sin porcentaje (MACHINE, PACKAGING): no consumen, se pinta el
+   * marcador y no hay resta que calcular.
+   */
+  const requiredOf = (line: RecipeLineView): string | null =>
+    line.percentage === null
+      ? null
+      : quantity.trim() === ''
+        ? '0'
+        : consumedQuantity(quantity, line.percentage);
 
-  /** Restante de una linea: el stock MENOS lo requerido. `null` = el producto no tiene stock. */
-  const remainingOf = (line: RecipeLineView): string | null =>
-    line.productStock === null ? null : subtractDecimal(line.productStock.toString(), requiredOf(line));
+  /** Restante de una linea: el stock MENOS lo requerido. `null` = sin stock o sin requerida. */
+  const remainingOf = (line: RecipeLineView): string | null => {
+    const required = requiredOf(line);
+    if (line.productStock === null || required === null) return null;
+    return subtractDecimal(line.productStock.toString(), required);
+  };
 
   /** Faltante: el restante es negativo, el pedido pide mas de lo que hay. Se resalta en rojo. */
   const isShort = (remaining: string): boolean => remaining.startsWith('-');
@@ -168,7 +179,7 @@ export function OrderIngredientsTable({
                     className="text-right"
                     data-testid="order-ingredient-percentage"
                   >
-                    {formatPercentage(line.percentage)} %
+                    {line.percentage === null ? MISSING_VALUE_MARK : `${formatPercentage(line.percentage)} %`}
                   </TableCell>
                   <TableCell data-testid="order-ingredient-unit">
                     {unitLabel(line.productUnitId, units)}
@@ -188,10 +199,10 @@ export function OrderIngredientsTable({
                   </TableCell>
                   <TableCell
                     className="text-right"
-                    title={exactDecimalTitle(required)}
+                    title={required === null ? undefined : exactDecimalTitle(required)}
                     data-testid="order-ingredient-required"
                   >
-                    {formatDecimalDisplay(required)}
+                    {required === null ? MISSING_VALUE_MARK : formatDecimalDisplay(required)}
                   </TableCell>
                   <TableCell
                     className="text-right"

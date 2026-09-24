@@ -22,10 +22,10 @@ export type AssignedOrderExecutionView = {
 
 export type ExecutionLineView = {
   readonly productName: string | null;
-  /** "10.00" */
-  readonly percentage: string;
-  /** `consumedQuantity(orderQuantity, percentage)`. */
-  readonly quantity: string;
+  /** "10.00"; `null` en lineas de MACHINE y PACKAGING: se pinta el guion. */
+  readonly percentage: string | null;
+  /** `consumedQuantity(orderQuantity, percentage)`; `null` con porcentaje `null`. */
+  readonly quantity: string | null;
   /** La del insumo; `null` = sin lotes o dado de baja. */
   readonly unit: UnitRef | null;
   /** Misma base efectiva que `unit`, sin ella misma; vacio si `unit` es `null`. */

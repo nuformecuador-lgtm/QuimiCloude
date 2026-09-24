@@ -110,7 +110,8 @@ export function createGetAssignedOrderExecution(
       return {
         productName: productRef?.name ?? null,
         percentage: line.percentage,
-        quantity: consumedQuantity(summary.quantity, line.percentage),
+        quantity:
+          line.percentage === null ? null : consumedQuantity(summary.quantity, line.percentage),
         unit,
         alternativeUnits,
       };

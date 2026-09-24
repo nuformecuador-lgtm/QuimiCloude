@@ -61,7 +61,8 @@ export interface RecipeCatalog {
 export type RecipeExecutionLine = {
   readonly productId: string;
   readonly productName: string | null;
-  readonly percentage: string;
+  /** NULL en lineas de MACHINE y PACKAGING: no consumen ni se costean. */
+  readonly percentage: string | null;
 };
 
 /** Lo que hace falta para EJECUTAR una receta: pasos y lineas, y nada de lo que la pantalla no

@@ -15,6 +15,7 @@ import {
   toProductRef,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { productCompanyScope } from '@/lib/modules/inventario/adapters/driven/persistence/company-scope';
+import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 
 /**
  * Doble del cliente Prisma, SOLO para el bloque QC-50 R29 de mas abajo: cuenta invocaciones y
@@ -25,31 +26,45 @@ const { findMany } = vi.hoisted(() => ({ findMany: vi.fn() }));
 vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { product: { findMany } } }));
 
 describe('toProductRef', () => {
-  it('mapea id, name, unitId y stockByUnit tal cual', () => {
+  it('mapea id, name, type, unitId y stockByUnit tal cual', () => {
     const ref = toProductRef({
       id: 'p-1',
       name: 'Acido sulfurico',
+      type: PRODUCT_TYPES.PRODUCT,
       unitId: 'kg',
       stockByUnit: [{ unitId: 'kg', quantity: 12 }],
     });
     expect(ref).toEqual({
       id: 'p-1',
       name: 'Acido sulfurico',
+      type: PRODUCT_TYPES.PRODUCT,
       unitId: 'kg',
       stockByUnit: [{ unitId: 'kg', quantity: 12 }],
     });
   });
 
   it('sin lotes, stockByUnit es un array vacio', () => {
-    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', unitId: null, stockByUnit: [] });
+    const ref = toProductRef({
+      id: 'p-1',
+      name: 'Acido sulfurico',
+      type: PRODUCT_TYPES.PRODUCT,
+      unitId: null,
+      stockByUnit: [],
+    });
     expect(ref.stockByUnit).toEqual([]);
   });
 
   it('la referencia publica NO lleva existencia total del producto (R11)', () => {
     // R11 — `products.stock` ya no existe: la existencia sale UNICAMENTE de `stockByUnit`, que
     // agrupa por unidad (R5) y no es lo mismo que el producto declarando SU unidad.
-    const ref = toProductRef({ id: 'p-1', name: 'Acido sulfurico', unitId: null, stockByUnit: [] });
-    expect(Object.keys(ref).sort()).toEqual(['id', 'name', 'stockByUnit', 'unitId']);
+    const ref = toProductRef({
+      id: 'p-1',
+      name: 'Acido sulfurico',
+      type: PRODUCT_TYPES.PRODUCT,
+      unitId: null,
+      stockByUnit: [],
+    });
+    expect(Object.keys(ref).sort()).toEqual(['id', 'name', 'stockByUnit', 'type', 'unitId']);
     expect(Object.keys(ref)).not.toContain('stock');
     expect(Object.keys(ref)).not.toContain('latestBatchUnitId');
   });
@@ -61,19 +76,25 @@ describe('R14 — findRefs lee la existencia y la unidad de las columnas del pro
   });
 
   it('con unidad guardada, unitId y stockByUnit traen esa unidad', async () => {
-    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: 12, unitId: 'kg' }]);
+    findMany.mockResolvedValue([
+      { id: 'p-1', name: 'Acido sulfurico', type: 'MACHINE', stock: 12, unitId: 'kg' },
+    ]);
 
     const [ref] = await findProductRefs(['p-1'], 'empresa-1');
 
+    expect(ref?.type).toEqual('MACHINE');
     expect(ref?.unitId).toEqual('kg');
     expect(ref?.stockByUnit).toEqual([{ unitId: 'kg', quantity: 12 }]);
   });
 
   it('sin unidad guardada (sin lotes), unitId es null y stockByUnit es un array vacio', async () => {
-    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: 0, unitId: null }]);
+    findMany.mockResolvedValue([
+      { id: 'p-1', name: 'Acido sulfurico', type: 'PRODUCT', stock: 0, unitId: null },
+    ]);
 
     const [ref] = await findProductRefs(['p-1'], 'empresa-1');
 
+    expect(ref?.type).toEqual('PRODUCT');
     expect(ref?.unitId).toBeNull();
     expect(ref?.stockByUnit).toEqual([]);
   });

@@ -230,7 +230,8 @@ describe('recipe_lines.percentage — rango y redondeo (R6)', () => {
         data: { recipeId, productId, percentage: new Prisma.Decimal('100.00') },
         select: { percentage: true },
       })
-      expect(line.percentage.toString()).toBe('100')
+      expect(line.percentage).not.toBeNull()
+      expect(line.percentage!.toString()).toBe('100')
     })
   })
 
@@ -248,7 +249,8 @@ describe('recipe_lines.percentage — rango y redondeo (R6)', () => {
         where: { recipeId },
         select: { percentage: true },
       })
-      expect(line.percentage.toString()).toBe('12.35')
+      expect(line.percentage).not.toBeNull()
+      expect(line.percentage!.toString()).toBe('12.35')
 
       const crudo = await tx.$queryRaw<{ percentage: string }[]>`
         SELECT "percentage"::text AS percentage FROM "recipe_lines" WHERE "recipe_id" = ${asUuid(recipeId)}`

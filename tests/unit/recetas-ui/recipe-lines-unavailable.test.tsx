@@ -7,6 +7,7 @@ import {
   RecipeLinesField,
   buildRecipePayload,
   type RecipeLineFormValue,
+  type RecipeMachineFormValue,
 } from '@/app/(private)/produccion/formulas/components';
 
 /**
@@ -80,6 +81,7 @@ function Harness({
   readonly onLinesChange?: (lines: readonly RecipeLineFormValue[]) => void;
 }) {
   const [lines, setLines] = useState(initialLines);
+  const [machines, setMachines] = useState<readonly RecipeMachineFormValue[]>([]);
   return (
     <RecipeLinesField
       lines={lines}
@@ -90,6 +92,8 @@ function Harness({
       units={[]}
       initialProductPage={INITIAL_PRODUCT_PAGE}
       initialMachinePage={INITIAL_PRODUCT_PAGE}
+      machines={machines}
+      onMachinesChange={setMachines}
     />
   );
 }
@@ -170,6 +174,7 @@ describe('aviso y marcador de líneas con producto dado de baja', () => {
       name: 'Receta de prueba',
       description: '',
       lines,
+      machines: [],
       steps: [],
       image: { kind: 'untouched' },
     });

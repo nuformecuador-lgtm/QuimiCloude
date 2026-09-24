@@ -7,6 +7,7 @@ import { setupUser } from '../../helpers/user-event';
 import {
   RecipeLinesField,
   type RecipeLineFormValue,
+  type RecipeMachineFormValue,
 } from '@/app/(private)/produccion/formulas/components';
 
 /**
@@ -44,6 +45,7 @@ function lineValue(key: string, percentage: string): RecipeLineFormValue {
 
 function Harness({ initialLines = [] as readonly RecipeLineFormValue[] }) {
   const [lines, setLines] = useState(initialLines);
+  const [machines, setMachines] = useState<readonly RecipeMachineFormValue[]>([]);
   return (
     <RecipeLinesField
       lines={lines}
@@ -51,6 +53,8 @@ function Harness({ initialLines = [] as readonly RecipeLineFormValue[] }) {
       units={[]}
       initialProductPage={PRODUCT_PAGE}
       initialMachinePage={MACHINE_PAGE}
+      machines={machines}
+      onMachinesChange={setMachines}
     />
   );
 }

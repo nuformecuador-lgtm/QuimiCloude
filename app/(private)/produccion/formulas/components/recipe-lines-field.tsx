@@ -21,6 +21,7 @@ import {
   createLocalKey,
   type RecipeLineErrors,
   type RecipeLineFormValue,
+  type RecipeMachineFormValue,
 } from './recipe-form-state';
 
 /**
@@ -57,17 +58,6 @@ function productPickerLabel(productName: string | null, emptyLabel = 'Buscar ing
   if (productName === '') return emptyLabel;
   return productName;
 }
-
-/**
- * Máquina seleccionada en el tab de máquinas. Selección pura: sin porcentaje ni cantidad de
- * referencia -el instrumento no lleva %-. UI-only por decisión de producto: no viaja al payload
- * ni al contrato; cuando se persista, este tipo alimenta la relación nueva.
- */
-export type RecipeMachineFormValue = {
-  readonly key: string;
-  readonly productId: string;
-  readonly productName: string | null;
-};
 
 type LinesTab = 'ingredients' | 'machines';
 
@@ -149,14 +139,16 @@ export type RecipeLinesFieldProps = {
     readonly totalPages: number;
   };
   /**
-   * Primera página de MÁQUINAS, ya filtrada por tipo desde la página del formulario. El tab de
-   * máquinas es UI-only: su selección vive en el estado interno de este campo y no sale al
-   * payload.
+   * Primera página de MÁQUINAS, ya filtrada por tipo desde la página del formulario. Las
+   * máquinas elegidas viajan al payload con `percentage: null` (`buildRecipePayload`).
    */
   readonly initialMachinePage: {
     readonly items: readonly ProductPickerOption[];
     readonly totalPages: number;
   };
+  /** Herramientas elegidas: estado del formulario, no de este campo. Exentas de % y de suma. */
+  readonly machines: readonly RecipeMachineFormValue[];
+  readonly onMachinesChange: (machines: readonly RecipeMachineFormValue[]) => void;
   readonly errors?: RecipeLineErrors;
   readonly generalError?: string;
 };
@@ -174,13 +166,14 @@ export function RecipeLinesField({
   units,
   initialProductPage,
   initialMachinePage,
+  machines,
+  onMachinesChange,
   errors,
   generalError,
 }: RecipeLinesFieldProps) {
   const headingId = useId();
   const sumId = useId();
   const [activeTab, setActiveTab] = useState<LinesTab>('ingredients');
-  const [machines, setMachines] = useState<readonly RecipeMachineFormValue[]>([]);
 
   // Derivado en CADA render, nunca cacheado: borrar este `.filter(` tiene que poner el test en
   // rojo, así que no puede sustituirse por un contador guardado en el estado.
@@ -255,8 +248,9 @@ export function RecipeLinesField({
     onChange(lines.filter((_, i) => i !== index));
   }
 
-  // --- Tab de máquinas (UI-only): el mismo ciclo fantasma/materializar del de ingredientes,
-  // pero sin porcentaje. Cada lista excluye lo suyo: son tipos disjuntos, así que no comparten
+  // --- Tab de herramientas: el mismo ciclo fantasma/materializar del de ingredientes,
+  // pero sin porcentaje. Viajan al payload con `percentage: null` (`buildRecipePayload`) y no
+  // entran a la suma. Cada lista excluye lo suyo: son tipos disjuntos, así que no comparten
   // `excludedIds` entre tabs.
   const isMachineGhost = machines.length === 0;
   const machineRows: readonly RecipeMachineFormValue[] = isMachineGhost
@@ -270,23 +264,29 @@ export function RecipeLinesField({
 
   function addMachineAfter(index: number) {
     if (isMachineGhost) {
-      setMachines([blankMachine(), blankMachine()]);
+      onMachinesChange([blankMachine(), blankMachine()]);
       return;
     }
-    setMachines([...machines.slice(0, index + 1), blankMachine(), ...machines.slice(index + 1)]);
+    onMachinesChange([
+      ...machines.slice(0, index + 1),
+      blankMachine(),
+      ...machines.slice(index + 1),
+    ]);
   }
 
   function updateMachine(index: number, patch: Partial<RecipeMachineFormValue>) {
     if (isMachineGhost) {
-      setMachines([{ ...blankMachine(), ...patch }]);
+      onMachinesChange([{ ...blankMachine(), ...patch }]);
       return;
     }
-    setMachines(machines.map((machine, i) => (i === index ? { ...machine, ...patch } : machine)));
+    onMachinesChange(
+      machines.map((machine, i) => (i === index ? { ...machine, ...patch } : machine)),
+    );
   }
 
   function removeMachine(index: number) {
     if (isMachineGhost) return;
-    setMachines(machines.filter((_, i) => i !== index));
+    onMachinesChange(machines.filter((_, i) => i !== index));
   }
 
   function usedMachineIds(exceptIndex: number): readonly string[] {

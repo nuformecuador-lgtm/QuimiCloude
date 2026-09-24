@@ -6,6 +6,7 @@ import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { ProductId, ProductRef } from '../../../domain/product-catalog';
 import type { CostingBatch } from '../../../domain/costing-batch';
 import type { ProductStockByUnit } from '../../../domain/product-stock';
+import type { ProductType } from '../../../domain/product-type';
 
 import { batchCompanyScope, productCompanyScope } from './company-scope';
 
@@ -27,6 +28,7 @@ import { batchCompanyScope, productCompanyScope } from './company-scope';
 type ProductCatalogRow = {
   readonly id: string;
   readonly name: string;
+  readonly type: ProductType;
   readonly unitId: string | null;
   readonly stockByUnit: readonly ProductStockByUnit[];
 };
@@ -36,15 +38,17 @@ export function toProductRef(row: ProductCatalogRow): ProductRef {
   return {
     id: row.id,
     name: row.name,
+    type: row.type,
     unitId: row.unitId,
     stockByUnit: row.stockByUnit,
   };
 }
 
-/** Fila cruda que devuelve la consulta: existencia y unidad guardadas, ya en `products`. */
+/** Fila cruda que devuelve la consulta: tipo, existencia y unidad guardadas, ya en `products`. */
 type ProductStockRow = {
   readonly id: string;
   readonly name: string;
+  readonly type: ProductType;
   readonly stock: number;
   readonly unitId: string | null;
 };
@@ -62,7 +66,7 @@ async function findAliveProducts(
     where: {
       AND: [productCompanyScope(scope), { id: { in: [...ids] }, deletedAt: null }],
     },
-    select: { id: true, name: true, stock: true, unitId: true },
+    select: { id: true, name: true, type: true, stock: true, unitId: true },
   });
 }
 
@@ -78,6 +82,7 @@ export async function findProductRefs(
     toProductRef({
       id: row.id,
       name: row.name,
+      type: row.type,
       unitId: row.unitId,
       stockByUnit: row.unitId === null ? [] : [{ unitId: row.unitId, quantity: row.stock }],
     }),

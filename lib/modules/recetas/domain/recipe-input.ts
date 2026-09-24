@@ -9,8 +9,10 @@ import { PERCENTAGE_PATTERN, formatPercentage, percentageToHundredths, sumPercen
  */
 
 /**
- * Porcentaje de una linea, como CADENA: el dominio no puede importar `@prisma/client` ni pasar
- * por `number`. Hasta 3 enteros y 2 decimales, mayor que cero y hasta 100.
+ * Porcentaje de una linea, como CADENA o NULL: el dominio no puede importar
+ * `@prisma/client` ni pasar por `number`. Con valor, hasta 3 enteros y 2 decimales, mayor
+ * que cero y hasta 100. NULL lo admiten las lineas de MACHINE y PACKAGING; las de PRODUCT
+ * lo siguen exigiendo, pero esa regla vive en el servicio -el esquema no conoce tipos-.
  */
 const percentageSchema = z
   .string()
@@ -28,7 +30,8 @@ const percentageSchema = z
       return hundredths !== null && hundredths <= BigInt(10000);
     },
     { message: 'El porcentaje no puede pasar de 100.' },
-  );
+  )
+  .nullable();
 
 /** Sin unidad: `.strict()` rechaza cualquier clave extra, incluida `unitId`. */
 export const recipeLineSchema = z
@@ -214,10 +217,11 @@ function sinProductoRepetido(lines: readonly RecipeLineInput[]): boolean {
 }
 
 /**
- * Suma de las lineas, sin guarda para la lista vacia: `sumPercentages([])` ya da
- * `total: '0.00'`, `isComplete: false`, y cae por el mismo `superRefine`. Se conserva
- * `.default([])`: un payload sin la clave `lines` se trata como lista vacia y se rechaza
- * igual, en alta y en edicion.
+ * Suma de las lineas CON porcentaje, sin guarda para la lista vacia:
+ * `sumPercentages([])` ya da `total: '0.00'`, `isComplete: false`, y cae por el mismo
+ * `superRefine`. Las lineas en NULL no suman: solo los definidos tienen que dar 100,00 %
+ * exacto. Se conserva `.default([])`: un payload sin la clave `lines` se trata como lista
+ * vacia y se rechaza igual, en alta y en edicion.
  */
 const recipeLinesSchema = z
   .array(recipeLineSchema)
@@ -226,7 +230,10 @@ const recipeLinesSchema = z
     message: 'No puede haber dos lineas con el mismo producto.',
   })
   .superRefine((lines, ctx) => {
-    const total = sumPercentages(lines.map((line) => line.percentage));
+    const defined = lines
+      .map((line) => line.percentage)
+      .filter((percentage): percentage is string => percentage !== null);
+    const total = sumPercentages(defined);
     if (!total.isComplete) {
       ctx.addIssue({
         code: 'custom',

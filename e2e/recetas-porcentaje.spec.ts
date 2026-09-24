@@ -437,7 +437,7 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
       select: { id: true, lines: { select: { productId: true, percentage: true } } },
     });
     const byProduct = new Map(
-      saved.lines.map((line) => [line.productId, line.percentage.toFixed(2)]),
+      saved.lines.map((line) => [line.productId, line.percentage?.toFixed(2)]),
     );
     expect(byProduct.get(productAId)).toBe('92.50');
     expect(byProduct.get(productBId)).toBe('7.50');

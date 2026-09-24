@@ -56,7 +56,14 @@ function contenido(overrides?: Partial<RecipeExecutionContent>): RecipeExecution
 }
 
 function producto(overrides?: Partial<ProductRef>): ProductRef {
-  return { id: PRODUCTO, name: 'Hipoclorito', unitId: LITRO, stockByUnit: [], ...overrides };
+  return {
+    id: PRODUCTO,
+    name: 'Hipoclorito',
+    type: 'PRODUCT',
+    unitId: LITRO,
+    stockByUnit: [],
+    ...overrides,
+  };
 }
 
 function unidad(overrides?: Partial<UnitRef>): UnitRef {
@@ -284,6 +291,21 @@ describe('getAssignedOrderExecution — R18: porcentaje y cantidad de la linea',
     expect(line?.quantity).toBe('20');
     expect(line?.unit?.id).toBe(LITRO);
     expect(line?.unit?.symbol).toBe('L');
+  });
+
+  it('una linea sin porcentaje (maquina) viene con percentage y quantity en null', async () => {
+    const { deps } = montar({
+      content: contenido({
+        lines: [{ productId: PRODUCTO, productName: null, percentage: null }],
+      }),
+    });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    const [line] = view.lines;
+    expect(line?.percentage).toBeNull();
+    expect(line?.quantity).toBeNull();
   });
 });
 

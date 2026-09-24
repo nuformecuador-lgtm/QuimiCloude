@@ -821,6 +821,46 @@ describe('R27 — añadir y quitar líneas; sin líneas no se guarda', () => {
   });
 });
 
+describe('Guardar exige % definido en cada ingrediente; las herramientas están exentas', () => {
+  it('línea con producto pero sin porcentaje deja Guardar deshabilitado hasta escribirlo', async () => {
+    const user = setupUser();
+    renderCreateForm();
+
+    await user.type(screen.getByTestId('recipe-field-name'), 'Receta sin porcentaje todavía');
+    await chooseProductForLine(user, 0, PRODUCT_1_NAME);
+
+    expect(screen.getByTestId('recipe-form-submit')).toBeDisabled();
+
+    await user.type(screen.getByTestId('recipe-line-percentage-0'), '100');
+
+    expect(screen.getByTestId('recipe-form-submit')).toBeEnabled();
+  });
+
+  it('en edición, la línea sin porcentaje precarga el tab de herramientas y no bloquea el Guardar', async () => {
+    const user = setupUser();
+    renderEditForm(
+      recipeDetail({
+        lines: [
+          lineView({ id: 'line-a', productId: PRODUCT_1_ID, percentage: '100.00' }),
+          lineView({
+            id: 'line-b',
+            productId: PRODUCT_WITH_UNIT_ID,
+            productName: 'Agitador industrial',
+            percentage: null,
+            productUnitId: null,
+          }),
+        ],
+      }),
+    );
+
+    // La suma de definidos da 100 y la herramienta no bloquea: Guardar habilitado.
+    expect(screen.getByTestId('recipe-form-submit')).toBeEnabled();
+
+    await user.click(screen.getByTestId('recipe-lines-tab-machines'));
+    expect(screen.getByTestId('recipe-machine-product-0')).toHaveValue('Agitador industrial');
+  });
+});
+
 describe('R28 — el selector de producto alcanza la segunda página sin filtrar en cliente', () => {
   // El mecanismo cambió el 2026-09-07 (decisión humana): la página siguiente ya no se pide con un
   // botón «Siguiente» dentro del desplegable, sino al llegar al final de su scroll. Lo que R28
@@ -970,12 +1010,10 @@ describe('R31 — dos líneas del mismo producto y un porcentaje inválido no se
     expect(await screen.findByRole('option', { name: PRODUCT_1_NAME })).toBeInTheDocument();
   });
 
-  it('un porcentaje que el esquema rechaza presenta el error junto a la línea afectada', async () => {
-    // La suma solo cuenta lo que casa el patrón (`sumPercentages`): con la primera línea al
-    // 100 % y la segunda con un texto inválido -que no suma nada-, el indicador da por completa
-    // la suma y el botón se habilita, pero el ESQUEMA sigue rechazando la segunda línea por su
-    // formato, sin escribir ninguna fila. La segunda línea se pide ANTES de completar el
-    // 100 %: al 100 % el `+` ya no deja agregarla.
+  it('una línea sin porcentaje deja el Guardar deshabilitado y no se envía nada', async () => {
+    // Un ingrediente con producto elegido pero sin % definido no habilita el Guardar aunque
+    // las demás líneas sumen: el rechazo ya no espera al esquema del servidor, el botón no
+    // deja llegar hasta ahí. La segunda línea se pide ANTES de completar el 100 %.
     const user = setupUser();
     renderCreateForm();
 
@@ -983,18 +1021,17 @@ describe('R31 — dos líneas del mismo producto y un porcentaje inválido no se
     await addValidLine(user, 0, { productName: PRODUCT_1_NAME, percentage: '60' });
     await user.click(screen.getByTestId('recipe-line-add-0'));
     await chooseProductForLine(user, 1, PRODUCT_2_NAME);
-    await user.type(screen.getByTestId('recipe-line-percentage-1'), 'abc'); // no cumple el patrón decimal
-    // Se completa la primera línea hasta el 100 % con la segunda ya creada.
-    await user.clear(screen.getByTestId('recipe-line-percentage-0'));
-    await user.type(screen.getByTestId('recipe-line-percentage-0'), '100');
+    await user.type(screen.getByTestId('recipe-line-percentage-1'), 'abc'); // saneado a ''
 
-    expect(screen.getByTestId('recipe-form-submit')).toBeEnabled();
-    await user.click(screen.getByTestId('recipe-form-submit'));
+    const submit = screen.getByTestId('recipe-form-submit');
+    expect(submit).toBeDisabled();
 
-    const error = await screen.findByTestId('recipe-line-percentage-error-1');
-    expect(error).toBeInTheDocument();
-    expect(screen.getByTestId('recipe-line-percentage-1')).toHaveAttribute('aria-invalid', 'true');
+    await user.click(submit);
     expect(createRecipeActionMock).not.toHaveBeenCalled();
+
+    // Al definir el porcentaje (40 = lo que queda), el Guardar se habilita.
+    await user.type(screen.getByTestId('recipe-line-percentage-1'), '40');
+    expect(screen.getByTestId('recipe-form-submit')).toBeEnabled();
   });
 });
 

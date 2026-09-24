@@ -109,7 +109,13 @@ function montar(options?: {
     } as UnitCatalog,
     products: {
       findRefs: vi.fn(async () => [
-        { id: PRODUCTO, name: 'Sosa caustica', unitId: null, stockByUnit: [] },
+        {
+          id: PRODUCTO,
+          name: 'Sosa caustica',
+          type: 'PRODUCT' as const,
+          unitId: null,
+          stockByUnit: [],
+        },
       ]),
       findCostingBatches: vi.fn(async () => {
         throw new Error('arrancar un pedido asignado no costea nada');

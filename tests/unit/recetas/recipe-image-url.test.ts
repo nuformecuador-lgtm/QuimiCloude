@@ -59,7 +59,7 @@ function montarRepositorio(overrides: Partial<RecipeRepository> = {}): RecipeRep
 function montarCatalogo(): ProductCatalog {
   return {
     findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
-      { id: PRODUCTO_ID, name: 'Acido sulfurico', unitId: null, stockByUnit: [] },
+      { id: PRODUCTO_ID, name: 'Acido sulfurico', type: 'PRODUCT', unitId: null, stockByUnit: [] },
     ]),
     findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
       throw new Error('recetas no debe costear nada');

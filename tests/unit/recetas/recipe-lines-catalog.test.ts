@@ -36,6 +36,7 @@ const LINEA_NUEVA = { productId: PRODUCTO_NUEVO, percentage: '40.00' };
 const REF_NUEVO: ProductRef = {
   id: PRODUCTO_NUEVO,
   name: 'Sosa caustica',
+  type: 'PRODUCT',
   unitId: null,
   stockByUnit: [],
 };
@@ -159,12 +160,134 @@ describe('R46 — anadir una linea nueva cuyo producto no existe o esta de baja 
     expect(recipes.replaceAlive).not.toHaveBeenCalled();
   });
 
+  it('el NULL de una linea MACHINE se admite en el alta', async () => {
+    const MAQUINA = '44444444-4444-4444-8444-444444444444';
+    const recipes = montarRepositorio();
+    const products: ProductCatalog = {
+      findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
+        REF_NUEVO,
+        { id: MAQUINA, name: 'Agitador', type: 'MACHINE', unitId: null, stockByUnit: [] },
+      ]),
+      findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
+        throw new Error('recetas no debe costear nada');
+      }),
+    };
+    const images = montarAlmacenamiento();
+    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
+
+    // 100 % en definidos + la maquina sin %: el alta pasa y la linea viaja con null.
+    await createRecipe(
+      {
+        name: 'Receta con maquina',
+        description: null,
+        steps: [],
+        lines: [
+          { productId: PRODUCTO_NUEVO, percentage: '100.00' },
+          { productId: MAQUINA, percentage: null },
+        ],
+      },
+      ADMIN,
+    );
+
+    expect(recipes.create).toHaveBeenCalledTimes(1);
+    const [datos] = (recipes.create as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      { lines: readonly { productId: string; percentage: string | null }[] },
+    ];
+    expect(datos.lines).toEqual([
+      { productId: PRODUCTO_NUEVO, percentage: '100.00' },
+      { productId: MAQUINA, percentage: null },
+    ]);
+  });
+
+  it('el NULL de una linea PRODUCT se rechaza en el alta aunque la suma de definidos de 100', async () => {
+    const OTRO_PRODUCTO = '55555555-5555-4555-8555-555555555555';
+    const recipes = montarRepositorio();
+    const products: ProductCatalog = {
+      findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
+        REF_NUEVO,
+        { id: OTRO_PRODUCTO, name: 'Otro insumo', type: 'PRODUCT', unitId: null, stockByUnit: [] },
+      ]),
+      findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
+        throw new Error('recetas no debe costear nada');
+      }),
+    };
+    const images = montarAlmacenamiento();
+    const createRecipe = createCreateRecipe({ recipes, products, images, now: () => AHORA });
+
+    await expect(
+      createRecipe(
+        {
+          name: 'Receta con producto sin porcentaje',
+          description: null,
+          steps: [],
+          lines: [
+            { productId: PRODUCTO_NUEVO, percentage: '100.00' },
+            { productId: OTRO_PRODUCTO, percentage: null },
+          ],
+        },
+        ADMIN,
+      ),
+    ).rejects.toThrow();
+
+    expect(recipes.create).not.toHaveBeenCalled();
+  });
+
+  it('en edicion, la linea preexistente NULL sin ref (baja) pasa; la NULL de un PRODUCT vivo se rechaza', async () => {
+    const MAQUINA_VIVA = '66666666-6666-4666-8666-666666666666';
+    // La receta YA trae una linea NULL cuyo producto esta de baja: el catalogo no la devuelve.
+    const filaConMaquinaDeBaja: RecipeRow = {
+      ...filaConLineaVieja(),
+      lines: [{ id: 'linea-0', productId: PRODUCTO_VIEJO, percentage: null }],
+    };
+    const products: ProductCatalog = {
+      findRefs: vi.fn<ProductCatalog['findRefs']>(async (ids: readonly string[]) =>
+        ids.flatMap((id) => {
+          if (id === MAQUINA_VIVA) {
+            return [{ id, name: 'Agitador', type: 'MACHINE', unitId: null, stockByUnit: [] }];
+          }
+          if (id === PRODUCTO_NUEVO) return [REF_NUEVO];
+          return [];
+        }),
+      ),
+      findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
+        throw new Error('recetas no debe costear nada');
+      }),
+    };
+    const images = montarAlmacenamiento();
+
+    const repositorioConMaquina = montarRepositorio({ findAliveById: vi.fn(async () => filaConMaquinaDeBaja) });
+    const updateRecipe = createUpdateRecipe({
+      recipes: repositorioConMaquina,
+      products,
+      images,
+      now: () => AHORA,
+    });
+
+    // Reenviar la linea NULL de baja + sumar la maquina viva NULL: pasa sin escribir de mas.
+    await updateRecipe(
+      'receta-1',
+      {
+        name: 'Desengrasante 5%',
+        description: null,
+        steps: [],
+        lines: [
+          { productId: PRODUCTO_VIEJO, percentage: null },
+          { productId: PRODUCTO_NUEVO, percentage: '100.00' },
+          { productId: MAQUINA_VIVA, percentage: null },
+        ],
+      },
+      ADMIN,
+    );
+
+    expect(repositorioConMaquina.replaceAlive).toHaveBeenCalledTimes(1);
+  });
+
   it('en el alta se tratan todas las lineas como nuevas: findRefs se llama con todos los ids', async () => {
     const recipes = montarRepositorio();
     const products: ProductCatalog = {
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
         REF_NUEVO,
-        { id: PRODUCTO_VIEJO, name: 'Acido sulfurico', unitId: null, stockByUnit: [] },
+        { id: PRODUCTO_VIEJO, name: 'Acido sulfurico', type: 'PRODUCT', unitId: null, stockByUnit: [] },
       ]),
       findCostingBatches: vi.fn<ProductCatalog['findCostingBatches']>(() => {
         throw new Error('recetas no debe costear nada');

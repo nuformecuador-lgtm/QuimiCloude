@@ -99,7 +99,7 @@ function catalogoDeProductos(batches: readonly CostingBatch[] = [], refs?: reado
   const refsPorDefecto =
     refs ??
     [...new Map(batches.map((batch) => [batch.productId, batch.unitId])).entries()].map(
-      ([id, unitId]): ProductRef => ({ id, name: 'producto', unitId, stockByUnit: [] }),
+      ([id, unitId]): ProductRef => ({ id, name: 'producto', type: 'PRODUCT', unitId, stockByUnit: [] }),
     );
   const findCostingBatches = vi.fn(async () => batches);
   const findRefs = vi.fn(async () => refsPorDefecto);

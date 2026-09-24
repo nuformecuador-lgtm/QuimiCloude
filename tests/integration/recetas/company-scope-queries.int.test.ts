@@ -356,7 +356,8 @@ describe('R16, R17, R20 — findAliveById / replaceAlive / softDeleteAlive con u
     expect(await prisma.recipeLine.count({ where: { recipeId: ajena } })).toBe(lineasAntes);
     const lineaOriginal = await prisma.recipeLine.findFirstOrThrow({ where: { recipeId: ajena } });
     expect(lineaOriginal.productId).toBe(B.productId);
-    expect(lineaOriginal.percentage.toFixed(2)).toBe('100.00');
+    expect(lineaOriginal.percentage).not.toBeNull();
+    expect(lineaOriginal.percentage!.toFixed(2)).toBe('100.00');
   });
 
   it('control positivo: el mismo replaceAlive, desde B, SI escribe y concilia sus lineas', async () => {

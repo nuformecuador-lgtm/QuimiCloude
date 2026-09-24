@@ -96,9 +96,9 @@ describe('pantalla de ejecucion — sin factor de escala, con la cantidad de la 
     render(<OrderExecutionScreen execution={EXECUTION} />);
 
     expect(screen.getByText(new RegExp(EXECUTION.orderQuantity))).toBeVisible();
-    expect(screen.getByTestId('order-execution-line-quantity-0')).toHaveTextContent(
-      EXECUTION.lines[0]!.quantity,
-    );
+    const quantity = EXECUTION.lines[0]!.quantity;
+    expect(quantity).not.toBeNull();
+    expect(screen.getByTestId('order-execution-line-quantity-0')).toHaveTextContent(quantity ?? '');
   });
 });
 

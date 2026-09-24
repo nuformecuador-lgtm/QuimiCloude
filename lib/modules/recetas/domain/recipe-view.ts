@@ -39,7 +39,8 @@ export type RecipeLineView = {
   readonly id: string;
   readonly productId: string;
   readonly productName: string | null;
-  readonly percentage: string;
+  /** NULL en lineas de MACHINE y PACKAGING: no consumen ni se costean. */
+  readonly percentage: string | null;
   readonly productUnitId: string | null;
   readonly productStock: number | null;
 };

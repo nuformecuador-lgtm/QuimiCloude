@@ -10,6 +10,7 @@ import {
   referenceAmountForPercentage,
   sanitizePercentageInput,
   type RecipeLineFormValue,
+  type RecipeMachineFormValue,
 } from '@/app/(private)/produccion/formulas/components';
 
 /**
@@ -41,6 +42,7 @@ function lineValue(key: string, percentage: string): RecipeLineFormValue {
 
 function Harness({ initialLines = [] as readonly RecipeLineFormValue[] }) {
   const [lines, setLines] = useState(initialLines);
+  const [machines, setMachines] = useState<readonly RecipeMachineFormValue[]>([]);
   return (
     <RecipeLinesField
       lines={lines}
@@ -48,6 +50,8 @@ function Harness({ initialLines = [] as readonly RecipeLineFormValue[] }) {
       units={[]}
       initialProductPage={INITIAL_PRODUCT_PAGE}
       initialMachinePage={INITIAL_PRODUCT_PAGE}
+      machines={machines}
+      onMachinesChange={setMachines}
     />
   );
 }

@@ -76,11 +76,23 @@ export type RecipeStepFormValue = {
   readonly document: RecipeStepDocument;
 };
 
+/**
+ * Máquina seleccionada en el tab de herramientas. Selección pura: sin porcentaje. Vive en su
+ * propio array del estado (`machines`, no `lines`) y viaja al payload con `percentage: null`
+ * -el contrato lo admite en MACHINE y PACKAGING-.
+ */
+export type RecipeMachineFormValue = {
+  readonly key: string;
+  readonly productId: string;
+  readonly productName: string | null;
+};
+
 /** Estado completo y controlado del formulario. */
 export type RecipeFormState = {
   readonly name: string;
   readonly description: string;
   readonly lines: readonly RecipeLineFormValue[];
+  readonly machines: readonly RecipeMachineFormValue[];
   readonly steps: readonly RecipeStepFormValue[];
   readonly image: ImageFieldState;
 };
@@ -88,7 +100,7 @@ export type RecipeFormState = {
 /** Línea tal como la espera el contrato (`recipeLineSchema`): sin `key` ni `productName`, sin unidad. */
 export type RecipeLinePayload = {
   readonly productId: string;
-  readonly percentage: string;
+  readonly percentage: string | null;
 };
 
 /**
@@ -136,12 +148,16 @@ export type RecipePayload = {
  * `recipe-steps-field.tsx` mantener ese array en el orden que el usuario ve, arrastre o teclado
  * mediante; esta función solo proyecta cada paso a su documento.
  *
- * **Las líneas van completas y sin decisión propia** (R21, R22): `productName` y `key` -que son
- * de PRESENTACIÓN, nunca del contrato- se descartan aquí, pero `productId` y el porcentaje ya
- * convertido viajan intactos incluso si la línea está marcada como "producto no disponible" en la
- * interfaz: esta función no conoce esa marca, es derivada en `recipe-lines-field.tsx` a partir de
- * `productName === null` y nunca llega hasta aquí.
- */
+  * **Las líneas van completas y sin decisión propia** (R21, R22): `productName` y `key` -que son
+  * de PRESENTACIÓN, nunca del contrato- se descartan aquí, pero `productId` y el porcentaje ya
+  * convertido viajan intactos incluso si la línea está marcada como "producto no disponible" en la
+  * interfaz: esta función no conoce esa marca, es derivada en `recipe-lines-field.tsx` a partir de
+  * `productName === null` y nunca llega hasta aquí.
+  *
+  * **Las máquinas viajan como líneas con `percentage: null`**, detrás de los ingredientes y en
+  * su orden: el contrato las admite en MACHINE y PACKAGING, y el servicio rechaza el NULL en
+  * PRODUCT. Filas fantasma nunca llegan aquí: no están en el estado.
+  */
 export function buildRecipePayload(mode: RecipeFormMode, state: RecipeFormState): RecipePayload {
   if (mode === 'create' && state.image.kind === 'cleared') {
     // R36: el control de quitar no se ofrece en el alta, así que este estado nunca debería
@@ -156,12 +172,17 @@ export function buildRecipePayload(mode: RecipeFormMode, state: RecipeFormState)
     name: state.name,
     description: state.description.trim() === '' ? null : state.description,
     steps: state.steps.map((step): RecipeStepPayload => step.document),
-    lines: state.lines.map(
-      (line): RecipeLinePayload => ({
-        productId: line.productId,
-        percentage: line.percentage.replace(',', '.'),
-      }),
-    ),
+    lines: [
+      ...state.lines.map(
+        (line): RecipeLinePayload => ({
+          productId: line.productId,
+          percentage: line.percentage.replace(',', '.'),
+        }),
+      ),
+      ...state.machines.map(
+        (machine): RecipeLinePayload => ({ productId: machine.productId, percentage: null }),
+      ),
+    ],
   };
 
   switch (state.image.kind) {

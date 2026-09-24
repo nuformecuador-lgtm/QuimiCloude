@@ -67,6 +67,13 @@ describe('linea de ejecucion — insumo, porcentaje y cantidad (R18)', () => {
     expect(screen.getByText(PRODUCT_NAME_FALLBACK)).toBeVisible();
   });
 
+  it('una linea sin porcentaje (maquina) pinta guion en porcentaje y cantidad', () => {
+    render(<OrderExecutionLines lines={[linea({ percentage: null, quantity: null })]} />);
+
+    expect(screen.getByTestId('order-execution-line-percentage-0')).toHaveTextContent('—');
+    expect(screen.getByTestId('order-execution-line-quantity-0')).toHaveTextContent('—');
+  });
+
   it('presenta las lineas en modo lectura, sin ningun control de edicion', () => {
     render(<OrderExecutionLines lines={[linea()]} />);
 

@@ -65,6 +65,7 @@ const FILA_RECETA: RecipeRow = {
 const PRODUCTO_REF: ProductRef = {
   id: LINEA_VALIDA.productId,
   name: 'Acido sulfurico',
+  type: 'PRODUCT',
   unitId: UNIT_ID,
   stockByUnit: [{ unitId: UNIT_ID, quantity: 3 }],
 };
@@ -361,6 +362,7 @@ describe('R14, R24 — existencia del insumo en SU PROPIA unidad', () => {
     const getRecipe = montarConProducto({
       id: LINEA_VALIDA.productId,
       name: 'Acido sulfurico',
+      type: 'PRODUCT',
       unitId: UNIT_ID,
       stockByUnit: [{ unitId: UNIT_ID, quantity: 15 }],
     });
@@ -374,7 +376,7 @@ describe('R14, R24 — existencia del insumo en SU PROPIA unidad', () => {
     const recipes = montarRepositorio();
     const products = montarCatalogo({
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
-        { id: LINEA_VALIDA.productId, name: 'Sosa caustica', unitId: null, stockByUnit: [] },
+        { id: LINEA_VALIDA.productId, name: 'Sosa caustica', type: 'PRODUCT', unitId: null, stockByUnit: [] },
       ]),
     });
     const images = montarAlmacenamiento();
@@ -477,7 +479,7 @@ describe('R4 — guarda y relee cada porcentaje con el mismo valor enviado', () 
     const products = montarCatalogo({
       findRefs: vi.fn<ProductCatalog['findRefs']>(async () => [
         PRODUCTO_REF,
-        { id: '22222222-2222-4222-8222-222222222222', name: 'Sosa caustica', unitId: null, stockByUnit: [] },
+        { id: '22222222-2222-4222-8222-222222222222', name: 'Sosa caustica', type: 'PRODUCT', unitId: null, stockByUnit: [] },
       ]),
     });
     const images = montarAlmacenamiento();

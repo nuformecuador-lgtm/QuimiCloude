@@ -2,19 +2,22 @@
 
 import type { ProductStockByUnit } from './product-stock';
 import type { CostingBatch } from './costing-batch';
+import type { ProductType } from './product-type';
 
 /** Identificador de un producto visto DESDE FUERA de `inventario`. Es lo unico que otro
  *  modulo guarda de un producto (p. ej. `recipe_lines.product_id`). */
 export type ProductId = string;
 
 /** Lo que otro modulo puede saber de un producto sin tocar su tabla: identidad, nombre,
- *  unidad y existencia. Deliberadamente NO expone costo, compra minima ni presentacion: la
- *  presentacion se mudo al lote (`ProductBatch`) el 2026-09-09, y un contrato publico se
- *  amplia cuando alguien lo necesita, no antes.
+ *  tipo, unidad y existencia. Deliberadamente NO expone costo, compra minima ni
+ *  presentacion: la presentacion se mudo al lote (`ProductBatch`) el 2026-09-09, y un
+ *  contrato publico se amplia cuando alguien lo necesita, no antes. `type` entro porque
+ *  recetas valida el % por tipo (PRODUCT lo exige, MACHINE y PACKAGING admiten null).
  */
 export type ProductRef = {
   readonly id: ProductId;
   readonly name: string;
+  readonly type: ProductType;
   /** La unidad del producto; null mientras no tiene ningun lote. */
   readonly unitId: string | null;
   /** Suma de lotes por unidad; array vacio cuando el producto no tiene ninguno. */
