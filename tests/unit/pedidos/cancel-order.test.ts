@@ -17,9 +17,12 @@ import { createCancelOrder } from '@/lib/modules/pedidos/domain/cancel-order'
 import {
   NotCancellableError,
   OrderNotFoundError,
+  UnauthorizedError,
   ValidationError,
   type PedidosError,
 } from '@/lib/modules/pedidos/domain/errors'
+
+import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification'
@@ -56,16 +59,8 @@ function fila(status: OrderStatus, cancellationReason: string | null = null): Or
 }
 
 function dobles(opciones: { fila?: OrderRow | null; cancelacion?: 'ok' | 'not_found' } = {}) {
-  const findAliveById = vi.fn(async () => (opciones.fila === undefined ? null : opciones.fila))
-  // Los parametros van TIPADOS -y no `vi.fn(async () => ...)`- para poder afirmar sobre
-  // `mock.calls[0]`: sin ellos, TypeScript infiere una tupla vacia y `calls[0][1]` no existe.
-  const cancelAlive = vi.fn(
-    async (id: string, reason: string, actorId: string, when: Date) => {
-      // El doble no usa los argumentos; los DECLARA para que `mock.calls` tenga tipo.
-      void [id, reason, actorId, when]
-      return opciones.cancelacion ?? 'ok'
-    },
-  )
+  const filaVista = opciones.fila === undefined ? null : opciones.fila
+  const findAliveById = vi.fn(async () => filaVista)
 
   const explota = (nombre: string) =>
     vi.fn(() => {
@@ -73,17 +68,30 @@ function dobles(opciones: { fila?: OrderRow | null; cancelacion?: 'ok' | 'not_fo
     })
 
   const orders = {
-    create: explota('orders.create'),
     findAliveById,
     listAlive: explota('orders.listAlive'),
-    // R26: la edicion NO puede cancelar. Si `cancelOrder` llamara a `updateAlive`, habria dos
-    // caminos hacia `CANCELADO` y el motivo dejaria de estar garantizado en un solo sitio.
-    updateAlive: explota('orders.updateAlive'),
-    cancelAlive,
-    softDeleteAlive: explota('orders.softDeleteAlive'),
   } as unknown as OrderRepository
 
-  return { orders, now: () => AHORA, findAliveById, cancelAlive }
+  // `lockAliveById` bloquea la MISMA fila que `findAliveById` -en estos tests no hay carrera
+  // que las separe-. Los parametros van TIPADOS -y no `vi.fn(async () => ...)`- para poder
+  // afirmar sobre `mock.calls[0]`: sin ellos, TypeScript infiere una tupla vacia.
+  const lockAliveById = vi.fn(async () => (filaVista === null ? null : { ...filaVista, reservedAt: null }))
+  const cancelAlive = vi.fn(
+    async (id: string, reason: string, actorId: string | null, when: Date) => {
+      // El doble no usa los argumentos; los DECLARA para que `mock.calls` tenga tipo.
+      void [id, reason, actorId, when]
+      return opciones.cancelacion ?? 'ok'
+    },
+  )
+  const setReservedAt = vi.fn(async (id: string, reservedAt: Date | null) => { void [id, reservedAt] })
+  const releaseForOrder = vi.fn(async (input: { reason: 'release' | 'expire'; actorId: string | null }) => { void input })
+
+  const { unitOfWork } = fakeUnitOfWork({
+    orders: { lockAliveById, cancelAlive, setReservedAt },
+    reservations: { releaseForOrder },
+  })
+
+  return { orders, unitOfWork, now: () => AHORA, findAliveById, lockAliveById, cancelAlive, setReservedAt, releaseForOrder }
 }
 
 async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string> {
@@ -207,5 +215,60 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
     await createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN)
 
     expect(d.cancelAlive).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('QC-141 T9 — cancelar libera (R18, R41)', () => {
+  it('el orden real es lockAliveById -> cancelAlive -> releaseForOrder(release) -> setReservedAt(null)', async () => {
+    const d = dobles({ fila: fila('PENDIENTE') })
+    const orden: string[] = []
+    d.lockAliveById.mockImplementation(async () => {
+      orden.push('orders.lockAliveById')
+      return { ...fila('PENDIENTE'), reservedAt: null }
+    })
+    d.cancelAlive.mockImplementation(async () => {
+      orden.push('orders.cancelAlive')
+      return 'ok' as const
+    })
+    d.releaseForOrder.mockImplementation(async () => {
+      orden.push('reservations.releaseForOrder')
+    })
+    d.setReservedAt.mockImplementation(async () => {
+      orden.push('orders.setReservedAt')
+    })
+
+    await createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN)
+
+    expect(orden).toEqual([
+      'orders.lockAliveById',
+      'orders.cancelAlive',
+      'reservations.releaseForOrder',
+      'orders.setReservedAt',
+    ])
+    expect(d.releaseForOrder.mock.calls[0]?.[0]).toMatchObject({ reason: 'release', actorId: ADMIN.id })
+    expect(d.setReservedAt.mock.calls[0]?.[1]).toBeNull()
+  })
+
+  it('R41: el permiso se exige ANTES de abrir la unidad de trabajo', async () => {
+    const findAliveById = vi.fn(() => {
+      throw new Error('orders.findAliveById no deberia llamarse sin permiso')
+    })
+    const unitOfWork = {
+      run: vi.fn(() => {
+        throw new Error('unitOfWork.run no deberia llamarse sin permiso')
+      }),
+    }
+    const cancelOrder = createCancelOrder({
+      orders: { findAliveById, listAlive: vi.fn() } as unknown as OrderRepository,
+      unitOfWork: unitOfWork as unknown as ReturnType<typeof dobles>['unitOfWork'],
+      now: () => AHORA,
+    })
+    const SIN_PERMISO: Actor = { id: 'u-1', companyId: ADMIN.companyId, permissions: ['pedidos.consultar'] }
+
+    await expect(
+      cancelOrder(ORDER_ID, { reason: 'sin stock' }, SIN_PERMISO),
+    ).rejects.toBeInstanceOf(UnauthorizedError)
+    expect(findAliveById).not.toHaveBeenCalled()
+    expect(unitOfWork.run).not.toHaveBeenCalled()
   })
 })

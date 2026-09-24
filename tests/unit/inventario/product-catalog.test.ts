@@ -10,6 +10,8 @@
 // findProductRefs solo devuelve productos vivos'` -ese es el que muerde si alguien quita un
 // filtro; este archivo, con mocks, no podria detectarlo.
 
+import { Prisma } from '@prisma/client';
+
 import {
   findProductRefs,
   toProductRef,
@@ -30,13 +32,13 @@ describe('toProductRef', () => {
       id: 'p-1',
       name: 'Acido sulfurico',
       unitId: 'kg',
-      stockByUnit: [{ unitId: 'kg', quantity: 12 }],
+      stockByUnit: [{ unitId: 'kg', quantity: '12.0000' }],
     });
     expect(ref).toEqual({
       id: 'p-1',
       name: 'Acido sulfurico',
       unitId: 'kg',
-      stockByUnit: [{ unitId: 'kg', quantity: 12 }],
+      stockByUnit: [{ unitId: 'kg', quantity: '12.0000' }],
     });
   });
 
@@ -61,16 +63,16 @@ describe('R14 — findRefs lee la existencia y la unidad de las columnas del pro
   });
 
   it('con unidad guardada, unitId y stockByUnit traen esa unidad', async () => {
-    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: 12, unitId: 'kg' }]);
+    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: new Prisma.Decimal(12), unitId: 'kg' }]);
 
     const [ref] = await findProductRefs(['p-1'], 'empresa-1');
 
     expect(ref?.unitId).toEqual('kg');
-    expect(ref?.stockByUnit).toEqual([{ unitId: 'kg', quantity: 12 }]);
+    expect(ref?.stockByUnit).toEqual([{ unitId: 'kg', quantity: '12.0000' }]);
   });
 
   it('sin unidad guardada (sin lotes), unitId es null y stockByUnit es un array vacio', async () => {
-    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: 0, unitId: null }]);
+    findMany.mockResolvedValue([{ id: 'p-1', name: 'Acido sulfurico', stock: new Prisma.Decimal(0), unitId: null }]);
 
     const [ref] = await findProductRefs(['p-1'], 'empresa-1');
 
@@ -133,7 +135,7 @@ describe('QC-50 R22 — findRefs exige el ambito de empresa (la excepcion de R29
     // despues: devuelve tal cual lo que el `where` (ya acotado) dejo pasar. Si `findMany`
     // filtro por empresa, un producto ajeno simplemente no aparece en la fila -mismo camino que
     // un id que no existe, sin distincion posible para quien pregunta.
-    findMany.mockResolvedValue([{ id: 'p-propio', name: 'Acido sulfurico', stock: 0, unitId: null }]);
+    findMany.mockResolvedValue([{ id: 'p-propio', name: 'Acido sulfurico', stock: new Prisma.Decimal(0), unitId: null }]);
 
     const refs = await findProductRefs(['p-propio', 'p-de-otra-empresa'], 'empresa-1');
 

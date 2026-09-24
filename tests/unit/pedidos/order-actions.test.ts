@@ -35,6 +35,7 @@ import {
   createOrderAction,
   deleteOrderAction,
   getOrderAction,
+  listOrderCoverageAction,
   listOrdersAction,
   quoteOrderCostAction,
   updateOrderAction,
@@ -51,6 +52,7 @@ import { createQuoteOrderCost } from '@/lib/modules/pedidos/domain/quote-order-c
 import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
 
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
@@ -62,6 +64,7 @@ const {
   updateOrderMock,
   cancelOrderMock,
   deleteOrderMock,
+  findCoverageMock,
   quoteOrderCostMock,
   getSessionUserMock,
   getSessionContextMock,
@@ -72,6 +75,8 @@ const {
   updateOrderMock: vi.fn(),
   cancelOrderMock: vi.fn(),
   deleteOrderMock: vi.fn(),
+  // La cobertura de la pagina.
+  findCoverageMock: vi.fn(),
   quoteOrderCostMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   // QC-60 (R17): la action pide las DOS caras de la sesion. Sin contexto no hay actor.
@@ -96,6 +101,7 @@ vi.mock('@/lib/composition', () => ({
     updateOrder: updateOrderMock,
     cancelOrder: cancelOrderMock,
     deleteOrder: deleteOrderMock,
+    findCoverage: findCoverageMock,
     quoteOrderCost: quoteOrderCostMock,
   },
 }))
@@ -536,13 +542,17 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
       'deleteOrderAction',
     )
 
+    findCoverageMock.mockRejectedValueOnce(ajeno)
+    sinDetalle(await listOrderCoverageAction([ORDER_ID]), 'listOrderCoverageAction')
+
     quoteOrderCostMock.mockRejectedValueOnce(ajeno)
     sinDetalle(
       await quoteOrderCostAction({ recipeId: RECIPE_ID, quantity: '12.5000' }),
       'quoteOrderCostAction',
     )
 
-    // Y no hay ni un `catch` que se quede callado: los siete `catch` del archivo devuelven
+    // Y no hay ni un `catch` que se quede callado: los OCHO `catch` del archivo -uno por
+    // Server Action, incluidas `listOrderCoverageAction` y `quoteOrderCostAction`- devuelven
     // `toErrorState`, que o traduce el error de dominio o registra el ajeno y devuelve el
     // codigo generico. Ninguno se lo traga sin dejar rastro.
     const source = readActionsSource()
@@ -551,7 +561,7 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     expect(catches.length).toBeGreaterThan(0)
     // Uno por action, sin ninguno de mas y sin ninguno de menos.
     expect(traducciones.length).toBe(catches.length)
-    expect(catches.length).toBe(7)
+    expect(catches.length).toBe(8)
     expect(source, 'hay un catch vacio').not.toMatch(/catch\s*\([^)]*\)\s*\{\s*\}/)
   })
 })
@@ -696,13 +706,10 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
         throw new Error(`el puerto ${nombre} no debe llamarse sin contexto de sesion`)
       })
     const orders = {
-      create: explota('create'),
       findAliveById: explota('findAliveById'),
       listAlive: explota('listAlive'),
-      updateAlive: explota('updateAlive'),
-      cancelAlive: explota('cancelAlive'),
-      softDeleteAlive: explota('softDeleteAlive'),
     }
+    const unitOfWork = { run: explota('unitOfWork.run') }
     const recipes = {
       findRefsIncludingDeleted: explota('findRefsIncludingDeleted'),
       findExecutionContentById: explota('findExecutionContentById'),
@@ -719,6 +726,7 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
     const log = { ignoredFields: explota('ignoredFields') }
     const deps = {
       orders: orders as unknown as OrderRepository,
+      unitOfWork: unitOfWork as unknown as OrderUnitOfWork,
       recipes: recipes as unknown as RecipeCatalog,
       products: products as unknown as ProductCatalog,
       units: units as unknown as UnitCatalog,
@@ -745,7 +753,12 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
         message: errorMessage('unauthorized'),
       })
     }
-    for (const espia of [...Object.values(orders), ...Object.values(recipes), log.ignoredFields]) {
+    for (const espia of [
+      ...Object.values(orders),
+      unitOfWork.run,
+      ...Object.values(recipes),
+      log.ignoredFields,
+    ]) {
       expect(espia).not.toHaveBeenCalled()
     }
 
@@ -768,6 +781,7 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
       updateOrderMock,
       cancelOrderMock,
       deleteOrderMock,
+      findCoverageMock,
       quoteOrderCostMock,
     ]) {
       mock.mockReset()
@@ -775,8 +789,8 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
   })
 })
 
-describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian', () => {
-  it('el modulo exporta exactamente las siete actions, con su aridad de siempre', () => {
+describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, mas las de QC-141 T14 y QC-151 T7', () => {
+  it('el modulo exporta exactamente las ocho actions, con su aridad de siempre', () => {
     const exportadas = Object.entries(orderActions)
       .filter(([, valor]) => typeof valor === 'function')
       .map(([nombre, valor]) => [nombre, (valor as (...args: never[]) => unknown).length] as const)
@@ -787,6 +801,8 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian', (
       ['createOrderAction', 2],
       ['deleteOrderAction', 2],
       ['getOrderAction', 1],
+      // La cobertura de la pagina, argumento ya tipado, ningun `FormData`.
+      ['listOrderCoverageAction', 1],
       ['listOrdersAction', 1],
       ['quoteOrderCostAction', 1],
       ['updateOrderAction', 3],
@@ -802,6 +818,7 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian', (
       deleteOrderAction: 'prevState: OrderMutationFormState, formData: FormData',
       getOrderAction: 'id: string',
       listOrdersAction: 'query: unknown',
+      listOrderCoverageAction: 'orderIds: readonly string[]',
       quoteOrderCostAction: 'input: unknown',
     }
     for (const [nombre, parametros] of Object.entries(FIRMAS)) {

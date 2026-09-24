@@ -84,6 +84,10 @@ export interface OrderCatalog {
    * baja o es de otra empresa-; `'stale'` es un caso nuevo: el pedido sigue vivo y es de esa
    * empresa, pero su estado ya no es `from` porque alguien lo movio entre la lectura y esta
    * llamada.
+   *
+   * Si `to` es `'ENTREGADO'`, la misma llamada consume el material apartado:
+   * `'insufficient_material'` si no alcanza y `'recipe_without_lines'` si la receta no
+   * tiene lineas y el pedido no tiene nada apartado. Los dos deshacen la operacion entera.
    */
   transitionAliveById(
     id: string,
@@ -92,7 +96,7 @@ export interface OrderCatalog {
     to: OrderStatus,
     actorId: string,
     now: Date,
-  ): Promise<'ok' | 'not_found' | 'stale'>;
+  ): Promise<'ok' | 'not_found' | 'stale' | 'insufficient_material' | 'recipe_without_lines'>;
 }
 
 /**

@@ -164,6 +164,8 @@ export const E2E_ESPERADOS = [
   // ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
   'recetas-porcentaje.spec.ts',
   'recetas.spec.ts',
+  // Alta con el mismo patron que las demas: no toca el identificador de peticion.
+  'reserva-de-material.spec.ts',
   'session.spec.ts',
   'theme.spec.ts',
   'unidades.spec.ts',
@@ -294,6 +296,13 @@ export const MIGRACIONES_ESPERADAS = [
   // Igual patron: anula `product_batches.presentation_id` y `unit_cost` (solo MACHINE los
   // omite en el borde); no toca el identificador de peticion.
   '20260923140000_product_batch_nullable_machine',
+  // Ninguna de las dos toca el identificador de peticion: una anade un valor a un enum, la otra
+  // cambia el tipo de columnas de existencia y crea el libro de reservas.
+  '20260923150000_inventory_movement_kind_consumption',
+  '20260923150100_reservations_and_decimal_stock',
+  // Aparta los pedidos vivos existentes con un bloque PL/pgSQL: no toca el identificador de
+  // peticion.
+  '20260923150200_reserve_existing_orders',
   // Con el mismo patron que las anteriores: la migracion que crea la tabla `customers` y los
   // permisos de `clientes` no persiste el identificador de peticion ni lo menciona; se nombra
   // aqui a mano y la lista sigue CERRADA para la siguiente.

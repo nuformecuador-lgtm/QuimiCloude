@@ -3,9 +3,10 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/shared/db/prisma';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
+import { compareQuantities } from '../../../domain/decimal-quantity';
 import { BatchDuplicateLotError, BatchStockNegativeError, ValidationError } from '../../../domain/errors';
 import { normalizeProductName } from '../../../domain/product-name';
-import { singleUnitStock } from '../../../domain/product-stock';
+import { netReservedQuantity } from '../../../domain/reservation-ledger';
 
 import { writeMovement } from './batch-movement-prisma';
 import {
@@ -14,12 +15,14 @@ import {
   presentationCompanyScope,
   productCompanyScope,
 } from './company-scope';
+import { findReservedAndAvailableByBatch, findReservedAndAvailableByProduct } from './reservation-prisma';
 import {
   dateRangeCondition,
   normalizedSearchCondition,
   numberRangeCondition,
   selectCondition,
   textCondition,
+  type NumberRangeCondition,
 } from './list-query-sql';
 
 import type { InventoryScope } from '../../../domain/inventory-scope';
@@ -50,14 +53,16 @@ export const PRODUCT_SELECT = {
 
 type ProductRow = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>;
 
+const ZERO_QUANTITY = '0.0000';
+
 export function toProductView(row: ProductRow): ProductView {
   return {
     id: row.id,
     name: row.name,
     imagePath: row.imagePath,
-    stock: row.stock,
+    stock: row.stock.toFixed(4),
     unitId: row.unitId,
-    qtyAlert: row.qtyAlert,
+    qtyAlert: row.qtyAlert === null ? null : row.qtyAlert.toFixed(4),
     type: row.type as ProductType,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -166,6 +171,16 @@ export function productOrderBy(
   }
 }
 
+/** Del rango generico del contrato al rango en `Prisma.Decimal`: `stock` y `qtyAlert` son
+ *  columnas `Decimal(14,4)`, y compararlas contra un `number` de JavaScript perderia precision
+ *  a partir de 2^53. Mismo patron que `toDecimalRange` de `pedidos/order-prisma.ts`. */
+function toDecimalRange(condition: NumberRangeCondition): { gte?: Prisma.Decimal; lte?: Prisma.Decimal } {
+  return {
+    ...(condition.gte === undefined ? {} : { gte: new Prisma.Decimal(condition.gte) }),
+    ...(condition.lte === undefined ? {} : { lte: new Prisma.Decimal(condition.lte) }),
+  };
+}
+
 function productFilterWhere(
   field: string,
   value: ListFilterValue,
@@ -184,8 +199,8 @@ function productFilterWhere(
     case 'numberRange': {
       const condition = numberRangeCondition(value.min, value.max);
       if (condition === null) return null;
-      if (field === 'stock') return { stock: condition };
-      if (field === 'qtyAlert') return { qtyAlert: condition };
+      if (field === 'stock') return { stock: toDecimalRange(condition) };
+      if (field === 'qtyAlert') return { qtyAlert: toDecimalRange(condition) };
       return null;
     }
     case 'dateRange': {
@@ -250,7 +265,19 @@ export async function listAliveProducts(
     prisma.product.count({ where }),
   ]);
 
-  return buildPage(rows.map(toProductView), total, query.page, limit);
+  // UNA consulta agregada mas para la pagina entera, nunca una por fila: `reserved`/`available`
+  // salen del libro de reservas, sumados por producto.
+  const reservedByProduct = await findReservedAndAvailableByProduct(
+    prisma,
+    scope.companyId,
+    rows.map((row) => row.id),
+  );
+  const items = rows.map((row) => {
+    const aggregate = reservedByProduct.get(row.id);
+    return { ...toProductView(row), reserved: aggregate?.reserved ?? ZERO_QUANTITY, available: aggregate?.available ?? ZERO_QUANTITY };
+  });
+
+  return buildPage(items, total, query.page, limit);
 }
 
 /**
@@ -299,32 +326,33 @@ export async function findAliveIdByNameInPresentationUnit(
 }
 
 /**
- * Suma los lotes vivos-de-empresa del producto y escribe `products.stock`. No exportada y sin
- * tocar `product_batches`: quien la llama ya escribio el lote (o el ajuste) y su asiento antes
- * de invocarla, en la MISMA transaccion.
+ * Suma los lotes vivos-de-empresa del producto y escribe `products.stock`. No toca
+ * `product_batches`: quien la llama ya escribio el lote (o el ajuste) y su asiento antes de
+ * invocarla, en la MISMA transaccion. Exportada para el consumo del pedido.
+ *
+ * La suma la hace Postgres en `numeric`, sobre las filas de la MISMA empresa: pasar por
+ * JavaScript convertiria cada `Decimal` a un tipo intermedio antes de sumar y perderia
+ * precision. Que los lotes sumados compartan unidad ya lo garantiza el disparador
+ * `product_batches_check_unit`, asi que este `UPDATE` no necesita comprobarlo.
  *
  * El `UPDATE` es SQL crudo -y no `updateMany`- para no disparar el `@updatedAt` de Prisma: el
  * recalculo no debe mover `products.updated_at`.
  */
-async function recalculateProductStock(
+export async function recalculateProductStock(
   tx: Prisma.TransactionClient,
   productId: string,
   scope: InventoryScope,
 ): Promise<void> {
   const { companyId } = companyScopeColumns(scope);
 
-  const rows = await tx.productBatch.findMany({
-    where: { AND: [batchCompanyScope(scope), { productId }] },
-    select: { stock: true, presentation: { select: { unitId: true } } },
-  });
-
-  const stock = singleUnitStock(
-    rows.map((row) => ({ stock: row.stock, unitId: row.presentation?.unitId ?? null })),
-  );
-
   await tx.$executeRaw(Prisma.sql`
     UPDATE "products"
-       SET "stock" = ${stock}
+       SET "stock" = COALESCE((
+             SELECT sum("stock")
+               FROM "product_batches"
+              WHERE "product_id" = ${productId}::uuid
+                AND "company_id" = ${companyId}::uuid
+           ), 0)
      WHERE "id" = ${productId}::uuid
        AND "company_id" = ${companyId}::uuid
   `);
@@ -334,6 +362,13 @@ async function recalculateProductStock(
  *  coma flotante antes de una columna `DECIMAL(14,4)`. `null` solo llega de MACHINE sin costo. */
 function toBatchUnitCost(unitCost: string | null): Prisma.Decimal | null {
   return unitCost === null ? null : new Prisma.Decimal(unitCost);
+}
+
+/** `'5.0000'` -> `'-5.0000'`: la salida del consumo se guarda en negativo, como la resta de un
+ *  ajuste. `quantity` llega siempre positiva -es lo que se decremento-, asi que basta anteponer
+ *  el signo. */
+function negateQuantity(quantity: string): string {
+  return quantity.startsWith('-') ? quantity.slice(1) : `-${quantity}`;
 }
 
 /** Con `Z`: sin zona, la cadena se leeria en la hora local del servidor y la fecha podria correrse un
@@ -615,7 +650,14 @@ export async function createWithFirstBatch(
 
     await writeMovement(
       tx,
-      { batchId: createdBatch.id, kind: 'opening', quantity: batch.stock, reason: null, createdBy: batch.createdBy },
+      {
+        batchId: createdBatch.id,
+        kind: 'opening',
+        quantity: batch.stock,
+        reason: null,
+        orderId: null,
+        createdBy: batch.createdBy,
+      },
       now,
       scope,
     );
@@ -663,7 +705,14 @@ export async function addBatchToAlive(
 
     await writeMovement(
       tx,
-      { batchId: createdBatch.id, kind: 'opening', quantity: batch.stock, reason: null, createdBy: batch.createdBy },
+      {
+        batchId: createdBatch.id,
+        kind: 'opening',
+        quantity: batch.stock,
+        reason: null,
+        orderId: null,
+        createdBy: batch.createdBy,
+      },
       now,
       scope,
     );
@@ -694,7 +743,7 @@ function toBatchView(row: BatchViewRow): ProductBatchView {
   return {
     id: row.id,
     lot: row.lot,
-    stock: row.stock,
+    stock: row.stock.toFixed(4),
     unitId: row.presentation?.unitId ?? null,
     purchaseDate: toCivilDate(row.purchaseDate),
     expiryDate: row.expiryDate === null ? null : toCivilDate(row.expiryDate),
@@ -715,7 +764,21 @@ export async function findBatchesOfAliveProduct(
     select: BATCH_VIEW_SELECT,
   });
 
-  return rows.map(toBatchView);
+  // UNA consulta agregada para todos los lotes del producto, no una por lote.
+  const reservedByBatch = await findReservedAndAvailableByBatch(
+    prisma,
+    scope.companyId,
+    rows.map((row) => row.id),
+  );
+  return rows.map((row) => {
+    const aggregate = reservedByBatch.get(row.id);
+    return {
+      ...toBatchView(row),
+      reserved: aggregate?.reserved ?? ZERO_QUANTITY,
+      available: aggregate?.available ?? row.stock.toFixed(4),
+      overReserved: aggregate?.overReserved ?? false,
+    };
+  });
 }
 
 /** `P2025`: el `where` unico mas el filtro de empresa no encontraron fila que actualizar. */
@@ -740,12 +803,12 @@ type AdjustProductRow = { readonly id: string };
  */
 export async function adjustBatchStock(
   batchId: string,
-  delta: number,
+  delta: string,
   reason: MovementReason,
   actorId: string,
   now: Date,
   scope: InventoryScope,
-): Promise<{ stock: number } | null> {
+): Promise<{ stock: string; reserved: string; overReserved: boolean } | null> {
   const { companyId } = companyScopeColumns(scope);
 
   try {
@@ -763,19 +826,91 @@ export async function adjustBatchStock(
 
       const updated = await tx.productBatch.update({
         where: { id: batchId, companyId },
-        data: { stock: { increment: delta }, updatedBy: actorId, updatedAt: now },
+        data: { stock: { increment: new Prisma.Decimal(delta) }, updatedBy: actorId, updatedAt: now },
         select: { stock: true },
       });
 
-      await writeMovement(tx, { batchId, kind: 'adjustment', quantity: delta, reason, createdBy: actorId }, now, scope);
+      await writeMovement(
+        tx,
+        { batchId, kind: 'adjustment', quantity: delta, reason, orderId: null, createdBy: actorId },
+        now,
+        scope,
+      );
 
       await recalculateProductStock(tx, product.id, scope);
 
-      return { stock: updated.stock };
+      // El apartado no lo escribe este archivo -es un libro aparte, `reservation_movements`,
+      // dueno de `reservation-prisma.ts`-, pero un ajuste tiene que poder decir si deja el lote
+      // sobre-reservado, y las dos tablas estan en la misma transaccion.
+      const reservationRows = await tx.reservationMovement.findMany({
+        where: { companyId, batchId },
+        select: { kind: true, quantity: true },
+      });
+      const reserved = netReservedQuantity(
+        reservationRows.map((row) => ({ kind: row.kind, quantity: row.quantity.toFixed(4) })),
+      );
+      const stock = updated.stock.toFixed(4);
+
+      return { stock, reserved, overReserved: compareQuantities(reserved, stock) > 0 };
     });
   } catch (error) {
     if (isBatchNotFound(error)) return null;
     if (isBatchStockNegativeViolation(error)) throw new BatchStockNegativeError();
     throw error;
   }
+}
+
+/**
+ * El decremento CONDICIONAL del consumo al entregar: `stock >= quantity` va
+ * en el `WHERE`, asi que dos escrituras concurrentes nunca dejan el lote negativo aunque las dos
+ * pasen el mismo bloqueo de producto. `count === 0` no dice POR QUE fallo -lote de otra empresa,
+ * inexistente o con menos de lo pedido-, y con el producto ya bloqueado por quien llama la unica
+ * causa posible es la merma: por eso se resuelve leyendo el `stock` actual, sin lanzar.
+ *
+ * Como `adjustBatchStock`, asienta en la MISMA transaccion con `kind: 'consumption'`, cantidad EN
+ * NEGATIVO -es una salida- y el pedido que la causa. No recalcula `products.stock`: con varios
+ * lotes de un mismo producto consumidos en la misma entrega, recalcular una vez por producto (en
+ * `consumeForOrder`) evita sumar la misma tabla varias veces por nada.
+ */
+export async function consumeBatchStock(
+  tx: Prisma.TransactionClient,
+  input: { readonly batchId: string; readonly quantity: string; readonly orderId: string; readonly actorId: string },
+  now: Date,
+  scope: InventoryScope,
+): Promise<{ kind: 'consumed'; stock: string } | { kind: 'insufficient'; available: string }> {
+  const { companyId } = companyScopeColumns(scope);
+  const decimalQuantity = new Prisma.Decimal(input.quantity);
+
+  const { count } = await tx.productBatch.updateMany({
+    where: { id: input.batchId, companyId, stock: { gte: decimalQuantity } },
+    data: { stock: { decrement: decimalQuantity }, updatedBy: input.actorId, updatedAt: now },
+  });
+
+  if (count === 0) {
+    const current = await tx.productBatch.findFirst({
+      where: { id: input.batchId, companyId },
+      select: { stock: true },
+    });
+    return { kind: 'insufficient', available: current === null ? '0.0000' : current.stock.toFixed(4) };
+  }
+
+  await writeMovement(
+    tx,
+    {
+      batchId: input.batchId,
+      kind: 'consumption',
+      quantity: negateQuantity(input.quantity),
+      reason: null,
+      orderId: input.orderId,
+      createdBy: input.actorId,
+    },
+    now,
+    scope,
+  );
+
+  const updated = await tx.productBatch.findFirst({
+    where: { id: input.batchId, companyId },
+    select: { stock: true },
+  });
+  return { kind: 'consumed', stock: (updated?.stock ?? new Prisma.Decimal(0)).toFixed(4) };
 }

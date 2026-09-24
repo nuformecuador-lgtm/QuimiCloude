@@ -2,7 +2,7 @@
 import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
-import { OrderNotFoundError, ValidationError } from './errors';
+import { MaterialShortageError, OrderNotFoundError, RecipeWithoutLinesError, ValidationError } from './errors';
 import { assertOrderAcceptsWrites } from './order-state';
 
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
@@ -28,6 +28,11 @@ export type FinishAssignedOrderResult = { readonly numberText: string };
  * Devuelve el numero visible del pedido para que la lista, al volver, pueda confirmar la
  * entrega. Se lee ANTES de transicionar: una vez `ENTREGADO`, el pedido ya no aparece entre
  * los estados de trabajo que consulta `listAliveSummariesByIds`.
+ *
+ * `transitionAliveById` consume el material por dentro: `'insufficient_material'` se traduce a
+ * `MaterialShortageError` y `'recipe_without_lines'` a `RecipeWithoutLinesError`, las dos
+ * propias de este modulo para que el adaptador driving las traduzca con su propio
+ * `instanceof`.
  */
 export function createFinishAssignedOrder(
   deps: FinishAssignedOrderDeps,
@@ -77,6 +82,8 @@ export function createFinishAssignedOrder(
       );
       if (result === 'ok') return { numberText };
       if (result === 'not_found') throw new OrderNotFoundError();
+      if (result === 'insufficient_material') throw new MaterialShortageError();
+      if (result === 'recipe_without_lines') throw new RecipeWithoutLinesError();
       // 'stale': alguien lo movio entre la lectura y esta llamada. Se relee y se reintenta
       // contra el estado real.
       order = await deps.orders.findAliveById(orderId, actor.companyId);

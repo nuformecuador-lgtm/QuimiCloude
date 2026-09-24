@@ -213,7 +213,7 @@ function newProduct(overrides: Partial<NewProduct> = {}): NewProduct {
 function newBatch(fixture: Fixture, overrides: Partial<NewProductBatch> = {}): NewProductBatch {
   return {
     presentationId: fixture.presentationId,
-    stock: 3,
+    stock: '3',
     unitCost: '2.5000',
     lot: null,
     purchaseDate: '2026-09-01',
@@ -261,13 +261,13 @@ describe('R7 (lado base): el costo unitario derivado se guarda con sus 4 decimal
 
     try {
       // `'10' / 3` llena los cuatro decimales con un valor no representable en binario.
-      const derivado = deriveUnitCost('10', 3);
+      const derivado = deriveUnitCost('10', '3');
       expect(derivado).toBe('3.3333');
       if (derivado === null) throw new Error('la derivacion no puede ser nula en este caso');
 
       const creado = await createWithFirstBatch(
         newProduct(),
-        newBatch(fixture, { stock: 3, unitCost: derivado }),
+        newBatch(fixture, { stock: '3', unitCost: derivado }),
         new Date(),
         ambito(fixture),
       );
@@ -443,8 +443,8 @@ describe('R18: agregar un lote no toca el producto (QC-121, R2, R9, R11)', () =>
 
     try {
       const primero = await createWithFirstBatch(
-        newProduct({ qtyAlert: 2 }),
-        newBatch(fixture, { stock: 7 }),
+        newProduct({ qtyAlert: '2' }),
+        newBatch(fixture, { stock: '7' }),
         new Date(),
           ambito(fixture),
       );
@@ -454,7 +454,7 @@ describe('R18: agregar un lote no toca el producto (QC-121, R2, R9, R11)', () =>
 
       const agregado = await addBatchToAlive(
         primero.id,
-        newBatch(fixture, { stock: 99, unitCost: '1.0000' }),
+        newBatch(fixture, { stock: '99', unitCost: '1.0000' }),
         new Date(Date.now() + 60_000),
         ambito(fixture),
       );
@@ -462,12 +462,12 @@ describe('R18: agregar un lote no toca el producto (QC-121, R2, R9, R11)', () =>
 
       const despues = await prisma.product.findUniqueOrThrow({ where: { id: primero.id } });
       expect(despues.name).toBe(antes.name);
-      expect(despues.qtyAlert).toBe(antes.qtyAlert);
+      expect(despues.qtyAlert?.toFixed(4)).toBe(antes.qtyAlert?.toFixed(4));
       expect(despues.unitId).toBe(antes.unitId);
       // Agregar un lote no es editar el producto: `updated_at` tampoco se mueve.
       expect(despues.updatedAt.toISOString()).toBe(antes.updatedAt.toISOString());
       // La unica columna que SI cambia: la suma de los dos lotes (R8, R9).
-      expect(despues.stock).toBe(7 + 99);
+      expect(despues.stock.toFixed(4)).toBe((7 + 99).toFixed(4));
 
       const lotes = await prisma.productBatch.count({ where: { productId: primero.id } });
       expect(lotes).toBe(2);

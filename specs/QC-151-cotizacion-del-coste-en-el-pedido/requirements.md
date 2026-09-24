@@ -1,5 +1,7 @@
 # QC-151 — cotizacion-del-coste-en-el-pedido · requirements.md
 
+> **Derogado en parte el 2026-09-23 por QC-141 (decisión D22 del humano).** El coste de ingredientes de un pedido pasa a ser, por ingrediente, **cantidad necesaria × promedio simple del coste unitario de TODOS los lotes del producto con disponible > 0** (disponible = total − reservado; al editar cuenta lo que el propio pedido tiene apartado; los lotes sin coste o sin presentación quedan fuera). La cotización en vivo sale de ese mismo cálculo, así que su número cambia con esa regla; el resto de QC-151 sigue en pie. Si el disponible no cubre la necesidad, el pedido sigue **sin importe**. Detalle: `specs/QC-141-reserva-de-material-del-pedido/requirements.md`, R59–R66.
+
 > **Zona** fullstack · **Complejidad** medium · **depends_on** — · **Rama** feature/QC-151-cotizacion-del-coste-en-el-pedido
 >
 > **Alcance.** El formulario de pedido (alta y edición) muestra una **cotización del coste de producción**:

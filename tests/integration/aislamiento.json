@@ -30,6 +30,8 @@
     "inventario/presentation-uniqueness.int.test.ts",
     "inventario/product-batch-write.int.test.ts",
     "inventario/product-unit.int.test.ts",
+    "inventario/reservations-and-decimal-stock-migration.int.test.ts",
+    "inventario/reserve-existing-orders-migration.int.test.ts",
     "pedidos/company-scope.int.test.ts",
     "pedidos/order-crud.int.test.ts",
     "pedidos/pedidos-constraints.int.test.ts",
@@ -161,6 +163,11 @@
       "desde": "2026-09-12"
     },
     {
+      "archivo": "inventario/reservation.int.test.ts",
+      "motivo": "QC-141 T7: llama a 'createMaterialReservations' (reservation-prisma.ts) y a 'createWithFirstBatch'/'addBatchToAlive'/'adjustBatchStock'/'consumeBatchStock' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL -las tres primeras abren cada una SU PROPIA 'prisma.$transaction'-, igual que 'product-stock.int.test.ts' y 'ledger-cuadre.int.test.ts': envolver la corrida en una transaccion del test seria aislamiento de mentira. Cada caso fabrica su propia empresa efimera con randomUUID (receta, presentacion, producto, lotes y pedidos), escribe solo en ella y la limpia en un 'finally' en orden de FK (los dos libros -> pedidos -> lotes -> productos -> receta -> presentacion -> usuario). El caso de R30/R15 que comprueba 'sin cambiar nada' ante 'insufficient' SI abre su propia 'prisma.$transaction' con una senal de rollback, sobre el mismo fixture ya committeado, para simular el contorno que abrira 'pedidos' (T10) y demostrar que no queda nada escrito. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-23"
+    },
+    {
       "archivo": "inventario/product-stock.int.test.ts",
       "motivo": "QC-121 T4/T14: llama a 'createWithFirstBatch', 'addBatchToAlive' y 'adjustBatchStock' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL y abren cada uno SU PROPIA 'prisma.$transaction', igual que 'ledger-cuadre.int.test.ts' -envolverlos en una transaccion del test seria aislamiento de mentira, y ademas dos altas o dos ajustes concurrentes (R10, R31) necesitan que cada uno CONFIRME para que el otro vea su cambio-. Cada caso fabrica su empresa efimera con randomUUID, escribe solo en ella y la limpia en un 'finally' en orden de FK (asientos -> lotes -> productos -> presentacion -> usuario). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-18"
@@ -181,6 +188,11 @@
       "desde": "2026-09-16"
     },
     {
+      "archivo": "pedidos/order-expiry.int.test.ts",
+      "motivo": "QC-141 T12: el proceso diario cableado a mano con 'createExpireStaleOrders', el 'listActiveCompanyIds' REAL de 'identity' y el 'findExpirableOrders' REAL de 'pedidos', igual que 'order-reservation.int.test.ts': 'withOrderTransaction' abre su PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test no la envolveria; el caso de las dos ejecuciones SOLAPADAS ademas necesita que cada rama confirme para que la otra la vea bajo el candado de la fila. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, presentacion, unidad, receta, producto y lote) y la limpia en un 'finally'. 'listActiveCompanyIds' lee TODAS las empresas de la base de la corrida, tambien las de otros archivos, pero ninguna aporta un candidato cuyo 'reserved_at' caiga antes del umbral de estos casos.",
+      "desde": "2026-09-23"
+    },
+    {
       "archivo": "pedidos/order-cost-quote.int.test.ts",
       "motivo": "QC-151 T7: ejercita 'pedidos.quoteOrderCost' junto con 'createCreateOrder', los dos cableados a mano con los adaptadores driven REALES de 'pedidos', 'recetas', 'inventario' y 'unidades', que hablan con el cliente Prisma GLOBAL, asi que una transaccion del test no los envolveria. Dos empresas efimeras (randomUUID) nacen en 'beforeAll' y mueren en 'afterAll'; cada caso siembra su propio producto/lote/receta y los borra en un 'finally' por su id exacto. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-23"
@@ -199,6 +211,21 @@
       "archivo": "pedidos/order-ingredients-cost.int.test.ts",
       "motivo": "QC-123 T10: ejercita el flujo REAL de alta y edicion ('createCreateOrder'/'createUpdateOrder') cableado a mano con los adaptadores driven REALES de 'pedidos', 'recetas', 'inventario' y 'unidades' -el mismo conjunto que 'lib/composition' ata-, y esos adaptadores hablan con el cliente Prisma GLOBAL, asi que una transaccion del test no los envolveria. Dos empresas efimeras (randomUUID) nacen en 'beforeAll' y mueren en 'afterAll'; cada caso siembra su propio producto/lote/receta/pedido y los borra en un 'finally' por su id exacto, en el orden que exigen las FK. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-18"
+    },
+    {
+      "archivo": "pedidos/order-unit-of-work.int.test.ts",
+      "motivo": "QC-141 T8: 'withOrderTransaction' (order-unit-of-work-prisma.ts) abre su PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que envolver la corrida en una transaccion del test seria aislamiento de mentira -correria en otra conexion del pool-. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, presentacion, unidad, receta y, cuando hace falta, producto y lote) y la limpia en un 'finally'. El caso de R15 fuerza el fallo DENTRO de 'run', despues de 'create' y de 'syncForOrder', y comprueba con el cliente global que no quedo ni el pedido ni el asiento de reserva. El caso del reintento reutiliza el trigger determinista de 'order-duplicate-number.int.test.ts' -sin el no hay forma de provocar el choque del correlativo sin una carrera de verdad- para demostrar que la unidad ENTERA se reintenta, no solo el INSERT.",
+      "desde": "2026-09-23"
+    },
+    {
+      "archivo": "pedidos/order-reservation-concurrency.int.test.ts",
+      "motivo": "QC-141 T15: la carrera del apartado (R16), la merma simultanea a un apartado, y cien vueltas de combinaciones de crear/editar/cancelar/borrar/Finalizar, todas cableadas igual que 'order-reservation.int.test.ts' -'withOrderTransaction' y 'adjustBatchStock' abren cada uno SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL-, asi que una transaccion del test no las envolveria y ademas necesitan que cada rama CONFIRME para que la otra la vea. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, presentacion, unidad, receta, producto y lote) y la limpia en un 'finally'. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-09-23"
+    },
+    {
+      "archivo": "pedidos/order-reservation.int.test.ts",
+      "motivo": "QC-141 T9: crear/editar/cancelar/borrar ('createCreateOrder'/'createUpdateOrder'/'createCancelOrder'/'createDeleteOrder') cableados a mano con los adaptadores driven REALES de 'pedidos', 'recetas', 'inventario' y 'unidades', igual que 'order-ingredients-cost.int.test.ts' y 'order-unit-of-work.int.test.ts': 'withOrderTransaction' abre su PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test no la envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, presentacion, unidad, receta y, cuando hace falta, producto y lote) y la limpia en un 'finally'. Los casos de R30/R15 y R50 comprueban con el cliente global que un rechazo -'insufficient_material', 'recipe_without_lines'- no dejo escrito ni el pedido ni la reserva.",
+      "desde": "2026-09-23"
     },
     {
       "archivo": "pedidos/order-repository.int.test.ts",

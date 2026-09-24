@@ -1,5 +1,7 @@
 # QC-123 — el-total-del-pedido-decidir-donde-vive-el-precio · requirements.md
 
+> **Derogado en parte el 2026-09-23 por QC-141 (decisión D22 del humano).** El coste de ingredientes de un pedido pasa a ser, por ingrediente, **cantidad necesaria × promedio simple del coste unitario de TODOS los lotes del producto con disponible > 0** (disponible = total − reservado; al editar cuenta lo que el propio pedido tiene apartado; los lotes sin coste o sin presentación quedan fuera). **Sustituye D3** («lotes con existencia, más antiguo primero, acumulando hasta cubrir») y **D4** («promedio de los lotes usados»); el resto de las decisiones sigue en pie. Si el disponible no cubre la necesidad, el pedido sigue **sin importe**. Detalle: `specs/QC-141-reserva-de-material-del-pedido/requirements.md`, R59–R66.
+
 > **Zona** `backend` · **Complejidad** `high` *(sube desde `medium` al acotar)* · **depends_on** —
 > · **Rama** `feature/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio`
 >

@@ -6,7 +6,7 @@ export type NewProductBatch = {
    */
   readonly presentationId: string | null;
 
-  readonly stock: number;
+  readonly stock: string;
 
   /** `null` solo para MACHINE sin costo en el borde; PRODUCT y PACKAGING la exigen. */
   readonly unitCost: string | null;

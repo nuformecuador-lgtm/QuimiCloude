@@ -13,6 +13,8 @@
 // La unidad tambien es columna propia del producto (`products.unit_id`): el mapeo la lee
 // tal cual, sin recorrer ningun lote.
 
+import { Prisma } from '@prisma/client';
+
 import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import {
   PRODUCT_SELECT,
@@ -26,9 +28,9 @@ describe('toProductView', () => {
     // `null` en el fixture base porque hoy nadie llena esa columna; el caso de abajo comprueba
     // que la ruta se copia tal cual.
     imagePath: null,
-    stock: 15,
+    stock: new Prisma.Decimal(15),
     unitId: 'u-9',
-    qtyAlert: 5,
+    qtyAlert: new Prisma.Decimal(5),
     type: PRODUCT_TYPES.PRODUCT,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-02T00:00:00Z'),
@@ -45,7 +47,7 @@ describe('toProductView', () => {
 
   it('mapea la alerta de cantidad sin reinterpretarla', () => {
     const vista = toProductView(filaBase);
-    expect(vista.qtyAlert).toBe(5);
+    expect(vista.qtyAlert).toBe('5.0000');
     expect(toProductView({ ...filaBase, qtyAlert: null }).qtyAlert).toBeNull();
   });
 
@@ -65,7 +67,7 @@ describe('toProductView', () => {
 
   it('mapea `stock` y `unitId` tal cual, directamente desde la columna de la fila', () => {
     const vista = toProductView(filaBase);
-    expect(vista.stock).toBe(15);
+    expect(vista.stock).toBe('15.0000');
     expect(vista.unitId).toBe('u-9');
     expect(Object.keys(PRODUCT_SELECT)).toContain('stock');
     expect(Object.keys(PRODUCT_SELECT)).toContain('unitId');

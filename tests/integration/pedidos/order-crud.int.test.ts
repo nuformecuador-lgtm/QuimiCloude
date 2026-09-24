@@ -923,7 +923,7 @@ describe('QC-146 — la presentacion del pedido, contra la base', () => {
         where: { id: batch.id },
         select: { stock: true },
       })
-      expect(stockDespues.stock).toBe(batch.stock)
+      expect(stockDespues.stock.toFixed(4)).toBe(batch.stock.toFixed(4))
       const movimientos = await tx.inventoryMovement.count({ where: { batchId: batch.id } })
       expect(movimientos).toBe(0)
     })
