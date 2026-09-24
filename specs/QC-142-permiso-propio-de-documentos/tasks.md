@@ -23,7 +23,7 @@
 
 ### T1 — Catálogo y seed
 
-- [ ] Añadir `documentos.consultar` y `documentos.modificar` al final de `PERMISSIONS`, con las
+- [x] Añadir `documentos.consultar` y `documentos.modificar` al final de `PERMISSIONS`, con las
   descripciones de `design.md > 2.1`; añadirlos al final del conjunto del Administrador en
   `SEED_ROLE_PERMISSIONS`. Reescribir la línea que afirma «dieciocho permisos» y añadir el párrafo
   de enmienda (≤ 5 líneas, sin citas).
@@ -34,7 +34,7 @@
 
 ### T2 — La constante del módulo documentos
 
-- [ ] `DOCUMENT_UPLOAD_PERMISSION` pasa a `'documentos.modificar'`; JSDoc de la constante reescrito
+- [x] `DOCUMENT_UPLOAD_PERMISSION` pasa a `'documentos.modificar'`; JSDoc de la constante reescrito
   corto (permiso de escritura propio del módulo), sin la frase «el catálogo es cerrado y no se
   amplía» ni la justificación por proveedores.
 - **Archivos:** `lib/modules/documentos/domain/actor.ts`.
@@ -43,9 +43,9 @@
 
 ### T3 [P] — Migración de datos con su `down`
 
-- [ ] Crear `migration.sql` y `down.sql` según `design.md > 3.1` y `> 3.2`, escritos a mano, con
+- [x] Crear `migration.sql` y `down.sql` según `design.md > 3.1` y `> 3.2`, escritos a mano, con
   cabecera corta sin citas.
-- [ ] Añadir `'20260924130000_documents_permissions'` al final de `MIGRACIONES_ESPERADAS`.
+- [x] Añadir `'20260924130000_documents_permissions'` al final de `MIGRACIONES_ESPERADAS`.
 - **Archivos:** `db/migrations/20260924130000_documents_permissions/migration.sql`,
   `db/migrations/20260924130000_documents_permissions/down.sql`,
   `tests/guards/guard-identificador-de-request.test.ts`.
@@ -56,7 +56,7 @@
 
 ### T4 [P] — Test estático de la migración (R4, R9, R10, R11, R21)
 
-- [ ] Predicados puros exportados sobre el SQL real y sobre una copia mutada en memoria: el UP son
+- [x] Predicados puros exportados sobre el SQL real y sobre una copia mutada en memoria: el UP son
   exactamente tres `INSERT` con `ON CONFLICT ... DO NOTHING` y cero DDL; códigos, módulos, acciones
   y descripciones importados de `PERMISSIONS` coinciden con el SQL; la herencia filtra por
   `proveedores.modificar` y solo inserta `documentos.modificar`; el Administrador se resuelve por
@@ -68,7 +68,7 @@
 
 ### T5 — Test de integración de la migración (R4-R10)
 
-- [ ] Patrón de `packer-role-migration.int.test.ts`: cada caso en transacción revertida; «antes de
+- [x] Patrón de `packer-role-migration.int.test.ts`: cada caso en transacción revertida; «antes de
   la migración» simulado borrando las dos filas y sus asignaciones; SQL leído del archivo.
   Casos: UP crea las dos filas iguales al catálogo (R4); Administrador con las dos (R5); rol
   efímero con `proveedores.modificar` gana solo `documentos.modificar` (R6, R7); rol efímero sin
@@ -82,7 +82,7 @@
 
 ### T6 [P] — Tests del catálogo y del seed sin total fijo (R1, R2, R12, R13)
 
-- [ ] Aplicar la regla de `design.md > 5` a los sitios 3, 4, 10 y 11 de `design.md > 1.3`; casos
+- [x] Aplicar la regla de `design.md > 5` a los sitios 3, 4, 10 y 11 de `design.md > 1.3`; casos
   nuevos con `R<n>` en el nombre: las dos entradas con `toContainEqual` (R1); «previo + dos, ningún
   otro `documentos.*`» (R2); Administrador incluye las dos, Operador y Empacador exactos (R12);
   seed sobre base vacía y sembrada deja a cada rol su conjunto derivado de
@@ -97,7 +97,7 @@
 
 ### T7 [P] — Anclas de guardias y de alcance de otras fichas sin total fijo (R3)
 
-- [ ] Aplicar la regla de `design.md > 5` a los sitios 1, 2, 6, 7, 8 y 9 de `design.md > 1.3`.
+- [x] Aplicar la regla de `design.md > 5` a los sitios 1, 2, 6, 7, 8 y 9 de `design.md > 1.3`.
 - **Archivos:** `tests/guards/guard-permisos-sembrados.test.ts`,
   `tests/guards/guard-nav-permisos-declarados.test.ts`,
   `tests/unit/identity/roles/scope.test.ts`, `tests/unit/identity/grupos/scope.test.ts`,
@@ -109,7 +109,7 @@
 
 ### T8 — Test que hace cumplir R3
 
-- [ ] Predicado puro exportado que detecta un total literal del catálogo o del seed en un fuente
+- [x] Predicado puro exportado que detecta un total literal del catálogo o del seed en un fuente
   de test (fuera de comentarios), con casos sintéticos que disparan y simétricos que no; barrido
   real de `tests/` y `e2e/` en verde.
 - **Archivos:** `tests/unit/identity/catalogo-sin-total-fijo.test.ts` (nuevo).
@@ -119,15 +119,15 @@
 
 ### T9 [P] — Autorización del módulo documentos (R14-R18)
 
-- [ ] Reescribir el bloque «el permiso exigido sale del catálogo cerrado» de `authorization.test.ts`:
+- [x] Reescribir el bloque «el permiso exigido sale del catálogo cerrado» de `authorization.test.ts`:
   la constante es `documentos.modificar`, está en el catálogo, el Administrador la tiene y Operador
   y Empacador no (leído de `SEED_ROLE_PERMISSIONS`), sin total (R12, R14); el literal sigue escrito
   una vez en el módulo y ningún fuente del módulo compara nombres de rol (R17).
-- [ ] En los tres unit de caso de uso: actor con `proveedores.modificar` + `proveedores.consultar`
+- [x] En los tres unit de caso de uso: actor con `proveedores.modificar` + `proveedores.consultar`
   sin `documentos.modificar` → `UnauthorizedError` y ningún puerto tocado (R15); actor con solo
   `documentos.consultar` → rechazo (R15); actor con solo `documentos.modificar` → autorizado (R16);
   la primera comprobación es el permiso, antes del esquema (R14).
-- [ ] En `read-document.test.ts`: actor sin ningún permiso lee y descarga una ruta de su empresa
+- [x] En `read-document.test.ts`: actor sin ningún permiso lee y descarga una ruta de su empresa
   (R18).
 - **Archivos:** `tests/unit/documentos/authorization.test.ts`,
   `tests/unit/documentos/issue-upload-links.test.ts`,
