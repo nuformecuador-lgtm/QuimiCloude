@@ -18,14 +18,14 @@
 ## Requisitos (EARS)
 
 > Cada requisito cita entre corchetes la fila de «Decisiones cerradas» que cubre: `[D1]` es la primera
-> fila de la tabla (¿Cómo aparece?) y `[D7]` la última (¿Librería nueva?). «La subida» es el componente
-> de QC-107 entero: selector de archivos, subir, quitar la selección, lista de archivos con su estado y
-> mensajes de error. «El botón» es el control que abre la ventana. «El permiso de subida» es
+> fila de la tabla (¿Cómo aparece?) y `[D11]` la última (caso E2E de QC-142). «La subida» es el
+> componente de QC-107 entero: selector de archivos, subir, quitar la selección, lista de archivos con
+> su estado y mensajes de error. «El botón» es el control que abre la ventana. «El permiso de subida» es
 > `documentos.modificar`, el que exigen los casos de uso de subida desde QC-142.
 >
-> **Falta un requisito a propósito**: el comportamiento al cerrar la ventana a mitad de tanda depende
-> de la pregunta abierta 1. `design.md > 5` deja escritos los dos textos candidatos (R21-A y R21-B);
-> el que el humano elija entra aquí como R21 al aprobar el spec.
+> **[D9] no tiene requisito propio**: es una regla de proceso (revisar el choque con QC-158 al
+> sincronizar, antes de implementar), no un comportamiento del sistema, y no se puede probar con un
+> test. La cubre la T0 de `tasks.md`.
 
 ### El botón y la ventana
 
@@ -90,7 +90,7 @@
 - **R17** [D3, D6] — CUANDO un Administrador sembrado abre la ventana en el listado de fórmulas y sube
   dos PDFs, el sistema DEBE llevar cada archivo hasta el estado terminado y persistir una tanda con
   estrategia `formula`.
-- **R18** [D5, D6] — CUANDO un usuario cuyo rol tiene `proveedores.consultar` y `proveedores.modificar`
+- **R18** [D5, D6, D11] — CUANDO un usuario cuyo rol tiene `proveedores.consultar` y `proveedores.modificar`
   pero no `documentos.modificar` abre el detalle de un proveedor de su empresa, el sistema NO DEBE
   mostrarle el botón ni la subida, NO DEBE enviar ningún archivo al almacenamiento y NO DEBE persistir
   ninguna tanda nueva en esa empresa.
@@ -103,23 +103,19 @@
 - **R20** [D7] — Esta feature NO DEBE añadir ninguna dependencia al manifiesto del proyecto, y la
   ventana DEBE construirse con la primitiva de diálogo que ya existe en el repositorio, sin crear otra.
 
+### Cerrar a mitad de tanda y dónde va el botón
+
+- **R21** [D1, D8] — CUANDO el usuario cierra la ventana con archivos elegidos, subiendo, en cola o
+  procesando y la vuelve a abrir sin salir de la pantalla, el sistema DEBE mostrar los mismos archivos
+  con su estado actualizado, sin pedir confirmación al cerrar; la tanda solo DEBE vaciarse con «Quitar
+  la selección» o al salir de la pantalla.
+- **R22** [D10] — El botón DEBE tener el texto «Subir PDFs» y DEBE aparecer, en el detalle de un
+  proveedor, después de la cabecera del proveedor y antes del catálogo; y en el listado de fórmulas,
+  en la misma fila que el enlace «Nueva fórmula».
+
 ## Preguntas abiertas
 
-1. **Cerrar la ventana a mitad de tanda.** No está decidido qué pasa si se cierra con archivos en cola o
-   procesando: ¿se avisa?, ¿al reabrir se ve la tanda en curso o una vacía? El procesamiento sigue en el
-   servidor de todas formas (QC-111).
-   _Recomendación de spec_author: sin aviso y conservando la tanda al reabrir (R21-A). Lo razono en
-   `design.md > 5` junto con lo que cambiaría con la otra opción (R21-B)._
-2. **Choque con QC-158.** QC-158 (`in_progress`) también toca `/proveedores/[id]`. El orden no está
-   decidido: lo mira el leader en F1.0/F2.0 por la regla de paralelismo.
-3. **Dónde va el botón y qué dice.** Ninguna decisión lo fija. `design.md > 6` propone: en el detalle de
-   proveedor, entre la cabecera y el catálogo; en fórmulas, en la fila del título junto a «Nueva
-   fórmula»; texto «Subir PDFs». Queda aprobado con el spec salvo que el humano diga otra cosa.
-4. **El caso E2E de QC-142 sin `documentos.modificar`.** Hoy ese usuario llega a la subida, pulsa subir
-   y ve el error de autorización. Con esta feature ya no ve el botón, así que el caso tiene que
-   cambiar su cuerpo. Propuesta (`design.md > 9.3`): que pase a afirmar R18 de esta ficha. «No puede
-   subir» se sigue cumpliendo, que es lo que fijó QC-142 en su D7, y el rechazo del service queda
-   probado en los unit de QC-142. Hay que confirmarlo porque el test es de otra ficha.
+Ninguna.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -132,3 +128,7 @@
 | 2026-09-24 | ¿Quién ve el botón? | Solo quien tiene el permiso que exige la subida. Heredado de QC-142 (`documentos.modificar`); la autorización sigue en el service (QC-106/QC-111). |
 | 2026-09-24 | ¿E2E? | **Sí.** Se ajusta el recorrido de QC-107 (pulsar el botón primero) y se suma fórmulas. IA y cola simuladas; el gate corre sin red. |
 | 2026-09-24 | ¿Librería nueva? | **No.** El diálogo sale de shadcn, ya montado; no se re-crea. |
+| 2026-09-24 | ¿Qué pasa si se cierra la ventana a mitad de tanda? | **Sin aviso; al reabrir se ve la misma tanda con su estado** (`keepMounted`). `components/ui/dialog.tsx` recibe la prop opcional que la reenvía al portal. |
+| 2026-09-24 | ¿Choque de archivos con QC-158 en `/proveedores/[id]`? | Se revisa **al sincronizar con `dev`, antes de implementar**. |
+| 2026-09-24 | ¿Dónde va el botón y qué dice? | En proveedores, **entre la cabecera y el catálogo**; en fórmulas, **junto a «Nueva fórmula»**. Texto: **«Subir PDFs»**. |
+| 2026-09-24 | ¿Qué hace el caso E2E de QC-142 del usuario sin `documentos.modificar`? | Pasa a comprobar que **no ve el botón, no sube nada y no se crea ninguna tanda**. El rechazo del service queda cubierto por los unitarios de QC-142. |

@@ -21,7 +21,7 @@ comportamiento.
 - `DocumentUpload({ strategy })` es `'use client'` y **guarda todo su estado dentro**: archivos
   elegidos, fase de navegador, `batchId`, errores y `busy` (`document-upload.tsx:50-57`). El sondeo
   (`use-batch-status.ts`) se arma con `batchId` y se desarma cuando el componente se desmonta
-  (`:67-70`). Por eso la pregunta abierta 1 es sobre todo una pregunta de **montaje** (sección 5).
+  (`:67-70`). Por eso cerrar la ventana a mitad de tanda es sobre todo una cuestión de **montaje** (sección 5).
 - Test ids estables: `document-upload`, `-input`, `-trigger`, `-submit`, `-clear`,
   `-selection-error`, `-error` (con `data-code`), `-resume`, `-missing` y `-list`, más los de fila.
 - Área táctil: `TOUCH_TARGET = 'min-h-11 min-w-11 text-base'` (`:37`). El `<input type="file">` es
@@ -101,7 +101,7 @@ Esta rama sale de `dev` **sin** QC-142. La T0 de `tasks.md` no deja empezar hast
   cambian** en QC-142.
 - QC-142 añade a `e2e/documentos.spec.ts` un caso con un rol efímero que tiene
   `proveedores.consultar` y `proveedores.modificar`, pero no `documentos.modificar`, y que ve el
-  error de autorización al subir. Esta ficha cambia ese caso (9.3, pregunta abierta 4).
+  error de autorización al subir. Esta ficha cambia ese caso (9.3, D11).
 
 Si al llegar a T0 cualquiera de estos puntos ha cambiado en `dev`, se para y se vuelve al spec. No se
 adapta sobre la marcha.
@@ -153,23 +153,22 @@ Composición:
 - `max-h-[85dvh] overflow-y-auto`: una tanda de diez filas no cabe en un móvil. Se usa `dvh` y no
   `vh` por la barra de direcciones de iOS (R15).
 - Escape y el foco de vuelta al disparador (R3, R4) los da Base UI por defecto. Solo se prueban.
-- `keepMounted` depende de la pregunta abierta 1: está en el bloque si se elige R21-A y se quita si
-  se elige R21-B (sección 5).
+- `keepMounted` mantiene la tanda viva al cerrar la ventana (D8, R21; sección 5).
 
 ### 3.2 Textos (`labels.ts`, se amplía)
 
 `OPEN_LABEL = 'Subir PDFs'`, `DIALOG_TITLE = 'Subir PDFs'`, `CLOSE_LABEL = 'Cerrar'` y
 `dialogDescription(max)` → «Solo PDF, hasta {max} archivos por tanda.». El tope llega importado del
-contrato (`MAX_FILES_PER_BATCH`), nunca escrito, que es lo que exige la guardia R22 de QC-107. Los
-textos son **propuesta** (pregunta abierta 3).
+contrato (`MAX_FILES_PER_BATCH`), nunca escrito, que es lo que exige la guardia R22 de QC-107. El texto
+del botón, «Subir PDFs», lo fija D10 (R22 de esta ficha); el título, «Cerrar» y la descripción son
+propuesta de este spec, aprobada con él.
 
-### 3.3 `components/ui/dialog.tsx` (solo con R21-A)
+### 3.3 `components/ui/dialog.tsx`
 
-`DialogContent` gana una prop opcional `keepMounted?: boolean` que se reenvía a `DialogPortal`. El
-valor por defecto sigue siendo el de Base UI (`false`), así que `adjust-batch-dialog` y `recipe-form`
-no cambian. Es una línea en la primitiva ya instalada: **no se re-crea el diálogo** (D7, R20).
-
-Con R21-B este archivo no se toca.
+`DialogContent` gana una prop opcional `keepMounted?: boolean` que se reenvía a `DialogPortal` (D8).
+El valor por defecto sigue siendo el de Base UI (`false`), así que `adjust-batch-dialog` y
+`recipe-form` no cambian. Es una línea en la primitiva ya instalada: **no se re-crea el diálogo** (D7,
+R20).
 
 ### 3.4 Lo que NO se toca
 
@@ -221,64 +220,41 @@ const canUpload = canUploadDocuments(await identity.getSessionUser());
 - `identity.getSessionUser()` reutiliza la lectura de `requirePagePermission` dentro de la misma
   petición (1.4). No hay segunda consulta.
 
-## 5. Pregunta abierta 1: cerrar la ventana a mitad de tanda
+## 5. Cerrar la ventana a mitad de tanda (D8, R21)
 
-El estado de la tanda vive **dentro** de `DocumentUpload` (1.1). Lo que decide si sobrevive a cerrar
-la ventana es si el componente se desmonta al cerrar. Por defecto, Base UI desmonta el popup cerrado.
+El estado de la tanda vive **dentro** de `DocumentUpload` (1.1), así que sobrevive a cerrar la ventana
+solo si el componente no se desmonta. Por defecto, Base UI desmonta el popup cerrado.
 
-### Recomendación: R21-A, sin aviso y conservando la tanda al reabrir
+Decisión: **sin aviso, y al reabrir se ve la misma tanda con su estado.** Se implementa con
+`keepMounted` en el portal (3.1, 3.3). El componente sigue montado y oculto, y el sondeo continúa hasta
+que todos los archivos terminan, igual que hoy con la subida a la vista.
 
-> **R21-A** [D1] — CUANDO el usuario cierra la ventana con archivos elegidos, subiendo, en cola o
-> procesando y la vuelve a abrir sin salir de la pantalla, el sistema DEBE mostrar los mismos archivos
-> con su estado actualizado, sin pedir confirmación al cerrar; la tanda solo se vacía con «Quitar la
-> selección» o al salir de la pantalla.
-
-Cómo se implementa: `keepMounted` en el portal (3.1, 3.3). El componente sigue montado y oculto, y el
-sondeo continúa hasta que todos los archivos terminan, igual que hoy con la subida a la vista.
-
-Por qué la recomiendo:
-- **No toca la lógica de QC-107** (Alcance y D4). Cualquier aviso necesita saber desde fuera si hay
+- **No toca la lógica de QC-107** (Alcance y D4). Un aviso habría necesitado saber desde fuera si hay
   una tanda en curso, y eso obliga a que `DocumentUpload` publique su estado hacia arriba.
 - **No miente**: el servidor sigue procesando (QC-111). Reabrir y ver la tanda en marcha cuenta lo que
-  de verdad pasa. Una ventana vacía haría pensar que la subida se perdió e invitaría a subirla otra vez,
-  con dos tandas del mismo PDF.
-- **Coste**: con la ventana cerrada, el sondeo sigue consultando cada 2 s hasta que la tanda termina.
-  Es lo mismo que pasa hoy con la subida a la vista. Con la ventana cerrada, el componente sigue en el
-  DOM aunque oculto: los tests afirman «no visible» (`toBeHidden` / `not.toBeVisible()`), no «no
-  existe». Tampoco hay un indicador en el botón de que hay una tanda en curso, porque no está pedido.
+  de verdad pasa.
+- **Coste aceptado**: con la ventana cerrada, el sondeo sigue consultando cada 2 s hasta que la tanda
+  termina, lo mismo que hoy con la subida a la vista. El componente sigue en el DOM aunque oculto: los
+  tests afirman «no visible» (`toBeHidden` / `not.toBeVisible()`), no «no existe». El botón no muestra
+  ningún indicador de tanda en curso, porque no está pedido.
 
-### Si se elige R21-B, desmontar al cerrar
-
-> **R21-B** [D1] — CUANDO el usuario cierra la ventana y la vuelve a abrir, el sistema DEBE mostrar la
-> subida vacía, sin archivos elegidos ni estado de una tanda anterior; la tanda ya encolada DEBE
-> seguir procesándose en el servidor.
-
-Qué cambia respecto de la recomendación:
-- Se quita `keepMounted`. `components/ui/dialog.tsx` no se toca y el componente se monta vacío en
-  cada apertura. Los tests de «cerrada» afirman que la subida no existe.
-- Si se cierra en mitad del envío, la función asíncrona del componente sigue viva hasta terminar. Los
-  `PUT` en vuelo acaban y la tanda puede encolarse, pero **ya no hay ningún sitio donde verla**.
-- **Con aviso** (B + confirmar antes de cerrar) haría falta que `DocumentUpload` expusiera `busy` o
-  `batchId` hacia fuera, por ejemplo con una prop `onBatchChange`. Eso toca el componente de QC-107,
-  que D4 y el Alcance dejan fuera. Si el humano quiere aviso, hay que reabrir esa decisión: no lo decide
-  este spec.
-
-En los dos casos, el E2E de R16 y R17 no cambia: no cierra la ventana a mitad de tanda.
+La otra opción, desmontar al cerrar, queda en la sección 14 como alternativa descartada. El E2E de R16
+y R17 no cierra la ventana a mitad de tanda; R21 lo prueba el unit del diálogo.
 
 ## 6. Montaje por pantalla
 
 ### 6.1 `/proveedores/[id]`
 
 - Se quita el `<DocumentUpload strategy="catalogo" />` de `page.tsx:126`.
-- **Propuesta** (pregunta abierta 3): `DocumentUploadDialog strategy="catalogo"` en una fila propia de
-  la página, **entre** `SupplierDetailHeader` y el `<Suspense>` del catálogo, alineada a la derecha. No
-  se mete dentro de `SupplierDetailHeader`, para no tocar un componente de ruta que QC-158 puede estar
-  cambiando (pregunta abierta 2).
+- `DocumentUploadDialog strategy="catalogo"` en una fila propia de la página, **entre**
+  `SupplierDetailHeader` y el `<Suspense>` del catálogo, alineada a la derecha (D10, R22). No se mete
+  dentro de `SupplierDetailHeader`, para no tocar un componente de ruta que QC-158 puede estar cambiando
+  (D9).
 - Solo en la rama de éxito. Con proveedor inexistente o error de carga no se monta (R7).
 
 ### 6.2 `/produccion/formulas`
 
-- **Propuesta**: en la fila del título, junto al enlace «Nueva fórmula», agrupados en un
+- En la fila del título, junto al enlace «Nueva fórmula» (D10, R22), agrupados en un
   `div className="flex flex-wrap items-center gap-2"`. `strategy="formula"`.
 - Solo en el listado (`page.tsx`). `nueva/page.tsx` y `[id]/page.tsx` no se tocan (R7).
 - La página importa `identity` de `@/lib/composition` y `canUploadDocuments` del barrel de
@@ -314,7 +290,10 @@ Ninguno. No hay tabla, columna, migración, RLS ni seed. El permiso lo trae QC-1
   - `issueUploadLinksAction` en `unauthorized` muestra `document-upload-error` con
     `data-code="unauthorized"` y no llama a `enqueueBatchAction` (R13);
   - botón y cerrar con `min-h-11 min-w-11`, y el popup con `max-h-[85dvh]` y `overflow-y-auto` (R15);
-  - el caso de R21, según la opción que se elija.
+  - con archivos elegidos y con una tanda en `processing`, cerrar y reabrir muestra las mismas filas
+    con su fase y estado, sin ningún diálogo de confirmación al cerrar, y el sondeo sigue llamando a
+    `getBatchStatusAction` con la ventana cerrada (R21);
+  - el botón dice «Subir PDFs» (R22).
 - `tests/unit/documentos-ui/formulas-upload.test.tsx`: la página de fórmulas con sesión que tiene
   `recetas.consultar` + `documentos.modificar` pinta el botón, y al subir encola `strategy: 'formula'`
   (R6, R10). Con `recetas.consultar` + `recetas.modificar` + `documentos.consultar` y sin
@@ -326,13 +305,16 @@ Ninguno. No hay tabla, columna, migración, RLS ni seed. El permiso lo trae QC-1
   subida está oculta hasta pulsarlo, y al subir se encola `catalogo`» (R1, R5, R10). El caso «no
   añade ningún corte de permiso» pasa a «sin `documentos.modificar` (con `proveedores.consultar` y
   `proveedores.modificar`) no hay botón ni subida» (R11), más «proveedor inexistente: sin botón» (R7).
+  Caso nuevo (R22): `document-upload-open` va después de `supplier-detail` y antes de `catalog-list` en
+  el orden del documento (`compareDocumentPosition`). En `formulas-upload.test.tsx`, el botón comparte
+  contenedor padre con `recipe-create-open`.
 - `document-upload-convenciones.test.ts`:
   - R19 de QC-107: la lista de páginas que montan la pieza pasa a ser exactamente
     `[formulas/page.tsx, proveedores/[id]/page.tsx]`, y `nueva/` y `[id]/` de fórmulas no la montan
     (R7). El listado de proveedores tampoco.
   - R18 de QC-107: se sustituye por «la única pantalla de fórmulas que monta la pieza es el listado; y
     ninguna fuente de fórmulas nombra `proveedores.*`». Lo del catálogo cerrado ya lo ajustó QC-142
-    (ver riesgo 13.2).
+    (ver riesgo 13.2: solo se toca aquí si sigue en rojo en `dev` al empezar).
   - Nuevo: ninguna página de `app/` escribe el literal `documentos.modificar`, las dos que montan el
     diálogo llaman a `canUploadDocuments`, y ningún fuente de la carpeta del componente contiene
     `permission`, `permiso` ni `roleName` (R12).
@@ -347,8 +329,8 @@ Ninguno. No hay tabla, columna, migración, RLS ni seed. El permiso lo trae QC-1
 No nace ningún archivo: la lista cerrada de E2E de `guard-identificador-de-request.test.ts` no cambia.
 
 - **R16** (caso existente de QC-107, ajustado): tras `goto(supplierDetailRoute)`, afirma
-  `document-upload-open` visible y `document-upload` oculto (`toBeHidden`, que vale para R21-A y para
-  R21-B). Pulsa el botón, espera `document-upload-dialog` visible y sigue el recorrido de siempre. La
+  `document-upload-open` visible y `document-upload` oculto (`toBeHidden`: con `keepMounted` está
+  en el DOM pero no visible). Pulsa el botón, espera `document-upload-dialog` visible y sigue el recorrido de siempre. La
   afirmación de base de datos pasa de «una tanda en la empresa» a «**una tanda nueva con estrategia
   `catalogo`**»: se cuentan antes y después, filtrando por empresa y estrategia, porque el caso de
   fórmulas puede compartir empresa si cae en el mismo worker.
@@ -357,7 +339,7 @@ No nace ningún archivo: la lista cerrada de E2E de `guard-identificador-de-requ
   `qc107_e2e_formula_<n>_<RUN_ID>.pdf`, sube, espera `data-status="done"` en las dos filas y afirma una
   tanda nueva con estrategia `formula` y dos archivos `done`. El contador de `PUT` interceptados sube
   en 2.
-- **R18** (el caso que añade QC-142, pregunta abierta 4): mismo rol efímero y mismo usuario. Tras abrir
+- **R18** (el caso que añade QC-142, D11): mismo rol efímero y mismo usuario. Tras abrir
   el detalle de un proveedor de su empresa, afirma `document-upload-open` y `document-upload` con
   `toHaveCount(0)`, cero `PUT` interceptados y el mismo conteo de tandas antes y después. El nombre del
   caso lleva `R18` y conserva la referencia a QC-142 R20.
@@ -404,23 +386,24 @@ en `docs/dependencias.md`). No se ejecuta `npx shadcn add`. No se tocan `package
 | R18 | `e2e/documentos.spec.ts` (caso de QC-142 ajustado) |
 | R19 | `e2e/documentos.spec.ts` (contadores de `PUT` de los tres casos) |
 | R20 | `document-upload-convenciones.test.ts` y `tests/guards/guard-dependencias-aprobadas.test.ts` |
-| R21 | `document-upload-dialog.test.tsx` (A: reabrir conserva filas y fases; B: reabrir vacío) |
+| R21 | `document-upload-dialog.test.tsx` (reabrir conserva filas, fases y estado; sin confirmación al cerrar) |
+| R22 | `document-upload-dialog.test.tsx` (texto), `supplier-detail-upload.test.tsx` y `formulas-upload.test.tsx` (posición) |
 
 ## 13. Riesgos
 
-1. **QC-158 (`in_progress`, fullstack) y `/proveedores/[id]`** (pregunta abierta 2). Esta ficha toca
+1. **QC-158 (`in_progress`, fullstack) y `/proveedores/[id]`** (D9). Esta ficha toca
    `app/(private)/proveedores/[id]/page.tsx` y `supplier-detail-upload.test.tsx`, y además
-   `lib/modules/documentos/domain/actor.ts` e `index.ts`. Si QC-158 toca cualquiera de ellos, hay
-   conflicto de archivos: decide el leader.
+   `lib/modules/documentos/domain/actor.ts` e `index.ts`. El choque se revisa en T0, al sincronizar
+   con `dev` y antes de implementar. Si QC-158 toca cualquiera de ellos, se para y decide el leader.
 2. **`document-upload-convenciones.test.ts:188-192` de QC-107** afirma que ningún código del catálogo
-   casa con `/documento/i`. QC-142 lo rompe al añadir `documentos.*` y su design no lo lista entre los
-   sitios que toca. T0 comprueba que QC-142 lo arregló al mergear. Si no, se arregla en T6 de esta
-   ficha y se anota.
+   casa con `/documento/i`, y QC-142 lo rompe al añadir `documentos.*`. El arreglo le corresponde al
+   implementer de QC-142, al que ya se le ha pasado. T0 comprueba en `dev` si sigue en rojo, y **solo
+   en ese caso** lo arregla la T6 de esta ficha, dejándolo anotado.
 3. **Imports en tests de fórmulas.** `recipe-page.test.tsx` y `pantallas-exigen-permiso.test.tsx`
    importan `formulas/page.tsx`. Ahora esa página arrastra el componente de cliente y sus acciones
    `'use server'`. Si el import no resuelve en jsdom, se añade el `vi.mock` de las dos acciones de
    `documentos`, como ya hace `supplier-detail-upload.test.tsx`. No se toca ningún caso.
-4. **`keepMounted` en jsdom (solo R21-A).** Queda por verificar en T2 que Base UI 1.7.0 oculta el
+4. **`keepMounted` en jsdom.** Queda por verificar en T2 que Base UI 1.7.0 oculta el
    popup cerrado (atributo `hidden` o `display: none`) de forma que `not.toBeVisible()` lo detecte en
    jsdom. Si no lo hace, la afirmación de R1 pasa a comprobar el estado cerrado del popup
    (`data-closed`) y se anota.
@@ -448,6 +431,10 @@ en `docs/dependencias.md`). No se ejecuta `npx shadcn add`. No se tocan `package
    `components/shared/document-upload/`** para usar `keepMounted` sin tocar `components/ui/dialog.tsx`.
    Descartada: sería un segundo diálogo (D7), y la guardia de QC-107 exige que la carpeta solo importe
    el paquete `react`.
-7. **Un archivo E2E nuevo para fórmulas.** Descartada: la lista cerrada de E2E de
+7. **Desmontar la subida al cerrar la ventana**, con o sin aviso. Descartada por D8. Sin aviso, quien
+   cierra en mitad del envío ve la ventana vacía al reabrir, aunque la tanda siga encolándose en el
+   servidor, y eso invita a subir dos veces el mismo PDF. Con aviso, `DocumentUpload` tendría que
+   publicar su estado hacia fuera, lo que toca el componente de QC-107 que D4 deja fuera.
+8. **Un archivo E2E nuevo para fórmulas.** Descartada: la lista cerrada de E2E de
    `guard-identificador-de-request.test.ts` tendría que cambiar, y el fixture (empresa, Administrador,
    intercepción del `PUT`) ya está en `documentos.spec.ts`.

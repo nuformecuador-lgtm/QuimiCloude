@@ -23,7 +23,7 @@
 
 ## Tasks
 
-### T0 — Precondiciones: QC-142 en `dev` y preguntas respondidas
+### T0 — Precondiciones: QC-142 en `dev` y choque con QC-158 revisado
 
 - [ ] **QC-142 está en `dev`**: `git log origin/dev` contiene su merge, y en `origin/dev`
   `lib/modules/documentos/domain/actor.ts` declara
@@ -31,14 +31,16 @@
   `documentos.modificar`. **Si no está, no se empieza**: se para y se avisa al leader.
 - [ ] Traer `dev` a esta rama (`git merge origin/dev`) y confirmar que los cuatro puntos de
   `design.md > 2` se cumplen tal cual. Si alguno cambió, se para y se vuelve al spec.
-- [ ] Comprobar que `tests/unit/documentos-ui/document-upload-convenciones.test.ts` está verde tras el
-  merge. Es el riesgo 13.2 del design: si QC-142 no ajustó la línea del catálogo con `/documento/i`, se
-  anota para T6.
-- [ ] El humano respondió la pregunta abierta 1 (R21-A o R21-B), y R21 está escrito en
-  `requirements.md` con el texto elegido. Las preguntas 3 y 4 están confirmadas o corregidas. El leader
-  resolvió la 2 (orden frente a QC-158).
+- [ ] Comprobar si `tests/unit/documentos-ui/document-upload-convenciones.test.ts` está verde en `dev`.
+  Lo normal es que sí: el arreglo de la línea del catálogo con `/documento/i` es del implementer de
+  QC-142. **Solo si sigue en rojo** se anota para T6 (riesgo 13.2).
+- [ ] **Choque con QC-158 (D9)**: al sincronizar con `dev`, comparar los archivos que QC-158 ha
+  cambiado (en `dev` o en su rama) con los de esta ficha: `app/(private)/proveedores/[id]/page.tsx`,
+  `tests/unit/documentos-ui/supplier-detail-upload.test.tsx`, `lib/modules/documentos/domain/actor.ts`,
+  `lib/modules/documentos/index.ts` y `tests/unit/documentos/module-contract.test.ts`. Si alguno
+  coincide, **se para antes de implementar** y se avisa al leader.
 - [ ] La base `QuimiCloude_QC160` existe, con migraciones aplicadas y sembrada.
-- **Archivos:** ninguno de producción; solo `specs/QC-160-boton-de-subida-de-pdf/requirements.md` (R21).
+- **Archivos:** ninguno.
 - **Depende de:** aprobación del spec y merge de QC-142 en `dev`.
 - **Hecho cuando:** todas las casillas marcadas y `./init.sh --rapido` verde sobre la rama con `dev`
   mergeado, antes de cambiar una sola línea.
@@ -59,13 +61,12 @@
 - **Hecho cuando:** los dos tests verdes, typecheck verde, y cambiar en local la constante a otro
   código pone rojo el caso `true` (sin commitear).
 
-### T2 [P] — `keepMounted` en `DialogContent` (solo si se eligió R21-A)
+### T2 [P] — `keepMounted` en `DialogContent` (D8)
 
 - [ ] `DialogContent` acepta `keepMounted?: boolean` y lo reenvía a `DialogPortal`. Sin valor por
   defecto propio.
 - [ ] Verificar en jsdom que, con `keepMounted`, el popup cerrado no es visible para
   `not.toBeVisible()`. Si no lo es, anotar en el design cómo se afirma el estado cerrado (riesgo 13.4).
-- [ ] Con R21-B: esta task se marca como «no aplica» y no se toca el archivo.
 - **Archivos:** `components/ui/dialog.tsx`.
 - **Depende de:** T0.
 - **Hecho cuando:** los tests existentes de `adjust-batch-dialog` y `recipe-form` siguen verdes sin
@@ -76,17 +77,18 @@
 - [ ] Componente según `design.md > 3.1`: `DialogTrigger` con `document-upload-open`, `DialogContent`
   con `document-upload-dialog`, `showCloseButton={false}`, `sm:max-w-lg max-h-[85dvh] overflow-y-auto`,
   `DialogClose` propio `document-upload-close` con `min-h-11 min-w-11`, y `DocumentUpload` dentro con la
-  `strategy` recibida. `keepMounted` solo con R21-A.
+  `strategy` recibida, y `keepMounted` (R21).
 - [ ] Textos en `labels.ts` (`OPEN_LABEL`, `DIALOG_TITLE`, `CLOSE_LABEL`, `dialogDescription(max)`),
   con el tope importado del contrato. Exportar el componente, su tipo de props y los test ids nuevos por
   el barrel.
 - [ ] Ningún archivo de la carpeta nombra `permission`, `permiso` ni `roleName`, ni escribe
   `'catalogo'` o `'formula'`.
-- [ ] Test nuevo con los casos de `design.md > 9.1` para R1, R2, R3, R4, R8, R13, R15 y R21.
+- [ ] Test nuevo con los casos de `design.md > 9.1` para R1, R2, R3, R4, R8, R13, R15, R21 y el texto
+  «Subir PDFs» de R22.
 - **Archivos:** `components/shared/document-upload/document-upload-dialog.tsx` (nuevo),
   `components/shared/document-upload/labels.ts`, `components/shared/document-upload/index.ts`,
   `tests/unit/documentos-ui/document-upload-dialog.test.tsx` (nuevo).
-- **Depende de:** T0 y T2 (si aplica).
+- **Depende de:** T0 y T2.
 - **Hecho cuando:** test nuevo verde, los siete tests de componente de QC-107 verdes y **sin editar**, y
   `git diff origin/dev -- components/shared/document-upload/document-upload.tsx
   components/shared/document-upload/document-upload-row.tsx
@@ -103,7 +105,7 @@
 - [ ] Limpiar los comentarios de las líneas que se tocan en `page.tsx` (sin arrastrar el resto).
 - [ ] Reescribir los dos casos de `supplier-detail-upload.test.tsx` según `design.md > 9.2`: botón con
   permiso y encolado `catalogo` (R1, R5, R10); sin `documentos.modificar` no hay botón ni subida (R11);
-  proveedor inexistente sin botón (R7).
+  proveedor inexistente sin botón (R7); el botón va después de la cabecera y antes del catálogo (R22).
 - **Archivos:** `app/(private)/proveedores/[id]/page.tsx`,
   `tests/unit/documentos-ui/supplier-detail-upload.test.tsx`.
 - **Depende de:** T1, T3.
@@ -116,7 +118,8 @@
   `canUploadDocuments(await identity.getSessionUser())`. Si es `true`, `DocumentUploadDialog
   strategy="formula"` en la fila del título, junto a «Nueva fórmula» (`design.md > 6.2`). `nueva/` y
   `[id]/` no se tocan.
-- [ ] Test nuevo de la página (R6, R10, R11) según `design.md > 9.1`.
+- [ ] Test nuevo de la página (R6, R10, R11, y R22: el botón comparte fila con «Nueva fórmula») según
+  `design.md > 9.1` y `9.2`.
 - [ ] Si `recipe-page.test.tsx` o `pantallas-exigen-permiso.test.tsx` no resuelven el import en jsdom,
   añadirles **solo** el `vi.mock` de las dos acciones de `documentos`, sin tocar ningún caso (riesgo
   13.3).
@@ -137,8 +140,9 @@
   `documentos.modificar`, las dos llaman a `canUploadDocuments`, la carpeta no nombra permisos) y R20
   (el manifiesto no gana dependencias, y la carpeta importa el diálogo solo de `@/components/ui/dialog`).
   Cada regla nueva, con su caso sintético que la hace fallar.
-- [ ] Si T0 anotó el riesgo 13.2, arreglar aquí la aserción del catálogo con `/documento/i` y dejarlo
-  escrito en `progress/impl_…`.
+- [ ] **Solo si** T0 vio en rojo en `dev` la aserción del catálogo con `/documento/i` (riesgo 13.2),
+  arreglarla aquí y dejarlo escrito en `progress/impl_…`. Si está verde, no se toca: el arreglo le toca
+  al implementer de QC-142.
 - **Archivos:** `tests/unit/documentos-ui/document-upload-convenciones.test.ts`.
 - **Depende de:** T4, T5.
 - **Hecho cuando:** verde sobre el árbol real, y cada caso sintético nuevo se pone rojo.
@@ -152,7 +156,7 @@
 - [ ] Caso nuevo de fórmulas (R17): `goto(FORMULAS_ROUTE)`, abrir, dos PDFs
   `qc107_e2e_formula_<n>_<RUN_ID>.pdf`, esperar `done` en las dos filas, una tanda nueva `formula` con
   dos archivos `done` y dos `PUT` interceptados.
-- [ ] Ajustar el caso de QC-142 sin `documentos.modificar` (R18), según la respuesta a la pregunta 4:
+- [ ] Ajustar el caso de QC-142 sin `documentos.modificar` (R18, D11):
   `document-upload-open` y `document-upload` con `toHaveCount(0)`, cero `PUT` y el mismo conteo de
   tandas antes y después. El nombre lleva `R18` y conserva la referencia a QC-142 R20.
 - [ ] Sin cambios en `playwright.config.ts` ni en los dobles (R19). Ningún archivo E2E nuevo.
@@ -165,7 +169,7 @@
 ### T8 — Cierre
 
 - [ ] `progress/impl_QC-160-boton-de-subida-de-pdf.md` con el mapa `R<n> -> test` de
-  `design.md > 12` (R1-R21, ninguno sin test).
+  `design.md > 12` (R1-R22, ninguno sin test).
 - [ ] `./init.sh` completo en verde, con `QuimiCloude_QC160`.
 - [ ] `git diff --stat origin/dev...HEAD` no lista `package.json`, `pnpm-lock.yaml`,
   `docs/dependencias.md`, `db/` ni ningún archivo de `lib/modules/documentos/adapters/` (R9, R20).
