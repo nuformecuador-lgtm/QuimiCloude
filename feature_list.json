@@ -2421,7 +2421,7 @@
       "epic_name": "Documentos e IA",
       "name": "boton-de-subida-de-pdf",
       "description": "La subida de PDFs (componente de QC-107) deja de estar siempre visible: un BOTON la abre en una VENTANA EMERGENTE (dialogo), con el estado por archivo dentro. Solo PDF, que el componente ya cumple. DONDE: /proveedores/[id] (estrategia catalogo; hoy montada a la vista) y el LISTADO de formulas /produccion/formulas (estrategia formula; montaje NUEVO, traido de QC-142). ACOTADA el 2026-09-24 con /afinar-feature: quien ve el boton es quien tiene el permiso que exige la subida (QC-142). E2E: SI, se ajusta el de QC-107 y se suma formulas, con IA y cola simuladas. NO ENTRA: el permiso propio (QC-142), receta desde PDF (QC-159), catalogo desde PDF (QC-158), la logica del componente (QC-107). BLOQUEADA POR QC-142.",
-      "status": "spec_ready",
+      "status": "in_progress",
       "sdd": true,
       "complexity": "medium",
       "zone": "frontend",
