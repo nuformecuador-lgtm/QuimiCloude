@@ -382,65 +382,36 @@ describe('R29 — package.json sin dependencias nuevas respecto a origin/dev', (
   });
 });
 
+// Commit de merge del PR #112 (QC-145) en origin/dev. Fijo, no depende de fichas posteriores.
+const MERGE_QC145 = '51f2d1013f33a3fde50594ac0dde7ec7b7535938';
+
+/** Nombres de `model X {` del esquema, en el texto dado. */
+function modelosDe(schema: string): string[] {
+  return [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map((match) => match[1] as string).sort();
+}
+
 describe('R29 — el esquema no gana modelos ni tablas: el unico cambio es la columna de R1', () => {
-  /** Nombres de `model X {` del esquema, en el texto dado. */
-  function modelosDe(schema: string): string[] {
-    return [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map((match) => match[1] as string).sort();
-  }
-
-  /**
-   * Lo esperado: la UNION sin duplicar entre los modelos de la base de fusion y los que anade
-   * esta rama. Una vez que la base de fusion YA trae alguno de `estaRama` (porque ya se mergeo),
-   * sumarlo dos veces romperia el test contra si mismo; la union lo evita sin dejar de exigir el
-   * resto.
-   */
-  function modelosEsperados(modelosDeLaBase: readonly string[], estaRama: readonly string[]): string[] {
-    return [...new Set([...modelosDeLaBase, ...estaRama])].sort();
-  }
-
-  it('los modelos de db/schema.prisma son los mismos que en la base de fusion con origin/dev, salvo el libro de reservas de QC-141', () => {
-    let modelosDev: string[];
+  it('los modelos de db/schema.prisma en el merge de QC-145 (PR #112) son los mismos que en su primer padre', () => {
+    let modelosPadre: string[];
+    let modelosMerge: string[];
     try {
-      const base = git('git merge-base origin/dev HEAD').trim();
-      modelosDev = modelosDe(git(`git show ${base}:db/schema.prisma`));
+      modelosPadre = modelosDe(git(`git show ${MERGE_QC145}~1:db/schema.prisma`));
+      modelosMerge = modelosDe(git(`git show ${MERGE_QC145}:db/schema.prisma`));
     } catch (error) {
       throw new Error(
-        'No se pudo leer db/schema.prisma de la base de fusion con origin/dev, asi que la ' +
-          `parte de esquema de R29 no se ha comprobado en este caso. Causa: ${String(error)}`,
+        `No se pudo leer db/schema.prisma en ${MERGE_QC145} ni en su padre (clon superficial ` +
+          `sin ese commit), asi que la parte de esquema de R29 no se ha comprobado en este ` +
+          `caso. Causa: ${String(error)}`,
       );
     }
 
-    const modelosActuales = modelosDe(readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8'));
-
-    // Tras mergear origin/dev, ese merge-base ES la punta de dev: la comparacion pasa a medir
-    // esta rama contra dev, y esta rama SI anade una tabla propia, el libro de reservas.
-    // `ReservationMovement` es el unico modelo nuevo esperado; cualquier otro sigue sin declararse.
-    const ESPERADOS_DE_ESTA_RAMA = ['ReservationMovement'];
-
-    expect(modelosActuales).toEqual(modelosEsperados(modelosDev, ESPERADOS_DE_ESTA_RAMA));
+    expect(modelosMerge).toEqual(modelosPadre);
   });
 
-  it('R29 (esquema) — con fuente fabricada, si la base de fusion YA tiene el modelo de esta rama, la union no lo duplica', () => {
-    const modelosDev = ['Order', 'ReservationMovement'];
+  it('dispara con un esquema sintetico que gana un modelo respecto de su padre', () => {
+    const padre = 'model Order {\n  id String\n}\n';
+    const conModeloNuevo = padre + '\nmodel OrderFinishedLog {\n  id String\n}\n';
 
-    expect(modelosEsperados(modelosDev, ['ReservationMovement'])).toEqual(['Order', 'ReservationMovement']);
-  });
-
-  it('R29 (esquema) — con fuente fabricada, un modelo nuevo no declarado en esta rama sigue dando rojo', () => {
-    const modelosDev = ['Order'];
-    const modelosActuales = ['Order', 'ReservationMovement', 'OrderFinishedLog'].sort();
-
-    expect(modelosActuales).not.toEqual(modelosEsperados(modelosDev, ['ReservationMovement']));
-  });
-
-  it('dispara con un esquema sintetico que gana un modelo respecto del de referencia', () => {
-    function modelosDe(schema: string): string[] {
-      return [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map((match) => match[1] as string).sort();
-    }
-
-    const referencia = 'model Order {\n  id String\n}\n';
-    const conModeloNuevo = referencia + '\nmodel OrderFinishedLog {\n  id String\n}\n';
-
-    expect(modelosDe(conModeloNuevo)).not.toEqual(modelosDe(referencia));
+    expect(modelosDe(conModeloNuevo)).not.toEqual(modelosDe(padre));
   });
 });

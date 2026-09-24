@@ -267,6 +267,53 @@ pnpm run db:test status  (DATABASE_URL/DIRECT_URL -> QuimiCloude_QC153)
   ✓ base de desarrollo «QuimiCloude_QC153» al dia: 45 migracion(es) aplicada(s)
 ```
 
+## Decision humana 2026-09-24: guardian de modelos de QC-145 fijado a su propio merge
+
+El caso rojo (`R29 — el esquema no gana modelos ni tablas`, «los modelos de db/schema.prisma
+son los mismos que en la base de fusion con origin/dev, salvo el libro de reservas de
+QC-141») comparaba HEAD contra `git merge-base origin/dev HEAD`, asi que cualquier ficha
+posterior que anadiera un modelo (esta ficha, con `Customer`) lo ponia en rojo. Se reescribio
+para comparar los modelos del propio merge de QC-145 (PR #112) contra su primer padre, sin
+depender de fichas posteriores.
+
+- SHA del merge de QC-145 (PR #112) usado, fijo como constante `MERGE_QC145`:
+  `51f2d1013f33a3fde50594ac0dde7ec7b7535938` (confirmado con
+  `git log --merges --grep="#112" origin/dev --oneline`).
+- Verificado a mano: `git show 51f2d1013f33a3fde50594ac0dde7ec7b7535938~1:db/schema.prisma`
+  vs `git show 51f2d1013f33a3fde50594ac0dde7ec7b7535938:db/schema.prisma` difieren solo en la
+  columna `finishedAt` de `Order`; la lista de `model X {` es identica en ambos.
+- La excepcion de QC-141 (`ReservationMovement` en `ESPERADOS_DE_ESTA_RAMA`) se QUITO: ya no
+  hace falta, porque la comparacion ya no llega hasta el punto en que `origin/dev` incluye
+  QC-141. `ReservationMovement` no aparece en ninguno de los dos lados de la comparacion
+  contra el merge de QC-145.
+- Hallazgo tecnico: `execSync` en Windows corre por `cmd.exe`, donde `^` es caracter de escape;
+  `${MERGE_QC145}^1` se corrompia a un SHA con un caracter de mas. Se uso `${MERGE_QC145}~1`
+  (equivalente para primer padre) en su lugar.
+- Caso sintetico «dispara con un esquema sintetico que gana un modelo respecto de su padre»
+  reescrito para ejercitar la misma funcion `modelosDe` que usa el caso real (antes tenia su
+  propia copia local de la funcion).
+- Sin red: si el commit no existe (clon superficial), el caso lanza `throw new Error(...)` con
+  el motivo, nunca se salta.
+
+Salida real de los comandos pedidos:
+
+```
+pnpm exec vitest run tests/unit/pedidos/qc145-estado-solo-planta.test.ts
+  Test Files  1 passed (1)
+       Tests  18 passed (18)
+
+pnpm exec vitest related --run tests/unit/pedidos/qc145-estado-solo-planta.test.ts
+  Test Files  1 passed (1)
+       Tests  18 passed (18)
+
+pnpm run typecheck
+  (sin salida, exit 0)
+
+pnpm run lint
+  2 warnings preexistentes en tests/unit/pedidos/order-service.test.ts (no relacionadas con
+  este cambio), 0 errores.
+```
+
 ## Sincronizacion con origin/dev (implementer, 2026-09-24)
 
 - Merge de `origin/dev` (`08935782`, incluye QC-141) en `6261e981`. Unico conflicto:
