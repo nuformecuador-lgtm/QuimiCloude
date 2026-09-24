@@ -39,11 +39,10 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 54 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 55 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
-      // 54 y no 51: entran `insufficient_material`, `recipe_without_lines` y
-      // `user_cannot_be_responsible`.
-      expect(ERROR_CODES).toHaveLength(54)
+      // 55 y no 54: entra `customer_not_found`.
+      expect(ERROR_CODES).toHaveLength(55)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -280,6 +279,28 @@ describe('QC-121 R20 — presentation_unit_locked es la novena enmienda al catal
     it('la cabecera de error-codes.ts redacta la decima enmienda con su fecha', () => {
       const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
       expect(source).toContain('**Decima enmienda, el 2026-09-22 (fix directo)**')
+    })
+  })
+
+  describe('R34 — customer_not_found tiene clave y texto no vacio', () => {
+    it('customer_not_found esta en el catalogo con su clave y su texto exacto', () => {
+      const codigos: readonly string[] = ERROR_CODES
+      expect(codigos).toContain('customer_not_found')
+      expect(ERROR_MESSAGE_KEY.customer_not_found).toBe('errors.customer_not_found')
+      expect(errorMessage('customer_not_found')).toBe('El cliente solicitado no existe.')
+      expect(errorMessage('customer_not_found').trim().length).toBeGreaterThan(0)
+    })
+
+    it('se distingue de supplier_not_found, invalid_input y unexpected', () => {
+      const texto = errorMessage('customer_not_found')
+      expect(texto).not.toBe(errorMessage('supplier_not_found'))
+      expect(texto).not.toBe(errorMessage('invalid_input'))
+      expect(texto).not.toBe(errorMessage('unexpected'))
+    })
+
+    it('la cabecera de error-codes.ts redacta la duodecima enmienda con su fecha', () => {
+      const source = readModuleFile('lib/modules/errores/domain/error-codes.ts')
+      expect(source).toContain('**Duodecima enmienda, el 2026-09-24**')
     })
   })
 
