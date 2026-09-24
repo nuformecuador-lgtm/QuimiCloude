@@ -4775,3 +4775,28 @@ podar.
 - **Deuda:** T14 (dispositivos reales), R51 de `proveedores.spec.ts` rojo heredado de `dev`
   (`682d3e3b`), y los menores de la segunda revisión (tres aserciones sin sucesor en los tests
   recuperados, citas en comentarios de tests).
+
+## 2026-09-24 — QC-153-modelo-de-clientes
+
+- **Qué:** tabla `customers` (nombres, apellidos y ciudad obligatorios; teléfono, correo, dirección opcionales;
+  duplicados permitidos; borrado lógico; `company_id` con unicidad `(company_id, id)`; RLS) y enmienda al
+  catálogo de permisos: `clientes.consultar`/`clientes.modificar`, solo Administrador (16→18, seed 20→22).
+  Módulo `clientes` solo con armazón. Primera ficha de la épica nueva **QC-152 Clientes**.
+- **PR #117**, merge `cf99cc2b`. Spec R1–R29. Review OK. Gate completo verde (674/9418).
+- **Decisiones humanas sobre tests ajenos:** el guardián de modelos de QC-145 se fija a su propio merge (PR
+  #112) en vez del merge-base de cada rama; `pedidos-schema` deroga solo la prohibición del modelo `Customer`
+  (la de que `Order` no tenga cliente sigue hasta QC-156). **Desbloquea QC-154.**
+
+## 2026-09-24 — QC-158-catalogo-desde-pdf
+
+- **Qué:** lo que la IA lee de un PDF de catálogo se convierte en líneas del catálogo del proveedor tras una
+  revisión en `/proveedores/[id]/importar/[documentoId]`: producto existente solo actualiza `cost`, presentación
+  nueva se crea (unidad elegida por el revisor, exige `inventario.modificar`), imagen recortada por página y orden,
+  campos nuevos `material` y `measurements`. Primera ficha que interpreta la salida de la IA; enmienda R10 de
+  QC-129. R29: editar una línea ya no borra su imagen.
+- **PR #119**, merge `6962dac9`. Spec R1–R38. Review: vuelta 1 rechazada (B1, R28 «mostrar» sin test), vuelta 2 OK.
+  El E2E de QC-107 (`documentos.spec.ts`), rojo en dev desde QC-110, vuelve a verde.
+- **Incidencia:** el `implementer` se cortó ~15 h sin entregar informe; se detectó al preguntar el humano y se
+  reanudó sin pérdida. **Lección:** comprobar el último commit antes de estimar.
+- **Quedan:** imagen en pantalla con URL firmada → **QC-140** (encargo en su issue); R37 en móvil real (humano);
+  prompt de catálogo en Vercel y firma → **QC-131** (humano).

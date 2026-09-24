@@ -19,6 +19,8 @@
 
 ## Evaluaciones
 
+**2026-09-24:** QC-153 (PR #117) y QC-158 (PR #119) cerradas; resumenes en `progress/history.md`. Desbloquea **QC-154** (CRUD de clientes). Pendientes humanos: R37 de QC-158 en movil real; QC-131 (prompt en Vercel y firma).
+
 ### QC-168 - NACE y se ACOTA con `/afinar-feature` (2026-09-24)
 
 **13 decisiones cerradas**, ninguna abierta, en `specs/QC-168-estado-por-empacar/requirements.md`. Bloqueada por QC-150 y **bloquea a QC-82**, cuyo spec aprobado hay que revisar antes de implementar (Finalizar deja Por empacar; dos acciones de empaque en el registro). Orden: QC-150 -> QC-168 -> QC-82. Tambien nacio **QC-167** (consulta del recorrido en el dashboard, bloqueada por QC-82).
@@ -47,7 +49,7 @@ PR #118, merge `a738d81f`. Resumen en `progress/history.md`. **Deuda: T14, revis
 
 **QC-160** (frontend, bloqueada por QC-142) creada en el board y sembrada: 7 decisiones y 2 preguntas abiertas en `specs/QC-160-boton-de-subida-de-pdf/requirements.md`. Absorbe el montaje en formulas de **QC-142**, que queda solo permiso y pasa a `zone: backend` (editado en Jira y en `feature_list.json`). Toca `/proveedores/[id]` como QC-158: mirar en F1.0.
 
-### QC-158 / QC-159 - lectura de PDF con IA a datos, del chat (2026-09-23)
+### QC-158 CERRADA (2026-09-24) / QC-159 - lectura de PDF con IA a datos - lectura de PDF con IA a datos, del chat (2026-09-23)
 
 **QC-158** `catalogo-desde-pdf` (fullstack, high) ACOTADA y sembrada: 9 decisiones y 4 preguntas abiertas en `specs/QC-158-catalogo-desde-pdf/requirements.md`; enmienda R10 de QC-129 (avisado en QC-131). **F1.0 de QC-158 hecho el 2026-09-23** (worktree montado; cupo `fullstack` 1 de 3 con QC-141; el cruce de archivos con QC-141 se mira en F2.0). **F1.2/F1.3 hechos**: R1-R38, T0-T17; 7 preguntas con propuesta (design §10); tarjeta en *En revision*. **F1.4 APROBADO el 2026-09-23 por chat** (P1-P7 con las propuestas del design §10). **F2.0 hecho**: `in_progress`, *En curso*, cupo `fullstack` 2 de 3 con QC-141 (solapes pequenos: listas cerradas de e2e/migraciones y `lib/composition/index.ts`). Hallazgos: orquestacion en `documentos` (proveedores no puede importar inventario); editar una linea hoy borra su imagen (R29); el E2E de QC-107 probablemente rojo desde QC-110 (T0/T14). **F2.1-F2.4 hechos el 2026-09-24**: el implementer se corto 15 h sin informe y se reanudo; review vuelta 1 RECHAZADO (B1: R28 mostrar sin test), vuelta 2 OK; decisiones humanas: imagen en pantalla -> QC-140 (encargo en su issue), medidas sin ceros; `documentos.spec.ts` de QC-107 vuelve a verde; gate completo 708 verdes + flake QC-126 (aislado 27/27); `--rapido` verde tras merge. **PR #119 abierto.** Pendiente humano: R37 en movil real. **QC-159** `formula-desde-pdf` (fullstack) nace sin sembrar, bloqueada por QC-142.
 
@@ -55,7 +57,7 @@ PR #118, merge `a738d81f`. Resumen en `progress/history.md`. **Deuda: T14, revis
 
 `backend`, **`complexity: low`** (label en Jira). Deps QC-107 y QC-111 `done`. **Ficha HUMANA**: ningun agente redacta el texto definitivo, lo pone en Vercel ni firma. Decisiones del humano el 2026-09-23: (1) el arnes le prepara BORRADORES de los dos prompts y una guia paso a paso, en el `design.md` del spec (sin diff de codigo); el texto final lo decide y lo pone el; (2) **cierra la pregunta abierta 1 de QC-129**: el humano pone las dos variables TAMBIEN en Preview, con el mismo texto que en produccion. Worktree montado. **F1.2/F1.3 hechos**: recortada a SOLO CATALOGO (formula -> QC-157, bloqueada por QC-142); borradores en `borradores-de-prompts/` (gitignorada); spec en la rama (`16d4d35d`), tarjeta en *En revision*. **F1.4 APROBADO el 2026-09-23 por chat; F2.0 hecho** (`in_progress`, *En curso*, cupo `backend` 1 de 2). **El trabajo es HUMANO** (T1-T7 del tasks.md): no se lanza implementer. Aviso: QC-158 amplia el contrato del prompt de catalogo (material y medidas): conviene fijar el texto tras el spec de QC-158.
 
-### QC-152 Clientes - EPICA NUEVA del chat, ACOTADA con `/afinar-feature` (2026-09-23)
+### QC-152 Clientes (QC-153 CERRADA el 2026-09-24, PR #117) - EPICA NUEVA del chat, ACOTADA con `/afinar-feature` (2026-09-23)
 
 Epica **QC-152** y tareas **QC-153** (modelo, backend), **QC-154** (CRUD, backend, bloqueada por 153), **QC-155** (pantalla, frontend, bloqueada por 154) y **QC-156** (pedido con cliente, fullstack, bloqueada por 154, sin sembrar). 153-155 sembradas con 7 decisiones comunes y 1 pregunta abierta (largos y formato de telefono/correo) en `specs/QC-15{3,4,5}-*/requirements.md`. `complexity` pendiente de F1.0. **QC-153 F1.0 hecho el 2026-09-24**: `complexity: medium` (migracion con RLS, FK compuesta y enmienda al catalogo de permisos con seed), worktree montado, cupo `backend` 2 de 2 con QC-131 (humana). **F1.2/F1.3 hechos**: R1-R29, T0-T13; tarjeta en *En revision*; **F1.4 APROBADO el 2026-09-24** (FK de auditoria simples, descripciones propuestas, ciudad 80/direccion 200). **F2.0 hecho**: `in_progress`, *En curso*. **F2.1-F2.4 hechos el 2026-09-24**: review OK (0 bloqueantes, menores cerrados); decisiones humanas sobre tests ajenos (guardian de QC-145 fijado a su merge; `pedidos-schema` deroga solo la prohibicion de `Customer`); gate completo VERDE (674/9418). **PR #117 abierto.** Choca con QC-142 en el catalogo de permisos: no en paralelo.
 
