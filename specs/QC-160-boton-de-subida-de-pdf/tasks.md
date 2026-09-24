@@ -180,12 +180,12 @@
 
 ### T8 — Cierre
 
-- [ ] `progress/impl_QC-160-boton-de-subida-de-pdf.md` con el mapa `R<n> -> test` de
+- [x] `progress/impl_QC-160-boton-de-subida-de-pdf.md` con el mapa `R<n> -> test` de
   `design.md > 12` (R1-R22, ninguno sin test).
 - [ ] `./init.sh` completo en verde, con `QuimiCloude_QC160`.
-- [ ] `git diff --stat origin/dev...HEAD` no lista `package.json`, `pnpm-lock.yaml`,
+- [x] `git diff --stat origin/dev...HEAD` no lista `package.json`, `pnpm-lock.yaml`,
   `docs/dependencias.md`, `db/` ni ningún archivo de `lib/modules/documentos/adapters/` (R9, R20).
-- [ ] Ningún comentario de producción tocado casa con
+- [x] Ningún comentario de producción tocado casa con
   `/QC-\d+|\bR\d+\b|\bD\d+\b|design\.md|decisi[oó]n cerrada/i`.
 - **Archivos:** `progress/impl_QC-160-boton-de-subida-de-pdf.md`.
 - **Depende de:** T1-T7.
