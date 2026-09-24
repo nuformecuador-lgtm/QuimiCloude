@@ -238,6 +238,17 @@ describe('documentos — lectura y descarga con comprobacion de empresa', () => 
     });
   });
 
+  describe('las lecturas no exigen ningun permiso, solo la empresa (R18)', () => {
+    for (const { nombre, construir } of OPERACIONES) {
+      it(`R18 — ${nombre}: un actor SIN ningun permiso lee su propia ruta igual que uno con permisos`, async () => {
+        const doble = dobleDeAlmacenamiento();
+        const sinPermisos: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [] };
+
+        await expect(construir(doble.storage)(sinPermisos, RUTA_PROPIA)).resolves.toBeDefined();
+      });
+    }
+  });
+
   describe('la forma de las dos operaciones (R1)', () => {
     it('R1 — el actor entra por parametro: el dominio no lee sesion, cookie ni cabecera', () => {
       const raiz = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
