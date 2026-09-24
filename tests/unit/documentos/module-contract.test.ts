@@ -326,6 +326,10 @@ const EXPORTACIONES_DE_EJECUCION = [
   'createRunDocumentJob',
   'createGetBatchStatus',
   'createCropCatalogImages',
+  'confirmCatalogImportInputSchema',
+  'newPresentationUnitSchema',
+  'previewCatalogImportInputSchema',
+  'createPreviewCatalogImport',
 ] as const;
 
 /** Y lo que publica SOLO COMO TIPO: se borra al compilar, asi que no se ve en el objeto importado y
@@ -360,6 +364,15 @@ const EXPORTACIONES_DE_TIPO = [
   'CropCatalogImagesDeps',
   'CropCatalogImagesInput',
   'CropCatalogImagesResult',
+  'ConfirmCatalogImportInput',
+  'NewPresentationUnitInput',
+  'PreviewCatalogImportInput',
+  'ReviewedLineInput',
+  'CatalogImportDeps',
+  'CatalogImportNewPresentation',
+  'CatalogImportPreview',
+  'CatalogImportPreviewCrop',
+  'CatalogImportPreviewRow',
 ] as const;
 
 /** Nombres exportados SOLO como tipo por un barril, leidos del fuente: `export { type X } from ...`

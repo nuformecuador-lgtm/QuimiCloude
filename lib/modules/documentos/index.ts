@@ -153,3 +153,30 @@ export {
   type CropCatalogImagesInput,
   type CropCatalogImagesResult,
 } from './domain/crop-catalog-images';
+
+// El esquema del borde de la vista previa y de la confirmacion de una importacion de catalogo, y
+// sus tipos inferidos: una sola definicion de la entrada, reutilizada por las dos Server Actions
+// de T12.
+export {
+  confirmCatalogImportInputSchema,
+  newPresentationUnitSchema,
+  previewCatalogImportInputSchema,
+  type ConfirmCatalogImportInput,
+  type NewPresentationUnitInput,
+  type PreviewCatalogImportInput,
+  type ReviewedLineInput,
+} from './domain/catalog-import-input';
+
+// La vista previa de una importacion de catalogo, publicada como FABRICA por el mismo motivo que
+// el resto: quien la usa recibe el caso de uso ya construido y nunca ve a sus puertos ni a los
+// casos de uso de `proveedores` e `inventario` que trae inyectados. `CatalogImportDeps` se
+// publica porque T10 (`confirm-catalog-import.ts`) comparte el MISMO tipo, y quien cablea los dos
+// (`lib/composition`) necesita nombrarlo una sola vez.
+export {
+  createPreviewCatalogImport,
+  type CatalogImportDeps,
+  type CatalogImportNewPresentation,
+  type CatalogImportPreview,
+  type CatalogImportPreviewCrop,
+  type CatalogImportPreviewRow,
+} from './domain/preview-catalog-import';
