@@ -101,23 +101,51 @@ export async function findAliveProductById(
   return row === null ? null : toProductView(row);
 }
 
-/** `updateMany` y no `update`: sin fila viva `count` sale 0 y se devuelve `false` en vez de lanzar. */
+type ProductTypeRow = { readonly type: ProductType };
+
+/**
+ * Bloquea la fila para decidir el tipo antes de escribir, sin dos consultas sueltas que dejen
+ * hueco a una carrera: `FOR NO KEY UPDATE` retiene la fila hasta que la transaccion cierra.
+ * Devuelve `false` sin fila viva de la empresa, `'type_locked'` si la edicion cambiaria el tipo
+ * a o desde `FINISHED_PRODUCT` (R4), y `true` tras escribir. El tipo en si nunca se escribe: la
+ * edicion no lo cambia, ni para un producto terminado ni para ningun otro.
+ */
 export async function updateAliveProduct(
   id: string,
   data: NewProduct,
   now: Date,
   scope: InventoryScope,
-): Promise<boolean> {
-  const { count } = await prisma.product.updateMany({
-    where: { AND: [productCompanyScope(scope), { id, deletedAt: null }] },
-    data: {
-      name: data.name,
-      nameNormalized: normalizeProductName(data.name),
-      qtyAlert: data.qtyAlert ?? null,
-      updatedAt: now,
-    },
+): Promise<boolean | 'type_locked'> {
+  const { companyId } = companyScopeColumns(scope);
+
+  return prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<ReadonlyArray<ProductTypeRow>>(Prisma.sql`
+      SELECT "type"
+        FROM "products"
+       WHERE "id" = ${id}::uuid
+         AND "company_id" = ${companyId}::uuid
+         AND "deleted_at" IS NULL
+         FOR NO KEY UPDATE
+    `);
+    const alive = rows[0];
+    if (alive === undefined) return false;
+
+    const requestedType = data.type ?? PRODUCT_TYPES.PRODUCT;
+    const wasFinished = alive.type === PRODUCT_TYPES.FINISHED_PRODUCT;
+    const staysFinished = requestedType === PRODUCT_TYPES.FINISHED_PRODUCT;
+    if (wasFinished !== staysFinished) return 'type_locked';
+
+    const { count } = await tx.product.updateMany({
+      where: { id, companyId, deletedAt: null },
+      data: {
+        name: data.name,
+        nameNormalized: normalizeProductName(data.name),
+        qtyAlert: data.qtyAlert ?? null,
+        updatedAt: now,
+      },
+    });
+    return count === 1;
   });
-  return count === 1;
 }
 
 export async function softDeleteAliveProduct(

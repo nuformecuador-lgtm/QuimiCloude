@@ -49,7 +49,17 @@ import type { BatchHistoryEntry } from '../domain/reservation';
 export interface ProductRepository {
   create(data: NewProduct, now: Date, scope: InventoryScope): Promise<{ id: string }>;
   findAliveById(id: string, scope: InventoryScope): Promise<ProductView | null>;
-  updateAlive(id: string, data: NewProduct, now: Date, scope: InventoryScope): Promise<boolean>;
+  /**
+   * `'type_locked'` (R4): la edicion cambiaria el tipo a `FINISHED_PRODUCT`, o cambiaria el de
+   * un producto terminado a cualquier otro. El adaptador lo decide bajo el mismo bloqueo con el
+   * que escribe, para que dos ediciones concurrentes no lo esquiven.
+   */
+  updateAlive(
+    id: string,
+    data: NewProduct,
+    now: Date,
+    scope: InventoryScope,
+  ): Promise<boolean | 'type_locked'>;
   softDeleteAlive(id: string, now: Date, scope: InventoryScope): Promise<boolean>;
   /** QC-57 (R24): recibe el CONTRATO GENERICO ya saneado por el caso de uso, no la
    *  consulta cruda del llamante. Traducir `columnId`/filtros a SQL es del adaptador. */

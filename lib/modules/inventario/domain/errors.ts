@@ -96,6 +96,16 @@ export class BatchStockNegativeError extends InventarioError {
   }
 }
 
+/** La entrada es valida y el actor tiene permiso: lo que la regla de negocio rechaza es la
+ *  ACCION pedida (cambiar el tipo de o hacia un producto terminado, un homonimo terminado). */
+export class ActionNotAllowedError extends InventarioError {
+  readonly code = 'action_not_allowed';
+
+  constructor(diagnostic?: string) {
+    super('action_not_allowed', diagnostic);
+  }
+}
+
 export class ValidationError extends InventarioError {
   readonly code = 'invalid_input';
 
