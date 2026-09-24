@@ -30,6 +30,25 @@
   ampliado): se revirtió con `git checkout -- pnpm-workspace.yaml` y se corrió
   `pnpm exec prisma generate` directo, que generó el cliente sin problema.
 
+## T1 — `db/schema.prisma`
+
+Modelo `Customer` añadido al final del archivo, tras `DocumentFile`, tal cual `design.md > 2.1`.
+`pnpm prisma validate` y `pnpm exec prisma generate` en verde. `pnpm exec next typegen` fue
+necesario para que `typecheck` no fallara por `LayoutProps` sin generar (deuda del worktree
+recién montado, no de esta ficha). `typecheck` en verde tras eso.
+`guard-empresa-en-esquema.test.ts` y `guard-arquitectura-modulos.test.ts`: 77 tests verdes.
+
+## T2 — Migración `20260924120000_customers`
+
+`migration.sql` y `down.sql` escritos a mano según `design.md > 2.2`/`2.3`. Aplicados sobre
+`QuimiCloude_QC153` con `pnpm run db:migrate`; probado migrar → `pnpm run db:rollback` →
+migrar de nuevo, los tres pasos sin error. `db:test status` confirma 46 migraciones al día tras
+la reaplicación.
+
+Alta de `20260924120000_customers` al final de `MIGRACIONES_ESPERADAS`
+(`tests/guards/guard-identificador-de-request.test.ts`). `guard-identificador-de-request.test.ts`
+y `guard-rls-force.test.ts`: 27 tests verdes.
+
 ## Verificación T0
 
 ```

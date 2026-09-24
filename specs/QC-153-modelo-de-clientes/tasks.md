@@ -55,7 +55,7 @@ QC-158 (`in_progress`) puede añadir migración: choca solo en `MIGRACIONES_ESPE
       `pnpm prisma generate`. **Hecho cuando:** `pnpm prisma validate` pasa, `typecheck` pasa y
       `guard-empresa-en-esquema` y `guard-arquitectura-modulos` (bloque 10) siguen verdes.
       *Depende de T0.*
-- [ ] **T2.** `db/migrations/<ts>_customers/migration.sql` y `down.sql`, escritos a mano según
+- [x] **T2.** `db/migrations/<ts>_customers/migration.sql` y `down.sql`, escritos a mano según
       `design.md > 2.2` y `> 2.3`, con cabecera corta sin citas. Aplicar con `pnpm run db:migrate`
       sobre `QuimiCloude_QC153`; comprobar `pnpm run db:rollback` y volver a aplicar.
       Alta de `<ts>_customers` al final de `MIGRACIONES_ESPERADAS`

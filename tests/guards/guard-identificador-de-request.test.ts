@@ -294,6 +294,10 @@ export const MIGRACIONES_ESPERADAS = [
   // Igual patron: anula `product_batches.presentation_id` y `unit_cost` (solo MACHINE los
   // omite en el borde); no toca el identificador de peticion.
   '20260923140000_product_batch_nullable_machine',
+  // Con el mismo patron que las anteriores: la migracion que crea la tabla `customers` y los
+  // permisos de `clientes` no persiste el identificador de peticion ni lo menciona; se nombra
+  // aqui a mano y la lista sigue CERRADA para la siguiente.
+  '20260924120000_customers',
 ] as const
 
 export function hallazgosDeMigraciones(
