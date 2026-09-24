@@ -86,4 +86,9 @@ export {
 // Solo tipos: por aqui otros modulos apuntan a un producto sin tocar la tabla ni Prisma. La
 // implementacion se cablea en `lib/composition`.
 export type { ProductCatalog, ProductId, ProductRef } from './domain/product-catalog';
-export type { PresentationCatalog, PresentationId, PresentationRef } from './domain/presentation-catalog';
+export type {
+  PresentationByName,
+  PresentationCatalog,
+  PresentationId,
+  PresentationRef,
+} from './domain/presentation-catalog';
