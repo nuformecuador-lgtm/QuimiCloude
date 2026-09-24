@@ -329,3 +329,32 @@ pnpm run lint
   en `tests/baseline-rojos.json`. Lo pone rojo el modelo `Customer` (R1). QC-141 resolvio el mismo choque
   anadiendo su modelo como excepcion nombrada en ese caso; aqui NO se ha tocado: pendiente de decision.
 - Gate completo (`./init.sh`) NO corrido: lo corre el leader.
+
+## Decision humana 2026-09-24: pedidos-schema, derogacion parcial
+
+`tests/unit/pedidos/schema/pedidos-schema.test.ts`, caso «Order no declara cliente, destinatario
+ni ninguna columna equivalente», prohibia dos cosas: (a) campos de cliente/destinatario en `Order`,
+y (b) un catalogo de clientes (modelos `Customer`/`Client`/`Recipient`/`Buyer` y sus `@@map`).
+Decision humana: (b) queda derogada solo para `Customer`/`customers` por el modulo Clientes
+(QC-152/QC-153, 2026-09-24); (a) sigue vigente hasta QC-156.
+
+Cambios:
+- Se retiro `Customer` de la lista `forbidden` de modelos y `customers` del regex `@@map`
+  prohibido en ese caso. `Client`, `Recipient`, `Buyer`, `clients` y `recipients` se mantienen.
+- Se reescribio el comentario del caso para reflejar la derogacion parcial y su fecha.
+- Se anadio nota fechada 2026-09-24 en `specs/QC-153-modelo-de-clientes/design.md` §6.1.
+- La aseveracion (a) sobre los campos de `Order` no se toco.
+
+Salida real:
+```
+pnpm exec vitest run tests/unit/pedidos/schema/pedidos-schema.test.ts
+  Test Files  1 passed (1)
+       Tests  28 passed (28)
+
+pnpm run typecheck
+  (sin salida, exit 0)
+
+pnpm run lint
+  2 warnings preexistentes en tests/unit/pedidos/order-service.test.ts (no relacionadas con
+  este cambio), 0 errores.
+```

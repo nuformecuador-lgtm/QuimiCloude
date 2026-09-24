@@ -340,6 +340,14 @@ los números se **suben** y las listas se **amplían** nombrando la entrada nuev
 
 ### 6.1 Recuento del catálogo (hoy 16 → 18) y de asignaciones (hoy 20 → 22)
 
+**Nota 2026-09-24 (decisión humana):** `tests/unit/pedidos/schema/pedidos-schema.test.ts`, caso
+«Order no declara cliente, destinatario ni ninguna columna equivalente», prohibía también un
+catálogo de clientes (modelos `Customer`/`Client`/`Recipient`/`Buyer` y sus `@@map`). Esta ficha
+deroga esa prohibición solo para `Customer`/`customers`: el catálogo de clientes que crea existe.
+La prohibición de `Client`, `Recipient`, `Buyer` y sus `@@map` (`clients`, `recipients`) sigue en
+pie. La parte del mismo caso sobre los campos de `Order` (que Order no declara cliente ni
+destinatario) no cambia y sigue vigente hasta QC-156.
+
 | Archivo:línea | Qué fija | Cambio |
 |---|---|---|
 | `tests/unit/identity/permissions.test.ts:25-42` | `CODIGOS_DEL_REQUISITO` a mano | suma los dos códigos al final |
