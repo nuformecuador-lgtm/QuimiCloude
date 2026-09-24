@@ -5,9 +5,9 @@
 > con `./init.sh` completo. Comentarios de producción sin citas a fichas, requisitos ni `design.md`;
 > `R<n>` va en el nombre de los tests.
 >
-> **Bloqueos por F1.4.** Las tasks marcadas `[bloqueada: P<n>]` no se empiezan hasta que el humano
-> cierre esa pregunta (`requirements.md > Preguntas abiertas`, propuestas en `design.md > 10`). Si la
-> respuesta difiere de la propuesta, se enmienda el spec antes de tocar la task.
+> **Sin bloqueos por F1.4.** El 2026-09-23 el humano aprobó el spec y cerró las siete preguntas con
+> las propuestas de `design.md > 10` (`[F1]`…`[F7]` en `requirements.md`). T3, T4, T5, T6, T10, T11,
+> T12 y T14 quedan desbloqueadas; cada una cita la decisión que implementa.
 >
 > **Base de datos.** Toda migración, rollback y E2E de esta rama corre contra **`QuimiCloude_QC158`**,
 > a la que apunta el `.env` del worktree. Nunca contra la compartida `QuimiCloude`.
@@ -53,7 +53,7 @@ limpio (salida en la bitácora); test estático de que `down.sql` revierte exact
 2 CHECK (**R30**); integración: `material = '  '` y `measurements = '[]'` rechazados, `NULL` y
 objeto aceptados (**R27**); `guard-empresa-en-esquema` y `guard-rls-force` verdes.
 
-## T3 — Esquema de los campos nuevos en `proveedores` `[depende de T2]` `[bloqueada: P2]`
+## T3 — Esquema de los campos nuevos en `proveedores` `[depende de T2]` `[F2]`
 
 Archivos: `lib/modules/proveedores/domain/{catalog-line-input,catalog-line-view,create-catalog-line,update-catalog-line}.ts`,
 `lib/modules/proveedores/index.ts`,
@@ -67,7 +67,7 @@ Archivos: `lib/modules/proveedores/domain/{catalog-line-input,catalog-line-view,
 únicos, boca ≤ 40, material ≤ 120); alta y edición existentes siguen verdes; el listado devuelve los
 dos campos.
 
-## T4 — Importación por identidad en `proveedores` `[depende de T3]` `[bloqueada: P7]`
+## T4 — Importación por identidad en `proveedores` `[depende de T3]` `[F7]`
 
 Archivos: `lib/modules/proveedores/ports/supplier-catalog-import-repository.ts` (nuevo),
 `lib/modules/proveedores/adapters/driven/persistence/supplier-catalog-import-prisma.ts` (nuevo),
@@ -86,7 +86,7 @@ escribe» (`updated_at` igual), **R16**, **R21** (fallo forzado en la fila 3 de 
 otra empresa o dado de baja ⇒ `supplier_not_found`, nada escrito); `proveedores/scope.test.ts` verde
 (el módulo sigue sin nombrar `inventario`).
 
-## T5 — Interpretar el texto de la IA `[depende de T1]` `[bloqueada: P4]`
+## T5 — Interpretar el texto de la IA `[depende de T1]` `[F4]`
 
 Archivos: `lib/modules/documentos/domain/catalog-extraction.ts` (nuevo),
 `tests/unit/documentos/catalog-extraction.test.ts`.
@@ -98,7 +98,7 @@ desconocida, tipo erróneo en un campo deja la línea con ese campo nulo, elemen
 descartado), **R6** (sin objeto, JSON roto, `lines` string ⇒ `ValidationError`), **R35** (`cost:
 1250.5` numérico ⇒ `null`) y **R7** (la función no escribe: es pura, sin dependencias).
 
-## T6 — Clasificar, sugerir unidad y emparejar imagen `[depende de T3, T5]` `[bloqueada: P1, P3]`
+## T6 — Clasificar, sugerir unidad y emparejar imagen `[depende de T3, T5]` `[F1]` `[F3]`
 
 Archivos: `lib/modules/documentos/domain/{classify-catalog-import,suggest-unit,crop-pairing}.ts`
 (nuevos), `lib/modules/documentos/domain/document-path.ts` (`isCropPathOf`),
@@ -151,7 +151,7 @@ Archivos: `lib/modules/documentos/domain/preview-catalog-import.ts` (nuevo),
 `lines` editadas reclasifica) y **R31** (sin permiso: ningún puerto tocado; el orden de llamadas se
 registra).
 
-## T10 — Caso de uso de confirmación `[depende de T9]` `[bloqueada: P1, P6]`
+## T10 — Caso de uso de confirmación `[depende de T9]` `[F1]` `[F6]`
 
 Archivos: `lib/modules/documentos/domain/confirm-catalog-import.ts` (nuevo),
 `lib/modules/documentos/index.ts`, `tests/unit/documentos/{confirm-catalog-import,catalog-import-authorization}.test.ts`,
@@ -164,7 +164,7 @@ presentación nueva ⇒ `unauthorized` antes de escribir nada); integración par
 creada queda, segunda confirmación la reutiliza), **R22** y **R34** (archivo, recortes, proveedor y
 unidad de otra empresa).
 
-## T11 — Material y medidas en la pantalla del catálogo `[depende de T3]` `[P con T8-T10]` `[bloqueada: P2]`
+## T11 — Material y medidas en la pantalla del catálogo `[depende de T3]` `[P con T8-T10]` `[F2]`
 
 Archivos: `app/(private)/proveedores/[id]/components/{catalog-line-form,catalog-columns,catalog-columns-skeleton}.tsx|ts`,
 `lib/modules/proveedores/adapters/driving/supplier-catalog-actions.ts`,
@@ -176,7 +176,7 @@ Archivos: `app/(private)/proveedores/[id]/components/{catalog-line-form,catalog-
 **Hecho cuando:** tests verdes para **R28** (se ven y se escriben en alta y edición) y **R29** (editar
 solo el costo de una línea con imagen, material y medidas los conserva); inputs ≥ 16 px.
 
-## T12 — Pantalla de revisión y sus acciones `[depende de T9, T10]` `[bloqueada: P1, P3]`
+## T12 — Pantalla de revisión y sus acciones `[depende de T9, T10]` `[F1]` `[F3]` `[F5]`
 
 Archivos: `lib/shared/routes.ts` (`supplierCatalogImportRoute`),
 `lib/modules/documentos/adapters/driving/catalog-import-actions.ts` (nuevo),
@@ -203,7 +203,7 @@ Archivos: `components/shared/document-upload/{document-upload,document-upload-ro
 (`formula` sin enlace); los tests existentes de `documentos-ui` siguen verdes sin cambios;
 `proveedores/scope.test.ts` verde (`components/` sin archivos que casen `proveedor|supplier`).
 
-## T14 — Cableado y dobles E2E `[depende de T8, T10]` `[bloqueada: P4]`
+## T14 — Cableado y dobles E2E `[depende de T8, T10]` `[F4]`
 
 Archivos: `lib/composition/index.ts` (fachada `documentos`: `previewCatalogImport`,
 `confirmCatalogImport`, `CropCatalog`; `cropStorage` con doble; fachada `proveedores`: los dos casos

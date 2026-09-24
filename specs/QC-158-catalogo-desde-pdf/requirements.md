@@ -33,15 +33,15 @@
 > `measurements` · `[D7]` fórmulas fuera · `[D8]` permiso `proveedores.modificar` en el service ·
 > `[D9]` E2E con IA y cola simuladas. Las **nueve** quedan citadas al menos una vez.
 >
-> **Requisitos que dependen de una pregunta abierta** llevan `(P<n>)`: su redacción es la
-> **propuesta** de `design.md > 10` y no se implementan hasta que el humano la cierre en F1.4.
+> **Decisiones de F1.4.** Los requisitos que nacieron de una pregunta abierta citan ahora su decisión
+> cerrada `[F1]`…`[F7]` (nota fechada al final del archivo).
 
 ### Entrada a la revisión
 
 **R1.** CUANDO un archivo de una tanda con estrategia **`catalogo`** llega a «listo» en el componente
 de carga del detalle de un proveedor, el sistema DEBE ofrecer en la fila de ese archivo un acceso a
 **su revisión**, que abre la pantalla de revisión de **ese archivo para ese proveedor**. SI el
-archivo está en otro estado, ENTONCES el acceso NO DEBE aparecer. `[D1]` `[D2]`
+archivo está en otro estado, ENTONCES el acceso NO DEBE aparecer. `[D1]` `[D2]` `[F5]`
 
 **R2.** SI la tanda del archivo tiene estrategia **`formula`**, ENTONCES el sistema NO DEBE ofrecer
 ninguna revisión ni convertir su texto en nada. `[D7]`
@@ -58,7 +58,7 @@ sistema DEBE responder `supplier_not_found` y NO DEBE mostrar ni escribir ningun
 **R5.** El sistema DEBE interpretar el texto guardado del archivo según la **forma JSON fijada en
 `design.md > 3`**, y DEBE tolerar: cercas de código markdown, texto antes o después del objeto,
 `"lines": null` (cero líneas), claves ausentes y valores `null` (campo vacío), y claves desconocidas
-(se ignoran). Un campo cuyo tipo no encaja DEBE tratarse como vacío, sin descartar la línea. `(P4)`
+(se ignoran). Un campo cuyo tipo no encaja DEBE tratarse como vacío, sin descartar la línea. `[F4]`
 `[D2]` `[D6]`
 
 **R6.** SI el texto no contiene un objeto JSON interpretable, o su `lines` no es ni lista ni `null`,
@@ -109,7 +109,7 @@ DEBE fiarse de la clasificación que envía el navegador. `[D2]` `[D3]`
 **R15.** CUANDO se confirma una fila incluida cuya identidad coincide con una línea viva, el sistema
 DEBE actualizar **solo su costo** —y el autor y la fecha de la última modificación— y NO DEBE cambiar
 su nombre, presentación, unidad, compra mínima, tiempo de entrega, imagen, material ni medidas. Si el
-costo es el mismo, NO DEBE escribir la línea. `[D3]` `(P7)`
+costo es el mismo, NO DEBE escribir la línea. `[D3]` `[F7]`
 
 **R16.** CUANDO se confirma una fila incluida sin línea viva con su identidad, el sistema DEBE crear
 la línea en el catálogo **de ese proveedor** con los campos revisados, la imagen asignada, el material
@@ -126,7 +126,7 @@ DEBE rechazar la confirmación **entera** diciendo qué filas lo impiden. `[D4]`
 **R19.** Para cada presentación nueva, el sistema DEBE **preseleccionar** la unidad visible para la
 empresa (de sistema o propia) cuyo nombre o símbolo normalizado coincida con la unidad leída por la
 IA, y DEBE dejarla **sin elegir** si no coincide ninguna o coincide más de una; el revisor DEBE poder
-elegir cualquiera de las unidades visibles. `(P1)` `[D4]`
+elegir cualquiera de las unidades visibles. `[F1]` `[D4]`
 
 **R20.** SI una fila incluida es «incompleta» o «duplicada», o dos filas incluidas comparten
 identidad tras las correcciones, ENTONCES el sistema DEBE rechazar la confirmación entera con
@@ -154,7 +154,7 @@ DEBE crear la línea sin imagen. `[D5]`
 
 **R25.** El sistema DEBE proponer la imagen de cada fila emparejando por **página y orden** según
 `design.md > 10.3`, y DEBE dejar la fila **sin imagen propuesta** cuando el emparejamiento no sea
-unívoco. `(P3)` `[D5]`
+unívoco. `[F3]` `[D5]`
 
 **R26.** SI una fila confirmada trae una imagen que no es un recorte existente **de ese archivo y de
 esa empresa**, ENTONCES el sistema DEBE rechazar la confirmación entera con `invalid_input`, sin
@@ -164,7 +164,7 @@ escribir nada. `[D5]` `[D8]`
 
 **R27.** La línea del catálogo DEBE admitir **`material`** (texto, opcional) y **`measurements`**
 (opcional: diámetro, alto y medida de la boca, con la forma de `design.md > 2.2`). Un material en
-blanco o unas medidas sin ningún valor DEBEN guardarse como **ausentes**. `[D6]` `(P2)`
+blanco o unas medidas sin ningún valor DEBEN guardarse como **ausentes**. `[D6]` `[F2]`
 
 **R28.** La pantalla del catálogo del proveedor DEBE **mostrar** el material y las medidas de cada
 línea y DEBE permitir **escribirlos** en el alta y en la edición de una línea, con las mismas reglas
@@ -188,7 +188,7 @@ abrirse, y SI falta alguno DEBE responder **404** como el resto de pantallas pri
 
 **R33.** SI la confirmación necesita crear alguna presentación y el actor no tiene
 `inventario.modificar`, ENTONCES el sistema DEBE rechazar la confirmación entera con `unauthorized`
-sin escribir ninguna línea. `(P6)` `[D4]` `[D8]`
+sin escribir ninguna línea. `[F6]` `[D4]` `[D8]`
 
 **R34.** Toda lectura y escritura de esta ficha DEBE quedar acotada a la **empresa del actor**:
 archivo, recortes, proveedor, líneas, presentaciones y unidades de otra empresa DEBEN comportarse como
@@ -198,13 +198,13 @@ inexistentes. `[D1]` `[D8]`
 
 **R35.** El costo, la compra mínima y los valores de las medidas DEBEN viajar como **cadena decimal**
 desde el texto de la IA hasta la base, sin pasar por coma flotante; un valor numérico JSON en esos
-campos DEBE tratarse como vacío. `[D3]` `(P4)`
+campos DEBE tratarse como vacío. `[D3]` `[F4]`
 
 ### Contrato con el prompt
 
 **R36.** Ningún archivo versionado DEBE contener el texto del prompt de catálogo, ni completo ni en
 fragmento reconocible: esta ficha fija **solo la forma** del JSON que acepta, y el borrador de QC-131
-(fuera de git) se ajusta a ella. `[D6]` `(P4)`
+(fuera de git) se ajusta a ella. `[D6]` `[F4]`
 
 ### Pantalla
 
@@ -223,32 +223,10 @@ medidas e imagen, y la presentación creada. `[D9]` `[D3]` `[D4]` `[D5]` `[D6]`
 
 ## Preguntas abiertas
 
-1. **Unidad de una presentación nueva.** Una presentación exige unidad (QC-80, `unit_id` NOT NULL). Si la
-   IA lee una unidad que no está en el catálogo de unidades, no está decidido qué pasa (¿el revisor
-   elige una?, ¿se rechaza la línea?).
-2. **Unidad de cada medida.** No está decidido si diámetro, alto y boca guardan cada uno su unidad (cm,
-   mm) o si se fija una sola.
-3. **Emparejar imagen y línea.** Cómo sabe el sistema qué recorte de QC-110 corresponde a qué producto
-   depende de lo que devuelven la IA y el recorte; hay que medirlo en el código antes de decidir.
-4. **Contrato JSON del prompt.** El prompt de catálogo debe devolver también `material` y las medidas:
-   **enmienda R10 de QC-129** (seis campos). El spec fija la forma JSON que el sistema acepta y el borrador
-   de QC-131 (`borradores-de-prompts/catalogo.md`, fuera de git) se ajusta a ella. Nada valida hoy la
-   salida de la IA (se guarda en `document_files.extracted_text` tal cual): esta ficha es la primera que
-   la interpreta.
+Ninguna.
 
-*Añadidas por spec_author el 2026-09-23 al medir el código (no reabren nada de la tabla):*
-
-5. **¿Se puede volver a revisar un archivo más tarde?** La tanda no guarda **qué proveedor** la subió
-   (`document_batches` no tiene `supplier_id`) y el componente de carga solo conoce la tanda mientras
-   está montado. Con la ruta propia de `design.md > 6` la revisión sobrevive a recargar, pero nada
-   lista los archivos pendientes de revisar ni impide revisar el PDF de un proveedor desde otro.
-6. **¿Crear una presentación exige también `inventario.modificar`?** El alta de presentación ya lo
-   exige en su caso de uso (`create-presentation.ts:45`); saltárselo sería un permiso esquivado. Hoy
-   solo el rol Administrador tiene `proveedores.modificar`, y también tiene `inventario.modificar`.
-7. **«Solo sus precios» = solo `cost`.** La línea tiene un único importe (`cost`); `min_purchase` es
-   cantidad y `delivery_time` días. Se lee así; si «precios» incluía algo más, R15 cambia.
-
-Las **propuestas** para las siete están en `design.md > 10`, cada una con la task que bloquea.
+*(Las siete que hubo —cuatro sembradas y tres añadidas al medir el código— se cerraron en F1.4 el
+2026-09-23; ver la nota fechada al final.)*
 
 ## Decisiones cerradas (no reabrir)
 
@@ -263,3 +241,19 @@ Las **propuestas** para las siete están en `design.md > 10`, cada una con la ta
 | 2026-09-23 | ¿Fórmulas? | No entran: **QC-159**, bloqueada por QC-142. |
 | 2026-09-23 | ¿Permiso? | Revisar y confirmar exige **`proveedores.modificar`** (heredado de QC-107) hasta que QC-142 traiga el permiso propio de documentos. Validado en el service. |
 | 2026-09-23 | ¿E2E? | **Sí**: toca importes y datos del catálogo (`CHECKPOINTS.md`), con la IA y la cola **simuladas** para que el gate corra sin red (patrón de QC-107). |
+
+### Nota fechada — 2026-09-23, F1.4: preguntas abiertas cerradas
+
+El humano aprobó el spec y aceptó **tal cual** las siete propuestas de `design.md > 10`. Pasan a
+decisiones cerradas con las etiquetas `[F1]`…`[F7]`, que citan los requisitos afectados. La tabla de
+arriba no se toca.
+
+| Fecha | Pregunta | Decisión |
+|---|---|---|
+| 2026-09-23 | `[F1]` Unidad de una presentación nueva | El revisor **elige** entre las unidades visibles para la empresa, **preseleccionada** si la unidad leída coincide exactamente con una por nombre o símbolo normalizado. Sin unidad **no se confirma**. **No se crean unidades.** (R18, R19) |
+| 2026-09-23 | `[F2]` Unidad de cada medida | Diámetro y alto con su unidad **`mm` o `cm`**, tal como se leyó, **sin convertir**; la boca como **texto libre**. (R27) |
+| 2026-09-23 | `[F3]` Emparejar imagen y línea | El JSON trae **`page`** por línea; en cada página se empareja **en orden** solo si hay tantas líneas como recortes; si no, **sin imagen propuesta**. El revisor la quita o la cambia por **cualquier recorte del archivo**. (R24, R25) |
+| 2026-09-23 | `[F4]` Contrato JSON del prompt | La forma de `design.md > 3`: **ocho datos más `page`**; **enmienda R10 de QC-129**; un costo **numérico** se trata como **vacío**; el texto del prompt, **fuera del repositorio**. (R5, R35, R36) |
+| 2026-09-23 | `[F5]` Volver a revisar más tarde | **Pantalla propia** `/proveedores/[id]/importar/[documentoId]`; sin proveedor en la tanda y sin lista de pendientes. (R1, R32) |
+| 2026-09-23 | `[F6]` Permiso para crear presentación | Crear presentación exige **también `inventario.modificar`**. (R33) |
+| 2026-09-23 | `[F7]` Qué es «precio» | **Solo `cost`**. (R15) |

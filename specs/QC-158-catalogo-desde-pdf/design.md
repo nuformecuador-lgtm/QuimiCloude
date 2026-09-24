@@ -1,8 +1,7 @@
 # QC-158 — catalogo-desde-pdf · design.md
 
-> Decisiones técnicas para `requirements.md` (R1–R38). Las secciones marcadas **PROPUESTA** esperan a
-> que el humano cierre la pregunta abierta correspondiente en F1.4 (`> 10`); las tasks que dependen
-> de ellas están bloqueadas en `tasks.md`.
+> Decisiones técnicas para `requirements.md` (R1–R38). Aprobado en F1.4 el 2026-09-23: las siete
+> preguntas abiertas quedaron cerradas con las propuestas de este documento (`> 10`, `[F1]`…`[F7]`).
 
 ## 0. Lo medido en el código (rama `feature/QC-158-catalogo-desde-pdf`, base `dev` en `f4b1eb49`)
 
@@ -78,7 +77,7 @@ ALTER TABLE "supplier_catalog_lines" DROP COLUMN IF EXISTS "material";
 - **Base propia**: toda migración y rollback de esta rama contra `QuimiCloude_QC158` (el `.env` del
   worktree apunta ahí), nunca contra la compartida (lección de QC-147/QC-141, `tasks.md > T2`).
 
-### 2.2 Forma de los campos nuevos — **PROPUESTA (pregunta 2)**
+### 2.2 Forma de los campos nuevos `[F2]`
 
 ```ts
 material: string | null                 // trim; 1..120; en blanco -> null
@@ -99,7 +98,7 @@ measurements: {
   `measurementsSchema`), compartido por alta, edición e importación. `catalogLineFieldsShape` pasa de
   siete a **nueve** campos; `CatalogLineFields`/`CatalogLineView` ganan `material` y `measurements`.
 
-## 3. Contrato JSON que acepta el sistema — **PROPUESTA (pregunta 4)**
+## 3. Contrato JSON que acepta el sistema `[F4]`
 
 Enmienda **R10 de QC-129** (de seis a **ocho** datos, más la página). La forma se fija aquí; el texto
 del prompt **no** (R36, QC-129 R9/`[D13]`): el borrador fuera de git se ajusta a esta forma.
@@ -326,7 +325,7 @@ Alta en `session-once-per-request-actions.test.ts`. La confirmación termina con
 | Abrir pantalla | `proveedores.consultar` + `proveedores.modificar` → 404 | `page.tsx` (R32) |
 | Vista previa / confirmar | `proveedores.modificar`, primera línea | `documentos` (R31) |
 | Leer/escribir líneas | `proveedores.modificar` | `proveedores` (defensa en profundidad) |
-| Crear presentación | `inventario.modificar` | `inventario.createPresentation` (**PROPUESTA pregunta 6**, R33) |
+| Crear presentación | `inventario.modificar` | `inventario.createPresentation` (`[F6]`, R33) |
 
 Para R33 la confirmación **comprueba antes de escribir nada** si alguna fila necesita presentación
 nueva y, en ese caso, `assertPermission(actor, 'inventario.modificar')` vía el barrel de `identity`;
@@ -385,53 +384,58 @@ Patrón de QC-107: dobles solo con `DOCUMENTS_E2E_DOUBLES`, elegidos **en cada l
 - `documentos.spec.ts` (QC-107) pasa a recibir coordenadas válidas en el recorte: si hoy está rojo
   (`> 0`), vuelve a verde; si está verde, sigue verde.
 
-## 10. Propuestas para las preguntas abiertas (cerrar en F1.4)
+## 10. Preguntas cerradas en F1.4 (2026-09-23)
 
-### 10.1 Pregunta 1 — unidad de una presentación nueva
-**Propuesta:** el revisor **elige** la unidad entre las visibles para la empresa, con preselección
+El humano aprobó el spec y aceptó **tal cual** las siete propuestas de abajo; son las decisiones
+`[F1]`…`[F7]` de la nota fechada de `requirements.md`. Ninguna task queda bloqueada por ellas. Las
+alternativas se conservan como registro de lo que se descartó.
+
+### 10.1 Pregunta 1 — unidad de una presentación nueva `[F1]`
+**Decidido:** el revisor **elige** la unidad entre las visibles para la empresa, con preselección
 cuando la unidad leída casa **exactamente una** por nombre o símbolo normalizado (R19). Sin unidad, la
 confirmación entera se rechaza nombrando las filas (R18). No se crean unidades desde aquí (exigiría
 `unidades.modificar` y decidir derivación y factor). **Descartado:** rechazar la línea en silencio —
-el revisor perdería filas sin saberlo—. **Bloquea:** T6 (sugerencia), T10 (confirmación), T12 (UI).
+el revisor perdería filas sin saberlo—. **Afecta a:** T6 (sugerencia), T10 (confirmación), T12 (UI).
 
-### 10.2 Pregunta 2 — unidad de cada medida
-**Propuesta:** `> 2.2` — diámetro y alto con su unidad (`mm|cm`) tal como se leyó, **sin convertir**;
-boca como texto libre. **Alternativa** para el humano: una sola unidad (`mm`) convirtiendo al
-importar (×10 exacto sobre cadena); más simple para filtrar en QC-140, pero obliga a decidir qué
-hacer con «28/410». **Bloquea:** T3 (esquema), T11 y T12 (UI). La migración (T2) no depende: la
+### 10.2 Pregunta 2 — unidad de cada medida `[F2]`
+**Decidido:** `> 2.2` — diámetro y alto con su unidad (`mm|cm`) tal como se leyó, **sin convertir**;
+boca como texto libre. **Alternativa descartada:** una sola unidad (`mm`) convirtiendo al
+importar (×10 exacto sobre cadena); más simple para filtrar en QC-140, pero obligaba a decidir qué
+hacer con «28/410». **Afecta a:** T3 (esquema), T11 y T12 (UI). La migración (T2) no depende: la
 base solo exige «objeto o nulo».
 
-### 10.3 Pregunta 3 — emparejar imagen y línea
+### 10.3 Pregunta 3 — emparejar imagen y línea `[F3]`
 Medido (`> 0`): dos llamadas a la IA, índices independientes; la página es fiable, el orden dentro de
 la página no.
-**Propuesta:** el JSON de catálogo trae `page` por línea (`> 3`). Para cada página: si el número de
+**Decidido:** el JSON de catálogo trae `page` por línea (`> 3`). Para cada página: si el número de
 filas con esa `page` es **igual** al número de recortes de esa página, se emparejan en orden (fila
 i ↔ recorte i, recortes ordenados por `n`); si no, ninguna fila de esa página lleva imagen propuesta.
 Siempre se ve la miniatura al lado de la fila y el revisor puede quitarla o elegir **cualquier**
 recorte del archivo (R24, R25). La imagen de la línea es la **clave del recorte en su bucket**
 (`<empresa>/<archivo>/<página>-<n>.png`); QC-140 la firma para mostrarla.
-**Alternativa (no recomendada en esta ficha):** que el recorte deje de hacer su propia llamada y use
+**Alternativa descartada:** que el recorte deje de hacer su propia llamada y use
 cajas por producto devueltas por el prompt de catálogo — emparejamiento exacto, pero reabre el paso
 de QC-110 (`[D5]`, `[D14]`) y el trabajo de la cola.
 **Riesgo:** QC-110 dejó abierto si los recortes se borran (su pregunta 2); si algún día caducan, la
-imagen de la línea apuntaría a nada. **Bloquea:** T6 (emparejamiento), T12 (selector).
+imagen de la línea apuntaría a nada. **Afecta a:** T6 (emparejamiento), T12 (selector).
 
-### 10.4 Pregunta 4 — contrato JSON
-**Propuesta:** `> 3` tal cual, con `page` incluido (lo exige 10.3). El humano ajusta el borrador fuera
-de git y lo sube a Vercel en QC-131. **Bloquea:** T5 (interpretación), T15 (texto de guion E2E).
+### 10.4 Pregunta 4 — contrato JSON `[F4]`
+**Decidido:** `> 3` tal cual, con `page` incluido (lo exige 10.3); enmienda R10 de QC-129; costo
+numérico = vacío; el texto del prompt fuera del repositorio. El humano ajusta el borrador fuera de git
+y lo sube a Vercel en QC-131. **Afecta a:** T5 (interpretación), T14 y T15 (texto de guion E2E).
 
-### 10.5 Pregunta 5 — volver a revisar más tarde
-**Propuesta:** con la ruta propia (`> 6.1`) basta para esta ficha: la revisión se abre desde la fila,
-sobrevive a recargar y a compartir el enlace. **No** se añade `supplier_id` a la tanda ni una lista de
-pendientes; si hace falta, ficha propia. **Bloquea:** nada (si el humano pide la lista, nace T nueva).
+### 10.5 Pregunta 5 — volver a revisar más tarde `[F5]`
+**Decidido:** pantalla propia (`> 6.1`): la revisión se abre desde la fila, sobrevive a recargar y a
+compartir el enlace. **No** se añade `supplier_id` a la tanda ni una lista de pendientes; si hace
+falta, ficha propia. **Afecta a:** T12, T13.
 
-### 10.6 Pregunta 6 — `inventario.modificar` para crear presentación
-**Propuesta:** sí, exigirlo (R33, `> 7`), porque el alta de presentación ya lo exige y crearla por la
+### 10.6 Pregunta 6 — `inventario.modificar` para crear presentación `[F6]`
+**Decidido:** sí, se exige (R33, `> 7`), porque el alta de presentación ya lo exige y crearla por la
 puerta de atrás sería un permiso esquivado. En el sembrado vigente no cambia nada para nadie.
-**Bloquea:** T10.
+**Afecta a:** T10.
 
-### 10.7 Pregunta 7 — qué es «precio»
-**Propuesta:** solo `cost` (R15). **Bloquea:** T4 (el `DO UPDATE`).
+### 10.7 Pregunta 7 — qué es «precio» `[F7]`
+**Decidido:** solo `cost` (R15). **Afecta a:** T4 (el `DO UPDATE`).
 
 ## 11. Alternativas descartadas
 
