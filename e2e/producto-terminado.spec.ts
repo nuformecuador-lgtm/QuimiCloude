@@ -142,6 +142,17 @@ function exactText(value: string): RegExp {
   return new RegExp(`^\\s*${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`);
 }
 
+/**
+ * Igualdad del nombre de producto EN LA CELDA de la tabla, que puede llevar la unidad anadida
+ * detras (`productDisplayName`, `product-columns.tsx > nameCell`): «nombre · simbolo». Se exige
+ * el nombre completo y exacto al principio -sigue sin poder casar con el prefijo de otro-, con un
+ * sufijo de unidad opcional, nunca un sufijo cualquiera.
+ */
+function exactProductNameCellText(value: string): RegExp {
+  const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^\\s*${escaped}(?:\\s*·\\s*\\S.*)?\\s*$`);
+}
+
 function ordersUrl(): string {
   const query = new URLSearchParams({ [PAGE_SIZE_PARAM]: LIST_PAGE_SIZE });
   return `${ORDERS_ROUTE}?${query.toString()}`;
@@ -248,7 +259,9 @@ async function openFinishedGoodsBatchesPanel(page: Page, productName: string): P
     { timeout: 60_000 },
   );
 
-  const nameCell = page.getByTestId(NAME_CELL_TESTID).filter({ hasText: exactText(productName) });
+  const nameCell = page
+    .getByTestId(NAME_CELL_TESTID)
+    .filter({ hasText: exactProductNameCellText(productName) });
   await expect(nameCell).toHaveCount(1, { timeout: 60_000 });
 
   const row = page
