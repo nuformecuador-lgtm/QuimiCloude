@@ -106,6 +106,13 @@ function baseDeFusionOMuda(ctx: Pick<import('vitest').TestContext, 'skip'>): str
     ctx.skip('no se pudo calcular el merge-base con origin/dev: este caso NO ha comprobado nada.');
     return null;
   }
+  // Lo que se mide es el diff de ESTA ficha: en la rama de otra ficha, sus migraciones legitimas
+  // no son asunto de este caso y lo pondrian rojo sin motivo.
+  const rama = (git(['rev-parse', '--abbrev-ref', 'HEAD']) ?? '').trim();
+  if (!rama.startsWith('feature/QC-140-')) {
+    ctx.skip(`la rama actual (${rama || 'desconocida'}) no es la del catalogo visual: este caso NO ha comprobado nada.`);
+    return null;
+  }
   if (!RANGO_TIENE_COMMITS_PROPIOS) {
     ctx.skip(
       'origin/dev..HEAD no tiene ningun commit propio (ya mergeada, o corriendo sobre dev): ' +

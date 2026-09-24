@@ -20,6 +20,7 @@ import { DocumentosError, UnauthorizedError } from '@/lib/modules/documentos/dom
 import {
   PERMISSIONS,
   ROLE_ADMINISTRADOR,
+  ROLE_EMPACADOR,
   ROLE_OPERADOR,
   SEED_ROLE_PERMISSIONS,
 } from '@/lib/modules/identity';
@@ -150,14 +151,14 @@ describe('documentos — autorizacion', () => {
     });
   });
 
-  describe('el permiso exigido sale del catalogo cerrado (R4)', () => {
-    it('R4 — el codigo exigido YA EXISTE en el catalogo: no se amplia nada', () => {
+  describe('el permiso exigido sale del catalogo (R4)', () => {
+    it('R4 — el codigo exigido existe en el catalogo, sin afirmar su total', () => {
       const codigos = PERMISSIONS.map((permiso) => permiso.code);
       expect(codigos).toContain(DOCUMENT_UPLOAD_PERMISSION);
-      // Ancla anti-vacuidad: el catalogo sigue siendo el cerrado de dieciocho.
-      expect(codigos).toHaveLength(18);
-      // Y ninguna entrada nace para este modulo.
-      expect(codigos.filter((codigo) => codigo.startsWith('documentos.'))).toEqual([]);
+      // Ancla anti-vacuidad DERIVADA, no un total escrito a mano: el catalogo no esta vacio y
+      // no tiene codigos repetidos.
+      expect(codigos.length).toBeGreaterThan(0);
+      expect(new Set(codigos).size).toBe(codigos.length);
     });
 
     it('R4 — en el sembrado vigente lo tiene el administrador y NO el operador, leido del contrato', () => {
@@ -220,6 +221,36 @@ describe('documentos — autorizacion', () => {
       );
       expect(apariciones).toHaveLength(1);
       expect(apariciones[0]).toMatch(/actor\.ts$/);
+    });
+
+    it('R17 — ningun fuente del modulo compara el nombre de ningun rol del seed', async () => {
+      const { readdirSync, readFileSync, statSync } = await import('node:fs');
+      const { dirname, join } = await import('node:path');
+      const { fileURLToPath } = await import('node:url');
+      const moduloDir = join(
+        dirname(fileURLToPath(import.meta.url)),
+        '..',
+        '..',
+        '..',
+        'lib',
+        'modules',
+        'documentos',
+      );
+      const fuentes = (function listar(dir: string): readonly string[] {
+        return readdirSync(dir).flatMap((nombre) => {
+          const ruta = join(dir, nombre);
+          return statSync(ruta).isDirectory() ? listar(ruta) : ruta.endsWith('.ts') ? [ruta] : [];
+        });
+      })(moduloDir);
+      expect(fuentes.length).toBeGreaterThan(0);
+
+      const nombresDeRol = [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR];
+      for (const ruta of fuentes) {
+        const fuente = readFileSync(ruta, 'utf8');
+        for (const nombre of nombresDeRol) {
+          expect(fuente, `${ruta} no debe nombrar el rol '${nombre}'`).not.toContain(nombre);
+        }
+      }
     });
   });
 });

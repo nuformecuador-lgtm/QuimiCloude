@@ -17,8 +17,13 @@ const RAIZ = join(__dirname, '..', '..', '..');
 
 const CARPETA_DEL_COMPONENTE = 'components/shared/document-upload';
 
-/** Donde el montaje de esta ficha esta permitido, y el unico sitio. */
-const PANTALLA_CON_MONTAJE = 'app/(private)/proveedores/[id]/page.tsx';
+/**
+ * Donde el montaje de esta ficha esta permitido, y el unico sitio: no la pantalla en si, sino su
+ * envoltorio de cliente, porque una funcion (`reviewHrefFor`) no puede cruzar del Server Component
+ * al cliente y `page.tsx` deja de importar el componente directo.
+ */
+const PANTALLA_CON_MONTAJE = 'app/(private)/proveedores/[id]/components/catalog-pdf-upload.tsx';
+const PAGINA_DEL_PROVEEDOR = 'app/(private)/proveedores/[id]/page.tsx';
 
 /** La carpeta de las pantallas de formulas, DERIVADA de la constante de ruta. */
 const CARPETA_DE_FORMULAS = `app/(private)${FORMULAS_ROUTE}`;
@@ -92,8 +97,9 @@ describe('lo que la pieza de subida NO trae', () => {
       CODIGO_DEL_COMPONENTE.flatMap(({ codigo }) => importesDe(codigo)).filter(esPaquete),
     );
 
-    // `react` y nada mas: el sondeo es `useEffect` + `setTimeout`.
-    expect([...paquetes].sort()).toEqual(['react']);
+    // `react` para el sondeo (`useEffect` + `setTimeout`) y `next/link` para el enlace de
+    // revision opcional: nada mas.
+    expect([...paquetes].sort()).toEqual(['next/link', 'react']);
 
     const manifiesto = JSON.parse(leer('package.json')) as {
       dependencies: Record<string, string>;
@@ -131,13 +137,19 @@ describe('lo que la pieza de subida NO trae', () => {
 
     expect(existsSync(join(RAIZ, 'app/(private)/documentos'))).toBe(false);
 
-    // Ninguna carpeta de `app/` estrena un `page.tsx` que sea la pantalla del componente.
+    // Ninguna otra pieza de `app/` monta el componente: el unico archivo cuyo texto lo delata es
+    // el envoltorio de proveedores.
     const paginasQueLoMontan = fuentesBajo('app')
-      .filter((ruta) => ruta.endsWith('page.tsx'))
+      .filter((ruta) => ruta.endsWith('.tsx'))
       .filter((ruta) =>
         MARCAS_DEL_COMPONENTE.some((marca) => sinComentarios(leer(ruta)).includes(marca)),
       );
     expect(paginasQueLoMontan).toEqual([aPosix(PANTALLA_CON_MONTAJE)]);
+
+    // Y la pantalla del proveedor usa ese envoltorio, nunca el componente directo.
+    const pagina = sinComentarios(leer(PAGINA_DEL_PROVEEDOR));
+    expect(pagina).not.toMatch(/DocumentUpload/);
+    expect(pagina).toContain('CatalogPdfUpload');
   });
 
   it('el tope y los tipos se importan del contrato del modulo y no se reescriben (R22)', () => {
@@ -185,13 +197,13 @@ describe('lo que la pieza de subida NO trae', () => {
       expect(sinComentarios(leer(ruta)), ruta).not.toMatch(/proveedores\.\w+/);
     }
 
-    // El catalogo de permisos sigue cerrado: nada nuevo para documentos ni para subir.
+    // El catalogo gano un permiso propio de documentos: los unicos codigos que casan con este
+    // patron son exactamente esos dos, sin ningun otro `subir` ni `carga`.
     const codigos = PERMISSIONS.map((permiso) => permiso.code);
-    for (const codigo of codigos) {
-      expect(codigo).not.toMatch(/documento|subir|carga/i);
-    }
+    const quePareceDeSubida = codigos.filter((codigo) => /documento|subir|carga/i.test(codigo));
+    expect(quePareceDeSubida.sort()).toEqual(['documentos.consultar', 'documentos.modificar']);
 
-    // Lo que el modulo exige es un codigo QUE YA EXISTIA, no uno inventado para esta ficha.
+    // Lo que el modulo exige es un codigo que vive en el catalogo, no un string suelto sin registrar.
     expect(codigos).toContain(DOCUMENT_UPLOAD_PERMISSION);
 
     // El componente no nombra ningun permiso: quien autoriza es el caso de uso.

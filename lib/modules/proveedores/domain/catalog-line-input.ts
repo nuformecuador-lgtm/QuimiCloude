@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { blankToNull } from './supplier-input';
 import { normalizeSupplierName } from './supplier-name';
 
 /**
@@ -71,6 +72,71 @@ const catalogLineNameSchema = z
   .max(CATALOG_LINE_NAME_MAX_LENGTH)
   .refine((name) => normalizeSupplierName(name) !== '');
 
+/** Largo maximo de `material`: mismo criterio que `CATALOG_LINE_NAME_MAX_LENGTH`. */
+export const CATALOG_LINE_MATERIAL_MAX_LENGTH = 120;
+
+/** Largo maximo de `measurements.mouth`: texto libre, p. ej. un acabado de rosca. */
+export const CATALOG_LINE_MOUTH_MAX_LENGTH = 40;
+
+/**
+ * `material`: recortado, en blanco -> ausente, hasta 120 caracteres. Mismo `blankToNull`
+ * que ya usan telefono y correo del proveedor: «no tengo el dato» y «cadena vacia» no son lo
+ * mismo, y el `CHECK` de la migracion trata las dos igual justo para que no puedan diverger.
+ */
+const materialSchema = z
+  .string()
+  .trim()
+  .max(CATALOG_LINE_MATERIAL_MAX_LENGTH)
+  .nullish()
+  .transform(blankToNull);
+
+/**
+ * Valor de una medida (diametro o alto): la MISMA cadena decimal que el costo -patron de
+ * `DECIMAL(14,4)`, mayor que cero, rechazado LEXICAMENTE- porque es el mismo dato con otro
+ * nombre. Nunca `number`.
+ */
+const measurementValueSchema = costSchema;
+
+/** Unidad de una medida: lista cerrada, sin conversion. */
+const measurementUnitSchema = z.enum(['mm', 'cm']);
+
+/** Diametro o alto: valor y unidad juntos, o ausentes del todo. */
+const dimensionSchema = z
+  .object({ value: measurementValueSchema, unit: measurementUnitSchema })
+  .nullish();
+
+/**
+ * Boca del envase: texto libre -un acabado de rosca como «28/410» no es una longitud-,
+ * recortado, en blanco -> ausente, hasta 40 caracteres.
+ */
+const mouthSchema = z.string().trim().max(CATALOG_LINE_MOUTH_MAX_LENGTH).nullish().transform(blankToNull);
+
+/**
+ * `measurements`: diametro, alto y boca. Las TRES ausentes colapsan a `null`
+ * entero -«unas medidas sin ningun valor deben guardarse como ausentes»-, y `undefined` en
+ * cualquiera de los tres cuenta como ausente igual que `null`, para que el mismo dato pueda
+ * venir del formulario (que omite la clave) o de la interpretacion del JSON de la IA (que la
+ * manda en `null`).
+ */
+const measurementsSchema = z
+  .object({ diameter: dimensionSchema, height: dimensionSchema, mouth: mouthSchema })
+  .nullish()
+  .transform((value) => {
+    if (value === null || value === undefined) return null;
+    const diameter = value.diameter ?? null;
+    const height = value.height ?? null;
+    const mouth = value.mouth ?? null;
+    if (diameter === null && height === null && mouth === null) return null;
+    return { diameter, height, mouth };
+  });
+
+export type CatalogLineMeasurement = { readonly value: string; readonly unit: 'mm' | 'cm' };
+export type CatalogLineMeasurements = {
+  readonly diameter: CatalogLineMeasurement | null;
+  readonly height: CatalogLineMeasurement | null;
+  readonly mouth: string | null;
+};
+
 /** Presentacion: uuid y OBLIGATORIA (R10). Que EXISTA lo garantiza la FK, no este esquema. */
 const presentationIdSchema = z.string().uuid();
 
@@ -87,9 +153,9 @@ const unitIdSchema = z.string().uuid().nullish();
 const imagePathSchema = z.string().min(1).nullish();
 
 /**
- * Los SIETE campos de negocio de la linea, compartidos por el alta y la edicion. Estan
+ * Los NUEVE campos de negocio de la linea, compartidos por el alta y la edicion. Estan
  * declarados UNA vez: dos listas paralelas divergen en cuanto alguien anade un campo a una
- * sola de ellas.
+ * sola de ellas. `material` y `measurements` se suman aqui.
  */
 const catalogLineFieldsShape = {
   name: catalogLineNameSchema,
@@ -99,6 +165,8 @@ const catalogLineFieldsShape = {
   cost: costSchema,
   minPurchase: minPurchaseSchema,
   deliveryTime: deliveryTimeSchema,
+  material: materialSchema,
+  measurements: measurementsSchema,
 } as const;
 
 /**

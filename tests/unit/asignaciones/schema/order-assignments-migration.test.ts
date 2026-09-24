@@ -861,21 +861,38 @@ describe('down.sql — revertir deja la base exactamente como estaba antes del U
     }
   })
 
-  it('revertir devuelve el catalogo persistido a sus trece entradas (R34)', () => {
-    // El DOWN borra EXACTAMENTE los codigos que el UP escribio, ni uno mas: el catalogo vuelve a
-    // las trece entradas de QC-66. El numero no esta escrito a mano contra el SQL: sale de
-    // `PERMISSIONS` menos lo que el DOWN se lleva y menos lo que sumaron las fichas posteriores.
+  it('revertir devuelve el catalogo persistido al de QC-66 (R34)', () => {
+    // El DOWN borra EXACTAMENTE los codigos que el UP escribio, ni uno mas: el catalogo vuelve al
+    // de QC-66. La cuenta no esta escrita a mano contra el SQL: sale de `PERMISSIONS` menos lo que
+    // el DOWN se lleva y menos lo que sumaron las fichas posteriores, comparada contra la lista de
+    // codigos de QC-66.
     const CODIGOS_DE_FICHAS_POSTERIORES = [
       'terminados.consultar',
       'clientes.consultar',
       'clientes.modificar',
+      'documentos.consultar',
+      'documentos.modificar',
+    ]
+    const CODIGOS_QC66 = [
+      'dashboard.consultar',
+      'inventario.consultar',
+      'inventario.modificar',
+      'recetas.consultar',
+      'recetas.modificar',
+      'unidades.consultar',
+      'unidades.modificar',
+      'proveedores.consultar',
+      'proveedores.modificar',
+      'pedidos.consultar',
+      'pedidos.modificar',
+      'usuarios.consultar',
+      'usuarios.modificar',
     ]
     const borrados = boundedDeletesIn(downSource).map((borrado) => borrado.codigos)
     expect(borrados[0]).toEqual(CODIGOS_DE_LA_FICHA)
-    expect(PERMISSIONS.length).toBe(18)
     expect(
       PERMISSIONS.length - CODIGOS_DE_LA_FICHA.length - CODIGOS_DE_FICHAS_POSTERIORES.length,
-    ).toBe(13)
+    ).toBe(CODIGOS_QC66.length)
   })
 })
 

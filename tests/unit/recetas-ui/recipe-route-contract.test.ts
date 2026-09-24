@@ -1130,6 +1130,11 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'credentialSetupRoute',
         'USERS_ROUTE',
         'recipeEditRoute',
+        // Alta el 2026-09-24: la revision de un catalogo importado desde PDF, derivada de
+        // `supplierDetailRoute` (`/proveedores/<id>/importar/<archivo>`). No es del asistente de
+        // lectura: no la marca el patron de arriba ni apunta a ninguna de sus URL. La lista sigue
+        // CERRADA.
+        'supplierCatalogImportRoute',
         'supplierDetailRoute',
       ].sort(),
     );

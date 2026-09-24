@@ -516,6 +516,8 @@ model SupplierCatalogLine {
   cost           Decimal   @db.Decimal(14, 4)
   minPurchase    Decimal?  @map("min_purchase") @db.Decimal(14, 4)
   deliveryTime   Int?      @map("delivery_time")
+  material       String?
+  measurements   Json?
   companyId      String    @map("company_id") @db.Uuid
   createdBy      String?   @map("created_by") @db.Uuid
   updatedBy      String?   @map("updated_by") @db.Uuid

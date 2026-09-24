@@ -9,4 +9,4 @@
  * Para que el numero no se quede atras en silencio, el test de esta ruta lo ata a la longitud real
  * de `buildCatalogColumns(...)`: cambiar una sin la otra pone la suite en rojo.
  */
-export const CATALOG_SKELETON_COLUMN_COUNT = 10;
+export const CATALOG_SKELETON_COLUMN_COUNT = 12;

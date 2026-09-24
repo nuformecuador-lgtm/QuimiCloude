@@ -21,7 +21,10 @@ import { normalizeCompanyName } from '@/lib/modules/identity';
 import { findCostingBatches, findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { adjustBatchStock, createWithFirstBatch } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
-import { findPresentationRefs } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
+import {
+  findPresentationRefs,
+  findPresentationsByNormalizedNames,
+} from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import {
   findAliveOrderById,
   listAliveOrders,
@@ -92,7 +95,10 @@ const recipes: RecipeCatalog = {
 };
 
 const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches };
-const presentations: PresentationCatalog = { findRefs: findPresentationRefs };
+const presentations: PresentationCatalog = {
+  findRefs: findPresentationRefs,
+  findByNormalizedNames: findPresentationsByNormalizedNames,
+};
 const units: UnitCatalog = {
   findRefs: findUnitRefs,
   findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,

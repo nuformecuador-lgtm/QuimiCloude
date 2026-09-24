@@ -4775,3 +4775,37 @@ podar.
 - **Deuda:** T14 (dispositivos reales), R51 de `proveedores.spec.ts` rojo heredado de `dev`
   (`682d3e3b`), y los menores de la segunda revisión (tres aserciones sin sucesor en los tests
   recuperados, citas en comentarios de tests).
+
+## 2026-09-24 — QC-153-modelo-de-clientes
+
+- **Qué:** tabla `customers` (nombres, apellidos y ciudad obligatorios; teléfono, correo, dirección opcionales;
+  duplicados permitidos; borrado lógico; `company_id` con unicidad `(company_id, id)`; RLS) y enmienda al
+  catálogo de permisos: `clientes.consultar`/`clientes.modificar`, solo Administrador (16→18, seed 20→22).
+  Módulo `clientes` solo con armazón. Primera ficha de la épica nueva **QC-152 Clientes**.
+- **PR #117**, merge `cf99cc2b`. Spec R1–R29. Review OK. Gate completo verde (674/9418).
+- **Decisiones humanas sobre tests ajenos:** el guardián de modelos de QC-145 se fija a su propio merge (PR
+  #112) en vez del merge-base de cada rama; `pedidos-schema` deroga solo la prohibición del modelo `Customer`
+  (la de que `Order` no tenga cliente sigue hasta QC-156). **Desbloquea QC-154.**
+
+## 2026-09-24 — QC-158-catalogo-desde-pdf
+
+- **Qué:** lo que la IA lee de un PDF de catálogo se convierte en líneas del catálogo del proveedor tras una
+  revisión en `/proveedores/[id]/importar/[documentoId]`: producto existente solo actualiza `cost`, presentación
+  nueva se crea (unidad elegida por el revisor, exige `inventario.modificar`), imagen recortada por página y orden,
+  campos nuevos `material` y `measurements`. Primera ficha que interpreta la salida de la IA; enmienda R10 de
+  QC-129. R29: editar una línea ya no borra su imagen.
+- **PR #119**, merge `6962dac9`. Spec R1–R38. Review: vuelta 1 rechazada (B1, R28 «mostrar» sin test), vuelta 2 OK.
+  El E2E de QC-107 (`documentos.spec.ts`), rojo en dev desde QC-110, vuelve a verde.
+- **Incidencia:** el `implementer` se cortó ~15 h sin entregar informe; se detectó al preguntar el humano y se
+  reanudó sin pérdida. **Lección:** comprobar el último commit antes de estimar.
+- **Quedan:** imagen en pantalla con URL firmada → **QC-140** (encargo en su issue); R37 en móvil real (humano);
+  prompt de catálogo en Vercel y firma → **QC-131** (humano).
+
+## 2026-09-24 — QC-142-permiso-propio-de-documentos
+
+- **Qué:** `documentos` deja de pedir prestado `proveedores.modificar`: nacen `documentos.consultar` y `documentos.modificar`, solo para el Administrador; la migración hace heredar `documentos.modificar` a todo rol con `proveedores.modificar`. Los tres casos de uso de subida exigen el permiso nuevo; las lecturas siguen sin permiso.
+- **PR #120**, merge `5d3e90d9`. Spec R1–R21, D1–D8. Review: rechazado por 1 mayor (el test anti-total no veía aserciones multilínea ni un `/*` dentro de un string), aprobado en la segunda. Gate completo verde (688/688).
+- **Ningún test fija ya el total del catálogo de permisos**, y un test nuevo lo impide: QC-161 y QC-168 también lo amplían.
+- **Para arrancarla se subió el cupo de `backend` a 3** con `/afinar-regla` (`cdfc6bb`).
+- **Quinto test de alcance que compara contra la rama y rompe fichas ajenas** (QC-140 R29, QC-158 R36a): corregidos. La clase entera es **QC-99**.
+- **Deuda:** el recorrido E2E de subida de PDFs sigue en rojo, heredado de `dev`.

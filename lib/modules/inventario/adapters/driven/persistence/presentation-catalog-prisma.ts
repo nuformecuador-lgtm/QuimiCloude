@@ -1,7 +1,11 @@
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '../../../domain/inventory-scope';
-import type { PresentationId, PresentationRef } from '../../../domain/presentation-catalog';
+import type {
+  PresentationByName,
+  PresentationId,
+  PresentationRef,
+} from '../../../domain/presentation-catalog';
 
 import { presentationCompanyScope } from './company-scope';
 
@@ -53,4 +57,39 @@ export async function findPresentationRefs(
   const rows = await findScopedPresentations(ids, { companyId });
 
   return rows.map(toPresentationRef);
+}
+
+type PresentationByNameRow = {
+  readonly id: string;
+  readonly name: string;
+  readonly nameNormalized: string;
+  readonly unitId: string;
+};
+
+/** Fila de Prisma -> `PresentationByName` del contrato publico. Funcion pura, testeable sin base. */
+export function toPresentationByName(row: PresentationByNameRow): PresentationByName {
+  return { id: row.id, name: row.name, nameNormalized: row.nameNormalized, unitId: row.unitId };
+}
+
+async function findScopedPresentationsByNormalizedNames(
+  names: readonly string[],
+  scope: InventoryScope,
+): Promise<readonly PresentationByNameRow[]> {
+  return prisma.presentation.findMany({
+    where: {
+      AND: [presentationCompanyScope(scope), { nameNormalized: { in: [...names] } }],
+    },
+    select: { id: true, name: true, nameNormalized: true, unitId: true },
+  });
+}
+
+export async function findPresentationsByNormalizedNames(
+  names: readonly string[],
+  companyId: string,
+): Promise<readonly PresentationByName[]> {
+  if (names.length === 0) return [];
+
+  const rows = await findScopedPresentationsByNormalizedNames(names, { companyId });
+
+  return rows.map(toPresentationByName);
 }

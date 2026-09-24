@@ -53,6 +53,9 @@ function dobleDeRepositorio(guardada: BatchStatus | null) {
     }),
     expireStale,
     readBatch,
+    readFileForReview: vi.fn(async () => {
+      throw new Error('getBatchStatus no lee para revision');
+    }),
   };
   return { repository, expireStale, readBatch };
 }
@@ -172,5 +175,40 @@ describe('documentos — getBatchStatus', () => {
 
     const [, , olderThan] = doble.expireStale.mock.calls[0] ?? [];
     expect((olderThan as Date).getTime()).toBe(AHORA.getTime() - 60 * 1000);
+  });
+
+  describe('documentos.modificar decide, nunca proveedores.* (R14, R15, R16)', () => {
+    it('R15 — proveedores.modificar y proveedores.consultar, sin documentos.modificar, rechazan sin tocar el repositorio', async () => {
+      const doble = dobleDeRepositorio(tandaGuardada());
+      const getBatchStatus = createGetBatchStatus({ repository: doble.repository, config: config(), now: () => AHORA });
+      const actor: Actor = {
+        id: PERSONA,
+        companyId: EMPRESA,
+        permissions: ['proveedores.modificar', 'proveedores.consultar'],
+      };
+
+      await expect(getBatchStatus(actor, TANDA)).rejects.toThrow(UnauthorizedError);
+      expect(doble.expireStale).not.toHaveBeenCalled();
+      expect(doble.readBatch).not.toHaveBeenCalled();
+    });
+
+    it('R15 — solo documentos.consultar, sin documentos.modificar, tambien rechaza', async () => {
+      const doble = dobleDeRepositorio(tandaGuardada());
+      const getBatchStatus = createGetBatchStatus({ repository: doble.repository, config: config(), now: () => AHORA });
+      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: ['documentos.consultar'] };
+
+      await expect(getBatchStatus(actor, TANDA)).rejects.toThrow(UnauthorizedError);
+      expect(doble.readBatch).not.toHaveBeenCalled();
+    });
+
+    it('R16 — documentos.modificar sin ningun permiso de proveedores autoriza la consulta', async () => {
+      const doble = dobleDeRepositorio(tandaGuardada());
+      const getBatchStatus = createGetBatchStatus({ repository: doble.repository, config: config(), now: () => AHORA });
+      const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: ['documentos.modificar'] };
+
+      const resultado = await getBatchStatus(actor, TANDA);
+
+      expect(resultado?.id).toBe(TANDA);
+    });
   });
 });

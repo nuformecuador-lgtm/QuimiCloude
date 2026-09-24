@@ -25,7 +25,10 @@ import { createFinishAssignedOrder } from '@/lib/modules/asignaciones/domain/fin
 import { createListFinishedOrders } from '@/lib/modules/asignaciones/domain/list-finished-orders';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import { ROLE_EMPACADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
-import { findPresentationRefs } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
+import {
+  findPresentationRefs,
+  findPresentationsByNormalizedNames,
+} from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import {
   findAliveOrderTargetById,
@@ -91,7 +94,7 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
         },
       },
       people: assignmentDirectoryPrisma,
-      presentations: { findRefs: findPresentationRefs },
+      presentations: { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames },
       now: () => NOW,
     }),
     finishAssignedOrder: createFinishAssignedOrder({
