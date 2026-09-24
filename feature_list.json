@@ -1209,7 +1209,8 @@
       "zone": "fullstack",
       "branch": "feature/QC-82-registro-de-ejecucion-de-receta",
       "depends_on": [
-        "QC-63"
+        "QC-63",
+        "QC-168"
       ],
       "spec_path": "specs/QC-82-registro-de-ejecucion-de-receta"
     },
@@ -2550,13 +2551,15 @@
       "epic": "QC-31",
       "epic_name": "Pedidos",
       "name": "estado-por-empacar",
-      "description": "El pedido gana un estado nuevo, **POR EMPACAR**, entre EN_CURSO y ENTREGADO: cuando el Operario **finaliza la produccion** el pedido pasa a **Por empacar**, y desde ahi el **Empacador** (QC-144) puede **comenzar el empaquetado**.\n\nHoy el Finalizar del Operario deja el pedido ENTREGADO (QC-63) y QC-145 escribe `finished_at` en ese momento. QC-145 dejo fuera «un estado empacado»: esta ficha lo recoge.\n\n**NACE EL 2026-09-24** por pedido del humano. Se acota con `/afinar-feature` antes del spec.\n\n**QUEDA ABIERTO:** flujo del Empacador (estado EN EMPAQUE o accion directa a Entregado; quien marca Entregado); que ve el Empacador y como convive con «Terminados» (QC-145); cuando se escribe `finished_at` o si hacen falta dos fechas; como se registra en QC-82; cuando se consume y libera el material (QC-141, QC-150); si se puede cancelar Por empacar y quien; que pasa con los pedidos existentes.\n\n**Relacion:** afecta a QC-82, cuyo spec asume que Finalizar deja ENTREGADO; conviene acotarla antes de implementar QC-82. Tambien a QC-145, QC-144, QC-141 y QC-150.",
+      "description": "El pedido gana dos estados entre EN_CURSO y ENTREGADO: **POR_EMPACAR** y **EN_EMPAQUE**.\n\n* **Flujo:** PENDIENTE -> EN_CURSO -> **POR_EMPACAR** (el Operario finaliza la produccion) -> **EN_EMPAQUE** (el Empacador comienza) -> ENTREGADO (el Empacador termina).\n* **Cualquier Empacador de la empresa** toma cualquier pedido Por empacar, sin asignacion: el primero que lo comienza se lo queda y solo el lo termina.\n* **Inventario al producir:** al pasar a Por empacar se consume el material (QC-141) y entra el lote de producto terminado (QC-150). `finished_at` al entregar.\n* **No se cancela** ni Por empacar ni En empaque; los problemas se corrigen con ajuste (QC-92).\n* **Permiso nuevo de empaque, solo el Empacador** (catalogo 16 -> 17).\n* **Pestana «Por empacar» en /asignacion**; cada fila abre una pantalla con Comenzar y Terminar.\n* E2E si. Sin migracion de datos.\n\n**NO ENTRA:** registrar el empaque en el log (lo anade **QC-82**, despues de esta); que el Administrador empaque; asignar empacadores.\n\n**Orden:** QC-150 -> QC-168 -> QC-82.\n\n--- Acotada por `/afinar-feature` el 2026-09-24. Las decisiones estan en `specs/QC-168-estado-por-empacar/requirements.md`. ---",
       "status": "pending",
       "sdd": true,
-      "complexity": null,
+      "complexity": "high",
       "zone": "fullstack",
       "branch": "feature/QC-168-estado-por-empacar",
-      "depends_on": [],
+      "depends_on": [
+        "QC-150"
+      ],
       "spec_path": "specs/QC-168-estado-por-empacar"
     }
   ]

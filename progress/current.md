@@ -19,6 +19,10 @@
 
 ## Evaluaciones
 
+### QC-168 - NACE y se ACOTA con `/afinar-feature` (2026-09-24)
+
+**13 decisiones cerradas**, ninguna abierta, en `specs/QC-168-estado-por-empacar/requirements.md`. Bloqueada por QC-150 y **bloquea a QC-82**, cuyo spec aprobado hay que revisar antes de implementar (Finalizar deja Por empacar; dos acciones de empaque en el registro). Orden: QC-150 -> QC-168 -> QC-82. Tambien nacio **QC-167** (consulta del recorrido en el dashboard, bloqueada por QC-82).
+
 ### QC-140 - CERRADA (2026-09-24)
 
 PR #118, merge `a738d81f`. Resumen en `progress/history.md`. **Deuda: T14, revision en iPhone y Android reales**, pendiente del humano.
