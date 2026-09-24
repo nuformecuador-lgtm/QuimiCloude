@@ -19,9 +19,9 @@
 
 ## Evaluaciones
 
-### QC-142 - ACOTADA con `/afinar-feature` y F1.0 (2026-09-24)
+### QC-142 - CERRADA (2026-09-24)
 
-**8 decisiones**, ninguna abierta, en `specs/QC-142-permiso-propio-de-documentos/requirements.md`. `complexity: low`. Desbloquea QC-157, QC-159 y QC-160 (IA). Cupo `backend` lleno (QC-131, QC-153): solo spec hasta que se libere.
+PR #120, merge `5d3e90d9`. Resumen en `progress/history.md`. Desbloquea QC-160 (spec aprobado), QC-159 y QC-157.
 
 **2026-09-24:** QC-153 (PR #117) y QC-158 (PR #119) cerradas; resumenes en `progress/history.md`. Desbloquea **QC-154** (CRUD de clientes). Pendientes humanos: R37 de QC-158 en movil real; QC-131 (prompt en Vercel y firma).
 
@@ -667,7 +667,7 @@ porque es validacion de entrada y no una regla nueva de dominio.
 
 ## Deudas y cosas abiertas
 
-- **2026-09-23 · restos de worktree en disco**: `.worktrees/QC-107-componente-de-carga-de-archivos`, `.worktrees/QC-140-catalogo-visual-de-proveedores`, `.worktrees/QC-145-pedidos-terminados-en-asignacion`, `.worktrees/QC-146-presentacion-del-pedido` y `.worktrees/QC-147-cantidades-de-receta-en-porcentaje` ya no estan registrados en git, pero sus carpetas siguen con `node_modules` bloqueados por Windows (proceso node vivo). Borrarlas a mano cuando no haya servidores ni E2E corriendo. Las ramas locales tambien quedan: ya estan mergeadas. Las bases `QuimiCloude_QC140`, `QuimiCloude_QC145` y `QuimiCloude_QC147` sobran y se puede borrar.
+- **2026-09-23 · restos de worktree en disco**: `.worktrees/QC-107-componente-de-carga-de-archivos`, `.worktrees/QC-140-catalogo-visual-de-proveedores`, `.worktrees/QC-142-permiso-propio-de-documentos`, `.worktrees/QC-145-pedidos-terminados-en-asignacion`, `.worktrees/QC-146-presentacion-del-pedido` y `.worktrees/QC-147-cantidades-de-receta-en-porcentaje` ya no estan registrados en git, pero sus carpetas siguen con `node_modules` bloqueados por Windows (proceso node vivo). Borrarlas a mano cuando no haya servidores ni E2E corriendo. Las ramas locales tambien quedan: ya estan mergeadas. Las bases `QuimiCloude_QC140`, `QuimiCloude_QC142`, `QuimiCloude_QC145` y `QuimiCloude_QC147` sobran y se puede borrar.
 ### El E2E de dev tiene 11 rojos que no son de ninguna ficha en curso (2026-09-22)
 
 Medido por el leader al cerrar QC-146, sobre `origin/dev` limpio (`bc902800`), chromium, un worker: fallan `cierre-de-sesiones` (cierra sesiones de otra persona), `documentos` R20, `errores` R33, `inventario` R26 y QC-90 R32, `permisos` (Operador aterriza en asignacion), `presentaciones` R36, `proveedores` R51, `session` (dos casos) y `usuarios` R4/R42. Los mismos fallan en la rama de QC-146, que no los toca. Nadie tiene la ficha: hace falta una en el board.
