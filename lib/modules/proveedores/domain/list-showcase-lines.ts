@@ -19,14 +19,8 @@ function toShowcaseLine(line: CatalogLineView): ShowcaseLine {
 }
 
 /**
- * «Cargar mas» de una fila. Reutiliza el puerto YA EXISTENTE
- * `SupplierCatalogRepository.listBySupplierAlive`, con `search: productSearch` y el
- * orden y el tamano de tanda fijos del dominio: son el mismo que usa el adaptador para la
- * primera tanda de cada fila, y por eso el prefijo no tiene huecos ni repetidos.
- *
- * Mismo orden que el resto del modulo: `requirePermission` primero, despues zod, despues el
- * puerto. `'supplier_not_found'` se traduce igual que en `listCatalogLines`: un proveedor de
- * otra empresa o dado de baja responde «no encontrado», nunca una pagina vacia.
+ * «Cargar mas» de una fila: mismo orden y tamano de tanda que la primera pagina, para
+ * que el prefijo no tenga huecos ni repetidos.
  */
 export function createListShowcaseLines(
   deps: ListShowcaseLinesDeps,

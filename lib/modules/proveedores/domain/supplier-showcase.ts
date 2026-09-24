@@ -1,13 +1,8 @@
-// lib/modules/proveedores/domain/supplier-showcase.ts
 import { z } from 'zod';
 
 /**
- * Tipos, constantes y esquemas de la vista de catalogo visual.
- *
- * Los tamanos de tanda y el orden son CONSTANTES DEL DOMINIO, no entrada: el cliente no puede
- * pedir mas proveedores ni mas lineas de las que aqui se declaran, ni otro orden. Los tipos de
- * salida NO llevan `createdBy`, `updatedBy` ni fechas: la vista pinta imagen y nombre, y lo que
- * no viaja no se puede pintar por descuido.
+ * Tamanos de tanda y orden son CONSTANTES DEL DOMINIO: el cliente no puede pedir mas
+ * proveedores ni lineas de las declaradas, ni otro orden.
  */
 
 export const SHOWCASE_SUPPLIER_BATCH = 5;
