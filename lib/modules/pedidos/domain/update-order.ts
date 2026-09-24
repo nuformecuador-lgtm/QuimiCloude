@@ -105,7 +105,9 @@ export function createUpdateOrder(
 
     // El coste se recalcula con la receta del DATO ENTRANTE, no con la de la fila vieja: una
     // edicion que solo cambia la cantidad o la prioridad tambien reescribe el importe con los
-    // lotes de HOY.
+    // lotes de HOY. `orderId: id` cuenta lo que este mismo pedido tiene apartado como
+    // disponible para si mismo: editarlo sin cambiar nada no le hace perder de su propio
+    // promedio el lote que el mismo aparto entero.
     const ingredientsCost = await resolveIngredientsCost(
       deps.recipes,
       deps.products,
@@ -113,6 +115,7 @@ export function createUpdateOrder(
       data.recipeId,
       data.quantity,
       actor.companyId,
+      { orderId: id },
     );
 
     const instant = now();
@@ -129,7 +132,7 @@ export function createUpdateOrder(
       // por otro pedido que use la misma receta -`buildRequirement` es dominio puro sobre las
       // lineas de ESTA receta, y `syncForOrder` solo toca el libro de ESTE pedido-. Se lee con
       // `scope.recipes`, sobre el cliente de ESTA transaccion, para que la lectura vea la
-      // misma instantanea que acaba de bloquear `lockAliveById` (`design.md > 5.2.2`).
+      // misma instantanea que acaba de bloquear `lockAliveById`.
       const content = await transaction.recipes.findExecutionContentById(data.recipeId, actor.companyId);
       const requirement = buildRequirement(content?.lines ?? [], data.quantity);
 

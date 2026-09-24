@@ -981,8 +981,10 @@ const orderRepository: OrderRepository = {
 /**
  * `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye, con el
  * MISMO `tx`, el repositorio de escritura de `pedidos`, las reservas de `inventario` y el
- * lector de contenido de receta (`design.md > 5.2.2`, m7). Sin `unitCatalog`: la necesidad ya
- * llega en la unidad del producto, asi que `createMaterialReservations` no convierte nada.
+ * lector de contenido de receta, para que las tres lecturas y escrituras vean la misma
+ * instantanea sin abrir una segunda conexion mientras esta retiene la suya. Sin `unitCatalog`:
+ * la necesidad ya llega en la unidad del producto, asi que `createMaterialReservations` no
+ * convierte nada.
  */
 const orderUnitOfWork: OrderUnitOfWork = {
   run: (work) =>

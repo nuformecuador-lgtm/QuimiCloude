@@ -3,7 +3,7 @@
 // Dominio puro: sin Prisma, sin framework, sin reloj y sin estado. Recibe datos ya leidos por
 // quien orquesta (alta o edicion) y devuelve el importe, o `null` cuando no se puede calcular.
 
-import { compareBatchesOldestFirst, type CostingBatch, type ProductId } from '@/lib/modules/inventario'
+import type { CostingBatch, ProductId } from '@/lib/modules/inventario'
 import { consumedQuantity } from '@/lib/modules/recetas'
 import { convertQuantity, IncompatibleUnitsError, type UnitConversion } from '@/lib/modules/unidades'
 
@@ -73,7 +73,8 @@ function multiplyInternal(a: bigint, b: bigint): bigint {
   return (a * b) / pow10(INTERNAL_SCALE)
 }
 
-/** Promedio simple de costes unitarios ya escalados a `INTERNAL_SCALE`. */
+/** Promedio simple de costes unitarios ya escalados a `INTERNAL_SCALE`, sin ponderar por la
+ *  cantidad de ningun lote. */
 function averageInternal(values: readonly bigint[]): bigint {
   const sum = values.reduce((total, value) => total + value, ZERO)
   return sum / BigInt(values.length)
@@ -113,24 +114,33 @@ function calculateLineCost(
     return ZERO
   }
 
-  const productBatches = batches
-    .filter((batch) => batch.productId === line.productId)
-    .slice()
-    .sort(compareBatchesOldestFirst)
+  // Todos los lotes del producto con disponible mayor que cero entran en el promedio, se
+  // necesiten o no para cubrir la cantidad necesaria; ni el orden de compra ni el numero de
+  // lote importan ya para el coste.
+  const productBatches = batches.filter((batch) => batch.productId === line.productId)
 
   let coveredInternal = ZERO
-  const usedUnitCostsInternal: bigint[] = []
+  const unitCostsInternal: bigint[] = []
 
   for (const batch of productBatches) {
+    const availableScaled = parseDecimal(batch.available)
+    if (availableScaled === null) {
+      return null
+    }
+    const availableInternalNative = toInternal(availableScaled)
+    if (availableInternalNative <= ZERO) {
+      continue
+    }
+
     const batchUnit = units.get(batch.unitId)
     if (batchUnit === undefined) {
       return null
     }
 
-    let stockConverted: string
+    let availableConverted: string
     let unitFactor: string
     try {
-      stockConverted = convertQuantity(batch.stock, batchUnit, lineUnit)
+      availableConverted = convertQuantity(batch.available, batchUnit, lineUnit)
       unitFactor = convertQuantity('1', lineUnit, batchUnit)
     } catch (error) {
       if (error instanceof IncompatibleUnitsError) {
@@ -139,26 +149,22 @@ function calculateLineCost(
       throw error
     }
 
-    const stockScaled = parseDecimal(stockConverted)
+    const availableConvertedScaled = parseDecimal(availableConverted)
     const factorScaled = parseDecimal(unitFactor)
     const unitCostScaled = parseDecimal(batch.unitCost)
-    if (stockScaled === null || factorScaled === null || unitCostScaled === null) {
+    if (availableConvertedScaled === null || factorScaled === null || unitCostScaled === null) {
       return null
     }
 
-    coveredInternal += toInternal(stockScaled)
-    usedUnitCostsInternal.push(multiplyInternal(toInternal(unitCostScaled), toInternal(factorScaled)))
-
-    if (coveredInternal >= neededInternal) {
-      break
-    }
+    coveredInternal += toInternal(availableConvertedScaled)
+    unitCostsInternal.push(multiplyInternal(toInternal(unitCostScaled), toInternal(factorScaled)))
   }
 
-  if (coveredInternal < neededInternal) {
+  if (coveredInternal < neededInternal || unitCostsInternal.length === 0) {
     return null
   }
 
-  const averageUnitCostInternal = averageInternal(usedUnitCostsInternal)
+  const averageUnitCostInternal = averageInternal(unitCostsInternal)
   return multiplyInternal(averageUnitCostInternal, neededInternal)
 }
 
