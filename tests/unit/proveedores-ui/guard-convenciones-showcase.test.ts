@@ -81,39 +81,29 @@ function git(args: readonly string[]): string | null {
   }
 }
 
-/** El merge-base con `origin/dev`, o `null` si no se puede calcular (sin git, o sin esa rama). */
-const MERGE_BASE = (() => {
-  const salida = git(['merge-base', 'origin/dev', 'HEAD']);
-  const sha = (salida ?? '').trim();
-  return sha.length > 0 ? sha : null;
-})();
+// Comparar con `origin/dev` mordia a cualquier rama posterior que tocara `db/` por su cuenta. Lo
+// que R29 y D20 protegen es un hecho historico: el merge con el que este catalogo entro en dev.
+// Por eso se comparan sus dos padres, no la punta de dev. (2026-09-24)
+const MERGE_DE_ENTRADA = 'a738d81f';
 
-/**
- * `true` cuando `origin/dev..HEAD` trae al menos un commit propio. Una vez mergeada esta rama,
- * `dev` corre esta misma guardia con el diff vacio: sin esta comprobacion, R29 y D20 pasarian en
- * verde sin haber mirado nada (mismo patron que `tests/unit/identity/qc78-alcance.test.ts` y
- * `tests/unit/proveedores-ui/guard-convenciones-proveedores.test.ts`).
- */
-const RANGO_TIENE_COMMITS_PROPIOS = (() => {
-  if (MERGE_BASE === null) return false;
-  const salida = git(['rev-list', '--count', 'origin/dev..HEAD']);
-  return Number((salida ?? '0').trim()) > 0;
-})();
-
-/** El merge-base, o `null` con un `ctx.skip()` en voz alta si no hay nada que mirar. */
-function baseDeFusionOMuda(ctx: Pick<import('vitest').TestContext, 'skip'>): string | null {
-  if (MERGE_BASE === null) {
-    ctx.skip('no se pudo calcular el merge-base con origin/dev: este caso NO ha comprobado nada.');
-    return null;
-  }
-  if (!RANGO_TIENE_COMMITS_PROPIOS) {
-    ctx.skip(
-      'origin/dev..HEAD no tiene ningun commit propio (ya mergeada, o corriendo sobre dev): ' +
-        'este caso NO ha comprobado nada.',
+/** La salida de un comando git, o lanza un error explicito si el commit no esta en este clon. */
+function gitOFalla(args: readonly string[]): string {
+  const salida = git(args);
+  if (salida === null) {
+    throw new Error(
+      `no se pudo ejecutar 'git ${args.join(' ')}': falta el merge ${MERGE_DE_ENTRADA} en este ` +
+        'clon (superficial o sin ese commit), asi que este caso no ha comprobado nada.',
     );
-    return null;
   }
-  return MERGE_BASE;
+  return salida;
+}
+
+/** Rutas no vacias de una salida `git diff --name-only`, en el orden en que git las entrega. */
+function rutasDe(salidaDiff: string): string[] {
+  return salidaDiff
+    .split('\n')
+    .map((linea) => linea.trim())
+    .filter((linea) => linea.length > 0);
 }
 
 describe('convenciones del catalogo visual de proveedores (QC-140)', () => {
@@ -172,46 +162,47 @@ describe('convenciones del catalogo visual de proveedores (QC-140)', () => {
     expect(hallazgos).toEqual([]);
   });
 
-  it('R29: el diff de la rama contra origin/dev no añade ningun archivo bajo db/', (ctx) => {
-    const base = baseDeFusionOMuda(ctx);
-    if (base === null) return;
+  describe('R29 — el merge de entrada (PR #118) no anade ningun archivo bajo db/', () => {
+    it(`el diff entre ${MERGE_DE_ENTRADA} y su primer padre no trae ningun archivo nuevo bajo db/`, () => {
+      const salida = gitOFalla([
+        'diff',
+        '--name-only',
+        '--diff-filter=A',
+        `${MERGE_DE_ENTRADA}~1`,
+        MERGE_DE_ENTRADA,
+        '--',
+        'db/',
+      ]);
 
-    // Dos fuentes, como en `guard-convenciones-proveedores.test.ts`: los archivos ya COMMITEADOS
-    // desde el merge-base (`git diff`) y los del ARBOL DE TRABAJO todavia sin commitear (`git
-    // status --porcelain`). Un archivo nuevo sin `git add` no aparece en `git diff` -no tiene blob
-    // que comparar-, y quedarse solo con `git diff` dejaria pasar justo ese caso.
-    const salidaDiff = git(['diff', '--name-only', '--diff-filter=A', base, '--', 'db/']);
-    expect(salidaDiff, 'git no pudo calcular el diff de db/').not.toBeNull();
+      expect(rutasDe(salida), `el merge ${MERGE_DE_ENTRADA} anade archivos bajo db/: ${salida}`).toEqual([]);
+    });
 
-    const anadidos = new Set(
-      (salidaDiff as string)
-        .split('\n')
-        .map((linea) => linea.trim())
-        .filter((linea) => linea.length > 0),
-    );
+    // Anti-placebo: si `rutasDe` no detectara una adicion real, el caso de arriba pasaria en verde
+    // sin haber comprobado nada. `ffabc3af` es un commit real de este repo que SI anade archivos
+    // bajo db/ (la primera migracion de usuarios y roles); demuestra que el mismo diff, aplicado a
+    // un rango donde de verdad se anaden archivos, no vuelve vacio.
+    it('el mismo diff, aplicado a un commit real que si anade archivos bajo db/, no viene vacio', () => {
+      const COMMIT_QUE_ANADE_DB = 'ffabc3af62a5d38034913a5e70fec10926d6a31e';
+      const salida = gitOFalla([
+        'diff',
+        '--name-only',
+        '--diff-filter=A',
+        `${COMMIT_QUE_ANADE_DB}~1`,
+        COMMIT_QUE_ANADE_DB,
+        '--',
+        'db/',
+      ]);
 
-    const salidaEstado = git(['status', '--porcelain', '--', 'db/']);
-    expect(salidaEstado, 'git no pudo leer el estado de db/').not.toBeNull();
-
-    for (const linea of (salidaEstado as string).split('\n')) {
-      if (linea.trim().length === 0) continue;
-      const camino = linea.slice(3).trim();
-      const destino = camino.includes(' -> ') ? camino.split(' -> ')[1] : camino;
-      anadidos.add(aPosix(destino.replace(/^"|"$/g, '')));
-    }
-
-    expect([...anadidos].sort(), `la ficha anade archivos bajo db/: ${[...anadidos].join(', ')}`).toEqual([]);
+      expect(rutasDe(salida).length).toBeGreaterThan(0);
+    });
   });
 
-  it('D20: components/shared/entity-image.tsx no aparece en el diff de la rama', (ctx) => {
-    const base = baseDeFusionOMuda(ctx);
-    if (base === null) return;
-
+  it('D20: components/shared/entity-image.tsx no aparece en el diff del merge de entrada (PR #118)', () => {
     const ARCHIVO = 'components/shared/entity-image.tsx';
-    const salida = git(['diff', '--name-only', base, '--', ARCHIVO]);
-    expect(salida, `git no pudo calcular el diff de ${ARCHIVO}`).not.toBeNull();
+    const salida = gitOFalla(['diff', '--name-only', `${MERGE_DE_ENTRADA}~1`, MERGE_DE_ENTRADA, '--', ARCHIVO]);
 
-    const tocado = (salida as string).trim();
-    expect(tocado, `la ficha toca ${ARCHIVO}, y D20 dice que se reutiliza tal cual`).toBe('');
+    expect(rutasDe(salida), `el merge ${MERGE_DE_ENTRADA} toca ${ARCHIVO}, y D20 dice que se reutiliza tal cual`).toEqual(
+      [],
+    );
   });
 });
