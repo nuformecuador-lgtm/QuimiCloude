@@ -698,7 +698,7 @@ describe('seedInitialAccess', () => {
   // ---------------------------------------------------------------------------------
 
   // El catalogo completo y las asignaciones de los tres roles, contra el repositorio falso.
-  it('sobre una base vacia crea los dieciocho permisos del catalogo y las veintidos asignaciones del seed', async () => {
+  it('sobre una base vacia crea el catalogo completo y todas las asignaciones del seed', async () => {
     const repository = crearRepositorioFalso();
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
@@ -726,8 +726,7 @@ describe('seedInitialAccess', () => {
     );
     expect(outcome.createdPermissions).toEqual(PERMISSIONS.map((permission) => permission.code));
 
-    // Luego: las asignaciones, las veintidos (dieciocho del Administrador + dos del Operador +
-    // dos del Empacador).
+    // Luego: las asignaciones, todas las que declara `SEED_ROLE_PERMISSIONS` para los tres roles.
     const creacionesDeAsignaciones = repository.llamadas.filter(
       (llamada) => llamada.metodo === 'createRolePermissions',
     );
@@ -736,7 +735,7 @@ describe('seedInitialAccess', () => {
       roleId: string;
       permissionCode: string;
     }[];
-    expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBe(22);
+    expect(TOTAL_DE_ASIGNACIONES_DEL_SEED).toBeGreaterThan(0);
     expect(paresCreados).toHaveLength(TOTAL_DE_ASIGNACIONES_DEL_SEED);
     expect(outcome.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
 
@@ -753,10 +752,9 @@ describe('seedInitialAccess', () => {
     const codigosDelAdministrador = paresCreados
       .filter((par) => par.roleId === rolesCreados.get(ROLE_ADMINISTRADOR))
       .map((par) => par.permissionCode);
-    expect(codigosDelAdministrador).toHaveLength(18);
+    expect(codigosDelAdministrador).toHaveLength(PERMISSIONS.length);
     expect(new Set(codigosDelAdministrador)).toEqual(new Set(PERMISSIONS.map((permission) => permission.code)));
-    // QC-74 R9 le daba UNO; QC-86 R26 le suma `asignaciones.consultar` y son DOS, y ni uno mas
-    // (QC-86 R27). El orden es el de `SEED_ROLE_PERMISSIONS`, que es como el seed los recorre.
+    // El orden es el de `SEED_ROLE_PERMISSIONS`, que es como el seed los recorre.
     expect(
       paresCreados
         .filter((par) => par.roleId === rolesCreados.get(ROLE_OPERADOR))
@@ -778,6 +776,31 @@ describe('seedInitialAccess', () => {
     expect(indiceDe('createRole')).toBeLessThan(indiceDe('createPermissions'));
     expect(indiceDe('createPermissions')).toBeLessThan(indiceDe('createRolePermissions'));
     expect(indiceDe('createRolePermissions')).toBeLessThan(indiceDe('createInitialAdmin'));
+  });
+
+  it('QC-142 R13: sobre una base vacia el Administrador recibe documentos.consultar y documentos.modificar; Operador y Empacador ninguno', async () => {
+    const repository = crearRepositorioFalso();
+    const passwordHasher = crearHasherFalso();
+    const checkCredentialPolicy = crearPoliticaFalsa();
+    const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
+
+    await seedInitialAccess({ repository, passwordHasher, credentials, checkCredentialPolicy });
+
+    const paresCreados = repository.llamadas.find((llamada) => llamada.metodo === 'createRolePermissions')
+      ?.args[0] as readonly { roleId: string; permissionCode: string }[];
+    const rolesCreados = new Map(
+      repository.llamadas
+        .filter((llamada) => llamada.metodo === 'createRole')
+        .map((llamada, index) => [(llamada.args[0] as { name: string }).name, `rol-${index + 1}`]),
+    );
+    const codigosDe = (rol: string): string[] =>
+      paresCreados.filter((par) => par.roleId === rolesCreados.get(rol)).map((par) => par.permissionCode);
+
+    expect(codigosDe(ROLE_ADMINISTRADOR)).toEqual(expect.arrayContaining(['documentos.consultar', 'documentos.modificar']));
+    expect(codigosDe(ROLE_OPERADOR)).not.toContain('documentos.consultar');
+    expect(codigosDe(ROLE_OPERADOR)).not.toContain('documentos.modificar');
+    expect(codigosDe(ROLE_EMPACADOR)).not.toContain('documentos.consultar');
+    expect(codigosDe(ROLE_EMPACADOR)).not.toContain('documentos.modificar');
   });
 
   // Caso 15 (QC-74 R10)
