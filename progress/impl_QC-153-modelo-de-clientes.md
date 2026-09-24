@@ -109,6 +109,25 @@ integracion construyo su plantilla propia (`qct_tpl_1e52306aa6a0`, 46 migracione
 `20260924120000_customers`) y una base efimera (`qct_qc153_a65926a5_mufj77v3_j44`), borrada al
 terminar. **15/15 tests verdes.**
 
+## Verificación final (T0–T7)
+
+- `pnpm run typecheck`: sin salida, exit 0.
+- `pnpm run lint`: sin salida, exit 0.
+- `pnpm prisma validate`: `The schema at db\schema.prisma is valid 🚀`.
+- `pnpm exec vitest related --run db/schema.prisma lib/modules/clientes/domain/customer.ts
+  lib/modules/clientes/index.ts lib/modules/identity/domain/permissions.ts`: `permissions.ts`
+  se importa desde casi todo el dominio de negocio, así que el grafo relacionó **374 archivos /
+  5576 tests**. Resultado: **1 fallo, 5555 pasan, 20 skip**. El único fallo es el hallazgo
+  fuera de alcance ya descrito (`qc145-estado-solo-planta.test.ts`, R29 modelos vs
+  merge-base). Ninguna otra regresión.
+- Los archivos de guardia y tests concretos que las tasks nombran, corridos uno a uno
+  (`guard-identificador-de-request`, `guard-rls-force`, `guard-empresa-en-esquema`,
+  `guard-arquitectura-modulos`, `guard-permisos-sembrados`, `guard-nav-permisos-declarados`,
+  y los ocho de T6), todos verdes salvo el hallazgo ya anotado.
+- `identity-seed.int.test.ts` contra `QuimiCloude_QC153`: **15/15 verdes**.
+- `git diff --name-only origin/dev...HEAD` coincide exactamente con la lista de archivos que
+  `tasks.md` declara tocar (más `specs/` y `progress/`); ningún archivo de `e2e/`.
+
 ## Verificación T0
 
 ```
